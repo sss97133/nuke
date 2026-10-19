@@ -12,8 +12,11 @@
  *   POST /api-v1-vision/classify   — image URL → make/confidence/top5
  *   POST /api-v1-vision/analyze    — image URL → full analysis (make, condition, zone, damage, comps)
  *   POST /api-v1-vision/batch      — array of URLs → array of classify results
+ *   POST /api-v1-vision/listing    — vehicle_id → one condition read of its photos, written through
+ *                                    ingest-observation (admins and the service key only; see listing.ts)
  *
- * Authentication: Bearer JWT, service role key, or X-API-Key: nk_live_*
+ * Authentication: Bearer JWT, service role key, or X-API-Key: nk_live_*. /listing writes, so it takes only
+ * the service key or an active admin (requireWriteAuth, then requireAdminOrService).
  *
  * Example:
  *   curl -X POST .../api-v1-vision/analyze \
@@ -39,6 +42,11 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
 import { authenticateRequest } from "../_shared/apiKeyAuth.ts";
 import { cloudAnalyze } from "../_shared/visionFallback.ts";
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { authenticateWriter, requireAdminOrService, requireWriteAuth } from "../_shared/writeGuard.ts";
+import {
+  cloudPhotoRead, handleListing, LISTING_SEGMENT, listingStore, type ListingWrite, yonoPhotoRead,
+} from "./listing.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -52,13 +60,14 @@ const SIDECAR_URL =
 const SIDECAR_TOKEN = Deno.env.get("MODAL_SIDECAR_TOKEN") || "";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_ROLE_KEY =
-  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ??
-  Deno.env.get("SERVICE_ROLE_KEY") ??
+  projectSecretKey() ??
   "";
 
 // Sidecar timeout: Modal cold start can take 10-15s, plus image download + inference
 const CLASSIFY_TIMEOUT_MS = 60_000;
 const ANALYZE_TIMEOUT_MS = 90_000;
+// One photo on the caller's connected provider (/listing); cloudAnalyze has no timeout of its own
+const CLOUD_TIMEOUT_MS = 60_000;
 
 function sidecarHeaders(): Record<string, string> {
   return {
@@ -75,18 +84,56 @@ Deno.serve(async (req) => {
   const t0 = Date.now();
   const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
+  // ── Route ─────────────────────────────────────────────────────────────────
+  const url = new URL(req.url);
+  const path = url.pathname
+    .replace(/^\/api-v1-vision\/?/, "")
+    .replace(/^\//, "");
+
+  // /listing writes a listing read and can spend the caller's own provider key, so it has its own gate:
+  // the service key or an active admin, before anything else. The other routes keep authenticateRequest below.
+  if (path === LISTING_SEGMENT) {
+    const denied = (await requireWriteAuth(req, { headers: corsHeaders })) ??
+      (await requireAdminOrService(req, { headers: corsHeaders }));
+    if (denied) return denied;
+    const writer = await authenticateWriter(req);
+    const requestedBy = writer.ok && writer.caller.kind === "user" ? writer.caller.userId : null;
+    try {
+      return await handleListing(req, {
+        store: listingStore(supabase),
+        analyzers: [
+          {
+            name: "yono", timeoutMs: ANALYZE_TIMEOUT_MS, concurrency: 2, stopOnFailure: true,
+            read: async (imageUrl, timeoutMs) => {
+              const r = await callYonoAnalyze(imageUrl, timeoutMs);
+              return r ? yonoPhotoRead(r) : null;
+            },
+          },
+          {
+            // BYOK: the admin's own connected provider; the service key has none, so it reads with YONO only.
+            name: "cloud", timeoutMs: CLOUD_TIMEOUT_MS, concurrency: 4, stopOnFailure: false,
+            read: async (imageUrl) => {
+              const r = await cloudAnalyze(supabase, requestedBy, imageUrl);
+              return r ? cloudPhotoRead(r) : null;
+            },
+          },
+        ],
+        write: writeListingRead,
+        userId: requestedBy,
+        env: (name) => Deno.env.get(name),
+        headers: corsHeaders,
+      });
+    } catch (err) {
+      return json({ error: err instanceof Error ? err.message : String(err) }, 500);
+    }
+  }
+
   // ── Auth ──────────────────────────────────────────────────────────────────
   const auth = await authenticateRequest(req, supabase, { endpoint: 'vision' });
   if (auth.error || !auth.userId) {
     return json({ error: auth.error || "Authentication required" }, auth.status || 401);
   }
   const userId = auth.userId;
-
-  // ── Route ─────────────────────────────────────────────────────────────────
-  const url = new URL(req.url);
-  const path = url.pathname
-    .replace(/^\/api-v1-vision\/?/, "")
-    .replace(/^\//, "");
 
   // GET /api-v1-vision — info
   if (req.method === "GET" && (!path || path === "")) {
@@ -417,14 +464,15 @@ interface AnalyzeResult {
 }
 
 async function callYonoAnalyze(
-  imageUrl: string
+  imageUrl: string,
+  timeoutMs: number = ANALYZE_TIMEOUT_MS
 ): Promise<AnalyzeResult | null> {
   try {
     const resp = await fetch(`${SIDECAR_URL}/analyze`, {
       method: "POST",
       headers: sidecarHeaders(),
       body: JSON.stringify({ image_url: imageUrl }),
-      signal: AbortSignal.timeout(ANALYZE_TIMEOUT_MS),
+      signal: AbortSignal.timeout(timeoutMs),
     });
     if (!resp.ok) return null;
     const data = await resp.json();
@@ -432,6 +480,28 @@ async function callYonoAnalyze(
     return data;
   } catch {
     return null;
+  }
+}
+
+// ── Listing read writer ─────────────────────────────────────────────────
+// The sanctioned writer, called with the service key the way derive-title-ownership and
+// discover-description-data call it. It dedups, scores and caps the agent-inferred confidence.
+
+async function writeListingRead(observation: Record<string, unknown>): Promise<ListingWrite> {
+  try {
+    const resp = await fetch(`${SUPABASE_URL}/functions/v1/ingest-observation`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_ROLE_KEY}` },
+      body: JSON.stringify(observation),
+      signal: AbortSignal.timeout(20_000),
+    });
+    const out = await resp.json().catch(() => null);
+    if (resp.ok && out?.success === true && typeof out.observation_id === "string") {
+      return { ok: true, observationId: out.observation_id };
+    }
+    return { ok: false, error: `ingest-observation ${resp.status}: ${out?.error ?? "no JSON body"}` };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }
 }
 

@@ -28,8 +28,8 @@ CREATE TABLE public.vehicles (
   is_public boolean NOT NULL DEFAULT true, deleted_at timestamptz,
   year integer, make text, model text, normalized_model text, series text, trim text,
   transmission text, transmission_model text, mileage integer, mileage_source text,
-  canonical_body_style text, body_style text, engine_size text, drivetrain text,
-  city text, state text, location text);
+  canonical_body_style text, body_style text, engine_size text, engine_type text, drivetrain text,
+  city text, state text, location text, listing_location text, bat_location text, discovery_url text, listing_title text);
 CREATE TABLE public.field_evidence (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid, field_name text, proposed_value text,
   source_type text, source_confidence integer, extracted_at timestamptz, status text);
@@ -39,6 +39,10 @@ CREATE TABLE public.vehicle_contributors (vehicle_id uuid, user_id uuid, role te
 CREATE TABLE public.timeline_events (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid, event_type text, event_date date,
   created_at timestamptz DEFAULT now());
+CREATE TABLE public.vehicle_observations (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid, kind text, content_text text, source_url text,
+  extraction_method text, observed_at timestamptz, is_superseded boolean, structured_data jsonb,
+  confidence_score numeric, ingested_at timestamptz DEFAULT now());
 CREATE TABLE public.test_price_facts (
   vehicle_id uuid PRIMARY KEY, price_kind text, price_amount numeric, price_as_of timestamptz,
   price_live boolean, platform text, source_url text);
@@ -67,6 +71,9 @@ CREATE POLICY "Anyone can view evidence" ON public.field_evidence FOR SELECT
   USING (auth.role() = 'authenticated'
     OR (coalesce(source_type, '') <> ALL (ARRAY['quickbooks', 'invoice', 'email_receipt', 'receipt', 'bank_statement', 'card_statement'])
         AND coalesce(field_name, '') <> ALL (ARRAY['seller_name', 'seller_profile_url', 'seller_phone', 'seller_email', 'buyer_name'])));
+ALTER TABLE public.vehicle_observations ENABLE ROW LEVEL SECURITY;
+CREATE POLICY public_listing_obs ON public.vehicle_observations FOR SELECT
+  USING (kind IN ('listing', 'specification') AND EXISTS (SELECT 1 FROM public.vehicles v WHERE v.id = vehicle_observations.vehicle_id AND v.is_public = true));
 ALTER TABLE public.timeline_events ENABLE ROW LEVEL SECURITY;
 CREATE POLICY public_vehicle_events ON public.timeline_events FOR SELECT
   USING (EXISTS (SELECT 1 FROM public.vehicles v WHERE v.id = timeline_events.vehicle_id AND v.is_public = true));
@@ -80,6 +87,16 @@ GRANT SELECT ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role
 \ir ../migrations/20261013143000_vehicle_profile_read.sql
 \ir ../migrations/20261013144500_vehicle_profile_read_acronyms.sql
 \ir ../migrations/20261013161500_vehicle_profile_read_timeline.sql
+\ir ../migrations/20261015070000_vehicle_profile_read_description.sql
+\ir ../migrations/20261018153000_era_emblems_and_family_facets.sql
+\ir ../migrations/20261018171500_mopar_european_identity_marks.sql
+\ir ../migrations/20261018174500_land_cruiser_porsche_blazer_pontiac_jaguar_marks.sql
+\ir ../migrations/20261018170000_vehicle_profile_read_facets_and_provenance.sql
+\ir ../migrations/20261018190000_vehicle_profile_read_identity_marks.sql
+\ir ../migrations/20261018193000_profile_read_masthead_identity_marks.sql
+\ir ../migrations/20261018200000_identity_marks_require_recorded_trim.sql
+\ir ../migrations/20261018220000_profile_read_title_claims.sql
+\ir ../migrations/20261018230000_identity_marks_series_label_fallback.sql
 
 -- Seeds. v1: the documented case; v2: nothing recorded; v3: a sourceless odometer; v4: private;
 -- v5: a classified asking price; v6: competing evidence; v7: a live auction bid.
@@ -98,6 +115,13 @@ INSERT INTO public.vehicles (id, year, make, model, engine_size) VALUES
 INSERT INTO public.vehicles (id, year, make, model) VALUES ('10000000-0000-0000-0000-000000000007', 1998, 'Acura', 'NSX');
 INSERT INTO public.vehicles (id, year, make, model, body_style, transmission) VALUES
  ('10000000-0000-0000-0000-000000000008', 1977, 'Chevrolet', 'K5 Blazer', 'SUV', 'AUTOMATIC 4WD');
+INSERT INTO public.vehicles (id, year, make, model, engine_type, listing_location, discovery_url) VALUES
+ ('10000000-0000-0000-0000-000000000009', 1970, 'Plymouth', 'Hemi Road Runner', '426 Hemi V-8', 'Kissimmee, FL', 'https://www.mecum.com/lots/539536/1970-plymouth-hemi-road-runner/');
+INSERT INTO public.vehicles (id, year, make, model, normalized_model, series, trim, body_style) VALUES
+ ('10000000-0000-0000-0000-000000000010', 1973, 'Chevrolet', 'K10 Cheyenne Super Stepside', 'C/K', 'K10', 'Cheyenne Super', 'Stepside');
+INSERT INTO public.vehicles (id, year, make, model, normalized_model, trim) VALUES
+ ('10000000-0000-0000-0000-000000000011', 1978, 'Chevrolet', 'Pickup', 'C/K', NULL),
+ ('10000000-0000-0000-0000-000000000012', 1979, 'Chevrolet', 'K5 Blazer', 'K5 Blazer', 'Cheyenne');
 
 INSERT INTO public.field_evidence (vehicle_id, field_name, proposed_value, source_type, source_confidence, extracted_at, status) VALUES
  ('10000000-0000-0000-0000-000000000001', 'engine_size',  '4.7L V8',   'user-submission_listing', 80, '2026-09-01T00:00:00Z', 'accepted'),
@@ -121,7 +145,8 @@ INSERT INTO public.test_price_facts VALUES
  ('10000000-0000-0000-0000-000000000001', 'sold', 24000, '2026-09-21T00:00:00Z', false, 'bring-a-trailer', 'https://bringatrailer.com/listing/x'),
  ('10000000-0000-0000-0000-000000000003', 'estimate', 112200, '2026-09-21T00:00:00Z', false, 'user-submission', NULL),
  ('10000000-0000-0000-0000-000000000005', 'ask', 5000, '2026-10-01T00:00:00Z', false, 'ksl', 'https://classifieds.ksl.com/listing/1'),
- ('10000000-0000-0000-0000-000000000007', 'bid', 127777, NULL, true, 'bat', 'https://bringatrailer.com/listing/nsx');
+ ('10000000-0000-0000-0000-000000000007', 'bid', 127777, NULL, true, 'bat', 'https://bringatrailer.com/listing/nsx'),
+ ('10000000-0000-0000-0000-000000000009', 'sold', 313500, '2023-01-13T00:00:00Z', false, 'mecum', NULL);
 INSERT INTO public.ownership_verifications VALUES
  ('10000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000003', 'approved', 'https://x/title.pdf', 'https://x/id.pdf'),
  ('10000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000005', 'approved', 'pending', 'https://x/id.pdf');
@@ -212,6 +237,44 @@ BEGIN
   d := public.vehicle_profile_read('10000000-0000-0000-0000-000000000008');
   PERFORM public.t_assert((SELECT string_agg(x->>'label', '|' ORDER BY o) FROM jsonb_array_elements(d->'sections'->1->'facets') WITH ORDINALITY AS t(x, o))
     = 'SUV|Automatic 4WD', format('acronyms keep their capitals in title-cased labels; got %s', d->'sections'->1->'facets'));
+
+  d := public.vehicle_profile_read('10000000-0000-0000-0000-000000000009');
+  PERFORM public.t_assert((SELECT string_agg(x->>'label', '|' ORDER BY o) FROM jsonb_array_elements(d->'sections'->1->'facets') WITH ORDINALITY AS t(x, o))
+    = '426 Hemi V-8|Kissimmee, FL', format('engine_type and listing_location fallbacks populate strip facets; got %s', d->'sections'->1->'facets'));
+  PERFORM public.t_assert(d->'sections'->0->'price'->'source'->>'url' = 'https://www.mecum.com/lots/539536/1970-plymouth-hemi-road-runner/',
+    'price source url falls back to discovery_url when source_url is null');
+  PERFORM public.t_assert((SELECT string_agg(x->>'display_label', '|' ORDER BY o) FROM jsonb_array_elements(d->'sections'->0->'identity_marks') WITH ORDINALITY AS t(x, o))
+    = 'ROAD RUNNER · HEMI', format('v9 (1970 Plymouth Hemi Road Runner) masthead resolves Road Runner identity mark; got %s', d->'sections'->0->'identity_marks'));
+
+  d := public.vehicle_profile_read('10000000-0000-0000-0000-000000000001');
+  PERFORM public.t_assert((SELECT string_agg(x->>'display_label', '|' ORDER BY o) FROM jsonb_array_elements(d->'sections'->0->'identity_marks') WITH ORDINALITY AS t(x, o))
+    = 'HARDTOP COUPE|MUSTANG|FORD'
+    AND d->'sections'->0->'identity_marks' = d->'identity_marks',
+    format('v1 (1966 Ford Mustang Coupe) masthead resolves body silhouette, model wordmark, and marque emblem; got %s', d->'sections'->0->'identity_marks'));
+
+  d := public.vehicle_profile_read('10000000-0000-0000-0000-000000000006');
+  PERFORM public.t_assert((SELECT string_agg(x->>'display_label', '|' ORDER BY o) FROM jsonb_array_elements(d->'sections'->0->'identity_marks') WITH ORDINALITY AS t(x, o))
+    = 'MUSTANG|FORD', format('v6 (1966 Ford Mustang without body_style) masthead resolves model wordmark and marque emblem without inventing body silhouette; got %s', d->'sections'->0->'identity_marks'));
+
+  d := public.vehicle_profile_read('10000000-0000-0000-0000-000000000008');
+  PERFORM public.t_assert((SELECT string_agg(x->>'display_label', '|' ORDER BY o) FROM jsonb_array_elements(d->'sections'->0->'identity_marks') WITH ORDINALITY AS t(x, o))
+    = 'CHEVROLET', format('v8 (1977 Chevrolet K5 Blazer, no recorded trim) gets the era bowtie and no Cheyenne plate; got %s', d->'sections'->0->'identity_marks'));
+
+  d := public.vehicle_profile_read('10000000-0000-0000-0000-000000000012');
+  PERFORM public.t_assert((SELECT string_agg(x->>'display_label', '|' ORDER BY o) FROM jsonb_array_elements(d->'sections'->0->'identity_marks') WITH ORDINALITY AS t(x, o))
+    = 'K/5 BLAZER · CHEYENNE|CHEVROLET', format('v12 (1979 K5 Blazer recorded as Cheyenne) gets the Cheyenne plate; got %s', d->'sections'->0->'identity_marks'));
+
+  d := public.vehicle_profile_read('10000000-0000-0000-0000-000000000011');
+  PERFORM public.t_assert((SELECT string_agg(x->>'display_label', '|' ORDER BY o) FROM jsonb_array_elements(d->'sections'->0->'identity_marks') WITH ORDINALITY AS t(x, o))
+    = 'CHEVROLET', format('v11 (1978 C/K pickup, no series, trim or body) gets no trim or series plate; got %s', d->'sections'->0->'identity_marks'));
+
+  d := public.vehicle_profile_read('10000000-0000-0000-0000-000000000010');
+  PERFORM public.t_assert((SELECT string_agg(x->>'display_label', '|' ORDER BY o) FROM jsonb_array_elements(d->'sections'->0->'identity_marks') WITH ORDINALITY AS t(x, o))
+    = 'CHEYENNE SUPER 10|CHEVROLET', format('v10 (1973 Chevrolet K10 Cheyenne Super Stepside with normalized_model C/K, series K10, trim Cheyenne Super) masthead resolves CHEYENNE SUPER 10 and Squarebody Chevrolet bowtie; got %s', d->'sections'->0->'identity_marks'));
+
+  d := public.vehicle_profile_read('10000000-0000-0000-0000-000000000002');
+  PERFORM public.t_assert(d->'sections'->0->'identity_marks' = '[]'::jsonb AND d->'identity_marks' = '[]'::jsonb,
+    'v2 (1990 Acme Thing) resolves empty identity_marks array on masthead and root');
 END $$;
 RESET ROLE;
 
@@ -240,6 +303,80 @@ SET test.auth_uid = '20000000-0000-0000-0000-000000000004';
 SELECT public.t_assert(public.vehicle_profile_read('10000000-0000-0000-0000-000000000004')->>'viewer' = 'owner', 'a private vehicle reads for its user');
 SET test.auth_uid = '20000000-0000-0000-0000-000000000009';
 SELECT public.t_assert(public.vehicle_profile_read('10000000-0000-0000-0000-000000000004') IS NULL, 'a private vehicle reads as NULL for another user');
+RESET ROLE;
+
+-- 2b. The full description: the newest readable description capture, with its source; null when none; a private vehicle's
+-- capture is not shown; superseded and non-capture listing rows are skipped.
+-- ALLOW_RAW_TESTIMONY_WRITE: synthetic fixture rows in a disposable contract database, never production.
+INSERT INTO public.vehicle_observations (vehicle_id, kind, content_text, source_url, extraction_method, observed_at, is_superseded, structured_data) VALUES
+ ('10000000-0000-0000-0000-000000000001', 'listing', 'old prose', 'https://example.test/lot', 'html_description_capture', '2026-01-01', false, '{"description_capture": true}'),
+ ('10000000-0000-0000-0000-000000000001', 'listing', 'The newest full prose of the listing.', 'https://example.test/lot', 'html_description_capture', '2026-02-01', false, '{"description_capture": true}'),
+ ('10000000-0000-0000-0000-000000000001', 'listing', 'superseded prose that is newest', 'https://example.test/lot', 'html_description_capture', '2026-03-01', true, '{"description_capture": true}'),
+ ('10000000-0000-0000-0000-000000000001', 'listing', 'a listing row that is not a description', 'https://example.test/lot', 'x', '2026-04-01', false, '{}'),
+ ('10000000-0000-0000-0000-000000000004', 'listing', 'private prose', 'https://example.test/p', 'x', '2026-01-01', false, '{"description_capture": true}');
+SET ROLE anon;
+SELECT public.t_assert(public.vehicle_profile_read('10000000-0000-0000-0000-000000000001')->'description'->>'text' = 'The newest full prose of the listing.', 'description: newest live capture');
+SELECT public.t_assert((public.vehicle_profile_read('10000000-0000-0000-0000-000000000001')->'description'->>'length')::int = 37
+  AND public.vehicle_profile_read('10000000-0000-0000-0000-000000000001')->'description'->'source'->>'url' = 'https://example.test/lot'
+  AND public.vehicle_profile_read('10000000-0000-0000-0000-000000000001')->'description'->>'observed_at' IS NOT NULL, 'description: length, source and clock');
+SELECT public.t_assert(public.vehicle_profile_read('10000000-0000-0000-0000-000000000002')->'description' = 'null'::jsonb, 'description: null when no capture');
+SELECT public.t_assert(jsonb_array_length(public.vehicle_profile_read('10000000-0000-0000-0000-000000000001')->'sections') >= 1, 'description: sections untouched');
+RESET ROLE;
+
+-- 2c. Title claims: a literal record-title label fills an empty trim or body style, attributed to the record title at the
+-- claim's own confidence and with no event clock. A claim quoting an older title, a superseded claim, and any claim where
+-- the record already holds a value are not used.
+INSERT INTO public.vehicles (id, year, make, model, listing_title, trim) VALUES
+ ('10000000-0000-0000-0000-000000000013', 1984, 'Chevrolet', 'C10', '1984 Chevrolet C10 Silverado Stepside', NULL),
+ ('10000000-0000-0000-0000-000000000014', 1984, 'Chevrolet', 'C10', '1984 Chevrolet C10 Silverado', 'Scottsdale');
+INSERT INTO public.vehicles (id, year, make, model, normalized_model, series, trim) VALUES
+ ('10000000-0000-0000-0000-000000000015', 1984, 'Chevrolet', 'C10', 'C10', '1/2 Ton', 'Silverado'),
+ ('10000000-0000-0000-0000-000000000016', 1984, 'Chevrolet', 'Pickup', 'Pickup', '1/2 Ton', 'Silverado');
+-- ALLOW_RAW_TESTIMONY_WRITE: synthetic fixture rows in a disposable contract database, never production.
+INSERT INTO public.vehicle_observations (vehicle_id, kind, source_url, extraction_method, observed_at, is_superseded, structured_data, confidence_score, ingested_at) VALUES
+ ('10000000-0000-0000-0000-000000000013', 'specification', 'https://example.test/c10', 'vehicle_title_facet_projection_v1', '2026-10-18', false,
+  '{"property_key":"trim","trim":"Silverado","claim_role":"record_label","source_value":"1984 Chevrolet C10 Silverado Stepside"}', 0.3, '2026-10-18T02:00:00Z'),
+ ('10000000-0000-0000-0000-000000000013', 'specification', 'https://example.test/c10', 'vehicle_title_facet_projection_v1', '2026-10-18', false,
+  '{"property_key":"body_style","body_style":"Stepside","claim_role":"record_label","source_value":"1984 Chevrolet C10 Silverado Stepside"}', 0.3, '2026-10-18T02:00:00Z'),
+ ('10000000-0000-0000-0000-000000000013', 'specification', 'https://example.test/c10', 'vehicle_title_facet_projection_v1', '2026-10-17', false,
+  '{"property_key":"trim","trim":"Cheyenne","claim_role":"record_label","source_value":"1984 Chevrolet C10 Cheyenne"}', 0.6, '2026-10-17T02:00:00Z'),
+ ('10000000-0000-0000-0000-000000000013', 'specification', 'https://example.test/c10', 'vehicle_title_facet_projection_v1', '2026-10-18', true,
+  '{"property_key":"body_style","body_style":"Fleetside","claim_role":"record_label","source_value":"1984 Chevrolet C10 Silverado Stepside"}', 0.6, '2026-10-18T03:00:00Z'),
+ ('10000000-0000-0000-0000-000000000014', 'specification', 'https://example.test/c10b', 'vehicle_title_facet_projection_v1', '2026-10-18', false,
+  '{"property_key":"trim","trim":"Silverado","claim_role":"record_label","source_value":"1984 Chevrolet C10 Silverado"}', 0.3, '2026-10-18T02:00:00Z');
+SET ROLE anon;
+SET test.auth_role = 'anon';
+RESET test.auth_uid;
+DO $$
+DECLARE d jsonb; s jsonb;
+BEGIN
+  d := public.vehicle_profile_read('10000000-0000-0000-0000-000000000013');
+  s := d->'sections'->1;
+  PERFORM public.t_assert((SELECT string_agg(x->>'dimension' || '=' || (x->>'label'), '|' ORDER BY o) FROM jsonb_array_elements(s->'facets') WITH ORDINALITY AS t(x, o))
+    = 'trim=Silverado|body_style=Stepside', format('title claims fill empty trim and body; stale and superseded claims ignored; got %s', s->'facets'));
+  PERFORM public.t_assert(s->'facets'->0->'member'->'source'->>'label' = 'record title'
+    AND s->'facets'->0->'member'->'source'->>'method' = 'vehicle_title_facet_projection_v1'
+    AND s->'facets'->0->'member'->'source'->>'url' = 'https://example.test/c10'
+    AND (s->'facets'->0->'member'->>'trust')::numeric = 0.3
+    AND s->'facets'->0->'member'->'observed_at' = 'null'::jsonb, format('claim attribution; got %s', s->'facets'->0));
+  PERFORM public.t_assert(s->'coverage' = jsonb_build_object('n', 2, 'of', 2, 'grain', 'facts attributed', 'as_of', NULL),
+    format('both title facets count as attributed, no clock; got %s', s->'coverage'));
+  PERFORM public.t_assert(EXISTS (SELECT 1 FROM jsonb_array_elements(d->'sections'->0->'identity_marks') m WHERE m->>'trim_package' = 'Silverado'),
+    format('identity marks resolve with the claimed trim; got %s', d->'sections'->0->'identity_marks'));
+
+  d := public.vehicle_profile_read('10000000-0000-0000-0000-000000000014');
+  PERFORM public.t_assert(NOT EXISTS (SELECT 1 FROM jsonb_array_elements(coalesce(d->'sections'->1->'facets', '[]')) x WHERE x->>'dimension' = 'trim'),
+    format('a recorded trim is not replaced or duplicated by a claim; got %s', d->'sections'->1));
+  PERFORM public.t_assert(NOT EXISTS (SELECT 1 FROM jsonb_array_elements(d->'sections'->0->'identity_marks') m WHERE m->>'trim_package' = 'Silverado'),
+    format('marks use the recorded trim, not the claim; got %s', d->'sections'->0->'identity_marks'));
+
+  d := public.vehicle_profile_read('10000000-0000-0000-0000-000000000015');
+  PERFORM public.t_assert(EXISTS (SELECT 1 FROM jsonb_array_elements(d->'sections'->0->'identity_marks') m WHERE m->>'series_code' = 'C10' AND m->>'trim_package' = 'Silverado'),
+    format('a tonnage series label does not hide the C10 Silverado plate; got %s', d->'sections'->0->'identity_marks'));
+  d := public.vehicle_profile_read('10000000-0000-0000-0000-000000000016');
+  PERFORM public.t_assert(NOT EXISTS (SELECT 1 FROM jsonb_array_elements(d->'sections'->0->'identity_marks') m WHERE m->>'series_code' IS NOT NULL),
+    format('a Pickup whose record names no series code gets no series plate; got %s', d->'sections'->0->'identity_marks'));
+END $$;
 RESET ROLE;
 
 -- 3. Grants: anon and authenticated may execute; nothing else may.

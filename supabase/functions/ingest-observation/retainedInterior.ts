@@ -1,6 +1,6 @@
 import { RETAINED_POWERTRAIN_FIELDS, retainedPowertrainValue } from "./retainedPowertrain.ts";
 import { observationClockMicroseconds } from "../_shared/observationContentHash.ts";
-import { DESCRIPTION_POWERTRAIN_VERSION, retainedDescriptionCaptureQualified, retainedDescriptionWitness } from "./retainedDescriptionPowertrain.ts";
+import { DESCRIPTION_POWERTRAIN_VERSION, DESCRIPTION_ENGINE_FAMILY_LABEL_VERSION, ENGINE_FAMILY_LABEL_VERSION, proposedRetainedEngineFamilyLabelWitness, retainedDescriptionCaptureQualified, retainedDescriptionWitness } from "./retainedDescriptionPowertrain.ts";
 import { RETAINED_ODOMETER_VERSION, retainedOdometerWitness } from "./retainedOdometer.ts";
 import { RETAINED_IDENTITY_KEYS, RETAINED_IDENTITY_LABEL_VERSION, retainedListingIdentityValue } from "./retainedListingIdentity.ts";
 import { RETAINED_PRESENTATION_VERSION, descriptionPresentationWitness } from "./retainedDescriptionPresentation.ts";
@@ -12,7 +12,7 @@ import { DESCRIPTION_YEAR_VERSION,retainedDescriptionYearWitness } from "./retai
 export const RETAINED_INTERIOR_MODE = "retained_listing_interior_color_v1";
 export const RETAINED_EXTERIOR_MODE = "retained_listing_exterior_color_v1";
 export const RETAINED_INTERIOR_METHOD = "retained_listing_property_projection_v1";
-export const RETAINED_PROPERTY_KEYS = ["interior_color", "exterior_color", ...Object.keys(RETAINED_POWERTRAIN_FIELDS), "mileage_miles", ...RETAINED_IDENTITY_KEYS];
+export const RETAINED_PROPERTY_KEYS = ["interior_color", "exterior_color", ...Object.keys(RETAINED_POWERTRAIN_FIELDS), "engine_family_label", "mileage_miles", ...RETAINED_IDENTITY_KEYS];
 export const RETAINED_PROPERTY_MODES = RETAINED_PROPERTY_KEYS.map(key => `retained_listing_${key}_v1`);
 const UUID = /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 
@@ -29,18 +29,20 @@ export function deriveRetainedInterior(source: Record<string, any>, vehicle: Rec
   const exterior = mode === RETAINED_EXTERIOR_MODE;
   const propertyKey = mode.slice("retained_listing_".length, -3);
   const powertrain = propertyKey in RETAINED_POWERTRAIN_FIELDS;
+  const engineFamily = propertyKey === "engine_family_label";
   const odometer = propertyKey === "mileage_miles";
   if(odometer && registeredSource?.slug==="craigslist")return deriveRetainedCraigslistOdometer(source,vehicle,registeredSource);
   if(propertyKey==="year" && registeredSource?.slug==="craigslist")return deriveRetainedCraigslistYear(source,vehicle,registeredSource);
   const identity = RETAINED_IDENTITY_KEYS.includes(propertyKey);
   const presentation = ["interior_color","exterior_color","drivetrain_layout"].includes(propertyKey);
   const description = source?.extraction_method === "html_description_capture";
+  if (engineFamily && !description) return null;
   if (odometer && !description) return null;
   if (identity && description && propertyKey === "vin") return null;
   const nativeIdentity=description&&["make","model"].includes(propertyKey)?retainedDescriptionIdentityWitness(source,propertyKey):null;
   const nativeYear=description&&propertyKey==="year"?retainedDescriptionYearWitness(source):null;
   const reading = description && odometer && retainedDescriptionCaptureQualified(source) ? retainedOdometerWitness(source.content_text) : null;
-  const witness = description ? nativeYear ?? nativeIdentity ?? (odometer ? reading : presentation && retainedDescriptionCaptureQualified(source) ? descriptionPresentationWitness(propertyKey,source.content_text) : retainedDescriptionWitness(source, propertyKey)) : null;
+  const witness = description ? nativeYear ?? nativeIdentity ?? (engineFamily ? proposedRetainedEngineFamilyLabelWitness(source) : odometer ? reading : presentation && retainedDescriptionCaptureQualified(source) ? descriptionPresentationWitness(propertyKey,source.content_text) : retainedDescriptionWitness(source, propertyKey)) : null;
   const sourceField = description ? "content_text" : identity ? propertyKey : powertrain ? RETAINED_POWERTRAIN_FIELDS[propertyKey as keyof typeof RETAINED_POWERTRAIN_FIELDS] : exterior ? "color" : "interior_color";
   const rawValue = description ? witness?.source_value : source?.structured_data?.[sourceField];
   const value = description ? witness?.value : identity ? retainedListingIdentityValue(propertyKey, rawValue) : powertrain ? retainedPowertrainValue(propertyKey, rawValue) : rawValue;
@@ -80,6 +82,10 @@ export function deriveRetainedInterior(source: Record<string, any>, vehicle: Rec
       ...(propertyKey === "vin" ? { vin_identifier_namespace: "standard_17_character_vin_label",
         vin_format_status: "17_character_format", vin_checksum_status: "not_evaluated" } : {}),
       ...(powertrain ? { source_value: rawValue, normalization_version: "retained_powertrain_v1" } : {}),
+      ...(engineFamily ? { source_value: rawValue, normalization_version: ENGINE_FAMILY_LABEL_VERSION,
+        label_role: "publisher_powering_engine_label", engine_identity_status: "unverified",
+        source_event_time_status: "unknown", source_captured_at: source.structured_data.source_captured_at,
+        source_capture_basis: source.structured_data.source_capture_basis } : {}),
       ...(reading ? { source_value: rawValue, normalization_version: "retained_odometer_miles_v1",
         source_reading_value: reading.source_reading_value, source_reading_unit: reading.source_reading_unit,
         reported_precision_miles: reading.reported_precision_miles, value_is_approximate: reading.value_is_approximate,
@@ -87,7 +93,7 @@ export function deriveRetainedInterior(source: Record<string, any>, vehicle: Rec
         source_observed_at_basis: "source_capture", source_event_time_status: "unknown" } : {}),
       ...(description && presentation && !powertrain ? { source_value:rawValue,normalization_version:"retained_color_text_v1" } : {}),
       ...(description && presentation ? { source_event_time_status:"unknown" } : {}),
-      ...(description ? { source_witness_version: nativeIdentity?DESCRIPTION_IDENTITY_VERSION:nativeYear?DESCRIPTION_YEAR_VERSION:odometer ? RETAINED_ODOMETER_VERSION : presentation ? RETAINED_PRESENTATION_VERSION : DESCRIPTION_POWERTRAIN_VERSION,
+      ...(description ? { source_witness_version: nativeIdentity?DESCRIPTION_IDENTITY_VERSION:nativeYear?DESCRIPTION_YEAR_VERSION:engineFamily ? DESCRIPTION_ENGINE_FAMILY_LABEL_VERSION : odometer ? RETAINED_ODOMETER_VERSION : presentation ? RETAINED_PRESENTATION_VERSION : DESCRIPTION_POWERTRAIN_VERSION,
         source_capture_sha256: source.structured_data.source_capture_sha256 } : {}),
       analysis_kind: "retained_listing_property_projection", projection_version: mode,
       property_key: propertyKey, source_field: sourceField, claim_role: "listing_claim",

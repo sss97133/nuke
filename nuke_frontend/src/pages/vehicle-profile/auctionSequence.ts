@@ -13,8 +13,8 @@
  * Sources: auction_comments (bids are comments with comment_type 'bid'),
  * auction_events (lot, outcome, counts), vehicle_events (start / end when the
  * extractor recorded them), timeline_events (auction_listed / auction_sold),
- * vehicle_images (capture time, or its absence; the BaT upload path carries the
- * month the photos were published).
+ * vehicle_images (capture time, or its absence; the BaT upload path carries an
+ * upload-month hint, not proof of listing membership or publication time).
  */
 
 export interface AuctionCommentRow {
@@ -72,7 +72,7 @@ export interface ImageStampRow {
   id: string;
   taken_at: string | null;
   source: string | null;
-  /** where the file came from — a BaT upload path carries the month it was published */
+  /** where the file came from — a BaT upload path can carry an upload-month hint */
   source_url?: string | null;
 }
 
@@ -137,9 +137,9 @@ export interface AuctionSequence {
   /** true when auction_comments holds nothing for the listing — the sequence is not extracted, not empty */
   activityExtracted: boolean;
   photos: {
-    /** photos published with this listing (no capture time in Nuke) */
+    /** legacy field name: image records grouped with this listing by inference, not proven publication */
     publishedWithListing: number;
-    /** true when the photos could not be tied to a listing and sit here as the car's current listing */
+    /** true for missing-month fallback across multiple listings; false does not prove listing membership */
     attributionUncertain: boolean;
   };
 }
@@ -167,12 +167,24 @@ const recordedGrain = (iso: string): { grain: 'instant' } | { grain: 'day'; day:
   ? { grain: 'instant' }
   : { grain: 'day', day: iso.slice(0, 10) };
 
-const BAT_LOT = /bringatrailer\.com\/listing\/([^/?#]+)/i;
+const BAT_LOT_PATH = /^\/listing\/([^/]+)/i;
 
-/** One key per BaT listing, whatever the URL's scheme, host prefix, query or trailing slash. */
-export function lotKey(url: string | null | undefined): string | null {
+/** Native BaT URL forms share host ownership; callers qualify their own path. */
+function nativeBatUrl(url: string | null | undefined): URL | null {
   if (!url) return null;
-  const m = BAT_LOT.exec(url);
+  const raw = url.trim();
+  try {
+    const parsed = new URL(raw.startsWith('//') ? `https:${raw}` : /^[a-z][a-z\d+.-]*:\/\//i.test(raw) ? raw : `https://${raw}`);
+    const host = parsed.hostname.toLowerCase();
+    if (!['http:', 'https:'].includes(parsed.protocol) || parsed.port || (host !== 'bringatrailer.com' && !host.endsWith('.bringatrailer.com'))) return null;
+    return parsed;
+  } catch { return null; }
+}
+
+/** One key per native BaT listing; bare and protocol-relative URLs imply HTTPS. */
+export function lotKey(url: string | null | undefined): string | null {
+  const parsed = nativeBatUrl(url);
+  const m = parsed && BAT_LOT_PATH.exec(parsed.pathname);
   return m ? m[1].toLowerCase() : null;
 }
 
@@ -185,16 +197,16 @@ export function commentPermalink(lotUrl: string, batCommentId: number | null): s
   return batCommentId ? `${base}/#comment-${batCommentId}` : `${base}/`;
 }
 
-/** The month a BaT-hosted photo was published, from its upload path (…/uploads/2018/07/…). */
+/** Upload-month hint in a native BaT path (…/uploads/2018/07/…), not a publication clock. */
 export function uploadMonth(sourceUrl: string | null | undefined): string | null {
-  if (!sourceUrl) return null;
-  const m = /bringatrailer\.com\/wp-content\/uploads\/(\d{4})\/(\d{2})\//i.exec(sourceUrl);
+  const parsed = nativeBatUrl(sourceUrl);
+  const m = parsed && /^\/wp-content\/uploads\/(\d{4})\/(\d{2})\//i.exec(parsed.pathname);
   return m ? `${m[1]}-${m[2]}` : null;
 }
 
 /** A BaT-imported photo carries no capture time: the importer stamped its own run time. */
 export function isBatHosted(im: ImageStampRow): boolean {
-  return /bat/i.test(im.source ?? '') || /bringatrailer\.com/i.test(im.source_url ?? '');
+  return /bat/i.test(im.source ?? '') || nativeBatUrl(im.source_url) !== null;
 }
 
 export interface SequenceInput {
@@ -212,6 +224,8 @@ export interface SequencesResult {
   sequences: AuctionSequence[];
   /** local days whose photo stamps are import times, not capture times */
   importStampedDays: string[];
+  /** Eligible native comments, after dedupe/assignment, with no usable posting clock. */
+  hasUnpositionedActivity: boolean;
 }
 
 const DAY = 86400e3;
@@ -247,7 +261,9 @@ export function dedupeComments(comments: AuctionCommentRow[]): AuctionCommentRow
 }
 
 export function buildAuctionSequences(rawInput: SequenceInput): SequencesResult {
-  const input: SequenceInput = { ...rawInput, comments: dedupeComments(rawInput.comments) };
+  // Only native URLs and the existing blank fallback compete in this projection's identity.
+  const eligibleComments = rawInput.comments.filter(c => lotKey(c.source_url) !== null || !c.source_url?.trim());
+  const input: SequenceInput = { ...rawInput, comments: dedupeComments(eligibleComments) };
   // every listing the rows know about
   const keys = new Set<string>();
   const hintKey = lotKey(input.lotUrlHint);
@@ -255,15 +271,18 @@ export function buildAuctionSequences(rawInput: SequenceInput): SequencesResult 
   for (const c of input.comments) { const k = lotKey(c.source_url); if (k) keys.add(k); }
   for (const e of input.auctionEvents) { const k = lotKey(e.source_url); if (k) keys.add(k); }
   for (const v of input.vehicleEvents) { const k = lotKey(v.source_url); if (k) keys.add(k); }
-  if (keys.size === 0) return { sequences: [], importStampedDays: [] };
+  if (keys.size === 0) return { sequences: [], importStampedDays: [], hasUnpositionedActivity: false };
 
   // items per listing; rows with no listing URL of their own go to the car's own listing
   const itemsByKey = new Map<string, AuctionItem[]>();
   for (const k of keys) itemsByKey.set(k, []);
   const pending: AuctionCommentRow[] = [];
+  let hasUnpositionedActivity = false;
   for (const c of input.comments) {
     const k = lotKey(c.source_url);
-    if (k) pushItem(itemsByKey.get(k)!, c, k); else pending.push(c);
+    if (k) {
+      if (!pushItem(itemsByKey.get(k)!, c, k)) hasUnpositionedActivity = true;
+    } else if (!c.source_url?.trim()) pending.push(c);
   }
   for (const list of itemsByKey.values()) sortItems(list);
 
@@ -277,7 +296,9 @@ export function buildAuctionSequences(rawInput: SequenceInput): SequencesResult 
     }
     if (!defaultKey) defaultKey = Array.from(keys)[0];
   }
-  for (const c of pending) pushItem(itemsByKey.get(defaultKey)!, c, defaultKey);
+  for (const c of pending) {
+    if (!pushItem(itemsByKey.get(defaultKey)!, c, defaultKey)) hasUnpositionedActivity = true;
+  }
   sortItems(itemsByKey.get(defaultKey)!);
 
   // one sequence per listing
@@ -293,7 +314,7 @@ export function buildAuctionSequences(rawInput: SequenceInput): SequencesResult 
   drafts.sort((a, b) => (when(a) < when(b) ? 1 : when(a) > when(b) ? -1 : 0));
   drafts.forEach((s, i) => { s.ordinal = drafts.length - i; s.listingCount = drafts.length; });
 
-  // photos: a BaT-hosted photo has no capture time in Nuke; its upload month names its listing
+  // Group native image records by upload-month hint/fallback; neither proves listing membership.
   const stamped = new Set<string>();
   for (const im of input.images) {
     if (!isBatHosted(im)) continue;
@@ -305,10 +326,10 @@ export function buildAuctionSequences(rawInput: SequenceInput): SequencesResult 
     target.photos.publishedWithListing += 1;
   }
 
-  return { sequences: drafts, importStampedDays: Array.from(stamped).sort() };
+  return { sequences: drafts, importStampedDays: Array.from(stamped).sort(), hasUnpositionedActivity };
 }
 
-/** The month a listing's photos were published: the month it opened, or the one before. */
+/** Heuristic upload-month window: the listing's opening month, or the one before. */
 function publishMonths(s: AuctionSequence): string[] {
   const at = s.open?.at ?? s.items[0]?.at ?? s.close?.at;
   if (!at) return [];
@@ -319,9 +340,9 @@ function publishMonths(s: AuctionSequence): string[] {
 }
 
 /**
- * Which listing a BaT-hosted photo was published with: the listing whose opening month
- * matches the photo's upload path; a photo with no path sits on the car's own (newest)
- * listing. Null for a photo that is not BaT-hosted (it has its own capture time).
+ * Infer a native photo's listing group from the first compatible upload-month window,
+ * otherwise the newest listing. Windows can overlap; this is not source-page membership
+ * or a publication clock. Null for a photo outside the existing native-source predicate.
  */
 export function listingForPhoto(im: ImageStampRow, sequences: AuctionSequence[]): AuctionSequence | null {
   if (!isBatHosted(im) || sequences.length === 0) return null;
@@ -333,9 +354,9 @@ export function listingForPhoto(im: ImageStampRow, sequences: AuctionSequence[])
   return sequences.find(s => s.ordinal === s.listingCount) ?? sequences[0];
 }
 
-function pushItem(list: AuctionItem[], c: AuctionCommentRow, key: string): void {
+function pushItem(list: AuctionItem[], c: AuctionCommentRow, key: string): boolean {
   const at = isoOrNull(c.posted_at);
-  if (!at) return;
+  if (!at) return false;
   const isBid = c.comment_type === 'bid';
   const isSeller = c.is_seller === true || c.comment_type === 'seller_response';
   list.push({
@@ -351,6 +372,7 @@ function pushItem(list: AuctionItem[], c: AuctionCommentRow, key: string): void 
     postClose: null,
     listingKey: key,
   });
+  return true;
 }
 
 function sortItems(list: AuctionItem[]): void {

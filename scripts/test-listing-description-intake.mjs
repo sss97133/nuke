@@ -1,6 +1,10 @@
 // Actual description producer helper + installed Supabase SDK; no live requests.
 import assert from 'node:assert/strict';
-import { createHash, createHmac, webcrypto } from 'node:crypto';
+import { createHash, generateKeyPairSync, sign as signWith, webcrypto } from 'node:crypto';
+// Signed-in sessions as Auth issues them since 2026-10-14: ES256, verified against the project JWKS.
+const userKeys = generateKeyPairSync('ec', { namedCurve: 'P-256' });
+const userJwks = JSON.stringify({ keys: [{ ...userKeys.publicKey.export({ format: 'jwk' }), kid: 'fixture', alg: 'ES256' }] });
+const es256 = signing => signWith('sha256', Buffer.from(signing), { key: userKeys.privateKey, dsaEncoding: 'ieee-p1363' }).toString('base64url');
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { runInNewContext } from 'node:vm';
@@ -83,7 +87,7 @@ function canonicalIntake(options = {}) {
   Object.assign(snapshot, options.snapshot);
   const observations = options.observations ?? [];
   const env = { SUPABASE_URL: 'https://fixture.invalid', SUPABASE_SERVICE_ROLE_KEY: 'synthetic-service',
-    JWT_SIGNING_SECRET: 'synthetic-jwt-secret' };
+    SUPABASE_JWKS: userJwks };
   async function network(request, init = {}) {
     const url = new URL(typeof request === 'string' ? request : request.url ?? request.href);
     assert.equal(url.hostname, 'fixture.invalid', 'No source re-download, real database or model call');
@@ -280,7 +284,7 @@ test('explicit historical append crosses actual canonical intake with exact arch
   assert.equal(row.structured_data.source_captured_at, f.snapshot.fetched_at);
   assert.equal(row.structured_data.source_archive_ingested_at, f.snapshot.created_at);
   assert.equal(row.structured_data.source_text_field, 'listing_page_snapshots.html:batParser.extractDescription');
-  assert.equal(row.structured_data.extractor_version, 'extract-bat-core:4.4.0');
+  assert.equal(row.structured_data.extractor_version, 'extract-bat-core:4.5.1');
   assert.equal(row.structured_data.source_event_time_status, 'unknown');
   assert.equal(row.raw_source_ref, `listing_page_snapshots:${f.snapshot.id}`);
   assert.equal(row.source_identifier, row.raw_source_ref);
@@ -321,10 +325,10 @@ test('registered BaT source unavailable cannot advertise a preview or invoke int
 });
 
 function userToken(role) {
-  const payload = [ { alg: 'HS256', typ: 'JWT' },
+  const payload = [ { alg: 'ES256', typ: 'JWT', kid: 'fixture' },
     { role, sub: '00000000-0000-4000-8000-000000000005', exp: Math.floor(Date.now()/1000)+3600 } ]
     .map(value => Buffer.from(JSON.stringify(value)).toString('base64url')).join('.');
-  return `${payload}.${createHmac('sha256','synthetic-jwt-secret').update(payload).digest('base64url')}`;
+  return `${payload}.${es256(payload)}`;
 }
 for (const role of ['authenticated','anon']) test(`${role} caller cannot read protected prose through actual core`, async () => {
   const f = canonicalIntake({ core: true });

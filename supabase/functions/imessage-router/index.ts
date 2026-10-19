@@ -23,10 +23,11 @@ import { corsHeaders } from "../_shared/cors.ts";
 import { callTier } from "../_shared/llmRouter.ts";
 import type { AgentTier } from "../_shared/llmRouter.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const supabase = createClient(
   Deno.env.get("SUPABASE_URL")!,
-  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+  projectSecretKey()!
 );
 
 // ── Types ────────────────────────────────────────────────────
@@ -273,7 +274,7 @@ async function handlePhotoSubmission(
       {
         method: "POST",
         headers: {
-          "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+          "Authorization": `Bearer ${projectSecretKey()}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
@@ -357,7 +358,7 @@ async function handleStatusCheck(): Promise<string> {
       {
         method: "POST",
         headers: {
-          "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+          "Authorization": `Bearer ${projectSecretKey()}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ action: "brief" }),
@@ -555,7 +556,7 @@ async function handleDataEntry(
       {
         method: "POST",
         headers: {
-          "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+          "Authorization": `Bearer ${projectSecretKey()}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({

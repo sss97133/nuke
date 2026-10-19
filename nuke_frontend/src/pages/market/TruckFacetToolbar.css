@@ -1,0 +1,7 @@
+.truck-facets { --truck-toolbar-top: var(--market-sticky-top, var(--header-height, 42px)); position: sticky; top: var(--truck-toolbar-top); z-index: 20; background: var(--surface); border-bottom: 2px solid var(--border); padding: 8px 12px; }
+.truck-facets__groups, .truck-facets__selection { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.truck-facets__label { font: 700 9px Arial, sans-serif; text-transform: uppercase; }
+.truck-facets button { border: 2px solid var(--border); border-radius: 0; background: var(--bg); color: var(--text); padding: 6px 8px; font: 700 9px Arial, sans-serif; text-transform: uppercase; cursor: pointer; }
+.truck-facets button[aria-pressed="true"] { background: var(--text); color: var(--bg); }
+.truck-facets__selection { margin-top: 6px; font: 11px 'Courier New', monospace; }
+.truck-facets p { margin: 6px 0 0; font: 10px Arial, sans-serif; color: var(--text-secondary); }

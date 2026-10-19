@@ -28,7 +28,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const since = new Date(Date.now() - 90 * 24 * 3600 * 1000).toISOString().slice(0, 10);
   const url =
     `${SUPABASE_URL}/rest/v1/vw_journal_density` +
-    `?select=date,photo_count,receipt_count,receipt_total,payment_total,top_vehicle_id` +
+    `?select=date,photo_count,receipt_count,payment_count,top_vehicle_id` +
     `&date=gte.${since}&order=date.desc&limit=120`;
 
   const response = await fetch(url, {

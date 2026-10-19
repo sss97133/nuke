@@ -14,6 +14,7 @@ import {
   rateLimitHeaders,
   rateLimitResponse,
 } from '../_shared/rateLimit.ts';
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -178,6 +179,25 @@ function tokenizeQuery(query: string): string[] {
     .filter(t => !['the', 'a', 'an', 'and', 'or', 'for', 'with', 'in', 'on'].includes(t));
 }
 
+// Corrects a known typo or nickname in each query word before the ranked search, from expand_search_query (the
+// synonym map search_vehicles_deep uses): "chevorlet" → "chevrolet", "chevy" → "chevrolet". Only one-word
+// replacements are taken, so an expansion such as "gt" → "gran turismo" never turns one required term into two.
+// Measured 2026-10-14 logged out: "chevorlet" took 61.0 s and found 4 vehicles, because the ranked search found
+// under half a page and the deep and fuzzy readers ran; "chevrolet" took 0.85 s and found 15. The correction is a
+// pure function of the words, so every page of one query searches the same terms. A failed lookup keeps the word.
+async function correctTokens(supabase: any, tokens: string[]): Promise<string[]> {
+  if (tokens.length === 0 || tokens.length > 8) return tokens;
+  return await Promise.all(tokens.map(async (token) => {
+    try {
+      const { data, error } = await supabase.rpc('expand_search_query', { raw_query: token });
+      const word = typeof data === 'string' ? data.trim() : '';
+      return !error && word && !/\s/.test(word) ? word : token;
+    } catch {
+      return token;
+    }
+  }));
+}
+
 // Escape for PostgreSQL ILIKE
 function escapeIlike(s: string): string {
   return s.replace(/([%_\\])/g, '\\$1');
@@ -200,7 +220,7 @@ Deno.serve(async (req) => {
   try {
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      projectSecretKey() ?? ''
     );
 
     // ── Rate limiting ──────────────────────────────────────────────────────────
@@ -515,7 +535,8 @@ Deno.serve(async (req) => {
     if (allowedTypes.includes('vehicle')) {
       vehicleSearchDone = (async () => {
         // Convert query to tsquery format: "BMW M3 E30" → "BMW & M3 & E30"
-        const tsqueryTerms = tokens.map(t => t.replace(/[^a-zA-Z0-9]/g, '')).filter(t => t.length > 0);
+        const searchTokens = await correctTokens(supabase, tokens);
+        const tsqueryTerms = searchTokens.map(t => t.replace(/[^a-zA-Z0-9]/g, '')).filter(t => t.length > 0);
         const tsqueryStr = tsqueryTerms.join(' & ');
 
         let vehicles: any[] = [];
@@ -814,21 +835,25 @@ Deno.serve(async (req) => {
     // --- EXTERNAL IDENTITIES (BaT users, etc.) ---
     if (firstPage && allowedTypes.includes('external_identity')) {
       searches.push((async () => {
-        const { data: identities } = await supabase
+        // The table's columns are handle and display_name. The select named username and avatar_url, which do
+        // not exist, so PostgREST refused every call and identity search returned nothing from 2026-01-23 until
+        // 2026-10-14; the error is now logged instead of swallowed.
+        const { data: identities, error: identityError } = await supabase
           .from('external_identities')
-          .select('id, username, display_name, platform, profile_url, avatar_url')
-          .or(`username.ilike."${escapePostgrestValue(searchPattern)}",display_name.ilike."${escapePostgrestValue(searchPattern)}"`)
+          .select('id, handle, display_name, platform, profile_url')
+          .or(`handle.ilike."${escapePostgrestValue(searchPattern)}",display_name.ilike."${escapePostgrestValue(searchPattern)}"`)
           .limit(Math.ceil(sanitizedLimit / 4));
+        if (identityError) console.error('universal-search: external identity search failed', identityError.message);
 
         for (const ei of identities || []) {
-          const displayName = ei.display_name || ei.username || 'Unknown';
+          const displayName = ei.display_name || ei.handle || 'Unknown';
 
           results.push({
             id: `external_${ei.id}`,
             type: 'external_identity',
             title: displayName,
-            subtitle: `${ei.platform} ${ei.username ? `@${ei.username}` : ''}`.trim(),
-            image_url: ei.avatar_url,
+            subtitle: `${ei.platform} ${ei.handle ? `@${ei.handle}` : ''}`.trim(),
+            image_url: undefined,
             relevance_score: 0.6,
             metadata: { platform: ei.platform, profile_url: ei.profile_url }
           });

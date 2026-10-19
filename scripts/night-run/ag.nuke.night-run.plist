@@ -2,15 +2,11 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <!-- Nightly repair-loop run (scripts/night-run/run.sh): one bounded Claude Code session on the owner's subscription
-       (claude -p, ANTHROPIC_API_KEY unset for the child) that works work-order.md's three items and opens PRs for the lead's
-       morning review. Never merges, deploys, pushes to main or loads jobs. Report: ~/nuke-logs/night-run/<UTC date>.md;
-       transcript beside it. The script runs from ~/nuke's git only to fetch and add the night's worktree at origin/main.
-       NOT LOADED until the data-model lead has reviewed work-order.md line by line. To load:
-       cp scripts/night-run/ag.nuke.night-run.plist ~/Library/LaunchAgents/ && launchctl load ~/Library/LaunchAgents/ag.nuke.night-run.plist
-       Stop: launchctl unload the same file. Runs at 01:30 local time, two hours before the stack generator (03:30), so the
-       two never share the machine. gtimeout in run.sh caps the session at 45 minutes.
-       Repo copy is source of truth; keep identical to ~/Library/LaunchAgents/ag.nuke.night-run.plist. -->
+  <!-- Subscription RSI controller. 01:30 starts the local daily budget window; inexpensive
+       15-minute wake-ups resume unfinished work and inspect pending PR gates. Inference is capped
+       at 45 minutes TOTAL per window, not per wake-up. No merge/deploy/production-write authority.
+       State and receipts: ~/nuke-logs/night-run/. Unfinished worktrees are never force-pruned.
+       Repo copy is source of truth; install with launchctl bootout/bootstrap after validation. -->
   <key>Label</key><string>ag.nuke.night-run</string>
   <key>ProgramArguments</key>
   <array>
@@ -22,6 +18,7 @@
   <dict>
     <key>PATH</key><string>/Users/skylar/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
   </dict>
+  <key>StartInterval</key><integer>900</integer>
   <key>StartCalendarInterval</key>
   <dict><key>Hour</key><integer>1</integer><key>Minute</key><integer>30</integer></dict>
   <key>StandardOutPath</key><string>/Users/skylar/nuke-logs/night-run/launchd.log</string>

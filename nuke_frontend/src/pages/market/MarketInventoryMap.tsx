@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { MakeIdentity } from '../../components/common/MakeIdentity';
 import { Text } from '../../kit';
 import { squarify } from '../../lib/squarify';
-import { MAP_GROUPS, inventoryGroups, mapValue, readableInventoryLayout, type InventoryMapGroup, type InventoryMapLens, type MapDimension, type MapSubdivision } from './inventoryMap';
+import { MAP_GROUPS, groupArea, inventoryGroups, mapValue, readableInventoryLayout, type InventoryMapGroup, type InventoryMapLens, type MapDimension, type MapMeasure, type MapSubdivision } from './inventoryMap';
 import type { InventoryTaxonomy, LiveAuction } from './useMarketPulse';
 import './MarketInventoryMap.css';
 
@@ -17,15 +17,18 @@ interface Props {
   onLensChange: (change: Partial<InventoryMapLens>) => void;
   onSelect: (dimension: MapDimension | 'lot', group: InventoryMapGroup, child?: boolean) => void;
   selectedModel: string | null;
+  /** What a box's area stands for; 'bids' draws the board's live total by what it is made of. */
+  measure?: MapMeasure;
 }
 
 export default function MarketInventoryMap({ auctions, lens, taxonomy, taxonomyLoading, taxonomyError, onRetryTaxonomy,
-  risenIds, onLensChange, onSelect, selectedModel }: Props) {
+  risenIds, onLensChange, onSelect, selectedModel, measure = 'lots' }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
   const [pulses, setPulses] = useState(true);
   const [hovered, setHovered] = useState<string | null>(null);
   const [list, setList] = useState<{ keys: string[]; dimension: MapDimension | 'lot'; parent?: string; parentKey?: string } | null>(null);
+  const selectedOpener = useRef<{ button: HTMLButtonElement; lens: InventoryMapLens; model: string | null; list: typeof list } | null>(null);
   useLayoutEffect(() => {
     const element = ref.current;
     if (!element) return;
@@ -44,29 +47,50 @@ export default function MarketInventoryMap({ auctions, lens, taxonomy, taxonomyL
   [auctions, lens.group, taxonomy, list]);
   const rects = useMemo(() => {
     const focused = groups.filter(g => lens.focus == null || g.key === lens.focus);
-    return readableInventoryLayout(focused, width, height).map(rect => {
+    const area = (g: InventoryMapGroup) => groupArea(g, measure);
+    return readableInventoryLayout(focused, width, height, measure).map(rect => {
       const roomy = rect.w >= 160 && rect.h >= 154;
       // The groups too small for a readable box of their own keep their area as cells inside one box, each
       // sized by its lots (the long tail is shown, not summarised); the box's heading still opens them as a list.
       if (rect.node.remainder) {
-        const children = roomy ? squarify(rect.node.remainder.map(node => ({ node, area: node.lots.length })), 0, 0, rect.w - 4, rect.h - 48) : [];
+        const children = roomy ? squarify(rect.node.remainder.filter(node => area(node) > 0).map(node => ({ node, area: area(node) })), 0, 0, rect.w - 4, rect.h - 48) : [];
         return { ...rect, expanded: roomy, children, childDimension: lens.group as MapDimension | 'lot' };
       }
       // Inside a box every member keeps its area, down to a pixel: a brand's decades read as a distribution,
       // labelled where there is room and identified by hover or focus elsewhere.
       const expanded = lens.inside !== 'none' && lens.inside !== lens.group && roomy;
       const childGroups = expanded ? inventoryGroups(rect.node.lots, lens.inside as MapDimension | 'lot', taxonomy) : [];
-      const children = squarify(childGroups.map(node => ({ node, area: lens.inside === 'lot' ? 1 : node.lots.length })), 0, 0, rect.w - 4, rect.h - 48);
+      const children = squarify(childGroups.filter(node => area(node) > 0)
+        .map(node => ({ node, area: lens.inside === 'lot' && measure === 'lots' ? 1 : area(node) })), 0, 0, rect.w - 4, rect.h - 48);
       return { ...rect, expanded, children, childDimension: lens.inside as MapDimension | 'lot' };
     });
-  }, [groups, lens.focus, lens.inside, lens.group, taxonomy, width, height]);
+  }, [groups, lens.focus, lens.inside, lens.group, taxonomy, width, height, measure]);
+  useLayoutEffect(() => {
+    const selected = selectedOpener.current;
+    if (!selected) return;
+    const changed = selected.lens.group !== lens.group || selected.lens.inside !== lens.inside || selected.lens.focus !== lens.focus
+      || selected.lens.child !== lens.child || selected.model !== selectedModel || selected.list !== list;
+    if (!changed) {
+      if (!selected.button.isConnected || document.activeElement !== selected.button) selectedOpener.current = null;
+      return;
+    }
+    selectedOpener.current = null;
+    if (!selected.button.isConnected && document.activeElement === document.body) ref.current?.focus({ preventScroll: true });
+  }, [lens.group, lens.inside, lens.focus, lens.child, selectedModel, rects, list]);
   const needsTaxonomy = lens.group === 'type' || lens.group === 'body';
   const pending = needsTaxonomy && taxonomyLoading;
   const failed = needsTaxonomy && taxonomyError;
   const updates = auctions.filter(a => risenIds.has(a.id)).length;
-  const select = (dimension: MapDimension | 'lot', group: InventoryMapGroup, child = false) => { setList(null); setHovered(null); onSelect(dimension, group, child); };
+  const select = (dimension: MapDimension | 'lot', group: InventoryMapGroup, child = false, opener?: HTMLButtonElement) => {
+    selectedOpener.current = dimension !== 'lot' && opener && opener === document.activeElement
+      ? { button: opener, lens: { ...lens }, model: selectedModel, list } : null;
+    setList(null); setHovered(null); onSelect(dimension, group, child);
+  };
   const plural = (dimension: MapDimension | 'lot') => ({ make: 'brands', model: 'models', type: 'vehicle types', body: 'body styles', era: 'decades', year: 'years', lot: 'vehicles' })[dimension];
-  const count = (group: InventoryMapGroup) => <span className="inventory-map-count">{group.lots.length.toLocaleString('en-US')} <span>{group.lots.length === 1 ? 'lot' : 'lots'}</span></span>;
+  const dollars = (n: number) => n >= 1_000_000 ? `$${(n / 1_000_000).toFixed(1)}M` : n >= 10_000 ? `$${Math.round(n / 1_000)}K` : `$${Math.round(n).toLocaleString('en-US')}`;
+  const count = (group: InventoryMapGroup) => measure === 'bids'
+    ? <span className="inventory-map-count">{dollars(groupArea(group, 'bids'))} <span>{group.lots.length.toLocaleString('en-US')} {group.lots.length === 1 ? 'lot' : 'lots'}</span></span>
+    : <span className="inventory-map-count">{group.lots.length.toLocaleString('en-US')} <span>{group.lots.length === 1 ? 'lot' : 'lots'}</span></span>;
   const showList = (groups: InventoryMapGroup[], dimension: MapDimension | 'lot', parent?: string, parentKey?: string) => {
     setHovered(null); setList({ keys: groups.map(g => g.key), dimension, parent, parentKey });
     requestAnimationFrame(() => ref.current?.querySelector<HTMLButtonElement>('.inventory-map-back')?.focus({ preventScroll: true }));
@@ -74,7 +98,7 @@ export default function MarketInventoryMap({ auctions, lens, taxonomy, taxonomyL
   const describe = (group: InventoryMapGroup, dimension: MapDimension | 'lot') => {
     const changes = group.lots.filter(a => risenIds.has(a.id)).length;
     if (dimension === 'lot') return `${group.name} · Select to inspect this vehicle`;
-    return `${group.name}: ${group.lots.length} captured ${dimension === 'make' ? 'live ' : ''}lots${dimension === 'model' ? '. Filter this recorded model' : ''}${changes ? `. ${changes} recorded bid${changes === 1 ? '' : 's'} increased since refresh` : ''}`;
+    return `${group.name}: ${measure === 'bids' ? `${dollars(groupArea(group, 'bids'))} bid on ` : ''}${group.lots.length} captured ${dimension === 'make' ? 'live ' : ''}lots${dimension === 'model' ? '. Filter this recorded model' : ''}${changes ? `. ${changes} recorded bid${changes === 1 ? '' : 's'} increased since refresh` : ''}`;
   };
   const identity = (group: InventoryMapGroup, dimension: MapDimension | 'lot', roomy: boolean) => dimension === 'make' && roomy
     ? <MakeIdentity make={group.name} /> : group.name;
@@ -91,18 +115,18 @@ export default function MarketInventoryMap({ auctions, lens, taxonomy, taxonomyL
       {lens.focus != null && <button type="button" className="market-control" onClick={() => onLensChange({ focus: null, child: null })}><Text role="label">← All {plural(lens.group)}</Text></button>}
       {lens.child != null && <button type="button" className="market-control" onClick={() => onLensChange({ child: null })}><Text role="label">Clear sub-box selection</Text></button>}
     </div>
-    <div className="inventory-map-key"><Text role="caption">Box size = number of open lots{lens.inside === 'lot' ? ' · Each small box = one vehicle' : ''}</Text><Text role="caption">{lens.inside === 'lot' ? 'Hover or focus to identify · Select to inspect' : `Select ${lens.group === 'make' ? 'a brand to see its models' : 'a box to narrow the inventory'}`}</Text></div>
+    <div className="inventory-map-key"><Text role="caption">{measure === 'bids' ? 'Box size = dollars bid now; lots without a bid add none' : 'Box size = number of open lots'}{lens.inside === 'lot' ? ' · Each small box = one vehicle' : ''}</Text><Text role="caption">{lens.inside === 'lot' ? 'Hover or focus to identify · Select to inspect' : `Select ${lens.group === 'make' ? 'a brand to see its models' : 'a box to narrow the inventory'}`}</Text></div>
     {pending && <p role="status" className="k-body">Reading recorded classifications…</p>}
     {failed && <p role="status" className="k-body">Recorded classifications could not be loaded. <button type="button" className="market-control" onClick={onRetryTaxonomy}><Text role="label">Retry classifications</Text></button></p>}
     {!pending && !failed && width > 0 && rects.length === 0 && <p role="status" className="k-body">No captured lots remain in this map group. <button type="button" className="market-control" onClick={() => onLensChange({ focus: null, child: null })}><Text role="label">Show all map groups</Text></button></p>}
-    <div ref={ref} className="inventory-map-canvas" style={{ height: list ? 'auto' : pending || failed || (width > 0 && rects.length === 0) ? 0 : height }} aria-label={`Captured inventory by ${MAP_GROUPS.find(g => g.id === lens.group)?.label}`} onMouseLeave={() => setHovered(null)}>
+    <div ref={ref} className="inventory-map-canvas" role="group" tabIndex={-1} style={{ height: list ? 'auto' : pending || failed || (width > 0 && rects.length === 0) ? 0 : height }} aria-label={`Captured inventory by ${MAP_GROUPS.find(g => g.id === lens.group)?.label}`} onMouseLeave={() => setHovered(null)}>
       {!pending && !failed && list && <div className="inventory-map-remainder">
         <div className="inventory-map-list-heading"><button type="button" className="inventory-map-back" onClick={() => { setList(null); requestAnimationFrame(() => ref.current?.querySelector<HTMLButtonElement>('[data-map-more]')?.focus({ preventScroll: true })); }}>← Back to map</button>
           <strong>{list.parent ? `${list.parent} · ` : ''}{listedGroups.length} {plural(list.dimension)}</strong></div>
         {listedGroups.length === 0 && <p>No matching lots remain in this list.</p>}
         <div className="inventory-map-list-grid">{listedGroups.map(g => <button type="button" key={g.key}
           className={pulses && g.lots.some(a => risenIds.has(a.id)) ? 'inventory-map-pulse' : undefined}
-          onClick={() => select(list.dimension, g, !!list.parent)} aria-label={describe(g, list.dimension)}>
+          onClick={(e) => select(list.dimension, g, !!list.parent, e.currentTarget)} aria-label={describe(g, list.dimension)}>
           <span>{identity(g, list.dimension, true)}</span>{list.dimension !== 'lot' && count(g)}<span aria-hidden="true">→</span>
         </button>)}</div>
       </div>}
@@ -117,7 +141,7 @@ export default function MarketInventoryMap({ auctions, lens, taxonomy, taxonomyL
             aria-label={moreLabel ? `${moreLabel}: ${node.lots.length} lots. Open list` : describe(node, lens.group)} aria-pressed={active(node)} title={moreLabel ?? describe(node, lens.group)}
             onMouseEnter={() => setHovered(moreLabel ? `${moreLabel} · ${node.lots.length} lots · Open list` : describe(node, lens.group))}
             onFocus={() => setHovered(moreLabel ? `${moreLabel} · ${node.lots.length} lots · Open list` : describe(node, lens.group))}
-            onClick={() => node.remainder ? showList(node.remainder, lens.group) : select(lens.group, node)}>
+            onClick={(e) => node.remainder ? showList(node.remainder, lens.group) : select(lens.group, node, false, e.currentTarget)}>
             <span className="inventory-map-name">{moreLabel ?? identity(node, lens.group, roomy)}</span>
             {count(node)}
             {!expanded && roomy && <span className="inventory-map-action">{moreLabel ? 'Open list' : 'Explore'} <span aria-hidden="true">→</span></span>}
@@ -135,7 +159,7 @@ export default function MarketInventoryMap({ auctions, lens, taxonomy, taxonomyL
               style={{ left: child.x + 1, top: child.y + 1, width: Math.max(0, child.w - 2), height: Math.max(0, child.h - 2) }}
               aria-label={more ? `${more.length} more ${plural(dimension)} in ${node.name}` : describe(child.node, dimension)} title={describe(child.node, dimension)}
               onMouseEnter={() => setHovered(describe(child.node, dimension))} onFocus={() => setHovered(describe(child.node, dimension))}
-              onClick={() => more ? showList(more, dimension, node.name, node.key) : select(dimension, child.node, !node.remainder)}>
+              onClick={(e) => more ? showList(more, dimension, node.name, node.key) : select(dimension, child.node, !node.remainder, e.currentTarget)}>
               {labeled && <span className="inventory-map-name">{more ? `${more.length} more ${plural(dimension)}` : vehicleLabel || identity(child.node, dimension, child.w >= 160)}</span>}
               {labeled && dimension !== 'lot' && count(child.node)}
               {labeled && (more || (dimension === 'lot' && child.w >= 88 && child.h >= 68)) && <span className="inventory-map-action">{more ? 'Open list' : 'Inspect'} →</span>}
@@ -148,7 +172,7 @@ export default function MarketInventoryMap({ auctions, lens, taxonomy, taxonomyL
     {!pending && !failed && <details className="inventory-map-notes"><summary><Text role="label">Map notes · {groups.length} groups as a list</Text></summary>
       <label className="inventory-map-pulse-control k-body"><input type="checkbox" checked={pulses} onChange={e => setPulses(e.target.checked)} /> Pulse on recorded bid increases <span>· 60-second refreshes</span></label>
       <p className="inventory-map-note k-caption">Pulses show recorded bid increases between 60-second refreshes, not every individual bid. Source delay and complete platform coverage are unknown. Bid numbers have unverified currency.{updates > 0 && pulses ? ` ${updates} lot${updates === 1 ? '' : 's'} updated.` : ''}</p>
-      <div className="inventory-map-list">{groups.map(g => <button type="button" key={g.key} onClick={() => select(lens.group, g)} aria-label={`Focus ${g.name}: ${g.lots.length} captured lots`}>
+      <div className="inventory-map-list">{groups.map(g => <button type="button" key={g.key} onClick={(e) => select(lens.group, g, false, e.currentTarget)} aria-label={`Focus ${g.name}: ${g.lots.length} captured lots`}>
         <span>{identity(g, lens.group, true)}</span><span>{g.lots.length}</span>
       </button>)}</div>
     </details>}

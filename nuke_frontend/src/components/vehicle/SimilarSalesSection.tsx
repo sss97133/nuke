@@ -1,11 +1,23 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useSimilarSales, type SimilarSale } from '../../hooks/useSimilarSales';
+import {
+  buildVehicleCohortOptions,
+  classifyVehicleFacet,
+  computeCohortComparisonStats,
+  filterComparableSalesByCohort,
+  type VehicleCohortFilterKey,
+} from '../../lib/market/vehicleTaxonomy';
 
-interface SimilarSalesSectionProps {
+export interface SimilarSalesSectionProps {
   vehicleId: string;
   vehicleYear: number;
   vehicleMake: string;
   vehicleModel: string;
+  vehicleSeries?: string | null;
+  vehicleTrim?: string | null;
+  vehicleBodyStyle?: string | null;
+  vehicleTitle?: string | null;
+  initialSales?: SimilarSale[];
 }
 
 // Platform abbreviations — no decorative colors per design system
@@ -54,88 +66,259 @@ function formatMileage(mileage: number | null): string {
   return `${new Intl.NumberFormat('en-US').format(mileage)} mi`;
 }
 
-const PLACEHOLDER_IMAGE = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjgwIiB2aWV3Qm94PSIwIDAgMTIwIDgwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxyZWN0IHdpZHRoPSIxMjAiIGhlaWdodD0iODAiIGZpbGw9IiNlNWU3ZWIiLz48cGF0aCBkPSJNMzUgNTJMMjUgNDBMMjAgNDhIMTVWNTJIMzVaIiBmaWxsPSIjOWNhM2FmIi8+PGNpcmNsZSBjeD0iNjUiIGN5PSIzNSIgcj0iMTIiIGZpbGw9IiM5Y2EzYWYiLz48cGF0aCBkPSJNMTAgNTJINTBMMzcgMzVMMjUgNDhMMjAgNDBMMTAgNTJaIiBmaWxsPSIjNmI3MjgwIi8+PC9zdmc+';
-
 export function SimilarSalesSection({
   vehicleId,
   vehicleYear,
   vehicleMake,
   vehicleModel,
+  vehicleSeries,
+  vehicleTrim,
+  vehicleBodyStyle,
+  vehicleTitle,
+  initialSales,
 }: SimilarSalesSectionProps) {
-  const { data, isLoading: loading, error: queryError } = useSimilarSales(vehicleId, vehicleMake);
+  const { data, isLoading: queryLoading, error: queryError } = useSimilarSales(
+    initialSales ? '' : vehicleId,
+    initialSales ? '' : vehicleMake,
+  );
   const [showAll, setShowAll] = useState(false);
+  const [activeCohort, setActiveCohort] = useState<VehicleCohortFilterKey>('all');
 
-  const sales = data?.sales ?? [];
+  const loading = initialSales ? false : queryLoading;
+  const sales = initialSales ?? data?.sales ?? [];
   const summary = data?.summary ?? null;
-  const error = queryError ? 'Unable to load comparable sales' : null;
+  const error = !initialSales && queryError ? 'Unable to load comparable sales' : null;
 
-  const displayedSales = showAll ? sales : sales.slice(0, 6);
+  const { facets: vehicleFacets, options: cohortOptions } = useMemo(() => {
+    const classified = classifyVehicleFacet({
+      year: vehicleYear,
+      make: vehicleMake,
+      model: vehicleModel,
+      series: vehicleSeries ?? null,
+      trim: vehicleTrim ?? null,
+      body_style: vehicleBodyStyle ?? null,
+      listing_title: vehicleTitle ?? null,
+    });
+    const built = buildVehicleCohortOptions({
+      year: vehicleYear,
+      make: vehicleMake,
+      model: vehicleModel,
+      series: classified.series ?? vehicleSeries ?? null,
+      trim: classified.trim ?? vehicleTrim ?? null,
+      body_style: classified.body ?? vehicleBodyStyle ?? null,
+      listing_title: vehicleTitle ?? null,
+    });
+    return built;
+  }, [vehicleYear, vehicleMake, vehicleModel, vehicleSeries, vehicleTrim, vehicleBodyStyle, vehicleTitle]);
+
+  const filteredSales = useMemo(
+    () => filterComparableSalesByCohort(sales, activeCohort, vehicleFacets, vehicleMake),
+    [sales, activeCohort, vehicleFacets, vehicleMake],
+  );
+
+  const cohortStats = useMemo(
+    () => computeCohortComparisonStats(sales, filteredSales),
+    [sales, filteredSales],
+  );
+
+  const displayedSales = showAll ? filteredSales : filteredSales.slice(0, 6);
 
   if (loading) {
     return (
-      <div style={{ padding: '10px' }}>
-        <div style={{
-          display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '4px',
-        }}>
+      <div className="vp-comps-section">
+        <div className="vp-comps-grid">
           {[1, 2, 3].map((i) => (
-            <div key={i} style={{
-              height: '80px', backgroundColor: 'var(--surface)',
-              border: '2px solid var(--border)',
-              opacity: 0.5,
-            }} />
+            <div key={i} className="vp-comps-skeleton" />
           ))}
         </div>
       </div>
     );
   }
 
-  // If query failed, return null — don't show error text to the user
   if (error) return null;
-
-  // Progressive density: don't render at all when no comparable sales exist
   if (sales.length === 0) return null;
 
+  const familyMedian = cohortStats.familyMedianPrice ?? summary?.median_price ?? null;
+  const selectedMedian = cohortStats.cohortMedianPrice;
+  const deltaPct = cohortStats.deltaPctVsFamily;
+  const deltaText =
+    deltaPct != null
+      ? `${deltaPct >= 0 ? '+' : ''}${deltaPct.toFixed(1)}% ${
+          deltaPct > 0 ? 'PREMIUM' : deltaPct < 0 ? 'DISCOUNT' : 'PAR'
+        } VS FAMILY MEDIAN`
+      : null;
+
   return (
-    <div style={{ padding: '10px' }}>
+    <div className="vp-comps-section" data-testid="similar-sales-section">
+      <style>{`
+        .vp-comps-section {
+          padding: 10px;
+        }
+        .vp-comps-skeleton {
+          height: 80px;
+          background-color: var(--surface);
+          border: 2px solid var(--border);
+          opacity: 0.5;
+        }
+        .vp-cohort-bar {
+          display: flex;
+          flex-wrap: wrap;
+          align-items: center;
+          justify-content: space-between;
+          gap: 6px;
+          margin-bottom: 8px;
+          padding-bottom: 8px;
+          border-bottom: 1px solid var(--border);
+        }
+        .vp-cohort-bar__pills {
+          display: inline-flex;
+          flex-wrap: wrap;
+          gap: 4px;
+          align-items: center;
+        }
+        .vp-cohort-pill {
+          background: var(--bg);
+          color: var(--text-secondary);
+          border: 1px solid var(--border);
+          padding: 2px 8px;
+          font-family: 'Courier New', Courier, monospace;
+          font-size: 9px;
+          font-weight: 700;
+          letter-spacing: 0.06em;
+          text-transform: uppercase;
+          cursor: pointer;
+        }
+        .vp-cohort-pill:hover {
+          color: var(--text);
+          border-color: var(--text);
+        }
+        .vp-cohort-pill--active {
+          background: var(--text);
+          color: var(--bg);
+          border-color: var(--text);
+        }
+        .vp-cohort-pill--active:hover {
+          color: var(--bg);
+        }
+        .vp-cohort-bar__metrics {
+          display: inline-flex;
+          flex-wrap: wrap;
+          align-items: baseline;
+          gap: 10px;
+          font-family: 'Courier New', Courier, monospace;
+          font-size: 9px;
+        }
+        .vp-cohort-delta--premium {
+          color: var(--success, #16825d);
+          font-weight: 700;
+        }
+        .vp-cohort-delta--discount {
+          color: var(--warning, #b45309);
+          font-weight: 700;
+        }
+        .vp-cohort-delta--par {
+          color: var(--text-secondary);
+          font-weight: 700;
+        }
+        .vp-comps-summary {
+          display: flex;
+          gap: 16px;
+          flex-wrap: wrap;
+          align-items: baseline;
+          margin-bottom: 8px;
+          padding-bottom: 8px;
+          border-bottom: 1px solid var(--border);
+        }
+        .vp-comps-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+          gap: 4px;
+          margin-bottom: 8px;
+        }
+      `}</style>
+
+      {/* Interactive Cohort Filter Bar (ALL FAMILY | SERIES: <val> | TRIM: <val> | BODY: <val>) */}
+      <div
+        className="vp-cohort-bar"
+        data-testid="comparable-cohort-filter-bar"
+        role="group"
+        aria-label="Comparable sales cohort filter"
+      >
+        <div className="vp-cohort-bar__pills">
+          {cohortOptions.map((opt) => {
+            const isActive = activeCohort === opt.key;
+            return (
+              <button
+                key={opt.key}
+                type="button"
+                data-testid={`cohort-filter-${opt.key}`}
+                aria-pressed={isActive}
+                className={`vp-cohort-pill${isActive ? ' vp-cohort-pill--active' : ''}`}
+                onClick={() => setActiveCohort(opt.key)}
+              >
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="vp-cohort-bar__metrics" data-testid="cohort-comparison-summary">
+          {selectedMedian != null && (
+            <span data-testid="cohort-median-price">
+              COHORT MEDIAN: <strong>{formatPrice(selectedMedian)}</strong> ({cohortStats.cohortCount})
+            </span>
+          )}
+          {familyMedian != null && (
+            <span data-testid="family-median-price">
+              FAMILY MEDIAN: <strong>{formatPrice(familyMedian)}</strong> ({cohortStats.familyCount})
+            </span>
+          )}
+          {deltaText && (
+            <span
+              data-testid="cohort-delta-vs-family"
+              className={`vp-cohort-delta--${cohortStats.deltaDirection ?? 'par'}`}
+            >
+              {deltaText}
+            </span>
+          )}
+        </div>
+      </div>
+
       {/* Summary stats */}
-      {summary && (
-        <div style={{
-          display: 'flex',
-          gap: '16px',
-          flexWrap: 'wrap',
-          alignItems: 'baseline',
-          marginBottom: '8px',
-          paddingBottom: '8px',
-          borderBottom: '1px solid var(--border)',
-        }}>
-          <StatPill label="MEDIAN" value={formatPrice(summary.median_price)} accent />
-          <StatPill label="MEDIAN" value={formatPrice(summary.median_price)} />
-          <StatPill label="RANGE" value={`${formatPrice(summary.min_price)} \u2014 ${formatPrice(summary.max_price)}`} />
+      {(summary || selectedMedian != null) && (
+        <div className="vp-comps-summary">
+          {selectedMedian != null && (
+            <StatPill label="MEDIAN" value={formatPrice(selectedMedian)} accent />
+          )}
+          {summary && (
+            <StatPill label="RANGE" value={`${formatPrice(summary.min_price)} \u2014 ${formatPrice(summary.max_price)}`} />
+          )}
           <span style={{
             fontFamily: "'Courier New', Courier, monospace",
             fontSize: '8px',
             color: 'var(--text-disabled)',
             letterSpacing: '0.06em',
           }}>
-            {vehicleYear != null ? `${vehicleYear - 2}\u2013${vehicleYear + 2}` : ''} {vehicleMake} {vehicleModel} &middot; {sales.length} SOLD
+            {vehicleYear != null ? `${vehicleYear - 2}\u2013${vehicleYear + 2}` : ''} {vehicleMake} {vehicleModel} &middot; {filteredSales.length} OF {sales.length} SOLD
           </span>
         </div>
       )}
 
       {/* Sales Grid */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
-        gap: '4px',
-        marginBottom: '8px',
-      }}>
-        {displayedSales.map((sale, i) => (
-          <SaleCard key={`${sale.vehicle_id ?? i}-${i}`} sale={sale} />
-        ))}
-      </div>
+      {filteredSales.length === 0 ? (
+        <div data-testid="cohort-empty-state" style={{ padding: '12px 0', fontSize: '10px', color: 'var(--text-secondary)' }}>
+          No comparable sales matched this facet cohort. Showing 0 of {sales.length} family records.
+        </div>
+      ) : (
+        <div className="vp-comps-grid" data-testid="comparable-sales-grid">
+          {displayedSales.map((sale, i) => (
+            <SaleCard key={`${sale.vehicle_id ?? i}-${i}`} sale={sale} />
+          ))}
+        </div>
+      )}
 
       {/* Show more / less */}
-      {sales.length > 6 && (
+      {filteredSales.length > 6 && (
         <div style={{ textAlign: 'center', paddingTop: '4px' }}>
           <button
             onClick={() => setShowAll(!showAll)}
@@ -152,7 +335,7 @@ export function SimilarSalesSection({
               cursor: 'pointer',
             }}
           >
-            {showAll ? 'SHOW FEWER' : `SHOW ALL ${sales.length} SALES`}
+            {showAll ? 'SHOW FEWER' : `SHOW ALL ${filteredSales.length} SALES`}
           </button>
         </div>
       )}
@@ -192,25 +375,27 @@ function SaleCard({ sale }: { sale: SimilarSale }) {
   const platformAbbrev = sale.platform ? (PLATFORM_ABBREV[sale.platform] ?? sale.platform.toUpperCase()) : null;
 
   const cardContent = (
-    <div style={{
-      display: 'flex',
-      gap: '8px',
-      padding: '8px',
-      border: '2px solid var(--border)',
-      backgroundColor: 'var(--surface)',
-      transition: 'border-color 180ms cubic-bezier(0.16, 1, 0.3, 1)',
-      cursor: sale.listing_url ? 'pointer' : 'default',
-      textDecoration: 'none',
-      color: 'inherit',
-    }}
-    onMouseEnter={(e) => {
-      if (sale.listing_url) {
-        (e.currentTarget as HTMLElement).style.borderColor = 'var(--text)';
-      }
-    }}
-    onMouseLeave={(e) => {
-      (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)';
-    }}
+    <div
+      data-testid="comparable-sale-card"
+      style={{
+        display: 'flex',
+        gap: '8px',
+        padding: '8px',
+        border: '2px solid var(--border)',
+        backgroundColor: 'var(--surface)',
+        transition: 'border-color 180ms cubic-bezier(0.16, 1, 0.3, 1)',
+        cursor: sale.listing_url ? 'pointer' : 'default',
+        textDecoration: 'none',
+        color: 'inherit',
+      }}
+      onMouseEnter={(e) => {
+        if (sale.listing_url) {
+          (e.currentTarget as HTMLElement).style.borderColor = 'var(--text)';
+        }
+      }}
+      onMouseLeave={(e) => {
+        (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)';
+      }}
     >
       {/* Thumbnail */}
       <div style={{

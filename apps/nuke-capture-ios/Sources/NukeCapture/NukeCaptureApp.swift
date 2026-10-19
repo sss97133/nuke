@@ -22,8 +22,6 @@ import BackgroundTasks
 struct NukeCaptureApp: App {
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var session = SessionStore()
-    // Shared singleton — the BG task handler drives the same engine.
-    @ObservedObject private var engine = SyncEngine.shared
     /// Ignition phase drives the denied-grant detour (below).
     @ObservedObject private var ignition = IgnitionEngine.shared
     /// Flipped by IgnitionEngine when the first-run sequence completes.
@@ -122,6 +120,9 @@ struct NukeCaptureApp: App {
                     if SyncEngine.shared.backfillRemaining > 0 {
                         Self.scheduleBackgroundBackfill()
                     }
+                    // File what the owner's albums already say (no image reading, so it is cheap
+                    // enough for the foreground); serial reads wait for the charging job.
+                    await AttributionEngine.shared.run(limit: 500, ocrBudget: 0)
                 }
                 // Freshen the local store from the newest photos' true EXIF so the day
                 // receipt renders offline. DEFERRED + low-priority + small: the head pass
@@ -132,10 +133,15 @@ struct NukeCaptureApp: App {
                 Task(priority: .background) {
                     try? await Task.sleep(for: .seconds(3))
                     // The source record starts at intake, before opening Profile.
-                    // Bounded local originals only; deeper progress uses the
-                    // existing power/Wi-Fi backfill job.
+                    // A warm phone does none of it: the charging job carries the library.
+                    guard !SyncEngine.deviceWarm else { return }
                     await LibraryStore.shared.refreshAlbums()
-                    await LibraryIngest.shared.runAlbumReview(budget: 24)
+                    // The album review reads originals with OCR (seconds per photo): only while
+                    // charging at a nominal temperature, never as a cost of opening the app.
+                    if LibraryIngest.mayReviewInForeground {
+                        await LibraryIngest.shared.runAlbumReview(budget: 24)
+                        await AttributionEngine.shared.run(limit: 500, ocrBudget: 0)
+                    }
                     await LibraryIngest.shared.syncNativeAlbums()
                     await LibraryIngest.shared.runHeadPass(limit: 300)
                 }
@@ -263,7 +269,9 @@ struct NukeCaptureApp: App {
             // Then ATTRIBUTE: route the day's freshly-uploaded orphans home
             // on-device (VIN-match + session inheritance). This is the nightly
             // charging-window slot — upload, then send photos to their vehicle.
-            await AttributionEngine.shared.run()
+            // Prioritize this upload backlog. Fresh reads use LibraryIngest's original-byte
+            // reader and are retained for later zero-OCR foreground passes.
+            await AttributionEngine.shared.run(limit: 500, ocrBudget: 200)
             // Reschedule when work remains — the upload queue still has assets, the
             // drain bailed early (metered link / paused / cancelled), or the
             // local-store backlog isn't fully indexed yet.

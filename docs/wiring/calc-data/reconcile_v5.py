@@ -10,14 +10,17 @@ Deterministic. No network, no DB. Re-run any time; output is overwritten.
 
 Sources (all rows keep file:line provenance):
   V42  docs/wiring/output/K5_cut_list_v4_2.txt      174 wires, newest decisions (Jun 10).
-       Parsed with lego-book/build_ch1.parse_cut_list (reused, not re-implemented).
-  CH1  docs/wiring/output/lego-book/ch1_wire_index.csv  Dave-convention colors,
-       printed labels, engine-running flags (Sep 25).
-  APR  docs/wiring/build-plan/MASTER_CUT_LIST.csv   332 wires, whole vehicle, both
+       Parsed with calc-data/cut_list_v42.parse_cut_list (lego-book/build_ch1's parser, copied verbatim).
+  CH1  calc-data/inputs/ch1_wire_index.csv            Dave-convention colors,
+       printed labels, engine-running flags (Sep 25). Written by lego-book/build_ch1.py.
+  APR  calc-data/inputs/MASTER_CUT_LIST.csv           332 wires, whole vehicle, both
        ends + terminals (Apr 17). Pre-dates the Tefzel lock (2026-05-11) and the
        6L90/PCS, EV1, Quantum-pump, engine-only-firewall decisions.
-  DEV  /Users/skylar/k5-harness-pull/devices.json   141-device manifest.
+  DEV  calc-data/inputs/devices.json                  141-device manifest (k5-harness-pull, May 3).
   SUB  docs/wiring/calc-data/subsystems.json         wire -> subsystem (v3 era).
+  The three inputs/ files are copies, made 2026-10-15, of files that lived off main (build-plan/ and lego-book/ are
+  git-ignored CSV; devices.json was outside the repo), so the registry rebuilds from a clean checkout. Row
+  citations keep their original paths (build-plan/MASTER_CUT_LIST.csv:<line>); the line numbers hold in the copies.
 
 Outputs:
   docs/wiring/calc-data/k5_registry.json   the master (v5.0-draft)
@@ -26,7 +29,7 @@ Outputs:
 import csv
 import importlib.util
 import json
-import os
+import math
 import re
 from collections import Counter, OrderedDict, defaultdict
 from pathlib import Path
@@ -34,27 +37,22 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[3]   # the checkout this file lives in (was hard-coded /Users/skylar/nuke)
 WD = REPO / "docs/wiring"
 CD = WD / "calc-data"
-LEGO = WD / "output/lego-book"
-APR_CSV = WD / "build-plan/MASTER_CUT_LIST.csv"
-CH1_CSV = LEGO / "ch1_wire_index.csv"
-DEV_JSON = Path("/Users/skylar/k5-harness-pull/devices.json")
+INPUTS = CD / "inputs"
+APR_CSV = INPUTS / "MASTER_CUT_LIST.csv"
+CH1_CSV = INPUTS / "ch1_wire_index.csv"
+DEV_JSON = INPUTS / "devices.json"
 SUB_JSON = CD / "subsystems.json"
 OUT_REG = CD / "k5_registry.json"
 OUT_REP = CD / "RECONCILE_REPORT.md"
 
 # ---------------------------------------------------------------- V42 via the existing parser
 def load_v42():
-    here = os.getcwd()
-    os.chdir(LEGO)  # build_ch1 runs its twin-geometry step at import; it expects its own dir
-    try:
-        spec = importlib.util.spec_from_file_location("build_ch1", LEGO / "build_ch1.py")
-        b1 = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(b1)
-        wires = b1.parse_cut_list()
-        V42_ECU["M130"] = [[pin, code, name] for pin, (code, name) in b1.M130.items()]
-        V42_ECU["rail_pins"] = sorted(b1.RAIL_PINS)
-    finally:
-        os.chdir(here)
+    spec = importlib.util.spec_from_file_location("cut_list_v42", CD / "cut_list_v42.py")
+    b1 = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(b1)
+    wires = b1.parse_cut_list()
+    V42_ECU["M130"] = [[pin, code, name] for pin, (code, name) in b1.M130.items()]
+    V42_ECU["rail_pins"] = sorted(b1.RAIL_PINS)
     return wires
 
 
@@ -756,6 +754,11 @@ IMPLIED += [
      "RCA pair", HERMOSA + "; RetroSound Motor 2B user manual p.3: 'Multi-channel pre-amp outputs (front, rear, subwoofer)'"),
     ("SUB_JMP_P", "Woofer jumper (+): woofer 1 to woofer 2, in parallel", "SUB (+)", "SUB-2 (+)", 10, "M22759/16", "owner 2026-09-25: 'we are gonna do jbl 10\" compact woofers, an amp not sure which and then the appropriate other speakers'; JBL Club 102SL: impedance selector 2 or 4 ohm, 350 W RMS (Crutchfield page, snapshot web_snapshots/www.crutchfield.com__JBL-Club-102SL.md) — both set to 4 ohm and wired in parallel = 2 ohm for the amp's 300 W sub channel; build book 'Audio, decided Sep 25': 10 AWG pair with a jumper between the two woofers"),
     ("SUB_JMP_N", "Woofer jumper (-): woofer 1 to woofer 2, in parallel", "SUB (-)", "SUB-2 (-)", 10, "M22759/16", "owner 2026-09-25: 'we are gonna do jbl 10\" compact woofers, an amp not sure which and then the appropriate other speakers'; JBL Club 102SL: impedance selector 2 or 4 ohm, 350 W RMS (Crutchfield page, snapshot web_snapshots/www.crutchfield.com__JBL-Club-102SL.md) — both set to 4 ohm and wired in parallel = 2 ohm for the amp's 300 W sub channel; build book 'Audio, decided Sep 25': 10 AWG pair with a jumper between the two woofers"),
+    # RSI pass 29: each woofer takes its own pair of the amp's sub harness, so no push terminal holds two 10 AWG wires
+    ("30c", "Subwoofer 2 (+): amp sub harness pair 2 -> woofer 2", "AMP (sub output +, pair 2)", "SUB-2 (+)", 10, "M22759/16",
+     "JL VX700/5i connection guide (reference_documents/web_snapshots/www.retailspecs.com__VXi_700_5_MAN.md, Subwoofer Output Harness): 'Two pairs of wire leads are included to facilitate multiple subwoofer wiring. Both positive and both negative wire leads are connected in parallel inside the harness' (brown +, brown/white -)"),
+    ("30d", "Subwoofer 2 (-): amp sub harness pair 2 -> woofer 2", "AMP (sub output -, pair 2)", "SUB-2 (-)", 10, "M22759/16",
+     "JL VX700/5i connection guide (reference_documents/web_snapshots/www.retailspecs.com__VXi_700_5_MAN.md, Subwoofer Output Harness): 'Two pairs of wire leads are included to facilitate multiple subwoofer wiring. Both positive and both negative wire leads are connected in parallel inside the harness' (brown +, brown/white -)"),
     ("RCA_SUB", "Radio sub RCA out -> amplifier sub input", "RADIO (sub RCA out)", "AMP (sub input)", None, "RCA pair",
      "RetroSound Motor 2B user manual p.3 (reference_documents/component_drawings/RetroSound_Motor-2B_User_Manual.pdf): "
      "'Multi-channel pre-amp outputs (front, rear, subwoofer)'; the JL VX700/5i DSP does 'input routing and mixing' "
@@ -868,6 +871,15 @@ IMPLIED_EXTRA_0927.update({
     "REAR_ST_R": {"control": "PDM30 logic: brake DIG14, right turn DIG5 (flash); hazard = DIG4 + DIG5 together"},
 })
 IMPLIED_EXTRA.update(IMPLIED_EXTRA_0927)
+# RSI pass 29: woofer 2 takes the amp sub harness's second lead pair; the jumpers retire (a push terminal holds one 10 AWG wire)
+IMPLIED_EXTRA.update({
+    "30c": {"color": "red", "length_ft": 18.4, "length_basis": "the run of #30a: both woofers sit in one sealed box (endpoints SUB, SUB-2)"},
+    "30d": {"color": "black", "length_ft": 18.4, "length_basis": "the run of #30b: both woofers sit in one sealed box (endpoints SUB, SUB-2)"},
+})
+IMPLIED_RETIRED.update({
+    "SUB_JMP_P": "JBL Club shallow subwoofer owner's manual (web_snapshots/www.sonicelectronix.com__club10_12.md): push terminals take bare or tinned wire 14 to 8 AWG, one hole each; two 10 AWG wires are 20,760 CM against 8 AWG's 16,510, and no MiniSeal stub splice takes 10 AWG (TE/Raychem D-609-05 tops out at 6,755 CMA). JL VX700/5i connection guide (reference_documents/web_snapshots/www.retailspecs.com__VXi_700_5_MAN.md, Subwoofer Output Harness): 'Two pairs of wire leads are included to facilitate multiple subwoofer wiring. Both positive and both negative wire leads are connected in parallel inside the harness' (brown +, brown/white -); woofer 2 takes pair 2 (#30c/#30d) instead (RSI pass 29)",
+    "SUB_JMP_N": "JBL Club shallow subwoofer owner's manual (web_snapshots/www.sonicelectronix.com__club10_12.md): push terminals take bare or tinned wire 14 to 8 AWG, one hole each; two 10 AWG wires are 20,760 CM against 8 AWG's 16,510, and no MiniSeal stub splice takes 10 AWG (TE/Raychem D-609-05 tops out at 6,755 CMA). JL VX700/5i connection guide (reference_documents/web_snapshots/www.retailspecs.com__VXi_700_5_MAN.md, Subwoofer Output Harness): 'Two pairs of wire leads are included to facilitate multiple subwoofer wiring. Both positive and both negative wire leads are connected in parallel inside the harness' (brown +, brown/white -); woofer 2 takes pair 2 (#30c/#30d) instead (RSI pass 29)",
+})
 
 # Decisions made after v4.2 that change an existing v4.2 row (cited). Applied over the v4.2 value;
 # the old value is kept in `conflicts`, so each row reads its own history. Nothing is deleted:
@@ -1010,8 +1022,13 @@ D0927 = {
                   "(3 % drop over 18.4 ft) is past the Superseal contact's 24-16 AWG and MoTeC's 24#-20# for 8 A outputs (p.48), "
                   "so it moves to the free 20 A pair OUT5 (A9 + A17, PDM manual p.43) and takes the pigtail + M81824/1-3 "
                   "treatment of #21; OUT10 is free again (book review 2026-09-28); " + AGENT},
-    "23": {"frm": "PDM15:OUT11", "to": {"device": "AC-CLUTCH", "pin": "clutch lead", "terminal": "open"},
+    "23": {"frm": "PDM15:OUT8", "awg": 18, "to": {"device": "AC-CLUTCH", "pin": "clutch lead", "terminal": "open"},
            "control": "CAN: M130 A/C request, interlocked by the PDM15 low/high pressure switch inputs",
+           "conflict": ("decision: frm PDM15:OUT11 -> PDM15:OUT8, awg 20 -> 18 (RSI pass 24) — the Sanden SD7 clutch draws up to 4.2 A "
+                        "(SD7 service manual p.14), so the limit is ceil(1.25 x 4.2) = 6 A; 20 AWG at 100 C is 6 A (PDM manual p.48), "
+                        "0.85 x 6 = 5.1 A < 6. 18 AWG (9 A, 0.85 x 9 = 7.6 A) carries it, but MoTeC wants 24#-20# on an 8 A output "
+                        "(p.6, p.48), so the clutch moves to PDM15's free 20 A output OUT8 (B7 + B13, p.43): two 20 AWG pigtails into "
+                        "an M81824/1-2 and the 18 AWG run, the treatment #64 got in round 4. OUT11 is free again"),
            "why": "compressor ordered 2026-09-24 (state §1 A/C hard parts); clutch is an engine-bay load; " + AGENT},
     "64": {"frm": "PDM15:OUT7", "label": "LTCD power (+12 V)", "awg": 16, "spec": "M22759/32",
            "conflict": ("decision: awg 18 -> 16 — OUT12 needs ceil(1.25 x 6.1 A) = 8 A; 18# is 9 A at 100 C (PDM manual p.48), 0.85 x 9 = "
@@ -1353,6 +1370,19 @@ for _k, _v in D0927B.items():
         _v = dict(_v, why=_d["why"] + " | " + _v["why"])
     _d.update(_v)
 
+# 2026-10-14: the harness model's geometry check (v_harness_segment_geometry) found four PDM30 -> Dakota VHX wires planned
+# shorter than the straight line between their plugs in the twin (3.59 ft): #119 and #120 at 1.5 ft, #71 and #39 at
+# 3.5 ft, all cut list v4.2 zone estimates. The twin routes this run as landmark L18 (PDM30 -> the DASH_CLUSTER anchor,
+# where the Dakota VHX box sits). length_ft is the route; the 15 % body pad (state row 33) is applied downstream
+# (kits_v5.py BOM feet), so it is not added here.
+_TWIN_L18 = ("twin: landmark L18, PDM30 -> DASH_CLUSTER (headlight-switch dash region, the Dakota VHX box's anchor), 43.4 in "
+             "= 3.62 ft along the routed polyline (output/K5_landmarks_blender_derived.yaml; k5LandmarkPaths.ts L18), rounded "
+             "up to 0.1 ft; the 15 % body pad (state row 33) is applied downstream; the PDM30 position is the twin's assertion A2 "
+             "(state section 4); replaces the cut list v4.2 zone estimate, which was shorter than the 3.59 ft straight line; "
+             "not taped on the truck")
+for _k in ("119", "120", "71", "39"):
+    DECISIONS.setdefault(_k, {}).update(length_ft=3.7, length_basis=_TWIN_L18)
+
 # Subsystem for wires no subsystems.json list carries (v4.1/v4.2/05-14 additions + implied), by the section or
 # decision that added them — the recalc engine and the app toggle on this field, so every wire needs one.
 SUBSYSTEM_RULES = [
@@ -1384,7 +1414,7 @@ SUBSYSTEM_RULES = [
     (r"^(DOME_GND|UD_GND|FW_GND|UH_GND|CARGO_GND)$", "LIGHTING_INTERIOR", "interior lamp grounds (2026-09-27)"),
     (r"^(WASH_.*|WIPER_.*)$", "WIPERS_WASHER", "factory wiper circuit and washer ground (2026-09-27)"),
     (r"^(BLOWER_.*)$", "HVAC_AC", "factory Four-Season blower circuit (2026-09-27)"),
-    (r"^(RADIO_.*|RCA_.*|AMP_GND|SUB_JMP_.*)$", "AUDIO", "head unit, amplifier, woofer jumpers (2026-09-27)"),
+    (r"^(RADIO_.*|RCA_.*|AMP_GND|SUB_JMP_.*|30[cd])$", "AUDIO", "head unit, amplifier, woofer jumpers (2026-09-27), woofer 2's own pair (RSI pass 29)"),
     (r"^(USB_GND|OUT12V_GND)$", "ACCESSORY_12V", "accessory grounds (2026-09-27)"),
     (r"^(STEP_.*)$", "AMP_STEPS", "AMP Research harness (2026-09-27)"),
     (r"^(ESTOPP_.*)$", "EPARKING_BRAKE", "E-Stopp (2026-09-27)"),
@@ -1627,6 +1657,9 @@ def pins_from_terminations(reg):
         if w.get("retired"):
             continue
         tl = ends.get(str(w["id"]), [])
+        # RSI pass 26: a wire that ends at the splice beside a pin reaches that pin through the splice's lead
+        tl = tl + [dict(t, endpoint=eps[t["endpoint"]]["pin_splice"]["plug"], cavity=eps[t["endpoint"]]["pin_splice"]["cavity"])
+                   for t in tl if (eps.get(t["endpoint"]) or {}).get("pin_splice")]
         frm = str(w.get("frm") or "")
         start = base(frm)
         far = [t for t in tl if not str(t["endpoint"]).startswith(_BOXES) and t["endpoint"] != start
@@ -1666,7 +1699,8 @@ def length_kind(w):
     if not w.get("length_ft"):
         return None
     b = str(w.get("length_basis") or "").lower()
-    return "tape" if b.startswith("tape") else "twin" if b.startswith("twin") else "estimate"
+    return ("tape" if b.startswith("tape") else "twin" if b.startswith("twin") else "route" if b.startswith("route")
+            else "design" if b.startswith("design") else "estimate")
 
 
 
@@ -1772,7 +1806,7 @@ PDM_LOADS = {   # (box, output): (running current A or None, source or what clos
     ("PDM15", 5): (5.1, "QFS P367 (HFP-367) web_snapshots/www.highflowfuel.com__fuel-pump-oem-replacement-hfp-367-qfs.md: 'Flow: 145LPH, Draws 5.1 Amps @ 60psi'"),
     ("PDM15", 9): (0.025, "Holley 197-400 pigtail, 560 ohm in line (holley_midmount_fitment.pdf p.15): 14 V / 560 ohm"),
     ("PDM15", 13): (None, "needs the PCS TCM-2650 ignition current (ZGP harness drawing / guide). OPEN until the TCM-4610 drawing: if the kit feeds case 12 (switched ignition, PNK) and case 9 (accessory, YEL) from the PCS ignition lead, their wake current is on this output too"),
-    ("PDM15", 11): (None, "needs the Sanden SD7B10 clutch coil current (Sanden spec)"),
+    ("PDM15", 8): (4.2, "Sanden SD7 service manual p.14 §10.4 (component_drawings/Sanden_SD7_Service_Manual.pdf; SD7B10 listed p.3): 'Normal current should be 3.6 - 4.2A at 12VDC', the top of the range (RSI pass 23)"),
     ("PDM15", 7): (6.1, "LTC manual p.31 + p.37: over 6.1 A cold for two sensors (a lower bound)"),
     ("PDM30", 1): (11.0, "CANDIDATE Nu-Relics 17383-1 ACI motor, 11 A high load (20 A stall); the base factory motor is absent"),
     ("PDM30", 2): (None, "needs the 4 Seasons 35587 blower current on HIGH (no published rating: measure)"),
@@ -1781,11 +1815,11 @@ PDM_LOADS = {   # (box, output): (running current A or None, source or what clos
     ("PDM30", 5): (0.5, "#93 CHMSL ORACLE 4514-003 0.5 A + the PCS_BRK brake-signal input, mA — OPEN; "
                         "ORACLE 6 W at 12 V (web_snapshots/www.oraclelights.com__...chmsl-module-red.md); the input currents are not in ZGP guide rev2 p.18 or Holley 558-499 p.3"),
     ("PDM30", 6): (None, "needs the 4 Seasons 35587 blower current on LOW/MED through the resistor (measure)"),
-    ("PDM30", 7): (None, "needs the E-Stopp ESK001 engage current (estopp.com FAQ gives no figure)"),
+    ("PDM30", 7): (8, "E-Stopp standard kit page (web_snapshots/www.estopp.com__e-stopp-standard-kit.md:264-267, 2026-10-15): 'Power Requirement: 12V/10A constant power', 'Draws 3-8A when operating'; it runs about 8-10 s to full stroke (E-Stopp_ESK001_Installation.pdf p.1), a pulse the PDM's 20-50 s filter rides (PDM manual p.23) (RSI pass 23)"),
     ("PDM30", 8): (15.0, "Blue Sea 1011 dash socket, 15 A max (web_snapshots/www.bluesea.com__Dash_Socket_12V_DC_with_Watertight_Cap.md)"),
     ("PDM30", 9): (None, "needs the iBooster pin 20 current (Bosch; the OEM 5 A fuse is not the draw)"),
     ("PDM30", 10): (None, "needs the E-Stopp F (safety-to-ignition) current"),
-    ("PDM30", 11): (None, "needs the RetroSound memory (constant) current"),
+    ("PDM30", 11): (15, "RetroSound Motor 2B user manual printed p.21 (component_drawings/RetroSound_Motor-2B_User_Manual.pdf): 'Current Consumption (during operation) Max. 15A', the whole radio with its internal amp at full output, fused on this yellow lead (p.19). This build runs the speakers off the external amp, so its draw is lower: bench the yellow lead at 13.5 V with the speaker outputs open and USB loaded (RSI pass 23)"),
     ("PDM30", 12): (5.0, "1977 Light Truck Service Manual p.812 wiper trouble chart: 'Current Draw Normal (3.5 — 5.0 amps.)' (the upper figure; a bench reading, wiper detached: the on-truck draw with linkage and wet glass is a clamp-meter measurement at mock-up). p.810: 'Ammeter Reading — 20+ Amps ... will stall wiper' is the stall current: over the 8 A output, so a jammed blade trips OUT12 through the filtered over-current (PDM manual p.23-24: inrush is ridden through, a sustained overload shuts down), backed by the motor's internal circuit breaker (p.802). The limit also protects WIPER_T1, WIPER_T3 and WIPER_SW_GND: every ampere enters at the center terminal (p.803)"),
     ("PDM30", 13): (2.36, "4 x 1157 dim filament 0.59 A (2 tail + 2 front park; 1977 Light Truck Service Manual p.838 lamp bulb data (trade numbers); 1157 2.1 A (bright) / 0.59 A (dim) (web_snapshots/www.autolumination.com__visual_bulb_finder.md)); the Dakota DIM (+) is a sense input, not counted"),
     ("PDM30", 14): (None, "needs the horn current"),
@@ -1801,13 +1835,13 @@ PDM_LOADS = {   # (box, output): (running current A or None, source or what clos
                          "p.48) would carry 12 A, but the base build's free 20 A outputs are OUT3 and OUT4 and both belong to PW (candidate): "
                          "PL can't take one without dropping PW"),
     ("PDM30", 22): (2.1, "1157 bright filament (1977 Light Truck Service Manual p.838 lamp bulb data (trade numbers); 1157 2.1 A (bright) / 0.59 A (dim) (web_snapshots/www.autolumination.com__visual_bulb_finder.md))"),
-    ("PDM30", 23): (None, "needs the RVS mirror display current (rearviewsafety.com gives none)"),
-    ("PDM30", 24): (None, "needs the M130 supply current (no consumption figure in the M1 techspec on file)"),
+    ("PDM30", 23): (0.67, "RVS-7180355-IR mirror monitor specs (web_snapshots/www.rearviewsafety.com__license-plate-backup-camera-system-rvs-7180355-ir.md:490-491): 'Power Consumption 8W', 0.67 A at 12 V (RSI pass 23)"),
+    ("PDM30", 24): (0.34, "MoTeC M130 product page (web_snapshots/www.motec.com.au__M130.md:88, 2026-10-15): 'Typical no-load supply current: 0.34 A at 13.8 V supply'; the throttle servo's current also enters at A26 through the half bridges (RMS 4 A at most): log it before calling the limit final (RSI pass 23)"),
     ("PDM30", 25): (4.73, "dome 211-2 0.97 A + underhood 93 1.04 A (1977 Light Truck Service Manual p.838 lamp bulb data (trade numbers); 211-2 0.97 A (web_snapshots/www.autolumination.com__visual_bulb_finder.md); 93 1.04 A (web_snapshots/lightingsupply.com__standard-93.md)) + Lumitec 101241 0.36 A x 2 + Truck-Lite 80251C 2 A (vendor pages)"),
-    ("PDM30", 26): (None, "needs the Hella 8TW 004 223-031 pump current: Hella's product information (web_snapshots/www.hella.com__BI_Washer-pumps-and-water-tanks_2026.md) gives 12 V, 2 bar, 1 l/min and the plug, not the current: bench it"),
+    ("PDM30", 26): (None, "needs the factory washer ratchet solenoid's coil current: the Hella pump and tank were retired on 2026-09-29 and #50 now feeds the solenoid on the wiper gearbox (endpoint WASHER-PUMP); the 1977 LTSM (p.803, p.814) gives no current: bench it (RSI pass 23)"),
     ("PDM30", 27): (2.1, "1157 bright filament front turn (1977 Light Truck Service Manual p.838 lamp bulb data (trade numbers); 1157 2.1 A (bright) / 0.59 A (dim) (web_snapshots/www.autolumination.com__visual_bulb_finder.md)); the Dakota turn input is a sense input"),
     ("PDM30", 28): (2.1, "1157 bright filament front turn (1977 Light Truck Service Manual p.838 lamp bulb data (trade numbers); 1157 2.1 A (bright) / 0.59 A (dim) (web_snapshots/www.autolumination.com__visual_bulb_finder.md)); the Dakota turn input is a sense input"),
-    ("PDM30", 29): (None, "needs the Dakota VHX and GSS-3000 currents (manuals give none)"),
+    ("PDM30", 29): (1.02, "Dakota VHX manual 650314:P p.7: 'the system draws less than 1 amp'; GSS-3000 manual p.10 (web_snapshots/www.dakotadigital.com__GSS-3000.md:533-535): 'W/O Safety Relay ~ 20 mA' (the registry wires no safety relay) (RSI pass 23)"),
     ("PDM30", 30): (None, "needs the Blue Sea 1045 input current (4.8 A out at 5 V; input not published)"),
 }
 PAIRED_WITH = {("PDM15", 1): ("PDM15", 6)}
@@ -2017,6 +2051,27 @@ def main():
     assign_subsystems(list(wires) + list(implied))
     pigtails = add_pigtails(list(wires) + list(implied))
     implied += pigtails
+    # RSI pass 42: a PDM pigtail, and the PCS ignition pin lead, runs from a Superseal contact into the in-line splice
+    # beside the plug: the pin leads' pattern (kits_v5.LEAD_IN, RSI pass 26), which had no length here, so 33 segments
+    # had no plan and the pigtails' stock claimed no feet. Each splice's legs are one length (PDM_PIGTAIL_NOTE: "equal
+    # length"); a box's splices alternate 4 and 6 in by output number so they don't stack in the bundle. The cut is still
+    # made at the formboard (kits_meta deferred).
+    import kits_v5
+    _leg = defaultdict(list)
+    for w in list(wires) + list(implied):
+        m = re.match(r"(PDM15|PDM30):", str(w.get("frm") or ""))
+        spl = re.match(r"SPL-(PDM15|PDM30)-OUT(\d+)\b", str(w.get("to") or ""))
+        if m and spl and m.group(1) == spl.group(1) and not w.get("retired") and not isinstance(w.get("length_ft"), (int, float)):
+            _leg[(spl.group(1), int(spl.group(2)))].append(w)
+    for box in {b for b, _ in _leg}:
+        for k, out in enumerate(sorted(o for b, o in _leg if b == box)):
+            inch = kits_v5.LEAD_IN[k % len(kits_v5.LEAD_IN)]
+            for w in _leg[(box, out)]:
+                w["length_ft"] = round(inch / 12, 2)
+                w["length_basis"] = (f"design call, RSI pass 42: {inch} in from the {box} contact to the in-line splice "
+                                     f"SPL-{box}-OUT{out}, every leg of the splice one length; a box's splices alternate "
+                                     f"{kits_v5.LEAD_IN[0]} and {kits_v5.LEAD_IN[1]} in, staggered (the pin leads' rule, RSI "
+                                     f"pass 26); cut at the formboard")
     # 22 AWG signal wire is M22759/16-22, not /32-22 (2026-09-26 PM): MoTeC specifies "22# Tefzel wire (Mil Spec
     # M22759/16-22)" (C125 manual p.20) and tables M22759/16 (PDM manual p.48); /32-22 is 0.043 in = 1.09 mm OD
     # (ProWire AS22759/32 datasheet) — under the 1.20–1.85 mm seal range of GT150 22–20 terminals (12191818 tech
@@ -2025,6 +2080,32 @@ def main():
         if w.get("awg") == 22 and str(w.get("spec") or "").startswith("M22759/32"):
             w.setdefault("conflicts", []).append(WIRE22_WHY)
             w["spec"] = "M22759/16" + str(w["spec"])[len("M22759/32"):]
+    # RSI pass 39: a wire's route over the twin graph (inputs/route_lengths.json, export_route_lengths.py from the live
+    # model). No length: the complete route. A zone estimate or an older twin path (taken before the route graph and the
+    # cab placement of the PDM30): the longer of the two, because a twin route carries no modelled slack or service loop
+    # and so never shortens a cut. Tape and design lengths stand. A wire with one segment, or a through run (RSI pass
+    # 40): one path whose only interior plugs are crossings (the 61-pin, a body bulkhead, a door pass-through), so its
+    # segments sum to the wire. A bus (CAN, the door-lock buses) is a tree, not a run, and waits.
+    _rl = json.load((INPUTS / "route_lengths.json").open()) if (INPUTS / "route_lengths.json").exists() else {}
+    _crossing = re.compile(r"^(FIREWALL-CABIN|FIREWALL-BODY-[A-Z]|DOOR-[LR]-PASS(-P)?)$")
+    for w in list(wires) + list(implied):
+        r = (_rl.get("wires") or {}).get(str(w["id"]))
+        run = r and (r.get("segments") == 1 or (r.get("chain") and all(_crossing.match(p) for p in r["chain"][1:-1])))
+        if (not r or not r.get("complete") or not run or w.get("retired")
+                or length_kind(w) not in (None, "estimate", "twin")):
+            continue
+        route_ft = math.ceil(r["route_in"] / 12 * 10) / 10
+        old = w.get("length_ft")
+        if isinstance(old, (int, float)) and old >= route_ft:
+            continue
+        via = f" through {', '.join(r['chain'][1:-1])}" if r.get("segments", 1) > 1 and r.get("chain") else ""
+        w.setdefault("conflicts", []).append(
+            f"decision: length_ft {old} -> {route_ft} — its route over the twin graph is {r['route_in']} in over {r['branches']} "
+            f"branches{via} ({_rl.get('exported_at')}, inputs/route_lengths.json)"
+            + (f", longer than the {'twin path' if length_kind(w) == 'twin' else 'zone estimate'}" if old else ""))
+        w["length_ft"] = route_ft
+        w["length_basis"] = (f"route over the twin graph: {r['route_in']} in over {r['branches']} branches{via} "
+                             f"(inputs/route_lengths.json, {_rl.get('exported_at')}); the cut adds the pad")
     for w in list(wires) + list(implied):
         w["length_kind"] = length_kind(w)
         if isinstance(w.get("awg"), int):          # one printed gauge per cable, parallel conductors included

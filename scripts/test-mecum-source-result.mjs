@@ -4,7 +4,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { createHash, createHmac, webcrypto } from 'node:crypto';
+import { createHash, generateKeyPairSync, sign as signWith, webcrypto } from 'node:crypto';
+// Signed-in sessions as Auth issues them since 2026-10-14: ES256, verified against the project JWKS.
+const userKeys = generateKeyPairSync('ec', { namedCurve: 'P-256' });
+const userJwks = JSON.stringify({ keys: [{ ...userKeys.publicKey.export({ format: 'jwk' }), kid: 'fixture', alg: 'ES256' }] });
+const es256 = signing => signWith('sha256', Buffer.from(signing), { key: userKeys.privateKey, dsaEncoding: 'ieee-p1363' }).toString('base64url');
 import { dirname, resolve } from 'node:path';
 import { runInNewContext } from 'node:vm';
 
@@ -212,6 +216,7 @@ const previewSources = new Map([
   ['extractor', compile(owner)],
   ['archive', compile('supabase/functions/_shared/archiveFetch.ts')],
   ['guard', compile('supabase/functions/_shared/writeGuard.ts')],
+  ['keys', compile('supabase/functions/_shared/supabaseKeys.ts')],
 ]);
 function previewFixture(options = {}) {
   const requests = [], modules = new Map(), handlers = new Map();
@@ -247,7 +252,7 @@ function previewFixture(options = {}) {
   const supabase = createClient('https://fixture.invalid', 'svc-test', {
     global: { fetch: http }, auth: { persistSession: false, autoRefreshToken: false },
   });
-  const env = { SUPABASE_URL: 'https://fixture.invalid', SUPABASE_SERVICE_ROLE_KEY: 'svc-test', SUPABASE_JWT_SECRET: 'test-jwt' };
+  const env = { SUPABASE_URL: 'https://fixture.invalid', SUPABASE_SERVICE_ROLE_KEY: 'svc-test', SUPABASE_JWKS: userJwks };
   function load(name) {
     if (modules.has(name)) return modules.get(name);
     const exports = {}; modules.set(name, exports);
@@ -261,6 +266,12 @@ function previewFixture(options = {}) {
         if (specifier === 'https://esm.sh/parse5@7.3.0') return { parse: parseHtml };
         if (specifier === '../_shared/archiveFetch.ts') return load('archive');
         if (specifier === '../_shared/writeGuard.ts') return load('guard');
+        if (specifier === './supabaseKeys.ts' || specifier === '../_shared/supabaseKeys.ts') return load('keys');
+        if (specifier === '../_shared/vehicleEventWrite.ts') return { patchForLiveRow: () => assert.fail('No event write in the preview'), writeVehicleEventByKey: () => assert.fail('No event write in the preview') };
+        if (specifier === './indexLot.ts') return { indexLot: () => assert.fail('No index read in the preview'), parseSaleFacet: () => assert.fail('No index read in the preview') };
+        if (specifier === '../_shared/writeResult.ts') return { mustWrite: () => assert.fail('No write in the preview'), softWrite: () => assert.fail('No write in the preview') };
+        if (specifier === './identityFill.ts') return { fillOnlyIdentity: () => assert.fail('No identity write in the preview') };
+        if (specifier === './rscPost.ts') return { postFromFlight: () => assert.fail('No app-router lot read in the preview') };
         if (specifier === './apiKeyAuth.ts') return { hashApiKey: () => assert.fail('No API-key path') };
         if (specifier === './batFetcher.ts') return { fetchBatPage: () => assert.fail('No source fetch'), logFetchCost: () => assert.fail('No paid fetch'), isLoginPage: () => false };
         if (specifier === './hybridFetcher.ts') return { fetchPage: () => assert.fail('No source fetch') };
@@ -304,9 +315,9 @@ test('inline preview avoids storage; ordinary archive reads still return markdow
 });
 test('anonymous and signed-in callers cannot access protected preview source', async () => {
   const f = previewFixture(); assert.equal((await f.run({}, '')).status, 401); assert.equal(f.requests.length, 0);
-  const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
+  const header = Buffer.from(JSON.stringify({ alg: 'ES256', typ: 'JWT', kid: 'fixture' })).toString('base64url');
   const payload = Buffer.from(JSON.stringify({ role: 'authenticated', sub: '00000000-0000-4000-8000-000000000001', exp: Math.floor(Date.now() / 1000) + 3600 })).toString('base64url');
-  const token = header + '.' + payload + '.' + createHmac('sha256', 'test-jwt').update(header + '.' + payload).digest('base64url');
+  const token = header + '.' + payload + '.' + es256(header + '.' + payload);
   const user = previewFixture(), r = await user.run({}, token);
   assert.equal(r.status, 403); assert.equal(r.body.reason, 'service_role_required'); assert.equal(user.requests.length, 0);
 });

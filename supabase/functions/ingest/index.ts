@@ -17,7 +17,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
-import { normalizeVehicleFields, normalizeMake, isGarbageMake } from "../_shared/normalizeVehicle.ts";
+import { normalizeVehicleFields, normalizeMake } from "../_shared/normalizeVehicle.ts";
 import { qualityGate } from "../_shared/extractionQualityGate.ts";
 import { validateVINChecksum } from "../_shared/intelligence-layer.ts";
 import { decodeVin } from "../_shared/vin-decoder.ts";
@@ -25,14 +25,21 @@ import { archiveFetch } from "../_shared/archiveFetch.ts";
 import { normalizeListingUrl } from "../_shared/urlNormalization.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { writeObservation } from "../_shared/observationWriter.ts";
+import { insertMissingVehicleImages } from "../_shared/vehicleImageWrite.ts";
+import { applyCraigslistImagePlan, planCraigslistImages } from "../_shared/craigslistImages.ts";
+import { landCraigslistBlip, modelFromText, type ModelCitation } from "./craigslistBlip.ts";
 import { type CraigslistCapture, pickCapture } from "../_shared/craigslistAttributes.ts";
 import { type CaptureLanding, landCraigslistCapture, ledgerFields } from "./craigslistCapture.ts";
+import { vinMakeCheckApplies } from "./vinGate.ts";
+import { classifiedListingId, classifiedPlatform, landClassifiedListing } from "./classifiedEvent.ts";
 import { slugStubRejection } from "./slugStub.ts";
+import { parseVehicleTitle, type ParsedVehicle } from "./vehicleTitle.ts";
 import { extractFromHtml } from "../extract-craigslist/extract.ts";
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const supabaseAdmin = createClient(
   Deno.env.get("SUPABASE_URL")!,
-  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+  projectSecretKey()!,
   { global: { headers: { "X-Nuke-Writer": "ingest" } } },
 );
 
@@ -272,6 +279,7 @@ async function resolveCraigslistShareUrl(shareUrl: string): Promise<{ url: strin
     const canonicalTag = html.match(/<link\b[^>]*\brel\s*=\s*["'][^"']*\bcanonical\b[^"']*["'][^>]*>/i)?.[0];
     const canonical = canonicalTag?.match(/\bhref\s*=\s*(["'])([^"']+)\1/i)?.[2];
     if (canonical === requested.href) {
+      // A post with no asking price has no JSON-LD name; extractFromHtml reads its title line (2026-10-15).
       const detail = extractFromHtml(html, shareUrl);
       if (detail.post_id && detail.title && detail.description) return { url: shareUrl, postId: detail.post_id, error: null };
       // A self-canonical shell/expired page cannot borrow a recommendation's identity.
@@ -291,181 +299,6 @@ async function resolveCraigslistShareUrl(shareUrl: string): Promise<{ url: strin
     console.error(`Craigslist share resolution failed for ${shareUrl}:`, error);
     return { url: null, postId: null, error };
   }
-}
-
-// ── Vehicle Title Parser ────────────────────────────────────────
-
-// Title-parsing make list — includes common aliases for matching.
-// normalizeMake() from normalizeVehicle.ts handles canonical form conversion.
-const MAKES = [
-  "Toyota", "Ford", "Chevrolet", "Chevy", "Honda", "Nissan", "BMW",
-  "Mercedes-Benz", "Mercedes", "Audi", "Porsche", "Volkswagen", "VW",
-  "Dodge", "Ram", "Jeep", "GMC", "Cadillac", "Lincoln", "Buick",
-  "Pontiac", "Oldsmobile", "Plymouth", "Chrysler", "Mazda", "Subaru",
-  "Lexus", "Acura", "Infiniti", "Hyundai", "Kia", "Volvo", "Jaguar",
-  "Land Rover", "Mini", "AMC", "International", "Studebaker", "Datsun",
-  "Triumph", "MG", "Austin-Healey", "Shelby", "Saab", "Peugeot",
-  "Fiat", "Alfa Romeo", "Ferrari", "Lamborghini", "Maserati", "Lotus",
-  "De Tomaso", "Jensen", "TVR", "Morgan", "Sunbeam", "Opel",
-  "Willys", "Kaiser", "Nash", "Hudson", "Packard", "Lancia",
-  "DeLorean", "Isuzu", "Mitsubishi", "Suzuki", "Eagle",
-  "Aston Martin", "Rolls-Royce", "Bentley", "McLaren", "Bugatti",
-  "Tesla", "Rivian", "Hummer", "International Harvester",
-  "AM General",
-];
-
-/**
- * MAKES matched longest-first, with hyphen and space treated as equivalent.
- *
- * Two bugs this closes, both measured in live rows on 2026-07-26:
- *  - URL slugs arrive with hyphens already turned into spaces
- *    ("mercedes benz 350slc"), so a literal startsWith("Mercedes-Benz") misses
- *    and the shorter alias "Mercedes" matches instead — consuming half the make
- *    and leaving the rest at the head of the model. Result: make
- *    "Mercedes-Benz" + model "benz sl500". 20 distinct corrupted model strings
- *    in 24h.
- *  - Array order decided which make won, so "International" shadowed
- *    "International Harvester" the same way.
- * Sorting by length makes the more specific make always win regardless of where
- * anyone adds an entry, and `[-\s]*` also catches the run-together spelling
- * ("rollsroyce") that RM Sotheby's slugs use.
- */
-const MAKE_MATCHERS: Array<{ make: string; re: RegExp }> = [...MAKES]
-  .sort((a, b) => b.length - a.length)
-  .map((make) => ({
-    make,
-    re: new RegExp(
-      "^" + make.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/[-\s]+/g, "[-\\s]*") + "\\b",
-      "i",
-    ),
-  }));
-
-interface ParsedVehicle {
-  year: number | null;
-  make: string | null;
-  model: string | null;
-}
-
-// Models/sub-brands that unambiguously identify a make when the title omits it.
-// Improves title parsing for facebook-saved and other sources with informal titles.
-const MODEL_IMPLIES_MAKE: Record<string, string> = {
-  // Chevrolet
-  "corvette": "Chevrolet", "camaro": "Chevrolet", "chevelle": "Chevrolet",
-  "nova": "Chevrolet", "el camino": "Chevrolet", "impala": "Chevrolet",
-  "bel air": "Chevrolet", "monte carlo": "Chevrolet", "blazer": "Chevrolet",
-  "silverado": "Chevrolet", "suburban": "Chevrolet",
-  "c10": "Chevrolet", "c-10": "Chevrolet", "c20": "Chevrolet", "c-20": "Chevrolet",
-  "c30": "Chevrolet", "c-30": "Chevrolet", "k10": "Chevrolet", "k-10": "Chevrolet",
-  "k20": "Chevrolet", "k-20": "Chevrolet", "k5": "Chevrolet",
-  "square body": "Chevrolet", "squarebody": "Chevrolet",
-  "stingray": "Chevrolet",
-  // GMC
-  "k15": "GMC", "k-15": "GMC",
-  // Ford
-  "mustang": "Ford", "bronco": "Ford", "thunderbird": "Ford",
-  "f-100": "Ford", "f100": "Ford", "f-150": "Ford", "f150": "Ford",
-  "f-250": "Ford", "f250": "Ford", "f-350": "Ford", "f350": "Ford",
-  "fairlane": "Ford", "galaxie": "Ford", "falcon": "Ford",
-  // Dodge / Plymouth
-  "charger": "Dodge", "challenger": "Dodge", "coronet": "Dodge",
-  "roadrunner": "Plymouth", "road runner": "Plymouth",
-  "barracuda": "Plymouth", "'cuda": "Plymouth", "cuda": "Plymouth",
-  "duster": "Plymouth", "satellite": "Plymouth", "gtx": "Plymouth",
-  // Pontiac
-  "firebird": "Pontiac", "trans am": "Pontiac", "gto": "Pontiac",
-  // Mercury / Dodge / Plymouth / Jeep / AMC bare models
-  "comet": "Mercury", "cougar": "Mercury",
-  "dart": "Dodge",
-  "valiant": "Plymouth",
-  "gremlin": "AMC", "javelin": "AMC",
-  "wrangler": "Jeep", "cj": "Jeep", "cj5": "Jeep", "cj7": "Jeep", "yj": "Jeep",
-  // Misc
-  "miata": "Mazda",
-  "scout": "International Harvester",
-  "moke": "MINI",
-};
-
-/**
- * Take the first few words after the make as the model.
- *
- * The old filter dropped EVERY purely-numeric word, which deleted real model
- * designations: Austin-Healey 3000 lost its model entirely and was then refused
- * by the minimum-viability gate; Land Rover Defender 90 became "defender";
- * Chevrolet 210, Ferrari 250, Datsun 510, BMW 2002 all the same. The filter was
- * aimed at listing ids and prices, so aim it there instead: ids are long (5+
- * digits — `cleanSlugTail` already trims the trailing one) and a repeat of the
- * year is noise, but a short number is part of the car's name.
- */
-function modelFromWords(text: string, year: number | null): string | null {
-  return text
-    .split(/[\s·•|—,\-$]+/)
-    .filter((w) =>
-      w &&
-      !/^\$/.test(w) &&
-      // keep 1-4 digit designations, drop long opaque ids
-      !(/^\d+$/.test(w) && w.length > 4) &&
-      // drop a restated year ("1969 chevrolet 1969 camaro")
-      !(year !== null && w === String(year))
-    )
-    .slice(0, 3)
-    .join(" ")
-    .trim() || null;
-}
-
-function parseVehicleTitle(text: string): ParsedVehicle {
-  if (!text) return { year: null, make: null, model: null };
-
-  // Strip common prefixes
-  const cleaned = text
-    .replace(/^(SOLD|PENDING|NEW|REDUCED|PRICE DROP)[:\s!-]*/i, "")
-    .trim();
-
-  // Extract year
-  const yearMatch = cleaned.match(/\b(19\d{2}|20[0-2]\d)\b/);
-  if (!yearMatch) return { year: null, make: null, model: null };
-  const year = parseInt(yearMatch[1]);
-
-  // Get text after year
-  const afterYear = cleaned.slice(cleaned.indexOf(yearMatch[0]) + yearMatch[0].length).trim();
-  const lower = afterYear.toLowerCase();
-
-  for (const { make, re } of MAKE_MATCHERS) {
-    const hit = afterYear.match(re);
-    if (hit) {
-      // Slice by what actually matched, not by the length of the MAKES entry —
-      // the two differ whenever the separator differs ("mercedes benz" is 13
-      // chars, "Mercedes-Benz" is 13 but "mercedesbenz" is 12).
-      const afterMake = afterYear.slice(hit[0].length).trim();
-      return { year, make: normalizeMake(make) || make, model: modelFromWords(afterMake, year) };
-    }
-  }
-
-  // No explicit make found — check if a known model name implies the make
-  for (const [keyword, impliedMake] of Object.entries(MODEL_IMPLIES_MAKE)) {
-    const re = new RegExp(`\\b${keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i");
-    if (re.test(lower)) {
-      // Extract model as the text starting from the keyword
-      const modelStart = lower.indexOf(keyword.toLowerCase());
-      const modelText = modelFromWords(afterYear.slice(modelStart), year) || keyword;
-      return { year, make: impliedMake, model: modelText };
-    }
-  }
-
-  // Tier 3 fallback: no known make/model matched. Take the first token that
-  // could plausibly be a make — skip leading dimension/engine/spec tokens
-  // ("5x8", "22r", "500cc", "115", a doubled year) that FB/CL titles lead with.
-  // If nothing plausible remains, make is UNKNOWN (null) — never a garbage
-  // token on a live listing. (Gate 5, 2026-07-08.)
-  const words = afterYear.split(/\s+/).filter(Boolean);
-  let mi = 0;
-  while (mi < words.length && isGarbageMake(words[mi])) mi++;
-  const candidate = words[mi] || null;
-  const make = candidate && !isGarbageMake(candidate) ? candidate : null;
-  return {
-    year,
-    make,
-    model: make ? words.slice(mi + 1, mi + 3).join(" ") || null : null,
-  };
 }
 
 // ── Price Parser ────────────────────────────────────────────────
@@ -788,6 +621,11 @@ async function matchOrCreateVehicle(
     source: platform && platform !== "unknown" ? platform : null,
     platform_source: platformSourceFor(platform), // C7: the platform key
   };
+  // A Craigslist post is a live classified when we read it. The column defaulted to false for every one of them
+  // (1,053 of 1,053 created in two days, 2026-10-15) while sale_status said "available".
+  if (platform === "craigslist") vehicleData.is_for_sale = true;
+  // A model read from the post's own text (craigslistBlip.modelFromText) says so; the span is on the observation.
+  if (parsed.modelSource) vehicleData.model_source = parsed.modelSource;
 
   // Populate everything we have (real vehicles columns only — the table has
   // engine_type, not engine, and no condition_notes column)
@@ -834,12 +672,17 @@ async function matchOrCreateVehicle(
     const imageRows = allImages.map((url: string, i: number) => ({
       vehicle_id: newVehicle.id,
       image_url: url,
+      position: i,
+      display_order: i,
       is_primary: i === 0,
       source: imageSourceFor(platform),
       is_external: true,
+      ai_processing_status: "skipped", // not requested: see the matched path below
       source_url: parsed.url || null,
     }));
-    await supabaseAdmin.from("vehicle_images").insert(imageRows);
+    // (Deployed 2026-10-15 with #1531: #1528's deploy died on its migration before the functions step.)
+    const imgWrite = await insertMissingVehicleImages(supabaseAdmin, newVehicle.id, imageRows);
+    if (imgWrite.error) console.error(`[ingest] vehicle_images insert ${newVehicle.id}: ${imgWrite.error.message}`);
   }
 
   // ── Create merge proposals for Tier 3 candidates ──────────────
@@ -927,8 +770,18 @@ async function enrichVehicle(vehicleId: string, data: VehicleEnrichment, platfor
     // Check which images already exist
     const { data: existingImages } = await supabaseAdmin
       .from("vehicle_images")
-      .select("image_url")
+      .select("id, image_url, is_primary, is_duplicate, vision_gate_status")
       .eq("vehicle_id", vehicleId);
+
+    if (platform === "craigslist") {
+      // The gallery at full size: add what is missing, supersede the 600x450 rows (never delete). See craigslistImages.ts.
+      const plan = planCraigslistImages(existingImages || [], allImages);
+      if (plan.insert.length > 0) {
+        const applied = await applyCraigslistImagePlan(supabaseAdmin, { vehicleId, sourceUrl: data.url || null, source: imageSourceFor(platform), plan });
+        if (applied.errors.length) console.error(`[ingest] craigslist images ${vehicleId}: ${applied.errors.slice(0, 3).join("; ")}`);
+      }
+      return;
+    }
 
     const existingUrls = new Set((existingImages || []).map((i: any) => i.image_url));
     const newImages = allImages.filter((url: string) => !existingUrls.has(url));
@@ -941,9 +794,12 @@ async function enrichVehicle(vehicleId: string, data: VehicleEnrichment, platfor
         is_primary: !hasPrimary && i === 0,
         source: imageSourceFor(platform),
         is_external: true,
+        ai_processing_status: "skipped", // listing photos are not analyzed unless someone asks; "pending" fires the photo pipeline per row
         source_url: data.url || null,
       }));
-      await supabaseAdmin.from("vehicle_images").insert(imageRows);
+      // A revisit never re-adds a photo the vehicle already holds (_shared/vehicleImageWrite.ts).
+      const imgWrite = await insertMissingVehicleImages(supabaseAdmin, vehicleId, imageRows);
+      if (imgWrite.error) console.error(`[ingest] vehicle_images insert ${vehicleId}: ${imgWrite.error.message}`);
 
       // Update primary_image_url if vehicle didn't have one
       if (!hasPrimary) {
@@ -978,6 +834,10 @@ interface EnrichedData {
   seller_name?: string | null;
   /** Canonicalized listing URL the extractor actually wrote to `vehicles.listing_url`, if it differs from the input URL. */
   listing_url?: string | null;
+  /** When the listing went up, if the extractor read it (ClassicCars and KSL events; ISO). */
+  posted_at?: string | null;
+  /** The seller class the source states (KSL sellerType, ClassicCars Listed By), as written. */
+  seller_type_raw?: string | null;
   /** Craigslist only: the post's attribute block, id and clocks, as extract-craigslist read them (see ./craigslistCapture.ts). */
   capture?: CraigslistCapture | null;
 }
@@ -988,7 +848,7 @@ type EnrichResult =
 
 async function tryAutoEnrich(url: string, platform: string): Promise<EnrichResult> {
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const serviceKey = projectSecretKey()!;
 
   // BaT delegates to extract-bat-core, a self-contained writer (it creates or
   // conservatively updates the vehicle row itself, resolving by
@@ -1109,6 +969,9 @@ async function tryAutoEnrich(url: string, platform: string): Promise<EnrichResul
     "bonhams.com": "extract-bonhams",
     "cars.bonhams.com": "extract-bonhams",
     "broadarrowauctions.com": "extract-broad-arrow",
+    "cars.ksl.com": "extract-ksl", // deterministic (page payload); no LLM
+    "collectingcars.com": "extract-collecting-cars", // deterministic (page payload via Firecrawl); no LLM
+    "classiccars.com": "extract-classiccars", // deterministic (page JSON-LD + attribute panel); no LLM
   };
   const host = new URL(url).hostname.replace(/^www\./, "").toLowerCase();
   const extractorName = extractors[platform] || hostExtractors[host] || "extract-vehicle-data-ai";
@@ -1185,6 +1048,8 @@ async function tryAutoEnrich(url: string, platform: string): Promise<EnrichResul
         seller_name: vehicle.seller || vehicle.seller_username || vehicle.seller_name || null,
         listing_url: vehicle.listing_url || (typeof vehicle.url === "string" ? vehicle.url : null),
         vehicle_id: writtenId || undefined,
+        posted_at: typeof vehicle.posted_at === "string" ? vehicle.posted_at : null,
+        seller_type_raw: typeof vehicle.seller_type === "string" ? vehicle.seller_type : null,
         capture: platform === "craigslist" ? pickCapture(vehicle) : null,
       },
     };
@@ -1229,7 +1094,7 @@ interface IngestInput {
 }
 
 interface IngestResult {
-  status: "created" | "matched" | "duplicate" | "rejected" | "error" | "preview";
+  status: "created" | "matched" | "duplicate" | "rejected" | "error" | "preview" | "unresolved";
   vehicle_id?: string | null;
   discovery_id?: string | null;
   is_new_vehicle?: boolean;
@@ -1252,6 +1117,8 @@ interface IngestResult {
   // Craigslist only: the post's id, clocks and attribute block (and, once a vehicle exists, how the landing went).
   // The poller copies it onto the import_queue ledger row, so the ledger carries what the page said.
   listing_capture?: Record<string, unknown>;
+  // Craigslist only: the unresolved-listing observation written when the post names no model (status "unresolved").
+  blip?: { observation: string; observation_id?: string; errors: string[] };
 }
 
 /**
@@ -1395,12 +1262,16 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
 
     // Auto-enrich: call the platform's extractor to get full listing data
     let capture: CraigslistCapture | null = null;
+    // Keep source prose beside its capture, separately from caller notes or retained vehicle text.
+    let captureDescription: string | null = null;
     const captureAnswer = (): { listing_capture?: Record<string, unknown> } =>
       capture ? { listing_capture: ledgerFields(capture) } : {};
     let enrichmentSucceeded = false;
     let enrichmentSkipped = false;
     let enrichmentError: string | null = null;
     let extractorVehicleId: string | undefined;
+    let enrichedPostedAt: string | null = null;
+    let enrichedSellerType: string | null = null;
 
     if (input.enrich !== false && listingUrl && !input.description) {
       const enrichResult = await tryAutoEnrich(listingUrl, platform);
@@ -1412,6 +1283,8 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
             enrichment_error: "Craigslist share detail post identity mismatch", source: platform, external_id: externalId };
         }
         extractorVehicleId = enriched.vehicle_id;
+        enrichedPostedAt = enriched.posted_at ?? null;
+        enrichedSellerType = enriched.seller_type_raw ?? null;
         // The extractor (e.g. extract-bat-core) may have written the vehicle
         // under its own canonicalized URL, which can differ from the URL we
         // were given (trailing slash, www, query params). Adopt it so the
@@ -1442,7 +1315,11 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
           input.location = normalizeLocation(enriched.location) ?? undefined;
         }
         if (!input.seller_name && enriched.seller_name) input.seller_name = enriched.seller_name;
-        if (enriched.capture) capture = enriched.capture;
+        if (enriched.capture) {
+          capture = enriched.capture;
+          captureDescription = typeof enriched.description === "string" && enriched.description.trim()
+            ? enriched.description : null;
+        }
         // Extracted identity beats slug-derived guesses (caller-explicit fields
         // were already merged into input above, so they still win)
         if (enriched.year && enriched.make) {
@@ -1478,6 +1355,28 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
         reason: `extractor skipped page: ${enrichmentError}`,
         source: platform,
         external_id: externalId,
+      };
+    }
+    // Craigslist: a blank model may be stated in the post's own text. Read it with its citation, or keep the post.
+    let modelCitation: ModelCitation | null = null;
+    if (platform === "craigslist" && capture && parsed.year && parsed.make && !parsed.model) {
+      modelCitation = modelFromText(input.description || input.notes, parsed.year, parsed.make);
+      if (modelCitation) { parsed.model = modelCitation.value; (parsed as any).modelSource = "listing_text"; }
+    }
+    if ((!parsed.year || !parsed.make || !parsed.model) && platform === "craigslist" && capture) {
+      // A blip: the post, its text, photos, place and clocks, retained with no vehicle (AGENTS.md).
+      const blip = await landCraigslistBlip(
+        { supabase: supabaseAdmin, writeObservation },
+        { listingUrl: listingUrl ?? input.url ?? "", capture, year: parsed.year ?? null, make: parsed.make ?? null,
+          description: input.description || input.notes, imageUrls: input.image_urls ?? (input.image_url ? [input.image_url] : null) },
+      );
+      return {
+        status: "unresolved",
+        reason: `insufficient identity: year=${parsed.year ?? "?"} make=${parsed.make ?? "?"} model=${parsed.model ?? "?"} — kept as an unresolved listing`,
+        blip,
+        source: platform,
+        external_id: externalId,
+        ...captureAnswer(),
       };
     }
     if (!parsed.year || !parsed.make || !parsed.model) {
@@ -1559,7 +1458,8 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
     const suggestions: Record<string, string> = {};
     if (candidateData.vin && typeof candidateData.vin === "string" && candidateData.vin.length >= 6) {
       const decoded = decodeVin(candidateData.vin);
-      if (decoded.make && candidateData.make) {
+      // Only a 17-character VIN with a valid check digit is decoded for make (./vinGate.ts); a chassis number is a claim.
+      if (vinMakeCheckApplies(candidateData.vin) && decoded.make && candidateData.make) {
         const vinMake = normalizeMake(decoded.make);
         const claimedMake = normalizeMake(candidateData.make);
         if (vinMake && claimedMake && vinMake !== claimedMake) {
@@ -1640,7 +1540,8 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
       year: gateResult.cleaned.year ?? parsed.year,
       make: gateResult.cleaned.make ?? parsed.make,
       model: gateResult.cleaned.model ?? parsed.model,
-    };
+      ...((parsed as any).modelSource ? { modelSource: (parsed as any).modelSource } : {}),
+    } as typeof parsed;
     if (gateResult.cleaned.vin) input.vin = gateResult.cleaned.vin;
     if (gateResult.cleaned.transmission) input.transmission = gateResult.cleaned.transmission;
     if (gateResult.cleaned.color) input.color = gateResult.cleaned.color;
@@ -1686,7 +1587,10 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
           vehicleId: match.vehicleId,
           listingUrl: listingUrl ?? input.url ?? "",
           capture,
+          sourceDescription: captureDescription,
           isNewVehicle: match.isNew,
+          modelCitation,
+          description: input.description || input.notes,
           written: {
             mileage: input.mileage,
             title_status: input.title_status,
@@ -1696,6 +1600,24 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
           },
         },
       );
+    }
+
+    // ClassicCars and KSL: the same listing projection Craigslist lands, so the classified board can read them.
+    const classified = classifiedPlatform(listingUrl);
+    if (classified && match.vehicleId && !isPreview) {
+      const listingId = classifiedListingId(listingUrl);
+      if (listingId) {
+        try {
+          const landed = await landClassifiedListing(supabaseAdmin, {
+            vehicleId: match.vehicleId, platform: classified, listingUrl: listingUrl ?? "", listingId,
+            price: typeof input.price === "number" ? input.price : null, postedAt: enrichedPostedAt,
+            observedAt: new Date().toISOString(), sellerTypeRaw: enrichedSellerType,
+          });
+          if (landed.event.action === "error") console.error(`[ingest] ${classified} listing event ${match.vehicleId}: ${landed.event.error}`);
+        } catch (e) {
+          console.error(`[ingest] ${classified} listing event ${match.vehicleId}: ${e instanceof Error ? e.message : String(e)}`);
+        }
+      }
     }
 
     // Facebook Saved: set status based on sold flag
@@ -1799,9 +1721,21 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
         .eq("id", match.vehicleId);
     }
 
-    // If this is a marketplace listing, upsert it and get the listing ID
+    // A held marketplace listing is capture testimony (extract-facebook-marketplace): link it, never rewrite it.
+    // An upsert here once replaced its title, clocks and description with this call's fields and nulls.
     let marketplaceListingId: string | null = null;
-    if (listingUrl && platform === "facebook_marketplace" && externalId) {
+    const heldListing = listingUrl && platform === "facebook_marketplace" && externalId
+      ? (await supabaseAdmin.from("marketplace_listings").select("id, vehicle_id").eq("facebook_id", externalId).maybeSingle()).data
+      : null;
+    if (heldListing) {
+      marketplaceListingId = heldListing.id;
+      if (!heldListing.vehicle_id && match.vehicleId) {
+        // write-error-ok: a failed link is returned to the caller in this response's issues
+        const linked = await supabaseAdmin.from("marketplace_listings").update({ vehicle_id: match.vehicleId })
+          .eq("id", heldListing.id).is("vehicle_id", null);
+        if (linked.error) gateResult.issues.push(`marketplace_listing_link_failed: ${linked.error.message}`);
+      }
+    } else if (listingUrl && platform === "facebook_marketplace" && externalId) {
       const { data: listingData } = await supabaseAdmin
         .from("marketplace_listings")
         .upsert(

@@ -1,3 +1,4 @@
+import { geminiFetch } from './geminiGuard.ts';
 /**
  * Unified LLM Router — Single entry point for all LLM calls across the platform.
  *
@@ -290,7 +291,7 @@ export const MODEL_REGISTRY: Record<string, ModelEntry> = {
     timeoutMs: 120_000,
   },
   "gemini-flash": {
-    id: "gemini-2.0-flash-lite",
+    id: "gemini-flash-lite-latest",
     provider: "google",
     displayName: "Gemini Flash Lite",
     costPerInputMTok: 0,
@@ -665,7 +666,7 @@ async function callGoogle(
 
   const url = `${model.endpoint}/models/${model.id}:generateContent?key=${apiKey}`;
 
-  const response = await fetch(url, {
+  const response = await geminiFetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -677,7 +678,7 @@ async function callGoogle(
       },
     }),
     signal: AbortSignal.timeout(model.timeoutMs),
-  });
+  }, 'llmRouter');
 
   if (!response.ok) {
     const err = await response.text();

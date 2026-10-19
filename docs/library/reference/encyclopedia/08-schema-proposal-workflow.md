@@ -22,6 +22,37 @@ This chapter is the handbook entry an external agent reads when it encounters da
 
 ## 0. Grounding — what exists today vs what this chapter proposes
 
+### Implementation check, 2026-10-11
+
+Live catalog inspection confirms `schema_proposals` as the existing owner. Its review
+trigger calls `fn_schema_proposal_apply`: approved `add_property` and `add_source`
+proposals insert registry rows; other proposal types need their particular implementation
+checked. An approval is not evidence that a consumer can use the resulting vocabulary.
+`ingest-observation` still admits explicitly supported property keys. Registration alone
+does not expand that intake contract.
+
+The [retry and progress migration](../../../../supabase/migrations/20261011223810_schema_proposal_retry_and_progress.sql)
+is implemented and tested in disposable PostgreSQL 17, **not yet deployed**. It makes an
+`add_property` retry a no-op only while the same proposal owns the matching definition,
+including insertion-default parent and trust policy. Missing, changed, foreign or retired
+registrations require review. Matching is against the current approved proposal row;
+this change does not add an immutable snapshot of the reviewed payload.
+
+Its service-only, invoker reader `get_schema_proposal_progress(proposal_id)` distinguishes
+review, unregistered vocabulary, registration drift, pending ratification and core
+registration. It also distinguishes source registration from verification of the proposed
+source definition: the existing source branch can retain a previously registered source.
+`consumer_state` remains `unverified` in every result because this reader has no consumer
+replay receipt. Agents can inspect it with the existing read-only `scripts/data/q.sh` route.
+
+The older counts, endpoint examples, lifecycle diagram and cleanup-bot descriptions below
+are historical design material, not current operational receipts. In particular, the live
+`pending_claims` table and its comment do not establish an operating replay worker. A repair
+closes only after retained input passes the sanctioned writer and the original consumer
+question is tested, including a counterexample. Do not mark a claim migrated from a registry
+insertion alone. See [case §13.11](../../../ledger/theory/data-machine-cases.md#1311-discussion-must-develop-the-model-and-its-working-method-owner-2026-10-11)
+for the owner's discussion-to-construction direction and remaining acceptance work.
+
 This chapter describes a workflow. The tables the workflow runs on are partly real and partly proposed. Read this section first so you know which is which.
 
 | Table or enum                         | Status                                | Notes |
@@ -47,6 +78,24 @@ The earlier draft of this chapter named a generic `claims`, `properties`, `sourc
 ---
 
 ## 1. When you must file a schema proposal
+
+### Executable connection after registration (2026-10-11)
+
+Registration alone does not make a claim admissible or readable. The retained `engine_family_label`
+case connects an existing proposal to the existing `ingest-observation` selector, PostgreSQL source
+guard and both `get_field_provenance` and `vehicle_canonical`. It preserves a publisher's literal
+powering-engine label, quotation, capture fingerprint and clocks. It does not establish a casting or
+serial code, physical engine identity, factory/current configuration or event date.
+
+The feature migration `20261011230939_retained_engine_family_intake.sql` does not approve the proposal
+or start replay. Its family path requires the reviewed proposal's ratified core property, and its
+shared reader predicate withdraws the claim when that registration or source becomes ineligible.
+The actual handler revalidates stored results on retries through `retained_listing_property_result_matches`.
+The reproducible local/CI contract is `scripts/test-engine-family-intake.sh`: the same selector fails
+with absent vocabulary, still fails after local review against the old SQL, and must succeed after
+the migration with cited reader output. Synthetic review is confined to a disposable database.
+
+This is prepared implementation, not evidence of production approval, deployment or fleet coverage.
 
 You file a proposal whenever the write API rejects your deposit for a vocabulary reason — not because your data was malformed, but because the institution has no slot for it. The four trigger cases:
 

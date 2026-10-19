@@ -42,7 +42,28 @@
 .status-replay-answer { border-top: 1px solid var(--border); padding-top: 12px; }
 .status-price { display: block; font: 700 30px 'Courier New', monospace; margin-top: 8px; }
 .status-question { font-size: 13px; line-height: 1.4; margin: 4px 0 8px; max-width: 75ch; }
+.status-source-operating { margin: 16px 0; border: 2px solid var(--border); padding: 12px; }
+.status-source-operating p { line-height: 1.5; }
+.status-source-inventories { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.status-source-owner { min-width: 0; border: 2px solid var(--border); padding: 12px; }
+.status-source-owner h4 { font-size: 14px; margin: 0; }
+.status-source-owner-name { font: 10px 'Courier New', monospace; color: var(--text-secondary); overflow-wrap: anywhere; }
+.status-source-counts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 12px 0; }
+.status-source-counts dt { font-size: 9px; text-transform: uppercase; color: var(--text-secondary); }
+.status-source-counts dd { margin: 4px 0 0; font: 700 14px 'Courier New', monospace; overflow-wrap: anywhere; }
+.status-source-details { border-top: 2px solid var(--border); padding-top: 12px; }
+.status-source-details summary { cursor: pointer; font-weight: 700; }
+.status-source-filters { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; margin: 12px 0; }
+.status-source-filters label { display: flex; flex-direction: column; gap: 5px; font-size: 11px; min-width: 0; }
+.status-source-filters input[type=search], .status-source-filters select { min-width: 0; max-width: 100%; border: 2px solid var(--border); padding: 6px; color: var(--text); background: var(--bg); }
+.status-source-filters .status-source-error-filter { flex-direction: row; align-items: center; }
+.status-source-table-scroll { overflow-x: auto; }
+.status-source-table { width: 100%; border-collapse: collapse; }
+.status-source-table caption { text-align: left; font-size: 10px; color: var(--text-secondary); padding: 6px 0; }
+.status-source-table th, .status-source-table td { padding: 6px 8px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; overflow-wrap: anywhere; }
+.status-source-table th[scope=col] { font-size: 9px; text-transform: uppercase; }
 @container status-view (max-width: 760px) {
+  .status-source-inventories { grid-template-columns: minmax(0, 1fr); }
   .status-operating-panels { grid-template-columns: minmax(0, 1fr); }
   .status-attention { grid-column: 1; grid-row: 2; }
   .status-flow, .status-trace { grid-template-columns: repeat(2, minmax(0, 1fr)); }

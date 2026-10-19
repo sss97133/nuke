@@ -141,6 +141,16 @@ export function FeedStatsStrip({
   };
 
   const isFiltered = hasActiveFilters && filtered.count !== stats.total_vehicles;
+  // Value and for-sale are recomputed by an old job. When they are more than three days old they are not shown as current.
+  const valueAge = stats.value_updated_at ? Date.now() - Date.parse(stats.value_updated_at) : Infinity;
+  const valueIsCurrent = Number.isFinite(valueAge) && valueAge < 3 * 86_400_000;
+  const forSaleAge = stats.for_sale_updated_at ? Date.now() - Date.parse(stats.for_sale_updated_at) : Infinity;
+  const forSaleIsCurrent = Number.isFinite(forSaleAge) && forSaleAge < 3 * 3_600_000;
+  const asOf = stats.total_as_of ? new Date(stats.total_as_of) : null;
+  const asOfLabel = asOf && Number.isFinite(asOf.getTime()) ? `${String(asOf.getUTCHours()).padStart(2, '0')}:${String(asOf.getUTCMinutes()).padStart(2, '0')}Z` : null;
+  const totalLabel = stats.total_is_estimate
+    ? `about ${formatCompact(stats.total_vehicles)} (estimate)`
+    : `${stats.total_vehicles.toLocaleString('en-US')} public records${asOfLabel ? `, as of ${asOfLabel}` : ''}`;
 
   return (
     <div
@@ -158,22 +168,31 @@ export function FeedStatsStrip({
       {/* SHOWING: filtered / total */}
       <Stat
         label={filteredStats ? 'LOADED' : 'ALL RECORDS'}
-        value={!filteredStats ? formatCompact(stats.total_vehicles) : isFiltered
-          ? `${formatCompact(filtered.count)} / ${formatCompact(stats.total_vehicles)}`
+        value={!filteredStats ? totalLabel : isFiltered
+          ? `${formatCompact(filtered.count)} / ${stats.total_is_estimate ? `about ${formatCompact(stats.total_vehicles)}` : stats.total_vehicles.toLocaleString('en-US')}`
           : formatCompact(filtered.count)}
         onClick={() => onMetricClick?.('vehicles')}
         active={activeMetric === 'vehicles'}
-        hoverHint="Reset to all vehicles"
+        hoverHint={stats.total_is_estimate ? `Estimate of public records, ${stats.counts_updated_at ?? 'time unknown'}. Click to reset to all vehicles` : 'Reset to all vehicles'}
       />
 
+      {/* The estimated population, always visible beside the loaded count so the two are not read as one number. */}
+      {filteredStats && !isFiltered && (
+        <Stat
+          label="ALL RECORDS"
+          value={totalLabel}
+          hoverHint={stats.total_is_estimate ? `Planner estimate of public records, updated ${stats.counts_updated_at ?? 'time unknown'}.` : `Public records: is_public, not deleted, not a non-vehicle item. The same exact count the map shows, as of ${stats.total_as_of ?? 'time unknown'}; it updates when the map refreshes (daily, 09:10Z).`}
+        />
+      )}
+
       {/* VALUE: filtered set total */}
-      <Stat
+      {(isFiltered || valueIsCurrent) && <Stat
         label={isFiltered ? 'LOADED VALUE' : 'ALL RECORD VALUE'}
         value={formatDollarCompact(isFiltered ? filtered.totalValue : stats.total_value)}
         onClick={() => onMetricClick?.('value')}
         active={activeMetric === 'value'}
         hoverHint="Sort by price"
-      />
+      />}
 
       {/* TODAY */}
       {stats.vehicles_added_today > 0 && (
@@ -188,13 +207,13 @@ export function FeedStatsStrip({
       )}
 
       {/* FOR SALE */}
-      <Stat
+      {(isFiltered || forSaleIsCurrent) && <Stat
         label="FOR SALE"
         value={formatCompact(isFiltered ? filtered.forSaleCount : stats.for_sale_count)}
         onClick={() => onMetricClick?.('for_sale')}
         active={activeMetric === 'for_sale'}
-        hoverHint="Show only for-sale vehicles"
-      />
+        hoverHint={stats.for_sale_definition ? `${stats.for_sale_definition} Updated ${stats.for_sale_updated_at}. Click to show only for-sale vehicles` : 'Show only for-sale vehicles'}
+      />}
 
       {/* LIVE auctions */}
       {(isFiltered ? filtered.liveCount : stats.active_auctions) > 0 && (

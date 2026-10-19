@@ -66,6 +66,10 @@ export interface OrganizationProfileData {
 /**
  * Get comprehensive user profile data (BaT-style)
  */
+// The vehicle fields the profile tabs read from an embedded vehicle. A vehicles(*) embed fails since the
+// owner's purchase facts are not granted to readers (lib/privateMoney).
+const PROFILE_VEHICLE_COLUMNS = 'id, year, make, model, trim, vin, is_public, primary_image_url';
+
 export async function getUserProfileData(userId: string): Promise<UserProfileData> {
   // Profile + claimed identities are independent — fetch in parallel.
   const [profileRes, identitiesRes] = await Promise.all([
@@ -239,7 +243,7 @@ export async function getPublicProfileByExternalIdentity(externalIdentityId: str
     .from('vehicle_events')
     .select(`
       *,
-      vehicle:vehicles(*)
+      vehicle:vehicles(${PROFILE_VEHICLE_COLUMNS})
     `)
     .eq('seller_external_identity_id', externalIdentity.id)
     .eq('source_platform', 'bat')
@@ -252,7 +256,7 @@ export async function getPublicProfileByExternalIdentity(externalIdentityId: str
     .from('auction_comments')
     .select(`
       *,
-      auction:auction_events(*, vehicle:vehicles(*))
+      auction:auction_events(*, vehicle:vehicles(${PROFILE_VEHICLE_COLUMNS}))
     `)
     .eq('external_identity_id', externalIdentity.id)
     .is('bid_amount', null)
@@ -261,7 +265,7 @@ export async function getPublicProfileByExternalIdentity(externalIdentityId: str
   if (commentsError) throw commentsError;
   const [bidRead, firstActivityRead] = await Promise.all([
     supabase.from('auction_comments')
-      .select('id, vehicle_id, auction_event_id, bid_amount, posted_at, auction:auction_events(*, vehicle:vehicles(*))', { count: 'exact' })
+      .select(`id, vehicle_id, auction_event_id, bid_amount, posted_at, auction:auction_events(*, vehicle:vehicles(${PROFILE_VEHICLE_COLUMNS}))`, { count: 'exact' })
       .eq('external_identity_id', externalIdentity.id).not('bid_amount', 'is', null)
       .order('posted_at', { ascending: false }).limit(100),
     supabase.from('auction_comments').select('posted_at')
@@ -281,7 +285,7 @@ export async function getPublicProfileByExternalIdentity(externalIdentityId: str
     .from('vehicle_events')
     .select(`
       *,
-      vehicle:vehicles(*)
+      vehicle:vehicles(${PROFILE_VEHICLE_COLUMNS})
     `)
     .eq('buyer_external_identity_id', externalIdentity.id)
     .eq('event_status', 'sold')
@@ -329,7 +333,7 @@ export async function getOrganizationProfileData(orgId: string): Promise<Organiz
     .from('vehicle_events')
     .select(`
       *,
-      vehicle:vehicles(*)
+      vehicle:vehicles(${PROFILE_VEHICLE_COLUMNS})
     `)
     .eq('source_organization_id', orgId)
     .eq('source_platform', 'bat')
@@ -364,7 +368,7 @@ export async function getOrganizationProfileData(orgId: string): Promise<Organiz
           .from('auction_events')
           .select(`
             *,
-            vehicle:vehicles(*)
+            vehicle:vehicles(${PROFILE_VEHICLE_COLUMNS})
           `)
           .in('vehicle_id', ids)
           .order('auction_end_date', { ascending: false })
@@ -417,7 +421,7 @@ export async function getOrganizationProfileData(orgId: string): Promise<Organiz
         .from('auction_comments')
         .select(`
           *,
-          listing:auction_events(*, vehicle:vehicles(*))
+          listing:auction_events(*, vehicle:vehicles(${PROFILE_VEHICLE_COLUMNS}))
         `)
         // Filter the canonical author key, external_identity_id: 99.9% filled
         // after the 2026-10-06 backfill (key_auction_comment_authors) and served
@@ -437,7 +441,7 @@ export async function getOrganizationProfileData(orgId: string): Promise<Organiz
     .from('vehicle_events')
     .select(`
       *,
-      vehicle:vehicles(*)
+      vehicle:vehicles(${PROFILE_VEHICLE_COLUMNS})
     `)
     .eq('source_organization_id', orgId)
     .eq('event_status', 'sold')
@@ -582,79 +586,6 @@ export async function getOrganizationProfileData(orgId: string): Promise<Organiz
     website_mapping: websiteMapping || null,
     seller_track_record: sellerTrackRecord,
   };
-}
-
-/**
- * Competitive context for an organization: state rank and volume peers
- */
-export interface CompetitiveContext {
-  state_rank: number | null;
-  state_total: number | null;
-  state: string | null;
-  volume_peers: Array<{ org_id: string; business_name: string; vehicle_count: number }>;
-}
-
-export async function getOrganizationCompetitiveContext(
-  orgId: string,
-  state: string | null
-): Promise<CompetitiveContext | null> {
-  if (!state) return null;
-
-  // Use SQL-based aggregation via RPC-style query for case-insensitive state matching
-  // Count vehicles per org in this state
-  const { data: stateOrgs, error } = await supabase
-    .from('organization_vehicles')
-    .select('organization_id, vehicle:vehicles!inner(state)')
-    .ilike('vehicle.state', state)
-    .eq('status', 'active');
-
-  if (error || !stateOrgs || stateOrgs.length === 0) {
-    // Fallback: try without inner join filter if PostgREST doesn't support ilike on joins
-    return null;
-  }
-
-  const orgCounts = new Map<string, number>();
-  for (const row of stateOrgs) {
-    const oid = (row as any).organization_id;
-    orgCounts.set(oid, (orgCounts.get(oid) || 0) + 1);
-  }
-
-  // Filter to orgs with 3+ vehicles
-  const qualifiedOrgs = [...orgCounts.entries()]
-    .filter(([, count]) => count >= 3)
-    .sort((a, b) => b[1] - a[1]);
-
-  const myCount = orgCounts.get(orgId) || 0;
-  if (myCount < 3) return null;
-
-  const stateRank = qualifiedOrgs.findIndex(([id]) => id === orgId) + 1;
-  const stateTotal = qualifiedOrgs.length;
-
-  // Find volume peers: orgs with similar total vehicle count (within +/-30%)
-  const peerCandidates = qualifiedOrgs
-    .filter(([id, count]) => id !== orgId && count >= myCount * 0.7 && count <= myCount * 1.3)
-    .slice(0, 5);
-
-  const volumePeers: CompetitiveContext['volume_peers'] = [];
-  if (peerCandidates.length > 0) {
-    const { data: peerOrgs } = await supabase
-      .from('businesses')
-      .select('id, business_name')
-      .in('id', peerCandidates.map(([id]) => id));
-
-    for (const [id, count] of peerCandidates) {
-      const org = peerOrgs?.find((o: any) => o.id === id);
-      if (org) {
-        volumePeers.push({
-          org_id: id,
-          business_name: (org as any).business_name,
-          vehicle_count: count,
-        });
-      }
-    }
-  }
-
-  return { state_rank: stateRank, state_total: stateTotal, state, volume_peers: volumePeers };
 }
 
 /**

@@ -1,6 +1,13 @@
 /**
  * extract-bat-core
  *
+ * Version: 4.5.1 — a withdrawn lot is closed: outcome 'cancelled', end = its "Withdrawn on" stamp (2026-10-15)
+ * Version: 4.5.0 — an end event only once the auction is over; the lot's own end, never the widget's (2026-10-15)
+ * - A running lot gets no auction_sold / auction_reserve_not_met / auction_ended row and no end-dated mileage reading
+ *   (auctionClose.ts): every live read had written "BaT ended • bid to $<current bid>" dated the scheduled end.
+ * - Closing reads retire the listing's earlier auction_ended rows through supersede_timeline_events (kept whole).
+ * - The end comes from the lot's own countdown or result stamp (readOwnAuctionEnd): a closed page's first
+ *   data-auction-ends belongs to the "Current BaT Auctions" widget, and dated May 2026 sales 2026-10-15.
  * Version: 4.4.0 — the Chassis/VIN line is read by _shared/batChassis.ts: a short or I/O/Q/separator chassis lands (2026-10-06)
  * - The Listing Details "Chassis:" line used to need 11-17 characters of the VIN alphabet; 18% of the lots that state
  *   one (short pre-1981 and import chassis) and every chassis with I, O, Q or a separator were left VIN-less.
@@ -34,19 +41,21 @@ import { normalizeVehicleFields } from "../_shared/normalizeVehicle.ts";
 import { qualityGate } from "../_shared/extractionQualityGate.ts";
 import { batchUpsertWithProvenance, quarantineRecord, type ProvenanceMetadata } from "../_shared/batUpsertWithProvenance.ts";
 import { writeObservation } from "../_shared/observationWriter.ts";
-import { readCommentsJson, summarizeAuction, vinCheckDigitOk, buildAuctionCommentRows, linkAuctionCommentIdentities, sha256Hex } from "../_shared/batAuctionRecord.ts";
+import { readCommentsJson, readOwnAuctionEnd, summarizeAuction, vinCheckDigitOk, buildAuctionCommentRows, linkAuctionCommentIdentities, sha256Hex } from "../_shared/batAuctionRecord.ts";
 import { parseBatIdentityFromUrl, parseBatIdentityFromTitle, readBatTaxonomy } from "../_shared/batParser.ts";
 import { chassisFromListItemText, isIdentityGradeVin } from "../_shared/batChassis.ts";
 import { authenticateWriter, requireWriteAuth } from "../_shared/writeGuard.ts";
 import { sourceReadClock } from "./sourceReadClock.ts";
+import { auctionClose, planEndRows, writtenBeforeItsEnd, END_EVENT_TYPES, type EndRow } from "./auctionClose.ts";
 import { recordListingDescription } from "./descriptionObservation.ts";
 import { loadDescriptionInput, descriptionInputFingerprint, descriptionPreview } from "../discover-description-data/descriptionInput.ts";
 import { closingBatTargets, collectBatLive, batStreamIO } from "./liveStream.ts";
 import { BAT_LIVE_MODE } from "../_shared/batLiveEvents.ts";
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void };
 
 // Extractor versioning - update on each significant change
-const EXTRACTOR_VERSION = 'extract-bat-core:4.4.0';
+const EXTRACTOR_VERSION = 'extract-bat-core:4.5.1';
 
 // Shared column list for the four vehicle-existence lookups below
 // (discovery_url / bat_auction_url / listing_url / update-existing-vehicle
@@ -305,6 +314,9 @@ function extractEssentials(html: string): {
   reserve_status: string | null;
   auction_end_date: string | null; // YYYY-MM-DD
   auction_end_at: string | null; // ISO timestamp (UTC) when available
+  auction_end_source: string | null; // data-ends | result_stamp | countdown | auction_record
+  auction_closed_at: string | null; // the closed page's own result stamp; null while the lot runs
+  auction_withdrawn: boolean; // the result line says "Withdrawn on <date>": no sale, no reserve result
   bid_count: number;
   comment_count: number;
   view_count: number;
@@ -460,23 +472,14 @@ function extractEssentials(html: string): {
   if (/\bReserve Met\b/i.test(reserveScope)) reserve_status = "reserve_met";
   if (statsHasReserveNotMet) reserve_status = "reserve_not_met";
 
-  // Auction end date
-  let auction_end_date: string | null = null;
-  let auction_end_at: string | null = null;
-  const endsMatch = h.match(/data-ends="(\d+)"/i);
-  if (endsMatch?.[1]) {
-    const ts = parseInt(endsMatch[1], 10);
-    if (Number.isFinite(ts) && ts > 0) {
-      const dt = new Date(ts * 1000);
-      auction_end_at = dt.toISOString();
-      auction_end_date = auction_end_at.split("T")[0];
-    }
-  }
-  if (!auction_end_date) {
-    // Active listings often expose a countdown date string like "2025-12-16-19-08-57".
-    const m = h.match(/data-auction-ends="(\d{4}-\d{2}-\d{2})-\d{2}-\d{2}-\d{2}"/i);
-    if (m?.[1]) auction_end_date = String(m[1]);
-  }
+  // Auction end: the lot's own countdown while it runs, its own result stamp once closed — never the countdown of
+  // another lot in the page's "Current BaT Auctions" widget (readOwnAuctionEnd, _shared/batAuctionRecord.ts).
+  const ownEnd = readOwnAuctionEnd(h);
+  const auction_end_at: string | null = ownEnd.endsAt ?? ownEnd.closedAt;
+  const auction_end_date: string | null = auction_end_at ? auction_end_at.slice(0, 10) : ownEnd.endsDate;
+  const auction_end_source: string | null = ownEnd.endsFrom ?? (ownEnd.closedAt ? "result_stamp" : null);
+  const auction_closed_at: string | null = ownEnd.closedAt;
+  const auction_withdrawn = ownEnd.withdrawn;
 
   // Bid/comment/view/watcher counts
   const bidCountMatch = h.match(/"type":"bat-bid"/g);
@@ -733,6 +736,9 @@ function extractEssentials(html: string): {
     reserve_status,
     auction_end_date,
     auction_end_at,
+    auction_end_source,
+    auction_closed_at,
+    auction_withdrawn,
     bid_count,
     comment_count,
     view_count,
@@ -998,6 +1004,75 @@ async function tryUpsertAuctionTimelineEvent(args: {
   }
 }
 
+// The end event of one listing, written once the auction is over (auctionClose). An auction_ended row the listing
+// got while it ran, on another day, or beside its result is retired through supersede_timeline_events with this row
+// as its replacement — kept whole in superseded_rows, never edited (planEndRows, ./auctionClose.ts).
+async function writeAuctionEndEvent(args: {
+  supabase: any;
+  vehicleId: string;
+  eventType: "auction_sold" | "auction_reserve_not_met" | "auction_ended";
+  eventDateYmd: string;
+  title: string;
+  description: string | null;
+  sourceUrl: string;
+  costAmount: number | null;
+  metadata: Record<string, any>;
+  readAt: string | null;
+  readBasis: string;
+}): Promise<{ id: string | null; inserted: boolean; retired: number; error: string | null }> {
+  const ymd = String(args.eventDateYmd || "").slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return { id: null, inserted: false, retired: 0, error: `end event date ${ymd || "missing"}` };
+  const { data: rows, error: readError } = await args.supabase
+    .from("timeline_events")
+    .select("id, event_type, event_date, created_at, metadata, data_source")
+    .eq("vehicle_id", args.vehicleId)
+    .in("event_type", END_EVENT_TYPES as unknown as string[])
+    .contains("metadata", { source_url: args.sourceUrl })
+    .limit(50);
+  if (readError) return { id: null, inserted: false, retired: 0, error: `end event lookup failed: ${readError.message}` };
+  const plan = planEndRows((rows ?? []) as EndRow[], { eventType: args.eventType, eventDate: ymd });
+  let id = plan.keepId;
+  let inserted = false;
+  if (!id) {
+    const { data, error } = await args.supabase.from("timeline_events").insert({
+      vehicle_id: args.vehicleId,
+      user_id: null,
+      event_type: args.eventType,
+      source: "bat",
+      title: args.title,
+      description: args.description,
+      event_date: ymd,
+      cost_amount: typeof args.costAmount === "number" && Number.isFinite(args.costAmount) ? args.costAmount : null,
+      cost_currency: typeof args.costAmount === "number" ? "USD" : null,
+      metadata: { ...args.metadata, source_url: args.sourceUrl, read_at: args.readAt, read_basis: args.readBasis },
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      confidence_score: 85,
+      data_source: "extract-bat-core",
+      source_type: "system",
+    }).select("id").single();
+    if (error) return { id: null, inserted: false, retired: 0, error: `end event insert failed: ${error.message}` };
+    id = String(data.id);
+    inserted = true;
+  }
+  if (!plan.retire.length) return { id, inserted, retired: 0, error: null };
+  const { data: result, error: retireError } = await args.supabase.rpc("supersede_timeline_events", {
+    p_rows: plan.retire.map((r) => ({
+      event_id: r.id,
+      expected_vehicle_id: args.vehicleId,
+      expected_event_type: r.event_type,
+      replacement_event_id: id,
+      source: { type: "listing_page", ref: args.sourceUrl, read_at: args.readAt, basis: args.readBasis },
+      reason: writtenBeforeItsEnd(r)
+        ? "BaT end event written while the auction was still running: its date was the scheduled end and its amount the bid at that read, not a result"
+        : `BaT end event replaced by this listing's ${args.eventType} on ${ymd}, read after the close`,
+    })),
+    p_asserted_by: EXTRACTOR_VERSION,
+  });
+  if (retireError) return { id, inserted, retired: 0, error: `end event supersession failed: ${retireError.message}` };
+  return { id, inserted, retired: Number(result?.retired ?? 0), error: null };
+}
+
 async function tryUpsertMileageTimelineEvent(args: {
   supabase: any;
   vehicleId: string;
@@ -1055,7 +1130,7 @@ Deno.serve(async (req) => {
 
   try {
     const supabaseUrl = (Deno.env.get("SUPABASE_URL") ?? "").trim();
-    const serviceRoleKey = (Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? Deno.env.get("SERVICE_ROLE_KEY") ?? "").trim();
+    const serviceRoleKey = (projectSecretKey() ?? "").trim();
     if (!supabaseUrl) throw new Error("Missing SUPABASE_URL");
     if (!serviceRoleKey) throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY");
 
@@ -1289,6 +1364,7 @@ Deno.serve(async (req) => {
       if (!essentials.auction_end_date && auction.recordAt) {
         essentials.auction_end_at = auction.recordAt;
         essentials.auction_end_date = auction.recordAt.slice(0, 10);
+        essentials.auction_end_source = "auction_record";
       }
     }
     // buyer only on a sold lot
@@ -2095,6 +2171,17 @@ Deno.serve(async (req) => {
     // 20260927090100), and compute_vehicle_grade() reads timeline_events — so the auction result and the
     // mileage reading must exist when that single grade runs.
     // Persist auction timeline events so the 7-day BaT window is visible: listed (start) + sold/ended (end).
+    // A running lot gets no end event (and no end-dated mileage reading): its end is a schedule, its bid not a result.
+    let endEvent: { close: ReturnType<typeof auctionClose>; id: string | null; inserted: boolean; retired: number; error: string | null } = {
+      close: auctionClose({
+        hasSale: Number.isFinite(essentials.sale_price) && (essentials.sale_price || 0) > 0,
+        recordClosed: auction.parsed && (auction.sold || auction.reserveNotMet),
+        closedAt: essentials.auction_closed_at,
+        endAt: essentials.auction_end_at,
+        readAt: sourceFetchedAt,
+      }),
+      id: null, inserted: false, retired: 0, error: null,
+    };
     if (vehicleId && essentials.auction_end_date) {
       const endYmd = String(essentials.auction_end_date).slice(0, 10);
       if (/^\d{4}-\d{2}-\d{2}$/.test(endYmd)) {
@@ -2127,11 +2214,14 @@ Deno.serve(async (req) => {
           },
         });
       }
+    }
+    if (vehicleId && essentials.auction_end_date && endEvent.close.over) {
       const hasSale = Number.isFinite(essentials.sale_price) && (essentials.sale_price || 0) > 0;
       const hasBid = Number.isFinite(essentials.high_bid) && (essentials.high_bid || 0) > 0;
+      const withdrawn = essentials.auction_withdrawn && !hasSale;
       const eventType =
         hasSale ? "auction_sold" :
-        (essentials.reserve_status === "reserve_not_met" ? "auction_reserve_not_met" : "auction_ended");
+        (!withdrawn && essentials.reserve_status === "reserve_not_met" ? "auction_reserve_not_met" : "auction_ended");
 
       const amount = hasSale ? (essentials.sale_price || null) : (hasBid ? (essentials.high_bid || null) : null);
       const amountText = typeof amount === "number" && amount > 0 ? `$${Math.round(amount).toLocaleString()}` : "";
@@ -2140,7 +2230,9 @@ Deno.serve(async (req) => {
           ? `BaT sold${amountText ? ` for ${amountText}` : ""}`
           : eventType === "auction_reserve_not_met"
             ? `BaT ended (RNM)${amountText ? ` • bid to ${amountText}` : ""}`
-            : `BaT ended${amountText ? ` • bid to ${amountText}` : ""}`;
+            : withdrawn
+              ? `BaT withdrawn${amountText ? ` • bid to ${amountText}` : ""}`
+              : `BaT ended${amountText ? ` • bid to ${amountText}` : ""}`;
 
       const descParts: string[] = [];
       if (essentials.lot_number) descParts.push(`Lot #${essentials.lot_number}`);
@@ -2148,14 +2240,13 @@ Deno.serve(async (req) => {
       if (essentials.comment_count) descParts.push(`${essentials.comment_count} comments`);
       const desc = descParts.length ? descParts.join(" • ") : null;
 
-      await tryUpsertAuctionTimelineEvent({
+      const written = await writeAuctionEndEvent({
         supabase,
         vehicleId,
         eventType,
         eventDateYmd: essentials.auction_end_date,
         title,
         description: desc,
-        source: "bat",
         sourceUrl: listingUrlCanonical,
         costAmount: typeof amount === "number" ? amount : null,
         metadata: {
@@ -2167,11 +2258,17 @@ Deno.serve(async (req) => {
           lot_number: essentials.lot_number,
           bid_count: essentials.bid_count,
           comment_count: essentials.comment_count,
-          // the exact close: the page's data-ends, else the sale / reserve-not-met record's timestamp
+          // the exact close: the lot's own countdown or result stamp, else the sale / reserve-not-met record's timestamp
           occurred_at: essentials.auction_end_at ?? auction.recordAt ?? null,
-          occurred_at_source: essentials.auction_end_at ? "data-ends" : (auction.recordAt ? "auction_record" : null),
+          occurred_at_source: essentials.auction_end_source ?? (auction.recordAt ? "auction_record" : null),
+          close_basis: endEvent.close.basis,
+          ...(withdrawn ? { withdrawn: true } : {}),
         },
+        readAt: sourceFetchedAt,
+        readBasis: htmlSource === "direct" ? "direct_fetch" : "cached_snapshot",
       });
+      endEvent = { ...endEvent, ...written };
+      if (written.error) console.warn(`[BAT] ${written.error} (${listingUrlCanonical})`);
 
       // Mileage reading timeline event (per auction)
       if (typeof essentials.mileage === "number" && Number.isFinite(essentials.mileage) && essentials.mileage > 0) {
@@ -2210,18 +2307,23 @@ Deno.serve(async (req) => {
       mark("observation_receipts");
       if (cleanedImages.length > 0) {
         try {
-          const { data: existingRows, error: existingErr } = await supabase
-            .from("vehicle_images")
-            .select("id, image_url, source_url, exif_data, is_primary, is_document, is_duplicate, file_hash")
-            .eq("vehicle_id", vehicleId)
-            // Keep parity with gallery filters
-            .not("is_document", "is", true)
-            .not("is_duplicate", "is", true)
-            .limit(5000);
-
-          if (existingErr) throw existingErr;
-
-          const existing = Array.isArray(existingRows) ? existingRows : [];
+          // Read every held row, a page at a time: one .limit() read is capped by the API, so a vehicle with more rows than
+          // the cap looked empty past it and every run inserted the rest again (9,972 rows for 719 URLs, 2026-02).
+          const existing: any[] = [];
+          for (let from = 0; ; from += 1000) {
+            const { data: page, error: existingErr } = await supabase
+              .from("vehicle_images")
+              .select("id, image_url, source_url, exif_data, is_primary, is_document, is_duplicate, file_hash")
+              .eq("vehicle_id", vehicleId)
+              // Keep parity with gallery filters
+              .not("is_document", "is", true)
+              .not("is_duplicate", "is", true)
+              .order("id", { ascending: true })
+              .range(from, from + 999);
+            if (existingErr) throw existingErr;
+            if (Array.isArray(page)) existing.push(...page);
+            if (!Array.isArray(page) || page.length < 1000) break;
+          }
           const hasPrimaryAlready = existing.some((r: any) => Boolean(r?.is_primary));
 
           const keyFromRow = (r: any): string => {
@@ -2632,8 +2734,12 @@ Deno.serve(async (req) => {
       // Reading one wrote 'bid_to' on 15 running lots on 2026-09-29 (bat-data coverage audit, P0a).
       const endMsForOutcome = essentials.auction_end_at ? Date.parse(essentials.auction_end_at) : NaN;
       const stillRunning = !hasSale && Number.isFinite(endMsForOutcome) && endMsForOutcome > Date.now();
+      // BaT withdrew the lot ("Withdrawn on 10/5/26"): a terminal no-sale, 'cancelled' in auction_events. 'bid_to' kept
+      // six withdrawn lots live in the stream schedule (only sold / reserve_not_met / cancelled retire a monitor).
       const outcome = hasSale
         ? "sold"
+        : essentials.auction_withdrawn
+        ? "cancelled"
         : stillRunning
         ? "live"
         : (essentials.reserve_status === "reserve_not_met" ? "reserve_not_met" : (hasBid ? "bid_to" : "no_sale"));
@@ -2909,6 +3015,7 @@ Deno.serve(async (req) => {
         },
         vin_rejected: vinRejected,
         sale_supersession: saleSupersession,
+        end_event: endEvent,
         comments_written: commentsWritten,
         comments_write_error: commentsWriteError,
         bids_written: bidsWritten,

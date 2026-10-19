@@ -2,6 +2,7 @@ import { DOMParser } from 'https://deno.land/x/deno_dom@v0.1.38/deno-dom-wasm.ts
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { ExtractionLogger, validateVin } from '../_shared/extractionHealth.ts'
 import { requireWriteAuth } from '../_shared/writeGuard.ts';
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -1326,7 +1327,7 @@ Deno.serve(async (req) => {
 
     // Initialize Supabase client for schema lookup
     const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+    const supabaseKey = projectSecretKey() || '';
     let supabase = null;
     try {
       supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
@@ -1476,7 +1477,7 @@ Deno.serve(async (req) => {
       domain = new URL(url).hostname.replace(/^www\./, '');
       if (supabase) {
         const schemaResponse = await supabase
-          .from('source_site_schemas')
+          .from('dealer_site_schemas')
           .select('schema_data, site_name')
           .eq('domain', domain)
           .single();
@@ -2141,7 +2142,7 @@ Deno.serve(async (req) => {
     try {
       const supabase = createClient(
         Deno.env.get('SUPABASE_URL')!,
-        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+        projectSecretKey()!
       )
 
       // Determine source from URL

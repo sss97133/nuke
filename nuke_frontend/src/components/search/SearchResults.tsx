@@ -3,6 +3,10 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import type { FeedItem } from '../feed/types';
 import ContentCard from '../feed/ContentCard';
 import VehicleCardDense from '../vehicles/VehicleCardDense';
+import {
+  HeaderSearchFacetPills,
+  boostAndFilterVehicleSearchResults,
+} from '../HeaderSearch';
 import { highlightSearchTerm } from '../../utils/searchHighlight';
 import { useViewHistory } from '../../hooks/useViewHistory';
 import type { SearchResult } from '../../types/search';
@@ -164,7 +168,12 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
       .filter((group) => group.count > 0);
   }, [results]);
 
-  const filteredAndSortedResults = results
+  const facetAdjustedResults = useMemo(
+    () => (searchQuery ? boostAndFilterVehicleSearchResults(searchQuery, results) : results),
+    [searchQuery, results],
+  );
+
+  const filteredAndSortedResults = facetAdjustedResults
     .filter(result => filterBy === 'all' || result.type === filterBy)
     .sort((a, b) => {
       switch (sortBy) {
@@ -618,6 +627,17 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
                       showDetailOverlay={true}
                       infoDense={true}
                       thumbnailFit="contain"
+                    />
+                    <HeaderSearchFacetPills
+                      year={result.metadata?.year}
+                      make={result.metadata?.make}
+                      model={result.metadata?.model}
+                      series={result.metadata?.series}
+                      trim={result.metadata?.trim}
+                      bodyStyle={result.metadata?.body_style}
+                      title={result.title}
+                      subtitle={result.subtitle}
+                      description={result.description}
                     />
                     {/* Deep match snippet — shows WHY this result matched */}
                     {result.metadata?.deep_snippet && (

@@ -38,6 +38,9 @@ type VehicleRow = {
   primary_image_url?: string | null;
 };
 
+const LISTING_PUBLIC_COLUMNS = 'id, vehicle_id, seller_id, sale_type, status, auction_start_time, auction_end_time, auction_duration_minutes, current_high_bid_cents, bid_count, created_at';
+const LISTING_SELLER_COLUMNS = 'list_price_cents, reserve_price_cents, auto_start_enabled, schedule_strategy, premium_status, premium_budget_cents, premium_paid_at, premium_priority, readiness_last_result';
+
 function formatCurrency(cents: number | null | undefined) {
   const v = typeof cents === 'number' && Number.isFinite(cents) ? cents : 0;
   return `$${(v / 100).toLocaleString()}`;
@@ -62,6 +65,7 @@ function formatTimeRemaining(endTimeIso: string | null) {
 export default function AuctionListing() {
   const { listingId } = useParams();
   const { user } = useAuth();
+  const userId = user?.id ?? null;
   const [loading, setLoading] = useState(true);
   const [listing, setListing] = useState<ListingRow | null>(null);
   const [vehicle, setVehicle] = useState<VehicleRow | null>(null);
@@ -79,14 +83,23 @@ export default function AuctionListing() {
       try {
         setLoading(true);
         setError(null);
+        // maybeSingle: an unknown id is a not-found, not a 406. The seller's reserve, ask, premium budget and
+        // scheduling state are read only for the seller.
         const { data: listingData, error: listingErr } = await supabase
           .from('vehicle_listings')
-          .select('id, vehicle_id, seller_id, sale_type, status, auction_start_time, auction_end_time, auction_duration_minutes, list_price_cents, reserve_price_cents, current_high_bid_cents, bid_count, auto_start_enabled, schedule_strategy, premium_status, premium_budget_cents, premium_paid_at, premium_priority, readiness_last_result, created_at')
+          .select(LISTING_PUBLIC_COLUMNS)
           .eq('id', listingId)
-          .single();
+          .maybeSingle();
         if (cancelled) return;
-        if (listingErr || !listingData) { setListing(null); setVehicle(null); setError(listingErr?.message || 'Listing not found'); return; }
-        setListing(listingData as ListingRow);
+        if (listingErr) console.warn('auction listing read failed', listingErr);
+        if (listingErr || !listingData) { setListing(null); setVehicle(null); setError(listingErr ? 'This auction could not be read.' : 'No auction at this address.'); return; }
+        let row = listingData as ListingRow;
+        if (userId && row.seller_id === userId) {
+          const { data: ownerData } = await supabase.from('vehicle_listings').select(LISTING_SELLER_COLUMNS).eq('id', listingId).maybeSingle();
+          if (cancelled) return;
+          if (ownerData) row = { ...row, ...(ownerData as Partial<ListingRow>) };
+        }
+        setListing(row);
         const { data: vehicleData } = await supabase.from('vehicles').select('id, year, make, model, trim, primary_image_url').eq('id', listingData.vehicle_id).maybeSingle();
         if (cancelled) return;
         setVehicle((vehicleData as VehicleRow) || null);
@@ -98,7 +111,7 @@ export default function AuctionListing() {
       }
     })();
     return () => { cancelled = true; };
-  }, [listingId, refreshNonce]);
+  }, [listingId, refreshNonce, userId]);
 
   const isOwner = useMemo(() => {
     if (!user || !listing) return false;
@@ -155,10 +168,10 @@ export default function AuctionListing() {
           </div>
           <div className="card-body" style={{ fontSize: '12px' }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
-              <div><div style={{ color: 'var(--text-muted)' }}>Current</div><div style={{ fontWeight: 800 }}>{formatCurrency(listing.current_high_bid_cents)}</div></div>
+              <div><div style={{ color: 'var(--text-muted)' }}>Current</div><div style={{ fontWeight: 800 }}>{listing.current_high_bid_cents != null ? formatCurrency(listing.current_high_bid_cents) : 'No bids'}</div></div>
               <div><div style={{ color: 'var(--text-muted)' }}>Bids</div><div style={{ fontWeight: 800 }}>{Number(listing.bid_count || 0)}</div></div>
               <div><div style={{ color: 'var(--text-muted)' }}>Time Remaining</div><div style={{ fontWeight: 800 }}>{formatTimeRemaining(listing.auction_end_time)}</div></div>
-              <div><div style={{ color: 'var(--text-muted)' }}>Reserve</div><div style={{ fontWeight: 800 }}>{listing.reserve_price_cents ? formatCurrency(listing.reserve_price_cents) : 'No reserve'}</div></div>
+              {isOwner && <div><div style={{ color: 'var(--text-muted)' }}>Reserve</div><div style={{ fontWeight: 800 }}>{listing.reserve_price_cents ? formatCurrency(listing.reserve_price_cents) : 'No reserve'}</div></div>}
             </div>
           </div>
         </div>

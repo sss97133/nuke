@@ -8,7 +8,7 @@ const fixture = vi.hoisted(() => ({ catalog: {} as any, query: {} as any, reques
 vi.mock('./useRecordedSales', async original => ({ ...await original<typeof import('./useRecordedSales')>(),
   useSalesScopes: () => fixture.catalog, useRecordedSales: (request: SalesRequest | null) => { fixture.request = request; return fixture.query; } }));
 vi.mock('../../components/PrefetchLink', () => ({ PrefetchLink: ({ to, ...props }: any) => <a href={to} {...props} /> }));
-import RecordedSalesComparison from './RecordedSalesComparison';
+import RecordedSalesComparison, { MarketScopeControls } from './RecordedSalesComparison';
 
 const make: SalesScopeOption = { key: 'make:fixture-make', label: 'FIXTURE MAKE', make: 'FIXTURE MAKE',
   scope: { kind: 'canonical_make', canonical_make_id: 'fixture-make' } };
@@ -58,10 +58,22 @@ describe('recorded sales evidence comparison', () => {
     expect(container.querySelector('[aria-label="Recorded sales event window"]')).toBeNull();
     expect(container.querySelector('[aria-label="Daily recorded sales counts"]')).toBeNull();
   });
+  it.each(['inventory', 'sales'] as const)('names the shared make control for the %s view', async view => {
+    await act(async () => root.render(<MarketScopeControls make="FIXTURE MAKE" scopeKey={make.key} view={view} onMakeChange={vi.fn()} onViewChange={vi.fn()} />));
+    const scope = container.querySelector('select')!;
+    expect(scope.getAttribute('aria-label')).toBe(view === 'inventory' ? 'Live inventory make' : 'Recorded sales scope');
+    expect(scope.value).toBe(make.key);
+  });
+  it.each(['inventory', 'sales'] as const)('names the standalone make control for the %s view', async view => {
+    await act(async () => root.render(<RecordedSalesComparison make="FIXTURE MAKE" view={view} />));
+    const scope = container.querySelector('select')!;
+    expect(scope.getAttribute('aria-label')).toBe(view === 'inventory' ? 'Live inventory make' : 'Recorded sales scope');
+    expect(scope.value).toBe(make.key);
+  });
   it('preserves an unregistered stored make in the shared control without inventing a sales scope', async () => {
     const onMakeChange = vi.fn();
     await act(async () => root.render(<RecordedSalesComparison make="UNREGISTERED" view="inventory" onMakeChange={onMakeChange} />));
-    const scope = container.querySelector('select[aria-label="Recorded sales scope"]') as HTMLSelectElement;
+    const scope = container.querySelector('select[aria-label="Live inventory make"]') as HTMLSelectElement;
     expect(scope.selectedOptions[0].textContent).toBe('UNREGISTERED · recorded inventory label');
     expect(fixture.request).toBeNull();
     await act(async () => root.render(<RecordedSalesComparison make="UNREGISTERED" view="sales" onMakeChange={onMakeChange} />));
@@ -177,6 +189,31 @@ describe('recorded sales evidence comparison', () => {
     expect(container.querySelector('[aria-label="Recorded sales contributors"]')).toBeNull();
     fixture.query.isFetching = false; await render();
     expect(document.activeElement).toBe(container.querySelector('[aria-label="Recorded sales contributors"]'));
+  });
+  it.each(['selected', 'benchmark'] as const)('returns keyboard focus to the exact %s day when clearing its evidence', async series => {
+    await render();
+    if (series === 'benchmark') await act(async () => (container.querySelector('input[aria-label="Show rest of BaT absolute counts"]') as HTMLInputElement).click());
+    const trigger = countButton(series === 'selected' ? 'FIXTURE MAKE: 2 recorded' : 'Rest of BaT: 10 recorded');
+    await act(async () => trigger.click());
+    expect(document.activeElement).toBe(container.querySelector('[aria-label="Recorded sales contributors"]'));
+    const clear = [...container.querySelectorAll('button')].find(b => b.textContent === 'Clear selected sales day')!;
+    clear.focus();
+    await act(async () => clear.click());
+    expect(document.activeElement).toBe(trigger);
+    expect(trigger.getAttribute('aria-pressed')).toBe('false');
+    expect(container.querySelector('[aria-label="Recorded sales contributors"]')).toBeNull();
+    expect(fixture.request).not.toHaveProperty('evidence_bucket');
+    expect(fixture.request).not.toHaveProperty('evidence_series');
+  });
+  it('returns to the event window when the selected count is refused by a later read', async () => {
+    await render(); await act(async () => countButton('FIXTURE MAKE: 2 recorded').click());
+    const data = receipt(); data.truncated = true;
+    data.series.forEach(p => { p.value = null; p.denominator = null; }); fixture.query.data = data; await render();
+    const clear = [...container.querySelectorAll('button')].find(b => b.textContent === 'Clear selected sales day')!;
+    clear.focus(); await act(async () => clear.click());
+    expect(document.activeElement).toBe(container.querySelector('[aria-label="Recorded sales event window"]'));
+    expect(container.textContent).toContain('Counts, denominators, ratios and changes are refused');
+    expect(container.querySelector('[aria-label="Recorded sales contributors"]')).toBeNull();
   });
   it('shares the make with live inventory while preserving the narrower grouping qualification', async () => {
     const onMakeChange = vi.fn();

@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 /**
  * feed-query — Server-side feed endpoint.
@@ -60,6 +61,13 @@ async function getPortfolioStats(supabaseClient: any): Promise<any> {
       vehicles_added_today: cacheRow.vehicles_added_today ?? 0,
       sales_count_today: cacheRow.sales_count_today ?? 0,
       sales_volume_today: cacheRow.sales_volume_today ?? 0,
+      // When each figure was last computed: counts by refresh_feed_rollups (an estimate), value and for-sale by the old job.
+      total_is_estimate: cacheRow.total_is_estimate === true,
+      total_as_of: cacheRow.total_as_of ?? null,
+      counts_updated_at: cacheRow.counts_updated_at ?? null,
+      value_updated_at: cacheRow.value_updated_at ?? cacheRow.updated_at ?? null,
+      for_sale_updated_at: cacheRow.for_sale_updated_at ?? null,
+      for_sale_definition: cacheRow.for_sale_definition ?? null,
     };
   } else {
     cachedPortfolioStats = {
@@ -156,7 +164,7 @@ Deno.serve(async (req) => {
   try {
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+      projectSecretKey() ?? "",
     );
 
     // Warm up DB connection pool on cold start

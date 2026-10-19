@@ -1,5 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { mustWrite } from '../_shared/writeResult.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -191,7 +193,7 @@ Deno.serve(async (req: Request) => {
   try {
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      projectSecretKey() ?? ''
     );
 
     const body: BackfillRequest = await req.json();
@@ -339,11 +341,11 @@ Deno.serve(async (req: Request) => {
         try {
           const existing = existingBySourceUrl.get(rawUrl);
           if (existing?.id && (existing?.position === null || existing?.position === undefined)) {
-            await supabase
+            mustWrite('vehicle_images update', await supabase
               .from('vehicle_images')
               .update({ position: i })
               .eq('id', existing.id)
-              .catch(() => null);
+              .catch(() => null));
           }
         } catch {
           // ignore
@@ -672,11 +674,11 @@ Deno.serve(async (req: Request) => {
               
               // If legacy image has same hash, mark as duplicate
               if (legacyHash && legacyHash === fileHash) {
-                await supabase
+                mustWrite('vehicle_images update', await supabase
                   .from('vehicle_images')
                   .update({ is_duplicate: true })
                   .eq('id', legacy.id)
-                  .catch(() => null);
+                  .catch(() => null));
                 console.log(`Marked legacy import_queue image as duplicate (same hash): ${legacyPath}`);
               }
             }
@@ -698,14 +700,14 @@ Deno.serve(async (req: Request) => {
 
             // If vehicle has no primary image, set it from this upload
             if (!vehicleCheck?.primary_image_url) {
-              await supabase
+              mustWrite('vehicles update', await supabase
                 .from('vehicles')
                 .update({
                   primary_image_url: publicUrl,
                   image_url: publicUrl,
                   updated_at: new Date().toISOString()
                 })
-                .eq('id', vehicle_id);
+                .eq('id', vehicle_id));
               console.log(`✅ Set vehicle primary_image_url to first uploaded image`);
             }
           } catch (updateErr) {
@@ -723,7 +725,7 @@ Deno.serve(async (req: Request) => {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
+                  'Authorization': `Bearer ${projectSecretKey()}`
                 },
                 body: JSON.stringify({
                   image_url: publicUrl,
@@ -769,7 +771,7 @@ Deno.serve(async (req: Request) => {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+              'Authorization': `Bearer ${projectSecretKey()}`,
             },
             body: JSON.stringify({
               vehicle_id,

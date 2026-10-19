@@ -68,6 +68,15 @@ final class LibraryOverlayStore: ObservableObject {
         if !running { running = true; Task { await run() } }
     }
 
+    /// A cell scrolled away before its turn: drop it from the queue so a fast flick does not leave
+    /// hundreds of classifications (and iCloud fetches) running after the scroll stops. It is
+    /// queued again if it comes back on screen.
+    func forget(_ localIdentifier: String) {
+        guard let i = queue.firstIndex(of: localIdentifier) else { return }
+        queue.remove(at: i)
+        seen.remove(localIdentifier)
+    }
+
     func decoration(for localIdentifier: String) -> LibraryDecoration? { decorations[localIdentifier] }
     func isPersonal(_ localIdentifier: String) -> Bool { personal.contains(localIdentifier) }
 
@@ -117,7 +126,8 @@ final class LibraryOverlayStore: ObservableObject {
         if !queue.isEmpty { running = true; Task { await run() } }   // ids that arrived mid-drain
     }
 
-    private func nextLID() -> String? { queue.isEmpty ? nil : queue.removeFirst() }
+    /// Newest first: the cells on screen now, ahead of ones already scrolled past.
+    private func nextLID() -> String? { queue.popLast() }
 
     private func apply(_ lid: String, _ info: (isPersonal: Bool, isJunk: Bool, hasPerson: Bool, label: String?, ownerApproved: Bool?, glyph: String?)?) {
         guard let info else { return }

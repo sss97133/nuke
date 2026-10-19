@@ -42,13 +42,13 @@ enum ColorLens: String, CaseIterable, Identifiable {
     case era, price, gap
     var id: String { rawValue }
     var label: String {
-        switch self { case .era: return "Era"; case .price: return "Price"; case .gap: return "Gap" }
+        switch self { case .era: return "Era"; case .price: return "Price"; case .gap: return "Venues" }
     }
     var lo: String {
-        switch self { case .era: return "CLASSIC"; case .price: return "VALUE"; case .gap: return "PARITY" }
+        switch self { case .era: return "CLASSIC"; case .price: return "LOWER"; case .gap: return "SMALLER" }
     }
     var hi: String {
-        switch self { case .era: return "MODERN"; case .price: return "PREMIUM"; case .gap: return "WIDE" }
+        switch self { case .era: return "MODERN"; case .price: return "HIGHER"; case .gap: return "LARGER" }
     }
 }
 
@@ -135,7 +135,7 @@ struct MarketTreemapView: View {
     @State private var gZoomBase: CGFloat? = nil   // zoom at pinch start
     @State private var gPanBase: CGSize = .zero    // pan at pinch start
     @State private var dragBase: CGSize? = nil     // pan at drag start
-    private let chromeInset: CGFloat = 150         // at-rest clearance: floating toggle + header + pivot row
+    private var chromeInset: CGFloat { filters.isEmpty ? 175 : 220 } // includes the direct inspection action
     @State private var nodes: [TreemapNode] = []
     @State private var loading = true
     @State private var failed = false
@@ -215,10 +215,10 @@ struct MarketTreemapView: View {
             }
             return max(0, min(1, (log10(Double(p)) - priceLo) / (priceHi - priceLo)))
         case .gap:
-            // Auction median over marketplace median − 1: how far retail asks lag
-            // auction-discovered value. Fixed 0…150% scale (Chevy ≈ +164% is the known
-            // ceiling); needs BOTH venue medians and ≥8 priced rows, else neutral.
-            guard let a = n.auction_med, let m = n.market_med, m > 0,
+            // Descriptive venue median difference across unmatched populations.
+            // This does not establish comparable value, arbitrage or expected return.
+            // Needs both medians and at least eight priced rows in the combined group.
+            guard let a = n.auction_med, a > 0, let m = n.market_med, m > 0,
                   (n.price_n ?? 0) >= 8 else { return nil }
             let gap = Double(a) / Double(m) - 1
             return max(0, min(1, gap / 1.5))
@@ -370,6 +370,11 @@ struct MarketTreemapView: View {
         let watched = lists.watched.contains(n.name)
         let saved = lists.saved.contains(n.name)
         Section(n.name) {
+            if step(n).filters["make"] != "Unresolved" {
+                NavigationLink(value: TreemapStep(filters: step(n).filters, groupBy: nil)) {
+                    Label("Inspect cars", systemImage: "car.side")
+                }
+            }
             Button {
                 watched ? Haptics.watchOff() : Haptics.watchOn(); lists.toggleWatch(n.name)
             } label: {
@@ -384,7 +389,7 @@ struct MarketTreemapView: View {
         ShareLink(item: shareText(n)) { Label("Share", systemImage: "square.and.arrow.up") }
     }
     private func shareText(_ n: TreemapNode) -> String {
-        var s = "\(n.name) — \(n.count.formatted()) in the market"
+        var s = "\(n.name) — \(n.count.formatted()) public records (deleted included)"
         if let y = n.avg_year { s += " · typ. '\(String(format: "%02d", y % 100))" }
         return s
     }
@@ -398,6 +403,15 @@ struct MarketTreemapView: View {
             HStack(spacing: 8) {
                 if isTop { pivotBar } else { breadcrumb }
                 if !nodes.isEmpty { colorMenu.padding(.trailing, 12) }
+            }
+            if !filters.isEmpty && injectedNodes == nil && filters["make"] != "Unresolved" {
+                NavigationLink(value: TreemapStep(filters: filters, groupBy: nil)) {
+                    Label("Inspect cars in this selection", systemImage: "car.side")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.tint)
             }
         }
         // Clear the floating Map/Pulse toggle that rides above (ExploreView), so the
@@ -455,7 +469,7 @@ struct MarketTreemapView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if failed && nodes.isEmpty {
                     ContentUnavailableView {
-                        Label("Couldn't load", systemImage: "wifi.exclamationmark")
+                        Label("Couldn't load", systemImage: "exclamationmark.triangle")
                     } actions: {
                         Button("Retry") { Task { await load() } }.buttonStyle(.borderedProminent)
                     }
@@ -718,7 +732,7 @@ struct MarketTreemapView: View {
             HStack(spacing: 8) {
                 Text(total.formatted()).font(.system(.subheadline, design: .rounded).weight(.semibold))
                     .monospacedDigit()
-                Text(truncated ? "in top \(nodes.count) \(groupBy.label.lowercased())s" : "listed")
+                Text(truncated ? "in top \(nodes.count) \(groupBy.label.lowercased())s" : "records shown")
                     .font(.system(.caption)).foregroundStyle(.secondary)
                 Spacer(minLength: 6)
                 // The live color key — endpoints + the current ramp.
@@ -729,6 +743,16 @@ struct MarketTreemapView: View {
                     .frame(width: 42, height: 6).clipShape(Capsule())
                 Text(lens.hi).font(.system(size: 9, weight: .semibold, design: .monospaced))
                     .foregroundStyle(.secondary)
+            }
+            Text(lens == .era ? "Area: records · color: average year" :
+                 lens == .price ? "Area: records · color: recorded median price" :
+                 "Area: records · color: venue median difference")
+                .font(.system(size: 10, design: .monospaced))
+                .foregroundStyle(.secondary)
+            if lens != .era {
+                Text(lens == .gap ? "Different cars and price bases; not an expected return." :
+                     "Mixed recorded prices; not a valuation or bargain ranking.")
+                    .font(.caption2).foregroundStyle(.secondary)
             }
             // The denominator under the number (fleet-relative reporting): the population and
             // its clock. mv_market_pulse and mv_market_position filter on is_public only, so
@@ -904,7 +928,7 @@ struct FilteredVehicleGrid: View {
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 2), count: 3)
 
     private var title: String {
-        ["make", "model", "year", "metro", "dow"].compactMap { filters[$0] }.joined(separator: " ")
+        PulseDim.allCases.compactMap { filters[$0.rawValue] }.joined(separator: " · ")
     }
 
     var body: some View {
@@ -918,7 +942,7 @@ struct FilteredVehicleGrid: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if failed && rows.isEmpty {
                 ContentUnavailableView {
-                    Label("Couldn't load", systemImage: "wifi.exclamationmark")
+                    Label("Couldn't load", systemImage: "exclamationmark.triangle")
                 } actions: {
                     Button("Retry") { Task { await load() } }.buttonStyle(.borderedProminent)
                 }
@@ -930,6 +954,10 @@ struct FilteredVehicleGrid: View {
                     // above its holdings — the shape IS the price (no printed median).
                     CohortDistributionCard(filters: filters)
                         .padding(.horizontal, 10).padding(.top, 8).padding(.bottom, 6)
+                    Text("\(rows.count) photographed records shown · up to 60 · source-label matches · auction sources first, then recorded price · availability unverified")
+                        .font(.caption).foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 12).padding(.bottom, 8)
                     LazyVGrid(columns: columns, spacing: 2) {
                         ForEach(rows) { v in
                             NavigationLink(value: v) { cell(v) }.buttonStyle(.plain)
@@ -954,6 +982,15 @@ struct FilteredVehicleGrid: View {
                 }
             }
             .clipped()
+            .overlay(alignment: .bottomLeading) {
+                Text([v.year.map(String.init), v.make, v.model].compactMap { $0 }.joined(separator: " "))
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .lineLimit(2)
+                    .padding(6)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(.black.opacity(0.7))
+            }
             .contentShape(Rectangle())
     }
 
