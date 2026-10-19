@@ -717,6 +717,22 @@ job path counts sourced and pending operations, treats labor-task rows as operat
 `operation_excerpt_missing_from_scope` without deleting rows.
 Contract: `supabase/sql/test_work_order_scope_operations.sql`.
 
+### Retained lifecycle testimony
+
+The job loop's acceptance, start, completion, invoice and payment owners record authenticated Signs.
+Historical jobs predate them: their client and provider messages are retained `work_record` observations
+with a speaker label (`structured_data.who`) and no signer. `work_order_retained_testimony` holds one
+attributed claim per interpretation (`work_order_resource` event `retained_lifecycle`): `lifecycle_stage`
+(`terms_accepted`, `invoice_issued`, `work_paused`, `operation_completed`, `payment_reported`), the exact
+excerpt and original clock of the basis message, its speaker label copied verbatim, the interpreted
+`speaker_side` (constrained per stage: only the client accepts terms; the provider reports invoices, pauses and
+finished operations) and, for a completion, the operation it names. The job path adds a `retained_testimony`
+block of counts, sides, operations and the latest message clock to terms, execution, completion and accounting,
+and the scoreboard reports `retained_testimony_work_orders`. Stage states, approval and completion clocks and
+customer acceptance are untouched: testimony is not a Sign. Excerpts can hold stated amounts and stay
+service-only; withdrawn, reattributed or edited bases drop out. The reader, projector and scoreboard edits are
+anchored (each applied exactly once). Contract: `supabase/sql/test_work_order_retained_testimony.sql`.
+
 ## Image objects in job context
 
 `read_work_order_image_objects(work_order_id, after_observation_id, limit)` is a
