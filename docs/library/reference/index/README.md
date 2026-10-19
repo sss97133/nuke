@@ -256,6 +256,7 @@ Updated: 2026-03-27
 - **API VIN lookup**: `supabase/functions/api-v1-vin-lookup/index.ts`
 - **Feed query**: `supabase/functions/feed-query/index.ts`
 - **Treemap data**: `supabase/functions/treemap-data/index.ts`
+- **GM Truck partitions**: `nuke_frontend/src/pages/market/truckFacets.ts`, `TruckFacetToolbar.tsx`, existing `HomePage.tsx` / `FamilySalesChart.tsx`; public membership overload `treemap_family_models(text,text,boolean,uuid,integer)` in `20261018223739_truck_market_membership.sql`. Contract: `supabase/sql/test_truck_market_membership.sql`; interaction design: Design Book chapter 3. Current configuration is distinct from recorded identity and sale-time configuration.
 
 ### Operations / Monitoring
 - **Coordinator brief**: `supabase/functions/ralph-wiggum-rlm-extraction-coordinator/index.ts`

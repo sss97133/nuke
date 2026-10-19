@@ -1,6 +1,6 @@
 import { observationClockMicroseconds } from "../_shared/observationContentHash.ts";
 import { captureTrustedJPEGInputs, captureVisionInputs, runCapturedVision, type VisionInputCapture, type VisionInputSource } from "./inputCustody.ts";
-import { projectDepictedSubjects, SUBJECT_BATCH_LIMIT, SUBJECT_METHOD, SUBJECT_PROMPT,
+import { captureRelation, projectDepictedSubjects, SUBJECT_BATCH_LIMIT, SUBJECT_METHOD, SUBJECT_PROMPT,
   type SubjectInput, type SubjectProjection } from "./subjects.ts";
 import { qualifySubjectSource, readSubjectProfiles } from "./subjectReader.ts";
 import { assessSubjectAdmission } from "./subjectReplay.ts";
@@ -15,6 +15,7 @@ import type { AnthropicTokenUsage, PlatformAnalysisBilling } from "../_shared/pr
 export const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 export interface SubjectSource {
   source_identity?: SourceIdentity;
+  latitude?: number | null; longitude?: number | null; device_fingerprint?: string | null;
   id: string; user_id: string; image_url: string; file_hash: string; storage_path: string | null;
   taken_at: string | null; created_at: string; is_superseded: boolean | null; is_duplicate: boolean | null;
   is_document: boolean | null; is_sensitive: boolean | null; vision_gate_status: string | null;
@@ -31,13 +32,20 @@ export interface CandidateScope {
   kind: "account_associated_terminal_vehicles"; vehicle_ids: string[]; retrieved: number;
   exhausted: boolean; truncated: boolean; reference_photos_assessed: number;
   unavailable_references: string[]; global_novelty_asserted: false;
+  identifier_candidates?: Array<{ vin: string; make: string | null; model: string | null }>;
+  identifier_context?: { retrieved: number; supplied: number; truncated: boolean };
   subject_references?: { image_ids: string[]; coverage: Record<string, unknown> };
 }
 export interface SubjectEnvelope extends SubjectProjection {
   user_id: string; method: typeof SUBJECT_METHOD; run_key: string; provider: string; model: string;
   read_at: string; inputs: SubjectInput[]; candidate_scope: CandidateScope;
 }
+export interface CaptureProfileRequest {
+  basis: "capture_session"; vin: string; image_ids: string[];
+  make?: string; model?: string; evidence: Record<string, string>;
+}
 export interface SubjectStore {
+  admitCapture?(request: CaptureProfileRequest): Promise<Record<string, unknown>>;
   sources(userId: string, ids: string[]): Promise<SubjectSource[]>;
   readings(ids: string[]): Promise<SubjectReading[]>;
   candidates(userId: string): Promise<CandidateScope>;
@@ -250,7 +258,9 @@ export async function resolveSubjectBatch(store: SubjectStore, request: SubjectR
       const context = await store.context(request.user_id, fresh.get(ids[0])!);
       const qualified = context.sources.filter(source => sourceRoot(source) !== sourceRoot(fresh.get(ids[0])) && !sourceRefusal(source, request.user_id, asOf));
       if (qualified.length && qualified.length <= 2 && new Set(qualified.map(source => source.id)).size === qualified.length) {
-        sources = [fresh.get(ids[0])!, ...qualified];
+        sources = context.coverage.capture_neighbor_first === true && qualified.length === 1
+          ? [fresh.get(ids[0])!, ...qualified, ...ids.slice(1).map(id => fresh.get(id)!)].slice(0, SUBJECT_BATCH_LIMIT)
+          : [fresh.get(ids[0])!, ...qualified];
         consumedIds = ids.filter(id => sources.some(source => sourceRoot(source) === sourceRoot(fresh.get(id))));
         contextCoverage = context.coverage;
       }
@@ -296,9 +306,26 @@ export async function resolveSubjectBatch(store: SubjectStore, request: SubjectR
         Object.fromEntries(sources.map(source => [source.id, nativeFor(source)])), capture, now().toISOString()); }
       catch { return { ...base, status: "refused", refusal: "source_not_ready" }; }
     }
+    // Three frames include per-frame witnesses and pairwise contradictions. The
+    // live three-frame pilot exhausted 1,600 tokens with an unreadable result.
+    // 4096 remains inside the same two-cent default preflight reservation.
+    // Keep account context inside the existing platform's 8 KB text ceiling.
+    // Serial strings aid worn-mark reading; catalog labels are unnecessary here.
+    const serials = [...new Set((candidate_scope.identifier_candidates ?? []).map(candidate => candidate.vin))].sort();
+    const supplied: string[] = [];
+    for (const serial of serials) {
+      if (new TextEncoder().encode(JSON.stringify([...supplied, serial])).length > 3200) break;
+      supplied.push(serial);
+    }
+    candidate_scope.identifier_context = { retrieved: serials.length, supplied: supplied.length, truncated: supplied.length < serials.length };
     const result = await runCapturedVision(visionSources, capture, () => [
-      { text: SUBJECT_PROMPT }, ...sources.flatMap(source => [{ text: `Photo image_id=${source.id}` }, { image_key: source.id }]),
-    ], dependencies.vision, { limits: { output_tokens: 1600 } });
+      { text: SUBJECT_PROMPT },
+      { text: `Known account serial candidates (fallible lookup context, not proof; coverage=${JSON.stringify(candidate_scope.identifier_context)}): ${JSON.stringify(supplied)}` },
+      { text: `Capture relations: ${JSON.stringify(sources.flatMap((a, i) => sources.slice(i + 1).map(b => {
+        return { left_image_id: a.id, right_image_id: b.id, ...captureRelation(a, b) };
+      })))}` },
+      ...sources.flatMap(source => [{ text: `Photo image_id=${source.id}; capture_clock=${source.taken_at ?? "unknown"}` }, { image_key: source.id }]),
+    ], dependencies.vision, { limits: { output_tokens: 4096 } });
     if (!result.model_result) return { ...base, status: "refused", refusal: result.refusal,
       unavailable_inputs: capture.unavailable, candidate_scope,
       ...(result.provider_diagnostics?.length ? { provider_diagnostics: result.provider_diagnostics } : {}),
@@ -311,7 +338,8 @@ export async function resolveSubjectBatch(store: SubjectStore, request: SubjectR
       const prior = readings.filter(reading => reading.image_id === source.id && reading.is_active && reading.cluster_id &&
         reading.confidence_basis?.visual_subjects_v1?.envelope?.user_id === request.user_id);
       return { ...receipt, image_id: source.id, source_sha256: receipt.source_sha256!, taken_at: source.taken_at,
-        created_at: source.created_at, existing_cluster_id: prior.length === 1 ? prior[0].cluster_id : null,
+        created_at: source.created_at, capture_context: { latitude: source.latitude ?? null,
+          longitude: source.longitude ?? null, device_fingerprint: source.device_fingerprint ?? null }, existing_cluster_id: prior.length === 1 ? prior[0].cluster_id : null,
         existing_anchor_image_id: prior.length === 1 ? prior[0].confidence_basis.visual_subjects_v1!.anchor_image_id : null };
     });
     const projection = projectDepictedSubjects(result.model_result.data, inputs);
@@ -361,7 +389,43 @@ export async function resolveSubjectBatch(store: SubjectStore, request: SubjectR
       } catch { failures.push({ image_id: id, reason: "subject_storage_failed" }); }
     }
   }
-  const supported = new Set((membershipHeld ? [] : envelope.subjects).flatMap(subject => subject.member_image_ids));
+  const captureResults: Array<Record<string, unknown>> = [];
+  if (!request.dry_run && !membershipHeld && !failures.length && store.admitCapture) {
+    for (const session of envelope.capture_sessions ?? []) {
+      if (!session.member_image_ids.every(id => retained.includes(id))) continue;
+      try {
+        // A cached interpretation never inherits present source/metadata authority.
+        const current = await store.sources(request.user_id, session.member_image_ids);
+        if (current.length !== session.member_image_ids.length || current.some(source => {
+          const input = envelope!.inputs.find(i => i.image_id === source.id);
+          return !input || !qualifySubjectSource(input, source, request.user_id!, envelope!.read_at, now().toISOString());
+        })) { captureResults.push({ status: "source_changed", anchor_image_id: session.anchor_image_id }); continue; }
+        const anchor = envelope.inputs.find(input => input.image_id === session.anchor_image_id)!;
+        const result = await store.admitCapture({ basis: "capture_session", vin: session.identifier.text,
+          image_ids: session.member_image_ids, ...(session.asserted_identity.make ? { make: session.asserted_identity.make } : {}),
+          ...(session.asserted_identity.model_family ? { model: session.asserted_identity.model_family } : {}),
+          evidence: { context_method: "vin_capture_session_v1", anchor_image_id: session.anchor_image_id,
+            anchor_source_sha256: anchor.source_sha256, identifier_read: session.identifier.text,
+            identifier_legibility: session.identifier.legibility, edit_distance: "0", context_basis: session.basis,
+            interpretation_run_key: envelope.run_key, provider: envelope.provider, model: envelope.model,
+            read_at: envelope.read_at } });
+        captureResults.push({ ...result, anchor_image_id: session.anchor_image_id });
+        const filing = result.filing as { results?: Array<{ image_id: string; status: string }> } | undefined;
+        if (result.status === "busy" || filing?.results?.some(row => ["busy", "deferred"].includes(row.status))) {
+          for (const image_id of session.member_image_ids) failures.push({ image_id, reason: "capture_profile_filing_retry" });
+        }
+      } catch {
+        captureResults.push({ status: "filing_retry", anchor_image_id: session.anchor_image_id });
+        for (const image_id of session.member_image_ids) failures.push({ image_id, reason: "capture_profile_filing_retry" });
+      }
+    }
+  }
+  const canonicalFiled = captureResults.flatMap(result => {
+    const filing = result.filing as { results?: Array<{ image_id: string; status: string }> } | undefined;
+    return (filing?.results ?? []).filter(row => ["filed", "already"].includes(row.status) &&
+      envelope!.inputs.some(input => input.image_id === row.image_id)).map(row => row.image_id);
+  });
+  const supported = new Set([...(membershipHeld ? [] : envelope.subjects).flatMap(subject => subject.member_image_ids), ...canonicalFiled]);
   const heldMembership = membershipHeld ? envelope.subjects.flatMap(subject => subject.member_image_ids)
     .map(image_id => ({ image_id, reason: admissionReason ?? "subject_admission_held" })) : [];
   const inputForFresh = (id: string) => envelope!.inputs.find(input => sourceAliases(fresh.get(id)).includes(input.image_id))?.image_id;
@@ -369,13 +433,14 @@ export async function resolveSubjectBatch(store: SubjectStore, request: SubjectR
   const mappedFailures = failures.flatMap(failure => consumedIds.filter(id => id === failure.image_id || inputForFresh(id) === failure.image_id)
     .map(image_id => ({ ...failure, image_id })));
   const failureById = new Map(mappedFailures.map(row => [row.image_id, row]));
-  const mappedUnresolved = [...envelope.unresolved, ...heldMembership].flatMap(row => consumedIds.filter(id => inputForFresh(id) === row.image_id)
+  const mappedUnresolved = [...envelope.unresolved.filter(row => !canonicalFiled.includes(row.image_id)), ...heldMembership].flatMap(row => consumedIds.filter(id => inputForFresh(id) === row.image_id)
     .map(image_id => ({ ...row, image_id })));
-  return { ...base, status: failures.length ? "partial" : membershipHeld ? "unresolved" : reused ? "cached" : envelope.subjects.length ? "resolved" : "unresolved",
-    dry_run: request.dry_run ?? false, persisted_image_ids: forFresh(persisted).filter(id => !failureById.has(id)), subjects: membershipHeld ? [] : envelope.subjects,
+  return { ...base, status: failures.length ? "partial" : membershipHeld ? "unresolved" : reused ? "cached" : envelope.subjects.length || canonicalFiled.length ? "resolved" : "unresolved",
+    ...(captureResults.length ? { capture_profile_results: captureResults } : {}),
+    dry_run: request.dry_run ?? false, persisted_image_ids: forFresh([...persisted, ...canonicalFiled]).filter(id => !failureById.has(id)), subjects: membershipHeld ? [] : envelope.subjects,
     deferred_image_ids: ids.filter(id => !consumedIds.includes(id)),
     source_lineage: consumedIds.map(image_id => ({ requested_image_id: image_id, input_image_id: inputForFresh(image_id), identity: inspectSourceIdentity(fresh.get(image_id)) })),
-    admitted_image_ids: persisted, input_image_ids: envelope.inputs.map(input => input.image_id),
+    admitted_image_ids: persisted, canonical_filed_image_ids: canonicalFiled, input_image_ids: envelope.inputs.map(input => input.image_id),
     retained_reading_image_ids: forFresh(retained), retry_without_inference: retained.length + persisted.length > 0,
     unresolved: [...mappedUnresolved.filter(row => !failureById.has(row.image_id)),
       ...[...failureById.values()].filter(row => consumedIds.includes(row.image_id))], candidate_scope: envelope.candidate_scope,
@@ -386,7 +451,7 @@ export async function resolveSubjectBatch(store: SubjectStore, request: SubjectR
   };
 }
 
-export function supabaseSubjectStore(client: any): SubjectStore {
+export function supabaseSubjectStore(client: any, identityClient?: any): SubjectStore {
   const loaded = new Map<string, SubjectSource>();
   let owner: string | null = null;
   const aliasScope = (ids: string[]) => [...new Set(ids.flatMap(id => sourceAliases(loaded.get(id))))];
@@ -402,6 +467,11 @@ export function supabaseSubjectStore(client: any): SubjectStore {
     return result.data;
   }
   return {
+    ...(identityClient ? { async admitCapture(request: CaptureProfileRequest) {
+      const result = await identityClient.rpc("device_create_vehicle_profile", { p_profile: request });
+      if (result.error || !result.data || typeof result.data !== "object") throw new Error("capture_profile_filing_failed");
+      return result.data;
+    } } : {}),
     async sources(user, ids) {
       if (owner !== null && owner !== user) loaded.clear();
       owner = user;
@@ -457,14 +527,18 @@ export function supabaseSubjectStore(client: any): SubjectStore {
       const { data, error } = await client.rpc("user_associated_vehicle_ids", { p_user: user }).limit(501);
       if (error || !Array.isArray(data) || data.some(id => typeof id !== "string" || !UUID.test(id))) throw new Error("subject_candidate_scope_failed");
       const ids = [...new Set(data.slice(0, 500))] as string[], unavailable: string[] = [];
+      const identifiers: NonNullable<CandidateScope["identifier_candidates"]> = [];
       for (let i = 0; i < ids.length; i += 200) {
-        const chunk = ids.slice(i, i + 200), result = await client.from("vehicles").select("id,primary_image_url").in("id", chunk).limit(200);
+        const chunk = ids.slice(i, i + 200), result = await client.from("vehicles").select("id,primary_image_url,vin,make,model").in("id", chunk).limit(200);
         if (result.error || !Array.isArray(result.data) || result.data.length !== chunk.length) throw new Error("subject_candidate_read_failed");
         unavailable.push(...result.data.filter((row: any) => !row.primary_image_url).map((row: any) => row.id));
+        identifiers.push(...result.data.filter((row: any) => typeof row.vin === "string" && /^[A-Z0-9]{8,17}$/.test(row.vin.toUpperCase().trim()))
+          .map((row: any) => ({ vin: row.vin.toUpperCase().trim(), make: typeof row.make === "string" ? row.make.slice(0, 40) : null,
+            model: typeof row.model === "string" ? row.model.slice(0, 60) : null })));
       }
       return { kind: "account_associated_terminal_vehicles", vehicle_ids: ids, retrieved: ids.length,
         exhausted: data.length <= 500, truncated: data.length > 500, reference_photos_assessed: 0,
-        unavailable_references: unavailable, global_novelty_asserted: false };
+        unavailable_references: unavailable, global_novelty_asserted: false, identifier_candidates: identifiers };
     },
     async ingest(imageId, anchorId, envelope) {
       const { data: id, error } = await client.rpc("ingest_image_observation", {

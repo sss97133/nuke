@@ -44,6 +44,9 @@ export function qualifySubjectSourceCustody(input: unknown, live: unknown, userI
     !["is_superseded", "is_duplicate", "is_document", "is_sensitive"].every(key => Object.hasOwn(live, key)) ||
     !/^https?:\/\//.test(live.image_url) || !sha(live.file_hash) || input.source_sha256 !== live.file_hash ||
     !equalClock(input.created_at, live.created_at) || !equalClock(input.taken_at, live.taken_at)) return false;
+  if (input.capture_context !== undefined && (!record(input.capture_context) ||
+    input.capture_context.device_fingerprint !== (live.device_fingerprint ?? null) ||
+    input.capture_context.latitude !== (live.latitude ?? null) || input.capture_context.longitude !== (live.longitude ?? null))) return false;
   const read = clock(readAt), created = clock(live.created_at);
   if (read === null || created === null || read < created) return false;
   try { if (!qualifiedSubjectInput(input as SubjectInput)) return false; } catch { return false; }

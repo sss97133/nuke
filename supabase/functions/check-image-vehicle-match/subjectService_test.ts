@@ -1,10 +1,11 @@
 import { resolveSubjectBatch, subjectOwnerId, type CandidateScope, type SubjectEnvelope, type SubjectReading,
-  type SubjectSource, type SubjectStore, type SubjectDependencies } from "./subjectService.ts";
+  type SubjectSource, type SubjectStore, type SubjectDependencies, type CaptureProfileRequest } from "./subjectService.ts";
 import type { VisionInputCapture } from "./inputCustody.ts";
 import { projectSourceIdentities, sourceAliases, sourceIdentityRecords, attachSourceIdentityRecords } from "./sourceIdentity.ts";
 import { attachSubjectPrivacy } from "./subjectPrivacy.ts";
 import { assessSubjectAdmission } from "./subjectReplay.ts";
 import { VisionProviderUnavailable } from "../_shared/providerDiagnostic.ts";
+import { planSubjectReinspection } from "./subjectReinspection.ts";
 const uid = "00000000-0000-4000-8000-000000000001", other = "00000000-0000-4000-8000-000000000002";
 const ids = ["10000000-0000-4000-8000-000000000001", "10000000-0000-4000-8000-000000000002", "10000000-0000-4000-8000-000000000003"];
 const cluster = "20000000-0000-4000-8000-000000000001";
@@ -51,7 +52,7 @@ function fixture() {
     },
     vision: async options => {
       counts.models++;
-      equal(options.maxTokens, 1600);
+      equal(options.maxTokens, 4096);
       equal(options.parts.filter(part => "imageUrl" in part).every(part => "imageUrl" in part && part.imageUrl.startsWith("data:")), true);
       return { provider: "synthetic", model: "offline", data: {
         frames: ids.map(image_id => ({ image_id, medium: "photograph", view: "exterior", primary_subject: "vehicle", bbox: [0, 0, 1, 1] })),
@@ -66,6 +67,102 @@ function fixture() {
   const run = (body = request) => resolveSubjectBatch(store, body, "https://example.test", dependencies);
   return { sources, readings, writes, counts, store, dependencies, request, run };
 }
+function captureFixture() {
+  const f = fixture(), requests: CaptureProfileRequest[] = [];
+  f.sources.forEach((source, index) => Object.assign(source, { latitude: 35, longitude: -115,
+    device_fingerprint: "fixture-device", taken_at: `2026-10-01T12:0${index}:00Z` }));
+  f.dependencies.vision = async () => {
+    f.counts.models++;
+    return { provider: "synthetic", model: "offline", data: {
+      frames: ids.slice(0, 2).map((image_id, i) => ({ image_id, medium: "photograph",
+        view: i ? "detail" : "exterior", primary_subject: "vehicle", bbox: [0, 0, 1, 1] })),
+      correspondences: [], contradictions: [], labels: [],
+      capture_sessions: [{ anchor_image_id: ids[1], member_image_ids: ids.slice(0, 2),
+        identifier: { kind: "chassis", text: "6R07T123456", legibility: "clear" },
+        basis: "A primer coupe walk-around ends at its attached chassis plate.",
+        asserted_identity: { make: "Ford", model_family: "Mustang" } }],
+    } };
+  };
+  f.store.admitCapture = async request => {
+    equal(f.readings.length >= 2, true); // Retained interpretation precedes canonical admission.
+    requests.push(request);
+    return { status: "created", vehicle_id: cluster,
+      filing: { results: request.image_ids.map(image_id => ({ image_id, status: "filed" })) } };
+  };
+  return { ...f, requests };
+}
+Deno.test("capture reading reaches the existing profile writer with source custody and no album or second model call", async () => {
+  const f = captureFixture(), result = await f.run();
+  equal(result.status, "resolved"); equal(f.counts.models, 1); equal(f.writes.length, 0);
+  equal(f.requests.length, 1); equal(f.requests[0].basis, "capture_session");
+  equal(f.requests[0].vin, "6R07T123456");
+  equal(f.requests[0].evidence.anchor_source_sha256, f.sources[1].file_hash);
+  equal(f.requests[0].evidence.identifier_legibility, "clear");
+  equal("album_name" in f.requests[0], false);
+  equal("persisted_image_ids" in result && result.persisted_image_ids, ids.slice(0, 2));
+  equal("unresolved" in result && result.unresolved, []);
+  await resolveSubjectBatch(f.store, { ...f.request, reuse_only: true }, "https://example.test", f.dependencies);
+  equal(f.counts.models, 1); equal(f.requests.length, 2);
+});
+Deno.test("a capture filing transport failure retries its retained reading without paid inference", async () => {
+  const f = captureFixture(), writer = f.store.admitCapture!;
+  f.store.admitCapture = async () => { throw new Error("transport failed"); };
+  equal((await f.run()).status, "partial"); equal(f.counts.models, 1);
+  f.store.admitCapture = writer;
+  const retry = await resolveSubjectBatch(f.store, { ...f.request, reuse_only: true }, "https://example.test", f.dependencies);
+  equal(retry.status, "cached"); equal(f.counts.models, 1); equal(f.requests.length, 1);
+});
+Deno.test("operator-retained capture readings resume authenticated filing after privacy is already complete", async () => {
+  const f = captureFixture(), writer = f.store.admitCapture!;
+  delete f.store.admitCapture;
+  await f.run(); equal(f.requests.length, 0);
+  const reading = f.readings[0], at = "2026-10-02T00:00:00Z";
+  const plan = await planSubjectReinspection(f.store, uid, reading, at);
+  equal(plan?.candidate.capture_filing_pending, true);
+  equal(plan?.candidate.inspect, []); equal(plan?.candidate.pending_source_count, 0);
+  f.store.admitCapture = writer;
+  const retry = await resolveSubjectBatch(f.store, { user_id: uid, image_ids: plan!.candidate.image_ids,
+    expected_source_hashes: plan!.candidate.expected_source_hashes, reuse_only: true }, "https://example.test", f.dependencies);
+  equal(retry.status, "cached"); equal(f.counts.models, 1); equal(f.counts.captures, 1); equal(f.requests.length, 1);
+  f.sources.forEach(source => Object.assign(source, { vehicle_id: cluster }));
+  equal(await planSubjectReinspection(f.store, uid, reading, at), null);
+  f.sources.forEach(source => Object.assign(source, { vehicle_id: null }));
+  f.sources[1].longitude = -114;
+  equal(await planSubjectReinspection(f.store, uid, reading, at), null);
+});
+Deno.test("one nearby capture reference preserves both fresh inputs in the three-frame budget", async () => {
+  const f = captureFixture();
+  f.store.context = async () => ({ sources: [f.sources[2]], coverage: { capture_neighbor_first: true } });
+  const result = await f.run();
+  equal("deferred_image_ids" in result && result.deferred_image_ids, []);
+  equal("persisted_image_ids" in result && result.persisted_image_ids, ids.slice(0, 2));
+  equal(f.counts.models, 1); equal(f.requests.length, 1);
+});
+Deno.test("current admission holds, changed metadata and non-user stores cannot confer capture identity", async () => {
+  const f = captureFixture();
+  f.store.admission = async () => ({ data_reusable: true, admission_allowed: false,
+    blocked_image_ids: ids.slice(0, 2), reason: "current_membership_conflict" });
+  await f.run(); equal(f.requests.length, 0);
+  f.sources[1].longitude = -114;
+  await resolveSubjectBatch(f.store, { ...f.request, reuse_only: true }, "https://example.test", f.dependencies);
+  equal(f.requests.length, 0); equal(f.counts.models, 1);
+  const service = captureFixture(); delete service.store.admitCapture;
+  await service.run(); equal(service.requests.length, 0);
+});
+Deno.test("large account serial context stays below the platform text ceiling with explicit coverage", async () => {
+  const f = captureFixture(), vision = f.dependencies.vision;
+  f.store.candidates = async () => ({ ...scope, identifier_candidates: Array.from({ length: 500 }, (_, i) => ({
+    vin: `1AB${String(i).padStart(14, "0")}`, make: "Example".repeat(5), model: "Long catalog model".repeat(3) })) });
+  f.dependencies.vision = async options => {
+    const textBytes = options.parts.reduce((n, part) => n + ("text" in part ? new TextEncoder().encode(part.text).length : 0), 0);
+    equal(textBytes < 8000, true);
+    return await vision(options);
+  };
+  const result = await f.run(); equal(result.status, "resolved");
+  const coverage = "candidate_scope" in result && result.candidate_scope?.identifier_context;
+  equal(coverage && coverage.retrieved, 500); equal(coverage && coverage.truncated, true);
+  equal(f.counts.models, 1);
+});
 Deno.test("protected owner binding rejects other accounts and anonymous or unscoped callers", () => {
   equal(subjectOwnerId({ kind: "user", userId: uid }, uid), uid);
   equal(subjectOwnerId({ kind: "service_role" }, other), other);

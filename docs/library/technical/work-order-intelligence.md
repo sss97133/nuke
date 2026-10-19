@@ -1,5 +1,111 @@
 # Work Order Intelligence
 
+## Resource evidence graph (2026-10-19)
+
+`work_order_resource_requirements`, `work_order_resource_fulfillments` and
+`work_order_resource_attestations` are private typed projections of existing
+`vehicle_observations` work records. The observation ID is the projection ID and
+idempotency key. Original sources, methods, trust and clocks stay on that observation;
+corrections use the existing testimony supersession path.
+
+After a source has been admitted through `ingest-observation`, a service operator calls
+`project_work_order_resource_observation(observation_id)`. It accepts only a current,
+source-attributed `work_record` on the same vehicle as the work order. The versioned
+payload is `structured_data.work_order_resource`:
+
+| Event | Required payload beyond `version: 1`, `event_type`, `work_order_id` |
+|---|---|
+| `requirement` | `line_item_id`, `requirement_kind` (`tool`, `equipment`, `facility`, `skill`, `inspection`, `approval`), `description`; paired positive `quantity` + `unit`, or both null when unstated; optional paired `basis_observation_id` + exact `basis_excerpt` |
+| `fulfillment` | `requirement_id`; exactly one resource: `user_tool_id` / `inventory_tool_id` / `equipment_id` / `facility_organization_id` / `performer_actor_id`; exactly one supplier: `supplier_user_id` / `supplier_organization_id`, or both null for an actor candidate; optional paired `available_from`, `available_until`; optional actor basis `basis_line_item_id` + `basis_line_item_snapshot` |
+| `attestation` | `fulfillment_id`; exactly one of `attestor_user_id` / `attestor_organization_id`; `attestation_kind` (`condition`, `suitability`, `permission`, `availability`, `supervision`, `delivery`, `withdrawal`); `verdict` (`supports`, `contradicts`, `unknown`); explicit `scope` |
+
+The service-only `read_work_order_resources(work_order_id)` returns the current graph,
+source IDs and observation/ingestion clocks, plus recorded coverage. Withdrawing or
+reattributing a requirement source excludes its dependent offers and attestations from
+the current graph. Original projections remain immutable. Anonymous and authenticated
+roles receive no grants; neither the public resolver nor existing access policies change.
+
+Historical source reconstruction uses `basis_observation_id` and `basis_excerpt` on
+requirements. The projector checks that the original is a current, same-vehicle
+`work_record`, contains the exact excerpt, and has the same `observed_at` as the
+interpretation. The original cannot itself be a resource projection. A legacy original
+may lack source attribution; the new interpretation still requires an attributed source
+and must disclose its method. This establishes citation custody, not mechanical correctness
+or the speaker's authenticated identity. The reader exposes the interpretation's method
+and confidence; withdrawal or reattribution of the original excludes the whole derived
+chain, including on duplicate projection attempts. Unknown quantities stay null.
+
+A fulfillment is a **candidate arrangement**, and an attestation is a **reported
+statement**, including when its kind is `permission`. This projection does not
+authenticate the attestor or establish supplier authority. Several alternatives can
+coexist. Personal inventory may represent multiple tools, so its ID is not an exclusive
+physical-unit reservation. Tool requirements accept personal or shop tool/equipment
+references; equipment and facility requirements require their respective reference.
+Skill and inspection requirements accept a canonical `actors` reference; approval
+requirements remain unresolved. No resource conflicts are adjudicated because no capacity
+is reserved. The reader explicitly returns booking readiness and permission authority
+as `not_assessed`, and reservation/payment flags as false—even for a populated graph.
+
+Participant candidates reuse `actors`, the canonical vehicle-work actor registry. Actor
+names, types, specialties and legacy capability counts do not establish verified skill.
+They are not merged with `technicians`, `auth.users` or shop identity by name. The supplier
+is a separate attributed contracting party and can remain unknown for an actor candidate.
+An optional retained assignment basis must name the requirement's exact operation and
+performer and equal the **entire** current line-item row as JSON. Store that snapshot in
+`work_order_resource.basis_line_item_snapshot`. Any row revision conservatively withholds
+the candidate and its attestations from current reads; duplicate projections also refuse
+the stale basis. Independent alternatives remain available. History is retained.
+
+Derived candidates use the existing `internal-inference` source (now also supporting
+`work_record`) through sanctioned intake. Their observation clock records the interpretation;
+the snapshot preserves the operation's own clocks without asserting a physical-work time.
+The reader exposes extraction method, confidence, the source's `interpretation`, candidate
+basis, contracting-party status and canonical actor label. Account linkage and qualification
+remain `not_assessed`. A supported candidate may still disagree with the requested process;
+record that disagreement in the source interpretation rather than declaring fulfillment.
+
+This is the backend evidence relation, not completed booking, authenticated sign-off,
+settlement, historical replay, or historical job reconstruction. No source collection,
+photo-processing holds, paid inference or existing invoices are changed. The focused
+PG17 contract is `supabase/sql/test_work_order_resource_evidence.sql` and is picked up
+by the existing database-contract CI job.
+
+## Image objects in job context
+
+`read_work_order_image_objects(work_order_id, after_observation_id, limit)` is a
+service-only, read-only bridge from the job's vehicle to retained canonical deep-image
+observations. Pages contain 1–100 observations, ordered by observation UUID; the returned
+cursor continues the current read and is not an immutable historical snapshot. Each tool
+and component array member becomes a sighting with its original JSON, source observation,
+image, method, confidence, capture/observation/ingestion clocks and exact JSON pointer.
+Repeated labels and background objects remain separate occurrences. A sighting count is
+neither a distinct-object count nor evidence of billable activity. Missing or malformed
+array shapes are reported; malformed members retain their raw claim without an invented label.
+
+Only current attributed `image_deep_byok` condition observations with an approved,
+non-external image still assigned to the same vehicle qualify. Conflicting witness image
+IDs, reattribution, source withdrawal and changed image qualification remove current
+results. The reader performs no new analysis and changes no approval/processing hold.
+Its scope is vehicle context: these photos do not establish which work-order operation
+used an object, and unanalysed photos and other observation formats are outside coverage.
+
+Existing `equipment_usage_evidence` records link an image to the equipment endpoint.
+These remain qualified legacy associations, not per-object physical identity matches.
+Their reported state, minutes, method and confidence are exposed, but not adopted as
+usage or allocated to the job. The original cascade sometimes inferred minutes from
+visibility; this reader neither reruns that cascade nor repairs its historical claims.
+Purchase cost and its source, computed depreciation value and its formula are separate
+fields. Market value, job cost and labor value remain unknown; the equipment ledger
+does not record a currency. No estimate is relabelled as a paid acquisition cost.
+
+Owner direction: observe objects throughout every frame, accumulate evidence at their
+entity endpoints, and use that evidence to support labor valuation. Existing canonical
+observations already retain these object arrays, so this slice exposes a deterministic
+relational read instead of duplicating them in a new sightings ledger. Physical-instance
+resolution, material/process compatibility, condition/market valuation, measured usage,
+confirmed labor and compensation terms remain distinct downstream work.
+Contract: `supabase/sql/test_work_order_image_objects.sql`.
+
 The system that answers "update me on the Smith build" with a complete cited receipt in <5s.
 
 ## The Dual System

@@ -56,6 +56,8 @@ export interface ObservationInput {
   fields: Record<string, any>;       // extracted key-value pairs
   observationKind?: string;           // observation_kind enum; default "specification"
   rawData?: any;                      // optional raw extraction payload
+  /** Include rawData in dedup when large evidence is kept outside indexed fields. Omitted preserves legacy hashes. */
+  hashRawData?: boolean;
   extractionMethod?: string;          // "html_parse" | "regex" | "ai" | etc.
   observedAt?: string;                // ISO timestamp; defaults to now
   contentText?: string;               // optional free-text content
@@ -172,6 +174,7 @@ export async function writeObservation(
     fields,
     observationKind = "specification",
     rawData,
+    hashRawData,
     extractionMethod = "unknown",
     observedAt,
     contentText,
@@ -215,6 +218,7 @@ export async function writeObservation(
     fields,
     observationKind,
     rawData,
+    hashRawData,
     extractionMethod,
     observedAt,
     contentText,
@@ -318,6 +322,7 @@ async function writeObservationRow(
     fields: Record<string, any>;
     observationKind: string;
     rawData?: any;
+    hashRawData?: boolean;
     extractionMethod: string;
     observedAt?: string;
     contentText?: string;
@@ -350,6 +355,7 @@ async function writeObservationRow(
     identifier: params.source.sourceIdentifier,
     text: params.contentText,
     data: params.fields,
+    ...(params.hashRawData ? { raw: params.rawData } : {}),
   });
   const contentHash = await hashContent(contentForHash);
 

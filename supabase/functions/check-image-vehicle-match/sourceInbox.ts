@@ -25,6 +25,8 @@ export interface SourceInboxState {
   dependencies_complete: boolean;
   page_more: boolean;
   as_of: string;
+  private_vehicle_id?: string;
+  private_attributed_image_ids?: string[];
 }
 
 export interface InboxReading {
@@ -140,8 +142,12 @@ export function projectSourceInbox(userId: string, state: SourceInboxState) {
     // Its current gate wins; the earlier carrier cannot supply pixels or model qualification.
     const current = sources.get(source.id);
     const live = record(current) && current.user_id === userId ? current : null;
-    const visibility = live ? sourceVisibility(live, userId, asOf)
-      : { state: "unqualified", reason: "source_current_row_unavailable" } as const;
+    const binding = currentIdentitySource(live);
+    const scopedRejected = state.private_vehicle_id !== undefined && (!binding || binding.vehicle_id !== state.private_vehicle_id ||
+      !sourceAliases(live).some(id => state.private_attributed_image_ids?.includes(id)) ||
+      !Object.hasOwn(binding, "image_vehicle_match_status") || ["mismatch", "unrelated"].includes(binding.image_vehicle_match_status));
+    const visibility = scopedRejected ? { state: "held", reason: "vehicle_binding_unqualified" } as const
+      : live ? sourceVisibility(live, userId, asOf) : { state: "unqualified", reason: "source_current_row_unavailable" } as const;
     const heads = state.raw_heads.filter((row): row is Record<string, any> => record(row) && sourceAliases(live).includes(row.image_id) &&
       row.observed_by === RAW && row.superseded_by === null);
     const byContext = new Map<string, any[]>();
@@ -153,7 +159,7 @@ export function projectSourceInbox(userId: string, state: SourceInboxState) {
     const readings = visibility.state === "ready" && complete ? [...byContext.values()]
       .filter(rows => rows.length === 1).map(rows => currentRawReading(rows[0], source.id, sources, userId, asOf))
       .filter((value): value is InboxReading => value !== null) : [];
-    const retained_contexts = complete ? [...byContext.values()].filter(rows => rows.length === 1)
+    const retained_contexts = complete && !scopedRejected ? [...byContext.values()].filter(rows => rows.length === 1)
       .map(rows => retainedContextMetadata(rows[0], source.id, sources, userId, state.as_of)).filter(value => value !== null) : [];
     const withdrawn = heads.filter(row => row.is_active !== true || row.confidence_basis?.[RAW]?.state === "withdrawn").length;
     const memberships = state.membership_heads.filter((row): row is Record<string, any> => record(row) && sourceAliases(live).includes(row.image_id) &&
@@ -180,7 +186,7 @@ export function projectSourceInbox(userId: string, state: SourceInboxState) {
     account_total: null, accessible_device_library_total: null, inference_started: false } };
 }
 
-export interface SourceInboxOptions { limit?: number; cursor?: string; image_id?: string }
+export interface SourceInboxOptions { limit?: number; cursor?: string; image_id?: string; private_vehicle_id?: string }
 const SOURCE_COLUMNS = "id,user_id,vehicle_id,image_url,file_hash,storage_path,taken_at,created_at,is_superseded,is_duplicate,is_document,is_sensitive,vision_gate_status";
 const HEAD_COLUMNS = "id,image_id,vehicle_id,cluster_id,role,observed_by,agent_version,observed_at,is_active,superseded_by,confidence_basis";
 
@@ -200,6 +206,7 @@ function decodeCursor(value: string): { created_at: string | null; id: string } 
  */
 export async function readSourceInbox(supabase: any, userId: string, options: SourceInboxOptions = {}) {
   if (!uuid(userId) || !record(options) || options.image_id !== undefined && !uuid(options.image_id) ||
+    options.private_vehicle_id !== undefined && (!uuid(options.private_vehicle_id) || options.image_id !== undefined) ||
     options.image_id && options.cursor || options.limit !== undefined && (!Number.isSafeInteger(options.limit) || options.limit < 1 || options.limit > 24)) {
     throw new Error("source_inbox_scope_invalid");
   }
@@ -208,6 +215,8 @@ export async function readSourceInbox(supabase: any, userId: string, options: So
   let query = supabase.from("vehicle_images").select(SOURCE_COLUMNS).eq("user_id", userId)
     .order("created_at", { ascending: false, nullsFirst: false }).order("id", { ascending: false });
   if (options.image_id) query = query.eq("id", options.image_id);
+  if (options.private_vehicle_id) query = query.eq("vehicle_id", options.private_vehicle_id)
+    .eq("vehicle_image_gallery_eligible", false).not("is_superseded", "is", true);
   if (cursor?.created_at === null) query = query.is("created_at", null).lt("id", cursor.id);
   else if (cursor) {
     // The clock parser accepts only a numeric PostgreSQL timestamp grammar. Quoted literals
@@ -216,7 +225,8 @@ export async function readSourceInbox(supabase: any, userId: string, options: So
     query = query.or(`created_at.lt.${stamp},and(created_at.eq.${stamp},id.lt.${cursor.id}),created_at.is.null`);
   }
   const { data: carriers, error: pageError } = await query.limit(limit + 1);
-  if (pageError || !Array.isArray(carriers) || carriers.some(row => !record(row) || row.user_id !== userId || !uuid(row.id))) {
+  if (pageError || !Array.isArray(carriers) || carriers.some(row => !record(row) || row.user_id !== userId || !uuid(row.id) ||
+    options.private_vehicle_id !== undefined && row.vehicle_id !== options.private_vehicle_id)) {
     throw new Error("source_inbox_page_read_failed");
   }
   const page = carriers.slice(0, limit), pageMore = !options.image_id && carriers.length > limit;
@@ -237,9 +247,27 @@ export async function readSourceInbox(supabase: any, userId: string, options: So
   if (dependencyIds.size > 256) throw new Error("source_inbox_dependencies_exceed_budget");
   const lookup = await loadSourceIdentities(supabase, userId, [...dependencyIds]);
   const sources = await hydrateSubjectPrivacy(supabase, userId, lookup.sources);
+  let attributionComplete = true;
+  const attributed = new Set<string>();
+  if (options.private_vehicle_id && lookup.alias_image_ids.length) {
+    // A legacy attachment alone does not establish vehicle identity. Private
+    // vehicle views require the existing audited VIN/capture attribution path.
+    const proof = await supabase.from("reattribution_audit")
+      .select("old_observation_id,new_observation_id,new_vehicle_id,actor_user_id,reason")
+      .eq("observation_type", "image").eq("new_vehicle_id", options.private_vehicle_id).eq("actor_user_id", userId)
+      .in("new_observation_id", lookup.alias_image_ids).limit(97);
+    if (proof.error || !Array.isArray(proof.data)) throw new Error("source_inbox_attribution_read_failed");
+    attributionComplete = proof.data.length <= 96;
+    if (attributionComplete) for (const row of proof.data) {
+      if (row.actor_user_id === userId && row.new_vehicle_id === options.private_vehicle_id &&
+        row.old_observation_id === row.new_observation_id && typeof row.reason === "string" &&
+        /^(first_attribution: )?device (capture_session|vin_ocr|serial_ocr) /.test(row.reason)) attributed.add(row.new_observation_id);
+    }
+  }
   const result = projectSourceInbox(userId, { page, sources, raw_heads: readings, membership_heads: memberships.slice(0, 96),
     raw_heads_complete: raw.length <= 96, membership_heads_complete: memberships.length <= 96,
-    dependencies_complete: pageLookup.complete && lookup.complete && subjectPrivacyLookupComplete(sources), page_more: pageMore, as_of });
+    dependencies_complete: pageLookup.complete && lookup.complete && subjectPrivacyLookupComplete(sources) && attributionComplete, page_more: pageMore, as_of,
+    ...(options.private_vehicle_id ? { private_vehicle_id: options.private_vehicle_id, private_attributed_image_ids: [...attributed] } : {}) });
   const source_lookup = { page: pageLookup.coverage, dependencies: lookup.coverage, privacy_alias_limit: 256,
     raw_head_limit: 96, membership_head_limit: 96 };
   let next_cursor: string | null = null;
@@ -248,5 +276,5 @@ export async function readSourceInbox(supabase: any, userId: string, options: So
     if (last.created_at !== null && clock(last.created_at) === null) throw new Error("source_inbox_carrier_clock_invalid");
     next_cursor = btoa(JSON.stringify({ created_at: last.created_at, id: last.id }));
   }
-  return { ...result, source_lookup, next_cursor };
+  return { ...result, source_lookup, next_cursor, ...(options.private_vehicle_id ? { private_vehicle_id: options.private_vehicle_id } : {}) };
 }

@@ -478,5 +478,137 @@ class WriteTests(unittest.TestCase):
             client.ingest(a, a['listings'][0], 'scrape-source', 'sitemap')
 
 
+class ConflictHoldTests(unittest.TestCase):
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.root = Path(tmp.name)
+        self.manifest = self.root / 'manifest.json'
+        self.args = SimpleNamespace(state_dir=self.root, message_manifest=self.manifest, source='ksl',
+                                    target_email='private-recipient@example.test', days=None, limit=10,
+                                    dry_run=False, refresh_sitemap=False, stale_hours=72,
+                                    priority_years=[1960, 1991], batch_size=10, replay=False)
+
+        class DB(FakeSupabase):
+            identity_reads = 0
+
+            def source_config(self, source):
+                return None
+
+            def rows(self, table, **query):
+                if table in ('vehicles', 'vehicle_events'):
+                    return []
+                if table == 'vehicle_observations' and 'source_identifier' in query:
+                    self.identity_reads += 1
+                return super().rows(table, **query)
+
+        self.client = DB()
+
+    def alert(self, number):
+        msg = EmailMessage()
+        msg['From'] = 'cars@ksl.com'
+        msg['To'] = self.args.target_email
+        msg['Message-ID'] = f'<hold-{number}@example.test>'
+        msg['Date'] = 'Sun, 18 Oct 2026 21:00:00 +0000'
+        msg.set_content('Saved search alert')
+        msg.add_alternative(f'<!-- a listing --><a href="https://cars.ksl.com/listing/{number}">'
+                            '<img src="https://img.ksl.com/car.jpg"></a>'
+                            '<div>1968 Ford Falcon</div><div>$5,000.00</div><!-- end listing -->', subtype='html')
+        return msg
+
+    def select(self, messages):
+        entries = []
+        for i, msg in enumerate(messages):
+            p = self.root / f'input-{i}.eml'
+            p.write_bytes(msg.as_bytes())
+            entries.append({'path': str(p), 'received_at': '2026-10-18T22:00:00Z'})
+        self.manifest.write_text(json.dumps(entries))
+
+    def cycle(self):
+        out = io.StringIO()
+        with patch.object(m, 'Supabase', return_value=self.client), contextlib.redirect_stdout(out):
+            code = m.run(self.args)
+        return code, json.loads(out.getvalue())
+
+    def test_database_conflicts_are_retained_without_blocking_later_mail(self):
+        messages = [self.alert(i) for i in range(4)]
+        for msg in messages[:3]:
+            raw = msg.as_bytes()
+            a = m.parse_alert(msg, raw, 'ksl', 1792360800, {})
+            self.client.ingest(a, a['listings'][0], None, None)
+            msg['X-Synthetic-Cache-Variant'] = 'different bytes, unchanged listing'
+        # A genuinely changed claim is held too; it cannot replace earlier testimony.
+        html = messages[2].get_payload()[1]
+        html.set_content(html.get_content().replace('5,000', '7,500'), subtype='html')
+        originals = json.loads(json.dumps(self.client.observations))
+        self.select(messages)
+        code, report = self.cycle()
+        self.assertEqual(code, 0)
+        self.assertEqual(report['errors'], [])
+        self.assertEqual(report['holds'], {'message_identity_conflict': 3})
+        self.assertEqual(report['observations_verified'], 1)
+        self.assertEqual(self.client.posts, 4)
+        state = json.loads((self.root / 'state.json').read_text())
+        self.assertEqual(len(state['completed']), 1)
+        self.assertEqual(len(state['identity_holds']), 3)
+        for key, original in originals.items():
+            self.assertEqual(self.client.observations[key], original)
+        for msg in messages[:3]:
+            raw = msg.as_bytes()
+            archived = self.root / 'raw' / f'{m.digest(raw)}.eml'
+            self.assertEqual(archived.read_bytes(), raw)
+            self.assertEqual(archived.stat().st_mode & 0o777, 0o600)
+        reads = self.client.identity_reads
+        self.assertEqual(self.cycle()[0], 0)
+        self.assertEqual(self.client.identity_reads, reads)
+        self.assertEqual(json.loads((self.root / 'state.json').read_text()), state)
+        self.args.replay = True
+        self.assertEqual(self.cycle()[1]['holds']['message_identity_conflict'], 3)
+        self.assertEqual(self.client.identity_reads, reads + 4)
+        self.assertEqual(self.client.posts, 4)
+        self.args.replay = False
+        messages[0].replace_header('X-Synthetic-Cache-Variant', 'another independently retained variant')
+        self.select(messages)
+        reads = self.client.identity_reads
+        self.assertEqual(self.cycle()[0], 0)
+        self.assertEqual(self.client.identity_reads, reads + 1)
+        self.assertEqual(len(json.loads((self.root / 'state.json').read_text())['identity_holds']), 4)
+
+    def test_completed_message_variant_is_unacknowledged_and_batch_bounded(self):
+        msg = self.alert(1)
+        self.select([msg])
+        self.assertEqual(self.cycle()[0], 0)
+        state_bytes = (self.root / 'state.json').read_bytes()
+        completed = json.loads(state_bytes)['completed']
+        msg['X-Synthetic-Cache-Variant'] = 'new cached representation'
+        raw = msg.as_bytes()
+        variant = self.root / 'raw' / f'{m.digest(raw)}.eml'
+        self.select([msg, self.alert(2)])
+        self.args.dry_run = True
+        self.assertEqual(self.cycle()[1]['holds']['message_identity_conflict'], 1)
+        self.assertEqual((self.root / 'state.json').read_bytes(), state_bytes)
+        self.assertFalse(variant.exists())
+        self.args.dry_run = False
+        self.args.batch_size = 1
+        code, report = self.cycle()
+        self.assertEqual((code, report['observations_verified']), (0, 0))
+        self.assertEqual(variant.read_bytes(), raw)
+        self.assertEqual(json.loads((self.root / 'state.json').read_text())['completed'], completed)
+        self.assertEqual(self.cycle()[1]['observations_verified'], 1)
+        self.assertEqual(self.client.posts, 2)
+
+    def test_transport_and_readback_errors_keep_the_three_error_stop(self):
+        self.select([self.alert(i) for i in range(4)])
+        for mode in ('fail_observation', 'bad_readback'):
+            with self.subTest(mode=mode):
+                setattr(self.client, mode, True)
+                code, report = self.cycle()
+                self.assertEqual(code, 1)
+                self.assertEqual(len(report['errors']), 3)
+                self.assertEqual(report['holds'], {})
+                self.assertFalse((self.root / 'state.json').exists())
+                setattr(self.client, mode, False)
+
+
 if __name__ == '__main__':
     unittest.main()

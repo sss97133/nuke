@@ -222,13 +222,13 @@ final class LibraryIngest: ObservableObject {
         if let summary = await NativeAlbumPush.run(budget: budget) { albumSyncSummary = summary }
     }
 
-    private struct AlbumPhotoReviewResult: Sendable {
+    struct AlbumPhotoReviewResult: Sendable {
         let review: LocalAlbumImageReview?
         let pendingReason: String?
         static func pending(_ reason: String) -> Self { .init(review: nil, pendingReason: reason) }
     }
 
-    private nonisolated static func reviewAlbumPhoto(_ photo: LocalAlbumPhoto, method: String, allowNetwork: Bool) async -> AlbumPhotoReviewResult {
+    nonisolated static func reviewAlbumPhoto(_ photo: LocalAlbumPhoto, method: String, allowNetwork: Bool) async -> AlbumPhotoReviewResult {
         guard let asset = PHAsset.fetchAssets(withLocalIdentifiers: [photo.localIdentifier], options: nil).firstObject else { return .pending("sources inaccessible") }
         let version = asset.modificationDate.map { String($0.timeIntervalSince1970) }
         guard version == photo.sourceVersion else { return .pending("source versions changed") }

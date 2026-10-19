@@ -7,6 +7,18 @@ import Supabase
 @testable import NukeCapture
 
 final class DeviceAttributionTests: XCTestCase {
+    func testDuplicateSerialClaimsDoNotChooseDatabaseOrder() {
+        let entries = [(serial: "VIN12345678", vehicleId: "first"),
+                       (serial: "vin12345678", vehicleId: "second"),
+                       (serial: "UNIQUE12345", vehicleId: "third"),
+                       (serial: "UNIQUE12345", vehicleId: "third")]
+        for order in [entries, Array(entries.reversed())] {
+            let result = AttributionEngine.unambiguousSerialVehicles(order)
+            XCTAssertNil(result["VIN12345678"])
+            XCTAssertEqual(result["UNIQUE12345"], "third")
+        }
+    }
+
     func testManualReviewFilesOnlyTheExplicitSelection() {
         let session = ["mustang", "corvette", "porsche"]
         XCTAssertEqual(AttributionEngine.reviewedPhotoIDs(["mustang", "mustang", "outside-session"], sessionIDs: session), ["mustang"])

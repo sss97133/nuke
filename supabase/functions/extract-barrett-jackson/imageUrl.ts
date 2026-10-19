@@ -8,3 +8,11 @@ export function originImageUrl(url: string): string {
   const m = url.match(/\/cdn-cgi\/image\/[^/]+\/(https?:\/\/.+)$/i);
   return m ? m[1] : url;
 }
+
+// The CDN serves one stored photo as both ".jpeg" and ".jpg" (Palm Beach SL550 298545: 31 rows stored as
+// Engine_Web.jpeg in March, the same photos re-read as Engine_Web.jpg on 2026-10-19).
+/** Every spelling under which this photo may already be stored. */
+export function storedImageUrls(url: string): string[] {
+  const alt = url.replace(/\.(jpe?g)$/i, (_m, ext: string) => (ext.toLowerCase() === 'jpg' ? '.jpeg' : '.jpg'));
+  return alt === url ? [url] : [url, alt];
+}

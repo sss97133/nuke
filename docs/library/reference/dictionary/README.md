@@ -250,6 +250,8 @@ can supersede it without editing the original or guessing from model/year.
 
 ## P
 
+**Partition (market)** — Mutually exclusive groups of one declared population under one attribute. Every member belongs to one group, including an unknown/conflicting group where needed; group counts and dollars reconcile to that population. Changing grouping rearranges membership without changing filters or units. A configuration partition of current records does not establish the configuration of those assets at a historical sale.
+
 **Palimpsest** — A manuscript that has been written on, scraped off, and rewritten, with earlier layers still partially visible. In Nuke, the palimpsest model describes how a user's expertise evolves over time: each era (e.g., 5 years of Porsche, then a switch to trucks) is a layer that remains visible in their writing style even after the topical shift. Style is permanent; topic is temporal. The palimpsest is one of 7 novel ontological contributions identified in the applied ontology research.
 
 **Permanent Interface** — An interface element that solves a problem which hasn't changed and won't change. The scroll bar (content exceeds container), the menu bar (applications have actions), the address bar (users need location awareness), the search box (information exceeds browsability). The test: remove the element; if the user is stuck within seconds, it's permanent. If they adjust within minutes, it was trend. The header is permanent because its function (identity + command + session) hasn't changed. See Contemplation: The Permanent Interface.
@@ -281,6 +283,12 @@ can supersede it without editing the original or guessing from model/year.
 **Question Data Gap** — A taxonomy category where `answerable_from_db = false` — buyers ask about it but no structured DB field can answer it. Examples: video requests, seller responsiveness, provenance value, bidding strategy. Gaps inform what data to collect next or what features to build.
 
 ## R
+
+**Resource image sighting** — One retained tool/component array member in a canonical image observation, identified by source observation and JSON pointer. Several sightings may describe the same physical object; an equipment association is separately qualified. Presence, use, ownership, purchase cost, market value and contribution to labor are different claims. See [Work Order Intelligence](../../technical/work-order-intelligence.md).
+
+**Resource performer candidate** — A canonical `actors` reference proposed for a skill or inspection requirement. The contracting supplier can be unknown; an actor label does not establish account identity, qualification, consent or completion. A retained-operation basis includes an exact row snapshot and is withheld from current reads after that operation changes. See [Work Order Intelligence](../../technical/work-order-intelligence.md).
+
+**Resource requirement basis** — The original retained work-record observation and exact excerpt supporting an interpreted need for a work-order operation. The interpretation keeps the original observation clock and its own extraction method and confidence. A quoted need does not establish quantity, provider competence, permission or reservation. Withdrawing or reattributing the basis excludes its dependent current resource graph; original records remain. See [Work Order Intelligence](../../technical/work-order-intelligence.md).
 
 **Rhizome** — Deleuzian concept. A network with no center, no hierarchy, no beginning or end. Nuke's architecture is rhizomatic — every concept connects to every other. The observation system is the purest expression. See RHIZOME.md.
 

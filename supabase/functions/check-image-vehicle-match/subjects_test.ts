@@ -10,6 +10,40 @@ const edge = (a: string, b: string, kinds = ["body_geometry", "configuration"]) 
 const raw = (ids = ["a", "b"], edges = [edge("a", "b")]) => ({ frames: ids.map(id => frame(id)), correspondences: edges,
   labels: [{ anchor_image_id: "a", make: "Example", model_family: "Coupe" }], contradictions: [] as unknown[] });
 
+Deno.test("a VIN anchor and walk-around combine source capture context without fabricating visible correspondences", () => {
+  const reading = { ...raw(["a", "b"], []), capture_sessions: [{ anchor_image_id: "b", member_image_ids: ["a", "b"],
+    identifier: { kind: "chassis", text: "6R07T123456", legibility: "clear" },
+    basis: "A single primer coupe walk-around ends at its attached identification plate.",
+    asserted_identity: { make: "Ford", model_family: "Mustang" } }] };
+  reading.frames[1].view = "detail";
+  const sources = [input("a", { taken_at: "2026-10-01T12:00:00Z", capture_context: { device_fingerprint: "device", latitude: 35, longitude: -115 } }),
+    input("b", { taken_at: "2026-10-01T12:02:00Z", capture_context: { device_fingerprint: "device", latitude: 35.0001, longitude: -115 } })];
+  const result = projectDepictedSubjects(reading, sources);
+  equal(result.subjects, []);
+  equal(result.capture_sessions?.[0].identifier.text, "6R07T123456");
+  equal(result.capture_sessions?.[0].member_image_ids, ["a", "b"]);
+  for (const change of [
+    { taken_at: "2026-10-01T13:00:00Z" },
+    { capture_context: { device_fingerprint: "other", latitude: 35, longitude: -115 } },
+    { capture_context: { device_fingerprint: "device", latitude: 36, longitude: -115 } },
+    { capture_context: { device_fingerprint: "device", latitude: null, longitude: -115 } },
+    { source_qualified: false },
+  ]) equal(projectDepictedSubjects(reading, [sources[0], { ...sources[1], ...change }]).capture_sessions, undefined);
+  reading.contradictions = [{ left_image_id: "a", right_image_id: "b", reason: "Different paint and body configuration" }];
+  equal(projectDepictedSubjects(reading, sources).capture_sessions, undefined);
+});
+
+Deno.test("competing VIN session proposals retain ambiguity regardless of array order", () => {
+  const sources = [input("a", { taken_at: "2026-10-01T12:00:00Z", capture_context: { device_fingerprint: "device", latitude: 35, longitude: -115 } }),
+    input("b", { taken_at: "2026-10-01T12:02:00Z", capture_context: { device_fingerprint: "device", latitude: 35, longitude: -115 } })];
+  const proposal = { anchor_image_id: "b", member_image_ids: ["a", "b"], basis: "Walk-around and identifier detail",
+    identifier: { kind: "chassis", text: "6R07T123456", legibility: "clear" } };
+  const competing = { ...proposal, identifier: { ...proposal.identifier, text: "6R07T654321" } };
+  for (const sessions of [[proposal, competing], [competing, proposal]]) {
+    equal(projectDepictedSubjects({ ...raw(), capture_sessions: sessions }, sources).capture_sessions, undefined);
+  }
+});
+
 Deno.test("mixed cars retain a supported subject and an unresolved third frame, regardless of current filing", () => {
   const result = projectDepictedSubjects(raw(["a", "b", "c"]), [input("a"), input("b"), input("c")]);
   equal(result.subjects.map(s => s.member_image_ids), [["a", "b"]]);
