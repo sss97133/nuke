@@ -2994,9 +2994,12 @@ The job path now counts labor-task evidence and reports withdrawn or stale sourc
 PG17 covers 27 cases and reruns the 25 + 57 + 88 earlier mechanics assertions. Prose-only scopes
 remain unitemized; splitting comma lists is a later, separately evidenced pass.
 
-A job is a future receipt (2026-10-19): the mechanics slices above are read together as one
-model. A receipt is a computed conclusion over reconciled witnesses; a job is the same graph
-before conclusion, each stage a receipt line closed by a named witness, clock and signer.
-The stage-to-line table, invariants, fourteen-agreement inventory with holders and gaps,
-adopted owner-overridable defaults, listing-to-inspection pipeline and explainable matching
-join live in `docs/library/technical/work-order-intelligence.md` § "A job is a future receipt".
+A job is a quote (2026-10-19; owner: use the standard language): the mechanics slices above
+are read together as one model. A job is a quote whose itemized lines each name the witness,
+clock and signer that close them; acceptance makes it a work order, and invoice and payment
+conclude it as a receipt, a computed conclusion over reconciled witnesses. The lifecycle
+vocabulary, stage-to-line table, invariants, fourteen-agreement inventory with holders and
+gaps, privacy doctrine (job data open, personal information withheld, party payments visible
+only to the parties, contact brokered by the platform), adopted owner-overridable defaults,
+listing-to-inspection pipeline and explainable matching join live in
+`docs/library/technical/work-order-intelligence.md` § "A job is a quote".
