@@ -1345,7 +1345,12 @@ if (import.meta.main) Deno.serve(async (req) => {
       let streak = 0;
       for (const t of picked) {
         if (Date.now() - started > 110_000) { res.stopped = 'time_budget'; break; }
-        const { data: row, error: claimErr } = await supabase.from('import_queue').insert({ listing_url: t.listing_url, status: 'processing', extractor_version: TAG, raw_data: t.id === null ? { replay: true } : { target_id: t.id }, locked_at: new Date().toISOString() }).select('id').single();
+        let { data: row, error: claimErr } = await supabase.from('import_queue').insert({ listing_url: t.listing_url, status: 'processing', extractor_version: TAG, raw_data: t.id === null ? { replay: true } : { target_id: t.id }, locked_at: new Date().toISOString() }).select('id').single();
+        // A replayed lot already has its queue row (import_queue.listing_url is unique): claim that row instead.
+        if (claimErr?.code === '23505' && t.id === null) {
+          ({ data: row, error: claimErr } = await supabase.from('import_queue').update({ status: 'processing', locked_at: new Date().toISOString() })
+            .eq('listing_url', t.listing_url).neq('status', 'processing').select('id').maybeSingle());
+        }
         if (claimErr || !row) continue;
         const finish = async (status: string, error?: string, vehicleId?: string) =>
           softWrite('import_queue update', await supabase.from('import_queue').update({ status, error_message: error?.slice(0, 500) ?? null, vehicle_id: vehicleId ?? null, processed_at: new Date().toISOString() }).eq('id', row.id), res.errors);
