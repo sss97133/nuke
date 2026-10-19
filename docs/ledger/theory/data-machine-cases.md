@@ -2880,3 +2880,19 @@ Disposable PG17 exercises participant alternatives, inspection, type/identity re
 snapshot custody, stale-basis propagation and the unchanged private access boundary.
 This selected case does not establish broader historical coverage, accepted terms,
 authenticated approval, capacity reservation, completion or payment accounting.
+
+Image-object connection (2026-10-19): owner emphasized every background object occurrence,
+entity endpoints, separate cost/value claims and the eventual calculation of labor value.
+Live inspection found retained canonical tool/component arrays, an equipment ledger and
+legacy per-image equipment evidence. Old cascade code resolves names globally and can
+convert photo visibility into estimated minutes; those claims cannot be silently treated
+as measured use or a physical-instance identity. Migration
+`20261019031934_work_order_image_objects.sql` adds a private bounded job-context reader
+over existing observations, preserving source pointers, repeated appearances and clocks.
+It joins existing image/equipment associations while separating recorded purchase cost,
+computed depreciation value and unknown market/job/labor values. Current source and image
+qualification gates apply. The disposable PG17 contract covers custody, pagination,
+malformed evidence, privacy and refusal to accrue usage/value. This connects retained
+evidence without a new observation ledger, photo processing, paid inference or canonical
+asset minting. Full image coverage and a physical-object identity resolver remain unmeasured
+and unimplemented respectively; vehicle context does not establish operation usage.

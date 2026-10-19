@@ -70,6 +70,42 @@ photo-processing holds, paid inference or existing invoices are changed. The foc
 PG17 contract is `supabase/sql/test_work_order_resource_evidence.sql` and is picked up
 by the existing database-contract CI job.
 
+## Image objects in job context
+
+`read_work_order_image_objects(work_order_id, after_observation_id, limit)` is a
+service-only, read-only bridge from the job's vehicle to retained canonical deep-image
+observations. Pages contain 1–100 observations, ordered by observation UUID; the returned
+cursor continues the current read and is not an immutable historical snapshot. Each tool
+and component array member becomes a sighting with its original JSON, source observation,
+image, method, confidence, capture/observation/ingestion clocks and exact JSON pointer.
+Repeated labels and background objects remain separate occurrences. A sighting count is
+neither a distinct-object count nor evidence of billable activity. Missing or malformed
+array shapes are reported; malformed members retain their raw claim without an invented label.
+
+Only current attributed `image_deep_byok` condition observations with an approved,
+non-external image still assigned to the same vehicle qualify. Conflicting witness image
+IDs, reattribution, source withdrawal and changed image qualification remove current
+results. The reader performs no new analysis and changes no approval/processing hold.
+Its scope is vehicle context: these photos do not establish which work-order operation
+used an object, and unanalysed photos and other observation formats are outside coverage.
+
+Existing `equipment_usage_evidence` records link an image to the equipment endpoint.
+These remain qualified legacy associations, not per-object physical identity matches.
+Their reported state, minutes, method and confidence are exposed, but not adopted as
+usage or allocated to the job. The original cascade sometimes inferred minutes from
+visibility; this reader neither reruns that cascade nor repairs its historical claims.
+Purchase cost and its source, computed depreciation value and its formula are separate
+fields. Market value, job cost and labor value remain unknown; the equipment ledger
+does not record a currency. No estimate is relabelled as a paid acquisition cost.
+
+Owner direction: observe objects throughout every frame, accumulate evidence at their
+entity endpoints, and use that evidence to support labor valuation. Existing canonical
+observations already retain these object arrays, so this slice exposes a deterministic
+relational read instead of duplicating them in a new sightings ledger. Physical-instance
+resolution, material/process compatibility, condition/market valuation, measured usage,
+confirmed labor and compensation terms remain distinct downstream work.
+Contract: `supabase/sql/test_work_order_image_objects.sql`.
+
 The system that answers "update me on the Smith build" with a complete cited receipt in <5s.
 
 ## The Dual System
