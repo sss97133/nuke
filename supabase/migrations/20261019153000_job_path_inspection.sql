@@ -2,7 +2,7 @@
 -- read_work_order_job_path is the live definition (pg_get_functiondef md5 prefix 682206bf, from 20261019123000)
 -- with only the inspection stage changed. Linked inspection jobs (the job itself when scope_category is
 -- 'inspection', otherwise work orders whose parent_work_order_id is this job, 20261019150000) decide the stage:
--- recorded when one has a findings report (record_inspection_findings, 20261019151500), partial when requested
+-- recorded when one has a findings report (record_inspection_findings, 20261019152500), partial when requested
 -- without findings (gap inspection_findings_pending). Without a linked job the existing rule stands (an inspection
 -- requirement records the stage). New keys: inspection_jobs, inspection_job_role (self | child), counts of jobs with
 -- findings and reports, findings_clock, seller_permission (not_established). No raw ids, amounts or contact fields.

@@ -62,6 +62,9 @@ struct NukeCaptureApp: App {
                     ExploreView()
                 } else if ProcessInfo.processInfo.environment["NUKE_DEBUG_SCREEN"] == "app" {
                     DebugAppDeepLink()
+                } else if let org = ProcessInfo.processInfo.environment["NUKE_DEBUG_ACTOR_ORG"], !org.isEmpty {
+                    // NUKE_DEBUG_ACTOR_ORG=<uuid> roots on that organization's actor document (DEBUG only).
+                    NavigationStack { ActorProfileView(route: ActorRoute(kind: "organization", id: org, name: nil)) }
                 } else if let dbgDay = ProcessInfo.processInfo.environment["NUKE_DEBUG_DAY"], !dbgDay.isEmpty {
                     // NUKE_DEBUG_DAY=yyyy-MM-dd roots on that day's receipt for the sample
                     // profile (or NUKE_DEBUG_DAY_USER=<uuid>) as the current session: anon
