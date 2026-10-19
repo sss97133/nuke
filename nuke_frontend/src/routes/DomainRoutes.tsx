@@ -2,6 +2,7 @@
 import React, { Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { ProtectedRoute } from '../components/auth/ProtectedRoute';
+import { warmJobRoute } from '../pages/jobs/jobWarm';
 
 // Static pages (footer/legal) — lazy-loaded since rarely visited
 const About = React.lazy(() => import('../pages/About'));
@@ -120,9 +121,14 @@ const TransferPartyPage = React.lazy(() => import('../pages/TransferPartyPage'))
 const BuildDashboard = React.lazy(() => import('../pages/BuildDashboard'));
 
 // Jobs and providers — open job path readers; party money and personal fields withheld at the source
-const JobPage = React.lazy(() => import('../pages/jobs/JobPage'));
+// The job path read starts while JobPage's chunk downloads (pages/jobs/jobWarm.ts); JobPage takes it once.
+const JobPage = React.lazy(() => {
+  if (typeof window !== 'undefined') warmJobRoute(window.location.pathname);
+  return import('../pages/jobs/JobPage');
+});
 const ProviderProfilePage = React.lazy(() => import('../pages/providers/ProviderProfilePage'));
 const MessagesPage = React.lazy(() => import('../pages/messages/MessagesPage'));
+const SupplierInvitePage = React.lazy(() => import('../pages/orgs/SupplierInvitePage'));
 const ContactThreadPage = React.lazy(() => import('../pages/messages/MessagesPage').then(m => ({ default: m.ContactThreadPage })));
 
 // Public projections — journal index + day page
@@ -218,6 +224,9 @@ export const DomainRoutes = () => {
         <Route path="/providers/:handle" element={<ProviderProfilePage />} />
         {/* Statement: work_order_statement_read is open data; payments stay party-only from the server */}
         <Route path="/work-orders/statement" element={<WorkOrderStatement />} />
+        {/* A business opens the invite a customer shared (create_supplier_invite share_path); sign-in happens on the page */}
+        <Route path="/supplier-invite/:token" element={<SupplierInvitePage />} />
+        <Route path="/invite/:token" element={<SupplierInvitePage />} />
         {/* Investor offering / data room — semi-public fundraising page */}
         {/* Docs / developers landing */}
         <Route path="/developers" element={<DevelopersPage />} />

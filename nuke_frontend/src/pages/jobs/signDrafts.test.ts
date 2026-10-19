@@ -162,7 +162,7 @@ describe('co-sign, vouch and bookings', () => {
   });
 
   it('flattens facility_read asset groups', () => {
-    expect(facilityAssets({ assets: [{ kind: 'lift', capacity_total: 2, assets: [{ asset_id: 'as1', label: 'Lift A', capacity: 1, busy: [{ from: '2026-10-20T08:00:00Z', until: '2026-10-20T10:00:00Z' }] }] }] }))
+    expect(facilityAssets({ assets_by_kind: [{ kind: 'lift', capacity_total: 2, assets: [{ asset_id: 'as1', label: 'Lift A', capacity: 1, busy: [{ from: '2026-10-20T08:00:00Z', until: '2026-10-20T10:00:00Z' }] }] }] }))
       .toEqual([{ assetId: 'as1', kind: 'lift', label: 'Lift A', capacity: 1, busy: [{ from: '2026-10-20T08:00:00Z', until: '2026-10-20T10:00:00Z' }] }]);
   });
 

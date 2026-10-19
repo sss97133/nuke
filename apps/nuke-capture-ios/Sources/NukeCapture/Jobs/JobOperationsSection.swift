@@ -7,7 +7,8 @@
 // line status of "complete" is the record's mark, not a completion Sign; the completion stage says
 // whether anyone signed. The plan stage's inconsistencies say when an operation's source was
 // withdrawn or its quoted words left the job text; the reader does not say which operation, so the
-// section states that once. Descriptions that name a person arrive withheld for non-parties.
+// section states that once. Descriptions that name a person arrive withheld for non-parties. Parts
+// follow as product rows; each opens its page (PartProductView, work_order_part_read).
 
 import SwiftUI
 
@@ -134,11 +135,15 @@ struct JobOperationsSection: View {
                 RootedValueView(label: OperationsCopy.title(op), value: OperationsChecklist.status(op.status),
                                 status: OperationsChecklist.rung(op), decay: OperationsChecklist.detail(op))
             }
-            if !o.parts.isEmpty || !o.labor.isEmpty {
-                Text([o.parts.isEmpty ? nil : "\(o.parts.count) part\(o.parts.count == 1 ? "" : "s") on record",
-                      o.labor.isEmpty ? nil : "\(o.labor.count) labor line\(o.labor.count == 1 ? "" : "s") on record"]
-                        .compactMap { $0 }.joined(separator: " · "))
+            if !o.labor.isEmpty {
+                Text("\(o.labor.count) labor line\(o.labor.count == 1 ? "" : "s") on record")
                     .font(.caption2).foregroundStyle(.tertiary)
+            }
+        }
+        if !o.parts.isEmpty {
+            Text(PartProductCopy.partsLine(o.parts)).font(.caption).foregroundStyle(.secondary).padding(.top, 4)
+            ForEach(PartProductCopy.ordered(o.parts)) { part in
+                NavigationLink { PartProductView(partId: part.id) } label: { PartProductRow(part: part) }
             }
         }
     }

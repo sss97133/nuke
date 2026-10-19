@@ -54,6 +54,7 @@ const ProfileBidsTab = React.lazy(() => import('../components/profile/ProfileBid
 const StorefrontSettings = React.lazy(() => import('../components/organization/StorefrontSettings'));
 const ProfileSuccessStoriesTab = React.lazy(() => import('../components/profile/ProfileSuccessStoriesTab').then(m => ({ default: m.ProfileSuccessStoriesTab })));
 const CollectionIntelligenceTab = React.lazy(() => import('../components/organization/CollectionIntelligenceTab'));
+const OrganizationOnNuke = React.lazy(() => import('./orgs/OrganizationOnNuke'));
 
 interface ProfileLite {
   id: string;
@@ -2362,6 +2363,7 @@ export default function OrganizationProfile() {
         {activeTab === 'overview' && (
           <>
             {organizationId && <OrganizationSourceTargets key={organizationId} organizationId={organizationId} />}
+            {organizationId && <OrganizationOnNuke organizationId={organizationId} />}
             {/* Key Metrics Bar — only show when seller track record hasn't loaded yet (it supersedes this) */}
             {!sellerTrackRecord && (((organization?.total_vehicles ?? 0) > 0) || ((organization?.total_images ?? 0) > 0) || ((organization?.total_events ?? 0) > 0)) && (
             <div style={{

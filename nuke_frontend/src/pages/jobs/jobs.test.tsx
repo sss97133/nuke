@@ -352,6 +352,6 @@ describe('VehicleWorkCard', () => {
     fixture.rpc.mockResolvedValue({ data: read(true), error: null });
     await render(<VehicleWorkCard vehicleId="v1" vehicleTitle="1983 GMC K2500" signedIn />);
     expect(container.textContent).toContain('Post a job');
-    expect(rpcNames().every(n => n === 'vehicle_work_orders_read')).toBe(true);
+    expect(rpcNames().every(n => n === 'vehicle_work_orders_read' || n === 'vehicle_work_publication_read')).toBe(true);
   });
 });

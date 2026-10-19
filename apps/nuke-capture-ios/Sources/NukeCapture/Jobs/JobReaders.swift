@@ -252,6 +252,10 @@ enum JobReaders {
                 return JobRefusal(reader: reader, kind: .unavailable, title: "Vehicle not available",
                                   detail: "It doesn't exist, or it isn't shared with you.")
             }
+            if pg.message.contains("Part unavailable") {
+                return JobRefusal(reader: reader, kind: .unavailable, title: "Part not available",
+                                  detail: "It isn't on a job shared with you, or it doesn't exist.")
+            }
             if pg.message.contains("Work order unavailable") {
                 return JobRefusal(reader: reader, kind: .unavailable, title: "Job not available",
                                   detail: "It doesn't exist, or it isn't shared with you.")

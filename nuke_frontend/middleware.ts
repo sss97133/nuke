@@ -364,6 +364,11 @@ async function workSitemap(): Promise<Response> {
 /** The page for an open job, provider or organization route, or null to fall through to the plain app shell. */
 async function workPage(pathname: string, requestUrl: string): Promise<Response | null> {
   const path = pathname.length > 1 ? pathname.replace(/\/$/, '') : pathname;
+  // The app shell is fetched alongside the readers (it does not depend on them); unused when the route falls through.
+  const shaped = path === '/jobs' || /^\/jobs\/[0-9a-f-]{36}$/i.test(path) || /^\/org\/[0-9a-f-]{36}$/i.test(path)
+    || (/^\/providers\/[^/]+$/.test(path) && !path.startsWith('/providers/actor'));
+  if (!shaped) return null;
+  const shell = getBaseHtml(requestUrl).catch(() => null);
   let page = null;
   if (path === '/jobs') {
     page = jobsBoardFace(await anonRpc('open_requirements_read', { p_after: null, p_limit: 25, p_kind: null }));
@@ -399,7 +404,8 @@ async function workPage(pathname: string, requestUrl: string): Promise<Response 
     page = organizationFace(id, rows[0], supply);
   }
   if (!page) return null;
-  const html = await getBaseHtml(requestUrl);
+  const html = await shell;
+  if (!html) return null;
   return new Response(injectPage(html, page), { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': WORK_CACHE } });
 }
 
