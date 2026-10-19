@@ -64,7 +64,7 @@ export interface SubjectDependencies {
   now?: () => Date;
 }
 export interface SubjectRequest {
-  user_id?: string; image_ids?: string[]; dry_run?: boolean; reuse_only?: boolean;
+  user_id?: string; image_ids?: string[]; dry_run?: boolean; reuse_only?: boolean; privacy_only?: boolean;
   expected_source_hashes?: Record<string, string>;
   device_privacy_receipts?: Record<string, unknown>;
   allowed_source_hashes?: Record<string, string>;
@@ -144,15 +144,16 @@ async function retainCapturedPrivacy(store: SubjectStore, user: string, sources:
   return sources.map(source => current.find(row => row.id === source.id)!);
 }
 
-/** One explicitly bounded reading; no session inheritance or canonical vehicle writes.
- * Retained protected readings are checked before any object/renderer/provider call.
- * The private subject consumer reads current evidence independently after admission.
+/** One bounded reading or free source qualification. Reuse precedes inference;
+ * authenticated capture filing follows retained, currently qualified evidence.
+ * The private consumer independently rechecks sources after admission.
  */
 export async function resolveSubjectBatch(store: SubjectStore, request: SubjectRequest & { user_id: string },
   projectURL: string, dependencies: SubjectDependencies) {
   const ids = request.image_ids, now = dependencies.now ?? (() => new Date()), asOf = now().toISOString();
   if (!Array.isArray(ids) || ids.length < 1 || ids.length > SUBJECT_BATCH_LIMIT || new Set(ids).size !== ids.length || ids.some(id => typeof id !== "string" || !UUID.test(id)) ||
-    request.dry_run !== undefined && typeof request.dry_run !== "boolean" || request.reuse_only !== undefined && typeof request.reuse_only !== "boolean") {
+    request.dry_run !== undefined && typeof request.dry_run !== "boolean" || request.reuse_only !== undefined && typeof request.reuse_only !== "boolean" ||
+    request.privacy_only !== undefined && typeof request.privacy_only !== "boolean") {
     throw new Error("subject_input_scope_invalid");
   }
   const expected = request.expected_source_hashes;
@@ -180,6 +181,23 @@ export async function resolveSubjectBatch(store: SubjectStore, request: SubjectR
   }
   const freshScopeRefusal = scopeRefusal(sources);
   if (freshScopeRefusal) return { ...base, status: "refused", refusal: freshScopeRefusal };
+  if (request.privacy_only) {
+    // Completed local checks are independent testimony, not a paid interpretation.
+    // Keep the existing two-original proof bound; a three-view session can qualify
+    // two then one before its single model request. Never mark analysis completed.
+    if (ids.length > 2 || request.reuse_only || request.dry_run) return { ...base, status: "refused", refusal: "subject_privacy_scope_invalid" };
+    if (sources.some(source => sourceRefusal(source, request.user_id, asOf, privacy[source.id])))
+      return { ...base, status: "refused", refusal: "source_not_ready" };
+    const pending = sources.filter(source => !subjectSourceAvailable(source, request.user_id, asOf));
+    if (pending.length) {
+      const capture = await (dependencies.capturePrivacy ?? captureVisionInputs)(pending.map(source => ({
+        key: source.id, image_id: source.id, source_url: source.image_url, storage_path: source.storage_path,
+        expected_source_sha256: source.file_hash, representation: "source", required: true,
+      })));
+      sources = await retainCapturedPrivacy(store, request.user_id, sources, privacy, capture, now().toISOString());
+    }
+    return { ...base, status: "privacy_qualified", qualified_image_ids: sources.map(source => source.id), inference_started: false };
+  }
   const held = sources.map(row => ({ image_id: row.id, reason: request.reuse_only && subjectSourceCanEstablishPrivacy(row, request.user_id)
     ? null : sourceRefusal(row, request.user_id, asOf, privacy[row.id]) })).filter(row => row.reason);
   if (held.length) return { ...base, status: "refused", refusal: held.some(row => row.reason === "source_unavailable") ? "source_unavailable" : "source_not_ready", unresolved: held };
