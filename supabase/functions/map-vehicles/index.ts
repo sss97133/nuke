@@ -357,15 +357,16 @@ Deno.serve(async (req) => {
         }>(conn, sql, asOf ? [south, north, west, east, limit] : vArgs);
 
         totalMatched = rows.reduce((s, r) => s + r.count, 0);
+        // The driver hands float8 back as text here; GeoJSON coordinates must be numbers or nothing draws.
         features = rows.map(r => ({
           type: "Feature",
-          geometry: { type: "Point", coordinates: [r.lng, r.lat] },
+          geometry: { type: "Point", coordinates: [Number(r.lng), Number(r.lat)] },
           properties: {
             cluster: true,
             count: r.count,
             sources: r.sources ?? [],
             event_types: r.event_types ?? [],
-            avg_confidence: r.avg_confidence,
+            avg_confidence: Number(r.avg_confidence),
           },
         }));
 
@@ -411,7 +412,7 @@ Deno.serve(async (req) => {
         totalMatched = rows.length;
         features = rows.map((r: any) => ({
           type: "Feature",
-          geometry: { type: "Point", coordinates: [r.lng, r.lat] },
+          geometry: { type: "Point", coordinates: [Number(r.lng), Number(r.lat)] },
           properties: {
             observation_id: r.observation_id,
             vehicle_id: r.vehicle_id,
