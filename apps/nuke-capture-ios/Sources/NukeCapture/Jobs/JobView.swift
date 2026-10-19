@@ -27,15 +27,52 @@ struct JobView: View {
     @State private var operations: JobLoad<WorkOrderOperations> = .loading
     @State private var attachments: JobLoad<WorkOrderEvidence> = .loading
     @State private var place: JobLoad<JobProviderPlace> = .loading
+    @State private var mode: Mode = JobView.defaultMode
+
+    /// Live: the order-in-motion screen (JobLiveView). Details: every stage, quote, part and action.
+    enum Mode: String, CaseIterable, Identifiable {
+        case live = "Live", details = "Details"
+        var id: String { rawValue }
+    }
+
+    /// Live by default; the fixture backend's UI tests drive the Details screen.
+    static var defaultMode: Mode {
+        #if DEBUG
+        if FixtureBackend.isActive { return .details }
+        #endif
+        return .live
+    }
 
     var body: some View {
-        JobPathContent(workOrderId: workOrderId, path: path, resources: resources, quotes: quotes, offers: offers,
-                       inspections: inspections, invoices: invoices, evidence: evidence,
-                       facility: facility, operations: operations, attachments: attachments, place: place,
-                       titleHint: titleHint, vehicleHint: vehicleHint,
-                       onChanged: { Task { await load() } })
-            .task(id: workOrderId) { await load() }
-            .refreshable { await load() }
+        Group {
+            switch mode {
+            case .live:
+                JobLiveView(workOrderId: workOrderId, path: path, place: place, titleHint: titleHint, vehicleHint: vehicleHint,
+                            onOpenDetails: { withAnimation(.snappy) { mode = .details } },
+                            onChanged: { Task { await load() } })
+                    .navigationBarTitleDisplayMode(.inline)
+                    .transition(.opacity)
+            case .details:
+                JobPathContent(workOrderId: workOrderId, path: path, resources: resources, quotes: quotes, offers: offers,
+                               inspections: inspections, invoices: invoices, evidence: evidence,
+                               facility: facility, operations: operations, attachments: attachments, place: place,
+                               titleHint: titleHint, vehicleHint: vehicleHint,
+                               onChanged: { Task { await load() } })
+                    .refreshable { await load() }
+                    .transition(.opacity)
+            }
+        }
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                Picker("View", selection: $mode.animation(.snappy)) {
+                    ForEach(Mode.allCases) { Text($0.rawValue).tag($0) }
+                }
+                .pickerStyle(.segmented)
+                .frame(width: 180)
+                .onChange(of: mode) { Haptics.tick() }
+            }
+        }
+        .task(id: workOrderId) { await load() }
     }
 
     private func load() async {
