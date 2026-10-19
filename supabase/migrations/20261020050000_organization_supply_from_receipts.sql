@@ -84,7 +84,9 @@ COMMENT ON TABLE public.organization_supply_evidence IS
   'Projection: one row per (purchase record, organization, supply kind) from retained receipts, work-order parts and organization-resolved payments. Rebuilt by supply_resolve_counterparties(); service-only.';
 
 -- Reviewed vendors (2026-10-19, from live receipts/work_order_parts; counts are receipts at review time).
-INSERT INTO public.supply_vendors (vendor_slug, business_name, decision, organization_id, domain, supply_kinds, basis) VALUES
+-- Rows naming an existing organization land only where that organization exists (a fresh database has none).
+INSERT INTO public.supply_vendors (vendor_slug, business_name, decision, organization_id, domain, supply_kinds, basis)
+SELECT v.vendor_slug, v.business_name, v.decision, v.organization_id::uuid, v.domain, v.supply_kinds, v.basis FROM (VALUES
  ('holley', 'Holley', 'existing_organization', 'd0769163-47a9-4635-986c-e44a6ca86635', NULL, ARRAY['performance_parts','fuel_system_parts'], 'organization row website holley.com; 24 receipts'),
  ('wild_horses_4x4', 'Wild Horses 4x4', 'existing_organization', 'f40f60ca-e9dc-466a-9364-4ac407c4eca1', NULL, ARRAY['offroad_parts'], 'organization row website wildhorses4x4.com; receipts print wildhorses4x4.com'),
  ('ernies_upholstery', 'Ernie''s Upholstery', 'existing_organization', '40deadd4-f91f-4e92-99b5-50d42fcb0083', NULL, ARRAY['upholstery_service'], 'organization row (restoration_shop); work_order_parts supplier'),
@@ -110,8 +112,10 @@ INSERT INTO public.supply_vendors (vendor_slug, business_name, decision, organiz
  ('champion_cooling_systems', 'Champion Cooling Systems', 'gap_no_stable_identifier', NULL, NULL, ARRAY['cooling_parts'], '3 receipts; no domain printed'),
  ('sms_auto_fabrics', 'SMS Auto Fabrics', 'gap_no_stable_identifier', NULL, NULL, ARRAY['interior_parts'], '4 receipts; domain not printed on these receipts'),
  ('davis_off_road', 'Davis Off Road', 'gap_no_stable_identifier', NULL, NULL, ARRAY['offroad_parts'], 'work_order_parts supplier; no domain recorded'),
- ('ecklers', 'Ecklers', 'gap_no_stable_identifier', NULL, NULL, ARRAY['restoration_parts'], 'work_order_parts supplier; no domain recorded');
-INSERT INTO public.supply_vendor_aliases (alias_key, vendor_slug) VALUES
+ ('ecklers', 'Ecklers', 'gap_no_stable_identifier', NULL, NULL, ARRAY['restoration_parts'], 'work_order_parts supplier; no domain recorded')) v(vendor_slug, business_name, decision, organization_id, domain, supply_kinds, basis)
+WHERE v.organization_id IS NULL OR EXISTS (SELECT 1 FROM public.organizations o WHERE o.id = v.organization_id::uuid);
+INSERT INTO public.supply_vendor_aliases (alias_key, vendor_slug)
+SELECT a.* FROM (VALUES
  ('holley', 'holley'), ('holley performance products inc', 'holley'),
  ('wild horses inc', 'wild_horses_4x4'), ('wild horses 4x4', 'wild_horses_4x4'),
  ('ernie''s upholstery', 'ernies_upholstery'),
@@ -138,7 +142,8 @@ INSERT INTO public.supply_vendor_aliases (alias_key, vendor_slug) VALUES
  ('champion cooling systems', 'champion_cooling_systems'),
  ('sms auto fabrics', 'sms_auto_fabrics'),
  ('davis off road', 'davis_off_road'),
- ('ecklers', 'ecklers');
+ ('ecklers', 'ecklers')) a(alias_key, vendor_slug)
+WHERE EXISTS (SELECT 1 FROM public.supply_vendors s WHERE s.vendor_slug = a.vendor_slug);
 INSERT INTO public.supply_category_kinds (category, supply_kind) VALUES
  ('suspension', 'suspension_parts'), ('engine', 'engine_parts'), ('cooling', 'cooling_parts'), ('exhaust', 'exhaust_parts'),
  ('brakes', 'brake_parts'), ('electrical', 'electrical_parts'), ('fuel_system', 'fuel_system_parts'), ('paint', 'paint_materials'),
