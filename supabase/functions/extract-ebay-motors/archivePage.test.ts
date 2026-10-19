@@ -1,6 +1,6 @@
 // Run: deno test supabase/functions/extract-ebay-motors/
 // Snippets follow the text of real archived pages (2009 W0QQ era, 2011-2013 ViewItem era); no seller text is copied.
-import { archivedPageToItem, archiveItemId, endedAtIso, parseArchivedItemPage } from "./archivePage.ts";
+import { archivedPageToItem, archiveItemId, endedAtIso, parseArchivedItemPage, plausibleVin } from "./archivePage.ts";
 
 const eq = (a: unknown, b: unknown) => { if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error(`${JSON.stringify(a)} != ${JSON.stringify(b)}`); };
 
@@ -58,4 +58,24 @@ Deno.test("item ids from each archived URL form; end time in both zones; photos 
   const item = archivedPageToItem(parseArchivedItemPage(era2009("Ended: Dec 13, 2009 18:00:00 PST Bid history: 19 bids Winning bid: US $2,050.00")), "20091215000000");
   eq([item.legacyItemId, item.itemEndDate, item.bidCount, item.image?.imageUrl], ["160383911052", "2009-12-14T02:00:00.000Z", 19, "https://web.archive.org/web/20091215000000im_/http://i.ebayimg.com/14/!Bgnf~~_35.JPG"]);
   eq(item.localizedAspects?.find((a) => a.name === "Mileage")?.value, "121,540");
+});
+
+Deno.test("2010-11 sentence-case labels end at the next label; a masked or run-on VIN is dropped", () => {
+  const html = `<html><head><title>1977 Toyota Corolla | eBay</title></head><body><h1>1977 Toyota Corolla</h1>
+<div>Ended: Mar 18, 2012 19:06:32 PDT Bid history: 12 bids Winning bid: US $9,450.00</div><div>Item number: 120874652371</div><div>Item condition: Used</div>
+<div>VIN: XXXXXXX51564213 | See the full History Report</div><div>Mileage: 55,105 miles Hi I am selling my car</div>
+<div>For Sale By: Private seller Features Body type: Hatchback Engine: 4 - Cyl. Cylinder Exterior color: Orange Transmission: Manual Fuel type: Gasoline</div></body></html>`;
+  const p = parseArchivedItemPage(html);
+  eq([p.specifics.Make, p.specifics.Model, p.specifics.Mileage, p.specifics["Body Type"], p.specifics["Exterior Color"], p.specifics.Transmission], ["Toyota", "Corolla", "55,105 miles", "Hatchback", "Orange", "Manual"]);
+  const a = Object.fromEntries((archivedPageToItem(p, "20120320000000").localizedAspects ?? []).map((x) => [x.name, x.value]));
+  eq([a.VIN, a.Mileage], [undefined, "55,105"]);
+  eq(plausibleVin("F101CL22579|GETTHEVEHICLEHISTORYREPORT"), null);
+  eq(plausibleVin("1q87l8n587965"), "1Q87L8N587965");
+});
+
+Deno.test("an 'eBay Motors: Make' title with no specifics takes make and model from the archived URL slug", () => {
+  const html = `<html><head><title>eBay Motors: Ferrari (item 260345678901 end time Jan-10-09 18:00:00 PST)</title></head><body>
+<div>Ended: Jan 10, 2009 18:00:00 PST Bid history: 3 bids Current bid: US $10,000.00 Reserve not met</div><div>Item number: 260345678901</div></body></html>`;
+  const p = parseArchivedItemPage(html, "http://cgi.ebay.com:80/ebaymotors/1978-Ferrari-400-GT-Rare-5-Speed_W0QQitemZ260345678901QQcmdZViewItem");
+  eq([p.specifics.Year, p.specifics.Make, p.specifics.Model, p.outcome, p.priceShown], ["1978", "Ferrari", "400", "reserve_not_met", 10000]);
 });

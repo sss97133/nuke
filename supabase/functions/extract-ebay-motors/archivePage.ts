@@ -64,25 +64,39 @@ export function endedAtIso(text: string): string | null {
 }
 
 // Item-specifics labels as the 2009-2014 pages print them ("Label: value Label: value ..."); a value runs to the next label.
+// Pages print them in Title Case (2012+) or sentence case (2010-2011: "Body type:", "Exterior color:"); keys are kept Title Case.
 const LABELS = ["Year", "Make", "Model", "Sub Model", "Trim", "Mileage", "VIN", "Body Type", "Exterior Color", "Interior Color",
-  "Transmission", "Engine", "Drive Type", "Number of Cylinders", "Fuel Type", "Vehicle Title", "Title", "For Sale By", "For sale by",
+  "Transmission", "Engine", "Drive Type", "Drivetrain", "Number of Cylinders", "Fuel Type", "Vehicle Title", "Title", "For Sale By",
   "Warranty", "Condition", "Options", "Power Options", "Safety Features", "Disability Equipped", "Vehicle Inspection", "Location",
-  "Service Records", "Item condition", "Sells to", "Doors", "Cylinders"];
-const LABEL_RE = new RegExp(`(?:^|\\s)(${LABELS.map((l) => l.replace(/ /g, "\\s")).join("|")}):\\s`, "g");
+  "Service Records", "Item condition", "Sells to", "Doors", "Cylinders", "Features", "Certification", "Inspection",
+  "Cab Type \\(For Trucks Only\\)", "Bed Length", "Number of Doors", "Number of Owners"];
+const LABEL_RE = new RegExp(`(?:^|\\s)(${LABELS.map((l) => l.replace(/ /g, "\\s")).join("|")}):\\s`, "gi");
+const KEY = new Map(LABELS.map((l) => [l.replace(/\\/g, "").toLowerCase(), l.replace(/\\/g, "")]));
+// A value ends at the next label-like "Words:" or at a "|" separator, whichever is first.
+const VALUE_END = /\s\|\s|\s(?:Get the|See the|Read more|Photo Viewer|Share|Description\s)|\s[A-Z][A-Za-z()/-]*(?: [A-Za-z()/-]+){0,4}:\s/;
 
 function specificsOf(text: string): Record<string, string> {
   const start = text.search(/\b(Item specifics|Vehicle Information|Item condition:)/);
-  const block = start < 0 ? text : text.slice(start, start + 4000);
+  const block = start < 0 ? text : text.slice(start, start + 5000);
   const hits = [...block.matchAll(LABEL_RE)];
   const out: Record<string, string> = {};
   hits.forEach((h, i) => {
-    const label = h[1].replace(/\s+/g, " ");
+    const label = KEY.get(h[1].replace(/\s+/g, " ").toLowerCase()) ?? h[1];
     const from = (h.index ?? 0) + h[0].length, to = i + 1 < hits.length ? hits[i + 1].index ?? block.length : Math.min(block.length, from + 200);
-    const value = block.slice(from, to).replace(/\s*\|\s*See the (free|full) (Vehicle )?History Report.*$/i, "").replace(/\s+Read more.*$/i, "").trim().slice(0, 300);
-    const key = label === "For sale by" ? "For Sale By" : label === "Title" ? "Vehicle Title" : label;
+    let value = block.slice(from, to);
+    const cut = value.search(VALUE_END);
+    if (cut >= 0) value = value.slice(0, cut);
+    value = value.trim().slice(0, 300);
+    const key = label === "Title" ? "Vehicle Title" : label === "Drivetrain" ? "Drive Type" : label;
     if (value && !(key in out)) out[key] = value;
   });
   return out;
+}
+
+/** A typed chassis number worth keeping: letters/digits only, 5-17 long, not masked ("XXXXXXXFJ40255430", "5T09T12****"). */
+export function plausibleVin(raw: string | undefined): string | null {
+  const v = (raw ?? "").replace(/[\s-]/g, "").toUpperCase();
+  return /^[A-Z0-9]{5,17}$/.test(v) && /\d{3}/.test(v) && !/X{3,}|\*/.test(v) ? v : null;
 }
 
 function imagesOf(html: string): string[] {
@@ -100,7 +114,7 @@ export function parseArchivedItemPage(html: string, originalUrl = ""): ArchivedI
   const text = textOf(html);
   const titleTag = decode(html.match(/<title>([\s\S]*?)<\/title>/i)?.[1] ?? "").replace(/\s+/g, " ").trim();
   const h1 = html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i)?.[1];
-  const tagTitle = titleTag.replace(/\s*\(item \d+.*$/i, "").replace(/\s*[|:]\s*eBay( Motors)?.*$/i, "").replace(/\s+in\s+[^|]+$/, "").trim();
+  const tagTitle = titleTag.replace(/^eBay Motors:\s*/i, "").replace(/\s*\(item \d+.*$/i, "").replace(/\s*[|:]\s*eBay( Motors)?.*$/i, "").replace(/\s+in\s+[^|]+$/, "").trim();
   const title = (h1 ? textOf(h1) : "") || tagTitle || null;
   const itemId = text.match(/Item number:\s*(\d{9,13})/)?.[1] ?? titleTag.match(/\(item (\d{9,13})/)?.[1] ?? null;
 
@@ -138,6 +152,18 @@ export function parseArchivedItemPage(html: string, originalUrl = ""): ArchivedI
     const y = text.match(/Summary for ((?:19|20)\d\d) /)?.[1] ?? title?.match(/^((?:19|20)\d\d)\b/)?.[1] ?? originalUrl.match(/\/((?:19|20)\d\d)-[A-Za-z]/)?.[1];
     if (y) specifics["Year"] = y;
   }
+  // Still no Make/Model: the heading's "1977 Toyota Corolla" (eBay's category word "Other" is not a model).
+  const head = title?.match(/^(?:19|20)\d\d\s+(\S+)\s+(?:Other\s+)?(\S+)/);
+  if (!specifics["Make"] && head) specifics["Make"] = head[1];
+  if (!specifics["Model"] && head && head[2].toLowerCase() !== "other") specifics["Model"] = head[2];
+  // Last: the archived URL's title slug ("/ebaymotors/1978-Ferrari-400-GT-Rare-..."), which the seller typed.
+  const slug = originalUrl.match(/\/ebaymotors\/((?:19|20)\d\d)-([A-Za-z][A-Za-z]+)-([A-Za-z0-9]+)/);
+  if (!specifics["Make"] && slug) specifics["Make"] = slug[2];
+  if (!specifics["Model"] && slug && specifics["Make"]?.toLowerCase() === slug[2].toLowerCase()) specifics["Model"] = slug[3];
+  for (const k of ["Mileage", "Year"]) {
+    const n = specifics[k]?.match(/^[\d,.]+(?:\s*(?:miles?|km))?/i)?.[0];
+    if (specifics[k] !== undefined) { if (n) specifics[k] = n; else delete specifics[k]; }
+  }
   const seller = text.match(/Seller info\s+(?:Member id\s+)?([A-Za-z0-9._*\-]{2,64})\s*\(\s*(?:Feedback Score Of\s*)?(\d+)\s*\)/);
   const descHtml = html.match(/<div[^>]+id="ngvi_desc_div"[^>]*>([\s\S]*?)<\/div>\s*<\/div>/i)?.[1] ?? "";
   return {
@@ -155,6 +181,9 @@ export function archivedPageToItem(p: ArchivedItemPage, timestamp: string): Ebay
   const [city, state] = (p.location ?? "").split(",").map((s) => s.trim());
   const auction = p.bids !== null || /bid/i.test(p.priceLabel ?? "");
   const mileage = p.specifics["Mileage"]?.replace(/\s*miles?$/i, "");
+  const vin = plausibleVin(p.specifics["VIN"]);
+  const aspects: Record<string, string> = { ...p.specifics, ...(mileage ? { Mileage: mileage } : {}) };
+  if (vin) aspects["VIN"] = vin; else delete aspects["VIN"];
   return {
     itemId: p.itemId ? `v1|${p.itemId}|0` : undefined, legacyItemId: p.itemId ?? undefined, title: p.title ?? undefined, description: p.description,
     price: p.priceShown != null ? { value: String(p.priceShown), currency: "USD" } : undefined,
@@ -162,7 +191,7 @@ export function archivedPageToItem(p: ArchivedItemPage, timestamp: string): Ebay
     bidCount: p.bids ?? undefined, buyingOptions: auction ? ["AUCTION"] : ["FIXED_PRICE"],
     itemLocation: city ? { city, stateOrProvince: state } : undefined,
     image: images[0] ? { imageUrl: images[0] } : undefined, additionalImages: images.slice(1).map((u) => ({ imageUrl: u })),
-    localizedAspects: Object.entries({ ...p.specifics, ...(mileage ? { Mileage: mileage } : {}) }).map(([name, value]) => ({ name, value })),
+    localizedAspects: Object.entries(aspects).map(([name, value]) => ({ name, value })),
     seller: { username: p.sellerUsername ?? undefined, feedbackScore: p.sellerFeedbackCount ?? undefined },
     itemEndDate: p.endedAt ?? undefined, condition: p.specifics["Item condition"],
   };
