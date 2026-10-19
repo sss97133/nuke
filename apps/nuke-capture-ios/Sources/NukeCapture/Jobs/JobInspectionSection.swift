@@ -2,27 +2,50 @@
 //
 // Each inspection: its checklist, the findings recorded against each item (matches the listing /
 // doesn't / couldn't tell, severity, photo references), who recorded them (handle or "Unnamed
-// party") and whether the seller has agreed to the inspection. Recording findings is the
-// inspector's Sign; it is mentioned only when the server offers it to this viewer.
+// party") and whether the seller has agreed to the inspection. Recording findings (the inspector)
+// and granting access (the vehicle's verified owner) appear only when the server offers them to this
+// viewer for that inspection (InspectionSigns.swift).
 
 import SwiftUI
 
 struct JobInspectionSection: View {
     let read: JobLoad<InspectionRead>
+    var onSigned: () -> Void = {}
+
+    private struct Step: Identifiable {
+        enum Kind { case findings, grant }
+        let kind: Kind
+        let action: JobAction
+        let doc: InspectionDoc
+        var id: String { "\(kind)-\(doc.workOrderId)" }
+    }
+    @State private var step: Step?
 
     var body: some View {
         if case .loaded(let r) = read, !r.inspections.isEmpty {
-            ForEach(r.inspections) { doc in
+            Group { ForEach(r.inspections) { doc in
                 Section {
                     content(doc)
-                    if r.canRecordFindings {
-                        Text("You're the inspector. Recording findings from the app is coming soon.")
-                            .font(.footnote).foregroundStyle(.secondary)
+                    if let a = r.grantAction(for: doc.workOrderId) {
+                        Button { step = Step(kind: .grant, action: a, doc: doc) } label: {
+                            Label("Grant inspection access", systemImage: "key")
+                        }
+                    }
+                    if let a = r.findingsAction(for: doc.workOrderId) {
+                        Button { step = Step(kind: .findings, action: a, doc: doc) } label: {
+                            Label(doc.currentReport == nil ? "Record findings" : "Record updated findings", systemImage: "checklist")
+                        }
                     }
                 } header: {
                     Text("\(PlanCopy.inspectionTitle(doc.inspectionType)) · \(doc.state == "findings_recorded" ? "Findings recorded" : "Requested")")
                 } footer: {
                     Text("Findings are what the inspector recorded, signed through Nuke. No payment is authorized here.")
+                }
+            } }
+            .sheet(item: $step) { s in
+                switch s.kind {
+                case .findings: RecordFindingsSheet(action: s.action, doc: s.doc, onDone: onSigned)
+                case .grant: GrantInspectionAccessSheet(action: s.action, doc: s.doc, onDone: onSigned)
                 }
             }
         }
