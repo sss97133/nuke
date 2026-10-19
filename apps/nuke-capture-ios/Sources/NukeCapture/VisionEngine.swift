@@ -66,6 +66,19 @@ enum VisionEngine {
         return false
     }
 
+    /// Identity-path document guard: OCR text can identify a photographed invoice
+    /// even when the scene classifier misses the paper/document label. This is a
+    /// local, free check; OCR text itself is never uploaded as an identity claim.
+    static func isIdentityDocument(labels: [String], isScreenshot: Bool, ocrLines: [String]) -> Bool {
+        if isUnnecessary(labels: labels, isScreenshot: isScreenshot) { return true }
+        let text = ocrLines.joined(separator: " ").lowercased()
+        let directMarkers = ["invoice", "receipt", "estimate", "work order", "repair order",
+                             "bill to", "amount due", "project description"]
+        if directMarkers.contains(where: text.contains) { return true }
+        let lineItemMarkers = ["quantity", "unit price", "subtotal", "tax", "description", "cost"]
+        return lineItemMarkers.filter(text.contains).count >= 3
+    }
+
     // MARK: - Asset → CGImage (local, no network by default)
 
     /// Load a PHAsset (by localIdentifier) as a CGImage sized for Vision.

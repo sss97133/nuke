@@ -189,8 +189,8 @@ final class AttributionEngine: ObservableObject {
                 isVehicle = cached.isVehicle
                 identityReadAt = cached.analyzedAt
                 labels = cached.labels
-                isDocument = VisionEngine.isUnnecessary(labels: cached.labels,
-                    isScreenshot: VisionEngine.isScreenshot(localIdentifier: assetID))
+                isDocument = VisionEngine.isIdentityDocument(labels: cached.labels,
+                    isScreenshot: VisionEngine.isScreenshot(localIdentifier: assetID), ocrLines: cached.textLines)
                 sourceVINCandidates = isDocument ? [] : cached.vinCandidates.filter(VisionEngine.isValidVIN)
             } else {
                 guard read < ocrBudget else { continue }
@@ -211,8 +211,8 @@ final class AttributionEngine: ObservableObject {
                 isVehicle = review.isVehicle
                 identityReadAt = review.analyzedAt
                 labels = review.labels
-                isDocument = VisionEngine.isUnnecessary(labels: review.labels,
-                    isScreenshot: VisionEngine.isScreenshot(localIdentifier: assetID))
+                isDocument = VisionEngine.isIdentityDocument(labels: review.labels,
+                    isScreenshot: VisionEngine.isScreenshot(localIdentifier: assetID), ocrLines: review.textLines)
                 sourceVINCandidates = isDocument ? [] : review.vinCandidates.filter(VisionEngine.isValidVIN)
             }
             let match = isDocument || knownVINs.isEmpty ? nil : VisionEngine.matchSerial(in: lines, known: knownVINs)

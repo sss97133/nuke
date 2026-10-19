@@ -89,8 +89,14 @@ final class DeviceAttributionTests: XCTestCase {
 
     func testInvoiceLabelsAreNeverVehicleIdentityAnchors() {
         for label in ["invoice", "receipt", "document", "form"] {
-            XCTAssertTrue(VisionEngine.isUnnecessary(labels: [label, "car"], isScreenshot: false))
+            XCTAssertTrue(VisionEngine.isIdentityDocument(labels: [label, "car"], isScreenshot: false, ocrLines: []))
         }
+        XCTAssertTrue(VisionEngine.isIdentityDocument(labels: ["paper"], isScreenshot: false,
+            ocrLines: ["Invoice Number: 10", "Description Quantity Unit Price Cost"]))
+        XCTAssertTrue(VisionEngine.isIdentityDocument(labels: ["automobile"], isScreenshot: false,
+            ocrLines: ["Description Quantity Unit Price Cost Tax"]))
+        XCTAssertFalse(VisionEngine.isIdentityDocument(labels: ["pickup truck"], isScreenshot: false,
+            ocrLines: ["VIN 1GCEK14L9EJ147915"]))
     }
 
     func testIdentityFoldRejectsDocumentsStaleReadsAndAmbiguousVINNeighborhoods() {
