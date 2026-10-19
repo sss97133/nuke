@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import MapGL, { Source, Layer, NavigationControl, Marker } from 'react-map-gl/maplibre';
 import 'maplibre-gl/dist/maplibre-gl.css';
+import './maplibreWorker';
 import { supabase } from '../../lib/supabase';
 import { CARTO_DARK } from './constants';
 

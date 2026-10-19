@@ -1,5 +1,341 @@
 # Work Order Intelligence
 
+## A job is a quote (2026-10-19)
+
+Use the standard trade vocabulary in docs, readers and interface copy (owner, 2026-10-18:
+"its good to use the standard language"). Lifecycle: estimate → quote (→ revisions) →
+acceptance → deposit → work order → (change orders) → completion → invoice → payment →
+receipt. The live `work_orders.status` check already follows it: `pending`, `quoted`,
+`approved`, `rejected`, `scheduled`, `in_progress`, `completed`, `paid`, `cancelled`.
+
+| Standard term | Meaning here | Holder (shipped 2026-10-19; see "The shipped loop") |
+|---|---|---|
+| Estimate | Unpriced or ranged scope derived from evidence (photos, a listing); not an offer | `listing_work_plan_read` (open; the SQL form of `buying-evidence.mjs --plan`); legacy `work_orders.estimated_*` scalars (no provenance) |
+| Quote | Priced, itemized scope and terms offered by a provider; versioned | `work_order_quotes` (immutable, observation-backed), Sign `issue_work_order_quote`, reader `work_order_quotes_read` |
+| Quote revision | A new version superseding the prior quote before acceptance | `issue_work_order_quote(..., p_supersedes_quote_id)`; the latest current version wins |
+| Acceptance / approval | The client signs one specific quote version | `accept_work_order_quote` → `work_order_quote_acceptances` (signer, clock, hash); `work_orders.approved_at` is not written |
+| Deposit | Payment against an accepted quote | Requested only: quote `deposit_requested` (a term, not a payment). No deposit payment record |
+| Work order | The accepted quote being executed | `work_orders` header; providers through `accept_offer` → `work_order_assignments` |
+| Change order | A signed revision after acceptance | `issue_change_order` (new quote version with an explicit diff), accepted with `accept_work_order_quote` |
+| Invoice | Bill for completed work against the work order | `work_order_invoices` via `issue_work_order_invoice`; legacy `generated_invoices` is not read or changed |
+| Payment | Money movement against an invoice | Witnesses only: `record_work_order_payment` → `work_order_payment_witnesses` (payer report, payee confirmation). No money moves; legacy `work_order_payments`, `payment_events` are still counted |
+| Receipt | The concluded record: what was done, by whom, and what was paid | `work_order_invoices_read` reconciliation + release evaluation; `work_order_receipt_unified` + `work_order_balance`, `get_user_day_receipt` |
+
+A **receipt** in Nuke is not a row. It is a computed conclusion over witnesses that have
+been reconciled with each other: purchase receipts (`receipts` + `receipt_items`), money
+movements (`payment_events`, `work_order_payments`), labor days (`work_sessions` closed by
+`confirm_work_session`), operations performed (`component_events`) and outgoing invoices
+(`generated_invoices`). An invoice, a payment and a work order can be several witnesses to
+one economic item; reconcile their references before summing. Readers assemble the
+conclusion: `get_user_day_receipt` (one person-day), `compute_vehicle_investment_proof`
+(one vehicle, tiered proven / attributed / projected / market) and
+`work_order_receipt_unified` with `work_order_balance` (one job).
+
+A **job** is a **quote**: a `work_orders` header whose itemized lines each name the witness
+that will close it, the clock it will carry and the party who must sign. Acceptance turns
+the quote into a work order; invoicing and payment conclude it as a receipt. Concluding
+fills those slots with admitted observations. It never flips a status. `transfer_milestones`
+(required step, deadline, completed clock, signer, evidence pointer) is the existing shape
+of an itemized, signer-closed plan in the ownership domain; reuse the shape, not the table.
+
+| Stage (`read_work_order_job_path`) | Quote / work-order line it becomes | Closed by |
+|---|---|---|
+| intake | Header: asset, requester, stated scope, request clock | Vehicle bound + scope stated + authenticated requester |
+| inspection | A billable inspection line; its findings become the plan's basis | Inspector Sign on the findings |
+| plan | Operation × material/process × parts × tools × facility × performer | Builder Sign on the plan |
+| terms | Price, deposit, schedule, who agreed and when | Client Sign over a frozen scope snapshot + each provider's accept |
+| execution | Dated work log, sessions, installed parts, image evidence | Performer records + signed days |
+| completion | Performer attestation + client acceptance | Two Signs |
+| accounting | Charged, paid in, owed out per provider, comped value | Reconciled payments; release predicates evaluated, nothing disbursed |
+
+Measured on 2026-10-19 by `work_order_job_path_scoreboard()` over all 26 `work_orders`
+rows: no row has an approval clock or a schedule window; plan can never reach `recorded`
+(`executable: not_assessed`); 4 rows have a done status without a completion clock; booking
+readiness and permission authority are `not_assessed` on every row. The scoreboard reports
+that evidence exists, not that it is true.
+
+### Invariants
+
+These claims are kept as separate records and never collapsed into one another:
+
+presence (an image occurrence) ≠ identity (account or actor) ≠ ownership/access ≠ skill
+(evidence-derived only) ≠ permission ≠ availability (a stated window) ≠ reservation ≠
+accepted work ≠ completion ≠ client acceptance ≠ measured usage ≠ asset cost ≠ computed
+depreciation ≠ market value ≠ labor value ≠ payment record ≠ payout term ≠ disbursement.
+
+A tool seen in frame is not a tool owned, owned is not permitted for this job, a vouch is
+not skill evidence, an accept clock is not completion, and a payment row is not a release.
+Each is a stated invariant; the mechanism that enforces it is named where it exists
+(constraints and readers above and below) and otherwise recorded as missing.
+
+### Contextual agreements
+
+A job needs fourteen kinds of agreement between named parties. Every agreement is a
+`work_record` observation admitted through `ingest-observation` and projected into an
+immutable typed row, with three clocks (event, ingest, sign), an authenticated signer
+(`submitted_by_user_id = auth.uid()` at a Sign step, never an ambient trigger), a verdict
+(`supports` / `contradicts` / `unknown`) and a snapshot of what was agreed. The existing
+`basis_line_item_snapshot` pattern then withholds a stale agreement automatically when its
+basis changes.
+
+| Agreement | Parties | Existing holder | Gap |
+|---|---|---|---|
+| Quote acceptance | client ↔ lead provider | `work_orders.approved_at` (one clock) | No signer, no quote version |
+| Material/process spec | client ↔ provider ↔ supplier ↔ performer | `work_order_resource_specifications` stages + comparisons | Acceptance of the proposed pair: `not_established` |
+| Inspection as a job | client ↔ inspector (≠ executor) | `inspection` requirement + actor fulfillment; `scope_category='inspection'` | No parent ↔ child work-order link |
+| Provider offer/accept | provider ↔ lead or client | `work_order_assignments` offer/accept/decline clocks | Dormant; keyed to `technicians`, not the resource graph |
+| Compensation terms | provider ↔ payer | `work_order_assignments.payout_type` (flat / hourly / percentage) | No day rate or per-operation term; terms mutable |
+| Tool loan/access | tool owner ↔ performer | Fulfillment tool references + `permission` / `condition` / `delivery` / `withdrawal` attestations | Authentication, reservation, return clock, fee |
+| Facility/bay access | facility ↔ performer or client | Fulfillment `facility_organization_id` + window | No bay grain, no reservation |
+| Co-sign/vouch with a cut | co-signer ↔ provider ↔ client | `supervision` / `suitability` attestations; assignment roles | No authenticated attestor, liability scope or cut term |
+| Payment-release conditions | client ↔ providers ↔ platform | `payout_status` vocabulary only | No condition record |
+| Vehicle transport custody | shipper ↔ client ↔ shop | `delivery` attestation (resources only); `transfer_milestones` (ownership) | No work-custody handoff |
+| Change order/substitution | client ↔ provider | Specification summary reports `substitution_approval: not_established` | No signed supersession; scope text is editable in place |
+| Completion acceptance | client ↔ provider | `completed_at`; job path returns `customer_acceptance: not_established` | No client Sign |
+| Deposit | client ↔ shop | `work_orders.deposit_cents` | No payment link |
+| Vehicle access permission | owner ↔ provider | `vehicle_user_permissions` (role, grantor, expiry, revocation) | Not tied to a job window |
+
+Eleven of the fourteen have no holder or only a partial one.
+
+### Adopted design decisions (owner-overridable defaults, 2026-10-19)
+
+These defaults were adopted on 2026-10-19 so work can proceed. The owner can override any
+of them; until then, build against them.
+
+1. **The job row.** `work_orders` is the job header; no `jobs` table. `work_sessions` stays
+   the labor witness and links to a job through an evidenced edge.
+2. **Where agreements live.** New projector event types named in standard language
+   (`quote`, `quote_acceptance`, `change_order`, `invoice`, `release_condition`,
+   `custody`), added the way `operation` was. Status columns become derived caches,
+   not truth. `quote` and `quote_acceptance` exist (see "Quotes and acceptance").
+3. **Sign.** One authenticated Sign RPC family records the signer, the sign clock and a
+   snapshot or hash of the scope it covers. A later scope edit withholds the acceptance.
+4. **Identity bridge.** Extend `account_link_claims` with an `actor_id` (exclusive with the
+   external identity). Evidence rungs: unknown → self_claim → work_evidence → co_sign →
+   authenticated_sign. Never match by name. `technicians` and `technician_phone_links` are
+   retained legacy claims, not the bridge.
+5. **Inspection.** When priced or booked, an inspection is its own `work_orders` row
+   (`scope_category='inspection'`) with a parent link; its findings feed the parent plan.
+   The pre-purchase inspection is the first paid job.
+6. **Compensation terms.** Add day rate and per-operation beside flat, hourly and
+   percentage, pinned at acceptance. Book hours are a reference, never a price. Day-rate
+   productivity is measured from signed days plus completion evidence, never from
+   inferred minutes.
+7. **Payment release.** Predicates declared at acceptance and evaluated over evidence, as
+   a computed conclusion. Disbursement and Stripe Connect stay off.
+8. **Co-sign.** An authenticated `supervision` / `suitability` / `permission` attestation
+   (job-scoped in `work_order_resource_attestations`; standing in a user-subject sibling)
+   plus a separate compensation term (`work_order_assignments.role='cosigner'`). A vouch
+   is never skill evidence.
+9. **Mutable conclusions** become superseding testimony: session un-confirm, line-item
+   status, payment status and scope text.
+10. **Phantom tables and the quote.** `work_order_quotes`, `work_order_proofs`,
+    `work_contracts` and `technician_payout_log` exist in repo migrations but not live.
+    They are not applied as written. The quote is the central object, so it keeps the
+    standard name: an immutable, versioned, observation-backed quote projection, where a
+    revision supersedes and an acceptance signs one version. Reconciled 2026-10-19: the
+    repo's `20251212000013_work_order_quotes.sql` (a mutable `status` of draft / sent /
+    accepted / rejected / withdrawn, no version) was never applied, because that version is
+    recorded live as `profile_integrity_guardrails`; `20261019094500_work_order_quotes.sql`
+    reuses the name for the immutable projection. Proofs fold into the observation/image path.
+
+### Listing → pre-purchase inspection
+
+Today Nuke can produce an honest **estimate to inspect** from a listing, not an estimate to
+restore. Measured 2026-10-19: of 124,355 `description_discoveries` rows, 90,817 are stored
+extraction-failure rows (`raw_extraction.error`) and 7,504 carry structured condition,
+flags, work or modifications. `resolve_labor_rate()` with no reported rate returns a
+labelled $160 `spitball` placeholder (4 shop rates, below its threshold of 30).
+`labor_operations` holds 64 seed codes written around GM trucks; `stage_transition_labor_map`
+holds 28 seed ranges. No live transport owner exists.
+
+Pipeline, each step extending an existing owner:
+
+1. Listing claims reader: verbatim excerpt, source, clock and confidence per claim;
+   failure rows and unattributed images excluded and counted.
+2. Claim → operation crosswalk to `labor_operations` / `stage_transition_labor_map` through
+   a reviewed keyword table.
+3. As-found specification stage: what the listing shows today.
+4. Requirement templates per operation.
+5. Per-line estimate with method, coverage and a min/typical/max range.
+6. Pre-purchase inspection job on a non-owned vehicle, with a seller `permission`
+   attestation; findings land as `inspection_type: pre_purchase` observations.
+7. Builder match (below).
+8. Purchase and custody through `transfer_milestones` plus `delivery` attestations.
+9. The quote, accepted as a work order, then invoice, payment and receipt on the
+   work-order spine.
+
+The smallest honest first version is the read-only `scripts/discovery/buying-evidence.mjs
+--plan` report (operator contract in `scripts/discovery/buying-evidence.md`): identity conflicts first, then claims, candidate operations labelled
+`seed_uncalibrated`, the rate exactly as `resolve_labor_rate` returns it, priced parts only
+where a text-fitment match exists (unverified), and a PPI checklist.
+
+### Matching as an explainable join
+
+"Most accessible provider" is an explainable SQL join per requirement, not a score. Each
+candidate × input is `pass`, `fail` or `unknown`, with its reason. Inputs: the requirement,
+distance, service area, availability window, the resource satisfied by the candidate or by
+a Plan-B supplier, evidence rung, workload and price terms. A missing resource yields a
+Plan-B fulfillment, not disqualification. The largest gaps are person-level location,
+service area and availability, and a join key between tools and requirements.
+
+### The app as navigator
+
+The client apps navigate this graph rather than owning state. A profile is a public booking
+hub with provider, client and private faces. The work surface holds the signature queue,
+jobs in motion on a seven-stage rail, open requirements nearby, evidence to file and
+capture. One shared job view returns faces from server-supplied viewer slots and actions
+only from server-supplied action lists. Stage states map onto the trust ladder:
+recorded → attributed, partial → pending, status_only → recorded (dimmed), inconsistency →
+conflicting; proven only for authenticated signatures. Readers follow the privacy doctrine
+below: job path, resources and evidence are anon-safe readers with personal information
+stripped at the source; only a party's own payments and balances, and its signature queue,
+need the authenticated party.
+
+### Privacy doctrine (owner, 2026-10-18)
+
+- **Open by default.** Job, work, provider and vehicle data (job paths, quote scope and
+  specifications, resources, evidence, provider capability and work history) is platform
+  data, used across platform calculations and readable anonymously.
+- **Prices are open.** Quote prices, labor rates and parts costs are open.
+- **Party money is not.** Actual payments and balances between specific parties are
+  visible only to those parties.
+- **Personal information is withheld:** email, phone, street address and the legal names
+  of private people. People appear by platform handle.
+- **Contact is brokered.** Users reach each other through a platform contact request, never
+  through exposed contact fields, so contact data cannot be extracted.
+- **Mechanism.** Readers default to anon-safe, with personal information stripped at the
+  source rather than gated per caller. Sign writers require the authenticated party. The
+  open readers in "The shipped loop" apply this; the service-only cores behind them
+  (`read_work_order_resources`, `read_work_order_job_path`, `read_work_order_image_objects`,
+  `work_order_job_path_scoreboard`) stay service-only.
+
+### Exposures and traps
+
+The 2026-10-19 review found read paths that exposed personal contact fields on work-order
+and participant data; they are being closed in separate migrations and are not described
+here.
+The trap functions below are correctness hazards, listed in
+`docs/ledger/CAPABILITY_MAP.md`: `resolve_labor_rate`'s contract branch reads the absent
+`work_contracts`; `generate_repair_estimate` writes to an absent table;
+`estimate_labor_from_description` returns hardcoded confidence; and
+`organization_capabilities.verified` is true on rows with no evidence.
+
+### The shipped loop (2026-10-19)
+
+Shipped on 2026-10-19 by the QUOTE and backend lanes, and proven end to end by
+`supabase/sql/test_job_loop_golden_path.sql`. That contract runs two synthetic stories (a listing
+bought through a pre-purchase inspection, and a job a client posts on their own truck) through
+only these Sign writers and open readers, as distinct authenticated users (client, mechanic,
+admin reviewer, shop owner co-signer, seller who is a verified owner, inspector), and checks
+the privacy invariants for a visitor and a signed-in stranger after every step.
+
+Every Sign writes one owner-input `work_record` observation with `submitted_by_user_id =
+auth.uid()`, a sign clock and a hash or snapshot of what it covers. A projector turns that
+observation into an immutable row in the same transaction. A Sign is idempotent on its
+request key. A later change to what it covers withholds it rather than editing it. No Sign
+moves money: every result carries `payment_authorized: false`, and the money-touching ones
+also carry `disbursement: not_performed` and `money_moved: false`.
+
+**Sign writers** (authenticated only; anon gets 42501):
+
+| Sign | Who can call | Binds | Does not bind | Privacy |
+|---|---|---|---|---|
+| `post_work_request(vehicle, description, images, requested_operations, needed_by, visibility)` | The vehicle's owner, uploader or access holder (`vehicle_user_has_access`). Never another person's vehicle: that is `request_inspection` | A work order with the client as customer and their words verbatim as `scope_description`; client-stated operations quoting those words; requirements from a reviewed template keyed to the listing keyword table, or one skill requirement in the client's words; their own photos attached as intake evidence | Price (the suggested cost is reference hours times `resolve_labor_rate()` as returned, labelled seed_uncalibrated / placeholder), provider, schedule, payment | `open` lists the requirements in `open_requirements_read` (public vehicles only); `invite_only` does not. Descriptions with contact details or the client's own name are refused |
+| `request_inspection(vehicle, parent_work_order, scope)` | Any signed-in client, on a public vehicle or one they can access; the parent must be their own job | An inspection work order (`scope_category` inspection) with the client as customer, its checklist and requirement; optionally an inspection requirement on a parent operation | Vehicle access, seller permission, price, inspector, payment | Checklist and job open; client by handle or unnamed party |
+| `offer_on_requirement(requirement, terms, from, until, note)` / `withdraw_offer` | An account with an actor claim, as performer on a skill or inspection requirement (the claim's rung is recorded); an organization owner, offering a named performer or its facility. Never the customer | One current offer per account and requirement, with an offer hash over its terms; a new offer supersedes | Acceptance, schedule, payment | Terms and rung open; note only to parties |
+| `cosign_provider(work_order, offer, kinds, scope, cut)` | An owner or member of an organization, for that organization; or an account owning tools, for itself. Never the offering account or the customer | Authenticated supervision / suitability / permission / availability attestations with scope; optional cut term (share of a labor line, flat, or day rate) that binds only when the offer is accepted | Skill evidence, payment | Co-signer by organization name or handle; cut open |
+| `accept_offer(offer, terms_hash)` | The work order customer | That provider on those exact terms: the hash covers the offer and its current co-signs. Writes the provider assignment plus one unpaid cosigner term per cut. A later offer or co-sign change withholds it | Payment, completion, other requirements | Accepted providers and cuts open; raw ids only to parties |
+| `grant_inspection_access(inspection, scope, window)` | A verified owner: an approved, unexpired `ownership_verifications` row | A `permission` attestation for the accepted inspector, with scope and optional window | Vehicle access rows | Grantor by handle or unnamed party |
+| `record_inspection_findings(inspection, findings)` | The accepted inspector, an evidenced inspector actor, or the inspection organization's owner. Never the client | Append-only report (`inspection.v1`), with verdicts against checklist items; its text is a citable basis for parent requirements and specifications | Price, approval, seller permission | Report open; personal free text withheld |
+| `issue_work_order_quote(work_order, lines, deposit, valid_until, supersedes, release_conditions)` | An organization owner, accepted provider or evidenced performer. Never the customer | One quote version: a frozen scope snapshot, priced lines and optional release conditions, pinned by quote hash | Acceptance, deposit, payment | Prices open |
+| `accept_work_order_quote(quote, quote_hash)` | The work order customer | That exact version. Withheld if the quote is superseded, the scope changes or the signer stops being the customer | Deposit, payment | Signer as role; raw id to parties |
+| `issue_change_order(work_order, base_quote, changes, reason)` | The same issuers as quotes; the base must be the accepted current quote | A new quote version flagged as a change order, with explicit add / remove / modify / substitute lines. A substitution names a specification and its material or process key. Accepted through `accept_work_order_quote` | Payment | Diff open; personal reason text withheld |
+| `vouch_for_provider(user or actor, kinds, scope, expires)` / `withdraw_vouch` | A single-organization owner or member (vouches as the organization), or a tool-owning or organization-member account (vouches as itself). Never for oneself | A standing vouch, shown as `vouched_for_by` | Skill evidence (never under capabilities) | Voucher by organization name or handle |
+| `attach_job_evidence(work_order, images, operation, note)` | A party: the customer, an accepted provider or inspector, or an organization owner or member. Only their own, current, non-sensitive photos of the job's vehicle | A statement that these photos document the job | Image visibility or ownership, completion, payment | Images follow `vehicle_images` read rules; note only to parties |
+| `start_work(work_order, terms_hash)` | A current accepted provider. Never the customer | A start clock attributed to the signer, pinned to the accepted quote hash, or to the accepted offer terms hash when no quote is accepted | Status, schedule, completion, payment | Open as a stage state (signer role, not id); offered as a `viewer.actions` item on the job view, not a queue item |
+| `attest_work_completion(work_order, scope_hash, note, evidence)` | An accepted provider, or an owner or member of the job's organization. Never the customer | Completion against the accepted quote hash, or the scope-snapshot hash when no quote is accepted | Status, invoice, payment | Open |
+| `accept_work_completion(work_order, completion, completion_hash)` | The customer | That exact provider attestation | Payment | Open as signed / not established |
+| `issue_work_order_invoice(work_order, lines, quote, due)` | The same parties as completion | An invoice version with definite lines and `changes_from_quote` against the accepted quote | Payment request, collection | Lines and totals open |
+| `record_work_order_payment(invoice, amount, currency, method, paid_at, reference)` | The customer (reports paying) or the payee (confirms receipt) | A payment witness. Only payee witnesses settle | Charge, collection, refund, release, disbursement | Witnesses, references and balances only to parties |
+| `request_contact` / `respond_contact_request` / `post_contact_message` / `withdraw_contact_request` | Any signed-in user, to a user, an evidenced actor or an organization in a work order, requirement, vehicle or profile context. Rate-limited | An in-app request; a thread after acceptance | Contact fields (never returned) | Thread only to its two parties |
+| `confirm_work_session` (existing) | The session's own user | A self-confirmed work day | Counterparty acceptance | Open on public vehicles |
+
+The actor link is reviewed, not self-signed. A user inserts a `self_claim` into
+`account_link_claims`, which is enough to offer at the `self_claim` rung.
+`actor_link_claim_evidence_read` (open to the claimant and admins) finds candidate evidence
+by joining the claimant's own records to the actor's attributed work. `approve_actor_link_claim`
+(service only) promotes the claim with evidence row ids and names a distinct active admin
+as reviewer.
+
+**Open readers** (anon and authenticated, personal information stripped at the source).
+`work_order_job_path_read` also returns `viewer.actions` (`start_work` for the accepted provider):
+`listing_work_plan_read` (estimate to inspect and an `inspection_scope`);
+`open_requirements_read` (the explainable match table only for a signed-in viewer);
+`work_order_offers_read`, `work_order_quotes_read`, `work_order_resources_read`,
+`work_order_inspection_read` and `work_order_evidence_read`;
+`work_order_invoices_read` (payments, reconciliation and release only to parties);
+`work_order_job_path_read` (accounting withheld from non-parties) and
+`work_order_statement_read`; `provider_profile_read` and `provider_job_record_read`
+(accounting and customer identity withheld). Authenticated self readers: `my_signature_queue`
+(every Sign the viewer can act on now), `my_contact_requests`, `contact_thread_read` and
+`job_evidence_candidates_read`. Readers return `viewer.actions` (plus
+`viewer.issuer_actions` on quotes), so clients render actions from the server, never
+infer them.
+
+**Lifecycle mapped to functions.**
+
+| Step | Function |
+|---|---|
+| Request (own vehicle) | `post_work_request` (operations, requirements, intake photos, suggested cost) |
+| Estimate | `listing_work_plan_read` |
+| (Inspection) | `request_inspection` → `offer_on_requirement` → `accept_offer` → `grant_inspection_access` → `record_inspection_findings` |
+| Matching | `open_requirements_read` → `offer_on_requirement` (+ `cosign_provider`) → `accept_offer` |
+| Quote, revision | `issue_work_order_quote` |
+| Acceptance | `accept_work_order_quote` |
+| Deposit | requested only (quote `deposit_requested`) |
+| Change order | `issue_change_order` → `accept_work_order_quote` |
+| Start | `start_work` |
+| Execution evidence | `attach_job_evidence` |
+| Completion | `attest_work_completion` → `accept_work_completion` |
+| Invoice | `issue_work_order_invoice` |
+| Payment | `record_work_order_payment` (payer report, payee confirmation) |
+| Receipt | `work_order_invoices_read` reconciliation and release evaluation |
+
+**Job-path stage rules as they stand** (`read_work_order_job_path`; open as
+`work_order_job_path_read`):
+
+| Stage | recorded when | Otherwise |
+|---|---|---|
+| intake | vehicle bound and scope stated | partial / absent |
+| inspection | an inspection job for this work order has findings | partial: inspection job without findings |
+| plan | never: `executable` is `not_assessed` | partial with any operation, part or labor row; gaps such as `operations_without_requirements` |
+| terms | a current customer quote acceptance (approval clock) or a current accept clock (provider assignment or binding cosigner term) | partial: quote or estimate only. `customer_acceptance` is `signed` only with the customer's Sign. Gaps include `change_order_pending`, `provider_acceptance_withheld`, `acceptance_withheld_<reason>` |
+| execution | a current `start_work` Sign by an accepted provider (`state_basis` provider_start_sign, with `start_sign` and evidence counts), or a legacy start clock / component events | partial: attached evidence without a start Sign; otherwise absent |
+| completion | a current provider attestation | partial: a completion clock without attestation. `customer_acceptance` is established only with the customer's Sign |
+| accounting | a current invoice settled by payee witnesses | partial: invoice open or legacy payment rows. Amounts never appear in the job path |
+
+**What remains.**
+
+- Facility and bay assignment: organizations can declare assets (`declare_facility_asset`,
+  `20261019224000`), but reserving a bay for a job and confirming that reservation are not
+  shipped yet (backend lane in progress).
+- Payouts stay off. Release conditions are evaluated, but nothing is authorized or
+  disbursed. Deposits are requested terms only.
+- Posting a job covers vehicles the client owns or holds access to. The requirement template
+  covers only the reviewed keyword-table entries; anything else becomes one skill requirement in
+  the client's words. No live image analysis runs at intake: existing analyses are cited only.
+- No pause or resume of started work, and no Sign records an operation done.
+- Seller verification expires. On 2026-10-19 none of the 4 approved ownership verifications
+  was current, so live `grant_inspection_access` has no eligible seller.
+- Real-data gaps on 2026-10-19: 26 work orders and 3 resource requirements; 0 offers, quotes,
+  acceptances, completions, invoices, payment witnesses, evidence attachments, vouches,
+  contact requests or actor claims. The loop is proven in PG17 and by rolled-back live probes
+  only.
+- Migration replay order: `20261019214500` creates two hooks that `20261019213000` (earlier
+  by filename) already creates. Live followed deploy order; a filename-order replay would fail
+  there.
+
 ## Resource evidence graph (2026-10-19)
 
 `work_order_resource_requirements`, `work_order_resource_fulfillments` and
@@ -111,6 +447,217 @@ and completion as `not_established` and qualification as `not_assessed`. A confl
 the records disagree; it does not decide which record is right or whether a substitution
 was agreed. Contract: `supabase/sql/test_work_order_resource_specifications.sql`.
 
+## Quotes and acceptance
+
+A job is a quote: estimate → quote (revisions) → acceptance → deposit → work order →
+change order → completion → invoice → payment → receipt. `work_order_quotes` holds the
+quote and its revisions; `work_order_quote_acceptances` holds the customer's acceptance.
+Both are immutable projections keyed by their source observation.
+
+**Quote.** A provider's quote is a `work_record` admitted through `ingest-observation` with
+event type `quote` (payload: `quote_version`, `supersedes_quote_id`, `quoting_party`
+`{kind, id}`, `scope_snapshot`, `lines`, `deposit_requested` `{amount, currency}` or null,
+`valid_until` or null). The projector requires:
+
+- `scope_snapshot` equal to `work_order_quote_scope_snapshot(work_order_id)`: the current
+  operations, requirements, material/process specifications, parts and labor rows, without
+  progress fields (status, actor, hours) or amounts.
+- Each line names `ref_kind` (`operation`, `requirement`, `part`, `labor`, `fee`) and a `ref_id`
+  in the snapshot (null for a fee), a description and a `pricing_basis`: `flat`, `hourly`
+  (unit `hour`), `day_rate` (unit `day`) or `per_operation` (unit `operation`). An amount
+  requires an ISO currency, and the reverse; a quantity is stated or null, never assumed. At
+  least one line must be priced; an unpriced scope is an estimate.
+- The quoting party is an explicit actor, user or organization id, or `unknown`. It is
+  attributed by the source and not authenticated; it is never matched by name.
+- Version 1 first, then the next integer, superseding the current version. The newer version
+  withholds the older from current reads; history stays.
+
+The projection stores a SHA-256 `quote_hash` over the quote's canonical content.
+
+**Issue (Sign).** `issue_work_order_quote(p_work_order_id, p_lines, p_deposit, p_valid_until,
+p_supersedes_quote_id)` lets an authenticated provider issue a version through the same path:
+an `owner-input` work record signed by `auth.uid()`, projected as `quote` in the same
+transaction, with the signer as quoting party. Eligible: an active owner of the work order's
+organization (`business_ownership`), or an account whose evidenced identity bridge
+(`viewer_identity_bridge`: an approved actor claim at `work_evidence` or above; `self_claim` is
+not enough) names the work order's lead actor or an operation's actor. The customer cannot
+quote their own job. A repeated identical request returns the existing quote.
+
+**Acceptance (Sign).** `accept_work_order_quote(p_quote_id, p_quote_hash)` is the only writer.
+The caller must be the work order's customer (`auth.uid() = work_orders.customer_id`; a vehicle
+owner is not assumed to be the client, since in a pre-purchase inspection the owner is the
+seller). The hash must match the version, the version must be current and unexpired, its scope
+snapshot must still match, and the quoting user cannot accept their own quote. The RPC writes
+an `owner-input` work record (signer, sign clock, quote hash) and projects it in the same
+transaction; the projector refuses a `quote_acceptance` presented any other way. Neither
+`work_orders.status` nor `approved_at` is written. Nothing is collected, authorized or paid.
+
+**Reader.** `work_order_quotes_read(p_work_order_id)` is open to anon and authenticated
+callers under the privacy doctrine, and follows the open job readers. Slots come from
+`work_order_viewer_slots`; a work order on a non-public vehicle is shown only to slot holders;
+the header (`vehicle_label`, `display_title`, `request_source_label`) comes from
+`work_order_open_header`. It returns:
+
+- the current quote and every version, with the full scope snapshot, priced lines, totals,
+  the deposit as a requested term (`nature: requested_term_not_payment`) and validity (a
+  withdrawn version shows its summary only);
+- version states (`current`, `superseded`, `withdrawn`);
+- acceptance state (`accepted`, `withheld` with a reason, or `not_accepted`);
+- stored and derived `quoted_at` / `approved_at`;
+- the viewer block (a visitor gets `context: visitor`, no slots, no actions) and coverage.
+
+The quoting party and the signer appear by public profile handle, organization name or
+`unnamed party` (`platform_*_label`). A quote issued through `issue_work_order_quote` is
+attributed `authenticated_sign`. Raw user ids, and free text that names the customer or looks
+like contact data, go only to parties. No payments, balances or contact fields are returned.
+An acceptance is withheld when its quote is superseded or withdrawn, the scope changes, the
+signer is no longer the customer, or its own source is withdrawn. `accept_quote` appears in
+`actions` only when the viewer could sign now, and only the customer can.
+
+Not yet: change orders as their own event, and deposit and payment links.
+Contracts: `supabase/sql/test_work_order_quotes.sql`, `test_work_order_quote_issue.sql`,
+`test_work_order_quotes_open_read.sql`.
+
+## Inspection as its own job
+
+An inspection, when ordered or priced, is its own `work_orders` row (`scope_category =
+'inspection'`). The inspector can be a different person from whoever executes the work. The
+pre-purchase inspection (PPI) of a listing vehicle is the first paid job, and it runs on a
+vehicle the client does not own.
+
+`request_inspection(p_vehicle_id, p_parent_work_order_id, p_scope)` is the client's Sign. The
+vehicle must be public or one the client can access. A parent must be the client's own work
+order on the same vehicle. `p_scope` accepts the vehicle entry from `buying-evidence --plan`
+(`ppi_checklist`) or `{checklist}` (at most 50 one-line questions), plus `inspection_type`
+(default `pre_purchase`), `request_source` (`ios` or `web`), `listing_url` and an optional
+`parent_line_item_id`. The Sign writes:
+
+- one `owner-input` work record with the normalized checklist;
+- the work order, with the client as customer, `parent_work_order_id`, and `request_observation_id`
+  naming that record;
+- through the projector, one `inspect` operation quoting the job's description, and an
+  `inspection` requirement on it whose basis is the request;
+- with `parent_line_item_id`, an `inspection` requirement on that parent operation.
+
+`work_order_link_guard` allows a parent link only with the matching request record, and keeps
+the links (and a requested inspection's vehicle) immutable. The request grants no vehicle
+access and implies no seller permission; no organization, inspector, price or payment is set.
+`calculate_work_order_estimate` writes `estimated_total = 0` on every insert, so the job path
+reports `estimate_recorded` for every row, including inspections. That is an existing trap,
+not a price. Contract: `supabase/sql/test_inspection_request.sql`.
+
+`record_inspection_findings(p_inspection_work_order_id, p_findings)` is the inspector's Sign.
+Who may record (`inspection_findings_role`) follows the `issue_work_order_quote` rule: an active
+owner of the inspection job's organization, or an evidenced identity bridge to its lead actor
+or to the actor the client assigned on the inspect operation. Never the customer, and a
+`self_claim` is not enough.
+
+`p_findings` is the closed `inspection.json` event shape (`summary`, `findings[]` with
+`system` / `finding` / `severity` / `evidence_photo_ref`, `inspection_type`, `inspector_role`,
+`zones_inspected`, `overall_condition`, `deferred_maintenance_minutes`, `photos_referenced`),
+plus an optional `inspected_at`. A finding that answers a checklist item carries its `item_id`
+and a `verdict` (`supports` / `contradicts` / `unknown`) against that claim.
+
+Each report is one signed `owner-input` work record. Its `content_text` renders the findings,
+so a parent requirement or specification can quote them as `basis_observation_id` +
+`basis_excerpt`; that is how findings feed the parent plan. Reports are append-only. A verdict
+is testimony about one claim, not a price, an approval or seller permission.
+
+`work_order_inspection_read(p_work_order_id)` is open to anon and authenticated callers. For an
+inspection job, or for a parent's linked inspections, it returns the checklist, reports and
+findings, the recorder by public handle or `unnamed party`, coverage, quote state and
+`seller_permission: not_established`. Personal free text and raw ids go to parties only. A
+non-public vehicle is shown only to slot holders. Contract:
+`supabase/sql/test_inspection_findings.sql`.
+
+## Provider offers and acceptance
+
+The matching loop: `open_requirements_read` lists a requirement with an explainable match;
+a provider **offers**; the client **accepts a provider**; then quote and acceptance.
+
+An offer is a candidate arrangement made by the provider, so it extends
+`work_order_resource_fulfillments` with `offer_kind`, `offer_rung`, `offer_terms` and
+`offer_hash`. Every resource reader already lists those rows. The offering account and any
+note stay on the signed source record, never on the row, because the open resource readers
+pass fulfillment columns through.
+
+`offer_on_requirement(p_requirement_id, p_terms, p_available_from, p_available_until, p_note)`
+is the provider's Sign:
+
+- **Individual offer:** an account with an actor claim of any rung offers that actor as
+  performer on a skill or inspection requirement. A pending `self_claim` may offer; the rung
+  is recorded and is not competence.
+- **Organization offer (`p_terms.organization_id`):** an active owner offers the
+  organization's facility, or a named performer actor (attributed by the organization).
+- **Terms** are lines priced `flat`, `hourly`, `day_rate` or `per_operation`, with a
+  currency whenever an amount is stated. An unpriced offer is allowed.
+- **Where:** the work order must be open (not completed, paid, cancelled or rejected), on a
+  public vehicle or one the provider holds a slot on. The customer cannot offer on their own
+  job.
+
+Each account has one current offer per requirement. A new offer supersedes the previous one,
+and `withdraw_offer(p_offer_id)` writes a withdrawal record that supersedes it; superseded
+offers leave every reader. Contract: `supabase/sql/test_work_order_offers.sql`.
+
+`accept_offer(p_offer_id, p_offer_hash)` is the customer's Sign over one exact current
+performer offer, the same rule as `accept_work_order_quote`. It is never available to the
+offering account, a closed window or a concluded job. It projects into
+`work_order_assignments`, the dormant offer → accept → payout owner:
+
+- one accepted row with `performer_actor_id` (the legacy `technician_id` is kept, now
+  nullable), `fulfillment_id`, `acceptance_observation_id`, `accepted_by_user_id` and
+  `offer_hash`;
+- `offered_at` from the offer and `accepted_at` set to the sign clock;
+- role `inspector` on an inspection requirement, otherwise `technician`;
+- payout fields copied from a single priced offer line. These are terms, not a payment.
+
+Accepted rows are written only inside `accept_offer`, and their acceptance fields are
+immutable; status may still progress. A status of accepted or later now requires
+`accepted_at` (`NOT VALID`: the 9 legacy technician rows, none clocked, are kept as they are).
+
+`work_order_accepted_providers` counts an acceptance while its acceptance, offer and
+requirement sources are current and the signer is still the customer; a revised or withdrawn
+offer withholds it. The accepted offering account may issue quotes (`accepted_provider`) and,
+on an inspection job, record findings (`accepted_inspector`) without an identity bridge,
+because the customer chose that authenticated account. Contract:
+`supabase/sql/test_work_order_offer_acceptance.sql`.
+
+`work_order_offers_read(p_work_order_id)` is open to anon and authenticated callers. Per
+current requirement it lists the current offers: kind, evidence rung, provider by public
+handle, organization name or `unnamed party`, performer label, terms, availability window,
+offered clock and acceptance state (`accepted`, `withheld`, `not_accepted`). It also lists the
+accepted providers. Terms are open. Raw ids and the offer note go to parties, and to the
+offering account for its own offers. `viewer.actions` holds `offer` (per requirement, when the
+viewer may offer as an individual), `withdraw_offer` (own offers) and `accept_offer` (the
+customer, per acceptable offer). A non-public vehicle is shown only to slot holders.
+
+The job path's plan stage reports `requirements_with_offers` and
+`requirements_with_accepted_provider`. The terms stage counts an `accept_offer` assignment as an
+accept clock only while it is current, and adds `accepted_providers`,
+`provider_acceptance_clock` and `provider_acceptances_withheld`, plus the gap
+`provider_acceptance_withheld`. Contract: `supabase/sql/test_work_order_offers_read.sql`.
+
+Seller permission for an inspection is its own Sign. It is never implied by ordering or
+accepting an inspection.
+
+`grant_inspection_access(p_inspection_work_order_id, p_scope, p_window)` may be signed only by
+a verified owner of the vehicle (`vehicle_verified_owner`: approved, unexpired
+`ownership_verifications`). It records a `permission` attestation (verdict `supports`, the
+stated scope) on the current accepted inspector's offer, through the existing projector, with
+the signer as attestor. `p_window` (`{from, until}`) stays on the source record, and no vehicle
+access rows change.
+
+`inspection_seller_permission` reports the state:
+
+- `established` while the attestation, the inspector's offer and the inspection requirement
+  are current, and the attestor is still a verified owner;
+- `expired` after the window;
+- otherwise `not_established`.
+
+The open inspection reader and the job path's inspection stage read it. On 2026-10-19 the 4
+approved live owner verifications had all expired, so no live account could sign yet.
+Contract: `supabase/sql/test_inspection_access.sql`.
+
 ## Job path self-measurement
 
 `read_work_order_job_path(work_order_id)` reports one work order's evidence across seven
@@ -131,6 +678,23 @@ beside the job with attribution `not_established`. Plan executability, customer 
 measured usage, labor value and cost allocation stay unassessed or false, and nothing is
 disbursed. The scoreboard is the measurement the RSI loop reads before choosing the next
 gap that retained evidence can close. Contract: `supabase/sql/test_work_order_job_path.sql`.
+
+The terms stage reads quotes through `work_order_quote_state`. A current quote supplies the
+quote clock (`quote_clock_basis: current_quote`) and keeps terms at least partial. A current
+customer acceptance supplies the approval clock: the sign clock, attributed by
+`approval_signer` (role and acceptance id; no raw user id, since the open job readers pass
+this stage to anyone) with `approval_clock_basis: quote_acceptance_sign`. Terms is then recorded and `no_approval_clock` no longer applies.
+A withheld acceptance adds `acceptance_withheld_<reason>`. `work_orders.approved_at` and
+`quoted_at` stay the fallback; the stored approval clock is also reported as
+`stored_approval_clock`. Contract: `supabase/sql/test_work_order_job_path_quotes.sql`.
+
+The inspection stage reads linked inspection jobs: the job itself when it is an inspection,
+otherwise its child inspections (`parent_work_order_id`). With a linked job, the stage is
+`recorded` once one has a findings report and `partial` while requested (gap
+`inspection_findings_pending`). It reports `inspection_jobs`, `inspection_job_role`
+(`self` / `child`), jobs with findings, `findings_reports`, `findings_clock` and
+`seller_permission: not_established`. Without a linked job, an inspection requirement still
+records the stage, as before. Contract: `supabase/sql/test_job_path_inspection.sql`.
 
 ### Requested operations from scope text
 
@@ -281,16 +845,16 @@ Mitchell-style flat rate book. 64 operations across body, paint, mechanical, exh
 Per-technician hourly rates. Priority 2 in `resolve_labor_rate()` cascade.
 
 ### work_contracts
-Client-org negotiated rate agreements. Priority 1 in `resolve_labor_rate()` cascade. Vehicle-specific contracts override general ones.
+Client-org negotiated rate agreements, created in `20260327100000_work_order_intelligence_schema.sql`. **Absent live** (`to_regclass` null, 2026-10-19). Priority 1 in the `resolve_labor_rate()` cascade, so that branch errors when it runs.
 
 ## Rate Resolution Cascade
 
-`resolve_labor_rate(org, user, vehicle, client)` returns `{rate, source}`:
+`resolve_labor_rate(org, user, vehicle, client)` returns `{rate, source, rate_confidence, …}`:
 
-1. **Contract rate** (priority 1): `work_contracts` where client+org match, vehicle-specific first
+1. **Contract rate** (priority 1): `work_contracts` where client+org match, vehicle-specific first. Runs only when both client and org are passed; the table is absent live, so this branch is a trap.
 2. **User rate** (priority 2): `user_labor_rates` where user matches and is_active
 3. **Organization rate** (priority 3): `businesses.labor_rate` for the org
-4. **System default** (priority 4): $125/hr market average
+4. **No reported rate** (priority 4): the median of `businesses.labor_rate` when at least 30 shops report one (`market_estimate`); otherwise a $160 `spitball`. On 2026-10-19, 4 shops report a rate, so it returns `spitball` / `spitball_no_data`. A placeholder, never a provider's rate.
 
 ## Comp Tracking
 

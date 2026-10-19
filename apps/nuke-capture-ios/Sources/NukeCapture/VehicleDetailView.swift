@@ -648,6 +648,8 @@ struct VehicleDetailView: View {
                         loadState
                         liveAuctionBanner
                         profileHeaderBlock
+                        // The organizations behind the vehicle (seller, owner, consigner, shop), each a door to its measures.
+                        VehicleActorLinks(vehicleId: vehicleId).id("actors")
                         buildInstrument
                         if let t = profile?.timeline { ProfileTimelineCard(timeline: t).id("events") }
                         heroActionRow

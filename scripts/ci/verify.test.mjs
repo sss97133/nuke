@@ -246,7 +246,7 @@ test('clear enforce/warn runs preserve checkout selection and all checker argume
       ['--test', `${checkout}/scripts/data/declared-source-reader.test.mjs`],
       ['--test', `${checkout}/scripts/ci/invalid-indexes.test.mjs`],
       ['--test', `${checkout}/scripts/ci/owner-writable-views.test.mjs`],
-      ['--test', `${checkout}/scripts/discovery/buying-evidence.test.mjs`, `${checkout}/scripts/discovery/buying-evidence-matching.test.mjs`],
+      ['--test', `${checkout}/scripts/discovery/buying-evidence.test.mjs`, `${checkout}/scripts/discovery/buying-evidence-matching.test.mjs`, `${checkout}/scripts/discovery/buying-evidence-plan.test.mjs`],
       [`${checkout}/scripts/guardrails/no-dead-asset-references.mjs`, '--json'],
       [`${checkout}/scripts/guardrails/no-raw-testimony-insert.mjs`],
       [`${checkout}/scripts/guardrails/no-swallowed-write-errors.mjs`, '--all'],

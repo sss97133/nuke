@@ -382,9 +382,11 @@ Deno.serve(async (req) => {
             vlo.precision              AS loc_precision,
             vlo.observed_at            AS observed_at,
             vlo.location_text_raw      AS location,
+            vlo.source_url             AS source_url,
             vlo.metadata               AS metadata,
             v.year, v.make, v.model,
             v.sale_price               AS price,
+            v.asking_price             AS asking_price,
             v.primary_image_url        AS thumbnail,
             v.status                   AS vehicle_status
           FROM vehicle_location_observations vlo
@@ -399,10 +401,10 @@ Deno.serve(async (req) => {
           lng: number; lat: number;
           event_type: string; source: string | null;
           confidence: number; loc_precision: string | null;
-          observed_at: string; location: string | null;
+          observed_at: string; location: string | null; source_url: string | null;
           metadata: Record<string, unknown>;
           year: number | null; make: string | null; model: string | null;
-          price: number | null; thumbnail: string | null;
+          price: number | null; asking_price: number | null; thumbnail: string | null;
           vehicle_status: string | null;
         }>(conn, sql, vArgs);
 
@@ -419,9 +421,11 @@ Deno.serve(async (req) => {
             precision: r.loc_precision,
             observed_at: r.observed_at,
             location: r.location,
+            source_url: r.source_url,
             event_label: (r.metadata as Record<string, unknown>)?.event_type ?? r.event_type,
             year: r.year, make: r.make, model: r.model,
             price: r.price,
+            asking_price: r.asking_price != null ? Number(r.asking_price) : null,
             thumbnail: r.thumbnail,
             vehicle_status: r.vehicle_status,
           },

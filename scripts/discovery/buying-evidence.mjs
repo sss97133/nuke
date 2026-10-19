@@ -528,9 +528,14 @@ function privatePath(path) {
 
 export async function main(args) {
   const values = {};
+  let planMode = false;
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--help') {
-      console.log('node scripts/discovery/buying-evidence.mjs --vehicles UUID[,UUID] --out PRIVATE_DIRECTORY [--query LITERAL] [--request PRIVATE_REQUEST_JSON] [--page-size 100] [--max-pages 5] [--seconds 120] [--qsh PATH]\nOffline: --cache PRIVATE_CAPTURE_JSON --out PRIVATE_DIRECTORY [--query LITERAL]'); return 0;
+      console.log('node scripts/discovery/buying-evidence.mjs --vehicles UUID[,UUID] --out PRIVATE_DIRECTORY [--query LITERAL | --request PRIVATE_REQUEST_JSON | --plan] [--page-size 100] [--max-pages 5] [--seconds 120] [--qsh PATH]\nOffline: --cache PRIVATE_CAPTURE_JSON --out PRIVATE_DIRECTORY [--query LITERAL]'); return 0;
+    }
+    if (args[i] === '--plan') {
+      if (planMode) throw Error('Invalid arguments; use --help');
+      planMode = true; continue;
     }
     if (!['--vehicles', '--out', '--query', '--request', '--page-size', '--max-pages', '--seconds', '--qsh', '--cache'].includes(args[i]) ||
         values[args[i]] !== undefined || !args[i + 1] || args[i + 1].startsWith('--')) throw Error('Invalid arguments; use --help');
@@ -542,6 +547,7 @@ export async function main(args) {
   let capture;
   const query = values['--query'] ?? null;
   if (values['--request'] && (values['--query'] || values['--cache'])) throw Error('A request selects its own live mode; replay uses the captured request');
+  if (planMode && (values['--query'] || values['--request'] || values['--cache'])) throw Error('Plan mode is live only; replay detects it from the capture');
   if (values['--cache']) {
     if (values['--vehicles'] || values['--qsh']) throw Error('Cache replay does not use database arguments');
     const input = privatePath(values['--cache']);
@@ -553,8 +559,26 @@ export async function main(args) {
       seconds: Number(values['--seconds'] ?? 120) });
     const qsh = values['--qsh'] || join(homedir(), 'nuke/scripts/data/q.sh');
     const request = values['--request'] ? validateRequest(JSON.parse(readFileSync(privatePath(values['--request']), 'utf8'))) : null;
-    capture = request ? await collectMatching(options, request, (sql, deadline) => querySQL(sql, deadline, qsh))
-      : await collect(options, (sql, deadline) => querySQL(sql, deadline, qsh));
+    const read = (sql, deadline) => querySQL(sql, deadline, qsh);
+    if (planMode) {
+      const plan = await import('./buying-evidence-plan.mjs');
+      capture = await plan.collectPlan(options, read, plan.loadKeywordTable());
+    } else capture = request ? await collectMatching(options, request, read) : await collect(options, read);
+  }
+  if (capture.schema_version === 'buying_plan_capture_v1') {
+    if (query !== null) throw Error('Literal excerpt query does not apply to a plan capture');
+    const plan = await import('./buying-evidence-plan.mjs');
+    const report = plan.buildPlanReport(capture);
+    mkdirSync(destination, { recursive: true, mode: 0o700 });
+    for (const [file, contents] of [['capture.json', JSON.stringify(capture, null, 2)],
+      ['plan.json', JSON.stringify(report, null, 2)], ['plan.txt', plan.renderPlanText(report)]])
+      writeFileSync(join(destination, file), contents, { mode: 0o600, flag: 'wx' });
+    console.log(JSON.stringify({ output: destination, vehicles: report.vehicles.length,
+      ppi_items: report.vehicles.reduce((n, v) => n + v.ppi_checklist.length, 0),
+      incomplete: report.vehicles.filter(v => v.state !== 'public_current_parent' || v.gaps.length).length,
+      model_calls: 0, database_writes: 0 }));
+    return report.vehicles.some(v => v.state !== 'public_current_parent' || v.gaps.some(g => g.reason !== 'listing_text_absent'))
+      || report.rate.state !== 'as_returned' ? 2 : 0;
   }
   if (capture.schema_version === MATCH_CAPTURE_VERSION && query !== null) throw Error('Literal excerpt query does not apply to a matching capture');
   const report = capture.schema_version === MATCH_CAPTURE_VERSION ? buildMatchingReport(capture) : buildReport(capture, query);

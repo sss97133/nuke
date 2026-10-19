@@ -1,0 +1,91 @@
+{
+  "schema_version": "buying_plan_keywords_v1",
+  "reviewed_at": "2026-10-19",
+  "review_state": "operator_reviewed_pending_owner_review",
+  "note": "Search vocabulary from claim text to seed reference rows. A match proposes a candidate operation for inspection; it is not a diagnosis, a repair decision or a price. Hours come from labor_operations / stage_transition_labor_map as read live and stay seed_uncalibrated. Extend only from reviewed misses.",
+  "listing_image_sources": {
+    "bringatrailer.com": ["bat_import"]
+  },
+  "identity_series_families": [
+    { "family": "gm_ck_truck", "tokens": ["C10", "C20", "C30", "K5", "K10", "K20", "K30", "C1500", "C2500", "C3500", "K1500", "K2500", "K3500"] },
+    { "family": "lexus_lx", "tokens": ["LX450", "LX470", "LX570"] }
+  ],
+  "entries": [
+    { "id": "dent", "system": "body", "pattern": "\\bdent(s|ed|ing)?\\b", "exclude": "\\b(no|without)\\s+dents?\\b|paintless dent repair",
+      "targets": [
+        { "type": "labor_operation", "code": "BODY-DENT-SMALL" },
+        { "type": "labor_operation", "code": "BODY-DENT-MED" },
+        { "type": "labor_operation", "code": "BODY-DENT-LARGE" }
+      ], "target_choice": "alternatives_size_unknown", "parts_terms": [] },
+    { "id": "rust_body", "system": "body", "pattern": "\\b(rust|rusted|rusty|corrosion|corroded|rot|rotted|bubbl\\w*)\\b", "exclude": "\\brust[- ]free\\b|\\bno (visible )?rust\\b|\\bwithout rust\\b",
+      "targets": [
+        { "type": "labor_operation", "code": "BODY-RUST-SPOT" },
+        { "type": "labor_operation", "code": "BODY-RUST-PANEL" },
+        { "type": "stage_row", "category": "body", "from_stage": "stripped", "to_stage": "fabricated", "zone_pattern": "panel_*" }
+      ], "target_choice": "alternatives_extent_unknown", "parts_terms": [] },
+    { "id": "paint_refinish", "system": "body", "pattern": "\\b(fad\\w*|touch[- ]?up|scratch\\w*|blemish\\w*|chip(s|ped)?|clear ?coat (failure|peel\\w*)|peel\\w*|oxidi[sz]\\w*|paint imperfection\\w*|imperfections)\\b",
+      "targets": [
+        { "type": "labor_operation", "code": "PAINT-COMPLETE-PANEL" },
+        { "type": "stage_chain", "rows": [
+          { "category": "body", "from_stage": "fabricated", "to_stage": "primed", "zone_pattern": "panel_*" },
+          { "category": "body", "from_stage": "primed", "to_stage": "blocked", "zone_pattern": "panel_*" },
+          { "category": "body", "from_stage": "blocked", "to_stage": "basecoated", "zone_pattern": "panel_*" },
+          { "category": "body", "from_stage": "basecoated", "to_stage": "clearcoated", "zone_pattern": "panel_*" }
+        ] }
+      ], "target_choice": "per_panel_panel_count_unknown", "parts_terms": [] },
+    { "id": "bumper", "system": "body", "pattern": "\\bbumpers?\\b", "requires": "\\b(cut|dent\\w*|damag\\w*|bent|crack\\w*|rust\\w*|scratch\\w*|missing)\\b",
+      "targets": [
+        { "type": "labor_operation", "code": "TRIM-BUMPERS-FRONT" },
+        { "type": "labor_operation", "code": "TRIM-BUMPERS-REAR" }
+      ], "target_choice": "alternatives_position_unknown", "parts_terms": ["bumper"] },
+    { "id": "exhaust", "system": "other", "pattern": "\\b(muffler|exhaust)\\b", "requires": "\\b(leak\\w*|rust\\w*|loud|hole\\w*|damag\\w*|broken|rattl\\w*)\\b",
+      "targets": [{ "type": "labor_operation", "code": "EXH-MUFFLER-RR" }], "target_choice": "single", "parts_terms": ["muffler"] },
+    { "id": "brakes", "system": "brakes", "pattern": "\\bbrakes?\\b", "requires": "\\b(inadequate|worn|squeal\\w*|grind\\w*|pull\\w*|soft|spongy|leak\\w*|need\\w*|due|seized|rust\\w*|drums?)\\b",
+      "targets": [
+        { "type": "labor_operation", "code": "MECH-BRAKES-FRONT" },
+        { "type": "labor_operation", "code": "MECH-BRAKES-REAR" },
+        { "type": "labor_operation", "code": "MECH-BRAKES-ALL" },
+        { "type": "stage_row", "category": "chassis", "from_stage": "stock", "to_stage": "refreshed", "zone_pattern": "*" }
+      ], "target_choice": "alternatives_scope_unknown", "parts_terms": ["brake"] },
+    { "id": "parking_brake", "system": "brakes", "pattern": "\\b(parking brake|e-?brake|emergency brake)\\b",
+      "targets": [{ "type": "labor_operation", "code": "MECH-EBRAKE-REBUILD" }], "target_choice": "single", "parts_terms": [] },
+    { "id": "seat_upholstery", "system": "interior", "pattern": "\\b(bolster|seat (tear|torn|split|crack\\w*|wear)|torn|split seam|upholster\\w*|seat cover\\w*)\\b", "exclude": "\\breupholster(ed|y)\\b",
+      "targets": [
+        { "type": "labor_operation", "code": "INT-SEATS-RR" },
+        { "type": "stage_row", "category": "interior", "from_stage": "needs_work", "to_stage": "recovered", "zone_pattern": "*" }
+      ], "target_choice": "alternatives_scope_unknown", "parts_terms": ["seat cover"] },
+    { "id": "carpet", "system": "interior", "pattern": "\\bcarpet\\w*\\b", "requires": "\\b(worn|stain\\w*|torn|faded|wear|damag\\w*)\\b",
+      "targets": [{ "type": "labor_operation", "code": "INT-CARPET-RR" }], "target_choice": "single", "parts_terms": ["carpet"] },
+    { "id": "headliner", "system": "interior", "pattern": "\\bheadliner\\b", "requires": "\\b(sag\\w*|torn|stain\\w*|droop\\w*|damag\\w*)\\b",
+      "targets": [{ "type": "labor_operation", "code": "INT-HEADLINER-RR" }], "target_choice": "single", "parts_terms": ["headliner"] },
+    { "id": "dash", "system": "interior", "pattern": "\\b(dash|dashboard|dash pad)\\b", "requires": "\\b(crack\\w*|warp\\w*|damag\\w*|split)\\b",
+      "targets": [{ "type": "labor_operation", "code": "INT-DASH-RR" }], "target_choice": "single", "parts_terms": ["dash pad"] },
+    { "id": "windshield", "system": "body", "pattern": "\\bwindshield\\b", "requires": "\\b(crack\\w*|chip\\w*|pit\\w*|delaminat\\w*)\\b",
+      "targets": [{ "type": "labor_operation", "code": "GLASS-WINDSHIELD" }], "target_choice": "single", "parts_terms": ["windshield"] },
+    { "id": "cooling", "system": "cooling", "pattern": "\\b(radiator|overheat\\w*|coolant leak\\w*)\\b", "requires": "\\b(leak\\w*|overheat\\w*|clog\\w*|damag\\w*|need\\w*)\\b",
+      "targets": [{ "type": "labor_operation", "code": "MECH-RADIATOR-RR" }], "target_choice": "single", "parts_terms": ["radiator"] },
+    { "id": "gauges", "system": "electrical", "pattern": "\\b(gauges?|instrument cluster|speedometer|odometer)\\b", "requires": "\\b(non-?functional|inoperative|not working|doesn['’]t work|broken|intermittent)\\b",
+      "targets": [{ "type": "labor_operation", "code": "ELEC-GAUGES" }], "target_choice": "single", "parts_terms": ["gauge"] },
+    { "id": "wiring_repair", "system": "electrical", "pattern": "\\b(wiring|electrical (issue|gremlin|fault)\\w*)\\b", "requires": "\\b(issue\\w*|fault\\w*|gremlin\\w*|damag\\w*|need\\w*|intermittent|non-?functional|inoperative)\\b",
+      "targets": [{ "type": "stage_row", "category": "electrical", "from_stage": "partial", "to_stage": "complete", "zone_pattern": "*" }], "target_choice": "single", "parts_terms": [] },
+    { "id": "transmission", "system": "drivetrain", "pattern": "\\b(transmission|gearbox)\\b", "requires": "\\b(slip\\w*|leak\\w*|grind\\w*|hard shift\\w*|need\\w*|rebuild)\\b",
+      "targets": [{ "type": "stage_row", "category": "powertrain", "from_stage": "needs_work", "to_stage": "trans_rebuilt", "zone_pattern": "*" }], "target_choice": "single", "parts_terms": [] },
+    { "id": "tailshaft_seal", "system": "drivetrain", "pattern": "\\b(tail ?shaft|rear main) seal\\b",
+      "targets": [{ "type": "labor_operation", "code": "TRANS-TAILSHAFT-SEAL" }], "target_choice": "single", "parts_terms": [] },
+    { "id": "engine_health", "system": "engine_bay", "pattern": "\\b(smok\\w*|misfir\\w*|knock\\w*|blow-?by|low compression|burn\\w* oil)\\b",
+      "targets": [{ "type": "stage_row", "category": "powertrain", "from_stage": "needs_work", "to_stage": "rebuilt", "zone_pattern": "*" }], "target_choice": "single", "parts_terms": [] },
+    { "id": "front_suspension", "system": "suspension", "pattern": "\\b(ball joints?|tie rods?|front end|steering play|wander\\w*|bushings?)\\b", "requires": "\\b(worn|loose|play|need\\w*|wander\\w*|crack\\w*)\\b",
+      "targets": [{ "type": "labor_operation", "code": "MECH-SUSPENSION-FRONT" }], "target_choice": "single", "parts_terms": ["ball joint"] },
+    { "id": "lights", "system": "electrical", "pattern": "\\b(headlights?|taillights?|tail lights?)\\b", "requires": "\\b(crack\\w*|broken|inoperative|non-?functional|haz\\w*|out)\\b",
+      "targets": [
+        { "type": "labor_operation", "code": "ELEC-HEADLIGHTS" },
+        { "type": "labor_operation", "code": "ELEC-TAILLIGHTS" }
+      ], "target_choice": "alternatives_position_unknown", "parts_terms": ["headlight", "taillight"] },
+    { "id": "trim_exterior", "system": "body", "pattern": "\\b(grille|mirrors?|moldings?|mouldings?)\\b", "requires": "\\b(crack\\w*|broken|missing|damag\\w*|pitt\\w*|dent\\w*)\\b",
+      "targets": [
+        { "type": "labor_operation", "code": "TRIM-GRILLE" },
+        { "type": "labor_operation", "code": "TRIM-MIRRORS" },
+        { "type": "labor_operation", "code": "TRIM-MOLDINGS-SIDE" }
+      ], "target_choice": "alternatives_part_unknown", "parts_terms": ["grille", "molding"] }
+  ]
+}

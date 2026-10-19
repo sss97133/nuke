@@ -72,3 +72,12 @@ the case ledger records open work and dated acceptance evidence. The guardrails 
 inventory in `ledger.json`, and the local ratchets use `scripts/ci/baseline.json`. These inputs do
 not establish current database health or authorize archival. See `docs/ledger/README.md` and verify
 operational claims against the live atlas and affected writer/reader.
+
+## Job-loop migration replay
+
+`supabase/sql/test_job_loop_replay.sql` (db-contracts job) replays the job-loop build's migrations in filename order on
+PostgreSQL 17, as `supabase db reset` or a preview branch would. Push deploys apply only migration files a push
+**adds** (`supabase-deploy.yml`, `--diff-filter=A`), in push order, so live order can differ from filename order and an
+edit to an already-merged file never reaches live through a push (use the workflow's exact-file `migration_file`
+dispatch for a reviewed recovery). `scripts/ci/job-loop-replay-check.sh` fails the contract when a job-loop-named
+migration is missing from the replay, out of order, or absent; append new ones in filename order.

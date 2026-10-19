@@ -376,8 +376,8 @@ const BuildDashboard: React.FC = () => {
                       <td>
                         <span className="bd-status-badge">{wo.status || 'unknown'}</span>
                       </td>
-                      <td className="bd-num">{fmtMoney(num(wo.estimated_total))}</td>
-                      <td className="bd-num">{fmtMoney(num(wo.actual_total))}</td>
+                      <td className="bd-num">{wo.estimated_total == null ? '—' : fmtMoney(num(wo.estimated_total))}</td>
+                      <td className="bd-num">{wo.actual_total == null ? '—' : fmtMoney(num(wo.actual_total))}</td>
                       <td>{fmtDate(wo.created_at)}</td>
                     </tr>
                     {expandedWO === wo.id && (
