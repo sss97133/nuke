@@ -420,9 +420,9 @@ export const facilityChoices = (a: JobAction): FacilityChoice[] =>
 
 export type Asset = { assetId: string; kind: string; label: string; capacity: number; busy: Array<{ from: string; until: string }> };
 
-/** facility_read's declared assets, grouped by kind on the server, flattened here. */
+/** facility_read's declared assets (assets_by_kind: groups of {kind, capacity_total, assets}), flattened here. */
 export function facilityAssets(read: JsonObject | null): Asset[] {
-  const groups = arr(read?.assets).length ? arr(read?.assets) : arr(read?.asset_groups);
+  const groups = arr(read?.assets_by_kind).length ? arr(read?.assets_by_kind) : arr(read?.assets);
   const out: Asset[] = [];
   for (const g of groups.map(obj)) {
     const kind = str(g?.kind) ?? 'other';

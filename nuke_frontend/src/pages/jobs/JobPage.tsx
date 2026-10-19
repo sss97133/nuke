@@ -14,6 +14,7 @@ import {
 import { readJob, type Load } from './readJob';
 import ShareButton from './ShareButton';
 import { JobSheetContext } from './jobSheetContext';
+import { JobPublication } from './Publication';
 import { completionActions, completionState } from './signDrafts';
 import './job-page.css';
 const BestMatches = React.lazy(() => import('./BestMatches'));
@@ -434,6 +435,7 @@ export default function JobPage() {
         conflicts={Object.fromEntries(stages.map(s => [s.key, s.inconsistencies.length > 0]))} />
       <Text role="caption" as="p">Viewing as {viewingAs(viewer)}. Stages show what's on record, not yet verified; "proven" is kept for signatures made through Nuke.</Text>
       <JobStageRailLegend />
+      <JobPublication workOrderId={workOrderId} />
       {pathActions.length > 0 && <SignActions actions={pathActions} onSigned={reload} />}
     </Section>
 

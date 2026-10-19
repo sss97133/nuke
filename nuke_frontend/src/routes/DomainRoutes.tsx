@@ -123,6 +123,7 @@ const BuildDashboard = React.lazy(() => import('../pages/BuildDashboard'));
 const JobPage = React.lazy(() => import('../pages/jobs/JobPage'));
 const ProviderProfilePage = React.lazy(() => import('../pages/providers/ProviderProfilePage'));
 const MessagesPage = React.lazy(() => import('../pages/messages/MessagesPage'));
+const SupplierInvitePage = React.lazy(() => import('../pages/orgs/SupplierInvitePage'));
 const ContactThreadPage = React.lazy(() => import('../pages/messages/MessagesPage').then(m => ({ default: m.ContactThreadPage })));
 
 // Public projections — journal index + day page
@@ -218,6 +219,9 @@ export const DomainRoutes = () => {
         <Route path="/providers/:handle" element={<ProviderProfilePage />} />
         {/* Statement: work_order_statement_read is open data; payments stay party-only from the server */}
         <Route path="/work-orders/statement" element={<WorkOrderStatement />} />
+        {/* A business opens the invite a customer shared (create_supplier_invite share_path); sign-in happens on the page */}
+        <Route path="/supplier-invite/:token" element={<SupplierInvitePage />} />
+        <Route path="/invite/:token" element={<SupplierInvitePage />} />
         {/* Investor offering / data room — semi-public fundraising page */}
         {/* Docs / developers landing */}
         <Route path="/developers" element={<DevelopersPage />} />

@@ -7,6 +7,8 @@ import React, { useEffect, useState } from 'react';
 import { Section, Text } from '../../kit';
 import { PrefetchLink } from '../../components/PrefetchLink';
 import { JobReaders, jobHref, slotWords, vehicleText, type VehicleWorkOrdersRead } from './jobsReaders';
+import { PublicationRow } from './Publication';
+import { useVehiclePublication } from './useVehiclePublication';
 import './jobs.css';
 
 const WorkPlanPanel = React.lazy(() => import('./WorkPlanPanel'));
@@ -16,6 +18,7 @@ export default function VehicleWorkCard({ vehicleId, vehicleTitle, signedIn }: {
   const [read, setRead] = useState<VehicleWorkOrdersRead | null>(null);
   const [planOpen, setPlanOpen] = useState(false);
   const [posting, setPosting] = useState(false);
+  const publication = useVehiclePublication(vehicleId, signedIn);
 
   useEffect(() => {
     let cancelled = false;
@@ -32,6 +35,7 @@ export default function VehicleWorkCard({ vehicleId, vehicleTitle, signedIn }: {
     {read.rows.length > 0 && <ul className="jb-list">{read.rows.map(r => <li key={r.work_order_id} className="jb-row">
       <PrefetchLink to={jobHref(r.work_order_id)}><Text role="entity" dense>{r.display_title || r.title || 'Untitled job'}</Text></PrefetchLink>
       {(r.slots ?? []).length > 0 && <Text role="caption">{(r.slots ?? []).map(slotWords).join(' · ')}</Text>}
+      <PublicationRow state={publication.get(r.work_order_id)} onChanged={publication.reload} />
     </li>)}</ul>}
     <div className="jb-actions">
       <button type="button" className="btn-base btn-sm btn-secondary" aria-expanded={planOpen} onClick={() => setPlanOpen(v => !v)}>

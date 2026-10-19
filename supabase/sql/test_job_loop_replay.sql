@@ -388,6 +388,8 @@ GRANT SELECT ON public.organization_ownership_verifications TO service_role;
 \ir ../migrations/20261020100000_job_loop_read_speedups.sql
 \echo REPLAY 20261020101000_verified_claimant_offers.sql
 \ir ../migrations/20261020101000_verified_claimant_offers.sql
+\echo REPLAY 20261020111500_work_order_activity_read.sql
+\ir ../migrations/20261020111500_work_order_activity_read.sql
 -- Plan check and final state.
 \set replay_problems `scripts/ci/job-loop-replay-check.sh | tr '\n' ' '`
 SELECT t_assert(btrim(:'replay_problems') = '', 'replay plan covers the build in filename order: ' || COALESCE(NULLIF(btrim(:'replay_problems'), ''), 'ok'));
