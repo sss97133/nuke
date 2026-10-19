@@ -95,6 +95,12 @@ enum JobCopy {
         "no_payment_record": "No payment recorded",
         "no_payout_record": "No payout recorded",
         "provider_acceptance_withheld": "A provider acceptance is on hold",
+        "no_provider_completion_attestation": "Technician hasn't marked it done",
+        "no_customer_completion_acceptance": "Customer hasn't confirmed it's done",
+        "completion_attestation_withheld_scope_changed": "The work changed since it was marked done",
+        "no_invoice": "No invoice yet",
+        "invoice_balance_open": "Invoice not fully paid",
+        "payment_reported_by_payer_unconfirmed": "A reported payment isn't confirmed yet",
     ]
 
     private static let conflicts: [String: String] = [
@@ -152,6 +158,8 @@ enum JobCopy {
         "approval_clock": "Quote accepted",
         "quote_versions": "Quote versions",
         "accepted_providers": "Providers accepted",
+        "attestations_withheld": "Done marks on hold",
+        "acceptances_withheld": "Confirmations on hold",
         "provider_acceptance_clock": "Provider accepted",
         "provider_acceptances_withheld": "Provider acceptances on hold",
         "requirements_with_offers": "Requests with offers",
@@ -191,7 +199,9 @@ enum JobCopy {
 
     /// Reader bookkeeping that means nothing to a person (or that carries ids); never shown.
     static let hiddenFacts: Set<String> = ["source_scope", "current_quote", "quote_clock_basis", "approval_clock_basis",
-                                           "stored_approval_clock", "visibility", "basis"]
+                                           "stored_approval_clock", "visibility", "basis", "provider_attestation",
+                                           "customer_acceptance_sign", "scope_basis", "state_basis", "invoice", "reconciliation",
+                                           "release"]
 
     /// A value that is an id or a content hash: never primary text.
     static func isIdentifier(_ s: String) -> Bool {
@@ -320,6 +330,10 @@ enum JobCopy {
         "counterparty acceptance": "That the customer agreed",
         "labor value": "A price for the labor",
         "payment": "Any payment",
+        "completion": "That the work is done",
+        "disbursement": "Paying anyone out",
+        "image visibility or ownership": "Who can see the photos or who owns them",
+        "money movement": "That any money moved",
     ]
 
     static func signBinds(_ s: String?) -> String {
@@ -497,7 +511,7 @@ enum JobCopy {
 
     private static let actions: [String: String] = [
         "accept_terms": "Accept quote",
-        "contact_request": "Contact via Nuke",
+        "contact_request": "Contact request",
         "accept_quote": "Accept quote",
         "accept_offer": "Accept offer",
         "offer_on_requirement": "Make an offer",
@@ -507,6 +521,13 @@ enum JobCopy {
         "pay_deposit": "Pay deposit",
         "contact_via_nuke": "Contact via Nuke",
         "work_day": "Confirm work day",
+        "quote_to_accept": "Accept quote",
+        "offer_to_accept": "Accept offer",
+        "completion_to_accept": "Confirm the work is done",
+        "change_order_to_accept": "Accept change order",
+        "inspection_access_request": "Let an inspector see your car",
+        "invoice_payment_to_confirm": "Confirm a payment you received",
+        "cosign_request": "Co-sign a technician",
         "work_session": "Confirm work day",
         "session": "Confirm photo session",
         "photo_session": "Confirm photo session",
@@ -520,6 +541,11 @@ enum JobCopy {
     static func sentence(_ code: String) -> String {
         let words = code.replacingOccurrences(of: "_", with: " ")
         return words.prefix(1).uppercased() + words.dropFirst()
+    }
+
+    /// "4", "2.5" — a number as a person writes it.
+    static func plainNumber(_ v: Double) -> String {
+        v == v.rounded() && abs(v) < 1e15 ? String(Int64(v)) : String(v)
     }
 
     static func newerVersion(_ n: Int) -> String { "Some items need a newer app version (\(n))" }

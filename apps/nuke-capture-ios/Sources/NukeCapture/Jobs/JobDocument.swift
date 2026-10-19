@@ -266,6 +266,8 @@ struct JobAction: Decodable, Equatable, Identifiable {
     let args: [String: JobJSON]
     /// What the step will record the viewer as (e.g. offer_kind, offer_rung for an offer).
     let asFields: [String: JobJSON]
+    /// The same, when the reader sends a single word (e.g. record_payment as "payer" / "payee").
+    var asText: String? = nil
     var id: String { kind + (stage ?? "") + (args.keys.sorted().compactMap { args[$0]?.stringValue }.joined()) }
 
     init(kind: String, label: String? = nil, stage: String? = nil, rpc: String? = nil, args: [String: JobJSON] = [:],
@@ -290,6 +292,7 @@ struct JobAction: Decodable, Equatable, Identifiable {
                   rpc: try? c.decode(String.self, forKey: JobCodingKey("rpc")),
                   args: (try? c.decode([String: JobJSON].self, forKey: JobCodingKey("args"))) ?? [:],
                   asFields: (try? c.decode([String: JobJSON].self, forKey: JobCodingKey("as"))) ?? [:])
+        asText = try? c.decode(String.self, forKey: JobCodingKey("as"))
     }
 
     var title: String { label ?? JobCopy.action(kind) }
@@ -577,22 +580,28 @@ struct SignatureItem: Decodable, Equatable, Identifiable {
         }
     }
 
-    /// What signing binds and what it does not, as the server states it.
+    /// What signing binds and what it does not, as the server states it (binds: a sentence or a list).
     struct Sign: Decodable, Equatable {
         let rpc: String?
-        let binds: String?
+        let bindsList: [String]
         let doesNotBind: [String]
+        let argsHint: [String: JobJSON]
+
+        var binds: String? { bindsList.first }
 
         enum CodingKeys: String, CodingKey {
             case rpc, binds
             case doesNotBind = "does_not_bind"
+            case argsHint = "args_hint"
         }
 
         init(from decoder: Decoder) throws {
             let c = try decoder.container(keyedBy: CodingKeys.self)
             rpc = try? c.decode(String.self, forKey: .rpc)
-            binds = try? c.decode(String.self, forKey: .binds)
+            if let one = try? c.decode(String.self, forKey: .binds) { bindsList = [one] }
+            else { bindsList = (try? c.decode([String].self, forKey: .binds)) ?? [] }
             doesNotBind = (try? c.decode([String].self, forKey: .doesNotBind)) ?? []
+            argsHint = (try? c.decode([String: JobJSON].self, forKey: .argsHint)) ?? [:]
         }
     }
 
@@ -604,11 +613,15 @@ struct SignatureItem: Decodable, Equatable, Identifiable {
     let captureSpanMinutes: Int?
     let evidenceCounts: [String: JobJSON]
     let sign: Sign?
+    let displayTitle: String?
+    let summary: String?
 
     var id: String { kind + refId }
 
     enum CodingKeys: String, CodingKey {
-        case kind, clock, vehicle, sign
+        case kind, clock, vehicle, sign, summary
+        case displayTitle = "display_title"
+        case vehicleLabel = "vehicle_label"
         case refId = "ref_id"
         case workOrderId = "work_order_id"
         case captureSpanMinutes = "capture_span_minutes"
@@ -620,7 +633,9 @@ struct SignatureItem: Decodable, Equatable, Identifiable {
         kind = try c.decode(String.self, forKey: .kind)
         refId = try c.decode(String.self, forKey: .refId)
         workOrderId = try? c.decode(String.self, forKey: .workOrderId)
-        vehicle = try? c.decode(JobVehicleLabel.self, forKey: .vehicle)
+        vehicle = (try? c.decode(JobVehicleLabel.self, forKey: .vehicle)) ?? (try? c.decode(JobVehicleLabel.self, forKey: .vehicleLabel))
+        displayTitle = try? c.decode(String.self, forKey: .displayTitle)
+        summary = try? c.decode(String.self, forKey: .summary)
         clock = try? c.decode(Clock.self, forKey: .clock)
         captureSpanMinutes = try? c.decode(Int.self, forKey: .captureSpanMinutes)
         evidenceCounts = (try? c.decode([String: JobJSON].self, forKey: .evidenceCounts)) ?? [:]

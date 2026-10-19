@@ -76,7 +76,16 @@ struct NukeCaptureApp: App {
                     // The Work console over the live readers, as whoever the Keychain holds.
                     WorkConsoleView(showCapture: MainTabView.currentPhotoGrant())
                 } else if let dbgJob = ProcessInfo.processInfo.environment["NUKE_DEBUG_JOB_ID"], !dbgJob.isEmpty {
-                    NavigationStack { JobView(workOrderId: dbgJob) }
+                    NavigationStack {
+                        ScrollViewReader { proxy in
+                            JobView(workOrderId: dbgJob)
+                                .task {
+                                    guard let target = ProcessInfo.processInfo.environment["NUKE_DEBUG_SCROLL_TO"] else { return }
+                                    try? await Task.sleep(for: .seconds(8))
+                                    proxy.scrollTo(target, anchor: .top)
+                                }
+                        }
+                    }
                 } else if let dbgStatement = ProcessInfo.processInfo.environment["NUKE_DEBUG_STATEMENT_VEHICLE"], !dbgStatement.isEmpty {
                     NavigationStack { VehicleStatementView(vehicleId: dbgStatement) }
                 } else if let dbgPlan = ProcessInfo.processInfo.environment["NUKE_DEBUG_WORK_PLAN"], !dbgPlan.isEmpty {

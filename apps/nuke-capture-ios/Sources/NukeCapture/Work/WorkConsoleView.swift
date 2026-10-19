@@ -89,6 +89,7 @@ struct WorkConsoleContent: View {
     var onSigned: (() -> Void)? = nil
 
     @State private var signing: SignatureItem?
+    @State private var opening: SignatureItem?
 
     var body: some View {
         List {
@@ -108,6 +109,9 @@ struct WorkConsoleContent: View {
         }
         .sheet(item: $signing) { item in
             WorkSessionSignSheet(item: item) { onSigned?() }
+        }
+        .sheet(item: $opening) { item in
+            SignatureItemSheet(item: item)
         }
     }
 
@@ -169,19 +173,18 @@ struct WorkConsoleContent: View {
     static let signaturePreview = 5
 
     @ViewBuilder private func signatureRow(_ item: SignatureItem) -> some View {
-        let row = RootedValueView(
-            label: JobCopy.action(item.kind),
-            value: item.vehicle?.text ?? "Vehicle not named",
-            status: .pending,
-            decay: [JobCopy.day(item.clock?.sessionDate), JobCopy.span(item.captureSpanMinutes)]
-                .compactMap { $0 }.joined(separator: " · "))
-        if item.kind == "work_session" {
-            Button { signing = item } label: { row }
-                .buttonStyle(.plain)
-        } else if let wo = item.workOrderId {
-            NavigationLink { JobView(workOrderId: wo) } label: { row }
+        if !SignatureKinds.isKnown(item.kind) {
+            RootedValueView(label: JobCopy.state(.unknown(item.kind)), value: item.displayTitle ?? item.vehicle?.text ?? "",
+                            status: .recorded)
         } else {
-            row
+            let row = RootedValueView(
+                label: JobCopy.action(item.kind),
+                value: item.displayTitle ?? item.vehicle?.text ?? item.summary ?? "Details on the next screen",
+                status: .pending,
+                decay: [item.displayTitle != nil ? item.vehicle?.text : nil, JobCopy.day(item.clock?.sessionDate),
+                        JobCopy.span(item.captureSpanMinutes)].compactMap { $0 }.joined(separator: " · "))
+            Button { if item.kind == "work_session" { signing = item } else { opening = item } } label: { row }
+                .buttonStyle(.plain)
         }
     }
 

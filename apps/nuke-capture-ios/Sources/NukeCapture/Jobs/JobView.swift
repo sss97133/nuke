@@ -21,10 +21,12 @@ struct JobView: View {
     @State private var quotes: JobLoad<JobQuotes> = .loading
     @State private var offers: JobLoad<WorkOrderOffers> = .loading
     @State private var inspections: JobLoad<InspectionRead> = .loading
+    @State private var invoices: JobLoad<WorkOrderInvoices> = .loading
+    @State private var evidence: JobLoad<EvidenceCandidates> = .loading
 
     var body: some View {
         JobPathContent(workOrderId: workOrderId, path: path, resources: resources, quotes: quotes, offers: offers,
-                       inspections: inspections,
+                       inspections: inspections, invoices: invoices, evidence: evidence,
                        titleHint: titleHint, vehicleHint: vehicleHint,
                        onChanged: { Task { await load() } })
             .task(id: workOrderId) { await load() }
@@ -37,7 +39,12 @@ struct JobView: View {
         async let q = JobReaders.quotes(workOrderId: workOrderId)
         async let o = OfferReaders.offers(workOrderId: workOrderId)
         async let i = PlanReaders.inspections(workOrderId: workOrderId)
+        async let v = CloseoutReaders.invoices(workOrderId: workOrderId)
+        async let e = SupabaseService.currentUserId == nil ? JobLoad<EvidenceCandidates>.loading
+            : await CloseoutReaders.evidenceCandidates(workOrderId: workOrderId)
         let loaded = await (p, r, q, o, i)
+        invoices = await v
+        evidence = await e
         path = loaded.0
         resources = loaded.1
         quotes = loaded.2
@@ -65,6 +72,8 @@ struct JobPathContent: View {
     var quotes: JobLoad<JobQuotes> = .loading
     var offers: JobLoad<WorkOrderOffers>? = nil
     var inspections: JobLoad<InspectionRead>? = nil
+    var invoices: JobLoad<WorkOrderInvoices>? = nil
+    var evidence: JobLoad<EvidenceCandidates>? = nil
     var titleHint: String? = nil
     var vehicleHint: String? = nil
     var onChanged: (() -> Void)? = nil
@@ -92,6 +101,19 @@ struct JobPathContent: View {
                 quoteSection
                 if let offers { JobOffersSection(offers: offers, onChanged: onChanged) }
                 if let inspections { JobInspectionSection(read: inspections) }
+                if let completion = CompletionState(path: p) {
+                    JobCompletionSection(workOrderId: workOrderId, state: completion, viewerSlots: p.viewer?.slots ?? [],
+                                         canMarkDone: { if case .loaded(let r)? = invoices { return r.issueAction != nil } else { return false } }(),
+                                         onChanged: onChanged)
+                        .id("job-completion")
+                }
+                if let invoices {
+                    JobInvoiceSection(read: invoices, acceptedQuote: acceptedQuote, workOrderId: workOrderId, onChanged: onChanged)
+                        .id("job-invoice")
+                }
+                if let evidence {
+                    JobEvidencePrompt(workOrderId: workOrderId, jobTitle: navigationTitle, read: evidence, onChanged: onChanged)
+                }
                 ForEach(JobStageKey.allCases) { key in
                     stageSection(key, p.stages[key], p)
                 }
@@ -110,6 +132,12 @@ struct JobPathContent: View {
         .sheet(item: $accepting) { box in
             AcceptQuoteSheet(quote: box.quote, action: box.action) { onChanged?() }
         }
+    }
+
+    /// The current quote when the customer has accepted it (invoices start from its lines).
+    private var acceptedQuote: Quote? {
+        guard case .loaded(let q) = quotes, q.acceptance?.state == "accepted" else { return nil }
+        return q.currentQuote
     }
 
     /// The job's own title when anyone has it; never an id.

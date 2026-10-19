@@ -188,6 +188,50 @@ final class JobFixtureSnapshotTests: XCTestCase {
         try snapshot(view, name: "fixture-work-plan", pages: 3)
     }
 
+    func testRenderCloseoutSheets() throws {
+        let waiting = try XCTUnwrap(CompletionState(path: decode(JobPath.self, CloseoutFixtures.jobPath(attested: true, accepted: false, customer: true))))
+        try snapshot(MarkDoneSheet(workOrderId: CloseoutFixtures.workOrderId, state: waiting), name: "fixture-mark-done")
+        try snapshot(ConfirmDoneSheet(workOrderId: CloseoutFixtures.workOrderId, state: waiting), name: "fixture-confirm-done")
+        let quote = try decode(JobQuotes.self, JobFixtures.quotesForCustomer).currentQuote
+        try snapshot(IssueInvoiceSheet(workOrderId: CloseoutFixtures.workOrderId, acceptedQuote: quote), name: "fixture-issue-invoice", pages: 2)
+        let r = try decode(WorkOrderInvoices.self, CloseoutFixtures.invoices(party: true))
+        try snapshot(RecordPaymentSheet(action: try XCTUnwrap(r.paymentAction), invoice: try XCTUnwrap(r.current)), name: "fixture-record-payment")
+        let c = try decode(EvidenceCandidates.self, CloseoutFixtures.evidence)
+        try snapshot(AttachEvidenceSheet(workOrderId: CloseoutFixtures.workOrderId, jobTitle: "Brake service", imageIds: ["img-1", "img-2"],
+                                         candidates: c, skipped: 1), name: "fixture-attach-evidence")
+        try snapshot(JobAttachChooser(localIdentifiers: ["lid-a", "lid-b", "lid-c"], preloaded: (c, ["lid-a": "img-1", "lid-b": "img-2"])),
+                     name: "fixture-attach-chooser")
+    }
+
+    func testRenderCloseoutSections() throws {
+        let path = try decode(JobPath.self, CloseoutFixtures.jobPath(attested: true, accepted: false, customer: true))
+        let state = try XCTUnwrap(CompletionState(path: path))
+        let r = try decode(WorkOrderInvoices.self, CloseoutFixtures.invoices(party: true))
+        let c = try decode(EvidenceCandidates.self, CloseoutFixtures.evidence)
+        let view = NavigationStack {
+            List {
+                JobCompletionSection(workOrderId: CloseoutFixtures.workOrderId, state: state, viewerSlots: ["customer"], canMarkDone: false)
+                JobInvoiceSection(read: .loaded(r), workOrderId: CloseoutFixtures.workOrderId)
+                JobEvidencePrompt(workOrderId: CloseoutFixtures.workOrderId, jobTitle: "Brake service", read: .loaded(c))
+            }
+            .navigationTitle("Brake service").navigationBarTitleDisplayMode(.inline)
+        }
+        try snapshot(view, name: "fixture-closeout-sections", pages: 3)
+        let visitor = try decode(WorkOrderInvoices.self, CloseoutFixtures.invoices(party: false))
+        try snapshot(NavigationStack { List { JobInvoiceSection(read: .loaded(visitor), workOrderId: CloseoutFixtures.workOrderId) } },
+                     name: "fixture-invoice-visitor")
+    }
+
+    func testRenderSignatureQueueKinds() throws {
+        let q = try decode(SignatureQueue.self, CloseoutFixtures.queue)
+        let view = NavigationStack {
+            WorkConsoleContent(signatures: .loaded(q), jobs: .loading, identity: .loading, showCapture: false)
+                .navigationTitle("Work").navigationBarTitleDisplayMode(.inline)
+        }
+        try snapshot(view, name: "fixture-signature-kinds")
+        try snapshot(SignatureItemSheet(item: q.items[0]), name: "fixture-signature-item")
+    }
+
     func testRenderWorkSessionSignSheet() throws {
         let item = try decode(SignatureQueue.self, JobFixtures.signatureQueue).items[0]
         try snapshot(WorkSessionSignSheet(item: item), name: "fixture-sign-work-day")
