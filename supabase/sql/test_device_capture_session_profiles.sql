@@ -195,7 +195,7 @@ SELECT public.device_create_vehicle_profile(jsonb_set(:'existing_capture_request
 RESET ROLE;
 SELECT pg_temp.ok('a subsequent capture resolves the existing profile and files through its audited path',
  :'existing_capture_r'::jsonb->>'vehicle_id'=:'capture_r'::jsonb->>'vehicle_id'
- AND (SELECT count(*) FROM public.vehicles WHERE vin='CKR187F127263')=1
+ AND (SELECT count(*) FROM public.vehicles WHERE vin='CKR187F127263' AND make='Ford')=1
  AND (SELECT count(*) FROM public.vehicle_images WHERE id IN(pg_temp.i('capture-3'),pg_temp.i('capture-4'))
       AND vehicle_id=(:'capture_r'::jsonb->>'vehicle_id')::uuid)=2
  AND EXISTS(SELECT 1 FROM public.reattribution_audit WHERE old_observation_id=pg_temp.i('capture-3')
