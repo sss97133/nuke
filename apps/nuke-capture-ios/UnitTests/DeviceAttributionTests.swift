@@ -74,6 +74,25 @@ final class DeviceAttributionTests: XCTestCase {
         ])
     }
 
+    func testContextFoldUsesWalkaroundScaleAndRejectsCompetingVINAnchors() {
+        let vinA = "1GCEK14L9EJ147915", vinB = "JT6HJ88J4V0178097"
+        XCTAssertTrue(AttributionEngine.vinAnchoredCaptureGroups([
+            capture("plate", vin: vinA, exact: true),
+            capture("next-bay", time: "2026-10-18T12:01:00Z", lat: 37.0003, vehicle: true)
+        ]).isEmpty, "a neighboring bay must not inherit this VIN")
+        XCTAssertTrue(AttributionEngine.vinAnchoredCaptureGroups([
+            capture("plate-a", vin: vinA, exact: true),
+            capture("plate-b", vin: vinB, exact: true, time: "2026-10-18T12:01:00Z", lat: 37.0001),
+            capture("front-a", time: "2026-10-18T12:00:30Z", lat: 37, vehicle: true)
+        ]).isEmpty, "two VIN anchors in one walkaround neighborhood make the context ambiguous")
+    }
+
+    func testInvoiceLabelsAreNeverVehicleIdentityAnchors() {
+        for label in ["invoice", "receipt", "document", "form"] {
+            XCTAssertTrue(VisionEngine.isUnnecessary(labels: [label, "car"], isScreenshot: false))
+        }
+    }
+
     func testIdentityFoldRejectsDocumentsStaleReadsAndAmbiguousVINNeighborhoods() {
         let vinA = "1GCEK14L9EJ147915", vinB = "JT6HJ88J4V0178097"
         for invalidAnchor in [

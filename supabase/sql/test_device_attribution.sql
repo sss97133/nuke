@@ -197,7 +197,6 @@ GRANT EXECUTE ON FUNCTION public.attribute_testimony(text, uuid, uuid, text, uui
 \ir ../migrations/20261017021000_device_evidence_files_photos_and_profiles.sql
 ALTER TABLE public.vehicle_images
   ADD COLUMN source text,
-  ADD COLUMN is_document boolean DEFAULT false,
   ADD COLUMN doc_flag boolean DEFAULT false,
   ADD COLUMN is_sensitive boolean DEFAULT false,
   ADD COLUMN latitude double precision,

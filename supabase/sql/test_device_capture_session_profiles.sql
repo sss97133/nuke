@@ -13,7 +13,6 @@ CREATE TABLE public.image_observations (
 );
 RESET ROLE;
 \ir ../migrations/20261019020000_device_capture_session_profiles.sql
-\ir ../migrations/20261019020000_device_capture_session_profiles.sql
 
 -- All fixture writes below remain in the disposable dm_refinement_* database.
 INSERT INTO public.profiles(id) VALUES (pg_temp.u('capture'));
@@ -92,6 +91,12 @@ SET ROLE authenticated;
 SELECT public.device_create_vehicle_profile(pg_temp.capture_request()) AS r \gset wrong_place_
 RESET ROLE;
 SELECT pg_temp.ok('distant photos do not inherit the anchor', :'wrong_place_r'::jsonb->>'status'='insufficient_evidence');
+UPDATE public.vehicle_images SET latitude=35.0003 WHERE id=pg_temp.i('capture-2');
+SET ROLE authenticated;
+SELECT public.device_create_vehicle_profile(pg_temp.capture_request()) AS r \gset adjacent_bay_
+RESET ROLE;
+SELECT pg_temp.ok('a neighboring bay does not inherit the anchor', :'adjacent_bay_r'::jsonb->>'status'='insufficient_evidence');
+UPDATE public.vehicle_images SET latitude=35 WHERE id=pg_temp.i('capture-2');
 UPDATE public.vehicle_images SET latitude=35,taken_at='2026-01-01T13:00:00Z' WHERE id=pg_temp.i('capture-2');
 SELECT pg_temp.record_capture_reading('capture-1','capture-2');
 SET ROLE authenticated;

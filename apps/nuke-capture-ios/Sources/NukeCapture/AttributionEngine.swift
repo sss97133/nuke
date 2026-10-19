@@ -598,9 +598,9 @@ final class AttributionEngine: ObservableObject {
     }
 
     /// Build tight identity groups from fresh source reads. Every member is within
-    /// 15 minutes and 100 m of one exact VIN anchor in this pass. The run key is
+    /// Five minutes and 25 m of one exact VIN anchor in this pass. The run key is
     /// the relation; camera make/model/lens metadata is not a device identity.
-    /// If a vehicle frame is near two distinct VINs it remains unresolved.
+    /// A competing VIN anchor in that neighborhood makes the whole fold ambiguous.
     nonisolated static func vinAnchoredCaptureGroups(_ frames: [VINCaptureFrame]) -> [VINCaptureGroup] {
         func captureDate(_ value: String?) -> Date? {
             guard let value else { return nil }
@@ -612,14 +612,14 @@ final class AttributionEngine: ObservableObject {
             return standard.date(from: value)
         }
         func near(_ a: VINCaptureFrame, _ b: VINCaptureFrame) -> Bool {
-            guard let ta = captureDate(a.takenAt), let tb = captureDate(b.takenAt), abs(ta.timeIntervalSince(tb)) <= 900,
+            guard let ta = captureDate(a.takenAt), let tb = captureDate(b.takenAt), abs(ta.timeIntervalSince(tb)) <= 300,
                   let lat1 = a.latitude, let lon1 = a.longitude, let lat2 = b.latitude, let lon2 = b.longitude,
                   abs(lat1) <= 90, abs(lat2) <= 90, abs(lon1) <= 180, abs(lon2) <= 180 else { return false }
             let radians = Double.pi / 180
             let dLat = (lat2 - lat1) * radians, dLon = (lon2 - lon1) * radians
             let h = sin(dLat / 2) * sin(dLat / 2) + cos(lat1 * radians) * cos(lat2 * radians) *
                 sin(dLon / 2) * sin(dLon / 2)
-            return 6_371_000 * 2 * asin(sqrt(min(1, h))) <= 100
+            return 6_371_000 * 2 * asin(sqrt(min(1, h))) <= 25
         }
         let anchors = frames.filter {
             $0.exactVIN && !$0.isDocument && !$0.isSensitive &&
@@ -632,9 +632,10 @@ final class AttributionEngine: ObservableObject {
         var emitted = Set<String>()
         var groups: [VINCaptureGroup] = []
         for anchor in anchors where emitted.insert(anchor.vin!).inserted {
+            guard !anchors.contains(where: { $0.vin != anchor.vin && near(anchor, $0) }) else { continue }
             let neighbors = frames.filter { $0.isVehicle && !$0.isDocument && !$0.isSensitive && near(anchor, $0) }
             let members = neighbors.filter { frame in
-                Set(anchors.filter { near($0, frame) }.compactMap(\.vin)).count == 1
+                Set(anchors.filter { near($0, frame) }.compactMap(\.vin)) == [anchor.vin!]
             }
             guard !members.isEmpty else { continue }
             let ids = Array(Set([anchor.imageID] + members.map(\.imageID))).sorted()

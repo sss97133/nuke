@@ -409,12 +409,12 @@ BEGIN
                 OR vi.is_duplicate IS TRUE OR vi.is_document IS TRUE OR vi.is_sensitive IS TRUE
                 OR vi.taken_at IS NULL OR vi.latitude IS NULL OR vi.longitude IS NULL
                 OR vi.latitude NOT BETWEEN -90 AND 90 OR vi.longitude NOT BETWEEN -180 AND 180
-                OR abs(extract(epoch FROM vi.taken_at - a.taken_at)) > 900
+                OR abs(extract(epoch FROM vi.taken_at - a.taken_at)) > 300
                 OR 6371000 * 2 * asin(sqrt(least(1.0,
                      power(sin(radians(vi.latitude - a.latitude) / 2), 2)
                      + cos(radians(a.latitude)) * cos(radians(vi.latitude))
-                     * power(sin(radians(vi.longitude - a.longitude) / 2), 2)))) > 100))
-         OR (SELECT max(taken_at) - min(taken_at) FROM vehicle_images WHERE id = ANY(v_image_ids)) > interval '15 minutes' THEN
+                     * power(sin(radians(vi.longitude - a.longitude) / 2), 2)))) > 25))
+         OR (SELECT max(taken_at) - min(taken_at) FROM vehicle_images WHERE id = ANY(v_image_ids)) > interval '5 minutes' THEN
         RETURN jsonb_build_object('status', 'insufficient_evidence', 'basis', v_basis,
           'detail', 'capture members need nearby source clocks/GPS and live source bytes');
       END IF;
@@ -504,13 +504,13 @@ BEGIN
             jsonb_build_array(jsonb_build_object('image_id', other_image.id::text, 'source_sha256', other_image.file_hash))
           AND other_image.file_hash ~ '^[a-f0-9]{64}$'
           AND other_image.taken_at IS NOT NULL AND anchor_image.taken_at IS NOT NULL
-          AND abs(extract(epoch FROM other_image.taken_at - anchor_image.taken_at)) <= 900
+          AND abs(extract(epoch FROM other_image.taken_at - anchor_image.taken_at)) <= 300
           AND other_image.latitude BETWEEN -90 AND 90 AND other_image.longitude BETWEEN -180 AND 180
           AND anchor_image.latitude BETWEEN -90 AND 90 AND anchor_image.longitude BETWEEN -180 AND 180
           AND 6371000 * 2 * asin(sqrt(least(1.0,
                power(sin(radians(other_image.latitude - anchor_image.latitude) / 2), 2)
                + cos(radians(anchor_image.latitude)) * cos(radians(other_image.latitude))
-               * power(sin(radians(other_image.longitude - anchor_image.longitude) / 2), 2)))) <= 100
+               * power(sin(radians(other_image.longitude - anchor_image.longitude) / 2), 2)))) <= 25
       ) THEN
         RETURN jsonb_build_object('status', 'insufficient_evidence', 'basis', v_basis,
           'detail', 'fresh contextual on-device VIN and vehicle reads are required');
