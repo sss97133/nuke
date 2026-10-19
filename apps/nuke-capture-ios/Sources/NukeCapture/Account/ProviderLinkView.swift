@@ -79,13 +79,19 @@ struct ProviderLinkView: View {
 
     @ViewBuilder private var claimsSection: some View {
         if case .loaded(let me) = identity, !me.claims.isEmpty {
-            Section("Your links") {
+            Section {
                 ForEach(me.claims) { claim in
-                    RootedValueView(label: claim.actorName ?? "Technician profile",
-                                    value: JobCopy.claimStatus(claim.status),
-                                    status: Self.rung(claim.status),
-                                    decay: Self.claimLine(claim))
+                    NavigationLink { ClaimEvidenceView(claim: claim) } label: {
+                        RootedValueView(label: claim.actorName ?? "Technician profile",
+                                        value: JobCopy.claimStatus(claim.status),
+                                        status: Self.rung(claim.status),
+                                        decay: Self.claimLine(claim))
+                    }
                 }
+            } header: {
+                Text("Your links")
+            } footer: {
+                Text("Open a link to see the evidence Nuke found for it.")
             }
         }
     }

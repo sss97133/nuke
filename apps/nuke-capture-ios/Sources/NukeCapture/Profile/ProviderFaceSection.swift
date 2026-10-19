@@ -375,6 +375,9 @@ struct ProviderFaceContent: View {
                     RootedValueView(label: "Records disagree", value: JobCopy.count(n), status: .conflicting)
                 }
             }
+            if let id = p.subject?.profileId {
+                NavigationLink { ProviderProductivityView(userId: id) } label: { Label("Day by day", systemImage: "calendar") }
+            }
         } header: {
             Text("Work record")
         } footer: {
@@ -392,6 +395,11 @@ struct ProviderFaceContent: View {
                 } label: {
                     RootedValueView(label: "Technician profile", value: JobCopy.technicianLink(p.identityBridgeState) ?? "Not available",
                                     status: p.identityBridgeState == "evidenced" ? .attributed : .recorded)
+                }
+                if let id = p.subject?.profileId {
+                    NavigationLink { ProviderStandingView(userId: id) } label: {
+                        Label("Your provider standing", systemImage: "person.text.rectangle")
+                    }
                 }
             } else {
                 RootedValueView(label: "Technician profile", value: JobCopy.technicianLinkOf(p.identityBridgeState),
