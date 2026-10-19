@@ -36,7 +36,7 @@ import { mustWrite, softWrite } from '../_shared/writeResult.ts';
 import { fillOnlyIdentity, identityConflict, REVISION_DIFFERENT_CAR } from '../_shared/identityMatch.ts';
 import { ForcedVehicleMissing, forcedVehicleId, pickVehicleTarget } from "./vehicleTarget.ts";
 import { lotEventDate } from "./eventDate.ts";
-import { originImageUrl } from "./imageUrl.ts";
+import { originImageUrl, storedImageUrls } from "./imageUrl.ts";
 import { docketLotNumber, docketStatus, episodeSoldAt, episodeStatus, statesResult } from "./episode.ts";
 import { patchForLiveRow } from "../_shared/vehicleEventWrite.ts";
 import {
@@ -1137,7 +1137,7 @@ async function saveVehicle(
           .from("vehicle_images")
           .select("id")
           .eq("vehicle_id", vehicleId)
-          .eq("image_url", imgUrl)
+          .in("image_url", storedImageUrls(imgUrl))
           .limit(1)
           .maybeSingle();
         if (!existingImg) {
