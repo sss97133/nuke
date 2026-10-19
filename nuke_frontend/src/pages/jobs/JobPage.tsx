@@ -15,6 +15,7 @@ import { readJob, type Load } from './readJob';
 import { JobSheetContext } from './jobSheetContext';
 import { completionActions, completionState } from './signDrafts';
 import './job-page.css';
+const BestMatches = React.lazy(() => import('./BestMatches'));
 
 const READERS = {
   operations: { rpc: 'work_order_operations_read', title: 'Operations' },
@@ -441,6 +442,7 @@ export default function JobPage() {
     {r('operations') && <OperationsSection d={r('operations')!} />}
     {r('resources') && <ResourcesSection d={r('resources')!} />}
     {r('offers') && <OffersSection d={r('offers')!} onSigned={reload} />}
+    {viewer && (viewer.slots.includes('customer') || viewer.slots.includes('org_owner')) && <React.Suspense fallback={null}><BestMatches workOrderId={workOrderId} /></React.Suspense>}
     {r('quotes') && <QuoteSection d={r('quotes')!} onSigned={reload} />}
     {r('bookings') && <BookingsSection d={r('bookings')!} onSigned={reload} />}
     {r('inspection') && <InspectionSection d={r('inspection')!} onSigned={reload} />}
