@@ -355,6 +355,10 @@ ALTER TABLE public.observation_sources ADD COLUMN IF NOT EXISTS display_name tex
 \ir ../migrations/20261020041000_actor_link_review_owner_agent.sql
 \echo REPLAY 20261020041500_work_order_evidence_operation_redaction.sql
 \ir ../migrations/20261020041500_work_order_evidence_operation_redaction.sql
+\echo REPLAY 20261020050000_organization_supply_from_receipts.sql
+\ir ../migrations/20261020050000_organization_supply_from_receipts.sql
+\echo REPLAY 20261020051000_open_requirements_plan_b_suppliers.sql
+\ir ../migrations/20261020051000_open_requirements_plan_b_suppliers.sql
 \ir helpers/capability_keys_live_20261020.sql
 \echo REPLAY 20261020060000_requirement_capability_keys.sql
 \ir ../migrations/20261020060000_requirement_capability_keys.sql
