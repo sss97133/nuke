@@ -17,7 +17,11 @@ const persisted = (input: ObservationInput): any => ({
 function reader(row: () => unknown, error: unknown = null) {
   return { from(table: string) {
     eq(table, "vehicle_observations");
-    return { select() { return this; }, eq(column: string, id: string) { eq([column, id], ["id", "receipt-1"]); return this; },
+    return { select() { return this; }, eq(column: string, value: string) {
+      if (column === "id") eq(value, "receipt-1");
+      else { eq(column, "observed_at"); ok(Number.isFinite(Date.parse(value))); }
+      return this;
+    },
       async maybeSingle() { return { data: row(), error }; } };
   } };
 }
@@ -57,6 +61,24 @@ Deno.test("the source capture clock keeps its submillisecond precision", async (
   const source = { ...capture(), capturedAt: "2026-10-07T08:46:11.330123Z" };
   await loadCabObservation(reader(() => persisted(input)), source, async (_s, value) => { input = value; return success(); });
   eq(input.observedAt, source.capturedAt); eq(input.rawData.source_captured_at, source.capturedAt);
+});
+
+Deno.test("the readback requires PostgreSQL to match the exact microsecond clock", async () => {
+  const source = { ...capture(), capturedAt: "2026-10-07T08:46:11.330123Z" };
+  const differentClock = "2026-10-07T08:46:11.330124Z";
+  eq(Date.parse(source.capturedAt), Date.parse(differentClock));
+  let input!: ObservationInput;
+  const filters = new Map<string, string>();
+  const client = { from() { return {
+    select() { return this; }, eq(key: string, value: string) { filters.set(key, value); return this; },
+    async maybeSingle() {
+      // Native timestamptz equality withholds the row; millisecond equality would admit it.
+      return { data: filters.get("observed_at") === source.capturedAt ? null
+        : { ...persisted(input), observed_at: differentClock }, error: null };
+    },
+  }; } };
+  await refused(() => loadCabObservation(client, source, async (_s, value) => { input = value; return success(); }), "receipt does not match");
+  eq(filters.get("observed_at"), source.capturedAt);
 });
 
 Deno.test("missing source IDs and clocks refuse before a writer runs", async () => {
