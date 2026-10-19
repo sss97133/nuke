@@ -1370,11 +1370,26 @@ async function extractSingleAuctionGoldStandard(cab, auctionId) {
     }
     if (uErr) throw new Error(`Vehicle update failed for ${d.id}: ${describePgError(uErr)}`);
   } else {
-    const { data: insV, error: iErr } = await supabase
+    let { data: insV, error: iErr } = await supabase
       .from("vehicles")
       .insert(vehiclePayload)
       .select("id")
       .single();
+    // A deleted, never-merged vehicle can still hold this listing's discovery_url. The new vehicle keeps the listing
+    // (listing_url) without claiming that key; a live or merged holder is an identity question and still refuses.
+    if (iErr?.code === "23505" && iErr.message?.includes("vehicles_discovery_url_unique")) {
+      const { data: holder, error: hErr } = await supabase
+        .from("vehicles")
+        .select("id, deleted_at, merged_into_vehicle_id, status")
+        .in("discovery_url", [canonicalUrl, lowerUrl])
+        .limit(1)
+        .maybeSingle();
+      if (hErr) throw new Error(`Discovery URL holder lookup failed for ${d.id}: ${describePgError(hErr)}`);
+      if (holder?.deleted_at && !holder.merged_into_vehicle_id && holder.status !== "merged") {
+        const { discovery_url: _held, ...withoutDiscoveryUrl } = vehiclePayload;
+        ({ data: insV, error: iErr } = await supabase.from("vehicles").insert(withoutDiscoveryUrl).select("id").single());
+      }
+    }
     if (iErr) throw new Error(`Vehicle insert failed for ${d.id}: ${describePgError(iErr)}`);
     vehicleId = insV.id;
   }
