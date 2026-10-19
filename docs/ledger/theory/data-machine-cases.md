@@ -465,6 +465,13 @@ observation visibility predicate withholds `provenance`; this internal receipt m
 second public listing. The source's existing listing capability qualifies its retained parent;
 this guarded derivation does not declare a new publisher-provided provenance capability.
 
+The first authorized live attempt qualified all three selectors but admitted none: the existing
+market/media guard also requires sale context for an auction FK. The local fixture had omitted that
+guard. The follow-up fixture now reproduces the refusal with its actual function and both triggers;
+the narrow repair independently requalifies the exact protected narrative receipt, excludes media
+citations, and preserves legacy sale/chassis checks and both source-custody guards. A passing
+qualifier remains distinct from a successful canonical write and current stored-receipt readback.
+
 The typed relationship uses the existing `auction_event_id` FK, shared with the lot interaction
 log. It leaves `source_vehicle_event_id` NULL: that pointer would make native-state replacement
 refuse under existing sanctioned episode supersession. The local counterexample replaces the

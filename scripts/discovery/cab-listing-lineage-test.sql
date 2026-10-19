@@ -10,7 +10,9 @@ END $$;
 CREATE FUNCTION pg_temp.refuses(label text,statement text,expected text DEFAULT '23514') RETURNS void LANGUAGE plpgsql AS $$
 DECLARE actual text;
 BEGIN
- BEGIN EXECUTE statement; EXCEPTION WHEN OTHERS THEN GET STACKED DIAGNOSTICS actual=RETURNED_SQLSTATE; END;
+ BEGIN EXECUTE statement; EXCEPTION WHEN OTHERS THEN GET STACKED DIAGNOSTICS actual=RETURNED_SQLSTATE;
+   IF actual IS DISTINCT FROM expected THEN RAISE NOTICE 'unexpected refusal: % %',actual,SQLERRM; END IF;
+ END;
  PERFORM pg_temp.ok(label,actual=expected);
 END $$;
 ALTER TABLE public.vehicle_observations ADD COLUMN source_observation_id uuid REFERENCES public.vehicle_observations;
@@ -32,13 +34,20 @@ CREATE TRIGGER trg_retained_listing_property_source_update BEFORE UPDATE ON publ
 WHEN (OLD.source_observation_id IS NOT NULL OR NEW.source_observation_id IS NOT NULL)
 EXECUTE FUNCTION public.validate_retained_listing_property_source();
 \ir ../../supabase/migrations/20261018230628_cab_listing_capture_custody.sql
+ALTER TABLE public.vehicle_observations ADD COLUMN citation_publication_id uuid, ADD COLUMN media_start_ms bigint,
+ ADD COLUMN media_end_ms bigint, ADD COLUMN media_relation text, ADD COLUMN media_span_semantics text;
+ALTER TABLE public.auction_events ADD COLUMN raw_data jsonb;
+CREATE TABLE public.publications(id uuid PRIMARY KEY,platform text,platform_id text);
+GRANT SELECT ON public.publications TO service_role;
+\ir cab-market-guard.fixture.sql
+
 GRANT SELECT ON public.vehicles,public.observation_sources,public.vehicle_events,public.auction_events,public.listing_page_snapshots TO service_role;
 -- FOR SHARE requires UPDATE privilege; mirror the existing service role, not public access.
 GRANT UPDATE ON public.vehicles,public.observation_sources,public.vehicle_events,public.auction_events,public.listing_page_snapshots TO service_role;
 INSERT INTO public.observation_sources VALUES(md5('source-cab')::uuid,'cars-and-bids',ARRAY['listing']::public.observation_kind[]);
 INSERT INTO public.vehicle_events(id,vehicle_id,source_platform,source_url,source_listing_id)
 VALUES(md5('cab-episode')::uuid,md5('vehicle-1')::uuid,'cars_and_bids','https://carsandbids.com/auctions/AbC123/synthetic-lot','AbC123');
-INSERT INTO public.auction_events VALUES(md5('cab-auction')::uuid,md5('vehicle-1')::uuid,'cars_and_bids',
+INSERT INTO public.auction_events(id,vehicle_id,source,source_url,source_listing_id) VALUES(md5('cab-auction')::uuid,md5('vehicle-1')::uuid,'cars_and_bids',
  'https://carsandbids.com/auctions/AbC123/synthetic-lot','AbC123');
 INSERT INTO public.listing_page_snapshots(id,platform,listing_url,success,http_status,html,html_sha256,fetched_at,created_at,metadata)
 VALUES(md5('cab-snapshot')::uuid,'carsandbids','https://carsandbids.com/auctions/AbC123/synthetic-lot',true,200,
@@ -69,6 +78,27 @@ SELECT pg_temp.ok('receipt promotes no original specification and copies no sour
  public.synthetic_cab_qualification()->'input'->'structured_data'->'listing_capture_receipt'->>'scope'='attributed_listing_narrative_only'
  AND public.synthetic_cab_qualification()::text NOT LIKE '%UNVERIFIED_INTERPRETATION%'
  AND public.synthetic_cab_qualification()::text NOT LIKE '%Publisher claim%');
+SELECT pg_temp.refuses('actual legacy media guard reproduces qualified custody rejection',
+ 'SET ROLE service_role; SELECT public.synthetic_insert_cab_receipt(public.synthetic_cab_qualification()->''input'')'); RESET ROLE;
+\ir ../../supabase/migrations/20261019014500_cab_custody_market_guard.sql
+INSERT INTO public.auction_events(id,vehicle_id,source,source_url,source_listing_id,raw_data)
+VALUES(md5('legacy-market-lot')::uuid,md5('vehicle-1')::uuid,'synthetic','https://example.invalid/lots/123','123','{"auction_id":"SALE1"}');
+CREATE FUNCTION pg_temp.insert_market_context(context jsonb, vehicle uuid DEFAULT md5('vehicle-1')::uuid)
+RETURNS uuid LANGUAGE plpgsql AS $$ DECLARE result uuid; BEGIN
+ INSERT INTO public.vehicle_observations(vehicle_id,source_id,kind,observed_at,auction_event_id,structured_data)
+ VALUES(vehicle,md5('source-cab')::uuid,'listing',now(),md5('legacy-market-lot')::uuid,jsonb_build_object('event_context',context))
+ RETURNING id INTO result; RETURN result;
+END $$;
+SELECT pg_temp.ok('legacy matching listing and sale context remains admissible',
+ pg_temp.insert_market_context('{"source_listing_id":"123","auction_id":"SALE1"}') IS NOT NULL);
+SELECT pg_temp.refuses('legacy lot citation still requires listing context',
+ 'SELECT pg_temp.insert_market_context(''{}'')');
+SELECT pg_temp.refuses('legacy mismatched sale context remains refused',
+ 'SELECT pg_temp.insert_market_context(''{"source_listing_id":"123","auction_id":"OTHER"}'')');
+SELECT pg_temp.refuses('legacy mismatched chassis remains refused',
+ 'SELECT pg_temp.insert_market_context(''{"source_listing_id":"123","auction_id":"SALE1"}'',md5(''wrong-chassis'')::uuid)');
+SELECT pg_temp.refuses('protected listing custody cannot acquire media citations',
+ 'SET ROLE service_role; SELECT public.synthetic_insert_cab_receipt((public.synthetic_cab_qualification()->''input'')||''{"media_start_ms":0}''::jsonb)'); RESET ROLE;
 SET ROLE service_role;
 SELECT public.synthetic_insert_cab_receipt(public.synthetic_cab_qualification()->'input');
 RESET ROLE;
