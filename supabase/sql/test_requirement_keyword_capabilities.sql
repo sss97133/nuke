@@ -22,14 +22,14 @@ SELECT t_assert(pg_temp.keys('x', '51000000-0000-0000-0000-000000000001') = '[{"
  AND pg_temp.keys('Fuel', '51000000-0000-0000-0000-000000000002') = '[{"key":"fuel_system","from":"reviewed_keyword"}]',
  'the operation text is read as well as the requirement description');
 SELECT t_assert(pg_temp.keys('recovered seats') = '[]' AND pg_temp.keys('boil filter') = '[]' AND pg_temp.keys('oil filtration') = '[]'
- AND pg_temp.keys('Idler arm replacement') = '[]' AND pg_temp.keys('Tailgate fancy trim piece + GMC emblem') = '[]'
- AND pg_temp.keys('Front end alignment') = '[]' AND pg_temp.keys(NULL) = '[]',
- 'no partial-word matches; steering, alignment and trim stay without keys');
+ AND pg_temp.keys('Front end') = '[]' AND pg_temp.keys(NULL) = '[]',
+ 'no partial-word matches (steering, alignment and trim got their own types in 20261020130000)');
 SELECT t_assert(pg_temp.keys('Exhaust repair and fabrication', '51000000-0000-0000-0000-000000000003')
    = '[{"key":"exhaust_system","from":"reviewed_template"},{"key":"fabrication_exhaust","from":"operation"},{"key":"fabrication_exhaust","from":"reviewed_template"}]'
  AND pg_temp.keys('Rust repair and panel welding') = '[{"key":"rust_repair","from":"reviewed_template"},{"key":"welding_mig","from":"reviewed_template"}]',
  'template and operation keys are unchanged (additive)');
-SELECT t_assert((SELECT count(*) FROM capability_evidence_map WHERE kind = 'requirement_keyword') = 21
+SELECT t_assert((SELECT count(*) FROM capability_evidence_map WHERE kind = 'requirement_keyword'
+   AND capability_type NOT IN ('steering_suspension_alignment', 'trim_installation')) = 21
  AND NOT EXISTS (SELECT 1 FROM capability_evidence_map WHERE kind = 'requirement_keyword' AND (note IS NULL OR source_key !~ '^[a-z]+(_[a-z]+)*:[a-z_]+$'
    OR split_part(source_key, ':', 2) <> capability_type)),
  'every keyword row is <phrase>:<capability> and names the text it was added for');
