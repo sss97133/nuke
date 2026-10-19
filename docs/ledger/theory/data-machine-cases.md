@@ -3025,3 +3025,11 @@ interpretation, quoting the original message under its own clock and speaker lab
 testimony blocks into the shared job-path reader and scoreboard without changing stage states. Disposable PG17
 covers 33 cases; the job-loop replay contract proves the anchored edits against the real build. A name collision
 with the completion/invoice lane's `project_work_order_lifecycle_event` was caught by that replay and avoided.
+
+Card payment of job invoices (2026-10-19, owner: "build it out we have stripe"): the job loop could invoice and
+record payment testimony but not take a payment, and the existing stripe-webhook credited the AI wallet for every
+completed Checkout, including non-credit purchases. Migration `20261020014500_work_order_invoice_stripe_payments.sql`
+adds a `stripe` documentation source, an immutable processor-payment projection, customer-only checkout terms over
+the current invoice balance, a webhook recorder idempotent on Stripe event and session ids, and anchored edits so
+reconciliation counts processor receipts and the customer's job actions offer `pay_invoice`. The webhook now routes
+by purchase type. Collection only: no transfer, payout or release; the live key is not exercised by tests.

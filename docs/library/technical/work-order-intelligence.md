@@ -733,6 +733,30 @@ customer acceptance are untouched: testimony is not a Sign. Excerpts can hold st
 service-only; withdrawn, reattributed or edited bases drop out. The reader, projector and scoreboard edits are
 anchored (each applied exactly once). Contract: `supabase/sql/test_work_order_retained_testimony.sql`.
 
+### Card payment of an invoice (Stripe)
+
+The work order customer pays the current invoice's balance by card through Stripe Checkout. Collection only: money
+reaches the platform's Stripe account; nothing transfers, pays out or releases funds to the provider, and the job
+path keeps `disbursement: not_performed`.
+
+- `work_order_invoice_checkout(user, work_order)` (service-only) states what may be paid: only the customer, only
+  the current invoice version, only a balance still due (`work_order_invoice_reconciliation`), two-decimal
+  currencies, at least 0.50. Otherwise `{refused: not_the_customer | no_invoice | currency_not_supported |
+  nothing_due | below_processor_minimum}`. The customer's job actions offer `pay_invoice` while it holds.
+- `create-work-order-invoice-checkout` (edge, signed-in) opens a hosted Checkout for exactly that amount, with
+  `metadata.purchase_type = work_order_invoice` and the invoice id, version and hash. No work order title or
+  names reach Stripe. Stripe charges only if the customer completes the page.
+- `stripe-webhook` routes completed sessions by `purchase_type` (`_shared/stripeCheckoutRouting.ts`): invoice
+  sessions go to `record_work_order_processor_payment`; AI-wallet and API purchases, and sessions without a
+  purchase type, credit as before; any other purchase type (for example the vehicle facilitation fee) is no
+  longer credited to the payer's AI wallet.
+- `record_work_order_processor_payment` writes one `stripe`-source observation and one immutable
+  `work_order_processor_payments` row per session, idempotent on the Stripe event and session ids, after checking
+  the invoice hash, work order and currency. Reconciliation counts these as received beside payee witnesses.
+
+Contracts: `supabase/sql/test_work_order_invoice_stripe_payments.sql` (on top of the job-loop golden path) and
+the Deno tests `_shared/stripeCheckoutRouting.test.ts` and `create-work-order-invoice-checkout/checkout.test.ts`.
+
 ## Image objects in job context
 
 `read_work_order_image_objects(work_order_id, after_observation_id, limit)` is a
