@@ -49,7 +49,7 @@ BEGIN
 END $$;
 
 COMMENT ON CONSTRAINT source_targets_source_slug_fkey ON public.source_targets IS
-'The source whose sitemap or search listed the URL, keyed to the source registry. Validated 2026-10-13: all 785,126 rows on 10 slugs matched. ON DELETE and ON UPDATE NO ACTION: a source with discovered targets cannot be deleted or renamed without moving them first.';
+'The source whose sitemap or search listed the URL, keyed to the source registry. Validated when applied: on 2026-10-13 all 785,126 rows on 10 slugs matched; on 2026-10-19 all 12 distinct slugs (about 961,000 rows by planner estimate) were present in observation_sources. ON DELETE and ON UPDATE NO ACTION: a source with discovered targets cannot be deleted or renamed without moving them first.';
 
 COMMENT ON COLUMN public.source_targets.source_slug IS
 'The source whose sitemap or search API listed the URL (for example mecum, bat, bonhams). Unit: none (text, foreign key to observation_sources.slug). Source: scripts/ingest-source-targets.sh, the slug passed to bulk_load. Grain: one source x listing URL. Clock: n/a.';
