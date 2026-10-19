@@ -550,12 +550,10 @@ BEGIN
       SELECT count(*), coalesce(array_agg(DISTINCT t.id) FILTER (WHERE t.id IS NOT NULL), '{}')
         INTO v_holder_rows, v_holders
         FROM vehicles x CROSS JOIN LATERAL (SELECT public.vehicle_merge_terminal(x.id) AS id) t
-       WHERE upper(btrim(x.vin)) = v_ident;
-      -- An old serial can repeat across makes: only holders of the contextual make are candidates.
-      IF (v_basis = 'serial_album' OR v_basis = 'capture_session' AND length(v_ident) < 17 AND v_make IS NOT NULL) AND cardinality(v_holders) > 0 THEN
-        v_holders := ARRAY(SELECT x.id FROM vehicles x WHERE x.id = ANY (v_holders)
-                           AND upper(public.normalize_make(x.make)) = v_make_canonical ORDER BY x.id);
-      END IF;
+       WHERE upper(btrim(x.vin)) = v_ident
+         AND (v_basis NOT IN ('serial_album', 'capture_session') OR length(v_ident) = 17
+              OR v_make_canonical IS NULL OR upper(public.normalize_make(x.make)) = v_make_canonical);
+      -- The holder count and candidate IDs share the same make scope for classic serials.
       IF cardinality(v_holders) > 1 THEN
         v_assoc := ARRAY(SELECT public.user_associated_vehicle_ids(v_caller));
         RETURN jsonb_build_object('status', 'ambiguous', 'basis', v_basis,
