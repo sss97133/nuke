@@ -61,3 +61,14 @@ export function parseKslSearchCards(html: string): KslCard[] {
   }
   return cards;
 }
+
+/** KSL's published result count, not the number of cards on this page. Refuse conflicting counts and challenge pages. */
+export function parseKslSearchCount(html: string): number | null {
+  const visible = html.replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1>/gi, " ")
+    .replace(/<!--[\s\S]*?-->/g, " ").replace(/<[^>]*>/g, " ")
+    .replace(/&nbsp;|&#160;/g, " ").replace(/\s+/g, " ");
+  if (/confirm you are|verify you are|captcha/i.test(visible)) return null;
+  const counts = [...visible.matchAll(/(?<![\d,])(0|[1-9]\d{0,2}(?:,\d{3})+|[1-9]\d*) results?\b/g)]
+    .map((m) => Number(m[1].replaceAll(",", "")));
+  return counts.length && counts.every((n) => Number.isSafeInteger(n) && n === counts[0]) ? counts[0] : null;
+}
