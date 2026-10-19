@@ -101,7 +101,7 @@ struct ProviderFaceContent: View {
                 saysSection(p)
                 recordSection(p)
                 toolsSections(p)
-                shopsSection(p)
+                if Self.showsShops(p, isOwn: isOwn) { shopsSection(p) }
                 workRecordSection(p).id("provider-work")
                 ConcludedJobsSection(jobs: jobs, loadingMore: loadingMore, onLoadMore: onLoadMore).id("provider-jobs")
                 linkSection(p)
@@ -318,6 +318,10 @@ struct ProviderFaceContent: View {
     }
 
     // MARK: Shops
+
+    /// Shops stay off the visitor face: the owner took organizations off the profile face on 2026-06-13
+    /// ("I don't want those showing up"). Your own face keeps them; job and shop pages still link them.
+    static func showsShops(_ p: ProviderProfile, isOwn: Bool) -> Bool { p.isSelf || isOwn }
 
     @ViewBuilder private func shopsSection(_ p: ProviderProfile) -> some View {
         let active = p.facilities.filter(\.isActive)

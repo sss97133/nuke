@@ -73,6 +73,10 @@ final class ProviderProfileTests: XCTestCase {
         XCTAssertEqual(ProviderFaceContent.facilityValue(active[0]), "Technician")
         XCTAssertEqual(ProviderFaceContent.facilityValue(active[1]), "Owner")
         XCTAssertEqual(JobCopy.relationState("live"), "active now")
+        XCTAssertFalse(ProviderFaceContent.showsShops(p, isOwn: false))           // 2026-06-13: organizations off the visitor face
+        XCTAssertTrue(ProviderFaceContent.showsShops(p, isOwn: true))
+        let mine = try decode(ProviderProfile.self, ProviderFixtures.profile(context: "self"))
+        XCTAssertTrue(ProviderFaceContent.showsShops(mine, isOwn: false))
     }
 
     func testActorProfileMarksPhotoAndDayBlocksNotAssessed() throws {
