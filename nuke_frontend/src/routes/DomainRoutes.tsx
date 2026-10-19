@@ -80,6 +80,7 @@ const WorkOrderStatement = React.lazy(() => import('../pages/WorkOrderStatement'
 // Job loop: open requests board (public) and the signed-in work console
 const JobsBoard = React.lazy(() => import('../pages/jobs/JobsBoard'));
 const WorkPage = React.lazy(() => import('../pages/jobs/WorkPage'));
+const ProviderSetupPage = React.lazy(() => import('../pages/provider-setup/ProviderSetupPage'));
 const ImportDataPage = React.lazy(() => import('../pages/ImportDataPage'));
 const PhotoSyncPage = React.lazy(() => import('../pages/PhotoSyncPage'));
 const DailyDebrief = React.lazy(() => import('../pages/DailyDebrief'));
@@ -121,6 +122,8 @@ const BuildDashboard = React.lazy(() => import('../pages/BuildDashboard'));
 // Jobs and providers — open job path readers; party money and personal fields withheld at the source
 const JobPage = React.lazy(() => import('../pages/jobs/JobPage'));
 const ProviderProfilePage = React.lazy(() => import('../pages/providers/ProviderProfilePage'));
+const MessagesPage = React.lazy(() => import('../pages/messages/MessagesPage'));
+const ContactThreadPage = React.lazy(() => import('../pages/messages/MessagesPage').then(m => ({ default: m.ContactThreadPage })));
 
 // Public projections — journal index + day page
 const JournalIndex = React.lazy(() => import('../pages/journal/JournalIndex'));
@@ -213,6 +216,8 @@ export const DomainRoutes = () => {
         <Route path="/jobs/:workOrderId" element={<JobPage />} />
         <Route path="/providers/actor/:actorId" element={<ProviderProfilePage />} />
         <Route path="/providers/:handle" element={<ProviderProfilePage />} />
+        {/* Statement: work_order_statement_read is open data; payments stay party-only from the server */}
+        <Route path="/work-orders/statement" element={<WorkOrderStatement />} />
         {/* Investor offering / data room — semi-public fundraising page */}
         {/* Docs / developers landing */}
         <Route path="/developers" element={<DevelopersPage />} />
@@ -291,9 +296,12 @@ export const DomainRoutes = () => {
           <Route path="/tech/upload" element={<TechShareUpload />} />
           <Route path="/restoration" element={<RestorationIntake />} />
           <Route path="/intake/restoration" element={<RestorationIntake />} />
-          <Route path="/work-orders/statement" element={<WorkOrderStatement />} />
           {/* Work console: signature queue and the viewer's jobs */}
           <Route path="/work" element={<WorkPage />} />
+          <Route path="/messages" element={<MessagesPage />} />
+          <Route path="/messages/:requestId" element={<ContactThreadPage />} />
+          {/* Provider onboarding: suggested records, trade, area and hours, tools, client preview */}
+          <Route path="/work/setup" element={<ProviderSetupPage />} />
 
 
           {/* Settings (protected) */}

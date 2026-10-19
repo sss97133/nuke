@@ -35,6 +35,16 @@ export type OpenRequirement = {
   candidates_listed?: number;
   quote_state?: { has_current_quote?: boolean; quote_versions?: number | null; acceptance?: string | null };
   match?: MatchInput[] | null;
+  plan_b_suppliers?: PlanBSupplier[] | null;
+};
+
+/** An organization the platform's retained purchase records show was paid for this kind of supply. No amounts or payers. */
+export type PlanBSupplier = {
+  organization?: { organization_id?: string; name?: string | null } | null;
+  profile_public?: boolean;
+  times?: number;
+  last_on?: string | null;
+  kinds_matched?: string[];
 };
 
 export type OpenRequirementsRead = {
@@ -186,10 +196,43 @@ export function refusalText(error: { message?: string; code?: string } | null | 
   return 'Nuke could not do that right now.';
 }
 
+/** One plan read per vehicle per page session: the inspection call-to-action and Plan the work share it. */
+const planCache = new Map<string, Promise<RpcResult<WorkPlan>>>();
+export const clearPlanCache = () => planCache.clear();
+
+export type MatchProvider = {
+  rank: number;
+  provider: { kind?: string; profile_id?: string; handle?: string | null; label?: string } | null;
+  listed_because?: string[];
+  link_state?: string;
+  passed: number;
+  failed: number;
+  unknown: number;
+  inputs_total: number;
+  requirements: Array<{ requirement_id: string; requirement_kind: string; description?: string | null; passed: number; inputs: MatchInput[] }>;
+  contact?: { writer: string; recipient_user_id?: string } | null;
+};
+
+export type MatchesRead = {
+  as_of: string;
+  work_order_id: string;
+  providers: MatchProvider[];
+  ranking?: string;
+  coverage: { requirements: number; providers_considered: number; providers_returned: number; candidate_cap?: number; self_claims?: string };
+};
+
 export const JobReaders = {
   openRequirements: (after: string | null) => call<OpenRequirementsRead>('open_requirements_read', { p_after: after, p_limit: 25, p_kind: null }),
   offers: (workOrderId: string) => call<OffersRead>('work_order_offers_read', { p_work_order_id: workOrderId }),
-  plan: (vehicleId: string) => call<WorkPlan>('listing_work_plan_read', { p_vehicle_id: vehicleId }),
+  plan: (vehicleId: string) => {
+    const cached = planCache.get(vehicleId);
+    if (cached) return cached;
+    const p = call<WorkPlan>('listing_work_plan_read', { p_vehicle_id: vehicleId });
+    planCache.set(vehicleId, p);
+    void p.then(r => { if (r.refusal) planCache.delete(vehicleId); });
+    return p;
+  },
+  matches: (workOrderId: string) => call<MatchesRead>('work_order_provider_matches_read', { p_work_order_id: workOrderId, p_limit: 25 }),
   vehicleWorkOrders: (vehicleId: string) => call<VehicleWorkOrdersRead>('vehicle_work_orders_read', { p_vehicle_id: vehicleId, p_after: null, p_limit: 25 }),
   signatureQueue: () => call<SignQueueRead>('my_signature_queue', {}),
   myWorkOrders: (after: string | null) => call<MyWorkOrdersRead>('my_work_orders', { p_slot: null, p_after: after, p_limit: 25 }),
@@ -199,6 +242,9 @@ export const JobSigns = {
   offer: (args: OfferArgs) => call<{ offer_id: string; duplicate: boolean }>('offer_on_requirement', args),
   contact: (requirementId: string, message: string) =>
     call<{ request_id: string }>('request_contact', { p_context_kind: 'requirement', p_context_id: requirementId, p_message: message }),
+  invite: (requirementId: string, recipientUserId: string, message: string) =>
+    call<{ request_id: string }>('request_contact', { p_context_kind: 'requirement', p_context_id: requirementId, p_message: message,
+      p_recipient_user_id: recipientUserId, p_recipient_actor_id: null, p_recipient_organization_id: null }),
   requestInspection: (vehicleId: string, scope: Record<string, unknown>) =>
     call<{ work_order_id: string; duplicate: boolean; checklist_items: number }>('request_inspection',
       { p_vehicle_id: vehicleId, p_parent_work_order_id: null, p_scope: { ...scope, request_source: 'web' } }),
@@ -279,8 +325,15 @@ export function matchReason(m: MatchInput): string {
   if (r.startsWith('not required for a')) return 'Not needed for this';
   switch (m.input) {
     case 'skill': {
+      const covers = /capability (.+?) covers this requirement/.exec(r);
+      if (m.result === 'pass' && covers) return `Your work record shows ${covers[1].replace(/_/g, ' ')}`;
       const named = /capability (.+) is named in the requirement/.exec(r);
       if (m.result === 'pass' && named) return `Your record shows ${named[1].replace(/_/g, ' ')}`;
+      const against = /^only evidence against (.+?) for this requirement/.exec(r);
+      if (against) return `Only evidence against so far (${against[1].replace(/_/g, ' ')})`;
+      const hand = /^hand-entered capability record without basis: (.+)/.exec(r);
+      if (hand) return `An older hand-entered record lists ${hand[1].replace(/_/g, ' ')}, without its basis`;
+      if (r.startsWith('requested and reported-performed specifications differed')) return 'Earlier work differed from what was asked (evidence against, not a verdict)';
       return r.includes('do not name') ? "Your record doesn't show this skill yet" : 'Not shown in your record yet';
     }
     case 'tools': {
@@ -296,12 +349,19 @@ export function matchReason(m: MatchInput): string {
     case 'facility':
       if (m.result === 'pass') return 'Shop space is free in the window';
       return m.result === 'fail' ? 'Shop space is booked in the window' : 'No shop space found for this job';
-    case 'area':
-      if (m.result === 'pass') return r.includes('city') ? 'Same city' : 'Same state';
+    case 'area': {
+      const within = /within your (\d+)-mile service area/.exec(r);
+      if (within) return `Within your ${within[1]}-mile service area`;
+      if (r.startsWith('same state as your service area')) return 'Same state as your service area (distance not worked out)';
+      if (m.result === 'pass') return r.includes('and city') ? 'Same city' : 'Same state';
       if (r.includes('job area not public')) return "The job's area isn't public";
       if (r.includes('states no area')) return "Your profile doesn't list an area";
       return 'Different state';
+    }
     case 'availability':
+      if (m.result === 'pass') return 'Your hours fall inside the job window';
+      if (r.includes('window has passed')) return 'The job window has passed';
+      if (r.startsWith('no declared availability inside')) return "Your hours don't cover the job window";
       return "You haven't set availability yet";
     case 'evidence_rung':
       if (m.result === 'pass') return 'Linked and backed by your work';
@@ -320,6 +380,31 @@ export function matchNext(n: string | null | undefined): string | null {
     case null: case undefined: case '': return null;
     default: return sentence(n).toLowerCase();
   }
+}
+
+/** A provider's tally in the job owner's words: ranked only by how many inputs passed. */
+export function tallyWords(p: MatchProvider): string {
+  return `${p.passed} of ${p.inputs_total} checks pass · ${p.failed} not yet · ${p.unknown} unknown`;
+}
+
+export function providerName(p: MatchProvider['provider']): string {
+  return p?.handle ? '@' + p.handle : 'Unnamed party';
+}
+
+export function planBLine(s: PlanBSupplier): string {
+  const n = s.times ?? 0;
+  return `Paid for this before on Nuke (${n} time${n === 1 ? '' : 's'})`;
+}
+
+/** The viewer's match words, said about someone else (a job owner reading a provider's match). */
+export function theirWords(text: string): string {
+  return text
+    .replace(/\bYou said you own\b/g, 'They say they own')
+    .replace(/\bYou haven't\b/g, "They haven't")
+    .replace(/\bby you\b/g, 'by them')
+    .replace(/\bYour\b/g, 'Their')
+    .replace(/\byour\b/g, 'their')
+    .replace(/\bYou\b/g, 'They');
 }
 
 export function matchMark(result: string): string {

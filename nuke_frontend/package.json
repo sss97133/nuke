@@ -21,7 +21,8 @@
     "start-proxy": "npm run proxy",
     "fix-imports": "node fix-imports.cjs",
     "scan-fix-all": "node scan-fix-all-imports.cjs",
-    "type-check": "npx tsc --noEmit --skipLibCheck",
+    "type-check": "node ../scripts/ci/typecheck-ratchet.mjs",
+    "type-check:full": "tsc -p tsconfig.app.json --noEmit && tsc -p tsconfig.node.json --noEmit",
     "theme-audit": "node scripts/theme-audit.mjs",
     "theme-audit:fail": "node scripts/theme-audit.mjs --fail"
   },

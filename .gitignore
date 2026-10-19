@@ -322,3 +322,6 @@ DONE.md
 .claude/HANDOFF.md
 .claude/ACTIVE_AGENTS.md
 tools/nuke-desktop/src-tauri/target/
+
+# tsc incremental build info (scripts/ci/typecheck-ratchet.mjs)
+nuke_frontend/.tsbuild/

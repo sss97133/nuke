@@ -13,26 +13,30 @@ import { PrefetchLink } from '../../components/PrefetchLink';
 import { useAuthContext } from '../../contexts/AuthContext';
 import { usePageTitle } from '../../hooks/usePageTitle';
 import { ContactSheet, OfferSheet } from './JobSheets';
+import { MatchList, PlanBList } from './MatchList';
 import {
-  JobReaders, areaText, jobHref, matchInputLabel, matchMark, matchNext, matchReason, matchResultWord, openRequestsSentence,
-  quoteText, requirementKind, vehicleText, windowText,
-  type JobAction, type MatchInput, type OpenRequirement, type OpenRequirementsRead,
+  JobReaders, areaText, jobHref, openRequestsSentence, quoteText, requirementKind, vehicleText, windowText,
+  type JobAction, type OpenRequirement, type OpenRequirementsRead,
 } from './jobsReaders';
 import './jobs.css';
 
-export function MatchList({ inputs }: { inputs: MatchInput[] }) {
-  return <div>
-    <Text role="label">How you match</Text>
-    <ul className="jb-match" aria-label="How you match">
-      {inputs.map(m => {
-        const next = matchNext(m.next);
-        return <li key={m.input} aria-label={`${matchInputLabel(m.input)}: ${matchResultWord(m.result)}`}>
-          <Text role="measure" dense className={`jb-mark${m.result === 'pass' ? ' jb-mark--pass' : ''}`} aria-hidden>{matchMark(m.result)}</Text>
-          <Text role="body">{matchInputLabel(m.input)} — {matchReason(m)}{next && <> · <span className="jb-next">{next}</span></>}</Text>
-        </li>;
-      })}
-    </ul>
-  </div>;
+/** Below this many open requests the board explains how requests get here. */
+const FEW_REQUESTS = 10;
+
+/** How jobs reach this board, for a board with few requests. */
+function HowJobsAppear({ signedIn }: { signedIn: boolean }) {
+  return <section className="k-section" aria-label="How jobs appear here">
+    <Text role="label" as="h2">How jobs appear here</Text>
+    <ol className="jb-ol">
+      <li><Text role="body">An owner posts a job from their vehicle's page: <Text role="label">Post a job</Text>, in their own words.</Text></li>
+      <li><Text role="body">A buyer orders a pre-purchase inspection from a listing: <Text role="label">Plan the work</Text>, then <Text role="label">Order an inspection</Text>.</Text></li>
+    </ol>
+    <Text role="body">Each request lists what it needs; technicians, inspectors, tool owners and shops offer, and the customer chooses.</Text>
+    <Text role="body">{signedIn
+      ? <>Own a vehicle that needs work? <PrefetchLink to="/vehicle/list">Post a job from one of your vehicles</PrefetchLink>.</>
+      : <>Own a vehicle that needs work? <PrefetchLink to="/login">Sign in</PrefetchLink> and post a job from its page.</>}</Text>
+    <Text role="caption">Shops that run their work orders on Nuke list what a job needs here too.</Text>
+  </section>;
 }
 
 function RequirementRow({ row, offer, canContact, onOffer, onContact }: {
@@ -50,6 +54,7 @@ function RequirementRow({ row, offer, canContact, onOffer, onContact }: {
     <PrefetchLink to={jobHref(row.work_order_id)}><Text role="entity" dense>{row.display_title || 'Untitled job'}</Text></PrefetchLink>
     {detail && <Text role="caption">{detail}</Text>}
     {row.match && row.match.length > 0 && <MatchList inputs={row.match} />}
+    {row.plan_b_suppliers && row.plan_b_suppliers.length > 0 && <PlanBList suppliers={row.plan_b_suppliers} />}
     {(offer || canContact) && <div className="jb-actions">
       {offer && <button type="button" className="btn-base btn-sm btn-primary" onClick={onOffer}><Text role="label">Make an offer</Text></button>}
       {canContact && <button type="button" className="btn-base btn-sm btn-secondary" onClick={onContact}><Text role="label">Contact via Nuke</Text></button>}
@@ -114,6 +119,7 @@ const JobsBoard: React.FC = () => {
       {page.coverage.not_assessed && page.coverage.not_assessed.length > 0 &&
         <Text role="caption">Not assessed yet: {page.coverage.not_assessed.join(', ')}.</Text>}
     </Section>}
+    {page && total < FEW_REQUESTS && <HowJobsAppear signedIn={signedIn} />}
     {offering && offers[offering.requirement_id] && <OfferSheet action={offers[offering.requirement_id]}
       requestTitle={offering.description || requirementKind(offering.requirement_kind)} onClose={() => setOffering(null)} />}
     {contacting && <ContactSheet requirementId={contacting.requirement_id}

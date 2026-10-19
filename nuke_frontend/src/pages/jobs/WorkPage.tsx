@@ -12,6 +12,8 @@ import {
   JobReaders, STAGES, binds, day, gapWord, jobHref, paymentLine, quoteTotals, signKindTitle, slotWords, stageWord, stateWord, vehicleText,
   type MyWorkOrdersRead, type SignQueueItem, type SignQueueRead, type WorkOrderRow,
 } from './jobsReaders';
+import { ConfirmBookingSheet } from './PeopleSheets';
+import type { JsonObject } from './jobRead';
 import './jobs.css';
 
 function firstClock(item: SignQueueItem): string | null {
@@ -30,7 +32,8 @@ function counterpart(item: SignQueueItem): React.ReactNode {
   return p.label ? <>From {p.label}</> : null;
 }
 
-function QueueItem({ item }: { item: SignQueueItem }) {
+function QueueItem({ item, onSigned }: { item: SignQueueItem; onSigned: () => void }) {
+  const [confirming, setConfirming] = useState(false);
   const title = item.display_title || vehicleText(item.vehicle_label) || 'Untitled';
   const detail = [vehicleText(item.vehicle_label) !== title ? vehicleText(item.vehicle_label) : null, firstClock(item)].filter(Boolean).join(' · ');
   const amount = paymentLine(item);
@@ -51,7 +54,10 @@ function QueueItem({ item }: { item: SignQueueItem }) {
     {amount && <Text role="measure" dense>{amount}</Text>}
     {b.length > 0 && <div className="jb-says"><Text role="label">Signing says</Text><ul>{b.map(s => <li key={s}><Text role="body">{s}</Text></li>)}</ul></div>}
     {nb.length > 0 && <div className="jb-says"><Text role="label">It does not say</Text><ul>{nb.map(s => <li key={s}><Text role="body">{s}</Text></li>)}</ul></div>}
-    {item.work_order_id && <Text role="caption">Sign on the job page.</Text>}
+    {item.kind === 'facility_reservation_to_confirm'
+      ? <div className="jb-actions"><button type="button" className="btn-base btn-sm btn-primary" onClick={() => setConfirming(true)}><Text role="label">Confirm booking</Text></button></div>
+      : item.work_order_id && <Text role="caption">Sign on the job page.</Text>}
+    {confirming && <ConfirmBookingSheet item={item as unknown as JsonObject} onClose={() => setConfirming(false)} onDone={onSigned} />}
   </li>;
 }
 
@@ -83,21 +89,26 @@ const WorkPage: React.FC = () => {
     setJobRows(prev => (after ? [...prev, ...r.data.rows] : r.data.rows));
   }, []);
 
-  useEffect(() => {
+  const loadQueue = useCallback(() => {
     void JobReaders.signatureQueue().then(r => { if (r.refusal) setRefusal(r.refusal.message); else setQueue(r.data); });
+  }, []);
+
+  useEffect(() => {
+    loadQueue();
     void loadJobs(null);
-  }, [loadJobs]);
+  }, [loadJobs, loadQueue]);
 
   return <main className="jb-page jb-scope">
     <div className="jb-intro">
       <Text role="entity" as="h1">Work</Text>
       <Text role="body">What is waiting for your signature, and the jobs you are on. <PrefetchLink to="/jobs">Jobs looking for someone</PrefetchLink></Text>
+      <Text role="body"><PrefetchLink to="/work/setup">Set up your provider page</PrefetchLink> so jobs that fit can find you.</Text>
     </div>
     {refusal && <Text role="body" className="jb-warn">{refusal}</Text>}
     {queue && <Section title="Waiting for your signature" coverage={{ n: queue.coverage.returned, of: queue.coverage.total, grain: 'items', as_of: queue.as_of }}>
       {queue.items.length === 0
         ? <Text role="body">Nothing is waiting for your signature.</Text>
-        : <ul className="jb-list">{queue.items.map(i => <QueueItem key={`${i.kind}:${i.ref_id}`} item={i} />)}</ul>}
+        : <ul className="jb-list">{queue.items.map(i => <QueueItem key={`${i.kind}:${i.ref_id}`} item={i} onSigned={loadQueue} />)}</ul>}
     </Section>}
     {jobs && <Section title="Your jobs" coverage={{ n: jobRows.length, of: jobs.coverage.total_for_viewer, grain: 'jobs', as_of: jobs.as_of }}>
       {jobRows.length === 0

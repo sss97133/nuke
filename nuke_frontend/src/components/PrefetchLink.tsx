@@ -37,8 +37,12 @@ const CHUNK_MAP: { test: (href: string) => boolean; load: () => Promise<unknown>
     load: () => import('../pages/stacks/StacksIndex') },
   { test: (h) => h === '/jobs' || h === '/jobs/',
     load: () => import('../pages/jobs/JobsBoard') },
+  { test: (h) => h === '/messages' || h.startsWith('/messages/'),
+    load: () => import('../pages/messages/MessagesPage') },
   { test: (h) => h === '/work' || h === '/work/',
     load: () => import('../pages/jobs/WorkPage') },
+  { test: (h) => h === '/work/setup',
+    load: () => import('../pages/provider-setup/ProviderSetupPage') },
 ];
 
 function resolveChunk(href: string): (() => Promise<unknown>) | null {

@@ -29,7 +29,7 @@ scratch paths are translated only into the fixture namespace; tests never touch 
 
 | Check | Type | Baseline (2026-07-12) | Notes |
 |---|---|---|---|
-| frontend typecheck (`tsc --noEmit`) | **gate** | must be clean | hard fail if red |
+| frontend typecheck (`npm run type-check` = `scripts/ci/typecheck-ratchet.mjs`: tsc on `tsconfig.app.json` and `tsconfig.node.json`) | **ratchet**, per file | `scripts/ci/typecheck-baseline.json` (554 errors in 178 files, 2026-10-19) | fails when any file's error count rises or a file not in the baseline has errors; a clean local run lowers the baseline (commit it), CI only reports. Incremental build info in `nuke_frontend/.tsbuild/`. `npm run type-check:full` prints every error. Before 2026-10-19 `tsc --noEmit` ran on the solution tsconfig (`files: []`) and checked nothing. |
 | `no-dead-asset-references` (ghost tables/fns on live paths) | **ratchet** | 18 | 12 webhooks (pending strip) + 6 guarded `vehicle_transactions` |
 | `no-committed-secrets` | **gate** | 0 | any hit fails ENFORCE; WARN reports without blocking |
 | `no-raw-fetch` (must use `archiveFetch`) | **ratchet** | 144 | burn down opportunistically |

@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { Text } from '../../kit';
-import { obj, signFailure, str, type JsonObject } from '../jobs/jobRead';
+import { obj, str, type JsonObject } from '../jobs/jobRead';
+import { leftTodayText, refusal, requestsLeft } from '../jobs/signDrafts';
+import { readJob } from '../jobs/readJob';
 
 type Phase = 'idle' | 'writing' | 'confirming' | 'sending' | 'sent';
 
@@ -15,6 +17,14 @@ export function ContactViaNuke({ contact, signedIn, recipient }: { contact: Json
   const [phase, setPhase] = useState<Phase>('idle');
   const [message, setMessage] = useState('');
   const [failure, setFailure] = useState<string | null>(null);
+  const [left, setLeft] = useState<number | null>(null);
+  const open = signedIn && contact?.available === true;
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    readJob('my_contact_requests', {}).then(l => { if (!cancelled && l.status === 'loaded') setLeft(requestsLeft(l.data)); });
+    return () => { cancelled = true; };
+  }, [open]);
   if (!contact) return null;
   const request = obj(contact.request);
 
@@ -41,13 +51,16 @@ export function ContactViaNuke({ contact, signedIn, recipient }: { contact: Json
       p_recipient_actor_id: recipientUser ? null : str(request.recipient_actor_id),
       p_recipient_organization_id: null,
     });
-    if (error) { setFailure(signFailure(error)); setPhase('confirming'); return; }
+    if (error) { setFailure(refusal(error)); setPhase('confirming'); return; }
     setPhase('sent');
   };
 
-  if (phase === 'sent') return <Text role="body" as="p">Request sent. You'll see their answer in your contact requests.</Text>;
+  if (phase === 'sent') return <Text role="body" as="p">Request sent in Nuke. Their answer shows in <a className="job-link" href="/messages">Messages</a>. Your email and phone are never shared.</Text>;
   if (phase === 'idle') {
-    return <button type="button" className="job-button" onClick={() => setPhase('writing')}><Text role="label">Contact via Nuke</Text></button>;
+    return <div className="job-block">
+      <button type="button" className="job-button" disabled={left === 0} onClick={() => setPhase('writing')}><Text role="label">Contact via Nuke</Text></button>
+      {leftTodayText(left) && <Text role="caption" as="p">{leftTodayText(left)}</Text>}
+    </div>;
   }
   return <div className="job-sign" role="group" aria-label="Contact via Nuke">
     <label className="job-block">

@@ -10,6 +10,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useSearchParams } from 'react-router-dom';
+import { useAuth } from '../hooks/useAuth';
 import {
   useWorkOrderStatement,
   type PartRow,
@@ -43,7 +44,7 @@ const ContactViaNuke: React.FC<{ style?: React.CSSProperties }> = ({ style }) =>
   <button type="button" disabled title="Contact requests are brokered by Nuke; not available yet" style={{ cursor: 'not-allowed', opacity: 0.6, ...style }}>CONTACT VIA NUKE</button>
 );
 
-const InvoiceView: React.FC<{ data: any; onEdit: () => void; theme: InvoiceTheme; onThemeChange: (t: InvoiceTheme) => void }> = ({ data, onEdit, theme, onThemeChange }) => {
+const InvoiceView: React.FC<{ data: any; onEdit?: () => void; theme: InvoiceTheme; onThemeChange: (t: InvoiceTheme) => void }> = ({ data, onEdit, theme, onThemeChange }) => {
   const vehicleTitle = [data.vehicle.year, data.vehicle.make, data.vehicle.model].filter(Boolean).join(' ');
   const invoiceDate = fmtDate(new Date().toISOString());
   const invoiceNum = `INV-${(data.vehicle.model || 'VEH').replace(/\s+/g, '').toUpperCase().slice(0, 6)}-${new Date().toISOString().slice(2, 10).replace(/-/g, '')}`;
@@ -317,7 +318,7 @@ const InvoiceView: React.FC<{ data: any; onEdit: () => void; theme: InvoiceTheme
 
           {/* Action bar */}
           <div className="no-print" style={{ display: 'flex', gap: '8px', marginTop: '16px', paddingTop: '12px', borderTop: '1px solid #7B96B0' }}>
-            <button onClick={onEdit} style={{ padding: '8px 16px', fontSize: '9px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', border: '1px solid #7B96B0', background: 'transparent', color: '#4a6080', cursor: 'pointer', fontFamily: 'Arial' }}>EDIT</button>
+            {onEdit && <button onClick={onEdit} style={{ padding: '8px 16px', fontSize: '9px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', border: '1px solid #7B96B0', background: 'transparent', color: '#4a6080', cursor: 'pointer', fontFamily: 'Arial' }}>EDIT</button>}
             <button onClick={() => window.print()} style={{ padding: '8px 16px', fontSize: '9px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', border: '2px solid #1a3050', background: 'transparent', color: '#1a3050', cursor: 'pointer', fontFamily: 'Arial' }}>PRINT</button>
             <ContactViaNuke style={{
               flex: 1, padding: '8px 16px', fontSize: '9px', fontWeight: 700, textTransform: 'uppercase',
@@ -613,7 +614,7 @@ const InvoiceView: React.FC<{ data: any; onEdit: () => void; theme: InvoiceTheme
 
         {/* Action bar — not printed */}
         <div style={T.actionBar} className="no-print">
-          <button onClick={onEdit} style={T.editBtn}>EDIT</button>
+          {onEdit && <button onClick={onEdit} style={T.editBtn}>EDIT</button>}
           <button onClick={() => window.print()} style={T.printBtn}>PRINT</button>
           <ContactViaNuke style={{ ...T.sendBtn, background: '#1a1a1a' }} />
         </div>
@@ -917,7 +918,7 @@ const CellEditor: React.FC<CellEditorProps> = ({ value, type = 'text', format = 
   const [editValue, setEditValue] = useState(value ?? '');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-  const saveRef = useRef<NodeJS.Timeout>();
+  const saveRef = useRef<NodeJS.Timeout | undefined>(undefined);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { setEditValue(value ?? ''); }, [value]);
@@ -1141,6 +1142,7 @@ const WorkOrderStatement: React.FC = () => {
   const query = workOrderId ? `wo:${workOrderId}` : vehicleId ? `vehicle:${vehicleId}` : handle ? `handle:${handle}` : q || null;
   const [mode, setMode] = useState<'invoice' | 'edit'>('invoice');
   const [theme, setTheme] = useState<InvoiceTheme>('classic');
+  const { user } = useAuth();
 
   const { data, matches, loading, error, updateField, addRow, deleteRow, toggleComp } = useWorkOrderStatement(query);
 
@@ -1159,11 +1161,11 @@ const WorkOrderStatement: React.FC = () => {
   }
   if (error || !data) return <div style={center}>{error || 'No statement found for this lookup'}</div>;
 
-  if (mode === 'edit') {
+  if (mode === 'edit' && user) {
     return <EditView data={data} updateField={updateField} addRow={addRow} deleteRow={deleteRow} toggleComp={toggleComp} onInvoice={() => setMode('invoice')} />;
   }
 
-  return <InvoiceView data={data} onEdit={() => setMode('edit')} theme={theme} onThemeChange={setTheme} />;
+  return <InvoiceView data={data} onEdit={user ? () => setMode('edit') : undefined} theme={theme} onThemeChange={setTheme} />;
 };
 
 export default WorkOrderStatement;

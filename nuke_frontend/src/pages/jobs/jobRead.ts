@@ -333,18 +333,20 @@ export type JobAction = {
   doesNotBind: string[];
   termsBasis: string | null;
   label: string | null;
+  /** The whole action object, for hints a step carries beyond rpc and args (vocabularies, acting_for, facilities). */
+  raw: JsonObject;
 };
 
 export type Viewer = { context: string; slots: string[]; moneyVisible: boolean; party: boolean; actions: JobAction[]; issuerActions: JobAction[] };
 
 export function parseAction(raw: unknown): JobAction | null {
-  if (typeof raw === 'string') return { kind: raw, rpc: null, args: {}, binds: [], doesNotBind: [], termsBasis: null, label: null };
+  if (typeof raw === 'string') return { kind: raw, rpc: null, args: {}, binds: [], doesNotBind: [], termsBasis: null, label: null, raw: {} };
   const o = obj(raw);
   const kind = str(o?.action) ?? str(o?.kind);
   if (!o || !kind) return null;
   const binds = typeof o.binds === 'string' ? [o.binds] : strings(o.binds);
   return { kind, rpc: str(o.rpc), args: obj(o.args) ?? {}, binds, doesNotBind: strings(o.does_not_bind),
-    termsBasis: str(o.terms_basis), label: str(o.label) };
+    termsBasis: str(o.terms_basis), label: str(o.label), raw: o };
 }
 
 export const parseActions = (raw: unknown): JobAction[] => arr(raw).map(parseAction).filter((a): a is JobAction => a !== null);
@@ -372,15 +374,16 @@ const WEB_SIGNS: Record<string, string> = {
   accept_offer: 'accept_offer',
   withdraw_offer: 'withdraw_offer',
   cancel_facility_reservation: 'cancel_facility_reservation',
+  withdraw_vouch: 'withdraw_vouch',
 };
 
 export const isWebSign = (a: JobAction): boolean => !!a.rpc && WEB_SIGNS[a.kind] === a.rpc;
 
 const ACTION_TITLES: Record<string, string> = {
   start_work: 'Start work', accept_quote: 'Accept quote', accept_offer: 'Accept offer', withdraw_offer: 'Withdraw your offer',
-  cancel_facility_reservation: 'Cancel your booking request', reserve_facility: 'Book shop space', pay_invoice: 'Pay invoice',
-  issue_quote: 'Issue a quote', issue_change_order: 'Issue a change order', offer: 'Make an offer', cosign_provider: 'Co-sign a technician',
-  record_findings: 'Record inspection findings', grant_inspection_access: 'Let an inspector see the vehicle',
+  cancel_facility_reservation: 'Cancel your booking request', withdraw_vouch: 'Withdraw your vouch', reserve_facility: 'Book a bay', pay_invoice: 'Pay invoice',
+  issue_quote: 'Issue a quote', issue_change_order: 'Issue a change order', offer: 'Make an offer', cosign_provider: 'Co-sign this technician',
+  record_findings: 'Record inspection findings', grant_inspection_access: 'Let an inspector see your car',
   attach_evidence: 'Attach photos to this job', issue_invoice: 'Issue an invoice', record_payment: 'Record a payment',
   attest_completion: 'Mark the work done', accept_completion: 'Confirm the work is done',
 };
@@ -393,6 +396,19 @@ const SAYS: Record<string, string[]> = {
   accept_offer: ['This provider does this work on exactly these terms, including their current co-signs, pinned by hash.'],
   withdraw_offer: ['Your offer is withdrawn. The record that you offered stays.'],
   cancel_facility_reservation: ['You cancel your booking request for this window.'],
+  withdraw_vouch: ['Your vouch stops showing. The record that you vouched stays.'],
+  issue_quote: ['You offer to do this work at these prices, for this job.', 'The customer must accept it before anything is booked or paid.'],
+  issue_change_order: ['The work changes as listed, for the reason you give.'],
+  attest_completion: ['You say the work is done, against the accepted quote or the job as described now.'],
+  accept_completion: ['You confirm the technician finished this work, as they marked it.'],
+  issue_invoice: ['You bill the customer for these lines on this job.'],
+  record_payment: ['You state that this payment was made, as you describe it.'],
+  cosign_provider: ['You vouch for this technician within the scope you write.'],
+  reserve_facility: ['You ask the shop for this space in this window.'],
+  confirm_booking: ['You confirm the space for this window; it now holds capacity.'],
+  vouch: ['You vouch for this person within the scope you write.'],
+  record_findings: ['Your findings as the accepted inspector, item by item against the checklist.'],
+  attach_evidence: ['These photos of yours document this job.'],
 };
 const DOES_NOT_SAY: Record<string, string[]> = {
   start_work: ['completion', 'schedule', 'payment'],
@@ -400,6 +416,19 @@ const DOES_NOT_SAY: Record<string, string[]> = {
   accept_offer: ['payment', 'completion', 'other requirements'],
   withdraw_offer: ['anything about other offers'],
   cancel_facility_reservation: ['payment'],
+  withdraw_vouch: ['anything about their work'],
+  issue_quote: ['that the work is booked', 'payment (a deposit here is only requested)', 'that this is final (a new version replaces it)'],
+  issue_change_order: ['that the customer agrees (they accept it like a quote)', 'payment', 'that the earlier acceptance still covers the job'],
+  attest_completion: ['that the customer agrees', 'payment', 'an invoice'],
+  accept_completion: ['payment', 'release of money to anyone'],
+  issue_invoice: ['that anything was paid', 'collection'],
+  record_payment: ['that money moved through Nuke', 'refund or release'],
+  cosign_provider: ['skill proof (a co-sign is not skill evidence)', 'payment until the customer accepts the offer'],
+  reserve_facility: ['payment', 'vehicle access', 'the shop’s confirmation'],
+  confirm_booking: ['payment', 'vehicle access'],
+  vouch: ['skill proof (a vouch is not skill evidence)', 'any job, payment or booking'],
+  record_findings: ['a price', 'approval of the work', "the seller's permission"],
+  attach_evidence: ['who can see the photos or who owns them', 'completion', 'payment'],
 };
 const NOT_SAY_WORDS: Record<string, string> = {
   completion: 'That the work is done',
