@@ -1,0 +1,22 @@
+{
+  "about": "Personal-looking columns that anon or authenticated may read through an open path, each with the reason it is public. Read by scripts/guardrails/no-pii-exposure.mjs. Reviewed 2026-10-19 (SEC3) against live; populations are dated counts. audience omitted = both anon and authenticated.",
+  "entries": [
+    { "table": "organizations", "columns": ["address", "email", "latitude", "longitude", "legal_name", "phone", "zip_code"], "why": "Business contact details and location of organizations (businesses), public by doctrine; tax_id is withheld by column grant (20261020141000)." },
+    { "table": "businesses", "columns": ["address", "email", "latitude", "longitude", "legal_name", "phone", "zip_code"], "why": "Compatibility view over organizations; same business contact details." },
+    { "table": "organizations_compat", "columns": ["address", "email", "latitude", "longitude", "phone", "zip"], "why": "Compatibility view over organizations; same business contact details." },
+    { "table": "organization_locations", "columns": ["email", "latitude", "longitude", "phone", "street_address", "zip_code"], "why": "Business locations (shops, dealers) shown on organization pages and the map." },
+    { "table": "organization_images", "columns": ["exif_data", "latitude", "longitude"], "why": "Photos an organization publishes of its own premises and work; location is the business's." },
+    { "table": "tool_brands", "columns": ["support_email", "support_phone"], "why": "Manufacturer support contacts, published by the brands." },
+    { "table": "concierge_supply_stbarth", "columns": ["phone"], "why": "Hospitality supply listings (villas, services) with their public business phone." },
+    { "table": "business_related_persons", "columns": ["business_zip_code", "full_legal_name"], "why": "Officers and 20%+ owners disclosed for an offering (SEC Form C requires this public); 1 row, the issuer's own officer, business address only." },
+    { "table": "vehicle_display_names", "columns": ["full_name"], "why": "A vehicle's display name (year make model), not a person." },
+    { "table": "vehicle_full_name", "columns": ["full_name"], "why": "A vehicle's full name (year make model trim), not a person." },
+    { "table": "vehicle_zip_stats", "columns": ["zip_code"], "why": "Aggregate vehicle counts per ZIP code; no row identifies a person." },
+    { "table": "ghost_users", "columns": ["device_fingerprint"], "why": "Unclaimed source identities keyed by public profile URL (e.g. auction handles); 171 rows, no device serials (2026-10-19)." },
+    { "table": "image_tags", "columns": ["exif_data"], "why": "Camera settings on tagged images; no location keys in a 5% sample (0 of 109, 2026-10-19)." },
+    { "table": "shoppable_tags_with_suppliers", "columns": ["exif_data"], "why": "View over image_tags; same camera settings, no location." },
+    { "table": "org_mention_queue", "columns": ["extracted_phone"], "why": "Business phones extracted from organization mentions; 0 populated (2026-10-19). Residual: a writer that fills it with personal numbers would publish them." },
+    { "table": "vehicle_views", "columns": ["ip_address"], "why": "0 populated of 13,310 (2026-10-19); the view counter does not record addresses. Residual: a writer that starts recording them would publish them (policy view_select is true)." },
+    { "table": "timeline_events", "columns": ["location_address"], "why": "0 populated in a 2% sample (25,876 rows, 2026-10-19). The table-wide 'Public can view all timeline events' (true) policy is an open owner decision (design-trunk, 2026-10-13)." }
+  ]
+}
