@@ -307,6 +307,8 @@ ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS created_at timestamptz DEFA
 
 \echo REPLAY 20261019235000_capability_fold.sql
 \ir ../migrations/20261019235000_capability_fold.sql
+\echo REPLAY 20261019235300_provider_profile_derived_capabilities.sql
+\ir ../migrations/20261019235300_provider_profile_derived_capabilities.sql
 -- Plan check and final state.
 \set replay_problems `scripts/ci/job-loop-replay-check.sh | tr '\n' ' '`
 SELECT t_assert(btrim(:'replay_problems') = '', 'replay plan covers the build in filename order: ' || COALESCE(NULLIF(btrim(:'replay_problems'), ''), 'ok'));
