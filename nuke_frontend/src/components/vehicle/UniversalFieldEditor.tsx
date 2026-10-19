@@ -39,7 +39,7 @@ export const UniversalFieldEditor: React.FC<UniversalFieldEditorProps> = ({
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
-  const saveTimeoutRef = useRef<NodeJS.Timeout>();
+  const saveTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
   const inputRef = useRef<HTMLInputElement | HTMLSelectElement>(null);
 
   // Auto-save with debounce

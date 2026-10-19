@@ -918,7 +918,7 @@ const CellEditor: React.FC<CellEditorProps> = ({ value, type = 'text', format = 
   const [editValue, setEditValue] = useState(value ?? '');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-  const saveRef = useRef<NodeJS.Timeout>();
+  const saveRef = useRef<NodeJS.Timeout | undefined>(undefined);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { setEditValue(value ?? ''); }, [value]);

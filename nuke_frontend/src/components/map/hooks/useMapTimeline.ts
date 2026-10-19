@@ -14,7 +14,7 @@ export function useMapTimeline(viewState: MapViewState, minConfidence: number) {
   const [timeStart, setTimeStart] = useState<string | undefined>(undefined);
   const [timeEnd, setTimeEnd] = useState<string | undefined>(undefined);
   const [loading, setLoading] = useState(false);
-  const timerRef = useRef<ReturnType<typeof setTimeout>>();
+  const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   // Fetch histogram when viewport changes
   const fetchBuckets = useCallback(() => {

@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { ImageSet, ImageSetService } from '../../services/imageSetService';
+import { type ImageSet, ImageSetService } from '../../services/imageSetService';
 import { supabase } from '../../lib/supabase';
 
 interface ImageSetModalProps {

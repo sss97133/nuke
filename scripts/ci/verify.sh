@@ -75,7 +75,7 @@ ratchet(){ # name current baseline
 echo "── Nuke CI gate ($([ "$ENFORCE" = 1 ] && echo ENFORCE || echo warn) mode) ──"
 
 echo "• frontend typecheck…"
-if (cd "$ROOT/nuke_frontend" && npm run type-check >"$CI_TMP_DIR/ci_tc.out" 2>&1); then grn "  ✓ typecheck clean"
+if (cd "$ROOT/nuke_frontend" && npm run type-check >"$CI_TMP_DIR/ci_tc.out" 2>&1); then grn "  ✓ typecheck clean (no file gained errors against scripts/ci/typecheck-baseline.json)"
 else red "  ✗ typecheck FAILED"; tail -15 "$CI_TMP_DIR/ci_tc.out"; fail=1; fi
 
 if [ "${CI_BUILD:-0}" = 1 ]; then
@@ -96,6 +96,8 @@ if node --test "$ROOT/scripts/ci/invalid-indexes.test.mjs" >"$CI_TMP_DIR/ci_inva
 else red "  ✗ invalid-index detector contract FAILED"; cat "$CI_TMP_DIR/ci_invalid_indexes_tests.out"; fail=1; fi
 if node --test "$ROOT/scripts/ci/owner-writable-views.test.mjs" >"$CI_TMP_DIR/ci_owner_writable_views_tests.out" 2>&1; then grn "  ✓ owner-writable view detector contract"
 else red "  ✗ owner-writable view detector contract FAILED"; cat "$CI_TMP_DIR/ci_owner_writable_views_tests.out"; fail=1; fi
+if node --test "$ROOT/scripts/ci/typecheck-ratchet.test.mjs" >"$CI_TMP_DIR/ci_typecheck_ratchet_tests.out" 2>&1; then grn "  ✓ typecheck ratchet contract"
+else red "  ✗ typecheck ratchet contract FAILED"; cat "$CI_TMP_DIR/ci_typecheck_ratchet_tests.out"; fail=1; fi
 if node --test "$ROOT/scripts/discovery/buying-evidence.test.mjs" "$ROOT/scripts/discovery/buying-evidence-matching.test.mjs" "$ROOT/scripts/discovery/buying-evidence-plan.test.mjs" >"$CI_TMP_DIR/ci_buying_evidence_tests.out" 2>&1; then grn "  ✓ buying-evidence source, matching, plan and refusal contracts"
 else red "  ✗ buying-evidence source and refusal contracts FAILED"; cat "$CI_TMP_DIR/ci_buying_evidence_tests.out"; fail=1; fi
 ratchet "ghost-refs"       "$(count_ghost)"     "$(b no-dead-asset-references errors)"
