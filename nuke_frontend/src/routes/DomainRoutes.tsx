@@ -2,6 +2,7 @@
 import React, { Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { ProtectedRoute } from '../components/auth/ProtectedRoute';
+import { warmJobRoute } from '../pages/jobs/jobWarm';
 
 // Static pages (footer/legal) — lazy-loaded since rarely visited
 const About = React.lazy(() => import('../pages/About'));
@@ -120,7 +121,11 @@ const TransferPartyPage = React.lazy(() => import('../pages/TransferPartyPage'))
 const BuildDashboard = React.lazy(() => import('../pages/BuildDashboard'));
 
 // Jobs and providers — open job path readers; party money and personal fields withheld at the source
-const JobPage = React.lazy(() => import('../pages/jobs/JobPage'));
+// The job path read starts while JobPage's chunk downloads (pages/jobs/jobWarm.ts); JobPage takes it once.
+const JobPage = React.lazy(() => {
+  if (typeof window !== 'undefined') warmJobRoute(window.location.pathname);
+  return import('../pages/jobs/JobPage');
+});
 const ProviderProfilePage = React.lazy(() => import('../pages/providers/ProviderProfilePage'));
 const MessagesPage = React.lazy(() => import('../pages/messages/MessagesPage'));
 const SupplierInvitePage = React.lazy(() => import('../pages/orgs/SupplierInvitePage'));
