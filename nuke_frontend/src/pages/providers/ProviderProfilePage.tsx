@@ -13,6 +13,7 @@ import {
   technicianLinkOf, toolCategories,
 } from './providerRead';
 import { ContactViaNuke } from './ContactViaNuke';
+import { setupIncomplete } from '../provider-setup/setupReaders';
 import '../jobs/job-page.css';
 
 type Subject = { p_user_id: string } | { p_actor_id: string };
@@ -276,6 +277,7 @@ export default function ProviderProfilePage() {
         <Text role="caption">{technicianLinkOf(str(bridge?.state), isSelf)}</Text>
         {evidencedHandle && <PrefetchLink className="job-link" to={`/providers/${encodeURIComponent(evidencedHandle)}`}><Text role="body">Open @{evidencedHandle}'s provider page</Text></PrefetchLink>}
         {s?.kind === 'user' && str(s.handle) && <PrefetchLink className="job-link" to={`/u/${encodeURIComponent(str(s.handle)!)}`}><Text role="body">Open their profile</Text></PrefetchLink>}
+        {isSelf && setupIncomplete(data) && <PrefetchLink className="job-link" to="/work/setup"><Text role="body">Finish setting up your provider page</Text></PrefetchLink>}
       </div>
     </Masthead>
 
