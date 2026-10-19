@@ -13,6 +13,9 @@ INSERT INTO equipment(id,shop_id,name,category,status,source) VALUES
 INSERT INTO organization_images VALUES ('a5000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','10000000-0000-0000-0000-00000000000e');
 INSERT INTO organization_contributors(organization_id,user_id,role,status) VALUES
  ('20000000-0000-0000-0000-000000000001','10000000-0000-0000-0000-00000000000d','technician','active');
+CREATE TRIGGER shop_licenses_update_shop_timestamp AFTER INSERT OR UPDATE ON public.shop_licenses FOR EACH ROW EXECUTE FUNCTION public.update_shop_timestamp();
+CREATE TRIGGER trg_audit_shop_licenses AFTER INSERT OR DELETE OR UPDATE ON public.shop_licenses FOR EACH ROW EXECUTE FUNCTION public.trg_audit_shop_licenses();
+SELECT t_assert(t_refused_with($q$UPDATE shop_licenses SET is_active=true$q$,'does not exist'),'as live: shop_licenses writes fail on dead triggers before the migration');
 \ir ../migrations/20261019224000_facility_assets.sql
 
 SELECT t_assert((SELECT shop_id='20000000-0000-0000-0000-000000000001' AND notes IS NULL FROM equipment WHERE id='a4000000-0000-0000-0000-000000000001')
@@ -36,6 +39,9 @@ SELECT as_user('10000000-0000-0000-0000-00000000000e');
 INSERT INTO shop_licenses(shop_id,license_type,license_number) VALUES ('20000000-0000-0000-0000-000000000001','business_license','FIXTURE-BL-1');
 SELECT t_assert((SELECT count(*) FROM shop_licenses)=2,'owner writes and reads licenses');
 RESET ROLE;
+SELECT t_assert((SELECT count(*) FROM org_audit_log WHERE entity_table='shop_licenses')>=3
+ AND (SELECT count(*) FROM org_audit_log WHERE entity_table='shop_licenses' AND action='update' AND shop_id IS NULL)=1
+ AND NOT has_table_privilege('authenticated','public.org_audit_log','SELECT'),'repaired triggers: license writes audited (repoint update included), audit table closed to users');
 
 -- Declaring assets.
 SET ROLE authenticated;

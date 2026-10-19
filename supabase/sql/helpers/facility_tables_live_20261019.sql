@@ -27,6 +27,37 @@ END $$;
 CREATE FUNCTION public.is_shop_admin(p_shop_id uuid) RETURNS boolean LANGUAGE sql STABLE AS 'SELECT false';
 CREATE FUNCTION public.is_shop_member(p_shop_id uuid) RETURNS boolean LANGUAGE sql STABLE AS 'SELECT false';
 CREATE FUNCTION public.is_shop_owner(p_shop_id uuid) RETURNS boolean LANGUAGE sql STABLE AS 'SELECT false';
+-- Live triggers on shop_licenses as of 2026-10-19: both reference tables that do not exist (shops, org_audit_log).
+CREATE FUNCTION public.update_shop_timestamp() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  UPDATE shops SET updated_at = NOW() WHERE id = NEW.shop_id;
+  RETURN NEW;
+END $$;
+CREATE FUNCTION public.fn_org_audit_record(p_shop_id uuid, p_action text, p_entity_table text, p_entity_id uuid, p_changes jsonb)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path TO '' AS $$
+BEGIN
+  INSERT INTO public.org_audit_log (shop_id, actor_user_id, action, entity_table, entity_id, changes)
+  VALUES (p_shop_id, auth.uid(), p_action, p_entity_table, p_entity_id, COALESCE(p_changes, '{}'::jsonb));
+END $$;
+CREATE FUNCTION public.trg_audit_shop_licenses() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE ch jsonb;
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+    ch := to_jsonb(NEW) - 'updated_at';
+    PERFORM public.fn_org_audit_record(NEW.shop_id, 'insert', 'shop_licenses', NEW.id, ch);
+    RETURN NEW;
+  ELSIF TG_OP = 'UPDATE' THEN
+    ch := jsonb_strip_nulls(to_jsonb(NEW) - 'updated_at') - 'created_at';
+    PERFORM public.fn_org_audit_record(NEW.shop_id, 'update', 'shop_licenses', NEW.id, ch);
+    RETURN NEW;
+  ELSIF TG_OP = 'DELETE' THEN
+    ch := to_jsonb(OLD) - 'updated_at';
+    PERFORM public.fn_org_audit_record(OLD.shop_id, 'delete', 'shop_licenses', OLD.id, ch);
+    RETURN OLD;
+  END IF;
+  RETURN NULL;
+END $$;
+ALTER TABLE public.organizations ADD COLUMN IF NOT EXISTS updated_at timestamptz;
 ALTER TABLE public.equipment ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.shop_licenses ENABLE ROW LEVEL SECURITY;
 CREATE POLICY shop_licenses_admin_delete ON public.shop_licenses FOR DELETE TO authenticated USING (public.is_shop_admin(shop_id));
