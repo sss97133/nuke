@@ -362,6 +362,8 @@ ALTER TABLE public.observation_sources ADD COLUMN IF NOT EXISTS display_name tex
 \ir helpers/capability_keys_live_20261020.sql
 \echo REPLAY 20261020060000_requirement_capability_keys.sql
 \ir ../migrations/20261020060000_requirement_capability_keys.sql
+\echo REPLAY 20261020071500_work_order_provider_place_read.sql
+\ir ../migrations/20261020071500_work_order_provider_place_read.sql
 \ir helpers/catalog_tables_live_20261020.sql
 \echo REPLAY 20261020074500_work_order_part_product_matches.sql
 \ir ../migrations/20261020074500_work_order_part_product_matches.sql
