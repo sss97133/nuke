@@ -1,5 +1,7 @@
 /**
- * stripe-webhook — fulfills Stripe checkouts by crediting the AI credit ledger.
+ * stripe-webhook — fulfills Stripe checkouts: credit purchases credit the AI credit ledger; work order invoice
+ * payments are recorded through record_work_order_processor_payment (_shared/stripeCheckoutRouting.ts decides which;
+ * any other purchase_type is ignored, never credited).
  *
  * This is the missing funding-in wire: `create-api-access-checkout` opens a Stripe
  * Checkout with `metadata.user_id` (+ `amount_cents` for wallet top-ups), but until
@@ -22,6 +24,7 @@ import Stripe from "npm:stripe@14.11.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
 import { creditCents } from "../_shared/aiCredits.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { type CheckoutSessionLike, routeCheckoutSession } from "../_shared/stripeCheckoutRouting.ts";
 
 const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") ?? "", { apiVersion: "2023-10-16" });
 
@@ -66,12 +69,27 @@ Deno.serve(async (req) => {
   const supabase = svc();
 
   try {
-    if (event.type === "checkout.session.completed") {
+    if (event.type === "checkout.session.completed" || event.type === "checkout.session.async_payment_succeeded") {
       const session = event.data.object as Stripe.Checkout.Session;
-      const userId = session.metadata?.user_id ?? session.client_reference_id ?? null;
+      const route = routeCheckoutSession(event, session as unknown as CheckoutSessionLike);
+      if (route.kind === "work_order_invoice") {
+        const { data, error } = await supabase.rpc("record_work_order_processor_payment", { p: route.payload });
+        if (error) {
+          // Validation refusals (22023 bad input, 23514 no matching invoice version) never succeed on retry.
+          if (error.code === "22023" || error.code === "23514") {
+            console.warn(`[stripe-webhook] invoice payment refused for session ${session.id}: ${error.message}`);
+            return ok();
+          }
+          throw new Error(error.message);
+        }
+        console.log(`[stripe-webhook] invoice payment ${data?.duplicate ? "already recorded" : "recorded"} (event ${event.id})`);
+        return ok();
+      }
+      if (route.kind === "ignore") { console.warn(`[stripe-webhook] ${route.reason} (session ${session.id})`); return ok(); }
+      if (event.type !== "checkout.session.completed") return ok();
+      const userId = route.userId;
       const cents = centsFromSession(session);
 
-      if (!userId) { console.warn("[stripe-webhook] no user_id on session", session.id); return ok(); }
       if (cents <= 0) { console.warn("[stripe-webhook] zero credit amount", session.id); return ok(); }
       if (await alreadyProcessed(supabase, event.id)) return ok(); // idempotent
 
