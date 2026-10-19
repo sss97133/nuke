@@ -7,7 +7,7 @@ import type { CountyLayerData } from './layers/countyLayer';
 import type { StateLayerData } from './hooks/useStateData';
 import { fetchMakeHeatmap } from './mapService';
 import {
-  COUNTY_NAMES, STATE_FIPS, COLORWAY_IDS,
+  COUNTY_NAMES, STATE_FIPS, COLORWAY_IDS, BASEMAP_ATTRIBUTION, BASEMAP_MAX_NATIVE_ZOOM,
   type Colorway, type ColorwayId, type DrillLevel,
   countyColor, zoomToLevel,
 } from './shared';
@@ -383,12 +383,16 @@ export default function ChoroplethMap({ countyLayerData, stateLayerData, stats, 
 
       const map = L.map(mapRef.current!, {
         center: [39, -98], zoom: 4,
-        zoomControl: false, attributionControl: false,
+        zoomControl: false, attributionControl: true,
         zoomSnap: 0, wheelDebounceTime: 40,
         zoomAnimation: false, fadeAnimation: false, markerZoomAnimation: false,
       });
 
-      const tile = L.tileLayer(colorway.tileUrl, { maxZoom: 19 }).addTo(map);
+      map.attributionControl.setPrefix(false);
+      Object.assign(map.attributionControl.getContainer()!.style, {
+        background: 'rgba(0,0,0,0.45)', color: 'rgba(255,255,255,0.45)', fontSize: '8px', fontFamily: MAP_FONT,
+      });
+      const tile = L.tileLayer(colorway.tileUrl, { maxZoom: 19, maxNativeZoom: BASEMAP_MAX_NATIVE_ZOOM, attribution: BASEMAP_ATTRIBUTION }).addTo(map);
       tileLayerRef.current = tile;
       L.control.zoom({ position: 'bottomright' }).addTo(map);
 
@@ -460,7 +464,7 @@ export default function ChoroplethMap({ countyLayerData, stateLayerData, stats, 
     const map = leafletRef.current;
     if (!map) return;
     import('leaflet').then((L) => {
-      const newTile = L.tileLayer(colorway.tileUrl, { maxZoom: 19, opacity: 0 }).addTo(map);
+      const newTile = L.tileLayer(colorway.tileUrl, { maxZoom: 19, maxNativeZoom: BASEMAP_MAX_NATIVE_ZOOM, attribution: BASEMAP_ATTRIBUTION, opacity: 0 }).addTo(map);
       let opacity = 0;
       const fadeIn = setInterval(() => {
         opacity = Math.min(1, opacity + 0.15);
