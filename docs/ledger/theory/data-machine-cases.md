@@ -1408,6 +1408,26 @@ location/casing path and physical scalar backfills remain outside this patch. De
 and locally tested here; checked merge, CI deployment, dependent folds and anonymous runtime evidence
 belong in ~/nuke-logs/model-identity-fiat-20261018/.
 
+### Daily sold movement excludes asking captures, prepared 2026-10-19 UTC
+
+The broader identity investigation found a second measurement error in the current
+family_share_movers_build(integer,integer,text) owner: its live 1D branch unions Facebook
+capture/asking rows into confirmed sold vehicle_events. The capture clock is not a sale clock,
+and a classified status or asking amount supplies neither a confirmed outcome nor sale price.
+A bounded current read found982 captures in48 hours, none with parsed_make, so this admission
+path is presently latent; it does not establish contamination of today's displayed counts.
+No fleet-wide public/eligible denominator or readiness gain is claimed.
+
+The prepared repair removes only that union and its temporary capture load. Synthetic acceptance
+first reproduces10 confirmed Ford sales plus2 asks becoming12, then proves10 sales and the exact
+sold-dollar totals,11 Ford sale bins across both windows, unchanged other7 horizons, original
+function identity/owner/ACL, preserved source rows and supporting Facebook supply, and unchanged
+low-volume fallback. Capture recency, amount and even a classified sold label cannot change the
+confirmed-sale measure. A strict whole-definition guard refuses concurrent owner edits.
+Existing upcoming capture-date semantics remain a separate gap; this repair does not certify
+those dates or restart held Facebook intake. Exact checked/deployed/runtime stages belong in
+~/nuke-logs/model-movers-sold-20261019/.
+
 ## 13. Aspiration: twenty stacks the model must be able to carry (owner, 2026-10-06)
 
 **Owner direction, 2026-10-06 23:35Z.** "This scale is where we should be starting at every session: we are combing
