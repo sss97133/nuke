@@ -80,6 +80,7 @@ const WorkOrderStatement = React.lazy(() => import('../pages/WorkOrderStatement'
 // Job loop: open requests board (public) and the signed-in work console
 const JobsBoard = React.lazy(() => import('../pages/jobs/JobsBoard'));
 const WorkPage = React.lazy(() => import('../pages/jobs/WorkPage'));
+const ProviderSetupPage = React.lazy(() => import('../pages/provider-setup/ProviderSetupPage'));
 const ImportDataPage = React.lazy(() => import('../pages/ImportDataPage'));
 const PhotoSyncPage = React.lazy(() => import('../pages/PhotoSyncPage'));
 const DailyDebrief = React.lazy(() => import('../pages/DailyDebrief'));
@@ -299,6 +300,8 @@ export const DomainRoutes = () => {
           <Route path="/work" element={<WorkPage />} />
           <Route path="/messages" element={<MessagesPage />} />
           <Route path="/messages/:requestId" element={<ContactThreadPage />} />
+          {/* Provider onboarding: suggested records, trade, area and hours, tools, client preview */}
+          <Route path="/work/setup" element={<ProviderSetupPage />} />
 
 
           {/* Settings (protected) */}

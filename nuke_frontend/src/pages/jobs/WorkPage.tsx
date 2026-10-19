@@ -102,6 +102,7 @@ const WorkPage: React.FC = () => {
     <div className="jb-intro">
       <Text role="entity" as="h1">Work</Text>
       <Text role="body">What is waiting for your signature, and the jobs you are on. <PrefetchLink to="/jobs">Jobs looking for someone</PrefetchLink></Text>
+      <Text role="body"><PrefetchLink to="/work/setup">Set up your provider page</PrefetchLink> so jobs that fit can find you.</Text>
     </div>
     {refusal && <Text role="body" className="jb-warn">{refusal}</Text>}
     {queue && <Section title="Waiting for your signature" coverage={{ n: queue.coverage.returned, of: queue.coverage.total, grain: 'items', as_of: queue.as_of }}>
