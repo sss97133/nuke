@@ -131,6 +131,7 @@ struct JobPathContent: View {
                 if let operations { JobOperationsSection(read: operations, plan: p.stages[.plan]).id("job-operations") }
                 quoteSection.id("job-quote")
                 if let offers { JobOffersSection(offers: offers, onChanged: onChanged).id("job-offers") }
+                if let offers { ProviderMatchesEntry(workOrderId: workOrderId, offers: offers, onChanged: onChanged) }
                 if let facility {
                     JobFacilitySection(workOrderId: workOrderId, facility: facility, onChanged: onChanged)
                         .id("job-facility")
