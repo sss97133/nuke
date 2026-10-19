@@ -123,6 +123,10 @@ tables and captured batches are processing diagnostics. None is a public-readine
 | Compare examples and read market movement | Declared subject × comparison question, plus its candidate episode population | Reader returns qualifying members, exclusions, unresolved candidates, source/window coverage and matching rules. Amounts, currencies, asking prices, bids and sale outcomes remain distinct. A qualified measure requires the stated evidence and uncertainty; a browse group alone is insufficient. |
 | Use a derived assessment or forecast | Eligible subject × versioned question × cutoff | Inputs and calculation are replayable; held-out evaluation against the declared baseline establishes the method's error/calibration in its intended population. Unsupported assessments stay unavailable. Shipping basic exploration does not certify an unvalidated forecast. |
 
+A confirmed-sale movement fold must admit sale outcomes on their sale clocks. A classified
+capture, asking amount or disappearance cannot enter its sale count, sold-dollar sum or sparkline;
+keep those observations available through their presentation and supply readers.
+
 These are separate capabilities with separate gates. Do not average them into a completeness
 score. A record can support attributed inspection while its valuation is blocked. An unresolved
 listing can support source history while physical-vehicle identity remains unresolved.
