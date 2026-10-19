@@ -139,7 +139,7 @@ Pipeline, each step extending an existing owner:
 9. The future receipt on the work-order spine.
 
 The smallest honest first version is the read-only `scripts/discovery/buying-evidence.mjs
---plan` report: identity conflicts first, then claims, candidate operations labelled
+--plan` report (operator contract in `scripts/discovery/buying-evidence.md`): identity conflicts first, then claims, candidate operations labelled
 `seed_uncalibrated`, the rate exactly as `resolve_labor_rate` returns it, priced parts only
 where a text-fitment match exists (unverified), and a PPI checklist.
 
