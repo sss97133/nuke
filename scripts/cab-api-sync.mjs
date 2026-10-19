@@ -1126,18 +1126,24 @@ async function extractSingleAuctionGoldStandard(cab, auctionId) {
   const htmlBody = `<!-- cab-v2-api-json:${d.id} class="bid-bar ${isEnded ? "ended" : "live"}" -->\n<script id="cab-v2-json" type="application/json">${jsonSnapshotText}</script>`;
   const htmlSha256 = crypto.createHash("sha256").update(htmlBody).digest("hex");
 
-  const { data: existingSnap } = await supabase
-    .from("listing_page_snapshots")
-    .select("id")
-    .eq("platform", "carsandbids")
-    .eq("listing_url", canonicalUrl)
-    .eq("html_sha256", htmlSha256)
-    .limit(1)
-    .maybeSingle();
+  const readSnapshotReceipt = async () => {
+    const { data, error } = await supabase
+      .from("listing_page_snapshots")
+      .select("id")
+      .eq("platform", "carsandbids")
+      .eq("listing_url", canonicalUrl)
+      .eq("html_sha256", htmlSha256)
+      .eq("success", true)
+      .limit(1)
+      .maybeSingle();
+    if (error) throw new Error(`Snapshot lookup failed for ${d.id}: ${describePgError(error)}`);
+    return data;
+  };
+  const existingSnap = await readSnapshotReceipt();
 
   let snapshotSaved = existingSnap?.id ? 1 : 0;
   if (!existingSnap?.id) {
-    const { error: snapErr } = await supabase
+    const { data: savedSnap, error: snapErr } = await supabase
       .from("listing_page_snapshots")
       .insert({
         platform: "carsandbids",
@@ -1159,8 +1165,14 @@ async function extractSingleAuctionGoldStandard(cab, auctionId) {
           comments_and_bids_count: commentsAndBids.length,
           parsed_at: nowIso,
         },
-      });
-    if (!snapErr) snapshotSaved = 1;
+      }).select("id").single();
+    // A concurrent writer may have retained these exact bytes. Re-read only that
+    // successful source/hash tuple; any other failure must stop model admission.
+    const receipt = snapErr?.code === "23505" ? await readSnapshotReceipt() : savedSnap;
+    if ((snapErr && snapErr.code !== "23505") || !receipt?.id) {
+      throw new Error(`Snapshot insert failed for ${d.id}: ${snapErr ? describePgError(snapErr) : "no persisted snapshot receipt"}`);
+    }
+    snapshotSaved = 1;
   }
 
   // 2. Match or create vehicle (VIN takes priority if a canonical vehicle already owns this VIN)
