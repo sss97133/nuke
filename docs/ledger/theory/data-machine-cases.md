@@ -134,7 +134,7 @@ In addition to the card's list:
 | C13 | Dealer monitors dead since 2026-02-17 | 495 of 496; no second visit ever | open | yes | the diff step inside `poll-listing-feeds`: presence ledger (dealer, listing_url, observed_at, status, price), appear/disappear/sold events |
 | C14 | Craigslist stores share URLs, no post id, no HTML diff, no second sighting | 100% of rows since August | open | yes | read the post id from the detail page; snapshot the detail page (`archiveFetch`); diff the search snapshot per poll into appear/disappear events |
 | C15 | Block auctions: no sale entity, no catalog-before, no video | `auction_events` last house row 2026-04-01 | open | yes (catalog); video needs a cost plan | a sale entity (house, start, end, location, catalog); catalog-before per event; results after; video clips as documentation later |
-| C16 | Facebook dead since 2026-06-12, 111,669 phantom actives | monitor cron off | open | no (Mac fetch) | per-metro request budget and sighting log; the cloud only folds and checks |
+| C16 | Facebook dead since 2026-06-12, 111,669 phantom actives | monitor cron off; 2026-10-18 the iMac runner lands ~900 listings/day with custody, but 5% reached a vehicle (see "Facebook listings reach the graph", 2026-10-19) | open | no (Mac fetch) | per-metro request budget and sighting log; the cloud only folds and checks |
 | C17 | Photo pipeline operating coverage | Opening sample: 1,042 rows `classifier_failed=true`, no error text. Writer repair [#506](https://github.com/sss97133/nuke/pull/506) and typed witness [#507](https://github.com/sss97133/nuke/pull/507) merged. Read-only 2026-10-04 UTC: one existing observation has one typed witness and reaches the public field drill; 3/3 cited images load. Cron 478 remains paused. | open — one image-to-reader path verified | yes (bounded diagnosis) | Continue the existing cached-result/receipt lane; prove eligible arrivals reach durable observations, witnesses and a useful reader. Preserve processing holds; the opening backlog count is not a current re-drive instruction. See follow-up below. |
 | C18 | Sensitive photos hidden by RLS, still public by URL | 474 flagged | open | yes | move sensitive objects out of the public bucket or sign URLs |
 | C19 | Anon writers remaining (§2.10) | 66 functions, 127 unguarded deployed functions, `vehicle_custom_circuits` | open | yes | a census that matches every DML form and dynamic SQL; revoke; a policy fix; a deploy-list diff against the repo |
@@ -2739,6 +2739,59 @@ is gone, withdrawn, expired or sold off-site; the outcome is unknown, never a sa
 page of a search is not removed (only the first page is read), so absence from a search page is not evidence. The
 revisit rule (a landed post still on a search page is read again after 24 h) is the clock for this. A blank-model post is
 kept as an unresolved listing observation (`vehicle_id` NULL) and is not retried as a failure.
+
+### Facebook listings reach the graph the way Craigslist posts do (C16 follow-up, prepared 2026-10-19 UTC)
+
+**The question (owner, 2026-10-18 22:20 PT).** Is the incoming Facebook Marketplace data landing smoothly and going from
+snapshot to deeply integrated? Is it on the Sources board and the map? Can a user click through to the listing? Is the
+seller kept?
+
+**Measured before the repair (2026-10-19 ~05:30 UTC, bounded reads).** Custody was sound: the iMac Playwright runner's
+packets (61 search passes over ~30 metros on 10-18/19, 0 errors) each kept their raw batch in `fb_sweep_jobs` and one
+sighting per listing in `fb_listing_sightings`. Integration was not:
+- Population: `marketplace_listings` 117,546 rows (111,644 with a `vehicle_id`, almost all from the retired collectors).
+  New in 7 days: 1,803, all `fb-browser-capture`; 91 linked (5%), and every recent capture receipt said
+  `linked_observations: 0`.
+- Cause 1, identity: search cards carried `parsed_year` only, and `linkToVehicle` returns before matching without a make.
+  The shared title parser (`ingest/vehicleTitle.ts`) resolves year, make and model on 1,846 of the 1,871 titles first
+  seen in that window (98.7%); the rest state no model ("1984 Porsche") and stay unresolved.
+- Cause 2, events: the capture path wrote no `vehicle_events`, so the Sources board (`market_sources_read` counts
+  listing events by hour) showed Facebook landed 24 h = 0, 7 d = 91, last landed 10-15, while 918 and 1,803 listings
+  arrived. The 91 were a one-off `ingest` pass on 10-15.
+- Cause 3, ingest overwrote testimony: for a Facebook URL `ingest` upserted `marketplace_listings` on `facebook_id`,
+  replacing the captured title, description, seller name, image and `first_seen_at` with its own fields and NULLs.
+- Detail pages: of 133 retained listing pages, the "About this vehicle" block states mileage on 128, transmission 128,
+  exterior color 128, title status 47, owner count 32; the landed rows held mileage on 3 of 1,803.
+- Photos: a listing page's `all_images` also held the "Today's picks" tiles of other people's cars (median 29 captured,
+  10 the listing's own); 0 of 117,546 `image_url`s were in storage, and Facebook CDN links expire within days.
+- Seller: `seller_name` text on 121 of 1,803; no profile id captured; `external_identities` held 0 facebook rows
+  (697,279 bat). `marketplace_listings` has no row policy, so anonymous readers get no rows; `external_identities` and
+  `vehicles.seller_name` are publicly readable.
+- Map: `/map` and `/atlas` read organizations and `vehicle_location_observations`; that table held no Facebook rows.
+  1,449 of 1,804 recent "City, ST" locations match `city_geocode_lookup`.
+
+**The repair, in the existing owners.**
+- `extract-facebook-marketplace/listingFacts.ts` reads each packet's own text: identity from the title (Facebook's form
+  suffixes such as "Coupe 2D" and "Long Bed" read off first), the About block, the seller block's counts, the listed
+  label, and the gallery (center-cropped picks tiles, avatars and ad creatives dropped). Fill-only; the facts and
+  `fb-listing-facts-v1` ride in `raw_scrape_data.listing_facts`.
+- `integrate.ts`, after the custody receipt: a titled unlinked listing goes through `ingest` (VIN/URL match, gate, new
+  `discovered` vehicle or merge proposal, the classified listing event); a linked one lands its listing event at the
+  capture clock; a revisit's removal ends the event (outcome unknown); the place lands as a city-grain
+  `vehicle_location_observations` row; photos copy through `backfill-images` with `run_analysis: false`; a profile id
+  becomes `external_identities ('facebook', id)` with no display name, keyed from
+  `marketplace_listings.seller_identity_id`. Saved-items batch mode is not integrated (held privacy PR #1421).
+  The receipt joins the capture's `fb_sweep_jobs.metadata.integration`.
+- `ingest` links an existing `marketplace_listings` row and never rewrites it.
+- The runner (repo copy) sends the seller's profile link and drops photos inside links to other items; the iMac copy is
+  owned by its own agents and adopts this separately.
+- `map-vehicles` points carry `source_url` and `asking_price`; the pin panel shows the asking price and opens the listing.
+
+**Acceptance.** A new capture's `metadata.integration` shows created/matched vehicles and listing events; the Sources
+board's Facebook landed counts follow the arrivals; `/atlas?source=facebook_marketplace` shows the new points and the pin
+opens the Facebook listing; a seller key appears only where a profile link was captured. Disagreement case: a title
+without a model stays unlinked and is counted `unresolved_identity`. Stages (implemented, tested, merged, deployed,
+runtime-verified) are recorded in the PR and the lane log.
 
 ### 13.13 A listing rises by what it is: the classified merit stack (owner, 2026-10-15)
 

@@ -120,7 +120,12 @@ export default function NukeMap() {
     loadOverlays();
   }, []);
 
-  const onEventClick = useCallback((info: any) => { if (info.object) sidebar.openEventPin(info.object.properties as unknown as Record<string, unknown>); }, [sidebar]);
+  // The point's coordinates live on its geometry, not its properties; the pin panel reads both.
+  const onEventClick = useCallback((info: any) => {
+    if (!info.object) return;
+    const [lng, lat] = info.object.geometry?.coordinates ?? [];
+    sidebar.openEventPin({ ...(info.object.properties as Record<string, unknown>), lng, lat });
+  }, [sidebar]);
   const onClusterClick = useCallback((info: any) => { if (info.object) { const [lng, lat] = info.object.geometry.coordinates; setViewState(prev => ({ ...prev, longitude: lng, latitude: lat, zoom: Math.min(prev.zoom + 2, 18) })); } }, []);
   const onBusinessClick = useCallback((info: any) => { if (info.object) sidebar.openOrgDetail(info.object.id); }, [sidebar]);
   const onCollectionClick = useCallback((info: any) => { if (info.object) sidebar.openOrgDetail(info.object.id); }, [sidebar]);

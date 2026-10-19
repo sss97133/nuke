@@ -110,12 +110,15 @@ async function visitListing(page, id) {
   const why = await challenge(page); if (why) return { challenge: why };
   const more = page.getByRole('button', { name: /^see more$/i }).first();
   if (await more.isVisible().catch(() => false)) { await more.click().catch(() => {}); await sleep(jitter(700, 1500)); }
-  const read = () => page.evaluate(() => {
+  const read = () => page.evaluate((itemId) => {
     const main = document.querySelector('[role="main"]') ?? document.body;
-    const imgs = [...main.querySelectorAll('img')].filter(i => /fbcdn\.net/.test(i.currentSrc || i.src)).map(i => ({ url: i.currentSrc || i.src, width: i.naturalWidth, height: i.naturalHeight }));
+    // A photo inside a link to another item is a "Today's picks" tile, not this listing's gallery.
+    const otherItem = (el) => { const a = el.closest('a[href*="/marketplace/item/"]'); return !!a && !a.href.includes(`/item/${itemId}`); };
+    const imgs = [...main.querySelectorAll('img')].filter(i => /fbcdn\.net/.test(i.currentSrc || i.src) && !otherItem(i)).map(i => ({ url: i.currentSrc || i.src, width: i.naturalWidth, height: i.naturalHeight }));
     const h1 = [...main.querySelectorAll('h1')].map(n => n.innerText.trim()).find(t => t && !/^(marketplace|notifications)$/i.test(t)) ?? null;
-    return { text: main.innerText, title: h1, images: imgs };
-  });
+    const seller = [...main.querySelectorAll('a[href*="/marketplace/profile/"]')].map(a => a.href).find(h => /\/marketplace\/profile\/\d{5,}/.test(h)) ?? null;
+    return { text: main.innerText, title: h1, images: imgs, seller_profile_url: seller };
+  }, id);
   const first = await read(), seen = new Map(first.images.map(i => [i.url, i]));
   const next = page.getByRole('button', { name: /next (photo|image)/i }).first();
   for (let n = 0; n < 30 && await next.isVisible().catch(() => false); n++) {

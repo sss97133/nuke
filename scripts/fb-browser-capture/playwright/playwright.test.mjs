@@ -42,6 +42,12 @@ test('listing page reader pulls description, price, seller and full image list; 
   assert.equal(p.seller_name, 'Pat Example'); assert.equal(p.seller_type, null); assert.equal(p.seller_type_basis, 'not_shown'); assert.equal(p.images.length, 1);
   const card = detail.revisitCard('123', p, { text: fixtureText });
   assert.equal(card.removal, undefined); assert.deepEqual(card.all_images, ['https://scontent.fbcdn.net/a.jpg']);
+  assert.equal(card.seller_profile_url, undefined, 'no profile link read, no key sent');
+});
+test('the seller profile link travels as the key; anything but a numeric Marketplace profile is dropped', () => {
+  const linked = detail.readListingPage({ text: fixtureText, title: '1968 Ford Mustang', seller_profile_url: 'https://www.facebook.com/marketplace/profile/100012345678/?ref=listing' }, '2026-10-14T08:00:00Z');
+  assert.equal(detail.revisitCard('123', linked, { text: fixtureText }).seller_profile_url, 'https://www.facebook.com/marketplace/profile/100012345678/');
+  assert.equal(detail.readListingPage({ text: fixtureText, seller_profile_url: 'https://www.facebook.com/some.page' }, '2026-10-14T08:00:00Z').seller_profile_url, null);
 });
 test('removed page becomes removal evidence; Sold label is attributed, not a confirmed sale', () => {
   const gone = detail.readListingPage({ text: "This listing isn't available anymore.\nIt may have been removed.", title: null }, '2026-10-14T08:00:00Z');
