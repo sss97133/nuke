@@ -23,6 +23,9 @@ INSERT INTO public.profiles(id,username,is_public) VALUES ('00000000-0000-0000-0
 INSERT INTO public.actors VALUES ('a0000000-0000-0000-0000-0000000000f2','Private Painter','painter','+15550177');
 
 \ir ../migrations/20261019121500_open_job_readers.sql
+\ir ../migrations/20261019094500_work_order_quotes.sql
+\ir ../migrations/20261019120000_work_order_quote_issue.sql
+\ir ../migrations/20261019123000_work_order_job_path_quotes.sql
 
 CREATE OR REPLACE FUNCTION public.t_pii(j jsonb) RETURNS boolean LANGUAGE sql IMMUTABLE AS $$
   SELECT j::text ~ '(Fixture Customer|Other Customer|5550100|5550177|5550199|example\.com|Customer asked|road test|Fixture Performer|Private Painter|"amount"|amount_usd|actual_payout|total_cost|unit_price|total_labor_cost|"phone"|"email"|"address"|payment_records|payouts_recorded)' $$;

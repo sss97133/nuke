@@ -416,6 +416,15 @@ measured usage, labor value and cost allocation stay unassessed or false, and no
 disbursed. The scoreboard is the measurement the RSI loop reads before choosing the next
 gap that retained evidence can close. Contract: `supabase/sql/test_work_order_job_path.sql`.
 
+The terms stage reads quotes through `work_order_quote_state`. A current quote supplies the
+quote clock (`quote_clock_basis: current_quote`) and keeps terms at least partial. A current
+customer acceptance supplies the approval clock: the sign clock, attributed by
+`approval_signer` (role and acceptance id; no raw user id, since the open job readers pass
+this stage to anyone) with `approval_clock_basis: quote_acceptance_sign`. Terms is then recorded and `no_approval_clock` no longer applies.
+A withheld acceptance adds `acceptance_withheld_<reason>`. `work_orders.approved_at` and
+`quoted_at` stay the fallback; the stored approval clock is also reported as
+`stored_approval_clock`. Contract: `supabase/sql/test_work_order_job_path_quotes.sql`.
+
 ### Requested operations from scope text
 
 `work_order_line_items` is the operations owner. A work order's own description or
