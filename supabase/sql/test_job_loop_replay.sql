@@ -341,6 +341,11 @@ ALTER TABLE public.observation_sources ADD COLUMN IF NOT EXISTS display_name tex
 \ir ../migrations/20261020014500_work_order_invoice_stripe_payments.sql
 \echo REPLAY 20261020020000_work_order_inspection_seller_actions.sql
 \ir ../migrations/20261020020000_work_order_inspection_seller_actions.sql
+\ir helpers/tool_tables_live_20261020.sql
+\echo REPLAY 20261020030000_tool_requirement_keys.sql
+\ir ../migrations/20261020030000_tool_requirement_keys.sql
+\echo REPLAY 20261020040000_suggested_provider_links.sql
+\ir ../migrations/20261020040000_suggested_provider_links.sql
 -- Plan check and final state.
 \set replay_problems `scripts/ci/job-loop-replay-check.sh | tr '\n' ' '`
 SELECT t_assert(btrim(:'replay_problems') = '', 'replay plan covers the build in filename order: ' || COALESCE(NULLIF(btrim(:'replay_problems'), ''), 'ok'));
