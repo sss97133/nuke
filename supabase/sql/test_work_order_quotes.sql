@@ -23,7 +23,7 @@ CREATE TABLE public.work_orders(id uuid PRIMARY KEY,vehicle_id uuid,customer_id 
  customer_name text,customer_phone text,customer_email text,title text,description text,scope_description text,
  quoted_at timestamptz,estimated_total numeric,estimated_cost_cents integer,approved_at timestamptz,scheduled_start timestamptz,
  scheduled_end timestamptz,started_at timestamptz,actual_start timestamptz,completed_at timestamptz,actual_end timestamptz,status text,
- deposit_cents integer,created_at timestamptz DEFAULT '2026-01-01');
+ deposit_cents integer,created_at timestamptz DEFAULT '2026-01-01',scope_category text);
 CREATE TABLE public.vehicles(id uuid PRIMARY KEY,user_id uuid,owner_id uuid,uploaded_by uuid);
 CREATE TABLE public.business_ownership(business_id uuid,owner_id uuid,status text);
 CREATE TABLE public.admin_users(user_id uuid,is_active boolean);
@@ -115,6 +115,7 @@ INSERT INTO work_order_labor(id,work_order_id,task_name,task_category,hours,hour
 \ir ../migrations/20261019150000_inspection_request.sql
 \ir ../migrations/20261019180000_work_order_offers.sql
 \ir ../migrations/20261019182000_work_order_offer_acceptance.sql
+\ir ../migrations/20261019183000_work_order_offers_read.sql
 
 -- Synthetic sources in the guarded disposable database only.
 CREATE FUNCTION public.src(p_envelope jsonb,p_vehicle uuid DEFAULT '40000000-0000-0000-0000-000000000001',

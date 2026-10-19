@@ -18,7 +18,7 @@ CREATE TABLE public.organizations(id uuid PRIMARY KEY);
 CREATE TABLE public.work_orders(id uuid PRIMARY KEY,vehicle_id uuid,request_source text,customer_name text,customer_phone text,
  title text,description text,scope_description text,quoted_at timestamptz,estimated_total numeric,estimated_cost_cents integer,
  approved_at timestamptz,scheduled_start timestamptz,scheduled_end timestamptz,started_at timestamptz,actual_start timestamptz,
- completed_at timestamptz,actual_end timestamptz,status text,created_at timestamptz DEFAULT '2026-01-01',scope_category text);
+ completed_at timestamptz,actual_end timestamptz,status text,created_at timestamptz DEFAULT '2026-01-01',scope_category text,customer_id uuid);
 CREATE TABLE public.actors(id uuid PRIMARY KEY,name text,actor_type text);
 CREATE TABLE public.component_events(id uuid PRIMARY KEY,vehicle_id uuid,work_order_id uuid,metadata jsonb);
 CREATE TABLE public.work_order_parts(id uuid PRIMARY KEY,work_order_id uuid,part_name text,status text,job_op_code text,unit_price numeric);
@@ -44,7 +44,7 @@ CREATE TABLE public.user_tools(id uuid PRIMARY KEY,user_id uuid REFERENCES auth.
 CREATE TABLE public.tool_inventory(id uuid PRIMARY KEY,owner_id uuid);
 CREATE TABLE public.equipment(id uuid PRIMARY KEY,shop_id uuid);
 CREATE TABLE public.vehicle_observations(id uuid PRIMARY KEY,vehicle_id uuid,kind text,source_id uuid,
-  content_text text,extraction_method text,confidence_score numeric,structured_data jsonb,observed_at timestamptz,ingested_at timestamptz DEFAULT now(),is_superseded boolean DEFAULT false,source_identifier text);
+  content_text text,extraction_method text,confidence_score numeric,structured_data jsonb,observed_at timestamptz,ingested_at timestamptz DEFAULT now(),is_superseded boolean DEFAULT false,source_identifier text,submitted_by_user_id uuid);
 CREATE TABLE public.pipeline_registry(id uuid DEFAULT gen_random_uuid(),table_name text,column_name text,owned_by text,
   description text,do_not_write_directly boolean,write_via text,UNIQUE(table_name,column_name));
 GRANT USAGE ON SCHEMA public,auth TO anon,authenticated,service_role;
@@ -99,6 +99,7 @@ INSERT INTO vehicle_observations(id,vehicle_id,kind,source_id,observed_at,struct
 \ir ../migrations/20261019153000_job_path_inspection.sql
 \ir ../migrations/20261019180000_work_order_offers.sql
 \ir ../migrations/20261019182000_work_order_offer_acceptance.sql
+\ir ../migrations/20261019183000_work_order_offers_read.sql
 
 SET ROLE service_role;
 SELECT project_work_order_resource_observation('80000000-0000-0000-0000-000000000001');
