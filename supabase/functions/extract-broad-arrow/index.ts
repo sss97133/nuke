@@ -43,7 +43,7 @@ import { archiveFetch } from '../_shared/archiveFetch.ts';
 import { fillOnlyIdentity, identityConflict } from '../_shared/identityMatch.ts';
 import { recordRevision } from '../_shared/revision.ts';
 import { parseEventPage, parseListingCards, type RosterCard } from './roster.ts';
-import { galleryImageId, isVinClash, parseLotPage } from './lotPage.ts';
+import { estimateCurrency, galleryImageId, isVinClash, parseLotPage } from './lotPage.ts';
 
 // ============================================================================
 // TYPES
@@ -1378,7 +1378,7 @@ if (import.meta.main) Deno.serve(async (req) => {
             mileage: lot.odometer ? (lot.odometer.unit === 'km' ? Math.round(lot.odometer.value * 0.621371) : lot.odometer.value) : null,
             engine: null, transmission: null, drivetrain: null, exterior_color: null, interior_color: null, body_style: null,
             description: lot.description, image_urls: lot.imageUrls, scrape_ms: 0,
-            extra_metadata: { sale_starts_on: days?.starts_on ?? null, sale_ends_on: days?.ends_on ?? null, currency: lot.currency, sold_amount: lot.status === 'sold' ? lot.soldPrice : null, odometer: lot.odometer, read_by: 'broad-arrow-targets' },
+            extra_metadata: { sale_starts_on: days?.starts_on ?? null, sale_ends_on: days?.ends_on ?? null, currency: lot.currency ?? estimateCurrency(page.html), sold_amount: lot.status === 'sold' ? lot.soldPrice : null, odometer: lot.odometer, read_by: 'broad-arrow-targets' },
           };
           const saved = await saveToDatabase(supabase, extracted);
           await finish('complete', undefined, saved.vehicle_id);
