@@ -1,5 +1,178 @@
 # Work Order Intelligence
 
+## A job is a future receipt (2026-10-19)
+
+A **receipt** in Nuke is not a row. It is a computed conclusion over witnesses that have
+been reconciled with each other: purchase receipts (`receipts` + `receipt_items`), money
+movements (`payment_events`, `work_order_payments`), labor days (`work_sessions` closed by
+`confirm_work_session`), operations performed (`component_events`) and outgoing invoices
+(`generated_invoices`). An invoice, a payment and a work order can be several witnesses to
+one economic item; reconcile their references before summing. Readers assemble the
+conclusion: `get_user_day_receipt` (one person-day), `compute_vehicle_investment_proof`
+(one vehicle, tiered proven / attributed / projected / market) and
+`work_order_receipt_unified` with `work_order_balance` (one job).
+
+A **job** is the same graph before conclusion. A `work_orders` header and its operations
+are expected receipt lines; each line names the witness that will close it, the clock it
+will carry and the party who must sign. Concluding fills those slots with admitted
+observations. It never flips a status. `transfer_milestones` (required step, deadline,
+completed clock, signer, evidence pointer) is the existing shape of a future receipt in
+the ownership domain; reuse the shape, not the table.
+
+| Stage (`read_work_order_job_path`) | Becomes this receipt line | Closed by |
+|---|---|---|
+| intake | Header: asset, requester, stated scope, request clock | Vehicle bound + scope stated + authenticated requester |
+| inspection | A billable inspection line; its findings become the plan's basis | Inspector Sign on the findings |
+| plan | Operation × material/process × parts × tools × facility × performer | Builder Sign on the plan |
+| terms | Price, deposit, schedule, who agreed and when | Client Sign over a frozen scope snapshot + each provider's accept |
+| execution | Dated work log, sessions, installed parts, image evidence | Performer records + signed days |
+| completion | Performer attestation + client acceptance | Two Signs |
+| accounting | Charged, paid in, owed out per provider, comped value | Reconciled payments; release predicates evaluated, nothing disbursed |
+
+Measured on 2026-10-19 by `work_order_job_path_scoreboard()` over all 26 `work_orders`
+rows: no row has an approval clock or a schedule window; plan can never reach `recorded`
+(`executable: not_assessed`); 4 rows have a done status without a completion clock; booking
+readiness and permission authority are `not_assessed` on every row. The scoreboard reports
+that evidence exists, not that it is true.
+
+### Invariants
+
+These claims are kept as separate records and never collapsed into one another:
+
+presence (an image occurrence) ≠ identity (account or actor) ≠ ownership/access ≠ skill
+(evidence-derived only) ≠ permission ≠ availability (a stated window) ≠ reservation ≠
+accepted work ≠ completion ≠ client acceptance ≠ measured usage ≠ asset cost ≠ computed
+depreciation ≠ market value ≠ labor value ≠ payment record ≠ payout term ≠ disbursement.
+
+A tool seen in frame is not a tool owned, owned is not permitted for this job, a vouch is
+not skill evidence, an accept clock is not completion, and a payment row is not a release.
+Each is a stated invariant; the mechanism that enforces it is named where it exists
+(constraints and readers above and below) and otherwise recorded as missing.
+
+### Contextual agreements
+
+A job needs fourteen kinds of agreement between named parties. Every agreement is a
+`work_record` observation admitted through `ingest-observation` and projected into an
+immutable typed row, with three clocks (event, ingest, sign), an authenticated signer
+(`submitted_by_user_id = auth.uid()` at a Sign step, never an ambient trigger), a verdict
+(`supports` / `contradicts` / `unknown`) and a snapshot of what was agreed. The existing
+`basis_line_item_snapshot` pattern then withholds a stale agreement automatically when its
+basis changes.
+
+| Agreement | Parties | Existing holder | Gap |
+|---|---|---|---|
+| Scope acceptance | client ↔ lead provider | `work_orders.approved_at` (one clock) | No signer, no scope version |
+| Material/process spec | client ↔ provider ↔ supplier ↔ performer | `work_order_resource_specifications` stages + comparisons | Acceptance of the proposed pair: `not_established` |
+| Inspection as a job | client ↔ inspector (≠ executor) | `inspection` requirement + actor fulfillment; `scope_category='inspection'` | No parent ↔ child work-order link |
+| Provider offer/accept | provider ↔ lead or client | `work_order_assignments` offer/accept/decline clocks | Dormant; keyed to `technicians`, not the resource graph |
+| Compensation terms | provider ↔ payer | `work_order_assignments.payout_type` (flat / hourly / percentage) | No day rate or per-operation term; terms mutable |
+| Tool loan/access | tool owner ↔ performer | Fulfillment tool references + `permission` / `condition` / `delivery` / `withdrawal` attestations | Authentication, reservation, return clock, fee |
+| Facility/bay access | facility ↔ performer or client | Fulfillment `facility_organization_id` + window | No bay grain, no reservation |
+| Co-sign/vouch with a cut | co-signer ↔ provider ↔ client | `supervision` / `suitability` attestations; assignment roles | No authenticated attestor, liability scope or cut term |
+| Payment-release conditions | client ↔ providers ↔ platform | `payout_status` vocabulary only | No condition record |
+| Vehicle transport custody | shipper ↔ client ↔ shop | `delivery` attestation (resources only); `transfer_milestones` (ownership) | No work-custody handoff |
+| Change order/substitution | client ↔ provider | Specification summary reports `substitution_approval: not_established` | No signed supersession; scope text is editable in place |
+| Completion acceptance | client ↔ provider | `completed_at`; job path returns `customer_acceptance: not_established` | No client Sign |
+| Deposit | client ↔ shop | `work_orders.deposit_cents` | No payment link |
+| Vehicle access permission | owner ↔ provider | `vehicle_user_permissions` (role, grantor, expiry, revocation) | Not tied to a job window |
+
+Eleven of the fourteen have no holder or only a partial one.
+
+### Adopted design decisions (owner-overridable defaults, 2026-10-19)
+
+These defaults were adopted on 2026-10-19 so work can proceed. The owner can override any
+of them; until then, build against them.
+
+1. **The job row.** `work_orders` is the job header; no `jobs` table. `work_sessions` stays
+   the labor witness and links to a job through an evidenced edge.
+2. **Where agreements live.** New projector event types (`terms`, `acceptance`,
+   `change_order`, `release_condition`, `custody`), added the way `operation` was.
+   Status columns become derived caches, not truth.
+3. **Sign.** One authenticated Sign RPC family records the signer, the sign clock and a
+   snapshot or hash of the scope it covers. A later scope edit withholds the acceptance.
+4. **Identity bridge.** Extend `account_link_claims` with an `actor_id` (exclusive with the
+   external identity). Evidence rungs: unknown → self_claim → work_evidence → co_sign →
+   authenticated_sign. Never match by name. `technicians` and `technician_phone_links` are
+   retained legacy claims, not the bridge.
+5. **Inspection.** When priced or booked, an inspection is its own `work_orders` row
+   (`scope_category='inspection'`) with a parent link; its findings feed the parent plan.
+   The pre-purchase inspection is the first paid job.
+6. **Compensation terms.** Add day rate and per-operation beside flat, hourly and
+   percentage, pinned at acceptance. Book hours are a reference, never a price. Day-rate
+   productivity is measured from signed days plus completion evidence, never from
+   inferred minutes.
+7. **Payment release.** Predicates declared at acceptance and evaluated over evidence, as
+   a computed conclusion. Disbursement and Stripe Connect stay off.
+8. **Co-sign.** An authenticated `supervision` / `suitability` / `permission` attestation
+   (job-scoped in `work_order_resource_attestations`; standing in a user-subject sibling)
+   plus a separate compensation term (`work_order_assignments.role='cosigner'`). A vouch
+   is never skill evidence.
+9. **Mutable conclusions** become superseding testimony: session un-confirm, line-item
+   status, payment status and scope text.
+10. **Phantom tables.** `work_order_quotes`, `work_order_proofs`, `work_contracts` and
+    `technician_payout_log` exist in repo migrations but not live. They are not applied
+    as written. Quotes fold into `terms`; proofs into the observation/image path.
+
+### Listing → pre-purchase inspection
+
+Today Nuke can produce an honest **estimate to inspect** from a listing, not an estimate to
+restore. Measured 2026-10-19: of 124,355 `description_discoveries` rows, 90,817 are stored
+extraction-failure rows (`raw_extraction.error`) and 7,504 carry structured condition,
+flags, work or modifications. `resolve_labor_rate()` with no reported rate returns a
+labelled $160 `spitball` placeholder (4 shop rates, below its threshold of 30).
+`labor_operations` holds 64 seed codes written around GM trucks; `stage_transition_labor_map`
+holds 28 seed ranges. No live transport owner exists.
+
+Pipeline, each step extending an existing owner:
+
+1. Listing claims reader: verbatim excerpt, source, clock and confidence per claim;
+   failure rows and unattributed images excluded and counted.
+2. Claim → operation crosswalk to `labor_operations` / `stage_transition_labor_map` through
+   a reviewed keyword table.
+3. As-found specification stage: what the listing shows today.
+4. Requirement templates per operation.
+5. Per-line estimate with method, coverage and a min/typical/max range.
+6. Pre-purchase inspection job on a non-owned vehicle, with a seller `permission`
+   attestation; findings land as `inspection_type: pre_purchase` observations.
+7. Builder match (below).
+8. Purchase and custody through `transfer_milestones` plus `delivery` attestations.
+9. The future receipt on the work-order spine.
+
+The smallest honest first version is the read-only `scripts/discovery/buying-evidence.mjs
+--plan` report: identity conflicts first, then claims, candidate operations labelled
+`seed_uncalibrated`, the rate exactly as `resolve_labor_rate` returns it, priced parts only
+where a text-fitment match exists (unverified), and a PPI checklist.
+
+### Matching as an explainable join
+
+"Most accessible provider" is an explainable SQL join per requirement, not a score. Each
+candidate × input is `pass`, `fail` or `unknown`, with its reason. Inputs: the requirement,
+distance, service area, availability window, the resource satisfied by the candidate or by
+a Plan-B supplier, evidence rung, workload and price terms. A missing resource yields a
+Plan-B fulfillment, not disqualification. The largest gaps are person-level location,
+service area and availability, and a join key between tools and requirements.
+
+### The app as navigator
+
+The client apps navigate this graph rather than owning state. A profile is a public booking
+hub with provider, client and private faces. The work surface holds the signature queue,
+jobs in motion on a seven-stage rail, open requirements nearby, evidence to file and
+capture. One shared job view returns faces from server-supplied viewer slots and actions
+only from server-supplied action lists. Stage states map onto the trust ladder:
+recorded → attributed, partial → pending, status_only → recorded (dimmed), inconsistency →
+conflicting; proven only for authenticated signatures. Authenticated per-user readers
+(identity, my work orders, job path, resources, evidence, signature queue) come first.
+
+### Exposures and traps
+
+The 2026-10-19 review found public read paths on work-order, participant, rate and
+membership data; they are being closed in separate migrations and are not described here.
+The trap functions below are correctness hazards, listed in
+`docs/ledger/CAPABILITY_MAP.md`: `resolve_labor_rate`'s contract branch reads the absent
+`work_contracts`; `generate_repair_estimate` writes to an absent table;
+`estimate_labor_from_description` returns hardcoded confidence; and
+`organization_capabilities.verified` is true on rows with no evidence.
+
 ## Resource evidence graph (2026-10-19)
 
 `work_order_resource_requirements`, `work_order_resource_fulfillments` and
@@ -281,16 +454,16 @@ Mitchell-style flat rate book. 64 operations across body, paint, mechanical, exh
 Per-technician hourly rates. Priority 2 in `resolve_labor_rate()` cascade.
 
 ### work_contracts
-Client-org negotiated rate agreements. Priority 1 in `resolve_labor_rate()` cascade. Vehicle-specific contracts override general ones.
+Client-org negotiated rate agreements, created in `20260327100000_work_order_intelligence_schema.sql`. **Absent live** (`to_regclass` null, 2026-10-19). Priority 1 in the `resolve_labor_rate()` cascade, so that branch errors when it runs.
 
 ## Rate Resolution Cascade
 
-`resolve_labor_rate(org, user, vehicle, client)` returns `{rate, source}`:
+`resolve_labor_rate(org, user, vehicle, client)` returns `{rate, source, rate_confidence, …}`:
 
-1. **Contract rate** (priority 1): `work_contracts` where client+org match, vehicle-specific first
+1. **Contract rate** (priority 1): `work_contracts` where client+org match, vehicle-specific first. Runs only when both client and org are passed; the table is absent live, so this branch is a trap.
 2. **User rate** (priority 2): `user_labor_rates` where user matches and is_active
 3. **Organization rate** (priority 3): `businesses.labor_rate` for the org
-4. **System default** (priority 4): $125/hr market average
+4. **No reported rate** (priority 4): the median of `businesses.labor_rate` when at least 30 shops report one (`market_estimate`); otherwise a $160 `spitball`. On 2026-10-19, 4 shops report a rate, so it returns `spitball` / `spitball_no_data`. A placeholder, never a provider's rate.
 
 ## Comp Tracking
 

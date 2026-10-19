@@ -2940,3 +2940,10 @@ line items. A guard keeps sourced text and provenance immutable while parties ke
 The job path now counts labor-task evidence and reports withdrawn or stale sources. Disposable
 PG17 covers 27 cases and reruns the 25 + 57 + 88 earlier mechanics assertions. Prose-only scopes
 remain unitemized; splitting comma lists is a later, separately evidenced pass.
+
+A job is a future receipt (2026-10-19): the mechanics slices above are read together as one
+model. A receipt is a computed conclusion over reconciled witnesses; a job is the same graph
+before conclusion, each stage a receipt line closed by a named witness, clock and signer.
+The stage-to-line table, invariants, fourteen-agreement inventory with holders and gaps,
+adopted owner-overridable defaults, listing-to-inspection pipeline and explainable matching
+join live in `docs/library/technical/work-order-intelligence.md` § "A job is a future receipt".
