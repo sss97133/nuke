@@ -12,7 +12,7 @@ const limit = arg('--limit', 100), dryRun = process.argv.includes('--dry-run');
 const fn = `${process.env.SUPABASE_URL}/functions/v1/extract-ebay-motors`, key = process.env.SUPABASE_SERVICE_ROLE_KEY;
 if (!rankedPath || !logPath || !process.env.SUPABASE_URL || !key) { console.error('usage (under dotenvx): land.mjs <ranked.jsonl> <log.jsonl> [--limit N] [--dry-run]'); process.exit(2); }
 
-const done = new Set(existsSync(logPath) ? readFileSync(logPath, 'utf8').split('\n').filter(Boolean).map((l) => { try { return JSON.parse(l).item_id; } catch { return null; } }) : []);
+const done = new Set(existsSync(logPath) ? readFileSync(logPath, 'utf8').split('\n').filter(Boolean).map((l) => { try { const j = JSON.parse(l); return j.error ? null : j.item_id; } catch { return null; } }) : []);
 const todo = readFileSync(rankedPath, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)).filter((r) => !done.has(r.item_id)).slice(0, limit);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -30,6 +30,7 @@ async function latestCapture(r) {
   return { timestamp: c.timestamp, original: c.original, captures_seen: r.captures.length };
 }
 
+let streak = 0;
 for (let i = 0; i < todo.length; i += 5) {
   const batch = todo.slice(i, i + 5), caps = [];
   for (const r of batch) { caps.push(await latestCapture(r)); await sleep(1100); }
@@ -50,4 +51,7 @@ for (let i = 0; i < todo.length; i += 5) {
     console.log(`${r.score} ${r.title.slice(0, 60)} -> ${line.outcome ?? '-'} ${line.price ?? ''} ${line.landed ?? ''} ${line.error ?? ''}`);
   });
   if (out?.errors?.length) console.log('  run errors:', out.errors.slice(0, 3).join(' | '));
+  const failed = batch.filter((_, j) => (out?.results?.[j] ?? {}).error || !out?.results).length;
+  streak = failed === batch.length ? streak + 1 : 0;
+  if (streak >= 3) { console.log('STOP: three batches failed in a row (archive or function unavailable)'); process.exit(3); }
 }
