@@ -87,6 +87,7 @@ INSERT INTO vehicle_observations(id,vehicle_id,kind,source_id,observed_at,struct
 \ir ../migrations/20261019035407_work_order_resource_specifications.sql
 \ir ../migrations/20261019045753_work_order_job_path.sql
 \ir ../migrations/20261019051336_work_order_scope_operations.sql
+\ir ../migrations/20261019094500_work_order_quotes.sql
 
 SET ROLE service_role;
 SELECT project_work_order_resource_observation('80000000-0000-0000-0000-000000000001');

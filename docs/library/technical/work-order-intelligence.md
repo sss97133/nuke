@@ -107,7 +107,7 @@ of them; until then, build against them.
 2. **Where agreements live.** New projector event types named in standard language
    (`quote`, `quote_acceptance`, `change_order`, `invoice`, `release_condition`,
    `custody`), added the way `operation` was. Status columns become derived caches,
-   not truth.
+   not truth. `quote` and `quote_acceptance` exist (see "Quotes and acceptance").
 3. **Sign.** One authenticated Sign RPC family records the signer, the sign clock and a
    snapshot or hash of the scope it covers. A later scope edit withholds the acceptance.
 4. **Identity bridge.** Extend `account_link_claims` with an `actor_id` (exclusive with the
@@ -133,10 +133,11 @@ of them; until then, build against them.
     `work_contracts` and `technician_payout_log` exist in repo migrations but not live.
     They are not applied as written. The quote is the central object, so it keeps the
     standard name: an immutable, versioned, observation-backed quote projection, where a
-    revision supersedes and an acceptance signs one version. Reconcile the unapplied
-    `20251212000013_work_order_quotes.sql` (a mutable `status` of draft / sent / accepted /
-    rejected / withdrawn, no version) before reusing the name. Proofs fold into the
-    observation/image path.
+    revision supersedes and an acceptance signs one version. Reconciled 2026-10-19: the
+    repo's `20251212000013_work_order_quotes.sql` (a mutable `status` of draft / sent /
+    accepted / rejected / withdrawn, no version) was never applied, because that version is
+    recorded live as `profile_integrity_guardrails`; `20261019094500_work_order_quotes.sql`
+    reuses the name for the immutable projection. Proofs fold into the observation/image path.
 
 ### Listing → pre-purchase inspection
 
@@ -330,6 +331,60 @@ operation or at work-order scope (`operation_link`). Material and process relati
 and completion as `not_established` and qualification as `not_assessed`. A conflict says
 the records disagree; it does not decide which record is right or whether a substitution
 was agreed. Contract: `supabase/sql/test_work_order_resource_specifications.sql`.
+
+## Quotes and acceptance
+
+A job is a quote: estimate → quote (revisions) → acceptance → deposit → work order →
+change order → completion → invoice → payment → receipt. `work_order_quotes` holds the
+quote and its revisions; `work_order_quote_acceptances` holds the customer's acceptance.
+Both are immutable projections keyed by their source observation.
+
+**Quote.** A provider's quote is a `work_record` admitted through `ingest-observation` with
+event type `quote` (payload: `quote_version`, `supersedes_quote_id`, `quoting_party`
+`{kind, id}`, `scope_snapshot`, `lines`, `deposit_requested` `{amount, currency}` or null,
+`valid_until` or null). The projector requires:
+
+- `scope_snapshot` equal to `work_order_quote_scope_snapshot(work_order_id)`: the current
+  operations, requirements, material/process specifications, parts and labor rows, without
+  progress fields (status, actor, hours) or amounts.
+- Each line names `ref_kind` (`operation`, `requirement`, `part`, `labor`, `fee`) and a `ref_id`
+  in the snapshot (null for a fee), a description and a `pricing_basis`: `flat`, `hourly`
+  (unit `hour`), `day_rate` (unit `day`) or `per_operation` (unit `operation`). An amount
+  requires an ISO currency, and the reverse; a quantity is stated or null, never assumed. At
+  least one line must be priced; an unpriced scope is an estimate.
+- The quoting party is an explicit actor, user or organization id, or `unknown`. It is
+  attributed by the source and not authenticated; it is never matched by name.
+- Version 1 first, then the next integer, superseding the current version. The newer version
+  withholds the older from current reads; history stays.
+
+The projection stores a SHA-256 `quote_hash` over the quote's canonical content.
+
+**Acceptance (Sign).** `accept_work_order_quote(p_quote_id, p_quote_hash)` is the only writer.
+The caller must be the work order's customer (`auth.uid() = work_orders.customer_id`; a vehicle
+owner is not assumed to be the client, since in a pre-purchase inspection the owner is the
+seller). The hash must match the version, the version must be current and unexpired, its scope
+snapshot must still match, and the quoting user cannot accept their own quote. The RPC writes
+an `owner-input` work record (signer, sign clock, quote hash) and projects it in the same
+transaction; the projector refuses a `quote_acceptance` presented any other way. Neither
+`work_orders.status` nor `approved_at` is written. Nothing is collected, authorized or paid.
+
+**Reader.** `work_order_quotes_read(p_work_order_id)` admits callers that
+`work_order_is_accessible` admits (the `work_orders` select rule). It returns the current
+quote, version history with states (`current`, `superseded`, `withdrawn`), acceptance state
+(`accepted`, `withheld` with a reason, or `not_accepted`), stored and derived `quoted_at` /
+`approved_at`, a viewer block (context, slots, `money_visible`, `contact_visible: false`,
+`decided_from: auth.uid()`, actions) and coverage. An acceptance is withheld when its quote is
+superseded or withdrawn, the scope changes, the signer is no longer the customer, or its own
+source is withdrawn. Amounts and the scope snapshot go only to the customer and the provider
+side (quoting user, quoting organization owner, work order organization owner); other viewers
+get counts. Customer contact fields are never read. `accept_quote` appears in `actions` only
+when the viewer could sign now. This is stricter than the privacy doctrine above, under which
+quote prices and scope are open; an anon-safe quote reader is separate work, as it is for the
+other job readers.
+
+Not yet: change orders as their own event, deposit and payment links, provider authentication
+of the quote (offer Sign), and the job path's `terms` stage reading quotes.
+Contract: `supabase/sql/test_work_order_quotes.sql`.
 
 ## Job path self-measurement
 
