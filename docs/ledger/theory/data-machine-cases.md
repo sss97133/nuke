@@ -2896,3 +2896,21 @@ malformed evidence, privacy and refusal to accrue usage/value. This connects ret
 evidence without a new observation ledger, photo processing, paid inference or canonical
 asset minting. Full image coverage and a physical-object identity resolver remain unmeasured
 and unimplemented respectively; vehicle context does not establish operation usage.
+
+Work-specification connection (2026-10-19): owner direction that material and process belong
+together in the work specification, not in a free-standing provider qualification judgment.
+Live inspection of the selected case found three disagreeing accounts already retained: the
+requested scope quote, installed part records (graded and ungraded stainless, a stainless TIG
+filler) and the operation's component event (mild steel with MIG). Parts carry no typed
+operation link, and cost subsets matching the operation total were not unique, so part
+supply cannot be assigned to an operation by inference. Migration
+`20261019035407_work_order_resource_specifications.sql` adds a `specification` event to the
+existing resource projector and an immutable private table. Each claim records a stage, role,
+verbatim labels and dotted interpretation keys; its basis is a retained excerpt or an exact
+component-event or part row snapshot. The existing reader compares requested pairs with
+current claims by role and key and reports a conflict without adjudicating substitution,
+qualification or completion. Changed, withdrawn or reattributed bases withhold claims; history
+remains. Disposable PG17 covers 57 specification cases and reruns the 88 existing resource
+assertions against the new projector. This is one selected case; the specification population
+of other jobs is not assessed, and accepted scope changes, measured usage, completion and
+compensation remain open.

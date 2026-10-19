@@ -290,6 +290,8 @@ can supersede it without editing the original or guessing from model/year.
 
 **Resource requirement basis** — The original retained work-record observation and exact excerpt supporting an interpreted need for a work-order operation. The interpretation keeps the original observation clock and its own extraction method and confidence. A quoted need does not establish quantity, provider competence, permission or reservation. Withdrawing or reattributing the basis excludes its dependent current resource graph; original records remain. See [Work Order Intelligence](../../technical/work-order-intelligence.md).
 
+**Resource specification** — One attributed material/process pair for a work order at one stage: requested, proposed (quoted part), supplied (part recorded installed) or reported_performed (recorded operation). Labels are verbatim from the basis record; dotted keys are the interpretation, and materials are compared only within the same role (workpiece, filler, consumable). Disagreement between stages is reported as conflicting evidence, not as an approved substitution, a qualification finding or completion. See [Work Order Intelligence](../../technical/work-order-intelligence.md).
+
 **Rhizome** — Deleuzian concept. A network with no center, no hierarchy, no beginning or end. Nuke's architecture is rhizomatic — every concept connects to every other. The observation system is the purest expression. See RHIZOME.md.
 
 **Resolution** — See Entity Resolution.

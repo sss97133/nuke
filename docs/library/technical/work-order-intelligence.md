@@ -18,6 +18,7 @@ payload is `structured_data.work_order_resource`:
 | `requirement` | `line_item_id`, `requirement_kind` (`tool`, `equipment`, `facility`, `skill`, `inspection`, `approval`), `description`; paired positive `quantity` + `unit`, or both null when unstated; optional paired `basis_observation_id` + exact `basis_excerpt` |
 | `fulfillment` | `requirement_id`; exactly one resource: `user_tool_id` / `inventory_tool_id` / `equipment_id` / `facility_organization_id` / `performer_actor_id`; exactly one supplier: `supplier_user_id` / `supplier_organization_id`, or both null for an actor candidate; optional paired `available_from`, `available_until`; optional actor basis `basis_line_item_id` + `basis_line_item_snapshot` |
 | `attestation` | `fulfillment_id`; exactly one of `attestor_user_id` / `attestor_organization_id`; `attestation_kind` (`condition`, `suitability`, `permission`, `availability`, `supervision`, `delivery`, `withdrawal`); `verdict` (`supports`, `contradicts`, `unknown`); explicit `scope` |
+| `specification` | `specification_stage` (`requested`, `proposed`, `supplied`, `reported_performed`); `material_role` + `material_label` + `material_key` and/or `process_label` + `process_key`; optional `line_item_id`; exactly one basis: `basis_observation_id` + `basis_excerpt`, `basis_component_event_id` + `basis_snapshot`, or `basis_work_order_part_id` + `basis_snapshot` (see below) |
 
 The service-only `read_work_order_resources(work_order_id)` returns the current graph,
 source IDs and observation/ingestion clocks, plus recorded coverage. Withdrawing or
@@ -69,6 +70,46 @@ settlement, historical replay, or historical job reconstruction. No source colle
 photo-processing holds, paid inference or existing invoices are changed. The focused
 PG17 contract is `supabase/sql/test_work_order_resource_evidence.sql` and is picked up
 by the existing database-contract CI job.
+
+## Work specification: material and process together
+
+`work_order_resource_specifications` holds one attributed material/process claim per
+source observation. Material and process are kept as a pair: a requested scope
+("304 stainless, TIG welded"), a part record, and a reported operation are separate
+claims at separate stages, compared side by side rather than turned into a provider
+qualification judgment. Stages:
+
+- `requested`: quoted from a retained work record (`basis_observation_id` +
+  `basis_excerpt`, same rules and original clock as requirement bases). Required basis.
+- `reported_performed`: from a `component_events` row for the named operation. The
+  operation's `component_event_id` must be that event, and labels must equal a whole
+  recorded metadata value.
+- `supplied` / `proposed`: from a `work_order_parts` row of the same work order with
+  status `installed` / `quoted`. Cancelled and unused parts do not qualify. Parts have no
+  typed operation link, so these claims are work-order scoped; the projector refuses an
+  inferred operation. Matching parts to an operation by cost was tried and is not unique.
+
+Labels are verbatim from the basis (contained in the excerpt or part name, or equal to an
+event metadata value); keys are the derived interpretation. Keys are dotted, coarse to
+fine (`stainless_steel`, `stainless_steel.304`, `welding.tig`). Materials carry a role
+(`workpiece`, `filler`, `consumable`) and are compared only within a role, so an ER308L
+filler rod is never compared with workpiece tubing. Part and event bases store the
+**entire** row as `basis_snapshot`; any later change withholds the claim from current
+reads and refuses duplicate projection. There is no FK to those owners because their
+rows cascade from vehicles and timeline events. The projector and reader run with
+`TimeZone=UTC` so snapshot timestamps compare identically for every caller.
+
+`read_work_order_resources` adds `specifications` (without the snapshot, so part amounts
+are not republished), `specification_comparisons` and `specification_summaries`. Each
+current requested claim is compared with every current non-requested claim on the same
+operation or at work-order scope (`operation_link`). Material and process relations are
+`same`, `different`, `unresolved_specificity` (one key refines the other, e.g. ungraded
+"SS"), `not_stated` or, for material, `different_role_not_compared`. The summary status is
+`conflicting_evidence` when any relation differs, otherwise `consistent`, `unresolved` or
+`no_comparable_evidence`. It always returns substitution approval, scope-change acceptance
+and completion as `not_established` and qualification as `not_assessed`. A conflict says
+the records disagree; it does not decide which record is right or whether a substitution
+was agreed. Contract: `supabase/sql/test_work_order_resource_specifications.sql`.
 
 ## Image objects in job context
 

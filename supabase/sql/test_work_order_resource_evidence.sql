@@ -6,6 +6,7 @@ DO $$ BEGIN
     RAISE EXCEPTION 'Empty disposable PG17 database required';
   END IF;
 END $$;
+SET TimeZone = 'UTC';
 CREATE SCHEMA auth;
 DO $$ BEGIN
   IF NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname='anon') THEN CREATE ROLE anon NOLOGIN; END IF;
@@ -16,8 +17,10 @@ CREATE TABLE auth.users(id uuid PRIMARY KEY);
 CREATE TABLE public.organizations(id uuid PRIMARY KEY);
 CREATE TABLE public.work_orders(id uuid PRIMARY KEY,vehicle_id uuid);
 CREATE TABLE public.actors(id uuid PRIMARY KEY,name text,actor_type text);
+CREATE TABLE public.component_events(id uuid PRIMARY KEY,vehicle_id uuid,work_order_id uuid,metadata jsonb);
+CREATE TABLE public.work_order_parts(id uuid PRIMARY KEY,work_order_id uuid,part_name text,status text);
 CREATE TABLE public.work_order_line_items(id uuid PRIMARY KEY,work_order_id uuid REFERENCES work_orders(id),
- actor_id uuid REFERENCES actors(id),task_description text,updated_at timestamptz);
+ actor_id uuid REFERENCES actors(id),task_description text,component_event_id uuid,updated_at timestamptz);
 CREATE TYPE public.observation_kind AS ENUM ('valuation','condition','specification','work_record');
 CREATE TABLE public.observation_sources(id uuid PRIMARY KEY,slug text UNIQUE,category text,
  supported_observations public.observation_kind[],updated_at timestamptz);
@@ -61,6 +64,7 @@ INSERT INTO vehicle_observations(id,vehicle_id,kind,source_id,observed_at,struct
 \ir ../migrations/20261019005027_work_order_resource_evidence.sql
 \ir ../migrations/20261019013808_work_resource_retained_basis.sql
 \ir ../migrations/20261019030510_work_resource_actor_candidates.sql
+\ir ../migrations/20261019035407_work_order_resource_specifications.sql
 SET ROLE service_role;
 SELECT t_assert(read_work_order_resources('30000000-0000-0000-0000-000000000001')->>'booking_readiness'='not_assessed','empty graph never means ready');
 SELECT t_assert(t_refused($q$SELECT project_work_order_resource_observation('80000000-0000-0000-0000-000000000002')$q$),'fulfillment before requirement refused');
@@ -120,7 +124,7 @@ SET ROLE authenticated;
 SELECT t_assert(t_refused($q$SELECT * FROM work_order_resource_attestations$q$),'signed-in stranger cannot read attestations');
 SELECT t_assert(t_refused($q$SELECT project_work_order_resource_observation('80000000-0000-0000-0000-000000000001')$q$),'signed-in stranger cannot project');
 RESET ROLE;
-SELECT t_assert((SELECT count(*) FROM pipeline_registry WHERE owned_by='project_work_order_resource_observation')=3,'all three projection owners registered');
+SELECT t_assert((SELECT count(*) FROM pipeline_registry WHERE owned_by='project_work_order_resource_observation')=4,'all four projection owners registered');
 
 -- Synthetic fixtures only in the disposable PG17 database guarded above.
 INSERT INTO vehicle_observations(id,vehicle_id,kind,source_id,content_text,observed_at,structured_data)
