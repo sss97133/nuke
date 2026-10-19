@@ -15,6 +15,7 @@ const AgentChat = React.lazy(() => import('../../components/agent/AgentChat'));
 const WorthEngineCard = React.lazy(() => import('./WorthEngineCard'));
 const PhotoAuthenticationCard = React.lazy(() => import('./PhotoAuthenticationCard'));
 const VehicleFindingsCard = React.lazy(() => import('./VehicleFindingsCard'));
+const VehicleWorkCard = React.lazy(() => import('../jobs/VehicleWorkCard'));
 const BuyerQuestionPreview = React.lazy(() => import('../../components/vehicle/BuyerQuestionPreview'));
 const ExternalListingCard = React.lazy(() => import('../../components/vehicle/ExternalListingCard'));
 const VehicleReferenceLibrary = React.lazy(() => import('../../components/vehicle/VehicleReferenceLibrary'));
@@ -243,6 +244,12 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
           {/* Image-Analysis Findings — BYOK identity / powertrain / provenance / evidence rollup */}
           <React.Suspense fallback={null}>
             <VehicleFindingsCard vehicleId={vehicle.id} />
+          </React.Suspense>
+
+          {/* Work — jobs on this vehicle, Plan the work (listing plan + inspection order), Post a job */}
+          <React.Suspense fallback={null}>
+            <VehicleWorkCard vehicleId={vehicle.id} signedIn={!!session?.user?.id}
+              vehicleTitle={[vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(' ')} />
           </React.Suspense>
 
           {/* Description */}

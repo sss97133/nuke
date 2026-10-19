@@ -77,6 +77,9 @@ const ClaimExternalIdentity = React.lazy(() => import('../pages/ClaimExternalIde
 const BaTMembers = React.lazy(() => import('../pages/BaTMembers'));
 const InvoiceManager = React.lazy(() => import('../pages/InvoiceManager'));
 const WorkOrderStatement = React.lazy(() => import('../pages/WorkOrderStatement'));
+// Job loop: open requests board (public) and the signed-in work console
+const JobsBoard = React.lazy(() => import('../pages/jobs/JobsBoard'));
+const WorkPage = React.lazy(() => import('../pages/jobs/WorkPage'));
 const ImportDataPage = React.lazy(() => import('../pages/ImportDataPage'));
 const PhotoSyncPage = React.lazy(() => import('../pages/PhotoSyncPage'));
 const DailyDebrief = React.lazy(() => import('../pages/DailyDebrief'));
@@ -215,6 +218,8 @@ export const DomainRoutes = () => {
         <Route path="/t/:transferId" element={<TransferPartyPage />} />
         {/* Build Coordinator dashboard — public, vehicle-scoped */}
         <Route path="/builds/:vehicleId" element={<BuildDashboard />} />
+        {/* Open requests looking for a technician, inspector, tool or shop space */}
+        <Route path="/jobs" element={<JobsBoard />} />
         {/* Public projections — journal index + day page */}
         <Route path="/journal" element={<JournalIndex />} />
         <Route path="/journal/:date" element={<JournalPage />} />
@@ -279,6 +284,8 @@ export const DomainRoutes = () => {
           <Route path="/restoration" element={<RestorationIntake />} />
           <Route path="/intake/restoration" element={<RestorationIntake />} />
           <Route path="/work-orders/statement" element={<WorkOrderStatement />} />
+          {/* Work console: signature queue and the viewer's jobs */}
+          <Route path="/work" element={<WorkPage />} />
 
 
           {/* Settings (protected) */}
