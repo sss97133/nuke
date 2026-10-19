@@ -223,8 +223,8 @@ ALTER TABLE public.work_orders ADD COLUMN IF NOT EXISTS estimated_labor_cost num
 \ir ../migrations/20261019051336_work_order_scope_operations.sql
 \echo REPLAY 20261019054333_close_work_order_pii_readers.sql
 \ir ../migrations/20261019054333_close_work_order_pii_readers.sql
-\echo REPLAY 20261019060000_actors_contact_columns_service_only.sql
-\ir ../migrations/20261019060000_actors_contact_columns_service_only.sql
+\echo REPLAY 20261019060100_actors_contact_columns_service_only.sql
+\ir ../migrations/20261019060100_actors_contact_columns_service_only.sql
 \echo REPLAY 20261019091500_account_link_claims_actor_bridge.sql
 \ir ../migrations/20261019091500_account_link_claims_actor_bridge.sql
 \echo REPLAY 20261019093000_job_readers_authenticated.sql
