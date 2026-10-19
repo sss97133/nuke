@@ -7,7 +7,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { ListingExportService, ListingExport } from '../services/listingExportService';
+import { ListingExportService, type ListingExport } from '../services/listingExportService';
 
 // ---------------------------------------------------------------------------
 // Style constants

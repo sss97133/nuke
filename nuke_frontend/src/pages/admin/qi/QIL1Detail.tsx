@@ -3,7 +3,7 @@
  * Shows L2 subcategories with bars, all from already-loaded mv_question_intelligence rows
  */
 import { useSearchParams } from 'react-router-dom';
-import { TaxonomyRow, L1_COLORS, fmtK } from './constants';
+import { type TaxonomyRow, L1_COLORS, fmtK } from './constants';
 
 interface Props {
   l1: string;

@@ -5,7 +5,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../../../lib/supabase';
-import { TaxonomyRow, L1_COLORS, fmtK, isValidFieldColumn } from './constants';
+import { type TaxonomyRow, L1_COLORS, fmtK, isValidFieldColumn } from './constants';
 
 interface VehicleMissing {
   vehicle_id: string;
