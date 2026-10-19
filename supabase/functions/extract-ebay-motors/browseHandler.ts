@@ -9,8 +9,9 @@ import { discover, reland } from "./firecrawlSweep.ts";
 import { endcheck } from "./endState.ts";
 import { emptyReport, landItem } from "./browseSweep.ts";
 import { pageToItem, parseItemPage } from "./ebayPage.ts";
+import { landArchived, validCaptures } from "./archiveLand.ts";
 
-export const BROWSE_ACTIONS = ["sweep", "revisit", "aspects", "status", "preview", "discover", "deep", "reland", "endcheck"];
+export const BROWSE_ACTIONS = ["sweep", "revisit", "aspects", "status", "preview", "discover", "deep", "reland", "endcheck", "archive"];
 const json = (b: unknown, status = 200) => new Response(JSON.stringify(b), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
 export async function handleBrowse(supabase: any, body: any): Promise<Response> {
@@ -23,6 +24,15 @@ export async function handleBrowse(supabase: any, body: any): Promise<Response> 
   }
   if (body.action === "endcheck") { const rep = await endcheck(supabase, firecrawlFetcher(supabase, "ebay_motors"), { confirmMax: body.confirm_max, dailyCap: body.daily_cap, dryRun: body.dry_run === true, tiers: body.tiers, skipCensus: body.skip_census === true }); return json(rep, rep.ok ? 200 : 500); }
   if (body.action === "reland") { const rep = await reland(supabase, { limit: body.limit, offset: body.offset }); return json(rep, rep.ok ? 200 : 500); }
+  if (body.action === "archive") {     // archived item pages (Wayback Machine captures): free; clocks are the capture's
+    const caps = validCaptures(body.captures);
+    if (!caps.length) return json({ ok: false, error: "captures: [{ timestamp: 'YYYYMMDDhhmmss', original: 'http://cgi.ebay.com/...' }] (max 10)" }, 400);
+    const rep = emptyReport(body.dry_run === true ? "archive_dry_run" : "archive");
+    const results = [];
+    for (const c of caps) results.push(await landArchived(supabase, c, rep, body.dry_run === true));
+    if (rep.errors.length) rep.ok = false;
+    return json({ ...rep, results }, 200);
+  }
   if (body.action === "deep") {         // one item page: read, parse, and (unless dry_run) land
     const url = String(body.url ?? "");
     if (!/^https:\/\/(www\.)?ebay\.com\/itm\/\d{6,}/.test(url)) return json({ ok: false, error: "url must be an ebay.com/itm/<id> link" }, 400);
