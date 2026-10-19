@@ -16,7 +16,7 @@ payload is `structured_data.work_order_resource`:
 | Event | Required payload beyond `version: 1`, `event_type`, `work_order_id` |
 |---|---|
 | `requirement` | `line_item_id`, `requirement_kind` (`tool`, `equipment`, `facility`, `skill`, `inspection`, `approval`), `description`; paired positive `quantity` + `unit`, or both null when unstated; optional paired `basis_observation_id` + exact `basis_excerpt` |
-| `fulfillment` | `requirement_id`; exactly one of `supplier_user_id` / `supplier_organization_id`; exactly one of `user_tool_id` / `inventory_tool_id` / `equipment_id` / `facility_organization_id`; optional paired `available_from`, `available_until` |
+| `fulfillment` | `requirement_id`; exactly one resource: `user_tool_id` / `inventory_tool_id` / `equipment_id` / `facility_organization_id` / `performer_actor_id`; exactly one supplier: `supplier_user_id` / `supplier_organization_id`, or both null for an actor candidate; optional paired `available_from`, `available_until`; optional actor basis `basis_line_item_id` + `basis_line_item_snapshot` |
 | `attestation` | `fulfillment_id`; exactly one of `attestor_user_id` / `attestor_organization_id`; `attestation_kind` (`condition`, `suitability`, `permission`, `availability`, `supervision`, `delivery`, `withdrawal`); `verdict` (`supports`, `contradicts`, `unknown`); explicit `scope` |
 
 The service-only `read_work_order_resources(work_order_id)` returns the current graph,
@@ -41,10 +41,28 @@ authenticate the attestor or establish supplier authority. Several alternatives 
 coexist. Personal inventory may represent multiple tools, so its ID is not an exclusive
 physical-unit reservation. Tool requirements accept personal or shop tool/equipment
 references; equipment and facility requirements require their respective reference.
-Skill, inspection and approval requirements remain unresolved until participant-specific
-fulfillment is implemented. No resource conflicts are adjudicated because no capacity
+Skill and inspection requirements accept a canonical `actors` reference; approval
+requirements remain unresolved. No resource conflicts are adjudicated because no capacity
 is reserved. The reader explicitly returns booking readiness and permission authority
 as `not_assessed`, and reservation/payment flags as false—even for a populated graph.
+
+Participant candidates reuse `actors`, the canonical vehicle-work actor registry. Actor
+names, types, specialties and legacy capability counts do not establish verified skill.
+They are not merged with `technicians`, `auth.users` or shop identity by name. The supplier
+is a separate attributed contracting party and can remain unknown for an actor candidate.
+An optional retained assignment basis must name the requirement's exact operation and
+performer and equal the **entire** current line-item row as JSON. Store that snapshot in
+`work_order_resource.basis_line_item_snapshot`. Any row revision conservatively withholds
+the candidate and its attestations from current reads; duplicate projections also refuse
+the stale basis. Independent alternatives remain available. History is retained.
+
+Derived candidates use the existing `internal-inference` source (now also supporting
+`work_record`) through sanctioned intake. Their observation clock records the interpretation;
+the snapshot preserves the operation's own clocks without asserting a physical-work time.
+The reader exposes extraction method, confidence, the source's `interpretation`, candidate
+basis, contracting-party status and canonical actor label. Account linkage and qualification
+remain `not_assessed`. A supported candidate may still disagree with the requested process;
+record that disagreement in the source interpretation rather than declaring fulfillment.
 
 This is the backend evidence relation, not completed booking, authenticated sign-off,
 settlement, historical replay, or historical job reconstruction. No source collection,

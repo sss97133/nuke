@@ -54,6 +54,11 @@ same-vehicle operation, original excerpt and clock → immutable requirement →
 resource arrangements → scoped reported attestations. `read_work_order_resources`
 excludes chains whose original basis was superseded or reattributed. Unstated quantities
 remain null; booking readiness, provider authority and compensation remain unassessed.
+For skill/inspection, an existing canonical actor can be a candidate independently of
+the contracting user/shop. Retained operation attribution → exact full-row snapshot →
+derived actor candidate; a changed operation withholds that candidate and its descendants.
+Other arrangements survive independently. Actor identity is not an authenticated account,
+skill certification, accepted assignment or permission grant.
 Payload and limitations: [Work Order Intelligence](../work-order-intelligence.md).
 
 These schematics describe the system as it exists in code, not as an aspirational design. Where the current implementation diverges from the encyclopedia specification, both states are documented and the gap is called out.
