@@ -1478,6 +1478,32 @@ vehicles and their public sales groups, alongside conserved Lotus totals. This i
 only once checked merge, CI deployment, fold rebuilds and anonymous runtime checks are recorded in
 ~/nuke-logs/model-identity-lotus-20261019/. Other catalog candidates are not certified by this slice.
 
+### Civic identity admission corrected, prepared 2026-10-19 UTC
+
+The next bounded repair starts with retained City and Legend presentations incorrectly returned
+as Civic. The current Civic name bucket contains195 names representing1,873 dictionary records;
+these are classification inputs, not physical-asset or fleet-readiness counts. Honda's own Civic,
+City and Legend histories establish their distinct model identities. The Civic reference contains
+15 unrelated/generic aliases, including the single letter s. Remove those broad admissions, retain
+the eight Civic aliases, add City/Legend through canonical_models, and keep unassessed names
+unresolved. Source labels, bundle descriptions and superseded reference aliases remain intact.
+No claim that a City/Motocompo bundle is a single physical vehicle is introduced.
+
+Twelve actual-fold/intake cases cover City/Legend, valid Civic variants, existing Acty/S2000/Accord,
+and generic or unassessed negatives. Source rows and aggregate sale counts/dollars are conserved.
+One saved Civic fit is retained privately and withheld through record_family_price_index until
+qualified refitting; no affected registered profile was found. Acceptance must return to the
+exact retained City/Legend vehicles through the public reader after deployment and view rebuilds.
+Exact stages and private receipts belong in ~/nuke-logs/model-identity-honda-civic-20261019/.
+
+The preceding Lotus repair is now deployed and runtime-verified (PR2097). Its runtime dependency
+check also found one saved composite Elise fit beyond the three directly revised catalog keys;
+that fit was preserved privately and withheld through its sanctioned writer. Original specimens
+from2006/2015 were checked through the public historical fold, and the chart's intentional five-year
+window was checked separately. Saved-fit checks must include composite families losing members,
+not only edited catalog IDs. The public535-row Lotus year-price result matched its bounded
+independent reference. This closes that repair, not a full-catalog certification.
+
 ## 13. Aspiration: twenty stacks the model must be able to carry (owner, 2026-10-06)
 
 **Owner direction, 2026-10-06 23:35Z.** "This scale is where we should be starting at every session: we are combing
