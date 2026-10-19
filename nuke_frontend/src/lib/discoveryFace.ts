@@ -35,7 +35,51 @@ export type FacePage = {
   image?: string | null;
   type?: 'website' | 'article' | 'profile';
   body: string;
+  /** Inserted before </head>: critical CSS for the server-drawn header and the header payload the app paints from. */
+  head?: string;
 };
+
+/**
+ * The kit and job-page rules the server-drawn header uses, copied verbatim so the header the app draws on mount has the
+ * same size and place as the one painted first (src/kit/kit.css and pages/jobs/job-page.css stay the source;
+ * discovery.test.ts fails when a rule here no longer appears there).
+ */
+export const HEADER_CSS_RULES = [
+  ".k-entity  { font: 700 20px/1.1 Arial, sans-serif; letter-spacing: -0.02em; color: var(--text); }",
+  ".k-body    { font: 400 10px/1.5 Arial, sans-serif; color: var(--text); }",
+  ".k-caption { font: 400 9px/1.4 'Courier New', monospace; color: var(--text-secondary); }",
+  ".k-section { border-bottom: 2px solid var(--border); padding: 8px 12px; background: var(--surface); }",
+  ".k-masthead { display: flex; align-items: center; gap: 12px; min-height: 36px; }",
+  ".k-masthead__result { margin-left: auto; text-align: right; }",
+  ".job-page { max-width: 960px; margin: 0 auto; }",
+  ".job-masthead { display: grid; gap: 2px; min-width: 0; }",
+  ".job-link { color: var(--text); text-decoration: underline; text-underline-offset: 2px; }",
+];
+const HEADER_CSS = `<style id="nuke-face-css">${HEADER_CSS_RULES.join('')}` +
+  '@media (max-width: 420px){.k-masthead{flex-wrap:wrap}.k-masthead__result{margin-left:0;text-align:left}}</style>';
+
+export const JOB_HEADER_ID = 'nuke-job-header';
+
+/** Public header fields the job page paints before its own read returns. Never payments, people or contact fields. */
+export function jobHeaderPayload(workOrderId: string, path: J): Record<string, unknown> {
+  const stages = obj(path.stages);
+  const states: Record<string, string> = {};
+  for (const k of STAGE_ORDER) { const st = str(obj(stages?.[k])?.state); if (st) states[k] = st; }
+  const v = obj(path.vehicle_label);
+  return {
+    work_order_id: workOrderId,
+    display_title: str(path.display_title),
+    vehicle_label: v ? { text: vehicleText(v) } : null,
+    vehicle_id: str(path.vehicle_id),
+    request_source_label: str(path.request_source_label),
+    stages: states,
+  };
+}
+
+/** JSON inside a script tag, with '<' escaped so no value can close the tag. */
+export function jsonScript(id: string, value: unknown): string {
+  return `<script type="application/json" id="${id}">${JSON.stringify(value).replace(/</g, '\\u003c')}</script>`;
+}
 
 const KIND: Record<string, string> = { skill: 'Skill', inspection: 'Inspection', tool: 'Tool', equipment: 'Equipment', facility: 'Shop space', approval: 'Approval' };
 const kindWord = (k: string | null) => (k ? KIND[k] ?? sentence(k) : 'Request');
@@ -103,11 +147,18 @@ export function jobFace(workOrderId: string, path: J, resources: J | null, image
     return st ? `<dt>${escapeHtml(STAGE_WORD[k])}</dt><dd>${escapeHtml(STATE_WORD[st] ?? sentence(st).toLowerCase())}</dd>` : '';
   }).join('');
   const reqItems = reqs.slice(0, 20).map(r => `<li>${escapeHtml(`${kindWord(str(r.requirement_kind))}: ${clip(str(r.description) ?? 'no description', 200)}`)}</li>`).join('');
-  const body = `<article><h1>${escapeHtml(title)}</h1>${vehicle ? `<p>${escapeHtml(vehicle)}</p>` : ''}` +
+  const vid = str(path.vehicle_id);
+  const source = str(path.request_source_label);
+  // The same header markup the job page's Masthead draws, so the first paint and the app's header match.
+  const header = `<header class="k-section k-masthead"><div class="job-masthead"><h1 class="k-entity">${escapeHtml(title)}</h1>` +
+    (vehicle ? (vid ? `<a class="job-link" href="${SITE}/vehicle/${escapeHtml(vid)}"><span class="k-body">${escapeHtml(vehicle)}</span></a>` : `<span class="k-body">${escapeHtml(vehicle)}</span>`) : '') +
+    `</div>${source ? `<div class="k-masthead__result"><span class="k-caption">${escapeHtml(source)}</span></div>` : ''}</header>`;
+  const body = `<article class="job-page">${header}<section class="k-section">` +
     (stageRows ? `<h2>Job path</h2><dl>${stageRows}</dl>` : '') +
     (reqs.length ? `<h2>What it needs</h2><ol>${reqItems}</ol>${reqs.length > 20 ? `<p>The first 20 of ${reqs.length} are listed.</p>` : ''}` : '') +
-    `<p>Stages show what is on record, not verified. Payments are shown only to the people on the job. <a href="${SITE}/jobs">More open requests</a></p></article>`;
-  return { title: `${title} | Nuke jobs`, description, path: `/jobs/${workOrderId}`, image, type: 'article', body };
+    `<p>Stages show what is on record, not verified. Payments are shown only to the people on the job. <a href="${SITE}/jobs">More open requests</a></p></section></article>`;
+  return { title: `${title} | Nuke jobs`, description, path: `/jobs/${workOrderId}`, image, type: 'article', body,
+    head: HEADER_CSS + jsonScript(JOB_HEADER_ID, jobHeaderPayload(workOrderId, path)) };
 }
 
 // ── /providers/:handle ─────────────────────────────────────────────────────
@@ -169,6 +220,7 @@ export function injectPage(html: string, page: FacePage): string {
   html = setMeta(html, /<meta name="twitter:title" content="[^"]*"\s*\/>/, `<meta name="twitter:title" content="${t}" />`);
   html = setMeta(html, /<meta name="twitter:description" content="[^"]*"\s*\/>/, `<meta name="twitter:description" content="${d}" />`);
   html = setMeta(html, /<meta name="twitter:image" content="[^"]*"\s*\/>/, `<meta name="twitter:image" content="${image}" />`);
+  if (page.head) html = html.replace('</head>', `${page.head}\n</head>`);
   // React's createRoot replaces everything inside #root on mount; readers without JavaScript keep this.
   return html.replace('<div id="root"></div>', `<div id="root">${page.body}</div>`);
 }
