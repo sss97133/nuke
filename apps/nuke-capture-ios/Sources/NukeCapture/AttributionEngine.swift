@@ -9,18 +9,13 @@
 //     • VIN OCR + fuzzy-match against the owner's known VINs  → DEFINITIVE
 //       (validated on a real worn 1984 plate: G→6 misread recovered at edit-dist 1)
 //   PASS B (the sequence — "images are linear"):
-//     • a session = one day at one GPS cell = one truck. If ANY frame in a
-//       session got a VIN hit, the whole session inherits that vehicle.
+//     • legacy day/GPS buckets suggest an anchored vehicle; this is not yet
+//       sufficient for automatic walk-around session filing.
 //
-// Trust: nothing here writes vehicle_id. A VIN match and a session inheritance are both
-// SUGGESTIONS (auto_suggested_vehicle_id + confidence + reasons); the owner files them in
-// the confirm sheet, which goes through attribute_image_session → attribute_testimony
-// (audited). The VIN match used to write vehicle_id with a raw client UPDATE, outside the
-// sanctioned writers and without an audit row (2026-10-15).
-//
-// The vehicles matched against are every vehicle the account holds by user_id OR owner_id:
-// user_id alone saw 5 VINs of the owner's 211 vehicles and missed the Charger and the
-// Mustang, which he holds by owner_id.
+// Direct serial reads file through the existing audited device writers. Contextual
+// session inheritance below still produces suggestions; it must not be mistaken for
+// the completed capture-session resolver. Local original-byte OCR is reused before
+// any fresh reading. Known targets include the account's contributor associations.
 //
 // Feature-print similarity is deliberately NOT the decider: the live test
 // proved Apple's generic print can't separate same-bodystyle trucks
@@ -49,6 +44,7 @@ final class AttributionEngine: ObservableObject {
         let longitude: Double?
         let taken_at: String?
         let exif_data: Exif?
+        let file_hash: String?
     }
     private struct SuggestUpdate: Encodable {
         let auto_suggested_vehicle_id: String
@@ -98,8 +94,13 @@ final class AttributionEngine: ObservableObject {
         // screen task to populate the album catalog before trying to file its new photos.
         await LibraryStore.shared.refreshAlbums()
         let knownVINs = knownVehicles.compactMap { $0.vin?.uppercased() }.filter { $0.count >= 8 }
-        let vinToVehicle = Dictionary(knownVehicles.compactMap { v in v.vin.map { ($0.uppercased(), v.id) } },
-                                      uniquingKeysWith: { first, _ in first })
+        let vinToVehicle = Self.unambiguousSerialVehicles(knownVehicles.compactMap { v in
+            v.vin.map { (serial: $0, vehicleId: v.id) }
+        })
+        let catalog = LibraryStore.shared.albumCatalog
+        let localPhotos = Dictionary(((catalog?.photos ?? []) + (catalog?.albums.flatMap(\.photos) ?? []))
+            .map { ($0.localIdentifier, $0) }, uniquingKeysWith: { first, _ in first })
+        let method = LibraryIngest.albumMethodVersion
 
         guard !orphans.isEmpty else { lastSummary = "No orphan photos to attribute"; return true }
         progress = (0, orphans.count)
@@ -116,22 +117,34 @@ final class AttributionEngine: ObservableObject {
         for row in orphans {
             defer { progress.done += 1 }
             guard !Task.isCancelled else { return false }
-            guard read < ocrBudget else { break }
-            guard let assetID = row.exif_data?.uuid,
-                  let cg = await VisionEngine.loadCGImage(assetID: assetID, maxPixel: 1600) else { skippedNonLocal += 1; continue }
-            read += 1
-
-            // Classify and OCR off the main actor (accurate OCR is seconds per frame).
-            let vins = knownVINs
-            let (isVehicle, match, unknown) = await Task.detached(priority: .utility) { () -> (Bool, (vin: String, editDistance: Int)?, String?) in
-                let lines = VisionEngine.recognizeText(cg)
-                let m = vins.isEmpty ? nil : VisionEngine.matchSerial(in: lines, known: vins)
-                // A 17-character VIN with a valid check digit that matches none of the vehicles.
-                let fresh = m == nil
-                    ? VisionEngine.vinCandidates(in: lines).first(where: { VisionEngine.isValidVIN($0) && !vins.contains($0) })
-                    : nil
-                return (VisionEngine.classify(cg)?.isVehicle ?? false, m, fresh)
-            }.value
+            guard let assetID = row.exif_data?.uuid else { skippedNonLocal += 1; continue }
+            // Foreground sync has a zero *new* OCR budget. It must still consume original-byte
+            // reads already retained by LibraryIngest, qualified by source and method version.
+            let cached: LocalAlbumImageReview?
+            if let photo = localPhotos[assetID] {
+                cached = try? await Task.detached {
+                    try LocalStore.shared.albumImageReview(for: photo, methodVersion: method)
+                }.value
+            } else { cached = nil }
+            let lines: [String]
+            let isVehicle: Bool
+            if let cached, cached.inputSHA256 == row.file_hash {
+                lines = cached.textLines + cached.vinCandidates
+                isVehicle = cached.isVehicle
+            } else {
+                guard read < ocrBudget else { continue }
+                guard let cg = await VisionEngine.loadCGImage(assetID: assetID, maxPixel: 1600) else {
+                    skippedNonLocal += 1; continue
+                }
+                read += 1
+                (lines, isVehicle) = await Task.detached(priority: .utility) {
+                    (VisionEngine.recognizeText(cg), VisionEngine.classify(cg)?.isVehicle ?? false)
+                }.value
+            }
+            let match = knownVINs.isEmpty ? nil : VisionEngine.matchSerial(in: lines, known: knownVINs)
+            let unknown = match == nil ? VisionEngine.vinCandidates(in: lines).first(where: {
+                VisionEngine.isValidVIN($0) && !knownVINs.contains($0)
+            }) : nil
             var vinVehicleId: String? = nil, vinDist: Int? = nil
             if let m = match {
                 vinVehicleId = vinToVehicle[m.vin]; vinDist = m.editDistance; if vinVehicleId != nil { vinHits += 1 }
@@ -203,8 +216,11 @@ final class AttributionEngine: ObservableObject {
         }
 
         // Fallback and sessions: what the server did not file stays a suggestion for the owner.
-        var sessionVehicle: [String: String] = [:]
-        for s in signals where s.vinVehicleId != nil { sessionVehicle[s.session] = s.vinVehicleId }
+        // A shop cell can contain several cars. Preserve competing anchors rather
+        // than silently taking the final VIN in database order.
+        let sessionVehicle = Self.unambiguousSerialVehicles(signals.compactMap { signal in
+            signal.vinVehicleId.map { (serial: signal.session, vehicleId: $0) }
+        })
         var suggested = 0, unresolved = 0
         for s in signals where !completedIDs.contains(s.row.id) {
             if let vid = s.vinVehicleId {
@@ -213,7 +229,7 @@ final class AttributionEngine: ObservableObject {
                               reasons: ["vin_ocr_match", "edit_distance=\(s.vinDist ?? 0)"])
                 suggestionByImage[s.row.id] = vid
                 suggested += 1
-            } else if let vid = sessionVehicle[s.session], s.isVehicle {
+            } else if let vid = sessionVehicle[s.session.uppercased()], s.isVehicle {
                 await suggest(imageId: s.row.id, vehicleId: vid, conf: 0.80,
                               reasons: ["session_inheritance", "vin_anchored_session", "session=\(s.session)"])
                 suggestionByImage[s.row.id] = vid
@@ -406,14 +422,32 @@ final class AttributionEngine: ObservableObject {
         return "\(day)|\(lat),\(lon)"
     }
 
+    /// Duplicate serial claims retain ambiguity instead of choosing whichever row arrived first.
+    nonisolated static func unambiguousSerialVehicles(_ entries: [(serial: String, vehicleId: String)]) -> [String: String] {
+        let grouped = Dictionary(grouping: entries, by: { $0.serial.uppercased() })
+        return grouped.compactMapValues { rows in
+            let ids = Set(rows.map(\.vehicleId))
+            return ids.count == 1 ? ids.first : nil
+        }
+    }
+
     private func fetchKnownVehicles(userId: String) async throws -> [VehicleRow] {
-        return try await SupabaseService.client.from("vehicles")
-            .select("id, vin").or("user_id.eq.\(userId),owner_id.eq.\(userId)").execute().value
+        struct Params: Encodable { let p_user: String }
+        let ids: [String] = try await SupabaseService.client.rpc("user_associated_vehicle_ids",
+            params: Params(p_user: userId)).execute().value
+        var vehicles: [VehicleRow] = []
+        for start in stride(from: 0, to: ids.count, by: 200) {
+            let chunk = Array(ids[start..<min(start + 200, ids.count)])
+            let rows: [VehicleRow] = try await SupabaseService.client.from("vehicles")
+                .select("id, vin").in("id", values: chunk).execute().value
+            vehicles.append(contentsOf: rows)
+        }
+        return vehicles
     }
 
     private func fetchOrphans(userId: String, limit: Int) async throws -> [OrphanRow] {
         return try await SupabaseService.client.from("vehicle_images")
-            .select("id, latitude, longitude, taken_at, exif_data")
+            .select("id, latitude, longitude, taken_at, exif_data, file_hash")
             .eq("user_id", value: userId)
             .is("vehicle_id", value: nil)
             .eq("source", value: Config.sourceTag)

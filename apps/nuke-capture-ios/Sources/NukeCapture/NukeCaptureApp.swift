@@ -137,6 +137,7 @@ struct NukeCaptureApp: App {
                     // charging at a nominal temperature, never as a cost of opening the app.
                     if LibraryIngest.mayReviewInForeground {
                         await LibraryIngest.shared.runAlbumReview(budget: 24)
+                        await AttributionEngine.shared.run(limit: 500, ocrBudget: 0)
                     }
                     await LibraryIngest.shared.syncNativeAlbums()
                     await LibraryIngest.shared.runHeadPass(limit: 300)
@@ -265,7 +266,11 @@ struct NukeCaptureApp: App {
             // Then ATTRIBUTE: route the day's freshly-uploaded orphans home
             // on-device (VIN-match + session inheritance). This is the nightly
             // charging-window slot — upload, then send photos to their vehicle.
-            await AttributionEngine.shared.run(limit: 500, ocrBudget: 200)
+            // Retain reusable original-byte reads before filing. The same source/method
+            // receipts serve future foreground passes without repeating OCR.
+            await LibraryStore.shared.refreshAlbums()
+            await LibraryIngest.shared.runAlbumReview(budget: 200)
+            await AttributionEngine.shared.run(limit: 500, ocrBudget: 0)
             // Reschedule when work remains — the upload queue still has assets, the
             // drain bailed early (metered link / paused / cancelled), or the
             // local-store backlog isn't fully indexed yet.
