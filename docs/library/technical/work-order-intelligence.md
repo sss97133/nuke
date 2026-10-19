@@ -431,6 +431,30 @@ access and implies no seller permission; no organization, inspector, price or pa
 reports `estimate_recorded` for every row, including inspections. That is an existing trap,
 not a price. Contract: `supabase/sql/test_inspection_request.sql`.
 
+`record_inspection_findings(p_inspection_work_order_id, p_findings)` is the inspector's Sign.
+Who may record (`inspection_findings_role`) follows the `issue_work_order_quote` rule: an active
+owner of the inspection job's organization, or an evidenced identity bridge to its lead actor
+or to the actor the client assigned on the inspect operation. Never the customer, and a
+`self_claim` is not enough.
+
+`p_findings` is the closed `inspection.json` event shape (`summary`, `findings[]` with
+`system` / `finding` / `severity` / `evidence_photo_ref`, `inspection_type`, `inspector_role`,
+`zones_inspected`, `overall_condition`, `deferred_maintenance_minutes`, `photos_referenced`),
+plus an optional `inspected_at`. A finding that answers a checklist item carries its `item_id`
+and a `verdict` (`supports` / `contradicts` / `unknown`) against that claim.
+
+Each report is one signed `owner-input` work record. Its `content_text` renders the findings,
+so a parent requirement or specification can quote them as `basis_observation_id` +
+`basis_excerpt`; that is how findings feed the parent plan. Reports are append-only. A verdict
+is testimony about one claim, not a price, an approval or seller permission.
+
+`work_order_inspection_read(p_work_order_id)` is open to anon and authenticated callers. For an
+inspection job, or for a parent's linked inspections, it returns the checklist, reports and
+findings, the recorder by public handle or `unnamed party`, coverage, quote state and
+`seller_permission: not_established`. Personal free text and raw ids go to parties only. A
+non-public vehicle is shown only to slot holders. Contract:
+`supabase/sql/test_inspection_findings.sql`.
+
 ## Job path self-measurement
 
 `read_work_order_job_path(work_order_id)` reports one work order's evidence across seven
