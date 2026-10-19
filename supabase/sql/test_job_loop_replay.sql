@@ -400,6 +400,8 @@ CREATE TABLE IF NOT EXISTS public.organization_capabilities(id uuid PRIMARY KEY 
 \ir ../migrations/20261020130000_requirement_key_exclusions_trim_steering.sql
 \echo REPLAY 20261020135000_skill_supply_corroboration.sql
 \ir ../migrations/20261020135000_skill_supply_corroboration.sql
+\echo REPLAY 20261020160000_job_market_health.sql
+\ir ../migrations/20261020160000_job_market_health.sql
 -- Plan check and final state.
 \set replay_problems `scripts/ci/job-loop-replay-check.sh | tr '\n' ' '`
 SELECT t_assert(btrim(:'replay_problems') = '', 'replay plan covers the build in filename order: ' || COALESCE(NULLIF(btrim(:'replay_problems'), ''), 'ok'));
