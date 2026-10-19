@@ -15,7 +15,7 @@ payload is `structured_data.work_order_resource`:
 
 | Event | Required payload beyond `version: 1`, `event_type`, `work_order_id` |
 |---|---|
-| `requirement` | `line_item_id`, `requirement_kind` (`tool`, `equipment`, `facility`, `skill`, `inspection`, `approval`), `description`, positive `quantity`, `unit` |
+| `requirement` | `line_item_id`, `requirement_kind` (`tool`, `equipment`, `facility`, `skill`, `inspection`, `approval`), `description`; paired positive `quantity` + `unit`, or both null when unstated; optional paired `basis_observation_id` + exact `basis_excerpt` |
 | `fulfillment` | `requirement_id`; exactly one of `supplier_user_id` / `supplier_organization_id`; exactly one of `user_tool_id` / `inventory_tool_id` / `equipment_id` / `facility_organization_id`; optional paired `available_from`, `available_until` |
 | `attestation` | `fulfillment_id`; exactly one of `attestor_user_id` / `attestor_organization_id`; `attestation_kind` (`condition`, `suitability`, `permission`, `availability`, `supervision`, `delivery`, `withdrawal`); `verdict` (`supports`, `contradicts`, `unknown`); explicit `scope` |
 
@@ -24,6 +24,16 @@ source IDs and observation/ingestion clocks, plus recorded coverage. Withdrawing
 reattributing a requirement source excludes its dependent offers and attestations from
 the current graph. Original projections remain immutable. Anonymous and authenticated
 roles receive no grants; neither the public resolver nor existing access policies change.
+
+Historical source reconstruction uses `basis_observation_id` and `basis_excerpt` on
+requirements. The projector checks that the original is a current, same-vehicle
+`work_record`, contains the exact excerpt, and has the same `observed_at` as the
+interpretation. The original cannot itself be a resource projection. A legacy original
+may lack source attribution; the new interpretation still requires an attributed source
+and must disclose its method. This establishes citation custody, not mechanical correctness
+or the speaker's authenticated identity. The reader exposes the interpretation's method
+and confidence; withdrawal or reattribution of the original excludes the whole derived
+chain, including on duplicate projection attempts. Unknown quantities stay null.
 
 A fulfillment is a **candidate arrangement**, and an attestation is a **reported
 statement**, including when its kind is `permission`. This projection does not

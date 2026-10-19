@@ -46,6 +46,16 @@ configuration remains unresolved. The function migration ships only through exis
 
 ## How to Read These Documents
 
+### Work-order resource evidence (2026-10-19)
+
+Retained private work record → explicitly attributed interpretation through
+`ingest-observation` → `project_work_order_resource_observation` validates the
+same-vehicle operation, original excerpt and clock → immutable requirement → candidate
+resource arrangements → scoped reported attestations. `read_work_order_resources`
+excludes chains whose original basis was superseded or reattributed. Unstated quantities
+remain null; booking readiness, provider authority and compensation remain unassessed.
+Payload and limitations: [Work Order Intelligence](../work-order-intelligence.md).
+
 These schematics describe the system as it exists in code, not as an aspirational design. Where the current implementation diverges from the encyclopedia specification, both states are documented and the gap is called out.
 
 ASCII diagrams use the following conventions:
