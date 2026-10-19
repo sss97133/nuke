@@ -403,6 +403,34 @@ Not yet: change orders as their own event, and deposit and payment links.
 Contracts: `supabase/sql/test_work_order_quotes.sql`, `test_work_order_quote_issue.sql`,
 `test_work_order_quotes_open_read.sql`.
 
+## Inspection as its own job
+
+An inspection, when ordered or priced, is its own `work_orders` row (`scope_category =
+'inspection'`). The inspector can be a different person from whoever executes the work. The
+pre-purchase inspection (PPI) of a listing vehicle is the first paid job, and it runs on a
+vehicle the client does not own.
+
+`request_inspection(p_vehicle_id, p_parent_work_order_id, p_scope)` is the client's Sign. The
+vehicle must be public or one the client can access. A parent must be the client's own work
+order on the same vehicle. `p_scope` accepts the vehicle entry from `buying-evidence --plan`
+(`ppi_checklist`) or `{checklist}` (at most 50 one-line questions), plus `inspection_type`
+(default `pre_purchase`), `request_source` (`ios` or `web`), `listing_url` and an optional
+`parent_line_item_id`. The Sign writes:
+
+- one `owner-input` work record with the normalized checklist;
+- the work order, with the client as customer, `parent_work_order_id`, and `request_observation_id`
+  naming that record;
+- through the projector, one `inspect` operation quoting the job's description, and an
+  `inspection` requirement on it whose basis is the request;
+- with `parent_line_item_id`, an `inspection` requirement on that parent operation.
+
+`work_order_link_guard` allows a parent link only with the matching request record, and keeps
+the links (and a requested inspection's vehicle) immutable. The request grants no vehicle
+access and implies no seller permission; no organization, inspector, price or payment is set.
+`calculate_work_order_estimate` writes `estimated_total = 0` on every insert, so the job path
+reports `estimate_recorded` for every row, including inspections. That is an existing trap,
+not a price. Contract: `supabase/sql/test_inspection_request.sql`.
+
 ## Job path self-measurement
 
 `read_work_order_job_path(work_order_id)` reports one work order's evidence across seven
