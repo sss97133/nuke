@@ -13,7 +13,7 @@ import {
   technicianLinkOf, toolCategories,
 } from './providerRead';
 import { ContactViaNuke } from './ContactViaNuke';
-import '../jobs/jobs.css';
+import '../jobs/job-page.css';
 
 type Subject = { p_user_id: string } | { p_actor_id: string };
 

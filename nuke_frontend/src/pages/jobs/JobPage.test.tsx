@@ -43,7 +43,7 @@ function quotes(viewer: object) {
 
 let root: Root, host: HTMLDivElement;
 beforeEach(() => {
-  (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
+  (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   fixture.readers = {};
   fixture.rpc.mockReset();
   fixture.rpc.mockImplementation((name: string) => Promise.resolve(

@@ -10,7 +10,8 @@ vi.mock('../../hooks/useAuth', () => ({ useAuth: () => ({ user: fixture.user, se
 vi.mock('../../lib/supabase', () => ({ supabase: {
   rpc: fixture.rpc,
   from: () => {
-    const q: any = { select: () => q, eq: () => q, maybeSingle: () => Promise.resolve({ data: fixture.profileId ? { id: fixture.profileId } : null, error: null }) };
+    type Query = { select: () => Query; eq: () => Query; maybeSingle: () => Promise<{ data: { id: string } | null; error: null }> };
+    const q: Query = { select: () => q, eq: () => q, maybeSingle: () => Promise.resolve({ data: fixture.profileId ? { id: fixture.profileId } : null, error: null }) };
     return q;
   },
 } }));
@@ -56,7 +57,7 @@ const productivity = { as_of: '2026-10-19T19:00:00Z', range: { from: '2026-07-21
 
 let root: Root, host: HTMLDivElement;
 beforeEach(() => {
-  (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
+  (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   fixture.user = null;
   fixture.profileId = 'u-1';
   fixture.readers = { provider_profile_read: profile('visitor'), provider_job_record_read: jobs, provider_productivity_read: productivity };

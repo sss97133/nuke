@@ -12,7 +12,7 @@ import {
   type JobAction, type JsonObject, type Stage, type Viewer,
 } from './jobRead';
 import { readJob, type Load } from './readJob';
-import './jobs.css';
+import './job-page.css';
 
 const READERS = {
   operations: { rpc: 'work_order_operations_read', title: 'Operations' },

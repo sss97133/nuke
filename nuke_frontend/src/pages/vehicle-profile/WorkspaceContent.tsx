@@ -15,7 +15,6 @@ const AgentChat = React.lazy(() => import('../../components/agent/AgentChat'));
 const WorthEngineCard = React.lazy(() => import('./WorthEngineCard'));
 const PhotoAuthenticationCard = React.lazy(() => import('./PhotoAuthenticationCard'));
 const VehicleFindingsCard = React.lazy(() => import('./VehicleFindingsCard'));
-const VehicleWorkOrdersCard = React.lazy(() => import('./VehicleWorkOrdersCard'));
 const BuyerQuestionPreview = React.lazy(() => import('../../components/vehicle/BuyerQuestionPreview'));
 const ExternalListingCard = React.lazy(() => import('../../components/vehicle/ExternalListingCard'));
 const VehicleReferenceLibrary = React.lazy(() => import('../../components/vehicle/VehicleReferenceLibrary'));
@@ -244,11 +243,6 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
           {/* Image-Analysis Findings — BYOK identity / powertrain / provenance / evidence rollup */}
           <React.Suspense fallback={null}>
             <VehicleFindingsCard vehicleId={vehicle.id} />
-          </React.Suspense>
-
-          {/* Work — the vehicle's jobs, each opening its job page */}
-          <React.Suspense fallback={null}>
-            <VehicleWorkOrdersCard vehicleId={vehicle.id} />
           </React.Suspense>
 
           {/* Description */}
