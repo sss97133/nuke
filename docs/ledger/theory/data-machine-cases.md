@@ -2808,3 +2808,16 @@ Provider authority, authenticated sign-off, reservations and conflicts, compensa
 historical replay, end-user exposure and historical source reconstruction remain to implement.
 No empty or populated graph declares a booking ready. Deployment is a separate stage and must
 be checked against the live function and relation definitions after the normal CI release.
+
+
+Historical resource reconstruction follow-up (2026-10-19): bounded retained-message
+inspection found explicit work requirements without resource quantities, and legacy
+message observations lacking source_id. Migration `20261019013808_work_resource_retained_basis.sql`
+allows a paired unknown quantity/unit and links interpretations to the original observation
+and exact excerpt. Admission preserves the original clock, validates same-vehicle custody,
+and refuses nested resource interpretations. Original withdrawal/reattribution propagates
+through current reads and duplicate projections; the original testimony is untouched.
+The disposable contract covers these cases and private source visibility remains unchanged.
+A selected historical case is validation scope; neither its requirements nor the complete
+historical-job population has been exhaustively enumerated. No candidate, permission,
+booking readiness, reservation or payment is inferred from these requirement records.
