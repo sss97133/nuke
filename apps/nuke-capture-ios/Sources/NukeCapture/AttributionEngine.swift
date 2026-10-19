@@ -133,13 +133,21 @@ final class AttributionEngine: ObservableObject {
                 isVehicle = cached.isVehicle
             } else {
                 guard read < ocrBudget else { continue }
-                guard let cg = await VisionEngine.loadCGImage(assetID: assetID, maxPixel: 1600) else {
+                guard let photo = localPhotos[assetID] else { skippedNonLocal += 1; continue }
+                read += 1
+                let result = await Task.detached(priority: .utility) {
+                    await LibraryIngest.reviewAlbumPhoto(photo, method: method, allowNetwork: false)
+                }.value
+                guard let review = result.review, review.inputSHA256 == row.file_hash else {
                     skippedNonLocal += 1; continue
                 }
-                read += 1
-                (lines, isVehicle) = await Task.detached(priority: .utility) {
-                    (VisionEngine.recognizeText(cg), VisionEngine.classify(cg)?.isVehicle ?? false)
-                }.value
+                do { try await Task.detached { try LocalStore.shared.recordAlbumImageReview(review) }.value }
+                catch {
+                    lastSummary = "Photo filing couldn't retain its source read. \(ReadFailure.text(error))"
+                    return false
+                }
+                lines = review.textLines + review.vinCandidates
+                isVehicle = review.isVehicle
             }
             let match = knownVINs.isEmpty ? nil : VisionEngine.matchSerial(in: lines, known: knownVINs)
             let unknown = match == nil ? VisionEngine.vinCandidates(in: lines).first(where: {

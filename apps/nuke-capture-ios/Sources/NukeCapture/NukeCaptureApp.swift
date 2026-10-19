@@ -266,11 +266,9 @@ struct NukeCaptureApp: App {
             // Then ATTRIBUTE: route the day's freshly-uploaded orphans home
             // on-device (VIN-match + session inheritance). This is the nightly
             // charging-window slot — upload, then send photos to their vehicle.
-            // Retain reusable original-byte reads before filing. The same source/method
-            // receipts serve future foreground passes without repeating OCR.
-            await LibraryStore.shared.refreshAlbums()
-            await LibraryIngest.shared.runAlbumReview(budget: 200)
-            await AttributionEngine.shared.run(limit: 500, ocrBudget: 0)
+            // Prioritize this upload backlog. Fresh reads use LibraryIngest's original-byte
+            // reader and are retained for later zero-OCR foreground passes.
+            await AttributionEngine.shared.run(limit: 500, ocrBudget: 200)
             // Reschedule when work remains — the upload queue still has assets, the
             // drain bailed early (metered link / paused / cancelled), or the
             // local-store backlog isn't fully indexed yet.
