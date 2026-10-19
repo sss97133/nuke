@@ -1,8 +1,9 @@
-// ReaderGapFixtures.swift — the readers' new fields from B13, for tests. Test-only.
+// ReaderGapFixtures.swift — the readers' new fields from B13, for tests. DEBUG-only (unit tests and the UI-test fixture backend); never compiled into Release.
 // Keys mirror pg_get_functiondef (work_order_facility_reservations_read, work_order_facility_actions,
 // my_vouches_read, provider_vouches_for_viewer, cosign_acting_for, work_order_quotes_read release_conditions)
 // on 2026-10-19; values synthetic. No writer is ever called with these.
 
+#if DEBUG
 enum ReaderGapFixtures {
     static let workOrderId = FacilityFixtures.workOrderId
     static let orgId = FacilityFixtures.orgId
@@ -75,3 +76,4 @@ enum ReaderGapFixtures {
        "issuer_actions":[]}}
     """
 }
+#endif

@@ -71,6 +71,7 @@ struct ContactRequestSheet: View {
                         }
                         .disabled(busy || leftToday == 0
                                   || message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        .accessibilityIdentifier("contact.send")
                         if let failure {
                             Text(failure).font(.footnote).foregroundStyle(.secondary)
                         }

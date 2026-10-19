@@ -583,8 +583,12 @@ struct JobStatement: Decodable, Equatable {
         shop = try? c.decode(Shop.self, forKey: .shop)
         contact = try? c.decode(ContactBlock.self, forKey: .contact)
         workOrders = ((try? c.decode([WOSlot].self, forKey: .workOrders)) ?? []).compactMap(\.wo)
-        totals = try? c.decode(Totals.self, forKey: .totals)
         viewer = try? c.decode(JobViewer.self, forKey: .viewer)
+        // Payments and balance only for a party (money_visible), whatever the totals block carries.
+        let raw = try? c.decode(Totals.self, forKey: .totals)
+        let party = viewer?.moneyVisible == true || workOrders.contains(where: \.moneyVisible)
+        totals = raw.map { party ? $0 : Totals(parts: $0.parts, labor: $0.labor, subtotal: $0.subtotal, goodwill: $0.goodwill,
+                                               payments: nil, balance: nil) }
         asOf = try? c.decode(String.self, forKey: .asOf)
     }
 }

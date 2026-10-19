@@ -1,9 +1,10 @@
 // JobQuoteFixtures.swift — open-reader JSON for quotes, vehicle work lists and statements.
-// Test-only; never in the app bundle. Keys mirror the readers as pg_get_functiondef stated them on
+// DEBUG-only (unit tests and the UI-test fixture backend); never compiled into Release. Keys mirror the readers as pg_get_functiondef stated them on
 // 2026-10-19 (work_order_open_header, work_order_quotes_read, work_order_quote_for_viewer,
 // vehicle_work_orders_read, work_order_statement_read, accept_work_order_quote); values are
 // synthetic.
 
+#if DEBUG
 extension JobFixtures {
     static let quoteId = "00000000-0000-4000-8000-0000000000f2"
     static let quoteHash = String(repeating: "ab", count: 32)
@@ -165,3 +166,4 @@ extension JobFixtures {
 
     static let statementNoMatch = #"{"error":"no_match","lookup":"vehicle_id"}"#
 }
+#endif

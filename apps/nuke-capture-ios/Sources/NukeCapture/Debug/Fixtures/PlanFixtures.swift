@@ -1,7 +1,8 @@
 // PlanFixtures.swift — listing_work_plan_read and work_order_inspection_read JSON for tests.
-// Test-only; never in the app bundle. Keys mirror pg_get_functiondef and live anon output on
+// DEBUG-only (unit tests and the UI-test fixture backend); never compiled into Release. Keys mirror pg_get_functiondef and live anon output on
 // 2026-10-19; values synthetic. Nothing here is ever sent to request_inspection in production.
 
+#if DEBUG
 enum PlanFixtures {
     static let vehicleId = "00000000-0000-4000-8000-0000000000a7"
 
@@ -97,3 +98,4 @@ enum PlanFixtures {
      "vehicle_access_granted":false,"seller_permission":"not_established","payment_authorized":false}
     """
 }
+#endif
