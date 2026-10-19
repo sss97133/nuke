@@ -303,7 +303,12 @@ BEGIN
       RETURN jsonb_build_object('status', 'insufficient_evidence', 'basis', v_basis, 'detail', 'unknown contextual make');
     END IF;
     SELECT cm.display_name INTO v_make_display FROM canonical_makes cm WHERE cm.canonical_name = v_make_canonical;
-    v_key := CASE WHEN length(v_ident) = 17 THEN 'vin:' ELSE 'serial:' END || v_ident;
+    -- Classic chassis numbers are reused across manufacturers; scope the stable
+    -- profile key by canonical make so same-number Fords and Chevrolets do not
+    -- replay into one another. The replay lookup below recognizes the old key
+    -- when its stored make agrees.
+    v_key := CASE WHEN length(v_ident) = 17 THEN 'vin:' || v_ident
+      ELSE 'serial:' || v_make_canonical || ':' || v_ident END;
     v_method := 'capture_session'; v_conf := CASE WHEN v_evidence ->> 'identifier_legibility' = 'clear' THEN 0.9 ELSE 0.85 END; v_need := 2;
   ELSIF v_basis = 'vin' THEN
     v_ident := upper(btrim(coalesce(p_profile ->> 'vin', '')));
@@ -327,6 +332,9 @@ BEGIN
     v_words := array_remove(regexp_split_to_array(lower(coalesce(v_album, '')), '[\s_,]+'), '');
     v_pairs := ARRAY(SELECT v_words[i] || ' ' || v_words[i + 1] FROM generate_series(1, cardinality(v_words) - 1) i);
     v_make_canonical := upper(public.normalize_make(v_make));
+    IF v_basis = 'serial_album' THEN
+      v_key := 'serial:' || v_make_canonical || ':' || v_ident;
+    END IF;
     v_model_words := array_remove(regexp_split_to_array(lower(coalesce(v_model, '')), '[\s_,]+'), '');
     IF v_album IS NULL THEN
       RETURN jsonb_build_object('status', 'insufficient_evidence', 'basis', v_basis, 'detail', 'album_name is required');
@@ -364,7 +372,10 @@ BEGIN
   -- Replay: this caller's profile from the same basis and key.
   SELECT x.id INTO v_vehicle_id FROM vehicles x
    WHERE x.uploaded_by = v_caller AND x.profile_origin = 'device_evidence'
-     AND x.origin_metadata -> 'device_evidence' ->> 'key' = v_key
+     AND (x.origin_metadata -> 'device_evidence' ->> 'key' = v_key OR
+          (length(v_ident) < 17 AND v_make_canonical IS NOT NULL
+           AND x.origin_metadata -> 'device_evidence' ->> 'key' = 'serial:' || v_ident
+           AND upper(public.normalize_make(x.make)) = v_make_canonical))
    ORDER BY x.created_at, x.id LIMIT 1;
   IF FOUND THEN
     v_replay := true;
@@ -540,13 +551,8 @@ BEGIN
         INTO v_holder_rows, v_holders
         FROM vehicles x CROSS JOIN LATERAL (SELECT public.vehicle_merge_terminal(x.id) AS id) t
        WHERE upper(btrim(x.vin)) = v_ident;
-      -- An old serial can repeat across makes: only a holder of the album's make is this vehicle.
+      -- An old serial can repeat across makes: only holders of the contextual make are candidates.
       IF (v_basis = 'serial_album' OR v_basis = 'capture_session' AND length(v_ident) < 17 AND v_make IS NOT NULL) AND cardinality(v_holders) > 0 THEN
-        IF NOT EXISTS (SELECT 1 FROM vehicles x WHERE x.id = ANY (v_holders)
-                       AND upper(public.normalize_make(x.make)) = v_make_canonical) THEN
-          RETURN jsonb_build_object('status', 'ambiguous', 'basis', v_basis,
-            'detail', 'this serial is on a vehicle of another make');
-        END IF;
         v_holders := ARRAY(SELECT x.id FROM vehicles x WHERE x.id = ANY (v_holders)
                            AND upper(public.normalize_make(x.make)) = v_make_canonical ORDER BY x.id);
       END IF;

@@ -14,9 +14,9 @@ INSERT INTO public.profiles(id) VALUES (pg_temp.u('capture'));
 INSERT INTO public.vehicle_images(id,user_id,image_url,file_hash,taken_at,latitude,longitude)
 SELECT pg_temp.i('capture-' || n), pg_temp.u('capture'), 'https://fixture.invalid/' || n,
   repeat(n::text,64), '2026-01-01T12:00:00Z'::timestamptz + n * interval '30 seconds',
-  35.0, -115.0 FROM generate_series(1,6) n;
+  35.0, -115.0 FROM generate_series(1,8) n;
 UPDATE public.vehicle_images SET vision_gate_status='approved',is_document=false,is_sensitive=false
- WHERE id IN (SELECT pg_temp.i('capture-' || n) FROM generate_series(1,6) n);
+ WHERE id IN (SELECT pg_temp.i('capture-' || n) FROM generate_series(1,8) n);
 CREATE FUNCTION pg_temp.capture_request() RETURNS jsonb LANGUAGE sql AS $$
  SELECT jsonb_build_object('basis','capture_session','serial','CKR187F127263',
    'year',1966,'make','Ford','model','Mustang',
@@ -26,6 +26,13 @@ CREATE FUNCTION pg_temp.capture_request() RETURNS jsonb LANGUAGE sql AS $$
      'identity_method_version','vehicle-identity-context-fold-v3:fixture',
      'anchor_image_id',pg_temp.i('capture-1'),'anchor_source_sha256',repeat('1',64),
      'identifier_read','CKR187F127263','edit_distance','0','identifier_legibility','clear'))
+$$;
+CREATE FUNCTION pg_temp.chevrolet_capture_request() RETURNS jsonb LANGUAGE sql AS $$
+ SELECT jsonb_set(jsonb_set(jsonb_set(jsonb_set(jsonb_set(pg_temp.capture_request(),
+   '{make}',to_jsonb('Chevrolet'::text)),'{model}',to_jsonb('C10 Pickup'::text)),
+   '{image_ids}',jsonb_build_array(pg_temp.i('capture-7'),pg_temp.i('capture-8'))),
+   '{evidence,anchor_image_id}',to_jsonb(pg_temp.i('capture-7'))),
+   '{evidence,anchor_source_sha256}',to_jsonb(repeat('7',64)))
 $$;
 CREATE FUNCTION pg_temp.record_capture_reading(anchor_label text, member_label text, anchor_vin text DEFAULT 'CKR187F127263') RETURNS void LANGUAGE plpgsql AS $$
 DECLARE e jsonb; anchor_id uuid:=pg_temp.i(anchor_label); member_id uuid:=pg_temp.i(member_label);
@@ -128,6 +135,17 @@ SELECT pg_temp.ok('a classic serial and nearby views seed one private profile wi
  AND EXISTS(SELECT 1 FROM public.vehicle_contributors WHERE vehicle_id=(:'capture_r'::jsonb->>'vehicle_id')::uuid
       AND user_id=pg_temp.u('capture') AND role='photographer' AND can_sell=false)
  AND :'replay_r'::jsonb->>'vehicle_id'=:'capture_r'::jsonb->>'vehicle_id');
+SELECT pg_temp.record_capture_reading('capture-7','capture-8');
+SET ROLE authenticated;
+SELECT public.device_create_vehicle_profile(pg_temp.chevrolet_capture_request()) AS r \gset cross_make_
+SELECT public.device_create_vehicle_profile(pg_temp.chevrolet_capture_request()) AS r \gset cross_make_replay_
+RESET ROLE;
+SELECT pg_temp.ok('a repeated classic serial on a different canonical make creates and replays a separate profile',
+ :'cross_make_r'::jsonb->>'status'='created'
+ AND :'cross_make_r'::jsonb->>'vehicle_id'<>:'capture_r'::jsonb->>'vehicle_id'
+ AND :'cross_make_replay_r'::jsonb->>'vehicle_id'=:'cross_make_r'::jsonb->>'vehicle_id'
+ AND (SELECT count(*) FROM public.vehicles WHERE vin='CKR187F127263')=2
+ AND (SELECT make='Chevrolet' FROM public.vehicles WHERE id=(:'cross_make_r'::jsonb->>'vehicle_id')::uuid));
 SELECT pg_temp.ok('all capture filings have audited attribution',
  (SELECT count(*) FROM public.reattribution_audit WHERE new_vehicle_id=(:'capture_r'::jsonb->>'vehicle_id')::uuid)=2);
 SET ROLE authenticated;

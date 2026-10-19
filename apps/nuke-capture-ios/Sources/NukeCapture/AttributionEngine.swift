@@ -56,10 +56,10 @@ final class AttributionEngine: ObservableObject {
         let isVehicle: Bool
         let isDocument: Bool
         let isSensitive: Bool
-        let contextualYear: Int? = nil
-        let contextualMake: String? = nil
-        let contextualModel: String? = nil
-        let albumContextAmbiguous: Bool = false
+        let contextualYear: Int?
+        let contextualMake: String?
+        let contextualModel: String?
+        let albumContextAmbiguous: Bool
     }
     struct VINCaptureGroup: Equatable, Sendable {
         let vin: String
