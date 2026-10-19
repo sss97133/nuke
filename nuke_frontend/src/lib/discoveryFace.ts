@@ -201,6 +201,29 @@ export function organizationFace(id: string, org: J, supply: J | null): FacePage
   return { title: `${name} | Nuke`, description, path: `/org/${id}`, type: 'website', body };
 }
 
+// ── Sign-in and work console (static faces) ────────────────────────────────
+
+const NOINDEX = '<meta name="robots" content="noindex" />';
+
+/**
+ * What /login, /work and /work/setup say before the app's code arrives. Static text that is true for every visitor:
+ * the edge cannot tell who is signed in (the session lives in the browser), so these never mention a person.
+ */
+export function staticFace(pathname: string): FacePage | null {
+  const path = pathname.length > 1 ? pathname.replace(/\/$/, '') : pathname;
+  const page = (title: string, heading: string, lead: string): FacePage => ({
+    title: `${title} | Nuke`, description: lead, path, type: 'website', head: NOINDEX,
+    body: `<main><h1>${escapeHtml(heading)}</h1><p>${escapeHtml(lead)}</p></main>`,
+  });
+  if (path === '/login') return page('Sign in', 'Sign in to Nuke',
+    'Nuke keeps an observational record of physical assets: vehicles, the work done on them and who did it. Sign in with your email to post jobs, make offers and sign agreements through Nuke. Your contact details are never shown to other people.');
+  if (path === '/work') return page('Work', 'Work',
+    'What is waiting for your signature, and the jobs you are on: quotes and offers to accept, completions and payments to confirm, and contact requests. Each item links to its job, where the Sign is made.');
+  if (path === '/work/setup') return page('Set up your provider page', 'Set up your provider page',
+    'Join, keep logging what you do with photos, and Nuke sends you jobs that fit. Five optional steps: records that may be yours, your trade, where and when you work, your tools, and what clients will see.');
+  return null;
+}
+
 // ── Injection into the app shell ───────────────────────────────────────────
 
 function setMeta(html: string, re: RegExp, tag: string): string {
