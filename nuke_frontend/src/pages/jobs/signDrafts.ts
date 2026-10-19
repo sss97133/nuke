@@ -468,6 +468,99 @@ export function confirmBookingArgs(item: JsonObject): Built<{ p_reservation_id: 
   return { ok: true, args: { p_reservation_id: id, p_hash: hash } };
 }
 
+// MARK: - Inspection findings, inspection access, job evidence
+
+export const VERDICTS: Array<{ key: string; title: string }> = [
+  { key: 'supports', title: 'Matches what was claimed' }, { key: 'contradicts', title: "Doesn't match" }, { key: 'unknown', title: "Couldn't tell" },
+];
+export const SEVERITIES: Array<{ key: string; title: string }> = [
+  { key: 'info', title: 'For information' }, { key: 'monitor', title: 'Keep an eye on it' }, { key: 'concern', title: 'Concern' }, { key: 'critical', title: 'Critical' },
+];
+export const CONDITIONS: Array<{ key: string; title: string }> = [
+  { key: 'excellent', title: 'Excellent' }, { key: 'good', title: 'Good' }, { key: 'fair', title: 'Fair' }, { key: 'rough', title: 'Rough' },
+  { key: 'project', title: 'Project' }, { key: 'parts_only', title: 'Parts only' },
+];
+/** The systems record_inspection_findings accepts (2026-10-19). */
+export const SYSTEMS = ['engine_bay', 'top_end', 'bottom_end', 'undercarriage', 'interior', 'wheels', 'drivetrain', 'cooling', 'electrical', 'fuel',
+  'ignition', 'suspension', 'brakes', 'body', 'other'];
+
+export type FindingDraft = { itemId: string | null; verdict: string | null; finding: string; severity: string; system: string; photoRef: string };
+export type FindingsArgs = { p_inspection_work_order_id: string; p_findings: { summary: string; findings: JsonObject[]; overall_condition: string | null } };
+
+const oneLine = (s: string) => s.split(/\r?\n/).join(' ').trim();
+
+export function findingsArgs(a: JobAction, checklistIds: string[], summary: string, drafts: FindingDraft[], condition: string): Built<FindingsArgs> {
+  const id = str(a.args.p_inspection_work_order_id);
+  if (!offered(a, 'record_findings', 'record_inspection_findings') || !id) return fail("You aren't the accepted inspector on this inspection.");
+  const s = summary.trim();
+  if (!s) return fail('Write a one-line summary.');
+  if (s.length > 500) return fail('Keep the summary under 500 characters.');
+  const out: JsonObject[] = [];
+  for (const d of drafts) {
+    const answers = d.itemId !== null;
+    if (answers && d.verdict === null) continue;
+    const text = oneLine(d.finding);
+    if (!text) { if (answers) return fail('Say what you found for each checklist item you answered.'); continue; }
+    if (text.length > 2000) return fail('Keep each finding under 2,000 characters.');
+    if (answers && !checklistIds.includes(d.itemId!)) return fail('A checklist item changed. Reload and try again.');
+    if (answers && !VERDICTS.some(v => v.key === d.verdict)) return fail('Pick a verdict for each answered item.');
+    if (!SEVERITIES.some(v => v.key === d.severity)) return fail('Pick a severity for each finding.');
+    if (d.system && !SYSTEMS.includes(d.system)) return fail('Pick a system from the list.');
+    const ref = d.photoRef.trim();
+    if (ref.length > 1024) return fail('Keep each photo reference under 1,024 characters.');
+    const o: JsonObject = { finding: text, severity: d.severity };
+    if (answers) { o.item_id = d.itemId; o.verdict = d.verdict; }
+    if (d.system) o.system = d.system;
+    if (ref) o.evidence_photo_ref = ref;
+    out.push(o);
+  }
+  if (!out.length) return fail('Record at least one finding.');
+  if (out.length > 100) return fail('At most 100 findings in one report.');
+  if (condition && !CONDITIONS.some(c => c.key === condition)) return fail('Pick the overall condition from the list.');
+  return { ok: true, args: { p_inspection_work_order_id: id, p_findings: { summary: s, findings: out, overall_condition: condition || null } } };
+}
+
+export type GrantArgs = { p_inspection_work_order_id: string; p_scope: string; p_window: { from: string; until: string } | null };
+
+export function grantArgs(a: JobAction, scope: string, from: string, until: string, now = new Date()): Built<GrantArgs> {
+  const id = str(a.args.p_inspection_work_order_id);
+  if (!offered(a, 'grant_inspection_access', 'grant_inspection_access') || !id) return fail('Only the verified owner can let an inspector see this vehicle.');
+  const s = scope.trim();
+  if (!s) return fail('Say what the inspector may do (for example, where, and whether a test drive is allowed).');
+  if (s.length > 2000) return fail('Keep the scope under 2,000 characters.');
+  let w: GrantArgs['p_window'] = null;
+  if (from || until) {
+    const f = isoOf(from), u = isoOf(until);
+    if (!f || !u) return fail('Pick both the start and the end, or neither.');
+    if (Date.parse(f) >= Date.parse(u)) return fail('The window must end after it starts.');
+    if (Date.parse(u) <= now.getTime()) return fail('The window must end in the future.');
+    w = { from: f, until: u };
+  }
+  return { ok: true, args: { p_inspection_work_order_id: id, p_scope: s, p_window: w } };
+}
+
+export type EvidenceArgs = { p_work_order_id: string; p_image_ids: string[]; p_operation_id: string | null; p_note: string | null };
+
+/** Only photos the candidates reader lists for this job (the viewer's own, not sensitive or personal); at most 50 at once. */
+export function evidenceArgs(a: JobAction, candidates: JsonObject | null, imageIds: string[], operationId: string | null, note: string): Built<EvidenceArgs> {
+  const wo = str(a.args.p_work_order_id);
+  if (!offered(a, 'attach_evidence', 'attach_job_evidence') || !wo) return fail("You can't attach photos to this job.");
+  const eligible = new Set(arr(candidates?.items).map(obj).filter(i => str(i?.work_order_id) === wo).map(i => str(i?.image_id)).filter((x): x is string => !!x));
+  const ids = [...new Set(imageIds)].filter(id => eligible.has(id));
+  if (!ids.length) return fail('Choose at least one of your photos listed here.');
+  if (ids.length > 50) return fail('Attach at most 50 photos at once.');
+  const n = note.trim();
+  if (n.length > 1000) return fail('Keep the note under 1,000 characters.');
+  return { ok: true, args: { p_work_order_id: wo, p_image_ids: ids, p_operation_id: operationId, p_note: n || null } };
+}
+
+/** Why some of the viewer's photos in the job window can't be attached, from the reader's own count and basis. */
+export function notAttachableText(candidates: JsonObject | null): string | null {
+  const n = num(obj(candidates?.coverage)?.not_attachable_excluded) ?? 0;
+  if (n <= 0) return null;
+  return `${n.toLocaleString('en-US')} of your photo${n === 1 ? '' : 's'} from this job's window can't be attached: photos marked sensitive or personal, attributed to another vehicle, or replaced by a newer copy are excluded.`;
+}
+
 // MARK: - Contact
 
 export function contactMessage(message: string, max = 500): Built<string> {
@@ -529,6 +622,15 @@ const REFUSALS: Array<[RegExp, string]> = [
   [/Cannot vouch for oneself/i, "You can't vouch for yourself."],
   [/needs_facility_organization_or_owned_tools/i, 'To vouch, you need a shop on Nuke or tools on record.'],
   [/Co-sign unavailable/i, "You can't co-sign this offer from your account."],
+  [/client cannot record findings/i, "You're the customer on this inspection, so you can't record its findings."],
+  [/Inspection unavailable for findings/i, 'Only the accepted inspector can record findings.'],
+  [/Invalid finding/i, 'One finding is incomplete: each needs one line of text and a severity, and a verdict when it answers a checklist item.'],
+  [/verified owner of the vehicle required/i, 'Only the verified owner of this vehicle can grant access.'],
+  [/Accept an inspector offer before granting access/i, 'Accept an inspector first, then grant access.'],
+  [/Window needs from before until/i, 'The window must end after it starts, and in the future.'],
+  [/already attached to this work order/i, 'Some of these photos are already filed to this job.'],
+  [/Operation is not on this work order/i, 'That operation is not on this job. Reload and try again.'],
+  [/unavailable for evidence/i, "You can't file photos to this job."],
   [/not a declared, in-service facility asset/i, "That space isn't available for booking."],
   [/Window must be future/i, 'Pick a future window of at most 31 days that starts before it ends.'],
   [/Only the customer or an accepted provider reserves/i, 'Only the customer or an accepted technician can book space for this job.'],
