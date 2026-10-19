@@ -1,5 +1,6 @@
 -- Disposable PG17 only. Synthetic fixtures; exercises the actual migrations.
 -- Quote versions, supersession, the customer acceptance Sign and the party-gated quote reader.
+-- Reader assertions here cover the 20261019094500 definition; 20261019124500 opens it (test_work_order_quotes_open_read.sql).
 \set ON_ERROR_STOP on
 DO $$ BEGIN
   IF current_database() NOT LIKE 'dm_%' OR current_setting('server_version_num')::int / 10000 <> 17

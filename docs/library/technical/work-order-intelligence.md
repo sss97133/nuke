@@ -377,23 +377,31 @@ an `owner-input` work record (signer, sign clock, quote hash) and projects it in
 transaction; the projector refuses a `quote_acceptance` presented any other way. Neither
 `work_orders.status` nor `approved_at` is written. Nothing is collected, authorized or paid.
 
-**Reader.** `work_order_quotes_read(p_work_order_id)` admits callers that
-`work_order_is_accessible` admits (the `work_orders` select rule). It returns the current
-quote, version history with states (`current`, `superseded`, `withdrawn`), acceptance state
-(`accepted`, `withheld` with a reason, or `not_accepted`), stored and derived `quoted_at` /
-`approved_at`, a viewer block (context, slots, `money_visible`, `contact_visible: false`,
-`decided_from: auth.uid()`, actions) and coverage. An acceptance is withheld when its quote is
-superseded or withdrawn, the scope changes, the signer is no longer the customer, or its own
-source is withdrawn. Amounts and the scope snapshot go only to the customer and the provider
-side (quoting user, quoting organization owner, work order organization owner); other viewers
-get counts. Customer contact fields are never read. `accept_quote` appears in `actions` only
-when the viewer could sign now. This is stricter than the privacy doctrine above, under which
-quote prices and scope are open; an anon-safe quote reader is separate work, as it is for the
-other job readers.
+**Reader.** `work_order_quotes_read(p_work_order_id)` is open to anon and authenticated
+callers under the privacy doctrine, and follows the open job readers. Slots come from
+`work_order_viewer_slots`; a work order on a non-public vehicle is shown only to slot holders;
+the header (`vehicle_label`, `display_title`, `request_source_label`) comes from
+`work_order_open_header`. It returns:
 
-Not yet: change orders as their own event, deposit and payment links, provider authentication
-of the quote (offer Sign), and the job path's `terms` stage reading quotes.
-Contract: `supabase/sql/test_work_order_quotes.sql`.
+- the current quote and every version, with the full scope snapshot, priced lines, totals,
+  the deposit as a requested term (`nature: requested_term_not_payment`) and validity (a
+  withdrawn version shows its summary only);
+- version states (`current`, `superseded`, `withdrawn`);
+- acceptance state (`accepted`, `withheld` with a reason, or `not_accepted`);
+- stored and derived `quoted_at` / `approved_at`;
+- the viewer block (a visitor gets `context: visitor`, no slots, no actions) and coverage.
+
+The quoting party and the signer appear by public profile handle, organization name or
+`unnamed party` (`platform_*_label`). A quote issued through `issue_work_order_quote` is
+attributed `authenticated_sign`. Raw user ids, and free text that names the customer or looks
+like contact data, go only to parties. No payments, balances or contact fields are returned.
+An acceptance is withheld when its quote is superseded or withdrawn, the scope changes, the
+signer is no longer the customer, or its own source is withdrawn. `accept_quote` appears in
+`actions` only when the viewer could sign now, and only the customer can.
+
+Not yet: change orders as their own event, and deposit and payment links.
+Contracts: `supabase/sql/test_work_order_quotes.sql`, `test_work_order_quote_issue.sql`,
+`test_work_order_quotes_open_read.sql`.
 
 ## Job path self-measurement
 
