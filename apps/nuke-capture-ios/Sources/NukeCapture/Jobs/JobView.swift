@@ -90,6 +90,9 @@ struct JobPathContent: View {
     @State private var changing: ChangeBox?
     @State private var issuing: IssueBox?
     @State private var starting: JobAction?
+    @State private var paying = false
+    @State private var payFailure: String?
+    @Environment(\.openURL) private var openURL
 
     var body: some View {
         List {
@@ -299,14 +302,16 @@ struct JobPathContent: View {
         } header: {
             Text("Not decided yet")
         } footer: {
-            Text("Nothing on this screen books, approves or pays.")
+            Text("Nothing on this screen books or approves. Paying an invoice happens only on Stripe's checkout page.")
         }
     }
 
     // MARK: Actions (server-offered only)
 
     @ViewBuilder private func actionsSection(_ viewer: JobViewer?) -> some View {
-        let pathActions = viewer?.actions ?? []
+        let allActions = viewer?.actions ?? []
+        let payActions = allActions.filter { JobReaders.payArguments($0) != nil }
+        let pathActions = allActions.filter { JobReaders.payArguments($0) == nil }
         let accept: (JobAction, Quote)? = {
             if case .loaded(let q) = quotes, let a = q.acceptAction, let cur = q.currentQuote { return (a, cur) }
             return nil
@@ -320,21 +325,48 @@ struct JobPathContent: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
+            ForEach(payActions) { a in
+                Button {
+                    Task { await pay(a) }
+                } label: {
+                    HStack {
+                        Label(JobReaders.payAmountText(a).map { "Pay invoice · \($0)" } ?? "Pay invoice", systemImage: "creditcard")
+                        Spacer()
+                        if paying { ProgressView() }
+                    }
+                }
+                .disabled(paying)
+            }
+            if let payFailure {
+                Text(payFailure).font(.footnote).foregroundStyle(.secondary)
+            }
             ForEach(pathActions) { a in
                 RootedValueView(label: a.stage.map { JobStageKey(rawValue: $0)?.title ?? JobCopy.sentence($0) } ?? "Next step",
                                 value: a.title, status: .pending)
             }
-            if accept == nil && pathActions.isEmpty {
+            if accept == nil && pathActions.isEmpty && payActions.isEmpty {
                 Text("Nothing for you to do on this job right now.")
                     .font(.footnote).foregroundStyle(.secondary)
             }
         } header: {
             Text("Your next steps")
         } footer: {
-            if !pathActions.isEmpty {
+            if !payActions.isEmpty {
+                Text("Pay invoice opens Stripe's secure checkout. Nothing is charged until you finish there.")
+            } else if !pathActions.isEmpty {
                 Text("Signing these from the app is coming soon.")
             }
         }
+    }
+
+    private func pay(_ action: JobAction) async {
+        paying = true
+        payFailure = nil
+        switch await JobReaders.invoiceCheckout(action) {
+        case .success(let url): openURL(url)
+        case .failure(let f): payFailure = f.text
+        }
+        paying = false
     }
 
     // MARK: Quote (work_order_quotes_read; prices are open)
