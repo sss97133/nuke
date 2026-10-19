@@ -159,11 +159,16 @@ struct JobOffer: Decodable, Equatable, Identifiable {
     let note: String?
     let acceptanceState: String
     let acceptedAt: String?
+    /// The hash accept_offer pins: offer_hash when nothing is co-signed, otherwise it also covers the current co-signs.
+    let termsHash: String?
+    let coSigns: [CoSign]
 
     var id: String { offerId }
 
     enum CodingKeys: String, CodingKey {
         case provider, performer, facility, terms, note, acceptance
+        case termsHash = "terms_hash"
+        case coSigns = "co_signs"
         case offerId = "offer_id"
         case offerHash = "offer_hash"
         case offerKind = "offer_kind"
@@ -191,9 +196,53 @@ struct JobOffer: Decodable, Equatable, Identifiable {
         let a = try? c.decode(Acceptance.self, forKey: .acceptance)
         acceptanceState = a?.state ?? "not_accepted"
         acceptedAt = a?.accepted_at
+        termsHash = try? c.decode(String.self, forKey: .termsHash)
+        coSigns = ((try? c.decode([CoSignSlot].self, forKey: .coSigns)) ?? []).compactMap(\.cosign)
     }
 
+    private struct CoSignSlot: Decodable {
+        let cosign: CoSign?
+        init(from decoder: Decoder) throws { cosign = try? CoSign(from: decoder) }
+    }
+
+    /// The hash an acceptance of this offer must carry.
+    var acceptHash: String? { termsHash ?? offerHash }
+
     var who: String { (offerKind == "organization" ? facility ?? provider : provider)?.text ?? "Unnamed party" }
+}
+
+/// Someone vouching for an offer's technician on this job: kinds, scope and an optional cut.
+struct CoSign: Decodable, Equatable, Identifiable {
+    struct Cut: Decodable, Equatable {
+        let basis: String?
+        let percentage: Double?
+        let amount: Double?
+        let currency: String?
+    }
+    let cosignId: String
+    let coSigner: JobPerson?
+    let kinds: [String]
+    let scope: String?
+    let cut: Cut?
+    let signedAt: String?
+    var id: String { cosignId }
+
+    enum CodingKeys: String, CodingKey {
+        case kinds, scope, cut
+        case cosignId = "cosign_id"
+        case coSigner = "co_signer"
+        case signedAt = "signed_at"
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        cosignId = try c.decode(String.self, forKey: .cosignId)
+        coSigner = try? c.decode(JobPerson.self, forKey: .coSigner)
+        kinds = (try? c.decode([String].self, forKey: .kinds)) ?? []
+        scope = try? c.decode(String.self, forKey: .scope)
+        cut = try? c.decode(Cut.self, forKey: .cut)
+        signedAt = try? c.decode(String.self, forKey: .signedAt)
+    }
 }
 
 /// `{lines:[...]}` with each line keyed by its position; a malformed line is skipped.
@@ -284,11 +333,13 @@ struct WorkOrderOffers: Decodable, Equatable {
         actions.first { $0.kind == "withdraw_offer" && $0.args["p_offer_id"]?.stringValue == offerId }
     }
 
+    /// The server's accept step for this offer; its p_offer_hash is the terms hash (co-signs included).
     func acceptAction(for offer: JobOffer) -> JobAction? {
-        actions.first {
-            $0.kind == "accept_offer" && $0.args["p_offer_id"]?.stringValue == offer.offerId
-                && $0.args["p_offer_hash"]?.stringValue == offer.offerHash
-        }
+        actions.first { $0.kind == "accept_offer" && $0.args["p_offer_id"]?.stringValue == offer.offerId }
+    }
+
+    func cosignAction(for offer: JobOffer) -> JobAction? {
+        actions.first { $0.kind == "cosign_provider" && $0.args["p_offer_id"]?.stringValue == offer.offerId }
     }
 
     var offerCount: Int { requirements.reduce(0) { $0 + $1.offers.count } }
@@ -412,10 +463,12 @@ enum OfferDrafting {
     }
 
     /// The accept body, only when the server's action names this exact offer and hash.
+    /// The accept body: the id and hash exactly as the server's action names them, and only when that
+    /// hash is the terms this sheet shows (offer + current co-signs), never the bare offer_hash of a co-signed offer.
     static func acceptArguments(_ action: JobAction, offer: JobOffer) -> (id: String, hash: String)? {
         guard action.kind == "accept_offer", (action.rpc ?? "accept_offer") == "accept_offer",
               let id = action.args["p_offer_id"]?.stringValue, let hash = action.args["p_offer_hash"]?.stringValue,
-              id == offer.offerId, hash == offer.offerHash else { return nil }
+              id == offer.offerId, hash == offer.acceptHash else { return nil }
         return (id, hash)
     }
 }
@@ -564,7 +617,7 @@ enum OfferCopy {
     static func acceptFailure(_ error: Error) -> String {
         guard let pg = error as? PostgrestError else { return ReadFailure.text(error) }
         let m = pg.message
-        if m.contains("hash does not match") { return "This offer changed since you opened it. Refresh and review it again." }
+        if m.contains("hash does not match") { return "This offer or its co-signs changed since you opened it. Refresh and review it again." }
         if m.contains("offer_window_closed") { return "Their availability window has passed." }
         if m.contains("offering_account_cannot_accept") { return "You can't accept your own offer." }
         if m.contains("facility_offer_not_an_assignment") { return "A shop-space offer can't be accepted as a job assignment yet." }

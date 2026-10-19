@@ -32,6 +32,14 @@ struct AcceptQuoteSheet: View {
                 } header: {
                     Text("You are accepting")
                 }
+                if let co = quote.changeOrder {
+                    Section("Change order") {
+                        if let r = co.reason { Text("Why: \(r)").font(.footnote) }
+                        ForEach(co.changes) { c in
+                            Text(ChangeOrderCopy.line(c, currency: nil)).font(.footnote)
+                        }
+                    }
+                }
 
                 Section("Lines") {
                     ForEach(quote.lines) { line in

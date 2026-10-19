@@ -232,6 +232,31 @@ final class JobFixtureSnapshotTests: XCTestCase {
         try snapshot(SignatureItemSheet(item: q.items[0]), name: "fixture-signature-item")
     }
 
+    func testRenderCosignAndChangeOrderSheets() throws {
+        let customer = try decode(WorkOrderOffers.self, CosignFixtures.offers(customer: true))
+        let offer = try XCTUnwrap(customer.requirements.first?.offers.first)
+        try snapshot(AcceptOfferSheet(action: try XCTUnwrap(customer.acceptAction(for: offer)), offer: offer,
+                                      requirementTitle: "Skill: Paint touch-up on the driver door"), name: "fixture-accept-offer-cosigned", pages: 2)
+        let provider = try decode(WorkOrderOffers.self, CosignFixtures.offers(customer: false))
+        try snapshot(CosignSheet(action: try XCTUnwrap(provider.cosignAction(for: offer)), technician: "@fixture_painter",
+                                 requestTitle: "Skill: Paint touch-up on the driver door"), name: "fixture-cosign-sheet", pages: 2)
+        try snapshot(NavigationStack { List { JobOffersSection(offers: .loaded(provider)) } }, name: "fixture-offers-cosigned")
+        try snapshot(VouchSheet(subjectUserId: "p1", subjectName: "@fixture_tech"), name: "fixture-vouch-sheet")
+        let issuer = try decode(JobQuotes.self, CosignFixtures.acceptedForIssuer)
+        try snapshot(IssueChangeOrderSheet(action: try XCTUnwrap(issuer.changeOrderAction), quote: try XCTUnwrap(issuer.currentQuote),
+                                           prefill: { lines in var l = lines; l[1].state = .modify; l[1].quantity = "4"; l[2].state = .remove; return l }),
+                     name: "fixture-issue-change-order", pages: 2)
+        let co = try decode(JobQuotes.self, CosignFixtures.changeOrderQuotes)
+        try snapshot(AcceptQuoteSheet(quote: try XCTUnwrap(co.currentQuote), action: try XCTUnwrap(co.acceptAction)),
+                     name: "fixture-accept-change-order", pages: 2)
+        let path = try decode(JobPath.self, JobFixtures.jobPathWithLabels)
+        try snapshot(NavigationStack { JobPathContent(workOrderId: JobFixtures.workOrderId, path: .loaded(path), resources: .loading, quotes: .loaded(co)) },
+                     name: "fixture-quote-change-order")
+        let p = try decode(ProviderProfile.self, CosignFixtures.vouches)
+        try snapshot(NavigationStack { List { ProviderFaceContent(profile: .loaded(p), jobs: .loading, showSubject: true) } },
+                     name: "fixture-vouched-for-by", pages: 2)
+    }
+
     func testRenderWorkSessionSignSheet() throws {
         let item = try decode(SignatureQueue.self, JobFixtures.signatureQueue).items[0]
         try snapshot(WorkSessionSignSheet(item: item), name: "fixture-sign-work-day")

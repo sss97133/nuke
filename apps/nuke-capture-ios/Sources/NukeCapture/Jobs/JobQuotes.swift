@@ -67,6 +67,7 @@ enum JobMoney {
 struct QuoteLine: Decodable, Equatable, Identifiable {
     let index: Int
     let refKind: String?
+    let refId: String?
     let description: String?
     /// "withheld_personal_info" when the reader hid a description that named a person.
     let descriptionVisibility: String?
@@ -81,6 +82,7 @@ struct QuoteLine: Decodable, Equatable, Identifiable {
     enum CodingKeys: String, CodingKey {
         case description, amount, currency, unit, quantity
         case refKind = "ref_kind"
+        case refId = "ref_id"
         case descriptionVisibility = "description_visibility"
         case pricingBasis = "pricing_basis"
     }
@@ -89,6 +91,7 @@ struct QuoteLine: Decodable, Equatable, Identifiable {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         self.index = index
         refKind = try? c.decode(String.self, forKey: .refKind)
+        refId = try? c.decode(String.self, forKey: .refId)
         description = (try? c.decode(String.self, forKey: .description)).flatMap { $0.isEmpty ? nil : $0 }
         descriptionVisibility = try? c.decode(String.self, forKey: .descriptionVisibility)
         pricingBasis = try? c.decode(String.self, forKey: .pricingBasis)
@@ -140,9 +143,17 @@ struct Quote: Decodable, Equatable {
     let totals: [QuoteTotal]
     let depositRequested: DepositRequest?
     let scopeStatus: String?
+    let changeOrder: ChangeOrder?
+    /// The scope snapshot's specifications (material / process keys a change order can substitute).
+    let specifications: [SnapshotSpec]
+
+    var isChangeOrder: Bool { changeOrder != nil }
 
     enum CodingKeys: String, CodingKey {
         case version, expired, lines
+        case changeOrder = "change_order"
+        case isChangeOrderFlag = "is_change_order"
+        case scopeSnapshot = "scope_snapshot"
         case quoteId = "quote_id"
         case quoteHash = "quote_hash"
         case quotingParty = "quoting_party"
@@ -180,6 +191,18 @@ struct Quote: Decodable, Equatable {
         totals = (try? c.decode([QuoteTotal].self, forKey: .totalsByCurrency)) ?? []
         depositRequested = try? c.decode(DepositRequest.self, forKey: .depositRequested)
         scopeStatus = try? c.decode(String.self, forKey: .scopeStatus)
+        let flagged = (try? c.decode(Bool.self, forKey: .isChangeOrderFlag)) == true
+        changeOrder = (try? c.decode(ChangeOrder.self, forKey: .changeOrder)) ?? (flagged ? ChangeOrder.empty : nil)
+        specifications = (try? c.decode(SnapshotSpecs.self, forKey: .scopeSnapshot))?.specifications ?? []
+    }
+
+    private struct SnapshotSpecs: Decodable {
+        let specifications: [SnapshotSpec]
+        enum CodingKeys: String, CodingKey { case specifications }
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            specifications = (try? c.decode([SnapshotSpec].self, forKey: .specifications)) ?? []
+        }
     }
 
     /// "Version 3 · Revised 2 times", "Version 1".
@@ -190,6 +213,73 @@ struct Quote: Decodable, Equatable {
         case 1: return "Version \(version) · Revised once"
         default: return "Version \(version) · Revised \(revisions) times"
         }
+    }
+}
+
+/// A material / process specification in a quote's scope snapshot.
+struct SnapshotSpec: Decodable, Equatable, Identifiable {
+    let id: String
+    let material_key: String?
+    let material_label: String?
+    let process_key: String?
+    let process_label: String?
+}
+
+/// A change order: a quote version amending the accepted one, with its reason and line-by-line changes.
+struct ChangeOrder: Decodable, Equatable {
+    struct Spec: Decodable, Equatable {
+        let field: String?
+        let from_key: String?
+        let from_label: String?
+        let to_key: String?
+        let to_label: String?
+    }
+    struct Change: Decodable, Equatable, Identifiable {
+        let index: Int
+        let action: String
+        let fromLine: QuoteLine?
+        let toLine: QuoteLine?
+        let spec: Spec?
+        var id: Int { index }
+
+        enum CodingKeys: String, CodingKey {
+            case action, specification
+            case fromLine = "from_line"
+            case toLine = "to_line"
+        }
+
+        init(index: Int, from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            self.index = index
+            action = (try? c.decode(String.self, forKey: .action)) ?? "modify"
+            fromLine = try? c.decode(QuoteLine.self, forKey: .fromLine)
+            toLine = try? c.decode(QuoteLine.self, forKey: .toLine)
+            spec = try? c.decode(Spec.self, forKey: .specification)
+        }
+        init(from decoder: Decoder) throws { try self.init(index: 0, from: decoder) }
+    }
+
+    let reason: String?
+    let changes: [Change]
+
+    static let empty = ChangeOrder(reason: nil, changes: [])
+
+    init(reason: String?, changes: [Change]) { self.reason = reason; self.changes = changes }
+
+    enum CodingKeys: String, CodingKey { case reason, changes }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        reason = try? c.decode(String.self, forKey: .reason)
+        var out: [Change] = []
+        if var list = try? c.nestedUnkeyedContainer(forKey: .changes) {
+            var i = 0
+            while !list.isAtEnd {
+                if let ch = try? Change(index: i, from: list.superDecoder()) { out.append(ch) }
+                i += 1
+            }
+        }
+        changes = out
     }
 }
 
@@ -255,6 +345,8 @@ struct JobQuotes: Decodable, Equatable {
     let displayTitle: String?
     let vehicleLabel: JobVehicleLabel?
     let asOf: String?
+    /// Steps for the quoting side (e.g. issue_change_order), listed by the reader beside viewer.actions.
+    let issuerActions: [JobAction]
 
     enum CodingKeys: String, CodingKey {
         case history, acceptance, viewer
@@ -280,7 +372,19 @@ struct JobQuotes: Decodable, Equatable {
         displayTitle = try? c.decode(String.self, forKey: .displayTitle)
         vehicleLabel = try? c.decode(JobVehicleLabel.self, forKey: .vehicleLabel)
         asOf = try? c.decode(String.self, forKey: .asOf)
+        issuerActions = (try? c.decode(IssuerActions.self, forKey: .viewer))?.issuer_actions ?? []
     }
+
+    private struct IssuerActions: Decodable {
+        let issuer_actions: [JobAction]
+        enum CodingKeys: String, CodingKey { case issuer_actions }
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            issuer_actions = (try? c.decode([JobAction].self, forKey: .issuer_actions)) ?? []
+        }
+    }
+
+    var changeOrderAction: JobAction? { issuerActions.first { $0.kind == "issue_change_order" } }
 
     /// The accept_quote step the server offers this viewer, if any.
     var acceptAction: JobAction? { viewer?.actions.first { $0.kind == "accept_quote" } }

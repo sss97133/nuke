@@ -79,6 +79,7 @@ struct JobPathContent: View {
     var onChanged: (() -> Void)? = nil
 
     @State private var accepting: QuoteBox?
+    @State private var changing: ChangeBox?
 
     var body: some View {
         List {
@@ -131,6 +132,9 @@ struct JobPathContent: View {
         .navigationBarTitleDisplayMode(.inline)
         .sheet(item: $accepting) { box in
             AcceptQuoteSheet(quote: box.quote, action: box.action) { onChanged?() }
+        }
+        .sheet(item: $changing) { box in
+            IssueChangeOrderSheet(action: box.action, quote: box.quote) { onChanged?() }
         }
     }
 
@@ -325,7 +329,16 @@ struct JobPathContent: View {
                             row
                         }
                     }
-                    RootedValueView(label: "Version", value: quote.versionLine, status: .attributed)
+                    RootedValueView(label: "Version", value: quote.versionLine + (quote.isChangeOrder ? " · Change order" : ""),
+                                    status: .attributed)
+                    if let co = quote.changeOrder {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("Change order").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                            if let r = co.reason { Text("Why: \(r)").font(.footnote) }
+                            ForEach(co.changes) { c in Text(ChangeOrderCopy.line(c, currency: nil)).font(.footnote) }
+                        }
+                        .padding(.vertical, 2)
+                    }
                     ForEach(quote.lines) { line in
                         RootedValueView(label: JobCopy.lineLabel(line), value: JobCopy.linePrice(line),
                                         status: line.amount == nil ? .recorded : .attributed)
@@ -352,6 +365,13 @@ struct JobPathContent: View {
                     RootedValueView(label: "Acceptance", value: JobCopy.acceptance(q.acceptance),
                                     status: q.acceptance?.state == "accepted" ? .proven
                                         : (q.acceptance?.state == "withheld" ? .conflicting : .pending))
+                    if let a = q.changeOrderAction {
+                        Button {
+                            changing = ChangeBox(action: a, quote: quote)
+                        } label: {
+                            Label("Issue change order", systemImage: "arrow.triangle.branch")
+                        }
+                    }
                 } else {
                     Text(q.history.isEmpty ? "No quote yet." : "No current quote. Earlier versions were withdrawn.")
                         .font(.footnote).foregroundStyle(.secondary)
@@ -393,6 +413,12 @@ struct JobPathContent: View {
         default: return stageRung
         }
     }
+}
+
+private struct ChangeBox: Identifiable {
+    let action: JobAction
+    let quote: Quote
+    var id: String { quote.quoteId }
 }
 
 private struct QuoteBox: Identifiable {

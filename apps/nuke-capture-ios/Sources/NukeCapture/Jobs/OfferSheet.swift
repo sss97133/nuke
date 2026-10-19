@@ -149,6 +149,20 @@ struct AcceptOfferSheet: View {
                 } header: {
                     Text("You are accepting")
                 }
+                if !offer.coSigns.isEmpty {
+                    Section {
+                        ForEach(offer.coSigns) { c in
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(CosignCopy.line(c)).font(.footnote)
+                                if let s = c.scope { Text(s).font(.caption).foregroundStyle(.secondary) }
+                            }
+                        }
+                    } header: {
+                        Text("Co-signs")
+                    } footer: {
+                        Text("Accepting accepts the offer with these co-signs and cuts. If they change, you'll be asked again.")
+                    }
+                }
                 Section("Prices") {
                     if offer.lines.isEmpty {
                         Text("No prices in this offer.").font(.footnote).foregroundStyle(.secondary)

@@ -209,19 +209,22 @@ struct ProviderProfile: Decodable, Equatable {
         let seenInFrame: SeenInFrame?
         let claimedOwned: ClaimedOwned?
         let supportingAttestations: Int?
+        let authenticatedAttestations: Int?
 
         enum CodingKeys: String, CodingKey {
             case seenInFrame = "seen_in_frame"
             case claimedOwned = "claimed_owned"
             case coSigned = "co_signed"
         }
-        private struct CoSigned: Decodable { let supporting_attestations: Int? }
+        private struct CoSigned: Decodable { let supporting_attestations: Int?; let authenticated_attestations: Int? }
 
         init(from decoder: Decoder) throws {
             let c = try decoder.container(keyedBy: CodingKeys.self)
             seenInFrame = try? c.decode(SeenInFrame.self, forKey: .seenInFrame)
             claimedOwned = try? c.decode(ClaimedOwned.self, forKey: .claimedOwned)
-            supportingAttestations = (try? c.decode(CoSigned.self, forKey: .coSigned))?.supporting_attestations
+            let co = try? c.decode(CoSigned.self, forKey: .coSigned)
+            supportingAttestations = co?.supporting_attestations
+            authenticatedAttestations = co?.authenticated_attestations
         }
     }
 
@@ -318,9 +321,21 @@ struct ProviderProfile: Decodable, Equatable {
         }
     }
 
+    /// A standing vouch: who vouched, for what and within what scope. Never counted as skill.
+    struct Vouch: Decodable, Equatable, Identifiable {
+        let vouch_id: String
+        let voucher: JobPerson?
+        let kinds: [String]?
+        let scope: String?
+        let vouched_at: String?
+        let expires_at: String?
+        var id: String { vouch_id }
+    }
+
     let viewer: JobViewer?
     let subject: Subject?
     let claims: Claims?
+    let vouches: [Vouch]
     let capabilities: [Capability]
     let tools: Tools?
     let facilities: [Facility]
@@ -333,6 +348,7 @@ struct ProviderProfile: Decodable, Equatable {
     enum CodingKeys: String, CodingKey {
         case viewer, subject, claims, capabilities, tools, facilities, contact
         case identityBridge = "identity_bridge"
+        case vouchedForBy = "vouched_for_by"
         case workRecord = "work_record"
         case asOf = "as_of"
     }
@@ -346,6 +362,14 @@ struct ProviderProfile: Decodable, Equatable {
         init(from decoder: Decoder) throws { facility = try? Facility(from: decoder) }
     }
     private struct Bridge: Decodable { let state: String? }
+    private struct Vouches: Decodable {
+        let items: [Vouch]
+        enum CodingKeys: String, CodingKey { case items }
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            items = (try? c.decode([Vouch].self, forKey: .items)) ?? []
+        }
+    }
     private struct WorkRecord: Decodable {
         let days: WorkDays?
         let jobs: Jobs?
@@ -371,6 +395,7 @@ struct ProviderProfile: Decodable, Equatable {
         jobs = record?.jobs
         contact = try? c.decode(ContactBlock.self, forKey: .contact)
         asOf = try? c.decode(String.self, forKey: .asOf)
+        vouches = (try? c.decode(Vouches.self, forKey: .vouchedForBy))?.items ?? []
     }
 
     var isSelf: Bool { viewer?.context == .selfView }

@@ -69,6 +69,7 @@ struct ProviderFaceContent: View {
     var onLoadMore: (() -> Void)? = nil
 
     @State private var showAccount = false
+    @State private var vouching = false
 
     var body: some View {
         Group {
@@ -237,17 +238,49 @@ struct ProviderFaceContent: View {
                           "From receipts and inventory they keep. Not checked in person."))
             }
         }
+        vouchSection(p)
         Section {
             let n = p.tools?.supportingAttestations ?? 0
             if n == 0 {
-                Text("No one has vouched yet.").font(.footnote).foregroundStyle(.secondary)
+                Text("No co-signs on jobs yet.").font(.footnote).foregroundStyle(.secondary)
             } else {
-                RootedValueView(label: "Vouches from others", value: JobCopy.count(n), status: .attributed,
-                                decay: "as stated by the people who vouched")
+                RootedValueView(label: "Co-signs on jobs", value: JobCopy.count(n), status: .attributed,
+                                decay: p.tools?.authenticatedAttestations.map { "\($0) signed through Nuke" } ?? "as stated by the co-signers")
             }
         } header: {
-            Text("Vouched for by others")
+            Text("Co-signed on jobs")
         }
+    }
+
+    /// Standing vouches, kept apart from skills; others may add theirs (the server decides who can).
+    @ViewBuilder private func vouchSection(_ p: ProviderProfile) -> some View {
+        Section {
+            if p.vouches.isEmpty {
+                Text("No one has vouched yet.").font(.footnote).foregroundStyle(.secondary)
+            }
+            ForEach(p.vouches) { v in
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(Self.vouchLine(v)).font(.footnote)
+                    if let s = v.scope { Text(s).font(.caption).foregroundStyle(.secondary) }
+                    Text([JobCopy.day(v.vouched_at).map { "vouched \($0)" }, JobCopy.day(v.expires_at).map { "until \($0)" }]
+                        .compactMap { $0 }.joined(separator: " · "))
+                        .font(.system(size: 9, design: .monospaced)).foregroundStyle(.tertiary)
+                }
+            }
+            if !(p.isSelf || isOwn), SupabaseService.currentUserId != nil, let id = p.subject?.profileId {
+                Button { vouching = true } label: { Label("Vouch for this person", systemImage: "hand.thumbsup") }
+                    .sheet(isPresented: $vouching) { VouchSheet(subjectUserId: id, subjectName: p.subject?.name ?? "this person") }
+            }
+        } header: {
+            Text("Vouched for by")
+        } footer: {
+            Text("A vouch is someone's signed word about this person. It isn't counted as skill.")
+        }
+    }
+
+    static func vouchLine(_ v: ProviderProfile.Vouch) -> String {
+        let kinds = (v.kinds ?? []).map(CosignCopy.kind).joined(separator: ", ")
+        return (v.voucher?.text ?? "Unnamed party") + (kinds.isEmpty ? "" : ": \(kinds)")
     }
 
     /// "from 80 of 412 analysed photos · latest 1,000 of 3,200".

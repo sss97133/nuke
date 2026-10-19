@@ -126,7 +126,7 @@ final class OfferTests: XCTestCase {
         XCTAssertEqual(offer("Offer unavailable: individual_offers_cover_skill_and_inspection"),
                        "You can offer on skill and inspection needs. Tools and shop space are offered by a shop.")
         XCTAssertEqual(offer("Offer unavailable: customer_cannot_offer"), "You're the customer on this job.")
-        XCTAssertEqual(accept("Offer hash does not match this offer"), "This offer changed since you opened it. Refresh and review it again.")
+        XCTAssertEqual(accept("Offer hash does not match this offer"), "This offer or its co-signs changed since you opened it. Refresh and review it again.")
         XCTAssertEqual(accept("Offer cannot be accepted: offer_window_closed"), "Their availability window has passed.")
         XCTAssertEqual(accept("Offer unavailable"), "Only the customer on this job can accept offers.")
         XCTAssertEqual(try decode(OfferReceipt.self, OfferFixtures.offerReceipt).offerRung, "self_claim")
