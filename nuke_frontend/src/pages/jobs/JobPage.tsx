@@ -12,6 +12,7 @@ import {
   type JobAction, type JsonObject, type Stage, type Viewer,
 } from './jobRead';
 import { readJob, type Load } from './readJob';
+import ShareButton from './ShareButton';
 import { JobSheetContext } from './jobSheetContext';
 import { completionActions, completionState } from './signDrafts';
 import './job-page.css';
@@ -424,6 +425,7 @@ export default function JobPage() {
         {vehicle && (vehicleId
           ? <PrefetchLink className="job-link" to={`/vehicle/${vehicleId}`}><Text role="body">{vehicle}</Text></PrefetchLink>
           : <Text role="body">{vehicle}</Text>)}
+        <ShareButton path={`/jobs/${workOrderId}`} title={title} label="Share this job" />
       </div>
     </Masthead>
 

@@ -16,6 +16,7 @@ import { ContactViaNuke } from './ContactViaNuke';
 import { SignActions } from '../jobs/SignAction';
 import { VouchSheet } from '../jobs/PeopleSheets';
 import { setupIncomplete } from '../provider-setup/setupReaders';
+import ShareButton from '../jobs/ShareButton';
 import '../jobs/job-page.css';
 
 type Subject = { p_user_id: string } | { p_actor_id: string };
@@ -302,6 +303,7 @@ export default function ProviderProfilePage() {
         <Text role="caption">{technicianLinkOf(str(bridge?.state), isSelf)}</Text>
         {evidencedHandle && <PrefetchLink className="job-link" to={`/providers/${encodeURIComponent(evidencedHandle)}`}><Text role="body">Open @{evidencedHandle}'s provider page</Text></PrefetchLink>}
         {s?.kind === 'user' && str(s.handle) && <PrefetchLink className="job-link" to={`/u/${encodeURIComponent(str(s.handle)!)}`}><Text role="body">Open their profile</Text></PrefetchLink>}
+        {s?.kind === 'user' && str(s.handle) && <ShareButton path={`/providers/${encodeURIComponent(str(s.handle)!)}`} title={`${name} · work record`} label="Share profile" />}
         {isSelf && setupIncomplete(data) && <PrefetchLink className="job-link" to="/work/setup"><Text role="body">Finish setting up your provider page</Text></PrefetchLink>}
       </div>
     </Masthead>
