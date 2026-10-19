@@ -404,6 +404,8 @@ Sources/NukeCapture/
   Jobs/AcceptQuoteSheet.swift      the customer's Sign on one quote version (accept_work_order_quote)
   Vehicle/                         Work card (vehicle_work_orders_read) and statement view
   Profile/                         provider face (provider_profile_read) and jobs on record
+  Provider/                        provider standing: link evidence (actor_link_claim_evidence_read), work days and
+                                   day-rate terms (provider_productivity_read), agent-signed register (owner_delegated_signs_read)
   Contact/                         Contact via Nuke: request sheet, Work inbox, thread (in-app only)
   Explore/                         Plan the work (listing_work_plan_read) and the Order inspection Sign
   Jobs/JobCloseout*.swift + CloseoutSheets.swift  completion, invoice, payment witness, evidence Signs
