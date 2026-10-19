@@ -2,8 +2,8 @@
 // job owner looking at providers), and the backup suppliers on a request. Plain words; no score.
 import React from 'react';
 import { Text } from '../../kit';
-import { PrefetchLink } from '../../components/PrefetchLink';
-import { day, matchInputLabel, matchMark, matchNext, matchReason, matchResultWord, planBLine, theirWords, type MatchInput, type PlanBSupplier } from './jobsReaders';
+import { matchInputLabel, matchMark, matchNext, matchReason, matchResultWord, theirWords, type MatchInput, type PlanBSupplier } from './jobsReaders';
+import { SupplierRow } from './SupplierRow';
 
 export function MatchList({ inputs, perspective = 'self', title }: { inputs: MatchInput[]; perspective?: 'self' | 'them'; title?: string }) {
   const heading = title ?? (perspective === 'self' ? 'How you match' : 'How they match');
@@ -23,18 +23,11 @@ export function MatchList({ inputs, perspective = 'self', title }: { inputs: Mat
 }
 
 /** Organizations paid for this kind of supply before, from retained purchase records. Open data: no amounts, no payers. */
-export function PlanBList({ suppliers }: { suppliers: PlanBSupplier[] }) {
+export function PlanBList({ suppliers, requirementId, inviter }: { suppliers: PlanBSupplier[]; requirementId?: string; inviter?: boolean }) {
   return <div>
     <Text role="label">Backup suppliers</Text>
     <ul className="jb-match" aria-label="Backup suppliers">
-      {suppliers.map((s, i) => {
-        const id = s.organization?.organization_id;
-        const name = s.organization?.name || 'Unnamed supplier';
-        return <li key={id ?? i}>
-          <Text role="body">{s.profile_public && id ? <PrefetchLink to={`/org/${encodeURIComponent(id)}`}>{name}</PrefetchLink> : name}
-            {' — '}{planBLine(s)}{day(s.last_on) ? `, last ${day(s.last_on)}` : ''}</Text>
-        </li>;
-      })}
+      {suppliers.map((s, i) => <SupplierRow key={s.organization?.organization_id ?? i} s={s} requirementId={requirementId} inviter={inviter} />)}
     </ul>
   </div>;
 }

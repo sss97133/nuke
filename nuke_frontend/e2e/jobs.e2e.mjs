@@ -364,3 +364,42 @@ describe('business invite', () => {
     await ctx.close();
   });
 });
+
+describe('backup suppliers and business offers', () => {
+  const notOnNuke = { organization: { kind: 'organization', organization_id: 'org-cool', name: 'Champion Cooling' }, profile_public: true, times: 3, last_on: '2026-01-23',
+    role: 'plan_b_supplier', label: 'paid for this before on Nuke (3 times)', kinds_matched: ['cooling_parts'], on_nuke: { state: 'not_on_nuke_yet', label: 'Not on Nuke yet' }, can_receive_requests: false };
+  const claimed = { organization: { kind: 'organization', organization_id: 'org-summit', name: 'Summit Racing' }, profile_public: true, times: 5, last_on: '2026-02-04',
+    role: 'plan_b_supplier', label: 'paid for this before on Nuke (5 times)', kinds_matched: ['auto_parts'], on_nuke: { state: 'claimed', label: 'Claimed on Nuke', offer_capable: true }, can_receive_requests: true };
+  const open_reqs = { as_of: '2026-10-19T19:00:00Z', next_after: null, coverage: { returned: 1, total_open: 1 }, viewer: viewer('client', ['customer']),
+    contact: { action: 'contact_via_nuke', available: true }, rows: [{ requirement_id: 'req-1', work_order_id: WO, requirement_kind: 'skill', description: 'Radiator recore',
+      display_title: 'E2E exhaust job', vehicle_label: header.vehicle_label, plan_b_suppliers: [notOnNuke, claimed], match: [] }] };
+
+  it('the customer invites a business not on Nuke from the job page, and invites a claimed one to offer', async () => {
+    const cv = viewer('client', ['customer']);
+    const { ctx, page, writes } = await open(`/jobs/${WO}`, { who: CUSTOMER, readers: jobReaders(cv, { open_requirements_read: open_reqs }) });
+    const section = page.getByRole('region', { name: 'Backup suppliers for your requests' });
+    await section.waitFor();
+    assert.equal(await section.getByRole('link', { name: 'Not on Nuke yet — invite them' }).getAttribute('href'), '/org/org-cool?requirement=req-1');
+    await section.getByText('Claimed on Nuke').waitFor();
+    await section.getByRole('button', { name: 'Invite to offer' }).click();
+    await dialog(page).getByRole('button', { name: 'Send invitation' }).click();
+    const args = await waitForWrite(writes, 'request_contact');
+    assert.equal(args.p_recipient_organization_id, 'org-summit');
+    assert.equal(args.p_context_kind, 'requirement');
+    assert.equal(args.p_context_id, 'req-1');
+    await ctx.close();
+  });
+
+  it('a visitor sees offers from a business with its Claimed on Nuke badge, and no supplier invites', async () => {
+    const v = viewer('visitor');
+    const offersRead = { ...offers(v), requirements: [{ requirement_id: 'req-1', requirement_kind: 'skill', description: 'Radiator recore',
+      offers: [{ offer_id: 'org-offer', offer_kind: 'organization', offer_rung: 'verified_claimant', terms_hash: 'd'.repeat(64),
+        provider: { kind: 'organization', organization_id: 'org-summit', name: 'Summit Racing', on_nuke: 'Claimed on Nuke', evidence_rung: 'verified_claimant' },
+        terms: { lines: [] }, acceptance: { state: 'not_accepted' }, co_signs: [] }] }] };
+    const { ctx, page } = await open(`/jobs/${WO}`, { readers: jobReaders(v, { work_order_offers_read: offersRead, open_requirements_read: open_reqs }) });
+    await page.getByText('Summit Racing · Claimed on Nuke').waitFor();
+    assert.equal(await page.getByRole('region', { name: 'Backup suppliers for your requests' }).count(), 0);
+    assert.equal(await page.getByRole('link', { name: 'Not on Nuke yet — invite them' }).count(), 0);
+    await ctx.close();
+  });
+});

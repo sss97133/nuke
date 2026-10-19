@@ -151,3 +151,16 @@ describe('Sign actions', () => {
     expect([...host.querySelectorAll('.job-sign button')]).toHaveLength(0);
   });
 });
+
+describe('offers from a business', () => {
+  it('shows the organization name and its Claimed on Nuke badge for a verified claimant offer', async () => {
+    fixture.readers.work_order_job_path_read = path(visitor);
+    fixture.readers.work_order_offers_read = { ...header, viewer: visitor, accepted_providers: [], requirements: [{ requirement_id: 'req-1', requirement_kind: 'skill', description: 'Radiator recore',
+      offers: [{ offer_id: 'o1', offer_kind: 'organization', offer_rung: 'verified_claimant', provider: { kind: 'organization', organization_id: 'org-2', name: 'Summit Racing', on_nuke: 'Claimed on Nuke', evidence_rung: 'verified_claimant' },
+        terms: { lines: [] }, acceptance: { state: 'not_accepted' }, co_signs: [] }] }] };
+    await render();
+    const offer = host.querySelector('.job-offer') as HTMLElement;
+    expect(offer.textContent).toContain('Summit Racing · Claimed on Nuke');
+    expect(offer.textContent).toContain('The business, by someone verified to run it');
+  });
+});

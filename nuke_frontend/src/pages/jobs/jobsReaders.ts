@@ -45,6 +45,10 @@ export type PlanBSupplier = {
   times?: number;
   last_on?: string | null;
   kinds_matched?: string[];
+  /** organization_on_nuke: state 'claimed' | 'not_on_nuke_yet', label, offer_capable, claim. */
+  on_nuke?: Record<string, unknown> | null;
+  /** Whether a Contact via Nuke request to this organization reaches someone. */
+  can_receive_requests?: boolean;
 };
 
 export type OpenRequirementsRead = {
