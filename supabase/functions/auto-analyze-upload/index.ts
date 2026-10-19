@@ -1,4 +1,5 @@
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -23,8 +24,7 @@ Deno.serve(async (req) => {
     console.log(`[auto-analyze-upload] Forwarding to yono-analyze: ${image_url} for vehicle ${vehicle_id}`)
 
     const serviceRoleKey =
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ||
-      Deno.env.get('SERVICE_ROLE_KEY') ||
+      projectSecretKey() ||
       Deno.env.get('SUPABASE_SERVICE_KEY') ||
       Deno.env.get('SUPABASE_KEY') ||
       ''

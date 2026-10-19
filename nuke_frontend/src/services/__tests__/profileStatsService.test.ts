@@ -6,7 +6,7 @@ const fixture = vi.hoisted(() => ({
 }));
 
 vi.mock('../../lib/supabase', () => ({ supabase: { from(table: string) {
-  const read = { table, filters: [] as Array<[string, any]>, nulls: [] as string[], fields: '', or: '', limit: 0 };
+  const read = { table, filters: [] as Array<[string, any]>, nulls: [] as string[], nonnulls: [] as string[], fields: '', or: '', limit: 0, ascending: false };
   fixture.reads.push(read);
   const result = () => {
     if (table === 'external_identities') return { data: read.filters.some(([field]) => field === 'id') ? fixture.identity : [fixture.identity], error: null };
@@ -16,8 +16,9 @@ vi.mock('../../lib/supabase', () => ({ supabase: { from(table: string) {
     if (table !== 'auction_comments') return { data: [], error: null };
     if (fixture.commentError) return { data: null, error: fixture.commentError };
     const rows = fixture.comments.filter(c => read.filters.every(([field, value]) => c[field] === value)
-      && read.nulls.every(field => c[field] == null));
-    return { data: rows.slice(0, read.limit), error: null };
+      && read.nulls.every(field => c[field] == null) && read.nonnulls.every(field => c[field] != null));
+    if (read.ascending) rows.sort((a,b) => String(a.posted_at).localeCompare(String(b.posted_at)));
+    return { data: rows.slice(0, read.limit), count: rows.length, error: null };
   };
   const query: any = {
     select(fields: string) { read.fields = fields; return query; },
@@ -25,7 +26,8 @@ vi.mock('../../lib/supabase', () => ({ supabase: { from(table: string) {
     in() { return query; },
     or(filter: string) { read.or = filter; return query; },
     is(field: string) { read.nulls.push(field); return query; },
-    order() { return query; },
+    not(field: string) { read.nonnulls.push(field); return query; },
+    order(_field: string, options: any) { read.ascending = options?.ascending === true; return query; },
     limit(n: number) { read.limit = n; return Promise.resolve(result()); },
     single() { return Promise.resolve(result()); },
     maybeSingle() { return Promise.resolve({ data: null, error: null }); },
@@ -55,7 +57,7 @@ describe('public source-account comments', () => {
     expect(profile?.stats.total_comments).toBe(2);
     expect(profile?.comments[0].listing.source_url).toBe(parent.source_url);
     expect(profile?.comments[0].auction.vehicle.id).toBe('public-vehicle');
-    const reads = fixture.reads.filter(r => r.table === 'auction_comments');
+    const reads = fixture.reads.filter(r => r.table === 'auction_comments' && r.nulls.includes('bid_amount'));
     expect(reads).toHaveLength(1);
     expect(reads[0].limit).toBe(100);
   });
@@ -70,6 +72,16 @@ describe('public source-account comments', () => {
     const profile = await getPublicProfileByExternalIdentity('source-account');
     expect(profile?.stats.total_comments).toBe(0);
     expect(profile?.comments).toEqual([]);
+  });
+  it('uses canonical bid events and the earliest observed activity instead of ingestion as membership', async () => {
+    Object.assign(fixture.identity, { first_seen_at: '2026-09-01', created_at: '2026-09-01' });
+    fixture.comments[0].posted_at = '2019-01-01T00:00:00Z';
+    fixture.comments[3].posted_at = '2018-01-01T00:00:00Z';
+    const profile = await getPublicProfileByExternalIdentity('source-account');
+    expect(profile?.bids.map(b => b.id)).toEqual(['bid']);
+    expect(profile?.stats.total_bids).toBe(1);
+    expect(profile?.profile.member_since).toBe('2018-01-01T00:00:00Z');
+    expect(profile?.profile.created_at).toBe('2026-09-01');
   });
 
   it('retains the existing claimed-account route and its distinct Nuke comments', async () => {

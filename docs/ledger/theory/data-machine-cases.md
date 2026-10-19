@@ -125,7 +125,7 @@ In addition to the card's list:
 | C4 | Soft-close fold for every closed lot | 400-lot sample: 80% extend; 39% of bids in chains; median +25% price made in chain | open | yes | read-only chain function; batch fold per closed lot as-of its close; bidder record as-of date keyed to `external_identities` |
 | C5 | `hours_until_close` defect | 73% wrong; 98.8% right since 09-27 | **closed for the reader** 2f48581f4 (20261001000200): `live_lot_temperature` keys comparables on `auction_events.auction_end_date` (else the vehicle's clocked end) minus `posted_at`; lots with no defensible close are not counted (`lots_without_close`). SL500 cohort before: the "bid at 2 h" equalled the final bid on 179 of 312 lots (median 20 bids by 2 h); after: 7 of 183 (median 6). Live lot 99fcbbd4: above 157 of 182 sold comparables, 101 lots without a close, 0.78 s as anon. The column itself is still wrong: a recompute or view is a separate case | yes | the column: recompute from `auction_events` in batches, or a view; never trust it |
 | C6 | Identity keys half filled | 2026-10-02 08:17Z: latest 10,000 comments, 9,971 identifiable, 7,960 missing keys; 6,905 missing keys match existing exact identities. At 12:11Z: all 187/187 identifiable arrivals since deployment linked, 0 mismatches, 0 missing vehicle/event links (10,000-row cap; arrivals 08:25–12:11Z). | open — fresh writer verified | yes | `e96ba7f02`: shared bounded identity resolver in core reader + archive loader, deployed `extract-bat-core` v155 via [CI](https://github.com/sss97133/nuke/actions/runs/36983740279). Re-measure with `node scripts/check-comment-linkage.ts --since 2026-10-02T08:24:02.906Z`. Historical rows untouched; historical repair through sanctioned supersession, listing/event identities and `bat_users` retirement remain. |
-| C7 | `platform_source` NULL on every new vehicle | 55,507 in 7 days | **writers fixed** 567bf9b0d: extract-bat-core stamps `bringatrailer` on insert and fills it on update; ingest maps its platform to `source_registry.slug` (the platform entity exists: slug matches the column's main values). Measured 10-01: 56,243 of 58,566 rows created 09-24..10-01 NULL (45,612 BaT, 9,963 Craigslist); 10 of 1,227 live BaT lots NULL and so unscheduled by the live pull. **Backfilled** 4191be659 (`backfill_vehicle_platform_source`, cron 512, self-retiring): NULL on vehicles created since 09-24 went 56,243 → 217 (59,549 filled) in 60 runs 08:12Z–10:10Z (2 hit the 50 s timeout), then the job turned itself off; the 217 are hosts outside the map. (PR #498 closed: merging is agent work, not the owner's.) Tested live 10-01 ~09:30Z: a Facebook Marketplace listing (1993 Land Cruiser FZJ80, item 1081313484286582, $9,500, 266,000 mi, Moreno Valley CA) sent through the `ingest` edge function with the service key landed as vehicle 6044cfee with `platform_source = facebook_marketplace`, anon-visible. Found: fan-out 1 (one `marketplace_listings` row); 0 `vehicle_observations`, 0 `vehicle_events`, 0 `vehicle_images`: the ingest writer makes an entity and a blip but no event in the log (§2.3 again). The Nuke MCP connector returned 401 (not a JWT), the wall the Opus session also hit | yes | a `NOT VALID` key to `source_registry.slug` once `unknown`, `facebook_marketplace`, `classiccars`, `bonhams` have registry rows |
+| C7 | `platform_source` NULL on every new vehicle | 55,507 in 7 days | **writers fixed** 567bf9b0d: extract-bat-core stamps `bringatrailer` on insert and fills it on update; ingest maps its platform to `source_registry.slug` (the platform entity exists: slug matches the column's main values). Measured 10-01: 56,243 of 58,566 rows created 09-24..10-01 NULL (45,612 BaT, 9,963 Craigslist); 10 of 1,227 live BaT lots NULL and so unscheduled by the live pull. **Backfilled** 4191be659 (`backfill_vehicle_platform_source`, cron 512, self-retiring): NULL on vehicles created since 09-24 went 56,243 → 217 (59,549 filled) in 60 runs 08:12Z–10:10Z (2 hit the 50 s timeout), then the job turned itself off; the 217 are hosts outside the map. (PR #498 closed: merging is agent work, not the owner's.) Tested live 10-01 ~09:30Z: a Facebook Marketplace listing (1993 Land Cruiser FZJ80, item 1081313484286582, $9,500, 266,000 mi, Moreno Valley CA) sent through the `ingest` edge function with the service key landed as vehicle 6044cfee with `platform_source = facebook_marketplace`, anon-visible. Found: fan-out 1 (one `marketplace_listings` row); 0 `vehicle_observations`, 0 `vehicle_events`, 0 `vehicle_images`: the ingest writer makes an entity and a blip but no event in the log (§2.3 again). The Nuke MCP connector returned 401 (not a JWT), the wall the Opus session also hit | yes | a `NOT VALID` key to the platform entity `observation_sources(slug)` (declared 20261007233000), not `source_registry.slug`, once the writers' spellings have entity rows (2026-10-14: 285,417 of 570,508 non-null public values, 50.0%, matched an entity slug; `bringatrailer` alone is 210,828). Steps proposed: the `source_registry.observation_source_id` bridge fill (3 of 97 filled; #1251), the alias rows (the #798 proposals, #1246), and the resolver fix (#1253). The sale-provenance writer also writes non-platform values into this column (memo #1500) |
 | C8 | Place is not an entity | 13 location columns; `geocoding_cache` 26K idle | **declared at county grain** 2026-10-07 (migration 20261007210000, memo `docs/proposals/2026-10-07-place-entity.md`): `us_county_boundaries` (3,231 counties) is the place entity; `vehicle_location_observations.county_fips` and `zip_to_fips.fips` key to it (NOT VALID). County coding had stopped in 2026-04 (0 of 207,324 rows since carried a code): migration 20261007213000 keys `county_fips` at insert from the postal code through `zip_to_fips` (trigger `trg_key_vehicle_location_county`, ZIP grain, method in `metadata.county_key`) and back-fills the 183,478 eligible rows through `key_vehicle_location_county_from_zip()` (receipted). Still open: state → region levels; non-US places; the 3,244 `_none` rows and 244 retired ZIP codes | yes | a state level when a reader needs it; the per-county residual fold for S01 |
 | C9 | Comparables too narrow for half the lots | 6 of 12 lots closing within 10 min had < 8 same-model comparables | open | yes | widen model → make → department per `TEMPERATURE_PLAN.md`; store level and n |
 | C10 | Two truths for the sale of record | §2.7 | open | yes | every cohort reader goes through `vehicle_sale_basis()`; `canonical_sold_price` nulled on live lots through the chokepoint |
@@ -134,7 +134,7 @@ In addition to the card's list:
 | C13 | Dealer monitors dead since 2026-02-17 | 495 of 496; no second visit ever | open | yes | the diff step inside `poll-listing-feeds`: presence ledger (dealer, listing_url, observed_at, status, price), appear/disappear/sold events |
 | C14 | Craigslist stores share URLs, no post id, no HTML diff, no second sighting | 100% of rows since August | open | yes | read the post id from the detail page; snapshot the detail page (`archiveFetch`); diff the search snapshot per poll into appear/disappear events |
 | C15 | Block auctions: no sale entity, no catalog-before, no video | `auction_events` last house row 2026-04-01 | open | yes (catalog); video needs a cost plan | a sale entity (house, start, end, location, catalog); catalog-before per event; results after; video clips as documentation later |
-| C16 | Facebook dead since 2026-06-12, 111,669 phantom actives | monitor cron off | open | no (Mac fetch) | per-metro request budget and sighting log; the cloud only folds and checks |
+| C16 | Facebook dead since 2026-06-12, 111,669 phantom actives | monitor cron off; 2026-10-18 the iMac runner lands ~900 listings/day with custody, but 5% reached a vehicle (see "Facebook listings reach the graph", 2026-10-19) | open | no (Mac fetch) | per-metro request budget and sighting log; the cloud only folds and checks |
 | C17 | Photo pipeline operating coverage | Opening sample: 1,042 rows `classifier_failed=true`, no error text. Writer repair [#506](https://github.com/sss97133/nuke/pull/506) and typed witness [#507](https://github.com/sss97133/nuke/pull/507) merged. Read-only 2026-10-04 UTC: one existing observation has one typed witness and reaches the public field drill; 3/3 cited images load. Cron 478 remains paused. | open — one image-to-reader path verified | yes (bounded diagnosis) | Continue the existing cached-result/receipt lane; prove eligible arrivals reach durable observations, witnesses and a useful reader. Preserve processing holds; the opening backlog count is not a current re-drive instruction. See follow-up below. |
 | C18 | Sensitive photos hidden by RLS, still public by URL | 474 flagged | open | yes | move sensitive objects out of the public bucket or sign URLs |
 | C19 | Anon writers remaining (§2.10) | 66 functions, 127 unguarded deployed functions, `vehicle_custom_circuits` | open | yes | a census that matches every DML form and dynamic SQL; revoke; a policy fix; a deploy-list diff against the repo |
@@ -392,6 +392,98 @@ event), described (COMMENT ON), owned (a registry row) and read. Not fewer table
 | Aggregators (Classic.com, Hemmings, ClassicCars.com) | a map of who exists; never the truth | discovery only | `scrape_sources` / `source_registry` | new dealers found per week |
 | Media, forums, video | slow, unstructured, high provenance value; vision costs per minute | none yet | documents keyed to vehicles | cost per clip; claims extracted per clip |
 | Owner's private data (Photos, receipts, K5 registry) | private; Mac-bound | `photo-sync-daemon`, receipts reconcile | observations, masked | classifier success rate (today 0%) |
+
+The species is a column (2026-10-18): `observation_sources.species`, with `species_set` and the evidence it was read from (`species_evidence`); a listing takes its own species where its URL or metadata shows it (`v_listing_species`). The extractor's builder declares it from the source itself (`.claude/rules/extraction.md`, Source species), and the Sources board groups by it with the names above. Barn Finds is an aggregator (a curator: its posts point at eBay, Craigslist and Facebook listings), with its own 'BF Exclusive' ads as classifieds.
+
+### Cars & Bids capture integrity — bounded repair, 2026-10-18
+
+The source question is whether a retained auction reading contains a usable keyed and clocked
+thread, before its current state is updated. `scripts/cab-api-sync.mjs` previously treated a failed
+comments request as an empty thread. The existing `inspect-cab-snapshot.mjs` now owns the deterministic
+`cab-capture-integrity-v1` assessment, called before the collector's first write. Failed/malformed
+responses, wrong listing identity, missing/duplicate thread IDs, missing source clocks, invalid bid
+amounts, source bid-count disagreement and a full limited page refuse the extraction. A disagreement
+between concurrently fetched detail and thread can cause refusal; it is not proof the source is wrong.
+No pagination protocol is invented. Unknown source bid counts remain unassessed; matching counts do
+not prove source enumeration or semantic accuracy. Comment-counter semantics, retained DB links and
+public delivery remain separate, unassessed gates.
+
+Offline replay: `node scripts/inspect-cab-snapshot.mjs --api-json <retained-json-file>`. Output contains
+counts and reasons, not comment bodies or handles. `scripts/inspect-cab-snapshot.test.mjs` exercises
+the actual collector's pre-write refusal and unknown/disagreement cases. The historical skip rule and
+dispatch population are unchanged, labelled previously processed rather than complete; legacy mixed
+row telemetry is explicitly not new-row or model coverage. No collection, replay or paused job is
+started by this repair. Three explicit retained captures passed the local capture assessment; their
+bid counts matched the stored totals. This is bounded validation, not fleet/public readiness.
+
+Next relationship to assay: the collector's listing observation uses source URL/identifier but does
+not pass typed snapshot or presentation pointers through `observationWriter`. Inspect canonical intake
+admission and existing binding owners before extending that path. Original source-ID reconciliation,
+capture identity, disagreement, withdrawal and anonymous-reader behavior must be proved together;
+adding a pointer alone does not close the case. Current stage: local implementation and focused tests;
+publication/deployment evidence belongs in the private lane receipt.
+
+The October 18 observation-load replay uses one retained C&B page and the live observation-index
+definition in disposable PostgreSQL 17. The old writer returns no observation ID and a contained
+error: its 6,808-byte index row exceeds the 2,704-byte limit. Compact fields occupy 1,380 bytes;
+full text stays in `content_text` and import metadata in `extraction_metadata.raw`. Opt-in raw-data
+hashing retains materially different evidence in dedup while existing callers keep their old hash.
+The source capture clock stays separate from database ingest time. A caller must await the writer,
+inspect its errors, and read back the same source, vehicle, clock and evidence on an unsuperseded
+row; a duplicate ID alone is insufficient. The local replay proves admission, identical-input dedup
+and supersession refusal, with registry/provenance branches isolated. Earlier vehicle writes are
+separate and are not rolled back by an observation failure. Production delivery, full intake/RLS,
+typed capture bindings and fleet coverage remain separate evidence in the private ETL receipt.
+The next private PG17 counterexample changes only the stored clock by one microsecond. JavaScript
+millisecond equality falsely accepts it; the readback must also constrain `observed_at` through
+PostgreSQL's native timestamp equality. That refuses the different instant while accepting equivalent
+time-zone representations. This is a local receipt-verification assay, not evidence of production
+clock corruption or a new production admission; exact deployment/runtime stages stay in the receipt.
+An independent collector replay uses a qualified retained response and rejects its snapshot insert.
+The old archive phase ignores the database error and proceeds toward the model with no saved capture.
+Archive lookup errors, rejected inserts and missing persisted IDs must stop that attempt. Dedup and
+unique-key races qualify only the exact successful platform/URL/content-hash tuple; an unsuccessful
+capture is not promoted or overwritten. This preserves the existing pre-write capture guard and
+does not repair source pagination. Script availability, collector activation and full source-to-reader
+acceptance remain separate stages in the private receipt.
+
+**Next loop, staged 2026-10-18: explicit listing-capture custody.** The prospective
+`cab_listing_capture_v1` mode in the existing `ingest-observation` accepts only an original
+observation, retained snapshot and canonical auction-lot selector, with explicit dry-run. Its
+database qualifier independently checks inline UTF8 SHA, case-sensitive source auction ID,
+same attributed parent/source, exact reconstructed listing narrative and microsecond clocks.
+Both existing source guards must admit the exact derived tuple under locks. A separate sparse
+`provenance` receipt keys the original observation, capture and presentation; the original remains
+unchanged. It asserts narrative provenance only: no copied specification, sale, independent
+corroboration or physical identity verification. Receipt ingestion establishes when that
+binding was recorded; it does not reconstruct historical native identity availability.
+
+The existing inspector's `--lineage <original> <snapshot> <presentation>` previews without writes;
+`--result <receipt>` requalifies stored custody through the same service-only qualifier. Withdrawal,
+privacy or changed source evidence withholds verification. No public grants, collection, queue,
+source activation or historical replay are added. Local tests combine the actual canonical handler,
+PostgreSQL admission, current receipt reader and two-session mutation controls. Three explicitly
+selected retained tuples are rehearsed offline; this is
+not production admission, actual anonymous privacy acceptance or a fleet readiness numerator.
+Full retained/eligible populations and net public supported-answer gain remain unassessed.
+The production schema/admission change remains a held draft until separately authorized; do not
+treat implementation, local tests or source-selector previews as a deployed repair. The existing
+observation visibility predicate withholds `provenance`; this internal receipt must not become a
+second public listing. The source's existing listing capability qualifies its retained parent;
+this guarded derivation does not declare a new publisher-provided provenance capability.
+
+The first authorized live attempt qualified all three selectors but admitted none: the existing
+market/media guard also requires sale context for an auction FK. The local fixture had omitted that
+guard. The follow-up fixture now reproduces the refusal with its actual function and both triggers;
+the narrow repair independently requalifies the exact protected narrative receipt, excludes media
+citations, and preserves legacy sale/chassis checks and both source-custody guards. A passing
+qualifier remains distinct from a successful canonical write and current stored-receipt readback.
+
+The typed relationship uses the existing `auction_event_id` FK, shared with the lot interaction
+log. It leaves `source_vehicle_event_id` NULL: that pointer would make native-state replacement
+refuse under existing sanctioned episode supersession. The local counterexample replaces the
+native state while the auction-lot/capture receipt remains verifiable; no correction owner or
+public policy is weakened.
 
 ## 7. Hypotheses the owner wants tested as veins (in the vocabulary)
 
@@ -949,6 +1041,100 @@ a more efficient form: "ensuring the model grows as data is discovered and needi
 but very little keys, foreign keys, joins, edges, residuals, queries ... our job is to put name and meaning to it."
 This section is the index he asked for, the process in the card's own words, and the proposal. It installs nothing.
 
+### Public-readiness criteria corrected, owner direction 2026-10-12
+
+The owner rejected any-binding coverage as a useful headline and required criteria derived from
+production-grade public exploration. Field-slot and canonical-claim counts point toward missing
+structure but do not establish even basic public-use acceptance. The owner also rejected unknown
+Facebook-wide size as an excuse for having no acquisition goal: Facebook is a larger platform
+entity whose channels, markets, publishers, presentations, media and interactions need scoped work.
+
+The [theory card's public-use criteria](data-machine.md#public-use-readiness-owner-correction-2026-10-12)
+now define per-capability evidence/identity/public-reader/freshness/quality gates, ready/blocked/
+not-assessed populations, full-population denominators and net supported-answer gain. The Facebook
+contract requires an intended target inventory, enumeration witnesses, capture depth, revisit
+obligations and retained-population reconciliation. Source-level history can be useful before an
+asset match; unknown global platform size does not erase target-plan or retained-backlog obligations.
+
+This entry records criteria preparation, not a measured readiness numerator or completed launch.
+Implementation belongs to existing source/stack/assay and `db-stats`/SystemStatus owners. Closure
+requires versioned public capability specifications, automated population reconciliation, independent
+quality evidence, anonymous end-to-end assays and dated before/after ready counts. Existing source,
+privacy and operational holds remain. Preserve older field/capture metrics as dated diagnostics.
+
+### Executable public inventory acceptance matrix, prepared 2026-10-13
+
+The owner clarified that Facebook is one source in the broader goal: Nuke should replace daily
+listing rounds. Extend the existing public-reader assay through
+`bash scripts/check-ingestion-health.sh --public-readers --acceptance-matrix /private/manifest.json --out /private/new-matrix.json`.
+The versioned `public_inventory_acceptance_v1` input contains `population`, `assessments`, `targets`
+and `targetPlanComplete`. It compiles public find/open, attributed inspection and one-inventory
+contracts, including original source evidence, new/change/repeat membership, clocks, asking-price
+units, collection gaps and history. Existing owners include HomePage/MarketPulse, Search/useSearchPage,
+`universal-search`, VehicleProfile and provenance readers; routes are candidate owners, not runtime passes.
+
+Gate declarations need matching subject/capability/gate receipts and qualified method/clock/digest
+metadata. Public delivery requires anonymous runtime evidence; source fidelity and semantic quality
+require independent review. Missing objectives, missing measured service/freshness metrics, private or
+fixture delivery, future/wrong-scope receipts and unresolved gates cannot pass. Held or underspecified
+source/channel/region/query/cadence/depth targets remain blocked or not assessed. Configured targets do
+not establish enumeration, capture or revisit coverage. Failed reader/source gates retain reason codes.
+
+This compiler has no network, writer, source activation or inference. Private output is exclusive-create,
+with input and assay hashes. It classifies supplied declarations; it does not independently validate
+those receipts, produce a fleet readiness percentage, certify a release or grant public access. A
+complete explicit manifest must reconcile its declared pair count; mixed capabilities are reported
+separately, with no averaged readiness score. The first executed private matrix contains declared
+capabilities and known source-scope blockers, not a population census or newly modeled records.
+
+Focused offline failure/scope contracts passed before publication. Delivery and actual public-reader
+acceptance remain separate stages. Next: bind the required gates to existing actual reader/quality
+assays and reconcile retained populations; resolve the public inventory gap without counting private
+Facebook history or isolated ingestion success as one-place public usability.
+
+### Full-population reconciliation, prepared 2026-10-13
+
+The same assay now accepts `--reconcile-population /private/config.json --out /private/report.jsonl`.
+The `population_reconciliation_v1` mode joins a sorted, exhausted subject manifest to separately
+sorted assessment receipts with bounded memory. It retains every eligible member: absent assessments
+remain `not_assessed`. Each capability has its own eligible denominator, ready/blocked/not-assessed
+totals, gate reasons and intersections. Other capability grains remain explicitly unmeasured.
+
+The configuration binds the population filter, full retained/public denominators and their grains,
+UTC measurement window, source receipt, and the row counts and SHA-256 hashes of both streams.
+Each stream must end with a matching dated exhaustion receipt and content digest. Duplicates,
+unmatched or ineligible assessments, grain/window/count mismatches, incomplete tails and changed
+files fail reconciliation. Only a terminal `reconciled` summary establishes completion; a partial
+output is not a completed census. Private output includes the configuration and assay hashes plus
+the digest of all preceding output rows. The existing explicit-manifest mode remains available.
+
+This remains an offline compiler of supplied gate evidence. Matching file hashes cannot establish
+source fidelity, independent review or anonymous runtime delivery. A windowed cached export is
+dated evidence, not an atomic or current production snapshot. Reconciliation alone neither adds
+usable records nor produces a launch certificate. The actual population gate assays remain required.
+
+The same owner also accepts `--compare-populations /private/comparison.json --out /private/delta.jsonl`.
+Its `population_comparison_v1` configuration carries `before` and `after`, each with an explicit
+`evaluatedAt` UTC clock and a complete reconciliation `configuration` as defined above. Stream paths
+are relative to the comparison file. It reruns both reconciliations with bounded pull streams,
+including all original counts, hashes, tails and gate qualification; it does not trust summary totals.
+Population filters, grains and capability eligibility rules must match. Retained/public denominators
+and measurement windows remain beside each side's eligible population.
+
+The result separates shared-member state transitions from arrivals and departures and reconciles the
+ready-count delta to those components. `blocked → ready`, `not_assessed → ready`, `ready → blocked`
+and `ready → not_assessed` remain separate. Changed freshness/service objectives have a separate
+transition matrix; loosening an objective cannot masquerade as a pass under unchanged objectives.
+The primary gain/loss counters require unchanged objectives; the separate decision-count delta
+includes all objective changes and reconciles to arrivals/departures. Population measurement clocks
+and window boundaries cannot run backward. Each side is evaluated at its declared time, so expired evidence can regress. A newly assessed pass
+is a measurement change, and no state transition by itself establishes that a repair caused the gain.
+Only the terminal `reconciled` summary establishes a complete comparison. A broken input tail leaves
+an incomplete private output, never a success report. This mode performs no network, model calls or
+database writes and does not independently certify the supplied gate evidence.
+Configuration and stream inputs must be regular files; nonblocking admission rejects named pipes
+without waiting indefinitely for another process.
+
 ### Where the process is defined (checked against origin/main and the live database, 2026-10-06 20:40Z)
 
 | Question | Where | What it establishes |
@@ -983,6 +1169,51 @@ and its words are already in §1. Each stage has a clock, a tier that runs it, a
 
 The repair loop in the card is one pass of key → describe → shape → fold → replay → assay on one gap. "Standing" means
 the pass runs between shifts, taking its gap from a queue the database computes.
+
+**Coverage-reporting correction, owner 2026-10-11.** Reports emphasized a selected 500-vehicle
+validation cohort without the full-lot reference. Against the owner's stated 690,000-vehicle reference,
+500 is about **0.072%**; that reference is not a newly verified live census. The cohort's field gains
+prove a bounded change, not whole-fleet semantic coverage or general-audience readiness. Completed
+source-property work and distinct vehicles touched are separate processing measures. Apply the
+fleet-relative reporting contract in `data-machine.md` to subsequent repair-loop reports. Fleet-wide
+net usable coverage, eligible backlog and completion time remain unestablished by these cohort receipts;
+this correction does not close C28 or authorize a new worker, source admission or capacity change.
+
+### Correction reaches a comparison: bounded contract, 2026-10-12 UTC
+
+The owner's objection is whether an evolving representation compounds understanding or mistakes.
+Correction belongs in the development loop: retain captured observations, attributed claims,
+versioned interpretations and computed conclusions; then prove the consequences of a changed
+interpretation rather than treating schema growth as the result.
+
+`nuke_frontend/src/lib/dealRead/batComps.test.ts` now connects the existing
+`selectSourceSalePopulation` and `comparePriceToSourceSales` contracts across three synthetic
+later contradictions: episode model identity, sold amount and sale outcome. The fixed input contains
+20 sale episodes in two disjoint ten-episode model cohorts; appending a later capture produces
+21 captures of the same 20 episodes. The affected matched denominator changes from ten to nine;
+the synthetic candidate's percentile changes from 45 to approximately 38.89 and the median from
+5,500 to 6,000 in the declared synthetic units. These are fixture results, not market measurements.
+
+- Both captures remain inspectable with their source and qualification references. A model conflict
+  withholds narrow matching but retains the independently supported sale in the broad population.
+  Amount/outcome conflicts withhold the disputed sale from the qualified price population.
+- The earlier knowledge cutoff excludes the later capture and reproduces the entire earlier price
+  calculation. The previous input and result are unchanged; the unrelated cohort's calculation is
+  identical. Reordered input and repeated evaluation produce the same revised calculation.
+- This proves conflict propagation and deterministic evaluation, not admitted supersession,
+  automatic conflict resolution, persistent evaluation dependencies or independently measured accuracy.
+  The population selector remains a local contract, not a newly wired production valuation reader.
+  Its replay proves this selector/calculator path, not historical canonical-reader reconstruction.
+
+The focused file passes 74 tests, including the three new cases. This entry records implemented and
+locally tested stages only; PR CI, merge and delivery require their own receipts. No production schema,
+testimony, source, worker, evaluation policy or capacity changes are part of this increment. Net newly
+usable fleet claims from this test work: zero. Fleet-wide semantic coverage remains unestablished by it.
+
+The next acceptance case must use an existing sanctioned supersession owner, revise a supported
+interpretation, prove its actual downstream consumer and reproduce the earlier evaluation receipt.
+Then test a separately selected held-out case and report correction cost and regressions. The bounded
+conflict assay does not close C28 or establish repeated autonomous representation development.
 
 ### What is inefficient today (measured 2026-10-06)
 
@@ -1075,6 +1306,222 @@ readings remain unmeasured rather than claiming an undeclared writer or absent o
 Twenty-nine focused UI contracts and the existing ENFORCE/build gate pass. This is a bounded
 contention mitigation; the follow-up merge, deployment and signed-in successful reading remain
 separate delivery stages until recorded in the private receipt.
+
+**Source-intake acknowledgement and observation visibility, 2026-10-12 UTC
+(implementation/testing; delivery stages recorded separately).** The existing feed poller assigned
+`ledger=complete` before its queue write returned. An actual-handler/installed-SDK denied-write
+fixture reproduced that result; completion now requires one returned queue receipt with the exact
+URL and expected status. Failed, missing or unrelated acknowledgements remain unavailable.
+The existing extraction metrics helper records bounded feed-run progress in `extraction_runs`;
+source work stops if progress cannot be acknowledged. Completed target processing, dispatch intent,
+actual ingestion requests, unattempted targets and ledger acknowledgements remain different measures.
+Interrupted runs retain their last acknowledged progress. Existing invocation ceilings, source
+rotation, sanctioned intake, crons and native BaT admission controls are unchanged.
+
+The existing `db-stats?intake=jobs` / `/admin/status` consumer reads at most50 matching runs per
+worker over24hours, with overflow and unavailable readings explicit. It also consumes the existing
+Facebook capture writer's `fb_sweep_jobs.metadata.results` and verifies exact listing/sighting and
+linked-observation pointers; original cards, contacts, target URLs and error bodies are excluded.
+Browser observation time and intake clocks remain separate. The read-only live SQL assay at
+07:01:43Z found41 retained presentations in three declared captures and41 matching sightings;
+all were unlinked. That is source-listing custody in the declared capture scope, not new vehicle
+models, continuous availability, a source-wide denominator or public consumer usability. The full
+eligible stored-record reference remains the completed632,014-record census; no repeat census or
+whole-fleet canonical gain is claimed. Source-intake holds and unresolved vehicle links remain.
+
+**Deterministic bulk model construction, 2026-10-12 UTC (implementation/testing).**
+The owner explicitly rejected per-node LLM processing. The existing specification reader gains a
+bounded200-ID metadata model overload (optional typed custody reads capped20) that includes every eligible requested record, including those with
+no canonical claim.13 recorded primitive attributes retain their `vehicles` origin, maintenance
+clocks, unassayed attribution and unknown units/configuration. A set-based record binding function maps
+existing literal labels and powertrain values to11 ratified property keys, retaining source column/value,
+numeric unit conversion and column disagreement without canonical promotion; unitless mileage stays unbound.11 current canonical selectors retain
+property/observation keys and qualifiers. Unrequested typed claims are labeled separately from zero qualified claims. This expands a consistent data-exploration contract;
+it creates no testimony and does not establish full vehicle models or full-fleet runtime verification.
+
+The existing retained-listing owner batches up to500 source PKs in SQL and repairs already visited
+native year parents for exact make/model opening-label tokens. A finite prior-work source-key walk
+runs inside the original seeder; the raw cursor,120attempts/minute,2admissions, guards, source custody
+and held sources remain. Model remainders may contain trim/body words and are not catalog identities.
+No provider or per-record model calls occur. The existing deployment pauses and reactivates this same
+job only with its matching canonical edge owner deployed.
+
+The complete32,164-key enrolled-year-work probe found18,941 qualified native captures on2,172
+stored eligible vehicles;18,671 recognized captures cover2,143 vehicles. Relative to the dated
+full-model baseline, only40 make and40 model slots were absent. A complete current reread of those40 vehicles found68
+of the80 slots already present, leaving12 potential additions in this declared set. These are potential missing fields,
+not realized gains, complete cars or a fleet breakthrough. The full reference remains the
+2026-10-11 windowed census:687,987 public rows;631,862 public, undeleted, non-nonvehicle rows;
+31,311 with any type-valid canonical claim and720 with all eleven core slots. The bulk reader's
+record availability must not be substituted for these evidence-coverage measures. Private source
+pages, type/qualification tests and delivery stages are retained under `~/nuke-logs/retained-bulk-*`.
+Merge, deployment, realized net gains and anonymous runtime remain separate until recorded.
+
+### Model-name separation and shared alias contamination, 2026-10-18
+
+The original Relativity example retained a source-labeled Bultaco Frontera 370 but assigned its
+listing to the Pursang key. Fixing a UUID display fallback exposed rather than corrected that
+interpretation. The same live alias owner assigned Cappuccino to Jimny and Hayabusa/RE-5 to GSX-R.
+The historical specialist-family test explicitly expected Hayabusa to bind to GSX-R: positive
+binding tests and healthy refresh jobs were not semantic identity acceptance.
+
+The full stored-vehicle reference was an atlas estimate of 1,248,544 rows on October 18; an exact
+public denominator and fleet-wide affected count were not measured. The reference-catalog assay
+read 4,470 rows/22,250 aliases. Its 515 cross-name candidates include legitimate hierarchy and are
+not an error count. The first repair cohort is all 1,310 retained Bultaco/Suzuki names representing
+5,216 dictionary record rows, not 5,216 verified physical vehicles or newly ready public answers.
+
+The prepared repair narrows eight existing rows and adds fourteen source-supported model names in
+the existing `canonical_models` owner. Its disposable replay rebinds 542 represented rows and names
+18 formerly unresolved rows; 1,899 formerly forced bindings become unresolved. All names and
+make-level sale counts/dollars survive. Those figures measure dictionary classification changes,
+not whole-fleet model completeness. Sources are the Barcelona Motorcycle Museum Bultaco catalogue
+and Suzuki's own digital archive/history. Unknown production ranges remain unknown.
+
+`test_model_identity_separation.sql` runs the actual matcher, market/sales folds, anonymous sales
+reader and fit writer. It covers twenty-three names, unrelated Porsche controls, source retention,
+generic/unassessed-name refusal, idempotence and withholding a price fit made from old membership.
+The existing `refresh-market-views.py` gains a bounded dependency-ordered selection with a dry run
+and stops before dependent folds after a failure. Refreshes remain concurrent; year prices use their
+existing owner/planner settings. No new queue, schedule or raw testimony writer is introduced.
+
+Delivery stages and before/after anonymous reader evidence belong in the operator receipt at
+`~/nuke-logs/model-identity-repair-20261018/`; this entry records local implementation and testing,
+not production completion. Remaining work includes other catalog candidate families, the differing
+normalizer year/null rules and the independent 1D sale/capture admission defect. Existing GM truck
+hierarchy decisions are outside this repair and remain intact.
+
+### Year-price correction rebuild follow-up prepared, 2026-10-18
+
+PR2074's catalog correction deployed; names, market, sales and movers rebuilt, with anonymous
+Frontera/Pursang separation and unchanged source rows and two-brand count/dollar totals. The
+existing year-price refresh was canceled twice when Realtime slot creation waited on its long
+transaction. A later wait belonged to a separate pg_net worker; unrelated sessions were preserved.
+This is an operational failure of the rebuild, not a completed year-price correction.
+
+A read-only, one-snapshot Bultaco/Suzuki replay of the year-price query returned 716 rows on both
+sides, with zero differences under EXCEPT ALL in both directions. Materializing the existing named
+and conflict stages reduced cohort execution from 4,893.630ms to 1,569.982ms. The original conflict
+subplan ran 825 times for each of ten aggregates; the candidate evaluates it once per eligible row.
+This fixed cohort is a performance/equality assay, not full-build timing or fleet readiness.
+
+The prepared migration creates only a private, unpopulated beside copy from the live definition,
+adding those two evaluation fences and the same indexes. The populated view, public grants and
+cron remain unchanged. The PG17 contract reuses the existing sold/ask, privacy, conflict, year-window,
+platform-pooling, odometer and percentile fixtures and checks exact output multiplicity (excluding
+only the rebuild clock). Build and reviewed rename cutover remain separate delivery stages.
+The private-copy preparation subsequently deployed through PR2082. Its first full build completed
+in 79.5s under the operator's 120s ceiling, producing 101,347 rows. The 716-row corrected cohort
+matched the independently evaluated reference digest exactly. Frontera contributes 22 sold-year
+rows with at most eight pooled prices; every row remains thin and withholds percentiles. These are
+model-year aggregate rows, not physical vehicles. A separate guarded activation migration is prepared;
+it preserves role privileges, retains the old populated fold privately, refuses new tracked consumers
+or semantic drift, and leaves the existing refresh owner and schedule intact. Activation is not yet
+claimed here; exact checked/deployed/runtime stages remain in the private receipt.
+Receipts: `~/nuke-logs/model-year-refresh-20261018/`. No third unchanged refresh, Realtime access
+change, capacity increase, raw testimony mutation or new recurring job is part of this repair.
+
+### Fiat model identity and intake matching prepared, 2026-10-19 UTC
+
+The earlier full stored-vehicle reference remains the October18 atlas estimate of1,248,544 rows;
+current exact public/eligible and affected-fleet denominators are not measured. This next validation
+cohort is all973 retained Fiat name rows representing4,133 dictionary record rows, not verified
+physical vehicles or newly ready answers.94 name rows/367 represented records explicitly naming
+nine other models were in500;850 source examples were inX1/9. Retained Panda/850 native headlines
+agree with those model claims. Original source rows and physical identity uncertainty remain intact.
+
+Two catalog rows are narrowed and ten source-supported names use the existing canonical_models
+owner. References are Fiat's official history, Stellantis Heritage's1100/128/130/131/barchetta
+accounts and Giugiaro's850 Spider portfolio. Fiat's history explicitly identifies Topolino as500,
+so that alias is retained. Unassessed coachbuilder/generic tokens remain unresolved. In the complete
+retained-name replay,594 represented records rebind, none become newly bound, and370 formerly forced
+bindings become unresolved; all973 names/4,133 represented records survive. These are classification
+changes, not a fleet-readiness gain. New production ranges remain unknown.
+
+The native normalize_vehicle_model owner also ranked generic Spider above the specific850 alias
+because it sorted display-name length. It treated NULL year starts as exclusion and could match130
+inside1300. The prepared fix ranks the actual literal alias, preserves numeric boundaries, admits
+unknown bounds while respecting explicit limits, and leaves exact-match confidence semantics intact.
+GM truck, unqualified and wildcard-make lookup paths retain their prior rules. An initial generic
+candidate changed K1500 Silverado toSilverado; the final scoped candidate preserves all19 controls
+from the current273-row GM catalog. No GM catalog or market-family rule changes are included.
+The same-corrected-catalog Fiat name-only diagnostic changes45 names/116 represented records under
+the new normalizer; that diagnostic has no independent correctness or fleet-readiness interpretation.
+
+The actual PostgreSQL contract has33 assertions, including source/count/dollar preservation,
+Topolino/X1/9 controls, public Panda sales, old-fit withholding, explicit-year refusal, earlier
+Bultaco/Suzuki cases, literal wildcard/numeric negatives and unchanged functionOID/owner/grants.
+A real concurrent owner edit is refused before catalog writes and remains preserved. No Fiat
+make_model_profiles rows were present. The prior500 fit/series is retained privately and withheld
+through record_family_price_index; qualified new fitting remains separate. The legacy normalize_model
+location/casing path and physical scalar backfills remain outside this patch. Delivery is prepared
+and locally tested here; checked merge, CI deployment, dependent folds and anonymous runtime evidence
+belong in ~/nuke-logs/model-identity-fiat-20261018/.
+
+### Daily sold movement excludes asking captures, prepared 2026-10-19 UTC
+
+The broader identity investigation found a second measurement error in the current
+family_share_movers_build(integer,integer,text) owner: its live 1D branch unions Facebook
+capture/asking rows into confirmed sold vehicle_events. The capture clock is not a sale clock,
+and a classified status or asking amount supplies neither a confirmed outcome nor sale price.
+A bounded current read found982 captures in48 hours, none with parsed_make, so this admission
+path is presently latent; it does not establish contamination of today's displayed counts.
+No fleet-wide public/eligible denominator or readiness gain is claimed.
+
+The prepared repair removes only that union and its temporary capture load. Synthetic acceptance
+first reproduces10 confirmed Ford sales plus2 asks becoming12, then proves10 sales and the exact
+sold-dollar totals,11 Ford sale bins across both windows, unchanged other7 horizons, original
+function identity/owner/ACL, preserved source rows and supporting Facebook supply, and unchanged
+low-volume fallback. Capture recency, amount and even a classified sold label cannot change the
+confirmed-sale measure. A strict whole-definition guard refuses concurrent owner edits.
+Existing upcoming capture-date semantics remain a separate gap; this repair does not certify
+those dates or restart held Facebook intake. Exact checked/deployed/runtime stages belong in
+~/nuke-logs/model-movers-sold-20261019/.
+
+### Lotus catch-all aliases corrected, prepared 2026-10-19 UTC
+
+The next concrete source-to-reader failure is a retained Climax Eleven headline grouped as Seven.
+The bounded population is727 retained Lotus names representing2,939 dictionary records; these are
+classification inputs, not verified physical assets or a fleet-readiness denominator. Lotus's
+own Seven/Eleven/2-Eleven/3-Eleven histories establish distinct model identities. Two catalog rows
+are narrowed, the dedicated2-Eleven alias row's generic Elise label is corrected, and3-Eleven is
+added through canonical_models. Existing340R/Elise membership remains: Lotus explicitly names the
+car Elise340R. Generic engines, unrelated types and unassessed replicas are retained unresolved.
+Superseded labels/aliases remain in notes; source testimony is unchanged. No saved fits or profiles
+were present for the affected keys at preparation time; the existing fit writer remains the
+invalidation path if any appear before deployment.
+
+Twelve synthetic names exercise actual folds/intake with count/dollar/source preservation and
+idempotent migration application. Production acceptance returns to the two exact retained source
+vehicles and their public sales groups, alongside conserved Lotus totals. This is a shipped repair
+only once checked merge, CI deployment, fold rebuilds and anonymous runtime checks are recorded in
+~/nuke-logs/model-identity-lotus-20261019/. Other catalog candidates are not certified by this slice.
+
+### Civic identity admission corrected, prepared 2026-10-19 UTC
+
+The next bounded repair starts with retained City and Legend presentations incorrectly returned
+as Civic. The current Civic name bucket contains195 names representing1,873 dictionary records;
+these are classification inputs, not physical-asset or fleet-readiness counts. Honda's own Civic,
+City and Legend histories establish their distinct model identities. The Civic reference contains
+15 unrelated/generic aliases, including the single letter s. Remove those broad admissions, retain
+the eight Civic aliases, add City/Legend through canonical_models, and keep unassessed names
+unresolved. Source labels, bundle descriptions and superseded reference aliases remain intact.
+No claim that a City/Motocompo bundle is a single physical vehicle is introduced.
+
+Twelve actual-fold/intake cases cover City/Legend, valid Civic variants, existing Acty/S2000/Accord,
+and generic or unassessed negatives. Source rows and aggregate sale counts/dollars are conserved.
+One saved Civic fit is retained privately and withheld through record_family_price_index until
+qualified refitting; no affected registered profile was found. Acceptance must return to the
+exact retained City/Legend vehicles through the public reader after deployment and view rebuilds.
+Exact stages and private receipts belong in ~/nuke-logs/model-identity-honda-civic-20261019/.
+
+The preceding Lotus repair is now deployed and runtime-verified (PR2097). Its runtime dependency
+check also found one saved composite Elise fit beyond the three directly revised catalog keys;
+that fit was preserved privately and withheld through its sanctioned writer. Original specimens
+from2006/2015 were checked through the public historical fold, and the chart's intentional five-year
+window was checked separately. Saved-fit checks must include composite families losing members,
+not only edited catalog IDs. The public535-row Lotus year-price result matched its bounded
+independent reference. This closes that repair, not a full-catalog certification.
 
 ## 13. Aspiration: twenty stacks the model must be able to carry (owner, 2026-10-06)
 
@@ -1301,6 +1748,43 @@ must survive reopening offline. Declare accessible-library coverage (limited Pho
 unread images, source/method versions and unresolved vehicle/role matches. Cached analysis may be reused when its source
 and method still qualify. An image's existing `vehicle_id` is context, not an independent confirmation of itself.
 This direction authorizes the app-first workflow; it does not lift separate canonical-write, privacy or paid-intake holds.
+
+**Owner correction, 2026-10-18: resolving the subject is the machine's job.** Asking the photographer
+which existing profile a car belongs to, or whether it is new, hands back the operation's central task.
+The machine must investigate retained evidence before asking for facts it can derive. Manual selection
+is a correction tool, not the default identity engine. Apply this contract to the existing image,
+album, observation and profile owners:
+
+1. Separate photo bytes, a depicted physical subject, its possible record matches, its attributed
+   specifications and the photographer's relationship. An unknown year or VIN does not make a
+   well-supported subject disappear. Photographing a car does not establish ownership.
+2. Read each photo independently, including already-filed photos. Use albums, time, place, labels
+   and visual similarity for retrieval. Establish membership with visible correspondences across
+   views; keep generic parts unresolved when there is no supported chain to an identifying view.
+   A day at a shop can contain several cars. An existing attachment cannot confirm itself.
+3. Compare to retained historical evidence, following merge terminals and source lineage. Search
+   beyond the make on a possibly wrong current profile. Keep candidate population, truncation,
+   exclusions and absent references with the decision. A profile cover can itself be misfiled.
+   An unrecognized model response must never silently choose the first candidate.
+4. Carry a supported but unmatched subject forward through the existing unresolved cluster owner
+   (`emergent_vehicle_clusters`, linked observations), then the existing private profile writer when
+   admission is supported. Keep unknown specifications unknown. "No match among these references"
+   does not prove global novelty; do not mint duplicate chassis records to conceal incomplete search.
+   Current `device_create_vehicle_profile` admits VIN/serial/album evidence only: visual-subject
+   admission, qualified byte custody and its consumer are still missing, not delivered by this contract.
+5. Select the next discriminating evidence from accessible retained images before asking the user:
+   identifier views, body/part correspondences, historical states and contradictory candidates.
+   Retain source IDs/hashes, source and reading clocks, method/model, agreements and contradictions.
+   Numeric model confidence alone is not calibrated physical identity. Revise earlier interpretations
+   through the sanctioned supersession/attribution path and recheck the actual gallery/profile reader.
+
+Acceptance must include a mixed-car day, a new subject without a VIN, competing same-model cars,
+a contaminated reference cover, a generic part close-up and a later discriminating observation.
+Measure subject grouping, existing-record retrieval, admitted attribution and actual consumer delivery
+separately; an honest unresolved result passes refusal but does not count as resolved. Versioned
+comparison receipts and parser tests are a bounded repair, not proof of autonomous filing accuracy.
+Live atlas inspection on 2026-10-18 found the existing cluster store idle (1,597 estimated rows,
+last inspected samples dated May); its existence is not an operating subject-resolution pipeline.
 
 ### 13.4 The owner on the API, the name and the calculations (2026-10-07)
 
@@ -1731,6 +2215,35 @@ we have to collect and analyze the data to understand the odds."
    organizations it scores. The registry change is the data-model lane's; the needs above are its list.
 5. **The pitch is secondary.** It stays in `docs/POSITIONING.md` as one application of the function, not the goal.
 
+### 13.9.3 Attributed demand and contextual opportunities (owner, 2026-10-14 local)
+
+The owner broadened the classified-feed question beyond personal interest: model local, state, national and cultural
+value contexts and the ability to act; precompute useful supply/demand connections before a user joins. A public
+wanted post can express attributed demand without becoming a Nuke account or proof of current buying intent. Interest,
+request, available supply, contextual fit and financial opportunity have different evidence and outcomes. The owner
+asked agents to proceed independently, test the model through skeptical review, and repair useful missing relationships.
+
+The existing [opportunity matching specification](../../features/opportunity-matching/SPEC.md) now carries this general
+contract and preserves the funding case as dated history. Inspection found three differently grained owners:
+`demand_signal` measures aggregate search/interest; `taste_intent_signals` records user saves; `demand_briefs` carries
+concierge partner asks. None becomes a new external-request store. Attributed testimony and property vocabulary retain
+their existing observation/identity/curator owners; request episode, criteria, lifecycle, visibility and evaluation
+relationships remain named work.
+
+Independent review corrected two model errors: no known unmet criterion does not establish eligibility when required
+facts are unknown; and a registry of eligible businesses cannot supply the application denominator for funding odds.
+The first implementation extends `scripts/discovery/buying-evidence.mjs` with an explicit structured-request mode,
+using existing anonymous typed-specification and provenance readers. Required/preferred predicates return met, unmet,
+unknown or conflict with source IDs and clocks. Primitive record labels cannot satisfy a requirement. This is a bounded
+private operator consumer over 1–10 declared candidates, not a maintained public market feed or automatic request
+extraction. Availability, geographic/cultural ranking, economic outcomes and whole-market coverage remain unassessed.
+
+The correction assay preserves captured inputs and reevaluates the same request after discriminating evidence, with an
+unaffected candidate and earlier captured receipt retained. Such replay proves the evaluator, not historical canonical
+state reconstruction or fleet improvement. No production schema, request admission, source activation, contact or paid
+model calls are part of this implementation. Implementation/test/publication/runtime stages are recorded in the lane's
+private receipt; neither this contract nor a passing fixture establishes net newly ready public answers.
+
 ### 13.10 Used-vehicle buying evidence: resale reassurance and personal use (owner, 2026-10-08)
 
 **Owner direction, in substance.** A buyer comparing a truck at 94k miles and a higher price with one at
@@ -1767,3 +2280,726 @@ versus planned action, event date/mileage and ownership-window relationships, wi
 and sanctioned admission. Qualify outcome histories before learning cost/reliability weights; missing records
 do not establish neglect or successful work. Measure resale reassurance against later price/liquidity
 separately from personal-use repair expense, downtime and useful service over an explicit buyer horizon.
+
+### 13.11 The owner on seeing actors: every endpoint a measure, relative, the map as the zoomed-out view (2026-10-14 00:00Z)
+
+**Owner direction, in substance.** Click-through runs on the phone end on incomplete data and on endpoints that
+mean nothing for the goal. The stacks exist to *see* users and organizations: a name and a list of cars is not
+that. What has meaning is performance and relativity, the measure. Opening Viva! Las Vegas Autos should show its
+stats: personality, era specialization, market performance and ROI, whether the actor reports its profits. The app
+is full click-through, every number a door; the map is the same view zoomed out: a ZIP where the actors are
+"stackmaxxing", fully open to audit, and showing how well they perform.
+
+**What that means for an endpoint.** An actor (organization or person) renders as a document of measures, each
+with its method, its population and a rank among a stated peer cohort above the rank floor (kit `Measure`,
+`RANK_FLOOR` 5). Four families, mapped to the stacks above: performance (sell-through on known outcomes, bids,
+comments and views per listing, volume; stacks 4 and 17), specialization (share of the actor's vehicles by
+decade and make against the market's share, a concentration ratio; stack 17), open books (of sold vehicles, how
+many carry a recorded sale amount; of held vehicles, how many carry a recorded acquisition cost; how many carry
+both, the vehicles whose ROI is computable; stack 15, amounts never shown to strangers, only the fact of
+disclosure), and documentation depth (photos, observations and work per vehicle against peers; the "stackmaxxing"
+measure). An unknown is stated as unknown with its denominator, never as zero. The map aggregates the same
+measures per ZIP or county over the actors located there (stack 1).
+
+**The worked case, read-only, 2026-10-14 00:08Z.** Viva! Las Vegas Autos (`organizations` c433d27e, dealer,
+Boulder City NV). From `organization_seller_stats` (contract `listing_activity_v1`, computed 2026-10-13 23:50Z):
+72 attributed listings, 31 sold, 5 unsold, 35 without a recorded outcome; sell-through 86.1% of known outcomes,
+the 59th percentile of 211 organizations with at least five known outcomes (median 83.6%); bids per listing the
+highest of the 211; views per listing the 5th percentile; volume the 42nd. From `organization_vehicles` joined
+to `vehicles` (owner, sold_by and consigner links, 137 vehicles with a year): 1970s 26% against 13% of the market
+(2.0×), 1980s 23% against 11% (2.1×), 2020s 10% against 3.7% (2.8×), 2000s 0.6×; Chevrolet 42, Ford 22, GMC 15.
+Open books: 54 of 74 sold vehicles carry a recorded sale amount; 15 of 63 held vehicles carry an acquisition cost.
+The listing-activity contract counts 0 priced sales where the vehicle rows carry 54 sale amounts: two populations,
+reconcile before either becomes a performance number. The organization row's own counters (`total_sold` 0,
+`gmv` 0, `total_auction_wins` 17) contradict both and are not measures. `organization_seller_stats` has row
+security and no read policy, so a stranger reads none of it today.
+
+**Build order.** (1) A typed read per actor kind returning the kit document (masthead, measures sections with
+coverage and peer rank, a table of the actor's vehicles by role), a public projection with no amounts; a contract
+test on a disposable PG17. (2) The phone renders measures and tables through the kit twin and reaches an actor from
+search, from a vehicle's seller or owner link and from the map. (3) The same read for a person (garage, work,
+disclosure), then the per-ZIP aggregate for the map.
+
+### 13.12 The wiring harness as a stack (owner, 2026-10-14)
+
+**Owner direction, in substance.** Each vehicle has its own extensive data model with its unique data, queried with
+SQL in Postgres: "a series of tables and descriptions, that's how we're supposed to be storing an entire wiring
+harness, not raw data, heavily structured data ... options are different from hard coding ... using the data model as
+our method of delivering the facts of a wiring harness." After seeing the K5 harness rendered from its rows: it
+"preceded our whole data model movement"; "completely ingest this into the proper data model with all the data
+machine concepts and rules, making sure everything's deeply connected ... ruminate, hypothesize, develop criteria of
+what is a stack for wiring harnesses, what is the structured data of this system."
+
+**What the rows are today (read-only, 2026-10-14, vehicle e08bf694).** 37 wiring tables exist. The K5 holds 528 live
+wires (`vehicle_custom_circuits`), 227 plugs (`harness_endpoints`) and 891 wire ends (`wire_termination_specs`),
+loaded one way from `k5_registry.json`, which is the source of truth. 136 of the 528 wire rows store a Python
+dictionary as text in `from_component`/`to_component`, and 27 store prose in a cavity column. 0 of 891 wire ends and 0
+of 227 plugs key into `catalog_parts` (10,853 rows), although the wire-end table carries nine foreign keys for it.
+1,100 of the 1,156 rows in the shared pin library (`device_pin_maps`) also carry one vehicle's connections.
+`factory_harness_circuits` holds 71 squarebody 1973-87 circuits beside 60 `nuke_build` rows (a build mixed into the
+factory baseline). `connector_cavity_layouts` holds 467 cavities across 46 connector models, with the D38999 25-61
+listed twice under two names. 9 of 132 columns in the three core tables are described. 42 of 528 wires carry stored
+check results; the checks run in Python with the truck's layout typed in. The owner's verdict stands: tables holding an
+export, not a model.
+
+**The nouns already exist outside.** VDA 4968, the Vehicle Electric Container (VEC), is the automotive industry's
+information model for harnesses: components such as connectors and wires, connectivity and wiring, topology and
+geometry, and variants and modules, with the older harness list KBL (VDA 4964) beside it (prostep ivip fact sheet).
+Take its concept set as the dimension vocabulary rather than inventing one. What Nuke adds is what VEC does not
+carry: testimony behind every value, clocks and replay, cohort baselines, and outcomes.
+
+**The harness through the nine layers (lead's hypothesis).**
+
+| Layer | What it means for a harness | Exists today as |
+|---|---|---|
+| Log | Every statement about the harness, attributed: a maker's datasheet line, a service-manual page, a vendor drawing, an owner call, a builder's practice, a receipt, a photo, a tape measurement, an agent interpretation with its method and version, a check result with its inputs and rule version. Event clock (said or measured) and ingest clock. | Receipts in git; some `vehicle_observations`; most harness facts are registry fields with a source string |
+| Key | Part numbers to `catalog_parts`; pins to the device pin library; cavities to the connector model's cavity layout; plugs to device instances; speakers to identities and organizations | The foreign-key columns exist and are empty |
+| Dimension (shared, versioned, no vehicle in it) | Parts (housing, terminal, seal, wedge, backshell, wire spec, fuse, crimp tool and die); connector models with cavity layouts and compatibility (terminal × seal × wire outside diameter); device models with pins (function, electrical type, limits); wire specs (gauge, diameter, ampacity by temperature, resistance per foot); signal types; body-generation routing landmarks; the factory circuit catalog per generation | `catalog_parts`, `connector_cavity_layouts`, `wire_catalog`, `component_library`; `device_pin_maps` and `factory_harness_circuits` mixed with one build |
+| Instance graph (per vehicle: the harness itself) | Device instance (placed, with its position source) → connector instance (one mated half) → cavity occupancy (a terminal instance) ← segment (one physical wire between two terminations: spec, colour, planned and measured length) ; segments compose a net (the logical circuit: source pin to load pins, function, protection); splices, studs and ground banks are nodes; bundles and branches carry coverings and routes; every row carries its variant membership (the "150 % harness") | `harness_endpoints`; `vehicle_custom_circuits` conflates net and segment (a wire through the firewall is one row with four end rows); `wiring_decision_links` |
+| Fold | State per instance as of any date: design (concept → decided), procurement (carted → bought with proof → in hand), build (cut → terminated → installed → tested) | Status columns rewritten by each load |
+| Baseline | (a) The factory harness of the body generation, what the truck was born with; (b) the cohort of comparable builds (standalone ECU and PDM restomods, other M130 looms: Dave's Bronco sheet belongs here as a comparable, never as K5 fact); (c) maker rule limits (ampacity, drop ≤ 3 %, seal range) | 71 factory circuits with typical lengths and 26 known failure modes; no build cohort |
+| Residual | This harness against its baselines: each factory circuit kept, replaced, deleted or new; wire per function against the cohort; margins against the rules (drop, ampacity, PDM output current); spare cavities, outputs and inputs against the cohort | The manifest's KEEP / REPLACE / NEW / SPLICE flag; margins only in `CABLE_SIZING.md` |
+| Feature | Per harness as of t: readiness by layer (plugs, ends, crossing, terminals, material), cited-field share, minimum margins, spare capacity, open unknowns with the cost to close each, key-off draw | `options_v5.py` readiness levels, outside the database |
+| Prediction (six blanks) | At design freeze t, for standalone-ECU harness builds P, predict cut length per segment, material cost, build hours and first-start defects as a median and 80 % range; grade by absolute error against the as-built outcome; baseline the factory typical length plus pad, or the cohort median. Per segment: the chance of rework | None |
+| Outcome | The as-built truth joined back by key and clock: measured cut lengths, receipts, work sessions, continuity and insulation tests, voltage drop under load, first start, later faults | None (nothing cut) |
+
+**Criteria: the harness is a stack when each of these holds, and each is a test.**
+1. Every physical thing has a grain and a key: part, connector model, cavity, device model, pin, device instance,
+   connector instance, terminal instance, segment, net, node (splice, stud, ground bank), bundle, route node. A wire
+   through a bulkhead is one net and two segments.
+2. The library and the instance are separate: no library row names a vehicle, and no instance row restates a library
+   fact as text.
+3. Every reference is a key. An unresolved reference is held as a candidate with its original text and a status, never
+   as prose or a serialized object in a typed column.
+4. Every value carries testimony: its source observation, the speaker's relation (maker, service manual, owner intent,
+   builder practice, another vehicle, agent with method and version), both clocks and trust. Another vehicle's
+   document can inform a baseline; it cannot become this vehicle's fact.
+5. Replay: the harness as it stood on any date is a query, and state changes are events.
+6. Variants are data: an option is a decision row, instance rows carry variant membership, a configuration is a query,
+   and deciding an option changes rows, not code. An option with no rows reports itself as unexpanded.
+7. Checks are computed conclusions in SQL, with a rule version and stored inputs. A decided owner call is a constraint
+   the instance cannot violate. Generators never decide.
+8. Every output reads the rows: build book, diagrams, cut list, formboard, carts and the stack page. Nothing generated
+   is a source.
+9. Coverage comes first, across every harness instance in the database (the K5, a factory generation, any other
+   build), each layer with its denominator.
+10. Every column is described in the database (meaning, unit, source, grain, clock).
+11. A second vehicle's harness, or a factory generation, lands in the same tables without a new table.
+
+**Hypotheses, each falsifiable.**
+- *H1, net and segment.* Wire #110 (coolant temp) as one net and two segments through 61-pin cavity w reproduces
+  today's kit output and gives each segment its own length and cut state. It fails if a segment needs a field the net
+  owns.
+- *H2, checks as joins.* Terminal wire range, cavity validity and seal fit recomputed in SQL over library and instance
+  rows agree with `check_plug_ends.py` on all 939 ends; every disagreement names a model gap.
+- *H3, contamination is a key error.* The 65 fields resting on the Bronco sheet and the 28 purchase flags citing
+  another customer's invoice become other-vehicle or baseline testimony once every observation is keyed to the
+  vehicle it observes; none can then be a decided K5 fact.
+- *H4, variants.* Rev A as a query (492 of 528 wires on 2026-10-14) equals `options_v5.py`'s configuration for the
+  same option set. 50 of the 55 candidate options have no rows today.
+- *H5, factory baseline.* The 71 factory circuits give the K5 a residual (kept, replaced, new per factory function)
+  that accounts for its 528 wires; the 60 `nuke_build` rows leave the factory table.
+
+**Build order (a proposal; tables only through SCHEMA_LAW and `schema_proposals`, nothing minted here).**
+(1) Map each VEC concept to an existing table or a proposal, and name each conflation (net and segment; library and
+instance in `device_pin_maps` and `factory_harness_circuits`). (2) Re-ingest the K5 from its sources rather than
+from the registry: each fact an observation with its datasheet page, manual page, owner call, receipt, photo or
+measurement, then keyed and folded into the instance graph. The registry becomes a generated view, and its row-by-row
+diff against today's file is the audit. (3) Port the checks to SQL (H2) and the configuration to a query (H4).
+(4) Load the factory generation as the first baseline (H5) and one more build as the first cohort member. (5) The
+harness stack page, rendered from rows, coverage first, every number a door.
+
+#### 13.12.1 RSI pass on 13.12, and step 1: the VEC map (lead, 2026-10-14)
+
+The owner left the judgment to the machine ("it's up to you, that's why we're supposed to be doing RSI"). The lead
+re-read 13.12 against the theory card, VEC's class model and the live rows, and found nine faults in its own draft.
+
+**What was wrong or missing.**
+1. *The design was put in the log.* A harness design is intent, not observation. The log holds observations of the
+   world (makers' part specifications, the truck's measurements, receipts, photos, tests) and statement events (an
+   owner call, a builder's practice, an agent interpretation with its method). The design is a fold over decision
+   events, and every planned value is a **prediction** graded by the as-built **outcome**: planned length against
+   measured cut length, predicted drop against measured drop under load. The harness stack has a prediction layer from
+   the first decided wire.
+2. *One connectivity level was too few.* VEC keeps `Signal` (what it means), `Net` / `Connection` (what is electrically
+   joined), `WireElementReference` (the physical wire) and `Topology` (where it runs) apart. Criterion 1 becomes four
+   levels: signal → net → segment → route.
+3. *"Checks in SQL" contradicted an existing decision.* `wiring_policy_rules` was created as "Physics stays in code;
+   policy (limits, ...) in rows" and holds 0 rows. Corrected: limits and policies are versioned rows; physics is code
+   that reads only rows; every result is a row with its inputs and rule version; a failing result blocks the state
+   change it guards.
+4. *Coverage had no denominator.* Completeness needs a contract per grain stored as data (what a closed wire end, a
+   placed device, a protected net requires). The wire-closure protocol's fields are that contract, kept today as a
+   markdown rule.
+5. *Lengths were treated as values.* A segment's planned length is computed from the route graph plus the pad rule;
+   the digital twin's measured paths become topology rows.
+6. *Electrical behaviour was missing.* Every net carries its load model and its protection element (fuse, or PDM output
+   with its current setting) as data, and margins are computed from them. 19 of 40 assigned PDM outputs have no
+   current setting today.
+7. *Privacy was missing.* Money and people's contact details are owner-only at the source (the manifest leak found the
+   same night, PRs #1147 and #1148).
+8. *H5 over-claimed.* A standalone-ECU restomod is mostly new circuits, so the factory harness cannot "account for"
+   528 wires. The test is the classification itself: each of the 71 factory circuits kept, replaced or deleted, and
+   each K5 net factory-derived or new. That measures how far the build departs.
+9. *Provenance exists and is laundered.* The instance tables have `source`, `method`, `observed_at` and `trust`, but
+   every live K5 row cites the export: 390 wires "k5_registry v5", 138 "April 2026 whole-truck plan", 795 wire ends
+   "k5_registry v5" and 96 "k5-wiring", all at trust T3. The registry carries per-field citations (the ~470 cited
+   fields `audit_citations.py` reads), and the loader flattens them away. Re-ingest carries each field's own
+   citation into its observation.
+
+**Criteria, revised (supersedes the list above).**
+1. Four connectivity levels, each a grain with a key: signal → net → segment (one physical wire) → route (topology
+   node and segment). A wire through a bulkhead is one net and two segments mated at a cavity.
+2. Library and instance are separate (VEC's specification and occurrence): no library row names a vehicle.
+3. Every reference is a key; an unresolved one is a candidate row with its text and a status.
+4. Three evidence kinds, never mixed: observations (with source document, speaker relation, both clocks, trust),
+   decisions (author, rationale, the observations they rest on) and computed results (inputs and rule version).
+   Another vehicle's document informs a baseline, never this vehicle's fact.
+5. The design is a fold over decision events; replaying any date is a query.
+6. Planned values are predictions and are graded against as-built outcomes.
+7. Variants are data: configuration and variant membership on every instance row (plug, segment, end), and a
+   configuration is a query.
+8. Limits and policies are versioned rows; physics is code reading only rows; results are rows; a failing result
+   blocks its transition.
+9. Completeness is computed against per-grain contracts stored as data, across every harness instance in the
+   database.
+10. Lengths come from the route graph; margins come from each net's load model and protection element.
+11. Every output reads the rows (book, diagrams, cut list, formboard, carts, page).
+12. Every column is described; money and contacts are masked at the source; a second vehicle or a factory generation
+    lands in the same tables.
+
+**Hypotheses, revised.** H1 becomes four-level: #110 as signal "coolant temp", one net, two segments mated at 61-pin
+cavity w, routed over twin topology. H2 tests policy rows plus code: limits for terminal range, seal range and cavity
+move into `wiring_policy_rules`, and the recomputed verdicts must match `check_plug_ends.py` on all 939 ends. H3 and H4
+stand. H5 becomes the classification in fault 8. New, *H6, the design as prediction*: once segments are cut, planned
+length against measured length per segment gives the twin's calibration (median error and 80 % range) by route type.
+Until then it is untestable and says so.
+
+**Step 1 result: VEC concepts against the live tables.**
+
+| VEC concept | Meaning | Nuke today | Verdict |
+|---|---|---|---|
+| `PartVersion` + specifications (`ConnectorHousingSpecification`, terminal, cavity seal, `WireElement`, `CoreSpecification`) | the part master | `catalog_parts` (10,853), `wire_catalog` (107), `connector_specifications`, `component_library` (84) | Exists; no instance keys into it |
+| `Slot` / `Cavity` | positions in a housing | `connector_cavity_layouts` (467 cavities, 46 models) | Exists; D38999 25-61 twice; not keyed to the housing part |
+| Component specification with its pins | a device model and its pins | `device_pin_maps` (1,156) | Conflated: 1,100 rows also carry one vehicle's wiring |
+| Component occurrence (`Role`, `Placement`) | this device on this truck, placed | `vehicle_build_manifest` (141) and device rows in `harness_endpoints` | Two tables for one concept; placement is three columns plus a text source |
+| Connector occurrence, `Mating` | a plug half on the truck and the half it mates with | plug rows in `harness_endpoints` (e.g. FIREWALL-CABIN / -ENGINE) | No mating relation |
+| `CavityReference` + `ContactPoint` | one wire end: cavity, terminal, seal | `wire_termination_specs` (891) | Right grain; part numbers are text, nine keys empty |
+| `WireElementReference` | one physical wire | inside `vehicle_custom_circuits` | Conflated with the connection |
+| `Connection` / `ConnectionEnd` / `Net` | what is electrically joined | inside `vehicle_custom_circuits`; splices as plug rows | No net table |
+| `Signal` | what it means | `circuit_name` and `signal_type` text | No table |
+| `TopologyNode` / `TopologySegment` / `Routing` | the route graph and what rides each branch | `vehicle_harness_landmarks`, `harness_bundle_definitions` (both idle); the twin lives outside the database | Absent in practice |
+| `Configuration` / `Variant` / `UsageNode` / `Module` | options and their members | `wiring_decisions` (`opt-*`) + `wiring_decision_links` (`coupled_with`, plugs only) | Partial: membership on plugs, not on segments or ends |
+| `DocumentVersion` | the source document | `wiring_reference_documents` (idle), library extracts in git, `source` strings | Not keyed; flattened to the export |
+| (Nuke) testimony per value | source, relation, clocks, trust | columns on the instance tables | Present, all pointing at the export |
+| (Nuke) policy rows | limits as versioned data | `wiring_policy_rules` | 0 rows |
+| (Nuke) baseline | the factory harness | `factory_harness_circuits` | 71 factory rows mixed with 60 build rows |
+
+**Next (step 2 begins).** Filed as `schema_proposals` 006d44ec (add_table, open, 2026-10-14 05:21Z): signal, net,
+segment (wire element occurrence), topology node and routing, with landmarks extended into topology branches,
+`Mating` as a key between plug rows, and variant links reaching segments and wire ends. A curator approves it. Then
+#110 is re-ingested end to end from its own citations as the first case (H1), with its diff against today's rows.
+
+#### 13.12.2 Step 2, dry run on wire #110 (lead, 2026-10-14)
+
+The harness tables went live with migration 20261014060000 (PR #1156; 5 tables, 75 of 75 columns described). Before
+writing #110 into them, a read-only dry run asked what each of its facts would key to. The answer locates step 2's
+real work.
+
+**What #110 is, across its records.** The cited closure of 2026-05-13 says M22759/32 tan/white, a Metri-Pack 150 sensor
+plug and a WPCTS30 pigtail. The registry today says M22759/16-22 yellow/red (colour basis: Dave's Bronco sheet, a
+practice from another vehicle) and a GT150 plug; its own wire row still names a Metri-Pack terminal while its end rows
+say GT150 12191818. Four versions of the same wire, none of them superseded in the database: the history the new
+tables can carry and the old ones overwrote.
+
+**What its facts can key to today.**
+- Cavities: 1 of 4 wire ends resolves, and only by translation ("B04" in the harness, "B4" in
+  `connector_cavity_layouts`). The library stores the D38999 25-61 insert twice (`D38999_J61`,
+  `mil_spec_D38999_24WJ61SN`), both with invented names (R1P1 to R4P20) instead of the MIL-STD-1560 letters the
+  harness uses ("w"). The standard letters and positions are already transcribed in the repo from MILNEC
+  p. B-22 (`scripts/generate_connector_build_sheets.py`, `CAV_XY`). No GT150 2-way layout exists.
+- Parts: the wire-end table carries nine catalog keys and fills none. `catalog_parts` holds M22759/16-22 in solid
+  colours only (no -42 yellow/red), the M800-KIT-N Superseal kit and a GT150 2-way female housing (15497399), but not
+  the D38999/24WJ61SN receptacle, the /26WJ61PN plug, the M39029/56-351 and /58-363 contacts, the GT150 terminal
+  12191818 or seal 15366021.
+- Catalogs: eight parallel tables hold parts (`catalog_parts`, `parts_catalog`, `part_catalog`,
+  `intelligent_parts_catalog`, `ebay_parts_catalog`, `wire_catalog`, `electrical_system_catalog`, `tool_catalog`).
+  `catalog_parts` is the one the harness foreign keys point at.
+- Lengths: one 4.6 ft zone estimate for the whole wire; never split at the firewall. Each segment's planned length
+  is unknown, with that reason, until routing exists.
+
+**Step 2, in order.** (a) Name `catalog_parts` the part master for harness keys and record the other seven as feeders
+or retired, through `schema_proposals` (no data moves in this step). (b) Library repairs from cited sources: the 25-61
+insert once, with standard letters and positions from MILNEC p. B-22; a GT150 2-way layout; one cavity-naming rule
+for housings (molded numbers) with the ECU's A/B labels mapped at the instance. (c) Catalog rows for #110's missing
+parts, each with its supplier page as source and no price. (d) #110 itself: signal, net, two segments mated at cavity
+w, every resolvable key filled, every unresolved one held with its text and reason. (e) Parity: the legacy query and
+the new rows return the same four wire ends; the diff is published with the change.
+
+#### 13.12.3 RSI passes 1 to 45: the model measures itself and fills its gaps (lead, 2026-10-14 to 16)
+
+Owner, on the reshape: "a bit light ... data model goes rsi". The loop each pass ran:
+1. Read the stack SH scoreboard (`v_harness_coverage`, per public vehicle and layer).
+2. Take the largest gap that existing evidence can close.
+3. Close it with a migration and a PG17 contract test.
+4. Re-measure live as a logged-out reader.
+
+Every pass has a receipt in `docs/wiring/receipts/` dated 2026-10-14.
+
+| Pass | Migration | Gap (before) | Evidence used | After (live) |
+|---|---|---|---|---|
+| 1 | 20261014113000 | no field-level evidence, no design state, options at plug grain only, no protection, no self-measurement | 783 k5-wiring observations; device_pin_maps; endpoint couplings | 450 decided / 138 candidate / 50 contradicted segments; 1,066 option links; 57 protected nets; 798 evidence links; stack SH + scoreboard |
+| 2 | 20261014123000 | cavity keys 0 / 884 | MILNEC 25-61 transcription (rings checked 1/6/12/19/23); MoTeC 65044 / 65045 | 295 / 884; 121 cited cavity rows |
+| 3 | 20261014133000 | baseline and residual missing | 65 factory-circuit facts landed through ingest-observation | factory rows keyed 27 / 62; carried 5, unassessed 13, baseline gap 23 |
+| 4 | 20261014143000 | 4 of 28 build-cited GM numbers unnamed; cavity and PDM keys unreadable to the public | ST 352 78 Circuit Tabulation pp. 8-11 (generated rows) | 129 circuits added (348 in all); 139 agree, 6 conflict; build-cited GM circuits named 28 / 28; cavity library and PDM tables readable to a logged-out reader |
+| 5 | 20261014153000 | one net joined battery + and a PDM output to ground | the fold's own node rule, stated as data | net GND-BANK-CAB superseded, 16 nets added (400 live); supply joined to ground 0 / 400; design loads on 12 nets (battery + 180 A, peak 200 A); protection unchanged at 57. The cab ground bank's return to the engine star now waits with the DC primary (its engine end is a PS-STUDS row) |
+| 6 | 20261014163000 | terminal keys 27, tool keys 211 / 884 | the build catalog (parts.yaml, tools.yaml) | 102 catalog rows added (27 already present); terminal keys 494 / 884, tool keys 403 / 884; key_harness_wire_ends() |
+| 7 | 20261014173000 | planned lengths never checked against geometry | twin positions on 98 plugs | 132 / 638 segments with both plugs positioned; 4 of the 15 with a plan are planned shorter than the straight line (PDM30 to Dakota VHX); harness views revoked of public write grants |
+| 8 | 20261014233000 | no record of any build step; the public key could write build_state (closed first, 20261014193000) | the build_state column's own transitions, logged by trigger | append-only harness_build_events; 0 / 390 decided wires with a recorded step (nothing cut yet) |
+| 9 | 20261014234500 | Deutsch DT/DTP plugs had no cavity layout | stored customconnectorkits pages for DT 2/6/8/12-way and DTP 2/4-way | 49 / 49 Deutsch ends keyed; cavity keys 344 / 884 |
+| 10 | 20261014235500 | measures carried no unit; the owner could not see the scoreboard | the measures themselves | a grain on every measure; owner MODEL tab on the wiring page |
+| (re-plan) | 20261015001000 | four PDM30 to Dakota VHX wires planned shorter than the straight line | the twin's L18 route, 43.4 in unpadded | 0 / 15 planned shorter; the cut pad stays downstream in the BOM |
+| 11 | 20261015003000 | a loader run that supersedes a wire would strand its segments silently | the loader's own supersession links | resync fold, called by the loader after every run; 0 / 638 live segments on superseded rows |
+| 12 | 20261015013000 | the route graph lived only in repo files; 132 plug positions were copied anchor coordinates, ten of them overtaken by the record | k5LandmarkPaths.ts and the landmark YAML; state rows 0ag, 0ah and section 4 | 51 live points, 12 fallen to successors; 7 of 32 branches standing; 435 / 884 wire ends at a node, 199 of them at a node not yet placed; 46 / 638 segments at standing positions; geometry check 0 / 3 |
+| 13 | 20261015023000 | the PDM15 pin map was not MoTeC's (21 of 37 rows wrong, 24 pins missing); 13 / 63 PDM-fed wires sat on an output their design does not name | MoTeC PDM manual, printed p.43 (PDF p.46) | pin map per the manual; protection fold (pin, else the output the design names); PDM-fed wires off their output 0 / 63; protected nets 57 to 62 |
+| 14 | 20261015033000 | wires landed in one pin were separate nets: 89 nets were pieces of 27 electrical nodes | the plugs' own cavity labels (case-sensitive: the 61-pin has F and f) | refold_harness_nets(); 338 live nets; 29 / 602 pin cavities shared |
+| 15 | 20261015043000 | no programmed limit or cited load on any PDM-fed net | the registry's pdm_settings (39 outputs) | 40 channels; PDM-fed nets with a limit 20 / 39 and with a load 20 / 39; 18 / 40 outputs waiting on a cited current; 1 / 40 in conflict; nets with a load 12 to 32 |
+| 16 | 20261015090000, writer re-issued 20261015093000 | the design's splices were not in the model, so 29 shared pins could not be told from crowded contacts | the registry's splices | harness_splices and members, loaded by the loader; shared pins with no splice the design names 29 / 29 to 0 / 29 (0 / 30 after pass 19); 144 / 148 conductors keyed |
+| 17 | (generator) | the registry could not be rebuilt from main (four inputs off main), so design changes were hand-patched | the generator's own inputs, copied in | a fresh main checkout rebuilds k5_registry.json byte-identical; #1238's hand-patched wires now agree with their BOM and readiness |
+| 18 | (generator) | 11 device terminals held several wires with no splice in the registry, though each device is marked a splice point | the endpoints' splice_point marks and open notes | 12 device-terminal splices listed (37 to 49): 7 with a MiniSeal part, 5 past the largest cavity with none; a 10 AWG zero-area bug in the sizing fixed |
+| 19 | 20261015100000 | 47 live wire ends of 21 decided wires sat on no segment (empty segments made before their ends existed), and no measure saw them | the wires' own live ends, by the reshape's rule | fill_harness_segment_ends(); wire ends on no segment 0 / 931; segments with both ends known 458 / 638 to 484 / 643; terminal keys 494 to 523, tool keys 403 to 418 |
+| 20 | 20261015104500 (re-issue of 20261015103000) | the fill check used the AWG formula and the crimp tool's colour bands | TE/Raychem SCD D-609-03/-04/-05 (CMA ranges) and D-436-60/-61 (CMA per gauge) | TE's figures put 2 / 34 checkable sides over (M130-B B16 group 1 7,248 and PDM30-A A24 6,956 against D-609-05's 6,755 CMA), both closed by pass 21; 0 / 56 after |
+| 21 | (generator) | 1 of 31 spliced pins named the lead into its contact, and splices were sized on the formula | TE's CMA figures; MoTeC PDM manual p.6 and p.48 (24-20 AWG on 8 A outputs); ProWire SSC-N (16-24 AWG) | every ECU/PDM pin splice names a 20 AWG pin lead; spliced pins with a named lead 1 / 31 to 19 / 31; B16, A24 and B8 split into groups; splices 49 to 53; sides the check cannot settle 31 / 64 to 12 / 68 |
+| 22 | 20261015110000 | passes 2 and 9 keyed cavities inline, so ends added later were never keyed (344 to 340) | the rules of passes 2 and 9 | key_harness_wire_end_cavities(), called by the loader; 18 ends and 13 housings keyed on its first run; cavity keys 340 to 358 / 931 |
+| 23 | (generator) | 18 of 40 PDM outputs had no cited running current | maker pages and manuals (Sanden SD7 p.14, E-Stopp kit page, RetroSound Motor 2B p.21, RVS mirror specs, MoTeC M130 page, Dakota VHX p.7 and GSS-3000 p.10) | outputs waiting on a cited current 18 / 40 to 12 / 40; PDM-fed nets with a load 20 / 39 to 26 / 39, with a limit 20 / 39 to 24 / 39; outputs in conflict 1 / 40 to 3 / 40 (the A/C clutch on 20 AWG; the radio on its 15 A maximum, which a bench figure closes) |
+| 24 | (generator) | the A/C clutch's cited 4.2 A needs a 6 A limit that its 20 AWG feed cannot carry, and MoTeC wants 24-20 AWG on an 8 A output | MoTeC PDM manual p.6, p.43, p.48; the treatment #64 got in round 4 | #23 moves to PDM15 OUT8 with two 20 AWG pigtails into an M81824/1-2 and an 18 AWG run; outputs in conflict 3 / 40 to 2 / 40. The load also showed that wires the loader adds get no segment (wire ends on no segment 0 to 1; segments on superseded rows 0 to 1): pass 25 |
+| 25 | 20261015150000 | a wire the loader adds gets no segment (the clutch's pigtails, pass 24), and no measure counted decided wires without one | the reshape's rule over each wire's live ends | conform_harness_segments(), called by the loader; decided wires with no live segment 0 / 392; segments on superseded rows 1 to 0 / 645; wire ends on no segment 1 to 0 / 935 |
+| 26 | (generator and loader, #1623) | the leads into 19 spliced ECU/PDM pins were words in the splice rows: no wire row, cut length, BOM feet or member key (splice members keyed 147 / 178); the pin's wires were modelled as ending in one contact | TE: one conductor per Superseal cavity; the PDM pigtails' pattern (a splice node and implied wire rows) | each pin splice is a node SPL-<plug>-<cavity> where its wires end; 25 lead wires (19 pin, 6 group; M22759/32 20 AWG, 4 or 6 in staggered, the system's call); splice members keyed 178 / 178; decided wires 392 to 417, all on segments; pin cavities shared by several wires 30 to 11. The load dropped cited ends 88 to 51, factory nets 33 to 26 and topology ends 446 to 398: pass 28 |
+| 27 | 20261015170000 | #86 read "protected by OUT17" though its design feeds it from OUT18: #85 and #86 parallel PDM30 OUT17 and OUT18 at the dimmer, the model held one output per net, and the net's limit read 4 A | MoTeC PDM manual p.6, pp.22-23; registry pdm_settings (4 A each; 20 AWG cap 8 A) | harness_nets.protection_pdm_channel_ids; a net's limits and distinct loads add over its outputs; PDM-fed wires not protected by their output 1 to 0 / 63; the dimmer net 4 to 8 A, 2.95 to 5.90 A |
+| 28 | 20261015180000 | rules that ran once missed what the loader adds: citations stayed on superseded wire ends, 26 plugs had no node kind, and the new nodes never keyed to the route graph | the reshape's node rule; the citations themselves | classify_harness_endpoint_nodes() and carry_harness_termination_evidence(), called by the loader; cited ends 51 to 88 / 985 (279 links to 55 ends); factory nets 26 to 33 / 337; topology ends 398 to 490 / 985 |
+| 29 | (generator, #1639) | woofer 2 was jumpered off woofer 1's push terminals: two 10 AWG wires in a terminal JBL rates for one 14-8 AWG wire, and no MiniSeal takes 10 AWG | JBL Club owner's manual (push terminals 14-8 AWG); JL VX700/5i guide ("two pairs of wire leads ... connected in parallel inside the harness") | woofer 2 on the amp sub harness's second pair (#30c/#30d), jumpers retired; splices 54 to 52; device pins waiting on a lead 12 to 10 |
+| 30 | 20261015190000 | segments made after the reshape got no wire-part key and no option link (both written once, by the reshape and pass 1) | the catalog's exact M22759 parts; the plugs' option couplings | key_harness_segments(), called by the loader; wire-part keys 398 to 427 / 670; option links 476 to 531 / 670 |
+| 31 | 20261015200000 | the M130 and PDM30 points stood with no coordinates, and nothing could write one (254 / 985 wire ends unplaced) | a headless-Blender free-space study of the twin (research/2026-10-15_m130-pdm30-cab-placement.md): the firewall face is full of pedal and column, the dash underside left of the column fits both | M130 (0.55, -1.22, 0.987) and PDM30 (0.30, -1.30, 0.997) proposed in mounts.yaml, medium-low confidence; load_harness_topology_points; unplaced ends 254 to 44 / 985; segments with both plugs standing 46 to 143 / 670 |
+| 32 | 20261015210000 | the node-kind and citation folds matched a plug by row id, so a re-inserted plug lost its citations (88 to 85) and would take the generic kind (PS-STUDS or MARKER-LF as a bus would join supply to ground) | net fold v2's evidence-set kinds | both folds follow a plug by code, evidence-set kinds first; cited ends back to 88 / 985 |
+| 33 | 20261015220000 | routing 0 / 670: the June branches fell with the overtaken points and nothing could write a branch or a routing | a twin route study (research/2026-10-15_route-branches.md): 39 branches, 9 junctions, 536.5 in, the 61-pin the only crossing, 88 mm or more from exhaust | load_harness_branches and route_harness_segments (shortest chain), called by the loader; routed segments 0 to 121 / 670 |
+| 34 | 20261015230000 | 106 of the 121 routed segments had no planned length, and no check compared a plan with its route | the routes; K5_WIRING_STATE row 33 pads (1.20 engine, 1.15 body) | plan_harness_segment_lengths and the check "routed segments planned shorter than their route (must be 0)"; planned segments 268 to 374 / 670; the check 0 / 121 |
+| 35 | (generator, #1671) | 368 of 670 segments could not route: 124 plugs had no position | a headless-Blender study of the twin (research/2026-10-15_device-positions.md): bounding boxes, split lamp meshes, ray casts | 119 end positions in mounts.yaml, loaded as route-graph points. The load stopped half-way at a branch-key clash (pass 36); its tail folds ran by hand |
+| 36 | 20261015240000 | the point writer re-rowed a point on new words alone, so a branch kept the old id and the history-wide key refused it; the loader stopped before routing | the pass 35 failure | points re-row only when they move; branches re-link in place; the loader's end folds all run and it exits non-zero after |
+| 37 | (generator, #1689) | PS-STUDS was one node for nine studs, so every DC primary cable shared one point | the power-spine records (chapters/17, the DC primary sheet) | nine stud nodes; each cable end on its stud; endpoints 203 to 212, wire ends 993 to 999; supply-to-ground 0 / 328 |
+| 38 | (generator, #1690) | 196 placed plug pairs had no branch chain | a second twin route study (research/2026-10-15_route-branches-2.md): 116 branches, 16 junctions | routed segments 125 to 397 / 669; planned 375 to 587 |
+| 39 | 20261015250000 | 14 of 397 routed segments were planned shorter than their route, all cut-list estimates copied unpadded; 207 of 417 registry wires had no length | the live routes, exported to inputs/route_lengths.json | the planner pads estimates and gives way to a longer route; the registry takes one-segment routes: 120 wires gain a length, 14 short ones rise; the check 14 to 0 / 397, plans shorter than the straight line 9 to 0 / 424 |
+| 40 | (loader + generator, #1698, #1700) | "AMP CH1+" matched no plug, so 26a/26b/27a/27b started at the door and chained back through the amp (26a summed 28.2 ft) | the registry's start text | the start resolves by its first word and the 4 wires re-chain AMP, door, speaker; through runs (one path whose interior plugs are crossings) take their summed route: 72 more wires, 81 of 85 multi-hop wires eligible; the 4 buses wait |
+
+**W| 41 | 20261015260000 (#1702) | 106 Deutsch and MIL-splice wire ends had no crimp tool; the loader wrote an end once and read at most 1,000 rows (999 live ends) | ProWire's HDT-48-00 and MiniSeal pages (saved through fetch_sources.py) | tools mapped, two catalog rows, the loader pages and re-writes changed ends; ends keyed to a crimp tool 475 to 581 / 991 |
+| 42 | 20261015270000 (#1705) | 354 wire lengths said nothing about what they were, so the planner called pin leads and twin paths zone estimates; the 32 PDM pigtails had no length | the registry's length kinds; the pin leads' design rule (pass 26) | planned_length_kind and _basis on the wire, the planner names the kind, the pigtails take 4 and 6 in; planned segments 587 to 620 / 669 |
+| 43 | (generator, #1726) | 56 segments sat on an unplaced plug, 7 of the 8 open plugs on the engine; the twin's engine was said to sit 15 cm into the cab | three owner photos triangulated against the true-size engine_ls3 model (research/2026-10-15_engine-position.md) | the engine is where it is (the v2 block box was GM's 710 mm misread); 34 engine ends placed on the corrected engine, 22 branches redrawn, 19 added; a shortest-path walk joins 443 / 443 placed segments |
+| 44 | (generator, #1729) | 93 of 443 routed segments ran over 2x their straight line (about 246 ft beyond a 1.4x path): the 61-pin had no trunk across the firewall recess, so rear-of-engine wires went round the intake front | a fourth twin route study (research/2026-10-15_route-branches-4.md) | 27 branches and 2 junctions; live, segments over 2x 93 to 16 (each kept one with its reason), excess 344.8 to 164.5 ft |
+| 45 | (generator, #1734) | the cut list still carried the routes from before the engine fix and the trunks | the live routes, re-exported | 82 wire lengths change, 63 fall by 79.2 ft as detours leave; BOM wire feet 1,461.5 to 1,426.4 |
+hat the loop found that no one asked about:**
+- **A short in the model.** It was found while folding loads. The reshape treated PS-STUDS (nine distinct studs) and
+  MARKER-LF (a lamp typed ground) as single nodes. The scoreboard now carries the physics check "nets that join a
+  supply to ground (must be 0)".
+- **Factory baseline gaps.** The build cites 23 GM circuits that the factory baseline has no keyed row for. The
+  baseline itself is thin.
+- **Six colour conflicts** between the 1973 manual and the 1978 chart: circuits 22, 67, 225, 231, 232 and 234. They are
+  recorded and not resolved.
+- **Unreadable keys.** Row security was on with no policy on the cavity library and the PDM tables.
+- **Impossible lengths.** Four wires from the PDM30 to the Dakota VHX were planned shorter than the straight line
+  between their plugs. They were re-planned from the twin's L18 route (20261015001000). Pass 12 then showed L18's own
+  PDM30 spot (twin assumption A2) was overtaken on 2026-09-29, so that plan's basis is stale. A driver-side PDM30 sits
+  nearer the Dakota box, so the plan errs long.
+- **The twin was overtaken.** Ten of its anchors were replaced by later rows of the record. The one 61-pin moved the
+  firewall crossing to the driver fuse-box hole; the M130 and PDM30 follow it; the coils are on the central
+  DEL-Stributor; the CKP is above the starter; the battery, alternator and O2 sensors moved. 24 of its 30 branches fell
+  with those points. Pass 12 keeps them all, superseded, and counts a plug's position only where its point stands.
+- **The PDM15 pin map was not MoTeC's.** It numbered outputs A1 to A15 in order. MoTeC's manual pairs the 20 A outputs
+  across pins (OUT1 = A1 + A10) and puts the 8 A outputs between them.
+- **Wires in one pin were separate circuits.** The fold joined wires only through bus plugs; 89 nets were pieces of 27
+  electrical nodes. The 8 marker and clearance feeds on PDM30 OUT19 were 8 nets.
+- **Paralleled outputs, on purpose.** PDM30 OUT17 and OUT18 meet at the floor dimmer's feed (receipt 2026-05-14). MoTeC
+  allows outputs in parallel when they are one type and share one condition (PDM manual printed p.6, pp.22-23); both
+  are 8 A outputs. MoTeC does not say how a trip on one behaves for the other.
+- **An output that cannot carry its load.** PDM30 OUT21 (door locks) needs 12 A; an 8 A output's setting caps at 10 A.
+- **The design record could not be rebuilt.** The registry's generator read four files that were not on main, so every
+  design change since late September was a hand patch, and the BOM drifted from the wires.
+- **The scoreboard was blind to ends off segments.** Every wire-end measure counted ends on live segments only, so 47
+  ends the loader added sat unseen until pass 19 counted them.
+- **Production refuses what the contracts allowed.** The production API refuses an UPDATE without a WHERE, even inside a
+  function (pg-safeupdate), and stack_needs objects must be table.column. Both broke a first deploy; each now has a
+  contract or a fixture constraint.
+- **New wires get no segment.** The reshape segmented the wires that existed on 2026-10-14; a wire the loader adds
+  later (the clutch's pigtails, pass 24) has no segment, and no measure counts decided wires without one.
+- **A lead in words is not a wire.** The 25 conductors into spliced ECU/PDM contacts had no row, so no cut length, no
+  BOM feet and no key; the 68 wires that share those pins were counted as crimped into the contacts. As wire rows
+  they cost 10 ft of 20 AWG. Wire ends keyed to a cavity fell 359 to 308 for a physical reason: a splice barrel has
+  no cavity.
+- **One output per net hid a fault current.** The dimmer's net is fed by two paralleled 4 A outputs; the model read
+  4 A where a fault sees 8 A, which is exactly the 20 AWG wires' cap.
+- **A rule that runs once decays.** Node kinds (net fold v2) and citations (passes 1 and 3) were written by
+  migrations; every row the loader added later missed them. Both now run after every load.
+- **The twin's engine sits about 15 cm into the cab** (corrected by pass 43: it does not; its block box was GM's 710 mm
+  outline, which runs from the ring gear to the water-pump inlet, so the box's rear face sat 13 cm behind the real block
+  rear; the cylinders are within 8 mm of the photos). Its block rear is at y -1.30 against a firewall at -1.447 (route
+  study), so the twin cannot settle anything near the rear of the engine; those branches are confidence low. Its
+  iBooster also sits 20 mm above the 61-pin point: on the truck the two share the driver firewall, which needs a look.
+- **The cut list's zone estimates run 4x the twin routes** (15 routed segments that carry one: average 4.0x, minimum
+  1.88x). The estimates may be generous, or the twin may miss slack and service loops. Measured lengths settle it.
+- **The cut list's zone estimates were not cut lengths.** 186 segments carried a wire's whole-length estimate as
+  their plan, without the pad the column promises; 14 were shorter than their own route (#67 dome lamp 3.5 ft over
+  11.29 ft). Pass 34's "4x" ran the other way: those 15 were the long ones.
+- **A long route can be a missing branch.** After the engine fix, a fifth of the routed segments ran over twice their
+  straight line; the shortest-path walk was right, the graph lacked the trunk a real engine harness has. Studies 3 and 4
+  measured the ratio by hand; the scoreboard has no measure for it yet (owed: routed segments over 2x their straight line).
+- **A start in words chose the wrong end.** The loader parsed "AMP CH1+" as no plug and started four speaker leads at
+  the door, so their segments doubled back through the amp.
+- **The crimp tool's colour bands are not the splice maker's ranges.** On TE's own figures two pin splices the formula
+  passed are over D-609-05 (M130-B B16's first group, 7,248 against 6,755 CMA).
+
+**Owed, as the scoreboard names it:**
+- Routing beyond the placed points: after pass 43, 12 segments sit on an unplaced point (the battery, the driver O2
+  sensor, the underhood lamp, and the open frame, head and firewall grounds); 62 join two plugs at one point. One tape
+  on the truck (passenger firewall flat face to the passenger head's rear face) settles the engine's fore-aft position
+  to 5 mm.
+- Buses as trees: CAN_HI/CAN_LO and the door-lock buses are chained like runs; their length and the order of their
+  drops is a design question the segment fold cannot answer.
+- The DC primary's stud-to-stud topology. It waits on the power-spine re-draw.
+- PDM limits still waiting on a cited load current: 12 of 40 outputs, most with no published figure; each status names
+  the bench measurement that closes it (coil packs, starter solenoid, PCS ignition, blower, E-Stopp sense, iBooster
+  wake, radio ACC, horn, camera, washer solenoid, USB charger input).
+- Two outputs in conflict: PDM30 OUT11 (the radio's published 15 A maximum assumes its own speakers; a bench figure
+  closes it) and OUT21 (door locks, 9 A needing 12 A on an 8 A output; the actuators stall while a rocker is held, so
+  the pulse load wants a measured stall current before the 125 % rule is applied to it).
+- The factory baseline's own completeness: 35 rows unkeyed and 23 cited circuits absent. The 1978 diagram pages are
+  images.
+- Cavity layouts for the families with none cited: GM 56-series blade, Metri-Pack, rings and kit terminals.
+- The leads into device terminals the design splices (the dimmer, door jambs, blower, tailgate switches, subwoofer):
+  the factory terminals' ranges are open. Five of those joins have no MiniSeal that fits (2 x 12, 2 x 14, 2 x 10 AWG).
+- Answers only the makers can give: the Superseal seal range against MoTeC's own 22 AWG Tefzel; two wires in one
+  Superseal contact; how paralleled PDM outputs trip.
+- Measured lengths (the outcome).
+
+### Recursive refinement: the original request must cross admission and readers (2026-10-11)
+
+**Owner direction, in substance.** Discussion must in parallel shape PostgreSQL, documentation and the
+Markdown methodology guiding the next agent. Artist, buyer and researcher are descriptions arising
+from behavior, not fixed audience categories. A progress function or proposal is not the completed model.
+
+**Bounded implemented case.** The existing engine-family proposal had a deterministic witness but no
+supported admission path. The prepared migration `20261011230939_retained_engine_family_intake.sql`
+extends existing PostgreSQL witness, tuple-validation and insertion functions, plus provenance output.
+The Edge selector accepts only the retained source ID and derives its claim from that source. The
+property must belong to the existing approved proposal and be ratified core vocabulary. A publisher's
+label stays separate from `engine_code`, with literal quote, source fingerprint, microsecond clocks
+and unknown engine identity/configuration/event time. No new table, stack entry, worker or replay is created.
+
+**Local evidence.** `scripts/test-engine-family-intake.sh` uses PostgreSQL 17 and the actual Edge handler
+with a narrow test transport. Both source and child enter through that handler. The unchanged selector
+fails before registration, still fails after synthetic curator review against old SQL, then succeeds
+after migration. Ten integrated steps verify actual anonymous provenance/canonical readers, same-ID
+retry, withdrawal/supersession/visibility refusal, error refusal, twenty SQL/TypeScript witness cases,
+preserved function attributes and idempotent reapplication. The existing intake suite reports 330
+passing tests; the enforced local repository gate passes. This is not deployed HTTP/PostgREST proof.
+
+**What the iteration corrected.** One reader called the inner value predicate, so the new registration
+gate moved to the shared predicate. Duplicate lookup bypassed insertion checks, so success now calls
+the existing result validator. Provenance output omitted identity/capture qualifiers, so those now
+survive that reader too. Questions, general-model assertions and engine labels in another part of a
+sentence were excluded from the family grammar. These observed failures refined code and methodology together.
+
+**Delivery and population boundary.** Implemented and locally tested; production approval, merge,
+deployment and runtime verification remain outstanding. The live proposal was still open on the
+dated read. This pass changes production coverage by zero; total eligibility and fleet gain were not
+measured. Automatic schema repair and the cross-domain behavior-to-role model remain unfinished.
+
+**Integration refresh, 2026-10-15 UTC.** PR #976 was resumed against current main. Live definitions
+showed newer native make/model admission and provenance qualifiers; the migration and disposable
+baseline now preserve them. The real-handler contract tests make admission before the migration,
+then make replay and model admission afterwards. Its service-call tests use the current secret-key
+contract and refuse publishable keys, legacy HS256 tokens and authenticated users. A local attack
+also showed that changing the family property's unit left one canonical claim readable; the shared
+predicate now refuses unit, parent and discriminator changes, and duplicate intake rechecks that
+same predicate. Existing testimony remains intact.
+
+The PostgreSQL 17 integration passes twelve steps, and the intake suite passes 351 tests with its
+opt-in integration test separately exercised. The enforced local gate passes. Read-only rechecking
+the proposal's four original source IDs at 00:35 UTC retains one M50 candidate and three refusals;
+these are original controls, not independent held-out accuracy or admitted production claims.
+
+Population boundary: the live atlas at 00:28 UTC estimates 1,014,519 stored vehicle records; public
+and engine-family-eligible totals remain unmeasured. Four source controls do not establish fleet
+coverage. Net newly usable production answers from this refresh: zero. The production proposal is
+still open; merge/deployment authorization and curator ratification remain separate held steps.
+
+### Live-market classifieds: what "ended" means (lane-live-market, 2026-10-15)
+
+A classified listing (Craigslist) has no close and no reserve. While the page reads, `vehicle_events.event_status` is
+`unknown`. When a revisit gets HTTP 404 for the post (measured 2026-10-15: posts from 2025 return 404 "Page Not Found"),
+the listing is `ended`, `ended_at` is the fetch time, and `metadata.removal` holds the evidence. That says the listing
+is gone, withdrawn, expired or sold off-site; the outcome is unknown, never a sale. A listing that scrolls off the first
+page of a search is not removed (only the first page is read), so absence from a search page is not evidence. The
+revisit rule (a landed post still on a search page is read again after 24 h) is the clock for this. A blank-model post is
+kept as an unresolved listing observation (`vehicle_id` NULL) and is not retried as a failure.
+
+### Facebook listings reach the graph the way Craigslist posts do (C16 follow-up, prepared 2026-10-19 UTC)
+
+**The question (owner, 2026-10-18 22:20 PT).** Is the incoming Facebook Marketplace data landing smoothly and going from
+snapshot to deeply integrated? Is it on the Sources board and the map? Can a user click through to the listing? Is the
+seller kept?
+
+**Measured before the repair (2026-10-19 ~05:30 UTC, bounded reads).** Custody was sound: the iMac Playwright runner's
+packets (61 search passes over ~30 metros on 10-18/19, 0 errors) each kept their raw batch in `fb_sweep_jobs` and one
+sighting per listing in `fb_listing_sightings`. Integration was not:
+- Population: `marketplace_listings` 117,546 rows (111,644 with a `vehicle_id`, almost all from the retired collectors).
+  New in 7 days: 1,803, all `fb-browser-capture`; 91 linked (5%), and every recent capture receipt said
+  `linked_observations: 0`.
+- Cause 1, identity: search cards carried `parsed_year` only, and `linkToVehicle` returns before matching without a make.
+  The shared title parser (`ingest/vehicleTitle.ts`) resolves year, make and model on 1,846 of the 1,871 titles first
+  seen in that window (98.7%); the rest state no model ("1984 Porsche") and stay unresolved.
+- Cause 2, events: the capture path wrote no `vehicle_events`, so the Sources board (`market_sources_read` counts
+  listing events by hour) showed Facebook landed 24 h = 0, 7 d = 91, last landed 10-15, while 918 and 1,803 listings
+  arrived. The 91 were a one-off `ingest` pass on 10-15.
+- Cause 3, ingest overwrote testimony: for a Facebook URL `ingest` upserted `marketplace_listings` on `facebook_id`,
+  replacing the captured title, description, seller name, image and `first_seen_at` with its own fields and NULLs.
+- Detail pages: of 133 retained listing pages, the "About this vehicle" block states mileage on 128, transmission 128,
+  exterior color 128, title status 47, owner count 32; the landed rows held mileage on 3 of 1,803.
+- Photos: a listing page's `all_images` also held the "Today's picks" tiles of other people's cars (median 29 captured,
+  10 the listing's own); 0 of 117,546 `image_url`s were in storage, and Facebook CDN links expire within days.
+- Seller: `seller_name` text on 121 of 1,803; no profile id captured; `external_identities` held 0 facebook rows
+  (697,279 bat). `marketplace_listings` has no row policy, so anonymous readers get no rows; `external_identities` and
+  `vehicles.seller_name` are publicly readable.
+- Map: `/map` and `/atlas` read organizations and `vehicle_location_observations`; that table held no Facebook rows.
+  1,449 of 1,804 recent "City, ST" locations match `city_geocode_lookup`.
+
+**The repair, in the existing owners.**
+- `extract-facebook-marketplace/listingFacts.ts` reads each packet's own text: identity from the title (Facebook's form
+  suffixes such as "Coupe 2D" and "Long Bed" read off first), the About block, the seller block's counts, the listed
+  label, and the gallery (center-cropped picks tiles, avatars and ad creatives dropped). Fill-only; the facts and
+  `fb-listing-facts-v1` ride in `raw_scrape_data.listing_facts`.
+- `integrate.ts`, after the custody receipt: a titled unlinked listing goes through `ingest` (VIN/URL match, gate, new
+  `discovered` vehicle or merge proposal, the classified listing event); a linked one lands its listing event at the
+  capture clock; a revisit's removal ends the event (outcome unknown); the place lands as a city-grain
+  `vehicle_location_observations` row; photos copy through `backfill-images` with `run_analysis: false`; a profile id
+  becomes `external_identities ('facebook', id)` with no display name, keyed from
+  `marketplace_listings.seller_identity_id`. Saved-items batch mode is not integrated (held privacy PR #1421).
+  The receipt joins the capture's `fb_sweep_jobs.metadata.integration`.
+- `ingest` links an existing `marketplace_listings` row and never rewrites it.
+- The runner (repo copy) sends the seller's profile link and drops photos inside links to other items; the iMac copy is
+  owned by its own agents and adopts this separately.
+- `map-vehicles` points carry `source_url` and `asking_price`; the pin panel shows the asking price and opens the listing.
+
+**Acceptance.** A new capture's `metadata.integration` shows created/matched vehicles and listing events; the Sources
+board's Facebook landed counts follow the arrivals; `/atlas?source=facebook_marketplace` shows the new points and the pin
+opens the Facebook listing; a seller key appears only where a profile link was captured. Disagreement case: a title
+without a model stays unlinked and is counted `unresolved_identity`. Stages (implemented, tested, merged, deployed,
+runtime-verified) are recorded in the PR and the lane log.
+
+### 13.13 A listing rises by what it is: the classified merit stack (owner, 2026-10-15)
+
+**Owner direction, in substance.** The arrivals feed is led by Craigslist "not cuz its good but cuz its easy. its
+boring to look at. that needs to be expressed in the very thread of the dna." Saying the listings are bad gets nowhere;
+the goal is to define in Postgres (keys, foreign keys, folds, larger group cross-analysis) the difference between a 1967
+Corvette for $22K and a 1971 Buick for $5,500, so leads surface "preference / hard code agnostic. they rise by way of
+what they are." The human explanation: a sick listing sells fast, "but not for us": the why has to be factual, with
+citation. Same night (to skylar-83): the benchmark is Barn Finds' "good deal, snatch this up", and the visualizer should
+teach the market by saying where each listing sits in our price analysis.
+
+**What was there.** The feed (`classified_ask_board`, Market tab "Just listed") ordered newest first, with a "band" sort
+on `compute_taste_score`: hand-typed weights (Chevrolet 40, Blazer 25, a Las Vegas bonus of 5). That is the hard code the
+owner names. Every row on 2026-10-15 was Craigslist (1,158 events since 10-13), because Craigslist is the one classified
+source landing listing events; 136 Facebook listings landed on 10-12/13 with no vehicle bound and none since.
+
+**The stack, layer by layer.**
+
+| Layer | Object | Grain, key, clock | State 2026-10-15 |
+|---|---|---|---|
+| Log | `vehicle_events` (classified listings), `marketplace_listings` (Facebook sweeps), `mv_treemap_outcomes` (recorded sales) | one listing / one recorded outcome; created_at / first_seen_at, sale_date | existing |
+| Key | `mv_model_family_names.family_id` (#1317, skylar-83) | make and model name -> canonical_models family, year range +/-1 | 494,210 of 681,551 public vehicles keyed |
+| Dimension | factory model family x model year | canonical_models | existing |
+| Fold / baseline | `mv_family_year_prices` (#1375) | family x model year x basis (sold, asked); narrowest 0/1/2/3/5-year window holding 10 prices, cited; conflicts counted | created empty; first build by the 09:40 UTC cron (load, see below) |
+| Residual / feature | `classified_ask_board.position` (#1382) | per listing: at_or_below among sales and among other asks, p25/p50/p75, n, venues, share; `position` sort | merges after the first build |
+| Prediction | `classified_ask_board.merit` from the active `listing_exit_models` row (#1380) | P(gone within 7 days of first sight) | no active model: the exit test failed (below) |
+| Outcome | `v_classified_exit_outcomes` (#1380) | per listing: first seen, last seen, exited_at, region, fate_7d | Facebook 3,777 exits Feb-Jun; Craigslist revisits from 10-15 (5 per 15 min) |
+
+**The identity guard (a raw-vs-model test inside the fold).** Of 469 recorded 1967 Corvette sales (model strings
+beginning "corvette"), 34 have their own source page naming a different car: Camaros, Chevelles, Impalas, a C10, a Nova,
+El Caminos. Of the six recorded at $22K or less, three are other cars (a C10 at $10,999, a custom sport truck at $3,450, a
+Mecum Chevelle at $16,000) and two are real project coupes ($16,500, $20,250). The fold refuses a sale whose page names its
+model year but not its family and counts it in `conflicts`, so the defect is measured fleet-wide and a cheap ask is not
+flattered by mislabeled sales. A page counts as naming the family if it carries any of the family's canonical_models
+phrases (name and aliases, 3+ characters): the first rule, the alias the name matched, refused 535 of 548 Wrangler sales
+whose pages read "2000-jeep-wrangler-82". Across 1962-72 the refused "Corvette" pages read Impala 38, Camaro 32, Chevelle
+16, Corvair 12, El Camino 10, Bel Air 9, Nova 7, Biscayne 7, C10 8. The record repair is the vehicle-identity owner's
+(supersession of `vehicles.model`). This stack realizes registered stacks SC (liquidity as an option) and S10 (liquidity
+surface) for classifieds; registering its needs in `stack_needs` is the next registry step.
+
+**The two cars, read with the fold's rules** (bounded reads 2026-10-15 ~04:50Z; the fold's first build is the
+authority). A 1967 Corvette asking $22,000: 435 recorded 1967 Corvette sales (Bring a Trailer 243, Mecum 37, Gooding 16,
+other 138), median $93,000 (p25 $70,641, p75 $132,000); 4 of 435 sold for $22,000 or less, so the ask sits under 431 of
+them, $71,000 below the median, in a single model year. The 1971 Electra 225 asking $5,500 (Sacramento, Craigslist): 17
+recorded Electra sales across 1969-73 (the window had to widen two years either side), median $17,500 (p25 $12,750); none
+at or below $5,500. Both asks sit at the bottom of their family's sales; what separates them is depth (435 sales in one
+model year against 17 across five), the dollars between ask and the middle ($71,000 against $12,000) and the multiple
+(4.2x against 3.2x). Among Facebook asks first seen in the last year the Corvette sits 5 of 16 (1965-69, median $31,250)
+and the Electra 4 of 10 (1968-74, median $8,000): a classified ask against auction sales mostly measures venue.
+
+**The owner's acceptance case** (skylar-83, his read of the top three in the feed, 04:15Z). 1965 Barracuda $29,500, "top
+dollar": 11 of 14 recorded 1965 Barracuda sales at or below, above the p75 ($28,375). 1999 Wrangler $14,000 at 178,000 mi,
+"right in the middle": 24 of 51 recorded 1999 Wrangler sales at or below (median $14,500), and 45 of 46 Facebook asks
+(median $5,500), so expensive for a classified. 1995 GMC K1500 $3,500 at 300,000 mi, "busted up": 6 recorded K1500 sales
+across 1990-2000 and 2 asks, so no position; GMC and Chevrolet K1500s are separate families today (a badge-twin gap in
+the key layer), and mileage is not a feature yet.
+
+**The exit test (the "sells fast" claim, measured).** Facebook listings keyed to a family with a known 7-day fate,
+restricted to the five weeks the removal sweep ran (2026-02-23, 03-02, 03-23, 03-30, 06-08; in other weeks only survivors
+have a known fate): 1,743 listings, 339 gone within 7 days (19.4%). Of those, 952 sit among 10+ earlier asks of their
+family (point-in-time, another vehicle, the fold's window rule). Train before 03-30, test after: position among asks gave
+a held-out AUC of 0.501 +/- 0.031 (price alone 0.541 +/- 0.028); the exit rate by ask position ran 23.1%, 21.7%, 17.6%,
+25.1%, 16.1% from the bottom fifth to the top. On this label, where an ask sits among its family's asks does not predict
+that it is gone in a week, so no `listing_exit_models` row is active and `merit` stays null. The label is weak (missing
+from a later sweep is not a sale) and small; the next tests are the sale position once the fold is built and Craigslist
+404 exits as they accrue. Scripts and the result: `scripts/stacks/classified-exit/`. Until a model beats chance on held-out
+exits, the feed's factual order is `position` (the share of the family's prices at or below the ask, lowest first): one
+measured quantity, labeled as what it is, never as "best deal".
+
+**Load, measured.** Production estimates the family join at 1 row (it is ~400,000), and with nested loops the planner
+paired every year row with every target year: a 0.5% sample ran past 10 s. Built without nested loops it reads `vehicles`
+once (parallel seq scan) and merge-joins on the family; the same query over 170,252 sales and 111,553 asks took 0.84 s on
+PostgreSQL 17 locally. Intake lanes were writing at deploy time (skylar-f7), so the view is created empty and the first
+build is the 09:40 UTC cron.
+
+**What is still missing.** Condition: the price follows condition, and condition comes from photos; 0 of 690 photos on 60
+recent Craigslist cars carry a condition read, so seller-declared condition (an attributed claim, `condition` on the
+board) is the only input until the on-demand Analyze path exists. Venue: a classified ask against auction sales mostly
+measures venue and condition, which is why the ask-vs-asks position leads and the sale position follows. Facebook
+classified listings do not reach the board (no vehicle binding since 10-13). Craigslist exits accrue at the revisit
+sweep's rate (5 posts per 15-minute run). Mileage is not yet a feature.
+
+### Work-order resource evidence — owner direction and executable first slice, 2026-10-19
+
+Owner direction: build the data model beneath inspection, job planning, provider tools,
+shared facilities, scoped sign-offs and contributions. Historical messages, images,
+receipts, invoices and payments are retained evidence for reconstructing real jobs;
+their full linked population and replay coverage have not been measured. A missing
+resource should permit alternative supplying arrangements rather than disqualifying
+the performing mechanic automatically. Ownership, access, capability, availability,
+approval and compensation are separate relationships.
+
+The live atlas and column inspection found existing owners in work_orders,
+work_order_line_items, work_order_assignments, user_tools, tool_inventory, equipment,
+organizations, actor_capabilities and the observation logs. A tool verification boolean
+does not carry a scoped attestation; an assignment's payout fields do not establish an
+equipment reservation. The resource relations did not exist at inspection.
+
+The implementation in migration `20261019005027_work_order_resource_evidence.sql`
+adds three private typed indexes of existing work_record testimony: operation requirements,
+candidate resource arrangements, and reported scoped attestations. Source IDs key every
+row; no raw source writer or duplicated identity/invoice/payment ledger is introduced.
+The service-only projector validates the source and same-job relationships. The service-only
+reader excludes superseded/reattributed source chains and keeps unknown coverage explicit.
+Details and payload contract: `docs/library/technical/work-order-intelligence.md`.
+
+Acceptance is the actual migration on disposable PG17: personal-tool and shop alternatives,
+source-to-graph reads, duplicate replay, cross-order/source/type refusals, immutable projections,
+withdrawal/reattribution propagation and anonymous/authenticated access refusals. This tests
+the supplied cases; it does not measure historical-job coverage or certify physical work.
+Provider authority, authenticated sign-off, reservations and conflicts, compensation settlement,
+historical replay, end-user exposure and historical source reconstruction remain to implement.
+No empty or populated graph declares a booking ready. Deployment is a separate stage and must
+be checked against the live function and relation definitions after the normal CI release.
+
+
+Historical resource reconstruction follow-up (2026-10-19): bounded retained-message
+inspection found explicit work requirements without resource quantities, and legacy
+message observations lacking source_id. Migration `20261019013808_work_resource_retained_basis.sql`
+allows a paired unknown quantity/unit and links interpretations to the original observation
+and exact excerpt. Admission preserves the original clock, validates same-vehicle custody,
+and refuses nested resource interpretations. Original withdrawal/reattribution propagates
+through current reads and duplicate projections; the original testimony is untouched.
+The disposable contract covers these cases and private source visibility remains unchanged.
+A selected historical case is validation scope; neither its requirements nor the complete
+historical-job population has been exhaustively enumerated. No candidate, permission,
+booking readiness, reservation or payment is inferred from these requirement records.
+
+Participant follow-up (2026-10-19): inspection of actors, actor_capabilities, technicians,
+assignments and identity bridges found a canonical actor reference on a selected retained
+operation, but no supported account bridge or proof of qualification. Migration
+`20261019030510_work_resource_actor_candidates.sql` extends the existing fulfillment
+owner with an actor alternative for skill/inspection and an optional exact operation
+snapshot. The supplier remains separate and can be unknown. Existing internal-inference
+intake identifies derived evidence; it does not impersonate a provider. Changed operation
+bases withhold current descendants without deleting history. The reader carries method,
+confidence and unresolved source interpretation, including process disagreements.
+Disposable PG17 exercises participant alternatives, inspection, type/identity refusals,
+snapshot custody, stale-basis propagation and the unchanged private access boundary.
+This selected case does not establish broader historical coverage, accepted terms,
+authenticated approval, capacity reservation, completion or payment accounting.
+
+Image-object connection (2026-10-19): owner emphasized every background object occurrence,
+entity endpoints, separate cost/value claims and the eventual calculation of labor value.
+Live inspection found retained canonical tool/component arrays, an equipment ledger and
+legacy per-image equipment evidence. Old cascade code resolves names globally and can
+convert photo visibility into estimated minutes; those claims cannot be silently treated
+as measured use or a physical-instance identity. Migration
+`20261019031934_work_order_image_objects.sql` adds a private bounded job-context reader
+over existing observations, preserving source pointers, repeated appearances and clocks.
+It joins existing image/equipment associations while separating recorded purchase cost,
+computed depreciation value and unknown market/job/labor values. Current source and image
+qualification gates apply. The disposable PG17 contract covers custody, pagination,
+malformed evidence, privacy and refusal to accrue usage/value. This connects retained
+evidence without a new observation ledger, photo processing, paid inference or canonical
+asset minting. Full image coverage and a physical-object identity resolver remain unmeasured
+and unimplemented respectively; vehicle context does not establish operation usage.
+
+Work-specification connection (2026-10-19): owner direction that material and process belong
+together in the work specification, not in a free-standing provider qualification judgment.
+Live inspection of the selected case found three disagreeing accounts already retained: the
+requested scope quote, installed part records (graded and ungraded stainless, a stainless TIG
+filler) and the operation's component event (mild steel with MIG). Parts carry no typed
+operation link, and cost subsets matching the operation total were not unique, so part
+supply cannot be assigned to an operation by inference. Migration
+`20261019035407_work_order_resource_specifications.sql` adds a `specification` event to the
+existing resource projector and an immutable private table. Each claim records a stage, role,
+verbatim labels and dotted interpretation keys; its basis is a retained excerpt or an exact
+component-event or part row snapshot. The existing reader compares requested pairs with
+current claims by role and key and reports a conflict without adjudicating substitution,
+qualification or completion. Changed, withdrawn or reattributed bases withhold claims; history
+remains. Disposable PG17 covers 57 specification cases and reruns the 88 existing resource
+assertions against the new projector. This is one selected case; the specification population
+of other jobs is not assessed, and accepted scope changes, measured usage, completion and
+compensation remain open.
+
+Mechanics RSI pass 1, job-path scoreboard (2026-10-19): owner direction "rsi" applies the
+measure → largest closable gap → migration + PG17 → re-measure loop to the mechanics job path.
+The job path had no self-measurement. Migration `20261019045753_work_order_job_path.sql`
+adds a private read-only reader per work order and a population scoreboard over existing
+owners, reporting stage states, gaps and status/clock/record inconsistencies without repair.
+Before (live, 2026-10-19 04:56 UTC, denominator all 26 work_orders rows): 22 vehicle-bound;
+operations itemized on 2; resource requirements on 2 and specifications on 1; installed parts
+on 2, parts with an operation code on 1; assignments on 1 (9 rows, none with an accept clock);
+labor rows on 3; start clocks 5; completion clocks 7 against 10 done/paid statuses; payment
+records on 3, including one without a vehicle; a paid status with no payment record; 15
+vehicle-scoped payment events with no job attribution; no approval clock and no payout record
+anywhere. Next passes take the largest gap the retained evidence can close; readiness,
+acceptance, usage and labor value stay unassessed until evidence supports them.
+
+Mechanics RSI pass 2, requested operations (2026-10-19): the pass 1 scoreboard's largest gap was
+`no_operations`, 24 of 26 work orders. Retained evidence for those 24 is mostly prose summary;
+one quoted work order itemizes its scope line by line, and one completed order holds labor-task
+rows the scoreboard did not count. The operations owner, `work_order_line_items`, had no
+provenance or sanctioned insert path, and billing reads only priced lines. Migration
+`20261019051336_work_order_scope_operations.sql` adds provenance to that owner and an `operation`
+projection that quotes the work order's own text verbatim into pending, unpriced, unassigned
+line items. A guard keeps sourced text and provenance immutable while parties keep editing status.
+The job path now counts labor-task evidence and reports withdrawn or stale sources. Disposable
+PG17 covers 27 cases and reruns the 25 + 57 + 88 earlier mechanics assertions. Prose-only scopes
+remain unitemized; splitting comma lists is a later, separately evidenced pass.
+
+A job is a quote (2026-10-19; owner: use the standard language): the mechanics slices above
+are read together as one model. A job is a quote whose itemized lines each name the witness,
+clock and signer that close them; acceptance makes it a work order, and invoice and payment
+conclude it as a receipt, a computed conclusion over reconciled witnesses. The lifecycle
+vocabulary, stage-to-line table, invariants, fourteen-agreement inventory with holders and
+gaps, privacy doctrine (job data open, personal information withheld, party payments visible
+only to the parties, contact brokered by the platform), adopted owner-overridable defaults,
+listing-to-inspection pipeline and explainable matching join live in
+`docs/library/technical/work-order-intelligence.md` § "A job is a quote".

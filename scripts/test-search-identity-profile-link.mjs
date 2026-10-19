@@ -60,6 +60,9 @@ function handlerFixture({ failProfile = false, profileRows = profiles } = {}) {
       serve: (callback) => { handler = callback; },
     },
     require: (specifier) => {
+      if (specifier === '../_shared/supabaseKeys.ts') {
+        return { projectSecretKey: () => 'fixture-key', projectPublishableKey: () => 'fixture-key' };
+      }
       assert.equal(specifier, 'https://esm.sh/@supabase/supabase-js@2');
       return { createClient: (url, key) => createClient(url, key, {
         global: { fetch: fixtureFetch }, auth: { persistSession: false, autoRefreshToken: false },

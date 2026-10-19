@@ -87,7 +87,7 @@ function CompareTray({ rows, onClear, onRemove }: { rows: LiveRow[]; onClear: ()
 }
 
 export default function LiveFloor() {
-  const { params, setParams, rows, loading, newCount, refresh } = useLiveFloor();
+  const { params, setParams, rows, loading, error, newCount, refresh } = useLiveFloor();
   const [compare, setCompare] = useState<LiveRow[]>([]);
   // Countdown tick — re-render every 30s so "ends in" stays honest without refetching.
   const [nowMs, setNowMs] = useState(() => Date.now());
@@ -123,12 +123,14 @@ export default function LiveFloor() {
           onClick={refresh}
           style={{ margin: '8px 12px', padding: '6px 12px', border: '2px solid var(--text)', borderRadius: 0, background: 'var(--surface)', color: 'var(--text)', fontSize: 11, cursor: 'pointer' }}
         >
-          ● {newCount} new listing{newCount === 1 ? '' : 's'} landed — refresh
+          ● {newCount} listing{newCount === 1 ? '' : 's'} added across all scopes — refresh
         </button>
       )}
 
       {loading ? (
         <div style={{ padding: 24, fontSize: 12, opacity: 0.6 }}>Loading floor…</div>
+      ) : error ? (
+        <div role="alert" style={{ padding: 24, fontSize: 12 }}>{error} <button type="button" onClick={refresh}>Read again</button></div>
       ) : rows.length === 0 ? (
         <div style={{ padding: 24, fontSize: 12, opacity: 0.6 }}>No inventory matches those parameters.</div>
       ) : (

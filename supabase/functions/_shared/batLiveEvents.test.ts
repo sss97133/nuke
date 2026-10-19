@@ -7,6 +7,36 @@ const target: BatLiveTarget = { id: "00000000-0000-0000-0000-000000000001", vehi
   post_id: fixture.post_id, source_url: fixture.source_url, last_comment_id: 0 };
 const frames = fixture.events.map(f => ({ ...f, monitored_auction_id: target.id, transport: "public_pusher" as const }));
 
+// Control the collector's clock and waits together. Real one-second timers can
+// wake just before its threshold, making short fixtures skip a heartbeat/ping.
+async function withCollectorClock(run:()=>Promise<void>) {
+  const realNow=Date.now,realSetTimeout=globalThis.setTimeout,realClearTimeout=globalThis.clearTimeout;
+  let now=realNow(),nextId=0,pump:ReturnType<typeof globalThis.setTimeout>|undefined;
+  const timers=new Map<number,{at:number;run:()=>void}>();
+  const schedule=()=>{
+    if(pump!==undefined||!timers.size)return;
+    pump=realSetTimeout(()=>{
+      pump=undefined;
+      const next=[...timers].sort((a,b)=>a[1].at-b[1].at||a[0]-b[0])[0];
+      if(next){timers.delete(next[0]);now=Math.max(now,next[1].at);next[1].run();}
+      schedule();
+    },0);
+  };
+  Date.now=()=>now;
+  globalThis.setTimeout=((handler:Parameters<typeof setTimeout>[0],delay=0,...args:unknown[])=>{
+    assert.equal(typeof handler,"function");
+    const id=++nextId;
+    timers.set(id,{at:now+Math.max(0,delay),run:()=>{(handler as (...args:unknown[])=>void)(...args);}});
+    schedule();return id;
+  }) as unknown as typeof globalThis.setTimeout;
+  globalThis.clearTimeout=(id)=>{if(typeof id==="number")timers.delete(id);};
+  try { await run(); }
+  finally {
+    if(pump!==undefined)realClearTimeout(pump);
+    Date.now=realNow;globalThis.setTimeout=realSetTimeout;globalThis.clearTimeout=realClearTimeout;
+  }
+}
+
 Deno.test("captured native bid and final record retain source clocks, identities and result", async () => {
   const bid = await prepareBatLiveFrame(frames[0], target);
   assert.equal(bid.current_bid, 30750);
@@ -59,6 +89,46 @@ Deno.test("current metadata supports withdrawn bids and never substitutes catch-
   assert.equal(empty.bid_count, 0);
 });
 
+Deno.test("native member link supplies the current bidder alias while preserving the original frame", async () => {
+  const data: Record<string, any> = { ...frames[3].data };
+  delete data.high_bidder_username;
+  const original = JSON.stringify(data);
+  for (const link of [data.high_bidder_link, 'by <a href="https://bringatrailer.com/member/example_bidder/" target="_blank">Example_Bidder</a>']) {
+    const frame = { ...frames[3], data: { ...data, high_bidder_link: link } };
+    const projection = await prepareBatLiveFrame(frame, target);
+    assert.equal(projection.high_bidder, link === data.high_bidder_link ? "JuergenJanzen" : "Example_Bidder");
+    assert.deepEqual(JSON.parse(projection.raw_frame_json).data, frame.data);
+    assert.equal(projection.clock_basis, "collector_receipt_time_publication_unknown");
+    assert.equal(projection.observed_at, frame.received_at);
+    assert.equal(projection.buyer, null);
+    assert.equal(projection.outcome, null);
+    assert.equal(projection.comment_row, null);
+    assert.equal(projection.projection_error, null);
+    assert.equal((await prepareBatLiveFrame(frame, target)).content_hash, projection.content_hash);
+  }
+  assert.equal(JSON.stringify(data), original);
+});
+
+Deno.test("member-link fallback refuses ambiguous, mismatched and nonnative aliases", async () => {
+  const link = 'by <a href="https://bringatrailer.com/member/example_bidder/" target="_blank">Example_Bidder</a>';
+  const data: Record<string, any> = { ...frames[3].data };
+  delete data.high_bidder_username;
+  for (const bad of [null, {}, "", link.replace("https:", "http:"), link.replace("bringatrailer.com/", "bringatrailer.com.evil/"),
+    link.replace("example_bidder/", "different/"), link.replace("example_bidder/", "example_bidder/?x=1"),
+    link.replace("example_bidder/", "example_bidder/#x"), link.replace("example_bidder/", "%65xample_bidder/"),
+    link.replace("https://", "https://user@"), link + link, link + " trailing", link.replace("Example_Bidder</a>", "<b>Example_Bidder</b></a>"),
+    link.replace("Example_Bidder</a>", "Example&amp;Bidder</a>"), link.replace("by ", "winner "), "x".repeat(1025)]) {
+    const frame = { ...frames[3], data: { ...data, high_bidder_link: bad } };
+    const projection = await prepareBatLiveFrame(frame, target);
+    assert.equal(projection.high_bidder, null);
+    assert.equal(projection.current_bid, 33000);
+    assert.equal(projection.bid_count, 16);
+    assert.deepEqual(JSON.parse(projection.raw_frame_json).data, frame.data);
+  }
+  assert.equal((await prepareBatLiveFrame({ ...frames[3], data: { ...data, high_bidder_link: link, high_bidder_username: "Native_Typed_Alias" } }, target)).high_bidder, "Native_Typed_Alias");
+  assert.equal((await prepareBatLiveFrame({ ...frames[2], data: { ...frames[2].data, high_bidder_link: link } }, target)).high_bidder, null);
+});
+
 Deno.test("intake failure keeps every frame in order; bounded overflow is an error", async () => {
   let failed = true;
   const admitted: BatLiveFrame[] = [];
@@ -73,7 +143,72 @@ Deno.test("intake failure keeps every frame in order; bounded overflow is an err
   assert.equal(queue.pending, 0);
 });
 
-Deno.test("slow historical admission cannot stop socket pings or connected coverage heartbeats", async () => {
+Deno.test("one rejected lot retains its ordered frames without blocking another lot", async () => {
+  const badId = target.id;
+  const goodId = "00000000-0000-0000-0000-000000000003";
+  let rejected = true;
+  const admitted: BatLiveFrame[] = [];
+  const failedFrames = Array.from({ length: 60 }, (_, i) => ({ ...frames[0], data: { sequence: i } }));
+  const goodFrames = [frames[1], frames[4]].map(f => ({ ...f, monitored_auction_id: goodId }));
+  const queue = new BatLiveBuffer(async batch => {
+    assert.equal(new Set(batch.map(f => f.monitored_auction_id)).size, 1);
+    assert.ok(batch.length <= 50);
+    if (rejected && batch[0].monitored_auction_id === badId) throw new Error("canonical vehicle auction event missing");
+    admitted.push(...batch);
+  });
+  failedFrames.forEach(f => queue.push(f));
+  goodFrames.forEach(f => queue.push(f));
+  await assert.rejects(() => queue.flush(), /canonical vehicle auction event missing/);
+  assert.deepEqual(admitted, goodFrames);
+  assert.equal(queue.pending, failedFrames.length);
+  assert.equal(queue.statusFor(badId).pending, failedFrames.length);
+  assert.match(queue.statusFor(badId).error!, /canonical vehicle auction event missing/);
+  assert.deepEqual(queue.statusFor(goodId), { pending: 0, oldestReceivedAt: null, error: null });
+  rejected = false;
+  await queue.flush();
+  assert.deepEqual(admitted, [...goodFrames, ...failedFrames]);
+  assert.equal(queue.pending, 0);
+  assert.equal(queue.statusFor(badId).error, null);
+});
+
+Deno.test("a collector reports admission lag and failure only on the rejected lot", () => withCollectorClock(async () => {
+  const good = { ...target, id: "00000000-0000-0000-0000-000000000003", post_id: target.post_id + 1 };
+  const heartbeats: any[] = [];
+  const admitted: BatLiveFrame[] = [];
+  const socket: any = { readyState: 1, close() { this.readyState = 3; this.onclose?.(); }, send(raw: string) {
+    const f = JSON.parse(raw);
+    if (f.event === "pusher:subscribe") queueMicrotask(() => this.onmessage({ data: JSON.stringify({
+      event: "pusher_internal:subscription_succeeded", channel: f.data.channel, data: {} }) }));
+    if (f.event === "pusher:ping") queueMicrotask(() => this.onmessage({ data: JSON.stringify({ event: "pusher:pong", data: {} }) }));
+  } };
+  await assert.rejects(() => collectBatLive([{ ...target }, good], {
+    socket: () => { queueMicrotask(() => socket.onmessage({ data: JSON.stringify({ event: "pusher:connection_established", data: {} }) })); return socket; },
+    admit: async (batch, h) => {
+      heartbeats.push(...h);
+      if (batch.some(f => f.monitored_auction_id === target.id)) throw new Error("live_intake_http_500");
+      admitted.push(...batch);
+    },
+    missed: async t => ({ comments: [], metadata: { post_id: t.post_id, current_numeric: 100, count: 1 } }),
+  }, 2100), /live_intake_http_500/);
+  assert.equal(admitted.filter(f => f.monitored_auction_id === good.id).length, 1);
+  assert.ok(heartbeats.some(h => h.monitored_auction_id === target.id && h.pending > 0 && h.error?.includes("live_intake_http_500")));
+  assert.ok(heartbeats.some(h => h.monitored_auction_id === good.id && h.connected && h.pending === 0 && h.error === null));
+}));
+
+Deno.test("arrivals during admission survive acknowledgement even when the same frame object is reused", async () => {
+  let appended = false;
+  const sizes: number[] = [];
+  const queue = new BatLiveBuffer(async batch => {
+    sizes.push(batch.length);
+    if (!appended) { appended = true; queue.push(frames[0]); }
+  });
+  for (let i = 0; i < 50; i++) queue.push(frames[0]);
+  await queue.flush();
+  assert.deepEqual(sizes, [50, 1]);
+  assert.equal(queue.pending, 0);
+});
+
+Deno.test("slow historical admission cannot stop socket pings or connected coverage heartbeats", () => withCollectorClock(async () => {
   let release!: () => void;
   const slowAdmission = new Promise<void>(resolve => { release = resolve; });
   let blocked = false, connections = 0, pings = 0;
@@ -99,9 +234,9 @@ Deno.test("slow historical admission cannot stop socket pings or connected cover
     assert.ok(heartbeatsDuringAdmission.filter(h => h.connected).length >= 3);
     assert.ok(heartbeatsDuringAdmission.every(h => h.error === null && h.pending > 0));
   } finally { clearTimeout(finishAdmission); release(); }
-});
+}));
 
-Deno.test("a stalled coverage acknowledgement cannot block source capture or spawn overlapping heartbeat requests", async () => {
+Deno.test("a stalled coverage acknowledgement cannot block source capture or spawn overlapping heartbeat requests", () => withCollectorClock(async () => {
   let release!: () => void;
   const stalledHeartbeat = new Promise<void>(resolve => { release = resolve; });
   let pings = 0, connections = 0, heartbeatCallsWhileStalled = 0, stalled = true;
@@ -122,9 +257,9 @@ Deno.test("a stalled coverage acknowledgement cannot block source capture or spa
     assert.equal(connections, 1);
     assert.ok(pings >= 4);
   } finally { clearTimeout(unblock); release(); }
-});
+}));
 
-Deno.test("public collector covers all 20 simultaneous closings and recovers on subscription", async () => {
+Deno.test("public collector covers all 20 simultaneous closings and recovers on subscription", () => withCollectorClock(async () => {
   const targets = Array.from({ length: 20 }, (_, i) => ({ ...target,
     id: `00000000-0000-0000-0000-${String(i + 1).padStart(12,"0")}`, post_id: fixture.post_id + i }));
   const subscriptions: string[] = []; const recovered = new Set<number>(); const heartbeats: any[] = [];
@@ -139,4 +274,20 @@ Deno.test("public collector covers all 20 simultaneous closings and recovers on 
   assert.equal(subscriptions.length, 60);
   assert.equal(recovered.size, 20);
   assert.equal(new Set(heartbeats.map(h => h.monitored_auction_id)).size, 20);
+}));
+
+Deno.test("one bid arriving by three transports with differently shaped frames is one observation key", async () => {
+  const pusher = await prepareBatLiveFrame({ ...frames[0], transport: "public_pusher" }, target);
+  const missed = await prepareBatLiveFrame({ ...frames[0], transport: "missed_comments", received_at: "2026-10-04T18:01:30Z",
+    data: { ...frames[0].data, extra_transport_field: "x", comment: { ...frames[0].data.comment, likes: 3 } } }, target);
+  const html = await prepareBatLiveFrame({ ...frames[0], transport: "direct_html", received_at: "2026-10-04T18:05:00Z",
+    data: { post_id: frames[0].data.post_id, comment: frames[0].data.comment } }, target);
+  assert.equal(pusher.kind, "bid");
+  assert.equal(pusher.content_hash, missed.content_hash);
+  assert.equal(pusher.content_hash, html.content_hash);
+  assert.equal(pusher.source_identifier, missed.source_identifier);
+  assert.equal(pusher.source_identifier, html.source_identifier);
+  // a different bid (different comment id) still gets its own key
+  const other = await prepareBatLiveFrame(frames[1], target);
+  assert.notEqual(other.source_identifier, pusher.source_identifier);
 });

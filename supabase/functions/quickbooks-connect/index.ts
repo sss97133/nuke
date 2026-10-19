@@ -7,6 +7,7 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { authenticateWriter, requireWriteAuth } from '../_shared/writeGuard.ts';
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -34,7 +35,7 @@ Deno.serve(async (req) => {
 
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL') ?? '',
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    projectSecretKey() ?? ''
   );
 
   // The connected QuickBooks company is the owner's own books, and "signed in" means anyone (sign-up is
@@ -228,13 +229,19 @@ Deno.serve(async (req) => {
       const realmId = company.quickbooks_realm_id;
 
       // Fetch Balance Sheet
-      const balanceSheet = await fetchReport(accessToken, realmId, 'BalanceSheet');
+      // Optional period: ?start_date=2024-01-01&end_date=2024-12-31&accounting_method=Cash&summarize_column_by=Month
+      const reportParams = new URLSearchParams();
+      for (const k of ['start_date', 'end_date', 'accounting_method', 'summarize_column_by']) {
+        const v = url.searchParams.get(k);
+        if (v) reportParams.set(k, v);
+      }
+      const balanceSheet = await fetchReport(accessToken, realmId, 'BalanceSheet', reportParams);
 
       // Fetch Profit & Loss
-      const profitLoss = await fetchReport(accessToken, realmId, 'ProfitAndLoss');
+      const profitLoss = await fetchReport(accessToken, realmId, 'ProfitAndLoss', reportParams);
 
       // Fetch Cash Flow
-      const cashFlow = await fetchReport(accessToken, realmId, 'CashFlow');
+      const cashFlow = await fetchReport(accessToken, realmId, 'CashFlow', reportParams);
 
       return new Response(JSON.stringify({
         success: true,
@@ -304,7 +311,7 @@ Deno.serve(async (req) => {
 
   } catch (error) {
     return new Response(JSON.stringify({
-      error: error.message,
+      error: error instanceof Error ? error.message : 'request failed',
     }), {
       status: 400,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -345,9 +352,10 @@ async function refreshToken(supabase: any, company: any): Promise<string> {
   return tokens.access_token;
 }
 
-async function fetchReport(accessToken: string, realmId: string, reportName: string): Promise<any> {
+async function fetchReport(accessToken: string, realmId: string, reportName: string, params?: URLSearchParams): Promise<any> {
+  const qs = params && params.toString() ? `?${params.toString()}` : '';
   const response = await fetch(
-    `${QB_API_BASE}/v3/company/${realmId}/reports/${reportName}`,
+    `${QB_API_BASE}/v3/company/${realmId}/reports/${reportName}${qs}`,
     {
       headers: {
         'Authorization': `Bearer ${accessToken}`,

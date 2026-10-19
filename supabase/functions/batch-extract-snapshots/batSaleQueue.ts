@@ -1,5 +1,6 @@
 // Deterministic retained-capture lane. Only canonical ingest may admit testimony.
 import { corsHeaders } from "../_shared/cors.ts";
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const TRANSIENT = new Set(["parent_read_failed", "current_sale_read_failed", "snapshot_read_failed",
@@ -55,7 +56,7 @@ export async function drainBatSaleQueue(supabase: any, body: any,
               Math.min(10000, 40000 - (Date.now() - started))))]), body: selector,
           }));
         } else {
-          const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+          const key = projectSecretKey();
           if (!key) throw new Error("credential_unavailable");
           response = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/ingest-observation`, {
             method: "POST", signal: AbortSignal.timeout(10000),

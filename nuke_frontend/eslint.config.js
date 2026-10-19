@@ -61,6 +61,17 @@ export default tseslint.config(
       'design-system/no-banned-fonts': 'warn',
     },
   },
+  // Kit discipline: a page sets neither inline style nor type. src/kit is the one place
+  // type and layout are decided (text roles and containers); everything else consumes it.
+  // Counted and ratcheted by scripts/guardrails/design-violations.mjs via scripts/ci/verify.sh.
+  {
+    files: ['src/**/*.{ts,tsx}'],
+    ignores: ['src/kit/**'],
+    rules: {
+      'design-system/no-inline-style': 'warn',
+      'design-system/no-font-props': 'warn',
+    },
+  },
   // Allow console usage in scripts and configuration files
   {
     files: ['scripts/**/*.{js,ts}', 'vite.config.ts', 'eslint.config.js'],

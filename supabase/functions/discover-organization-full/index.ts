@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { requireWriteAuth } from '../_shared/writeGuard.ts';
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 /**
  * DISCOVER ORGANIZATION FULL
@@ -108,7 +109,7 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      projectSecretKey() ?? ''
     );
 
     console.log(`\n🔍 DISCOVER ORGANIZATION FULL`);
@@ -139,7 +140,7 @@ Deno.serve(async (req) => {
     let existingPatterns: any = null;
     if (!force_rediscover) {
       const { data: patterns } = await supabase
-        .from('source_site_schemas')
+        .from('dealer_site_schemas')
         .select('*')
         .eq('domain', new URL(siteUrl).hostname)
         .maybeSingle();
@@ -664,8 +665,9 @@ async function storeLearnedPatterns(
       discovered_at: new Date().toISOString(),
     };
 
-    await supabase
-      .from('source_site_schemas')
+    // source_site_schemas does not exist; dealer_site_schemas has the same columns and UNIQUE (domain).
+    const { error: schemaError } = await supabase
+      .from('dealer_site_schemas')
       .upsert({
         domain,
         site_name: domain,
@@ -676,6 +678,7 @@ async function storeLearnedPatterns(
       }, {
         onConflict: 'domain',
       });
+    if (schemaError) throw new Error(`dealer_site_schemas upsert failed: ${schemaError.message}`);
 
     return true;
   } catch (error: any) {
@@ -701,7 +704,7 @@ async function extractAllData(
   other_data: any;
 }> {
   const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
-  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+  const serviceKey = projectSecretKey() || '';
 
   // Find inventory URL
   const inventoryPage = siteStructure.page_types.find((pt) => pt.type === 'inventory');

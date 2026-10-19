@@ -51,14 +51,12 @@
      To add a new sticky layer: add its height, insert a new anchor,
      and bump all anchors below it. Never use raw px for sticky top. */
   --vp-h-site: var(--header-height, 42px);       /* global header (NUKE + search) */
-  --vp-h-tab-bar: 28px;                           /* vehicle tab bar */
-  --vp-h-sub: 36px;                               /* sub-header (badge bar) */
-  --vp-h-barcode: 10px;                            /* barcode timeline strip */
+  --vp-h-masthead: 50px;                          /* measured identity + price */
+  --vp-h-barcode: 24px;                            /* barcode timeline strip */
 
-  --vp-stick-tab-bar: var(--vp-h-site);                                              /* tab bar sticks below header */
-  --vp-stick-sub: calc(var(--vp-h-site) + var(--vp-h-tab-bar));                      /* sub-header sticks below tab bar */
-  --vp-stick-barcode: calc(var(--vp-h-site) + var(--vp-h-tab-bar) + var(--vp-h-sub)); /* barcode sticks below sub-header */
-  --vp-sticky-top: calc(var(--vp-h-site) + var(--vp-h-tab-bar) + var(--vp-h-sub) + var(--vp-h-barcode)); /* columns stick below barcode */
+  --vp-stick-masthead: var(--vp-h-site);
+  --vp-stick-barcode: calc(var(--vp-h-site) + var(--vp-h-masthead));
+  --vp-sticky-top: calc(var(--vp-h-site) + var(--vp-h-masthead) + var(--vp-h-barcode));
 }
 
 /* Dark mode overrides for vehicle profile tokens */
@@ -78,16 +76,6 @@
   /* Heatmap contrast — dark mode */
   --heat-0: #3a3a3a;
   --heat-2: #4ade80;
-
-  /* Layout Heights — same sticky stack as light mode */
-  --vp-h-site: var(--header-height, 42px);
-  --vp-h-tab-bar: 28px;
-  --vp-h-sub: 36px;
-  --vp-h-barcode: 10px;
-  --vp-stick-tab-bar: var(--vp-h-site);
-  --vp-stick-sub: calc(var(--vp-h-site) + var(--vp-h-tab-bar));
-  --vp-stick-barcode: calc(var(--vp-h-site) + var(--vp-h-tab-bar) + var(--vp-h-sub));
-  --vp-sticky-top: calc(var(--vp-h-site) + var(--vp-h-tab-bar) + var(--vp-h-sub) + var(--vp-h-barcode));
 
   /* Layout */
   --h-hero: 550px;
@@ -137,11 +125,9 @@
 /* ============ LAYER 2: VEHICLE SUB-HEADER ============ */
 
 .vehicle-profile-sub-header {
-  position: sticky;
-  top: var(--vp-stick-sub);
   background: var(--vp-surface);
   border-bottom: 1px solid var(--vp-ghost);
-  min-height: var(--vp-h-sub);
+  min-height: 36px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -149,20 +135,6 @@
   z-index: 900;
   gap: 8px;
   overflow: visible;
-}
-
-/* VehicleHeader wrapper: keep mounted for data/context, hide visually.
-   VehicleSubHeader (rendered separately) is the visible badge bar. */
-.vehicle-profile-page > .vehicle-profile-sub-header {
-  display: none !important;
-}
-
-/* VehicleSubHeader: show as sticky badge bar */
-.vehicle-profile-page .vp-sub-header {
-  display: flex !important;
-  position: sticky !important;
-  top: var(--vp-stick-sub) !important;
-  z-index: 900 !important;
 }
 
 .vehicle-sub__left {
@@ -1226,29 +1198,6 @@
 /* ============ MOBILE ============ */
 
 @media (max-width: 768px) {
-  /* Sub-header: wrap to multiple lines on mobile */
-  .vp-sub-header {
-    height: auto !important;
-    min-height: 36px !important;
-    overflow: visible !important;
-    flex-wrap: wrap !important;
-    padding: 4px 8px !important;
-    gap: 4px !important;
-  }
-  .vp-sub-header__left {
-    flex-shrink: 1 !important;
-    min-width: 0 !important;
-    width: 100% !important;
-  }
-  .vp-sub-header__title {
-    max-width: none !important;
-    font-size: 10px !important;
-  }
-  .vp-sub-header__badges {
-    flex-wrap: wrap !important;
-    overflow: visible !important;
-    gap: 3px !important;
-  }
 
   .vehicle-sub__badges { display: none; }
   .vehicle-sub__title { font-size: 10px; }
@@ -1285,3 +1234,83 @@
     grid-template-columns: 60px minmax(0, 1fr) !important;
   }
 }
+
+/* One identity masthead; one primary owner for each fact. */
+.vp-performance :focus-visible, .vehicle-profile-page .barcode-bar:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+/* The header through the kit (ProfileHeader): identity and price stay in view; the strip scrolls with the page. */
+.vp-header-sticky { position: sticky; top: var(--vp-stick-masthead); z-index: 900; }
+.vp-strip { position: relative; }
+.vp-performance { padding: 12px; border-bottom: 2px solid var(--border); font: 11px/1.4 Arial, sans-serif; background: var(--surface); }
+.vp-performance--facet { padding: 0; border: 0; }
+.vp-performance__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.vp-performance h2 { margin: 0; font-size: 9px; text-transform: uppercase; letter-spacing: .1em; }
+.vp-performance select { max-width: 100%; min-width: 0; font: 10px Arial, sans-serif; color: var(--text); background: var(--surface); border: 0; border-bottom: 2px solid var(--border); padding: 3px 0; }
+.vp-performance__head > select { width: auto; flex: 0 1 auto; min-height: 0; }
+.vp-performance__scope { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 6px 0 10px; color: var(--text-secondary); font-size: 10px; }
+.vp-performance__scope span { font-size: 9px; }
+.vp-performance__readings { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0; }
+.vp-performance__readings > div { padding: 0 12px; border-left: 2px solid var(--border); }
+.vp-performance__readings > div:first-child { padding-left: 0; border-left: 0; }
+.vp-performance__readings > div:last-child { padding-right: 0; }
+.vp-performance__readings dt { font-size: 9px; color: var(--text-secondary); }
+.vp-performance__readings dd { margin: 4px 0 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; }
+.vp-performance__readings strong { font: 700 24px/1 'Courier New', monospace; }
+.vp-performance__readings dd > span { font-size: 11px; }
+.vp-performance__scale { position: relative; width: 100%; height: 3px; margin: 6px 0; background: var(--border); }
+.vp-performance__scale span { position: absolute; top: -3px; width: 2px; height: 9px; background: var(--text); transform: translateX(-1px); }
+.vp-performance__footer { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 4px 12px; margin-top: 6px; font-size: 9px; color: var(--text-secondary); }
+.vp-performance__change strong { font-family: 'Courier New', monospace; color: var(--text); }
+.vp-performance__reference { margin-top: 6px; font-size: 10px; }
+.vp-performance__reference summary, .timeline-view-options summary { cursor: pointer; font-size: 9px; padding: 4px 0; color: var(--text-secondary); }
+.vp-performance__reference label { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 6px; margin: 8px 12px 8px 0; }
+.vp-performance__context { color: var(--text-secondary); }
+.vp-performance__unranked { margin: 8px 0; font-weight: 700; }
+.vp-performance__unranked span { font-weight: 400; color: var(--text-secondary); }
+.vp-performance__widen { padding: 4px 0; border: 0; border-bottom: 1px solid var(--text-secondary); background: transparent; color: var(--text); font: inherit; font-size: 10px; cursor: pointer; }
+.vp-performance__evidence-table { width: 100%; border-collapse: collapse; font-size: 10px; margin: 8px 0; }
+.vp-performance__evidence-table td, .vp-performance__evidence-table th { text-align: left; padding: 3px; border-bottom: 1px solid var(--border); }
+.vehicle-profile-page .barcode-bar { border: 0; background: var(--vp-surface); text-align: left; }
+.vehicle-profile-page .barcode-bar__label-left { color: var(--vp-ink); }
+.timeline-auction-select { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 8px 0; font-size: 11px; }
+.timeline-auction-select select { max-width: 100%; font: inherit; background: var(--vp-surface); color: var(--vp-ink); border: 2px solid var(--vp-ghost); padding: 4px; }
+.vp-stored-interpretations, .vp-sold-context { padding: 6px 12px; border-bottom: 2px solid var(--border); font: 10px/1.4 Arial, sans-serif; }
+.vp-stored-interpretations > summary, .vp-sold-context > summary { cursor: pointer; }
+.vp-sold-context > summary { font-weight: 700; }
+.vp-sold-context > summary span { margin-left: 12px; font-weight: 400; color: var(--text-secondary); }
+.vp-stored-interpretations[open] > summary { margin-bottom: 8px; }
+.vp-sold-context__basis { margin: 6px 0; color: var(--text-secondary); font-size: 9px; }
+.vp-sold-context__interpretation { max-width: 60ch; }
+.vp-sold-context__group { margin-top: 12px; }
+.vp-sold-context__group h3 { display: flex; flex-wrap: wrap; align-items: baseline; gap: 12px; margin: 0 0 4px; font-size: 11px; }
+.vp-sold-context__group h3 small { font-size: 9px; color: var(--text-secondary); font-weight: 400; }
+.vp-sold-context__sale { display: flex; align-items: center; gap: 12px; padding: 5px 0; border-bottom: 1px solid var(--border); }
+.vp-sold-context__sale strong { font: 700 12px 'Courier New', monospace; margin-left: auto; }
+.vp-sold-context__record { display: flex; align-items: center; gap: 8px; color: inherit; text-decoration: none; }
+.vp-sold-context__record img { object-fit: cover; }
+.vp-sold-context__record small { display: block; font-size: 9px; color: var(--text-secondary); }
+.auction-band__facts--compact { display: flex; justify-content: space-between; align-items: flex-start; }
+.auction-band__source { max-width: 360px; font: 9px/1.5 Arial, sans-serif; }
+.auction-band__source summary { cursor: pointer; color: var(--text-secondary); }
+.auction-band__source dl { margin: 8px 0; }
+.auction-band__source dl > div { display: grid; grid-template-columns: 100px 1fr; gap: 8px; }
+.auction-band__source dd { margin: 0; font-family: 'Courier New', monospace; }
+.auction-band__source small { display: block; color: var(--text-secondary); }
+@media (max-width: 768px) {
+  .vehicle-profile-page { --h-hero: clamp(220px, 65vw, 420px); }
+}
+@media (max-width: 420px) {
+  .vp-performance__readings > div { padding: 0 8px; }
+  .vp-performance__readings dd { flex-direction: column; align-items: flex-start; }
+  .vp-performance__readings strong { font-size: 22px; }
+  .vp-sold-context > summary span { display: block; margin-left: 12px; }
+}
+
+.vp-seller-evidence { display: grid; gap: 8px; font-size: 11px; }
+.vp-seller-evidence dl { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 0; }
+.vp-seller-evidence dt { font-size: 9px; text-transform: uppercase; color: var(--text-secondary); }
+.vp-seller-evidence dd { margin: 4px 0; display: grid; gap: 3px; }
+.vp-seller-evidence strong { font: bold 24px 'Courier New', monospace; }
+.vp-seller-evidence small { color: var(--text-secondary); }
+
+.vp-live-seller { position: relative; }
+.vp-live-seller > button { background: transparent; border: 0; padding: 4px; font: 11px Arial, sans-serif; color: var(--text); cursor: pointer; }

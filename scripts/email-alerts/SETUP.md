@@ -1,6 +1,51 @@
 # Email alert acquisition
 
-## Current repair and operating boundary, 2026-10-04
+## Priority capture, 2026-10-18
+
+The owner's October 18 request expands capture to the existing dedicated alerts mailbox,
+with 1960–1991 vehicles first. It supersedes the October 4 account exclusion below. Select
+the account explicitly; the connected chat Gmail account can differ from the Mail account.
+
+```sh
+python3 scripts/ingest-mail-alerts.py --source ksl --target-email "$MAIL_ALERT_TARGET" \
+  --priority-years 1960 1991 --days 7 --limit 1000 --dry-run
+```
+
+`--priority-years FROM TO` orders messages containing qualifying cards before newer messages
+without one, then orders qualifying cards first within each message. Both endpoints are
+inclusive. Only a card's stated year qualifies: saved-search names, neighboring cards and
+unknown years confer no priority. Other cards remain eligible, and acknowledgement still
+requires verified receipts for every card in the message. Completed messages do not consume
+the writer's bounded batch. Priority changes scheduling, never publisher testimony or identity.
+
+Apple Mail must finish syncing original message bodies. A fresh index alone does not prove
+body coverage: inspect `cached` and `holds.body_not_cached` beside `selected` in the receipt.
+The `--limit` window bounds discovery before priority ordering, so it is not a complete-mailbox
+or all-history scan. `scripts/mail-app-intake.mjs --daemon` forwards the same options and runs
+bounded cycles five minutes apart. Verify a scheduled receipt and durable observations before
+calling recurrence operational. This path reads Mail's cache without changing labels/read state.
+
+The reader supports Python 3.9, including UTC timestamps ending in `Z` in raw-email manifests,
+database readback and health receipts. On older Macs, select the actual Mail cache with
+`--mail-dir` and `--mail-db`; Monterey uses `~/Library/Mail/V9` rather than the default V10.
+For a machine move, verify the destination's selected account, background Mail access and
+successful scheduled writer receipt before unloading the original worker. Keep private MIME,
+checkpoints and credentials outside the repository; a code copy alone is not a working move.
+
+Different cached bytes under the same message identity remain a review hold, even when the
+decoded email looks identical. Original MIME and stored testimony are never normalized or
+replaced to force a duplicate match. The local `identity_holds` checkpoint retains each raw
+variant separately from completed messages; subsequent cycles skip that exact held variant
+while continuing other alerts. Changed bytes are checked again, and `--replay` explicitly
+rechecks held variants. The receipt reports `holds.message_identity_conflict`; a healthy
+transport does not mean these conflicts are resolved. Failed requests and failed readback
+still stop the batch after three errors and remain retryable.
+
+Email capture remains independent of KSL page enrichment. A blocked/failed headless request
+must not discard the email, imply withdrawal, or trigger a paid fallback. Keep the paused cloud
+poller and paid source settings unchanged. Deployment and runtime receipts remain private.
+
+## Historical repair boundary, 2026-10-04
 
 **Owner scope: connected Gmail only.** The dedicated alerts mailbox and its Apple Mail daemon
 are excluded from this repair's rollout. The Mac findings below explain the old path's failure;

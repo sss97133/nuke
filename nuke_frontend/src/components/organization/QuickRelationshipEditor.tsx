@@ -113,7 +113,8 @@ const QuickRelationshipEditor: React.FC<Props> = ({
           updated_at: new Date().toISOString()
         })
         .eq('id', orgVehicleId)
-        .select();
+        .select('id');
+
 
       console.log('Update result:', { data, error: updateError });
 

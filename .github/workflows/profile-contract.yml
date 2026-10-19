@@ -1,0 +1,35 @@
+name: Profile contract
+
+# The vehicle profile as a logged-out visitor sees it, measured nightly against its floors
+# (scripts/ci/profile-baseline.json): request budget, console errors, type scale, inline styles,
+# internal vocabulary, money and plates. A metric may go down; it may not go up.
+on:
+  schedule:
+    - cron: '0 9 * * *'
+  workflow_dispatch:
+
+jobs:
+  profile-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install Playwright
+        run: |
+          mkdir -p /tmp/pw && cd /tmp/pw && npm init -y >/dev/null && npm i playwright@1.61.1 >/dev/null
+          npx playwright install --with-deps chromium
+      - name: Measure the live profile, logged out
+        env:
+          NODE_PATH: /tmp/pw/node_modules
+          PROFILE_CONTRACT_OUT: ${{ runner.temp }}/profile-contract
+        run: node scripts/ci/profile-contract.mjs
+      - name: Keep the screenshots and measurements
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: profile-contract
+          path: ${{ runner.temp }}/profile-contract
+          retention-days: 14

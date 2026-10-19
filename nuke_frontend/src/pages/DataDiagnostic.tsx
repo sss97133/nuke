@@ -26,8 +26,9 @@ const DataDiagnostic: React.FC = () => {
       try {
         const { data, error } = await supabase
           .from('vehicles')
-          .select('*')
+          .select('id, year, make, model')
           .eq('user_id', session.user.id);
+
 
         if (!error) {
           setSupabaseVehicles(data || []);

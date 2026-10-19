@@ -191,6 +191,8 @@ export default function MarketDashboard() {
     searchText,
     viewMode,
     cardsPerRow,
+    imageFit,
+    setImageFit,
     hasActiveFilters,
     setFilters,
     setSortBy,
@@ -248,9 +250,10 @@ export default function MarketDashboard() {
         viewMode={viewMode}
         compact={viewMode === 'grid' && cardsPerRow > 8}
         showScores={showScores}
+        imageFit={imageFit === 'auto' ? 'cover' : imageFit}
       />
     ),
-    [viewMode, cardsPerRow, showScores],
+    [viewMode, cardsPerRow, showScores, imageFit],
   );
 
   // Brand heartbeat
@@ -259,7 +262,7 @@ export default function MarketDashboard() {
 
   // Stat card renderer
   const renderStatCard = useCallback(
-    (index: number) => <FeedStatCard index={index} stats={stats} vehicleCount={vehicles.length} />,
+    (index: number) => <FeedStatCard index={index} stats={stats} />,
     [stats, vehicles.length],
   );
 
@@ -300,7 +303,7 @@ export default function MarketDashboard() {
             fontFamily: "'Courier New', monospace",
             color: 'var(--text-secondary)',
           }}>
-            <span>NUKE MARKET — 590K+ collector vehicles across 15 auction sources. Sorted by deal_score.</span>
+            <span>CAPTURED VEHICLE RECORDS · scope and ordering follow the selected filters</span>
             <button
               type="button"
               onClick={() => {
@@ -342,6 +345,8 @@ export default function MarketDashboard() {
           cardsPerRow={cardsPerRow}
           fontSize={fontSize}
           showScores={showScores}
+          imageFit={imageFit}
+          onImageFitChange={setImageFit}
           onSortChange={setSortBy}
           onDirectionChange={setSortDirection}
           onViewModeChange={setViewMode}

@@ -12,6 +12,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { SUPABASE_URL } from '../../lib/env';
+import { Text } from '../../kit';
 
 const API_BASE = `${SUPABASE_URL}/functions/v1`;
 
@@ -360,7 +361,7 @@ const SECTIONS = [
 function OverviewSection() {
   const [stats, setStats] = useState<{
     vehicles: string; observations: string; valuations: string; images: string;
-    auctions: string; platforms: string; makes: string;
+    auctions: string; asOf: string;
   } | null>(null);
 
   useEffect(() => {
@@ -375,9 +376,9 @@ function OverviewSection() {
           observations: fmtK(d.details?.observations?.total || d.observations || 0),
           valuations:   fmtK(d.nuke_estimates || d.details?.valuations?.nuke_estimates || 0),
           images:       fmtK(d.images     || d.total_images  || 0),
-          auctions:     fmtK(d.details?.auctions?.total || d.auction_events || 227700),
-          platforms:    '15+',
-          makes:        '12K+',
+          auctions:     fmtK(d.details?.auctions?.total || d.auction_events || 0),
+          // The function stamps its own read; the bar shows that clock, never a typed count.
+          asOf:         String(d.generated_at || new Date().toISOString()),
         });
       })
       .catch(() => {});
@@ -389,11 +390,12 @@ function OverviewSection() {
 
   return (
     <div>
-      <h1 style={{ ...s.h1, fontSize: '18px' }}>Every vehicle. Every auction. Every data point. One API.</h1>
+      <h1 style={{ ...s.h1, fontSize: '18px' }}>Every observation, with its source. One API.</h1>
       <p style={s.p}>
-        Nuke indexes collector vehicles across 15+ auction platforms, marketplaces, registries, and forums.
-        Send a photo, a VIN, a URL, or a natural-language question — get structured intelligence back
-        with provenance, confidence scoring, and real comparable sales.
+        Nuke keeps every observation about a vehicle (a bid, a comment, a photo, a receipt, a title transfer) with
+        its source, its clocks and its trust, from auction venues, marketplaces, registries and forums. Send a photo,
+        a VIN, a URL or a question; what comes back is what the ledger holds and what it computed from it, with the
+        evidence and the coverage behind each number.
       </p>
 
       {/* ── Stats bar ── */}
@@ -412,14 +414,13 @@ function OverviewSection() {
             { value: stats.images,       label: 'Images' },
             { value: stats.auctions,     label: 'Auction Events' },
             { value: stats.observations, label: 'Observations' },
-            { value: stats.platforms,    label: 'Platforms' },
-            { value: stats.makes,        label: 'Makes' },
           ].map(({ value, label }) => (
             <div key={label}>
               <div style={{ ...mono, fontSize: '13px', fontWeight: 'bold' as const }}>{value}</div>
               <div style={label8}>{label}</div>
             </div>
           ))}
+          <Text role="caption">counts read from the live database at {stats.asOf.slice(11, 16)} UTC</Text>
         </div>
       )}
 
@@ -2945,7 +2946,7 @@ export default function DevelopersPage() {
             Nuke Docs
           </div>
           <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>
-            Vehicle Intelligence API
+            The ledger, by API
           </div>
         </div>
 

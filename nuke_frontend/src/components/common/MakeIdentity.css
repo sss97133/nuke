@@ -2,7 +2,7 @@
 .make-identity strong { overflow-wrap:anywhere; }
 .sx-make-logo { flex:0 0 24px; width:24px; height:24px; object-fit:contain; }
 .sx-make-wordmark { display:block; width:104px; height:24px; max-width:100%; object-fit:contain; object-position:left center; }
-.make-identity .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; border:0; }
+.make-identity .sr-only, .vehicle-identity .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; border:0; }
 .sx-make-wordmark-dark { display:none; }
 :root[data-theme="dark"] .sx-make-wordmark-light { display:none; }
 :root[data-theme="dark"] .sx-make-wordmark-dark { display:block; }
@@ -17,3 +17,32 @@
 :root[data-theme="dark"] .make-identity[data-inverse="true"] .sx-make-wordmark-dark { display:none; }
 :root[data-theme="dark"] .make-identity[data-inverse="true"] .sx-make-wordmark-monochrome,
 :root[data-theme="dark"] .make-identity[data-inverse="true"] .sx-make-logo:is([src$="mercedes-benz.svg"],[src$="chevrolet.svg"]) { filter:none; }
+
+.vehicle-identity { display:inline-flex; align-items:center; flex-wrap:wrap; gap:8px; min-width:0; max-width:100%; font-family:Arial,sans-serif; }
+.vehicle-identity__maker { display:flex; flex-direction:column; align-items:center; gap:4px; flex:0 0 auto; font-size:11px; }
+.vehicle-identity__year { font:10px/1 'Courier New',monospace; letter-spacing:.08em; }
+.vehicle-identity__name { display:flex; align-items:center; gap:6px; min-width:0; max-width:100%; }
+.vehicle-identity__model { font-size:20px; line-height:1; overflow-wrap:anywhere; }
+.vehicle-identity__art { display:block; flex-shrink:0; max-width:100%; }
+.vehicle-identity__art svg { display:block; max-width:100%; height:auto; overflow:hidden; }
+.vehicle-identity__art--make { width:52px; }
+.vehicle-identity__art--model { width:140px; }
+.vehicle-identity__art--emblem { width:28px; }
+.vehicle-identity__variant { font-size:14px; font-weight:400; }
+.vehicle-identity__art--variant { width:112px; }
+/* Keep period artwork at headline scale alongside the recorded identity. */
+.vehicle-identity[data-variant-artwork="true"] { flex-wrap:nowrap; }
+.vehicle-identity[data-variant-artwork="true"] .vehicle-identity__maker { align-items:flex-start; }
+.vehicle-identity[data-variant-artwork="true"] .vehicle-identity__art--make { width:84px; }
+.vehicle-identity[data-variant-artwork="true"] .vehicle-identity__art--emblem { order:-1; }
+.vehicle-identity[data-variant-artwork="true"] .vehicle-identity__model { font:inherit; }
+/* A neutral nameplate surface retains the source chrome/enamel in both themes.
+   Multiply removes the white photographic surround without recoloring the badge. */
+.vehicle-identity[data-period-artwork="true"] { background:#f1f1ee; color:#202020; padding:6px 8px; }
+.vehicle-identity[data-period-artwork="true"] .vehicle-identity__art { mix-blend-mode:multiply; }
+@media (max-width:600px) {
+  .vehicle-identity__art--model { width:120px; }
+  .vehicle-identity__art--emblem { width:24px; }
+  .vehicle-identity[data-variant-artwork="true"] .vehicle-identity__art--make { width:72px; }
+  .vehicle-identity__art--variant { width:96px; }
+}

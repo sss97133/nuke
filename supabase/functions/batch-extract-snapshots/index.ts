@@ -11,8 +11,24 @@
  *   "dry_run": boolean,
  *   "offset": number,           // for pagination (default 0)
  *   "mode": string,             // "skeleton" | "sparse" | "deep" | "force" (re-extract everything)
- *   "force": boolean            // re-extract even if already processed by this version
+ *   "force": boolean,           // re-extract even if already processed by this version
+ *   "use_queue": boolean,       // claim from snapshot_extraction_queue instead of scanning vehicles
+ *   "no_ai": boolean            // never call the model (see aiGate.ts); default false
  * }
+ *
+ * The regex parser runs first. Without no_ai, a row it reads as empty on content over 500 characters goes to
+ * claude-haiku, and mode "ai" and platforms with no regex parser use the model as the parser. With no_ai: true none of
+ * that runs: the response counts regex_empty rows and ai_blocked calls, and a regex-empty queue row ends with status
+ * 'regex_empty' rather than 'completed'. no_ai with mode "ai" or a platform that has no regex parser is a 400.
+ *
+ * Two database refusals no longer fail a row (writeRules.ts): a parsed sale_price is written only to a vehicle already marked
+ * sold (guard_vehicle_sale_price refuses any other, and refused the whole update with it), and a VIN already on another
+ * vehicle is dropped from the update (enforce_vin_uniqueness, which the old retry did not recognize). The response counts
+ * sale_price_withheld and vin_conflicts.
+ *
+ * Queue mode: a claimed row whose vehicle no longer exists ends with status 'no_vehicle'. It used to stay 'processing',
+ * come back to 'pending' after 5 minutes and be claimed first again (the claim orders by vehicle_id): measured
+ * 2026-10-14, 43% of the first 2,000 pending Barrett-Jackson rows and all 127 Bonhams rows have no vehicle.
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -20,6 +36,13 @@ import { callTier, parseJsonResponse } from "../_shared/agentTiers.ts";
 import { writeObservation } from "../_shared/observationWriter.ts";
 import { authenticateWriter, requireWriteAuth } from "../_shared/writeGuard.ts";
 import { drainBatSaleQueue } from "./batSaleQueue.ts";
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { makeAiGate, noAiConflict, readNoAi, terminalQueueStatus } from "./aiGate.ts";
+import { orphanVehicleIds } from "./queueRows.ts";
+import { isUniqueViolation, salePriceWritable } from "./writeRules.ts";
+import { mustWrite, softWrite } from '../_shared/writeResult.ts';
+import { identityConflict } from '../_shared/identityMatch.ts';
+import { judge, pickBjLotPrice, urlVariants, type LotPage } from "./snapshotCompare.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -38,7 +61,7 @@ Deno.serve(async (req) => {
   try {
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+      projectSecretKey() ?? "",
     );
 
     const body = req.method === "POST" ? await req.json().catch(() => ({})) : {};
@@ -53,6 +76,15 @@ Deno.serve(async (req) => {
       if (body.use_source_queue === true) return await drainBatSaleQueue(supabase, body);
       return await qualifySourceSales(supabase, body);
     }
+    // Read-only: does each vehicle's row name the same car as the house pages of the lots it carries? No writes.
+    if (body.mode === "compare_snapshot") {
+      const verdict = await authenticateWriter(req);
+      if (!verdict.ok || verdict.caller.kind !== "service_role") {
+        return new Response(JSON.stringify({ error: "Snapshot comparison requires a service caller" }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      return await compareSnapshots(supabase, body);
+    }
     const batchSize = Math.min(Math.max(Number(body.batch_size) || 50, 1), 200);
     const platform = body.platform || "bat";
     const dryRun = body.dry_run === true;
@@ -61,12 +93,23 @@ Deno.serve(async (req) => {
 
     const mode = body.mode || "sparse";
     const useQueue = body.use_queue === true;
-    console.log(`[batch-extract] v2 batch=${batchSize} platform=${platform} mode=${mode} dry=${dryRun} offset=${offset} force=${force} queue=${useQueue}`);
+    const noAi = readNoAi(body);
+    const conflict = noAiConflict(noAi, mode, platform);
+    if (conflict) {
+      return new Response(JSON.stringify({ error: conflict }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    // Every call to the model goes through this gate (aiGate.ts); with no_ai it never makes one.
+    const gate = makeAiGate(noAi, parseWithAI);
+    console.log(`[batch-extract] v2 batch=${batchSize} platform=${platform} mode=${mode} dry=${dryRun} offset=${offset} force=${force} queue=${useQueue} no_ai=${noAi}`);
 
-    const selectFields = `id, year, make, model, trim, vin, mileage, horsepower, torque, engine_type, engine_displacement, transmission, drivetrain, body_style, color, color_primary, interior_color, description, sale_price, bat_auction_url, discovery_url, listing_url, extractor_version`;
+    const selectFields = `id, year, make, model, trim, vin, mileage, horsepower, torque, engine_type, engine_displacement, transmission, drivetrain, body_style, color, color_primary, interior_color, description, sale_price, sale_status, auction_outcome, bat_auction_url, discovery_url, listing_url, extractor_version`;
 
     let vehicles: any[] = [];
     let queueItems: { vehicle_id: string; snapshot_url: string }[] = [];
+    let orphansMarked = 0;
 
     if (useQueue) {
       // ============================================================
@@ -98,6 +141,19 @@ Deno.serve(async (req) => {
         .in("id", vehicleIds);
       if (vErr) throw new Error(`Vehicle fetch failed: ${vErr.message}`);
       vehicles = vData || [];
+
+      // A claimed row whose vehicle no longer exists is never visited by the loop below. It would stay 'processing', go back
+      // to 'pending' after 5 minutes and be claimed first again, because the claim takes the lowest vehicle_ids. End it.
+      const orphanIds = orphanVehicleIds(claimed, vehicles);
+      if (orphanIds.length > 0 && !dryRun) {
+        const { error: orphanErr } = await supabase.from("snapshot_extraction_queue")
+          .update({ status: "no_vehicle", completed_at: new Date().toISOString() })
+          .in("vehicle_id", orphanIds)
+          .eq("platform", platform)
+          .eq("status", "processing");
+        if (orphanErr) console.warn(`[batch-extract] could not end ${orphanIds.length} rows with no vehicle: ${orphanErr.message}`);
+        else orphansMarked = orphanIds.length;
+      }
     } else {
       // ============================================================
       // LEGACY MODE: OFFSET-based scanning (slower for large datasets)
@@ -154,8 +210,11 @@ Deno.serve(async (req) => {
     if (vehicles.length === 0) {
       return okJson({
         success: true,
-        message: "No vehicles need extraction",
+        message: orphansMarked > 0 ? "Claimed rows had no vehicle; ended as no_vehicle" : "No vehicles need extraction",
         processed: 0,
+        claimed: queueItems.length,
+        orphans_marked: orphansMarked,
+        no_ai: noAi,
         duration_ms: Date.now() - startTime,
       });
     }
@@ -173,6 +232,9 @@ Deno.serve(async (req) => {
     let noSnapshot = 0;
     let errors = 0;
     let fieldsTotal = 0;
+    let salePriceWithheld = 0; // parsed prices not written because the vehicle is not marked sold (writeRules.ts)
+    let identityRefused = 0; // snapshots whose car is not the vehicle's (identity_match / different_car / relink): nothing written
+    let vinConflicts = 0; // parsed VINs not written because another vehicle already holds them (writeRules.ts)
     const sampleResults: any[] = [];
 
     // Helper: read HTML from Supabase Storage when inline html is null
@@ -279,15 +341,16 @@ Deno.serve(async (req) => {
           noSnapshot++;
           // Mark queue item as failed if in queue mode
           if (useQueue) {
-            await supabase.from("snapshot_extraction_queue")
+            mustWrite('snapshot_extraction_queue update', await supabase.from("snapshot_extraction_queue")
               .update({ status: "failed", completed_at: new Date().toISOString() })
-              .eq("vehicle_id", vehicle.id);
+              .eq("vehicle_id", vehicle.id));
           }
           continue;
         }
 
         // Parse based on platform — try regex first, fall back to AI
         let parsed: Record<string, any>;
+        let regexEmpty = false;
         const useAI = mode === "ai";
 
         if (useAI) {
@@ -295,7 +358,7 @@ Deno.serve(async (req) => {
           // Prefer markdown over raw HTML (cleaner for LLM)
           const snapshotMarkdown = snapshot?.markdown || null;
           const content = snapshotMarkdown || snapshotHtml;
-          parsed = await parseWithAI(content, vehicleUrl, platform);
+          parsed = await gate.primary(content, vehicleUrl, platform);
         } else if (platform === "bat") {
           parsed = parseBatHtml(snapshotHtml);
         } else if (platform === "bonhams") {
@@ -310,23 +373,43 @@ Deno.serve(async (req) => {
           // Unknown platform: try AI extraction
           const snapshotMarkdown = snapshot?.markdown || null;
           const content = snapshotMarkdown || snapshotHtml;
-          parsed = await parseWithAI(content, vehicleUrl, platform);
+          parsed = await gate.primary(content, vehicleUrl, platform);
         }
 
-        // AI FALLBACK: If regex parser returned 0 useful fields, try AI
-        if (!useAI && Object.keys(parsed).filter(k => parsed[k] != null).length === 0) {
+        // AI FALLBACK: If regex parser returned 0 useful fields, try AI (never with no_ai: the row is counted regex-empty)
+        if (!useAI) {
           const snapshotMarkdown = snapshot?.markdown || null;
           const content = snapshotMarkdown || snapshotHtml;
-          if (content && content.length > 500) {
-            console.log(`[AI-fallback] Regex returned 0 fields for ${vehicle.id}, trying AI...`);
-            parsed = await parseWithAI(content, vehicleUrl, platform);
-          }
+          const fb = await gate.fallback(parsed, content, vehicleUrl, platform, vehicle.id);
+          parsed = fb.parsed;
+          regexEmpty = fb.regexEmpty;
         }
+        // 'completed', or under no_ai 'regex_empty' for a row the regex could not read
+        const terminal = terminalQueueStatus(noAi, regexEmpty);
 
         // Extract primary image URL from HTML (works for all platforms)
         if (!parsed.primary_image_url && snapshotHtml) {
           const img = extractPrimaryImage(snapshotHtml, platform);
           if (img) parsed.primary_image_url = img;
+        }
+
+        // Identity guard: a snapshot of a different car must not fill, or force-overwrite, this vehicle. The row is left for a
+        // relink (revision item: missing identity_match, reason different_car), counted, and its queue row marked failed.
+        if (platform === "barrett-jackson") {
+          const conflict = identityConflict(
+            { year: vehicle.year, make: vehicle.make, model: vehicle.model, vin: vehicle.vin },
+            { year: parsed.year, make: parsed.make, model: parsed.model, vin: parsed.vin },
+          );
+          if (conflict) {
+            identityRefused++;
+            if (sampleResults.length < 5) sampleResults.push({ id: vehicle.id, status: "identity_refused", error: conflict });
+            if (!dryRun && useQueue) {
+              mustWrite('snapshot_extraction_queue update', await supabase.from("snapshot_extraction_queue")
+                .update({ status: "failed", completed_at: new Date().toISOString() })
+                .eq("vehicle_id", vehicle.id));
+            }
+            continue;
+          }
         }
 
         // Build update payload — only fill missing fields (unless force mode)
@@ -364,6 +447,12 @@ Deno.serve(async (req) => {
           const existingEmpty = existing === null || existing === undefined || String(existing).trim() === "";
 
           if (existingEmpty) {
+            // The database refuses a price on a vehicle that is not marked sold and fails the whole row with it.
+            // A price alone is not a sale: leave it unwritten and count it (the snapshot is kept; it can be read again).
+            if (dbField === "sale_price" && !salePriceWritable(vehicle)) {
+              salePriceWithheld++;
+              continue;
+            }
             updatePayload[dbField] = newVal;
             fieldsUpdated.push(dbField);
           } else if (force) {
@@ -391,14 +480,14 @@ Deno.serve(async (req) => {
         if (fieldsUpdated.length === 0) {
           skipped++;
           if (!dryRun) {
-            await supabase.from("vehicles").update({
+            mustWrite('vehicles update', await supabase.from("vehicles").update({
               extractor_version: VERSION,
               updated_at: new Date().toISOString(),
-            }).eq("id", vehicle.id);
+            }).eq("id", vehicle.id));
             if (useQueue) {
-              await supabase.from("snapshot_extraction_queue")
-                .update({ status: "completed", completed_at: new Date().toISOString(), fields_filled: 0 })
-                .eq("vehicle_id", vehicle.id);
+              mustWrite('snapshot_extraction_queue update', await supabase.from("snapshot_extraction_queue")
+                .update({ status: terminal, completed_at: new Date().toISOString(), fields_filled: 0 })
+                .eq("vehicle_id", vehicle.id));
             }
           }
           continue;
@@ -413,22 +502,23 @@ Deno.serve(async (req) => {
             .update(updatePayload)
             .eq("id", vehicle.id);
 
-          // If VIN unique constraint fails, retry without VIN
-          if (uErr?.message?.includes("unique constraint") && updatePayload.vin) {
+          // If the VIN is already on another vehicle (the unique index, or enforce_vin_uniqueness), retry without it
+          if (isUniqueViolation(uErr) && updatePayload.vin) {
+            vinConflicts++;
             delete updatePayload.vin;
             const vinIdx = fieldsUpdated.indexOf("vin");
             if (vinIdx >= 0) fieldsUpdated.splice(vinIdx, 1);
 
             if (fieldsUpdated.length === 0) {
-              await supabase.from("vehicles").update({
+              mustWrite('vehicles update', await supabase.from("vehicles").update({
                 extractor_version: VERSION,
                 updated_at: new Date().toISOString(),
-              }).eq("id", vehicle.id);
+              }).eq("id", vehicle.id));
               skipped++;
               if (useQueue) {
-                await supabase.from("snapshot_extraction_queue")
-                  .update({ status: "completed", completed_at: new Date().toISOString(), fields_filled: 0 })
-                  .eq("vehicle_id", vehicle.id);
+                mustWrite('snapshot_extraction_queue update', await supabase.from("snapshot_extraction_queue")
+                  .update({ status: terminal, completed_at: new Date().toISOString(), fields_filled: 0 })
+                  .eq("vehicle_id", vehicle.id));
               }
               continue;
             }
@@ -446,9 +536,9 @@ Deno.serve(async (req) => {
               sampleResults.push({ id: vehicle.id, status: "error", error: uErr.message });
             }
             if (useQueue) {
-              await supabase.from("snapshot_extraction_queue")
+              mustWrite('snapshot_extraction_queue update', await supabase.from("snapshot_extraction_queue")
                 .update({ status: "failed", completed_at: new Date().toISOString() })
-                .eq("vehicle_id", vehicle.id);
+                .eq("vehicle_id", vehicle.id));
             }
             continue;
           }
@@ -476,9 +566,9 @@ Deno.serve(async (req) => {
         }
 
         if (useQueue && !dryRun) {
-          await supabase.from("snapshot_extraction_queue")
-            .update({ status: "completed", completed_at: new Date().toISOString(), fields_filled: fieldsUpdated.length })
-            .eq("vehicle_id", vehicle.id);
+          mustWrite('snapshot_extraction_queue update', await supabase.from("snapshot_extraction_queue")
+            .update({ status: terminal, completed_at: new Date().toISOString(), fields_filled: fieldsUpdated.length })
+            .eq("vehicle_id", vehicle.id));
         }
         if (sampleResults.length < 10) {
           sampleResults.push({
@@ -495,9 +585,9 @@ Deno.serve(async (req) => {
           sampleResults.push({ id: vehicle.id, status: "error", error: e?.message });
         }
         if (useQueue) {
-          await supabase.from("snapshot_extraction_queue")
+          softWrite('snapshot_extraction_queue update', await supabase.from("snapshot_extraction_queue")
             .update({ status: "failed", completed_at: new Date().toISOString() })
-            .eq("vehicle_id", vehicle.id);
+            .eq("vehicle_id", vehicle.id));
         }
       }
     }
@@ -512,9 +602,16 @@ Deno.serve(async (req) => {
       batch_size: batchSize,
       offset,
       vehicles_found: vehicles.length,
+      claimed: queueItems.length,
+      orphans_marked: orphansMarked,
+      no_ai: noAi,
+      ...gate.counters(),
       extracted,
       skipped,
       no_snapshot: noSnapshot,
+      sale_price_withheld: salePriceWithheld,
+      vin_conflicts: vinConflicts,
+      identity_refused: identityRefused,
       errors,
       fields_filled: fieldsTotal,
       sample_results: sampleResults,
@@ -567,6 +664,54 @@ async function qualifySourceSales(supabase: any, body: any): Promise<Response> {
     refused: results.filter(r => r.status === "refused").length,
     writes: results.reduce((total,r) => total + Number(r.writes ?? 0),0), model_calls: 0, results }),
     { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+}
+
+/** Read-only. For 1–50 vehicles: each lot the vehicle carries on the platform, its newest HTTP-200 page, what the
+ * platform's parser reads there (year, make, model, VIN, price), and a verdict (snapshotCompare.ts): publish,
+ * row_disagrees, lots_disagree or no_page. Barrett-Jackson only for now (its lots are vehicle_events 'barrettjackson'). */
+async function compareSnapshots(supabase: any, body: any): Promise<Response> {
+  const ids = Array.isArray(body.vehicle_ids) ? body.vehicle_ids : [];
+  const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (body.platform !== "barrett-jackson" || ids.length < 1 || ids.length > 50
+    || ids.some((id: unknown) => typeof id !== "string" || !uuid.test(id)) || new Set(ids).size !== ids.length) {
+    return new Response(JSON.stringify({ error: "Provide platform barrett-jackson and 1–50 distinct vehicle UUIDs" }),
+      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  }
+  const { data: rows, error: vErr } = await supabase.from("vehicles")
+    .select("id, year, make, model, vin, sale_price, is_public").in("id", ids);
+  if (vErr) throw vErr;
+  const { data: events, error: eErr } = await supabase.from("vehicle_events")
+    .select("id, vehicle_id, source_url, event_status, final_price").in("vehicle_id", ids).eq("source_platform", "barrettjackson");
+  if (eErr) throw eErr;
+  const results: Record<string, unknown>[] = [];
+  let pagesRead = 0;
+  for (const row of rows ?? []) {
+    const lots: (LotPage & { event_status: string | null; final_price: number | null; page_price: number | null })[] = [];
+    for (const ev of (events ?? []).filter((e: any) => e.vehicle_id === row.id && e.source_url)) {
+      const { data: snaps } = await supabase.from("listing_page_snapshots")
+        .select("id, html, html_storage_path").in("listing_url", urlVariants(ev.source_url))
+        .eq("platform", "barrett-jackson").eq("http_status", 200).order("fetched_at", { ascending: false }).limit(1);
+      const snap = snaps?.[0];
+      let html: string | null = snap?.html && snap.html.length > 500 ? snap.html : null;
+      if (!html && snap?.html_storage_path) {
+        const { data: file } = await supabase.storage.from("listing-snapshots").download(snap.html_storage_path);
+        html = file ? await file.text() : null;
+      }
+      const parsed = html ? parseBarrettJacksonHtml(html) : null;
+      if (parsed) pagesRead++;
+      lots.push({ event_id: ev.id, url: ev.source_url, snapshot_id: snap?.id ?? null, event_status: ev.event_status,
+        final_price: ev.final_price == null ? null : Number(ev.final_price),
+        page: parsed ? { year: parsed.year ?? null, make: parsed.make ?? null, model: parsed.model ?? null, vin: parsed.vin ?? null } : null,
+        page_price: parsed?.sale_price ?? null });
+    }
+    const { verdict, reasons } = judge({ year: row.year, make: row.make, model: row.model, vin: row.vin }, lots);
+    results.push({ vehicle_id: row.id, is_public: row.is_public,
+      row: { year: row.year, make: row.make, model: row.model, vin: row.vin, sale_price: row.sale_price }, lots, verdict, reasons });
+  }
+  const tally: Record<string, number> = {};
+  for (const r of results) tally[r.verdict as string] = (tally[r.verdict as string] ?? 0) + 1;
+  return new Response(JSON.stringify({ success: true, mode: "compare_snapshot", requested: ids.length, pages_read: pagesRead,
+    writes: 0, model_calls: 0, tally, results }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 }
 
 // ============================================================
@@ -848,13 +993,11 @@ function parseBarrettJacksonHtml(rawHtml: string): Record<string, any> {
     }
   }
 
-  // Price from "price":"$$99,000.00" format (RSC data)
+  // Price from "price":"$$99,000.00" format (RSC data): the lot record's price, never the menu's bidder-package promo
+  // ("Bidder packages start at $250", read as the sale price on 19 vehicles before 2026-10-15).
   if (!result.sale_price) {
-    const priceStrMatch = html.match(/"price"\s*:\s*"\$?\$?([\d,]+(?:\.\d{2})?)"/);
-    if (priceStrMatch?.[1]) {
-      const price = parseInt(priceStrMatch[1].replace(/[,\.]\d{2}$/, '').replace(/,/g, ''));
-      if (price > 0) result.sale_price = price;
-    }
+    const price = pickBjLotPrice(html);
+    if (price) result.sale_price = price;
   }
 
   // Description from "full_description" in RSC data

@@ -17,6 +17,7 @@ import React, { useEffect, useState } from 'react';
 import type { FeedVehicle } from '../../feed/types/feed';
 import { resolveVehiclePrice } from '../../feed/utils/feedPriceResolution';
 import { supabase } from '../../lib/supabase';
+import { VEHICLE_POPUP_COLUMNS } from './vehiclePopupColumns';
 import { usePopup } from './usePopup';
 import { optimizeImageUrl } from '../../lib/imageOptimizer';
 import { useViewHistory } from '../../hooks/useViewHistory';
@@ -110,6 +111,7 @@ export function VehiclePopup({ vehicle, searchQuery }: Props) {
   const price = resolveVehiclePrice(vehicle);
   const [intel, setIntel] = useState<VehicleIntel | null>(null);
   const [loading, setLoading] = useState(true);
+  const [unavailable, setUnavailable] = useState(false);
 
   // Track view
   useEffect(() => {
@@ -124,15 +126,17 @@ export function VehiclePopup({ vehicle, searchQuery }: Props) {
     let cancelled = false;
 
     async function fetchIntel() {
+      setUnavailable(false);
       try {
         const { data, error } = await supabase.rpc('popup_vehicle_intel', {
           p_vehicle_id: vehicle.id,
         });
+        if (error) throw error;
         if (!cancelled && !error && data) {
           setIntel(data as VehicleIntel);
         }
       } catch {
-        // fail silently
+        if (!cancelled) setUnavailable(true);
       }
       if (!cancelled) setLoading(false);
     }
@@ -154,7 +158,7 @@ export function VehiclePopup({ vehicle, searchQuery }: Props) {
     if (src) openPopup(<SourcePopup source={src} />, src.toUpperCase(), 420);
   };
   const handleCompClick = (comp: CompSale) => {
-    supabase.from('vehicles').select('*').eq('id', comp.id).single().then(({ data }) => {
+    supabase.from('vehicles').select(VEHICLE_POPUP_COLUMNS).eq('id', comp.id).single().then(({ data }) => {
       if (data) openPopup(<VehiclePopup vehicle={data as unknown as FeedVehicle} />, [comp.year, comp.model].filter(Boolean).join(' '), 480);
     });
   };
@@ -507,10 +511,10 @@ export function VehiclePopup({ vehicle, searchQuery }: Props) {
       </div>
 
       {/* Loading state for intel */}
-      {loading && (
+      {(loading || unavailable) && (
         <div style={{ padding: '8px 12px', textAlign: 'center' }}>
           <span style={{ fontFamily: MONO, fontSize: 8, color: '#999', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-            Loading intelligence...
+            {unavailable ? 'Vehicle intelligence unavailable.' : 'Loading intelligence...'}
           </span>
         </div>
       )}

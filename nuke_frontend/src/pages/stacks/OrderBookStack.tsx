@@ -11,6 +11,7 @@ import {
 import { CoverageTable, LayerPath } from './stackParts';
 import { ForecastPanel } from './ForecastPanel';
 import VehicleCohort from './VehicleCohort';
+import { stackBackParams } from './bidExpression';
 import { STATE_WORD, clock, count, layerReadings, outcomeWord, span, usd } from './stackFormat';
 import './stacks.css';
 
@@ -569,8 +570,9 @@ export default function OrderBookStack() {
   if (!UUID_RE.test(vehicleId)) {
     return <main className="stack-page"><p className="stack-status" role="status">This address does not name a vehicle. Nothing was read.</p></main>;
   }
+  const back = stackBackParams(params.get('back')).toString();
   const header = (
-    <div className="stack-eyebrow"><Link to={params.get('back') ? `/stacks?${params.get('back')}` : '/stacks'}>Stacks</Link> / Stack {STACK.letter} · {STACK.name}</div>
+    <div className="stack-eyebrow"><Link to={back ? `/stacks?${back}` : '/stacks'}>Stacks</Link> / Stack {STACK.letter} · {STACK.name}</div>
   );
   if (query.isPending) return <main className="stack-page">{header}<p className="stack-status" role="status">Reading the lot…</p></main>;
   if (query.isError) {
@@ -607,7 +609,7 @@ export default function OrderBookStack() {
         <span><span className="stack-label">Status</span> {outcomeWord(lot, view.window.open)}</span>
         <span><span className="stack-label">{view.window.open ? 'Scheduled close' : 'Closed'}</span> <span className="stack-mono">{view.window.closeAt == null ? 'unknown' : clock(view.window.closeAt)}</span></span>
         {view.window.open && toClose != null && <span><span className="stack-label">To close</span> <span className="stack-mono">{span(toClose)}</span></span>}
-        <Link to={`/vehicle/${read.vehicle.id}`}>Vehicle record →</Link>
+        <Link to={`/vehicle/${read.vehicle.id}?${new URLSearchParams({returnTo: `/stacks/order-book/${read.vehicle.id}?${params}`})}`}>Current vehicle record →</Link>
         <a href={`${trimUrl(lot.source_url)}/`} target="_blank" rel="noopener noreferrer">BaT listing ↗</a>
       </div>
       {read.lots.length > 1 && (

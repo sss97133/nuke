@@ -1,7 +1,7 @@
 // Actual shared archive/parser code and installed Supabase SDK; synthetic HTTP only.
 // NODE_PATH=nuke_frontend/node_modules node --test scripts/test-archive-source-custody.mjs
 import assert from 'node:assert/strict';
-import { createHash, createHmac, webcrypto } from 'node:crypto';
+import { createHash, generateKeyPairSync, sign as signWith, webcrypto } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { test } from 'node:test';
@@ -10,6 +10,15 @@ import { runInNewContext } from 'node:vm';
 const require = createRequire(import.meta.url);
 const ts = require('typescript');
 const { createClient } = require('@supabase/supabase-js');
+const userKeys = generateKeyPairSync('ec', { namedCurve: 'P-256' });
+const userJwks = JSON.stringify({ keys: [{ ...userKeys.publicKey.export({ format: 'jwk' }), kid: 'fixture', alg: 'ES256' }] });
+// A signed-in user's session as Auth issues it since 2026-10-14: ES256, verified against the project JWKS.
+function userToken() {
+  const header = Buffer.from(JSON.stringify({ alg: 'ES256', typ: 'JWT', kid: 'fixture' })).toString('base64url');
+  const payload = Buffer.from(JSON.stringify({ role: 'authenticated', sub: vehicleId, exp: 4102444800 })).toString('base64url');
+  const signing = `${header}.${payload}`;
+  return `${signing}.${signWith('sha256', Buffer.from(signing), { key: userKeys.privateKey, dsaEncoding: 'ieee-p1363' }).toString('base64url')}`;
+}
 const vehicleId = '00000000-0000-4000-8000-000000000001';
 const snapshotId = '00000000-0000-4000-8000-000000000002';
 const sourceUrl = 'https://bringatrailer.com/listing/synthetic-one/';
@@ -43,20 +52,40 @@ const sources = new Map([
   ['chassis',compile('../supabase/functions/_shared/batChassis.ts')],
   ['handler',compile('../supabase/functions/batch-extract-snapshots/index.ts')],
   ['batSaleQueue',compile('../supabase/functions/batch-extract-snapshots/batSaleQueue.ts')],
+  ['aiGate',compile('../supabase/functions/batch-extract-snapshots/aiGate.ts')],
+  ['queueRows',compile('../supabase/functions/batch-extract-snapshots/queueRows.ts')],
+  ['writeRules',compile('../supabase/functions/batch-extract-snapshots/writeRules.ts')],
+  ['snapshotCompare',compile('../supabase/functions/batch-extract-snapshots/snapshotCompare.ts')],
   ['intake',compile('../supabase/functions/ingest-observation/index.ts')],
+  ['historicalAsks',compile('../supabase/functions/ingest-observation/historicalAsks.ts')],
+  ['historicalAskIntake',compile('../supabase/functions/ingest-observation/historicalAskIntake.ts')],
   ['liveIntake',compile('../supabase/functions/ingest-observation/batLive.ts')],
   ['liveEvents',compile('../supabase/functions/_shared/batLiveEvents.ts')],
   ['auctionRecord',compile('../supabase/functions/_shared/batAuctionRecord.ts')],
   ['property',compile('../supabase/functions/ingest-observation/imageProperties.ts')],
   ['retainedInterior',compile('../supabase/functions/ingest-observation/retainedInterior.ts')],
+  ['retainedCraigslistOdometer',compile('../supabase/functions/ingest-observation/retainedCraigslistOdometer.ts')],
+  ['retainedCraigslistCapture',compile('../supabase/functions/ingest-observation/retainedCraigslistCapture.ts')],
+  ['retainedCraigslistYear',compile('../supabase/functions/ingest-observation/retainedCraigslistYear.ts')],
+  ['retainedDescriptionYear',compile('../supabase/functions/ingest-observation/retainedDescriptionYear.ts')],
+  ['retainedDescriptionIdentity',compile('../supabase/functions/ingest-observation/retainedDescriptionIdentity.ts')],
+  ['retainedPowertrain',compile('../supabase/functions/ingest-observation/retainedPowertrain.ts')],
+  ['retainedDescriptionPowertrain',compile('../supabase/functions/ingest-observation/retainedDescriptionPowertrain.ts')],
+  ['retainedReportedWork',compile('../supabase/functions/ingest-observation/retainedReportedWork.ts')],
+  ['retainedOdometer',compile('../supabase/functions/ingest-observation/retainedOdometer.ts')],
+  ['retainedListingIdentity',compile('../supabase/functions/ingest-observation/retainedListingIdentity.ts')],
+  ['retainedDescriptionPresentation',compile('../supabase/functions/ingest-observation/retainedDescriptionPresentation.ts')],
   ['retainedIdentity',compile('../supabase/functions/ingest-observation/retainedIdentity.ts')],
   ['retainedVin',compile('../supabase/functions/ingest-observation/retainedVinReference.ts')],
   ['retainedVinBatch',compile('../supabase/functions/ingest-observation/retainedVinBatch.ts')],
   ['retainedListingDrain',compile('../supabase/functions/ingest-observation/retainedListingDrain.ts')],
+  ['titleFacets',compile('../supabase/functions/ingest-observation/titleFacets.ts')],
+  ['vehicleFacets',compile('../supabase/functions/_shared/vehicleFacets.ts')],
   ['hash',compile('../supabase/functions/_shared/observationContentHash.ts')],
   ['proxy',compile('../supabase/functions/ingest-observation-batch/index.ts')],
   ['cached',compile('../supabase/functions/ingest-observation-batch/cachedProperties.ts')],
   ['guard',compile('../supabase/functions/_shared/writeGuard.ts')],
+  ['keys',compile('../supabase/functions/_shared/supabaseKeys.ts')],
 ]);
 
 function fixture(options = {}) {
@@ -199,7 +228,7 @@ function fixture(options = {}) {
   const supabase=createClient('https://fixture.invalid','svc-test',{global:{fetch:http},auth:{persistSession:false,autoRefreshToken:false}});
   const modules=new Map();
   const handlers=new Map();
-  const env={SUPABASE_URL:'https://fixture.invalid',SUPABASE_SERVICE_ROLE_KEY:'svc-test',SUPABASE_JWT_SECRET:'test-jwt'};
+  const env={SUPABASE_URL:'https://fixture.invalid',SUPABASE_SERVICE_ROLE_KEY:'svc-test',SUPABASE_JWKS:userJwks};
   function load(name) {
     if(modules.has(name))return modules.get(name);
     const exports={};modules.set(name,exports);
@@ -221,7 +250,12 @@ function fixture(options = {}) {
         if(specifier==='../_shared/batLiveEvents.ts')return load('liveEvents');
         if(specifier==='./batAuctionRecord.ts')return load('auctionRecord');
         if(specifier==='../_shared/writeGuard.ts')return load('guard');
+        if(specifier==='./supabaseKeys.ts'||specifier==='../_shared/supabaseKeys.ts')return load('keys');
         if(specifier==='./batSaleQueue.ts')return load('batSaleQueue');
+        if(specifier==='./aiGate.ts')return load('aiGate');
+        if(specifier==='./queueRows.ts')return load('queueRows');
+        if(specifier==='./writeRules.ts')return load('writeRules');
+        if(specifier==='./snapshotCompare.ts')return load('snapshotCompare');
         if(specifier==='../batch-extract-snapshots/batSaleQueue.ts')return load('batSaleQueue');
         if(specifier==='./apiKeyAuth.ts')return {hashApiKey:()=>assert.fail('No API-key route')};
         if(specifier==='../_shared/agentTiers.ts')return {callTier:()=>assert.fail('No paid inference'),parseJsonResponse:()=>assert.fail('No inference')};
@@ -230,15 +264,32 @@ function fixture(options = {}) {
         if(specifier==='../_shared/rateLimit.ts')return {checkRateLimit:()=>assert.fail('No anonymous intake'),getClientIp:()=>assert.fail('No anonymous intake')};
         if(specifier==='./imageProperties.ts')return load('property');
         if(specifier==='./retainedInterior.ts')return load('retainedInterior');
+        if(specifier==='./retainedCraigslistOdometer.ts')return load('retainedCraigslistOdometer');
+        if(specifier==='./retainedCraigslistCapture.ts')return load('retainedCraigslistCapture');
+        if(specifier==='./retainedCraigslistYear.ts')return load('retainedCraigslistYear');
+        if(specifier==='./retainedDescriptionYear.ts')return load('retainedDescriptionYear');
+        if(specifier==='./retainedDescriptionIdentity.ts')return load('retainedDescriptionIdentity');
+        if(specifier==='./retainedPowertrain.ts')return load('retainedPowertrain');
+        if(specifier==='./retainedDescriptionPowertrain.ts')return load('retainedDescriptionPowertrain');
+        if(specifier==='./retainedReportedWork.ts')return load('retainedReportedWork');
+        if(specifier==='./retainedOdometer.ts')return load('retainedOdometer');
+        if(specifier==='./retainedListingIdentity.ts')return load('retainedListingIdentity');
+        if(specifier==='./retainedDescriptionPresentation.ts')return load('retainedDescriptionPresentation');
         if(specifier==='./retainedVinReference.ts')return load('retainedVin');
         if(specifier==='./retainedVinBatch.ts')return load('retainedVinBatch');
         if(specifier==='./retainedListingDrain.ts')return load('retainedListingDrain');
+        if(specifier==='./titleFacets.ts')return load('titleFacets');
+        if(specifier==='../_shared/vehicleFacets.ts')return load('vehicleFacets');
         if(specifier==='./retainedIdentity.ts')return load('retainedIdentity');
+        if(specifier==='./historicalAsks.ts')return load('historicalAsks');
+        if(specifier==='./historicalAskIntake.ts')return load('historicalAskIntake');
         if(specifier==='../_shared/batAuctionRecord.ts')return load('auctionRecord');
         if(specifier==='../_shared/observationContentHash.ts')return load('hash');
         if(specifier==='../ingest-observation/imageProperties.ts')return load('property');
         if(specifier==='./cachedProperties.ts')return load('cached');
         if(specifier==='../_shared/cors.ts')return {corsHeaders:{'Access-Control-Allow-Origin':'*'}};
+        if(specifier==='../_shared/writeResult.ts')return {mustWrite:(_label,result)=>result,softWrite:()=>null};
+        if(specifier==='../_shared/identityMatch.ts')return {identityConflict:()=>null};
         assert.fail(`Unexpected import ${specifier}`);
       }});
     return exports;
@@ -366,9 +417,7 @@ test('canonical service preview defaults to no writes or inference and ignores f
 });
 test('anonymous and signed-in user cannot become protected qualification writers',async()=>{
   const noAuth=fixture();assert.equal((await noAuth.run({},null)).status,401);assert.equal(noAuth.requests.length,0);
-  const header=Buffer.from(JSON.stringify({alg:'HS256',typ:'JWT'})).toString('base64url');
-  const payload=Buffer.from(JSON.stringify({role:'authenticated',sub:vehicleId,exp:4102444800})).toString('base64url');
-  const signing=`${header}.${payload}`,token=signing+'.'+createHmac('sha256','test-jwt').update(signing).digest('base64url');
+  const token=userToken();
   const user=fixture();assert.equal((await user.run({},token)).status,403);assert.equal(user.requests.length,0);
 });
 test('qualification source disagreement, private parents and invalid batch boundary do not mutate',async()=>{
@@ -440,9 +489,7 @@ test('canonical intake derives preview from raw source and refuses generic prote
 });
 test('canonical protected mode refuses anonymous and signed-in callers before reading source evidence',async()=>{
   const anon=fixture();assert.equal((await anon.intake({},null)).status,401);assert.equal(anon.requests.length,0);
-  const header=Buffer.from(JSON.stringify({alg:'HS256',typ:'JWT'})).toString('base64url');
-  const payload=Buffer.from(JSON.stringify({role:'authenticated',sub:vehicleId,exp:4102444800})).toString('base64url');
-  const signing=`${header}.${payload}`,token=signing+'.'+createHmac('sha256','test-jwt').update(signing).digest('base64url');
+  const token=userToken();
   const user=fixture();assert.equal((await user.intake({},token)).status,403);assert.equal(user.requests.length,0);
 });
 test('canonical intake holds corrupt raw, incompatible current facts and unknown outcomes without writing',async()=>{
@@ -481,9 +528,7 @@ test('actual current v1 protected intake refuses an unestablished caller episode
   assert(!f.requests.some(q=>q.path.endsWith('/vehicle_observations')&&q.method==='POST'));
 });
 test('generic batch cannot elevate a signed-in or service caller into protected mode',async()=>{
-  const header=Buffer.from(JSON.stringify({alg:'HS256',typ:'JWT'})).toString('base64url');
-  const payload=Buffer.from(JSON.stringify({role:'authenticated',sub:vehicleId,exp:4102444800})).toString('base64url');
-  const signing=`${header}.${payload}`,user=signing+'.'+createHmac('sha256','test-jwt').update(signing).digest('base64url');
+  const user=userToken();
   for(const token of ['svc-test',user]){
     const f=fixture(),r=await f.proxy({observations:[{mode:'source_sale_qualification',vehicle_id:vehicleId,dry_run:false}]},token);
     assert.equal(r.status,403);assert.equal(f.requests.length,0);assert.equal(f.writes.length,0);
@@ -657,9 +702,7 @@ test('canonical sale queue refuses mixed/raw/paid/held/unbounded requests before
  }
 });
 test('canonical sale queue remains service-only and reports failed persisted completion honestly',async()=>{
- const header=Buffer.from(JSON.stringify({alg:'HS256',typ:'JWT'})).toString('base64url');
- const payload=Buffer.from(JSON.stringify({role:'authenticated',sub:vehicleId,exp:4102444800})).toString('base64url');
- const signing=`${header}.${payload}`,token=signing+'.'+createHmac('sha256','test-jwt').update(signing).digest('base64url');
+ const token=userToken();
  for(const actor of ['',token]){
   const f=fixture({sourceQueue:true});const r=await f.intake(canonicalQueueBody,actor);
   assert([401,403].includes(r.status));assert.equal(f.requests.length,0);
@@ -715,9 +758,7 @@ test('source queue refuses previews, mixed selectors, paid flags and held episod
  }
 });
 test('source queue remains service-only before claim or raw access',async()=>{
- const header=Buffer.from(JSON.stringify({alg:'HS256',typ:'JWT'})).toString('base64url');
- const payload=Buffer.from(JSON.stringify({role:'authenticated',sub:vehicleId,exp:4102444800})).toString('base64url');
- const signing=`${header}.${payload}`,token=signing+'.'+createHmac('sha256','test-jwt').update(signing).digest('base64url');
+ const token=userToken();
  for(const actor of ['',token]){
   const f=fixture({sourceQueue:true});const r=await f.run(queueBody,actor);
   assert([401,403].includes(r.status));assert.equal(f.requests.length,0);assert.equal(f.writes.length,0);

@@ -138,6 +138,8 @@ author. Missing, held and ambiguous originals remain unlinked.
 
 **Freeport** — Tax-free storage facilities (Geneva, Luxembourg, Singapore, Delaware). Assets enter and disappear from public record. A freeport period in a provenance chain is a black zone.
 
+**Family price index** — What a model family's price did for the same cars, not what its median did. `family_price_index` holds, per family and calendar month or quarter, the price of one reference car with its 95% range, the sales in the period and their plain median; `family_price_change` holds the 12-month change (last 365 days against the 365 before) with its range, a verdict (up, down, flat, too few to tell), the repeat-sale check and the segment chips. Fitted nightly by `scripts/market/family-price-index.py` (method `hedonic_v1`: log price on period dummies plus variant, gearbox, miles, model year, title flags and venue), written by `record_family_price_index()`, read by `family_price_index_read()`. A family under 30 sales in either year or 150 since 2016 is not fitted. The family's median moves when the mix of what sold moves; this does not.
+
 ## G
 
 **Ghost Text** — Rotating placeholder text in the command input that cycles through input type examples: "Search vehicles...", "Paste a URL...", "Drop an image...", "Ask anything...". Ghost text solves the discoverability problem of polymorphic inputs — the user learns what the input accepts by reading the examples. Each rotation teaches one capability. Styled in `--text-disabled`, animated with subtle fade (4s cycle), disappears on focus.
@@ -181,6 +183,8 @@ author. Missing, held and ambiguous originals remain unlinked.
 ## J
 
 **Jewel** — A low-frequency, high-importance concept from the prompt analysis. Features that appear in few prompts but are architecturally critical: YONO, Photo Sync, Condition Scoring, Autonomous Loop, Nuke Estimate, Observation System, Developer API, Labor Estimation. See JEWELS.md.
+
+**Job path stage state** — For one work order and one stage (intake, inspection, plan, terms, execution, completion, accounting): `recorded`, `partial`, `status_only` or `absent`, from existing owner records and clocks. Presence of evidence, not verified truth; status/clock/record disagreements are listed as inconsistencies. See [Work Order Intelligence](../../technical/work-order-intelligence.md).
 
 ## K
 
@@ -248,6 +252,8 @@ can supersede it without editing the original or guessing from model/year.
 
 ## P
 
+**Partition (market)** — Mutually exclusive groups of one declared population under one attribute. Every member belongs to one group, including an unknown/conflicting group where needed; group counts and dollars reconcile to that population. Changing grouping rearranges membership without changing filters or units. A configuration partition of current records does not establish the configuration of those assets at a historical sale.
+
 **Palimpsest** — A manuscript that has been written on, scraped off, and rewritten, with earlier layers still partially visible. In Nuke, the palimpsest model describes how a user's expertise evolves over time: each era (e.g., 5 years of Porsche, then a switch to trucks) is a layer that remains visible in their writing style even after the topical shift. Style is permanent; topic is temporal. The palimpsest is one of 7 novel ontological contributions identified in the applied ontology research.
 
 **Permanent Interface** — An interface element that solves a problem which hasn't changed and won't change. The scroll bar (content exceeds container), the menu bar (applications have actions), the address bar (users need location awareness), the search box (information exceeds browsability). The test: remove the element; if the user is stuck within seconds, it's permanent. If they adjust within minutes, it was trend. The header is permanent because its function (identity + command + session) hasn't changed. See Contemplation: The Permanent Interface.
@@ -280,9 +286,19 @@ can supersede it without editing the original or guessing from model/year.
 
 ## R
 
+**Resource image sighting** — One retained tool/component array member in a canonical image observation, identified by source observation and JSON pointer. Several sightings may describe the same physical object; an equipment association is separately qualified. Presence, use, ownership, purchase cost, market value and contribution to labor are different claims. See [Work Order Intelligence](../../technical/work-order-intelligence.md).
+
+**Resource performer candidate** — A canonical `actors` reference proposed for a skill or inspection requirement. The contracting supplier can be unknown; an actor label does not establish account identity, qualification, consent or completion. A retained-operation basis includes an exact row snapshot and is withheld from current reads after that operation changes. See [Work Order Intelligence](../../technical/work-order-intelligence.md).
+
+**Resource requirement basis** — The original retained work-record observation and exact excerpt supporting an interpreted need for a work-order operation. The interpretation keeps the original observation clock and its own extraction method and confidence. A quoted need does not establish quantity, provider competence, permission or reservation. Withdrawing or reattributing the basis excludes its dependent current resource graph; original records remain. See [Work Order Intelligence](../../technical/work-order-intelligence.md).
+
+**Resource specification** — One attributed material/process pair for a work order at one stage: requested, proposed (quoted part), supplied (part recorded installed) or reported_performed (recorded operation). Labels are verbatim from the basis record; dotted keys are the interpretation, and materials are compared only within the same role (workpiece, filler, consumable). Disagreement between stages is reported as conflicting evidence, not as an approved substitution, a qualification finding or completion. See [Work Order Intelligence](../../technical/work-order-intelligence.md).
+
 **Rhizome** — Deleuzian concept. A network with no center, no hierarchy, no beginning or end. Nuke's architecture is rhizomatic — every concept connects to every other. The observation system is the purest expression. See RHIZOME.md.
 
 **Resolution** — See Entity Resolution.
+
+**Reference car** — The one car a family price index prices: the last 12 months' mix of variants, gearbox, miles, model years and venues. `family_price_index.index_usd` is its price in each period; `family_price_change.ref_car` describes it (sales, median year and miles, manual share, venues, top variants).
 
 **Savant Janitor** — One of three user modes (not personas — modes). The Savant Janitor has 400 photos on their phone, receipts in the glovebox, and doesn't want to organize anything. They want to dump everything into the system and have it sort itself. Their need is a drain — an endpoint that accepts everything and classifies it. The Coaching Flow serves Savant Janitors by telling them exactly what to do next without requiring them to understand the system's structure. See Contemplation: The Three Users and the Finder.
 
@@ -376,6 +392,14 @@ The vocabulary is Nuke-specific, but every underlying concept descends from a we
 - **Source Trust / Trust Weight** → reliability-weighted evidence combination at the heart of record linkage. [fellegi-sunter-1969]
 - **Half-Life / trust decay** → the accuracy/currency dimension of provenance: a datum's value depends on how and when it was derived. [buneman-2001-why-where-provenance]
 - **Dimensional Shadow / Digital Twin (five fixed perspectives)** → separation of facts (measures) from dimensions, i.e. Kimball star-schema dimensional modeling. [kimball-2013-dw-toolkit]
+
+### Publisher engine-family label (implementation prepared 2026-10-11)
+
+`engine_family_label` is the literal label in a publisher's direct statement about the engine powering
+the subject. It is distinct from the existing casting/serial-derived `engine_code`. A derived label
+retains its exact quote, source observation, capture fingerprint, capture/recording clocks and
+`engine_identity_status=unverified`; factory/current configuration and event time remain unknown.
+The existing property proposal governs ratification. An intake implementation does not itself approve it.
 
 ### Bibliography
 

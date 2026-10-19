@@ -383,10 +383,11 @@ export default function ApiLanding() {
 
       {/* ---- Hero ---- */}
       <div style={s.hero}>
-        <div style={s.heroTitle}>Your raw data in.<br />Structured vehicle intelligence out.</div>
+        <div style={s.heroTitle}>The ledger, by API.</div>
         <div style={s.heroSub}>
-          Send a photo, a listing URL, a text description — whatever you have.
-          No VIN required. We figure out the vehicle, the value, and the market.
+          Send a photo, a listing URL or a description. What comes back is what the ledger holds and what it
+          computed from it: every observation with its source, its clocks and its trust, and every number with
+          the evidence and the coverage behind it. No VIN required.
         </div>
         <Code>{`import Nuke from '@nuke1/sdk';
 const nuke = new Nuke('nk_live_...');
@@ -418,12 +419,13 @@ const results = await nuke.search.query('air-cooled porsche under 100k');
       <div style={s.section}>
         <div style={s.label}>VISION</div>
         <div style={{ fontWeight: 'bold', marginBottom: 'var(--space-2)' }}>
-          Send a photo. Know the car.
+          A photo is an observation.
         </div>
         <div style={s.prose}>
-          Our model identifies the vehicle from the image alone — year, make, model,
-          condition, which part of the car you're looking at, and any visible damage.
-          Trained on our own data. Works on a phone photo from a parking lot.
+          The vision endpoint reads year, make, model, the view and the visible condition from an image, and
+          returns each as an attributed observation with its confidence. The model is a sensor, not a source: its
+          output lands as a row with provenance, next to the listing text and the bids. A phone photo from a
+          parking lot is enough to start.
         </div>
         <Code>{`const analysis = await nuke.vision.analyze({
   image_url: 'https://photos.example.com/img_4892.jpg'
@@ -457,10 +459,9 @@ const results = await nuke.search.query('air-cooled porsche under 100k');
           Every value shows its work.
         </div>
         <div style={s.prose}>
-          We don't return a number and ask you to trust it. Every valuation comes with
-          the comparable sales it's based on, which sources they came from, and a
-          confidence score. Multiple independent sources confirm the same value —
-          confidence goes up. Your users see why a car is worth what it's worth.
+          A valuation returns the comparable sales it rests on, the source of each, and its coverage: how many
+          lots, over which window. No number arrives without them, and the live model's error is graded in
+          public on the <Link to="/about">about page</Link>, by lot, with its date.
         </div>
         <Code>{`const val = await nuke.valuations.get({
   make: 'Porsche', model: '911', year: 1973

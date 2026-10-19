@@ -7,15 +7,20 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
  *
  * Sources:
  *   - BaT: Scrapes auctionsCurrentInitialData from /auctions/ page (no API key needed)
- *   - Collecting Cars: Uses Typesense API (public API key)
+ *   - Collecting Cars: the site's public Typesense listing collection (production_listings)
+ *   - PCarMarket: its server-rendered live auction board (direct fetch); bids of lots that moved from the lot page
+ *   - Bonhams: its public Typesense lot index, open Cars sales
  *   - Cars & Bids: Uses Firecrawl (Cloudflare protected)
- *   - PCarMarket, Mecum, Barrett-Jackson, RM Sotheby's, Gooding, Bonhams: Firecrawl scrape + extract
+ *   - Mecum, Barrett-Jackson, RM Sotheby's, Gooding: Firecrawl scrape + extract
+ * Collecting Cars, PCarMarket and Bonhams boards are complete lists: after the vehicles upsert each is handed to
+ * live_auction_board_sync, the monitored_auctions schedule writer for those houses (BaT's is bat_live_pull_run).
  *
  * Deploy: supabase functions deploy sync-live-auctions --no-verify-jwt
  *
  * Usage:
  *   POST {"action": "sync"}                      - sync all platforms
  *   POST {"action": "sync", "platform": "bat"}   - sync specific platform (bat, cc, cab, pcarmarket, mecum, barrett-jackson, rm-sothebys, gooding, bonhams)
+ *   POST {"action": "sync", "platforms": ["collecting-cars", "pcarmarket", "bonhams"]} - sync several
  *   POST {"action": "status"}                    - get current live auction stats
  */
 
@@ -24,6 +29,9 @@ import { firecrawlScrape } from "../_shared/firecrawl.ts";
 import { archiveFetch } from "../_shared/archiveFetch.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { parseBatIdentityFromUrl, parseBatIdentityFromTitle } from "../_shared/batParser.ts";
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { mustWrite } from '../_shared/writeResult.ts';
+import { type BonhamsLotDoc, bonhamsLot, type PcarBoardItem, parsePcarBids, parsePcarBoard } from "./boards.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -55,6 +63,7 @@ interface LiveAuction {
   model: string | null;
   thumbnail_url: string | null;
   external_id: string | null;
+  currency?: string | null;
   raw_data: Record<string, unknown>;
 }
 
@@ -65,6 +74,9 @@ interface SyncResult {
   new_count: number;
   updated_count: number;
   ended_count: number;
+  write_errors?: string[];
+  board?: Record<string, unknown> | null;
+  bid_snapshots?: number;
   error: string | null;
   duration_ms: number;
 }
@@ -180,7 +192,10 @@ async function syncBaT(): Promise<{ auctions: LiveAuction[]; error: string | nul
 // Collecting Cars Sync (Typesense API)
 // ============================================
 
-const TYPESENSE_API_KEY = "pHuIUBo3XGxHk9Ll9g4q71qXbTYAM2w1";
+// The site's public search-only key and collection (collecting-cars-discovery reads the same). The old collection
+// "production_cars" was retired upstream: it answered 404 "Collection not found" from 2026-02 until this change.
+const TYPESENSE_API_KEY = "0I2WvLvRUeeHNaDV74u0KRlkLnhhgH9S";
+const TYPESENSE_COLLECTION = "production_listings";
 const TYPESENSE_ENDPOINT = "https://dora.production.collecting.com/multi_search";
 
 interface TypesenseDocument {
@@ -199,7 +214,7 @@ interface TypesenseDocument {
   countryCode?: string;
   regionCode?: string;
   currencyCode?: string;
-  noReserve?: string;
+  noReserve?: string | boolean;
   reserveMet?: boolean;
   mainImageUrl?: string;
   features?: {
@@ -222,19 +237,19 @@ async function syncCollectingCars(): Promise<{ auctions: LiveAuction[]; error: s
     let page = 1;
 
     while (page <= CC_MAX_PAGES) {
-      const response = await fetch(`${TYPESENSE_ENDPOINT}?x-typesense-api-key=${TYPESENSE_API_KEY}`, {
+      const response = await fetch(`${TYPESENSE_ENDPOINT}?x-typesense-api-key=${TYPESENSE_API_KEY}`, { // guardrail-allow: raw-fetch (house JSON API)
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
           searches: [{
-            collection: "production_cars",
+            collection: TYPESENSE_COLLECTION,
             q: "*",
-            filter_by: "listingStage:live",
+            filter_by: "stage:=live && lotType:=car",
             per_page: CC_PAGE_SIZE,
             page,
-            query_by: "title,productMake,vehicleMake,productYear",
+            query_by: "title",
           }],
         }),
       });
@@ -244,6 +259,9 @@ async function syncCollectingCars(): Promise<{ auctions: LiveAuction[]; error: s
       }
 
       const data = await response.json();
+      if (data.results?.[0]?.error) {
+        return { auctions: [], error: `Collecting Cars Typesense: ${data.results[0].error}` };
+      }
       const hits = data.results?.[0]?.hits ?? [];
       const pageDocs = hits.map((hit: { document: TypesenseDocument }) => hit.document);
       documents.push(...pageDocs);
@@ -258,15 +276,18 @@ async function syncCollectingCars(): Promise<{ auctions: LiveAuction[]; error: s
       .filter(doc => doc.lotType === "car") // Only cars, not plates/parts/bikes
       .map(doc => {
         const year = doc.productYear ? parseInt(doc.productYear, 10) : (doc.features?.modelYear ? parseInt(doc.features.modelYear, 10) : null);
+        // dtStageEndsUTC is "YYYY-MM-DD HH:MM:SS" in UTC with no zone mark
+        const ends = doc.dtStageEndsUTC ? new Date(`${doc.dtStageEndsUTC.replace(" ", "T")}Z`) : null;
 
         return {
           url: `https://collectingcars.com/for-sale/${doc.slug}`,
           title: doc.title,
           platform: "collecting-cars",
-          auction_end_date: doc.dtStageEndsUTC ? new Date(doc.dtStageEndsUTC).toISOString() : new Date().toISOString(),
-          current_bid: doc.currentBid,
+          auction_end_date: ends && Number.isFinite(ends.getTime()) ? ends.toISOString() : "",
+          current_bid: doc.currentBid > 0 ? doc.currentBid : null,
           bid_count: doc.noBids,
-          no_reserve: doc.noReserve === "true",
+          currency: doc.currencyCode ?? null,
+          no_reserve: doc.noReserve === true || doc.noReserve === "true",
           reserve_met: doc.reserveMet ?? null,
           year,
           make: doc.makeName || null,
@@ -274,7 +295,7 @@ async function syncCollectingCars(): Promise<{ auctions: LiveAuction[]; error: s
           thumbnail_url: doc.mainImageUrl || null,
           external_id: String(doc.auctionId),
           raw_data: {
-            source: "typesense_api",
+            source: "typesense_production_listings",
             slug: doc.slug,
             auction_id: doc.auctionId,
             location: doc.location,
@@ -415,16 +436,118 @@ async function syncViaFirecrawlExtract(
 }
 
 // ============================================
-// PCarMarket Sync (Firecrawl)
+// PCarMarket Sync (server-rendered live board, direct fetch)
 // ============================================
 
+const PCAR_MAX_PAGES = 8;
+
+/** Year / make / model from a lot slug (descriptor-safe, multi-word makes) and its title, as for BaT. */
+function identityFromSlugAndTitle(slug: string, title: string) {
+  const ident = parseBatIdentityFromUrl(`https://x.invalid/listing/${slug.replace(/-\d{10,}$/, "")}`);
+  const fromTitle = parseBatIdentityFromTitle(title, ident.make);
+  return {
+    year: ident.year ?? fromTitle.year,
+    make: ident.make ?? fromTitle.make,
+    model: (ident.make && fromTitle.model) ? fromTitle.model : (ident.model ?? fromTitle.model),
+  };
+}
+
 async function syncPCarMarket(): Promise<{ auctions: LiveAuction[]; error: string | null }> {
-  return syncViaFirecrawlExtract(
-    "pcarmarket",
-    "https://www.pcarmarket.com/listings/",
-    /pcarmarket\.com\/auction\//i,
-    { waitFor: 5000 }
-  );
+  try {
+    const items: PcarBoardItem[] = [];
+    let pages = 1;
+    for (let page = 1; page <= Math.min(pages, PCAR_MAX_PAGES); page++) {
+      // /auctions is the live board; ?page=1 and the old ?auctionType=live redirect, which the direct fetcher refuses
+      const { html, error } = await archiveFetch(page === 1 ? "https://www.pcarmarket.com/auctions" : `https://www.pcarmarket.com/auctions?page=${page}`, {
+        platform: "pcarmarket",
+        skipCache: true,
+        useFirecrawl: false, // the board is server-rendered; archiveFetch would otherwise route pcarmarket.com to Firecrawl
+        callerName: "sync-live-auctions",
+      });
+      if (error || !html) return { auctions: [], error: `PCarMarket board page ${page}: ${error ?? "no HTML"}` };
+      const board = parsePcarBoard(html);
+      if (page === 1 && board.items.length === 0) return { auctions: [], error: "PCarMarket board: no items parsed" };
+      items.push(...board.items);
+      pages = board.totalPages ?? 1;
+    }
+    console.log(`[sync-live-auctions] PCarMarket: ${items.length} open items on ${pages} board pages`);
+    const auctions: LiveAuction[] = items
+      .filter((it) => it.status === "ITEM_OPEN" && it.schema === "Vehicle")
+      .map((it) => {
+        const ident = identityFromSlugAndTitle(it.slug, it.title);
+        return {
+          url: it.url,
+          title: it.title,
+          platform: "pcarmarket",
+          auction_end_date: it.ends ?? "",
+          current_bid: it.current_bid,
+          bid_count: it.bid_count,
+          currency: it.currency,
+          no_reserve: false,
+          reserve_met: null,
+          year: ident.year,
+          make: ident.make,
+          model: ident.model,
+          thumbnail_url: null,
+          external_id: it.slug,
+          raw_data: { source: "pcarmarket_live_board", basta_item_id: it.id, image_count: it.image_count, synced_at: new Date().toISOString() },
+        };
+      });
+    return { auctions, error: null };
+  } catch (e: unknown) {
+    return { auctions: [], error: `PCarMarket sync failed: ${e instanceof Error ? e.message : String(e)}` };
+  }
+}
+
+/**
+ * Bids of PCarMarket lots whose bid count moved, from the lot page's own bid history (Basta id, time, amount,
+ * bidder), admitted through ingest-observation as kind 'bid' with observed_at = the bid's own time. A bid already
+ * held for the vehicle is not posted again.
+ */
+async function ingestPcarBids(
+  supabase: ReturnType<typeof createClient>,
+  moved: { url: string; vehicle_id: string | null }[],
+  maxLots: number,
+): Promise<{ lots: number; posted: number; errors: string[] }> {
+  const out = { lots: 0, posted: 0, errors: [] as string[] };
+  const base = Deno.env.get("SUPABASE_URL") ?? "";
+  const key = projectSecretKey() ?? "";
+  const linked = moved.flatMap((m) => (m.vehicle_id ? [{ url: m.url, vehicle_id: m.vehicle_id }] : []));
+  for (const lot of linked.slice(0, maxLots)) {
+    const { html, error } = await archiveFetch(lot.url.replace("https://pcarmarket.com/", "https://www.pcarmarket.com/"), {
+      platform: "pcarmarket", skipCache: true, useFirecrawl: false, callerName: "sync-live-auctions",
+    });
+    if (error || !html) { out.errors.push(`${lot.url}: ${error ?? "no HTML"}`); continue; }
+    out.lots++;
+    const bids = parsePcarBids(html);
+    if (!bids.length) continue;
+    const ids = bids.map((b) => `pcarmarket-bid:${b.id}`);
+    const { data: held } = await supabase.from("vehicle_observations").select("source_identifier")
+      .eq("vehicle_id", lot.vehicle_id).eq("kind", "bid").in("source_identifier", ids);
+    const have = new Set((held ?? []).map((r: { source_identifier: string }) => r.source_identifier));
+    for (const b of bids) {
+      const sid = `pcarmarket-bid:${b.id}`;
+      if (have.has(sid)) continue;
+      const res = await fetch(`${base}/functions/v1/ingest-observation`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          source_slug: "pcarmarket",
+          kind: "bid",
+          observed_at: b.at,
+          source_url: lot.url,
+          source_identifier: sid,
+          content_text: `Bid $${b.amount.toLocaleString("en-US")}`,
+          structured_data: { bid_id: b.id, amount: b.amount, currency: "USD", bidder: b.bidder, bid_status: b.status, clock: "source_event_time" },
+          vehicle_id: lot.vehicle_id,
+          extraction_method: "pcarmarket_ssr_bids_v1",
+        }),
+      });
+      if (res.ok) out.posted++;
+      else out.errors.push(`${sid}: HTTP ${res.status} ${(await res.text()).slice(0, 120)}`);
+    }
+  }
+  return out;
 }
 
 // ============================================
@@ -480,17 +603,66 @@ async function syncGooding(): Promise<{ auctions: LiveAuction[]; error: string |
 }
 
 // ============================================
-// Bonhams Motoring Sync (Firecrawl)
+// Bonhams Motoring Sync (public Typesense lot index, open Cars sales)
 // ============================================
 
+const BONHAMS_TS_HOST = "https://api01.bonhams.com/search-proxy/collections";
+const BONHAMS_TS_KEY = "7YZqOyG0twgst4ACc2VuCyZxpGAYzM0weFTLCC20FQY"; // the site's public search-only key (extract-bonhams-typesense)
+
 async function syncBonhams(): Promise<{ auctions: LiveAuction[]; error: string | null }> {
-  return syncViaFirecrawlExtract(
-    "bonhams",
-    "https://www.bonhams.com/departments/mot/",
-    /bonhams\.com\//i,
-    { waitFor: 4000 }
-  );
+  try {
+    const get = async (collection: string, params: Record<string, string>) => {
+      const res = await fetch(`${BONHAMS_TS_HOST}/${collection}/documents/search?${new URLSearchParams(params)}`, { // guardrail-allow: raw-fetch (house JSON API)
+        headers: { "X-TYPESENSE-API-KEY": BONHAMS_TS_KEY, Accept: "application/json" },
+      });
+      if (!res.ok) throw new Error(`Bonhams Typesense ${collection} HTTP ${res.status}`);
+      return await res.json();
+    };
+    const today = new Date().toISOString().slice(0, 10);
+    const a = await get("auctions", { q: "*", query_by: "brand", per_page: "60", filter_by: "departments.code:=MOT-CAR", sort_by: "dates.end.timestamp:desc" });
+    // deno-lint-ignore no-explicit-any
+    const sales = (a.hits ?? []).map((h: any) => h.document).filter((d: any) => !d.flags?.isAuctionEnded && String(d.dates?.end?.datetime ?? "").slice(0, 10) >= today);
+    const auctions: LiveAuction[] = [];
+    for (const sale of sales) {
+      for (let page = 1; page <= 4; page++) {
+        const r = await get("lots", { q: "*", query_by: "title", per_page: "250", page: String(page), filter_by: `auctionId:=${sale.id} && department.code:=MOT-CAR` });
+        // deno-lint-ignore no-explicit-any
+        for (const doc of (r.hits ?? []).map((h: any) => h.document as BonhamsLotDoc)) {
+          if (!doc.lotId || doc.lotId === "0") continue; // not yet catalogued: no lot number, no lot page
+          const lot = bonhamsLot(doc);
+          if (!lot.title || !lot.url.includes("/lot/")) continue;
+          const ident = parseBatIdentityFromTitle(lot.title.replace(/\s+(Chassis|Registration|Frame|Engine) no\..*$/i, ""), null);
+          auctions.push({
+            url: lot.url,
+            title: lot.title,
+            platform: "bonhams",
+            auction_end_date: lot.ends ?? "",
+            current_bid: lot.hammer,
+            bid_count: null,
+            currency: lot.currency,
+            no_reserve: false,
+            reserve_met: null,
+            year: ident.year,
+            make: ident.make,
+            model: ident.model,
+            thumbnail_url: null,
+            external_id: lot.external_id,
+            raw_data: { source: "bonhams_typesense_lots", sale_id: sale.id, sale_title: sale.auctionTitle ?? null, status: lot.status,
+                        estimate_low: lot.estimate_low, estimate_high: lot.estimate_high, synced_at: new Date().toISOString() },
+          });
+        }
+        if ((r.hits ?? []).length < 250) break;
+      }
+    }
+    console.log(`[sync-live-auctions] Bonhams: ${sales.length} open Cars sales, ${auctions.length} lots`);
+    return { auctions, error: null };
+  } catch (e: unknown) {
+    return { auctions: [], error: `Bonhams sync failed: ${e instanceof Error ? e.message : String(e)}` };
+  }
 }
+
+/** The houses whose open board is read complete and scheduled by live_auction_board_sync (slug per platform). */
+const BOARD_SOURCES: Record<string, string> = { "collecting-cars": "collecting-cars", pcarmarket: "pcarmarket", bonhams: "bonhams" };
 
 // ============================================
 // Cars & Bids Sync (Firecrawl)
@@ -607,8 +779,8 @@ async function syncToDatabase(
   supabase: ReturnType<typeof createClient>,
   auctions: LiveAuction[],
   platform: string
-): Promise<{ new_count: number; updated_count: number; ended_count: number }> {
-  const stats = { new_count: 0, updated_count: 0, ended_count: 0 };
+): Promise<{ new_count: number; updated_count: number; ended_count: number; write_errors: string[] }> {
+  const stats = { new_count: 0, updated_count: 0, ended_count: 0, write_errors: [] as string[] };
 
   if (auctions.length === 0) {
     return stats;
@@ -648,6 +820,7 @@ async function syncToDatabase(
         no_reserve: auction.no_reserve,
         reserve_met: auction.reserve_met,
         bid_count: auction.bid_count,
+        currency: auction.currency ?? null,
         thumbnail_url: auction.thumbnail_url,
         last_sync: now,
         ...auction.raw_data,
@@ -671,6 +844,7 @@ async function syncToDatabase(
         stats.new_count += typeof data === "number" ? data : chunk.length;
       } else {
         console.error(`[sync-live-auctions] upsert_live_auction_vehicles failed: ${error.message}`);
+        stats.write_errors.push(`upsert_live_auction_vehicles: ${error.message}`);
       }
     }
 
@@ -691,12 +865,15 @@ async function syncToDatabase(
   // Cars' feed are the complete live sets, so a row of this platform that is absent from them ends
   // here — sale_status/auction_status 'ended', no sale claim; settlement records the result. The RPC
   // ends nothing for a short (partial) list. Homepage-scraped platforms are not complete lists.
-  if (platform === "bringatrailer" || platform === "collecting-cars") {
+  if (platform === "bringatrailer" || platform === "collecting-cars" || platform === "pcarmarket") {
     const { data: ended, error: endErr } = await supabase.rpc("end_live_auctions_absent", {
       p_platform: platform,
       p_live_urls: auctions.map(a => a.url),
     });
-    if (endErr) console.error(`[sync-live-auctions] end_live_auctions_absent failed: ${endErr.message}`);
+    if (endErr) {
+      console.error(`[sync-live-auctions] end_live_auctions_absent failed: ${endErr.message}`);
+      stats.write_errors.push(`end_live_auctions_absent: ${endErr.message}`);
+    }
     else {
       stats.ended_count = Number(ended) || 0;
       if (stats.ended_count > 0) console.log(`[sync-live-auctions] ${platform}: ${stats.ended_count} live rows ended (absent from the live list)`);
@@ -789,10 +966,10 @@ async function updateSourceRegistry(
     updateData.last_successful_at = new Date().toISOString();
   }
 
-  await supabase
+  mustWrite('source_registry update', await supabase
     .from("source_registry")
     .update(updateData)
-    .eq("slug", slug);
+    .eq("slug", slug));
 }
 
 // ============================================
@@ -816,7 +993,7 @@ Deno.serve(async (req) => {
 
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL") ?? "",
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+    projectSecretKey() ?? "",
     { global: { headers: { "X-Nuke-Writer": "sync-live-auctions" } } },
   );
 
@@ -890,7 +1067,9 @@ Deno.serve(async (req) => {
         "gooding",
         "bonhams",
       ];
-      const platforms = targetPlatform ? [targetPlatform] : allPlatforms;
+      const platforms: string[] = Array.isArray(body.platforms) && body.platforms.length
+        ? body.platforms.map(String)
+        : targetPlatform ? [targetPlatform] : allPlatforms;
 
       const platformAliases: Record<string, string> = {
         bat: "bringatrailer",
@@ -981,7 +1160,7 @@ Deno.serve(async (req) => {
         if (normalizedPlatform === "bringatrailer" && !syncResult.error && syncResult.auctions.length > 0) {
           try {
             const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-            const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+            const serviceKey = projectSecretKey() ?? "";
             const endingSoon = syncResult.auctions.filter(a => {
               const hoursLeft = (new Date(a.auction_end_date).getTime() - Date.now()) / (1000 * 60 * 60);
               return hoursLeft > 0 && hoursLeft <= 6 && a.current_bid && a.current_bid > 0;
@@ -1003,18 +1182,47 @@ Deno.serve(async (req) => {
         }
 
         // Sync to database (skip during cron to avoid timeout — 355k+ active vehicles make this slow)
-        let dbStats = { new_count: 0, updated_count: 0, ended_count: 0 };
+        let dbStats = { new_count: 0, updated_count: 0, ended_count: 0, write_errors: [] as string[] };
         if (!skipVehicleSync && !syncResult.error) {
           dbStats = await syncToDatabase(supabase, syncResult.auctions, normalizedPlatform);
+        }
+
+        // Board-synced houses: the same complete board goes to the monitored_auctions schedule writer; lots whose bid
+        // count moved have their bids read with their own clocks where the house publishes them (PCarMarket).
+        let board: Record<string, unknown> | null = null;
+        const boardSlug = BOARD_SOURCES[normalizedPlatform];
+        if (boardSlug) {
+          const { data: bs, error: bsErr } = await supabase.rpc("live_auction_board_sync", syncResult.error
+            ? { p_slug: boardSlug, p_lots: [], p_complete: false, p_error: syncResult.error }
+            : {
+              p_slug: boardSlug,
+              p_lots: syncResult.auctions.map((a) => ({
+                url: a.url, external_id: a.external_id, ends: a.auction_end_date || null,
+                current_bid: a.current_bid, bid_count: a.bid_count, currency: a.currency ?? null,
+              })),
+              p_complete: true,
+            });
+          if (bsErr) dbStats.write_errors.push(`live_auction_board_sync: ${bsErr.message}`);
+          board = (bs as Record<string, unknown>) ?? null;
+          const moved = Array.isArray(board?.moved) ? board!.moved as { url: string; vehicle_id: string | null }[] : [];
+          if (normalizedPlatform === "pcarmarket" && moved.length && Date.now() - functionStartTime < 30_000) {
+            const bids = await ingestPcarBids(supabase, moved, 8);
+            board = { ...board, moved: moved.length, bid_reads: bids };
+            if (bids.errors.length) console.warn(`[sync-live-auctions] PCarMarket bid reads: ${bids.errors.slice(0, 3).join("; ")}`);
+          } else if (board) {
+            board = { ...board, moved: moved.length };
+          }
         }
 
         // Update source registry
         await updateSourceRegistry(supabase, normalizedPlatform, !syncResult.error);
 
         results.push({
+          board,
           platform: normalizedPlatform,
-          success: !syncResult.error,
+          success: !syncResult.error && dbStats.write_errors.length === 0,
           live_count: syncResult.auctions.length,
+          write_errors: dbStats.write_errors,
           new_count: dbStats.new_count,
           updated_count: dbStats.updated_count,
           ended_count: dbStats.ended_count,
@@ -1047,6 +1255,7 @@ Deno.serve(async (req) => {
       const totalUpdated = results.reduce((sum, r) => sum + r.updated_count, 0);
       const totalEnded = results.reduce((sum, r) => sum + r.ended_count, 0);
       const allSuccess = results.every(r => r.success);
+      const writeFailed = results.some(r => (r.write_errors?.length ?? 0) > 0);
 
       return okJson({
         success: allSuccess,
@@ -1058,7 +1267,7 @@ Deno.serve(async (req) => {
         },
         results,
         synced_at: new Date().toISOString(),
-      });
+      }, writeFailed ? 500 : 200);
     }
 
     return okJson({ error: "Invalid action. Use 'sync' or 'status'." }, 400);

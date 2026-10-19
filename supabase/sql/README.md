@@ -5,6 +5,16 @@ This directory standardizes how we store and run SQL outside of migrations.
 - supabase/migrations/: The authoritative schema history. Always use migrations for schema changes.
 - supabase/sql/helpers/: One-off admin operations, diagnostics, and utility functions. Run intentionally.
 - supabase/sql/seeds/: Seed datasets for development/testing only unless explicitly vetted.
+- supabase/sql/test_*.sql: Database contracts (below).
+
+## Database contracts
+
+Each `test_*.sql` runs alone, as `psql -X -v ON_ERROR_STOP=1 -f <file>` from the repo root, in an empty disposable
+PostgreSQL 17 database whose name starts with `dm_refinement_`. CI runs every one in the `db-contracts` job of
+`.github/workflows/frontend-tests.yml`, each in a fresh database, so a new contract needs only its file, not a job.
+A file that needs other setup runs in a job that names it, or is listed with its reason in
+`scripts/ci/db-contracts-skip.txt`. To run them locally on a throwaway server:
+`scripts/ci/run-db-contracts.sh [test_x.sql ...]`.
 
 ## Safety model
 

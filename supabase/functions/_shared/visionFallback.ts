@@ -1,6 +1,7 @@
-// Cloud vision fallback — BYOK-native. Used ONLY when the free YONO sidecar is unavailable.
+// Legacy cloud fallback remains BYOK. Customer subject resolution uses the
+// separate wallet-reserved platformVisionMultiJSON path below (owner, 2026-10-18).
 //
-// ECONOMICS (per Skylar, 2026-06-16): Nuke does NOT fund cloud inference. The caller brings the
+// LEGACY FALLBACK ECONOMICS (2026-06-16; not the customer subject-resolution path): the caller brings the
 // compute — their connected Claude / ChatGPT / Gemini subscription or key (stored in
 // `user_ai_providers`, resolved by getUserApiKey). They pay. Nuke owns the harness (YONO free
 // tier + the consensus engine); the caller owns the inference. The path is: YONO (free) → the
@@ -8,43 +9,56 @@
 // subscription" is a primary flow.
 //
 // The `system` env-key pool (Nuke's temporary bootstrap) is RETIRED (Skylar, 2026-09-28): every tier
-// in it had died — gemini-2.0-flash-lite 404 (model gone), claude-haiku-4-5 400, gpt-4o-mini 429 "no
+// in it had died — gemini-flash-lite-latest 404 (model gone), claude-haiku-4-5 400, gpt-4o-mini 429 "no
 // credits remaining", ~5,900 failed attempts each 2026-09-27 21:00–23:17Z, $0 billed, nothing analyzed.
-// getUserApiKey still falls back to env keys for other callers; this module takes only user keys.
+// getUserApiKey still falls back to env keys for other callers; resolveTiers takes only user keys.
 //
-// When neither YONO nor a user key is available, callers should surface
+// When neither YONO nor a user key is available, legacy fallback callers surface
 // "connect your AI subscription to enable analysis" rather than silently spending Nuke's money.
 
 import { callLLM, type LLMConfig } from "./llmProvider.ts";
 import { getUserApiKey } from "./getUserApiKey.ts";
+import { ProviderHTTPError, VisionProviderUnavailable, safeAnthropicUsage, type AnthropicTokenUsage, type CredentialKind, type ProviderDiagnostic } from "./providerDiagnostic.ts";
+import { reserveCredits, settleHold, estimateCents, usageToCents } from "./aiCredits.ts";
+import type { PlatformAnalysisBilling } from "./providerDiagnostic.ts";
 
 type Provider = "google" | "anthropic" | "openai";
 
 // Cheapest-first provider preference; each resolved BYOK-first via getUserApiKey.
 const PROVIDER_PREFS: Array<{ provider: Provider; model: string; env: string }> = [
-  { provider: "google", model: "gemini-2.0-flash-lite", env: "GOOGLE_AI_API_KEY" },
+  { provider: "google", model: "gemini-flash-lite-latest", env: "GOOGLE_AI_API_KEY" },
   { provider: "anthropic", model: "claude-haiku-4-5-20251001", env: "ANTHROPIC_API_KEY" },
   { provider: "openai", model: "gpt-4o-mini", env: "OPENAI_API_KEY" },
 ];
 
-interface ResolvedTier extends LLMConfig { keySource: "user" | "system"; }
+interface ResolvedTier extends LLMConfig { keySource: "user" | "system"; credentialKind?: CredentialKind; }
+interface VisionDependencies {
+  getKey?: typeof getUserApiKey;
+  call?: typeof callLLM;
+}
 
 // Resolve usable tiers for this caller: the caller's own connected providers (BYOK — caller pays),
 // cheapest first. Returns [] when the caller has none; callers then say "connect your AI subscription".
-async function resolveTiers(supabase: unknown, userId: string | null): Promise<ResolvedTier[]> {
+async function resolveTiers(supabase: unknown, userId: string | null, getKey = getUserApiKey) {
   const tiers: ResolvedTier[] = [];
+  const diagnostics: ProviderDiagnostic[] = [];
   for (const p of PROVIDER_PREFS) {
     try {
-      const r = await getUserApiKey(supabase, userId, p.provider, p.env);
+      const r = await getKey(supabase, userId, p.provider, p.env);
       // user keys only: the system pool is retired (header)
       if (r.apiKey && r.source === "user") {
-        tiers.push({ provider: p.provider, model: r.modelName || p.model, apiKey: r.apiKey, source: r.source, keySource: r.source });
+        tiers.push({ provider: p.provider, model: r.modelName || p.model, apiKey: r.apiKey, source: r.source, keySource: r.source,
+          credentialKind: r.credentialKind });
+      } else if (r.userKeyStatus === "lookup_failed") {
+        diagnostics.push({ code: "credential_lookup_failed", provider: p.provider, http_status: null, credential_kind: null });
+      } else {
+        diagnostics.push({ code: "no_connected_key", provider: p.provider, http_status: null, credential_kind: null });
       }
     } catch {
-      // provider unavailable for this caller; skip
+      diagnostics.push({ code: "credential_lookup_failed", provider: p.provider, http_status: null, credential_kind: null });
     }
   }
-  return tiers;
+  return { tiers, diagnostics };
 }
 
 async function toImagePart(imageUrl: string): Promise<{ type: "image_url"; image_url: { url: string } }> {
@@ -79,18 +93,110 @@ function parseJson(content: string): unknown | null {
   }
 }
 
-interface VisionResult { data: Record<string, unknown>; provider: string; model: string; keySource: "user" | "system"; ms: number; }
+interface VisionResult { data: Record<string, unknown>; provider: string; model: string; keySource: "user" | "system"; ms: number; usage: AnthropicTokenUsage | null; billing?: PlatformAnalysisBilling;
+  settleBilling?: (readingRetained: boolean) => Promise<PlatformAnalysisBilling>; }
 
-async function runTiers(tiers: ResolvedTier[], messages: unknown[], maxTokens: number): Promise<VisionResult | null> {
+/** Customer photo analysis uses Nuke's server key, never a customer's provider row.
+ * No automatic provider/model fallback may spend beyond this reservation.
+ * Image custody/permission is established by the existing subject service first.
+ */
+export async function platformVisionMultiJSON(
+  supabase: unknown, userId: string,
+  opts: { parts: Array<{ text: string } | { imageUrl: string }>; maxTokens: number },
+  deps: { call?: typeof callLLM; env?: (name: string) => string | undefined;
+    reserve?: typeof reserveCredits; settle?: typeof settleHold } = {},
+): Promise<VisionResult> {
+  const fail = (code: ProviderDiagnostic["code"], status: number | null = null): never => {
+    throw new VisionProviderUnavailable([{ code, provider: "anthropic", http_status: status, credential_kind: null }], "platform");
+  };
+  const images = opts.parts.filter((part): part is { imageUrl: string } => "imageUrl" in part);
+  const textBytes = opts.parts.reduce((sum, part) => sum + ("text" in part ? new TextEncoder().encode(part.text).length : 0), 0);
+  if (!userId || !Number.isSafeInteger(opts.maxTokens) || opts.maxTokens < 1 || opts.maxTokens > 4096 ||
+      images.length < 2 || images.length > 14 || opts.parts.length > 29 || textBytes > 8000 ||
+      images.some(part => !part.imageUrl.startsWith("data:image/jpeg;base64,"))) return fail("platform_unavailable");
+  const env = deps.env ?? (name => Deno.env.get(name));
+  const apiKey = env("NUKE_PHOTO_ANTHROPIC_API_KEY");
+  if (!apiKey) return fail("platform_not_configured");
+  const model = "claude-haiku-5-5";
+  const margin = Number(env("AI_CREDIT_MARGIN") ?? "1.2");
+  if (!Number.isFinite(margin) || margin < 1 || margin > 10) return fail("platform_unavailable");
+  // Each high-resolution image is capped at4,784 visual tokens. Pinned subject
+  // inputs plus bounded text fit below80k, retaining the <=100k pricing tier.
+  const inputCeiling = 80_000;
+  const reservation = estimateCents(model, inputCeiling, opts.maxTokens, margin);
+  const digest = async (value: string) => [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value)))]
+    .map(byte => byte.toString(16).padStart(2, "0")).join("");
+  const hashes = await Promise.all(images.map(image => digest(image.imageUrl)));
+  // A deliberately repaired output bound is a different request contract. The
+  // same images/settings remain deduplicated after an unreadable response.
+  const ref = "photo:v1:" + await digest(JSON.stringify({ model, output_tokens: opts.maxTokens, hashes: hashes.sort() }));
+  let hold: Awaited<ReturnType<typeof reserveCredits>>;
+  try { hold = await (deps.reserve ?? reserveCredits)(supabase, userId, reservation, ref, { model, source: "nuke_photo_analysis_v1" }); }
+  catch { return fail("platform_unavailable"); }
+  if (hold.status !== "reserved") return fail(hold.status === "insufficient_funds" ? "analysis_balance_required" : "analysis_pending");
+  const settle = deps.settle ?? settleHold;
+  let response: any;
+  try {
+    response = await (deps.call ?? callLLM)({ provider: "anthropic", model, apiKey, source: "system",
+      workspaceId: env("NUKE_PHOTO_ANTHROPIC_WORKSPACE_ID") },
+      [{ role: "user", content: opts.parts.map(part => "text" in part ? { type: "text", text: part.text }
+        : { type: "image_url", image_url: { url: part.imageUrl } }) }], { maxTokens: opts.maxTokens, vision: true });
+  } catch (error) {
+    const status = error instanceof ProviderHTTPError ? error.diagnostic.http_status : null;
+    // Transport/server ambiguity retains the reservation. Never free it then
+    // silently make another paid call whose first result may already exist.
+    if (status !== null && status >= 400 && status < 500) {
+      try { await settle(supabase, userId, hold.hold_id, 0, { provider_read: "not_started", http_status: status, model }); }
+      catch { return fail("analysis_pending"); }
+    }
+    return fail("platform_unavailable", status);
+  }
+  const usage = safeAnthropicUsage(response.usage);
+  if (usage) console.log("[platformVision] anthropic_token_usage", JSON.stringify(usage));
+  // A clipped response is not a complete interpretation, even if a JSON prefix
+  // happens to parse. Do not persist or charge it, and never retry inference here.
+  const outputLimitReached = response.finish_reason === "max_tokens";
+  const parsed = outputLimitReached ? null : parseJson(response.content || "");
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    try { await settle(supabase, userId, hold.hold_id, 0, { provider_read: "unreadable", model, usage,
+      output_limit_reached: outputLimitReached }); }
+    catch { return fail("analysis_pending"); }
+    return fail("platform_result_unreadable");
+  }
+  const billing: PlatformAnalysisBilling = { source: "nuke_wallet", status: "pending", hold_id: hold.hold_id, charged_cents: null };
+  // Settle only after protected storage acknowledges the complete interpretation.
+  // Storage/usage ambiguity keeps a reservation, never a second paid inference.
+  const settleBilling = async (readingRetained: boolean): Promise<PlatformAnalysisBilling> => {
+    if (!readingRetained || !usage || usage.input_tokens > inputCeiling || usage.output_tokens > opts.maxTokens ||
+        (usage.cache_creation_input_tokens ?? 0) !== 0 || (usage.cache_read_input_tokens ?? 0) !== 0) return billing;
+    const actual = usageToCents(model, usage, margin);
+    try { await settle(supabase, userId, hold.hold_id, actual, { provider_read: "completed", model, usage });
+      return { ...billing, status: "settled", charged_cents: actual }; }
+    catch { console.warn("[platformVision] settlement_pending"); return billing; }
+  };
+  return { data: parsed as Record<string, unknown>, provider: "anthropic", model, keySource: "system", ms: response.duration_ms ?? 0,
+    usage, billing, settleBilling };
+}
+
+async function runTiers(tiers: ResolvedTier[], messages: unknown[], maxTokens: number, diagnostics: ProviderDiagnostic[],
+  call = callLLM): Promise<VisionResult | null> {
   for (const cfg of tiers) {
     try {
-      const r = await callLLM(cfg, messages as never[], { temperature: 0.2, maxTokens, vision: true });
+      const r = await call(cfg, messages as never[], { temperature: 0.2, maxTokens, vision: true });
+      const usage = cfg.provider === "anthropic" ? safeAnthropicUsage(r.usage) : null;
+      // Completed-but-unreadable responses can consume tokens too. Only log
+      // numeric counters; never provider prose, keys, prompts or image data.
+      if (usage) console.log("[visionFallback] anthropic_token_usage", JSON.stringify(usage));
       const data = parseJson(r.content || "");
       if (data && typeof data === "object") {
-        return { data: data as Record<string, unknown>, provider: cfg.provider, model: cfg.model, keySource: cfg.keySource, ms: r.duration_ms ?? 0 };
+        return { data: data as Record<string, unknown>, provider: cfg.provider, model: cfg.model, keySource: cfg.keySource, ms: r.duration_ms ?? 0, usage };
       }
+      diagnostics.push({ code: "response_unreadable", provider: cfg.provider, http_status: null, credential_kind: cfg.credentialKind ?? null });
     } catch (e) {
-      console.warn(`[visionFallback] ${cfg.provider}/${cfg.model} (${cfg.keySource}) failed: ${e instanceof Error ? e.message : String(e)}`);
+      const diagnostic = e instanceof ProviderHTTPError ? { ...e.diagnostic, credential_kind: cfg.credentialKind ?? null }
+        : { code: "request_failed" as const, provider: cfg.provider, http_status: null, credential_kind: cfg.credentialKind ?? null };
+      diagnostics.push(diagnostic);
+      console.warn(`[visionFallback] ${cfg.provider} failed: ${diagnostic.code}`);
     }
   }
   return null;
@@ -102,22 +208,26 @@ export async function cloudVisionJSON(
   userId: string | null,
   opts: { systemPrompt?: string; userPrompt: string; imageUrl: string; maxTokens?: number },
 ): Promise<VisionResult | null> {
-  const tiers = await resolveTiers(supabase, userId);
+  const { tiers, diagnostics } = await resolveTiers(supabase, userId);
   if (tiers.length === 0) return null;
   const messages: unknown[] = [];
   if (opts.systemPrompt) messages.push({ role: "system", content: opts.systemPrompt });
   messages.push({ role: "user", content: [{ type: "text", text: opts.userPrompt }, await toImagePart(opts.imageUrl)] });
-  return runTiers(tiers, messages, opts.maxTokens ?? 800);
+  return runTiers(tiers, messages, opts.maxTokens ?? 800, diagnostics);
 }
 
 /** Multi-image (interleaved text + images) vision via the caller's BYOK provider. */
 export async function cloudVisionMultiJSON(
   supabase: unknown,
   userId: string | null,
-  opts: { systemPrompt?: string; parts: Array<{ text: string } | { imageUrl: string }>; maxTokens?: number },
+  opts: { systemPrompt?: string; parts: Array<{ text: string } | { imageUrl: string }>; maxTokens?: number; throwOnUnavailable?: boolean },
+  dependencies: VisionDependencies = {},
 ): Promise<VisionResult | null> {
-  const tiers = await resolveTiers(supabase, userId);
-  if (tiers.length === 0) return null;
+  const { tiers, diagnostics } = await resolveTiers(supabase, userId, dependencies.getKey);
+  if (tiers.length === 0) {
+    if (opts.throwOnUnavailable) throw new VisionProviderUnavailable(diagnostics);
+    return null;
+  }
   const content: unknown[] = [];
   for (const p of opts.parts) {
     if ("text" in p) content.push({ type: "text", text: p.text });
@@ -126,7 +236,9 @@ export async function cloudVisionMultiJSON(
   const messages: unknown[] = [];
   if (opts.systemPrompt) messages.push({ role: "system", content: opts.systemPrompt });
   messages.push({ role: "user", content });
-  return runTiers(tiers, messages, opts.maxTokens ?? 600);
+  const result = await runTiers(tiers, messages, opts.maxTokens ?? 600, diagnostics, dependencies.call);
+  if (!result && opts.throwOnUnavailable) throw new VisionProviderUnavailable(diagnostics);
+  return result;
 }
 
 export interface CloudAnalyzeResult {

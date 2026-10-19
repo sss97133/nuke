@@ -21,6 +21,8 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { requireOwnerOrService, requireWriteAuth } from "../_shared/writeGuard.ts";
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { mustWrite } from '../_shared/writeResult.ts';
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -37,7 +39,7 @@ function json(status: number, body: unknown) {
 
 function getSupabase() {
   const url = Deno.env.get("SUPABASE_URL") ?? "";
-  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  const key = projectSecretKey() ?? "";
   return createClient(url, key, {
     auth: {
       persistSession: false,
@@ -53,7 +55,7 @@ async function callWidgetFunction(
   timeoutMs = 30_000
 ): Promise<{ ok: boolean; status: number; data: any }> {
   const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  const serviceKey = projectSecretKey() ?? "";
 
   const res = await fetch(`${supabaseUrl}/functions/v1/${name}`, {
     method: "POST",
@@ -591,7 +593,7 @@ async function upsertSignal(
 
   // Write history if severity changed
   if (changeDirection !== "unchanged" && upserted?.id) {
-    await supabase.from("analysis_signal_history").insert({
+    mustWrite('analysis_signal_history insert', await supabase.from("analysis_signal_history").insert({
       signal_id: upserted.id,
       vehicle_id: vehicleId,
       widget_slug: widget.slug,
@@ -600,7 +602,7 @@ async function upsertSignal(
       label: result.label ?? null,
       reasons: result.reasons,
       computed_at: new Date().toISOString(),
-    });
+    }));
   }
 
   return {
@@ -823,7 +825,7 @@ async function processQueue(
     }
 
     // Mark queue item complete
-    await supabase
+    mustWrite('analysis_queue update', await supabase
       .from("analysis_queue")
       .update({
         status: failed > 0 && computed === 0 ? "failed" : "complete",
@@ -832,7 +834,7 @@ async function processQueue(
         compute_time_ms: Date.now() - startMs,
         completed_at: new Date().toISOString(),
       })
-      .eq("id", queueItem.id);
+      .eq("id", queueItem.id));
 
     results.push({
       vehicle_id: queueItem.vehicle_id,

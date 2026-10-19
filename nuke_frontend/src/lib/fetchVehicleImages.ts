@@ -1,6 +1,9 @@
 import { supabase } from './supabase';
 
-const PAGE_SIZE = 500;
+// PostgREST's row cap on this project (probed 2026-10-14: limit=1500 returns 1000 rows). Every page re-runs the whole
+// filter and sort over all of the vehicle's images and projects them before the page is cut, so the work of a gallery
+// load is (pages x the vehicle's images): the K5's 3,716 images cost eight page queries at 500 and four at 1000.
+const PAGE_SIZE = 1000;
 const DEFAULT_TIMEOUT_MS = 12000;
 // Cap the fan-out so a 50k-image vehicle doesn't fire 100 concurrent requests.
 const MAX_PARALLEL_PAGES = 6;
@@ -19,6 +22,13 @@ interface FetchVehicleImagesOptions {
    * (hero + gallery) stuck on an infinite "Loading…" spinner. Default 12s.
    */
   timeoutMs?: number;
+  /**
+   * Told how many rows were loaded against how many the database admits (page 0 carries the exact
+   * count), once the fetch settles. A caller that shows a count can then say "n of N" when a cap or
+   * the deadline left rows behind, instead of presenting what loaded as the whole. Not part of the
+   * in-flight dedupe key, so a coalesced concurrent caller is not told.
+   */
+  onLoadCoverage?: (coverage: { loaded: number; total: number }) => void;
 }
 
 // In-flight dedupe keyed on query shape. The identical full-set vehicle_images
@@ -62,6 +72,8 @@ async function fetchVehicleImagesUncached<T = any>(
 ): Promise<T[]> {
   const { maxRows, timeoutMs = DEFAULT_TIMEOUT_MS } = options;
   const deadline = Date.now() + Math.max(1000, timeoutMs);
+  // A caller that wants only the first N rows (the hero resolver) asks for no more than that.
+  let pageSize = maxRows ? Math.min(PAGE_SIZE, maxRows) : PAGE_SIZE;
 
   // The shared database predicate admits pending public listing photos only
   // with approved publication provenance tied to this vehicle's auction event.
@@ -81,7 +93,7 @@ async function fetchVehicleImagesUncached<T = any>(
       .order('is_primary', { ascending: false })
       .order('position', { ascending: true, nullsFirst: false })
       .order('created_at', { ascending: true })
-      .range(from, from + PAGE_SIZE - 1);
+      .range(from, from + pageSize - 1);
     return options.includeMismatchFilter
       ? query.or('image_vehicle_match_status.is.null,image_vehicle_match_status.not.in.("mismatch","unrelated")')
       : query;
@@ -110,17 +122,24 @@ async function fetchVehicleImagesUncached<T = any>(
   if (first.timedOut) return [];
   const rows: T[] = [...(first.data || [])];
   const total = typeof first.count === 'number' ? first.count : rows.length;
+  // The row cap is server configuration. If it gave fewer rows than asked while more exist, page by what it gives
+  // instead of mistaking the short page for the last one.
+  if (rows.length > 0 && rows.length < pageSize && total > rows.length) pageSize = rows.length;
+  const settle = (collected: T[]) => {
+    options.onLoadCoverage?.({ loaded: collected.length, total: Math.max(total, collected.length) });
+    return collected;
+  };
 
   // Caller only wants the first N (e.g. hero/lead resolution) — stop early.
   if (maxRows && rows.length >= maxRows) {
     rows.length = maxRows;
-    return rows;
+    return settle(rows);
   }
-  if (rows.length < PAGE_SIZE || total <= rows.length) return rows;
+  if (rows.length < pageSize || total <= rows.length) return settle(rows);
 
   const cap = maxRows ? Math.min(total, maxRows) : total;
   const offsets: number[] = [];
-  for (let from = PAGE_SIZE; from < cap; from += PAGE_SIZE) offsets.push(from);
+  for (let from = pageSize; from < cap; from += pageSize) offsets.push(from);
 
   for (let i = 0; i < offsets.length; i += MAX_PARALLEL_PAGES) {
     const wave = offsets.slice(i, i + MAX_PARALLEL_PAGES);
@@ -138,5 +157,5 @@ async function fetchVehicleImagesUncached<T = any>(
   }
 
   if (maxRows && rows.length > maxRows) rows.length = maxRows;
-  return rows;
+  return settle(rows);
 }

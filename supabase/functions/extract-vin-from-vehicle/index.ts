@@ -2,6 +2,7 @@ import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { writeObservation } from "../_shared/observationWriter.ts"
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -98,8 +99,7 @@ Deno.serve(async (req) => {
     }
 
     const serviceKey =
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ||
-      Deno.env.get('SERVICE_ROLE_KEY') ||
+      projectSecretKey() ||
       Deno.env.get('SUPABASE_SERVICE_KEY') ||
       ''
     if (!serviceKey) throw new Error('Missing SUPABASE_SERVICE_ROLE_KEY / SERVICE_ROLE_KEY')

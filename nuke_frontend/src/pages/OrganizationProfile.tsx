@@ -6,15 +6,27 @@ import { FaviconIcon } from '../components/common/FaviconIcon';
 // Always loaded — used in the overview tab or global page structure
 import OrganizationTimelineHeatmap from '../components/organization/OrganizationTimelineHeatmap';
 import SoldInventoryBrowser from '../components/organization/SoldInventoryBrowser';
+import OrganizationSourceTargets from '../components/organization/OrganizationSourceTargets';
 import { ServiceVehicleCardRich, type ServiceVehicleStatsRow } from '../components/organization/ServiceVehicleCardRich';
 import { extractImageMetadata } from '../utils/imageMetadata';
 import { DynamicTabBar } from '../components/organization/DynamicTabBar';
 import { OrganizationIntelligenceService, type OrganizationIntelligence, type TabConfig } from '../services/organizationIntelligenceService';
 import VehicleThumbnail from '../components/VehicleThumbnail';
-import { getOrganizationProfileData, getOrganizationCompetitiveContext, type SellerTrackRecord, type CompetitiveContext } from '../services/profileStatsService';
+import { getOrganizationProfileData, type SellerTrackRecord } from '../services/profileStatsService';
 import { AdminNotificationService } from '../services/adminNotificationService';
+import { fetchVehicleCardImages } from '../services/vehicleCardImages';
 import BroadArrowMetricsDisplay from '../components/organization/BroadArrowMetricsDisplay';
+import OrganizationBroadcastIntelligence from '../components/organization/OrganizationBroadcastIntelligence';
 import VehicleCardDense from '../components/vehicles/VehicleCardDense';
+import { fetchOrganizationVehicleBooks, withOrganizationVehicleBook } from '../lib/privateMoney';
+import {
+  OrganizationFacetStrip,
+  computeOrganizationFacetBreakdown,
+  filterOrganizationVehiclesByFacet,
+  matchesOrganizationVehicleFacet,
+  type OrganizationFacetAxis,
+  type OrganizationVehicleFacetInput,
+} from '../components/organization/OrganizationFacetStrip';
 import '../styles/unified-design-system.css';
 
 // Lazy-loaded — only pulled in when the relevant tab or modal is activated
@@ -43,9 +55,6 @@ const StorefrontSettings = React.lazy(() => import('../components/organization/S
 const ProfileSuccessStoriesTab = React.lazy(() => import('../components/profile/ProfileSuccessStoriesTab').then(m => ({ default: m.ProfileSuccessStoriesTab })));
 const CollectionIntelligenceTab = React.lazy(() => import('../components/organization/CollectionIntelligenceTab'));
 
-// Canonical Bring a Trailer org – we show extraction coverage (target 222k, queue) and turnover/metrics note
-const BAT_ORG_ID = 'd2bd6370-11d1-4af0-8dd2-3de2c3899166';
-
 interface ProfileLite {
   id: string;
   full_name: string | null;
@@ -71,15 +80,6 @@ async function fetchProfilesByIds(ids: Array<string | null | undefined>): Promis
     .select('id, full_name, username, avatar_url')
     .in('id', unique);
   return new Map(((data ?? []) as ProfileLite[]).map((p) => [p.id, p]));
-}
-
-interface OrgExtractionCoverage {
-  org_id: string;
-  label: string | null;
-  extracted: number | null;
-  queue_pending: number | null;
-  target: number | null;
-  metrics_note?: string;
 }
 
 // Types for sorting and controls
@@ -366,7 +366,6 @@ export default function OrganizationProfile() {
   const [showVehicleInquiry, setShowVehicleInquiry] = useState(false);
   const [dataRoomAccessGranted, setDataRoomAccessGranted] = useState(false);
   const [showDataRoomGate, setShowDataRoomGate] = useState(false);
-  const [extractionCoverage, setExtractionCoverage] = useState<OrgExtractionCoverage | null>(null);
   const [selectedInquiryVehicle, setSelectedInquiryVehicle] = useState<{id: string, name: string} | null>(null);
   const [primaryHeroSrcIndex, setPrimaryHeroSrcIndex] = useState(0);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -375,8 +374,48 @@ export default function OrganizationProfile() {
   const ownershipUploadId = `org-ownership-${organizationId}`;
   const [comprehensiveData, setComprehensiveData] = useState<any>(null);
   const [sellerTrackRecord, setSellerTrackRecord] = useState<SellerTrackRecord | null>(null);
-  const [competitiveContext, setCompetitiveContext] = useState<CompetitiveContext | null>(null);
   const [auctionHeatmapEvents, setAuctionHeatmapEvents] = useState<Array<{ event_date: string; event_type: string; cost_amount?: number }>>([]);
+  const [facetAxis, setFacetAxis] = useState<OrganizationFacetAxis>('series');
+  const [selectedFacet, setSelectedFacet] = useState<string | null>(null);
+
+  const orgFacetBreakdown = useMemo(() => {
+    const byVehicleId = new Map<string, OrganizationVehicleFacetInput>();
+    for (const v of vehicles) {
+      const key = String(v.vehicle_id || v.id);
+      byVehicleId.set(key, v);
+    }
+    if (sellerTrackRecord?.vehicles_sold) {
+      for (const sv of sellerTrackRecord.vehicles_sold) {
+        const key = String(sv.vehicle_id);
+        if (!byVehicleId.has(key)) {
+          byVehicleId.set(key, {
+            vehicle_id: sv.vehicle_id,
+            vehicle_year: sv.year ?? null,
+            vehicle_make: sv.make ?? null,
+            vehicle_model: sv.model ?? null,
+            sale_price: sv.sale_price ?? null,
+            is_sold: Boolean(sv.sale_price || sv.sale_date),
+          });
+        }
+      }
+    }
+    return computeOrganizationFacetBreakdown(Array.from(byVehicleId.values()));
+  }, [vehicles, sellerTrackRecord]);
+
+  useEffect(() => {
+    if (orgFacetBreakdown.totalVehicles === 0) return;
+    const currentBuckets =
+      facetAxis === 'series'
+        ? orgFacetBreakdown.series
+        : facetAxis === 'trim'
+          ? orgFacetBreakdown.trim
+          : orgFacetBreakdown.body;
+    if (currentBuckets.length === 0) {
+      if (orgFacetBreakdown.series.length > 0) setFacetAxis('series');
+      else if (orgFacetBreakdown.trim.length > 0) setFacetAxis('trim');
+      else if (orgFacetBreakdown.body.length > 0) setFacetAxis('body');
+    }
+  }, [orgFacetBreakdown, facetAxis]);
 
   // Grid and sorting controls (similar to CursorHomepage)
   const [cardsPerRow, setCardsPerRow] = useState<number>(() => {
@@ -1180,13 +1219,6 @@ export default function OrganizationProfile() {
                 cost_amount: v.sale_price ? Number(v.sale_price) : undefined,
               }));
             setAuctionHeatmapEvents(heatEvents);
-            // Load competitive context using the org state
-            const orgState = org?.state || null;
-            if (orgState) {
-              getOrganizationCompetitiveContext(organizationId, orgState)
-                .then(ctx => { if (ctx) setCompetitiveContext(ctx); })
-                .catch(() => {});
-            }
           }
         } catch (err) {
           // Failed to load comprehensive profile data - silent
@@ -1201,11 +1233,9 @@ export default function OrganizationProfile() {
           if (intelligence) {
             setIntelligence(intelligence);
             
-            // Get data signals for tab priority calculation
-            let dataSignals = intelligence.dataSignals;
-            if (!dataSignals || Object.keys(dataSignals).length === 0) {
-              dataSignals = await OrganizationIntelligenceService.analyzeDataSignals(organizationId);
-            }
+            // Tab priority reads the stored signals. A page view never runs analyze_organization_data_signals: it
+            // writes the organization row and timed out (57014) for visitors on 2026-10-14.
+            const dataSignals = intelligence.dataSignals ?? org.data_signals ?? null;
             
             // Determine tab priority based on intelligence
             const priorityTabs = OrganizationIntelligenceService.determineTabPriority(intelligence, dataSignals);
@@ -1296,11 +1326,14 @@ export default function OrganizationProfile() {
           let orgVehicles: any[] = [];
           let vehiclesError: any = null;
           let hasMore = true;
+          // A link's cost basis, sale and asking price are the organization's books: its managers read
+          // them through the books reader, everyone else gets none (lib/privateMoney).
+          const booksPromise = fetchOrganizationVehicleBooks(organizationId || '');
 
           while (hasMore && orgVehicles.length < maxVehiclesToLoad) {
             const { data, error } = await supabase
               .from('organization_vehicles')
-              .select('id, vehicle_id, relationship_type, status, start_date, end_date, sale_date, sale_price, listing_status, asking_price, cost_basis, days_on_lot')
+              .select('id, vehicle_id, relationship_type, status, start_date, end_date, sale_date, listing_status, days_on_lot')
               .eq('organization_id', organizationId)
               .or('status.eq.active,status.eq.sold,status.eq.archived')
               .order('created_at', { ascending: false })
@@ -1324,6 +1357,8 @@ export default function OrganizationProfile() {
             setVehicles([]);
             return;
           }
+          const books = await booksPromise;
+          orgVehicles = orgVehicles.map((ov: any) => withOrganizationVehicleBook(ov, books));
 
           const vehicleIds = (orgVehicles || []).map((ov: any) => ov.vehicle_id).filter(Boolean);
           const now = new Date().toISOString();
@@ -1344,8 +1379,8 @@ export default function OrganizationProfile() {
           };
 
           const [allVehiclesData, allImagesData, allNativeAuctionsData, allExternalAuctionsData, allBatAuctionsData, soldExternalListingsData, soldBatListingsData, endedVehicleListingsData, allExternalListingsData] = await Promise.all([
-            runChunked(ids => supabase.from('vehicles').select('id, year, make, model, vin, current_value, asking_price, purchase_price, sale_status, sale_price, sale_date, listing_location, listing_location_raw, analysis_tier, signal_score, auction_outcome').in('id', ids)),
-            runChunked(ids => supabase.from('vehicle_images').select('vehicle_id, thumbnail_url, medium_url, image_url, variants, is_primary, created_at').in('vehicle_id', ids).order('is_primary', { ascending: false }).order('created_at', { ascending: true })),
+            runChunked(ids => supabase.from('vehicles').select('id, year, make, model, vin, current_value, asking_price, sale_status, sale_price, sale_date, listing_location, listing_location_raw, analysis_tier, signal_score, auction_outcome').in('id', ids)),
+            runChunked(ids => fetchVehicleCardImages(ids)),
             runChunked(ids => supabase.from('vehicle_listings').select('vehicle_id, id, status, sale_type, auction_end_time, current_high_bid_cents, bid_count, reserve_price_cents').in('vehicle_id', ids).eq('status', 'active').in('sale_type', ['auction', 'live_auction']).gt('auction_end_time', now)),
             // external_listings -> vehicle_events. external_listings is granted to
             // service_role ONLY and carries ZERO RLS policies, so from a browser
@@ -1998,33 +2033,6 @@ export default function OrganizationProfile() {
     }
   }, [loading, organizationId]);
 
-  // Fetch extraction coverage for this org (BAT, C&B, Craigslist, etc.) – poll so numbers update in real time
-  useEffect(() => {
-    if (!organizationId) {
-      setExtractionCoverage(null);
-      return;
-    }
-    let cancelled = false;
-    const load = async () => {
-      try {
-        const url = `${SUPABASE_URL}/functions/v1/org-extraction-coverage?org_id=${encodeURIComponent(organizationId)}`;
-        const res = await fetch(url, { headers: { Authorization: `Bearer ${SUPABASE_ANON_KEY}` } });
-        if (!res.ok || cancelled) return;
-        const data = (await res.json()) as OrgExtractionCoverage;
-        if (!cancelled && data?.org_id && (data.extracted != null || data.target != null)) setExtractionCoverage(data);
-        else if (!cancelled) setExtractionCoverage(null);
-      } catch {
-        if (!cancelled) setExtractionCoverage(null);
-      }
-    };
-    load();
-    const interval = setInterval(load, 45_000);
-    return () => {
-      cancelled = true;
-      clearInterval(interval);
-    };
-  }, [organizationId]);
-
   if (loading) {
     return (
       <div style={{ background: 'var(--bg)', minHeight: '100vh' }}>
@@ -2353,6 +2361,7 @@ export default function OrganizationProfile() {
       }}>
         {activeTab === 'overview' && (
           <>
+            {organizationId && <OrganizationSourceTargets key={organizationId} organizationId={organizationId} />}
             {/* Key Metrics Bar — only show when seller track record hasn't loaded yet (it supersedes this) */}
             {!sellerTrackRecord && (((organization?.total_vehicles ?? 0) > 0) || ((organization?.total_images ?? 0) > 0) || ((organization?.total_events ?? 0) > 0)) && (
             <div style={{
@@ -2384,103 +2393,47 @@ export default function OrganizationProfile() {
             </div>
             )}
 
+            {/* Broadcast & Video OCR Intelligence Fold (vehicle_observations where subject_type = 'organization') */}
+            {organizationId && (
+              <OrganizationBroadcastIntelligence
+                organizationId={organizationId}
+                organizationName={organization?.business_name}
+              />
+            )}
+
+            {/* Multi-Axis Inventory & Sales Facet Strip (SERIES | TRIM | BODY STYLE) */}
+            <OrganizationFacetStrip
+              breakdown={orgFacetBreakdown}
+              activeAxis={facetAxis}
+              selectedFacet={selectedFacet}
+              onSelectAxis={setFacetAxis}
+              onSelectFacet={setSelectedFacet}
+            />
+
             {/* Seller Track Record — GMV bars, volume, geography, vehicle table */}
-            {sellerTrackRecord && sellerTrackRecord.vehicles_sold.length > 0 && (
+            {sellerTrackRecord && sellerTrackRecord.vehicles_sold.length > 0 && (() => {
+              const filteredSoldVehicles = sellerTrackRecord.vehicles_sold.filter((v) =>
+                matchesOrganizationVehicleFacet(
+                  {
+                    vehicle_id: v.vehicle_id,
+                    vehicle_year: v.year ?? null,
+                    vehicle_make: v.make ?? null,
+                    vehicle_model: v.model ?? null,
+                    sale_price: v.sale_price ?? null,
+                    is_sold: true,
+                  },
+                  facetAxis,
+                  selectedFacet,
+                ),
+              );
+              if (filteredSoldVehicles.length === 0) return null;
+              return (
               <div style={{ marginBottom: '16px' }}>
-                {/* GMV by Year — horizontal bar chart */}
-                {Object.keys(sellerTrackRecord.gmv_by_year).length > 0 && (() => {
-                  const gmvEntries = Object.entries(sellerTrackRecord.gmv_by_year)
-                    .sort(([a], [b]) => a.localeCompare(b));
-                  const maxGmv = Math.max(...gmvEntries.map(([, v]) => Number(v)));
-                  const totalGmv = gmvEntries.reduce((s, [, v]) => s + Number(v), 0);
-                  const totalSold = sellerTrackRecord.vehicles_sold.filter(v => v.sale_price).length;
-                  return (
-                    <div style={{
-                      padding: '12px 16px',
-                      background: 'var(--surface)',
-                      border: '1px solid var(--border)',
-                      marginBottom: '8px',
-                    }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '8px' }}>
-                        <div style={{ fontSize: '9px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                          GROSS MERCHANDISE VALUE
-                        </div>
-                        <div style={{ fontSize: '11px', fontFamily: 'Courier New, monospace', color: 'var(--text)' }}>
-                          ${Math.round(totalGmv).toLocaleString()} · {totalSold} sold
-                        </div>
-                      </div>
-                      {gmvEntries.map(([yr, amt]) => {
-                        const pct = maxGmv > 0 ? (Number(amt) / maxGmv) * 100 : 0;
-                        const volForYear = sellerTrackRecord.volume_by_quarter
-                          .filter(q => q.quarter.startsWith(yr))
-                          .reduce((s, q) => s + q.count, 0);
-                        return (
-                          <div key={yr} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
-                            <span style={{ fontSize: '9px', fontFamily: 'Courier New, monospace', color: 'var(--text-muted)', width: '32px', textAlign: 'right', flexShrink: 0 }}>
-                              {yr}
-                            </span>
-                            <div style={{ flex: 1, height: '14px', background: 'var(--bg)' }}>
-                              <div style={{
-                                width: `${Math.max(pct, 1)}%`,
-                                height: '100%',
-                                background: 'var(--text)',
-                                opacity: 0.7,
-                                transition: 'width 0.3s ease',
-                              }} />
-                            </div>
-                            <span style={{ fontSize: '9px', fontFamily: 'Courier New, monospace', color: 'var(--text)', width: '80px', textAlign: 'right', flexShrink: 0 }}>
-                              ${Math.round(Number(amt) / 1000).toLocaleString()}K
-                            </span>
-                            <span style={{ fontSize: '8px', color: 'var(--text-muted)', width: '24px', textAlign: 'right', flexShrink: 0 }}>
-                              {volForYear > 0 ? volForYear : ''}
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  );
-                })()}
-
-                {/* Geography + Volume inline */}
-                {(Object.keys(sellerTrackRecord.state_distribution).length > 0 || sellerTrackRecord.volume_by_quarter.length > 0) && (
-                  <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: Object.keys(sellerTrackRecord.state_distribution).length > 0 && sellerTrackRecord.volume_by_quarter.length > 0 ? '1fr 1fr' : '1fr',
-                    gap: '1px',
-                    background: 'var(--border)',
-                    border: '1px solid var(--border)',
-                    marginBottom: '8px',
-                  }}>
-                    {Object.keys(sellerTrackRecord.state_distribution).length > 0 && (
-                      <div style={{ padding: '8px 16px', background: 'var(--surface)' }}>
-                        <div style={{ fontSize: '9px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>
-                          GEOGRAPHY
-                        </div>
-                        <div style={{ fontSize: '11px', color: 'var(--text)', fontFamily: 'Courier New, monospace', lineHeight: 1.6 }}>
-                          {Object.entries(sellerTrackRecord.state_distribution)
-                            .sort(([, a], [, b]) => b - a)
-                            .map(([st, count]) => `${st} ${count}`)
-                            .join('  ·  ')}
-                        </div>
-                      </div>
-                    )}
-                    {sellerTrackRecord.volume_by_quarter.length > 0 && (
-                      <div style={{ padding: '8px 16px', background: 'var(--surface)' }}>
-                        <div style={{ fontSize: '9px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>
-                          RECENT VOLUME
-                        </div>
-                        <div style={{ fontSize: '11px', color: 'var(--text)', fontFamily: 'Courier New, monospace', lineHeight: 1.6 }}>
-                          {sellerTrackRecord.volume_by_quarter
-                            .slice(-8)
-                            .map(q => `${q.quarter.replace(/^\d{4}\s/, "'"+ q.quarter.slice(2,4) + " ")}: ${q.count}`)
-                            .join('  ·  ')}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Per-vehicle sold table */}
+                {/* Relationship context; listing activity is measured separately. */}
+                <p style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                  Related vehicle records (bounded view): ownership, consignment, builds and sales. Currency is unmeasured in this vehicle-record view. Recorded amounts and dates do not establish this organization’s sales or revenue.
+                </p>
+                {/* Associated vehicle records, without organization revenue inference. */}
                 <div style={{
                   border: '1px solid var(--border)',
                   overflow: 'hidden',
@@ -2489,14 +2442,14 @@ export default function OrganizationProfile() {
                     <thead>
                       <tr style={{ background: 'var(--surface)', borderBottom: '2px solid var(--border)' }}>
                         <th style={{ padding: '6px 12px', textAlign: 'left', fontSize: '9px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-muted)' }}>Vehicle</th>
-                        <th style={{ padding: '6px 12px', textAlign: 'right', fontSize: '9px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-muted)' }}>Sale Price</th>
+                        <th style={{ padding: '6px 12px', textAlign: 'right', fontSize: '9px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-muted)' }}>Vehicle record price</th>
                         <th style={{ padding: '6px 12px', textAlign: 'right', fontSize: '9px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-muted)' }}>Date</th>
                         <th style={{ padding: '6px 12px', textAlign: 'center', fontSize: '9px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-muted)' }}>Role</th>
                         <th style={{ padding: '6px 12px', textAlign: 'right', fontSize: '9px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-muted)' }}>Estimate</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {sellerTrackRecord.vehicles_sold.slice(0, 50).map((v, i) => {
+                      {filteredSoldVehicles.slice(0, 50).map((v, i) => {
                         const roleBadge = v.relationship_type === 'owner' ? 'OWNED'
                           : v.relationship_type === 'consigner' ? 'CONSIGNED'
                           : v.relationship_type === 'supplier_build' ? 'BUILT'
@@ -2527,7 +2480,7 @@ export default function OrganizationProfile() {
                               {[v.year, v.make, v.model].filter(Boolean).join(' ') || '—'}
                             </td>
                             <td style={{ padding: '6px 12px', textAlign: 'right', fontFamily: 'Courier New, monospace', fontWeight: 600, color: 'var(--text)' }}>
-                              {v.sale_price ? `$${Math.round(Number(v.sale_price)).toLocaleString()}` : '—'}
+                              {v.sale_price ? Math.round(Number(v.sale_price)).toLocaleString() : '—'}
                             </td>
                             <td style={{ padding: '6px 12px', textAlign: 'right', color: 'var(--text-muted)' }}>
                               {v.sale_date ? new Date(v.sale_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : '—'}
@@ -2557,41 +2510,15 @@ export default function OrganizationProfile() {
                       })}
                     </tbody>
                   </table>
-                  {sellerTrackRecord.vehicles_sold.length > 50 && (
+                  {filteredSoldVehicles.length > 50 && (
                     <div style={{ padding: '8px 12px', fontSize: '10px', color: 'var(--text-muted)', background: 'var(--surface)', borderTop: '1px solid var(--border-light)' }}>
-                      Showing 50 of {sellerTrackRecord.vehicles_sold.length} vehicles
+                      Showing 50 of {filteredSoldVehicles.length} vehicles
                     </div>
                   )}
                 </div>
               </div>
-            )}
-
-            {/* Competitive Context */}
-            {competitiveContext && (
-              <div style={{
-                padding: '8px 16px',
-                background: 'var(--surface)',
-                border: '1px solid var(--border)',
-                marginBottom: '16px',
-                fontSize: '11px',
-                color: 'var(--text-muted)',
-              }}>
-                <span style={{ fontSize: '9px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginRight: '8px' }}>
-                  MARKET CONTEXT
-                </span>
-                {competitiveContext.state}: #{competitiveContext.state_rank} of {competitiveContext.state_total} sellers with 3+ vehicles
-                {competitiveContext.volume_peers.length > 0 && (
-                  <span style={{ marginLeft: '12px' }}>
-                    Similar volume: {competitiveContext.volume_peers.map(p => (
-                      <Link key={p.org_id} to={`/org/${p.org_id}`}
-                        style={{ color: 'var(--text)', textDecoration: 'underline', marginRight: '8px' }}>
-                        {p.business_name} ({p.vehicle_count})
-                      </Link>
-                    ))}
-                  </span>
-                )}
-              </div>
-            )}
+              );
+            })()}
 
             {/* Business docs for advisors — only show for owners or when data room has been granted */}
             {organization && organizationId && (isOwner || dataRoomAccessGranted) && (
@@ -2624,47 +2551,6 @@ export default function OrganizationProfile() {
               </div>
             )}
 
-            {/* Data coverage: what we have + what we're loading in (scraping in real time) */}
-            {extractionCoverage && (extractionCoverage.extracted != null || extractionCoverage.target != null) && (
-              <div style={{
-                marginBottom: '16px',
-                padding: '12px 16px',
-                background: 'var(--surface)',
-                border: '1px solid var(--border)',
-                borderRadius: '6px',
-                borderLeft: '4px solid var(--blue-500)',
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                  <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                    Data coverage
-                  </span>
-                  {extractionCoverage.queue_pending != null && extractionCoverage.queue_pending > 0 && (
-                    <span style={{
-                      fontSize: '9px',
-                      fontWeight: 600,
-                      color: 'var(--blue-600)',
-                      background: 'rgba(59, 130, 246, 0.12)',
-                      padding: '2px 6px',
-                      borderRadius: '4px',
-                      animation: 'pulse 2s ease-in-out infinite',
-                    }}>
-                      Scraping in progress
-                    </span>
-                  )}
-                </div>
-                <div style={{ fontSize: '13px', color: 'var(--text)', lineHeight: 1.5 }}>
-                  {extractionCoverage.extracted != null && `${(extractionCoverage.extracted / 1000).toFixed(0)}k listings`}
-                  {extractionCoverage.queue_pending != null && extractionCoverage.queue_pending > 0 && (
-                    <span> · {extractionCoverage.queue_pending.toLocaleString()} in queue · <strong style={{ color: 'var(--blue-600)' }}>loading in…</strong></span>
-                  )}
-                </div>
-                {extractionCoverage.metrics_note && (
-                  <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '6px' }}>
-                    {extractionCoverage.metrics_note}
-                  </div>
-                )}
-              </div>
-            )}
 
             {/* Activity Heatmap — only render when there's data to show */}
             {auctionHeatmapEvents.length > 0 && (
@@ -2718,11 +2604,15 @@ export default function OrganizationProfile() {
               });
               
               // Sort by auction end time (ending soon first)
-              const sortedAuctions = [...liveAuctions].sort((a, b) => {
-                const aEnd = a.auction_end_time ? new Date(a.auction_end_time).getTime() : 0;
-                const bEnd = b.auction_end_time ? new Date(b.auction_end_time).getTime() : 0;
-                return aEnd - bEnd;
-              });
+              const sortedAuctions = filterOrganizationVehiclesByFacet(
+                [...liveAuctions].sort((a, b) => {
+                  const aEnd = a.auction_end_time ? new Date(a.auction_end_time).getTime() : 0;
+                  const bEnd = b.auction_end_time ? new Date(b.auction_end_time).getTime() : 0;
+                  return aEnd - bEnd;
+                }),
+                facetAxis,
+                selectedFacet,
+              );
               
               if (sortedAuctions.length > 0) {
                 return (
@@ -2852,10 +2742,17 @@ export default function OrganizationProfile() {
                   if (isServiceOrg) {
                     // serviceVehicles is the shared memo above — the same list
                     // the "In Service N" header counts.
-                    if (serviceVehicles.length === 0) {
+                    const filteredServiceVehicles = filterOrganizationVehiclesByFacet(
+                      serviceVehicles,
+                      facetAxis,
+                      selectedFacet,
+                    );
+                    if (filteredServiceVehicles.length === 0) {
                       return (
                         <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', fontSize: '12px' }}>
-                          No vehicles currently in service. Service vehicles will appear here.
+                          {selectedFacet
+                            ? `No service vehicles matching ${selectedFacet}.`
+                            : 'No vehicles currently in service. Service vehicles will appear here.'}
                         </div>
                       );
                     }
@@ -2869,7 +2766,7 @@ export default function OrganizationProfile() {
                           gap: '8px' 
                         }}
                       >
-                        {serviceVehicles.map((vehicle) => (
+                        {filteredServiceVehicles.map((vehicle) => (
                           <ServiceVehicleCardRich
                             key={vehicle.id}
                             vehicleId={vehicle.vehicle_id}
@@ -2937,16 +2834,24 @@ export default function OrganizationProfile() {
                     return !isSold;
                   });
                   
-                  if (productsForSale.length === 0) {
+                  const filteredProductsForSale = filterOrganizationVehiclesByFacet(
+                    productsForSale,
+                    facetAxis,
+                    selectedFacet,
+                  );
+
+                  if (filteredProductsForSale.length === 0) {
                     return (
                       <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', fontSize: '12px' }}>
-                        No current inventory. Add vehicles to display them here.
+                        {selectedFacet
+                          ? `No current inventory matching ${selectedFacet}.`
+                          : 'No current inventory. Add vehicles to display them here.'}
                       </div>
                     );
                   }
                   
                   // Apply sorting based on sortBy and sortDirection
-                  const sorted = [...productsForSale];
+                  const sorted = [...filteredProductsForSale];
                   const dir = sortDirection === 'desc' ? 1 : -1;
                   
                   switch (sortBy) {

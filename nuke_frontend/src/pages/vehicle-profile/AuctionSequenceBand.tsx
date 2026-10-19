@@ -10,13 +10,14 @@
  */
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { auctionMomentLabel, hasRecordedAuctionEnd, fmtClock, fmtDayShort, fmtMoment, fmtUsd, localDate, type AuctionItem, type AuctionSequence } from './auctionSequence';
+import { auctionMomentLabel, auctionOpenDayTitle, hasRecordedAuctionEnd, fmtClock, fmtDayShort, fmtMoment, fmtUsd, localDate, type AuctionItem, type AuctionSequence } from './auctionSequence';
 
 interface Props {
   auction: AuctionSequence;
   activeDay: string | null;
   onOpenDay: (date: string) => void;
   onOpenBidReports?: () => void;
+  showResult?: boolean;
 }
 
 function useWidth<T extends HTMLElement>(ref: React.RefObject<T | null>): number {
@@ -31,17 +32,6 @@ function useWidth<T extends HTMLElement>(ref: React.RefObject<T | null>): number
   }, [ref]);
   return w;
 }
-
-const OUTCOME_LABEL: Record<AuctionSequence['outcome'], string> = {
-  sold: 'SOLD',
-  reserve_not_met: 'RESERVE NOT MET',
-  no_sale: 'NOT SOLD',
-  withdrawn: 'WITHDRAWN',
-  live: 'LIVE',
-  unknown: 'RESULT UNKNOWN',
-};
-
-const mono: React.CSSProperties = { fontFamily: 'var(--vp-font-mono)' };
 
 const LABEL_FONT_PX = 8;
 const LABEL_GAP_PX = 6;
@@ -62,22 +52,26 @@ function itemTitle(i: AuctionItem): string {
   return `${i.author}${i.kind === 'seller' ? ' (seller)' : ''} · ${when}${text ? ` · ${text}` : ''}`;
 }
 
-const AuctionSequenceBand: React.FC<Props> = ({ auction, activeDay, onOpenDay, onOpenBidReports }) => {
+const AuctionSequenceBand: React.FC<Props> = ({ auction, activeDay, onOpenDay, onOpenBidReports, showResult = true }) => {
   const ref = useRef<HTMLDivElement | null>(null);
   const width = useWidth(ref);
-  const [showAllActivity, setShowAllActivity] = useState(false);
   const { items, open, close } = auction;
+  const recordedOpen = open?.role === 'listing_start' && open.grain === 'instant' && open.exact;
+  const openingTitle = auctionOpenDayTitle(auction);
+  const openingLabel = recordedOpen ? 'OPEN' : open?.role === 'first_activity' ? 'FIRST OBSERVED'
+    : open?.role === 'listing_start' ? 'LISTING DAY' : 'OPENING UNKNOWN';
   const recordedEnd = hasRecordedAuctionEnd(auction);
   const retainedBids = items.filter(i => i.kind === 'bid' && i.amount != null);
 
   const geom = useMemo(() => {
     const times = items.map(i => new Date(i.at).getTime());
     const openT = open ? new Date(open.at).getTime() : (times.length ? Math.min(...times) : null);
-    const closeT = close ? new Date(close.at).getTime() : null;
+    const closeT = recordedEnd && close ? new Date(close.at).getTime() : null;
     if (openT == null) return null;
     const bidTimes = items.filter(i => i.kind === 'bid' && i.amount != null).map(i => new Date(i.at).getTime());
-    // Later commentary stays retained; it need not compress the bidding into a few pixels.
-    const lastT = !showAllActivity && bidTimes.length ? Math.max(...bidTimes) : (times.length ? Math.max(...times) : openT);
+    // Keep the auction episode legible. Later testimony remains a source-linked drill,
+    // rather than stretching a week of bidding across years of follow-up comments.
+    const lastT = closeT ?? (bidTimes.length ? Math.max(...bidTimes) : times.length ? Math.max(...times) : openT);
     const t0 = Math.min(openT, ...(times.length ? [times[0]] : []));
     let t1 = Math.max(lastT, closeT ?? lastT);
     if (t1 - t0 < 3600e3) t1 = t0 + 24 * 3600e3;
@@ -91,7 +85,7 @@ const AuctionSequenceBand: React.FC<Props> = ({ auction, activeDay, onOpenDay, o
       s = n.getTime();
     }
     return { t0, t1, openT, closeT, days };
-  }, [items, open, close, showAllActivity]);
+  }, [items, open, close, recordedEnd]);
 
   if (!geom) return null;
 
@@ -99,8 +93,8 @@ const AuctionSequenceBand: React.FC<Props> = ({ auction, activeDay, onOpenDay, o
   const laneBidTop = 22, laneBidBottom = 54, laneCmtTop = 60, laneCmtBottom = 72, axisY = 76;
   const x = (t: number) => padL + ((t - geom.t0) / (geom.t1 - geom.t0)) * Math.max(width - padL - padR, 1);
   const visibleItems = items.filter(i => new Date(i.at).getTime() <= geom.t1);
+  const laterItems = items.filter(i => new Date(i.at).getTime() > geom.t1);
   const bids = visibleItems.filter(i => i.kind === 'bid' && i.amount != null);
-  const outsideWindow = items.length - visibleItems.length;
   const maxBid = bids.reduce((m, b) => Math.max(m, b.amount as number), 0);
   const yBid = (amount: number) => laneBidBottom - (maxBid > 0 ? (amount / maxBid) * (laneBidBottom - laneBidTop) : 0);
   // running high bid as a step path
@@ -130,52 +124,35 @@ const AuctionSequenceBand: React.FC<Props> = ({ auction, activeDay, onOpenDay, o
     lastLabelRight = x0 + 3 + w;
   }
   const closeX = recordedEnd && geom.closeT != null ? x(geom.closeT) : null;
-  const resultLabel = `${OUTCOME_LABEL[auction.outcome]}${auction.price != null ? ` ${fmtUsd(auction.price)}` : ''}`;
 
   return (
     <div className="auction-band" ref={ref}>
-      {/* the facts line */}
-      <div className="auction-band__facts">
+      <div className="auction-band__facts auction-band__facts--compact">
         <a className="auction-band__lot" href={auction.lotUrl} target="_blank" rel="noreferrer">
           BAT{auction.lotNumber ? ` LOT ${auction.lotNumber}` : ''}↗
         </a>
-        {auction.listingCount > 1 && (
-          <span className="auction-band__basis">listing {auction.ordinal} of {auction.listingCount}{auction.ordinal === auction.listingCount ? ' (latest)' : ''}</span>
-        )}
-        <span style={mono}>OPEN {fmtMoment(open)}</span>
-        {open && <span className="auction-band__basis">({open.basis})</span>}
-        <span style={mono}>{auctionMomentLabel(auction)} {fmtMoment(close)}</span>
-        {close && <span className="auction-band__basis">({close.basis})</span>}
-        {auction.lastObservedBid && <a href={auction.lastObservedBid.url} target="_blank" rel="noreferrer" style={mono}>LAST OBSERVED BID {fmtDayShort(auction.lastObservedBid.at)} {fmtClock(auction.lastObservedBid.at)}</a>}
-        <span style={{ ...mono, fontWeight: 700 }}>{resultLabel}{auction.buyer ? ` · to ${auction.buyer}` : ''}</span>
-        {auction.outcomeConflict && <span className="auction-band__basis">recorded outcomes disagree; result unclassified</span>}
-        {auction.activityExtracted ? (
-          <span style={mono}>
-            {onOpenBidReports && retainedBids.length > 0 ? <button type="button" aria-label="Open recorded vehicle bid amounts" onClick={onOpenBidReports}
-              style={{ ...mono, fontSize: 'inherit', color: 'inherit', background: 'transparent', border: '2px solid var(--vp-ghost, #ddd)', padding: '1px 3px', cursor: 'pointer' }}>{retainedBids.length} bid reports</button> : `${retainedBids.length} bid reports`} · {items.length - retainedBids.length} comments{auction.watchers != null ? ` · ${auction.watchers.toLocaleString()} watchers` : ''}{auction.views != null ? ` · ${auction.views.toLocaleString()} views` : ''}
-          </span>
-        ) : (
-          <span className="auction-band__basis">no timed bid or comment entries in this read</span>
-        )}
-        {auction.photos.publishedWithListing > 0 && (
-          <span style={mono}>{auction.photos.publishedWithListing} photos published with the listing (no capture time{auction.photos.attributionUncertain ? '; some carry no listing path and sit on the latest listing' : ''})</span>
-        )}
+        {showResult && <span>{({ sold: 'SOLD', reserve_not_met: 'RESERVE NOT MET', no_sale: 'NOT SOLD', withdrawn: 'WITHDRAWN', live: 'RECORDED LIVE', unknown: 'RESULT UNKNOWN' })[auction.outcome]}{auction.price != null ? ` ${fmtUsd(auction.price)}` : ''}</span>}
+        <details className="auction-band__source"><summary>Source & capture</summary>
+          <dl>
+            <div><dt>{recordedOpen ? 'Opened' : openingTitle}</dt><dd>{fmtMoment(open)}{open && <small>{open.basis}</small>}</dd></div>
+            <div><dt>{auctionMomentLabel(auction)}</dt><dd>{fmtMoment(close)}{close && <small>{close.basis}</small>}</dd></div>
+            {auction.lastObservedBid && <div><dt>Last observed bid</dt><dd><a href={auction.lastObservedBid.url} target="_blank" rel="noreferrer">{fmtDayShort(auction.lastObservedBid.at)} {fmtClock(auction.lastObservedBid.at)}</a></dd></div>}
+          </dl>
+          {auction.outcomeConflict && <p>recorded outcomes disagree; result unclassified.</p>}
+          {auction.activityExtracted ? <p>
+            {onOpenBidReports && retainedBids.length > 0 ? <button type="button" aria-label="Open recorded vehicle bid amounts" onClick={onOpenBidReports}>{retainedBids.length} bid reports</button> : `${retainedBids.length} bid reports`}
+            {' · '}{items.length - retainedBids.length} comments{auction.watchers != null ? ` · ${auction.watchers.toLocaleString()} watchers` : ''}{auction.views != null ? ` · ${auction.views.toLocaleString()} views` : ''}
+          </p> : <p>No timed interactions in this read.</p>}
+          {auction.photos.publishedWithListing > 0 && <p>Grouped image records: {auction.photos.publishedWithListing} · listing association inferred · capture and publication times unknown{auction.photos.attributionUncertain ? ' · listing attribution incomplete' : ''}</p>}
+          <p>○ bid · ● last observed bid · line: running high bid · | comment · ▍ seller</p>
+          <p>{recordedEnd ? 'Shading follows the recorded end.' : 'End clock unknown; after-close activity unclassified.'} Select a day to open its record; marks link to source comments.</p>
+        </details>
       </div>
 
-      {retainedBids.length > 0 && (
-        <div className="auction-band__facts">
-          {(['Bidding window', 'All activity'] as const).map((label, index) => (
-            <button key={label} type="button" aria-pressed={showAllActivity === (index === 1)}
-              onClick={() => setShowAllActivity(index === 1)}
-              style={{ fontFamily: 'Arial, sans-serif', fontSize: 9, textTransform: 'uppercase', border: '2px solid var(--vp-ink, #1a1a1a)', borderRadius: 0, padding: '3px 6px', background: showAllActivity === (index === 1) ? 'var(--vp-ink, #1a1a1a)' : 'var(--vp-surface, #fff)', color: showAllActivity === (index === 1) ? 'var(--vp-surface, #fff)' : 'var(--vp-ink, #1a1a1a)' }}>
-              {label}
-            </button>
-          ))}
-          <span className="auction-band__basis">
-            {visibleItems.length.toLocaleString()} of {items.length.toLocaleString()} timed interactions shown{outsideWindow > 0 ? ` · ${outsideWindow.toLocaleString()} later interaction${outsideWindow === 1 ? '' : 's'} in All activity` : ''}
-          </span>
-        </div>
-      )}
+      {laterItems.length > 0 && <details className="auction-band__later"><summary>Later testimony · {laterItems.length} source entries</summary>
+        <ul>{laterItems.map(item => <li key={item.id}><a href={item.url} target="_blank" rel="noreferrer">{itemTitle(item)}</a></li>)}</ul>
+      </details>}
+
 
       {width > 0 && (
         <svg className="auction-band__svg" width={width} height={H} viewBox={`0 0 ${width} ${H}`} role="img"
@@ -207,7 +184,7 @@ const AuctionSequenceBand: React.FC<Props> = ({ auction, activeDay, onOpenDay, o
 
           {/* open */}
           <line x1={x(geom.openT)} y1={4} x2={x(geom.openT)} y2={axisY} stroke="var(--vp-pencil, #888)" strokeWidth={1} strokeDasharray="2 2" pointerEvents="none" />
-          <text x={x(geom.openT) + 3} y={12} fill="var(--vp-pencil, #888)" fontSize={8} fontWeight={700} letterSpacing="0.08em">OPEN</text>
+          <text x={x(geom.openT) + 3} y={12} fill="var(--vp-pencil, #888)" fontSize={8} fontWeight={700} letterSpacing="0.08em" aria-label={openingTitle}>{openingLabel}</text>
 
           {/* running high bid + every bid */}
           {stepPath && <path d={stepPath} fill="none" stroke="var(--vp-ink, #1a1a1a)" strokeWidth={1} pointerEvents="none" />}
@@ -241,19 +218,14 @@ const AuctionSequenceBand: React.FC<Props> = ({ auction, activeDay, onOpenDay, o
               <line x1={closeX} y1={4} x2={closeX} y2={axisY} stroke="var(--vp-ink, #1a1a1a)" strokeWidth={2} />
               <text x={closeX > width * 0.7 ? closeX - 4 : closeX + 4} y={12} textAnchor={closeX > width * 0.7 ? 'end' : 'start'}
                     fill="var(--vp-ink, #1a1a1a)" fontSize={8} fontWeight={700} letterSpacing="0.08em">
-                CLOSE · {resultLabel}
+                CLOSE
               </text>
             </g>
           )}
         </svg>
       )}
 
-      <div className="auction-band__legend">
-        <span>○ bid · ● last observed bid · line: running high bid</span>
-        <span>| comment · ▍ seller</span>
-        <span>{recordedEnd ? 'shaded: after the recorded end' : 'auction end clock unknown; after-close activity unclassified'}</span>
-        <span>a day opens its record; a mark opens its comment on BaT</span>
-      </div>
+
     </div>
   );
 };

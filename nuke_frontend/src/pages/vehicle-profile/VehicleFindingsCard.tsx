@@ -3,11 +3,14 @@
  * that the BYOK pass wrote into vehicle_images.ai_scan_metadata.
  *
  * Pulls metadata for the vehicle and rolls it into identity / powertrain /
- * provenance / evidence sections. Renders null if there are no findings.
+ * provenance / evidence sections, rendered through the kit: a Section with its
+ * coverage (images analyzed of images read, as of the newest analysis clock),
+ * Rows of label/value claims, no inline style. Renders null with no findings.
  */
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
-import { CollapsibleWidget } from '../../components/ui/CollapsibleWidget';
+import { Section, Rows, Row, Text } from '../../kit';
+import { useVehicleProfile } from './VehicleProfileContext';
 
 interface Props { vehicleId: string }
 
@@ -37,7 +40,15 @@ interface Findings {
   errors: number;                        // images that failed to fetch / classify
   confidenceSum: number;
   confidenceCount: number;
+  latestAnalyzedAt: string | null;   // the newest vision_analyzed_at among the rows read: the coverage clock
 }
+
+// The projection this card sent before vehicle_image_findings existed; used only while that function is not deployed.
+const LEGACY_FINDINGS_SELECT =
+  'classifier:ai_scan_metadata->classifier, error:ai_scan_metadata->error, vin:ai_scan_metadata->vin, license_plate:ai_scan_metadata->license_plate, engine:ai_scan_metadata->engine, engine_guess:ai_scan_metadata->engine_guess, engine_badge:ai_scan_metadata->engine_badge, transmission:ai_scan_metadata->transmission, color_visible:ai_scan_metadata->color_visible, interior_trim:ai_scan_metadata->interior_trim, odometer:ai_scan_metadata->odometer, mileage_at_listing:ai_scan_metadata->mileage_at_listing, source:ai_scan_metadata->source, part_number:ai_scan_metadata->part_number, critical:ai_scan_metadata->critical, privacy_concern:ai_scan_metadata->privacy_concern, attribution_concern:ai_scan_metadata->attribution_concern, phase:ai_scan_metadata->phase, scene_class:ai_scan_metadata->scene_class, make_guess:ai_scan_metadata->make_guess, model_guess:ai_scan_metadata->model_guess, year_guess:ai_scan_metadata->year_guess, confidence:ai_scan_metadata->confidence, byok_scene_type:ai_scan_metadata->byok_deep_analysis->scene_type, byok_build_phase_guess:ai_scan_metadata->byok_deep_analysis->build_phase_guess, byok_confidence:ai_scan_metadata->byok_deep_analysis->confidence, vision_analyzed_at';
+
+const isMissingFunction = (error: { code?: string; message?: string } | null | undefined): boolean =>
+  !!error && (error.code === 'PGRST202' || /could not find the function/i.test(error.message ?? ''));
 
 function inc(map: Record<string, number>, key: string | null | undefined) {
   if (!key) return;
@@ -46,23 +57,32 @@ function inc(map: Record<string, number>, key: string | null | undefined) {
 
 const VehicleFindingsCard: React.FC<Props> = ({ vehicleId }) => {
   const [findings, setFindings] = useState<Findings | null>(null);
+  // A plate read off a photo is personal data: masked for anyone but the owner (privacy is masking, not hiding).
+  const { isRowOwner, isVerifiedOwner, hasContributorAccess } = useVehicleProfile();
+  const canSeeIdentity = isRowOwner || isVerifiedOwner || hasContributorAccess;
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      // Project only the scalar keys this card reads — whole ai_scan_metadata
-      // rows carry multi-MB deep_analysis blobs (1.57MB -> 0.43MB for a
-      // 3.6k-image vehicle, measured on prod anon 2026-06-11).
-      const { data, error } = await supabase
-        .from('vehicle_images')
-        .select(
-          'classifier:ai_scan_metadata->classifier, error:ai_scan_metadata->error, vin:ai_scan_metadata->vin, license_plate:ai_scan_metadata->license_plate, engine:ai_scan_metadata->engine, engine_guess:ai_scan_metadata->engine_guess, engine_badge:ai_scan_metadata->engine_badge, transmission:ai_scan_metadata->transmission, color_visible:ai_scan_metadata->color_visible, interior_trim:ai_scan_metadata->interior_trim, odometer:ai_scan_metadata->odometer, mileage_at_listing:ai_scan_metadata->mileage_at_listing, source:ai_scan_metadata->source, part_number:ai_scan_metadata->part_number, critical:ai_scan_metadata->critical, privacy_concern:ai_scan_metadata->privacy_concern, attribution_concern:ai_scan_metadata->attribution_concern, phase:ai_scan_metadata->phase, scene_class:ai_scan_metadata->scene_class, make_guess:ai_scan_metadata->make_guess, model_guess:ai_scan_metadata->model_guess, year_guess:ai_scan_metadata->year_guess, confidence:ai_scan_metadata->confidence, byok_scene_type:ai_scan_metadata->byok_deep_analysis->scene_type, byok_build_phase_guess:ai_scan_metadata->byok_deep_analysis->build_phase_guess, byok_confidence:ai_scan_metadata->byok_deep_analysis->confidence',
-        )
-        .eq('vehicle_id', vehicleId)
-        .limit(5000);
-      if (error) return;
-      const rows = data || [];
-      const total = rows.length;
+      // One pass in the database over the frames this viewer may read (vehicle_image_findings, SECURITY INVOKER, so the
+      // image row policies still decide which). It replaces 26 arrow projections of ai_scan_metadata, each of which
+      // detoasted every frame's blob again (K5, anon, 2026-10-14: 534-624 ms and 239,000 buffer hits, now about 160 ms).
+      // `rows` holds each frame's non-null keys under the same names as before; `total` counts every frame read.
+      let rows: any[] = [];
+      let total = 0;
+      const read = await supabase.rpc('vehicle_image_findings', { p_vehicle_id: vehicleId });
+      if (!read.error && read.data) {
+        rows = Array.isArray((read.data as any).rows) ? (read.data as any).rows : [];
+        total = typeof (read.data as any).total === 'number' ? (read.data as any).total : rows.length;
+      } else if (isMissingFunction(read.error)) {
+        // The reader's migration has not been applied yet: read the frames the way this card always did.
+        const legacy = await supabase.from('vehicle_images').select(LEGACY_FINDINGS_SELECT).eq('vehicle_id', vehicleId).limit(5000);
+        if (legacy.error) return;
+        rows = legacy.data || [];
+        total = rows.length;
+      } else {
+        return;
+      }
       const out: Findings = {
         total,
         classified: 0,
@@ -88,6 +108,7 @@ const VehicleFindingsCard: React.FC<Props> = ({ vehicleId }) => {
         errors: 0,
         confidenceSum: 0,
         confidenceCount: 0,
+        latestAnalyzedAt: null,
       };
       const vins = new Set<string>();
       const plates = new Set<string>();
@@ -114,6 +135,7 @@ const VehicleFindingsCard: React.FC<Props> = ({ vehicleId }) => {
         if (m.byok_build_phase_guess) inc(out.phases, String(m.byok_build_phase_guess));
         if (typeof m.byok_confidence === 'number') { out.confidenceSum += m.byok_confidence; out.confidenceCount++; }
         if (m.error) out.errors++;
+        if (m.vision_analyzed_at && (!out.latestAnalyzedAt || String(m.vision_analyzed_at) > out.latestAnalyzedAt)) out.latestAnalyzedAt = String(m.vision_analyzed_at);
         if (m.vin) vins.add(String(m.vin));
         if (m.license_plate) plates.add(String(m.license_plate));
         if (m.engine) engines.add(String(m.engine));
@@ -158,178 +180,60 @@ const VehicleFindingsCard: React.FC<Props> = ({ vehicleId }) => {
 
   if (!findings || findings.classified === 0) return null;
 
-  const criticalEntries = Object.entries(findings.critical).sort((a, b) => b[1] - a[1]);
-  const attributionEntries = Object.entries(findings.attribution).sort((a, b) => b[1] - a[1]);
-  const privacyEntries = Object.entries(findings.privacy).sort((a, b) => b[1] - a[1]);
-
-  const row = (label: string, value: React.ReactNode) => (
-    <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--text-disabled, #ddd)', padding: '3px 0', gap: 8 }}>
-      <span style={{ fontSize: 9, letterSpacing: '0.06em', textTransform: 'uppercase', fontWeight: 700, color: 'var(--text-secondary, #666)', flexShrink: 0 }}>{label}</span>
-      <span style={{ fontFamily: 'Courier New, monospace', fontSize: 11, textAlign: 'right', wordBreak: 'break-word' }}>{value}</span>
-    </div>
-  );
-
-  const list = (arr: string[]) => arr.length === 0 ? '—' : arr.join(', ');
+  const humanize = (value: string) => value.replace(/_/g, ' ');
+  const list = (arr: string[], limit = 8) => arr.slice(0, limit).map(humanize).join(', ') + (arr.length > limit ? ` +${arr.length - limit}` : '');
+  const entries = (m: Record<string, number>) => Object.entries(m).sort((a, b) => b[1] - a[1]);
+  const total = (m: Record<string, number>) => Object.values(m).reduce((sum, n) => sum + n, 0);
+  const counted = (m: Record<string, number>) => entries(m).map(([k, n]) => `${humanize(k)} ${n}`).join(', ');
+  const distribution = (m: Record<string, number>, limit = 12) => {
+    const rows = entries(m);
+    if (rows.length === 0) return null;
+    return <>
+      {rows.slice(0, limit).map(([k, n]) => <Row key={k} label={humanize(k)} role="measure">{n.toLocaleString('en-US')}</Row>)}
+      {rows.length > limit && <Text role="caption">+{rows.length - limit} more</Text>}
+    </>;
+  };
+  const makeEntries = entries(findings.makeGuesses);
+  const meanConfidence = findings.confidenceCount > 0 ? findings.confidenceSum / findings.confidenceCount : null;
+  const coverage = { n: findings.classified, of: findings.total, grain: 'images analyzed', as_of: findings.latestAnalyzedAt };
 
   return (
-    <CollapsibleWidget
-      variant="profile"
-      title="Image-Analysis Findings"
-      defaultCollapsed={false}
-      badge={<span className="widget__count">{findings.classified}</span>}
-    >
-      <div style={{ padding: '8px 12px', fontFamily: 'Arial, sans-serif', color: 'var(--text, #1a1a1a)' }}>
-        <div style={{ fontSize: 9, letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 700, marginBottom: 4 }}>identity</div>
-        {findings.vins.length > 0 && row('VIN', list(findings.vins))}
-        {findings.plates.length > 0 && row('plate', list(findings.plates))}
-        {findings.colors.length > 0 && row('color', list(findings.colors.slice(0, 8)))}
-        {findings.interiorTrims.length > 0 && row('interior trim', list(findings.interiorTrims))}
-
-        {(findings.engines.length > 0 || findings.transmissions.length > 0 || findings.odometers.length > 0 || findings.mileageAtListings.length > 0) && (
-          <div style={{ fontSize: 9, letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 700, marginTop: 10, marginBottom: 4 }}>powertrain & mileage</div>
-        )}
-        {findings.engines.length > 0 && row('engine', list(findings.engines))}
-        {findings.transmissions.length > 0 && row('transmission', list(findings.transmissions))}
-        {findings.odometers.length > 0 && row('odometer (image)', list(findings.odometers))}
-        {findings.mileageAtListings.length > 0 && row('mileage at listing', list(findings.mileageAtListings))}
-
-        {findings.sources.length > 0 && (
-          <>
-            <div style={{ fontSize: 9, letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 700, marginTop: 10, marginBottom: 4 }}>provenance source</div>
-            {row('source', list(findings.sources))}
-          </>
-        )}
-
-        {criticalEntries.length > 0 && (
-          <>
-            <div style={{ fontSize: 9, letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 700, marginTop: 10, marginBottom: 4 }}>critical evidence ({criticalEntries.reduce((s, [, n]) => s + n, 0)})</div>
-            <div style={{ fontFamily: 'Courier New, monospace', fontSize: 10, lineHeight: 1.5 }}>
-              {criticalEntries.map(([k, n]) => (
-                <div key={k} style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--text-disabled, #ddd)', padding: '2px 0' }}>
-                  <span>{k.replace(/_/g, ' ')}</span>
-                  <span style={{ color: 'var(--text-secondary, #666)' }}>{n}</span>
-                </div>
-              ))}
-            </div>
-          </>
-        )}
-
-        {attributionEntries.length > 0 && (
-          <>
-            <div style={{ fontSize: 9, letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 700, marginTop: 10, marginBottom: 4, color: 'var(--error, #c00)' }}>attribution concerns ({attributionEntries.reduce((s, [, n]) => s + n, 0)})</div>
-            <div style={{ fontFamily: 'Courier New, monospace', fontSize: 10, lineHeight: 1.5 }}>
-              {attributionEntries.map(([k, n]) => (
-                <div key={k} style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--text-disabled, #ddd)', padding: '2px 0' }}>
-                  <span>{k.replace(/_/g, ' ')}</span>
-                  <span style={{ color: 'var(--error, #c00)' }}>{n}</span>
-                </div>
-              ))}
-            </div>
-          </>
-        )}
-
-        {privacyEntries.length > 0 && (
-          <>
-            <div style={{ fontSize: 9, letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 700, marginTop: 10, marginBottom: 4 }}>privacy gate ({privacyEntries.reduce((s, [, n]) => s + n, 0)})</div>
-            <div style={{ fontFamily: 'Courier New, monospace', fontSize: 10, lineHeight: 1.5 }}>
-              {privacyEntries.map(([k, n]) => (
-                <div key={k} style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--text-disabled, #ddd)', padding: '2px 0' }}>
-                  <span>{k.replace(/_/g, ' ')}</span>
-                  <span style={{ color: 'var(--text-secondary, #666)' }}>{n}</span>
-                </div>
-              ))}
-            </div>
-          </>
-        )}
-
-        {/* Deep substrate — the JSONB backbone the gate writes per image */}
-        {(() => {
-          const phaseEntries = Object.entries(findings.phases).sort((a, b) => b[1] - a[1]);
-          const sceneEntries = Object.entries(findings.scenes).sort((a, b) => b[1] - a[1]);
-          const makeEntries = Object.entries(findings.makeGuesses).sort((a, b) => b[1] - a[1]);
-          const modelEntries = Object.entries(findings.modelGuesses).sort((a, b) => b[1] - a[1]);
-          const yearEntries = Object.entries(findings.yearGuesses).sort((a, b) => b[1] - a[1]);
-          const colorObsEntries = Object.entries(findings.colorsObserved).sort((a, b) => b[1] - a[1]);
-          const avgConfidence = findings.confidenceCount > 0 ? (findings.confidenceSum / findings.confidenceCount) : null;
-          const blockHeader = (label: string, total?: number) => (
-            <div style={{ fontSize: 9, letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 700, marginTop: 12, marginBottom: 4 }}>
-              {label}{total != null ? ` (${total})` : ''}
-            </div>
-          );
-          const distroBlock = (entries: [string, number][], limit = 12, color = 'var(--text-secondary, #666)') => (
-            <div style={{ fontFamily: 'Courier New, monospace', fontSize: 10, lineHeight: 1.5 }}>
-              {entries.slice(0, limit).map(([k, n]) => (
-                <div key={k} style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--text-disabled, #ddd)', padding: '2px 0' }}>
-                  <span>{k.replace(/_/g, ' ')}</span>
-                  <span style={{ color }}>{n}</span>
-                </div>
-              ))}
-              {entries.length > limit && (
-                <div style={{ fontSize: 9, color: 'var(--text-secondary, #666)', paddingTop: 4 }}>
-                  +{entries.length - limit} more
-                </div>
-              )}
-            </div>
-          );
-          return (
-            <>
-              {phaseEntries.length > 0 && (
-                <>
-                  {blockHeader('build phases', phaseEntries.reduce((s, [, n]) => s + n, 0))}
-                  {distroBlock(phaseEntries)}
-                </>
-              )}
-
-              {sceneEntries.length > 0 && (
-                <>
-                  {blockHeader('scene classes', sceneEntries.reduce((s, [, n]) => s + n, 0))}
-                  {distroBlock(sceneEntries)}
-                </>
-              )}
-
-              {colorObsEntries.length > 0 && (
-                <>
-                  {blockHeader('colors observed', colorObsEntries.reduce((s, [, n]) => s + n, 0))}
-                  {distroBlock(colorObsEntries, 8)}
-                </>
-              )}
-
-              {(makeEntries.length > 0 || modelEntries.length > 0 || yearEntries.length > 0) && (
-                <>
-                  <div style={{ fontSize: 9, letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 700, marginTop: 12, marginBottom: 4, color: makeEntries.length > 1 ? 'var(--error, #c00)' : undefined }}>
-                    identity guesses
-                    {makeEntries.length > 1 && ' — contamination signal (>1 make)'}
-                  </div>
-                  {makeEntries.length > 0 && row('makes', makeEntries.map(([k, n]) => `${k} ${n}`).join(', '))}
-                  {modelEntries.length > 0 && row('models', modelEntries.map(([k, n]) => `${k} ${n}`).join(', '))}
-                  {yearEntries.length > 0 && row('years', yearEntries.map(([k, n]) => `${k} ${n}`).join(', '))}
-                </>
-              )}
-
-              {findings.partNumbers.length > 0 && (
-                <>
-                  {blockHeader('part numbers seen', findings.partNumbers.length)}
-                  <div style={{ fontFamily: 'Courier New, monospace', fontSize: 10, lineHeight: 1.6, color: 'var(--text-secondary, #666)' }}>
-                    {findings.partNumbers.slice(0, 30).join(' · ')}
-                    {findings.partNumbers.length > 30 && ` … +${findings.partNumbers.length - 30}`}
-                  </div>
-                </>
-              )}
-            </>
-          );
-        })()}
-
-        <div style={{ marginTop: 14, paddingTop: 8, borderTop: '1px solid var(--text-disabled, #ddd)', fontSize: 9, color: 'var(--text-secondary, #666)', display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-          <span>{findings.classified}/{findings.total} photos deep-analyzed (BYOK)</span>
-          {findings.confidenceCount > 0 && (
-            <span>avg confidence {(findings.confidenceSum / findings.confidenceCount).toFixed(2)}</span>
-          )}
-          {findings.errors > 0 && (
-            <span style={{ color: 'var(--error, #c00)' }}>{findings.errors} fetch errors</span>
-          )}
-        </div>
-      </div>
-    </CollapsibleWidget>
+    <Section title="Image analysis" coverage={coverage} ariaLabel="Image-analysis findings">
+      <Rows title="Identity">
+        {findings.vins.length > 0 && <Row label="VIN" role="measure">{list(findings.vins)}</Row>}
+        {findings.plates.length > 0 && <Row label="Plate" role="measure">{canSeeIdentity ? list(findings.plates) : <span title="Visible to the owner">••••</span>}</Row>}
+        {findings.colors.length > 0 && <Row label="Color">{list(findings.colors)}</Row>}
+        {findings.interiorTrims.length > 0 && <Row label="Interior trim">{list(findings.interiorTrims)}</Row>}
+      </Rows>
+      <Rows title="Powertrain and mileage">
+        {findings.engines.length > 0 && <Row label="Engine">{list(findings.engines)}</Row>}
+        {findings.transmissions.length > 0 && <Row label="Transmission">{list(findings.transmissions)}</Row>}
+        {findings.odometers.length > 0 && <Row label="Odometer in image" role="measure">{list(findings.odometers)}</Row>}
+        {findings.mileageAtListings.length > 0 && <Row label="Mileage at listing" role="measure">{list(findings.mileageAtListings)}</Row>}
+      </Rows>
+      <Rows title="Provenance source">
+        {findings.sources.length > 0 && <Row label="Source">{list(findings.sources)}</Row>}
+      </Rows>
+      <Rows title="Build phases" count={total(findings.phases)}>{distribution(findings.phases)}</Rows>
+      <Rows title="Scene classes" count={total(findings.scenes)}>{distribution(findings.scenes)}</Rows>
+      <Rows title="Colors observed" count={total(findings.colorsObserved)}>{distribution(findings.colorsObserved, 8)}</Rows>
+      <Rows title="Part numbers seen" count={findings.partNumbers.length}>
+        {findings.partNumbers.length > 0 && <Text role="caption">{findings.partNumbers.slice(0, 30).join(' · ')}{findings.partNumbers.length > 30 ? ` … +${findings.partNumbers.length - 30}` : ''}</Text>}
+      </Rows>
+      {/* Pipeline diagnostics describe the analysis run, not the vehicle. They stay with the people who can act on them. */}
+      {canSeeIdentity && (
+        <Rows title="Pipeline diagnostics, owner view">
+          {entries(findings.critical).length > 0 && <Row label="Critical evidence" role="measure">{counted(findings.critical)}</Row>}
+          {entries(findings.attribution).length > 0 && <Row label="Attribution concerns" role="measure">{counted(findings.attribution)}</Row>}
+          {entries(findings.privacy).length > 0 && <Row label="Privacy gate" role="measure">{counted(findings.privacy)}</Row>}
+          {makeEntries.length > 0 && <Row label={makeEntries.length > 1 ? 'Makes guessed, more than one: contamination signal' : 'Makes guessed'} role="measure">{makeEntries.map(([k, n]) => `${k} ${n}`).join(', ')}</Row>}
+          {entries(findings.modelGuesses).length > 0 && <Row label="Models guessed" role="measure">{entries(findings.modelGuesses).map(([k, n]) => `${k} ${n}`).join(', ')}</Row>}
+          {entries(findings.yearGuesses).length > 0 && <Row label="Years guessed" role="measure">{entries(findings.yearGuesses).map(([k, n]) => `${k} ${n}`).join(', ')}</Row>}
+          {meanConfidence != null && <Row label="Mean reported confidence" role="measure">{meanConfidence.toFixed(2)}</Row>}
+          {findings.errors > 0 && <Row label="Images that failed to classify" role="measure">{findings.errors}</Row>}
+        </Rows>
+      )}
+    </Section>
   );
 };
 
