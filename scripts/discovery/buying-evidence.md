@@ -183,3 +183,69 @@ Whole-market coverage is unmeasured; the population is the exact supplied record
 manifest. Exit 0 establishes complete selected reader access, not a supported match
 or available vehicle; exit 2 retains the partial receipt. No database changes,
 source activation, paid inference or contact is performed.
+
+## Listing inspection plan
+
+`--plan` selects a third read-only mode for 1–10 named public vehicles: an
+**estimate to inspect**, not an estimate to restore. It is the smallest first version
+of the listing → pre-purchase inspection pipeline in
+`docs/library/technical/work-order-intelligence.md` § "A job is a future receipt".
+Logic lives in `buying-evidence-plan.mjs`; the reviewed claim → operation vocabulary is
+`buying-evidence-plan-keywords.json`.
+
+```sh
+node scripts/discovery/buying-evidence.mjs --plan \
+  --vehicles VEHICLE_UUID,OTHER_VEHICLE_UUID --out /private/new-listing-plan
+
+node scripts/discovery/buying-evidence.mjs \
+  --cache /private/new-listing-plan/capture.json --out /private/replayed-listing-plan
+
+node --test scripts/discovery/buying-evidence-plan.test.mjs
+```
+
+Output is `capture.json` (rows and read receipts), `plan.json` and a readable
+`plan.txt`. Per vehicle, in order:
+
+1. **Identity.** Year, make, model, VIN, displacement, transmission, drivetrain and
+   induction from the record, the cached VIN decode (`vin_decoded_data`, only with a
+   success error code), the description extraction and regex matches in the listing text
+   with verbatim sentence excerpts. Each field is `agree`, `conflict`,
+   `unresolved_specificity`, `single_source` or `no_source`. Listing-text model tokens
+   are compared only within a reviewed series family. A conflict means the records
+   disagree; the inspection decides.
+2. **Claims.** Condition and unresolved-work sentences from the listing text (verbatim),
+   non-failure `description_discoveries` rows (flags, condition note, reported work,
+   modifications, documents, title, mileage; an exact excerpt only when the extracted text
+   appears in the listing text, otherwise marked paraphrase), and current
+   `vehicle_observations` of kind `condition` (rubric notes, text and image inference).
+   Each claim keeps its source row and path, method, clocks and recorded confidence;
+   LLM extraction confidence stays null. Extraction failure rows are excluded and counted.
+   An image claim counts only when its `vehicle_images` row is on the same vehicle,
+   nonsensitive and from a reviewed listing-import source for the listing host; others are
+   excluded and counted. Identical text from several projections becomes one checklist item.
+3. **Candidate operations.** Condition claims matched by the keyword table to live
+   `labor_operations` (single book value, no range) and `stage_transition_labor_map` rows or
+   summed chains (author-declared min/typical/max; materials currency unstated). Every target
+   is labelled `seed_uncalibrated` with year applicability; unmatched condition claims are
+   listed as having no reference operation. Reported completed work and modifications never
+   produce operations.
+4. **Rate.** `resolve_labor_rate()` called with no arguments and shown exactly as returned.
+   Its contract branch reads the absent `work_contracts` only when client and organization
+   are both passed, so it is never executed here. The rate is not multiplied into hours.
+5. **Parts.** Only `catalog_parts` rows with `price_current > 0`, a name match for the
+   operation's term, a `fits_models` token equal to a record model token and the record
+   year inside the row's year range; labelled `text_match_unverified`, and unusable while
+   year, make or model conflict.
+6. **PPI checklist.** Every identity conflict and every claim becomes an item with an empty
+   finding slot: `inspection_type: pre_purchase`, `system`, `verdict`
+   (supports/contradicts/unknown), `finding`, `severity` (info/monitor/concern/critical),
+   `evidence_photo_ref`, inspector and clock, following
+   `docs/library/reference/dictionary/inspection.md`.
+
+Not read: comment discoveries, auction comments, component identifications, image
+condition observations, condition scores and page captures; each is named in the report's
+retrieval boundary. Reads follow the existing bounds (READ ONLY, 5-second statements,
+public parent gate repeated on child reads, keyset pages, two-failure stop, private 0700/0600
+output outside the checkout, no SQL errors echoed). No paid inference, scraping, writes or
+contact. Exit 0: all parents public, all selected reads complete and the rate read; exit 2
+retains the partial plan.

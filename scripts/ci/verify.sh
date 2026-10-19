@@ -96,7 +96,7 @@ if node --test "$ROOT/scripts/ci/invalid-indexes.test.mjs" >"$CI_TMP_DIR/ci_inva
 else red "  ✗ invalid-index detector contract FAILED"; cat "$CI_TMP_DIR/ci_invalid_indexes_tests.out"; fail=1; fi
 if node --test "$ROOT/scripts/ci/owner-writable-views.test.mjs" >"$CI_TMP_DIR/ci_owner_writable_views_tests.out" 2>&1; then grn "  ✓ owner-writable view detector contract"
 else red "  ✗ owner-writable view detector contract FAILED"; cat "$CI_TMP_DIR/ci_owner_writable_views_tests.out"; fail=1; fi
-if node --test "$ROOT/scripts/discovery/buying-evidence.test.mjs" "$ROOT/scripts/discovery/buying-evidence-matching.test.mjs" >"$CI_TMP_DIR/ci_buying_evidence_tests.out" 2>&1; then grn "  ✓ buying-evidence source, matching and refusal contracts"
+if node --test "$ROOT/scripts/discovery/buying-evidence.test.mjs" "$ROOT/scripts/discovery/buying-evidence-matching.test.mjs" "$ROOT/scripts/discovery/buying-evidence-plan.test.mjs" >"$CI_TMP_DIR/ci_buying_evidence_tests.out" 2>&1; then grn "  ✓ buying-evidence source, matching, plan and refusal contracts"
 else red "  ✗ buying-evidence source and refusal contracts FAILED"; cat "$CI_TMP_DIR/ci_buying_evidence_tests.out"; fail=1; fi
 ratchet "ghost-refs"       "$(count_ghost)"     "$(b no-dead-asset-references errors)"
 ratchet "raw-fetch"        "$(count_rawfetch)"  "$(b no-raw-fetch violations)"
