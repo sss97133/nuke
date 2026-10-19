@@ -159,6 +159,51 @@ ALTER TABLE public.vehicle_images ADD COLUMN user_id uuid, ADD COLUMN image_url 
   ADD COLUMN is_sensitive boolean, ADD COLUMN is_superseded boolean, ADD COLUMN vision_gate_status text;
 CREATE TABLE public.organization_vehicles(organization_id uuid, vehicle_id uuid);
 \ir helpers/facility_tables_live_20261019.sql
+ALTER TABLE public.user_tools ADD COLUMN IF NOT EXISTS category text, ADD COLUMN IF NOT EXISTS total_quantity integer, ADD COLUMN IF NOT EXISTS total_spent numeric;
+ALTER TABLE public.tool_inventory ADD COLUMN IF NOT EXISTS category text, ADD COLUMN IF NOT EXISTS purchase_price numeric;
+ALTER TABLE public.business_ownership ADD COLUMN IF NOT EXISTS ownership_type text;
+ALTER TABLE public.organizations ADD COLUMN IF NOT EXISTS business_type text, ADD COLUMN IF NOT EXISTS city text, ADD COLUMN IF NOT EXISTS state text;
+ALTER TABLE public.organization_images ADD COLUMN IF NOT EXISTS taken_at timestamptz, ADD COLUMN IF NOT EXISTS created_at timestamptz DEFAULT now();
+CREATE TABLE public.timeline_events(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), organization_id uuid, user_id uuid, event_date date);
+CREATE TABLE public.contractor_work_contributions(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), organization_id uuid, contractor_user_id uuid, work_date date);
+CREATE FUNCTION public.org_site_photos(p_org_id uuid, p_user_id uuid, p_from timestamptz, p_to timestamptz, p_radius_m double precision DEFAULT 150)
+RETURNS TABLE(image_id uuid, vehicle_id uuid, taken_at timestamptz, shared_with integer, vehicle_linked boolean)
+LANGUAGE sql STABLE AS $$ SELECT NULL::uuid, NULL::uuid, NULL::timestamptz, NULL::integer, NULL::boolean WHERE false $$;
+CREATE FUNCTION public.relation_weight(p_last timestamptz, p_at timestamptz DEFAULT now(), p_half_life interval DEFAULT '06:00:00')
+RETURNS double precision LANGUAGE sql IMMUTABLE SET search_path TO 'public' AS $$
+  SELECT CASE WHEN p_last IS NULL OR p_at IS NULL OR p_last > p_at THEN 0::double precision
+    WHEN extract(epoch FROM (p_at - p_last)) / extract(epoch FROM p_half_life) > 50 THEN 0::double precision
+    ELSE power(2::double precision, -extract(epoch FROM (p_at - p_last)) / extract(epoch FROM p_half_life)) END $$;
+CREATE FUNCTION public.relation_state(p_weight double precision) RETURNS text LANGUAGE sql IMMUTABLE SET search_path TO 'public' AS $$
+  SELECT CASE WHEN p_weight >= 0.5 THEN 'live' WHEN p_weight >= 0.0625 THEN 'stalling' ELSE 'dormant' END $$;
+CREATE FUNCTION public.user_org_relations(p_user_id uuid, p_at timestamptz DEFAULT now()) RETURNS jsonb LANGUAGE sql STABLE AS $$
+  SELECT jsonb_build_object('relations', COALESCE(jsonb_agg(jsonb_build_object('organization_id', oc.organization_id, 'name', NULL,
+    'type', NULL, 'role', oc.role, 'membership_status', oc.status,
+    'relation', jsonb_build_object('weight', 0.5, 'state', 'live', 'last_contribution_at', '2026-01-04T12:00:00Z'))), '[]'::jsonb))
+  FROM public.organization_contributors oc WHERE oc.user_id = p_user_id $$;
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO service_role;
+ALTER TABLE public.component_events ADD COLUMN component_table text, ADD COLUMN component_id uuid, ADD COLUMN event_type text,
+  ADD COLUMN actor_id uuid, ADD COLUMN event_date date, ADD COLUMN description text, ADD COLUMN evidence_ids uuid[];
+CREATE TABLE public.actor_capabilities(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), actor_id uuid NOT NULL REFERENCES public.actors(id) ON DELETE CASCADE,
+  capability_type text NOT NULL CONSTRAINT chk_ac_capability_type CHECK (capability_type = ANY (ARRAY['engine_machining','engine_assembly','engine_tuning',
+    'engine_diagnostics','transmission_rebuild','differential_rebuild','transfer_case_rebuild','brake_rebuild','brake_fabrication','suspension_rebuild',
+    'suspension_fabrication','steering_rebuild','steering_fabrication','paint_refinish','paint_correction','paint_custom','body_repair','body_fabrication',
+    'rust_repair','panel_replacement','frame_repair','frame_fabrication','frame_reinforcement','upholstery_repair','upholstery_full','convertible_top',
+    'electrical_repair','electrical_custom','wiring_harness','welding_mig','welding_tig','welding_stick','welding_gas','welding_brazing',
+    'fabrication_sheet_metal','fabrication_tube','fabrication_exhaust','glass_installation','glass_fabrication','chrome_plating','powder_coating',
+    'anodizing','machine_lathe','machine_mill','machine_cnc','machine_hone','machine_grind','appraisal','inspection','documentation','judging',
+    'transport','storage','detailing','general_maintenance','diagnostics_obd','diagnostics_analog','fuel_system','cooling_system','exhaust_system',
+    'intake_system','ac_system','audio_system','hydraulics'])),
+  complexity_tier text NOT NULL CONSTRAINT chk_ac_complexity_tier CHECK (complexity_tier = ANY (ARRAY['basic','intermediate','advanced','expert','master'])),
+  evidence_count integer NOT NULL CONSTRAINT chk_ac_evidence_count CHECK (evidence_count >= 0), first_demonstrated date, last_demonstrated date,
+  best_outcome_vehicle_id uuid, best_outcome_description text, avg_spec_compliance numeric, notes text,
+  created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT chk_ac_dates CHECK (last_demonstrated IS NULL OR first_demonstrated IS NULL OR last_demonstrated >= first_demonstrated));
+ALTER TABLE public.actor_capabilities ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Anyone can view actor_capabilities" ON public.actor_capabilities FOR SELECT USING (true);
+GRANT SELECT ON public.actor_capabilities TO anon, authenticated;
+GRANT ALL ON public.actor_capabilities TO service_role;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS created_at timestamptz DEFAULT now();
 
 -- This build in filename order.
 \echo REPLAY 20261019005027_work_order_resource_evidence.sql
@@ -255,9 +300,13 @@ CREATE TABLE public.organization_vehicles(organization_id uuid, vehicle_id uuid)
 \ir ../migrations/20261019231500_job_loop_grant_tidy.sql
 \echo REPLAY 20261019233000_post_work_request.sql
 \ir ../migrations/20261019233000_post_work_request.sql
+\echo REPLAY 20261019234000_post_work_request_description.sql
+\ir ../migrations/20261019234000_post_work_request_description.sql
 \echo REPLAY 20261019234500_start_work.sql
 \ir ../migrations/20261019234500_start_work.sql
 
+\echo REPLAY 20261019235000_capability_fold.sql
+\ir ../migrations/20261019235000_capability_fold.sql
 -- Plan check and final state.
 \set replay_problems `scripts/ci/job-loop-replay-check.sh | tr '\n' ' '`
 SELECT t_assert(btrim(:'replay_problems') = '', 'replay plan covers the build in filename order: ' || COALESCE(NULLIF(btrim(:'replay_problems'), ''), 'ok'));
