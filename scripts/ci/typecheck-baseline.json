@@ -5,7 +5,7 @@
     "tsconfig.app.json",
     "tsconfig.node.json"
   ],
-  "total": 554,
+  "total": 529,
   "files": {
     "nuke_frontend/src/branding/ModeSwitcher.tsx": 1,
     "nuke_frontend/src/components/AdminDashboard.tsx": 1,
@@ -15,7 +15,6 @@
     "nuke_frontend/src/components/HeaderSearch.test.ts": 4,
     "nuke_frontend/src/components/HeaderSearch.tsx": 1,
     "nuke_frontend/src/components/NotificationCenter.tsx": 4,
-    "nuke_frontend/src/components/PricingIntelligence.tsx": 25,
     "nuke_frontend/src/components/PurchaseAgreementManager.tsx": 1,
     "nuke_frontend/src/components/SmartInvoiceUploader.tsx": 5,
     "nuke_frontend/src/components/UniversalImageUpload.tsx": 3,
