@@ -8,6 +8,37 @@ CREATE TABLE public.image_observations (
 );
 RESET ROLE;
 \ir ../migrations/20261019020000_device_capture_session_profiles.sql
+-- Recreate the observed live pre-forward trigger body so this contract executes
+-- the deployment migration's guarded replacement branch, not only its replay path.
+CREATE OR REPLACE FUNCTION public.enforce_vin_uniqueness()
+ RETURNS trigger
+ LANGUAGE plpgsql
+AS $function$
+declare
+  v_norm text;
+  v_existing uuid;
+begin
+  if new.vin is null or length(trim(new.vin)) < 11 then
+    return new;
+  end if;
+  v_norm := upper(trim(new.vin));
+  select id into v_existing
+    from vehicles
+   where upper(trim(vin)) = v_norm
+     and id <> new.id
+     and status is distinct from 'merged'
+   limit 1;
+  if v_existing is not null then
+    raise exception 'VIN % already exists on vehicle %', v_norm, v_existing
+      using errcode = 'unique_violation',
+            hint = 'Attach observations to the existing vehicle via ingest-observation, or resolve via merge_proposals.';
+  end if;
+  return new;
+end;
+$function$;
+SELECT pg_temp.ok('forward migration fixture matches the observed live trigger definition',
+ md5(pg_get_functiondef('public.enforce_vin_uniqueness()'::regprocedure))='3896038eacd5775f349b5b5d22a8a9c3'); -- gitleaks:allow (function-definition fingerprint, not a credential)
+\ir ../migrations/20261019190602_device_identity_classic_serial_make_scope.sql
 
 -- All fixture writes below remain in the disposable dm_refinement_* database.
 INSERT INTO public.profiles(id) VALUES (pg_temp.u('capture'));
