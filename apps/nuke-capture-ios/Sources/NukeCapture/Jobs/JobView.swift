@@ -99,8 +99,8 @@ struct JobPathContent: View {
             case .loaded(let p):
                 header(p)
                 railSection(p)
-                quoteSection
-                if let offers { JobOffersSection(offers: offers, onChanged: onChanged) }
+                quoteSection.id("job-quote")
+                if let offers { JobOffersSection(offers: offers, onChanged: onChanged).id("job-offers") }
                 if let inspections { JobInspectionSection(read: inspections) }
                 if let completion = CompletionState(path: p) {
                     JobCompletionSection(workOrderId: workOrderId, state: completion, viewerSlots: p.viewer?.slots ?? [],
