@@ -60,6 +60,7 @@ Standing rules the code carries:
   the raw original outside the full-screen viewer.
 - **Payments open Stripe, never compose an amount.** A job's `pay_invoice` action comes only from the server (`viewer.actions`, offered to the work order customer while a balance is due). `JobPayment.swift` passes back its `work_order_id` to `create-work-order-invoice-checkout` and opens the returned page only when it is https on stripe.com. Nothing is charged until the customer finishes on Stripe; the payment reaches the job through `stripe-webhook`. Collection only: the app shows no payout or release.
 - **Job history is testimony until someone signs.** A stage's `retained_testimony` (counts of claims quoted from retained work messages) renders in `JobTestimony.swift` on the attributed rung as "N messages from the shop say…", never as accepted, done or paid, and never changes the stage. `JobOperationsSection` takes each operation's rung from `work_order_operations_read`'s `requested_by_basis` (signed → proven, quoted from the work order's text → attributed, no source → recorded); a "complete" line status is the record's mark, not a completion Sign. `JobEvidenceSection` shows `work_order_evidence_read` filings, counting photos the viewer may not see, and names an operation for visitors only in the operations reader's redacted words.
+- **Notifications mirror the web's NotificationCenter.** The Work tab reads the account's latest 50 `user_notifications` rows under their own-row policy (exact count beside them), the unread count from `get_unread_notification_count`, and marks read only from a tap through `mark_notification_read` / `mark_all_notifications_read` (`Notifications/`). A row opens a job or conversation when its metadata names one (`work_order_id`, `contact_request_id`), else the web's order: `action_url`, `vehicle_id`, `organization_id`; a nuke.ag path with no screen opens on the web, and other sites are not opened. Anything that needs a Sign stays in `my_signature_queue`. The Work badge is the unread count plus the queue's stated total. There is no push (no APNs entitlement or registration).
 - **Uploads are keyed by their bytes.** The storage path is `users/<uid>/capture-relay/<sha256>/<filename>`
   (`Config.storagePath`). The filename alone wraps at IMG_9999: by 2026-10-15, 586 old paths each held rows of
   different photos (1,266 rows, at least 598 showing another photo's bytes). Never key an object by a name the
@@ -405,6 +406,8 @@ Sources/NukeCapture/
   Jobs/AcceptQuoteSheet.swift      the customer's Sign on one quote version (accept_work_order_quote)
   Vehicle/                         Work card (vehicle_work_orders_read) and statement view
   Profile/                         provider face (provider_profile_read) and jobs on record
+  Provider/                        provider standing: link evidence (actor_link_claim_evidence_read), work days and
+                                   day-rate terms (provider_productivity_read), agent-signed register (owner_delegated_signs_read)
   Contact/                         Contact via Nuke: request sheet, Work inbox, thread (in-app only)
   Explore/                         Plan the work (listing_work_plan_read) and the Order inspection Sign
   Jobs/JobCloseout*.swift + CloseoutSheets.swift  completion, invoice, payment witness, evidence Signs
