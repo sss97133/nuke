@@ -48,6 +48,8 @@ final class ParityUITests: XCTestCase {
     private func type(_ app: XCUIApplication, into placeholder: String, _ value: String) {
         let f = app.textFields.matching(NSPredicate(format: "placeholderValue == %@", placeholder)).firstMatch
         reveal(f, in: app).tap()
+        if !app.keyboards.firstMatch.waitForExistence(timeout: 4) { f.tap() }
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 6), "the field never took focus")
         f.typeText(value + "\n")      // Return closes the keyboard so the next field can be reached
     }
 

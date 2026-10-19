@@ -92,6 +92,9 @@ final class JobFlowUITests: XCTestCase {
         while !field.exists && !view.exists && Date() < deadline { usleep(250_000) }
         let target = field.exists ? field : view
         reveal(target, in: app).tap()
+        // Slow runners may not have focused the field yet: wait for the keyboard, tap again if it isn't up.
+        if !app.keyboards.firstMatch.waitForExistence(timeout: 4) { target.tap() }
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 6), "the field never took focus")
         target.typeText(value)
     }
 
@@ -207,6 +210,8 @@ final class JobFlowUITests: XCTestCase {
 
     func testAcceptingACoSignedOfferSendsTheTermsHash() {
         let app = launch("client", scenario: "cosign", ["NUKE_DEBUG_JOB_ID": jobId, "NUKE_DEBUG_SCROLL_TO": "job-offers"])
+        XCTAssertTrue(app.staticTexts["Stages"].waitForExistence(timeout: 20))
+        sleep(2)
         let accept = app.buttons["Accept offer"].firstMatch
         reveal(accept, in: app).tap()
         reveal(text(app, contains: "Co-signed by Fixture Garage"), in: app)
