@@ -1,7 +1,8 @@
 import { assertEquals } from "jsr:@std/assert@1";
 import {
-  type BonhamsSaleDoc, bonhamsLot, bonhamsLotPhase, bonhamsSaleKind, type MecumIndexHit, mecumLot, mecumRunDatesToRead, mecumSalesToRead,
-  parseBonhamsBidStates, parsePcarBids, parsePcarBoard,
+  aucticEventListings, aucticEvents, aucticEventsToRead, aucticState, bjCalendar, bjDocketLots, bjDocketMatch, bjEventsToRead,
+  type BonhamsSaleDoc, bonhamsLot, bonhamsLotPhase, bonhamsSaleKind, inertiaPage, type MecumIndexHit, mecumLot, mecumRunDatesToRead,
+  mecumSalesToRead, parseBonhamsBidStates, parsePcarBids, parsePcarBoard,
 } from "./boards.ts";
 import { type AmLotDoc, type AmSale, amIsVehicleLot, amOpenTimedSales, amSales, amTimedLot } from "./boards.ts";
 
@@ -349,4 +350,112 @@ Deno.test("mecumLot: a crossed lot carries its result, its hammer bid when state
 Deno.test("mecumLot leaves out Road Art and records without a lot page", () => {
   assertEquals(mecumLot(Z443, MECUM_READ_AT), null);
   assertEquals(mecumLot({ ...W290, permalink: "" }, MECUM_READ_AT), null);
+});
+
+// Barrett-Jackson, read 2026-10-20 ~19:50Z, trimmed to the fields read: its calendar (www.barrett-jackson.com/api/non-past-events),
+// its bidding platform bid.barrett-jackson.com (Auctic: the home page, the events archive, the Las Vegas 2026 event page as
+// Inertia JSON) and its docket API (/api/docket?slug=2026-las-vegas&type=Vehicles).
+const BJ_CALENDAR = [
+  { attributes: { start_date: "2026-11-05", end_date: "2026-11-12", name: "2026 Nov. Digital Select", slug: "2026-november-digital-select",
+    event_status: "select_preview", event_type: "Online", event_timezone: "America/Phoenix" } },
+  { attributes: { start_date: "2027-01-23", end_date: "2027-01-31", name: "2027 Scottsdale", slug: "2027-scottsdale",
+    event_status: "upcoming", event_type: "Live", event_timezone: "America/Phoenix" } },
+];
+const AUCTIC_VERSION = "3e5e1baf188c3de95b428d7839516208"; // gitleaks:allow (the site's public asset-build hash, not a secret)
+const AUCTIC_HOME_HTML = `<div class="relative"> <div id="app" data-page="${
+  JSON.stringify({ component: "Site/Index", props: { events: [], auctions: [], featured_listings: [] }, url: "/", version: AUCTIC_VERSION })
+    .replace(/"/g, "&quot;")}"></div></div>`;
+const AUCTIC_ARCHIVE_EVENTS = [
+  { id: 327, title: "Las Vegas 2026 Collector Car Auction", slug: "las-vegas-2026-collector-car-auction", status: "archived", event_type: "live_auction",
+    category: "Collector Cars", start_time: "2026-09-10T11:59:00.000000Z", end_time: "2026-09-12T23:58:00.000000Z" },
+  { id: 328, title: "Las Vegas 2026 - Automobilia Auction", slug: "las-vegas-2026-automobilia-auction", status: "archived", event_type: "live_auction",
+    category: "Automobilia", start_time: "2026-09-10T09:36:00.000000Z", end_time: "2026-09-12T11:00:00.000000Z" },
+];
+const AUCTIC_EVENT_PROPS = {
+  event: { id: 327, title: "Las Vegas 2026 Collector Car Auction", slug: "las-vegas-2026-collector-car-auction", event_type: "live_auction",
+    status: "archived", start_time: "2026-09-10T11:59:00.000000Z", end_time: "2026-09-12T23:58:00.000000Z" },
+  listings: { current_page: 1, per_page: 4000, total: 599, data: [
+    { id: 11987, slug: "1981-honda-atc200-three-wheeler", url: "/events/listing/11987/1981-honda-atc200-three-wheeler", lot_number: "1",
+      title: "1981 HONDA ATC200 THREE-WHEELER", status: "sold", start_time: "2026-09-10T11:00:00+00:00", end_time: "2026-09-10T17:55:25+00:00",
+      starting_bid_amount: 0, highest_bid_amount: 2500, sold_price: 2500, number_of_bids: 17,
+      hero: "https://vapor-barrettjackson-production.s3.amazonaws.com/40413/conversions/340c2478-c28b-f111-ab10-000d3a337bf6_a1cd7b50-0093-409f-94f1-649dfe7d721d_Web-xl.jpg",
+      sale_day: 1, sale_method: "auction", show_countdown: false, meta: { is_manual_close: true, is_onsite: false, sale_day: 1 } },
+    { id: 11988, slug: "1979-honda-atc110-three-wheeler", url: "/events/listing/11988/1979-honda-atc110-three-wheeler", lot_number: "2",
+      title: "1979 HONDA ATC110 THREE-WHEELER", status: "sold", start_time: "2026-09-10T11:02:00+00:00", end_time: "2026-09-10T17:56:54+00:00",
+      starting_bid_amount: 0, highest_bid_amount: 1000, sold_price: 1000, number_of_bids: 5,
+      hero: "https://vapor-barrettjackson-production.s3.amazonaws.com/40421/conversions/a3ce0d7f-ff8a-f111-ab10-000d3a5cf316_777fcfb1-0f47-4215-8353-53fbac613bf7_Web-xl.jpg",
+      sale_day: 1, sale_method: "auction", show_countdown: false, meta: { is_manual_close: true, is_onsite: false, sale_day: 1 } },
+    { id: 12650, slug: "1965-ford-mustang", url: "/events/listing/12650/1965-ford-mustang", lot_number: "45", title: "1965 FORD MUSTANG",
+      status: "passed", start_time: "2026-09-10T12:50:24+00:00", end_time: "2026-09-10T19:01:13+00:00", starting_bid_amount: 0,
+      highest_bid_amount: 1000, sold_price: null, number_of_bids: 1,
+      hero: "https://vapor-barrettjackson-production.s3.amazonaws.com/58260/conversions/7b0a570f-e677-f011-b4cc-6045bd024560_f190071e-3f13-4916-bf5b-00e9c121b273_Web-xl.jpg",
+      sale_day: 1, sale_method: "auction", show_countdown: false, meta: { is_manual_close: true, is_onsite: false, sale_day: 1 } },
+  ] },
+};
+const BJ_DOCKET = { data: [
+  { attributes: { lot_number: "1", title: "1981 HONDA ATC200 THREE-WHEELER", slug: "1981-honda-atc200-three-wheeler-302207", item_id: "302207",
+    event_slug: "2026-las-vegas", year: "1981", make: "HONDA", model: "ATC200", reserve_type_name: "No Reserve" } },
+  { attributes: { lot_number: "2", title: "1979 HONDA ATC110 THREE-WHEELER", slug: "1979-honda-atc110-three-wheeler-302193", item_id: "302193",
+    event_slug: "2026-las-vegas", year: "1979", make: "HONDA", model: "ATC110", reserve_type_name: "No Reserve" } },
+], meta: { pagination: { page: "1", pageCount: 1, pageSize: "1000", total: 594 } } };
+
+Deno.test("bjCalendar and bjEventsToRead: nothing is read on 20 Oct; the Digital Select is read from a day before it opens", () => {
+  const cal = bjCalendar(BJ_CALENDAR);
+  assertEquals(cal.map((e) => [e.slug, e.start_date, e.end_date, e.type]), [
+    ["2026-november-digital-select", "2026-11-05", "2026-11-12", "Online"], ["2027-scottsdale", "2027-01-23", "2027-01-31", "Live"]]);
+  assertEquals(bjEventsToRead(cal, Date.parse("2026-10-20T19:50:00Z")), []);
+  assertEquals(bjEventsToRead(cal, Date.parse("2026-11-04T00:00:00Z")).map((e) => e.slug), ["2026-november-digital-select"]);
+  assertEquals(bjEventsToRead(cal, Date.parse("2026-11-14T23:59:00Z")).map((e) => e.slug), ["2026-november-digital-select"]);
+  assertEquals(bjEventsToRead(cal, Date.parse("2026-11-15T00:00:00Z")), []);
+  assertEquals(bjCalendar({ error: "x" }), []);
+});
+
+Deno.test("inertiaPage reads the Auctic home page's props and asset version; today it lists no event", () => {
+  const page = inertiaPage(AUCTIC_HOME_HTML)!;
+  assertEquals([page.component, page.version, aucticEvents(page.props)], ["Site/Index", AUCTIC_VERSION, []]);
+  assertEquals(inertiaPage("<html>no app</html>"), null);
+});
+
+Deno.test("aucticEventsToRead never reads an archived or automobilia event", () => {
+  const events = aucticEvents({ events: AUCTIC_ARCHIVE_EVENTS });
+  assertEquals(events.map((e) => [e.id, e.category, e.status]), [[327, "Collector Cars", "archived"], [328, "Automobilia", "archived"]]);
+  assertEquals(aucticEventsToRead(events, Date.parse("2026-09-11T18:00:00Z")), []);
+  // The archive keeps no record of these events' status while they ran; with the archived flag cleared, the window is
+  // two hours before the event opens to 12 hours after it ends, and the automobilia event is still left out.
+  const running = events.map((e) => ({ ...e, status: "" }));
+  assertEquals(aucticEventsToRead(running, Date.parse("2026-09-11T18:00:00Z")).map((e) => e.id), [327]);
+  assertEquals(aucticEventsToRead(running, Date.parse("2026-09-10T09:58:00Z")).map((e) => e.id), []);
+  assertEquals(aucticEventsToRead(running, Date.parse("2026-09-13T11:57:00Z")).map((e) => e.id), [327]);
+});
+
+Deno.test("aucticEventListings reads each lot's status, times, bid, sold price and count; sold and passed lots are closed", () => {
+  const { event, listings } = aucticEventListings(AUCTIC_EVENT_PROPS);
+  assertEquals([event?.id, event?.type, listings.length], [327, "live_auction", 3]);
+  assertEquals(listings[0], {
+    id: 11987, lot_number: "1", title: "1981 HONDA ATC200 THREE-WHEELER", status: "sold", opens: "2026-09-10T11:00:00+00:00",
+    closes: "2026-09-10T17:55:25+00:00", high_bid: 2500, sold_price: 2500, bids: 17,
+    image: "https://vapor-barrettjackson-production.s3.amazonaws.com/40413/conversions/340c2478-c28b-f111-ab10-000d3a337bf6_a1cd7b50-0093-409f-94f1-649dfe7d721d_Web-xl.jpg",
+    url: "https://bid.barrett-jackson.com/events/listing/11987/1981-honda-atc200-three-wheeler", manual_close: true,
+  });
+  assertEquals([listings[2].status, listings[2].high_bid, listings[2].sold_price], ["passed", 1000, null]);
+  const at = Date.parse("2026-09-10T20:00:00Z");
+  assertEquals(listings.map((l) => aucticState(l, at)), ["closed", "closed", "closed"]);
+  // An active lot (as lot 1 was on its sale day) is open once its own bidding opens, upcoming before.
+  assertEquals(aucticState({ ...listings[0], status: "active" }, Date.parse("2026-09-10T12:00:00Z")), "open");
+  assertEquals(aucticState({ ...listings[0], status: "active" }, Date.parse("2026-09-10T10:00:00Z")), "upcoming");
+  assertEquals(aucticState({ ...listings[0], status: "paused" }, Date.parse("2026-09-10T12:00:00Z")), "upcoming");
+});
+
+Deno.test("bjDocketMatch keys a lot to the docket lot with its number and title, in the spelling vehicles hold, and never guesses", () => {
+  const { listings } = aucticEventListings(AUCTIC_EVENT_PROPS);
+  const docket = bjDocketLots(BJ_DOCKET);
+  assertEquals(docket[0], { lot_number: "1", title: "1981 HONDA ATC200 THREE-WHEELER", year: 1981, make: "HONDA", model: "ATC200", no_reserve: true,
+    url: "https://barrett-jackson.com/2026-las-vegas/docket/vehicle/1981-honda-atc200-three-wheeler-302207" });
+  const match = bjDocketMatch(listings, docket);
+  assertEquals([...match.entries()].map(([id, d]) => [id, d.url]), [
+    [11987, "https://barrett-jackson.com/2026-las-vegas/docket/vehicle/1981-honda-atc200-three-wheeler-302207"],
+    [11988, "https://barrett-jackson.com/2026-las-vegas/docket/vehicle/1979-honda-atc110-three-wheeler-302193"],
+  ]);
+  // lot 45 (passed) is not in the docket the API returns after the sale; a lot number with another title is no match
+  assertEquals(bjDocketMatch([{ ...listings[1], lot_number: "1" }], docket).size, 0);
 });
