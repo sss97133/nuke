@@ -19,6 +19,9 @@
 --   * A fold row is keyed by the identity the lot named. A user who claimed the identity is read through
 --     v_vehicle_owner_periods (resolved_profile_id), so the profile-keyed readers (garage, reconciliation, possession,
 --     ownership rights) never see an unverified auction period as the user's own holding.
+--   * Fold rows are private by default: a restrictive SELECT policy hides them from anon and authenticated, the reader
+--     view, the flag table and every function are service_role only. Making the chain public is a product decision, done by
+--     dropping vehicle_ownerships_fold_rows_read_guard (and granting the view).
 --   * Rows are never deleted: a re-run supersedes (superseded_at, superseded_by, superseded_reason) and keeps the prior row.
 --   * Cloned from the live definitions, 2026-10-20: set_single_current_owner() md5 63b70426 (prefix),
 --     v_vehicle_ownership_status md5 a699bc63 (prefix). The trigger no longer lets an identity-keyed row
@@ -120,6 +123,12 @@ DROP POLICY IF EXISTS vehicle_ownerships_fold_rows_update_guard ON public.vehicl
 CREATE POLICY vehicle_ownerships_fold_rows_update_guard ON public.vehicle_ownerships AS RESTRICTIVE
   FOR UPDATE TO authenticated USING (owner_identity_id IS NULL AND basis IS NULL)
   WITH CHECK (owner_identity_id IS NULL AND basis IS NULL);
+
+-- Fold rows are private by default: a stitched public chain (handle -> vehicle -> dates) is a product decision, not a side effect.
+-- Opening it later is dropping this policy; un-publishing is not that cheap. service_role (the fold, operators) is unaffected.
+DROP POLICY IF EXISTS vehicle_ownerships_fold_rows_read_guard ON public.vehicle_ownerships;
+CREATE POLICY vehicle_ownerships_fold_rows_read_guard ON public.vehicle_ownerships AS RESTRICTIVE
+  FOR SELECT TO anon, authenticated USING (owner_identity_id IS NULL AND basis IS NULL);
 
 COMMENT ON COLUMN public.vehicle_ownerships.owner_profile_id IS
   'The user who held the vehicle. Null on a fold row, which is keyed by owner_identity_id instead; exactly one of the two is set. A user who claimed the identity is read through v_vehicle_owner_periods.resolved_profile_id.';
@@ -232,6 +241,8 @@ CREATE OR REPLACE FUNCTION public.ownership_fold_party(p_identity uuid)
 AS $$ SELECT p_identity $$;
 COMMENT ON FUNCTION public.ownership_fold_party(uuid) IS
   'The party an external identity stands for in the owner-period fold. Today it is the identity itself. An evidenced bridge between handles of one party replaces this body (CREATE OR REPLACE) so the chain closes across them; the fold hash includes the result, so a changed answer supersedes the affected periods.';
+REVOKE ALL ON FUNCTION public.ownership_fold_party(uuid) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.ownership_fold_party(uuid) TO service_role;
 
 -- 4. The plan: pure, read-only ---------------------------------------------------------------------------------------
 
@@ -550,9 +561,10 @@ SELECT vo.id, vo.vehicle_id, vo.role, vo.is_current, vo.basis, vo.ownership_type
   LEFT JOIN public.external_identities ei ON ei.id = vo.owner_identity_id
  WHERE vo.superseded_at IS NULL;
 REVOKE ALL ON public.v_vehicle_owner_periods FROM PUBLIC, anon, authenticated;
-GRANT SELECT ON public.v_vehicle_owner_periods TO anon, authenticated, service_role;
+-- private by default (see vehicle_ownerships_fold_rows_read_guard): operators read it; opening it to users is a product decision
+GRANT SELECT ON public.v_vehicle_owner_periods TO service_role;
 COMMENT ON VIEW public.v_vehicle_owner_periods IS
-  'Every current (not superseded) owner period of a vehicle, user-keyed and identity-keyed together, with the claimed user resolved (resolved_profile_id; claim_confidence says how sure) and the handle shown as the platform shows it. Order by start_at with start_unknown first, never by guessing a start. Read as the sold lots of one platform say, not as title.';
+  'Every current (not superseded) owner period of a vehicle, user-keyed and identity-keyed together, with the claimed user resolved (resolved_profile_id; claim_confidence says how sure) and the handle shown as the platform shows it. Order by start_at with start_unknown first, never by guessing a start. Read as the sold lots of one platform say, not as title. Granted to service_role only: fold rows are private by default (vehicle_ownerships_fold_rows_read_guard); publishing the stewardship chain is a product decision.';
 
 -- 7. Transfer status for a sale that was only recorded ---------------------------------------------------------------
 

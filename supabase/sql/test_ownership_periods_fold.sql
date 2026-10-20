@@ -19,6 +19,8 @@
 --   * a user-keyed current owner is neither ended by the fold nor does it end a fold row, and v_vehicle_ownership_status
 --     keeps showing the user's owner;
 --   * a signed-in vehicle uploader cannot write or alter a fold row;
+--   * fold rows are private: anon and authenticated read none of them (the user-keyed rows stay visible), the reader view,
+--     the flag table and the fold, plan, party and relabel functions are not reachable by them, service_role holds them;
 --   * a re-run with the same inputs writes nothing; changed inputs supersede (the old row is kept, pointed at its
 --     replacement) and one current period per vehicle remains; a dry run writes nothing; the cursor pages through;
 --   * ownership_fold_party() is the join point: a bridge that maps one handle to another closes the chain;
@@ -391,6 +393,62 @@ SELECT pg_temp.ok('the uploader still writes the user-keyed rows the policies al
   EXISTS (SELECT 1 FROM public.vehicle_ownerships WHERE vehicle_id = pg_temp.u(1, 1) AND owner_profile_id = pg_temp.u(4, 1)));
 SELECT pg_temp.fails('anon and authenticated cannot run the writer',
   $s$SET ROLE authenticated; SELECT public.fold_vehicle_ownership_periods(NULL, 10, true)$s$);
+RESET ROLE;
+
+-- fold rows are private by default
+CREATE TEMP TABLE _all_rows AS SELECT count(*) AS fold_rows, (SELECT count(*) FROM public.vehicle_ownerships WHERE owner_identity_id IS NULL) AS user_rows
+  FROM public.vehicle_ownerships WHERE owner_identity_id IS NOT NULL;
+GRANT SELECT ON _all_rows TO anon, authenticated;
+SELECT pg_temp.ok('fold rows exist and so do user-keyed rows (the test below is not vacuous)',
+  (SELECT fold_rows > 10 AND user_rows >= 3 FROM _all_rows));
+SET ROLE anon;
+CREATE TEMP TABLE _anon_seen AS SELECT count(*) FILTER (WHERE owner_identity_id IS NOT NULL OR basis IS NOT NULL) AS fold_seen,
+  count(*) FILTER (WHERE owner_profile_id IS NOT NULL) AS user_seen FROM public.vehicle_ownerships;
+RESET ROLE;
+SET ROLE authenticated;
+SET request.jwt.claim.sub = '00000000-0000-0000-0004-000000000001';
+CREATE TEMP TABLE _auth_seen AS SELECT count(*) FILTER (WHERE owner_identity_id IS NOT NULL OR basis IS NOT NULL) AS fold_seen,
+  count(*) FILTER (WHERE owner_profile_id IS NOT NULL) AS user_seen,
+  count(*) FILTER (WHERE owner_identity_id IS NOT NULL AND vehicle_id = '00000000-0000-0000-0001-000000000001') AS own_vehicle_fold_seen FROM public.vehicle_ownerships;
+RESET ROLE;
+SELECT pg_temp.ok('anon reads no fold row and still reads the user-keyed rows of public vehicles',
+  (SELECT fold_seen = 0 AND user_seen >= 3 FROM _anon_seen));
+SELECT pg_temp.ok('a signed-in user reads no fold row, not even on a vehicle they uploaded, and still reads user-keyed rows',
+  (SELECT fold_seen = 0 AND own_vehicle_fold_seen = 0 AND user_seen >= 3 FROM _auth_seen));
+SELECT pg_temp.ok('the reader view, the flag table and the fold functions are not granted to anon or authenticated, and are to service_role',
+  NOT has_table_privilege('anon', 'public.v_vehicle_owner_periods', 'SELECT') AND NOT has_table_privilege('authenticated', 'public.v_vehicle_owner_periods', 'SELECT')
+  AND has_table_privilege('service_role', 'public.v_vehicle_owner_periods', 'SELECT')
+  AND NOT has_table_privilege('anon', 'public.ownership_fold_flags', 'SELECT') AND NOT has_table_privilege('authenticated', 'public.ownership_fold_flags', 'SELECT')
+  AND NOT has_table_privilege('anon', 'public.ownership_fold_flags', 'INSERT') AND NOT has_table_privilege('authenticated', 'public.ownership_fold_flags', 'UPDATE')
+  AND has_table_privilege('service_role', 'public.ownership_fold_flags', 'SELECT')
+  AND NOT has_function_privilege('anon', 'public.fold_vehicle_ownership_periods(uuid,integer,boolean)', 'EXECUTE')
+  AND NOT has_function_privilege('authenticated', 'public.fold_vehicle_ownership_periods(uuid,integer,boolean)', 'EXECUTE')
+  AND NOT has_function_privilege('anon', 'public.ownership_fold_plan(uuid[])', 'EXECUTE')
+  AND NOT has_function_privilege('authenticated', 'public.ownership_fold_plan(uuid[])', 'EXECUTE')
+  AND NOT has_function_privilege('anon', 'public.ownership_fold_party(uuid)', 'EXECUTE')
+  AND NOT has_function_privilege('authenticated', 'public.ownership_fold_party(uuid)', 'EXECUTE')
+  AND NOT has_function_privilege('anon', 'public.relabel_auction_transfers_recorded_unconfirmed(uuid,integer,boolean)', 'EXECUTE')
+  AND NOT has_function_privilege('authenticated', 'public.relabel_auction_transfers_recorded_unconfirmed(uuid,integer,boolean)', 'EXECUTE')
+  AND has_function_privilege('service_role', 'public.fold_vehicle_ownership_periods(uuid,integer,boolean)', 'EXECUTE')
+  AND has_function_privilege('service_role', 'public.ownership_fold_plan(uuid[])', 'EXECUTE')
+  AND has_function_privilege('service_role', 'public.ownership_fold_party(uuid)', 'EXECUTE')
+  AND has_function_privilege('service_role', 'public.relabel_auction_transfers_recorded_unconfirmed(uuid,integer,boolean)', 'EXECUTE'));
+SELECT pg_temp.fails('anon cannot read the reader view', $s$SET ROLE anon; SELECT count(*) FROM public.v_vehicle_owner_periods$s$);
+RESET ROLE;
+SELECT pg_temp.fails('a signed-in user cannot read the reader view', $s$SET ROLE authenticated; SELECT count(*) FROM public.v_vehicle_owner_periods$s$);
+RESET ROLE;
+SELECT pg_temp.fails('anon cannot read the flag table', $s$SET ROLE anon; SELECT count(*) FROM public.ownership_fold_flags$s$);
+RESET ROLE;
+SELECT pg_temp.fails('a signed-in user cannot plan a fold', $s$SET ROLE authenticated; SELECT count(*) FROM public.ownership_fold_plan(ARRAY[gen_random_uuid()])$s$);
+RESET ROLE;
+DROP POLICY vehicle_ownerships_fold_rows_read_guard ON public.vehicle_ownerships;
+SET ROLE anon;
+CREATE TEMP TABLE _anon_open AS SELECT count(*) AS n FROM public.vehicle_ownerships WHERE owner_identity_id IS NOT NULL;
+RESET ROLE;
+SELECT pg_temp.ok('without the guard anon would read every live fold row of a public vehicle', (SELECT n > 10 FROM _anon_open));
+\ir ../migrations/20261020330000_ownership_periods_fold.sql
+SET ROLE anon;
+SELECT pg_temp.ok('and re-applying the migration puts the guard back', (SELECT count(*) FROM public.vehicle_ownerships WHERE owner_identity_id IS NOT NULL) = 0);
 RESET ROLE;
 
 -- idempotence
