@@ -1,3 +1,4 @@
+import { parseTheMarketLive } from "./boards.ts";
 import { assertEquals } from "jsr:@std/assert@1";
 import {
   type BonhamsSaleDoc, bonhamsLot, bonhamsLotPhase, bonhamsSaleKind, parseBonhamsBidStates, parsePcarBids, parsePcarBoard,
@@ -50,6 +51,54 @@ Deno.test("parsePcarBoard reads each open item with dollars, bid count, close ti
   });
   assertEquals(items[1].schema, "Watches");
   assertEquals(items[1].current_bid, null);
+});
+
+// The Market: fixtures/themarket-live-2026-10-20.html is the <script id="__NUXT_DATA__"> element of
+// https://www.themarket.co.uk/auctions/live as served 2026-10-20 19:59Z (the rest of the page dropped), byte for byte but
+// for three hashes in the CMS banner's response headers (two ETags, a CloudFront id), set to "redacted" because the
+// secret scanner reads them as tokens; nothing the reader uses.
+const THE_MARKET_LIVE_PAGE = await Deno.readTextFile(new URL("./fixtures/themarket-live-2026-10-20.html", import.meta.url));
+
+Deno.test("parseTheMarketLive reads every lot of the live page with its link, pounds, bid count, UTC close and reserve", () => {
+  const board = parseTheMarketLive(THE_MARKET_LIVE_PAGE)!;
+  assertEquals([board.total, board.totalPages, board.houseTime, board.lots.length], [11, 1, "2026-10-20T19:59:01.000Z", 11]);
+  assertEquals(board.lots[0], {
+    id: "e3d02f1d-99a9-4e8b-8525-d7ed7da29e0c",
+    url: "https://www.themarket.co.uk/listings/austin-healey/3000-mk-iii/e3d02f1d-99a9-4e8b-8525-d7ed7da29e0c",
+    title: "1966 Austin Healey 3000 Mk III",
+    year: 1966,
+    make: "Austin Healey",
+    model: "3000 Mk III",
+    lot_number: 5278,
+    status: 1,
+    current_bid: 45000,
+    bid_count: 9,
+    currency: "GBP",
+    // end_date "2026-10-21 12:00:00" is UTC: the lot page says "Ends 1:00 PM, 21 Oct 2026" (BST)
+    ends: "2026-10-21T12:00:00.000Z",
+    reserve_status: "reserve-close",
+    no_reserve: false,
+    reserve_met: false,
+    buy_now_price: null,
+    image: "https://cdn.themarket.co.uk/e3d02f1d-99a9-4e8b-8525-d7ed7da29e0c/3b49e4f9-2016-4250-8fa7-e54eb44a0170.jpg",
+    location: "THE MARKET HQ, GB",
+    tagline: "Heritage Certificate - Restored - Exceptional",
+  });
+  const open = board.lots.filter((l) => l.status === 1);
+  assertEquals([open.length, open.filter((l) => l.current_bid !== null).length, [...new Set(board.lots.map((l) => l.currency))]], [10, 10, ["GBP"]]);
+  // after the clocks change: "2026-10-26 13:00:00" renders "Ends 1:00 PM, 26 Oct 2026" (GMT)
+  const jag = board.lots.find((l) => l.lot_number === 5282)!;
+  assertEquals([jag.ends, jag.current_bid, jag.bid_count, jag.reserve_met], ["2026-10-26T13:00:00.000Z", 11250, 18, true]);
+  const norton = board.lots.find((l) => l.lot_number === 5274)!;
+  assertEquals([norton.no_reserve, norton.reserve_met, norton.current_bid], [true, null, 3750]);
+  // lot 5260 closed on 2026-10-07 and is offered at a Buy Now price: on the page, not open for bids
+  const mini = board.lots.find((l) => l.lot_number === 5260)!;
+  assertEquals([mini.status, mini.ends, mini.buy_now_price], [5, "2026-10-07T12:01:45.000Z", 54000]);
+});
+
+Deno.test("parseTheMarketLive returns null for a page without the listings payload", () => {
+  assertEquals(parseTheMarketLive("<html><body>Access denied</body></html>"), null);
+  assertEquals(parseTheMarketLive(`<script id="__NUXT_DATA__" type="application/json">[{"data":1},{}]</script>`), null);
 });
 
 Deno.test("parsePcarBids reads the lot's bid history with Basta ids and clocks, not other arrays", () => {
