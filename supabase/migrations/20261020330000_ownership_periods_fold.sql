@@ -41,9 +41,13 @@
 --   winner, has start_unknown. A vehicle with a lot that has no clock, two lots on one clock, or one lot recorded twice
 --   with different parties is not folded at all and gets a flag row instead. Lots that are not sold are never read.
 --
+-- Applied as three short transactions with lock retries (see pg_temp.ddl below); each stage is idempotent, so a failure part
+-- way is repaired by running the file again. Edited in place on 2026-10-20 after the first deploy run rolled back on a
+-- lock timeout creating ownership_fold_flags (a foreign key to vehicles); the file had not been applied.
+--
 -- Not done here: no backfill (scripts/data/fold-ownership-periods.mjs runs it in id chunks), no edge-function edit.
 -- The transfer status change is at the end: a new enum value and an unrun relabel function.
-SET statement_timeout = '30s';
+SET statement_timeout = '120s';
 SET lock_timeout = '5s';
 
 -- New enum values are usable only once committed, so they are added before the transaction below.
@@ -56,13 +60,40 @@ DO $$ BEGIN
   END IF;
 END $$;
 
+-- Locks. This file runs in three short transactions (vehicle_ownerships; the identity key; the rest), each idempotent, so a
+-- failure part way is repaired by running the file again. Every statement that takes a strong lock on a table the writers
+-- use (ALTER TABLE, CREATE INDEX, CREATE POLICY, a foreign key to external_identities, replacing the status view, a comment
+-- on ownership_transfers) goes through pg_temp.ddl: up to ten attempts, each with lock_timeout 2 s and a 2 s pause, so no
+-- writer queues behind one long wait; the tenth failure raises. ownership_fold_flags.vehicle_id has no foreign key on
+-- purpose: a foreign key to vehicles would lock the hottest table, and the column is a locator like the lot ids.
+CREATE OR REPLACE FUNCTION pg_temp.ddl(p_sql text, p_when boolean DEFAULT true) RETURNS void LANGUAGE plpgsql AS $f$
+DECLARE
+  attempt int := 0;
+  v_old text := current_setting('lock_timeout');
+BEGIN
+  IF p_when IS NOT TRUE THEN RETURN; END IF;
+  LOOP
+    BEGIN
+      PERFORM set_config('lock_timeout', '2s', true);
+      EXECUTE p_sql;
+      PERFORM set_config('lock_timeout', v_old, true);
+      RETURN;
+    EXCEPTION WHEN lock_not_available THEN
+      attempt := attempt + 1;
+      IF attempt >= 10 THEN RAISE; END IF;
+      PERFORM pg_sleep(2);
+    END;
+  END LOOP;
+END $f$;
+
 BEGIN;
 
 -- 1. vehicle_ownerships holds identity-keyed periods ---------------------------------------------------------------
 
+SELECT pg_temp.ddl($q$
 ALTER TABLE public.vehicle_ownerships
   ALTER COLUMN owner_profile_id DROP NOT NULL,
-  ADD COLUMN IF NOT EXISTS owner_identity_id uuid REFERENCES public.external_identities(id) ON DELETE RESTRICT,
+  ADD COLUMN IF NOT EXISTS owner_identity_id uuid,
   ADD COLUMN IF NOT EXISTS basis text,
   ADD COLUMN IF NOT EXISTS fold_key text,
   ADD COLUMN IF NOT EXISTS fold_hash text,
@@ -81,15 +112,13 @@ ALTER TABLE public.vehicle_ownerships
   ADD COLUMN IF NOT EXISTS fold_run_at timestamptz,
   ADD COLUMN IF NOT EXISTS superseded_at timestamptz,
   ADD COLUMN IF NOT EXISTS superseded_by uuid REFERENCES public.vehicle_ownerships(id) ON DELETE RESTRICT,
-  ADD COLUMN IF NOT EXISTS superseded_reason text;
+  ADD COLUMN IF NOT EXISTS superseded_reason text
+$q$);
 
-DO $$ BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'vehicle_ownerships_one_owner_key') THEN
-    ALTER TABLE public.vehicle_ownerships ADD CONSTRAINT vehicle_ownerships_one_owner_key
-      CHECK (num_nonnulls(owner_profile_id, owner_identity_id) = 1);
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'vehicle_ownerships_fold_shape') THEN
-    ALTER TABLE public.vehicle_ownerships ADD CONSTRAINT vehicle_ownerships_fold_shape CHECK (
+SELECT pg_temp.ddl($q$ALTER TABLE public.vehicle_ownerships ADD CONSTRAINT vehicle_ownerships_one_owner_key
+  CHECK (num_nonnulls(owner_profile_id, owner_identity_id) = 1)$q$,
+  NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'vehicle_ownerships_one_owner_key'));
+SELECT pg_temp.ddl($q$ALTER TABLE public.vehicle_ownerships ADD CONSTRAINT vehicle_ownerships_fold_shape CHECK (
       (basis IS NULL) = (owner_identity_id IS NULL)
       AND (basis IS NULL OR basis IN ('auction_sale'))
       AND (basis IS NULL OR (fold_key IS NOT NULL AND fold_hash IS NOT NULL))
@@ -99,23 +128,23 @@ DO $$ BEGIN
       AND (chain_flag IS NULL OR chain_flag IN ('handover_unobserved', 'party_unkeyed'))
       AND (sale_confirmation IS NULL OR (basis IS NOT NULL AND sale_confirmation IN ('recorded', 'confirmed_next_lot')))
       AND (superseded_by IS NULL OR superseded_at IS NOT NULL)
-      AND (superseded_at IS NULL OR NOT is_current));
-  END IF;
-END $$;
+      AND (superseded_at IS NULL OR NOT is_current))$q$,
+  NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'vehicle_ownerships_fold_shape'));
 
-CREATE UNIQUE INDEX IF NOT EXISTS uq_vehicle_ownerships_fold_key
-  ON public.vehicle_ownerships (vehicle_id, fold_key) WHERE basis IS NOT NULL AND superseded_at IS NULL;
-CREATE UNIQUE INDEX IF NOT EXISTS uq_vehicle_ownerships_fold_current
-  ON public.vehicle_ownerships (vehicle_id) WHERE basis IS NOT NULL AND is_current AND superseded_at IS NULL;
-CREATE INDEX IF NOT EXISTS idx_vehicle_ownerships_identity
-  ON public.vehicle_ownerships (owner_identity_id) WHERE owner_identity_id IS NOT NULL;
-CREATE INDEX IF NOT EXISTS idx_vehicle_ownerships_acquired_lot
-  ON public.vehicle_ownerships (acquired_via_lot_id) WHERE acquired_via_lot_id IS NOT NULL;
-CREATE INDEX IF NOT EXISTS idx_vehicle_ownerships_disposed_lot
-  ON public.vehicle_ownerships (disposed_via_lot_id) WHERE disposed_via_lot_id IS NOT NULL;
+SELECT pg_temp.ddl($q$CREATE UNIQUE INDEX IF NOT EXISTS uq_vehicle_ownerships_fold_key
+  ON public.vehicle_ownerships (vehicle_id, fold_key) WHERE basis IS NOT NULL AND superseded_at IS NULL$q$);
+SELECT pg_temp.ddl($q$CREATE UNIQUE INDEX IF NOT EXISTS uq_vehicle_ownerships_fold_current
+  ON public.vehicle_ownerships (vehicle_id) WHERE basis IS NOT NULL AND is_current AND superseded_at IS NULL$q$);
+SELECT pg_temp.ddl($q$CREATE INDEX IF NOT EXISTS idx_vehicle_ownerships_identity
+  ON public.vehicle_ownerships (owner_identity_id) WHERE owner_identity_id IS NOT NULL$q$);
+SELECT pg_temp.ddl($q$CREATE INDEX IF NOT EXISTS idx_vehicle_ownerships_acquired_lot
+  ON public.vehicle_ownerships (acquired_via_lot_id) WHERE acquired_via_lot_id IS NOT NULL$q$);
+SELECT pg_temp.ddl($q$CREATE INDEX IF NOT EXISTS idx_vehicle_ownerships_disposed_lot
+  ON public.vehicle_ownerships (disposed_via_lot_id) WHERE disposed_via_lot_id IS NOT NULL$q$);
 
 -- A signed-in user who uploaded a vehicle can write that vehicle's user-keyed ownership rows (existing policies).
 -- Fold rows are derived and written only by fold_vehicle_ownership_periods; the restrictive policies keep them out of reach.
+SELECT pg_temp.ddl($q$
 DROP POLICY IF EXISTS vehicle_ownerships_fold_rows_insert_guard ON public.vehicle_ownerships;
 CREATE POLICY vehicle_ownerships_fold_rows_insert_guard ON public.vehicle_ownerships AS RESTRICTIVE
   FOR INSERT TO authenticated WITH CHECK (owner_identity_id IS NULL AND basis IS NULL);
@@ -123,12 +152,15 @@ DROP POLICY IF EXISTS vehicle_ownerships_fold_rows_update_guard ON public.vehicl
 CREATE POLICY vehicle_ownerships_fold_rows_update_guard ON public.vehicle_ownerships AS RESTRICTIVE
   FOR UPDATE TO authenticated USING (owner_identity_id IS NULL AND basis IS NULL)
   WITH CHECK (owner_identity_id IS NULL AND basis IS NULL);
+$q$);
 
 -- Fold rows are private by default: a stitched public chain (handle -> vehicle -> dates) is a product decision, not a side effect.
 -- Opening it later is dropping this policy; un-publishing is not that cheap. service_role (the fold, operators) is unaffected.
+SELECT pg_temp.ddl($q$
 DROP POLICY IF EXISTS vehicle_ownerships_fold_rows_read_guard ON public.vehicle_ownerships;
 CREATE POLICY vehicle_ownerships_fold_rows_read_guard ON public.vehicle_ownerships AS RESTRICTIVE
-  FOR SELECT TO anon, authenticated USING (owner_identity_id IS NULL AND basis IS NULL);
+  FOR SELECT TO anon, authenticated USING (owner_identity_id IS NULL AND basis IS NULL)
+$q$);
 
 COMMENT ON COLUMN public.vehicle_ownerships.owner_profile_id IS
   'The user who held the vehicle. Null on a fold row, which is keyed by owner_identity_id instead; exactly one of the two is set. A user who claimed the identity is read through v_vehicle_owner_periods.resolved_profile_id.';
@@ -181,7 +213,23 @@ begin
   return NEW;
 end; $function$;
 
+
+COMMIT;
+
+-- The identity key: a foreign key locks external_identities (upserted constantly by extract-bat-core), so it is added NOT VALID
+-- through pg_temp.ddl, then validated (a weaker lock; every existing row is null).
+BEGIN;
+SELECT pg_temp.ddl($q$ALTER TABLE public.vehicle_ownerships ADD CONSTRAINT vehicle_ownerships_owner_identity_id_fkey
+  FOREIGN KEY (owner_identity_id) REFERENCES public.external_identities(id) ON DELETE RESTRICT NOT VALID$q$,
+  NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'vehicle_ownerships_owner_identity_id_fkey'));
+SELECT pg_temp.ddl($q$ALTER TABLE public.vehicle_ownerships VALIDATE CONSTRAINT vehicle_ownerships_owner_identity_id_fkey$q$,
+  EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'vehicle_ownerships_owner_identity_id_fkey' AND NOT convalidated));
+COMMIT;
+
+BEGIN;
+
 -- The status view reads the user-keyed current owner; a fold row has no profile to show.
+SELECT pg_temp.ddl($q$
 CREATE OR REPLACE VIEW public.v_vehicle_ownership_status WITH (security_invoker = true) AS
  SELECT v.id AS vehicle_id,
     v.year,
@@ -202,13 +250,14 @@ CREATE OR REPLACE VIEW public.v_vehicle_ownership_status WITH (security_invoker 
         END AS has_ownership_conflict
    FROM ((vehicles v
      LEFT JOIN ownership_verifications ov_title ON (((ov_title.vehicle_id = v.id) AND (ov_title.status = 'approved'::text) AND (ov_title.verification_category = 'title_document'::text))))
-     LEFT JOIN vehicle_ownerships vo ON (((vo.vehicle_id = v.id) AND (vo.is_current = true) AND (vo.owner_profile_id IS NOT NULL) AND (vo.role = ANY (ARRAY['owner'::text, 'verified_owner'::text])))));
+     LEFT JOIN vehicle_ownerships vo ON (((vo.vehicle_id = v.id) AND (vo.is_current = true) AND (vo.owner_profile_id IS NOT NULL) AND (vo.role = ANY (ARRAY['owner'::text, 'verified_owner'::text])))))
+$q$);
 
 -- 2. What the fold refuses to guess ---------------------------------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS public.ownership_fold_flags (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  vehicle_id uuid NOT NULL REFERENCES public.vehicles(id) ON DELETE CASCADE,
+  vehicle_id uuid NOT NULL, -- a locator, like the lot ids: no foreign key, which would lock vehicles
   auction_event_id uuid,
   reason text NOT NULL CHECK (reason IN ('duplicate_lot', 'duplicate_lot_conflict', 'no_event_clock', 'same_clock', 'seller_is_winner', 'relist_same_seller', 'unsold_lot_unordered')),
   detail jsonb NOT NULL DEFAULT '{}'::jsonb,
@@ -223,7 +272,7 @@ GRANT SELECT ON public.ownership_fold_flags TO service_role;
 
 COMMENT ON TABLE public.ownership_fold_flags IS
   'Lots and vehicles the owner-period fold refused to fold or declined to take at face value, with the reason (grain: vehicle x lot x reason, open while resolved_at is null). duplicate_lot: one lot held twice with the same parties, the sold copy is read. duplicate_lot_conflict, no_event_clock, same_clock: the vehicle is not folded because the order or the parties of a sold lot cannot be told. seller_is_winner: the lot names one identity on both sides, read as written. relist_same_seller: the same seller listed the vehicle again right after this sold lot, so the recorded sale did not hand it on and the winner holds no period; the lot stays the winner''s sale claim. unsold_lot_unordered: an unsold lot with no clock, or on another lot''s clock, is listed and not used as evidence. Writer: fold_vehicle_ownership_periods. Reader: operators; a flag is a to-do, not a verdict.';
-COMMENT ON COLUMN public.ownership_fold_flags.vehicle_id IS 'The vehicle the flag is about (FK vehicles).';
+COMMENT ON COLUMN public.ownership_fold_flags.vehicle_id IS 'The vehicle the flag is about (a locator into vehicles, not a foreign key: a foreign key would lock the busiest table; a flag for a merged or deleted vehicle is simply never raised again).';
 COMMENT ON COLUMN public.ownership_fold_flags.auction_event_id IS 'The lot the flag is about, a locator into auction_events; null never happens today.';
 COMMENT ON COLUMN public.ownership_fold_flags.reason IS 'duplicate_lot, duplicate_lot_conflict, no_event_clock, same_clock or seller_is_winner.';
 COMMENT ON COLUMN public.ownership_fold_flags.detail IS 'Public facts only: the lot key and the lot that was kept; never a name.';
@@ -568,8 +617,8 @@ COMMENT ON VIEW public.v_vehicle_owner_periods IS
 
 -- 7. Transfer status for a sale that was only recorded ---------------------------------------------------------------
 
-COMMENT ON COLUMN public.ownership_transfers.status IS
-  'Transfer state (enum transfer_status). recorded_unconfirmed: a sale recorded at the hammer from a scraped lot; payment, title and handover were never observed and cannot be by a scraper, so no milestone beyond agreement_reached is open. A sold lot is a recorded sale, not a completed transfer: a later listing by the winner confirms it, a later listing by the same seller says it did not happen (see ownership_fold_flags relist_same_seller and vehicle_ownerships.sale_confirmation). in_progress: a party engaged and at least one milestone beyond agreement_reached was observed. completed, cancelled, disputed: observed outcomes. stalled: an observed transfer that went quiet. pending: seeded for a Nuke-facilitated deal, not started.';
+SELECT pg_temp.ddl($q$COMMENT ON COLUMN public.ownership_transfers.status IS
+  'Transfer state (enum transfer_status). recorded_unconfirmed: a sale recorded at the hammer from a scraped lot; payment, title and handover were never observed and cannot be by a scraper, so no milestone beyond agreement_reached is open. A sold lot is a recorded sale, not a completed transfer: a later listing by the winner confirms it, a later listing by the same seller says it did not happen (see ownership_fold_flags relist_same_seller and vehicle_ownerships.sale_confirmation). in_progress: a party engaged and at least one milestone beyond agreement_reached was observed. completed, cancelled, disputed: observed outcomes. stalled: an observed transfer that went quiet. pending: seeded for a Nuke-facilitated deal, not started.'$q$);
 
 CREATE OR REPLACE FUNCTION public.relabel_auction_transfers_recorded_unconfirmed(
   p_after uuid DEFAULT NULL, p_limit integer DEFAULT 2000, p_apply boolean DEFAULT false)
