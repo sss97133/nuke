@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { CollapsibleWidget } from '../../components/ui/CollapsibleWidget';
 import { supabase } from '../../lib/supabase';
-import { useInvestmentLedger, type OwnerEpoch } from './hooks/useInvestmentLedger';
-import type { WorkOrderReceipt, VehicleReceipt } from './hooks/useBuildStatus';
+import { useInvestmentLedger, type OwnerEpoch, type VehicleReceipt } from './hooks/useInvestmentLedger';
+import type { WorkOrderReceipt } from './hooks/useBuildStatus';
 
 const vendorSlug = (name: string | null | undefined): string | null => {
   if (!name) return null;

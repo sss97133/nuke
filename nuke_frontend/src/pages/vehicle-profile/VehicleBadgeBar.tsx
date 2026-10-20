@@ -150,7 +150,7 @@ const VehicleBadgeBar: React.FC = () => {
 
   const handleDrilldownClick = (href: string, e?: React.MouseEvent | React.KeyboardEvent) => {
     if (e) {
-      if ('metaKey' in e && (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0)) {
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || ('button' in e && e.button !== 0)) {
         return;
       }
       e.preventDefault();

@@ -21,8 +21,8 @@ interface ValidationPopupV2Props {
   vehicleId: string;
   fieldName: string;
   fieldValue: string;
-  vehicleYear?: number;
-  vehicleMake?: string;
+  vehicleYear?: number | null;
+  vehicleMake?: string | null;
   onClose: () => void;
 }
 

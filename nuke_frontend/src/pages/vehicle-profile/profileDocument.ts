@@ -8,7 +8,9 @@ import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import { getVehicleIdentityTokens, type VehicleIdentitySource } from '../../utils/vehicleIdentity';
-import type { ProfileDocument, Section } from '../../kit';
+import type { ProfileDocument } from '../../kit';
+// The kit index exports the Section component under the same name, which hides this type there.
+import type { Section } from '../../kit/types';
 
 type Masthead = Extract<Section, { kind: 'masthead' }>;
 /** The masthead as the read ships it: the raw identity columns in place of tokens. */

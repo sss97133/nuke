@@ -242,7 +242,7 @@ const ObservationPage: React.FC = () => {
   const sourceArtifact = publicObservationArtifact();
   const visibleData = useMemo(() => publicObservationData(obs?.structured_data ?? null), [obs]);
 
-  const vehLabel = vehicle?.id === vehicleId
+  const vehLabel = vehicle && vehicle.id === vehicleId
     ? `${vehicle.year ?? ''} ${vehicle.make ?? ''} ${vehicle.model ?? ''} ${vehicle.trim ?? ''}`.replace(/\s+/g, ' ').trim()
     : 'Vehicle';
 

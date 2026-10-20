@@ -220,6 +220,36 @@ describe('VehicleBadgeBar facet chips & era identity mark drilldown links', () =
     expect(navigateMock).toHaveBeenLastCalledWith(expectedTrimUrl);
   });
 
+  it('activates a chip from the keyboard with Space or Enter, and leaves modified keys to the browser', async () => {
+    fixture.vehicle = {
+      id: 'veh-c10-cheyenne-1976', year: 1976, make: 'Chevrolet', model: 'C10 Cheyenne Fleetside Short Bed',
+      normalized_model: 'C10', series: 'C10', trim: 'Cheyenne', body_style: 'Fleetside Short Bed',
+    };
+    await act(async () => {
+      root.render(<VehicleBadgeBar />);
+    });
+    const trimChip = host.querySelector<HTMLAnchorElement>('[data-testid="vehicle-facet-trim"]')!;
+    const href = trimChip.getAttribute('href');
+    const press = (init: KeyboardEventInit) => {
+      const event = new KeyboardEvent('keydown', { bubbles: true, cancelable: true, ...init });
+      act(() => { trimChip.dispatchEvent(event); });
+      return event;
+    };
+
+    navigateMock.mockClear();
+    press({ key: ' ' });
+    expect(navigateMock).toHaveBeenCalledTimes(1);
+    expect(navigateMock).toHaveBeenLastCalledWith(href);
+
+    navigateMock.mockClear();
+    expect(press({ key: 'Enter' }).defaultPrevented).toBe(true);
+    expect(navigateMock).toHaveBeenCalledTimes(1);
+
+    navigateMock.mockClear();
+    expect(press({ key: 'Enter', metaKey: true }).defaultPrevented).toBe(false);
+    expect(navigateMock).not.toHaveBeenCalled();
+  });
+
   it('pre-selects the exact family, facet axis tab, and facet pill on HomePage when navigating from a VehicleBadgeBar chip URL', async () => {
     const facets = classifyVehicleFacets(
       'Chevrolet',

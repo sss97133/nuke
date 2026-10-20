@@ -312,7 +312,7 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = ({ selectedAuctionUrl, o
   useEffect(() => {
     if (!vehicleId) return;
     let cancelled = false;
-    supabase.rpc('get_vehicle_day_depth', { p_vehicle_id: vehicleId }).then(({ data }) => {
+    Promise.resolve(supabase.rpc('get_vehicle_day_depth', { p_vehicle_id: vehicleId })).then(({ data }) => {
       if (cancelled || !data) return;
       const m: Record<string, number> = {};
       for (const r of data as any[]) {

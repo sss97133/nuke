@@ -3,7 +3,7 @@ import { supabase } from '../../lib/supabase';
 
 interface MobileImageGalleryProps {
   vehicleId: string | undefined;
-  leadImageUrl: string;
+  leadImageUrl: string | null;
   onClose: () => void;
 }
 
@@ -106,7 +106,7 @@ const MobileImageGallery: React.FC<MobileImageGalleryProps> = ({ vehicleId, lead
   };
 
   const currentImage = images[currentIndex];
-  const imageUrl = currentImage?.image_url || leadImageUrl;
+  const imageUrl = currentImage?.image_url || leadImageUrl || undefined;
 
   return (
     <div
