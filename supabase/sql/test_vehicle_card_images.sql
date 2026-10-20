@@ -139,7 +139,7 @@ SELECT public.t_assert((SELECT image_url FROM old_reads WHERE who = 'anon' AND v
 
 -- 2. The migration.
 \ir ../migrations/20261014040500_vehicle_card_images.sql
-\ir ../migrations/20261021030000_vehicle_card_images_gate_for_everyone.sql
+\ir ../migrations/20261021030500_vehicle_card_images_gate_for_everyone.sql
 
 CREATE TEMP TABLE new_reads (who text, vehicle_id uuid, image_url text, thumbnail_url text, medium_url text, variants jsonb, is_primary boolean);
 GRANT ALL ON new_reads TO anon, authenticated;
@@ -247,5 +247,5 @@ SELECT public.t_assert((SELECT count(*) FROM public.vehicle_card_images(ARRAY(SE
 
 -- 8. A second run of the migrations is a no-op.
 \ir ../migrations/20261014040500_vehicle_card_images.sql
-\ir ../migrations/20261021030000_vehicle_card_images_gate_for_everyone.sql
+\ir ../migrations/20261021030500_vehicle_card_images_gate_for_everyone.sql
 SELECT 'vehicle_card_images contract: PASS' AS result;
