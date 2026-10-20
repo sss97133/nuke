@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { OrgLogo } from '../../components/common/OrgLogo';
+import { MakeIdentity } from '../../components/common/MakeIdentity';
 import { sourceLogoInk } from './sourceLogoInk';
 import { matchesSaleSubModel, readFamilySales, type Sale } from './FamilySalesChart';
 import {
@@ -1398,6 +1399,155 @@ export function computeDrillCohortSummary(
   };
 }
 
+// What a source's activity is made of, one line per kind (market_source_pulse_read, 20261022000000). "backfill" is a bid or
+// comment captured more than 2 hours after it was posted: old activity arriving late, not the site's pulse.
+export type PulseKind = 'bid' | 'comment' | 'listing' | 'backfill';
+export const PULSE_KINDS: { kind: PulseKind; label: string; hint: string }[] = [
+  { kind: 'bid', label: 'Bids', hint: 'Bids posted on the site and captured within 2 hours' },
+  { kind: 'comment', label: 'Comments', hint: 'Comments and seller replies posted on the site and captured within 2 hours' },
+  { kind: 'listing', label: 'New listings', hint: 'Listings and auction rows newly captured' },
+  { kind: 'backfill', label: 'Backfill', hint: 'Older bids and comments captured more than 2 hours after they were posted' },
+];
+export type SourcePulse = {
+  hours24: Record<PulseKind, number[]>;
+  mins60: Record<PulseKind, number[]>;
+  last: Record<PulseKind, string | null>;
+};
+
+export function parsePulse(value: unknown): SourcePulse | null {
+  if (!value || typeof value !== 'object') return null;
+  const v = value as Record<string, any>;
+  const series = (x: any, len: number): Record<PulseKind, number[]> => {
+    const out = {} as Record<PulseKind, number[]>;
+    for (const { kind } of PULSE_KINDS) {
+      const a = Array.isArray(x?.[kind]) ? x[kind].map((n: unknown) => num(n) ?? 0) : [];
+      out[kind] = a.length === len ? a : Array(len).fill(0);
+    }
+    return out;
+  };
+  const last = {} as Record<PulseKind, string | null>;
+  for (const { kind } of PULSE_KINDS) last[kind] = str(v.last?.[kind]);
+  return { hours24: series(v.hours24, 24), mins60: series(v.mins60, 12), last };
+}
+
+/** Milliseconds a record ends or ended at, from its own timestamp; null when it carries only a date or nothing. */
+export function recordEndsAt(recordDate: string | null): number | null {
+  if (!recordDate || recordDate.length <= 10) return null;
+  const t = Date.parse(recordDate.replace(/^(\d{4}-\d{2}-\d{2})\s+/, '$1T').replace(/([+-]\d{2})$/, '$1:00'));
+  return Number.isNaN(t) ? null : t;
+}
+
+/** "6d 04:12:09", "3:12:09", "12:09" counting down; "ended 3d" after. */
+export function formatCountdown(endsAt: number, now: number): { text: string; live: boolean; soon: boolean } {
+  const ms = endsAt - now;
+  if (ms > 0) {
+    const sec = Math.floor(ms / 1000);
+    const d = Math.floor(sec / 86400);
+    const h = Math.floor((sec % 86400) / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    const ss = sec % 60;
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const text = d > 0 ? `${d}d ${pad(h)}:${pad(m)}:${pad(ss)}` : h > 0 ? `${h}:${pad(m)}:${pad(ss)}` : `${m}:${pad(ss)}`;
+    return { text, live: true, soon: sec < 3600 };
+  }
+  const ago = Math.floor(-ms / 1000);
+  const text = ago < 3600 ? `ended ${Math.max(1, Math.floor(ago / 60))}m` : ago < 86400 ? `ended ${Math.floor(ago / 3600)}h` : `ended ${Math.floor(ago / 86400)}d`;
+  return { text, live: false, soon: false };
+}
+
+export function formatTickAgo(iso: string | null, now: number): string {
+  const t = iso ? Date.parse(iso) : NaN;
+  if (Number.isNaN(t)) return 'none in 24h';
+  const sec = Math.max(0, Math.floor((now - t) / 1000));
+  if (sec < 60) return `${sec}s ago`;
+  if (sec < 3600) return `${Math.floor(sec / 60)}m ago`;
+  return `${Math.floor(sec / 3600)}h ago`;
+}
+
+export type DrillColumnKey = 'ends' | 'year' | 'make' | 'model' | 'vin' | 'lot' | 'miles' | 'bids' | 'price';
+
+/** Sort value per column; null sorts last in either direction. Live lots by time left, then ended lots by recency. */
+export function drillColumnValue(ev: LandingRecentEvent, key: DrillColumnKey, now: number): number | string | null {
+  switch (key) {
+    case 'ends': {
+      const t = recordEndsAt(ev.recordDate);
+      return t == null ? null : t > now ? t - now : 1e15 + (now - t);
+    }
+    case 'year': return ev.year;
+    case 'make': return ev.make?.toLowerCase() ?? null;
+    case 'model': return ev.model?.toLowerCase() ?? null;
+    case 'vin': return ev.vin?.toLowerCase() ?? null;
+    case 'lot': return ev.lot ? (/^\d+$/.test(ev.lot.trim()) ? Number(ev.lot) : ev.lot.toLowerCase()) : null;
+    case 'miles': return ev.mileage;
+    case 'bids': return ev.bidCount;
+    case 'price': return ev.price != null && ev.price > 0 ? ev.price : null;
+  }
+}
+
+export function sortDrillColumn(
+  events: LandingRecentEvent[],
+  sort: { key: DrillColumnKey; dir: 'asc' | 'desc' } | null,
+  now: number,
+): LandingRecentEvent[] {
+  if (!sort) return events;
+  const sign = sort.dir === 'asc' ? 1 : -1;
+  return events
+    .map((ev, i) => ({ ev, i, v: drillColumnValue(ev, sort.key, now) }))
+    .sort((a, b) => {
+      if (a.v == null && b.v == null) return a.i - b.i;
+      if (a.v == null) return 1;
+      if (b.v == null) return -1;
+      const c = typeof a.v === 'number' && typeof b.v === 'number' ? a.v - b.v : String(a.v).localeCompare(String(b.v), 'en', { numeric: true });
+      return c === 0 ? a.i - b.i : c * sign;
+    })
+    .map((x) => x.ev);
+}
+
+const DRILL_COLUMNS: { key: DrillColumnKey; label: string; numeric?: boolean }[] = [
+  { key: 'ends', label: 'Ends' },
+  { key: 'year', label: 'Year', numeric: true },
+  { key: 'make', label: 'Make' },
+  { key: 'model', label: 'Model' },
+  { key: 'vin', label: 'VIN' },
+  { key: 'lot', label: 'Lot' },
+  { key: 'miles', label: 'Miles', numeric: true },
+  { key: 'bids', label: 'Bids', numeric: true },
+  { key: 'price', label: 'Price', numeric: true },
+];
+
+/** One thin bar line per activity kind, with its total and last-seen clock, on one shared time axis. */
+function PulseLines({ title, series, labels, now, last }: {
+  title: string;
+  series: Record<PulseKind, number[]> | null;
+  labels: (idx: number, len: number) => string;
+  now: number;
+  last?: Record<PulseKind, string | null> | null;
+}) {
+  return (
+    <div className="market-sources__pulse">
+      <div className="market-sources__chart-head"><span>{title}</span></div>
+      {PULSE_KINDS.map(({ kind, label, hint }) => {
+        const vals = series?.[kind] ?? [];
+        const max = Math.max(1, ...vals);
+        const total = vals.reduce((a, b) => a + b, 0);
+        return (
+          <div key={kind} className={`market-sources__pulse-row is-${kind}`} title={hint}>
+            <span className="market-sources__pulse-label">{label}</span>
+            <strong className="market-sources__pulse-total">{count(total)}</strong>
+            <div className="market-sources__pulse-bars" role="img" aria-label={`${label}: ${count(total)}`}>
+              {vals.map((n, idx) => (
+                <i key={idx} className={idx === vals.length - 1 ? 'is-now' : ''} title={`${labels(idx, vals.length)}: ${count(n)}`}
+                  style={{ height: n > 0 ? `${Math.max(8, Math.round((Math.sqrt(n) / Math.sqrt(max)) * 100))}%` : '0' }} />
+              ))}
+            </div>
+            <small className="market-sources__pulse-last">{last ? formatTickAgo(last[kind], now) : ''}</small>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function SourceLandingInspector({
   row,
   boardLanding,
@@ -1413,14 +1563,9 @@ function SourceLandingInspector({
   onClose: () => void;
   asBlock?: boolean;
 }) {
-  const [selectedHour, setSelectedHour] = useState<string | null>(null);
-  const [selectedDrillMake, setSelectedDrillMake] = useState<string | null>(null);
-  const [selectedDrillModel, setSelectedDrillModel] = useState<string | null>(null);
-  const [selectedDrillFacet, setSelectedDrillFacet] = useState<{
-    axis: 'series' | 'trim' | 'body';
-    value: string;
-  } | null>(null);
-  const [sortMode, setSortMode] = useState<DrillStreamSortMode>('latest');
+  const [columnSort, setColumnSort] = useState<{ key: DrillColumnKey; dir: 'asc' | 'desc' } | null>({ key: 'ends', dir: 'asc' });
+  const [pulse, setPulse] = useState<SourcePulse | null>(null);
+  const [tickNow, setTickNow] = useState(() => Date.now());
   const [detail, setDetail] = useState<SourceLandingDetail | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshTick, setRefreshTick] = useState(0);
@@ -1428,18 +1573,14 @@ function SourceLandingInspector({
   const displayName = row ? shortName(row.name) : 'All sources';
 
   useEffect(() => {
-    setSelectedDrillMake(null);
-    setSelectedDrillModel(null);
-    setSelectedDrillFacet(null);
-    setSortMode('latest');
+    setColumnSort({ key: 'ends', dir: 'asc' });
   }, [sourceKey]);
 
   useEffect(() => {
     let active = true;
     setLoading(true);
-    const params: { p_source?: string; p_hour?: string } = {};
+    const params: { p_source?: string } = {};
     if (sourceKey) params.p_source = sourceKey;
-    if (selectedHour) params.p_hour = selectedHour;
 
     Promise.resolve()
       .then(() => supabase.rpc('market_source_landing_read', params))
@@ -1456,115 +1597,66 @@ function SourceLandingInspector({
       });
 
     return () => { active = false; };
-  }, [sourceKey, selectedHour, refreshTick]);
+  }, [sourceKey, refreshTick]);
+
+  // The heartbeat: bids, comments, listings and backfill, each its own line (market_source_pulse_read).
+  useEffect(() => {
+    let active = true;
+    Promise.resolve()
+      .then(() => supabase.rpc('market_source_pulse_read', { p_source: sourceKey }))
+      .then(({ data: raw, error }) => {
+        if (active && !error) setPulse(parsePulse(raw));
+      })
+      .catch(() => undefined);
+    return () => { active = false; };
+  }, [sourceKey, refreshTick]);
+
+  // Countdowns and "ago" tick every second.
+  useEffect(() => {
+    if ((globalThis as any).IS_REACT_ACT_ENVIRONMENT) return;
+    const id = window.setInterval(() => setTickNow(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, []);
 
   // Auto-refresh live ingestion telemetry every 10s when inspecting live stream
   useEffect(() => {
-    if ((globalThis as any).IS_REACT_ACT_ENVIRONMENT || selectedHour) return;
+    if ((globalThis as any).IS_REACT_ACT_ENVIRONMENT) return;
     const id = window.setInterval(() => setRefreshTick((t) => t + 1), 10_000);
     return () => window.clearInterval(id);
-  }, [selectedHour]);
+  }, []);
 
-  const fallbackHours = row ? row.hours24 : boardLanding.hours24;
-  const fallbackMins = row ? row.mins60 : boardLanding.mins60;
-  const fallbackDays = row ? row.days14 : [];
-  const hours24 = detail?.hours24?.length === 24 ? detail.hours24 : fallbackHours;
-  const mins60 = detail?.mins60?.length === 12 ? detail.mins60 : fallbackMins;
-  const days14 = detail?.days14?.length === 14 ? detail.days14 : fallbackDays;
   const endHourIso = detail?.hour ?? boardLanding.hour ?? null;
-  const landed15m = detail?.landed15m ?? (row ? row.landed15m : boardLanding.landed15m);
   const landed1h = detail?.landed1h ?? (row ? row.landed1h : boardLanding.landed1h);
   const landed24 = detail?.landed24 ?? (row ? row.landed24 : boardLanding.landed24);
-  const landed7 = detail?.landed7 ?? (row ? row.landed7 : boardLanding.landed7);
   const lastLanded = detail?.lastLanded ?? (row ? row.lastLanded : null);
   const recent = detail?.recent ?? [];
-
-  const maxHour = Math.max(1, ...hours24);
-  const maxMin = Math.max(1, ...mins60);
-  const maxDay = Math.max(1, ...days14);
-  const show14dFallback = landed24 === 0 && days14.some((d) => d > 0);
   const Tag = asBlock ? 'div' : 'li';
 
-  const resolveSourceName = (rawSource: string) =>
-    sourceNames.get(rawSource) ?? sourceNames.get(normKey(rawSource)) ?? rawSource;
-
   const totalRecent = recent.length;
-  const refNow = detail?.asOf && !Number.isNaN(Date.parse(detail.asOf)) ? Date.parse(detail.asOf) : Date.now();
-  const ymmStructured = recent.filter((e) => e.year != null && !!e.make && !!e.model).length;
-  const datedCount = recent.filter((e) => !!e.recordDate).length;
-  const vinCount = recent.filter((e) => !!e.vin).length;
-  const pricedCount = recent.filter((e) => e.price != null && e.price > 0).length;
-  const dateSummaries = recent.map((e) => describeRecordDate(e.recordDate, refNow));
-  const currentCount = dateSummaries.filter((d) => d.kind === 'live' || d.kind === 'fresh').length;
-  const backfillCount = dateSummaries.filter((d) => d.kind === 'backfill').length;
   const rowCategory = row ? resolveSourceCategory(row) : null;
   const rowBadge = row ? sourceBadge(row) : null;
   const speciesEvidence = row?.speciesEvidence ?? null;
   const dealerBreakdown = row && rowCategory === 'dealer' ? describeDealerConsignment(row, recent) : null;
   const dealerProfileHref = row ? resolveDealerProfileHref(row) : null;
-  const topMakes = resolveDrillTopMakes(detail, recent);
-  const topModels = resolveDrillTopModels(detail, recent);
-  const facetDistribution = computeStreamFacetDistribution(recent);
-  const hasActiveDrillFilter = Boolean(selectedDrillMake || selectedDrillModel || selectedDrillFacet);
+  const sortedRecent = sortDrillColumn(recent, columnSort, tickNow);
 
-  const filteredRecent = recent.filter((ev) => {
-    if (selectedDrillMake) {
-      const evMake = (ev.make ?? '').trim().toLowerCase();
-      if (evMake !== selectedDrillMake.trim().toLowerCase()) return false;
-    }
-    if (selectedDrillModel) {
-      const targetModel = selectedDrillModel.trim().toLowerCase();
-      const evModel = (ev.model ?? '').trim().toLowerCase();
-      const evTitle = (ev.title ?? ev.rawTitle ?? '').trim().toLowerCase();
-      if (
-        evModel !== targetModel &&
-        !evModel.startsWith(`${targetModel} `) &&
-        !evTitle.includes(targetModel)
-      ) {
-        return false;
-      }
-    }
-    if (selectedDrillFacet) {
-      const f = classifyVehicleFacet({
-        make: ev.make,
-        model: ev.model,
-        series: ev.series,
-        trim: ev.trim,
-        bodyStyle: ev.bodyStyle,
-        title: ev.title,
-        rawTitle: ev.rawTitle,
-        year: ev.year,
-      });
-      const picked = f[selectedDrillFacet.axis];
-      if (!picked || picked.toLowerCase() !== selectedDrillFacet.value.toLowerCase()) {
-        return false;
-      }
-    }
-    return true;
-  });
+  // The site's heartbeat: the latest bid, comment or listing, ticking each second.
+  const beat = pulse
+    ? (['bid', 'comment', 'listing'] as const)
+        .map((k) => ({ k, t: pulse.last[k] ? Date.parse(pulse.last[k] as string) : NaN }))
+        .filter((x) => !Number.isNaN(x.t))
+        .sort((x, y) => y.t - x.t)[0] ?? null
+    : null;
+  const beatLabel = beat
+    ? `last ${beat.k} ${formatTickAgo(new Date(beat.t).toISOString(), tickNow)}`
+    : lastLanded
+      ? `last record ${formatTickAgo(lastLanded, tickNow)}`
+      : 'idle';
 
-  const sortedRecent = sortDrillStreamEvents(filteredRecent, sortMode);
-  const cohortSummary = computeDrillCohortSummary(filteredRecent, totalRecent);
-  // Unfiltered, the sold figures are the reader's count of every event landed in the window, not of the rows shown; a make,
-  // model or facet filter can only narrow the rows shown, so it falls back to them and says so.
-  const windowStats = !hasActiveDrillFilter ? detail?.window ?? null : null;
+  // The sold figures are the reader's count of every listing captured in the last 24 hours, not of the rows shown.
+  const windowStats = detail?.window ?? null;
   const windowConcluded = windowStats ? windowStats.sold + windowStats.ended : 0;
   const windowSellThrough = windowStats && windowConcluded > 0 ? Math.round((windowStats.sold / windowConcluded) * 100) : null;
-  const windowScope = selectedHour ? `the ${formatHourLabel(selectedHour)} hour` : 'the last 24 hours';
-  const activeFilterParts: string[] = [];
-  if (selectedDrillMake) activeFilterParts.push(selectedDrillMake);
-  if (selectedDrillModel) activeFilterParts.push(selectedDrillModel);
-  if (selectedDrillFacet) {
-    const pfx =
-      selectedDrillFacet.axis === 'series'
-        ? 'SER'
-        : selectedDrillFacet.axis === 'trim'
-          ? 'TRM'
-          : 'BDY';
-    activeFilterParts.push(`${pfx} ${selectedDrillFacet.value}`);
-  }
-  const activeFilterLabel =
-    activeFilterParts.length > 0 ? activeFilterParts.join(' · ') : 'All in stream';
 
   const statsHeld = detail?.stats?.held ?? row?.held ?? null;
   // The held count is a daily fold with its own clock; what landed after that clock is counted live beside it.
@@ -1596,27 +1688,18 @@ function SourceLandingInspector({
     <Tag className="market-sources__drill" aria-label={`Live ingestion for ${displayName}`}>
       <div className="market-sources__drill-head">
         <div className="market-sources__drill-title">
-          <i className={landed1h > 0 ? 'on live' : landed24 > 0 ? 'on' : 'off'} aria-hidden="true" />
-          <strong>{displayName}</strong>
+          <i className={landed1h > 0 || beat ? 'on live' : landed24 > 0 ? 'on' : 'off'} aria-hidden="true" />
+          {row?.logoUrl ? (
+            <OrgLogo logoUrl={row.logoUrl} businessType={row.businessType ?? null} businessName={displayName} size={26} maxWidth={140}
+              className={`market-sources__icon${sourceLogoInk(row.logoUrl) ? ` market-sources__icon--${sourceLogoInk(row.logoUrl)}` : ''}`} />
+          ) : null}
+          <strong className={row?.logoUrl ? 'sr-only' : undefined}>{displayName}</strong>
           {rowBadge ? (
             <span className={`market-sources__badge market-sources__badge--${rowBadge.key}`}>
               {rowBadge.label}
             </span>
           ) : null}
-          <span>{row ? 'vehicles, stats & live ingestion' : 'live & hourly ingestion'}</span>
-          {selectedHour ? (
-            <button
-              type="button"
-              className="market-sources__drill-filter"
-              onClick={() => setSelectedHour(null)}
-            >
-              Hour {formatHourLabel(selectedHour)} {zoneName(new Date(selectedHour))} ×
-            </button>
-          ) : (
-            <span className="market-sources__drill-live-tag">
-              {loading ? 'syncing…' : landed1h > 0 ? 'live stream' : landed24 > 0 ? 'active today' : 'historical log'}
-            </span>
-          )}
+          <span className="market-sources__drill-live-tag">{loading && !pulse ? 'syncing…' : beatLabel}</span>
         </div>
         <div className="market-sources__drill-actions">
           {dealerProfileHref ? (
@@ -1754,583 +1837,95 @@ function SourceLandingInspector({
         </div>
       ) : null}
 
-      <div className="market-sources__drill-kpis">
-        <div className="market-sources__kpi">
-          <span className="market-sources__kpi-label">Last 15 min</span>
-          <strong className={landed15m > 0 ? 'up' : ''}>+{count(landed15m)}</strong>
-        </div>
-        <div className="market-sources__kpi">
-          <span className="market-sources__kpi-label">Last 60 min</span>
-          <strong className={landed1h > 0 ? 'up' : ''}>+{count(landed1h)}</strong>
-        </div>
-        <div className="market-sources__kpi">
-          <span className="market-sources__kpi-label">Last 24 hours</span>
-          <strong>+{count(landed24)}</strong>
-        </div>
-        <div className="market-sources__kpi">
-          <span className="market-sources__kpi-label">Last 7 days</span>
-          <strong>+{count(landed7)}</strong>
-        </div>
-        <div className="market-sources__kpi market-sources__kpi--wide">
-          <span className="market-sources__kpi-label">Last record landed</span>
-          <strong>{lastLanded ? `${formatAgo(lastLanded)} · ${formatExactTime(lastLanded)}` : 'idle 14+ days'}</strong>
-        </div>
+      <div className="market-sources__drill-pulses">
+        <PulseLines
+          title={`Last 24 hours (${zoneName(new Date())})`}
+          series={pulse?.hours24 ?? null}
+          labels={(idx, len) => formatHourLabel(hourSlotIso(endHourIso, idx, len)) || `${len - 1 - idx}h ago`}
+          now={tickNow}
+          last={pulse?.last ?? null}
+        />
+        <PulseLines
+          title="Last 60 minutes"
+          series={pulse?.mins60 ?? null}
+          labels={(idx, len) => (idx === len - 1 ? 'now' : `-${(len - 1 - idx) * 5}m`)}
+          now={tickNow}
+        />
       </div>
 
-      <div className="market-sources__drill-charts">
-        <div className="market-sources__chart-box">
-          <div className="market-sources__chart-head">
-            <span>Hourly ingestion · last 24 hours ({zoneName(new Date())})</span>
-            <small>{selectedHour ? `Inspecting ${formatHourLabel(selectedHour)} ${zoneName(new Date(selectedHour))} — click bar again for live` : 'Click any hour bar to inspect records from that hour'}</small>
-          </div>
-          <div className="market-sources__hour-grid" role="group" aria-label="24 hourly ingestion bars">
-            {hours24.map((n, idx) => {
-              const slotIso = hourSlotIso(endHourIso, idx, 24);
-              const hourLabel = formatHourLabel(slotIso) || `${23 - idx}h`;
-              const isSelected = !!selectedHour && slotIso === selectedHour;
-              const isNow = idx === hours24.length - 1;
-              const pct = n > 0 ? Math.max(8, Math.round((Math.sqrt(n) / Math.sqrt(maxHour)) * 100)) : 0;
+      {windowStats && windowConcluded > 0 ? (
+        <div className="market-sources__sellthrough" data-testid="drill-sellthrough" title="Of the listings captured in the last 24 hours that have concluded">
+          <span className="market-sources__kpi-label">Sell-through</span>
+          <strong>{windowSellThrough}%</strong>
+          <span className="market-sources__sellthrough-bar" aria-hidden="true">
+            <i style={{ width: `${windowSellThrough}%` }} />
+          </span>
+          <small>{count(windowStats.sold)} sold of {count(windowConcluded)} concluded</small>
+        </div>
+      ) : null}
+
+      {totalRecent > 0 ? (
+        <div className="market-sources__events-wrap">
+          <div className="market-sources__events-cols" role="row">
+            {DRILL_COLUMNS.map(({ key, label, numeric }) => {
+              const active = columnSort?.key === key;
               return (
                 <button
-                  key={idx}
+                  key={key}
                   type="button"
-                  className={`market-sources__hour-col${isSelected ? ' is-selected' : ''}${isNow ? ' is-now' : ''}`}
-                  onClick={() => slotIso && setSelectedHour((cur) => (cur === slotIso ? null : slotIso))}
-                  title={`${hourLabel}${slotIso ? ` ${zoneName(new Date(slotIso))}` : ''}: +${count(n)} landed`}
+                  role="columnheader"
+                  className={`market-sources__col-head${numeric ? ' n' : ''}${active ? ' is-active' : ''}`}
+                  aria-sort={active ? (columnSort?.dir === 'asc' ? 'ascending' : 'descending') : 'none'}
+                  data-testid={`drill-col-${key}`}
+                  onClick={() =>
+                    setColumnSort((cur) =>
+                      cur?.key === key ? { key, dir: cur.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: key === 'ends' || key === 'make' || key === 'model' || key === 'vin' || key === 'lot' ? 'asc' : 'desc' },
+                    )
+                  }
                 >
-                  <span className="market-sources__hour-val">{n > 0 ? compactCount(n) : ''}</span>
-                  <svg className="market-sources__hour-track" viewBox="0 0 10 100" preserveAspectRatio="none" aria-hidden="true">
-                    {pct > 0 ? <rect className="market-sources__hour-fill" x="0" y={100 - pct} width="10" height={pct} /> : null}
-                  </svg>
-                  <span className="market-sources__hour-lbl">{idx % 3 === 0 || isNow ? hourLabel.slice(0, 2) : ''}</span>
+                  {label}{active ? (columnSort?.dir === 'asc' ? ' ▲' : ' ▼') : ''}
                 </button>
               );
             })}
           </div>
+          <ul className="market-sources__events">
+            {sortedRecent.map((ev) => {
+              const st = formatStatusCell(ev);
+              const endsAt = recordEndsAt(ev.recordDate);
+              const cd = endsAt != null && !ev.archived ? formatCountdown(endsAt, tickNow) : null;
+              const modelPrimary = ev.model || ev.rawTitle || ev.title || ev.lot || ev.id;
+              const href = ev.vehicleId ? `/vehicle/${ev.vehicleId}` : null;
+              return (
+                <li key={ev.id} className="market-sources__event">
+                  <span className={`market-sources__event-ends${cd?.live ? ' is-live' : ''}${cd?.soon ? ' is-soon' : ''}`}
+                    title={endsAt != null ? formatExactTime(new Date(endsAt).toISOString()) : 'No end time recorded'}>
+                    {cd ? cd.text : '—'}
+                  </span>
+                  <span className={`market-sources__event-year n${ev.year == null ? ' is-missing' : ''}`}>{ev.year ?? '—'}</span>
+                  <span className="market-sources__event-make">
+                    {ev.make ? <MakeIdentity make={ev.make} compact /> : <span className="is-missing">—</span>}
+                  </span>
+                  <span className={`market-sources__event-model${!ev.model ? ' is-unparsed' : ''}`} title={ev.rawTitle ?? modelPrimary}>
+                    {href ? <a href={href}>{modelPrimary}</a> : modelPrimary}
+                  </span>
+                  <span className="market-sources__event-vin" title={ev.vin ? 'VIN / chassis' : 'No VIN extracted'}>{ev.vin ?? '—'}</span>
+                  <span className="market-sources__event-lot" title="Source lot number">{ev.lot && !ev.lot.includes('/') ? ev.lot : '—'}</span>
+                  <span className={`market-sources__event-miles n${ev.mileage == null ? ' is-missing' : ''}`}
+                    title={ev.mileage != null ? `${count(ev.mileage)} miles` : 'Mileage not extracted'}>
+                    {ev.mileage != null && ev.mileage > 0 ? `${compactCount(ev.mileage)} mi` : '—'}
+                  </span>
+                  <span className={`market-sources__event-status n ${st.statusClass}`} title={st.title ?? undefined}>
+                    {cd?.live ? (ev.bidCount ? `${ev.bidCount} ${ev.bidCount === 1 ? 'bid' : 'bids'}` : 'no bids') : st.primary}
+                  </span>
+                  <span className="market-sources__event-price n">{ev.price && ev.price > 0 ? `$${count(ev.price)}` : '—'}</span>
+                </li>
+              );
+            })}
+          </ul>
         </div>
-
-        {show14dFallback ? (
-          <div className="market-sources__chart-box market-sources__chart-box--mins">
-            <div className="market-sources__chart-head">
-              <span>Daily ingestion · last 14 days</span>
-              <small>+{count(days14.reduce((a, b) => a + b, 0))} in 14d</small>
-            </div>
-            <div className="market-sources__day-grid" role="group" aria-label="14 daily ingestion bars">
-              {days14.map((n, idx) => {
-                const dayIso = daySlotIso(boardDay, idx, 14);
-                const lbl = shortDay(dayIso);
-                const pct = n > 0 ? Math.max(10, Math.round((Math.sqrt(n) / Math.sqrt(maxDay)) * 100)) : 0;
-                return (
-                  <div key={idx} className={`market-sources__min-col${idx === 13 ? ' is-now' : ''}`} title={`${lbl}: +${count(n)} landed`}>
-                    <span className="market-sources__hour-val">{n > 0 ? compactCount(n) : ''}</span>
-                    <svg className="market-sources__hour-track" viewBox="0 0 10 100" preserveAspectRatio="none" aria-hidden="true">
-                      {pct > 0 ? <rect className="market-sources__hour-fill" x="0" y={100 - pct} width="10" height={pct} /> : null}
-                    </svg>
-                    <span className="market-sources__hour-lbl">{idx % 3 === 0 || idx === 13 ? lbl.replace(' ', '\u00a0') : ''}</span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        ) : (
-          <div className="market-sources__chart-box market-sources__chart-box--mins">
-            <div className="market-sources__chart-head">
-              <span>Live 60m burst · 5-min windows</span>
-              <small>{landed1h > 0 ? `${(landed1h / 60).toFixed(1)}/min avg` : 'no arrivals in last 60m'}</small>
-            </div>
-            <div className="market-sources__min-grid" role="group" aria-label="12 five-minute ingestion bars">
-              {mins60.map((n, idx) => {
-                const minsAgo = (11 - idx) * 5;
-                const lbl = minsAgo === 0 ? 'now' : `-${minsAgo}m`;
-                const pct = n > 0 ? Math.max(10, Math.round((Math.sqrt(n) / Math.sqrt(maxMin)) * 100)) : 0;
-                return (
-                  <div key={idx} className={`market-sources__min-col${idx === 11 ? ' is-now' : ''}`} title={`${lbl}: +${count(n)} landed`}>
-                    <span className="market-sources__hour-val">{n > 0 ? compactCount(n) : ''}</span>
-                    <svg className="market-sources__hour-track" viewBox="0 0 10 100" preserveAspectRatio="none" aria-hidden="true">
-                      {pct > 0 ? <rect className="market-sources__hour-fill" x="0" y={100 - pct} width="10" height={pct} /> : null}
-                    </svg>
-                    <span className="market-sources__hour-lbl">{idx % 2 === 1 || idx === 0 ? lbl : ''}</span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-      </div>
-
-      <div className="market-sources__drill-feed">
-        <div className="market-sources__chart-head market-sources__feed-head">
-          <div className="market-sources__feed-title">
-            <span>
-              {selectedHour
-                ? `Structured records landed in ${formatHourLabel(selectedHour)} ${zoneName(new Date(selectedHour))}`
-                : `Structured ingestion stream · ${displayName}`}
-            </span>
-            <small>
-              {totalRecent
-                ? hasActiveDrillFilter
-                  ? `showing ${filteredRecent.length} of ${totalRecent} arriving records`
-                  : `showing ${totalRecent} arriving records`
-                : loading
-                  ? 'loading…'
-                  : 'no recent records in window'}
-            </small>
-            {hasActiveDrillFilter ? (
-              <button
-                type="button"
-                className="market-sources__drill-clear"
-                data-testid="drill-filter-clear"
-                onClick={() => {
-                  setSelectedDrillMake(null);
-                  setSelectedDrillModel(null);
-                  setSelectedDrillFacet(null);
-                }}
-              >
-                CLEAR
-              </button>
-            ) : null}
-          </div>
-          {totalRecent > 0 ? (
-            <div className="market-sources__schema-pills" aria-label="Ingestion structuring quality">
-              <span
-                className={`market-sources__schema-pill${ymmStructured === totalRecent ? ' is-good' : ymmStructured < totalRecent * 0.7 ? ' is-warn' : ''}`}
-                title="Records with Year, Make, and Model structured into separate columns"
-              >
-                Y·M·M {ymmStructured}/{totalRecent}
-              </span>
-              <span
-                className={`market-sources__schema-pill${datedCount === totalRecent ? ' is-good' : ' is-warn'}`}
-                title="Records carrying their own event/sale/listing date"
-              >
-                Dated {datedCount}/{totalRecent}
-              </span>
-              <span
-                className="market-sources__schema-pill"
-                title="Live/current market events vs. historical backfill records being ingested now"
-              >
-                {currentCount} current · {backfillCount} backfill
-              </span>
-              <span
-                className="market-sources__schema-pill"
-                title="Records with a structured VIN or chassis number"
-              >
-                VIN {vinCount}/{totalRecent}
-              </span>
-              <span
-                className="market-sources__schema-pill"
-                title="Records with a bid, hammer, or asking price"
-              >
-                Price {pricedCount}/{totalRecent}
-              </span>
-            </div>
-          ) : null}
-        </div>
-        {topMakes.length > 0 || topModels.length > 0 ? (
-          <div className="market-sources__drill-taxonomy-bars" data-testid="drill-make-model-bars">
-            {topMakes.length > 0 ? (
-              <div
-                className="market-sources__drill-top-makes"
-                data-testid="drill-top-makes"
-                role="group"
-                aria-label="Top Makes"
-              >
-                <span className="market-sources__drill-bar-label">Top Makes</span>
-                <div className="market-sources__drill-pill-list">
-                  {topMakes.map((item) => {
-                    const isMakeActive =
-                      selectedDrillMake != null &&
-                      selectedDrillMake.toLowerCase() === item.make.toLowerCase();
-                    const makeHref = `/?make=${encodeURIComponent(item.make)}`;
-                    return (
-                      <span
-                        key={item.make}
-                        className={`market-sources__drill-pill-wrap${isMakeActive ? ' is-active' : ''}`}
-                      >
-                        <button
-                          type="button"
-                          className={`market-sources__drill-pill market-sources__top-make-pill${isMakeActive ? ' is-active' : ''}`}
-                          data-testid={`drill-make-pill-${item.make}`}
-                          data-make={item.make}
-                          aria-pressed={isMakeActive}
-                          onClick={() =>
-                            setSelectedDrillMake((cur) =>
-                              cur && cur.toLowerCase() === item.make.toLowerCase() ? null : item.make,
-                            )
-                          }
-                        >
-                          {item.make} <span className="market-sources__drill-pill-count">({count(item.count)})</span>
-                        </button>
-                        <a
-                          href={makeHref}
-                          className="market-sources__pill-jump"
-                          data-testid={`drill-make-jump-${item.make}`}
-                          title={`Open ${item.make} on Market Treemap`}
-                          aria-label={`Open ${item.make} on Market Treemap`}
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          ↗
-                        </a>
-                      </span>
-                    );
-                  })}
-                </div>
-              </div>
-            ) : null}
-            {topModels.length > 0 ? (
-              <div
-                className="market-sources__drill-top-models"
-                data-testid="drill-top-models"
-                role="group"
-                aria-label="Top Models"
-              >
-                <span className="market-sources__drill-bar-label">Top Models</span>
-                <div className="market-sources__drill-pill-list">
-                  {topModels.map((item) => {
-                    const isModelActive =
-                      selectedDrillModel != null &&
-                      selectedDrillModel.toLowerCase() === item.model.toLowerCase();
-                    const effectiveMake = item.make ?? selectedDrillMake;
-                    const modelHref = effectiveMake
-                      ? `/?make=${encodeURIComponent(effectiveMake)}&model=${encodeURIComponent(item.model)}`
-                      : `/?model=${encodeURIComponent(item.model)}`;
-                    return (
-                      <span
-                        key={`${item.make ?? ''}:${item.model}`}
-                        className={`market-sources__drill-pill-wrap${isModelActive ? ' is-active' : ''}`}
-                      >
-                        <button
-                          type="button"
-                          className={`market-sources__drill-pill market-sources__top-model-pill${isModelActive ? ' is-active' : ''}`}
-                          data-testid={`drill-model-pill-${item.model}`}
-                          data-model={item.model}
-                          data-make={effectiveMake ?? undefined}
-                          aria-pressed={isModelActive}
-                          onClick={() =>
-                            setSelectedDrillModel((cur) =>
-                              cur && cur.toLowerCase() === item.model.toLowerCase() ? null : item.model,
-                            )
-                          }
-                        >
-                          {item.model} <span className="market-sources__drill-pill-count">({count(item.count)})</span>
-                        </button>
-                        <a
-                          href={modelHref}
-                          className="market-sources__pill-jump"
-                          data-testid={`drill-model-jump-${item.model}`}
-                          title={`Open ${effectiveMake ? `${effectiveMake} ` : ''}${item.model} on Market Treemap`}
-                          aria-label={`Open ${effectiveMake ? `${effectiveMake} ` : ''}${item.model} on Market Treemap`}
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          ↗
-                        </a>
-                      </span>
-                    );
-                  })}
-                </div>
-              </div>
-            ) : null}
-          </div>
-        ) : null}
-        {facetDistribution.length > 0 ? (
-          <div
-            className="market-sources__facet-breakdown"
-            data-testid="drill-facet-breakdown"
-            role="group"
-            aria-label="Facet breakdown"
-          >
-            <span className="market-sources__drill-bar-label">FACET BREAKDOWN</span>
-            <div className="market-sources__facet-breakdown-pills">
-              {facetDistribution.map((fp) => {
-                const isFacetActive =
-                  selectedDrillFacet != null &&
-                  selectedDrillFacet.axis === fp.axis &&
-                  selectedDrillFacet.value.toLowerCase() === fp.value.toLowerCase();
-                return (
-                  <button
-                    key={`${fp.axis}:${fp.value}`}
-                    type="button"
-                    className={`market-sources__facet-breakdown-pill market-sources__facet-breakdown-pill--${fp.axis}${isFacetActive ? ' is-active' : ''}`}
-                    data-testid={`drill-facet-pill-${fp.prefix}-${fp.value}`}
-                    data-axis={fp.axis}
-                    data-prefix={fp.prefix}
-                    data-facet={fp.value}
-                    aria-pressed={isFacetActive}
-                    onClick={() =>
-                      setSelectedDrillFacet((cur) =>
-                        cur &&
-                        cur.axis === fp.axis &&
-                        cur.value.toLowerCase() === fp.value.toLowerCase()
-                          ? null
-                          : { axis: fp.axis, value: fp.value },
-                      )
-                    }
-                  >
-                    <em className="market-sources__facet-prefix">{fp.prefix}</em> {fp.value} ({count(fp.count)})
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        ) : null}
-        {totalRecent > 0 ? (
-          <div className="market-sources__cohort-bar" data-testid="drill-cohort-summary-bar" aria-label="Cohort summary KPI bar">
-            <div className="market-sources__cohort-kpis" data-testid="drill-cohort-kpis">
-              <div className="market-sources__cohort-kpi" data-testid="drill-cohort-filtered-count">
-                <span className="market-sources__kpi-label">{windowStats ? 'Landed in window' : 'Filtered Count'}</span>
-                <strong>
-                  {windowStats
-                    ? `${count(windowStats.events)}${windowStats.capped ? '+' : ''}`
-                    : hasActiveDrillFilter
-                      ? `${count(cohortSummary.filteredCount)} of ${count(cohortSummary.totalStreamCount)}`
-                      : count(cohortSummary.filteredCount)}
-                </strong>
-                <small className="market-sources__cohort-scope">
-                  {windowStats
-                    ? `${windowScope} · every record landed, ${count(totalRecent)} shown below`
-                    : hasActiveDrillFilter ? `${activeFilterLabel} · of the ${count(totalRecent)} shown` : activeFilterLabel}
-                </small>
-              </div>
-              <div className="market-sources__cohort-kpi" data-testid="drill-cohort-sold-sellthrough">
-                <span className="market-sources__kpi-label">Sold Count &amp; Sell-Through %</span>
-                <strong>
-                  {windowStats
-                    ? windowSellThrough != null
-                      ? `${count(windowStats.sold)} sold · ${windowSellThrough}%`
-                      : `${count(windowStats.sold)} sold · —`
-                    : cohortSummary.filteredCount > 0 && cohortSummary.sellThroughPct != null
-                      ? `${count(cohortSummary.soldCount)} sold · ${cohortSummary.sellThroughPct}%`
-                      : '0 sold · —'}
-                </strong>
-                {windowStats ? (
-                  <small className="market-sources__cohort-scope">
-                    of {count(windowConcluded)} concluded · {count(windowStats.live)} still open when landed
-                  </small>
-                ) : null}
-              </div>
-              <div className="market-sources__cohort-kpi" data-testid="drill-cohort-median-sold-price">
-                <span className="market-sources__kpi-label">Median Sold Price</span>
-                <strong>
-                  {windowStats
-                    ? windowStats.medianSoldPrice != null && windowStats.medianSoldPrice > 0
-                      ? `$${count(windowStats.medianSoldPrice)}`
-                      : '—'
-                    : cohortSummary.medianSoldPrice != null && cohortSummary.medianSoldPrice > 0
-                      ? `$${count(cohortSummary.medianSoldPrice)}`
-                      : '—'}
-                </strong>
-                {windowStats ? (
-                  <small className="market-sources__cohort-scope">{count(windowStats.soldPriced)} priced sales</small>
-                ) : null}
-              </div>
-            </div>
-            <div
-              className="market-sources__sort-pills"
-              data-testid="drill-sort-selector"
-              role="group"
-              aria-label="Sort recent vehicles stream"
-            >
-              <span className="market-sources__drill-bar-label">SORT</span>
-              {(
-                [
-                  ['latest', 'LATEST'],
-                  ['price', 'HIGHEST PRICE'],
-                  ['year', 'YEAR'],
-                ] as const
-              ).map(([mode, label]) => {
-                const isSortActive = sortMode === mode;
-                return (
-                  <button
-                    key={mode}
-                    type="button"
-                    className={`market-sources__sort-pill${isSortActive ? ' is-active' : ''}`}
-                    data-testid={`drill-sort-${mode}`}
-                    data-sort={mode}
-                    aria-pressed={isSortActive}
-                    onClick={() => setSortMode(mode)}
-                  >
-                    {label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        ) : null}
-        {totalRecent > 0 ? (
-          <div className="market-sources__events-wrap">
-            <div className="market-sources__events-cols" aria-hidden="true">
-              <span>Landed</span>
-              <span>Record date · age</span>
-              <span className="n">Year</span>
-              <span>Make</span>
-              <span>Model &amp; trim</span>
-              <span>VIN / Lot</span>
-              <span className="n">Miles</span>
-              <span>Status</span>
-              <span className="n">Price</span>
-              <span className="n">Source</span>
-            </div>
-            <ul className="market-sources__events">
-              {sortedRecent.map((ev) => {
-                const recDate = describeRecordDate(ev.recordDate, refNow);
-                const vinLot = formatVinOrLot(ev);
-                const st = formatStatusCell(ev);
-                const srcDisplay = resolveSourceName(ev.source);
-                const modelPrimary = ev.model || ev.rawTitle || ev.title || ev.lot || ev.id;
-                const showTrim = !!ev.trim && (!ev.model || !ev.model.toLowerCase().includes(ev.trim.toLowerCase()));
-                const showRawHint = !!ev.rawTitle && (!ev.make || !ev.year) && ev.rawTitle !== modelPrimary;
-                const href = ev.vehicleId ? `/vehicle/${ev.vehicleId}` : ev.sourceUrl;
-                const facetInfo = classifyVehicleFacet({
-                  make: ev.make,
-                  model: ev.model,
-                  series: ev.series,
-                  trim: ev.trim,
-                  bodyStyle: ev.bodyStyle,
-                  title: ev.title,
-                  rawTitle: ev.rawTitle,
-                  year: ev.year,
-                });
-                const identityMark = resolveVehicleIdentityMark({
-                  make: ev.make,
-                  family: facetInfo.family,
-                  model: ev.model,
-                  trim: ev.trim,
-                  title: ev.title,
-                  rawTitle: ev.rawTitle,
-                  year: ev.year,
-                });
-                const facetEntries = ([
-                  ['series', 'SERIES', facetInfo.series],
-                  ['trim', 'TRIM', facetInfo.trim],
-                  ['body', 'BODY', facetInfo.body],
-                ] as const).filter((entry): entry is ['series' | 'trim' | 'body', string, string] => !!entry[2]);
-
-                return (
-                  <li key={ev.id} className="market-sources__event">
-                    <span className="market-sources__event-time" title={`Ingested into Nuke at ${formatExactTime(ev.createdAt)}`}>
-                      {formatAgo(ev.createdAt)}
-                    </span>
-                    <span
-                      className="market-sources__event-recdate"
-                      title={ev.archived && ev.capturedAt && ev.recordDate === ev.capturedAt
-                        ? `Captured by the Internet Archive on ${recDate.dateText}; the page carries no date of its own`
-                        : recDate.fullTitle}
-                    >
-                      <span className={`market-sources__recdate-val${recDate.kind === 'missing' ? ' is-missing' : ''}`}>
-                        {recDate.dateText}
-                      </span>
-                      {recDate.ageText ? (
-                        <em className={`market-sources__age-tag is-${recDate.kind}`}>
-                          {recDate.ageText}
-                        </em>
-                      ) : null}
-                    </span>
-                    <span
-                      className={`market-sources__event-year n${ev.year == null ? ' is-missing' : ''}`}
-                      title={ev.year != null ? `Model year: ${ev.year}` : 'Model year not extracted'}
-                    >
-                      {ev.year ?? '—'}
-                    </span>
-                    <span
-                      className={`market-sources__event-make${!ev.make ? ' is-missing' : ''}`}
-                      title={ev.make ? `Make: ${ev.make}` : `Make missing${ev.rawTitle ? ` (raw: ${ev.rawTitle})` : ''}`}
-                    >
-                      {ev.make ?? 'missing'}
-                    </span>
-                    <span
-                      className={`market-sources__event-model${!ev.model ? ' is-unparsed' : ''}`}
-                      title={ev.rawTitle ? `Model: ${ev.model ?? 'unparsed'} · Raw title: ${ev.rawTitle}` : modelPrimary}
-                    >
-                      {identityMark ? (
-                        <span
-                          className="market-sources__event-mark"
-                          title={`${identityMark.displayLabel} (${identityMark.yearStart}–${identityMark.yearEnd})`}
-                          aria-label={identityMark.displayLabel}
-                          dangerouslySetInnerHTML={{ __html: identityMark.svgMarkup }}
-                        />
-                      ) : null}
-                      {href ? (
-                        <a
-                          href={href}
-                          {...(!ev.vehicleId && ev.sourceUrl ? { target: '_blank', rel: 'noreferrer' } : {})}
-                        >
-                          {modelPrimary}
-                        </a>
-                      ) : (
-                        modelPrimary
-                      )}
-                      {showTrim ? <small className="market-sources__event-trim"> · {ev.trim}</small> : null}
-                      {showRawHint ? <small className="market-sources__event-raw"> ({ev.rawTitle})</small> : null}
-                      {facetEntries.length > 0 ? (
-                        <span className="market-sources__event-facets" aria-label="Vehicle taxonomy facets">
-                          {facetEntries.map(([axis, axisLabel, facetVal]) => {
-                            const facetHref =
-                              ev.make && facetInfo.family
-                                ? buildFacetDrilldownUrl({
-                                    make: ev.make,
-                                    family: facetInfo.family,
-                                    axis,
-                                    facet: facetVal,
-                                  })
-                                : null;
-                            return facetHref ? (
-                              <a
-                                key={axis}
-                                href={facetHref}
-                                className={`market-sources__facet-pill market-sources__facet-pill--${axis}`}
-                                data-axis={axis}
-                                title={`${axisLabel}: ${facetVal} (${ev.make} ${facetInfo.family})`}
-                              >
-                                <em className="market-sources__facet-axis">{axisLabel}</em> {facetVal}
-                              </a>
-                            ) : (
-                              <span
-                                key={axis}
-                                className={`market-sources__facet-pill market-sources__facet-pill--${axis}`}
-                                data-axis={axis}
-                                title={`${axisLabel}: ${facetVal}`}
-                              >
-                                <em className="market-sources__facet-axis">{axisLabel}</em> {facetVal}
-                              </span>
-                            );
-                          })}
-                        </span>
-                      ) : null}
-                    </span>
-                    <span
-                      className={`market-sources__event-vin${vinLot.isVin ? ' is-vin' : vinLot.isMissing ? ' is-missing' : ' is-lot'}`}
-                      title={vinLot.title}
-                    >
-                      {vinLot.text}
-                    </span>
-                    <span
-                      className={`market-sources__event-miles n${ev.mileage == null ? ' is-missing' : ''}`}
-                      title={ev.mileage != null ? `${count(ev.mileage)} miles` : 'Mileage not extracted'}
-                    >
-                      {ev.mileage != null && ev.mileage > 0 ? `${compactCount(ev.mileage)} mi` : '—'}
-                    </span>
-                    <span className={`market-sources__event-status ${st.statusClass}`} title={st.title ?? `${st.primary}${st.meta ? ` · ${st.meta}` : ''}`}>
-                      <strong>{st.primary}</strong>
-                      {st.meta ? <small> · {st.meta}</small> : null}
-                    </span>
-                    <span className="market-sources__event-price n">
-                      {ev.price && ev.price > 0 ? `$${count(ev.price)}` : '—'}
-                    </span>
-                    <span className="market-sources__event-link">
-                      {ev.sourceUrl ? (
-                        <a href={ev.sourceUrl} target="_blank" rel="noreferrer" title={ev.sourceUrl}>
-                          {srcDisplay} ↗
-                        </a>
-                      ) : (
-                        srcDisplay
-                      )}
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        ) : null}
-      </div>
+      ) : (
+        <small className="market-sources__drill-empty">{loading ? 'loading…' : 'no recent listings'}</small>
+      )}
     </Tag>
   );
 }

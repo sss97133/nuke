@@ -194,13 +194,16 @@
 .market-sources__schema-pill.is-good { border-color: var(--success); color: var(--success); }
 .market-sources__schema-pill.is-warn { border-color: var(--error); color: var(--error); }
 
-.market-sources__events-wrap { border: 1px solid var(--border); background: var(--bg); max-height: 340px; overflow-y: auto; overflow-x: auto; }
+.market-sources__events-wrap { border: 1px solid var(--border); background: var(--bg); max-height: 420px; overflow-y: auto; overflow-x: hidden; }
 .market-sources__events-cols, .market-sources__event { display: grid; align-items: center; gap: 8px;
-  grid-template-columns: 64px 150px 38px minmax(88px, 0.9fr) minmax(150px, 1.5fr) 128px 62px 98px 76px 96px;
-  min-width: 930px; padding: 3px 8px; box-sizing: border-box; }
+  grid-template-columns: 92px 40px minmax(84px, 0.9fr) minmax(110px, 1.6fr) minmax(120px, 1.2fr) 52px 56px 56px 78px;
+  min-width: 0; padding: 3px 8px; box-sizing: border-box; }
 .market-sources__events-cols { position: sticky; top: 0; z-index: 1; background: var(--surface);
-  border-bottom: 1px solid var(--border); font: 700 8px Arial, sans-serif; letter-spacing: 0.08em;
-  text-transform: uppercase; color: var(--text-secondary); padding: 4px 8px; }
+  border-bottom: 1px solid var(--border); padding: 0 8px; }
+.market-sources__col-head { all: unset; cursor: pointer; padding: 5px 0; font: 700 8px Arial, sans-serif; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--text-secondary); white-space: nowrap; }
+.market-sources__col-head.n { text-align: right; }
+.market-sources__col-head:hover, .market-sources__col-head:focus-visible, .market-sources__col-head.is-active { color: var(--text); }
 .market-sources__events { list-style: none; margin: 0; padding: 0; }
 .market-sources__event { border-top: 1px solid var(--border); font: 11px 'Courier New', monospace; }
 .market-sources__event:first-child { border-top: 0; }
@@ -322,3 +325,40 @@
 /* A dealer's lots sold on a venue the board already counts, and a cohort's sellers: beside held, never added to it. */
 .market-sources__venue, .market-sources__members { display: block; font-size: 10px; color: var(--text-secondary); white-space: nowrap; }
 .market-sources__more--group { margin: 6px 0 0 28px; }
+
+/* Drill-down: typographic actions, heartbeat lines, sell-through, countdown. */
+.market-sources__drill-btn { border: 0; background: none; padding: 2px 0; font: 700 10px Arial, sans-serif; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--text-secondary); text-decoration: none; cursor: pointer; }
+.market-sources__drill-btn:hover, .market-sources__drill-btn:focus-visible { color: var(--text); border: 0; text-decoration: underline; }
+.market-sources__drill-actions { gap: 14px; }
+.market-sources__drill-live-tag { border: 0; padding: 0; font: 700 10px 'Courier New', monospace; letter-spacing: 0.04em; text-transform: none; }
+.market-sources__drill-pulses { display: grid; grid-template-columns: 3fr 2fr; gap: 16px; margin: 8px 0; }
+@media (max-width: 720px) { .market-sources__drill-pulses { grid-template-columns: 1fr; } }
+.market-sources__pulse-row { display: grid; grid-template-columns: 74px 44px 1fr 64px; align-items: end; gap: 8px; padding: 2px 0; }
+.market-sources__pulse-label { font: 700 9px Arial, sans-serif; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-secondary); }
+.market-sources__pulse-total { font: 700 11px 'Courier New', monospace; text-align: right; }
+.market-sources__pulse-bars { display: flex; align-items: flex-end; gap: 2px; height: 26px; border-bottom: 1px solid var(--border); }
+.market-sources__pulse-bars i { flex: 1 1 0; background: var(--text); min-width: 1px; }
+.market-sources__pulse-bars i.is-now { background: var(--success); }
+.market-sources__pulse-row.is-backfill .market-sources__pulse-bars i { background: var(--text-disabled); }
+.market-sources__pulse-last { font: 9px 'Courier New', monospace; color: var(--text-secondary); text-align: right; white-space: nowrap; }
+.market-sources__sellthrough { display: flex; align-items: baseline; gap: 10px; margin: 6px 0 10px; }
+.market-sources__sellthrough strong { font-size: 18px; }
+.market-sources__sellthrough-bar { flex: 0 1 220px; height: 6px; background: var(--surface); border: 1px solid var(--border); align-self: center; }
+.market-sources__sellthrough-bar i { display: block; height: 100%; background: var(--success); }
+.market-sources__sellthrough small { color: var(--text-secondary); font: 10px 'Courier New', monospace; }
+.market-sources__event-ends { font-variant-numeric: tabular-nums; color: var(--text-secondary); white-space: nowrap; }
+.market-sources__event-ends.is-live { color: var(--text); }
+.market-sources__event-ends.is-soon { color: var(--error); font-weight: 700; }
+.market-sources__event-lot { color: var(--text-secondary); white-space: nowrap; }
+.market-sources__event-make { min-width: 0; overflow: hidden; }
+.market-sources__event-model { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.market-sources__event-status.n { text-align: right; }
+.market-sources__drill-empty { color: var(--text-secondary); }
+
+.market-sources__event { min-height: 28px; }
+.market-sources__event-make .make-identity { display: inline-flex; align-items: center; gap: 5px; max-width: 100%; }
+.market-sources__event-make .sx-make-wordmark, .market-sources__event-make .sx-make-logo { height: 14px; width: auto; max-width: 84px; object-fit: contain; }
+.market-sources__event-make .make-identity strong { font: 700 11px Arial, sans-serif; }
+.market-sources__event-status.n { color: var(--text-secondary); }
+.market-sources__event-status.n.is-sold { color: var(--success); font-weight: 700; }
