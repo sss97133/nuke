@@ -212,7 +212,6 @@
 .market-chips { display: flex; flex-wrap: wrap; gap: 4px; }
 .market-chip { display: inline-flex; align-items: baseline; gap: 6px; min-height: 28px; padding: 4px 8px; border: 2px solid var(--border); border-radius: 0; background: var(--bg); color: var(--text); cursor: pointer; }
 .market-chip:hover { border-color: var(--text); }
-.market-chip__logo { width: 18px; height: 18px; align-self: center; object-fit: contain; background: #fff; padding: 1px; }
 .market-chip--nr { background: var(--yellow-200); }
 .market-chip[aria-pressed="true"] { background: var(--text); color: var(--bg); border-color: var(--text); }
 .market-chip[aria-pressed="true"] .k-label, .market-chip[aria-pressed="true"] .k-measure { color: inherit; }
@@ -248,3 +247,31 @@
 .market-lot-finish__likely { stroke: var(--text-secondary); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
 .market-lot-finish__bid { stroke: var(--text); stroke-width: 2.5; vector-effect: non-scaling-stroke; }
 @media (max-width: 760px) { .market-lot-finish { justify-items: start; } }
+
+/* The houses: each by its own mark (public/source-logos); the name only when no mark is hosted. */
+.market-house-mark { display: inline-block; vertical-align: middle; max-width: 96px; width: auto; object-fit: contain; }
+.market-house-mark--name { white-space: nowrap; }
+:root[data-theme="dark"] .market-house-mark--dark { filter: invert(1); }
+:root[data-theme="light"] .market-house-mark--light { filter: invert(1); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .market-house-mark--dark { filter: invert(1); }
+}
+.market-venue__marks { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; }
+.market-chips--houses .market-chip { align-items: center; }
+/* What a clicked figure opens into: each house's share of the total, now and over time. */
+.market-share { --share-1: #1f6feb; --share-2: #d97706; --share-3: #2da44e; --share-4: #8250df; --share-5: #cf222e; --share-6: #0891b2; --share-7: #6e7781; --share-8: #bc4c00;
+  display: grid; gap: 8px; padding: 10px 8px; border-bottom: 2px solid var(--border); }
+:root[data-theme="dark"] .market-share { --share-1: #58a6ff; --share-2: #f0a35e; --share-3: #56d364; --share-4: #bc8cff; --share-5: #ff7b72; --share-6: #39c5cf; --share-7: #9ba3ab; --share-8: #ffa657; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .market-share { --share-1: #58a6ff; --share-2: #f0a35e; --share-3: #56d364; --share-4: #bc8cff; --share-5: #ff7b72; --share-6: #39c5cf; --share-7: #9ba3ab; --share-8: #ffa657; }
+}
+.market-share__head { display: grid; gap: 2px; }
+.market-share__now { display: flex; height: 14px; gap: 1px; background: var(--border); }
+.market-share__now > span { display: block; min-width: 2px; }
+.market-share__legend { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 0; padding: 0; list-style: none; }
+.market-share__legend li { display: inline-flex; align-items: center; gap: 6px; }
+.market-share__legend i { display: inline-block; width: 12px; height: 4px; }
+.market-share__chart { width: 100%; height: 160px; display: block; }
+.market-share__grid { stroke: var(--border); stroke-width: 1; }
+.market-share__line { fill: none; stroke-width: 2; stroke-linejoin: round; }
+.market-share__axis { display: flex; justify-content: space-between; gap: 8px; }

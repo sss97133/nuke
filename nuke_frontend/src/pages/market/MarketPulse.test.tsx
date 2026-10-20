@@ -4,7 +4,11 @@ import { createRoot, type Root } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const fixture = vi.hoisted(() => ({ pulse: {} as any, movement: {} as any, taxonomy: {} as any, details: new Map() as Map<string, any>, specs: [] as any[], retry: vi.fn(), sameHour: [] as any[], finish: new Map() as Map<string, any> }));
+const fixture = vi.hoisted(() => ({ share: { data: undefined as any, isError: false }, pulse: {} as any, movement: {} as any, taxonomy: {} as any, details: new Map() as Map<string, any>, specs: [] as any[], retry: vi.fn(), sameHour: [] as any[], finish: new Map() as Map<string, any> }));
+vi.mock('./HouseShare', async importOriginal => ({
+  ...await importOriginal<typeof import('./HouseShare')>(),
+  useHouseShare: () => fixture.share,
+}));
 vi.mock('./useFinishEstimates', () => ({ useFinishEstimates: () => ({ data: { fresh: true, writerAt: null, byId: fixture.finish } }) }));
 vi.mock('./useMarketPulse', async importOriginal => ({
   ...await importOriginal<typeof import('./useMarketPulse')>(),
@@ -76,6 +80,7 @@ beforeEach(() => {
   HTMLElement.prototype.scrollIntoView = vi.fn();
   fixture.movement = { data: [], coverage: undefined, dataUpdatedAt: Date.now() };
   fixture.sameHour = [];
+  fixture.share = { data: undefined, isError: false };
   Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1024 });
   fixture.pulse = { data: { auctions: [lot('later', 'PORSCHE', 25_000, 30), lot('first', 'PORSCHE', 0, 2),
     lot('unknown', 'PORSCHE', null, 10), lot('other-make', 'FORD', 100_000, 1)], syncedAt: Date.now(), curve: null },
@@ -415,7 +420,7 @@ describe('market answer -> supporting lots', () => {
   it('says the source once, as the venue, and not on each row', async () => {
     await render();
     expect(container.querySelector('h1')?.textContent).toBe('Live auctions');
-    expect(container.querySelector('.market-venue .k-label')?.textContent).toBe('BaT');
+    expect(container.querySelector('.market-venue__marks')?.getAttribute('aria-label')).toBe('BaT');
     expect(container.querySelector('.market-venue__mark')).toBeNull();
     expect(container.textContent).not.toContain('Source: BaT');
     expect(container.textContent).not.toContain('differing specification reports');
@@ -707,7 +712,9 @@ describe('every live house on one board', () => {
   it('titles the board for every house and shows the houses read, not BaT alone', async () => {
     await render();
     expect(container.querySelector('h1')?.textContent).toBe('Live auctions');
-    expect(container.querySelector('.market-venue .k-label')?.textContent).toBe('BaT · Collecting Cars · PCarMarket');
+    expect(container.querySelector('.market-venue__marks')?.getAttribute('aria-label')).toBe('BaT, Collecting Cars, PCarMarket');
+    expect([...container.querySelectorAll('.market-venue__marks img')].map(i => i.getAttribute('alt'))).toEqual(['BaT', 'Collecting Cars', 'PCarMarket']);
+    expect(container.querySelector('.market-venue__marks img')?.getAttribute('src')).toBe('/source-logos/bat.png');
     expect(cohortCount()).toBe('5');
   });
   it('adds only dollar bids into the headline, and says what it left out and which house is held off', async () => {
@@ -729,8 +736,8 @@ describe('every live house on one board', () => {
   it('filters by house, counts each house, and states the scope', async () => {
     await render();
     expect(button('All houses').textContent).toContain('5');
-    expect(button('Collecting Cars').textContent).toContain('2');
-    await click('Collecting Cars');
+    expect(button('Collecting Cars, 2 lots').querySelector('img')?.getAttribute('src')).toBe('/source-logos/collecting-cars.png');
+    await click('Collecting Cars, 2 lots');
     expect(window.location.search).toContain('house=collecting-cars');
     expect(boardTitles().sort()).toEqual(['cc-eur', 'cc-gbp']);
     expect(container.querySelector('h1')?.textContent).toBe('Collecting Cars');
@@ -742,8 +749,8 @@ describe('every live house on one board', () => {
   it('compares with last week on BaT lots only, and says so', async () => {
     fixture.pulse.data.weekAgo = { at: Date.now() - 7 * 24 * HOUR, bids: 25_000, n: 2, byMake: null, source: 'live' };
     await render();
-    expect(container.textContent).toContain('BaT lots +100.0% on a week ago');
-    await click('Collecting Cars');
+    expect(container.textContent).toContain('BaT +100.0% on a week ago');
+    await click('Collecting Cars, 2 lots');
     expect(container.textContent).not.toContain('on a week ago');
   });
   it('bids high to low by dollars; a bid in another currency is its own range, never an unrecorded one', async () => {
@@ -764,5 +771,37 @@ describe('every live house on one board', () => {
     await render();
     expect(container.querySelector('.market-figure__note')?.textContent).toContain('Other houses could not be read; showing Bring a Trailer only');
     expect(container.querySelector('[aria-label="Auction house"]')).toBeNull();
+  });
+  it('opens the dollars into each house\'s share now and over time, and says where the history starts', async () => {
+    const t0 = Date.parse('2026-10-03T08:00:00Z');
+    fixture.share = { isError: false, data: { firstAt: t0, firstAtByHouse: { bringatrailer: t0, pcarmarket: t0, 'collecting-cars': t0 }, weekAgo: {},
+      points: [t0, t0 + 3_600_000, t0 + 7_200_000].flatMap((at, i) => [
+        { at, house: 'bringatrailer', bidUsd: 50_000 + i * 1000, lots: 2, lotsWithBid: 2 },
+        { at, house: 'pcarmarket', bidUsd: 10_000, lots: 1, lotsWithBid: 1 }]) } };
+    await render('map=bids');
+    const chart = container.querySelector('[aria-label="Each house\'s share of dollars bid"]')!;
+    expect(chart).toBeTruthy();
+    expect(chart.textContent).toContain('Nothing before that is estimated');
+    expect(chart.textContent).toContain('Dollar bids only');
+    expect(chart.querySelectorAll('polyline.market-share__line').length).toBe(2);
+    // now: BaT $50,000 of $60,000, PCarMarket $10,000 (the GBP and EUR lots are not added in)
+    expect(chart.querySelector('li')?.textContent).toContain('83.3%');
+    await act(async () => container.querySelectorAll<HTMLButtonElement>('.market-figure__value')[1].click());
+    expect(container.querySelector('[aria-label="Each house\'s share of open lots"]')).toBeTruthy();
+  });
+  it('draws no line from a single reading and says recording has just begun', async () => {
+    fixture.share = { isError: false, data: { firstAt: null, firstAtByHouse: {}, weekAgo: {}, points: [] } };
+    await render('map=bids');
+    const chart = container.querySelector('[aria-label="Each house\'s share of dollars bid"]')!;
+    expect(chart.textContent).toContain('Recording starts now');
+    expect(chart.querySelector('polyline')).toBeNull();
+  });
+  it('compares each house with its own week-ago reading, and says which houses have no week of history yet', async () => {
+    const t0 = Date.parse('2026-09-26T12:00:00Z');
+    fixture.share = { isError: false, data: { firstAt: t0, firstAtByHouse: { pcarmarket: Date.parse('2026-10-02T00:00:00Z'), 'collecting-cars': t0 }, points: [],
+      weekAgo: { 'collecting-cars': { at: t0, bidUsd: 0, lots: 1, lotsWithBid: 1 } } } };
+    await render();
+    const text = container.querySelector('.market-figure')!.textContent!;
+    expect(text).toContain('PCarMarket: no week of history yet (recorded since Oct 1)');
   });
 });

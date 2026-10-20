@@ -7,6 +7,7 @@ import MarketInventoryMap from './MarketInventoryMap';
 import { mapLens, mapValue, matchesMapLens, recordedModel, taxonomyByListing, type InventoryMapLens, type InventoryMapGroup, type MapDimension } from './inventoryMap';
 import AuctionEvidence, { AuctionCompetition } from './AuctionEvidence';
 import { BAT_HOUSE, BID_BUCKETS, bidBucket, currentBidDistribution, houseName, listingKey, moneyIn, NO_MAKE, useMarketPulse, useInventoryTaxonomy, useSameHourReadings, usdBid, type BidBucket, type BidCurve, type HouseStatus, type LiveAuction } from './useMarketPulse';
+import { HouseMark, HouseShareChart, houseWeekChange, useHouseShare } from './HouseShare';
 import RecordedSalesComparison, { MarketScopeControls, type MarketSalesLens } from './RecordedSalesComparison';
 import { MakeLogo } from '../../components/common/MakeIdentity';
 import { selectRowFacts, useMarketRowDetails, useMarketRowSpecs, vehicleIdentity, type LotInspection, type MarketRowDetails } from './useMarketRowDetails';
@@ -106,13 +107,6 @@ function rankOf(value: number, readings: { v: number }[]): { below: number; abov
     : above === n ? `lower than all ${n}`
     : below >= above ? `higher than ${below} of ${n}` : `lower than ${above} of ${n}`;
   return { below, above, n, text };
-}
-
-/** A house's mark on its chip: the same files the Sources board uses; a house with no file keeps its name alone. */
-function HouseLogo({ house }: { house: string }) {
-  const [missing, setMissing] = React.useState(false);
-  if (missing) return null;
-  return <img className="market-chip__logo" src={house === BAT_HOUSE ? '/vendor/bat/favicon.ico' : `/source-logos/${house}.png`} alt="" width={18} height={18} onError={() => setMissing(true)} />;
 }
 
 function RangeBar({ value, readings, fmt, weekdayUtc, weeks, bare = false }: { value: number; readings: { day: string; v: number }[]; fmt: (n: number, compact?: boolean) => string; weekdayUtc: string; weeks: number; bare?: boolean }) {
@@ -427,6 +421,7 @@ export function matchesModelScope(a: LiveAuction, model: string | null): boolean
 export default function MarketPulse({ onUnavailable, collection }: { onUnavailable?: React.ReactNode; collection?: React.ReactNode }) {
   usePageTitle('Market');
   const { data, isLoading, isError, risenIds, refetch, dataUpdatedAt, newBids } = useMarketPulse();
+  const share = useHouseShare();
   // A bell for each bid as it lands, off until the viewer turns it on.
   const [sound, setSound] = useState(false);
   useEffect(() => (sound && newBids?.length ? ringBids(newBids) : undefined), [newBids, sound]);
@@ -676,6 +671,20 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
     ...heldOff.map((h: HouseStatus) => `${houseName(h.house)}: ${count(h.lots)} lots held off, last read ${h.readAt ? new Date(h.readAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'never'}`),
     data?.housesFailed ? 'Other houses could not be read; showing Bring a Trailer only' : null,
   ].filter((n): n is string => n != null);
+  // Week on week, house by house. BaT's comparison is its own long history (BAT-LIVE-BIDS); every other house is compared
+  // with its own reading from a week ago, which exists only once its own recording is a week old (live_board_snapshots).
+  const otherHouses = boardHouses.filter(h => h !== BAT_HOUSE);
+  const houseWeek = (measure: 'bids' | 'lots'): string[] => {
+    if (make != null || house != null || otherHouses.length === 0) return [];
+    const nowOf = (h: string) => live.filter(a => a.house === h).reduce((n, a) => n + (measure === 'bids' ? (usdBid(a) ?? 0) : (a.currentBid != null ? 1 : 0)), 0);
+    const have = otherHouses.map(h => ({ h, pct: houseWeekChange(h, nowOf(h), measure === 'bids' ? 'bids' : 'lots', share.data) })).filter(x => x.pct != null);
+    const lacking = otherHouses.filter(h => !have.some(x => x.h === h));
+    const since = lacking.map(h => share.data?.firstAtByHouse[h]).filter((t): t is number => t != null);
+    return [
+      have.length ? `week on week: ${have.map(x => `${houseName(x.h, true)} ${signed(x.pct as number)}`).join(' · ')}` : null,
+      lacking.length ? `${lacking.map(h => houseName(h, true)).join(', ')}: no week of history yet${since.length ? ` (recorded since ${new Date(Math.min(...since)).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})` : ''}` : null,
+    ].filter((t): t is string => t != null);
+  };
   const mapMeasure: 'bids' | 'lots' | null = params.get('map') === 'lots' ? 'lots' : params.get('map') ? 'bids' : null;
   const [reading, setReading] = useState(false);
   const readAgain = async () => { setReading(true); try { await refetch(); } finally { setReading(false); } };
@@ -692,7 +701,7 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
       {view === 'inventory' ? <span className="market-venue">
         {house && <img className="market-venue__mark" src={house === BAT_HOUSE ? '/vendor/bat/favicon.ico' : `/source-logos/${house}.png`} alt="" width={32} height={32} />}
         <Text role="entity" as="h1">{house ? houseName(house) : 'Live auctions'}{make ? ` · ${make}${familyName && !model ? ` · ${familyName}` : ''}${era ? ` · ${era.replace('-', '–')}` : ''}` : ''}</Text>
-        <Text role="label">{house ? 'Live auctions' : boardHouses.map(h => houseName(h, true)).join(' · ')}</Text>
+        {house ? <Text role="label">Live auctions</Text> : <span className="market-venue__marks" aria-label={boardHouses.map(h => houseName(h, true)).join(', ')}>{boardHouses.map(h => <HouseMark key={h} house={h} height={16} />)}</span>}
       </span> : <Text role="entity" as="h1">Recorded sales</Text>}
     </Masthead>
   );
@@ -701,12 +710,12 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
     <section className="k-section market-figure" aria-label="The live board in numbers">
       <Figure value={isLoading ? '…' : bidNumber(cohortBids, true)} label="Bid now" open={mapMeasure === 'bids'} onToggle={() => toggleMap('bids')}
         title={`Current bids recorded in US dollars, added across ${house ? houseName(house) : 'every house on the board'}${data?.source ? ` (${data.source})` : ''}. Bids in another currency are not converted or added.${data?.weekAgo && baselineApplies ? ` A week ago on BaT: ${bidNumber(data.weekAgo.bids)} across ${data.weekAgo.n.toLocaleString('en-US')} auctions at ${clock(data.weekAgo.at)}${data.weekAgo.source === 'archive' ? ', rebuilt from BaT bid history (96% of auctions)' : ''}.` : ''}`}
-        relative={[weekAgoPct != null ? `${mixedScope ? 'BaT lots ' : ''}${data?.weekAgo?.source === 'archive' ? '≈' : ''}${signed(weekAgoPct)} on a week ago` : null, rank?.text ? `${mixedScope ? 'BaT lots ' : ''}${at(rank)}` : null]}
+        relative={[weekAgoPct != null ? `${mixedScope ? 'BaT ' : ''}${data?.weekAgo?.source === 'archive' ? '≈' : ''}${signed(weekAgoPct)} on a week ago` : null, rank?.text ? `${mixedScope ? 'BaT ' : ''}${at(rank)}` : null, ...houseWeek('bids')]}
         bar={data?.sameHour && boardReadings.length > 0 ? <RangeBar bare value={batBids} readings={boardReadings} fmt={bidNumber}
           weekdayUtc={data.sameHour.weekdayUtc} weeks={boardReadings.length} /> : undefined} />
       <Figure value={isLoading ? '…' : count(cohort.length)} label="Open lots" open={mapMeasure === 'lots'} onToggle={() => toggleMap('lots')}
         title={`Open lots on the board, every house. Compared with earlier weeks as BaT lots with a recorded bid number, $0 included (${count(bidded)} now), the unit the hourly readings keep.`}
-        relative={[lotWeekPct != null ? `${mixedScope ? 'BaT lots ' : ''}${signed(lotWeekPct)} on a week ago` : null, lotRank?.text ? `${mixedScope ? 'BaT lots ' : ''}${at(lotRank)}` : null]} />
+        relative={[lotWeekPct != null ? `${mixedScope ? 'BaT ' : ''}${signed(lotWeekPct)} on a week ago` : null, lotRank?.text ? `${mixedScope ? 'BaT ' : ''}${at(lotRank)}` : null, ...houseWeek('lots')]} />
       {boardNotes.length > 0 && <Text role="caption" as="p" className="market-figure__note">{boardNotes.join(' · ')}</Text>}
     </section>
   ) : null;
@@ -745,6 +754,7 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
       {scope}
 
       {view === 'inventory' && mapMeasure && <section id="market-composition" className="market-map" aria-label={mapMeasure === 'bids' ? 'What the bids are made of' : 'What the open lots are'}>
+        <HouseShareChart measure={mapMeasure} live={live} data={share.data} isError={share.isError} now={now} />
         <BoardHistory key={`${make}:${familyName}:${era}:${mapMeasure}`} samples={history} measure={mapMeasure} />
         {mapAuctions.length > 0 && <MarketInventoryMap auctions={mapAuctions} lens={inventoryLens} taxonomy={taxonomy} measure={mapMeasure}
           taxonomyLoading={taxonomyQuery.isLoading} taxonomyError={taxonomyQuery.isError} onRetryTaxonomy={() => { void taxonomyQuery.refetch(); }}
@@ -771,8 +781,8 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
               <Text role="label">All houses</Text> <Text role="measure" dense>{cohortAnyHouse.length.toLocaleString('en-US')}</Text>
             </button>
             {houseCounts.map(([h, n]) => (
-              <button key={h} type="button" className="market-chip" aria-pressed={house === h} onClick={() => setParam('house', house === h ? null : h)}>
-                <HouseLogo house={h} /><Text role="label">{houseName(h, true)}</Text> <Text role="measure" dense>{n.toLocaleString('en-US')}</Text>
+              <button key={h} type="button" className="market-chip" aria-pressed={house === h} aria-label={`${houseName(h, true)}, ${n.toLocaleString('en-US')} lots`} onClick={() => setParam('house', house === h ? null : h)}>
+                <HouseMark house={h} /> <Text role="measure" dense>{n.toLocaleString('en-US')}</Text>
               </button>
             ))}
           </div>}
