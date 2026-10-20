@@ -7,8 +7,9 @@ import { toLanding } from "./browseMap.ts";
 import { censusRow, readCensus } from "./browseCensus.ts";
 import { emptyReport } from "./browseSweep.ts";
 import { landArchived, validCaptures } from "./archiveLand.ts";
+import { placeBackfill } from "./browsePlace.ts";
 
-export const BROWSE_ACTIONS = ["sweep", "revisit", "aspects", "status", "preview", "archive", "census"];
+export const BROWSE_ACTIONS = ["sweep", "revisit", "aspects", "status", "preview", "archive", "census", "place"];
 const json = (b: unknown, status = 200) => new Response(JSON.stringify(b), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
 export async function handleBrowse(supabase: any, body: any): Promise<Response> {
@@ -20,6 +21,10 @@ export async function handleBrowse(supabase: any, body: any): Promise<Response> 
     for (const c of caps) results.push(await landArchived(supabase, c, rep, body.dry_run === true));
     if (rep.errors.length) rep.ok = false;
     return json({ ...rep, results }, 200);
+  }
+  if (body.action === "place") {       // back-fill: the stated place of listings landed before landing wrote it; reads our own rows only
+    const rep = await placeBackfill(supabase, { max: body.max, after: body.after ?? null, dryRun: body.dry_run === true });
+    return json(rep, rep.ok ? 200 : 500);
   }
   if (!Deno.env.get("EBAY_CLIENT_ID") || !Deno.env.get("EBAY_CLIENT_SECRET")) {
     return json({ ok: false, error: "EBAY_CLIENT_ID / EBAY_CLIENT_SECRET are not set; nothing was called" }, 503);
