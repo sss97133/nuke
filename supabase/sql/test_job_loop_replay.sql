@@ -409,6 +409,8 @@ ALTER TABLE public.organizations ADD COLUMN IF NOT EXISTS services_offered text[
 CREATE TABLE IF NOT EXISTS public.city_geocode_lookup(city text, state text, latitude numeric, longitude numeric, sample_size integer, source text);
 \echo REPLAY 20261020173000_requirement_plan_b_listing_tier.sql
 \ir ../migrations/20261020173000_requirement_plan_b_listing_tier.sql
+\echo REPLAY 20261020184000_requirement_plan_b_listing_cache.sql
+\ir ../migrations/20261020184000_requirement_plan_b_listing_cache.sql
 -- Plan check and final state.
 \set replay_problems `scripts/ci/job-loop-replay-check.sh | tr '\n' ' '`
 SELECT t_assert(btrim(:'replay_problems') = '', 'replay plan covers the build in filename order: ' || COALESCE(NULLIF(btrim(:'replay_problems'), ''), 'ok'));
