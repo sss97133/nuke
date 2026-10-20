@@ -117,13 +117,21 @@ struct WorkConsoleContent: View {
             jobsSection
             JobsLookingSection(open: open, bridge: { if case .loaded(let me) = identity { return me.bridge } else { return nil } }())
             if showCapture {
+                // The sync, reading and tool controls are engineering detail: one row that opens them,
+                // not a screenful under the jobs (owner, 2026-10-20: "too much noise").
                 Section {
-                    Text("Sync, on-device reads and tools for photos taken at your work sites.")
-                        .font(.footnote).foregroundStyle(.secondary)
-                } header: {
-                    Text("Capture")
+                    NavigationLink {
+                        List { CaptureSections() }
+                            .navigationTitle("Capture")
+                            .navigationBarTitleDisplayMode(.inline)
+                    } label: {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Capture")
+                            Text("Sync, on-device reads and tools for photos at your work sites.")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
                 }
-                CaptureSections()
             }
         }
         .sheet(item: $signing) { item in
