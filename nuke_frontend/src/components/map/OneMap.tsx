@@ -4,21 +4,21 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import './maplibreWorker';
 import './one-map.css';
 import { CARTO_LIGHT } from './constants';
-import { BAND_RGBA, BANDS, BOUNDARY_TILES, band, foldByZip, makeLabel, platformName, readCounty, zipBounds, type LocationRow, type ZipGroup } from './oneMapService';
+import { BAND_RGBA, BANDS, BOUNDARY_TILES, band, eligible, makeLabel, outcome, platformName, readArea, readAreas, readZip, zipBounds, type AreaLayers, type LocationRow } from './oneMapService';
 
 /**
- * The web map as the iOS map (MarketMapView.swift, CountyZIPDrill), which the owner is pleased with: a standard light
- * map, ZIP areas shaded by distinct vehicles with ZIP evidence in fixed bands, the counties in view read in full and
- * folded per ZIP in the client, "All makes · All time" on top, "N vehicles in visible ZIPs · captured history", tap a
- * ZIP for its activity (platforms, vehicle mix, every vehicle with its observations, each opening its page), search a
- * ZIP. Boundaries are the static tiles in storage; the reads are the iOS reads.
+ * The web map as the iOS map, repaired by case 14 (docs/ledger/theory/data-machine-cases.md): the unit is the
+ * selected ZIP; the counts at every zoom are map_facts rows (a sum, never a scan, so nothing spins); the ZIP panel
+ * shows its readings nested in county, state and country with the records that carry no ZIP counted at their grain;
+ * the map says it is the seller ledger of an area, not vehicles present; every datum on the panel opens.
  */
 
-const WINDOWS: { key: string; label: string; days: number | null }[] = [
-  { key: 'all', label: 'All time', days: null }, { key: '30', label: 'Last 30 days', days: 30 }, { key: '90', label: 'Last 90 days', days: 90 }, { key: '365', label: 'Last year', days: 365 },
-];
+const WINDOWS = [{ key: '30', label: 'Last 30 days', days: 30 }, { key: '90', label: 'Last 90 days', days: 90 }, { key: '365', label: 'Last year', days: 365 }];
+const LAYER_WORD: Record<string, string> = { vehicle: 'vehicles', listing: 'listings', sale: 'sales', organization: 'shops' };
 const fmt = (n: number) => n.toLocaleString('en-US');
+const money = (n: number | null | undefined) => (n == null ? '' : `$${Math.round(n).toLocaleString('en-US')}`);
 const day = (iso: string | null) => (iso ? iso.slice(0, 10) : 'date unknown');
+const utc = (d: Date) => d.toISOString().slice(0, 10);
 
 export default function OneMap() {
   const p = useMemo(() => new URLSearchParams(window.location.search), []);
@@ -26,32 +26,34 @@ export default function OneMap() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [ready, setReady] = useState(false);
   const [viewKey, setViewKey] = useState(0);
-  const [make, setMake] = useState(p.get('make') ?? '');
-  const [windowKey, setWindowKey] = useState(WINDOWS.some((w) => w.key === p.get('window')) ? p.get('window')! : 'all');
-  const [rowsByCounty, setRowsByCounty] = useState<Map<string, LocationRow[]>>(new Map());
-  const [loading, setLoading] = useState<Set<string>>(new Set());
-  const [failed, setFailed] = useState<Set<string>>(new Set());
-  const [visibleZips, setVisibleZips] = useState<Set<string>>(new Set());
-  const [countiesInView, setCountiesInView] = useState<string[]>([]);
-  const [selected, setSelected] = useState<string | null>(p.get('zip'));
+  const [layer, setLayer] = useState(p.get('layer') && p.get('layer')! in LAYER_WORD ? p.get('layer')! : 'vehicle');
+  const [windowKey, setWindowKey] = useState(WINDOWS.some((w) => w.key === p.get('window')) ? p.get('window')! : '365');
+  const [visible, setVisible] = useState<{ zips: string[]; counties: Map<string, string> }>({ zips: [], counties: new Map() });
+  const [inView, setInView] = useState<{ total: number; areas: number; asOf: string | null } | null>(null);
+  const [selected, setSelected] = useState<{ zip: string; county: string; state: string } | null>(null);
+  const [dolls, setDolls] = useState<{ zip: AreaLayers | null; county: AreaLayers | null; state: AreaLayers | null; us: number | null; countyNoZip: number | null }>({ zip: null, county: null, state: null, us: null, countyNoZip: null });
+  const [rows, setRows] = useState<LocationRow[] | null>(null);
+  const [rowsBusy, setRowsBusy] = useState(false);
+  const [pick, setPick] = useState<{ platform?: string; make?: string }>({});
+  const [open, setOpen] = useState<string | null>(null);
   const [query, setQuery] = useState('');
-  const [showMakes, setShowMakes] = useState(false);
+  const [showLayers, setShowLayers] = useState(false);
   const [showWindows, setShowWindows] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
   const [note, setNote] = useState('');
-  const cacheRef = useRef<Map<string, LocationRow[]>>(new Map());
   const paintedRef = useRef<Set<string>>(new Set());
+  const win = useMemo(() => { const d = WINDOWS.find((w) => w.key === windowKey)!.days; return { from: utc(new Date(Date.now() - d * 86_400_000)), to: utc(new Date()) }; }, [windowKey]);
+  const windowLabel = WINDOWS.find((w) => w.key === windowKey)!.label;
 
-  // URL state.
   useEffect(() => {
     const m = mapRef.current;
     const url = new URL(window.location.href);
-    for (const [k, v] of [['make', make], ['window', windowKey === 'all' ? '' : windowKey], ['zip', selected ?? '']] as const) { if (v) url.searchParams.set(k, v); else url.searchParams.delete(k); }
+    url.searchParams.set('layer', layer); url.searchParams.set('window', windowKey);
+    if (selected) url.searchParams.set('zip', selected.zip); else url.searchParams.delete('zip');
     if (m) { const c = m.getCenter(); url.searchParams.set('lng', c.lng.toFixed(3)); url.searchParams.set('lat', c.lat.toFixed(3)); url.searchParams.set('z', m.getZoom().toFixed(2)); }
     window.history.replaceState(null, '', url);
-  }, [make, windowKey, selected, viewKey]);
+  }, [layer, windowKey, selected, viewKey]);
 
-  // The map: a standard light basemap, county context lines, ZIP fills in the iOS bands.
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
     const map = new MLMap({ container: containerRef.current, style: CARTO_LIGHT, center: [Number(p.get('lng')) || -115.1, Number(p.get('lat')) || 36.1], zoom: Number(p.get('z')) || 9.3, minZoom: 4, maxZoom: 16, attributionControl: { compact: true } });
@@ -62,6 +64,7 @@ export default function OneMap() {
       map.addLayer({ id: 'zcta-fill', type: 'fill', source: 'bounds', 'source-layer': 'zctas', paint: { 'fill-color': fill, 'fill-opacity': 1 } });
       map.addLayer({ id: 'zcta-line', type: 'line', source: 'bounds', 'source-layer': 'zctas', paint: { 'line-color': 'rgba(0,122,255,0.20)', 'line-width': 0.5 } });
       map.addLayer({ id: 'zcta-selected', type: 'line', source: 'bounds', 'source-layer': 'zctas', paint: { 'line-color': 'rgb(0,122,255)', 'line-width': 1.6 }, filter: ['==', ['id'], -1] });
+      map.addLayer({ id: 'county-fill', type: 'fill', source: 'bounds', 'source-layer': 'counties', paint: { 'fill-color': 'rgba(0,0,0,0)' } });
       map.addLayer({ id: 'county-line', type: 'line', source: 'bounds', 'source-layer': 'counties', paint: { 'line-color': 'rgba(60,60,67,0.45)', 'line-width': 0.8 } });
       setReady(true); setViewKey((k) => k + 1);
     });
@@ -70,74 +73,57 @@ export default function OneMap() {
     return () => { map.remove(); mapRef.current = null; };
   }, [p]);
 
-  // What is in view: counties (to read) and ZIPs (to count).
+  // The ZIPs and counties in view.
   useEffect(() => {
     const map = mapRef.current;
     if (!ready || !map) return;
-    const counties = [...new Set(map.queryRenderedFeatures({ layers: ['county-line'] }).map((f) => String(f.properties.fips)))].sort();
-    const zips = new Set(map.queryRenderedFeatures({ layers: ['zcta-fill'] }).map((f) => String(f.properties.zcta)));
-    setCountiesInView((prev) => (prev.join() === counties.join() ? prev : counties));
-    setVisibleZips((prev) => (prev.size === zips.size && [...zips].every((z) => prev.has(z)) ? prev : zips));
+    const zips = [...new Set(map.queryRenderedFeatures({ layers: ['zcta-fill'] }).map((f) => String(f.properties.zcta)))].sort();
+    const counties = new Map<string, string>();
+    for (const f of map.queryRenderedFeatures({ layers: ['county-fill'] })) counties.set(String(f.properties.fips), String(f.properties.name));
+    setVisible((prev) => (prev.zips.join() === zips.join() && prev.counties.size === counties.size ? prev : { zips, counties }));
   }, [ready, viewKey]);
 
-  // Read every county in view, in full, two at a time; keep what is already read this session.
-  useEffect(() => {
-    if (!countiesInView.length) return;
-    const ctl = new AbortController();
-    const want = countiesInView.filter((c) => !cacheRef.current.has(c) && !loading.has(c));
-    if (!want.length) return;
-    setLoading((s) => new Set([...s, ...want]));
-    let i = 0;
-    const worker = async () => {
-      while (i < want.length && !ctl.signal.aborted) {
-        const fips = want[i++];
-        try {
-          const rows = await readCounty(fips, ctl.signal, (page) => setRowsByCounty((m) => new Map(m).set(fips, [...(m.get(fips) ?? []), ...page])));
-          cacheRef.current.set(fips, rows);
-          setRowsByCounty((m) => new Map(m).set(fips, rows));
-          setFailed((s) => { const n = new Set(s); n.delete(fips); return n; });
-        } catch (e) {
-          if ((e as Error).name !== 'AbortError') setFailed((s) => new Set([...s, fips]));
-        } finally {
-          setLoading((s) => { const n = new Set(s); n.delete(fips); return n; });
-        }
-      }
-    };
-    Promise.all([worker(), worker()]);
-    return () => ctl.abort();
-  }, [countiesInView]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // The fold: every row of every county in view → ZIP groups, by make and window.
-  const from = useMemo(() => { const w = WINDOWS.find((x) => x.key === windowKey); return w?.days ? new Date(Date.now() - w.days * 86_400_000) : null; }, [windowKey]);
-  const rows = useMemo(() => countiesInView.flatMap((c) => rowsByCounty.get(c) ?? []), [countiesInView, rowsByCounty]);
-  const fold = useMemo(() => foldByZip(rows, { make: make || undefined, from }), [rows, make, from]);
-  const makes = useMemo(() => {
-    const m = new Map<string, Set<string>>();
-    for (const r of rows) { const k = (r.vehicles.make ?? '').trim(); if (k) (m.get(k) ?? m.set(k, new Set()).get(k)!).add(r.vehicles.id); }
-    return [...m.entries()].map(([k, v]) => [k, v.size] as const).sort((a, b) => b[1] - a[1]);
-  }, [rows]);
-  const visibleVehicles = useMemo(() => { const s = new Set<string>(); for (const z of visibleZips) for (const id of fold.groups.get(z)?.vehicles.keys() ?? []) s.add(id); return s.size; }, [fold, visibleZips]);
-  const complete = countiesInView.length > 0 && countiesInView.every((c) => cacheRef.current.has(c));
-
-  // Paint the bands.
-  const paint = useCallback(() => {
-    const map = mapRef.current;
-    if (!map || !ready) return;
+  // The counts: one facts read for the ZIPs in view, painted as bands. A sum, never a scan.
+  const paint = useCallback((counts: Map<string, number>) => {
+    const map = mapRef.current; if (!map) return;
     const src = { source: 'bounds', sourceLayer: 'zctas' };
-    for (const z of paintedRef.current) map.setFeatureState({ ...src, id: Number(z) }, { band: null });
-    paintedRef.current = new Set();
-    for (const g of fold.groups.values()) { map.setFeatureState({ ...src, id: Number(g.zip) }, { band: band(g.vehicles.size) }); paintedRef.current.add(g.zip); }
-  }, [fold, ready]);
-  useEffect(() => { paint(); }, [paint, viewKey]);
-  useEffect(() => { const m = mapRef.current; if (m?.getLayer('zcta-selected')) m.setFilter('zcta-selected', ['==', ['id'], selected ? Number(selected) : -1]); }, [selected, ready]);
+    for (const z of paintedRef.current) if (!counts.has(z)) map.setFeatureState({ ...src, id: Number(z) }, { band: null });
+    for (const [z, n] of counts) map.setFeatureState({ ...src, id: Number(z) }, { band: band(n) });
+    paintedRef.current = new Set(counts.keys());
+  }, []);
+  useEffect(() => {
+    if (!ready || !visible.zips.length) { setInView(null); return; }
+    const ctl = new AbortController();
+    readAreas('zcta', layer, win.from, win.to, visible.zips.slice(0, 2000), ctl.signal)
+      .then((r) => { paint(new Map(r.areas.map((a) => [a.key, a.entities]))); setInView({ total: r.totals.entities, areas: r.totals.areas, asOf: r.as_of }); setNote(''); })
+      .catch((e) => { if (e.name !== 'AbortError') setNote(String(e.message ?? e)); });
+    return () => ctl.abort();
+  }, [ready, visible, layer, win.from, win.to, paint]);
 
-  // Tap a ZIP.
+  useEffect(() => { const m = mapRef.current; if (m?.getLayer('zcta-selected')) m.setFilter('zcta-selected', ['==', ['id'], selected ? Number(selected.zip) : -1]); }, [selected, ready]);
+
+  // The selected ZIP: its dolls from the facts, its rows from the ledger.
+  useEffect(() => {
+    if (!selected) { setDolls({ zip: null, county: null, state: null, us: null, countyNoZip: null }); setRows(null); return; }
+    const ctl = new AbortController();
+    setRowsBusy(true); setPick({}); setOpen(null);
+    Promise.all([
+      readArea('zcta', selected.zip, win.from, win.to, ctl.signal), readArea('county', selected.county, win.from, win.to, ctl.signal), readArea('state', selected.state, win.from, win.to, ctl.signal),
+      readAreas('state', layer, win.from, win.to, undefined, ctl.signal), readAreas('zcta', layer, win.from, win.to, [selected.zip], ctl.signal),
+    ]).then(([z, c, s, us]) => setDolls({ zip: z, county: c, state: s, us: us.totals.entities + us.unkeyed.entities, countyNoZip: null })).catch((e) => { if (e.name !== 'AbortError') setNote(String(e.message ?? e)); });
+    readZip(selected.zip, selected.county, ctl.signal).then((r) => { setRows(r.filter(eligible)); setRowsBusy(false); }).catch((e) => { if (e.name !== 'AbortError') { setNote(String(e.message ?? e)); setRowsBusy(false); } });
+    return () => ctl.abort();
+  }, [selected, win.from, win.to, layer]);
+
+  // Tap a ZIP (its county and state come from the tiles under the tap).
   useEffect(() => {
     const map = mapRef.current;
     if (!ready || !map) return;
     const onClick = (e: MapMouseEvent) => {
-      const f = map.queryRenderedFeatures(e.point, { layers: ['zcta-fill'] })[0] as MapGeoJSONFeature | undefined;
-      setSelected(f ? String(f.properties.zcta) : null);
+      const z = map.queryRenderedFeatures(e.point, { layers: ['zcta-fill'] })[0] as MapGeoJSONFeature | undefined;
+      const c = map.queryRenderedFeatures(e.point, { layers: ['county-fill'] })[0] as MapGeoJSONFeature | undefined;
+      if (!z || !c) { setSelected(null); return; }
+      setSelected({ zip: String(z.properties.zcta), county: String(c.properties.fips), state: String(c.properties.state) });
     };
     const onMove = (e: MapMouseEvent) => { map.getCanvas().style.cursor = map.queryRenderedFeatures(e.point, { layers: ['zcta-fill'] }).length ? 'pointer' : ''; };
     map.on('click', onClick); map.on('mousemove', onMove);
@@ -147,104 +133,119 @@ export default function OneMap() {
   const search = async (e: React.FormEvent) => {
     e.preventDefault();
     const q = query.trim(); const map = mapRef.current; if (!q || !map) return;
-    if (/^\d{5}$/.test(q)) {
-      const b = await zipBounds(q);
-      if (!b) { setNote(`ZIP ${q} has no area`); return; }
-      setNote(''); map.fitBounds(b, { padding: 60, duration: 600 }); setSelected(q); return;
-    }
-    const hit = rows.find((r) => makeLabel(r).toLowerCase().includes(q.toLowerCase()) || r.vehicles.id === q);
-    if (!hit) { setNote(`No vehicle matching "${q}" in the loaded area`); return; }
-    setNote(''); window.location.href = `/vehicle/${hit.vehicles.id}`;
+    if (!/^\d{5}$/.test(q)) { setNote('Search takes a five-digit ZIP'); return; }
+    const b = await zipBounds(q);
+    if (!b) { setNote(`ZIP ${q} has no area`); return; }
+    setNote(''); map.fitBounds(b, { padding: 60, duration: 600 });
+    map.once('idle', () => {
+      const c = map.queryRenderedFeatures(map.project([(b[0] + b[2]) / 2, (b[1] + b[3]) / 2]), { layers: ['county-fill'] })[0];
+      if (c) setSelected({ zip: q, county: String(c.properties.fips), state: String(c.properties.state) });
+    });
   };
 
-  const group: ZipGroup | null = selected ? fold.groups.get(selected) ?? { zip: selected, vehicles: new Map() } : null;
-  const sheet = useMemo(() => {
-    if (!group) return null;
-    const sources = new Map<string, Set<string>>(); const mix = new Map<string, Set<string>>();
-    for (const [vid, obs] of group.vehicles) {
-      for (const r of obs) (sources.get(platformName(r.source_platform)) ?? sources.set(platformName(r.source_platform), new Set()).get(platformName(r.source_platform))!).add(vid);
-      const mk = (obs[0].vehicles.make ?? '').trim() || 'Make unrecorded';
-      (mix.get(mk) ?? mix.set(mk, new Set()).get(mk)!).add(vid);
-    }
-    const list = (m: Map<string, Set<string>>) => [...m.entries()].map(([k, v]) => [k, v.size] as const).sort((a, b) => b[1] - a[1]);
-    const vehicles = [...group.vehicles.entries()].sort((a, b) => ((a[1][0].observed_at ?? '') < (b[1][0].observed_at ?? '') ? 1 : -1));
-    return { sources: list(sources), mix: list(mix), vehicles };
-  }, [group]);
-  const windowLabel = WINDOWS.find((w) => w.key === windowKey)!.label;
+  // The rows folded: vehicles once, newest first; platforms and makes as filters that are buttons.
+  const vehicles = useMemo(() => {
+    const m = new Map<string, LocationRow[]>();
+    for (const r of rows ?? []) (m.get(r.vehicles.id) ?? m.set(r.vehicles.id, []).get(r.vehicles.id)!).push(r);
+    return [...m.values()].sort((a, b) => ((a[0].observed_at ?? '') < (b[0].observed_at ?? '') ? 1 : -1));
+  }, [rows]);
+  const platforms = useMemo(() => { const m = new Map<string, Set<string>>(); for (const v of vehicles) for (const r of v) (m.get(platformName(r.source_platform)) ?? m.set(platformName(r.source_platform), new Set()).get(platformName(r.source_platform))!).add(v[0].vehicles.id); return [...m.entries()].map(([k, s]) => [k, s.size] as const).sort((a, b) => b[1] - a[1]); }, [vehicles]);
+  const makes = useMemo(() => { const m = new Map<string, number>(); for (const v of vehicles) { const k = (v[0].vehicles.make ?? '').trim() || 'Make unrecorded'; m.set(k, (m.get(k) ?? 0) + 1); } return [...m.entries()].sort((a, b) => b[1] - a[1]); }, [vehicles]);
+  const shown = vehicles.filter((v) => (!pick.platform || v.some((r) => platformName(r.source_platform) === pick.platform)) && (!pick.make || ((v[0].vehicles.make ?? '').trim() || 'Make unrecorded') === pick.make));
+  const countyName = selected ? visible.counties.get(selected.county) ?? `County ${selected.county}` : '';
+  const doll = (a: AreaLayers | null, key: string) => a?.layers.find((l) => l.layer === key);
 
+  const word = LAYER_WORD[layer];
   return (
     <div className="om" data-testid="one-map">
       <div ref={containerRef} className="om-canvas" />
 
       <div className="om-top">
         <div className="om-row">
-          <button type="button" className="om-link" onClick={() => { setShowMakes((v) => !v); setShowWindows(false); }}>{make || 'All makes'} ▾</button>
-          <button type="button" className="om-link" onClick={() => { setShowWindows((v) => !v); setShowMakes(false); }}>{windowLabel} ▾</button>
+          <button type="button" className="om-link" onClick={() => { setShowLayers((v) => !v); setShowWindows(false); }}>{word[0].toUpperCase() + word.slice(1)} ▾</button>
+          <button type="button" className="om-link" onClick={() => { setShowWindows((v) => !v); setShowLayers(false); }}>{windowLabel} ▾</button>
           <button type="button" className="om-link" aria-label="About this map" onClick={() => setShowInfo(true)}>ⓘ</button>
         </div>
         <div className="om-count" data-testid="headline">
-          {loading.size && !complete ? <span className="om-spin" /> : null}
-          {complete || rows.length ? `${fmt(visibleVehicles)} vehicles in visible ZIPs · ${windowKey === 'all' ? 'captured history' : windowLabel.toLowerCase()}` : countiesInView.length ? 'Loading records…' : 'Move the map over the US'}
+          {inView ? `${fmt(inView.total)} ${word} in ${fmt(inView.areas)} ZIPs in view · ${windowLabel.toLowerCase()}` : visible.zips.length ? 'Counting…' : 'Zoom in to ZIPs'}
         </div>
+        <div className="om-muted">Where vehicles were sold from, not where they are now.</div>
         <div className="om-legend">
-          <span className="om-legend-title">Vehicles per ZIP</span>
+          <span className="om-legend-title">{word[0].toUpperCase() + word.slice(1)} per ZIP</span>
           {BANDS.map((b, i) => <span key={b} className="om-swatch"><i style={{ background: BAND_RGBA[i] }} />{b}</span>)}
         </div>
-        {showMakes && <div className="om-menu">
-          <button type="button" className={make ? '' : 'on'} onClick={() => { setMake(''); setShowMakes(false); }}>All makes</button>
-          {makes.slice(0, 40).map(([m, n]) => <button key={m} type="button" className={m === make ? 'on' : ''} onClick={() => { setMake(m); setShowMakes(false); }}>{m} <span>{fmt(n)}</span></button>)}
-        </div>}
-        {showWindows && <div className="om-menu">
-          {WINDOWS.map((w) => <button key={w.key} type="button" className={w.key === windowKey ? 'on' : ''} onClick={() => { setWindowKey(w.key); setShowWindows(false); }}>{w.label}</button>)}
-        </div>}
+        {showLayers && <div className="om-menu">{Object.entries(LAYER_WORD).map(([k, w]) => <button key={k} type="button" className={k === layer ? 'on' : ''} onClick={() => { setLayer(k); setShowLayers(false); }}>{w[0].toUpperCase() + w.slice(1)}</button>)}</div>}
+        {showWindows && <div className="om-menu">{WINDOWS.map((w) => <button key={w.key} type="button" className={w.key === windowKey ? 'on' : ''} onClick={() => { setWindowKey(w.key); setShowWindows(false); }}>{w.label}</button>)}</div>}
       </div>
 
       <div className="om-bottom">
         <div className="om-row om-between">
-          <span>{selected ? `ZIP ${selected}` : 'Tap a ZIP to explore its activity'}</span>
-          {failed.size ? <span className="om-warn">Some records did not load · <button type="button" className="om-link" onClick={() => { setFailed(new Set()); setCountiesInView((c) => [...c]); }}>Retry</button></span> : null}
-          {fold.noZip ? <span className="om-muted">{fmt(fold.noZip)} records without a ZIP</span> : null}
+          <span>{selected ? `ZIP ${selected.zip} · ${countyName}` : 'Tap a ZIP to explore its activity'}</span>
+          {note && <span className="om-warn">{note}</span>}
         </div>
-        <form onSubmit={search}><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="ZIP, or vehicle" aria-label="ZIP, or vehicle" /></form>
-        {note && <div className="om-warn">{note}</div>}
+        <form onSubmit={search}><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="ZIP" aria-label="ZIP" /></form>
       </div>
 
-      {group && sheet && (
+      {selected && (
         <div className="om-sheet" data-testid="area-sheet">
-          <div className="om-row om-between">
-            <h2>ZIP {group.zip}</h2>
-            <button type="button" className="om-link" onClick={() => setSelected(null)}>Done</button>
-          </div>
-          <div className="om-muted">{make || 'All makes'} · {windowLabel}{complete ? '' : ' · still loading, counts are provisional'}</div>
-          <div className="om-metrics">
-            <div><b>{fmt(group.vehicles.size)}</b><span>Vehicles</span></div>
-            <div><b>{fmt(sheet.sources.length)}</b><span>Platforms</span></div>
-            <div><b>{fmt(sheet.mix.length)}</b><span>Makes</span></div>
-          </div>
+          <div className="om-row om-between"><h2>ZIP {selected.zip}</h2><button type="button" className="om-link" onClick={() => setSelected(null)}>Done</button></div>
+          <div className="om-muted">{countyName} · {windowLabel} · seller ledger: where vehicles were sold from</div>
+
+          <h3>This ZIP inside its county, state and country</h3>
+          <table className="om-dolls" data-testid="dolls">
+            <thead><tr><th /><th>ZIP</th><th>{countyName}</th><th>State</th><th>US</th></tr></thead>
+            <tbody>
+              {(['listing', 'sale', 'vehicle', 'organization'] as const).map((k) => (
+                <tr key={k} className={k === layer ? 'on' : ''}>
+                  <td><button type="button" className="om-link" onClick={() => setLayer(k)}>{LAYER_WORD[k]}</button></td>
+                  <td>{dolls.zip ? fmt(doll(dolls.zip, k)?.entities ?? 0) : '…'}</td>
+                  <td>{dolls.county ? fmt(doll(dolls.county, k)?.entities ?? 0) : '…'}</td>
+                  <td>{dolls.state ? fmt(doll(dolls.state, k)?.entities ?? 0) : '…'}</td>
+                  <td>{k === layer && dolls.us != null ? fmt(dolls.us) : ''}</td>
+                </tr>
+              ))}
+              {dolls.zip && doll(dolls.zip, 'sale')?.priced ? <tr><td>sold for, average</td><td>{money(doll(dolls.zip, 'sale')!.avg)}</td><td>{money(doll(dolls.county, 'sale')?.avg)}</td><td>{money(doll(dolls.state, 'sale')?.avg)}</td><td /></tr> : null}
+            </tbody>
+          </table>
+          <div className="om-muted">Counts are from the fold as of {dolls.zip?.layers[0]?.as_of?.slice(11, 16) ?? '…'} UTC. Records with no ZIP count in their county and state, not here.</div>
+
           <h3>Platforms represented</h3>
-          {sheet.sources.map(([s, n]) => <div key={s} className="om-row om-between om-line"><span>{s}</span><span>{fmt(n)} vehicles</span></div>)}
+          {platforms.map(([s, n]) => <button key={s} type="button" className={`om-line om-row om-between om-pick ${pick.platform === s ? 'on' : ''}`} onClick={() => setPick((x) => ({ ...x, platform: x.platform === s ? undefined : s }))}><span>{s}</span><span>{fmt(n)} vehicles</span></button>)}
+          {rowsBusy && !platforms.length && <div className="om-muted">Reading the ZIP's records…</div>}
+
           <h3>Vehicle mix</h3>
-          {sheet.mix.slice(0, 8).map(([m, n]) => <div key={m} className="om-bar"><span>{m}</span><i style={{ width: `${Math.max(4, (100 * n) / sheet.mix[0][1])}%` }} /><b>{fmt(n)}</b></div>)}
-          <h3>Vehicles</h3>
-          {sheet.vehicles.map(([vid, obs]) => (
-            <a key={vid} href={`/vehicle/${vid}`} className="om-vehicle">
-              {obs[0].vehicles.primary_image_url ? <img src={obs[0].vehicles.primary_image_url} alt="" width={56} height={42} loading="lazy" /> : <span className="om-noimg" />}
-              <span className="om-vtext">
-                <b>{makeLabel(obs[0])}</b>
-                <span className="om-muted">{obs.length} {obs.length === 1 ? 'record' : 'records'} · {platformName(obs[0].source_platform)} · {day(obs[0].observed_at)}</span>
-              </span>
-            </a>
-          ))}
-          {!group.vehicles.size && <div className="om-muted">No vehicles with ZIP evidence here{make ? ` for ${make}` : ''}{windowKey !== 'all' ? ` in ${windowLabel.toLowerCase()}` : ''}.</div>}
+          {makes.slice(0, 10).map(([m, n]) => <button key={m} type="button" className={`om-bar om-pick ${pick.make === m ? 'on' : ''}`} onClick={() => setPick((x) => ({ ...x, make: x.make === m ? undefined : m }))}><span>{m}</span><i style={{ width: `${Math.max(4, (100 * n) / makes[0][1])}%` }} /><b>{fmt(n)}</b></button>)}
+
+          <h3>Vehicles{pick.platform || pick.make ? ` · ${[pick.make, pick.platform].filter(Boolean).join(' · ')}` : ''} ({fmt(shown.length)})</h3>
+          {shown.map((v) => {
+            const first = v[0]; const o = outcome(first.vehicles); const isOpen = open === first.vehicles.id;
+            return (
+              <div key={first.vehicles.id} className="om-vehicle-block">
+                <button type="button" className="om-vehicle" onClick={() => setOpen(isOpen ? null : first.vehicles.id)}>
+                  {first.vehicles.primary_image_url ? <img src={first.vehicles.primary_image_url} alt="" width={56} height={42} loading="lazy" /> : <span className="om-noimg" />}
+                  <span className="om-vtext">
+                    <b>{makeLabel(first)}</b>
+                    <span className="om-muted">{o.word ? `${o.word}${o.price ? ' ' + money(o.price) : ''} · ` : ''}{v.length} {v.length === 1 ? 'record' : 'records'} · {platformName(first.source_platform)} · {day(first.observed_at)}</span>
+                  </span>
+                </button>
+                {isOpen && <div className="om-records">
+                  <a href={`/vehicle/${first.vehicles.id}`} className="om-link">Open the vehicle</a>
+                  {v.map((r) => <div key={r.id} className="om-record"><span>{day(r.observed_at)} · {r.source_type ?? 'record'} · {platformName(r.source_platform)}{r.postal_code ? ` · ${r.postal_code}` : ''}</span>{r.source_url && <a href={r.source_url} target="_blank" rel="noreferrer" className="om-link">source</a>}</div>)}
+                </div>}
+              </div>
+            );
+          })}
+          {rows && !shown.length && <div className="om-muted">No records here{pick.platform || pick.make ? ' for that pick' : ''}.</div>}
         </div>
       )}
 
       {showInfo && (
         <div className="om-sheet" role="dialog">
-          <div className="om-row om-between"><h2>Sources and coverage</h2><button type="button" className="om-link" onClick={() => setShowInfo(false)}>Done</button></div>
-          <p>Color shows distinct vehicles with source ZIP evidence in fixed bands: 1–4, 5–19, 20–99 and 100 or more. Unshaded areas have no matching mapped evidence in this loaded region; that does not establish an inactive market. These are not completed sales, current availability or bid counts.</p>
-          <p>ZIP areas are Census 2020 ZIP Code Tabulation Areas. Some postal ZIPs have no area, and ZIPs can cross county boundaries. Records without a source ZIP are counted at the bottom of the map.</p>
-          <p>The date window uses the record's observation date. Every vehicle shown is a public record and opens to its page.</p>
+          <div className="om-row om-between"><h2>What this map shows</h2><button type="button" className="om-link" onClick={() => setShowInfo(false)}>Done</button></div>
+          <p>Each ZIP is shaded by the count of the chosen kind of record in the window: vehicles (each once, at its newest observation), listings (each vehicle once, on the day first seen listed), sales (sold events), shops. The bands are fixed: 1–4, 5–19, 20–99, 100 or more.</p>
+          <p>A location is where a vehicle was sold or offered from, usually the seller's place. Sold vehicles usually leave. This is the seller ledger of an area, not the vehicles present in it.</p>
+          <p>Records that carry no ZIP count in their county or state and are shown there. ZIP areas are Census 2020 ZIP Code Tabulation Areas; some postal ZIPs have no area, and ZIPs cross county lines.</p>
+          <p>Counts come from a fold refreshed every 10 minutes (last 3 days) and nightly (the year). Every vehicle shown is a public record and opens to its page and its sources.</p>
         </div>
       )}
     </div>
