@@ -75,7 +75,18 @@ enum FixtureBackend {
             }
             return reader(name, args)
         }
-        if path.hasPrefix("/rest/v1/") { return table(String(path.dropFirst("/rest/v1/".count))) }
+        if path.hasPrefix("/rest/v1/") {
+            let name = String(path.dropFirst("/rest/v1/".count))
+            let method = (request.httpMethod ?? "GET").uppercased()
+            if method != "GET" && method != "HEAD" {
+                // Row writes (inserts and updates under owner policies) are writers too.
+                let body = FixtureURLProtocol.body(of: request).flatMap { try? JSONSerialization.jsonObject(with: $0) }
+                let row = (body as? [String: Any]) ?? (body as? [[String: Any]])?.first ?? [:]
+                log.record(rpc: "\(method == "PATCH" ? "update" : "insert") \(name)", args: row)
+                return (201, Data("[]".utf8))
+            }
+            return table(name)
+        }
         return (404, Data(#"{"message":"not served by the fixture backend"}"#.utf8))
     }
 
@@ -88,6 +99,13 @@ enum FixtureBackend {
         let signedIn = persona != .visitor
         switch name {
         case "listing_work_plan_read": return ok(PlanFixtures.plan)
+        case "my_suggested_provider_links": return ok(ParityFixtures.suggestions)
+        case "work_order_publication_read":
+            return scenario == "publish" ? ok(ParityFixtures.publication(visibility: "not_published")) : pending
+        case "organization_supply_read": return ok(ParityFixtures.supply)
+        case "facility_read": return scenario == "org" ? ok(FacilityFixtures.read(party: false)) : pending
+        case "get_org_page":
+            return ok(#"{"org":{"id":"\#(ParityFixtures.orgId)","name":"Fixture Garage","type":"garage","city":"Fixture City","state":"NV"},"as_of":"2026-10-19T20:00:00Z","half_life_hours":6,"dormant_below":0.05,"basis":[],"you":null,"vehicles":[],"vehicles_considered":0,"vehicles_total":0}"#)
         case "vehicle_work_orders_read":
             let access = scenario == "post-job" ? #""vehicle_access":{"role":"owner","can_post_work_request":true},"# : ""
             return ok(JobFixtures.vehicleWorkOrders.replacingOccurrences(of: #""viewer":{"#, with: #""viewer":{\#(access)"#))
@@ -113,8 +131,10 @@ enum FixtureBackend {
         case "work_order_facility_reservations_read":
             return ok(#"{"reservations":[],"viewer":{"party":false,"actions":[]},"payment_authorized":false}"#)
         case "work_order_operations_read": return ok(IssueQuoteFixtures.operationsRead)
-        case "open_requirements_read": return ok(OfferFixtures.open(signedIn: signedIn))
+        case "open_requirements_read":
+            return ["offer", "publish"].contains(scenario) ? ok(ParityFixtures.openWithPlanB(signedIn: signedIn)) : ok(OfferFixtures.open(signedIn: signedIn))
         case "provider_profile_read":
+            if scenario == "setup" { return ok(ParityFixtures.selfProfile) }
             var p = ProviderFixtures.profile(context: signedIn ? "visitor" : "visitor")
             if scenario == "contact-send" {
                 p = p.replacingOccurrences(of: #""contact":{"action":"contact_via_nuke","available":false,"basis":"contact between users is brokered by Nuke"}"#,
@@ -182,6 +202,10 @@ enum FixtureBackend {
         case "request_contact": return ok(ContactFixtures.sendReceipt)
         case "respond_contact_request": return ok(#"{"request_id":"\#(args["p_id"] as? String ?? "")","status":"accepted"}"#)
         case "post_contact_message": return ok(#"{"message_id":"m3","created_at":"2026-10-19T09:10:00Z"}"#)
+        case "publish_work_order":
+            return ok(#"{"work_order_id":"\#(args["p_work_order_id"] as? String ?? "")","visibility":"\#(args["p_visibility"] as? String ?? "")","providers_notified":false,"payment_authorized":false}"#)
+        case "claim_organization": return ok(ParityFixtures.claimed)
+        case "create_supplier_invite": return ok(ParityFixtures.invite)
         default: return ok("{}")
         }
     }
@@ -191,6 +215,8 @@ enum FixtureBackend {
     private static func table(_ name: String) -> (Int, Data) {
         switch name {
         case "vehicle_images": return ok(persona == .client ? PostJobFixtures.photos : "[]")
+        case "profiles": return ok(ParityFixtures.ownRow)
+        case "tool_requirement_key_map": return ok(ParityFixtures.toolKeys)
         default: return ok("[]")
         }
     }

@@ -64,6 +64,12 @@ final class JobFlowUITests: XCTestCase {
             if up { app.swipeUp() } else { app.swipeDown() }
             n += 1
         }
+        // Past it (a slow runner can overshoot)? Search back the other way once.
+        n = 0
+        while !(el.exists && el.isHittable) && n < tries {
+            if up { app.swipeDown() } else { app.swipeUp() }
+            n += 1
+        }
         XCTAssertTrue(el.exists, "not found: \(el)")
         return el
     }
@@ -92,6 +98,9 @@ final class JobFlowUITests: XCTestCase {
         while !field.exists && !view.exists && Date() < deadline { usleep(250_000) }
         let target = field.exists ? field : view
         reveal(target, in: app).tap()
+        // Slow runners may not have focused the field yet: wait for the keyboard, tap again if it isn't up.
+        if !app.keyboards.firstMatch.waitForExistence(timeout: 4) { target.tap() }
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 6), "the field never took focus")
         target.typeText(value)
     }
 
@@ -206,7 +215,9 @@ final class JobFlowUITests: XCTestCase {
     // MARK: 4. Accept offer on a co-signed offer sends the terms hash (regression for #2185)
 
     func testAcceptingACoSignedOfferSendsTheTermsHash() {
-        let app = launch("client", scenario: "cosign", ["NUKE_DEBUG_JOB_ID": jobId, "NUKE_DEBUG_SCROLL_TO": "job-offers"])
+        let app = launch("client", scenario: "cosign", ["NUKE_DEBUG_JOB_ID": jobId])
+        XCTAssertTrue(app.staticTexts["Stages"].waitForExistence(timeout: 20))
+        sleep(2)
         let accept = app.buttons["Accept offer"].firstMatch
         reveal(accept, in: app).tap()
         reveal(text(app, contains: "Co-signed by Fixture Garage"), in: app)

@@ -47,6 +47,9 @@ struct JobsLookingSection: View {
                     RootedValueView(label: "Technician profile", value: JobCopy.technicianLink(bridge) ?? "Not available",
                                     status: bridge == "evidenced" ? .attributed : .recorded)
                 }
+                NavigationLink { ProviderSetupView() } label: {
+                    Label("Set up your technician page", systemImage: "person.text.rectangle")
+                }
             }
         } header: {
             Text("Jobs looking for someone")
@@ -69,6 +72,9 @@ struct OpenRequirementRow: View {
             Text(row.description ?? "No description").font(.subheadline).lineLimit(3)
             Text(row.displayTitle ?? "Untitled job").font(.caption).foregroundStyle(.primary).lineLimit(1)
             Text(Self.detail(row)).font(.caption2).foregroundStyle(.secondary).lineLimit(2)
+            ForEach(row.planB.prefix(3)) { s in
+                Label(s.line, systemImage: s.onNuke?.claimed == true ? "checkmark.seal" : "building.2").font(.caption2).foregroundStyle(.secondary)
+            }
         }
         .padding(.vertical, 3)
     }

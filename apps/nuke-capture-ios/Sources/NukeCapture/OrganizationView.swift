@@ -194,6 +194,7 @@ struct OrganizationView: View {
             } else {
                 Section { ProgressView() }
             }
+            OrgSupplySection(orgId: orgId, nameHint: page?.org.name ?? fallbackName)
         }
         .navigationTitle(page?.org.name ?? fallbackName ?? "Organization")
         .navigationBarTitleDisplayMode(.inline)

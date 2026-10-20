@@ -27,6 +27,8 @@ struct JobView: View {
     @State private var operations: JobLoad<WorkOrderOperations> = .loading
     @State private var attachments: JobLoad<WorkOrderEvidence> = .loading
     @State private var place: JobLoad<JobProviderPlace> = .loading
+    @State private var publication: JobLoad<WorkOrderPublication> = .loading
+    @State private var supplierRows: [OpenRequirement] = []
     @State private var mode: Mode = JobView.defaultMode
 
     /// Live: the order-in-motion screen (JobLiveView). Details: every stage, quote, part and action.
@@ -55,7 +57,8 @@ struct JobView: View {
             case .details:
                 JobPathContent(workOrderId: workOrderId, path: path, resources: resources, quotes: quotes, offers: offers,
                                inspections: inspections, invoices: invoices, evidence: evidence,
-                               facility: facility, operations: operations, attachments: attachments, place: place,
+                               facility: facility, operations: operations, publication: publication, supplierRows: supplierRows,
+                               attachments: attachments, place: place,
                                titleHint: titleHint, vehicleHint: vehicleHint,
                                onChanged: { Task { await load() } })
                     .refreshable { await load() }
@@ -99,6 +102,11 @@ struct JobView: View {
         operations = await IssueQuoteReaders.operations(workOrderId: workOrderId)
         let requirements: [RequirementOffers] = { if case .loaded(let o) = loaded.3 { return o.requirements } else { return [] } }()
         facility = await FacilityReaders.job(workOrderId: workOrderId, requirements: requirements)
+        publication = await PublicationReaders.read(workOrderId: workOrderId)
+        // The customer sees which businesses supplied the job's needs before; rows come from the open-requirements reader.
+        if case .loaded(let pub) = publication, pub.party, case .loaded(let page) = await OfferReaders.openRequirements(limit: 100) {
+            supplierRows = page.rows.filter { $0.workOrderId == workOrderId }
+        }
     }
 }
 
@@ -125,6 +133,8 @@ struct JobPathContent: View {
     var evidence: JobLoad<EvidenceCandidates>? = nil
     var facility: JobLoad<JobFacility>? = nil
     var operations: JobLoad<WorkOrderOperations>? = nil
+    var publication: JobLoad<WorkOrderPublication>? = nil
+    var supplierRows: [OpenRequirement] = []
     var attachments: JobLoad<WorkOrderEvidence>? = nil
     var place: JobLoad<JobProviderPlace>? = nil
     var titleHint: String? = nil
@@ -168,9 +178,11 @@ struct JobPathContent: View {
                         Text("You were accepted for this job. Starting records the time, under exactly what was accepted.")
                     }
                 }
+                if let publication { JobPublicationSection(workOrderId: workOrderId, read: publication, onChanged: onChanged).id("job-publication") }
                 if let operations { JobOperationsSection(read: operations, plan: p.stages[.plan]).id("job-operations") }
                 quoteSection.id("job-quote")
                 if let offers { JobOffersSection(offers: offers, onChanged: onChanged).id("job-offers") }
+                JobSuppliersSection(rows: supplierRows).id("job-suppliers")
                 if let offers { ProviderMatchesEntry(workOrderId: workOrderId, offers: offers, onChanged: onChanged) }
                 if let facility {
                     JobFacilitySection(workOrderId: workOrderId, facility: facility, onChanged: onChanged)

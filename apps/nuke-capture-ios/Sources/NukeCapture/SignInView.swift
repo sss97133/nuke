@@ -330,6 +330,11 @@ struct AccountView: View {
                     } label: {
                         Label("Vouches you've given", systemImage: "hand.thumbsup")
                     }
+                    NavigationLink {
+                        ProviderSetupView()
+                    } label: {
+                        Label("Set up your technician page", systemImage: "person.text.rectangle")
+                    }
                 }
 
                 // Contributor mode — the crew safety gate. ON when this device
