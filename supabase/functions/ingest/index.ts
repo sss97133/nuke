@@ -32,6 +32,7 @@ import { type CraigslistCapture, pickCapture } from "../_shared/craigslistAttrib
 import { type CaptureLanding, landCraigslistCapture, ledgerFields } from "./craigslistCapture.ts";
 import { vinMakeCheckApplies } from "./vinGate.ts";
 import { classifiedListingId, classifiedPlatform, landClassifiedListing } from "./classifiedEvent.ts";
+import { findCraigslistRepost } from "./repostMatch.ts";
 import { slugStubRejection } from "./slugStub.ts";
 import { parseVehicleTitle, type ParsedVehicle } from "./vehicleTitle.ts";
 import { extractFromHtml } from "../extract-craigslist/extract.ts";
@@ -332,6 +333,7 @@ interface MatchResult {
   isNew: boolean;
   matchTier?: number;       // 1=VIN, 2=URL, 3=YMM+context
   matchConfidence?: number; // 0-1
+  matchBasis?: string;      // "repost_shared_photos": a Craigslist re-post matched by its photo files (Tier 2d)
 }
 
 interface VehicleEnrichment {
@@ -507,6 +509,18 @@ async function matchOrCreateVehicle(
     if (listingUrlMatch) {
       await enrichVehicle(listingUrlMatch.id, parsed, platform);
       return { vehicleId: listingUrlMatch.id, isNew: false, matchTier: 2, matchConfidence: 0.95 };
+    }
+  }
+
+  // ── Tier 2d: a Craigslist re-post (shared photo files) ────────
+  // A re-post has a new post id and share token and usually no VIN, so no tier above can link it. Photo ids are the same on
+  // every post that carries the file. See ./repostMatch.ts for the guards; the post still lands its own listing episode.
+  if (platform === "craigslist") {
+    const repost = await findCraigslistRepost(supabaseAdmin, parsed);
+    if (repost) {
+      console.log(`[ingest] craigslist re-post of ${repost.vehicleId}: ${repost.shared} shared photos (${Math.round(repost.ratio * 100)}% of the smaller set)`);
+      await enrichVehicle(repost.vehicleId, parsed, platform);
+      return { vehicleId: repost.vehicleId, isNew: false, matchTier: 2, matchConfidence: 0.97, matchBasis: "repost_shared_photos" };
     }
   }
 
