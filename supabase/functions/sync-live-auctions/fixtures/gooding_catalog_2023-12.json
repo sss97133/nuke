@@ -1,0 +1,90 @@
+{
+ "source": "https://cdn.goodingco.com/graphql getVehicles(filtersInput: {onlineAuctionName: [\"1701709200000_Geared Online | December\"]}, sortBy: ENDING_SOONEST) (fetched 2026-10-20; lots 2, 19 and 43)",
+ "data": {
+  "getVehicles": {
+   "vehicles": [
+    {
+     "slug": "goodyear-tire-sign",
+     "title": "Goodyear Tire Sign",
+     "itemType": "Automobilia",
+     "make": null,
+     "model": null,
+     "modelYear": null,
+     "lotNumber": 2,
+     "hasReservePrice": false,
+     "currency": "USD",
+     "activeAuction": "false",
+     "auctionEndDate": "1702054800000",
+     "upcomingAuctionEndDate": "9999999999999",
+     "lotAuctionMobilityId": null,
+     "auctionAuctionMobilityId": "1-84OYL5",
+     "cloudinaryImages": [
+      {
+       "public_id": "Prod/O23G_December 2023/225_Goodyear Sign/Goodyear_Sign_9_nc4ody"
+      },
+      {
+       "public_id": "Prod/O23G_December 2023/225_Goodyear Sign/Goodyear_Sign_8_gcirpj"
+      },
+      {
+       "public_id": "Prod/O23G_December 2023/225_Goodyear Sign/Goodyear_Sign_1_bdkuc7"
+      }
+     ]
+    },
+    {
+     "slug": "1957-porsche-356-a-speedster-1c",
+     "title": "1957 Porsche 356 A Speedster",
+     "itemType": "Cars",
+     "make": "Porsche",
+     "model": "356 A Speedster",
+     "modelYear": 1957,
+     "lotNumber": 19,
+     "hasReservePrice": false,
+     "currency": "USD",
+     "activeAuction": "false",
+     "auctionEndDate": "1702054800000",
+     "upcomingAuctionEndDate": "9999999999999",
+     "lotAuctionMobilityId": null,
+     "auctionAuctionMobilityId": "1-84OYL5",
+     "cloudinaryImages": [
+      {
+       "public_id": "Prod/O23G_December 2023/214_1957 Porsche 356 A Speedster/1957_Porsche_356_A_Speedster_52_dn263q"
+      },
+      {
+       "public_id": "Prod/O23G_December 2023/214_1957 Porsche 356 A Speedster/1957_Porsche_356_A_Speedster_42_r82m1m"
+      },
+      {
+       "public_id": "Prod/O23G_December 2023/214_1957 Porsche 356 A Speedster/1957_Porsche_356_A_Speedster_43_wjyhlr"
+      }
+     ]
+    },
+    {
+     "slug": "1973-porsche-911-carrera-rs-27-lightweight-1b",
+     "title": "1973 Porsche 911 Carrera RS 2.7 Lightweight",
+     "itemType": "Cars",
+     "make": "Porsche",
+     "model": "911 Carrera RS 2.7 Lightweight",
+     "modelYear": 1973,
+     "lotNumber": 43,
+     "hasReservePrice": true,
+     "currency": "USD",
+     "activeAuction": "false",
+     "auctionEndDate": "1702054800000",
+     "upcomingAuctionEndDate": "9999999999999",
+     "lotAuctionMobilityId": null,
+     "auctionAuctionMobilityId": "1-84OYL5",
+     "cloudinaryImages": [
+      {
+       "public_id": "Prod/O23G_December 2023/243_1973 Porsche 911 Carrera 2.7 RS Lightweight/1973_Porsche_911_Carrera_27_RS_LW_1_nq87ks"
+      },
+      {
+       "public_id": "Prod/O23G_December 2023/243_1973 Porsche 911 Carrera 2.7 RS Lightweight/1973_Porsche_911_Carrera_27_RS_LW_58_ealmp2"
+      },
+      {
+       "public_id": "Prod/O23G_December 2023/243_1973 Porsche 911 Carrera 2.7 RS Lightweight/1973_Porsche_911_Carrera_27_RS_LW_63_kgajgw"
+      }
+     ]
+    }
+   ]
+  }
+ }
+}

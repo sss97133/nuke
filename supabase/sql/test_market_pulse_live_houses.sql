@@ -3,7 +3,8 @@
 -- Contract for 20261022010000_market_pulse_live_houses.sql: the other houses' open lots in the board's row shape plus
 -- house and currency; the house comes from the listing URL before platform_source; a house whose newest write is
 -- six hours old is off the board but named in 'houses'; Bonhams, BaT, ended, private and deleted lots are not read;
--- a visitor can read it.
+-- a visitor can read it. 20261022043000_gooding_live_board: Gooding's rows (board house, live_auction_sources) and its
+-- place in the houses job, appended without dropping a house another reader added.
 \set ON_ERROR_STOP on
 DO $$ BEGIN
   IF current_database() NOT LIKE 'dm_refinement_%'
@@ -27,6 +28,26 @@ DO $$ BEGIN
   IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'service_role') THEN CREATE ROLE service_role NOLOGIN; END IF;
 END $$;
 GRANT SELECT ON public.vehicles, public.canonical_makes TO anon, authenticated;
+-- What a reader's migration also touches: its live_auction_sources row and the houses job (pg_cron stand-in).
+CREATE TABLE public.live_auction_sources (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), slug text NOT NULL UNIQUE, display_name text NOT NULL, base_url text NOT NULL,
+  sync_method text NOT NULL DEFAULT 'polling_scrape', auction_format text, default_poll_interval_ms integer DEFAULT 60000,
+  notes text, scraping_config jsonb DEFAULT '{}');
+CREATE SCHEMA cron;
+CREATE TABLE cron.job (jobid bigint GENERATED ALWAYS AS IDENTITY, jobname text, schedule text, command text);
+CREATE FUNCTION cron.alter_job(job_id bigint, schedule text DEFAULT NULL, command text DEFAULT NULL, database text DEFAULT NULL,
+  username text DEFAULT NULL, active boolean DEFAULT NULL) RETURNS void LANGUAGE sql AS $$
+  UPDATE cron.job SET schedule = coalesce(alter_job.schedule, job.schedule), command = coalesce(alter_job.command, job.command)
+  WHERE jobid = job_id $$;
+-- the job as 20261019021000_live_auction_board_sync_health schedules it
+INSERT INTO cron.job (jobname, schedule, command) VALUES ('sync-live-auctions-houses', '*/5 * * * *', $job$
+  SELECT net.http_post(
+    url := get_service_url() || '/functions/v1/sync-live-auctions',
+    headers := jsonb_build_object('Content-Type','application/json','Authorization','Bearer ' || get_service_role_key_for_cron()),
+    body := '{"action":"sync","platform":"collecting-cars","platforms":["collecting-cars","pcarmarket","bonhams"]}'::jsonb,
+    timeout_milliseconds := 150000
+  );
+$job$);
 CREATE OR REPLACE FUNCTION pg_temp.ok(label text, condition boolean) RETURNS void LANGUAGE plpgsql AS $$ BEGIN
   IF condition IS NOT TRUE THEN RAISE EXCEPTION 'Contract failed: %', label; END IF;
   RAISE NOTICE 'PASS %', label;
@@ -63,6 +84,8 @@ VALUES
 \ir ../migrations/20261022010000_market_pulse_live_houses.sql
 \ir ../migrations/20261022020000_live_board_houses.sql
 \ir ../migrations/20261022020000_live_board_houses.sql
+\ir ../migrations/20261022043000_gooding_live_board.sql
+\ir ../migrations/20261022043000_gooding_live_board.sql
 
 CREATE TEMP TABLE board AS SELECT public.market_pulse_live_houses() AS j;
 
@@ -109,3 +132,30 @@ SELECT jsonb_array_length(public.market_pulse_live_houses()->'auctions') AS anon
 RESET ROLE;
 SELECT pg_temp.ok('a visitor reads it', :'anon_lots'::int = 3
   AND has_function_privilege('anon', 'public.market_pulse_live_houses()', 'execute'));
+
+-- 20261022043000_gooding_live_board: Gooding is a house with a reader; its open lot is read, its catalog rows are not.
+SELECT pg_temp.ok('Gooding is enabled with its label, and has its live_auction_sources row for the board writer',
+  EXISTS (SELECT 1 FROM public.live_board_houses WHERE house = 'gooding' AND enabled AND label = 'Gooding Christie''s')
+  AND (SELECT default_poll_interval_ms = 300000 AND sync_method = 'polling_api' FROM public.live_auction_sources WHERE slug = 'gooding'));
+INSERT INTO public.vehicles (id, year, make, model, high_bid, auction_end_date, updated_at, created_at, origin_metadata, listing_url, sale_status, platform_source)
+VALUES ('cccccccc-0000-0000-0000-000000000010', 1957, 'Porsche', '356 A Speedster', 210000, now() + interval '3 hours', now(), now(),
+        '{"currency": "USD", "no_reserve": true}', 'https://goodingco.com/lot/g', 'auction_live', 'gooding'),
+       -- a catalog lot extract-gooding holds (sold, discovery_url only): never on the board
+       ('cccccccc-0000-0000-0000-000000000011', 1961, 'Jaguar', 'E-Type', NULL, now() + interval '3 hours', now(), now(),
+        NULL, NULL, 'sold', 'gooding');
+SELECT pg_temp.ok('an open Gooding lot is on the board under its house and label, in its currency',
+  EXISTS (SELECT 1 FROM jsonb_array_elements(public.market_pulse_live_houses()->'auctions') a
+          WHERE a->>0 = 'cccccccc-0000-0000-0000-000000000010' AND a->>12 = 'gooding' AND a->>13 = 'USD' AND (a->>4)::numeric = 210000)
+  AND public.market_pulse_live_houses()->'houses' @> '[{"house": "gooding", "label": "Gooding Christie''s", "lots": 1, "on_board": true}]'::jsonb
+  AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements(public.market_pulse_live_houses()->'auctions') a WHERE a->>0 = 'cccccccc-0000-0000-0000-000000000011'));
+SELECT pg_temp.ok('the houses job posts Gooding once, after the houses it posted, its command otherwise as it was',
+  (SELECT (substring(command from $re$body := '(\{[^']*\})'::jsonb$re$)::jsonb) =
+          '{"action": "sync", "platform": "collecting-cars", "platforms": ["collecting-cars", "pcarmarket", "bonhams", "gooding"]}'::jsonb
+     AND command LIKE '%/functions/v1/sync-live-auctions%' AND command LIKE '%timeout_milliseconds := 150000%' AND schedule = '*/5 * * * *'
+   FROM cron.job WHERE jobname = 'sync-live-auctions-houses'));
+-- another reader's house appended meanwhile, Gooding not yet: the migration keeps it and appends Gooding after it
+UPDATE cron.job SET command = replace(command, '"bonhams", "gooding"]', '"bonhams", "rm-sothebys"]') WHERE jobname = 'sync-live-auctions-houses';
+\ir ../migrations/20261022043000_gooding_live_board.sql
+SELECT pg_temp.ok('a house another reader appended stays in the job',
+  (SELECT substring(command from $re$body := '(\{[^']*\})'::jsonb$re$)::jsonb -> 'platforms' FROM cron.job WHERE jobname = 'sync-live-auctions-houses')
+  = '["collecting-cars", "pcarmarket", "bonhams", "rm-sothebys", "gooding"]'::jsonb);

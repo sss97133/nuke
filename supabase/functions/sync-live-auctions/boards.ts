@@ -1,7 +1,7 @@
 /**
  * Pure readers for the board-synced houses (no I/O): PCarMarket's server-rendered auction board and lot bid history,
- * Bonhams' Typesense sale and lot documents and its bidding platform's lot states, and Broad Arrow's timed sales on
- * its bidding site. sync-live-auctions fetches; these parse.
+ * Bonhams' Typesense sale and lot documents and its bidding platform's lot states, Broad Arrow's timed sales on its
+ * bidding site, and Gooding's bidding-platform lots with its catalog's identity. sync-live-auctions fetches; these parse.
  */
 
 /** One open lot on PCarMarket's live board (the Basta query cache the page server-renders). */
@@ -335,4 +335,197 @@ export function amTimedLot(doc: AmLotDoc, sale: AmSale, now: number): AmTimedLot
     reserve_met: typeof doc.reserve_met === "boolean" ? doc.reserve_met : null,
     image_url: doc.cover_thumbnail ?? null,
   };
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Gooding (Gooding Christie's). Bids are taken on its Auction Mobility platform, bid.goodingco.com, whose /ajax/lots/
+// endpoint answers the platform's lot documents as JSON: status 'active' is a timed lot open for bidding (the platform's
+// own lots controller), timed_auction_bid.amount the standing high bid, extended_end_time the lot's own close with its
+// extensions. Broad Arrow and Bonhams bid on the same platform, so a lot is read by amTimedLot and a bid box answer by
+// parseBonhamsBidStates; the bid count (live_bid_timed_count) comes only in the widget/lots answer the lot page's bid
+// box reads. Identity (slug, year, make, model, item type, reserve, images) is the house catalog's
+// (cdn.goodingco.com/graphql getVehicles, the index its /lots page reads), keyed by the platform ids it carries.
+
+/** A lot document of the lot list: the platform's lot, with the sale summary the list embeds in each lot. */
+export interface GoodingAmLot extends AmLotDoc {
+  hide_estimate?: boolean | null;
+  truncated_description?: string | null;
+  sold_price?: string | null;
+  state_sequence_number?: number | null;
+  auction?: (AmSale & { active_lot_count?: number | null }) | null;
+}
+
+/** One Gooding lot as the platform states it now. phase 'open' = a timed lot taking bids at this moment. */
+export interface GoodingLot {
+  am_lot_id: string;
+  am_auction_id: string | null;
+  sale: string | null;
+  auction_type: string | null;
+  auction_active_lots: number | null;
+  lot_number: number | null;
+  title: string;
+  status: string;
+  phase: "open" | "upcoming" | "closed" | "other";
+  current_bid: number | null;
+  bid_at: string | null;
+  bid_count: number | null; // from the widget/lots answer only; the lot list does not carry it
+  opening_bid: number | null;
+  sold_price: number | null;
+  reserve_met: boolean | null;
+  without_reserve: boolean;
+  starts: string | null;
+  ends: string | null;
+  estimate_low: number | null;
+  estimate_high: number | null;
+  currency: string | null;
+  image: string | null;
+  bid_url: string | null;
+  state_sequence: number | null;
+}
+
+const CLOSED_STATUSES = new Set(["sold", "reserve_not_met", "expired", "withdrawn", "passed", "unsold", "pre_sold", "post_sold", "subject_to"]);
+
+/** 'open' = an active lot of a sale that has started, closing after `now` (timed and timed_then_live sales alike). */
+function goodingPhase(status: string, starts: string | null, ends: string | null, now: number): GoodingLot["phase"] {
+  if (status !== "active") return CLOSED_STATUSES.has(status) ? "closed" : "other";
+  if (!(Date.parse(starts ?? "") <= now)) return "upcoming";
+  return ends !== null && Date.parse(ends) <= now ? "closed" : "open";
+}
+
+/** One platform lot document as a GoodingLot, its phase judged at `now` (ms). */
+export function goodingLot(lot: GoodingAmLot, now: number): GoodingLot {
+  const sale: AmSale = lot.auction ?? { row_id: "" };
+  const t = amTimedLot(lot, sale, now); // the platform's timed-lot reading, shared with Broad Arrow (its url is Broad Arrow's)
+  const status = t.status ?? "";
+  const n = Number(lot.lot_number);
+  return {
+    am_lot_id: lot.row_id,
+    am_auction_id: lot.auction?.row_id ?? null,
+    sale: sale.title ?? null,
+    auction_type: sale.auction_type ?? null,
+    auction_active_lots: lot.auction?.active_lot_count ?? null,
+    lot_number: lot.lot_number != null && Number.isFinite(n) ? n : null,
+    title: t.title,
+    status,
+    phase: goodingPhase(status, sale.time_start ?? null, t.ends, now),
+    current_bid: t.current_bid,
+    bid_at: t.current_bid !== null ? t.bid_at : null,
+    bid_count: null, // only the bid box answer carries it (goodingWithBidState)
+    opening_bid: t.opening_bid,
+    sold_price: positive(lot.sold_price),
+    reserve_met: t.reserve_met,
+    without_reserve: /without reserve/i.test(lot.truncated_description ?? ""),
+    starts: sale.time_start ?? null,
+    ends: t.ends,
+    estimate_low: lot.hide_estimate ? null : t.estimate_low,
+    estimate_high: lot.hide_estimate ? null : t.estimate_high,
+    currency: t.currency,
+    image: t.image_url,
+    bid_url: lot._detail_url ? `https://bid.goodingco.com${lot._detail_url}` : null,
+    state_sequence: lot.state_sequence_number ?? null,
+  };
+}
+
+/**
+ * A lot with the state its lot page's bid box shows (the platform's widget/lots answer, parsed by parseBonhamsBidStates):
+ * the leading bid, the bid count and the close each extension moves. Without a state the lot stays as listed.
+ */
+export function goodingWithBidState(lot: GoodingLot, s: BonhamsBidState | undefined, now: number): GoodingLot {
+  if (!s) return lot;
+  const status = s.status ?? lot.status;
+  const ends = s.ends ?? lot.ends;
+  // the widget's bid carries no time (created_at null, 2026-10-20): keep the lot list's time while the bid is the same
+  const bid_at = s.current_bid === null ? null : s.bid_at ?? (s.current_bid === lot.current_bid ? lot.bid_at : null);
+  return { ...lot, status, ends, phase: goodingPhase(status, lot.starts, ends, now), current_bid: s.current_bid, bid_at, bid_count: s.bid_count };
+}
+
+/** One /ajax/lots/ page: its lots, the platform's total, and the next page's offset (null on the last page). */
+export function parseGoodingLots(json: unknown, now: number): { lots: GoodingLot[]; total: number | null; next: number | null } {
+  const doc = (json ?? {}) as { result_page?: GoodingAmLot[]; query_info?: { next_page?: string | null; page_start_offset?: number; total_num_results?: number } };
+  if (!Array.isArray(doc.result_page)) throw new Error("Gooding lots: no result_page in the platform's answer");
+  const lots = doc.result_page.filter((l) => l && typeof l.row_id === "string").map((l) => goodingLot(l, now));
+  const qi = doc.query_info ?? {};
+  return {
+    lots,
+    total: qi.total_num_results ?? null,
+    next: qi.next_page && doc.result_page.length > 0 ? (qi.page_start_offset ?? 0) + doc.result_page.length : null,
+  };
+}
+
+/** The fields of a Gooding catalog lot (cdn.goodingco.com/graphql getVehicles) the board reads. */
+export interface GoodingCatalogLot {
+  slug: string;
+  title?: string | null;
+  itemType?: string | null;
+  make?: string | null;
+  model?: string | null;
+  modelYear?: number | null;
+  lotNumber?: number | null;
+  hasReservePrice?: boolean | null;
+  lotAuctionMobilityId?: string | null;
+  auctionAuctionMobilityId?: string | null;
+  upcomingAuctionEndDate?: string | null;
+  cloudinaryImages?: { public_id: string }[] | null;
+}
+
+/** The catalog lot for a platform lot: by the platform lot id it carries, else by its sale id and lot number. */
+export function goodingCatalogFor(lot: GoodingLot, catalog: GoodingCatalogLot[]): GoodingCatalogLot | null {
+  return catalog.find((c) => c.lotAuctionMobilityId && c.lotAuctionMobilityId === lot.am_lot_id)
+    ?? catalog.find((c) => c.auctionAuctionMobilityId && c.auctionAuctionMobilityId === lot.am_auction_id
+      && (lot.lot_number ?? 0) > 0 && c.lotNumber === lot.lot_number)
+    ?? null;
+}
+
+/** The URL spelling vehicles hold for a Gooding lot (canonicalize_vehicle_url: no www, no trailing slash). */
+export const goodingLotUrl = (slug: string) => `https://goodingco.com/lot/${slug}`;
+
+/** Every spelling a vehicle may hold for that lot: both hosts, with and without a trailing slash. */
+export function goodingUrlVariants(url: string): string[] {
+  const slug = url.match(/^https?:\/\/(?:www\.)?goodingco\.com\/lot\/([^/?#]+)/i)?.[1];
+  if (!slug) return [url];
+  return ["https://goodingco.com", "https://www.goodingco.com"].flatMap((h) => [`${h}/lot/${slug}`, `${h}/lot/${slug}/`]);
+}
+
+/** A catalog image as the house serves it, in the spelling extract-gooding writes (its buildCloudinaryUrl). */
+export const goodingImageUrl = (publicId: string) =>
+  `https://media.goodingco.com/image/upload/c_fill,g_auto,q_90,w_1800/v1/${publicId.split("/").map(encodeURIComponent).join("/")}`;
+
+/**
+ * A platform lot as a board row, with its catalog identity when matched: the catalog lot page (where the house shows
+ * the live bid) in the spelling vehicles hold, else the platform's lot page. vehicle = the catalog says Cars or
+ * Motorcycles, or (unmatched) the title opens with a year.
+ */
+export function goodingBoardLot(lot: GoodingLot, cat: GoodingCatalogLot | null) {
+  const img = cat?.cloudinaryImages?.[0]?.public_id;
+  return {
+    url: cat ? goodingLotUrl(cat.slug) : lot.bid_url,
+    title: cat?.title?.trim() || lot.title,
+    year: cat?.modelYear ?? null,
+    make: cat?.make?.trim() || null, // the catalog writes some makes with a trailing space ("Ducati ")
+    model: cat?.model?.trim() || null,
+    image: img ? goodingImageUrl(img) : lot.image,
+    no_reserve: cat?.hasReservePrice === false || lot.without_reserve,
+    item_type: cat?.itemType ?? null,
+    vehicle: cat ? ["Cars", "Motorcycles"].includes(cat.itemType ?? "") : /^(1[89]|20)\d{2}\s/.test(lot.title),
+  };
+}
+
+/** A vehicles row that may hold a Gooding lot, by either URL column. */
+export interface GoodingVehicleRow { id: string; listing_url: string | null; discovery_url: string | null }
+
+/**
+ * How a board lot reaches the vehicle that already holds it, so the live upsert (keyed on listing_url) updates that
+ * vehicle instead of minting a second one: 'held' = a vehicle's listing_url is a spelling of the lot (write under
+ * that spelling); 'claim' = a vehicle holds the lot only as discovery_url, listing_url empty (fill it, then write);
+ * 'new' = no vehicle holds it (write, then fill discovery_url so extract-gooding finds the same row); 'other' = the
+ * vehicle holding it as discovery_url lists elsewhere now (a later BaT or Mecum sale): the Gooding lot gets its own row.
+ */
+export function goodingLinkPlan(url: string, rows: GoodingVehicleRow[]): { url: string; link: "held" | "claim" | "new" | "other"; vehicle_id: string | null } {
+  const spellings = new Set(goodingUrlVariants(url));
+  const held = rows.find((r) => r.listing_url && spellings.has(r.listing_url));
+  if (held) return { url: held.listing_url!, link: "held", vehicle_id: held.id };
+  const byDiscovery = rows.filter((r) => r.discovery_url && spellings.has(r.discovery_url));
+  const claim = byDiscovery.find((r) => !r.listing_url);
+  if (claim) return { url, link: "claim", vehicle_id: claim.id };
+  return byDiscovery.length ? { url, link: "other", vehicle_id: null } : { url, link: "new", vehicle_id: null };
 }
