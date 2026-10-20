@@ -9,7 +9,11 @@ import SourcesBoard, {
   categoryBadgeLabel,
   describeDealerConsignment,
   describeRecordDate,
+  formatCountdown,
   formatDealerHqBadge,
+  type LandingRecentEvent,
+  parsePulse,
+  sortDrillColumn,
   gradeText,
   heldShare,
   landingState,
@@ -276,24 +280,63 @@ it('switches the landing column to 24h hourly bars and 1h live bars when clicked
   const drill = container.querySelector('.market-sources__drill')!;
   expect(drill).not.toBeNull();
   expect(drill.textContent).toContain('Bring a Trailer');
-  expect(drill.textContent).toContain('Y·M·M 1/2');
   expect(drill.textContent).toContain('1991');
   expect(drill.textContent).toContain('Acura');
   expect(drill.textContent).toContain('NSX 5-Speed');
   expect(drill.textContent).toContain('JH4NA1150MT001234');
   expect(drill.textContent).toContain('$42,500');
-  expect(drill.textContent).toContain('Jun 22, 2023');
-  expect(drill.querySelector('.market-sources__event-make.is-missing')?.textContent).toBe('missing');
-  expect(drill.querySelectorAll('.market-sources__hour-col')).toHaveLength(24);
-  expect(drill.querySelectorAll('.market-sources__min-col')).toHaveLength(12);
+  // the heartbeat: one line per kind, and no ingestion-quality pills, make/model/facet pills or source link-outs
+  expect(fixture.rpc).toHaveBeenCalledWith('market_source_pulse_read', { p_source: 'bat' });
+  expect(drill.querySelectorAll('.market-sources__pulse-row')).toHaveLength(8);
+  expect(drill.querySelector('.market-sources__schema-pills')).toBeNull();
+  expect(drill.querySelector('[data-testid="drill-top-makes"]')).toBeNull();
+  expect(drill.querySelector('[data-testid="drill-facet-breakdown"]')).toBeNull();
+  expect(drill.querySelector('.market-sources__event-link')).toBeNull();
+});
 
-  // Click one of the 24 hourly bars to inspect a specific hour
-  const hourButtons = drill.querySelectorAll('.market-sources__hour-col');
-  await act(async () => { (hourButtons[20] as HTMLButtonElement).click(); });
-  expect(fixture.rpc).toHaveBeenCalledWith('market_source_landing_read', {
-    p_source: 'bat',
-    p_hour: '2026-10-16T07:00:00.000Z',
+it('sorts the stream by any column header, and again to reverse', async () => {
+  fixture.rpc.mockImplementation((fn: string) => {
+    if (fn === 'market_sources_read') return Promise.resolve({ data: value, error: null });
+    if (fn === 'market_source_landing_read') return Promise.resolve({ data: batLandingDetail, error: null });
+    return Promise.resolve({ data: null, error: { message: 'none' } });
   });
+  await act(async () => root.render(<SourcesBoard />));
+  await act(async () => { (container.querySelector('button.market-sources__landing') as HTMLButtonElement).click(); });
+  const drill = container.querySelector('.market-sources__drill')!;
+  const years = () => [...drill.querySelectorAll('li.market-sources__event .market-sources__event-year')].map((n) => n.textContent);
+  const head = drill.querySelector('[data-testid="drill-col-year"]') as HTMLButtonElement;
+  await act(async () => { head.click(); });
+  expect(head.getAttribute('aria-sort')).toBe('descending');
+  const desc = years();
+  await act(async () => { head.click(); });
+  expect(head.getAttribute('aria-sort')).toBe('ascending');
+  expect(years()).toEqual([...desc].reverse());
+});
+
+it('counts down a live lot to the second and sorts soonest-ending first, ended lots after, undated last', () => {
+  const now = Date.parse('2026-10-20T17:00:00Z');
+  expect(formatCountdown(now + (6 * 86400 + 4 * 3600 + 12 * 60 + 9) * 1000, now).text).toBe('6d 04:12:09');
+  expect(formatCountdown(now + (3 * 3600 + 12 * 60 + 9) * 1000, now).text).toBe('3:12:09');
+  const soon = formatCountdown(now + 125_000, now);
+  expect(soon).toEqual({ text: '2:05', live: true, soon: true });
+  expect(formatCountdown(now - 3 * 86400_000, now).text).toBe('ended 3d');
+  const mk = (id: string, recordDate: string | null) => ({ id, recordDate } as LandingRecentEvent);
+  const sorted = sortDrillColumn(
+    [mk('none', null), mk('ended', '2026-10-18T00:00:00Z'), mk('later', '2026-10-27T17:00:00Z'), mk('soon', '2026-10-20T18:00:00Z')],
+    { key: 'ends', dir: 'asc' },
+    now,
+  );
+  expect(sorted.map((e) => e.id)).toEqual(['soon', 'later', 'ended', 'none']);
+});
+
+it('reads the heartbeat reader as one series per kind and refuses a malformed one', () => {
+  const kinds = { bid: Array(24).fill(1), comment: Array(24).fill(2), listing: Array(24).fill(0), backfill: Array(24).fill(3) };
+  const mins = { bid: Array(12).fill(1), comment: Array(12).fill(0), listing: Array(12).fill(0), backfill: Array(12).fill(0) };
+  const pulse = parsePulse({ hours24: kinds, mins60: mins, last: { bid: '2026-10-20T17:00:00Z' } });
+  expect(pulse?.hours24.comment).toHaveLength(24);
+  expect(pulse?.last.bid).toBe('2026-10-20T17:00:00Z');
+  expect(pulse?.last.listing).toBeNull();
+  expect(parsePulse(null)).toBeNull();
 });
 
 it('shows nothing when the reader fails or holds no rows', async () => {
@@ -588,413 +631,6 @@ it('renders high-confidence Regime 1/2 census rows for all 7 audited sources and
   expect(drill.querySelector('a[href="/browse?source=rm_sothebys"]')).not.toBeNull();
 });
 
-it('renders SERIES, TRIM, and BODY facet pills linked to /?make=...&family=...&axis=...&facet=... plus matched era SVG identity marks in IngestionDrillPanel', async () => {
-  const facetLandingDetail = {
-    ...batLandingDetail,
-    recent: [
-      {
-        id: 'ev-c10-silverado',
-        source: 'bat',
-        event_type: 'auction',
-        event_status: 'active',
-        reserve: 'no_reserve',
-        price: 38500,
-        bid_count: 11,
-        year: 1979,
-        make: 'Chevrolet',
-        model: 'C10 Silverado Fleetside Pickup',
-        trim: 'Silverado',
-        vin: 'CCZ149F123456',
-        mileage: 44100,
-        record_date: '2026-10-20T18:00:00Z',
-        title: '1979 Chevrolet C10 Silverado Fleetside Pickup',
-        raw_title: '1979 Chevrolet C10 Silverado Fleetside Pickup',
-        lot: 'bat-c10-79',
-        vehicle_id: 'veh-c10-79',
-        source_url: 'https://bringatrailer.com/listing/1979-chevrolet-c10-silverado',
-        created_at: '2026-10-16T10:46:12Z',
-      },
-      {
-        id: 'ev-mustang-boss',
-        source: 'bat',
-        event_type: 'auction',
-        event_status: 'sold',
-        reserve: 'reserve',
-        price: 215000,
-        bid_count: 34,
-        year: 1969,
-        make: 'Ford',
-        model: 'Mustang Boss 429 Fastback',
-        trim: 'Boss 429',
-        vin: '9F02Z123456',
-        mileage: 19200,
-        record_date: '2026-10-15T20:00:00Z',
-        title: '1969 Ford Mustang Boss 429 Fastback',
-        raw_title: '1969 Ford Mustang Boss 429 Fastback',
-        lot: 'bat-boss-69',
-        vehicle_id: 'veh-boss-69',
-        source_url: 'https://bringatrailer.com/listing/1969-ford-mustang-boss-429',
-        created_at: '2026-10-16T10:45:00Z',
-      },
-    ],
-  };
-
-  fixture.rpc.mockImplementation((fn: string) => {
-    if (fn === 'market_sources_read') return Promise.resolve({ data: value, error: null });
-    if (fn === 'market_source_landing_read') return Promise.resolve({ data: facetLandingDetail, error: null });
-    return Promise.resolve({ data: null, error: { message: 'none' } });
-  });
-
-  await act(async () => root.render(<SourcesBoard />));
-  const firstRow = container.querySelector('li.market-sources__row') as HTMLLIElement;
-  await act(async () => { firstRow.click(); });
-
-  const drill = container.querySelector('.market-sources__drill')!;
-  expect(drill).not.toBeNull();
-  const eventRows = [...drill.querySelectorAll('li.market-sources__event')];
-  expect(eventRows).toHaveLength(2);
-
-  // First event: 1979 Chevrolet C10 Silverado Fleetside Pickup
-  const c10Row = eventRows[0];
-  const c10Mark = c10Row.querySelector('.market-sources__event-mark');
-  expect(c10Mark).not.toBeNull();
-  expect(c10Mark?.querySelector('svg')).not.toBeNull();
-
-  const c10Pills = [...c10Row.querySelectorAll('a.market-sources__facet-pill')] as HTMLAnchorElement[];
-  expect(c10Pills.map((p) => p.textContent?.trim())).toEqual([
-    'SERIES C10 (1/2-Ton 2WD)',
-    'TRIM Silverado',
-    'BODY Fleetside / Styleside',
-  ]);
-  expect(c10Pills.map((p) => p.getAttribute('href'))).toEqual([
-    '/?make=Chevrolet&family=Pickup&axis=series&facet=C10+%281%2F2-Ton+2WD%29',
-    '/?make=Chevrolet&family=Pickup&axis=trim&facet=Silverado',
-    '/?make=Chevrolet&family=Pickup&axis=body&facet=Fleetside+%2F+Styleside',
-  ]);
-
-  // Second event: 1969 Ford Mustang Boss 429 Fastback
-  const mustangRow = eventRows[1];
-  const mustangMark = mustangRow.querySelector('.market-sources__event-mark');
-  expect(mustangMark).not.toBeNull();
-  expect(mustangMark?.querySelector('svg')).not.toBeNull();
-
-  const mustangPills = [...mustangRow.querySelectorAll('a.market-sources__facet-pill')] as HTMLAnchorElement[];
-  expect(mustangPills.map((p) => p.textContent?.trim())).toEqual([
-    'SERIES Boss 429',
-    'BODY Fastback',
-  ]);
-  expect(mustangPills.map((p) => p.getAttribute('href'))).toEqual([
-    '/?make=Ford&family=Mustang&axis=series&facet=Boss+429',
-    '/?make=Ford&family=Mustang&axis=body&facet=Fastback',
-  ]);
-});
-
-it('filters Recent Vehicles Stream by Top Makes, Top Models (with CLEAR chip and ↗ treemap links), and FACET BREAKDOWN pills', async () => {
-  const drillFilterDetail = {
-    ...batLandingDetail,
-    recent_vehicles: [
-      {
-        id: 'ev-991-gt3',
-        source: 'bat',
-        event_type: 'auction',
-        event_status: 'sold',
-        price: 168000,
-        year: 2018,
-        make: 'Porsche',
-        model: '911 GT3',
-        series: '991',
-        trim: 'GT3',
-        body_style: 'Coupe',
-        vin: 'WP0AC2A98JS175001',
-        mileage: 11200,
-        record_date: '2026-10-16T18:00:00Z',
-        title: '2018 Porsche 911 (991) GT3 Coupe',
-        raw_title: '2018 Porsche 911 (991) GT3 Coupe',
-        created_at: '2026-10-16T10:46:12Z',
-      },
-      {
-        id: 'ev-991-carrera',
-        source: 'bat',
-        event_type: 'auction',
-        event_status: 'active',
-        price: 94000,
-        year: 2016,
-        make: 'Porsche',
-        model: '911 Carrera',
-        series: '991',
-        trim: 'Carrera S',
-        body_style: 'Coupe',
-        vin: 'WP0AB2A96GS122002',
-        mileage: 24500,
-        record_date: '2026-10-18T19:00:00Z',
-        title: '2016 Porsche 911 (991) Carrera S Coupe',
-        raw_title: '2016 Porsche 911 (991) Carrera S Coupe',
-        created_at: '2026-10-16T10:45:00Z',
-      },
-      {
-        id: 'ev-vette-z06',
-        source: 'bat',
-        event_type: 'auction',
-        event_status: 'sold',
-        price: 82500,
-        year: 2017,
-        make: 'Chevrolet',
-        model: 'Corvette Z06',
-        series: 'C7',
-        trim: 'Z06',
-        body_style: 'Coupe',
-        vin: '1G1YU2D68H5600003',
-        mileage: 8900,
-        record_date: '2026-10-15T20:00:00Z',
-        title: '2017 Chevrolet Corvette Z06 Coupe',
-        raw_title: '2017 Chevrolet Corvette Z06 Coupe',
-        created_at: '2026-10-16T10:44:00Z',
-      },
-      {
-        id: 'ev-c10-stepside',
-        source: 'bat',
-        event_type: 'auction',
-        event_status: 'sold',
-        price: 46000,
-        year: 1978,
-        make: 'Chevrolet',
-        model: 'C10 Silverado Stepside',
-        trim: 'Silverado',
-        vin: 'CCL148F300004',
-        mileage: 52000,
-        record_date: '2026-10-14T20:00:00Z',
-        title: '1978 Chevrolet C10 Silverado Stepside Pickup',
-        raw_title: '1978 Chevrolet C10 Silverado Stepside Pickup',
-        created_at: '2026-10-16T10:43:00Z',
-      },
-    ],
-  };
-
-  fixture.rpc.mockImplementation((fn: string) => {
-    if (fn === 'market_sources_read') return Promise.resolve({ data: value, error: null });
-    if (fn === 'market_source_landing_read') return Promise.resolve({ data: drillFilterDetail, error: null });
-    return Promise.resolve({ data: null, error: { message: 'none' } });
-  });
-
-  await act(async () => root.render(<SourcesBoard />));
-  const firstRow = container.querySelector('li.market-sources__row') as HTMLLIElement;
-  await act(async () => { firstRow.click(); });
-
-  const drill = container.querySelector('.market-sources__drill')!;
-  expect(drill).not.toBeNull();
-  expect(drill.querySelectorAll('li.market-sources__event')).toHaveLength(4);
-
-  // Verify Top Makes and Top Models secondary ↗ links point to /?make=<Make> and /?make=<Make>&model=<Model>
-  const porscheJump = drill.querySelector('[data-testid="drill-make-jump-Porsche"]') as HTMLAnchorElement;
-  expect(porscheJump).not.toBeNull();
-  expect(porscheJump.getAttribute('href')).toBe('/?make=Porsche');
-
-  const gt3Jump = drill.querySelector('[data-testid="drill-model-jump-911 GT3"]') as HTMLAnchorElement;
-  expect(gt3Jump).not.toBeNull();
-  expect(gt3Jump.getAttribute('href')).toBe('/?make=Porsche&model=911%20GT3');
-
-  // Clicking a Top Make pill filters the Recent Vehicles Stream to Porsche (2 rows) and shows CLEAR chip
-  const porschePill = drill.querySelector('[data-testid="drill-make-pill-Porsche"]') as HTMLButtonElement;
-  await act(async () => { porschePill.click(); });
-  expect(porschePill.getAttribute('aria-pressed')).toBe('true');
-  expect(drill.querySelectorAll('li.market-sources__event')).toHaveLength(2);
-  expect(drill.querySelector('[data-testid="drill-filter-clear"]')).not.toBeNull();
-
-  // Clicking a Top Model pill further narrows to 911 GT3 (1 row)
-  const gt3ModelPill = drill.querySelector('[data-testid="drill-model-pill-911 GT3"]') as HTMLButtonElement;
-  await act(async () => { gt3ModelPill.click(); });
-  expect(gt3ModelPill.getAttribute('aria-pressed')).toBe('true');
-  expect(drill.querySelectorAll('li.market-sources__event')).toHaveLength(1);
-  expect(drill.querySelector('li.market-sources__event')?.textContent).toContain('911 GT3');
-
-  // Clicking CLEAR chip resets Make & Model filters back to all 4 vehicles
-  const clearBtn = drill.querySelector('[data-testid="drill-filter-clear"]') as HTMLButtonElement;
-  await act(async () => { clearBtn.click(); });
-  expect(drill.querySelectorAll('li.market-sources__event')).toHaveLength(4);
-
-  // Verify FACET BREAKDOWN bar renders live Series, Trim, and Body Style tags with counts
-  const facetBar = drill.querySelector('[data-testid="drill-facet-breakdown"]')!;
-  expect(facetBar).not.toBeNull();
-  expect(facetBar.textContent).toContain('FACET BREAKDOWN');
-  expect(facetBar.textContent).toContain('SER 991 (2)');
-  expect(facetBar.textContent).toContain('TRM Z06 (1)');
-  expect(facetBar.textContent).toContain('BDY Coupe (3)');
-
-  // Clicking SER 991 (2) filters stream to the 2 Porsche 991 rows
-  const ser991Pill = drill.querySelector('[data-testid="drill-facet-pill-SER-991"]') as HTMLButtonElement;
-  expect(ser991Pill).not.toBeNull();
-  await act(async () => { ser991Pill.click(); });
-  expect(ser991Pill.getAttribute('aria-pressed')).toBe('true');
-  expect(drill.querySelectorAll('li.market-sources__event')).toHaveLength(2);
-
-  // Clicking TRM Z06 (1) switches facet filter to the 1 Corvette Z06 row
-  const trmZ06Pill = drill.querySelector('[data-testid="drill-facet-pill-TRM-Z06"]') as HTMLButtonElement;
-  expect(trmZ06Pill).not.toBeNull();
-  await act(async () => { trmZ06Pill.click(); });
-  expect(trmZ06Pill.getAttribute('aria-pressed')).toBe('true');
-  expect(drill.querySelectorAll('li.market-sources__event')).toHaveLength(1);
-  expect(drill.querySelector('li.market-sources__event')?.textContent).toContain('Corvette Z06');
-
-  // Clicking BDY Coupe (3) switches facet filter to the 3 Coupe rows
-  const bdyCoupePill = drill.querySelector('[data-testid="drill-facet-pill-BDY-Coupe"]') as HTMLButtonElement;
-  expect(bdyCoupePill).not.toBeNull();
-  await act(async () => { bdyCoupePill.click(); });
-  expect(drill.querySelectorAll('li.market-sources__event')).toHaveLength(3);
-});
-
-it('sorts filtered recent_vehicles in-memory (LATEST / HIGHEST PRICE / YEAR) without extra RPC calls and updates the Cohort Summary KPI bar', async () => {
-  const sortAndCohortDetail = {
-    ...batLandingDetail,
-    recent_vehicles: [
-      {
-        id: 'ev-vette-z06',
-        source: 'bat',
-        event_type: 'auction',
-        event_status: 'sold',
-        price: 82500,
-        year: 2017,
-        make: 'Chevrolet',
-        model: 'Corvette Z06',
-        series: 'C7',
-        trim: 'Z06',
-        body_style: 'Coupe',
-        vin: '1G1YU2D68H5600003',
-        mileage: 8900,
-        record_date: '2026-10-15T20:00:00Z',
-        title: '2017 Chevrolet Corvette Z06 Coupe',
-        raw_title: '2017 Chevrolet Corvette Z06 Coupe',
-        created_at: '2026-10-16T10:48:00Z',
-      },
-      {
-        id: 'ev-991-gt3',
-        source: 'bat',
-        event_type: 'auction',
-        event_status: 'sold',
-        price: 168000,
-        year: 2018,
-        make: 'Porsche',
-        model: '911 GT3',
-        series: '991',
-        trim: 'GT3',
-        body_style: 'Coupe',
-        vin: 'WP0AC2A98JS175001',
-        mileage: 11200,
-        record_date: '2026-10-16T18:00:00Z',
-        title: '2018 Porsche 911 (991) GT3 Coupe',
-        raw_title: '2018 Porsche 911 (991) GT3 Coupe',
-        created_at: '2026-10-16T10:46:12Z',
-      },
-      {
-        id: 'ev-992-carrera',
-        source: 'bat',
-        event_type: 'auction',
-        event_status: 'active',
-        price: 195000,
-        year: 2022,
-        make: 'Porsche',
-        model: '911 Carrera GTS',
-        series: '992',
-        trim: 'Carrera GTS',
-        body_style: 'Coupe',
-        vin: 'WP0AB2A96NS220002',
-        mileage: 4500,
-        record_date: '2026-10-18T19:00:00Z',
-        title: '2022 Porsche 911 (992) Carrera GTS Coupe',
-        raw_title: '2022 Porsche 911 (992) Carrera GTS Coupe',
-        created_at: '2026-10-16T10:45:00Z',
-      },
-      {
-        id: 'ev-c10-stepside',
-        source: 'bat',
-        event_type: 'auction',
-        event_status: 'sold',
-        price: 46000,
-        year: 1978,
-        make: 'Chevrolet',
-        model: 'C10 Silverado Stepside',
-        trim: 'Silverado',
-        vin: 'CCL148F300004',
-        mileage: 52000,
-        record_date: '2026-10-14T20:00:00Z',
-        title: '1978 Chevrolet C10 Silverado Stepside Pickup',
-        raw_title: '1978 Chevrolet C10 Silverado Stepside Pickup',
-        created_at: '2026-10-16T10:43:00Z',
-      },
-    ],
-  };
-
-  fixture.rpc.mockImplementation((fn: string) => {
-    if (fn === 'market_sources_read') return Promise.resolve({ data: value, error: null });
-    if (fn === 'market_source_landing_read') return Promise.resolve({ data: sortAndCohortDetail, error: null });
-    return Promise.resolve({ data: null, error: { message: 'none' } });
-  });
-
-  await act(async () => root.render(<SourcesBoard />));
-  const firstRow = container.querySelector('li.market-sources__row') as HTMLLIElement;
-  await act(async () => { firstRow.click(); });
-
-  const drill = container.querySelector('.market-sources__drill')!;
-  expect(drill).not.toBeNull();
-  const rpcCallsBefore = fixture.rpc.mock.calls.filter((c) => c[0] === 'market_source_landing_read').length;
-  expect(rpcCallsBefore).toBe(1);
-
-  // Verify initial Cohort Summary KPI bar for all 4 vehicles:
-  // 4 total, 3 sold (75%), sold prices = [46000, 82500, 168000] -> median $82,500
-  const cohortBar = drill.querySelector('[data-testid="drill-cohort-summary-bar"]')!;
-  expect(cohortBar).not.toBeNull();
-  expect(drill.querySelector('[data-testid="drill-cohort-filtered-count"]')?.textContent).toContain('4');
-  expect(drill.querySelector('[data-testid="drill-cohort-sold-sellthrough"]')?.textContent).toContain('3 sold · 75%');
-  expect(drill.querySelector('[data-testid="drill-cohort-median-sold-price"]')?.textContent).toContain('$82,500');
-
-  const getRowPrices = () =>
-    [...drill.querySelectorAll('li.market-sources__event .market-sources__event-price')].map((el) =>
-      el.textContent?.trim(),
-    );
-
-  // Default sort is LATEST (created_at DESC)
-  expect(getRowPrices()).toEqual(['$82,500', '$168,000', '$195,000', '$46,000']);
-
-  // Sort by HIGHEST PRICE in-memory
-  const sortPriceBtn = drill.querySelector('[data-testid="drill-sort-price"]') as HTMLButtonElement;
-  await act(async () => { sortPriceBtn.click(); });
-  expect(sortPriceBtn.getAttribute('aria-pressed')).toBe('true');
-  expect(getRowPrices()).toEqual(['$195,000', '$168,000', '$82,500', '$46,000']);
-
-  // Sort by YEAR in-memory: 2022 -> 2018 -> 2017 -> 1978
-  const sortYearBtn = drill.querySelector('[data-testid="drill-sort-year"]') as HTMLButtonElement;
-  await act(async () => { sortYearBtn.click(); });
-  expect(sortYearBtn.getAttribute('aria-pressed')).toBe('true');
-  expect(
-    [...drill.querySelectorAll('li.market-sources__event .market-sources__event-year')].map((el) => el.textContent?.trim()),
-  ).toEqual(['2022', '2018', '2017', '1978']);
-
-  // Switch back to LATEST
-  const sortLatestBtn = drill.querySelector('[data-testid="drill-sort-latest"]') as HTMLButtonElement;
-  await act(async () => { sortLatestBtn.click(); });
-  expect(sortLatestBtn.getAttribute('aria-pressed')).toBe('true');
-  expect(getRowPrices()).toEqual(['$82,500', '$168,000', '$195,000', '$46,000']);
-
-  // Ensure zero extra RPC round-trips occurred during sorting
-  const rpcCallsAfterSort = fixture.rpc.mock.calls.filter((c) => c[0] === 'market_source_landing_read').length;
-  expect(rpcCallsAfterSort).toBe(rpcCallsBefore);
-
-  // Filter by Chevrolet (2 vehicles: both sold at $82,500 and $46,000 -> 2 of 4, 2 sold · 100%, median $64,250)
-  const chevyPill = drill.querySelector('[data-testid="drill-make-pill-Chevrolet"]') as HTMLButtonElement;
-  await act(async () => { chevyPill.click(); });
-  expect(drill.querySelector('[data-testid="drill-cohort-filtered-count"]')?.textContent).toContain('2 of 4');
-  expect(drill.querySelector('[data-testid="drill-cohort-sold-sellthrough"]')?.textContent).toContain('2 sold · 100%');
-  expect(drill.querySelector('[data-testid="drill-cohort-median-sold-price"]')?.textContent).toContain('$64,250');
-
-  // Filter by Porsche (2 vehicles: 1 sold at $168,000, 1 active at $195,000 -> 2 of 4, 1 sold · 50%, median $168,000)
-  const porschePill = drill.querySelector('[data-testid="drill-make-pill-Porsche"]') as HTMLButtonElement;
-  await act(async () => { porschePill.click(); });
-  expect(drill.querySelector('[data-testid="drill-cohort-filtered-count"]')?.textContent).toContain('2 of 4');
-  expect(drill.querySelector('[data-testid="drill-cohort-sold-sellthrough"]')?.textContent).toContain('1 sold · 50%');
-  expect(drill.querySelector('[data-testid="drill-cohort-median-sold-price"]')?.textContent).toContain('$168,000');
-});
-
-// Live 2026-10-20 05:23Z, eBay Motors: "Listings held 3,575" beside "+17,583 in 24 hours", a 1973 BMW "ACTIVE" with "no date" that
-// was a 2012 Internet Archive capture, and "4 sold · 10%" from the 40 rows shown over a window of 3,634 sold and 11,931 ended.
 it('counts the window, not the rows shown: held plus what landed since, archived captures marked and dated, the viewer\'s clock', async () => {
   const archivedDetail = {
     as_of: '2026-10-20T05:33:46Z', source: 'bat', hour: '2026-10-20T05:00:00Z', selected_hour: null,
@@ -1025,31 +661,19 @@ it('counts the window, not the rows shown: held plus what landed since, archived
   expect(heldKpi.textContent).toContain('19,351');
   expect(heldKpi.textContent).toContain('3,575 measured Oct 19, 03:27 PDT + 15,776 landed since');
 
-  expect(drill.querySelector('[data-testid="drill-cohort-filtered-count"]')?.textContent).toContain('18,090');
-  expect(drill.querySelector('[data-testid="drill-cohort-filtered-count"]')?.textContent).toContain('every record landed, 2 shown below');
-  expect(drill.querySelector('[data-testid="drill-cohort-sold-sellthrough"]')?.textContent).toContain('3,634 sold · 23%');
-  expect(drill.querySelector('[data-testid="drill-cohort-sold-sellthrough"]')?.textContent).toContain('of 15,565 concluded · 2,525 still open when landed');
-  expect(drill.querySelector('[data-testid="drill-cohort-median-sold-price"]')?.textContent).toContain('$9,216');
-  expect(drill.querySelector('[data-testid="drill-cohort-median-sold-price"]')?.textContent).toContain('3,634 priced sales');
+  // sell-through is the reader's count of the whole window, not of the rows shown
+  const sell = drill.querySelector('[data-testid="drill-sellthrough"]')?.textContent ?? '';
+  expect(sell).toContain('23%');
+  expect(sell).toContain('3,634 sold of 15,565 concluded');
+  expect(drill.querySelector('[data-testid="drill-cohort-median-sold-price"]')).toBeNull();
 
-  const [sold, seen] = [...drill.querySelectorAll('li.market-sources__event')]; // newest landing first
+  const rows = [...drill.querySelectorAll('li.market-sources__event')];
+  const sold = rows.find((r) => r.querySelector('.market-sources__event-status')?.textContent?.includes('sold'))!;
+  const seen = rows.find((r) => !r.querySelector('.market-sources__event-status')?.textContent?.includes('sold'))!;
   expect(seen.querySelector('.market-sources__event-status')?.textContent).toContain('seen live');
   expect(seen.querySelector('.market-sources__event-status')?.textContent).not.toContain('active');
   expect(seen.querySelector('.market-sources__event-status')?.getAttribute('title')).toContain('captured this page on 2012-01-19');
-  expect(seen.querySelector('.market-sources__event-recdate')?.textContent).toContain('Jan 19, 2012');
-  expect(seen.querySelector('.market-sources__event-recdate')?.getAttribute('title')).toContain('Captured by the Internet Archive');
   expect(sold.querySelector('.market-sources__event-status')?.textContent).toContain('sold');
-
-  // times are the viewer's, with the zone named: 05:23:50Z is 22:23:50 the evening before in Pacific time
-  expect(drill.textContent).toContain('Oct 19, 22:23:50 PDT');
-  expect(drill.textContent).not.toContain('UTC');
-  expect(drill.querySelector('.market-sources__hour-col.is-now')?.getAttribute('title')).toBe('22:00 PDT: +426 landed');
-
-  // a make filter can only narrow the rows shown, so the tiles fall back to them and say so
-  await act(async () => { (drill.querySelector('[data-testid="drill-make-pill-BMW"]') as HTMLButtonElement).click(); });
-  expect(drill.querySelector('[data-testid="drill-cohort-filtered-count"]')?.textContent).toContain('1 of 2');
-  expect(drill.querySelector('[data-testid="drill-cohort-filtered-count"]')?.textContent).toContain('of the 2 shown');
-  expect(drill.querySelector('[data-testid="drill-cohort-sold-sellthrough"]')?.textContent).toContain('0 sold');
 });
 
 it('prints a labelled reference as an estimate, apart from a census, and grades an earlier reference against it', async () => {
