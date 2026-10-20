@@ -826,4 +826,14 @@ describe('every live house on one board', () => {
     const text = container.querySelector('.market-figure')!.textContent!;
     expect(text).toContain('PCarMarket: no week of history yet (recorded since Oct 2)');
   });
+  it('keeps the price axis readable: neighbouring ticks differ even when the range is a sliver of the total', async () => {
+    const t0 = Date.parse('2026-10-03T08:00:00Z');
+    fixture.share = { isError: false, data: { firstAt: t0, firstAtByHouse: { bringatrailer: t0 }, weekAgo: {},
+      points: [45_480_000, 45_520_000, 45_560_000, 45_600_000].map((v, i) => ({ at: t0 + i * 900_000, house: 'bringatrailer', bidUsd: v, lots: 2, lotsWithBid: 2 })) } };
+    await render('map=bids');
+    const ticks = [...container.querySelectorAll('.market-stock__tick')].map(e => e.textContent).filter(x => /\$/.test(x ?? ''));
+    expect(ticks.length).toBe(4);
+    expect(new Set(ticks).size).toBe(4);
+    expect(container.querySelector('.market-stock__tag')?.textContent).toBe('$45.60M');
+  });
 });

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useLayoutEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import { Text } from '../../kit';
@@ -116,12 +116,30 @@ function valueText(n: number, measure: ShareMeasure, places = 2): string {
 }
 function signedPct(p: number): string { return `${p >= 0 ? '+' : ''}${p.toFixed(2)}%`; }
 
-const W = 760, H = 250, PAD_R = 64, PAD_B = 22, PAD_T = 10;
+const H = 260, PAD_R = 70, PAD_B = 22, PAD_T = 10;
+
+/** Decimals for an axis in millions or thousands so neighbouring ticks never read the same. */
+function axisPlaces(step: number, top: number, measure: ShareMeasure): number {
+  if (measure !== 'bids' || !(step > 0)) return 0;
+  const unit = top >= 1_000_000 ? 1_000_000 : 1_000;
+  return Math.min(3, Math.max(1, Math.ceil(-Math.log10(step / unit)) + 0));
+}
 
 /** A price chart of one series: a line and soft area in green when the range is up and red when down, a dashed last-price
  *  line with its tag on the right axis, a price grid and a time axis, and a crosshair that reads the value under the pointer. */
 export function PriceChart({ series, measure, up }: { series: { t: number; v: number }[]; measure: ShareMeasure; up: boolean }) {
   const [hover, setHover] = useState<number | null>(null);
+  // Drawn at its real pixel width so the labels keep their size on any screen.
+  const ref = useRef<SVGSVGElement>(null);
+  const [width, setWidth] = useState(760);
+  useLayoutEffect(() => {
+    const node = ref.current;
+    if (!node || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(entries => { const w = Math.round(entries[0]?.contentRect.width ?? 0); if (w > 0) setWidth(w); });
+    ro.observe(node);
+    return () => ro.disconnect();
+  }, []);
+  const W = Math.max(320, width);
   const lo0 = Math.min(...series.map(x => x.v)), hi0 = Math.max(...series.map(x => x.v));
   const pad = (hi0 - lo0) * 0.12 || hi0 * 0.02 || 1;
   const lo = lo0 - pad, hi = hi0 + pad;
@@ -132,6 +150,7 @@ export function PriceChart({ series, measure, up }: { series: { t: number; v: nu
   const last = series[series.length - 1];
   const color = up ? 'var(--success)' : 'var(--error)';
   const ticks = [0, 1, 2, 3].map(i => lo + ((hi - lo) * (i + 0.5)) / 4);
+  const places = axisPlaces((hi - lo) / 4, hi, measure);
   const h = hover != null ? series[hover] : null;
   const onMove = (e: React.PointerEvent<SVGSVGElement>) => {
     const box = e.currentTarget.getBoundingClientRect();
@@ -141,15 +160,15 @@ export function PriceChart({ series, measure, up }: { series: { t: number; v: nu
     setHover(best);
   };
   return (
-    <svg className="market-stock__chart" viewBox={`0 0 ${W} ${H}`} role="img" onPointerMove={onMove} onPointerLeave={() => setHover(null)}
+    <svg ref={ref} className="market-stock__chart" viewBox={`0 0 ${W} ${H}`} width="100%" height={H} role="img" onPointerMove={onMove} onPointerLeave={() => setHover(null)}
       aria-label={`${valueText(last.v, measure)} at ${stamp(last.t)}, ${stamp(t0)} to ${stamp(t1)}`}>
       {ticks.map((v, i) => <g key={i}><line className="market-stock__grid" x1="0" x2={W - PAD_R} y1={py(v)} y2={py(v)} />
-        <text className="market-stock__tick" x={W - PAD_R + 6} y={py(v) + 3}>{valueText(v, measure, 1)}</text></g>)}
+        <text className="market-stock__tick" x={W - PAD_R + 6} y={py(v) + 3}>{valueText(v, measure, places)}</text></g>)}
       <polygon className="market-stock__area" style={{ fill: color }} points={`0,${H - PAD_B} ${pts.join(' ')} ${px(t1).toFixed(1)},${H - PAD_B}`} />
       <polyline className="market-stock__line" style={{ stroke: color }} points={pts.join(' ')} />
       <line className="market-stock__last" style={{ stroke: color }} x1="0" x2={W - PAD_R} y1={py(last.v)} y2={py(last.v)} />
       <rect x={W - PAD_R + 2} y={py(last.v) - 9} width={PAD_R - 2} height="18" style={{ fill: color }} />
-      <text className="market-stock__tag" x={W - PAD_R + 6} y={py(last.v) + 4}>{valueText(last.v, measure, 1)}</text>
+      <text className="market-stock__tag" x={W - PAD_R + 6} y={py(last.v) + 4}>{valueText(last.v, measure, Math.max(2, places))}</text>
       <text className="market-stock__tick" x="0" y={H - 6}>{series.length > 1 && t1 - t0 < 86_400_000 * 1.5 ? clock(t0) : stamp(t0)}</text>
       <text className="market-stock__tick" x={W - PAD_R} y={H - 6} textAnchor="end">{series.length > 1 && t1 - t0 < 86_400_000 * 1.5 ? clock(t1) : stamp(t1)}</text>
       {h && <g>
