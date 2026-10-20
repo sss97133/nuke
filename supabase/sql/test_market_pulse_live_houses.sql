@@ -61,7 +61,8 @@ VALUES
    NULL, 'https://collectingcars.com/for-sale/g', NULL, 'auction_live', 'collecting-cars', true, now());
 
 \ir ../migrations/20261022010000_market_pulse_live_houses.sql
-\ir ../migrations/20261022010000_market_pulse_live_houses.sql
+\ir ../migrations/20261022020000_live_board_houses.sql
+\ir ../migrations/20261022020000_live_board_houses.sql
 
 CREATE TEMP TABLE board AS SELECT public.market_pulse_live_houses() AS j;
 
@@ -90,6 +91,18 @@ SELECT pg_temp.ok('Bonhams, BaT, ended, private and deleted lots are not read',
 UPDATE public.vehicles SET updated_at = now() WHERE id = 'cccccccc-0000-0000-0000-000000000003';
 SELECT pg_temp.ok('a house whose reader writes again returns to the board',
   jsonb_array_length(public.market_pulse_live_houses()->'auctions') = 3);
+
+-- A house is a row: enabling Bonhams brings its lot in with its label; an unlisted house is never read.
+SELECT pg_temp.ok('houses carry the label of their row', public.market_pulse_live_houses()->'houses' @> '[{"house": "collecting-cars", "label": "Collecting Cars"}]'::jsonb);
+UPDATE public.live_board_houses SET enabled = true WHERE house = 'bonhams';
+SELECT pg_temp.ok('enabling a house reads its lots (Bonhams, matched by link host)',
+  jsonb_array_length(public.market_pulse_live_houses()->'auctions') = 4
+  AND public.market_pulse_live_houses()->'houses' @> '[{"house": "bonhams", "label": "Bonhams", "lots": 1}]'::jsonb);
+INSERT INTO public.vehicles (id, year, make, model, high_bid, auction_end_date, updated_at, created_at, listing_url, sale_status, platform_source)
+VALUES ('cccccccc-0000-0000-0000-000000000009', 1970, 'X', 'Y', 5, now() + interval '1 day', now(), now(), 'https://unlisted.example/lot/1', 'auction_live', 'unlisted-house');
+SELECT pg_temp.ok('a house with no row is not read', jsonb_array_length(public.market_pulse_live_houses()->'auctions') = 4);
+UPDATE public.live_board_houses SET enabled = false WHERE house = 'bonhams';
+UPDATE public.vehicles SET updated_at = now() WHERE id = 'cccccccc-0000-0000-0000-000000000003';
 
 SET ROLE anon;
 SELECT jsonb_array_length(public.market_pulse_live_houses()->'auctions') AS anon_lots \gset

@@ -85,8 +85,10 @@ export const HOUSE_NAMES: Record<string, string> = {
 export const HOUSE_SHORT: Record<string, string> = {
   bringatrailer: 'BaT', 'collecting-cars': 'Collecting Cars', pcarmarket: 'PCarMarket', 'cars-and-bids': 'Cars & Bids',
 };
+// Labels the houses read sent with the payload (live_board_houses.label): a house added there needs no edit here.
+const SENT_LABELS = new Map<string, string>();
 export function houseName(house: string, short = false): string {
-  return (short ? HOUSE_SHORT : HOUSE_NAMES)[house] ?? house;
+  return (short ? HOUSE_SHORT : HOUSE_NAMES)[house] ?? SENT_LABELS.get(house) ?? house;
 }
 
 /** The bid in US dollars, or null when the lot is not bid in dollars or has no bid. No rate table exists, so a
@@ -257,9 +259,10 @@ export async function fetchHouses(): Promise<{ auctions: LiveAuction[]; houses: 
       house: r[12], currency: String(r[13] || 'USD').toUpperCase(), band: null, serverHeat: null,
     })),
     houses: Array.isArray(data?.houses)
-      ? (data.houses as { house: string; lots: number; read_at: string | null; on_board: boolean }[]).map((h) => ({
-          house: h.house, lots: Number(h.lots), readAt: h.read_at ? Date.parse(h.read_at) : null, onBoard: h.on_board === true,
-        }))
+      ? (data.houses as { house: string; label?: string | null; lots: number; read_at: string | null; on_board: boolean }[]).map((h) => {
+          if (h.label) SENT_LABELS.set(h.house, h.label);
+          return { house: h.house, lots: Number(h.lots), readAt: h.read_at ? Date.parse(h.read_at) : null, onBoard: h.on_board === true };
+        })
       : [],
   };
 }
