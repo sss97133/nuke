@@ -216,6 +216,9 @@
 .market-chip[aria-pressed="true"] { background: var(--text); color: var(--bg); border-color: var(--text); }
 .market-chip[aria-pressed="true"] .k-label, .market-chip[aria-pressed="true"] .k-measure { color: inherit; }
 .market-no-reserve { display: inline-block; align-self: flex-start; margin-top: 6px; padding: 2px 5px; background: var(--yellow-200); color: var(--text); }
+.market-chips--houses { padding-right: 8px; border-right: 2px solid var(--border); }
+.market-lot-house { margin-top: 6px; }
+.market-figure__note { flex-basis: 100%; margin: 0; }
 .market-board__scope { padding: 4px 8px; border-bottom: 2px solid var(--border); }
 /* The drawer: how the bidding went, what is being asked and said, the rest of the car. */
 .market-inspection-header { flex-wrap: wrap; overflow-wrap: normal; }
