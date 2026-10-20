@@ -126,11 +126,12 @@ into permanent identity types or mandatory arrival choices without a separate mo
   `scripts/guardrails/check-write-guard.mjs` fails the deploy otherwise.
 - **Row writes.** Only through the sanctioned writers: `ingest-observation`,
   `correct_vehicle_sale_provenance_batch`, and the supersession functions.
-  - Image evidence store (touches no testimony of record): `evidence_open_run`, `evidence_close_run`,
-    `evidence_record_answers`, `propose_image_candidates`, `propose_capture_time_claims`,
-    `confirm_capture_times_by_rule`, `propose_evidence_links`, `propose_account_entities`, `propose_change_claim`,
-    `propose_claim_support`, `record_day_context`, `decide_evidence`. Called as top-level PostgREST RPC with the
-    service-role key under `dotenvx run` (the owner's own aal2 session for `decide_evidence`); never from q.sh.
+  - Image evidence store (from M1w, `20261021221000`; not live until it deploys). These writers write only the evidence
+    store and touch no existing testimony table: `evidence_open_run`, `evidence_close_run`, `evidence_record_answers`,
+    `propose_image_candidates`, `propose_capture_time_claims`, `confirm_capture_times_by_rule`,
+    `propose_evidence_links`, `propose_account_entities`, `propose_change_claim`, `propose_claim_support`,
+    `record_day_context`, `decide_evidence`. Called as top-level PostgREST RPC with the service-role key under
+    `dotenvx run` (the owner's own aal2 session for `decide_evidence`); never from q.sh.
   - No raw INSERT, UPDATE or DELETE on testimony tables.
   - No `DISABLE TRIGGER`.
   - No `statement_timeout = 0`.

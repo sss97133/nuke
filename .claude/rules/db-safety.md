@@ -50,12 +50,16 @@ Testimony is the rows that record what was observed, by whom, from what source a
   AGENTS.md "Row writes", called as top-level PostgREST RPC; triggers fired ALWAYS refuse anything else. They are never
   updated in place: a newer row supersedes an older one with the `superseded_by` / `superseded_at` stamp (these tables
   have no `is_superseded`), and `evidence_decisions` is append-only (a later decision wins).
-- `evidence_runs` is the store's run log. `evidence_close_run` closes a running run once; review sheets and the owner's
-  stored answers (`review` and `review_answers` runs) are written once and never change.
+- `evidence_runs` is the store's run log. A run's kind, config and scope never change; only `evidence_close_run`
+  closes a running run, once, setting its close columns. The owner's stored answers (`review_answers` runs) are written
+  closed, so the guard refuses any later change to them; a review sheet (`review` run) keeps the rows and targets it was
+  written with.
 - No agent uses or obtains an owner session (his JWT, cookies, a signed-in browser) to record a decision. Owner
   decisions come only from his own step-up (aal2) session; agents transcribe his chat answers through the agent channel
   (`evidence_record_answers`, then `decide_evidence` citing the stored answer).
-- A data-only restore of these tables is a reviewed migration (PLAN-style runbook in the PR), never DISABLE TRIGGER.
+- A data-only restore of these tables is a reviewed migration written for that restore, in one transaction: drop the 27
+  guard triggers, load the rows, recreate the triggers `ENABLE ALWAYS` exactly as
+  `20261021220000_image_evidence_tables.sql` does, and check that all 27 fire ALWAYS. Never `DISABLE TRIGGER`.
 
 ## Grants, policies and public reads
 - A migration that revokes or narrows a grant or policy on a table the public site reads (`vehicle_images`, `vehicles`, `vehicle_events` ...) is not done at "tests pass". Before it merges, grep every consumer: PostgREST filters and computed-column functions that take the whole row (`vehicle_image_gallery_eligible`), `select=*`, joins and RLS policies in other tables. A whole-row reference needs every column, so column grants break it.
