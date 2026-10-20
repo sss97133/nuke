@@ -57,6 +57,38 @@ export const readArea = (level: 'zcta' | 'county' | 'state', key: string, from: 
 export const readAreas = (level: 'zcta' | 'county' | 'state', layer: string, from: string, to: string, keys?: string[], signal?: AbortSignal) =>
   fn<AreasOut>({ mode: 'areas', level, layer, from, to, keys: keys?.join(',') }, signal);
 
+/** The sellers behind a ZIP's vehicles: Bring a Trailer seller handles on their lots (bat_listings), as the iOS map reads. */
+export interface SellerLink { vehicle_id: string; handle: string; url: string | null }
+export async function readSellers(vehicleIds: string[], signal?: AbortSignal): Promise<SellerLink[]> {
+  const out: SellerLink[] = [];
+  for (let i = 0; i < vehicleIds.length; i += 100) {
+    const chunk = vehicleIds.slice(i, i + 100);
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/bat_listings?select=vehicle_id,bat_listing_url,seller_username&vehicle_id=in.(${chunk.join(',')})&limit=1000`, { signal, headers });
+    if (!res.ok) throw new Error(`sellers read ${res.status}`);
+    for (const r of (await res.json()) as { vehicle_id: string; bat_listing_url: string | null; seller_username: string | null }[]) {
+      const h = (r.seller_username ?? '').trim();
+      if (h) out.push({ vehicle_id: r.vehicle_id, handle: h, url: r.bat_listing_url });
+    }
+  }
+  return out;
+}
+/** The businesses linked to a ZIP's vehicles (organization_vehicles), platforms left out. */
+export interface BusinessLink { vehicle_id: string; relationship: string | null; id: string; name: string; slug: string | null; kind: string | null }
+export async function readBusinesses(vehicleIds: string[], signal?: AbortSignal): Promise<BusinessLink[]> {
+  const out: BusinessLink[] = [];
+  for (let i = 0; i < vehicleIds.length; i += 100) {
+    const chunk = vehicleIds.slice(i, i + 100);
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/organization_vehicles?select=vehicle_id,relationship_type,organizations(id,name,slug,business_type)&vehicle_id=in.(${chunk.join(',')})&limit=1000`, { signal, headers });
+    if (!res.ok) throw new Error(`businesses read ${res.status}`);
+    for (const r of (await res.json()) as { vehicle_id: string; relationship_type: string | null; organizations: { id: string; name: string | null; slug: string | null; business_type: string | null } | null }[]) {
+      const o = r.organizations;
+      if (!o || !o.name || r.relationship_type === 'auction_platform' || ['auction_platform', 'marketplace', 'platform', 'auction_house'].includes((o.business_type ?? '').toLowerCase())) continue;
+      out.push({ vehicle_id: r.vehicle_id, relationship: r.relationship_type, id: o.id, name: o.name, slug: o.slug, kind: o.business_type });
+    }
+  }
+  return out;
+}
+
 export interface ZipGroup { zip: string; vehicles: Map<string, LocationRow[]> }
 
 /** The iOS fold: rows → ZIP → vehicles (each once) → its observations, newest first; filters by make and window. */
