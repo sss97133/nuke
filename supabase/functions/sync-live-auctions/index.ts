@@ -13,6 +13,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
  *     (live.bonhams.com); lots of in-room catalog sales are written 'upcoming', never live
  *   - Broad Arrow: its bidding site's timed online sales (sale list hourly, lot list with top bids every run)
  *   - Gooding: its bidding platform's open timed lots (bid.goodingco.com /ajax/lots JSON), identity from its catalog
+ *   - Hagerty Marketplace: its open-auction search (page 1 server-rendered, each page from the Next.js data route)
  *   - Cars & Bids: Uses Firecrawl (Cloudflare protected)
  *   - Mecum, Barrett-Jackson: Firecrawl scrape + extract; RM Sotheby's has no readable live bid (see syncRMSothebys)
  * Collecting Cars, PCarMarket, Bonhams, Broad Arrow and Gooding boards are complete lists: after the vehicles upsert each is handed to
@@ -43,6 +44,7 @@ import {
   goodingBoardLot, type GoodingCatalogLot, goodingCatalogFor, goodingLinkPlan, type GoodingLot, goodingUrlVariants,
   type GoodingVehicleRow, goodingWithBidState, parseGoodingLots,
 } from "./boards.ts";
+import { type HagertyAuction, hagertyNextData, parseHagertySearch } from "./boards.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -943,8 +945,71 @@ async function syncBroadArrow(): Promise<{ auctions: LiveAuction[]; error: strin
   }
 }
 
+// ============================================
+// Hagerty Marketplace Sync (its auction search: page 1 server-rendered, every page from the Next.js data route)
+// ============================================
+
+const HAGERTY_SEARCH = "sortBy=ending_soonest&type=auctions&forSale=true"; // open auctions only (forSale=false is the results)
+const HAGERTY_MAX_PAGES = 15; // 33 a page; 229 open auctions on 2026-10-20
+const HAGERTY_UA = "NukeListingCollector/1.0 (+https://nuke.ag)";
+
+async function syncHagerty(): Promise<{ auctions: LiveAuction[]; error: string | null }> {
+  try {
+    // Page 1 server-renders the search (archived) and names the build whose data route serves each page as JSON.
+    const { html, error } = await archiveFetch(`https://www.hagerty.com/marketplace/search?${HAGERTY_SEARCH}`, {
+      platform: "hagerty",
+      skipCache: true,
+      useFirecrawl: false,
+      directFetchOptions: { publicOnly: true }, // one identified request; a refusal is reported, not retried
+      callerName: "sync-live-auctions",
+    });
+    if (error || !html) return { auctions: [], error: `Hagerty search page: ${error ?? "no HTML"}` };
+    const next = hagertyNextData(html);
+    const first = next ? parseHagertySearch(next.pageProps) : null;
+    if (!next?.buildId || !first?.items.length || !first.totalCount) return { auctions: [], error: "Hagerty search page: no auctions parsed" };
+    const pages = Math.min(Math.ceil(first.totalCount / (first.limit ?? first.items.length)), HAGERTY_MAX_PAGES);
+    // Last page first: the search sorts by close time, so a lot closing mid-read shifts later lots onto pages already
+    // read (read twice, kept once) instead of past them (missed).
+    const byId = new Map<string, HagertyAuction>();
+    for (let page = pages; page >= 1; page--) {
+      const res = await fetch(`https://www.hagerty.com/marketplace/_next/data/${next.buildId}/search.json?${HAGERTY_SEARCH}&page=${page}`, { // guardrail-allow: raw-fetch (house JSON API)
+        headers: { "User-Agent": HAGERTY_UA, Accept: "application/json" },
+      });
+      if (!res.ok) return { auctions: [], error: `Hagerty search data page ${page}: HTTP ${res.status}` };
+      const body = await res.json().catch(() => null);
+      for (const it of parseHagertySearch(body?.pageProps ?? {}).items) byId.set(it.id, it);
+    }
+    if (byId.size < first.totalCount * 0.9) return { auctions: [], error: `Hagerty search: ${byId.size} of ${first.totalCount} auctions read` };
+    console.log(`[sync-live-auctions] Hagerty: ${byId.size} open auctions on ${pages} search pages (search total ${first.totalCount})`);
+    const now = new Date().toISOString();
+    const auctions: LiveAuction[] = [...byId.values()]
+      .filter((it) => it.status === "ACTIVE" && it.year !== null) // a lot without a vehicle year is a part or memorabilia
+      .map((it) => ({
+        url: it.url,
+        title: it.title,
+        platform: "hagerty-marketplace",
+        auction_end_date: it.ends ?? "",
+        current_bid: it.current_bid,
+        bid_count: it.bid_count,
+        currency: it.currency,
+        no_reserve: it.no_reserve,
+        reserve_met: null,
+        year: it.year,
+        make: it.make,
+        model: it.model,
+        thumbnail_url: it.image,
+        external_id: it.id,
+        raw_data: { source: "hagerty_marketplace_search", location: it.location, synced_at: now },
+      }));
+    return { auctions, error: null };
+  } catch (e: unknown) {
+    return { auctions: [], error: `Hagerty sync failed: ${e instanceof Error ? e.message : String(e)}` };
+  }
+}
+
 /** The houses whose open board is read complete and scheduled by live_auction_board_sync (slug per platform). */
 const BOARD_SOURCES: Record<string, string> = { "collecting-cars": "collecting-cars", pcarmarket: "pcarmarket", bonhams: "bonhams", "broad-arrow": "broad-arrow", gooding: "gooding" };
+BOARD_SOURCES["hagerty-marketplace"] = "hagerty-marketplace";
 
 // ============================================
 // Cars & Bids Sync (Firecrawl)
@@ -1147,7 +1212,8 @@ async function syncToDatabase(
   // Cars' feed are the complete live sets, so a row of this platform that is absent from them ends
   // here — sale_status/auction_status 'ended', no sale claim; settlement records the result. The RPC
   // ends nothing for a short (partial) list. Homepage-scraped platforms are not complete lists.
-  if (platform === "bringatrailer" || platform === "collecting-cars" || platform === "pcarmarket") {
+  if (platform === "bringatrailer" || platform === "collecting-cars" || platform === "pcarmarket"
+      || platform === "hagerty-marketplace") {
     const { data: ended, error: endErr } = await supabase.rpc("end_live_auctions_absent", {
       p_platform: platform,
       p_live_urls: auctions.map(a => a.url),
@@ -1236,6 +1302,7 @@ async function updateSourceRegistry(
     "gooding": "gooding",
     "bonhams": "bonhams",
     "broad-arrow": "broadarrow",
+    "hagerty-marketplace": "hagerty-marketplace",
   };
 
   const slug = slugMap[platform];
@@ -1309,6 +1376,7 @@ Deno.serve(async (req) => {
         else if (url.includes("goodingco")) platform = "gooding";
         else if (url.includes("bonhams.com")) platform = "bonhams";
         else if (/^https?:\/\/([a-z0-9-]+\.)*broadarrowauctions\.com\//i.test(url)) platform = "broad-arrow";
+        else if (url.includes("hagerty.com/marketplace")) platform = "hagerty-marketplace";
         byPlatform[platform] = (byPlatform[platform] || 0) + 1;
       }
 
@@ -1351,6 +1419,7 @@ Deno.serve(async (req) => {
         "gooding",
         "bonhams",
         "broad-arrow",
+        "hagerty-marketplace",
       ];
       const platforms: string[] = Array.isArray(body.platforms) && body.platforms.length
         ? body.platforms.map(String)
@@ -1363,6 +1432,7 @@ Deno.serve(async (req) => {
         pcar: "pcarmarket",
         bj: "barrett-jackson",
         rm: "rm-sothebys",
+        hagerty: "hagerty-marketplace",
       };
 
       const functionStartTime = Date.now();
@@ -1426,6 +1496,10 @@ Deno.serve(async (req) => {
             break;
           case "broad-arrow":
             syncResult = await syncBroadArrow();
+            break;
+          case "hagerty":
+          case "hagerty-marketplace":
+            syncResult = await syncHagerty();
             break;
           default:
             syncResult = { auctions: [], error: `Unknown platform: ${platform}` };

@@ -85,6 +85,92 @@ export function parsePcarBids(html: string): PcarBid[] {
   return out;
 }
 
+/** One open auction on Hagerty Marketplace's search (its Apollo cache, server-rendered or from the Next.js data route). */
+export interface HagertyAuction {
+  id: string;
+  url: string;
+  title: string;
+  year: number | null;
+  make: string | null;
+  model: string | null;
+  status: string;
+  current_bid: number | null; // dollars (the house carries cents)
+  bid_count: number | null;
+  ends: string | null;
+  no_reserve: boolean;
+  currency: string | null;
+  image: string | null;
+  location: string | null;
+}
+
+/** The build id and page props a Hagerty marketplace page server-renders in __NEXT_DATA__. */
+export function hagertyNextData(html: string): { buildId: string | null; pageProps: Record<string, unknown> } | null {
+  const m = html.match(/<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/);
+  if (!m) return null;
+  try {
+    const d = JSON.parse(m[1]);
+    return d?.props?.pageProps ? { buildId: typeof d.buildId === "string" ? d.buildId : null, pageProps: d.props.pageProps } : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The auctions on one page of Hagerty's marketplace search (filters forSale + type AUCTIONS), with the total the search
+ * reports and its page size. The lot link is the one the page renders: /marketplace/auction/<year>-<make>-<model>/<id>,
+ * each part's first space a hyphen, URI-encoded ("1935-Ford-Custom-Hot%20Rod"), on hagerty.com without www (the spelling
+ * the vehicles rows already hold). Bids are cents; the search omits the currency, and Hagerty Marketplace sells in US
+ * dollars (its lot pages' MonetaryValue carries "USD"), so a missing currency reads USD.
+ */
+export function parseHagertySearch(pageProps: Record<string, unknown>): { items: HagertyAuction[]; totalCount: number | null; limit: number | null } {
+  // deno-lint-ignore no-explicit-any
+  const state = (pageProps?.__APOLLO_STATE__ ?? {}) as Record<string, any>;
+  const search = state.ROOT_QUERY?.marketplaceSearch?.search ?? {};
+  const exploreKey = Object.keys(search).find((k) => {
+    if (!k.startsWith("marketplaceExplore:")) return false;
+    try {
+      const f = JSON.parse(k.slice("marketplaceExplore:".length))?.filters ?? {};
+      return f.forSale === true && f.type === "AUCTIONS";
+    } catch {
+      return false;
+    }
+  });
+  const explore = exploreKey ? search[exploreKey] : null;
+  const pageKey = explore ? Object.keys(explore).find((k) => k.startsWith("paginated:")) : undefined;
+  const conn = pageKey ? explore[pageKey] : null;
+  if (!conn) return { items: [], totalCount: null, limit: null };
+  let limit: number | null = null;
+  try { limit = Number(JSON.parse(pageKey!.slice("paginated:".length))?.limit) || null; } catch { /* no page size */ }
+  const items: HagertyAuction[] = [];
+  for (const edge of conn.edges ?? []) {
+    const node = state[edge?.node?.__ref ?? ""];
+    if (!node?.id) continue;
+    const photo = node.mainPhoto?.__ref ? state[node.mainPhoto.__ref] : node.mainPhoto;
+    const cents = Number(node.currentHighestBid?.amount);
+    // parts and memorabilia lots carry year "0000" (a collection's wheels, seats, engines): no vehicle year
+    const year = /^(18[89]\d|19\d\d|20\d\d)$/.test(String(node.year ?? "")) ? Number(node.year) : null;
+    const part = (s: unknown) => String(s ?? "").replace(" ", "-");
+    const slug = encodeURIComponent([part(node.year), part(node.make), part(node.model)].join("-"));
+    items.push({
+      id: node.id,
+      url: `https://hagerty.com/marketplace/auction/${slug}/${node.id}`,
+      title: node.auctionTitle ?? node.lotTitle ?? [node.year, node.make, node.model].filter(Boolean).join(" "),
+      year,
+      make: node.make || null,
+      model: node.model || null,
+      status: node.status ?? "",
+      current_bid: Number.isFinite(cents) && cents > 0 ? cents / 100 : null,
+      bid_count: typeof node.successfulBidCount === "number" ? node.successfulBidCount : null,
+      ends: node.endDateTime ?? null,
+      no_reserve: node.hasReserve === false,
+      currency: node.currentHighestBid?.currency ?? "USD",
+      image: photo?.url ?? null,
+      location: [node.location?.city, node.location?.state].map((s) => String(s ?? "").trim()).filter(Boolean).join(", ") || null,
+    });
+  }
+  return { items, totalCount: typeof conn.totalCount === "number" ? conn.totalCount : null, limit };
+}
+
 /** The fields of a Bonhams Typesense lot document the live board uses. */
 export interface BonhamsLotDoc {
   id: string;
