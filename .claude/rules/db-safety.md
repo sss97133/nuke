@@ -44,6 +44,18 @@ Testimony is the rows that record what was observed, by whom, from what source a
 - Keep `merged_from_vehicle_id` populated on anything moved across vehicles.
 - Why: on 2026-05-01 an agent deleted a wrongly merged auction event instead of relinking it to a stub vehicle,
   and orphaned a real vehicle's history for good. Background: `docs/library/intellectual/contemplations/the-trust-invariant.md`.
+- The image evidence store is testimony too: `image_vehicle_candidates`, `image_capture_time_claims`,
+  `evidence_links`, `evidence_account_entities`, `vehicle_change_claims`, `vehicle_change_claim_support`,
+  `user_day_vehicle_context` and `evidence_decisions`. Their rows are written only by the evidence writers named in
+  AGENTS.md "Row writes", called as top-level PostgREST RPC; triggers fired ALWAYS refuse anything else. They are never
+  updated in place: a newer row supersedes an older one with the `superseded_by` / `superseded_at` stamp (these tables
+  have no `is_superseded`), and `evidence_decisions` is append-only (a later decision wins).
+- `evidence_runs` is the store's run log. `evidence_close_run` closes a running run once; review sheets and the owner's
+  stored answers (`review` and `review_answers` runs) are written once and never change.
+- No agent uses or obtains an owner session (his JWT, cookies, a signed-in browser) to record a decision. Owner
+  decisions come only from his own step-up (aal2) session; agents transcribe his chat answers through the agent channel
+  (`evidence_record_answers`, then `decide_evidence` citing the stored answer).
+- A data-only restore of these tables is a reviewed migration (PLAN-style runbook in the PR), never DISABLE TRIGGER.
 
 ## Grants, policies and public reads
 - A migration that revokes or narrows a grant or policy on a table the public site reads (`vehicle_images`, `vehicles`, `vehicle_events` ...) is not done at "tests pass". Before it merges, grep every consumer: PostgREST filters and computed-column functions that take the whole row (`vehicle_image_gallery_eligible`), `select=*`, joins and RLS policies in other tables. A whole-row reference needs every column, so column grants break it.
