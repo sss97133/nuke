@@ -111,3 +111,30 @@ SELECT fixture_assert(NOT has_function_privilege('anon', 'public.fold_map_facts_
   'anon cannot run the fold');
 SELECT public.refresh_map_facts(3);
 SELECT fixture_assert((SELECT count(*) = 1 FROM public.write_receipts WHERE writer = 'refresh_map_facts'), 'the recent refresher still runs whole');
+
+-- 20261021143000: a county code that is not a FIPS ('_none', 3,244 rows from the 2026-03 geocoder) folds as no county.
+-- Vehicle 8 listed 200 days ago in '_none' with region NV; vehicle 9 sold yesterday, its only place '_none'.
+INSERT INTO public.vehicles SELECT md5('sr' || g)::uuid, true, NULL, 1000 * g FROM generate_series(8, 9) g;
+INSERT INTO public.vehicle_location_observations (vehicle_id, source_type, source_platform, observed_at, county_fips, region_code, country_code)
+VALUES (md5('sr8')::uuid, 'listing', 'bat', now() - interval '200 days', '_none', 'NV', NULL),
+       (md5('sr9')::uuid, 'listing', 'bat', now() - interval '300 days', '_none', NULL, NULL);
+INSERT INTO public.vehicle_events (vehicle_id, event_status, sold_at, final_price, source_platform)
+VALUES (md5('sr9')::uuid, 'sold', now() - interval '1 day', 5000, 'bat');
+DO $$ BEGIN
+  PERFORM public.fold_map_facts_listing(current_date - 210, current_date, clock_timestamp());
+  RAISE EXCEPTION 'expected the old fold to refuse ''_none''';
+EXCEPTION WHEN check_violation THEN RAISE NOTICE 'ok: before: the 365-day fold fails on a ''_none'' county';
+END $$;
+\ir ../migrations/20261021143000_map_facts_county_code_guard.sql
+\ir ../migrations/20261021143000_map_facts_county_code_guard.sql
+SELECT public.fold_map_facts_listing(current_date - 210, current_date, clock_timestamp());
+SELECT fixture_assert((SELECT sum(entities) = 1 FROM public.map_facts WHERE layer = 'listing' AND level = 'county' AND area_key IS NULL
+  AND day = current_date - 200), 'a ''_none'' listing is no county');
+SELECT fixture_assert((SELECT sum(entities) = 1 FROM public.map_facts WHERE layer = 'listing' AND level = 'state' AND area_key = '32'
+  AND day = current_date - 200), 'and lands in its stated state');
+SELECT fixture_assert((SELECT count(*) = 0 FROM public.map_facts WHERE area_key !~ '^[0-9]+$'), 'no area key is anything but digits');
+SELECT public.fold_map_facts_sale(current_date - 3, current_date, clock_timestamp());
+SELECT fixture_assert((SELECT sum(entities) = 1 FROM public.map_facts WHERE layer = 'sale' AND level = 'county' AND area_key IS NULL),
+  'a sale placed only by ''_none'' is no county');
+SELECT public.rebuild_map_facts();
+SELECT fixture_assert((SELECT count(*) = 1 FROM public.write_receipts WHERE writer = 'rebuild_map_facts'), 'the nightly rebuild runs whole');
