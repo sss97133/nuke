@@ -1122,8 +1122,8 @@ const speciesValue = {
     { species: 'classifieds', label: 'Classifieds', unit: 'posts held', counts_as_held: true },
     { species: 'auth_walled_marketplace', label: 'Auth-walled marketplaces', unit: 'listings held', counts_as_held: true },
     { species: 'aggregator', label: 'Aggregators', unit: 'pages read, not listings held', counts_as_held: false },
-    { species: 'private_seller', label: 'Private sellers', unit: 'BaT lots, by seller cohort', counts_as_held: false },
-    { species: 'owner_private', label: "Owner's private data", unit: 'vehicles with owner records', counts_as_held: false },
+    { species: 'private_seller', label: 'Private sellers', unit: 'BaT lots', counts_as_held: false },
+    { species: 'owner_private', label: "Owner's private data", unit: 'vehicles', counts_as_held: false },
   ],
 };
 
@@ -1154,7 +1154,7 @@ it('groups the board by species with the doc\'s names, aggregators apart, and sh
     ['Barn Finds'], ['Sellers with 50 or more BaT lots', 'BaT lots with no seller recorded'], ['Owner input']]);
   // a dealer's BaT lots sit beside held, never in it; a cohort row says how many sellers it counts
   expect(groups[2].querySelector('.market-sources__held')?.textContent).toBe('3,246 +87 since Oct 9 +2,744 sold on BaT');
-  expect(groups[5].querySelector('.market-sources__cols .n')?.textContent).toBe('BaT lots, by seller cohort');
+  expect(groups[5].querySelector('.market-sources__cols .n')?.textContent).toBe('BaT lots');
   expect([...groups[5].querySelectorAll('.market-sources__held')].map((h) => h.textContent)).toEqual(['28,487 159 sellers', '230,757']);
   expect(groups[6].querySelector('.market-sources__held')?.textContent).toBe('614');
   expect(groups[3].querySelector('.market-sources__badge')).toBeNull();
