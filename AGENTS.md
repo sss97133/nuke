@@ -131,7 +131,8 @@ into permanent identity types or mandatory arrival choices without a separate mo
     `propose_image_candidates`, `propose_capture_time_claims`, `confirm_capture_times_by_rule`,
     `propose_evidence_links`, `propose_account_entities`, `propose_change_claim`, `propose_claim_support`,
     `record_day_context`, `decide_evidence`. Called as top-level PostgREST RPC with the service-role key under
-    `dotenvx run` (the owner's own aal2 session for `decide_evidence`); never from q.sh.
+    `dotenvx run`, except `decide_evidence`, which only the owner's own aal2 session calls (it is not granted to the
+    service role); never from q.sh. `evidence_record_answers` stores his chat answers and decides nothing.
   - No raw INSERT, UPDATE or DELETE on testimony tables.
   - No `DISABLE TRIGGER`.
   - No `statement_timeout = 0`.

@@ -54,9 +54,10 @@ Testimony is the rows that record what was observed, by whom, from what source a
   running run, once, setting its close columns. The owner's stored answers (`review_answers` runs) are written
   closed, so the guard refuses any later change to them; a review sheet (`review` run) keeps the rows and targets it was
   written with.
-- No agent uses or obtains an owner session (his JWT, cookies, a signed-in browser) to record a decision. Owner
-  decisions come only from his own step-up (aal2) session; agents transcribe his chat answers through the agent channel
-  (`evidence_record_answers`, then `decide_evidence` citing the stored answer).
+- No agent records an owner decision, and no agent uses or obtains an owner session (his JWT, cookies, a signed-in
+  browser). Owner decisions come only from his own step-up (aal2) session (`decide_evidence`; service_role cannot call
+  it). Agents store his chat answers word for word (`evidence_record_answers`); a stored answer decides nothing until
+  he confirms it himself in the app.
 - A data-only restore of these tables is a reviewed migration written for that restore, in one transaction: drop the 27
   guard triggers, load the rows, recreate the triggers `ENABLE ALWAYS` exactly as
   `20261021220000_image_evidence_tables.sql` does, and check that all 27 fire ALWAYS. Never `DISABLE TRIGGER`.
