@@ -137,7 +137,10 @@ into permanent identity types or mandatory arrival choices without a separate mo
 ## PR titles and commit messages
 The repo is public, and a squash merge puts the PR title (or a single commit's subject) on `main` as the
 permanent record. Write both as `type(scope): summary`, at most 72 characters. The PR gate in
-`pre-deploy-check.yml` fails any other form.
+`pre-deploy-check.yml` fails any other form. Check a title before `gh pr create` with
+`node scripts/ci/pr-title-check.mjs "<title>"`; with no argument it checks the branch's open PR, and
+`scripts/ci/verify.sh` (the pre-push gate) warns when that title would fail. After a retitle,
+`gh run rerun <run> --failed` passes: the gate reads the live title.
 - **type**: `feat`, `fix`, `perf`, `refactor`, `data` (backfills and corrections), `docs`, `test`, `ci`,
   `build`, `chore` or `revert`.
 - **scope**: the component, by its code name. That can be a table (`vehicle_events`), a function
