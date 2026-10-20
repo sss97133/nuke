@@ -517,7 +517,7 @@ export class VehicleValuationService {
       // Fetch all documents and filter client-side to avoid enum type issues with .in()
       let documents: any[] = [];
       try {
-        let allDocs = null;
+        let allDocs: any[] | null = null;
         let docsError = null;
         
         try {

@@ -56,7 +56,7 @@ export function generateEventSummary(event: any): TimelineEventSummary {
     summaryParts.push(title);
   } else {
     // Fallback: generate from event type
-    const typeLabel = eventType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+    const typeLabel = eventType.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase());
     summaryParts.push(typeLabel || 'Work Session');
   }
 
@@ -192,7 +192,7 @@ export function generateDaySummary(events: any[]): TimelineEventSummary {
   
   if (eventTypes.size === 1) {
     const type = Array.from(eventTypes)[0];
-    const typeLabel = type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+    const typeLabel = type.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase());
     summaryParts.push(`(${typeLabel})`);
   }
 

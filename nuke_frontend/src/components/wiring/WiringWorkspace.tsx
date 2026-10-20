@@ -62,7 +62,7 @@ interface Props {
 export function WiringWorkspace({ initialDevices, vehicleId }: Props) {
   const { devices, result, terminations } = useOverlayCompute(initialDevices);
   const [tier, setTier] = useState<WireTier>('professional');
-  const { products, gaugeConversions } = useWireCatalog(tier);
+  const { products, gaugeConversion: gaugeConversions } = useWireCatalog(tier);
   const { findComponent } = useComponentLibrary();
 
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);

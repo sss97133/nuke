@@ -26,6 +26,8 @@ interface ComprehensiveWorkOrderReceiptProps {
 
 interface WorkOrder {
   id: string;
+  /** timeline_events.metadata, kept for auction events in the fallback read. */
+  calculation_metadata?: any;
   title: string;
   description?: string;
   event_date: string;
@@ -328,7 +330,7 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
           calculation_metadata: (eventData as any).metadata
         } as WorkOrder;
       } else {
-        wo = viewData;
+        wo = viewData as WorkOrder;
         // Store minimal event for summary generation
         setMinimalEvent(viewData);
       }
@@ -1427,7 +1429,7 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
           </div>
         ) : (
           /* STANDARD COST BREAKDOWN - For non-auction events */
-          (costBreakdown?.parts?.items?.length > 0 || costBreakdown?.labor?.tasks?.length > 0 || workOrder.cost_amount) && (
+          ((costBreakdown?.parts?.items?.length ?? 0) > 0 || (costBreakdown?.labor?.tasks?.length ?? 0) > 0 || workOrder.cost_amount) && (
             <div style={{ padding: '12px', borderBottom: '2px solid var(--text)' }}>
               <div style={{ 
                 fontSize: '11px', 
@@ -1557,7 +1559,6 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
               <div></div>
               <div style={{ textAlign: 'right' }}>
                 {formatCurrency(
-                  costBreakdown?.calculated_total || 
                   workOrder.cost_amount || 
                   (costBreakdown?.parts?.total || 0) + (costBreakdown?.labor?.total || 0)
                 )}
@@ -1932,7 +1933,7 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
             <div>TOTAL:</div>
             {(() => {
               const toNum = (v: any) => (typeof v === 'number' ? v : (v ? Number(v) : 0));
-              const estimateTotal = toNum(costBreakdown?.calculated_total) || toNum(workOrder.cost_amount) || toNum(workOrder.calculated_total);
+              const estimateTotal = toNum(workOrder.cost_amount) || toNum(workOrder.calculated_total);
               const ledgerTotal = receiptHeaders.reduce((sum, r) => {
                 const t = toNum((r as any).total);
                 if (t > 0) return sum + t;
@@ -1948,7 +1949,7 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
           </div>
           {(() => {
             const toNum = (v: any) => (typeof v === 'number' ? v : (v ? Number(v) : 0));
-            const estimateTotal = toNum(costBreakdown?.calculated_total) || toNum(workOrder.cost_amount) || toNum(workOrder.calculated_total);
+            const estimateTotal = toNum(workOrder.cost_amount) || toNum(workOrder.calculated_total);
             const ledgerTotal = receiptHeaders.reduce((sum, r) => {
               const t = toNum((r as any).total);
               if (t > 0) return sum + t;

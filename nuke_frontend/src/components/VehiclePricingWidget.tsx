@@ -320,7 +320,7 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
         await loadPricingStatus();
         
         // Check if we have results
-        if (pricingStatus && pricingStatus.status !== 'not_analyzed' && pricingStatus.confidence_score > 0) {
+        if (pricingStatus && pricingStatus.status !== 'not_analyzed' && (pricingStatus.confidence_score ?? 0) > 0) {
           clearInterval(pollInterval);
           setIsAnalyzing(false);
           setToast({ message: 'Analysis complete!', type: 'success' });

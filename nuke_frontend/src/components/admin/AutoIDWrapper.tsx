@@ -19,7 +19,7 @@ export const AutoIDWrapper: React.FC<AutoIDWrapperProps> = ({ text, className = 
   // Split text by UUIDs and wrap them
   const parts: React.ReactNode[] = [];
   let lastIndex = 0;
-  let match;
+  let match: RegExpExecArray | null;
 
   // First, find all UUIDs (full format)
   const uuidMatches: Array<{ start: number; end: number; id: string }> = [];
@@ -37,8 +37,9 @@ export const AutoIDWrapper: React.FC<AutoIDWrapperProps> = ({ text, className = 
   const shortIdRegex = new RegExp(SHORT_ID_PATTERN);
   while ((match = shortIdRegex.exec(text)) !== null) {
     // Check if this match is already part of a UUID
+    const found = match;
     const isPartOfUuid = uuidMatches.some(
-      uuid => match.index >= uuid.start && match.index < uuid.end
+      uuid => found.index >= uuid.start && found.index < uuid.end
     );
     if (!isPartOfUuid) {
       shortIdMatches.push({

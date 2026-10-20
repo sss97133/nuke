@@ -247,6 +247,18 @@ function MailboxDot({ address }: { address: string }) {
 
 // ─── Emails Tab ───────────────────────────────────────────────────────────────
 
+// Per-mailbox totals for the sidebar, or null when the read fails. A Postgrest builder is only
+// thenable (it has no .catch), so it is wrapped before the failure handler.
+export async function readInboxCounts(): Promise<Record<string, { total: number; unread: number }> | null> {
+  const { data } = await Promise.resolve(supabase.from('v_inbox_summary').select('*')).catch(() => ({ data: null }));
+  if (!data) return null;
+  const c: Record<string, { total: number; unread: number }> = {};
+  for (const row of (data as any[])) {
+    c[row.to_address] = { total: row.total, unread: row.unread };
+  }
+  return c;
+}
+
 function EmailsTab({ alertsOnly = false }: { alertsOnly?: boolean }) {
   const [emails, setEmails] = useState<InboxEmail[]>([]);
   const [selected, setSelected] = useState<InboxEmail | null>(null);
@@ -280,17 +292,8 @@ function EmailsTab({ alertsOnly = false }: { alertsOnly?: boolean }) {
   }, [statusFilter, mailboxFilter, alertsOnly]);
 
   const fetchCounts = useCallback(async () => {
-    const { data } = await supabase
-      .from('v_inbox_summary')
-      .select('*')
-      .catch(() => ({ data: null }));
-    if (data) {
-      const c: Record<string, { total: number; unread: number }> = {};
-      for (const row of (data as any[])) {
-        c[row.to_address] = { total: row.total, unread: row.unread };
-      }
-      setCounts(c);
-    }
+    const c = await readInboxCounts();
+    if (c) setCounts(c);
   }, []);
 
   useEffect(() => {

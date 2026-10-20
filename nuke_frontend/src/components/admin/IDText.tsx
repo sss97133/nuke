@@ -36,7 +36,7 @@ export const IDText: React.FC<IDTextProps> = ({ children, className = '' }) => {
   // Find all UUIDs first
   const uuidMatches: Array<{ start: number; end: number; id: string }> = [];
   const uuidRegex = new RegExp(UUID_PATTERN);
-  let match;
+  let match: RegExpExecArray | null;
   while ((match = uuidRegex.exec(text)) !== null) {
     uuidMatches.push({
       start: match.index,
@@ -49,8 +49,9 @@ export const IDText: React.FC<IDTextProps> = ({ children, className = '' }) => {
   const shortIdMatches: Array<{ start: number; end: number; id: string }> = [];
   const shortIdRegex = new RegExp(SHORT_ID_PATTERN);
   while ((match = shortIdRegex.exec(text)) !== null) {
+    const found = match;
     const isPartOfUuid = uuidMatches.some(
-      uuid => match.index >= uuid.start && match.index < uuid.end
+      uuid => found.index >= uuid.start && found.index < uuid.end
     );
     if (!isPartOfUuid) {
       shortIdMatches.push({
