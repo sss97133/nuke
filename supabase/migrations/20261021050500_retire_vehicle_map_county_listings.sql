@@ -1,4 +1,4 @@
--- Retire vehicle_map_county_listings (20261020004000): the one map's first listing fold, superseded by map_facts.
+-- 20261021050500 (renamed from 20261021050000, which #2358 also used). Retire vehicle_map_county_listings (20261020004000): the one map's first listing fold, superseded by map_facts.
 --
 -- WHY. The owner retired the old maps on 2026-10-20 ("send it"). map_facts (20261020220000) holds the listing layer
 -- at state, county and ZIP level with the same rule over a longer horizon, refreshed every 10 minutes and nightly;
