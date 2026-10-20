@@ -77,6 +77,7 @@ Generated 2026-07-12 from the Canonical Ledger (`CANONICAL_LEDGER.md`, `ledger.j
 | Create ownership transfer on sale | `auto_create_transfer_on_auction_close` trigger → `transfer-automator` ⚠ | backfill_transfers_for_sold_auctions (manual repair only) |
 | Transfer state read / advance | `transfer-status-api` ⚠ / `transfer-advance` ⚠ | direct .from('ownership_transfers') reads scattered in FE |
 | Transfer storage | `ownership_transfers` + `transfer_milestones` | — |
+| Owner periods from sold lots | `fold_vehicle_ownership_periods` (the only writer; plan `ownership_fold_plan`, refusals in `ownership_fold_flags`) → `vehicle_ownerships` identity-keyed rows (`owner_identity_id`, `basis` auction_sale); reader `v_vehicle_owner_periods`; backfill `scripts/data/fold-ownership-periods.mjs`; bridge point `ownership_fold_party()` | a new periods table; writing `owner_profile_id` from a lot; deriving a period from `ownership_transfers.sale_date` |
 | Stripe checkout (API subscription) | `create-api-access-checkout` | stripe-checkout (orphan deploy — undeploy), ds-create-checkout (deleted) |
 | Stripe checkout (credits/cash) | `create-checkout` | create-vehicle-transaction-checkout (its table DROPPED — runtime-broken) |
 | Stripe payment-method setup | `setup-payment-method` | create-setup-session (undeployed; ProfileVerification broken) |
