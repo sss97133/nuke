@@ -102,6 +102,13 @@ if node --test "$GD/no-pii-exposure.test.mjs" >"$CI_TMP_DIR/ci_pii_exposure_test
 else red "  ✗ pii-exposure detector contract FAILED"; cat "$CI_TMP_DIR/ci_pii_exposure_tests.out"; fail=1; fi
 if node "$GD/no-pii-exposure.mjs" >"$CI_TMP_DIR/ci_pii_exposure.out" 2>&1; then grn "  ✓ no new migration opens personal columns to anon/authenticated"
 else red "  ✗ a migration opens personal columns to anon/authenticated (scripts/guardrails/pii-exposure-allowlist.json)"; cat "$CI_TMP_DIR/ci_pii_exposure.out"; fail=1; fi
+if node --test "$ROOT/scripts/ci/pr-title-check.test.mjs" >"$CI_TMP_DIR/ci_pr_title_tests.out" 2>&1; then grn "  ✓ PR title check contract"
+else red "  ✗ PR title check contract FAILED"; cat "$CI_TMP_DIR/ci_pr_title_tests.out"; fail=1; fi
+# Hint only, never fails: the branch's open PR title against the pre-deploy-check.yml gate. Skipped in Actions, which runs the gate.
+if [[ -z "${GITHUB_ACTIONS:-}" ]] && command -v gh >/dev/null 2>&1; then
+  title_hint="$(cd "$ROOT" && node scripts/ci/pr-title-check.mjs --warn 2>/dev/null || true)"
+  [[ -z "$title_hint" ]] || ylw "  ! $title_hint"
+fi
 if node --test "$ROOT/scripts/ci/flake-report.test.mjs" >"$CI_TMP_DIR/ci_flake_report_tests.out" 2>&1; then grn "  ✓ flake report contract"
 else red "  ✗ flake report contract FAILED"; cat "$CI_TMP_DIR/ci_flake_report_tests.out"; fail=1; fi
 if node --test "$ROOT/scripts/ci/typecheck-ratchet.test.mjs" >"$CI_TMP_DIR/ci_typecheck_ratchet_tests.out" 2>&1; then grn "  ✓ typecheck ratchet contract"
