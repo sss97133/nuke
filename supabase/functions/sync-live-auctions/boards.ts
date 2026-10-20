@@ -1,7 +1,7 @@
 /**
  * Pure readers for the board-synced houses (no I/O): PCarMarket's server-rendered auction board and lot bid history,
- * Bonhams' Typesense sale and lot documents and its bidding platform's lot states, and Broad Arrow's timed sales on
- * its bidding site. sync-live-auctions fetches; these parse.
+ * Bonhams' Typesense sale and lot documents and its bidding platform's lot states, Broad Arrow's timed sales on its
+ * bidding site, and Mecum's public lot index around a sale's run days. sync-live-auctions fetches; these parse.
  */
 
 /** One open lot on PCarMarket's live board (the Basta query cache the page server-renders). */
@@ -334,5 +334,130 @@ export function amTimedLot(doc: AmLotDoc, sale: AmSale, now: number): AmTimedLot
     estimate_high: amAmount(doc.estimate_high),
     reserve_met: typeof doc.reserve_met === "boolean" ? doc.reserve_met : null,
     image_url: doc.cover_thumbnail ?? null,
+  };
+}
+
+// ── Mecum: its public lot index (Algolia wp_posts_lot), the index the site's own search reads ──
+//
+// Mecum sells on the block during a sale's run days; bidding on a car is open on its run day until it crosses the block,
+// and the index records each result within minutes of the hammer (Nashville 2026, 24 Sep: rows changed in docket order
+// through the day, lot T1 first). Some lots also take online pre-bids before their day (has_prebidding_meta). The live
+// bid on the block itself is published only to signed-in bidders (bidnow.mecum.com), so a lot's current bid here is the
+// one the index states.
+
+/** A sale on Mecum's calendar: the index facet value "Name|startEpoch|endEpoch" (00:00 UTC of its first and last run dates). */
+export interface MecumSale { value: string; name: string; startEpoch: number; endEpoch: number; lots: number }
+
+/**
+ * The sales whose run days hold now: from 00:00 UTC of the first run date (a US run day starts at local midnight, 04:00 to
+ * 10:00 UTC) to 12:00 UTC of the day after the last (every US run day has closed by then).
+ */
+export function mecumSalesToRead(facet: Record<string, number>, nowMs: number): MecumSale[] {
+  const now = nowMs / 1000;
+  return Object.entries(facet ?? {}).flatMap(([value, lots]) => {
+    const [name, s, e] = value.split("|");
+    const startEpoch = Number(s), endEpoch = Number(e);
+    if (!name || !Number.isFinite(startEpoch) || !Number.isFinite(endEpoch)) return [];
+    return now >= startEpoch && now < endEpoch + 36 * 3600 ? [{ value, name, startEpoch, endEpoch, lots }] : [];
+  });
+}
+
+/**
+ * The run dates (YYYY-MM-DD) of a sale to read at nowMs, inside the sale's dates: today's UTC date, and yesterday's until
+ * 12:00 UTC (its lots stay open until their local midnight and are then read once more as closed).
+ */
+export function mecumRunDatesToRead(sale: MecumSale, nowMs: number): string[] {
+  const first = new Date(sale.startEpoch * 1000).toISOString().slice(0, 10);
+  const last = new Date(sale.endEpoch * 1000).toISOString().slice(0, 10);
+  const days = new Date(nowMs).getUTCHours() < 12 ? [-1, 0] : [0];
+  return days.map((d) => new Date(nowMs + d * 86_400_000).toISOString().slice(0, 10)).filter((d) => d >= first && d <= last);
+}
+
+/** The fields of one index record the live reader asks for (attributesToRetrieve). */
+export interface MecumIndexHit {
+  post_title?: string;
+  permalink?: string;
+  lot_number_meta?: string | null;
+  auction_day_start_meta?: string | null;
+  current_bid_meta?: number | null;
+  has_prebidding_meta?: boolean | null;
+  sold?: number | null;
+  bid_goes_on?: number | null;
+  highest_bid_or_price?: number | null;
+  images_meta?: { url?: string }[] | null;
+  taxonomies?: Record<string, { name?: string | number; slug?: string }[] | undefined>;
+}
+
+/** open: bidding is open now; crossed: the index states a result; closed: its run day ended with none stated; upcoming. */
+export type MecumLotState = "open" | "crossed" | "closed" | "upcoming";
+
+export interface MecumLot {
+  url: string;
+  lot_id: string;
+  title: string;
+  lot_number: string | null;
+  sale: string | null;
+  run_day: string | null;
+  opens: string | null; // the run day's start as the index states it (auction_day_start_meta: local midnight, in UTC)
+  closes: string | null; // 24 hours later: bidding on the lot cannot outlast its run day
+  state: MecumLotState;
+  result: "sold" | "bid-goes-on" | null;
+  current_bid: number | null; // an open lot's bid as the index states it; null when none
+  closing_bid: number | null; // a crossed lot's hammer bid when stated, the standing high bid of a bid-goes-on lot
+  price_with_premium: number | null; // a sold lot's highest_bid_or_price: the sale price, buyer's premium included
+  prebid: boolean;
+  no_reserve: boolean;
+  image: string | null;
+  year: number | null;
+  make: string | null;
+  model: string | null;
+}
+
+// The lot types Mecum's lander treats as vehicles (extract-mecum INDEX_VEHICLE_TYPES); Road Art is automobilia.
+const MECUM_VEHICLE_TYPES = new Set(["Auto", "Motorcycle", "Tractor", "Boat"]);
+const term = (h: MecumIndexHit, key: string, field: "name" | "slug" = "name"): string | null => {
+  const v = h.taxonomies?.[key]?.[0]?.[field];
+  return v === undefined || v === null || v === "" ? null : String(v);
+};
+
+/** One index record as a lot with its live state at nowMs; null for a lot that is not a vehicle or has no lot page. */
+export function mecumLot(hit: MecumIndexHit, nowMs: number): MecumLot | null {
+  const type = term(hit, "lot_type");
+  if (!type || !MECUM_VEHICLE_TYPES.has(type)) return null;
+  const permalink = typeof hit.permalink === "string" ? hit.permalink : "";
+  const lotId = permalink.match(/^\/lots\/([A-Za-z0-9-]+)\//)?.[1];
+  if (!lotId) return null;
+  const dayStart = typeof hit.auction_day_start_meta === "string" ? Date.parse(`${hit.auction_day_start_meta.replace(" ", "T")}Z`) : NaN;
+  const opens = Number.isFinite(dayStart) ? dayStart : null;
+  const closes = opens === null ? null : opens + 86_400_000;
+  const result = hit.sold === 1 ? "sold" : hit.bid_goes_on === 1 ? "bid-goes-on" : null;
+  const prebid = hit.has_prebidding_meta === true;
+  const state: MecumLotState = result ? "crossed"
+    : closes !== null && nowMs >= closes ? "closed"
+    : (opens !== null && nowMs >= opens) || (prebid && (closes === null || nowMs < closes)) ? "open"
+    : "upcoming";
+  const stated = positive(hit.current_bid_meta);
+  const year = Number(term(hit, "lot_year"));
+  return {
+    url: `https://www.mecum.com${permalink}`,
+    lot_id: lotId,
+    title: (hit.post_title ?? "").trim() || lotId,
+    lot_number: hit.lot_number_meta || null,
+    sale: term(hit, "auction_tax")?.split("|")[0] ?? null,
+    run_day: term(hit, "run_date"),
+    opens: opens === null ? null : new Date(opens).toISOString(),
+    closes: closes === null ? null : new Date(closes).toISOString(),
+    state,
+    result,
+    current_bid: state === "open" ? stated : null,
+    closing_bid: result ? (stated ?? (result === "bid-goes-on" ? positive(hit.highest_bid_or_price) : null))
+      : state === "closed" ? stated : null,
+    price_with_premium: result === "sold" ? positive(hit.highest_bid_or_price) : null,
+    prebid,
+    no_reserve: (hit.taxonomies?.lot_status ?? []).some((s) => s?.slug === "no-reserve"),
+    image: hit.images_meta?.find((i) => typeof i?.url === "string" && i.url.startsWith("http"))?.url ?? null,
+    year: Number.isInteger(year) && year >= 1885 && year <= 2100 ? year : null,
+    make: term(hit, "make"),
+    model: term(hit, "model"),
   };
 }
