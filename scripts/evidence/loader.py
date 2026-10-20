@@ -368,6 +368,11 @@ class Loader:
         except common.StopLoop as e:
             self.close_runs('aborted', e.reason)
             raise
+        except Exception as e:
+            # a writer raised (a CHECK the local checks missed, a timeout): the call rolled back; close every open
+            # run 'failed' so none is left running, and surface the error
+            self.close_runs('failed', '%s: %s' % (type(e).__name__, str(e)[:200]))
+            raise
         self.close_runs('done', keep_open=keep_open)
 
     def manifest(self):

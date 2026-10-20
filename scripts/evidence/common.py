@@ -303,9 +303,11 @@ class Rest:
                     continue
                 raise RpcError(fn, e.code, j.get('code'), self._scrub(j.get('message') or '')[:500])
             except (urllib.error.URLError, TimeoutError, OSError) as e:
-                # A client-side timeout means the 60 s authenticator cap fired or the network dropped: the caller
-                # treats it like a 57014 cancel (nothing committed).
-                raise RpcError(fn, 0, '57014' if 'timed out' in str(e) else 'network', self._scrub(str(e))[:300])
+                # The database cancels at the authenticator's 60 s and PostgREST answers 57014 before this client's
+                # 75 s timeout. A client timeout or a dropped connection leaves the outcome unknown (the call may still
+                # commit), so it is never recorded as a 57014: the caller stops and the next run re-reads the state.
+                raise RpcError(fn, 0, 'client_timeout' if 'timed out' in str(e) else 'network',
+                               self._scrub(str(e))[:300])
         raise RpcError(fn, 429, 'throttled', 'gave up after 4 attempts')
 
 

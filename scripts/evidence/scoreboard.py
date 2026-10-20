@@ -4,13 +4,14 @@ against the previous scoreboard.
 Statements are read-only and paced (common.Reader: one read a minute by default, EVIDENCE_READ_GAP_S to change).
 "chunked" measures run once per taken_at quarter (idx_vehicle_images_user_taken_at keeps each under the 10 s cap)
 and are summed; M12 reads the merged vehicle ids once, keeps those an active >= 0.85 claim names, and counts per 50
-ids. A measure whose objects are not deployed yet (before M1a/M1w) is recorded with its error. Before starting, the
+ids. A measure whose objects are not deployed yet (before M1a/M1w) is recorded with its error, except M1 and M7, which
+fall back to their pre-store form (taken_at alone, as the 2026-10-20 baseline measured them). Before starting, the
 script refuses to run if another scoreboard statement is already active (db-safety: duplicate heavy reads).
 
 The owner id comes from --user / EVIDENCE_OWNER_ID / the loop config and appears in no output (params show '<uid>').
 
 Usage: python3 scripts/evidence/scoreboard.py --user <owner> --vehicle <exit-test vehicle> [--out-dir <loop dir>]
-       [--date YYYY-MM-DD] [--dry-run]
+       [--date YYYY-MM-DD] [--only M1 M7 ...] [--dry-run]
 """
 import argparse
 import datetime as dt
@@ -70,7 +71,18 @@ def wilson(wrong, n, z=1.96):
     return [round(mid - half, 4), round(mid + half, 4)]
 
 
-def run(reader, uid, vehicle, statements=None, dry_run=False, printer=print):
+def chunked(reader, sql, params, chunks, name, uid, dry_run, printer):
+    total = 0
+    for a, b in chunks:
+        p = dict(params, chunk_from=a, chunk_to=b)
+        if dry_run:
+            printer('-- %s %s..%s\n%s;' % (name, a, b, common.Reader.substitute(sql, p).replace(uid, '<uid>')))
+            continue
+        total += int(reader.read(sql, p, tag=name)[0]['n'])
+    return total
+
+
+def run(reader, uid, vehicle, statements=None, dry_run=False, printer=print, only=None):
     params = {'uid': uid, 'vehicle_id': vehicle, 'window_from': WINDOW[0], 'window_to': WINDOW[1]}
     out = {}
     statements = statements or parse()
@@ -82,19 +94,26 @@ def run(reader, uid, vehicle, statements=None, dry_run=False, printer=print):
             raise common.StopLoop('scoreboard_already_running', '%d active scoreboard statement(s)' % len(active))
     by = {n: (m, s) for n, m, s in statements}
     for name, mode, sql in statements:
-        if name in ('M12_merged_ids', 'M12_claimed_vehicle_ids'):
+        if name in ('M12_merged_ids', 'M12_claimed_vehicle_ids') or name.endswith('_pre') or \
+                (only and name not in only):
             continue
         sql = MARK + sql
         try:
             if mode == 'chunked':
-                total, chunks = 0, quarters()
-                for a, b in chunks:
-                    p = dict(params, chunk_from=a, chunk_to=b)
-                    if dry_run:
-                        printer('-- %s %s..%s\n%s;' % (name, a, b, common.Reader.substitute(sql, p).replace(uid, '<uid>')))
-                        continue
-                    total += int(reader.read(sql, p, tag=name)[0]['n'])
+                chunks = quarters()
+                try:
+                    total = chunked(reader, sql, params, chunks, name, uid, dry_run, printer)
+                    basis = None
+                except common.ReadError as e:
+                    if '42P01' not in str(e) or name + '_pre' not in by:
+                        raise
+                    # the evidence store is not deployed yet: the pre-store form (taken_at alone), as the baseline
+                    total = chunked(reader, MARK + by[name + '_pre'][1], params, chunks, name + '_pre', uid, dry_run,
+                                    printer)
+                    basis = 'pre-store: taken_at alone (v_image_capture_time not deployed)'
                 out[name] = {'value': total, 'chunks': len(chunks)}
+                if basis:
+                    out[name]['basis'] = basis
             elif mode == 'ids':
                 if dry_run:
                     printer('-- %s (per 50 merged ids an active claim names)\n%s;' % (name, sql))
@@ -150,6 +169,7 @@ def main():
     ap.add_argument('--date')
     ap.add_argument('--dry-run', action='store_true', help='print the statements (owner id shown as <uid>); no reads')
     ap.add_argument('--gap', type=float, help='seconds between reads (default EVIDENCE_READ_GAP_S or 60)')
+    ap.add_argument('--only', nargs='*', help='measures to run (default: all)')
     a = ap.parse_args()
     uid = common.owner_id(a.user)
     if not common.is_uuid(a.vehicle):
@@ -160,7 +180,7 @@ def main():
     reader = common.Reader(min_gap=a.gap)
     date = a.date or common.today()
     try:
-        measures = run(reader, uid, a.vehicle)
+        measures = run(reader, uid, a.vehicle, only=a.only)
     except common.StopLoop as e:
         common.eprint('STOP: %s' % e)
         return 3

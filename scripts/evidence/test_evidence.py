@@ -330,6 +330,16 @@ class DbMode(SyntheticCase):
         self.assertTrue(closed and all(c['p_status'] == 'aborted' for c in closed))
         self.assertEqual(closed[0]['p_counts']['stop_reason'], 'writer_refused_42501')
 
+    def test_a_writer_error_closes_every_run_failed(self):
+        rest = FakeRest(fail={'propose_evidence_links': common.RpcError(
+            'propose_evidence_links', 400, '23514', 'new row violates check constraint')})
+        with self.assertRaises(common.RpcError):
+            self.loader(rest).load_dir(self.out)
+        closed = [a for fn, a in rest.calls if fn == 'evidence_close_run']
+        opened = [fn for fn, _a in rest.calls if fn == 'evidence_open_run']
+        self.assertEqual(len(closed), len(opened))
+        self.assertTrue(all(c['p_status'] == 'failed' for c in closed))
+
     def test_guard_and_io_pressure_stop(self):
         rest = FakeRest(fail={'propose_capture_time_claims': common.RpcError(
             'propose_capture_time_claims', 403, '42501', 'image_capture_time_claims: rows are written only by the '
@@ -565,6 +575,19 @@ class ReadPath(unittest.TestCase):
         self.assertNotIn(testdata.OWNER, json.dumps(logged))
         with self.assertRaises(common.ReadError):
             common.Reader.substitute('select :x', {'x': "1'; drop table vehicles; --"})
+
+    def test_scoreboard_falls_back_before_the_store_exists(self):
+        class Pre:
+            def read(self, sql, params=None, tag=None):
+                if tag == 'scoreboard_dupes':
+                    return []
+                if 'v_image_capture_time' in sql or 'image_vehicle_candidates' in sql:
+                    raise common.ReadError('ERROR:  42P01: relation does not exist')
+                return [{'n': 2}]
+        out = scoreboard.run(Pre(), testdata.OWNER, testdata.V['TRUCK'], only=['M1', 'M7', 'M2'])
+        self.assertEqual(out['M1']['value'], 16)
+        self.assertIn('pre-store', out['M1']['basis'])
+        self.assertIn('error', out['M2'])
 
     def test_scoreboard_sql_blocks(self):
         st = scoreboard.parse()

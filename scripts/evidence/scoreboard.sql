@@ -13,6 +13,14 @@ select count(*) n from vehicle_images vi
    and vi.taken_at >= :chunk_from and vi.taken_at < :chunk_to
    and coalesce(t.capture_at, vi.taken_at) >= :window_from and coalesce(t.capture_at, vi.taken_at) < :window_to;
 
+-- name: M1_pre chunked
+-- M1 before the store exists (no v_image_capture_time yet): taken_at alone, as the 2026-10-20 baseline measured it.
+select count(*) n from vehicle_images vi
+ where vi.user_id = :uid and vi.vehicle_id is null
+   and not coalesce(vi.is_superseded, false) and not coalesce(vi.is_duplicate, false) and vi.source <> 'bat_import'
+   and vi.taken_at >= :chunk_from and vi.taken_at < :chunk_to
+   and vi.taken_at >= :window_from and vi.taken_at < :window_to;
+
 -- name: M2
 -- Sampled wrong-filing rate (scoreboard.py adds the Wilson 95% interval).
 select count(*) filter (where st = 'rejected') wrong, count(*) filter (where st in ('confirmed', 'rejected')) decided
@@ -89,6 +97,13 @@ select pass, count(*) runs, sum(input_tokens) tokens, sum(cost_usd) usd, sum((co
 -- In-window rows without a confirmed capture time.
 select count(*) n from vehicle_images vi left join v_image_capture_time t on t.image_id = vi.id
  where vi.user_id = :uid and t.image_id is null and vi.source <> 'bat_import'
+   and vi.taken_at >= :chunk_from and vi.taken_at < :chunk_to
+   and vi.taken_at >= :window_from and vi.taken_at < :window_to;
+
+-- name: M7_pre chunked
+-- M7 before the store exists: every in-window row lacks a confirmed capture time.
+select count(*) n from vehicle_images vi
+ where vi.user_id = :uid and vi.source <> 'bat_import'
    and vi.taken_at >= :chunk_from and vi.taken_at < :chunk_to
    and vi.taken_at >= :window_from and vi.taken_at < :window_to;
 
