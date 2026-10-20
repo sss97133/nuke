@@ -3,6 +3,9 @@ import {
   type BonhamsSaleDoc, bonhamsLot, bonhamsLotPhase, bonhamsSaleKind, parseBonhamsBidStates, parsePcarBids, parsePcarBoard,
 } from "./boards.ts";
 import { type AmLotDoc, type AmSale, amIsVehicleLot, amOpenTimedSales, amSales, amTimedLot } from "./boards.ts";
+import {
+  isUwaVehicle, parseUwaBoard, parseUwaLot, UWA_HOUSES, uwaCurrency, uwaIdentityTitle, uwaKnownMake, uwaOpenLots, zonedTimeToIso,
+} from "./boards.ts";
 
 // Trimmed from https://www.pcarmarket.com/auctions?auctionType=live&page=1 (2026-10-18): the Basta query cache.
 const BOARD = `queries:$R[22]=[$R[30]={state:$R[31]={data:$R[32]={search:$R[33]={pageInfo:$R[34]={page:1,pageSize:24,totalPages:3,hasNextPage:!0},` +
@@ -253,4 +256,109 @@ Deno.test("amIsVehicleLot: a model-year title in a car sale, not a year-led part
   assertEquals(amIsVehicleLot("1992 Original Lotus 107C Rear Wing Element", "Global Icons: Memorabilia Online 2026"), false);
   assertEquals(amIsVehicleLot("Ralf Schumacher 2004 Original Williams Gloves", "Global Icons: Memorabilia Online 2026"), false);
   assertEquals(amTimedLot(GLOVES, MEMO, READ_AT).vehicle, false);
+});
+
+// Ultimate WooCommerce Auction houses. Fixtures are verbatim cuts of pages fetched 2026-10-20 (bidder-name cells removed
+// from the bid histories): every product card of https://www.allcollectorcars.com/classic-car-auctions/auctions/ (server
+// time 15:58:24 EDT) and of https://iconicmotorbikeauctions.com/ (12:59:39 PDT); the countdown, reserve box and bid
+// history of the ACC lot 1970-chevrolet-chevelle-ss-396-2 and the Iconic lot 1993-muzzy-kawasaki-zx-7r-scott-russell-wsbk.
+const fixture = (name: string) => Deno.readTextFileSync(new URL(`./fixtures/${name}`, import.meta.url));
+const ACC = UWA_HOUSES.allcollectorcars;
+const ICONIC = UWA_HOUSES["iconic-motorbike-auctions"];
+
+Deno.test("parseUwaBoard reads every ACC card: lot id, link, title, image, bid, close in UTC, tags", () => {
+  const cards = parseUwaBoard(fixture("uwa-acc-auctions-20261020.html"));
+  assertEquals(cards.length, 63);
+  assertEquals(cards.every((c) => c.status === "live"), true);
+  assertEquals(cards.filter((c) => c.current_bid !== null).length, 61);
+  assertEquals(cards.filter((c) => c.starting_bid !== null).map((c) => [c.auction_id, c.starting_bid]), [["1978203", 1000], ["1978527", 1000]]);
+  const rr = cards.find((c) => c.auction_id === "1978798")!;
+  assertEquals(rr, {
+    auction_id: "1978798",
+    href: "https://www.allcollectorcars.com/classic-car-auctions/vehicles/1969-plymouth-road-runner/",
+    url: "https://www.allcollectorcars.com/classic-car-auctions/vehicles/1969-plymouth-road-runner",
+    title: "1969 Plymouth Road Runner Convertible",
+    subtitle: "Numbers-Matching 383 HP V8 | A-833 4-Speed | 3.23 Sure Grip | Factory A/C | 1-of-1 Galen Registry Documented",
+    image: "https://allcollectorcars.nyc3.digitaloceanspaces.com/auction/wp-content/uploads/2026/10/16163731/Screenshot-2026-10-16-at-4.22.48-PM-400x225.png",
+    status: "live",
+    current_bid: 1200,
+    starting_bid: null,
+    symbol: "$",
+    ends_local: "2026-10-27 14:00:00",
+    zone: "America/New_York",
+    ends: "2026-10-27T18:00:00.000Z",
+    reserve_met: null,
+    no_reserve: false,
+    categories: ["auctions", "convertible", "muscle-car-auctions", "plymouth", "road-runner"],
+  });
+  assertEquals(uwaCurrency(rr, ACC), "USD");
+  // entities decoded in titles
+  assertEquals(cards.find((c) => c.auction_id === "1978449")!.title, "1976 Chevrolet Blazer Cheyenne 4×4");
+});
+
+Deno.test("uwaOpenLots keeps ACC's vehicles and drops its automobilia (kiddie rides, signs, a traffic light)", () => {
+  const cards = parseUwaBoard(fixture("uwa-acc-auctions-20261020.html"));
+  const open = uwaOpenLots(cards, ACC, Date.parse("2026-10-20T19:58:24Z"));
+  const dropped = cards.filter((c) => !open.includes(c)).map((c) => c.title);
+  assertEquals(dropped.sort(), ["Custom Ferrari Neon Sign", "Rabbit Kiddie Ride", "Sandy Horse Kiddie Ride", "Space Shuttle Kiddie Ride",
+    "Vintage Traffic Light Replica"]);
+  assertEquals([open.length, open.filter((c) => c.current_bid !== null).length], [58, 56]);
+  // a lot whose close has passed is not open
+  assertEquals(uwaOpenLots(cards, ACC, Date.parse("2026-10-27T18:00:00Z")).length, 0);
+});
+
+Deno.test("parseUwaBoard reads Iconic's cards: soft-close time, reserve met, no-reserve titles, Bidding Open", () => {
+  const cards = parseUwaBoard(fixture("uwa-iconic-home-20261020.html"));
+  assertEquals(cards.length, 24);
+  assertEquals(cards.filter((c) => c.current_bid !== null).length, 20);
+  const bimota = cards.find((c) => c.auction_id === "96471")!;
+  // the close moved by a late bid: 13:00:00 became 13:01:16 Pacific
+  assertEquals([bimota.title, bimota.current_bid, bimota.ends_local, bimota.zone, bimota.ends, bimota.reserve_met],
+    ["1991 Bimota YB10 Dieci", 11600, "2026-10-20 13:01:16", "America/Los_Angeles", "2026-10-20T20:01:16.000Z", true]);
+  const montesa = cards.find((c) => c.auction_id === "101225")!;
+  assertEquals([montesa.no_reserve, montesa.reserve_met, uwaIdentityTitle(montesa.title)],
+    [true, true, "2003 Montesa Honda HRC 315R Dougie Lampkin Replica"]);
+  const fzr = cards.find((c) => c.auction_id === "100945")!;
+  assertEquals([fzr.current_bid, fzr.starting_bid, fzr.symbol, uwaCurrency(fzr, ICONIC)], [null, null, null, "USD"]);
+});
+
+Deno.test("uwaOpenLots keeps Iconic's motorcycles and drops its memorabilia and watch", () => {
+  const cards = parseUwaBoard(fixture("uwa-iconic-home-20261020.html"));
+  const open = uwaOpenLots(cards, ICONIC, Date.parse("2026-10-20T19:59:39Z"));
+  const dropped = cards.filter((c) => !open.includes(c)).map((c) => c.auction_id);
+  // signed helmet (only "motorbikes"), team leathers (memorabilia), Tissot watch (no motorbikes category)
+  assertEquals(dropped.sort(), ["101122", "101387", "101460"]);
+  assertEquals([open.length, open.filter((c) => c.current_bid !== null).length], [21, 18]);
+  assertEquals(isUwaVehicle(cards.find((c) => c.auction_id === "97934")!, ICONIC), true); // 1912 Indian board-track racer
+  // after the Bimota's extended close it is no longer open
+  assertEquals(uwaOpenLots(cards, ICONIC, Date.parse("2026-10-20T20:01:17Z")).some((c) => c.auction_id === "96471"), false);
+});
+
+Deno.test("uwaKnownMake takes the make from a tag the title spells right after the year", () => {
+  assertEquals(uwaKnownMake("1992 Mercedes-Benz 190E", ["auctions", "foreign-and-import-car-auctions", "luxury", "mercedes-benz", "190e"]), "Mercedes-Benz");
+  assertEquals(uwaKnownMake("1986 Zimmer Golden Spirit", ["auctions", "classic-car-auctions", "zimmer", "zimmer-golden-spirit"]), "Zimmer");
+  assertEquals(uwaKnownMake("2003 Montesa Honda HRC 315R Dougie Lampkin Replica", ["montesa", "motorbikes"]), "Montesa");
+  // no tag names the first words: the first word stays the make
+  assertEquals(uwaKnownMake("2017 Ford Mustang Shelby GT350", ["auctions", "mustang", "late-models", "performance-car-auctions", "shelby", "gt350"]), null);
+});
+
+Deno.test("parseUwaLot reads the bid count, reserve state and close of a lot page", () => {
+  assertEquals(parseUwaLot(fixture("uwa-acc-lot-1978441-20261020.html"), "1978441"), {
+    bid_count: 8, reserve_met: false, ends_local: "2026-10-22 13:50:00", zone: "America/New_York", ends: "2026-10-22T17:50:00.000Z",
+  });
+  assertEquals(parseUwaLot(fixture("uwa-iconic-lot-101200-20261020.html"), "101200"), {
+    bid_count: 30, reserve_met: true, ends_local: "2026-10-24 14:00:00", zone: "America/Los_Angeles", ends: "2026-10-24T21:00:00.000Z",
+  });
+  // another lot's page, or no page: nothing claimed
+  assertEquals(parseUwaLot(fixture("uwa-acc-lot-1978441-20261020.html"), "1"), {
+    bid_count: null, reserve_met: false, ends_local: null, zone: null, ends: null,
+  });
+});
+
+Deno.test("zonedTimeToIso converts a house's wall clock through daylight saving", () => {
+  assertEquals(zonedTimeToIso("2026-10-27 14:00:00", "America/New_York"), "2026-10-27T18:00:00.000Z");
+  assertEquals(zonedTimeToIso("2026-11-02 13:00:00", "America/New_York"), "2026-11-02T18:00:00.000Z");
+  assertEquals(zonedTimeToIso("2026-11-01 01:30:00", "America/Los_Angeles"), "2026-11-01T08:30:00.000Z");
+  assertEquals(zonedTimeToIso("2026-10-27 14:00:00", "Not/AZone"), null);
+  assertEquals(zonedTimeToIso("27/10/2026", "America/New_York"), null);
 });

@@ -14,21 +14,25 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
  *   - Broad Arrow: its bidding site's timed online sales (sale list hourly, lot list with top bids every run)
  *   - Cars & Bids: Uses Firecrawl (Cloudflare protected)
  *   - Mecum, Barrett-Jackson, Gooding: Firecrawl scrape + extract; RM Sotheby's has no readable live bid (see syncRMSothebys)
- * Collecting Cars, PCarMarket, Bonhams and Broad Arrow boards are complete lists: after the vehicles upsert each is handed to
- * live_auction_board_sync, the monitored_auctions schedule writer for those houses (BaT's is bat_live_pull_run).
+ *   - AllCollectorCars ACC Auctions, Iconic Motorbike Auctions: one reader for the WordPress auction plugin both run
+ *     (Ultimate WooCommerce Auction): the server-rendered list of open lots, lot pages for bid count and reserve
+ * Collecting Cars, PCarMarket, Bonhams, Broad Arrow and the plugin houses' boards are complete lists: after the vehicles
+ * upsert each is handed to live_auction_board_sync, the monitored_auctions schedule writer for those houses (BaT's is
+ * bat_live_pull_run).
  *
  * Deploy: supabase functions deploy sync-live-auctions --no-verify-jwt
  *
  * Usage:
  *   POST {"action": "sync"}                      - sync all platforms
- *   POST {"action": "sync", "platform": "bat"}   - sync specific platform (bat, cc, cab, pcarmarket, mecum, barrett-jackson, rm-sothebys, gooding, bonhams, broad-arrow)
+ *   POST {"action": "sync", "platform": "bat"}   - sync specific platform (bat, cc, cab, pcarmarket, mecum, barrett-jackson, rm-sothebys, gooding, bonhams, broad-arrow,
+ *                                                  allcollectorcars, iconic-motorbike-auctions)
  *   POST {"action": "sync", "platforms": ["collecting-cars", "pcarmarket", "bonhams"]} - sync several
  *   POST {"action": "status"}                    - get current live auction stats
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { firecrawlScrape } from "../_shared/firecrawl.ts";
-import { archiveFetch } from "../_shared/archiveFetch.ts";
+import { archiveFetch, isGarbageHtml } from "../_shared/archiveFetch.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { parseBatIdentityFromUrl, parseBatIdentityFromTitle } from "../_shared/batParser.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
@@ -38,6 +42,9 @@ import {
   type PcarBoardItem, parseBonhamsBidStates, parsePcarBids, parsePcarBoard,
 } from "./boards.ts";
 import { type AmLotDoc, amOpenTimedSales, amSales, amTimedLot, BROAD_ARROW_BID } from "./boards.ts";
+import {
+  parseUwaBoard, parseUwaLot, UWA_HOUSES, type UwaHouse, type UwaLotRead, uwaCurrency, uwaIdentityTitle, uwaKnownMake, uwaOpenLots,
+} from "./boards.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -777,6 +784,183 @@ async function syncBroadArrow(): Promise<{ auctions: LiveAuction[]; error: strin
 const BOARD_SOURCES: Record<string, string> = { "collecting-cars": "collecting-cars", pcarmarket: "pcarmarket", bonhams: "bonhams", "broad-arrow": "broad-arrow" };
 
 // ============================================
+// Ultimate WooCommerce Auction houses (AllCollectorCars ACC Auctions, Iconic Motorbike Auctions): one reader
+// ============================================
+
+for (const slug of Object.keys(UWA_HOUSES)) BOARD_SOURCES[slug] = slug; // their list page is the complete open board
+
+const UWA_DETAIL_DEADLINE_MS = 40_000; // lot-page reads stop once the run has used this much of its budget
+const UWA_UA = "NukeListingCollector/1.0 (+https://nuke.ag)"; // the identified public reader (archiveFetch publicOnly)
+// deno-lint-ignore no-explicit-any
+type UwaDb = ReturnType<typeof createClient<any>>; // untyped schema: rows read as any, not never
+
+/**
+ * A plugin house's page by one direct GET with the reader's identity, no redirect followed. archiveFetch's direct
+ * fetcher cannot read these WordPress pages reliably: it takes a page for a login wall on "Log in to Reply" or "sign in
+ * to add auction to watchlist" next to "register" (every lot page of both houses, 2026-10-20) and for a block whenever
+ * the word "blocked" appears in its text (ACC lot pages). refused = the site said no (401/403/429, or a challenge page).
+ */
+async function uwaGet(url: string): Promise<{ html: string | null; status: number | null; refused: boolean; error: string | null }> {
+  try {
+    const res = await fetch(url, { headers: { "User-Agent": UWA_UA, Accept: "text/html,application/xhtml+xml" }, redirect: "manual", signal: AbortSignal.timeout(20_000) }); // guardrail-allow: raw-fetch (house page; archiveFetch's direct fetcher rejects these pages, see above)
+    const html = await res.text();
+    const refused = [401, 403, 429].includes(res.status) || (res.ok && isGarbageHtml(html, "uwa"));
+    return res.ok && !refused ? { html, status: res.status, refused, error: null } : { html: null, status: res.status, refused, error: `HTTP ${res.status}` };
+  } catch (e: unknown) {
+    return { html: null, status: null, refused: false, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+/**
+ * One read of a plugin house: its list page (every open lot's id, link, title, image, bid and close), archived through
+ * archiveFetch, read directly when archiveFetch's heuristics reject a page the site served (HTTP 200); then lot pages for
+ * the lots that are new or whose bid moved since the last read (bid count = rows of the bid history; reserve state), at
+ * most house.detailReads a run, soonest close first, one second apart. A lot whose bid did not move keeps the bid count
+ * monitored_auctions holds from its last read. No Firecrawl. A refused read is recorded as 'blocked'; after three in a
+ * row the house is probed once an hour, never evaded.
+ */
+async function syncUwaHouse(
+  supabase: UwaDb,
+  house: UwaHouse,
+  startedAt: number,
+): Promise<{ auctions: LiveAuction[]; error: string | null }> {
+  try {
+    const { data: src } = await supabase.from("live_auction_sources")
+      .select("id, consecutive_failures, last_sync_error").eq("slug", house.slug).maybeSingle();
+    const failures = Number(src?.consecutive_failures ?? 0);
+    if (/^blocked/.test(String(src?.last_sync_error ?? "")) && failures >= 3 && failures % 12 !== 0) {
+      return { auctions: [], error: `blocked (holding): ${house.label} refused ${failures} reads in a row; probing once an hour` };
+    }
+    const page = await archiveFetch(house.listUrl, {
+      platform: house.slug, skipCache: true, useFirecrawl: false, directFetchOptions: { publicOnly: true }, callerName: "sync-live-auctions",
+    });
+    let html = page.html && !isGarbageHtml(page.html, house.slug) ? page.html : null;
+    if (!html && page.statusCode === 200) {
+      const direct = await uwaGet(house.listUrl);
+      html = direct.html;
+      if (!html) return { auctions: [], error: `${direct.refused ? "blocked: " : ""}${house.label} list: ${direct.error ?? "unreadable page"}` };
+    }
+    if (!html) {
+      const refused = [401, 403, 429].includes(page.statusCode ?? 0) || !!page.html;
+      return { auctions: [], error: `${refused ? "blocked: " : ""}${house.label} list: HTTP ${page.statusCode ?? "-"} ${page.error ?? "unreadable page"}` };
+    }
+    const lots = uwaOpenLots(parseUwaBoard(html), house, Date.now());
+    if (!lots.length) return { auctions: [], error: `${house.label} list: no open lots parsed` };
+
+    // the last read of each lot (monitored_auctions, written every run by live_auction_board_sync)
+    const prior = new Map<string, { cents: number | null; bids: number | null }>();
+    if (src?.id) {
+      const { data: rows, error } = await supabase.from("monitored_auctions")
+        .select("external_auction_id, current_bid_cents, bid_count").eq("source_id", src.id)
+        .in("external_auction_id", lots.map((l) => l.auction_id));
+      if (error) console.warn(`[sync-live-auctions] ${house.slug}: prior read failed: ${error.message}`);
+      for (const r of rows ?? []) {
+        prior.set(String(r.external_auction_id), {
+          cents: r.current_bid_cents === null ? null : Number(r.current_bid_cents),
+          bids: r.bid_count === null ? null : Number(r.bid_count),
+        });
+      }
+    }
+    const cents = (v: number) => Math.round(v * 100);
+    const moved = lots.filter((l) => {
+      if (l.current_bid === null) return false; // no bid yet: zero bids, nothing to read
+      const p = prior.get(l.auction_id);
+      return !p || p.bids === null || p.cents !== cents(l.current_bid);
+    }).sort((a, b) => Date.parse(a.ends!) - Date.parse(b.ends!));
+
+    const reads = new Map<string, UwaLotRead>();
+    let readErrors = 0;
+    for (const lot of moved.slice(0, house.detailReads)) {
+      if (Date.now() - startedAt > UWA_DETAIL_DEADLINE_MS) break;
+      if (reads.size + readErrors > 0) await new Promise((r) => setTimeout(r, 1000));
+      const res = await uwaGet(lot.href); // lot.href passed house.lotUrl: no other link on the site is followed
+      if (!res.html) {
+        readErrors++;
+        console.warn(`[sync-live-auctions] ${house.slug}: lot page ${lot.href}: ${res.error ?? "unreadable"}`);
+        if (res.refused) break; // the site said no: stop reading lot pages this run
+        continue;
+      }
+      reads.set(lot.auction_id, parseUwaLot(res.html, lot.auction_id));
+    }
+    console.log(`[sync-live-auctions] ${house.slug}: ${lots.length} open lots (${lots.filter((l) => l.current_bid !== null).length} with a bid), ` +
+      `${moved.length} new or moved, ${reads.size} lot pages read, ${readErrors} failed`);
+
+    const auctions: LiveAuction[] = lots.map((l) => {
+      const read = reads.get(l.auction_id);
+      const p = prior.get(l.auction_id);
+      const bidCount = l.current_bid === null ? 0 : read?.bid_count ?? (p && p.cents === cents(l.current_bid) ? p.bids : null);
+      const idTitle = uwaIdentityTitle(l.title);
+      const ident = parseBatIdentityFromTitle(idTitle, uwaKnownMake(idTitle, l.categories));
+      return {
+        url: l.url,
+        title: l.title,
+        platform: house.slug,
+        auction_end_date: read?.ends ?? l.ends ?? "",
+        current_bid: l.current_bid,
+        bid_count: bidCount,
+        currency: uwaCurrency(l, house),
+        no_reserve: l.no_reserve,
+        reserve_met: read?.reserve_met ?? l.reserve_met,
+        year: ident.year,
+        make: ident.make,
+        model: ident.model,
+        thumbnail_url: l.image,
+        external_id: l.auction_id,
+        raw_data: {
+          source: "uwa_live_list", list_url: house.listUrl, auction_id: l.auction_id, subtitle: l.subtitle,
+          starting_bid: l.starting_bid, categories: l.categories, ends_local: read?.ends_local ?? l.ends_local, zone: l.zone,
+          lot_page_read: !!read, synced_at: new Date().toISOString(),
+        },
+      };
+    });
+    return { auctions, error: null };
+  } catch (e: unknown) {
+    return { auctions: [], error: `${house.label} sync failed: ${e instanceof Error ? e.message : String(e)}` };
+  }
+}
+
+/**
+ * A plugin house after its vehicles upsert. Its list page is the complete open board, so a live row of the house absent
+ * from it has ended: sale_status/auction_status 'ended', no outcome claimed (end_live_auctions_absent's rule without its
+ * 50-lot floor, which a 20-lot house never reaches). And when this read changed no row (the upsert writes only rows whose
+ * bid, close, status or image moved), the soonest-closing lot gets this read's updated_at, so the board's
+ * six-hour reader-freshness gate sees a reader that is running, and one that stops still drops off.
+ */
+async function closeUwaBoard(
+  supabase: UwaDb,
+  platform: string,
+  auctions: LiveAuction[],
+  rows: { listing_url: string; auction_end_date: string; updated_at: string }[],
+  written: number,
+): Promise<{ ended: number; errors: string[] }> {
+  const out = { ended: 0, errors: [] as string[] };
+  const live = new Set(auctions.map((a) => a.url.replace(/\/+$/, "")));
+  const { data: open, error } = await supabase.from("vehicles").select("id, listing_url")
+    .eq("sale_status", "auction_live").eq("platform_source", platform).is("deleted_at", null).limit(2000);
+  if (error) {
+    out.errors.push(`${platform} live rows: ${error.message}`);
+    return out;
+  }
+  const gone = (open ?? []).filter((v) => !live.has(String(v.listing_url ?? "").replace(/\/+$/, ""))).map((v) => v.id);
+  if (gone.length) {
+    const { error: endErr, count } = await supabase.from("vehicles")
+      .update({ sale_status: "ended", auction_status: "ended", updated_at: new Date().toISOString() }, { count: "exact" })
+      .in("id", gone).eq("sale_status", "auction_live");
+    if (endErr) out.errors.push(`${platform} end absent lots: ${endErr.message}`);
+    else out.ended = count ?? gone.length;
+  }
+  if (written === 0 && rows.length) {
+    // updated_at only: the row's metadata (reserve state, bid count) stays as its last change wrote it
+    const first = [...rows].sort((a, b) => a.auction_end_date.localeCompare(b.auction_end_date))[0];
+    const { error: stampErr } = await supabase.from("vehicles")
+      .update({ updated_at: first.updated_at })
+      .eq("listing_url", first.listing_url).eq("sale_status", "auction_live").is("deleted_at", null);
+    if (stampErr) out.errors.push(`${platform} read stamp: ${stampErr.message}`);
+  }
+  return out;
+}
+
+// ============================================
 // Cars & Bids Sync (Firecrawl)
 // ============================================
 
@@ -977,7 +1161,11 @@ async function syncToDatabase(
   // Cars' feed are the complete live sets, so a row of this platform that is absent from them ends
   // here — sale_status/auction_status 'ended', no sale claim; settlement records the result. The RPC
   // ends nothing for a short (partial) list. Homepage-scraped platforms are not complete lists.
-  if (platform === "bringatrailer" || platform === "collecting-cars" || platform === "pcarmarket") {
+  if (UWA_HOUSES[platform]) {
+    const closed = await closeUwaBoard(supabase, platform, auctions, upsertRows, stats.new_count);
+    stats.ended_count = closed.ended;
+    stats.write_errors.push(...closed.errors);
+  } else if (platform === "bringatrailer" || platform === "collecting-cars" || platform === "pcarmarket") {
     const { data: ended, error: endErr } = await supabase.rpc("end_live_auctions_absent", {
       p_platform: platform,
       p_live_urls: auctions.map(a => a.url),
@@ -1257,6 +1445,10 @@ Deno.serve(async (req) => {
           case "broad-arrow":
             syncResult = await syncBroadArrow();
             break;
+          case "allcollectorcars":
+          case "iconic-motorbike-auctions":
+            syncResult = await syncUwaHouse(supabase, UWA_HOUSES[platform], functionStartTime);
+            break;
           default:
             syncResult = { auctions: [], error: `Unknown platform: ${platform}` };
         }
@@ -1356,7 +1548,9 @@ Deno.serve(async (req) => {
           .from("vehicles")
           .update({ auction_status: "ended", sale_status: "not_sold" })
           .eq("auction_status", "active")
-          .neq("platform_source", "bringatrailer") // BaT soft-close clocks require a native terminal record.
+          // BaT soft-close clocks require a native terminal record. The plugin houses end their own lots ('ended'), never
+          // with an unobserved 'not_sold'.
+          .not("platform_source", "in", `(${["bringatrailer", ...Object.keys(UWA_HOUSES)].join(",")})`)
           .lt("auction_end_date", new Date().toISOString())
           .not("auction_end_date", "is", null)
           .select("id", { count: "exact", head: true });
