@@ -6,6 +6,7 @@
  * `seller.sellerAccountType` exist only on EBAY_AT/BE/CH/DE/ES/FR/GB/IE/IT/PL. So the seller class here is a
  * CLAIM made by Nuke from stated signals, stored beside those signals; it is never an eBay fact.
  */
+import { vinCheckDigitOk } from "../_shared/batAuctionRecord.ts";
 
 export type SellerClass = "likely_private" | "unknown" | "likely_dealer";
 
@@ -107,6 +108,35 @@ export function vinOf(a: Record<string, string>): { vin: string | null; modern: 
   if (!raw || /^(NA|N\/A|NONE|UNKNOWN|NOVIN)$/.test(raw)) return { vin: null, modern: false };
   if (/^(.)\1+$/.test(raw)) return { vin: null, modern: false };   // 00000000000000000, 11111111111111111, XXXXXXXXXXXXXXXXX: a placeholder typed into the field, not a VIN
   return { vin: raw, modern: VIN17.test(raw) };
+}
+
+/**
+ * The VIN a listing may join an existing vehicle by, or null. A seller-typed VIN picks a vehicle only when it is strong
+ * for the car's era: a 17-character VIN (VIN alphabet; a North American one, or one on a pre-1980 car, must pass its
+ * check digit), or for a car before 1981 a chassis number of 8 to 16 characters. eBay's VIN field pads old chassis
+ * numbers with leading zeros ("0000008T02S…"), so that form is looked up both padded and bare. Placeholders
+ * (repeated characters, counting runs, all zeros) never link. Anything else is kept on the observation as a claim and
+ * the listing lands as its own vehicle, never on a year/make/model neighbour.
+ * Measured 2026-10-20 on 19,269 archived episodes: every join onto another source's vehicle was an exact VIN match;
+ * 25 joins stood on a placeholder, zero-padded or non-VIN-alphabet value; the placeholder ones, read by hand, were each
+ * one seller relisting one car, so the rule closes the door without any repair.
+ */
+export function linkVin(vin: string | null | undefined, year: number | null | undefined): { grade: "vin17" | "chassis"; keys: string[] } | null {
+  const v = String(vin ?? "").replace(/[\s-]/g, "").toUpperCase();
+  if (!/^[A-Z0-9]{8,17}$/.test(v) || !/\d/.test(v)) return null;
+  if (/(.)\1{7,}/.test(v.replace(/^0+/, "")) || /^(.)\1+$/.test(v) || /0123456|1234567|2345678|3456789/.test(v)) return null;
+  const y = Number(year) || null;
+  const bare = v.replace(/^0+/, "");
+  const padded = v.length === 17 && bare.length < 17 && y !== null && y < 1981;
+  if (v.length === 17 && !padded) {
+    if (!VIN17.test(v)) return null;
+    const check = vinCheckDigitOk(v);
+    if ((/^[1-5]/.test(v) || (y !== null && y < 1980)) && check !== true) return null;
+    return { grade: "vin17", keys: [v] };
+  }
+  if (y === null || y >= 1981) return null;
+  if (bare.length < 8 || bare.length > 16 || /(.)\1{7,}/.test(bare)) return null;
+  return { grade: "chassis", keys: bare === v ? [v] : [v, bare] };
 }
 
 // ---- seller class ----------------------------------------------------------------------------------------------
