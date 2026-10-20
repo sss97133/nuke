@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!-- The daily image-evidence loop (PLAN section 5): 04:00 local (the Mac runs Pacific time). Runs loop.py from a
+       detached worktree reset to origin/main before each run, under dotenvx. Placeholders (scripts/evidence/README.md,
+       "Scheduling"): __HOME__, __WORKTREE__ (e.g. __HOME__/.worktrees/evidence-runner), __CASE__ (the local case
+       file), __OUT__ (a dated run folder is created under it), __MODE__ (file until the evidence store is live, then
+       db) and __DB_WRITES__ (0, or 1 once M1a/M1w are deployed and verified). The owner id is read from the local
+       loop config, never from this file. Install: fill the placeholders, plutil -lint, then launchctl bootstrap. -->
+  <key>Label</key><string>ag.nuke.evidence-loop</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>-c</string>
+    <string>set -euo pipefail; WT="__WORKTREE__"; git -C "__HOME__/nuke" fetch -q origin main; [ -d "$WT" ] || git -C "__HOME__/nuke" worktree add -q --detach "$WT" origin/main; git -C "$WT" checkout -q --detach origin/main; git -C "$WT" reset -q --hard origin/main; cd "$WT"; exec /opt/homebrew/bin/dotenvx run -q -f "__HOME__/nuke/.env" -- python3 scripts/evidence/loop.py --mode __MODE__ --case "__CASE__" --out "__OUT__/$(date +%F)"</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key><string>__HOME__/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    <key>EVIDENCE_DB_WRITES</key><string>__DB_WRITES__</string>
+  </dict>
+  <key>StartCalendarInterval</key>
+  <dict><key>Hour</key><integer>4</integer><key>Minute</key><integer>0</integer></dict>
+  <key>StandardOutPath</key><string>__OUT__/launchd.log</string>
+  <key>StandardErrorPath</key><string>__OUT__/launchd.log</string>
+</dict>
+</plist>

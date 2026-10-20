@@ -72,6 +72,9 @@ jobs:
       - name: Market fold refresh contracts
         run: python3 scripts/test-refresh-market-views.py
 
+      - name: Evidence loop runner contracts
+        run: python3 scripts/evidence/test_evidence.py
+
       - name: Type check
         working-directory: ./nuke_frontend
         run: npm run type-check || npx tsc --noEmit --skipLibCheck
