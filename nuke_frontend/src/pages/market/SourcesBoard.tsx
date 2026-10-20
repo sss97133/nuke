@@ -1534,12 +1534,22 @@ function PulseLines({ title, series, labels, now, last }: {
           <div key={kind} className={`market-sources__pulse-row is-${kind}`} title={hint}>
             <span className="market-sources__pulse-label">{label}</span>
             <strong className="market-sources__pulse-total">{count(total)}</strong>
-            <div className="market-sources__pulse-bars" role="img" aria-label={`${label}: ${count(total)}`}>
+            <svg className="market-sources__pulse-line" viewBox="0 0 100 28" preserveAspectRatio="none" role="img" aria-label={`${label}: ${count(total)}`}>
+              <line className="market-sources__pulse-base" x1="0" x2="100" y1="27" y2="27" vectorEffect="non-scaling-stroke" />
+              {vals.length > 1 ? (
+                <polyline className="market-sources__pulse-path" vectorEffect="non-scaling-stroke"
+                  points={vals.map((n, i) => `${((i / (vals.length - 1)) * 100).toFixed(2)},${(26 - (n / max) * 24).toFixed(2)}`).join(' ')} />
+              ) : null}
+              {vals.length > 1 ? (
+                <polyline className="market-sources__pulse-path is-now" vectorEffect="non-scaling-stroke"
+                  points={vals.slice(-2).map((n, i) => `${(((vals.length - 2 + i) / (vals.length - 1)) * 100).toFixed(2)},${(26 - (n / max) * 24).toFixed(2)}`).join(' ')} />
+              ) : null}
               {vals.map((n, idx) => (
-                <i key={idx} className={idx === vals.length - 1 ? 'is-now' : ''} title={`${labels(idx, vals.length)}: ${count(n)}`}
-                  style={{ height: n > 0 ? `${Math.max(8, Math.round((Math.sqrt(n) / Math.sqrt(max)) * 100))}%` : '0' }} />
+                <rect key={idx} x={(idx / vals.length) * 100} y="0" width={100 / vals.length} height="28" fill="transparent">
+                  <title>{`${labels(idx, vals.length)}: ${count(n)}`}</title>
+                </rect>
               ))}
-            </div>
+            </svg>
             <small className="market-sources__pulse-last">{last ? formatTickAgo(last[kind], now) : ''}</small>
           </div>
         );
