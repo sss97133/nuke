@@ -29,6 +29,19 @@ function exactListingKey(raw: string): string | null {
   } catch { return null; }
 }
 
+/** The live (not merged, not deleted) vehicles holding this platform's lot episode. */
+async function liveVehicles(supabase: { from: (t: string) => any }, platform: string, listingUrlKey: string, signal: AbortSignal): Promise<string[]> {
+  const { data: events, error } = await supabase.from('vehicle_events').select('vehicle_id')
+    .eq('source_platform', platform).eq('source_listing_id', listingUrlKey).limit(10).abortSignal(signal);
+  if (error) throw error;
+  const ids = [...new Set<string>((events ?? []).map((e: { vehicle_id: string }) => e.vehicle_id))];
+  if (!ids.length) return [];
+  const { data: vehicles, error: vErr } = await supabase.from('vehicles').select('id,status,deleted_at').in('id', ids).abortSignal(signal);
+  if (vErr) throw vErr;
+  return (vehicles ?? []).filter((v: { status?: string | null; deleted_at?: string | null }) => v.status !== 'merged' && !v.deleted_at)
+    .map((v: { id: string }) => v.id);
+}
+
 export async function resolveExistingVehicleId(
   supabase: { from: (t: string) => any },
   options: ResolveOptions
@@ -46,7 +59,12 @@ export async function resolveExistingVehicleId(
       .eq('source_platform', platform)
       .eq('source_listing_id', listingUrlKey);
     if (signal) query = query.limit(2).abortSignal(signal);
-    const { data: event, error } = await query.maybeSingle();
+    let { data: event, error } = await query.maybeSingle();
+    // A merged-away duplicate keeps its copy of the lot's episode; the lot still belongs to one live vehicle.
+    if (requireExactListingUrl && error && (error as { code?: string }).code === 'PGRST116') {
+      const live = await liveVehicles(supabase, platform, listingUrlKey, signal!);
+      if (live.length === 1) { event = { vehicle_id: live[0] }; error = null; }
+    }
     if (requireExactListingUrl && error) throw error;
     if (event?.vehicle_id) {
       return { vehicleId: event.vehicle_id };
@@ -57,10 +75,10 @@ export async function resolveExistingVehicleId(
     // A canonical URL hit alone cannot exclude conflicting query/hash aliases.
     // Inspect a bounded candidate set, then compare whole keys rather than prefixes.
     const pattern = `%${listingUrlKey!.replace(/[\\%_]/g, '\\$&')}%`;
-    const { data, error } = await supabase.from('vehicles').select('id,discovery_url')
+    const { data, error } = await supabase.from('vehicles').select('id,discovery_url,status,deleted_at')
       .ilike('discovery_url', pattern).limit(51).abortSignal(signal!);
     if (error) throw error;
-    const rows = data ?? [];
+    const rows = (data ?? []).filter((row: { status?: string | null; deleted_at?: string | null }) => row.status !== 'merged' && !row.deleted_at);
     if (rows.length >= 51) throw new Error('Listing URL candidate limit reached; identity unresolved');
     const ids = [...new Set<string>(rows.filter((row: { discovery_url: string }) => exactListingKey(row.discovery_url) === listingUrlKey)
       .map((row: { id: string }) => row.id))];
