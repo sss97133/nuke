@@ -8,7 +8,7 @@ import { listingKey, type LiveAuction } from './useMarketPulse';
 
 const lot = (id: string, make: string, year: number): LiveAuction => ({
   id, make, year, model: 'Recorded model', currentBid: 100, endsAt: 0, updatedAt: 0, listedAt: 0,
-  listingUrl: `https://bringatrailer.com/listing/${id}/`, imageUrl: null, noReserve: false, title: null, band: null,
+  listingUrl: `https://bringatrailer.com/listing/${id}/`, imageUrl: null, noReserve: false, title: null, band: null, house: 'bringatrailer', currency: 'USD',
 });
 const lots = [lot('p1', 'PORSCHE', 2011), lot('p2', 'PORSCHE', 2004), lot('p3', 'PORSCHE', 1992), lot('f1', 'FORD', 1968)];
 const initialLens: InventoryMapLens = { group: 'make', inside: 'lot', focus: null, child: null };

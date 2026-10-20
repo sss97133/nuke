@@ -1,4 +1,4 @@
-import { listingKey, type InventoryTaxonomy, type LiveAuction } from './useMarketPulse';
+import { listingKey, usdBid, type InventoryTaxonomy, type LiveAuction } from './useMarketPulse';
 import { squarify } from '../../lib/squarify';
 import { vehicleIdentity } from './useMarketRowDetails';
 
@@ -56,7 +56,7 @@ export interface ReadableMapGroup extends InventoryMapGroup { remainder?: Invent
 // opened into what it is made of). A lot without a recorded bid adds no dollars.
 export type MapMeasure = 'lots' | 'bids';
 export function groupArea(group: InventoryMapGroup, measure: MapMeasure = 'lots'): number {
-  return measure === 'bids' ? group.lots.reduce((n, a) => n + (a.currentBid != null && a.currentBid > 0 ? a.currentBid : 0), 0)
+  return measure === 'bids' ? group.lots.reduce((n, a) => n + (usdBid(a) != null && usdBid(a)! > 0 ? usdBid(a)! : 0), 0)
     : group.lots.length;
 }
 

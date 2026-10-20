@@ -4,7 +4,7 @@ import { inventoryGroups, mapLens, mapValue, matchesMapLens, taxonomyByListing, 
 
 const lot = (id: string, make = 'FORD', year: number | null = 1995): LiveAuction => ({ id, make, year, model: 'Shared model',
   currentBid: 100, endsAt: 0, updatedAt: 0, listedAt: 0, listingUrl: `https://bringatrailer.com/listing/${id}/`,
-  imageUrl: null, noReserve: false, title: null, band: null });
+  imageUrl: null, noReserve: false, title: null, band: null, house: 'bringatrailer', currency: 'USD' });
 
 describe('inventory map grain and grouping', () => {
   const lots = [lot('a'), lot('b', 'TOYOTA'), lot('c', 'FORD', null)];

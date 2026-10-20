@@ -44,7 +44,7 @@ const HOUR = 3_600_000;
 function lot(id: string, make: string, bid: number | null, hours: number): LiveAuction {
   return { id, make, currentBid: bid, endsAt: Date.now() + hours * HOUR, year: 2000, model: 'Local fixture',
     updatedAt: Date.now(), listedAt: Date.now() - 2 * HOUR, imageUrl: null, noReserve: false,
-    listingUrl: `https://bringatrailer.com/listing/local-fixture-${id}/`, title: id, band: null };
+    listingUrl: `https://bringatrailer.com/listing/local-fixture-${id}/`, title: id, band: null, house: 'bringatrailer', currency: 'USD' };
 }
 async function render(query = '') {
   await act(async () => {
@@ -344,7 +344,7 @@ describe('market answer -> supporting lots', () => {
   it('keeps unknown separate from zero and assigns each boundary exactly once', () => {
     const bids = [null, 0, 9_999, 10_000, 24_999, 25_000, 49_999, 50_000, 99_999, 100_000, NaN, -1];
     const d = currentBidDistribution(bids.map((bid, i) => lot(String(i), 'PORSCHE', bid, 1)));
-    expect(d.counts).toEqual({ under10k: 2, '10k25k': 2, '25k50k': 2, '50k100k': 2, '100kplus': 1, unknown: 3 });
+    expect(d.counts).toEqual({ under10k: 2, '10k25k': 2, '25k50k': 2, '50k100k': 2, '100kplus': 1, unknown: 3, otherCurrency: 0 });
     expect(d.recorded).toBe(9); expect(d.median).toBe(25_000);
     expect(Object.values(d.counts).reduce((a, b) => a + b, 0)).toBe(bids.length);
     expect(currentBidDistribution([lot('missing', 'PORSCHE', null, 1)]).median).toBeNull();
@@ -414,8 +414,9 @@ describe('market answer -> supporting lots', () => {
   });
   it('says the source once, as the venue, and not on each row', async () => {
     await render();
-    expect(container.querySelector('h1')?.textContent).toBe('Bring a Trailer');
-    expect(container.querySelector('.market-venue__mark')?.getAttribute('src')).toBe('/vendor/bat/favicon.ico');
+    expect(container.querySelector('h1')?.textContent).toBe('Live auctions');
+    expect(container.querySelector('.market-venue .k-label')?.textContent).toBe('BaT');
+    expect(container.querySelector('.market-venue__mark')).toBeNull();
     expect(container.textContent).not.toContain('Source: BaT');
     expect(container.textContent).not.toContain('differing specification reports');
   });
@@ -535,7 +536,7 @@ describe('the market document', () => {
   it('names the population once, counts the cohort in the masthead and states its coverage in the strip', async () => {
     await render('make=PORSCHE');
     const h1 = container.querySelector('h1')!;
-    expect(h1.textContent).toBe('Bring a Trailer · PORSCHE');
+    expect(h1.textContent).toBe('Live auctions · PORSCHE');
     expect(h1.className).toContain('k-entity');
     expect(container.querySelector('.market-figure .k-figure')?.textContent).toBe('$25K');
     expect(cohortCount()).toBe('3');
@@ -551,7 +552,7 @@ describe('the market document', () => {
   it('keeps the scope strip and the masthead when the live board cannot be read', async () => {
     fixture.pulse.data = undefined; fixture.pulse.isLoading = false; fixture.pulse.isError = true;
     await render();
-    expect(container.querySelector('h1')?.textContent).toBe('Bring a Trailer');
+    expect(container.querySelector('h1')?.textContent).toBe('Live auctions');
     expect(container.querySelector('[aria-label="Market scope"]')).toBeTruthy();
     expect(container.querySelector('[aria-label="Market scope"] .k-coverage')).toBeNull();
     expect(container.querySelector('.k-masthead__result')?.textContent).toBe('↻ retry');
@@ -612,7 +613,7 @@ describe('inline market row inspection', () => {
       { ...lot('f-1', 'FORD', 24000, 4, 'f-150-raptor'), year: 2018, model: 'F-150' },
     ];
     await render('make=Ford&family=8a8271f8-d299-4b55-837a-35ca919f8937&family_name=Mustang');
-    expect(container.querySelector('h1')?.textContent).toBe('Bring a Trailer · FORD · Mustang');
+    expect(container.querySelector('h1')?.textContent).toBe('Live auctions · FORD · Mustang');
     expect(boardTitles()).toEqual(['m-1', 'm-2']);
 
     await render('make=Ford&family=8a8271f8-d299-4b55-837a-35ca919f8937&family_name=Mustang&model=Mustang+GT');
@@ -688,5 +689,80 @@ describe('headline movement inspection', () => {
     await update(fixture.pulse.data.auctions.map((a: LiveAuction) => ({ ...a, currentBid: 999999 })));
     expect(select().options.length).toBe(initial);
     expect(container.querySelector('.market-history__change')).toBeNull();
+  });
+});
+
+
+describe('every live house on one board', () => {
+  const other = (id: string, house: string, currency: string, bid: number | null, hours: number): LiveAuction => ({
+    ...lot(id, 'PORSCHE', bid, hours), house, currency, listingUrl: `https://collectingcars.com/for-sale/${id}` });
+  const houses = (extra: any[] = []) => [
+    { house: 'bringatrailer', lots: 4, readAt: Date.now(), onBoard: true },
+    { house: 'collecting-cars', lots: 3, readAt: Date.now(), onBoard: true }, ...extra];
+  beforeEach(() => {
+    fixture.pulse.data.auctions = [lot('bat-1', 'PORSCHE', 20_000, 5), lot('bat-2', 'PORSCHE', 30_000, 6),
+      other('cc-usd', 'pcarmarket', 'USD', 10_000, 3), other('cc-gbp', 'collecting-cars', 'GBP', 44_694, 2), other('cc-eur', 'collecting-cars', 'EUR', 38_250, 4)];
+    fixture.pulse.data.houses = houses([{ house: 'cars-and-bids', lots: 188, readAt: Date.parse('2026-10-01T15:00:00Z'), onBoard: false }]);
+  });
+  it('titles the board for every house and shows the houses read, not BaT alone', async () => {
+    await render();
+    expect(container.querySelector('h1')?.textContent).toBe('Live auctions');
+    expect(container.querySelector('.market-venue .k-label')?.textContent).toBe('BaT · Collecting Cars · PCarMarket');
+    expect(cohortCount()).toBe('5');
+  });
+  it('adds only dollar bids into the headline, and says what it left out and which house is held off', async () => {
+    await render();
+    expect(container.querySelector('.market-figure .k-figure')?.textContent).toBe('$60K');
+    const note = container.querySelector('.market-figure__note')!.textContent!;
+    expect(note).toContain('2 lots bid in another currency are listed but not added to the dollar total');
+    expect(note).toContain('Cars & Bids: 188 lots held off, last read Oct 1');
+  });
+  it('shows each lot in its own currency with its house', async () => {
+    await render();
+    const gbp = container.querySelector('[data-vehicle-id="cc-gbp"]')!;
+    expect(gbp.textContent).toContain('GBP');
+    expect(gbp.textContent).toContain('44,694');
+    expect(gbp.textContent).not.toContain('$44,694');
+    expect(gbp.querySelector('.market-lot-house')?.textContent).toBe('Collecting Cars');
+    expect(container.querySelector('[data-vehicle-id="bat-1"] .market-lot-house')?.textContent).toBe('BaT');
+  });
+  it('filters by house, counts each house, and states the scope', async () => {
+    await render();
+    expect(button('All houses').textContent).toContain('5');
+    expect(button('Collecting Cars').textContent).toContain('2');
+    await click('Collecting Cars');
+    expect(window.location.search).toContain('house=collecting-cars');
+    expect(boardTitles().sort()).toEqual(['cc-eur', 'cc-gbp']);
+    expect(container.querySelector('h1')?.textContent).toBe('Collecting Cars');
+    expect(container.querySelector('.market-venue__mark')?.getAttribute('src')).toBe('/source-logos/collecting-cars.png');
+    expect(container.querySelector('.market-figure .k-figure')?.textContent).toBe('$0');
+    await click('All houses');
+    expect(window.location.search).not.toContain('house=');
+  });
+  it('compares with last week on BaT lots only, and says so', async () => {
+    fixture.pulse.data.weekAgo = { at: Date.now() - 7 * 24 * HOUR, bids: 25_000, n: 2, byMake: null, source: 'live' };
+    await render();
+    expect(container.textContent).toContain('BaT lots +100.0% on a week ago');
+    await click('Collecting Cars');
+    expect(container.textContent).not.toContain('on a week ago');
+  });
+  it('bids high to low by dollars; a bid in another currency is its own range, never an unrecorded one', async () => {
+    await render();
+    expect(currentBidDistribution(fixture.pulse.data.auctions).counts.otherCurrency).toBe(2);
+    expect(currentBidDistribution(fixture.pulse.data.auctions).counts.unknown).toBe(0);
+    expect(currentBidDistribution(fixture.pulse.data.auctions).total).toBe(60_000);
+  });
+  it("opens another house's lot on its Nuke record, not BaT's listing evidence", async () => {
+    await render();
+    await act(async () => container.querySelector<HTMLButtonElement>('[data-vehicle-id="cc-usd"] .market-lot-name')!.click());
+    expect(window.location.pathname).toBe('/vehicle/cc-usd');
+    window.history.replaceState({}, '', '/');
+  });
+  it('says plainly when the other houses could not be read', async () => {
+    fixture.pulse.data.auctions = fixture.pulse.data.auctions.filter((a: LiveAuction) => a.house === 'bringatrailer');
+    fixture.pulse.data.houses = []; fixture.pulse.data.housesFailed = true;
+    await render();
+    expect(container.querySelector('.market-figure__note')?.textContent).toContain('Other houses could not be read; showing Bring a Trailer only');
+    expect(container.querySelector('[aria-label="Auction house"]')).toBeNull();
   });
 });
