@@ -37,3 +37,10 @@ test('reintroducing the Leaflet-on-every-page chunking fails the budget on every
     assert.ok(m.routes[name].chunks.includes('maps'));
   }
 });
+
+test('putting clsx back into the charts chunk loads recharts with the vehicle workspace and fails', async () => {
+  const m = await measure({ manualChunks: (id, own) => (id.includes('/clsx/') ? 'charts' : own) });
+  const { problems } = check(m, baseline);
+  assert.ok(m.routes.vehicle_workspace.chunks.includes('charts'));
+  assert.ok(problems.some(p => p.startsWith('vehicle_workspace: loads charts')), JSON.stringify(problems));
+});
