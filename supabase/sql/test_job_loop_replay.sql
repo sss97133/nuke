@@ -6,6 +6,8 @@
 -- below in filename order (the check fails the contract when one is missing, absent or out of order).
 -- Out of scope (other lanes in the same range; their own contracts cover them):
 --   migrations/20261019031934_work_order_image_objects.sql (image lane; needs the canonical image-object fixture)
+--   migrations/20261020185000_invoice_party_reads_and_description_redaction.sql (security lane: generated_invoices read
+--   policy and the vehicle row readers, no job-loop function; test_invoice_party_reads_and_description_redaction.sql)
 --   and the non-job files of 2026-10-19: facet, truck, auction bids, org signals, lotus/honda identity, cab custody,
 --   device capture, live auction board, profile reader role, merge identity, source species, broadcast profile, org
 --   name trgm, canonical make, identity marks/handle index, family sales, fold docket, marketplace listings.
