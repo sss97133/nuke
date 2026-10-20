@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Offline contracts for the image-evidence runner (draft.sql v8): every pass in file mode on synthetic pilot-shaped
+"""Offline contracts for the image-evidence runner (draft.sql v10): every pass in file mode on synthetic pilot-shaped
 inputs (no real id, amount, path, model, vendor or person name), the CHECK rules, the file-mode readers and the exit
 test, the loader's batching, gates and reported outcomes, db-mode refusal and stop conditions against a fake
 PostgREST, the manifest of returned ids and its M10b reconciliation, review rows that ask one question in one
@@ -370,7 +370,10 @@ class Builders(unittest.TestCase):
                     dict(ok['rows'], **{'2': {'targets': [{'kind': 'payment', 'key': pk('00206')},
                                                           {'kind': 'account', 'key': 'bank_account:a'}]}}),
                     dict(ok['rows'], **{'2': {'reask_of': reask, 'question': 'evidence_link'}}),
-                    dict(ok['rows'], **{'2': {'reask_of': 'review:x#4'}})):
+                    dict(ok['rows'], **{'2': {'reask_of': 'review:x#4'}}),
+                    # (v10, A1) the writer sets the first asking on a re-ask and drops it from a fresh row
+                    dict(ok['rows'], **{'2': dict(ok['rows']['2'], asked_first=reask)}),
+                    dict(ok['rows'], **{'2': {'reask_of': reask, 'asked_first': reask}})):
             with self.assertRaises(ValueError):
                 payloads.open_run('u', 'review', 'review_sheet', 'p', 'v', dict(ok, rows=bad))
         with self.assertRaises(ValueError) as cm:                # (v9, M8) at most 10,000 targets on a sheet
@@ -685,6 +688,65 @@ class Readers(SyntheticCase):
                           readers.places_distinct(None, 'label:x'), readers.places_distinct('label:x', 'label:x')),
                          (True, False, True, False))
 
+    def test_statements_are_listed_apart_and_never_summed(self):
+        """(v10, the lead's money decision) his confirmed statement is never a payment of the bands: it is listed
+        under 'stated' with the row it answers and the keyed payments that cover it (each covers its first statement
+        only)."""
+        jacket = next(ln['key'] for ln in self.files['links.jsonl'] if ln['key'].endswith('#line:paint@%s' % T[:8]))
+        base = readers.accounting(self.files, T)
+        pay = next(p for b, x in base['costs'].items() if b != 'asserted_unpaid' for p in x['payments']
+                   if p['category'] and p['paid_on'])
+
+        def statement(n, on):
+            ref = payloads.answer_ref(testdata.U('answers'), n)
+            return {'key': 'link:%s@%s' % (ref, T[:8]), 'writer': 'propose_evidence_links', 'p_run_id': '@run:owner_review',
+                    'row': {'vehicle_id': T, 'source_kind': 'owner_statement', 'external_ref': ref, 'role': 'payment_out',
+                            'direction': 'out', 'payment_key': 'owner:' + ref, 'payer_entity': 'owner_business:synthetic',
+                            'cost_category': pay['category'], 'occurred_on': on, 'join_key': 'his answer',
+                            'confidence': 1.0, 'evidence': [{'kind': 'link', 'id': jacket}]}}
+        first, second = statement(1, pay['paid_on']), statement(2, pay['paid_on'])
+        f = dict(self.files, **{'links.jsonl': list(self.files['links.jsonl']) + [first, second]})
+        v = readers.accounting(f, T, [{'target': first['key'], 'decision': 'confirmed'},
+                                      {'target': second['key'], 'decision': 'confirmed'}])
+        m5 = readers.extract_m5(v)
+        self.assertFalse([k for keys in m5['bands'].values() for k in keys if k.startswith('owner:')])
+        self.assertEqual(m5['bands'], readers.extract_m5(base)['bands'])            # the bands are unchanged
+        st = {x['link_id']: x for x in v['stated']['statements']}
+        self.assertEqual(st[first['key']]['answers'], {'kind': 'link', 'id': jacket, 'status': 'proposed',
+                                                       'current': True})
+        self.assertIn(pay['payment_key'], st[first['key']]['covered_by'])
+        self.assertNotIn(pay['payment_key'], st[second['key']]['covered_by'])     # one payment, its first statement
+        self.assertEqual(m5['stated'][0][:2], [first['row']['payment_key'], 'out'])
+        self.assertEqual(readers.accounting(self.files, T)['stated'], {'cents_out': 0, 'cents_in': 0, 'statements': []})
+
+    def test_two_current_acquisitions_are_asked_about(self):
+        """(v10, money F4) two current acquisition claims on the truck: which one is the deal? An upper bound from
+        custody_bounds is not one."""
+        acq = 'claim:acquisition:%s' % T[:8]
+        other = payloads.claim_line('claim:acquisition:again', 'ledger_vendor_date', payloads.change_claim(
+            T, 'custody', 'acquisition', 'bought again?', 0.4, occurred_from='2031-02-01', occurred_to='2031-02-02'), [])
+        bound = payloads.claim_line('claim:acquisition:bound', 'custody_bounds', payloads.change_claim(
+            T, 'custody', 'acquisition', 'acquired by', 0.3, occurred_to='2031-03-31'), [])
+        f = self.files_with([bound])
+        self.assertFalse([q for q in readers.accounting(f, T)['open_questions'] if q['q'] == 'acquisition_conflict'])
+        v = readers.accounting(self.files_with([other, bound]), T)
+        self.assertIn({'q': 'acquisition_conflict', 'kind': 'acquisition', 'claim_ids': sorted([acq, other['key']])},
+                      v['open_questions'])
+        rejected = readers.accounting(self.files_with([other]), T, [{'target': other['key'], 'decision': 'rejected'}])
+        self.assertFalse([q for q in rejected['open_questions'] if q['q'] == 'acquisition_conflict'])
+
+    def test_a_journal_entry_dates_its_payment(self):
+        """(v10, money F3/F5) one list of payment sources: a journal entry dates a payment; an order does not."""
+        def link(kind, on, ext):
+            return payloads.line('link:%s@%s' % (ext, T[:8]), 'propose_evidence_links', 'ledger_vendor_date',
+                                 payloads.evidence_link(T, kind, 'payment_out', 'synthetic', 0.6, [{'kind': 'note'}],
+                                                        external_ref=ext, payment_key='bank:SYNTH-JE', occurred_on=on,
+                                                        anchor='line:1' if kind == 'journal_entry' else None))
+        f = dict(self.files, **{'links.jsonl': list(self.files['links.jsonl']) + [
+            link('gmail_order', '2031-05-01', 'gmail:order:je'), link('journal_entry', '2031-05-10', 'je:1')]})
+        pays = [p for x in readers.accounting(f, T)['costs'].values() for p in x.get('payments') or []]
+        self.assertEqual(next(p['paid_on'] for p in pays if p['payment_key'] == 'bank:SYNTH-JE'), '2031-05-10')
+
     def test_a_day_he_rejected_reads_undated(self):
         """(v7, F1; v8: his decision) a photo whose only time he rejected is undated until a time is confirmed."""
         claim = next(ln for ln in self.files['time_claims.jsonl']
@@ -739,7 +801,7 @@ class ExitTest(SyntheticCase):
 
             def read(self, sql, params=None, tag=None):
                 self.sql.append((sql, params))
-                return [{'waiting': 3, 'rewritten_ask_again': 0, 'rows_answered': 2, 'his_decisions': 1}]
+                return [{'waiting': 3, 'rewritten_ask_again': 0, 'questions_answered': 2, 'his_decisions': 1}]
         r = R()
         self.assertEqual(exit_test.his_state(testdata.OWNER, r), {'waiting': 3, 'decisions': 1})
         # the scoreboard's M15 read: (v9) the latest stored answer per sheet row
@@ -804,7 +866,7 @@ class Loader(SyntheticCase):
 
 
 class FakeRest:
-    """Stands in for PostgREST: answers each writer the way draft.sql v8 does, records every call."""
+    """Stands in for PostgREST: answers each writer the way draft.sql v10 does, records every call."""
 
     def __init__(self, fail=None, links=None):
         self.calls = []
@@ -1093,6 +1155,27 @@ class DbMode(SyntheticCase):
             go()
         loop_close = [a for fn, a in rest.calls if fn == 'evidence_close_run' and a['p_run_id'] == report['loop_run']]
         self.assertEqual([c['p_status'] for c in loop_close], ['failed'])
+
+    def test_unchanged_candidates_are_matched_by_image(self):
+        """(v10, trucks F2) the store keeps the photo's own vehicle row (for a photo a merge moved, the row it came
+        from), so an unchanged candidate is read back by its image; the vehicle decides only between two rows."""
+        lines = self.files['candidates.combined.jsonl'][:2]
+        merged_from = testdata.U('vehicle', 'merged-from')
+
+        class Reader(FakeReader):
+            def read(self, sql, params=None, tag=None):
+                if tag == 'read_back':
+                    return [{'id': testdata.U('cand', 'a'), 'image_id': lines[0]['row']['image_id'],
+                             'vehicle_id': merged_from, 'subject_key': None},
+                            {'id': testdata.U('cand', 'b1'), 'image_id': lines[1]['row']['image_id'],
+                             'vehicle_id': merged_from, 'subject_key': None},
+                            {'id': testdata.U('cand', 'b2'), 'image_id': lines[1]['row']['image_id'],
+                             'vehicle_id': testdata.U('vehicle', 'x'), 'subject_key': None}]
+                return super().read(sql, params, tag)
+        ld = self.loader(FakeRest(), Reader())
+        ld.read_back_candidates('run:combined', lines)
+        self.assertEqual(ld.ids[lines[0]['key']], testdata.U('cand', 'a'))
+        self.assertEqual(ld.skipped[lines[1]['key']], 'no_result')          # two rows, neither the one named
 
     def test_read_backs_are_keyed_by_the_owner(self):
         reader = FakeReader()
@@ -1412,12 +1495,16 @@ class ReviewSheet(SyntheticCase):
         with self.assertRaises(ValueError) as cm:
             review_sheet.profile({'targets': [RT('evidence_link', truck206)], 'asks': 'party'}, lines)
         self.assertIn('payment source', str(cm.exception))
-        # (v9, W3) nor a line of a payment source with no key (a P&L or ledger line): its payer is its account's
-        unkeyed = dict(lines[jacket], row=dict(lines[jacket]['row'], source_kind='pnl_line'))
-        with self.assertRaises(ValueError) as cm:
-            review_sheet.profile({'targets': [RT('evidence_link', jacket)], 'asks': 'party'}, dict(lines, **{
-                jacket: unkeyed}))
-        self.assertIn('payment source line', str(cm.exception))
+        # (v9, W3) nor a line of a payment source with no key: (v10) a journal entry is one, a P&L line is not
+        for kind, refused in (('journal_entry', True), ('ledger_line', True), ('pnl_line', False)):
+            unkeyed = dict(lines[jacket], row=dict(lines[jacket]['row'], source_kind=kind))
+            ask = {'targets': [RT('evidence_link', jacket)], 'asks': 'party'}
+            if refused:
+                with self.assertRaises(ValueError) as cm:
+                    review_sheet.profile(ask, dict(lines, **{jacket: unkeyed}))
+                self.assertIn('payment source line', str(cm.exception))
+            else:
+                self.assertEqual(review_sheet.profile(ask, dict(lines, **{jacket: unkeyed}))['asks'], 'party')
         files = dict(self.files, **{'links.jsonl': [dict(ln, row=dict(ln['row'], source_kind='ledger_line'))
                                                     if ln['key'] == jacket else ln for ln in self.files['links.jsonl']]})
         rows, _d = review_sheet.build_rows(self.ctx, files, readers.accounting(files, T))
@@ -1429,6 +1516,18 @@ class ReviewSheet(SyntheticCase):
                          ('evidence_link', None, 'placement', [pk('00737')]))
         multi = review_sheet.profile({'targets': [RT('evidence_link', truck206), RT('evidence_link', sub206)]}, lines)
         self.assertEqual((multi['asked_place'], payloads.answer_dimension(multi)), ('multi', []))
+
+    def test_two_current_acquisitions_are_asked_one_row_each(self):
+        """(v10, money F4) acquisition_conflict: one yes/no row per claim, a change-claim question each."""
+        other = payloads.claim_line('claim:acquisition:again', 'ledger_vendor_date', payloads.change_claim(
+            T, 'custody', 'acquisition', 'bought again?', 0.4, occurred_from='2031-02-01', occurred_to='2031-02-02'), [])
+        f = dict(self.files, **{'change_claims.jsonl': list(self.files['change_claims.jsonl']) + [other]})
+        rows, _d = review_sheet.build_rows(self.ctx, f, readers.accounting(f, T))
+        deal = [r for r in rows if r['section'] == 'deal']
+        self.assertEqual(sorted(r['targets'][0]['key'] for r in deal),
+                         sorted(['claim:acquisition:%s' % T[:8], other['key']]))
+        self.assertTrue(all((r['profile']['question'], r['profile']['asks']) == ('change_claim', 'place')
+                            and '2 current acquisition claims' in r['question_text'] for r in deal))
 
     def test_a_row_whose_targets_place_nothing_asks_about_none(self):
         """(v7, D6) a "no truck in frame" verdict or an unplaced line: asked place 'none', a yes/no row."""
@@ -2021,7 +2120,9 @@ class ReadPath(unittest.TestCase):
         self.assertIn('human_without_step_up_record', names['M10_step_up'][1])
         self.assertIn("created_by not like 'human:%'", names['M10b'][1])
         self.assertIn('evidence_answers_to_confirm(:uid)', names['M15'][1])
-        self.assertIn('a.message_at desc', names['M15'][1])            # (v9) the latest stored answer per row
+        self.assertIn('replaced_by is null', names['M15'][1])          # (v10) his latest answer per question
+        self.assertIn('question_key', names['M15'][1])
+        self.assertIn("v->'stated'->'statements'", names['M5'][1])      # (v10) statements apart, never summed
         self.assertIn("config->>'message_at'", names['M10b_answers'][1])
         self.assertIn('closed_accounts', names['M14_accounts'][1])
         out = io.StringIO()
@@ -2099,7 +2200,7 @@ class ReadPath(unittest.TestCase):
                              'message_at': '2031-06-01T18:09:00+00:00',     # message, stored with another time
                              'rows': {'2': {'verbatim': 'no'}}}]
                 if tag == 'M15':
-                    return [{'waiting': 3, 'rewritten_ask_again': 1, 'rows_answered': 2, 'his_decisions': len(his)}]
+                    return [{'waiting': 3, 'rewritten_ask_again': 1, 'questions_answered': 2, 'his_decisions': len(his)}]
                 if tag == 'M4a':
                     return [{'agrees_on_yes_no': True, 'named_place': None, 'n': len(his)}] if his else []
                 return []
@@ -2112,8 +2213,8 @@ class ReadPath(unittest.TestCase):
                                                         'transcript'])
         self.assertEqual(scoreboard.scalar(a), 2)
         # (v8) his answers wait for him: the confirmed level reads "waiting on his app" until he decides
-        self.assertEqual(out['M15'], {'waiting': 3, 'rewritten_ask_again': 1, 'rows_answered': 2, 'his_decisions': 0,
-                                      'confirmed_level': 'waiting on his app'})
+        self.assertEqual(out['M15'], {'waiting': 3, 'rewritten_ask_again': 1, 'questions_answered': 2,
+                                      'his_decisions': 0, 'confirmed_level': 'waiting on his app'})
         self.assertEqual((scoreboard.scalar(out['M15']), out['M4a']), (3, {'rows': []}))
         self.assertEqual((seen['M15']['uid'], seen['M4a']['uid']), (testdata.OWNER, testdata.OWNER))
         his.append('a decision of his')

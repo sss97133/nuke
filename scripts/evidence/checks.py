@@ -1,4 +1,4 @@
-"""Local checker for file-mode payloads before any load (port of the pilot's validate.py to the v8 contract).
+"""Local checker for file-mode payloads before any load (port of the pilot's validate.py to the v10 contract).
 
 Checks every line of run.json and the canonical JSONL files against the CHECK constraints and writer rules in
 payloads.CONTRACT (vocabularies; er_coverage_source; ivc_*, ictc_*, el_*, eae_*, vcc_*, udvc_* shapes, the v5 entity

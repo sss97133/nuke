@@ -1,6 +1,6 @@
 """The writer contract: argument names, CHECK vocabularies and payload builders for the image-evidence writers.
 
-Source: draft.sql blocks M1a (tables and CHECKs), M1w (writers, readers) and M1p (promotion path), design v8 of
+Source: draft.sql blocks M1a (tables and CHECKs), M1w (writers, readers) and M1p (promotion path), design v10 of
 2026-10-20. Every pass builds its rows here, and checks.py validates against the same CONTRACT, so a later design
 revision that renames a field or a value is one edit in this module, or a JSON override passed as the case's
 `contract_overrides` (merged key by key; `renames` maps writer -> {old field: new field} and is applied to every row
@@ -32,6 +32,10 @@ v9: answers are stored per chat message (several answers runs per sheet), each w
 most 20,000 characters of his words per row. A re-ask row names the sent row it asks again ('reask_of') and the writer
 copies that row as it was frozen; a sheet lists at most 10,000 targets; a who-paid row never asks about a payment
 source line (bank, card or ledger line, payment event, QB transaction, P&L line), keyed or not.
+v10: one list of payment sources, a journal entry among them and a P&L line not; the writer sets asked_first on a re-ask
+and drops it from a fresh row, so a job never sends it; a capture time he rejected answers every instant on that day;
+a candidate stores the photo's own vehicle row (for a photo a merge moved, the row it came from), so results are
+matched by image id.
 """
 import copy
 import datetime as dt
@@ -41,7 +45,7 @@ import re
 import common
 
 CONTRACT = {
-    'version': 'draft-v9-2026-10-20',
+    'version': 'draft-v10-2026-10-20',
     'pass_names': [
         'listing_class', 'time_offset', 'photos_join', 'photos_album', 'file_hash_twin', 'exif_neighbour',
         'day_context', 'legacy_suggestion', 'claim_import', 'jev_choice', 'paid_vision', 'combined', 'owner_review',
@@ -64,10 +68,10 @@ CONTRACT = {
                      'photos_album', 'work_session', 'listing', 'calendar_item', 'note', 'vehicle_field',
                      'owner_statement', 'photos_item'],
     'anchor_required': ['deal_jacket', 'deal_document', 'journal_entry', 'vehicle_field'],
-    'payment_sources': ['bank_line', 'ledger_line', 'payment_event', 'qb_transaction'],
-    # (v9, W3) the lines of a payment source, keyed or not: a who-paid row never asks about one (its payer is its
-    # account's: an account row)
-    'payment_source_lines': ['bank_line', 'ledger_line', 'payment_event', 'qb_transaction', 'pnl_line'],
+    # (v10, money F3/F5) the one list of payment sources (evidence_is_payment_source): a line that IS a payment. A journal
+    # entry is one (bank-feed postings), a P&L line is not. Its payer is its account's, so (v9, W3) a who-paid row never
+    # asks about one, keyed or not; the reader dates and amounts a payment from it.
+    'payment_sources': ['bank_line', 'ledger_line', 'payment_event', 'qb_transaction', 'journal_entry'],
     # er_coverage_source: only these runs record config.coverage_to, always with config.covers_accounts
     'payment_source_passes': ['ledger_vendor_date', 'qb_correlation', 'receipt_vehicle_id'],
     'directions': ['out', 'in', 'none'],
@@ -507,6 +511,9 @@ def review_rows_problem(config):
     for k, v in rows.items():
         if not (str(k).isdigit() and 1 <= int(k) <= int(items)):
             return 'row %s is not 1..%s' % (k, items)
+        if isinstance(v, dict) and 'asked_first' in v:
+            # (v10, A1) the writer sets the question's first asking on a re-ask and drops it from a fresh row
+            return 'row %s: a job never sends asked_first (the writer sets it on a re-ask)' % k
         if isinstance(v, dict) and 'reask_of' in v:
             if set(v) != {'reask_of'} or not re.match(C['reask_ref_re'], str(v['reask_of'])):
                 return 'row %s: a re-ask row is {"reask_of": "review:<sheet run>#<row>"} alone' % k

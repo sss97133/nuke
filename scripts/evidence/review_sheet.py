@@ -26,9 +26,11 @@ lettered decisions, answered in OWNER-DECISIONS.
 A row whose stored reading a second reader, the transcript check or his objection disputed (loop/disputed.jsonl) is
 asked again until a delivered sheet has asked it. (v9, W2) A row asked again from a sent db sheet is stored in the new
 review run as {"reask_of": "review:<sheet run>#<row>"}: the writer copies that row exactly as it was frozen (targets,
-question, asked place), and the sidecar keeps the frozen row. (W3) A who-paid row never asks about a line of a payment
-source (bank, card or ledger line, payment event, QB transaction, P&L line), keyed or not: its payer is its account's.
-(M8) A sheet lists at most 10,000 targets.
+question, asked place), and the sidecar keeps the frozen row; (v10) a job never sends asked_first (the writer sets it
+on a re-ask). (W3) A who-paid row never asks about a line of a payment source ((v10) a bank, card or ledger line, a
+payment event, a QB transaction or a journal entry; a P&L line is not one), keyed or not: its payer is its account's.
+(M8) A sheet lists at most 10,000 targets. (v10) Two or more current acquisition (or sale) claims on the truck
+(acquisition_conflict) are asked one row per claim: is this one the deal?
 
 Photos: one row per image. A thumbnail only for an image the phone's VisionEngine approved (vision_gate_status
 'approved'); any other image is listed by id, "review in the app". Thumbnails are local paths (the case's
@@ -174,10 +176,10 @@ def profile(row, lines):
         # (v8) money with a payment source gets its payer from the account map: ask the account's row instead
         raise ValueError('this money has a payment source (%s): ask whose account paid it (an account row), not who '
                          'paid' % ', '.join(sorted(pkeys)))
-    if asks == 'party' and q == 'evidence_link' and kinds & set(payloads.C['payment_source_lines']):
-        # (v9, W3) nor a line of a payment source, keyed or not: its payer is its account's
+    if asks == 'party' and q == 'evidence_link' and kinds & set(payloads.C['payment_sources']):
+        # (v9, W3; v10 one list) nor a line of a payment source, keyed or not: its payer is its account's
         raise ValueError('this money is a payment source line (%s): ask whose account paid it (an account row), not '
-                         'who paid' % ', '.join(sorted(kinds & set(payloads.C['payment_source_lines']))))
+                         'who paid' % ', '.join(sorted(kinds & set(payloads.C['payment_sources']))))
     return {'question': q, 'asks': asks, 'asked_place': asked, 'frame': frame, 'link_class': link,
             'places': sorted(places), 'images': sorted(images), 'payment_keys': sorted(pkeys),
             'source_keys': sorted(skeys), 'accounts': sorted(accts)}
@@ -277,7 +279,7 @@ def build_rows(ctx, files, read):
     for u in (costs.get('asserted_unpaid') or {}).get('links') or []:
         if u['link_id'] in answered_by_case:
             continue                    # "who paid for the truck" already asks about its purchase line: one question
-        if ((lines.get(u['link_id']) or {}).get('row') or {}).get('source_kind') in payloads.C['payment_source_lines']:
+        if ((lines.get(u['link_id']) or {}).get('row') or {}).get('source_kind') in payloads.C['payment_sources']:
             continue                    # (v9, W3) a payment source line: its payer is its account's (an account row)
         add('who paid', "No payment was found for '%s' (%s). Who paid it: you, one of your businesses (name it), or "
             'another party (name it)? (where the money came from only, not what it was for)'
@@ -298,6 +300,15 @@ def build_rows(ctx, files, read):
             # (v7, F7a) an account his records name that no export covers
             decision('Account %s: your records name it, but no statement of it has been read. Is there an export to '
                      'add?' % q['account_ref'], 'yes, I will add it / no, there is none')
+        elif q['q'] == 'acquisition_conflict':
+            # (v10, money F4) two or more current claims of one deal: one yes/no row per claim
+            for cid in q.get('claim_ids') or []:
+                c = next((x for x in files.get('change_claims.jsonl', []) if x['key'] == cid), None)
+                when = ' (%s..%s)' % (c['p_claim'].get('occurred_from'), c['p_claim'].get('occurred_to')) if c else ''
+                add('deal', '%s has %d current %s claims. Is the %s claim%s%s the %s?'
+                    % (this, len(q['claim_ids']), q['kind'], q['kind'], when,
+                       ' (%s)' % c['p_claim']['summary'] if c and c['p_claim'].get('summary') else '', q['kind']),
+                    [T('change_claim', cid)], 'yes, this one / no, not this one')
     for ln in files.get('account_entities.jsonl', []):
         r = ln['row']
         add('accounts', "Account %s: is it %s's? If not, whose is it: yours, one of your businesses' (name it), or "

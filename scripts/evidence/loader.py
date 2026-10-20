@@ -18,7 +18,10 @@ batch_offset_v1 claims of the closed gate run (the writer confirms only what the
 kept_stronger, unchanged, owner_answer_missing, entity_is_owners_call (the next run or the next sheet asks again), and
 so are the refusals (image_not_eligible, vehicle_not_in_scope, source_not_users, vehicle_not_found). (v9) A photo's
 'already_rejected' (a truck he said no to, or a place other than the subject he confirmed) writes nothing and leaves
-the line off the sheet; skips a writer itemizes are counted once. A claim his decision or his who-paid statement
+the line off the sheet; skips a writer itemizes are counted once. (v10) A capture time on a day he rejected is
+'already_rejected' whatever its instant; image candidates are matched to their lines by image id (the store keeps the
+photo's own vehicle row). On a load larger than the pilot, the evidence tables are ANALYZEd between batches by the
+operator (the runner's read path runs SELECT only): unanalyzed rows slow each 500-row call from 0.2 s to 1.1 s at 10x. A claim his decision or his who-paid statement
 answers is never superseded: the line's support goes onto that claim (propose_claim_support) and is reported as
 claim_carries_owner_decision; a claim no longer current is claim_not_current. No job decides (v8): the loader never
 calls decide_evidence. Every id a writer returns goes to the manifest (common.Rest; manifest.py).
@@ -290,7 +293,9 @@ class Loader:
             self.read_back(writer, run_key, sent, res)
 
     def read_back_candidates(self, run_key, lines):
-        """Rows the writer left unchanged return no item: read their ids back (current row, same pass)."""
+        """Rows the writer left unchanged return no item: read their ids back (current row, same pass). (v10, trucks
+        F2) Matched by image id: the store keeps the photo's own vehicle row (for a photo a merge moved, the row it came
+        from), not always the vehicle the pass named; the vehicle decides only between two rows of one photo."""
         pass_name = lines[0]['p_run_id'][5:]
         if pass_name not in payloads.C['pass_names']:
             raise common.EvidenceError('unknown pass %s' % pass_name)
@@ -298,9 +303,13 @@ class Loader:
                                 "image_id = any(:ids) and user_id = :uid and superseded_by is null and pass = '%s'"
                                 % pass_name, {'ids': sorted({ln['row']['image_id'] for ln in lines}),
                                               'uid': self.ctx.user_id}, tag='read_back')
-        by = {(r['image_id'], r.get('vehicle_id') or r.get('subject_key')): r['id'] for r in rows}
+        per = collections.defaultdict(dict)
+        for r in rows:
+            per[r['image_id']][r.get('vehicle_id') or r.get('subject_key')] = r['id']
         for ln in lines:
-            cid = by.get((ln['row']['image_id'], ln['row'].get('vehicle_id') or ln['row'].get('subject_key')))
+            mine = per.get(ln['row']['image_id']) or {}
+            cid = mine.get(ln['row'].get('vehicle_id') or ln['row'].get('subject_key')) or \
+                (next(iter(mine.values())) if len(mine) == 1 else None)
             if cid:
                 self.ids[ln['key']] = cid
                 self.counts[run_key]['unchanged'] += 1

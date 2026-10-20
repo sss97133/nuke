@@ -1,4 +1,4 @@
--- Image-evidence scoreboard (PLAN section 6; DESIGN-v5 section 11; v9). Read-only; run by scoreboard.py through q.sh.
+-- Image-evidence scoreboard (PLAN section 6; DESIGN-v5 section 11; v10). Read-only; run by scoreboard.py through q.sh.
 -- Parameters: :uid (the owner, from --user; never written into the repo), :vehicle_id (the exit-test vehicle),
 -- :chunk_from / :chunk_to (taken_at chunks; idx_vehicle_images_user_taken_at), :ids (a uuid list), :window_from /
 -- :window_to (the capture window), :since (the M10b window start). Each statement follows a "-- name: <measure>"
@@ -62,7 +62,8 @@ select d.detail->'stored_reading'->>'decision' = d.decision agrees_on_yes_no,
  group by 1, 2 order by 1, 2;
 
 -- name: M5
--- Exit test read (exit_test.py compares ids, never amounts; v5: keyed by the owner, tuples widened).
+-- Exit test read (exit_test.py compares ids, never amounts; v5: keyed by the owner, tuples widened). (v10) Only the
+-- costs bands are payments; his statements are 'stated', apart and never summed.
 select jsonb_build_object(
   'identity', v->'identity', 'custody', v->'custody',
   'work_days', (select jsonb_agg(d->>'day') from jsonb_array_elements(case when jsonb_typeof(v->'work_days') = 'array'
@@ -83,6 +84,9 @@ select jsonb_build_object(
                                                 x->>'to_account_ref', x->>'payer', x->>'payee'))
                from jsonb_array_elements(v->'money_received'->'payments') x),
   'undated_own_photos', v->'undated_own_photos', 'cover_to', v->'money_sources_cover_to',
+  -- (v10) his statements apart, never summed: key, direction and the keyed payments covering each (ids, no cents)
+  'stated', (select jsonb_agg(jsonb_build_array(x->>'payment_key', x->>'direction', x->'covered_by'))
+               from jsonb_array_elements(coalesce(v->'stated'->'statements', '[]')) x),
   'open_questions', v->'open_questions') m5
 from (select public.vehicle_accounting_evidence(:vehicle_id, NULL, NULL, :uid) v) s;
 
@@ -286,13 +290,11 @@ select r.pass, max((r.config->>'coverage_to')::date) cover_to, current_date - ma
 -- (v8) His stored answers waiting for him in the app (evidence_answers_to_confirm: his words, the reading, the row as it
 -- is now): targets he has not decided since he answered, and rows re-written with another meaning since (asked again);
 -- and his own decisions so far. Until he has decided, the confirmed level reads "waiting on his app". (v9) A sheet row
--- can hold several stored answers (one per chat message): only the latest by message time counts, as the app shows it.
+-- can hold several stored answers (one per chat message); (v10) one question across its re-asks (question_key): only
+-- his latest answer to a question counts (replaced_by NULL), as the app shows it.
 select count(*) filter (where last_decided_at is null or last_decided_at < stored_at) waiting,
        count(*) filter (where same_question is false) rewritten_ask_again,
-       count(distinct (sheet_run, row_no)) rows_answered,
+       count(distinct question_key) questions_answered,
        (select count(*) from evidence_decisions where user_id = :uid and decided_by like 'human:%'
            and decision in ('confirmed', 'rejected')) his_decisions
-  from (select distinct on (a.sheet_run, a.row_no, a.target_kind, a.target_ref) a.*
-          from public.evidence_answers_to_confirm(:uid) a
-         order by a.sheet_run, a.row_no, a.target_kind, a.target_ref, a.message_at desc nulls last, a.stored_at desc,
-                  a.answers_run desc) latest;
+  from public.evidence_answers_to_confirm(:uid) where replaced_by is null;

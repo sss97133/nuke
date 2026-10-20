@@ -297,7 +297,7 @@ def run(fixture, files, read_fn, mode=common.FILE, his=None):
 
 def his_state(uid, reader=None):
     """(v8) His decisions so far and his stored answers still waiting for him in the app: the scoreboard's M15 read
-    ((v9) the latest stored answer per sheet row)."""
+    ((v10) his latest answer per question, across its re-asks)."""
     import scoreboard
     reader = reader or common.Reader()
     sql = next(s for n, _m, s in scoreboard.parse() if n == 'M15')
