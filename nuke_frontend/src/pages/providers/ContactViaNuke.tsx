@@ -55,7 +55,7 @@ export function ContactViaNuke({ contact, signedIn, recipient }: { contact: Json
     setPhase('sent');
   };
 
-  if (phase === 'sent') return <Text role="body" as="p">Request sent in Nuke. Their answer shows in <a className="job-link" href="/messages">Messages</a>. Your email and phone are never shared.</Text>;
+  if (phase === 'sent') return <div role="status"><Text role="body" as="p">Request sent in Nuke. Their answer shows in <a className="job-link" href="/messages">Messages</a>. Your email and phone are never shared.</Text></div>;
   if (phase === 'idle') {
     return <div className="job-block">
       <button type="button" className="job-button" disabled={left === 0} onClick={() => setPhase('writing')}><Text role="label">Contact via Nuke</Text></button>
@@ -80,7 +80,7 @@ export function ContactViaNuke({ contact, signedIn, recipient }: { contact: Json
         <li><Text role="body">Your email, phone or address: Nuke never shares contact fields</Text></li>
         <li><Text role="body">Any agreement, booking or payment</Text></li>
       </ul>
-      {failure && <Text role="body" as="p" className="job-sign__failure">{failure}</Text>}
+      <div role="alert" className="jb-live">{failure && <Text role="body" as="p" className="job-sign__failure">{failure}</Text>}</div>
       <div className="job-sign__buttons">
         <button type="button" className="job-button job-button--primary" disabled={phase === 'sending'} onClick={send}>
           <Text role="label">{phase === 'sending' ? 'Sending…' : 'Send request'}</Text>

@@ -42,14 +42,14 @@ export default function SupplierInvitePage() {
   const onNuke = obj(invite?.on_nuke);
   const orgId = str(org?.organization_id) ?? str(obj(claim?.args)?.p_organization_id);
 
-  return <main className="jb-page jb-scope" aria-label="Invitation to Nuke">
+  return <article className="jb-page jb-scope" aria-label="Invitation to Nuke">
     <Masthead><Text role="entity" as="h1">{invite ? `${name} is invited to Nuke` : 'You were invited to Nuke'}</Text></Masthead>
     {!invite && <div className="job-block">
       <Text role="body" as="p">A customer who has bought from you shared this link so you can see a job's need and claim your business on Nuke. Nuke sent nothing; the link works once.</Text>
       {!user && <Text role="body" as="p"><a className="job-link" href={`/login?returnUrl=${encodeURIComponent(location.pathname)}`}>Sign up or sign in</a> to open it.</Text>}
       {user && <div className="jb-actions"><button type="button" className="btn-base btn-md btn-primary" disabled={busy} onClick={redeem}>
         <Text role="label">{busy ? 'Opening…' : 'Open the invite'}</Text></button></div>}
-      {failure && <Text role="body" className="jb-warn">{failure}</Text>}
+      <div role="alert" className="jb-live">{failure && <Text role="body" className="jb-warn">{failure}</Text>}</div>
     </div>}
     {invite && <>
       <Rows title="The need you were invited to">
@@ -70,5 +70,5 @@ export default function SupplierInvitePage() {
         domainQualifies={typeof claim?.domain_email_qualifies === 'boolean' ? claim.domain_email_qualifies as boolean : null}
         onClose={() => setClaiming(false)} onDone={() => setClaimed(true)} />}
     </>}
-  </main>;
+  </article>;
 }

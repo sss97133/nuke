@@ -55,6 +55,8 @@ export async function mockSupabase(context, { who = null, readers = {}, tables =
       if (WRITERS.has(name)) {
         writes.push({ rpc: name, args });
         if (!who) return json(route, { code: '42501', message: 'Authentication required' }, 401);
+        // A writer whose answer a page renders (e.g. redeem_supplier_invite) may be given its real shape in readers.
+        if (name in readers) return json(route, typeof readers[name] === 'function' ? readers[name](args) : readers[name]);
         return json(route, { ok: true, version: 1, duplicate: false, payment_authorized: false });
       }
       if (name in readers) {

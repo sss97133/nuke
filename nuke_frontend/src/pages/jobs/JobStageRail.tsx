@@ -42,7 +42,7 @@ export function JobStageRailLegend() {
   ];
   return <ul className="job-legend" aria-label="Legend">
     {rows.map(([kind, words]) => <li key={kind} className={`job-rail__cell--${kind}`}>
-      <Text role="caption">{GLYPH[kind]} {words}</Text>
+      <Text role="measure" dense aria-hidden>{GLYPH[kind]}</Text> <Text role="caption">{words}</Text>
     </li>)}
   </ul>;
 }

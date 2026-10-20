@@ -23,7 +23,7 @@
 .jb-match li { display: flex; gap: 6px; align-items: baseline; }
 .jb-mark { width: 10px; flex-shrink: 0; text-align: center; }
 .jb-mark--pass { color: var(--success, var(--text)); }
-.jb-next { color: var(--warning, var(--text-secondary)); }
+.jb-next { color: var(--warning-dark, var(--text)); }
 
 .jb-says { display: grid; gap: 2px; }
 .jb-says ul { margin: 0; padding-left: 14px; }
@@ -43,7 +43,7 @@ textarea.jb-input { resize: vertical; min-height: 96px; }
 .jb-choice { display: flex; gap: 12px; flex-wrap: wrap; }
 .jb-choice label { display: inline-flex; gap: 4px; align-items: center; cursor: pointer; }
 .jb-line { display: grid; gap: 6px; padding: 6px 0; border-bottom: 1px solid var(--border); }
-.jb-warn { color: var(--warning, var(--text)); }
+.jb-warn { color: var(--warning-dark, var(--text)); }
 .jb-done { color: var(--success, var(--text)); }
 
 /* Provider setup: the step index and time inputs. */
@@ -57,3 +57,8 @@ textarea.jb-input { resize: vertical; min-height: 96px; }
 /* Share control: a button, and the bare URL to copy by hand when the clipboard is unavailable. */
 .jb-share { display: inline-flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .jb-share__url { width: 320px; max-width: 100%; }
+
+/* Live regions stay mounted so announcements fire; while empty they take no space in grid layouts. */
+.jb-live:empty { position: absolute; }
+/* .btn-primary inverts on hover; the kit label must follow or it drops to ~2.6:1 against --text. */
+.btn-primary:hover:not(:disabled) > .k-label { color: var(--surface); }
