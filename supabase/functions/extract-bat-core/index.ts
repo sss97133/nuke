@@ -1,6 +1,7 @@
 /**
  * extract-bat-core
  *
+ * Version: 4.5.2 — the lot's own "Private Party or Dealer" line lands in auction_events.seller_type (raw text in raw_data.party_type_raw) (2026-10-20)
  * Version: 4.5.1 — a withdrawn lot is closed: outcome 'cancelled', end = its "Withdrawn on" stamp (2026-10-15)
  * Version: 4.5.0 — an end event only once the auction is over; the lot's own end, never the widget's (2026-10-15)
  * - A running lot gets no auction_sold / auction_reserve_not_met / auction_ended row and no end-dated mileage reading
@@ -43,6 +44,7 @@ import { batchUpsertWithProvenance, quarantineRecord, type ProvenanceMetadata } 
 import { writeObservation } from "../_shared/observationWriter.ts";
 import { readCommentsJson, readOwnAuctionEnd, summarizeAuction, vinCheckDigitOk, buildAuctionCommentRows, linkAuctionCommentIdentities, sha256Hex } from "../_shared/batAuctionRecord.ts";
 import { parseBatIdentityFromUrl, parseBatIdentityFromTitle, readBatTaxonomy } from "../_shared/batParser.ts";
+import { readBatPartyLine, type BatSellerType } from "../_shared/batSellerType.ts";
 import { chassisFromListItemText, isIdentityGradeVin } from "../_shared/batChassis.ts";
 import { authenticateWriter, requireWriteAuth } from "../_shared/writeGuard.ts";
 import { sourceReadClock } from "./sourceReadClock.ts";
@@ -55,7 +57,7 @@ import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void };
 
 // Extractor versioning - update on each significant change
-const EXTRACTOR_VERSION = 'extract-bat-core:4.5.1';
+const EXTRACTOR_VERSION = 'extract-bat-core:4.5.2';
 
 // Shared column list for the four vehicle-existence lookups below
 // (discovery_url / bat_auction_url / listing_url / update-existing-vehicle
@@ -298,6 +300,9 @@ function extractTitleIdentity(html: string, listingUrl: string): { title: string
 
 function extractEssentials(html: string): {
   seller_username: string | null;
+  /** BaT's own "Private Party or Dealer" line as stated, and its normalized value (_shared/batSellerType.ts) */
+  party_type_raw: string | null;
+  seller_type: BatSellerType | null;
   buyer_username: string | null;
   location: string | null;
   lot_number: string | null;
@@ -718,8 +723,12 @@ function extractEssentials(html: string): {
   if (!reserve_status && hasGotAway) reserve_status = "reserve_not_met";
   if (!reserve_status && sale_price) reserve_status = "reserve_met";
 
+  const partyLine = readBatPartyLine(win);
+
   return {
     seller_username,
+    party_type_raw: partyLine.party_type_raw,
+    seller_type: partyLine.seller_type,
     buyer_username,
     location,
     lot_number,
@@ -2762,6 +2771,9 @@ Deno.serve(async (req) => {
           winning_bid: hasSale ? essentials.sale_price : null,
           winning_bidder: hasSale ? (essentials.buyer_username || null) : null,
           seller_name: essentials.seller_username || null,
+          // BaT's own line for this lot. Left out of the payload when the page has no recognized value, so a
+          // later read of a page without it cannot null a type an earlier read stored.
+          ...(essentials.seller_type ? { seller_type: essentials.seller_type } : {}),
           total_bids: essentials.bid_count || null,
           unique_bidders: auction.parsed ? auction.uniqueBidders : null,
           comments_count: essentials.comment_count || null,
@@ -2773,6 +2785,8 @@ Deno.serve(async (req) => {
             extractor: "extract-bat-core",
             source_read: readClock.source_read,
             listing_url: listingUrlCanonical,
+            // the "Private Party or Dealer" line exactly as the page states it (seller_type is its normalized value)
+            party_type_raw: essentials.party_type_raw,
             listing_details: {
               vin: essentials.vin,
               mileage: essentials.mileage,
