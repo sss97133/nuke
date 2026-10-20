@@ -76,3 +76,10 @@ test("job B: an unsold lot has no buyer key; --no-b-attribution leaves the attri
   assert.ok(!("buyer_username" in p.row.corrections.metadata.merge));
   assert.deepEqual(Object.keys(p.row.corrections), ["metadata"]);
 });
+
+test("job B does not touch the identity of a row whose organization is right", () => {
+  const p = planRow(ev({ damage: "overwritten_meta", source_organization_id: ORG_DEALER, seller_external_identity_id: null }),
+    [lot({ seller_name: "synthetic_dealer", seller_handle: "Synthetic_Dealer", seller_external_identity_id: ID_DEALER })], monitors);
+  assert.deepEqual(Object.keys(p.row.corrections), ["metadata"]);
+  assert.equal(p.kind, "meta_restore");
+});

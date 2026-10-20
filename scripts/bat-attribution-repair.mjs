@@ -18,7 +18,7 @@
  *   job B  metadata merge (adds keys, never removes one): seller_username := auction_events.seller_name,
  *          buyer_username := auction_events.winning_bidder (sold lots), lot_number := auction_events.lot_number,
  *          restored_from := 'auction_events'. The same lot-derived organization / identity correction as job A is
- *          added to the row when it differs (turn off with --no-b-attribution). Images (images, image_urls,
+ *          added to the row when the stamped organization differs (turn off with --no-b-attribution). Images (images, image_urls,
  *          image_count) are NOT restored here: they need the saved page html; re-reading the lot through
  *          extract-bat-core (which rewrites the whole event payload from the page) restores them.
  *   A lot with no auction_events row, or with several rows that disagree, is skipped and listed with its reason. Nothing is guessed.
@@ -104,7 +104,9 @@ export function planRow(ev, aeRows, monitors, { bAttribution = true } = {}) {
   const source = { type: "auction_events", ref: `auction_events ${ae.id}, repair 2026-10-20`,
     ...(sorted.length > 1 ? { same_lot_rows: sorted.slice(1).map((a) => a.id) } : {}) };
   const corrections = {};
-  const wantAttribution = ev.damage === "wrong_org" || bAttribution;
+  // Job B restores metadata; it corrects the attribution too only where the stamped organization is wrong (not to
+  // fill an identity on a row whose organization is right).
+  const wantAttribution = ev.damage === "wrong_org" || (bAttribution && (ev.source_organization_id ?? null) !== att.org);
   let kind = null;
   if (wantAttribution) {
     if ((ev.source_organization_id ?? null) !== att.org) {
