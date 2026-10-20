@@ -60,7 +60,7 @@ export const band = (n: number) => (n < 5 ? 0 : n < 20 ? 1 : n < 100 ? 2 : 3);
 export const BAND_RGBA = ['rgba(97,184,214,0.22)', 'rgba(51,148,196,0.32)', 'rgba(26,102,168,0.42)', 'rgba(20,64,133,0.54)'];
 
 export const makeLabel = (r: LocationRow) => [r.vehicles.year, r.vehicles.make, r.vehicles.model].filter(Boolean).join(' ') || 'Vehicle';
-export const platformName = (s: string | null) => ({ bat: 'Bring a Trailer', 'barrett-jackson': 'Barrett-Jackson', craigslist: 'Craigslist', facebook_marketplace: 'Facebook Marketplace', mecum: 'Mecum', carsandbids: 'Cars & Bids', 'cars-and-bids': 'Cars & Bids' } as Record<string, string>)[s ?? ''] ?? (s ?? 'Source unrecorded');
+export const platformName = (s: string | null) => ({ bat: 'Bring a Trailer', 'barrett-jackson': 'Barrett-Jackson', craigslist: 'Craigslist', facebook_marketplace: 'Facebook Marketplace', mecum: 'Mecum', carsandbids: 'Cars & Bids', 'cars-and-bids': 'Cars & Bids', ebay_motors: 'eBay Motors' } as Record<string, string>)[s ?? ''] ?? (s ?? 'Source unrecorded');
 
 /** Where a ZIP is: its county, then the county's shapes in storage. */
 export async function zipBounds(zip: string, signal?: AbortSignal): Promise<[number, number, number, number] | null> {
