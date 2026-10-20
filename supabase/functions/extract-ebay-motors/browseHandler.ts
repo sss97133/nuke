@@ -4,26 +4,13 @@ import { htmlToText } from "../_shared/htmlToText.ts";
 import { BrowseClient, yearAspect } from "./browseApi.ts";
 import { revisit, sweep } from "./browseSweep.ts";
 import { toLanding } from "./browseMap.ts";
-import { firecrawlFetcher } from "./retain.ts";
-import { discover, reland } from "./firecrawlSweep.ts";
-import { endcheck } from "./endState.ts";
-import { emptyReport, landItem } from "./browseSweep.ts";
-import { pageToItem, parseItemPage } from "./ebayPage.ts";
+import { emptyReport } from "./browseSweep.ts";
 import { landArchived, validCaptures } from "./archiveLand.ts";
 
-export const BROWSE_ACTIONS = ["sweep", "revisit", "aspects", "status", "preview", "discover", "deep", "reland", "endcheck", "archive"];
+export const BROWSE_ACTIONS = ["sweep", "revisit", "aspects", "status", "preview", "archive"];
 const json = (b: unknown, status = 200) => new Response(JSON.stringify(b), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
 export async function handleBrowse(supabase: any, body: any): Promise<Response> {
-  // Firecrawl door: eBay's public pages, no developer account.
-  if (body.action === "discover") {
-    const rep = await discover(supabase, {
-      tiers: body.tiers, facets: body.facets, jobs: body.jobs, pages: body.pages, deepMax: body.deep_max, dailyItemCap: body.daily_item_cap, dryRun: body.dry_run === true, backfill: body.backfill === true,
-    });
-    return json(rep, rep.ok ? 200 : 500);
-  }
-  if (body.action === "endcheck") { const rep = await endcheck(supabase, firecrawlFetcher(supabase, "ebay_motors"), { confirmMax: body.confirm_max, dailyCap: body.daily_cap, dryRun: body.dry_run === true, tiers: body.tiers, skipCensus: body.skip_census === true }); return json(rep, rep.ok ? 200 : 500); }
-  if (body.action === "reland") { const rep = await reland(supabase, { limit: body.limit, offset: body.offset }); return json(rep, rep.ok ? 200 : 500); }
   if (body.action === "archive") {     // archived item pages (Wayback Machine captures): free; clocks are the capture's
     const caps = validCaptures(body.captures);
     if (!caps.length) return json({ ok: false, error: "captures: [{ timestamp: 'YYYYMMDDhhmmss', original: 'http://cgi.ebay.com/...' }] (max 10)" }, 400);
@@ -32,20 +19,6 @@ export async function handleBrowse(supabase: any, body: any): Promise<Response> 
     for (const c of caps) results.push(await landArchived(supabase, c, rep, body.dry_run === true));
     if (rep.errors.length) rep.ok = false;
     return json({ ...rep, results }, 200);
-  }
-  if (body.action === "deep") {         // one item page: read, parse, and (unless dry_run) land
-    const url = String(body.url ?? "");
-    if (!/^https:\/\/(www\.)?ebay\.com\/itm\/\d{6,}/.test(url)) return json({ ok: false, error: "url must be an ebay.com/itm/<id> link" }, 400);
-    const res = await firecrawlFetcher(supabase, "ebay_motors")(url, { markdown: true, metadata: { kind: "item", via: "deep" } });
-    if (!res.html || !res.markdown || res.error) return json({ ok: false, error: res.error ?? "empty page", status: res.statusCode }, 502);
-    const page = parseItemPage(res.html, res.markdown);
-    const item = pageToItem(page);
-    if (body.dry_run === true) return json({ ok: true, snapshot_id: res.snapshotId, page: { ...page, description: page.description.slice(0, 1500) }, landing: toLanding(item, htmlToText, "ebay-firecrawl") });
-    const rep = emptyReport("deep");
-    const out = await landItem(supabase, item, rep, new Date().toISOString(), { snapshotId: res.snapshotId, source: "ebay-firecrawl", method: "ebay_firecrawl_v1",
-      extra: { page: { specifics: page.specifics, location: page.location, time_left_text: page.timeLeft, for_sale_by: page.forSaleBy, format: page.format, bids: page.bids, image_count: page.images.length } } });
-    if (rep.errors.length) rep.ok = false;
-    return json({ ...rep, result: out, snapshot_id: res.snapshotId }, rep.ok ? 200 : 500);
   }
   if (!Deno.env.get("EBAY_CLIENT_ID") || !Deno.env.get("EBAY_CLIENT_SECRET")) {
     return json({ ok: false, error: "EBAY_CLIENT_ID / EBAY_CLIENT_SECRET are not set; nothing was called" }, 503);
