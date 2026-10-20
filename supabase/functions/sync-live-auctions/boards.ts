@@ -1,6 +1,6 @@
 /**
  * Pure readers for the board-synced houses (no I/O): PCarMarket's server-rendered auction board and lot bid history,
- * and Bonhams' Typesense lot documents. sync-live-auctions fetches; these parse.
+ * Bonhams' Typesense sale and lot documents and its bidding platform's lot states. sync-live-auctions fetches; these parse.
  */
 
 /** One open lot on PCarMarket's live board (the Basta query cache the page server-renders). */
@@ -89,6 +89,8 @@ export interface BonhamsLotDoc {
   id: string;
   lotId?: string;
   auctionId?: string;
+  lotAMId?: string; // the lot's id on Bonhams' bidding platform (Auction Mobility, live.bonhams.com)
+  auctionAMId?: string;
   title?: string;
   slug?: string;
   status?: string;
@@ -96,8 +98,14 @@ export interface BonhamsLotDoc {
   auctionEndDate?: { datetime?: string };
   currency?: { iso_code?: string };
   price?: Record<string, unknown>;
-  flags?: { isAuctionEnded?: boolean };
+  flags?: { isAuctionEnded?: boolean; isWithoutReserve?: boolean };
+  image?: { url?: string };
 }
+
+const positive = (v: unknown): number | null => {
+  const n = Number(v);
+  return v !== null && v !== "" && Number.isFinite(n) && n > 0 ? n : null;
+};
 
 /** A Bonhams lot as a board row: its page url (the spelling vehicles already hold), close time, estimate, currency. */
 export function bonhamsLot(doc: BonhamsLotDoc) {
@@ -105,18 +113,99 @@ export function bonhamsLot(doc: BonhamsLotDoc) {
   const lot = doc.lotId ?? doc.id.split("-")[1];
   const cur = doc.currency?.iso_code ?? null;
   const p = doc.price ?? {};
-  const low = cur ? Number(p[`${cur}LowEstimate`]) : NaN;
-  const high = cur ? Number(p[`${cur}HighEstimate`]) : NaN;
-  const hammer = Number(p.hammerPrice ?? p[`${cur}HammerPrice`]);
   return {
     external_id: doc.id,
     url: `https://www.bonhams.com/auction/${sale}/lot/${lot}/${doc.slug ?? ""}`.replace(/\/$/, ""),
     title: doc.title ?? "",
     ends: doc.hammerTime?.datetime ?? doc.auctionEndDate?.datetime ?? null,
     currency: cur,
-    estimate_low: Number.isFinite(low) && low > 0 ? low : null,
-    estimate_high: Number.isFinite(high) && high > 0 ? high : null,
-    hammer: Number.isFinite(hammer) && hammer > 0 ? hammer : null,
+    // estimateLow/High are in the lot's own currency; <CUR>LowEstimate is absent for some (a EUR lot carries only GBP*)
+    estimate_low: (cur ? positive(p[`${cur}LowEstimate`]) : null) ?? positive(p.estimateLow),
+    estimate_high: (cur ? positive(p[`${cur}HighEstimate`]) : null) ?? positive(p.estimateHigh),
+    hammer: positive(p.hammerPrice ?? p[`${cur}HammerPrice`]),
     status: doc.status ?? null,
+    am_lot_id: doc.lotAMId ?? null,
+    am_sale_id: doc.auctionAMId ?? null,
+    no_reserve: doc.flags?.isWithoutReserve === true,
+    image: doc.image?.url || null,
   };
+}
+
+/** The fields of a Bonhams Typesense sale document (collection "auctions") the reader uses. */
+export interface BonhamsSaleDoc {
+  id: string;
+  auctionTitle?: string;
+  auctionType?: string; // ONLINE (timed, bid on the site) | PUBLIC (in the room) | EXHIBITION
+  biddingStatus?: string; // NS not started | IP in progress | EN ended
+  dates?: { end?: { datetime?: string } };
+  flags?: { isAuctionEnded?: boolean };
+}
+
+/**
+ * How a Bonhams sale takes bids, from its own index:
+ *   live_bid        an online timed sale with bidding open (ONLINE, IP): every lot has a running bid and its own close;
+ *   online_not_open an online sale whose bidding has not opened (ONLINE, NS): estimates only, no bid yet;
+ *   catalog         an in-room sale (PUBLIC): estimates and a sale date; bids are taken in the room on the day, so its
+ *                   lots are never a live bid (they stay on the auction calendar);
+ *   ended           bidding is over.
+ */
+export type BonhamsSaleKind = "live_bid" | "online_not_open" | "catalog" | "ended";
+
+export function bonhamsSaleKind(sale: BonhamsSaleDoc): BonhamsSaleKind {
+  if (sale.flags?.isAuctionEnded || sale.biddingStatus === "EN") return "ended";
+  if (sale.auctionType === "ONLINE") return sale.biddingStatus === "IP" ? "live_bid" : "online_not_open";
+  return "catalog";
+}
+
+/** One lot's bidding state as Bonhams' bidding platform reports it (POST live.bonhams.com/widget/lots/<sale AM id>). */
+export interface BonhamsBidState {
+  am_lot_id: string;
+  status: string | null; // active | sold | reserve_not_met | withdrawn ...
+  sale_type: string | null; // timed (online) | live (in the room)
+  current_bid: number | null; // the leading bid; null when no bid is placed
+  bid_at: string | null; // when the leading bid was placed
+  opening_bid: number | null; // the starting price a first bid must meet
+  bid_count: number | null;
+  ends: string | null; // the lot's own close, moved later by every extension
+  currency: string | null;
+  image: string | null;
+}
+
+/** The lots of a widget/lots answer. Bidder registrations (paddles) in the answer are never read. */
+export function parseBonhamsBidStates(body: unknown): BonhamsBidState[] {
+  const page = (body as { result_page?: unknown })?.result_page;
+  if (!Array.isArray(page)) return [];
+  const out: BonhamsBidState[] = [];
+  for (const raw of page) {
+    // deno-lint-ignore no-explicit-any
+    const r = raw as any;
+    if (!r || typeof r.row_id !== "string") continue;
+    const bid = r.timed_auction_bid && typeof r.timed_auction_bid === "object" ? r.timed_auction_bid : null;
+    const count = Number(r.live_bid_timed_count);
+    out.push({
+      am_lot_id: r.row_id,
+      status: typeof r.status === "string" ? r.status : null,
+      sale_type: typeof r.auction?.auction_type === "string" ? r.auction.auction_type : null,
+      current_bid: positive(bid?.amount),
+      bid_at: typeof bid?.created_at === "string" ? bid.created_at : null,
+      opening_bid: positive(r.starting_price),
+      bid_count: r.live_bid_timed_count === null || r.live_bid_timed_count === undefined || !Number.isFinite(count) ? null : count,
+      ends: typeof r.extended_end_time === "string" ? r.extended_end_time : null,
+      currency: typeof r.auction?.currency_code === "string" ? r.auction.currency_code : null,
+      image: typeof r.cover_thumbnail === "string" && r.cover_thumbnail ? r.cover_thumbnail : null,
+    });
+  }
+  return out;
+}
+
+/**
+ * Where a lot stands for the live board: 'live' only in a live-bid sale whose bidding platform reports the lot open
+ * (timed, active, closing in the future); 'closed' when that lot has ended there; every other lot (in-room catalog,
+ * online not yet open, or no state from the platform) is 'upcoming' and never a live bid.
+ */
+export function bonhamsLotPhase(kind: BonhamsSaleKind, bid: BonhamsBidState | undefined, nowMs: number): "live" | "closed" | "upcoming" {
+  if (kind !== "live_bid" || !bid || bid.sale_type !== "timed") return "upcoming";
+  const ends = bid.ends ? Date.parse(bid.ends) : NaN;
+  if (bid.status !== "active" || (Number.isFinite(ends) && ends <= nowMs)) return "closed";
+  return Number.isFinite(ends) ? "live" : "upcoming";
 }

@@ -9,7 +9,8 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
  *   - BaT: Scrapes auctionsCurrentInitialData from /auctions/ page (no API key needed)
  *   - Collecting Cars: the site's public Typesense listing collection (production_listings)
  *   - PCarMarket: its server-rendered live auction board (direct fetch); bids of lots that moved from the lot page
- *   - Bonhams: its public Typesense lot index, open Cars sales
+ *   - Bonhams: its public Typesense sale and lot index; bids of its online (timed) sales from its bidding platform
+ *     (live.bonhams.com); lots of in-room catalog sales are written 'upcoming', never live
  *   - Cars & Bids: Uses Firecrawl (Cloudflare protected)
  *   - Mecum, Barrett-Jackson, RM Sotheby's, Gooding: Firecrawl scrape + extract
  * Collecting Cars, PCarMarket and Bonhams boards are complete lists: after the vehicles upsert each is handed to
@@ -31,7 +32,10 @@ import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { parseBatIdentityFromUrl, parseBatIdentityFromTitle } from "../_shared/batParser.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { mustWrite } from '../_shared/writeResult.ts';
-import { type BonhamsLotDoc, bonhamsLot, type PcarBoardItem, parsePcarBids, parsePcarBoard } from "./boards.ts";
+import {
+  type BonhamsBidState, type BonhamsLotDoc, type BonhamsSaleDoc, bonhamsLot, bonhamsLotPhase, bonhamsSaleKind,
+  type PcarBoardItem, parseBonhamsBidStates, parsePcarBids, parsePcarBoard,
+} from "./boards.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -64,6 +68,8 @@ interface LiveAuction {
   thumbnail_url: string | null;
   external_id: string | null;
   currency?: string | null;
+  /** auction_live unless the house says otherwise: a catalog lot is 'upcoming', a lot whose bidding closed 'ended'. */
+  sale_status?: "auction_live" | "upcoming" | "ended";
   raw_data: Record<string, unknown>;
 }
 
@@ -603,58 +609,100 @@ async function syncGooding(): Promise<{ auctions: LiveAuction[]; error: string |
 }
 
 // ============================================
-// Bonhams Motoring Sync (public Typesense lot index, open Cars sales)
+// Bonhams Motoring Sync (public Typesense sale + lot index; bids from its bidding platform)
 // ============================================
 
 const BONHAMS_TS_HOST = "https://api01.bonhams.com/search-proxy/collections";
 const BONHAMS_TS_KEY = "7YZqOyG0twgst4ACc2VuCyZxpGAYzM0weFTLCC20FQY"; // the site's public search-only key (extract-bonhams-typesense)
+// Bonhams' bidding platform (Auction Mobility): the call the lot page's own bid box makes for a sale's lots
+const BONHAMS_BIDS_URL = "https://live.bonhams.com/widget/lots/";
+const BONHAMS_UA = "NukeLiveBidReader/1.0 (+https://nuke.ag)";
 
+/**
+ * Only an online (timed) sale with bidding open carries live bids: each lot's leading bid, bid count and its own close
+ * (moved by extensions) come from the bidding platform, 50 lots a call, 0.6 s apart; a refused call stops the read.
+ * An in-room sale (Typesense auctionType PUBLIC; the platform's sale type 'live') has estimates and a sale date only:
+ * its lots are written 'upcoming' and stay on the auction calendar, never on the live board.
+ */
 async function syncBonhams(): Promise<{ auctions: LiveAuction[]; error: string | null }> {
   try {
     const get = async (collection: string, params: Record<string, string>) => {
       const res = await fetch(`${BONHAMS_TS_HOST}/${collection}/documents/search?${new URLSearchParams(params)}`, { // guardrail-allow: raw-fetch (house JSON API)
-        headers: { "X-TYPESENSE-API-KEY": BONHAMS_TS_KEY, Accept: "application/json" },
+        headers: { "X-TYPESENSE-API-KEY": BONHAMS_TS_KEY, Accept: "application/json", "User-Agent": BONHAMS_UA },
       });
       if (!res.ok) throw new Error(`Bonhams Typesense ${collection} HTTP ${res.status}`);
       return await res.json();
     };
+    const bidStates = async (amSale: string, amLots: string[]) => {
+      const out = new Map<string, BonhamsBidState>();
+      for (let i = 0; i < amLots.length; i += 50) {
+        if (i > 0) await new Promise((r) => setTimeout(r, 600));
+        const res = await fetch(`${BONHAMS_BIDS_URL}${encodeURIComponent(amSale)}`, { // guardrail-allow: raw-fetch (house JSON API)
+          method: "POST",
+          headers: { "Content-Type": "application/json", Accept: "application/json", "User-Agent": BONHAMS_UA },
+          body: JSON.stringify({ lot_ids: amLots.slice(i, i + 50) }),
+          signal: AbortSignal.timeout(15_000),
+        });
+        if (!res.ok) throw new Error(`Bonhams bidding platform sale ${amSale} HTTP ${res.status}`);
+        for (const s of parseBonhamsBidStates(await res.json())) out.set(s.am_lot_id, s);
+      }
+      return out;
+    };
     const today = new Date().toISOString().slice(0, 10);
-    const a = await get("auctions", { q: "*", query_by: "brand", per_page: "60", filter_by: "departments.code:=MOT-CAR", sort_by: "dates.end.timestamp:desc" });
+    const now = Date.now();
+    const a = await get("auctions", { q: "*", query_by: "brand", per_page: "60", filter_by: "departments.code:=[MOT-CAR,MOT-CYC]", sort_by: "dates.end.timestamp:desc" });
     // deno-lint-ignore no-explicit-any
-    const sales = (a.hits ?? []).map((h: any) => h.document).filter((d: any) => !d.flags?.isAuctionEnded && String(d.dates?.end?.datetime ?? "").slice(0, 10) >= today);
+    const sales = (a.hits ?? []).map((h: any) => h.document as BonhamsSaleDoc)
+      .filter((d: BonhamsSaleDoc) => bonhamsSaleKind(d) !== "ended" && String(d.dates?.end?.datetime ?? "").slice(0, 10) >= today);
     const auctions: LiveAuction[] = [];
+    const kinds: string[] = [];
     for (const sale of sales) {
+      const kind = bonhamsSaleKind(sale);
+      kinds.push(`${sale.id}:${kind}`);
+      // an online sale's motorcycles bid live too; in-room catalog lots are read for cars only, as before
+      const depts = kind === "live_bid" ? "[MOT-CAR,MOT-CYC]" : "MOT-CAR";
+      const docs: BonhamsLotDoc[] = [];
       for (let page = 1; page <= 4; page++) {
-        const r = await get("lots", { q: "*", query_by: "title", per_page: "250", page: String(page), filter_by: `auctionId:=${sale.id} && department.code:=MOT-CAR` });
+        const r = await get("lots", { q: "*", query_by: "title", per_page: "250", page: String(page), filter_by: `auctionId:=${sale.id} && department.code:=${depts}` });
         // deno-lint-ignore no-explicit-any
-        for (const doc of (r.hits ?? []).map((h: any) => h.document as BonhamsLotDoc)) {
-          if (!doc.lotId || doc.lotId === "0") continue; // not yet catalogued: no lot number, no lot page
-          const lot = bonhamsLot(doc);
-          if (!lot.title || !lot.url.includes("/lot/")) continue;
-          const ident = parseBatIdentityFromTitle(lot.title.replace(/\s+(Chassis|Registration|Frame|Engine) no\..*$/i, ""), null);
-          auctions.push({
-            url: lot.url,
-            title: lot.title,
-            platform: "bonhams",
-            auction_end_date: lot.ends ?? "",
-            current_bid: lot.hammer,
-            bid_count: null,
-            currency: lot.currency,
-            no_reserve: false,
-            reserve_met: null,
-            year: ident.year,
-            make: ident.make,
-            model: ident.model,
-            thumbnail_url: null,
-            external_id: lot.external_id,
-            raw_data: { source: "bonhams_typesense_lots", sale_id: sale.id, sale_title: sale.auctionTitle ?? null, status: lot.status,
-                        estimate_low: lot.estimate_low, estimate_high: lot.estimate_high, synced_at: new Date().toISOString() },
-          });
-        }
+        docs.push(...(r.hits ?? []).map((h: any) => h.document as BonhamsLotDoc));
         if ((r.hits ?? []).length < 250) break;
       }
+      const lots = docs.filter((d) => d.lotId && d.lotId !== "0") // not yet catalogued: no lot number, no lot page
+        .map(bonhamsLot).filter((l) => l.title && l.url.includes("/lot/"));
+      const amSale = lots.find((l) => l.am_sale_id)?.am_sale_id;
+      const states = kind === "live_bid" && amSale
+        ? await bidStates(amSale, lots.flatMap((l) => (l.am_lot_id ? [l.am_lot_id] : [])))
+        : new Map<string, BonhamsBidState>();
+      for (const lot of lots) {
+        const bid = lot.am_lot_id ? states.get(lot.am_lot_id) : undefined;
+        const phase = bonhamsLotPhase(kind, bid, now);
+        const ident = parseBatIdentityFromTitle(lot.title.replace(/\s+(Chassis|Registration|Frame|Engine) no\..*$/i, ""), null);
+        auctions.push({
+          url: lot.url,
+          title: lot.title,
+          platform: "bonhams",
+          auction_end_date: (phase === "upcoming" ? null : bid?.ends) ?? lot.ends ?? "",
+          current_bid: phase === "upcoming" ? null : bid?.current_bid ?? null, // a bid placed; the opening bid is not one
+          bid_count: phase === "upcoming" ? null : bid?.bid_count ?? null,
+          currency: lot.currency ?? bid?.currency ?? null,
+          sale_status: phase === "live" ? "auction_live" : phase === "closed" ? "ended" : "upcoming",
+          no_reserve: lot.no_reserve,
+          reserve_met: null,
+          year: ident.year,
+          make: ident.make,
+          model: ident.model,
+          thumbnail_url: lot.image ?? bid?.image ?? null,
+          external_id: lot.external_id,
+          raw_data: { source: "bonhams_typesense_lots", sale_id: sale.id, sale_title: sale.auctionTitle ?? null, sale_kind: kind,
+                      status: lot.status, estimate_low: lot.estimate_low, estimate_high: lot.estimate_high,
+                      ...(bid ? { bid_source: "bonhams_bidding_platform", bid_status: bid.status, bid_at: bid.bid_at, opening_bid: bid.opening_bid } : {}),
+                      synced_at: new Date().toISOString() },
+        });
+      }
     }
-    console.log(`[sync-live-auctions] Bonhams: ${sales.length} open Cars sales, ${auctions.length} lots`);
+    const live = auctions.filter((x) => x.sale_status === "auction_live");
+    console.log(`[sync-live-auctions] Bonhams: ${sales.length} open motoring sales (${kinds.join(", ")}), ${auctions.length} lots, ${live.length} live (${live.filter((x) => x.current_bid).length} with a bid)`);
     return { auctions, error: null };
   } catch (e: unknown) {
     return { auctions: [], error: `Bonhams sync failed: ${e instanceof Error ? e.message : String(e)}` };
@@ -808,8 +856,8 @@ async function syncToDatabase(
       year: auction.year,
       make: auction.make,
       model: auction.model,
-      auction_status: "active",
-      sale_status: "auction_live",
+      auction_status: auction.sale_status === "ended" ? "ended" : "active",
+      sale_status: auction.sale_status ?? "auction_live",
       auction_end_date: auction.auction_end_date,
       sale_price: auction.current_bid,
       primary_image_url: auction.thumbnail_url || undefined,
