@@ -1,6 +1,7 @@
 /** A bounded read of the existing image ledger, shared by the profile and field drill. */
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../../lib/supabase';
+import { vehicleImageGallerySource } from '../../../lib/vehicleImageColumns';
 
 export interface EvidenceImage {
   id: string;
@@ -68,7 +69,7 @@ export function useVehicleImageEvidence(vehicleId: string | undefined) {
       signal.addEventListener('abort', abort, { once: true });
       const timeout = setTimeout(abort, 12_000);
       try {
-        const { data, count, error } = await supabase.from('vehicle_images')
+        const { data, count, error } = await supabase.from(await vehicleImageGallerySource())
           .select(SELECT, { count: 'exact' }).eq('vehicle_id', vehicleId!)
           .eq('vehicle_image_gallery_eligible', true)
           .not('is_sensitive', 'is', true).not('is_duplicate', 'is', true)

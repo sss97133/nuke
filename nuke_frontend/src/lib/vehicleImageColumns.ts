@@ -29,3 +29,12 @@ export async function vehicleImageColumnsForViewer<T extends string>(columns: T)
   const excluded = new Set<string>(VEHICLE_IMAGE_ANON_EXCLUDED_COLUMNS);
   return columns.split(',').map((c) => c.trim()).filter((c) => c && !excluded.has(c)).join(', ') as T;
 }
+
+/**
+ * Where a gallery read goes. The gate filter `vehicle_image_gallery_eligible` takes the whole row, which anon cannot form
+ * once its column grants withhold location/EXIF/device fields, so a signed-out gallery read uses vehicle_images_public (the
+ * same rows and gate, without those columns) and a signed-in read keeps the table.
+ */
+export async function vehicleImageGallerySource(): Promise<'vehicle_images'> {
+  return ((await signedIn()) ? 'vehicle_images' : 'vehicle_images_public') as 'vehicle_images';
+}

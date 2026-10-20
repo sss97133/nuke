@@ -28,7 +28,8 @@ const response = (rows: unknown[], total = rows.length) => new Response(JSON.str
 const requests = () => transport.fetch.mock.calls.map(([input]) => new URL(String(input)));
 
 function expectCanonicalAdmission(url: URL) {
-  expect(url.pathname).toBe('/rest/v1/vehicle_images');
+  // signed out (this client has no session): the view that omits the withheld columns
+  expect(url.pathname).toBe('/rest/v1/vehicle_images_public');
   expect(url.searchParams.get('vehicle_id')).toBe(`eq.${vehicleId}`);
   // The database proves public listing provenance; the browser must not duplicate
   // that join or fall back to the old NULL/approved-only gate when it fails.

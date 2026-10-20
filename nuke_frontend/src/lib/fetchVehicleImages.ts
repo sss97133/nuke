@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { vehicleImageGallerySource, vehicleImageColumnsForViewer } from './vehicleImageColumns';
 
 // PostgREST's row cap on this project (probed 2026-10-14: limit=1500 returns 1000 rows). Every page re-runs the whole
 // filter and sort over all of the vehicle's images and projects them before the page is cut, so the work of a gallery
@@ -79,10 +80,12 @@ async function fetchVehicleImagesUncached<T = any>(
   // with approved publication provenance tied to this vehicle's auction event.
   // It preserves the gate for private intake and excludes rejected/unsafe rows;
   // display eligibility does not claim that vision analysis has completed.
+  const source = await vehicleImageGallerySource();
+  const columns = await vehicleImageColumnsForViewer(selectClause);
   const fetchPage = (from: number, withCount: boolean) => {
     const query = supabase
-      .from('vehicle_images')
-      .select(selectClause, withCount ? { count: 'exact' } : undefined)
+      .from(source)
+      .select(columns, withCount ? { count: 'exact' } : undefined)
       .eq('vehicle_id', vehicleId)
       .eq('vehicle_image_gallery_eligible', true)
       .not('is_document', 'is', true)
