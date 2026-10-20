@@ -575,6 +575,7 @@ final class SyncEngine: ObservableObject {
         report("ios_sync_pass", [
             "uploaded": uploaded, "metadata_only": metadataOnly, "deduped": deduped, "deferred": deferred,
             "held_private": heldPrivate, "failed": failed, "recent": recent.count, "window": assets.count,
+            "page_full": assets.count >= Config.maxPerRun ? 1 : 0,  // a full page every pass with an unmoved watermark = a stuck cursor
         ], extra: ["gates": gates, "stop": stopReason ?? "end",
                    "watermark": ISO8601DateFormatter().string(from: watermark)])
         lastPassSummary = [
