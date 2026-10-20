@@ -346,6 +346,7 @@ struct VehicleDetailView: View {
     @State private var engagementError = false
     @State private var commentDraft = ""
     @State private var posting = false
+    @State private var commentError: String?
     @State private var followBusy = false
     @State private var showComments = false   // the comment thread lives in a summoned sheet
     // CONTRIBUTE — the user's job: fill what the record needs. The unverified (facade)
@@ -424,7 +425,7 @@ struct VehicleDetailView: View {
         }
         .sheet(isPresented: $showComments) {
             CommentsSheet(engagement: engagement,
-                          commentDraft: $commentDraft, posting: $posting,
+                          commentDraft: $commentDraft, posting: $posting, commentError: $commentError,
                           onPost: { await postComment() })
         }
         .fullScreenCover(isPresented: $galleryOpen) {
@@ -1702,14 +1703,21 @@ struct VehicleDetailView: View {
             let p_kind = "comment"; let p_target_type = "vehicle"
             let p_target_id: String; let p_payload: [String: String]
         }
+        struct CommentResult: Decodable { let ok: Bool?; let message: String? }
         do {
-            _ = try await SupabaseService.client
+            let result: CommentResult = try await SupabaseService.client
                 .rpc("record_interaction",
                      params: CommentParams(p_target_id: vehicleId, p_payload: ["text": text]))
-                .execute()
+                .execute().value
+            if result.ok == false {
+                commentError = result.message ?? "Couldn't post that comment."
+                return
+            }
+            commentError = nil
             commentDraft = ""
             await loadEngagement()
         } catch {
+            commentError = error.localizedDescription
             NSLog("NukeCapture comment post failed: %@", String(describing: error))
         }
     }
@@ -2991,6 +2999,7 @@ private struct CommentsSheet: View {
     let engagement: VehicleEngagement?
     @Binding var commentDraft: String
     @Binding var posting: Bool
+    @Binding var commentError: String?
     let onPost: () async -> Void
     @Environment(\.dismiss) private var dismiss
 
@@ -3034,14 +3043,21 @@ private struct CommentsSheet: View {
 
     @ViewBuilder private var composer: some View {
         if SupabaseService.currentUserId != nil {
-            HStack(spacing: 8) {
-                TextField("Add a comment…", text: $commentDraft, axis: .vertical)
-                    .textFieldStyle(.plain).lineLimit(1...4).submitLabel(.send)
-                Button { Task { await onPost() } } label: {
-                    if posting { ProgressView().scaleEffect(0.7) }
-                    else { Image(systemName: "arrow.up.circle.fill").font(.title2) }
+            VStack(alignment: .leading, spacing: 6) {
+                if let commentError {
+                    Text(commentError)
+                        .font(.caption).foregroundStyle(.red)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                .disabled(posting || commentDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                HStack(spacing: 8) {
+                    TextField("Add a comment…", text: $commentDraft, axis: .vertical)
+                        .textFieldStyle(.plain).lineLimit(1...4).submitLabel(.send)
+                    Button { Task { await onPost() } } label: {
+                        if posting { ProgressView().scaleEffect(0.7) }
+                        else { Image(systemName: "arrow.up.circle.fill").font(.title2) }
+                    }
+                    .disabled(posting || commentDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
             }
             .padding(12)
             .background(.bar)

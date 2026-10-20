@@ -298,6 +298,8 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
         setNewComment('');
         setMemePickerOpen(false);
         refetch();
+      } else {
+        alert(error.message || 'Failed to post comment');
       }
     } catch (err) {
       console.error('Failed to post comment:', err);
@@ -336,6 +338,7 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
         refetch();
       } else {
         console.error('Failed to update comment:', error);
+        alert(error.message || 'Failed to update comment');
       }
     } catch (err) {
       console.error('Failed to update comment:', err);
