@@ -42,6 +42,17 @@ GLOB_CHARS = set('*?[]{}')
 UUID_RE = re.compile(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$')
 NAMESPACE = uuid.UUID('6f1c2a52-5d0e-4c2b-9a51-3e0d1b7c9e41')     # deterministic ids for file-mode keys
 FILE, DB = 'file', 'db'
+# (v6, RU6) the readers that raise when no user is named: a read of one must pass :uid
+READER_CALL = re.compile(r'\b(vehicle_accounting_evidence|get_vehicle_day_records|evidence_candidates_for_images|'
+                         r'evidence_custody|evidence_identity_set|get_user_day_record|evidence_revert_watch)\s*\(')
+
+
+def loop_file(name, setting):
+    """A local loop record (never in the repo): the path the named setting gives, else <loop dir>/<name>. Read at call
+    time, so a test or a second case can point it elsewhere. (v6, M10b) sheets.jsonl (sheets issued and the messages
+    that delivered them), disputed.jsonl (answers runs a second reader, the transcript check or his objection
+    disputed), readback.jsonl (the agent decisions the next sheet reads back to him)."""
+    return Path(os.environ.get(setting) or str(LOOP_DIR / name)).expanduser()
 
 
 class EvidenceError(Exception):
@@ -372,6 +383,9 @@ class Reader:
                           r'view)|drop\s+(table|function|view|index)|create\s+(table|function|view|index|or)|'
                           r'grant\s|revoke\s|set\s+(local\s+|session\s+)?statement_timeout)', head):
             raise ReadError('read path: one SELECT/WITH statement, no writes')
+        if READER_CALL.search(head) and not (re.search(r'(?<![:\w]):uid\b', sql)
+                                             and is_uuid(str((params or {}).get('uid') or ''))):
+            raise ReadError('a reader names the user whose evidence it reads (:uid); the store raises without one')
         sent = self.substitute(sql, params or {})
         for attempt in range(retries):
             gap = time.time() - self._last

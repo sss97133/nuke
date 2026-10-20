@@ -30,6 +30,7 @@ import checks
 import common
 import exit_test
 import loader
+import manifest
 import money
 import passlib
 import payloads
@@ -131,6 +132,7 @@ def db_steps(ctx, a, report, rest, reader):
             reader, ctx.user_id, ctx.vid(ctx.case['vehicle']),
             deployed_md5s=common.load_json(md5_file) if md5_file.exists() else None)
         report['scoreboard'] = {k: scoreboard.scalar(v) for k, v in sb.items()}
+        report['answers_runs_disputed_by_transcript'] = scoreboard.dispute_failed_answers(sb)
         bad = scoreboard.integrity_failed(sb.get('M10_integrity'))
         if bad:
             raise common.StopLoop('integrity_check_failed', bad)
@@ -155,18 +157,21 @@ def db_steps(ctx, a, report, rest, reader):
                                       'left_off_not_loaded': len(side['left_off_not_loaded'])}
         if promotion_live:
             report['repin'] = repin.repin(rest, reader, ctx.user_id, parent=loop_run)
-        decided = [] if not promotion_live else reader.read("select distinct c.image_id from image_vehicle_candidates c join v_evidence_status s on "
-                              "s.target_kind = 'image_candidate' and s.target_id = c.id where c.user_id = :uid and "
-                              "c.superseded_by is null and s.status in ('confirmed', 'rejected') and "
-                              "s.channel in ('human', 'agent')", {'uid': ctx.user_id}, tag='decided_images')
+        # (v6, AC10) an agent decision of an answers run a second reader or his read-back disputed is never promoted
+        disputed = [d for d in manifest.disputed_runs() if common.is_uuid(d)]
+        decided = [] if not promotion_live else reader.read(
+            "select distinct c.image_id from image_vehicle_candidates c join v_evidence_status s on "
+            "s.target_kind = 'image_candidate' and s.target_id = c.id join evidence_decisions d on d.id = s.decision_id "
+            "where c.user_id = :uid and c.superseded_by is null and s.status in ('confirmed', 'rejected') and "
+            "s.channel in ('human', 'agent') and coalesce(substring(d.detail->>'answer_ref' from "
+            "'^answers:([0-9a-f-]{36})#')::uuid <> all(:disputed), true)",
+            {'uid': ctx.user_id, 'disputed': disputed}, tag='decided_images')
         imgs = [r['image_id'] for r in decided]
-        if not promotion_live:
-            pass
-        elif unmanifested:
+        if promotion_live and unmanifested:
             # (v5, M10b) a row no writer call returned: promotion and publication wait; the lead reads the rows
             report['promotion_held'] = {'reason': 'unmanifested_rows', 'rows': unmanifested,
                                         'by_table': (sb.get('M10b') or {}).get('by_table')}
-        else:
+        elif promotion_live:
             report['promote'] = dict(promote.promote(rest, reader, ctx.user_id, imgs, parent=loop_run)) if imgs else {}
             report['publish'] = dict(publish.publish(rest, reader, ctx.user_id,
                                                      publish.watch_images(reader, ctx.user_id), parent=loop_run))

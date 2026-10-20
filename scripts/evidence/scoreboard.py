@@ -12,6 +12,10 @@ script refuses to run if another scoreboard statement is already active (db-safe
 loop/deployed_md5s.json ({name: md5}, from the PR's post-deploy output). M10b matches every evidence row created in
 the last --m10b-hours against the runner's manifest of returned ids (manifest.py): `unmanifested` > 0 halts
 promotion; owner decisions are counted for the lead to match against the API request log.
+(v6, AC10) M10b_answers checks each answers run against the chat transcript (the sheet's delivery by sha256, his reply
+after it, his verbatim words in the reply; transcript.py) and marks a failing run disputed; M4a leaves out agent rows
+of disputed runs (loop/disputed.jsonl, written by record_answers.py second-read and dispute too); M10b_readback checks
+that every agent decision of the week is on the read-back list the next sheet reads to him (loop/readback.jsonl).
 
 The owner id comes from --user / EVIDENCE_OWNER_ID / the loop config and appears in no output (params show '<uid>').
 
@@ -37,12 +41,12 @@ WINDOW = ('2024-01-01', '2026-01-01')
 
 
 def parse(path=SQL_FILE):
-    """-> [(name, mode, sql)], mode in ('', 'chunked', 'ids', 'manifest')."""
+    """-> [(name, mode, sql)], mode in ('', 'chunked', 'ids', 'manifest', 'answers', 'readback')."""
     out, cur, name, mode = [], [], None, ''
     with open(path, encoding='utf-8') as f:
         text = f.read()
     for ln in text.splitlines():
-        m = re.match(r'^-- name: (\S+)(?: (chunked|ids|manifest))?\s*$', ln)
+        m = re.match(r'^-- name: (\S+)(?: (chunked|ids|manifest|answers|readback))?\s*$', ln)
         if m:
             if name:
                 out.append((name, mode, '\n'.join(cur).strip().rstrip(';')))
@@ -115,9 +119,11 @@ def integrity_failed(m):
 
 
 def run(reader, uid, vehicle, statements=None, dry_run=False, printer=print, only=None, manifest_dir=None,
-        since=None, deployed_md5s=None):
+        since=None, deployed_md5s=None, disputed=None, sheets=None, transcripts=None, readback=None):
     since = since or common.iso_utc(common.utc_now() - dt.timedelta(hours=24))
-    params = {'uid': uid, 'vehicle_id': vehicle, 'window_from': WINDOW[0], 'window_to': WINDOW[1], 'since': since}
+    disputed = manifest.disputed_runs() if disputed is None else disputed
+    params = {'uid': uid, 'vehicle_id': vehicle, 'window_from': WINDOW[0], 'window_to': WINDOW[1], 'since': since,
+              'disputed': [d for d in disputed if common.is_uuid(d)]}
     out = {}
     statements = statements or parse()
     if not dry_run:
@@ -167,7 +173,20 @@ def run(reader, uid, vehicle, statements=None, dry_run=False, printer=print, onl
                     continue
                 created = {r['t']: _json(r['x']) for r in reader.read(sql, params, tag=name)}
                 lines = manifest.load(manifest_dir or common.MANIFEST_DIR, since)
-                out[name] = dict(manifest.reconcile(created, lines), since=since)
+                out[name] = dict(manifest.reconcile(created, lines), since=since, disputed_answers_runs=len(disputed))
+            elif mode in ('answers', 'readback'):
+                if dry_run:
+                    printer('-- %s (checked against the %s)\n%s;' % (
+                        name, 'chat transcript' if mode == 'answers' else 'read-back list',
+                        common.Reader.substitute(sql, params).replace(uid, '<uid>')))
+                    continue
+                rows = reader.read(sql, params, tag=name)
+                if mode == 'answers':
+                    import review_sheet
+                    runs = [dict(r, rows=_json(r.get('rows'))) for r in rows]
+                    out[name] = manifest.check_answers(runs, review_sheet.load_index(sheets), transcripts)
+                else:
+                    out[name] = manifest.check_readback(rows, manifest.readback_entries(readback))
             else:
                 if dry_run:
                     printer('-- %s\n%s;' % (name, common.Reader.substitute(sql, params).replace(uid, '<uid>')))
@@ -188,11 +207,25 @@ def run(reader, uid, vehicle, statements=None, dry_run=False, printer=print, onl
     return out
 
 
+def dispute_failed_answers(measures):
+    """(v6, AC10) An answers run whose reply does not hold his words, or comes before the sheet, is disputed (once):
+    its agent rows leave M4a, are never promoted, and the next sheet asks its rows again."""
+    done = {e['answers_run'] for e in manifest.disputed_rows() if e.get('by') == 'm10b_transcript'}
+    new = [p for p in ((measures or {}).get('M10b_answers') or {}).get('problems') or [] if p['answers_run'] not in done]
+    for p in new:
+        manifest.mark_disputed(dict(p, by='m10b_transcript'))
+    return len(new)
+
+
 def scalar(v):
     if isinstance(v, dict) and 'value' in v:
         return v['value']
     if isinstance(v, dict) and 'unmanifested' in v:
         return v['unmanifested']
+    if isinstance(v, dict) and 'not_read_back' in v:
+        return v['not_read_back']
+    if isinstance(v, dict) and isinstance(v.get('problems'), list):
+        return len(v['problems'])
     if isinstance(v, dict) and 'rate' in v:
         return v['rate']
     return None
@@ -233,6 +266,7 @@ def main():
     try:
         measures = run(reader, uid, a.vehicle, only=a.only, manifest_dir=a.manifest_dir, since=since,
                        deployed_md5s=deployed)
+        dispute_failed_answers(measures)
     except common.StopLoop as e:
         common.eprint('STOP: %s' % e)
         return 3

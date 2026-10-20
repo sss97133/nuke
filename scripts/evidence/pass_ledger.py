@@ -11,6 +11,7 @@ ledger_vendor_date  one link per placement the case lists ({line_id, vehicle, so
                     confidence, join_key, note}). The ledger is a payment source: its run records coverage_to (the
                     case's statement end, else the newest line date) with covers_accounts, the account refs whose
                     statements the export is (v5, readers v4 #3); with no covers_accounts it records no coverage.
+                    (v6, RU4) closed_accounts: the accounts whose final statement the export is (a subset).
 pnl_allocation      a link per allocation on the allocated vehicle, with the same payment_key (v3, ET2-1/ET2-9):
                     disposition rows cite a payment by its bank reference ('Bank payment<ref>'); job rows of the
                     independent P&L ledger carry '<job>-<line id>' ids. A job with no Nuke vehicle row is written with
@@ -70,6 +71,11 @@ def build(ctx, built):
     if lcfg.get('covers_accounts'):
         lconf['coverage_to'] = lcfg.get('coverage_to') or src.newest_date(lname)
         lconf['covers_accounts'] = list(lcfg['covers_accounts'])
+        if lcfg.get('closed_accounts'):
+            lconf['closed_accounts'] = list(lcfg['closed_accounts'])   # (v6, RU4) the export is their final statement
+        bad = payloads.coverage_problem('ledger_vendor_date', lconf)
+        if bad:
+            raise common.EvidenceError('ledger_vendor_date: %s' % bad)
     else:
         ctx.note('ledger_vendor_date: no covers_accounts in the case; the run records no money coverage')
     res = {'ledger_vendor_date': {'emitted': n, 'config': lconf, 'counts': {'links': n}}}

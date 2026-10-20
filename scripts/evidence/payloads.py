@@ -1,6 +1,6 @@
 """The writer contract: argument names, CHECK vocabularies and payload builders for the image-evidence writers.
 
-Source: draft.sql blocks M1a (tables and CHECKs), M1w (writers, readers) and M1p (promotion path), design v5 of
+Source: draft.sql blocks M1a (tables and CHECKs), M1w (writers, readers) and M1p (promotion path), design v6 of
 2026-10-20. Every pass builds its rows here, and checks.py validates against the same CONTRACT, so a later design
 revision that renames a field or a value is one edit in this module, or a JSON override passed as the case's
 `contract_overrides` (merged key by key; `renames` maps writer -> {old field: new field} and is applied to every row
@@ -18,15 +18,20 @@ v5 rules the builders apply (DESIGN-v5 "Changes from v4"): a pass names only thi
 (the owner's entities come from his confirmed account map or his own statement); an owner_statement link and an
 'owner:' payment key cite his stored answer (answers:<run>#<row>); only payment-source runs record coverage_to, always
 with covers_accounts; review runs store per-row targets; stored answers carry a structured reading of his words.
+v6 (DESIGN-v6 "Changes from v5"): each review row asks one question (one decision kind; 'place' or 'party'), and a
+reading names only a place of the row's dimension, never inverted ("no" to the asked place is bare); one answers run per
+message_ref '<source>:<message id>'; an owner statement answers a who-paid row and names the row target it answers;
+a payment-source run may record closed_accounts (a subset of covers_accounts).
 """
 import copy
+import datetime as dt
 import json
 import re
 
 import common
 
 CONTRACT = {
-    'version': 'draft-v5-2026-10-20',
+    'version': 'draft-v6-2026-10-20',
     'pass_names': [
         'listing_class', 'time_offset', 'photos_join', 'photos_album', 'file_hash_twin', 'exif_neighbour',
         'day_context', 'legacy_suggestion', 'claim_import', 'jev_choice', 'paid_vision', 'combined', 'owner_review',
@@ -82,14 +87,21 @@ CONTRACT = {
     'review_id_kinds': ['image', 'image_candidate', 'evidence_link', 'album_map', 'change_claim', 'capture_time_claim',
                         'day_context', 'account_entity', 'image_publication'],
     'review_key_kinds': ['payment', 'source', 'account'],
-    # evidence_record_answers: {"decision": confirmed|rejected|unsure, and at most one place}
+    # (v6, AC1) the one decision kind a sheet row asks about (evidence_sheet_row)
+    'review_questions': ['image_candidate', 'image_publication', 'capture_time_claim', 'evidence_link', 'album_map',
+                         'account_entity', 'change_claim', 'day_context'],
+    'image_questions': ['image_candidate', 'image_publication', 'capture_time_claim'],
+    # evidence_record_answers: {"decision": confirmed|rejected|unsure, and at most one place of the row's dimension}
     'answer_decisions': ['confirmed', 'rejected', 'unsure'],
-    'answer_places': ['vehicle_id', 'subject_key', 'entity_key'],
+    'answer_places': ['vehicle_id', 'subject_key', 'entity_key', 'captured_on'],
     'answer_ref_re': r'^answers:[0-9a-f-]{36}#[0-9]+$',
+    # (v6, AC10) one transcription per message: '<source>:<message id>', at most 200 characters
+    'message_ref_re': r'^[A-Za-z0-9_.-]+:[A-Za-z0-9_.:/#@-]+$',
     # Per-row results the writers return that are reported and never retried (PLAN section 1, runner note 7); the
     # next sheet or the next run asks again.
     'reported_outcomes': ['human_decision_newer', 'human_decision_stands', 'already_decided', 'owner_answer_missing',
-                          'kept_stronger', 'entity_is_owners_call'],
+                          'kept_stronger', 'entity_is_owners_call', 'reassign_needs_review', 'reassign_not_a_placement',
+                          'unchanged'],
     # evidence_writer_names(): the only functions that may be the outermost caller of a write to the nine tables
     'writer_names': ['evidence_open_run', 'evidence_close_run', 'evidence_record_answers', 'propose_image_candidates',
                      'propose_capture_time_claims', 'confirm_capture_times_by_rule', 'propose_evidence_links',
@@ -274,6 +286,9 @@ def whole_hour_offset(stored, corrected):
 
 def capture_time_claim(image_id, stored_taken_at, corrected_taken_at, captured_on, rule, witness, confidence,
                        local_offset_minutes=None, batch_key=None, offset_seconds=None):
+    if rule == 'owner' and not re.match(C['answer_ref_re'], (witness or {}).get('answer_ref') or ''):
+        # (v6, RU5) his word on a capture time cites his answer to a capture-time row about this photo and day
+        raise ValueError("an 'owner' capture time carries witness.answer_ref answers:<run>#<row>")
     if offset_seconds is None and stored_taken_at is not None:
         offset_seconds = whole_hour_offset(stored_taken_at, corrected_taken_at)[0]
     return _clean('capture_time', {
@@ -304,6 +319,16 @@ def answer_ref(answers_run, row):
 def owner_payment_key(answers_run, row):
     """el_owner_word_cited: a payment that rests on his word only is keyed by his stored answer."""
     return 'owner:' + answer_ref(answers_run, row)
+
+
+def link_class(role, allocated, source_kind):
+    """(v6, AC2/AC7/AC12) evidence_link_class: placement (unallocated payment or figure), share (allocated), album,
+    contradicts or other; it decides what a placed answer may touch."""
+    if source_kind == 'photos_album':
+        return 'album'
+    if role in ('payment_out', 'payment_in', 'assertion'):
+        return 'placement' if allocated is None else 'share'
+    return 'contradicts' if role == 'contradicts' else 'other'
 
 
 def evidence_link(vehicle_id, source_kind, role, join_key, confidence, evidence, external_ref=None, anchor=None,
@@ -386,10 +411,11 @@ def support_line(key, pass_name, claim_key, supports):
 
 # ---------------------------------------------------------------------------------------------------- run and decision args
 def coverage_problem(pass_name, config):
-    """er_coverage_source: coverage_to only on a payment-source run, as a date, with a non-empty covers_accounts."""
+    """er_coverage_source: coverage_to only on a payment-source run, as a date, with a non-empty covers_accounts;
+    (v6, RU4/RU9) closed_accounts only with coverage_to, a subset of covers_accounts."""
     config = config or {}
     if 'coverage_to' not in config and 'covers_accounts' not in config:
-        return None
+        return 'closed_accounts goes with coverage_to on a payment-source run' if 'closed_accounts' in config else None
     if pass_name not in C['payment_source_passes']:
         return 'coverage_to is recorded only by payment-source runs (%s), not %s' % (
             ', '.join(C['payment_source_passes']), pass_name)
@@ -399,6 +425,13 @@ def coverage_problem(pass_name, config):
     if not (isinstance(accts, list) and accts and all(isinstance(a, str) and re.match(C['account_ref_re'], a)
                                                       for a in accts)):
         return 'coverage_to needs covers_accounts: the account refs the export covers'
+    try:
+        dt.date.fromisoformat(config['coverage_to'])
+    except ValueError:
+        return 'coverage_to %s is not a date' % config['coverage_to']
+    closed = config.get('closed_accounts')
+    if closed is not None and not (isinstance(closed, list) and set(closed) <= set(accts)):
+        return 'closed_accounts must be a subset of covers_accounts (accounts whose final statement the export is)'
     return None
 
 
@@ -412,22 +445,56 @@ def review_target(kind, ident=None, key=None):
     raise ValueError('review target %s %r is not an id or key evidence_open_run accepts' % (kind, ident or key))
 
 
+def row_question(row):
+    """(v6, AC1) The one decision kind a sheet row asks about, from its targets as evidence_sheet_row derives it (a
+    payment or source key asks about links, an account about its map row, an image adds no kind), or the row's own
+    'question' when it lists only images. Raises when the targets imply two kinds or a stated question disagrees."""
+    kinds = set()
+    for t in row.get('targets') or []:
+        k = t.get('kind')
+        if k in C['review_questions']:
+            kinds.add(k)
+        elif k in ('payment', 'source'):
+            kinds.add('evidence_link')
+        elif k == 'account':
+            kinds.add('account_entity')
+    if len(kinds) > 1:
+        raise ValueError('the row asks about more than one kind of thing (%s): one question per row' % sorted(kinds))
+    q = next(iter(kinds), None)
+    if row.get('question') is not None:
+        if q is not None and row['question'] != q:
+            raise ValueError('question %s does not match its targets (%s)' % (row['question'], q))
+        q = row['question']
+    if q not in C['review_questions']:
+        raise ValueError('a row that lists only images names its question (%s)' % ', '.join(C['image_questions']))
+    if any(t.get('kind') == 'image' for t in row.get('targets') or []) and q not in C['image_questions']:
+        raise ValueError('the row lists an image but asks about %s' % q)
+    if row.get('asks', 'place') not in ('place', 'party'):
+        raise ValueError('asks is place or party')
+    return q
+
+
 def review_rows_problem(config):
-    """The review run's per-row targets (v4, rules-violation v3): rows.<1..items>.targets, each a valid target."""
+    """The review run's per-row targets (v4) and (v6) one question per row: rows.<1..items>.targets, each a valid
+    target, implying one decision kind (or naming it when the row lists only images), asks 'place' or 'party'."""
     rows, items = config.get('rows'), str(config.get('items', ''))
-    if not isinstance(rows, dict) or not items.isdigit() or len(rows) != int(items):
-        return 'a review run lists targets for every row (rows.<n>.targets, n = 1..items)'
+    if not isinstance(rows, dict) or not items.isdigit() or len(rows) != int(items) or not 1 <= int(items) <= 500:
+        return 'a review run lists targets for every row (rows.<n>.targets, n = 1..items, at most 500)'
     for k, v in rows.items():
         if not (str(k).isdigit() and 1 <= int(k) <= int(items)):
             return 'row %s is not 1..%s' % (k, items)
         ts = (v or {}).get('targets')
-        if not (isinstance(ts, list) and ts):
-            return 'row %s has no targets' % k
+        if not (isinstance(ts, list) and 1 <= len(ts) <= 200):
+            return 'row %s lists 1..200 targets' % k
         for t in ts:
             try:
                 review_target(t.get('kind'), t.get('id'), t.get('key'))
             except (ValueError, AttributeError) as e:
                 return 'row %s: %s' % (k, e)
+        try:
+            row_question(v)
+        except ValueError as e:
+            return 'row %s: %s' % (k, e)
     return None
 
 
@@ -454,10 +521,13 @@ def close_run(run_id, status, counts, input_tokens=0, scoreboard=None, gap_picke
             'p_scoreboard': scoreboard, 'p_gap_picked': gap_picked}
 
 
-def answer_problem(answer):
+def answer_problem(answer, row=None):
     """evidence_record_answers' rule for the structured reading of one answer (v5, rules-channels v4 #1):
-    {"decision": confirmed|rejected|unsure} plus at most one place he named (vehicle_id | subject_key | entity_key);
-    'unsure' carries no place. Returns the problem, or None."""
+    {"decision": confirmed|rejected|unsure} plus at most one place he named; 'unsure' carries no place. With the sheet
+    row's profile (review_sheet: question, asks, asked_place, frame, link_class), the v6 rules too (AC1/AC3/AC4): only
+    a place of the row's own dimension; a yes names the asked place or none, "no" to the asked place is bare, a "where?"
+    row takes {confirmed, <place>}, a row in several places takes a bare yes or no, a who-paid row takes
+    {confirmed, entity_key}. Returns the problem, or None."""
     if not isinstance(answer, dict) or answer.get('decision') not in C['answer_decisions']:
         return 'answer needs decision confirmed | rejected | unsure'
     extra = set(answer) - {'decision'} - set(C['answer_places'])
@@ -474,24 +544,77 @@ def answer_problem(answer):
         return 'subject_key is not vin:|album:|label:<name>'
     if 'entity_key' in answer and not re.match(C['entity_key_re'], answer['entity_key'] or ''):
         return 'entity_key is not owner | owner_business:<x> | third_party:<x> | unknown'
+    if 'captured_on' in answer:
+        try:
+            dt.date.fromisoformat(answer['captured_on'])
+        except (TypeError, ValueError):
+            return 'captured_on is a date'
+    if row is None:
+        return None
+    allowed = answer_dimension(row)
+    if places and places[0] not in allowed:
+        return 'row %s asks %s about %s: its answer names %s' % (
+            row.get('row', '?'), row.get('asks', 'place'), row.get('question'),
+            ('at most one of ' + ', '.join(allowed)) if allowed else 'no place (a bare yes, no or not sure)')
+    if answer['decision'] == 'unsure':
+        return None
+    place, asked = answer_place(answer), row.get('asked_place')
+    if row.get('asks') == 'party':
+        if answer['decision'] != 'confirmed' or 'entity_key' not in answer:
+            return 'a who-paid row takes {"decision": "confirmed", "entity_key": <who>} or unsure'
+        return None
+    if not allowed:
+        return None
+    if asked is not None and answer['decision'] == 'confirmed' and place is not None and place != asked:
+        return 'a yes names the place the row asks about (%s); another place is {"decision": "rejected", <place>}' % asked
+    if asked is not None and answer['decision'] == 'rejected' and place is not None and place == asked:
+        return '"no" to the place the row asks about is a bare {"decision": "rejected"}'
+    if asked is None and (answer['decision'] == 'rejected' or place is None):
+        return 'the row asks where: {"decision": "confirmed", <the place he named>} or unsure'
     return None
 
 
+def answer_dimension(row):
+    """(v6, AC3) The places a reading may name on this row (evidence_record_answers' v_allowed)."""
+    if row.get('asks') == 'party':
+        return ['entity_key']
+    if row.get('asked_place') == 'multi' or row.get('frame') == 'mixed' or row.get('link_class') == 'mixed':
+        return []
+    q = row.get('question')
+    if q == 'image_candidate' or (q == 'evidence_link' and row.get('link_class') == 'placement'):
+        return ['vehicle_id', 'subject_key']
+    return {'album_map': ['vehicle_id'], 'account_entity': ['entity_key'],
+            'capture_time_claim': ['captured_on']}.get(q, [])
+
+
 def answer_place(answer):
-    """Where his answer says the subject belongs, as decide_evidence compares it: the vehicle, the subject_key or
-    'entity:<key>'; None for a bare yes / no."""
+    """Where his answer says the subject belongs, as decide_evidence compares it: the vehicle, the subject_key,
+    'entity:<key>' or 'day:<date>'; None for a bare yes / no."""
     if answer.get('vehicle_id'):
         return answer['vehicle_id']
     if answer.get('subject_key'):
         return answer['subject_key']
     if answer.get('entity_key'):
         return 'entity:' + answer['entity_key']
+    if answer.get('captured_on'):
+        return 'day:' + answer['captured_on']
+    return None
+
+
+def message_ref_problem(ref):
+    """(v6, AC10) '<source>:<message id>', at most 200 characters: the one chat message an answers run transcribes."""
+    ref = (ref or '').strip()
+    if len(ref) > 200 or not re.match(C['message_ref_re'], ref):
+        return 'message_ref is <source>:<message id> (e.g. <claude session id>:<message uuid>), at most 200 characters'
     return None
 
 
 def record_answers(user_id, sheet_run, message_ref, rows, producer, code_version):
     """rows: {"<sheet row>": {"verbatim": "<his words>", "answer": {...}}} -> the evidence_record_answers args. One
     answer set per sheet: a later answer goes on a new sheet."""
+    bad = message_ref_problem(message_ref)
+    if bad:
+        raise ValueError(bad)
     out = {}
     for k, v in rows.items():
         if not (isinstance(v, dict) and isinstance(v.get('verbatim'), str) and v['verbatim'].strip()):
@@ -500,7 +623,7 @@ def record_answers(user_id, sheet_run, message_ref, rows, producer, code_version
         if bad:
             raise ValueError('answer row %s: %s' % (k, bad))
         out[str(int(k))] = {'verbatim': v['verbatim'], 'answer': v['answer']}
-    return {'p_user_id': user_id, 'p_sheet_run': sheet_run, 'p_message_ref': message_ref, 'p_rows': out,
+    return {'p_user_id': user_id, 'p_sheet_run': sheet_run, 'p_message_ref': message_ref.strip(), 'p_rows': out,
             'p_producer': producer, 'p_code_version': code_version}
 
 

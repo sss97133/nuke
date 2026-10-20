@@ -1,9 +1,11 @@
 -- Image-evidence scoreboard (PLAN section 6; DESIGN-v5 section 11). Read-only; run by scoreboard.py through q.sh.
 -- Parameters: :uid (the owner, from --user; never written into the repo), :vehicle_id (the exit-test vehicle),
 -- :chunk_from / :chunk_to (taken_at chunks; idx_vehicle_images_user_taken_at), :ids (a uuid list), :window_from /
--- :window_to (the capture window), :since (the M10b window start). Each statement follows a "-- name: <measure>"
--- line; "chunked" statements run once per chunk and are summed by scoreboard.py, "manifest" rows are matched against
--- the runner's manifest of returned ids (M10b), and M10_integrity's bodies against the deployed md5s.
+-- :window_to (the capture window), :since (the M10b window start), :disputed (answers runs a second reader or his
+-- read-back disputed). Each statement follows a "-- name: <measure>" line; "chunked" statements run once per chunk and
+-- are summed by scoreboard.py, "manifest" rows are matched against the runner's manifest of returned ids (M10b),
+-- "answers" runs against the chat transcript, "readback" decisions against the read-back list, and M10_integrity's
+-- bodies against the deployed md5s.
 
 -- name: M1 chunked
 -- Unfiled own rows in the window (baseline 408 on 2026-10-20).
@@ -25,7 +27,7 @@ select count(*) n from vehicle_images vi
 -- name: M2
 -- Sampled wrong-filing rate (scoreboard.py adds the Wilson 95% interval).
 select count(*) filter (where st = 'rejected') wrong, count(*) filter (where st in ('confirmed', 'rejected')) decided
-  from (select public.evidence_status('image_candidate', c.id) st from image_vehicle_candidates c
+  from (select public.evidence_status('image_candidate', c.id, :uid) st from image_vehicle_candidates c
          where c.user_id = :uid and c.pass = 'audit_sample' and c.superseded_by is null) s;
 
 -- name: M3
@@ -52,10 +54,13 @@ select t.pass, count(*) decided,
 
 -- name: M4a
 -- The same on the agent channel, reported apart; never a gate until 20 agent decisions are re-confirmed in the app.
+-- (v6, AC10) agent rows whose answers run a second reader or his read-back disputed (:disputed) are left out.
 with truth as (
   select c.image_id, c.vehicle_id v from image_vehicle_candidates c
     join v_evidence_status s on s.target_kind = 'image_candidate' and s.target_id = c.id
-   where c.user_id = :uid and s.status = 'confirmed' and s.channel = 'agent' and c.frame_role = 'subject'),
+    join evidence_decisions d on d.id = s.decision_id
+   where c.user_id = :uid and s.status = 'confirmed' and s.channel = 'agent' and c.frame_role = 'subject'
+     and coalesce(substring(d.detail->>'answer_ref' from '^answers:([0-9a-f-]{36})#')::uuid <> all(:disputed), true)),
 top as (
   select distinct on (c.image_id, c.pass) c.image_id, c.pass, c.vehicle_id, c.verdict from image_vehicle_candidates c
    where c.user_id = :uid and c.superseded_by is null and c.frame_role = 'subject'
@@ -150,7 +155,10 @@ select count(*) filter (where decided_by like 'human:%' and detail->>'api_role' 
        count(*) filter (where decided_by like 'agent:%' and detail->>'row_targets_checked' is distinct from 'true')
          agent_unbound,
        count(*) filter (where decided_by like 'human:%' and detail->>'aal' is distinct from 'aal2') human_not_stepped_up,
-       count(*) filter (where decided_by like 'agent:%' and detail->>'answer_bound' is distinct from 'true') agent_not_bound
+       count(*) filter (where decided_by like 'agent:%' and detail->>'answer_bound' is distinct from 'true') agent_not_bound,
+       -- (v6, AC-aal / AC1) the server-side step-up record on every human row; the row's question on every agent row
+       count(*) filter (where decided_by like 'human:%' and detail->'step_up' is null) human_without_step_up_record,
+       count(*) filter (where decided_by like 'agent:%' and detail->>'question' is null) agent_without_question
   from evidence_decisions
  where user_id = :uid and decision in ('confirmed', 'rejected') and created_at > now() - interval '1 day';
 
@@ -207,6 +215,20 @@ select 'evidence_decisions', coalesce(jsonb_agg(jsonb_build_object('id', d.id, '
                                                                    'run', d.detail->>'run_id', 'image', d.result_image_id)), '[]')
   from evidence_decisions d where d.user_id = :uid and d.created_at > :since;
 
+-- name: M10b_answers answers
+-- (v6, AC10) The answers runs stored since :since, with his words, for scoreboard.py to check against the chat
+-- transcript and the sheets index (delivery by sha256, reply after it, verbatim words in the reply). The words stay in
+-- the scoreboard's memory; nothing but ids and verdicts is written.
+select r.id, r.config->>'sheet_run' sheet_run, r.config->>'message_ref' message_ref, r.config->'rows' rows
+  from evidence_runs r where r.user_id = :uid and r.run_kind = 'review_answers' and r.started_at > :since;
+
+-- name: M10b_readback readback
+-- (v6, AC10) Every agent decision of the last 7 days; scoreboard.py checks each has a read-back line (loop/readback.jsonl,
+-- written when record_answers.py records it), so the next sheet reads it back to him.
+select d.id, d.review_ref, d.detail->>'answer_ref' answer_ref from evidence_decisions d
+ where d.user_id = :uid and d.decided_by like 'agent:%' and d.decision in ('confirmed', 'rejected')
+   and d.created_at > now() - interval '7 days';
+
 -- name: M11
 -- Machine first filings per day by signal (orchestrator GPS re-arm; baseline 0 since 2026-10-20 08:50Z).
 select created_at::date d, coalesce(substring(reason from 'signal=([a-z_:\-]+)'), '') sig, count(*) n
@@ -239,6 +261,14 @@ select m.id, m.status, m.detected_by from vehicle_merge_proposals m
  where m.status in ('detected', 'proposed') and m.requires_approval_from is null
    and (m.primary_vehicle_id in (select public.evidence_fleet_vehicle_ids(:uid))
         or m.duplicate_vehicle_id in (select public.evidence_fleet_vehicle_ids(:uid)));
+
+-- name: M14_accounts
+-- (v6, RU4) Per account: its newest coverage and whether a run recorded it closed (an open account behind the newest is
+-- asked about on the sheet: money_source_behind).
+select acct, max((r.config->>'coverage_to')::date) cover_to,
+       bool_or(coalesce(r.config->'closed_accounts', '[]'::jsonb) @> to_jsonb(acct)) closed
+  from evidence_runs r cross join lateral jsonb_array_elements_text(r.config->'covers_accounts') acct
+ where r.user_id = :uid and r.config ? 'coverage_to' group by 1 order by 2;
 
 -- name: M14
 -- Money freshness: the newest coverage per payment source and its age in days (OWNER-DECISIONS 8).

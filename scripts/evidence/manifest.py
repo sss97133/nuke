@@ -30,8 +30,12 @@ def _items(result):
 
 
 def _decide_items(items, out):
+    """decide_evidence items, (v6) the nested reassign_result's included: its decision, implied rejections and the
+    owner_review row it may have written are ids this call created."""
     for it in items:
         out['results'][it.get('result') or 'none'] += 1
+        if it.get('reassign_note'):
+            out['results'][it['reassign_note']] += 1
         if _uuid(it.get('decision_id')):
             out['decision_ids'].append(it['decision_id'])
         out['implied_decision_ids'] += [x for x in it.get('implied_decision_ids') or [] if _uuid(x)]
@@ -169,6 +173,85 @@ class Manifest:
     def record_unknown(self, writer, args, code):
         return self.append({'at': common.iso_utc(self.clock()), 'writer': writer, 'run_id': run_of(writer, args, None),
                             'outcome': 'unknown', 'code': code})
+
+
+def _append(path, rec):
+    p = str(path)
+    os.makedirs(os.path.dirname(p), exist_ok=True)
+    with open(p, 'a', encoding='utf-8') as f:
+        f.write(json.dumps(dict(rec, at=common.iso_utc(common.utc_now())), sort_keys=True) + '\n')
+
+
+def _lines(path):
+    return common.read_jsonl(str(path)) if os.path.exists(str(path)) else []
+
+
+def disputed_ledger():
+    return common.loop_file('disputed.jsonl', 'EVIDENCE_DISPUTED')
+
+
+def disputed_runs(path=None):
+    """(v6, AC10) Answers runs a second reader, the transcript check or his objection disputed: their agent rows leave
+    M4a and are never promoted, and the next sheet asks the row again."""
+    return sorted({e['answers_run'] for e in _lines(path or disputed_ledger()) if e.get('answers_run')})
+
+
+def disputed_rows(path=None):
+    """The disputed entries (an entry with no row disputes every answered row of its sheet)."""
+    return [e for e in _lines(path or disputed_ledger()) if e.get('answers_run') and e.get('event') != 'reasked']
+
+
+def reasked_rows(path=None):
+    """{(sheet, row)} that a delivered sheet has asked again ('reasked' events, record_answers.py delivered)."""
+    return {(e.get('sheet'), e.get('row')) for e in _lines(path or disputed_ledger()) if e.get('event') == 'reasked'}
+
+
+def mark_disputed(rec, path=None):
+    _append(path or disputed_ledger(), rec)
+
+
+def readback_ledger():
+    return common.loop_file('readback.jsonl', 'EVIDENCE_READBACK')
+
+
+def append_readback(rec, path=None):
+    """(v6, AC10) One agent decision recorded from his answer: the next sheet reads it back to him."""
+    _append(path or readback_ledger(), rec)
+
+
+def readback_entries(path=None):
+    return _lines(path or readback_ledger())
+
+
+def check_answers(runs, sheets, where=None):
+    """(v6, AC10; M10b item 5) Each answers run against the chat: its sheet's delivery message carries the sheet as
+    issued, his reply comes after it and holds each row's verbatim words. runs: [{id, sheet_run, message_ref, rows:
+    {"<n>": {"verbatim"}}}] (read by q.sh; the words stay in memory); sheets: the sheets index (review_sheet)."""
+    import transcript
+    out = {'answers_runs': len(runs), 'checked': 0, 'unchecked': [], 'problems': [], 'no_delivery': []}
+    for r in runs:
+        sh = sheets.get(r.get('sheet_run')) or {}
+        if not sh.get('delivered_ref'):
+            out['no_delivery'].append(r['id'])
+            continue
+        res = transcript.check(sh.get('sheet_sha256'), sh['delivered_ref'], r.get('message_ref'),
+                               {k: (v or {}).get('verbatim') for k, v in (r.get('rows') or {}).items()}, where)
+        if not res['checked']:
+            out['unchecked'].append(r['id'])
+        else:
+            out['checked'] += 1
+            if res['problems']:
+                out['problems'].append({'answers_run': r['id'], 'sheet_run': r.get('sheet_run'),
+                                        'sheet': sh.get('sidecar'), 'problems': res['problems']})
+    return out
+
+
+def check_readback(decisions, entries, examples=5):
+    """(v6, AC10; M10b item 6) Every agent decision of the week has a read-back line (record_answers.py decide), so the
+    next sheet reads it back to him. decisions: [{id, review_ref, answer_ref}] from the store."""
+    seen = {(e.get('review_ref'), e.get('answer_ref')) for e in entries}
+    missing = [d['id'] for d in decisions if (d.get('review_ref'), d.get('answer_ref')) not in seen]
+    return {'agent_decisions_7d': len(decisions), 'not_read_back': len(missing), 'examples': missing[:examples]}
 
 
 def load(directory, since, until=None):

@@ -208,8 +208,11 @@ def make_case(d):
     with open(p('listing_rows.json'), 'w') as f:
         json.dump(_listing_rows(), f)
     with open(p('sessions.json'), 'w') as f:
+        # (v6, RU2) the last session is another user's on the same truck: never his work day
         json.dump({'result': [{'id': U('session', s), 'session_date': s, 'his': True, 'confirmed': False, 'title': 'x'}
-                              for s in (YARD_DAY, ACQ_DAY, DOC_DAY)]}, f)
+                              for s in (YARD_DAY, ACQ_DAY, DOC_DAY)] +
+                             [{'id': U('session', 'other-user'), 'session_date': SELLER_DAY, 'his': False,
+                               'confirmed': False, 'title': 'x'}]}, f)
     with open(p('primary.json'), 'w') as f:
         json.dump({'result': []}, f)
     with open(p('dedupe_done.txt'), 'w') as f:
@@ -318,7 +321,9 @@ def make_case(d):
                            'SWB': '2031 synthetic short bed'},
         'review': {'questions': [
             {'text': 'OWNER-DECISIONS 1: may photos go to the vision vendor?', 'answer_hint': 'yes / no'},
-            {'text': 'Which account paid for the truck when you bought it?', 'answer_hint': 'mine / <business>',
+            {'text': 'Who paid for the truck when you bought it: you, one of your businesses (name it), or another '
+                     'party (name it)?', 'answer_hint': 'me / <business> / <other party> / not sure', 'asks': 'party',
+             'section': 'who paid',
              'targets': [{'target_kind': 'change_claim', 'key': 'claim:acquisition:%s' % V['TRUCK'][:8]}]}]},
         'passes': {
             'photos_album': {'albums': [{'album_uuid': ALBUM, 'title': ALBUM_TITLE, 'vehicle': 'TRUCK',
@@ -475,7 +480,8 @@ def make_case(d):
                                      'awaiting_statement': {'ref': []}}}},
         {'id': 'coverage', 'level': 'evidence', 'expect': {'read_equals': {
             'money_sources_cover_to': COVER_TO, 'money_sources_cover_to_by_account': {LEDGER_ACCOUNT: COVER_TO},
-            'payments_outside_window': [], 'undated_own_photos': 0}}},
+            'money_sources_closed': [], 'payments_outside_window': [], 'payments_undated': [],
+            'undated_own_photos': 0}}},
         {'id': 'photos_items', 'level': 'evidence', 'expect': {
             'photos_items_total': 12, 'read_contains': {'photos_items_not_in_nuke': [{'day': '2031-04-22', 'items': 12}]}}},
         {'id': 'no_characterisation_keys', 'level': 'evidence', 'expect': {'read_keys_absent': ['own_labour_asserted',

@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
-"""Offline contracts for the image-evidence runner (draft.sql v5): every pass in file mode on synthetic pilot-shaped
-inputs (no real id, amount, path, model, vendor or person name), the v5 CHECK rules, the file-mode readers and the
-exit test, the loader's batching, gates and reported outcomes, db-mode refusal and stop conditions against a fake
-PostgREST, the manifest of returned ids and its M10b reconciliation, review rows with per-row targets, structured
-answers and answer binding, the pinned-source refusals, promotion guards, the scoreboard SQL and the read path.
-No network, no database, no Photos library.
+"""Offline contracts for the image-evidence runner (draft.sql v6): every pass in file mode on synthetic pilot-shaped
+inputs (no real id, amount, path, model, vendor or person name), the CHECK rules, the file-mode readers and the exit
+test, the loader's batching, gates and reported outcomes, db-mode refusal and stop conditions against a fake
+PostgREST, the manifest of returned ids and its M10b reconciliation, review rows that ask one question in one
+dimension, the sheet's delivery and his reply (one transcription per message, checked against a synthetic chat
+transcript), structured answers and answer binding, who-paid rows and owner statements, the second reader, the
+read-back list and disputed rows, the pinned-source refusals, promotion guards, the scoreboard SQL and the read path.
+No network, no database, no Photos library; the loop's local records and the transcripts live in a temp dir.
 
 Run: python3 scripts/evidence/test_evidence.py
 """
+import atexit
 import contextlib
 import io
 import json
@@ -23,6 +26,17 @@ from unittest import mock
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
+
+# Hermetic: the loop's local records (sheets index, disputed rows, read-back list, manifests, config) and the chat
+# transcripts the answer checks read point into a temp dir, never at ~/nuke-logs or ~/.claude. Set before common is
+# imported (it reads the loop dir at import time).
+LOOP_TMP = tempfile.mkdtemp(prefix='evidence-loop-')
+atexit.register(shutil.rmtree, LOOP_TMP, True)
+for _k in ('EVIDENCE_SHEETS_INDEX', 'EVIDENCE_DISPUTED', 'EVIDENCE_READBACK', 'EVIDENCE_MANIFEST_DIR',
+           'EVIDENCE_PINNED_SOURCES', 'EVIDENCE_OWNER_ID'):
+    os.environ.pop(_k, None)
+os.environ['EVIDENCE_LOOP_DIR'] = LOOP_TMP
+os.environ['EVIDENCE_TRANSCRIPTS'] = os.path.join(LOOP_TMP, 'transcripts')
 
 import checks  # noqa: E402
 import common  # noqa: E402
@@ -42,6 +56,7 @@ import repin  # noqa: E402
 import review_sheet  # noqa: E402
 import scoreboard  # noqa: E402
 import testdata  # noqa: E402
+import transcript  # noqa: E402
 
 EXPECTED = {'time_claims.jsonl': 133, 'links.album.jsonl': 1, 'candidates.photos_album.jsonl': 99,
             'candidates.combined.jsonl': 133, 'day_context.jsonl': 23, 'account_entities.jsonl': 3,
@@ -209,6 +224,14 @@ class Validator(SyntheticCase):
     def test_owner_word_must_cite_his_answer(self):
         self.assertCaught(lambda ls: ls[0]['row'].update(source_kind='owner_statement'), 'el_owner_word_cited')
         self.assertCaught(lambda ls: ls[0]['row'].update(payment_key='owner:he-said-so'), 'el_owner_word_cited')
+        # (v6, AC9) and names the who-paid row target it answers
+        ref = payloads.answer_ref(testdata.U('answers'), 4)
+        self.assertCaught(lambda ls: ls[0]['row'].update(source_kind='owner_statement', external_ref=ref),
+                          'answers_row_target')
+
+    def test_account_refs_that_look_like_account_numbers(self):
+        self.assertCaught(lambda ls: ls[0]['row'].update(from_account_ref='bank_account:acct_12345678'),
+                          'looks like an account number')
 
     def test_joined_assertion_needs_a_join_confidence(self):
         def drop(ls):
@@ -312,34 +335,141 @@ class Builders(unittest.TestCase):
             payloads.open_run('u', 'pilot', 'ledger_vendor_date', 'p', 'v', {'coverage_to': '2032-12-31'})
         payloads.open_run('u', 'pilot', 'ledger_vendor_date', 'p', 'v', {'coverage_to': '2032-12-31',
                                                                        'covers_accounts': ['bank_account:a']})
+        # (v6, RU4/RU9) closed_accounts: a subset of covers_accounts, only with a real coverage date
+        payloads.open_run('u', 'pilot', 'ledger_vendor_date', 'p', 'v', {
+            'coverage_to': '2032-12-31', 'covers_accounts': ['bank_account:a', 'bank_account:b'],
+            'closed_accounts': ['bank_account:b']})
+        for bad in ({'coverage_to': '2032-12-31', 'covers_accounts': ['bank_account:a'],
+                     'closed_accounts': ['bank_account:b']},
+                    {'closed_accounts': ['bank_account:a']},
+                    {'coverage_to': '2032-02-30', 'covers_accounts': ['bank_account:a']}):
+            with self.assertRaises(ValueError):
+                payloads.open_run('u', 'pilot', 'ledger_vendor_date', 'p', 'v', bad)
         img = testdata.U('image', 1)
         ok = {'sheet_sha256': 'x', 'items': 2, 'rows': {
             '1': {'targets': [{'kind': 'image_candidate', 'id': testdata.U('c')}, {'kind': 'image', 'id': img}]},
             '2': {'targets': [{'kind': 'payment', 'key': pk('00206')}]}}}
         payloads.open_run('u', 'review', 'review_sheet', 'p', 'v', ok)
         for bad in ({'1': ok['rows']['1']}, dict(ok['rows'], **{'2': {'targets': []}}),
-                    dict(ok['rows'], **{'2': {'targets': [{'kind': 'account', 'key': 'my checking'}]}})):
+                    dict(ok['rows'], **{'2': {'targets': [{'kind': 'account', 'key': 'my checking'}]}}),
+                    dict(ok['rows'], **{'2': {'targets': [{'kind': 'payment', 'key': pk('00206')},
+                                                          {'kind': 'account', 'key': 'bank_account:a'}]}})):
             with self.assertRaises(ValueError):
                 payloads.open_run('u', 'review', 'review_sheet', 'p', 'v', dict(ok, rows=bad))
+
+    def test_one_question_per_row(self):
+        img, cand = testdata.U('image', 1), testdata.U('cand')
+        rq = payloads.row_question
+        self.assertEqual(rq({'targets': [{'kind': 'image_candidate', 'id': cand}, {'kind': 'image', 'id': img}]}),
+                         'image_candidate')
+        self.assertEqual(rq({'targets': [{'kind': 'image', 'id': img}], 'question': 'image_publication'}),
+                         'image_publication')
+        self.assertEqual(rq({'targets': [{'kind': 'payment', 'key': pk('00206')}]}), 'evidence_link')
+        self.assertEqual(rq({'targets': [{'kind': 'account', 'key': testdata.LEDGER_ACCOUNT}]}), 'account_entity')
+        for bad in ({'targets': [{'kind': 'image', 'id': img}]},                  # an image-only row names its question
+                    {'targets': [{'kind': 'payment', 'key': pk('00206')},
+                                 {'kind': 'account', 'key': testdata.LEDGER_ACCOUNT}]},     # two kinds
+                    {'targets': [{'kind': 'account_entity', 'id': cand}], 'question': 'evidence_link'},
+                    {'targets': [{'kind': 'evidence_link', 'id': cand}, {'kind': 'image', 'id': img}]},
+                    {'targets': [{'kind': 'image', 'id': img}], 'question': 'album_map'},
+                    {'targets': [{'kind': 'payment', 'key': pk('00206')}], 'asks': 'who'}):
+            with self.assertRaises(ValueError):
+                rq(bad)
 
     def test_structured_answers(self):
         good = [{'decision': 'confirmed'}, {'decision': 'rejected', 'vehicle_id': T},
                 {'decision': 'confirmed', 'subject_key': 'label:JOB-SIDE'},
-                {'decision': 'confirmed', 'entity_key': 'owner_business:synthetic'}, {'decision': 'unsure'}]
+                {'decision': 'confirmed', 'entity_key': 'owner_business:synthetic'},
+                {'decision': 'rejected', 'captured_on': '2031-04-21'}, {'decision': 'unsure'}]
         for a in good:
             self.assertIsNone(payloads.answer_problem(a), a)
         bad = [{'decision': 'yes'}, {'decision': 'confirmed', 'vehicle_id': T, 'entity_key': 'owner'},
                {'decision': 'unsure', 'vehicle_id': T}, {'decision': 'confirmed', 'subject_key': 'the job'},
-               {'decision': 'confirmed', 'entity_key': 'my business'}, {'decision': 'confirmed', 'note': 'x'}, 'yes']
+               {'decision': 'confirmed', 'entity_key': 'my business'}, {'decision': 'confirmed', 'note': 'x'},
+               {'decision': 'rejected', 'captured_on': 'last week'}, 'yes']
         for a in bad:
             self.assertIsNotNone(payloads.answer_problem(a), a)
-        args = payloads.record_answers('u', 's', 'm', {'3': {'verbatim': 'no, the second truck',
-                                                             'answer': {'decision': 'rejected', 'vehicle_id': T}}},
-                                       'p', 'v')
+        rows = {'3': {'verbatim': 'no, the second truck', 'answer': {'decision': 'rejected', 'vehicle_id': T}}}
+        args = payloads.record_answers('u', 's', ' session-1:msg-1 ', rows, 'p', 'v')
         self.assertEqual(args['p_rows']['3']['answer'], {'decision': 'rejected', 'vehicle_id': T})
+        self.assertEqual(args['p_message_ref'], 'session-1:msg-1')
         with self.assertRaises(ValueError):
-            payloads.record_answers('u', 's', 'm', {'3': 'no, the second truck'}, 'p', 'v')
+            payloads.record_answers('u', 's', 'session-1:msg-1', {'3': 'no, the second truck'}, 'p', 'v')
+        # (v6, AC10) the message is '<source>:<message id>', at most 200 characters
+        for ref in ('msg-1', 'session 1:msg-1', 's:' + 'x' * 199, None):
+            with self.assertRaises(ValueError):
+                payloads.record_answers('u', 's', ref, rows, 'p', 'v')
         self.assertEqual(payloads.answer_place({'decision': 'confirmed', 'entity_key': 'owner'}), 'entity:owner')
+        self.assertEqual(payloads.answer_place({'decision': 'rejected', 'captured_on': '2031-04-21'}), 'day:2031-04-21')
+
+    def test_readings_by_row_dimension_never_inverted(self):
+        """(v6, AC1-AC4) evidence_record_answers' rules over the row profile evidence_sheet_row derives."""
+        def prof(**kw):
+            return dict({'row': 1, 'asks': 'place', 'asked_place': T, 'frame': None, 'link_class': None}, **kw)
+        S = testdata.V['SUB']
+        photo = prof(question='image_candidate', frame='subject')
+        where = prof(question='evidence_link', link_class='placement', asked_place=None)
+        multi = prof(question='image_candidate', frame='subject', asked_place='multi')
+        share = prof(question='evidence_link', link_class='share')
+        contra = prof(question='evidence_link', link_class='contradicts')
+        acct = prof(question='account_entity', asked_place='entity:owner')
+        paid = prof(question='evidence_link', link_class='placement', asks='party')
+        when = prof(question='capture_time_claim', asked_place='day:2031-04-20')
+        claim = prof(question='change_claim')
+        cases = [
+            (photo, {'decision': 'confirmed'}, None), (photo, {'decision': 'confirmed', 'vehicle_id': T}, None),
+            (photo, {'decision': 'rejected', 'vehicle_id': S}, None),
+            (photo, {'decision': 'rejected', 'subject_key': 'label:X'}, None),
+            (photo, {'decision': 'confirmed', 'vehicle_id': S}, 'a yes names the place'),
+            (photo, {'decision': 'rejected', 'vehicle_id': T}, 'is a bare'),
+            (photo, {'decision': 'confirmed', 'entity_key': 'owner'}, 'its answer names'),
+            (where, {'decision': 'confirmed', 'subject_key': 'label:JOB-SIDE'}, None),
+            (where, {'decision': 'unsure'}, None),
+            (where, {'decision': 'confirmed'}, 'asks where'),
+            (where, {'decision': 'rejected', 'vehicle_id': S}, 'asks where'),
+            (multi, {'decision': 'rejected'}, None), (multi, {'decision': 'confirmed', 'vehicle_id': T}, 'no place'),
+            (share, {'decision': 'confirmed'}, None), (share, {'decision': 'rejected', 'vehicle_id': S}, 'no place'),
+            (contra, {'decision': 'confirmed'}, None), (contra, {'decision': 'confirmed', 'vehicle_id': T}, 'no place'),
+            (acct, {'decision': 'rejected', 'entity_key': 'owner_business:x'}, None),
+            (acct, {'decision': 'confirmed', 'entity_key': 'owner'}, None),
+            (acct, {'decision': 'confirmed', 'entity_key': 'owner_business:x'}, 'a yes names the place'),
+            (acct, {'decision': 'rejected', 'entity_key': 'owner'}, 'is a bare'),
+            (paid, {'decision': 'confirmed', 'entity_key': 'third_party:seller'}, None),
+            (paid, {'decision': 'unsure'}, None),
+            (paid, {'decision': 'confirmed'}, 'who-paid'), (paid, {'decision': 'rejected', 'entity_key': 'owner'}, 'who-paid'),
+            (paid, {'decision': 'confirmed', 'vehicle_id': T}, 'its answer names'),
+            (when, {'decision': 'rejected', 'captured_on': '2031-04-21'}, None), (when, {'decision': 'confirmed'}, None),
+            (when, {'decision': 'rejected', 'captured_on': '2031-04-20'}, 'is a bare'),
+            (when, {'decision': 'confirmed', 'captured_on': '2031-04-21'}, 'a yes names the place'),
+            (claim, {'decision': 'rejected'}, None), (claim, {'decision': 'confirmed', 'vehicle_id': T}, 'no place')]
+        for p, ans, why in cases:
+            got = payloads.answer_problem(ans, p)
+            if why is None:
+                self.assertIsNone(got, (p['question'], p['asked_place'], ans))
+            else:
+                self.assertIn(why, got or '', (p['question'], p['asked_place'], ans))
+        self.assertEqual(payloads.answer_dimension(paid), ['entity_key'])
+        self.assertEqual(payloads.answer_dimension(photo), ['vehicle_id', 'subject_key'])
+        self.assertEqual(payloads.answer_dimension(when), ['captured_on'])
+        self.assertEqual(payloads.answer_dimension(dict(photo, frame='mixed')), [])
+        self.assertEqual(payloads.answer_dimension(dict(where, link_class='mixed')), [])
+
+    def test_owner_time_claim_cites_his_answer(self):
+        args = (testdata.U('image', 1), '2031-04-20T18:00:00+00:00', '2031-04-21T01:00:00+00:00', '2031-04-20', 'owner')
+        with self.assertRaises(ValueError):
+            payloads.capture_time_claim(*args, {'note': 'he said so'}, 0.9)
+        row = payloads.capture_time_claim(*args, {'answer_ref': payloads.answer_ref(testdata.U('answers'), 7)}, 0.9)
+        self.assertEqual((row['rule'], row['offset_seconds']), ('owner', -25200))
+
+    def test_link_classes_and_reported_outcomes(self):
+        lc = payloads.link_class
+        self.assertEqual([lc('payment_out', None, 'bank_line'), lc('assertion', None, 'deal_jacket'),
+                          lc('payment_out', '@amount:x:1', 'pnl_line'), lc('context', None, 'photos_album'),
+                          lc('contradicts', None, 'message'), lc('supports', None, 'deal_document')],
+                         ['placement', 'placement', 'share', 'album', 'contradicts', 'other'])
+        self.assertLessEqual({'reassign_needs_review', 'reassign_not_a_placement', 'unchanged', 'owner_answer_missing',
+                              'human_decision_newer', 'human_decision_stands', 'already_decided', 'kept_stronger',
+                              'entity_is_owners_call'}, set(payloads.C['reported_outcomes']))
 
 
 class Readers(SyntheticCase):
@@ -384,7 +514,10 @@ class Readers(SyntheticCase):
         self.assertEqual(v['money_sources_cover_to'], '2032-01-31')
 
     def test_session_days_without_own_photos(self):
-        v = readers.accounting(self.files, T, sessions=readers.sessions_of(self.ctx))
+        sessions = readers.sessions_of(self.ctx)
+        # (v6, RU2) the session another user logged on the truck is never his work day
+        self.assertNotIn(testdata.SELLER_DAY, [s['day'] for s in sessions])
+        v = readers.accounting(self.files, T, sessions=sessions)
         self.assertEqual([(d['day'], d['sessions'], d['in_custody']) for d in v['session_days']],
                          [(testdata.DOC_DAY, 1, False)])
 
@@ -392,6 +525,50 @@ class Readers(SyntheticCase):
         v = readers.accounting(self.files, T, date_from='2031-05-27', date_to='2031-05-27')
         self.assertEqual(v['payments_outside_window'], [{'payment_key': pk('00770'), 'paid_on': '2031-05-28'}])
         self.assertNotIn(pk('00770'), readers.extract_m5(v)['band_links'])
+
+    def test_a_windowed_read_lists_undated_payments_apart(self):
+        """(v6, RU3) a payment with no date is never banded in a windowed read; an all-evidence read bands it."""
+        undated = payloads.line('link:note:undated@%s' % T[:8], 'propose_evidence_links', 'ledger_vendor_date',
+                                payloads.evidence_link(T, 'note', 'payment_out', 'synthetic', 0.6, [{'kind': 'note'}],
+                                                       external_ref='note:undated', payment_key='bank:SYNTH-UNDATED'))
+        f = dict(self.files, **{'links.jsonl': list(self.files['links.jsonl']) + [undated]})
+        v = readers.accounting(f, T, date_from='2031-01-01', date_to='2032-12-31')
+        self.assertEqual(v['payments_undated'], [{'payment_key': 'bank:SYNTH-UNDATED', 'links': 1}])
+        m5 = readers.extract_m5(v)
+        self.assertFalse([b for b, keys in m5['bands'].items() if 'bank:SYNTH-UNDATED' in keys])
+        self.assertEqual(m5['payments_undated'], ['bank:SYNTH-UNDATED'])
+        whole = readers.extract_m5(readers.accounting(f, T))
+        self.assertIn('bank:SYNTH-UNDATED', whole['bands']['med'])
+        self.assertEqual(whole['payments_undated'], [])
+
+    def test_closed_and_third_party_accounts_leave_the_coverage(self):
+        """(v6, RU4) coverage counts his open accounts; a lagging one is asked about; an assertion names what it waits
+        on; a closed account (its final statement read) or a third party's (his confirmed map) waits on nothing."""
+        share = {'key': 'run:qb_correlation', 'writer': 'evidence_open_run', 'args': {
+            'p_pass': 'qb_correlation', 'p_config': {'coverage_to': '2032-01-31',
+                                                     'covers_accounts': [testdata.SHARE_ACCOUNT]}}}
+        run = json.loads(json.dumps(self.files['run.json']))
+        run['runs'].append(share)
+        f = dict(self.files, **{'run.json': run})
+        v = readers.accounting(f, T)
+        self.assertEqual(v['money_sources_cover_to'], '2032-01-31')
+        self.assertEqual([q for q in v['open_questions'] if q['q'] == 'money_source_behind'], [{
+            'q': 'money_source_behind', 'account_ref': testdata.SHARE_ACCOUNT, 'coverage_to': '2032-01-31',
+            'newest_coverage': testdata.COVER_TO}])
+        waiting = [q for q in v['open_questions'] if q['q'] == 'awaiting_statement']
+        self.assertEqual(sorted(q['ref'] for q in waiting), sorted(
+            testdata.JACKET_REF + '#' + a for a in ('line:labour', 'line:paint', 'line:dry_ice', 'line:corner')))
+        self.assertTrue(all(q['waiting_on'] == [testdata.SHARE_ACCOUNT] for q in waiting))
+        share_map = next(ln['key'] for ln in self.files['account_entities.jsonl']
+                         if ln['row']['account_ref'] == testdata.SHARE_ACCOUNT)
+        mapped = readers.accounting(f, T, [{'target': share_map, 'decision': 'confirmed'}])
+        closed_run = json.loads(json.dumps(run))
+        closed_run['runs'][-1]['args']['p_config']['closed_accounts'] = [testdata.SHARE_ACCOUNT]
+        closed = readers.accounting(dict(f, **{'run.json': closed_run}), T)
+        self.assertEqual(closed['money_sources_closed'], [testdata.SHARE_ACCOUNT])
+        for w in (mapped, closed):
+            self.assertEqual(w['money_sources_cover_to'], testdata.COVER_TO)
+            self.assertFalse([q for q in w['open_questions'] if q['q'] in ('money_source_behind', 'awaiting_statement')])
 
 
 class ExitTest(SyntheticCase):
@@ -585,6 +762,28 @@ class DbMode(SyntheticCase):
         self.assertEqual(sum(1 for r in sent if r.get('external_ref') == refused), 1)
         self.assertEqual(ld.manifest()['outcomes_reported_not_retried'], dict(ld.outcomes))
 
+    def test_unchanged_rows_are_counted_and_never_retried(self):
+        """(v6, RU5) the time pass re-proposes freely: an identical claim or candidate comes back 'unchanged'."""
+        rest = FakeRest()
+
+        def times(args):
+            n = len(args['p_rows'])
+            return {'proposed': n - 2, 'machine_confirmed': n - 2, 'kept_stronger': 0, 'unchanged': 2,
+                    'ids': [rest.new() for _i in range(n - 2)], 'decision_ids': []}
+
+        def cands(args):
+            rows = args['p_rows']
+            return {'proposed': len(rows) - 1, 'unchanged': 1, 'items': [
+                {'image_id': r['image_id'], 'result': 'proposed', 'candidate_id': rest.new()} for r in rows[1:]]}
+        rest.fail = {'propose_capture_time_claims': times, 'propose_image_candidates': cands}
+        ld = self.loader(rest)
+        ld.load_dir(self.out)
+        time_calls = [a for fn, a in rest.calls if fn == 'propose_capture_time_claims']
+        cand_calls = [a for fn, a in rest.calls if fn == 'propose_image_candidates']
+        self.assertEqual(ld.outcomes['unchanged'], 2 * len(time_calls) + len(cand_calls))
+        self.assertEqual(sum(len(a['p_rows']) for a in time_calls), 133)          # each claim sent once
+        self.assertEqual(ld.manifest()['outcomes_reported_not_retried']['unchanged'], ld.outcomes['unchanged'])
+
     def test_custody_bounds_null_is_skipped_with_its_reason(self):
         rest = FakeRest(fail={'propose_change_claim': lambda args: None})
         ld = self.loader(rest)
@@ -650,7 +849,11 @@ class DbMode(SyntheticCase):
         self.assertFalse({'promote_image', 'publish_image', 'evidence_repin_after_merge'} & set(fns))
         loop_close = [a for fn, a in rest.calls if fn == 'evidence_close_run' and a['p_run_id'] == report['loop_run']]
         self.assertEqual([c['p_status'] for c in loop_close], ['done'])
-        self.assertTrue(report['review_sheet']['sheet_run'])               # 53 rows: more than 50, so it is issued
+        self.assertTrue(report['review_sheet']['sheet_run'])               # 52 rows: more than 50, so it is issued
+        self.assertIn(report['review_sheet']['sheet_run'], review_sheet.load_index())     # M10b matches its delivery
+        cfg = [a['p_config'] for fn, a in rest.calls if fn == 'evidence_open_run' and a['p_pass'] == 'review_sheet'][0]
+        self.assertIsNone(payloads.review_rows_problem(cfg))
+        self.assertTrue(all(r['question'] in payloads.C['review_questions'] for r in cfg['rows'].values()))
 
     def test_db_loop_closes_its_run_failed_on_an_error(self):
         rest, report, go = self.db_loop('ERROR:  42P01: relation "x" does not exist')
@@ -736,6 +939,14 @@ class Manifest(unittest.TestCase):
                                                                   'decision_id': u('d5'),
                                                                   'reassign_decision_id': u('d6')}]})
         self.assertEqual(r['reassign_decision_ids'], [u('d6')])
+        # (v6, AC5-AC7) a reassign the writer did not make is a note, reported and never retried; the nested
+        # reassign_result's own ids (an owner_review row, its decision, its implied rejections) are this call's too
+        r = manifest.returned('decide_evidence', {}, {'items': [
+            {'id': u('t3'), 'result': 'rejected', 'decision_id': u('d7'), 'reassign_note': 'reassign_not_a_placement'},
+            {'id': u('t4'), 'result': 'rejected', 'decision_id': u('d8'), 'reassigned_to': u('c4'),
+             'reassign_result': {'items': [{'id': u('c4'), 'result': 'human_decision_newer'}]}}]})
+        self.assertEqual(sorted(r['ids']), sorted([u('d7'), u('d8'), u('c4')]))
+        self.assertEqual((r['results']['reassign_not_a_placement'], r['results']['human_decision_newer']), (1, 1))
 
     def test_reconcile_finds_rows_no_call_returned(self):
         u = lambda *x: testdata.U(*x)  # noqa: E731
@@ -901,50 +1112,103 @@ class ReviewSheet(SyntheticCase):
         rows, decisions = self.rows()
         self.assertEqual([d['letter'] for d in decisions], ['A'])          # spend: OWNER-DECISIONS, no evidence row
         self.assertTrue(all(r['targets'] for r in rows))
+        for r in rows:                                                     # (v6, AC1) one decision kind per row
+            self.assertEqual(r['profile']['question'], payloads.row_question(r))
         photos = [r for r in rows if r['section'] == 'photos']
         self.assertEqual(len(photos), 35)
-        self.assertTrue(all(sorted(t['target_kind'] for t in r['targets']) == ['image', 'image_candidate'] for r in photos))
-        self.assertEqual(len([r for r in rows if r['section'] == 'accounts']), 3)
-        money_rows = [r for r in rows if r['section'] == 'money']
-        contested = [r for r in money_rows if 'also on' in r['question']]
+        self.assertTrue(all(sorted(t['kind'] for t in r['targets']) == ['image', 'image_candidate'] for r in photos))
+        self.assertTrue(all((r['profile']['question'], r['profile']['asked_place'], r['profile']['frame']) ==
+                            ('image_candidate', T, 'subject') for r in photos))
+        accts = [r for r in rows if r['section'] == 'accounts']
+        self.assertEqual(len(accts), 3)
+        self.assertTrue(all(r['profile']['question'] == 'account_entity' and len(r['profile']['accounts']) == 1
+                            for r in accts))
+        contested = [r for r in rows if 'also places it on' in r['question_text']]
         self.assertEqual(len(contested), 2)
-        self.assertTrue(all(len([t for t in r['targets'] if t['target_kind'] == 'payment']) == 1 for r in contested))
+        self.assertTrue(all(len([t for t in r['targets'] if t['kind'] == 'payment']) == 1 and
+                            (r['profile']['link_class'], r['profile']['asked_place']) == ('placement', T)
+                            for r in contested))
+        disputed = [r for r in rows if r['profile']['link_class'] == 'contradicts']
+        self.assertEqual(len(disputed), 1)
+        self.assertEqual(payloads.answer_dimension(disputed[0]['profile']), [])     # "customer job" is a bare yes
+        paid = [r for r in rows if r['profile']['asks'] == 'party']
+        self.assertEqual(({r['section'] for r in paid}, len(paid)), ({'who paid'}, 6))
+        self.assertTrue(all(payloads.answer_dimension(r['profile']) == ['entity_key'] and r['profile']['asked_place'] == T
+                            for r in paid))
+        self.assertEqual(sorted(r['profile']['question'] for r in paid), ['change_claim'] + ['evidence_link'] * 5)
+        # the purchase line supports the purchase the case asks "who paid" about: asked once, not twice
+        self.assertFalse([r for r in paid if "'purchase'" in r['question_text']])
         md = review_sheet.render(self.ctx, rows, '2031-06-01', decisions)
         self.assertNotIn('http', md)
         self.assertNotIn('120.10', md)
         gates = {r['id']: r['gate'] for r in common.load_json(os.path.join(os.path.dirname(self.td['case']),
                                                                           'image_rows.json'))['result']}
         for r in photos:
-            img = next(t['key'] for t in r['targets'] if t['target_kind'] == 'image')
-            self.assertEqual('review in the app' in r['question'], gates[img] != 'approved')
+            img = next(t['key'] for t in r['targets'] if t['kind'] == 'image')
+            self.assertEqual('review in the app' in r['question_text'], gates[img] != 'approved')
+
+    def test_who_paid_rows_and_where_rows(self):
+        lines = review_sheet.lines_by_key(self.files)
+        RT = review_sheet.T
+        truck206 = testdata.lkey(testdata.LEDGER_EXT + testdata.lid('00206'), T)
+        sub206 = 'link:pnl:disposition:R000000000206@%s' % testdata.V['SUB'][:8]
+        ok = review_sheet.profile({'targets': [RT('change_claim', 'claim:acquisition:%s' % T[:8])], 'asks': 'party'},
+                                  lines)
+        self.assertEqual((ok['question'], ok['asks'], ok['asked_place']), ('change_claim', 'party', T))
+        contra = next(ln['key'] for ln in self.files['links.jsonl'] if ln['row']['role'] == 'contradicts'
+                      and ln['row'].get('payment_key'))
+        acct = self.files['account_entities.jsonl'][0]['key']
+        for bad in ([RT('change_claim', 'claim:paint:%s' % T[:8])],              # not an acquisition or a sale
+                    [RT('payment', pk('00206'))],                                # no place: a "where?" row
+                    [RT('evidence_link', truck206), RT('evidence_link', sub206)],  # two places
+                    [RT('evidence_link', contra)],                               # a contradiction is not a placement
+                    [RT('account_entity', acct)]):
+            with self.assertRaises(ValueError):
+                review_sheet.profile({'targets': bad, 'asks': 'party'}, lines)
+        where = review_sheet.profile({'targets': [RT('payment', pk('00737'))]}, lines)
+        self.assertEqual((where['question'], where['asked_place'], where['link_class'], where['payment_keys']),
+                         ('evidence_link', None, 'placement', [pk('00737')]))
+        multi = review_sheet.profile({'targets': [RT('evidence_link', truck206), RT('evidence_link', sub206)]}, lines)
+        self.assertEqual((multi['asked_place'], payloads.answer_dimension(multi)), ('multi', []))
 
     def test_db_issue_stores_row_targets_and_leaves_off_rows_not_loaded(self):
         rows, decisions = self.rows()
         ids = {k: common.uuid5('id', k) for f in self.files if f.endswith('.jsonl') for k in
                (ln['key'] for ln in self.files[f])}
-        dropped = next(t['key'] for t in rows[3]['targets'] if t['target_kind'] == 'image_candidate')
+        dropped = next(t['key'] for t in rows[3]['targets'] if t['kind'] == 'image_candidate')
         del ids[dropped]
         rest = FakeRest()
         d = self.copy_out('sheet-db')
-        side = review_sheet.issue(self.ctx, rows, decisions, '2031-06-01', d, common.DB, rest, testdata.OWNER, ids)
+        idx = os.path.join(d, 'sheets.jsonl')
+        side = review_sheet.issue(self.ctx, rows, decisions, '2031-06-01', d, common.DB, rest, testdata.OWNER, ids,
+                                  index=idx)
         cfg = [a for fn, a in rest.calls if fn == 'evidence_open_run'][0]['p_config']
         self.assertIsNone(payloads.review_rows_problem(cfg))
         self.assertEqual((cfg['items'], side['items'], len(side['left_off_not_loaded'])), (len(rows) - 1,) * 2 + (1,))
         self.assertEqual(cfg['sheet_sha256'], side['sheet_sha256'])
         self.assertEqual([fn for fn, _a in rest.calls], ['evidence_open_run', 'evidence_close_run'])
+        self.assertTrue(all(r['question'] in payloads.C['review_questions'] for r in cfg['rows'].values()))
+        self.assertEqual(len([r for r in cfg['rows'].values() if r.get('asks') == 'party']), 6)
+        self.assertTrue(all(common.is_uuid(t.get('id') or '') or t.get('key')
+                            for r in cfg['rows'].values() for t in r['targets']))
+        self.assertEqual(review_sheet.load_index(idx)[side['sheet_run']]['sheet_sha256'], side['sheet_sha256'])
 
 
 class Answers(SyntheticCase):
-    def sheet(self, name):
+    def sheet(self, name, date='2031-06-01'):
         d = self.copy_out(name)
         rows, decisions = review_sheet.build_rows(self.ctx, self.files, readers.accounting(self.files, T))
-        side = review_sheet.issue(self.ctx, rows, decisions, '2031-06-01', d)
-        return d, os.path.join(d, 'review-2031-06-01.json'), side
+        side = review_sheet.issue(self.ctx, rows, decisions, date, d)
+        return d, os.path.join(d, 'review-%s.json' % date), side
 
-    def store(self, sp, answers, mode=common.FILE):
+    def deliver(self, sp, ref='session-1:msg-0'):
+        with contextlib.redirect_stdout(io.StringIO()):
+            record_answers.delivered(mock.Mock(sheet=sp, message_ref=ref), self.ctx)
+
+    def store(self, sp, answers, mode=common.FILE, ref='session-1:msg-1'):
         ap = os.path.join(os.path.dirname(sp), 'answers-in.json')
         common.dump_json(ap, answers)
-        args = mock.Mock(sheet=sp, answers=ap, message_ref='session-1:msg-1', mode=mode, user=testdata.OWNER)
+        args = mock.Mock(sheet=sp, answers=ap, message_ref=ref, mode=mode, user=testdata.OWNER)
         with contextlib.redirect_stdout(io.StringIO()):
             record_answers.store(args, self.ctx)
         return common.load_json(record_answers.receipt_path(sp, common.load_json(sp)))
@@ -952,119 +1216,362 @@ class Answers(SyntheticCase):
     def decide(self, d, sp, plan, mode=common.FILE, manifest_path=None):
         pp = os.path.join(d, 'plan.json')
         common.dump_json(pp, plan)
-        args = mock.Mock(sheet=sp, receipt=os.path.join(d, 'answers-2031-06-01.json'), plan=pp,
+        args = mock.Mock(sheet=sp, receipt=record_answers.receipt_path(sp, common.load_json(sp)), plan=pp,
                          agent_session='lead-session-1', manifest=manifest_path, mode=mode, user=testdata.OWNER)
         with contextlib.redirect_stdout(io.StringIO()):
             record_answers.decide(args, self.ctx)
-        return common.load_json(os.path.join(d, 'decisions-2031-06-01.json'))
+        return common.load_json(os.path.join(d, 'decisions-%s.json' % common.load_json(sp)['date']))
 
     @staticmethod
     def row(side, text, pkey=None):
-        return next(r for r in side['rows'] if text in r['question'] and (pkey is None or pkey in r['question']))
+        return next(r for r in side['rows'] if text in r['question_text']
+                    and (pkey is None or pkey in r['question_text']))
 
-    def test_structured_answers_are_stored_once_per_sheet(self):
-        d, sp, side = self.sheet('answers-store')
-        r = self.row(side, 'also on', pk('00206'))
-        rc = self.store(sp, {str(r['row']): {'verbatim': 'no, that was the second truck',
-                                             'answer': {'decision': 'rejected', 'vehicle_id': 'SUB'}}})
+    @staticmethod
+    def truck_link(r):
+        return next(t['key'] for t in r['targets'] if t['kind'] == 'evidence_link' and t['key'].endswith(T[:8]))
+
+    def test_answers_need_the_delivery_and_a_later_message(self):
+        d, sp, side = self.sheet('answers-delivery')
+        r = self.row(side, 'also places it on', pk('00206'))
+        ans = {str(r['row']): {'verbatim': 'no, that was the second truck',
+                               'answer': {'decision': 'rejected', 'vehicle_id': 'SUB'}}}
+        with self.assertRaises(SystemExit) as cm:                  # (v6, AC10) the delivery is recorded first
+            self.store(sp, ans)
+        self.assertIn('delivered', str(cm.exception))
+        for bad in ('msg-0', 'session 1:msg-0', 'session-1:' + 'x' * 200):
+            with self.assertRaises(SystemExit):
+                self.deliver(sp, bad)
+        self.deliver(sp)
+        self.deliver(sp)                                           # the same message again changes nothing
+        with self.assertRaises(SystemExit):                        # one delivery per sheet
+            self.deliver(sp, 'session-1:msg-9')
+        for ref in ('session-1:msg-0', 'msg-1'):                   # the delivery itself is not his reply
+            with self.assertRaises(SystemExit):
+                self.store(sp, ans, ref=ref)
+        rc = self.store(sp, ans)
+        self.assertEqual((rc['message_ref'], rc['delivery_ref'], rc['transcript']),
+                         ('session-1:msg-1', 'session-1:msg-0', 'not on this Mac'))
         stored = rc['rows'][str(r['row'])]
         self.assertEqual(stored['sha256'], common.sha256_text('no, that was the second truck'))
         self.assertEqual(stored['answer'], {'decision': 'rejected', 'vehicle_id': testdata.V['SUB']})
         self.assertNotIn('second truck', json.dumps(rc))
-        with self.assertRaises(SystemExit):                     # one answer set per sheet
-            self.store(sp, {'1': {'verbatim': 'yes', 'answer': {'decision': 'confirmed'}}})
-        for bad in ({str(len(side['rows']) + 1): {'verbatim': 'x', 'answer': {'decision': 'confirmed'}}},
-                    {'1': 'yes'}, {'1': {'verbatim': ' ', 'answer': {'decision': 'confirmed'}}},
-                    {'1': {'verbatim': 'yes', 'answer': {'decision': 'confirmed', 'vehicle_id': T,
-                                                         'entity_key': 'owner'}}}):
-            with self.assertRaises(SystemExit):
-                record_answers.validate_answers(self.ctx, side, bad)
+        with self.assertRaises(SystemExit) as cm:                  # one transcription per message
+            self.store(sp, ans)
+        self.assertIn('already transcribed', str(cm.exception))
+        with self.assertRaises(SystemExit) as cm:                  # one answer set per sheet
+            self.store(sp, {'1': {'verbatim': 'me', 'answer': {'decision': 'unsure'}}}, ref='session-1:msg-2')
+        self.assertIn('one answer set per sheet', str(cm.exception))
+
+    def test_readings_stay_in_the_row_dimension(self):
+        _d, _sp, side = self.sheet('answers-dimension')
+        painter = self.row(side, 'also places it on', pk('00206'))
+        disputed = self.row(side, 'says it was for something else')
+        paid = self.row(side, "'paint'")
+        acct = next(r for r in side['rows'] if r['section'] == 'accounts')
+        photo = next(r for r in side['rows'] if r['section'] == 'photos')
+        ident = next(r for r in side['rows'] if r['section'] == 'identity')
+
+        def check(row, answer):
+            return record_answers.validate_answers(self.ctx, side, {str(row['row']): {'verbatim': 'w', 'answer': answer}})
+        for row, answer in ((painter, {'decision': 'rejected', 'vehicle_id': 'SUB'}), (painter, {'decision': 'confirmed'}),
+                            (painter, {'decision': 'confirmed', 'vehicle_id': 'TRUCK'}),
+                            (painter, {'decision': 'rejected', 'subject_key': 'label:' + testdata.JOB}),
+                            (disputed, {'decision': 'confirmed'}),
+                            (paid, {'decision': 'confirmed', 'entity_key': 'owner_business:synthetic'}),
+                            (paid, {'decision': 'unsure'}),
+                            (acct, {'decision': 'rejected', 'entity_key': 'owner_business:synthetic'}),
+                            (photo, {'decision': 'rejected', 'vehicle_id': 'SWB'}), (ident, {'decision': 'confirmed'})):
+            check(row, answer)
+        refused = [(painter, {'decision': 'confirmed', 'vehicle_id': 'SUB'}, 'a yes names the place'),
+                   (painter, {'decision': 'rejected', 'vehicle_id': 'TRUCK'}, 'is a bare'),
+                   (painter, {'decision': 'confirmed', 'entity_key': 'owner'}, 'its answer names'),
+                   (disputed, {'decision': 'confirmed', 'vehicle_id': 'TRUCK'}, 'no place'),
+                   (paid, {'decision': 'confirmed'}, 'who-paid row'),
+                   (paid, {'decision': 'rejected', 'entity_key': 'owner'}, 'who-paid row'),
+                   (acct, {'decision': 'confirmed', 'vehicle_id': 'TRUCK'}, 'its answer names'),
+                   (acct, {'decision': 'confirmed', 'entity_key': 'third_party:x'}, 'a yes names the place'),
+                   (photo, {'decision': 'rejected', 'vehicle_id': testdata.U('vehicle', 'stranger')},
+                    'neither his nor on the row'),
+                   (ident, {'decision': 'confirmed', 'vehicle_id': 'TWIN'}, 'no place')]
+        for row, answer, why in refused:
+            with self.assertRaises(SystemExit) as cm:
+                check(row, answer)
+            self.assertIn(why, str(cm.exception), (row['row'], answer))
 
     def test_decisions_follow_his_answer(self):
         d, sp, side = self.sheet('answers-decide')
-        painter = self.row(side, 'also on', pk('00206'))
-        job = self.row(side, 'also on', pk('00737'))
+        painter = self.row(side, 'also places it on', pk('00206'))
+        job = self.row(side, 'also places it on', pk('00737'))
         photo = next(r for r in side['rows'] if r['section'] == 'photos')
         acct = next(r for r in side['rows'] if r['section'] == 'accounts')
+        paid = self.row(side, "'paint'")
+        self.deliver(sp)
         self.store(sp, {
             str(painter['row']): {'verbatim': 'the second truck', 'answer': {'decision': 'rejected', 'vehicle_id': 'SUB'}},
-            str(job['row']): {'verbatim': 'that was the side job', 'answer': {'decision': 'confirmed',
-                                                                               'subject_key': 'label:' + testdata.JOB}},
+            str(job['row']): {'verbatim': 'no, that was the side job',
+                              'answer': {'decision': 'rejected', 'subject_key': 'label:' + testdata.JOB}},
             str(photo['row']): {'verbatim': 'yes', 'answer': {'decision': 'confirmed'}},
-            str(acct['row']): {'verbatim': 'not sure', 'answer': {'decision': 'unsure'}}})
-        truck_link = lambda r: next(t['key'] for t in r['targets']  # noqa: E731
-                                    if t['target_kind'] == 'evidence_link' and t['key'].endswith(T[:8]))
-        label_link = next(t['key'] for t in job['targets'] if t['target_kind'] == 'evidence_link'
-                          and t['key'].endswith('label:' + testdata.JOB))
-        cand = next(t['key'] for t in photo['targets'] if t['target_kind'] == 'image_candidate')
+            str(acct['row']): {'verbatim': 'not sure', 'answer': {'decision': 'unsure'}},
+            str(paid['row']): {'verbatim': 'my business paid the painter',
+                               'answer': {'decision': 'confirmed', 'entity_key': 'owner_business:synthetic'}}})
+        label_link = next(ln['key'] for ln in self.files['links.jsonl']
+                          if ln['row'].get('subject_key') == 'label:' + testdata.JOB)
+        cand = next(t['key'] for t in photo['targets'] if t['kind'] == 'image_candidate')
         dec = self.decide(d, sp, [
-            {'row': painter['row'], 'target_kind': 'evidence_link', 'targets': [truck_link(painter)],
+            {'row': painter['row'], 'target_kind': 'evidence_link', 'targets': [self.truck_link(painter)],
              'decision': 'rejected', 'reassign_vehicle': 'SUB'},
+            # "no, the side job": the job's own placement (the payment's slot) is confirmed, the truck's rejected
             {'row': job['row'], 'target_kind': 'evidence_link', 'targets': [label_link], 'decision': 'confirmed'},
-            {'row': job['row'], 'target_kind': 'evidence_link', 'targets': [truck_link(job)], 'decision': 'rejected'},
+            {'row': job['row'], 'target_kind': 'evidence_link', 'targets': [self.truck_link(job)], 'decision': 'rejected'},
             {'row': photo['row'], 'target_kind': 'image_candidate', 'targets': [cand], 'decision': 'confirmed'}])
         self.assertEqual(dec[0]['reassign_to'], 'link:pnl:disposition:R000000000206@%s' % testdata.V['SUB'][:8])
         after = readers.extract_m5(readers.accounting(self.files, T, dec))
         self.assertIn(pk('00206'), after['bands']['rejected'])
         self.assertIn(pk('00737'), after['bands']['rejected'])
+        back = common.load_json(os.path.join(d, 'readback-2031-06-01.json'))       # file mode: a preview only
+        self.assertEqual(back[0]['reading'], 'no, it is synthetic second truck (SUB, %s)' % testdata.V['SUB'][:8])
+        self.assertEqual([e['row'] for e in back], [painter['row'], job['row'], job['row'], photo['row']])
         refusals = [
-            ({'row': painter['row'], 'target_kind': 'evidence_link', 'targets': [truck_link(painter)],
+            ({'row': painter['row'], 'target_kind': 'evidence_link', 'targets': [self.truck_link(painter)],
               'decision': 'confirmed'}, 'does not support'),             # his answer placed it elsewhere
-            ({'row': painter['row'], 'target_kind': 'evidence_link', 'targets': [truck_link(painter)],
+            ({'row': painter['row'], 'target_kind': 'evidence_link', 'targets': [self.truck_link(painter)],
               'decision': 'rejected', 'reassign_vehicle': 'TWIN'}, 'reassign'),
-            ({'row': photo['row'], 'target_kind': 'evidence_link', 'targets': [truck_link(painter)],
-              'decision': 'confirmed'}, 'not on row'),
+            ({'row': job['row'], 'target_kind': 'evidence_link', 'targets': [self.truck_link(job)],
+              'decision': 'confirmed'}, 'does not support'),
+            ({'row': job['row'], 'target_kind': 'evidence_link', 'targets': [self.truck_link(painter)],
+              'decision': 'rejected'}, 'not on row'),                    # another payment's link
+            ({'row': photo['row'], 'target_kind': 'evidence_link', 'targets': [self.truck_link(painter)],
+              'decision': 'confirmed'}, 'cannot decide'),                # the row asks about the photo
             ({'row': photo['row'], 'target_kind': 'image_candidate', 'targets': [cand], 'decision': 'rejected'},
              'does not support'),                                         # a bare yes decides only a yes
             ({'row': acct['row'], 'target_kind': 'account_entity', 'decision': 'confirmed'}, 'nothing is decided'),
-            ({'row': 1, 'target_kind': 'change_claim', 'decision': 'confirmed'}, 'no stored answer')]
+            ({'row': paid['row'], 'target_kind': 'evidence_link', 'decision': 'confirmed'}, 'decides nothing'),
+            ({'row': 2, 'target_kind': 'album_map', 'decision': 'confirmed'}, 'no stored answer')]
         for plan, why in refusals:
             with self.assertRaises(SystemExit) as cm:
                 self.decide(d, sp, [plan])
             self.assertIn(why, str(cm.exception))
 
-    def test_owner_statement_cites_his_answer(self):
+    def test_owner_statement_answers_a_who_paid_row(self):
         d, sp, side = self.sheet('answers-statement')
-        line = self.row(side, "line 'paint'")
-        self.store(sp, {str(line['row']): {'verbatim': 'my business paid the painter',
-                                           'answer': {'decision': 'confirmed', 'entity_key': 'owner_business:synthetic'}}})
-        self.decide(d, sp, [{'row': line['row'], 'owner_statement': {
-            'vehicle': 'TRUCK', 'role': 'payment_out', 'side': 'payer', 'payment_key': True,
-            'amount': ['jacket3', 'line:paint'], 'occurred_on': '2032-02-04', 'source_label': 'paint'}}])
+        paid = self.row(side, "'paint'")
+        dry = self.row(side, "'dry ice'")
+        painter = self.row(side, 'also places it on', pk('00206'))
+        self.deliver(sp)
+        self.store(sp, {str(paid['row']): {'verbatim': 'my business paid the painter',
+                                           'answer': {'decision': 'confirmed', 'entity_key': 'owner_business:synthetic'}},
+                        str(dry['row']): {'verbatim': 'no idea', 'answer': {'decision': 'unsure'}},
+                        str(painter['row']): {'verbatim': 'yes', 'answer': {'decision': 'confirmed'}}})
+        self.decide(d, sp, [{'row': paid['row'], 'owner_statement': {
+            'role': 'payment_out', 'payment_key': True, 'amount': ['jacket3', 'line:paint'], 'occurred_on': '2032-02-04',
+            'source_label': 'paint'}}])
         st = common.read_jsonl(os.path.join(d, 'owner-statements-2031-06-01.jsonl'))[0]['row']
         self.assertRegex(st['external_ref'], payloads.C['answer_ref_re'])
+        self.assertTrue(st['external_ref'].endswith('#%d' % paid['row']))
         self.assertEqual(st['payment_key'], 'owner:' + st['external_ref'])
-        self.assertEqual(st['payer_entity'], 'owner_business:synthetic')
-        with self.assertRaises(SystemExit):                     # the answer names no payee entity... nor an amount
-            self.decide(d, sp, [{'row': line['row'], 'owner_statement': {'vehicle': 'TRUCK', 'side': 'payer'}}])
+        self.assertEqual((st['payer_entity'], st['vehicle_id']), ('owner_business:synthetic', T))   # the row's place
+        target = next(t['key'] for t in paid['targets'] if t['kind'] == 'evidence_link')
+        self.assertIn({'kind': 'answers_row_target', 'ref': target}, st['evidence'])
+        for plan, why in (({'row': painter['row'], 'owner_statement': {'amount': ['jacket3', 'line:paint']}},
+                           'does not ask who paid'),
+                          ({'row': dry['row'], 'owner_statement': {'amount': ['jacket3', 'line:dry_ice']}}, 'names nobody'),
+                          ({'row': paid['row'], 'owner_statement': {'role': 'payment_out'}}, 'pinned source')):
+            with self.assertRaises(SystemExit) as cm:
+                self.decide(d, sp, [plan])
+            self.assertIn(why, str(cm.exception))
+
+    def test_second_reader_objection_and_asking_again(self):
+        ledger = os.path.join(self.tmp, 'disputed-second.jsonl')
+        with mock.patch.dict(os.environ, {'EVIDENCE_DISPUTED': ledger}):
+            d, sp, side = self.sheet('answers-second')
+            painter = self.row(side, 'also places it on', pk('00206'))
+            photo = next(r for r in side['rows'] if r['section'] == 'photos')
+            self.deliver(sp)
+            rc = self.store(sp, {
+                str(painter['row']): {'verbatim': 'no, the second truck',
+                                      'answer': {'decision': 'rejected', 'vehicle_id': 'SUB'}},
+                str(photo['row']): {'verbatim': 'yes', 'answer': {'decision': 'confirmed'}}})
+            rp = record_answers.receipt_path(sp, side)
+            with contextlib.redirect_stdout(io.StringIO()):
+                record_answers.second_packet(mock.Mock(sheet=sp, answers=os.path.join(d, 'answers-in.json')), self.ctx)
+            packet = common.load_json(os.path.join(d, 'second-read-2031-06-01.json'))
+            self.assertEqual([(e['row'], e['verbatim'], e['answer']) for e in packet],
+                             [(photo['row'], 'yes', None), (painter['row'], 'no, the second truck', None)])
+            sec = os.path.join(d, 'second.json')
+            args = mock.Mock(sheet=sp, receipt=rp, second=sec)
+            common.dump_json(sec, [{'row': photo['row'], 'answer': {'decision': 'confirmed'}},
+                                   {'row': painter['row'], 'answer': {'decision': 'rejected', 'vehicle_id': 'SUB'}}])
+            with contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(record_answers.second_compare(args, self.ctx), 0)
+            self.assertEqual(manifest.disputed_runs(), [])
+            common.dump_json(sec, [{'row': photo['row'], 'answer': {'decision': 'confirmed'}},
+                                   {'row': painter['row'], 'answer': {'decision': 'rejected'}}])   # read as a bare no
+            with contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(record_answers.second_compare(args, self.ctx), 1)
+            run = record_answers.answers_run_of(rc)
+            self.assertEqual(manifest.disputed_runs(), [run])               # its agent rows leave M4a
+            # the next sheet asks the disputed row again, until a delivered sheet has asked it
+            _d2, sp2, side2 = self.sheet('answers-second-next', '2031-06-08')
+            again = [r for r in side2['rows'] if r['section'] == 'asked again']
+            self.assertEqual([(r['question_text'], r['reask_of']) for r in again],
+                             [(painter['question_text'], {'sheet': sp, 'row': painter['row']})])
+            self.deliver(sp2, 'session-1:msg-5')
+            _d3, _sp3, side3 = self.sheet('answers-second-later', '2031-06-15')
+            self.assertFalse([r for r in side3['rows'] if r['section'] == 'asked again'])
+            self.assertEqual(manifest.disputed_runs(), [run])
+            # his objection to a read-back line disputes the run the same way
+            with contextlib.redirect_stdout(io.StringIO()):
+                record_answers.dispute(mock.Mock(receipt=rp, row=photo['row'], message_ref='session-1:msg-7'), self.ctx)
+            last = manifest.disputed_rows()[-1]
+            self.assertEqual((last['by'], last['row'], last['message_ref']), ('owner_objection', photo['row'],
+                                                                              'session-1:msg-7'))
+            with self.assertRaises(SystemExit):
+                record_answers.dispute(mock.Mock(receipt=rp, row=photo['row'], message_ref='not a ref'), self.ctx)
 
     @mock.patch.dict(os.environ, {'EVIDENCE_DB_WRITES': '1'})
-    def test_db_results_are_reported_never_retried(self):
-        d, sp, side = self.sheet('answers-db')
-        side['sheet_run'] = testdata.U('sheet-run')
-        common.dump_json(sp, side)
-        painter = self.row(side, 'also on', pk('00206'))
-        fake = FakeRest(decide=lambda args: {'items': [{'id': i, 'result': 'human_decision_newer'}
-                                                       for i in args['p_target_ids']]})
-        with mock.patch.object(common, 'Rest', lambda *a, **k: fake):
-            rc = self.store(sp, {str(painter['row']): {'verbatim': 'the second truck',
-                                                       'answer': {'decision': 'rejected', 'vehicle_id': 'SUB'}}},
-                            common.DB)
-            ids = {t['key']: common.uuid5('id', t['key']) for t in painter['targets']}
+    def test_db_results_are_reported_never_retried_and_read_back(self):
+        back = os.path.join(self.tmp, 'readback-db.jsonl')
+        idx = os.path.join(self.tmp, 'sheets-db.jsonl')
+        with mock.patch.dict(os.environ, {'EVIDENCE_READBACK': back, 'EVIDENCE_SHEETS_INDEX': idx}), \
+                mock.patch.object(common, 'today', lambda now=None: '2031-06-02'):
+            d, sp, side = self.sheet('answers-db')
+            side['sheet_run'] = testdata.U('sheet-run')
+            common.dump_json(sp, side)
+            painter = self.row(side, 'also places it on', pk('00206'))
+            photo = next(r for r in side['rows'] if r['section'] == 'photos')
+            cand = next(t['key'] for t in photo['targets'] if t['kind'] == 'image_candidate')
+
+            def decided(args):
+                if args['p_target_kind'] == 'image_candidate':       # he decided the photo in the app after the sheet
+                    return {'items': [{'id': i, 'result': 'human_decision_newer'} for i in args['p_target_ids']]}
+                return {'items': [{'id': i, 'result': 'rejected', 'decision_id': testdata.U('decision', i),
+                                   'reassign_note': 'reassign_needs_review'} for i in args['p_target_ids']]}
+            fake = FakeRest(decide=decided)
+            ids = {t['key']: common.uuid5('id', t['key']) for r in (painter, photo) for t in r['targets']}
             mp = os.path.join(d, 'load-manifest.json')
             common.dump_json(mp, {'ids': ids})
-            key = next(t['key'] for t in painter['targets'] if t['target_kind'] == 'evidence_link'
-                       and t['key'].endswith(T[:8]))
-            out = self.decide(d, sp, [{'row': painter['row'], 'target_kind': 'evidence_link', 'targets': [key],
-                                       'decision': 'rejected', 'reassign_vehicle': 'SUB'}], common.DB, mp)
-        calls = [a for fn, a in fake.calls if fn == 'decide_evidence']
-        self.assertEqual(len(calls), 1)
-        self.assertEqual(calls[0]['p_answer_ref'], 'answers:%s#%d' % (rc['answers_run'], painter['row']))
-        self.assertEqual(calls[0]['p_review_ref'], 'review:%s#%d' % (side['sheet_run'], painter['row']))
-        self.assertEqual(out[0]['result']['items'][0]['result'], 'human_decision_newer')
-        rec = [a for fn, a in fake.calls if fn == 'evidence_record_answers'][0]
-        self.assertEqual(rec['p_rows'][str(painter['row'])]['answer'], {'decision': 'rejected',
-                                                                         'vehicle_id': testdata.V['SUB']})
+            with mock.patch.object(common, 'Rest', lambda *a, **k: fake):
+                self.deliver(sp)
+                rc = self.store(sp, {str(painter['row']): {'verbatim': 'the second truck',
+                                                           'answer': {'decision': 'rejected', 'vehicle_id': 'SUB'}},
+                                     str(photo['row']): {'verbatim': 'yes', 'answer': {'decision': 'confirmed'}}},
+                                common.DB)
+                out = self.decide(d, sp, [
+                    {'row': painter['row'], 'target_kind': 'evidence_link', 'targets': [self.truck_link(painter)],
+                     'decision': 'rejected', 'reassign_vehicle': 'SUB'},
+                    {'row': photo['row'], 'target_kind': 'image_candidate', 'targets': [cand], 'decision': 'confirmed'}],
+                    common.DB, mp)
+            calls = [a for fn, a in fake.calls if fn == 'decide_evidence']
+            self.assertEqual(len(calls), 2)                                  # one call per plan line, never retried
+            self.assertEqual(calls[0]['p_answer_ref'], 'answers:%s#%d' % (rc['answers_run'], painter['row']))
+            self.assertEqual(calls[0]['p_review_ref'], 'review:%s#%d' % (side['sheet_run'], painter['row']))
+            self.assertEqual(calls[0]['p_reassign_vehicle_id'], testdata.V['SUB'])
+            self.assertEqual(calls[1]['p_expected'], {ids[cand]: T})
+            self.assertEqual(out[1]['result']['items'][0]['result'], 'human_decision_newer')
+            rec = [a for fn, a in fake.calls if fn == 'evidence_record_answers'][0]
+            self.assertEqual(rec['p_message_ref'], 'session-1:msg-1')
+            self.assertEqual(rec['p_rows'][str(painter['row'])]['answer'], {'decision': 'rejected',
+                                                                             'vehicle_id': testdata.V['SUB']})
+            self.assertEqual(review_sheet.load_index()[side['sheet_run']]['delivered_ref'], 'session-1:msg-0')
+            lines = manifest.readback_entries()
+            self.assertEqual([(e['row'], e['results']) for e in lines], [
+                (painter['row'], {'rejected': 1, 'reassign_needs_review': 1}), (photo['row'], {'human_decision_newer': 1})])
+            self.assertEqual([e['answer_ref'] for e in lines], [c['p_answer_ref'] for c in calls])
+            self.assertEqual(manifest.check_readback([{'id': 'x', 'review_ref': c['p_review_ref'],
+                                                       'answer_ref': c['p_answer_ref']} for c in calls], lines)
+                             ['not_read_back'], 0)
+            # the next sheet reads the week's decisions back to him, with what the store did
+            _d2, _sp2, side2 = self.sheet('answers-db-next', '2031-06-03')
+            md = Path(side2['sheet']).read_text()
+            self.assertIn('What I recorded from your earlier answers', md)
+            self.assertIn('your own later decision in the app stands', md)
+            self.assertIn('not moved to the truck you named', md)
+            self.assertNotIn('the second truck', md)                       # his words stay out; the reading is shown
+            self.assertEqual(len(side2['read_back']), 2)
+            # the store refuses a second transcription of a sheet or a message: reported, not retried
+            d4, sp4, _side4 = self.sheet('answers-db-dup', '2031-06-04')
+            side4 = dict(common.load_json(sp4), sheet_run=testdata.U('sheet-run-2'))
+            common.dump_json(sp4, side4)
+            dup = FakeRest(fail={'evidence_record_answers': common.RpcError(
+                'evidence_record_answers', 409, '23505', 'message session-1:msg-3 is already transcribed')})
+            with mock.patch.object(common, 'Rest', lambda *a, **k: dup):
+                self.deliver(sp4, 'session-1:msg-2')
+                with self.assertRaises(SystemExit) as cm:
+                    self.store(sp4, {str(painter['row']): {'verbatim': 'yes', 'answer': {'decision': 'confirmed'}}},
+                               common.DB, 'session-1:msg-3')
+            self.assertIn('already holds answers', str(cm.exception))
+            self.assertFalse(os.path.exists(record_answers.receipt_path(sp4, side4)))
+
+
+class Transcript(SyntheticCase):
+    """(v6, AC10; M10b item 5) the sheet's delivery and his reply, checked in a synthetic Claude Code transcript."""
+
+    def test_delivery_and_reply_are_matched_in_the_transcript(self):
+        root = tempfile.mkdtemp(prefix='evidence-transcripts-')
+        self.addCleanup(shutil.rmtree, root, True)
+        with mock.patch.dict(os.environ, {'EVIDENCE_TRANSCRIPTS': root}):
+            d = self.copy_out('transcript')
+            rows, decisions = review_sheet.build_rows(self.ctx, self.files, readers.accounting(self.files, T))
+            side = review_sheet.issue(self.ctx, rows, decisions, '2031-06-01', d)
+            sp = os.path.join(d, 'review-2031-06-01.json')
+            md = Path(side['sheet']).read_text()
+            painter = next(r for r in side['rows'] if pk('00206') in r['question_text']
+                           and 'also places it on' in r['question_text'])
+            sid = testdata.U('session')
+
+            def u(n):
+                return testdata.U('message', n)
+
+            def ref(n):
+                return '%s:%s' % (sid, u(n))
+            entries = [
+                {'uuid': u(0), 'type': 'user', 'timestamp': '2031-06-01T17:00:00Z',
+                 'message': {'role': 'user', 'content': 'send me the sheet'}},
+                {'uuid': u(1), 'type': 'assistant', 'timestamp': '2031-06-01T17:01:00Z',
+                 'message': {'role': 'assistant', 'content': [{'type': 'text', 'text': md}]}},
+                {'uuid': u(2), 'type': 'user', 'timestamp': '2031-06-01T18:00:00Z',
+                 'message': {'role': 'user', 'content': '%d. no, that was the  second truck' % painter['row']}},
+                {'uuid': u(3), 'type': 'user', 'timestamp': '2031-06-01T18:05:00Z',
+                 'message': {'role': 'user', 'content': 'thanks'}}]
+            p = Path(root, 'project-a', sid + '.jsonl')
+            p.parent.mkdir(parents=True)
+            p.write_text(''.join(json.dumps(e) + '\n' for e in entries))
+            self.assertEqual(transcript.find(ref(2))['index'], 2)
+            self.assertIsNone(transcript.find('other-channel:42'))
+            ans = {str(painter['row']): {'verbatim': 'no, that was the second truck',
+                                         'answer': {'decision': 'rejected', 'vehicle_id': 'SUB'}}}
+
+            def deliver(r):
+                with contextlib.redirect_stdout(io.StringIO()):
+                    record_answers.delivered(mock.Mock(sheet=sp, message_ref=r), self.ctx)
+
+            def store(r):
+                ap = os.path.join(d, 'answers-in.json')
+                common.dump_json(ap, ans)
+                with contextlib.redirect_stdout(io.StringIO()):
+                    record_answers.store(mock.Mock(sheet=sp, answers=ap, message_ref=r, mode=common.FILE,
+                                                   user=testdata.OWNER), self.ctx)
+                return common.load_json(record_answers.receipt_path(sp, side))
+            with self.assertRaises(SystemExit):                          # that message does not carry the sheet
+                deliver(ref(2))
+            deliver(ref(1))
+            self.assertEqual(common.load_json(sp)['delivery']['transcript'], 'checked')
+            with self.assertRaises(SystemExit) as cm:                    # a reply that does not hold his words
+                store(ref(3))
+            self.assertIn('not in the reply', str(cm.exception))
+            with self.assertRaises(SystemExit) as cm:                    # a message before the sheet went out
+                store(ref(0))
+            self.assertIn('does not come after', str(cm.exception))
+            self.assertEqual(store(ref(2))['transcript'], 'checked')    # spacing aside, his words are in the reply
+            sheets = {'run-1': {'sheet_sha256': side['sheet_sha256'], 'delivered_ref': ref(1), 'sidecar': sp}}
+            runs = [{'id': 'a1', 'sheet_run': 'run-1', 'message_ref': ref(2), 'rows': ans},
+                    {'id': 'a2', 'sheet_run': 'run-1', 'message_ref': ref(3), 'rows': ans},
+                    {'id': 'a3', 'sheet_run': 'run-1', 'message_ref': 'other-channel:42', 'rows': ans},
+                    {'id': 'a4', 'sheet_run': 'run-2', 'message_ref': ref(2), 'rows': ans}]
+            m = manifest.check_answers(runs, sheets)
+            self.assertEqual((m['checked'], m['unchecked'], m['no_delivery']), (2, ['a3'], ['a4']))
+            self.assertEqual([(x['answers_run'], x['sheet']) for x in m['problems']], [('a2', sp)])
 
 
 class ReadPath(unittest.TestCase):
@@ -1082,6 +1589,14 @@ class ReadPath(unittest.TestCase):
         self.assertNotIn(testdata.OWNER, json.dumps(logged))
         with self.assertRaises(common.ReadError):
             common.Reader.substitute('select :x', {'x': "1'; drop table vehicles; --"})
+        # (v6, RU6) a reader names the user whose evidence it reads: the store raises without one, the runner refuses first
+        for sql, params in (('select public.vehicle_accounting_evidence(:v, NULL, NULL, NULL) x', {'v': T}),
+                            ('select * from public.evidence_revert_watch(:uid)', {'uid': None}),
+                            ('select public.evidence_custody(array[:v]::uuid[], :uid)', {'v': T, 'uid': 'someone'})):
+            with self.assertRaises(common.ReadError):
+                r.read(sql, params)
+        self.assertEqual(r.read('select public.vehicle_accounting_evidence(:v, NULL, NULL, :uid) x',
+                                {'v': T, 'uid': testdata.OWNER}), [{'n': 1}])
 
     def test_scoreboard_falls_back_before_the_store_exists(self):
         class Pre:
@@ -1100,13 +1615,23 @@ class ReadPath(unittest.TestCase):
         st = scoreboard.parse()
         names = {n: (m, s) for n, m, s in st}
         for m in ('M1', 'M2', 'M3', 'M4', 'M4a', 'M5', 'M6', 'M7', 'M8', 'M9', 'M10_channels', 'M10_guards',
-                  'M10_stamps', 'M10_integrity', 'M10_frameless', 'M10b', 'M11', 'M12', 'M13', 'M13_open_proposals',
-                  'M14'):
+                  'M10_stamps', 'M10_integrity', 'M10_frameless', 'M10b', 'M10b_answers', 'M10b_readback', 'M11', 'M12',
+                  'M13', 'M13_open_proposals', 'M14_accounts', 'M14'):
             self.assertIn(m, names)
         self.assertEqual(names['M1'][0], 'chunked')
-        self.assertEqual(names['M10b'][0], 'manifest')
+        self.assertEqual((names['M10b'][0], names['M10b_answers'][0], names['M10b_readback'][0]),
+                         ('manifest', 'answers', 'readback'))
         self.assertIn('vehicle_accounting_evidence(:vehicle_id, NULL, NULL, :uid)', names['M5'][1])
         self.assertIn("x->>'to_account_ref', x->>'payer', x->>'payee'", names['M5'][1])
+        # (v6) every read names the owner; M4a leaves out disputed answers runs; the stamps count v6's two gaps
+        self.assertIn("evidence_status('image_candidate', c.id, :uid)", names['M2'][1])
+        for n, (_m, s) in names.items():
+            if common.READER_CALL.search(s.lower()):
+                self.assertIn(':uid', s, n)
+        self.assertIn('<> all(:disputed)', names['M4a'][1])
+        self.assertIn('human_without_step_up_record', names['M10_stamps'][1])
+        self.assertIn('agent_without_question', names['M10_stamps'][1])
+        self.assertIn('closed_accounts', names['M14_accounts'][1])
         out = io.StringIO()
         scoreboard.run(None, testdata.OWNER, T, st, dry_run=True, printer=lambda s: out.write(s))
         self.assertNotIn(testdata.OWNER, out.getvalue())
@@ -1144,6 +1669,49 @@ class ReadPath(unittest.TestCase):
         self.assertIn('guard triggers', scoreboard.integrity_failed(out['M10_integrity']))
         self.assertIsNone(scoreboard.integrity_failed({'always_on': 27, 'total': 27, 'drifted': []}))
 
+    def test_m10b_answers_readback_and_m4a_through_the_scoreboard(self):
+        """(v6, AC10) M10b items 5 and 6 and the M4a exclusion, against a synthetic transcript and local records."""
+        d = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, d, True)
+        u = testdata.U
+        idx, back, root = os.path.join(d, 'sheets.jsonl'), os.path.join(d, 'readback.jsonl'), os.path.join(d, 'tx')
+        sheet_run, run_a, run_b = u('sheet'), u('answers-a'), u('answers-b')
+        review_sheet.append_index({'event': 'issued', 'sheet_run': sheet_run, 'sidecar': '/x/review-2031-06-01.json',
+                                   'sheet_sha256': common.sha256_text('the sheet')}, idx)
+        review_sheet.append_index({'event': 'delivered', 'sheet_run': sheet_run, 'delivered_ref': 'sess-x:m1'}, idx)
+        Path(root, 'project').mkdir(parents=True)
+        Path(root, 'project', 'sess-x.jsonl').write_text(''.join(json.dumps(e) + '\n' for e in (
+            {'uuid': 'm1', 'message': {'role': 'assistant', 'content': [{'type': 'text', 'text': 'the sheet'}]}},
+            {'uuid': 'm2', 'message': {'role': 'user', 'content': '1. yes'}})))
+        manifest.append_readback({'review_ref': 'review:%s#1' % sheet_run, 'answer_ref': 'answers:%s#1' % run_a}, back)
+        seen = {}
+
+        class R:
+            def read(self, sql, params=None, tag=None):
+                seen[tag] = params
+                if tag == 'M10b_answers':
+                    return [{'id': run_a, 'sheet_run': sheet_run, 'message_ref': 'sess-x:m2',
+                             'rows': json.dumps({'1': {'verbatim': 'yes'}})},
+                            {'id': run_b, 'sheet_run': sheet_run, 'message_ref': 'sess-x:m1',
+                             'rows': {'1': {'verbatim': 'no'}}}]          # the delivery itself, cited as his reply
+                if tag == 'M10b_readback':
+                    return [{'id': u('d1'), 'review_ref': 'review:%s#1' % sheet_run, 'answer_ref': 'answers:%s#1' % run_a},
+                            {'id': u('d2'), 'review_ref': 'review:%s#2' % sheet_run, 'answer_ref': 'answers:%s#2' % run_a}]
+                return []
+        out = scoreboard.run(R(), testdata.OWNER, T, only=['M10b_answers', 'M10b_readback', 'M4a'],
+                             disputed=[u('answers-c'), 'not-a-uuid'], sheets=idx, transcripts=[root], readback=back)
+        a = out['M10b_answers']
+        self.assertEqual((a['checked'], [(p['answers_run'], p['sheet']) for p in a['problems']]),
+                         (2, [(run_b, '/x/review-2031-06-01.json')]))
+        self.assertEqual(out['M10b_readback'], {'agent_decisions_7d': 2, 'not_read_back': 1, 'examples': [u('d2')]})
+        self.assertEqual((scoreboard.scalar(a), scoreboard.scalar(out['M10b_readback'])), (1, 1))
+        self.assertEqual(seen['M4a']['disputed'], [u('answers-c')])
+        # the failing run is disputed once (the next sheet asks its rows again), however often the scoreboard runs
+        with mock.patch.dict(os.environ, {'EVIDENCE_DISPUTED': os.path.join(d, 'disputed.jsonl')}):
+            self.assertEqual([scoreboard.dispute_failed_answers(out) for _i in range(2)], [1, 0])
+            self.assertEqual(manifest.disputed_runs(), [run_b])
+            self.assertEqual(manifest.disputed_rows()[0]['sheet'], '/x/review-2031-06-01.json')
+
 
 class PhotosJoin(unittest.TestCase):
     def test_strict_offset_stem_match(self):
@@ -1179,7 +1747,7 @@ class LoopCli(SyntheticCase):
         self.assertTrue(rep['exit_test']['structural_pass'])
         self.assertEqual(rep['exit_test']['blocked'], 0)
         self.assertEqual({f: rep['files'].get(f, 0) for f in EXPECTED}, EXPECTED)
-        self.assertEqual(rep['review_sheet']['decisions'], 1)
+        self.assertEqual((rep['review_sheet']['rows'], rep['review_sheet']['decisions']), (52, 1))
         for f in ('checks.json', 'load-plan.json', 'exit-test-2031-06-01.json', 'review-2031-06-01.md'):
             self.assertTrue(os.path.exists(os.path.join(out, f)), f)
 

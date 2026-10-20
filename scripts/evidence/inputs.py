@@ -33,8 +33,9 @@ def primary_ids(ctx):
 
 
 def work_sessions(ctx):
+    """His own work sessions: (v6, RU2) a session another user logged on the truck is never his work day."""
     p = ctx.input_path('work_sessions')
-    return ctx.cached('sessions', lambda: _rows(p) if p else [])
+    return ctx.cached('sessions', lambda: [s for s in _rows(p) if s.get('his', True)] if p else [])
 
 
 def session_by_day(ctx):

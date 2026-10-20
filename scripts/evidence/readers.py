@@ -1,4 +1,4 @@
-"""File-mode model of the v5 readers (draft.sql M1w 2.5): vehicle_accounting_evidence and the day records it reads,
+"""File-mode model of the v6 readers (draft.sql M1w 2.5): vehicle_accounting_evidence and the day records it reads,
 computed over a payload directory instead of the store. Line keys stand in for row ids; the payload is one owner's,
 so the v5 user filter (p_user_id) is the directory itself.
 
@@ -11,10 +11,13 @@ dated sale is outside custody even when the start is unknown; payment-level stat
 placed_elsewhere, contested (a subject_key placement included), disputed, then the confidence band); a payment is
 dated by its payment source (paid_on) and a windowed read selects payments by that date; asserted_unpaid with
 awaiting_statement after the coverage of the assertion's own account (else the oldest coverage); money_received;
-open questions. Capture times are confirmed the way the writer confirms them (check:photos_exif_join). Owner
-decisions can be supplied as a list ({"target": <key>, "decision": confirmed|rejected, "by": "agent"|"human",
-"reassign_to": <key>}) to read the confirmed level. Amounts are not read (cents are null), so over_allocated is not
-evaluated here.
+open questions. (v6) A windowed read bands only payments dated in the window and lists undated ones apart
+(payments_undated); a closed account (closed_accounts) is complete and an account his map gives to a third party is not
+his, so coverage counts his open accounts, an awaiting assertion names the accounts it waits on and a lagging open
+account is asked about (money_source_behind); work sessions are his own. Capture times are confirmed the way the
+writer confirms them (check:photos_exif_join). Owner decisions can be supplied as a list ({"target": <key>,
+"decision": confirmed|rejected, "by": "agent"|"human", "reassign_to": <key>}) to read the confirmed level. Amounts are
+not read (cents are null), so over_allocated is not evaluated here.
 
 extract_m5() is PLAN section 6 M5 (the exit-test extraction), shared by file and db mode.
 """
@@ -67,15 +70,17 @@ class Store:
         return off == r.get('offset_seconds') and off % 3600 == 0 and abs(off) // 3600 in self.allowed
 
     def coverage(self):
-        """{account_ref: newest coverage_to} over the runs that record coverage (v5, readers v4 #3)."""
-        out = {}
+        """{account_ref: newest coverage_to} over the runs that record coverage (v5, readers v4 #3), and the accounts
+        a run recorded as closed (v6, RU4: their final statement was read)."""
+        out, closed = {}, set()
         for r in self.runs:
             cfg = (r.get('args') or {}).get('p_config') or {}
             if not cfg.get('coverage_to'):
                 continue
             for acct in cfg.get('covers_accounts') or []:
                 out[acct] = max(out.get(acct, ''), cfg['coverage_to'])
-        return out
+            closed |= set(cfg.get('closed_accounts') or [])
+        return out, closed
 
 
 def identity_set(st, vehicle):
@@ -237,7 +242,7 @@ def day_records(st, ids, cust, win=('1900-01-01', '2999-12-31'), sessions=None):
 
 
 def accounting(files, vehicle, decisions=None, date_from=None, date_to=None, sessions=None):
-    """vehicle_accounting_evidence(vehicle, from, to, user) over payload files (v5)."""
+    """vehicle_accounting_evidence(vehicle, from, to, user) over payload files (v6)."""
     st = Store(files, decisions)
     ids = identity_set(st, vehicle)
     win = (date_from or '1900-01-01', date_to or '2999-12-31')
@@ -245,8 +250,13 @@ def accounting(files, vehicle, decisions=None, date_from=None, date_to=None, ses
     # (v4) a confirmed 'unknown' mapping ("no idea whose") is not mapped
     mapped = {ln['row']['account_ref']: ln['row']['entity_key'] for ln in st.entities
               if st.status(ln['key']) == 'confirmed' and ln['row']['entity_key'] != 'unknown'}
-    cov_acct = st.coverage()
-    cov = min(cov_acct.values()) if cov_acct else None
+    cov_acct, closed = st.coverage()
+    # (v6, RU4) the accounts that could still be missing a payment: open, and not a third party's by his confirmed map
+    cov_open = {a: d for a, d in cov_acct.items()
+                if a not in closed and not (mapped.get(a) or '').startswith('third_party:')}
+    cov = min(cov_open.values()) if cov_open else None
+    newest = max(cov_open.values()) if cov_open else None
+    windowed = bool(date_from or date_to)
     claims = []
     for ln in st.claims:
         c = ln['p_claim']
@@ -275,13 +285,16 @@ def accounting(files, vehicle, decisions=None, date_from=None, date_to=None, ses
         anyd = [l['occurred_on'] for l in ks if l.get('occurred_on')]
         paid_on[k] = min(src) if src else (min(anyd) if anyd else None)
 
-    def in_win(d):
-        return d is None or win[0] <= d <= win[1]
-    keyed = [l for l in links_all if l.get('payment_key') and l['role'] in ('payment_out', 'payment_in', 'assertion',
-                                                                            'contradicts')
-             and in_win(paid_on[l['payment_key']])]
+    def banded(d):
+        """(v6, RU3) a windowed read bands only payments dated inside the window; an all-evidence read bands all."""
+        return (d is not None and win[0] <= d <= win[1]) if windowed else True
+    money_roles = ('payment_out', 'payment_in', 'assertion', 'contradicts')
+    keyed = [l for l in links_all if l.get('payment_key') and l['role'] in money_roles and banded(paid_on[l['payment_key']])]
     outside_window = sorted({(l['payment_key'], paid_on[l['payment_key']]) for l in links if l.get('payment_key')
-                             and not in_win(paid_on[l['payment_key']])})
+                             and paid_on[l['payment_key']] is not None
+                             and not win[0] <= paid_on[l['payment_key']] <= win[1]})
+    undated_pay = collections.Counter(l['payment_key'] for l in links_all if windowed and l.get('payment_key')
+                                      and paid_on[l['payment_key']] is None and l['role'] in money_roles)
     keys = sorted({l['payment_key'] for l in keyed})
     outside = {}
     for ln in st.links:
@@ -340,17 +353,26 @@ def accounting(files, vehicle, decisions=None, date_from=None, date_to=None, ses
                        'from_account_ref': first('from_account_ref'), 'to_account_ref': first('to_account_ref'),
                        'paid_on': paid_on[k],
                        'other_vehicles': sorted(o['veh']) if o.get('veh') else None,
+                       # (v6, RU8) the read's order: by day (undated last), then source
                        'links': [{'link_id': l['id'], 'ref': l['source_key'], 'kind': l['source_kind'],
                                   'role': l['role'], 'label': l.get('source_label'), 'on': l.get('occurred_on'),
                                   'transaction_on': l.get('transaction_on'), 'status': l['status'],
                                   'confidence': l['confidence'],
-                                  'payment_join_confidence': l.get('payment_join_confidence')} for l in ks]})
+                                  'payment_join_confidence': l.get('payment_join_confidence')}
+                                 for l in sorted(ks, key=lambda l: (l.get('occurred_on') is None,
+                                                                    l.get('occurred_on') or '', l['source_key'],
+                                                                    l['id']))]})
     unpaid = []
     for l in links:
         if not l.get('payment_key') and l['role'] in ('payment_out', 'assertion') and l.get('direction') == 'out' \
                 and l['status'] != 'rejected':
-            bound = cov_acct.get(l.get('from_account_ref')) or cov
-            unpaid.append(dict(l, awaiting_statement=bool(l.get('occurred_on') and bound and l['occurred_on'] > bound)))
+            acct, on = l.get('from_account_ref'), l.get('occurred_on')
+            if acct and acct in cov_acct:              # (v6, RU4) its own account: complete once closed
+                waiting = acct not in closed and bool(on) and on > cov_acct[acct]
+            else:                                      # else the oldest coverage of his open accounts
+                waiting = bool(on and cov and on > cov)
+            unpaid.append(dict(l, awaiting_statement=waiting,
+                               waiting_on=sorted(a for a, d in cov_open.items() if on and d < on and (not acct or a == acct))))
     costs = collections.OrderedDict()
     for b in sorted({x['b'] for x in banded if x['is_out'] and not x['is_in']}):
         ps = [x for x in banded if x['b'] == b and x['is_out'] and not x['is_in']]
@@ -389,11 +411,16 @@ def accounting(files, vehicle, decisions=None, date_from=None, date_to=None, ses
            if c['kind'] == 'acquisition' and not c['_bound'] and not backed(c, 'payment_out', 'payer')]
     oq += [{'q': 'who_received', 'claim_id': c['id'], 'kind': c['kind']} for c in live
            if c['kind'] == 'sale' and not backed(c, 'payment_in', 'payee')]
-    oq += [{'q': 'awaiting_statement' if l['awaiting_statement'] else 'unpaid_assertion', 'link_id': l['id'],
-            'ref': l['source_key'], 'label': l.get('source_label')} for l in unpaid if l['status'] == 'proposed']
+    oq += [dict({'q': 'awaiting_statement' if l['awaiting_statement'] else 'unpaid_assertion', 'link_id': l['id'],
+                 'ref': l['source_key'], 'label': l.get('source_label')},
+                **({'waiting_on': l['waiting_on'] or None} if l['awaiting_statement'] else {}))
+           for l in unpaid if l['status'] == 'proposed']
     refs = sorted({r for l in links if l['status'] != 'rejected' for r in (l.get('from_account_ref'),
                                                                           l.get('to_account_ref')) if r})
     oq += [{'q': 'account_entity_unknown', 'account_ref': r} for r in refs if r not in mapped]
+    # (v6, RU4) an open account whose statements stop before his newest: closed, or is an export missing?
+    oq += [{'q': 'money_source_behind', 'account_ref': a, 'coverage_to': d, 'newest_coverage': newest}
+           for a, d in sorted(cov_open.items()) if d < newest]
     if cust['status'] != 'confirmed':
         oq.append({'q': 'custody_window', 'status': cust['status']})
     dayrec = day_records(st, ids, cust, win, sessions)
@@ -445,7 +472,9 @@ def accounting(files, vehicle, decisions=None, date_from=None, date_to=None, ses
                                      if d['photos_items_not_in_nuke'] > 0],
         'money_sources_cover_to': cov,
         'money_sources_cover_to_by_account': cov_acct,
+        'money_sources_closed': sorted(a for a in cov_acct if a in closed),
         'payments_outside_window': [{'payment_key': k, 'paid_on': d} for k, d in outside_window],
+        'payments_undated': [{'payment_key': k, 'links': n} for k, n in sorted(undated_pay.items())],
         'costs': costs,
         'money_received': {
             'payments': [{'payment_key': x['payment_key'], 'band': x['b'], 'cents': None, 'paid_on': x['paid_on'],
@@ -495,6 +524,7 @@ def extract_m5(v):
         'income': [[x.get('payment_key'), x.get('band'), x.get('from_account_ref'), x.get('to_account_ref'),
                     x.get('payer'), x.get('payee')] for x in arr((v.get('money_received') or {}).get('payments'))],
         'undated_own_photos': v.get('undated_own_photos'), 'cover_to': v.get('money_sources_cover_to'),
+        'payments_undated': [x.get('payment_key') for x in arr(v.get('payments_undated'))],
         'open_questions': arr(v.get('open_questions')),
         'claims': {c['id']: c for k in ('acquisition', 'sale') for c in arr(v.get(k))},
         'keys': sorted(v.keys()),
@@ -502,8 +532,8 @@ def extract_m5(v):
 
 
 def sessions_of(ctx):
-    """The case's work sessions read for its vehicle, as the day reader takes them (the SQL counts every session on
-    the identity's vehicles)."""
+    """His work sessions read for the case vehicle, as the day reader takes them ((v6, RU2) the reading user's own:
+    inputs.work_sessions leaves out the rest)."""
     import inputs
     if not ctx.input_path('work_sessions'):
         return None

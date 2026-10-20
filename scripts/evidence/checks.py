@@ -1,4 +1,4 @@
-"""Local checker for file-mode payloads before any load (port of the pilot's validate.py to the v5 contract).
+"""Local checker for file-mode payloads before any load (port of the pilot's validate.py to the v6 contract).
 
 Checks every line of run.json and the canonical JSONL files against the CHECK constraints and writer rules in
 payloads.CONTRACT (vocabularies; er_coverage_source; ivc_*, ictc_*, el_*, eae_*, vcc_*, udvc_* shapes, the v5 entity
@@ -112,6 +112,11 @@ def validate_dir(d, ctx=None, money_sources=None, show_notes=True):
     case = ctx.case if ctx else {}
     vid = ctx.vid if ctx else (lambda x: x)
     base_scope = {vid(x) for x in case.get('base_scope') or []} if ctx else None
+    # account refs the local case declares (its ledger's and its account map's): their names may carry digits
+    passes = case.get('passes') or {}
+    led = passes.get('ledger_vendor_date') or {}
+    known_accounts = set(led.get('covers_accounts') or []) | {led.get('account_ref')} | {
+        a.get('account_ref') for a in (passes.get('account_map') or {}).get('accounts') or []}
     images = {}
     listing = {}
     if ctx and ctx.input_path('image_rows'):
@@ -237,6 +242,8 @@ def validate_dir(d, ctx=None, money_sources=None, show_notes=True):
             v.add(f, w, 'rule %r' % r.get('rule'))
         if r.get('rule') == 'batch_offset_v1' and not r.get('batch_key'):
             v.add(f, w, 'ictc_batch: batch_offset_v1 needs batch_key')
+        if r.get('rule') == 'owner' and not re.match(C['answer_ref_re'], (r.get('witness') or {}).get('answer_ref') or ''):
+            v.add(f, w, "an 'owner' capture time cites his answer (witness.answer_ref answers:<run>#<row>; v6 RU5)")
         if not is_ts(r.get('corrected_taken_at')):
             v.add(f, w, 'corrected_taken_at NOT NULL timestamptz')
         if not is_date(r.get('captured_on')):
@@ -410,6 +417,10 @@ def validate_dir(d, ctx=None, money_sources=None, show_notes=True):
                                 "the confirmed account map (the writer returns entity_is_owners_call)" % (fld, r[fld]))
             if sk == 'owner_statement' and not re.match(C['answer_ref_re'], r.get('external_ref') or ''):
                 v.add(f, w, 'el_owner_word_cited: an owner_statement link cites answers:<run>#<row>')
+            if (sk == 'owner_statement' or (pk or '').startswith('owner:')) and not any(
+                    isinstance(e, dict) and e.get('kind') == 'answers_row_target' and e.get('ref')
+                    for e in r.get('evidence') or []):
+                v.add(f, w, 'an owner statement names the who-paid row target it answers (answers_row_target; v6 AC9)')
             if pk and pk.startswith('owner:') and not re.match('^owner:' + C['answer_ref_re'][1:], pk):
                 v.add(f, w, "el_owner_word_cited: an 'owner:' payment key is owner:answers:<run>#<row>")
             if sk == 'photos_item' and (pk or amt is not None or role != 'context'):
@@ -417,7 +428,7 @@ def validate_dir(d, ctx=None, money_sources=None, show_notes=True):
             for fld in ('from_account_ref', 'to_account_ref'):
                 if r.get(fld) is not None and not re.match(C['account_ref_re'], r[fld]):
                     v.add(f, w, '%s shape %r' % (fld, r[fld]))
-                if r.get(fld) and re.search(r'\d{4,}', r[fld].split(':', 1)[1].replace('1299', '')):
+                if r.get(fld) and r[fld] not in known_accounts and re.search(r'\d{4,}', r[fld].split(':', 1)[1]):
                     v.add(f, w, '%s looks like an account number' % fld)
             if 'account_ref' in r:
                 v.add(f, w, 'account_ref is v2; v3 writes from_account_ref / to_account_ref')
