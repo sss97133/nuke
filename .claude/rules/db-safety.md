@@ -47,5 +47,9 @@ Testimony is the rows that record what was observed, by whom, from what source a
 
 ## Grants, policies and public reads
 - A migration that revokes or narrows a grant or policy on a table the public site reads (`vehicle_images`, `vehicles`, `vehicle_events` ...) is not done at "tests pass". Before it merges, grep every consumer: PostgREST filters and computed-column functions that take the whole row (`vehicle_image_gallery_eligible`), `select=*`, joins and RLS policies in other tables. A whole-row reference needs every column, so column grants break it.
+- Every public reader (a SECURITY DEFINER function anon can execute, or a view anon can select) states the whole
+  visibility test on `vehicles` itself: `is_public = true AND deleted_at IS NULL` (and `listing_kind` when it lists
+  vehicles). A filter on `is_public` alone served 298 deleted ghost rows as a make's inventory (2026-10-20,
+  `search_vehicles_browse`, fixed in #2345); a matview folded without the test publishes them nightly.
 - After it deploys, run `node scripts/ci/logged-out-live.mjs` (also runs on every deploy and every 30 minutes, and opens an issue named "Live site broken for logged-out visitors"). Say "live" only with its output.
 - Why: 2026-10-19, #2293 limited anon to column grants; every logged-out gallery failed with 42501 for hours while every check was green. Fixed by #2320 / #2322; the live check is #2323.

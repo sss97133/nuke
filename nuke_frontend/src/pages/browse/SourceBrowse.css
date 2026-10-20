@@ -1,0 +1,91 @@
+/* The source level of /browse: layout only. Type comes from the kit roles (src/kit/kit.css); color from the tokens in
+   unified-design-system.css. Zero radius, zero shadow, 2px frames, 1px rules. */
+
+.sb-page { max-width: 1280px; margin: 0 auto; padding-bottom: 24px; }
+
+/* Text roles render as spans; a standalone line inside a section is its own block. A word typed or named with no break
+   point wraps instead of widening the page. */
+.sb-note { display: block; margin-top: 6px; overflow-wrap: anywhere; }
+/* Said to a screen reader and not drawn: what More added. */
+.sb-sr { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; border: 0; }
+.sb-state { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 16px 12px; }
+
+/* Identity: the mark, the name, what kind of source it is. */
+.sb-identity { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.sb-identity__text { display: grid; gap: 2px; min-width: 0; }
+.sb-identity__text .k-entity, .sb-identity__text .k-body { overflow-wrap: anywhere; }
+.sb-logo { flex: none; width: 64px; height: 32px; object-fit: contain; object-position: left center; }
+/* A mark drawn in dark ink flips on the dark theme, and one in light ink on the light theme (as the sources board does). */
+:root[data-theme="dark"] .sb-logo--dark,
+:root:not([data-theme="dark"]) .sb-logo--light { filter: invert(1) hue-rotate(180deg); }
+.sb-link { text-decoration: underline; text-underline-offset: 2px; }
+.sb-link .k-label { color: var(--text); }
+
+/* Where you are: the kit strip, wrapping on a phone instead of scrolling sideways. */
+.sb-scope .k-strip { flex-wrap: wrap; overflow-x: visible; }
+.sb-crumb { text-decoration: none; }
+a.sb-crumb:hover, a.sb-crumb:focus-visible { text-decoration: underline; text-underline-offset: 2px; }
+a.sb-crumb:hover .k-label, a.sb-crumb:focus-visible .k-label, .sb-crumb--here .k-label { color: var(--text); }
+/* A make or model name with no break point wraps instead of widening the page on a phone. */
+.sb-crumb .k-label { overflow-wrap: anywhere; }
+
+/* What the source carries: a ruled block per reading, then the history line (its parts wrap like words). */
+.sb-measures { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px 16px; }
+.sb-measure { display: grid; gap: 2px; align-content: start; padding: 4px 0 4px 10px; border-left: 2px solid var(--border); }
+/* The kit keeps a coverage line on one line; in a narrow block it wraps instead of running into the next. */
+.sb-measure .k-coverage { display: block; white-space: normal; }
+
+/* A grid's frame: the kit section's band and head, without a second coverage (the strip above states it). */
+.sb-body { padding: 8px 12px; border-bottom: 2px solid var(--border); background: var(--surface); }
+.sb-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
+.sb-head .k-label { overflow-wrap: anywhere; }
+.sb-head .k-caption { text-align: right; min-width: 0; overflow-wrap: anywhere; }
+
+/* Controls: a filter and a sort, in the page's own frame. */
+.sb-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 6px; }
+.sb-input { box-sizing: border-box; width: 100%; max-width: 420px; padding: 4px 6px; border: 2px solid var(--border); border-radius: 0; background: var(--bg); color: var(--text); }
+select.sb-input { width: auto; max-width: 100%; }
+.sb-input:focus { outline: 2px solid var(--text); outline-offset: 0; }
+.sb-sort { display: inline-flex; align-items: center; gap: 6px; }
+
+/* The grid of makes and models, and the grid of listings. */
+.sb-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; margin-top: 8px; }
+.sb-grid--cards { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+/* The cards are of the order before this one, until the new order has been read. */
+.sb-grid--busy { opacity: 0.55; }
+.sb-cell { display: grid; gap: 4px; align-content: start; min-width: 0; padding: 10px 12px; border: 2px solid var(--border);
+  background: var(--bg); color: var(--text); text-decoration: none; transition: border-color 180ms cubic-bezier(0.16, 1, 0.3, 1); }
+.sb-cell:hover, .sb-cell:focus-visible, .sb-card:hover, .sb-card:focus-within { border-color: var(--text); }
+.sb-cell:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+/* A row of cells keeps one baseline whether or not a make has an emblem; a long name is clamped to two lines. */
+.sb-cell__name { display: flex; align-items: center; gap: 8px; min-width: 0; min-height: 24px; }
+.sb-cell__name .k-entity { min-width: 0; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; }
+.sb-cell__count { display: flex; align-items: baseline; gap: 6px; }
+.sb-top { list-style: none; margin: 6px 0 0; padding: 6px 0 0; border-top: 1px solid var(--border); display: grid; gap: 2px; }
+.sb-top li { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; min-width: 0; }
+.sb-top .k-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.sb-card { display: grid; grid-template-rows: 1fr auto; min-width: 0; border: 2px solid var(--border); background: var(--bg); color: var(--text);
+  transition: border-color 180ms cubic-bezier(0.16, 1, 0.3, 1); }
+.sb-card__main { display: grid; grid-template-rows: auto 1fr; color: inherit; text-decoration: none; }
+.sb-card__main:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+.sb-card__photo, .sb-card__blank { display: block; width: 100%; aspect-ratio: 4 / 3; border-bottom: 2px solid var(--border); background: var(--surface); }
+.sb-card__photo { height: auto; object-fit: cover; }
+.sb-card__blank { display: grid; place-items: center; }
+.sb-card__body { display: grid; gap: 3px; align-content: start; padding: 8px 10px; min-width: 0; }
+.sb-card__body .k-entity { overflow-wrap: anywhere; }
+.sb-clip { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sb-card__link { display: block; padding: 6px 10px 8px; border-top: 1px solid var(--border); text-decoration: underline; text-underline-offset: 2px; }
+.sb-card__link:hover .k-caption, .sb-card__link:focus-visible .k-caption { color: var(--text); }
+
+.sb-more { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding-top: 12px; }
+/* More stays focusable while it reads (a disabled button cannot keep focus), so it is marked, not disabled. */
+.sb-more [aria-disabled="true"] { opacity: 0.6; cursor: progress; }
+
+/* Phones: smaller cells, two to a row. */
+@media (max-width: 480px) {
+  .sb-grid, .sb-grid--cards { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 6px; }
+  .sb-cell { padding: 8px 10px; }
+  .sb-logo { width: 48px; height: 24px; }
+  .sb-input { max-width: none; }
+}
