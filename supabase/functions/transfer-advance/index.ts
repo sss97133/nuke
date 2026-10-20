@@ -18,6 +18,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
 import { requireWriteAuth } from '../_shared/writeGuard.ts';
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { ADVANCEABLE_STATUSES, ensurePipelineMilestones, RECORDED_STATUS } from '../_shared/transferSeed.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE_KEY = projectSecretKey()!;
@@ -113,6 +114,9 @@ async function advanceManual(supabase: ReturnType<typeof createClient>, body: {
 
   const completed_at = body.completed_at ?? new Date().toISOString();
 
+  // A recorded sale (seeded from a scraped lot) has only its hammer milestone: a party engaging creates the deal pipeline.
+  await ensurePipelineMilestones(supabase, transfer_id);
+
   const { data, error } = await supabase
     .from('transfer_milestones')
     .update({
@@ -129,12 +133,12 @@ async function advanceManual(supabase: ReturnType<typeof createClient>, body: {
 
   if (error) return json({ error: String(error) }, 500);
 
-  // Advance transfer status to in_progress if still pending
+  // Advance transfer status to in_progress if still pending, or if it was only a recorded sale until now
   await supabase
     .from('ownership_transfers')
     .update({ status: 'in_progress' })
     .eq('id', transfer_id)
-    .eq('status', 'pending');
+    .in('status', ['pending', RECORDED_STATUS]);
 
   // If this is the final milestone, mark transfer complete
   if (milestone_type === 'transfer_complete') {
@@ -165,6 +169,9 @@ async function ingestSignal(supabase: ReturnType<typeof createClient>, body: {
   if (!transfer_id || !signal_text) {
     return json({ error: 'transfer_id and signal_text required' }, 400);
   }
+
+  // A recorded sale needs its pipeline before a signal can be matched to a step
+  await ensurePipelineMilestones(supabase, transfer_id);
 
   // Get current transfer state
   const { data: transfer } = await supabase
@@ -291,7 +298,7 @@ async function ingestEmail(supabase: ReturnType<typeof createClient>, body: {
       .from('ownership_transfers')
       .select('id')
       .eq('vehicle_id', body.vehicle_id)
-      .in('status', ['pending', 'in_progress'])
+      .in('status', [...ADVANCEABLE_STATUSES])
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();
@@ -356,7 +363,7 @@ async function ingestSms(supabase: ReturnType<typeof createClient>, body: {
       .from('ownership_transfers')
       .select('id')
       .eq('vehicle_id', body.vehicle_id)
-      .in('status', ['pending', 'in_progress'])
+      .in('status', [...ADVANCEABLE_STATUSES])
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();

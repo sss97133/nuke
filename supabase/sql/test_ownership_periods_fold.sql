@@ -121,10 +121,10 @@ CREATE TYPE public.transfer_status AS ENUM ('pending', 'in_progress', 'completed
 CREATE TYPE public.milestone_status AS ENUM ('pending', 'in_progress', 'completed', 'skipped', 'blocked', 'overdue');
 CREATE TABLE public.ownership_transfers (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid, trigger_table text, trigger_id uuid,
-  status public.transfer_status NOT NULL DEFAULT 'in_progress');
+  status public.transfer_status NOT NULL DEFAULT 'in_progress', from_user_id uuid, to_user_id uuid, cancelled_at timestamptz);
 CREATE TABLE public.transfer_milestones (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(), transfer_id uuid NOT NULL REFERENCES public.ownership_transfers(id),
-  milestone_type text NOT NULL, status public.milestone_status NOT NULL DEFAULT 'pending', notes text);
+  milestone_type text NOT NULL, status public.milestone_status NOT NULL DEFAULT 'pending', notes text, deadline_at timestamptz);
 CREATE TABLE public.transfer_communications (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), transfer_id uuid NOT NULL REFERENCES public.ownership_transfers(id));
 
 -- the migration applies twice
