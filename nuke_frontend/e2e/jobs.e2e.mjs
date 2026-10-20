@@ -4,6 +4,7 @@
 import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
+import { readFileSync } from 'node:fs';
 import { startDevServer } from './devServer.mjs';
 import { mockSupabase, persona } from './mockSupabase.mjs';
 import {
@@ -400,6 +401,19 @@ describe('backup suppliers and business offers', () => {
     await page.getByText('Summit Racing · Claimed on Nuke').waitFor();
     assert.equal(await page.getByRole('region', { name: 'Backup suppliers for your requests' }).count(), 0);
     assert.equal(await page.getByRole('link', { name: 'Not on Nuke yet — invite them' }).count(), 0);
+    await ctx.close();
+  });
+});
+
+describe('job market', () => {
+  it('a visitor reads the market as plain counts, with no ids, names or amounts', async () => {
+    const market = JSON.parse(readFileSync(new URL('../src/pages/work/marketFixture.json', import.meta.url), 'utf8'));
+    const { ctx, page, writes } = await open('/work/market', { readers: { job_market_health_read: market } });
+    await page.getByRole('heading', { name: 'The job market on Nuke' }).waitFor();
+    const text = await page.locator('article[aria-label="The job market on Nuke"]').innerText();
+    for (const s of ['39 open requests', '1 technician linked by evidence', '23 requests have a backup supplier', '0 businesses claimed yet']) assert.ok(text.includes(s), `missing: ${s}`);
+    assert.doesNotMatch(text, /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|@|\$\d/);
+    assert.deepEqual(writes, []);
     await ctx.close();
   });
 });

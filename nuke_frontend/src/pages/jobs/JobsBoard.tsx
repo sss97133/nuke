@@ -104,7 +104,7 @@ const JobsBoard: React.FC = () => {
   return <main className="jb-page jb-scope">
     <div className="jb-intro">
       <Text role="entity" as="h1">Jobs looking for someone</Text>
-      {page && <Text role="body">{openRequestsSentence(total)}.</Text>}
+      {page && <Text role="body">{openRequestsSentence(total)}. <PrefetchLink to="/work/market">How the job market is forming</PrefetchLink></Text>}
       {page && <Text role="caption">{signedIn
         ? "How your record lines up, item by item. There's no score, and nothing rules you out."
         : <>Sign in to see how your record lines up. <PrefetchLink to="/login">Sign in</PrefetchLink></>}</Text>}
