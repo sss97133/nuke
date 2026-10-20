@@ -1,4 +1,5 @@
--- Isolated PostgreSQL 17 contract for 20261015220000_merge_carries_events_and_supersedes.sql. Synthetic rows only; never production.
+-- Isolated PostgreSQL 17 contract for 20261015220000_merge_carries_events_and_supersedes.sql and
+-- 20261020050500_merge_vin_carry_and_protected_observations.sql. Synthetic rows only; never production.
 -- Run in an empty, disposable dm_refinement_* database from the repo root:
 --   createdb dm_refinement_merge_into_primary
 --   psql -X -v ON_ERROR_STOP=1 -d dm_refinement_merge_into_primary -f supabase/sql/test_merge_into_primary_contract.sql
@@ -38,7 +39,7 @@ CREATE FUNCTION public.is_admin_or_moderator() RETURNS boolean LANGUAGE sql AS $
 CREATE FUNCTION public.user_can_edit_vehicle(uuid, uuid) RETURNS boolean LANGUAGE sql AS $$ SELECT false $$;
 
 CREATE TABLE public.vehicles (
-  id uuid PRIMARY KEY, status text, merged_into_vehicle_id uuid, deleted_at timestamptz, user_id uuid, image_count integer);
+  id uuid PRIMARY KEY, status text, merged_into_vehicle_id uuid, deleted_at timestamptz, user_id uuid, image_count integer, vin text);
 CREATE TABLE public.vehicle_images (
   id uuid PRIMARY KEY, vehicle_id uuid, merged_from_vehicle_id uuid, image_url text, file_hash text,
   is_superseded boolean, is_duplicate boolean);
@@ -46,7 +47,9 @@ CREATE UNIQUE INDEX idx_unique_vehicle_file_hash ON public.vehicle_images (vehic
   WHERE file_hash IS NOT NULL AND vehicle_id IS NOT NULL AND COALESCE(is_superseded, false) = false;
 CREATE TABLE public.vehicle_observations (
   id uuid PRIMARY KEY, vehicle_id uuid, merged_from_vehicle_id uuid, source_id uuid, source_identifier text, kind text,
-  content_hash text, observed_at timestamptz, is_superseded boolean, superseded_by uuid, superseded_at timestamptz);
+  content_hash text, observed_at timestamptz, is_superseded boolean, superseded_by uuid, superseded_at timestamptz,
+  source_vin text, source_vin_taxonomy_revision_id bigint, extraction_method text, source_vehicle_event_id uuid,
+  source_observation_id uuid, source_comment_id uuid, source_snapshot_id uuid);
 CREATE UNIQUE INDEX unique_observation ON public.vehicle_observations (source_id, source_identifier, kind, content_hash);
 CREATE TABLE public.auction_events (id uuid PRIMARY KEY, vehicle_id uuid, merged_from_vehicle_id uuid, source_url text);
 CREATE UNIQUE INDEX idx_auction_events_vehicle_source_url ON public.auction_events (vehicle_id, source_url);
@@ -77,6 +80,7 @@ CREATE TABLE public.merge_proposals (
 
 -- The migration under test.
 \i supabase/migrations/20261015220000_merge_carries_events_and_supersedes.sql
+\i supabase/migrations/20261020050500_merge_vin_carry_and_protected_observations.sql
 
 SELECT pg_temp.ok('the migration added merged_from_vehicle_id to vehicle_events and timeline_events',
   (SELECT count(*) FROM information_schema.columns WHERE table_name IN ('vehicle_events', 'timeline_events') AND column_name = 'merged_from_vehicle_id') = 2);
@@ -101,6 +105,9 @@ INSERT INTO vehicle_observations (id, vehicle_id, source_id, source_identifier, 
   ('20000000-0000-0000-0000-0000000000d1', :D, :S, 'lot-1', 'listing', 'c-old', '2026-02-01', false),      -- same (source, identifier, kind), other content: superseded by P's, moved
   ('20000000-0000-0000-0000-0000000000d2', :D, :S, 'lot-2', 'listing', 'c-2', '2026-02-01', false),        -- no counterpart: moved plain
   ('20000000-0000-0000-0000-0000000000d3', :D, :S, 'lot-3', 'condition', 'c-3', '2026-02-01', true);       -- already superseded: moved as is
+INSERT INTO vehicle_observations (id, vehicle_id, source_id, source_identifier, kind, content_hash, observed_at, is_superseded, source_vin, extraction_method) VALUES
+  ('20000000-0000-0000-0000-0000000000d4', :D, :S, 'retained-vin:d', 'specification', 'c-4', '2026-02-01', false,
+   '2G1FT1EW6A9137982', 'protected_retained_vin_reference_v1');                                                -- protected: stays on D (guard_retained_vin_observation refuses to move it in prod)
 
 INSERT INTO auction_events (id, vehicle_id, source_url) VALUES
   ('30000000-0000-0000-0000-000000000001', :P, 'https://x/lot/1'),
@@ -179,6 +186,9 @@ SELECT pg_temp.ok('observation: the revision P already has a newer one for is SU
 SELECT pg_temp.ok('observations: the other two moved, stamped, and the already-superseded one kept its flag',
   (SELECT count(*) FROM vehicle_observations WHERE vehicle_id = :P AND merged_from_vehicle_id = :D) = 3
   AND (SELECT is_superseded AND superseded_by IS NULL FROM vehicle_observations WHERE id = '20000000-0000-0000-0000-0000000000d3'));
+SELECT pg_temp.ok('observations: the protected retained VIN reference stayed on D, unstamped, and the journal names it',
+  (SELECT vehicle_id = :D AND merged_from_vehicle_id IS NULL AND is_superseded IS NOT TRUE FROM vehicle_observations WHERE id = '20000000-0000-0000-0000-0000000000d4')
+  AND (SELECT merge_journal -> 'observations_left_ids' = '["20000000-0000-0000-0000-0000000000d4"]'::jsonb FROM vehicle_merge_proposals WHERE primary_vehicle_id = :P AND duplicate_vehicle_id = :D));
 SELECT pg_temp.ok('auction_events: the same-url event stayed on D, the other moved and is stamped',
   (SELECT vehicle_id FROM auction_events WHERE id = '30000000-0000-0000-0000-0000000000d1') = :D
   AND (SELECT vehicle_id = :P AND merged_from_vehicle_id = :D FROM auction_events WHERE id = '30000000-0000-0000-0000-0000000000d2'));
@@ -257,6 +267,14 @@ SELECT pg_temp.ok('EVERY table: row count and row checksum after the unmerge equ
 INSERT INTO vehicles (id, status) VALUES ('00000000-0000-0000-0000-0000000000a2', 'active'), ('00000000-0000-0000-0000-0000000000d2', 'merged');
 INSERT INTO vehicle_merge_proposals (id, primary_vehicle_id, duplicate_vehicle_id, status) VALUES
   ('90000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-0000000000a2', '00000000-0000-0000-0000-0000000000d2', 'merged');
+-- After the before/after checksum: two more live rows for the two-VIN refusal.
+INSERT INTO vehicles (id, status, vin) VALUES
+  ('00000000-0000-0000-0000-00000000ee01', 'active', '1G1YY2189J5117603'),
+  ('00000000-0000-0000-0000-00000000ee02', 'active', '2G1FT1EW9A9168675');
+SELECT pg_temp.ok('two live rows with two different 11+ character VINs are two vehicles: the merge is refused (vin_conflict)',
+  merge_into_primary('00000000-0000-0000-0000-00000000ee01', '00000000-0000-0000-0000-00000000ee02') ->> 'skipped' = 'vin_conflict'
+  AND (SELECT status = 'active' FROM vehicles WHERE id = '00000000-0000-0000-0000-00000000ee02'));
+
 SELECT pg_temp.ok('unmerge of a merge with no journal says no_journal',
   unmerge_vehicle('90000000-0000-0000-0000-000000000001') ->> 'error' = 'no_journal');
 
