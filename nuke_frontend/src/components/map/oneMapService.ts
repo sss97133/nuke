@@ -7,9 +7,10 @@ export interface LocationRow {
   id: string; observed_at: string | null; source_type: string | null; source_platform: string | null; source_url: string | null;
   postal_code: string | null; county_fips: string | null; city: string | null; precision: string | null; confidence: number | null;
   vehicles: { id: string; year: number | null; make: string | null; model: string | null; trim: string | null; primary_image_url: string | null;
-    city: string | null; state: string | null; status: string | null; deleted_at: string | null };
+    city: string | null; state: string | null; status: string | null; deleted_at: string | null;
+    asking_price: number | null; sale_price: number | null; sold_price: number | null; sale_status: string | null; auction_outcome: string | null };
 }
-const SELECT = 'id,observed_at,source_type,source_platform,source_url,postal_code,county_fips,city,precision,confidence,vehicles!inner(id,year,make,model,trim,primary_image_url,city,state,status,deleted_at)';
+const SELECT = 'id,observed_at,source_type,source_platform,source_url,postal_code,county_fips,city,precision,confidence,vehicles!inner(id,year,make,model,trim,primary_image_url,city,state,status,deleted_at,asking_price,sale_price,sold_price,sale_status,auction_outcome)';
 const NOT_ELIGIBLE = new Set(['deleted', 'merged', 'rejected', 'duplicate']);
 const headers = { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` };
 
@@ -33,6 +34,28 @@ export async function readCounty(fips: string, signal?: AbortSignal, onPage?: (r
     after = page[page.length - 1].id;
   }
 }
+
+/** The selected ZIP's rows: the county's index, then the ZIP (no index on zcta; LA County answers in about 3 s). */
+export async function readZip(zip: string, countyFips: string, signal?: AbortSignal): Promise<LocationRow[]> {
+  const qs = `select=${SELECT}&county_fips=eq.${countyFips}&zcta=eq.${zip}&confidence=gte.0.5&order=observed_at.desc&limit=2000`;
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/vehicle_location_observations?${qs}`, { signal, headers });
+  if (!res.ok) throw new Error(`zip read ${res.status}`);
+  return (await res.json()) as LocationRow[];
+}
+
+/** The facts for one area, every layer (map-vehicles mode=area), and for every area at a level in view (mode=areas). */
+export interface AreaLayers { level: string; key: string; from: string; to: string; layers: { layer: string; entities: number; priced: number; value: number | null; avg: number | null; as_of: string | null; latest_day: string | null }[] }
+export interface AreasOut { level: string; layer: string; areas: { key: string; entities: number; priced: number; value: number; avg: number | null }[]; unkeyed: { entities: number }; undated: { entities: number }; totals: { entities: number; value: number; areas: number }; by_source: { source: string; entities: number }[]; as_of: string | null }
+const fn = async <T,>(params: Record<string, string | undefined>, signal?: AbortSignal): Promise<T> => {
+  const qs = new URLSearchParams(); for (const [k, v] of Object.entries(params)) if (v) qs.set(k, v);
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/map-vehicles?${qs}`, { signal, headers: { apikey: SUPABASE_ANON_KEY } });
+  if (!res.ok) throw new Error(`map-vehicles ${res.status}`);
+  return res.json();
+};
+export const readArea = (level: 'zcta' | 'county' | 'state', key: string, from: string, to: string, signal?: AbortSignal) =>
+  fn<AreaLayers>({ mode: 'area', level, key, from, to }, signal);
+export const readAreas = (level: 'zcta' | 'county' | 'state', layer: string, from: string, to: string, keys?: string[], signal?: AbortSignal) =>
+  fn<AreasOut>({ mode: 'areas', level, layer, from, to, keys: keys?.join(',') }, signal);
 
 export interface ZipGroup { zip: string; vehicles: Map<string, LocationRow[]> }
 
@@ -59,6 +82,14 @@ export const BANDS = ['1–4', '5–19', '20–99', '100+'];
 export const band = (n: number) => (n < 5 ? 0 : n < 20 ? 1 : n < 100 ? 2 : 3);
 export const BAND_RGBA = ['rgba(97,184,214,0.22)', 'rgba(51,148,196,0.32)', 'rgba(26,102,168,0.42)', 'rgba(20,64,133,0.54)'];
 
+/** What happened to the vehicle, in plain words, from its own row. */
+export function outcome(v: LocationRow['vehicles']): { word: string; price: number | null } {
+  const sold = v.sold_price ?? v.sale_price;
+  if ((v.sale_status ?? '').toLowerCase() === 'sold' || (v.auction_outcome ?? '').toLowerCase() === 'sold' || (sold && (v.sale_status ?? '') !== 'not_sold')) return { word: 'sold', price: sold ?? null };
+  if (['reserve_not_met', 'no_sale'].includes((v.auction_outcome ?? '').toLowerCase()) || ['not_sold', 'unsold', 'bid_to'].includes((v.sale_status ?? '').toLowerCase())) return { word: 'not sold', price: v.sale_price ?? null };
+  if (v.asking_price) return { word: 'asking', price: v.asking_price };
+  return { word: '', price: null };
+}
 export const makeLabel = (r: LocationRow) => [r.vehicles.year, r.vehicles.make, r.vehicles.model].filter(Boolean).join(' ') || 'Vehicle';
 export const platformName = (s: string | null) => ({ bat: 'Bring a Trailer', 'barrett-jackson': 'Barrett-Jackson', craigslist: 'Craigslist', facebook_marketplace: 'Facebook Marketplace', mecum: 'Mecum', carsandbids: 'Cars & Bids', 'cars-and-bids': 'Cars & Bids', ebay_motors: 'eBay Motors' } as Record<string, string>)[s ?? ''] ?? (s ?? 'Source unrecorded');
 
