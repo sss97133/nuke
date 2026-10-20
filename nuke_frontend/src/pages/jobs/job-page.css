@@ -52,3 +52,19 @@
 
 /* Live regions stay mounted so announcements fire; while empty they take no space in grid layouts. */
 .jb-live:empty { position: absolute; }
+
+/* Parts from eBay (PartsFinder) and the hand-off: a pick list, then each listing as a thumbnail row. */
+.pf-pick { display: grid; gap: 2px; margin: 6px 0; padding: 4px 8px; border: 2px solid var(--border); }
+.pf-pick__item { display: flex; align-items: center; gap: 6px; }
+.pf-add { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 6px 8px; margin: 6px 0; }
+.pf-add__field { display: grid; gap: 2px; min-width: 0; }
+.pf-input { box-sizing: border-box; min-width: 0; width: 220px; max-width: 100%; padding: 4px; border: 2px solid var(--border); background: var(--bg); color: var(--text); }
+.pf-input--zip { width: 72px; }
+.pf-remove { all: unset; cursor: pointer; text-decoration: underline; }
+.pf-part { padding-top: 6px; border-top: 2px solid var(--border); }
+.pf-listings { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 6px; }
+.pf-listing { display: grid; grid-template-columns: 72px minmax(0, 1fr); gap: 8px; padding: 4px 0; border-bottom: 1px solid var(--border); }
+.pf-listing__img { width: 72px; height: 72px; object-fit: contain; border: 1px solid var(--border); background: var(--surface-hover, var(--surface)); }
+.pf-listing__main { display: grid; gap: 2px; min-width: 0; }
+.pf-listing__actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
+a.job-button { color: var(--text); text-decoration: none; }
