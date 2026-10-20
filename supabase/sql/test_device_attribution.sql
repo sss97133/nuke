@@ -44,6 +44,8 @@ END $$;
 
 -- Supabase's auth helpers read the request's JWT claims.
 CREATE SCHEMA auth;
+CREATE TABLE auth.users (id uuid PRIMARY KEY);
+GRANT REFERENCES ON auth.users TO dm_contract_deployer;
 CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS
 $$ SELECT nullif(nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub', '')::uuid $$;
 CREATE FUNCTION auth.role() RETURNS text LANGUAGE sql STABLE AS
@@ -193,6 +195,13 @@ GRANT EXECUTE ON FUNCTION public.attribute_testimony(text, uuid, uuid, text, uui
 
 -- The migration -----------------------------------------------------------------------------------------------------
 \ir ../migrations/20261017021000_device_evidence_files_photos_and_profiles.sql
+ALTER TABLE public.vehicle_images
+  ADD COLUMN source text,
+  ADD COLUMN doc_flag boolean DEFAULT false,
+  ADD COLUMN is_sensitive boolean DEFAULT false,
+  ADD COLUMN latitude double precision,
+  ADD COLUMN longitude double precision,
+  ADD COLUMN exif_data jsonb;
 
 -- A 17-character VIN with its check digit computed into position 9.
 CREATE FUNCTION pg_temp.vin(t text) RETURNS text LANGUAGE plpgsql IMMUTABLE AS $$
@@ -208,6 +217,11 @@ SELECT pg_temp.ok('the recovered check digit accepts known VINs and refuses a wr
   AND NOT public.validate_vin_check_digit('1HGCM82634A004352'));
 
 -- Fixture -----------------------------------------------------------------------------------------------------------
+-- auth.users is owned by the platform auth role in production; seed that fixture as postgres,
+-- then resume the constrained deployment role for the application tables.
+RESET ROLE;
+INSERT INTO auth.users (id) VALUES (pg_temp.u('owner')), (pg_temp.u('stranger')), (pg_temp.u('busy'));
+SET ROLE dm_contract_deployer;
 INSERT INTO public.profiles (id) VALUES (pg_temp.u('owner')), (pg_temp.u('stranger')), (pg_temp.u('busy'));
 INSERT INTO public.vehicles (id, uploaded_by, owner_id, year, make, model, vin, is_public, status, merged_into_vehicle_id, deleted_at) VALUES
   (pg_temp.v('accord'),   pg_temp.u('owner'),    NULL,               2003, 'Honda',     'Accord',       '1HGCM82633A004352', true, 'active', NULL, NULL),

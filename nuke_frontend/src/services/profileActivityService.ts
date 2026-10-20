@@ -153,7 +153,7 @@ export class ProfileActivityService {
       // Count user's images
       const { count: imageCount } = await supabase
         .from('vehicle_images')
-        .select('*', { count: 'exact', head: true })
+        .select('id', { count: 'exact', head: true })
         .eq('user_id', userId);
 
       // Count user's timeline events

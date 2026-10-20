@@ -62,6 +62,9 @@ struct NukeCaptureApp: App {
                     ExploreView()
                 } else if ProcessInfo.processInfo.environment["NUKE_DEBUG_SCREEN"] == "app" {
                     DebugAppDeepLink()
+                } else if let org = ProcessInfo.processInfo.environment["NUKE_DEBUG_ACTOR_ORG"], !org.isEmpty {
+                    // NUKE_DEBUG_ACTOR_ORG=<uuid> roots on that organization's actor document (DEBUG only).
+                    NavigationStack { ActorProfileView(route: ActorRoute(kind: "organization", id: org, name: nil)) }
                 } else if let dbgDay = ProcessInfo.processInfo.environment["NUKE_DEBUG_DAY"], !dbgDay.isEmpty {
                     // NUKE_DEBUG_DAY=yyyy-MM-dd roots on that day's receipt for the sample
                     // profile (or NUKE_DEBUG_DAY_USER=<uuid>) as the current session: anon
@@ -72,6 +75,73 @@ struct NukeCaptureApp: App {
                     DebugProfileDeepLink()
                 } else if ProcessInfo.processInfo.environment["NUKE_DEBUG_SCREEN"] == "today" {
                     DebugTodayDeepLink()
+                } else if ProcessInfo.processInfo.environment["NUKE_DEBUG_SCREEN"] == "work" {
+                    // The Work console over the live readers, as whoever the Keychain holds.
+                    WorkConsoleView(showCapture: MainTabView.currentPhotoGrant())
+                } else if let dbgJob = ProcessInfo.processInfo.environment["NUKE_DEBUG_JOB_ID"], !dbgJob.isEmpty {
+                    NavigationStack {
+                        ScrollViewReader { proxy in
+                            JobView(workOrderId: dbgJob)
+                                .task {
+                                    guard let target = ProcessInfo.processInfo.environment["NUKE_DEBUG_SCROLL_TO"] else { return }
+                                    // The section exists only once its readers load, which is slower on CI runners.
+                                    for delay in [8, 6, 6] {
+                                        try? await Task.sleep(for: .seconds(delay))
+                                        proxy.scrollTo(target, anchor: .top)
+                                    }
+                                }
+                        }
+                    }
+                } else if let dbgStatement = ProcessInfo.processInfo.environment["NUKE_DEBUG_STATEMENT_VEHICLE"], !dbgStatement.isEmpty {
+                    NavigationStack { VehicleStatementView(vehicleId: dbgStatement) }
+                } else if let dbgPlan = ProcessInfo.processInfo.environment["NUKE_DEBUG_WORK_PLAN"], !dbgPlan.isEmpty {
+                    // "Plan the work" for one listed vehicle, over the live reader (no photos).
+                    NavigationStack {
+                        ScrollViewReader { proxy in
+                            WorkPlanEstimateView(vehicleId: dbgPlan)
+                                .task {
+                                    guard let target = ProcessInfo.processInfo.environment["NUKE_DEBUG_SCROLL_TO"] else { return }
+                                    try? await Task.sleep(for: .seconds(6))
+                                    proxy.scrollTo(target, anchor: .top)
+                                }
+                        }
+                    }
+                } else if let dbgFacility = ProcessInfo.processInfo.environment["NUKE_DEBUG_FACILITY"], !dbgFacility.isEmpty {
+                    // A shop's space, equipment and licenses alone, over the live reader (no photos).
+                    NavigationStack { FacilityView(organizationId: dbgFacility) }
+                } else if ProcessInfo.processInfo.environment["NUKE_DEBUG_SCREEN"] == "provider-setup" {
+                    NavigationStack { ProviderSetupView() }
+                } else if let dbgOrg = ProcessInfo.processInfo.environment["NUKE_DEBUG_ORG"], !dbgOrg.isEmpty {
+                    NavigationStack { OrganizationView(orgId: dbgOrg) }
+                } else if ProcessInfo.processInfo.environment["NUKE_DEBUG_JOBS_LOOKING"] == "1" {
+                    // Work's "Jobs looking for someone" alone, over the live reader (no capture photos).
+                    DebugJobsLookingHost()
+                } else if let dbgProvider = ProcessInfo.processInfo.environment["NUKE_DEBUG_PROVIDER"], !dbgProvider.isEmpty {
+                    // The provider face alone (no identity header, garage or photos), over the live readers.
+                    NavigationStack {
+                        ScrollViewReader { proxy in
+                            List { ProviderFaceSection(userId: dbgProvider, showSubject: true) }
+                                .navigationTitle("Provider")
+                                .navigationBarTitleDisplayMode(.inline)
+                                .task {
+                                    guard let target = ProcessInfo.processInfo.environment["NUKE_DEBUG_SCROLL_TO"] else { return }
+                                    try? await Task.sleep(for: .seconds(8))
+                                    proxy.scrollTo(target, anchor: .top)
+                                }
+                        }
+                    }
+                } else if let dbgWork = ProcessInfo.processInfo.environment["NUKE_DEBUG_VEHICLE_WORK"], !dbgWork.isEmpty {
+                    // The vehicle page's Work card alone, over the live reader, without the page's photos.
+                    NavigationStack {
+                        ScrollView {
+                            VehicleWorkSection(vehicleId: dbgWork)
+                                .environment(\.vehicleListingContext, ProcessInfo.processInfo.environment["NUKE_DEBUG_LISTING"] == "1")
+                                .padding(.top, 12)
+                        }
+                            .background(Color(.systemGroupedBackground))
+                            .navigationTitle("Vehicle work")
+                            .navigationBarTitleDisplayMode(.inline)
+                    }
                 } else if ProcessInfo.processInfo.environment["NUKE_DEBUG_SCREEN"] == "days" {
                     // Days + the day receipt are entirely LocalStore — anon, no session.
                     LibraryDaysView()
@@ -94,8 +164,15 @@ struct NukeCaptureApp: App {
                 #endif
             }
             .environmentObject(session)
+            #if DEBUG
+            .overlay(alignment: .topLeading) { if FixtureBackend.isActive { FixtureWriteLogOverlay() } }
+            #endif
         }
         .onChange(of: scenePhase) { _, phase in
+            #if DEBUG
+            // Fixture runs (UI tests) start no sync, photo-library or background work.
+            if FixtureBackend.isActive { return }
+            #endif
             switch phase {
             case .active:
                 // Back from Settings with the grant now on? Re-arm ignition
@@ -366,6 +443,19 @@ private struct DebugVehicleDeepLink: View {
                       SupabaseService.currentUserId ?? "nil")
             }
             ready = true
+        }
+    }
+}
+
+/// NUKE_DEBUG_JOBS_LOOKING=1 → the open-requests section alone, read live. DEBUG only.
+private struct DebugJobsLookingHost: View {
+    @State private var open: JobLoad<OpenRequirements> = .loading
+    var body: some View {
+        NavigationStack {
+            List { JobsLookingSection(open: open) }
+                .navigationTitle("Work")
+                .navigationBarTitleDisplayMode(.inline)
+                .task { open = await OfferReaders.openRequirements() }
         }
     }
 }

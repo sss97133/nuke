@@ -97,9 +97,11 @@ export function headerText(brand: string, dollars: string, width: number, size =
   return textWidth(brand) * size <= room ? brand : '';
 }
 
-export default function BrandFamilyMap({ width, height, onPickBrand, onPickFamily, baseline = null, basis = 'ledger', familyMoves, gateMin = GATE_MIN, horizonShortLabel = '12 mo', windowLabel }: {
+export default function BrandFamilyMap({ width, height, onPickBrand, onPickFamily, baseline = null, basis = 'ledger', familyMoves, gateMin = GATE_MIN, horizonShortLabel = '12 mo', windowLabel, houses }: {
   width: number; height: number; onPickBrand: (brand: string, focusAfterPick?: boolean) => void; onPickFamily: (brand: string, familyKey: string, family: string, focusAfterPick?: boolean) => void;
   baseline?: Baseline | null; basis?: MapBasis; familyMoves?: Record<string, HorizonMoveCounts>; gateMin?: number; horizonShortLabel?: string; windowLabel?: string;
+  /** The measured houses from the refresh receipt; each tile's card names them. */
+  houses?: readonly string[];
 }) {
   const [rows, setRows] = useState<MapRow[] | null | undefined>(undefined);
   const [tooltip, setTooltip] = useState<{ row: MapRow; x: number; y: number } | null>(null);
@@ -109,7 +111,7 @@ export default function BrandFamilyMap({ width, height, onPickBrand, onPickFamil
   const pick = (r: MapRow, focus: boolean) => r.family_key === 'more' || r.family_key === 'other'
     ? onPickBrand(r.brand, focus) : onPickFamily(r.brand, r.family_key, r.family ?? '', focus);
   const moveFor = (r: MapRow): Move => r.family_key === 'more' || r.family_key === 'other'
-    ? { kind: 'none' } : relativeMove(toNode(r), baseline, basis === 'ledger', gateMin);
+    ? { kind: 'none' } : relativeMove(toNode(r), baseline, basis === 'ledger', gateMin, houses);
   const inspected = (r: MapRow) => ({ ...toNode(r), name: `${r.brand} ${label(r)}` });
   useEffect(() => { setTooltip(null); setSheet(null); }, [basis, familyMoves, gateMin, windowLabel, horizonShortLabel]);
   useEffect(() => { let live = true; readBrandFamilyMap().then((r) => { if (live) setRows(r); }); return () => { live = false; }; }, []);

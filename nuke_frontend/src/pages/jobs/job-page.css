@@ -1,0 +1,54 @@
+/* Job and provider pages: kit roles for the type, this file for layout and the trust marks. */
+.job-page { max-width: 960px; margin: 0 auto; }
+.job-masthead { display: grid; gap: 2px; min-width: 0; }
+.job-link { color: var(--text); text-decoration: underline; text-underline-offset: 2px; }
+.job-block { display: grid; gap: 4px; }
+.job-block + .job-block { margin-top: 8px; }
+.job-block p, .job-page p { margin: 0; }
+.job-list { margin: 2px 0 0; padding-left: 14px; }
+
+/* The rail: seven cells on one ladder. Recorded-only is dim; records that disagree carry the warning border. */
+.job-rail { list-style: none; margin: 0 0 6px; padding: 0; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; }
+.job-rail__cell { display: grid; justify-items: center; gap: 2px; padding: 4px 2px; border-top: 2px solid var(--border); }
+.job-rail--compact { display: inline-grid; grid-template-columns: repeat(7, 14px); gap: 2px; margin: 0; }
+.job-rail--compact .job-rail__cell { padding: 0; border-top: 0; }
+.job-rail__cell--attributed, .job-rail__cell--pending { border-top-color: var(--text); }
+/* Dim only the decorative glyph (aria-hidden); labels keep the theme's readable text colours. */
+.job-rail__cell--recorded > .k-measure, .job-rail__cell--absent > .k-measure, .job-rail__cell--missing > .k-measure, .job-rail__cell--withheld > .k-measure { opacity: 0.45; }
+.job-rail__cell--conflicting { border-top-color: var(--warning, var(--text)); }
+.job-legend { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 12px; }
+
+.job-stages { display: grid; gap: 8px; }
+.job-stage { display: grid; gap: 4px; padding: 6px 0 6px 8px; border-left: 2px solid var(--border); }
+.job-stage--attributed, .job-stage--pending { border-left-color: var(--text); }
+.job-stage--conflicting { border-left-color: var(--warning, var(--text)); }
+.job-stage--recorded { border-left-style: dashed; }
+.job-stage__head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+.job-stage__head h3, .job-sign h3 { margin: 0; }
+.job-stage__conflicts { padding-left: 6px; border-left: 2px solid var(--warning, var(--text)); }
+.job-details summary { cursor: pointer; }
+
+.job-offer { padding: 4px 0; border-top: 1px solid var(--border); }
+.job-images { display: flex; flex-wrap: wrap; gap: 4px; }
+.job-images__img { width: 160px; height: 120px; object-fit: cover; border: 1px solid var(--border); background: var(--surface-hover, var(--surface)); }
+
+/* A Sign: what it says and does not, then an explicit confirm. */
+.job-signs { display: grid; gap: 6px; margin-top: 8px; }
+.job-sign { display: grid; gap: 4px; padding: 6px 8px; border: 2px solid var(--border); }
+.job-sign__terms { display: grid; gap: 4px; }
+.job-sign__buttons { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.job-sign__failure { padding-left: 6px; border-left: 2px solid var(--warning, var(--text)); }
+.job-button { all: unset; cursor: pointer; justify-self: start; padding: 4px 8px; border: 2px solid var(--text); background: var(--surface); }
+.job-button:hover { background: var(--surface-hover, var(--surface)); }
+.job-button:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+.job-button:disabled { cursor: default; opacity: 0.5; }
+.job-button--primary { background: var(--text); }
+.job-button--primary .k-label { color: var(--bg); }
+.job-textarea { width: 100%; min-height: 64px; box-sizing: border-box; padding: 4px; border: 2px solid var(--border); background: var(--bg); color: var(--text); resize: vertical; }
+
+/* Job rows on a vehicle or provider page. */
+.job-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 4px 12px; padding: 4px 0; border-bottom: 1px solid var(--border); }
+.job-row__main { display: grid; gap: 2px; min-width: 0; }
+
+/* Live regions stay mounted so announcements fire; while empty they take no space in grid layouts. */
+.jb-live:empty { position: absolute; }

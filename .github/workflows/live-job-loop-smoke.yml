@@ -1,0 +1,46 @@
+name: Live job-loop smoke
+
+# The job loop against PRODUCTION inside rolled-back transactions (scripts/ci/live-job-loop-smoke.mjs): synthetic users
+# created in the transaction post a job, offer, accept, start, quote, accept, attest and accept completion, invoice and
+# witness payment, and contact each other through Nuke; the open readers are read as anon and as a signed-in stranger.
+# It asserts every Sign works, no reader shows personal information, payment_authorized is never true, the job path
+# stages move, and contact threads stay private; then ROLLBACK. Read-only checks on real data: scoreboard shape, the
+# owner's profile skills, anon latency under 2 s warm. Afterwards it proves zero net rows (job-loop table counts and
+# synthetic-id residue). Same Management API secret as update-stats.yml; nothing is ever committed.
+
+on:
+  schedule:
+    - cron: '40 7 * * *'   # daily, 07:40 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: live-job-loop-smoke
+  cancel-in-progress: false
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Job loop against production, rolled back
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+        run: node scripts/ci/live-job-loop-smoke.mjs --json "${{ runner.temp }}/live-job-loop-smoke.json"
+
+      - name: Keep the results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-job-loop-smoke
+          path: ${{ runner.temp }}/live-job-loop-smoke.json
+          retention-days: 14

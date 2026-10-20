@@ -1,6 +1,7 @@
 import { supabase } from '../../lib/supabase';
 import type { Vehicle } from '../../types';
 import { VEHICLE_CARD_COLUMNS } from '../../components/vehicles/vehicleCardColumns';
+import { vehicleImageRowColumns } from '../../lib/vehicleImageColumns';
 
 // One vehicles row as the caller may see it: hidden rows read as null, the owner's purchase facts as
 // null unless the caller is the owner. A select('*') or returning '*' on vehicles is not granted.
@@ -22,7 +23,7 @@ export const vehicleService = {
     // Fetch images separately
     const { data: images, error: imagesError } = await supabase
       .from('vehicle_images')
-      .select('*')
+      .select(await vehicleImageRowColumns())
       .eq('vehicle_id', id);
 
     if (imagesError) throw imagesError;
@@ -108,7 +109,7 @@ export const vehicleService = {
     const vehicleIds = vehicles.map(v => v.id);
     const { data: images, error: imagesError } = await supabase
       .from('vehicle_images')
-      .select('*')
+      .select(await vehicleImageRowColumns())
       .in('vehicle_id', vehicleIds);
 
     if (imagesError) throw imagesError;

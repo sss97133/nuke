@@ -154,6 +154,13 @@ final class LibraryIngest: ObservableObject {
         return "album-vision-v2:\(VNClassifyImageRequest.defaultRevision):\(VNRecognizeTextRequest.defaultRevision):\(os.majorVersion)"
     }
 
+    /// Identity decisions start with a new pass over the original bytes. A prior
+    /// image analysis may have been wrong anywhere upstream, so it cannot qualify
+    /// as the VIN/classification read that anchors a capture-session fold.
+    static var identityMethodVersion: String {
+        "vehicle-identity-context-fold-v3:\(VNClassifyImageRequest.defaultRevision):\(VNRecognizeTextRequest.defaultRevision)"
+    }
+
     /// Read every selected source image, including already-bound photos. Album
     /// membership is context, never an inferred vehicle ID. A whole-library pass
     /// prioritizes albums, then visits the remaining visible photos exactly once.
@@ -250,7 +257,8 @@ final class LibraryIngest: ObservableObject {
         // Preserve all source text, including pre-1981 serials that the existing
         // modern 17-character VIN detector cannot recognize. Never force a match.
         let textLines = asset.mediaSubtypes.contains(.photoScreenshot) ? [] : VisionEngine.recognizeText(cg)
-        let vins = Array(Set(VisionEngine.vinCandidates(in: textLines))).sorted()
+        let vins = Array(Set(VisionEngine.vinCandidates(in: textLines) +
+            VisionEngine.labelledClassicSerialCandidates(in: textLines))).sorted()
         let encoder = JSONEncoder()
         guard let labelData = try? encoder.encode(labels), let vinData = try? encoder.encode(vins),
               let textData = try? encoder.encode(textLines),

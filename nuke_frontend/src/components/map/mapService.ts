@@ -78,9 +78,13 @@ export async function fetchHistogram(
   });
 }
 
+/** Count listings first seen in the last `days` (vehicle_map_county_listings) instead of located vehicles. */
+export interface ListingMeasure { eventType: 'listing'; days: number; source?: string }
+
 export async function fetchCountyData(
   timeStart?: string,
   timeEnd?: string,
+  listing?: ListingMeasure,
 ): Promise<import('./types').CountyMapData> {
   // NOTE: The backend RPC (get_vehicle_map_data) uses a materialized view and does NOT
   // support time_start/time_end filtering in county mode yet. Params are passed through
@@ -89,18 +93,25 @@ export async function fetchCountyData(
     mode: 'county',
     time_start: timeStart,
     time_end: timeEnd,
+    event_type: listing?.eventType,
+    days: listing?.days,
+    source: listing?.source,
   });
 }
 
 export async function fetchStateData(
   timeStart?: string,
   timeEnd?: string,
+  listing?: ListingMeasure,
 ): Promise<import('./types').StateMapData> {
   // NOTE: Same materialized view limitation as fetchCountyData above.
   return mapFetch<import('./types').StateMapData>({
     mode: 'state',
     time_start: timeStart,
     time_end: timeEnd,
+    event_type: listing?.eventType,
+    days: listing?.days,
+    source: listing?.source,
   });
 }
 

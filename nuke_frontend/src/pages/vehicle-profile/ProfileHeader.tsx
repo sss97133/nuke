@@ -227,7 +227,7 @@ export default function ProfileHeader({ priceLotId }: { priceLotId?: string }) {
       meta && /^\d+$/.test(String(meta.mec_web_id)) && `mecum:${meta.mec_web_id}` === targetLotKey);
     const fallbackUrl = base.source.url ?? null;
     const pulseLot = targetLotKey && comparableLotKey(pAny.listing_url) === targetLotKey ? pAny.lot_number : null;
-    const candidates = [...(currentLotRead?.candidates ?? []), { lotNumber: pulseLot },
+    const candidates: SaleLotProvenance[] = [...(currentLotRead?.candidates ?? []), { lotNumber: pulseLot },
       ...boundInline.map(meta => extractInlineLotProvenance({ provenance_metadata: meta }))];
     const texts = (values: unknown[]) => [...new Set(values.filter((v): v is string => typeof v === 'string' && !!v.trim()).map(v => v.trim()))];
     const lots = texts([base.source.lotNumber, base.source.video?.lotNumber, ...candidates.map(c => c.lotNumber)]);
@@ -312,7 +312,7 @@ export default function ProfileHeader({ priceLotId }: { priceLotId?: string }) {
         {strip.odometer && <ClaimView label="Odometer" role="label" claim={strip.odometer} format={value => `${Number(value).toLocaleString('en-US')} mi`} />}
         {strip.facets.map(f => <Facet key={f.dimension} label={f.label} expanded={activeFacet === f.dimension}
           ariaLabel={`${f.label} performance stack`}
-          onClick={() => setActiveFacet(current => current === f.dimension ? null : f.dimension)} />)}
+          onClick={() => setActiveFacet(current => current === f.dimension ? null : f.dimension as ProfileFacet)} />)}
       </Strip>
       {selected && <HeaderPopover open onClose={() => setActiveFacet(null)} title={selected.label} width={360} dismissBoundaryRef={stripBoundary}>
         <SourceView claim={selected.member} />

@@ -1,0 +1,68 @@
+name: Logged-out live check
+
+# Is the public site working for a stranger? Runs after every deploy and every 30 minutes, opens an issue when it is not
+# (GitHub emails the owner) and closes it when it is again. Script header: scripts/ci/logged-out-live.mjs.
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_run:
+    workflows: ['Supabase Deploy', 'Deploy to Vercel']
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: logged-out-live
+  cancel-in-progress: false
+
+jobs:
+  live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install Playwright
+        run: |
+          mkdir -p /tmp/pw && cd /tmp/pw && npm init -y >/dev/null && npm i playwright@1.61.1 >/dev/null
+          npx playwright install --with-deps chromium
+      - name: Wait for a fresh deploy to settle
+        if: github.event_name == 'workflow_run'
+        run: sleep 120
+      - name: Open the site as a stranger
+        id: probe
+        continue-on-error: true
+        env:
+          NODE_PATH: /tmp/pw/node_modules
+          LIVE_OUT: ${{ runner.temp }}/logged-out-live
+        run: node scripts/ci/logged-out-live.mjs 2>&1 | tee "$RUNNER_TEMP/probe.log"; exit ${PIPESTATUS[0]}
+      - name: Keep the screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: logged-out-live
+          path: ${{ runner.temp }}/logged-out-live
+          retention-days: 7
+      - name: Tell the owner, or clear the alarm
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OUTCOME: ${{ steps.probe.outcome }}
+          TRIGGER: ${{ github.event_name }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -u
+          TITLE="Live site broken for logged-out visitors"
+          NUM=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "\"$TITLE\" in:title" --json number --jq '.[0].number // empty')
+          if [ "$OUTCOME" = "failure" ]; then
+            BODY=$(printf 'Run: %s\nTrigger: %s\n\n```\n%s\n```\n' "$RUN_URL" "$TRIGGER" "$(head -c 3500 "$RUNNER_TEMP/probe.log")")
+            if [ -n "$NUM" ]; then gh issue comment "$NUM" --repo "$GITHUB_REPOSITORY" --body "$BODY"
+            else gh issue create --repo "$GITHUB_REPOSITORY" --title "$TITLE" --body "$BODY"; fi
+          elif [ -n "$NUM" ]; then
+            gh issue close "$NUM" --repo "$GITHUB_REPOSITORY" --comment "Passing again: $RUN_URL"
+          fi
+          [ "$OUTCOME" != "failure" ]

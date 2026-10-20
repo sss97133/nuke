@@ -5,12 +5,13 @@ import { useHeaderHeight } from './hooks/useHeaderHeight';
 import { useSession } from './hooks/useSession';
 import { useNotificationBadge } from './hooks/useNotificationBadge';
 import { useAdminAccess } from '../../hooks/useAdminAccess';
-import HeaderSearch from '../HeaderSearch';
+import HeaderSearch from '../HeaderSearchLauncher';
 import { UserArea } from './UserArea';
 import { UserDropdown } from './UserDropdown';
 import { useBranding } from '../../branding/BrandingContext';
 import { useOptionalTheme } from '../../contexts/ThemeContext';
-import GlobalUploadIndicator from '../GlobalUploadIndicator';
+import GlobalUploadIndicator from '../UploadIndicatorLauncher';
+import ActivityLauncher from './ActivityLauncher';
 import './AppHeader.css';
 
 interface AppHeaderProps {
@@ -25,6 +26,8 @@ const NAV_LINKS = [
   { label: 'JOURNAL', to: '/journal' },
   { label: 'STACKS', to: '/stacks' },
 ];
+// Signed-in only: the work console (signature queue and the viewer's jobs).
+const SIGNED_IN_NAV_LINKS = [{ label: 'WORK', to: '/work' }, { label: 'MESSAGES', to: '/messages' }];
 
 /**
  * AppHeader — One row, four zones, 40px.
@@ -85,7 +88,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
 
         {/* Zone 2: Navigation — hover-prefetch per McMaster benchmark */}
         <nav className="header-nav" aria-label="Main navigation">
-          {NAV_LINKS.map(({ label, to }) => (
+          {(session ? [...NAV_LINKS, ...SIGNED_IN_NAV_LINKS] : NAV_LINKS).map(({ label, to }) => (
             <PrefetchLink
               key={to}
               to={to}
@@ -116,6 +119,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
             </button>
           )}
           <GlobalUploadIndicator />
+          {session && <ActivityLauncher userId={userId} onOpenNotifications={onOpenNotifications} />}
           {session ? (
             <UserArea
               session={session}

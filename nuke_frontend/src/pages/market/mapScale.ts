@@ -16,10 +16,29 @@ export interface MarketCounts {
   sold_prior_12m?: number | null;
 }
 
+/** `houses`: the auction houses the move was measured at (treemap_populations().measured_houses, the houses held in
+ *  full in both windows); the card and legend name them instead of a hard-coded list. */
 export type Move =
-  | { kind: 'move'; rel: number; raw: number; sold: number; prior: number }
-  | { kind: 'few'; sold: number; prior: number; why: 'count' | 'share' }
+  | { kind: 'move'; rel: number; raw: number; sold: number; prior: number; houses?: readonly string[] }
+  | { kind: 'few'; sold: number; prior: number; why: 'count' | 'share'; houses?: readonly string[] }
   | { kind: 'none' };
+
+/** The measured houses when the refresh receipt has not been read yet: the three that cleared the 90%-held test on
+ *  2026-10-18 (migration 20261018120000_measured_houses_market_fold.sql). The receipt's list wins when present. */
+export const DEFAULT_MEASURED_HOUSES: readonly string[] = ['Bring a Trailer', 'Mecum', 'Bonhams'];
+
+/** The receipt's measured houses, or the default when the receipt is absent or empty. */
+export function measuredHouses(fromReceipt?: readonly string[] | null): readonly string[] {
+  const clean = (fromReceipt ?? []).filter((h): h is string => typeof h === 'string' && h.trim().length > 0);
+  return clean.length ? clean : DEFAULT_MEASURED_HOUSES;
+}
+
+/** "Bring a Trailer, Mecum and Bonhams": the houses as one phrase. */
+export function housesPhrase(houses: readonly string[]): string {
+  const h = [...houses];
+  if (h.length <= 1) return h[0] ?? '';
+  return `${h.slice(0, -1).join(', ')} and ${h[h.length - 1]}`;
+}
 
 export interface Baseline { sold: number; prior: number; move: number }
 
@@ -52,16 +71,19 @@ export function batBaseline(nodes: readonly MarketCounts[] | null | undefined): 
   return prior > 0 ? { sold, prior, move: sold / prior - 1 } : null;
 }
 
-/** `allVenues`: the tile is sized by all venues' sales, so its BaT move stands for it only when BaT holds at least
- *  half of them; sized by BaT's own 12 months, the tile is BaT's and that test does not apply. */
-export function relativeMove(n: MarketCounts, base: Baseline | null, allVenues = false, gateMin = GATE_MIN): Move {
+/** `allVenues`: the tile is sized by all venues' sales (`count`, the confirmed sales at every house), so the measured
+ *  houses' move stands for it only when they hold at least half of them (`dated`); sized by the measured houses' own
+ *  12 months, the tile is theirs and that test does not apply. `houses` names the measured houses on the result so the
+ *  card can say where the move was measured; a brand sold mostly elsewhere never takes their move as its own. */
+export function relativeMove(n: MarketCounts, base: Baseline | null, allVenues = false, gateMin = GATE_MIN, houses?: readonly string[]): Move {
   if (n.sold_12m == null || n.sold_prior_12m == null || n.sold_12m + n.sold_prior_12m === 0) return { kind: 'none' };
   const sold = n.sold_12m;
   const prior = n.sold_prior_12m;
-  if (sold < gateMin || prior < gateMin) return { kind: 'few', sold, prior, why: 'count' };
-  if (allVenues && gateMin >= GATE_MIN && (!n.dated || n.dated < 0.5 * n.count)) return { kind: 'few', sold, prior, why: 'share' };
+  const at = houses?.length ? { houses } : {};
+  if (sold < gateMin || prior < gateMin) return { kind: 'few', sold, prior, why: 'count', ...at };
+  if (allVenues && gateMin >= GATE_MIN && (!n.dated || n.dated < 0.5 * n.count)) return { kind: 'few', sold, prior, why: 'share', ...at };
   const raw = sold / prior - 1;
-  return { kind: 'move', raw, rel: base ? (1 + raw) / (1 + base.move) - 1 : raw, sold, prior };
+  return { kind: 'move', raw, rel: base ? (1 + raw) / (1 + base.move) - 1 : raw, sold, prior, ...at };
 }
 
 /** The fill for a relative move: a CSS color between the two stops around it (tokens --map-1 .. --map-7). */

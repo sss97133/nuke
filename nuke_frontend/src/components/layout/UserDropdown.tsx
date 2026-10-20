@@ -54,6 +54,8 @@ export const UserDropdown: React.FC<UserDropdownProps> = ({
           <button onClick={() => go('/inbox')}>
             Inbox
           </button>
+          <button onClick={() => go('/work')}>Work</button>
+          <button onClick={() => go('/messages')}>Messages</button>
           <button onClick={() => { onOpenNotifications(); onClose(); }}>
             <span>Notifications</span>
             {unreadCount > 0 && (

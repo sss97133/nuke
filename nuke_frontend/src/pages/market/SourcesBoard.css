@@ -316,3 +316,9 @@
 .market-sources__dialog .n { text-align: right; font-family: 'Courier New', monospace; font-variant-numeric: tabular-nums; }
 
 .market-sources__share--current { grid-template-columns: 1fr; }
+
+/* Sales by house (the refresh receipt) opens from the board header; the map styles give it its bar. */
+.market-sources__head .venue-mix { border-bottom: 0; padding: 0; background: transparent; flex-basis: 100%; }
+/* A dealer's lots sold on a venue the board already counts, and a cohort's sellers: beside held, never added to it. */
+.market-sources__venue, .market-sources__members { display: block; font-size: 10px; color: var(--text-secondary); white-space: nowrap; }
+.market-sources__more--group { margin: 6px 0 0 28px; }

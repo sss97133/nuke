@@ -11,8 +11,13 @@ import { currentIdentitySource, loadSourceIdentities, sourceAliases, sourceRoot,
 import { planSubjectReinspection } from "./subjectReinspection.ts";
 import { allowedSubjectSources, subjectInputScopeRefusal } from "./subjectInputScope.ts";
 import type { AnthropicTokenUsage, PlatformAnalysisBilling } from "../_shared/providerDiagnostic.ts";
+import { validateVINChecksum } from "../_shared/intelligence-layer.ts";
 
 export const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+function isDeviceVehicleIdentifier(value: unknown): value is string {
+  if (typeof value !== "string" || !/^[A-Z0-9]{8,17}$/.test(value) || !/[A-Z]/.test(value) || !/[0-9]/.test(value)) return false;
+  return value.length === 17 ? /^[A-HJ-NPR-Z0-9]{17}$/.test(value) && validateVINChecksum(value) : true;
+}
 export interface SubjectSource {
   source_identity?: SourceIdentity;
   latitude?: number | null; longitude?: number | null; device_fingerprint?: string | null;
@@ -23,10 +28,56 @@ export interface SubjectSource {
 }
 export interface SubjectReading {
   id: string; image_id: string; cluster_id: string | null; is_active: boolean;
+  observed_by?: string;
   confidence_basis: {
     visual_subjects_v1?: { anchor_image_id: string; envelope: SubjectEnvelope; state?: string };
     visual_subject_reading_v1?: { envelope: SubjectEnvelope };
   };
+}
+
+/** Fresh device Vision/OCR hints enrich the one bounded contextual model read.
+ * They never qualify cluster membership and cannot be replayed as a completed deep read. */
+export function onDeviceSourceHints(readings: SubjectReading[], sources: SubjectSource[], user: string, asOf: string) {
+  const live = new Map(sources.map(source => [source.id, source])), hints = new Map<string, Record<string, unknown>>();
+  for (const row of readings) {
+    if (!row.is_active || row.observed_by && row.observed_by !== "visual_subject_reading_v1") continue;
+    const envelope = row.confidence_basis?.visual_subject_reading_v1?.envelope;
+    const rawValue = envelope?.device_source_context ?? envelope?.raw_model_reading;
+    const raw = rawValue && typeof rawValue === "object" && !Array.isArray(rawValue) ? rawValue as Record<string, any> : null;
+    const sourceInputs = raw?.inputs ?? envelope?.inputs;
+    if (!envelope || envelope.user_id !== user || envelope.method !== SUBJECT_METHOD ||
+      !raw || !["on_device_identity_read_v1", "on_device_identity_context_v1"].includes(raw.kind) ||
+      typeof raw.identity_run_id !== "string" || !UUID.test(raw.identity_run_id) ||
+      typeof raw.identity_method_version !== "string" ||
+      !/^vehicle-identity-context-fold-v3:[A-Za-z0-9._:-]{1,80}$/.test(raw.identity_method_version) ||
+      !Array.isArray(sourceInputs) || sourceInputs.length < 2 || sourceInputs.length > 3 ||
+      !Array.isArray(raw.observations) || raw.observations.length !== sourceInputs.length) continue;
+    const qualified = sourceInputs.every((input: any) => {
+      const source = live.get(input?.image_id);
+      return !!source && input.source_qualified === true && input.representation === "source" &&
+        input.source_sha256 === source.file_hash && input.input_sha256 === source.file_hash &&
+        qualifySubjectSource(input, source, user, envelope.read_at, asOf);
+    });
+    if (!qualified) continue;
+    for (const observation of raw.observations) {
+      if (!observation || typeof observation !== "object" || !live.has(observation.image_id) ||
+        typeof observation.is_vehicle !== "boolean" || typeof observation.is_document !== "boolean" ||
+        !Array.isArray(observation.labels) || !Array.isArray(observation.vin_candidates)) continue;
+      const current = hints.get(observation.image_id);
+      const candidate = { image_id: observation.image_id, is_vehicle: observation.is_vehicle,
+        is_document: observation.is_document, labels: observation.labels.filter((value: unknown) => typeof value === "string").slice(0, 8),
+        vin_candidates: observation.vin_candidates.filter((value: unknown) => isDeviceVehicleIdentifier(value)).slice(0, 4),
+        method_version: raw.identity_method_version, identity_run_id: raw.identity_run_id };
+      if (!current || Date.parse(envelope.read_at) > Date.parse(String(current.read_at ?? "")))
+        hints.set(observation.image_id, { ...candidate, read_at: envelope.read_at });
+    }
+  }
+  return sources.flatMap(source => {
+    const hint = hints.get(source.id);
+    if (!hint) return [];
+    const { read_at: _readAt, ...publicHint } = hint;
+    return [publicHint];
+  });
 }
 export interface CandidateScope {
   kind: "account_associated_terminal_vehicles"; vehicle_ids: string[]; retrieved: number;
@@ -39,10 +90,12 @@ export interface CandidateScope {
 export interface SubjectEnvelope extends SubjectProjection {
   user_id: string; method: typeof SUBJECT_METHOD; run_key: string; provider: string; model: string;
   read_at: string; inputs: SubjectInput[]; candidate_scope: CandidateScope;
+  raw_model_reading?: unknown;
+  device_source_context?: unknown;
 }
 export interface CaptureProfileRequest {
-  basis: "capture_session"; vin: string; image_ids: string[];
-  make?: string; model?: string; evidence: Record<string, string>;
+  basis: "capture_session"; vin?: string; serial?: string; image_ids: string[];
+  year?: number; make?: string; model?: string; evidence: Record<string, string>;
 }
 export interface SubjectStore {
   admitCapture?(request: CaptureProfileRequest): Promise<Record<string, unknown>>;
@@ -64,10 +117,73 @@ export interface SubjectDependencies {
   now?: () => Date;
 }
 export interface SubjectRequest {
-  user_id?: string; image_ids?: string[]; dry_run?: boolean; reuse_only?: boolean;
+  user_id?: string; image_ids?: string[]; dry_run?: boolean; reuse_only?: boolean; privacy_only?: boolean;
   expected_source_hashes?: Record<string, string>;
   device_privacy_receipts?: Record<string, unknown>;
   allowed_source_hashes?: Record<string, string>;
+}
+
+export interface DeviceSourceReadRequest {
+  user_id?: string; image_ids?: string[]; expected_source_hashes?: Record<string, string>;
+  identity_run_id?: string; identity_method_version?: string;
+  device_privacy_receipts?: Record<string, unknown>;
+  observations?: Array<{ image_id: string; read_at: string; is_vehicle: boolean; is_document: boolean;
+    labels: string[]; vin_candidates: string[] }>;
+}
+
+/** Retain a fresh, cheap on-device read in the existing protected reading lane.
+ * This is deliberately not a subject graph: context is recorded, membership is not asserted. */
+export async function retainDeviceSourceReading(store: SubjectStore, request: DeviceSourceReadRequest & { user_id: string }, now = new Date()) {
+  const ids = request.image_ids, observations = request.observations;
+  const privacy = request.device_privacy_receipts ?? {};
+  const refused = (reason: string) => ({ method: SUBJECT_METHOD, status: "refused", refusal: reason, persisted_image_ids: [] as string[] });
+  if (!Array.isArray(ids) || ids.length < 2 || ids.length > 3 || new Set(ids).size !== ids.length ||
+    ids.some(id => !UUID.test(id)) || !Array.isArray(observations) || observations.length !== ids.length ||
+    new Set(observations.map(item => item?.image_id)).size !== ids.length || observations.some(item =>
+      !ids.includes(item.image_id) || typeof item.is_vehicle !== "boolean" || typeof item.is_document !== "boolean" ||
+      !Array.isArray(item.labels) || item.labels.length > 12 || item.labels.some(label => typeof label !== "string" || label.length > 80) ||
+      !Array.isArray(item.vin_candidates) || item.vin_candidates.length > 8 || item.vin_candidates.some(vin => !isDeviceVehicleIdentifier(vin)) ||
+      typeof item.read_at !== "string" || !Number.isFinite(Date.parse(item.read_at)) || Date.parse(item.read_at) > now.getTime() + 5 * 60_000) ||
+    typeof request.identity_run_id !== "string" || !UUID.test(request.identity_run_id) ||
+    typeof request.identity_method_version !== "string" || !/^vehicle-identity-context-fold-v3:[A-Za-z0-9._:-]{1,80}$/.test(request.identity_method_version) ||
+    !request.expected_source_hashes || Object.keys(request.expected_source_hashes).length !== ids.length ||
+    ids.some(id => !/^[a-f0-9]{64}$/.test(request.expected_source_hashes![id] ?? "")) ||
+    !privacy || typeof privacy !== "object" || Array.isArray(privacy) || Object.keys(privacy).length > 2 ||
+    Object.keys(privacy).some(id => !ids.includes(id))) return refused("identity_read_scope_invalid");
+  let sources = await store.sources(request.user_id, ids); const readAt = now.toISOString();
+  if (sources.length !== ids.length || new Set(sources.map(source => source.id)).size !== ids.length ||
+    sources.some(source => request.expected_source_hashes![source.id] !== source.file_hash ||
+      sourceRefusal(source, request.user_id, readAt, privacy[source.id])))
+    return refused("source_changed_or_unqualified");
+  const pending = sources.filter(source => !subjectSourceAvailable(source, request.user_id, readAt));
+  if (pending.length) {
+    if (pending.some(source => !Object.hasOwn(privacy, source.id))) return refused("source_not_ready");
+    try {
+      const capture = await captureVisionInputs(pending.map(source => ({ key: source.id, image_id: source.id,
+        source_url: source.image_url, storage_path: source.storage_path, expected_source_sha256: source.file_hash,
+        representation: "source", required: true })));
+      sources = await retainCapturedPrivacy(store, request.user_id, sources, privacy, capture, readAt);
+    } catch { return refused("source_not_ready"); }
+  }
+  const inputs: SubjectInput[] = sources.map(source => ({ image_id: source.id, source_sha256: source.file_hash,
+    input_sha256: source.file_hash, source_qualified: true, representation: "source", source_url: source.image_url,
+    input_url: source.image_url, taken_at: source.taken_at, created_at: source.created_at,
+    capture_context: { device_fingerprint: source.device_fingerprint ?? null,
+      latitude: source.latitude ?? null, longitude: source.longitude ?? null } }));
+  const byId = new Map(observations.map(item => [item.image_id, item]));
+  const envelope: SubjectEnvelope = { user_id: request.user_id, method: SUBJECT_METHOD,
+    run_key: request.identity_run_id, provider: "Apple Vision (on-device)", model: request.identity_method_version,
+    read_at: readAt, inputs, subjects: [], frames: ids.map(image_id => { const item = byId.get(image_id)!; return {
+      image_id, medium: "photograph", view: "unknown", primary_subject: item.is_document ? "none" : item.is_vehicle ? "vehicle" : "unknown", bbox: null,
+    }; }), unresolved: ids.map(image_id => ({ image_id, reason: "on_device_source_read_only" })), contradictions: [], rejected_links: 0,
+    candidate_scope: { kind: "account_associated_terminal_vehicles", vehicle_ids: [], retrieved: 0, exhausted: false,
+      truncated: false, reference_photos_assessed: 0, unavailable_references: [], global_novelty_asserted: false },
+    raw_model_reading: { kind: "on_device_identity_read_v1", identity_run_id: request.identity_run_id,
+      identity_method_version: request.identity_method_version, observations } };
+  const persisted: string[] = [];
+  for (const id of ids) persisted.push(await store.retainReading(id, envelope));
+  return { method: SUBJECT_METHOD, status: "reading_retained", persisted_image_ids: persisted,
+    identity_run_id: request.identity_run_id, inference_started: false };
 }
 
 /** Authentication alone is insufficient when a privileged client supplies user_id. */
@@ -102,7 +218,10 @@ function replayEnvelope(readings: SubjectReading[], sources: SubjectSource[], us
   for (const reading of readings) {
     const wrapper = reading.confidence_basis?.visual_subjects_v1;
     const envelope = reading.confidence_basis?.visual_subject_reading_v1?.envelope ?? wrapper?.envelope;
-    if (!reading.is_active || wrapper?.state === "withdrawn" || !envelope || envelope.method !== SUBJECT_METHOD ||
+    if (!reading.is_active || wrapper?.state === "withdrawn" || !envelope) continue;
+    const raw = envelope.raw_model_reading;
+    const rawReading = raw && typeof raw === "object" && !Array.isArray(raw) ? raw as Record<string, unknown> : null;
+    if (rawReading?.kind === "on_device_identity_read_v1" || envelope.method !== SUBJECT_METHOD ||
       envelope.user_id !== user || !Array.isArray(envelope.inputs) || envelope.inputs.length !== sources.length ||
       !Array.isArray(envelope.subjects) || !Array.isArray(envelope.frames)) continue;
     // Protected, admitted testimony is reusable only for these exact live sources.
@@ -144,15 +263,16 @@ async function retainCapturedPrivacy(store: SubjectStore, user: string, sources:
   return sources.map(source => current.find(row => row.id === source.id)!);
 }
 
-/** One explicitly bounded reading; no session inheritance or canonical vehicle writes.
- * Retained protected readings are checked before any object/renderer/provider call.
- * The private subject consumer reads current evidence independently after admission.
+/** One bounded reading or free source qualification. Reuse precedes inference;
+ * authenticated capture filing follows retained, currently qualified evidence.
+ * The private consumer independently rechecks sources after admission.
  */
 export async function resolveSubjectBatch(store: SubjectStore, request: SubjectRequest & { user_id: string },
   projectURL: string, dependencies: SubjectDependencies) {
   const ids = request.image_ids, now = dependencies.now ?? (() => new Date()), asOf = now().toISOString();
   if (!Array.isArray(ids) || ids.length < 1 || ids.length > SUBJECT_BATCH_LIMIT || new Set(ids).size !== ids.length || ids.some(id => typeof id !== "string" || !UUID.test(id)) ||
-    request.dry_run !== undefined && typeof request.dry_run !== "boolean" || request.reuse_only !== undefined && typeof request.reuse_only !== "boolean") {
+    request.dry_run !== undefined && typeof request.dry_run !== "boolean" || request.reuse_only !== undefined && typeof request.reuse_only !== "boolean" ||
+    request.privacy_only !== undefined && typeof request.privacy_only !== "boolean") {
     throw new Error("subject_input_scope_invalid");
   }
   const expected = request.expected_source_hashes;
@@ -180,6 +300,23 @@ export async function resolveSubjectBatch(store: SubjectStore, request: SubjectR
   }
   const freshScopeRefusal = scopeRefusal(sources);
   if (freshScopeRefusal) return { ...base, status: "refused", refusal: freshScopeRefusal };
+  if (request.privacy_only) {
+    // Completed local checks are independent testimony, not a paid interpretation.
+    // Keep the existing two-original proof bound; a three-view session can qualify
+    // two then one before its single model request. Never mark analysis completed.
+    if (ids.length > 2 || request.reuse_only || request.dry_run) return { ...base, status: "refused", refusal: "subject_privacy_scope_invalid" };
+    if (sources.some(source => sourceRefusal(source, request.user_id, asOf, privacy[source.id])))
+      return { ...base, status: "refused", refusal: "source_not_ready" };
+    const pending = sources.filter(source => !subjectSourceAvailable(source, request.user_id, asOf));
+    if (pending.length) {
+      const capture = await (dependencies.capturePrivacy ?? captureVisionInputs)(pending.map(source => ({
+        key: source.id, image_id: source.id, source_url: source.image_url, storage_path: source.storage_path,
+        expected_source_sha256: source.file_hash, representation: "source", required: true,
+      })));
+      sources = await retainCapturedPrivacy(store, request.user_id, sources, privacy, capture, now().toISOString());
+    }
+    return { ...base, status: "privacy_qualified", qualified_image_ids: sources.map(source => source.id), inference_started: false };
+  }
   const held = sources.map(row => ({ image_id: row.id, reason: request.reuse_only && subjectSourceCanEstablishPrivacy(row, request.user_id)
     ? null : sourceRefusal(row, request.user_id, asOf, privacy[row.id]) })).filter(row => row.reason);
   if (held.length) return { ...base, status: "refused", refusal: held.some(row => row.reason === "source_unavailable") ? "source_unavailable" : "source_not_ready", unresolved: held };
@@ -187,6 +324,7 @@ export async function resolveSubjectBatch(store: SubjectStore, request: SubjectR
   const fresh = new Map(sources.map(source => [source.id, source]));
   const nativeFor = (source: SubjectSource) => privacy[source.id] ?? privacy[ids.find(id => sourceRoot(fresh.get(id)) === sourceRoot(source)) ?? ""];
   let consumedIds = [...ids], contextCoverage: Record<string, unknown> = {};
+  let localSourceHints: ReturnType<typeof onDeviceSourceHints> = [];
   let readings = await store.readings(ids);
   let envelope: SubjectEnvelope | null = null;
   let providerUsage: AnthropicTokenUsage | null = null;
@@ -246,6 +384,7 @@ export async function resolveSubjectBatch(store: SubjectStore, request: SubjectR
     }
   }
   const reused = !!envelope;
+  if (envelope) localSourceHints = onDeviceSourceHints(readings, sources, request.user_id, now().toISOString());
   // Replayed context is subject to the same explicit caller scope, even when
   // reuse would make no provider call. Refuse before retained/membership writes.
   const replayScopeRefusal = scopeRefusal(sources);
@@ -306,6 +445,7 @@ export async function resolveSubjectBatch(store: SubjectStore, request: SubjectR
         Object.fromEntries(sources.map(source => [source.id, nativeFor(source)])), capture, now().toISOString()); }
       catch { return { ...base, status: "refused", refusal: "source_not_ready" }; }
     }
+    localSourceHints = onDeviceSourceHints(readings, sources, request.user_id, now().toISOString());
     // Three frames include per-frame witnesses and pairwise contradictions. The
     // live three-frame pilot exhausted 1,600 tokens with an unreadable result.
     // 4096 remains inside the same two-cent default preflight reservation.
@@ -320,6 +460,7 @@ export async function resolveSubjectBatch(store: SubjectStore, request: SubjectR
     candidate_scope.identifier_context = { retrieved: serials.length, supplied: supplied.length, truncated: supplied.length < serials.length };
     const result = await runCapturedVision(visionSources, capture, () => [
       { text: SUBJECT_PROMPT },
+      ...(localSourceHints.length ? [{ text: `Fresh on-device source context (bounded retrieval hints, not identity or membership proof): ${JSON.stringify(localSourceHints)}` }] : []),
       { text: `Known account serial candidates (fallible lookup context, not proof; coverage=${JSON.stringify(candidate_scope.identifier_context)}): ${JSON.stringify(supplied)}` },
       { text: `Capture relations: ${JSON.stringify(sources.flatMap((a, i) => sources.slice(i + 1).map(b => {
         return { left_image_id: a.id, right_image_id: b.id, ...captureRelation(a, b) };
@@ -349,7 +490,13 @@ export async function resolveSubjectBatch(store: SubjectStore, request: SubjectR
       provider: result.model_result.provider, model: result.model_result.model, read_at,
     }))).then(value => [...new Uint8Array(value)].map(v => v.toString(16).padStart(2, "0")).join(""));
     envelope = { ...projection, user_id: request.user_id, method: SUBJECT_METHOD, run_key,
-      provider: result.model_result.provider, model: result.model_result.model, read_at, inputs, candidate_scope };
+      provider: result.model_result.provider, model: result.model_result.model, read_at, inputs, candidate_scope,
+      raw_model_reading: result.model_result.data,
+      ...(localSourceHints.length >= 2 && new Set(localSourceHints.map(hint => `${hint.identity_run_id}|${hint.method_version}`)).size === 1
+        ? { device_source_context: { kind: "on_device_identity_context_v1",
+            identity_run_id: localSourceHints[0].identity_run_id, identity_method_version: localSourceHints[0].method_version,
+            inputs: inputs.filter(input => localSourceHints.some(hint => hint.image_id === input.image_id)),
+            observations: localSourceHints } } : {}) };
   }
   const writeScopeRefusal = scopeRefusal(sources);
   if (writeScopeRefusal) return { ...base, status: "refused", refusal: writeScopeRefusal };
@@ -393,6 +540,18 @@ export async function resolveSubjectBatch(store: SubjectStore, request: SubjectR
   if (!request.dry_run && !membershipHeld && !failures.length && store.admitCapture) {
     for (const session of envelope.capture_sessions ?? []) {
       if (!session.member_image_ids.every(id => retained.includes(id))) continue;
+      const localAnchor = localSourceHints.find(hint => hint.image_id === session.anchor_image_id &&
+        hint.vin_candidates instanceof Array && hint.vin_candidates.includes(session.identifier.text));
+      const localRun = typeof localAnchor?.identity_run_id === "string" ? localAnchor.identity_run_id : null;
+      const localMethod = typeof localAnchor?.method_version === "string" ? localAnchor.method_version : null;
+      const localSupport = !!localAnchor && session.member_image_ids.every(id => {
+        const hint = localSourceHints.find(item => item.image_id === id && item.identity_run_id === localRun && item.method_version === localMethod);
+        return !!hint && !hint.is_document && (id === session.anchor_image_id || hint.is_vehicle === true);
+      });
+      if (!localSupport || !localRun || !localMethod) {
+        captureResults.push({ status: "on_device_identity_context_unavailable", anchor_image_id: session.anchor_image_id });
+        continue;
+      }
       try {
         // A cached interpretation never inherits present source/metadata authority.
         const current = await store.sources(request.user_id, session.member_image_ids);
@@ -407,6 +566,7 @@ export async function resolveSubjectBatch(store: SubjectStore, request: SubjectR
           evidence: { context_method: "vin_capture_session_v1", anchor_image_id: session.anchor_image_id,
             anchor_source_sha256: anchor.source_sha256, identifier_read: session.identifier.text,
             identifier_legibility: session.identifier.legibility, edit_distance: "0", context_basis: session.basis,
+            identity_run_id: localRun, identity_method_version: localMethod,
             interpretation_run_key: envelope.run_key, provider: envelope.provider, model: envelope.model,
             read_at: envelope.read_at } });
         captureResults.push({ ...result, anchor_image_id: session.anchor_image_id });
@@ -470,7 +630,24 @@ export function supabaseSubjectStore(client: any, identityClient?: any): Subject
     ...(identityClient ? { async admitCapture(request: CaptureProfileRequest) {
       const result = await identityClient.rpc("device_create_vehicle_profile", { p_profile: request });
       if (result.error || !result.data || typeof result.data !== "object") throw new Error("capture_profile_filing_failed");
-      return result.data;
+      const profile = result.data as Record<string, unknown>;
+      const vehicleId = profile.vehicle_id;
+      // The live VIN trigger has no configured URL/service key, so it silently
+      // skips this canonical enrichment. Invoke the already-deployed, free NHTSA
+      // decoder through its service-only owner after the user-scoped profile RPC.
+      // Never write decoded fields from this image-reading function itself.
+      if (profile.status === "created" && profile.replay !== true && typeof vehicleId === "string" &&
+        UUID.test(vehicleId) && typeof request.vin === "string" && /^[A-HJ-NPR-Z0-9]{17}$/.test(request.vin)) {
+        const decoded = await client.functions.invoke("decode-vin-and-update", {
+          body: { vehicle_id: vehicleId, vin: request.vin },
+        });
+        const data = decoded.data && typeof decoded.data === "object" ? decoded.data as Record<string, unknown> : {};
+        profile.identity_seed = decoded.error || data.success !== true
+          ? { status: "decode_unavailable" }
+          : { status: Array.isArray(data.decoded_fields) && data.decoded_fields.length > 0 ? "decoded" : "no_new_fields",
+              fields: Array.isArray(data.decoded_fields) ? data.decoded_fields.filter((field): field is string => typeof field === "string").slice(0, 32) : [] };
+      }
+      return profile;
     } } : {}),
     async sources(user, ids) {
       if (owner !== null && owner !== user) loaded.clear();

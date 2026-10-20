@@ -725,7 +725,7 @@ Deno.serve(async (req) => {
 
     // Get organization with all fields to check what's missing
     const { data: org, error: orgError } = await supabase
-      .from('businesses')
+      .from('organizations')
       .select('*')
       .eq('id', organizationId)
       .single();
@@ -955,7 +955,7 @@ Deno.serve(async (req) => {
     }
 
     const { error: updateError } = await supabase
-      .from('businesses')
+      .from('organizations')
       .update(updates)
       .eq('id', organizationId);
 

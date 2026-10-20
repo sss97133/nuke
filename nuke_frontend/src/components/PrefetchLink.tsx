@@ -19,6 +19,10 @@ const CHUNK_MAP: { test: (href: string) => boolean; load: () => Promise<unknown>
     load: () => import('../pages/OrganizationProfile') },
   { test: (h) => h.startsWith('/u/') || h === '/profile' || h.startsWith('/profile/'),
     load: () => import('../pages/UserProfile') },
+  { test: (h) => h.startsWith('/jobs/'),
+    load: () => import('../pages/jobs/JobPage') },
+  { test: (h) => h.startsWith('/providers/'),
+    load: () => import('../pages/providers/ProviderProfilePage') },
   { test: (h) => h.startsWith('/vehicle/'),
     load: () => import('../routes/modules/vehicle/routes') },
   { test: (h) => h === '/search' || h.startsWith('/search?'),
@@ -31,6 +35,16 @@ const CHUNK_MAP: { test: (href: string) => boolean; load: () => Promise<unknown>
     load: () => import('../pages/stacks/OrderBookStack') },
   { test: (h) => h === '/stacks' || h === '/stacks/' || h.startsWith('/stacks?'),
     load: () => import('../pages/stacks/StacksIndex') },
+  { test: (h) => h === '/jobs' || h === '/jobs/',
+    load: () => import('../pages/jobs/JobsBoard') },
+  { test: (h) => h === '/messages' || h.startsWith('/messages/'),
+    load: () => import('../pages/messages/MessagesPage') },
+  { test: (h) => h === '/work/market',
+    load: () => import('../pages/work/MarketHealthPage') },
+  { test: (h) => h === '/work' || h === '/work/',
+    load: () => import('../pages/jobs/WorkPage') },
+  { test: (h) => h === '/work/setup',
+    load: () => import('../pages/provider-setup/ProviderSetupPage') },
 ];
 
 function resolveChunk(href: string): (() => Promise<unknown>) | null {

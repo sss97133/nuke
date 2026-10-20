@@ -10,3 +10,4 @@ Disallow: /capture
 Disallow: /dealer/
 
 Sitemap: https://nuke.ag/sitemap.xml
+Sitemap: https://nuke.ag/sitemap-work.xml

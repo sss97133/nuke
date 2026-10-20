@@ -33,6 +33,17 @@ final class SubjectResolutionEngine: ObservableObject {
         return UUID(uuidString: current) == UUID(uuidString: userId) && UUID(uuidString: userId) != nil
     }
 
+    /// Reuse only the purpose-bound receipt already captured from each exact upload.
+    /// The source-reading route never invents a privacy receipt or requests one from the user.
+    func privacyReceipts(for sourceHashes: Set<String>, userId: String) -> [String: DevicePrivacyReceipt] {
+        guard stillOwnAccount(userId), let queue = try? load(userId) else { return [:] }
+        return Dictionary(queue.uploads.compactMap { upload -> (String, DevicePrivacyReceipt)? in
+            guard sourceHashes.contains(upload.sourceHash), let receipt = upload.privacyReceipt,
+                  receipt.source_sha256 == upload.sourceHash, receipt.owner_user_id == userId.lowercased() else { return nil }
+            return (upload.localIdentifier, receipt)
+        }, uniquingKeysWith: { first, _ in first })
+    }
+
     func acknowledge(localIdentifier: String, sourceHash: String, userId: String, privacyReceipt: DevicePrivacyReceipt? = nil) {
         guard stillOwnAccount(userId) else { return }
         do {

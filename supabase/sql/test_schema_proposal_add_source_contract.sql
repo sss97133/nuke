@@ -581,3 +581,4 @@ SELECT pg_temp.ok('no function yet: the migration creates it with the same defin
 
 -- Reuse this live-shaped curator fixture for the open-only engine-family proposal.
 \ir test_retained_engine_family_proposal.sql
+\ir test_schema_proposal_retry_and_progress.sql

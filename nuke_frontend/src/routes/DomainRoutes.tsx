@@ -2,6 +2,7 @@
 import React, { Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { ProtectedRoute } from '../components/auth/ProtectedRoute';
+import { warmJobRoute } from '../pages/jobs/jobWarm';
 
 // Static pages (footer/legal) — lazy-loaded since rarely visited
 const About = React.lazy(() => import('../pages/About'));
@@ -22,21 +23,12 @@ const CohortTerminal = React.lazy(() => import('../pages/CohortTerminal'));
 const DealRead = React.lazy(() => import('../pages/DealRead'));
 // R&D: white-label / "make this my app" showroom
 const BrandStudio = React.lazy(() => import('../pages/BrandStudio'));
-const PublicMap = React.lazy(() => import('../components/map/PublicMap'));
 const Valuation = React.lazy(() => import('../pages/Valuation'));
 const SourcesBoard = React.lazy(() => import('../pages/market/SourcesBoard'));
 // Stacks: a page per stack, a path through the nine layers (case ledger §13.2)
 const StacksIndex = React.lazy(() => import('../pages/stacks/StacksIndex'));
 const OrderBookStack = React.lazy(() => import('../pages/stacks/OrderBookStack'));
 
-// Public map page — no auth, no DeckGL
-function MapPage() {
-  return (
-    <React.Suspense fallback={<div style={{ height: '100vh', background: '#111' }} />}>
-      <PublicMap />
-    </React.Suspense>
-  );
-}
 
 // Lazy load domain modules
 const VehicleRoutes = React.lazy(() => import('./modules/vehicle/routes'));
@@ -86,6 +78,10 @@ const ClaimExternalIdentity = React.lazy(() => import('../pages/ClaimExternalIde
 const BaTMembers = React.lazy(() => import('../pages/BaTMembers'));
 const InvoiceManager = React.lazy(() => import('../pages/InvoiceManager'));
 const WorkOrderStatement = React.lazy(() => import('../pages/WorkOrderStatement'));
+// Job loop: open requests board (public) and the signed-in work console
+const JobsBoard = React.lazy(() => import('../pages/jobs/JobsBoard'));
+const WorkPage = React.lazy(() => import('../pages/jobs/WorkPage'));
+const ProviderSetupPage = React.lazy(() => import('../pages/provider-setup/ProviderSetupPage'));
 const ImportDataPage = React.lazy(() => import('../pages/ImportDataPage'));
 const PhotoSyncPage = React.lazy(() => import('../pages/PhotoSyncPage'));
 const DailyDebrief = React.lazy(() => import('../pages/DailyDebrief'));
@@ -123,6 +119,18 @@ const TransferPartyPage = React.lazy(() => import('../pages/TransferPartyPage'))
 
 // Build Coordinator dashboard (public, vehicle-scoped)
 const BuildDashboard = React.lazy(() => import('../pages/BuildDashboard'));
+
+// Jobs and providers — open job path readers; party money and personal fields withheld at the source
+// The job path read starts while JobPage's chunk downloads (pages/jobs/jobWarm.ts); JobPage takes it once.
+const JobPage = React.lazy(() => {
+  if (typeof window !== 'undefined') warmJobRoute(window.location.pathname);
+  return import('../pages/jobs/JobPage');
+});
+const ProviderProfilePage = React.lazy(() => import('../pages/providers/ProviderProfilePage'));
+const MessagesPage = React.lazy(() => import('../pages/messages/MessagesPage'));
+const SupplierInvitePage = React.lazy(() => import('../pages/orgs/SupplierInvitePage'));
+const MarketHealthPage = React.lazy(() => import('../pages/work/MarketHealthPage'));
+const ContactThreadPage = React.lazy(() => import('../pages/messages/MessagesPage').then(m => ({ default: m.ContactThreadPage })));
 
 // Public projections — journal index + day page
 const JournalIndex = React.lazy(() => import('../pages/journal/JournalIndex'));
@@ -196,7 +204,6 @@ export const DomainRoutes = () => {
         <Route path="/deal/:vehicleId" element={<DealRead />} />
         <Route path="/browse" element={<BrowseVehicles />} />
         <Route path="/live" element={<LiveFloor />} />
-        <Route path="/map" element={<MapPage />} />
         <Route path="/sources" element={<SourcesBoard />} />
         <Route path="/sources/:source" element={<SourcesBoard />} />
         <Route path="/valuation" element={<Valuation />} />
@@ -212,6 +219,17 @@ export const DomainRoutes = () => {
         <Route path="/profile/external/:externalIdentityId" element={<UserProfile />} />
         {/* Canonical handle-based user binding (frontend-doctrine §2a primary surface) */}
         <Route path="/u/:handle" element={<UserProfile />} />
+        {/* Jobs (work orders) and provider work records — public, read-first; Signs only where the server offers them */}
+        <Route path="/jobs/:workOrderId" element={<JobPage />} />
+        <Route path="/providers/actor/:actorId" element={<ProviderProfilePage />} />
+        <Route path="/providers/:handle" element={<ProviderProfilePage />} />
+        {/* Statement: work_order_statement_read is open data; payments stay party-only from the server */}
+        <Route path="/work-orders/statement" element={<WorkOrderStatement />} />
+        {/* A business opens the invite a customer shared (create_supplier_invite share_path); sign-in happens on the page */}
+        <Route path="/supplier-invite/:token" element={<SupplierInvitePage />} />
+        {/* The job marketplace forming: job_market_health_read aggregates, public */}
+        <Route path="/work/market" element={<MarketHealthPage />} />
+        <Route path="/invite/:token" element={<SupplierInvitePage />} />
         {/* Investor offering / data room — semi-public fundraising page */}
         {/* Docs / developers landing */}
         <Route path="/developers" element={<DevelopersPage />} />
@@ -225,6 +243,8 @@ export const DomainRoutes = () => {
         <Route path="/t/:transferId" element={<TransferPartyPage />} />
         {/* Build Coordinator dashboard — public, vehicle-scoped */}
         <Route path="/builds/:vehicleId" element={<BuildDashboard />} />
+        {/* Open requests looking for a technician, inspector, tool or shop space */}
+        <Route path="/jobs" element={<JobsBoard />} />
         {/* Public projections — journal index + day page */}
         <Route path="/journal" element={<JournalIndex />} />
         <Route path="/journal/:date" element={<JournalPage />} />
@@ -240,11 +260,7 @@ export const DomainRoutes = () => {
 
         {/* ── Hub convenience redirects → homepage tabs ─────────────────── */}
         <Route path="/garage" element={<Navigate to="/?tab=garage" replace />} />
-        {/* /map is NOT redirected here — it's served by the real MapPage route
-            declared above (line ~181). A duplicate redirect route used to live
-            here; it was dead code (React Router resolves same-path ties to the
-            earlier-declared route, so this one could never fire). Removed
-            2026-07-06 QA pass — see nuke.ag QA findings. */}
+        {/* /map is the standalone county listing map in App.tsx (no AppLayout chrome). */}
         <Route path="/feed" element={<Navigate to="/?tab=feed" replace />} />
 
         {/* ── Protected routes (require sign-in) ───────────────────────── */}
@@ -292,7 +308,12 @@ export const DomainRoutes = () => {
           <Route path="/tech/upload" element={<TechShareUpload />} />
           <Route path="/restoration" element={<RestorationIntake />} />
           <Route path="/intake/restoration" element={<RestorationIntake />} />
-          <Route path="/work-orders/statement" element={<WorkOrderStatement />} />
+          {/* Work console: signature queue and the viewer's jobs */}
+          <Route path="/work" element={<WorkPage />} />
+          <Route path="/messages" element={<MessagesPage />} />
+          <Route path="/messages/:requestId" element={<ContactThreadPage />} />
+          {/* Provider onboarding: suggested records, trade, area and hours, tools, client preview */}
+          <Route path="/work/setup" element={<ProviderSetupPage />} />
 
 
           {/* Settings (protected) */}

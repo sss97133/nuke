@@ -4,9 +4,9 @@ import { supabase, SUPABASE_ANON_KEY, SUPABASE_URL } from '../lib/supabase';
 interface PartsQuoteGeneratorProps {
   vehicleId: string;
   vehicleInfo: {
-    year: number;
-    make: string;
-    model: string;
+    year: number | null;
+    make: string | null;
+    model: string | null;
   };
 }
 

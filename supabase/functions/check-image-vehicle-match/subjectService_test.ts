@@ -1,4 +1,4 @@
-import { resolveSubjectBatch, subjectOwnerId, type CandidateScope, type SubjectEnvelope, type SubjectReading,
+import { resolveSubjectBatch, retainDeviceSourceReading, subjectOwnerId, supabaseSubjectStore, type CandidateScope, type SubjectEnvelope, type SubjectReading,
   type SubjectSource, type SubjectStore, type SubjectDependencies, type CaptureProfileRequest } from "./subjectService.ts";
 import type { VisionInputCapture } from "./inputCustody.ts";
 import { projectSourceIdentities, sourceAliases, sourceIdentityRecords, attachSourceIdentityRecords } from "./sourceIdentity.ts";
@@ -78,7 +78,7 @@ function captureFixture() {
         view: i ? "detail" : "exterior", primary_subject: "vehicle", bbox: [0, 0, 1, 1] })),
       correspondences: [], contradictions: [], labels: [],
       capture_sessions: [{ anchor_image_id: ids[1], member_image_ids: ids.slice(0, 2),
-        identifier: { kind: "chassis", text: "6R07T123456", legibility: "clear" },
+        identifier: { kind: "vin", text: "1HGCM82633A004352", legibility: "clear" },
         basis: "A primer coupe walk-around ends at its attached chassis plate.",
         asserted_identity: { make: "Ford", model_family: "Mustang" } }],
     } };
@@ -89,20 +89,92 @@ function captureFixture() {
     return { status: "created", vehicle_id: cluster,
       filing: { results: request.image_ids.map(image_id => ({ image_id, status: "filed" })) } };
   };
-  return { ...f, requests };
+  const run = f.run;
+  const runWithDeviceContext = async (body = f.request) => {
+    await retainDeviceSourceReading(f.store, { user_id: uid, image_ids: [ids[1], ids[0]],
+      expected_source_hashes: Object.fromEntries(f.sources.slice(0, 2).map(source => [source.id, source.file_hash])),
+      identity_run_id: "30000000-0000-4000-8000-000000000001", identity_method_version: "vehicle-identity-context-fold-v3:vision-1",
+      observations: [
+        { image_id: ids[1], read_at: "2026-10-01T12:02:00Z", is_vehicle: false, is_document: false,
+          labels: ["VIN plate"], vin_candidates: ["1HGCM82633A004352"] },
+        { image_id: ids[0], read_at: "2026-10-01T12:00:00Z", is_vehicle: true, is_document: false,
+          labels: ["car"], vin_candidates: [] },
+      ] }, new Date("2026-10-02T00:00:00Z"));
+    return await run(body);
+  };
+  return { ...f, run: runWithDeviceContext, requests };
 }
 Deno.test("capture reading reaches the existing profile writer with source custody and no album or second model call", async () => {
   const f = captureFixture(), result = await f.run();
   equal(result.status, "resolved"); equal(f.counts.models, 1); equal(f.writes.length, 0);
   equal(f.requests.length, 1); equal(f.requests[0].basis, "capture_session");
-  equal(f.requests[0].vin, "6R07T123456");
+  equal(f.requests[0].vin, "1HGCM82633A004352");
   equal(f.requests[0].evidence.anchor_source_sha256, f.sources[1].file_hash);
   equal(f.requests[0].evidence.identifier_legibility, "clear");
+  equal(f.requests[0].evidence.identity_run_id, "30000000-0000-4000-8000-000000000001");
+  equal(f.requests[0].evidence.identity_method_version, "vehicle-identity-context-fold-v3:vision-1");
   equal("album_name" in f.requests[0], false);
   equal("persisted_image_ids" in result && result.persisted_image_ids, ids.slice(0, 2));
   equal("unresolved" in result && result.unresolved, []);
   await resolveSubjectBatch(f.store, { ...f.request, reuse_only: true }, "https://example.test", f.dependencies);
   equal(f.counts.models, 1); equal(f.requests.length, 2);
+});
+Deno.test("fresh on-device context is retained as a reading-only receipt without inference or membership", async () => {
+  const f = fixture(), run = "30000000-0000-4000-8000-000000000001", method = "vehicle-identity-context-fold-v3:vision-1";
+  const vin = "1HGCM82633A004352";
+  const result = await retainDeviceSourceReading(f.store, { user_id: uid, image_ids: ids.slice(0, 2),
+    expected_source_hashes: Object.fromEntries(f.sources.slice(0, 2).map(source => [source.id, source.file_hash])),
+    identity_run_id: run, identity_method_version: method, observations: [
+      { image_id: ids[0], read_at: "2026-10-02T00:00:00Z", is_vehicle: false, is_document: false,
+        labels: ["VIN plate"], vin_candidates: [vin] },
+      { image_id: ids[1], read_at: "2026-10-02T00:00:01Z", is_vehicle: true, is_document: false,
+        labels: ["car"], vin_candidates: [] },
+    ] }, new Date("2026-10-02T00:00:02Z"));
+  equal(result.status, "reading_retained"); equal(f.counts.models, 0);
+  equal(f.readings.length, 2);
+  const envelope = f.readings[0].confidence_basis.visual_subject_reading_v1!.envelope;
+  equal(envelope.subjects, []); equal((envelope.raw_model_reading as Record<string, unknown>).kind, "on_device_identity_read_v1");
+});
+Deno.test("fresh reading lane retains a labelled classic chassis serial candidate", async () => {
+  const f = fixture();
+  const result = await retainDeviceSourceReading(f.store, { user_id: uid, image_ids: ids.slice(0, 2),
+    expected_source_hashes: Object.fromEntries(f.sources.slice(0, 2).map(source => [source.id, source.file_hash])),
+    identity_run_id: "30000000-0000-4000-8000-000000000001", identity_method_version: "vehicle-identity-context-fold-v3:vision-1",
+    observations: [
+      { image_id: ids[0], read_at: "2026-10-02T00:00:00Z", is_vehicle: false, is_document: false,
+        labels: ["VIN plate"], vin_candidates: ["CKR187F127263"] },
+      { image_id: ids[1], read_at: "2026-10-02T00:00:01Z", is_vehicle: true, is_document: false,
+        labels: ["car"], vin_candidates: [] },
+    ] }, new Date("2026-10-02T00:00:02Z"));
+  equal(result.status, "reading_retained");
+});
+Deno.test("a pending source without its existing device privacy receipt stays unqualified", async () => {
+  const f = fixture(); f.sources[0].vision_gate_status = "pending";
+  const result = await retainDeviceSourceReading(f.store, { user_id: uid, image_ids: ids.slice(0, 2),
+    expected_source_hashes: Object.fromEntries(f.sources.slice(0, 2).map(source => [source.id, source.file_hash])),
+    identity_run_id: "30000000-0000-4000-8000-000000000001", identity_method_version: "vehicle-identity-context-fold-v3:vision-1",
+    observations: ids.slice(0, 2).map((image_id, index) => ({ image_id, read_at: `2026-10-02T00:00:0${index}Z`,
+      is_vehicle: true, is_document: false, labels: ["car"], vin_candidates: [] })) }, new Date("2026-10-02T00:00:02Z"));
+  equal(result.status, "refused"); equal(f.readings.length, 0);
+});
+Deno.test("fresh device receipts contextualize the later deep read but never replace it", async () => {
+  const f = fixture(), vin = "1HGCM82633A004352";
+  await retainDeviceSourceReading(f.store, { user_id: uid, image_ids: ids.slice(0, 2),
+    expected_source_hashes: Object.fromEntries(f.sources.slice(0, 2).map(source => [source.id, source.file_hash])),
+    identity_run_id: "30000000-0000-4000-8000-000000000001", identity_method_version: "vehicle-identity-context-fold-v3:vision-1",
+    observations: [
+      { image_id: ids[0], read_at: "2026-10-01T00:00:00Z", is_vehicle: false, is_document: false, labels: ["VIN plate"], vin_candidates: [vin] },
+      { image_id: ids[1], read_at: "2026-10-01T00:00:01Z", is_vehicle: true, is_document: false, labels: ["car"], vin_candidates: [] },
+    ] }, new Date("2026-10-02T00:00:00Z"));
+  const vision = f.dependencies.vision; let prompt = "";
+  f.dependencies.vision = async options => { prompt = options.parts.filter((part): part is { text: string } => "text" in part)
+    .map(part => part.text).join("\n"); return await vision(options); };
+  await f.run();
+  equal(f.counts.models, 1); equal(prompt.includes("Fresh on-device source context"), true);
+  equal(prompt.includes(vin), true); equal(prompt.includes("membership proof"), true);
+  const retained = f.readings.find(row => row.confidence_basis.visual_subject_reading_v1?.envelope.device_source_context);
+  equal((retained?.confidence_basis.visual_subject_reading_v1?.envelope.device_source_context as Record<string, unknown>)?.kind,
+    "on_device_identity_context_v1");
 });
 Deno.test("a capture filing transport failure retries its retained reading without paid inference", async () => {
   const f = captureFixture(), writer = f.store.admitCapture!;
@@ -116,7 +188,7 @@ Deno.test("operator-retained capture readings resume authenticated filing after 
   const f = captureFixture(), writer = f.store.admitCapture!;
   delete f.store.admitCapture;
   await f.run(); equal(f.requests.length, 0);
-  const reading = f.readings[0], at = "2026-10-02T00:00:00Z";
+  const reading = f.readings.find(row => row.confidence_basis.visual_subject_reading_v1?.envelope.capture_sessions?.length)!, at = "2026-10-02T00:00:00Z";
   const plan = await planSubjectReinspection(f.store, uid, reading, at);
   equal(plan?.candidate.capture_filing_pending, true);
   equal(plan?.candidate.inspect, []); equal(plan?.candidate.pending_source_count, 0);
@@ -169,6 +241,28 @@ Deno.test("protected owner binding rejects other accounts and anonymous or unsco
   for (const caller of [{ kind: "user", userId: other }, { kind: "anonymous" }, { kind: "api_key", userId: uid }]) {
     let refused = false; try { subjectOwnerId(caller, uid); } catch { refused = true; } equal(refused, true);
   }
+});
+
+Deno.test("a newly created capture profile uses the existing NHTSA writer for free VIN seed fields", async () => {
+  const calls: unknown[] = [], vehicleId = "40000000-0000-4000-8000-000000000001";
+  const request: CaptureProfileRequest = { basis: "capture_session", vin: "1HGCM82633A004352", image_ids: ids.slice(0, 2),
+    evidence: { context_method: "vin_capture_session_v1" } };
+  const store = supabaseSubjectStore({ functions: { invoke: async (...args: unknown[]) => {
+    calls.push(args); return { data: { success: true, decoded_fields: ["make", "year", "model"] }, error: null };
+  } } }, { rpc: async () => ({ data: { status: "created", replay: false, vehicle_id: vehicleId }, error: null }) });
+  const result = await store.admitCapture!(request);
+  equal(calls, [["decode-vin-and-update", { body: { vehicle_id: vehicleId, vin: request.vin } }]]);
+  equal(result.identity_seed, { status: "decoded", fields: ["make", "year", "model"] });
+});
+
+Deno.test("a profile replay does not repeat VIN decoding", async () => {
+  let calls = 0;
+  const request: CaptureProfileRequest = { basis: "capture_session", vin: "1HGCM82633A004352", image_ids: ids.slice(0, 2),
+    evidence: { context_method: "vin_capture_session_v1" } };
+  const store = supabaseSubjectStore({ functions: { invoke: async () => { calls++; return { data: { success: true }, error: null }; } } },
+    { rpc: async () => ({ data: { status: "created", replay: true, vehicle_id: cluster }, error: null }) });
+  await store.admitCapture!(request);
+  equal(calls, 0);
 });
 Deno.test("source to projection to sanctioned storage retains per-photo evidence and broad retrieval coverage", async () => {
   const f = fixture(), result = await f.run();
@@ -473,4 +567,14 @@ Deno.test("typed provider failure reaches the owner receipt without saving readi
   const replay = await resolveSubjectBatch(f.store, { ...f.request, reuse_only: true }, "https://example.test", f.dependencies);
   equal("refusal" in replay && replay.refusal, "retained_reading_unavailable");
   equal(f.counts.models, 1); equal(f.counts.captures, 1);
+});
+
+Deno.test("retain unprojected provider proposals so a projection repair needs no new inference", async () => {
+  const f = fixture(), vision = f.dependencies.vision;
+  const raw = { frames: [], correspondences: [], contradictions: [], labels: [],
+    capture_sessions: [{ anchor_image_id: ids[0], identifier: { text: "unreadable" } }] };
+  f.dependencies.vision = async options => ({ ...(await vision(options))!, data: raw });
+  await f.run();
+  equal(f.readings[0].confidence_basis.visual_subject_reading_v1?.envelope.raw_model_reading, raw);
+  equal(f.counts.models, 1);
 });

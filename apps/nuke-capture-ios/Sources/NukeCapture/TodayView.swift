@@ -10,179 +10,19 @@
 //   • the WORKBENCH — the operator's tools (sync, analyze, repair, confirm). The
 //     reason the tab earns its keep: a home to develop and run capabilities.
 // The record itself (day-stories, understood days) lives in Profile / the day receipt,
-// not here. The struct name stays TodayView to avoid a churny rename; the tab is "Engine".
+// not here. The struct name stays TodayView to avoid a churny rename. The tab is now "Work"
+// (WorkConsoleView), which embeds CaptureSections as its Capture section.
 
 import SwiftUI
 import Photos
 
 struct TodayView: View {
-    @ObservedObject private var engine = SyncEngine.shared
-    @ObservedObject private var attribution = AttributionEngine.shared
     @State private var showAccount = false
 
     var body: some View {
         NavigationStack {
             List {
-                // ── Errors / permission banner ──
-                if engine.authorizationDenied {
-                    Section {
-                        Label(
-                            "Photos access is off. Enable it in Settings → Privacy & Security → Photos → Nuke.",
-                            systemImage: "exclamationmark.triangle"
-                        )
-                        .font(.footnote)
-                        .foregroundStyle(.orange)
-                    }
-                }
-                if let problem = engine.authProblem {
-                    Section {
-                        Label(problem, systemImage: "person.crop.circle.badge.exclamationmark")
-                            .font(.footnote)
-                            .foregroundStyle(.orange)
-                    }
-                }
-                if let summary = engine.lastPassSummary {
-                    Section {
-                        Text("Last pass: \(summary).")
-                            .font(.footnote).foregroundStyle(.secondary)
-                    }
-                }
-                if engine.gaveUpCount > 0 {
-                    Section {
-                        Text("\(engine.gaveUpCount) photos failed three times and are no longer retried on open. The last error: \(engine.lastError ?? "not recorded").")
-                            .font(.footnote).foregroundStyle(.secondary)
-                    }
-                }
-                if let error = engine.backfillError, engine.backfillRemaining > 0 {
-                    Section {
-                        Text(error).font(.footnote).foregroundStyle(.secondary)
-                        Button("Retry uploads") { Task { await syncNow() } }
-                            .disabled(engine.isSyncing || engine.isPaused || engine.authorizationDenied)
-                    }
-                }
-
-                // ── Live metrics strip ──
-                Section {
-                    LiveMetricsStrip(engine: engine)
-                        .listRowInsets(EdgeInsets(top: 12, leading: 16, bottom: 12, trailing: 16))
-                        .listRowBackground(Color.clear)
-                }
-
-                // ── Live analysis · the pipeline on the wire ──
-                // The ENGINE worklight: each frame's DEEP verdict landing in
-                // realtime (get_analysis_stream), newest first — the data itself
-                // streaming, not a progress bar. Tap a frame → its evidence (the
-                // same rail the ANALYZED grid drills to). Self-loading.
-                if let uid = SupabaseService.currentUserId {
-                    LiveAnalysisStream(userId: uid)
-                }
-
-                // ── Your garage ── Today opens onto the owner's actual record,
-                // not just relay counters. Self-loading; renders nothing if empty.
-                if let uid = SupabaseService.currentUserId {
-                    GarageStrip(userId: uid)
-                }
-
-                // ── Just read · on-device (T0) ──
-                // The live capture demo: a frame shot at the site is read on-device
-                // (Apple Vision) the instant it uploads — the detection lands here
-                // in seconds, no network. A DETECTION (a label), not confirmed work.
-                if !engine.liveT0Atoms.isEmpty {
-                    Section {
-                        LiveT0Strip(atoms: engine.liveT0Atoms)
-                            .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
-                    } header: {
-                        Label("Just read · on-device", systemImage: "wand.and.stars")
-                    } footer: {
-                        Text("Read on this phone in milliseconds — a detection, not confirmed work.")
-                            .font(.caption2).foregroundStyle(.secondary)
-                    }
-                }
-
-                // Pulled from the Engine on purpose:
-                //  • UnderstandingPanel — its "latest understood" day-stories are the
-                //    RECORD, not the live moment (and rendered 12 days stale here). They
-                //    belong in the day receipt / Profile, where a record is read.
-                //  • Recent uploads — it surfaced personal photos (a newborn) the
-                //    backfill is shipping to the cloud. Hiding the strip doesn't un-ship
-                //    them; the real fix is the upload gate (the backfill must respect the
-                //    local-first site/ownership gate, not brute-force the whole library).
-                //    That's an ownership decision (what leaves the device) — Skylar's call.
-
-                // ── Tools · the workbench ── the operator levers. This is the honest
-                // reason the Engine tab earns its place: a home to develop + run tools.
-                Section {
-                    Button {
-                        Task { await syncNow() }
-                    } label: {
-                        Label("Sync Now", systemImage: "arrow.triangle.2.circlepath")
-                    }
-                    .disabled(engine.isSyncing || engine.isPaused)
-
-                    // Analyze Today — user-triggered on-device attribution run
-                    // (the tuning surface: the owner decides when to route the
-                    // day's photos home). On-device, free, no Mac, no GPU.
-                    Button {
-                        Task { await attribution.run() }
-                    } label: {
-                        if attribution.isRunning, attribution.progress.total > 0 {
-                            Label("Analyzing \(attribution.progress.done)/\(attribution.progress.total)…",
-                                  systemImage: "wand.and.stars")
-                        } else {
-                            Label("Analyze Today", systemImage: "wand.and.stars")
-                        }
-                    }
-                    .disabled(attribution.isRunning)
-
-                    // Repair photo dates — re-reads each synced asset's true EXIF
-                    // (DateTimeOriginal + GPS) on-device and patches rows that an
-                    // older build stamped with the iCloud re-add date. One-shot.
-                    Button {
-                        Task { await engine.reconcileLibrary() }
-                    } label: {
-                        if engine.isReconciling {
-                            Label(engine.reconcileStatus.isEmpty ? "Repairing…" : engine.reconcileStatus,
-                                  systemImage: "calendar.badge.clock")
-                        } else {
-                            Label("Repair photo dates", systemImage: "calendar.badge.clock")
-                        }
-                    }
-                    .disabled(engine.isReconciling)
-
-                    // Confirm sessions — the backlog sweep: one tap routes a day's
-                    // photos to a vehicle (handles VIN-less + new-vehicle cases).
-                    NavigationLink {
-                        SessionConfirmView()
-                    } label: {
-                        Label("Confirm sessions", systemImage: "checklist")
-                    }
-
-                    // Tier 3 → 4: the day-journal sign surface, promoted to a
-                    // direct entry (it was buried a level under Confirm sessions).
-                    NavigationLink {
-                        WorkDaySignView()
-                    } label: {
-                        Label("Confirm your days", systemImage: "checkmark.seal")
-                    }
-
-                    // Pause toggle — secondary; the big numbers are the hero
-                    Toggle("Uploads", isOn: Binding(
-                        get: { !engine.isPaused },
-                        set: { engine.setPaused(!$0) }
-                    ))
-                } header: {
-                    Label("Tools", systemImage: "wrench.and.screwdriver")
-                } footer: {
-                    VStack(alignment: .leading, spacing: 4) {
-                        // Privacy story: one line instead of a paragraph
-                        Text("On-site photos only · \(engine.totalSkippedOffShop) held back")
-                        if let s = attribution.lastSummary {
-                            Text(s)   // what the last Analyze Today run routed
-                        }
-                    }
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                }
+                CaptureSections()
             }
             .navigationTitle("Engine")
             .navigationBarTitleDisplayMode(.inline)
@@ -200,12 +40,183 @@ struct TodayView: View {
                 AccountView()
             }
             .refreshable {
-                await syncNow()
+                await CaptureSections.syncNow()
             }
         }
     }
+}
 
-    private func syncNow() async {
+/// The Engine's sections (metrics, live analysis, garage, T0 strip, Tools), embeddable in any
+/// List: TodayView hosts them alone, and the Work tab hosts them as its Capture section.
+struct CaptureSections: View {
+    @ObservedObject private var engine = SyncEngine.shared
+    @ObservedObject private var attribution = AttributionEngine.shared
+
+    var body: some View {
+        // ── Errors / permission banner ──
+        if engine.authorizationDenied {
+            Section {
+                Label(
+                    "Photos access is off. Enable it in Settings → Privacy & Security → Photos → Nuke.",
+                    systemImage: "exclamationmark.triangle"
+                )
+                .font(.footnote)
+                .foregroundStyle(.orange)
+            }
+        }
+        if let problem = engine.authProblem {
+            Section {
+                Label(problem, systemImage: "person.crop.circle.badge.exclamationmark")
+                    .font(.footnote)
+                    .foregroundStyle(.orange)
+            }
+        }
+        if let summary = engine.lastPassSummary {
+            Section {
+                Text("Last pass: \(summary).")
+                    .font(.footnote).foregroundStyle(.secondary)
+            }
+        }
+        if engine.gaveUpCount > 0 {
+            Section {
+                Text("\(engine.gaveUpCount) photos failed three times and are no longer retried on open. The last error: \(engine.lastError ?? "not recorded").")
+                    .font(.footnote).foregroundStyle(.secondary)
+            }
+        }
+        if let error = engine.backfillError, engine.backfillRemaining > 0 {
+            Section {
+                Text(error).font(.footnote).foregroundStyle(.secondary)
+                Button("Retry uploads") { Task { await Self.syncNow() } }
+                    .disabled(engine.isSyncing || engine.isPaused || engine.authorizationDenied)
+            }
+        }
+
+        // ── Live metrics strip ──
+        Section {
+            LiveMetricsStrip(engine: engine)
+                .listRowInsets(EdgeInsets(top: 12, leading: 16, bottom: 12, trailing: 16))
+                .listRowBackground(Color.clear)
+        }
+
+        // ── Live analysis · the pipeline on the wire ──
+        // The ENGINE worklight: each frame's DEEP verdict landing in
+        // realtime (get_analysis_stream), newest first — the data itself
+        // streaming, not a progress bar. Tap a frame → its evidence (the
+        // same rail the ANALYZED grid drills to). Self-loading.
+        if let uid = SupabaseService.currentUserId {
+            LiveAnalysisStream(userId: uid)
+        }
+
+        // ── Your garage ── Today opens onto the owner's actual record,
+        // not just relay counters. Self-loading; renders nothing if empty.
+        if let uid = SupabaseService.currentUserId {
+            GarageStrip(userId: uid)
+        }
+
+        // ── Just read · on-device (T0) ──
+        // The live capture demo: a frame shot at the site is read on-device
+        // (Apple Vision) the instant it uploads — the detection lands here
+        // in seconds, no network. A DETECTION (a label), not confirmed work.
+        if !engine.liveT0Atoms.isEmpty {
+            Section {
+                LiveT0Strip(atoms: engine.liveT0Atoms)
+                    .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
+            } header: {
+                Label("Just read · on-device", systemImage: "wand.and.stars")
+            } footer: {
+                Text("Read on this phone in milliseconds — a detection, not confirmed work.")
+                    .font(.caption2).foregroundStyle(.secondary)
+            }
+        }
+
+        // Pulled from the Engine on purpose:
+        //  • UnderstandingPanel — its "latest understood" day-stories are the
+        //    RECORD, not the live moment (and rendered 12 days stale here). They
+        //    belong in the day receipt / Profile, where a record is read.
+        //  • Recent uploads — it surfaced personal photos (a newborn) the
+        //    backfill is shipping to the cloud. Hiding the strip doesn't un-ship
+        //    them; the real fix is the upload gate (the backfill must respect the
+        //    local-first site/ownership gate, not brute-force the whole library).
+        //    That's an ownership decision (what leaves the device) — Skylar's call.
+
+        // ── Tools · the workbench ── the operator levers. This is the honest
+        // reason the Engine tab earns its place: a home to develop + run tools.
+        Section {
+            Button {
+                Task { await Self.syncNow() }
+            } label: {
+                Label("Sync Now", systemImage: "arrow.triangle.2.circlepath")
+            }
+            .disabled(engine.isSyncing || engine.isPaused)
+
+            // Analyze Today — user-triggered on-device attribution run
+            // (the tuning surface: the owner decides when to route the
+            // day's photos home). On-device, free, no Mac, no GPU.
+            Button {
+                Task { await attribution.run() }
+            } label: {
+                if attribution.isRunning, attribution.progress.total > 0 {
+                    Label("Analyzing \(attribution.progress.done)/\(attribution.progress.total)…",
+                          systemImage: "wand.and.stars")
+                } else {
+                    Label("Analyze Today", systemImage: "wand.and.stars")
+                }
+            }
+            .disabled(attribution.isRunning)
+
+            // Repair photo dates — re-reads each synced asset's true EXIF
+            // (DateTimeOriginal + GPS) on-device and patches rows that an
+            // older build stamped with the iCloud re-add date. One-shot.
+            Button {
+                Task { await engine.reconcileLibrary() }
+            } label: {
+                if engine.isReconciling {
+                    Label(engine.reconcileStatus.isEmpty ? "Repairing…" : engine.reconcileStatus,
+                          systemImage: "calendar.badge.clock")
+                } else {
+                    Label("Repair photo dates", systemImage: "calendar.badge.clock")
+                }
+            }
+            .disabled(engine.isReconciling)
+
+            // Confirm sessions — the backlog sweep: one tap routes a day's
+            // photos to a vehicle (handles VIN-less + new-vehicle cases).
+            NavigationLink {
+                SessionConfirmView()
+            } label: {
+                Label("Confirm sessions", systemImage: "checklist")
+            }
+
+            // Tier 3 → 4: the day-journal sign surface, promoted to a
+            // direct entry (it was buried a level under Confirm sessions).
+            NavigationLink {
+                WorkDaySignView()
+            } label: {
+                Label("Confirm your days", systemImage: "checkmark.seal")
+            }
+
+            // Pause toggle — secondary; the big numbers are the hero
+            Toggle("Uploads", isOn: Binding(
+                get: { !engine.isPaused },
+                set: { engine.setPaused(!$0) }
+            ))
+        } header: {
+            Label("Tools", systemImage: "wrench.and.screwdriver")
+        } footer: {
+            VStack(alignment: .leading, spacing: 4) {
+                // Privacy story: one line instead of a paragraph
+                Text("On-site photos only · \(engine.totalSkippedOffShop) held back")
+                if let s = attribution.lastSummary {
+                    Text(s)   // what the last Analyze Today run routed
+                }
+            }
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+        }
+    }
+
+    static func syncNow() async {
+        let engine = SyncEngine.shared
         await engine.sync()
         await engine.resumeBackfillIfNeeded()
     }

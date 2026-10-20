@@ -68,6 +68,13 @@ joins existing image/equipment evidence to its asset endpoint. Legacy usage and 
 claims stay qualified; computed depreciation value is separate from market value,
 allocated job cost and labor value. No new observation, physical identity or usage is minted.
 
+Retained request excerpt / operation `component_events` row / installed or quoted
+`work_order_parts` row → derived specification through `ingest-observation` →
+projector checks verbatim labels and exact row snapshot → immutable material/process
+claim (requested, supplied, proposed, reported_performed) → `read_work_order_resources`
+compares requested pairs with current claims by role and dotted key. Part claims stay
+work-order scoped; a changed basis row withholds its claim. Conflict ≠ adjudication.
+
 These schematics describe the system as it exists in code, not as an aspirational design. Where the current implementation diverges from the encyclopedia specification, both states are documented and the gap is called out.
 
 ASCII diagrams use the following conventions:

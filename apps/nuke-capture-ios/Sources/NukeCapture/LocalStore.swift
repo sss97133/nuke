@@ -343,6 +343,10 @@ struct LocalAlbumImageReview: Codable, FetchableRecord, PersistableRecord, Senda
         (try? JSONDecoder().decode([String].self, from: Data(vinCandidatesJSON.utf8))) ?? []
     }
 
+    var labels: [String] {
+        (try? JSONDecoder().decode([String].self, from: Data(labelsJSON.utf8))) ?? []
+    }
+
     var textLines: [String] {
         (try? JSONDecoder().decode([String].self, from: Data(textLinesJSON.utf8))) ?? []
     }

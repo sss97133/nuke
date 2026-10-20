@@ -153,6 +153,11 @@ struct OrganizationView: View {
                         if !line.isEmpty { Text(line).font(.caption).foregroundStyle(.secondary) }
                     }
                 }
+                Section {
+                    NavigationLink { FacilityView(organizationId: orgId, nameHint: page.org.name ?? fallbackName) } label: {
+                        Label("Space, equipment and licenses", systemImage: "building.2")
+                    }
+                }
                 if let you = page.you {
                     Section {
                         RelationWeightLine(relation: you.relation)
@@ -189,6 +194,7 @@ struct OrganizationView: View {
             } else {
                 Section { ProgressView() }
             }
+            OrgSupplySection(orgId: orgId, nameHint: page?.org.name ?? fallbackName)
         }
         .navigationTitle(page?.org.name ?? fallbackName ?? "Organization")
         .navigationBarTitleDisplayMode(.inline)

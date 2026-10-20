@@ -79,7 +79,8 @@ async function mount(props: Record<string, any> = {}) {
   for (let i = 0; i < 20; i++) await act(async () => { await vi.advanceTimersByTimeAsync(500); });
 }
 
-describe('ImageGallery canonical database rows', () => {
+// Each case renders 399 rows through 20 timer steps (about 0.6 s locally, near 5 s on loaded CI runners; one timed out on 2026-10-13).
+describe('ImageGallery canonical database rows', { timeout: 20_000 }, () => {
   it.each([false, true])('navigates the full filtered collection before thumbnail paging (filtered=%s)', async (filtered) => {
     vi.stubGlobal('IntersectionObserver', class { observe() {} disconnect() {} unobserve() {} });
     fixture.rows.forEach((row, index) => { row.category = index % 2 === 0 ? 'detail' : 'general'; });

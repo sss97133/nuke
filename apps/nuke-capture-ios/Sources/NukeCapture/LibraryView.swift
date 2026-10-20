@@ -117,18 +117,24 @@ struct LibraryView: View {
             }
             .safeAreaInset(edge: .bottom) {
                 if selectMode {
-                    HStack(spacing: 12) {
-                        Button(role: .destructive) { applyVerdict(approved: false) } label: {
-                            Label("Reject", systemImage: "eye.slash").frame(maxWidth: .infinity)
+                    // setVerdict writes LocalStore only; no server writer backs it yet.
+                    VStack(spacing: 6) {
+                        JobAttachBar(localIdentifiers: selected.compactMap { LibraryStore.shared.asset(at: $0)?.localIdentifier })
+                        HStack(spacing: 12) {
+                            Button(role: .destructive) { applyVerdict(approved: false) } label: {
+                                Label("Reject", systemImage: "eye.slash").frame(maxWidth: .infinity)
+                            }
+                            Button { applyVerdict(approved: true) } label: {
+                                Label("Approve", systemImage: "checkmark.circle").frame(maxWidth: .infinity)
+                            }
+                            .tint(.green)
                         }
-                        Button { applyVerdict(approved: true) } label: {
-                            Label("Approve", systemImage: "checkmark.circle").frame(maxWidth: .infinity)
-                        }
-                        .tint(.green)
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.large)
+                        .disabled(selected.isEmpty)
+                        Text("On this phone only · not sent to your Nuke record")
+                            .font(.caption2).foregroundStyle(.secondary)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.large)
-                    .disabled(selected.isEmpty)
                     .padding(.horizontal).padding(.vertical, 8)
                     .background(.ultraThinMaterial)
                 }

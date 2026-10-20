@@ -9,6 +9,16 @@ import {
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { cellsAsOf, cellsCanAnswer, cellsClusterSql, cellsHistogramSql, readWithin } from "./cells.ts";
+import { areaSql, areasSql, bySourceSql, parseArea, parseAreas, shapeAreas, type AreaRow } from "./facts.ts";
+
+const STATE_BY_FIPS: Record<string, string> = {
+  "01": "AL", "02": "AK", "04": "AZ", "05": "AR", "06": "CA", "08": "CO", "09": "CT", "10": "DE", "11": "DC", "12": "FL",
+  "13": "GA", "15": "HI", "16": "ID", "17": "IL", "18": "IN", "19": "IA", "20": "KS", "21": "KY", "22": "LA", "23": "ME",
+  "24": "MD", "25": "MA", "26": "MI", "27": "MN", "28": "MS", "29": "MO", "30": "MT", "31": "NE", "32": "NV", "33": "NH",
+  "34": "NJ", "35": "NM", "36": "NY", "37": "NC", "38": "ND", "39": "OH", "40": "OK", "41": "OR", "42": "PA", "44": "RI",
+  "45": "SC", "46": "SD", "47": "TN", "48": "TX", "49": "UT", "50": "VT", "51": "VA", "53": "WA", "54": "WV", "55": "WI",
+  "56": "WY", "72": "PR",
+};
 
 const RATE_LIMIT_CONFIG = {
   namespace: "map-vehicles",
@@ -91,13 +101,108 @@ Deno.serve(async (req) => {
 
     const mode = params.mode ?? (params.bbox ? "points" : "state");
 
+    // ── THE ONE MAP (map_facts) ─────────────────────────────────────────────
+    // mode=layers | areas | area read the precomputed map_facts rows (plan step 6); nothing here counts a source
+    // table. A photo layer is never served as points: mode=points refuses layer=photo.
+    if (mode === "layers" || mode === "areas" || mode === "area") {
+      let q: ReturnType<typeof parseAreas> | ReturnType<typeof parseArea> | null = null;
+      try {
+        if (mode === "areas") q = parseAreas(params);
+        if (mode === "area") q = parseArea(params);
+      } catch (e) {
+        return json({ error: (e as Error).message }, rlHdrs, 400);
+      }
+      const dbUrl = (Deno.env.get("NUKE_DB_POOL_URL") || Deno.env.get("SUPABASE_DB_URL"))!;
+      const fPool = new Pool(dbUrl, 1, true);
+      const fConn = await fPool.connect();
+      try {
+        if (mode === "layers") {
+          const { rows } = await readWithin(fConn, `
+            SELECT layer, sort_order, entity, source_table, rule, clock, geography, value_basis, value_column, points_allowed, fold
+            FROM map_layers ORDER BY sort_order`, [], "5s");
+          return json({ layers: rows, generated_at: new Date().toISOString() }, rlHdrs);
+        }
+        if (mode === "areas") {
+          const aq = q as ReturnType<typeof parseAreas>;
+          const a = areasSql(aq), b = bySourceSql(aq);
+          const { rows } = await readWithin<AreaRow>(fConn, a.text, a.args, "5s");
+          const { rows: bySource } = await readWithin<{ source: string; entities: number }>(fConn, b.text, b.args, "5s");
+          return json(shapeAreas(aq, rows, bySource), rlHdrs);
+        }
+        const oq = q as ReturnType<typeof parseArea>;
+        const o = areaSql(oq);
+        const { rows } = await readWithin<Record<string, unknown>>(fConn, o.text, o.args, "5s");
+        return json({ level: oq.level, key: oq.key, from: oq.from, to: oq.to,
+          layers: rows.map((r) => ({ ...r, value: r.value == null ? null : Number(r.value),
+            avg: r.priced && r.value != null ? Math.round(Number(r.value) / Number(r.priced)) : null })),
+          generated_at: new Date().toISOString() }, rlHdrs);
+      } finally {
+        fConn.release();
+        await fPool.end();
+      }
+    }
+    if (mode === "points" && String(params.layer ?? "") === "photo") {
+      return json({ error: "photo is never served as points (map_layers.points_allowed = false)" }, rlHdrs, 400);
+    }
+
     // ── CHOROPLETH ──────────────────────────────────────────────────────────
     if (mode === "state" || mode === "county") {
       const choroplethTimeStart = params.time_start ?? null;
       const choroplethTimeEnd = params.time_end ?? null;
+      const list = (v: unknown) => String(v ?? "").split(",").map((x) => x.trim()).filter((x) => /^[a-z0-9_-]{2,40}$/.test(x));
+      const choroplethEvents = list(params.event_type);
+      const choroplethSources = list(params.source);
+      // A listing count sums what the sellers ask; every other count sums recorded sales.
+      const listingOnly = choroplethEvents.length > 0 && choroplethEvents.every((e) => e === "listing");
+      const valueExpr = listingOnly ? "COALESCE(v.asking_price, 0)" : "COALESCE(v.sale_price, v.sold_price, 0)";
 
-      // No time filter → fast materialized view path
-      if (!choroplethTimeStart && !choroplethTimeEnd) {
+      // Listings over a window of days → the per-county, per-day listing fold (vehicle_map_county_listings).
+      if (listingOnly && !choroplethTimeStart && !choroplethTimeEnd) {
+        const days = Math.min(Math.max(Number.parseInt(String(params.days ?? "30"), 10) || 30, 1), 30);
+        const dbUrl = (Deno.env.get("NUKE_DB_POOL_URL") || Deno.env.get("SUPABASE_DB_URL"))!;
+        const lPool = new Pool(dbUrl, 1, true);
+        const lConn = await lPool.connect();
+        try {
+          const keyExpr = mode === "county" ? "l.fips" : "left(l.fips, 2)";
+          const where = "l.day > (now() AT TIME ZONE 'UTC')::date - $1::int"
+            + (choroplethSources.length ? " AND l.source_platform = ANY($2)" : "");
+          const args: unknown[] = choroplethSources.length ? [days, choroplethSources] : [days];
+          const { rows } = await readWithin<{ k: string; count: number; value: string | null; priced: number }>(lConn, `
+            SELECT ${keyExpr} AS k, sum(l.listings)::int AS count, sum(l.asking_sum) AS value, sum(l.priced)::int AS priced
+            FROM vehicle_map_county_listings l WHERE ${where} GROUP BY 1`, args);
+          const { rows: bySource } = await readWithin<{ source: string; count: number }>(lConn, `
+            SELECT l.source_platform AS source, sum(l.listings)::int AS count
+            FROM vehicle_map_county_listings l WHERE ${where} GROUP BY 1 ORDER BY 2 DESC`, args);
+          const { rows: asOfRows } = await readWithin<{ as_of: string | null }>(lConn,
+            "SELECT max(as_of)::text AS as_of FROM vehicle_map_county_listings", []);
+          const regions = rows.map((r) => {
+            const value = Number(r.value ?? 0);
+            return { key: r.k, count: r.count, value, avg: r.priced ? Math.round(value / r.priced) : 0 };
+          });
+          const totalCount = regions.reduce((a, r) => a + r.count, 0);
+          const totalValue = regions.reduce((a, r) => a + r.value, 0);
+          const meta = { measure: "listings", value_basis: "asking", days, source: choroplethSources,
+            by_source: bySource, as_of: asOfRows[0]?.as_of ?? null, generated_at: new Date().toISOString() };
+          return json(mode === "county"
+            ? { level: "county", counties: regions.map(({ key, ...r }) => ({ fips: key, ...r })),
+                stats: { totalCount, totalValue, countyCount: regions.length }, ...meta }
+            : { level: "state", states: regions.map(({ key, ...r }) => ({ code: STATE_BY_FIPS[key] ?? key, ...r })),
+                stats: { totalCount, totalValue }, ...meta }, rlHdrs);
+        } catch (e) {
+          // Not yet filled by its first refresh: an empty measure, said so.
+          if (String((e as Error)?.message ?? e).includes("has not been populated")) {
+            return json({ level: mode, counties: [], states: [], stats: { totalCount: 0, totalValue: 0, countyCount: 0 },
+              measure: "listings", populated: false, generated_at: new Date().toISOString() }, rlHdrs);
+          }
+          throw e;
+        } finally {
+          lConn.release();
+          await lPool.end();
+        }
+      }
+
+      // No time or event/source filter → fast materialized view path
+      if (!choroplethTimeStart && !choroplethTimeEnd && !choroplethEvents.length && !choroplethSources.length) {
         const { data, error } = await rlSupabase.rpc("get_vehicle_map_data", {
           p_level: mode,
         });
@@ -126,6 +231,14 @@ Deno.serve(async (req) => {
           tConditions.push(`vlo.observed_at <= $${tp++}`);
           tArgs.push(choroplethTimeEnd);
         }
+        if (choroplethEvents.length) {
+          tConditions.push(`vlo.source_type = ANY($${tp++})`);
+          tArgs.push(choroplethEvents);
+        }
+        if (choroplethSources.length) {
+          tConditions.push(`vlo.source_platform = ANY($${tp++})`);
+          tArgs.push(choroplethSources);
+        }
 
         const tWhere = tConditions.join(" AND ");
 
@@ -143,8 +256,8 @@ Deno.serve(async (req) => {
             SELECT
               vc.fips,
               COUNT(*)::int AS count,
-              SUM(COALESCE(v.sale_price, v.sold_price, 0)) AS value,
-              ROUND(AVG(NULLIF(COALESCE(v.sale_price, v.sold_price, 0), 0)))::bigint AS avg
+              SUM(${valueExpr}) AS value,
+              ROUND(AVG(NULLIF(${valueExpr}, 0)))::bigint AS avg
             FROM vlo_county vc
             JOIN vehicles v ON v.id = vc.vehicle_id AND v.is_public AND v.deleted_at IS NULL
             GROUP BY vc.fips
@@ -166,6 +279,8 @@ Deno.serve(async (req) => {
             temporal: true,
             time_start: choroplethTimeStart,
             time_end: choroplethTimeEnd,
+            event_type: choroplethEvents, source: choroplethSources,
+            value_basis: listingOnly ? "asking" : "sold",
           }, rlHdrs);
 
         } else {
@@ -201,8 +316,8 @@ Deno.serve(async (req) => {
                 ELSE vs.state_fips
               END AS code,
               COUNT(*)::int AS count,
-              SUM(COALESCE(v.sale_price, v.sold_price, 0)) AS value,
-              ROUND(AVG(NULLIF(COALESCE(v.sale_price, v.sold_price, 0), 0)))::bigint AS avg
+              SUM(${valueExpr}) AS value,
+              ROUND(AVG(NULLIF(${valueExpr}, 0)))::bigint AS avg
             FROM vlo_state vs
             JOIN vehicles v ON v.id = vs.vehicle_id AND v.is_public AND v.deleted_at IS NULL
             GROUP BY vs.state_fips
@@ -224,6 +339,8 @@ Deno.serve(async (req) => {
             temporal: true,
             time_start: choroplethTimeStart,
             time_end: choroplethTimeEnd,
+            event_type: choroplethEvents, source: choroplethSources,
+            value_basis: listingOnly ? "asking" : "sold",
           }, rlHdrs);
         }
       } finally {
@@ -357,15 +474,16 @@ Deno.serve(async (req) => {
         }>(conn, sql, asOf ? [south, north, west, east, limit] : vArgs);
 
         totalMatched = rows.reduce((s, r) => s + r.count, 0);
+        // The driver hands float8 back as text here; GeoJSON coordinates must be numbers or nothing draws.
         features = rows.map(r => ({
           type: "Feature",
-          geometry: { type: "Point", coordinates: [r.lng, r.lat] },
+          geometry: { type: "Point", coordinates: [Number(r.lng), Number(r.lat)] },
           properties: {
             cluster: true,
             count: r.count,
             sources: r.sources ?? [],
             event_types: r.event_types ?? [],
-            avg_confidence: r.avg_confidence,
+            avg_confidence: Number(r.avg_confidence),
           },
         }));
 
@@ -382,9 +500,11 @@ Deno.serve(async (req) => {
             vlo.precision              AS loc_precision,
             vlo.observed_at            AS observed_at,
             vlo.location_text_raw      AS location,
+            vlo.source_url             AS source_url,
             vlo.metadata               AS metadata,
             v.year, v.make, v.model,
             v.sale_price               AS price,
+            v.asking_price             AS asking_price,
             v.primary_image_url        AS thumbnail,
             v.status                   AS vehicle_status
           FROM vehicle_location_observations vlo
@@ -399,17 +519,17 @@ Deno.serve(async (req) => {
           lng: number; lat: number;
           event_type: string; source: string | null;
           confidence: number; loc_precision: string | null;
-          observed_at: string; location: string | null;
+          observed_at: string; location: string | null; source_url: string | null;
           metadata: Record<string, unknown>;
           year: number | null; make: string | null; model: string | null;
-          price: number | null; thumbnail: string | null;
+          price: number | null; asking_price: number | null; thumbnail: string | null;
           vehicle_status: string | null;
         }>(conn, sql, vArgs);
 
         totalMatched = rows.length;
         features = rows.map((r: any) => ({
           type: "Feature",
-          geometry: { type: "Point", coordinates: [r.lng, r.lat] },
+          geometry: { type: "Point", coordinates: [Number(r.lng), Number(r.lat)] },
           properties: {
             observation_id: r.observation_id,
             vehicle_id: r.vehicle_id,
@@ -419,9 +539,11 @@ Deno.serve(async (req) => {
             precision: r.loc_precision,
             observed_at: r.observed_at,
             location: r.location,
+            source_url: r.source_url,
             event_label: (r.metadata as Record<string, unknown>)?.event_type ?? r.event_type,
             year: r.year, make: r.make, model: r.model,
             price: r.price,
+            asking_price: r.asking_price != null ? Number(r.asking_price) : null,
             thumbnail: r.thumbnail,
             vehicle_status: r.vehicle_status,
           },
@@ -456,8 +578,9 @@ Deno.serve(async (req) => {
 });
 
 // deno-lint-ignore no-explicit-any
-function json(data: any, extraHeaders?: Record<string, string>) {
+function json(data: any, extraHeaders?: Record<string, string>, status = 200) {
   return new Response(JSON.stringify(data), {
+    status,
     headers: { ...corsHeaders, ...extraHeaders, "Content-Type": "application/json" },
   });
 }

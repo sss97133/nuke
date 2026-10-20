@@ -54,6 +54,8 @@ const ProfileBidsTab = React.lazy(() => import('../components/profile/ProfileBid
 const StorefrontSettings = React.lazy(() => import('../components/organization/StorefrontSettings'));
 const ProfileSuccessStoriesTab = React.lazy(() => import('../components/profile/ProfileSuccessStoriesTab').then(m => ({ default: m.ProfileSuccessStoriesTab })));
 const CollectionIntelligenceTab = React.lazy(() => import('../components/organization/CollectionIntelligenceTab'));
+import DeferUntilVisible from './orgs/DeferUntilVisible';
+const OrganizationOnNuke = React.lazy(() => import('./orgs/OrganizationOnNuke'));
 
 interface ProfileLite {
   id: string;
@@ -1206,7 +1208,7 @@ export default function OrganizationProfile() {
       // Load comprehensive profile data (BaT-style stats) - LAZY LOAD in background
       (async () => {
         try {
-          const comprehensive = await getOrganizationProfileData(organizationId);
+          const comprehensive = await getOrganizationProfileData(organizationId, org);
           setComprehensiveData(comprehensive);
           if (comprehensive.seller_track_record) {
             setSellerTrackRecord(comprehensive.seller_track_record);
@@ -2362,6 +2364,8 @@ export default function OrganizationProfile() {
         {activeTab === 'overview' && (
           <>
             {organizationId && <OrganizationSourceTargets key={organizationId} organizationId={organizationId} />}
+            {/* Opened to invite this business to a job's need: the on-Nuke section leads. Otherwise it sits below the fold. */}
+            {organizationId && new URLSearchParams(location.search).has('requirement') && <OrganizationOnNuke organizationId={organizationId} />}
             {/* Key Metrics Bar — only show when seller track record hasn't loaded yet (it supersedes this) */}
             {!sellerTrackRecord && (((organization?.total_vehicles ?? 0) > 0) || ((organization?.total_images ?? 0) > 0) || ((organization?.total_events ?? 0) > 0)) && (
             <div style={{
@@ -3048,6 +3052,9 @@ export default function OrganizationProfile() {
             )}
 
             {/* Stats moved to top metrics bar */}
+            {organizationId && !new URLSearchParams(location.search).has('requirement') && (
+              <DeferUntilVisible><OrganizationOnNuke organizationId={organizationId} /></DeferUntilVisible>
+            )}
           </>
         )}
 

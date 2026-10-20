@@ -132,12 +132,23 @@ into permanent identity types or mandatory arrival choices without a separate mo
 - **Reads.** Use `scripts/data/q.sh "SELECT …"`.
 - **Frontend.** Open a PR to `main`. Vercel deploys on merge, which takes 8–10 min. Check the live page
   afterwards.
+- **Grants, policies and public reads.** A migration that revokes or narrows a grant or policy on a table the public
+  site reads (`vehicle_images`, `vehicles`, `vehicle_events`) is not done at "tests pass". Before it merges, grep every
+  consumer: PostgREST filters and computed-column functions that take the whole row (`vehicle_image_gallery_eligible`;
+  a whole-row reference needs every column, so column grants break it), `select=*`, joins, and policies on other
+  tables. After it deploys, run `node scripts/ci/logged-out-live.mjs` (it also runs after every deploy and every 30
+  minutes and opens an issue, "Live site broken for logged-out visitors"); say "live" only with its output.
+  2026-10-19: #2293 limited anon to column grants and every logged-out gallery failed for hours while every check was
+  green (fixed in #2320, #2322; the live check is #2323).
 - **Never** hand-apply a migration or function deploy, and never change compute, plan or disk.
 
 ## PR titles and commit messages
 The repo is public, and a squash merge puts the PR title (or a single commit's subject) on `main` as the
 permanent record. Write both as `type(scope): summary`, at most 72 characters. The PR gate in
-`pre-deploy-check.yml` fails any other form.
+`pre-deploy-check.yml` fails any other form. Check a title before `gh pr create` with
+`node scripts/ci/pr-title-check.mjs "<title>"`; with no argument it checks the branch's open PR, and
+`scripts/ci/verify.sh` (the pre-push gate) warns when that title would fail. After a retitle,
+`gh run rerun <run> --failed` passes: the gate reads the live title.
 - **type**: `feat`, `fix`, `perf`, `refactor`, `data` (backfills and corrections), `docs`, `test`, `ci`,
   `build`, `chore` or `revert`.
 - **scope**: the component, by its code name. That can be a table (`vehicle_events`), a function

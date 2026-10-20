@@ -7,7 +7,7 @@
 
 import Foundation
 
-struct AlbumLabel: Equatable {
+struct AlbumLabel: Hashable {
     let year: Int
     let make: String
     let model: String?

@@ -22,8 +22,7 @@ import { useAuth } from './hooks/useAuth';
 const HomePage = React.lazy(() => import('./pages/HomePage'));
 const LandingPage = React.lazy(() => import('./pages/landing/LandingPage'));
 const ProductPage = React.lazy(() => import('./pages/landing/ProductPage'));
-const PublicMap = React.lazy(() => import('./components/map/PublicMap'));
-const NukeMap = React.lazy(() => import('./components/map/NukeMap'));
+const OneMap = React.lazy(() => import('./components/map/OneMap'));
 const VehicleShowcase = React.lazy(() => import('./pages/showcase/VehicleShowcase'));
 const DeckPage = React.lazy(() => import('./pages/DeckPage'));
 const ShareWiring = React.lazy(() => import('./pages/ShareWiring'));
@@ -44,7 +43,7 @@ const LazyFallback = <div style={{ height: '100vh', background: 'var(--bg)' }} /
  */
 function HomeGate() {
   const { user, loading } = useAuth();
-  // Legacy links use /?tab=map, but no such tab exists — the org map is /map
+  // Legacy links use /?tab=map, but no such tab exists — the map is /map
   if (new URLSearchParams(window.location.search).get('tab') === 'map') {
     return <Navigate to="/map" replace />;
   }
@@ -87,8 +86,9 @@ function RoutedApp() {
           {/* ── Standalone pages (no AppLayout chrome) ── */}
           <Route path="/" element={<HomeGate />} />
           <Route path="/products/:slug" element={<Suspense fallback={LazyFallback}><ProductPage /></Suspense>} />
-          <Route path="/map" element={<Suspense fallback={LazyFallback}><PublicMap /></Suspense>} />
-          <Route path="/atlas" element={<Suspense fallback={LazyFallback}><div style={{ position: 'fixed', inset: 0 }}><NukeMap /></div></Suspense>} />
+          {/* One map: new listings per county. /atlas was the point map; it now opens the same map. */}
+          <Route path="/map" element={<Suspense fallback={LazyFallback}><div style={{ position: 'fixed', inset: 0 }}><OneMap /></div></Suspense>} />
+          <Route path="/atlas" element={<Navigate to="/map" replace />} />
           <Route path="/showcase" element={<Suspense fallback={LazyFallback}><VehicleShowcase /></Suspense>} />
           <Route path="/showcase/:vehicleId" element={<Suspense fallback={LazyFallback}><VehicleShowcase /></Suspense>} />
           <Route path="/deck/:deckId" element={<Suspense fallback={LazyFallback}><DeckPage /></Suspense>} />

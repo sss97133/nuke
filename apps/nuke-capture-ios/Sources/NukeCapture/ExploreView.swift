@@ -93,6 +93,7 @@ struct ExploreView: View {
         if ProcessInfo.processInfo.environment["NUKE_DEBUG_EXPLORE_MODE"] == "live" { return .live }
         if ProcessInfo.processInfo.environment["NUKE_DEBUG_EXPLORE_MODE"] == "listings" { return .listings }
         if ProcessInfo.processInfo.environment["NUKE_DEBUG_EXPLORE_MODE"] == "map" { return .map }
+        if ProcessInfo.processInfo.environment["NUKE_DEBUG_EXPLORE_MODE"] == "map" { return .map }
         #endif
         // Land where the web Market tab lands: the open board, the one population with a
         // recorded clock (market_pulse_live). Map, Pulse and Listings stay one tap away.
@@ -197,7 +198,7 @@ struct ExploreView: View {
             .navigationDestination(for: VehicleHeaderRow.self) { v in
                 // PUSH (back chevron) — kills the Done-only dead-end.
                 VehicleDetailView(vehicleId: v.id.uuidString.lowercased(),
-                                  embedInNavigationStack: false)
+                                  embedInNavigationStack: false).environment(\.vehicleListingContext, true)
             }
             .navigationDestination(for: CohortTarget.self) { c in
                 // PUSH the cohort instrument. Its comp rows drill back into this
@@ -227,7 +228,7 @@ struct ExploreView: View {
             .task(id: landingMode) { if landingMode == .metros { await loadMetros() } }
             .task(id: query) {
                 let term = query.trimmingCharacters(in: .whitespaces)
-                guard isSearching else { results = []; searchMeta = nil; searched = false; return }
+                guard isSearching else { results = []; searchMeta = nil; actorHits = []; searched = false; return }
                 try? await Task.sleep(nanoseconds: 300_000_000)   // debounce
                 guard !Task.isCancelled else { return }
                 await search(term)
@@ -358,6 +359,7 @@ struct ExploreView: View {
                             .buttonStyle(.plain)
                         Divider()
                     }
+                    if !actorHits.isEmpty { actorRows }
                     // The denominator before the pictures: what this page is a window onto.
                     if let m = searchMeta {
                         Text(m.sentence)
@@ -527,8 +529,11 @@ struct ExploreView: View {
     private func search(_ term: String) async {
         searchError = false
         do {
-            let res = try await UniversalSearch.vehicles(query: term)
+            let res = try await UniversalSearch.vehicles(query: term, types: UniversalSearch.firstPageTypes)
             guard res.success else { throw URLError(.badServerResponse) }
+            // Actors the door matched by name lead the results: an organization opens its measures,
+            // a person their profile. Vehicles follow in the grid.
+            actorHits = res.results.filter { $0.type == "organization" || $0.type == "external_identity" || ($0.type == "user" && UUID(uuidString: $0.id) != nil) }
             let rows = Self.photosFirst(res.results.compactMap(\.headerRow))
             results = rows
             loadMoreError = nil
@@ -620,6 +625,37 @@ struct ExploreView: View {
         }
     }
     @State private var searchMeta: SearchCoverage?
+    @State private var actorHits: [UniversalSearchHit] = []
+
+    /// Organizations and people the door matched by name, each a door to its endpoint.
+    @ViewBuilder private var actorRows: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(actorHits) { hit in
+                Group {
+                    if let route = hit.actorRoute {
+                        NavigationLink { ActorProfileView(route: route) } label: { actorRow(hit, icon: route.kind == "identity" ? "person.crop.circle" : "building.2") }
+                    } else {
+                        NavigationLink { ProfileView(userId: hit.id.lowercased(), isOwn: false) } label: { actorRow(hit, icon: "person") }
+                    }
+                }
+                .buttonStyle(.plain)
+                Divider().padding(.leading, 52)
+            }
+        }
+    }
+    private func actorRow(_ hit: UniversalSearchHit, icon: String) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon).font(.title3).foregroundStyle(.secondary).frame(width: 28)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(hit.title ?? "Unnamed").font(.subheadline.weight(.semibold))
+                if let sub = hit.subtitle, !sub.isEmpty { Text(sub).font(.caption).foregroundStyle(.secondary) }
+            }
+            Spacer()
+            Image(systemName: "chevron.right").font(.caption2).foregroundStyle(.tertiary)
+        }
+        .padding(.horizontal, 16).padding(.vertical, 10)
+        .contentShape(Rectangle())
+    }
     @State private var loadingMore = false
     @State private var loadMoreError: String?
     @State private var scrollToFootTick = 0

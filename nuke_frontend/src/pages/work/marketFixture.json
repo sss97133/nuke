@@ -1,0 +1,162 @@
+{
+ "flow": {
+  "counts": {
+   "offers": 0,
+   "starts": 0,
+   "invoices": 0,
+   "quotes_issued": 0,
+   "offers_accepted": 0,
+   "quotes_accepted": 0,
+   "payment_witnesses": 0,
+   "completions_accepted": 0,
+   "completions_attested": 0,
+   "invoices_with_payment_witness": 0
+  },
+  "step_hours": {
+   "offer_to_acceptance": {
+    "samples": 0,
+    "median_hours": null
+   },
+   "quote_to_acceptance": {
+    "samples": 0,
+    "median_hours": null
+   },
+   "start_to_completion": {
+    "samples": 0,
+    "median_hours": null
+   },
+   "completion_to_acceptance": {
+    "samples": 0,
+    "median_hours": null
+   },
+   "quote_acceptance_to_start": {
+    "samples": 0,
+    "median_hours": null
+   },
+   "invoice_to_payment_witness": {
+    "samples": 0,
+    "median_hours": null
+   }
+  },
+  "money_moved_by_nuke": false
+ },
+ "as_of": "2026-10-19T23:48:21.012627+00:00",
+ "rules": {
+  "medians": "hours between consecutive signed steps, shown with at least 2 samples",
+  "published": "aggregates only: no ids, names, handles, amounts or texts",
+  "unknown_for_all": "requirements where the input is unknown for every account in the population",
+  "open_requirement": "current requirement; work order not completed, paid, cancelled or rejected; public vehicle; not invite_only",
+  "evidenced_candidate": "an account in the population, not the job's customer, passes the evidence rung and the requirement's own input (skill, tools or facility), or a current offer at an evidenced rung",
+  "provider_population": "accounts with an approved work_evidence, co_sign or authenticated_sign provider link, or a verified business claim; at most 200"
+ },
+ "trust": {
+  "exposure_basis": "tracked access-rule checks; details are not published",
+  "open_exposures_known": 0,
+  "owner_delegated_signs": 11,
+  "owner_delegated_signs_last_30_days": 11
+ },
+ "demand": {
+  "jobs": 26,
+  "published": {
+   "open": 4,
+   "unset": 21,
+   "invite_only": 1
+  },
+  "new_requests": {
+   "last_7_days": 0,
+   "last_30_days": 0,
+   "published_open_last_7_days": 4,
+   "published_open_last_30_days": 4
+  },
+  "jobs_by_stage": {
+   "requested": 6,
+   "no_requirements": 20
+  },
+  "jobs_by_status": {
+   "paid": 1,
+   "quoted": 2,
+   "pending": 4,
+   "completed": 9,
+   "in_progress": 10
+  },
+  "inspection_orders": {
+   "open": 0,
+   "total": 1
+  },
+  "open_requirements": 39,
+  "requirements_by_kind": {
+   "tool": 2,
+   "skill": 37,
+   "facility": 2,
+   "inspection": 1
+  },
+  "open_requirements_by_kind": {
+   "tool": 2,
+   "skill": 35,
+   "facility": 2
+  }
+ },
+ "supply": {
+  "provider_population": 1,
+  "providers_with_both": 0,
+  "declared_facility_assets": 0,
+  "provider_population_capped": false,
+  "verified_claimant_accounts": 0,
+  "providers_with_availability": 0,
+  "providers_with_service_area": 0,
+  "supply_organizations_claimable": {
+   "document_only": 2,
+   "by_domain_email": 21,
+   "not_on_nuke_yet": 23
+  },
+  "verified_claimant_organizations": 0,
+  "declared_facility_assets_by_kind": {},
+  "organizations_with_declared_assets": 0,
+  "organizations_with_supply_evidence": 23,
+  "accounts_with_pending_provider_links": 0,
+  "accounts_with_evidenced_provider_links": 1
+ },
+ "history": [
+  {
+   "date": "2026-10-19",
+   "jobs": 26,
+   "offers": 0,
+   "invoices": 0,
+   "quotes_accepted": 0,
+   "open_requirements": 39,
+   "payment_witnesses": 0,
+   "completions_accepted": 0,
+   "with_plan_b_supplier": 23,
+   "new_requests_last_7_days": 0,
+   "with_evidenced_candidate": 0,
+   "evidenced_provider_accounts": 1,
+   "verified_claimant_organizations": 0
+  }
+ ],
+ "matching": {
+  "unknown_for_all": {
+   "area": 0,
+   "skill": 32,
+   "tools": 0,
+   "facility": 1,
+   "availability": 34,
+   "evidence_rung": 0
+  },
+  "open_requirements": 39,
+  "tool_key_coverage": {
+   "percent": 50.0,
+   "with_keys": 1,
+   "requirements": 2
+  },
+  "skill_key_coverage": {
+   "percent": 100.0,
+   "with_keys": 35,
+   "requirements": 35
+  },
+  "with_plan_b_supplier": 23,
+  "with_evidenced_candidate": 0,
+  "with_no_provider_considered": 5,
+  "with_reachable_plan_b_supplier": 0
+ },
+ "history_basis": "daily snapshots (UTC), last 90 days; written by cron job-market-health-snapshot"
+}

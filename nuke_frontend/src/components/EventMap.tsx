@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { optimizeImageUrl } from '../lib/imageOptimizer';
+import { vehicleImageColumnsForViewer } from '../lib/vehicleImageColumns';
 
 // Lightweight Leaflet loader via CDN to avoid adding npm deps right now
 const ensureLeaflet = (): Promise<typeof window & { L: any }> => {
@@ -67,7 +68,7 @@ const EventMap: React.FC<EventMapProps> = ({ vehicleId, showLifeOnly = false }) 
       console.log('Loading image points for vehicle:', vehicleId);
       const { data, error } = await supabase
         .from('vehicle_images')
-        .select('id,image_url,exif_data,created_at,file_name,latitude,longitude')
+        .select(await vehicleImageColumnsForViewer('id,image_url,exif_data,created_at,file_name,latitude,longitude'))
         .eq('vehicle_id', vehicleId)
         .limit(1000);
       

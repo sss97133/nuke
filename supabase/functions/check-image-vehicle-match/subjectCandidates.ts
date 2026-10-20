@@ -117,7 +117,7 @@ export function projectResolutionContext(userId: string, freshImageId: string, s
   const unresolved = [...pool.keys()].filter(id => pool.get(id) === "unresolved_exterior").sort(rank);
   const freshSource = sources.get(freshImageId);
   const captureNeighbors = freshSource ? [...pool.keys()].map(id => ({ id, relation: captureRelation(freshSource, sources.get(id)) }))
-    .filter(row => row.relation.same_device_signature === true && row.relation.seconds_apart !== null && row.relation.seconds_apart <= 900 &&
+    .filter(row => row.relation.seconds_apart !== null && row.relation.seconds_apart <= 900 &&
       row.relation.meters_apart !== null && row.relation.meters_apart <= 100)
     .sort((a, b) => a.relation.seconds_apart! - b.relation.seconds_apart! || rank(a.id, b.id)) : [];
   const captureFirst = captureNeighbors.length > 0;

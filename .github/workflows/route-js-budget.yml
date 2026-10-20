@@ -1,0 +1,33 @@
+name: Frontend route JS budget
+
+# Initial JavaScript per route (vehicle, /jobs, /jobs/:id, /providers/:handle, /org/:id, /work/setup, /login), gzip KB
+# of the entry plus each route's page chunks and their static imports, against scripts/ci/route-js-budget.json:
+# fails on growth over 10%, over the absolute cap, or when a route loads a heavy lazy vendor chunk (maps, three,
+# charts) before first paint. The contract proves the 2026-10-19 Leaflet-on-every-page bug fails this check.
+# Lab LCP is not gated here (see scripts/perf/mobile-lab.mjs for why); this budget is the deterministic part.
+on:
+  pull_request:
+    paths:
+      - 'nuke_frontend/**'
+      - 'scripts/ci/route-js-budget*'
+      - '.github/workflows/route-js-budget.yml'
+  workflow_dispatch:
+
+jobs:
+  route-js-budget:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: nuke_frontend/package-lock.json
+      - name: Install app dependencies
+        working-directory: ./nuke_frontend
+        run: npm ci
+      - name: Per-route initial JS within budget
+        run: node scripts/ci/route-js-budget.mjs
+      - name: Budget contract (a reintroduced Leaflet-on-every-page chunking fails)
+        run: node --test --test-reporter=spec scripts/ci/route-js-budget.test.mjs

@@ -24,11 +24,12 @@ Deno.test("a VIN anchor and walk-around combine source capture context without f
   equal(result.capture_sessions?.[0].member_image_ids, ["a", "b"]);
   for (const change of [
     { taken_at: "2026-10-01T13:00:00Z" },
-    { capture_context: { device_fingerprint: "other", latitude: 35, longitude: -115 } },
     { capture_context: { device_fingerprint: "device", latitude: 36, longitude: -115 } },
     { capture_context: { device_fingerprint: "device", latitude: null, longitude: -115 } },
     { source_qualified: false },
   ]) equal(projectDepictedSubjects(reading, [sources[0], { ...sources[1], ...change }]).capture_sessions, undefined);
+  equal(projectDepictedSubjects(reading, [sources[0], { ...sources[1], capture_context: { device_fingerprint: "other", latitude: 35, longitude: -115 } }]).capture_sessions?.length, 1);
+  equal(projectDepictedSubjects(reading, [sources[0], { ...sources[1], capture_context: { device_fingerprint: null, latitude: 35, longitude: -115 } }]).capture_sessions?.length, 1);
   reading.contradictions = [{ left_image_id: "a", right_image_id: "b", reason: "Different paint and body configuration" }];
   equal(projectDepictedSubjects(reading, sources).capture_sessions, undefined);
 });
@@ -106,5 +107,27 @@ Deno.test("a qualified normalized input retains different source/consumed hashes
   equal(projectDepictedSubjects(raw(), [input("a", normalized), input("b")]).subjects.length, 1);
   for (const extra of [{ derivation_qualified: false }, { source_bytes_qualified: true }, { mime_type: "image/heic" }, { input_url: "https://untrusted.example/other.jpg" }]) {
     equal(projectDepictedSubjects(raw(), [input("a", { ...normalized, ...extra }), input("b")]).subjects.length, 0);
+  }
+});
+
+Deno.test("corroborating VIN anchors combine deterministically without manufacturing legibility", () => {
+  const sources = ["a", "b", "c"].map(id => input(id, { taken_at: "2026-10-01T12:00:00Z",
+    capture_context: { device_fingerprint: "device", latitude: 35, longitude: -115 } }));
+  const proposal = { anchor_image_id: "b", member_image_ids: ["a", "b"], basis: "Attached plate and walk-around",
+    identifier: { kind: "chassis", text: "6R07T123456", legibility: "partial" },
+    asserted_identity: { make: "Ford", model_family: "Mustang" } };
+  const other = { ...proposal, anchor_image_id: "c", member_image_ids: ["a", "c"],
+    identifier: { ...proposal.identifier, legibility: "clear" } };
+  const project = (sessions: unknown[]) => projectDepictedSubjects({ ...raw(["a", "b", "c"], []), capture_sessions: sessions }, sources).capture_sessions;
+  const combined = project([proposal, other]);
+  equal(project([other, proposal]), combined);
+  equal(combined?.[0].anchor_image_id, "c"); equal(combined?.[0].member_image_ids, ["a", "b", "c"]);
+  equal(combined?.[0].identifier.legibility, "clear");
+  equal(project([proposal, proposal])?.[0].identifier.legibility, "partial");
+  for (const change of [{ identifier: { ...other.identifier, text: "6R07T654321" } },
+    { asserted_identity: { make: "Other", model_family: "Mustang" } },
+    { asserted_identity: { make: "Ford", model_family: "Other" } }]) {
+    equal(project([proposal, { ...other, ...change }]), undefined);
+    equal(project([{ ...other, ...change }, proposal]), undefined);
   }
 });

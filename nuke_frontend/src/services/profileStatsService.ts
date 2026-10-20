@@ -318,15 +318,19 @@ export async function getPublicProfileByExternalIdentity(externalIdentityId: str
 /**
  * Get comprehensive organization profile data (BaT-style)
  */
-export async function getOrganizationProfileData(orgId: string): Promise<OrganizationProfileData> {
-  // Get organization with stats
-  const { data: organization, error: orgError } = await supabase
-    .from('businesses')
-    .select('*')
-    .eq('id', orgId)
-    .single();
-
-  if (orgError) throw orgError;
+export async function getOrganizationProfileData(orgId: string, preloaded?: { id?: unknown } | null): Promise<OrganizationProfileData> {
+  // The organization row: the caller's when it already read `businesses.*` for this id (the profile page does),
+  // otherwise read here.
+  let organization: any = preloaded && preloaded.id === orgId ? preloaded : null;
+  if (!organization) {
+    const { data, error: orgError } = await supabase
+      .from('businesses')
+      .select('*')
+      .eq('id', orgId)
+      .single();
+    if (orgError) throw orgError;
+    organization = data;
+  }
 
   // Get listings (vehicle_events for BaT + auction events)
   const { data: batEvents } = await supabase

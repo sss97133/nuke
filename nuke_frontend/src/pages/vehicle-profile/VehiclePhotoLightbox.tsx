@@ -136,14 +136,14 @@ const VehiclePhotoLightbox: React.FC = () => {
     const cached = photoIndexCache.get(vehicleId);
     if (cached) { setRows(cached); return; }
     let cancelled = false;
-    supabase
+    Promise.resolve(supabase
       .from('vehicle_images')
       .select('id, image_url, taken_at, source')
       .eq('vehicle_id', vehicleId)
       .not('is_duplicate', 'is', true)
       .not('image_url', 'is', null)
       .order('taken_at', { ascending: true, nullsFirst: false })
-      .limit(3000)
+      .limit(3000))
       .then(({ data, error }) => {
         if (cancelled) return;
         if (error || !Array.isArray(data)) {
@@ -164,12 +164,12 @@ const VehiclePhotoLightbox: React.FC = () => {
     if (!rows || !target?.id || !vehicleId) return;
     if (rows.some(r => r.id === target.id)) return;
     let cancelled = false;
-    supabase
+    Promise.resolve(supabase
       .from('vehicle_images')
       .select('id, image_url, taken_at, source')
       .eq('id', target.id)
       .eq('vehicle_id', vehicleId)
-      .maybeSingle()
+      .maybeSingle())
       .then(({ data, error }: { data: PhotoRow | null; error: unknown }) => {
         if (cancelled) return;
         if (error || (data !== null && !data?.image_url)) {

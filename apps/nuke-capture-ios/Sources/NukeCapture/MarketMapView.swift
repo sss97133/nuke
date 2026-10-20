@@ -401,54 +401,39 @@ struct CountyZIPGeometry {
         return Self(outline: outline, rings: rings, bounds: bounds)
     }
 
-    func areas() async throws -> (overlays: [MKOverlay], labels: [ZIPAreaLabel]) {
-        let geometry = try JSONSerialization.data(withJSONObject: ["rings": rings, "spatialReference": ["wkid": 4326]], options: .sortedKeys)
+    /// The county's ZCTA shapes, one GET from Nuke's own storage (scripts/map/build-tiles.mjs writes
+    /// map-data/geo/v1/county/<fips>.geojson from the Census 2020 cartographic file: every ZCTA that touches the
+    /// county, with GEOID, INTPTLAT and INTPTLON). No live Census query, no paging; the file is immutable and CDN-cached.
+    static func areasURL(_ fips: String) -> URL {
+        Config.supabaseURL.appendingPathComponent("storage/v1/object/public/map-data/geo/v1/county/\(fips).geojson")
+    }
+
+    func areas(fips: String) async throws -> (overlays: [MKOverlay], labels: [ZIPAreaLabel]) {
         var overlays: [MKOverlay] = []; var labels: [ZIPAreaLabel] = []; var seen = Set<String>()
-        // Fixed 2020 vintage, bounded to the actual county polygon; no national download.
-        var offset = 0
-        while true {
-            try Task.checkCancellation()
-            var url = URLComponents(string: "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/84/query")!
-            let params = ["where": "1=1", "geometry": String(decoding: geometry, as: UTF8.self),
-                          "geometryType": "esriGeometryPolygon", "inSR": "4326", "outSR": "4326",
-                          "spatialRel": "esriSpatialRelIntersects", "outFields": "GEOID,INTPTLAT,INTPTLON",
-                          "f": "geojson", "maxAllowableOffset": "0.0005", "geometryPrecision": "5",
-                          "resultRecordCount": "500", "resultOffset": String(offset), "orderByFields": "GEOID"]
-            url.queryItems = params.sorted { $0.key < $1.key }.map { URLQueryItem(name: $0.key, value: $0.value) }
-            var request = URLRequest(url: url.url!, cachePolicy: .returnCacheDataElseLoad, timeoutInterval: 20)
-            // Large coastal county rings can exceed normal URL limits. Query POST
-            // reads the same immutable geography; it carries no user location.
-            if request.url!.absoluteString.count > 7000 {
-                request.url = URL(string: url.string!.components(separatedBy: "?")[0])!
-                request.httpMethod = "POST"; request.httpBody = url.percentEncodedQuery?.data(using: .utf8)
-                request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+        try Task.checkCancellation()
+        let request = URLRequest(url: Self.areasURL(fips), cachePolicy: .returnCacheDataElseLoad, timeoutInterval: 20)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw URLError(.badServerResponse) }
+        let decoded = try await Task.detached(priority: .userInitiated) { try MKGeoJSONDecoder().decode(data) }.value
+        for case let feature as MKGeoJSONFeature in decoded {
+            guard let properties = feature.properties,
+                  let props = try JSONSerialization.jsonObject(with: properties) as? [String: Any],
+                  let code = props["GEOID"] as? String, CountyLocationRow.zip(code) == code,
+                  seen.insert(code).inserted else { throw URLError(.cannotParseResponse) }
+            let shapes = feature.geometry.compactMap { $0 as? MKOverlay }
+            guard !shapes.isEmpty, shapes.allSatisfy({ $0 is MKPolygon || $0 is MKMultiPolygon }) else {
+                throw URLError(.cannotParseResponse)
             }
-            let (data, response) = try await URLSession.shared.data(for: request)
-            guard (response as? HTTPURLResponse)?.statusCode == 200,
-                  let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  let features = json["features"] as? [[String: Any]] else { throw URLError(.badServerResponse) }
-            if features.isEmpty { return (overlays, labels) }
-            let decoded = try await Task.detached(priority: .userInitiated) { try MKGeoJSONDecoder().decode(data) }.value
-            for case let feature as MKGeoJSONFeature in decoded {
-                guard let properties = feature.properties,
-                      let props = try JSONSerialization.jsonObject(with: properties) as? [String: Any],
-                      let code = props["GEOID"] as? String, CountyLocationRow.zip(code) == code,
-                      seen.insert(code).inserted else { throw URLError(.cannotParseResponse) }
-                let shapes = feature.geometry.compactMap { $0 as? MKOverlay }
-                guard !shapes.isEmpty, shapes.allSatisfy({ $0 is MKPolygon || $0 is MKMultiPolygon }) else {
-                    throw URLError(.cannotParseResponse)
-                }
-                for shape in shapes {
-                    (shape as? MKShape)?.title = code; overlays.append(shape)
-                }
-                if let rawLat = props["INTPTLAT"] as? String, let lat = Double(rawLat),
-                   let rawLon = props["INTPTLON"] as? String, let lon = Double(rawLon),
-                   CLLocationCoordinate2DIsValid(CLLocationCoordinate2D(latitude: lat, longitude: lon)) {
-                    labels.append(ZIPAreaLabel(zip: code, coordinate: CLLocationCoordinate2D(latitude: lat, longitude: lon)))
-                }
+            for shape in shapes {
+                (shape as? MKShape)?.title = code; overlays.append(shape)
             }
-            offset += features.count
+            if let rawLat = props["INTPTLAT"] as? String, let lat = Double(rawLat),
+               let rawLon = props["INTPTLON"] as? String, let lon = Double(rawLon),
+               CLLocationCoordinate2DIsValid(CLLocationCoordinate2D(latitude: lat, longitude: lon)) {
+                labels.append(ZIPAreaLabel(zip: code, coordinate: CLLocationCoordinate2D(latitude: lat, longitude: lon)))
+            }
         }
+        return (overlays, labels)
     }
 }
 
@@ -598,7 +583,7 @@ struct ZIPMapViewport {
             let result: (overlays: [MKOverlay], labels: [ZIPAreaLabel])
             if let cached { result = (cached.1, cached.2) }
             else {
-                result = try await boundary.areas()
+                result = try await boundary.areas(fips: fips)
                 await ZIPMapReadCache.shared.putGeometry(fips, boundary, result.overlays, result.labels)
             }
             try Task.checkCancellation()

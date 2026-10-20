@@ -2,7 +2,15 @@ import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { fetchVehicleOwnerBooks } from '../../../lib/privateMoney';
-import type { WorkOrderReceipt, VehicleReceipt, DealContact } from './useBuildStatus';
+import type { WorkOrderReceipt, DealContact } from './useBuildStatus';
+
+export interface VehicleReceipt {
+  id: string;
+  vendor_name: string | null;
+  total: number;
+  receipt_date: string | null;
+  invoice_number: string | null;
+}
 
 export interface DealJacketRow {
   id: string;

@@ -66,6 +66,19 @@ enum VisionEngine {
         return false
     }
 
+    /// Identity-path document guard: OCR text can identify a photographed invoice
+    /// even when the scene classifier misses the paper/document label. This is a
+    /// local, free check; OCR text itself is never uploaded as an identity claim.
+    static func isIdentityDocument(labels: [String], isScreenshot: Bool, ocrLines: [String]) -> Bool {
+        if isUnnecessary(labels: labels, isScreenshot: isScreenshot) { return true }
+        let text = ocrLines.joined(separator: " ").lowercased()
+        let directMarkers = ["invoice", "receipt", "estimate", "work order", "repair order",
+                             "bill to", "amount due", "project description"]
+        if directMarkers.contains(where: text.contains) { return true }
+        let lineItemMarkers = ["quantity", "unit price", "subtotal", "tax", "description", "cost"]
+        return lineItemMarkers.filter(text.contains).count >= 3
+    }
+
     // MARK: - Asset → CGImage (local, no network by default)
 
     /// Load a PHAsset (by localIdentifier) as a CGImage sized for Vision.
@@ -482,6 +495,28 @@ enum VisionEngine {
             }
         }
         return out
+    }
+
+    /// Pre-1981 chassis serials have no check digit. Accept them only when OCR sees
+    /// an explicit VIN/serial/chassis label on the same line; album context later
+    /// supplies make/model and the capture fold supplies the photographed vehicle.
+    /// This keeps arbitrary part numbers and invoice line items from becoming IDs.
+    static func labelledClassicSerialCandidates(in lines: [String]) -> [String] {
+        let label = try? NSRegularExpression(pattern: #"\b(?:VIN|SERIAL(?:\s+NO\.?|\s+NUMBER)?|CHASSIS(?:\s+(?:NO\.?|NUMBER))?|VEHICLE\s+IDENTIFICATION)\b"#, options: [.caseInsensitive])
+        var result = Set<String>()
+        for line in lines {
+            let ns = line as NSString
+            guard let match = label?.firstMatch(in: line, range: NSRange(location: 0, length: ns.length)) else { continue }
+            let tail = ns.substring(from: NSMaxRange(match.range))
+            let tokens = tail.uppercased().components(separatedBy: CharacterSet.alphanumerics.inverted)
+            let candidates = tokens.filter { token in
+                (8...16).contains(token.count) && token.contains(where: \.isLetter) &&
+                    token.contains(where: \.isNumber) && token.utf8.allSatisfy({ $0 < 128 })
+            }
+            // More than one serial-shaped value on a labelled line is ambiguous.
+            if candidates.count == 1, let candidate = candidates.first { result.insert(candidate) }
+        }
+        return result.sorted()
     }
 
     private static func levenshtein(_ a: String, _ b: String) -> Int {

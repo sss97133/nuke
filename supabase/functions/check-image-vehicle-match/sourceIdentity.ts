@@ -180,7 +180,7 @@ export function inspectSourceIdentity(source: unknown) {
   const result = binding.result, lineage = result.status === "refused" ? null : result.lineage;
   return { contract: binding.contract, receipt_image_id: binding.receipt_image_id,
     root_image_id: lineage?.root_image_id ?? null, current_image_id: lineage?.current_image_id ?? null,
-    alias_image_ids: lineage?.alias_image_ids ?? [binding.receipt_image_id], audit_ids: lineage?.audit_ids ?? [],
+    alias_image_ids: lineage?.alias_image_ids ?? [], audit_ids: lineage?.audit_ids ?? [],
     state: result.status, reason: result.status === "eligible_for_byte_verification" ? null : result.reason,
     complete: binding.lookup_complete, source_photo_count: lineage ? 1 : null,
     current_vehicle_attribution_proven: false };

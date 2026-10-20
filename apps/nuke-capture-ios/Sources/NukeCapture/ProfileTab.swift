@@ -357,6 +357,9 @@ struct ProfileView: View {
                 }
             }
 
+            ClientFaceSection(isOwn: isOwn)
+            ProviderFaceSection(userId: userId, isOwn: isOwn)
+
             // ORGANIZATIONS — the person's memberships with each relation's weight (user_org_relations), on their
             // own profile only: the owner took organizations off the profile face on 2026-06-13 ("I don't want those
             // showing up"; UserWorkspaceContent.tsx), and the web shows them only on the signed-in capsule.
@@ -365,6 +368,7 @@ struct ProfileView: View {
             // GARAGE — the user's vehicles, the way into the whole drill chain.
             // Empty + own profile → a LIVING state that says what's coming, not a
             // hidden section that reads as a dead profile (the cold-start gravestone).
+            if isOwn { GarageDoorSection(userId: userId) }
             if !garage.isEmpty || !unresolvedGarageSources.isEmpty {
                 garageSection
             } else if garageError {
@@ -593,6 +597,12 @@ struct ProfileView: View {
             if let bio = profile?.bio, !bio.isEmpty {
                 Text(bio).font(.callout).foregroundStyle(Color.primary)
                     .fixedSize(horizontal: false, vertical: true)
+            }
+
+            // profiles.role is a self-claim, never a decided context: dim, at the record rung.
+            if let role = profile?.role, !role.isEmpty {
+                RootedValueView(label: "Role", value: role.replacingOccurrences(of: "_", with: " "),
+                                status: .recorded, decay: "self-described")
             }
 
             // LIVE STATE — is this node producing NOW? The first "worth-connecting-to"
@@ -856,36 +866,9 @@ struct ProfileView: View {
         guard isOwn else { await loadPublicGarage(); return }
         garageError = false
         do {
-            async let legacyRows: [GarageVehicle] = SupabaseService.client
-                .rpc("get_user_garage", params: ["p_user_id": userId])
-                .execute()
-                .value
-            async let correctionRows = fetchOwnGarageCorrections()
-            var rows = try await legacyRows
-            let fetchedCorrections = try await correctionRows
-            let corrections = isOwn && SupabaseService.currentUserId == userId.lowercased() ? fetchedCorrections : []
-            let unresolved = GarageUnresolvedSource.from(corrections)
-            let ids = Array(Set(rows.map(\.vehicle_id) + corrections.compactMap(\.vehicle_id)))
-            if !ids.isEmpty {
-                let metadata: [GarageMetadata] = try await SupabaseService.client.from("vehicles")
-                    .select("id,year,make,model,normalized_model,trim,vin,primary_image_url,image_count")
-                    .in("id", values: ids).execute().value
-                let byID = Dictionary(uniqueKeysWithValues: metadata.map { ($0.id, $0) })
-                let present = Set(rows.map(\.vehicle_id))
-                for m in metadata where !present.contains(m.id) {
-                    rows.append(GarageVehicle(vehicle_id: m.id, year: m.year, make: m.make,
-                        model: m.normalized_model ?? m.model, trim_name: m.trim, image_url: m.primary_image_url,
-                        current_value: nil, image_count: m.image_count ?? 0, relationship: "relationship_review", vin: m.vin))
-                }
-                for index in rows.indices {
-                    if let m = byID[rows[index].id] {
-                        rows[index].vin = m.vin
-                        let normalized = m.normalized_model?.trimmingCharacters(in: .whitespaces)
-                        rows[index].model = normalized?.isEmpty == false ? normalized : m.model
-                    }
-                }
-            }
-            rows = GarageVehicle.applying(corrections, to: rows)
+            let own = try await GarageReaders.ownGarage(userId: userId)
+            let rows = own.vehicles
+            let unresolved = own.unresolved
             garage = rows
             unresolvedGarageSources = unresolved
             garageIsCached = false
@@ -934,11 +917,6 @@ struct ProfileView: View {
         let vin: String?
         let primary_image_url: String?
         let image_count: Int?
-    }
-
-    private func fetchOwnGarageCorrections() async throws -> [GarageOwnerCorrection] {
-        guard isOwn, SupabaseService.currentUserId == userId.lowercased() else { return [] }
-        return try await SupabaseService.client.rpc("get_my_garage_owner_corrections", params: ["p_include_unresolved": true]).execute().value
     }
 
     // ─── Garage failed to load — distinct from "no vehicles yet". ─────────────
@@ -1109,7 +1087,7 @@ struct ProfileView: View {
         do {
             let rows: [ProfileRow] = try await SupabaseService.client
                 .from("profiles")
-                .select("id,username,full_name,avatar_url,bio,location,role")
+                .select("id,username,full_name,avatar_url,bio,location,city,role")
                 .eq("id", value: userId)
                 .limit(1)
                 .execute()
@@ -1138,7 +1116,7 @@ struct ProfileView: View {
             loadError = nil
         } catch {
             if Self.isPermissionDenied(error) { signInNeeded = true; loadError = nil; profileSettled = true; return }
-            loadError = "Load failed"
+            loadError = ReadFailure.text(error)
             NSLog("NukeCapture profile load failed: %@", String(describing: error))
         }
         profileSettled = true
@@ -1259,12 +1237,12 @@ struct DayReceiptView: View {
                     } description: {
                         Text("Day receipts are read by signed-in accounts.")
                     }
-                } else if loadError != nil {
+                } else if let failure = loadError {
                     // Failed ≠ empty — offer a way back, never a dead red string.
                     ContentUnavailableView {
                         Label("Couldn't load the day", systemImage: "exclamationmark.triangle")
                     } description: {
-                        Text("The read failed. Retry.")
+                        Text(failure)
                     } actions: {
                         Button("Retry") { Task { loaded = false; loadError = nil; await load() } }
                             .buttonStyle(.borderedProminent)
@@ -1313,7 +1291,7 @@ struct DayReceiptView: View {
             if let pg = error as? PostgrestError, pg.code == "42501" {
                 loadError = "Sign in to open a day receipt"
             } else {
-                loadError = "Load failed"
+                loadError = ReadFailure.text(error)
             }
             NSLog("NukeCapture day receipt failed: %@", String(describing: error))
         }

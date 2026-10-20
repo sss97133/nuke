@@ -134,7 +134,7 @@ In addition to the card's list:
 | C13 | Dealer monitors dead since 2026-02-17 | 495 of 496; no second visit ever | open | yes | the diff step inside `poll-listing-feeds`: presence ledger (dealer, listing_url, observed_at, status, price), appear/disappear/sold events |
 | C14 | Craigslist stores share URLs, no post id, no HTML diff, no second sighting | 100% of rows since August | open | yes | read the post id from the detail page; snapshot the detail page (`archiveFetch`); diff the search snapshot per poll into appear/disappear events |
 | C15 | Block auctions: no sale entity, no catalog-before, no video | `auction_events` last house row 2026-04-01 | open | yes (catalog); video needs a cost plan | a sale entity (house, start, end, location, catalog); catalog-before per event; results after; video clips as documentation later |
-| C16 | Facebook dead since 2026-06-12, 111,669 phantom actives | monitor cron off | open | no (Mac fetch) | per-metro request budget and sighting log; the cloud only folds and checks |
+| C16 | Facebook dead since 2026-06-12, 111,669 phantom actives | monitor cron off; 2026-10-18 the iMac runner lands ~900 listings/day with custody, but 5% reached a vehicle (see "Facebook listings reach the graph", 2026-10-19) | open | no (Mac fetch) | per-metro request budget and sighting log; the cloud only folds and checks |
 | C17 | Photo pipeline operating coverage | Opening sample: 1,042 rows `classifier_failed=true`, no error text. Writer repair [#506](https://github.com/sss97133/nuke/pull/506) and typed witness [#507](https://github.com/sss97133/nuke/pull/507) merged. Read-only 2026-10-04 UTC: one existing observation has one typed witness and reaches the public field drill; 3/3 cited images load. Cron 478 remains paused. | open — one image-to-reader path verified | yes (bounded diagnosis) | Continue the existing cached-result/receipt lane; prove eligible arrivals reach durable observations, witnesses and a useful reader. Preserve processing holds; the opening backlog count is not a current re-drive instruction. See follow-up below. |
 | C18 | Sensitive photos hidden by RLS, still public by URL | 474 flagged | open | yes | move sensitive objects out of the public bucket or sign URLs |
 | C19 | Anon writers remaining (§2.10) | 66 functions, 127 unguarded deployed functions, `vehicle_custom_circuits` | open | yes | a census that matches every DML form and dynamic SQL; revoke; a policy fix; a deploy-list diff against the repo |
@@ -2740,6 +2740,71 @@ page of a search is not removed (only the first page is read), so absence from a
 revisit rule (a landed post still on a search page is read again after 24 h) is the clock for this. A blank-model post is
 kept as an unresolved listing observation (`vehicle_id` NULL) and is not retried as a failure.
 
+### Facebook listings reach the graph the way Craigslist posts do (C16 follow-up, prepared 2026-10-19 UTC)
+
+**The question (owner, 2026-10-18 22:20 PT).** Is the incoming Facebook Marketplace data landing smoothly and going from
+snapshot to deeply integrated? Is it on the Sources board and the map? Can a user click through to the listing? Is the
+seller kept?
+
+**Measured before the repair (2026-10-19 ~05:30 UTC, bounded reads).** Custody was sound: the iMac Playwright runner's
+packets (61 search passes over ~30 metros on 10-18/19, 0 errors) each kept their raw batch in `fb_sweep_jobs` and one
+sighting per listing in `fb_listing_sightings`. Integration was not:
+- Population: `marketplace_listings` 117,546 rows (111,644 with a `vehicle_id`, almost all from the retired collectors).
+  New in 7 days: 1,803, all `fb-browser-capture`; 91 linked (5%), and every recent capture receipt said
+  `linked_observations: 0`.
+- Cause 1, identity: search cards carried `parsed_year` only, and `linkToVehicle` returns before matching without a make.
+  The shared title parser (`ingest/vehicleTitle.ts`) resolves year, make and model on 1,846 of the 1,871 titles first
+  seen in that window (98.7%); the rest state no model ("1984 Porsche") and stay unresolved.
+- Cause 2, events: the capture path wrote no `vehicle_events`, so the Sources board (`market_sources_read` counts
+  listing events by hour) showed Facebook landed 24 h = 0, 7 d = 91, last landed 10-15, while 918 and 1,803 listings
+  arrived. The 91 were a one-off `ingest` pass on 10-15.
+- Cause 3, ingest overwrote testimony: for a Facebook URL `ingest` upserted `marketplace_listings` on `facebook_id`,
+  replacing the captured title, description, seller name, image and `first_seen_at` with its own fields and NULLs.
+- Detail pages: of 133 retained listing pages, the "About this vehicle" block states mileage on 128, transmission 128,
+  exterior color 128, title status 47, owner count 32; the landed rows held mileage on 3 of 1,803.
+- Photos: a listing page's `all_images` also held the "Today's picks" tiles of other people's cars (median 29 captured,
+  10 the listing's own); 0 of 117,546 `image_url`s were in storage, and Facebook CDN links expire within days.
+- Seller: `seller_name` text on 121 of 1,803; no profile id captured; `external_identities` held 0 facebook rows
+  (697,279 bat). `marketplace_listings` has no row policy, so anonymous readers get no rows; `external_identities` and
+  `vehicles.seller_name` are publicly readable.
+- Map: `/map` and `/atlas` read organizations and `vehicle_location_observations`; that table held no Facebook rows.
+  1,449 of 1,804 recent "City, ST" locations match `city_geocode_lookup`.
+
+**The repair, in the existing owners.**
+- `extract-facebook-marketplace/listingFacts.ts` reads each packet's own text: identity from the title (Facebook's form
+  suffixes such as "Coupe 2D" and "Long Bed" read off first), the About block, the seller block's counts, the listed
+  label, and the gallery (center-cropped picks tiles, avatars and ad creatives dropped). Fill-only; the facts and
+  `fb-listing-facts-v1` ride in `raw_scrape_data.listing_facts`.
+- `integrate.ts`, after the custody receipt: a titled unlinked listing goes through `ingest` (VIN/URL match, gate, new
+  `discovered` vehicle or merge proposal, the classified listing event); a linked one lands its listing event at the
+  capture clock; a revisit's removal ends the event (outcome unknown); the place lands as a city-grain
+  `vehicle_location_observations` row; photos copy through `backfill-images` with `run_analysis: false`; a profile id
+  becomes `external_identities ('facebook', id)` with no display name, keyed from
+  `marketplace_listings.seller_identity_id`. Saved-items batch mode is not integrated (held privacy PR #1421).
+  The receipt joins the capture's `fb_sweep_jobs.metadata.integration`.
+- `ingest` links an existing `marketplace_listings` row and never rewrites it.
+- The runner (repo copy) sends the seller's profile link and drops photos inside links to other items; the iMac copy is
+  owned by its own agents and adopts this separately.
+- `map-vehicles` points carry `source_url` and `asking_price`; the pin panel shows the asking price and opens the listing.
+
+**Acceptance.** A new capture's `metadata.integration` shows created/matched vehicles and listing events; the Sources
+board's Facebook landed counts follow the arrivals; `/atlas?source=facebook_marketplace` shows the new points and the pin
+opens the Facebook listing; a seller key appears only where a profile link was captured. Disagreement case: a title
+without a model stays unlinked and is counted `unresolved_identity`. Stages (implemented, tested, merged, deployed,
+runtime-verified) are recorded in the PR and the lane log.
+
+**Delivered 2026-10-19.** #2122 (column) and #2124 (writer, ingest, map) merged and deployed 06:17Z; #2133 (card photo
+for imageless vehicles) 06:44Z. Runtime-verified on live packets: 06:21:52Z 50 cards gave 40 vehicles, observations,
+map rows and photo copies, with 9 deferred by the source_intake ceiling of 40; 06:22:22Z 31 cards gave 30, 0 errors. A
+bounded replay (`mode: "integrate"`, 77 calls of 25 ids) over the 1,909 capture-era unlinked listings created 1,805
+vehicles, 1,805 observations and 1,697 map rows, left 22 unresolved (no model) and had 0 errors; it added no sighting or
+submission count. Population after, first seen since 2026-10-12, measured 06:53Z: 2,066 listings, 2,029 linked (98%),
+2,029 with a listing event, 1,820 with a map row, 209 with a stored photo (replayed rows held no image; their next
+sighting copies one), 28 unlinked active, 9 unlinked inactive; 28 merge proposals filed, none auto-merged. Sources board
+Facebook landed 24 h: 1,938 (this day includes the replay, which the board dates by event creation). Seller identities:
+0, waiting on the iMac runner adopting `seller_profile_url`. Not in scope: the 111,644 older linked listings and the 513
+older seller ids (replaying them would present phantom actives as live listings).
+
 ### 13.13 A listing rises by what it is: the classified merit stack (owner, 2026-10-15)
 
 **Owner direction, in substance.** The arrivals feed is led by Craigslist "not cuz its good but cuz its easy. its
@@ -2896,3 +2961,75 @@ malformed evidence, privacy and refusal to accrue usage/value. This connects ret
 evidence without a new observation ledger, photo processing, paid inference or canonical
 asset minting. Full image coverage and a physical-object identity resolver remain unmeasured
 and unimplemented respectively; vehicle context does not establish operation usage.
+
+Work-specification connection (2026-10-19): owner direction that material and process belong
+together in the work specification, not in a free-standing provider qualification judgment.
+Live inspection of the selected case found three disagreeing accounts already retained: the
+requested scope quote, installed part records (graded and ungraded stainless, a stainless TIG
+filler) and the operation's component event (mild steel with MIG). Parts carry no typed
+operation link, and cost subsets matching the operation total were not unique, so part
+supply cannot be assigned to an operation by inference. Migration
+`20261019035407_work_order_resource_specifications.sql` adds a `specification` event to the
+existing resource projector and an immutable private table. Each claim records a stage, role,
+verbatim labels and dotted interpretation keys; its basis is a retained excerpt or an exact
+component-event or part row snapshot. The existing reader compares requested pairs with
+current claims by role and key and reports a conflict without adjudicating substitution,
+qualification or completion. Changed, withdrawn or reattributed bases withhold claims; history
+remains. Disposable PG17 covers 57 specification cases and reruns the 88 existing resource
+assertions against the new projector. This is one selected case; the specification population
+of other jobs is not assessed, and accepted scope changes, measured usage, completion and
+compensation remain open.
+
+Mechanics RSI pass 1, job-path scoreboard (2026-10-19): owner direction "rsi" applies the
+measure → largest closable gap → migration + PG17 → re-measure loop to the mechanics job path.
+The job path had no self-measurement. Migration `20261019045753_work_order_job_path.sql`
+adds a private read-only reader per work order and a population scoreboard over existing
+owners, reporting stage states, gaps and status/clock/record inconsistencies without repair.
+Before (live, 2026-10-19 04:56 UTC, denominator all 26 work_orders rows): 22 vehicle-bound;
+operations itemized on 2; resource requirements on 2 and specifications on 1; installed parts
+on 2, parts with an operation code on 1; assignments on 1 (9 rows, none with an accept clock);
+labor rows on 3; start clocks 5; completion clocks 7 against 10 done/paid statuses; payment
+records on 3, including one without a vehicle; a paid status with no payment record; 15
+vehicle-scoped payment events with no job attribution; no approval clock and no payout record
+anywhere. Next passes take the largest gap the retained evidence can close; readiness,
+acceptance, usage and labor value stay unassessed until evidence supports them.
+
+Mechanics RSI pass 2, requested operations (2026-10-19): the pass 1 scoreboard's largest gap was
+`no_operations`, 24 of 26 work orders. Retained evidence for those 24 is mostly prose summary;
+one quoted work order itemizes its scope line by line, and one completed order holds labor-task
+rows the scoreboard did not count. The operations owner, `work_order_line_items`, had no
+provenance or sanctioned insert path, and billing reads only priced lines. Migration
+`20261019051336_work_order_scope_operations.sql` adds provenance to that owner and an `operation`
+projection that quotes the work order's own text verbatim into pending, unpriced, unassigned
+line items. A guard keeps sourced text and provenance immutable while parties keep editing status.
+The job path now counts labor-task evidence and reports withdrawn or stale sources. Disposable
+PG17 covers 27 cases and reruns the 25 + 57 + 88 earlier mechanics assertions. Prose-only scopes
+remain unitemized; splitting comma lists is a later, separately evidenced pass.
+
+A job is a quote (2026-10-19; owner: use the standard language): the mechanics slices above
+are read together as one model. A job is a quote whose itemized lines each name the witness,
+clock and signer that close them; acceptance makes it a work order, and invoice and payment
+conclude it as a receipt, a computed conclusion over reconciled witnesses. The lifecycle
+vocabulary, stage-to-line table, invariants, fourteen-agreement inventory with holders and
+gaps, privacy doctrine (job data open, personal information withheld, party payments visible
+only to the parties, contact brokered by the platform), adopted owner-overridable defaults,
+listing-to-inspection pipeline and explainable matching join live in
+`docs/library/technical/work-order-intelligence.md` § "A job is a quote".
+
+Mechanics RSI pass 3, retained lifecycle testimony (2026-10-19): overnight the job loop gained Sign owners for
+quote acceptance, start, completion, invoice and payment witness, all empty across the 26 work orders because
+their Signs need authenticated parties. The selected real job's retained messages already state client price
+acceptance, an invoice, a pause and finished operations. Forging Signs from them would invent authentication,
+so migration `20261020003000_work_order_retained_testimony.sql` adds a separate immutable projection keyed to the
+interpretation, quoting the original message under its own clock and speaker label, and anchors count-only
+testimony blocks into the shared job-path reader and scoreboard without changing stage states. Disposable PG17
+covers 33 cases; the job-loop replay contract proves the anchored edits against the real build. A name collision
+with the completion/invoice lane's `project_work_order_lifecycle_event` was caught by that replay and avoided.
+
+Card payment of job invoices (2026-10-19, owner: "build it out we have stripe"): the job loop could invoice and
+record payment testimony but not take a payment, and the existing stripe-webhook credited the AI wallet for every
+completed Checkout, including non-credit purchases. Migration `20261020014500_work_order_invoice_stripe_payments.sql`
+adds a `stripe` documentation source, an immutable processor-payment projection, customer-only checkout terms over
+the current invoice balance, a webhook recorder idempotent on Stripe event and session ids, and anchored edits so
+reconciliation counts processor receipts and the customer's job actions offer `pay_invoice`. The webhook now routes
+by purchase type. Collection only: no transfer, payout or release; the live key is not exercised by tests.

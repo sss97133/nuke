@@ -94,7 +94,6 @@ const VehicleBanners: React.FC<VehicleBannersProps> = ({
       {isVerifiedOwner && (
         <React.Suspense fallback={null}>
           <MergeProposalsPanel
-            sellerStack={<React.Suspense fallback={null}><SellerStackButton /></React.Suspense>}
             vehicleId={vehicle.id}
             onMergeComplete={onMergeComplete}
           />

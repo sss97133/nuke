@@ -72,7 +72,9 @@ Deno.test("missing audit and foreign source rows never become guessed aliases", 
   result = await loadSourceIdentities(new DB(f.images, f.audits), owner, [id(1)]);
   assert(result.sources[0].source_identity.result.status === "refused");
   assert(result.alias_image_ids.join() === id(1));
-  assert(inspectSourceIdentity(result.sources[0])?.current_image_id === null);
+  const receipt = inspectSourceIdentity(result.sources[0]);
+  assert(receipt?.state === "refused" && receipt.current_image_id === null && receipt.root_image_id === null);
+  assert(receipt.alias_image_ids.length === 0 && receipt.audit_ids.length === 0 && receipt.source_photo_count === null);
 });
 Deno.test("capped audit lookup is incomplete and cannot assert absence of a fork or withdrawal", async () => {
   const f = family(), audits = Array.from({ length: 2049 }, (_, n) => ({ ...f.audits[0], id: id(10000 + n) }));

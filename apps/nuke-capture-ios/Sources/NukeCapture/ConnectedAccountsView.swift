@@ -1,8 +1,8 @@
 // ConnectedAccountsView.swift — what the user chooses to link to their profile.
 //
-// BYOK doctrine (laser-tag): Nuke owns the checklist + harness; the user brings
-// their OWN compute — their ChatGPT / Claude / Grok / Gemini subscription. The key
-// is theirs, the cost is theirs; Nuke never meters its own AI against the user.
+// Customer cloud subject analysis runs on Nuke's server credential and the prepaid
+// wallet (README, "Shipping"); customers connect no provider key for that path. A
+// linked key is optional and stays the user's own.
 // Mirrors the web `user_ai_providers` model (AIProviderSettings.tsx): a row per
 // provider, the key stored base64 in api_key_encrypted, RLS-scoped to the user.
 // Accounting (QuickBooks) links via the web OAuth hub.
@@ -46,11 +46,10 @@ struct ConnectedAccountsView: View {
     private func icon(for key: String) -> String {
         providerOptions.first { $0.key == key }?.icon ?? "key"
     }
-    // Which compute tier is driving: your own key (BYOK) > prepaid wallet > nothing.
+    // Cloud subject analysis draws on the prepaid wallet; an unread balance is said as unread.
     private var computeSource: String {
-        if !providers.isEmpty { return "Your linked key" }
-        if let c = balanceCents, c > 0 { return "Nuke wallet" }
-        return "Not configured"
+        guard let c = balanceCents else { return "Wallet not read" }
+        return c > 0 ? "Nuke wallet" : "Wallet not funded"
     }
 
     var body: some View {
@@ -72,10 +71,10 @@ struct ConnectedAccountsView: View {
             } header: {
                 Text("Compute")
             } footer: {
-                Text("Analysis runs on your linked key when present. The Nuke wallet is prepaid managed compute, funded on the web.")
+                Text("Cloud subject analysis uses Nuke's server credential and your prepaid Nuke wallet, funded on the web. It does not need a key of your own.")
             }
 
-            // ── BYOK AI ────────────────────────────────────────────────────────
+            // ── Your own provider keys (optional) ─────────────────────────────
             Section {
                 if !loaded {
                     HStack(spacing: 8) { ProgressView(); Text("Loading…").font(.footnote).foregroundStyle(.secondary) }
@@ -86,7 +85,7 @@ struct ConnectedAccountsView: View {
                         Button("Retry") { Task { await load() } }.font(.footnote)
                     }
                 } else if providers.isEmpty {
-                    Text("Link your ChatGPT, Claude, Grok, or Gemini subscription — the app runs analysis on YOUR key, never metered against ours.")
+                    Text("No provider key linked. Cloud subject analysis does not need one.")
                         .font(.footnote).foregroundStyle(.secondary)
                 } else {
                     ForEach(providers) { p in
@@ -106,9 +105,9 @@ struct ConnectedAccountsView: View {
                 }
                 Button { showAdd = true } label: { Label("Link a provider", systemImage: "plus") }
             } header: {
-                Text("AI · bring your own")
+                Text("AI · your own keys (optional)")
             } footer: {
-                Text("Your key, your subscription, your cost. Stored on your account, used only for your vehicles.")
+                Text("Stored on your account. Cloud subject analysis does not run on these keys.")
             }
 
             // ── Accounting ─────────────────────────────────────────────────────

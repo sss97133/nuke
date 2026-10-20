@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
@@ -36,6 +37,10 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id) {
+          // Vite's dynamic-import preload helper is imported by every chunk that lazy-loads anything. Left unassigned,
+          // Rollup placed it in 'maps', so the entry and every route statically imported maps (Leaflet, ~150 KB
+          // compressed, plus its stylesheet in <head>) on every page (measured 2026-10-19). Keep it with React.
+          if (id.includes('vite/preload-helper')) return 'vendor';
           if (id.includes('node_modules')) {
             // THREE.JS — @react-three/* goes here (only used by wiring page, lazy-loaded).
             // Dependency is one-way: three→vendor (for React). No circular dep.
@@ -62,6 +67,11 @@ export default defineConfig({
               id.includes('react-dom') ||
               id.includes('/react/')
             ) return 'vendor';
+
+            // clsx is both a recharts dependency and the app's cn() helper (src/lib/utils.ts, used by CollapsibleWidget).
+            // Left to the rule below it joined 'charts', so every CollapsibleWidget pulled all of recharts (~125 KB
+            // compressed) onto the vehicle page (measured 2026-10-19). Keep it with React.
+            if (id.includes('/clsx/')) return 'vendor';
 
             // Charts — lazy-loaded, only a few pages use recharts
             if (id.includes('recharts') || id.includes('d3-')) return 'charts';

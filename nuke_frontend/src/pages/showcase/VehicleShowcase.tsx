@@ -336,7 +336,7 @@ export default function VehicleShowcase() {
         <div style={{ fontSize: 9, color: '#444' }}>
           Vehicle is the entity. Every photo, every record, every comment is testimony from a source, at a time, with a trust level.
           Nothing is overwritten. {' '}
-          <Link to="/atlas" style={{ color: '#5af', textDecoration: 'none' }}>See the full atlas →</Link>
+          <Link to="/map" style={{ color: '#5af', textDecoration: 'none' }}>See the map →</Link>
         </div>
       </div>
     </div>

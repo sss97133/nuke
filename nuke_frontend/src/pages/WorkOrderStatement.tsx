@@ -3,13 +3,14 @@
  * 1. INVOICE (default) — clean auto shop invoice, printable, customer-facing
  * 2. EDIT — full CRUD with inline editing, status dropdowns, provenance (owner view)
  *
- * Route: /work-orders/statement?q=smith (or ?vehicle_id=UUID)
+ * Route: /work-orders/statement?work_order_id=UUID | ?vehicle_id=UUID | ?handle=name (or ?q=UUID / ?q=@handle)
+ * Open statement; payments and balances only for the viewer's own work orders; contact is brokered by Nuke.
  */
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useSearchParams } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
+import { useAuth } from '../hooks/useAuth';
 import {
   useWorkOrderStatement,
   type PartRow,
@@ -17,6 +18,8 @@ import {
   type PaymentRow,
   type ShopInfo,
 } from './vehicle-profile/hooks/useWorkOrderStatement';
+
+type PaymentMethod = NonNullable<ShopInfo['payment_methods']>[number];
 
 // ── Helpers ──
 
@@ -39,7 +42,11 @@ const fmtDateShort = (d: string) => {
 
 type InvoiceTheme = 'classic' | 'modern' | 'dealer';
 
-const InvoiceView: React.FC<{ data: any; onEdit: () => void; onSend: () => void; sending: boolean; sentStatus: string; theme: InvoiceTheme; onThemeChange: (t: InvoiceTheme) => void }> = ({ data, onEdit, onSend, sending, sentStatus, theme, onThemeChange }) => {
+const ContactViaNuke: React.FC<{ style?: React.CSSProperties }> = ({ style }) => (
+  <button type="button" disabled title="Contact requests are brokered by Nuke; not available yet" style={{ cursor: 'not-allowed', opacity: 0.6, ...style }}>CONTACT VIA NUKE</button>
+);
+
+const InvoiceView: React.FC<{ data: any; onEdit?: () => void; theme: InvoiceTheme; onThemeChange: (t: InvoiceTheme) => void }> = ({ data, onEdit, theme, onThemeChange }) => {
   const vehicleTitle = [data.vehicle.year, data.vehicle.make, data.vehicle.model].filter(Boolean).join(' ');
   const invoiceDate = fmtDate(new Date().toISOString());
   const invoiceNum = `INV-${(data.vehicle.model || 'VEH').replace(/\s+/g, '').toUpperCase().slice(0, 6)}-${new Date().toISOString().slice(2, 10).replace(/-/g, '')}`;
@@ -90,7 +97,7 @@ const InvoiceView: React.FC<{ data: any; onEdit: () => void; onSend: () => void;
               letterSpacing: '0.06em', cursor: 'pointer', fontFamily: 'Arial',
               border: theme === t ? '2px solid #1a3050' : '1px solid #999',
               background: theme === t ? '#1a3050' : 'transparent',
-              color: theme === t ? '#fff' : '#666',
+              color: theme === t ? '#fff' : '#444',
             }}>{t}</button>
           ))}
         </div>
@@ -105,8 +112,7 @@ const InvoiceView: React.FC<{ data: any; onEdit: () => void; onSend: () => void;
             <div style={{ fontSize: '18px', fontWeight: 800, letterSpacing: '0.08em' }}>{data.shop?.name?.toUpperCase() || 'NUKE'}</div>
             <div style={{ fontSize: '9px', color: '#4a6080' }}>Vehicle Build & Service</div>
             <div style={{ fontSize: '9px', color: '#4a6080' }}>{[data.shop?.city, data.shop?.state?.toUpperCase()].filter(Boolean).join(', ') || 'Las Vegas, NV'}</div>
-            {data.shop?.email && <div style={{ fontSize: '9px', color: '#4a6080' }}>{data.shop.email}{data.shop.website ? ` · ${data.shop.website.replace(/^https?:\/\/(www\.)?/, '')}` : ''}</div>}
-            {data.shop?.phone && <div style={{ fontSize: '9px', color: '#4a6080' }}>{data.shop.phone}</div>}
+            {data.shop?.website && <div style={{ fontSize: '9px', color: '#4a6080' }}>{data.shop.website.replace(/^https?:\/\/(www\.)?/, '')}</div>}
           </div>
 
           {/* Order number */}
@@ -115,8 +121,8 @@ const InvoiceView: React.FC<{ data: any; onEdit: () => void; onSend: () => void;
           {/* ── CUSTOMER / VEHICLE INFO GRID ── */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', ...RO, marginBottom: '2px' }}>
             <div style={{ padding: '3px 6px', borderRight: '1px solid #7B96B0' }}>
-              <span style={{ fontSize: '7px', fontWeight: 700, textTransform: 'uppercase', color: '#4a6080' }}>NAME </span>
-              <span style={{ fontWeight: 600 }}>{data.contact?.name || '—'}</span>
+              <span style={{ fontSize: '7px', fontWeight: 700, textTransform: 'uppercase', color: '#4a6080' }}>CONTACT </span>
+              <span style={{ fontWeight: 600 }}>via Nuke</span>
             </div>
             <div style={{ padding: '3px 6px', minWidth: '120px' }}>
               <span style={{ fontSize: '7px', fontWeight: 700, textTransform: 'uppercase', color: '#4a6080' }}>DATE </span>
@@ -126,11 +132,11 @@ const InvoiceView: React.FC<{ data: any; onEdit: () => void; onSend: () => void;
           <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', ...RO, marginBottom: '2px' }}>
             <div style={{ padding: '3px 6px', borderRight: '1px solid #7B96B0' }}>
               <span style={{ fontSize: '7px', fontWeight: 700, textTransform: 'uppercase', color: '#4a6080' }}>ADDRESS </span>
-              <span>{data.contact?.email || '—'}</span>
+              <span>—</span>
             </div>
             <div style={{ padding: '3px 6px', minWidth: '120px' }}>
               <span style={{ fontSize: '7px', fontWeight: 700, textTransform: 'uppercase', color: '#4a6080' }}>PH. NO. </span>
-              <span>{data.contact?.phone || '—'}</span>
+              <span>—</span>
             </div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', ...RO, marginBottom: '2px' }}>
@@ -227,7 +233,7 @@ const InvoiceView: React.FC<{ data: any; onEdit: () => void; onSend: () => void;
               )}
               {/* TOTAL AMOUNT */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px', background: '#1a3050' }}>
-                <div style={{ padding: '4px 6px', fontSize: '10px', fontWeight: 800, textTransform: 'uppercase', color: '#fff', borderRight: '1px solid #7B96B0' }}>TOTAL AMOUNT</div>
+                <div style={{ padding: '4px 6px', fontSize: '10px', fontWeight: 800, textTransform: 'uppercase', color: '#fff', borderRight: '1px solid #7B96B0' }}>{data.moneyVisible ? 'TOTAL AMOUNT' : 'TOTAL · PAYMENTS SHOWN TO PARTIES ONLY'}</div>
                 <div style={{ padding: '4px 6px', textAlign: 'right', fontFamily: 'Courier New', fontSize: '12px', fontWeight: 800, color: '#fff' }}>{fmt(data.totals.balance)}</div>
               </div>
             </div>
@@ -284,7 +290,7 @@ const InvoiceView: React.FC<{ data: any; onEdit: () => void; onSend: () => void;
             <div style={{ margin: '10px 0', padding: '8px 10px', border: '1px solid #7B96B0', background: '#e8edf3' }}>
               <div style={{ fontSize: '8px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#1a3050', marginBottom: '6px' }}>Payment Instructions</div>
               <div style={{ display: 'grid', gridTemplateColumns: `repeat(${data.shop.payment_methods.length}, 1fr)`, gap: '10px', fontSize: '9px', color: '#1a3050', lineHeight: 1.5 }}>
-                {data.shop.payment_methods.map((pm, i) => (
+                {data.shop.payment_methods.map((pm: PaymentMethod, i: number) => (
                   <div key={i}>
                     <div style={{ fontWeight: 700, marginBottom: '2px' }}>{pm.label}</div>
                     <div>{pm.detail}</div>
@@ -303,6 +309,8 @@ const InvoiceView: React.FC<{ data: any; onEdit: () => void; onSend: () => void;
                 level="M"
                 fgColor="#1a3050"
                 bgColor="transparent"
+                role="img"
+                aria-label="QR code: this vehicle's page on Nuke"
               />
               <div style={{ fontSize: '7px', color: '#4a6080', textTransform: 'uppercase' }}>Payment due upon receipt<br/>Questions? Contact {data.shop?.email || 'support@nuke.ag'}</div>
             </div>
@@ -314,15 +322,12 @@ const InvoiceView: React.FC<{ data: any; onEdit: () => void; onSend: () => void;
 
           {/* Action bar */}
           <div className="no-print" style={{ display: 'flex', gap: '8px', marginTop: '16px', paddingTop: '12px', borderTop: '1px solid #7B96B0' }}>
-            <button onClick={onEdit} style={{ padding: '8px 16px', fontSize: '9px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', border: '1px solid #7B96B0', background: 'transparent', color: '#4a6080', cursor: 'pointer', fontFamily: 'Arial' }}>EDIT</button>
+            {onEdit && <button onClick={onEdit} style={{ padding: '8px 16px', fontSize: '9px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', border: '1px solid #7B96B0', background: 'transparent', color: '#4a6080', cursor: 'pointer', fontFamily: 'Arial' }}>EDIT</button>}
             <button onClick={() => window.print()} style={{ padding: '8px 16px', fontSize: '9px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', border: '2px solid #1a3050', background: 'transparent', color: '#1a3050', cursor: 'pointer', fontFamily: 'Arial' }}>PRINT</button>
-            {data.contact?.email && (
-              <button onClick={onSend} disabled={sending || sentStatus === 'sent'} style={{
-                flex: 1, padding: '8px 16px', fontSize: '9px', fontWeight: 700, textTransform: 'uppercase',
-                letterSpacing: '0.08em', border: '2px solid #1a3050', cursor: 'pointer', fontFamily: 'Arial',
-                background: sentStatus === 'sent' ? '#006847' : '#1a3050', color: '#fff', opacity: sending ? 0.6 : 1,
-              }}>{sending ? 'SENDING...' : sentStatus === 'sent' ? 'SENT' : 'SEND TO CUSTOMER'}</button>
-            )}
+            <ContactViaNuke style={{
+              flex: 1, padding: '8px 16px', fontSize: '9px', fontWeight: 700, textTransform: 'uppercase',
+              letterSpacing: '0.08em', border: '2px solid #1a3050', fontFamily: 'Arial', background: '#1a3050', color: '#fff',
+            }} />
           </div>
         </div>
 
@@ -368,8 +373,7 @@ const InvoiceView: React.FC<{ data: any; onEdit: () => void; onSend: () => void;
             <div style={T.shopName}>{data.shop?.name?.toUpperCase() || 'NUKE'}</div>
             <div style={T.shopDetail}>Vehicle Build & Service</div>
             <div style={T.shopDetail}>{[data.shop?.city, data.shop?.state?.toUpperCase()].filter(Boolean).join(', ') || 'Las Vegas, NV'}</div>
-            {data.shop?.email && <div style={T.shopDetail}>{data.shop.email}</div>}
-            {data.shop?.phone && <div style={T.shopDetail}>{data.shop.phone}</div>}
+            {data.shop?.website && <div style={T.shopDetail}>{data.shop.website.replace(/^https?:\/\/(www\.)?/, '')}</div>}
           </div>
           <div style={{ textAlign: 'right' }}>
             <div style={T.invoiceTitle}>INVOICE</div>
@@ -389,15 +393,7 @@ const InvoiceView: React.FC<{ data: any; onEdit: () => void; onSend: () => void;
         <div style={T.infoRow}>
           <div>
             <div style={T.infoLabel}>BILL TO</div>
-            {data.contact ? (
-              <>
-                <div style={T.infoName}>{data.contact.name}</div>
-                {data.contact.email && <div style={T.infoLine}>{data.contact.email}</div>}
-                {data.contact.phone && <div style={T.infoLine}>{data.contact.phone}</div>}
-              </>
-            ) : (
-              <div style={T.infoLine}>—</div>
-            )}
+            <div style={T.infoLine}>Contact via Nuke</div>
           </div>
           <div style={{ textAlign: 'right' }}>
             <div style={T.infoLabel}>VEHICLE</div>
@@ -522,7 +518,7 @@ const InvoiceView: React.FC<{ data: any; onEdit: () => void; onSend: () => void;
                 </div>
               )}
               <div style={T.balanceDue}>
-                <span>BALANCE DUE</span>
+                <span>{data.moneyVisible ? 'BALANCE DUE' : 'TOTAL · PAYMENTS SHOWN TO PARTIES ONLY'}</span>
                 <span>{fmt(balance)}</span>
               </div>
             </div>
@@ -601,7 +597,7 @@ const InvoiceView: React.FC<{ data: any; onEdit: () => void; onSend: () => void;
           <div style={{ marginTop: '24px', padding: '16px', border: '2px solid #1a1a1a', background: '#fafafa' }}>
             <div style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.08em', marginBottom: '10px' }}>Payment Instructions</div>
             <div style={{ display: 'grid', gridTemplateColumns: `repeat(${data.shop.payment_methods.length}, 1fr)`, gap: '16px', fontSize: '10px', lineHeight: 1.5 }}>
-              {data.shop.payment_methods.map((pm, i) => (
+              {data.shop.payment_methods.map((pm: PaymentMethod, i: number) => (
                 <div key={i}>
                   <div style={{ fontWeight: 700, marginBottom: '4px' }}>{pm.label}</div>
                   <div>{pm.detail}</div>
@@ -622,21 +618,9 @@ const InvoiceView: React.FC<{ data: any; onEdit: () => void; onSend: () => void;
 
         {/* Action bar — not printed */}
         <div style={T.actionBar} className="no-print">
-          <button onClick={onEdit} style={T.editBtn}>EDIT</button>
+          {onEdit && <button onClick={onEdit} style={T.editBtn}>EDIT</button>}
           <button onClick={() => window.print()} style={T.printBtn}>PRINT</button>
-          {data.contact?.email && (
-            <button
-              onClick={onSend}
-              disabled={sending || sentStatus === 'sent'}
-              style={{
-                ...T.sendBtn,
-                opacity: sending ? 0.6 : 1,
-                background: sentStatus === 'sent' ? '#006847' : '#1a1a1a',
-              }}
-            >
-              {sending ? 'SENDING...' : sentStatus === 'sent' ? 'SENT' : 'SEND TO CUSTOMER'}
-            </button>
-          )}
+          <ContactViaNuke style={{ ...T.sendBtn, background: '#1a1a1a' }} />
         </div>
       </div>
 
@@ -938,7 +922,7 @@ const CellEditor: React.FC<CellEditorProps> = ({ value, type = 'text', format = 
   const [editValue, setEditValue] = useState(value ?? '');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-  const saveRef = useRef<NodeJS.Timeout>();
+  const saveRef = useRef<NodeJS.Timeout | undefined>(undefined);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { setEditValue(value ?? ''); }, [value]);
@@ -1034,7 +1018,7 @@ const EditView: React.FC<{ data: any; updateField: any; addRow: any; deleteRow: 
 
         <div style={E.header}>
           <span style={E.headerTitle}>EDITING: {vehicleTitle}</span>
-          <span style={E.headerBalance}>Balance: {fmt(data.totals.balance)}</span>
+          <span style={E.headerBalance}>{data.moneyVisible ? `Balance: ${fmt(data.totals.balance)}` : 'Payments shown to parties only'}</span>
         </div>
 
         {data.workOrders.map((wo: any) => {
@@ -1155,38 +1139,37 @@ const editStyles = {
 
 const WorkOrderStatement: React.FC = () => {
   const [searchParams] = useSearchParams();
-  const query = searchParams.get('q') || searchParams.get('vehicle_id') || null;
+  const workOrderId = searchParams.get('work_order_id');
+  const vehicleId = searchParams.get('vehicle_id');
+  const handle = searchParams.get('handle');
+  const q = searchParams.get('q');
+  const query = workOrderId ? `wo:${workOrderId}` : vehicleId ? `vehicle:${vehicleId}` : handle ? `handle:${handle}` : q || null;
   const [mode, setMode] = useState<'invoice' | 'edit'>('invoice');
   const [theme, setTheme] = useState<InvoiceTheme>('classic');
-  const [sending, setSending] = useState(false);
-  const [sentStatus, setSentStatus] = useState<'idle' | 'sent' | 'error'>('idle');
+  const { user } = useAuth();
 
-  const { data, loading, error, updateField, addRow, deleteRow, toggleComp, refetch } = useWorkOrderStatement(query);
+  const { data, matches, loading, error, updateField, addRow, deleteRow, toggleComp } = useWorkOrderStatement(query);
 
-  const handleSend = useCallback(async () => {
-    if (!data?.contact?.email || !data.vehicle) return;
-    setSending(true);
-    setSentStatus('idle');
-    try {
-      const vehicleTitle = [data.vehicle.year, data.vehicle.make, data.vehicle.model].filter(Boolean).join(' ');
-      const invoiceDate = new Date().toISOString().split('T')[0];
-      const invoiceNumber = `INV-${(data.vehicle.model || 'VEH').replace(/\s+/g, '').toUpperCase().slice(0, 6)}-${invoiceDate.replace(/-/g, '').slice(4)}`;
-      await supabase.from('generated_invoices').upsert({ work_order_id: data.workOrders[0]?.id, invoice_number: invoiceNumber, invoice_date: invoiceDate, due_date: invoiceDate, subtotal: data.totals.subtotal, tax_amount: 0, tax_rate: 0, total_amount: data.totals.subtotal, amount_paid: data.totals.payments, amount_due: data.totals.balance, payment_status: data.totals.balance > 0 ? 'partial' : 'paid', status: 'sent', sent_at: new Date().toISOString() }, { onConflict: 'work_order_id' });
-      const { error: sendError } = await supabase.functions.invoke('send-invoice-email', { body: { to: data.contact.email, subject: `Invoice: ${vehicleTitle} — ${fmt(data.totals.balance)} Balance Due`, customer_name: data.contact.name, vehicle_title: vehicleTitle, invoice_number: invoiceNumber, invoice_date: invoiceDate, total: data.totals.subtotal, paid: data.totals.payments, balance: data.totals.balance, line_items: data.workOrders.map((wo: any) => ({ description: wo.title, amount: wo.parts_total + wo.labor_total })), payment_methods: data.shop?.payment_methods || [], shop: data.shop ? { name: data.shop.name, email: data.shop.email, phone: data.shop.phone, city: data.shop.city, state: data.shop.state } : undefined } });
-      if (sendError) throw sendError;
-      setSentStatus('sent');
-    } catch { setSentStatus('error'); } finally { setSending(false); }
-  }, [data]);
+  const center: React.CSSProperties = { minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Arial', color: '#888' };
+  if (!query) return <div style={center}>Add ?work_order_id=, ?vehicle_id= or ?handle= to the URL</div>;
+  if (loading) return <div style={{ ...center, fontFamily: 'Courier New', fontSize: '12px' }}>Loading...</div>;
+  if (matches) {
+    return (
+      <div style={{ ...center, flexDirection: 'column', gap: '8px' }}>
+        <div>Choose a vehicle</div>
+        {matches.map((m) => (
+          <a key={m.vehicle_id} href={`?vehicle_id=${m.vehicle_id}`}>{m.vehicle_label?.text || m.vehicle_id}</a>
+        ))}
+      </div>
+    );
+  }
+  if (error || !data) return <div style={center}>{error || 'No statement found for this lookup'}</div>;
 
-  if (!query) return <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Arial', color: '#888' }}>Add ?q=name or ?vehicle_id=UUID to the URL</div>;
-  if (loading) return <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Courier New', color: '#888', fontSize: '12px' }}>Loading...</div>;
-  if (error || !data) return <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Arial', color: '#888' }}>{error || `No results for "${query}"`}</div>;
-
-  if (mode === 'edit') {
+  if (mode === 'edit' && user) {
     return <EditView data={data} updateField={updateField} addRow={addRow} deleteRow={deleteRow} toggleComp={toggleComp} onInvoice={() => setMode('invoice')} />;
   }
 
-  return <InvoiceView data={data} onEdit={() => setMode('edit')} onSend={handleSend} sending={sending} sentStatus={sentStatus} theme={theme} onThemeChange={setTheme} />;
+  return <InvoiceView data={data} onEdit={user ? () => setMode('edit') : undefined} theme={theme} onThemeChange={setTheme} />;
 };
 
 export default WorkOrderStatement;

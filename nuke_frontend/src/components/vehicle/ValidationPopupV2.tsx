@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useVINProofs } from '../../hooks/useVINProofs';
 import { useFieldIntelligence, type FieldIntelligence } from '../../hooks/useFieldIntelligence';
+import { vehicleImageColumnsForViewer } from '../../lib/vehicleImageColumns';
 
 interface ValidationSource {
   source_type: string;
@@ -20,8 +21,8 @@ interface ValidationPopupV2Props {
   vehicleId: string;
   fieldName: string;
   fieldValue: string;
-  vehicleYear?: number;
-  vehicleMake?: string;
+  vehicleYear?: number | null;
+  vehicleMake?: string | null;
   onClose: () => void;
 }
 
@@ -437,7 +438,7 @@ const ValidationPopupV2: React.FC<ValidationPopupV2Props> = ({
       // 2. Tagged images (title/registration/VIN photos)
       const { data: docImages } = await supabase
         .from('vehicle_images')
-        .select('sensitive_type, image_url, created_at, user_id, documented_by_user_id, exif_data')
+        .select(await vehicleImageColumnsForViewer('sensitive_type, image_url, created_at, user_id, documented_by_user_id, exif_data'))
         .eq('vehicle_id', vehicleId)
         .in('sensitive_type', ['title', 'registration', 'vin_plate', 'bill_of_sale'])
         .order('created_at', { ascending: false });

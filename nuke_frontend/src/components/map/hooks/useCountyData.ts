@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { fetchCountyData } from '../mapService';
+import { fetchCountyData, type ListingMeasure } from '../mapService';
 import { loadCountyBoundaries, prepareCountyData, type CountyLayerData } from '../layers/countyLayer';
 import type { CountyMapData } from '../types';
 
-export function useCountyData(enabled: boolean, timeStart?: string, timeEnd?: string) {
+export function useCountyData(enabled: boolean, timeStart?: string, timeEnd?: string, listing?: ListingMeasure) {
   const [layerData, setLayerData] = useState<CountyLayerData | null>(null);
   const [stats, setStats] = useState<CountyMapData['stats'] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -16,7 +16,7 @@ export function useCountyData(enabled: boolean, timeStart?: string, timeEnd?: st
     setLoading(true);
     setError(null);
 
-    Promise.all([loadCountyBoundaries(), fetchCountyData(timeStart, timeEnd)])
+    Promise.all([loadCountyBoundaries(), fetchCountyData(timeStart, timeEnd, listing)])
       .then(([geojson, data]) => {
         if (cancelled) return;
         const prepared = prepareCountyData(geojson, data.counties);
@@ -31,7 +31,7 @@ export function useCountyData(enabled: boolean, timeStart?: string, timeEnd?: st
       });
 
     return () => { cancelled = true; };
-  }, [enabled, timeStart, timeEnd]);
+  }, [enabled, timeStart, timeEnd, listing?.eventType, listing?.days, listing?.source]);
 
   return { layerData, stats, loading, error };
 }

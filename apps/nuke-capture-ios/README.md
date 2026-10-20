@@ -58,6 +58,13 @@ Standing rules the code carries:
   and until it checks `vision_gate_status` a reader that drops the predicate can read rejected frames.
   Thumbnails render through `NukeImage.thumb(url, width:)` (the render endpoint, or BaT's `?w=`), never
   the raw original outside the full-screen viewer.
+- **Payments open Stripe, never compose an amount.** A job's `pay_invoice` action comes only from the server (`viewer.actions`, offered to the work order customer while a balance is due). `JobPayment.swift` passes back its `work_order_id` to `create-work-order-invoice-checkout` and opens the returned page only when it is https on stripe.com. Nothing is charged until the customer finishes on Stripe; the payment reaches the job through `stripe-webhook`. Collection only: the app shows no payout or release.
+- **Job history is testimony until someone signs.** A stage's `retained_testimony` (counts of claims quoted from retained work messages) renders in `JobTestimony.swift` on the attributed rung as "N messages from the shop say…", never as accepted, done or paid, and never changes the stage. `JobOperationsSection` takes each operation's rung from `work_order_operations_read`'s `requested_by_basis` (signed → proven, quoted from the work order's text → attributed, no source → recorded); a "complete" line status is the record's mark, not a completion Sign. `JobEvidenceSection` shows `work_order_evidence_read` filings, counting photos the viewer may not see, and names an operation for visitors only in the operations reader's redacted words.
+- **Providers are placed by their band, never pinned.** "Choose who does it" (`Jobs/ProviderMatchesView.swift`, from the job while nobody is accepted and from Job posted) renders `work_order_provider_matches_read` in its own order (rank by passed checks, ties shared) with every input in third-person words. Service area and availability are the provider's self-claimed Signs and say so. The readers return no coordinates for people, so the map draws each stated band as a circle around its city's center (MapKit geocoding of the public "City, ST") and the job's public city; no business pin until a reader returns a public business place. Filters cover only the reader's inputs and a stated mobile band. Standing comes from `provider_profile_read` with its basis; Accept offer appears only when `work_order_offers_read` names it. The screen contacts nobody.
+- **A job's who-and-where card shows only what the server placed.** `JobProviderPlaceCard.swift` renders `work_order_provider_place_read`: the work order's organization (rating "Not rated" unless reviews are recorded, hours as written), the people on the job (accepted through Nuke apart from recorded assignment rows), and a tracker whose steps, evidence (Sign, record, status) and clocks come from the server's job path; messages are counted under a step and never fill it. A pin, Directions and Call appear only for a storefront business the server located; a personal collection, an untyped organization or a provider's self-stated band is a city-level circle labelled approximate, never a pin.
+- **A part is a product page, not a purchase.** The checklist lists a job's parts as product rows; each opens `PartProductView` (`PartProduct.swift`) over `work_order_part_read`: the line's recorded status (not a sign-off), its recorded prices as recorded (a total is never multiplied out), the part's product page (`work_order_part_products`: the seller page, the seller's photo and the match basis), the seller link and recorded retailer offers opened in Safari only when http(s) (no in-app ordering or payment), and a catalog listing matched by exact part number. A product page or catalog listing is labelled with its source and clock as a statement about the product, never as the installed part; row thumbnails are the seller's photo from `work_order_operations_read`'s `product` card. Parts have no key to an operation, so the page names only labor lines sharing the part's job code and attributes no photo to a part.
+- **A job opens Live, with Details one tap away.** `JobLiveView.swift` is the order-in-motion screen: map hero, status headline (the latest kind of event in `work_order_activity_read`, not a stage verdict), the server's tracker steps, who is doing it, and the activity feed (`JobActivity.swift`), where each row says how it is known (Signed, Recorded, Card processor, Message · not verified) and never shows a user id, an amount or message text. While open it polls at the server's `poll_after_seconds` with `p_since`, slides new events in and refreshes the detail readers. Actions stay on Details (`JobPathContent`); the fixture backend opens Details so the UI tests drive it.
+- **Notifications mirror the web's NotificationCenter.** The Work tab reads the account's latest 50 `user_notifications` rows under their own-row policy (exact count beside them), the unread count from `get_unread_notification_count`, and marks read only from a tap through `mark_notification_read` / `mark_all_notifications_read` (`Notifications/`). A row opens a job or conversation when its metadata names one (`work_order_id`, `contact_request_id`), else the web's order: `action_url`, `vehicle_id`, `organization_id`; a nuke.ag path with no screen opens on the web, and other sites are not opened. Anything that needs a Sign stays in `my_signature_queue`. The Work badge is the unread count plus the queue's stated total. There is no push (no APNs entitlement or registration).
 - **Uploads are keyed by their bytes.** The storage path is `users/<uid>/capture-relay/<sha256>/<filename>`
   (`Config.storagePath`). The filename alone wraps at IMG_9999: by 2026-10-15, 586 old paths each held rows of
   different photos (1,266 rows, at least 598 showing another photo's bytes). Never key an object by a name the
@@ -67,13 +74,43 @@ Standing rules the code carries:
 - **Photos file to the owner's vehicles; strong evidence makes a profile.** Owner direction, 2026-10-15: "the app
   after vision run is supposed to assign the vehicle to a profile under the image owners associated vehicle profiles,
   its supposed to create new profiles if theres enough data to support it." `AttributionEngine.run` files an uploaded
-  photo through the server (`device_file_images` → `attribute_testimony`, audited) on a serial read matching one of
-  the owner's vehicles (every era's serial, `VisionEngine.matchSerial`) or on the owner's album mapped to a vehicle
-  (`album_sync_map`). A valid 17-character VIN (`VisionEngine.isValidVIN`) that matches nothing, or an unmapped album
+  photo through the server (`device_file_images` → `attribute_testimony`, audited) on a fresh exact VIN or chassis
+  serial matching one of the owner's vehicles, or on the owner's album mapped to a vehicle (`album_sync_map`) after a
+  fresh original-byte read classifies the image as a vehicle. Fuzzy reads and photos without a fresh source read stay out
+  of automatic filing. A valid 17-character VIN (`VisionEngine.isValidVIN`) that matches nothing, or an unmapped album
   named "year make model" (`AlbumLabel`) with `Config.albumProfileMinPhotos` uploaded photos, goes to
   `device_create_vehicle_profile`, which resolves an existing vehicle first and creates a private profile, with the
-  owner as photographer and not as owner, only when the server's thresholds hold. A session inheritance (same day,
-  same ~100 m cell) stays a suggestion: a dealer lot holds many cars. Nothing in the app writes `vehicle_id` directly.
+  owner as photographer and not as owner, only when the server's thresholds hold. Vehicle identity now has its own `identityMethodVersion`: it reads original local photo bytes with on-device
+  Vision OCR/classification and does not accept previous cloud, album, or deep-analysis output as identity evidence.
+  A fresh VIN-anchored capture read is retained in the existing protected, reading-only `image_observations` lane.
+  It records the source hash, method revision, run, bounded peer inputs, local vehicle/document classifications and
+  check-digit-valid modern VINs and explicitly labelled 8–16 character classic chassis serials. It creates no subject or membership. This keeps pre-identity reads out of
+  `image_analysis_records` (whose required `vehicle_id` would invent a relation) and avoids a parallel source-read
+  table. Before profile admission, the server folds only reads from the same fresh run and exact source hashes, with
+  the identifier anchor and independently classified vehicle frames within five minutes and 25 m by capture metadata.
+  A classic serial additionally needs one unambiguous owner album label for its year, make and model; unlabeled OCR
+  strings and serials without that context remain unresolved. Invoice/document language in local OCR blocks both VIN
+  and serial anchors, and raw OCR text never leaves the phone.
+  Documents, sensitive or rejected photos, stale hashes, missing clocks/locations, and nearby conflicting VINs block
+  the fold. The existing audited profile writer then resolves a globally held VIN or creates a private profile with
+  the photographer relation. For a newly created 17-character VIN profile, the server invokes the existing
+  `decode-vin-and-update` owner so free NHTSA results seed canonical fields and their observation provenance; it
+  reports decode unavailable/no-new-fields separately from the successfully filed photos. The live VIN trigger is
+  installed but its required database URL and service-key settings are absent, so it currently skips its queue call.
+  Camera make/model/lens metadata is not treated as a unique device id. This path includes a pending migration and is
+  not deployed or runtime-verified. Broad day/place inheritance remains a suggestion.
+  The table fold follows ownership: `vehicle_images` retains original source, owner, hash and capture facts;
+  `image_observations` retains private source reads and unresolved subject testimony; `emergent_vehicle_clusters`
+  carries supported unresolved depicted subjects; the profile writer uses `vehicles`, `vehicle_contributors` and
+  `reattribution_audit` only after admission. `image_analysis_records` and `vehicle_field_evidence` are downstream
+  vehicle-linked analysis, so neither is allowed to invent identity before that fold resolves.
+  Historical analysis is not silently promoted into fresh identity evidence: the live atlas shows no
+  `image_analysis_records` writes since 2026-08-02, `vehicle_observations` has a large photo-pipeline cohort whose
+  rows mostly record classifier failures, and `vehicle_field_evidence` contains 238k NHTSA values literally equal
+  to `undefined` plus fabricated Hagerty placeholders already flagged for exclusion. `image_identities` is a content
+  root, not a vehicle identity; it can connect exact/aliased photo appearances but cannot by itself establish which
+  car is pictured. The fresh v2 read is hash-pinned to the retained original and does not reuse those prior verdicts.
+  Nothing in the app writes `vehicle_id` directly.
   Confirming one at a time is unrealistic at the owner's volume (owner, 2026-10-17): `SessionConfirmView` files
   photo-backed serial matches to its server suggestion (`get_orphan_sessions.suggested_vehicle_id`) with one tap, or
   across all suggested sessions at once. A session is a day/place review group and can contain several vehicles;
@@ -226,11 +263,16 @@ Standing rules the code carries:
 - **No fabricated data anywhere,** including DEBUG builds and screenshots (`docs/design/CONSTRAINTS.md` C0).
   DEBUG-only deep links (`NUKE_DEBUG_*`, `NukeCaptureApp.swift`) drive the screenshot loop and are compiled
   out of Release: `NUKE_DEBUG_VEHICLE_ID=<uuid>` roots on a profile as anon, `NUKE_DEBUG_SCREEN=app|
-  profile|explore|today|library`, `NUKE_DEBUG_SCROLL_TO=worth|proof|asset|specs|events|photos|more`,
+  profile|explore|today|work|library`, `NUKE_DEBUG_JOB_ID=<uuid>` roots on that work order's `JobView` (with `NUKE_DEBUG_SCROLL_TO=job-completion|job-invoice`) (readable signed out when the reader
+  allows it; `NUKE_DEBUG_CODES=1` shows raw reader codes under the plain copy),
+  `NUKE_DEBUG_VEHICLE_WORK=<uuid>` hosts a vehicle's Work card alone, `NUKE_DEBUG_STATEMENT_VEHICLE=<uuid>` its statement,
+  `NUKE_DEBUG_PROVIDER=<user uuid>` hosts a profile's provider face alone (no photos),
+  `NUKE_DEBUG_JOBS_LOOKING=1` hosts Work's "Jobs looking for someone" alone,
+  `NUKE_DEBUG_WORK_PLAN=<vehicle uuid>` hosts "Plan the work" for a listed vehicle (scroll anchors plan-work, plan-checklist), `NUKE_DEBUG_SCROLL_TO=worth|proof|asset|specs|events|photos|more`,
   `NUKE_DEBUG_EXPLORE_MODE=pulse|live|listings|map`, `NUKE_DEBUG_EXPLORE_QUERY=<text>` lands on the search
   results and `NUKE_DEBUG_EXPLORE_PAGES=<n>` walks n more pages through the door, `NUKE_DEBUG_LIVE_READING=1` opens
   the first hot or cold lot's reading on the board, `NUKE_DEBUG_LEDGER_MAKE=Chevrolet` opens that brand's models on the
-  ledger map, `NUKE_DEBUG_DAY=<yyyy-mm-dd>`
+  ledger map, `NUKE_DEBUG_ACTOR_ORG=<uuid>` roots on an organization's actor document, `NUKE_DEBUG_DAY=<yyyy-mm-dd>`
   (+ `NUKE_DEBUG_DAY_USER`) opens a day receipt. A session injected once persists in the simulator Keychain;
   terminate and relaunch, or use an explicit screen hook. `simctl install` the fresh product before a
   capture: a launch hook on a stale install looks like a code bug (2026-10-13).
@@ -287,6 +329,13 @@ In Xcode: target **NukeCapture-iOS** → Signing & Capabilities → set your
 preview; use the existing CI release path for an upload, without hand-bumping the
 build number. `generate.sh` is not tracked on main.
 
+**Tests.** `xcodebuild test -scheme NukeCapture-iOS` runs the unit tests (`UnitTests/`) and the UI tests
+(`UITests/`, XCUITest). The UI tests launch the app with `-NukeFixtureBackend 1` and a persona
+(`-NukeFixturePersona visitor|client|provider`): the Supabase client then talks only to an in-process fixture
+backend on `https://fixture.nuke.invalid` (`Sources/NukeCapture/Debug/FixtureBackend.swift`) and records every
+writer call for the assertions. The backend and the reader fixtures (`Sources/NukeCapture/Debug/Fixtures/`, shared
+with the unit tests) are wrapped in `#if DEBUG`, so a Release build never contains them and no test reaches production.
+
 ## Shipping
 
 The Library's **Albums** door preserves native album names, folder paths and exact
@@ -326,6 +375,16 @@ title/dispute qualifiers, evidence IDs and qualified account cover choices survi
 the offline cache. Business handling, consignment, representation and pending or
 disputed interests remain separate from personal ownership. A fork requires review.
 
+The own profile's **Garage** door (`Garage/`) opens the same fold (`GarageReaders.ownGarage`, shared
+with the profile list) grouped by the server's relationship: owned, other interests, previously owned,
+contributed; the footer states the total and its clock. A photographed or contributed vehicle is never
+shown as owned. `my_unorganized_photo_count` (the web's inbox badge, capped at 1,000 and shown as
+"1,000+") leads to `SessionConfirmView`, which reviews only this app's dated uploads; the screen says so.
+Each vehicle opens a hub: visibility, removal or merge from `vehicle_row_read`, the Work card (jobs,
+"Post a job" for an owned vehicle until `vehicle_access` says otherwise, else an inspection) and the
+profile. `my_vehicles` is not read: on 2026-10-19 no `work_record` observation carried an observer and
+the reader ran past the statement timeout.
+
 Album grouping and on-device review coverage persist locally. Limited Photos access
 cannot expose user albums, so the screen reports unknown album coverage while
 selected photos remain analyzable. No new
@@ -360,7 +419,28 @@ PrivacyInfo.xcprivacy              Apple privacy manifest (photos, precise locat
 Sources/NukeCapture/
   NukeCaptureApp.swift             @main; BGAppRefreshTask register/schedule; routing
   SignInView.swift                 sign in / sign out / account deletion (5.1.1(v))
-  TodayView.swift                  native value screen: counters, thumbs, Sync Now
+  TodayView.swift                  native value screen: counters, thumbs, Sync Now (CaptureSections)
+  Work/WorkConsoleView.swift       the Work tab: signature queue, jobs in motion, Capture
+  Work/WorkSessionSignSheet.swift  confirm one work day (confirm_work_session), explicit button
+  Account/ProviderLinkView.swift   technician-profile link: my_identity_read claims + self-claim filing
+  Jobs/JobQuotes.swift             quote, people and statement DTOs (open prices; payments to parties)
+  Jobs/AcceptQuoteSheet.swift      the customer's Sign on one quote version (accept_work_order_quote)
+  Vehicle/                         Work card (vehicle_work_orders_read) and statement view
+  Garage/                          owner's garage, photos to organize, per-vehicle work hub
+  Profile/                         provider face (provider_profile_read) and jobs on record
+  Provider/                        provider standing: link evidence (actor_link_claim_evidence_read), work days and
+                                   day-rate terms (provider_productivity_read), agent-signed register (owner_delegated_signs_read)
+  Provider/Toolbox*.swift          Toolbox: maker pack shots, list value, owner-only paid (user_toolbox_read)
+  Provider/ToolActionShots*.swift  Seen at work: photos by tool type the image analysis saw, not toolbox items
+                                   (user_tool_action_shots_read)
+  Contact/                         Contact via Nuke: request sheet, Work inbox, thread (in-app only)
+  Explore/                         Plan the work (listing_work_plan_read) and the Order inspection Sign
+  Jobs/JobCloseout*.swift + CloseoutSheets.swift  completion, invoice, payment witness, evidence Signs
+  Library/JobAttachBar.swift       select mode → Attach to job (job_evidence_candidates_read + attach_job_evidence)
+  Jobs/JobOffers.swift + Work/JobsLookingSection.swift  open requests, match table, offers (offer/accept Signs)
+  Jobs/ProviderMatches*.swift      Choose who does it: work_order_provider_matches_read cards, city-level area map,
+                                   provider_profile_read standing, the job's offers with the server's accept step
+  Jobs/                            JobView over work_order_job_path_read; DTOs, readers, stage rail
   SyncEngine.swift                 PhotoKit watch + watermark + dedupe + GPS gate
   SupabaseService.swift            auth, storage upload, vehicle_images insert
   Config.swift                     public URL/anon key, shop-gate geometry, tuning
