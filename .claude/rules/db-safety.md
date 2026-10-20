@@ -50,8 +50,8 @@ Testimony is the rows that record what was observed, by whom, from what source a
   AGENTS.md "Row writes", called as top-level PostgREST RPC; triggers fired ALWAYS refuse anything else. They are never
   updated in place: a newer row supersedes an older one with the `superseded_by` / `superseded_at` stamp (these tables
   have no `is_superseded`), and `evidence_decisions` is append-only (a later decision wins).
-- `evidence_runs` is the store's run log. A run's kind, config and scope never change; only `evidence_close_run`
-  closes a running run, once, setting its close columns. The owner's stored answers (`review_answers` runs) are written
+- `evidence_runs` is the store's run log. A run's kind, config and scope never change; `evidence_close_run` closes a
+  running run, once, setting its close columns. The owner's stored answers (`review_answers` runs) are written
   closed, so the guard refuses any later change to them; a review sheet (`review` run) keeps the rows and targets it was
   written with.
 - No agent uses or obtains an owner session (his JWT, cookies, a signed-in browser) to record a decision. Owner
