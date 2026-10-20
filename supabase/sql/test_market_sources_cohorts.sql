@@ -112,10 +112,11 @@ SELECT pg_temp.ok('no handle reaches the board', NOT EXISTS (
 SELECT pg_temp.ok('no source holding data lacks a species: cohort rows are not sources', NOT EXISTS (SELECT 1 FROM public.source_species_gaps()));
 
 SET ROLE service_role;
-SELECT pg_temp.ok('a second reading the same day replaces the rows',
-  public.record_market_source_day() > 0
-  AND (SELECT count(*) = 1 FROM public.market_source_days WHERE day = current_date AND source_slug = 'bat-sellers-2-9'));
+SELECT pg_temp.ok('a second reading the same day writes again', public.record_market_source_day() > 0);
 RESET ROLE;
+SELECT pg_temp.ok('and replaces the rows, never adding to them',
+  (SELECT count(*) = 1 FROM public.market_source_days WHERE day = current_date AND source_slug = 'bat-sellers-2-9')
+  AND (SELECT count(*) = 1 FROM public.market_source_days WHERE day = current_date AND source_slug = 'iphoto'));
 
 SET ROLE anon;
 DO $$
