@@ -148,7 +148,7 @@ const DealerDropboxImport: React.FC = () => {
 
         const { count } = await supabase
           .from('vehicle_images')
-          .select('*', { count: 'exact', head: true })
+          .select('id', { count: 'exact', head: true })
           .eq('vehicle_id', vehicle.id);
 
         if (count === 0) {

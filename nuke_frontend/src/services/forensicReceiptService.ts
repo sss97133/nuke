@@ -20,6 +20,7 @@
  */
 
 import { supabase } from '../lib/supabase';
+import { vehicleImageColumnsForViewer } from '../lib/vehicleImageColumns';
 
 // Types
 interface ForensicWorkSession {
@@ -130,7 +131,7 @@ export class ForensicReceiptService {
       // 1. Fetch image data with EXIF
       const { data: images, error: fetchError } = await supabase
         .from('vehicle_images')
-        .select('id, image_url, taken_at, latitude, longitude, exif_data, uploaded_by')
+        .select(await vehicleImageColumnsForViewer('id, image_url, taken_at, latitude, longitude, exif_data, uploaded_by'))
         .in('id', imageIds)
         .eq('vehicle_id', vehicleId);
       
