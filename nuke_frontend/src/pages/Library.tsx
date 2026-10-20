@@ -28,10 +28,27 @@ interface ReferenceDocument {
   vehicles_using?: number;
 }
 
+interface DocumentExtraction {
+  id: string;
+  status: string;
+  extracted_data: { colors?: unknown[]; specifications?: { engines?: unknown[] }; options?: unknown[] } | null;
+  extracted_at: string | null;
+}
+
+/** A reference document as groupDocumentsByBook returns it: uploads within two minutes are one book. */
+type LibraryBook = ReferenceDocument & {
+  is_book: true;
+  pages: ReferenceDocument[];
+  page_count: number;
+  total_size: number;
+  extraction: DocumentExtraction | null;
+  uploader_name: string;
+};
+
 const Library: React.FC = () => {
   const navigate = useNavigate();
   const [session, setSession] = useState<any>(() => readCachedSession());
-  const [documents, setDocuments] = useState<ReferenceDocument[]>([]);
+  const [documents, setDocuments] = useState<LibraryBook[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);

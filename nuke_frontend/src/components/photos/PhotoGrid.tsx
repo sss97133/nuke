@@ -379,7 +379,7 @@ export function PhotoGrid({
                   gap: '1px',
                 }}
               >
-                {row.photoIndices.map((photoIdx) => {
+                {row.photoIndices.map((photoIdx: number) => {
                   const photo = photos[photoIdx];
                   if (!photo) return <div key={photoIdx} />;
                   return (

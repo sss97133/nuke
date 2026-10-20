@@ -90,6 +90,9 @@ type OrgSortDirection = 'asc' | 'desc';
 
 interface Organization {
   id: string;
+  // businesses is read with select('*'); StorefrontSettings reads and writes these two.
+  slug: string | null;
+  ui_config: any;
   business_name: string;
   legal_name?: string;
   business_type?: string;
@@ -1374,7 +1377,7 @@ export default function OrganizationProfile() {
           };
           const idsChunks = chunk(vehicleIds, CHUNK);
 
-          const runChunked = async (fn: (ids: string[]) => Promise<{ data: any[] | null }>) => {
+          const runChunked = async (fn: (ids: string[]) => PromiseLike<{ data: any[] | null }>) => {
             if (idsChunks.length === 0) return [];
             const results = await Promise.all(idsChunks.map(fn));
             return results.flatMap(r => r.data || []);
@@ -2645,7 +2648,7 @@ export default function OrganizationProfile() {
                       >
                         {sortedAuctions.map((vehicle) => {
                         // Transform to VehicleCardDense format with auction metadata
-                        const vehicleData = transformVehicleForCard(vehicle);
+                        const vehicleData: ReturnType<typeof transformVehicleForCard> & { auction_end_date?: string } = transformVehicleForCard(vehicle);
                         // Add auction-specific data
                         vehicleData.auction_end_date = vehicle.auction_end_time || undefined;
                         vehicleData.asking_price = vehicle.auction_current_bid ? vehicle.auction_current_bid / 100 : undefined;

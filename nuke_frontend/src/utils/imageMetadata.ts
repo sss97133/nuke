@@ -10,6 +10,8 @@ export interface ImageMetadata {
     latitude: number;
     longitude: number;
     address?: string;
+    city?: string;
+    state?: string;
   };
   camera?: {
     make: string;
@@ -90,10 +92,11 @@ export async function extractImageMetadata(file: File): Promise<ImageMetadata> {
         // Validate coordinates are reasonable
         if (typeof lat === 'number' && typeof lon === 'number' && 
             lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180) {
-          metadata.location = {
+          const location: NonNullable<ImageMetadata['location']> = {
             latitude: lat,
             longitude: lon,
           };
+          metadata.location = location;
           console.log('Final GPS coordinates after processing:', lat, lon);
           
           // Reverse geocode to get city/state (async, don't block)
@@ -102,9 +105,9 @@ export async function extractImageMetadata(file: File): Promise<ImageMetadata> {
               // Parse address into city/state
               const parts = address.split(', ');
               if (parts.length >= 2) {
-                metadata.location.city = parts[0];
-                metadata.location.state = parts[1];
-                metadata.location.address = address;
+                location.city = parts[0];
+                location.state = parts[1];
+                location.address = address;
                 console.log('Reverse geocoded location:', metadata.location);
                 
                 // Update database if image already exists (for new uploads, this will be in exifPayload)

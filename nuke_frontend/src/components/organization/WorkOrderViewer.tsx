@@ -48,7 +48,7 @@ export default function WorkOrderViewer({ event, organizationName, laborRate = 0
   // Aggregate images from event (handles both single events and grouped events)
   let images: string[] = [];
   if (event.image_urls && Array.isArray(event.image_urls)) {
-    images = event.image_urls.filter(url => url); // Remove nulls
+    images = event.image_urls.filter((url: string | null) => url); // Remove nulls
   } else if (event.image_urls && typeof event.image_urls === 'string') {
     images = [event.image_urls]; // Single string URL
   }

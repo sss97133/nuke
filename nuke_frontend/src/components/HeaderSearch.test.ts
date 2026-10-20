@@ -5,6 +5,8 @@ import {
   scoreVehicleFacetMatch,
 } from './HeaderSearch';
 
+type Candidate = { id: string; type: string; title: string; relevance_score: number; metadata: Record<string, any> };
+
 describe('HeaderSearch facet query boosting and filtering', () => {
   it('extracts Series, Trim, and Body Style facet intent from queries without forcing default pickup body', () => {
     const cheyenneSuper = extractQueryFacets('Cheyenne Super');
@@ -41,7 +43,7 @@ describe('HeaderSearch facet query boosting and filtering', () => {
   });
 
   it('boosts and filters local/RPC vehicle search results for "Cheyenne Super" and excludes base "Cheyenne" or "Silverado"', () => {
-    const candidates = [
+    const candidates: Candidate[] = [
       {
         id: 'v-cheyenne-base',
         type: 'vehicle',
@@ -80,7 +82,7 @@ describe('HeaderSearch facet query boosting and filtering', () => {
   });
 
   it('matches and boosts "Split-Window" against a 1963 Corvette Sting Ray Coupe even when the literal token is absent from the title', () => {
-    const corvettes = [
+    const corvettes: Candidate[] = [
       {
         id: 'c2-1963-convertible',
         type: 'vehicle',

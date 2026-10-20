@@ -59,7 +59,7 @@ export const MobileVINScanner: React.FC<MobileVINScannerProps> = ({
       console.log('OCR: Extracting text from VIN plate...');
       const Tesseract = await loadTesseract();
       const { data: { text } } = await Tesseract.recognize(file, 'eng', {
-        logger: m => console.log(m)
+        logger: (m: unknown) => console.log(m)
       });
 
       console.log('OCR Result:', text);

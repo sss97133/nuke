@@ -149,13 +149,13 @@ function buildIntelligentDescription(
   });
 
   // Build details from appraiser data
-  if (appraiserData.is_stock?.some(v => v === false)) {
+  if (appraiserData.is_stock?.some((v: unknown) => v === false)) {
     details.push('Non-stock modifications detected');
   }
-  if (appraiserData.wiring_quality?.some(v => v === 'clean')) {
+  if (appraiserData.wiring_quality?.some((v: unknown) => v === 'clean')) {
     details.push('Clean wiring observed');
   }
-  if (appraiserData.rust_damage?.some(v => v === true)) {
+  if (appraiserData.rust_damage?.some((v: unknown) => v === true)) {
     details.push('Rust or damage noted');
   }
 

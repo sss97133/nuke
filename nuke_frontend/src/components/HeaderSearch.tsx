@@ -768,7 +768,7 @@ export interface HeaderSearchProps {
 }
 
 export const HeaderSearch: React.FC<HeaderSearchProps> = ({ className }) => {
-  return <AIDataIngestionSearch className={className} />;
+  return <AIDataIngestionSearch />;
 };
 
 export default HeaderSearch;
