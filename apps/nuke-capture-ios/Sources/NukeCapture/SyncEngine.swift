@@ -598,7 +598,9 @@ final class SyncEngine: ObservableObject {
         // when nothing failed — a failed asset must be retried next pass.
         // A full page (fetchLimit) means more photos sit past the last one read: move the watermark
         // only to that photo, or the rest of the window would be skipped for good.
-        let reachedTo = assets.count >= Config.maxPerRun ? (assets.last?.creationDate ?? runStarted) : runStarted
+        let reachedTo = Self.nextWatermark(pageFull: assets.count >= Config.maxPerRun,
+                                           lastReadAt: assets.last?.creationDate,
+                                           previous: watermark, runStarted: runStarted, overlap: overlap)
         advanceWatermark(to: reachedTo, failures: failed)
 
         NSLog("NukeCapture sync: %d uploaded (%d metadata-only), %d off-shop skipped, %d held(private), %d deduped, %d failed",
@@ -658,6 +660,18 @@ final class SyncEngine: ObservableObject {
         queue.append(contentsOf: add)
         defaults.set(queue, forKey: Key.backfillQueue)
         backfillRemaining = queue.count
+    }
+
+    /// Where the cursor goes after a clean pass. A caught-up pass moves to the run start. A full page
+    /// moves so the next fetch (cursor minus the overlap) starts one second before the last photo
+    /// read. Storing the last photo itself made the next fetch start `overlap` earlier, and when the
+    /// page spanned less than the overlap that was the same page again: the owner's cursor sat at
+    /// 2026-06-20 for four months (200 photos in about three days). Never moves backward.
+    nonisolated static func nextWatermark(pageFull: Bool, lastReadAt: Date?, previous: Date,
+                              runStarted: Date, overlap: TimeInterval) -> Date {
+        guard pageFull, let last = lastReadAt else { return runStarted }
+        let stepped = min(last.addingTimeInterval(overlap - 1), runStarted)
+        return max(stepped, previous)
     }
 
     private func advanceWatermark(to date: Date, failures: Int) {
