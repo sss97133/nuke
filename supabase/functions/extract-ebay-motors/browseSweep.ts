@@ -147,6 +147,8 @@ export async function landItem(supabase: any, raw: any, rep: Report, now = new D
     vehicleId, unresolved: vehicleId === null,
     source: { platform: PLATFORM, url: landing.url, sourceIdentifier: landing.listingKey },
     fields: landing.obsFields, observationKind: "listing", extractionMethod: opts.method ?? METHOD, observedAt: now,
+    // a VIN too weak to pick a vehicle is too weak to write onto one: it stays a claim on this row
+    ...(landing.vin.vin && !linkVin(landing.vin.vin, landing.year) ? { testimonyOnly: ["vin"] } : {}),
     contentText: landing.descriptionText || raw.title,
     rawData: {
       snapshot_id: snapshotId, item_id: raw.itemId, title: raw.title, category_path: raw.categoryPath ?? null, condition: raw.condition ?? null,
