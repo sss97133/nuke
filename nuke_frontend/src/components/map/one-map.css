@@ -19,3 +19,13 @@
   --om-ramp-3: #e9a020;
   --om-ramp-4: #ffd166;
 }
+
+.one-map { position: relative; width: 100%; height: 100%; background: var(--om-bg); --om-shop: #7ec8e3; }
+.one-map-canvas { position: absolute; inset: 0; }
+.one-map-search { position: absolute; z-index: 6; top: 12px; left: 12px; width: 340px; max-width: calc(100% - 24px); }
+.one-map-hover { position: absolute; z-index: 6; top: 12px; right: 12px; pointer-events: none; }
+.one-map-panel { position: absolute; z-index: 5; top: 64px; left: 12px; bottom: 12px; width: 340px; max-width: calc(100% - 24px);
+  overflow-y: auto; background: var(--om-panel); border: 2px solid var(--om-line); color: var(--om-text); }
+@media (max-width: 640px) {
+  .one-map-panel { top: auto; left: 0; right: 0; bottom: 0; width: 100%; max-width: 100%; height: 46%; border-left: 0; border-right: 0; border-bottom: 0; }
+}
