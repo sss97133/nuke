@@ -383,6 +383,11 @@ class Readers(SyntheticCase):
         self.assertNotIn('gmail:thread:synththread0007', waiting)          # dated before the coverage
         self.assertEqual(v['money_sources_cover_to'], '2032-01-31')
 
+    def test_session_days_without_own_photos(self):
+        v = readers.accounting(self.files, T, sessions=readers.sessions_of(self.ctx))
+        self.assertEqual([(d['day'], d['sessions'], d['in_custody']) for d in v['session_days']],
+                         [(testdata.DOC_DAY, 1, False)])
+
     def test_a_windowed_read_dates_a_payment_by_its_payment_source(self):
         v = readers.accounting(self.files, T, date_from='2031-05-27', date_to='2031-05-27')
         self.assertEqual(v['payments_outside_window'], [{'payment_key': pk('00770'), 'paid_on': '2031-05-28'}])

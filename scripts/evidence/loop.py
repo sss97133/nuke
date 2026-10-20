@@ -89,12 +89,14 @@ def file_steps(ctx, a, report):
     if fx:
         fixture = common.load_json(fx)
         vehicle = fixture.get('vehicle_id') or ctx.vid(ctx.case['vehicle'])
-        results, summary = exit_test.run(fixture, files, lambda dec: readers.accounting(files, vehicle, dec))
+        sessions = readers.sessions_of(ctx)
+        results, summary = exit_test.run(fixture, files, lambda dec: readers.accounting(files, vehicle, dec,
+                                                                                         sessions=sessions))
         common.dump_json(ctx.out / ('exit-test-%s.json' % a.date), {'mode': 'file', 'vehicle_id': vehicle,
                                                                      'summary': summary, 'results': results})
         report['exit_test'] = summary
         ok = summary['structural_pass']
-    read = readers.accounting(files, ctx.vid(ctx.case['vehicle']))
+    read = readers.accounting(files, ctx.vid(ctx.case['vehicle']), sessions=readers.sessions_of(ctx))
     rows, decisions = review_sheet.build_rows(ctx, files, read)
     side = review_sheet.issue(ctx, rows, decisions, a.date, ctx.out)
     report['review_sheet'] = {'rows': side['items'], 'decisions': len(decisions), 'sha256': side['sheet_sha256']}

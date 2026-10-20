@@ -501,6 +501,17 @@ def extract_m5(v):
     }
 
 
+def sessions_of(ctx):
+    """The case's work sessions read for its vehicle, as the day reader takes them (the SQL counts every session on
+    the identity's vehicles)."""
+    import inputs
+    if not ctx.input_path('work_sessions'):
+        return None
+    veh = ctx.vid(ctx.case.get('vehicle'))
+    return [{'id': s['id'], 'day': s['session_date'], 'vehicle_id': s.get('vehicle_id') or veh}
+            for s in inputs.work_sessions(ctx) if s.get('session_date')]
+
+
 def load_files(d):
     """The payload files plus run.json (the readers take money coverage from its run configs)."""
     import checks

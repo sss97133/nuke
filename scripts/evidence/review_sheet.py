@@ -237,7 +237,7 @@ def main():
     payloads.use_contract(ctx.contract)
     date = a.date or common.today()
     files = readers.load_files(a.dir)
-    read = readers.accounting(files, ctx.vid(ctx.case['vehicle']))
+    read = readers.accounting(files, ctx.vid(ctx.case['vehicle']), sessions=readers.sessions_of(ctx))
     rows, decisions = build_rows(ctx, files, read)
     rest = uid = ids = None
     if a.mode == common.DB:

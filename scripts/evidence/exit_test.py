@@ -23,6 +23,7 @@ to_account_ref, payer, payee]), outside tuples [day, side, own_photos, document_
 image_class_count, counts. None inside a tuple matches anything.
 
 Usage: python3 scripts/evidence/exit_test.py --fixture <exit-expected.json> --dir <payload dir> [--mode file|db]
+       [--case <case.json>] [--user <owner>]
 """
 import argparse
 import collections
@@ -303,14 +304,16 @@ def main():
     ap.add_argument('--decisions', help='file mode: decisions applied to every read')
     ap.add_argument('--out', help='results file (default <dir>/exit-test-<date>.json)')
     ap.add_argument('--user', help='db mode: owner uuid')
+    ap.add_argument('--case', help='file mode: the case file (its work sessions feed session_days)')
     a = ap.parse_args()
     fx = common.load_json(a.fixture)
     vehicle = a.vehicle or fx['vehicle_id']
     files = readers.load_files(a.dir)
     extra = common.load_json(a.decisions) if a.decisions else []
+    sessions = readers.sessions_of(common.Context(a.case, a.dir)) if a.case else None
     if a.mode == common.FILE:
         def read_fn(dec):
-            return readers.accounting(files, vehicle, extra + (dec or []))
+            return readers.accounting(files, vehicle, extra + (dec or []), sessions=sessions)
     else:
         common.require_db_writes()
         snap = db_read(vehicle, common.owner_id(a.user), a.manifest or os.path.join(a.dir, 'load-manifest.json'))
