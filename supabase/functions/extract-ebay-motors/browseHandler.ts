@@ -1,4 +1,5 @@
-/** HTTP surface of the Browse intake: POST {action: sweep | revisit | aspects | status | preview}. */
+/** HTTP surface of the Browse intake: POST {action: sweep | revisit | aspects | status | preview | archive | census | place |
+ *  honour_deletions | member_handles}. */
 import { corsHeaders } from "../_shared/cors.ts";
 import { htmlToText } from "../_shared/htmlToText.ts";
 import { BrowseClient, yearAspect } from "./browseApi.ts";
@@ -8,8 +9,9 @@ import { censusRow, readCensus } from "./browseCensus.ts";
 import { emptyReport } from "./browseSweep.ts";
 import { landArchived, validCaptures } from "./archiveLand.ts";
 import { placeBackfill } from "./browsePlace.ts";
+import { deletedLookup, honourDeletions, readStoredHandles, tombstoneItem } from "./deletedMembers.ts";
 
-export const BROWSE_ACTIONS = ["sweep", "revisit", "aspects", "status", "preview", "archive", "census", "place"];
+export const BROWSE_ACTIONS = ["sweep", "revisit", "aspects", "status", "preview", "archive", "census", "place", "honour_deletions", "member_handles"];
 const json = (b: unknown, status = 200) => new Response(JSON.stringify(b), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
 export async function handleBrowse(supabase: any, body: any): Promise<Response> {
@@ -24,6 +26,14 @@ export async function handleBrowse(supabase: any, body: any): Promise<Response> 
   }
   if (body.action === "place") {       // back-fill: the stated place of listings landed before landing wrote it; reads our own rows only
     const rep = await placeBackfill(supabase, { max: body.max, after: body.after ?? null, dryRun: body.dry_run === true });
+    return json(rep, rep.ok ? 200 : 500);
+  }
+  if (body.action === "honour_deletions") {   // eBay account deletions: every copy of a deleted member's handle redacted (cron ebay-deletion-honour)
+    const rep = await honourDeletions(supabase, { dryRun: body.dry_run === true, budgetMs: body.budget_ms });
+    return json(rep, rep.ok ? 200 : 500);
+  }
+  if (body.action === "member_handles") {     // stored pages read once for the member handles they name (hashes into metadata)
+    const rep = await readStoredHandles(supabase, { after: body.after ?? null, listings: body.listings });
     return json(rep, rep.ok ? 200 : 500);
   }
   if (!Deno.env.get("EBAY_CLIENT_ID") || !Deno.env.get("EBAY_CLIENT_SECRET")) {
@@ -41,7 +51,7 @@ export async function handleBrowse(supabase: any, body: any): Promise<Response> 
           year_counts: ya ? Object.fromEntries([...ya.counts].sort((a, b) => a[0] - b[0])) : null, calls: client.calls });
       }
       case "preview": {          // one item read and mapped, nothing written: for the raw-vs-model gate
-        const raw = await client.getItem(String(body.item_id));
+        const raw = (await tombstoneItem(deletedLookup(supabase), await client.getItem(String(body.item_id)))).raw;
         return json({ ok: true, raw, landing: toLanding(raw, htmlToText), calls: client.calls });
       }
       case "census": {           // eBay's own counts, one source_census row: category total, make, year, vintage by ZIP prefix, near-me per anchor

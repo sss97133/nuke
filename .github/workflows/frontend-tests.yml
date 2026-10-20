@@ -565,6 +565,8 @@ jobs:
         run: deno test --no-check supabase/functions/extract-rmsothebys/
       - name: Verify an eBay listing's place is its own claim, a masked ZIP is never a ZIP, a point eBay contradicts is dropped
         run: deno test --no-check --allow-env supabase/functions/extract-ebay-motors/browsePlace.test.ts
+      - name: Verify a deleted eBay member's handle leaves every page and item before landing, and the honour worker redacts and finishes by hash with counts only
+        run: deno test --no-check supabase/functions/extract-ebay-motors/deletedMembers.test.ts
       - name: Verify the eBay parts finder maps fitment from eBay's own value lists, ranks by fit never by commission, and stops at its quota cap
         run: deno test --no-check --allow-env supabase/functions/extract-ebay-motors/parts.test.ts
       - name: Verify a Barrett-Jackson lot written to a given vehicle never lands on a new vehicle, and its sale date is its own event's

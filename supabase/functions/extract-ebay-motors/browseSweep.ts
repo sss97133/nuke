@@ -23,6 +23,7 @@ import { aspectFilterFor, BrowseClient, ItemGone, QuotaExceeded, yearAspect } fr
 import { CLASS_RANK, classifySeller, linkVin, listingKey, TIERS, toLanding, type SellerClass } from "./browseMap.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { landPlace, newPlaceCtx } from "./browsePlace.ts";
+import { deletedLookup, handleHashes, tombstoneItem } from "./deletedMembers.ts";
 
 export const PLATFORM = "ebay_motors";
 const METHOD = "ebay_browse_api_v1";
@@ -83,6 +84,10 @@ export interface LandOpts {
 }
 
 export async function landItem(supabase: any, raw: any, rep: Report, now = new Date().toISOString(), opts: LandOpts = {}): Promise<"landed" | "blip" | "rejected" | "skipped"> {
+  // 0. a member eBay says deleted their account stays gone: their handle (and, on a listing they sold, the seller object and the
+  //    description's contact details) is redacted before anything is stored (deletedMembers.ts). No answer, no landing.
+  try { raw = (await tombstoneItem(deletedLookup(supabase), raw)).raw; }
+  catch (e) { rep.errors.push(`deleted-member check ${String(raw?.itemId).slice(0, 40)}: ${(e as Error).message}`.slice(0, 300)); return "skipped"; }
   const landing = toLanding(raw, htmlToText, opts.source);
   if (!landing) { rep.errors.push(`item without a numeric id: ${String(raw?.itemId).slice(0, 40)}`); return "skipped"; }
 
@@ -91,9 +96,11 @@ export async function landItem(supabase: any, raw: any, rep: Report, now = new D
   if (!opts.snapshotId) {
     const body = JSON.stringify(raw);
     const sha = [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(body)))].map((b) => b.toString(16).padStart(2, "0")).join("");
+    const handles = await handleHashes(body);   // the members the body names, by hash: a later deletion request finds it without reading it
     const snap = await supabase.from("listing_page_snapshots").insert({
       platform: PLATFORM, listing_url: landing.url, fetched_at: now, fetch_method: "ebay_browse_getItem", http_status: 200, success: true,
-      html: body, html_sha256: sha, content_length: body.length, metadata: { api: "buy/browse/v1/item", marketplace: raw.listingMarketplaceId ?? null, caller: "extract-ebay-motors" },
+      html: body, html_sha256: sha, content_length: body.length, metadata: { api: "buy/browse/v1/item", marketplace: raw.listingMarketplaceId ?? null, caller: "extract-ebay-motors",
+        member_handles_sha256: handles.member, seller_handles_sha256: handles.seller },
     }).select("id").maybeSingle();
     snapshotId = snap.data?.id ?? null;
     if (snap.error && String(snap.error.code) !== "23505") mustWrite(`snapshot ${landing.listingKey}`, snap);
