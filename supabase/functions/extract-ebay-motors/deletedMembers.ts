@@ -267,10 +267,11 @@ export interface HandlesReport { action: "member_handles"; ok: boolean; pages: n
 export async function readStoredHandles(supabase: any, o: { after?: string | null; listings?: number } = {}): Promise<HandlesReport> {
   const rep: HandlesReport = { action: "member_handles", ok: true, pages: 0, written: 0, next_after: null, errors: [] };
   try {
-    const todo = mustWrite("handles todo", await supabase.rpc("ebay_snapshot_handles_todo", { p_after: o.after ?? null, p_limit: o.listings ?? 20 })).data ?? {};
+    const todo = mustWrite("handles todo", await supabase.rpc("ebay_snapshot_handles_todo", { p_after: o.after ?? null, p_limit: o.listings ?? 40 })).data ?? {};
     rep.next_after = todo.next_after ?? null;
     const rows: { snapshot_id: string; member_handles_sha256: string[]; seller_handles_sha256: string[] }[] = [];
-    for (const s of todo.rows ?? []) {
+    const queue = [...(todo.rows ?? [])];
+    await Promise.all(Array.from({ length: Math.min(6, queue.length) }, async () => { for (let s = queue.shift(); s; s = queue.shift()) {
       try {
         let text = "";
         if (s.inline) {
@@ -288,7 +289,7 @@ export async function readStoredHandles(supabase: any, o: { after?: string | nul
       } catch (err) {
         rep.errors.push(`snapshot ${s.id}: ${(err as Error).message}`.slice(0, 200));
       }
-    }
+    } }));   // six stored pages at a time
     for (const c of chunks(rows, 200)) rep.written += Number(mustWrite("handles write", await supabase.rpc("set_ebay_snapshot_handles", { p_rows: c })).data?.updated ?? 0);
   } catch (err) {
     rep.errors.push((err as Error).message.slice(0, 300));
