@@ -11,6 +11,7 @@ export const WRITERS = new Set([
   'confirm_facility_reservation', 'cancel_facility_reservation', 'request_contact', 'respond_contact_request', 'withdraw_contact_request',
   'post_contact_message', 'record_inspection_findings', 'grant_inspection_access', 'attach_job_evidence', 'offer_on_requirement', 'accept_offer',
   'publish_work_order', 'unpublish_work_order', 'claim_organization', 'create_supplier_invite', 'redeem_supplier_invite',
+  'mark_notification_read', 'mark_all_notifications_read',
 ]);
 
 const b64url = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');

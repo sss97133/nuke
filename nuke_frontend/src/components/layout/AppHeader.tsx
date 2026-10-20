@@ -11,6 +11,7 @@ import { UserDropdown } from './UserDropdown';
 import { useBranding } from '../../branding/BrandingContext';
 import { useOptionalTheme } from '../../contexts/ThemeContext';
 import GlobalUploadIndicator from '../UploadIndicatorLauncher';
+import ActivityLauncher from './ActivityLauncher';
 import './AppHeader.css';
 
 interface AppHeaderProps {
@@ -118,6 +119,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
             </button>
           )}
           <GlobalUploadIndicator />
+          {session && <ActivityLauncher userId={userId} onOpenNotifications={onOpenNotifications} />}
           {session ? (
             <UserArea
               session={session}
