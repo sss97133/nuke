@@ -27,8 +27,9 @@ const MEMBER_URL = new RegExp(`[?&;](?:amp;)?(?:userid|user_id|_ssn|ssn|sellerid
 const LABELLED = new RegExp(`(Seller info|Seller information|Seller|Member id|User ID|High bidder|Winning bidder|Bidder|Buyer)\\s*:?\\s*` +
   `(?:Member id\\s+)?(${NAME})\\s*\\(\\s*(?:Feedback Score Of\\s*)?\\d+`, "gi");   // "Seller: name ( 123 )", "High bidder: name ( 45 )"
 
-const textOf = (html: string) => html.replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/gi, " ").replace(/<[^>]+>/g, " ")
-  .replace(/&nbsp;/gi, " ").replace(/&amp;/gi, "&").replace(/&quot;/gi, '"').replace(/&#39;|&apos;/gi, "'").replace(/\s+/g, " ");
+// Text to read labels from (never shown or stored): tags dropped, a few entities decoded, &amp; last so nothing decodes twice.
+const textOf = (html: string) => html.replace(/<script\b[^>]*>[\s\S]*?<\/script[^>]*>|<style\b[^>]*>[\s\S]*?<\/style[^>]*>/gi, " ").replace(/<[^>]+>/g, " ")
+  .replace(/&nbsp;/gi, " ").replace(/&quot;/gi, '"').replace(/&#39;|&apos;/gi, "'").replace(/&amp;/gi, "&").replace(/\s+/g, " ");
 
 /** Every member handle the text names, lower-cased, true when it is named as the seller. */
 export function memberHandles(text: string): Map<string, boolean> {
