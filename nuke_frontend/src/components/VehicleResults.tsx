@@ -2,11 +2,11 @@ import React from 'react';
 
 interface VehicleResultsProps {
   vehicleId: string;
-  salePrice?: number;
-  auctionEndDate?: string;
-  bidCount?: number;
-  viewCount?: number;
-  auctionSource?: string;
+  salePrice?: number | null;
+  auctionEndDate?: string | null;
+  bidCount?: number | null;
+  viewCount?: number | null;
+  auctionSource?: string | null;
 }
 
 const VehicleResults: React.FC<VehicleResultsProps> = ({

@@ -11,6 +11,8 @@ import type { LinkedOrg } from '../../components/vehicle/LinkedOrganizations';
 // --- Vehicle ---
 
 export interface Vehicle {
+  /** Legacy local-browser vehicles only; rows read from the database never carry it. */
+  isAnonymous?: boolean;
   id: string;
   // Identity
   year: number | null;
@@ -613,6 +615,8 @@ export interface LiveSession {
 
 export interface AuctionPulse {
   platform: string;
+  /** Legacy external_listings id when the pulse came from that writer; canonical event pulses carry null. */
+  external_listing_id?: string | null;
   listing_url: string;
   listing_status: string;
   end_date: string | null;

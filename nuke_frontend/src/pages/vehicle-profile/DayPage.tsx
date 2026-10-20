@@ -144,7 +144,7 @@ const DayPage: React.FC = () => {
         if (obsRes.status === 'rejected' || obsRes.value.error || !Array.isArray(obsRes.value.data)) {
           setObservationsError(true);
         } else {
-          const rows = obsRes.value.data as (DayObservation & { observation_sources?: { slug?: string; display_name?: string } })[];
+          const rows = obsRes.value.data as unknown as (DayObservation & { observation_sources?: { slug?: string; display_name?: string } })[];
           if (rows.some(row => {
             const observed = row.observed_at ? Date.parse(row.observed_at) : NaN;
             return row.vehicle_id !== vehicleId || !Number.isFinite(observed) || observed < start || observed >= start + 86_400_000;
@@ -461,8 +461,8 @@ const ObservationsList: React.FC<ObservationsListProps> = ({ observations, vehic
                     // First request transforms, every subsequent hit is CDN-cached.
                     const thumbSrc = optimizeImageUrl(candidate, 'medium') || candidate;
                     const witnessImageId =
-                      (typeof sd.witness_image_id === 'string' && (sd.witness_image_id as string)) ||
-                      (typeof sd.install_witness_image_id === 'string' && (sd.install_witness_image_id as string)) ||
+                      (typeof sd?.witness_image_id === 'string' && (sd.witness_image_id as string)) ||
+                      (typeof sd?.install_witness_image_id === 'string' && (sd.install_witness_image_id as string)) ||
                       null;
                     return (
                       <div style={{ marginBottom: 8 }}>

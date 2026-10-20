@@ -156,7 +156,7 @@ const VehicleDayDrawer: React.FC<VehicleDayDrawerProps> = ({ date, auctions = []
           .lt('taken_at', captureEnd)
           .order('taken_at', { ascending: true })
           .limit(120);
-    query
+    Promise.resolve(query)
       .then(({ data, error }) => {
         if (cancelled) return;
         if (error || !Array.isArray(data)) {

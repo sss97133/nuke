@@ -75,7 +75,7 @@ interface VehicleProfileContextValue {
   // Header data
   responsibleName: string | null;
   linkedOrganizations: any[];
-  auctionCurrency: string;
+  auctionCurrency: string | null;
 
   // UI state
   loading: boolean;
@@ -411,7 +411,7 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
       } } : prev);
 
       // Convert image_sets to timeline event shape and merge when it lands.
-      void imageSetsPromise.then((isResult: any) => {
+      void Promise.resolve(imageSetsPromise.then((isResult: any) => {
         if (!isCurrent() || isResult.error || !Array.isArray(isResult.data) || isResult.data.length === 0) return;
         const sessionEvents = isResult.data.map((s: any) => ({
           id: s.id,
@@ -432,7 +432,7 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
           const have = new Set((prev || []).map((e: any) => e.id));
           return sortByDateDesc([...(prev || []), ...sessionEvents.filter((e: any) => !have.has(e.id))]);
         });
-      }).catch(() => { /* supplementary */ });
+      })).catch(() => { /* supplementary */ });
     } catch {
       if (isCurrent()) setTimelineRead(prev => isCurrent() ? { vehicleId, primaryRequest: request,
         state: { timeline: 'unavailable', work: 'unavailable' } } : prev);
@@ -955,7 +955,7 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
   useEffect(() => {
     if (!vehicle?.id) return;
     // Record view (fire-and-forget)
-    supabase.from('vehicle_views').insert({ vehicle_id: vehicle.id, user_id: session?.user?.id || null, viewed_at: new Date().toISOString() }).then(() => {}).catch(() => {});
+    void Promise.resolve(supabase.from('vehicle_views').insert({ vehicle_id: vehicle.id, user_id: session?.user?.id || null, viewed_at: new Date().toISOString() }).then(() => {})).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vehicle?.id]);
 

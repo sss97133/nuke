@@ -19,6 +19,8 @@ import {
   type ShopInfo,
 } from './vehicle-profile/hooks/useWorkOrderStatement';
 
+type PaymentMethod = NonNullable<ShopInfo['payment_methods']>[number];
+
 // ── Helpers ──
 
 const fmt = (n: number) =>
@@ -288,7 +290,7 @@ const InvoiceView: React.FC<{ data: any; onEdit?: () => void; theme: InvoiceThem
             <div style={{ margin: '10px 0', padding: '8px 10px', border: '1px solid #7B96B0', background: '#e8edf3' }}>
               <div style={{ fontSize: '8px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#1a3050', marginBottom: '6px' }}>Payment Instructions</div>
               <div style={{ display: 'grid', gridTemplateColumns: `repeat(${data.shop.payment_methods.length}, 1fr)`, gap: '10px', fontSize: '9px', color: '#1a3050', lineHeight: 1.5 }}>
-                {data.shop.payment_methods.map((pm, i) => (
+                {data.shop.payment_methods.map((pm: PaymentMethod, i: number) => (
                   <div key={i}>
                     <div style={{ fontWeight: 700, marginBottom: '2px' }}>{pm.label}</div>
                     <div>{pm.detail}</div>
@@ -595,7 +597,7 @@ const InvoiceView: React.FC<{ data: any; onEdit?: () => void; theme: InvoiceThem
           <div style={{ marginTop: '24px', padding: '16px', border: '2px solid #1a1a1a', background: '#fafafa' }}>
             <div style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.08em', marginBottom: '10px' }}>Payment Instructions</div>
             <div style={{ display: 'grid', gridTemplateColumns: `repeat(${data.shop.payment_methods.length}, 1fr)`, gap: '16px', fontSize: '10px', lineHeight: 1.5 }}>
-              {data.shop.payment_methods.map((pm, i) => (
+              {data.shop.payment_methods.map((pm: PaymentMethod, i: number) => (
                 <div key={i}>
                   <div style={{ fontWeight: 700, marginBottom: '4px' }}>{pm.label}</div>
                   <div>{pm.detail}</div>

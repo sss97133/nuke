@@ -264,7 +264,7 @@ const ImagePage: React.FC = () => {
     };
   }, [vehicleId, imageId]);
 
-  const vehLabel = vehicle?.id === vehicleId
+  const vehLabel = vehicle && vehicle.id === vehicleId
     ? `${vehicle.year ?? ''} ${vehicle.make ?? ''} ${vehicle.model ?? ''} ${vehicle.trim ?? ''}`.replace(/\s+/g, ' ').trim()
     : 'Vehicle';
 

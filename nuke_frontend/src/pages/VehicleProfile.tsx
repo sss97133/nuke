@@ -258,8 +258,6 @@ const VehicleProfileInner: React.FC = () => {
           <React.Suspense fallback={null}>
             {vehicle ? (
               <WorkspaceContent
-                valuationIntel={valuationIntel}
-                readinessSnapshot={readinessSnapshot}
                 referenceLibraryRefreshKey={referenceLibraryRefreshKey}
                 onAddEventClick={() => setShowAddEvent(true)}
                 onDataPointClick={handleDataPointClick}

@@ -45,7 +45,7 @@ const L1_COLORS: Record<string, string> = {
   community: '#9d6b6b', legal_and_regulatory: '#7d9d6b',
 };
 
-export default function BuyerQuestionPreview({ vehicleId, make }: { vehicleId: string; make?: string }) {
+export default function BuyerQuestionPreview({ vehicleId, make }: { vehicleId: string; make?: string | null }) {
   const requestedMake = typeof make === 'string' ? make.trim() : '';
   const [result, setResult] = useState<{ vehicleId: string; make: string; rows: QuestionRow[]; failed: boolean } | null>(null);
 
