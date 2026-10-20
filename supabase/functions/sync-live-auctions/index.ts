@@ -9,6 +9,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
  *   - BaT: Scrapes auctionsCurrentInitialData from /auctions/ page (no API key needed)
  *   - Collecting Cars: the site's public Typesense listing collection (production_listings)
  *   - PCarMarket: its server-rendered live auction board (direct fetch); bids of lots that moved from the lot page
+ *   - The Market (themarket.co.uk): its live auctions page, the listings payload the Nuxt page server-renders
  *   - Bonhams: its public Typesense sale and lot index; bids of its online (timed) sales from its bidding platform
  *     (live.bonhams.com); lots of in-room catalog sales are written 'upcoming', never live
  *   - Broad Arrow: its bidding site's timed online sales (sale list hourly, lot list with top bids every run)
@@ -33,6 +34,7 @@ import { archiveFetch } from "../_shared/archiveFetch.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { parseBatIdentityFromUrl, parseBatIdentityFromTitle } from "../_shared/batParser.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { parseTheMarketLive, type TheMarketLot } from "./boards.ts";
 import { mustWrite, softWrite } from '../_shared/writeResult.ts';
 import {
   type BonhamsBidState, type BonhamsLotDoc, type BonhamsSaleDoc, bonhamsLot, bonhamsLotPhase, bonhamsSaleKind,
@@ -1054,6 +1056,65 @@ async function syncCarsAndBids(): Promise<{ auctions: LiveAuction[]; error: stri
 }
 
 // ============================================
+// The Market Sync (its live auctions page: the listings payload its Nuxt page server-renders)
+// ============================================
+
+const THE_MARKET_LIVE = "https://www.themarket.co.uk/auctions/live";
+const THE_MARKET_MAX_PAGES = 5; // 51 lots a page; 11 on 2026-10-20
+
+async function syncTheMarket(): Promise<{ auctions: LiveAuction[]; error: string | null }> {
+  try {
+    const lots: TheMarketLot[] = [];
+    let pages = 1;
+    let total: number | null = null;
+    let houseTime: string | null = null;
+    for (let page = 1; page <= Math.min(pages, THE_MARKET_MAX_PAGES); page++) {
+      const { html, error } = await archiveFetch(page === 1 ? THE_MARKET_LIVE : `${THE_MARKET_LIVE}?page=${page}`, {
+        platform: "the-market",
+        skipCache: true,
+        useFirecrawl: false,
+        directFetchOptions: { publicOnly: true }, // one identified request; a refusal is reported, not retried
+        callerName: "sync-live-auctions",
+      });
+      if (error || !html) return { auctions: [], error: `The Market live page ${page}: ${error ?? "no HTML"}` };
+      const board = parseTheMarketLive(html);
+      if (!board) return { auctions: [], error: `The Market live page ${page}: no listings payload` };
+      lots.push(...board.lots);
+      pages = board.totalPages ?? 1;
+      total = board.total;
+      houseTime ??= board.houseTime;
+    }
+    if (total !== null && lots.length < total) return { auctions: [], error: `The Market: ${lots.length} of ${total} lots read` };
+    // status 1 is open for bids; a lot whose auction closed stays on the page at a Buy Now price (status 5) and is not live
+    const open = lots.filter((l) => l.status === 1);
+    console.log(`[sync-live-auctions] The Market: ${lots.length} lots on the live page, ${open.length} open for bids (${open.filter((l) => l.current_bid).length} with a bid)`);
+    const now = new Date().toISOString();
+    const auctions: LiveAuction[] = open.map((l) => ({
+      url: l.url,
+      title: l.title,
+      platform: "the-market",
+      auction_end_date: l.ends ?? "",
+      current_bid: l.current_bid,
+      bid_count: l.bid_count,
+      currency: l.currency,
+      no_reserve: l.no_reserve,
+      reserve_met: l.reserve_met,
+      year: l.year,
+      make: l.make,
+      model: l.model,
+      thumbnail_url: l.image,
+      external_id: l.id,
+      raw_data: { source: "themarket_live_page", lot_number: l.lot_number, reserve_status: l.reserve_status, tagline: l.tagline,
+                  location: l.location, buy_now_price: l.buy_now_price, house_time: houseTime, synced_at: now },
+    }));
+    return { auctions, error: null };
+  } catch (e: unknown) {
+    return { auctions: [], error: `The Market sync failed: ${e instanceof Error ? e.message : String(e)}` };
+  }
+}
+BOARD_SOURCES["the-market"] = "the-market";
+
+// ============================================
 // Database Sync
 // ============================================
 
@@ -1344,6 +1405,7 @@ Deno.serve(async (req) => {
         "bringatrailer",
         "collecting-cars",
         "cars-and-bids",
+        "the-market",
         "pcarmarket",
         "mecum",
         "barrett-jackson",
@@ -1402,6 +1464,9 @@ Deno.serve(async (req) => {
           case "cab":
           case "cars-and-bids":
             syncResult = await syncCarsAndBids();
+            break;
+          case "the-market":
+            syncResult = await syncTheMarket();
             break;
           case "pcar":
           case "pcarmarket":
@@ -1523,11 +1588,12 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Cleanup: mark expired auctions as ended (catches C&B 7-day defaults and any stale auctions)
+      // Cleanup: mark expired auctions as ended (catches C&B 7-day defaults and any stale auctions). Nobody observed the
+      // result here, so the lot is 'ended', never 'not_sold'; settlement records the outcome (as end_live_auctions_absent).
       try {
         const { count: endedCount } = await supabase
           .from("vehicles")
-          .update({ auction_status: "ended", sale_status: "not_sold" })
+          .update({ auction_status: "ended", sale_status: "ended" })
           .eq("auction_status", "active")
           // BaT soft-close clocks require a native terminal record. eBay Motors lots are ended by their own reader
           // (extract-ebay-motors auctions) as 'ended': eBay's API cannot say sold or unsold, so 'not_sold' would be invented.

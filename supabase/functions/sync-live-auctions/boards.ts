@@ -57,6 +57,137 @@ export function parsePcarBoard(html: string): { items: PcarBoardItem[]; totalPag
   return { items, totalPages: tp ? Number(tp[1]) : null };
 }
 
+/** The flat devalue array a Nuxt page server-renders in <script id="__NUXT_DATA__">, or null. */
+export function nuxtData(html: string): unknown[] | null {
+  const m = html.match(/<script\b[^>]*\bid="__NUXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
+  if (!m) return null;
+  try {
+    const d = JSON.parse(m[1]);
+    return Array.isArray(d) ? d : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * One entry of a devalue array, revived: a number inside an object or array is the index of its value (negative ones
+ * are undefined, hole, NaN, ±Infinity, -0); a tagged array is a Nuxt reducer that wraps one value (ShallowReactive,
+ * Reactive, Ref, ...) or a Date, Set or Map.
+ */
+export function nuxtRevive(data: unknown[], index: number, memo = new Map<number, unknown>()): unknown {
+  if (index < 0) return ({ [-3]: NaN, [-4]: Infinity, [-5]: -Infinity, [-6]: -0 } as Record<number, number>)[index];
+  if (memo.has(index)) return memo.get(index);
+  const x = data[index];
+  const at = (i: unknown) => (typeof i === "number" ? nuxtRevive(data, i, memo) : i);
+  if (Array.isArray(x)) {
+    if (typeof x[0] === "string") {
+      if (x[0] === "Date") return x[1];
+      if (x[0] === "EmptyRef" || x[0] === "EmptyShallowRef") return null;
+      if (x[0] === "Set") return x.slice(1).map(at);
+      if (x[0] === "Map" || x[0] === "null") {
+        const o: Record<string, unknown> = {};
+        for (let i = 1; i + 1 < x.length; i += 2) o[String(at(x[i]))] = at(x[i + 1]);
+        return o;
+      }
+      return at(x[1]);
+    }
+    const out: unknown[] = [];
+    memo.set(index, out);
+    for (const i of x) out.push(at(i));
+    return out;
+  }
+  if (x !== null && typeof x === "object") {
+    const out: Record<string, unknown> = {};
+    memo.set(index, out);
+    for (const [k, i] of Object.entries(x)) out[k] = at(i);
+    return out;
+  }
+  return x;
+}
+
+/** One lot on The Market's live auctions page (themarket.co.uk/auctions/live). */
+export interface TheMarketLot {
+  id: string;
+  url: string;
+  title: string;
+  year: number | null;
+  make: string | null;
+  model: string | null;
+  lot_number: number | null;
+  status: number | null; // 1 = open for bids; 5 = the auction closed and the car is offered at a Buy Now price
+  current_bid: number | null; // pounds (the house carries pence)
+  bid_count: number | null;
+  currency: string | null;
+  ends: string | null;
+  reserve_status: string | null;
+  no_reserve: boolean;
+  reserve_met: boolean | null;
+  buy_now_price: number | null;
+  image: string | null;
+  location: string | null;
+  tagline: string | null;
+}
+
+/**
+ * The lots on one page of The Market's live auctions, from the /api/listings/live result its Nuxt page server-renders
+ * (the route itself answers 403 to us), with the page count it reports and the house's clock at render time.
+ * end_date ("2026-10-21 12:00:00") is UTC: the lot page renders it as "Ends 1:00 PM, 21 Oct 2026" in BST and
+ * "2026-10-26 13:00:00" as "Ends 1:00 PM, 26 Oct 2026" in GMT, and its JSON-LD carries the same time with a Z
+ * (2026-10-20); the payload's timezone field (Europe/London) is the display zone. Bids are pence. The link is the lot
+ * page's canonical one.
+ */
+export function parseTheMarketLive(html: string): { lots: TheMarketLot[]; total: number | null; totalPages: number | null; houseTime: string | null } | null {
+  const data = nuxtData(html);
+  if (!data) return null;
+  // deno-lint-ignore no-explicit-any
+  const root = nuxtRevive(data, 0) as any;
+  const payload = (root?.data ?? {}) as Record<string, unknown>;
+  const key = Object.keys(payload).find((k) => k.startsWith("/api/listings/live"));
+  // deno-lint-ignore no-explicit-any
+  const live = key ? payload[key] as any : null;
+  if (!live || !Array.isArray(live.data)) return null;
+  const clockKey = Object.keys(payload).find((k) => k.startsWith("/api/server-time"));
+  const clock = clockKey ? Number(payload[clockKey]) : NaN;
+  const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : null);
+  const lots: TheMarketLot[] = [];
+  for (const it of live.data) {
+    if (!it?.id || !it.make_slug || !it.model_slug) continue;
+    const pence = num(it.highest_bid);
+    const buyNow = num(it.buy_now_price);
+    const end = typeof it.end_date === "string" ? it.end_date.trim() : "";
+    const endsAt = /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2})?$/.test(end) ? new Date(`${end.replace(" ", "T")}Z`) : new Date(end);
+    const year = /^(18[89]\d|19\d\d|20\d\d)$/.test(String(it.year ?? "")) ? Number(it.year) : null;
+    const reserve = typeof it.reserve_status === "string" ? it.reserve_status : null;
+    lots.push({
+      id: String(it.id),
+      url: `https://www.themarket.co.uk/listings/${it.make_slug}/${it.model_slug}/${it.id}`,
+      title: [it.year, it.make, it.model].map((s) => String(s ?? "").trim()).filter(Boolean).join(" "),
+      year,
+      make: it.make || null,
+      model: it.model || null,
+      lot_number: num(it.lot_number),
+      status: num(it.status),
+      current_bid: pence !== null && pence > 0 ? pence / 100 : null,
+      bid_count: num(it.bids_count),
+      currency: it.currency || null,
+      ends: end && Number.isFinite(endsAt.getTime()) ? endsAt.toISOString() : null,
+      reserve_status: reserve,
+      no_reserve: reserve === "no-reserve",
+      reserve_met: reserve === "reserve-met" ? true : reserve && reserve !== "no-reserve" ? false : null,
+      buy_now_price: buyNow !== null && buyNow > 0 ? buyNow / 100 : null,
+      image: it.original_image ? `https://cdn.themarket.co.uk/${it.original_image}` : null,
+      location: [it.location, it.location_country].map((s) => String(s ?? "").trim()).filter(Boolean).join(", ") || null,
+      tagline: it.tagline || null,
+    });
+  }
+  return {
+    lots,
+    total: num(live.meta?.total),
+    totalPages: num(live.meta?.total_pages),
+    houseTime: Number.isFinite(clock) && clock > 0 ? new Date(clock * 1000).toISOString() : null,
+  };
+}
+
 /** One bid in a PCarMarket lot's bid history, with Basta's own id and time. */
 export interface PcarBid { id: string; amount: number; at: string; bidder: string | null; status: string | null }
 

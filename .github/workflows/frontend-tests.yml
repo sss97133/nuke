@@ -141,6 +141,10 @@ jobs:
         run: createdb dm_live_board_sync_ci
       - name: Verify the board-synced houses' schedule writer, bid moves, complete-board ending and health
         run: psql -X -v ON_ERROR_STOP=1 -d dm_live_board_sync_ci -f supabase/sql/test_live_auction_board_sync.sql
+      - name: Create disposable The Market live board database
+        run: createdb dm_refinement_the_market_board_ci
+      - name: Verify The Market is an enabled live board house in GBP and the houses job posts it once
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_the_market_board_ci -f supabase/sql/test_the_market_live_board.sql
       - name: Create disposable comment author key database
         run: createdb dm_refinement_comment_author_keys_ci
       - name: Verify comment author keys at insert and by bounded backfill; retired twin untouched
