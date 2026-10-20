@@ -1,20 +1,21 @@
 {
-  "generated": "2026-10-19",
+  "generated": "2026-10-20",
   "note": "Initial JavaScript per route, gzip KB of the entry chunk plus the route's page chunks and their static imports (scripts/ci/route-js-budget.mjs). A route fails when it grows more than `tolerance` over its baseline or exceeds `cap_kb`. Lower a baseline with --write when a route shrinks; raising one needs a stated reason in the PR. `never_initial` names heavy lazy vendor chunks (maps: Leaflet/deck.gl, three, charts) that no measured route may load before first paint.",
   "tolerance": 0.1,
-  "cap_kb": 450,
+  "cap_kb": 400,
   "never_initial": [
     "maps",
     "three",
     "charts"
   ],
   "routes": {
-    "vehicle": 362,
-    "jobs": 308.3,
-    "job": 339.9,
-    "provider": 343,
-    "org": 384.5,
-    "work_setup": 321.4,
-    "login": 299.2
+    "vehicle": 259.7,
+    "vehicle_workspace": 273.7,
+    "jobs": 221.3,
+    "job": 237.4,
+    "provider": 240.4,
+    "org": 330.8,
+    "work_setup": 218.8,
+    "login": 196.6
   }
 }

@@ -55,6 +55,9 @@ class GlobalUploadQueue {
     // when someone actually uploads.
 
     if (typeof window !== 'undefined') {
+      // The header mounts its upload indicator lazily (components/UploadIndicatorLauncher.tsx): announce the queue.
+      (window as Window & { __nukeUploadQueue?: boolean }).__nukeUploadQueue = true;
+      window.dispatchEvent(new Event('nuke:upload-queue'));
       // Connection returned — resume pending uploads
       window.addEventListener('online', () => this.processQueue());
       // One-time cleanup of the legacy localStorage queue (metadata-only, unresumable)

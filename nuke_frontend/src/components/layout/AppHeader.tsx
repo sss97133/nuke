@@ -5,12 +5,12 @@ import { useHeaderHeight } from './hooks/useHeaderHeight';
 import { useSession } from './hooks/useSession';
 import { useNotificationBadge } from './hooks/useNotificationBadge';
 import { useAdminAccess } from '../../hooks/useAdminAccess';
-import HeaderSearch from '../HeaderSearch';
+import HeaderSearch from '../HeaderSearchLauncher';
 import { UserArea } from './UserArea';
 import { UserDropdown } from './UserDropdown';
 import { useBranding } from '../../branding/BrandingContext';
 import { useOptionalTheme } from '../../contexts/ThemeContext';
-import GlobalUploadIndicator from '../GlobalUploadIndicator';
+import GlobalUploadIndicator from '../UploadIndicatorLauncher';
 import './AppHeader.css';
 
 interface AppHeaderProps {
