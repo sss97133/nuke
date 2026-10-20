@@ -73,7 +73,7 @@ export class BrowseClient {
     if (opts.fieldgroups) p.fieldgroups = opts.fieldgroups;
     const j = await this.get("/buy/browse/v1/item_summary/search", p);
     if (j?.__notFound) return { total: 0, itemSummaries: [], next: null };
-    return { total: Number(j.total ?? 0), itemSummaries: j.itemSummaries ?? [], next: j.next ?? null, aspectDistributions: j.aspectDistributions };
+    return { total: Number(j.total ?? 0), itemSummaries: j.itemSummaries ?? [], next: j.next ?? null, aspectDistributions: j.refinement?.aspectDistributions ?? j.aspectDistributions };
   }
 
   /** The category's aspect names and values with counts. The Year aspect is read from here, never assumed. */
@@ -92,7 +92,7 @@ export class BrowseClient {
 
 /** The Year aspect's exact name and the year values eBay lists for the category, with counts. */
 export function yearAspect(dist: NonNullable<SearchPage["aspectDistributions"]>): { name: string; counts: Map<number, number> } | null {
-  const d = dist.find((x) => /^year$/i.test((x.localizedAspectName ?? "").trim()));
+  const d = dist.find((x) => /^(model )?year$/i.test((x.localizedAspectName ?? "").trim()));
   if (!d?.localizedAspectName) return null;
   const counts = new Map<number, number>();
   for (const v of d.aspectValueDistributions ?? []) {
