@@ -84,8 +84,11 @@ struct NukeCaptureApp: App {
                             JobView(workOrderId: dbgJob)
                                 .task {
                                     guard let target = ProcessInfo.processInfo.environment["NUKE_DEBUG_SCROLL_TO"] else { return }
-                                    try? await Task.sleep(for: .seconds(8))
-                                    proxy.scrollTo(target, anchor: .top)
+                                    // The section exists only once its readers load, which is slower on CI runners.
+                                    for delay in [8, 6, 6] {
+                                        try? await Task.sleep(for: .seconds(delay))
+                                        proxy.scrollTo(target, anchor: .top)
+                                    }
                                 }
                         }
                     }
