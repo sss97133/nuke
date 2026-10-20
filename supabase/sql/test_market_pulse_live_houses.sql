@@ -32,7 +32,7 @@ GRANT SELECT ON public.vehicles, public.canonical_makes TO anon, authenticated;
 CREATE TABLE public.live_auction_sources (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(), slug text NOT NULL UNIQUE, display_name text NOT NULL, base_url text NOT NULL,
   sync_method text NOT NULL DEFAULT 'polling_scrape', auction_format text, default_poll_interval_ms integer DEFAULT 60000,
-  notes text, scraping_config jsonb DEFAULT '{}');
+  notes text, scraping_config jsonb DEFAULT '{}', last_successful_sync timestamptz);
 CREATE SCHEMA cron;
 CREATE TABLE cron.job (jobid bigint GENERATED ALWAYS AS IDENTITY, jobname text, schedule text, command text);
 CREATE FUNCTION cron.alter_job(job_id bigint, schedule text DEFAULT NULL, command text DEFAULT NULL, database text DEFAULT NULL,
@@ -159,3 +159,22 @@ UPDATE cron.job SET command = replace(command, '"bonhams", "gooding"]', '"bonham
 SELECT pg_temp.ok('a house another reader appended stays in the job',
   (SELECT substring(command from $re$body := '(\{[^']*\})'::jsonb$re$)::jsonb -> 'platforms' FROM cron.job WHERE jobname = 'sync-live-auctions-houses')
   = '["collecting-cars", "pcarmarket", "bonhams", "rm-sothebys", "gooding"]'::jsonb);
+
+-- 20261022071500_live_board_reader_gate: a house is on the board while its reader reads, not while its lots change.
+\ir ../migrations/20261022071500_live_board_reader_gate.sql
+\ir ../migrations/20261022071500_live_board_reader_gate.sql
+UPDATE public.vehicles SET updated_at = now() - interval '2 days' WHERE id = 'cccccccc-0000-0000-0000-000000000010';
+UPDATE public.live_auction_sources SET last_successful_sync = now() - interval '4 minutes' WHERE slug = 'gooding';
+SELECT pg_temp.ok('a quiet house (lots last written two days ago) stays on the board while its reader read in the last 30 minutes',
+  public.market_pulse_live_houses()->'houses' @> '[{"house": "gooding", "on_board": true}]'::jsonb
+  AND EXISTS (SELECT 1 FROM jsonb_array_elements(public.market_pulse_live_houses()->'auctions') a WHERE a->>0 = 'cccccccc-0000-0000-0000-000000000010'));
+UPDATE public.live_auction_sources SET last_successful_sync = now() - interval '2 hours' WHERE slug = 'gooding';
+SELECT pg_temp.ok('the same house is held off once its reader has not read for 30 minutes and its lots are old',
+  public.market_pulse_live_houses()->'houses' @> '[{"house": "gooding", "on_board": false}]'::jsonb
+  AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements(public.market_pulse_live_houses()->'auctions') a WHERE a->>0 = 'cccccccc-0000-0000-0000-000000000010'));
+UPDATE public.vehicles SET updated_at = now() WHERE id = 'cccccccc-0000-0000-0000-000000000010';
+SELECT pg_temp.ok('a lot write in the last six hours still counts when the reader has no recent read',
+  public.market_pulse_live_houses()->'houses' @> '[{"house": "gooding", "on_board": true}]'::jsonb);
+UPDATE public.vehicles SET updated_at = now() - interval '2 days' WHERE id = 'cccccccc-0000-0000-0000-000000000003';
+SELECT pg_temp.ok('a house with no live_auction_sources row keeps the lot-write gate (Cars & Bids, written two days ago, stays off)',
+  public.market_pulse_live_houses()->'houses' @> '[{"house": "cars-and-bids", "on_board": false}]'::jsonb);
