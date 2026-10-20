@@ -105,6 +105,7 @@ const VIN17 = /^[A-HJ-NPR-Z0-9]{17}$/i;
 export function vinOf(a: Record<string, string>): { vin: string | null; modern: boolean } {
   const raw = (a["vin"] ?? a["vehicle identification number"] ?? "").replace(/[\s-]/g, "").toUpperCase();
   if (!raw || /^(NA|N\/A|NONE|UNKNOWN|NOVIN)$/.test(raw)) return { vin: null, modern: false };
+  if (/^(.)\1+$/.test(raw)) return { vin: null, modern: false };   // 00000000000000000, 11111111111111111, XXXXXXXXXXXXXXXXX: a placeholder typed into the field, not a VIN
   return { vin: raw, modern: VIN17.test(raw) };
 }
 
