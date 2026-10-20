@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 const fixture = vi.hoisted(() => ({ rpc: vi.fn(), from: vi.fn() }));
 vi.mock('../../lib/supabase', () => ({ supabase: { rpc: fixture.rpc, from: fixture.from } }));
-import { assertPulseColumns, bidBucket, fetchBoard, fetchPulse, moneyIn, parseTape, usdBid, PULSE_COLUMNS, readInventoryTaxonomy, useMarketPulse, withTapeBids } from './useMarketPulse';
+import { assertPulseColumns, bidBucket, fetchBoard, houseName, fetchPulse, moneyIn, parseTape, usdBid, PULSE_COLUMNS, readInventoryTaxonomy, useMarketPulse, withTapeBids } from './useMarketPulse';
 
 afterEach(() => { vi.useRealTimers(); vi.clearAllMocks(); });
 
@@ -213,6 +213,14 @@ describe('every house on one board', () => {
     expect(b.auctions[0]).toMatchObject({ band: null, serverHeat: null, noReserve: true, title: '1994 Porsche 911', make: 'PORSCHE' });
     expect(b.houses.map(h => [h.house, h.onBoard])).toEqual([['bringatrailer', true], ['collecting-cars', true], ['cars-and-bids', false]]);
     expect(b.housesFailed).toBe(false);
+  });
+  it('names a house by the label its row sends, with no edit here', async () => {
+    board({ data: { auctions: [], houses: [{ house: 'new-house', label: 'New House Auctions', lots: 2, read_at: null, on_board: true }] }, error: null });
+    await fetchBoard();
+    expect(houseName('new-house')).toBe('New House Auctions');
+    expect(houseName('new-house', true)).toBe('New House Auctions');
+    expect(houseName('bringatrailer', true)).toBe('BaT');
+    expect(houseName('never-sent')).toBe('never-sent');
   });
   it("keeps BaT's board and says so when the other houses cannot be read", async () => {
     board({ data: null, error: new Error('boom') });
