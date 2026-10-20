@@ -2,6 +2,7 @@ import { assertEquals } from "jsr:@std/assert@1";
 import {
   type BonhamsSaleDoc, bonhamsLot, bonhamsLotPhase, bonhamsSaleKind, parseBonhamsBidStates, parsePcarBids, parsePcarBoard,
 } from "./boards.ts";
+import { type AmLotDoc, type AmSale, amIsVehicleLot, amOpenTimedSales, amSales, amTimedLot } from "./boards.ts";
 
 // Trimmed from https://www.pcarmarket.com/auctions?auctionType=live&page=1 (2026-10-18): the Basta query cache.
 const BOARD = `queries:$R[22]=[$R[30]={state:$R[31]={data:$R[32]={search:$R[33]={pageInfo:$R[34]={page:1,pageSize:24,totalPages:3,hasNextPage:!0},` +
@@ -167,4 +168,89 @@ Deno.test("bonhamsLot carries the platform ids, image, no-reserve flag and a EUR
   assertEquals([inRoom.url, inRoom.ends, inRoom.estimate_low, inRoom.estimate_high, inRoom.hammer, inRoom.no_reserve],
     ["https://www.bonhams.com/auction/31858/lot/218/1923-rolls-royce-4050hp-silver-ghost-limousine-chassis-no-56hg-engine-no-p489",
      "2026-10-30T17:00:00+00:00", 50000, 70000, null, false]);
+});
+
+// Broad Arrow's bidding site, read 2026-10-20 19:36Z (fields trimmed; values as served). The page's state line from
+// https://bid.broadarrowauctions.com/ with two of its six sales: the in-room Las Vegas sale and a timed online sale.
+const BA_PAGE = `<script>\n        viewVars = {"currentRouteName":"upcoming-auctions","brand":"broadarrowauctions","auctions":{"result_page":[` +
+  `{"row_id":"1-D1BF6R","auction_type":"live","title":"The Las Vegas Auction 2026","time_start":"2026-10-31T21:30:00Z","duration":"PT4H30M",` +
+  `"timezone":"America\\/Los_Angeles","effective_end_time":"2026-11-01T02:00:00Z","extend_by_auction":false,"extended_end_time":null,"currency_code":"USD"},` +
+  `{"row_id":"1-DGLXWK","auction_type":"timed","title":"Global Icons: Memorabilia Online 2026","time_start":"2026-11-09T09:00:00Z","duration":"P13DT9H",` +
+  `"timezone":"Europe\\/Paris","effective_end_time":"2026-11-22T21:26:00Z","extend_by_auction":false,"extended_end_time":null,"currency_code":"EUR"}],` +
+  `"query_info":{"page_size":20,"page_start_offset":0,"total_num_results":6}},"serverTime":1792525001813};\n</script>`;
+
+// /ajax/lots/?auctionId=1-D1GBGZ (Global Icons: Zoute Online 2026, a timed car sale that closed 2026-10-14) and
+// /ajax/lots/?auctionId=1-DGLXWK (the memorabilia sale above, not yet open), read 2026-10-20.
+const ZOUTE: AmSale = { row_id: "1-D1GBGZ", auction_type: "timed", title: "Global Icons: Zoute Online 2026", time_start: "2026-10-05T08:00:00Z",
+  effective_end_time: "2026-10-14T16:36:56Z", extend_by_auction: false, extended_end_time: null, currency_code: "EUR" };
+const FERRARI: AmLotDoc = { row_id: "1-DH4AXO", lot_number: 107, status: "sold", title: "2005 Ferrari 575M Maranello", estimate_low: "120000.00",
+  estimate_high: "160000.00", starting_price: null, currency_code: "EUR",
+  cover_thumbnail: "https://images-cdn.auctionmobility.com/is3/auctionmobility-static/dL9y-1-5M3B07/1-DHWN7F/ee017a95-034c-4123-9b92-26b31d8e6585",
+  extended_end_time: "2026-10-14T15:18:40Z", timed_auction_bid: { amount: "125000.00", created_at: "2026-10-14T15:17:40.541Z" }, reserve_met: true,
+  _detail_url: "/lots/view/1-DH4AXO/2005-ferrari-575m-maranello" };
+const BENTLEY: AmLotDoc = { row_id: "1-DH4AYG", lot_number: 121, status: "reserve_not_met",
+  title: "2016 Bentley Mulsanne Extended Wheelbase ex-Her Majesty Queen Elizabeth II", estimate_low: "400000.00", estimate_high: "450000.00",
+  starting_price: null, currency_code: "EUR", extended_end_time: "2026-10-14T16:00:00Z", timed_auction_bid: null, reserve_met: false,
+  _detail_url: "/lots/view/1-DH4AYG/2016-bentley-mulsanne-extended-wheelbase-ex-her-majesty-queen-elizabeth-ii" };
+const MEMO = amSales(BA_PAGE)[1];
+const GLOVES: AmLotDoc = { row_id: "1-DJT38T", lot_number: 102, status: "active", title: "Ralf Schumacher 2004 Original Williams Gloves",
+  estimate_low: "200.00", estimate_high: "400.00", starting_price: null, currency_code: "EUR", extended_end_time: "2026-11-22T18:01:00Z",
+  timed_auction_bid: null, reserve_met: null, _detail_url: "/lots/view/1-DJT38T/ralf-schumacher-2004-original-williams-gloves" };
+const READ_AT = Date.parse("2026-10-20T19:36:41Z");
+
+Deno.test("amSales reads the sales Broad Arrow's bidding page server-renders", () => {
+  const sales = amSales(BA_PAGE);
+  assertEquals(sales.map((s) => [s.row_id, s.auction_type, s.time_start, s.currency_code]), [
+    ["1-D1BF6R", "live", "2026-10-31T21:30:00Z", "USD"],
+    ["1-DGLXWK", "timed", "2026-11-09T09:00:00Z", "EUR"],
+  ]);
+  assertEquals(amSales("<html>no state</html>"), []);
+});
+
+Deno.test("amOpenTimedSales keeps started timed car sales: never the in-room sale, never a memorabilia sale", () => {
+  const sales = [...amSales(BA_PAGE), ZOUTE];
+  assertEquals(amOpenTimedSales(sales, READ_AT), []); // Zoute closed 2026-10-14 16:36Z
+  assertEquals(amOpenTimedSales(sales, Date.parse("2026-10-04T00:00:00Z")), []); // before it opened
+  assertEquals(amOpenTimedSales(sales, Date.parse("2026-10-10T00:00:00Z")).map((s) => s.row_id), ["1-D1GBGZ"]);
+  assertEquals(amOpenTimedSales(sales, Date.parse("2026-10-14T20:00:00Z")).map((s) => s.row_id), ["1-D1GBGZ"]); // within six hours of its end
+  assertEquals(amOpenTimedSales(sales, Date.parse("2026-11-01T00:00:00Z")), []); // the Las Vegas sale is in the room
+  assertEquals(amOpenTimedSales(sales, Date.parse("2026-11-10T00:00:00Z")), []); // the memorabilia sale is open, not read
+});
+
+Deno.test("amTimedLot reads the top timed bid, the lot's extended close, estimate, currency, image and bidding-page url", () => {
+  const lot = amTimedLot(FERRARI, ZOUTE, Date.parse("2026-10-14T15:10:00Z"));
+  assertEquals(lot, {
+    external_id: "1-DH4AXO",
+    url: "https://bid.broadarrowauctions.com/lots/view/1-DH4AXO/2005-ferrari-575m-maranello",
+    title: "2005 Ferrari 575M Maranello",
+    lot_number: "107",
+    status: "sold",
+    open: false, // read after it closed: a sold lot is never open, whatever the clock
+    vehicle: true,
+    current_bid: 125000,
+    bid_at: "2026-10-14T15:17:40.541Z",
+    opening_bid: null,
+    currency: "EUR",
+    ends: "2026-10-14T15:18:40Z", // a bid at 15:17:40 moved the close a minute on
+    estimate_low: 120000,
+    estimate_high: 160000,
+    reserve_met: true,
+    image_url: "https://images-cdn.auctionmobility.com/is3/auctionmobility-static/dL9y-1-5M3B07/1-DHWN7F/ee017a95-034c-4123-9b92-26b31d8e6585",
+  });
+  const unsold = amTimedLot(BENTLEY, ZOUTE, READ_AT);
+  assertEquals([unsold.open, unsold.current_bid, unsold.reserve_met, unsold.status], [false, null, false, "reserve_not_met"]);
+});
+
+Deno.test("an active lot is open only between its sale's start and its own close", () => {
+  assertEquals(amTimedLot(GLOVES, MEMO, READ_AT).open, false); // sale opens 2026-11-09
+  assertEquals(amTimedLot(GLOVES, MEMO, Date.parse("2026-11-10T00:00:00Z")).open, true);
+  assertEquals(amTimedLot(GLOVES, MEMO, Date.parse("2026-11-22T18:01:00Z")).open, false);
+  assertEquals(amTimedLot(GLOVES, { ...MEMO, auction_type: "live" }, Date.parse("2026-11-10T00:00:00Z")).open, false);
+});
+
+Deno.test("amIsVehicleLot: a model-year title in a car sale, not a year-led part in a memorabilia sale", () => {
+  assertEquals(amIsVehicleLot("1996 Jaguar XK8 Coupé", "Global Icons: Zoute Online 2026"), true);
+  assertEquals(amIsVehicleLot("1992 Original Lotus 107C Rear Wing Element", "Global Icons: Memorabilia Online 2026"), false);
+  assertEquals(amIsVehicleLot("Ralf Schumacher 2004 Original Williams Gloves", "Global Icons: Memorabilia Online 2026"), false);
+  assertEquals(amTimedLot(GLOVES, MEMO, READ_AT).vehicle, false);
 });
