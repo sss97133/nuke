@@ -772,29 +772,51 @@ describe('every live house on one board', () => {
     expect(container.querySelector('.market-figure__note')?.textContent).toContain('Other houses could not be read; showing Bring a Trailer only');
     expect(container.querySelector('[aria-label="Auction house"]')).toBeNull();
   });
-  it('opens the dollars into each house\'s share now and over time, and says where the history starts', async () => {
+  it('opens the dollars into a price chart of the total with a watchlist of the houses, and says where the history starts', async () => {
     const t0 = Date.parse('2026-10-03T08:00:00Z');
-    fixture.share = { isError: false, data: { firstAt: t0, firstAtByHouse: { bringatrailer: t0, pcarmarket: t0, 'collecting-cars': t0 }, weekAgo: {},
-      points: [t0, t0 + 3_600_000, t0 + 7_200_000].flatMap((at, i) => [
-        { at, house: 'bringatrailer', bidUsd: 50_000 + i * 1000, lots: 2, lotsWithBid: 2 },
-        { at, house: 'pcarmarket', bidUsd: 10_000, lots: 1, lotsWithBid: 1 }]) } };
+    fixture.share = { isError: false, data: { firstAt: t0, firstAtByHouse: { bringatrailer: t0, pcarmarket: t0 }, weekAgo: {},
+      points: [0, 1, 2, 3].flatMap((i) => [
+        { at: t0 + i * 900_000, house: 'bringatrailer', bidUsd: 50_000 + i * 1000, lots: 2, lotsWithBid: 2 },
+        { at: t0 + i * 900_000, house: 'pcarmarket', bidUsd: 10_000 - i * 500, lots: 1, lotsWithBid: 1 }]) } };
     await render('map=bids');
-    const chart = container.querySelector('[aria-label="Each house\'s share of dollars bid"]')!;
-    expect(chart).toBeTruthy();
-    expect(chart.textContent).toContain('Nothing before that is estimated');
-    expect(chart.textContent).toContain('Dollar bids only');
-    expect(chart.querySelectorAll('polyline.market-share__line').length).toBe(2);
-    // now: BaT $50,000 of $60,000, PCarMarket $10,000 (the GBP and EUR lots are not added in)
-    expect(chart.querySelector('li')?.textContent).toContain('83.3%');
+    const stock = container.querySelector('[aria-label="Dollars bid, every house"]')!;
+    expect(stock).toBeTruthy();
+    expect(stock.textContent).toContain('Nothing before that is estimated');
+    expect(stock.textContent).toContain('Dollar bids only');
+    // the total went from $60,000 to $61,500: up, drawn as a green line with a last-price tag
+    expect(stock.querySelector('.market-stock__chg')?.className).toContain('is-up');
+    expect(stock.querySelector('.market-stock__chg')?.textContent).toContain('+2.50%');
+    expect(stock.querySelector('polyline.market-stock__line')).toBeTruthy();
+    expect(stock.querySelector('.market-stock__tag')?.textContent).toBe('$61.5K');
+    // the watchlist: BaT up, PCarMarket down, shares from the live board ($50,000 of $60,000)
+    const rows = [...stock.querySelectorAll('tbody tr')];
+    expect(rows[0].textContent).toContain('83.3%');
+    expect(rows[0].querySelector('td.is-up')).toBeTruthy();
+    expect(rows[1].querySelector('td.is-down')).toBeTruthy();
+    expect(rows[0].querySelector('img')?.getAttribute('alt')).toBe('BaT');
     await act(async () => container.querySelectorAll<HTMLButtonElement>('.market-figure__value')[1].click());
-    expect(container.querySelector('[aria-label="Each house\'s share of open lots"]')).toBeTruthy();
+    expect(container.querySelector('[aria-label="Open lots, every house"]')).toBeTruthy();
   });
-  it('draws no line from a single reading and says recording has just begun', async () => {
+  it('switches the range and reads the value under the pointer', async () => {
+    const t0 = Date.parse('2026-10-03T00:00:00Z'), end = Date.parse('2026-10-03T12:00:00Z');
+    const pts = Array.from({ length: 13 }, (_, i) => ({ at: t0 + i * 3_600_000, house: 'bringatrailer', bidUsd: 50_000 + i * 1000, lots: 2, lotsWithBid: 2 }));
+    fixture.share = { isError: false, data: { firstAt: t0, firstAtByHouse: { bringatrailer: t0 }, weekAgo: {}, points: pts } };
+    await render('map=bids');
+    const chart = () => container.querySelector('.market-stock__chart')!;
+    const span = () => container.querySelector('.market-stock__note')!.textContent!;
+    expect(span()).toContain('Showing 12 h');
+    await click('6H');
+    expect(span()).toContain('Showing 6 h');
+    expect(end).toBeGreaterThan(t0);
+    await act(async () => { chart().dispatchEvent(new MouseEvent('pointermove', { bubbles: true, clientX: 0 })); });
+    expect(container.querySelector('.market-stock__tipv')).toBeTruthy();
+  });
+  it('draws no line from fewer than two readings and says recording has just begun', async () => {
     fixture.share = { isError: false, data: { firstAt: null, firstAtByHouse: {}, weekAgo: {}, points: [] } };
     await render('map=bids');
-    const chart = container.querySelector('[aria-label="Each house\'s share of dollars bid"]')!;
-    expect(chart.textContent).toContain('Recording starts now');
-    expect(chart.querySelector('polyline')).toBeNull();
+    const stock = container.querySelector('[aria-label="Dollars bid, every house"]')!;
+    expect(stock.textContent).toContain('Recording starts now');
+    expect(stock.querySelector('polyline')).toBeNull();
   });
   it('compares each house with its own week-ago reading, and says which houses have no week of history yet', async () => {
     const t0 = Date.parse('2026-09-26T12:00:00Z');
