@@ -242,9 +242,9 @@ SELECT fixture_assert((SELECT count(*) > 0 FROM public.map_facts WHERE layer = '
 -- The one-area read the reader will make: one county, one layer, a day range.
 SELECT fixture_assert((SELECT count(*) > 0 FROM public.map_facts WHERE layer = 'listing' AND level = 'county' AND area_key = '32003' AND day BETWEEN current_date - 7 AND current_date), 'one-area read answers');
 
--- Retirement (20261021050000): the #2215 fold and its cron go; map_facts and its crons stay whole.
-\ir ../migrations/20261021050000_retire_vehicle_map_county_listings.sql
-\ir ../migrations/20261021050000_retire_vehicle_map_county_listings.sql
+-- Retirement (20261021050100): the #2215 fold and its cron go; map_facts and its crons stay whole.
+\ir ../migrations/20261021050100_retire_vehicle_map_county_listings.sql
+\ir ../migrations/20261021050100_retire_vehicle_map_county_listings.sql
 SELECT fixture_assert(to_regclass('public.vehicle_map_county_listings') IS NULL, 'the county listing fold is gone');
 SELECT fixture_assert((SELECT count(*) = 0 FROM cron.job WHERE jobname = 'vehicle-map-county-listings'), 'its cron is gone');
 SELECT fixture_assert((SELECT count(*) = 2 FROM cron.job WHERE jobname LIKE 'map-facts%'), 'the map_facts crons remain');
