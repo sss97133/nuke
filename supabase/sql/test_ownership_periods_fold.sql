@@ -3,6 +3,12 @@
 --   * the migration applies twice;
 --   * a vehicle with three sold lots whose chain continues (each seller is the previous winner) folds to the first
 --     seller (start unknown), then one period per winner, each ending at the next lot, the last one current;
+--   * a sold lot is a recorded sale: when the next listing (any outcome) is by the same seller, no period starts for the
+--     winner, the lot is flagged relist_same_seller, and the seller keeps holding (a held period when no sale after it
+--     handed the vehicle on); when the next listing is by the winner, the period says confirmed_next_lot, otherwise
+--     recorded; an unsold lot with no clock is listed and not used;
+--   * every lot gets a link state against the lot before it (first, continuity, break, relist_same_seller, prev_not_sold,
+--     unkeyed, undated, date_error), reported and never stored;
 --   * a seller who is not the previous winner keeps both periods, marks the earlier end unknown, and flags both
 --     sides handover_unobserved with the neighbouring lot; no bridge is invented;
 --   * a lot that is not sold is never read; a lot whose seller or winner is unkeyed flags party_unkeyed;
@@ -129,10 +135,10 @@ CREATE FUNCTION pg_temp.u(kind int, n int) RETURNS uuid LANGUAGE sql IMMUTABLE A
   $$ SELECT ('00000000-0000-0000-' || lpad(kind::text, 4, '0') || '-' || lpad(n::text, 12, '0'))::uuid $$;
 -- kind 1 vehicle, 2 identity, 3 lot, 4 profile
 INSERT INTO public.profiles SELECT pg_temp.u(4, n) FROM generate_series(1, 3) n;
-INSERT INTO public.vehicles (id, is_public) SELECT pg_temp.u(1, n), true FROM generate_series(1, 12) n;
+INSERT INTO public.vehicles (id, is_public) SELECT pg_temp.u(1, n), true FROM generate_series(1, 16) n;
 INSERT INTO public.external_identities (id, platform, handle, claimed_by_user_id, claim_confidence)
 SELECT pg_temp.u(2, n), 'bat', 'synthetic_handle_' || n, CASE WHEN n = 30 THEN pg_temp.u(4, 1) END, CASE WHEN n = 30 THEN 100 END
-  FROM generate_series(1, 40) n;
+  FROM generate_series(1, 70) n;
 
 CREATE FUNCTION pg_temp.lot(n int, veh int, url text, outcome text, ends text, seller int, winner int) RETURNS void LANGUAGE sql AS $$
   INSERT INTO public.auction_events (id, vehicle_id, source, source_url, outcome, auction_end_date, seller_external_identity_id, winning_bidder_external_identity_id)
@@ -176,6 +182,22 @@ VALUES (pg_temp.u(1, 9), pg_temp.u(4, 2), 'verified_owner', true, '2026-05-24', 
 SELECT pg_temp.lot(20, 10, 'v10-a', 'sold', '2024-01-10 20:00+00', 32, NULL);
 SELECT pg_temp.lot(21, 10, 'v10-b', 'sold', '2024-07-10 20:00+00', 33, 34);
 SELECT pg_temp.lot(22, 10, 'v10-c', 'sold', '2024-12-10 20:00+00', 35, 35);
+-- V12: the same seller lists it again after a sold lot, and nothing sold since: the sale did not hand it on
+SELECT pg_temp.lot(40, 12, 'v12-a', 'sold', '2024-01-10 20:00+00', 41, 42);
+SELECT pg_temp.lot(41, 12, 'v12-b', 'no_sale', '2024-03-10 20:00+00', 41, NULL);
+-- V13: the same seller relists and then sells: the first sale did not hand it on
+SELECT pg_temp.lot(42, 13, 'v13-a', 'sold', '2024-01-10 20:00+00', 43, 44);
+SELECT pg_temp.lot(43, 13, 'v13-b', 'sold', '2024-05-10 20:00+00', 43, 45);
+-- V14: the winner lists it next, unsold: the sale is confirmed
+SELECT pg_temp.lot(44, 14, 'v14-a', 'sold', '2024-01-10 20:00+00', 46, 47);
+SELECT pg_temp.lot(45, 14, 'v14-b', 'reserve_not_met', '2024-04-10 20:00+00', 47, NULL);
+-- V15: a sale hands it on (48 -> 49), then another seller's sale (50 -> 51) is followed by the same seller 50 listing it again
+SELECT pg_temp.lot(46, 15, 'v15-a', 'sold', '2024-01-10 20:00+00', 48, 49);
+SELECT pg_temp.lot(47, 15, 'v15-b', 'sold', '2024-06-10 20:00+00', 50, 51);
+SELECT pg_temp.lot(48, 15, 'v15-c', 'no_sale', '2024-08-10 20:00+00', 50, NULL);
+-- V16: an unsold lot with no clock at all: listed, not used, and the vehicle still folds
+SELECT pg_temp.lot(49, 16, 'v16-a', 'sold', '2024-01-10 20:00+00', 52, 53);
+SELECT pg_temp.lot(50, 16, 'v16-b', 'bid_to', NULL, 54, NULL);
 -- V11: another source with no parties at all: nothing to fold
 INSERT INTO public.auction_events (vehicle_id, source, source_url, outcome, auction_end_date)
 VALUES (pg_temp.u(1, 11), 'mecum', 'https://example.test/lot/11', 'sold', '2024-01-10 20:00+00');
@@ -188,9 +210,26 @@ SELECT pg_temp.ok('a dry run reports periods and writes none',
   AND (SELECT count(*) FROM public.vehicle_ownerships WHERE basis IS NOT NULL) = 0
   AND (SELECT count(*) FROM public.ownership_fold_flags) = 0);
 SELECT pg_temp.ok('a vehicle whose only sold lots name no party is not a candidate',
-  (SELECT (r ->> 'vehicles')::int FROM _dry) = 10);
+  (SELECT (r ->> 'vehicles')::int FROM _dry) = 15);
 
 SELECT public.fold_vehicle_ownership_periods(NULL, 100, true);
+
+-- how every lot links to the lot before it, reported and never stored
+CREATE TEMP TABLE _links AS
+  SELECT p.vehicle_id, p.flag_lot_id AS lot_id, p.flag_reason AS state
+    FROM public.ownership_fold_plan(ARRAY(SELECT id FROM public.vehicles)) p WHERE p.kind = 'link';
+SELECT pg_temp.ok('link states: a chain is first, continuity, continuity',
+  (SELECT array_agg(state ORDER BY lot_id) FROM _links WHERE vehicle_id = pg_temp.u(1, 1)) = ARRAY['first', 'continuity', 'continuity']);
+SELECT pg_temp.ok('link states: a different seller is a break, and the lot after an unsold lot is prev_not_sold',
+  (SELECT array_agg(state ORDER BY lot_id) FROM _links WHERE vehicle_id = pg_temp.u(1, 2)) = ARRAY['first', 'break', 'prev_not_sold']);
+SELECT pg_temp.ok('link states: the same seller again is relist_same_seller, a lot on one clock is date_error, no clock is undated, an unkeyed side is unkeyed',
+  (SELECT state FROM _links WHERE lot_id = pg_temp.u(3, 41)) = 'relist_same_seller'
+  AND (SELECT state FROM _links WHERE lot_id = pg_temp.u(3, 43)) = 'relist_same_seller'
+  AND (SELECT state FROM _links WHERE lot_id = pg_temp.u(3, 14)) = 'date_error'
+  AND (SELECT state FROM _links WHERE lot_id = pg_temp.u(3, 50)) = 'undated'
+  AND (SELECT state FROM _links WHERE lot_id = pg_temp.u(3, 17)) = 'undated'
+  AND (SELECT state FROM _links WHERE lot_id = pg_temp.u(3, 21)) = 'unkeyed');
+SELECT pg_temp.ok('link states are not written anywhere', NOT EXISTS (SELECT 1 FROM public.ownership_fold_flags WHERE reason NOT IN ('duplicate_lot', 'duplicate_lot_conflict', 'no_event_clock', 'same_clock', 'seller_is_winner', 'relist_same_seller', 'unsold_lot_unordered')));
 
 -- V1: the chain continues
 SELECT pg_temp.ok('V1: four periods, one per party: the first seller (start unknown) and three winners',
@@ -209,6 +248,11 @@ SELECT pg_temp.ok('V1: each winner holds from its lot to the next lot, proved by
 SELECT pg_temp.ok('V1: the last winner is the one current period, open ended',
   (SELECT array_agg(owner_identity_id) FROM public.vehicle_ownerships WHERE vehicle_id = pg_temp.u(1, 1) AND is_current) = ARRAY[pg_temp.u(2, 4)]
   AND EXISTS (SELECT 1 FROM public.vehicle_ownerships WHERE vehicle_id = pg_temp.u(1, 1) AND is_current AND end_at IS NULL AND NOT end_unknown));
+SELECT pg_temp.ok('V1: a winner whose seller is the next lot''s seller is confirmed_next_lot; the last winner is only recorded; a seller period has no confirmation',
+  (SELECT sale_confirmation FROM public.vehicle_ownerships WHERE vehicle_id = pg_temp.u(1, 1) AND owner_identity_id = pg_temp.u(2, 2)) = 'confirmed_next_lot'
+  AND (SELECT sale_confirmation FROM public.vehicle_ownerships WHERE vehicle_id = pg_temp.u(1, 1) AND owner_identity_id = pg_temp.u(2, 3)) = 'confirmed_next_lot'
+  AND (SELECT sale_confirmation FROM public.vehicle_ownerships WHERE vehicle_id = pg_temp.u(1, 1) AND owner_identity_id = pg_temp.u(2, 4)) = 'recorded'
+  AND (SELECT sale_confirmation FROM public.vehicle_ownerships WHERE vehicle_id = pg_temp.u(1, 1) AND owner_identity_id = pg_temp.u(2, 1)) IS NULL);
 SELECT pg_temp.ok('V1: a fold row is low authority, unverified, and carries the vehicle''s role owner and its fold key',
   (SELECT bool_and(authority_score = 20 AND ownership_type = 'claimed_unverified' AND role = 'owner' AND owner_profile_id IS NULL
                    AND basis = 'auction_sale' AND fold_hash IS NOT NULL) FROM public.vehicle_ownerships WHERE basis IS NOT NULL)
@@ -281,6 +325,38 @@ SELECT pg_temp.ok('V10: an unkeyed winner leaves no period for it; the next sell
               AND start_unknown AND chain_flag = 'party_unkeyed' AND chain_peer_lot_id = pg_temp.u(3, 20)));
 SELECT pg_temp.ok('V10: a lot naming one identity on both sides is read as written and flagged seller_is_winner',
   EXISTS (SELECT 1 FROM public.ownership_fold_flags WHERE vehicle_id = pg_temp.u(1, 10) AND reason = 'seller_is_winner' AND auction_event_id = pg_temp.u(3, 22)));
+
+-- V12 to V16: a sold lot is a recorded sale
+SELECT pg_temp.ok('V12: the same seller listing again after the sale means the winner holds nothing; the seller holds it now, start unknown, proved by the sale lot',
+  (SELECT count(*) FROM public.vehicle_ownerships WHERE vehicle_id = pg_temp.u(1, 12) AND basis IS NOT NULL) = 1
+  AND EXISTS (SELECT 1 FROM public.vehicle_ownerships WHERE vehicle_id = pg_temp.u(1, 12) AND owner_identity_id = pg_temp.u(2, 41)
+              AND fold_key = 'held:' || pg_temp.u(3, 40) AND is_current AND start_unknown AND NOT end_unknown AND listed_via_lot_id = pg_temp.u(3, 40)
+              AND proof_event_id = pg_temp.u(3, 40) AND chain_flag IS NULL)
+  AND NOT EXISTS (SELECT 1 FROM public.vehicle_ownerships WHERE owner_identity_id = pg_temp.u(2, 42))
+  AND EXISTS (SELECT 1 FROM public.ownership_fold_flags WHERE vehicle_id = pg_temp.u(1, 12) AND reason = 'relist_same_seller'
+              AND auction_event_id = pg_temp.u(3, 40) AND (detail ->> 'next_lot')::uuid = pg_temp.u(3, 41) AND resolved_at IS NULL));
+SELECT pg_temp.ok('V13: relist then sale: the first winner has no period, the seller''s period runs to the lot that handed the vehicle on',
+  NOT EXISTS (SELECT 1 FROM public.vehicle_ownerships WHERE owner_identity_id = pg_temp.u(2, 44))
+  AND EXISTS (SELECT 1 FROM public.vehicle_ownerships WHERE vehicle_id = pg_temp.u(1, 13) AND owner_identity_id = pg_temp.u(2, 43)
+              AND start_unknown AND end_at = '2024-05-10 20:00+00' AND disposed_via_lot_id = pg_temp.u(3, 43) AND chain_flag IS NULL)
+  AND EXISTS (SELECT 1 FROM public.vehicle_ownerships WHERE vehicle_id = pg_temp.u(1, 13) AND owner_identity_id = pg_temp.u(2, 45) AND is_current AND sale_confirmation = 'recorded')
+  AND (SELECT count(*) FROM public.vehicle_ownerships WHERE vehicle_id = pg_temp.u(1, 13) AND basis IS NOT NULL) = 2
+  AND EXISTS (SELECT 1 FROM public.ownership_fold_flags WHERE reason = 'relist_same_seller' AND auction_event_id = pg_temp.u(3, 42)));
+SELECT pg_temp.ok('V14: the winner listing the vehicle next, even unsold, confirms the sale',
+  EXISTS (SELECT 1 FROM public.vehicle_ownerships WHERE vehicle_id = pg_temp.u(1, 14) AND owner_identity_id = pg_temp.u(2, 47) AND is_current AND sale_confirmation = 'confirmed_next_lot')
+  AND (SELECT count(*) FROM public.vehicle_ownerships WHERE vehicle_id = pg_temp.u(1, 14) AND basis IS NOT NULL) = 2
+  AND NOT EXISTS (SELECT 1 FROM public.ownership_fold_flags WHERE vehicle_id = pg_temp.u(1, 14)));
+SELECT pg_temp.ok('V15: a relisted sale after an earlier effective sale: the earlier winner''s end is unknown, the relisting seller holds it now, each flagged with the other''s lot',
+  EXISTS (SELECT 1 FROM public.vehicle_ownerships WHERE vehicle_id = pg_temp.u(1, 15) AND owner_identity_id = pg_temp.u(2, 49)
+          AND end_unknown AND NOT is_current AND chain_flag = 'handover_unobserved' AND chain_peer_lot_id = pg_temp.u(3, 47))
+  AND EXISTS (SELECT 1 FROM public.vehicle_ownerships WHERE vehicle_id = pg_temp.u(1, 15) AND owner_identity_id = pg_temp.u(2, 50)
+              AND fold_key = 'held:' || pg_temp.u(3, 47) AND is_current AND start_unknown AND chain_flag = 'handover_unobserved' AND chain_peer_lot_id = pg_temp.u(3, 46))
+  AND NOT EXISTS (SELECT 1 FROM public.vehicle_ownerships WHERE owner_identity_id = pg_temp.u(2, 51))
+  AND (SELECT count(*) FROM public.vehicle_ownerships WHERE vehicle_id = pg_temp.u(1, 15) AND is_current) = 1);
+SELECT pg_temp.ok('V16: an unsold lot with no clock is listed, not used, and does not stop the vehicle folding',
+  (SELECT count(*) FROM public.vehicle_ownerships WHERE vehicle_id = pg_temp.u(1, 16) AND basis IS NOT NULL) = 2
+  AND EXISTS (SELECT 1 FROM public.ownership_fold_flags WHERE vehicle_id = pg_temp.u(1, 16) AND reason = 'unsold_lot_unordered'
+              AND auction_event_id = pg_temp.u(3, 50) AND (detail ->> 'undated')::boolean));
 
 -- V11 and the invariants over the whole table
 SELECT pg_temp.ok('V11: a sold lot naming no party yields nothing',
@@ -374,7 +450,7 @@ END $$;
 SELECT pg_temp.ok('a dry run in pages of three covers every candidate vehicle once and its periods add up to the one-shot run',
   (SELECT sum((r ->> 'vehicles')::int) FROM _pages) = (SELECT (r ->> 'vehicles')::int FROM (SELECT public.fold_vehicle_ownership_periods(NULL, 100, false) AS r) x)
   AND (SELECT sum((r ->> 'periods')::int) FROM _pages) = (SELECT (r ->> 'periods')::int FROM (SELECT public.fold_vehicle_ownership_periods(NULL, 100, false) AS r) x)
-  AND (SELECT count(*) FROM _pages) = 4);
+  AND (SELECT count(*) FROM _pages) = 5);
 
 -- the join point: a bridge between two handles of one party closes the chain
 CREATE OR REPLACE FUNCTION public.ownership_fold_party(p_identity uuid) RETURNS uuid LANGUAGE sql STABLE AS
@@ -395,6 +471,12 @@ INSERT INTO public.ownership_transfers (id, vehicle_id, trigger_table, status) V
   (pg_temp.u(5, 4), pg_temp.u(1, 4), 'listing', 'in_progress'),          -- not seeded from a lot: stays
   (pg_temp.u(5, 5), pg_temp.u(1, 5), 'auction_events', 'completed'),     -- already closed: stays
   (pg_temp.u(5, 6), pg_temp.u(1, 6), 'auction_events', 'in_progress');   -- hammer only: relabelled
+INSERT INTO public.ownership_transfers (id, vehicle_id, trigger_table, trigger_id, status) VALUES
+  (pg_temp.u(5, 7), pg_temp.u(1, 12), 'auction_events', pg_temp.u(3, 40), 'in_progress'),  -- the seller relisted: held back
+  (pg_temp.u(5, 8), pg_temp.u(1, 1), 'auction_events', pg_temp.u(3, 1), 'in_progress');    -- the winner listed it next: held back
+INSERT INTO public.transfer_milestones (transfer_id, milestone_type, status)
+SELECT t, m, CASE WHEN m = 'agreement_reached' THEN 'completed'::public.milestone_status ELSE 'pending' END
+  FROM (VALUES (pg_temp.u(5, 7)), (pg_temp.u(5, 8))) t(t) CROSS JOIN (VALUES ('agreement_reached'), ('contact_exchanged')) m(m);
 INSERT INTO public.transfer_milestones (transfer_id, milestone_type, status)
 SELECT t, m, CASE WHEN m = 'agreement_reached' THEN 'completed'::public.milestone_status WHEN m = 'contact_exchanged' AND t = pg_temp.u(5, 6) THEN 'overdue' ELSE 'pending' END
   FROM (VALUES (pg_temp.u(5, 1)), (pg_temp.u(5, 2)), (pg_temp.u(5, 3)), (pg_temp.u(5, 4)), (pg_temp.u(5, 6))) t(t)
@@ -403,16 +485,19 @@ UPDATE public.transfer_milestones SET status = 'completed' WHERE transfer_id = p
 INSERT INTO public.transfer_communications (transfer_id) VALUES (pg_temp.u(5, 3));
 
 CREATE TEMP TABLE _rel_dry AS SELECT public.relabel_auction_transfers_recorded_unconfirmed(NULL, 100, false) AS r;
-SELECT pg_temp.ok('the relabel dry run names the two transfers and writes nothing',
-  (SELECT (r ->> 'transfers')::int = 2 AND (r ->> 'milestones_closed')::int = 6 FROM _rel_dry)
-  AND (SELECT count(*) FROM public.ownership_transfers WHERE status = 'in_progress') = 5);
+SELECT pg_temp.ok('the relabel dry run names the two transfers, holds back the relisted and the confirmed, and writes nothing',
+  (SELECT (r ->> 'transfers')::int = 2 AND (r ->> 'milestones_closed')::int = 6
+          AND (r ->> 'held_back_relisted')::int = 1 AND (r ->> 'held_back_confirmed')::int = 1 FROM _rel_dry)
+  AND (SELECT count(*) FROM public.ownership_transfers WHERE status = 'in_progress') = 7);
 SELECT public.relabel_auction_transfers_recorded_unconfirmed(NULL, 100, true);
-SELECT pg_temp.ok('a transfer with only the hammer moves to recorded_unconfirmed; transfers with observed progress, a communication, another seed, or a close stay as they were',
+SELECT pg_temp.ok('a transfer with only the hammer moves to recorded_unconfirmed; transfers with observed progress, a communication, another seed, a close, a relisted lot or a confirmed lot stay as they were',
   (SELECT array_agg(id ORDER BY id) FROM public.ownership_transfers WHERE status = 'recorded_unconfirmed') = ARRAY[pg_temp.u(5, 1), pg_temp.u(5, 6)]
   AND (SELECT status FROM public.ownership_transfers WHERE id = pg_temp.u(5, 2)) = 'in_progress'
   AND (SELECT status FROM public.ownership_transfers WHERE id = pg_temp.u(5, 3)) = 'in_progress'
   AND (SELECT status FROM public.ownership_transfers WHERE id = pg_temp.u(5, 4)) = 'in_progress'
-  AND (SELECT status FROM public.ownership_transfers WHERE id = pg_temp.u(5, 5)) = 'completed');
+  AND (SELECT status FROM public.ownership_transfers WHERE id = pg_temp.u(5, 5)) = 'completed'
+  AND (SELECT status FROM public.ownership_transfers WHERE id = pg_temp.u(5, 7)) = 'in_progress'
+  AND (SELECT status FROM public.ownership_transfers WHERE id = pg_temp.u(5, 8)) = 'in_progress');
 SELECT pg_temp.ok('their open milestones are not_observable and the hammer stays completed; other transfers'' milestones are untouched',
   (SELECT count(*) FROM public.transfer_milestones WHERE transfer_id IN (pg_temp.u(5, 1), pg_temp.u(5, 6)) AND status = 'not_observable') = 6
   AND (SELECT count(*) FROM public.transfer_milestones WHERE transfer_id IN (pg_temp.u(5, 1), pg_temp.u(5, 6)) AND milestone_type = 'agreement_reached' AND status = 'completed') = 2
