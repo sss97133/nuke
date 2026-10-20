@@ -1,5 +1,6 @@
 -- Empty disposable PG17 only: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_market_source_landing_window -f this-file.sql
--- Contract for 20261021001000_market_source_landing_live_held_archived_window.sql, on top of the Sources board contract's
+-- Contract for 20261021001000_market_source_landing_live_held_archived_window.sql and
+-- 20261021004000_market_source_window_starts_at_first_bar.sql, on top of the Sources board contract's
 -- synthetic sources and readers (test_market_sources_board.sql). Synthetic rows only; never production.
 --   * the drill-down's held count is the fold's count with its clock, and held_since counts the events landed after that
 --     clock (eBay Motors read "3,575 held" beside "+17,583 in 24 hours" on 2026-10-20);
@@ -52,6 +53,8 @@ INSERT INTO public.vehicle_events (source_platform, created_at, event_type, even
    NULL, 500, NULL, NULL, '{"page": {"archive": {"archive_timestamp": "not-a-time"}}}');
 \ir ../migrations/20261021001000_market_source_landing_live_held_archived_window.sql
 \ir ../migrations/20261021001000_market_source_landing_live_held_archived_window.sql
+\ir ../migrations/20261021004000_market_source_window_starts_at_first_bar.sql
+\ir ../migrations/20261021004000_market_source_window_starts_at_first_bar.sql
 
 SET ROLE anon;
 DO $$
@@ -64,6 +67,9 @@ BEGIN
   PERFORM pg_temp.ok('the window counts every event landed in 24 hours: one sold, two ended, two active, four archived',
     (d->'window'->>'events')::int = 5 AND (d->'window'->>'sold')::int = 1 AND (d->'window'->>'ended')::int = 2
     AND (d->'window'->>'live')::int = 2 AND (d->'window'->>'archived')::int = 4 AND (d->'window'->>'capped')::boolean IS FALSE);
+  PERFORM pg_temp.ok('the window starts at the first hourly bar (this hour and the 23 before it), so it spans what "last 24 hours" counts',
+    (d->'window'->>'since')::timestamptz = date_trunc('hour', now()) - interval '23 hours'
+    AND (h->'window'->>'since')::timestamptz = date_trunc('hour', now() - interval '3 hours'));
   PERFORM pg_temp.ok('the median sold price is over sold rows with a price, not the rows shown',
     (d->'window'->>'sold_priced')::int = 1 AND (d->'window'->>'median_sold_price')::numeric = 14999);
   SELECT x INTO r FROM jsonb_array_elements(d->'recent') x WHERE x->>'lot' = 'active-1';
