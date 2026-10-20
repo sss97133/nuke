@@ -1,5 +1,5 @@
--- Isolated PostgreSQL 17 contract for 20261019030000_merge_carries_identity_unmerge_batch.sql and
--- 20261020011000_merge_batch_discovery_url_fill_only.sql. Synthetic rows only; never production.
+-- Isolated PostgreSQL 17 contract for 20261019030000_merge_carries_identity_unmerge_batch.sql,
+-- 20261020011000_merge_batch_discovery_url_fill_only.sql and 20261020050500_merge_vin_carry_and_protected_observations.sql. Synthetic rows only; never production.
 -- Run in an empty, disposable dm_refinement_* database from the repo root:
 --   createdb dm_refinement_merge_batch_identity
 --   psql -X -v ON_ERROR_STOP=1 -d dm_refinement_merge_batch_identity -f supabase/sql/test_merge_batch_identity_contract.sql
@@ -39,33 +39,41 @@ CREATE TABLE public.vehicles (
   id uuid PRIMARY KEY, status text, merged_into_vehicle_id uuid, deleted_at timestamptz, user_id uuid, image_count integer,
   has_photos boolean, vin text, year integer, make text, model text, trim text, series text, generation text, body_style text,
   engine_size text, engine_type text, drivetrain text, fuel_type text, listing_url text, discovery_url text, primary_image_url text,
-  sale_date date, color text, interior_color text, transmission text, description text);
+  sale_date date, color text, interior_color text, transmission text, description text, profile_origin text, origin_metadata jsonb);
 CREATE UNIQUE INDEX vehicles_vin_unique_17char_v2 ON public.vehicles (vin)
   WHERE vin IS NOT NULL AND length(vin) = 17 AND status IS DISTINCT FROM 'merged';
 CREATE UNIQUE INDEX idx_vehicles_listing_url_unique ON public.vehicles (listing_url)
   WHERE deleted_at IS NULL AND listing_url IS NOT NULL AND listing_url <> '';
 CREATE UNIQUE INDEX vehicles_discovery_url_unique ON public.vehicles (discovery_url) WHERE discovery_url IS NOT NULL;
+-- The live trigger as deployed through 20261019190602 (no status filter): it counted a merged-away duplicate as a holder, so
+-- the batch merge's VIN carry raised on every 11+ character VIN (measured 2026-10-19, 10 of 20 live pairs).
+-- 20261020050500 below makes it skip status 'merged', as the partial unique indexes already do.
+CREATE FUNCTION public.normalize_make(p text) RETURNS text LANGUAGE sql IMMUTABLE AS $$ SELECT lower(trim(p)) $$;
 CREATE FUNCTION public.enforce_vin_uniqueness() RETURNS trigger LANGUAGE plpgsql AS $$
-declare
-  v_norm text;
-  v_existing uuid;
-begin
-  if new.vin is null or length(trim(new.vin)) < 11 then
-    return new;
-  end if;
-  v_norm := upper(trim(new.vin));
-  select id into v_existing
-    from vehicles
-   where upper(trim(vin)) = v_norm
-     and id <> new.id
-     and status is distinct from 'merged'
-   limit 1;
-  if v_existing is not null then
-    raise exception 'VIN % already exists on vehicle %', v_norm, v_existing
-      using errcode = 'unique_violation';
-  end if;
-  return new;
-end;
+  DECLARE
+    v_norm text;
+    v_existing uuid;
+    v_classic_serial boolean;
+  BEGIN
+    IF NEW.vin IS NULL OR length(trim(NEW.vin)) < 11 THEN
+      RETURN NEW;
+    END IF;
+    v_norm := upper(trim(NEW.vin));
+    v_classic_serial := length(v_norm) < 17
+      AND NEW.profile_origin = 'device_evidence'
+      AND NEW.origin_metadata -> 'device_evidence' ->> 'basis' IN ('serial_album', 'capture_session');
+    IF v_classic_serial THEN
+      SELECT id INTO v_existing FROM public.vehicles
+       WHERE upper(trim(vin)) = v_norm AND upper(public.normalize_make(make)) = upper(public.normalize_make(NEW.make)) AND id <> NEW.id LIMIT 1;
+    ELSE
+      SELECT id INTO v_existing FROM public.vehicles WHERE upper(trim(vin)) = v_norm AND id <> NEW.id LIMIT 1;
+    END IF;
+    IF v_existing IS NOT NULL THEN
+      RAISE EXCEPTION 'VIN or chassis identifier % already exists on vehicle %', v_norm, v_existing
+        USING ERRCODE = 'unique_violation', HINT = 'Attach observations to the existing vehicle via the sanctioned identity path.';
+    END IF;
+    RETURN NEW;
+  END;
 $$;
 CREATE TRIGGER trg_enforce_vin_uniqueness BEFORE INSERT OR UPDATE OF vin ON public.vehicles
   FOR EACH ROW EXECUTE FUNCTION public.enforce_vin_uniqueness();
@@ -100,6 +108,7 @@ CREATE TABLE public.superseded_rows (
 
 \i supabase/migrations/20261019030000_merge_carries_identity_unmerge_batch.sql
 \i supabase/migrations/20261020011000_merge_batch_discovery_url_fill_only.sql
+\i supabase/migrations/20261020050500_merge_vin_carry_and_protected_observations.sql
 
 -- ---------------------------------------------------------------------------------------------------------------------
 -- 1. correct_vehicle_vin: a merged-away holder owns nothing; a live holder still does.
