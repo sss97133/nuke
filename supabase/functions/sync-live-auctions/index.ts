@@ -625,7 +625,7 @@ async function syncMecum(): Promise<SyncOutcome> {
       `hitsPerPage=1000&filters=${encodeURIComponent(filters)}&attributesToRetrieve=${encodeURIComponent(MECUM_LOT_FIELDS)}&attributesToHighlight=[]&attributesToSnippet=[]`;
     const calendar = await mecumIndex(`hitsPerPage=0&facets=${encodeURIComponent('["taxonomies.auction_tax.name"]')}&maxValuesPerFacet=1000`);
     const sales = mecumSalesToRead(calendar.facets?.["taxonomies.auction_tax.name"] ?? {}, now);
-    const quote = (s: string) => `"${s.replace(/"/g, '\\"')}"`;
+    const quote = (s: string) => `"${s.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`; // an Algolia filter string literal
     const notRunning = sales.map((s) => ` AND NOT taxonomies.auction_tax.name:${quote(s.value)}`).join("");
     const pre = await mecumIndex(lotQuery(
       `current_bid_meta > 0 AND auction_end_date_meta >= ${Math.floor(now / 1000) - 86_400} AND NOT taxonomies.lot_type.name:"Road Art"${notRunning}`,
