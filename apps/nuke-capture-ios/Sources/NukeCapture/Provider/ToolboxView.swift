@@ -4,7 +4,8 @@
 // and list value (maker list price × quantity). The header keeps the list value and, for the
 // owner, what their receipts say they paid, in separate sections: neither is resale value.
 // Sort and filter use only fields the reader returned. Records without a catalog match are
-// counted in the footer and never described.
+// counted in the footer and never described. "Seen at work" (ToolActionShotsView.swift) loads on
+// its own below the grid, so the photo scan never holds up the pack shots.
 
 import SwiftUI
 
@@ -12,15 +13,27 @@ struct ToolboxView: View {
     let userId: String
 
     @State private var read: JobLoad<Toolbox> = .loading
+    @State private var shots: JobLoad<ToolActionShots> = .loading
 
     var body: some View {
-        ToolboxContent(read: read, onRetry: { Task { await load() } })
+        ToolboxContent(read: read, onRetry: { Task { await load() } },
+                       shotsUserId: userId, shots: shots, onRetryShots: { Task { await loadShots() } })
             .task(id: userId) { await load() }
-            .refreshable { await load() }
+            .task(id: userId) { await loadShots() }
+            .refreshable {
+                async let t: Void = load()
+                async let s: Void = loadShots()
+                _ = await (t, s)
+            }
     }
 
     private func load() async {
         read = await ToolboxReaders.toolbox(userId: userId)
+    }
+
+    private func loadShots() async {
+        let r = await ToolActionShotsReaders.shots(userId: userId)
+        withAnimation(.easeOut(duration: 0.3)) { shots = r }
     }
 }
 
@@ -28,41 +41,67 @@ struct ToolboxView: View {
 struct ToolboxContent: View {
     let read: JobLoad<Toolbox>
     var onRetry: (() -> Void)? = nil
+    var shotsUserId: String? = nil
+    var shots: JobLoad<ToolActionShots>? = nil
+    var onRetryShots: (() -> Void)? = nil
 
     @State private var sort: ToolboxSort = .value
     @State private var category: String?
 
     private let columns = [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)]
+    private static let seenAtWorkAnchor = "seen-at-work"
 
     var body: some View {
-        ScrollView {
-            switch read {
-            case .loading:
-                HStack(spacing: 10) {
-                    ProgressView()
-                    Text("Loading the toolbox…").font(.footnote).foregroundStyle(.secondary)
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    toolbox(proxy)
+                    if let shots, let shotsUserId {
+                        Divider().padding(.horizontal)
+                        ToolActionShotsSection(userId: shotsUserId, read: shots, onRetry: onRetryShots)
+                            .padding()
+                            .id(Self.seenAtWorkAnchor)
+                    }
                 }
-                .frame(maxWidth: .infinity)
-                .padding(.top, 40)
-            case .refused(let refusal):
-                VStack(alignment: .leading, spacing: 10) {
-                    JobRefusalRow(refusal: refusal)
-                    if refusal.kind == .failed, let onRetry { Button("Try again", action: onRetry) }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding()
-            case .loaded(let t):
-                loaded(t)
             }
         }
         .navigationTitle("Toolbox")
         .navigationBarTitleDisplayMode(.inline)
     }
 
-    @ViewBuilder private func loaded(_ t: Toolbox) -> some View {
+    @ViewBuilder private func toolbox(_ proxy: ScrollViewProxy) -> some View {
+        switch read {
+        case .loading:
+            HStack(spacing: 10) {
+                ProgressView()
+                Text("Loading the toolbox…").font(.footnote).foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.top, 40)
+        case .refused(let refusal):
+            VStack(alignment: .leading, spacing: 10) {
+                JobRefusalRow(refusal: refusal)
+                if refusal.kind == .failed, let onRetry { Button("Try again", action: onRetry) }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding()
+        case .loaded(let t):
+            loaded(t, proxy)
+        }
+    }
+
+    @ViewBuilder private func loaded(_ t: Toolbox, _ proxy: ScrollViewProxy) -> some View {
         let shown = ToolboxCopy.sorted(ToolboxCopy.filtered(t.items, category: category), by: sort)
         VStack(alignment: .leading, spacing: 16) {
             ToolboxTotalsHeader(toolbox: t)
+            if case .loaded(let s)? = shots, let label = ActionShotsCopy.jumpLabel(s) {
+                Button {
+                    withAnimation(.easeInOut) { proxy.scrollTo(Self.seenAtWorkAnchor, anchor: .top) }
+                } label: {
+                    Label(label, systemImage: "camera.viewfinder").font(.footnote)
+                }
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
             if !t.items.isEmpty { controls(t) }
             if t.items.isEmpty {
                 Text(t.isOwner ? "None of your tool records match a maker's catalog product yet." : "No tool records match a maker's catalog product yet.")

@@ -430,6 +430,9 @@ Sources/NukeCapture/
   Profile/                         provider face (provider_profile_read) and jobs on record
   Provider/                        provider standing: link evidence (actor_link_claim_evidence_read), work days and
                                    day-rate terms (provider_productivity_read), agent-signed register (owner_delegated_signs_read)
+  Provider/Toolbox*.swift          Toolbox: maker pack shots, list value, owner-only paid (user_toolbox_read)
+  Provider/ToolActionShots*.swift  Seen at work: photos by tool type the image analysis saw, not toolbox items
+                                   (user_tool_action_shots_read)
   Contact/                         Contact via Nuke: request sheet, Work inbox, thread (in-app only)
   Explore/                         Plan the work (listing_work_plan_read) and the Order inspection Sign
   Jobs/JobCloseout*.swift + CloseoutSheets.swift  completion, invoice, payment witness, evidence Signs
