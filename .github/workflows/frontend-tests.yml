@@ -137,6 +137,10 @@ jobs:
         run: createdb dm_bat_live_pull_inflight_ci
       - name: Verify the live pull's run-time pause samples, per-slot in-flight accounting and row locking
         run: psql -X -v ON_ERROR_STOP=1 -d dm_bat_live_pull_inflight_ci -f supabase/sql/test_bat_live_pull_inflight_slots.sql
+      - name: Create disposable Classic Trader live board database
+        run: createdb dm_refinement_classic_trader_board_ci
+      - name: Verify Classic Trader is a live board source and house in its own currencies and the houses job posts it once
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_classic_trader_board_ci -f supabase/sql/test_classic_trader_live_board.sql
       - name: Create disposable live board sync database
         run: createdb dm_live_board_sync_ci
       - name: Verify the board-synced houses' schedule writer, bid moves, complete-board ending and health

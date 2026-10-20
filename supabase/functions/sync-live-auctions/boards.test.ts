@@ -1,6 +1,7 @@
 import { assertEquals } from "jsr:@std/assert@1";
 import {
-  type BonhamsSaleDoc, bonhamsLot, bonhamsLotPhase, bonhamsSaleKind, parseBonhamsBidStates, parsePcarBids, parsePcarBoard,
+  type BonhamsSaleDoc, bonhamsLot, bonhamsLotPhase, bonhamsSaleKind, parseBonhamsBidStates, parseClassicTraderAuctions, parsePcarBids,
+  parsePcarBoard,
 } from "./boards.ts";
 import { type AmLotDoc, type AmSale, amIsVehicleLot, amOpenTimedSales, amSales, amTimedLot } from "./boards.ts";
 import {
@@ -59,6 +60,54 @@ Deno.test("parsePcarBids reads the lot's bid history with Basta ids and clocks, 
     ["45acc0f7", 3000, "2026-10-16T14:48:04Z", "SuprDough", "WINNING"],
   ]);
   assertEquals(parsePcarBids("<html>no bids</html>"), []);
+});
+
+// Classic Trader: fixtures/classictrader-auctions-2026-10-20.html is six auction cards (<article>) of
+// https://www.classic-trader.com/uk/auctions as served 2026-10-20 19:58Z: a EUR auction with a bid, a CHF one with its
+// reserve met, one without a bid, a motorbike, a later card of the first auction (the page repeats auctions across its
+// sections) and an ended one. Card HTML as served; inside each island's props the seller, its user record, the postal
+// code and coordinates, and every image but the first are removed (the rest of each props value is unchanged).
+const CLASSIC_TRADER_PAGE = await Deno.readTextFile(new URL("./fixtures/classictrader-auctions-2026-10-20.html", import.meta.url));
+
+Deno.test("parseClassicTraderAuctions reads each auction once with its link, own currency, bid, bid count, end time and reserve", () => {
+  const { auctions, states } = parseClassicTraderAuctions(CLASSIC_TRADER_PAGE);
+  assertEquals(states, { RUNNING: 4, WON: 1 });
+  assertEquals(auctions.map((a) => a.auction_id), [3655, 3654, 3576, 3755, 3731]);
+  assertEquals(auctions[0], {
+    auction_id: 3655,
+    listing_id: 466313,
+    ad_type: "CarAd",
+    url: "https://www.classic-trader.com/uk/cars/listing/alfa-romeo/giulia/giulia-1300-ti/1967/466313",
+    title: "1967 Alfa Romeo Giulia 1300 TI",
+    year: 1967,
+    make: "Alfa Romeo",
+    model: "Giulia 1300 TI",
+    model_family: "Giulia",
+    state: "RUNNING",
+    type: "REGULAR",
+    currency: "EUR",
+    current_bid: 3500,
+    bid_count: 11,
+    starts: "2026-10-06T15:45:00+00:00",
+    ends: "2026-10-21T15:45:00+00:00",
+    reserve: "RESERVE_PRICE_NOT_MET",
+    no_reserve: false,
+    reserve_met: false,
+    estimate_low: 18000,
+    estimate_high: 20000,
+    image: "https://cdn.classic-trader.com/I/images/960_720/vehicle_ad_standard_image_8c44c8ca35783c082fc2ab34b0ee0e53.jpg",
+    location: "Vigevano, IT",
+  });
+  // the card reads "Current bid CHF 16,000": the bid is in the auction's own currency, never converted
+  const chf = auctions[1];
+  assertEquals([chf.currency, chf.current_bid, chf.bid_count, chf.reserve_met, chf.ends, chf.title],
+    ["CHF", 16000, 4, true, "2026-10-25T16:45:00+00:00", "1964 Cadillac Ambulance Carrosserie Köng"]);
+  assertEquals([auctions[2].current_bid, auctions[2].bid_count], [null, 0]);
+  const bike = auctions[3];
+  assertEquals([bike.ad_type, bike.make, bike.model, bike.url, bike.current_bid],
+    ["MotorbikeAd", "Piaggio", "Vespa 150", "https://www.classic-trader.com/uk/motorcycle/listing/piaggio/vespa-150/1961/468143", 500]);
+  assertEquals(auctions[4].state, "WON");
+  assertEquals(parseClassicTraderAuctions("<html><body>Access denied</body></html>"), { auctions: [], states: {} });
 });
 
 Deno.test("bonhamsLot keeps the www.bonhams.com url spelling, the lot's hammer time and the estimate in its currency", () => {

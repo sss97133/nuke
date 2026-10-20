@@ -8,6 +8,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
  * Sources:
  *   - BaT: Scrapes auctionsCurrentInitialData from /auctions/ page (no API key needed)
  *   - Collecting Cars: the site's public Typesense listing collection (production_listings)
+ *   - Classic Trader: its server-rendered auctions page (each card's auction record: bid, currency, end time)
  *   - PCarMarket: its server-rendered live auction board (direct fetch); bids of lots that moved from the lot page
  *   - Bonhams: its public Typesense sale and lot index; bids of its online (timed) sales from its bidding platform
  *     (live.bonhams.com); lots of in-room catalog sales are written 'upcoming', never live
@@ -36,7 +37,7 @@ import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { mustWrite, softWrite } from '../_shared/writeResult.ts';
 import {
   type BonhamsBidState, type BonhamsLotDoc, type BonhamsSaleDoc, bonhamsLot, bonhamsLotPhase, bonhamsSaleKind,
-  type PcarBoardItem, parseBonhamsBidStates, parsePcarBids, parsePcarBoard,
+  type PcarBoardItem, parseBonhamsBidStates, parseClassicTraderAuctions, parsePcarBids, parsePcarBoard,
 } from "./boards.ts";
 import { type AmLotDoc, amOpenTimedSales, amSales, amTimedLot, BROAD_ARROW_BID } from "./boards.ts";
 import {
@@ -1077,10 +1078,11 @@ async function syncToDatabase(
   // No auction we sync runs longer than 14 days (BaT 7, Collecting Cars 7–14, Cars & Bids 7): a later end date
   // is a feed or parse fault, not a live lot, and must not become an auction_live placeholder nothing ever ends
   // (a Collecting Cars row read 2027-02-25 for six months, 2026-09-27). Such lots are skipped and named, not capped.
-  const horizon = Date.now() + 14 * 86_400_000;
+  // Classic Trader runs 12- and 15-day auctions (its own start and end times, 2026-10-20): 16 days for it.
+  const horizon = Date.now() + (platform === "classic-trader" ? 16 : 14) * 86_400_000;
   const impossible = auctions.filter(a => { const t = Date.parse(a.auction_end_date); return !Number.isFinite(t) || t > horizon; });
   if (impossible.length > 0) {
-    console.warn(`[sync-live-auctions] ${platform}: ${impossible.length} lots skipped, auction_end_date unparseable or more than 14 days out: ${impossible.slice(0, 3).map(a => `${a.url} ${a.auction_end_date}`).join(", ")}`);
+    console.warn(`[sync-live-auctions] ${platform}: ${impossible.length} lots skipped, auction_end_date unparseable or past the horizon: ${impossible.slice(0, 3).map(a => `${a.url} ${a.auction_end_date}`).join(", ")}`);
   }
   const writable = impossible.length > 0 ? auctions.filter(a => !impossible.includes(a)) : auctions;
 
@@ -1165,6 +1167,61 @@ async function syncToDatabase(
   return stats;
 }
 
+// ============================================
+// Classic Trader Sync (its server-rendered auctions page: each card carries the house's own auction record)
+// ============================================
+
+const CLASSIC_TRADER_AUCTIONS = "https://www.classic-trader.com/uk/auctions";
+const CLASSIC_TRADER_UA = "NukeListingCollector/1.0 (+https://nuke.ag)";
+
+/**
+ * One identified request a run; a refusal (any status but 200, a redirect, a page without auction cards) is reported,
+ * never retried or worked around. Read directly, not through archiveFetch: the page is 5.2 MB (every five minutes that
+ * is about 1.5 GB a day of listing_page_snapshots), and its translation strings ("forgot password", "sign in to",
+ * "register") make the direct fetcher's login-page check refuse it as a login wall. What the read saw is kept on each
+ * lot instead (origin_metadata: auction id, ad id, reserve state, estimate, start).
+ */
+async function syncClassicTrader(): Promise<{ auctions: LiveAuction[]; error: string | null }> {
+  try {
+    const res = await fetch(CLASSIC_TRADER_AUCTIONS, { headers: { "User-Agent": CLASSIC_TRADER_UA, Accept: "text/html" }, redirect: "manual", signal: AbortSignal.timeout(25_000) }); // guardrail-allow: raw-fetch (5 MB house page, see above)
+    if (res.status !== 200) {
+      await res.body?.cancel();
+      return { auctions: [], error: `Classic Trader auctions page: HTTP ${res.status}` };
+    }
+    const { auctions: all, states } = parseClassicTraderAuctions(await res.text());
+    if (!all.length) return { auctions: [], error: "Classic Trader auctions page: no auction cards parsed" };
+    // the catalog lists every running auction first, then the rest; a page of running auctions only may be cut off
+    if (all.every((a) => a.state === "RUNNING")) return { auctions: [], error: `Classic Trader auctions page: only running auctions (${all.length}), the list may be cut off` };
+    // a sealed auction hides its bids; only regular running auctions are live bids
+    const running = all.filter((a) => a.state === "RUNNING" && a.type === "REGULAR" && a.url);
+    console.log(`[sync-live-auctions] Classic Trader: ${all.length} auctions on the page ${JSON.stringify(states)}, ${running.length} running (${running.filter((a) => a.current_bid).length} with a bid)`);
+    const now = new Date().toISOString();
+    const auctions: LiveAuction[] = running.map((a) => ({
+      url: a.url,
+      title: a.title,
+      platform: "classic-trader",
+      auction_end_date: a.ends ?? "",
+      current_bid: a.current_bid,
+      bid_count: a.bid_count,
+      currency: a.currency,
+      no_reserve: a.no_reserve,
+      reserve_met: a.reserve_met,
+      year: a.year,
+      make: a.make,
+      model: a.model,
+      thumbnail_url: a.image,
+      external_id: String(a.auction_id),
+      raw_data: { source: "classic_trader_auctions_page", auction_id: a.auction_id, listing_id: a.listing_id, ad_type: a.ad_type,
+                  model_family: a.model_family, reserve_price_info: a.reserve, estimate_low: a.estimate_low, estimate_high: a.estimate_high,
+                  starts_at: a.starts, location: a.location, synced_at: now },
+    }));
+    return { auctions, error: null };
+  } catch (e: unknown) {
+    return { auctions: [], error: `Classic Trader sync failed: ${e instanceof Error ? e.message : String(e)}` };
+  }
+}
+BOARD_SOURCES["classic-trader"] = "classic-trader";
+
 // Bid snapshots (retired 2026-09-29). recordBidSnapshots matched the live list against vehicle_events rows with
 // event_status 'active', which live lots no longer get (upsert_live_auction_listings' call is gone, see above), so it
 // wrote 0 rows on every run since 2026-07-22 (86 of 86 runs on 2026-09-29) while reading up to 10,000 stale rows per
@@ -1233,6 +1290,7 @@ async function updateSourceRegistry(
     "mecum": "mecum",
     "barrett-jackson": "barrett-jackson",
     "rm-sothebys": "rm-sothebys",
+    "classic-trader": "classic-trader",
     "gooding": "gooding",
     "bonhams": "bonhams",
     "broad-arrow": "broadarrow",
@@ -1348,6 +1406,7 @@ Deno.serve(async (req) => {
         "mecum",
         "barrett-jackson",
         "rm-sothebys",
+        "classic-trader",
         "gooding",
         "bonhams",
         "broad-arrow",
@@ -1417,6 +1476,9 @@ Deno.serve(async (req) => {
           case "rm":
           case "rm-sothebys":
             syncResult = await syncRMSothebys();
+            break;
+          case "classic-trader":
+            syncResult = await syncClassicTrader();
             break;
           case "gooding":
             syncResult = await syncGooding(supabase, !skipVehicleSync);
@@ -1523,11 +1585,12 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Cleanup: mark expired auctions as ended (catches C&B 7-day defaults and any stale auctions)
+      // Cleanup: mark expired auctions as ended (catches C&B 7-day defaults and any stale auctions). Nobody observed the
+      // result here, so the lot is 'ended', never 'not_sold'; settlement records the outcome (as end_live_auctions_absent).
       try {
         const { count: endedCount } = await supabase
           .from("vehicles")
-          .update({ auction_status: "ended", sale_status: "not_sold" })
+          .update({ auction_status: "ended", sale_status: "ended" })
           .eq("auction_status", "active")
           // BaT soft-close clocks require a native terminal record. eBay Motors lots are ended by their own reader
           // (extract-ebay-motors auctions) as 'ended': eBay's API cannot say sold or unsold, so 'not_sold' would be invented.
