@@ -1523,11 +1523,12 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Cleanup: mark expired auctions as ended (catches C&B 7-day defaults and any stale auctions)
+      // Cleanup: mark expired auctions as ended (catches C&B 7-day defaults and any stale auctions). 'ended' says the
+      // clock ran out; no reader observed a result here, so it is never written as 'not_sold'.
       try {
         const { count: endedCount } = await supabase
           .from("vehicles")
-          .update({ auction_status: "ended", sale_status: "not_sold" })
+          .update({ auction_status: "ended", sale_status: "ended" })
           .eq("auction_status", "active")
           // BaT soft-close clocks require a native terminal record. eBay Motors lots are ended by their own reader
           // (extract-ebay-motors auctions) as 'ended': eBay's API cannot say sold or unsold, so 'not_sold' would be invented.
