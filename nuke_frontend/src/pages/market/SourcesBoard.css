@@ -316,3 +316,6 @@
 .market-sources__dialog .n { text-align: right; font-family: 'Courier New', monospace; font-variant-numeric: tabular-nums; }
 
 .market-sources__share--current { grid-template-columns: 1fr; }
+
+/* Sales by house (the refresh receipt) opens from the board header; the map styles give it its bar. */
+.market-sources__head .venue-mix { border-bottom: 0; padding: 0; background: transparent; flex-basis: 100%; }

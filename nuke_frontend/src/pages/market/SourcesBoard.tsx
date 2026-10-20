@@ -8,6 +8,7 @@ import {
   classifyVehicleFacet,
   resolveVehicleIdentityMark,
 } from '../../lib/market/vehicleTaxonomy';
+import { VenueMix, type HouseRow } from './MarketTile';
 import './SourcesBoard.css';
 
 // Every source on one board with the same measures, ranked by the lots we hold for it (market_sources_read,
@@ -2242,17 +2243,24 @@ function resolveInitialSource(rows: SourceRow[], explicit?: string | null): stri
   return found ? found.source : null;
 }
 
+export type HouseMix = { rows: HouseRow[]; clock: string };
+
 export function SourcesBoardView({
   data,
   scope,
   scoped = null,
   initialSource,
+  houseMix = null,
 }: {
   data: SourcesBoardData;
   scope?: string | null;
   /** The drilled family's or model's sales by source: the board ranks and counts that scope instead of every make. */
   scoped?: BoardScope | null;
   initialSource?: string | null;
+  /** Each house's share of the map's confirmed sales (the refresh receipt), opened from the board's header. It used
+   *  to sit above the map, where it said Bring a Trailer's share a second time (owner, 2026-10-17: state each fact
+   *  once; he liked the bar, so it moved here instead of going). Shown on the all-makes board only. */
+  houseMix?: HouseMix | null;
 }) {
   const [all, setAll] = useState(() => !!resolveInitialSource(data.rows, initialSource));
   const [horizon, setHorizon] = useState<LandingHorizon>('14d');
@@ -2318,6 +2326,7 @@ export function SourcesBoardView({
             ? `ranked by ${count(scoped.total)} ${scoped.label} sales with a date, last 5 years${scoped.unattributed ? ` (${count(scoped.unattributed)} at houses not listed)` : ''} · held, landing and live count each source’s whole catalogue`
             : 'ranked by what we hold · a source moves up as more of it lands'}{heldAt ? ` · held counts as of ${heldWhen(heldAt)}` : ''}
         </span>
+        {!scoped && houseMix && <VenueMix rows={houseMix.rows} clock={houseMix.clock} />}
         <div className="market-sources__cat-filters" role="group" aria-label="Filter sources by category">
           <button
             type="button"
@@ -2514,11 +2523,13 @@ export function SourcesBoardView({
 export default function SourcesBoard({
   scope,
   initialSource,
+  houseMix = null,
 }: {
   /** A make alone, or the map's drill scope. A family (or a model inside it) scopes the board through its sales
    *  (treemap_family_sales); a make alone has no per-house reader yet and keeps the all-makes board, labeled so. */
   scope?: string | SourcesScope | null;
   initialSource?: string | null;
+  houseMix?: HouseMix | null;
 } = {}) {
   const [data, setData] = useState<SourcesBoardData | null>(null);
   const s: SourcesScope | null = typeof scope === 'string' ? { make: scope } : scope ?? null;
@@ -2562,5 +2573,5 @@ export default function SourcesBoard({
     };
   }, []);
   if (!data || !data.rows.length) return null;
-  return <SourcesBoardView data={data} scope={make} scoped={scoped} initialSource={initialSource} />;
+  return <SourcesBoardView data={data} scope={make} scoped={scoped} initialSource={initialSource} houseMix={houseMix} />;
 }

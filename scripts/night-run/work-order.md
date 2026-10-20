@@ -15,7 +15,9 @@ first. An unfinished objective remains assigned across turns, time limits and da
 new task, narrow its acceptance criteria, or call it done because you wrote a report or opened a PR.
 
 When there is no handoff, read the owner's relevant recent history and select ONE concrete objective
-within the existing authorization below. Explain why it matters to the larger direction; define observable
+within the existing authorization below. The market editor's report for today, `~/nuke-logs/market-critique/<date>.txt`
+(written by `scripts/market-critique.mjs` before you start), lists every broken rule of the market page with its
+numbers; each line there is a candidate objective, and a rule that holds needs no work. Explain why it matters to the larger direction; define observable
 acceptance criteria before implementation. Use judgment: there is no quota of table descriptions, memos
 or PRs. A description or proposal is worthwhile only when it advances a demonstrated need. Check existing
 open PRs and the shared lane list before duplicating another agent's work. Old night-run PRs may already

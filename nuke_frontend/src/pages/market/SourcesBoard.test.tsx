@@ -1187,3 +1187,17 @@ it('shows a dated source-reported active count without dividing historical holdi
   expect(container.querySelector('dialog .market-sources__drill-stats')?.textContent).toContain('67,878 current listings');
   expect(container.querySelector('dialog .market-sources__drill-stats')?.textContent).not.toContain('95% of');
 });
+
+it('opens sales by house from the all-makes header, once on the page, and not on a drilled board', async () => {
+  fixture.rpc.mockResolvedValue({ data: value, error: null });
+  const houseMix = { rows: [{ house: 'Bring a Trailer', sales: 182868, amount: 8.4e9 }, { house: 'Mecum', sales: 68121, amount: 4.0e9 }], clock: '' };
+  await act(async () => root.render(<SourcesBoard houseMix={houseMix} />));
+  const mix = container.querySelectorAll('.market-sources__head .venue-mix');
+  expect(mix.length).toBe(1);
+  expect(mix[0].textContent).toContain('Sales by house');
+  expect(mix[0].textContent).toContain('Bring a Trailer 73%');
+  expect(container.querySelectorAll('.venue-mix').length).toBe(1);
+  await act(async () => root.render(<SourcesBoard scope="Ford" houseMix={houseMix} />));
+  expect(container.querySelector('.market-sources__title')?.textContent).toBe('Sources · all makes');
+  expect(container.querySelectorAll('.venue-mix').length).toBe(1);
+});
