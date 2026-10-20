@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import { vehicleImageColumnsForViewer, vehicleImageGallerySource } from '../../lib/vehicleImageColumns';
 
 interface PublicImageGalleryProps {
   userId: string;
@@ -98,8 +99,8 @@ const PublicImageGallery: React.FC<PublicImageGalleryProps> = ({ userId, isOwnPr
     for (let i = 0; i < ids.length; i += chunkSize) {
       const chunk = ids.slice(i, i + chunkSize);
       const { data, error } = await supabase
-        .from('vehicle_images')
-        .select(IMAGE_SELECT)
+        .from(await vehicleImageGallerySource())
+        .select(await vehicleImageColumnsForViewer(IMAGE_SELECT))
         .in('id', chunk);
       if (error) {
         console.error('Error loading attributed image chunk:', error);
@@ -113,7 +114,7 @@ const PublicImageGallery: React.FC<PublicImageGalleryProps> = ({ userId, isOwnPr
   const hasTrustedAttribution = (img: any): boolean => {
     if (!img) return false;
     if (img.user_id === userId) return true;
-    const deviceAttrs = Array.isArray(img.device_attributions) ? img.device_attributions : [];
+    const deviceAttrs = [img.device_attributions].flat().filter(Boolean);
     return deviceAttrs.some((attr: any) => attr?.actual_contributor_id === userId);
   };
 
@@ -141,8 +142,8 @@ const PublicImageGallery: React.FC<PublicImageGalleryProps> = ({ userId, isOwnPr
       setLoading(true);
 
       const { data: userImages, error: userImagesError } = await supabase
-        .from('vehicle_images')
-        .select(IMAGE_SELECT)
+        .from(await vehicleImageGallerySource())
+        .select(await vehicleImageColumnsForViewer(IMAGE_SELECT))
         .eq('user_id', userId)
         // Capture time, not ingestion time — backfilled photos get created_at=now.
         .order('taken_at', { ascending: false, nullsFirst: false })
