@@ -20,7 +20,7 @@ import { recordRevision } from "../_shared/revision.ts";
 import { htmlToText } from "../_shared/htmlToText.ts";
 import { endedRow } from "../poll-listing-feeds/removal.ts";
 import { aspectFilterFor, BrowseClient, ItemGone, QuotaExceeded, yearAspect } from "./browseApi.ts";
-import { CLASS_RANK, classifySeller, listingKey, TIERS, toLanding, type SellerClass } from "./browseMap.ts";
+import { CLASS_RANK, classifySeller, linkVin, listingKey, TIERS, toLanding, type SellerClass } from "./browseMap.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 export const PLATFORM = "ebay_motors";
@@ -102,13 +102,22 @@ export async function landItem(supabase: any, raw: any, rep: Report, now = new D
   // 2a. a VIN already held by a vehicle decides first (a car that sold on BaT and is now on eBay is one record):
   //     same car (identityMatch: VIN, make, year, model words agree) -> link to it, fill-only, no new vehicle;
   //     a different car under the same VIN, or two holders -> a revision item and an unresolved listing, never a new vehicle.
+  //     Only a VIN strong for the car's era may pick a vehicle (linkVin); a weak one stays a claim on the observation and the
+  //     listing goes to ingest, which links on the listing URL only and never on year/make/model.
+  // 2a0. a listing id already linked to a vehicle stays on that vehicle (a second capture of the same item)
   let vinBlocked = false;
-  const heldVin = landing.vin.vin && /^[A-Z0-9]{8,17}$/.test(landing.vin.vin) ? landing.vin.vin : null;
-  if (heldVin) {
-    const held = await supabase.from("vehicles").select("id,year,make,model,vin").eq("vin", heldVin).limit(3);
+  const linked = await supabase.from("vehicle_events").select("vehicle_id").eq("source_platform", PLATFORM)
+    .eq("source_listing_id", landing.listingKey).not("vehicle_id", "is", null).limit(2);
+  if (linked.error) { rep.errors.push(`listing lookup ${landing.listingKey}: ${linked.error.message}`); return "skipped"; }
+  const linkedIds = [...new Set((linked.data ?? []).map((r: any) => r.vehicle_id))];
+  if (linkedIds.length === 1) vehicleId = linkedIds[0] as string;
+  const strong = vehicleId ? null : linkVin(landing.vin.vin, landing.year);
+  const heldVin = strong ? landing.vin.vin : null;
+  if (strong && heldVin) {
+    const held = await supabase.from("vehicles").select("id,year,make,model,vin").in("vin", strong.keys).limit(3);
     if (held.error) { rep.errors.push(`vin lookup ${landing.listingKey}: ${held.error.message}`); return "skipped"; }
     const rows = held.data ?? [];
-    const incoming = { year: landing.year, make: landing.make, model: landing.model, vin: heldVin };
+    const incoming = { year: landing.year, make: landing.make, model: landing.model, vin: rows.length === 1 ? rows[0].vin : heldVin };
     const conflict = rows.length > 1 ? `${rows.length} vehicles hold vin ${heldVin}` : rows.length === 1 ? identityConflict(rows[0], incoming) : null;
     if (rows.length === 1 && !conflict) {
       vehicleId = rows[0].id; rep.linked_by_vin = (rep.linked_by_vin ?? 0) + 1;
@@ -138,6 +147,8 @@ export async function landItem(supabase: any, raw: any, rep: Report, now = new D
     vehicleId, unresolved: vehicleId === null,
     source: { platform: PLATFORM, url: landing.url, sourceIdentifier: landing.listingKey },
     fields: landing.obsFields, observationKind: "listing", extractionMethod: opts.method ?? METHOD, observedAt: now,
+    // a VIN too weak to pick a vehicle is too weak to write onto one: it stays a claim on this row
+    ...(landing.vin.vin && !linkVin(landing.vin.vin, landing.year) ? { testimonyOnly: ["vin"] } : {}),
     contentText: landing.descriptionText || raw.title,
     rawData: {
       snapshot_id: snapshotId, item_id: raw.itemId, title: raw.title, category_path: raw.categoryPath ?? null, condition: raw.condition ?? null,

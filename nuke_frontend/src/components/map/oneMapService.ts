@@ -1,116 +1,82 @@
-// oneMapService.ts: the one map's reads. The map is a finder: the cars, sales and shops near a place, each one
-// openable; areas and their counts are context. Every count is a map_facts row read through map-vehicles; every
-// item is a public row the anonymous reader may see.
+// oneMapService.ts: the web map's reads, the same reads the iOS map makes (MarketMapView.swift, the one map the
+// owner is pleased with): location observations of public vehicles per county, folded per ZIP in the client;
+// boundaries from the static tiles in storage. Anon key only: the reads are public and must start at once.
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from '../../lib/env';
-import type { MapFeatureCollection, MapEventPoint } from './types';
 
-export type Level = 'state' | 'county' | 'zcta';
-
-export interface MapLayerDef {
-  layer: string; sort_order: number; entity: string; source_table: string; rule: string; clock: string;
-  geography: string; value_basis: string | null; value_column: string | null; points_allowed: boolean; fold: string | null;
+export interface LocationRow {
+  id: string; observed_at: string | null; source_type: string | null; source_platform: string | null; source_url: string | null;
+  postal_code: string | null; county_fips: string | null; city: string | null; precision: string | null; confidence: number | null;
+  vehicles: { id: string; year: number | null; make: string | null; model: string | null; trim: string | null; primary_image_url: string | null;
+    city: string | null; state: string | null; status: string | null; deleted_at: string | null };
 }
-export interface AreaCount { key: string; entities: number; priced: number; value: number; avg: number | null }
-export interface AreasResponse {
-  level: Level; layer: string; from: string; to: string; source: string[]; keys: number | null;
-  areas: AreaCount[]; unkeyed: { entities: number }; undated: { entities: number };
-  totals: { entities: number; value: number; areas: number }; by_source: { source: string; entities: number }[];
-  as_of: string | null; generated_at: string;
-}
-export interface Car {
-  vehicle_id: string; lng: number; lat: number; year: number | null; make: string | null; model: string | null;
-  price: number | null; source: string | null; source_url: string | null; thumbnail: string | null;
-  observed_at: string; status: string | null; location: string | null;
-}
-export interface Shop { id: string; name: string; slug: string | null; lat: number; lng: number; kind: string | null }
+const SELECT = 'id,observed_at,source_type,source_platform,source_url,postal_code,county_fips,city,precision,confidence,vehicles!inner(id,year,make,model,trim,primary_image_url,city,state,status,deleted_at)';
+const NOT_ELIGIBLE = new Set(['deleted', 'merged', 'rejected', 'duplicate']);
+const headers = { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` };
 
-const NOT_YET = 'map-vehicles does not serve this mode yet';
+export const zip5 = (raw: string | null | undefined): string | null => {
+  const m = (raw ?? '').trim().match(/^(\d{5})(?:-\d{4})?$/);
+  return m ? m[1] : null;
+};
+export const eligible = (r: LocationRow) => r.vehicles.deleted_at == null && !NOT_ELIGIBLE.has((r.vehicles.status ?? '').toLowerCase());
 
-async function fn<T>(params: Record<string, string | number | undefined | null>, signal?: AbortSignal): Promise<T> {
-  const qs = new URLSearchParams();
-  for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== null && v !== '') qs.set(k, String(v));
-  // Public reads: the anon key, never the browser session (waiting on supabase.auth.getSession() stalled the
-  // first read for seconds in a fresh context, 2026-10-19).
-  const res = await fetch(`${SUPABASE_URL}/functions/v1/map-vehicles?${qs.toString()}`, { signal, headers: { apikey: SUPABASE_ANON_KEY } });
-  if (!res.ok) throw new Error(`map-vehicles ${res.status}: ${(await res.text()).slice(0, 200)}`);
-  return res.json();
-}
-async function rest<T>(path: string, signal?: AbortSignal): Promise<T> {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, { signal, headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` } });
-  if (!res.ok) throw new Error(`rest ${res.status}: ${(await res.text()).slice(0, 200)}`);
-  return res.json();
-}
-
-export const readLayers = (signal?: AbortSignal) => fn<{ layers: MapLayerDef[] }>({ mode: 'layers' }, signal).then((r) => {
-  if (!Array.isArray(r?.layers)) throw new Error(NOT_YET);
-  return r.layers;
-});
-
-export const readAreas = (q: { level: Level; layer: string; from: string; to: string; source?: string; keys?: string[] }, signal?: AbortSignal) =>
-  fn<AreasResponse>({ mode: 'areas', level: q.level, layer: q.layer, from: q.from, to: q.to, source: q.source, keys: q.keys?.join(',') }, signal).then((r) => {
-    if (!Array.isArray(r?.areas) || !r.unkeyed || !r.totals) throw new Error(NOT_YET);
-    return r;
-  });
-
-/** The cars in a box: each vehicle once, at its newest observation, newest first. */
-export async function readCars(q: { bbox: [number, number, number, number]; from: string; to: string; source?: string; make?: string; limit?: number }, signal?: AbortSignal): Promise<Car[]> {
-  const fc = await fn<MapFeatureCollection>({
-    mode: 'points', bbox: q.bbox.join(','), zoom: 12, min_confidence: 0, time_start: `${q.from}T00:00:00Z`, time_end: `${q.to}T23:59:59Z`,
-    source: q.source, make: q.make, limit: q.limit ?? 2000,
-  }, signal);
-  const byVehicle = new Map<string, Car>();
-  for (const f of fc.features ?? []) {
-    const p = f.properties as MapEventPoint & { cluster?: boolean };
-    if (p.cluster || !p.vehicle_id) continue;
-    const car: Car = {
-      vehicle_id: p.vehicle_id, lng: f.geometry.coordinates[0], lat: f.geometry.coordinates[1], year: p.year ?? null, make: p.make ?? null,
-      model: p.model ?? null, price: p.price ?? p.asking_price ?? null, source: p.source ?? null, source_url: p.source_url ?? null,
-      thumbnail: p.thumbnail ?? null, observed_at: p.observed_at, status: p.vehicle_status ?? null, location: p.location ?? null,
-    };
-    const prev = byVehicle.get(car.vehicle_id);
-    if (!prev || prev.observed_at < car.observed_at) byVehicle.set(car.vehicle_id, car);
+/** Every location observation of one county, paged by id as the iOS reader does; a page is never a dataset limit. */
+export async function readCounty(fips: string, signal?: AbortSignal, onPage?: (rows: LocationRow[]) => void): Promise<LocationRow[]> {
+  const all: LocationRow[] = [];
+  let after: string | null = null;
+  for (;;) {
+    const qs = `select=${SELECT}&county_fips=eq.${fips}&confidence=gte.0.5${after ? `&id=gt.${after}` : ''}&order=id.asc&limit=1000`;
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/vehicle_location_observations?${qs}`, { signal, headers });
+    if (!res.ok) throw new Error(`location read ${res.status}`);
+    const page = (await res.json()) as LocationRow[];
+    all.push(...page); onPage?.(page);
+    if (page.length < 1000) return all;
+    after = page[page.length - 1].id;
   }
-  return [...byVehicle.values()].sort((a, b) => (a.observed_at < b.observed_at ? 1 : -1));
 }
 
-/** The public shops in a box (organizations with a point). */
-export async function readShops(q: { bbox: [number, number, number, number]; limit?: number }, signal?: AbortSignal): Promise<Shop[]> {
-  const [w, s, e, n] = q.bbox;
-  const rows = await rest<{ id: string; name: string; slug: string | null; latitude: number; longitude: number; business_type: string | null }[]>(
-    `organizations?select=id,name,slug,latitude,longitude,business_type&is_public=eq.true&status=eq.active&latitude=gte.${s}&latitude=lte.${n}&longitude=gte.${w}&longitude=lte.${e}&order=name&limit=${q.limit ?? 500}`, signal);
-  return rows.map((r) => ({ id: r.id, name: r.name, slug: r.slug, lat: r.latitude, lng: r.longitude, kind: r.business_type }));
-}
+export interface ZipGroup { zip: string; vehicles: Map<string, LocationRow[]> }
 
-/** Where a search string points: a ZIP (through its county's shapes), else a city. */
-export async function findPlace(text: string, signal?: AbortSignal): Promise<{ label: string; bounds?: [number, number, number, number]; center?: [number, number] } | null> {
-  const t = text.trim();
-  if (/^\d{5}$/.test(t)) {
-    const z = await rest<{ zcta: string; county_fips: string }[]>(`us_zctas?select=zcta,county_fips&zcta=eq.${t}`, signal);
-    if (!z.length) return null;
-    const res = await fetch(`${SUPABASE_URL}/storage/v1/object/public/map-data/geo/v1/county/${z[0].county_fips}.geojson`, { signal });
-    if (!res.ok) return null;
-    const fc = await res.json() as { features: { id: string; geometry: { type: string; coordinates: number[][][] | number[][][][] } }[] };
-    const f = fc.features.find((x) => x.id === t);
-    if (!f) return null;
-    const rings = f.geometry.type === 'Polygon' ? (f.geometry.coordinates as number[][][]) : (f.geometry.coordinates as number[][][][]).flat();
-    let w = 180, s = 90, e = -180, n = -90;
-    for (const ring of rings) for (const [x, y] of ring) { if (x < w) w = x; if (x > e) e = x; if (y < s) s = y; if (y > n) n = y; }
-    return { label: `ZIP ${t}`, bounds: [w, s, e, n] };
+/** The iOS fold: rows → ZIP → vehicles (each once) → its observations, newest first; filters by make and window. */
+export function foldByZip(rows: LocationRow[], opts: { make?: string; from?: Date | null }): { groups: Map<string, ZipGroup>; vehicles: number; noZip: number } {
+  const groups = new Map<string, ZipGroup>(); const all = new Set<string>(); let noZip = 0;
+  for (const r of rows) {
+    if (!eligible(r)) continue;
+    if (opts.make && (r.vehicles.make ?? '').trim().toLowerCase() !== opts.make.toLowerCase()) continue;
+    if (opts.from && (!r.observed_at || new Date(r.observed_at) < opts.from)) continue;
+    all.add(r.vehicles.id);
+    const z = zip5(r.postal_code);
+    if (!z) { noZip++; continue; }
+    const g = groups.get(z) ?? { zip: z, vehicles: new Map() };
+    const list = g.vehicles.get(r.vehicles.id) ?? [];
+    list.push(r); g.vehicles.set(r.vehicles.id, list); groups.set(z, g);
   }
-  const m = t.match(/^([^,]+?)(?:,\s*([a-z]{2}))?$/i);
-  if (!m) return null;
-  const city = encodeURIComponent(m[1].trim()), state = m[2]?.toUpperCase();
-  const rows = await rest<{ city: string; state: string; latitude: number; longitude: number; sample_size: number }[]>(
-    `city_geocode_lookup?select=city,state,latitude,longitude,sample_size&city=ilike.${city}${state ? `&state=eq.${state}` : ''}&order=sample_size.desc&limit=1`, signal);
-  if (!rows.length) return null;
-  return { label: `${rows[0].city}, ${rows[0].state}`, center: [rows[0].longitude, rows[0].latitude] };
+  for (const g of groups.values()) for (const list of g.vehicles.values()) list.sort((a, b) => ((a.observed_at ?? '') < (b.observed_at ?? '') ? 1 : -1));
+  return { groups, vehicles: all.size, noZip };
 }
 
-/** UTC day strings for "the last n days through today". */
-export function window(days: number, now = new Date()): { from: string; to: string } {
-  const day = (d: Date) => d.toISOString().slice(0, 10);
-  return { from: day(new Date(now.getTime() - days * 86_400_000)), to: day(now) };
+/** The iOS palette: fixed bands so a colour means the same thing in every region. */
+export const BANDS = ['1–4', '5–19', '20–99', '100+'];
+export const band = (n: number) => (n < 5 ? 0 : n < 20 ? 1 : n < 100 ? 2 : 3);
+export const BAND_RGBA = ['rgba(97,184,214,0.22)', 'rgba(51,148,196,0.32)', 'rgba(26,102,168,0.42)', 'rgba(20,64,133,0.54)'];
+
+export const makeLabel = (r: LocationRow) => [r.vehicles.year, r.vehicles.make, r.vehicles.model].filter(Boolean).join(' ') || 'Vehicle';
+export const platformName = (s: string | null) => ({ bat: 'Bring a Trailer', 'barrett-jackson': 'Barrett-Jackson', craigslist: 'Craigslist', facebook_marketplace: 'Facebook Marketplace', mecum: 'Mecum', carsandbids: 'Cars & Bids', 'cars-and-bids': 'Cars & Bids' } as Record<string, string>)[s ?? ''] ?? (s ?? 'Source unrecorded');
+
+/** Where a ZIP is: its county, then the county's shapes in storage. */
+export async function zipBounds(zip: string, signal?: AbortSignal): Promise<[number, number, number, number] | null> {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/us_zctas?select=county_fips&zcta=eq.${zip}`, { signal, headers });
+  if (!res.ok) return null;
+  const z = (await res.json()) as { county_fips: string }[];
+  if (!z.length) return null;
+  const g = await fetch(`${SUPABASE_URL}/storage/v1/object/public/map-data/geo/v1/county/${z[0].county_fips}.geojson`, { signal });
+  if (!g.ok) return null;
+  const fc = (await g.json()) as { features: { id: string; geometry: { type: string; coordinates: number[][][] | number[][][][] } }[] };
+  const f = fc.features.find((x) => x.id === zip);
+  if (!f) return null;
+  const rings = f.geometry.type === 'Polygon' ? (f.geometry.coordinates as number[][][]) : (f.geometry.coordinates as number[][][][]).flat();
+  let w = 180, s = 90, e = -180, n = -90;
+  for (const ring of rings) for (const [x, y] of ring) { if (x < w) w = x; if (x > e) e = x; if (y < s) s = y; if (y > n) n = y; }
+  return [w, s, e, n];
 }
 
-/** The tiles the boundaries come from: one static tileset in the public map-data bucket (scripts/map/build-tiles.mjs). */
 export const BOUNDARY_TILES = `${SUPABASE_URL}/storage/v1/object/public/map-data/tiles/v1/{z}/{x}/{y}.pbf`;
