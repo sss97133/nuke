@@ -417,6 +417,8 @@ CREATE TABLE IF NOT EXISTS public.city_geocode_lookup(city text, state text, lat
 \ir ../migrations/20261020184000_requirement_plan_b_listing_cache.sql
 \echo REPLAY 20261020186500_work_order_provider_matches_materialize.sql
 \ir ../migrations/20261020186500_work_order_provider_matches_materialize.sql
+\echo REPLAY 20261022013000_work_order_part_listing_approvals.sql
+\ir ../migrations/20261022013000_work_order_part_listing_approvals.sql
 -- Plan check and final state.
 \set replay_problems `scripts/ci/job-loop-replay-check.sh | tr '\n' ' '`
 SELECT t_assert(btrim(:'replay_problems') = '', 'replay plan covers the build in filename order: ' || COALESCE(NULLIF(btrim(:'replay_problems'), ''), 'ok'));
