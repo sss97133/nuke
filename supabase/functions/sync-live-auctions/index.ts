@@ -12,9 +12,10 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
  *   - Bonhams: its public Typesense sale and lot index; bids of its online (timed) sales from its bidding platform
  *     (live.bonhams.com); lots of in-room catalog sales are written 'upcoming', never live
  *   - Broad Arrow: its bidding site's timed online sales (sale list hourly, lot list with top bids every run)
+ *   - Gooding: its bidding platform's open timed lots (bid.goodingco.com /ajax/lots JSON), identity from its catalog
  *   - Cars & Bids: Uses Firecrawl (Cloudflare protected)
- *   - Mecum, Barrett-Jackson, Gooding: Firecrawl scrape + extract; RM Sotheby's has no readable live bid (see syncRMSothebys)
- * Collecting Cars, PCarMarket, Bonhams and Broad Arrow boards are complete lists: after the vehicles upsert each is handed to
+ *   - Mecum, Barrett-Jackson: Firecrawl scrape + extract; RM Sotheby's has no readable live bid (see syncRMSothebys)
+ * Collecting Cars, PCarMarket, Bonhams, Broad Arrow and Gooding boards are complete lists: after the vehicles upsert each is handed to
  * live_auction_board_sync, the monitored_auctions schedule writer for those houses (BaT's is bat_live_pull_run).
  *
  * Deploy: supabase functions deploy sync-live-auctions --no-verify-jwt
@@ -32,12 +33,16 @@ import { archiveFetch } from "../_shared/archiveFetch.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { parseBatIdentityFromUrl, parseBatIdentityFromTitle } from "../_shared/batParser.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
-import { mustWrite } from '../_shared/writeResult.ts';
+import { mustWrite, softWrite } from '../_shared/writeResult.ts';
 import {
   type BonhamsBidState, type BonhamsLotDoc, type BonhamsSaleDoc, bonhamsLot, bonhamsLotPhase, bonhamsSaleKind,
   type PcarBoardItem, parseBonhamsBidStates, parsePcarBids, parsePcarBoard,
 } from "./boards.ts";
 import { type AmLotDoc, amOpenTimedSales, amSales, amTimedLot, BROAD_ARROW_BID } from "./boards.ts";
+import {
+  goodingBoardLot, type GoodingCatalogLot, goodingCatalogFor, goodingLinkPlan, type GoodingLot, goodingUrlVariants,
+  type GoodingVehicleRow, goodingWithBidState, parseGoodingLots,
+} from "./boards.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -598,16 +603,181 @@ async function syncRMSothebys(): Promise<{ auctions: LiveAuction[]; error: strin
 }
 
 // ============================================
-// Gooding Sync (Firecrawl)
+// Gooding Sync (its bidding platform's open timed lots, direct JSON; identity from its catalog)
 // ============================================
 
-async function syncGooding(): Promise<{ auctions: LiveAuction[]; error: string | null }> {
-  return syncViaFirecrawlExtract(
-    "gooding",
-    "https://www.goodingco.com/auctions/",
-    /goodingco\.com\//i,
-    { waitFor: 4000 }
-  );
+const GOODING_BID = "https://bid.goodingco.com";
+const GOODING_CATALOG = "https://cdn.goodingco.com/graphql";
+const GOODING_UA = "NukeListingCollector/1.0 (+https://nuke.ag)";
+const GOODING_LOT_FIELDS = "timed-auction reserve-status absentee-bid highest-live-bid summary";
+const GOODING_BLOCKED = "blocked or rate-limited";
+const GOODING_CATALOG_QUERY = `query GetVehiclesAndFilters($filtersInput: FiltersInput!, $pageNumber: Int, $sortBy: SortBy!, $hitsPerPage: Int) {
+  getVehicles(filtersInput: $filtersInput, pageNumber: $pageNumber, sortBy: $sortBy, updateFilters: false, hitsPerPage: $hitsPerPage) {
+    vehicles { slug title itemType make model modelYear lotNumber hasReservePrice upcomingAuctionEndDate lotAuctionMobilityId auctionAuctionMobilityId cloudinaryImages { public_id } }
+  }
+}`;
+
+// deno-lint-ignore no-explicit-any
+type GoodingDb = { from: (table: string) => any }; // the vehicles reads and fill-only writes below
+
+/** One JSON read from Gooding, politely: our own user agent, one request at a time, a block or rate limit stops the read. */
+async function goodingJson(url: string, init: { method?: string; headers?: Record<string, string>; body?: string } = {}): Promise<unknown> {
+  const res = await fetch(url, { method: init.method, body: init.body, signal: AbortSignal.timeout(20_000), // guardrail-allow: raw-fetch (house JSON API)
+    headers: { "User-Agent": GOODING_UA, Accept: "application/json", ...init.headers } });
+  if (res.status === 403 || res.status === 429) throw new Error(`${new URL(url).host} answered ${res.status} (${GOODING_BLOCKED}); read stopped`);
+  if (!res.ok) throw new Error(`${new URL(url).host} HTTP ${res.status}`);
+  return await res.json();
+}
+
+/**
+ * Gooding's open timed lots (Geared Online and any timed sale) from its bidding platform, bid.goodingco.com: every lot of
+ * a timed sale that has not ended (the lot list), then the open lots' bid box state (leading bid, bid count, the close
+ * each extension moved). Nothing open costs two small requests. In-room sales (Pebble Beach, Amelia, the
+ * Gooding Christie's sales registered through christies.com) take bids only in the room and are not read here. Each open
+ * vehicle lot carries its catalog identity and the catalog lot URL in the spelling vehicles hold; a vehicle that holds the
+ * lot only as discovery_url gets it as listing_url first, so the live upsert updates that vehicle rather than minting a
+ * twin (goodingLinkPlan). The list is complete: lots that left it leave the schedule in live_auction_board_sync.
+ */
+async function syncGooding(
+  supabase: GoodingDb,
+  link: boolean,
+): Promise<{ auctions: LiveAuction[]; error: string | null; write_errors?: string[] }> {
+  try {
+    const now = Date.now();
+    const page = (params: Record<string, string>, o: number) => goodingJson(`${GOODING_BID}/ajax/lots/?${new URLSearchParams({
+      n: "100", order_by: "auction_date lot_number", order: "asc asc", fieldset: GOODING_LOT_FIELDS, paramsType: "server", ...params, o: String(o),
+    })}`);
+    const readAll = async (params: Record<string, string>) => {
+      const out: GoodingLot[] = [];
+      for (let o: number | null = 0, i = 0; o !== null && i < 10; i++) {
+        const p = parseGoodingLots(await page(params, o), now);
+        out.push(...p.lots);
+        o = p.next;
+      }
+      return out;
+    };
+    // the platform's "upcoming" lots are those of sales whose end is still ahead, running sales included
+    const lots = await readAll({ lotsRange: "upcoming", auction_type: "timed timed_then_live" });
+    // the newest timed sale filed as past is read whole only if it still has active lots
+    const newest = parseGoodingLots(await page({ lotsRange: "past", auction_type: "timed timed_then_live", n: "1", order: "desc asc" }, 0), now).lots[0];
+    if (newest?.am_auction_id && (newest.auction_active_lots ?? 0) > 0 && !lots.some((l) => l.am_auction_id === newest.am_auction_id)) {
+      lots.push(...await readAll({ auctionId: newest.am_auction_id }));
+    }
+    const listed = lots.filter((l) => l.phase === "open");
+    const phases = lots.reduce((m, l) => ({ ...m, [l.phase]: (m[l.phase] ?? 0) + 1 }), {} as Record<string, number>);
+    console.log(`[sync-live-auctions] Gooding: ${lots.length} timed-sale lots on bid.goodingco.com ${JSON.stringify(phases)}`);
+    if (!listed.length) return { auctions: [], error: null };
+
+    // The open lots' bid box state (widget/lots, the call the lot page makes; 50 lots a call, 0.6 s apart): the leading
+    // bid, the bid count and the close each extension moved. If it fails, the lot list's bids stand without a count.
+    const states = new Map<string, BonhamsBidState>();
+    let widgetError: string | null = null;
+    try {
+      const bySale = new Map<string, string[]>();
+      for (const l of listed) if (l.am_auction_id) bySale.set(l.am_auction_id, [...(bySale.get(l.am_auction_id) ?? []), l.am_lot_id]);
+      let calls = 0;
+      for (const [sale, ids] of bySale) {
+        for (let i = 0; i < ids.length; i += 50) {
+          if (calls++) await new Promise((r) => setTimeout(r, 600));
+          const body = await goodingJson(`${GOODING_BID}/widget/lots/${encodeURIComponent(sale)}`, {
+            method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ lot_ids: ids.slice(i, i + 50) }),
+          });
+          for (const s of parseBonhamsBidStates(body)) states.set(s.am_lot_id, s);
+        }
+      }
+    } catch (e) {
+      widgetError = e instanceof Error ? e.message : String(e);
+      if (widgetError.includes(GOODING_BLOCKED)) throw e; // a refusal stops the read and is recorded, never worked around
+    }
+    const open = listed.map((l) => goodingWithBidState(l, states.get(l.am_lot_id), now)).filter((l) => l.phase === "open");
+
+    // Catalog identity. ENDING_SOONEST lists lots of sales still ahead first; read until every open lot is matched.
+    const catalog: GoodingCatalogLot[] = [];
+    let catalogError: string | null = null;
+    try {
+      for (let p = 0; p < 8; p++) {
+        const r = await goodingJson(GOODING_CATALOG, {
+          method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer" },
+          body: JSON.stringify({ query: GOODING_CATALOG_QUERY, variables: { filtersInput: {}, pageNumber: p, sortBy: "ENDING_SOONEST", hitsPerPage: 100 } }),
+        }) as { data?: { getVehicles?: { vehicles?: GoodingCatalogLot[] } }; errors?: { message?: string }[] };
+        if (r.errors?.length) throw new Error(r.errors[0].message ?? "GraphQL error");
+        const vs = r.data?.getVehicles?.vehicles ?? [];
+        catalog.push(...vs);
+        if (open.every((l) => goodingCatalogFor(l, catalog)) || vs.length < 100 || vs.some((v) => Number(v.upcomingAuctionEndDate) >= 9_999_999_999_999)) break;
+      }
+    } catch (e) {
+      catalogError = e instanceof Error ? e.message : String(e); // the lots still read, under the platform's lot pages
+      if (catalogError.includes(GOODING_BLOCKED)) throw e;
+    }
+    const rows = open.map((lot) => ({ lot, cat: goodingCatalogFor(lot, catalog) }))
+      .map((r) => ({ ...r, ...goodingBoardLot(r.lot, r.cat) }))
+      .filter((r) => r.vehicle && r.url);
+
+    // The vehicles already holding these lots, under either URL column and every spelling.
+    const held: GoodingVehicleRow[] = [];
+    const spellings = [...new Set(rows.flatMap((r) => goodingUrlVariants(r.url!)))];
+    for (let i = 0; i < spellings.length; i += 50) {
+      const chunk = spellings.slice(i, i + 50);
+      for (const column of ["listing_url", "discovery_url"]) {
+        const { data, error } = await supabase.from("vehicles").select("id, listing_url, discovery_url").in(column, chunk).is("deleted_at", null);
+        if (error) throw new Error(`Gooding vehicle lookup: ${error.message}`);
+        held.push(...(data ?? []) as GoodingVehicleRow[]);
+      }
+    }
+    const writeErrors: string[] = [];
+    const auctions: LiveAuction[] = [];
+    for (const r of rows) {
+      const plan = goodingLinkPlan(r.url!, held);
+      if (plan.link === "claim" && link) {
+        // fill only: the vehicle holds this lot as discovery_url and has no listing_url
+        const claimed = await supabase.from("vehicles").update({ listing_url: plan.url }).eq("id", plan.vehicle_id!).is("listing_url", null);
+        if (softWrite(`gooding listing_url claim ${plan.vehicle_id}`, claimed, writeErrors)) continue; // never write a twin
+      }
+      const ident = r.cat ? { year: r.year, make: r.make, model: r.model } : parseBatIdentityFromTitle(r.title, null);
+      auctions.push({
+        url: plan.url,
+        title: r.title,
+        platform: "gooding",
+        auction_end_date: r.lot.ends ?? "",
+        current_bid: r.lot.current_bid,
+        bid_count: r.lot.bid_count,
+        currency: r.lot.currency,
+        no_reserve: r.no_reserve,
+        reserve_met: r.lot.reserve_met,
+        year: ident.year,
+        make: ident.make,
+        model: ident.model,
+        thumbnail_url: r.image,
+        external_id: r.lot.am_lot_id,
+        raw_data: {
+          source: "gooding_am_lots", sale: r.lot.sale, am_auction_id: r.lot.am_auction_id, lot_number: r.lot.lot_number,
+          bid_url: r.lot.bid_url, bid_at: r.lot.bid_at, opening_bid: r.lot.opening_bid, estimate_low: r.lot.estimate_low,
+          estimate_high: r.lot.estimate_high, item_type: r.item_type, catalog: r.cat ? "matched" : (catalogError ?? "unmatched"),
+          bid_state: states.has(r.lot.am_lot_id) ? "bid_box" : (widgetError ?? "lot_list"),
+          link: plan.link, state_sequence: r.lot.state_sequence, synced_at: new Date().toISOString(),
+        },
+      });
+    }
+    console.log(`[sync-live-auctions] Gooding: ${open.length} open lots, ${auctions.length} vehicles on the board` +
+      `${catalogError ? ` (catalog: ${catalogError})` : ""}${widgetError ? ` (bid box: ${widgetError})` : ""}`);
+    return { auctions, error: null, write_errors: writeErrors };
+  } catch (e: unknown) {
+    return { auctions: [], error: `Gooding sync failed: ${e instanceof Error ? e.message : String(e)}` };
+  }
+}
+
+/**
+ * Gooding lots no vehicle held were just written under their catalog URL: give that row the same discovery_url (fill only),
+ * so extract-gooding, which resolves a lot by discovery_url, enriches the row instead of inserting a twin.
+ */
+async function goodingFillDiscovery(supabase: GoodingDb, auctions: LiveAuction[]): Promise<string[]> {
+  const errors: string[] = [];
+  // catalog lot URLs only: a lot the catalog did not match is written under the platform's lot page, which no intake keys on
+  for (const a of auctions.filter((x) => x.raw_data.link === "new" && goodingUrlVariants(x.url).length > 1)) {
+    softWrite(`gooding discovery_url fill ${a.url}`, await supabase.from("vehicles").update({ discovery_url: a.url })
+      .eq("listing_url", a.url).is("discovery_url", null).is("deleted_at", null), errors);
+  }
+  return errors;
 }
 
 // ============================================
@@ -774,7 +944,7 @@ async function syncBroadArrow(): Promise<{ auctions: LiveAuction[]; error: strin
 }
 
 /** The houses whose open board is read complete and scheduled by live_auction_board_sync (slug per platform). */
-const BOARD_SOURCES: Record<string, string> = { "collecting-cars": "collecting-cars", pcarmarket: "pcarmarket", bonhams: "bonhams", "broad-arrow": "broad-arrow" };
+const BOARD_SOURCES: Record<string, string> = { "collecting-cars": "collecting-cars", pcarmarket: "pcarmarket", bonhams: "bonhams", "broad-arrow": "broad-arrow", gooding: "gooding" };
 
 // ============================================
 // Cars & Bids Sync (Firecrawl)
@@ -1217,7 +1387,7 @@ Deno.serve(async (req) => {
         }
 
         const startTime = Date.now();
-        let syncResult: { auctions: LiveAuction[]; error: string | null };
+        let syncResult: { auctions: LiveAuction[]; error: string | null; write_errors?: string[] };
 
         // Fetch from platform
         switch (platform) {
@@ -1249,7 +1419,7 @@ Deno.serve(async (req) => {
             syncResult = await syncRMSothebys();
             break;
           case "gooding":
-            syncResult = await syncGooding();
+            syncResult = await syncGooding(supabase, !skipVehicleSync);
             break;
           case "bonhams":
             syncResult = await syncBonhams();
@@ -1303,6 +1473,9 @@ Deno.serve(async (req) => {
         let dbStats = { new_count: 0, updated_count: 0, ended_count: 0, write_errors: [] as string[] };
         if (!skipVehicleSync && !syncResult.error) {
           dbStats = await syncToDatabase(supabase, syncResult.auctions, normalizedPlatform);
+        }
+        if (normalizedPlatform === "gooding" && !skipVehicleSync && !syncResult.error) {
+          dbStats.write_errors.push(...(syncResult.write_errors ?? []), ...await goodingFillDiscovery(supabase, syncResult.auctions));
         }
 
         // Board-synced houses: the same complete board goes to the monitored_auctions schedule writer; lots whose bid

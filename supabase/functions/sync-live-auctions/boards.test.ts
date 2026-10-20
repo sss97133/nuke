@@ -3,6 +3,17 @@ import {
   type BonhamsSaleDoc, bonhamsLot, bonhamsLotPhase, bonhamsSaleKind, parseBonhamsBidStates, parsePcarBids, parsePcarBoard,
 } from "./boards.ts";
 import { type AmLotDoc, type AmSale, amIsVehicleLot, amOpenTimedSales, amSales, amTimedLot } from "./boards.ts";
+import {
+  goodingBoardLot, type GoodingCatalogLot, goodingCatalogFor, goodingLinkPlan, goodingWithBidState, parseGoodingLots,
+} from "./boards.ts";
+// Gooding, captured from the house (each file names its source): its bidding platform's lot documents while a timed sale
+// was open (Internet Archive capture), after a timed sale with cars closed, and today's board; its catalog for those lots.
+import amOpen from "./fixtures/gooding_am_open_2025-04-18.json" with { type: "json" };
+import amClosed from "./fixtures/gooding_am_closed_2023-12.json" with { type: "json" };
+import amToday from "./fixtures/gooding_am_upcoming_2026-10-20.json" with { type: "json" };
+import catDec23 from "./fixtures/gooding_catalog_2023-12.json" with { type: "json" };
+import catSpring25 from "./fixtures/gooding_catalog_2025-04.json" with { type: "json" };
+import amWidget from "./fixtures/gooding_am_widget_2023-12.json" with { type: "json" };
 
 // Trimmed from https://www.pcarmarket.com/auctions?auctionType=live&page=1 (2026-10-18): the Basta query cache.
 const BOARD = `queries:$R[22]=[$R[30]={state:$R[31]={data:$R[32]={search:$R[33]={pageInfo:$R[34]={page:1,pageSize:24,totalPages:3,hasNextPage:!0},` +
@@ -253,4 +264,89 @@ Deno.test("amIsVehicleLot: a model-year title in a car sale, not a year-led part
   assertEquals(amIsVehicleLot("1992 Original Lotus 107C Rear Wing Element", "Global Icons: Memorabilia Online 2026"), false);
   assertEquals(amIsVehicleLot("Ralf Schumacher 2004 Original Williams Gloves", "Global Icons: Memorabilia Online 2026"), false);
   assertEquals(amTimedLot(GLOVES, MEMO, READ_AT).vehicle, false);
+});
+
+Deno.test("Gooding today: no lot of a timed sale is open or upcoming on its bidding platform (2026-10-20)", () => {
+  const page = parseGoodingLots(amToday, Date.parse("2026-10-20T19:45:57Z"));
+  assertEquals([page.lots.length, page.total, page.next], [0, 0, null]);
+});
+
+Deno.test("Gooding open sale: each active lot with its standing bid, its own staggered close, estimate and currency", () => {
+  const now = amOpen.serverTime; // 2025-04-18T00:18:22Z, the capture's own server clock
+  const page = parseGoodingLots(amOpen.lots, now);
+  assertEquals([page.total, page.next], [525, 3]); // the platform's total; the next offset after this (trimmed) page
+  assertEquals(page.lots.map((l) => [l.lot_number, l.phase, l.current_bid, l.ends, l.reserve_met]), [
+    [1, "open", 2300, "2025-04-18T16:00:00Z", null],
+    [2, "open", 775, "2025-04-18T16:00:30Z", true],
+    [28, "open", 14500, "2025-04-18T16:13:30Z", true],
+  ]);
+  const [first] = page.lots;
+  assertEquals(first, {
+    am_lot_id: "1-AF7H9S", am_auction_id: "1-9QGHT2", sale: "Geared Online | Spring Automobilia 2025", auction_type: "timed",
+    auction_active_lots: 525, lot_number: 1, title: "Ferrari Illuminated Dealership Sign", status: "active", phase: "open",
+    current_bid: 2300, bid_at: "2025-04-17T20:04:42.479Z", bid_count: null, opening_bid: 25, sold_price: null, reserve_met: null, without_reserve: true,
+    starts: "2025-04-11T16:00:00Z", ends: "2025-04-18T16:00:00Z", estimate_low: 10000, estimate_high: 15000, currency: "USD",
+    image: "https://images-cdn.auctionmobility.com/is3/auctionmobility-static/iiyL-1-NERL3/1-AGYT8D/aaf88261-e500-4cc4-90ef-c7bfee313de8",
+    bid_url: "https://bid.goodingco.com/lots/view/1-AF7H9S/ferrari-illuminated-dealership-sign", state_sequence: 35,
+  });
+  // the same documents judged before the sale opened, and 15 seconds after lot 1's close
+  assertEquals(parseGoodingLots(amOpen.lots, Date.parse("2025-04-11T15:00:00Z")).lots.map((l) => l.phase), ["upcoming", "upcoming", "upcoming"]);
+  assertEquals(parseGoodingLots(amOpen.lots, Date.parse("2025-04-18T16:00:15Z")).lots.map((l) => l.phase), ["closed", "open", "open"]);
+});
+
+Deno.test("Gooding open sale of automobilia: the catalog says Automobilia, so no lot is a vehicle for the board", () => {
+  const catalog = catSpring25.data.getVehicles.vehicles as GoodingCatalogLot[];
+  const rows = parseGoodingLots(amOpen.lots, amOpen.serverTime).lots.map((l) => goodingBoardLot(l, goodingCatalogFor(l, catalog)));
+  assertEquals(rows.map((r) => [r.url, r.item_type, r.vehicle]), [
+    ["https://goodingco.com/lot/ferrari-illuminated-dealership-sign", "Automobilia", false],
+    ["https://goodingco.com/lot/ferrari-logo-sign-1a", "Automobilia", false],
+    ["https://goodingco.com/lot/ferrari-brochures-for-212-tuboscocca-and-340-america", "Automobilia", false],
+  ]);
+});
+
+Deno.test("Gooding closed sale with cars: closed lots, the hammer kept, catalog identity by sale id and lot number", () => {
+  const lots = parseGoodingLots(amClosed, Date.parse("2026-10-20T19:00:00Z")).lots;
+  assertEquals(lots.map((l) => [l.lot_number, l.status, l.phase, l.current_bid, l.sold_price, l.ends]), [
+    [2, "sold", "closed", 8000, 8000, "2023-12-08T17:04:00Z"],
+    [19, "sold", "closed", 245000, 245000, "2023-12-08T18:13:49Z"],
+    [43, "reserve_not_met", "closed", null, null, "2023-12-08T19:48:00Z"],
+  ]);
+  const catalog = catDec23.data.getVehicles.vehicles as GoodingCatalogLot[];
+  const rows = lots.map((l) => goodingBoardLot(l, goodingCatalogFor(l, catalog)));
+  assertEquals(rows[1], {
+    url: "https://goodingco.com/lot/1957-porsche-356-a-speedster-1c",
+    title: "1957 Porsche 356 A Speedster", year: 1957, make: "Porsche", model: "356 A Speedster",
+    // the spelling vehicle de44862c-3aff-45b3-8f1c-ff7808ddd570 holds as primary_image_url (read 2026-10-20)
+    image: "https://media.goodingco.com/image/upload/c_fill,g_auto,q_90,w_1800/v1/Prod/O23G_December%202023/214_1957%20Porsche%20356%20A%20Speedster/1957_Porsche_356_A_Speedster_52_dn263q",
+    no_reserve: true, item_type: "Cars", vehicle: true,
+  });
+  assertEquals([rows[0].vehicle, rows[2].vehicle, rows[2].no_reserve, rows[2].url], [false, true, false, "https://goodingco.com/lot/1973-porsche-911-carrera-rs-27-lightweight-1b"]);
+  // unmatched in the catalog: the platform's own lot page, a vehicle only when the title opens with a year
+  assertEquals([goodingBoardLot(lots[1], null).url, goodingBoardLot(lots[1], null).vehicle, goodingBoardLot(lots[0], null).vehicle],
+    ["https://bid.goodingco.com/lots/view/1-8DT8SX/1957-porsche-356-a-speedster", true, false]);
+});
+
+Deno.test("Gooding bid box state: the widget answer adds the bid count and the close it moved, read by the shared parser", () => {
+  const now = Date.parse("2026-10-20T19:00:00Z");
+  const lots = parseGoodingLots(amClosed, now).lots;
+  const states = new Map(parseBonhamsBidStates(amWidget).map((s) => [s.am_lot_id, s]));
+  const [, porsche356, rs27] = lots.map((l) => goodingWithBidState(l, states.get(l.am_lot_id), now));
+  assertEquals([porsche356.bid_count, porsche356.current_bid, porsche356.bid_at, porsche356.ends, porsche356.phase],
+    [54, 245000, "2023-12-08T18:10:49.400Z", "2023-12-08T18:13:49.307Z", "closed"]);
+  assertEquals([rs27.bid_count, rs27.current_bid, rs27.status], [36, null, "reserve_not_met"]);
+  assertEquals(goodingWithBidState(lots[0], undefined, now), lots[0]); // no state: as listed
+});
+
+Deno.test("Gooding link plan: write under the spelling a vehicle holds, claim a discovery-only vehicle, never mint a twin", () => {
+  // vehicles rows as read 2026-10-20
+  assertEquals(goodingLinkPlan("https://goodingco.com/lot/1957-porsche-356-a-speedster-1c", [
+    { id: "de44862c-3aff-45b3-8f1c-ff7808ddd570", listing_url: null, discovery_url: "https://goodingco.com/lot/1957-porsche-356-a-speedster-1c" },
+  ]), { url: "https://goodingco.com/lot/1957-porsche-356-a-speedster-1c", link: "claim", vehicle_id: "de44862c-3aff-45b3-8f1c-ff7808ddd570" });
+  assertEquals(goodingLinkPlan("https://goodingco.com/lot/2006-ferrari-f430-spider", [
+    { id: "beac6545-451a-470f-865b-0eeca43a5671", listing_url: "https://www.goodingco.com/lot/2006-ferrari-f430-spider", discovery_url: "https://goodingco.com/lot/2006-ferrari-f430-spider" },
+  ]), { url: "https://www.goodingco.com/lot/2006-ferrari-f430-spider", link: "held", vehicle_id: "beac6545-451a-470f-865b-0eeca43a5671" });
+  assertEquals(goodingLinkPlan("https://goodingco.com/lot/1990-ferrari-348-tb", [
+    { id: "1349de34-a459-47b0-8411-3bd39cf2fca8", listing_url: "https://bringatrailer.com/listing/1990-ferrari-348-5", discovery_url: "https://goodingco.com/lot/1990-ferrari-348-tb" },
+  ]), { url: "https://goodingco.com/lot/1990-ferrari-348-tb", link: "other", vehicle_id: null });
+  assertEquals(goodingLinkPlan("https://goodingco.com/lot/not-held", []), { url: "https://goodingco.com/lot/not-held", link: "new", vehicle_id: null });
 });

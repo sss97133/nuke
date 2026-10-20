@@ -1,0 +1,437 @@
+{
+ "source": "https://web.archive.org/web/20250418001822id_/https://bid.goodingco.com/auctions/1-9QGHT2/geared-online-spring-automobilia-2025 (viewVars.lots and viewVars.serverTime; lots 1, 2 and 28 of the first page, each document whole but its bidder registration)",
+ "serverTime": 1744935502959,
+ "lots": {
+  "result_page": [
+   {
+    "row_id": "1-AF7H9S",
+    "type": "auction-lot-summary",
+    "self_url": "https://production2-server.auctionmobility.com/v1/auction-lot/1-AF7H9S/summary",
+    "watch_url": "https://production2-server.auctionmobility.com/v1/auction-lot/1-AF7H9S/watch",
+    "detail_url": "https://production2-server.auctionmobility.com/v1/auction-lot/1-AF7H9S/",
+    "lot_number": 1,
+    "status": "active",
+    "title": "Ferrari Illuminated Dealership Sign",
+    "last_updated": "2025-04-17T20:04:42Z",
+    "lot_number_extension": "",
+    "starting_price": "25.00",
+    "hide_estimate": false,
+    "estimate_low": "10000.00",
+    "estimate_high": "15000.00",
+    "quantity": null,
+    "condition": null,
+    "highlight": null,
+    "bid_table": null,
+    "truncated_description": "Without Reserve<br/> \r\n<br/> \r\n<br/> \r\n<p>From the Ken Roath Collection. Extremely rare. Illuminated yellow sign, double sided. Dimensions: 43 in. high x 71 in. wide x 11 in. deep.\n<br/>\n*Please note that this Lot will be available for collection post-auction from a warehouse in Costa Mesa, California.</p>\n <br/> \r\n<br/> \r\n<br/> \r\n<br/>",
+    "bidding_enabled": true,
+    "lot_symbols": null,
+    "estimate_symbols": null,
+    "buyers_premium_amount": null,
+    "commodity_type": null,
+    "commodity_quantity": null,
+    "perfect_condition": false,
+    "artist": null,
+    "dimensions": null,
+    "cover_thumbnail": "https://images-cdn.auctionmobility.com/is3/auctionmobility-static/iiyL-1-NERL3/1-AGYT8D/aaf88261-e500-4cc4-90ef-c7bfee313de8",
+    "auction_lot_group": null,
+    "currency_code": "USD",
+    "artist_records": [],
+    "when_produced": null,
+    "package_type": null,
+    "color": null,
+    "is_mixed_lot": false,
+    "estimate_low_hk": null,
+    "estimate_high_hk": null,
+    "preferred_order": null,
+    "lot_group": null,
+    "external_info_url": null,
+    "minimum_autosell_amount": null,
+    "extended_end_time": "2025-04-18T16:00:00Z",
+    "timed_auction_bid": {
+     "row_id": "1-AHE96S",
+     "absentee_bid_id": "1-AGK8ZW",
+     "amount": "2300.00",
+     "amount_percentage": null,
+     "created_at": "2025-04-17T20:04:42.479Z",
+     "updated_at": "2025-04-17T20:04:42.479Z"
+    },
+    "monthly_revenue": null,
+    "auction": {
+     "row_id": "1-9QGHT2",
+     "type": "auction-summary",
+     "self_url": "https://production2-server.auctionmobility.com/v1/auction/1-9QGHT2/summary",
+     "detail_url": "https://production2-server.auctionmobility.com/v1/auction/1-9QGHT2/",
+     "auction_type": "timed",
+     "title": "Geared Online | Spring Automobilia 2025",
+     "time_start": "2025-04-11T16:00:00Z",
+     "time_start_live_auction": null,
+     "time_start_proxy_bidding": null,
+     "duration": "P7D",
+     "timezone": "America/Los_Angeles",
+     "truncated_description": "Featuring over 500 lots of motoring-themed memorabilia, collectibles, petroliana, Americana, automotive literature, and rare car parts, Geared Online | Spring Automobilia will present a robust array of automobilia, offered largely without reserve, from respected collections, including the Ken Roath Collection and the Fred Leydorf Collection.\n\nThe Geared Online auction series offers a selection of lots with and without reserve, providing a brilliant selection of automotive history for every level of collector. Gooding & Company houses all available lots at the company’s Southern California facility, providing interested bidders the unique opportunity to conduct on-site inspections of the online offerings and interact with our marque expert specialists. The auction house invites you to speak with a Gooding & Company staff member for more information on viewing and inspection, as well as on how to consign for upcoming Geared Online sales.",
+     "last_updated": "2024-10-22T17:33:56Z",
+     "auction_code": null,
+     "banner": null,
+     "subtitle": null,
+     "viewing_information": "All Geared Online lots are available for viewing and inspection in Southern California, by appointment only. Appointments are available weekdays 9am to 5pm from Friday, April 11, through Friday, April 18. Please email clientservices@goodingco.com or call 310.899.1960 to make arrangements.",
+     "publication_status": "full",
+     "bidder_registration_allowed": true,
+     "location_name": null,
+     "percentage_bidding": false,
+     "bid_table": {
+      "0.00": [
+       "25.00"
+      ],
+      "1000.00": [
+       "50.00"
+      ],
+      "2500.00": [
+       "100.00"
+      ],
+      "5000.00": [
+       "250.00"
+      ],
+      "10000.00": [
+       "500.00"
+      ],
+      "25000.00": [
+       "1000.00"
+      ],
+      "100000.00": [
+       "5000.00"
+      ],
+      "500000.00": [
+       "10000.00"
+      ],
+      "1000000.00": [
+       "20000.00"
+      ]
+     },
+     "active_lot_count": 525,
+     "lot_count": 525,
+     "sold_lot_count": 0,
+     "effective_end_time": "2025-04-18T20:22:00Z",
+     "require_approval": null,
+     "extend_by_auction": false,
+     "extended_end_time": null,
+     "cover_thumbnail": "https://images-cdn.auctionmobility.com/is3/auctionmobility-static/kgnz-1-NERL3/1-A604OY/167c3991-6e8a-455c-83da-21acee96c4d5",
+     "total_sold_value": null,
+     "total_hammer_price": null,
+     "minimum_buyers_premium": "0.00",
+     "default_buyers_premium": null,
+     "currency_code": "USD",
+     "realtime_server_url": null,
+     "conditions_of_sale_url": null,
+     "contact_notes": null,
+     "contact_condition_report_email": null,
+     "is_times_the_money": false,
+     "lot_url": "https://production2-server.auctionmobility.com/v1/auction/1-9QGHT2/lots",
+     "_detail_url": "/auctions/1-9QGHT2/geared-online-spring-automobilia-2025",
+     "_slug": "geared-online-spring-automobilia-2025"
+    },
+    "sold_price": null,
+    "reserve_met": null,
+    "state_sequence_number": 35,
+    "_detail_url": "/lots/view/1-AF7H9S/ferrari-illuminated-dealership-sign",
+    "_slug": "ferrari-illuminated-dealership-sign",
+    "_gridPosition": "first",
+    "_jsonld": {
+     "product": {
+      "@context": "http://schema.org/",
+      "@type": "Product",
+      "name": "Ferrari Illuminated Dealership Sign"
+     }
+    }
+   },
+   {
+    "row_id": "1-AF7H9U",
+    "type": "auction-lot-summary",
+    "self_url": "https://production2-server.auctionmobility.com/v1/auction-lot/1-AF7H9U/summary",
+    "watch_url": "https://production2-server.auctionmobility.com/v1/auction-lot/1-AF7H9U/watch",
+    "detail_url": "https://production2-server.auctionmobility.com/v1/auction-lot/1-AF7H9U/",
+    "lot_number": 2,
+    "status": "active",
+    "title": "Ferrari Logo Sign",
+    "last_updated": "2025-04-17T21:35:43Z",
+    "lot_number_extension": "",
+    "starting_price": "25.00",
+    "hide_estimate": false,
+    "estimate_low": "2000.00",
+    "estimate_high": "4000.00",
+    "quantity": null,
+    "condition": null,
+    "highlight": null,
+    "bid_table": null,
+    "truncated_description": "Without Reserve<br/> \r\n<br/> \r\n<br/> \r\n<p>From the Ken Roath Collection. Large, painted Ferrari sign with prancing horse logo, with pressure-sensitive &quot;Ferrari&quot; script decal. Dimensions: 84 in. high x 48 in. wide.\n<br/>\n*Please note that this Lot will be available for collection post-auction from a warehouse in Costa Mesa, California.</p>\n <br/> \r\n<br/> \r\n<br/> \r\n<br/>",
+    "bidding_enabled": true,
+    "lot_symbols": null,
+    "estimate_symbols": null,
+    "buyers_premium_amount": null,
+    "commodity_type": null,
+    "commodity_quantity": null,
+    "perfect_condition": false,
+    "artist": null,
+    "dimensions": null,
+    "cover_thumbnail": "https://images-cdn.auctionmobility.com/is3/auctionmobility-static/iWck-1-NERL3/1-AF7H9U/2_1.jpg",
+    "auction_lot_group": null,
+    "currency_code": "USD",
+    "artist_records": [],
+    "when_produced": null,
+    "package_type": null,
+    "color": null,
+    "is_mixed_lot": false,
+    "estimate_low_hk": null,
+    "estimate_high_hk": null,
+    "preferred_order": null,
+    "lot_group": null,
+    "external_info_url": null,
+    "minimum_autosell_amount": null,
+    "extended_end_time": "2025-04-18T16:00:30Z",
+    "timed_auction_bid": {
+     "row_id": "1-AHEVKL",
+     "absentee_bid_id": "1-AGYSHI",
+     "amount": "775.00",
+     "amount_percentage": null,
+     "created_at": "2025-04-17T21:35:43.560Z",
+     "updated_at": "2025-04-17T21:35:43.560Z"
+    },
+    "monthly_revenue": null,
+    "auction": {
+     "row_id": "1-9QGHT2",
+     "type": "auction-summary",
+     "self_url": "https://production2-server.auctionmobility.com/v1/auction/1-9QGHT2/summary",
+     "detail_url": "https://production2-server.auctionmobility.com/v1/auction/1-9QGHT2/",
+     "auction_type": "timed",
+     "title": "Geared Online | Spring Automobilia 2025",
+     "time_start": "2025-04-11T16:00:00Z",
+     "time_start_live_auction": null,
+     "time_start_proxy_bidding": null,
+     "duration": "P7D",
+     "timezone": "America/Los_Angeles",
+     "truncated_description": "Featuring over 500 lots of motoring-themed memorabilia, collectibles, petroliana, Americana, automotive literature, and rare car parts, Geared Online | Spring Automobilia will present a robust array of automobilia, offered largely without reserve, from respected collections, including the Ken Roath Collection and the Fred Leydorf Collection.\n\nThe Geared Online auction series offers a selection of lots with and without reserve, providing a brilliant selection of automotive history for every level of collector. Gooding & Company houses all available lots at the company’s Southern California facility, providing interested bidders the unique opportunity to conduct on-site inspections of the online offerings and interact with our marque expert specialists. The auction house invites you to speak with a Gooding & Company staff member for more information on viewing and inspection, as well as on how to consign for upcoming Geared Online sales.",
+     "last_updated": "2024-10-22T17:33:56Z",
+     "auction_code": null,
+     "banner": null,
+     "subtitle": null,
+     "viewing_information": "All Geared Online lots are available for viewing and inspection in Southern California, by appointment only. Appointments are available weekdays 9am to 5pm from Friday, April 11, through Friday, April 18. Please email clientservices@goodingco.com or call 310.899.1960 to make arrangements.",
+     "publication_status": "full",
+     "bidder_registration_allowed": true,
+     "location_name": null,
+     "percentage_bidding": false,
+     "bid_table": {
+      "0.00": [
+       "25.00"
+      ],
+      "1000.00": [
+       "50.00"
+      ],
+      "2500.00": [
+       "100.00"
+      ],
+      "5000.00": [
+       "250.00"
+      ],
+      "10000.00": [
+       "500.00"
+      ],
+      "25000.00": [
+       "1000.00"
+      ],
+      "100000.00": [
+       "5000.00"
+      ],
+      "500000.00": [
+       "10000.00"
+      ],
+      "1000000.00": [
+       "20000.00"
+      ]
+     },
+     "active_lot_count": 525,
+     "lot_count": 525,
+     "sold_lot_count": 0,
+     "effective_end_time": "2025-04-18T20:22:00Z",
+     "require_approval": null,
+     "extend_by_auction": false,
+     "extended_end_time": null,
+     "cover_thumbnail": "https://images-cdn.auctionmobility.com/is3/auctionmobility-static/kgnz-1-NERL3/1-A604OY/167c3991-6e8a-455c-83da-21acee96c4d5",
+     "total_sold_value": null,
+     "total_hammer_price": null,
+     "minimum_buyers_premium": "0.00",
+     "default_buyers_premium": null,
+     "currency_code": "USD",
+     "realtime_server_url": null,
+     "conditions_of_sale_url": null,
+     "contact_notes": null,
+     "contact_condition_report_email": null,
+     "is_times_the_money": false,
+     "lot_url": "https://production2-server.auctionmobility.com/v1/auction/1-9QGHT2/lots",
+     "_detail_url": "/auctions/1-9QGHT2/geared-online-spring-automobilia-2025",
+     "_slug": "geared-online-spring-automobilia-2025"
+    },
+    "sold_price": null,
+    "reserve_met": true,
+    "state_sequence_number": 29,
+    "_detail_url": "/lots/view/1-AF7H9U/ferrari-logo-sign",
+    "_slug": "ferrari-logo-sign",
+    "_gridPosition": "second",
+    "_jsonld": {
+     "product": {
+      "@context": "http://schema.org/",
+      "@type": "Product",
+      "name": "Ferrari Logo Sign"
+     }
+    }
+   },
+   {
+    "row_id": "1-AF7HBA",
+    "type": "auction-lot-summary",
+    "self_url": "https://production2-server.auctionmobility.com/v1/auction-lot/1-AF7HBA/summary",
+    "watch_url": "https://production2-server.auctionmobility.com/v1/auction-lot/1-AF7HBA/watch",
+    "detail_url": "https://production2-server.auctionmobility.com/v1/auction-lot/1-AF7HBA/",
+    "lot_number": 28,
+    "status": "active",
+    "title": "Ferrari Brochures for 212 Tuboscocca and 340 America",
+    "last_updated": "2025-04-17T23:07:19Z",
+    "lot_number_extension": "",
+    "starting_price": "25.00",
+    "hide_estimate": false,
+    "estimate_low": "2500.00",
+    "estimate_high": "5000.00",
+    "quantity": null,
+    "condition": null,
+    "highlight": null,
+    "bid_table": null,
+    "truncated_description": "Without Reserve<br/> \r\n<br/> \r\n<br/> \r\n<p>From the Fred Leydorf Collection. Two rarely seen, early Ferrari brochures. </p>\n <br/> \r\n<br/> \r\n<br/> \r\n<br/>",
+    "bidding_enabled": true,
+    "lot_symbols": null,
+    "estimate_symbols": null,
+    "buyers_premium_amount": null,
+    "commodity_type": null,
+    "commodity_quantity": null,
+    "perfect_condition": false,
+    "artist": null,
+    "dimensions": null,
+    "cover_thumbnail": "https://images-cdn.auctionmobility.com/is3/auctionmobility-static/KS8U-1-NERL3/1-AF7HBA/28_1.JPG",
+    "auction_lot_group": null,
+    "currency_code": "USD",
+    "artist_records": [],
+    "when_produced": null,
+    "package_type": null,
+    "color": null,
+    "is_mixed_lot": false,
+    "estimate_low_hk": null,
+    "estimate_high_hk": null,
+    "preferred_order": null,
+    "lot_group": null,
+    "external_info_url": null,
+    "minimum_autosell_amount": null,
+    "extended_end_time": "2025-04-18T16:13:30Z",
+    "timed_auction_bid": {
+     "row_id": "1-AHFC0Q",
+     "absentee_bid_id": "1-AGTOER",
+     "amount": "14500.00",
+     "amount_percentage": null,
+     "created_at": "2025-04-17T23:07:19.489Z",
+     "updated_at": "2025-04-17T23:07:19.489Z"
+    },
+    "monthly_revenue": null,
+    "auction": {
+     "row_id": "1-9QGHT2",
+     "type": "auction-summary",
+     "self_url": "https://production2-server.auctionmobility.com/v1/auction/1-9QGHT2/summary",
+     "detail_url": "https://production2-server.auctionmobility.com/v1/auction/1-9QGHT2/",
+     "auction_type": "timed",
+     "title": "Geared Online | Spring Automobilia 2025",
+     "time_start": "2025-04-11T16:00:00Z",
+     "time_start_live_auction": null,
+     "time_start_proxy_bidding": null,
+     "duration": "P7D",
+     "timezone": "America/Los_Angeles",
+     "truncated_description": "Featuring over 500 lots of motoring-themed memorabilia, collectibles, petroliana, Americana, automotive literature, and rare car parts, Geared Online | Spring Automobilia will present a robust array of automobilia, offered largely without reserve, from respected collections, including the Ken Roath Collection and the Fred Leydorf Collection.\n\nThe Geared Online auction series offers a selection of lots with and without reserve, providing a brilliant selection of automotive history for every level of collector. Gooding & Company houses all available lots at the company’s Southern California facility, providing interested bidders the unique opportunity to conduct on-site inspections of the online offerings and interact with our marque expert specialists. The auction house invites you to speak with a Gooding & Company staff member for more information on viewing and inspection, as well as on how to consign for upcoming Geared Online sales.",
+     "last_updated": "2024-10-22T17:33:56Z",
+     "auction_code": null,
+     "banner": null,
+     "subtitle": null,
+     "viewing_information": "All Geared Online lots are available for viewing and inspection in Southern California, by appointment only. Appointments are available weekdays 9am to 5pm from Friday, April 11, through Friday, April 18. Please email clientservices@goodingco.com or call 310.899.1960 to make arrangements.",
+     "publication_status": "full",
+     "bidder_registration_allowed": true,
+     "location_name": null,
+     "percentage_bidding": false,
+     "bid_table": {
+      "0.00": [
+       "25.00"
+      ],
+      "1000.00": [
+       "50.00"
+      ],
+      "2500.00": [
+       "100.00"
+      ],
+      "5000.00": [
+       "250.00"
+      ],
+      "10000.00": [
+       "500.00"
+      ],
+      "25000.00": [
+       "1000.00"
+      ],
+      "100000.00": [
+       "5000.00"
+      ],
+      "500000.00": [
+       "10000.00"
+      ],
+      "1000000.00": [
+       "20000.00"
+      ]
+     },
+     "active_lot_count": 525,
+     "lot_count": 525,
+     "sold_lot_count": 0,
+     "effective_end_time": "2025-04-18T20:22:00Z",
+     "require_approval": null,
+     "extend_by_auction": false,
+     "extended_end_time": null,
+     "cover_thumbnail": "https://images-cdn.auctionmobility.com/is3/auctionmobility-static/kgnz-1-NERL3/1-A604OY/167c3991-6e8a-455c-83da-21acee96c4d5",
+     "total_sold_value": null,
+     "total_hammer_price": null,
+     "minimum_buyers_premium": "0.00",
+     "default_buyers_premium": null,
+     "currency_code": "USD",
+     "realtime_server_url": null,
+     "conditions_of_sale_url": null,
+     "contact_notes": null,
+     "contact_condition_report_email": null,
+     "is_times_the_money": false,
+     "lot_url": "https://production2-server.auctionmobility.com/v1/auction/1-9QGHT2/lots",
+     "_detail_url": "/auctions/1-9QGHT2/geared-online-spring-automobilia-2025",
+     "_slug": "geared-online-spring-automobilia-2025"
+    },
+    "sold_price": null,
+    "reserve_met": true,
+    "state_sequence_number": 44,
+    "_detail_url": "/lots/view/1-AF7HBA/ferrari-brochures-for-212-tuboscocca-and-340-america",
+    "_slug": "ferrari-brochures-for-212-tuboscocca-and-340-america",
+    "_gridPosition": "first",
+    "_jsonld": {
+     "product": {
+      "@context": "http://schema.org/",
+      "@type": "Product",
+      "name": "Ferrari Brochures for 212 Tuboscocca and 340 America"
+     }
+    }
+   }
+  ],
+  "query_info": {
+   "base_query": "https://production2-server.auctionmobility.com/v1/auction/1-9QGHT2/lots?order_by=auction_date+lot_number&order=desc+asc&fieldset=timed-auction+reserve-status+summary",
+   "next_page": "https://production2-server.auctionmobility.com/v1/auction/1-9QGHT2/lots?n=36&order_by=auction_date+lot_number&order=desc+asc&fieldset=timed-auction+reserve-status+summary&o=36",
+   "prev_page": null,
+   "page_size": 36,
+   "page_start_offset": 0,
+   "total_num_results": 525
+  },
+  "responseCode": 200
+ }
+}

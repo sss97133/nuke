@@ -1,0 +1,90 @@
+{
+ "source": "https://cdn.goodingco.com/graphql getVehicles(filtersInput: {onlineAuctionName: [\"1744390800000_Geared Online | Spring Automobilia\"]}, sortBy: ENDING_SOONEST) (fetched 2026-10-20; lots 1, 2 and 28)",
+ "data": {
+  "getVehicles": {
+   "vehicles": [
+    {
+     "slug": "ferrari-illuminated-dealership-sign",
+     "title": "Ferrari Illuminated Dealership Sign",
+     "itemType": "Automobilia",
+     "make": null,
+     "model": null,
+     "modelYear": null,
+     "lotNumber": 1,
+     "hasReservePrice": false,
+     "currency": "USD",
+     "activeAuction": "false",
+     "auctionEndDate": "1744995600000",
+     "upcomingAuctionEndDate": "9999999999999",
+     "lotAuctionMobilityId": null,
+     "auctionAuctionMobilityId": "1-9QGHT2",
+     "cloudinaryImages": [
+      {
+       "public_id": "Prod/O25B_Spring Automobilia/B133_Ferrari Sign/Ferrari_Sign_3_wzmm6q"
+      },
+      {
+       "public_id": "Prod/O25B_Spring Automobilia/B133_Ferrari Sign/Ferrari_Sign_2_utrdut"
+      },
+      {
+       "public_id": "Prod/O25B_Spring Automobilia/B133_Ferrari Sign/Ferrari_Sign_1_iixb63"
+      }
+     ]
+    },
+    {
+     "slug": "ferrari-logo-sign-1a",
+     "title": "Ferrari Logo Sign",
+     "itemType": "Automobilia",
+     "make": null,
+     "model": null,
+     "modelYear": null,
+     "lotNumber": 2,
+     "hasReservePrice": false,
+     "currency": "USD",
+     "activeAuction": "false",
+     "auctionEndDate": "1744995600000",
+     "upcomingAuctionEndDate": "9999999999999",
+     "lotAuctionMobilityId": null,
+     "auctionAuctionMobilityId": "1-9QGHT2",
+     "cloudinaryImages": [
+      {
+       "public_id": "Prod/O25B_Spring Automobilia/B015_Large Enamel Ferrari Sign/Enamel_Ferrari_Sign_1_ltd2xo"
+      },
+      {
+       "public_id": "Prod/O25B_Spring Automobilia/B015_Large Enamel Ferrari Sign/Enamel_Ferrari_Sign_2_czwq9p"
+      },
+      {
+       "public_id": "Prod/O25B_Spring Automobilia/B015_Large Enamel Ferrari Sign/Enamel_Ferrari_Sign_3_r9xed6"
+      }
+     ]
+    },
+    {
+     "slug": "ferrari-brochures-for-212-tuboscocca-and-340-america",
+     "title": "Ferrari Brochures for 212 Tuboscocca and 340 America",
+     "itemType": "Automobilia",
+     "make": null,
+     "model": null,
+     "modelYear": null,
+     "lotNumber": 28,
+     "hasReservePrice": false,
+     "currency": "USD",
+     "activeAuction": "false",
+     "auctionEndDate": "1744995600000",
+     "upcomingAuctionEndDate": "9999999999999",
+     "lotAuctionMobilityId": null,
+     "auctionAuctionMobilityId": "1-9QGHT2",
+     "cloudinaryImages": [
+      {
+       "public_id": "Prod/O25B_Spring Automobilia/B321_Ferrari Brochures for 212 Tuboscocca and 340 America/Ferrari_212_340_Brochures_1_e2zd4g"
+      },
+      {
+       "public_id": "Prod/O25B_Spring Automobilia/B321_Ferrari Brochures for 212 Tuboscocca and 340 America/Ferrari_212_340_Brochures_2_s0hciw"
+      },
+      {
+       "public_id": "Prod/O25B_Spring Automobilia/B321_Ferrari Brochures for 212 Tuboscocca and 340 America/Ferrari_212_340_Brochures_3_fko9cj"
+      }
+     ]
+    }
+   ]
+  }
+ }
+}
