@@ -7,7 +7,7 @@ import { htmlToText } from "../_shared/htmlToText.ts";
 import { writeVehicleEventByKey } from "../_shared/vehicleEventWrite.ts";
 import { toLanding } from "./browseMap.ts";
 import { landItem, PLATFORM, type Report } from "./browseSweep.ts";
-import { archivedPageToItem, type ArchivedOutcome, parseArchivedItemPage } from "./archivePage.ts";
+import { archivedPageToItem, type ArchivedOutcome, archivedPhotos, parseArchivedItemPage, type PhotoProbe } from "./archivePage.ts";
 
 export interface Capture { timestamp: string; original: string }
 
@@ -41,6 +41,13 @@ export function archiveOnlyVehicleCorrections(v: { sale_status: string | null; i
 }
 
 
+/** Ask the archive for one photo as a browser would; which capture answered is in the final URL. */
+async function probeArchivedPhoto(url: string): Promise<PhotoProbe> {
+  const res = await fetch(url, { redirect: "follow", signal: AbortSignal.timeout(20_000), headers: { "User-Agent": "nuke.ag archive reader (+https://nuke.ag)" } }); // guardrail-allow: raw-fetch (public archive, availability check)
+  await res.body?.cancel();
+  return { status: res.status, servedTimestamp: String(res.url ?? "").match(/\/web\/(\d{14})im_\//)?.[1] ?? null, image: (res.headers.get("content-type") ?? "").startsWith("image/") };
+}
+
 export function validCaptures(raw: unknown): Capture[] {
   return (Array.isArray(raw) ? raw : [])
     .filter((c: any) => /^\d{14}$/.test(String(c?.timestamp)) && /^https?:\/\/(cgi|motors|www)\.ebay\.com[:/]/i.test(String(c?.original)))
@@ -57,11 +64,15 @@ export async function landArchived(supabase: any, cap: Capture, rep: Report, dry
   const p = parseArchivedItemPage(html, cap.original);
   if (!p.itemId) return { capture: cap, error: "no eBay item number on the archived page" };
   const observedAt = tsIso(actualTs);
-  const item = archivedPageToItem(p, actualTs);
+  // A photo lands only when the archive serves it (it kept few: 0 of 106 stored links answered 2026-10-20); the page's full
+  // photo list stays on the observation as photos.listed_urls.
+  const photos = await archivedPhotos(p.photoSizes, actualTs, probeArchivedPhoto);
+  const item = archivedPageToItem(p, actualTs, photos.held);
+  const photoReceipt = { listed: photos.listed, checked: photos.checked, archived: photos.held.length, listed_urls: p.images, basis: "GET web.archive.org <ts>im_ per photo, cover first" };
   const archive = { archive_url: `https://web.archive.org/web/${actualTs}/${cap.original}`, archive_timestamp: actualTs, original_url: cap.original };
   const outcome = { outcome: p.outcome, price_label: p.priceLabel, price_shown: p.priceShown, bids_shown: p.bids, reserve_not_met: p.reserveNotMet,
     ended_text: p.endedText, ended_at: p.endedAt, basis: "archived eBay item page (Wayback Machine capture)" };
-  if (dryRun) return { capture: cap, archive, page: { ...p, description: p.description.slice(0, 800) }, landing: toLanding(item, htmlToText, "ebay-wayback") };
+  if (dryRun) return { capture: cap, archive, photos: photoReceipt, page: { ...p, description: p.description.slice(0, 800) }, landing: toLanding(item, htmlToText, "ebay-wayback") };
 
   const bytes = new TextEncoder().encode(html), sha = await hex(bytes), url = `https://www.ebay.com/itm/${p.itemId}`;
   const path = `${PLATFORM}/wayback/${actualTs.slice(0, 4)}/${sha}.html`;
@@ -78,7 +89,7 @@ export async function landArchived(supabase: any, cap: Capture, rep: Report, dry
     if (!snapshotId) return { capture: cap, error: "snapshot receipt missing after unique-key conflict" };
   }
 
-  const landed = await landItem(supabase, item, rep, observedAt, { snapshotId, source: "ebay-wayback", method: "ebay_wayback_v1", extra: { archive, archived_outcome: outcome } });
+  const landed = await landItem(supabase, item, rep, observedAt, { snapshotId, source: "ebay-wayback", method: "ebay_wayback_v1", extra: { archive, archived_outcome: outcome, photos: photoReceipt } });
   if (landed !== "landed") return { capture: cap, item_id: p.itemId, landed, outcome: p.outcome };
 
   const ev = await supabase.from("vehicle_events").select("vehicle_id").eq("source_platform", PLATFORM).eq("source_listing_id", p.itemId).limit(1).maybeSingle();
