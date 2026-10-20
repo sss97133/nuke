@@ -288,7 +288,7 @@ export class ImageTrackingService {
       // Get total image count
       const { count: totalImages } = await supabase
         .from('vehicle_images')
-        .select('*', { count: 'exact', head: true });
+        .select('id', { count: 'exact', head: true });
 
       // Get images with timeline events (approximate)
       const { data: timelineEvents } = await supabase
@@ -347,7 +347,7 @@ export class ImageTrackingService {
         // Count actual images for this user
         const { count: actualImageCount } = await supabase
           .from('vehicle_images')
-          .select('*', { count: 'exact', head: true })
+          .select('id', { count: 'exact', head: true })
           .eq('user_id', userId);
 
         // Get current profile stats

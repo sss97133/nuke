@@ -33,18 +33,18 @@ export default function LiveImageAnalysisMonitor() {
       // Get total images
       const { count: total } = await supabase
         .from('vehicle_images')
-        .select('*', { count: 'exact', head: true });
+        .select('id', { count: 'exact', head: true });
 
       // Get analyzed images (have appraiser primary_label)
       const { count: analyzed } = await supabase
         .from('vehicle_images')
-        .select('*', { count: 'exact', head: true })
+        .select('id', { count: 'exact', head: true })
         .not('ai_scan_metadata->appraiser->primary_label', 'is', null);
 
       // Get pending images
       const { count: pending } = await supabase
         .from('vehicle_images')
-        .select('*', { count: 'exact', head: true })
+        .select('id', { count: 'exact', head: true })
         .is('ai_scan_metadata->appraiser->primary_label', null);
 
       if (total === null || analyzed === null || pending === null) return;

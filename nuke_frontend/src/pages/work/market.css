@@ -1,0 +1,6 @@
+/* /work/market: layout and the trend line only. Type comes from the kit roles. */
+.mk-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px 16px; margin-bottom: 8px; }
+.mk-stat { display: grid; gap: 4px; padding: 6px 0 6px 10px; border-left: 2px solid var(--border); }
+.mk-stat:first-child { border-left: 0; padding-left: 0; }
+.mk-trend { display: block; width: 120px; height: 24px; }
+.mk-trend__line { fill: none; stroke: var(--text); stroke-width: 1.5; }
