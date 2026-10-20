@@ -9,6 +9,7 @@ import {
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { cellsAsOf, cellsCanAnswer, cellsClusterSql, cellsHistogramSql, readWithin } from "./cells.ts";
+import { areaSql, areasSql, bySourceSql, parseArea, parseAreas, shapeAreas, type AreaRow } from "./facts.ts";
 
 const STATE_BY_FIPS: Record<string, string> = {
   "01": "AL", "02": "AK", "04": "AZ", "05": "AR", "06": "CA", "08": "CO", "09": "CT", "10": "DE", "11": "DC", "12": "FL",
@@ -99,6 +100,50 @@ Deno.serve(async (req) => {
     }
 
     const mode = params.mode ?? (params.bbox ? "points" : "state");
+
+    // ── THE ONE MAP (map_facts) ─────────────────────────────────────────────
+    // mode=layers | areas | area read the precomputed map_facts rows (plan step 6); nothing here counts a source
+    // table. A photo layer is never served as points: mode=points refuses layer=photo.
+    if (mode === "layers" || mode === "areas" || mode === "area") {
+      let q: ReturnType<typeof parseAreas> | ReturnType<typeof parseArea> | null = null;
+      try {
+        if (mode === "areas") q = parseAreas(params);
+        if (mode === "area") q = parseArea(params);
+      } catch (e) {
+        return json({ error: (e as Error).message }, rlHdrs, 400);
+      }
+      const dbUrl = (Deno.env.get("NUKE_DB_POOL_URL") || Deno.env.get("SUPABASE_DB_URL"))!;
+      const fPool = new Pool(dbUrl, 1, true);
+      const fConn = await fPool.connect();
+      try {
+        if (mode === "layers") {
+          const { rows } = await readWithin(fConn, `
+            SELECT layer, sort_order, entity, source_table, rule, clock, geography, value_basis, value_column, points_allowed, fold
+            FROM map_layers ORDER BY sort_order`, [], "5s");
+          return json({ layers: rows, generated_at: new Date().toISOString() }, rlHdrs);
+        }
+        if (mode === "areas") {
+          const aq = q as ReturnType<typeof parseAreas>;
+          const a = areasSql(aq), b = bySourceSql(aq);
+          const { rows } = await readWithin<AreaRow>(fConn, a.text, a.args, "5s");
+          const { rows: bySource } = await readWithin<{ source: string; entities: number }>(fConn, b.text, b.args, "5s");
+          return json(shapeAreas(aq, rows, bySource), rlHdrs);
+        }
+        const oq = q as ReturnType<typeof parseArea>;
+        const o = areaSql(oq);
+        const { rows } = await readWithin<Record<string, unknown>>(fConn, o.text, o.args, "5s");
+        return json({ level: oq.level, key: oq.key, from: oq.from, to: oq.to,
+          layers: rows.map((r) => ({ ...r, value: r.value == null ? null : Number(r.value),
+            avg: r.priced && r.value != null ? Math.round(Number(r.value) / Number(r.priced)) : null })),
+          generated_at: new Date().toISOString() }, rlHdrs);
+      } finally {
+        fConn.release();
+        await fPool.end();
+      }
+    }
+    if (mode === "points" && String(params.layer ?? "") === "photo") {
+      return json({ error: "photo is never served as points (map_layers.points_allowed = false)" }, rlHdrs, 400);
+    }
 
     // ── CHOROPLETH ──────────────────────────────────────────────────────────
     if (mode === "state" || mode === "county") {
@@ -533,8 +578,9 @@ Deno.serve(async (req) => {
 });
 
 // deno-lint-ignore no-explicit-any
-function json(data: any, extraHeaders?: Record<string, string>) {
+function json(data: any, extraHeaders?: Record<string, string>, status = 200) {
   return new Response(JSON.stringify(data), {
+    status,
     headers: { ...corsHeaders, ...extraHeaders, "Content-Type": "application/json" },
   });
 }
