@@ -3,7 +3,9 @@ name: Frontend e2e (job loop)
 # The signed-in job loop in a real browser: the Vite dev server against a mocked Supabase host
 # (nuke_frontend/e2e/mockSupabase.mjs answers every request from fixtures in the live readers' shapes and aborts all
 # other hosts), so no test reaches production. Asserts the exact writer arguments each Sign sends after its confirm,
-# and what a visitor must not see. Playwright is installed outside the app's lockfile, as profile-contract does.
+# and what a visitor must not see. a11y.e2e.mjs runs axe-core on every job-loop page and Sign sheet (serious + critical
+# violations = 0) and checks sheet focus by keyboard. Playwright and axe-core are installed outside the app's lockfile, as
+# profile-contract does.
 on:
   pull_request:
     paths:
@@ -11,6 +13,10 @@ on:
       - 'nuke_frontend/src/pages/providers/**'
       - 'nuke_frontend/src/pages/work/**'
       - 'nuke_frontend/src/pages/messages/**'
+      - 'nuke_frontend/src/pages/orgs/**'
+      - 'nuke_frontend/src/pages/provider-setup/**'
+      - 'nuke_frontend/src/pages/WorkOrderStatement.tsx'
+      - 'nuke_frontend/src/kit/**'
       - 'nuke_frontend/e2e/**'
       - '.github/workflows/frontend-e2e.yml'
   workflow_dispatch:
@@ -29,12 +35,12 @@ jobs:
       - name: Install app dependencies
         working-directory: ./nuke_frontend
         run: npm ci
-      - name: Install Playwright (outside the app lockfile)
+      - name: Install Playwright and axe-core (outside the app lockfile)
         run: |
-          mkdir -p /tmp/pw && cd /tmp/pw && npm init -y >/dev/null && npm i playwright@1.61.1 >/dev/null
+          mkdir -p /tmp/pw && cd /tmp/pw && npm init -y >/dev/null && npm i playwright@1.61.1 axe-core@4.14.0 >/dev/null
           npx playwright install --with-deps chromium
       - name: Run the job loop in the browser
         working-directory: ./nuke_frontend
         env:
           NODE_PATH: /tmp/pw/node_modules
-        run: node --test --test-reporter=spec e2e/jobs.e2e.mjs
+        run: node --test --test-reporter=spec e2e/jobs.e2e.mjs e2e/a11y.e2e.mjs

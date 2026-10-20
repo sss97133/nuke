@@ -95,7 +95,7 @@ const InvoiceView: React.FC<{ data: any; onEdit?: () => void; theme: InvoiceThem
               letterSpacing: '0.06em', cursor: 'pointer', fontFamily: 'Arial',
               border: theme === t ? '2px solid #1a3050' : '1px solid #999',
               background: theme === t ? '#1a3050' : 'transparent',
-              color: theme === t ? '#fff' : '#666',
+              color: theme === t ? '#fff' : '#444',
             }}>{t}</button>
           ))}
         </div>
@@ -307,6 +307,8 @@ const InvoiceView: React.FC<{ data: any; onEdit?: () => void; theme: InvoiceThem
                 level="M"
                 fgColor="#1a3050"
                 bgColor="transparent"
+                role="img"
+                aria-label="QR code: this vehicle's page on Nuke"
               />
               <div style={{ fontSize: '7px', color: '#4a6080', textTransform: 'uppercase' }}>Payment due upon receipt<br/>Questions? Contact {data.shop?.email || 'support@nuke.ag'}</div>
             </div>
