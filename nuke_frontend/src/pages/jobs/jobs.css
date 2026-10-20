@@ -62,3 +62,5 @@ textarea.jb-input { resize: vertical; min-height: 96px; }
 .jb-live:empty { position: absolute; }
 /* .btn-primary inverts on hover; the kit label must follow or it drops to ~2.6:1 against --text. */
 .btn-primary:hover:not(:disabled) > .k-label { color: var(--surface); }
+/* Read by screen readers, not shown: live-update announcements whose content is already on the page. */
+.jb-sr { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }

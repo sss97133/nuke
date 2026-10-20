@@ -5,9 +5,19 @@ import { createRoot, type Root } from 'react-dom/client';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const fixture = vi.hoisted(() => ({ readers: {} as Record<string, unknown>, rpc: vi.fn() }));
+type Signal = { kind: string; requestId: string | null };
+const fixture = vi.hoisted(() => ({ readers: {} as Record<string, unknown>, rpc: vi.fn(), user: null as { id: string } | null,
+  listeners: [] as { userId: string; listener: (s: Signal) => void }[] }));
 vi.mock('../../hooks/useIsMobile', () => ({ useIsMobile: () => false }));
 vi.mock('../../lib/supabase', () => ({ supabase: { rpc: fixture.rpc } }));
+vi.mock('../../hooks/useAuth', () => ({ useAuth: () => ({ user: fixture.user, session: null, loading: false }) }));
+vi.mock('../../lib/contactLive', () => ({
+  subscribeContactInbox: (userId: string, listener: (s: Signal) => void) => {
+    const entry = { userId, listener };
+    fixture.listeners.push(entry);
+    return () => { fixture.listeners = fixture.listeners.filter(e => e !== entry); };
+  },
+}));
 import MessagesPage, { ContactThreadPage } from './MessagesPage';
 
 const inbox = {
@@ -23,6 +33,8 @@ let root: Root, host: HTMLDivElement;
 beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   fixture.readers = { my_contact_requests: inbox };
+  fixture.user = null;
+  fixture.listeners = [];
   fixture.rpc.mockReset();
   fixture.rpc.mockImplementation((name: string) => Promise.resolve({ data: fixture.readers[name] ?? { ok: true }, error: null }));
   host = document.createElement('div'); document.body.appendChild(host); root = createRoot(host);
@@ -90,5 +102,79 @@ describe('ContactThreadPage', () => {
     await render('/messages/r2');
     expect(host.querySelector('textarea')).toBeNull();
     expect(host.textContent).toContain('Messages open once the request is accepted.');
+  });
+});
+
+describe('live updates', () => {
+  const signal = async (s: Signal) => {
+    await act(async () => { for (const e of fixture.listeners) e.listener(s); });
+    await act(async () => { await new Promise(r => setTimeout(r, 300)); });
+  };
+  const announced = () => document.querySelector('[role="status"].jb-sr')?.textContent ?? '';
+  const reads = (name: string) => fixture.rpc.mock.calls.filter(c => c[0] === name).length;
+  const thread = (messages: object[], status = 'accepted') => ({ as_of: '2026-10-19T19:00:00Z', can_post: status === 'accepted',
+    request: { request_id: 'r2', direction: 'outgoing', status, counterpart: { kind: 'user', handle: 'tech2' } }, messages });
+  const mine = { message_id: 'm1', author: { kind: 'you' }, body: 'Are you free Friday?', created_at: '2026-10-19T11:00:00Z' };
+  const theirs = { message_id: 'm2', author: { kind: 'user', handle: 'tech2' }, body: 'Friday works', created_at: '2026-10-19T11:05:00Z' };
+
+  it('does not subscribe without a signed-in user', async () => {
+    await render('/messages');
+    expect(fixture.listeners).toHaveLength(0);
+  });
+
+  it('a thread refetches on a signal for it, shows the reply and announces it politely; other threads are ignored', async () => {
+    fixture.user = { id: 'u-self' };
+    fixture.readers.contact_thread_read = thread([mine]);
+    await render('/messages/r2');
+    expect(fixture.listeners.map(e => e.userId)).toEqual(['u-self']);
+    expect(announced()).toBe('');
+    await signal({ kind: 'message', requestId: 'r-other' });
+    expect(reads('contact_thread_read')).toBe(1);
+    fixture.readers.contact_thread_read = thread([mine, theirs]);
+    await signal({ kind: 'message', requestId: 'r2' });
+    expect(reads('contact_thread_read')).toBe(2);
+    expect(host.textContent).toContain('Friday works');
+    expect(announced()).toBe('New message from @tech2.');
+    expect(document.querySelector('.jb-sr')?.getAttribute('role')).toBe('status');
+  });
+
+  it('a burst of signals becomes one refetch; resync after the tab returns refetches too', async () => {
+    fixture.user = { id: 'u-self' };
+    fixture.readers.contact_thread_read = thread([mine]);
+    await render('/messages/r2');
+    await act(async () => { for (const e of fixture.listeners) { e.listener({ kind: 'message', requestId: 'r2' }); e.listener({ kind: 'status', requestId: 'r2' }); } });
+    await act(async () => { await new Promise(r => setTimeout(r, 300)); });
+    expect(reads('contact_thread_read')).toBe(2);
+    await signal({ kind: 'resync', requestId: null });
+    expect(reads('contact_thread_read')).toBe(3);
+    expect(announced()).toBe('');
+  });
+
+  it('/messages refetches on any signal and announces a new request without its text', async () => {
+    fixture.user = { id: 'u-self' };
+    await render('/messages');
+    fixture.readers.my_contact_requests = { ...inbox, incoming: [{ request_id: 'r3', direction: 'incoming', status: 'pending', message: 'SECRET request text',
+      counterpart: { kind: 'user', handle: 'buyer9' }, context: { kind: 'profile' }, thread: { messages: 0 }, actions: ['respond_contact_request'] }, ...inbox.incoming] };
+    await signal({ kind: 'request', requestId: 'r3' });
+    expect(host.textContent).toContain('From @buyer9');
+    expect(announced()).toBe('New contact request from @buyer9.');
+    expect(announced()).not.toContain('SECRET');
+  });
+
+  it('a failed live refresh keeps the last good read on screen', async () => {
+    fixture.user = { id: 'u-self' };
+    await render('/messages');
+    fixture.rpc.mockImplementation(() => Promise.resolve({ data: null, error: { message: 'network down' } }));
+    await signal({ kind: 'message', requestId: 'r2' });
+    expect(host.textContent).toContain('From @client1');
+  });
+
+  it('unsubscribes when the page closes', async () => {
+    fixture.user = { id: 'u-self' };
+    await render('/messages');
+    expect(fixture.listeners).toHaveLength(1);
+    await act(async () => root.unmount());
+    expect(fixture.listeners).toHaveLength(0);
+    root = createRoot(host);
   });
 });

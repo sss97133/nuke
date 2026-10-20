@@ -2,18 +2,23 @@
  * Messages — /messages, contact requests brokered by Nuke (my_contact_requests): incoming and outgoing, with the
  * replies the server offers on each (accept or decline, withdraw), and /messages/:requestId, one conversation
  * (contact_thread_read, post_contact_message). People appear by handle; no contact field is ever read or shown.
+ * Both refetch through their reader when a live contact signal arrives (lib/contactLive) and say what changed in a
+ * polite live region.
  */
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Masthead, Row, Rows, Section, Text } from '../../kit';
 import { PrefetchLink } from '../../components/PrefetchLink';
 import { usePageTitle } from '../../hooks/usePageTitle';
+import { useAuth } from '../../hooks/useAuth';
+import { useContactLive } from '../../hooks/useContactLive';
 import { supabase } from '../../lib/supabase';
 import { arr, day, num, obj, personLabel, str, type JsonObject } from '../jobs/jobRead';
 import { readJob, type Load } from '../jobs/readJob';
 import { contactContext, contactMessage, contactStatus, itemActions, leftTodayText, refusal, requestsLeft } from '../jobs/signDrafts';
 import { SignSheet } from '../jobs/SignSheet';
 import { useWriter } from '../jobs/useWriter';
+import { inboxNews, threadNews } from './contactNews';
 import '../jobs/job-page.css';
 import '../jobs/jobs.css';
 
@@ -27,6 +32,34 @@ const REPLY: Record<Reply, { title: string; rpc: string; says: (who: string) => 
   withdraw: { title: 'Withdraw request', rpc: 'withdraw_contact_request', says: () => ['Your request is withdrawn. The record that you asked stays.'],
     not: ['Anything about them'], done: 'Withdrawn.' },
 };
+
+type News = { text: string; n: number } | null;
+
+/** A reader kept current by live contact signals: a failed refresh keeps the last good read on screen. */
+function useLiveRead(rpc: string, args: Record<string, unknown>, news: (prev: JsonObject | null, next: JsonObject) => string | null) {
+  const [load, setLoad] = useState<Load>({ status: 'loading' });
+  const [said, setSaid] = useState<News>(null);
+  const current = useRef<JsonObject | null>(null);
+  const say = useRef(news);
+  say.current = news;
+  const key = JSON.stringify(args);
+  const read = useCallback((live = false) => {
+    readJob(rpc, JSON.parse(key)).then(r => {
+      if (r.status === 'loaded') {
+        const text = live ? say.current(current.current, r.data) : null;
+        current.current = r.data;
+        setLoad(r);
+        if (text) setSaid(p => ({ text, n: (p?.n ?? 0) + 1 }));
+      } else if (!live || !current.current) setLoad(r);
+    });
+  }, [rpc, key]);
+  useEffect(() => { current.current = null; read(); }, [read]);
+  return { load, said, read };
+}
+
+function Announce({ said }: { said: News }) {
+  return <div role="status" className="jb-sr">{said && <span key={said.n}>{said.text}</span>}</div>;
+}
 
 function ReplySheet({ reply, item, onClose, onDone }: { reply: Reply; item: JsonObject; onClose: () => void; onDone: () => void }) {
   const r = REPLY[reply];
@@ -73,13 +106,15 @@ function RequestRow({ item, incoming, onChanged }: { item: JsonObject; incoming:
 
 export default function MessagesPage() {
   usePageTitle('Messages');
-  const [inbox, setInbox] = useState<Load>({ status: 'loading' });
-  const load = useCallback(() => { readJob('my_contact_requests', {}).then(setInbox); }, []);
-  useEffect(() => { load(); }, [load]);
+  const { user } = useAuth();
+  const { load: inbox, said, read } = useLiveRead('my_contact_requests', {}, inboxNews);
+  const load = useCallback(() => read(), [read]);
+  useContactLive(user?.id, () => read(true));
   const d = inbox.status === 'loaded' ? inbox.data : null;
   const incoming = arr(d?.incoming).map(obj).filter((o): o is JsonObject => !!o);
   const outgoing = arr(d?.outgoing).map(obj).filter((o): o is JsonObject => !!o);
   return <article className="jb-page jb-scope" aria-label="Messages">
+    <Announce said={said} />
     <div className="jb-intro">
       <Text role="entity" as="h1">Messages</Text>
       <Text role="body">Contact requests through Nuke. Your email and phone are never shared. <PrefetchLink to="/work">Work</PrefetchLink></Text>
@@ -101,12 +136,13 @@ export default function MessagesPage() {
 export function ContactThreadPage() {
   const { requestId = '' } = useParams<{ requestId: string }>();
   usePageTitle('Conversation');
-  const [thread, setThread] = useState<Load>({ status: 'loading' });
+  const { user } = useAuth();
+  const { load: thread, said, read } = useLiveRead('contact_thread_read', { p_request_id: requestId }, threadNews);
+  const load = useCallback(() => read(), [read]);
+  useContactLive(user?.id, signals => { if (signals.some(s => s.kind === 'resync' || s.requestId === requestId)) read(true); });
   const [body, setBody] = useState('');
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
-  const load = useCallback(() => { readJob('contact_thread_read', { p_request_id: requestId }).then(setThread); }, [requestId]);
-  useEffect(() => { load(); }, [load]);
 
   const send = async () => {
     const m = contactMessage(body, 2000);
@@ -124,6 +160,7 @@ export function ContactThreadPage() {
   const messages = arr(d?.messages).map(obj).filter((o): o is JsonObject => !!o);
   const who = personLabel(request?.counterpart);
   return <article className="jb-page jb-scope" aria-label="Conversation">
+    <Announce said={said} />
     <Masthead result={<Text role="caption">{request ? contactStatus(str(request.status)) : ''}</Text>}>
       <Text role="entity" as="h1">{d ? `Conversation with ${who}` : 'Conversation'}</Text>
     </Masthead>

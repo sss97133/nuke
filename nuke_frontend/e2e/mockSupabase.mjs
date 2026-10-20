@@ -1,7 +1,9 @@
 // A network-level stand-in for Supabase. The app runs against https://e2e-mock.supabase.co; every request to that host
 // is answered here from fixtures that mirror the live readers' shapes (pg_get_functiondef and anon reads, 2026-10-19).
 // Writer calls are recorded and answered { ok: true } — no request ever reaches a real Supabase project, and every
-// other external host is aborted, so a test cannot touch production.
+// other external host is aborted, so a test cannot touch production. Websockets too: Realtime on the mock host is
+// answered by a Phoenix (vsn 2.0.0) stand-in that, like the server's realtime.messages policy, admits a private join
+// only to the signed-in persona's own contact_inbox topic; the dev server's own socket passes; every other is closed.
 export const MOCK_HOST = 'https://e2e-mock.supabase.co';
 export const STORAGE_KEY = 'sb-e2e-mock-auth-token';
 
@@ -24,6 +26,57 @@ export function persona(id, handle) {
   return { id, handle, user, session: { access_token, refresh_token: 'e2e-refresh', token_type: 'bearer', expires_in: 3600, expires_at: exp, user } };
 }
 
+const realtimes = new WeakMap();
+
+/** The Realtime stand-in of a mocked context: `joins` (every join attempt) and `broadcast(topic, event, payload)`. */
+export function realtimeFor(context) {
+  return realtimes.get(context);
+}
+
+function realtimeMock(who) {
+  const sockets = new Set();
+  const joins = [];
+  const own = who ? `realtime:contact_inbox:${who.id}` : null;
+  return {
+    joins,
+    handle(ws) {
+      const joined = new Set();
+      const entry = { ws, joined };
+      sockets.add(entry);
+      ws.onMessage((raw) => {
+        if (typeof raw !== 'string') return;
+        let m;
+        try { m = JSON.parse(raw); } catch { return; }
+        if (!Array.isArray(m)) return;
+        const [joinRef, ref, topic, event, payload] = m;
+        const reply = (status, response = {}) => ws.send(JSON.stringify([joinRef, ref, topic, 'phx_reply', { status, response }]));
+        if (event === 'heartbeat') return reply('ok');
+        if (event === 'phx_join') {
+          const isPrivate = payload?.config?.private === true;
+          const ok = isPrivate && topic === own && typeof payload?.access_token === 'string' && payload.access_token.length > 0;
+          joins.push({ topic, private: isPrivate, ok });
+          if (!ok) return reply('error', { reason: 'Unauthorized: You do not have permissions to read from this Channel topic' });
+          joined.add(topic);
+          return reply('ok', { postgres_changes: [] });
+        }
+        if (event === 'phx_leave') { joined.delete(topic); return reply('ok'); }
+        return undefined;
+      });
+      ws.onClose(() => sockets.delete(entry));
+    },
+    /** Pushes one broadcast to every socket joined to topic; returns how many received it. */
+    broadcast(topic, event, payload) {
+      let n = 0;
+      for (const { ws, joined } of sockets) {
+        if (!joined.has(`realtime:${topic}`)) continue;
+        ws.send(JSON.stringify([null, null, `realtime:${topic}`, 'broadcast', { type: 'broadcast', event, payload }]));
+        n++;
+      }
+      return n;
+    },
+  };
+}
+
 const json = (route, body, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
 
 /**
@@ -32,6 +85,14 @@ const json = (route, body, status = 200) => route.fulfill({ status, contentType:
  */
 export async function mockSupabase(context, { who = null, readers = {}, tables = {}, functions = {} } = {}) {
   const writes = [];
+  const realtime = realtimeMock(who);
+  realtimes.set(context, realtime);
+  await context.routeWebSocket(() => true, (ws) => {
+    const url = new URL(ws.url());
+    if (url.hostname === '127.0.0.1' || url.hostname === 'localhost') return ws.connectToServer();
+    if (url.origin.replace(/^ws/, 'http') === MOCK_HOST && url.pathname.startsWith('/realtime/v1/websocket')) return realtime.handle(ws);
+    return ws.close();
+  });
   if (who) {
     await context.addInitScript(([key, value]) => { window.localStorage.setItem(key, value); }, [STORAGE_KEY, JSON.stringify(who.session)]);
   }

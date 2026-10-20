@@ -4,7 +4,8 @@ name: Frontend e2e (job loop)
 # (nuke_frontend/e2e/mockSupabase.mjs answers every request from fixtures in the live readers' shapes and aborts all
 # other hosts), so no test reaches production. Asserts the exact writer arguments each Sign sends after its confirm,
 # and what a visitor must not see. a11y.e2e.mjs runs axe-core on every job-loop page and Sign sheet (serious + critical
-# violations = 0) and checks sheet focus by keyboard. Playwright and axe-core are installed outside the app's lockfile, as
+# violations = 0) and checks sheet focus by keyboard. contactLive.e2e.mjs drives live contact threads over a mocked
+# Realtime websocket (own private topic only; refetch, announce, pause while hidden). Playwright and axe-core are installed outside the app's lockfile, as
 # profile-contract does.
 on:
   pull_request:
@@ -17,6 +18,8 @@ on:
       - 'nuke_frontend/src/pages/provider-setup/**'
       - 'nuke_frontend/src/pages/WorkOrderStatement.tsx'
       - 'nuke_frontend/src/kit/**'
+      - 'nuke_frontend/src/lib/contactLive.ts'
+      - 'nuke_frontend/src/hooks/useContactLive.ts'
       - 'nuke_frontend/e2e/**'
       - '.github/workflows/frontend-e2e.yml'
   workflow_dispatch:
@@ -43,4 +46,4 @@ jobs:
         working-directory: ./nuke_frontend
         env:
           NODE_PATH: /tmp/pw/node_modules
-        run: node --test --test-reporter=spec e2e/jobs.e2e.mjs e2e/a11y.e2e.mjs
+        run: node --test --test-reporter=spec e2e/jobs.e2e.mjs e2e/a11y.e2e.mjs e2e/contactLive.e2e.mjs
