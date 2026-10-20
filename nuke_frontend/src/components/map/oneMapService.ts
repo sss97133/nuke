@@ -1,7 +1,6 @@
 // oneMapService.ts: the one map's reads. The map is a finder: the cars, sales and shops near a place, each one
 // openable; areas and their counts are context. Every count is a map_facts row read through map-vehicles; every
 // item is a public row the anonymous reader may see.
-import { supabase } from '../../lib/supabase';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from '../../lib/env';
 import type { MapFeatureCollection, MapEventPoint } from './types';
 
@@ -30,11 +29,9 @@ const NOT_YET = 'map-vehicles does not serve this mode yet';
 async function fn<T>(params: Record<string, string | number | undefined | null>, signal?: AbortSignal): Promise<T> {
   const qs = new URLSearchParams();
   for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== null && v !== '') qs.set(k, String(v));
-  const { data: { session } } = await supabase.auth.getSession();
-  const token = session?.access_token;
-  const res = await fetch(`${SUPABASE_URL}/functions/v1/map-vehicles?${qs.toString()}`, {
-    signal, headers: { ...(token ? { Authorization: `Bearer ${token}` } : { apikey: SUPABASE_ANON_KEY }) },
-  });
+  // Public reads: the anon key, never the browser session (waiting on supabase.auth.getSession() stalled the
+  // first read for seconds in a fresh context, 2026-10-19).
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/map-vehicles?${qs.toString()}`, { signal, headers: { apikey: SUPABASE_ANON_KEY } });
   if (!res.ok) throw new Error(`map-vehicles ${res.status}: ${(await res.text()).slice(0, 200)}`);
   return res.json();
 }
