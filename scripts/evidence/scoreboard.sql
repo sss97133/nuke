@@ -1,4 +1,4 @@
--- Image-evidence scoreboard (PLAN section 6; DESIGN-v5 section 11; v8). Read-only; run by scoreboard.py through q.sh.
+-- Image-evidence scoreboard (PLAN section 6; DESIGN-v5 section 11; v9). Read-only; run by scoreboard.py through q.sh.
 -- Parameters: :uid (the owner, from --user; never written into the repo), :vehicle_id (the exit-test vehicle),
 -- :chunk_from / :chunk_to (taken_at chunks; idx_vehicle_images_user_taken_at), :ids (a uuid list), :window_from /
 -- :window_to (the capture window), :since (the M10b window start). Each statement follows a "-- name: <measure>"
@@ -225,8 +225,10 @@ select 'evidence_decisions', coalesce(jsonb_agg(jsonb_build_object('id', d.id, '
 -- name: M10b_answers answers
 -- (v6, AC10; v8: kept for every stored answer) The answers runs stored since :since, with his words, for
 -- scoreboard.py to check against the chat transcript and the sheets index (delivery by sha256, reply after it, verbatim
--- words in the reply). The words stay in the scoreboard's memory; nothing but ids and verdicts is written.
-select r.id, r.config->>'sheet_run' sheet_run, r.config->>'message_ref' message_ref, r.config->'rows' rows
+-- words in the reply, (v9) the stored message time the reply's own). The words stay in the scoreboard's memory;
+-- nothing but ids and verdicts is written.
+select r.id, r.config->>'sheet_run' sheet_run, r.config->>'message_ref' message_ref,
+       r.config->>'message_at' message_at, r.config->'rows' rows
   from evidence_runs r where r.user_id = :uid and r.run_kind = 'review_answers' and r.started_at > :since;
 
 -- name: M11
@@ -283,9 +285,14 @@ select r.pass, max((r.config->>'coverage_to')::date) cover_to, current_date - ma
 -- name: M15
 -- (v8) His stored answers waiting for him in the app (evidence_answers_to_confirm: his words, the reading, the row as it
 -- is now): targets he has not decided since he answered, and rows re-written with another meaning since (asked again);
--- and his own decisions so far. Until he has decided, the confirmed level reads "waiting on his app".
+-- and his own decisions so far. Until he has decided, the confirmed level reads "waiting on his app". (v9) A sheet row
+-- can hold several stored answers (one per chat message): only the latest by message time counts, as the app shows it.
 select count(*) filter (where last_decided_at is null or last_decided_at < stored_at) waiting,
        count(*) filter (where same_question is false) rewritten_ask_again,
+       count(distinct (sheet_run, row_no)) rows_answered,
        (select count(*) from evidence_decisions where user_id = :uid and decided_by like 'human:%'
            and decision in ('confirmed', 'rejected')) his_decisions
-  from public.evidence_answers_to_confirm(:uid);
+  from (select distinct on (a.sheet_run, a.row_no, a.target_kind, a.target_ref) a.*
+          from public.evidence_answers_to_confirm(:uid) a
+         order by a.sheet_run, a.row_no, a.target_kind, a.target_ref, a.message_at desc nulls last, a.stored_at desc,
+                  a.answers_run desc) latest;

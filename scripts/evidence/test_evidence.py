@@ -13,6 +13,7 @@ Run: python3 scripts/evidence/test_evidence.py
 """
 import atexit
 import contextlib
+import datetime as dt
 import io
 import json
 import os
@@ -357,12 +358,24 @@ class Builders(unittest.TestCase):
             '1': {'targets': [{'kind': 'image_candidate', 'id': testdata.U('c')}, {'kind': 'image', 'id': img}]},
             '2': {'targets': [{'kind': 'payment', 'key': pk('00206')}]}}}
         payloads.open_run('u', 'review', 'review_sheet', 'p', 'v', ok)
+        reask = 'review:%s#4' % testdata.U('sheet-run')
+        payloads.open_run('u', 'review', 'review_sheet', 'p', 'v', dict(ok, rows=dict(ok['rows'], **{
+            '2': {'reask_of': reask}})))                       # (v9, W2) the writer copies that sent row as frozen
+        many = {str(n): {'targets': [{'kind': 'payment', 'key': 'bank:%d-%d' % (n, k)} for k in range(200)]}
+                for n in range(1, 51)}
+        payloads.open_run('u', 'review', 'review_sheet', 'p', 'v', dict(ok, items=50, rows=many))     # 10,000 targets
+        many['51'] = {'targets': [{'kind': 'payment', 'key': 'bank:one-more'}]}
         for bad in ({'1': ok['rows']['1']}, dict(ok['rows'], **{'2': {'targets': []}}),
                     dict(ok['rows'], **{'2': {'targets': [{'kind': 'account', 'key': 'my checking'}]}}),
                     dict(ok['rows'], **{'2': {'targets': [{'kind': 'payment', 'key': pk('00206')},
-                                                          {'kind': 'account', 'key': 'bank_account:a'}]}})):
+                                                          {'kind': 'account', 'key': 'bank_account:a'}]}}),
+                    dict(ok['rows'], **{'2': {'reask_of': reask, 'question': 'evidence_link'}}),
+                    dict(ok['rows'], **{'2': {'reask_of': 'review:x#4'}})):
             with self.assertRaises(ValueError):
                 payloads.open_run('u', 'review', 'review_sheet', 'p', 'v', dict(ok, rows=bad))
+        with self.assertRaises(ValueError) as cm:                # (v9, M8) at most 10,000 targets on a sheet
+            payloads.open_run('u', 'review', 'review_sheet', 'p', 'v', dict(ok, items=51, rows=many))
+        self.assertIn('10000 targets', str(cm.exception))
 
     def test_one_question_per_row(self):
         img, cand = testdata.U('image', 1), testdata.U('cand')
@@ -403,19 +416,29 @@ class Builders(unittest.TestCase):
             self.assertIsNotNone(payloads.answer_problem(a), a)
         rows = {'3': {'verbatim': 'no, the second truck', 'answer': {'decision': 'rejected', 'vehicle_id': T}},
                 '4': {'verbatim': 'hmm, the blue one maybe'}}           # (v8) no reading: his words alone
-        args = payloads.record_answers('u', 's', ' Session-1:MSG-1 ', rows, 'p', 'v')
+        at = '2031-06-01T18:00:00.250Z'                                 # (v9) the message's own time
+        args = payloads.record_answers('u', 's', ' Session-1:MSG-1 ', rows, 'p', 'v', at)
         self.assertEqual(args['p_rows'], {'3': rows['3'], '4': {'verbatim': 'hmm, the blue one maybe'}})
         self.assertEqual(args['p_message_ref'], 'session-1:msg-1')          # stored lower-cased (v7, D4)
+        self.assertEqual(args['p_message_at'], '2031-06-01T18:00:00.250000+00:00')
+        self.assertEqual(list(payloads.rpc_args('evidence_record_answers', args))[-1], 'p_message_at')
         self.assertEqual(payloads.message_id(' Session-1:MSG-1 '), 'msg-1')
-        with self.assertRaises(ValueError):
-            payloads.record_answers('u', 's', 'session-1:msg-1', {'3': 'no, the second truck'}, 'p', 'v')
-        with self.assertRaises(ValueError):
-            payloads.record_answers('u', 's', 'session-1:msg-1', {'3': {'verbatim': 'x', 'answer': 'yes'}}, 'p', 'v')
+        for bad_rows in ({'3': 'no, the second truck'}, {'3': {'verbatim': 'x', 'answer': 'yes'}}, {},
+                         {'3': {'verbatim': 'x' * 20001}}):                # (v9) at least one row, 20,000 characters
+            with self.assertRaises(ValueError):
+                payloads.record_answers('u', 's', 'session-1:msg-1', bad_rows, 'p', 'v', at)
+        payloads.record_answers('u', 's', 'session-1:msg-1', {'3': {'verbatim': 'x' * 20000}}, 'p', 'v', at)
+        # (v9) the message time is the transcript's, with its zone; never missing
+        for bad_at in (None, '', '2031-06-01', '2031-06-01T18:00:00', 'yesterday', '2031-13-01T18:00:00Z'):
+            with self.assertRaises(ValueError):
+                payloads.record_answers('u', 's', 'session-1:msg-1', rows, 'p', 'v', bad_at)
+        self.assertEqual(payloads.message_time('2031-06-01T11:00:00-07:00'), payloads.message_time(
+            '2031-06-01T18:00:00Z'))
         # (v7, D4) '<source>:<message id>': exactly one colon, no path, no dots, at most 200 characters
         for ref in ('msg-1', 'session 1:msg-1', 's:' + 'x' * 199, None, 'session-1:msg:1', 'session.1:msg-1',
                     'session-1:/tmp/reply.txt'):
             with self.assertRaises(ValueError):
-                payloads.record_answers('u', 's', ref, rows, 'p', 'v')
+                payloads.record_answers('u', 's', ref, rows, 'p', 'v', at)
         self.assertEqual(payloads.answer_place({'decision': 'confirmed', 'entity_key': 'owner'}), 'entity:owner')
         self.assertEqual(payloads.answer_place({'decision': 'rejected', 'captured_on': '2031-04-21'}), 'day:2031-04-21')
 
@@ -491,7 +514,7 @@ class Builders(unittest.TestCase):
                          ['placement', 'placement', 'share', 'album', 'contradicts', 'other'])
         self.assertEqual(set(payloads.C['reported_outcomes']), {
             'already_decided', 'already_rejected', 'owner_answer_missing', 'kept_stronger', 'entity_is_owners_call',
-            'unchanged'})
+            'unchanged', 'claim_carries_owner_decision', 'claim_not_current'})
 
 
 class Readers(SyntheticCase):
@@ -628,6 +651,40 @@ class Readers(SyntheticCase):
         self.assertEqual(who_paid([{'target': statement['key'], 'decision': 'confirmed'}]), [])
         self.assertEqual(len(who_paid([{'target': statement['key'], 'decision': 'rejected'}])), 1)
 
+    def test_his_word_on_a_photo_reads_per_truck(self):
+        """(v9, R-T1/R-T2) his no to a truck for a photo holds on every row naming that truck (any pass, any id of the
+        truck); his yes to one subject answers every subject row at another place; a row in frame is not a subject."""
+        img, V = testdata.U('image', 'per-truck'), testdata.V
+
+        def cand(key, pass_, vehicle=None, subject_key=None, frame='subject'):
+            return {'key': key, 'p_run_id': '@run:' + pass_, 'row': {
+                'image_id': img, 'vehicle_id': vehicle, 'subject_key': subject_key, 'verdict': 'is_vehicle',
+                'frame_role': frame, 'pass_captured_on': '2031-05-01', 'image_class': 'own'}}
+        rows = [cand('c:truck', 'combined', V['TRUCK']), cand('c:twin', 'listing_class', V['TWIN']),
+                cand('c:sub', 'combined', V['SUB']), cand('c:sub-again', 'listing_class', V['SUB']),
+                cand('c:job', 'combined', subject_key='label:' + testdata.JOB),
+                cand('c:swb-in-frame', 'combined', V['SWB'], frame='also_in_frame')]
+        f = dict(self.files, **{'candidates.photos_album.jsonl': [],
+                                'candidates.combined.jsonl': [r for r in rows if r['p_run_id'] == '@run:combined'],
+                                'candidates.listing_class.jsonl': [r for r in rows
+                                                                   if r['p_run_id'] == '@run:listing_class']})
+
+        def status(decisions):
+            return {c['id']: c['status'] for c in readers.candidates_for_images(readers.Store(f, decisions), {img})}
+        self.assertEqual(set(status(None).values()), {'proposed'})
+        no_sub = status([{'target': 'c:sub', 'decision': 'rejected'}])
+        self.assertEqual((no_sub['c:sub'], no_sub['c:sub-again'], no_sub['c:truck']), ('rejected', 'rejected', 'proposed'))
+        self.assertEqual(status([{'target': 'c:truck', 'decision': 'confirmed'}]), {
+            'c:truck': 'confirmed', 'c:twin': 'rejected', 'c:sub': 'rejected', 'c:sub-again': 'rejected',
+            'c:job': 'rejected', 'c:swb-in-frame': 'proposed'})
+        # once he confirmed the pair, the twin is the same truck under another id: not another place
+        pair = {'target': 'claim:same_vehicle_as:%s' % V['TWIN'][:8], 'decision': 'confirmed'}
+        self.assertEqual(status([pair, {'target': 'c:truck', 'decision': 'confirmed'}])['c:twin'], 'proposed')
+        self.assertEqual(status([pair, {'target': 'c:twin', 'decision': 'rejected'}])['c:truck'], 'rejected')
+        self.assertEqual((readers.places_distinct(V['TRUCK'], 'label:x'), readers.places_distinct('vin:1', 'label:x'),
+                          readers.places_distinct(None, 'label:x'), readers.places_distinct('label:x', 'label:x')),
+                         (True, False, True, False))
+
     def test_a_day_he_rejected_reads_undated(self):
         """(v7, F1; v8: his decision) a photo whose only time he rejected is undated until a time is confirmed."""
         claim = next(ln for ln in self.files['time_claims.jsonl']
@@ -682,9 +739,11 @@ class ExitTest(SyntheticCase):
 
             def read(self, sql, params=None, tag=None):
                 self.sql.append((sql, params))
-                return [{'n': 3}]
+                return [{'waiting': 3, 'rewritten_ask_again': 0, 'rows_answered': 2, 'his_decisions': 1}]
         r = R()
-        self.assertEqual(exit_test.his_state(testdata.OWNER, r), {'waiting': 3, 'decisions': 3})
+        self.assertEqual(exit_test.his_state(testdata.OWNER, r), {'waiting': 3, 'decisions': 1})
+        # the scoreboard's M15 read: (v9) the latest stored answer per sheet row
+        self.assertEqual(r.sql[0][0], next(s for n, _m, s in scoreboard.parse() if n == 'M15'))
         self.assertIn('evidence_answers_to_confirm(:uid)', r.sql[0][0])
         self.assertTrue(all(p == {'uid': testdata.OWNER} for _s, p in r.sql))
 
@@ -878,6 +937,68 @@ class DbMode(SyntheticCase):
         self.assertEqual(sum(len(a['p_rows']) for a in time_calls), 133)          # each claim sent once
         self.assertEqual(ld.manifest()['outcomes_reported_not_retried']['unchanged'], ld.outcomes['unchanged'])
 
+    def test_v9_outcomes_are_reported_and_never_retried(self):
+        """(v9) a photo his word answers, itemized account-map skips counted once, and claims a pass may not re-write."""
+        d = self.copy_out('db-v9-outcomes')
+        lines = common.read_jsonl(os.path.join(d, 'change_claims.jsonl'))
+        decided, gone = testdata.U('claim', 'decided'), testdata.U('claim', 'gone')
+        # two claims whose support is links only (every link loads; two photos per call are answered below)
+        links_only = [i for i, ln in enumerate(lines) if ln.get('p_support') and all(
+            str(s['evidence_id']).startswith('@key:link') for s in ln['p_support'])]
+        with_support, other = links_only[0], links_only[1]
+        lines[with_support]['p_supersedes'], lines[other]['p_supersedes'] = decided, gone
+        with open(os.path.join(d, 'change_claims.jsonl'), 'w') as f:
+            f.write(''.join(json.dumps(ln) + '\n' for ln in lines))
+        rest, refs = FakeRest(), []
+
+        def cands(args):
+            rows = args['p_rows']
+            return {'proposed': len(rows) - 2, 'unchanged': 0, 'items': [
+                {'image_id': rows[0]['image_id'], 'result': 'already_rejected', 'candidate_id': rest.new()},
+                {'image_id': rows[1]['image_id'], 'result': 'already_rejected', 'confirmed_candidate_id': rest.new()}]
+                + [{'image_id': r['image_id'], 'result': 'proposed', 'candidate_id': rest.new()} for r in rows[2:]]}
+
+        def accounts(args):
+            refs.extend(r['account_ref'] for r in args['p_rows'][1:])
+            return {'proposed': len(args['p_rows']) - 1, 'ids': [rest.new() for _r in args['p_rows'][1:]],
+                    'already_decided': 1, 'skipped': [{'account_ref': args['p_rows'][0]['account_ref'],
+                                                       'result': 'already_decided', 'id': rest.new()}]}
+
+        def claims(args):
+            if args['p_supersedes'] == decided:
+                raise common.RpcError('propose_change_claim', 400, 'P0001', 'claim %s carries an owner decision (his '
+                                      'decision or his who-paid statement); a pass may not supersede it' % decided)
+            if args['p_supersedes'] == gone:
+                raise common.RpcError('propose_change_claim', 400, '22023',
+                                      'claim %s is not a current claim of this user: nothing to supersede' % gone)
+            return rest.new()
+
+        class Reader(FakeReader):
+            def read(self, sql, params=None, tag=None):
+                if tag == 'read_back' and 'evidence_account_entities' in sql:
+                    return [{'id': testdata.U('account-row', a), 'account_ref': a} for a in refs]
+                return super().read(sql, params, tag)
+        rest.fail = {'propose_image_candidates': cands, 'propose_account_entities': accounts,
+                     'propose_change_claim': claims}
+        ld = self.loader(rest, Reader())
+        ld.load_dir(d)
+        cand_calls = [a for fn, a in rest.calls if fn == 'propose_image_candidates']
+        firsts = {a['p_rows'][k]['image_id'] for a in cand_calls for k in (0, 1)}
+        answered = [k for k, why in ld.skipped.items() if why == 'already_rejected']
+        self.assertEqual(len(answered), 2 * len(cand_calls))           # his word answers them: nothing to ask
+        self.assertFalse(set(answered) & set(ld.ids))
+        self.assertEqual(len(firsts), 2 * len(cand_calls))
+        self.assertEqual((ld.outcomes['already_rejected'], ld.outcomes['already_decided']), (2 * len(cand_calls), 1))
+        self.assertEqual(sum(1 for why in ld.skipped.values() if why == 'already_decided'), 1)
+        # (v9, W4/M7) his claim keeps its word; the pass's support goes onto it; a claim gone is nothing to supersede
+        self.assertEqual(ld.ids[lines[with_support]['key']], decided)
+        support = [a for fn, a in rest.calls if fn == 'propose_claim_support' and a['p_claim_id'] == decided]
+        self.assertEqual(sum(len(a['p_support']) for a in support), len(lines[with_support]['p_support']))
+        self.assertEqual(ld.skipped[lines[other]['key']], 'claim_not_current')
+        self.assertEqual((ld.outcomes['claim_carries_owner_decision'], ld.outcomes['claim_not_current']), (1, 1))
+        closed = [a['p_status'] for fn, a in rest.calls if fn == 'evidence_close_run']
+        self.assertTrue(closed and set(closed) == {'done'})            # reported, not a failed load
+
     def test_custody_bounds_null_is_skipped_with_its_reason(self):
         rest = FakeRest(fail={'propose_change_claim': lambda args: None})
         ld = self.loader(rest)
@@ -1036,6 +1157,20 @@ class Manifest(unittest.TestCase):
         r = manifest.returned('evidence_record_answers', {'p_sheet_run': u('sheet')}, u('answers'))
         self.assertEqual((r['ids'], manifest.run_of('evidence_record_answers', {'p_sheet_run': u('sheet')}, None)),
                          ([u('answers')], u('sheet')))
+        # (v9, M5/M6) a skip the writer both counts and itemizes is counted once; the photos of refused owner times
+        # are image ids, not rows; a photo his word answers names the row it stands on
+        r = manifest.returned('propose_account_entities', {}, {'proposed': 1, 'ids': [u('a1')], 'already_decided': 1,
+                                                               'skipped': [{'account_ref': 'bank_account:x',
+                                                                            'result': 'already_decided', 'id': u('a0')}]})
+        self.assertEqual((r['ids'], r['existing'], dict(r['results'])),
+                         ([u('a1')], [u('a0')], {'proposed': 1, 'already_decided': 1}))
+        r = manifest.returned('propose_capture_time_claims', {}, {'proposed': 0, 'owner_answer_missing': 1,
+                                                                  'owner_answer_missing_ids': [u('image', 1)]})
+        self.assertEqual((r['ids'], dict(r['results'])), ([], {'owner_answer_missing': 1}))
+        r = manifest.returned('propose_image_candidates', {}, {'items': [
+            {'image_id': u('i1'), 'result': 'already_rejected', 'candidate_id': u('c1')},
+            {'image_id': u('i2'), 'result': 'already_rejected', 'confirmed_candidate_id': u('c2')}]})
+        self.assertEqual((r['ids'], r['existing'], dict(r['results'])), ([], [u('c1'), u('c2')], {'already_rejected': 2}))
 
     def test_reconcile_finds_rows_no_call_returned(self):
         u = lambda *x: testdata.U(*x)  # noqa: E731
@@ -1264,6 +1399,18 @@ class ReviewSheet(SyntheticCase):
         with self.assertRaises(ValueError) as cm:
             review_sheet.profile({'targets': [RT('evidence_link', truck206)], 'asks': 'party'}, lines)
         self.assertIn('payment source', str(cm.exception))
+        # (v9, W3) nor a line of a payment source with no key (a P&L or ledger line): its payer is its account's
+        unkeyed = dict(lines[jacket], row=dict(lines[jacket]['row'], source_kind='pnl_line'))
+        with self.assertRaises(ValueError) as cm:
+            review_sheet.profile({'targets': [RT('evidence_link', jacket)], 'asks': 'party'}, dict(lines, **{
+                jacket: unkeyed}))
+        self.assertIn('payment source line', str(cm.exception))
+        files = dict(self.files, **{'links.jsonl': [dict(ln, row=dict(ln['row'], source_kind='ledger_line'))
+                                                    if ln['key'] == jacket else ln for ln in self.files['links.jsonl']]})
+        rows, _d = review_sheet.build_rows(self.ctx, files, readers.accounting(files, T))
+        before, _d = self.rows()
+        asks = lambda rs: sorted(r['targets'][0]['key'] for r in rs if r['asks'] == 'party')  # noqa: E731
+        self.assertEqual(set(asks(before)) - set(asks(rows)), {jacket})
         where = review_sheet.profile({'targets': [RT('payment', pk('00737'))]}, lines)
         self.assertEqual((where['question'], where['asked_place'], where['link_class'], where['payment_keys']),
                          ('evidence_link', None, 'placement', [pk('00737')]))
@@ -1337,7 +1484,8 @@ class ReviewSheet(SyntheticCase):
 
 
 class Answers(SyntheticCase):
-    """(v8) His answers are stored word for word, with an optional reading, and decide nothing."""
+    """(v8) His answers are stored word for word, with an optional reading, and decide nothing; (v9) one answers run
+    per chat message, with the message's own time, only on a sheet that was sent."""
 
     def sheet(self, name, date='2031-06-01'):
         d = self.copy_out(name)
@@ -1349,13 +1497,20 @@ class Answers(SyntheticCase):
         with contextlib.redirect_stdout(io.StringIO()):
             record_answers.delivered(mock.Mock(sheet=sp, message_ref=ref, mode=mode), self.ctx)
 
-    def store(self, sp, answers, mode=common.FILE, ref='session-1:msg-1'):
+    @staticmethod
+    def after_sending(sp, seconds=1):
+        """A message time the chat could show for his reply: just after the sheet was sent."""
+        sent = common.parse_ts(record_answers.sent_at(common.load_json(sp)))
+        return common.iso_utc(sent + dt.timedelta(seconds=seconds))
+
+    def store(self, sp, answers, mode=common.FILE, ref='session-1:msg-1', at=None):
         ap = os.path.join(os.path.dirname(sp), 'answers-in.json')
         common.dump_json(ap, answers)
-        args = mock.Mock(sheet=sp, answers=ap, message_ref=ref, mode=mode, user=testdata.OWNER)
+        at = at or self.after_sending(sp)
+        args = mock.Mock(sheet=sp, answers=ap, message_ref=ref, mode=mode, user=testdata.OWNER, message_at=at)
         with contextlib.redirect_stdout(io.StringIO()):
             record_answers.store(args, self.ctx)
-        return common.load_json(record_answers.receipt_path(sp, common.load_json(sp)))
+        return common.load_json(record_answers.receipt_path(sp, common.load_json(sp), ref))
 
     @staticmethod
     def row(side, text, pkey=None):
@@ -1367,14 +1522,17 @@ class Answers(SyntheticCase):
         r = self.row(side, 'also places it on', pk('00206'))
         ans = {str(r['row']): {'verbatim': 'no, that was the second truck',
                                'answer': {'decision': 'rejected', 'vehicle_id': 'SUB'}}}
-        with self.assertRaises(SystemExit) as cm:                  # (v6, AC10) the delivery is recorded first
-            self.store(sp, ans)
+        with self.assertRaises(SystemExit) as cm:                  # (v6, AC10; v9) a sheet takes answers once sent
+            self.store(sp, ans, at='2031-06-01T18:00:00Z')
+        self.assertIn('sheet_not_sent', str(cm.exception))
         self.assertIn('delivered', str(cm.exception))
         for bad in ('msg-0', 'session 1:msg-0', 'session-1:msg:0', 'session-1/x:msg-0', 'session-1:' + 'x' * 200):
             with self.assertRaises(SystemExit):
                 self.deliver(sp, bad)
         self.deliver(sp)
+        sent = record_answers.sent_at(common.load_json(sp))
         self.deliver(sp, 'Session-1:MSG-0')                       # the same message again (the store lower-cases it)
+        self.assertEqual(record_answers.sent_at(common.load_json(sp)), sent)
         with self.assertRaises(SystemExit):                        # one delivery per sheet
             self.deliver(sp, 'session-1:msg-9')
         for ref in ('session-1:msg-0', 'msg-1', 'elsewhere:msg-0'):  # the delivery itself is not his reply, by any source
@@ -1383,6 +1541,7 @@ class Answers(SyntheticCase):
         rc = self.store(sp, ans, ref='Session-1:Msg-1')
         self.assertEqual((rc['message_ref'], rc['delivery_ref'], rc['transcript'], rc['readings']),
                          ('session-1:msg-1', 'session-1:msg-0', 'not on this Mac', 1))
+        self.assertEqual(common.parse_ts(rc['message_at']), common.parse_ts(self.after_sending(sp)))
         stored = rc['rows'][str(r['row'])]
         self.assertEqual(stored['sha256'], common.sha256_text('no, that was the second truck'))
         self.assertEqual(stored['answer'], {'decision': 'rejected', 'vehicle_id': testdata.V['SUB']})
@@ -1390,10 +1549,28 @@ class Answers(SyntheticCase):
         for ref in ('session-1:msg-1', 'elsewhere:MSG-1'):        # one transcription per message id, whatever the source
             with self.assertRaises(SystemExit) as cm:
                 self.store(sp, ans, ref=ref)
-            self.assertIn('already transcribed', str(cm.exception))
-        with self.assertRaises(SystemExit) as cm:                  # one answer set per sheet
-            self.store(sp, {'1': {'verbatim': 'me', 'answer': {'decision': 'unsure'}}}, ref='session-1:msg-2')
-        self.assertIn('one answer set per sheet', str(cm.exception))
+            self.assertIn('already stored', str(cm.exception))
+        # (v9, W2) his reply's next message is stored on the same sheet, as its own answers run
+        rc2 = self.store(sp, {'1': {'verbatim': 'me', 'answer': {'decision': 'unsure'}}}, ref='session-1:msg-2',
+                         at=self.after_sending(sp, 2))
+        self.assertEqual((rc2['message_ref'], rc2['sheet_sha256']), ('session-1:msg-2', rc['sheet_sha256']))
+        self.assertNotEqual(record_answers.answers_run_of(rc2), record_answers.answers_run_of(rc))
+        self.assertEqual(sorted(x['message_ref'] for x in record_answers.receipts(sp)),
+                         ['session-1:msg-1', 'session-1:msg-2'])
+        # (v9) the message time: the chat's own, after the sheet was sent, never from the future, never missing
+        later = {'1': {'verbatim': 'later'}}
+        for at, why in ((self.after_sending(sp, -1), 'message_predates_sheet'),
+                        (common.iso_utc(common.utc_now() + dt.timedelta(minutes=5)), 'in the future'),
+                        ('2031-06-01T18:00:00', 'ISO 8601'), ('yesterday', 'ISO 8601')):
+            with self.assertRaises(SystemExit) as cm:
+                self.store(sp, later, ref='session-1:msg-3', at=at)
+            self.assertIn(why, str(cm.exception))
+        ap = os.path.join(d, 'answers-in.json')
+        with self.assertRaises(SystemExit) as cm:
+            record_answers.store(mock.Mock(sheet=sp, answers=ap, message_ref='session-1:msg-3', mode=common.FILE,
+                                           user=testdata.OWNER, message_at=None), self.ctx)
+        self.assertIn('the message time is needed', str(cm.exception))
+        self.assertEqual(len(record_answers.receipts(sp)), 2)          # nothing stored by a refusal
 
     def test_a_reading_is_optional_and_storing_decides_nothing(self):
         d, sp, side = self.sheet('answers-unread')
@@ -1410,12 +1587,15 @@ class Answers(SyntheticCase):
         self.assertEqual(rc['rows'][str(photo['row'])], {'sha256': common.sha256_text('hmm, that one maybe'),
                                                          'answer': {'decision': 'unsure', 'unread': True}})
         self.assertEqual(rc['rows'][str(acct['row'])]['answer'], record_answers.UNREAD)
-        # the receipt is all it writes: no decision, no owner statement, no read-back
-        self.assertEqual(set(os.listdir(d)) - before, {'answers-in.json', 'answers-2031-06-01.json'})
+        # the receipt is all it writes (one per message): no decision, no owner statement, no read-back
+        self.assertEqual(set(os.listdir(d)) - before, {'answers-in.json', 'answers-2031-06-01-msg-1.json'})
         with self.assertRaises(SystemExit) as cm:                  # 'unread' is the store's mark, never a reading
             record_answers.validate_answers(self.ctx, side, {str(photo['row']): {
                 'verbatim': 'w', 'answer': {'decision': 'unsure', 'unread': True}}})
         self.assertIn('answer carries', str(cm.exception))
+        with self.assertRaises(SystemExit) as cm:                  # (v9, M4) his words, bounded
+            record_answers.validate_answers(self.ctx, side, {str(photo['row']): {'verbatim': 'w' * 20001}})
+        self.assertIn('20000 characters', str(cm.exception))
         # (v8) decide is retired: no job decides
         self.assertFalse(hasattr(record_answers, 'decide'))
         with mock.patch.object(sys, 'argv', ['record_answers.py', 'decide', '--sheet', sp, '--plan', 'plan.json']), \
@@ -1478,7 +1658,7 @@ class Answers(SyntheticCase):
                                       'answer': {'decision': 'rejected', 'vehicle_id': 'SUB'}},
                 str(photo['row']): {'verbatim': 'yes', 'answer': {'decision': 'confirmed'}},
                 str(acct['row']): {'verbatim': 'that account, hmm'}})
-            rp = record_answers.receipt_path(sp, side)
+            rp = record_answers.receipt_path(sp, side, 'session-1:msg-1')
             with contextlib.redirect_stdout(io.StringIO()):
                 record_answers.second_packet(mock.Mock(sheet=sp, answers=os.path.join(d, 'answers-in.json')), self.ctx)
             packet = common.load_json(os.path.join(d, 'second-read-2031-06-01.json'))
@@ -1503,8 +1683,8 @@ class Answers(SyntheticCase):
             # the next sheet asks the disputed row again, until a delivered sheet has asked it
             _d2, sp2, side2 = self.sheet('answers-second-next', '2031-06-08')
             again = [r for r in side2['rows'] if r['section'] == 'asked again']
-            self.assertEqual([(r['question_text'], r['reask_of']) for r in again],
-                             [(painter['question_text'], {'sheet': sp, 'row': painter['row']})])
+            self.assertEqual([(r['question_text'], r['reask_of'], r.get('reask_ref')) for r in again],
+                             [(painter['question_text'], {'sheet': sp, 'row': painter['row']}, None)])
             self.deliver(sp2, 'session-1:msg-5')
             _d3, _sp3, side3 = self.sheet('answers-second-later', '2031-06-15')
             self.assertFalse([r for r in side3['rows'] if r['section'] == 'asked again'])
@@ -1517,6 +1697,50 @@ class Answers(SyntheticCase):
                                                                               'session-1:msg-7'))
             with self.assertRaises(SystemExit):
                 record_answers.dispute(mock.Mock(receipt=rp, row=photo['row'], message_ref='not a ref'), self.ctx)
+            # (v9) a run disputed as a whole (the transcript check) asks again the rows that run answered
+            manifest.mark_disputed({'answers_run': run, 'sheet_run': None, 'sheet': sp, 'by': 'm10b_transcript'})
+            _d4, _sp4, side4 = self.sheet('answers-second-whole', '2031-06-22')
+            self.assertEqual(sorted(r['reask_of']['row'] for r in side4['rows'] if r['section'] == 'asked again'),
+                             sorted([acct['row'], photo['row']]))     # painter's row was asked again already
+
+    @mock.patch.dict(os.environ, {'EVIDENCE_DB_WRITES': '1'})
+    def test_a_disputed_row_of_a_sent_db_sheet_is_asked_again_as_frozen(self):
+        """(v9, W2) The re-ask names the sent row (reask_of) and the writer copies it as it was frozen."""
+        ledger, idx = os.path.join(self.tmp, 'disputed-frozen.jsonl'), os.path.join(self.tmp, 'sheets-frozen.jsonl')
+        with mock.patch.dict(os.environ, {'EVIDENCE_DISPUTED': ledger, 'EVIDENCE_SHEETS_INDEX': idx}):
+            ids = {k: common.uuid5('id', k) for f in self.files if f.endswith('.jsonl')
+                   for k in (ln['key'] for ln in self.files[f])}
+            d = self.copy_out('answers-frozen')
+            rows, decisions = review_sheet.build_rows(self.ctx, self.files, readers.accounting(self.files, T))
+            fake = FakeRest()
+            with mock.patch.object(common, 'Rest', lambda *a, **k: fake):
+                side = review_sheet.issue(self.ctx, rows, decisions, '2031-06-01', d, common.DB, fake, testdata.OWNER,
+                                          ids)
+                sp = os.path.join(d, 'review-2031-06-01.json')
+                self.deliver(sp, mode=common.DB)
+                painter = self.row(side, 'also places it on', pk('00206'))
+                self.store(sp, {str(painter['row']): {'verbatim': 'no, the second truck',
+                                                      'answer': {'decision': 'rejected', 'vehicle_id': 'SUB'}}},
+                           common.DB)
+            rec = [a for fn, a in fake.calls if fn == 'evidence_record_answers'][0]
+            self.assertEqual(common.parse_ts(rec['p_message_at']), common.parse_ts(self.after_sending(sp)))
+            with contextlib.redirect_stdout(io.StringIO()):
+                record_answers.dispute(mock.Mock(receipt=record_answers.receipt_path(sp, side, 'session-1:msg-1'),
+                                                 row=painter['row'], message_ref='session-1:msg-2'), self.ctx)
+            # the next db sheet: nothing of today's load is needed for it; the row is asked as it was sent
+            d2 = self.copy_out('answers-frozen-next')
+            rows2, decisions2 = review_sheet.build_rows(self.ctx, self.files, readers.accounting(self.files, T))
+            fake2 = FakeRest()
+            side2 = review_sheet.issue(self.ctx, rows2, decisions2, '2031-06-08', d2, common.DB, fake2, testdata.OWNER,
+                                       {})
+            cfg = fake2.calls[0][1]['p_config']
+            self.assertEqual([v for v in cfg['rows'].values() if 'reask_of' in v],
+                             [{'reask_of': 'review:%s#%d' % (side['sheet_run'], painter['row'])}])
+            self.assertIsNone(payloads.review_rows_problem(cfg))
+            again = next(r for r in side2['rows'] if r['section'] == 'asked again')
+            self.assertEqual((again['section'], again['profile'], again['targets']),
+                             ('asked again', painter['profile'], painter['targets']))     # with the ids it was sent
+            self.assertEqual(again['reask_of'], {'sheet': sp, 'row': painter['row']})
 
     @mock.patch.dict(os.environ, {'EVIDENCE_DB_WRITES': '1'})
     def test_db_sheet_closes_once_when_sent_and_refusals_are_reported(self):
@@ -1538,8 +1762,11 @@ class Answers(SyntheticCase):
                 rc = self.store(sp, {str(painter['row']): {'verbatim': 'the second truck',
                                                            'answer': {'decision': 'rejected', 'vehicle_id': 'SUB'}},
                                      str(photo['row']): {'verbatim': 'not sure which one that is'}}, common.DB)
-            self.assertEqual([fn for fn, _a in fake.calls], ['evidence_close_run', 'evidence_record_answers'])
-            close, rec = fake.calls[0][1], fake.calls[1][1]
+                # (v9, W2) the next message of his reply: a second answers run on the same sheet
+                rc2 = self.store(sp, {str(photo['row']): {'verbatim': 'it is the second truck after all'}}, common.DB,
+                                 'session-1:msg-2', self.after_sending(sp, 2))
+            self.assertEqual([fn for fn, _a in fake.calls], ['evidence_close_run'] + ['evidence_record_answers'] * 2)
+            close, rec, rec2 = fake.calls[0][1], fake.calls[1][1], fake.calls[2][1]
             self.assertEqual((close['p_run_id'], close['p_status'], close['p_counts']),
                              (side['sheet_run'], 'done', {'items': side['items'], 'sent': True}))
             self.assertEqual((rec['p_user_id'], rec['p_sheet_run'], rec['p_message_ref']),
@@ -1548,7 +1775,10 @@ class Answers(SyntheticCase):
                 str(painter['row']): {'verbatim': 'the second truck',
                                       'answer': {'decision': 'rejected', 'vehicle_id': testdata.V['SUB']}},
                 str(photo['row']): {'verbatim': 'not sure which one that is'}})     # the writer marks it unread
-            self.assertEqual(rc['answers_run'], '00000000-0000-4000-8000-%012d' % 1)
+            self.assertEqual((rec2['p_sheet_run'], rec2['p_message_ref']), (side['sheet_run'], 'session-1:msg-2'))
+            self.assertLess(common.parse_ts(rec['p_message_at']), common.parse_ts(rec2['p_message_at']))
+            self.assertEqual((rc['answers_run'], rc2['answers_run']),
+                             ('00000000-0000-4000-8000-%012d' % 1, '00000000-0000-4000-8000-%012d' % 2))
             self.assertEqual(review_sheet.load_index()[side['sheet_run']]['delivered_ref'], 'session-1:msg-0')
             # a run the store no longer holds running is reported and the delivery recorded; any other refusal stops it
             _d2, sp2, _side2 = self.sheet('answers-db-closed', '2031-06-03')
@@ -1564,20 +1794,28 @@ class Answers(SyntheticCase):
                         with self.assertRaises(common.RpcError):
                             self.deliver(sp2, 'session-1:msg-3', common.DB)
                 self.assertEqual(bool(common.load_json(sp2).get('delivery')), recorded)
-            # the store refuses a second transcription of a sheet or a message: reported, not retried
-            d4, sp4, _side4 = self.sheet('answers-db-dup', '2031-06-04')
+            # the store's refusals are reported, never retried, and nothing is kept: (v9) a message stored once (its
+            # error names no run), a sheet never sent, a message older than the sheet's sending
+            d4, sp4, _side4 = self.sheet('answers-db-refused', '2031-06-04')
             side4 = dict(common.load_json(sp4), sheet_run=testdata.U('sheet-run-2'))
             common.dump_json(sp4, side4)
-            dup = FakeRest(fail={'evidence_record_answers': common.RpcError(
-                'evidence_record_answers', 409, '23505', 'message session-1:msg-5 is already transcribed')})
-            with mock.patch.object(common, 'Rest', lambda *a, **k: dup):
+            with mock.patch.object(common, 'Rest', lambda *a, **k: FakeRest()):
                 self.deliver(sp4, 'session-1:msg-4', common.DB)
-                with self.assertRaises(SystemExit) as cm:
+            for n, (code, text, why) in enumerate((
+                    ('23505', 'message session-1:msg-5 is already stored; a message is stored once', 'already holds'),
+                    ('22023', 'sheet_not_sent: sheet x is running, never sent', 'sheet_not_sent'),
+                    ('22023', 'message_predates_sheet: message session-1:msg-5 is older than sheet x',
+                     'message_predates_sheet')), 5):
+                refusing = FakeRest(fail={'evidence_record_answers': common.RpcError(
+                    'evidence_record_answers', 400, code, text)})
+                ref = 'session-1:msg-%d' % (n * 10)
+                with mock.patch.object(common, 'Rest', lambda *a, **k: refusing), \
+                        self.assertRaises(SystemExit) as cm:
                     self.store(sp4, {str(painter['row']): {'verbatim': 'yes', 'answer': {'decision': 'confirmed'}}},
-                               common.DB, 'session-1:msg-5')
-            self.assertIn('already holds answers', str(cm.exception))
-            self.assertEqual([fn for fn, _a in dup.calls], ['evidence_close_run', 'evidence_record_answers'])
-            self.assertFalse(os.path.exists(record_answers.receipt_path(sp4, side4)))
+                               common.DB, ref)
+                self.assertIn(why, str(cm.exception))
+                self.assertEqual([fn for fn, _a in refusing.calls], ['evidence_record_answers'])
+                self.assertFalse(os.path.exists(record_answers.receipt_path(sp4, side4, ref)))
             # a db sheet's answers need its review run; a file-mode sheet has none
             _d5, sp5, _side5 = self.sheet('answers-db-file-sheet', '2031-06-05')
             self.deliver(sp5, 'session-1:msg-6')
@@ -1624,30 +1862,40 @@ class Transcript(SyntheticCase):
             ans = {str(painter['row']): {'verbatim': 'no, that was the second truck',
                                          'answer': {'decision': 'rejected', 'vehicle_id': 'SUB'}}}
 
+            # the chat's clock (the synthetic chat lies ahead of the real one): the sheet is recorded sent at 17:30
+            clock = [common.parse_ts('2031-06-01T17:30:00Z')]
+
             def deliver(r):
-                with contextlib.redirect_stdout(io.StringIO()):
+                with contextlib.redirect_stdout(io.StringIO()), mock.patch.object(common, 'utc_now', lambda: clock[0]):
                     record_answers.delivered(mock.Mock(sheet=sp, message_ref=r), self.ctx)
 
-            def store(r):
+            def store(r, **kw):
                 ap = os.path.join(d, 'answers-in.json')
                 common.dump_json(ap, ans)
-                with contextlib.redirect_stdout(io.StringIO()):
+                with contextlib.redirect_stdout(io.StringIO()), mock.patch.object(common, 'utc_now', lambda: clock[0]):
                     record_answers.store(mock.Mock(sheet=sp, answers=ap, message_ref=r, mode=common.FILE,
-                                                   user=testdata.OWNER), self.ctx)
-                return common.load_json(record_answers.receipt_path(sp, side))
+                                                   user=testdata.OWNER, **kw), self.ctx)
+                return common.load_json(record_answers.receipt_path(sp, side, r))
             with self.assertRaises(SystemExit):                          # that message does not carry the sheet
                 deliver(ref(2))
             deliver(ref(1))
             self.assertEqual(common.load_json(sp)['delivery']['transcript'], 'checked')
+            clock[0] = common.parse_ts('2031-06-01T19:00:00Z')
             with self.assertRaises(SystemExit) as cm:                    # a reply that does not hold his words
                 store(ref(3))
             self.assertIn('not in the reply', str(cm.exception))
             with self.assertRaises(SystemExit) as cm:                    # a message before the sheet went out
                 store(ref(0))
             self.assertIn('does not come after', str(cm.exception))
-            self.assertEqual(store(ref(2))['transcript'], 'checked')    # spacing aside, his words are in the reply
+            with self.assertRaises(SystemExit) as cm:                    # (v9) the time is the transcript's
+                store(ref(2), message_at='2031-06-01T18:10:00Z')
+            self.assertIn('is not the time the transcript gives', str(cm.exception))
+            rc = store(ref(2))
+            self.assertEqual((rc['transcript'], common.parse_ts(rc['message_at'])),   # spacing aside, his words
+                             ('checked', common.parse_ts('2031-06-01T18:00:00Z')))     # are in the reply
             sheets = {'run-1': {'sheet_sha256': side['sheet_sha256'], 'delivered_ref': ref(1), 'sidecar': sp}}
-            runs = [{'id': 'a1', 'sheet_run': 'run-1', 'message_ref': ref(2), 'rows': ans},
+            runs = [{'id': 'a1', 'sheet_run': 'run-1', 'message_ref': ref(2), 'rows': ans,
+                     'message_at': rc['message_at']},
                     {'id': 'a2', 'sheet_run': 'run-1', 'message_ref': ref(3), 'rows': ans},
                     {'id': 'a3', 'sheet_run': 'run-1', 'message_ref': 'other-channel:42', 'rows': ans},
                     {'id': 'a4', 'sheet_run': 'run-2', 'message_ref': ref(2), 'rows': ans}]
@@ -1721,6 +1969,8 @@ class ReadPath(unittest.TestCase):
         self.assertIn('human_without_step_up_record', names['M10_step_up'][1])
         self.assertIn("created_by not like 'human:%'", names['M10b'][1])
         self.assertIn('evidence_answers_to_confirm(:uid)', names['M15'][1])
+        self.assertIn('a.message_at desc', names['M15'][1])            # (v9) the latest stored answer per row
+        self.assertIn("config->>'message_at'", names['M10b_answers'][1])
         self.assertIn('closed_accounts', names['M14_accounts'][1])
         out = io.StringIO()
         scoreboard.run(None, testdata.OWNER, T, st, dry_run=True, printer=lambda s: out.write(s))
@@ -1772,14 +2022,16 @@ class ReadPath(unittest.TestCase):
         self.addCleanup(shutil.rmtree, d, True)
         u = testdata.U
         idx, root = os.path.join(d, 'sheets.jsonl'), os.path.join(d, 'tx')
-        sheet_run, run_a, run_b = u('sheet'), u('answers-a'), u('answers-b')
+        sheet_run, run_a, run_b, run_c = u('sheet'), u('answers-a'), u('answers-b'), u('answers-c')
         review_sheet.append_index({'event': 'issued', 'sheet_run': sheet_run, 'sidecar': '/x/review-2031-06-01.json',
                                    'sheet_sha256': common.sha256_text('the sheet')}, idx)
         review_sheet.append_index({'event': 'delivered', 'sheet_run': sheet_run, 'delivered_ref': 'sess-x:m1'}, idx)
         Path(root, 'project').mkdir(parents=True)
         Path(root, 'project', 'sess-x.jsonl').write_text(''.join(json.dumps(e) + '\n' for e in (
-            {'uuid': 'm1', 'message': {'role': 'assistant', 'content': [{'type': 'text', 'text': 'the sheet'}]}},
-            {'uuid': 'm2', 'message': {'role': 'user', 'content': '1. yes'}})))
+            {'uuid': 'm1', 'timestamp': '2031-06-01T17:00:00Z',
+             'message': {'role': 'assistant', 'content': [{'type': 'text', 'text': 'the sheet'}]}},
+            {'uuid': 'm2', 'timestamp': '2031-06-01T18:00:00Z', 'message': {'role': 'user', 'content': '1. yes'}},
+            {'uuid': 'm3', 'timestamp': '2031-06-01T18:05:00Z', 'message': {'role': 'user', 'content': '2. no'}})))
         seen = {}
         his = []
 
@@ -1788,11 +2040,14 @@ class ReadPath(unittest.TestCase):
                 seen[tag] = params
                 if tag == 'M10b_answers':
                     return [{'id': run_a, 'sheet_run': sheet_run, 'message_ref': 'sess-x:m2',
-                             'rows': json.dumps({'1': {'verbatim': 'yes'}})},
+                             'message_at': '2031-06-01T18:00:00+00:00', 'rows': json.dumps({'1': {'verbatim': 'yes'}})},
                             {'id': run_b, 'sheet_run': sheet_run, 'message_ref': 'sess-x:m1',
-                             'rows': {'1': {'verbatim': 'no'}}}]          # the delivery itself, cited as his reply
+                             'rows': {'1': {'verbatim': 'no'}}},          # the delivery itself, cited as his reply
+                            {'id': run_c, 'sheet_run': sheet_run, 'message_ref': 'sess-x:m3',     # (v9) a second
+                             'message_at': '2031-06-01T18:09:00+00:00',     # message, stored with another time
+                             'rows': {'2': {'verbatim': 'no'}}}]
                 if tag == 'M15':
-                    return [{'waiting': 3, 'rewritten_ask_again': 1, 'his_decisions': len(his)}]
+                    return [{'waiting': 3, 'rewritten_ask_again': 1, 'rows_answered': 2, 'his_decisions': len(his)}]
                 if tag == 'M4a':
                     return [{'agrees_on_yes_no': True, 'named_place': None, 'n': len(his)}] if his else []
                 return []
@@ -1800,10 +2055,12 @@ class ReadPath(unittest.TestCase):
                              transcripts=[root])
         a = out['M10b_answers']
         self.assertEqual((a['checked'], [(p['answers_run'], p['sheet']) for p in a['problems']]),
-                         (2, [(run_b, '/x/review-2031-06-01.json')]))
-        self.assertEqual(scoreboard.scalar(a), 1)
+                         (3, [(run_b, '/x/review-2031-06-01.json'), (run_c, '/x/review-2031-06-01.json')]))
+        self.assertEqual(a['problems'][1]['problems'], ["the stored message time is not the reply's time in the "
+                                                        'transcript'])
+        self.assertEqual(scoreboard.scalar(a), 2)
         # (v8) his answers wait for him: the confirmed level reads "waiting on his app" until he decides
-        self.assertEqual(out['M15'], {'waiting': 3, 'rewritten_ask_again': 1, 'his_decisions': 0,
+        self.assertEqual(out['M15'], {'waiting': 3, 'rewritten_ask_again': 1, 'rows_answered': 2, 'his_decisions': 0,
                                       'confirmed_level': 'waiting on his app'})
         self.assertEqual((scoreboard.scalar(out['M15']), out['M4a']), (3, {'rows': []}))
         self.assertEqual((seen['M15']['uid'], seen['M4a']['uid']), (testdata.OWNER, testdata.OWNER))
@@ -1813,8 +2070,8 @@ class ReadPath(unittest.TestCase):
         self.assertEqual(out2['M4a']['rows'], [{'agrees_on_yes_no': True, 'named_place': None, 'n': 1}])
         # the failing run is disputed once (the next sheet asks its rows again), however often the scoreboard runs
         with mock.patch.dict(os.environ, {'EVIDENCE_DISPUTED': os.path.join(d, 'disputed.jsonl')}):
-            self.assertEqual([scoreboard.dispute_failed_answers(out) for _i in range(2)], [1, 0])
-            self.assertEqual(manifest.disputed_runs(), [run_b])
+            self.assertEqual([scoreboard.dispute_failed_answers(out) for _i in range(2)], [2, 0])
+            self.assertEqual(manifest.disputed_runs(), sorted([run_b, run_c]))
             self.assertEqual(manifest.disputed_rows()[0]['sheet'], '/x/review-2031-06-01.json')
 
 

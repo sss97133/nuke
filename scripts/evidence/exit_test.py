@@ -296,13 +296,13 @@ def run(fixture, files, read_fn, mode=common.FILE, his=None):
 
 
 def his_state(uid, reader=None):
-    """(v8) His decisions so far and his stored answers still waiting for him in the app (M15)."""
+    """(v8) His decisions so far and his stored answers still waiting for him in the app: the scoreboard's M15 read
+    ((v9) the latest stored answer per sheet row)."""
+    import scoreboard
     reader = reader or common.Reader()
-    w = reader.read('select count(*) filter (where last_decided_at is null or last_decided_at < stored_at) n '
-                    'from public.evidence_answers_to_confirm(:uid)', {'uid': uid}, tag='answers_waiting')
-    d = reader.read("select count(*) n from evidence_decisions where user_id = :uid and decided_by like 'human:%' "
-                    "and decision in ('confirmed', 'rejected')", {'uid': uid}, tag='his_decisions')
-    return {'waiting': int((w or [{}])[0].get('n') or 0), 'decisions': int((d or [{}])[0].get('n') or 0)}
+    sql = next(s for n, _m, s in scoreboard.parse() if n == 'M15')
+    row = (reader.read(sql, {'uid': uid}, tag='M15') or [{}])[0]
+    return {'waiting': int(row.get('waiting') or 0), 'decisions': int(row.get('his_decisions') or 0)}
 
 
 def db_read(vehicle, uid, manifest_path, reader=None):

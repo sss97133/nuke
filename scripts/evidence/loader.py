@@ -14,17 +14,21 @@ append-only guard refusal, a pinned-source refusal or IO above 3 for 10 minutes 
 open run 'aborted' with the reason. After the capture-time claims, confirm_capture_times_by_rule is called with the
 batch_offset_v1 claims of the closed gate run (the writer confirms only what the gate passes).
 
-(v5-v8) Per-row results the writers return are counted, never retried: already_decided, already_rejected,
+(v5-v9) Per-row results the writers return are counted, never retried: already_decided, already_rejected,
 kept_stronger, unchanged, owner_answer_missing, entity_is_owners_call (the next run or the next sheet asks again), and
-so are the refusals (image_not_eligible, vehicle_not_in_scope, source_not_users, vehicle_not_found). No job decides
-(v8): the loader never calls decide_evidence. Every id a writer returns goes to the manifest (common.Rest;
-manifest.py).
+so are the refusals (image_not_eligible, vehicle_not_in_scope, source_not_users, vehicle_not_found). (v9) A photo's
+'already_rejected' (a truck he said no to, or a place other than the subject he confirmed) writes nothing and leaves
+the line off the sheet; skips a writer itemizes are counted once. A claim his decision or his who-paid statement
+answers is never superseded: the line's support goes onto that claim (propose_claim_support) and is reported as
+claim_carries_owner_decision; a claim no longer current is claim_not_current. No job decides (v8): the loader never
+calls decide_evidence. Every id a writer returns goes to the manifest (common.Rest; manifest.py).
 
 Usage: python3 scripts/evidence/loader.py --dir <payload dir> --case <case.json> [--mode file|db] [--user <uuid>]
 """
 import argparse
 import collections
 import os
+import re
 import sys
 import time
 
@@ -247,9 +251,11 @@ class Loader:
                 self.counts[run_key][it.get('result', 'refused')] += 1
                 if it.get('result') in payloads.C['reported_outcomes']:
                     self.outcomes[it['result']] += 1
-                if it.get('candidate_id'):
+                if it.get('candidate_id') and it.get('result') in ('proposed', 'already_decided'):
                     self.ids[ln['key']] = it['candidate_id']     # 'already_decided' names the decided row
                 else:
+                    # (v9) 'already_rejected': his word on this photo answers the row (a truck he said no to, or a
+                    # place other than the subject he confirmed); nothing is written and the sheet does not ask it
                     self.skipped[ln['key']] = it.get('result', 'refused')
             if missing:
                 self.read_back_candidates(run_key, missing)
@@ -270,8 +276,10 @@ class Loader:
         else:
             # capture-time claims, day context and account entities return their ids in write order but not per
             # line (rows the writer skips are absent): read the ids back by run (current rows of this owner)
+            itemized = {it.get('result', 'skipped') for it in res.get('skipped') or []}
             for k, v in res.items():
-                if isinstance(v, int) and not isinstance(v, bool):
+                if isinstance(v, int) and not isinstance(v, bool) and k not in itemized:
+                    # (v9, M5) a writer that itemizes its skips may also count them: each is counted once, below
                     self.counts[run_key][k] += v
                     if k in payloads.C['reported_outcomes'] and v:
                         self.outcomes[k] += v
@@ -306,11 +314,14 @@ class Loader:
                                     {'ids': [ln['row']['image_id'] for ln in sent], 'uid': self.ctx.user_id},
                                     tag='read_back')
             by = {r['image_id']: r['id'] for r in rows}
+            missing = set((res or {}).get('owner_answer_missing_ids') or [])      # (v9, M6) named by the writer
             for ln in sent:
-                if ln['row']['image_id'] in by:
+                if ln['row']['image_id'] in missing and ln['row'].get('rule') == 'owner':
+                    self.skipped[ln['key']] = 'owner_answer_missing'
+                elif ln['row']['image_id'] in by:
                     self.ids[ln['key']] = by[ln['row']['image_id']]   # written now, or a decided / stronger claim kept
                 else:
-                    self.skipped[ln['key']] = 'not_written (compare-and-set or not eligible)'
+                    self.skipped[ln['key']] = 'not_written (compare-and-set, not eligible or already rejected)'
         elif writer == 'record_day_context':
             rows = self.reader.read('select id, day::text, place_cluster, vehicle_id from user_day_vehicle_context '
                                     'where run_id = :run and superseded_by is null', {'run': self.runs[run_key]},
@@ -331,11 +342,13 @@ class Loader:
             rows = self.reader.read('select id, account_ref from evidence_account_entities where run_id = :run',
                                     {'run': self.runs[run_key]}, tag='read_back')
             by = {r['account_ref']: r['id'] for r in rows}
+            # (v9, M5) the writer itemizes what it kept: his decided row stands (left off the sheet: he answered it)
+            kept = {it.get('account_ref'): it for it in (res or {}).get('skipped') or []}
             for ln in sent:
                 if ln['row']['account_ref'] in by:
                     self.ids[ln['key']] = by[ln['row']['account_ref']]
                 else:
-                    self.skipped[ln['key']] = 'already_decided'
+                    self.skipped[ln['key']] = (kept.get(ln['row']['account_ref']) or {}).get('result', 'already_decided')
 
     def load_claims(self, lines):
         for ln in lines:
@@ -343,14 +356,20 @@ class Loader:
             try:
                 claim = self.resolve(ln['p_claim'])
                 sup = self.resolve(ln['p_support'] or [])
+                old = self.resolve(ln.get('p_supersedes'))
             except KeyError as e:
                 self.skipped[ln['key']] = 'dependency_not_loaded:%s' % e.args[0]
                 continue
             self.io_gate()
-            res = self.call('propose_change_claim', {'p_run_id': self.runs[run_key], 'p_claim': claim,
-                                                     'p_support': sup, 'p_supersedes': ln.get('p_supersedes')},
-                            {'run': run_key, 'file': 'change_claims.jsonl', 'rows': 1, 'first': ln['key'],
-                             'support_rows': len(sup)})
+            try:
+                res = self.call('propose_change_claim', {'p_run_id': self.runs[run_key], 'p_claim': claim,
+                                                         'p_support': sup, 'p_supersedes': old},
+                                {'run': run_key, 'file': 'change_claims.jsonl', 'rows': 1, 'first': ln['key'],
+                                 'support_rows': len(sup)})
+            except common.RpcError as e:
+                if not old or not self.supersede_refused(ln, run_key, old, sup, e):
+                    raise
+                continue
             self.lock_check()
             if self.mode == common.DB and res is None:
                 # (v5) custody_bounds writes nothing where a sourced acquisition exists on the identity
@@ -359,6 +378,27 @@ class Loader:
                 continue
             self.ids[ln['key']] = res if self.mode == common.DB else ln['key']
             self.counts[run_key]['claims'] += 1
+
+    def supersede_refused(self, ln, run_key, old, sup, e):
+        """(v9, W4/M7) A pass never re-writes a claim his decision or his who-paid statement answers: its support goes
+        onto that claim instead (propose_claim_support), and the line names his claim. A claim that is no longer
+        current is nothing to supersede: the line is skipped. Both are reported, never retried. -> handled?"""
+        if re.match(r'^claim \S+ carries an owner decision', e.message or ''):
+            for k in range(0, len(sup), payloads.C['writers']['propose_claim_support']['max_rows']):
+                self.call('propose_claim_support', {'p_run_id': self.runs[run_key], 'p_claim_id': old,
+                                                    'p_support': sup[k:k + 50]},
+                          {'run': run_key, 'file': 'change_claims.jsonl', 'rows': len(sup[k:k + 50]),
+                           'first': ln['key']})
+            self.ids[ln['key']] = old
+            self.counts[run_key]['support_rows'] += len(sup)
+            outcome = 'claim_carries_owner_decision'
+        elif e.code == '22023' and 'is not a current claim' in (e.message or ''):
+            self.skipped[ln['key']] = outcome = 'claim_not_current'
+        else:
+            return False
+        self.counts[run_key][outcome] += 1
+        self.outcomes[outcome] += 1
+        return True
 
     def load_support(self, lines):
         for ln in lines:

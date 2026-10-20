@@ -13,12 +13,12 @@ loop/deployed_md5s.json ({name: md5}, from the PR's post-deploy output). M10b ma
 in the last --m10b-hours against the runner's manifest of returned ids (manifest.py): `unmanifested` > 0 halts
 promotion; his decisions and the rows they write are counted for the lead to match against the API request log.
 (v6, AC10; v8) M10b_answers checks each answers run against the chat transcript (the sheet's delivery by sha256, his
-reply after it, his verbatim words in the reply; transcript.py) and marks a failing run disputed (loop/disputed.jsonl;
-the next sheet asks its rows again).
+reply after it, his verbatim words in the reply, (v9) the stored message time the reply's own; transcript.py) and
+marks a failing run disputed (loop/disputed.jsonl; the next sheet asks its rows again).
 (v8) No job decides. M4a is transcription accuracy (his decision against the stored reading it cites); M10_stamps
 expects no agent row, no job-written owner day, no owner statement without his decision and no service_role EXECUTE
-on decide_evidence; M15 counts his stored answers waiting for him in the app (evidence_answers_to_confirm) and reports
-the confirmed level as "waiting on his app" until his decisions exist.
+on decide_evidence; M15 counts his stored answers waiting for him in the app (evidence_answers_to_confirm; (v9) the
+latest answer per sheet row) and reports the confirmed level as "waiting on his app" until his decisions exist.
 
 The owner id comes from --user / EVIDENCE_OWNER_ID / the loop config and appears in no output (params show '<uid>').
 
@@ -208,9 +208,11 @@ def run(reader, uid, vehicle, statements=None, dry_run=False, printer=print, onl
 
 
 def answers_waiting(row):
-    """(v8) M15: his stored answers waiting for him in the app, and the confirmed level's state."""
-    waiting, rewritten, his = (int(row.get(k) or 0) for k in ('waiting', 'rewritten_ask_again', 'his_decisions'))
-    return {'waiting': waiting, 'rewritten_ask_again': rewritten, 'his_decisions': his,
+    """(v8) M15: his stored answers waiting for him in the app ((v9) the latest per sheet row), and the confirmed
+    level's state."""
+    waiting, rewritten, rows, his = (int(row.get(k) or 0) for k in ('waiting', 'rewritten_ask_again', 'rows_answered',
+                                                                     'his_decisions'))
+    return {'waiting': waiting, 'rewritten_ask_again': rewritten, 'rows_answered': rows, 'his_decisions': his,
             'confirmed_level': 'waiting on his app' if not his else 'his decisions recorded'}
 
 

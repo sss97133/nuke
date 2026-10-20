@@ -24,7 +24,11 @@ lettered decisions, answered in OWNER-DECISIONS.
 
 (v8) His answers decide nothing: record_answers.py stores them word for word and he confirms them himself in the app.
 A row whose stored reading a second reader, the transcript check or his objection disputed (loop/disputed.jsonl) is
-asked again until a delivered sheet has asked it.
+asked again until a delivered sheet has asked it. (v9, W2) A row asked again from a sent db sheet is stored in the new
+review run as {"reask_of": "review:<sheet run>#<row>"}: the writer copies that row exactly as it was frozen (targets,
+question, asked place), and the sidecar keeps the frozen row. (W3) A who-paid row never asks about a line of a payment
+source (bank, card or ledger line, payment event, QB transaction, P&L line), keyed or not: its payer is its account's.
+(M8) A sheet lists at most 10,000 targets.
 
 Photos: one row per image. A thumbnail only for an image the phone's VisionEngine approved (vision_gate_status
 'approved'); any other image is listed by id, "review in the app". Thumbnails are local paths (the case's
@@ -107,7 +111,7 @@ def target_profile(kind, ln):
     if kind in ('evidence_link', 'album_map'):
         cls = payloads.link_class(r.get('role'), r.get('allocated_cents'), r.get('source_kind'))
         return {'place': r.get('vehicle_id') or r.get('subject_key'), 'link_class': cls,
-                'payment_key': r.get('payment_key'), 'role': r.get('role'),
+                'payment_key': r.get('payment_key'), 'role': r.get('role'), 'source_kind': r.get('source_kind'),
                 'source_key': payloads.source_key(r.get('source_table'), r.get('source_row_id'), r.get('external_ref'),
                                                   r.get('anchor')),
                 'exclusive': cls in ('placement', 'album')}
@@ -125,7 +129,7 @@ def profile(row, lines):
     Raises ValueError for a row the writer would refuse."""
     q = payloads.row_question(row)
     places, frames, classes, claim_kinds = set(), set(), set(), set()
-    images, pkeys, skeys, accts = set(), set(), set(), set()
+    images, pkeys, skeys, accts, kinds = set(), set(), set(), set(), set()
     own = 0
     for t in row['targets']:
         if t['kind'] == 'image':
@@ -147,7 +151,7 @@ def profile(row, lines):
             p = target_profile(q, ln)
             places.add(p.get('place') or 'none')         # (v7, D6) a target that places nothing
             for s, k in ((frames, 'frame'), (classes, 'link_class'), (images, 'image'), (pkeys, 'payment_key'),
-                         (skeys, 'source_key'), (accts, 'account'), (claim_kinds, 'claim_kind')):
+                         (skeys, 'source_key'), (accts, 'account'), (claim_kinds, 'claim_kind'), (kinds, 'source_kind')):
                 if p.get(k):
                     s.add(p[k])
     asks = row.get('asks', 'place')
@@ -168,6 +172,10 @@ def profile(row, lines):
         # (v8) money with a payment source gets its payer from the account map: ask the account's row instead
         raise ValueError('this money has a payment source (%s): ask whose account paid it (an account row), not who '
                          'paid' % ', '.join(sorted(pkeys)))
+    if asks == 'party' and q == 'evidence_link' and kinds & set(payloads.C['payment_source_lines']):
+        # (v9, W3) nor a line of a payment source, keyed or not: its payer is its account's
+        raise ValueError('this money is a payment source line (%s): ask whose account paid it (an account row), not '
+                         'who paid' % ', '.join(sorted(kinds & set(payloads.C['payment_source_lines']))))
     return {'question': q, 'asks': asks, 'asked_place': asked, 'frame': frame, 'link_class': link,
             'places': sorted(places), 'images': sorted(images), 'payment_keys': sorted(pkeys),
             'source_keys': sorted(skeys), 'accounts': sorted(accts)}
@@ -180,11 +188,12 @@ def build_rows(ctx, files, read):
     rows, decisions = [], []
     lines = lines_by_key(files)
 
-    def add(section, text, targets, answer_hint=None, asks='place', **stated):
+    def add(section, text, targets, answer_hint=None, asks='place', frozen=None, **stated):
         row = {'row': len(rows) + 1, 'section': section, 'question_text': text, 'targets': targets,
                'answer_hint': answer_hint, 'asks': asks}
         row.update({k: v for k, v in stated.items() if v is not None})     # question / frame a row states itself
-        row['profile'] = profile(row, lines)
+        # (v9, W2) a row asked again from a sent sheet keeps the profile it was frozen with (the writer copies it)
+        row['profile'] = frozen or profile(row, lines)
         rows.append(row)
 
     def decision(question, hint=None):
@@ -266,6 +275,8 @@ def build_rows(ctx, files, read):
     for u in (costs.get('asserted_unpaid') or {}).get('links') or []:
         if u['link_id'] in answered_by_case:
             continue                    # "who paid for the truck" already asks about its purchase line: one question
+        if ((lines.get(u['link_id']) or {}).get('row') or {}).get('source_kind') in payloads.C['payment_source_lines']:
+            continue                    # (v9, W3) a payment source line: its payer is its account's (an account row)
         add('who paid', "No payment was found for '%s' (%s). Who paid it: you, one of your businesses (name it), or "
             'another party (name it)? (where the money came from only, not what it was for)'
             % (u.get('label') or u['ref'], u['ref']), [T('evidence_link', u['link_id'])],
@@ -292,17 +303,27 @@ def build_rows(ctx, files, read):
             [T('account_entity', ln['key']), T('account', r['account_ref'])], 'yes / no, it is <entity>')
     # (v6, AC10) a row whose stored reading a second reader, the transcript check or his objection disputed is asked
     # again
-    for old, ref in reask(lines):
-        add('asked again', old['question_text'], old['targets'], old.get('answer_hint'), old.get('asks', 'place'),
-            question=old.get('question'), frame=old.get('frame'))
+    for old, ref, sent_ref in reask(lines):
+        if sent_ref:
+            # (v9, W2) asked exactly as it was sent: the review run names that row (reask_of) and the writer copies
+            # its frozen targets and question; the sidecar keeps them, with their ids, for the reading checks
+            add('asked again', old['question_text'], old['targets'], old.get('answer_hint'), old.get('asks', 'place'),
+                frozen=old['profile'], question=old.get('question'), frame=old.get('frame'))
+            rows[-1]['reask_ref'] = sent_ref
+        else:
+            add('asked again', old['question_text'], [{k: v for k, v in t.items() if k != 'id'} for t in old['targets']],
+                old.get('answer_hint'), old.get('asks', 'place'), question=old.get('question'), frame=old.get('frame'))
         rows[-1]['reask_of'] = ref
     return rows, decisions
 
 
 def reask(lines):
-    """-> [(old row, {sheet, row})]: the disputed rows of earlier sheets that no delivered sheet has asked again, whose
-    targets still exist, once each (manifest.disputed_rows; an entry with no row disputes every answered row)."""
+    """-> [(old row, {sheet, row}, 'review:<sheet run>#<row>' or None)]: the disputed rows of earlier sheets that no
+    delivered sheet has asked again, whose targets still exist, once each (manifest.disputed_rows; an entry with no
+    row disputes every row its answers run answered). (v9, W2) A row of a sent db sheet is named by its review run and
+    row: the writer copies it as it was frozen."""
     import manifest
+    import record_answers
     out, seen = [], manifest.reasked_rows()
     for e in manifest.disputed_rows():
         if not e.get('sheet') or not os.path.exists(e['sheet']):
@@ -311,8 +332,10 @@ def reask(lines):
         if e.get('row'):
             want = [int(e['row'])]
         else:
-            rc = os.path.join(os.path.dirname(e['sheet']), 'answers-%s.json' % side.get('date'))
-            want = sorted(int(k) for k in common.load_json(rc).get('rows') or {}) if os.path.exists(rc) else \
+            # (v9) several answers runs per sheet: the rows the disputed run answered
+            rcs = [r for r in record_answers.receipts(e['sheet']) if r.get('sheet_sha256') == side.get('sheet_sha256')
+                   and record_answers.answers_run_of(r) == e.get('answers_run')]
+            want = sorted({int(k) for r in rcs for k in r.get('rows') or {}}) if rcs else \
                 [r['row'] for r in side.get('rows') or []]
         for n in want:
             if (e['sheet'], n) in seen:
@@ -320,8 +343,9 @@ def reask(lines):
             seen.add((e['sheet'], n))
             old = next((r for r in side.get('rows') or [] if r['row'] == n), None)
             if old and all(t['kind'] in KEY_KINDS + ('image',) or t['key'] in lines for t in old['targets']):
-                out.append((dict(old, targets=[{k: v for k, v in t.items() if k != 'id'} for t in old['targets']]),
-                            {'sheet': e['sheet'], 'row': n}))
+                sent = side.get('sheet_run') and (side.get('delivery') or {}).get('message_ref')
+                out.append((old, {'sheet': e['sheet'], 'row': n},
+                            'review:%s#%d' % (side['sheet_run'], n) if sent else None))
     return out
 
 
@@ -336,9 +360,13 @@ def run_target(t, ids):
 
 
 def resolve(rows, ids):
-    """Keep the rows whose every target loaded, renumbered; -> (rows, left_off). Each kept target gets its id."""
+    """Keep the rows whose every target loaded, renumbered; -> (rows, left_off). Each kept target gets its id. (v9) A
+    row asked again from a sent sheet keeps the targets it was frozen with."""
     kept, left = [], []
     for r in rows:
+        if r.get('reask_ref'):
+            kept.append(dict(r, row=len(kept) + 1))
+            continue
         tgts = [(t, run_target(t, ids)) for t in r['targets']]
         if any(x is None for _t, x in tgts):
             left.append({'question': r['question_text'][:120], 'not_loaded': [t['key'] for t, x in tgts if x is None]})
@@ -350,7 +378,10 @@ def resolve(rows, ids):
 
 def run_row(r, ids):
     """What the review run stores for a row: its targets, its question and what it asks (the writer derives the rest
-    and refuses a row that mixes kinds)."""
+    and refuses a row that mixes kinds); (v9, W2) for a row asked again from a sent sheet, only the row it asks again
+    (the writer copies that row as it was frozen)."""
+    if r.get('reask_ref'):
+        return {'reask_of': r['reask_ref']}
     out = {'targets': [run_target(t, ids) for t in r['targets']], 'question': r['profile']['question']}
     if r['profile']['asks'] != 'place':
         out['asks'] = r['profile']['asks']

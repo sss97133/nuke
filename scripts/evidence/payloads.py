@@ -27,6 +27,11 @@ v8 (the agent decision channel does not ship): no job decides. The runner never 
 has no EXECUTE on it), never writes his word (an owner_statement link, an 'owner:' payment key or a rule 'owner'
 capture time is owner_answer_missing) and never opens an owner_review run. His chat answers are stored word for word
 (evidence_record_answers, with an optional reading) and wait for him to confirm them in the app.
+v9: answers are stored per chat message (several answers runs per sheet), each with the message's own time
+(p_message_at), only on a sheet that was sent and only from a message written after it was sent; at least one row, at
+most 20,000 characters of his words per row. A re-ask row names the sent row it asks again ('reask_of') and the writer
+copies that row as it was frozen; a sheet lists at most 10,000 targets; a who-paid row never asks about a payment
+source line (bank, card or ledger line, payment event, QB transaction, P&L line), keyed or not.
 """
 import copy
 import datetime as dt
@@ -36,7 +41,7 @@ import re
 import common
 
 CONTRACT = {
-    'version': 'draft-v8-2026-10-20',
+    'version': 'draft-v9-2026-10-20',
     'pass_names': [
         'listing_class', 'time_offset', 'photos_join', 'photos_album', 'file_hash_twin', 'exif_neighbour',
         'day_context', 'legacy_suggestion', 'claim_import', 'jev_choice', 'paid_vision', 'combined', 'owner_review',
@@ -60,6 +65,9 @@ CONTRACT = {
                      'owner_statement', 'photos_item'],
     'anchor_required': ['deal_jacket', 'deal_document', 'journal_entry', 'vehicle_field'],
     'payment_sources': ['bank_line', 'ledger_line', 'payment_event', 'qb_transaction'],
+    # (v9, W3) the lines of a payment source, keyed or not: a who-paid row never asks about one (its payer is its
+    # account's: an account row)
+    'payment_source_lines': ['bank_line', 'ledger_line', 'payment_event', 'qb_transaction', 'pnl_line'],
     # er_coverage_source: only these runs record config.coverage_to, always with config.covers_accounts
     'payment_source_passes': ['ledger_vendor_date', 'qb_correlation', 'receipt_vehicle_id'],
     'directions': ['out', 'in', 'none'],
@@ -104,10 +112,18 @@ CONTRACT = {
     # (v6, AC10; v7, D4) one transcription per message: '<source>:<message id>', exactly one colon, no path, at most
     # 200 characters; the writer stores it lower-cased and keys uniqueness on the message id
     'message_ref_re': r'^[A-Za-z0-9_-]+:[A-Za-z0-9_-]+$',
+    # (v9, M4) his words per answered row, at most
+    'verbatim_max': 20000,
+    # (v9, M8) targets on one review sheet, at most (a larger sheet is several sheets)
+    'sheet_targets_max': 10000,
+    'reask_ref_re': r'^review:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}#[0-9]+$',
     # Per-row results the writers return that are reported and never retried (PLAN section 1, runner notes); the next
-    # sheet or the next run asks again. (v8) owner_answer_missing: a job never writes his word.
+    # sheet or the next run asks again. (v8) owner_answer_missing: a job never writes his word. (v9) already_rejected
+    # also for a truck he said no to for that photo (any pass, any id of the truck) or a place other than the subject
+    # he confirmed; claim_carries_owner_decision: a claim his decision or his who-paid statement answers is never
+    # superseded by a pass (its support is added instead); claim_not_current: nothing to supersede.
     'reported_outcomes': ['already_decided', 'already_rejected', 'owner_answer_missing', 'kept_stronger',
-                          'entity_is_owners_call', 'unchanged'],
+                          'entity_is_owners_call', 'unchanged', 'claim_carries_owner_decision', 'claim_not_current'],
     # evidence_writer_names(): the only functions that may be the outermost caller of a write to the nine tables
     # ('writers' below are the ones this runner calls: (v8) never decide_evidence, his own session's writer)
     'writer_names': ['evidence_open_run', 'evidence_close_run', 'evidence_record_answers', 'propose_image_candidates',
@@ -124,7 +140,7 @@ CONTRACT = {
         'evidence_close_run': {'args': ['p_run_id', 'p_status', 'p_counts', 'p_input_tokens', 'p_scoreboard',
                                         'p_gap_picked']},
         'evidence_record_answers': {'args': ['p_user_id', 'p_sheet_run', 'p_message_ref', 'p_rows', 'p_producer',
-                                             'p_code_version']},
+                                             'p_code_version', 'p_message_at']},
         'propose_image_candidates': {'args': ['p_run_id', 'p_rows'], 'max_rows': 500, 'row': 'candidate'},
         'propose_capture_time_claims': {'args': ['p_run_id', 'p_rows'], 'max_rows': 500, 'row': 'capture_time'},
         'confirm_capture_times_by_rule': {'args': ['p_gate_run_id', 'p_claim_ids'], 'max_rows': 1000},
@@ -481,16 +497,26 @@ def row_question(row):
 
 def review_rows_problem(config):
     """The review run's per-row targets (v4) and (v6) one question per row: rows.<1..items>.targets, each a valid
-    target, implying one decision kind (or naming it when the row lists only images), asks 'place' or 'party'."""
+    target, implying one decision kind (or naming it when the row lists only images), asks 'place' or 'party'. (v9, W2)
+    A re-ask row is {"reask_of": "review:<sheet run>#<row>"} alone: the writer copies that sent row as it was frozen.
+    (M8) At most 10,000 targets on the sheet."""
     rows, items = config.get('rows'), str(config.get('items', ''))
     if not isinstance(rows, dict) or not items.isdigit() or len(rows) != int(items) or not 1 <= int(items) <= 500:
         return 'a review run lists targets for every row (rows.<n>.targets, n = 1..items, at most 500)'
+    total = 0
     for k, v in rows.items():
         if not (str(k).isdigit() and 1 <= int(k) <= int(items)):
             return 'row %s is not 1..%s' % (k, items)
+        if isinstance(v, dict) and 'reask_of' in v:
+            if set(v) != {'reask_of'} or not re.match(C['reask_ref_re'], str(v['reask_of'])):
+                return 'row %s: a re-ask row is {"reask_of": "review:<sheet run>#<row>"} alone' % k
+            continue
         ts = (v or {}).get('targets')
         if not (isinstance(ts, list) and 1 <= len(ts) <= 200):
             return 'row %s lists 1..200 targets' % k
+        total += len(ts)
+        if total > C['sheet_targets_max']:
+            return 'a review sheet lists at most %d targets in all: split it' % C['sheet_targets_max']
         for t in ts:
             try:
                 review_target(t.get('kind'), t.get('id'), t.get('key'))
@@ -631,17 +657,37 @@ def message_ref_problem(ref):
     return None
 
 
-def record_answers(user_id, sheet_run, message_ref, rows, producer, code_version):
+def message_time(value):
+    """(v9) A chat message's own time, as the transcript records it (ISO 8601 with its zone) -> aware datetime, or
+    None when it is not one. Never the time of storing: the writer compares it with the sheet's sending."""
+    if not isinstance(value, str) or not re.match(
+            r'^\d{4}-\d\d-\d\d[T ]\d\d:\d\d(:\d\d(\.\d+)?)?(Z|[+-]\d\d(:?\d\d)?)$', value.strip()):
+        return None
+    try:
+        return common.parse_ts(value)
+    except ValueError:
+        return None
+
+
+def record_answers(user_id, sheet_run, message_ref, rows, producer, code_version, message_at):
     """rows: {"<sheet row>": {"verbatim": "<his words>"[, "answer": {...}]}} -> the evidence_record_answers args. The
-    reading is optional (v8): without one the store keeps his words alone, marked unread. One answer set per sheet and
-    per message: a later answer goes on a new sheet. Storing decides nothing."""
+    reading is optional (v8): without one the store keeps his words alone, marked unread. Storing decides nothing.
+    (v9) One answers run per chat message, on the sheet that message answers (a reply in several messages is several
+    calls on one sheet), with the message's own time; at least one row, at most 20,000 characters per row."""
     bad = message_ref_problem(message_ref)
     if bad:
         raise ValueError(bad)
+    at = message_time(message_at)
+    if at is None:
+        raise ValueError("message_at is the message's own time in the transcript (ISO 8601 with its zone)")
+    if not rows:
+        raise ValueError('a stored answer has at least one row')
     out = {}
     for k, v in rows.items():
         if not (isinstance(v, dict) and isinstance(v.get('verbatim'), str) and v['verbatim'].strip()):
             raise ValueError('answer row %s has no verbatim text' % k)
+        if len(v['verbatim']) > C['verbatim_max']:
+            raise ValueError('answer row %s: at most %d characters of his words per row' % (k, C['verbatim_max']))
         out[str(int(k))] = {'verbatim': v['verbatim']}
         if v.get('answer') is not None:
             bad = answer_problem(v['answer'])
@@ -649,7 +695,8 @@ def record_answers(user_id, sheet_run, message_ref, rows, producer, code_version
                 raise ValueError('answer row %s: %s' % (k, bad))
             out[str(int(k))]['answer'] = v['answer']
     return {'p_user_id': user_id, 'p_sheet_run': sheet_run, 'p_message_ref': norm_ref(message_ref), 'p_rows': out,
-            'p_producer': producer, 'p_code_version': code_version}
+            'p_producer': producer, 'p_code_version': code_version,
+            'p_message_at': at.astimezone(dt.timezone.utc).isoformat()}
 
 
 def rpc_args(writer, values):

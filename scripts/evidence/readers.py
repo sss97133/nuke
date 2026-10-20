@@ -1,9 +1,13 @@
-"""File-mode model of the v8 readers (draft.sql M1w 2.5): vehicle_accounting_evidence and the day records it reads,
+"""File-mode model of the v9 readers (draft.sql M1w 2.5): vehicle_accounting_evidence and the day records it reads,
 computed over a payload directory instead of the store. Line keys stand in for row ids; the payload is one owner's,
-so the v5 user filter (p_user_id) is the directory itself. (v8) Reader shapes are v6's; every decision is his.
+so the v5 user filter (p_user_id) is the directory itself. (v8) Reader shapes are v6's; every decision is his. (v9)
+The 'stated' band (his confirmed who-paid statement whose money a keyed payment now carries: listed, never summed)
+needs his statement, which only his decision in the app writes, so it never appears in file mode.
 
 It follows the SQL: identity = the vehicle plus the confirmed same_vehicle_as pairs, closed transitively (bounded);
-candidate status = the latest owner decision, else confirmed_by_album_map, else proposed; one effective day per image
+candidate status = the row's own decision, else (v9) rejected when his word on that photo, truck and frame role (any
+row) is a no or he confirmed another subject for the photo, else confirmed_by_album_map, else proposed; one effective
+day per image
 (confirmed capture time, else the combined row's day, else the earliest pass day); custody from the best
 non-rejected acquisition and sale claims (confirmed first, then sourced before custody_bounds' upper bounds, then a
 start date, then confidence, then the newest), 'unknown' with acquired_by when the window has no start; a day after a
@@ -25,6 +29,7 @@ over_allocated is not evaluated here.
 extract_m5() is PLAN section 6 M5 (the exit-test extraction), shared by file and db mode.
 """
 import collections
+import re
 
 import payloads
 
@@ -56,6 +61,7 @@ class Store:
                 seq += 1
                 self.dec[d['reassign_to']] = ('confirmed', d.get('by', 'human'), seq)
         self.allowed = C['allowed_offset_hours']
+        self.truck_keys = {}                             # (v9) vehicle id -> the least id of its identity
 
     def status(self, key):
         d = self.dec.get(key)
@@ -149,12 +155,35 @@ def custody(st, ids):
             'status': status}
 
 
+def places_distinct(a, b):
+    """evidence_places_distinct over two truck keys (a vehicle id, a 'vin:', 'label:' or 'album:' key; None for no
+    truck): known to be different places. Two no-row keys of different kinds may be one truck. File mode reads no VINs,
+    so a row and a 'vin:' key count as different."""
+    a, b = a or 'none', b or 'none'
+    if a == b:
+        return False
+
+    def kind(x):
+        return 'row' if re.match(r'^[0-9a-f]{8}-[0-9a-f]{4}-', x) else ('none' if x == 'none' else x.split(':', 1)[0])
+    ka, kb = kind(a), kind(b)
+    return ka == kb or 'none' in (ka, kb) or 'row' in (ka, kb)
+
+
 def candidates_for_images(st, image_ids):
     """evidence_candidates_for_images: one effective day per image (a confirmed capture time, else the combined row's
     day, else the earliest pass day), (v7, F1) undated while that pass day is a day his own word rejected for the
-    photo; status his decision, else confirmed_by_album_map (his confirmed album, no rejection of his of that truck for
-    the photo), else proposed."""
+    photo. Status (v9, R-T1/R-T2): the row's own decision; else 'rejected' when his latest word on this photo, this
+    truck (its identity: evidence_truck_key) and this frame role, on any row, is a no, or when the row is a subject at a
+    place known to differ from the subject he confirmed for the photo; else confirmed_by_album_map (his confirmed
+    album names the row's truck); else proposed."""
     cs = [ln for ln in st.cands if ln['row']['image_id'] in image_ids]
+
+    def truck(vid, subject_key):
+        if vid is None:
+            return subject_key
+        if vid not in st.truck_keys:
+            st.truck_keys[vid] = min(identity_set(st, vid))     # the least id of the truck's identity
+        return st.truck_keys[vid]
     album_ok = {}
     for ln in st.links:
         if ln['row'].get('source_kind') == 'photos_album' and st.status(ln['key']) == 'confirmed':
@@ -177,14 +206,30 @@ def candidates_for_images(st, image_ids):
         anyd = [ln['row'].get('pass_captured_on') for ln in lns if ln['row'].get('pass_captured_on')]
         pass_day = min(comb) if comb else (min(anyd) if anyd else None)
         day = min(tdays[iid]) if tdays.get(iid) else (None if pass_day in no_days.get(iid, ()) else pass_day)
+        word, confirmed, no_truck_v = {}, [], set(payloads.C['no_vehicle_verdicts'])
+        for ln in lns:
+            r = ln['row']
+            d = st.dec.get(ln['key'])
+            r_truck = truck(r.get('vehicle_id'), r.get('subject_key'))
+            if d and d[1] in ('human', 'implied'):          # his word, by photo, frame role and truck
+                g = (r.get('frame_role', 'subject'), r_truck or 'none:' + r['verdict'])
+                if g not in word or d[2] > word[g][1]:
+                    word[g] = (d[0], d[2])
+                if d[0] == 'confirmed' and d[1] == 'human' and r.get('frame_role', 'subject') == 'subject':
+                    confirmed.append((r_truck, r['verdict'] in no_truck_v))
         for ln in lns:
             r = ln['row']
             s = st.status(ln['key'])
-            if s == 'proposed' and r.get('album_link_id'):
-                lk = r['album_link_id'][5:]
-                if lk in album_ok and album_ok[lk] == r.get('vehicle_id') and not any(
-                        o['row'].get('vehicle_id') == r.get('vehicle_id') and st.status(o['key']) == 'rejected'
-                        and st.dec[o['key']][1] == 'human' for o in lns):
+            r_truck = truck(r.get('vehicle_id'), r.get('subject_key'))
+            frame = r.get('frame_role', 'subject')
+            if s == 'proposed':
+                no_truck = r['verdict'] in no_truck_v
+                if (word.get((frame, r_truck or 'none:' + r['verdict'])) or (None,))[0] == 'rejected':
+                    s = 'rejected'
+                elif frame == 'subject' and any(places_distinct(t, r_truck) or n != no_truck for t, n in confirmed):
+                    s = 'rejected'                         # his confirm of another subject answered it
+                elif r.get('album_link_id') and album_ok.get(r['album_link_id'][5:]) and \
+                        truck(album_ok[r['album_link_id'][5:]], None) == r_truck:
                     s = 'confirmed_by_album_map'
             out.append(dict(r, id=ln['key'], pass_=ln['p_run_id'][5:], status=s, captured_on=day,
                             time_unverified=not tdays.get(iid)))
@@ -255,7 +300,7 @@ def day_records(st, ids, cust, win=('1900-01-01', '2999-12-31'), sessions=None):
 
 
 def accounting(files, vehicle, decisions=None, date_from=None, date_to=None, sessions=None):
-    """vehicle_accounting_evidence(vehicle, from, to, user) over payload files (v8)."""
+    """vehicle_accounting_evidence(vehicle, from, to, user) over payload files (v9)."""
     st = Store(files, decisions)
     ids = identity_set(st, vehicle)
     win = (date_from or '1900-01-01', date_to or '2999-12-31')

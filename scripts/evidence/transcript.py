@@ -4,8 +4,9 @@ A message_ref is '<source>:<message id>' ((v7, D4) exactly one colon, no path; t
 Claude Code session the source is the session id (the transcript <session id>.jsonl under ~/.claude/projects/*/, or
 EVIDENCE_TRANSCRIPTS) and the message id is the entry's uuid. The checks: the sheet's delivery message carries the
 sheet as sent (a text block hashing to the sheet's sha256), the reply comes after it, and the reply holds each row's
-verbatim words. (v8) They stay for every stored answer: the app shows him those words to confirm. Only booleans and
-refs leave this module: no message text is copied anywhere.
+verbatim words. (v8) They stay for every stored answer: the app shows him those words to confirm. (v9) The reply's
+own time is the message time the store keeps (p_message_at), and M10b holds it to the transcript. Only booleans,
+times and refs leave this module: no message text is copied anywhere.
 """
 import json
 import os
@@ -61,8 +62,9 @@ def carries_sheet(msg, sheet_sha256):
                for t in texts + ['\n'.join(texts)])
 
 
-def check(sheet_sha256, delivery_ref, reply_ref, verbatims, where=None):
-    """-> {'checked': bool, 'problems': [...]}: unchecked when either message is not in a local transcript."""
+def check(sheet_sha256, delivery_ref, reply_ref, verbatims, where=None, message_at=None):
+    """-> {'checked': bool, 'problems': [...]}: unchecked when either message is not in a local transcript. (v9) With
+    the stored message time, it must be the reply's own time in the transcript (within a second)."""
     if not delivery_ref:
         return {'checked': False, 'problems': ['no delivery message recorded for the sheet']}
     delivery, reply = find(delivery_ref, where), find(reply_ref, where)
@@ -80,4 +82,11 @@ def check(sheet_sha256, delivery_ref, reply_ref, verbatims, where=None):
     for row, words in sorted((verbatims or {}).items(), key=lambda x: int(x[0])):
         if _norm(words) not in body:
             problems.append('row %s: his verbatim words are not in the reply message' % row)
+    if message_at:
+        try:
+            off = abs((common.parse_ts(message_at) - common.parse_ts(reply.get('timestamp') or '')).total_seconds())
+        except ValueError:
+            off = None
+        if off is None or off > 1:
+            problems.append("the stored message time is not the reply's time in the transcript")
     return {'checked': True, 'problems': problems}

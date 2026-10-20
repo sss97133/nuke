@@ -1,8 +1,8 @@
 # Image evidence loop runner
 
-Runs the passes of the image and vehicle-record rebuild (design v8), writes their rows as the payloads of the
+Runs the passes of the image and vehicle-record rebuild (design v9), writes their rows as the payloads of the
 evidence writers, checks them, plans or performs the load, reads the result back against an exit fixture, and
-issues the owner's review sheet. The writers and readers are the M1w and M1p blocks of the v8 design (not yet
+issues the owner's review sheet. The writers and readers are the M1w and M1p blocks of the v9 design (not yet
 migrations); this folder only calls them.
 
 (v8) No job decides. The runner proposes, stores his chat answers word for word and reads; every decision is his,
@@ -15,11 +15,11 @@ payment key or a rule `owner` capture time: `owner_answer_missing`) and never op
 | | file (default) | db |
 |---|---|---|
 | Passes | build JSONL payloads from local inputs | the same |
-| Checks | `checks.py` against the v8 CHECK rules and the privacy rules | the same; a violation stops the run |
+| Checks | `checks.py` against the v9 CHECK rules and the privacy rules | the same; a violation stops the run |
 | Load | `loader.py` dry run: `load-plan.json` (every call, batch and gate, no network) | writer RPCs through PostgREST; `load-manifest.json` (line key -> id); every returned id appended to the manifest |
 | Exit test | `exit_test.py` against `readers.py`, a Python model of `vehicle_accounting_evidence` over the files | the read keyed by the owner through `scripts/data/q.sh`; stored as an `exit_test` run; the confirmed level waits on his decisions in the app |
 | Review | `review-<date>.md` + `.json` | the same, and a `review` run (opened running) holding the sheet's sha256, row count and each row's targets, question and asks; the sheet joins the sheets index; the run is closed once, when the sheet is sent |
-| Answers | a local receipt (sha256 and reading per row) | `evidence_record_answers`: his words stored, written closed; nothing decided |
+| Answers | a local receipt per message (sha256 and reading per row) | `evidence_record_answers`: his words stored per chat message with its time, written closed; nothing decided |
 | Promote, repin, publish, probe | print what they would call | the writers, one image per call |
 
 db mode refuses to start unless `EVIDENCE_DB_WRITES=1`. Set it only after M1a and M1w are deployed and their
@@ -53,21 +53,25 @@ M10b also checks the chat, from two local records in the loop dir (each path can
 is recorded) and `disputed.jsonl` (`EVIDENCE_DISPUTED`; answers runs a second reader, the transcript check or his
 objection disputed, and the rows a later sheet asked again). `M10b_answers` matches each answers run to the chat
 transcript (`transcript.py`: the sheet's delivery message hashes to the sheet's sha256, his reply comes after it and
-holds each row's verbatim words) and marks a failing run disputed; the next sheet asks its rows again. Reading the
-auth audit log for his account (M10b item 7) is the lead's.
+holds each row's verbatim words, and (v9) the stored message time is the reply's own) and marks a failing run
+disputed; the next sheet asks its rows again. Reading the auth audit log for his account (M10b item 7) is the lead's.
 
 (v8) M4a is transcription accuracy: for each of his decisions that cites a stored answer, whether the stored reading
 (`detail.stored_reading`) agrees with what he decided. M10_stamps expects no agent row, no owner day a job wrote, no
 owner statement without his decision and no service_role EXECUTE on `decide_evidence`; M10_step_up, every human
-decision from a step-up session. M15 reads `evidence_answers_to_confirm(:uid)`: his stored answers waiting for him,
-the rows re-written with another meaning since (asked again), and his decisions so far; until he has decided, the
-confirmed level reads "waiting on his app".
+decision from a step-up session. M15 reads `evidence_answers_to_confirm(:uid)`: his stored answers waiting for him
+((v9) the latest answer per sheet row, by message time), the rows re-written with another meaning since (asked
+again), and his decisions so far; until he has decided, the confirmed level reads "waiting on his app".
 
 ## Per-row results reported, never retried
 
 `already_decided`, `already_rejected`, `kept_stronger`, `owner_answer_missing`, `entity_is_owners_call` and
 `unchanged` (and the refusals `image_not_eligible`, `vehicle_not_in_scope`, `source_not_users`, `vehicle_not_found`)
-are counted in the load manifest and never retried: the next run or the next sheet asks again.
+are counted in the load manifest and never retried: the next run or the next sheet asks again. (v9) A photo's
+`already_rejected` (a truck he said no to for it, on any row or id of that truck, or a place other than the subject he
+confirmed) writes nothing and leaves the line off the sheet; a skip a writer both counts and itemizes is counted once.
+A claim his decision or his who-paid statement answers is never superseded by a pass: the line's support goes onto
+his claim (`claim_carries_owner_decision`); a claim that is no longer current is `claim_not_current`.
 
 ## Run file mode
 
@@ -99,7 +103,7 @@ a path not on the list, and any path containing `FOR-SIGNING` or `jenny-inbox` (
 resolving a symlink). A refused path stops the loop. Amounts are read from these files only when the loader resolves
 an `@amount:<source>:<ref>` placeholder in db mode, in memory.
 
-## Owner review and answers (v8)
+## Owner review and answers (v9)
 
 - Each numbered row asks one question, of one decision kind, in one dimension, and names its targets: the exact ids a
   bare yes or no is about, plus the payment key, account or image a named place may land on. The review run stores the
@@ -115,14 +119,24 @@ an `@amount:<source>:<ref>` placeholder in db mode, in memory.
   and links; an account its map row and the account. A **who-paid** row (`asks: party`, exactly one target) asks only
   about money no payment source carries (a jacket line, an order with no bank line: its one placement link) or an
   acquisition or sale claim (the case's "who paid for the truck"). Money with a payment key gets its payer from the
-  account map: its question is the account's row, and `evidence_open_run` refuses a who-paid row on it. A row whose
-  targets place nothing asks about place `none`. Rows a second reader or his objection disputed are asked again ("asked
-  again") until a delivered sheet has asked them.
+  account map: its question is the account's row, and `evidence_open_run` refuses a who-paid row on it, and (v9) on
+  any line of a payment source (bank, card or ledger line, payment event, QB transaction, P&L line), keyed or not. A
+  row whose targets place nothing asks about place `none`. Rows a second reader or his objection disputed are asked
+  again ("asked again") until a delivered sheet has asked them; (v9) a row of a sent db sheet is asked again by
+  reference (`{"reask_of": "review:<sheet run>#<row>"}`): the writer copies it exactly as it was frozen, and the
+  sidecar keeps the frozen row. A sheet lists at most 10,000 targets.
 - Send the `.md` text as its own message, then `record_answers.py delivered --message-ref <source>:<message id>`
-  (`--mode db` for a db sheet: it closes the review run, once). A message ref is `<source>:<message id>`: one colon, no
-  path, stored lower-cased; for a Claude session the session id and the message's own uuid.
-- `store` takes his reply as a later message (one answers run per sheet and per message id, whatever the source; the
-  run is written closed) with his words verbatim and, when the transcriber has one, a structured reading:
+  (`--mode db` for a db sheet: it closes the review run, once). Record the delivery right after posting the sheet and
+  before he replies: (v9) the store takes only messages written after the run was closed. A message ref is
+  `<source>:<message id>`: one colon, no path, stored lower-cased; for a Claude session the session id and the
+  message's own uuid.
+- `store` takes one message of his reply, a later message than the delivery: (v9) one answers run per chat message
+  (a reply spread over several messages is stored message by message on the sheet it answers, one receipt each; a
+  message id is stored once, whatever the source), written closed, with the message's own time: the transcript's when
+  it is on this Mac, else `--message-at` as the chat shows it, never the time of storing. The store refuses a sheet
+  never sent (`sheet_not_sent`), a message older than the sheet's sending (`message_predates_sheet`), a time from the
+  future, an empty set and more than 20,000 characters of his words per row; refusals are reported, never retried.
+  Each row carries his words verbatim and, when the transcriber has one, a structured reading:
   `{"decision": "confirmed" | "rejected" | "unsure", and at most one place of the row's dimension}`: `vehicle_id` /
   `subject_key` on a photo, album or unallocated placement, `entity_key` on an account or who-paid row, `captured_on`
   on a capture time, none on a pair, claim, share or contradiction. "Yes" is `{confirmed}` (or names the asked place),
@@ -136,7 +150,7 @@ an `@amount:<source>:<ref>` placeholder in db mode, in memory.
   the answers run on any disagreement with a stored reading (rows stored unread are skipped); `dispute` records his
   objection to a stored reading. `decide` is retired.
 
-## Payload rules (v8)
+## Payload rules (v9)
 
 - A pass names only third parties (`third_party:<x>`) as payer, payee or party, or leaves it NULL: whose money it
   was comes from his confirmed account map or his own statement, which only his decision in the app writes. The owner
@@ -157,6 +171,15 @@ an `@amount:<source>:<ref>` placeholder in db mode, in memory.
   rejected leaves the photo undated.
 - Work sessions are his own: a session another user logged on the truck never makes a work day.
 - Album items with no image row become `photos_item` links (context, `photos:<uuid>`), listed per day by the reader.
+
+## The file-mode readers (v9)
+
+`readers.py` follows `vehicle_accounting_evidence` and the day readers over the payload files (the exit test's file
+mode). A photo's row reads `rejected` when his latest word on that photo, truck (its identity: his confirmed same-truck
+pairs) and frame role, on any row, is a no, or when he confirmed another subject for the photo; an album row reads
+`confirmed_by_album_map` only when the album's truck is the row's. The `stated` band (his confirmed who-paid statement
+whose money a keyed payment now carries: listed, never summed) needs his statement, which only his decision in the app
+writes, so it never appears in file mode.
 
 ## Privacy rules
 
@@ -204,8 +227,8 @@ Install them in file mode first; switch `__MODE__` to `db` and `__DB_WRITES__` t
 |---|---|
 | `common.py` | modes, pinned sources, PostgREST client, q.sh reader, case context |
 | `payloads.py` | the writer contract (signatures, vocabularies) and every payload builder; override per case |
-| `checks.py` | the v8 CHECK rules and the privacy scan over a payload directory |
-| `readers.py` | file-mode `vehicle_accounting_evidence` (v8) and the M5 extraction |
+| `checks.py` | the v9 CHECK rules and the privacy scan over a payload directory |
+| `readers.py` | file-mode `vehicle_accounting_evidence` (v9) and the M5 extraction |
 | `manifest.py` | the manifest of ids every writer call returned, the M10b reconciliation, the disputed list |
 | `transcript.py` | finds a `<source>:<message id>` in the Claude Code transcripts; checks a sheet's delivery and his reply |
 | `inputs.py`, `money.py` | input readers; pinned money sources (metadata for passes, amounts for the loader) |

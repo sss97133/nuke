@@ -35,7 +35,7 @@ def _items(result):
 
 
 def returned(writer, args, result):
-    """The ids one writer call returned, by kind (draft.sql v5-v8 return shapes)."""
+    """The ids one writer call returned, by kind (draft.sql v5-v9 return shapes)."""
     out = {'ids': [], 'decision_ids': [], 'existing': [], 'support': [], 'results': collections.Counter(),
            'image_id': None}
     args = args or {}
@@ -62,6 +62,8 @@ def returned(writer, args, result):
             out['results'][it.get('result') or 'none'] += 1
             if _uuid(it.get('candidate_id')):
                 (out['ids'] if it.get('result') == 'proposed' else out['existing']).append(it['candidate_id'])
+            if _uuid(it.get('confirmed_candidate_id')):          # (v9) already_rejected: the subject he confirmed
+                out['existing'].append(it['confirmed_candidate_id'])
         if isinstance(result, dict) and result.get('unchanged'):
             out['results']['unchanged'] += int(result['unchanged'])
     elif writer == 'propose_evidence_links':
@@ -74,9 +76,10 @@ def returned(writer, args, result):
         r = result if isinstance(result, dict) else {}
         out['ids'] += [x for x in r.get('ids') or [] if _uuid(x)]
         out['decision_ids'] += [x for x in r.get('decision_ids') or [] if _uuid(x)]
+        itemized = {it.get('result') or 'skipped' for it in r.get('skipped') or []}
         for k, v in r.items():          # proposed, machine_confirmed, unchanged, (v7/v8) already_rejected, ... counts
-            if isinstance(v, int) and not isinstance(v, bool) and v:
-                out['results'][k] += v
+            if isinstance(v, int) and not isinstance(v, bool) and v and k not in itemized:
+                out['results'][k] += v          # (v9, M5) a result the writer also itemizes is counted once, below
         for it in r.get('skipped') or []:
             out['results'][it.get('result') or 'skipped'] += 1
             if _uuid(it.get('id')):
@@ -195,9 +198,9 @@ def mark_disputed(rec, path=None):
 
 def check_answers(runs, sheets, where=None):
     """(v6, AC10; M10b item 5, kept in v8 for every stored answer) Each answers run against the chat: its sheet's
-    delivery message carries the sheet as issued, his reply comes after it and holds each row's verbatim words. runs:
-    [{id, sheet_run, message_ref, rows: {"<n>": {"verbatim"}}}] (read by q.sh; the words stay in memory); sheets: the
-    sheets index (review_sheet)."""
+    delivery message carries the sheet as issued, his reply comes after it and holds each row's verbatim words, and
+    (v9) the stored message time is the reply's own. runs: [{id, sheet_run, message_ref, message_at, rows: {"<n>":
+    {"verbatim"}}}] (read by q.sh; the words stay in memory); sheets: the sheets index (review_sheet)."""
     import transcript
     out = {'answers_runs': len(runs), 'checked': 0, 'unchecked': [], 'problems': [], 'no_delivery': []}
     for r in runs:
@@ -206,7 +209,8 @@ def check_answers(runs, sheets, where=None):
             out['no_delivery'].append(r['id'])
             continue
         res = transcript.check(sh.get('sheet_sha256'), sh['delivered_ref'], r.get('message_ref'),
-                               {k: (v or {}).get('verbatim') for k, v in (r.get('rows') or {}).items()}, where)
+                               {k: (v or {}).get('verbatim') for k, v in (r.get('rows') or {}).items()}, where,
+                               r.get('message_at'))
         if not res['checked']:
             out['unchecked'].append(r['id'])
         else:
