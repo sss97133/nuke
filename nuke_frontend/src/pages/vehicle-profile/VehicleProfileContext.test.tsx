@@ -113,7 +113,7 @@ beforeEach(() => {
       const response = reply(request);
       if (response) return response;
       if (path === '/rest/v1/rpc/get_vehicle_profile_data') return json(profile(subject(request)));
-      if (path === '/rest/v1/vehicle_images') return json([photo(subject(request))]);
+      if (path === '/rest/v1/vehicle_images' || path === '/rest/v1/vehicle_images_public') return json([photo(subject(request))]);
       if (path === '/rest/v1/vehicle_events') return json([listing(subject(request))]);
       return json([]);
     } },
@@ -147,7 +147,8 @@ async function render(strict = false, counts = false) {
 }
 const visit = async (id: string) => { await act(async () => go(`/vehicle/${id}`)); };
 const release = async (pending: ReturnType<typeof deferred>, response: Response) => { await act(async () => pending.resolve(response)); };
-const endpoint = (request: RequestRecord, name: string, id: string) => request.url.pathname === `/rest/v1/${name}` && subject(request) === id;
+// Signed-out gallery reads go to vehicle_images_public; the fixtures treat it as the same rows.
+const endpoint = (request: RequestRecord, name: string, id: string) => (request.url.pathname === `/rest/v1/${name}` || (name === 'vehicle_images' && request.url.pathname === '/rest/v1/vehicle_images_public')) && subject(request) === id;
 
 it('withholds the previous primary profile in the very first committed frame of a pending route', async () => {
   const pending = deferred();
