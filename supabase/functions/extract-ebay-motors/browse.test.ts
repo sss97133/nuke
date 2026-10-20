@@ -72,3 +72,9 @@ Deno.test("sweep refuses to spend the reserved quota", async () => {
   const rep = await sweep(fakeSb([]), client, { reserveCalls: 400, dryRun: true });
   assertEquals(rep.stopped?.startsWith("quota"), true);
 });
+
+Deno.test("the year aspect is eBay's live name, Model Year, and filters on that exact name", () => {
+  const ya = yearAspect([{ localizedAspectName: "Make" }, { localizedAspectName: "Model Year", aspectValueDistributions: [{ localizedAspectValue: "1969", matchCount: 7 }] }])!;
+  assertEquals(ya.name, "Model Year");
+  assertEquals(aspectFilterFor(ya.name, [1969]), "categoryId:6001,Model Year:{1969}");
+});
