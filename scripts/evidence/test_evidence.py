@@ -635,5 +635,38 @@ class CustodyBounds(SyntheticCase):
         self.assertEqual((c['kind'], c['occurred_from'], c['occurred_to']), ('acquisition', '2031-01-18', '2031-01-18'))
 
 
+class BatchOffsets(unittest.TestCase):
+    def test_unjoined_rows_take_their_batch_offset_and_the_gate_counts(self):
+        import csv
+        tmp = tempfile.mkdtemp(prefix='evidence-batch-')
+        self.addCleanup(shutil.rmtree, tmp, True)
+        td = testdata.make_case(os.path.join(tmp, 'case'))
+        p = os.path.join(tmp, 'case', 'photos_join.csv')
+        with open(p, newline='') as f:
+            rows = list(csv.DictReader(f))
+        ssd = [r for r in rows if r['source'] == 'ssd_blast'][:2]       # 26 joined: a pooled key under 50
+        upl = [r for r in rows if r['source'] == 'user_upload' and r['albums'] == ''][:3]
+        for r in ssd + upl:
+            r.update(match_kind='none', capture_utc_true='', photos_uuid='', albums='', album_uuids='')
+        with open(p, 'w', newline='') as f:
+            w = csv.DictWriter(f, fieldnames=list(rows[0]))
+            w.writeheader()
+            w.writerows(rows)
+        ctx, built, counts = build(td['case'], os.path.join(tmp, 'out'))
+        rep = checks.validate_dir(str(ctx.out), ctx, money.Sources(ctx))
+        self.assertEqual(rep.total, 0, rep.as_dict()['by_file'])
+        batch = [ln['row'] for ln in built.files['time_claims.jsonl'] if ln['row']['rule'] == 'batch_offset_v1']
+        keys = sorted({r['batch_key'] for r in batch})
+        self.assertEqual(len(batch), 5)
+        self.assertEqual(keys, ['ssd_blast|pool|2033-0700', 'user_upload|2033-03-01|-0700'])
+        self.assertTrue(all(r['offset_seconds'] in (0, -10800) for r in batch))
+        gate = [r for r in common.load_json(os.path.join(tmp, 'out', 'run.json'))['runs'] if r['key'] == 'run:time_rule_gate']
+        g = gate[0]['close']['counts']['batches']
+        self.assertEqual(g['ssd_blast|pool|2033-0700']['joined'], 24)
+        self.assertEqual(g['ssd_blast|pool|2033-0700']['worst_day_agreement'], 1.0)
+        self.assertEqual(g['user_upload|2033-03-01|-0700']['offset_seconds'], -10800)
+        self.assertEqual(counts['candidates.combined.jsonl'], 128)
+
+
 if __name__ == '__main__':
     unittest.main(verbosity=1)
