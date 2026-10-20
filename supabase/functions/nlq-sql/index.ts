@@ -3,6 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 import { callLLM, getLLMConfig, type AnalysisTier, type LLMProvider } from "../_shared/llmProvider.ts"
 import { corsHeaders } from "../_shared/cors.ts"
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { requireAdminOrService, requireWriteAuth } from "../_shared/writeGuard.ts"
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? ""
 const SERVICE_ROLE_KEY =
@@ -258,6 +259,10 @@ async function execSql(supabase: any, sql: string): Promise<{ data?: any[]; erro
 }
 
 Deno.serve(async (req) => {
+  // The model's SQL runs through execute_sql as the database owner, so this is the admin query console's
+  // (useAdminAccess: an active admin_users row) or the service key's; signed-in alone is anyone (2026-10-20).
+  const denied = (await requireWriteAuth(req, { headers: cors })) ?? (await requireAdminOrService(req, { headers: cors }))
+  if (denied) return denied
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors })
   if (req.method !== "POST") return json(405, { error: "Method not allowed" })
 

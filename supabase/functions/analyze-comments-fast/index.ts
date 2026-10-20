@@ -427,7 +427,9 @@ async function calibrate(supabase: any) {
 
 async function analyze(supabase: any, body: any) {
   const batchSize = Math.min(body.batch_size || 100, 500);
-  const minComments = body.min_comments ?? 5;
+  // Written into the execute_sql text below (it runs as the database owner): only an integer may reach it.
+  const minCommentsIn = Number(body.min_comments ?? 5);
+  const minComments = Number.isFinite(minCommentsIn) ? Math.max(0, Math.trunc(minCommentsIn)) : 5;
   const offset = body.offset ?? 0;
 
   // Get candidate vehicles (same logic as batch-comment-discovery)
