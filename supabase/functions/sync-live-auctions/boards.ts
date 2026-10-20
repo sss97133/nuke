@@ -132,6 +132,57 @@ export function bonhamsLot(doc: BonhamsLotDoc) {
   };
 }
 
+/** One open auction card of The MB Market's live list (its get_auction_list endpoint's HTML). */
+export interface MbCard {
+  slug: string;
+  url: string;
+  title: string;
+  current_bid: number | null;
+  currency: string | null;
+  image: string | null;
+}
+
+const MB_CURRENCY: Record<string, string> = { "$": "USD" }; // the house prices in US dollars ("$14,500")
+/** Plain text of a title: tags and stray angle brackets out, then entities, &amp; last so nothing is unescaped twice. */
+function plainText(html: string): string {
+  let s = html, prev: string;
+  do { prev = s; s = s.replace(/<[^<>]*>/g, ""); } while (s !== prev); // tags out, repeated until none is left
+  return s.replace(/[<>]/g, "").replace(/&quot;/g, '"').replace(/&#0?39;|&apos;/g, "'").replace(/&amp;/g, "&").trim();
+}
+
+/** The cards of The MB Market's live auction list: link, title, current bid ("Bidding now open" = no bid yet), image. */
+export function parseMbAuctionList(html: string): MbCard[] {
+  const out: MbCard[] = [];
+  for (const box of html.split('<div class="box">').slice(1)) {
+    const slug = box.match(/<a href="\/([^"/?#]+)"/)?.[1];
+    const title = box.match(/<h3[^>]*>([\s\S]*?)<\/h3>/)?.[1];
+    if (!slug || !title) continue;
+    const bid = box.match(/CURRENT BID: <\/span><span>\s*([$€£])\s*([\d,]+)/);
+    out.push({
+      slug,
+      url: `https://thembmarket.com/${slug}`,
+      title: plainText(title),
+      current_bid: bid ? Number(bid[2].replace(/,/g, "")) : null,
+      currency: bid ? MB_CURRENCY[bid[1]] ?? null : null,
+      image: box.match(/data-src="(https?:[^"]+)"/)?.[1] ?? box.match(/<img src="(https?:[^"]+)"/)?.[1] ?? null,
+    });
+  }
+  return out;
+}
+
+/** An MB Market lot page: its close time (time_ends_ts, epoch seconds, moved by soft-close extensions), bid count, bid. */
+export function parseMbLot(html: string): { ends: string | null; bid_count: number | null; current_bid: number | null } {
+  const ts = Number(html.match(/name="time_ends_ts" value="(\d+)"/)?.[1]);
+  const bid = html.match(/CURRENT BID <\/div><span>\s*[$€£]\s*([\d,]+)/);
+  const history = html.match(/BID HISTORY <\/div><span><a [^>]*>([^<]*)<\/a>/)?.[1]?.trim() ?? null;
+  const count = history && /^\d+$/.test(history) ? Number(history) : history && /bidding now open/i.test(history) && !bid ? 0 : null;
+  return {
+    ends: Number.isFinite(ts) && ts > 0 ? new Date(ts * 1000).toISOString() : null,
+    bid_count: count,
+    current_bid: bid ? Number(bid[1].replace(/,/g, "")) : null,
+  };
+}
+
 /** The fields of a Bonhams Typesense sale document (collection "auctions") the reader uses. */
 export interface BonhamsSaleDoc {
   id: string;

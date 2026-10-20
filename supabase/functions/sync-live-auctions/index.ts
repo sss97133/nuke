@@ -9,6 +9,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
  *   - BaT: Scrapes auctionsCurrentInitialData from /auctions/ page (no API key needed)
  *   - Collecting Cars: the site's public Typesense listing collection (production_listings)
  *   - PCarMarket: its server-rendered live auction board (direct fetch); bids of lots that moved from the lot page
+ *   - The MB Market: its live-list endpoint; a lot page (close time, bid count) for a lot that is new or whose bid moved
  *   - Bonhams: its public Typesense sale and lot index; bids of its online (timed) sales from its bidding platform
  *     (live.bonhams.com); lots of in-room catalog sales are written 'upcoming', never live
  *   - Broad Arrow: its bidding site's timed online sales (sale list hourly, lot list with top bids every run)
@@ -33,6 +34,7 @@ import { archiveFetch } from "../_shared/archiveFetch.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { parseBatIdentityFromUrl, parseBatIdentityFromTitle } from "../_shared/batParser.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { type MbCard, parseMbAuctionList, parseMbLot } from "./boards.ts";
 import { mustWrite, softWrite } from '../_shared/writeResult.ts';
 import {
   type BonhamsBidState, type BonhamsLotDoc, type BonhamsSaleDoc, bonhamsLot, bonhamsLotPhase, bonhamsSaleKind,
@@ -781,6 +783,96 @@ async function goodingFillDiscovery(supabase: GoodingDb, auctions: LiveAuction[]
 }
 
 // ============================================
+// The MB Market Sync (its live-list endpoint; a lot page only for a lot that is new or whose bid moved)
+// ============================================
+
+const MB_UA = "NukeListingCollector/1.0 (+https://nuke.ag)";
+
+/** Every card of one MB Market list ("live" or "no-reserve") from the endpoint its browse page calls. */
+async function mbList(type: "live" | "no-reserve"): Promise<MbCard[]> {
+  const cards: MbCard[] = [];
+  for (let page = 1, last = 1; page <= Math.min(last, 5); page++) {
+    const res = await fetch("https://thembmarket.com/ajax/index.php?action=get_auction_list", { // guardrail-allow: raw-fetch (house JSON API)
+      method: "POST",
+      headers: {
+        "User-Agent": MB_UA,
+        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+        "X-Requested-With": "XMLHttpRequest",
+        Referer: `https://thembmarket.com/browse-auctions/${type}`, // the endpoint answers an empty body without it
+      },
+      body: new URLSearchParams({ form_data: `limit=100&auction_page=${page}&type=${type}&sort_by=end-date` }),
+    });
+    if (!res.ok) throw new Error(`MB Market ${type} list HTTP ${res.status}`);
+    const body = await res.json().catch(() => null);
+    if (body?.status !== "success") throw new Error(`MB Market ${type} list: ${body?.messages || "no JSON"}`);
+    const html = String(body.data?.html ?? "");
+    const got = parseMbAuctionList(html);
+    if (!got.length && !/no-results/.test(html)) throw new Error(`MB Market ${type} list: no cards parsed`);
+    cards.push(...got);
+    last = Number(body.data?.last_page) || 1;
+  }
+  return cards;
+}
+
+async function syncMbMarket(supabase: ReturnType<typeof createClient>): Promise<{ auctions: LiveAuction[]; error: string | null }> {
+  try {
+    const live = await mbList("live");
+    const noReserve = new Set((await mbList("no-reserve")).map((c) => c.slug));
+    // A lot's close time and bid count only move with a bid (soft close), so the schedule's copy stands until the card's
+    // bid differs from it; the lot page (archived) is read for a new lot or a moved bid.
+    const { data: srcRow } = await supabase.from("live_auction_sources").select("id").eq("slug", "mb-market").maybeSingle();
+    const src = srcRow as { id: string } | null;
+    const { data: held } = src
+      ? await supabase.from("monitored_auctions").select("external_auction_id, auction_end_time, bid_count, current_bid_cents")
+        .eq("source_id", src.id).eq("is_live", true).limit(500)
+      : { data: [] };
+    const heldBy = new Map((held ?? []).map((h: { external_auction_id: string }) => [h.external_auction_id, h]));
+    const now = new Date().toISOString();
+    const auctions: LiveAuction[] = [];
+    let lotReads = 0;
+    for (const c of live) {
+      const ident = identityFromSlugAndTitle(c.slug, c.title);
+      if (!ident.year) continue; // parts lots (wheels, a steering wheel) carry no vehicle year
+      const h = heldBy.get(c.slug) as { auction_end_time: string | null; bid_count: number | null; current_bid_cents: number | null } | undefined;
+      const cents = c.current_bid !== null ? Math.round(c.current_bid * 100) : null;
+      let ends = h?.auction_end_time ?? null;
+      let bidCount = h?.bid_count ?? null;
+      if (!h || !ends || bidCount === null || (h.current_bid_cents === null ? null : Number(h.current_bid_cents)) !== cents) {
+        const { html, error } = await archiveFetch(c.url, {
+          platform: "mb-market", skipCache: true, useFirecrawl: false, directFetchOptions: { publicOnly: true }, callerName: "sync-live-auctions",
+        });
+        if (error || !html) return { auctions: [], error: `MB Market lot ${c.slug}: ${error ?? "no HTML"}` };
+        const lot = parseMbLot(html);
+        ends = lot.ends;
+        bidCount = lot.bid_count;
+        lotReads++;
+      }
+      auctions.push({
+        url: c.url,
+        title: c.title,
+        platform: "mb-market",
+        auction_end_date: ends ?? "",
+        current_bid: c.current_bid,
+        bid_count: bidCount,
+        currency: c.currency ?? "USD", // the house lists in US dollars; a lot without a bid shows no price
+        no_reserve: noReserve.has(c.slug),
+        reserve_met: null,
+        year: ident.year,
+        make: ident.make,
+        model: ident.model,
+        thumbnail_url: c.image,
+        external_id: c.slug,
+        raw_data: { source: "mb_market_live_list", synced_at: now },
+      });
+    }
+    console.log(`[sync-live-auctions] MB Market: ${live.length} live cards, ${auctions.length} vehicles, ${lotReads} lot pages read`);
+    return { auctions, error: null };
+  } catch (e: unknown) {
+    return { auctions: [], error: `MB Market sync failed: ${e instanceof Error ? e.message : String(e)}` };
+  }
+}
+
+// ============================================
 // Bonhams Motoring Sync (public Typesense sale + lot index; bids from its bidding platform)
 // ============================================
 
@@ -1266,6 +1358,8 @@ function okJson(body: unknown, status = 200): Response {
   });
 }
 
+BOARD_SOURCES["mb-market"] = "mb-market"; // syncMbMarket reads the house's complete live list
+
 Deno.serve(async (req) => {
   // Writes are never anonymous: service key, signed-in user, or nothing (P0.2, 2026-09-27).
   const denied = await requireWriteAuth(req);
@@ -1349,6 +1443,7 @@ Deno.serve(async (req) => {
         "barrett-jackson",
         "rm-sothebys",
         "gooding",
+        "mb-market",
         "bonhams",
         "broad-arrow",
       ];
@@ -1420,6 +1515,9 @@ Deno.serve(async (req) => {
             break;
           case "gooding":
             syncResult = await syncGooding(supabase, !skipVehicleSync);
+            break;
+          case "mb-market":
+            syncResult = await syncMbMarket(supabase);
             break;
           case "bonhams":
             syncResult = await syncBonhams();
