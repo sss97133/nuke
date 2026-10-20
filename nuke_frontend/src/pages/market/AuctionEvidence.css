@@ -212,6 +212,7 @@
 .market-chips { display: flex; flex-wrap: wrap; gap: 4px; }
 .market-chip { display: inline-flex; align-items: baseline; gap: 6px; min-height: 28px; padding: 4px 8px; border: 2px solid var(--border); border-radius: 0; background: var(--bg); color: var(--text); cursor: pointer; }
 .market-chip:hover { border-color: var(--text); }
+.market-chip__logo { width: 18px; height: 18px; align-self: center; object-fit: contain; background: #fff; padding: 1px; }
 .market-chip--nr { background: var(--yellow-200); }
 .market-chip[aria-pressed="true"] { background: var(--text); color: var(--bg); border-color: var(--text); }
 .market-chip[aria-pressed="true"] .k-label, .market-chip[aria-pressed="true"] .k-measure { color: inherit; }
