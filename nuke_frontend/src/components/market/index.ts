@@ -5,4 +5,3 @@
  */
 
 export { default as VenueSpreadAnalyzer } from './VenueSpreadAnalyzer';
-export { default as MarketGeographyMap } from './MarketGeographyMap';
