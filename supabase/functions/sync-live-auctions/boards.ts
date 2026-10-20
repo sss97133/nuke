@@ -158,6 +158,111 @@ export function bonhamsSaleKind(sale: BonhamsSaleDoc): BonhamsSaleKind {
   return "catalog";
 }
 
+/** An HTML attribute value as Astro writes island props (&quot; &amp; &#39; &lt; &gt; and numeric references). */
+function unescapeAttr(s: string): string {
+  const named: Record<string, string> = { quot: '"', amp: "&", apos: "'", lt: "<", gt: ">" };
+  return s.replace(/&(?:#(\d+)|#x([0-9a-f]+)|([a-z]+));/gi, (m, dec, hex, name) =>
+    dec ? String.fromCodePoint(Number(dec)) : hex ? String.fromCodePoint(parseInt(hex, 16)) : named[name.toLowerCase()] ?? m);
+}
+
+/** Astro island props: each value is [type, value]; type 0 a plain value (objects nest the same way), 1 an array. */
+function astroValue(v: unknown): unknown {
+  if (!Array.isArray(v) || v.length !== 2 || typeof v[0] !== "number") return v;
+  const [t, x] = v;
+  if (t === 1) return Array.isArray(x) ? x.map(astroValue) : x;
+  if (t === 0 && x !== null && typeof x === "object" && !Array.isArray(x)) {
+    return Object.fromEntries(Object.entries(x as Record<string, unknown>).map(([k, y]) => [k, astroValue(y)]));
+  }
+  return x; // a primitive, or a Date / Map / Set / URL as Astro writes it
+}
+
+/** One auction on Classic Trader's auctions page, as the house's own auction record on the card states it. */
+export interface ClassicTraderAuction {
+  auction_id: number;
+  listing_id: number | null;
+  ad_type: string | null; // CarAd | MotorbikeAd
+  url: string;
+  title: string;
+  year: number | null;
+  make: string | null;
+  model: string | null;
+  model_family: string | null;
+  state: string; // RUNNING | PUBLISHED (not started) | WON | SOLD ...
+  type: string | null; // REGULAR | SEALED (bids hidden)
+  currency: string | null;
+  current_bid: number | null;
+  bid_count: number | null;
+  starts: string | null;
+  ends: string | null;
+  reserve: string | null; // NO_RESERVE_PRICE | RESERVE_PRICE_MET | RESERVE_PRICE_NEARLY_MET | RESERVE_PRICE_NOT_MET
+  no_reserve: boolean;
+  reserve_met: boolean | null;
+  estimate_low: number | null;
+  estimate_high: number | null;
+  image: string | null;
+  location: string | null;
+}
+
+/**
+ * Every auction on Classic Trader's server-rendered auctions page (classic-trader.com/uk/auctions), once each, with a
+ * count per state. Each card's island props carry the vehicle ad and its auction record: the auction's own currency
+ * (EUR and CHF on 2026-10-20; the card shows the bid in it), the current highest bid, the bid count, and absolute start
+ * and end times with their offset (a card's "Time left" is a countdown from ends_at, and a bid in the closing buffer
+ * moves ends_at later). The page lists the same auction in several sections; the catalog leads with every running
+ * auction, then the not yet started, then the ended.
+ */
+export function parseClassicTraderAuctions(html: string): { auctions: ClassicTraderAuction[]; states: Record<string, number> } {
+  const byId = new Map<number, ClassicTraderAuction>();
+  const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : null);
+  const str = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null);
+  for (const m of html.matchAll(/\sprops="([^"]*)"/g)) {
+    if (!m[1].includes("&quot;vehicleAd&quot;")) continue;
+    // deno-lint-ignore no-explicit-any
+    let ad: any;
+    try {
+      ad = astroValue([0, JSON.parse(unescapeAttr(m[1]))]) as Record<string, unknown>;
+      ad = ad.vehicleAd;
+    } catch {
+      continue;
+    }
+    const a = ad?.auction;
+    const id = num(a?.id);
+    if (id === null || byId.has(id)) continue;
+    const v = ad.vehicle ?? {};
+    const bid = num(a.current_highest_bid_amount);
+    const reserve = str(a.reserve_price_info);
+    const image = Array.isArray(ad.images) ? ad.images[0] : null;
+    byId.set(id, {
+      auction_id: id,
+      listing_id: num(ad.id),
+      ad_type: str(ad.type),
+      url: str(ad.canonicalUrl) ?? str(ad.url) ?? "",
+      title: (str(ad.title) ?? "").replace(/^(\d{4})\s*\|\s*/, "$1 "),
+      year: num(ad.yearOfProduction),
+      make: str(v.make?.label),
+      model: str(v.modelSpecification?.label) ?? str(v.model?.label),
+      model_family: str(v.model?.label),
+      state: str(a.state) ?? "",
+      type: str(a.type),
+      currency: str(a.currency),
+      current_bid: bid !== null && bid > 0 ? bid : null,
+      bid_count: num(a.number_of_bids),
+      starts: str(a.starts_at),
+      ends: str(a.ends_at),
+      reserve,
+      no_reserve: reserve === "NO_RESERVE_PRICE",
+      reserve_met: reserve === "RESERVE_PRICE_MET" ? true : reserve && reserve !== "NO_RESERVE_PRICE" ? false : null,
+      estimate_low: num(a.estimated_price_range_lower),
+      estimate_high: num(a.estimated_price_range_upper),
+      image: str(image?.thumbnailUrl?.large) ?? str(image?.originalImageUrl),
+      location: [ad.location?.city, ad.location?.countryCode].map((s: unknown) => String(s ?? "").trim()).filter(Boolean).join(", ") || null,
+    });
+  }
+  const states: Record<string, number> = {};
+  for (const x of byId.values()) states[x.state] = (states[x.state] ?? 0) + 1;
+  return { auctions: [...byId.values()], states };
+}
+
 /** One lot's bidding state as Bonhams' bidding platform reports it (POST live.bonhams.com/widget/lots/<sale AM id>). */
 export interface BonhamsBidState {
   am_lot_id: string;

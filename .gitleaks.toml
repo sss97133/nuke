@@ -79,6 +79,17 @@ title = "Nuke Key Guardian"
     regexTarget = "line"
     regexes = ['''"sha256": "[0-9a-f]{64}" \},?$''']
 
+  # Classic Trader's public CDN image file names (vehicle_ad_standard_image_<md5>.jpg) in its captured auctions page
+  # fixture and the live board contract test, not credentials.
+  [[rules.allowlists]]
+    condition = "AND"
+    paths = [
+      '''(^|/)supabase/functions/sync-live-auctions/fixtures/classictrader-auctions-\d{4}-\d{2}-\d{2}\.html$''',
+      '''(^|/)supabase/sql/test_classic_trader_live_board\.sql$''',
+    ]
+    regexTarget = "line"
+    regexes = ['''cdn\.classic-trader\.com/I/images/[0-9a-z_]+/vehicle_ad_standard_image_[0-9a-f]{32}\.jpg''']
+
 [[rules]]
   id = "modal-token"
   description = "Modal Token"
