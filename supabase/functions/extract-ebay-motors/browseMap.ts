@@ -5,6 +5,9 @@
  * on EBAY_US/EBAY_MOTORS_US there is NO private-vs-dealer filter or field. `sellerAccountTypes` and
  * `seller.sellerAccountType` exist only on EBAY_AT/BE/CH/DE/ES/FR/GB/IE/IT/PL. So the seller class here is a
  * CLAIM made by Nuke from stated signals, stored beside those signals; it is never an eBay fact.
+ * The seller's own declaration is the For Sale By item specific (Dealer / Private Seller / Not Specified): getItem's
+ * localizedAspects, and on search an aspect filter (category 6001 refinements, 2026-10-20: 30,307 / 3,856 / 1,454), which
+ * browseBulk.ts records per listing for vintage years.
  */
 import { vinCheckDigitOk } from "../_shared/batAuctionRecord.ts";
 
@@ -185,15 +188,19 @@ export interface Landing {
   vin: { vin: string | null; modern: boolean };
 }
 
-export function toLanding(item: EbayItem, htmlToText: (h: string) => string, source = "ebay-browse-api"): Landing | null {
+/** Year, make and model a caller read elsewhere (a search summary carries no item specifics: browseBulk.summaryIdentity).
+ *  When given, it is the identity exactly, a null staying unknown; when omitted, the item's own specifics decide. */
+export interface IdentityClaim { year: number | null; make: string | null; model: string | null }
+
+export function toLanding(item: EbayItem, htmlToText: (h: string) => string, source = "ebay-browse-api", identity?: IdentityClaim): Landing | null {
   const url = canonicalUrl(item);
   const key = listingKey(item);
   if (!url || !key) return null;
   const a = aspectsOf(item);
   const description = htmlToText(item.description ?? item.shortDescription ?? "").trim();
-  const year = yearOf(item, a);
-  const make = a["make"] ?? a["brand"] ?? null;
-  const model = a["model"] ?? null;
+  const year = identity ? identity.year : yearOf(item, a);
+  const make = identity ? identity.make : a["make"] ?? a["brand"] ?? null;
+  const model = identity ? identity.model : a["model"] ?? null;
   const price = priceOf(item);
   const seller = classifySeller(item, description);
   const images = imagesOf(item);

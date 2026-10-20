@@ -1,7 +1,7 @@
 // Fixtures shaped like the getItem captures held on 2026-10-20 (itemLocation with a full state name and a postal code
 // masked to three digits; descriptions that state a dealer address), with made-up places and codes.
 import { assertEquals } from "jsr:@std/assert@1";
-import { decide, describedPlaces, landPlace, newPlaceCtx, placeRow, statedPlace, type StateRow } from "./browsePlace.ts";
+import { decide, describedPlaces, landPlace, newPlaceCtx, placeRow, prefixState, statedPlace, type StateRow } from "./browsePlace.ts";
 
 const states: StateRow[] = [
   { fips: "06", usps: "CA", name: "California" }, { fips: "08", usps: "CO", name: "Colorado" },
@@ -70,6 +70,8 @@ function fakeDb(geo: Record<string, [number, number] | null>, county: (lon: numb
         eq: (k: string, v: any) => { where.push((r) => r[k] === v); return q; },
         is: (k: string, v: any) => { where.push((r) => (r[k] ?? null) === v); return q; },
         like: (k: string, v: string) => { where.push((r) => String(r[k]).startsWith(v.replace(/%$/, ""))); return q; },
+        gte: (k: string, v: string) => { where.push((r) => String(r[k]) >= v); return q; },
+        lt: (k: string, v: string) => { where.push((r) => String(r[k]) < v); return q; },
         in: (k: string, vs: unknown[]) => { where.push((r) => vs.includes(r[k])); return q; },
         insert: (row: any) => { op = "insert"; input = row; return q; },
         then: (ok: any, no: any) => Promise.resolve().then(() => {
@@ -115,4 +117,20 @@ Deno.test("a seller ZIP counts only when zip_to_fips puts it in its state: a sto
   // a real address in another state: disputed, not placed
   const d = await landPlace(db, ctx, { ...base, vehicleId: "w2", description: "Located in Big City, TX 75002" });
   assertEquals([d.disputed, d.grain, db.inserted[1].region_code, db.inserted[1].latitude], [true, null, null, null]);
+});
+
+Deno.test("a search summary names no state: eBay's prefix places the car in a state only when all its ZIPs are in one", async () => {
+  assertEquals(prefixState("891", ["32003", "32003", "32031"], states)?.usps, "NV");
+  assertEquals(prefixState("739", ["40139", "48421"], states), null);   // a prefix across a state line places it nowhere
+  assertEquals(prefixState("999", [], states), null);
+  const db = fakeDb({}, () => null, [{ zip: "89101", fips: "32003" }, { zip: "89199", fips: "32003" }, { zip: "73901", fips: "40139" }, { zip: "73960", fips: "48421" }]);
+  const ctx = newPlaceCtx();
+  const base = { url: "https://www.ebay.com/itm/3", observedAt: "2026-10-20T01:00:00Z", description: "" };
+  const r = await landPlace(db, ctx, { ...base, vehicleId: "s1", loc: { postalCode: "891**", country: "US" } });
+  assertEquals([r.outcome, r.grain], ["written", "region"]);
+  const row = db.inserted[0];
+  assertEquals([row.region_code, row.city, row.postal_code, row.latitude, row.precision, row.location_text_raw, row.metadata.place.state_basis],
+    ["NV", null, null, null, "region", "891**", "zip3_prefix"]);
+  assertEquals((await landPlace(db, ctx, { ...base, vehicleId: "s2", loc: { postalCode: "739**", country: "US" } })).outcome, "no_state");
+  assertEquals((await landPlace(db, ctx, { ...base, vehicleId: "s3", loc: { postalCode: "891**", country: "CA" } })).outcome, "no_state");
 });

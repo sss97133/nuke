@@ -20,10 +20,11 @@ import { recordRevision } from "../_shared/revision.ts";
 import { htmlToText } from "../_shared/htmlToText.ts";
 import { endedRow } from "../poll-listing-feeds/removal.ts";
 import { aspectFilterFor, BrowseClient, ItemGone, QuotaExceeded, yearAspect } from "./browseApi.ts";
-import { CLASS_RANK, classifySeller, linkVin, listingKey, TIERS, toLanding, type SellerClass } from "./browseMap.ts";
+import { CLASS_RANK, classifySeller, type IdentityClaim, linkVin, listingKey, TIERS, toLanding, type SellerClass } from "./browseMap.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { landPlace, newPlaceCtx } from "./browsePlace.ts";
-import { deletedLookup, handleHashes, tombstoneItem } from "./deletedMembers.ts";
+import { deletedLookup, handleHashes, type Lookup, tombstoneItem } from "./deletedMembers.ts";
+import { ANCHORS, zip3Of } from "./browseCensus.ts";
 
 export const PLATFORM = "ebay_motors";
 const METHOD = "ebay_browse_api_v1";
@@ -36,6 +37,7 @@ export interface SweepOptions {
   blindCap?: number;           // calls allowed when eBay will not report the remaining quota
   dryRun?: boolean;            // search and classify only; no getItem, no writes
   concurrency?: number;
+  fromHeld?: number;           // also rank up to this many search-page landings with no full read yet (summaryOnlyCandidates)
 }
 
 export interface Report {
@@ -44,6 +46,7 @@ export interface Report {
   per_tier: Record<string, { seen: number; held: number; new: number; fetched: number; landed: number }>;
   by_class: Record<string, number>; landed: number; blips: number; rejected: number; ingest_created: number; ingest_matched: number; linked_by_vin?: number; vin_conflicts?: number;
   places?: Record<string, number>;
+  from_held?: number;
   errors: string[];
 }
 export const emptyReport = (action: string): Report => ({
@@ -81,15 +84,24 @@ export interface LandOpts {
   /** Extra attributed facts for the observation's raw data and the episode's metadata (card text, listed label, ...). */
   extra?: Record<string, unknown>;
   method?: string;
+  /** A search summary's identity, read by browseBulk.summaryIdentity (a summary has no item specifics). */
+  identity?: IdentityClaim;
+  /** The deleted-member lookup; browseBulk asks once per search page and answers each item from that one read. */
+  lookup?: Lookup;
+  /** A changed price on an unresolved listing is a new observation: the raw payload joins the dedup hash. */
+  hashRawData?: boolean;
+  /** At most this many photos go to ingest (the observation keeps every listed photo URL). */
+  ingestImageCap?: number;
 }
 
 export async function landItem(supabase: any, raw: any, rep: Report, now = new Date().toISOString(), opts: LandOpts = {}): Promise<"landed" | "blip" | "rejected" | "skipped"> {
   // 0. a member eBay says deleted their account stays gone: their handle (and, on a listing they sold, the seller object and the
   //    description's contact details) is redacted before anything is stored (deletedMembers.ts). No answer, no landing.
-  try { raw = (await tombstoneItem(deletedLookup(supabase), raw)).raw; }
+  try { raw = (await tombstoneItem(opts.lookup ?? deletedLookup(supabase), raw)).raw; }
   catch (e) { rep.errors.push(`deleted-member check ${String(raw?.itemId).slice(0, 40)}: ${(e as Error).message}`.slice(0, 300)); return "skipped"; }
-  const landing = toLanding(raw, htmlToText, opts.source);
+  const landing = toLanding(raw, htmlToText, opts.source, opts.identity);
   if (!landing) { rep.errors.push(`item without a numeric id: ${String(raw?.itemId).slice(0, 40)}`); return "skipped"; }
+  if (landing.ingestInput && opts.ingestImageCap != null) landing.ingestInput.image_urls = landing.images.slice(0, Math.max(0, opts.ingestImageCap));
 
   // 1. the capture: the raw getItem JSON, kept whole (the Firecrawl door has already stored its page and passes the id)
   let snapshotId: string | null = opts.snapshotId ?? null;
@@ -157,6 +169,7 @@ export async function landItem(supabase: any, raw: any, rep: Report, now = new D
     vehicleId, unresolved: vehicleId === null,
     source: { platform: PLATFORM, url: landing.url, sourceIdentifier: landing.listingKey },
     fields: landing.obsFields, observationKind: "listing", extractionMethod: opts.method ?? METHOD, observedAt: now,
+    ...(opts.hashRawData ? { hashRawData: true } : {}),
     // a VIN too weak to pick a vehicle is too weak to write onto one: it stays a claim on this row
     ...(landing.vin.vin && !linkVin(landing.vin.vin, landing.year) ? { testimonyOnly: ["vin"] } : {}),
     contentText: landing.descriptionText || raw.title,
@@ -187,8 +200,8 @@ export async function landItem(supabase: any, raw: any, rep: Report, now = new D
     rep.errors.push(`listing event ${landing.listingKey}: no observation id, episode not written`);
   }
 
-  // 5. where the listing says the car is (browsePlace.ts), on the capture's clock; Browse captures only
-  if (vehicleId && (opts.source ?? "ebay-browse-api") === "ebay-browse-api") {
+  // 5. where the listing says the car is (browsePlace.ts), on the capture's clock; Browse captures only (getItem or a search page)
+  if (vehicleId && ["ebay-browse-api", "ebay-browse-search"].includes(opts.source ?? "ebay-browse-api")) {
     try {
       const p = await landPlace(supabase, placeCtx, { vehicleId, url: landing.url, observedAt: now, loc: raw.itemLocation,
         description: landing.descriptionText, observationId: obs.observationId ?? null, snapshotId });
@@ -207,6 +220,55 @@ export async function pool<T>(items: T[], n: number, fn: (t: T) => Promise<void>
   await Promise.all(Array.from({ length: Math.min(n, items.length) }, async () => { while (i < items.length) await fn(items[i++]); }));
 }
 
+// ---- which listings get a full read first ---------------------------------------------------------------------------
+
+export type Cand = { key: string; id: string; cls: SellerClass; tier: number; endsAt: number | null; area: number };
+/** The census anchors' 3-digit ZIP prefixes, Las Vegas (the owner's) first: a listing there ranks before the rest of its tier. */
+const ANCHOR_ZIP3 = ANCHORS.map(([zip]) => zip.slice(0, 3));
+export const areaRank = (postal: unknown): number => {
+  const z = zip3Of(postal);
+  const i = z ? ANCHOR_ZIP3.indexOf(z) : -1;
+  return i < 0 ? ANCHOR_ZIP3.length : i;
+};
+/** An auction's end (ms) when the listing is auction-format, else null; and its area rank. */
+export function rankOf(s: { buyingOptions?: unknown; itemEndDate?: unknown; itemLocation?: { postalCode?: unknown } | null }) {
+  const t = Date.parse(String(s.itemEndDate ?? ""));
+  const auction = Array.isArray(s.buyingOptions) && s.buyingOptions.includes("AUCTION");
+  return { endsAt: auction && Number.isFinite(t) ? t : null, area: areaRank(s.itemLocation?.postalCode) };
+}
+const endsFirst = (a: number | null, b: number | null) => a === b ? 0 : a === null ? 1 : b === null ? -1 : a - b;
+export function byDetailPriority(a: Cand, b: Cand): number {
+  return a.tier - b.tier || endsFirst(a.endsAt, b.endsAt) || CLASS_RANK[a.cls] - CLASS_RANK[b.cls] || a.area - b.area;
+}
+
+/**
+ * Listings landed from a search page (episode metadata.source 'ebay-browse-search', browseBulk.ts) that no getItem has read yet,
+ * still open at least an hour: up to `max` vintage auctions ending soonest and up to `max` by tier. A seller-declared For Sale By
+ * (the bulk pass's aspect filter) decides the class; otherwise the heuristic claim the landing kept.
+ */
+export async function summaryOnlyCandidates(supabase: any, max: number, now: number): Promise<Cand[]> {
+  const soon = new Date(now + 3_600_000).toISOString();
+  const base = () => supabase.from("vehicle_events")
+    .select("source_listing_id,item_id:metadata->>item_id,tier:metadata->>tier,ends:metadata->>listing_ends_at,opts:metadata->buying_options,loc:metadata->>location,cls:metadata->seller_class_claim->>value,fsb:metadata->page->for_sale_by->>value")
+    .eq("source_platform", PLATFORM).eq("event_type", "listing").eq("metadata->>source", "ebay-browse-search").neq("event_status", "ended")
+    .not("metadata->>tier", "is", null).gt("metadata->>listing_ends_at", soon);
+  const [auc, tier] = await Promise.all([
+    base().contains("metadata", { buying_options: ["AUCTION"] }).order("metadata->>listing_ends_at", { ascending: true }).limit(max),
+    base().order("metadata->>tier", { ascending: true }).order("metadata->>listing_ends_at", { ascending: true }).limit(max),
+  ]);
+  for (const r of [auc, tier]) if (r.error) throw new Error(`summary-only listings read failed: ${r.error.message}`);
+  const out = new Map<string, Cand>();
+  for (const r of [...(auc.data ?? []), ...(tier.data ?? [])]) {
+    const key = String(r.source_listing_id ?? "");
+    if (!/^\d+$/.test(key) || out.has(key)) continue;
+    const cls: SellerClass = r.fsb === "Private Seller" ? "likely_private" : r.fsb === "Dealer" ? "likely_dealer"
+      : (["likely_private", "unknown", "likely_dealer"].includes(r.cls) ? r.cls : "unknown");
+    out.set(key, { key, id: r.item_id || `v1|${key}|0`, cls, tier: Number(r.tier) || 9,
+      ...rankOf({ buyingOptions: r.opts, itemEndDate: r.ends, itemLocation: { postalCode: r.loc } }) });
+  }
+  return [...out.values()];
+}
+
 export async function sweep(supabase: any, client: BrowseClient, o: SweepOptions = {}): Promise<Report> {
   const rep = emptyReport(o.dryRun ? "sweep_dry_run" : "sweep");
   const maxPages = o.maxSearchPages ?? 3, maxItems = o.maxItems ?? 25, reserve = o.reserveCalls ?? 400, conc = o.concurrency ?? 3;
@@ -221,7 +283,6 @@ export async function sweep(supabase: any, client: BrowseClient, o: SweepOptions
     if (!ya) { rep.ok = false; rep.errors.push("category 6001 refinements list no Year aspect"); return rep; }
     rep.year_aspect = ya.name;
 
-    type Cand = { key: string; id: string; cls: SellerClass; tier: number };
     const cands: Cand[] = [];
     for (const tier of TIERS.filter((t) => !o.tiers || o.tiers.includes(t.id))) {
       const years = tier.years.filter((y) => ya.counts.size === 0 || (ya.counts.get(y) ?? 0) > 0);
@@ -236,21 +297,30 @@ export async function sweep(supabase: any, client: BrowseClient, o: SweepOptions
         t.held += sums.length - fresh.length; t.new += fresh.length;
         for (const s of fresh) {
           const cls = classifySeller(s).class; rep.by_class[cls] = (rep.by_class[cls] ?? 0) + 1;
-          if (!cands.some((c) => c.key === listingKey(s))) cands.push({ key: listingKey(s)!, id: s.itemId!, cls, tier: tier.id });
+          if (!cands.some((c) => c.key === listingKey(s))) cands.push({ key: listingKey(s)!, id: s.itemId!, cls, tier: tier.id, ...rankOf(s) });
         }
         if (fresh.length === 0 || !res.next || (page + 1) * 200 >= 9800) break;   // reached what we already hold
       }
     }
+    // listings the bulk pass landed from search pages (browseBulk.ts) that have no full read yet, vintage first
+    if (o.fromHeld) {
+      const more = await summaryOnlyCandidates(supabase, o.fromHeld, Date.now());
+      const held = new Set<string>();
+      for (let i = 0; i < more.length; i += 200) for (const k of await heldKeys(supabase, more.slice(i, i + 200).map((c) => c.key))) held.add(k);
+      for (const c of more) if (!held.has(c.key) && !cands.some((x) => x.key === c.key)) cands.push(c);
+      rep.from_held = more.length;
+    }
     if (o.dryRun) { rep.stopped = "dry run"; return rep; }
 
-    // tier first (the owner's order), private-first inside a tier, newest-first inside a class (search order is kept by the stable sort)
-    cands.sort((a, b) => a.tier - b.tier || CLASS_RANK[a.cls] - CLASS_RANK[b.cls]);
+    // tier first (the owner's order), then auctions ending soonest (a full read after the end may never come), private-first,
+    // then the anchor areas (Las Vegas first), newest-first last (search order is kept by the stable sort)
+    cands.sort(byDetailPriority);
     const todo = cands.slice(0, Math.min(maxItems, Math.max(0, spend())));
     await pool(todo, conc, async (c) => {
       if (client.calls >= budget + 2) return;
       try {
         const raw = await client.getItem(c.id);
-        rep.per_tier[c.tier].fetched++;
+        (rep.per_tier[c.tier] ??= { seen: 0, held: 0, new: 0, fetched: 0, landed: 0 }).fetched++;
         const r = await landItem(supabase, raw, rep);
         if (r === "landed") rep.per_tier[c.tier].landed++;
       } catch (e) {
