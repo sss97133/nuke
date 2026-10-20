@@ -170,52 +170,9 @@ struct LibraryAlbumsView: View {
     var body: some View {
         NavigationStack {
             List {
-                Section {
-                    if let evidence, let total = evidence.catalog.photos?.count {
-                        NavigationLink {
-                            LibraryAlbumPhotosView(userId: userId)
-                        } label: { LabeledContent("Accessible photos", value: total.formatted()) }
-                        LabeledContent("Read on-device", value: evidence.reviewed.formatted())
-                        LabeledContent("Awaiting read", value: (total - evidence.reviewed).formatted())
-                    }
-                    if let error = store.albumError { Text(error).foregroundStyle(.secondary) }
-                    if store.refreshingAlbums && store.albumCatalog == nil { ProgressView("Reading albums…") }
-                }
-                if let evidence {
-                    let supported = evidence.vehicles.filter { v in evidence.photos.contains { $0.candidateVehicleIds == [v.id] } }
-                    if !supported.isEmpty {
-                        Section("Vehicle identity · serial evidence") {
-                            ForEach(supported) { vehicle in
-                                NavigationLink {
-                                    LibraryAlbumPhotosView(userId: userId, candidateVehicleId: vehicle.id)
-                                } label: {
-                                    VStack(alignment: .leading, spacing: 3) {
-                                        Text(vehicle.title)
-                                        Text("\(evidence.photos.filter { $0.candidateVehicleIds == [vehicle.id] }.count) exact serial reads · \(vehicle.relationshipLabel)")
-                                            .font(.caption).foregroundStyle(.secondary)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    Section("Identity review") {
-                        if evidence.reviewed > 0 {
-                            NavigationLink {
-                                LibraryAlbumPhotosView(userId: userId, needsIdentity: true)
-                            } label: {
-                                LabeledContent("Unresolved vehicle frames", value: evidence.unresolved.formatted())
-                            }
-                        }
-                        if evidence.conflicted > 0 {
-                            NavigationLink {
-                                LibraryAlbumPhotosView(userId: userId, conflictingIdentity: true)
-                            } label: { LabeledContent("Conflicting serial matches", value: evidence.conflicted.formatted()) }
-                        }
-                        NavigationLink {
-                            LibraryAlbumPhotosView(userId: userId, unreadOnly: true)
-                        } label: { Text("Unread source photos") }
-                    }
-                }
+                // Albums are what a person came for. The reading counts, serial evidence and the
+                // on-device pass are engineering detail: one collapsed row, closed by default
+                // (owner, 2026-10-20: "too much noise").
                 if let catalog = store.albumCatalog, catalog.accessScope == "full" {
                     Section("Photos albums · \(catalog.albums.count)") {
                         ForEach(catalog.albums.sorted { ($0.name ?? "").localizedStandardCompare($1.name ?? "") == .orderedAscending }) { album in
@@ -239,14 +196,54 @@ struct LibraryAlbumsView: View {
                             : "Albums are unavailable with the current Photos access.")
                     }
                 }
-                if store.albumCatalog?.accessScope == "full" || store.albumCatalog?.accessScope == "limited" {
-                    Section("On-device pass") {
-                        Button("Analyze library") {
-                            Task { await ingest.runAlbumReview(); await ingest.syncNativeAlbums(); await reloadEvidence() }
-                        }.disabled(ingest.running)
-                        if ingest.running { ProgressView("\(ingest.albumReviewDone) photos read this pass") }
-                        if let summary = ingest.albumReviewSummary { Text(summary).font(.caption).foregroundStyle(.secondary) }
-                        if let summary = ingest.albumSyncSummary { Text(summary).font(.caption).foregroundStyle(.secondary) }
+                if let error = store.albumError { Section { Text(error).foregroundStyle(.secondary) } }
+                if store.refreshingAlbums && store.albumCatalog == nil { Section { ProgressView("Reading albums…") } }
+                Section {
+                    DisclosureGroup("Reading details") {
+                        if let evidence, let total = evidence.catalog.photos?.count {
+                            NavigationLink {
+                                LibraryAlbumPhotosView(userId: userId)
+                            } label: { LabeledContent("Accessible photos", value: total.formatted()) }
+                            LabeledContent("Read on-device", value: evidence.reviewed.formatted())
+                            LabeledContent("Awaiting read", value: (total - evidence.reviewed).formatted())
+                        }
+                        if let evidence {
+                            let supported = evidence.vehicles.filter { v in evidence.photos.contains { $0.candidateVehicleIds == [v.id] } }
+                            ForEach(supported) { vehicle in
+                                NavigationLink {
+                                    LibraryAlbumPhotosView(userId: userId, candidateVehicleId: vehicle.id)
+                                } label: {
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        Text(vehicle.title)
+                                        Text("\(evidence.photos.filter { $0.candidateVehicleIds == [vehicle.id] }.count) exact serial reads · \(vehicle.relationshipLabel)")
+                                            .font(.caption).foregroundStyle(.secondary)
+                                    }
+                                }
+                            }
+                            if evidence.reviewed > 0 {
+                                NavigationLink {
+                                    LibraryAlbumPhotosView(userId: userId, needsIdentity: true)
+                                } label: {
+                                    LabeledContent("Unresolved vehicle frames", value: evidence.unresolved.formatted())
+                                }
+                            }
+                            if evidence.conflicted > 0 {
+                                NavigationLink {
+                                    LibraryAlbumPhotosView(userId: userId, conflictingIdentity: true)
+                                } label: { LabeledContent("Conflicting serial matches", value: evidence.conflicted.formatted()) }
+                            }
+                            NavigationLink {
+                                LibraryAlbumPhotosView(userId: userId, unreadOnly: true)
+                            } label: { Text("Unread source photos") }
+                        }
+                        if store.albumCatalog?.accessScope == "full" || store.albumCatalog?.accessScope == "limited" {
+                            Button("Analyze library") {
+                                Task { await ingest.runAlbumReview(); await ingest.syncNativeAlbums(); await reloadEvidence() }
+                            }.disabled(ingest.running)
+                            if ingest.running { ProgressView("\(ingest.albumReviewDone) photos read this pass") }
+                            if let summary = ingest.albumReviewSummary { Text(summary).font(.caption).foregroundStyle(.secondary) }
+                            if let summary = ingest.albumSyncSummary { Text(summary).font(.caption).foregroundStyle(.secondary) }
+                        }
                     }
                 }
             }
