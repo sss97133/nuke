@@ -1,5 +1,5 @@
 -- Isolated PostgreSQL 17 contract for 20261019030000_merge_carries_identity_unmerge_batch.sql,
--- 20261020011000_merge_batch_discovery_url_fill_only.sql and 20261020050500_merge_vin_carry_and_protected_observations.sql. Synthetic rows only; never production.
+-- 20261020011000_merge_batch_discovery_url_fill_only.sql , 20261020050500_merge_vin_carry_and_protected_observations.sql and 20261021040000_merge_batch_same_source_image_stays.sql. Synthetic rows only; never production.
 -- Run in an empty, disposable dm_refinement_* database from the repo root:
 --   createdb dm_refinement_merge_batch_identity
 --   psql -X -v ON_ERROR_STOP=1 -d dm_refinement_merge_batch_identity -f supabase/sql/test_merge_batch_identity_contract.sql
@@ -109,6 +109,7 @@ CREATE TABLE public.superseded_rows (
 \i supabase/migrations/20261019030000_merge_carries_identity_unmerge_batch.sql
 \i supabase/migrations/20261020011000_merge_batch_discovery_url_fill_only.sql
 \i supabase/migrations/20261020050500_merge_vin_carry_and_protected_observations.sql
+\i supabase/migrations/20261021040000_merge_batch_same_source_image_stays.sql
 
 -- ---------------------------------------------------------------------------------------------------------------------
 -- 1. correct_vehicle_vin: a merged-away holder owns nothing; a live holder still does.
@@ -290,3 +291,46 @@ SELECT pg_temp.ok('a www. primary merges a duplicate holding the canonical URL; 
   AND (SELECT discovery_url FROM vehicles WHERE id = '00000000-0000-0000-0000-0000000008a1') = 'https://www.goodingco.com/lot/1903-packard-model-f'
   AND (SELECT status FROM vehicles WHERE id = '00000000-0000-0000-0000-0000000008d1') = 'merged');
 DROP TRIGGER vehicles_canonicalize_discovery_url ON public.vehicles;
+
+-- ---------------------------------------------------------------------------------------------------------------------
+-- 7. Re-posted listings: hash-less photos the survivor already holds (by image_url) stay on the duplicate, and a photo two
+--    sibling duplicates both carry moves once (the one with the smaller id). 20261021040000.
+--    P7 holds x, y.   D7a (smaller image ids): x, y (held by P7), a, b.   D7b: x (held by P7), a (D7a's smaller-id copy moves), c.
+--    D7c: a photo with no image_url and a photo with a file_hash: both still move (the rule is for hash-less photos with a URL).
+-- ---------------------------------------------------------------------------------------------------------------------
+INSERT INTO vehicles (id, status, year, make, model) VALUES
+  ('00000000-0000-0000-0000-0000000009a1', 'active', 1978, 'Buick', 'Electra LTD'),
+  ('00000000-0000-0000-0000-0000000009d1', 'active', 1978, 'Buick', 'Electra LTD'),
+  ('00000000-0000-0000-0000-0000000009d2', 'active', 1978, 'Buick', 'Electra LTD'),
+  ('00000000-0000-0000-0000-0000000009d3', 'active', 1978, 'Buick', 'Electra LTD');
+INSERT INTO vehicle_images (id, vehicle_id, image_url, file_hash) VALUES
+  ('91000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-0000000009a1', 'https://images.example.test/x.jpg', NULL),
+  ('91000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-0000000009a1', 'https://images.example.test/y.jpg', NULL),
+  ('91000000-0000-0000-0000-0000000000a1', '00000000-0000-0000-0000-0000000009d1', 'https://images.example.test/x.jpg', NULL),
+  ('91000000-0000-0000-0000-0000000000a2', '00000000-0000-0000-0000-0000000009d1', 'https://images.example.test/y.jpg', NULL),
+  ('91000000-0000-0000-0000-0000000000a3', '00000000-0000-0000-0000-0000000009d1', 'https://images.example.test/a.jpg', NULL),
+  ('91000000-0000-0000-0000-0000000000a4', '00000000-0000-0000-0000-0000000009d1', 'https://images.example.test/b.jpg', NULL),
+  ('91000000-0000-0000-0000-0000000000b1', '00000000-0000-0000-0000-0000000009d2', 'https://images.example.test/x.jpg', NULL),
+  ('91000000-0000-0000-0000-0000000000b2', '00000000-0000-0000-0000-0000000009d2', 'https://images.example.test/a.jpg', NULL),
+  ('91000000-0000-0000-0000-0000000000b3', '00000000-0000-0000-0000-0000000009d2', 'https://images.example.test/c.jpg', NULL),
+  ('91000000-0000-0000-0000-0000000000c1', '00000000-0000-0000-0000-0000000009d3', NULL, NULL),
+  ('91000000-0000-0000-0000-0000000000c2', '00000000-0000-0000-0000-0000000009d3', 'https://images.example.test/x.jpg', 'h-d3');
+CREATE TABLE pg_temp.repost_merge AS
+  SELECT merge_into_primary_batch(
+    ARRAY['00000000-0000-0000-0000-0000000009a1', '00000000-0000-0000-0000-0000000009a1', '00000000-0000-0000-0000-0000000009a1']::uuid[],
+    ARRAY['00000000-0000-0000-0000-0000000009d1', '00000000-0000-0000-0000-0000000009d2', '00000000-0000-0000-0000-0000000009d3']::uuid[]) r;
+SELECT pg_temp.ok('the three re-posts merged', (SELECT (r ->> 'merged_count')::int = 3 FROM pg_temp.repost_merge));
+SELECT pg_temp.ok('images: the survivor holds its two photos plus one copy each of a, b, c (and D7c''s two); no photo twice',
+  (SELECT count(*) FROM vehicle_images WHERE vehicle_id = '00000000-0000-0000-0000-0000000009a1') = 7
+  AND (SELECT count(DISTINCT image_url) FROM vehicle_images WHERE vehicle_id = '00000000-0000-0000-0000-0000000009a1' AND image_url IS NOT NULL AND file_hash IS NULL) = 5
+  AND (SELECT count(*) FROM vehicle_images WHERE vehicle_id = '00000000-0000-0000-0000-0000000009a1' AND image_url = 'https://images.example.test/a.jpg') = 1);
+SELECT pg_temp.ok('the photos the survivor already held stay on the duplicates, unstamped, nothing deleted',
+  (SELECT vehicle_id = '00000000-0000-0000-0000-0000000009d1' AND merged_from_vehicle_id IS NULL FROM vehicle_images WHERE id = '91000000-0000-0000-0000-0000000000a1')
+  AND (SELECT vehicle_id = '00000000-0000-0000-0000-0000000009d2' AND merged_from_vehicle_id IS NULL FROM vehicle_images WHERE id = '91000000-0000-0000-0000-0000000000b1')
+  AND (SELECT vehicle_id = '00000000-0000-0000-0000-0000000009d2' FROM vehicle_images WHERE id = '91000000-0000-0000-0000-0000000000b2')
+  AND (SELECT count(*) FROM vehicle_images WHERE id::text LIKE '91000000%') = 11);
+SELECT pg_temp.ok('the photo two duplicates carry moved once: D7a''s copy (smaller id) moved, D7b''s stayed',
+  (SELECT vehicle_id = '00000000-0000-0000-0000-0000000009a1' AND merged_from_vehicle_id = '00000000-0000-0000-0000-0000000009d1' FROM vehicle_images WHERE id = '91000000-0000-0000-0000-0000000000a3'));
+SELECT pg_temp.ok('a photo with no URL and a photo with a file_hash both still move',
+  (SELECT count(*) FROM vehicle_images WHERE id IN ('91000000-0000-0000-0000-0000000000c1', '91000000-0000-0000-0000-0000000000c2')
+     AND vehicle_id = '00000000-0000-0000-0000-0000000009a1' AND merged_from_vehicle_id = '00000000-0000-0000-0000-0000000009d3') = 2);
