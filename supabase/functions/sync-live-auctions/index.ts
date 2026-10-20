@@ -11,16 +11,17 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
  *   - PCarMarket: its server-rendered live auction board (direct fetch); bids of lots that moved from the lot page
  *   - Bonhams: its public Typesense sale and lot index; bids of its online (timed) sales from its bidding platform
  *     (live.bonhams.com); lots of in-room catalog sales are written 'upcoming', never live
+ *   - Broad Arrow: its bidding site's timed online sales (sale list hourly, lot list with top bids every run)
  *   - Cars & Bids: Uses Firecrawl (Cloudflare protected)
- *   - Mecum, Barrett-Jackson, RM Sotheby's, Gooding: Firecrawl scrape + extract
- * Collecting Cars, PCarMarket and Bonhams boards are complete lists: after the vehicles upsert each is handed to
+ *   - Mecum, Barrett-Jackson, Gooding: Firecrawl scrape + extract; RM Sotheby's has no readable live bid (see syncRMSothebys)
+ * Collecting Cars, PCarMarket, Bonhams and Broad Arrow boards are complete lists: after the vehicles upsert each is handed to
  * live_auction_board_sync, the monitored_auctions schedule writer for those houses (BaT's is bat_live_pull_run).
  *
  * Deploy: supabase functions deploy sync-live-auctions --no-verify-jwt
  *
  * Usage:
  *   POST {"action": "sync"}                      - sync all platforms
- *   POST {"action": "sync", "platform": "bat"}   - sync specific platform (bat, cc, cab, pcarmarket, mecum, barrett-jackson, rm-sothebys, gooding, bonhams)
+ *   POST {"action": "sync", "platform": "bat"}   - sync specific platform (bat, cc, cab, pcarmarket, mecum, barrett-jackson, rm-sothebys, gooding, bonhams, broad-arrow)
  *   POST {"action": "sync", "platforms": ["collecting-cars", "pcarmarket", "bonhams"]} - sync several
  *   POST {"action": "status"}                    - get current live auction stats
  */
@@ -36,6 +37,7 @@ import {
   type BonhamsBidState, type BonhamsLotDoc, type BonhamsSaleDoc, bonhamsLot, bonhamsLotPhase, bonhamsSaleKind,
   type PcarBoardItem, parseBonhamsBidStates, parsePcarBids, parsePcarBoard,
 } from "./boards.ts";
+import { type AmLotDoc, amOpenTimedSales, amSales, amTimedLot, BROAD_ARROW_BID } from "./boards.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -583,16 +585,16 @@ async function syncBarrettJackson(): Promise<{ auctions: LiveAuction[]; error: s
 }
 
 // ============================================
-// RM Sotheby's Sync (Firecrawl)
+// RM Sotheby's: no live-bid source
 // ============================================
 
+// RM's timed online sales list their lots publicly (api/search/SearchLots: estimate, scheduled close, no-reserve), but
+// a lot's current bid reaches its page only over RM's bid socket (wss://bid-service-*.rmsothebys.com/ws/timed/listen/),
+// which closes every connection whose Origin is not RM's own site: "1003 Invalid origin" with no Origin and with
+// https://nuke.ag (2026-10-20). The Firecrawl extract this replaced wrote auction pages as lots with an invented
+// seven-day close. RM's catalog lots come from extract-rmsothebys.
 async function syncRMSothebys(): Promise<{ auctions: LiveAuction[]; error: string | null }> {
-  return syncViaFirecrawlExtract(
-    "rm-sothebys",
-    "https://rmsothebys.com/en/auctions",
-    /rmsothebys\.com\//i,
-    { waitFor: 4000 }
-  );
+  return { auctions: [], error: "RM Sotheby's: no live-bid source (its bid socket admits only rmsothebys.com origins); lots come from extract-rmsothebys" };
 }
 
 // ============================================
@@ -709,8 +711,70 @@ async function syncBonhams(): Promise<{ auctions: LiveAuction[]; error: string |
   }
 }
 
+// ============================================
+// Broad Arrow Sync (timed online sales on its bidding site)
+// ============================================
+
+// Its in-room sales are bid only in the room; its timed online sales (car sales such as "Global Icons: Zoute Online",
+// and memorabilia and art sales, whose lots are not vehicles) show each lot's top bid and its soft-close end. The sale
+// list changes when a sale is scheduled, so an hour-old capture of it serves; each open sale's lot list is read fresh.
+const BA_UA = "NukeListingCollector/1.0 (+https://nuke.ag)";
+
+async function syncBroadArrow(): Promise<{ auctions: LiveAuction[]; error: string | null }> {
+  try {
+    const now = Date.now();
+    const { html, error } = await archiveFetch(`${BROAD_ARROW_BID}/`, {
+      platform: "broad_arrow", maxAgeSec: 3600, useFirecrawl: false, callerName: "sync-live-auctions",
+      directFetchOptions: { publicOnly: true, timeout: 20_000 },
+    });
+    if (error || !html) return { auctions: [], error: `Broad Arrow sale list: ${error ?? "no HTML"}` };
+    const all = amSales(html);
+    if (all.length === 0) return { auctions: [], error: "Broad Arrow sale list: no sales parsed" };
+    const sales = amOpenTimedSales(all, now);
+    const auctions: LiveAuction[] = [];
+    for (const sale of sales) {
+      for (let o = 0, total = 1; o < total && o < 1000; o += 100) {
+        const q = new URLSearchParams({ n: "100", o: String(o), order_by: "auction_date lot_number", order: "desc asc",
+          fieldset: "timed-auction reserve-status summary", auctionId: sale.row_id, paramsType: "server" });
+        const res = await fetch(`${BROAD_ARROW_BID}/ajax/lots/?${q}`, { headers: { "User-Agent": BA_UA, Accept: "application/json" } }); // guardrail-allow: raw-fetch (house JSON API)
+        if (!res.ok) throw new Error(`lots of sale ${sale.row_id}: HTTP ${res.status}`);
+        const page = await res.json();
+        total = Number(page?.query_info?.total_num_results ?? 0);
+        for (const doc of (page?.result_page ?? []) as AmLotDoc[]) {
+          const lot = amTimedLot(doc, sale, now);
+          if (!lot.open || !lot.vehicle) continue;
+          const ident = parseBatIdentityFromTitle(lot.title, null);
+          auctions.push({
+            url: lot.url,
+            title: lot.title,
+            platform: "broad-arrow",
+            auction_end_date: lot.ends ?? "",
+            current_bid: lot.current_bid,
+            bid_count: null, // the lot list states no bid count
+            currency: lot.currency,
+            no_reserve: false, // not stated on the lot list (reserve_met is kept)
+            reserve_met: lot.reserve_met,
+            year: ident.year,
+            make: ident.make,
+            model: ident.model,
+            thumbnail_url: lot.image_url,
+            external_id: lot.external_id,
+            raw_data: { source: "broad_arrow_timed_lots", sale_id: sale.row_id, sale_title: sale.title ?? null, lot_number: lot.lot_number,
+                        status: lot.status, bid_at: lot.bid_at, opening_bid: lot.opening_bid, estimate_low: lot.estimate_low,
+                        estimate_high: lot.estimate_high, synced_at: new Date().toISOString() },
+          });
+        }
+      }
+    }
+    console.log(`[sync-live-auctions] Broad Arrow: ${all.length} sales listed, ${sales.length} timed sales open, ${auctions.length} vehicle lots open`);
+    return { auctions, error: null };
+  } catch (e: unknown) {
+    return { auctions: [], error: `Broad Arrow sync failed: ${e instanceof Error ? e.message : String(e)}` };
+  }
+}
+
 /** The houses whose open board is read complete and scheduled by live_auction_board_sync (slug per platform). */
-const BOARD_SOURCES: Record<string, string> = { "collecting-cars": "collecting-cars", pcarmarket: "pcarmarket", bonhams: "bonhams" };
+const BOARD_SOURCES: Record<string, string> = { "collecting-cars": "collecting-cars", pcarmarket: "pcarmarket", bonhams: "bonhams", "broad-arrow": "broad-arrow" };
 
 // ============================================
 // Cars & Bids Sync (Firecrawl)
@@ -1001,6 +1065,7 @@ async function updateSourceRegistry(
     "rm-sothebys": "rm-sothebys",
     "gooding": "gooding",
     "bonhams": "bonhams",
+    "broad-arrow": "broadarrow",
   };
 
   const slug = slugMap[platform];
@@ -1073,6 +1138,7 @@ Deno.serve(async (req) => {
         else if (url.includes("rmsothebys")) platform = "rm-sothebys";
         else if (url.includes("goodingco")) platform = "gooding";
         else if (url.includes("bonhams.com")) platform = "bonhams";
+        else if (url.includes("broadarrowauctions.com")) platform = "broad-arrow";
         byPlatform[platform] = (byPlatform[platform] || 0) + 1;
       }
 
@@ -1114,6 +1180,7 @@ Deno.serve(async (req) => {
         "rm-sothebys",
         "gooding",
         "bonhams",
+        "broad-arrow",
       ];
       const platforms: string[] = Array.isArray(body.platforms) && body.platforms.length
         ? body.platforms.map(String)
@@ -1186,6 +1253,9 @@ Deno.serve(async (req) => {
             break;
           case "bonhams":
             syncResult = await syncBonhams();
+            break;
+          case "broad-arrow":
+            syncResult = await syncBroadArrow();
             break;
           default:
             syncResult = { auctions: [], error: `Unknown platform: ${platform}` };

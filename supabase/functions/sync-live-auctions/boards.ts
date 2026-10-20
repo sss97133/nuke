@@ -1,6 +1,7 @@
 /**
  * Pure readers for the board-synced houses (no I/O): PCarMarket's server-rendered auction board and lot bid history,
- * Bonhams' Typesense sale and lot documents and its bidding platform's lot states. sync-live-auctions fetches; these parse.
+ * Bonhams' Typesense sale and lot documents and its bidding platform's lot states, and Broad Arrow's timed sales on
+ * its bidding site. sync-live-auctions fetches; these parse.
  */
 
 /** One open lot on PCarMarket's live board (the Basta query cache the page server-renders). */
@@ -208,4 +209,130 @@ export function bonhamsLotPhase(kind: BonhamsSaleKind, bid: BonhamsBidState | un
   const ends = bid.ends ? Date.parse(bid.ends) : NaN;
   if (bid.status !== "active" || (Number.isFinite(ends) && ends <= nowMs)) return "closed";
   return Number.isFinite(ends) ? "live" : "upcoming";
+}
+
+// ── Broad Arrow: timed sales on its bidding site (bid.broadarrowauctions.com, an AuctionMobility site) ──────────────
+
+export const BROAD_ARROW_BID = "https://bid.broadarrowauctions.com";
+
+/** A sale as the bidding site lists it (an AuctionMobility auction summary). */
+export interface AmSale {
+  row_id: string;
+  title?: string | null;
+  auction_type?: string | null; // "timed" (online, lots close one by one), "live" (in the room), "timed_then_live", "catalog_only"
+  time_start?: string | null;
+  effective_end_time?: string | null;
+  extend_by_auction?: boolean | null;
+  extended_end_time?: string | null;
+  currency_code?: string | null;
+}
+
+/** A lot as the bidding site's lot list returns it (fieldsets timed-auction, reserve-status and summary). */
+export interface AmLotDoc {
+  row_id: string;
+  lot_number?: number | string | null;
+  status?: string | null; // "active" until the lot closes; then "sold", "reserve_not_met", "expired" or "withdrawn"
+  title?: string | null;
+  estimate_low?: string | number | null;
+  estimate_high?: string | number | null;
+  starting_price?: string | number | null;
+  currency_code?: string | null;
+  cover_thumbnail?: string | null;
+  extended_end_time?: string | null; // the lot's close, pushed back by a late bid
+  timed_auction_bid?: { amount?: string | number | null; created_at?: string | null } | null; // the lot's top bid
+  reserve_met?: boolean | null;
+  _detail_url?: string | null;
+}
+
+/** The sales the bidding site's page lists. The page server-renders its state as one line, `viewVars = {...};`. */
+export function amSales(html: string): AmSale[] {
+  const m = html.match(/\bviewVars = (\{.*\});[ \t]*\r?$/m);
+  if (!m) return [];
+  try {
+    const rows = JSON.parse(m[1])?.auctions?.result_page;
+    return Array.isArray(rows) ? rows.filter((r: AmSale) => r && typeof r.row_id === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+const amEnd = (sale: AmSale) => (sale.extend_by_auction ? sale.extended_end_time : null) ?? sale.effective_end_time ?? null;
+
+// The house's online sales also sell memorabilia and art, whose titles can lead with a year ("1992 Original Lotus 107C
+// Rear Wing Element"); a vehicle lot leads with its model year and sits in a sale that is not one of those.
+const NOT_VEHICLE_SALE = /memorabilia|artwork|automobilia|petroliana/i;
+
+/**
+ * The timed sales whose bidding is open at `now` and that sell vehicles: started, and not closed more than six hours ago
+ * (the list can be an hour old, and a late bid moves a lot's close past the sale's stated end). Live sales are bid in
+ * the room only; memorabilia and art sales are not read at all.
+ */
+export function amOpenTimedSales(sales: AmSale[], now: number): AmSale[] {
+  return sales.filter((s) => {
+    if (s.auction_type !== "timed" || !s.time_start || !(Date.parse(s.time_start) <= now)) return false;
+    if (NOT_VEHICLE_SALE.test(s.title ?? "")) return false;
+    const end = amEnd(s);
+    return !end || Date.parse(end) + 6 * 3_600_000 > now;
+  });
+}
+
+export function amIsVehicleLot(title: string, saleTitle: string): boolean {
+  const y = title.match(/^(18[89]\d|19\d\d|20\d\d)\s+\S/);
+  return !!y && Number(y[1]) <= new Date().getUTCFullYear() + 1 && !NOT_VEHICLE_SALE.test(saleTitle);
+}
+
+const amAmount = (v: unknown): number | null => {
+  const n = Number(v);
+  return v != null && v !== "" && Number.isFinite(n) && n > 0 ? n : null;
+};
+
+/** A Broad Arrow timed lot as a board row. */
+export interface AmTimedLot {
+  external_id: string;
+  url: string;
+  title: string;
+  lot_number: string | null;
+  status: string | null;
+  open: boolean;
+  vehicle: boolean;
+  current_bid: number | null;
+  bid_at: string | null;
+  opening_bid: number | null;
+  currency: string | null;
+  ends: string | null;
+  estimate_low: number | null;
+  estimate_high: number | null;
+  reserve_met: boolean | null;
+  image_url: string | null;
+}
+
+/**
+ * A lot of a timed sale. It is open while the lot is active, its sale has started and its close is ahead; the close
+ * is the lot's extended end (a late bid pushes it back). The current bid is the lot's top timed bid, in the lot's
+ * currency; the list states no bid count, and no reserve flag beyond reserve_met.
+ */
+export function amTimedLot(doc: AmLotDoc, sale: AmSale, now: number): AmTimedLot {
+  const ends = doc.extended_end_time ?? amEnd(sale);
+  const endT = ends ? Date.parse(ends) : NaN;
+  const title = (doc.title ?? "").trim();
+  const path = doc._detail_url && doc._detail_url.startsWith("/lots/view/") ? doc._detail_url : `/lots/view/${doc.row_id}`;
+  return {
+    external_id: doc.row_id,
+    url: `${BROAD_ARROW_BID}${path}`,
+    title,
+    lot_number: doc.lot_number != null ? String(doc.lot_number) : null,
+    status: doc.status ?? null,
+    open: sale.auction_type === "timed" && doc.status === "active" && !!sale.time_start && Date.parse(sale.time_start) <= now &&
+      Number.isFinite(endT) && endT > now,
+    vehicle: amIsVehicleLot(title, sale.title ?? ""),
+    current_bid: amAmount(doc.timed_auction_bid?.amount),
+    bid_at: doc.timed_auction_bid?.created_at ?? null,
+    opening_bid: amAmount(doc.starting_price),
+    currency: doc.currency_code ?? sale.currency_code ?? null,
+    ends,
+    estimate_low: amAmount(doc.estimate_low),
+    estimate_high: amAmount(doc.estimate_high),
+    reserve_met: typeof doc.reserve_met === "boolean" ? doc.reserve_met : null,
+    image_url: doc.cover_thumbnail ?? null,
+  };
 }
