@@ -7,7 +7,7 @@ import MarketInventoryMap from './MarketInventoryMap';
 import { mapLens, mapValue, matchesMapLens, recordedModel, taxonomyByListing, type InventoryMapLens, type InventoryMapGroup, type MapDimension } from './inventoryMap';
 import AuctionEvidence, { AuctionCompetition } from './AuctionEvidence';
 import { BAT_HOUSE, BID_BUCKETS, bidBucket, currentBidDistribution, houseName, listingKey, moneyIn, NO_MAKE, useMarketPulse, useInventoryTaxonomy, useSameHourReadings, usdBid, type BidBucket, type BidCurve, type HouseStatus, type LiveAuction } from './useMarketPulse';
-import { HouseMark, HouseShareChart, houseWeekChange, useHouseShare } from './HouseShare';
+import { HouseMark, HouseMarket, houseWeekChange, useHouseShare } from './HouseShare';
 import RecordedSalesComparison, { MarketScopeControls, type MarketSalesLens } from './RecordedSalesComparison';
 import { MakeLogo } from '../../components/common/MakeIdentity';
 import { selectRowFacts, useMarketRowDetails, useMarketRowSpecs, vehicleIdentity, type LotInspection, type MarketRowDetails } from './useMarketRowDetails';
@@ -754,7 +754,7 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
       {scope}
 
       {view === 'inventory' && mapMeasure && <section id="market-composition" className="market-map" aria-label={mapMeasure === 'bids' ? 'What the bids are made of' : 'What the open lots are'}>
-        <HouseShareChart measure={mapMeasure} live={live} data={share.data} isError={share.isError} now={now} />
+        <HouseMarket measure={mapMeasure} live={live} data={share.data} isError={share.isError} now={now} />
         <BoardHistory key={`${make}:${familyName}:${era}:${mapMeasure}`} samples={history} measure={mapMeasure} />
         {mapAuctions.length > 0 && <MarketInventoryMap auctions={mapAuctions} lens={inventoryLens} taxonomy={taxonomy} measure={mapMeasure}
           taxonomyLoading={taxonomyQuery.isLoading} taxonomyError={taxonomyQuery.isError} onRetryTaxonomy={() => { void taxonomyQuery.refetch(); }}
