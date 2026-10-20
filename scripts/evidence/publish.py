@@ -1,4 +1,4 @@
-"""Publication (PLAN K30-4 g, section 5 step 7): publish_image once per image.
+"""Publication (PLAN pilot step 4 g, section 5 step 7): publish_image once per image.
 
 A confirmed publication releases the image's evidence-privacy hold, but only when the gate before filing was
 'approved' (the phone's VisionEngine verdict) or the owner decided the publication per image in the app or on the

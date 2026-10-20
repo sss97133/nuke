@@ -7,7 +7,8 @@ Two modes:
         Refused unless EVIDENCE_DB_WRITES=1: the evidence store is not live until M1a/M1w ship.
 
 Reads go through scripts/data/q.sh (SELECT/WITH only, paced, with a backoff on throttling). Writes go only through
-the writers. The service-role key is never printed, logged or written to a file. The owner's user id comes from
+the writers, and every writer call appends the ids it returned to the manifest (manifest.py; PLAN M10b). The
+service-role key is never printed, logged or written to a file. The owner's user id comes from
 --user, EVIDENCE_OWNER_ID or the local loop config, and is never written to a repo file.
 
 Money and document passes read only the paths in the pinned source list (local, never in the repo). The list is
@@ -33,6 +34,8 @@ QSH = REPO / 'scripts' / 'data' / 'q.sh'
 LOOP_DIR = Path(os.environ.get('EVIDENCE_LOOP_DIR',
                                str(Path.home() / 'nuke-logs' / 'image-rebuild-20261019' / 'loop'))).expanduser()
 PINNED_LIST = Path(os.environ.get('EVIDENCE_PINNED_SOURCES', str(LOOP_DIR / 'pinned_sources.txt'))).expanduser()
+# (v5, PLAN section 0) every writer call appends the ids it returned here; the scoreboard's M10b reads it
+MANIFEST_DIR = Path(os.environ.get('EVIDENCE_MANIFEST_DIR', str(LOOP_DIR / 'manifests'))).expanduser()
 LOOP_CONFIG = LOOP_DIR / 'config.json'
 REFUSED_PARTS = ('FOR-SIGNING', 'jenny-inbox')
 GLOB_CHARS = set('*?[]{}')
@@ -259,10 +262,15 @@ class Rest:
     """PostgREST client for the writers: POST /rest/v1/rpc/<fn> with the service-role key.
 
     The key is read from SUPABASE_SERVICE_ROLE_KEY (dotenvx provides it), kept in a private attribute, and scrubbed
-    from every error text. repr() says only whether it is set."""
+    from every error text. repr() says only whether it is set. Every call that returns appends one manifest line
+    with the ids the writer returned; a call whose outcome is unknown appends an 'unknown' line."""
 
-    def __init__(self, url=None, key=None, timeout=75, opener=None):
+    def __init__(self, url=None, key=None, timeout=75, opener=None, manifest=None):
         require_db_writes()
+        if manifest is None:
+            import manifest as manifest_mod
+            manifest = manifest_mod.Manifest()
+        self.manifest = manifest
         self.url = (url or os.environ.get('SUPABASE_URL') or os.environ.get('VITE_SUPABASE_URL') or '').rstrip('/')
         self.__key = key or os.environ.get('SUPABASE_SERVICE_ROLE_KEY') or ''
         if not self.url or not self.__key:
@@ -288,7 +296,9 @@ class Rest:
             try:
                 with self._open(req, timeout=self.timeout) as r:
                     raw = r.read().decode('utf-8')
-                return json.loads(raw) if raw.strip() else None
+                res = json.loads(raw) if raw.strip() else None
+                self.manifest.record(fn, args, res)
+                return res
             except urllib.error.HTTPError as e:
                 try:
                     raw = self._scrub(e.read().decode('utf-8', 'replace'))
@@ -306,8 +316,9 @@ class Rest:
                 # The database cancels at the authenticator's 60 s and PostgREST answers 57014 before this client's
                 # 75 s timeout. A client timeout or a dropped connection leaves the outcome unknown (the call may still
                 # commit), so it is never recorded as a 57014: the caller stops and the next run re-reads the state.
-                raise RpcError(fn, 0, 'client_timeout' if 'timed out' in str(e) else 'network',
-                               self._scrub(str(e))[:300])
+                code = 'client_timeout' if 'timed out' in str(e) else 'network'
+                self.manifest.record_unknown(fn, args, code)
+                raise RpcError(fn, 0, code, self._scrub(str(e))[:300])
         raise RpcError(fn, 429, 'throttled', 'gave up after 4 attempts')
 
 

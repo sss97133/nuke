@@ -1,4 +1,4 @@
-"""Promotion (PLAN K30-6, section 5 step 7): promote_image once per image, after the owner's decisions.
+"""Promotion (PLAN pilot step 6, section 5 step 7): promote_image once per image, after the owner's decisions.
 
 Before the first image and between images: refused 03:15-03:35Z (cron 501's sweep and 499), IO waiters <= 3 (a
 stop after 10 minutes above), the daily cap of testimony writes (1,000 by default). promote_image checks the same

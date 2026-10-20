@@ -1,8 +1,8 @@
 # Image evidence loop runner
 
-Runs the passes of the image and vehicle-record rebuild (design v3), writes their rows as the payloads of the
+Runs the passes of the image and vehicle-record rebuild (design v5), writes their rows as the payloads of the
 evidence writers, checks them, plans or performs the load, reads the result back against an exit fixture, and
-issues the owner's review sheet. The writers and readers are the M1w and M1p blocks of the v3 design (not yet
+issues the owner's review sheet. The writers and readers are the M1w and M1p blocks of the v5 design (not yet
 migrations); this folder only calls them.
 
 ## Two modes
@@ -10,10 +10,10 @@ migrations); this folder only calls them.
 | | file (default) | db |
 |---|---|---|
 | Passes | build JSONL payloads from local inputs | the same |
-| Checks | `checks.py` against the v3 CHECK rules and the privacy rules | the same; a violation stops the run |
-| Load | `loader.py` dry run: `load-plan.json` (every call, batch and gate, no network) | writer RPCs through PostgREST; `load-manifest.json` (line key -> id) |
-| Exit test | `exit_test.py` against `readers.py`, a Python model of `vehicle_accounting_evidence` over the files | the live read through `scripts/data/q.sh`; stored as an `exit_test` run |
-| Review | `review-<date>.md` + `.json` | the same, and a `review` run holding the sheet's sha256 and row count |
+| Checks | `checks.py` against the v5 CHECK rules and the privacy rules | the same; a violation stops the run |
+| Load | `loader.py` dry run: `load-plan.json` (every call, batch and gate, no network) | writer RPCs through PostgREST; `load-manifest.json` (line key -> id); every returned id appended to the manifest |
+| Exit test | `exit_test.py` against `readers.py`, a Python model of `vehicle_accounting_evidence` over the files | the read keyed by the owner through `scripts/data/q.sh`; stored as an `exit_test` run |
+| Review | `review-<date>.md` + `.json` | the same, and a `review` run holding the sheet's sha256, row count and each row's targets |
 | Answers, promote, repin, publish, probe | print what they would call | the writers, one image per call |
 
 db mode refuses to start unless `EVIDENCE_DB_WRITES=1`. Set it only after M1a and M1w are deployed and their
@@ -21,10 +21,31 @@ post-deploy checks pass (promotion also needs M1p and, for any testimony write, 
 `SUPABASE_URL` (or `VITE_SUPABASE_URL`) and `SUPABASE_SERVICE_ROLE_KEY` from the environment: run it under
 `dotenvx run --`. The key is never printed, logged or written; error text is scrubbed of it.
 
-Writes go only through the writers (`evidence_open_run`, `propose_*`, `record_day_context`,
-`evidence_record_answers`, `decide_evidence`, `promote_image`, `evidence_repin_after_merge`, `publish_image`,
-`record_promotion_failure`, `evidence_probe_write`, `evidence_close_run`). Reads go through `scripts/data/q.sh`
-(one statement, SELECT/WITH only, paced at `EVIDENCE_READ_GAP_S` seconds, default 60).
+Writes go only through the writers (`evidence_open_run`, `propose_*`, `confirm_capture_times_by_rule`,
+`record_day_context`, `evidence_record_answers`, `decide_evidence`, `promote_image`, `evidence_repin_after_merge`,
+`publish_image`, `record_promotion_failure`, `evidence_probe_write`, `evidence_close_run`). Reads go through
+`scripts/data/q.sh` (one statement, SELECT/WITH only, paced at `EVIDENCE_READ_GAP_S` seconds, default 60); every
+reader call passes the owner as `p_user_id` (the 4th argument of `vehicle_accounting_evidence` and
+`get_vehicle_day_records`, the 2nd of `evidence_candidates_for_images`, `evidence_custody` and
+`evidence_identity_set`), so a service-role read shows his rows only.
+
+## The manifest of returned ids (M10b)
+
+Every writer call through `common.Rest` appends one line to `<EVIDENCE_MANIFEST_DIR, default
+~/nuke-logs/image-rebuild-20261019/loop/manifests>/<UTC date>.jsonl`: the writer, the run, every id the call created
+(`ids`, with `decision_ids`, `implied_decision_ids` and `reassign_decision_ids` also apart), support rows per claim,
+rows it returned without creating (`existing`) and the per-row results. A call whose outcome is unknown (a client
+timeout) is recorded as `unknown`. The runner only appends; a line it cannot write stops the loop. The scoreboard's
+M10b matches every evidence row created in the window against the manifest; any unmanifested row holds promotion
+and publication and is reported with its ids. Owner decisions (`human:`) are counted for the lead to match against the
+API request log.
+
+## Per-row results reported, never retried
+
+`already_decided`, `kept_stronger`, `owner_answer_missing`, `entity_is_owners_call`, `human_decision_newer` and
+`human_decision_stands` (and the refusals `image_not_eligible`, `vehicle_not_in_scope`, `source_not_users`,
+`vehicle_not_found`, `not_current`, `changed_since_review`) are counted in the load manifest and the decision records
+and never retried: the next run or the next sheet asks again.
 
 ## Run file mode
 
@@ -55,6 +76,34 @@ a path not on the list, and any path containing `FOR-SIGNING` or `jenny-inbox` (
 resolving a symlink). A refused path stops the loop. Amounts are read from these files only when the loader resolves
 an `@amount:<source>:<ref>` placeholder in db mode, in memory.
 
+## Owner review and answers (v5)
+
+- Each numbered row asks one question with one answer place (one album, pair, image, payment, document line, claim or
+  account) and names its targets: the exact ids a bare yes or no decides, plus the payment key, account or image a
+  named place may land on. The review run stores them (`config.rows.<n>.targets`); a row whose targets did not load
+  is left off. Questions that decide no evidence row (spend, the writers, the Photos order) are listed apart as
+  lettered decisions. Thumbnails only for images the phone's vision gate approved; others say "review in the app".
+- `record_answers.py store` stores his words verbatim with the transcriber's structured reading,
+  `{"decision": "confirmed" | "rejected" | "unsure", and at most one of "vehicle_id" | "subject_key" | "entity_key"}`,
+  one answer set per sheet, the same day. `decide` checks every decision against that reading before the call (a
+  bare yes or no decides only the row's exact targets; a named place confirms only what is placed there and rejects
+  only what is placed elsewhere; a reassign names the vehicle his answer names; "unsure" decides nothing).
+- A payment that rests on his word is an `owner_statement` link citing `answers:<run>#<row>`, with payment key
+  `owner:answers:<run>#<row>` and the payer or payee his answer names.
+
+## Payload rules (v5)
+
+- A pass names only third parties (`third_party:<x>`) as payer, payee or party, or leaves it NULL: whose money it
+  was comes from his confirmed account map or his own statement. The owner may be named as the worker of a
+  `work_performed` / `worked_on` claim; a truck with no row is a `subject_key` there and on links and candidates.
+- Only a payment-source run (`ledger_vendor_date`, later `qb_correlation`, `receipt_vehicle_id`) records
+  `coverage_to`, always with `covers_accounts` (the account refs the export truly covers).
+- `custody_bounds` proposes only an acquisition upper bound (occurred_to = the first own-photo day, no start,
+  confidence at most 0.5) where no source dates the acquisition, and never a sale.
+- Every capture-time claim carries `witness.upload_day`; the batch gate records counts per upload day, and the
+  loader calls `confirm_capture_times_by_rule` after the claims are in.
+- Album items with no image row become `photos_item` links (context, `photos:<uuid>`), listed per day by the reader.
+
 ## Privacy rules
 
 - Files name money by ledger line id, payment key or link id, never by amount. Every amount field is a placeholder;
@@ -68,7 +117,7 @@ an `@amount:<source>:<ref>` placeholder in db mode, in memory.
 - Gmail: ids and the ledger line a total joins, never the total (`pass_gmail.py`). The repo has no Gmail API
   client, so a session with the Gmail connector writes the manifest; `collect_from_mail()` documents the stub.
 - His review answers are stored verbatim only in the owner-private store (`evidence_record_answers`); local
-  receipts keep their sha256.
+  receipts keep their sha256 and the structured reading.
 
 ## Load rules (db mode)
 
@@ -100,8 +149,9 @@ Install them in file mode first; switch `__MODE__` to `db` and `__DB_WRITES__` t
 |---|---|
 | `common.py` | modes, pinned sources, PostgREST client, q.sh reader, case context |
 | `payloads.py` | the writer contract (signatures, vocabularies) and every payload builder; override per case |
-| `checks.py` | the v3 CHECK rules and the privacy scan over a payload directory |
-| `readers.py` | file-mode `vehicle_accounting_evidence` and the M5 extraction |
+| `checks.py` | the v5 CHECK rules and the privacy scan over a payload directory |
+| `readers.py` | file-mode `vehicle_accounting_evidence` (v5) and the M5 extraction |
+| `manifest.py` | the manifest of ids every writer call returned, and the M10b reconciliation |
 | `inputs.py`, `money.py` | input readers; pinned money sources (metadata for passes, amounts for the loader) |
 | `photos_index.py`, `photos_join.py`, `photos_albums.py` | Photos metadata index, the image join, album to vehicle map |
 | `pass_*.py`, `passlib.py` | the passes and their orchestration |

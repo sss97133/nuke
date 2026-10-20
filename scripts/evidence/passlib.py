@@ -52,9 +52,10 @@ class Built:
 
 
 def claim_key(built, kind, vehicle_id, explicit=None):
+    """'claim:<kind>:<vehicle id prefix>' (or the subject_key of a truck with no row), numbered when taken."""
     if explicit:
         return explicit
-    base = 'claim:%s:%s' % (kind, vehicle_id[:8])
+    base = 'claim:%s:%s' % (kind, vehicle_id[:8] if common.is_uuid(vehicle_id or '') else vehicle_id)
     if not built.has(base):
         return base
     n = 2
@@ -159,8 +160,9 @@ def declared_claims(ctx, built, pass_name, specs):
     the first and last day of its image-candidate supports about 'date'."""
     n = 0
     for c in specs or []:
-        veh = ctx.vid(c['vehicle'])
-        key = claim_key(built, c['kind'], veh, c.get('key'))
+        veh = ctx.vid(c.get('vehicle'))
+        subject = None if veh else c.get('subject_key')   # (v4) worked_on / work_performed on a truck with no row
+        key = claim_key(built, c['kind'], veh or subject, c.get('key'))
         sup = select_supports(ctx, built, c.get('support'))
         frm, to = c.get('from'), c.get('to')
         if c.get('window_from_support'):
@@ -175,7 +177,7 @@ def declared_claims(ctx, built, pass_name, specs):
             amount_cents=amount_of(c.get('amount')), trade_in_cents=amount_of(c.get('trade_in')),
             related_vehicle_id=ctx.vid(c.get('related_vehicle')),
             survivor_vehicle_id=ctx.vid(c.get('survivor_vehicle')), party_entity=c.get('party_entity'),
-            asserted_value=_amounts_in(c.get('asserted_value')))
+            asserted_value=_amounts_in(c.get('asserted_value')), subject_key=subject)
         built.add('change_claims.jsonl', payloads.claim_line(key, pass_name, claim, sup))
         n += 1
     return n

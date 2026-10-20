@@ -1,9 +1,10 @@
-"""Synthetic K30-shaped inputs for the runner's tests. Everything here is made up: uuids are uuid5 of labels, dates are
-shifted to 2031-2032, ledger line ids, bank references, thread ids, message GUIDs, amounts and place coordinates are
-invented. The shape mirrors the K30 pilot (133 own photos, 99 in the vehicle album, 1,006 listing urls over 4,534
-listing rows, 20 ledger lines, a P&L allocation to a second vehicle, a job allocation to a truck with no row, a
-contradicting message, unjoined orders, a deal jacket and its claims) so the counts the file-mode lane recorded can
-be asserted without a real id in the repo.
+"""Synthetic pilot-shaped inputs for the runner's tests. Everything here is made up: uuids are uuid5 of labels, dates
+are shifted to 2031-2032, ledger line ids, bank references, thread ids, message GUIDs, amounts, labels and place
+coordinates are invented, and no real model, vendor or place name appears. The shape mirrors the first pilot vehicle
+(133 own photos, 99 in the vehicle album and 12 album items with no image row, 1,006 listing urls over 4,534 listing
+rows, 20 ledger lines on one covered account, a P&L allocation to a second vehicle, a job allocation to a truck with
+no row, a contradicting message, orders joined to a payment with no total and orders with none, a deal jacket and its
+claims) so the counts the file-mode lane recorded can be asserted without a real id in the repo.
 
 make_case(dir) writes every input, the pinned list, the case and its exit fixture, and returns their paths.
 """
@@ -29,8 +30,8 @@ ALBUM = U('album', 'truck').upper()
 SWB_ALBUM = U('album', 'swb').upper()
 YARD_ALBUM = U('album', 'yard').upper()
 PAINT_ALBUM = U('album', 'paint').upper()
-ALBUM_TITLE = '2031 Synthetic K30 Crew Cab'
-SWB_TITLE = '2031 Synthetic K10 SWB'
+ALBUM_TITLE = '2031 Synthetic Crew Cab'
+SWB_TITLE = '2031 Synthetic Short Bed'
 YARD_TITLE = 'synthetic yard'
 PAINT_TITLE = 'P aint synthetic'
 SELLER_DAY, YARD_DAY, ACQ_DAY, SWB_DAY, DOC_DAY = '2031-01-06', '2031-01-09', '2031-01-18', '2031-03-31', '2032-10-18'
@@ -47,14 +48,16 @@ ORG = U('org')
 LEDGER_EXT = 'ledger:SYNTH-LEDGER:'
 JACKET_REF = 'file:SYNTH-JACKETS.txt:jacket3'
 SHEET_REF = 'file:SYNTH-DEALS.txt:vin:SYNTHVIN0001'
-LIST1 = 'example.test/listing/synthetic-k30'
-LIST2 = 'example.test/listing/synthetic-k30-2'
+LIST1 = 'example.test/listing/synthetic-pickup'
+LIST2 = 'example.test/listing/synthetic-pickup-2'
+JOB = 'JOB-SIDE'                                  # a job on a truck with no vehicle row (subject_key label:JOB-SIDE)
+COVER_TO = '2032-12-31'
 # (line id suffix, ledger date, card date or None, amount, category text, label, cost_category, payee, conf)
 LINES = [
     ('00240', '2031-02-10', '02/08', '-120.10', 'parts', 'Glass Co', 'parts', 'third_party:glass_co', 0.25),
     ('00268', '2031-02-16', '02/14', '-230.20', 'parts', 'Tire Co', 'parts', 'third_party:tire_co', 0.15),
     ('00709', '2031-05-13', None, '-40.30', 'parts', 'Parts Store', 'parts', 'third_party:parts_store', 0.25),
-    ('00737', '2031-05-20', None, '-777.00', 'paint', 'Zelle painter', 'paint', 'third_party:painter', 0.25),
+    ('00737', '2031-05-20', None, '-777.00', 'paint', 'Transfer painter', 'paint', 'third_party:painter', 0.25),
     ('00770', '2031-05-30', '05/28', '-150.40', 'parts', 'Online Store', 'parts', 'third_party:online_store', 0.25),
     ('00132', '2032-01-21', '01/19', '-60.50', 'parts', 'Auction Site', 'parts', 'third_party:auction_site', 0.2),
     ('00145', '2032-01-22', None, '-300.60', 'labour', 'bank transfer', None, None, 0.2),
@@ -68,7 +71,7 @@ LINES = [
     ('00187', '2032-01-27', '01/24', '-150.15', 'labour', 'cash app', None, 'third_party:shop_helper', 0.2),
     ('00193', '2032-01-28', None, '-220.16', 'labour', 'Detail Co', None, 'third_party:detail_co', 0.25),
     ('00243', '2032-02-04', None, '-310.17', 'labour', 'bank transfer', None, None, 0.2),
-    ('00206', '2032-01-29', None, '-1500.00', 'paint', 'Zelle painter', 'paint', 'third_party:painter', 0.5),
+    ('00206', '2032-01-29', None, '-1500.00', 'paint', 'Transfer painter', 'paint', 'third_party:painter', 0.5),
     ('00144', '2032-01-22', '01/20', '-640.18', 'parts', 'Speed Shop', 'parts', 'third_party:speed_shop', 0.05),
 ]
 PROPOSED = ['00240', '00268', '00709', '00770', '00132', '00145', '00148', '00161', '00163', '00181', '00182', '00183',
@@ -217,10 +220,10 @@ def make_case(d):
         w.writerow(['year', 'bank_line_id', 'date', 'amount', 'description', 'original_category'])
         for sfx, date, card, amt, cat, label, *_ in LINES:
             desc = ('VISA - %s %s' % (card, label.upper())) if card else \
-                ('ZELLE %s;R0000000%s;%s;DR' % (label.upper(), sfx, date) if label.startswith('Zelle') else label.upper())
+                ('XFER %s;R0000000%s;%s;DR' % (label.upper(), sfx, date) if label.startswith('Transfer') else label.upper())
             w.writerow([date[:4], lid(sfx), date, amt, desc, cat])
         w.writerow(['2032', lid('00306'), '2032-02-19', '9000.00', 'TRANSFER FROM SHARE ACCOUNT', 'money in'])
-        w.writerow(['2032', lid('00999'), '2032-03-01', '-10.00', 'ZELLE OTHER;R0000000999X;2032-03-01;DR', 'paint'])
+        w.writerow(['2032', lid('00999'), '2032-03-01', '-10.00', 'XFER OTHER;R0000000999X;2032-03-01;DR', 'paint'])
     with open(p('disposition.csv'), 'w', newline='') as f:
         w = csv.writer(f)
         w.writerow(['asset', 'year', 'component', 'amount', 'evidence'])
@@ -231,17 +234,17 @@ def make_case(d):
         w = csv.writer(f)
         w.writerow(['year', 'date', 'id', 'section', 'category', 'amount', 'account', 'description', 'source',
                     'decision', 'bank_links', 'status'])
-        w.writerow(['2031', '2031-05-20', 'JOB-K10-' + lid('00737'), 'Expense', 'paint', '-777.00', 'x', 'x', 'x', 'x',
+        w.writerow(['2031', '2031-05-20', JOB + '-' + lid('00737'), 'Expense', 'paint', '-777.00', 'x', 'x', 'x', 'x',
                     lid('00737'), 'Included'])
-        w.writerow(['2032', '2032-03-01', 'JOB-K10-' + lid('00999'), 'Expense', 'paint', '-10.00', 'x', 'x', 'x', 'x',
+        w.writerow(['2032', '2032-03-01', JOB + '-' + lid('00999'), 'Expense', 'paint', '-10.00', 'x', 'x', 'x', 'x',
                     lid('00999'), 'Included'])
-    jacket_prefix = '3. 2031 Synthetic K30 (SYNTHVIN0001'
+    jacket_prefix = '3. 2031 Synthetic Pickup (SYNTHVIN0001'
     with open(p('jackets.txt'), 'w') as f:
         f.write('1. other truck; nothing here\n')
         f.write(jacket_prefix + ', the truck): acquired Jan 24 2032 from a private seller; sold Feb 4 2032; buyer '
                 'Synthetic Equipment LLC (Nowhere); 12,345; purchase 6,789 + travel 100; trade-in 2030 Synthetic C10, '
                 'VIN SYNTHVIN0002, title clear ("Trade ACV 1000 / CTV 2000", cost line (3,000)); dry ice (1,111); '
-                'Synthetic paint (2,222.22); "Labor 10 details 20 Lift 30" = (3,333.33) green; Ernie\'s (444.44); '
+                'Synthetic paint (2,222.22); "Labor 10 details 20 Lift 30" = (3,333.33) green; Corner Shop (444.44); '
                 'total cost 1.00.\n')
     pinned = p('pinned_sources.txt')
     with open(pinned, 'w') as f:
@@ -258,10 +261,15 @@ def make_case(d):
          'payment_join': {'line_id': lid('00181'), 'confidence': 0.95, 'basis': 'total = line amount'}},
         {'thread_id': 'synththread0003', 'kind': 'order', 'date': '2031-05-27', 'vehicle': 'TRUCK',
          'source_label': 'Online Store', 'cost_category': 'parts', 'confidence': 0.25, 'summary': 'carburetor shipment',
-         'payment_join': None, 'why_unjoined': 'shipments do not sum to the line'},
+         'payment_join': {'line_id': lid('00770'), 'confidence': 0.8, 'no_total': True,
+                          'basis': 'the line names the order number; the shipments do not sum to it'}},
         {'thread_id': 'synththread0004', 'kind': 'order', 'date': '2032-01-27', 'vehicle': 'TRUCK',
          'source_label': 'Truck Parts Co', 'cost_category': 'parts', 'confidence': 0.25, 'summary': 'backorder notice',
-         'payment_join': None, 'why_unjoined': 'no total'},
+         'payment_join': {'line_id': lid('00163'), 'confidence': 0.8, 'no_total': True,
+                          'basis': 'backorder notice with no total; the only line of that vendor near the date'}},
+        {'thread_id': 'synththread0007', 'kind': 'order', 'date': '2032-01-28', 'vehicle': 'TRUCK',
+         'source_label': 'Parts Store', 'cost_category': 'parts', 'confidence': 0.2, 'summary': 'order confirmation',
+         'payment_join': None, 'why_unjoined': 'no ledger line of that vendor near the date'},
         {'thread_id': 'synththread0005', 'kind': 'listing_event', 'date': '2031-07-27', 'vehicle': 'TRUCK',
          'confidence': 0.95, 'summary': 'auction ended'},
         {'thread_id': 'synththread0006', 'kind': 'listing_event', 'date': '2031-12-22', 'vehicle': 'TRUCK',
@@ -284,7 +292,7 @@ def make_case(d):
                       confidence=0.5, join_key='date', summary='transfer in from the share account'))
     msg = lambda chat, local: [chats[chat], local]  # noqa: E731
     case = {
-        'case': 'synthetic-k30', 'vehicle': 'TRUCK', 'run_kind': 'pilot', 'vehicles': V,
+        'case': 'synthetic-pilot', 'vehicle': 'TRUCK', 'run_kind': 'pilot', 'vehicles': V,
         'base_scope': ['TRUCK', 'TWIN', 'SUB', 'SWB'], 'scope_vehicles': ['TRUCK', 'TWIN', 'TRADE', 'SUB'],
         'window': {'from': '2031-01-01', 'to': '2032-10-18'}, 'exit_fixture': 'exit-expected.json',
         'pinned_sources_file': pinned,
@@ -302,16 +310,20 @@ def make_case(d):
                                   'trade_in_cost_line': r'cost line \(' + NUM + r'\)',
                                   'line:dry_ice': r'dry ice \(' + NUM + r'\)', 'line:paint': r'paint \(' + NUM + r'\)',
                                   'line:labour': r'"Labor[^"]*" = \(' + NUM + r'\)',
-                                  'line:ernies': r"Ernie's \(" + NUM + r'\)'}}},
+                                  'line:corner': r'Corner Shop \(' + NUM + r'\)'}}},
         'place_clusters': CLUSTERS, 'place_cluster_default': 'en_route',
         'privacy': {'people_sha16': [hashlib.sha256(b'zorblat').hexdigest()[:16]]},   # a made-up name
-        'vehicle_labels': {'TRUCK': '2031 synthetic K30', 'TWIN': '2031 synthetic K30 (second profile)',
-                           'TRADE': '2030 synthetic C10', 'SUB': 'synthetic second truck', 'SWB': '2031 synthetic K10'},
-        'review': {'questions': [{'text': 'OWNER-DECISIONS 1: may photos go to Jev?', 'answer_hint': 'yes / no'}]},
+        'vehicle_labels': {'TRUCK': '2031 synthetic pickup', 'TWIN': '2031 synthetic pickup (second profile)',
+                           'TRADE': '2030 synthetic trade-in', 'SUB': 'synthetic second truck',
+                           'SWB': '2031 synthetic short bed'},
+        'review': {'questions': [
+            {'text': 'OWNER-DECISIONS 1: may photos go to the vision vendor?', 'answer_hint': 'yes / no'},
+            {'text': 'Which account paid for the truck when you bought it?', 'answer_hint': 'mine / <business>',
+             'targets': [{'target_kind': 'change_claim', 'key': 'claim:acquisition:%s' % V['TRUCK'][:8]}]}]},
         'passes': {
             'photos_album': {'albums': [{'album_uuid': ALBUM, 'title': ALBUM_TITLE, 'vehicle': 'TRUCK',
                                          'candidate_set': ['TRUCK', 'TWIN'], 'confidence': 0.9, 'items_all_dates': 111,
-                                         'map': {'ref': 'album map', 'map_confidence': 0.6}}]},
+                                         'photos_items': True, 'map': {'ref': 'album map', 'map_confidence': 0.6}}]},
             'listing_class': {'vehicle': 'TRUCK', 'listings': [
                 {'match': {'ex_src': True}, 'ref': LIST1, 'confidence': 0.98, 'basis': 'exif source url'},
                 {'match': {}, 'ref': LIST2, 'confidence': 0.9, 'basis': 'relist gallery'}]},
@@ -335,12 +347,12 @@ def make_case(d):
                 'survivor_vehicle': 'TRUCK', 'confidence': 0.6, 'summary': 'second profile of the truck',
                 'support': [{'link': {'source_key': 'photos_album:' + ALBUM, 'vehicle': 'TRUCK'}, 'about': 'identity'}]}]},
             'ledger_vendor_date': {'source': 'ledger', 'ledger_name': 'SYNTH-LEDGER', 'account_ref': LEDGER_ACCOUNT,
-                                   'lines': lines},
+                                   'coverage_to': COVER_TO, 'covers_accounts': [LEDGER_ACCOUNT], 'lines': lines},
             'pnl_allocation': {'sources': [
                 {'name': 'pnl_disposition', 'kind': 'disposition', 'assets': {'Synthetic second truck': 'SUB'},
                  'confidence': 0.7, 'cost_category': {'paint': 'paint'}},
                 {'name': 'pnl_ledger', 'kind': 'independent_ledger',
-                 'jobs': {'JOB-K10': {'vehicle': None, 'source_label': 'K10 job', 'cost_category': 'paint'}}}]},
+                 'jobs': {JOB: {'vehicle': None, 'source_label': 'side job', 'cost_category': 'paint'}}}]},
             'gmail_order': {'ledger_source': 'ledger', 'account_ref': LEDGER_ACCOUNT},
             'messages_mention': {'tz': 'America/Los_Angeles', 'counts_window': {'from': '2032-01-15', 'to': '2032-02-28'},
                                  'mentions': [
@@ -365,8 +377,9 @@ def make_case(d):
                      'cost_category': 'paint', 'source_label': 'paint', 'occurred_on': '2032-02-04', 'confidence': 0.9},
                     {'anchor': 'line:dry_ice', 'role': 'assertion', 'direction': 'out', 'amount_fact': 'line:dry_ice',
                      'cost_category': 'other', 'source_label': 'dry ice', 'occurred_on': '2032-02-04', 'confidence': 0.9},
-                    {'anchor': 'line:ernies', 'role': 'assertion', 'direction': 'out', 'amount_fact': 'line:ernies',
-                     'cost_category': 'other', 'source_label': "Ernie's", 'occurred_on': '2032-02-04', 'confidence': 0.9}]},
+                    {'anchor': 'line:corner', 'role': 'assertion', 'direction': 'out', 'amount_fact': 'line:corner',
+                     'cost_category': 'other', 'source_label': 'Corner Shop', 'occurred_on': '2032-02-04',
+                     'confidence': 0.9}]},
                 {'external_ref': SHEET_REF, 'vehicle': 'TRUCK', 'anchors': [
                     {'anchor': 'received', 'role': 'supports', 'occurred_on': '2031-01-19', 'confidence': 0.9}]}],
                 'claims': [
@@ -416,6 +429,8 @@ def make_case(d):
         },
     }
     T = V['TRUCK']
+    pk = lambda sfx: 'bank:' + lid(sfx)  # noqa: E731
+    jacket_refs = [jref('line:labour'), jref('line:paint'), jref('line:dry_ice'), jref('line:corner'), jref('purchase')]
     fixture = {'vehicle_id': T, 'assertions': [
         {'id': 'identity', 'level': 'evidence', 'expect': {'identity_contains': [T], 'identity_excludes': [V['TWIN']]}},
         {'id': 'identity_pair_confirmed', 'level': 'confirmed',
@@ -424,32 +439,45 @@ def make_case(d):
         {'id': 'acquisition', 'level': 'evidence', 'expect': {'claim': {
             'key': 'claim:acquisition:%s' % T[:8], 'from': ACQ_DAY, 'to': '2031-01-19',
             'supports_kind_count': {'image_candidate': 3}, 'supports': [[lkey(SHEET_REF + '#received', T), 'date']],
-            'contradicts': [[lkey(jref('acquired_date'), T), 'date']]}}},
+            'contradicts': [[lkey(jref('acquired_date'), T), 'date']]},
+            'open_question': {'q': 'who_paid', 'claim_key': 'claim:acquisition:%s' % T[:8]}}},
         {'id': 'custody', 'level': 'evidence', 'expect': {'custody': {'from': ACQ_DAY, 'to': '2032-02-16',
-                                                                      'status': 'proposed'}}},
+                                                                      'status': 'proposed', 'acquired_by': None}}},
         {'id': 'work_days', 'level': 'evidence', 'expect': {'work_days_exact': sorted(ALBUM_DAYS)}},
         {'id': 'third_party', 'level': 'evidence', 'expect': {'not_in_work_days': [SELLER_DAY],
                                                               'not_in_outside': [SELLER_DAY],
                                                               'image_class_count': {'third_party': 5}}},
-        {'id': 'outside', 'level': 'evidence', 'expect': {'outside_contains': [[YARD_DAY, 'before', None],
-                                                                               [DOC_DAY, 'after', 1]]}},
+        {'id': 'outside', 'level': 'evidence', 'expect': {'outside_contains': [[YARD_DAY, 'before', None, None],
+                                                                               [DOC_DAY, 'after', None, 1]]}},
         {'id': 'payment_keys_once', 'level': 'evidence', 'expect': {'payment_keys_once': True}},
         {'id': 'tires_once', 'level': 'evidence', 'expect': {'payment_links_contain': {
-            'bank:' + lid('00268'): [LEDGER_EXT + lid('00268'), 'gmail:thread:synththread0001']}}},
-        {'id': 'painter_contested', 'level': 'evidence', 'expect': {'band_of': {'bank:' + lid('00206'): 'contested'}}},
+            pk('00268'): [LEDGER_EXT + lid('00268'), 'gmail:thread:synththread0001']}}},
+        {'id': 'painter_contested', 'level': 'evidence', 'expect': {'band_of': {pk('00206'): 'contested'}}},
         {'id': 'painter_answered', 'level': 'confirmed',
          'decisions': [{'target': lkey(LEDGER_EXT + lid('00206'), T), 'decision': 'rejected',
                         'reassign_to': lkey('pnl:disposition:R000000000206', V['SUB'])}],
-         'expect': {'band_of': {'bank:' + lid('00206'): 'rejected'}}},
-        {'id': 'job_contested', 'level': 'evidence', 'blocked_on': 'job vehicle not identified',
-         'expect': {'band_of': {'bank:' + lid('00737'): 'contested'}}},
-        {'id': 'disputed', 'level': 'evidence', 'expect': {'band_of': {'bank:' + lid('00144'): 'disputed'},
-                                                           'not_summed': ['bank:' + lid('00144')]}},
-        {'id': 'proposed_bands_now', 'level': 'evidence', 'expect': {'band_keys_exact': {
-            'bands': ['confirmed', 'high', 'med', 'low'], 'keys': ['bank:' + lid(s) for s in PROPOSED] + ['bank:' + lid('00737')]}}},
+         'expect': {'band_of': {pk('00206'): 'rejected'}}},
+        {'id': 'job_contested', 'level': 'evidence', 'expect': {
+            'band_of': {pk('00737'): 'contested'}, 'other_vehicles': {pk('00737'): ['label:' + JOB]},
+            'open_question_values': {'payment_placement': {'payment_key': [pk('00206'), pk('00737')]}}}},
+        {'id': 'disputed', 'level': 'evidence', 'expect': {'band_of': {pk('00144'): 'disputed'},
+                                                           'not_summed': [pk('00144')]}},
+        {'id': 'proposed_bands', 'level': 'evidence', 'expect': {'band_keys_exact': {
+            'bands': ['confirmed', 'high', 'med', 'low'], 'keys': [pk(x) for x in PROPOSED]}}},
+        {'id': 'joined_orders_in_their_payment', 'level': 'evidence', 'expect': {
+            'payment_links_contain': {pk('00163'): [LEDGER_EXT + lid('00163'), 'gmail:thread:synththread0004'],
+                                      pk('00770'): [LEDGER_EXT + lid('00770'), 'gmail:thread:synththread0003']},
+            'unpaid_refs_exclude': ['gmail:thread:synththread0003', 'gmail:thread:synththread0004']}},
         {'id': 'asserted_unpaid', 'level': 'evidence', 'expect': {
-            'unpaid_labels_contain': ['Labor', 'paint', 'dry ice', "Ernie's"],
-            'unpaid_refs_contain': ['gmail:thread:synththread0003', 'gmail:thread:synththread0004']}},
+            'unpaid_labels_contain': ['Labor', 'paint', 'dry ice', 'Corner Shop'],
+            'unpaid_refs_exact': jacket_refs + ['gmail:thread:synththread0007'],
+            'open_question_values': {'unpaid_assertion': {'ref': jacket_refs + ['gmail:thread:synththread0007']},
+                                     'awaiting_statement': {'ref': []}}}},
+        {'id': 'coverage', 'level': 'evidence', 'expect': {'read_equals': {
+            'money_sources_cover_to': COVER_TO, 'money_sources_cover_to_by_account': {LEDGER_ACCOUNT: COVER_TO},
+            'payments_outside_window': [], 'undated_own_photos': 0}}},
+        {'id': 'photos_items', 'level': 'evidence', 'expect': {
+            'photos_items_total': 12, 'read_contains': {'photos_items_not_in_nuke': [{'day': '2031-04-22', 'items': 12}]}}},
         {'id': 'no_characterisation_keys', 'level': 'evidence', 'expect': {'read_keys_absent': ['own_labour_asserted',
                                                                                                 'labour_paid']}},
         {'id': 'work_performed', 'level': 'evidence', 'expect': {'work_performed_contains': [
@@ -463,8 +491,8 @@ def make_case(d):
             'open_question': {'q': 'who_received', 'claim_key': 'claim:sale:%s' % T[:8]},
             'open_question_refs': {'q': 'account_entity_unknown', 'account_refs': [LEDGER_ACCOUNT, SHARE_ACCOUNT]},
             'contradictions': {'claim:acquisition:%s' % T[:8]: ['date'], 'claim:sale:%s' % T[:8]: ['date']}}},
-        {'id': 'income', 'level': 'evidence', 'expect': {'income_contains': [['bank:' + lid('00306'), 'med',
-                                                                               SHARE_ACCOUNT, 'unknown']]}},
+        {'id': 'income', 'level': 'evidence', 'expect': {'income_contains': [
+            [pk('00306'), 'med', SHARE_ACCOUNT, LEDGER_ACCOUNT, 'unknown', 'unknown']]}},
         {'id': 'image_side', 'level': 'evidence', 'expect': {'counts': {
             'time_claims.jsonl': 133, 'candidates.photos_album.jsonl': 99, 'candidates.combined.jsonl': 133,
             'candidates.listing_class.jsonl': 1006}}}]}

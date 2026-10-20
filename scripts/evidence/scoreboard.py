@@ -8,6 +8,11 @@ ids. A measure whose objects are not deployed yet (before M1a/M1w) is recorded w
 fall back to their pre-store form (taken_at alone, as the 2026-10-20 baseline measured them). Before starting, the
 script refuses to run if another scoreboard statement is already active (db-safety: duplicate heavy reads).
 
+(v5) M5 reads vehicle_accounting_evidence keyed by the owner. M10_integrity compares the guard and writer bodies with
+loop/deployed_md5s.json ({name: md5}, from the PR's post-deploy output). M10b matches every evidence row created in
+the last --m10b-hours against the runner's manifest of returned ids (manifest.py): `unmanifested` > 0 halts
+promotion; owner decisions are counted for the lead to match against the API request log.
+
 The owner id comes from --user / EVIDENCE_OWNER_ID / the loop config and appears in no output (params show '<uid>').
 
 Usage: python3 scripts/evidence/scoreboard.py --user <owner> --vehicle <exit-test vehicle> [--out-dir <loop dir>]
@@ -16,12 +21,15 @@ Usage: python3 scripts/evidence/scoreboard.py --user <owner> --vehicle <exit-tes
 import argparse
 import datetime as dt
 import glob
+import json
 import math
 import os
 import re
 import sys
 
 import common
+import manifest
+import payloads
 
 SQL_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'scoreboard.sql')
 MARK = '/* evidence-scoreboard */ '
@@ -29,12 +37,12 @@ WINDOW = ('2024-01-01', '2026-01-01')
 
 
 def parse(path=SQL_FILE):
-    """-> [(name, mode, sql)], mode in ('', 'chunked', 'ids')."""
+    """-> [(name, mode, sql)], mode in ('', 'chunked', 'ids', 'manifest')."""
     out, cur, name, mode = [], [], None, ''
     with open(path, encoding='utf-8') as f:
         text = f.read()
     for ln in text.splitlines():
-        m = re.match(r'^-- name: (\S+)(?: (chunked|ids))?\s*$', ln)
+        m = re.match(r'^-- name: (\S+)(?: (chunked|ids|manifest))?\s*$', ln)
         if m:
             if name:
                 out.append((name, mode, '\n'.join(cur).strip().rstrip(';')))
@@ -82,8 +90,34 @@ def chunked(reader, sql, params, chunks, name, uid, dry_run, printer):
     return total
 
 
-def run(reader, uid, vehicle, statements=None, dry_run=False, printer=print, only=None):
-    params = {'uid': uid, 'vehicle_id': vehicle, 'window_from': WINDOW[0], 'window_to': WINDOW[1]}
+def _json(v):
+    return json.loads(v) if isinstance(v, str) else v
+
+
+def integrity(row, deployed):
+    """M10_integrity: guard triggers firing ALWAYS, and bodies that differ from the deployed md5s."""
+    md5s = _json(row.get('md5s')) or {}
+    drifted = sorted(n for n, m in md5s.items() if deployed.get(n) and deployed[n] != m) if deployed else None
+    return {'always_on': int(row.get('always_on') or 0), 'total': int(row.get('total') or 0), 'drifted': drifted,
+            'bodies': len(md5s), 'md5_basis': 'deployed_md5s' if deployed else 'no deployed md5s file: not compared'}
+
+
+def integrity_failed(m):
+    """The stop condition (PLAN section 5): fewer guard triggers firing ALWAYS than deployed, or a drifted body."""
+    if not isinstance(m, dict) or 'error' in m:
+        return None
+    want = payloads.C['guard_triggers']
+    if m['always_on'] < want or m['always_on'] != m['total']:
+        return '%d of %d guard triggers fire ALWAYS (want %d)' % (m['always_on'], m['total'], want)
+    if m.get('drifted'):
+        return 'bodies differ from the deployed md5s: %s' % ', '.join(m['drifted'])
+    return None
+
+
+def run(reader, uid, vehicle, statements=None, dry_run=False, printer=print, only=None, manifest_dir=None,
+        since=None, deployed_md5s=None):
+    since = since or common.iso_utc(common.utc_now() - dt.timedelta(hours=24))
+    params = {'uid': uid, 'vehicle_id': vehicle, 'window_from': WINDOW[0], 'window_to': WINDOW[1], 'since': since}
     out = {}
     statements = statements or parse()
     if not dry_run:
@@ -126,6 +160,14 @@ def run(reader, uid, vehicle, statements=None, dry_run=False, printer=print, onl
                 for k in range(0, len(ids), 50):
                     total += int(reader.read(sql, dict(params, ids=ids[k:k + 50]), tag=name)[0]['n'])
                 out[name] = {'value': total, 'merged_vehicle_ids': len(merged), 'named_by_a_claim': len(ids)}
+            elif mode == 'manifest':
+                if dry_run:
+                    printer('-- %s (matched against the manifest)\n%s;' % (
+                        name, common.Reader.substitute(sql, params).replace(uid, '<uid>')))
+                    continue
+                created = {r['t']: _json(r['x']) for r in reader.read(sql, params, tag=name)}
+                lines = manifest.load(manifest_dir or common.MANIFEST_DIR, since)
+                out[name] = dict(manifest.reconcile(created, lines), since=since)
             else:
                 if dry_run:
                     printer('-- %s\n%s;' % (name, common.Reader.substitute(sql, params).replace(uid, '<uid>')))
@@ -136,7 +178,9 @@ def run(reader, uid, vehicle, statements=None, dry_run=False, printer=print, onl
                     out[name] = {'wrong': w, 'decided': n, 'rate': round(w / n, 4) if n else None,
                                  'wilson95': wilson(w, n)}
                 elif name == 'M5':
-                    out[name] = rows[0].get('m5') if rows else None
+                    out[name] = _json(rows[0].get('m5')) if rows else None
+                elif name == 'M10_integrity' and rows:
+                    out[name] = integrity(rows[0], deployed_md5s)
                 else:
                     out[name] = {'rows': rows}
         except (common.ReadError, common.EvidenceError) as e:
@@ -147,6 +191,8 @@ def run(reader, uid, vehicle, statements=None, dry_run=False, printer=print, onl
 def scalar(v):
     if isinstance(v, dict) and 'value' in v:
         return v['value']
+    if isinstance(v, dict) and 'unmanifested' in v:
+        return v['unmanifested']
     if isinstance(v, dict) and 'rate' in v:
         return v['rate']
     return None
@@ -170,6 +216,9 @@ def main():
     ap.add_argument('--dry-run', action='store_true', help='print the statements (owner id shown as <uid>); no reads')
     ap.add_argument('--gap', type=float, help='seconds between reads (default EVIDENCE_READ_GAP_S or 60)')
     ap.add_argument('--only', nargs='*', help='measures to run (default: all)')
+    ap.add_argument('--m10b-hours', type=float, default=24, help='M10b window (rows created in the last N hours)')
+    ap.add_argument('--manifest-dir', default=str(common.MANIFEST_DIR))
+    ap.add_argument('--deployed-md5s', default=str(common.LOOP_DIR / 'deployed_md5s.json'))
     a = ap.parse_args()
     uid = common.owner_id(a.user)
     if not common.is_uuid(a.vehicle):
@@ -179,8 +228,11 @@ def main():
         return 0
     reader = common.Reader(min_gap=a.gap)
     date = a.date or common.today()
+    deployed = common.load_json(a.deployed_md5s) if os.path.exists(a.deployed_md5s) else None
+    since = common.iso_utc(common.utc_now() - dt.timedelta(hours=a.m10b_hours))
     try:
-        measures = run(reader, uid, a.vehicle, only=a.only)
+        measures = run(reader, uid, a.vehicle, only=a.only, manifest_dir=a.manifest_dir, since=since,
+                       deployed_md5s=deployed)
     except common.StopLoop as e:
         common.eprint('STOP: %s' % e)
         return 3

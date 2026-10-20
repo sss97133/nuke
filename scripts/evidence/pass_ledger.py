@@ -8,11 +8,15 @@ case, never the line's free text: descriptions carry people's names and phone nu
 goes to transaction_on (v3, FM-16). Amounts are @amount placeholders resolved at load time.
 
 ledger_vendor_date  one link per placement the case lists ({line_id, vehicle, source_label, cost_category, payee,
-                    confidence, join_key, note}).
+                    confidence, join_key, note}). The ledger is a payment source: its run records coverage_to (the
+                    case's statement end, else the newest line date) with covers_accounts, the account refs whose
+                    statements the export is (v5, readers v4 #3); with no covers_accounts it records no coverage.
 pnl_allocation      a link per allocation on the allocated vehicle, with the same payment_key (v3, ET2-1/ET2-9):
                     disposition rows cite a payment by its bank reference ('Bank payment<ref>'); job rows of the
                     independent P&L ledger carry '<job>-<line id>' ids. A job with no Nuke vehicle row is written with
-                    subject_key 'label:<job>'. By default only payments the case already places are allocated.
+                    subject_key 'label:<job>' (the reader then reads the payment contested, with the label in
+                    other_vehicles). By default only payments the case already places are allocated. No coverage.
+Payer and payee are third parties the source names, or NULL (v5): whose account it was comes from the account map.
 """
 import os
 import re
@@ -61,10 +65,14 @@ def build(ctx, built):
                 summary=p.get('summary'))))
         placed.add(p['line_id'])
         n += 1
-    res = {'ledger_vendor_date': {'emitted': n, 'config': {
-        'ledger': ledger_name, 'ledger_sha256': sha, 'lines': n, 'payment_key': 'bank:<line id>',
-        'account_ref': account, 'amounts': 'resolved at load time from the pinned file; never in these files'},
-        'counts': {'links': n}}}
+    lconf = {'ledger': ledger_name, 'ledger_sha256': sha, 'lines': n, 'payment_key': 'bank:<line id>',
+             'account_ref': account, 'amounts': 'resolved at load time from the pinned file; never in these files'}
+    if lcfg.get('covers_accounts'):
+        lconf['coverage_to'] = lcfg.get('coverage_to') or src.newest_date(lname)
+        lconf['covers_accounts'] = list(lcfg['covers_accounts'])
+    else:
+        ctx.note('ledger_vendor_date: no covers_accounts in the case; the run records no money coverage')
+    res = {'ledger_vendor_date': {'emitted': n, 'config': lconf, 'counts': {'links': n}}}
 
     pcfg = ctx.pass_cfg('pnl_allocation')
     if not pcfg:

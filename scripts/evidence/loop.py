@@ -5,13 +5,17 @@ file mode (default)  build every pass from the case's inputs, validate the paylo
                      review sheet, and report. Nothing leaves the machine. Exit 1 on a payload violation or a failed
                      structural exit assertion.
 db mode              (refused unless EVIDENCE_DB_WRITES=1) the same build and checks, then: load through the writers
-                     (the loop run stays open), the scoreboard, the review sheet when it is due, repin, promote per
-                     decided image, publish, pick the gap, close the loop run with the scoreboard and the gap.
+                     (the loop run stays open), the scoreboard, the review sheet when it is due (its review run
+                     stores each row's targets), repin, promote per decided image, publish, pick the gap, close the
+                     loop run with the scoreboard and the gap. Every writer call appends its returned ids to the
+                     manifest (loop/manifests/<UTC date>.jsonl); M10b reconciles them, and any unmanifested row holds
+                     promotion and publication for the run.
 
 Stop conditions (the run closes 'aborted' with the reason): a halting row in evidence_revert_watch; a writer's
-42501; the insert or append-only guard firing; IO waiters above 3 for 10 minutes; a STOP file (dedupe or another
-lane) naming a vehicle in scope; the pinned-source check refusing a path; the Jev cap (Jev is not wired: no call
-is made until OWNER-DECISIONS 1 says yes).
+42501; the insert or append-only guard firing; the integrity check failing (fewer guard triggers firing ALWAYS than
+deployed, or a guard or writer body that differs from the deployed md5); IO waiters above 3 for 10 minutes; a STOP
+file (dedupe or another lane) naming a vehicle in scope; the pinned-source check refusing a path; a manifest line
+that cannot be written; the Jev cap (Jev is not wired: no call is made until OWNER-DECISIONS 1 says yes).
 
 Usage: python3 scripts/evidence/loop.py --case <case.json> --out <dir> [--mode file|db] [--user <uuid>]
        [--fixture <exit-expected.json>] [--date YYYY-MM-DD] [--skip-scoreboard]
@@ -91,13 +95,9 @@ def file_steps(ctx, a, report):
         report['exit_test'] = summary
         ok = summary['structural_pass']
     read = readers.accounting(files, ctx.vid(ctx.case['vehicle']))
-    rows = review_sheet.build_rows(ctx, files, read)
-    md = review_sheet.render(ctx, rows, a.date)
-    (ctx.out / ('review-%s.md' % a.date)).write_text(md, encoding='utf-8')
-    side = {'sheet': str(ctx.out / ('review-%s.md' % a.date)), 'sheet_sha256': common.sha256_bytes(md.encode('utf-8')),
-            'items': len(rows), 'date': a.date, 'sheet_run': None, 'rows': rows}
-    common.dump_json(ctx.out / ('review-%s.json' % a.date), side)
-    report['review_sheet'] = {'rows': len(rows), 'sha256': side['sheet_sha256']}
+    rows, decisions = review_sheet.build_rows(ctx, files, read)
+    side = review_sheet.issue(ctx, rows, decisions, a.date, ctx.out)
+    report['review_sheet'] = {'rows': side['items'], 'decisions': len(decisions), 'sha256': side['sheet_sha256']}
     return ok
 
 
@@ -115,36 +115,41 @@ def db_steps(ctx, a, report, rest, reader):
         common.dump_json(ctx.out / 'load-manifest.json', ld.manifest())
     loop_run = ld.runs['run:loop']
     report['loop_run'] = loop_run
+    report['outcomes_reported_not_retried'] = dict(ld.outcomes)
     try:
-        sb = {} if a.skip_scoreboard else scoreboard.run(reader, ctx.user_id, ctx.vid(ctx.case['vehicle']))
+        md5_file = common.LOOP_DIR / 'deployed_md5s.json'
+        sb = {} if a.skip_scoreboard else scoreboard.run(
+            reader, ctx.user_id, ctx.vid(ctx.case['vehicle']),
+            deployed_md5s=common.load_json(md5_file) if md5_file.exists() else None)
         report['scoreboard'] = {k: scoreboard.scalar(v) for k, v in sb.items()}
+        bad = scoreboard.integrity_failed(sb.get('M10_integrity'))
+        if bad:
+            raise common.StopLoop('integrity_check_failed', bad)
+        unmanifested = (sb.get('M10b') or {}).get('unmanifested') or 0
         halting = [w for w in dbops.watch(reader, ctx.user_id) if w.get('halting')]
         if halting:
             raise common.StopLoop('halting_watch_row', '%d image(s)' % len(halting))
         files = readers.load_files(str(ctx.out))
-        rows = review_sheet.build_rows(ctx, files, readers.accounting(files, ctx.vid(ctx.case['vehicle'])))
+        rows, decisions = review_sheet.build_rows(ctx, files, readers.accounting(files, ctx.vid(ctx.case['vehicle'])))
         weekday = (ctx.case.get('review') or {}).get('weekday', 6)          # Sunday; or when the queue passes 50
         if rows and (dt.date.fromisoformat(a.date).weekday() == weekday or len(rows) > 50):
-            md = review_sheet.render(ctx, rows, a.date)
-            (ctx.out / ('review-%s.md' % a.date)).write_text(md, encoding='utf-8')
-            sha = common.sha256_bytes(md.encode('utf-8'))
-            sheet_run = rest.rpc('evidence_open_run', payloads.open_run(
-                ctx.user_id, 'review', 'review_sheet', common.producer('loop.py#review_sheet'), common.code_version(),
-                {'sheet_sha256': sha, 'items': str(len(rows))}))
-            rest.rpc('evidence_close_run', payloads.close_run(sheet_run, 'done', {'items': len(rows)}))
-            common.dump_json(ctx.out / ('review-%s.json' % a.date), {
-                'sheet': str(ctx.out / ('review-%s.md' % a.date)), 'sheet_sha256': sha, 'items': len(rows),
-                'date': a.date, 'sheet_run': sheet_run, 'rows': rows})
-            report['review_sheet'] = {'rows': len(rows), 'sheet_run': sheet_run}
+            side = review_sheet.issue(ctx, rows, decisions, a.date, ctx.out, common.DB, rest, ctx.user_id, ld.ids)
+            report['review_sheet'] = {'rows': side['items'], 'sheet_run': side['sheet_run'],
+                                      'left_off_not_loaded': len(side['left_off_not_loaded'])}
         report['repin'] = repin.repin(rest, reader, ctx.user_id, parent=loop_run)
         decided = reader.read("select distinct c.image_id from image_vehicle_candidates c join v_evidence_status s on "
                               "s.target_kind = 'image_candidate' and s.target_id = c.id where c.user_id = :uid and "
                               "c.superseded_by is null and s.status in ('confirmed', 'rejected') and "
                               "s.channel in ('human', 'agent')", {'uid': ctx.user_id}, tag='decided_images')
         imgs = [r['image_id'] for r in decided]
-        report['promote'] = dict(promote.promote(rest, reader, ctx.user_id, imgs, parent=loop_run)) if imgs else {}
-        report['publish'] = dict(publish.publish(rest, reader, ctx.user_id, publish.watch_images(reader, ctx.user_id),
-                                                 parent=loop_run))
+        if unmanifested:
+            # (v5, M10b) a row no writer call returned: promotion and publication wait; the lead reads the rows
+            report['promotion_held'] = {'reason': 'unmanifested_rows', 'rows': unmanifested,
+                                        'by_table': (sb.get('M10b') or {}).get('by_table')}
+        else:
+            report['promote'] = dict(promote.promote(rest, reader, ctx.user_id, imgs, parent=loop_run)) if imgs else {}
+            report['publish'] = dict(publish.publish(rest, reader, ctx.user_id,
+                                                     publish.watch_images(reader, ctx.user_id), parent=loop_run))
         gap = pick_gap(report.get('scoreboard') or {})
         rest.rpc('evidence_close_run', payloads.close_run(loop_run, 'done', {'files': report.get('files')},
                                                           scoreboard=sb or None, gap_picked=gap))

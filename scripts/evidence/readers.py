@@ -1,23 +1,30 @@
-"""File-mode model of the v3 readers (draft.sql M1w 2.5): vehicle_accounting_evidence and the day records it reads,
-computed over a payload directory instead of the store. Line keys stand in for row ids.
+"""File-mode model of the v5 readers (draft.sql M1w 2.5): vehicle_accounting_evidence and the day records it reads,
+computed over a payload directory instead of the store. Line keys stand in for row ids; the payload is one owner's,
+so the v5 user filter (p_user_id) is the directory itself.
 
-It follows the SQL: identity = the vehicle plus one hop of confirmed same_vehicle_as; candidate status = the latest
-owner decision, else confirmed_by_album_map, else proposed; one effective day per image (confirmed capture time,
-else the combined row's day, else the earliest pass day); custody from the best non-rejected acquisition and sale
-claims; payment-level status per payment_key (owner decision, placed_elsewhere, contested, disputed, then the
-confidence band); asserted_unpaid; money_received; open questions. Capture times are confirmed the way the writer
-confirms them (check:photos_exif_join). Owner decisions can be supplied as a list ({"target": <key>, "decision":
-confirmed|rejected, "by": "agent"|"human", "reassign_to": <key>}) to read the confirmed level. Amounts are not read
-(cents are null), so over_allocated is not evaluated here.
+It follows the SQL: identity = the vehicle plus the confirmed same_vehicle_as pairs, closed transitively (bounded);
+candidate status = the latest owner decision, else confirmed_by_album_map, else proposed; one effective day per image
+(confirmed capture time, else the combined row's day, else the earliest pass day); custody from the best
+non-rejected acquisition and sale claims (confirmed first, then sourced before custody_bounds' upper bounds, then a
+start date, then confidence, then the newest), 'unknown' with acquired_by when the window has no start; a day after a
+dated sale is outside custody even when the start is unknown; payment-level status per payment_key (owner decision,
+placed_elsewhere, contested (a subject_key placement included), disputed, then the confidence band); a payment is
+dated by its payment source (paid_on) and a windowed read selects payments by that date; asserted_unpaid with
+awaiting_statement after the coverage of the assertion's own account (else the oldest coverage); money_received;
+open questions. Capture times are confirmed the way the writer confirms them (check:photos_exif_join). Owner
+decisions can be supplied as a list ({"target": <key>, "decision": confirmed|rejected, "by": "agent"|"human",
+"reassign_to": <key>}) to read the confirmed level. Amounts are not read (cents are null), so over_allocated is not
+evaluated here.
 
 extract_m5() is PLAN section 6 M5 (the exit-test extraction), shared by file and db mode.
 """
 import collections
 
-import common
 import payloads
 
 BANDS_SUMMED = ('confirmed', 'high', 'med', 'low')
+PAYMENT_SOURCES = ('bank_line', 'ledger_line', 'payment_event', 'qb_transaction')
+IDENTITY_DEPTH = 8
 
 
 class Store:
@@ -30,6 +37,10 @@ class Store:
         self.claims = files.get('change_claims.jsonl', [])
         self.extra_support = files.get('claim_support.jsonl', [])
         self.entities = files.get('account_entities.jsonl', [])
+        self.runs = (files.get('run.json') or {}).get('runs') or []
+        self.order = {}
+        for i, ln in enumerate(self.claims + self.links):
+            self.order[ln['key']] = i                    # file order stands in for created_at
         self.dec = {}
         seq = 0
         for d in decisions or []:
@@ -55,14 +66,33 @@ class Store:
         off = payloads.whole_hour_offset(r['stored_taken_at'], r['corrected_taken_at'])[0]
         return off == r.get('offset_seconds') and off % 3600 == 0 and abs(off) // 3600 in self.allowed
 
+    def coverage(self):
+        """{account_ref: newest coverage_to} over the runs that record coverage (v5, readers v4 #3)."""
+        out = {}
+        for r in self.runs:
+            cfg = (r.get('args') or {}).get('p_config') or {}
+            if not cfg.get('coverage_to'):
+                continue
+            for acct in cfg.get('covers_accounts') or []:
+                out[acct] = max(out.get(acct, ''), cfg['coverage_to'])
+        return out
+
 
 def identity_set(st, vehicle):
-    ids = {vehicle}
+    """The vehicle and every vehicle the confirmed same_vehicle_as pairs join to it, transitively (depth <= 8)."""
+    edges = collections.defaultdict(set)
     for ln in st.claims:
         c = ln['p_claim']
-        if c['kind'] == 'same_vehicle_as' and st.status(ln['key']) == 'confirmed' and \
-                (c['vehicle_id'] in ids or c.get('related_vehicle_id') in ids):
-            ids |= {c['vehicle_id'], c['related_vehicle_id']}
+        if c['kind'] == 'same_vehicle_as' and st.status(ln['key']) == 'confirmed' and c.get('vehicle_id') and \
+                c.get('related_vehicle_id'):
+            edges[c['vehicle_id']].add(c['related_vehicle_id'])
+            edges[c['related_vehicle_id']].add(c['vehicle_id'])
+    ids, frontier = {vehicle}, {vehicle}
+    for _ in range(IDENTITY_DEPTH):
+        frontier = {b for a in frontier for b in edges[a]} - ids
+        if not frontier:
+            break
+        ids |= frontier
     return ids
 
 
@@ -77,19 +107,34 @@ def claim_support(st, key):
              'weight': s.get('weight', 1)} for s in sup]
 
 
+def bound_only(ln):
+    return ln.get('p_run_id') == '@run:custody_bounds'
+
+
 def custody(st, ids):
-    ks = [(ln, st.status(ln['key'])) for ln in st.claims if ln['p_claim']['vehicle_id'] in ids
+    ks = [(ln, st.status(ln['key'])) for ln in st.claims if ln['p_claim'].get('vehicle_id') in ids
           and ln['p_claim']['kind'] in ('acquisition', 'sale')]
 
     def best(kind):
         live = [(ln, s) for ln, s in ks if ln['p_claim']['kind'] == kind and s != 'rejected']
-        live.sort(key=lambda x: (x[1] != 'confirmed', -x[0]['p_claim']['confidence']))
+        if kind == 'acquisition':
+            live.sort(key=lambda x: (x[1] != 'confirmed', bound_only(x[0]), x[0]['p_claim'].get('occurred_from') is None,
+                                     -x[0]['p_claim']['confidence'], -st.order.get(x[0]['key'], 0)))
+        else:
+            live.sort(key=lambda x: (x[1] != 'confirmed', bound_only(x[0]), -x[0]['p_claim']['confidence'],
+                                     -st.order.get(x[0]['key'], 0)))
         return live[0] if live else (None, None)
     acq, acq_st = best('acquisition')
     sal, sal_st = best('sale')
-    status = 'unknown' if acq is None else (
-        'confirmed' if acq_st == 'confirmed' and (sal_st or 'confirmed') == 'confirmed' else 'proposed')
-    return {'from': acq['p_claim'].get('occurred_from') if acq else None,
+    frm = acq['p_claim'].get('occurred_from') if acq else None
+    if acq is None or frm is None:
+        status = 'unknown'
+    elif acq_st == 'confirmed' and (sal_st or 'confirmed') == 'confirmed':
+        status = 'confirmed'
+    else:
+        status = 'proposed'
+    return {'from': frm,
+            'acquired_by': acq['p_claim'].get('occurred_to') if acq and frm is None else None,
             'to': (sal['p_claim'].get('occurred_to') or sal['p_claim'].get('occurred_from')) if sal else None,
             'acquisition_claim': acq['key'] if acq else None, 'sale_claim': sal['key'] if sal else None,
             'status': status}
@@ -128,12 +173,24 @@ def candidates_for_images(st, image_ids):
     return out
 
 
-def day_records(st, ids, cust, win=('1900-01-01', '2999-12-31')):
+def _counted(c):
+    return c['status'] != 'rejected' and c['verdict'] in ('is_vehicle', 'listing_evidence') and (
+        c['pass_'] in ('combined', 'owner_review') or c['status'] in ('confirmed', 'confirmed_by_album_map'))
+
+
+def in_custody(cust, day):
+    """get_vehicle_day_records (v5, readers v4 #9): a day after a dated sale is outside even with no start."""
+    if cust.get('to') and day > cust['to']:
+        return False
+    if not cust.get('from'):
+        return None
+    return cust['from'] <= day <= (cust.get('to') or '9999-12-31')
+
+
+def day_records(st, ids, cust, win=('1900-01-01', '2999-12-31'), sessions=None):
     imgs = {ln['row']['image_id'] for ln in st.cands if ln['row'].get('vehicle_id') in ids}
     cand = [c for c in candidates_for_images(st, imgs) if c.get('vehicle_id') in ids and c['captured_on']
-            and win[0] <= c['captured_on'] <= win[1] and c['status'] != 'rejected'
-            and c['verdict'] in ('is_vehicle', 'listing_evidence')
-            and (c['pass_'] in ('combined', 'owner_review') or c['status'] in ('confirmed', 'confirmed_by_album_map'))]
+            and win[0] <= c['captured_on'] <= win[1] and _counted(c)]
     days = collections.defaultdict(lambda: collections.defaultdict(set))
     for c in cand:
         own = c.get('image_class', 'own') == 'own'
@@ -156,57 +213,91 @@ def day_records(st, ids, cust, win=('1900-01-01', '2999-12-31')):
         cls = c.get('image_class', 'own')
         if cls in ('third_party', 'listing', 'document'):
             d[cls].add(c['image_id'])
+    items = collections.Counter()
+    for ln in st.links:
+        r = ln['row']
+        if r.get('vehicle_id') in ids and r.get('source_kind') == 'photos_item' and r.get('occurred_on') and \
+                win[0] <= r['occurred_on'] <= win[1] and st.status(ln['key']) != 'rejected':
+            items[r['occurred_on']] += 1
+    sess = collections.defaultdict(list)
+    for s in sessions or []:
+        if s.get('vehicle_id', next(iter(ids))) in ids and win[0] <= s['day'] <= win[1]:
+            sess[s['day']].append(s['id'])
     out = []
-    for day in sorted(days):
+    for day in sorted(set(days) | set(items) | set(sess)):
         d = days[day]
-        inc = None if not cust['from'] else (cust['from'] <= day <= (cust['to'] or '9999-12-31'))
-        out.append({'day': day, 'in_custody': inc, 'own_photos': len(d['own']), 'own_photos_confirmed': len(d['confirmed']),
-                    'own_photos_album': len(d['album']), 'own_photos_proposed_high': len(d['high']),
-                    'own_photos_proposed_other': len(d['other']), 'also_in_frame_photos': len(d['also']),
-                    'third_party_photos': len(d['third_party']), 'listing_photos': len(d['listing']),
-                    'document_photos': len(d['document']), 'time_unverified': len(d['tu'])})
+        out.append({'day': day, 'in_custody': in_custody(cust, day), 'own_photos': len(d['own']),
+                    'own_photos_confirmed': len(d['confirmed']), 'own_photos_album': len(d['album']),
+                    'own_photos_proposed_high': len(d['high']), 'own_photos_proposed_other': len(d['other']),
+                    'also_in_frame_photos': len(d['also']), 'third_party_photos': len(d['third_party']),
+                    'listing_photos': len(d['listing']), 'document_photos': len(d['document']),
+                    'time_unverified': len(d['tu']), 'sessions': len(sess.get(day, [])),
+                    'session_ids': sess.get(day) or None, 'photos_items_not_in_nuke': items.get(day, 0)})
     return out
 
 
-def accounting(files, vehicle, decisions=None, date_from=None, date_to=None):
-    """vehicle_accounting_evidence(vehicle, from, to) over payload files."""
+def accounting(files, vehicle, decisions=None, date_from=None, date_to=None, sessions=None):
+    """vehicle_accounting_evidence(vehicle, from, to, user) over payload files (v5)."""
     st = Store(files, decisions)
     ids = identity_set(st, vehicle)
     win = (date_from or '1900-01-01', date_to or '2999-12-31')
     cust = custody(st, ids)
+    # (v4) a confirmed 'unknown' mapping ("no idea whose") is not mapped
     mapped = {ln['row']['account_ref']: ln['row']['entity_key'] for ln in st.entities
-              if st.status(ln['key']) == 'confirmed'}
+              if st.status(ln['key']) == 'confirmed' and ln['row']['entity_key'] != 'unknown'}
+    cov_acct = st.coverage()
+    cov = min(cov_acct.values()) if cov_acct else None
     claims = []
     for ln in st.claims:
         c = ln['p_claim']
-        if c['vehicle_id'] in ids:
-            claims.append(dict(c, id=ln['key'], status=st.status(ln['key']), support=claim_support(st, ln['key'])))
+        if c.get('vehicle_id') in ids:
+            claims.append(dict(c, id=ln['key'], status=st.status(ln['key']), support=claim_support(st, ln['key']),
+                               _bound=bound_only(ln)))
     live = [c for c in claims if c['status'] != 'rejected']
-    links = []
-    for ln in st.links:
+
+    def link_rec(ln):
         r = ln['row']
-        if r.get('vehicle_id') in ids and (r.get('occurred_on') is None or win[0] <= r['occurred_on'] <= win[1]):
-            d = st.dec.get(ln['key'])
-            links.append(dict(r, id=ln['key'], source_key=payloads.source_key(
-                r.get('source_table'), r.get('source_row_id'), r.get('external_ref'), r.get('anchor')),
-                owner_decision=d[0] if d else None, decided_at=d[2] if d else None,
-                status=d[0] if d else 'proposed',
-                payer=r.get('payer_entity') or mapped.get(r.get('from_account_ref')),
-                payee=r.get('payee_entity') or mapped.get(r.get('to_account_ref'))))
-    keyed = [l for l in links if l.get('payment_key') and l['role'] in ('payment_out', 'payment_in', 'assertion',
-                                                                         'contradicts')]
+        d = st.dec.get(ln['key'])
+        status = d[0] if d else 'proposed'
+        return dict(r, id=ln['key'], source_key=payloads.source_key(
+            r.get('source_table'), r.get('source_row_id'), r.get('external_ref'), r.get('anchor')),
+            owner_decision=d[0] if d else None, decided_at=d[2] if d else None, status=status,
+            payer=r.get('payer_entity') or mapped.get(r.get('from_account_ref')),
+            payee=r.get('payee_entity') or mapped.get(r.get('to_account_ref')))
+    links_all = [link_rec(ln) for ln in st.links if ln['row'].get('vehicle_id') in ids]
+    links = [l for l in links_all if l.get('occurred_on') is None or win[0] <= l['occurred_on'] <= win[1]]
+    # (v5, readers v4 #8) a payment is dated by its payment source: transaction_on first, else the posting date
+    paid_on = {}
+    for k in {l['payment_key'] for l in links_all if l.get('payment_key')}:
+        ks = [l for l in links_all if l.get('payment_key') == k]
+        src = [l.get('transaction_on') or l.get('occurred_on') for l in ks if l['source_kind'] in PAYMENT_SOURCES
+               and (l.get('transaction_on') or l.get('occurred_on'))]
+        anyd = [l['occurred_on'] for l in ks if l.get('occurred_on')]
+        paid_on[k] = min(src) if src else (min(anyd) if anyd else None)
+
+    def in_win(d):
+        return d is None or win[0] <= d <= win[1]
+    keyed = [l for l in links_all if l.get('payment_key') and l['role'] in ('payment_out', 'payment_in', 'assertion',
+                                                                            'contradicts')
+             and in_win(paid_on[l['payment_key']])]
+    outside_window = sorted({(l['payment_key'], paid_on[l['payment_key']]) for l in links if l.get('payment_key')
+                             and not in_win(paid_on[l['payment_key']])})
     keys = sorted({l['payment_key'] for l in keyed})
     outside = {}
     for ln in st.links:
         r = ln['row']
-        if r.get('payment_key') in keys and r.get('vehicle_id') and r['vehicle_id'] not in ids:
-            o = outside.setdefault(r['payment_key'], {'placed': False, 'shared': False, 'unalloc': False, 'veh': set()})
-            dec = st.status(ln['key'])
-            if r['role'] != 'contradicts':
-                o['placed'] |= dec == 'confirmed'
-                o['shared'] |= dec != 'rejected'
-                o['unalloc'] |= dec != 'rejected' and r.get('allocated_cents') is None
-            o['veh'].add(r['vehicle_id'])
+        if r.get('payment_key') not in keys:
+            continue
+        elsewhere = (r.get('vehicle_id') and r['vehicle_id'] not in ids) or (not r.get('vehicle_id') and r.get('subject_key'))
+        if not elsewhere:
+            continue
+        o = outside.setdefault(r['payment_key'], {'placed': False, 'shared': False, 'unalloc': False, 'veh': set()})
+        dec = st.status(ln['key'])
+        if r['role'] != 'contradicts':
+            o['placed'] |= dec == 'confirmed'
+            o['shared'] |= dec != 'rejected'
+            o['unalloc'] |= dec != 'rejected' and r.get('allocated_cents') is None
+        o['veh'].add(r.get('vehicle_id') or r.get('subject_key'))
     banded = []
     for k in keys:
         ks = [l for l in keyed if l['payment_key'] == k]
@@ -236,30 +327,44 @@ def accounting(files, vehicle, decisions=None, date_from=None, date_to=None):
         else:
             b = 'low'
         first = lambda f: next((l[f] for l in ks if l.get(f)), None)  # noqa: E731
+        # (v4) known parties only, owner-confirmed links first; (v5) never from a rejected link
+        ranked = sorted((l for l in ks if l['status'] != 'rejected'),
+                        key=lambda l: (l['status'] != 'confirmed', -l['confidence'], l['id']))
+        cat = sorted((l for l in ks if l.get('cost_category')),
+                     key=lambda l: l['source_kind'] not in ('bank_line', 'ledger_line'))
         banded.append({'payment_key': k, 'b': b, 'is_in': any(l['role'] == 'payment_in' for l in ks),
                        'is_out': any(l['role'] in ('payment_out', 'assertion') for l in ks),
-                       'category': first('cost_category'), 'payer': first('payer'), 'payee': first('payee'),
+                       'category': cat[0]['cost_category'] if cat else None,
+                       'payer': next((l['payer'] for l in ranked if l.get('payer')), None),
+                       'payee': next((l['payee'] for l in ranked if l.get('payee')), None),
                        'from_account_ref': first('from_account_ref'), 'to_account_ref': first('to_account_ref'),
+                       'paid_on': paid_on[k],
                        'other_vehicles': sorted(o['veh']) if o.get('veh') else None,
                        'links': [{'link_id': l['id'], 'ref': l['source_key'], 'kind': l['source_kind'],
                                   'role': l['role'], 'label': l.get('source_label'), 'on': l.get('occurred_on'),
                                   'transaction_on': l.get('transaction_on'), 'status': l['status'],
                                   'confidence': l['confidence'],
                                   'payment_join_confidence': l.get('payment_join_confidence')} for l in ks]})
-    unpaid = [l for l in links if not l.get('payment_key') and l['role'] in ('payment_out', 'assertion')
-              and l.get('direction') == 'out' and l['status'] != 'rejected']
+    unpaid = []
+    for l in links:
+        if not l.get('payment_key') and l['role'] in ('payment_out', 'assertion') and l.get('direction') == 'out' \
+                and l['status'] != 'rejected':
+            bound = cov_acct.get(l.get('from_account_ref')) or cov
+            unpaid.append(dict(l, awaiting_statement=bool(l.get('occurred_on') and bound and l['occurred_on'] > bound)))
     costs = collections.OrderedDict()
     for b in sorted({x['b'] for x in banded if x['is_out'] and not x['is_in']}):
         ps = [x for x in banded if x['b'] == b and x['is_out'] and not x['is_in']]
         costs[b] = {'cents': None, 'payments': [{'payment_key': x['payment_key'], 'cents': None,
-                                                 'category': x['category'], 'payer': x['payer'] or 'unknown',
+                                                 'category': x['category'], 'paid_on': x['paid_on'],
+                                                 'payer': x['payer'] or 'unknown',
                                                  'other_vehicles': x['other_vehicles'], 'links': x['links']}
                                                 for x in sorted(ps, key=lambda x: x['payment_key'])]}
     if unpaid:
         costs['asserted_unpaid'] = {'cents': None, 'links': [
             {'link_id': l['id'], 'ref': l['source_key'], 'label': l.get('source_label'), 'on': l.get('occurred_on'),
-             'category': l.get('cost_category'), 'status': l['status']} for l in sorted(unpaid, key=lambda l: l['source_key'])]}
-    link_by_id = {l['id']: l for l in links}
+             'category': l.get('cost_category'), 'status': l['status'], 'awaiting_statement': l['awaiting_statement']}
+            for l in sorted(unpaid, key=lambda l: l['source_key'])]}
+    link_by_id = {l['id']: l for l in links_all}
     pay_ok = {x['payment_key']: x for x in banded}
 
     def backed(c, role, side):
@@ -279,21 +384,28 @@ def accounting(files, vehicle, decisions=None, date_from=None, date_to=None):
     oq += [{'q': 'payment_placement', 'payment_key': x['payment_key'], 'other_vehicles': x['other_vehicles']}
            for x in banded if x['b'] == 'contested']
     oq += [{'q': 'disputed_payment', 'payment_key': x['payment_key']} for x in banded if x['b'] == 'disputed']
+    # (v5, readers v4 #9) who_paid is not asked of a custody_bounds upper bound: no document backs it
     oq += [{'q': 'who_paid', 'claim_id': c['id'], 'kind': c['kind']} for c in live
-           if c['kind'] == 'acquisition' and not backed(c, 'payment_out', 'payer')]
+           if c['kind'] == 'acquisition' and not c['_bound'] and not backed(c, 'payment_out', 'payer')]
     oq += [{'q': 'who_received', 'claim_id': c['id'], 'kind': c['kind']} for c in live
            if c['kind'] == 'sale' and not backed(c, 'payment_in', 'payee')]
-    oq += [{'q': 'unpaid_assertion', 'link_id': l['id'], 'ref': l['source_key'], 'label': l.get('source_label')}
-           for l in unpaid if l['status'] == 'proposed']
+    oq += [{'q': 'awaiting_statement' if l['awaiting_statement'] else 'unpaid_assertion', 'link_id': l['id'],
+            'ref': l['source_key'], 'label': l.get('source_label')} for l in unpaid if l['status'] == 'proposed']
     refs = sorted({r for l in links if l['status'] != 'rejected' for r in (l.get('from_account_ref'),
                                                                           l.get('to_account_ref')) if r})
     oq += [{'q': 'account_entity_unknown', 'account_ref': r} for r in refs if r not in mapped]
     if cust['status'] != 'confirmed':
         oq.append({'q': 'custody_window', 'status': cust['status']})
-    work = [w for w in day_records(st, ids, cust, win) if w['own_photos'] > 0 or w['document_photos'] > 0]
+    dayrec = day_records(st, ids, cust, win, sessions)
+    work = [w for w in dayrec if w['own_photos'] > 0 or w['document_photos'] > 0]
+    imgs = {ln['row']['image_id'] for ln in st.cands if ln['row'].get('vehicle_id') in ids}
+    undated = {c['image_id'] for c in candidates_for_images(st, imgs) if c.get('vehicle_id') in ids
+               and c['captured_on'] is None and c['status'] != 'rejected' and c['verdict'] == 'is_vehicle'
+               and c.get('image_class', 'own') == 'own' and c.get('frame_role', 'subject') == 'subject'
+               and (c['pass_'] in ('combined', 'owner_review') or c['status'] in ('confirmed', 'confirmed_by_album_map'))}
 
     def claim_json(c):
-        return {k: v for k, v in c.items() if k != 'user_id'}
+        return {k: v for k, v in c.items() if k not in ('user_id', '_bound')}
     by_kind = lambda k: sorted((claim_json(c) for c in live if c['kind'] == k),  # noqa: E731
                                key=lambda c: (c['status'] != 'confirmed', -c['confidence']))
     return {
@@ -315,17 +427,28 @@ def accounting(files, vehicle, decisions=None, date_from=None, date_to=None):
                     if c['kind'] not in ('acquisition', 'sale', 'listing', 'work_performed')],
         'work_days': 'unknown' if cust['status'] == 'unknown' else [
             {'day': w['day'], 'own_photos': w['own_photos'], 'confirmed': w['own_photos_confirmed'],
-             'album_confirmed': w['own_photos_album'], 'time_unverified': w['time_unverified']}
+             'album_confirmed': w['own_photos_album'], 'time_unverified': w['time_unverified'],
+             'sessions': w['sessions']}
             for w in work if w['in_custody'] and w['own_photos'] > 0],
         'work_days_custody': cust['status'],
         'photo_days_outside_custody': [{'day': w['day'], 'own_photos': w['own_photos'],
                                         'document_photos': w['document_photos'],
-                                        'side': 'before' if w['day'] < (cust['from'] or '') else 'after'}
+                                        'side': 'before' if cust['from'] and w['day'] < cust['from'] else 'after'}
                                        for w in work if w['in_custody'] is False],
         'photo_days_custody_unknown': [w['day'] for w in work if w['in_custody'] is None],
+        'undated_own_photos': len(undated),
+        'also_in_frame_days': [{'day': d['day'], 'photos': d['also_in_frame_photos'], 'in_custody': d['in_custody']}
+                               for d in dayrec if d['also_in_frame_photos'] > 0],
+        'session_days': [{'day': d['day'], 'sessions': d['sessions'], 'session_ids': d['session_ids'],
+                          'in_custody': d['in_custody']} for d in dayrec if d['sessions'] > 0 and d['own_photos'] == 0],
+        'photos_items_not_in_nuke': [{'day': d['day'], 'items': d['photos_items_not_in_nuke']} for d in dayrec
+                                     if d['photos_items_not_in_nuke'] > 0],
+        'money_sources_cover_to': cov,
+        'money_sources_cover_to_by_account': cov_acct,
+        'payments_outside_window': [{'payment_key': k, 'paid_on': d} for k, d in outside_window],
         'costs': costs,
         'money_received': {
-            'payments': [{'payment_key': x['payment_key'], 'band': x['b'], 'cents': None,
+            'payments': [{'payment_key': x['payment_key'], 'band': x['b'], 'cents': None, 'paid_on': x['paid_on'],
                           'payer': x['payer'] or 'unknown', 'payee': x['payee'] or 'unknown',
                           'from_account_ref': x['from_account_ref'], 'to_account_ref': x['to_account_ref'],
                           'other_vehicles': x['other_vehicles'], 'links': x['links']}
@@ -346,27 +469,32 @@ def accounting(files, vehicle, decisions=None, date_from=None, date_to=None):
 
 
 def extract_m5(v):
-    """PLAN section 6 M5 over a vehicle_accounting_evidence result (db or file), plus the claims' supports."""
+    """PLAN section 6 M5 (v5 tuples) over a vehicle_accounting_evidence result (db or file), plus what the exit test
+    reads by key: the claims with their supports, each payment's links and other vehicles, the read's keys."""
     def arr(x):
         return x if isinstance(x, list) else []
     costs = v.get('costs') or {}
+    pays = [p for b in costs for p in (costs[b].get('payments') or [])] + \
+        arr((v.get('money_received') or {}).get('payments'))
     return {
         'identity': v.get('identity'), 'custody': v.get('custody'),
         'work_days': [d['day'] for d in arr(v.get('work_days'))],
         'work_days_unknown': v.get('work_days') == 'unknown',
-        'outside': [[d['day'], d['side'], d.get('document_photos')] for d in arr(v.get('photo_days_outside_custody'))],
+        'outside': [[d['day'], d['side'], d.get('own_photos'), d.get('document_photos')]
+                    for d in arr(v.get('photo_days_outside_custody'))],
         'custody_unknown_days': arr(v.get('photo_days_custody_unknown')),
         'bands': {b: [p.get('payment_key') or p.get('ref') for p in (costs[b].get('payments') or costs[b].get('links') or [])]
                   for b in costs},
-        'band_links': {p['payment_key']: [l['ref'] for l in p.get('links') or []]
-                       for b in costs for p in (costs[b].get('payments') or [])},
+        'band_links': {p['payment_key']: [l['ref'] for l in p.get('links') or []] for p in pays},
+        'other_vehicles': {p['payment_key']: p.get('other_vehicles') for p in pays},
         'unpaid_labels': [x.get('label') for x in (costs.get('asserted_unpaid') or {}).get('links') or []],
         'unpaid_refs': [x.get('ref') for x in (costs.get('asserted_unpaid') or {}).get('links') or []],
         'work_performed': [[x.get('party'), x.get('from'), x.get('to')] for x in arr(v.get('work_performed'))],
         'listings': [[x.get('from'), x.get('to')] for x in arr(v.get('listings'))],
         'sale_trade_in': [x.get('trade_in_vehicle_id') for x in arr((v.get('money_received') or {}).get('expected_from_sale'))],
-        'income': [[x.get('payment_key'), x.get('band'), x.get('from_account_ref'), x.get('payee')]
-                   for x in arr((v.get('money_received') or {}).get('payments'))],
+        'income': [[x.get('payment_key'), x.get('band'), x.get('from_account_ref'), x.get('to_account_ref'),
+                    x.get('payer'), x.get('payee')] for x in arr((v.get('money_received') or {}).get('payments'))],
+        'undated_own_photos': v.get('undated_own_photos'), 'cover_to': v.get('money_sources_cover_to'),
         'open_questions': arr(v.get('open_questions')),
         'claims': {c['id']: c for k in ('acquisition', 'sale') for c in arr(v.get(k))},
         'keys': sorted(v.keys()),
@@ -374,8 +502,11 @@ def extract_m5(v):
 
 
 def load_files(d):
+    """The payload files plus run.json (the readers take money coverage from its run configs)."""
     import checks
-    return checks.load_dir(d)[1]
+    run, files = checks.load_dir(d)
+    files['run.json'] = run
+    return files
 
 
 def read(d, vehicle, decisions=None):
@@ -385,6 +516,8 @@ def read(d, vehicle, decisions=None):
 if __name__ == '__main__':
     import argparse
     import json
+
+    import common
     ap = argparse.ArgumentParser(description='file-mode vehicle_accounting_evidence over a payload dir')
     ap.add_argument('--dir', required=True)
     ap.add_argument('--vehicle', required=True)

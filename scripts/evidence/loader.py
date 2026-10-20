@@ -1,4 +1,4 @@
-"""Loader (PLAN K30-3): replay a payload directory through the writers, in load order.
+"""Loader (PLAN pilot step 3): replay a payload directory through the writers, in load order.
 
 file mode (default)  a dry run: builds every call exactly as db mode would (batches, gates, placeholder order)
                      and writes load-plan.json. No network; amounts are checked to resolve, never written.
@@ -11,7 +11,13 @@ source key) in a call, so each result maps back to its line; listing_class rows 
 (its done list), with is_duplicate re-checked per image id right before each call (a copy is dropped, never sent);
 IO waiters <= 3 before a batch and no lock waiters after it (reads through q.sh). A writer's 42501, an insert or
 append-only guard refusal, a pinned-source refusal or IO above 3 for 10 minutes stops the load and closes every
-open run 'aborted' with the reason.
+open run 'aborted' with the reason. After the capture-time claims, confirm_capture_times_by_rule is called with the
+batch_offset_v1 claims of the closed gate run (the writer confirms only what the gate passes).
+
+(v5) Per-row results the writers return are counted, never retried: already_decided, kept_stronger,
+owner_answer_missing, entity_is_owners_call, human_decision_newer, human_decision_stands (the next run or the next
+sheet asks again), and so are the refusals (image_not_eligible, vehicle_not_in_scope, source_not_users,
+vehicle_not_found). Every id a writer returns goes to the manifest (common.Rest; manifest.py).
 
 Usage: python3 scripts/evidence/loader.py --dir <payload dir> --case <case.json> [--mode file|db] [--user <uuid>]
 """
@@ -42,6 +48,7 @@ class Loader:
         self.skipped = collections.OrderedDict()        # line key -> reason
         self.calls = []
         self.counts = collections.defaultdict(collections.Counter)
+        self.outcomes = collections.Counter()           # reported per-row results, never retried
         self.open_runs = []
 
     # ------------------------------------------------------------------ placeholders
@@ -233,12 +240,14 @@ class Loader:
                 it = by.get(ln['row']['image_id'])
                 if it is None:
                     missing.append(ln)                     # 'unchanged': the writer returns no item
-                elif it.get('candidate_id'):
-                    self.ids[ln['key']] = it['candidate_id']
-                    self.counts[run_key][it['result']] += 1
+                    continue
+                self.counts[run_key][it.get('result', 'refused')] += 1
+                if it.get('result') in payloads.C['reported_outcomes']:
+                    self.outcomes[it['result']] += 1
+                if it.get('candidate_id'):
+                    self.ids[ln['key']] = it['candidate_id']     # 'already_decided' names the decided row
                 else:
                     self.skipped[ln['key']] = it.get('result', 'refused')
-                    self.counts[run_key][it.get('result', 'refused')] += 1
             if missing:
                 self.read_back_candidates(run_key, missing)
         elif writer == 'propose_evidence_links':
@@ -247,45 +256,56 @@ class Loader:
                 r = ln['row']
                 it = by.get(payloads.source_key(r.get('source_table'), r.get('source_row_id'), r.get('external_ref'),
                                                 r.get('anchor')))
+                result = (it or {}).get('result', 'no_result')
+                self.counts[run_key][result] += 1
+                if result in payloads.C['reported_outcomes']:
+                    self.outcomes[result] += 1
                 if it and it.get('link_id'):
-                    self.ids[ln['key']] = it['link_id']
-                    self.counts[run_key][it['result']] += 1
+                    self.ids[ln['key']] = it['link_id']          # 'already_decided' names the decided row
                 else:
-                    self.skipped[ln['key']] = (it or {}).get('result', 'no_result')
-                    self.counts[run_key][(it or {}).get('result', 'no_result')] += 1
+                    self.skipped[ln['key']] = result
         else:
-            # capture-time claims, day context and account entities return counts only: read the ids back by run
+            # capture-time claims, day context and account entities return their ids in write order but not per
+            # line (rows the writer skips are absent): read the ids back by run (current rows of this owner)
             for k, v in res.items():
-                if isinstance(v, int):
+                if isinstance(v, int) and not isinstance(v, bool):
                     self.counts[run_key][k] += v
-            self.read_back(writer, run_key, sent)
+                    if k in payloads.C['reported_outcomes'] and v:
+                        self.outcomes[k] += v
+            for it in res.get('skipped') or []:
+                self.counts[run_key][it.get('result', 'skipped')] += 1
+                if it.get('result') in payloads.C['reported_outcomes']:
+                    self.outcomes[it['result']] += 1
+            self.read_back(writer, run_key, sent, res)
 
     def read_back_candidates(self, run_key, lines):
         """Rows the writer left unchanged return no item: read their ids back (current row, same pass)."""
         pass_name = lines[0]['p_run_id'][5:]
         if pass_name not in payloads.C['pass_names']:
             raise common.EvidenceError('unknown pass %s' % pass_name)
-        rows = self.reader.read('select id, image_id, vehicle_id from image_vehicle_candidates where image_id = '
-                                "any(:ids) and superseded_by is null and pass = '%s'" % pass_name,
-                                {'ids': sorted({ln['row']['image_id'] for ln in lines})}, tag='read_back')
-        by = {(r['image_id'], r.get('vehicle_id')): r['id'] for r in rows}
+        rows = self.reader.read('select id, image_id, vehicle_id, subject_key from image_vehicle_candidates where '
+                                "image_id = any(:ids) and user_id = :uid and superseded_by is null and pass = '%s'"
+                                % pass_name, {'ids': sorted({ln['row']['image_id'] for ln in lines}),
+                                              'uid': self.ctx.user_id}, tag='read_back')
+        by = {(r['image_id'], r.get('vehicle_id') or r.get('subject_key')): r['id'] for r in rows}
         for ln in lines:
-            cid = by.get((ln['row']['image_id'], ln['row'].get('vehicle_id')))
+            cid = by.get((ln['row']['image_id'], ln['row'].get('vehicle_id') or ln['row'].get('subject_key')))
             if cid:
                 self.ids[ln['key']] = cid
                 self.counts[run_key]['unchanged'] += 1
             else:
                 self.skipped[ln['key']] = 'no_result'
 
-    def read_back(self, writer, run_key, sent):
+    def read_back(self, writer, run_key, sent, res=None):
         if writer == 'propose_capture_time_claims':
             rows = self.reader.read('select id, image_id from image_capture_time_claims where image_id = any(:ids) '
-                                    'and superseded_by is null', {'ids': [ln['row']['image_id'] for ln in sent]},
+                                    'and user_id = :uid and superseded_by is null',
+                                    {'ids': [ln['row']['image_id'] for ln in sent], 'uid': self.ctx.user_id},
                                     tag='read_back')
             by = {r['image_id']: r['id'] for r in rows}
             for ln in sent:
                 if ln['row']['image_id'] in by:
-                    self.ids[ln['key']] = by[ln['row']['image_id']]
+                    self.ids[ln['key']] = by[ln['row']['image_id']]   # written now, or a decided / stronger claim kept
                 else:
                     self.skipped[ln['key']] = 'not_written (compare-and-set or not eligible)'
         elif writer == 'record_day_context':
@@ -293,13 +313,17 @@ class Loader:
                                     'where run_id = :run and superseded_by is null', {'run': self.runs[run_key]},
                                     tag='read_back')
             by = {(r['day'], r['place_cluster'], r['vehicle_id']): r['id'] for r in rows}
+            why = {(it.get('day'), it.get('vehicle_id')): it for it in (res or {}).get('skipped') or []}
             for ln in sent:
                 r = ln['row']
                 k = (r['day'], r['place_cluster'], r['vehicle_id'])
+                sk = why.get((r['day'], r['vehicle_id'])) or {}
                 if k in by:
                     self.ids[ln['key']] = by[k]
+                elif sk.get('id'):
+                    self.ids[ln['key']] = sk['id']             # already_decided: the decided row stands
                 else:
-                    self.skipped[ln['key']] = 'vehicle_not_in_scope'
+                    self.skipped[ln['key']] = sk.get('result', 'not_written')
         else:
             rows = self.reader.read('select id, account_ref from evidence_account_entities where run_id = :run',
                                     {'run': self.runs[run_key]}, tag='read_back')
@@ -325,6 +349,11 @@ class Loader:
                             {'run': run_key, 'file': 'change_claims.jsonl', 'rows': 1, 'first': ln['key'],
                              'support_rows': len(sup)})
             self.lock_check()
+            if self.mode == common.DB and res is None:
+                # (v5) custody_bounds writes nothing where a sourced acquisition exists on the identity
+                self.skipped[ln['key']] = 'sourced_acquisition_exists'
+                self.counts[run_key]['not_written'] += 1
+                continue
             self.ids[ln['key']] = res if self.mode == common.DB else ln['key']
             self.counts[run_key]['claims'] += 1
 
@@ -344,6 +373,22 @@ class Loader:
                            'first': ln['key']})
             self.ids[ln['key']] = ln['key']
             self.counts[run_key]['support_rows'] += len(sup)
+
+    def confirm_by_rule(self, lines):
+        """confirm_capture_times_by_rule(gate run, batch claim ids), <= 1000 ids a call, once the claims are in."""
+        if 'run:time_rule_gate' not in self.runs:
+            return
+        keys = [ln['key'] for ln in lines if ln['row'].get('rule') == 'batch_offset_v1' and ln['key'] in self.ids]
+        limit = payloads.C['writers']['confirm_capture_times_by_rule']['max_rows']
+        for k in range(0, len(keys), limit):
+            chunk = keys[k:k + limit]
+            self.io_gate()
+            res = self.call('confirm_capture_times_by_rule', {'p_gate_run_id': self.runs['run:time_rule_gate'],
+                                                              'p_claim_ids': [self.ids[x] for x in chunk]},
+                            {'run': 'run:time_rule_gate', 'file': 'time_claims.jsonl', 'rows': len(chunk),
+                             'first': chunk[0], 'last': chunk[-1]})
+            self.lock_check()
+            self.counts['run:time_rule_gate']['confirmed'] += int((res or {}).get('confirmed') or 0)
 
     # ------------------------------------------------------------------ main
     def load_dir(self, d, only=None, keep_open=()):
@@ -365,6 +410,8 @@ class Loader:
                     self.load_support(lines)
                 else:
                     self.load_rows(f, writer, lines)
+                if writer == 'propose_capture_time_claims':
+                    self.confirm_by_rule(lines)
         except common.StopLoop as e:
             self.close_runs('aborted', e.reason)
             raise
@@ -381,6 +428,7 @@ class Loader:
                     r.split(':')[0] for r in self.skipped.values())),
                 'calls': len(self.calls), 'calls_by_writer': dict(collections.Counter(c['writer'] for c in self.calls)),
                 'max_rows_in_a_call': max([c.get('rows', 0) for c in self.calls] or [0]),
+                'outcomes_reported_not_retried': dict(self.outcomes),
                 'counts': {k: dict(v) for k, v in self.counts.items()}}
 
 

@@ -1,11 +1,13 @@
-"""Exit test (PLAN K30-8, section 6 M5): assert a fixture of ids against the vehicle_accounting_evidence read.
+"""Exit test (PLAN pilot step 8, section 6 M5): assert a fixture of ids against the vehicle_accounting_evidence read.
 
 file mode  the read is readers.accounting() over the payload files (every row proposed; capture times confirmed the
            way the writer confirms them). Confirmed-level assertions are also evaluated with the decisions they name
            (the owner's answer, simulated) and reported as simulated.
-db mode    the read is `select public.vehicle_accounting_evidence(<vehicle>, NULL, NULL)` through q.sh; database ids
-           are mapped back to line keys through the loader's manifest. The result is stored as an exit_test run
-           (evidence_open_run + evidence_close_run, per-assertion results, ids only).
+db mode    the read is `select public.vehicle_accounting_evidence(<vehicle>, NULL, NULL, <owner>)` through q.sh (v5:
+           the reader is keyed by user, so a service-role read equals his own); database ids are mapped back to line
+           keys through the loader's manifest. The result is stored as an exit_test run (evidence_open_run +
+           evidence_close_run, per-assertion results, ids only).
+(v5, RD4-10) Assertions read the JSON keys the fixture names in the full read, not only the M5 tuples.
 
 Results: pass, fail, open (an owner answer is still missing), blocked (the fixture names what blocks it).
 "Structural pass" = every evidence-level assertion that is not blocked passes.
@@ -13,9 +15,12 @@ Results: pass, fail, open (an owner answer is still missing), blocked (the fixtu
 Fixture: {"vehicle_id", "assertions": [{"id", "level": "evidence"|"confirmed", "expect": {...}, "decisions": [...],
 "blocked_on", "note"}]}. Expect keys: identity_contains, identity_excludes, claim, open_question,
 open_question_refs, contradictions, custody, work_days_exact, not_in_work_days, not_in_outside, outside_contains,
-payment_keys_once, band_of, not_summed, band_keys_exact, bands_exact, payment_links_contain,
-unpaid_labels_contain, unpaid_refs_contain, read_keys_absent, work_performed_contains, listings_exact,
-sale_trade_in, income_contains, image_class_count, counts. None inside a tuple matches anything.
+payment_keys_once, band_of, not_summed, band_keys_exact, bands_exact, payment_links_contain, other_vehicles,
+unpaid_labels_contain, unpaid_refs_contain, unpaid_refs_exact, unpaid_refs_exclude, read_keys_absent,
+work_performed_contains, listings_exact, sale_trade_in, income_contains (v5: [payment_key, band, from_account_ref,
+to_account_ref, payer, payee]), outside tuples [day, side, own_photos, document_photos], open_question_values
+({q: {field: [values]}}), read_equals ({"a.b": value}), read_contains ({"a.b": [items]}), photos_items_total,
+image_class_count, counts. None inside a tuple matches anything.
 
 Usage: python3 scripts/evidence/exit_test.py --fixture <exit-expected.json> --dir <payload dir> [--mode file|db]
 """
@@ -39,6 +44,25 @@ def _match(want, got):
 
 def _contains(rows, want):
     return any(_match(want, r) for r in rows)
+
+
+def at(read, path):
+    """The value at a dotted path of the read ('custody.acquired_by', 'money_sources_cover_to')."""
+    cur = read
+    for part in path.split('.'):
+        if isinstance(cur, list) and part.isdigit() and int(part) < len(cur):
+            cur = cur[int(part)]
+        elif isinstance(cur, dict):
+            cur = cur.get(part)
+        else:
+            return None
+    return cur
+
+
+def _has(items, want):
+    if isinstance(want, dict):
+        return any(isinstance(x, dict) and all(x.get(k) == v for k, v in want.items()) for x in items or [])
+    return want in (items or [])
 
 
 def evaluate(expect, m5, read, files):
@@ -137,6 +161,36 @@ def evaluate(expect, m5, read, files):
             for b, pks in e.items():
                 if sorted(bands.get(b, [])) != sorted(pks):
                     fails.append('band %s = %s' % (b, sorted(bands.get(b, []))))
+        elif k == 'other_vehicles':
+            for pk, want in e.items():
+                got = sorted(m5['other_vehicles'].get(pk) or [])
+                if got != sorted(want):
+                    fails.append('%s other_vehicles %s' % (pk, got))
+        elif k == 'unpaid_refs_exact':
+            if sorted(m5['unpaid_refs']) != sorted(e):
+                fails.append('asserted_unpaid refs %s' % sorted(m5['unpaid_refs']))
+        elif k == 'unpaid_refs_exclude':
+            if set(e) & set(m5['unpaid_refs']):
+                fails.append('asserted_unpaid holds %s' % sorted(set(e) & set(m5['unpaid_refs'])))
+        elif k == 'open_question_values':
+            for q, fields in e.items():
+                for fld, want in fields.items():
+                    got = sorted(str(x.get(fld)) for x in oq if x.get('q') == q)
+                    if got != sorted(str(w) for w in want):
+                        fails.append('open questions %s.%s = %s' % (q, fld, got))
+        elif k == 'read_equals':
+            for path, want in e.items():
+                if at(read, path) != want:
+                    fails.append('%s = %r, want %r' % (path, at(read, path), want))
+        elif k == 'read_contains':
+            for path, wants in e.items():
+                for w in wants:
+                    if not _has(at(read, path), w):
+                        fails.append('%s lacks %s' % (path, w))
+        elif k == 'photos_items_total':
+            got = sum(int(x.get('items') or 0) for x in read.get('photos_items_not_in_nuke') or [])
+            if got != e:
+                fails.append('photos_items_not_in_nuke total %d, want %d' % (got, e))
         elif k == 'payment_links_contain':
             for pk, refs in e.items():
                 got = set(m5['band_links'].get(pk) or [])
@@ -225,10 +279,11 @@ def run(fixture, files, read_fn, mode=common.FILE):
                  'structural_pass': structural, 'simulated_confirmed': dict(sims)}
 
 
-def db_read(vehicle, manifest_path):
-    reader = common.Reader()
-    rows = reader.read('select public.vehicle_accounting_evidence(:vehicle, NULL, NULL) v', {'vehicle': vehicle},
-                       tag='exit_test')
+def db_read(vehicle, uid, manifest_path, reader=None):
+    """The one read, keyed by the owner (v5: p_user_id is the 4th argument)."""
+    reader = reader or common.Reader()
+    rows = reader.read('select public.vehicle_accounting_evidence(:vehicle, NULL, NULL, :uid) v',
+                       {'vehicle': vehicle, 'uid': uid}, tag='exit_test')
     v = rows[0]['v'] if rows else None
     if isinstance(v, str):
         v = json.loads(v)
@@ -258,7 +313,7 @@ def main():
             return readers.accounting(files, vehicle, extra + (dec or []))
     else:
         common.require_db_writes()
-        snap = db_read(vehicle, a.manifest or os.path.join(a.dir, 'load-manifest.json'))
+        snap = db_read(vehicle, common.owner_id(a.user), a.manifest or os.path.join(a.dir, 'load-manifest.json'))
 
         def read_fn(_dec):
             return snap

@@ -96,6 +96,12 @@ class Sources:
             raise common.EvidenceError('ledger lines not found: %s' % sorted(missing))
         return out
 
+    def newest_date(self, name):
+        """The newest line date of a ledger source: its coverage when the case states none."""
+        f = self._src(name).get('date_field', 'date')
+        ds = [r[f] for r in self.rows(name) if r.get(f)]
+        return max(ds) if ds else None
+
     def ledger_line_by_ref(self, name, ref):
         """The line id whose bank reference token is ref (a P&L row cites a payment by that token)."""
         src = self._src(name)

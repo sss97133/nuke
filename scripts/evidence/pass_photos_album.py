@@ -10,6 +10,11 @@ names no single vehicle gets one link per profile and its candidates share an am
 Confidence when the case does not state it (join-index candidates.py): the map confidence, x0.9 for a title with no
 series or model word and 2+ candidates, divided by the number of vehicle albums an image sits in when their
 candidate sets differ.
+
+photos_join (v4, ET3-8): the items of a vehicle album (case flag "photos_items": true; the album_items input) that no
+image row read for the case joins (videos, photos never uploaded) become one `photos_item` link each on the album's
+vehicle (role context, external_ref 'photos:<uuid>', the item's local day): the reader lists them per day under
+photos_items_not_in_nuke, never as work days. No pixels and no coordinates leave the Mac.
 """
 import csv
 
@@ -17,7 +22,7 @@ import common
 import inputs
 import payloads
 
-PASSES = ['photos_album']
+PASSES = ['photos_album', 'photos_join']
 
 
 def _albums(ctx, cfg):
@@ -104,11 +109,34 @@ def build(ctx, built):
                               album_link_id=payloads.key_ref(link_of[(u, v)]),
                               pass_captured_on=(j.get('photos_date_local') or '')[:10] or None)))
                 cands += 1
-    return {'photos_album': {'emitted': links + cands, 'config': {
+    res = {'photos_album': {'emitted': links + cands, 'config': {
         'albums': [{'album': a['album_uuid'], 'title': a['title'], 'vehicles': [a['chosen']] if a.get('chosen')
                     else a['candidates']} for a in albums],
         'rule': cfg.get('rule', 'joined image in a vehicle album -> is_vehicle candidate on the album link')},
         'counts': {'links': links, 'candidates': cands}}}
+    items_album = next((a for a in albums if a.get('photos_items') and a.get('chosen')), None)
+    if items_album:
+        joined = {(j.get('photos_uuid') or '').upper() for j in join.values()
+                  if j.get('match_kind') not in (None, '', 'none')}
+        v, n = items_album['chosen'], 0
+        for it in sorted(inputs.album_items(ctx), key=lambda r: (r.get('date') or '', r.get('uuid') or '')):
+            u = (it.get('uuid') or '').upper()
+            if not u or u in joined:
+                continue
+            ext = 'photos:' + u
+            built.add('links.jsonl', payloads.line(payloads.link_key(ext, v), 'propose_evidence_links', 'photos_join',
+                      payloads.evidence_link(
+                          v, 'photos_item', 'context', 'album item; no image row read for the case joins it',
+                          items_album.get('link_confidence', items_album.get('confidence', 0.6)),
+                          [{'kind': 'photos_album', 'ref': items_album['album_uuid']}], external_ref=ext,
+                          occurred_on=(it.get('date') or '')[:10] or None,
+                          summary='Photos item in the vehicle album, not in Nuke')))
+            n += 1
+        res['photos_join'] = {'emitted': n, 'config': {
+            'album': items_album['album_uuid'],
+            'rule': 'an album item no image row joins -> one photos_item link (context) on the album vehicle'},
+            'counts': {'photos_items': n}}
+    return res
 
 
 if __name__ == '__main__':

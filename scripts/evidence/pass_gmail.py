@@ -7,9 +7,11 @@ order the ledger line its total and date join (never the total itself; files car
 is the documented stub for collecting the same manifest unattended.
 
 gmail_order    joined to exactly one ledger line: role payment_out with payment_key 'bank:<line id>', the line's
-               amount at load time and payment_join_confidence (how sure the source is this payment; v3, FM-4);
-               otherwise role assertion with no amount and no payment_key (listed under asserted_unpaid, never
-               summed; v3, FM-5).
+               amount at load time and payment_join_confidence (how sure the source is this payment; v3, FM-4).
+               An order that states no usable total but still joins one line (a backorder notice, a split
+               shipment; v4, ET3-6: "no_total": true in the join) is an assertion with no amount carrying that
+               payment_key and payment_join_confidence: it sits in that payment's band and is never summed itself.
+               Otherwise role assertion with no amount and no payment_key (asserted_unpaid; v3, FM-5).
 listing_watch  listing-event emails (source_kind gmail_message) and listing pages (listing) as supports links, and
                one listing claim per listing window (v3, FM-11/FM-13).
 """
@@ -44,7 +46,17 @@ def build(ctx, built):
         if t['kind'] == 'order':
             pj = t.get('payment_join')
             ev = [{'kind': 'gmail', 'ref': 'thread:' + t['thread_id']}]
-            if pj:
+            if pj and pj.get('no_total'):
+                ev.append({'kind': 'ledger', 'ref': pj['line_id'], 'join_basis': pj.get('basis')})
+                row = payloads.evidence_link(
+                    veh, 'gmail_order', 'assertion', t.get('join_key', 'order joins one ledger line; no usable total'),
+                    t['confidence'], ev, external_ref=ext, source_label=t.get('source_label'), occurred_on=t['date'],
+                    direction='out', cost_category=t.get('cost_category'),
+                    counterparty_label=t.get('counterparty_label'), payment_key='bank:' + pj['line_id'],
+                    payee_entity=t.get('payee_entity'), from_account_ref=account,
+                    payment_join_confidence=pj.get('confidence', 0.8), summary=t.get('summary'))
+                joined += 1
+            elif pj:
                 ev.append({'kind': 'ledger', 'ref': pj['line_id'], 'join_basis': pj.get('basis')})
                 row = payloads.evidence_link(
                     veh, 'gmail_order', 'payment_out', t.get('join_key', 'order total and date = one ledger line'),
@@ -97,7 +109,8 @@ def build(ctx, built):
             nc += 1
     return {
         'gmail_order': {'emitted': no, 'config': {
-            'join_rule': 'payment_key only when the order total and date join one ledger line',
+            'join_rule': 'payment_key only when the order joins one ledger line (by total and date, or by a stated '
+                         'reference when the order has no usable total: then an assertion with no amount)',
             'unjoined': 'assertion with no amount (listed under asserted_unpaid)',
             'manifest': 'private, written by a session with the Gmail connector; ids and joins only'},
             'counts': {'orders': no, 'joined': joined, 'unjoined': unjoined}},

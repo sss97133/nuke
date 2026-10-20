@@ -1,4 +1,4 @@
-"""Size probe (PLAN K30-5b): evidence_probe_write only.
+"""Size probe (PLAN pilot step 5b): evidence_probe_write only.
 
 The function moves one of the vehicle's own images to a small sibling vehicle (100 rows or fewer, the owner can edit
 it) and back with relink_testimony inside a subtransaction that always rolls back, times both legs in the database

@@ -1,8 +1,9 @@
-"""Local checker for file-mode payloads before any load (port of the K30 pilot's validate.py to the v3 contract).
+"""Local checker for file-mode payloads before any load (port of the pilot's validate.py to the v5 contract).
 
 Checks every line of run.json and the canonical JSONL files against the CHECK constraints and writer rules in
-payloads.CONTRACT (vocabularies; ivc_*, ictc_*, el_*, eae_*, vcc_*, udvc_* shapes; the unique-current indexes; the
-writer's whole-hour offset rule; scope in load order; image eligibility; placeholders) and the privacy rules: no
+payloads.CONTRACT (vocabularies; er_coverage_source; ivc_*, ictc_*, el_*, eae_*, vcc_*, udvc_* shapes, the v5 entity
+and owner-word rules among them; the unique-current indexes; the writer's whole-hour offset rule; custody_bounds'
+upper-bound rule; scope in load order; image eligibility; placeholders) and the privacy rules: no
 amounts (only @amount placeholders), no contact details, no people's names (hashed list from the local case), no
 coordinates, the owner id only in run.json config.user_id, no FOR-SIGNING / jenny-inbox paths.
 
@@ -148,6 +149,11 @@ def validate_dir(d, ctx=None, money_sources=None, show_notes=True):
         if a.get('p_run_kind') == 'review' and not ('sheet_sha256' in (a.get('p_config') or {})
                                                   and str((a.get('p_config') or {}).get('items', '')).isdigit()):
             v.add(RUN_FILE, w, 'er_review_shape')
+        if a.get('p_run_kind') == 'review' and payloads.review_rows_problem(a.get('p_config') or {}):
+            v.add(RUN_FILE, w, payloads.review_rows_problem(a.get('p_config') or {}))
+        cov = payloads.coverage_problem(a.get('p_pass'), a.get('p_config') if isinstance(a.get('p_config'), dict) else {})
+        if cov:
+            v.add(RUN_FILE, w, 'er_coverage_source: ' + cov)
         par = a.get('p_parent_run_id')
         if par is not None and (not isinstance(par, str) or not par.startswith('@run:') or par[1:] not in run_keys):
             v.add(RUN_FILE, w, 'parent %r is not an earlier run key' % par)
@@ -237,6 +243,8 @@ def validate_dir(d, ctx=None, money_sources=None, show_notes=True):
             v.add(f, w, 'captured_on NOT NULL date')
         if not isinstance(r.get('witness'), dict):
             v.add(f, w, 'witness NOT NULL jsonb object')
+        elif not is_date((r.get('witness') or {}).get('upload_day')):
+            v.add(f, w, 'witness.upload_day missing: the batch gate confirms a pooled claim by its own upload day')
         if not conf_ok(r.get('confidence')):
             v.add(f, w, 'confidence not numeric(4,3) in [0,1]')
         if r.get('offset_seconds') is not None and not isinstance(r['offset_seconds'], int):
@@ -274,15 +282,15 @@ def validate_dir(d, ctx=None, money_sources=None, show_notes=True):
                 v.add(f, w, 'image_id not a uuid')
             if verdict not in C['verdicts']:
                 v.add(f, w, 'verdict %r' % verdict)
-            if not ((verdict in C['vehicle_verdicts'] and veh) or (verdict in C['no_vehicle_verdicts'] and veh is None)
-                    or verdict == 'ambiguous'):
+            sk = r.get('subject_key')
+            if not ((verdict == 'is_vehicle' and (veh or sk)) or (verdict == 'listing_evidence' and veh)
+                    or (verdict in C['no_vehicle_verdicts'] and veh is None) or verdict == 'ambiguous'):
                 v.add(f, w, 'ivc_vehicle_shape: verdict %s with vehicle %r' % (verdict, veh))
             fr = r.get('frame_role', 'subject')
             if fr not in C['frame_roles']:
                 v.add(f, w, 'frame_role %r' % fr)
             if fr != 'subject' and verdict != 'is_vehicle':
                 v.add(f, w, 'ivc_also_in_frame: also_in_frame rows are is_vehicle')
-            sk = r.get('subject_key')
             if sk is not None and (veh is not None or not re.match(C['subject_key_re'], sk)):
                 v.add(f, w, 'ivc_subject_key')
             if r.get('image_class', 'own') not in C['image_classes']:
@@ -308,9 +316,9 @@ def validate_dir(d, ctx=None, money_sources=None, show_notes=True):
                     v.add(f, w, 'album link loads after its candidates')
             if r.get('pass_captured_on') is not None and not is_date(r['pass_captured_on']):
                 v.add(f, w, 'pass_captured_on not a date')
-            u = (iid, veh, p)
+            u = (iid, veh or sk or '-', p)
             if u in uniq:
-                v.add(f, w, 'ivc_one_current: (image, vehicle, pass) twice')
+                v.add(f, w, 'ivc_one_current: (image, vehicle or subject_key, pass) twice')
             uniq.add(u)
             if not eligible(iid):
                 v.add(f, w, 'image not eligible (evidence_image_eligible; is_duplicate copies are refused)')
@@ -370,8 +378,10 @@ def validate_dir(d, ctx=None, money_sources=None, show_notes=True):
             amt, dirn = r.get('amount_cents'), r.get('direction')
             if role in C['payment_roles'] and not (amt is not None and dirn in ('out', 'in')):
                 v.add(f, w, 'el_money_shape: %s needs amount_cents and direction in/out' % role)
-            if role == 'assertion' and not (dirn in ('out', 'in') and (amt is not None or r.get('payment_key') is None)):
-                v.add(f, w, 'el_money_shape: an assertion needs a direction, and an amount once a payment is joined')
+            if role == 'assertion' and not (dirn in ('out', 'in') and (amt is not None or r.get('payment_key') is None
+                                                                       or r.get('payment_join_confidence') is not None)):
+                v.add(f, w, 'el_money_shape: an assertion needs a direction; joined to a payment it carries an amount '
+                            'or a payment_join_confidence')
             if role in C['payment_roles'] and dirn != C['payment_roles'][role]:
                 v.add(f, w, 'el_direction_role')
             if r.get('allocated_cents') is not None and amt is None:
@@ -394,6 +404,16 @@ def validate_dir(d, ctx=None, money_sources=None, show_notes=True):
                     v.add(f, w, '%s shape %r' % (fld, r[fld]))
                 if r.get(fld) == 'unknown':
                     v.add(f, w, "%s 'unknown' blocks the account map; leave it NULL (FM-7)" % fld)
+                elif r.get(fld) is not None and not r[fld].startswith('third_party:') and \
+                        sk != 'owner_statement' and p != 'owner_review':
+                    v.add(f, w, "el_entity_owner_word: %s %r: a pass names only third parties; his entities come from "
+                                "the confirmed account map (the writer returns entity_is_owners_call)" % (fld, r[fld]))
+            if sk == 'owner_statement' and not re.match(C['answer_ref_re'], r.get('external_ref') or ''):
+                v.add(f, w, 'el_owner_word_cited: an owner_statement link cites answers:<run>#<row>')
+            if pk and pk.startswith('owner:') and not re.match('^owner:' + C['answer_ref_re'][1:], pk):
+                v.add(f, w, "el_owner_word_cited: an 'owner:' payment key is owner:answers:<run>#<row>")
+            if sk == 'photos_item' and (pk or amt is not None or role != 'context'):
+                v.add(f, w, 'a photos_item link is context only (no payment, no amount)')
             for fld in ('from_account_ref', 'to_account_ref'):
                 if r.get(fld) is not None and not re.match(C['account_ref_re'], r[fld]):
                     v.add(f, w, '%s shape %r' % (fld, r[fld]))
@@ -419,9 +439,9 @@ def validate_dir(d, ctx=None, money_sources=None, show_notes=True):
                 v.add(f, w, 'el_subject_key')
             if veh is not None and not in_scope(veh):
                 v.add(f, w, 'vehicle %s not in scope when links load (links load before claims)' % veh)
-            u = (skey, veh)
+            u = (skey, veh or subj or '-')
             if u in link_uniq:
-                v.add(f, w, 'el_one_current: (source_key, vehicle) twice: %s' % skey)
+                v.add(f, w, 'el_one_current: (source_key, vehicle or subject_key) twice: %s' % skey)
             link_uniq[u] = ln.get('key')
             if ln.get('key') != payloads.link_key(skey, veh, subj):
                 v.add(f, w, 'key must be %s' % payloads.link_key(skey, veh, subj))
@@ -453,7 +473,7 @@ def validate_dir(d, ctx=None, money_sources=None, show_notes=True):
 
     # ------------------------------------------------------------------ day context
     f = 'day_context.jsonl'
-    dc = set()
+    dc, out_of_scope_days = set(), 0
     for i, ln in enumerate(files[f]):
         w = 'line %d' % (i + 1)
         p = run_pass(f, i, ln)
@@ -467,7 +487,7 @@ def validate_dir(d, ctx=None, money_sources=None, show_notes=True):
         if COORDS.search(r.get('place_cluster') or ''):
             v.add(f, w, 'place_cluster carries coordinates')
         if not in_scope(r.get('vehicle_id')):
-            v.add(f, w, 'vehicle not in scope (record_day_context returns it as skipped)')
+            out_of_scope_days += 1                      # (v4) recorded as context and listed under out_of_scope
         b = r.get('basis')
         if not (isinstance(b, list) and b and set(b) <= set(C['day_basis'])):
             v.add(f, w, 'basis must be a non-empty subset of the day basis vocabulary')
@@ -477,6 +497,9 @@ def validate_dir(d, ctx=None, money_sources=None, show_notes=True):
         if u in dc:
             v.add(f, w, 'udvc_one_current: (day, cluster, vehicle) twice')
         dc.add(u)
+    if out_of_scope_days:
+        v.notes.append('day_context: %d row(s) name a vehicle outside scope (recorded as context, listed out_of_scope)'
+                       % out_of_scope_days)
 
     # ------------------------------------------------------------------ change claims and support (load order)
     kind_files = {'image_candidate': ('candidates.',), 'evidence_link': ('links.',),
@@ -538,6 +561,10 @@ def validate_dir(d, ctx=None, money_sources=None, show_notes=True):
                 v.add(f, w, 'vcc_party: party only on %s' % C['party_kinds'])
             if not re.match(C['entity_key_re'], c['party_entity']):
                 v.add(f, w, 'party_entity shape %r' % c['party_entity'])
+            if not (c['party_entity'].startswith('third_party:') or
+                    (c['party_entity'] == 'owner' and c.get('kind') in C['owner_party_kinds'])):
+                v.add(f, w, 'vcc_party_not_entity: party %r (third parties, or the owner as the worker only)'
+                      % c['party_entity'])
         amount_ok(f, w, c.get('amount_cents'), 'amount_cents')
         amount_ok(f, w, c.get('trade_in_cents'), 'trade_in_cents')
         for path, val in walk(c.get('asserted_value') or {}):
@@ -549,11 +576,22 @@ def validate_dir(d, ctx=None, money_sources=None, show_notes=True):
             v.add(f, w, 'summary NOT NULL')
         if not conf_ok(c.get('confidence')):
             v.add(f, w, 'confidence not numeric(4,3) in [0,1]')
-        veh = c.get('vehicle_id')
-        if not common.is_uuid(veh or ''):
-            v.add(f, w, 'vehicle_id NOT NULL uuid')
-        elif not in_scope(veh) and c.get('kind') != 'worked_on':
+        veh, subj = c.get('vehicle_id'), c.get('subject_key')
+        if (veh is None) == (subj is None) or (subj is not None and (
+                c.get('kind') not in C['subject_claim_kinds'] or not re.match(C['subject_key_re'], subj))):
+            v.add(f, w, 'vcc_subject: a vehicle_id, or a subject_key on %s only' % '/'.join(C['subject_claim_kinds']))
+        elif veh is not None and not common.is_uuid(veh):
+            v.add(f, w, 'vehicle_id not a uuid')
+        elif veh is not None and not in_scope(veh) and c.get('kind') != 'worked_on':
             v.add(f, w, 'vehicle %s not in scope at this point of the load (the writer raises 22023)' % veh)
+        if ln.get('p_run_id') == '@run:custody_bounds':
+            if c.get('kind') != 'acquisition' or c.get('occurred_from') is not None or not c.get('occurred_to') \
+                    or not (isinstance(c.get('confidence'), (int, float)) and c['confidence'] <= 0.5):
+                v.add(f, w, 'custody_bounds proposes only an acquisition upper bound (occurred_to, no occurred_from, '
+                            'confidence <= 0.5), never a sale')
+            elif any(o['p_claim'].get('vehicle_id') == veh and o['p_claim'].get('kind') == 'acquisition'
+                     and o.get('p_run_id') != '@run:custody_bounds' for o in files[f]):
+                v.add(f, w, 'custody_bounds: a sourced acquisition exists for this vehicle (the writer writes nothing)')
         if p not in C['pass_names']:
             v.add(f, w, 'run pass not in evidence_pass_names')
         if ln.get('p_supersedes') is not None:

@@ -5,8 +5,11 @@
                     with a residual under 1 s and the stem match is unique within +-12 h (v3, FM-1).
   batch_offset_v1   no Photos match: the offset its upload batch agrees on. The batch key is 'source|created day|tz',
                     pooled to 'source|pool|<year><tz>' when the day has fewer than 50 joined rows (ET2-6). The gate run
-                    (time_rule_gate) carries per-batch agreement; confirm_capture_times_by_rule confirms a batch only
-                    at 50 joined rows and 0.99 agreement (and every contributing day at 0.99 for a pooled key).
+                    (time_rule_gate) carries per-batch agreement and, per upload day, the joined rows, agreement and
+                    offset (v4, ET3-5); confirm_capture_times_by_rule confirms a batch only at 50 joined rows and 0.99
+                    agreement, every contributing day at 0.99 for a pooled key, and a pooled claim only when its own
+                    upload day contributed at least 10 joined rows agreeing at 0.99 on the same offset.
+Every claim carries witness.upload_day (the row's upload batch day: the offset is a property of the upload batch).
 Rows the dedupe marked is_duplicate or that are superseded get no claim (the writer would skip them).
 """
 import collections
@@ -54,7 +57,8 @@ def build(ctx, built):
         batches[(r['source'], created_day, tzstr(tz))].append(off)
         witness = {'photos_uuid': j['photos_uuid'],
                    'stem': (j.get('filename_used') or '').split('.')[0].upper() or None,
-                   'unique_match': unique, 'match_kind': j['match_kind'], 'offset_rule': j.get('offset_rule') or None}
+                   'unique_match': unique, 'match_kind': j['match_kind'], 'offset_rule': j.get('offset_rule') or None,
+                   'upload_day': created_day or None}
         if near is not None:
             witness['same_stem_items_within_12h'] = near
         lines.append(payloads.line('time:' + r['id'], 'propose_capture_time_claims', 'time_offset',
@@ -76,6 +80,10 @@ def build(ctx, built):
         o, n = c.most_common(1)[0]
         return o, n / len(offs)
 
+    def day_stats(offs):
+        o, a = agreement(offs)
+        return {'joined': len(offs), 'agreement': round(a, 4), 'offset_seconds': o}
+
     batch_lines = []
     for r, _j in sorted(unjoined, key=lambda x: x[0]['id']):
         if not r.get('taken_at'):
@@ -86,7 +94,7 @@ def build(ctx, built):
             continue                                   # no joined rows that day, or two time zones: stays unverified
         tz, offs = tzs[0]
         if len(offs) >= POOL_BELOW:
-            key, pool_offs, worst = '%s|%s|%s' % (src, day, tz), offs, None
+            key, pool_offs, worst, members = '%s|%s|%s' % (src, day, tz), offs, None, [(day, offs)]
         else:
             year = day[:4]
             members = [(d, o2) for (s2, d, t2), o2 in batches.items() if s2 == src and t2 == tz and d[:4] == year]
@@ -94,7 +102,8 @@ def build(ctx, built):
             key = '%s|pool|%s%s' % (src, year, tz)
             worst = min(agreement(os_)[1] for _d, os_ in members)
         off, agr = agreement(pool_offs)
-        gate[key] = {'joined': len(pool_offs), 'agreement': round(agr, 4), 'offset_seconds': off}
+        gate[key] = {'joined': len(pool_offs), 'agreement': round(agr, 4), 'offset_seconds': off,
+                     'days': {d: day_stats(os_) for d, os_ in sorted(members)}}
         if worst is not None:
             gate[key]['worst_day_agreement'] = round(worst, 4)
         stored = common.parse_ts(r['taken_at'])
@@ -104,7 +113,8 @@ def build(ctx, built):
         batch_lines.append(payloads.line('time:' + r['id'], 'propose_capture_time_claims', 'time_offset',
                                          payloads.capture_time_claim(
                                              r['id'], stored, corrected, local_day, 'batch_offset_v1',
-                                             {'batch_key': key, 'joined': len(pool_offs), 'agreement': round(agr, 4)},
+                                             {'batch_key': key, 'joined': len(pool_offs), 'agreement': round(agr, 4),
+                                              'upload_day': day},
                                              min(agr, 0.99), local_offset_minutes=tz_sec // 60, batch_key=key,
                                              offset_seconds=off)))
     for ln in lines + batch_lines:
