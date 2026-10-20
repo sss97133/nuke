@@ -173,6 +173,10 @@ jobs:
         run: createdb dm_sale_provenance_seller_ci
       - name: Verify the sale-provenance writer corrects bat_seller and seller_name with citation, guard and audit
         run: psql -X -v ON_ERROR_STOP=1 -d dm_sale_provenance_seller_ci -f supabase/sql/test_sale_provenance_seller_columns.sql
+      - name: Create disposable identity equivalence database
+        run: createdb dm_refinement_identity_bridge_ci
+      - name: Verify the identity bridge, lot chain breaks and their evidence, append-only rows and private access
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_identity_bridge_ci -f supabase/sql/test_identity_equivalence_bridge.sql
       - name: Create disposable merge-writer re-parent database
         run: createdb dm_merge_writer_reparent_ci
       - name: Verify the merge writer re-parents observations, comments, bids and events, never deletes a lot row, and refuses a drifted body
