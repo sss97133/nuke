@@ -74,3 +74,8 @@ SELECT t_assert((SELECT prolang = (SELECT oid FROM pg_language WHERE lanname = '
   AND organization_on_nuke(:'az') @> '{"state":"claimed","label":"Claimed on Nuke","verified_claimants":1,"claimed_via":["domain_email"],
     "claim":{"methods":["domain_email","document"],"domain":"autozone.com"}}',
   'organization_on_nuke (PL/pgSQL) keeps its output');
+SELECT t_assert((SELECT (length(prosrc) - length(replace(prosrc, '(SELECT public.requirement_template_excluded(p_requirement))', ''))) / length('(SELECT public.requirement_template_excluded(p_requirement))') = 3
+    FROM pg_proc WHERE oid = 'public.requirement_capability_keys(jsonb,jsonb)'::regprocedure)
+  AND (SELECT (length(prosrc) - length(replace(prosrc, 'requirement_capability_keys(', ''))) / length('requirement_capability_keys(') = 1
+    FROM pg_proc WHERE oid = 'public.job_market_health_compute()'::regprocedure),
+  'exclusion checks run once per key computation; health computes keys once per requirement');

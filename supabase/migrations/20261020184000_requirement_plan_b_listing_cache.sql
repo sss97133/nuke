@@ -16,6 +16,10 @@
 --     rows; ranking, labels and fields are unchanged.
 --   organization_on_nuke (replaced, guarded): same query in PL/pgSQL (plans cached per session, website host read once);
 --     it is called for every listed supplier and was the remaining per-row cost.
+--   requirement_capability_keys (anchored): the three requirement_template_excluded(p_requirement) calls become scalar
+--     subqueries, evaluated once per call instead of once per capability_evidence_map row (2.7 ms -> 8.2 ms per call
+--     after 20261020183000; same keys).
+--   job_market_health_compute (anchored): requirement capability keys computed once per requirement (were twice).
 BEGIN;
 SET LOCAL statement_timeout = '10s';
 SET LOCAL lock_timeout = '1s';
@@ -251,6 +255,34 @@ BEGIN
   INTO r;
   RETURN r;
 END $$;
+
+DO $keys$
+DECLARE def text := pg_get_functiondef('public.requirement_capability_keys(jsonb,jsonb)'::regprocedure);
+  anchor constant text := $a$public.requirement_template_excluded(p_requirement)$a$;
+  n integer;
+BEGIN
+  n := (length(def) - length(replace(def, anchor, ''))) / length(anchor);
+  IF n <> 3 OR position('(SELECT public.requirement_template_excluded(p_requirement))' IN def) > 0 THEN
+    RAISE EXCEPTION 'requirement_capability_keys: exclusion calls found % times (or already wrapped)', n;
+  END IF;
+  EXECUTE replace(def, anchor, '(SELECT ' || anchor || ')');
+END $keys$;
+
+DO $health$
+DECLARE def text := pg_get_functiondef('public.job_market_health_compute()'::regprocedure);
+  a1 constant text := $a$'q', q || jsonb_build_object('capability_keys', public.requirement_capability_keys(q, g.g->'specifications')),$a$;
+  a2 constant text := $a$q->>'requirement_kind', public.requirement_capability_keys(q, g.g->'specifications'),$a$;
+  a3 constant text := $a$  FROM graphs g, jsonb_array_elements(COALESCE(g.g->'requirements', '[]'::jsonb)) q;$a$;
+BEGIN
+  IF (length(def) - length(replace(def, a1, ''))) / length(a1) <> 1 OR (length(def) - length(replace(def, a2, ''))) / length(a2) <> 1
+    OR (length(def) - length(replace(def, a3, ''))) / length(a3) <> 1 THEN
+    RAISE EXCEPTION 'job_market_health_compute: capability-key anchors not found once';
+  END IF;
+  def := replace(def, a1, $r$'q', q || jsonb_build_object('capability_keys', ck.keys),$r$);
+  def := replace(def, a2, $r$q->>'requirement_kind', ck.keys,$r$);
+  EXECUTE replace(def, a3, $r$  FROM graphs g, jsonb_array_elements(COALESCE(g.g->'requirements', '[]'::jsonb)) q,
+    LATERAL (SELECT public.requirement_capability_keys(q, g.g->'specifications') AS keys) ck;$r$);
+END $health$;
 
 INSERT INTO public.pipeline_registry (table_name, column_name, owned_by, description, do_not_write_directly, write_via)
 SELECT t, NULL, 'refresh_plan_b_listing_cache', 'Plan-B stated_by_listing candidate cache per job area (output-identical to plan_b_listing_candidates_live).', true,
