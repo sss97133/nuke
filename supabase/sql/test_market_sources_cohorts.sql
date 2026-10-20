@@ -116,6 +116,19 @@ SELECT pg_temp.ok('no handle reaches the board', NOT EXISTS (
                                   OR lower(d.display_name) LIKE '%batonly%')));
 SELECT pg_temp.ok('no source holding data lacks a species: cohort rows are not sources', NOT EXISTS (SELECT 1 FROM public.source_species_gaps()));
 
+-- Volo Auto Museum (20261020231500): a dealer-museum with 4 own-site lots on the board and no species failed the deploy gate
+INSERT INTO public.observation_sources (slug, display_name, category, created_at) VALUES ('volo-auto-museum', 'Volo Auto Museum', 'dealer', '2025-01-01');
+INSERT INTO public.market_source_days (day, source_slug, display_name, category, landed_lots) VALUES (current_date, 'volo-auto-museum', 'Volo Auto Museum', 'dealer', 4);
+SELECT pg_temp.ok('a dealer holding lots with no species is the gap', (SELECT array_agg(slug) FROM public.source_species_gaps()) = ARRAY['volo-auto-museum']);
+\ir ../migrations/20261020231500_volo_auto_museum_species.sql
+\ir ../migrations/20261020231500_volo_auto_museum_species.sql
+SELECT pg_temp.ok('labelled dealer from its own pages, the gap closes',
+  (SELECT species = 'dealer' AND species_evidence ->> 'examined_at' = '2026-10-19' AND species_evidence ->> 'seen' LIKE '%own site%'
+   FROM public.observation_sources WHERE slug = 'volo-auto-museum')
+  AND NOT EXISTS (SELECT 1 FROM public.source_species_gaps()));
+-- the fixture row leaves the board again; the ranking cases below are about the two dealers above
+DELETE FROM public.market_source_days WHERE source_slug = 'volo-auto-museum';
+
 SET ROLE service_role;
 SELECT pg_temp.ok('a second reading the same day writes again', public.record_market_source_day() > 0);
 RESET ROLE;
