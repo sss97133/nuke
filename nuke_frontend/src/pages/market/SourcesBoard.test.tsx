@@ -1088,14 +1088,31 @@ const craigslistEvidence = {
   seen: "Post page: 'post id: 7985432409 posted: 2026-10-17 16:14'; no bid, lot or close time.",
   doc: 'docs/ledger/theory/data-machine-cases.md §6 names it under Classifieds',
 };
+// 20261020201000: venue_lots, venue_slug and members appended; a dealer's BaT lots apart; private-seller cohorts and
+// owner sources as two count-only groups after the aggregators.
+const venueOf: Record<string, [number | null, string | null, number | null]> = {
+  'avant-garde-collection': [2744, 'bat', null],
+};
 const speciesValue = {
   ...value,
-  columns: [...columns, 'species', 'species_label', 'counts_as_held', 'species_evidence'],
+  columns: [...columns, 'species', 'species_label', 'counts_as_held', 'species_evidence', 'venue_lots', 'venue_slug', 'members'],
   rows: [
-    ...value.rows.map((r) => [...r, ...speciesOf[r[0] as string], r[0] === 'craigslist' ? craigslistEvidence : null]),
+    ...value.rows.map((r) => [...r, ...speciesOf[r[0] as string], r[0] === 'craigslist' ? craigslistEvidence : null,
+      ...(venueOf[r[0] as string] ?? [null, null, null])]),
     ['barnfinds', 'Barn Finds', 'aggregator', null, 13451, '2026-10-16T10:27:00Z', null, null, null, null, null, null, null,
       null, null, null, null, 0, null, null, null, 300, 2100, '2026-10-16T09:00:00Z', days(300), null, null,
-      'aggregator', 'Aggregators', false, { examined_at: '2026-10-18', examined: ['barnfinds posts'], seen: "190 of 200 posts say 'here on' another site." }],
+      'aggregator', 'Aggregators', false, { examined_at: '2026-10-18', examined: ['barnfinds posts'], seen: "190 of 200 posts say 'here on' another site." },
+      null, null, null],
+    ['bat-sellers-50-plus', 'Sellers with 50 or more BaT lots', 'seller_cohort', null, 28487, '2026-10-19T10:47:00Z', null, null,
+      null, null, null, null, null, null, null, null, null, 0, null, null, null, 0, 0, null, days(0), null, null,
+      'private_seller', 'Private sellers', false, null, null, 'bat', 159],
+    ['bat-sellers-none', 'BaT lots with no seller recorded', 'seller_cohort', null, 230757, '2026-10-19T10:47:00Z', null, null,
+      null, null, null, null, null, null, null, null, null, 0, null, null, null, 0, 0, null, days(0), null, null,
+      'private_seller', 'Private sellers', false, null, null, 'bat', 0],
+    ['owner-input', 'Owner input', 'owner', null, 614, '2026-10-19T21:22:00Z', null, null, null, null, null, null, null,
+      null, null, null, null, 0, null, null, null, 0, 0, null, days(0), null, null,
+      'owner_private', "Owner's private data", false, { examined_at: '2026-10-18', examined: ['vehicle_observations owner-input'], seen: "A signed-in owner's own entries." },
+      null, null, null],
   ],
   not_ranked: { 'capture channels': 1, 'no species evidence': 1 },
   species_groups: [
@@ -1105,13 +1122,19 @@ const speciesValue = {
     { species: 'classifieds', label: 'Classifieds', unit: 'posts held', counts_as_held: true },
     { species: 'auth_walled_marketplace', label: 'Auth-walled marketplaces', unit: 'listings held', counts_as_held: true },
     { species: 'aggregator', label: 'Aggregators', unit: 'pages read, not listings held', counts_as_held: false },
+    { species: 'private_seller', label: 'Private sellers', unit: 'BaT lots, by seller cohort', counts_as_held: false },
+    { species: 'owner_private', label: "Owner's private data", unit: 'vehicles with owner records', counts_as_held: false },
   ],
 };
 
 it('groups the board by species with the doc\'s names, aggregators apart, and shows each source\'s evidence', async () => {
   const d = parseSources(speciesValue)!;
   expect(d.speciesGroups?.map((g) => g.label)).toEqual(['Timed with soft close', 'Block houses', 'Dealer sites', 'Classifieds',
-    'Auth-walled marketplaces', 'Aggregators']);
+    'Auth-walled marketplaces', 'Aggregators', 'Private sellers', "Owner's private data"]);
+  expect(d.rows.find((r) => r.source === 'avant-garde-collection')).toMatchObject({ venueLots: 2744, venueSlug: 'bat', members: null });
+  expect(d.rows.find((r) => r.source === 'bat-sellers-50-plus')).toMatchObject({ species: 'private_seller', countsAsHeld: false,
+    held: 28487, venueSlug: 'bat', members: 159 });
+  expect(d.rows.find((r) => r.source === 'owner-input')).toMatchObject({ species: 'owner_private', countsAsHeld: false, held: 614 });
   expect(d.rows.find((r) => r.source === 'craigslist')).toMatchObject({ species: 'classifieds', speciesLabel: 'Classifieds',
     countsAsHeld: true, speciesEvidence: { examinedAt: '2026-10-18', seen: craigslistEvidence.seen } });
   expect(d.rows.find((r) => r.source === 'barnfinds')).toMatchObject({ species: 'aggregator', countsAsHeld: false });
@@ -1125,16 +1148,21 @@ it('groups the board by species with the doc\'s names, aggregators apart, and sh
   await act(async () => root.render(<SourcesBoard />));
   const groups = [...container.querySelectorAll('.market-sources__group')];
   expect(groups.map((g) => g.querySelector('.market-sources__group-title')?.textContent)).toEqual(
-    ['Timed with soft close', 'Block houses', 'Dealer sites', 'Classifieds', 'Aggregators']);
+    ['Timed with soft close', 'Block houses', 'Dealer sites', 'Classifieds', 'Aggregators', 'Private sellers', "Owner's private data"]);
   expect(groups.map((g) => [...g.querySelectorAll('.market-sources__name-text')].map((n) => n.textContent))).toEqual([
     ['Bring a Trailer', 'Cars & Bids'], ['Mecum Auctions'], ['Avant-Garde Collection', 'Beverly Hills Car Club'], ['Craigslist'],
-    ['Barn Finds']]);
+    ['Barn Finds'], ['Sellers with 50 or more BaT lots', 'BaT lots with no seller recorded'], ['Owner input']]);
+  // a dealer's BaT lots sit beside held, never in it; a cohort row says how many sellers it counts
+  expect(groups[2].querySelector('.market-sources__held')?.textContent).toBe('3,246 +87 since Oct 9 +2,744 sold on BaT');
+  expect(groups[5].querySelector('.market-sources__cols .n')?.textContent).toBe('BaT lots, by seller cohort');
+  expect([...groups[5].querySelectorAll('.market-sources__held')].map((h) => h.textContent)).toEqual(['28,487 159 sellers', '230,757']);
+  expect(groups[6].querySelector('.market-sources__held')?.textContent).toBe('614');
   expect(groups[3].querySelector('.market-sources__badge')).toBeNull();
   expect(groups[3].querySelector('.market-sources__cols .n')?.textContent).toBe('posts held');
   expect(groups[4].querySelector('.market-sources__cols .n')?.textContent).toBe('pages read, not listings held');
   expect(groups[4].querySelector('.market-sources__badge--aggregator')).toBeNull();
   expect([...container.querySelectorAll('.market-sources__cat-pill')].map((b) => b.textContent)).toEqual(
-    ['ALL', 'TIMED AUCTION', 'BLOCK HOUSE', 'DEALER SITE', 'CLASSIFIEDS', 'AGGREGATOR']);
+    ['ALL', 'TIMED AUCTION', 'BLOCK HOUSE', 'DEALER SITE', 'CLASSIFIEDS', 'AGGREGATOR', 'PRIVATE SELLERS', 'OWNERS']);
   expect(container.querySelector('.market-sources__foot .market-sources__note')?.textContent)
     .toBe('not ranked: 1 capture channel, 1 source without species evidence');
 
@@ -1200,4 +1228,25 @@ it('opens sales by house from the all-makes header, once on the page, and not on
   await act(async () => root.render(<SourcesBoard scope="Ford" houseMix={houseMix} />));
   expect(container.querySelector('.market-sources__title')?.textContent).toBe('Sources · all makes');
   expect(container.querySelectorAll('.venue-mix').length).toBe(1);
+});
+
+it('shows a long group\'s top ten with its own show-all, leaving the other groups as they are', async () => {
+  const dealerRow = (i: number) => ['dealer-' + i, 'Dealer ' + i, 'dealer', null, 1000 - i, '2026-10-16T10:27:00Z', null, null, null,
+    null, null, null, null, null, null, null, null, 0, null, null, null, 0, 0, null, days(0), null, 'dealer',
+    'dealer', 'Dealer sites', true, null, i, 'bat', null];
+  const long = { ...speciesValue, rows: [...speciesValue.rows, ...Array.from({ length: 12 }, (_, i) => dealerRow(i + 1))] };
+  fixture.rpc.mockImplementation((fn: string) => Promise.resolve(fn === 'market_sources_read'
+    ? { data: long, error: null } : { data: null, error: { message: 'none' } }));
+  await act(async () => root.render(<SourcesBoard />));
+  const dealers = [...container.querySelectorAll('.market-sources__group')]
+    .find((g) => g.querySelector('.market-sources__group-title')?.textContent === 'Dealer sites')!;
+  expect(dealers.querySelectorAll('li.market-sources__row').length).toBe(10);
+  const more = dealers.querySelector('.market-sources__more--group') as HTMLButtonElement;
+  expect(more.textContent).toBe('Show all 14 · vehicles held');
+  expect(container.querySelector('.market-sources__foot .market-sources__more')?.textContent).toBe('Show all 22 sources');
+  await act(async () => more.click());
+  expect(dealers.querySelectorAll('li.market-sources__row').length).toBe(14);
+  expect((dealers.querySelector('.market-sources__more--group') as HTMLButtonElement).textContent).toBe('Show the top 10');
+  expect(container.querySelector('.market-sources__foot .market-sources__more')).toBeNull();
+  expect([...container.querySelectorAll('.market-sources__group')].filter((g) => g.querySelector('.market-sources__more--group')).length).toBe(1);
 });
