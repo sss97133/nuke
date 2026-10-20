@@ -23,6 +23,7 @@ Usage: python3 scripts/evidence/loop.py --case <case.json> --out <dir> [--mode f
 import argparse
 import datetime as dt
 import os
+import re
 import sys
 
 import checks
@@ -103,8 +104,14 @@ def file_steps(ctx, a, report):
     return ok
 
 
+# the promotion path (M1p) ships after the store (M1a/M1w): until then its reader does not exist
+PROMOTION_MISSING = re.compile(r'42883|evidence_revert_watch\S* does not exist')
+
+
 def db_steps(ctx, a, report, rest, reader):
-    """PLAN section 5 steps 7-8 after the build. Raises StopLoop; the caller closes the loop run 'aborted'."""
+    """PLAN section 5 steps 7-8 after the build. The loop run closes 'aborted' on a stop condition and 'failed' on
+    any other error, then the error is raised. Before the promotion path (M1p) is deployed, repin, promote and
+    publish are skipped and the report says so."""
     import dbops
     import promote
     import publish
@@ -128,23 +135,34 @@ def db_steps(ctx, a, report, rest, reader):
         if bad:
             raise common.StopLoop('integrity_check_failed', bad)
         unmanifested = (sb.get('M10b') or {}).get('unmanifested') or 0
-        halting = [w for w in dbops.watch(reader, ctx.user_id) if w.get('halting')]
+        try:
+            watch, promotion_live = dbops.watch(reader, ctx.user_id), True
+        except common.ReadError as e:
+            if not PROMOTION_MISSING.search(str(e)):
+                raise
+            watch, promotion_live = [], False
+            report['promotion_path'] = 'not deployed (M1p): repin, promote and publish skipped'
+        halting = [w for w in watch if w.get('halting')]
         if halting:
             raise common.StopLoop('halting_watch_row', '%d image(s)' % len(halting))
         files = readers.load_files(str(ctx.out))
-        rows, decisions = review_sheet.build_rows(ctx, files, readers.accounting(files, ctx.vid(ctx.case['vehicle'])))
+        rows, decisions = review_sheet.build_rows(ctx, files, readers.accounting(
+            files, ctx.vid(ctx.case['vehicle']), sessions=readers.sessions_of(ctx)))
         weekday = (ctx.case.get('review') or {}).get('weekday', 6)          # Sunday; or when the queue passes 50
         if rows and (dt.date.fromisoformat(a.date).weekday() == weekday or len(rows) > 50):
             side = review_sheet.issue(ctx, rows, decisions, a.date, ctx.out, common.DB, rest, ctx.user_id, ld.ids)
             report['review_sheet'] = {'rows': side['items'], 'sheet_run': side['sheet_run'],
                                       'left_off_not_loaded': len(side['left_off_not_loaded'])}
-        report['repin'] = repin.repin(rest, reader, ctx.user_id, parent=loop_run)
-        decided = reader.read("select distinct c.image_id from image_vehicle_candidates c join v_evidence_status s on "
+        if promotion_live:
+            report['repin'] = repin.repin(rest, reader, ctx.user_id, parent=loop_run)
+        decided = [] if not promotion_live else reader.read("select distinct c.image_id from image_vehicle_candidates c join v_evidence_status s on "
                               "s.target_kind = 'image_candidate' and s.target_id = c.id where c.user_id = :uid and "
                               "c.superseded_by is null and s.status in ('confirmed', 'rejected') and "
                               "s.channel in ('human', 'agent')", {'uid': ctx.user_id}, tag='decided_images')
         imgs = [r['image_id'] for r in decided]
-        if unmanifested:
+        if not promotion_live:
+            pass
+        elif unmanifested:
             # (v5, M10b) a row no writer call returned: promotion and publication wait; the lead reads the rows
             report['promotion_held'] = {'reason': 'unmanifested_rows', 'rows': unmanifested,
                                         'by_table': (sb.get('M10b') or {}).get('by_table')}
@@ -159,6 +177,10 @@ def db_steps(ctx, a, report, rest, reader):
     except common.StopLoop as e:
         rest.rpc('evidence_close_run', payloads.close_run(loop_run, 'aborted', {'stop_reason': e.reason,
                                                                                'detail': str(e)[:300]}))
+        raise
+    except Exception as e:
+        rest.rpc('evidence_close_run', payloads.close_run(loop_run, 'failed', {
+            'error': '%s: %s' % (type(e).__name__, str(e)[:200])}))
         raise
 
 

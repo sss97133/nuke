@@ -629,6 +629,36 @@ class DbMode(SyntheticCase):
             self.loader(FakeRest(), FakeReader(locks=2)).load_dir(self.out)
         self.assertEqual(cm.exception.reason, 'lock_waiters_after_batch')
 
+    def db_loop(self, watch_error):
+        class Reader(FakeReader):
+            def read(self, sql, params=None, tag=None):
+                if tag == 'revert_watch':
+                    raise common.ReadError(watch_error)
+                return super().read(sql, params, tag)
+        d = self.copy_out('db-loop')
+        ctx = common.Context(self.td['case'], d, mode=common.DB, user_id=testdata.OWNER)
+        payloads.use_contract(ctx.contract)
+        rest, report = FakeRest(), {}
+        a = mock.Mock(skip_scoreboard=True, date='2031-06-02')
+        return rest, report, lambda: loop.db_steps(ctx, a, report, rest, Reader())
+
+    def test_db_loop_skips_an_undeployed_promotion_path(self):
+        rest, report, go = self.db_loop('ERROR:  42883: function public.evidence_revert_watch(unknown) does not exist')
+        go()
+        fns = [fn for fn, _a in rest.calls]
+        self.assertIn('not deployed', report['promotion_path'])
+        self.assertFalse({'promote_image', 'publish_image', 'evidence_repin_after_merge'} & set(fns))
+        loop_close = [a for fn, a in rest.calls if fn == 'evidence_close_run' and a['p_run_id'] == report['loop_run']]
+        self.assertEqual([c['p_status'] for c in loop_close], ['done'])
+        self.assertTrue(report['review_sheet']['sheet_run'])               # 53 rows: more than 50, so it is issued
+
+    def test_db_loop_closes_its_run_failed_on_an_error(self):
+        rest, report, go = self.db_loop('ERROR:  42P01: relation "x" does not exist')
+        with self.assertRaises(common.ReadError):
+            go()
+        loop_close = [a for fn, a in rest.calls if fn == 'evidence_close_run' and a['p_run_id'] == report['loop_run']]
+        self.assertEqual([c['p_status'] for c in loop_close], ['failed'])
+
     def test_read_backs_are_keyed_by_the_owner(self):
         reader = FakeReader()
         self.loader(FakeRest(), reader).load_dir(self.out)
