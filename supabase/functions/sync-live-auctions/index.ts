@@ -1138,7 +1138,7 @@ Deno.serve(async (req) => {
         else if (url.includes("rmsothebys")) platform = "rm-sothebys";
         else if (url.includes("goodingco")) platform = "gooding";
         else if (url.includes("bonhams.com")) platform = "bonhams";
-        else if (url.includes("broadarrowauctions.com")) platform = "broad-arrow";
+        else if (/^https?:\/\/([a-z0-9-]+\.)*broadarrowauctions\.com\//i.test(url)) platform = "broad-arrow";
         byPlatform[platform] = (byPlatform[platform] || 0) + 1;
       }
 
