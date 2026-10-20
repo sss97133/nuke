@@ -295,7 +295,9 @@ def make_case(d):
                       confidence=0.5, join_key='date', summary='transfer in from the share account'))
     msg = lambda chat, local: [chats[chat], local]  # noqa: E731
     case = {
-        'case': 'synthetic-pilot', 'vehicle': 'TRUCK', 'run_kind': 'pilot', 'vehicles': V,
+        # the case's clock: its synthetic years lie ahead of the real one (a statement cannot cover days not yet seen)
+        'case': 'synthetic-pilot', 'as_of': '2033-03-02T12:00:00+00:00', 'vehicle': 'TRUCK', 'run_kind': 'pilot',
+        'vehicles': V,
         'base_scope': ['TRUCK', 'TWIN', 'SUB', 'SWB'], 'scope_vehicles': ['TRUCK', 'TWIN', 'TRADE', 'SUB'],
         'window': {'from': '2031-01-01', 'to': '2032-10-18'}, 'exit_fixture': 'exit-expected.json',
         'pinned_sources_file': pinned,

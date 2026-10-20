@@ -1,8 +1,9 @@
-"""Local checker for file-mode payloads before any load (port of the pilot's validate.py to the v6 contract).
+"""Local checker for file-mode payloads before any load (port of the pilot's validate.py to the v8 contract).
 
 Checks every line of run.json and the canonical JSONL files against the CHECK constraints and writer rules in
 payloads.CONTRACT (vocabularies; er_coverage_source; ivc_*, ictc_*, el_*, eae_*, vcc_*, udvc_* shapes, the v5 entity
-and owner-word rules among them; the unique-current indexes; the writer's whole-hour offset rule; custody_bounds'
+rule and (v8) the rule that a job never writes his word: no owner statement, no 'owner:' key, no rule 'owner' capture
+time, no owner_review run; the unique-current indexes; the writer's whole-hour offset rule; custody_bounds'
 upper-bound rule; scope in load order; image eligibility; placeholders) and the privacy rules: no
 amounts (only @amount placeholders), no contact details, no people's names (hashed list from the local case), no
 coordinates, the owner id only in run.json config.user_id, no FOR-SIGNING / jenny-inbox paths.
@@ -156,9 +157,12 @@ def validate_dir(d, ctx=None, money_sources=None, show_notes=True):
             v.add(RUN_FILE, w, 'er_review_shape')
         if a.get('p_run_kind') == 'review' and payloads.review_rows_problem(a.get('p_config') or {}):
             v.add(RUN_FILE, w, payloads.review_rows_problem(a.get('p_config') or {}))
-        cov = payloads.coverage_problem(a.get('p_pass'), a.get('p_config') if isinstance(a.get('p_config'), dict) else {})
+        cov = payloads.coverage_problem(a.get('p_pass'), a.get('p_config') if isinstance(a.get('p_config'), dict) else {},
+                                        ctx.now.date() if ctx else None)
         if cov:
             v.add(RUN_FILE, w, 'er_coverage_source: ' + cov)
+        if a.get('p_pass') == 'owner_review':
+            v.add(RUN_FILE, w, 'a job never opens an owner_review run (v8: owner_answer_missing)')
         par = a.get('p_parent_run_id')
         if par is not None and (not isinstance(par, str) or not par.startswith('@run:') or par[1:] not in run_keys):
             v.add(RUN_FILE, w, 'parent %r is not an earlier run key' % par)
@@ -242,8 +246,9 @@ def validate_dir(d, ctx=None, money_sources=None, show_notes=True):
             v.add(f, w, 'rule %r' % r.get('rule'))
         if r.get('rule') == 'batch_offset_v1' and not r.get('batch_key'):
             v.add(f, w, 'ictc_batch: batch_offset_v1 needs batch_key')
-        if r.get('rule') == 'owner' and not re.match(C['answer_ref_re'], (r.get('witness') or {}).get('answer_ref') or ''):
-            v.add(f, w, "an 'owner' capture time cites his answer (witness.answer_ref answers:<run>#<row>; v6 RU5)")
+        if r.get('rule') == 'owner':
+            v.add(f, w, "owner_answer_missing: a job never proposes a rule 'owner' capture time (v8: his day comes "
+                        'from his own decision in the app)')
         if not is_ts(r.get('corrected_taken_at')):
             v.add(f, w, 'corrected_taken_at NOT NULL timestamptz')
         if not is_date(r.get('captured_on')):
@@ -411,18 +416,12 @@ def validate_dir(d, ctx=None, money_sources=None, show_notes=True):
                     v.add(f, w, '%s shape %r' % (fld, r[fld]))
                 if r.get(fld) == 'unknown':
                     v.add(f, w, "%s 'unknown' blocks the account map; leave it NULL (FM-7)" % fld)
-                elif r.get(fld) is not None and not r[fld].startswith('third_party:') and \
-                        sk != 'owner_statement' and p != 'owner_review':
+                elif r.get(fld) is not None and not r[fld].startswith('third_party:'):
                     v.add(f, w, "el_entity_owner_word: %s %r: a pass names only third parties; his entities come from "
                                 "the confirmed account map (the writer returns entity_is_owners_call)" % (fld, r[fld]))
-            if sk == 'owner_statement' and not re.match(C['answer_ref_re'], r.get('external_ref') or ''):
-                v.add(f, w, 'el_owner_word_cited: an owner_statement link cites answers:<run>#<row>')
-            if (sk == 'owner_statement' or (pk or '').startswith('owner:')) and not any(
-                    isinstance(e, dict) and e.get('kind') == 'answers_row_target' and e.get('ref')
-                    for e in r.get('evidence') or []):
-                v.add(f, w, 'an owner statement names the who-paid row target it answers (answers_row_target; v6 AC9)')
-            if pk and pk.startswith('owner:') and not re.match('^owner:' + C['answer_ref_re'][1:], pk):
-                v.add(f, w, "el_owner_word_cited: an 'owner:' payment key is owner:answers:<run>#<row>")
+            if sk == 'owner_statement' or (pk or '').startswith('owner:'):
+                # (v8) his word is written only by his own who-paid decision in the app, never by a job
+                v.add(f, w, 'owner_answer_missing: a job never writes an owner statement or an owner: payment key')
             if sk == 'photos_item' and (pk or amt is not None or role != 'context'):
                 v.add(f, w, 'a photos_item link is context only (no payment, no amount)')
             for fld in ('from_account_ref', 'to_account_ref'):

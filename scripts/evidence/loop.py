@@ -6,10 +6,11 @@ file mode (default)  build every pass from the case's inputs, validate the paylo
                      structural exit assertion.
 db mode              (refused unless EVIDENCE_DB_WRITES=1) the same build and checks, then: load through the writers
                      (the loop run stays open), the scoreboard, the review sheet when it is due (its review run
-                     stores each row's targets), repin, promote per decided image, publish, pick the gap, close the
-                     loop run with the scoreboard and the gap. Every writer call appends its returned ids to the
-                     manifest (loop/manifests/<UTC date>.jsonl); M10b reconciles them, and any unmanifested row holds
-                     promotion and publication for the run.
+                     stores each row's targets; it stays open until the sheet is sent), repin, promote per image he
+                     decided, publish, pick the gap, close the loop run with the scoreboard and the gap. Every writer
+                     call appends its returned ids to the manifest (loop/manifests/<UTC date>.jsonl); M10b reconciles
+                     them, and any unmanifested row holds promotion and publication for the run. (v8) The loop never
+                     decides: every decision is his, from his own step-up session in the app.
 
 Stop conditions (the run closes 'aborted' with the reason): a halting row in evidence_revert_watch; a writer's
 42501; the insert or append-only guard firing; the integrity check failing (fewer guard triggers firing ALWAYS than
@@ -30,7 +31,6 @@ import checks
 import common
 import exit_test
 import loader
-import manifest
 import money
 import passlib
 import payloads
@@ -157,15 +157,12 @@ def db_steps(ctx, a, report, rest, reader):
                                       'left_off_not_loaded': len(side['left_off_not_loaded'])}
         if promotion_live:
             report['repin'] = repin.repin(rest, reader, ctx.user_id, parent=loop_run)
-        # (v6, AC10) an agent decision of an answers run a second reader or his read-back disputed is never promoted
-        disputed = [d for d in manifest.disputed_runs() if common.is_uuid(d)]
+        # (v8) only his own decisions exist; (v7) the status view holds one row per user: his
         decided = [] if not promotion_live else reader.read(
             "select distinct c.image_id from image_vehicle_candidates c join v_evidence_status s on "
-            "s.target_kind = 'image_candidate' and s.target_id = c.id join evidence_decisions d on d.id = s.decision_id "
+            "s.target_kind = 'image_candidate' and s.target_id = c.id and s.user_id = :uid "
             "where c.user_id = :uid and c.superseded_by is null and s.status in ('confirmed', 'rejected') and "
-            "s.channel in ('human', 'agent') and coalesce(substring(d.detail->>'answer_ref' from "
-            "'^answers:([0-9a-f-]{36})#')::uuid <> all(:disputed), true)",
-            {'uid': ctx.user_id, 'disputed': disputed}, tag='decided_images')
+            "s.channel = 'human'", {'uid': ctx.user_id}, tag='decided_images')
         imgs = [r['image_id'] for r in decided]
         if promotion_live and unmanifested:
             # (v5, M10b) a row no writer call returned: promotion and publication wait; the lead reads the rows

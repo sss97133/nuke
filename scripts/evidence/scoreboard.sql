@@ -1,11 +1,10 @@
--- Image-evidence scoreboard (PLAN section 6; DESIGN-v5 section 11). Read-only; run by scoreboard.py through q.sh.
+-- Image-evidence scoreboard (PLAN section 6; DESIGN-v5 section 11; v8). Read-only; run by scoreboard.py through q.sh.
 -- Parameters: :uid (the owner, from --user; never written into the repo), :vehicle_id (the exit-test vehicle),
 -- :chunk_from / :chunk_to (taken_at chunks; idx_vehicle_images_user_taken_at), :ids (a uuid list), :window_from /
--- :window_to (the capture window), :since (the M10b window start), :disputed (answers runs a second reader or his
--- read-back disputed). Each statement follows a "-- name: <measure>" line; "chunked" statements run once per chunk and
--- are summed by scoreboard.py, "manifest" rows are matched against the runner's manifest of returned ids (M10b),
--- "answers" runs against the chat transcript, "readback" decisions against the read-back list, and M10_integrity's
--- bodies against the deployed md5s.
+-- :window_to (the capture window), :since (the M10b window start). Each statement follows a "-- name: <measure>"
+-- line; "chunked" statements run once per chunk and are summed by scoreboard.py, "manifest" rows are matched against
+-- the runner's manifest of returned ids (M10b), "answers" runs against the chat transcript, and M10_integrity's bodies
+-- against the deployed md5s. (v8) Every decision is his, from his own step-up session in the app: no job decides.
 
 -- name: M1 chunked
 -- Unfiled own rows in the window (baseline 408 on 2026-10-20).
@@ -36,10 +35,11 @@ select pass, status, count(*) n, count(distinct image_id) images, round(avg(conf
   from v_image_candidates_current where user_id = :uid group by 1, 2 order by 1, 2;
 
 -- name: M4
--- Precision per pass against the owner's confirmed vehicle for each image: human channel only (RV2-2).
+-- Precision per pass against the owner's confirmed vehicle for each image: human channel only (RV2-2); (v7) the
+-- status view holds one row per (user, kind, target): his rows only.
 with truth as (
   select c.image_id, c.vehicle_id v from image_vehicle_candidates c
-    join v_evidence_status s on s.target_kind = 'image_candidate' and s.target_id = c.id
+    join v_evidence_status s on s.target_kind = 'image_candidate' and s.target_id = c.id and s.user_id = :uid
    where c.user_id = :uid and s.status = 'confirmed' and s.channel = 'human' and c.frame_role = 'subject'),
 top as (
   select distinct on (c.image_id, c.pass) c.image_id, c.pass, c.vehicle_id, c.verdict from image_vehicle_candidates c
@@ -53,22 +53,13 @@ select t.pass, count(*) decided,
   from top t join truth tr using (image_id) group by 1 order by 1;
 
 -- name: M4a
--- The same on the agent channel, reported apart; never a gate until 20 agent decisions are re-confirmed in the app.
--- (v6, AC10) agent rows whose answers run a second reader or his read-back disputed (:disputed) are left out.
-with truth as (
-  select c.image_id, c.vehicle_id v from image_vehicle_candidates c
-    join v_evidence_status s on s.target_kind = 'image_candidate' and s.target_id = c.id
-    join evidence_decisions d on d.id = s.decision_id
-   where c.user_id = :uid and s.status = 'confirmed' and s.channel = 'agent' and c.frame_role = 'subject'
-     and coalesce(substring(d.detail->>'answer_ref' from '^answers:([0-9a-f-]{36})#')::uuid <> all(:disputed), true)),
-top as (
-  select distinct on (c.image_id, c.pass) c.image_id, c.pass, c.vehicle_id, c.verdict from image_vehicle_candidates c
-   where c.user_id = :uid and c.superseded_by is null and c.frame_role = 'subject'
-     and c.pass not in ('owner_review', 'audit_sample', 'claim_import')
-   order by c.image_id, c.pass, c.confidence desc)
-select t.pass, count(*) decided,
-       count(*) filter (where t.vehicle_id = tr.v and t.verdict in ('is_vehicle', 'listing_evidence')) correct
-  from top t join truth tr using (image_id) group by 1 order by 1;
+-- (v8) Transcription accuracy: for each of his decisions that cites a stored answer, does the stored reading agree
+-- with what he decided (the yes/no, and the place when the reading named one)? Never a gate.
+select d.detail->'stored_reading'->>'decision' = d.decision agrees_on_yes_no,
+       coalesce(d.detail->'stored_reading'->>'vehicle_id', d.detail->'stored_reading'->>'entity_key',
+                d.detail->'stored_reading'->>'captured_on') named_place, count(*) n
+  from evidence_decisions d where d.user_id = :uid and d.decided_by like 'human:%' and d.detail ? 'answer_ref'
+ group by 1, 2 order by 1, 2;
 
 -- name: M5
 -- Exit test read (exit_test.py compares ids, never amounts; v5: keyed by the owner, tuples widened).
@@ -146,19 +137,24 @@ select
       and created_at > now() - interval '1 day' and reason like 'writer_pending:%') writer_pending_24h;
 
 -- name: M10_stamps
--- Channel stamps and answer binding (24 h; expect 0 each): every human decision from his own aal2 session, every agent
--- decision from a job session, bound to its sheet row and to his stored answer (v4, v5).
+-- (v4; v8) Channel stamps (24 h; expect 0 | 0 | 0 | 0 | false): every human decision from his own session; no agent
+-- row; no owner day a job wrote; no owner statement without his decision; no service_role EXECUTE on decide_evidence.
 select count(*) filter (where decided_by like 'human:%' and detail->>'api_role' is distinct from 'authenticated')
          human_not_owner_session,
-       count(*) filter (where decided_by like 'agent:%' and detail->>'api_role' is distinct from 'service_role')
-         agent_not_job_session,
-       count(*) filter (where decided_by like 'agent:%' and detail->>'row_targets_checked' is distinct from 'true')
-         agent_unbound,
-       count(*) filter (where decided_by like 'human:%' and detail->>'aal' is distinct from 'aal2') human_not_stepped_up,
-       count(*) filter (where decided_by like 'agent:%' and detail->>'answer_bound' is distinct from 'true') agent_not_bound,
-       -- (v6, AC-aal / AC1) the server-side step-up record on every human row; the row's question on every agent row
-       count(*) filter (where decided_by like 'human:%' and detail->'step_up' is null) human_without_step_up_record,
-       count(*) filter (where decided_by like 'agent:%' and detail->>'question' is null) agent_without_question
+       count(*) filter (where decided_by like 'agent:%') agent_rows,
+       count(*) filter (where decided_by like 'check:owner%') job_owner_days,
+       (select count(*) from evidence_links l where l.user_id = :uid and l.source_kind = 'owner_statement'
+           and not exists (select 1 from evidence_decisions x where x.target_id = l.id and x.decided_by like 'human:%'))
+         statements_without_him,
+       has_function_privilege('service_role',
+                              'public.decide_evidence(text,uuid[],text,text,text,text,uuid,jsonb,uuid,text,text,jsonb)',
+                              'EXECUTE') svc_can_decide
+  from evidence_decisions where user_id = :uid and created_at > now() - interval '1 day';
+
+-- name: M10_step_up
+-- (v5, v6) Every human decision came from a step-up session and carries the server-side step-up record (expect 0 | 0).
+select count(*) filter (where decided_by like 'human:%' and detail->>'aal' is distinct from 'aal2') human_not_stepped_up,
+       count(*) filter (where decided_by like 'human:%' and detail->'step_up' is null) human_without_step_up_record
   from evidence_decisions
  where user_id = :uid and decision in ('confirmed', 'rejected') and created_at > now() - interval '1 day';
 
@@ -184,50 +180,54 @@ select (select count(*) from pg_proc p where p.pronamespace = 'public'::regnames
           and definition ~ ('\m(' || array_to_string(public.evidence_writer_names(), '|') || ')\s*\(')) frameless_callers;
 
 -- name: M10b manifest
--- Rows created since :since in the nine tables; scoreboard.py matches them against loop/manifests/<date>.jsonl (the ids
--- every writer call returned). Owner decisions (human:) are matched by the lead against the API request log.
-select 'evidence_runs' t, coalesce(jsonb_agg(r.id), '[]') x from evidence_runs r
+-- Rows created since :since in the nine tables; scoreboard.py matches the rows jobs wrote (x) against
+-- loop/manifests/<date>.jsonl (the ids every writer call returned). (v8) His decisions (human:), the rejections his
+-- confirm implies (implied:) and the rows his own decisions write (created_by 'human:%', counted in h) are matched by
+-- the lead against the API request log.
+select 'evidence_runs' t, coalesce(jsonb_agg(r.id), '[]') x, 0 h from evidence_runs r
  where r.user_id = :uid and r.started_at > :since
 union all
-select 'image_vehicle_candidates', coalesce(jsonb_agg(c.id), '[]') from image_vehicle_candidates c
- where c.user_id = :uid and c.created_at > :since
+select 'image_vehicle_candidates', coalesce(jsonb_agg(c.id) filter (where c.created_by not like 'human:%'), '[]'),
+       count(*) filter (where c.created_by like 'human:%')
+  from image_vehicle_candidates c where c.user_id = :uid and c.created_at > :since
 union all
-select 'image_capture_time_claims', coalesce(jsonb_agg(c.id), '[]') from image_capture_time_claims c
- where c.user_id = :uid and c.created_at > :since
+select 'image_capture_time_claims', coalesce(jsonb_agg(c.id) filter (where c.created_by not like 'human:%'), '[]'),
+       count(*) filter (where c.created_by like 'human:%')
+  from image_capture_time_claims c where c.user_id = :uid and c.created_at > :since
 union all
-select 'evidence_links', coalesce(jsonb_agg(l.id), '[]') from evidence_links l
- where l.user_id = :uid and l.created_at > :since
+select 'evidence_links', coalesce(jsonb_agg(l.id) filter (where l.created_by not like 'human:%'), '[]'),
+       count(*) filter (where l.created_by like 'human:%')
+  from evidence_links l where l.user_id = :uid and l.created_at > :since
 union all
-select 'evidence_account_entities', coalesce(jsonb_agg(a.id), '[]') from evidence_account_entities a
- where a.user_id = :uid and a.created_at > :since
+select 'evidence_account_entities', coalesce(jsonb_agg(a.id) filter (where a.created_by not like 'human:%'), '[]'),
+       count(*) filter (where a.created_by like 'human:%')
+  from evidence_account_entities a where a.user_id = :uid and a.created_at > :since
 union all
-select 'vehicle_change_claims', coalesce(jsonb_agg(k.id), '[]') from vehicle_change_claims k
- where k.user_id = :uid and k.created_at > :since
+select 'vehicle_change_claims', coalesce(jsonb_agg(k.id) filter (where k.created_by not like 'human:%'), '[]'),
+       count(*) filter (where k.created_by like 'human:%')
+  from vehicle_change_claims k where k.user_id = :uid and k.created_at > :since
 union all
-select 'user_day_vehicle_context', coalesce(jsonb_agg(u.id), '[]') from user_day_vehicle_context u
- where u.user_id = :uid and u.created_at > :since
+select 'user_day_vehicle_context', coalesce(jsonb_agg(u.id) filter (where u.created_by not like 'human:%'), '[]'),
+       count(*) filter (where u.created_by like 'human:%')
+  from user_day_vehicle_context u where u.user_id = :uid and u.created_at > :since
 union all
-select 'vehicle_change_claim_support', coalesce(jsonb_object_agg(s.claim_id, s.n), '{}')
-  from (select claim_id, count(*) n from vehicle_change_claim_support
-         where user_id = :uid and created_at > :since group by 1) s
+select 'vehicle_change_claim_support', coalesce(jsonb_object_agg(s.claim_id, s.n) filter (where s.n > 0), '{}'),
+       coalesce(sum(s.h), 0)
+  from (select claim_id, count(*) filter (where created_by not like 'human:%') n,
+               count(*) filter (where created_by like 'human:%') h
+          from vehicle_change_claim_support where user_id = :uid and created_at > :since group by 1) s
 union all
 select 'evidence_decisions', coalesce(jsonb_agg(jsonb_build_object('id', d.id, 'by', d.decided_by, 'decision', d.decision,
-                                                                   'run', d.detail->>'run_id', 'image', d.result_image_id)), '[]')
+                                                                   'run', d.detail->>'run_id', 'image', d.result_image_id)), '[]'),
+       0
   from evidence_decisions d where d.user_id = :uid and d.created_at > :since;
 
 -- name: M10b_answers answers
--- (v6, AC10) The answers runs stored since :since, with his words, for scoreboard.py to check against the chat
--- transcript and the sheets index (delivery by sha256, reply after it, verbatim words in the reply). The words stay in
--- the scoreboard's memory; nothing but ids and verdicts is written.
+-- (v6, AC10; v8: kept for every stored answer) The answers runs stored since :since, with his words, for
+-- scoreboard.py to check against the chat transcript and the sheets index (delivery by sha256, reply after it, verbatim
+-- words in the reply). The words stay in the scoreboard's memory; nothing but ids and verdicts is written.
 select r.id, r.config->>'sheet_run' sheet_run, r.config->>'message_ref' message_ref, r.config->'rows' rows
   from evidence_runs r where r.user_id = :uid and r.run_kind = 'review_answers' and r.started_at > :since;
-
--- name: M10b_readback readback
--- (v6, AC10) Every agent decision of the last 7 days; scoreboard.py checks each has a read-back line (loop/readback.jsonl,
--- written when record_answers.py records it), so the next sheet reads it back to him.
-select d.id, d.review_ref, d.detail->>'answer_ref' answer_ref from evidence_decisions d
- where d.user_id = :uid and d.decided_by like 'agent:%' and d.decision in ('confirmed', 'rejected')
-   and d.created_at > now() - interval '7 days';
 
 -- name: M11
 -- Machine first filings per day by signal (orchestrator GPS re-arm; baseline 0 since 2026-10-20 08:50Z).
@@ -263,14 +263,29 @@ select m.id, m.status, m.detected_by from vehicle_merge_proposals m
         or m.duplicate_vehicle_id in (select public.evidence_fleet_vehicle_ids(:uid)));
 
 -- name: M14_accounts
--- (v6, RU4) Per account: its newest coverage and whether a run recorded it closed (an open account behind the newest is
--- asked about on the sheet: money_source_behind).
-select acct, max((r.config->>'coverage_to')::date) cover_to,
-       bool_or(coalesce(r.config->'closed_accounts', '[]'::jsonb) @> to_jsonb(acct)) closed
-  from evidence_runs r cross join lateral jsonb_array_elements_text(r.config->'covers_accounts') acct
- where r.user_id = :uid and r.config ? 'coverage_to' group by 1 order by 2;
+-- (v6, RU4; v7, F7b) Per account: its newest coverage and whether it is closed, the word of the newest run covering it
+-- (an open account behind the newest is asked about on the sheet: money_source_behind; an account his records name
+-- that no run covers is money_source_missing, listed in the vehicle reads' open questions).
+select a.acct, a.cover_to, n.closed
+  from (select acct, max((r.config->>'coverage_to')::date) cover_to
+          from evidence_runs r cross join lateral jsonb_array_elements_text(r.config->'covers_accounts') acct
+         where r.user_id = :uid and r.config ? 'coverage_to' group by 1) a
+  join (select distinct on (acct) acct, coalesce(r.config->'closed_accounts', '[]'::jsonb) @> to_jsonb(acct) closed
+          from evidence_runs r cross join lateral jsonb_array_elements_text(r.config->'covers_accounts') acct
+         where r.user_id = :uid and r.config ? 'coverage_to' order by acct, r.started_at desc, r.id desc) n using (acct)
+ order by a.cover_to;
 
 -- name: M14
 -- Money freshness: the newest coverage per payment source and its age in days (OWNER-DECISIONS 8).
 select r.pass, max((r.config->>'coverage_to')::date) cover_to, current_date - max((r.config->>'coverage_to')::date) days_old
   from evidence_runs r where r.user_id = :uid and r.config ? 'coverage_to' group by 1;
+
+-- name: M15
+-- (v8) His stored answers waiting for him in the app (evidence_answers_to_confirm: his words, the reading, the row as it
+-- is now): targets he has not decided since he answered, and rows re-written with another meaning since (asked again);
+-- and his own decisions so far. Until he has decided, the confirmed level reads "waiting on his app".
+select count(*) filter (where last_decided_at is null or last_decided_at < stored_at) waiting,
+       count(*) filter (where same_question is false) rewritten_ask_again,
+       (select count(*) from evidence_decisions where user_id = :uid and decided_by like 'human:%'
+           and decision in ('confirmed', 'rejected')) his_decisions
+  from public.evidence_answers_to_confirm(:uid);

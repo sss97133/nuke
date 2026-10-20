@@ -1,10 +1,11 @@
 """Chat transcripts (v6, AC10; PLAN M10b): find the message a message_ref names and check a stored answer against it.
 
-A message_ref is '<source>:<message id>'. For a Claude Code session the source is the session id (the transcript
-<session id>.jsonl under ~/.claude/projects/*/, or EVIDENCE_TRANSCRIPTS) and the message id is the entry's uuid. The
-checks: the sheet's delivery message carries the sheet as sent (a text block hashing to the sheet's sha256), the
-reply comes after it, and the reply holds each row's verbatim words. Only booleans and refs leave this module: no
-message text is copied anywhere.
+A message_ref is '<source>:<message id>' ((v7, D4) exactly one colon, no path; the store keeps it lower-cased). For a
+Claude Code session the source is the session id (the transcript <session id>.jsonl under ~/.claude/projects/*/, or
+EVIDENCE_TRANSCRIPTS) and the message id is the entry's uuid. The checks: the sheet's delivery message carries the
+sheet as sent (a text block hashing to the sheet's sha256), the reply comes after it, and the reply holds each row's
+verbatim words. (v8) They stay for every stored answer: the app shows him those words to confirm. Only booleans and
+refs leave this module: no message text is copied anywhere.
 """
 import json
 import os
@@ -30,7 +31,7 @@ def _texts(entry):
 def find(ref, where=None):
     """-> {session, uuid, index, timestamp, role, texts} for the message the ref names, or None when no transcript
     under the roots holds it (another channel, or a transcript not on this Mac)."""
-    m = re.match(r'^([A-Za-z0-9_.-]+):(.+)$', (ref or '').strip())
+    m = re.match(r'^([a-z0-9_-]+):([a-z0-9_-]+)$', (ref or '').strip().lower())
     if not m:
         return None
     session, uid = m.group(1), m.group(2)
@@ -38,13 +39,13 @@ def find(ref, where=None):
         for path in sorted(Path(root).glob('*/%s.jsonl' % session)) + sorted(Path(root).glob('%s.jsonl' % session)):
             with open(path, encoding='utf-8', errors='replace') as f:
                 for i, ln in enumerate(f):
-                    if uid not in ln:
+                    if uid not in ln.lower():
                         continue
                     try:
                         e = json.loads(ln)
                     except ValueError:
                         continue
-                    if e.get('uuid') == uid:
+                    if str(e.get('uuid') or '').lower() == uid:
                         return {'session': session, 'uuid': uid, 'index': i, 'timestamp': e.get('timestamp'),
                                 'role': (e.get('message') or {}).get('role') or e.get('type'), 'texts': _texts(e)}
     return None

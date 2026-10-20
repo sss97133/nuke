@@ -1,6 +1,6 @@
 """The writer contract: argument names, CHECK vocabularies and payload builders for the image-evidence writers.
 
-Source: draft.sql blocks M1a (tables and CHECKs), M1w (writers, readers) and M1p (promotion path), design v6 of
+Source: draft.sql blocks M1a (tables and CHECKs), M1w (writers, readers) and M1p (promotion path), design v8 of
 2026-10-20. Every pass builds its rows here, and checks.py validates against the same CONTRACT, so a later design
 revision that renames a field or a value is one edit in this module, or a JSON override passed as the case's
 `contract_overrides` (merged key by key; `renames` maps writer -> {old field: new field} and is applied to every row
@@ -15,13 +15,18 @@ Placeholders the loader resolves at load time: @config.user_id, @run:<pass>, @ke
 @amount:<amount source>:<ref> (amounts never appear in a file).
 
 v5 rules the builders apply (DESIGN-v5 "Changes from v4"): a pass names only third parties as payer, payee or party
-(the owner's entities come from his confirmed account map or his own statement); an owner_statement link and an
-'owner:' payment key cite his stored answer (answers:<run>#<row>); only payment-source runs record coverage_to, always
-with covers_accounts; review runs store per-row targets; stored answers carry a structured reading of his words.
+(the owner's entities come from his confirmed account map, or from his own decision in the app); only payment-source
+runs record coverage_to, always with covers_accounts; review runs store per-row targets.
 v6 (DESIGN-v6 "Changes from v5"): each review row asks one question (one decision kind; 'place' or 'party'), and a
-reading names only a place of the row's dimension, never inverted ("no" to the asked place is bare); one answers run per
-message_ref '<source>:<message id>'; an owner statement answers a who-paid row and names the row target it answers;
-a payment-source run may record closed_accounts (a subset of covers_accounts).
+reading names only a place of the row's dimension, never inverted ("no" to the asked place is bare); a payment-source
+run may record closed_accounts (a subset of covers_accounts).
+v7: one spelling per message, '<source>:<message id>' with exactly one colon and no path (stored lower-cased; the
+message id is unique across every answers run); a row whose own targets place nothing asks about place 'none'; a
+statement cannot cover days that have not happened.
+v8 (the agent decision channel does not ship): no job decides. The runner never calls decide_evidence (service_role
+has no EXECUTE on it), never writes his word (an owner_statement link, an 'owner:' payment key or a rule 'owner'
+capture time is owner_answer_missing) and never opens an owner_review run. His chat answers are stored word for word
+(evidence_record_answers, with an optional reading) and wait for him to confirm them in the app.
 """
 import copy
 import datetime as dt
@@ -31,7 +36,7 @@ import re
 import common
 
 CONTRACT = {
-    'version': 'draft-v6-2026-10-20',
+    'version': 'draft-v8-2026-10-20',
     'pass_names': [
         'listing_class', 'time_offset', 'photos_join', 'photos_album', 'file_hash_twin', 'exif_neighbour',
         'day_context', 'legacy_suggestion', 'claim_import', 'jev_choice', 'paid_vision', 'combined', 'owner_review',
@@ -91,18 +96,20 @@ CONTRACT = {
     'review_questions': ['image_candidate', 'image_publication', 'capture_time_claim', 'evidence_link', 'album_map',
                          'account_entity', 'change_claim', 'day_context'],
     'image_questions': ['image_candidate', 'image_publication', 'capture_time_claim'],
-    # evidence_record_answers: {"decision": confirmed|rejected|unsure, and at most one place of the row's dimension}
+    # evidence_record_answers: an optional reading, {"decision": confirmed|rejected|unsure, and at most one place of
+    # the row's dimension}; (v8) a row stored with his words alone reads {"decision": "unsure", "unread": true}
     'answer_decisions': ['confirmed', 'rejected', 'unsure'],
     'answer_places': ['vehicle_id', 'subject_key', 'entity_key', 'captured_on'],
     'answer_ref_re': r'^answers:[0-9a-f-]{36}#[0-9]+$',
-    # (v6, AC10) one transcription per message: '<source>:<message id>', at most 200 characters
-    'message_ref_re': r'^[A-Za-z0-9_.-]+:[A-Za-z0-9_.:/#@-]+$',
-    # Per-row results the writers return that are reported and never retried (PLAN section 1, runner note 7); the
-    # next sheet or the next run asks again.
-    'reported_outcomes': ['human_decision_newer', 'human_decision_stands', 'already_decided', 'owner_answer_missing',
-                          'kept_stronger', 'entity_is_owners_call', 'reassign_needs_review', 'reassign_not_a_placement',
-                          'unchanged'],
+    # (v6, AC10; v7, D4) one transcription per message: '<source>:<message id>', exactly one colon, no path, at most
+    # 200 characters; the writer stores it lower-cased and keys uniqueness on the message id
+    'message_ref_re': r'^[A-Za-z0-9_-]+:[A-Za-z0-9_-]+$',
+    # Per-row results the writers return that are reported and never retried (PLAN section 1, runner notes); the next
+    # sheet or the next run asks again. (v8) owner_answer_missing: a job never writes his word.
+    'reported_outcomes': ['already_decided', 'already_rejected', 'owner_answer_missing', 'kept_stronger',
+                          'entity_is_owners_call', 'unchanged'],
     # evidence_writer_names(): the only functions that may be the outermost caller of a write to the nine tables
+    # ('writers' below are the ones this runner calls: (v8) never decide_evidence, his own session's writer)
     'writer_names': ['evidence_open_run', 'evidence_close_run', 'evidence_record_answers', 'propose_image_candidates',
                      'propose_capture_time_claims', 'confirm_capture_times_by_rule', 'propose_evidence_links',
                      'propose_account_entities', 'propose_change_claim', 'propose_claim_support', 'record_day_context',
@@ -126,9 +133,6 @@ CONTRACT = {
         'propose_change_claim': {'args': ['p_run_id', 'p_claim', 'p_support', 'p_supersedes'], 'row': 'claim'},
         'propose_claim_support': {'args': ['p_run_id', 'p_claim_id', 'p_support'], 'max_rows': 50},
         'record_day_context': {'args': ['p_run_id', 'p_rows'], 'max_rows': 500, 'row': 'day_context'},
-        'decide_evidence': {'args': ['p_target_kind', 'p_target_ids', 'p_decision', 'p_reason', 'p_review_ref',
-                                     'p_review_method', 'p_actor_user_id', 'p_expected', 'p_reassign_vehicle_id',
-                                     'p_agent_session', 'p_answer_ref'], 'max_rows': 200},
         'evidence_record_reverts': {'args': ['p_user_id']},
         'evidence_probe_write': {'args': ['p_parent_run_id', 'p_user_id', 'p_vehicle_id', 'p_image_id',
                                           'p_sibling_vehicle_id']},
@@ -147,6 +151,7 @@ CONTRACT = {
         'evidence_identity_set': ['p_vehicle_id', 'p_user_id'],
         'get_user_day_record': ['p_user_id', 'p_day'],
         'evidence_revert_watch': ['p_user_id'],
+        'evidence_answers_to_confirm': ['p_user_id'],         # (v8) his stored answers waiting for his app (M15)
     },
     # The row fields each row writer reads (x->>'<field>' in draft.sql). Builders emit nothing else.
     'fields': {
@@ -286,9 +291,10 @@ def whole_hour_offset(stored, corrected):
 
 def capture_time_claim(image_id, stored_taken_at, corrected_taken_at, captured_on, rule, witness, confidence,
                        local_offset_minutes=None, batch_key=None, offset_seconds=None):
-    if rule == 'owner' and not re.match(C['answer_ref_re'], (witness or {}).get('answer_ref') or ''):
-        # (v6, RU5) his word on a capture time cites his answer to a capture-time row about this photo and day
-        raise ValueError("an 'owner' capture time carries witness.answer_ref answers:<run>#<row>")
+    if rule == 'owner':
+        # (v8) his day for a photo is written only by his own decision in the app (decide_evidence), never by a job:
+        # propose_capture_time_claims counts such a row as owner_answer_missing
+        raise ValueError("a job never proposes a rule 'owner' capture time: his day comes from his decision in the app")
     if offset_seconds is None and stored_taken_at is not None:
         offset_seconds = whole_hour_offset(stored_taken_at, corrected_taken_at)[0]
     return _clean('capture_time', {
@@ -300,8 +306,8 @@ def capture_time_claim(image_id, stored_taken_at, corrected_taken_at, captured_o
 
 def third_party(entity):
     """A party a pass may name (v5, rules-channels v4 #4): 'third_party:<x>', else None. Whether money was his or one
-    of his businesses' is his call (his confirmed account map or his own statement), so 'owner', 'owner_business:*'
-    and 'unknown' become NULL and the reader resolves the side from the account map."""
+    of his businesses' is his call (his confirmed account map, or his own who-paid decision in the app), so 'owner',
+    'owner_business:*' and 'unknown' become NULL and the reader resolves the side from the account map."""
     return entity if isinstance(entity, str) and entity.startswith('third_party:') else None
 
 
@@ -313,17 +319,13 @@ def claim_party(kind, entity):
 
 
 def answer_ref(answers_run, row):
+    """A stored answer as his app decision cites it (p_answer_ref)."""
     return 'answers:%s#%d' % (answers_run, int(row))
-
-
-def owner_payment_key(answers_run, row):
-    """el_owner_word_cited: a payment that rests on his word only is keyed by his stored answer."""
-    return 'owner:' + answer_ref(answers_run, row)
 
 
 def link_class(role, allocated, source_kind):
     """(v6, AC2/AC7/AC12) evidence_link_class: placement (unallocated payment or figure), share (allocated), album,
-    contradicts or other; it decides what a placed answer may touch."""
+    contradicts or other; it decides which places a reading of a money row may name."""
     if source_kind == 'photos_album':
         return 'album'
     if role in ('payment_out', 'payment_in', 'assertion'):
@@ -339,17 +341,11 @@ def evidence_link(vehicle_id, source_kind, role, join_key, confidence, evidence,
                   summary=None):
     if role in C['payment_roles'] and direction is None:
         direction = C['payment_roles'][role]
-    if source_kind == 'owner_statement':
-        # his own word: the entity his stored answer names (the writer checks it against the answer)
-        if not re.match(C['answer_ref_re'], external_ref or ''):
-            raise ValueError('an owner_statement link cites his stored answer: external_ref answers:<run>#<row>')
-        payer_entity = None if payer_entity == 'unknown' else payer_entity
-        payee_entity = None if payee_entity == 'unknown' else payee_entity
-    else:
-        payer_entity, payee_entity = third_party(payer_entity), third_party(payee_entity)
-    if payment_key and payment_key.startswith('owner:') and not re.match(
-            '^owner:' + C['answer_ref_re'][1:], payment_key):
-        raise ValueError("an 'owner:' payment key is owner:answers:<run>#<row>")
+    if source_kind == 'owner_statement' or (payment_key or '').startswith('owner:'):
+        # (v8) his word ("the shop paid") is written only by his own who-paid decision in the app; propose_evidence_links
+        # returns owner_answer_missing for any job row carrying it
+        raise ValueError('a job never writes an owner statement or an owner: payment key (his decision in the app does)')
+    payer_entity, payee_entity = third_party(payer_entity), third_party(payee_entity)
     return _clean('link', {
         'vehicle_id': vehicle_id, 'subject_key': subject_key, 'source_kind': source_kind,
         'source_table': source_table, 'source_row_id': source_row_id, 'external_ref': external_ref,
@@ -410,9 +406,10 @@ def support_line(key, pass_name, claim_key, supports):
 
 
 # ---------------------------------------------------------------------------------------------------- run and decision args
-def coverage_problem(pass_name, config):
+def coverage_problem(pass_name, config, today=None):
     """er_coverage_source: coverage_to only on a payment-source run, as a date, with a non-empty covers_accounts;
-    (v6, RU4/RU9) closed_accounts only with coverage_to, a subset of covers_accounts."""
+    (v6, RU4/RU9) closed_accounts only with coverage_to, a subset of covers_accounts; (v7, F7c) given the day of the run
+    (today), coverage_to is not later than it."""
     config = config or {}
     if 'coverage_to' not in config and 'covers_accounts' not in config:
         return 'closed_accounts goes with coverage_to on a payment-source run' if 'closed_accounts' in config else None
@@ -426,9 +423,12 @@ def coverage_problem(pass_name, config):
                                                       for a in accts)):
         return 'coverage_to needs covers_accounts: the account refs the export covers'
     try:
-        dt.date.fromisoformat(config['coverage_to'])
+        cover = dt.date.fromisoformat(config['coverage_to'])
     except ValueError:
         return 'coverage_to %s is not a date' % config['coverage_to']
+    if today is not None and cover > today:
+        return 'coverage_to %s is later than the run day %s (a statement covers only days that have happened)' % (
+            cover, today)
     closed = config.get('closed_accounts')
     if closed is not None and not (isinstance(closed, list) and set(closed) <= set(accts)):
         return 'closed_accounts must be a subset of covers_accounts (accounts whose final statement the export is)'
@@ -471,6 +471,11 @@ def row_question(row):
         raise ValueError('the row lists an image but asks about %s' % q)
     if row.get('asks', 'place') not in ('place', 'party'):
         raise ValueError('asks is place or party')
+    if row.get('asks') == 'party' and not (len(row.get('targets') or []) == 1
+                                           and row['targets'][0].get('kind') in ('evidence_link', 'change_claim')):
+        # (v7, D2; v8) a who-paid row lists exactly one target: a link of money no payment source carries, or the
+        # acquisition / sale claim (evidence_sheet_row checks the rest against the rows)
+        raise ValueError('a who-paid row lists exactly one target: one placement link or one acquisition/sale claim')
     return q
 
 
@@ -502,6 +507,9 @@ def open_run(user_id, run_kind, pass_name, producer, code_version, config, scope
              parent=None):
     if run_kind in C['run_kinds_own_writer']:
         raise ValueError('run kind %s is written only by its own writer' % run_kind)
+    if pass_name == 'owner_review':
+        # (v8) owner_review rows are written only by his own decisions in the app (42501 owner_answer_missing)
+        raise ValueError('a job never opens an owner_review run: those rows come only from his decisions in the app')
     bad = coverage_problem(pass_name, config)
     if bad:
         raise ValueError(bad)
@@ -522,12 +530,14 @@ def close_run(run_id, status, counts, input_tokens=0, scoreboard=None, gap_picke
 
 
 def answer_problem(answer, row=None):
-    """evidence_record_answers' rule for the structured reading of one answer (v5, rules-channels v4 #1):
+    """evidence_record_answers' rule for a structured reading of one answer (v5, rules-channels v4 #1; (v8) the
+    reading is optional and decides nothing: it is what the app may show him as "you said X"):
     {"decision": confirmed|rejected|unsure} plus at most one place he named; 'unsure' carries no place. With the sheet
-    row's profile (review_sheet: question, asks, asked_place, frame, link_class), the v6 rules too (AC1/AC3/AC4): only
-    a place of the row's own dimension; a yes names the asked place or none, "no" to the asked place is bare, a "where?"
-    row takes {confirmed, <place>}, a row in several places takes a bare yes or no, a who-paid row takes
-    {confirmed, entity_key}. Returns the problem, or None."""
+    row's profile (review_sheet: question, asks, asked_place, frame, link_class), the v6/v7 rules too (AC1/AC3/AC4,
+    D6): only a place of the row's own dimension; a yes names the asked place or none, "no" to the asked place is bare,
+    a "where?" row takes {confirmed, <place>}, a row in several places takes a bare yes or no, a row whose targets
+    place nothing ('none') takes a bare yes or no or "no, it is Y", a who-paid row takes {confirmed, entity_key}.
+    Returns the problem, or None."""
     if not isinstance(answer, dict) or answer.get('decision') not in C['answer_decisions']:
         return 'answer needs decision confirmed | rejected | unsure'
     extra = set(answer) - {'decision'} - set(C['answer_places'])
@@ -588,7 +598,7 @@ def answer_dimension(row):
 
 
 def answer_place(answer):
-    """Where his answer says the subject belongs, as decide_evidence compares it: the vehicle, the subject_key,
+    """Where his answer says the subject belongs (evidence_answer_place): the vehicle, the subject_key,
     'entity:<key>' or 'day:<date>'; None for a bare yes / no."""
     if answer.get('vehicle_id'):
         return answer['vehicle_id']
@@ -601,17 +611,30 @@ def answer_place(answer):
     return None
 
 
+def norm_ref(ref):
+    """A chat message as the store keeps it: stripped and lower-cased ('<source>:<message id>')."""
+    return (ref or '').strip().lower()
+
+
+def message_id(ref):
+    """The message id of a ref (the part after '<source>:'): unique across every answers run of every user."""
+    return norm_ref(ref).partition(':')[2]
+
+
 def message_ref_problem(ref):
-    """(v6, AC10) '<source>:<message id>', at most 200 characters: the one chat message an answers run transcribes."""
-    ref = (ref or '').strip()
+    """(v6, AC10; v7, D4) '<source>:<message id>' with exactly one colon and no path, at most 200 characters: the one
+    chat message an answers run transcribes (for a Claude session, the session id and the message's own uuid)."""
+    ref = norm_ref(ref)
     if len(ref) > 200 or not re.match(C['message_ref_re'], ref):
-        return 'message_ref is <source>:<message id> (e.g. <claude session id>:<message uuid>), at most 200 characters'
+        return ('message_ref is <source>:<message id> (e.g. <claude session id>:<message uuid>): one colon, no path, '
+                'at most 200 characters')
     return None
 
 
 def record_answers(user_id, sheet_run, message_ref, rows, producer, code_version):
-    """rows: {"<sheet row>": {"verbatim": "<his words>", "answer": {...}}} -> the evidence_record_answers args. One
-    answer set per sheet: a later answer goes on a new sheet."""
+    """rows: {"<sheet row>": {"verbatim": "<his words>"[, "answer": {...}]}} -> the evidence_record_answers args. The
+    reading is optional (v8): without one the store keeps his words alone, marked unread. One answer set per sheet and
+    per message: a later answer goes on a new sheet. Storing decides nothing."""
     bad = message_ref_problem(message_ref)
     if bad:
         raise ValueError(bad)
@@ -619,29 +642,14 @@ def record_answers(user_id, sheet_run, message_ref, rows, producer, code_version
     for k, v in rows.items():
         if not (isinstance(v, dict) and isinstance(v.get('verbatim'), str) and v['verbatim'].strip()):
             raise ValueError('answer row %s has no verbatim text' % k)
-        bad = answer_problem(v.get('answer'))
-        if bad:
-            raise ValueError('answer row %s: %s' % (k, bad))
-        out[str(int(k))] = {'verbatim': v['verbatim'], 'answer': v['answer']}
-    return {'p_user_id': user_id, 'p_sheet_run': sheet_run, 'p_message_ref': message_ref.strip(), 'p_rows': out,
+        out[str(int(k))] = {'verbatim': v['verbatim']}
+        if v.get('answer') is not None:
+            bad = answer_problem(v['answer'])
+            if bad:
+                raise ValueError('answer row %s: %s' % (k, bad))
+            out[str(int(k))]['answer'] = v['answer']
+    return {'p_user_id': user_id, 'p_sheet_run': sheet_run, 'p_message_ref': norm_ref(message_ref), 'p_rows': out,
             'p_producer': producer, 'p_code_version': code_version}
-
-
-def decide(target_kind, target_ids, decision, reason, sheet_run, row, answers_run, owner, agent_session,
-           expected=None, reassign_vehicle_id=None):
-    """decide_evidence on the agent channel: the question is review:<sheet run>#<row>; the answer cited is
-    answers:<answers run>#<same row> (ed_agent_traceable)."""
-    if target_kind not in C['target_kinds'] or decision not in ('confirmed', 'rejected'):
-        raise ValueError('decide: bad target kind or decision')
-    if not re.match(r'^[A-Za-z0-9_.-]{3,64}$', agent_session or ''):
-        raise ValueError('agent session must match [A-Za-z0-9_.-]{3,64}')
-    if target_kind == 'image_candidate' and not expected:
-        raise ValueError('image decisions need expected {candidate_id: vehicle the owner saw}')
-    return {'p_target_kind': target_kind, 'p_target_ids': list(target_ids), 'p_decision': decision,
-            'p_reason': reason, 'p_review_ref': 'review:%s#%d' % (sheet_run, int(row)),
-            'p_review_method': 'owner_chat_review', 'p_actor_user_id': owner, 'p_expected': expected,
-            'p_reassign_vehicle_id': reassign_vehicle_id, 'p_agent_session': agent_session,
-            'p_answer_ref': answer_ref(answers_run, row)}
 
 
 def rpc_args(writer, values):

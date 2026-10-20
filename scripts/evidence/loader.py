@@ -14,11 +14,11 @@ append-only guard refusal, a pinned-source refusal or IO above 3 for 10 minutes 
 open run 'aborted' with the reason. After the capture-time claims, confirm_capture_times_by_rule is called with the
 batch_offset_v1 claims of the closed gate run (the writer confirms only what the gate passes).
 
-(v5, v6) Per-row results the writers return are counted, never retried: already_decided, kept_stronger, unchanged,
-owner_answer_missing, entity_is_owners_call, human_decision_newer, human_decision_stands, reassign_needs_review,
-reassign_not_a_placement (the next run or the next sheet asks again), and so are the refusals (image_not_eligible,
-vehicle_not_in_scope, source_not_users, vehicle_not_found). Every id a writer returns goes to the manifest
-(common.Rest; manifest.py).
+(v5-v8) Per-row results the writers return are counted, never retried: already_decided, already_rejected,
+kept_stronger, unchanged, owner_answer_missing, entity_is_owners_call (the next run or the next sheet asks again), and
+so are the refusals (image_not_eligible, vehicle_not_in_scope, source_not_users, vehicle_not_found). No job decides
+(v8): the loader never calls decide_evidence. Every id a writer returns goes to the manifest (common.Rest;
+manifest.py).
 
 Usage: python3 scripts/evidence/loader.py --dir <payload dir> --case <case.json> [--mode file|db] [--user <uuid>]
 """

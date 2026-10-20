@@ -1,6 +1,6 @@
-"""File-mode model of the v6 readers (draft.sql M1w 2.5): vehicle_accounting_evidence and the day records it reads,
+"""File-mode model of the v8 readers (draft.sql M1w 2.5): vehicle_accounting_evidence and the day records it reads,
 computed over a payload directory instead of the store. Line keys stand in for row ids; the payload is one owner's,
-so the v5 user filter (p_user_id) is the directory itself.
+so the v5 user filter (p_user_id) is the directory itself. (v8) Reader shapes are v6's; every decision is his.
 
 It follows the SQL: identity = the vehicle plus the confirmed same_vehicle_as pairs, closed transitively (bounded);
 candidate status = the latest owner decision, else confirmed_by_album_map, else proposed; one effective day per image
@@ -14,10 +14,13 @@ awaiting_statement after the coverage of the assertion's own account (else the o
 open questions. (v6) A windowed read bands only payments dated in the window and lists undated ones apart
 (payments_undated); a closed account (closed_accounts) is complete and an account his map gives to a third party is not
 his, so coverage counts his open accounts, an awaiting assertion names the accounts it waits on and a lagging open
-account is asked about (money_source_behind); work sessions are his own. Capture times are confirmed the way the
-writer confirms them (check:photos_exif_join). Owner decisions can be supplied as a list ({"target": <key>,
-"decision": confirmed|rejected, "by": "agent"|"human", "reassign_to": <key>}) to read the confirmed level. Amounts are
-not read (cents are null), so over_allocated is not evaluated here.
+account is asked about (money_source_behind); work sessions are his own. (v7) "Closed" is the newest covering run's
+word; an assertion naming an account no run covers waits on that account (money_source_missing); his confirmed
+who-paid statement closes who_paid / who_received; a photo he said was on the wrong day reads undated until a time is
+confirmed. Capture times are confirmed the way the writer confirms them (check:photos_exif_join). His decisions can be
+supplied as a list ({"target": <key>, "decision": confirmed|rejected, "reassign_to": <key>}) to read the confirmed
+level (a what-if in file mode: in the store only he decides). Amounts are not read (cents are null), so
+over_allocated is not evaluated here.
 
 extract_m5() is PLAN section 6 M5 (the exit-test extraction), shared by file and db mode.
 """
@@ -46,12 +49,12 @@ class Store:
             self.order[ln['key']] = i                    # file order stands in for created_at
         self.dec = {}
         seq = 0
-        for d in decisions or []:
+        for d in decisions or []:                        # (v8) every decision is his ('human')
             seq += 1
-            self.dec[d['target']] = (d['decision'], d.get('by', 'agent'), seq)
+            self.dec[d['target']] = (d['decision'], d.get('by', 'human'), seq)
             if d.get('reassign_to') and d['decision'] == 'rejected':
                 seq += 1
-                self.dec[d['reassign_to']] = ('confirmed', d.get('by', 'agent'), seq)
+                self.dec[d['reassign_to']] = ('confirmed', d.get('by', 'human'), seq)
         self.allowed = C['allowed_offset_hours']
 
     def status(self, key):
@@ -71,16 +74,17 @@ class Store:
 
     def coverage(self):
         """{account_ref: newest coverage_to} over the runs that record coverage (v5, readers v4 #3), and the accounts
-        a run recorded as closed (v6, RU4: their final statement was read)."""
-        out, closed = {}, set()
+        recorded closed (v6, RU4: their final statement was read; (v7, F7b) the word of the newest run covering the
+        account, so a later export that is not final reopens it). Run order in run.json stands in for started_at."""
+        out, newest_word = {}, {}
         for r in self.runs:
             cfg = (r.get('args') or {}).get('p_config') or {}
             if not cfg.get('coverage_to'):
                 continue
             for acct in cfg.get('covers_accounts') or []:
                 out[acct] = max(out.get(acct, ''), cfg['coverage_to'])
-            closed |= set(cfg.get('closed_accounts') or [])
-        return out, closed
+                newest_word[acct] = acct in (cfg.get('closed_accounts') or [])
+        return out, {a for a, closed in newest_word.items() if closed}
 
 
 def identity_set(st, vehicle):
@@ -146,15 +150,23 @@ def custody(st, ids):
 
 
 def candidates_for_images(st, image_ids):
+    """evidence_candidates_for_images: one effective day per image (a confirmed capture time, else the combined row's
+    day, else the earliest pass day), (v7, F1) undated while that pass day is a day his own word rejected for the
+    photo; status his decision, else confirmed_by_album_map (his confirmed album, no rejection of his of that truck for
+    the photo), else proposed."""
     cs = [ln for ln in st.cands if ln['row']['image_id'] in image_ids]
     album_ok = {}
     for ln in st.links:
         if ln['row'].get('source_kind') == 'photos_album' and st.status(ln['key']) == 'confirmed':
             album_ok[ln['key']] = ln['row'].get('vehicle_id')
-    tdays = collections.defaultdict(list)
+    tdays, no_days = collections.defaultdict(list), collections.defaultdict(set)
     for ln in st.times:
-        if ln['row']['image_id'] in image_ids and st.time_confirmed(ln):
+        if ln['row']['image_id'] not in image_ids:
+            continue
+        if st.time_confirmed(ln):
             tdays[ln['row']['image_id']].append(ln['row']['captured_on'])
+        elif ln['key'] in st.dec and st.dec[ln['key']][0] == 'rejected' and st.dec[ln['key']][1] == 'human':
+            no_days[ln['row']['image_id']].add(ln['row']['captured_on'])
     per = collections.defaultdict(list)
     for ln in cs:
         per[ln['row']['image_id']].append(ln)
@@ -163,7 +175,8 @@ def candidates_for_images(st, image_ids):
         comb = [ln['row'].get('pass_captured_on') for ln in lns if ln['p_run_id'] == '@run:combined'
                 and ln['row'].get('pass_captured_on')]
         anyd = [ln['row'].get('pass_captured_on') for ln in lns if ln['row'].get('pass_captured_on')]
-        day = min(tdays[iid]) if tdays.get(iid) else (min(comb) if comb else (min(anyd) if anyd else None))
+        pass_day = min(comb) if comb else (min(anyd) if anyd else None)
+        day = min(tdays[iid]) if tdays.get(iid) else (None if pass_day in no_days.get(iid, ()) else pass_day)
         for ln in lns:
             r = ln['row']
             s = st.status(ln['key'])
@@ -171,7 +184,7 @@ def candidates_for_images(st, image_ids):
                 lk = r['album_link_id'][5:]
                 if lk in album_ok and album_ok[lk] == r.get('vehicle_id') and not any(
                         o['row'].get('vehicle_id') == r.get('vehicle_id') and st.status(o['key']) == 'rejected'
-                        and st.dec[o['key']][1] in ('agent', 'human') for o in lns):
+                        and st.dec[o['key']][1] == 'human' for o in lns):
                     s = 'confirmed_by_album_map'
             out.append(dict(r, id=ln['key'], pass_=ln['p_run_id'][5:], status=s, captured_on=day,
                             time_unverified=not tdays.get(iid)))
@@ -242,7 +255,7 @@ def day_records(st, ids, cust, win=('1900-01-01', '2999-12-31'), sessions=None):
 
 
 def accounting(files, vehicle, decisions=None, date_from=None, date_to=None, sessions=None):
-    """vehicle_accounting_evidence(vehicle, from, to, user) over payload files (v6)."""
+    """vehicle_accounting_evidence(vehicle, from, to, user) over payload files (v8)."""
     st = Store(files, decisions)
     ids = identity_set(st, vehicle)
     win = (date_from or '1900-01-01', date_to or '2999-12-31')
@@ -367,12 +380,16 @@ def accounting(files, vehicle, decisions=None, date_from=None, date_to=None, ses
         if not l.get('payment_key') and l['role'] in ('payment_out', 'assertion') and l.get('direction') == 'out' \
                 and l['status'] != 'rejected':
             acct, on = l.get('from_account_ref'), l.get('occurred_on')
+            uncovered = bool(acct and cov_acct and acct not in cov_acct)
             if acct and acct in cov_acct:              # (v6, RU4) its own account: complete once closed
                 waiting = acct not in closed and bool(on) and on > cov_acct[acct]
+            elif uncovered:                            # (v7, F7a) an account no run covers: it waits on that account
+                waiting = not (mapped.get(acct) or '').startswith('third_party:')
             else:                                      # else the oldest coverage of his open accounts
                 waiting = bool(on and cov and on > cov)
-            unpaid.append(dict(l, awaiting_statement=waiting,
-                               waiting_on=sorted(a for a, d in cov_open.items() if on and d < on and (not acct or a == acct))))
+            unpaid.append(dict(l, awaiting_statement=waiting, account_uncovered=uncovered,
+                               waiting_on=[acct] if uncovered else sorted(
+                                   a for a, d in cov_open.items() if on and d < on and (not acct or a == acct))))
     costs = collections.OrderedDict()
     for b in sorted({x['b'] for x in banded if x['is_out'] and not x['is_in']}):
         ps = [x for x in banded if x['b'] == b and x['is_out'] and not x['is_in']]
@@ -390,11 +407,15 @@ def accounting(files, vehicle, decisions=None, date_from=None, date_to=None, ses
     pay_ok = {x['payment_key']: x for x in banded}
 
     def backed(c, role, side):
+        """A supporting payment of his, confirmed, with a known party; or (v7, F5; v8) his own who-paid statement,
+        which exists only on his decision in the app and closes the question while that decision stands."""
         for s in c['support'] or []:
             l = link_by_id.get(s['id'])
             if s['kind'] == 'evidence_link' and s['stance'] == 'supports' and l and l['role'] == role:
                 p = pay_ok.get(l.get('payment_key'))
                 if p and p['b'] == 'confirmed' and (p[side] or 'unknown') != 'unknown':
+                    return True
+                if l['source_kind'] == 'owner_statement' and l['status'] == 'confirmed' and l.get(side):
                     return True
         return False
 
@@ -415,6 +436,9 @@ def accounting(files, vehicle, decisions=None, date_from=None, date_to=None, ses
                  'ref': l['source_key'], 'label': l.get('source_label')},
                 **({'waiting_on': l['waiting_on'] or None} if l['awaiting_statement'] else {}))
            for l in unpaid if l['status'] == 'proposed']
+    # (v7, F7a) an account his assertions name that no run of his covers: is there an export to add?
+    oq += [{'q': 'money_source_missing', 'account_ref': a} for a in sorted(
+        {l['from_account_ref'] for l in unpaid if l['account_uncovered'] and l['awaiting_statement']})]
     refs = sorted({r for l in links if l['status'] != 'rejected' for r in (l.get('from_account_ref'),
                                                                           l.get('to_account_ref')) if r})
     oq += [{'q': 'account_entity_unknown', 'account_ref': r} for r in refs if r not in mapped]

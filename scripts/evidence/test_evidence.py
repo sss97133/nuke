@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
-"""Offline contracts for the image-evidence runner (draft.sql v6): every pass in file mode on synthetic pilot-shaped
+"""Offline contracts for the image-evidence runner (draft.sql v8): every pass in file mode on synthetic pilot-shaped
 inputs (no real id, amount, path, model, vendor or person name), the CHECK rules, the file-mode readers and the exit
 test, the loader's batching, gates and reported outcomes, db-mode refusal and stop conditions against a fake
 PostgREST, the manifest of returned ids and its M10b reconciliation, review rows that ask one question in one
 dimension, the sheet's delivery and his reply (one transcription per message, checked against a synthetic chat
-transcript), structured answers and answer binding, who-paid rows and owner statements, the second reader, the
-read-back list and disputed rows, the pinned-source refusals, promotion guards, the scoreboard SQL and the read path.
-No network, no database, no Photos library; the loop's local records and the transcripts live in a temp dir.
+transcript), his stored answers (verbatim, an optional reading; storing decides nothing, and no job decides or writes
+his word), who-paid rows, the second reader and disputed rows, the pinned-source refusals, promotion guards, the
+scoreboard SQL and the read path. No network, no database, no Photos library; the loop's local records and the
+transcripts live in a temp dir.
 
 Run: python3 scripts/evidence/test_evidence.py
 """
@@ -27,13 +28,13 @@ from unittest import mock
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
-# Hermetic: the loop's local records (sheets index, disputed rows, read-back list, manifests, config) and the chat
-# transcripts the answer checks read point into a temp dir, never at ~/nuke-logs or ~/.claude. Set before common is
-# imported (it reads the loop dir at import time).
+# Hermetic: the loop's local records (sheets index, disputed rows, manifests, config) and the chat transcripts the
+# answer checks read point into a temp dir, never at ~/nuke-logs or ~/.claude. Set before common is imported (it reads
+# the loop dir at import time).
 LOOP_TMP = tempfile.mkdtemp(prefix='evidence-loop-')
 atexit.register(shutil.rmtree, LOOP_TMP, True)
-for _k in ('EVIDENCE_SHEETS_INDEX', 'EVIDENCE_DISPUTED', 'EVIDENCE_READBACK', 'EVIDENCE_MANIFEST_DIR',
-           'EVIDENCE_PINNED_SOURCES', 'EVIDENCE_OWNER_ID'):
+for _k in ('EVIDENCE_SHEETS_INDEX', 'EVIDENCE_DISPUTED', 'EVIDENCE_MANIFEST_DIR', 'EVIDENCE_PINNED_SOURCES',
+           'EVIDENCE_OWNER_ID'):
     os.environ.pop(_k, None)
 os.environ['EVIDENCE_LOOP_DIR'] = LOOP_TMP
 os.environ['EVIDENCE_TRANSCRIPTS'] = os.path.join(LOOP_TMP, 'transcripts')
@@ -221,13 +222,20 @@ class Validator(SyntheticCase):
         self.assertCaught(lambda ls: ls[0]['row'].update(payer_entity='owner'), 'el_entity_owner_word')
         self.assertCaught(lambda ls: ls[0]['row'].update(payee_entity='owner_business:x'), 'el_entity_owner_word')
 
-    def test_owner_word_must_cite_his_answer(self):
-        self.assertCaught(lambda ls: ls[0]['row'].update(source_kind='owner_statement'), 'el_owner_word_cited')
-        self.assertCaught(lambda ls: ls[0]['row'].update(payment_key='owner:he-said-so'), 'el_owner_word_cited')
-        # (v6, AC9) and names the who-paid row target it answers
+    def test_a_job_never_writes_his_word(self):
+        """(v8) an owner statement, an owner: key and a rule 'owner' capture time come only from his decision."""
         ref = payloads.answer_ref(testdata.U('answers'), 4)
         self.assertCaught(lambda ls: ls[0]['row'].update(source_kind='owner_statement', external_ref=ref),
-                          'answers_row_target')
+                          'owner_answer_missing')
+        self.assertCaught(lambda ls: ls[0]['row'].update(payment_key='owner:' + ref), 'owner_answer_missing')
+        self.assertCaught(lambda ls: ls[0]['row'].update(rule='owner', witness=dict(ls[0]['row']['witness'],
+                                                                                      answer_ref=ref)),
+                          'owner_answer_missing', 'time_claims.jsonl')
+
+        def owner_review(run):
+            run['runs'][0]['args']['p_pass'] = 'owner_review'
+            run['runs'][0]['key'] = 'run:owner_review'
+        self.assertCaught(owner_review, 'never opens an owner_review run', 'run.json')
 
     def test_account_refs_that_look_like_account_numbers(self):
         self.assertCaught(lambda ls: ls[0]['row'].update(from_account_ref='bank_account:acct_12345678'),
@@ -293,31 +301,25 @@ class Builders(unittest.TestCase):
         self.assertEqual(row['payer_account_ref'], 'bank_account:a')
         self.assertNotIn('from_account_ref', row)
 
-    def test_every_writer_called_is_one_the_guard_admits(self):
-        self.assertEqual(set(payloads.CONTRACT['writers']), set(payloads.CONTRACT['writer_names']))
+    def test_every_writer_called_is_one_the_guard_admits_and_none_decides(self):
+        self.assertLessEqual(set(payloads.CONTRACT['writers']), set(payloads.CONTRACT['writer_names']))
+        # (v8) decide_evidence is his own session's writer: the runner has no entry for it, and no builder
+        self.assertNotIn('decide_evidence', payloads.CONTRACT['writers'])
+        self.assertFalse(hasattr(payloads, 'decide'))
+        self.assertIn('evidence_answers_to_confirm', payloads.CONTRACT['readers'])
 
     def test_builders_refuse_unknown_fields_and_own_writer_runs(self):
         with self.assertRaises(ValueError):
             payloads._clean('link', {'bogus': 1})
-        with self.assertRaises(ValueError):
-            payloads.open_run('u', 'probe', 'probe', 'p', 'v', {})
-        with self.assertRaises(ValueError):
-            payloads.decide('image_candidate', ['a'], 'confirmed', 'r', 's', 1, 'a', 'o', 'lead-1')
+        for kind, name in (('probe', 'probe'), ('review_answers', 'review_sheet'), ('pilot', 'owner_review')):
+            with self.assertRaises(ValueError):
+                payloads.open_run('u', kind, name, 'p', 'v', {})
 
     def test_parties_are_third_parties_or_null(self):
         row = payloads.evidence_link(T, 'ledger_line', 'payment_out', 'j', 0.5, [{'k': 1}], external_ref='x',
                                      amount_cents='@amount:l:1', payer_entity='owner', payee_entity='third_party:shop')
         self.assertNotIn('payer_entity', row)
         self.assertEqual(row['payee_entity'], 'third_party:shop')
-        ref = payloads.answer_ref(testdata.U('answers'), 4)
-        st = payloads.evidence_link(T, 'owner_statement', 'payment_out', 'j', 0.9, [{'k': 1}], external_ref=ref,
-                                    amount_cents='@amount:l:1', payer_entity='owner_business:x',
-                                    payment_key=payloads.owner_payment_key(testdata.U('answers'), 4))
-        self.assertEqual((st['payer_entity'], st['payment_key']), ('owner_business:x', 'owner:' + ref))
-        with self.assertRaises(ValueError):
-            payloads.evidence_link(T, 'owner_statement', 'context', 'j', 0.9, [{'k': 1}], external_ref='note:x')
-        with self.assertRaises(ValueError):
-            payloads.evidence_link(T, 'note', 'context', 'j', 0.9, [{'k': 1}], external_ref='x', payment_key='owner:x')
         self.assertEqual(payloads.change_claim(T, 'custody', 'acquisition', 's', 0.5, party_entity='owner')
                          .get('party_entity'), None)
         self.assertEqual(payloads.change_claim(T, 'physical', 'work_performed', 's', 0.5, party_entity='owner')
@@ -345,6 +347,11 @@ class Builders(unittest.TestCase):
                     {'coverage_to': '2032-02-30', 'covers_accounts': ['bank_account:a']}):
             with self.assertRaises(ValueError):
                 payloads.open_run('u', 'pilot', 'ledger_vendor_date', 'p', 'v', bad)
+        # (v7, F7c) a statement cannot cover days that have not happened (the run's day, when the caller knows it)
+        cfg = {'coverage_to': '2032-12-31', 'covers_accounts': ['bank_account:a']}
+        self.assertIn('later than the run day', payloads.coverage_problem('ledger_vendor_date', cfg,
+                                                                          common.parse_ts('2032-12-30').date()))
+        self.assertIsNone(payloads.coverage_problem('ledger_vendor_date', cfg, common.parse_ts('2032-12-31').date()))
         img = testdata.U('image', 1)
         ok = {'sheet_sha256': 'x', 'items': 2, 'rows': {
             '1': {'targets': [{'kind': 'image_candidate', 'id': testdata.U('c')}, {'kind': 'image', 'id': img}]},
@@ -372,9 +379,14 @@ class Builders(unittest.TestCase):
                     {'targets': [{'kind': 'account_entity', 'id': cand}], 'question': 'evidence_link'},
                     {'targets': [{'kind': 'evidence_link', 'id': cand}, {'kind': 'image', 'id': img}]},
                     {'targets': [{'kind': 'image', 'id': img}], 'question': 'album_map'},
-                    {'targets': [{'kind': 'payment', 'key': pk('00206')}], 'asks': 'who'}):
+                    {'targets': [{'kind': 'payment', 'key': pk('00206')}], 'asks': 'who'},
+                    # (v7, D2; v8) a who-paid row lists exactly one link or one acquisition/sale claim
+                    {'targets': [{'kind': 'payment', 'key': pk('00206')}], 'asks': 'party'},
+                    {'targets': [{'kind': 'evidence_link', 'id': cand}, {'kind': 'evidence_link', 'id': img}],
+                     'asks': 'party'}):
             with self.assertRaises(ValueError):
                 rq(bad)
+        self.assertEqual(rq({'targets': [{'kind': 'change_claim', 'id': cand}], 'asks': 'party'}), 'change_claim')
 
     def test_structured_answers(self):
         good = [{'decision': 'confirmed'}, {'decision': 'rejected', 'vehicle_id': T},
@@ -389,14 +401,19 @@ class Builders(unittest.TestCase):
                {'decision': 'rejected', 'captured_on': 'last week'}, 'yes']
         for a in bad:
             self.assertIsNotNone(payloads.answer_problem(a), a)
-        rows = {'3': {'verbatim': 'no, the second truck', 'answer': {'decision': 'rejected', 'vehicle_id': T}}}
-        args = payloads.record_answers('u', 's', ' session-1:msg-1 ', rows, 'p', 'v')
-        self.assertEqual(args['p_rows']['3']['answer'], {'decision': 'rejected', 'vehicle_id': T})
-        self.assertEqual(args['p_message_ref'], 'session-1:msg-1')
+        rows = {'3': {'verbatim': 'no, the second truck', 'answer': {'decision': 'rejected', 'vehicle_id': T}},
+                '4': {'verbatim': 'hmm, the blue one maybe'}}           # (v8) no reading: his words alone
+        args = payloads.record_answers('u', 's', ' Session-1:MSG-1 ', rows, 'p', 'v')
+        self.assertEqual(args['p_rows'], {'3': rows['3'], '4': {'verbatim': 'hmm, the blue one maybe'}})
+        self.assertEqual(args['p_message_ref'], 'session-1:msg-1')          # stored lower-cased (v7, D4)
+        self.assertEqual(payloads.message_id(' Session-1:MSG-1 '), 'msg-1')
         with self.assertRaises(ValueError):
             payloads.record_answers('u', 's', 'session-1:msg-1', {'3': 'no, the second truck'}, 'p', 'v')
-        # (v6, AC10) the message is '<source>:<message id>', at most 200 characters
-        for ref in ('msg-1', 'session 1:msg-1', 's:' + 'x' * 199, None):
+        with self.assertRaises(ValueError):
+            payloads.record_answers('u', 's', 'session-1:msg-1', {'3': {'verbatim': 'x', 'answer': 'yes'}}, 'p', 'v')
+        # (v7, D4) '<source>:<message id>': exactly one colon, no path, no dots, at most 200 characters
+        for ref in ('msg-1', 'session 1:msg-1', 's:' + 'x' * 199, None, 'session-1:msg:1', 'session.1:msg-1',
+                    'session-1:/tmp/reply.txt'):
             with self.assertRaises(ValueError):
                 payloads.record_answers('u', 's', ref, rows, 'p', 'v')
         self.assertEqual(payloads.answer_place({'decision': 'confirmed', 'entity_key': 'owner'}), 'entity:owner')
@@ -454,12 +471,17 @@ class Builders(unittest.TestCase):
         self.assertEqual(payloads.answer_dimension(dict(photo, frame='mixed')), [])
         self.assertEqual(payloads.answer_dimension(dict(where, link_class='mixed')), [])
 
-    def test_owner_time_claim_cites_his_answer(self):
+    def test_a_job_never_writes_his_word(self):
+        """(v8) his day, his statement and an owner: key come only from his own decision in the app."""
+        ref = payloads.answer_ref(testdata.U('answers'), 7)
         args = (testdata.U('image', 1), '2031-04-20T18:00:00+00:00', '2031-04-21T01:00:00+00:00', '2031-04-20', 'owner')
         with self.assertRaises(ValueError):
-            payloads.capture_time_claim(*args, {'note': 'he said so'}, 0.9)
-        row = payloads.capture_time_claim(*args, {'answer_ref': payloads.answer_ref(testdata.U('answers'), 7)}, 0.9)
-        self.assertEqual((row['rule'], row['offset_seconds']), ('owner', -25200))
+            payloads.capture_time_claim(*args, {'answer_ref': ref}, 0.9)
+        for kw in ({'source_kind': 'owner_statement', 'external_ref': ref},
+                   {'source_kind': 'note', 'external_ref': 'note:x', 'payment_key': 'owner:' + ref}):
+            sk = kw.pop('source_kind')
+            with self.assertRaises(ValueError):
+                payloads.evidence_link(T, sk, 'payment_out', 'j', 0.9, [{'k': 1}], amount_cents='@amount:l:1', **kw)
 
     def test_link_classes_and_reported_outcomes(self):
         lc = payloads.link_class
@@ -467,9 +489,9 @@ class Builders(unittest.TestCase):
                           lc('payment_out', '@amount:x:1', 'pnl_line'), lc('context', None, 'photos_album'),
                           lc('contradicts', None, 'message'), lc('supports', None, 'deal_document')],
                          ['placement', 'placement', 'share', 'album', 'contradicts', 'other'])
-        self.assertLessEqual({'reassign_needs_review', 'reassign_not_a_placement', 'unchanged', 'owner_answer_missing',
-                              'human_decision_newer', 'human_decision_stands', 'already_decided', 'kept_stronger',
-                              'entity_is_owners_call'}, set(payloads.C['reported_outcomes']))
+        self.assertEqual(set(payloads.C['reported_outcomes']), {
+            'already_decided', 'already_rejected', 'owner_answer_missing', 'kept_stronger', 'entity_is_owners_call',
+            'unchanged'})
 
 
 class Readers(SyntheticCase):
@@ -569,6 +591,50 @@ class Readers(SyntheticCase):
         for w in (mapped, closed):
             self.assertEqual(w['money_sources_cover_to'], testdata.COVER_TO)
             self.assertFalse([q for q in w['open_questions'] if q['q'] in ('money_source_behind', 'awaiting_statement')])
+        # (v7, F7b) "closed" is the newest covering run's word: a later export that is not final reopens it
+        reopened = json.loads(json.dumps(closed_run))
+        reopened['runs'].append(dict(share, key='run:receipt_vehicle_id', args=dict(share['args'], p_pass='receipt_vehicle_id')))
+        self.assertEqual(readers.accounting(dict(f, **{'run.json': reopened}), T)['money_sources_closed'], [])
+
+    def test_an_account_no_run_covers_is_waited_on_by_name(self):
+        """(v7, F7a) an assertion naming an account no statement covers waits on that account: money_source_missing."""
+        orphan = 'bank_account:synthetic_card'
+        line = next(ln for ln in self.files['links.jsonl'] if ln['key'].endswith('#line:corner@%s' % T[:8]))
+        moved = dict(line, row=dict(line['row'], from_account_ref=orphan))
+        f = dict(self.files, **{'links.jsonl': [moved if ln is line else ln for ln in self.files['links.jsonl']]})
+        v = readers.accounting(f, T)
+        corner = [q for q in v['open_questions'] if q.get('ref', '').endswith('#line:corner')]
+        self.assertEqual([(q['q'], q.get('waiting_on')) for q in corner], [('awaiting_statement', [orphan])])
+        self.assertIn({'q': 'money_source_missing', 'account_ref': orphan}, v['open_questions'])
+
+    def test_his_confirmed_statement_closes_who_paid(self):
+        """(v7, F5; v8) his own who-paid statement (written by his decision in the app) closes who_paid while that
+        decision stands; a job never writes one."""
+        acq = 'claim:acquisition:%s' % T[:8]
+        ref = payloads.answer_ref(testdata.U('answers'), 1)
+        statement = {'key': 'link:%s@%s' % (ref, T[:8]), 'writer': 'propose_evidence_links', 'p_run_id': '@run:owner_review',
+                     'row': {'vehicle_id': T, 'source_kind': 'owner_statement', 'external_ref': ref, 'role': 'payment_out',
+                             'direction': 'out', 'payment_key': 'owner:' + ref, 'payer_entity': 'owner_business:synthetic',
+                             'join_key': 'his answer', 'confidence': 1.0, 'evidence': []}}
+        support = {'key': 'support:his', 'writer': 'propose_claim_support', 'p_run_id': '@run:owner_review',
+                   'p_claim_id': '@key:' + acq, 'p_support': [{'evidence_kind': 'evidence_link', 'stance': 'supports',
+                                                               'evidence_id': '@key:' + statement['key'], 'about': 'party'}]}
+        f = dict(self.files, **{'links.jsonl': list(self.files['links.jsonl']) + [statement],
+                                'claim_support.jsonl': [support]})
+
+        def who_paid(decisions):
+            return [q for q in readers.accounting(f, T, decisions)['open_questions'] if q['q'] == 'who_paid']
+        self.assertEqual(len(who_paid(None)), 1)                     # proposed only: still open
+        self.assertEqual(who_paid([{'target': statement['key'], 'decision': 'confirmed'}]), [])
+        self.assertEqual(len(who_paid([{'target': statement['key'], 'decision': 'rejected'}])), 1)
+
+    def test_a_day_he_rejected_reads_undated(self):
+        """(v7, F1; v8: his decision) a photo whose only time he rejected is undated until a time is confirmed."""
+        claim = next(ln for ln in self.files['time_claims.jsonl']
+                     if ln['row']['captured_on'] == '2031-04-20')
+        before = readers.accounting(self.files, T)['undated_own_photos']
+        after = readers.accounting(self.files, T, [{'target': claim['key'], 'decision': 'rejected'}])
+        self.assertEqual((before, after['undated_own_photos']), (0, 1))
 
 
 class ExitTest(SyntheticCase):
@@ -591,6 +657,36 @@ class ExitTest(SyntheticCase):
         self.assertEqual(by['painter_answered']['result'], 'open')
         self.assertEqual(by['painter_answered']['simulated'], 'pass')
         self.assertEqual(by['identity_pair_confirmed']['simulated'], 'pass')
+
+    def test_db_confirmed_level_waits_on_his_app(self):
+        """(v8) in db mode only his own decisions satisfy the confirmed level; until any exist it is open, waiting on
+        his app with his stored answers counted."""
+        fx = common.load_json(self.td['fixture'])
+        decided = readers.accounting(self.files, T, [{'target': 'claim:same_vehicle_as:%s' % testdata.V['TWIN'][:8],
+                                                      'decision': 'confirmed'}])
+        res, summary = exit_test.run(fx, self.files, lambda dec: decided, common.DB, {'decisions': 0, 'waiting': 6})
+        by = {r['id']: r for r in res}
+        self.assertEqual((by['identity_pair_confirmed']['result'], by['identity_pair_confirmed']['waiting_on_his_app']),
+                         ('open', 6))                            # the read would pass, but no decision of his exists
+        self.assertEqual(summary['confirmed_level'], 'waiting on his app (6 stored answers waiting)')
+        self.assertNotIn('simulated', by['identity_pair_confirmed'])
+        res, summary = exit_test.run(fx, self.files, lambda dec: decided, common.DB, {'decisions': 1, 'waiting': 5})
+        by = {r['id']: r for r in res}
+        self.assertEqual((by['identity_pair_confirmed']['result'], by['painter_answered']['result']), ('pass', 'open'))
+        self.assertEqual(summary['confirmed_level'], 'his decisions recorded')
+
+    def test_his_state_reads_name_the_owner(self):
+        class R:
+            def __init__(self):
+                self.sql = []
+
+            def read(self, sql, params=None, tag=None):
+                self.sql.append((sql, params))
+                return [{'n': 3}]
+        r = R()
+        self.assertEqual(exit_test.his_state(testdata.OWNER, r), {'waiting': 3, 'decisions': 3})
+        self.assertIn('evidence_answers_to_confirm(:uid)', r.sql[0][0])
+        self.assertTrue(all(p == {'uid': testdata.OWNER} for _s, p in r.sql))
 
     def test_m5_extraction_keys(self):
         v = readers.accounting(self.files, T)
@@ -649,13 +745,12 @@ class Loader(SyntheticCase):
 
 
 class FakeRest:
-    """Stands in for PostgREST: answers each writer the way draft.sql v5 does, records every call."""
+    """Stands in for PostgREST: answers each writer the way draft.sql v8 does, records every call."""
 
-    def __init__(self, fail=None, links=None, decide=None):
+    def __init__(self, fail=None, links=None):
         self.calls = []
         self.fail = fail or {}
         self.link_results = links or {}                  # source key -> result for propose_evidence_links
-        self.decide_result = decide
         self.n = 0
 
     def new(self):
@@ -699,11 +794,8 @@ class FakeRest:
         if fn == 'confirm_capture_times_by_rule':
             return {'confirmed': len(args['p_claim_ids']), 'gate_run_id': args['p_gate_run_id'],
                     'decision_ids': [self.new() for _i in args['p_claim_ids']]}
-        if fn == 'decide_evidence':
-            if self.decide_result:
-                return self.decide_result(args)
-            return {'items': [{'id': i, 'result': args['p_decision'], 'decision_id': self.new()}
-                              for i in args['p_target_ids']]}
+        if fn == 'decide_evidence':                     # (v8) the service role has no EXECUTE on it
+            raise common.RpcError(fn, 403, '42501', 'permission denied for function decide_evidence')
         return {}
 
 
@@ -768,8 +860,9 @@ class DbMode(SyntheticCase):
 
         def times(args):
             n = len(args['p_rows'])
-            return {'proposed': n - 2, 'machine_confirmed': n - 2, 'kept_stronger': 0, 'unchanged': 2,
-                    'ids': [rest.new() for _i in range(n - 2)], 'decision_ids': []}
+            return {'proposed': n - 3, 'machine_confirmed': n - 3, 'kept_stronger': 0, 'unchanged': 2,
+                    'already_rejected': 1, 'owner_answer_missing': 0, 'image_not_eligible': 0,
+                    'ids': [rest.new() for _i in range(n - 3)], 'decision_ids': []}
 
         def cands(args):
             rows = args['p_rows']
@@ -781,6 +874,7 @@ class DbMode(SyntheticCase):
         time_calls = [a for fn, a in rest.calls if fn == 'propose_capture_time_claims']
         cand_calls = [a for fn, a in rest.calls if fn == 'propose_image_candidates']
         self.assertEqual(ld.outcomes['unchanged'], 2 * len(time_calls) + len(cand_calls))
+        self.assertEqual(ld.outcomes['already_rejected'], len(time_calls))    # (v7, F1) the time he rejected, again
         self.assertEqual(sum(len(a['p_rows']) for a in time_calls), 133)          # each claim sent once
         self.assertEqual(ld.manifest()['outcomes_reported_not_retried']['unchanged'], ld.outcomes['unchanged'])
 
@@ -854,6 +948,10 @@ class DbMode(SyntheticCase):
         cfg = [a['p_config'] for fn, a in rest.calls if fn == 'evidence_open_run' and a['p_pass'] == 'review_sheet'][0]
         self.assertIsNone(payloads.review_rows_problem(cfg))
         self.assertTrue(all(r['question'] in payloads.C['review_questions'] for r in cfg['rows'].values()))
+        # (v8) the review run stays open until the sheet is sent; nothing decides
+        self.assertFalse([a for fn, a in rest.calls if fn == 'evidence_close_run'
+                          and a['p_run_id'] == report['review_sheet']['sheet_run']])
+        self.assertNotIn('decide_evidence', fns)
 
     def test_db_loop_closes_its_run_failed_on_an_error(self):
         rest, report, go = self.db_loop('ERROR:  42P01: relation "x" does not exist')
@@ -909,6 +1007,10 @@ class Manifest(unittest.TestCase):
         self.assertEqual((ln['writer'], ln['run_id'], ln['ids'], ln['existing']),
                          ('propose_evidence_links', run, [a], [b]))
         self.assertEqual(ln['results'], {'proposed': 1, 'already_decided': 1, 'entity_is_owners_call': 1})
+        # (v8) the client never sends decide_evidence: nothing reaches the network or the manifest
+        with self.assertRaises(common.EvidenceError):
+            r.rpc('decide_evidence', {'p_target_kind': 'image_candidate'})
+        self.assertEqual((r.calls, len(self.lines())), (1, 1))
 
     def test_an_unknown_outcome_is_recorded(self):
         r = self.rest(urllib.error.URLError('timed out'))
@@ -918,54 +1020,44 @@ class Manifest(unittest.TestCase):
 
     def test_returned_shapes(self):
         u = lambda *x: testdata.U(*x)  # noqa: E731
-        res = {'items': [{'id': u('t'), 'result': 'rejected', 'decision_id': u('d1'), 'implied_decision_ids': [u('d2')],
-                          'reassigned_to': u('c2'), 'reassign_result': {'items': [
-                              {'id': u('c2'), 'result': 'confirmed', 'decision_id': u('d3'),
-                               'implied_decision_ids': [u('d4')]}]}},
-                         {'id': u('t2'), 'result': 'human_decision_newer'}]}
-        r = manifest.returned('decide_evidence', {}, res)
-        self.assertEqual(r['decision_ids'], [u('d1'), u('d3')])
-        self.assertEqual(r['implied_decision_ids'], [u('d2'), u('d4')])
-        self.assertEqual(set(r['ids']), {u('c2'), u('d1'), u('d2'), u('d3'), u('d4')})
-        self.assertEqual(r['results']['human_decision_newer'], 1)
-        r = manifest.returned('propose_capture_time_claims', {}, {'ids': [u('t1')], 'decision_ids': [u('d9')],
-                                                                  'kept_stronger': 2})
-        self.assertEqual((r['ids'], r['results']['kept_stronger']), ([u('t1'), u('d9')], 2))
+        # (v7/v8) every count the time writer returns is kept: owner_answer_missing and already_rejected included
+        r = manifest.returned('propose_capture_time_claims', {}, {
+            'ids': [u('t1')], 'decision_ids': [u('d9')], 'kept_stronger': 2, 'unchanged': 3, 'owner_answer_missing': 1,
+            'already_rejected': 1, 'stored_time_changed': 0})
+        self.assertEqual(r['ids'], [u('t1'), u('d9')])
+        self.assertEqual(dict(r['results']), {'kept_stronger': 2, 'unchanged': 3, 'owner_answer_missing': 1,
+                                              'already_rejected': 1})
+        r = manifest.returned('propose_evidence_links', {}, {'items': [{'ref': 'x', 'result': 'owner_answer_missing'}]})
+        self.assertEqual((r['ids'], dict(r['results'])), ([], {'owner_answer_missing': 1}))
         r = manifest.returned('propose_change_claim', {'p_support': [{}, {}]}, u('k'))
         self.assertEqual((r['ids'], r['support']), ([u('k')], [{'claim_id': u('k'), 'count': 2}]))
         r = manifest.returned('propose_claim_support', {'p_claim_id': u('k')}, 3)
         self.assertEqual(r['support'], [{'claim_id': u('k'), 'count': 3}])
-        r = manifest.returned('decide_evidence', {}, {'items': [{'id': u('t'), 'result': 'rejected',
-                                                                  'decision_id': u('d5'),
-                                                                  'reassign_decision_id': u('d6')}]})
-        self.assertEqual(r['reassign_decision_ids'], [u('d6')])
-        # (v6, AC5-AC7) a reassign the writer did not make is a note, reported and never retried; the nested
-        # reassign_result's own ids (an owner_review row, its decision, its implied rejections) are this call's too
-        r = manifest.returned('decide_evidence', {}, {'items': [
-            {'id': u('t3'), 'result': 'rejected', 'decision_id': u('d7'), 'reassign_note': 'reassign_not_a_placement'},
-            {'id': u('t4'), 'result': 'rejected', 'decision_id': u('d8'), 'reassigned_to': u('c4'),
-             'reassign_result': {'items': [{'id': u('c4'), 'result': 'human_decision_newer'}]}}]})
-        self.assertEqual(sorted(r['ids']), sorted([u('d7'), u('d8'), u('c4')]))
-        self.assertEqual((r['results']['reassign_not_a_placement'], r['results']['human_decision_newer']), (1, 1))
+        r = manifest.returned('evidence_record_answers', {'p_sheet_run': u('sheet')}, u('answers'))
+        self.assertEqual((r['ids'], manifest.run_of('evidence_record_answers', {'p_sheet_run': u('sheet')}, None)),
+                         ([u('answers')], u('sheet')))
 
     def test_reconcile_finds_rows_no_call_returned(self):
         u = lambda *x: testdata.U(*x)  # noqa: E731
         lines = [{'writer': 'evidence_open_run', 'ids': [u('run')]},
                  {'writer': 'propose_evidence_links', 'run_id': u('run'), 'ids': [u('l1')]},
-                 {'writer': 'propose_change_claim', 'ids': [u('k')], 'support': [{'claim_id': u('k'), 'count': 2}]},
-                 {'writer': 'decide_evidence', 'ids': [u('d1'), u('d2')], 'implied_decision_ids': [u('d2')]}]
+                 {'writer': 'propose_capture_time_claims', 'run_id': u('run'), 'ids': [u('t1'), u('c1')]},
+                 {'writer': 'propose_change_claim', 'ids': [u('k')], 'support': [{'claim_id': u('k'), 'count': 2}]}]
         created = {'evidence_runs': [u('run')], 'evidence_links': [u('l1'), u('l2')], 'vehicle_change_claims': [u('k')],
                    'vehicle_change_claim_support': {u('k'): 3},
-                   'evidence_decisions': [{'id': u('d1'), 'by': 'agent:lead-1'},
-                                          {'id': u('d2'), 'by': 'implied:' + u('d1')},
-                                          {'id': u('d3'), 'by': 'implied:' + u('d1')},
+                   'evidence_decisions': [{'id': u('c1'), 'by': 'check:photos_exif_join'},
+                                          {'id': u('a1'), 'by': 'agent:lead-1'},     # a job decision: never manifested
                                           {'id': u('h'), 'by': 'human:' + u('owner')},
+                                          {'id': u('i'), 'by': 'implied:' + u('h')},
                                           {'id': u('p'), 'by': 'writer:promote_image', 'run': u('run')}]}
-        m = manifest.reconcile(created, lines)
+        m = manifest.reconcile(created, lines, his_rows={'evidence_links': 1, 'vehicle_change_claim_support': 1})
         self.assertEqual(m['by_table'], {'evidence_links': 1, 'evidence_decisions': 1})
-        self.assertEqual(m['unmanifested'], 3)                    # l2, d3 and the support count
+        self.assertEqual(m['unmanifested'], 3)                    # l2, the agent row a1 and the support count
+        self.assertEqual(m['examples']['evidence_decisions'], [u('a1')])
         self.assertEqual(m['support_mismatch'], [{'claim_id': u('k'), 'rows': 3, 'manifest': 2}])
-        self.assertEqual(m['human_decisions_to_match_request_log'], 1)
+        # (v8) his decisions, what they imply and the rows they write go to the lead's request-log match
+        self.assertEqual((m['human_decisions_to_match_request_log'], m['implied_by_his_decisions'],
+                          m['his_rows_to_match_his_decisions']), (1, 1, 2))
 
     def test_a_manifest_that_cannot_be_written_stops(self):
         blocker = os.path.join(self.d, 'not-a-dir')
@@ -1158,18 +1250,42 @@ class ReviewSheet(SyntheticCase):
         contra = next(ln['key'] for ln in self.files['links.jsonl'] if ln['row']['role'] == 'contradicts'
                       and ln['row'].get('payment_key'))
         acct = self.files['account_entities.jsonl'][0]['key']
+        jacket = next(ln['key'] for ln in self.files['links.jsonl'] if ln['key'].endswith('#line:paint@%s' % T[:8]))
+        ok = review_sheet.profile({'targets': [RT('evidence_link', jacket)], 'asks': 'party'}, lines)
+        self.assertEqual((ok['link_class'], ok['asked_place'], ok['payment_keys']), ('placement', T, []))
         for bad in ([RT('change_claim', 'claim:paint:%s' % T[:8])],              # not an acquisition or a sale
                     [RT('payment', pk('00206'))],                                # no place: a "where?" row
                     [RT('evidence_link', truck206), RT('evidence_link', sub206)],  # two places
                     [RT('evidence_link', contra)],                               # a contradiction is not a placement
-                    [RT('account_entity', acct)]):
+                    [RT('account_entity', acct)],
+                    [RT('evidence_link', truck206)]):        # (v8) money a payment source carries: the account's row
             with self.assertRaises(ValueError):
                 review_sheet.profile({'targets': bad, 'asks': 'party'}, lines)
+        with self.assertRaises(ValueError) as cm:
+            review_sheet.profile({'targets': [RT('evidence_link', truck206)], 'asks': 'party'}, lines)
+        self.assertIn('payment source', str(cm.exception))
         where = review_sheet.profile({'targets': [RT('payment', pk('00737'))]}, lines)
         self.assertEqual((where['question'], where['asked_place'], where['link_class'], where['payment_keys']),
                          ('evidence_link', None, 'placement', [pk('00737')]))
         multi = review_sheet.profile({'targets': [RT('evidence_link', truck206), RT('evidence_link', sub206)]}, lines)
         self.assertEqual((multi['asked_place'], payloads.answer_dimension(multi)), ('multi', []))
+
+    def test_a_row_whose_targets_place_nothing_asks_about_none(self):
+        """(v7, D6) a "no truck in frame" verdict or an unplaced line: asked place 'none', a yes/no row."""
+        lines = dict(review_sheet.lines_by_key(self.files))
+        img = testdata.U('image', 'nobody')
+        lines['cand:x:none'] = {'key': 'cand:x:none', 'row': {'image_id': img, 'verdict': 'not_vehicle',
+                                                              'frame_role': 'subject'}}
+        p = review_sheet.profile({'targets': [review_sheet.T('image_candidate', 'cand:x:none'),
+                                              review_sheet.T('image', img)]}, lines)
+        self.assertEqual((p['asked_place'], p['places']), ('none', ['none']))
+        for ans, ok in (({'decision': 'confirmed'}, True), ({'decision': 'rejected'}, True),
+                        ({'decision': 'rejected', 'vehicle_id': T}, True),       # "no, it is the truck"
+                        ({'decision': 'confirmed', 'vehicle_id': T}, False)):     # a yes names no other place
+            self.assertEqual(payloads.answer_problem(ans, p) is None, ok, ans)
+        with self.assertRaises(ValueError):                                       # a who-paid row needs a place
+            review_sheet.profile({'targets': [review_sheet.T('image_candidate', 'cand:x:none')], 'asks': 'party'},
+                                 lines)
 
     def test_an_image_only_row_states_its_question(self):
         """(v6, AC1) "which truck is this?" lists the image with question image_candidate: a "where?" row."""
@@ -1191,7 +1307,7 @@ class ReviewSheet(SyntheticCase):
         self.assertIsNotNone(payloads.answer_problem({'decision': 'confirmed'}, p))
         self.assertEqual(review_sheet.run_row(r, {}), {'targets': [{'kind': 'image', 'id': img}],
                                                        'question': 'image_candidate'})
-        self.assertEqual(record_answers.covers(r, 'image_candidate', cand, lines), 'slot')   # his answer lands there
+        self.assertEqual(p['places'], [])                     # no candidate listed: his reading names the truck
         for bad in ({'targets': [review_sheet.T('image', img)]},                             # names no question
                     {'targets': [review_sheet.T('image_candidate', cand)], 'frame': 'also_in_frame'}):
             with self.assertRaises(ValueError):
@@ -1212,7 +1328,7 @@ class ReviewSheet(SyntheticCase):
         self.assertIsNone(payloads.review_rows_problem(cfg))
         self.assertEqual((cfg['items'], side['items'], len(side['left_off_not_loaded'])), (len(rows) - 1,) * 2 + (1,))
         self.assertEqual(cfg['sheet_sha256'], side['sheet_sha256'])
-        self.assertEqual([fn for fn, _a in rest.calls], ['evidence_open_run', 'evidence_close_run'])
+        self.assertEqual([fn for fn, _a in rest.calls], ['evidence_open_run'])     # (v8) closed when the sheet is sent
         self.assertTrue(all(r['question'] in payloads.C['review_questions'] for r in cfg['rows'].values()))
         self.assertEqual(len([r for r in cfg['rows'].values() if r.get('asks') == 'party']), 6)
         self.assertTrue(all(common.is_uuid(t.get('id') or '') or t.get('key')
@@ -1221,15 +1337,17 @@ class ReviewSheet(SyntheticCase):
 
 
 class Answers(SyntheticCase):
+    """(v8) His answers are stored word for word, with an optional reading, and decide nothing."""
+
     def sheet(self, name, date='2031-06-01'):
         d = self.copy_out(name)
         rows, decisions = review_sheet.build_rows(self.ctx, self.files, readers.accounting(self.files, T))
         side = review_sheet.issue(self.ctx, rows, decisions, date, d)
         return d, os.path.join(d, 'review-%s.json' % date), side
 
-    def deliver(self, sp, ref='session-1:msg-0'):
+    def deliver(self, sp, ref='session-1:msg-0', mode=common.FILE):
         with contextlib.redirect_stdout(io.StringIO()):
-            record_answers.delivered(mock.Mock(sheet=sp, message_ref=ref), self.ctx)
+            record_answers.delivered(mock.Mock(sheet=sp, message_ref=ref, mode=mode), self.ctx)
 
     def store(self, sp, answers, mode=common.FILE, ref='session-1:msg-1'):
         ap = os.path.join(os.path.dirname(sp), 'answers-in.json')
@@ -1239,23 +1357,10 @@ class Answers(SyntheticCase):
             record_answers.store(args, self.ctx)
         return common.load_json(record_answers.receipt_path(sp, common.load_json(sp)))
 
-    def decide(self, d, sp, plan, mode=common.FILE, manifest_path=None):
-        pp = os.path.join(d, 'plan.json')
-        common.dump_json(pp, plan)
-        args = mock.Mock(sheet=sp, receipt=record_answers.receipt_path(sp, common.load_json(sp)), plan=pp,
-                         agent_session='lead-session-1', manifest=manifest_path, mode=mode, user=testdata.OWNER)
-        with contextlib.redirect_stdout(io.StringIO()):
-            record_answers.decide(args, self.ctx)
-        return common.load_json(os.path.join(d, 'decisions-%s.json' % common.load_json(sp)['date']))
-
     @staticmethod
     def row(side, text, pkey=None):
         return next(r for r in side['rows'] if text in r['question_text']
                     and (pkey is None or pkey in r['question_text']))
-
-    @staticmethod
-    def truck_link(r):
-        return next(t['key'] for t in r['targets'] if t['kind'] == 'evidence_link' and t['key'].endswith(T[:8]))
 
     def test_answers_need_the_delivery_and_a_later_message(self):
         d, sp, side = self.sheet('answers-delivery')
@@ -1265,29 +1370,58 @@ class Answers(SyntheticCase):
         with self.assertRaises(SystemExit) as cm:                  # (v6, AC10) the delivery is recorded first
             self.store(sp, ans)
         self.assertIn('delivered', str(cm.exception))
-        for bad in ('msg-0', 'session 1:msg-0', 'session-1:' + 'x' * 200):
+        for bad in ('msg-0', 'session 1:msg-0', 'session-1:msg:0', 'session-1/x:msg-0', 'session-1:' + 'x' * 200):
             with self.assertRaises(SystemExit):
                 self.deliver(sp, bad)
         self.deliver(sp)
-        self.deliver(sp)                                           # the same message again changes nothing
+        self.deliver(sp, 'Session-1:MSG-0')                       # the same message again (the store lower-cases it)
         with self.assertRaises(SystemExit):                        # one delivery per sheet
             self.deliver(sp, 'session-1:msg-9')
-        for ref in ('session-1:msg-0', 'msg-1'):                   # the delivery itself is not his reply
+        for ref in ('session-1:msg-0', 'msg-1', 'elsewhere:msg-0'):  # the delivery itself is not his reply, by any source
             with self.assertRaises(SystemExit):
                 self.store(sp, ans, ref=ref)
-        rc = self.store(sp, ans)
-        self.assertEqual((rc['message_ref'], rc['delivery_ref'], rc['transcript']),
-                         ('session-1:msg-1', 'session-1:msg-0', 'not on this Mac'))
+        rc = self.store(sp, ans, ref='Session-1:Msg-1')
+        self.assertEqual((rc['message_ref'], rc['delivery_ref'], rc['transcript'], rc['readings']),
+                         ('session-1:msg-1', 'session-1:msg-0', 'not on this Mac', 1))
         stored = rc['rows'][str(r['row'])]
         self.assertEqual(stored['sha256'], common.sha256_text('no, that was the second truck'))
         self.assertEqual(stored['answer'], {'decision': 'rejected', 'vehicle_id': testdata.V['SUB']})
         self.assertNotIn('second truck', json.dumps(rc))
-        with self.assertRaises(SystemExit) as cm:                  # one transcription per message
-            self.store(sp, ans)
-        self.assertIn('already transcribed', str(cm.exception))
+        for ref in ('session-1:msg-1', 'elsewhere:MSG-1'):        # one transcription per message id, whatever the source
+            with self.assertRaises(SystemExit) as cm:
+                self.store(sp, ans, ref=ref)
+            self.assertIn('already transcribed', str(cm.exception))
         with self.assertRaises(SystemExit) as cm:                  # one answer set per sheet
             self.store(sp, {'1': {'verbatim': 'me', 'answer': {'decision': 'unsure'}}}, ref='session-1:msg-2')
         self.assertIn('one answer set per sheet', str(cm.exception))
+
+    def test_a_reading_is_optional_and_storing_decides_nothing(self):
+        d, sp, side = self.sheet('answers-unread')
+        painter = self.row(side, 'also places it on', pk('00206'))
+        photo = next(r for r in side['rows'] if r['section'] == 'photos')
+        acct = next(r for r in side['rows'] if r['section'] == 'accounts')
+        self.deliver(sp)
+        before = set(os.listdir(d))
+        rc = self.store(sp, {str(painter['row']): {'verbatim': 'no, the second truck',
+                                                   'answer': {'decision': 'rejected', 'vehicle_id': 'SUB'}},
+                             str(photo['row']): {'verbatim': 'hmm, that one maybe'},           # unclear: his words alone
+                             str(acct['row']): {'verbatim': 'ask me later', 'answer': None}})
+        self.assertEqual(rc['readings'], 1)
+        self.assertEqual(rc['rows'][str(photo['row'])], {'sha256': common.sha256_text('hmm, that one maybe'),
+                                                         'answer': {'decision': 'unsure', 'unread': True}})
+        self.assertEqual(rc['rows'][str(acct['row'])]['answer'], record_answers.UNREAD)
+        # the receipt is all it writes: no decision, no owner statement, no read-back
+        self.assertEqual(set(os.listdir(d)) - before, {'answers-in.json', 'answers-2031-06-01.json'})
+        with self.assertRaises(SystemExit) as cm:                  # 'unread' is the store's mark, never a reading
+            record_answers.validate_answers(self.ctx, side, {str(photo['row']): {
+                'verbatim': 'w', 'answer': {'decision': 'unsure', 'unread': True}}})
+        self.assertIn('answer carries', str(cm.exception))
+        # (v8) decide is retired: no job decides
+        self.assertFalse(hasattr(record_answers, 'decide'))
+        with mock.patch.object(sys, 'argv', ['record_answers.py', 'decide', '--sheet', sp, '--plan', 'plan.json']), \
+                self.assertRaises(SystemExit) as cm:
+            record_answers.main()
+        self.assertIn('retired', str(cm.exception))
 
     def test_readings_stay_in_the_row_dimension(self):
         _d, _sp, side = self.sheet('answers-dimension')
@@ -1307,7 +1441,8 @@ class Answers(SyntheticCase):
                             (paid, {'decision': 'confirmed', 'entity_key': 'owner_business:synthetic'}),
                             (paid, {'decision': 'unsure'}),
                             (acct, {'decision': 'rejected', 'entity_key': 'owner_business:synthetic'}),
-                            (photo, {'decision': 'rejected', 'vehicle_id': 'SWB'}), (ident, {'decision': 'confirmed'})):
+                            (photo, {'decision': 'rejected', 'vehicle_id': 'SWB'}), (ident, {'decision': 'confirmed'}),
+                            (paid, None), (photo, None)):                     # (v8) no reading: his words alone
             check(row, answer)
         refused = [(painter, {'decision': 'confirmed', 'vehicle_id': 'SUB'}, 'a yes names the place'),
                    (painter, {'decision': 'rejected', 'vehicle_id': 'TRUCK'}, 'is a bare'),
@@ -1319,93 +1454,16 @@ class Answers(SyntheticCase):
                    (acct, {'decision': 'confirmed', 'entity_key': 'third_party:x'}, 'a yes names the place'),
                    (photo, {'decision': 'rejected', 'vehicle_id': testdata.U('vehicle', 'stranger')},
                     'neither his nor on the row'),
+                   (photo, {'decision': 'rejected', 'vehicle_id': 'TRADE'}, 'neither his nor on the row'),  # (v7, D7)
+                   (photo, {'decision': 'unsure', 'vehicle_id': 'SWB'}, "'unsure' answer names no place"),
                    (ident, {'decision': 'confirmed', 'vehicle_id': 'TWIN'}, 'no place')]
         for row, answer, why in refused:
             with self.assertRaises(SystemExit) as cm:
                 check(row, answer)
             self.assertIn(why, str(cm.exception), (row['row'], answer))
-
-    def test_decisions_follow_his_answer(self):
-        d, sp, side = self.sheet('answers-decide')
-        painter = self.row(side, 'also places it on', pk('00206'))
-        job = self.row(side, 'also places it on', pk('00737'))
-        photo = next(r for r in side['rows'] if r['section'] == 'photos')
-        acct = next(r for r in side['rows'] if r['section'] == 'accounts')
-        paid = self.row(side, "'paint'")
-        self.deliver(sp)
-        self.store(sp, {
-            str(painter['row']): {'verbatim': 'the second truck', 'answer': {'decision': 'rejected', 'vehicle_id': 'SUB'}},
-            str(job['row']): {'verbatim': 'no, that was the side job',
-                              'answer': {'decision': 'rejected', 'subject_key': 'label:' + testdata.JOB}},
-            str(photo['row']): {'verbatim': 'yes', 'answer': {'decision': 'confirmed'}},
-            str(acct['row']): {'verbatim': 'not sure', 'answer': {'decision': 'unsure'}},
-            str(paid['row']): {'verbatim': 'my business paid the painter',
-                               'answer': {'decision': 'confirmed', 'entity_key': 'owner_business:synthetic'}}})
-        label_link = next(ln['key'] for ln in self.files['links.jsonl']
-                          if ln['row'].get('subject_key') == 'label:' + testdata.JOB)
-        cand = next(t['key'] for t in photo['targets'] if t['kind'] == 'image_candidate')
-        dec = self.decide(d, sp, [
-            {'row': painter['row'], 'target_kind': 'evidence_link', 'targets': [self.truck_link(painter)],
-             'decision': 'rejected', 'reassign_vehicle': 'SUB'},
-            # "no, the side job": the job's own placement (the payment's slot) is confirmed, the truck's rejected
-            {'row': job['row'], 'target_kind': 'evidence_link', 'targets': [label_link], 'decision': 'confirmed'},
-            {'row': job['row'], 'target_kind': 'evidence_link', 'targets': [self.truck_link(job)], 'decision': 'rejected'},
-            {'row': photo['row'], 'target_kind': 'image_candidate', 'targets': [cand], 'decision': 'confirmed'}])
-        self.assertEqual(dec[0]['reassign_to'], 'link:pnl:disposition:R000000000206@%s' % testdata.V['SUB'][:8])
-        after = readers.extract_m5(readers.accounting(self.files, T, dec))
-        self.assertIn(pk('00206'), after['bands']['rejected'])
-        self.assertIn(pk('00737'), after['bands']['rejected'])
-        back = common.load_json(os.path.join(d, 'readback-2031-06-01.json'))       # file mode: a preview only
-        self.assertEqual(back[0]['reading'], 'no, it is synthetic second truck (SUB, %s)' % testdata.V['SUB'][:8])
-        self.assertEqual([e['row'] for e in back], [painter['row'], job['row'], job['row'], photo['row']])
-        refusals = [
-            ({'row': painter['row'], 'target_kind': 'evidence_link', 'targets': [self.truck_link(painter)],
-              'decision': 'confirmed'}, 'does not support'),             # his answer placed it elsewhere
-            ({'row': painter['row'], 'target_kind': 'evidence_link', 'targets': [self.truck_link(painter)],
-              'decision': 'rejected', 'reassign_vehicle': 'TWIN'}, 'reassign'),
-            ({'row': job['row'], 'target_kind': 'evidence_link', 'targets': [self.truck_link(job)],
-              'decision': 'confirmed'}, 'does not support'),
-            ({'row': job['row'], 'target_kind': 'evidence_link', 'targets': [self.truck_link(painter)],
-              'decision': 'rejected'}, 'not on row'),                    # another payment's link
-            ({'row': photo['row'], 'target_kind': 'evidence_link', 'targets': [self.truck_link(painter)],
-              'decision': 'confirmed'}, 'cannot decide'),                # the row asks about the photo
-            ({'row': photo['row'], 'target_kind': 'image_candidate', 'targets': [cand], 'decision': 'rejected'},
-             'does not support'),                                         # a bare yes decides only a yes
-            ({'row': acct['row'], 'target_kind': 'account_entity', 'decision': 'confirmed'}, 'nothing is decided'),
-            ({'row': paid['row'], 'target_kind': 'evidence_link', 'decision': 'confirmed'}, 'decides nothing'),
-            ({'row': 2, 'target_kind': 'album_map', 'decision': 'confirmed'}, 'no stored answer')]
-        for plan, why in refusals:
-            with self.assertRaises(SystemExit) as cm:
-                self.decide(d, sp, [plan])
-            self.assertIn(why, str(cm.exception))
-
-    def test_owner_statement_answers_a_who_paid_row(self):
-        d, sp, side = self.sheet('answers-statement')
-        paid = self.row(side, "'paint'")
-        dry = self.row(side, "'dry ice'")
-        painter = self.row(side, 'also places it on', pk('00206'))
-        self.deliver(sp)
-        self.store(sp, {str(paid['row']): {'verbatim': 'my business paid the painter',
-                                           'answer': {'decision': 'confirmed', 'entity_key': 'owner_business:synthetic'}},
-                        str(dry['row']): {'verbatim': 'no idea', 'answer': {'decision': 'unsure'}},
-                        str(painter['row']): {'verbatim': 'yes', 'answer': {'decision': 'confirmed'}}})
-        self.decide(d, sp, [{'row': paid['row'], 'owner_statement': {
-            'role': 'payment_out', 'payment_key': True, 'amount': ['jacket3', 'line:paint'], 'occurred_on': '2032-02-04',
-            'source_label': 'paint'}}])
-        st = common.read_jsonl(os.path.join(d, 'owner-statements-2031-06-01.jsonl'))[0]['row']
-        self.assertRegex(st['external_ref'], payloads.C['answer_ref_re'])
-        self.assertTrue(st['external_ref'].endswith('#%d' % paid['row']))
-        self.assertEqual(st['payment_key'], 'owner:' + st['external_ref'])
-        self.assertEqual((st['payer_entity'], st['vehicle_id']), ('owner_business:synthetic', T))   # the row's place
-        target = next(t['key'] for t in paid['targets'] if t['kind'] == 'evidence_link')
-        self.assertIn({'kind': 'answers_row_target', 'ref': target}, st['evidence'])
-        for plan, why in (({'row': painter['row'], 'owner_statement': {'amount': ['jacket3', 'line:paint']}},
-                           'does not ask who paid'),
-                          ({'row': dry['row'], 'owner_statement': {'amount': ['jacket3', 'line:dry_ice']}}, 'names nobody'),
-                          ({'row': paid['row'], 'owner_statement': {'role': 'payment_out'}}, 'pinned source')):
-            with self.assertRaises(SystemExit) as cm:
-                self.decide(d, sp, [plan])
-            self.assertIn(why, str(cm.exception))
+        with self.assertRaises(SystemExit) as cm:
+            record_answers.validate_answers(self.ctx, side, {str(photo['row']): {'verbatim': '  '}})
+        self.assertIn('no verbatim text', str(cm.exception))
 
     def test_second_reader_objection_and_asking_again(self):
         ledger = os.path.join(self.tmp, 'disputed-second.jsonl')
@@ -1413,21 +1471,26 @@ class Answers(SyntheticCase):
             d, sp, side = self.sheet('answers-second')
             painter = self.row(side, 'also places it on', pk('00206'))
             photo = next(r for r in side['rows'] if r['section'] == 'photos')
+            acct = next(r for r in side['rows'] if r['section'] == 'accounts')
             self.deliver(sp)
             rc = self.store(sp, {
                 str(painter['row']): {'verbatim': 'no, the second truck',
                                       'answer': {'decision': 'rejected', 'vehicle_id': 'SUB'}},
-                str(photo['row']): {'verbatim': 'yes', 'answer': {'decision': 'confirmed'}}})
+                str(photo['row']): {'verbatim': 'yes', 'answer': {'decision': 'confirmed'}},
+                str(acct['row']): {'verbatim': 'that account, hmm'}})
             rp = record_answers.receipt_path(sp, side)
             with contextlib.redirect_stdout(io.StringIO()):
                 record_answers.second_packet(mock.Mock(sheet=sp, answers=os.path.join(d, 'answers-in.json')), self.ctx)
             packet = common.load_json(os.path.join(d, 'second-read-2031-06-01.json'))
-            self.assertEqual([(e['row'], e['verbatim'], e['answer']) for e in packet],
-                             [(photo['row'], 'yes', None), (painter['row'], 'no, the second truck', None)])
+            self.assertEqual(sorted((e['row'], e['verbatim'], e['answer']) for e in packet),
+                             sorted([(photo['row'], 'yes', None), (painter['row'], 'no, the second truck', None),
+                                     (acct['row'], 'that account, hmm', None)]))
             sec = os.path.join(d, 'second.json')
             args = mock.Mock(sheet=sp, receipt=rp, second=sec)
+            # a row stored unread has no reading to check, whatever the second reader makes of it
             common.dump_json(sec, [{'row': photo['row'], 'answer': {'decision': 'confirmed'}},
-                                   {'row': painter['row'], 'answer': {'decision': 'rejected', 'vehicle_id': 'SUB'}}])
+                                   {'row': painter['row'], 'answer': {'decision': 'rejected', 'vehicle_id': 'SUB'}},
+                                   {'row': acct['row'], 'answer': {'decision': 'rejected'}}])
             with contextlib.redirect_stdout(io.StringIO()):
                 self.assertEqual(record_answers.second_compare(args, self.ctx), 0)
             self.assertEqual(manifest.disputed_runs(), [])
@@ -1436,7 +1499,7 @@ class Answers(SyntheticCase):
             with contextlib.redirect_stdout(io.StringIO()):
                 self.assertEqual(record_answers.second_compare(args, self.ctx), 1)
             run = record_answers.answers_run_of(rc)
-            self.assertEqual(manifest.disputed_runs(), [run])               # its agent rows leave M4a
+            self.assertEqual(manifest.disputed_runs(), [run])
             # the next sheet asks the disputed row again, until a delivered sheet has asked it
             _d2, sp2, side2 = self.sheet('answers-second-next', '2031-06-08')
             again = [r for r in side2['rows'] if r['section'] == 'asked again']
@@ -1446,9 +1509,9 @@ class Answers(SyntheticCase):
             _d3, _sp3, side3 = self.sheet('answers-second-later', '2031-06-15')
             self.assertFalse([r for r in side3['rows'] if r['section'] == 'asked again'])
             self.assertEqual(manifest.disputed_runs(), [run])
-            # his objection to a read-back line disputes the run the same way
+            # his objection to a stored reading disputes the run the same way
             with contextlib.redirect_stdout(io.StringIO()):
-                record_answers.dispute(mock.Mock(receipt=rp, row=photo['row'], message_ref='session-1:msg-7'), self.ctx)
+                record_answers.dispute(mock.Mock(receipt=rp, row=photo['row'], message_ref='Session-1:MSG-7'), self.ctx)
             last = manifest.disputed_rows()[-1]
             self.assertEqual((last['by'], last['row'], last['message_ref']), ('owner_objection', photo['row'],
                                                                               'session-1:msg-7'))
@@ -1456,78 +1519,71 @@ class Answers(SyntheticCase):
                 record_answers.dispute(mock.Mock(receipt=rp, row=photo['row'], message_ref='not a ref'), self.ctx)
 
     @mock.patch.dict(os.environ, {'EVIDENCE_DB_WRITES': '1'})
-    def test_db_results_are_reported_never_retried_and_read_back(self):
-        back = os.path.join(self.tmp, 'readback-db.jsonl')
+    def test_db_sheet_closes_once_when_sent_and_refusals_are_reported(self):
         idx = os.path.join(self.tmp, 'sheets-db.jsonl')
-        with mock.patch.dict(os.environ, {'EVIDENCE_READBACK': back, 'EVIDENCE_SHEETS_INDEX': idx}), \
+        with mock.patch.dict(os.environ, {'EVIDENCE_SHEETS_INDEX': idx}), \
                 mock.patch.object(common, 'today', lambda now=None: '2031-06-02'):
             d, sp, side = self.sheet('answers-db')
             side['sheet_run'] = testdata.U('sheet-run')
             common.dump_json(sp, side)
             painter = self.row(side, 'also places it on', pk('00206'))
             photo = next(r for r in side['rows'] if r['section'] == 'photos')
-            cand = next(t['key'] for t in photo['targets'] if t['kind'] == 'image_candidate')
-
-            def decided(args):
-                if args['p_target_kind'] == 'image_candidate':       # he decided the photo in the app after the sheet
-                    return {'items': [{'id': i, 'result': 'human_decision_newer'} for i in args['p_target_ids']]}
-                return {'items': [{'id': i, 'result': 'rejected', 'decision_id': testdata.U('decision', i),
-                                   'reassign_note': 'reassign_needs_review'} for i in args['p_target_ids']]}
-            fake = FakeRest(decide=decided)
-            ids = {t['key']: common.uuid5('id', t['key']) for r in (painter, photo) for t in r['targets']}
-            mp = os.path.join(d, 'load-manifest.json')
-            common.dump_json(mp, {'ids': ids})
+            fake = FakeRest()
             with mock.patch.object(common, 'Rest', lambda *a, **k: fake):
-                self.deliver(sp)
+                with self.assertRaises(SystemExit) as cm:            # (v8) a review run is closed by its delivery
+                    self.deliver(sp)
+                self.assertIn('--mode db', str(cm.exception))
+                self.deliver(sp, mode=common.DB)
+                self.deliver(sp, mode=common.DB)                     # the same message again closes nothing
                 rc = self.store(sp, {str(painter['row']): {'verbatim': 'the second truck',
                                                            'answer': {'decision': 'rejected', 'vehicle_id': 'SUB'}},
-                                     str(photo['row']): {'verbatim': 'yes', 'answer': {'decision': 'confirmed'}}},
-                                common.DB)
-                out = self.decide(d, sp, [
-                    {'row': painter['row'], 'target_kind': 'evidence_link', 'targets': [self.truck_link(painter)],
-                     'decision': 'rejected', 'reassign_vehicle': 'SUB'},
-                    {'row': photo['row'], 'target_kind': 'image_candidate', 'targets': [cand], 'decision': 'confirmed'}],
-                    common.DB, mp)
-            calls = [a for fn, a in fake.calls if fn == 'decide_evidence']
-            self.assertEqual(len(calls), 2)                                  # one call per plan line, never retried
-            self.assertEqual(calls[0]['p_answer_ref'], 'answers:%s#%d' % (rc['answers_run'], painter['row']))
-            self.assertEqual(calls[0]['p_review_ref'], 'review:%s#%d' % (side['sheet_run'], painter['row']))
-            self.assertEqual(calls[0]['p_reassign_vehicle_id'], testdata.V['SUB'])
-            self.assertEqual(calls[1]['p_expected'], {ids[cand]: T})
-            self.assertEqual(out[1]['result']['items'][0]['result'], 'human_decision_newer')
-            rec = [a for fn, a in fake.calls if fn == 'evidence_record_answers'][0]
-            self.assertEqual(rec['p_message_ref'], 'session-1:msg-1')
-            self.assertEqual(rec['p_rows'][str(painter['row'])]['answer'], {'decision': 'rejected',
-                                                                             'vehicle_id': testdata.V['SUB']})
+                                     str(photo['row']): {'verbatim': 'not sure which one that is'}}, common.DB)
+            self.assertEqual([fn for fn, _a in fake.calls], ['evidence_close_run', 'evidence_record_answers'])
+            close, rec = fake.calls[0][1], fake.calls[1][1]
+            self.assertEqual((close['p_run_id'], close['p_status'], close['p_counts']),
+                             (side['sheet_run'], 'done', {'items': side['items'], 'sent': True}))
+            self.assertEqual((rec['p_user_id'], rec['p_sheet_run'], rec['p_message_ref']),
+                             (testdata.OWNER, side['sheet_run'], 'session-1:msg-1'))
+            self.assertEqual(rec['p_rows'], {
+                str(painter['row']): {'verbatim': 'the second truck',
+                                      'answer': {'decision': 'rejected', 'vehicle_id': testdata.V['SUB']}},
+                str(photo['row']): {'verbatim': 'not sure which one that is'}})     # the writer marks it unread
+            self.assertEqual(rc['answers_run'], '00000000-0000-4000-8000-%012d' % 1)
             self.assertEqual(review_sheet.load_index()[side['sheet_run']]['delivered_ref'], 'session-1:msg-0')
-            lines = manifest.readback_entries()
-            self.assertEqual([(e['row'], e['results']) for e in lines], [
-                (painter['row'], {'rejected': 1, 'reassign_needs_review': 1}), (photo['row'], {'human_decision_newer': 1})])
-            self.assertEqual([e['answer_ref'] for e in lines], [c['p_answer_ref'] for c in calls])
-            self.assertEqual(manifest.check_readback([{'id': 'x', 'review_ref': c['p_review_ref'],
-                                                       'answer_ref': c['p_answer_ref']} for c in calls], lines)
-                             ['not_read_back'], 0)
-            # the next sheet reads the week's decisions back to him, with what the store did
-            _d2, _sp2, side2 = self.sheet('answers-db-next', '2031-06-03')
-            md = Path(side2['sheet']).read_text()
-            self.assertIn('What I recorded from your earlier answers', md)
-            self.assertIn('your own later decision in the app stands', md)
-            self.assertIn('not moved to the truck you named', md)
-            self.assertNotIn('the second truck', md)                       # his words stay out; the reading is shown
-            self.assertEqual(len(side2['read_back']), 2)
+            # a run the store no longer holds running is reported and the delivery recorded; any other refusal stops it
+            _d2, sp2, _side2 = self.sheet('answers-db-closed', '2031-06-03')
+            side2 = dict(common.load_json(sp2), sheet_run=testdata.U('sheet-run-closed'))
+            common.dump_json(sp2, side2)
+            for err, recorded in ((common.RpcError('evidence_close_run', 400, '42501', 'permission denied'), False),
+                                  (common.RpcError('evidence_close_run', 400, 'P0001',
+                                                   'run %s is not a running run' % side2['sheet_run']), True)):
+                with mock.patch.object(common, 'Rest', lambda *a, **k: FakeRest(fail={'evidence_close_run': err})):
+                    if recorded:
+                        self.deliver(sp2, 'session-1:msg-3', common.DB)
+                    else:
+                        with self.assertRaises(common.RpcError):
+                            self.deliver(sp2, 'session-1:msg-3', common.DB)
+                self.assertEqual(bool(common.load_json(sp2).get('delivery')), recorded)
             # the store refuses a second transcription of a sheet or a message: reported, not retried
             d4, sp4, _side4 = self.sheet('answers-db-dup', '2031-06-04')
             side4 = dict(common.load_json(sp4), sheet_run=testdata.U('sheet-run-2'))
             common.dump_json(sp4, side4)
             dup = FakeRest(fail={'evidence_record_answers': common.RpcError(
-                'evidence_record_answers', 409, '23505', 'message session-1:msg-3 is already transcribed')})
+                'evidence_record_answers', 409, '23505', 'message session-1:msg-5 is already transcribed')})
             with mock.patch.object(common, 'Rest', lambda *a, **k: dup):
-                self.deliver(sp4, 'session-1:msg-2')
+                self.deliver(sp4, 'session-1:msg-4', common.DB)
                 with self.assertRaises(SystemExit) as cm:
                     self.store(sp4, {str(painter['row']): {'verbatim': 'yes', 'answer': {'decision': 'confirmed'}}},
-                               common.DB, 'session-1:msg-3')
+                               common.DB, 'session-1:msg-5')
             self.assertIn('already holds answers', str(cm.exception))
+            self.assertEqual([fn for fn, _a in dup.calls], ['evidence_close_run', 'evidence_record_answers'])
             self.assertFalse(os.path.exists(record_answers.receipt_path(sp4, side4)))
+            # a db sheet's answers need its review run; a file-mode sheet has none
+            _d5, sp5, _side5 = self.sheet('answers-db-file-sheet', '2031-06-05')
+            self.deliver(sp5, 'session-1:msg-6')
+            with mock.patch.object(common, 'Rest', lambda *a, **k: FakeRest()), self.assertRaises(SystemExit) as cm:
+                self.store(sp5, {str(painter['row']): {'verbatim': 'yes'}}, common.DB, 'session-1:msg-7')
+            self.assertIn('no review run', str(cm.exception))
 
 
 class Transcript(SyntheticCase):
@@ -1618,7 +1674,8 @@ class ReadPath(unittest.TestCase):
         # (v6, RU6) a reader names the user whose evidence it reads: the store raises without one, the runner refuses first
         for sql, params in (('select public.vehicle_accounting_evidence(:v, NULL, NULL, NULL) x', {'v': T}),
                             ('select * from public.evidence_revert_watch(:uid)', {'uid': None}),
-                            ('select public.evidence_custody(array[:v]::uuid[], :uid)', {'v': T, 'uid': 'someone'})):
+                            ('select public.evidence_custody(array[:v]::uuid[], :uid)', {'v': T, 'uid': 'someone'}),
+                            ('select count(*) n from public.evidence_answers_to_confirm()', {})):
             with self.assertRaises(common.ReadError):
                 r.read(sql, params)
         self.assertEqual(r.read('select public.vehicle_accounting_evidence(:v, NULL, NULL, :uid) x',
@@ -1641,22 +1698,29 @@ class ReadPath(unittest.TestCase):
         st = scoreboard.parse()
         names = {n: (m, s) for n, m, s in st}
         for m in ('M1', 'M2', 'M3', 'M4', 'M4a', 'M5', 'M6', 'M7', 'M8', 'M9', 'M10_channels', 'M10_guards',
-                  'M10_stamps', 'M10_integrity', 'M10_frameless', 'M10b', 'M10b_answers', 'M10b_readback', 'M11', 'M12',
-                  'M13', 'M13_open_proposals', 'M14_accounts', 'M14'):
+                  'M10_stamps', 'M10_step_up', 'M10_integrity', 'M10_frameless', 'M10b', 'M10b_answers', 'M11', 'M12',
+                  'M13', 'M13_open_proposals', 'M14_accounts', 'M14', 'M15'):
             self.assertIn(m, names)
         self.assertEqual(names['M1'][0], 'chunked')
-        self.assertEqual((names['M10b'][0], names['M10b_answers'][0], names['M10b_readback'][0]),
-                         ('manifest', 'answers', 'readback'))
+        self.assertEqual((names['M10b'][0], names['M10b_answers'][0]), ('manifest', 'answers'))
+        self.assertNotIn('M10b_readback', names)                       # (v8) no agent decision to read back
         self.assertIn('vehicle_accounting_evidence(:vehicle_id, NULL, NULL, :uid)', names['M5'][1])
         self.assertIn("x->>'to_account_ref', x->>'payer', x->>'payee'", names['M5'][1])
-        # (v6) every read names the owner; M4a leaves out disputed answers runs; the stamps count v6's two gaps
+        # (v6) every read names the owner
         self.assertIn("evidence_status('image_candidate', c.id, :uid)", names['M2'][1])
         for n, (_m, s) in names.items():
             if common.READER_CALL.search(s.lower()):
                 self.assertIn(':uid', s, n)
-        self.assertIn('<> all(:disputed)', names['M4a'][1])
-        self.assertIn('human_without_step_up_record', names['M10_stamps'][1])
-        self.assertIn('agent_without_question', names['M10_stamps'][1])
+        # (v8) no job decides: M4a is transcription accuracy, the stamps expect no agent row and no service_role
+        # EXECUTE on decide_evidence, M10b leaves his rows to the request log, M15 reads what waits for him
+        self.assertIn("detail->'stored_reading'", names['M4a'][1])
+        self.assertNotIn(':disputed', Path(scoreboard.SQL_FILE).read_text())
+        for col in ('human_not_owner_session', 'agent_rows', 'job_owner_days', 'statements_without_him', 'svc_can_decide'):
+            self.assertIn(col, names['M10_stamps'][1])
+        self.assertIn("has_function_privilege('service_role'", names['M10_stamps'][1])
+        self.assertIn('human_without_step_up_record', names['M10_step_up'][1])
+        self.assertIn("created_by not like 'human:%'", names['M10b'][1])
+        self.assertIn('evidence_answers_to_confirm(:uid)', names['M15'][1])
         self.assertIn('closed_accounts', names['M14_accounts'][1])
         out = io.StringIO()
         scoreboard.run(None, testdata.OWNER, T, st, dry_run=True, printer=lambda s: out.write(s))
@@ -1680,27 +1744,34 @@ class ReadPath(unittest.TestCase):
         class R:
             def read(self, sql, params=None, tag=None):
                 if tag == 'M10b':
-                    return [{'t': 'evidence_runs', 'x': [u('run')]},
-                            {'t': 'evidence_links', 'x': json.dumps([u('l1'), u('l9')])},
-                            {'t': 'vehicle_change_claim_support', 'x': {}},
-                            {'t': 'evidence_decisions', 'x': []}]
+                    return [{'t': 'evidence_runs', 'x': [u('run')], 'h': 0},
+                            {'t': 'evidence_links', 'x': json.dumps([u('l1'), u('l9')]), 'h': 2},
+                            {'t': 'vehicle_change_claim_support', 'x': {}, 'h': '1'},
+                            {'t': 'evidence_decisions', 'h': 0, 'x': [
+                                {'id': u('d1'), 'by': 'human:' + testdata.OWNER, 'decision': 'confirmed'},
+                                {'id': u('d2'), 'by': 'implied:' + u('d1'), 'decision': 'rejected'},
+                                {'id': u('d3'), 'by': 'agent:lead-session-1', 'decision': 'confirmed'}]}]
                 if tag == 'M10_integrity':
                     return [{'always_on': 26, 'total': 27, 'md5s': {'propose_evidence_links': 'a' * 32}}]
                 return []
         out = scoreboard.run(R(), testdata.OWNER, T, only=['M10b', 'M10_integrity'], manifest_dir=d,
                              since=common.iso_utc(now), deployed_md5s={'propose_evidence_links': 'b' * 32})
-        self.assertEqual((out['M10b']['unmanifested'], out['M10b']['examples']), (1, {'evidence_links': [u('l9')]}))
-        self.assertEqual(scoreboard.scalar(out['M10b']), 1)
+        # (v8) an agent decision is never the runner's: unmanifested; his decisions and his rows go to the request log
+        self.assertEqual((out['M10b']['unmanifested'], out['M10b']['examples']),
+                         (2, {'evidence_links': [u('l9')], 'evidence_decisions': [u('d3')]}))
+        self.assertEqual((out['M10b']['human_decisions_to_match_request_log'], out['M10b']['implied_by_his_decisions'],
+                          out['M10b']['his_rows_to_match_his_decisions']), (1, 1, 3))
+        self.assertEqual(scoreboard.scalar(out['M10b']), 2)
         self.assertEqual(out['M10_integrity']['drifted'], ['propose_evidence_links'])
         self.assertIn('guard triggers', scoreboard.integrity_failed(out['M10_integrity']))
         self.assertIsNone(scoreboard.integrity_failed({'always_on': 27, 'total': 27, 'drifted': []}))
 
-    def test_m10b_answers_readback_and_m4a_through_the_scoreboard(self):
-        """(v6, AC10) M10b items 5 and 6 and the M4a exclusion, against a synthetic transcript and local records."""
+    def test_m10b_answers_m15_and_m4a_through_the_scoreboard(self):
+        """(v6, AC10) M10b item 5 against a synthetic transcript and local records; (v8) M15 and M4a as read."""
         d = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, d, True)
         u = testdata.U
-        idx, back, root = os.path.join(d, 'sheets.jsonl'), os.path.join(d, 'readback.jsonl'), os.path.join(d, 'tx')
+        idx, root = os.path.join(d, 'sheets.jsonl'), os.path.join(d, 'tx')
         sheet_run, run_a, run_b = u('sheet'), u('answers-a'), u('answers-b')
         review_sheet.append_index({'event': 'issued', 'sheet_run': sheet_run, 'sidecar': '/x/review-2031-06-01.json',
                                    'sheet_sha256': common.sha256_text('the sheet')}, idx)
@@ -1709,8 +1780,8 @@ class ReadPath(unittest.TestCase):
         Path(root, 'project', 'sess-x.jsonl').write_text(''.join(json.dumps(e) + '\n' for e in (
             {'uuid': 'm1', 'message': {'role': 'assistant', 'content': [{'type': 'text', 'text': 'the sheet'}]}},
             {'uuid': 'm2', 'message': {'role': 'user', 'content': '1. yes'}})))
-        manifest.append_readback({'review_ref': 'review:%s#1' % sheet_run, 'answer_ref': 'answers:%s#1' % run_a}, back)
         seen = {}
+        his = []
 
         class R:
             def read(self, sql, params=None, tag=None):
@@ -1720,18 +1791,26 @@ class ReadPath(unittest.TestCase):
                              'rows': json.dumps({'1': {'verbatim': 'yes'}})},
                             {'id': run_b, 'sheet_run': sheet_run, 'message_ref': 'sess-x:m1',
                              'rows': {'1': {'verbatim': 'no'}}}]          # the delivery itself, cited as his reply
-                if tag == 'M10b_readback':
-                    return [{'id': u('d1'), 'review_ref': 'review:%s#1' % sheet_run, 'answer_ref': 'answers:%s#1' % run_a},
-                            {'id': u('d2'), 'review_ref': 'review:%s#2' % sheet_run, 'answer_ref': 'answers:%s#2' % run_a}]
+                if tag == 'M15':
+                    return [{'waiting': 3, 'rewritten_ask_again': 1, 'his_decisions': len(his)}]
+                if tag == 'M4a':
+                    return [{'agrees_on_yes_no': True, 'named_place': None, 'n': len(his)}] if his else []
                 return []
-        out = scoreboard.run(R(), testdata.OWNER, T, only=['M10b_answers', 'M10b_readback', 'M4a'],
-                             disputed=[u('answers-c'), 'not-a-uuid'], sheets=idx, transcripts=[root], readback=back)
+        out = scoreboard.run(R(), testdata.OWNER, T, only=['M10b_answers', 'M15', 'M4a'], sheets=idx,
+                             transcripts=[root])
         a = out['M10b_answers']
         self.assertEqual((a['checked'], [(p['answers_run'], p['sheet']) for p in a['problems']]),
                          (2, [(run_b, '/x/review-2031-06-01.json')]))
-        self.assertEqual(out['M10b_readback'], {'agent_decisions_7d': 2, 'not_read_back': 1, 'examples': [u('d2')]})
-        self.assertEqual((scoreboard.scalar(a), scoreboard.scalar(out['M10b_readback'])), (1, 1))
-        self.assertEqual(seen['M4a']['disputed'], [u('answers-c')])
+        self.assertEqual(scoreboard.scalar(a), 1)
+        # (v8) his answers wait for him: the confirmed level reads "waiting on his app" until he decides
+        self.assertEqual(out['M15'], {'waiting': 3, 'rewritten_ask_again': 1, 'his_decisions': 0,
+                                      'confirmed_level': 'waiting on his app'})
+        self.assertEqual((scoreboard.scalar(out['M15']), out['M4a']), (3, {'rows': []}))
+        self.assertEqual((seen['M15']['uid'], seen['M4a']['uid']), (testdata.OWNER, testdata.OWNER))
+        his.append('a decision of his')
+        out2 = scoreboard.run(R(), testdata.OWNER, T, only=['M15', 'M4a'])
+        self.assertEqual(out2['M15']['confirmed_level'], 'his decisions recorded')
+        self.assertEqual(out2['M4a']['rows'], [{'agrees_on_yes_no': True, 'named_place': None, 'n': 1}])
         # the failing run is disputed once (the next sheet asks its rows again), however often the scoreboard runs
         with mock.patch.dict(os.environ, {'EVIDENCE_DISPUTED': os.path.join(d, 'disputed.jsonl')}):
             self.assertEqual([scoreboard.dispute_failed_answers(out) for _i in range(2)], [1, 0])

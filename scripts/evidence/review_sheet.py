@@ -1,27 +1,30 @@
 """Review sheet (PLAN pilot step 4, section 5 step 7): one batched owner review, one question per numbered row.
 
-(v5, v6 AC1-AC4, AC9) Each numbered row asks ONE question, in one dimension, and names its targets, which the review
-run stores (config.rows.<n>: targets, question, asks) so an answer decides only what its row asked:
+(v5, v6 AC1-AC4) Each numbered row asks ONE question, in one dimension, and names its targets, which the review run
+stores (config.rows.<n>: targets, question, asks), so his answer is stored against the question it answers:
   album        "Is the album 'X' the truck A?"               the album link                 yes / no / no, it is <truck>
   identity     "Is A the same truck as B?"                    the pair claim                 yes / no
   photo        "Does this photo show A?"                      the candidate and its image    yes / no / no, it is <truck>
   money        "Was payment P A's?"                           P and P's unallocated links    yes / no / no, it was <truck>
                "Is <source> right that P was not A's?"        the contradicting link and P   yes / no
                "Was money in P for A?"                        P and its links on A           yes / no / no, it was <truck>
-  who paid     "Who paid <the line or the purchase>?"         one placement link or claim    <me / business / party>
-               (asks: party; it decides nothing, an owner statement answers it; a document line that supports a
-               purchase or sale the case already asks "who paid" about is not asked twice)
+  who paid     "Who paid <the line or the purchase>?"         one link or one claim          <me / business / party>
+               (asks: party; (v8) only money no payment source carries, a jacket line or an order with no bank line,
+               or the acquisition / sale claim: a payment with a source line is the account's row; a document line
+               that supports a purchase or sale the case already asks "who paid" about is not asked twice)
   dates        "Is the <kind> claim right?"                   the claim                      yes / no
   accounts     "Is account X E's?"                            the map row and the account    yes / no, it is <entity>
 The row profile the writer derives (question, asks, asked_place, frame, link_class and the places, images, keys and
 accounts it covers; evidence_sheet_row) is computed here too, so record_answers.py can check a reading before it is
-stored. A row in several places (asked_place 'multi') or of mixed frames or money classes takes only a bare yes or no.
-Questions that decide no evidence row (spend, the writers, the Photos order; "is account X closed, or is an export
-missing?" for a lagging money source) are listed apart as lettered decisions, answered in OWNER-DECISIONS.
+stored. A row in several places (asked_place 'multi') or of mixed frames or money classes takes only a bare yes or no;
+(v7, D6) a row whose own targets place nothing asks about place 'none' (yes, no, or "no, it is Y"). Questions that
+decide no evidence row (spend, the writers, the Photos order; "is account X closed, or is an export missing?" for a
+lagging money source; "is there an export of account X?" for an account no statement covers) are listed apart as
+lettered decisions, answered in OWNER-DECISIONS.
 
-(v6, AC10) The sheet opens by reading back what the agent recorded from his answers in the last 7 days (the read-back
-list loop/readback.jsonl, appended by record_answers.py decide), so an objection reaches the next sheet; a row whose
-reading was disputed (loop/disputed.jsonl) is asked again until a delivered sheet has asked it.
+(v8) His answers decide nothing: record_answers.py stores them word for word and he confirms them himself in the app.
+A row whose stored reading a second reader, the transcript check or his objection disputed (loop/disputed.jsonl) is
+asked again until a delivered sheet has asked it.
 
 Photos: one row per image. A thumbnail only for an image the phone's VisionEngine approved (vision_gate_status
 'approved'); any other image is listed by id, "review in the app". Thumbnails are local paths (the case's
@@ -29,17 +32,16 @@ review.thumbnails_dir/<image id>.jpg); no URL is embedded. No amounts and no per
 
 The sheet is review-<date>.md with a sidecar review-<date>.json (rows with targets and profiles, decisions); its sha256
 and row count are over the .md bytes. In db mode the review run (evidence_open_run run_kind 'review', pass
-'review_sheet', config {sheet_sha256, items, sheet, rows}) is opened and closed before anything is sent, target ids come
+'review_sheet', config {sheet_sha256, items, sheet, rows}) is opened (running) before anything is sent, target ids come
 from the loader manifest (line key -> id), a row whose targets did not all load is left off the sheet, and the sheet is
 appended to the sheets index (loop/sheets.jsonl) that M10b reads. Send the .md text as the message, then record that
-message with `record_answers.py delivered`.
+message with `record_answers.py delivered`, which (v8) closes the review run once: the sheet is sent.
 
 Usage: python3 scripts/evidence/review_sheet.py --dir <payload dir> --case <case.json> [--mode file|db]
        [--manifest load-manifest.json] [--user <owner>]
 """
 import argparse
 import collections
-import datetime as dt
 import json
 import os
 import string
@@ -51,16 +53,6 @@ import payloads
 import readers
 
 KEY_KINDS = ('payment', 'source', 'account')
-READBACK_DAYS = 7
-# results the writer reported and never retried, as the read-back says them (PLAN section 1, runner notes 7/8)
-READBACK_NOTES = {
-    'human_decision_newer': 'not recorded: your own later decision in the app stands',
-    'human_decision_stands': 'not recorded: your own decision in the app stands',
-    'not_current': 'not recorded: the item was replaced after the sheet was made',
-    'changed_since_review': 'not recorded: the photo moved after the sheet was made',
-    'reassign_needs_review': 'not moved to the truck you named: review it in the app',
-    'reassign_not_a_placement': 'not moved to the truck you named: a share or a contradiction stays where it is',
-    'owner_answer_missing': 'your statement was not recorded: the store found no answer of yours it could cite'}
 
 
 def label(ctx, vid):
@@ -134,6 +126,7 @@ def profile(row, lines):
     q = payloads.row_question(row)
     places, frames, classes, claim_kinds = set(), set(), set(), set()
     images, pkeys, skeys, accts = set(), set(), set(), set()
+    own = 0
     for t in row['targets']:
         if t['kind'] == 'image':
             images.add(t['key'])
@@ -143,10 +136,18 @@ def profile(row, lines):
             skeys.add(t['key'])
         elif t['kind'] == 'account':
             accts.add(t['key'])
+        elif t['kind'] == q == 'image_publication':
+            own += 1                                     # a photo: no place of its own
+            images.add(t['key'])
         elif t['kind'] == q:
-            p = target_profile(q, lines.get(t['key']))
-            for s, k in ((places, 'place'), (frames, 'frame'), (classes, 'link_class'), (images, 'image'),
-                         (pkeys, 'payment_key'), (skeys, 'source_key'), (accts, 'account'), (claim_kinds, 'claim_kind')):
+            ln = lines.get(t['key'])
+            if ln is None:
+                continue                                 # an id that names nothing of his covers only itself
+            own += 1
+            p = target_profile(q, ln)
+            places.add(p.get('place') or 'none')         # (v7, D6) a target that places nothing
+            for s, k in ((frames, 'frame'), (classes, 'link_class'), (images, 'image'), (pkeys, 'payment_key'),
+                         (skeys, 'source_key'), (accts, 'account'), (claim_kinds, 'claim_kind')):
                 if p.get(k):
                     s.add(p[k])
     asks = row.get('asks', 'place')
@@ -159,10 +160,14 @@ def profile(row, lines):
     if q == 'evidence_link':
         link = 'placement' if not classes else (next(iter(classes)) if len(classes) == 1 else 'mixed')
     asked = None if not places else (next(iter(places)) if len(places) == 1 else 'multi')
-    if asks == 'party' and (asked in (None, 'multi') or not (
+    if asks == 'party' and (asked in (None, 'multi', 'none') or own != 1 or len(row['targets']) != 1 or not (
             (q == 'evidence_link' and link == 'placement') or
             (q == 'change_claim' and len(claim_kinds) == 1 and claim_kinds <= {'acquisition', 'sale'}))):
         raise ValueError('a who-paid row asks about one placement of money or one acquisition or sale, in one place')
+    if asks == 'party' and q == 'evidence_link' and pkeys:
+        # (v8) money with a payment source gets its payer from the account map: ask the account's row instead
+        raise ValueError('this money has a payment source (%s): ask whose account paid it (an account row), not who '
+                         'paid' % ', '.join(sorted(pkeys)))
     return {'question': q, 'asks': asks, 'asked_place': asked, 'frame': frame, 'link_class': link,
             'places': sorted(places), 'images': sorted(images), 'payment_keys': sorted(pkeys),
             'source_keys': sorted(skeys), 'accounts': sorted(accts)}
@@ -276,12 +281,17 @@ def build_rows(ctx, files, read):
             decision('Account %s: its statements stop at %s while your newest export runs to %s. Is the account closed, '
                      'or is an export missing?' % (q['account_ref'], q.get('coverage_to'), q.get('newest_coverage')),
                      'closed / I will add the export')
+        elif q['q'] == 'money_source_missing':
+            # (v7, F7a) an account his records name that no export covers
+            decision('Account %s: your records name it, but no statement of it has been read. Is there an export to '
+                     'add?' % q['account_ref'], 'yes, I will add it / no, there is none')
     for ln in files.get('account_entities.jsonl', []):
         r = ln['row']
         add('accounts', "Account %s: is it %s's? If not, whose is it: yours, one of your businesses' (name it), or "
             "another party's (name it)?" % (r['account_ref'], r['entity_key']),
             [T('account_entity', ln['key']), T('account', r['account_ref'])], 'yes / no, it is <entity>')
-    # (v6, AC10) a row whose reading a second reader, the transcript check or his objection disputed is asked again
+    # (v6, AC10) a row whose stored reading a second reader, the transcript check or his objection disputed is asked
+    # again
     for old, ref in reask(lines):
         add('asked again', old['question_text'], old['targets'], old.get('answer_hint'), old.get('asks', 'place'),
             question=old.get('question'), frame=old.get('frame'))
@@ -313,26 +323,6 @@ def reask(lines):
                 out.append((dict(old, targets=[{k: v for k, v in t.items() if k != 'id'} for t in old['targets']]),
                             {'sheet': e['sheet'], 'row': n}))
     return out
-
-
-def reading_words(answer, ctx=None):
-    """His structured reading in plain words, for the read-back (a truck by its label when the case names it)."""
-    d = answer.get('decision')
-    if d == 'unsure':
-        return 'not sure'
-    place = (label(ctx, answer['vehicle_id']) if ctx and answer.get('vehicle_id') else answer.get('vehicle_id')) or \
-        answer.get('subject_key') or answer.get('entity_key') or answer.get('captured_on')
-    if not place:
-        return 'yes' if d == 'confirmed' else 'no'
-    return ('yes, %s' if d == 'confirmed' else 'no, it is %s') % place
-
-
-def readback(date, days=READBACK_DAYS, path=None):
-    """What the agent recorded from his answers in the week before this sheet (the read-back list, loop/readback.jsonl,
-    appended by record_answers.py decide when it records a decision)."""
-    import manifest
-    since = (dt.date.fromisoformat(date) - dt.timedelta(days=days)).isoformat()
-    return [e for e in manifest.readback_entries(path) if since <= (e.get('recorded_on') or '') < date]
 
 
 def run_target(t, ids):
@@ -374,18 +364,11 @@ def run_config(rows, sha, sheet_name, ids):
             'rows': {str(r['row']): run_row(r, ids) for r in rows}}
 
 
-def render(ctx, rows, date, decisions=(), read_back=()):
+def render(ctx, rows, date, decisions=()):
     out = ['# Owner review %s (%s)' % (date, ctx.case.get('case')), '',
-           'One answer per numbered row: yes, no, or the one truck, account or party it asks about. Answers are stored '
-           'word for word before any decision cites them. Tax or legal characterisation is never asked here.', '']
-    if read_back:
-        out += ['## What I recorded from your earlier answers (tell me if any is wrong)', '']
-        for e in read_back:
-            notes = [READBACK_NOTES[k] for k in sorted(e.get('results') or {}) if k in READBACK_NOTES]
-            out.append('- Sheet %s row %s (%s): I read "%s" and recorded %s.%s' % (
-                e.get('sheet_date'), e.get('row'), e.get('question_kind'), e.get('reading'), e.get('recorded'),
-                ''.join(' (%s)' % n for n in notes)))
-        out.append('')
+           'One answer per numbered row: yes, no, or the one truck, account or party it asks about. Your words are '
+           'stored as you write them and decide nothing: you confirm each one yourself in the app. Tax or legal '
+           'characterisation is never asked here.', '']
     section = None
     for r in rows:
         if r['section'] != section:
@@ -406,25 +389,23 @@ def render(ctx, rows, date, decisions=(), read_back=()):
 
 
 def issue(ctx, rows, decisions, date, out_dir, mode=common.FILE, rest=None, uid=None, ids=None, index=None):
-    """Write the sheet and its sidecar; in db mode open and close its review run with the per-row targets first and
-    append the sheet to the sheets index (M10b matches its delivery by sha256)."""
+    """Write the sheet and its sidecar; in db mode open its review run (running) with the per-row targets first and
+    append the sheet to the sheets index (M10b matches its delivery by sha256). (v8) The run is closed once, when the
+    sheet is sent: record_answers.py delivered."""
     left = []
     if mode == common.DB:
         rows, left = resolve(rows, ids or {})
-    back = readback(date)
-    md = render(ctx, rows, date, decisions, back)
+    md = render(ctx, rows, date, decisions)
     md_path = os.path.join(str(out_dir), 'review-%s.md' % date)
     with open(md_path, 'w', encoding='utf-8') as f:
         f.write(md)
     sha = common.sha256_bytes(md.encode('utf-8'))
     side = {'sheet': md_path, 'sheet_sha256': sha, 'items': len(rows), 'date': date, 'sheet_run': None, 'rows': rows,
-            'decisions': list(decisions), 'read_back': back, 'left_off_not_loaded': left, 'delivery': None}
+            'decisions': list(decisions), 'left_off_not_loaded': left, 'delivery': None}
     if mode == common.DB and rows:
         side['sheet_run'] = rest.rpc('evidence_open_run', payloads.open_run(
             uid, 'review', 'review_sheet', common.producer('review_sheet.py'), common.code_version(),
             run_config(rows, sha, os.path.basename(md_path), ids or {})))
-        # the sheet is issued as stored: close its run (answers cite it by id; its status does not gate them)
-        rest.rpc('evidence_close_run', payloads.close_run(side['sheet_run'], 'done', {'items': len(rows)}))
         append_index({'event': 'issued', 'sheet_run': side['sheet_run'], 'sheet_sha256': sha,
                       'sidecar': os.path.join(str(out_dir), 'review-%s.json' % date)}, index)
     common.dump_json(os.path.join(str(out_dir), 'review-%s.json' % date), side)
@@ -475,9 +456,9 @@ def main():
         rest, uid = common.Rest(), common.owner_id(a.user)
         ids = (common.load_json(a.manifest or os.path.join(a.dir, 'load-manifest.json')).get('ids') or {})
     side = issue(ctx, rows, decisions, date, a.dir, a.mode, rest, uid, ids)
-    print('review sheet %s: %d rows (%d left off: not loaded), %d decisions, %d read back, sha256 %s, run %s' % (
-        side['sheet'], side['items'], len(side['left_off_not_loaded']), len(decisions), len(side['read_back']),
-        side['sheet_sha256'], side['sheet_run'] or '(file mode)'))
+    print('review sheet %s: %d rows (%d left off: not loaded), %d decisions, sha256 %s, run %s' % (
+        side['sheet'], side['items'], len(side['left_off_not_loaded']), len(decisions), side['sheet_sha256'],
+        side['sheet_run'] or '(file mode)'))
     return 0
 
 

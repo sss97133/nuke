@@ -9,13 +9,16 @@ fall back to their pre-store form (taken_at alone, as the 2026-10-20 baseline me
 script refuses to run if another scoreboard statement is already active (db-safety: duplicate heavy reads).
 
 (v5) M5 reads vehicle_accounting_evidence keyed by the owner. M10_integrity compares the guard and writer bodies with
-loop/deployed_md5s.json ({name: md5}, from the PR's post-deploy output). M10b matches every evidence row created in
-the last --m10b-hours against the runner's manifest of returned ids (manifest.py): `unmanifested` > 0 halts
-promotion; owner decisions are counted for the lead to match against the API request log.
-(v6, AC10) M10b_answers checks each answers run against the chat transcript (the sheet's delivery by sha256, his reply
-after it, his verbatim words in the reply; transcript.py) and marks a failing run disputed; M4a leaves out agent rows
-of disputed runs (loop/disputed.jsonl, written by record_answers.py second-read and dispute too); M10b_readback checks
-that every agent decision of the week is on the read-back list the next sheet reads to him (loop/readback.jsonl).
+loop/deployed_md5s.json ({name: md5}, from the PR's post-deploy output). M10b matches every evidence row a job created
+in the last --m10b-hours against the runner's manifest of returned ids (manifest.py): `unmanifested` > 0 halts
+promotion; his decisions and the rows they write are counted for the lead to match against the API request log.
+(v6, AC10; v8) M10b_answers checks each answers run against the chat transcript (the sheet's delivery by sha256, his
+reply after it, his verbatim words in the reply; transcript.py) and marks a failing run disputed (loop/disputed.jsonl;
+the next sheet asks its rows again).
+(v8) No job decides. M4a is transcription accuracy (his decision against the stored reading it cites); M10_stamps
+expects no agent row, no job-written owner day, no owner statement without his decision and no service_role EXECUTE
+on decide_evidence; M15 counts his stored answers waiting for him in the app (evidence_answers_to_confirm) and reports
+the confirmed level as "waiting on his app" until his decisions exist.
 
 The owner id comes from --user / EVIDENCE_OWNER_ID / the loop config and appears in no output (params show '<uid>').
 
@@ -41,12 +44,12 @@ WINDOW = ('2024-01-01', '2026-01-01')
 
 
 def parse(path=SQL_FILE):
-    """-> [(name, mode, sql)], mode in ('', 'chunked', 'ids', 'manifest', 'answers', 'readback')."""
+    """-> [(name, mode, sql)], mode in ('', 'chunked', 'ids', 'manifest', 'answers')."""
     out, cur, name, mode = [], [], None, ''
     with open(path, encoding='utf-8') as f:
         text = f.read()
     for ln in text.splitlines():
-        m = re.match(r'^-- name: (\S+)(?: (chunked|ids|manifest|answers|readback))?\s*$', ln)
+        m = re.match(r'^-- name: (\S+)(?: (chunked|ids|manifest|answers))?\s*$', ln)
         if m:
             if name:
                 out.append((name, mode, '\n'.join(cur).strip().rstrip(';')))
@@ -119,11 +122,9 @@ def integrity_failed(m):
 
 
 def run(reader, uid, vehicle, statements=None, dry_run=False, printer=print, only=None, manifest_dir=None,
-        since=None, deployed_md5s=None, disputed=None, sheets=None, transcripts=None, readback=None):
+        since=None, deployed_md5s=None, sheets=None, transcripts=None):
     since = since or common.iso_utc(common.utc_now() - dt.timedelta(hours=24))
-    disputed = manifest.disputed_runs() if disputed is None else disputed
-    params = {'uid': uid, 'vehicle_id': vehicle, 'window_from': WINDOW[0], 'window_to': WINDOW[1], 'since': since,
-              'disputed': [d for d in disputed if common.is_uuid(d)]}
+    params = {'uid': uid, 'vehicle_id': vehicle, 'window_from': WINDOW[0], 'window_to': WINDOW[1], 'since': since}
     out = {}
     statements = statements or parse()
     if not dry_run:
@@ -171,22 +172,19 @@ def run(reader, uid, vehicle, statements=None, dry_run=False, printer=print, onl
                     printer('-- %s (matched against the manifest)\n%s;' % (
                         name, common.Reader.substitute(sql, params).replace(uid, '<uid>')))
                     continue
-                created = {r['t']: _json(r['x']) for r in reader.read(sql, params, tag=name)}
-                lines = manifest.load(manifest_dir or common.MANIFEST_DIR, since)
-                out[name] = dict(manifest.reconcile(created, lines), since=since, disputed_answers_runs=len(disputed))
-            elif mode in ('answers', 'readback'):
-                if dry_run:
-                    printer('-- %s (checked against the %s)\n%s;' % (
-                        name, 'chat transcript' if mode == 'answers' else 'read-back list',
-                        common.Reader.substitute(sql, params).replace(uid, '<uid>')))
-                    continue
                 rows = reader.read(sql, params, tag=name)
-                if mode == 'answers':
-                    import review_sheet
-                    runs = [dict(r, rows=_json(r.get('rows'))) for r in rows]
-                    out[name] = manifest.check_answers(runs, review_sheet.load_index(sheets), transcripts)
-                else:
-                    out[name] = manifest.check_readback(rows, manifest.readback_entries(readback))
+                created = {r['t']: _json(r['x']) for r in rows}
+                his = {r['t']: int(r.get('h') or 0) for r in rows}
+                lines = manifest.load(manifest_dir or common.MANIFEST_DIR, since)
+                out[name] = dict(manifest.reconcile(created, lines, his_rows=his), since=since)
+            elif mode == 'answers':
+                if dry_run:
+                    printer('-- %s (checked against the chat transcript)\n%s;' % (
+                        name, common.Reader.substitute(sql, params).replace(uid, '<uid>')))
+                    continue
+                import review_sheet
+                runs = [dict(r, rows=_json(r.get('rows'))) for r in reader.read(sql, params, tag=name)]
+                out[name] = manifest.check_answers(runs, review_sheet.load_index(sheets), transcripts)
             else:
                 if dry_run:
                     printer('-- %s\n%s;' % (name, common.Reader.substitute(sql, params).replace(uid, '<uid>')))
@@ -200,6 +198,8 @@ def run(reader, uid, vehicle, statements=None, dry_run=False, printer=print, onl
                     out[name] = _json(rows[0].get('m5')) if rows else None
                 elif name == 'M10_integrity' and rows:
                     out[name] = integrity(rows[0], deployed_md5s)
+                elif name == 'M15' and rows:
+                    out[name] = answers_waiting(rows[0])
                 else:
                     out[name] = {'rows': rows}
         except (common.ReadError, common.EvidenceError) as e:
@@ -207,9 +207,16 @@ def run(reader, uid, vehicle, statements=None, dry_run=False, printer=print, onl
     return out
 
 
+def answers_waiting(row):
+    """(v8) M15: his stored answers waiting for him in the app, and the confirmed level's state."""
+    waiting, rewritten, his = (int(row.get(k) or 0) for k in ('waiting', 'rewritten_ask_again', 'his_decisions'))
+    return {'waiting': waiting, 'rewritten_ask_again': rewritten, 'his_decisions': his,
+            'confirmed_level': 'waiting on his app' if not his else 'his decisions recorded'}
+
+
 def dispute_failed_answers(measures):
     """(v6, AC10) An answers run whose reply does not hold his words, or comes before the sheet, is disputed (once):
-    its agent rows leave M4a, are never promoted, and the next sheet asks its rows again."""
+    the next sheet asks its rows again."""
     done = {e['answers_run'] for e in manifest.disputed_rows() if e.get('by') == 'm10b_transcript'}
     new = [p for p in ((measures or {}).get('M10b_answers') or {}).get('problems') or [] if p['answers_run'] not in done]
     for p in new:
@@ -222,8 +229,8 @@ def scalar(v):
         return v['value']
     if isinstance(v, dict) and 'unmanifested' in v:
         return v['unmanifested']
-    if isinstance(v, dict) and 'not_read_back' in v:
-        return v['not_read_back']
+    if isinstance(v, dict) and 'waiting' in v:
+        return v['waiting']
     if isinstance(v, dict) and isinstance(v.get('problems'), list):
         return len(v['problems'])
     if isinstance(v, dict) and 'rate' in v:

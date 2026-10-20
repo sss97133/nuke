@@ -2,14 +2,16 @@
 
 file mode  the read is readers.accounting() over the payload files (every row proposed; capture times confirmed the
            way the writer confirms them). Confirmed-level assertions are also evaluated with the decisions they name
-           (the owner's answer, simulated) and reported as simulated.
+           (his decisions, simulated: a what-if) and reported as simulated.
 db mode    the read is `select public.vehicle_accounting_evidence(<vehicle>, NULL, NULL, <owner>)` through q.sh (v5:
            the reader is keyed by user, so a service-role read equals his own); database ids are mapped back to line
            keys through the loader's manifest. The result is stored as an exit_test run (evidence_open_run +
-           evidence_close_run, per-assertion results, ids only).
+           evidence_close_run, per-assertion results, ids only). (v8) The confirmed level waits on his own decisions
+           in the app: until any exist, a confirmed-level assertion is open, waiting on his app, with the number of his
+           stored answers still waiting (evidence_answers_to_confirm); a stored answer never satisfies one.
 (v5, RD4-10) Assertions read the JSON keys the fixture names in the full read, not only the M5 tuples.
 
-Results: pass, fail, open (an owner answer is still missing), blocked (the fixture names what blocks it).
+Results: pass, fail, open (his decision is still missing), blocked (the fixture names what blocks it).
 "Structural pass" = every evidence-level assertion that is not blocked passes.
 
 Fixture: {"vehicle_id", "assertions": [{"id", "level": "evidence"|"confirmed", "expect": {...}, "decisions": [...],
@@ -245,10 +247,12 @@ def remap(obj, inv):
     return obj
 
 
-def run(fixture, files, read_fn, mode=common.FILE):
-    """read_fn(decisions) -> a read; returns the per-assertion results and a summary."""
+def run(fixture, files, read_fn, mode=common.FILE, his=None):
+    """read_fn(decisions) -> a read; returns the per-assertion results and a summary. his (db mode, v8): {"decisions":
+    how many decisions of his exist, "waiting": his stored answers still waiting for him in the app}."""
     base = read_fn(None)
     m5 = readers.extract_m5(base)
+    his = his or {}
     out = []
     for a in fixture['assertions']:
         res = {'id': a['id'], 'level': a.get('level', 'evidence')}
@@ -268,6 +272,13 @@ def run(fixture, files, read_fn, mode=common.FILE):
                 res['simulated'] = 'pass' if ok else 'fail'
                 if not ok:
                     res['detail'] = detail
+            elif mode == common.DB:
+                # (v8) only his own decisions in the app can satisfy the confirmed level
+                ok, detail = evaluate(a['expect'], m5, base, files) if his.get('decisions') else (False, '')
+                if ok:
+                    res['result'] = 'pass'
+                else:
+                    res['waiting_on_his_app'] = his.get('waiting', 0)
             ev = a.get('evidence_level_expect')
             if ev:
                 ok, detail = evaluate(ev, m5, base, files)
@@ -276,8 +287,22 @@ def run(fixture, files, read_fn, mode=common.FILE):
     c = collections.Counter(r['result'] for r in out)
     structural = all(r['result'] in ('pass', 'blocked') for r in out if r['level'] == 'evidence')
     sims = collections.Counter(r.get('simulated') for r in out if r.get('simulated'))
-    return out, {'pass': c['pass'], 'fail': c['fail'], 'open': c['open'], 'blocked': c['blocked'],
-                 'structural_pass': structural, 'simulated_confirmed': dict(sims)}
+    summary = {'pass': c['pass'], 'fail': c['fail'], 'open': c['open'], 'blocked': c['blocked'],
+               'structural_pass': structural, 'simulated_confirmed': dict(sims)}
+    if mode == common.DB:
+        summary['confirmed_level'] = 'waiting on his app (%d stored answers waiting)' % his.get('waiting', 0) \
+            if not his.get('decisions') else 'his decisions recorded'
+    return out, summary
+
+
+def his_state(uid, reader=None):
+    """(v8) His decisions so far and his stored answers still waiting for him in the app (M15)."""
+    reader = reader or common.Reader()
+    w = reader.read('select count(*) filter (where last_decided_at is null or last_decided_at < stored_at) n '
+                    'from public.evidence_answers_to_confirm(:uid)', {'uid': uid}, tag='answers_waiting')
+    d = reader.read("select count(*) n from evidence_decisions where user_id = :uid and decided_by like 'human:%' "
+                    "and decision in ('confirmed', 'rejected')", {'uid': uid}, tag='his_decisions')
+    return {'waiting': int((w or [{}])[0].get('n') or 0), 'decisions': int((d or [{}])[0].get('n') or 0)}
 
 
 def db_read(vehicle, uid, manifest_path, reader=None):
@@ -311,16 +336,19 @@ def main():
     files = readers.load_files(a.dir)
     extra = common.load_json(a.decisions) if a.decisions else []
     sessions = readers.sessions_of(common.Context(a.case, a.dir)) if a.case else None
+    his = None
     if a.mode == common.FILE:
         def read_fn(dec):
             return readers.accounting(files, vehicle, extra + (dec or []), sessions=sessions)
     else:
         common.require_db_writes()
-        snap = db_read(vehicle, common.owner_id(a.user), a.manifest or os.path.join(a.dir, 'load-manifest.json'))
+        reader = common.Reader()
+        snap = db_read(vehicle, common.owner_id(a.user), a.manifest or os.path.join(a.dir, 'load-manifest.json'), reader)
+        his = his_state(common.owner_id(a.user), reader)
 
         def read_fn(_dec):
             return snap
-    results, summary = run(fx, files, read_fn, a.mode)
+    results, summary = run(fx, files, read_fn, a.mode, his)
     rec = {'mode': a.mode, 'vehicle_id': vehicle, 'fixture_sha256': common.sha256_bytes(Path(a.fixture).read_bytes()),
            'at': common.iso_utc(common.utc_now()), 'summary': summary, 'results': results}
     if a.mode == common.DB:

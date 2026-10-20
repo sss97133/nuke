@@ -44,14 +44,15 @@ NAMESPACE = uuid.UUID('6f1c2a52-5d0e-4c2b-9a51-3e0d1b7c9e41')     # deterministi
 FILE, DB = 'file', 'db'
 # (v6, RU6) the readers that raise when no user is named: a read of one must pass :uid
 READER_CALL = re.compile(r'\b(vehicle_accounting_evidence|get_vehicle_day_records|evidence_candidates_for_images|'
-                         r'evidence_custody|evidence_identity_set|get_user_day_record|evidence_revert_watch)\s*\(')
+                         r'evidence_custody|evidence_identity_set|get_user_day_record|evidence_revert_watch|'
+                         r'evidence_answers_to_confirm)\s*\(')
 
 
 def loop_file(name, setting):
     """A local loop record (never in the repo): the path the named setting gives, else <loop dir>/<name>. Read at call
     time, so a test or a second case can point it elsewhere. (v6, M10b) sheets.jsonl (sheets issued and the messages
-    that delivered them), disputed.jsonl (answers runs a second reader, the transcript check or his objection
-    disputed), readback.jsonl (the agent decisions the next sheet reads back to him)."""
+    that delivered them), disputed.jsonl (stored readings a second reader, the transcript check or his objection
+    disputed, and the rows a later sheet asked again)."""
     return Path(os.environ.get(setting) or str(LOOP_DIR / name)).expanduser()
 
 
@@ -298,6 +299,9 @@ class Rest:
         return (text or '').replace(self.__key, '[service-role key]') if self.__key else (text or '')
 
     def rpc(self, fn, args):
+        if fn == 'decide_evidence':
+            # (v8) no job decides: decide_evidence is his own step-up session's writer (no service_role EXECUTE)
+            raise EvidenceError('decide_evidence is never called by a job: he decides in the app')
         body = json.dumps(args, default=str).encode('utf-8')
         req = urllib.request.Request('%s/rest/v1/rpc/%s' % (self.url, fn), data=body, method='POST', headers={
             'apikey': self.__key, 'Authorization': 'Bearer ' + self.__key, 'Content-Type': 'application/json',
@@ -412,7 +416,8 @@ class Reader:
 
 # ---------------------------------------------------------------------------------------------------- run context
 class Context:
-    """What a pass needs: the case (local JSON, never in the repo), its inputs, the pinned sources and the output."""
+    """What a pass needs: the case (local JSON, never in the repo), its inputs, the pinned sources and the output.
+    `now` is the run's clock; a case may pin it with `as_of` (a synthetic case set in later years than the run)."""
 
     def __init__(self, case_path, out_dir, mode=FILE, user_id=None, pinned=None, contract=None, now=None):
         from payloads import load_contract
@@ -425,7 +430,7 @@ class Context:
         self.contract = contract or load_contract(self.case.get('contract_overrides'))
         plist = self.case.get('pinned_sources_file')
         self.pinned = pinned or PinnedSources(self.path(plist) if plist else None)
-        self.now = now or utc_now()
+        self.now = now or (parse_ts(self.case['as_of']) if self.case.get('as_of') else utc_now())
         self.vehicles = dict(self.case.get('vehicles') or {})
         self.notes = []
         self._cache = {}

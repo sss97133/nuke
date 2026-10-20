@@ -73,7 +73,7 @@ def build(ctx, built):
         lconf['covers_accounts'] = list(lcfg['covers_accounts'])
         if lcfg.get('closed_accounts'):
             lconf['closed_accounts'] = list(lcfg['closed_accounts'])   # (v6, RU4) the export is their final statement
-        bad = payloads.coverage_problem('ledger_vendor_date', lconf)
+        bad = payloads.coverage_problem('ledger_vendor_date', lconf, ctx.now.date())     # (v7, F7c) never the future
         if bad:
             raise common.EvidenceError('ledger_vendor_date: %s' % bad)
     else:

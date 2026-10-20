@@ -2,10 +2,15 @@
 
 Every writer call the runner makes through common.Rest appends one JSON line to
 <EVIDENCE_MANIFEST_DIR, default loop/manifests>/<UTC date>.jsonl: the writer, the run, the ids the call created
-(`ids`; the decision ids also apart as `decision_ids`, `implied_decision_ids`, `reassign_decision_ids`), the support
-rows it wrote per claim, the rows it returned without creating them (`existing`) and the per-row results. The runner
-only appends. The scoreboard's M10b matches every evidence row created in a window against these lines: a row that
-is in neither the manifest nor (an owner decision) the API request log is unmanifested and halts promotion.
+(`ids`; the decision ids also apart as `decision_ids`), the support rows it wrote per claim, the rows it returned
+without creating them (`existing`) and the per-row results. The runner only appends. The scoreboard's M10b matches
+every evidence row created in a window against these lines: a job's row that is not in the manifest is unmanifested
+and halts promotion.
+
+(v8) No job decides, so every decision recorded as his ('human:<uid>'), the rejections his confirm implies
+('implied:<decision>') and the rows his own decisions write (created_by 'human:<uid>': an owner_review row of his
+"no, it is Y", an owner statement and its support, an owner capture time) are never in this manifest: they are counted
+for the lead to match against the API request log (M10b steps 3 and 3b).
 
 A call whose outcome is unknown (a client timeout or a dropped connection) is recorded with outcome 'unknown' and no
 ids: if it committed, M10b shows its rows as unmanifested and the lead reads them.
@@ -18,7 +23,7 @@ from pathlib import Path
 
 import common
 
-ID_KEYS = ('ids', 'decision_ids', 'implied_decision_ids', 'reassign_decision_ids', 'existing')
+ID_KEYS = ('ids', 'decision_ids', 'existing')
 
 
 def _uuid(x):
@@ -29,29 +34,10 @@ def _items(result):
     return (result or {}).get('items') or [] if isinstance(result, dict) else []
 
 
-def _decide_items(items, out):
-    """decide_evidence items, (v6) the nested reassign_result's included: its decision, implied rejections and the
-    owner_review row it may have written are ids this call created."""
-    for it in items:
-        out['results'][it.get('result') or 'none'] += 1
-        if it.get('reassign_note'):
-            out['results'][it['reassign_note']] += 1
-        if _uuid(it.get('decision_id')):
-            out['decision_ids'].append(it['decision_id'])
-        out['implied_decision_ids'] += [x for x in it.get('implied_decision_ids') or [] if _uuid(x)]
-        if _uuid(it.get('reassign_decision_id')):
-            out['reassign_decision_ids'].append(it['reassign_decision_id'])
-        if _uuid(it.get('reassigned_to')):
-            out['ids'].append(it['reassigned_to'])      # an owner_review row decide_evidence wrote, or the existing one
-        sub = it.get('reassign_result')
-        if isinstance(sub, dict):
-            _decide_items(sub.get('items') or [], out)
-
-
 def returned(writer, args, result):
-    """The ids one writer call returned, by kind (draft.sql v5 return shapes)."""
-    out = {'ids': [], 'decision_ids': [], 'implied_decision_ids': [], 'reassign_decision_ids': [], 'existing': [],
-           'support': [], 'results': collections.Counter(), 'image_id': None}
+    """The ids one writer call returned, by kind (draft.sql v5-v8 return shapes)."""
+    out = {'ids': [], 'decision_ids': [], 'existing': [], 'support': [], 'results': collections.Counter(),
+           'image_id': None}
     args = args or {}
     if writer in ('evidence_open_run', 'evidence_record_answers'):
         if _uuid(result):
@@ -88,17 +74,15 @@ def returned(writer, args, result):
         r = result if isinstance(result, dict) else {}
         out['ids'] += [x for x in r.get('ids') or [] if _uuid(x)]
         out['decision_ids'] += [x for x in r.get('decision_ids') or [] if _uuid(x)]
-        for k in ('proposed', 'machine_confirmed', 'kept_stronger', 'recorded', 'confirmed'):
-            if isinstance(r.get(k), int) and r[k]:
-                out['results'][k] += r[k]
+        for k, v in r.items():          # proposed, machine_confirmed, unchanged, (v7/v8) already_rejected, ... counts
+            if isinstance(v, int) and not isinstance(v, bool) and v:
+                out['results'][k] += v
         for it in r.get('skipped') or []:
             out['results'][it.get('result') or 'skipped'] += 1
             if _uuid(it.get('id')):
                 out['existing'].append(it['id'])
         if r.get('out_of_scope'):
             out['results']['out_of_scope_context'] += len(r['out_of_scope'])
-    elif writer == 'decide_evidence':
-        _decide_items(_items(result), out)
     elif writer == 'evidence_probe_write':
         r = result if isinstance(result, dict) else {}
         if _uuid(r.get('probe_run')):
@@ -120,8 +104,7 @@ def returned(writer, args, result):
             out['results']['recorded'] += result
     # every id the call created, decisions included, in one list (M10b matches against it)
     seen = set()
-    out['ids'] = [x for x in out['ids'] + out['decision_ids'] + out['implied_decision_ids'] +
-                  out['reassign_decision_ids'] if not (x in seen or seen.add(x))]
+    out['ids'] = [x for x in out['ids'] + out['decision_ids'] if not (x in seen or seen.add(x))]
     return out
 
 
@@ -191,8 +174,8 @@ def disputed_ledger():
 
 
 def disputed_runs(path=None):
-    """(v6, AC10) Answers runs a second reader, the transcript check or his objection disputed: their agent rows leave
-    M4a and are never promoted, and the next sheet asks the row again."""
+    """(v6, AC10) Answers runs whose stored reading a second reader, the transcript check or his objection disputed:
+    the next sheet asks the row again ((v8) the reading decides nothing; he sees his words before he confirms)."""
     return sorted({e['answers_run'] for e in _lines(path or disputed_ledger()) if e.get('answers_run')})
 
 
@@ -210,23 +193,11 @@ def mark_disputed(rec, path=None):
     _append(path or disputed_ledger(), rec)
 
 
-def readback_ledger():
-    return common.loop_file('readback.jsonl', 'EVIDENCE_READBACK')
-
-
-def append_readback(rec, path=None):
-    """(v6, AC10) One agent decision recorded from his answer: the next sheet reads it back to him."""
-    _append(path or readback_ledger(), rec)
-
-
-def readback_entries(path=None):
-    return _lines(path or readback_ledger())
-
-
 def check_answers(runs, sheets, where=None):
-    """(v6, AC10; M10b item 5) Each answers run against the chat: its sheet's delivery message carries the sheet as
-    issued, his reply comes after it and holds each row's verbatim words. runs: [{id, sheet_run, message_ref, rows:
-    {"<n>": {"verbatim"}}}] (read by q.sh; the words stay in memory); sheets: the sheets index (review_sheet)."""
+    """(v6, AC10; M10b item 5, kept in v8 for every stored answer) Each answers run against the chat: its sheet's
+    delivery message carries the sheet as issued, his reply comes after it and holds each row's verbatim words. runs:
+    [{id, sheet_run, message_ref, rows: {"<n>": {"verbatim"}}}] (read by q.sh; the words stay in memory); sheets: the
+    sheets index (review_sheet)."""
     import transcript
     out = {'answers_runs': len(runs), 'checked': 0, 'unchecked': [], 'problems': [], 'no_delivery': []}
     for r in runs:
@@ -246,14 +217,6 @@ def check_answers(runs, sheets, where=None):
     return out
 
 
-def check_readback(decisions, entries, examples=5):
-    """(v6, AC10; M10b item 6) Every agent decision of the week has a read-back line (record_answers.py decide), so the
-    next sheet reads it back to him. decisions: [{id, review_ref, answer_ref}] from the store."""
-    seen = {(e.get('review_ref'), e.get('answer_ref')) for e in entries}
-    missing = [d['id'] for d in decisions if (d.get('review_ref'), d.get('answer_ref')) not in seen]
-    return {'agent_decisions_7d': len(decisions), 'not_read_back': len(missing), 'examples': missing[:examples]}
-
-
 def load(directory, since, until=None):
     """Manifest lines from the UTC-dated files covering since..until."""
     d = Path(directory or common.MANIFEST_DIR).expanduser()
@@ -268,20 +231,20 @@ def load(directory, since, until=None):
     return out
 
 
-def reconcile(created, lines, examples=5):
+def reconcile(created, lines, examples=5, his_rows=None):
     """M10b: every evidence row created in the window against the manifest.
 
-    created: {"<table>": [ids], "evidence_decisions": [{"id", "by", "decision", "run", "image"}],
-              "vehicle_change_claim_support": {"<claim id>": n}}.
-    Owner decisions (human:) are not the runner's: they are counted for the lead to match against the API request
-    log. An implied decision must be listed under a call's implied_decision_ids. A promotion-path decision
-    (writer:...) matches by its run or image when the writer returns no id."""
-    ids, implied, runs, images = set(), set(), set(), set()
+    created: {"<table>": [ids of rows a job wrote], "evidence_decisions": [{"id", "by", "decision", "run", "image"}],
+              "vehicle_change_claim_support": {"<claim id>": n}}; his_rows: {"<table>": n} rows his own decisions wrote
+    (created_by 'human:<uid>'). (v8) Neither his decisions (human:), nor the rejections his confirm implies
+    (implied:), nor the rows they write are the runner's: they are counted for the lead to match against the API
+    request log (steps 3 and 3b). A promotion-path decision (writer:...) matches by its run or image when the writer
+    returns no id."""
+    ids, runs, images = set(), set(), set()
     support = collections.Counter()
     reverts_recorded, unknown = 0, 0
     for ln in lines:
         ids |= set(ln.get('ids') or [])
-        implied |= set(ln.get('implied_decision_ids') or [])
         if ln.get('run_id'):
             runs.add(ln['run_id'])
         if ln.get('writer') == 'evidence_open_run':
@@ -295,7 +258,7 @@ def reconcile(created, lines, examples=5):
         if ln.get('outcome') == 'unknown':
             unknown += 1
     missing = collections.OrderedDict()
-    human = 0
+    human = implied = 0
     for table, rows in created.items():
         if table == 'vehicle_change_claim_support':
             continue
@@ -308,8 +271,9 @@ def reconcile(created, lines, examples=5):
                     human += 1
                     continue
                 if by.startswith('implied:'):
-                    ok = d['id'] in implied
-                elif by.startswith('writer:'):
+                    implied += 1                         # (v8) only his own confirm implies a rejection
+                    continue
+                if by.startswith('writer:'):
                     ok = d['id'] in ids or d.get('run') in runs or d.get('image') in images or (
                         d.get('decision') == 'revert_detected' and len(reverts) <= reverts_recorded)
                 else:
@@ -327,5 +291,6 @@ def reconcile(created, lines, examples=5):
             'by_table': {t: len(v) for t, v in missing.items()},
             'examples': {t: v[:examples] for t, v in missing.items()},
             'support_mismatch': mismatch[:examples],
-            'human_decisions_to_match_request_log': human,
+            'human_decisions_to_match_request_log': human, 'implied_by_his_decisions': implied,
+            'his_rows_to_match_his_decisions': sum(int(n or 0) for n in (his_rows or {}).values()),
             'manifest_lines': len(lines), 'unknown_outcomes': unknown}
