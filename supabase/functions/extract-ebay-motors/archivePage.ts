@@ -135,7 +135,7 @@ export function parseArchivedItemPage(html: string, originalUrl = ""): ArchivedI
   const text = textOf(html);
   const titleTag = decode(html.match(/<title>([\s\S]*?)<\/title>/i)?.[1] ?? "").replace(/\s+/g, " ").trim();
   const h1 = html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i)?.[1];
-  const tagTitle = titleTag.replace(/^eBay Motors:\s*/i, "").replace(/\s*\(item \d+.*$/i, "").replace(/\s*[|:]\s*eBay( Motors)?.*$/i, "").replace(/\s+in\s+[^|]+$/, "").trim();
+  const tagTitle = titleTag.replace(/^eBay Motors:\s*/i, "").replace(/\s*\(item \d+.*$/i, "").replace(/\s*[|:]\s*eBay( Motors)?.*$/i, "").replace(/\s+-\s+eBay( Motors)?$/i, "").replace(/\s+in\s+[^|]+$/, "").trim();
   const title = (h1 ? textOf(h1) : "") || tagTitle || null;
   const itemId = text.match(/Item number:\s*(\d{9,13})/)?.[1] ?? titleTag.match(/\(item (\d{9,13})/)?.[1] ?? null;
 

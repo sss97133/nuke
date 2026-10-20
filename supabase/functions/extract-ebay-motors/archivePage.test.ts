@@ -89,6 +89,17 @@ Deno.test("a dealer-template description with early-closing divs is read to eBay
   eq(parseArchivedItemPage(html).description, "Frame-off restoration, 11,000 miles since. Original 2F engine.");
 });
 
+// Title tags of captures from 2010-11 read "Ferrari : 308 - eBay (item 290519586058 end time  Jan-26-11 08:21:47 PST)"; 704 of the
+// 18,039 rows landed in the 24 hours to 2026-10-20 05:30Z carried the site's name in their model ("308 - eBay", "Mustang - eBay").
+Deno.test("a 2010-11 title tag's ' - eBay' site suffix is the site's name, not part of the model", () => {
+  const html = `<html><head><title>Ferrari : 308 - eBay (item 290519586058 end time  Jan-26-11 08:21:47 PST)</title></head><body>
+<div>Ended: Jan 26, 2011 08:21:47 PST Bid history: 3 bids Current bid: US $20,100.00 Reserve not met</div><div>Item number: 290519586058</div></body></html>`;
+  const p = parseArchivedItemPage(html, "http://cgi.ebay.com:80/ebaymotors/1978-Ferrari-308-GTS-Low-Miles-/290519586058?");
+  eq([p.specifics.Year, p.specifics.Make, p.specifics.Model, p.title], ["1978", "Ferrari", "308", "Ferrari : 308"]);
+  const motors = parseArchivedItemPage(html.replace("308 - eBay", "Mustang - eBay Motors"));
+  eq([motors.specifics.Make, motors.specifics.Model], ["Ferrari", "Mustang"]);
+});
+
 Deno.test("the year comes from two-digit and make-first URL slugs when the page prints none", () => {
   eq(slugYear("http://cgi.ebay.com:80/ebaymotors/1965-65-Barn-Find-389-4-speed-Pontiac-GTO_W0QQitemZ1"), "1965");
   eq(slugYear("http://cgi.ebay.com:80/ebaymotors/68-Charger-RT-barn-find-numbers-matching-/2903"), "1968");
