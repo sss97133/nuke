@@ -692,6 +692,14 @@ const Profile: React.FC = () => {
                   onSave={(v) => saveProfileField('is_public', v)}
                 />
 
+                <EditableField
+                  label="Show my activity to visitors (day counts, no photos)"
+                  name="activity_public"
+                  type="toggle"
+                  value={(profile as any).activity_public ?? true}
+                  onSave={(v) => saveProfileField('activity_public' as any, v)}
+                />
+
                 {/* Account type selector */}
                 <div style={{ marginBottom: 'var(--space-3)' }}>
                   <label className="text-small font-bold" style={{ display: 'block', marginBottom: 'var(--space-1)' }}>

@@ -37,11 +37,8 @@ export class ProfileService {
   static async getContributionDays(
     userId: string
   ): Promise<Array<{ day: string; kind: string; n: number }>> {
-    // The RPC counts every photo the user took, private vehicles included, so only signed-in viewers may call it;
-    // a stranger gets an empty timeline instead of a refused request.
-    const { data: session } = await supabase.auth.getSession().catch(() => ({ data: { session: null } }));
-    if (!session?.session) return [];
-    const { data, error } = await supabase.rpc('get_user_contribution_days', {
+    // Counts only, never images; the database answers a stranger only when the owner leaves activity public.
+    const { data, error } = await supabase.rpc('get_user_activity_days', {
       p_user_id: userId,
     });
     if (error) throw error;
