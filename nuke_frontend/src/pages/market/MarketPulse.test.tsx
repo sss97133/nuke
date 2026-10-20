@@ -798,10 +798,10 @@ describe('every live house on one board', () => {
   });
   it('compares each house with its own week-ago reading, and says which houses have no week of history yet', async () => {
     const t0 = Date.parse('2026-09-26T12:00:00Z');
-    fixture.share = { isError: false, data: { firstAt: t0, firstAtByHouse: { pcarmarket: Date.parse('2026-10-02T00:00:00Z'), 'collecting-cars': t0 }, points: [],
+    fixture.share = { isError: false, data: { firstAt: t0, firstAtByHouse: { pcarmarket: Date.parse('2026-10-02T12:00:00Z'), 'collecting-cars': t0 }, points: [],
       weekAgo: { 'collecting-cars': { at: t0, bidUsd: 0, lots: 1, lotsWithBid: 1 } } } };
     await render();
     const text = container.querySelector('.market-figure')!.textContent!;
-    expect(text).toContain('PCarMarket: no week of history yet (recorded since Oct 1)');
+    expect(text).toContain('PCarMarket: no week of history yet (recorded since Oct 2)');
   });
 });
