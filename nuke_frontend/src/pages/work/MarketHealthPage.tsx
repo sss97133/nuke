@@ -37,10 +37,10 @@ export default function MarketHealthPage() {
   useEffect(() => { readJob('job_market_health_read', {}).then(setRead); }, []);
 
   if (read.status !== 'loaded') {
-    return <main className="jb-page jb-scope" aria-label="The job market on Nuke">
+    return <article className="jb-page jb-scope" aria-label="The job market on Nuke">
       <Masthead><Text role="entity" as="h1">The job market on Nuke</Text></Masthead>
       <Text role="body">{read.status === 'loading' ? 'Counting…' : read.reason}</Text>
-    </main>;
+    </article>;
   }
   const d = read.data;
   const asOf = str(d.as_of);
@@ -57,7 +57,7 @@ export default function MarketHealthPage() {
   const flowTotal = FLOW_WORDS.reduce((n, [k]) => n + (num(counts[k]) ?? 0), 0);
   const medians = Object.keys(STEP_WORDS).map(k => ({ k, h: num(obj(steps[k])?.median_hours), n: num(obj(steps[k])?.samples) ?? 0 })).filter(x => x.h !== null);
 
-  return <main className="jb-page jb-scope" aria-label="The job market on Nuke">
+  return <article className="jb-page jb-scope" aria-label="The job market on Nuke">
     <Masthead result={<Text role="caption">{asOf ? `as of ${day(asOf)}` : ''}</Text>}>
       <Text role="entity" as="h1">The job market on Nuke</Text>
     </Masthead>
@@ -126,5 +126,5 @@ export default function MarketHealthPage() {
         <Row label="Known open access exposures" role="measure">{(num(trust.open_exposures_known) ?? 0).toLocaleString('en-US')}</Row>
       </Rows>
     </Section>
-  </main>;
+  </article>;
 }
