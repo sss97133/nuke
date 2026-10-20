@@ -41,7 +41,7 @@ SELECT t_assert(lt_names(:'oil', 'stated_by_listing') = ARRAY['Listed Lube', 'Ra
   'listing tier: same city first, then within the stated radius; far, short-radius, private, other-state and unmapped listings excluded: '
   || array_to_string(lt_names(:'oil', 'stated_by_listing'), ','));
 SELECT t_assert((:'oil'::jsonb)->0 @> '{"tier":"stated_by_listing","tier_label":"stated by the business listing","label":"listed as offering oil changes, tune ups — not verified",
-    "record_backed":false,"verified":false,"counts_as_evidence":false,"can_receive_requests":false,"on_nuke":{"state":"not_on_nuke_yet","label":"Not on Nuke yet"},
+    "record_backed":false,"verified":false,"counts_as_evidence":false,"supplier_result":"not_verified","can_receive_requests":false,"on_nuke":{"state":"not_on_nuke_yet","label":"Not on Nuke yet"},
     "geography":{"same_state":true,"same_city":true,"distance_miles":0.0},"services_listed":["oil_changes","tune_ups"],"capability_keys_matched":["general_maintenance"]}'
   AND ((:'oil'::jsonb)->1#>>'{geography,distance_miles}')::numeric BETWEEN 60 AND 80,
   'listing entries are labelled not verified, never evidence, Not on Nuke yet with the claim/invite path: ' || ((:'oil'::jsonb)->1)::text);

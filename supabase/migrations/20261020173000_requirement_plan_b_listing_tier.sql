@@ -182,6 +182,7 @@ BEGIN
       'label', 'listed as offering ' || array_to_string(ARRAY(SELECT replace(s, '_', ' ') FROM unnest(gd.services) s), ', ') || ' — not verified',
       'services_listed', to_jsonb(gd.services), 'capability_keys_matched', to_jsonb(gd.keys_matched),
       'record_backed', false, 'verified', false, 'counts_as_evidence', false,
+      'supplier_result', 'not_verified', 'supplier_label', 'listed as offering this — not verified',
       'geography', jsonb_build_object('same_state', true, 'same_city', gd.same_city IS TRUE, 'distance_miles', gd.miles,
         'service_radius_miles', gd.radius, 'basis', 'listing city/state against the job area'),
       'on_nuke', n.on_nuke, 'can_receive_requests', n.on_nuke->>'state' = 'claimed',
