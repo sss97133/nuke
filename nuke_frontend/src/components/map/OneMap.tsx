@@ -165,7 +165,7 @@ export default function OneMap() {
     setBusy(true); setNote('');
     const jobs: Promise<unknown>[] = [];
     if (what === 'shops') {
-      setCars([]);
+      setCars([]); (map.getSource('cars') as GeoJSONSource | undefined)?.setData({ type: 'FeatureCollection', features: [] });
       jobs.push(readShops({ bbox }, ctl.signal).then((s) => { setShops(s); (map.getSource('shops') as GeoJSONSource | undefined)?.setData({ type: 'FeatureCollection', features: s.map((x) => ({ type: 'Feature', id: x.id, properties: { id: x.id, name: x.name }, geometry: { type: 'Point', coordinates: [x.lng, x.lat] } })) }); }));
     } else {
       setShops([]); (map.getSource('shops') as GeoJSONSource | undefined)?.setData({ type: 'FeatureCollection', features: [] });
