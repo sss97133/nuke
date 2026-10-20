@@ -362,3 +362,10 @@
 .market-sources__event-make .make-identity strong { font: 700 11px Arial, sans-serif; }
 .market-sources__event-status.n { color: var(--text-secondary); }
 .market-sources__event-status.n.is-sold { color: var(--success); font-weight: 700; }
+
+.market-sources__pulse-row { grid-template-columns: 74px 44px 1fr 64px; position: relative; }
+.market-sources__pulse-line { width: 100%; height: 28px; display: block; overflow: visible; }
+.market-sources__pulse-base { stroke: var(--border); stroke-width: 1; }
+.market-sources__pulse-path { fill: none; stroke: var(--text); stroke-width: 1.5; stroke-linejoin: round; }
+.market-sources__pulse-row.is-backfill .market-sources__pulse-path { stroke: var(--text-disabled); }
+.market-sources__pulse-path.is-now { stroke: var(--success); stroke-width: 2; stroke-dasharray: 3 2; } /* the current bucket is still filling */
