@@ -1,7 +1,8 @@
 /**
  * Pure readers for the board-synced houses (no I/O): PCarMarket's server-rendered auction board and lot bid history,
  * Bonhams' Typesense sale and lot documents and its bidding platform's lot states, Broad Arrow's timed sales on its
- * bidding site, and Mecum's public lot index around a sale's run days. sync-live-auctions fetches; these parse.
+ * bidding site, Mecum's public lot index around a sale's run days, and Barrett-Jackson's calendar, bidding platform and
+ * docket. sync-live-auctions fetches; these parse.
  */
 
 /** One open lot on PCarMarket's live board (the Basta query cache the page server-renders). */
@@ -460,4 +461,191 @@ export function mecumLot(hit: MecumIndexHit, nowMs: number): MecumLot | null {
     make: term(hit, "make"),
     model: term(hit, "model"),
   };
+}
+
+// ── Barrett-Jackson: its calendar, its bidding platform (Barrett-Jackson Digital, an Auctic site) and its docket ──
+//
+// Online bidding for Barrett-Jackson's sales runs on bid.barrett-jackson.com (Auctic): live sales ("live_auction", lots
+// closed by the clerk as they cross the block; Las Vegas 2026 and Columbus 2026 are archived there) and online-only
+// sales ("auction", timed lots). An event page there carries every lot with its status, open and close times, highest
+// bid, bid count and sold price (Inertia page props; as JSON when asked with the page's asset version). Lots are keyed to
+// Barrett-Jackson's own docket (barrett-jackson.com/<event>/docket/vehicle/<slug>, the spelling vehicles hold) by lot
+// number and title: Las Vegas 2026's 594 sold lots all match one docket lot that way.
+
+/** One event of Barrett-Jackson's calendar (/api/non-past-events: Strapi records, dates in the event's own zone). */
+export interface BjCalendarEvent {
+  slug: string;
+  name: string;
+  start_date: string;
+  end_date: string;
+  status: string | null;
+  type: string | null;
+  timezone: string | null;
+}
+
+/** The calendar's events with the fields the reader uses; records without a slug or dates are dropped. */
+export function bjCalendar(json: unknown): BjCalendarEvent[] {
+  const rows = Array.isArray(json) ? json : [];
+  return rows.flatMap((r) => {
+    const a = (r as { attributes?: Record<string, unknown> })?.attributes ?? {};
+    const s = (k: string) => (typeof a[k] === "string" && a[k] ? String(a[k]) : null);
+    const slug = s("slug"), start = s("start_date"), end = s("end_date");
+    if (!slug || !start || !end) return [];
+    return [{ slug, name: s("name") ?? slug, start_date: start, end_date: end, status: s("event_status"), type: s("event_type"), timezone: s("event_timezone") }];
+  });
+}
+
+/** Calendar events near enough to now to read: from a day before the start date to two days after the end date. */
+export function bjEventsToRead(events: BjCalendarEvent[], nowMs: number): BjCalendarEvent[] {
+  return events.filter((e) => {
+    const start = Date.parse(`${e.start_date}T00:00:00Z`), end = Date.parse(`${e.end_date}T00:00:00Z`);
+    return Number.isFinite(start) && Number.isFinite(end) && nowMs >= start - 86_400_000 && nowMs < end + 3 * 86_400_000;
+  });
+}
+
+/** The Inertia page object an Auctic page server-renders in its #app data-page attribute. */
+export function inertiaPage(html: string): { component: string; props: Record<string, unknown>; version: string | null } | null {
+  const m = html.match(/<div id="app" data-page="([^"]*)"/);
+  if (!m) return null;
+  const txt = m[1].replace(/&quot;/g, '"').replace(/&#0?39;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
+  try {
+    const page = JSON.parse(txt);
+    return page && typeof page === "object" && page.props ? { component: String(page.component ?? ""), props: page.props, version: page.version ?? null } : null;
+  } catch {
+    return null;
+  }
+}
+
+/** An event on Barrett-Jackson Digital. */
+export interface AucticEvent {
+  id: number;
+  title: string;
+  slug: string;
+  status: string;
+  type: string;
+  category: string | null;
+  start: string | null;
+  end: string | null;
+}
+
+// deno-lint-ignore no-explicit-any
+const aucticEvent = (e: any): AucticEvent | null => (e && Number.isInteger(e.id) && e.slug ? {
+  id: e.id, title: String(e.title ?? ""), slug: String(e.slug), status: String(e.status ?? ""), type: String(e.event_type ?? ""),
+  category: e.category ? String(e.category) : null, start: e.start_time ?? null, end: e.end_time ?? null,
+} : null);
+
+/** The events an Auctic index page lists (props.events): its home page lists the events not yet archived. */
+export function aucticEvents(props: Record<string, unknown>): AucticEvent[] {
+  return (Array.isArray(props.events) ? props.events : []).flatMap((e) => aucticEvent(e) ?? []);
+}
+
+/** Collector-car events whose bidding window holds now: from two hours before the event opens to 12 hours after it ends. */
+export function aucticEventsToRead(events: AucticEvent[], nowMs: number): AucticEvent[] {
+  return events.filter((e) => {
+    const start = Date.parse(e.start ?? ""), end = Date.parse(e.end ?? "");
+    return e.category !== "Automobilia" && e.status !== "archived" && Number.isFinite(start) && Number.isFinite(end)
+      && nowMs >= start - 2 * 3_600_000 && nowMs < end + 12 * 3_600_000;
+  });
+}
+
+/** One lot of an Auctic event page. Amounts are dollars. */
+export interface AucticListing {
+  id: number;
+  lot_number: string;
+  title: string;
+  status: string;
+  opens: string | null;
+  closes: string | null;
+  high_bid: number | null;
+  sold_price: number | null;
+  bids: number | null;
+  image: string | null;
+  url: string;
+  manual_close: boolean;
+}
+
+/** The event and every lot an Auctic event page server-renders (props.event, props.listings.data). */
+export function aucticEventListings(props: Record<string, unknown>): { event: AucticEvent | null; listings: AucticListing[] } {
+  // deno-lint-ignore no-explicit-any
+  const data = (props.listings as any)?.data;
+  const num = (v: unknown) => (v === null || v === undefined || v === "" ? null : Number.isFinite(Number(v)) ? Number(v) : null);
+  // deno-lint-ignore no-explicit-any
+  const listings = (Array.isArray(data) ? data : []).flatMap((l: any): AucticListing[] => {
+    if (!l || !Number.isInteger(l.id) || l.lot_number === undefined || l.lot_number === null) return [];
+    return [{
+      id: l.id,
+      lot_number: String(l.lot_number),
+      title: String(l.title ?? ""),
+      status: String(l.status ?? ""),
+      opens: l.start_time ?? null,
+      closes: l.end_time ?? null,
+      high_bid: (num(l.highest_bid_amount) ?? 0) > 0 ? num(l.highest_bid_amount) : null,
+      sold_price: (num(l.sold_price) ?? 0) > 0 ? num(l.sold_price) : null,
+      bids: num(l.number_of_bids),
+      image: l.hero ?? l.hero_md ?? null,
+      url: `https://bid.barrett-jackson.com${l.url ?? `/events/listing/${l.id}`}`,
+      manual_close: l.meta?.is_manual_close === true,
+    }];
+  });
+  return { event: aucticEvent(props.event), listings };
+}
+
+/** open: bidding is open now; closed: the platform closed it (sold, passed, withdrawn); upcoming: not yet open, or paused. */
+export type AucticState = "open" | "closed" | "upcoming";
+const AUCTIC_CLOSED = new Set(["sold", "soldpostsale", "passed", "withdrawn", "canceled", "archived"]);
+
+export function aucticState(l: AucticListing, nowMs: number): AucticState {
+  if (AUCTIC_CLOSED.has(l.status)) return "closed";
+  if (l.status !== "active") return "upcoming";
+  const opens = Date.parse(l.opens ?? "");
+  return Number.isFinite(opens) && opens > nowMs ? "upcoming" : "open";
+}
+
+/** One vehicle lot of Barrett-Jackson's docket API (/api/docket?slug=&type=Vehicles). */
+export interface BjDocketLot {
+  lot_number: string;
+  title: string;
+  url: string;
+  year: number | null;
+  make: string | null;
+  model: string | null;
+  no_reserve: boolean;
+}
+
+/** Docket lots with their page in the spelling vehicles hold: https://barrett-jackson.com/<event>/docket/vehicle/<slug>. */
+export function bjDocketLots(json: unknown): BjDocketLot[] {
+  // deno-lint-ignore no-explicit-any
+  const data = (json as any)?.data;
+  // deno-lint-ignore no-explicit-any
+  return (Array.isArray(data) ? data : []).flatMap((d: any): BjDocketLot[] => {
+    const a = d?.attributes ?? {};
+    if (!a.slug || !a.event_slug || a.lot_number === undefined || a.lot_number === null) return [];
+    const year = Number(a.year);
+    return [{
+      lot_number: String(a.lot_number),
+      title: String(a.title ?? ""),
+      url: `https://barrett-jackson.com/${a.event_slug}/docket/vehicle/${a.slug}`,
+      year: Number.isInteger(year) && year >= 1885 && year <= 2100 ? year : null,
+      make: a.make ? String(a.make) : null,
+      model: a.model ? String(a.model) : null,
+      no_reserve: a.reserve_type_name === "No Reserve",
+    }];
+  });
+}
+
+const titleKey = (s: string) => s.toUpperCase().replace(/[^A-Z0-9]+/g, " ").trim();
+
+/**
+ * The docket lot of each Auctic listing: the one lot with the listing's lot number and title. A listing with no such lot,
+ * or with more than one, is left out: it is never guessed.
+ */
+export function bjDocketMatch(listings: AucticListing[], docket: BjDocketLot[]): Map<number, BjDocketLot> {
+  const byLot = new Map<string, BjDocketLot[]>();
+  for (const d of docket) byLot.set(d.lot_number, [...(byLot.get(d.lot_number) ?? []), d]);
+  const out = new Map<number, BjDocketLot>();
+  for (const l of listings) {
+    const hits = (byLot.get(l.lot_number) ?? []).filter((d) => titleKey(d.title) === titleKey(l.title));
+    if (hits.length === 1) out.set(l.id, hits[0]);
+  }
+  return out;
 }

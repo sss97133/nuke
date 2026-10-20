@@ -14,12 +14,14 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
  *   - Broad Arrow: its bidding site's timed online sales (sale list hourly, lot list with top bids every run)
  *   - Mecum: its public lot index (Algolia), read only around a sale's run days; a car is live on its run day until the
  *     index records it crossed the block (or before, with an online pre-bid)
+ *   - Barrett-Jackson: its calendar; inside an event's dates, its lots and bids from its bidding platform
+ *     (bid.barrett-jackson.com), each written under its docket page
  *   - Cars & Bids: Uses Firecrawl (Cloudflare protected)
- *   - Barrett-Jackson, Gooding: Firecrawl scrape + extract; RM Sotheby's has no readable live bid (see syncRMSothebys)
- * Collecting Cars, PCarMarket, Bonhams, Broad Arrow and Mecum boards are complete lists: after the vehicles upsert each is
- * handed to live_auction_board_sync, the monitored_auctions schedule writer for those houses (BaT's is bat_live_pull_run).
- * A house that reports each lot's close (Mecum) also returns those lots; their vehicles rows stop being live through
- * end_live_auction_lots.
+ *   - Gooding: Firecrawl scrape + extract; RM Sotheby's has no readable live bid (see syncRMSothebys)
+ * Collecting Cars, PCarMarket, Bonhams, Broad Arrow, Mecum and Barrett-Jackson boards are complete lists: after the
+ * vehicles upsert each is handed to live_auction_board_sync, the monitored_auctions schedule writer for those houses
+ * (BaT's is bat_live_pull_run). A house that reports each lot's close (Mecum, Barrett-Jackson) also returns those lots;
+ * their vehicles rows stop being live through end_live_auction_lots.
  *
  * Deploy: supabase functions deploy sync-live-auctions --no-verify-jwt
  *
@@ -41,6 +43,8 @@ import {
   type BonhamsBidState, type BonhamsLotDoc, type BonhamsSaleDoc, bonhamsLot, bonhamsLotPhase, bonhamsSaleKind,
   type MecumIndexHit, type MecumLot, mecumLot, mecumRunDatesToRead, mecumSalesToRead,
   type PcarBoardItem, parseBonhamsBidStates, parsePcarBids, parsePcarBoard,
+  type AucticEvent, type AucticListing, aucticEventListings, aucticEvents, aucticEventsToRead, aucticState, bjCalendar,
+  type BjDocketLot, bjDocketLots, bjDocketMatch, bjEventsToRead, inertiaPage,
 } from "./boards.ts";
 import { type AmLotDoc, amOpenTimedSales, amSales, amTimedLot, BROAD_ARROW_BID } from "./boards.ts";
 
@@ -96,6 +100,7 @@ interface SyncOutcome {
   error: string | null;
   closed?: ClosedLot[];
   reader?: Record<string, unknown>;
+  skip?: string; // the reader stood down (after refusals): nothing is written, not even health
 }
 
 interface SyncResult {
@@ -681,16 +686,146 @@ async function syncMecum(): Promise<SyncOutcome> {
 }
 
 // ============================================
-// Barrett-Jackson Sync (Firecrawl, stealth proxy)
+// Barrett-Jackson Sync (its calendar; lots and bids from its bidding platform, Barrett-Jackson Digital)
 // ============================================
 
-async function syncBarrettJackson(): Promise<{ auctions: LiveAuction[]; error: string | null }> {
-  return syncViaFirecrawlExtract(
-    "barrett-jackson",
-    "https://www.barrett-jackson.com/Events/",
-    /barrett-jackson\.com\//i,
-    { useProxy: true, waitFor: 5000 }
-  );
+// The owner authorized reading Barrett-Jackson despite its robots.txt (2026-10-16), politely: our own agent, one request
+// every 3 s at most, stop on a refusal. bid.barrett-jackson.com's robots.txt disallows only /admin/ and /account/.
+const BJ_CALENDAR_URL = "https://www.barrett-jackson.com/api/non-past-events";
+const BJ_DOCKET_URL = "https://www.barrett-jackson.com/api/docket";
+const BJ_DIGITAL = "https://bid.barrett-jackson.com";
+const BJ_GAP_MS = 3_000;
+const BJ_CLOSED_LOOKBACK_MS = 12 * 3_600_000;
+
+class BjRefused extends Error {}
+
+/** One Barrett-Jackson request: our agent, 3 s after the last, and a refusal (403, 429, a challenge page) stops the read. */
+async function bjGet(url: string, headers: Record<string, string>, clock: { last: number }): Promise<string> {
+  const wait = clock.last + BJ_GAP_MS - Date.now();
+  if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+  clock.last = Date.now();
+  const res = await fetch(url, { headers: { "User-Agent": NUKE_AGENT, ...headers }, signal: AbortSignal.timeout(25_000) }); // guardrail-allow: raw-fetch (house JSON API; Inertia page data)
+  const text = await res.text();
+  const where = `${new URL(url).host}${new URL(url).pathname}`;
+  if (res.status === 403 || res.status === 429) throw new BjRefused(`blocked: HTTP ${res.status} (${where})`);
+  if (/cf-chl|challenge-platform|Just a moment\.\.\./i.test(text.slice(0, 8000))) throw new BjRefused(`blocked: challenge page (${where})`);
+  if (!res.ok) throw new Error(`HTTP ${res.status} (${where})`);
+  return text;
+}
+
+/**
+ * Barrett-Jackson's live lots. Every read asks its calendar (one small JSON request); nothing else happens unless an event
+ * is within a day of its dates or lots it wrote are still live. Then it reads Barrett-Jackson Digital's home page (the
+ * events not yet archived, and the asset version its pages answer JSON to) and, for each collector-car event within two
+ * hours of opening to 12 hours after closing, the event's lots as JSON. A lot is live while the platform has it active
+ * and its own bidding has opened; sold, passed and withdrawn lots closed in the last 12 hours are returned as closed.
+ * Each lot is written under its docket page (barrett-jackson.com/<event>/docket/vehicle/<slug>): the docket API is read
+ * only for lots not yet matched (a match is kept on the lot's monitored_auctions row), and a lot with no single docket
+ * match by lot number and title is left out, never guessed.
+ */
+// deno-lint-ignore no-explicit-any
+async function syncBarrettJackson(supabase: any): Promise<SyncOutcome> {
+  try {
+    const now = Date.now();
+    const src = (await supabase.from("live_auction_sources")
+      .select("id, consecutive_failures, last_sync_error, updated_at").eq("slug", "barrett-jackson").maybeSingle()).data as
+      { id: string; consecutive_failures: number | null; last_sync_error: string | null; updated_at: string } | null;
+    if (src && (src.consecutive_failures ?? 0) >= 3 && String(src.last_sync_error ?? "").startsWith("blocked")
+        && now - Date.parse(src.updated_at) < 3_600_000) {
+      return { auctions: [], error: null, skip: `stopped after ${src.consecutive_failures} refused reads (${src.last_sync_error}); tries again an hour after the last` };
+    }
+    const clock = { last: 0 };
+    const calendar = bjCalendar(JSON.parse(await bjGet(BJ_CALENDAR_URL, { Accept: "application/json" }, clock)));
+    const events = bjEventsToRead(calendar, now);
+    const reader: Record<string, unknown> = { calendar: calendar.map((e) => `${e.slug} ${e.start_date}..${e.end_date} ${e.status ?? ""}`.trim()) };
+    let stillLive = 0;
+    if (!events.length && src?.id) {
+      const { count } = await supabase.from("monitored_auctions").select("id", { count: "exact", head: true }).eq("source_id", src.id).eq("is_live", true);
+      stillLive = count ?? 0;
+    }
+    if (!events.length && !stillLive) return { auctions: [], closed: [], error: null, reader: { ...reader, read: "calendar only" } };
+
+    const home = inertiaPage(await bjGet(`${BJ_DIGITAL}/`, { Accept: "text/html" }, clock));
+    if (!home) throw new Error("Barrett-Jackson Digital home page: no page data");
+    const toRead = aucticEventsToRead(aucticEvents(home.props), now);
+    reader.digital_events = toRead.map((e) => `${e.id} ${e.title} ${e.status}`);
+    const lots: { event: AucticEvent; lot: AucticListing }[] = [];
+    for (const ev of toRead) {
+      const page = JSON.parse(await bjGet(`${BJ_DIGITAL}/events/event/${ev.id}/${ev.slug}`, {
+        Accept: "text/html, application/xhtml+xml", "X-Requested-With": "XMLHttpRequest", "X-Inertia": "true",
+        "X-Inertia-Version": home.version ?? "", "X-Inertia-Partial-Component": "Event/ViewEvent", "X-Inertia-Partial-Data": "event,listings",
+      }, clock));
+      const { event, listings } = aucticEventListings(page?.props ?? {});
+      for (const lot of listings) lots.push({ event: event ?? ev, lot });
+    }
+    const relevant = lots.filter(({ lot }) => {
+      const state = aucticState(lot, now);
+      const closes = Date.parse(lot.closes ?? "");
+      return state === "open" || (state === "closed" && Number.isFinite(closes) && now - closes < BJ_CLOSED_LOOKBACK_MS);
+    });
+
+    // The docket page of each lot: kept on its monitored_auctions row once matched, else read from the docket API.
+    const known = new Map<number, string>();
+    for (let i = 0; src?.id && i < relevant.length; i += 200) {
+      const { data } = await supabase.from("monitored_auctions").select("external_auction_id, external_auction_url")
+        .eq("source_id", src.id).in("external_auction_id", relevant.slice(i, i + 200).map(({ lot }) => `auctic-${lot.id}`));
+      for (const r of (data ?? []) as { external_auction_id: string; external_auction_url: string | null }[]) {
+        if (r.external_auction_url) known.set(Number(r.external_auction_id.slice(7)), r.external_auction_url);
+      }
+    }
+    const unknown = relevant.map(({ lot }) => lot).filter((l) => !known.has(l.id));
+    const docket = new Map<number, BjDocketLot>();
+    for (const ev of unknown.length ? events : []) {
+      for (let page = 1; page <= 3; page++) {
+        const json = JSON.parse(await bjGet(`${BJ_DOCKET_URL}?page=${page}&type=Vehicles&size=1000&slug=${encodeURIComponent(ev.slug)}&validateLot=1`, { Accept: "application/json" }, clock));
+        for (const [id, d] of bjDocketMatch(unknown, bjDocketLots(json))) docket.set(id, d);
+        if (page >= Number(json?.meta?.pagination?.pageCount ?? 1)) break;
+      }
+    }
+
+    const auctions: LiveAuction[] = [];
+    const closed: ClosedLot[] = [];
+    let unmatched = 0;
+    for (const { event, lot } of relevant) {
+      const d = docket.get(lot.id);
+      const url = known.get(lot.id) ?? d?.url;
+      if (!url) { unmatched++; continue; }
+      const external_id = `auctic-${lot.id}`;
+      if (aucticState(lot, now) === "open") {
+        const ownClose = lot.closes && Date.parse(lot.closes) > now ? lot.closes : null;
+        const ident = d ? { year: d.year, make: d.make, model: d.model } : parseBatIdentityFromTitle(lot.title, null);
+        auctions.push({
+          url,
+          title: lot.title,
+          platform: "barrett-jackson",
+          auction_end_date: ownClose ?? event.end ?? "",
+          current_bid: lot.high_bid,
+          bid_count: lot.bids,
+          currency: "USD", // Barrett-Jackson Digital lists its lots in USD (listing 11987: currency "USD")
+          no_reserve: d?.no_reserve ?? false,
+          reserve_met: null,
+          year: ident.year,
+          make: ident.make,
+          model: ident.model,
+          thumbnail_url: lot.image,
+          external_id,
+          raw_data: {
+            source: "bj_digital_event", auctic_event_id: event.id, auctic_event: event.title, auctic_event_type: event.type,
+            auctic_listing_id: lot.id, auctic_url: lot.url, lot_number: lot.lot_number, opens: lot.opens,
+            ends_basis: ownClose ? "lot_close" : "event_close", manual_close: lot.manual_close, synced_at: new Date(now).toISOString(),
+          },
+        });
+      } else {
+        closed.push({ url, external_id, closing_bid: lot.sold_price ?? lot.high_bid, ended_at: lot.closes, currency: "USD", bid_count: lot.bids });
+      }
+    }
+    console.log(`[sync-live-auctions] Barrett-Jackson: ${toRead.length} Digital event(s), ${auctions.length} live, ${closed.length} closed, ${unmatched} without a docket match`);
+    return { auctions, closed, error: null, reader: { ...reader, lots: lots.length, live: auctions.length, closed: closed.length, unmatched, docket_read: unknown.length > 0 } };
+  } catch (e: unknown) {
+    // a refusal is recorded as "blocked: ..." so the next reads stand down (above)
+    if (e instanceof BjRefused) return { auctions: [], error: e.message };
+    return { auctions: [], error: `Barrett-Jackson sync failed: ${e instanceof Error ? e.message : String(e)}` };
+  }
 }
 
 // ============================================
@@ -885,6 +1020,7 @@ async function syncBroadArrow(): Promise<{ auctions: LiveAuction[]; error: strin
 /** The houses whose open board is read complete and scheduled by live_auction_board_sync (slug per platform). */
 const BOARD_SOURCES: Record<string, string> = {
   "collecting-cars": "collecting-cars", pcarmarket: "pcarmarket", bonhams: "bonhams", "broad-arrow": "broad-arrow", mecum: "mecum",
+  "barrett-jackson": "barrett-jackson",
 };
 
 // ============================================
@@ -1353,7 +1489,7 @@ Deno.serve(async (req) => {
             break;
           case "bj":
           case "barrett-jackson":
-            syncResult = await syncBarrettJackson();
+            syncResult = await syncBarrettJackson(supabase);
             break;
           case "rm":
           case "rm-sothebys":
@@ -1373,6 +1509,13 @@ Deno.serve(async (req) => {
         }
 
         const normalizedPlatform = platformAliases[platform] || platform;
+
+        // A reader standing down after refusals writes nothing, not even health, so its stand-down can lapse.
+        if (syncResult.skip) {
+          results.push({ platform: normalizedPlatform, success: true, live_count: 0, new_count: 0, updated_count: 0, ended_count: 0,
+                         reader: { skipped: syncResult.skip }, error: null, duration_ms: Date.now() - startTime });
+          continue;
+        }
 
         // Refresh the live lots' event rows first (fast, read by predictions). Bid snapshots are retired (see above).
         const bidSnapshotCount = 0;
