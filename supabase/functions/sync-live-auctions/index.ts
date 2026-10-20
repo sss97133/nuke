@@ -1356,7 +1356,9 @@ Deno.serve(async (req) => {
           .from("vehicles")
           .update({ auction_status: "ended", sale_status: "not_sold" })
           .eq("auction_status", "active")
-          .neq("platform_source", "bringatrailer") // BaT soft-close clocks require a native terminal record.
+          // BaT soft-close clocks require a native terminal record. eBay Motors lots are ended by their own reader
+          // (extract-ebay-motors auctions) as 'ended': eBay's API cannot say sold or unsold, so 'not_sold' would be invented.
+          .not("platform_source", "in", "(bringatrailer,ebay-motors)")
           .lt("auction_end_date", new Date().toISOString())
           .not("auction_end_date", "is", null)
           .select("id", { count: "exact", head: true });
