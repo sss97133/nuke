@@ -12,10 +12,14 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
  *   - Bonhams: its public Typesense sale and lot index; bids of its online (timed) sales from its bidding platform
  *     (live.bonhams.com); lots of in-room catalog sales are written 'upcoming', never live
  *   - Broad Arrow: its bidding site's timed online sales (sale list hourly, lot list with top bids every run)
+ *   - Mecum: its public lot index (Algolia), read only around a sale's run days; a car is live on its run day until the
+ *     index records it crossed the block (or before, with an online pre-bid)
  *   - Cars & Bids: Uses Firecrawl (Cloudflare protected)
- *   - Mecum, Barrett-Jackson, Gooding: Firecrawl scrape + extract; RM Sotheby's has no readable live bid (see syncRMSothebys)
- * Collecting Cars, PCarMarket, Bonhams and Broad Arrow boards are complete lists: after the vehicles upsert each is handed to
- * live_auction_board_sync, the monitored_auctions schedule writer for those houses (BaT's is bat_live_pull_run).
+ *   - Barrett-Jackson, Gooding: Firecrawl scrape + extract; RM Sotheby's has no readable live bid (see syncRMSothebys)
+ * Collecting Cars, PCarMarket, Bonhams, Broad Arrow and Mecum boards are complete lists: after the vehicles upsert each is
+ * handed to live_auction_board_sync, the monitored_auctions schedule writer for those houses (BaT's is bat_live_pull_run).
+ * A house that reports each lot's close (Mecum) also returns those lots; their vehicles rows stop being live through
+ * end_live_auction_lots.
  *
  * Deploy: supabase functions deploy sync-live-auctions --no-verify-jwt
  *
@@ -35,6 +39,7 @@ import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { mustWrite } from '../_shared/writeResult.ts';
 import {
   type BonhamsBidState, type BonhamsLotDoc, type BonhamsSaleDoc, bonhamsLot, bonhamsLotPhase, bonhamsSaleKind,
+  type MecumIndexHit, type MecumLot, mecumLot, mecumRunDatesToRead, mecumSalesToRead,
   type PcarBoardItem, parseBonhamsBidStates, parsePcarBids, parsePcarBoard,
 } from "./boards.ts";
 import { type AmLotDoc, amOpenTimedSales, amSales, amTimedLot, BROAD_ARROW_BID } from "./boards.ts";
@@ -75,6 +80,24 @@ interface LiveAuction {
   raw_data: Record<string, unknown>;
 }
 
+/** A lot the house itself reports closed (crossed the block, sold, passed, its day over): its vehicles row stops being live. */
+interface ClosedLot {
+  url: string;
+  external_id: string;
+  closing_bid: number | null; // the bid it closed on, when the house states it (never a sale price)
+  ended_at: string | null; // the close time the house states; null when it states none
+  currency: string | null;
+  bid_count: number | null;
+}
+
+/** One platform read: its open lots, the lots it reports closed, and what it read. */
+interface SyncOutcome {
+  auctions: LiveAuction[];
+  error: string | null;
+  closed?: ClosedLot[];
+  reader?: Record<string, unknown>;
+}
+
 interface SyncResult {
   platform: string;
   success: boolean;
@@ -84,6 +107,7 @@ interface SyncResult {
   ended_count: number;
   write_errors?: string[];
   board?: Record<string, unknown> | null;
+  reader?: Record<string, unknown> | null;
   bid_snapshots?: number;
   error: string | null;
   duration_ms: number;
@@ -559,16 +583,101 @@ async function ingestPcarBids(
 }
 
 // ============================================
-// Mecum Sync (Firecrawl, stealth proxy for Cloudflare)
+// Mecum Sync (its public lot index, read only around a sale's run days)
 // ============================================
 
-async function syncMecum(): Promise<{ auctions: LiveAuction[]; error: string | null }> {
-  return syncViaFirecrawlExtract(
-    "mecum",
-    "https://www.mecum.com/lots/",
-    /mecum\.com\/lots\//i,
-    { useProxy: true, waitFor: 5000 }
-  );
+// The index Mecum's own site search reads (Algolia app U6CFCQ7V52, index wp_posts_lot); extract-mecum lands lots from the
+// same index with the same search-only key, which the site ships and which can read, not write.
+const MECUM_INDEX_URL = "https://U6CFCQ7V52-dsn.algolia.net/1/indexes/*/queries";
+const MECUM_INDEX_APP = "U6CFCQ7V52";
+const MECUM_INDEX_KEY = "0291c46cde807bcb428a021a96138fcb"; // gitleaks:allow (public search-only key the site ships, not a secret)
+const NUKE_AGENT = "NukeListingCollector/1.0 (+https://nuke.ag)";
+const MECUM_LOT_FIELDS = JSON.stringify([
+  "post_title", "permalink", "lot_number_meta", "auction_day_start_meta", "current_bid_meta", "has_prebidding_meta", "sold",
+  "bid_goes_on", "highest_bid_or_price", "images_meta", "taxonomies.lot_type", "taxonomies.lot_status", "taxonomies.make",
+  "taxonomies.model", "taxonomies.lot_year", "taxonomies.run_date", "taxonomies.auction_tax",
+]);
+
+// deno-lint-ignore no-explicit-any
+async function mecumIndex(params: string): Promise<any> {
+  const res = await fetch(MECUM_INDEX_URL, { // guardrail-allow: raw-fetch (house JSON API)
+    method: "POST",
+    headers: { "x-algolia-application-id": MECUM_INDEX_APP, "x-algolia-api-key": MECUM_INDEX_KEY, "Content-Type": "application/json", "User-Agent": NUKE_AGENT },
+    body: JSON.stringify({ requests: [{ indexName: "wp_posts_lot", params }] }),
+  });
+  if (!res.ok) throw new Error(`Mecum index HTTP ${res.status}`);
+  const result = (await res.json())?.results?.[0];
+  if (!result || result.message) throw new Error(`Mecum index: ${result?.message ?? "no result"}`);
+  return result;
+}
+
+/**
+ * Mecum's live lots. Every read asks the calendar (one request) and, for lots of sales not running, whether any states an
+ * online pre-bid (one request); nothing else happens outside a sale's run days. Inside them it reads the lots of
+ * yesterday, today and tomorrow (one request each). A car is live on its run day, from the day's start the index states
+ * until 24 hours later, until the index records it crossed the block; a lot taking online pre-bids is live before its day.
+ * Crossed lots, and lots whose day ended with no result stated, are returned as closed.
+ */
+async function syncMecum(): Promise<SyncOutcome> {
+  try {
+    const now = Date.now();
+    const lotQuery = (filters: string) =>
+      `hitsPerPage=1000&filters=${encodeURIComponent(filters)}&attributesToRetrieve=${encodeURIComponent(MECUM_LOT_FIELDS)}&attributesToHighlight=[]&attributesToSnippet=[]`;
+    const calendar = await mecumIndex(`hitsPerPage=0&facets=${encodeURIComponent('["taxonomies.auction_tax.name"]')}&maxValuesPerFacet=1000`);
+    const sales = mecumSalesToRead(calendar.facets?.["taxonomies.auction_tax.name"] ?? {}, now);
+    const quote = (s: string) => `"${s.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`; // an Algolia filter string literal
+    const notRunning = sales.map((s) => ` AND NOT taxonomies.auction_tax.name:${quote(s.value)}`).join("");
+    const pre = await mecumIndex(lotQuery(
+      `current_bid_meta > 0 AND auction_end_date_meta >= ${Math.floor(now / 1000) - 86_400} AND NOT taxonomies.lot_type.name:"Road Art"${notRunning}`,
+    ));
+    const hits: MecumIndexHit[] = [...(pre.hits ?? [])];
+    const read: Record<string, number> = { stated_bid_outside_run_days: pre.nbHits ?? 0 };
+    for (const sale of sales) {
+      for (const day of mecumRunDatesToRead(sale, now)) {
+        const r = await mecumIndex(lotQuery(`taxonomies.auction_tax.name:${quote(sale.value)} AND taxonomies.run_date.name:${quote(day)}`));
+        if ((r.nbHits ?? 0) > 1000) console.warn(`[sync-live-auctions] Mecum ${sale.name} ${day}: ${r.nbHits} lots, 1000 readable`);
+        read[`${sale.name} ${day}`] = r.nbHits ?? 0;
+        hits.push(...(r.hits ?? []));
+      }
+    }
+    const lots = new Map<string, MecumLot>();
+    for (const h of hits) {
+      const lot = mecumLot(h, now);
+      if (lot) lots.set(lot.url, lot);
+    }
+    const auctions: LiveAuction[] = [];
+    const closed: ClosedLot[] = [];
+    for (const lot of lots.values()) {
+      if (lot.state === "open" && lot.closes) {
+        auctions.push({
+          url: lot.url,
+          title: lot.title,
+          platform: "mecum",
+          auction_end_date: lot.closes,
+          current_bid: lot.current_bid,
+          bid_count: null,
+          currency: "USD",
+          no_reserve: lot.no_reserve,
+          reserve_met: null,
+          year: lot.year,
+          make: lot.make,
+          model: lot.model,
+          thumbnail_url: lot.image,
+          external_id: lot.lot_id,
+          raw_data: {
+            source: "mecum_lot_index", sale: lot.sale, run_day: lot.run_day, lot_number: lot.lot_number, opens: lot.opens,
+            closes: lot.closes, ends_basis: "run_day_close", prebid: lot.prebid, synced_at: new Date(now).toISOString(),
+          },
+        });
+      } else if (lot.state === "crossed" || lot.state === "closed") {
+        closed.push({ url: lot.url, external_id: lot.lot_id, closing_bid: lot.closing_bid, ended_at: null, currency: "USD", bid_count: null });
+      }
+    }
+    console.log(`[sync-live-auctions] Mecum: ${sales.length} sale(s) in run days, ${auctions.length} live, ${closed.length} closed`);
+    return { auctions, closed, error: null, reader: { sales: sales.map((s) => s.name), read, live: auctions.length, closed: closed.length } };
+  } catch (e: unknown) {
+    return { auctions: [], error: `Mecum sync failed: ${e instanceof Error ? e.message : String(e)}` };
+  }
 }
 
 // ============================================
@@ -774,7 +883,9 @@ async function syncBroadArrow(): Promise<{ auctions: LiveAuction[]; error: strin
 }
 
 /** The houses whose open board is read complete and scheduled by live_auction_board_sync (slug per platform). */
-const BOARD_SOURCES: Record<string, string> = { "collecting-cars": "collecting-cars", pcarmarket: "pcarmarket", bonhams: "bonhams", "broad-arrow": "broad-arrow" };
+const BOARD_SOURCES: Record<string, string> = {
+  "collecting-cars": "collecting-cars", pcarmarket: "pcarmarket", bonhams: "bonhams", "broad-arrow": "broad-arrow", mecum: "mecum",
+};
 
 // ============================================
 // Cars & Bids Sync (Firecrawl)
@@ -1217,7 +1328,7 @@ Deno.serve(async (req) => {
         }
 
         const startTime = Date.now();
-        let syncResult: { auctions: LiveAuction[]; error: string | null };
+        let syncResult: SyncOutcome;
 
         // Fetch from platform
         switch (platform) {
@@ -1304,9 +1415,20 @@ Deno.serve(async (req) => {
         if (!skipVehicleSync && !syncResult.error) {
           dbStats = await syncToDatabase(supabase, syncResult.auctions, normalizedPlatform);
         }
+        // Lots the house reports closed stop being live: crossed the block, sold, passed (end_live_auction_lots ends only
+        // rows that are auction_live and inserts nothing).
+        const closedLots = syncResult.closed ?? [];
+        if (!skipVehicleSync && !syncResult.error && closedLots.length) {
+          const { data: n, error: endErr } = await supabase.rpc("end_live_auction_lots", {
+            p_lots: closedLots.map((c) => ({ url: c.url, closing_bid: c.closing_bid, ended_at: c.ended_at })),
+          });
+          if (endErr) dbStats.write_errors.push(`end_live_auction_lots: ${endErr.message}`);
+          else dbStats.ended_count += Number(n) || 0;
+        }
 
         // Board-synced houses: the same complete board goes to the monitored_auctions schedule writer; lots whose bid
-        // count moved have their bids read with their own clocks where the house publishes them (PCarMarket).
+        // count moved have their bids read with their own clocks where the house publishes them (PCarMarket). Closed lots
+        // go with their closing bid and close time (none stated: no end), so the writer takes them off the schedule.
         let board: Record<string, unknown> | null = null;
         const boardSlug = BOARD_SOURCES[normalizedPlatform];
         if (boardSlug) {
@@ -1314,10 +1436,15 @@ Deno.serve(async (req) => {
             ? { p_slug: boardSlug, p_lots: [], p_complete: false, p_error: syncResult.error }
             : {
               p_slug: boardSlug,
-              p_lots: syncResult.auctions.map((a) => ({
-                url: a.url, external_id: a.external_id, ends: a.auction_end_date || null,
-                current_bid: a.current_bid, bid_count: a.bid_count, currency: a.currency ?? null,
-              })),
+              p_lots: [
+                ...syncResult.auctions.map((a) => ({
+                  url: a.url, external_id: a.external_id, ends: a.auction_end_date || null,
+                  current_bid: a.current_bid, bid_count: a.bid_count, currency: a.currency ?? null,
+                })),
+                ...closedLots.map((c) => ({
+                  url: c.url, external_id: c.external_id, ends: c.ended_at, current_bid: c.closing_bid, bid_count: c.bid_count, currency: c.currency,
+                })),
+              ],
               p_complete: true,
             });
           if (bsErr) dbStats.write_errors.push(`live_auction_board_sync: ${bsErr.message}`);
@@ -1337,6 +1464,7 @@ Deno.serve(async (req) => {
 
         results.push({
           board,
+          reader: syncResult.reader ?? null,
           platform: normalizedPlatform,
           success: !syncResult.error && dbStats.write_errors.length === 0,
           live_count: syncResult.auctions.length,

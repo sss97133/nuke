@@ -1,6 +1,7 @@
 import { assertEquals } from "jsr:@std/assert@1";
 import {
-  type BonhamsSaleDoc, bonhamsLot, bonhamsLotPhase, bonhamsSaleKind, parseBonhamsBidStates, parsePcarBids, parsePcarBoard,
+  type BonhamsSaleDoc, bonhamsLot, bonhamsLotPhase, bonhamsSaleKind, type MecumIndexHit, mecumLot, mecumRunDatesToRead, mecumSalesToRead,
+  parseBonhamsBidStates, parsePcarBids, parsePcarBoard,
 } from "./boards.ts";
 import { type AmLotDoc, type AmSale, amIsVehicleLot, amOpenTimedSales, amSales, amTimedLot } from "./boards.ts";
 
@@ -253,4 +254,99 @@ Deno.test("amIsVehicleLot: a model-year title in a car sale, not a year-led part
   assertEquals(amIsVehicleLot("1992 Original Lotus 107C Rear Wing Element", "Global Icons: Memorabilia Online 2026"), false);
   assertEquals(amIsVehicleLot("Ralf Schumacher 2004 Original Williams Gloves", "Global Icons: Memorabilia Online 2026"), false);
   assertEquals(amTimedLot(GLOVES, MEMO, READ_AT).vehicle, false);
+});
+
+// Mecum's public lot index (Algolia U6CFCQ7V52 / wp_posts_lot), records as the reader requests them, read 2026-10-20 19:40Z.
+// The calendar facet (sale "Name|first run date|last run date" -> lots), four of its 272 values.
+const MECUM_FACET: Record<string, number> = {
+  "Nashville 2026|1790035200|1790380800": 1691,
+  "Dallas/Fort Worth 2026|1792540800|1792800000": 1258,
+  "Las Vegas 2026|1794441600|1794614400": 191,
+  "Kissimmee 2027|1799107200|1800144000": 910,
+};
+const tax = (sale: string, saleSlug: string, run: string, type: string, year: number | null, make: string | null, model: string | null, statuses: string[]) => ({
+  auction_tax: [{ name: sale, slug: saleSlug }],
+  lot_status: statuses.map((s) => ({ name: s, slug: s })),
+  lot_type: [{ name: type, slug: type.toLowerCase().replace(" ", "-") }],
+  ...(year ? { lot_year: [{ name: year, slug: String(year) }] } : {}),
+  ...(make ? { make: [{ name: make, slug: make.toLowerCase() }] } : {}),
+  ...(model ? { model: [{ name: model, slug: model.toLowerCase() }] } : {}),
+  run_date: [{ name: run, slug: run }],
+});
+const NASH = "Nashville 2026|1790035200|1790380800";
+const DFW = "Dallas/Fort Worth 2026|1792540800|1792800000";
+// Nashville 2026, run day 24 Sep: sold with the hammer stated, the bid goes on, sold with no hammer stated, and no result stated.
+const T149: MecumIndexHit = { post_title: "1969 Plymouth Barracuda Formula S Fastback", permalink: "/lots/1177898/1969-plymouth-barracuda-formula-s-fastback/",
+  taxonomies: tax(NASH, "nashville-2026", "2026-09-24", "Auto", 1969, "Plymouth", "Barracuda", ["star"]), auction_day_start_meta: "2026-09-24 05:00:00",
+  current_bid_meta: 31000, images_meta: [{ url: "https://res.cloudinary.com/mecum/image/upload/v1785517738/auctions/TN26/1177898/725650.jpg" }],
+  lot_number_meta: "T149", sold: 1, bid_goes_on: 0, highest_bid_or_price: 34100 };
+const T247: MecumIndexHit = { post_title: "1950 Ford Custom Deluxe", permalink: "/lots/1175178/1950-ford-custom-deluxe/",
+  taxonomies: tax(NASH, "nashville-2026", "2026-09-24", "Auto", 1950, "Ford", "Custom Deluxe", ["star"]), auction_day_start_meta: "2026-09-24 05:00:00",
+  current_bid_meta: 30000, lot_number_meta: "T247", sold: 0, bid_goes_on: 1, highest_bid_or_price: 30000 };
+const T25: MecumIndexHit = { post_title: "1987 Mercedes-Benz 560SL Convertible", permalink: "/lots/1177207/1987-mercedes-benz-560sl-convertible/",
+  taxonomies: tax(NASH, "nashville-2026", "2026-09-24", "Auto", 1987, "Mercedes-Benz", "560SL", ["Feature"]), auction_day_start_meta: "2026-09-24 05:00:00",
+  lot_number_meta: "T25", sold: 1, bid_goes_on: 0, highest_bid_or_price: 26400 };
+const T172: MecumIndexHit = { post_title: "1966 Chevrolet Chevy II", permalink: "/lots/1177954/1966-chevrolet-chevy-ii/",
+  taxonomies: tax(NASH, "nashville-2026", "2026-09-24", "Auto", 1966, "Chevrolet", "Chevy II", ["star"]), auction_day_start_meta: "2026-09-24 05:00:00",
+  current_bid_meta: 115000, lot_number_meta: "T172", sold: 0, bid_goes_on: 0, highest_bid_or_price: 115000 };
+// Dallas/Fort Worth 2026 (21-24 Oct), not yet run when read: a car with no bid, a no-reserve car stating $100, a Road Art sign taking pre-bids.
+const W290: MecumIndexHit = { post_title: "1955 Ford Thunderbird Convertible", permalink: "/lots/1182658/1955-ford-thunderbird-convertible/",
+  taxonomies: tax(DFW, "dallas-fort-worth-2026", "2026-10-21", "Auto", 1955, "Ford", "Thunderbird", ["Feature"]), auction_day_start_meta: "2026-10-21 05:00:00",
+  images_meta: [{ url: "https://res.cloudinary.com/mecum/image/upload/v1791409762/auctions/DA26/1182658/127987.jpg" }],
+  lot_number_meta: "W290", sold: 0, bid_goes_on: 0, highest_bid_or_price: 0 };
+const W21: MecumIndexHit = { post_title: "2014 Volkswagen Jetta SportWagen TDI", permalink: "/lots/1180508/2014-volkswagen-jetta-sportwagen-tdi/",
+  taxonomies: tax(DFW, "dallas-fort-worth-2026", "2026-10-21", "Auto", 2014, "Volkswagen", "Jetta", ["feature", "no-reserve"]), auction_day_start_meta: "2026-10-21 05:00:00",
+  current_bid_meta: 100, lot_number_meta: "W21", sold: 0, bid_goes_on: 0, highest_bid_or_price: 100 };
+const Z443: MecumIndexHit = { post_title: "Texaco Single-Sided Porcelain Neon Sign", permalink: "/lots/1183002/texaco-single-sided-porcelain-neon-sign/",
+  taxonomies: tax(DFW, "dallas-fort-worth-2026", "2026-10-24", "Road Art", null, null, null, ["general"]), auction_day_start_meta: "2026-10-24 05:00:00",
+  current_bid_meta: 2000, has_prebidding_meta: true, lot_number_meta: "Z443", sold: 0, bid_goes_on: 0, highest_bid_or_price: 2000 };
+const MECUM_READ_AT = Date.parse("2026-10-20T19:40:00Z");
+
+Deno.test("mecumSalesToRead reads a sale from 00:00 UTC of its first run date to 12:00 UTC after its last, and nothing else", () => {
+  assertEquals(mecumSalesToRead(MECUM_FACET, MECUM_READ_AT), []); // read the day before the sale: nothing runs
+  assertEquals(mecumSalesToRead(MECUM_FACET, Date.parse("2026-10-21T00:00:00Z")).map((s) => s.name), ["Dallas/Fort Worth 2026"]);
+  assertEquals(mecumSalesToRead(MECUM_FACET, Date.parse("2026-10-25T11:59:00Z")).map((s) => s.name), ["Dallas/Fort Worth 2026"]);
+  assertEquals(mecumSalesToRead(MECUM_FACET, Date.parse("2026-10-25T12:00:00Z")), []);
+  assertEquals(mecumSalesToRead(MECUM_FACET, Date.parse("2026-09-24T18:00:00Z")).map((s) => s.name), ["Nashville 2026"]);
+});
+
+Deno.test("mecumRunDatesToRead reads today, and yesterday until 12:00 UTC, inside the sale's dates", () => {
+  const [dfw] = mecumSalesToRead(MECUM_FACET, Date.parse("2026-10-21T06:00:00Z"));
+  assertEquals(mecumRunDatesToRead(dfw, Date.parse("2026-10-21T06:00:00Z")), ["2026-10-21"]);
+  assertEquals(mecumRunDatesToRead(dfw, Date.parse("2026-10-22T07:00:00Z")), ["2026-10-21", "2026-10-22"]);
+  assertEquals(mecumRunDatesToRead(dfw, Date.parse("2026-10-22T15:00:00Z")), ["2026-10-22"]);
+  assertEquals(mecumRunDatesToRead(dfw, Date.parse("2026-10-25T03:00:00Z")), ["2026-10-24"]);
+});
+
+Deno.test("mecumLot: a car is open on its run day, from the day's start until 24 hours later, and upcoming before", () => {
+  assertEquals(mecumLot(W290, MECUM_READ_AT)?.state, "upcoming");
+  const open = mecumLot(W290, Date.parse("2026-10-21T15:00:00Z"));
+  assertEquals(open, {
+    url: "https://www.mecum.com/lots/1182658/1955-ford-thunderbird-convertible/",
+    lot_id: "1182658", title: "1955 Ford Thunderbird Convertible", lot_number: "W290", sale: "Dallas/Fort Worth 2026", run_day: "2026-10-21",
+    opens: "2026-10-21T05:00:00.000Z", closes: "2026-10-22T05:00:00.000Z", state: "open", result: null,
+    current_bid: null, closing_bid: null, price_with_premium: null, prebid: false, no_reserve: false,
+    image: "https://res.cloudinary.com/mecum/image/upload/v1791409762/auctions/DA26/1182658/127987.jpg",
+    year: 1955, make: "Ford", model: "Thunderbird",
+  });
+  assertEquals(mecumLot(W290, Date.parse("2026-10-22T05:00:00Z"))?.state, "closed");
+  const jetta = mecumLot(W21, Date.parse("2026-10-21T15:00:00Z"))!;
+  assertEquals([jetta.state, jetta.current_bid, jetta.no_reserve], ["open", 100, true]);
+  assertEquals(mecumLot(W21, MECUM_READ_AT)!.current_bid, null); // a stated bid is not shown before the lot's day opens
+});
+
+Deno.test("mecumLot: a crossed lot carries its result, its hammer bid when stated and the sale price apart from the bid", () => {
+  const sold = mecumLot(T149, Date.parse("2026-09-24T20:00:00Z"))!;
+  assertEquals([sold.state, sold.result, sold.closing_bid, sold.price_with_premium, sold.current_bid], ["crossed", "sold", 31000, 34100, null]);
+  const bgo = mecumLot(T247, Date.parse("2026-09-24T20:00:00Z"))!;
+  assertEquals([bgo.state, bgo.result, bgo.closing_bid, bgo.price_with_premium], ["crossed", "bid-goes-on", 30000, null]);
+  const noHammer = mecumLot(T25, Date.parse("2026-09-24T20:00:00Z"))!;
+  assertEquals([noHammer.result, noHammer.closing_bid, noHammer.price_with_premium], ["sold", null, 26400]);
+  const none = mecumLot(T172, Date.parse("2026-09-25T06:00:00Z"))!;
+  assertEquals([none.state, none.result, none.closing_bid], ["closed", null, 115000]);
+});
+
+Deno.test("mecumLot leaves out Road Art and records without a lot page", () => {
+  assertEquals(mecumLot(Z443, MECUM_READ_AT), null);
+  assertEquals(mecumLot({ ...W290, permalink: "" }, MECUM_READ_AT), null);
 });
