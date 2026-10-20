@@ -517,6 +517,8 @@ jobs:
           deno-version: v2.x
       - name: Verify map-vehicles reads the fold only for unfiltered requests, inside timed transactions
         run: deno test --node-modules-dir=none supabase/functions/map-vehicles/cells.test.ts
+      - name: Verify the one map's areas and area reads come from map_facts only, bounded and shaped whole
+        run: deno test --node-modules-dir=none supabase/functions/map-vehicles/facts.test.ts
       - name: Verify archiveFetch cache hits any successful snapshot and does not archive large lot pages as login walls
         run: deno test --no-check --node-modules-dir=none --allow-env --allow-net --allow-read supabase/functions/_shared/archiveFetch.cache.test.ts supabase/functions/_shared/firecrawlGate.test.ts
       - name: Verify the live board readers for PCarMarket and Bonhams
