@@ -39,9 +39,12 @@ CREATE FUNCTION public.is_admin_or_moderator() RETURNS boolean LANGUAGE sql AS $
 CREATE FUNCTION public.user_can_edit_vehicle(uuid, uuid) RETURNS boolean LANGUAGE sql AS $$ SELECT false $$;
 
 CREATE TABLE public.vehicles (
-  id uuid PRIMARY KEY, status text, merged_into_vehicle_id uuid, deleted_at timestamptz, user_id uuid, owner_id uuid, uploaded_by uuid, image_count integer, vin text);
+  id uuid PRIMARY KEY, status text, merged_into_vehicle_id uuid, deleted_at timestamptz, user_id uuid, owner_id uuid, uploaded_by uuid, image_count integer, vin text, listing_url text);
 CREATE TABLE public.vehicle_user_permissions (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid NOT NULL, user_id uuid, role text, is_active boolean DEFAULT true);
+CREATE TABLE public.work_sessions (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid NOT NULL, start_time timestamptz NOT NULL, title text,
+  UNIQUE (vehicle_id, start_time));
+CREATE TABLE public.receipts (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid, scope_type text, scope_id text, total numeric);
 CREATE TABLE public.vehicle_images (
   id uuid PRIMARY KEY, vehicle_id uuid, merged_from_vehicle_id uuid, image_url text, file_hash text,
   is_superseded boolean, is_duplicate boolean);
@@ -84,6 +87,7 @@ CREATE TABLE public.merge_proposals (
 \i supabase/migrations/20261015220000_merge_carries_events_and_supersedes.sql
 \i supabase/migrations/20261020050500_merge_vin_carry_and_protected_observations.sql
 \i supabase/migrations/20261021170000_merge_gate_reads_every_owner_signal.sql
+\i supabase/migrations/20261021200000_merge_carries_records.sql
 
 SELECT pg_temp.ok('the migration added merged_from_vehicle_id to vehicle_events and timeline_events',
   (SELECT count(*) FROM information_schema.columns WHERE table_name IN ('vehicle_events', 'timeline_events') AND column_name = 'merged_from_vehicle_id') = 2);
@@ -304,6 +308,31 @@ INSERT INTO vehicle_merge_proposals (primary_vehicle_id, duplicate_vehicle_id, m
   VALUES ('00000000-0000-0000-0000-00000000c0d6', '00000000-0000-0000-0000-00000000c0a6', 'owner_approved', 'approved', '00000000-0000-0000-0000-0000000000f1');
 SELECT pg_temp.ok('an owner_id row merges once an approved, reviewed proposal names the pair (either direction)',
   merge_into_primary('00000000-0000-0000-0000-00000000c0a6', '00000000-0000-0000-0000-00000000c0d6') ? 'proposal_id');
+
+-- The single-pair merge carries the records too (20261021200000), refuses two different owners, and unmerge returns exactly them.
+INSERT INTO vehicles (id, status, owner_id) VALUES
+  ('00000000-0000-0000-0000-00000000d0a1', 'active', NULL), ('00000000-0000-0000-0000-00000000d0d1', 'active', '00000000-0000-0000-0000-0000000000f1'),
+  ('00000000-0000-0000-0000-00000000d0a2', 'active', '00000000-0000-0000-0000-0000000000f2'), ('00000000-0000-0000-0000-00000000d0d2', 'active', '00000000-0000-0000-0000-0000000000f3');
+INSERT INTO vehicle_merge_proposals (primary_vehicle_id, duplicate_vehicle_id, match_type, status, reviewed_by) VALUES
+  ('00000000-0000-0000-0000-00000000d0a1', '00000000-0000-0000-0000-00000000d0d1', 'owner_approved', 'approved', '00000000-0000-0000-0000-0000000000f1'),
+  ('00000000-0000-0000-0000-00000000d0a2', '00000000-0000-0000-0000-00000000d0d2', 'owner_approved', 'approved', '00000000-0000-0000-0000-0000000000f1');
+INSERT INTO work_sessions (id, vehicle_id, start_time, title) VALUES ('d0000000-0000-0000-0000-0000000000d1', '00000000-0000-0000-0000-00000000d0d1', '2025-05-02 08:00+00', 'kept as typed');
+INSERT INTO receipts (id, vehicle_id, scope_type, scope_id, total) VALUES ('d0100000-0000-0000-0000-0000000000d1', NULL, 'vehicle', '00000000-0000-0000-0000-00000000d0d1', 61.25);
+CREATE TABLE pg_temp.single_carry AS SELECT merge_into_primary('00000000-0000-0000-0000-00000000d0a1', '00000000-0000-0000-0000-00000000d0d1') r;
+SELECT pg_temp.ok('single merge: the work session and the scope-named receipt moved, the owner link filled the survivor, all journaled',
+  (SELECT vehicle_id = '00000000-0000-0000-0000-00000000d0a1' AND title = 'kept as typed' FROM work_sessions WHERE id = 'd0000000-0000-0000-0000-0000000000d1')
+  AND (SELECT scope_id = '00000000-0000-0000-0000-00000000d0a1' AND total = 61.25 FROM receipts WHERE id = 'd0100000-0000-0000-0000-0000000000d1')
+  AND (SELECT owner_id = '00000000-0000-0000-0000-0000000000f1' FROM vehicles WHERE id = '00000000-0000-0000-0000-00000000d0a1')
+  AND (SELECT merge_journal -> 'carry' -> 'carried' ? 'work_sessions' AND merge_journal -> 'carry' -> 'owner_filled' ? 'owner_id' FROM vehicle_merge_proposals WHERE duplicate_vehicle_id = '00000000-0000-0000-0000-00000000d0d1'));
+SELECT pg_temp.ok('single merge: two different owners are refused (owner_conflict) even with an approved proposal',
+  merge_into_primary('00000000-0000-0000-0000-00000000d0a2', '00000000-0000-0000-0000-00000000d0d2') ->> 'skipped' = 'owner_conflict');
+CREATE TABLE pg_temp.single_unmerge AS
+  SELECT unmerge_vehicle((SELECT id FROM vehicle_merge_proposals WHERE duplicate_vehicle_id = '00000000-0000-0000-0000-00000000d0d1' AND status = 'merged'), 'contract: single carry') r;
+SELECT pg_temp.ok('unmerge after a single merge returns the session, the receipt scope and the owner link',
+  (SELECT vehicle_id = '00000000-0000-0000-0000-00000000d0d1' FROM work_sessions WHERE id = 'd0000000-0000-0000-0000-0000000000d1')
+  AND (SELECT scope_id = '00000000-0000-0000-0000-00000000d0d1' FROM receipts WHERE id = 'd0100000-0000-0000-0000-0000000000d1')
+  AND (SELECT owner_id IS NULL FROM vehicles WHERE id = '00000000-0000-0000-0000-00000000d0a1')
+  AND (SELECT r ->> 'success' = 'true' FROM pg_temp.single_unmerge));
 
 SELECT pg_temp.ok('unmerge of a merge with no journal says no_journal',
   unmerge_vehicle('90000000-0000-0000-0000-000000000001') ->> 'error' = 'no_journal');

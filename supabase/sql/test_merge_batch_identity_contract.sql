@@ -98,7 +98,25 @@ CREATE TABLE public.vehicle_merge_proposals (
   merged_at timestamptz, merge_journal jsonb, pre_merge_dup_status text, unmerged_at timestamptz, unmerged_by uuid,
   UNIQUE (primary_vehicle_id, duplicate_vehicle_id));
 CREATE TABLE public.vehicle_user_permissions (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid NOT NULL, user_id uuid, role text, is_active boolean DEFAULT true);
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid NOT NULL, user_id uuid, role text, is_active boolean DEFAULT true,
+  UNIQUE (vehicle_id, user_id));
+-- Records a merge carries (20261021200000), with the live unique rules that decide a collision.
+CREATE TABLE public.work_sessions (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid NOT NULL, start_time timestamptz NOT NULL, title text,
+  UNIQUE (vehicle_id, start_time));
+CREATE TABLE public.receipts (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid, scope_type text, scope_id text, total numeric);
+CREATE TABLE public.payment_events (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), scope_type text, scope_id uuid, amount numeric);
+CREATE TABLE public.organization_vehicles (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), organization_id uuid NOT NULL, vehicle_id uuid NOT NULL,
+  relationship_type text, UNIQUE (organization_id, vehicle_id, relationship_type));
+CREATE TABLE public.vehicle_listings (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid NOT NULL, status text);
+CREATE UNIQUE INDEX vehicle_listings_one_active ON public.vehicle_listings (vehicle_id) WHERE status = 'active';
+CREATE UNIQUE INDEX vehicle_listings_one_draft ON public.vehicle_listings (vehicle_id) WHERE status = 'draft';
+CREATE TABLE public.qb_transactions (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid, amount numeric);
+-- a trigger that refuses to move a row: the carry must record it and go on
+CREATE FUNCTION public.t_refuse_qb_move() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN
+  IF NEW.vehicle_id IS DISTINCT FROM OLD.vehicle_id THEN RAISE EXCEPTION 'contract trigger: qb rows do not move'; END IF; RETURN NEW; END $$;
+CREATE TRIGGER t_refuse_qb_move BEFORE UPDATE ON public.qb_transactions FOR EACH ROW EXECUTE FUNCTION public.t_refuse_qb_move();
+-- evidence tables are never carried
+CREATE TABLE public.evidence_runs (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), named_vehicle_id uuid, vehicle_id uuid);
 CREATE TABLE public.merge_deleted_rows (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(), proposal_id uuid, source_table text, row_id uuid, row_data jsonb, restored_at timestamptz);
 CREATE TABLE public.merge_proposals (
@@ -113,6 +131,7 @@ CREATE TABLE public.superseded_rows (
 \i supabase/migrations/20261020050500_merge_vin_carry_and_protected_observations.sql
 \i supabase/migrations/20261021040000_merge_batch_same_source_image_stays.sql
 \i supabase/migrations/20261021170000_merge_gate_reads_every_owner_signal.sql
+\i supabase/migrations/20261021200000_merge_carries_records.sql
 
 -- ---------------------------------------------------------------------------------------------------------------------
 -- 1. correct_vehicle_vin: a merged-away holder owns nothing; a live holder still does.
@@ -373,3 +392,126 @@ SELECT pg_temp.ok('refused without approval: user_id, owner_id, uploaded_by, an 
 SELECT pg_temp.ok('merged: F inactive owner permission, G contributor permission, H approved owner pair, I no signal',
   (SELECT count(*) FROM vehicles WHERE id IN ('00000000-0000-0000-0000-00000000b0d6', '00000000-0000-0000-0000-00000000b0d7', '00000000-0000-0000-0000-00000000b0d8', '00000000-0000-0000-0000-00000000b0d9')
      AND status = 'merged') = 4);
+
+-- ---------------------------------------------------------------------------------------------------------------------
+-- 9. A merge carries the records about the car and its people (20261021200000); unmerge returns exactly those rows.
+--    P9 survivor (unowned), D9 duplicate (owner_id O1, approved proposal, filed the other way round).
+--    work_sessions: D9 has t1 (P9 holds t1 too) and t2        -> t2 moves, t1 stays
+--    receipts: one by vehicle_id, one named only by scope     -> both move;  payment_events: scope vehicle moves, scope user does not
+--    permissions: D9 has U1 owner and U2 contributor, P9 has U2 -> U1 moves, U2 stays
+--    organization_vehicles: D9 (org1 owner, org2 sold_by), P9 (org1 owner) -> org2 sold_by moves
+--    vehicle_listings: D9 active (P9 has one active) stays, D9 draft moves
+--    qb_transactions: a trigger refuses the move -> recorded in carry.errors, the row stays, the merge still happens
+--    evidence_runs naming D9 is never touched
+-- ---------------------------------------------------------------------------------------------------------------------
+\set P9 '''00000000-0000-0000-0000-00000000c9a1'''
+\set D9 '''00000000-0000-0000-0000-00000000c9d1'''
+\set O1 '''00000000-0000-0000-0000-0000000000a9'''
+INSERT INTO vehicles (id, status, year, make, model, owner_id) VALUES (:P9, 'active', 1966, 'Ford', 'Mustang', NULL), (:D9, 'active', 1966, 'Ford', 'Mustang', :O1);
+INSERT INTO vehicle_merge_proposals (primary_vehicle_id, duplicate_vehicle_id, match_type, status, reviewed_by)
+  VALUES (:D9, :P9, 'owner_approved', 'approved', '00000000-0000-0000-0000-0000000000a9');
+INSERT INTO work_sessions (id, vehicle_id, start_time, title) VALUES
+  ('c9000000-0000-0000-0000-000000000001', :P9, '2025-05-01 08:00+00', 'P9 own day'),
+  ('c9000000-0000-0000-0000-0000000000d1', :D9, '2025-05-01 08:00+00', 'D9 same day, titled K10'),
+  ('c9000000-0000-0000-0000-0000000000d2', :D9, '2025-05-02 08:00+00', 'D9 second day, titled K10');
+INSERT INTO receipts (id, vehicle_id, scope_type, scope_id, total) VALUES
+  ('c9100000-0000-0000-0000-0000000000d1', :D9, NULL, NULL, 125.50),
+  ('c9100000-0000-0000-0000-0000000000d2', NULL, 'vehicle', '00000000-0000-0000-0000-00000000c9d1', 40.00);
+INSERT INTO payment_events (id, scope_type, scope_id, amount) VALUES
+  ('c9200000-0000-0000-0000-0000000000d1', 'vehicle', :D9, 900),
+  ('c9200000-0000-0000-0000-0000000000d2', 'user', :D9, 5);
+INSERT INTO vehicle_user_permissions (id, vehicle_id, user_id, role, is_active) VALUES
+  ('c9300000-0000-0000-0000-000000000001', :P9, '00000000-0000-0000-0000-0000000000b2', 'contributor', true),
+  ('c9300000-0000-0000-0000-0000000000d1', :D9, '00000000-0000-0000-0000-0000000000b1', 'owner', true),
+  ('c9300000-0000-0000-0000-0000000000d2', :D9, '00000000-0000-0000-0000-0000000000b2', 'contributor', true);
+INSERT INTO organization_vehicles (id, organization_id, vehicle_id, relationship_type) VALUES
+  ('c9400000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-0000000000c1', :P9, 'owner'),
+  ('c9400000-0000-0000-0000-0000000000d1', '00000000-0000-0000-0000-0000000000c1', :D9, 'owner'),
+  ('c9400000-0000-0000-0000-0000000000d2', '00000000-0000-0000-0000-0000000000c2', :D9, 'sold_by');
+INSERT INTO vehicle_listings (id, vehicle_id, status) VALUES
+  ('c9500000-0000-0000-0000-000000000001', :P9, 'active'),
+  ('c9500000-0000-0000-0000-0000000000d1', :D9, 'active'),
+  ('c9500000-0000-0000-0000-0000000000d2', :D9, 'draft');
+INSERT INTO qb_transactions (id, vehicle_id, amount) VALUES ('c9600000-0000-0000-0000-0000000000d1', :D9, 77);
+INSERT INTO evidence_runs (id, named_vehicle_id, vehicle_id) VALUES ('c9700000-0000-0000-0000-0000000000d1', :D9, :D9);
+CREATE TABLE pg_temp.carry_run AS SELECT merge_into_primary_batch(ARRAY[:P9]::uuid[], ARRAY[:D9]::uuid[]) r;
+SELECT pg_temp.ok('the pair merged and the batch reports the rows it carried',
+  (SELECT (r ->> 'merged_count')::int = 1 AND (r ->> 'carried_rows')::int = 7 FROM pg_temp.carry_run));
+SELECT pg_temp.ok('work_sessions: the new day moved with its title untouched; the day the survivor holds stayed on the duplicate',
+  (SELECT vehicle_id = :P9 AND title = 'D9 second day, titled K10' FROM work_sessions WHERE id = 'c9000000-0000-0000-0000-0000000000d2')
+  AND (SELECT vehicle_id = :D9 FROM work_sessions WHERE id = 'c9000000-0000-0000-0000-0000000000d1'));
+SELECT pg_temp.ok('receipts follow by vehicle_id and by scope; amounts are untouched',
+  (SELECT vehicle_id = :P9 AND total = 125.50 FROM receipts WHERE id = 'c9100000-0000-0000-0000-0000000000d1')
+  AND (SELECT scope_id = '00000000-0000-0000-0000-00000000c9a1' AND total = 40.00 FROM receipts WHERE id = 'c9100000-0000-0000-0000-0000000000d2'));
+SELECT pg_temp.ok('payment_events: the vehicle-scoped row follows, a user-scoped row with the same id does not',
+  (SELECT scope_id = :P9 AND amount = 900 FROM payment_events WHERE id = 'c9200000-0000-0000-0000-0000000000d1')
+  AND (SELECT scope_id = :D9 FROM payment_events WHERE id = 'c9200000-0000-0000-0000-0000000000d2'));
+SELECT pg_temp.ok('permissions: the owner row moved (the owner link), the contributor the survivor already had stayed',
+  (SELECT vehicle_id = :P9 FROM vehicle_user_permissions WHERE id = 'c9300000-0000-0000-0000-0000000000d1')
+  AND (SELECT vehicle_id = :D9 FROM vehicle_user_permissions WHERE id = 'c9300000-0000-0000-0000-0000000000d2'));
+SELECT pg_temp.ok('organization links: the new relationship moved, the one the survivor holds stayed',
+  (SELECT vehicle_id = :P9 FROM organization_vehicles WHERE id = 'c9400000-0000-0000-0000-0000000000d2')
+  AND (SELECT vehicle_id = :D9 FROM organization_vehicles WHERE id = 'c9400000-0000-0000-0000-0000000000d1'));
+SELECT pg_temp.ok('listings: the draft moved; a second active listing stayed (one active per vehicle)',
+  (SELECT vehicle_id = :P9 FROM vehicle_listings WHERE id = 'c9500000-0000-0000-0000-0000000000d2')
+  AND (SELECT vehicle_id = :D9 FROM vehicle_listings WHERE id = 'c9500000-0000-0000-0000-0000000000d1'));
+SELECT pg_temp.ok('a table whose carry fails is recorded and skipped; the merge still happened',
+  (SELECT vehicle_id = :D9 FROM qb_transactions WHERE id = 'c9600000-0000-0000-0000-0000000000d1')
+  AND (SELECT merge_journal -> 'carry' -> 'errors' ? 'qb_transactions' FROM vehicle_merge_proposals WHERE primary_vehicle_id = :D9 AND duplicate_vehicle_id = :P9 OR primary_vehicle_id = :P9 AND duplicate_vehicle_id = :D9 ORDER BY merged_at NULLS LAST LIMIT 1)
+  AND (SELECT status = 'merged' FROM vehicles WHERE id = :D9));
+SELECT pg_temp.ok('the owner link filled the unowned survivor and is journaled',
+  (SELECT owner_id = :O1 FROM vehicles WHERE id = :P9)
+  AND (SELECT merge_journal -> 'carry' -> 'owner_filled' ->> 'owner_id' = '00000000-0000-0000-0000-0000000000a9'
+         FROM vehicle_merge_proposals WHERE status = 'merged' AND duplicate_vehicle_id = :D9));
+SELECT pg_temp.ok('evidence tables are never carried',
+  (SELECT named_vehicle_id = :D9 AND vehicle_id = :D9 FROM evidence_runs WHERE id = 'c9700000-0000-0000-0000-0000000000d1'));
+-- a row added to the survivor after the merge must stay through the unmerge
+INSERT INTO work_sessions (id, vehicle_id, start_time, title) VALUES ('c9000000-0000-0000-0000-00000000f001', :P9, '2025-06-01 08:00+00', 'added after the merge');
+CREATE TABLE pg_temp.carry_unmerge AS
+  SELECT unmerge_vehicle((SELECT id FROM vehicle_merge_proposals WHERE status = 'merged' AND duplicate_vehicle_id = :D9), 'contract: carry') r;
+SELECT pg_temp.ok('unmerge ran and reports what came back',
+  (SELECT r ->> 'success' = 'true' AND (r -> 'carry_returned' ->> 'work_sessions')::int = 1 FROM pg_temp.carry_unmerge));
+SELECT pg_temp.ok('unmerge returned exactly the carried rows and the owner link; the survivor kept its own rows and the one added after the merge',
+  (SELECT vehicle_id = :D9 FROM work_sessions WHERE id = 'c9000000-0000-0000-0000-0000000000d2')
+  AND (SELECT vehicle_id = :P9 FROM work_sessions WHERE id IN ('c9000000-0000-0000-0000-000000000001', 'c9000000-0000-0000-0000-00000000f001') GROUP BY vehicle_id HAVING count(*) = 2)
+  AND (SELECT vehicle_id = :D9 FROM receipts WHERE id = 'c9100000-0000-0000-0000-0000000000d1')
+  AND (SELECT scope_id = '00000000-0000-0000-0000-00000000c9d1' FROM receipts WHERE id = 'c9100000-0000-0000-0000-0000000000d2')
+  AND (SELECT scope_id = :D9 FROM payment_events WHERE id = 'c9200000-0000-0000-0000-0000000000d1')
+  AND (SELECT vehicle_id = :D9 FROM vehicle_user_permissions WHERE id = 'c9300000-0000-0000-0000-0000000000d1')
+  AND (SELECT vehicle_id = :D9 FROM organization_vehicles WHERE id = 'c9400000-0000-0000-0000-0000000000d2')
+  AND (SELECT vehicle_id = :D9 FROM vehicle_listings WHERE id = 'c9500000-0000-0000-0000-0000000000d2')
+  AND (SELECT vehicle_id = :P9 FROM vehicle_user_permissions WHERE id = 'c9300000-0000-0000-0000-000000000001')
+  AND (SELECT owner_id IS NULL FROM vehicles WHERE id = :P9)
+  AND (SELECT owner_id = :O1 AND status = 'active' FROM vehicles WHERE id = :D9));
+
+-- Two different owners are two vehicles' owners: refused, nothing moves.
+INSERT INTO vehicles (id, status, year, make, model, owner_id) VALUES
+  ('00000000-0000-0000-0000-00000000c9a2', 'active', 1967, 'Ford', 'Mustang', '00000000-0000-0000-0000-0000000000a1'),
+  ('00000000-0000-0000-0000-00000000c9d2', 'active', 1967, 'Ford', 'Mustang', '00000000-0000-0000-0000-0000000000a2');
+INSERT INTO vehicle_merge_proposals (primary_vehicle_id, duplicate_vehicle_id, match_type, status, reviewed_by)
+  VALUES ('00000000-0000-0000-0000-00000000c9a2', '00000000-0000-0000-0000-00000000c9d2', 'owner_approved', 'approved', '00000000-0000-0000-0000-0000000000a9');
+INSERT INTO receipts (id, vehicle_id, total) VALUES ('c9100000-0000-0000-0000-0000000000e1', '00000000-0000-0000-0000-00000000c9d2', 1);
+SELECT pg_temp.ok('two different owners: the batch refuses the pair even with an approved proposal, and nothing is carried',
+  (merge_into_primary_batch(ARRAY['00000000-0000-0000-0000-00000000c9a2']::uuid[], ARRAY['00000000-0000-0000-0000-00000000c9d2']::uuid[]) ->> 'merged_count')::int = 0
+  AND (SELECT status = 'active' FROM vehicles WHERE id = '00000000-0000-0000-0000-00000000c9d2')
+  AND (SELECT vehicle_id = '00000000-0000-0000-0000-00000000c9d2' FROM receipts WHERE id = 'c9100000-0000-0000-0000-0000000000e1'));
+
+-- A merge that ran before this migration is completed from its proposal, once, and an owned pair needs a reviewed proposal.
+INSERT INTO vehicles (id, status, year, make, model, merged_into_vehicle_id, deleted_at) VALUES
+  ('00000000-0000-0000-0000-00000000c9a3', 'active', 1968, 'Ford', 'Mustang', NULL, NULL),
+  ('00000000-0000-0000-0000-00000000c9d3', 'merged', 1968, 'Ford', 'Mustang', '00000000-0000-0000-0000-00000000c9a3', now());
+INSERT INTO work_sessions (id, vehicle_id, start_time) VALUES ('c9000000-0000-0000-0000-0000000000e3', '00000000-0000-0000-0000-00000000c9d3', '2025-07-01 08:00+00');
+INSERT INTO vehicle_merge_proposals (id, primary_vehicle_id, duplicate_vehicle_id, match_type, status, merge_journal)
+  VALUES ('c9800000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-00000000c9a3', '00000000-0000-0000-0000-00000000c9d3', 'exact_listing_url', 'merged', '{"method": "merge_into_primary"}'::jsonb);
+CREATE TABLE pg_temp.late_carry AS SELECT carry_children_for_merged_pair('c9800000-0000-0000-0000-000000000003') r;
+SELECT pg_temp.ok('an older merge is completed from its proposal: rows moved, the result journaled, and a second call is a no-op',
+  (SELECT (r ->> 'carried')::boolean FROM pg_temp.late_carry)
+  AND (SELECT vehicle_id = '00000000-0000-0000-0000-00000000c9a3' FROM work_sessions WHERE id = 'c9000000-0000-0000-0000-0000000000e3')
+  AND (SELECT merge_journal -> 'carry' -> 'carried' ? 'work_sessions' FROM vehicle_merge_proposals WHERE id = 'c9800000-0000-0000-0000-000000000003')
+  AND (SELECT (carry_children_for_merged_pair('c9800000-0000-0000-0000-000000000003') ->> 'already_carried')::boolean));
+SELECT pg_temp.ok('the carry helpers are service_role only',
+  has_function_privilege('service_role', 'merge_carry_children(uuid,uuid,boolean)', 'EXECUTE')
+  AND NOT has_function_privilege('authenticated', 'merge_carry_children(uuid,uuid,boolean)', 'EXECUTE')
+  AND NOT has_function_privilege('anon', 'merge_carry_children(uuid,uuid,boolean)', 'EXECUTE')
+  AND has_function_privilege('service_role', 'carry_children_for_merged_pair(uuid,boolean)', 'EXECUTE')
+  AND NOT has_function_privilege('authenticated', 'carry_children_for_merged_pair(uuid,boolean)', 'EXECUTE'));
