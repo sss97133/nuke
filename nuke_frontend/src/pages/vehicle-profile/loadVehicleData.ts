@@ -8,6 +8,7 @@
 import type React from 'react';
 import { buildAuctionPulseFromExternalListings, buildAuctionPulseFromReadResult } from './buildAuctionPulse';
 import { isMismatchedVehicleImage, scoreMoneyShot } from './imageFilterUtils';
+import { vehicleImageColumnsForViewer } from '../../lib/vehicleImageColumns';
 
 // ----- Hero Image Auto-Selection -----
 
@@ -118,7 +119,7 @@ export async function selectBestHeroImage(
   try {
     // Coalesce concurrent loads. Keep the recent window for owner-upload recency,
     // but read explicit primaries separately: recency alone can omit the primary.
-    const projection = 'id, image_url, medium_url, large_url, photo_quality_score, zone_confidence, vehicle_zone, exif_data, taken_at, position, angle, ai_detected_angle, source, is_primary, is_document, is_duplicate, is_superseded, is_sensitive, image_vehicle_match_status, ai_processing_status, vision_gate_status, created_at, category, image_type';
+    const projection = await vehicleImageColumnsForViewer('id, image_url, medium_url, large_url, photo_quality_score, zone_confidence, vehicle_zone, exif_data, taken_at, position, angle, ai_detected_angle, source, is_primary, is_document, is_duplicate, is_superseded, is_sensitive, image_vehicle_match_status, ai_processing_status, vision_gate_status, created_at, category, image_type');
     const readRows = async (query: any): Promise<any[]> => {
       const { data, error } = await query;
       if (error) console.warn('[selectBestHeroImage] query error:', error);

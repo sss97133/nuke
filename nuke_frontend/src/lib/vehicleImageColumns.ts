@@ -27,7 +27,10 @@ export async function vehicleImageRowColumns(): Promise<'*'> {
 export async function vehicleImageColumnsForViewer<T extends string>(columns: T): Promise<T> {
   if (await signedIn()) return columns;
   const excluded = new Set<string>(VEHICLE_IMAGE_ANON_EXCLUDED_COLUMNS);
-  return columns.split(',').map((c) => c.trim()).filter((c) => c && !excluded.has(c)).join(', ') as T;
+  // An item may be a column, an alias of a JSON path (`exif_camera:exif_data->camera`) or a path; what it reads is the
+  // part after the alias, up to the first arrow.
+  const reads = (item: string) => item.replace(/^[A-Za-z_][A-Za-z0-9_]*:(?!:)/, '').split('->')[0].trim();
+  return columns.split(',').map((c) => c.trim()).filter((c) => c && !excluded.has(reads(c))).join(', ') as T;
 }
 
 /**
