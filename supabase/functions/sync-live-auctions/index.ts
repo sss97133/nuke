@@ -893,11 +893,11 @@ const BA_UA = "NukeListingCollector/1.0 (+https://nuke.ag)";
 async function syncBroadArrow(): Promise<{ auctions: LiveAuction[]; error: string | null }> {
   try {
     const now = Date.now();
-    const { html, error } = await archiveFetch(`${BROAD_ARROW_BID}/`, {
-      platform: "broad_arrow", maxAgeSec: 3600, useFirecrawl: false, callerName: "sync-live-auctions",
-      directFetchOptions: { publicOnly: true, timeout: 20_000 },
-    });
-    if (error || !html) return { auctions: [], error: `Broad Arrow sale list: ${error ?? "no HTML"}` };
+    // A direct fetch, not archiveFetch: the shared fetcher mistakes this page's own "log in" strings for a login wall
+    // (AUTH_REQUIRED, 9 failed runs on 2026-10-20) and the page is public.
+    const home = await fetch(`${BROAD_ARROW_BID}/`, { headers: { "User-Agent": BA_UA, Accept: "text/html" }, redirect: "manual", signal: AbortSignal.timeout(20_000) }); // guardrail-allow: raw-fetch (house public page)
+    if (!home.ok) return { auctions: [], error: `Broad Arrow sale list: HTTP ${home.status}` };
+    const html = await home.text();
     const all = amSales(html);
     if (all.length === 0) return { auctions: [], error: "Broad Arrow sale list: no sales parsed" };
     const sales = amOpenTimedSales(all, now);
