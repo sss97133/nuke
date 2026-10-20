@@ -1,0 +1,490 @@
+{
+ "actors": [
+  "email",
+  "phone"
+ ],
+ "agent_messages": [
+  "from_email",
+  "to_email"
+ ],
+ "alert_email_log": [
+  "from_address"
+ ],
+ "api_usage_logs": [
+  "ip_address",
+  "user_agent"
+ ],
+ "business_related_persons": [
+  "business_zip_code",
+  "full_legal_name"
+ ],
+ "businesses": [
+  "address",
+  "email",
+  "latitude",
+  "legal_name",
+  "longitude",
+  "phone",
+  "tax_id",
+  "zip_code"
+ ],
+ "buyer_agency_agreements": [
+  "legal_address",
+  "legal_name",
+  "signed_ip_address",
+  "signed_user_agent"
+ ],
+ "city_geocode_lookup": [
+  "latitude",
+  "longitude"
+ ],
+ "clients": [
+  "address",
+  "contact_email",
+  "contact_phone",
+  "zip"
+ ],
+ "community_events": [
+  "address"
+ ],
+ "concierge_quotes": [
+  "guest_email",
+  "guest_name",
+  "guest_phone"
+ ],
+ "concierge_supply_stbarth": [
+  "phone"
+ ],
+ "contact_inbox": [
+  "from_address",
+  "to_address"
+ ],
+ "credential_access_log": [
+  "ip_address",
+  "user_agent"
+ ],
+ "deal_contacts": [
+  "address",
+  "email",
+  "first_name",
+  "full_name",
+  "last_name",
+  "phone_fax",
+  "zip"
+ ],
+ "device_attributions": [
+  "camera_serial",
+  "device_fingerprint",
+  "latitude",
+  "longitude",
+  "raw_exif"
+ ],
+ "device_locations": [
+  "address",
+  "latitude",
+  "longitude"
+ ],
+ "discovered_persons": [
+  "email",
+  "full_name",
+  "phone"
+ ],
+ "ds_deals": [
+  "owner_name"
+ ],
+ "expiring_licenses": [
+  "license_number"
+ ],
+ "fb_marketplace_locations": [
+  "latitude",
+  "longitude"
+ ],
+ "financial_documents": [
+  "issuer_tax_id",
+  "recipient_tax_id"
+ ],
+ "financial_operator_entities": [
+  "tax_ids"
+ ],
+ "geocoding_cache": [
+  "latitude",
+  "longitude"
+ ],
+ "ghost_users": [
+  "device_fingerprint"
+ ],
+ "image_identities": [
+  "exif_data",
+  "gps_latitude",
+  "gps_longitude"
+ ],
+ "image_tags": [
+  "exif_data"
+ ],
+ "image_work_extractions": [
+  "detected_location_address",
+  "detected_location_lat",
+  "detected_location_lng"
+ ],
+ "known_places": [
+  "address",
+  "latitude",
+  "longitude"
+ ],
+ "location_collaborations": [
+  "location_address",
+  "location_latitude",
+  "location_longitude"
+ ],
+ "lofficiel_samples": [
+  "return_address"
+ ],
+ "oauth_login_sessions": [
+  "email"
+ ],
+ "org_mention_queue": [
+  "extracted_phone"
+ ],
+ "organization_images": [
+  "exif_data",
+  "latitude",
+  "longitude"
+ ],
+ "organization_locations": [
+  "email",
+  "latitude",
+  "longitude",
+  "phone",
+  "street_address",
+  "zip_code"
+ ],
+ "organizations": [
+  "address",
+  "email",
+  "latitude",
+  "legal_name",
+  "longitude",
+  "phone",
+  "tax_id",
+  "zip_code"
+ ],
+ "organizations_archived_20260129": [
+  "address",
+  "email",
+  "latitude",
+  "longitude",
+  "phone",
+  "zip"
+ ],
+ "organizations_compat": [
+  "address",
+  "email",
+  "latitude",
+  "longitude",
+  "phone",
+  "zip"
+ ],
+ "ownership_transfers": [
+  "buyer_email",
+  "buyer_phone",
+  "inbox_email",
+  "seller_email",
+  "seller_phone"
+ ],
+ "ownership_verifications": [
+  "title_owner_name"
+ ],
+ "parent_company": [
+  "contact_email",
+  "contact_phone",
+  "ein",
+  "legal_name",
+  "mailing_address",
+  "principal_address",
+  "state_tax_id"
+ ],
+ "partner_activations": [
+  "contact_email",
+  "contact_name",
+  "contact_phone"
+ ],
+ "pending_contribution_approvals": [
+  "contributor_email"
+ ],
+ "pii_audit_log": [
+  "ip_address",
+  "user_agent"
+ ],
+ "pipeline_sellers": [
+  "email",
+  "phone"
+ ],
+ "profiles": [
+  "address",
+  "email",
+  "full_name",
+  "phone",
+  "phone_number",
+  "zip"
+ ],
+ "properties": [
+  "address",
+  "latitude",
+  "longitude",
+  "postal_code"
+ ],
+ "provider_service_area": [
+  "geocode_latitude",
+  "geocode_longitude"
+ ],
+ "publishing_communications": [
+  "email"
+ ],
+ "publishing_contacts": [
+  "email"
+ ],
+ "publishing_relationships": [
+  "source_email",
+  "target_email"
+ ],
+ "purchase_orders": [
+  "ship_to_address",
+  "ship_to_phone",
+  "supplier_contact_email",
+  "supplier_contact_phone"
+ ],
+ "receipts": [
+  "card_last4",
+  "vendor_address"
+ ],
+ "security_audit_log": [
+  "ip_address",
+  "user_agent"
+ ],
+ "shop_invitations_archived_20260129": [
+  "email"
+ ],
+ "shop_licenses": [
+  "license_number"
+ ],
+ "shop_locations": [
+  "address_line1",
+  "address_line2",
+  "email",
+  "latitude",
+  "longitude",
+  "phone",
+  "postal_code"
+ ],
+ "shoppable_tags_with_suppliers": [
+  "exif_data"
+ ],
+ "shops_archived_20260129": [
+  "address",
+  "address_line1",
+  "address_line2",
+  "email",
+  "latitude",
+  "legal_name",
+  "license_number",
+  "longitude",
+  "phone",
+  "postal_code",
+  "tax_id"
+ ],
+ "site_scout_candidates": [
+  "address",
+  "lat",
+  "lng"
+ ],
+ "sms_verification_submissions": [
+  "extracted_address",
+  "from_phone"
+ ],
+ "stripe_connect_accounts": [
+  "contact_email"
+ ],
+ "supplier_accounts": [
+  "account_email"
+ ],
+ "suppliers": [
+  "address",
+  "email",
+  "phone"
+ ],
+ "tax_returns_filed": [
+  "address"
+ ],
+ "technician_phone_links": [
+  "phone_number"
+ ],
+ "technicians": [
+  "license_number"
+ ],
+ "telegram_technicians": [
+  "phone_number"
+ ],
+ "telegram_users": [
+  "first_name",
+  "last_name",
+  "phone"
+ ],
+ "timeline_events": [
+  "location_address"
+ ],
+ "tool_brands": [
+  "support_email",
+  "support_phone"
+ ],
+ "transfer_communications": [
+  "from_address",
+  "to_address"
+ ],
+ "unverified_contacts": [
+  "phone_number"
+ ],
+ "usage_metrics": [
+  "ip_address",
+  "user_agent"
+ ],
+ "user_addresses": [
+  "postal_code",
+  "street_address"
+ ],
+ "user_consents": [
+  "ip_address",
+  "user_agent"
+ ],
+ "user_emails": [
+  "email"
+ ],
+ "user_organized_photos": [
+  "exif_data",
+  "latitude",
+  "longitude"
+ ],
+ "user_phones": [
+  "phone"
+ ],
+ "user_photo_inbox": [
+  "exif_data",
+  "latitude",
+  "longitude"
+ ],
+ "user_profiles": [
+  "birthdate"
+ ],
+ "user_sites": [
+  "lat",
+  "lon"
+ ],
+ "user_sync_preferences": [
+  "imessage_address",
+  "phone_number"
+ ],
+ "v_cross_post_intel": [
+  "email",
+  "phone"
+ ],
+ "v_dealer_registry": [
+  "email",
+  "phone"
+ ],
+ "v_inbox_summary": [
+  "latest_email",
+  "to_address"
+ ],
+ "v_place_anchor": [
+  "latitude",
+  "longitude"
+ ],
+ "v_villa": [
+  "latitude",
+  "longitude"
+ ],
+ "v_villa_listing": [
+  "latitude",
+  "longitude"
+ ],
+ "v_villa_metrics": [
+  "latitude",
+  "longitude"
+ ],
+ "vault_active_sms_sessions": [
+  "phone_number"
+ ],
+ "vault_sms_sessions": [
+  "phone_number"
+ ],
+ "vehicle_display_names": [
+  "full_name"
+ ],
+ "vehicle_full_name": [
+  "full_name"
+ ],
+ "vehicle_images": [
+  "device_fingerprint",
+  "exif_data",
+  "latitude",
+  "longitude"
+ ],
+ "vehicle_location_observations": [
+  "latitude",
+  "longitude",
+  "postal_code"
+ ],
+ "vehicle_timeline_events": [
+  "location_address"
+ ],
+ "vehicle_views": [
+  "ip_address"
+ ],
+ "vehicle_zip_stats": [
+  "zip_code"
+ ],
+ "vehicles": [
+  "gps_latitude",
+  "gps_longitude",
+  "owner_contact",
+  "owner_name",
+  "zip_code"
+ ],
+ "vehicles_inventory": [
+  "gps_latitude",
+  "gps_longitude",
+  "owner_contact",
+  "owner_name",
+  "zip_code"
+ ],
+ "villa_inventory": [
+  "latitude",
+  "longitude",
+  "manager_phone"
+ ],
+ "vlva_contacts": [
+  "address",
+  "email",
+  "first_name",
+  "full_name",
+  "last_name",
+  "phone_fax",
+  "zip"
+ ],
+ "work_order_receipt_unified": [
+  "customer_email",
+  "customer_name",
+  "customer_phone"
+ ],
+ "work_order_summary": [
+  "customer_name",
+  "customer_phone"
+ ],
+ "work_orders": [
+  "customer_email",
+  "customer_name",
+  "customer_phone"
+ ],
+ "zip_to_fips": [
+  "zip"
+ ]
+}

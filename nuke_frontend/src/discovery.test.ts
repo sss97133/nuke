@@ -138,6 +138,19 @@ describe('discovery faces', () => {
     for (const rule of HEADER_CSS_RULES) expect(css).toContain(rule);
   });
 
+  it.each([['/login', 'Sign in to Nuke'], ['/work', 'Work'], ['/work/setup', 'Set up your provider page'], ['/work/setup/', 'Set up your provider page']])(
+    '%s paints static, noindexed text with no reads', async (path, heading) => {
+      const out = await call(path, {});
+      expect(out!.body).toContain(`<main><h1>${heading}</h1><p>`);
+      expect(out!.body).toContain('<meta name="robots" content="noindex" />');
+      const calls = (globalThis.fetch as unknown as { mock: { calls: unknown[][] } }).mock.calls.map(c => String(c[0]));
+      expect(calls.some(u => u.includes('/rest/v1/'))).toBe(false);
+    });
+
+  it('leaves other /work routes to the app', async () => {
+    expect(await call('/work/market', {})).toBeNull();
+  });
+
   it('falls through to the app shell when a job is not open, or the id is not a UUID', async () => {
     expect(await call(`/jobs/${WO2}`, {})).toBeNull();
     expect(await call('/jobs/not-a-uuid', {})).toBeNull();

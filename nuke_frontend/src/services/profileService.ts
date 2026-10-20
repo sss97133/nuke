@@ -14,6 +14,7 @@ import type {
   DailyContributionSummary,
   ContributionHighlight
 } from '../types/profile';
+import { vehicleImageColumnsForViewer } from '../lib/vehicleImageColumns';
 
 export class ProfileService {
 
@@ -73,7 +74,7 @@ export class ProfileService {
         // Order by created_at (uses idx_vehicle_images_user_created) — taken_at has no index
         // and times out on users with thousands of images (vehicle_images is ~36M rows / 28GB).
         // EXIF-based ordering still happens client-side via toDateOnly() over taken_at when present.
-        supabase.from('vehicle_images').select('id, image_url, created_at, taken_at, exif_data, user_id, vehicle_id').eq('user_id', userId).order('created_at', { ascending: false }).limit(5000),
+        supabase.from('vehicle_images').select(await vehicleImageColumnsForViewer('id, image_url, created_at, taken_at, exif_data, user_id, vehicle_id')).eq('user_id', userId).order('created_at', { ascending: false }).limit(5000),
         // Get ALL business events - no date filter
         supabase.from('business_timeline_events').select('id, event_date, event_type, business_id, created_by, title, description, cost_amount, metadata, created_at').eq('created_by', userId).order('event_date', { ascending: false }).limit(5000)
       ]);

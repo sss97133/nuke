@@ -9,6 +9,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import { vehicleImageRowColumns } from '../../lib/vehicleImageColumns';
 
 interface ImageRow {
   id: string;
@@ -190,7 +191,7 @@ const ImagePage: React.FC = () => {
           vehFullRes,
           witFullRes,
         ] = await Promise.all([
-          supabase.from('vehicle_images').select('*').eq('id', imageId).eq('vehicle_id', vehicleId).limit(1).abortSignal(controller.signal),
+          supabase.from('vehicle_images').select(await vehicleImageRowColumns()).eq('id', imageId).eq('vehicle_id', vehicleId).limit(1).abortSignal(controller.signal),
           // The row as the caller may see it (the owner's purchase facts only for the owner).
           supabase.rpc('vehicle_row_read', { p_vehicle_id: vehicleId }).abortSignal(controller.signal),
           supabase.from('observation_witnesses').select('*').eq('image_id', imageId).limit(200).abortSignal(controller.signal),

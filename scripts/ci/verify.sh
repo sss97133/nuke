@@ -6,7 +6,7 @@
 #   scripts/ci/verify.sh                 # warn mode: reports, never blocks (default)
 #   CI_ENFORCE=1 scripts/ci/verify.sh    # enforce mode: exit 1 on any regression/secret/typefail
 #   CI_WRITE_BASELINE=1 scripts/ci/verify.sh   # (re)seed baseline.json from current counts
-#   CI_BUILD=1 scripts/ci/verify.sh      # also run the full vite build (slower)
+#   CI_BUILD=1 scripts/ci/verify.sh      # also run the full vite build and the per-route JS budget (slower)
 #
 # Ratchet philosophy: pre-existing violations are the baseline floor; the gate fails only when a
 # count EXCEEDS it (i.e. you ADDED a violation). Burn violations down, then lower the floor.
@@ -81,6 +81,8 @@ else red "  ✗ typecheck FAILED"; tail -15 "$CI_TMP_DIR/ci_tc.out"; fail=1; fi
 if [ "${CI_BUILD:-0}" = 1 ]; then
   echo "• frontend build…"
   if (cd "$ROOT/nuke_frontend" && npm run build >"$CI_TMP_DIR/ci_build.out" 2>&1); then grn "  ✓ build clean"; else red "  ✗ build FAILED"; tail -20 "$CI_TMP_DIR/ci_build.out"; fail=1; fi
+  if node "$ROOT/scripts/ci/route-js-budget.mjs" >"$CI_TMP_DIR/ci_routejs.out" 2>&1; then grn "  ✓ route JS budget (scripts/ci/route-js-budget.json)"
+  else red "  ✗ route JS budget REGRESSED"; tail -12 "$CI_TMP_DIR/ci_routejs.out"; fail=1; fi
 fi
 
 echo "• guardrails (ratchet)…"
@@ -96,6 +98,10 @@ if node --test "$ROOT/scripts/ci/invalid-indexes.test.mjs" >"$CI_TMP_DIR/ci_inva
 else red "  ✗ invalid-index detector contract FAILED"; cat "$CI_TMP_DIR/ci_invalid_indexes_tests.out"; fail=1; fi
 if node --test "$ROOT/scripts/ci/owner-writable-views.test.mjs" >"$CI_TMP_DIR/ci_owner_writable_views_tests.out" 2>&1; then grn "  ✓ owner-writable view detector contract"
 else red "  ✗ owner-writable view detector contract FAILED"; cat "$CI_TMP_DIR/ci_owner_writable_views_tests.out"; fail=1; fi
+if node --test "$GD/no-pii-exposure.test.mjs" >"$CI_TMP_DIR/ci_pii_exposure_tests.out" 2>&1; then grn "  ✓ pii-exposure detector contract"
+else red "  ✗ pii-exposure detector contract FAILED"; cat "$CI_TMP_DIR/ci_pii_exposure_tests.out"; fail=1; fi
+if node "$GD/no-pii-exposure.mjs" >"$CI_TMP_DIR/ci_pii_exposure.out" 2>&1; then grn "  ✓ no new migration opens personal columns to anon/authenticated"
+else red "  ✗ a migration opens personal columns to anon/authenticated (scripts/guardrails/pii-exposure-allowlist.json)"; cat "$CI_TMP_DIR/ci_pii_exposure.out"; fail=1; fi
 if node --test "$ROOT/scripts/ci/typecheck-ratchet.test.mjs" >"$CI_TMP_DIR/ci_typecheck_ratchet_tests.out" 2>&1; then grn "  ✓ typecheck ratchet contract"
 else red "  ✗ typecheck ratchet contract FAILED"; cat "$CI_TMP_DIR/ci_typecheck_ratchet_tests.out"; fail=1; fi
 if node --test "$ROOT/scripts/discovery/buying-evidence.test.mjs" "$ROOT/scripts/discovery/buying-evidence-matching.test.mjs" "$ROOT/scripts/discovery/buying-evidence-plan.test.mjs" >"$CI_TMP_DIR/ci_buying_evidence_tests.out" 2>&1; then grn "  ✓ buying-evidence source, matching, plan and refusal contracts"

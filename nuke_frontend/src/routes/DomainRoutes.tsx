@@ -129,6 +129,7 @@ const JobPage = React.lazy(() => {
 const ProviderProfilePage = React.lazy(() => import('../pages/providers/ProviderProfilePage'));
 const MessagesPage = React.lazy(() => import('../pages/messages/MessagesPage'));
 const SupplierInvitePage = React.lazy(() => import('../pages/orgs/SupplierInvitePage'));
+const MarketHealthPage = React.lazy(() => import('../pages/work/MarketHealthPage'));
 const ContactThreadPage = React.lazy(() => import('../pages/messages/MessagesPage').then(m => ({ default: m.ContactThreadPage })));
 
 // Public projections — journal index + day page
@@ -226,6 +227,8 @@ export const DomainRoutes = () => {
         <Route path="/work-orders/statement" element={<WorkOrderStatement />} />
         {/* A business opens the invite a customer shared (create_supplier_invite share_path); sign-in happens on the page */}
         <Route path="/supplier-invite/:token" element={<SupplierInvitePage />} />
+        {/* The job marketplace forming: job_market_health_read aggregates, public */}
+        <Route path="/work/market" element={<MarketHealthPage />} />
         <Route path="/invite/:token" element={<SupplierInvitePage />} />
         {/* Investor offering / data room — semi-public fundraising page */}
         {/* Docs / developers landing */}

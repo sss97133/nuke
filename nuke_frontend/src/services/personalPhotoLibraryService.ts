@@ -201,7 +201,7 @@ export class PersonalPhotoLibraryService {
     // Get total count
     const { count } = await supabase
       .from('vehicle_images')
-      .select('*', { count: 'exact', head: true })
+      .select('id', { count: 'exact', head: true })
       .eq('user_id', userId)
       .is('vehicle_id', null)
       .or('organization_status.eq.unorganized,organization_status.is.null');
