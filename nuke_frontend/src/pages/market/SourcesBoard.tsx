@@ -19,7 +19,7 @@ const COLUMNS = ['source', 'name', 'category', 'house', 'held_lots', 'held_at', 
   'population_confidence', 'population_at', 'map_sales', 'map_usd', 'sales_12m', 'usd_12m', 'sales_prior_12m',
   'usd_prior_12m', 'months', 'live_lots', 'live_at', 'held_lots_before', 'before_day', 'landed_24h', 'landed_7d',
   'last_landed', 'days14', 'logo_url', 'business_type', 'population_grade', 'species', 'species_label', 'counts_as_held',
-  'species_evidence'] as const;
+  'species_evidence', 'venue_lots', 'venue_slug', 'members'] as const;
 type Column = typeof COLUMNS[number];
 const SHOWN = 10;
 
@@ -147,6 +147,9 @@ export type SourceRow = {
    *  pages count as listings held (aggregators' do not), and what the label was read from. */
   species?: string | null; speciesLabel?: string | null; countsAsHeld?: boolean | null;
   speciesEvidence?: SpeciesEvidence | null;
+  /** Lots this source sold through a venue the board already counts (a dealer's BaT lots), shown apart from held and
+   *  never added to it; the venue; and, on a seller-cohort row, the sellers the row counts (20261020201000). */
+  venueLots?: number | null; venueSlug?: string | null; members?: number | null;
   /** Optional dealer organization identifier/slug and headquarters city/state metadata when provided. */
   organizationId?: string | null;
   hqCity?: string | null;
@@ -307,6 +310,7 @@ export function parseSources(value: unknown): SourcesBoardData | null {
       species: str(get('species')), speciesLabel: str(get('species_label')),
       countsAsHeld: typeof get('counts_as_held') === 'boolean' ? get('counts_as_held') as boolean : null,
       speciesEvidence: parseSpeciesEvidence(get('species_evidence')),
+      venueLots: num(get('venue_lots')), venueSlug: str(get('venue_slug')), members: num(get('members')),
       organizationId, hqCity, hqState, hqLocation,
     });
   }
@@ -712,6 +716,8 @@ export const SPECIES_BADGE_LABELS: Record<string, string> = {
   classifieds: 'CLASSIFIEDS',
   auth_walled_marketplace: 'AUTH-WALLED',
   aggregator: 'AGGREGATOR',
+  private_seller: 'PRIVATE SELLERS',
+  owner_private: 'OWNERS',
 };
 
 /** A row's badge: its species when the reader labels one, else its category. */
@@ -732,7 +738,11 @@ const SPECIES_HELD_LABELS: Record<string, string> = {
   classifieds: 'Posts held',
   auth_walled_marketplace: 'Listings held',
   aggregator: 'Pages read (not listings held)',
+  private_seller: 'BaT lots (by seller cohort)',
+  owner_private: 'Vehicles with owner records',
 };
+/** The venue's short name on a row's "+N sold on …" note (venue_slug from the reader). */
+const VENUE_NAMES: Record<string, string> = { bat: 'BaT' };
 
 export const KNOWN_DEALER_ORGANIZATIONS: Record<string, string> = {
   'avant-garde-collection': 'avant-garde-collection',
@@ -2266,6 +2276,8 @@ export function SourcesBoardView({
   const [horizon, setHorizon] = useState<LandingHorizon>('14d');
   const [openSource, setOpenSource] = useState<string | null>(() => resolveInitialSource(data.rows, initialSource));
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  // Groups the reader opened past their top rows (a long group, such as the dealers, shows its top and a show-all).
+  const [openGroups, setOpenGroups] = useState<Set<string>>(() => new Set());
   const dialogRef = useRef<HTMLDialogElement>(null);
   const closeInspector = () => {
     dialogRef.current?.close?.();
@@ -2290,8 +2302,9 @@ export function SourcesBoardView({
   }).filter((g) => g.rows.length);
   const groups = categoryFilter === 'all' ? allGroups : allGroups.filter((g) => g.key === categoryFilter);
   const shownPer = scoped || all || categoryFilter !== 'all' ? Infinity : SHOWN;
+  const shownIn = (key: string) => (openGroups.has(key) ? Infinity : shownPer);
   const hidden = scoped ? data.rows.filter((r) => groupOf(r) && scopeTotal(r) === 0).length
-    : categoryFilter === 'all' ? allGroups.reduce((n, g) => n + Math.max(0, g.rows.length - SHOWN), 0) : 0;
+    : categoryFilter === 'all' ? allGroups.reduce((n, g) => n + Math.max(0, g.rows.length - shownIn(g.key)), 0) : 0;
   const notRanked = Object.entries(data.notRanked).sort((x, y) => y[1] - x[1])
     .map(([k, n]) => `${n} ${NOT_RANKED_WORDS[k] ?? k}${n > 1 ? 's' : ''}`);
   const scopedLabel = scoped ? `Sources · ${scoped.label}` : scope?.trim() ? 'Sources · all makes' : 'Sources';
@@ -2392,7 +2405,7 @@ export function SourcesBoardView({
             <span>{scoped ? `${scoped.short} sales, last 12 months` : 'sales, last 12 months'}</span><span className="n">live now</span>
           </div>
           <ol className="market-sources__rows">
-            {g.rows.slice(0, shownPer).map((r, i) => {
+            {g.rows.slice(0, shownIn(g.key)).map((r, i) => {
               const s = heldShare(r);
               const week = r.held != null && r.heldBefore != null ? r.held - r.heldBefore : null;
               const land = landingState(r, horizon);
@@ -2444,6 +2457,14 @@ export function SourcesBoardView({
                       {week != null && week !== 0
                         ? <small className={week > 0 ? 'up' : 'down'}> {week > 0 ? '+' : '−'}{count(Math.abs(week))} since {shortDay(r.beforeDay)}</small>
                         : null}
+                      {r.venueLots != null && r.venueLots > 0 && r.members == null
+                        ? <small className="market-sources__venue"
+                            title={`${count(r.venueLots)} lots it sold on ${VENUE_NAMES[r.venueSlug ?? ''] ?? r.venueSlug ?? 'a venue'}, counted under that venue, not here`}>
+                            {' '}+{count(r.venueLots)} sold on {VENUE_NAMES[r.venueSlug ?? ''] ?? r.venueSlug ?? 'a venue'}</small>
+                        : null}
+                      {r.members != null && r.members > 0
+                        ? <small className="market-sources__members" title={`${count(r.members)} sellers in this cohort`}> {count(r.members)} sellers</small>
+                        : null}
                     </span>
                     <span className={`market-sources__share${r.currentInventory ? ' market-sources__share--current' : ''}`} title={total}>
                       {!r.currentInventory ? <svg className="market-sources__track" viewBox="0 0 100 8" preserveAspectRatio="none" aria-hidden="true">
@@ -2494,6 +2515,13 @@ export function SourcesBoardView({
               );
             })}
           </ol>
+          {g.rows.length > SHOWN && shownPer !== Infinity
+            ? <button type="button" className="market-sources__more market-sources__more--group"
+                aria-expanded={openGroups.has(g.key)}
+                onClick={() => setOpenGroups((cur) => { const next = new Set(cur); if (next.has(g.key)) next.delete(g.key); else next.add(g.key); return next; })}>
+                {openGroups.has(g.key) ? `Show the top ${SHOWN}` : `Show all ${g.rows.length} · ${g.unit}`}
+              </button>
+            : null}
         </div>
       ))}
       {openSource ? (
