@@ -286,6 +286,57 @@ const amAmount = (v: unknown): number | null => {
   return v != null && v !== "" && Number.isFinite(n) && n > 0 ? n : null;
 };
 
+/** A timed public auction of ISSIMI's listings (the initialAuctions its /listings page server-renders in __NEXT_DATA__). */
+export interface IssimiAuction {
+  id: number;
+  url: string;
+  title: string;
+  year: number | null;
+  make: string | null;
+  model: string | null;
+  current_bid: number | null; // the top bid, in the lot's own currency
+  currency: string | null;
+  starts: string;
+  ends: string;
+  no_reserve: boolean;
+  image: string | null;
+  open: boolean; // bidding window open at nowMs and the lot not ended
+}
+
+/**
+ * ISSIMI's timed public auctions (auctionType PublicAuction with a bidding window): an offer listing ("Listed" with no
+ * window) and a private sale are not auctions and are left out. ends is the close the house records, moved by its soft
+ * close (the last 2026 sale took a bid at 15:44:18 and closed 15:46:18). The lot page is /vehicles/<slug>.
+ */
+export function parseIssimiAuctions(pageProps: Record<string, unknown>, nowMs: number): IssimiAuction[] {
+  // deno-lint-ignore no-explicit-any
+  const all = (Array.isArray(pageProps?.initialAuctions) ? pageProps.initialAuctions : []) as any[];
+  const out: IssimiAuction[] = [];
+  for (const a of all) {
+    if (a?.auctionType !== "PublicAuction" || !a.slug || !a.auctionStartDateTime || !a.auctionEndDateTime) continue;
+    const starts = Date.parse(a.auctionStartDateTime), ends = Date.parse(a.auctionEndDateTime);
+    if (!Number.isFinite(starts) || !Number.isFinite(ends) || ends <= starts) continue;
+    const bid = Number(a.topBid?.bidAmount);
+    const v = a.vehicle ?? {};
+    out.push({
+      id: a.id,
+      url: `https://www.issimi.com/vehicles/${a.slug}`,
+      title: v.carDisplayName ?? [v.year, v.make, v.model].filter(Boolean).join(" "),
+      year: typeof v.year === "number" ? v.year : null,
+      make: v.make ?? null,
+      model: v.model ?? null,
+      current_bid: Number.isFinite(bid) && bid > 0 ? bid : null,
+      currency: a.currency ?? null,
+      starts: new Date(starts).toISOString(),
+      ends: new Date(ends).toISOString(),
+      no_reserve: Number(a.reservePrice) === 0,
+      image: a.heroImageUrl ?? v.images?.find?.((i: { isFeatured?: boolean }) => i.isFeatured)?.url ?? v.images?.[0]?.url ?? null,
+      open: a.status !== "Ended" && starts <= nowMs && nowMs < ends,
+    });
+  }
+  return out;
+}
+
 /** A Broad Arrow timed lot as a board row. */
 export interface AmTimedLot {
   external_id: string;

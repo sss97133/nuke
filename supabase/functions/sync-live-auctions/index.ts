@@ -14,6 +14,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
  *   - Broad Arrow: its bidding site's timed online sales (sale list hourly, lot list with top bids every run)
  *   - Gooding: its bidding platform's open timed lots (bid.goodingco.com /ajax/lots JSON), identity from its catalog
  *   - Cars & Bids: Uses Firecrawl (Cloudflare protected)
+ *   - ISSIMI: timed public auctions from its /listings page state (hourly while none is open; every run while one is)
  *   - Mecum, Barrett-Jackson: Firecrawl scrape + extract; RM Sotheby's has no readable live bid (see syncRMSothebys)
  * Collecting Cars, PCarMarket, Bonhams, Broad Arrow and Gooding boards are complete lists: after the vehicles upsert each is handed to
  * live_auction_board_sync, the monitored_auctions schedule writer for those houses (BaT's is bat_live_pull_run).
@@ -29,6 +30,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { firecrawlScrape } from "../_shared/firecrawl.ts";
+import { parseIssimiAuctions } from "./boards.ts";
 import { archiveFetch } from "../_shared/archiveFetch.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { parseBatIdentityFromUrl, parseBatIdentityFromTitle } from "../_shared/batParser.ts";
@@ -1219,6 +1221,60 @@ async function updateVehicleEvents(
   return updated;
 }
 
+// ============================================
+// ISSIMI Sync (timed public auctions from its /listings page state)
+// ============================================
+
+const ISSIMI_UA = "NukeListingCollector/1.0 (+https://nuke.ag)";
+
+/**
+ * ISSIMI's open timed auctions. The /listings page carries every listing the house ever made (414, about 2 MB, on
+ * 2026-10-20), and the house ran no timed auction from 2026-06-18 to at least 2026-10-20 (its listings are offers and
+ * private sales). So while the schedule holds no open ISSIMI lot the page is read in the first run of each hour only;
+ * while one is open it is read every run. The page is not archived (2 MB a read; the lots it yields are kept).
+ */
+async function syncIssimi(supabase: ReturnType<typeof createClient>): Promise<{ auctions: LiveAuction[]; error: string | null; skipped?: string }> {
+  try {
+    const { data: srcRow } = await supabase.from("live_auction_sources").select("id").eq("slug", "issimi").maybeSingle();
+    const src = srcRow as { id: string } | null;
+    const { count: open } = src
+      ? await supabase.from("monitored_auctions").select("id", { count: "exact", head: true }).eq("source_id", src.id).eq("is_live", true)
+      : { count: 0 };
+    if (!open && new Date().getUTCMinutes() >= 5) return { auctions: [], error: null, skipped: "no open ISSIMI auction held; read hourly" };
+    const res = await fetch("https://www.issimi.com/listings", { headers: { "User-Agent": ISSIMI_UA, Accept: "text/html" } }); // guardrail-allow: raw-fetch (house page state, 2 MB, not archived)
+    if (!res.ok) return { auctions: [], error: `ISSIMI listings HTTP ${res.status}` };
+    const m = (await res.text()).match(/<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/);
+    const pageProps = m ? JSON.parse(m[1])?.props?.pageProps : null;
+    if (!Array.isArray(pageProps?.initialAuctions) || !pageProps.initialAuctions.length) return { auctions: [], error: "ISSIMI listings: no listings parsed" };
+    const now = new Date().toISOString();
+    const lots = parseIssimiAuctions(pageProps, Date.now()).filter((a) => a.open && a.year !== null);
+    console.log(`[sync-live-auctions] ISSIMI: ${pageProps.initialAuctions.length} listings, ${lots.length} open timed auctions`);
+    return {
+      auctions: lots.map((a) => ({
+        url: a.url,
+        title: a.title,
+        platform: "issimi",
+        auction_end_date: a.ends,
+        current_bid: a.current_bid,
+        bid_count: null, // the listings state carries no count (allBidsCount is null)
+        currency: a.currency,
+        no_reserve: a.no_reserve,
+        reserve_met: null,
+        year: a.year,
+        make: a.make,
+        model: a.model,
+        thumbnail_url: a.image,
+        external_id: String(a.id),
+        raw_data: { source: "issimi_listings_state", starts: a.starts, synced_at: now },
+      })),
+      error: null,
+    };
+  } catch (e: unknown) {
+    return { auctions: [], error: `ISSIMI sync failed: ${e instanceof Error ? e.message : String(e)}` };
+  }
+}
+BOARD_SOURCES.issimi = "issimi"; // syncIssimi reads the house's complete listing state
+
 async function updateSourceRegistry(
   supabase: ReturnType<typeof createClient>,
   platform: string,
@@ -1345,6 +1401,7 @@ Deno.serve(async (req) => {
         "collecting-cars",
         "cars-and-bids",
         "pcarmarket",
+        "issimi",
         "mecum",
         "barrett-jackson",
         "rm-sothebys",
@@ -1387,7 +1444,7 @@ Deno.serve(async (req) => {
         }
 
         const startTime = Date.now();
-        let syncResult: { auctions: LiveAuction[]; error: string | null; write_errors?: string[] };
+        let syncResult: { auctions: LiveAuction[]; error: string | null; write_errors?: string[]; skipped?: string };
 
         // Fetch from platform
         switch (platform) {
@@ -1424,11 +1481,19 @@ Deno.serve(async (req) => {
           case "bonhams":
             syncResult = await syncBonhams();
             break;
+          case "issimi":
+            syncResult = await syncIssimi(supabase);
+            break;
           case "broad-arrow":
             syncResult = await syncBroadArrow();
             break;
           default:
             syncResult = { auctions: [], error: `Unknown platform: ${platform}` };
+        }
+        if (syncResult.skipped) { // a house read on a slower cadence: nothing read, nothing written this run
+          results.push({ platform, success: true, live_count: 0, new_count: 0, updated_count: 0, ended_count: 0,
+                         board: { skipped: syncResult.skipped }, error: null, duration_ms: Date.now() - startTime });
+          continue;
         }
 
         const normalizedPlatform = platformAliases[platform] || platform;
