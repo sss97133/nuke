@@ -86,6 +86,7 @@ coverage/
 playwright-report/
 test-results/
 scripts/test-screenshots/
+logged-out-live-out/
 
 # Temporary folders
 tmp/
