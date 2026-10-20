@@ -22,10 +22,11 @@ export interface BatPartyLine {
 const LINE_RE = /Private\s+Party\s+or\s+Dealer\s*(?::\s*)?(?:<\/(?:strong|b|span)>)?\s*:?\s*([\s\S]{0,200}?)(?:<\/div>|<\/li>|<\/p>|<br\b)/i;
 
 function decode(s: string): string {
+  // &amp; last: decoding it earlier would turn "&amp;#39;" into "'" (double unescaping)
   return s
     .replace(/&nbsp;|&#160;/gi, " ")
-    .replace(/&amp;/gi, "&")
-    .replace(/&#0?39;|&apos;/gi, "'");
+    .replace(/&#0?39;|&apos;/gi, "'")
+    .replace(/&amp;/gi, "&");
 }
 
 /** "Private Party" / "Dealer" in any case or spacing; anything else is null. */

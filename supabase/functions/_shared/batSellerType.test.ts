@@ -48,6 +48,10 @@ Deno.test("an unrecognized value keeps its raw text and gets no type", () => {
     { party_type_raw: null, seller_type: null });
 });
 
+Deno.test("an escaped entity is decoded once, not twice", () => {
+  equal(readBatPartyLine(block(`<div><strong>Private Party or Dealer</strong>: A &amp;#39; B</div>`)).party_type_raw, "A &#39; B");
+});
+
 Deno.test("normalizer accepts only BaT's two values", () => {
   equal(["Private Party", " private ", "Dealer.", "DEALERSHIP", "broker", "", null, undefined].map(normalizeBatSellerType),
     ["private", "private", "dealer", "dealer", null, null, null, null]);
