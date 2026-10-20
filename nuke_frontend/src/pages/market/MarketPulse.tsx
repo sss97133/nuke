@@ -108,6 +108,13 @@ function rankOf(value: number, readings: { v: number }[]): { below: number; abov
   return { below, above, n, text };
 }
 
+/** A house's mark on its chip: the same files the Sources board uses; a house with no file keeps its name alone. */
+function HouseLogo({ house }: { house: string }) {
+  const [missing, setMissing] = React.useState(false);
+  if (missing) return null;
+  return <img className="market-chip__logo" src={house === BAT_HOUSE ? '/vendor/bat/favicon.ico' : `/source-logos/${house}.png`} alt="" width={18} height={18} onError={() => setMissing(true)} />;
+}
+
 function RangeBar({ value, readings, fmt, weekdayUtc, weeks, bare = false }: { value: number; readings: { day: string; v: number }[]; fmt: (n: number, compact?: boolean) => string; weekdayUtc: string; weeks: number; bare?: boolean }) {
   const lo = Math.min(value, ...readings.map((r) => r.v));
   const hi = Math.max(value, ...readings.map((r) => r.v));
@@ -765,7 +772,7 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
             </button>
             {houseCounts.map(([h, n]) => (
               <button key={h} type="button" className="market-chip" aria-pressed={house === h} onClick={() => setParam('house', house === h ? null : h)}>
-                <Text role="label">{houseName(h, true)}</Text> <Text role="measure" dense>{n.toLocaleString('en-US')}</Text>
+                <HouseLogo house={h} /><Text role="label">{houseName(h, true)}</Text> <Text role="measure" dense>{n.toLocaleString('en-US')}</Text>
               </button>
             ))}
           </div>}
