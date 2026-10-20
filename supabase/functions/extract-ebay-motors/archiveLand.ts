@@ -8,6 +8,7 @@ import { writeVehicleEventByKey } from "../_shared/vehicleEventWrite.ts";
 import { toLanding } from "./browseMap.ts";
 import { landItem, PLATFORM, type Report } from "./browseSweep.ts";
 import { archivedPageToItem, type ArchivedOutcome, archivedPhotos, parseArchivedItemPage, type PhotoProbe } from "./archivePage.ts";
+import { deletedLookup, tombstonePage } from "./deletedMembers.ts";
 
 export interface Capture { timestamp: string; original: string }
 
@@ -60,7 +61,10 @@ export async function landArchived(supabase: any, cap: Capture, rep: Report, dry
   }).catch((e) => ({ ok: false, status: 0, url: "", text: async () => String(e) } as any));
   const actualTs = String(res.url ?? "").match(/\/web\/(\d{14})id_\//)?.[1] ?? cap.timestamp;
   if (!res.ok) return { capture: cap, error: `archive HTTP ${res.status}` };
-  const html = await res.text();
+  // A member eBay says deleted their account (seller or bidder) leaves the page before it is stored or parsed (deletedMembers.ts).
+  let html = await res.text(), handles: { member: string[]; seller: string[] };
+  try { const t = await tombstonePage(deletedLookup(supabase), html); html = t.html; handles = t; }
+  catch (e) { return { capture: cap, error: `deleted-member check: ${(e as Error).message}`.slice(0, 300) }; }
   const p = parseArchivedItemPage(html, cap.original);
   if (!p.itemId) return { capture: cap, error: "no eBay item number on the archived page" };
   const observedAt = tsIso(actualTs);
@@ -80,7 +84,8 @@ export async function landArchived(supabase: any, cap: Capture, rep: Report, dry
   if (up.error) return { capture: cap, error: `snapshot storage failed: ${up.error.message}` };
   const ins = await supabase.from("listing_page_snapshots").insert({
     platform: PLATFORM, listing_url: url, fetched_at: observedAt, fetch_method: "wayback_id", http_status: 200, success: true,
-    html: null, html_storage_path: path, html_sha256: sha, content_length: bytes.length, metadata: { ...archive, caller: "extract-ebay-motors archive", credits: 0 },
+    html: null, html_storage_path: path, html_sha256: sha, content_length: bytes.length,
+    metadata: { ...archive, caller: "extract-ebay-motors archive", credits: 0, member_handles_sha256: handles.member, seller_handles_sha256: handles.seller },
   }).select("id").maybeSingle();
   let snapshotId: string | null = ins.data?.id ?? null;
   if (ins.error) {
