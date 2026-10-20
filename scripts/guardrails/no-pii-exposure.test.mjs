@@ -58,3 +58,20 @@ test('the SEC3 migration closes paths and opens none', () => {
   const sql = readFileSync(new URL('../../supabase/migrations/20261020163000_pii_reads_admin_or_own.sql', import.meta.url), 'utf8');
   assert.deepEqual(findExposures(sql, { agent_messages: ['from_email', 'to_email'], device_attributions: ['latitude'] }), []);
 });
+
+test('free-form columns with personal content count as personal in static mode', async () => {
+  const { freeformColumns } = await import('./no-pii-exposure.mjs');
+  const listed = freeformColumns({ columns: [{ table: 'generated_invoices', columns: ['html_content', 'payment_token'] }] });
+  assert.deepEqual(findExposures('GRANT SELECT ON generated_invoices TO authenticated;', listed).map((h) => h.columns.join(',')),
+    ['html_content,payment_token']);
+});
+
+test('the content probe samples as anon, counts only, and rolls back', async () => {
+  const { contentProbeSql } = await import('./no-pii-exposure.mjs');
+  const sql = contentProbeSql([{ t: 'vehicles', k: 'r', est: 1300000, cols: ['description'] }, { t: 'v', k: 'v', est: 0, cols: ['notes'] }]);
+  assert.match(sql, /SET LOCAL ROLE anon;/);
+  assert.match(sql, /TABLESAMPLE SYSTEM \(0\.231\)/);
+  assert.match(sql, /count\(v\) FILTER \(WHERE v ~ /);
+  assert.doesNotMatch(sql, /SELECT v FROM|string_agg|array_agg/);
+  assert.match(sql, /ROLLBACK;$/);
+});

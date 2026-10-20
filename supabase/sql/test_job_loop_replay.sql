@@ -6,6 +6,8 @@
 -- below in filename order (the check fails the contract when one is missing, absent or out of order).
 -- Out of scope (other lanes in the same range; their own contracts cover them):
 --   migrations/20261019031934_work_order_image_objects.sql (image lane; needs the canonical image-object fixture)
+--   migrations/20261020185000_invoice_party_reads_and_description_redaction.sql (security lane: generated_invoices read
+--   policy and the vehicle row readers, no job-loop function; test_invoice_party_reads_and_description_redaction.sql)
 --   and the non-job files of 2026-10-19: facet, truck, auction bids, org signals, lotus/honda identity, cab custody,
 --   device capture, live auction board, profile reader role, merge identity, source species, broadcast profile, org
 --   name trgm, canonical make, identity marks/handle index, family sales, fold docket, marketplace listings.
@@ -411,6 +413,8 @@ CREATE TABLE IF NOT EXISTS public.city_geocode_lookup(city text, state text, lat
 \ir ../migrations/20261020173000_requirement_plan_b_listing_tier.sql
 \echo REPLAY 20261020183000_requirement_keyword_excluded_operation.sql
 \ir ../migrations/20261020183000_requirement_keyword_excluded_operation.sql
+\echo REPLAY 20261020184000_requirement_plan_b_listing_cache.sql
+\ir ../migrations/20261020184000_requirement_plan_b_listing_cache.sql
 -- Plan check and final state.
 \set replay_problems `scripts/ci/job-loop-replay-check.sh | tr '\n' ' '`
 SELECT t_assert(btrim(:'replay_problems') = '', 'replay plan covers the build in filename order: ' || COALESCE(NULLIF(btrim(:'replay_problems'), ''), 'ok'));

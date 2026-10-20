@@ -15,6 +15,7 @@ const loadSearch = () => (loading ??= import('./HeaderSearch').then(m => m.defau
 
 const PLACEHOLDER = 'SEARCH, PASTE URL, VIN, OR DROP IMAGE...';
 const LABEL = 'Magic Box — search, URL, VIN, or image';
+const PREFETCH_DELAY_MS = 2000;
 
 function setReactInputValue(input: HTMLInputElement, value: string) {
   const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
@@ -32,15 +33,25 @@ export default function HeaderSearchLauncher({ className }: { className?: string
     void loadSearch().then(C => setSearch(() => C));
   }, []);
 
-  // Fetch the real box once the page has settled, so it is usually ready before anyone reaches for it.
+  // Fetch the real box once the page has settled — after `load`, a short pause and an idle moment — so it never
+  // competes with the route's own code on a slow connection, yet is usually ready before anyone reaches for it.
   useEffect(() => {
     const w = window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number; cancelIdleCallback?: (id: number) => void };
-    if (w.requestIdleCallback) {
-      const id = w.requestIdleCallback(() => { void loadSearch(); }, { timeout: 5000 });
-      return () => w.cancelIdleCallback?.(id);
-    }
-    const t = window.setTimeout(() => { void loadSearch(); }, 3000);
-    return () => window.clearTimeout(t);
+    let timer = 0;
+    let idle = 0;
+    const schedule = () => {
+      timer = window.setTimeout(() => {
+        if (w.requestIdleCallback) idle = w.requestIdleCallback(() => { void loadSearch(); }, { timeout: 5000 });
+        else void loadSearch();
+      }, PREFETCH_DELAY_MS);
+    };
+    if (document.readyState === 'complete') schedule();
+    else window.addEventListener('load', schedule, { once: true });
+    return () => {
+      window.removeEventListener('load', schedule);
+      window.clearTimeout(timer);
+      if (idle) w.cancelIdleCallback?.(idle);
+    };
   }, []);
 
   // After the swap: move focus and any typed text into the real input.
