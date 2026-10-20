@@ -1,6 +1,7 @@
 // Synthetic fixtures shaped by the Browse OpenAPI spec (read 2026-10-15), not captured eBay data. The live gate replaces them.
 import { assertEquals } from "jsr:@std/assert@1";
 import { aspectFilterFor, yearAspect } from "./browseApi.ts";
+import { tallyZip3, zip3Of, censusRow, pickupFilter } from "./browseCensus.ts";
 import { classifySeller, fullSizeImage, imagesOf, linkVin, tierOfYear, toLanding, vinOf } from "./browseMap.ts";
 import { sweep } from "./browseSweep.ts";
 import { htmlToText } from "../_shared/htmlToText.ts";
@@ -114,4 +115,15 @@ Deno.test("linkVin: placeholders never link", () => {
     assertEquals(linkVin(v as string | null, 1965), null, String(v));
   }
   assertEquals(linkVin("11111111111111111", 1995), null);
+});
+
+Deno.test("census: ZIP prefix tally, filter and row", () => {
+  assertEquals(zip3Of("891**"), "891");
+  assertEquals(zip3Of(undefined), null);
+  const tally: Record<string, number> = {};
+  tallyZip3([{ itemLocation: { postalCode: "891**" } }, { itemLocation: { postalCode: "89123" } }, { itemLocation: {} }], tally);
+  assertEquals(tally, { "891": 2, none: 1 });
+  assertEquals(pickupFilter("89101"), "deliveryOptions:{SELLER_ARRANGED_LOCAL_PICKUP},pickupCountry:US,pickupPostalCode:89101,pickupRadius:100,pickupRadiusUnit:mi");
+  const row = censusRow("src", { as_of: "2026-10-20T00:00:00.000Z", total: 10, makes: { Ford: 4 }, years: { "1969": 2 }, vintage: { total: 2, read: 2, by_zip3: { "891": 2 }, skipped: null }, local_pickup: {}, calls: 3 });
+  assertEquals([row.universe_active, row.by_category.vintage_le_1991, row.raw_response.vintage_by_zip3["891"]], [10, 2, 2]);
 });

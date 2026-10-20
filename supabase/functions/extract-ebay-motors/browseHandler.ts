@@ -4,10 +4,11 @@ import { htmlToText } from "../_shared/htmlToText.ts";
 import { BrowseClient, yearAspect } from "./browseApi.ts";
 import { revisit, sweep } from "./browseSweep.ts";
 import { toLanding } from "./browseMap.ts";
+import { censusRow, readCensus } from "./browseCensus.ts";
 import { emptyReport } from "./browseSweep.ts";
 import { landArchived, validCaptures } from "./archiveLand.ts";
 
-export const BROWSE_ACTIONS = ["sweep", "revisit", "aspects", "status", "preview", "archive"];
+export const BROWSE_ACTIONS = ["sweep", "revisit", "aspects", "status", "preview", "archive", "census"];
 const json = (b: unknown, status = 200) => new Response(JSON.stringify(b), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
 export async function handleBrowse(supabase: any, body: any): Promise<Response> {
@@ -37,6 +38,15 @@ export async function handleBrowse(supabase: any, body: any): Promise<Response> 
       case "preview": {          // one item read and mapped, nothing written: for the raw-vs-model gate
         const raw = await client.getItem(String(body.item_id));
         return json({ ok: true, raw, landing: toLanding(raw, htmlToText), calls: client.calls });
+      }
+      case "census": {           // eBay's own counts, one source_census row: category total, make, year, vintage by ZIP prefix, near-me per anchor
+        const r = await readCensus(client);
+        const src = await supabase.from("observation_sources").select("id").eq("slug", "ebay_motors").maybeSingle();
+        if (!src.data?.id) return json({ ok: false, error: "observation_sources has no ebay_motors row", reading: { total: r.total } }, 500);
+        const ins = await supabase.from("source_census").insert(censusRow(src.data.id, r));
+        if (ins.error) return json({ ok: false, error: `source_census insert: ${ins.error.message}`, total: r.total }, 500);
+        return json({ ok: true, as_of: r.as_of, total: r.total, vintage_le_1991: r.vintage.total, vintage_read: r.vintage.read, vintage_skipped: r.vintage.skipped,
+          zip3_areas: Object.keys(r.vintage.by_zip3).length, local_pickup: r.local_pickup, calls: r.calls });
       }
       case "revisit": {
         const rep = await revisit(supabase, client, { max: body.max });
