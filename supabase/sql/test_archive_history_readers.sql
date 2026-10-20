@@ -1,5 +1,5 @@
 -- Empty disposable PG17 only: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_archive_history -f this-file.sql
--- Proves migration 20261021030000: hero_finds() stops returning hidden or deleted vehicles in all three blocks, and
+-- Proves migration 20261021030100: hero_finds() stops returning hidden or deleted vehicles in all three blocks, and
 -- get_comps_scored(...) dates a vehicle-record comp by its sale date. The functions start as production had them on
 -- 2026-10-20 (helpers/archive_history_readers_live_20261020.sql, checked by md5), the leak is shown on them, the
 -- migration is applied, and the same reads are repeated. Security, search settings and grants must not change.
@@ -75,7 +75,7 @@ SELECT public.t_assert(public.t_finds('multi_signal') = ARRAY['a1', 'a2', 'a3'],
 SELECT public.t_assert(public.t_comp_dates() = '{"c1": null, "c2": null, "c3": null}'::jsonb, 'before: vehicle-record comps are undated');
 
 -- 2. The migration.
-\ir ../migrations/20261021030000_archive_history_readers_public_and_dated.sql
+\ir ../migrations/20261021030100_archive_history_readers_public_and_dated.sql
 
 -- 3. Only the public, undeleted vehicle is a find, in every block.
 SELECT public.t_assert(public.t_finds('rare_finds') = ARRAY['a1'], 'after: rare_finds is public rows only');
@@ -96,7 +96,7 @@ SELECT public.t_assert(p.prosecdef AND p.proconfig = ARRAY['statement_timeout=10
 FROM pg_proc p WHERE p.proname IN ('hero_finds', 'get_comps_scored') AND p.pronamespace = 'public'::regnamespace;
 
 -- 6. A re-run is a no-op.
-\ir ../migrations/20261021030000_archive_history_readers_public_and_dated.sql
+\ir ../migrations/20261021030100_archive_history_readers_public_and_dated.sql
 SELECT public.t_assert(public.t_finds('rare_finds') = ARRAY['a1'], 'rerun: unchanged');
 
 \echo 'test_archive_history_readers: PASS'
