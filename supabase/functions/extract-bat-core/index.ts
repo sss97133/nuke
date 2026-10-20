@@ -36,6 +36,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { normalizeListingUrlKey } from "../_shared/listingUrl.ts";
+import { decideLotAttribution, mergeEventMetadata, monitorForSeller, type BatEventRow } from "./sellerAttribution.ts";
 import { parseLocation } from "../_shared/parseLocation.ts";
 import { normalizeVehicleFields } from "../_shared/normalizeVehicle.ts";
 import { qualityGate } from "../_shared/extractionQualityGate.ts";
@@ -2656,11 +2657,13 @@ Deno.serve(async (req) => {
     // Resolve seller_username → organization via bat_seller_monitors
     if (vehicleId && essentials.seller_username) {
       try {
-        const { data: monitor } = await supabase
+        // ILIKE treats "_" and "%" as wildcards: fetch candidates, then require an exact handle match.
+        const { data: monitorRows } = await supabase
           .from("bat_seller_monitors")
-          .select("organization_id")
+          .select("organization_id, seller_username")
           .ilike("seller_username", essentials.seller_username)
-          .maybeSingle();
+          .limit(5);
+        const monitor = monitorForSeller(essentials.seller_username, monitorRows || []);
 
         if (monitor?.organization_id) {
           // Upsert external_identity
@@ -2699,25 +2702,46 @@ Deno.serve(async (req) => {
               { onConflict: "organization_id,vehicle_id,relationship_type", ignoreDuplicates: true }
             );
 
-          // Wire vehicle_events
-          await supabase
+          // Wire vehicle_events: the lot being read only. The seller on this page is this lot's seller;
+          // other BaT lots of the same vehicle (resales by someone else) keep whatever they had.
+          const lotUrlKey = normalizeListingUrlKey(listingUrlCanonical);
+          const { data: lotRows } = await supabase
             .from("vehicle_events")
-            .update({
-              source_organization_id: monitor.organization_id,
-              ...(eiId ? { seller_external_identity_id: eiId } : {}),
-            })
+            .select("id, source_url, source_listing_id, source_organization_id, metadata")
             .eq("vehicle_id", vehicleId)
             .eq("source_platform", "bat")
-            .is("source_organization_id", null);
-
-          // Store ownership classification in event metadata for audit
-          if (relType !== "sold_by") {
-            await supabase
+            .or(`source_listing_id.eq.${lotUrlKey},source_url.eq.${listingUrlCanonical}`);
+          const decision = decideLotAttribution({
+            lotSellerHandle: essentials.seller_username,
+            monitors: monitorRows || [],
+            lotUrl: listingUrlCanonical,
+            events: (lotRows || []) as BatEventRow[],
+          });
+          for (const eventId of decision.attributeEventIds) {
+            const { error: attrErr } = await supabase
               .from("vehicle_events")
-              .update({ metadata: { ownership_classification: relType } })
-              .eq("vehicle_id", vehicleId)
-              .eq("source_platform", "bat")
-              .eq("source_organization_id", monitor.organization_id);
+              .update({
+                source_organization_id: monitor.organization_id,
+                ...(eiId ? { seller_external_identity_id: eiId } : {}),
+              })
+              .eq("id", eventId)
+              .is("source_organization_id", null);
+            if (attrErr) console.warn(`vehicle_events attribution failed (non-fatal): ${attrErr.message}`);
+          }
+
+          // Store ownership classification in event metadata for audit. Merge into this lot's metadata:
+          // a plain { metadata: {...} } update replaces the whole jsonb (it dropped seller_username,
+          // buyer_username, lot_number and images from ~0.6% of BaT events).
+          if (relType !== "sold_by") {
+            for (const row of ((lotRows || []) as BatEventRow[]).filter((r) =>
+              decision.attributeEventIds.includes(r.id) || r.source_organization_id === monitor.organization_id
+            )) {
+              const { error: metaErr } = await supabase
+                .from("vehicle_events")
+                .update({ metadata: mergeEventMetadata(row.metadata, { ownership_classification: relType }) })
+                .eq("id", row.id);
+              if (metaErr) console.warn(`vehicle_events metadata merge failed (non-fatal): ${metaErr.message}`);
+            }
           }
         }
       } catch (e: any) {
