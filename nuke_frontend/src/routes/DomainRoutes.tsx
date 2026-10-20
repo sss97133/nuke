@@ -126,6 +126,8 @@ const JobPage = React.lazy(() => {
   if (typeof window !== 'undefined') warmJobRoute(window.location.pathname);
   return import('../pages/jobs/JobPage');
 });
+// Parts to buy for a job: listings approved for its parts, one link each to eBay (work_order_operations_read)
+const JobPartsHandoff = React.lazy(() => import('../pages/jobs/JobPartsHandoff'));
 const ProviderProfilePage = React.lazy(() => import('../pages/providers/ProviderProfilePage'));
 const MessagesPage = React.lazy(() => import('../pages/messages/MessagesPage'));
 const SupplierInvitePage = React.lazy(() => import('../pages/orgs/SupplierInvitePage'));
@@ -221,6 +223,7 @@ export const DomainRoutes = () => {
         <Route path="/u/:handle" element={<UserProfile />} />
         {/* Jobs (work orders) and provider work records — public, read-first; Signs only where the server offers them */}
         <Route path="/jobs/:workOrderId" element={<JobPage />} />
+        <Route path="/jobs/:workOrderId/parts" element={<JobPartsHandoff />} />
         <Route path="/providers/actor/:actorId" element={<ProviderProfilePage />} />
         <Route path="/providers/:handle" element={<ProviderProfilePage />} />
         {/* Statement: work_order_statement_read is open data; payments stay party-only from the server */}
