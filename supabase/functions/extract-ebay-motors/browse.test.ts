@@ -78,3 +78,8 @@ Deno.test("the year aspect is eBay's live name, Model Year, and filters on that 
   assertEquals(ya.name, "Model Year");
   assertEquals(aspectFilterFor(ya.name, [1969]), "categoryId:6001,Model Year:{1969}");
 });
+
+Deno.test("a VIN of one repeated character is a placeholder, not a VIN", () => {
+  for (const v of ["00000000000000000", "11111111111111111", "xxxxxxxxxxxxxxxxx", "000000"]) assertEquals(vinOf({ vin: v }).vin, null);
+  assertEquals(vinOf({ vin: "1GCEK14V5SZ123456" }).vin, "1GCEK14V5SZ123456");
+});
