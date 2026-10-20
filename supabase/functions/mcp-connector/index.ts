@@ -13,6 +13,7 @@ import {
   type WriteTier,
 } from "../_shared/scopeGrammar.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { requireAdminOrService, requireWriteAuth } from "../_shared/writeGuard.ts";
 
 // =============================================================================
 // NUKE MCP CONNECTOR — Full-Resolution Vehicle Digital Twin Access
@@ -6091,7 +6092,7 @@ function handleToolsList(req: JsonRpcRequest, chatgptSurface = false): JsonRpcRe
 
 async function handleToolsCall(req: JsonRpcRequest, chatgptSurface = false): Promise<JsonRpcResponse> {
   const params = req.params as { name: string; arguments?: Record<string, unknown> } | undefined;
-  if (!params?.name) {
+  if (!params?.name || typeof params.name !== "string") {
     return rpcError(req.id, -32602, "Missing tool name");
   }
 
@@ -6224,15 +6225,26 @@ Deno.serve(async (req: Request) => {
     link_account: "canonical",
     verify_account_link: "canonical",
   };
+  // execute_sql hands the caller's text to public.execute_sql, which runs it as the database owner. It is gated like
+  // nlq-sql: the service key, or a verified-JWT caller who is an active admin (admin_users). _shared/writeGuard judges
+  // the JWT itself (ES256 against the project JWKS) and looks up admin_users, because the connector's own API-key auth
+  // cannot judge a user JWT. Anonymous → 401, a signed-in non-admin or an API key → 403/401.
+  const ADMIN_OR_SERVICE_TOOLS = new Set(["execute_sql"]);
   if (body.method === "tools/call") {
     const toolName = body?.params?.name as string | undefined;
     const authHeader = req.headers.get("Authorization");
     const apiKey = req.headers.get("X-API-Key");
     const requiredTier: WriteTier | undefined = toolName ? WRITE_TIERS[toolName] : undefined;
     const isWrite = Boolean(requiredTier);
+    const adminOrService = typeof toolName === "string" && ADMIN_OR_SERVICE_TOOLS.has(toolName);
 
-    // If auth is provided, always validate it (so a bad key fails fast even on read tools).
-    if (authHeader || apiKey) {
+    if (adminOrService) {
+      // Does not go through the connector's own authenticate(): writeGuard verifies the token and the admin row.
+      const denied = (await requireWriteAuth(req, { headers: CORS })) ??
+        (await requireAdminOrService(req, { headers: CORS }));
+      if (denied) return denied;
+    } else if (authHeader || apiKey) {
+      // If auth is provided, always validate it (so a bad key fails fast even on read tools).
       const auth = await authenticate(req);
       if (!auth.ok) {
         return new Response(

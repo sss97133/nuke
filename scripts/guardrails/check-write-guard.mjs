@@ -38,7 +38,7 @@ const ALLOWLIST = {
   "api-v1-signal": "apiKeyAuth.authenticateRequest refuses anonymous callers (401)",
   "api-v1-vehicles": "apiKeyAuth.authenticateRequest refuses anonymous callers (401)",
   "api-v1-agent-register": "anonymous self-registration by design; IP rate-limited",
-  "mcp-connector": "own tiered auth: write tools need nk_live_/OAuth/service; read tools open",
+  "mcp-connector": "own tiered auth: write tools need nk_live_/service; the execute_sql tool the service key only; read tools open",
   "oauth-server": "OAuth authorization/token flows carry their own proofs (client secret, PKCE, user session)",
   "stripe-webhook": "Stripe signature is the auth",
   "auto-merge-duplicate-orgs": "authenticateWriter refuses anonymous callers (writeAuthResponse on !ok); scanAll is service-role only, organizationId requires an owner/discoverer of that org",
