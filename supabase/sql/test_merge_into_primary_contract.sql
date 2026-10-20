@@ -39,7 +39,9 @@ CREATE FUNCTION public.is_admin_or_moderator() RETURNS boolean LANGUAGE sql AS $
 CREATE FUNCTION public.user_can_edit_vehicle(uuid, uuid) RETURNS boolean LANGUAGE sql AS $$ SELECT false $$;
 
 CREATE TABLE public.vehicles (
-  id uuid PRIMARY KEY, status text, merged_into_vehicle_id uuid, deleted_at timestamptz, user_id uuid, image_count integer, vin text);
+  id uuid PRIMARY KEY, status text, merged_into_vehicle_id uuid, deleted_at timestamptz, user_id uuid, owner_id uuid, uploaded_by uuid, image_count integer, vin text);
+CREATE TABLE public.vehicle_user_permissions (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid NOT NULL, user_id uuid, role text, is_active boolean DEFAULT true);
 CREATE TABLE public.vehicle_images (
   id uuid PRIMARY KEY, vehicle_id uuid, merged_from_vehicle_id uuid, image_url text, file_hash text,
   is_superseded boolean, is_duplicate boolean);
@@ -81,6 +83,7 @@ CREATE TABLE public.merge_proposals (
 -- The migration under test.
 \i supabase/migrations/20261015220000_merge_carries_events_and_supersedes.sql
 \i supabase/migrations/20261020050500_merge_vin_carry_and_protected_observations.sql
+\i supabase/migrations/20261021170000_merge_gate_reads_every_owner_signal.sql
 
 SELECT pg_temp.ok('the migration added merged_from_vehicle_id to vehicle_events and timeline_events',
   (SELECT count(*) FROM information_schema.columns WHERE table_name IN ('vehicle_events', 'timeline_events') AND column_name = 'merged_from_vehicle_id') = 2);
@@ -274,6 +277,33 @@ INSERT INTO vehicles (id, status, vin) VALUES
 SELECT pg_temp.ok('two live rows with two different 11+ character VINs are two vehicles: the merge is refused (vin_conflict)',
   merge_into_primary('00000000-0000-0000-0000-00000000ee01', '00000000-0000-0000-0000-00000000ee02') ->> 'skipped' = 'vin_conflict'
   AND (SELECT status = 'active' FROM vehicles WHERE id = '00000000-0000-0000-0000-00000000ee02'));
+
+-- Gate 2 reads every owner signal (20261021170000): owner_id, uploaded_by and an active owner / co_owner permission each refuse
+-- the merge without an approved, reviewed proposal; an inactive owner permission and a contributor do not; an approval lets it through.
+INSERT INTO vehicles (id, status, owner_id, uploaded_by) VALUES
+  ('00000000-0000-0000-0000-00000000c0a1', 'active', NULL, NULL), ('00000000-0000-0000-0000-00000000c0d1', 'active', '00000000-0000-0000-0000-0000000000f1', NULL),
+  ('00000000-0000-0000-0000-00000000c0a2', 'active', NULL, '00000000-0000-0000-0000-0000000000f1'), ('00000000-0000-0000-0000-00000000c0d2', 'active', NULL, NULL),
+  ('00000000-0000-0000-0000-00000000c0a3', 'active', NULL, NULL), ('00000000-0000-0000-0000-00000000c0d3', 'active', NULL, NULL),
+  ('00000000-0000-0000-0000-00000000c0a4', 'active', NULL, NULL), ('00000000-0000-0000-0000-00000000c0d4', 'active', NULL, NULL),
+  ('00000000-0000-0000-0000-00000000c0a5', 'active', NULL, NULL), ('00000000-0000-0000-0000-00000000c0d5', 'active', NULL, NULL),
+  ('00000000-0000-0000-0000-00000000c0a6', 'active', NULL, NULL), ('00000000-0000-0000-0000-00000000c0d6', 'active', '00000000-0000-0000-0000-0000000000f1', NULL);
+INSERT INTO vehicle_user_permissions (vehicle_id, user_id, role, is_active) VALUES
+  ('00000000-0000-0000-0000-00000000c0d3', '00000000-0000-0000-0000-0000000000f1', 'owner', true),
+  ('00000000-0000-0000-0000-00000000c0d4', '00000000-0000-0000-0000-0000000000f1', 'owner', false),
+  ('00000000-0000-0000-0000-00000000c0d5', '00000000-0000-0000-0000-0000000000f1', 'contributor', true);
+SELECT pg_temp.ok('owner_id on one row: refused (owned_requires_approval)',
+  merge_into_primary('00000000-0000-0000-0000-00000000c0a1', '00000000-0000-0000-0000-00000000c0d1') ->> 'skipped' = 'owned_requires_approval');
+SELECT pg_temp.ok('uploaded_by on one row: refused',
+  merge_into_primary('00000000-0000-0000-0000-00000000c0a2', '00000000-0000-0000-0000-00000000c0d2') ->> 'skipped' = 'owned_requires_approval');
+SELECT pg_temp.ok('an active owner permission on one row: refused',
+  merge_into_primary('00000000-0000-0000-0000-00000000c0a3', '00000000-0000-0000-0000-00000000c0d3') ->> 'skipped' = 'owned_requires_approval');
+SELECT pg_temp.ok('an inactive owner permission and an active contributor permission do not make a vehicle owned',
+  merge_into_primary('00000000-0000-0000-0000-00000000c0a4', '00000000-0000-0000-0000-00000000c0d4') ? 'proposal_id'
+  AND merge_into_primary('00000000-0000-0000-0000-00000000c0a5', '00000000-0000-0000-0000-00000000c0d5') ? 'proposal_id');
+INSERT INTO vehicle_merge_proposals (primary_vehicle_id, duplicate_vehicle_id, match_type, status, reviewed_by)
+  VALUES ('00000000-0000-0000-0000-00000000c0d6', '00000000-0000-0000-0000-00000000c0a6', 'owner_approved', 'approved', '00000000-0000-0000-0000-0000000000f1');
+SELECT pg_temp.ok('an owner_id row merges once an approved, reviewed proposal names the pair (either direction)',
+  merge_into_primary('00000000-0000-0000-0000-00000000c0a6', '00000000-0000-0000-0000-00000000c0d6') ? 'proposal_id');
 
 SELECT pg_temp.ok('unmerge of a merge with no journal says no_journal',
   unmerge_vehicle('90000000-0000-0000-0000-000000000001') ->> 'error' = 'no_journal');

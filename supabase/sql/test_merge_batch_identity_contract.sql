@@ -36,7 +36,7 @@ CREATE FUNCTION public.is_admin_or_moderator() RETURNS boolean LANGUAGE sql AS $
 CREATE FUNCTION public.user_can_edit_vehicle(uuid, uuid) RETURNS boolean LANGUAGE sql AS $$ SELECT false $$;
 
 CREATE TABLE public.vehicles (
-  id uuid PRIMARY KEY, status text, merged_into_vehicle_id uuid, deleted_at timestamptz, user_id uuid, image_count integer,
+  id uuid PRIMARY KEY, status text, merged_into_vehicle_id uuid, deleted_at timestamptz, user_id uuid, owner_id uuid, uploaded_by uuid, image_count integer,
   has_photos boolean, vin text, year integer, make text, model text, trim text, series text, generation text, body_style text,
   engine_size text, engine_type text, drivetrain text, fuel_type text, listing_url text, discovery_url text, primary_image_url text,
   sale_date date, color text, interior_color text, transmission text, description text, profile_origin text, origin_metadata jsonb);
@@ -97,6 +97,8 @@ CREATE TABLE public.vehicle_merge_proposals (
   match_type text, confidence_score integer, status text, detected_by text, detected_at timestamptz, reviewed_by uuid,
   merged_at timestamptz, merge_journal jsonb, pre_merge_dup_status text, unmerged_at timestamptz, unmerged_by uuid,
   UNIQUE (primary_vehicle_id, duplicate_vehicle_id));
+CREATE TABLE public.vehicle_user_permissions (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid NOT NULL, user_id uuid, role text, is_active boolean DEFAULT true);
 CREATE TABLE public.merge_deleted_rows (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(), proposal_id uuid, source_table text, row_id uuid, row_data jsonb, restored_at timestamptz);
 CREATE TABLE public.merge_proposals (
@@ -110,6 +112,7 @@ CREATE TABLE public.superseded_rows (
 \i supabase/migrations/20261020011000_merge_batch_discovery_url_fill_only.sql
 \i supabase/migrations/20261020050500_merge_vin_carry_and_protected_observations.sql
 \i supabase/migrations/20261021040000_merge_batch_same_source_image_stays.sql
+\i supabase/migrations/20261021170000_merge_gate_reads_every_owner_signal.sql
 
 -- ---------------------------------------------------------------------------------------------------------------------
 -- 1. correct_vehicle_vin: a merged-away holder owns nothing; a live holder still does.
@@ -334,3 +337,39 @@ SELECT pg_temp.ok('the photo two duplicates carry moved once: D7a''s copy (small
 SELECT pg_temp.ok('a photo with no URL and a photo with a file_hash both still move',
   (SELECT count(*) FROM vehicle_images WHERE id IN ('91000000-0000-0000-0000-0000000000c1', '91000000-0000-0000-0000-0000000000c2')
      AND vehicle_id = '00000000-0000-0000-0000-0000000009a1' AND merged_from_vehicle_id = '00000000-0000-0000-0000-0000000009d3') = 2);
+
+-- ---------------------------------------------------------------------------------------------------------------------
+-- 8. Gate 2 reads every owner signal (20261021170000), not user_id alone. Nine pairs in one call:
+--    A user_id on the duplicate   B owner_id on the duplicate   C uploaded_by on the primary   D active owner permission on the primary
+--    E active co_owner permission on the duplicate   -> refused (no approved, reviewed proposal)
+--    F inactive owner permission   G active contributor permission   I no signal   -> merged
+--    H owner_id on the duplicate WITH an approved, reviewed proposal (filed the other way round)   -> merged
+-- ---------------------------------------------------------------------------------------------------------------------
+INSERT INTO vehicles (id, status, year, make, model, user_id, owner_id, uploaded_by) VALUES
+  ('00000000-0000-0000-0000-00000000b0a1', 'active', 1971, 'Ford', 'Bronco', NULL, NULL, NULL), ('00000000-0000-0000-0000-00000000b0d1', 'active', 1971, 'Ford', 'Bronco', '00000000-0000-0000-0000-0000000000f1', NULL, NULL),
+  ('00000000-0000-0000-0000-00000000b0a2', 'active', 1972, 'Ford', 'Bronco', NULL, NULL, NULL), ('00000000-0000-0000-0000-00000000b0d2', 'active', 1972, 'Ford', 'Bronco', NULL, '00000000-0000-0000-0000-0000000000f1', NULL),
+  ('00000000-0000-0000-0000-00000000b0a3', 'active', 1973, 'Ford', 'Bronco', NULL, NULL, '00000000-0000-0000-0000-0000000000f1'), ('00000000-0000-0000-0000-00000000b0d3', 'active', 1973, 'Ford', 'Bronco', NULL, NULL, NULL),
+  ('00000000-0000-0000-0000-00000000b0a4', 'active', 1974, 'Ford', 'Bronco', NULL, NULL, NULL), ('00000000-0000-0000-0000-00000000b0d4', 'active', 1974, 'Ford', 'Bronco', NULL, NULL, NULL),
+  ('00000000-0000-0000-0000-00000000b0a5', 'active', 1975, 'Ford', 'Bronco', NULL, NULL, NULL), ('00000000-0000-0000-0000-00000000b0d5', 'active', 1975, 'Ford', 'Bronco', NULL, NULL, NULL),
+  ('00000000-0000-0000-0000-00000000b0a6', 'active', 1976, 'Ford', 'Bronco', NULL, NULL, NULL), ('00000000-0000-0000-0000-00000000b0d6', 'active', 1976, 'Ford', 'Bronco', NULL, NULL, NULL),
+  ('00000000-0000-0000-0000-00000000b0a7', 'active', 1977, 'Ford', 'Bronco', NULL, NULL, NULL), ('00000000-0000-0000-0000-00000000b0d7', 'active', 1977, 'Ford', 'Bronco', NULL, NULL, NULL),
+  ('00000000-0000-0000-0000-00000000b0a8', 'active', 1978, 'Ford', 'Bronco', NULL, NULL, NULL), ('00000000-0000-0000-0000-00000000b0d8', 'active', 1978, 'Ford', 'Bronco', NULL, '00000000-0000-0000-0000-0000000000f1', NULL),
+  ('00000000-0000-0000-0000-00000000b0a9', 'active', 1979, 'Ford', 'Bronco', NULL, NULL, NULL), ('00000000-0000-0000-0000-00000000b0d9', 'active', 1979, 'Ford', 'Bronco', NULL, NULL, NULL);
+INSERT INTO vehicle_user_permissions (vehicle_id, user_id, role, is_active) VALUES
+  ('00000000-0000-0000-0000-00000000b0a4', '00000000-0000-0000-0000-0000000000f1', 'owner', true),
+  ('00000000-0000-0000-0000-00000000b0d5', '00000000-0000-0000-0000-0000000000f1', 'co_owner', true),
+  ('00000000-0000-0000-0000-00000000b0d6', '00000000-0000-0000-0000-0000000000f1', 'owner', false),
+  ('00000000-0000-0000-0000-00000000b0d7', '00000000-0000-0000-0000-0000000000f1', 'contributor', true);
+INSERT INTO vehicle_merge_proposals (primary_vehicle_id, duplicate_vehicle_id, match_type, status, reviewed_by)
+  VALUES ('00000000-0000-0000-0000-00000000b0d8', '00000000-0000-0000-0000-00000000b0a8', 'owner_approved', 'approved', '00000000-0000-0000-0000-0000000000f1');
+CREATE TABLE pg_temp.owner_gate AS SELECT merge_into_primary_batch(
+  ARRAY(SELECT ('00000000-0000-0000-0000-00000000b0a' || n)::uuid FROM unnest(ARRAY['1','2','3','4','5','6','7','8','9']) n ORDER BY n),
+  ARRAY(SELECT ('00000000-0000-0000-0000-00000000b0d' || n)::uuid FROM unnest(ARRAY['1','2','3','4','5','6','7','8','9']) n ORDER BY n)) r;
+SELECT pg_temp.ok('four of nine pairs merge: inactive owner permission, contributor permission, an approved owner pair and a pair with no signal',
+  (SELECT (r ->> 'merged_count')::int = 4 FROM pg_temp.owner_gate));
+SELECT pg_temp.ok('refused without approval: user_id, owner_id, uploaded_by, an active owner permission and an active co_owner permission',
+  (SELECT count(*) FROM vehicles WHERE id IN ('00000000-0000-0000-0000-00000000b0d1', '00000000-0000-0000-0000-00000000b0d2', '00000000-0000-0000-0000-00000000b0d3',
+     '00000000-0000-0000-0000-00000000b0d4', '00000000-0000-0000-0000-00000000b0d5') AND status = 'active' AND merged_into_vehicle_id IS NULL) = 5);
+SELECT pg_temp.ok('merged: F inactive owner permission, G contributor permission, H approved owner pair, I no signal',
+  (SELECT count(*) FROM vehicles WHERE id IN ('00000000-0000-0000-0000-00000000b0d6', '00000000-0000-0000-0000-00000000b0d7', '00000000-0000-0000-0000-00000000b0d8', '00000000-0000-0000-0000-00000000b0d9')
+     AND status = 'merged') = 4);
