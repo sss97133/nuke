@@ -156,50 +156,7 @@ Deno.serve(async (req) => {
       const listingOnly = choroplethEvents.length > 0 && choroplethEvents.every((e) => e === "listing");
       const valueExpr = listingOnly ? "COALESCE(v.asking_price, 0)" : "COALESCE(v.sale_price, v.sold_price, 0)";
 
-      // Listings over a window of days → the per-county, per-day listing fold (vehicle_map_county_listings).
-      if (listingOnly && !choroplethTimeStart && !choroplethTimeEnd) {
-        const days = Math.min(Math.max(Number.parseInt(String(params.days ?? "30"), 10) || 30, 1), 30);
-        const dbUrl = (Deno.env.get("NUKE_DB_POOL_URL") || Deno.env.get("SUPABASE_DB_URL"))!;
-        const lPool = new Pool(dbUrl, 1, true);
-        const lConn = await lPool.connect();
-        try {
-          const keyExpr = mode === "county" ? "l.fips" : "left(l.fips, 2)";
-          const where = "l.day > (now() AT TIME ZONE 'UTC')::date - $1::int"
-            + (choroplethSources.length ? " AND l.source_platform = ANY($2)" : "");
-          const args: unknown[] = choroplethSources.length ? [days, choroplethSources] : [days];
-          const { rows } = await readWithin<{ k: string; count: number; value: string | null; priced: number }>(lConn, `
-            SELECT ${keyExpr} AS k, sum(l.listings)::int AS count, sum(l.asking_sum) AS value, sum(l.priced)::int AS priced
-            FROM vehicle_map_county_listings l WHERE ${where} GROUP BY 1`, args);
-          const { rows: bySource } = await readWithin<{ source: string; count: number }>(lConn, `
-            SELECT l.source_platform AS source, sum(l.listings)::int AS count
-            FROM vehicle_map_county_listings l WHERE ${where} GROUP BY 1 ORDER BY 2 DESC`, args);
-          const { rows: asOfRows } = await readWithin<{ as_of: string | null }>(lConn,
-            "SELECT max(as_of)::text AS as_of FROM vehicle_map_county_listings", []);
-          const regions = rows.map((r) => {
-            const value = Number(r.value ?? 0);
-            return { key: r.k, count: r.count, value, avg: r.priced ? Math.round(value / r.priced) : 0 };
-          });
-          const totalCount = regions.reduce((a, r) => a + r.count, 0);
-          const totalValue = regions.reduce((a, r) => a + r.value, 0);
-          const meta = { measure: "listings", value_basis: "asking", days, source: choroplethSources,
-            by_source: bySource, as_of: asOfRows[0]?.as_of ?? null, generated_at: new Date().toISOString() };
-          return json(mode === "county"
-            ? { level: "county", counties: regions.map(({ key, ...r }) => ({ fips: key, ...r })),
-                stats: { totalCount, totalValue, countyCount: regions.length }, ...meta }
-            : { level: "state", states: regions.map(({ key, ...r }) => ({ code: STATE_BY_FIPS[key] ?? key, ...r })),
-                stats: { totalCount, totalValue }, ...meta }, rlHdrs);
-        } catch (e) {
-          // Not yet filled by its first refresh: an empty measure, said so.
-          if (String((e as Error)?.message ?? e).includes("has not been populated")) {
-            return json({ level: mode, counties: [], states: [], stats: { totalCount: 0, totalValue: 0, countyCount: 0 },
-              measure: "listings", populated: false, generated_at: new Date().toISOString() }, rlHdrs);
-          }
-          throw e;
-        } finally {
-          lConn.release();
-          await lPool.end();
-        }
-      }
+      // Listings per area over a window: mode=areas (map_facts). The per-county listing fold of #2215 is retired.
 
       // No time or event/source filter → fast materialized view path
       if (!choroplethTimeStart && !choroplethTimeEnd && !choroplethEvents.length && !choroplethSources.length) {
