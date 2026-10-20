@@ -127,11 +127,14 @@ into permanent identity types or mandatory arrival choices without a separate mo
 - **Row writes.** Only through the sanctioned writers: `ingest-observation`,
   `correct_vehicle_sale_provenance_batch`, and the supersession functions.
   - Image evidence store (from M1w, `20261021221000`; not live until it deploys). These writers write only the evidence
-    store and touch no existing testimony table: `evidence_open_run`, `evidence_close_run`, `evidence_record_answers`,
-    `propose_image_candidates`, `propose_capture_time_claims`, `confirm_capture_times_by_rule`,
-    `propose_evidence_links`, `propose_account_entities`, `propose_change_claim`, `propose_claim_support`,
-    `record_day_context`, `decide_evidence`. Called as top-level PostgREST RPC with the service-role key under
-    `dotenvx run` (the owner's own aal2 session for `decide_evidence`); never from q.sh.
+    store and touch no existing testimony table. Jobs call `evidence_open_run`, `evidence_close_run`,
+    `evidence_record_answers`, `propose_image_candidates`, `propose_capture_time_claims`,
+    `confirm_capture_times_by_rule`, `propose_evidence_links`, `propose_account_entities`, `propose_change_claim`,
+    `propose_claim_support` and `record_day_context` as top-level PostgREST RPC with the service-role key under
+    `dotenvx run`, never from q.sh; `evidence_record_answers` stores his chat answers and decides nothing.
+    `decide_evidence` is called only from the owner's own aal2 session. No job can call it (it is not granted to the
+    service role and its body refuses a job caller), and a delegated Sign (`owner_delegated_sign_register`) never
+    stands in for it.
   - No raw INSERT, UPDATE or DELETE on testimony tables.
   - No `DISABLE TRIGGER`.
   - No `statement_timeout = 0`.

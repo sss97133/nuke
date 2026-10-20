@@ -54,9 +54,17 @@ Testimony is the rows that record what was observed, by whom, from what source a
   running run, once, setting its close columns. The owner's stored answers (`review_answers` runs) are written
   closed, so the guard refuses any later change to them; a review sheet (`review` run) keeps the rows and targets it was
   written with.
-- No agent uses or obtains an owner session (his JWT, cookies, a signed-in browser) to record a decision. Owner
-  decisions come only from his own step-up (aal2) session; agents transcribe his chat answers through the agent channel
-  (`evidence_record_answers`, then `decide_evidence` citing the stored answer).
+- No agent records an owner decision, and no agent uses or obtains an owner session (his JWT, cookies, a signed-in
+  browser). Owner decisions come only from his own step-up (aal2) session (`decide_evidence`; service_role cannot call
+  it). Agents store his chat answers word for word (`evidence_record_answers`); a stored answer decides nothing until
+  he confirms it himself in the app. Evidence decisions are excluded from the delegated-sign register
+  (`owner_delegated_sign_register`): no Sign an agent makes on his behalf records one, because `decide_evidence` reads
+  the auth server's own session and factor records (an aal2 session stepped up with his verified second factor, enrolled
+  at least 7 days earlier, within the last 15 minutes), which a delegated Sign does not satisfy.
+- Where that is enforced: by the writers migration (M1w, `20261021221000`, not live until it deploys), which grants
+  `decide_evidence` to authenticated only and refuses a job caller in its body. The tables' guard (`20261021220000`,
+  live) still lists `decide_evidence` among the writer names and would admit an `agent:` decision from a service-role
+  job through it; until the writers migration deploys, no writer exists at all.
 - A data-only restore of these tables is a reviewed migration written for that restore, in one transaction: drop the 27
   guard triggers, load the rows, recreate the triggers `ENABLE ALWAYS` exactly as
   `20261021220000_image_evidence_tables.sql` does, and check that all 27 fire ALWAYS. Never `DISABLE TRIGGER`.
