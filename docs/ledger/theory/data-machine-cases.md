@@ -3033,3 +3033,60 @@ adds a `stripe` documentation source, an immutable processor-payment projection,
 the current invoice balance, a webhook recorder idempotent on Stripe event and session ids, and anchored edits so
 reconciliation counts processor receipts and the customer's job actions offer `pay_invoice`. The webhook now routes
 by purchase type. Collection only: no transfer, payout or release; the live key is not exercised by tests.
+
+## 14. The map: place as where a user participates (owner, 2026-10-20)
+
+**Owner direction, 2026-10-20 09:12–09:25 PT**, on the web map that copies the iOS map (#2357), in his words:
+"i actually still prefer we focus on selected zip but we need more nesting dolls metrics because a lot of data is being
+hidden cuz it doesnt have a zip associated." "when we are drilling in to a map what are we hoping to find? we want to see
+the sources of the vehicles thats why maybe having the addresses of the prominent businesses would surface at a certain
+point, the color of the fill permeating from them." "the side menu i dont get to click which violates click through."
+"i wanna find cool things, i wanna see metrics on past listings more than the listings themselves because previous
+listings that are done and sold really only exist to provide data intelligence on the area and then finding the current
+listing is perhaps more priority because available listings is where a user can participate, the other area a user can
+participate is by discovering other users, or service providers active in that zip or zone. that doesnt yet exist...
+being able to follow or participate with those other users becomes a thing we start to ruminate on." "as for the vehicle
+list... whats that point in its current state. the data is bland... id wanna see the vehicles performance on the market."
+"eventually the view will transform... as the system is adopted people will provide their live profiles of vehicles
+present in the area. sold vehicles travel out of the zip usually... so what it shows is actually a little bit misleading
+we are currently showing a historic ledger of vehicles that sold thru that zip... usually more of an indication of the
+location of the seller." "the metrics dont differentiate listing type." "i zoom out and it just spins." "the theories
+havent been written on what we aspire to do."
+
+**The theory, as the lead reads it (to be corrected by the owner, not by agents).**
+
+1. **The unit stays the selected ZIP.** The view is navigation, not the cohort. A ZIP's reading sits inside its
+   county, its state and the country, and shows all four at once (nesting dolls), because records that carry no ZIP
+   are not missing: they are county-grain or state-grain evidence and count at the grain they have. "11,080 records
+   without a ZIP" is a coverage statement, not a footnote. (map_facts already holds the three grains with their
+   "no key" rows; the panel must show them.)
+2. **A place has two different facts, and the map must say which it is showing.** (a) *Where a vehicle was sold from*:
+   the seller's location at listing time, which is what every location observation is today; a sold vehicle has usually
+   left that ZIP. (b) *Where a vehicle is present*: an owner's live profile placing the asset there, which exists only as
+   adoption grows. Today's map is (a) and must label itself as the seller ledger of the area, never as "vehicles here".
+3. **Drilling in looks for sources.** The question behind the drill is "who is selling here": dealers, consignors,
+   auction houses, private sellers. Prominent businesses with addresses surface at a zoom, and the fill is attributable
+   to them (the color permeates from its sources). The ZIP panel leads with its top sources and their share, each
+   opening to the organization.
+4. **Past listings are intelligence; current listings are participation.** Done and sold episodes exist to produce the
+   area's numbers (what sells, sell-through, time to sell, like-for-like premium against the same cars elsewhere, trend);
+   they are shown as readings, not as a list. Available listings are the list, first, because they are where a user can
+   act. The third kind of participation is people: other users and service providers active in the zone, to discover
+   and follow (not built; see the organization layer and actors).
+5. **Every datum on the panel is a button.** Platforms, mix, metrics, records: each opens to its rows and its evidence.
+   A "1 record" line that does not open is a tenet-1 failure.
+6. **Metrics differentiate the kind of episode.** Listing, sale, sighting and bid are different layers (map_layers) and
+   are never summed as "vehicles".
+7. **A vehicle row carries its market performance**, not its name: outcome (sold, reserve not met, withdrawn, live),
+   price against its cohort's expectation, bids, days, relist count. Where the engine has no cohort, "too few to tell".
+8. **Speed is a fold, not a read.** Counts and readings at every zoom come from map_facts (sum over areas in
+   milliseconds); the raw records are read only for the selected ZIP. Reading every county in view is what spins.
+
+**Open for the owner to settle (not for agents):** the comparison that "performance" means (the car's national
+like-for-like cohort, the lead's default; or the ZIP's own past); and the second fact (vehicle presence) as a layer
+distinct from the seller ledger, once owner profiles place assets.
+
+**Status.** Theory written 2026-10-20; nothing in it is built beyond map_facts (#2331), map_layers (#2324) and the
+iOS-copy map (#2357). The lead's first repairs in this order: counts from map_facts at every zoom (8), the nested
+grains and the seller-ledger label (1, 2), click-through on every panel datum (5), sources first (3), then the readings
+(4, 7) once the like-for-like residual per sale exists.
