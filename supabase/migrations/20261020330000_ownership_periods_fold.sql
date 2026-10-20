@@ -20,9 +20,11 @@
 --     v_vehicle_owner_periods (resolved_profile_id), so the profile-keyed readers (garage, reconciliation, possession,
 --     ownership rights) never see an unverified auction period as the user's own holding.
 --   * Rows are never deleted: a re-run supersedes (superseded_at, superseded_by, superseded_reason) and keeps the prior row.
---   * Cloned from the live definitions, 2026-10-20: set_single_current_owner() md5 63b70426, v_vehicle_ownership_status
---     md5 a699bc63. The trigger no longer lets an identity-keyed row end a user's current ownership, and the status view
---     no longer joins identity-keyed rows.
+--   * Cloned from the live definitions, 2026-10-20: set_single_current_owner() md5 63b70426 (prefix),
+--     v_vehicle_ownership_status md5 a699bc63 (prefix). The trigger no longer lets an identity-keyed row
+--     end a user's current ownership, and the status view no longer joins identity-keyed rows. Left alone:
+--     get_vehicles_at_timestamp() joins every ownership row of a vehicle but already fails on any call (it returns a date
+--     where it declares timestamptz) and has no caller, so a fold row cannot reach a reader through it.
 --
 -- What the fold does (ownership_fold_plan, pure and read-only; fold_vehicle_ownership_periods, the only writer):
 --   For each vehicle it orders the lots by event clock (auction_end_date, else vehicle_events.sold_at/ended_at). A sold
