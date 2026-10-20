@@ -1,308 +1,252 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Map as MLMap, NavigationControl, type ExpressionSpecification, type GeoJSONSource, type MapGeoJSONFeature, type MapMouseEvent } from 'maplibre-gl';
+import { Map as MLMap, NavigationControl, type ExpressionSpecification, type MapGeoJSONFeature, type MapMouseEvent } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import './maplibreWorker';
 import './one-map.css';
-import { CARTO_DARK, MAP_FONT } from './constants';
-import {
-  BOUNDARY_TILES, findPlace, readAreas, readCars, readShops, window as dayWindow,
-  type AreasResponse, type Car, type Level, type Shop,
-} from './oneMapService';
+import { CARTO_LIGHT } from './constants';
+import { BAND_RGBA, BANDS, BOUNDARY_TILES, band, foldByZip, makeLabel, platformName, readCounty, zipBounds, type LocationRow, type ZipGroup } from './oneMapService';
 
 /**
- * The one map (docs/proposals/2026-10-19-one-map.md), as a finder: what is near a place, each thing openable.
- * The cars listed in view sit on the map as dots and in the list beside it; shops are pins; areas (state, county,
- * ZIP by zoom) carry their counts as context, and a click on one zooms into it. Search takes a ZIP or a city;
- * the make box narrows the cars. Every count is a map_facts row; every item is a public row.
+ * The web map as the iOS map (MarketMapView.swift, CountyZIPDrill), which the owner is pleased with: a standard light
+ * map, ZIP areas shaded by distinct vehicles with ZIP evidence in fixed bands, the counties in view read in full and
+ * folded per ZIP in the client, "All makes · All time" on top, "N vehicles in visible ZIPs · captured history", tap a
+ * ZIP for its activity (platforms, vehicle mix, every vehicle with its observations, each opening its page), search a
+ * ZIP. Boundaries are the static tiles in storage; the reads are the iOS reads.
  */
 
-type What = 'cars' | 'sold' | 'shops';
-const WHAT_LAYER: Record<What, string> = { cars: 'listing', sold: 'sale', shops: 'organization' };
-const WHAT_WORD: Record<What, string> = { cars: 'cars for sale', sold: 'sold', shops: 'shops' };
-const LEVEL_BY_ZOOM = (z: number): Level => (z < 5 ? 'state' : z < 8 ? 'county' : 'zcta');
-const SOURCE_LAYER: Record<Level, string> = { state: 'states', county: 'counties', zcta: 'zctas' };
-const KEY_PROP: Record<Level, string> = { state: 'fips', county: 'fips', zcta: 'zcta' };
-const DAY_CHOICES = [7, 30, 90, 365];
-
+const WINDOWS: { key: string; label: string; days: number | null }[] = [
+  { key: 'all', label: 'All time', days: null }, { key: '30', label: 'Last 30 days', days: 30 }, { key: '90', label: 'Last 90 days', days: 90 }, { key: '365', label: 'Last year', days: 365 },
+];
 const fmt = (n: number) => n.toLocaleString('en-US');
-const money = (n: number | null | undefined) => (n == null ? '' : `$${Math.round(n).toLocaleString('en-US')}`);
-const ago = (iso: string) => {
-  const d = (Date.now() - new Date(iso).getTime()) / 86_400_000;
-  return d < 1 ? 'today' : d < 2 ? 'yesterday' : d < 30 ? `${Math.floor(d)} days ago` : d < 365 ? `${Math.floor(d / 30)} months ago` : `${Math.floor(d / 365)} years ago`;
-};
-const title = (c: Car) => [c.year, c.make, c.model].filter(Boolean).join(' ') || 'Vehicle';
-
-function readUrl() {
-  const p = new URLSearchParams(window.location.search);
-  const days = Number(p.get('days'));
-  const what = p.get('what') as What | null;
-  return {
-    what: what && what in WHAT_LAYER ? what : 'cars' as What,
-    days: DAY_CHOICES.includes(days) ? days : 30,
-    source: p.get('source') ?? '', make: p.get('make') ?? '',
-    lng: Number(p.get('lng')) || -115.15, lat: Number(p.get('lat')) || 36.15, zoom: Number(p.get('z')) || 9,
-  };
-}
-
-function breaks(values: number[]): number[] {
-  const v = values.filter((x) => x > 0).sort((a, b) => a - b);
-  if (!v.length) return [1, 2, 3, 4];
-  const q = (p: number) => v[Math.min(v.length - 1, Math.floor(p * v.length))];
-  return [q(0.2), q(0.4), q(0.6), q(0.8)];
-}
-function palette(el: HTMLElement) {
-  const cs = getComputedStyle(el);
-  const v = (name: string) => cs.getPropertyValue(name).trim();
-  return { ramp: [0, 1, 2, 3, 4].map((i) => v(`--om-ramp-${i}`)), line: v('--om-line'), accent: v('--om-accent'), bg: v('--om-bg'), shop: v('--om-shop') };
-}
-function bounds(f: MapGeoJSONFeature): [number, number, number, number] {
-  const g = f.geometry as { type: string; coordinates: number[][][] | number[][][][] };
-  const rings = g.type === 'Polygon' ? (g.coordinates as number[][][]) : (g.coordinates as number[][][][]).flat();
-  let w = 180, s = 90, e = -180, n = -90;
-  for (const ring of rings) for (const [x, y] of ring) { if (x < w) w = x; if (x > e) e = x; if (y < s) s = y; if (y > n) n = y; }
-  return [w, s, e, n];
-}
+const day = (iso: string | null) => (iso ? iso.slice(0, 10) : 'date unknown');
 
 export default function OneMap() {
-  const init = useMemo(readUrl, []);
+  const p = useMemo(() => new URLSearchParams(window.location.search), []);
   const mapRef = useRef<MLMap | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [ready, setReady] = useState(false);
-  const [what, setWhat] = useState<What>(init.what);
-  const [days, setDays] = useState(init.days);
-  const [source, setSource] = useState(init.source);
-  const [make, setMake] = useState(init.make);
-  const [query, setQuery] = useState('');
-  const [zoom, setZoom] = useState(init.zoom);
   const [viewKey, setViewKey] = useState(0);
-  const [areas, setAreas] = useState<AreasResponse | null>(null);
-  const [cars, setCars] = useState<Car[]>([]);
-  const [shops, setShops] = useState<Shop[]>([]);
-  const [picked, setPicked] = useState<string | null>(null);
-  const [hover, setHover] = useState<{ name: string; count: number } | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [make, setMake] = useState(p.get('make') ?? '');
+  const [windowKey, setWindowKey] = useState(WINDOWS.some((w) => w.key === p.get('window')) ? p.get('window')! : 'all');
+  const [rowsByCounty, setRowsByCounty] = useState<Map<string, LocationRow[]>>(new Map());
+  const [loading, setLoading] = useState<Set<string>>(new Set());
+  const [failed, setFailed] = useState<Set<string>>(new Set());
+  const [visibleZips, setVisibleZips] = useState<Set<string>>(new Set());
+  const [countiesInView, setCountiesInView] = useState<string[]>([]);
+  const [selected, setSelected] = useState<string | null>(p.get('zip'));
+  const [query, setQuery] = useState('');
+  const [showMakes, setShowMakes] = useState(false);
+  const [showWindows, setShowWindows] = useState(false);
+  const [showInfo, setShowInfo] = useState(false);
   const [note, setNote] = useState('');
-  const level = LEVEL_BY_ZOOM(zoom);
-  const win = useMemo(() => dayWindow(days), [days]);
-  const countsRef = useRef<Map<string, number>>(new Map());
-  const listRef = useRef<HTMLDivElement>(null);
+  const cacheRef = useRef<Map<string, LocationRow[]>>(new Map());
+  const paintedRef = useRef<Set<string>>(new Set());
 
   // URL state.
   useEffect(() => {
     const m = mapRef.current;
     const url = new URL(window.location.href);
-    url.searchParams.set('what', what); url.searchParams.set('days', String(days));
-    for (const [k, v] of [['source', source], ['make', make]] as const) { if (v) url.searchParams.set(k, v); else url.searchParams.delete(k); }
+    for (const [k, v] of [['make', make], ['window', windowKey === 'all' ? '' : windowKey], ['zip', selected ?? '']] as const) { if (v) url.searchParams.set(k, v); else url.searchParams.delete(k); }
     if (m) { const c = m.getCenter(); url.searchParams.set('lng', c.lng.toFixed(3)); url.searchParams.set('lat', c.lat.toFixed(3)); url.searchParams.set('z', m.getZoom().toFixed(2)); }
     window.history.replaceState(null, '', url);
-  }, [what, days, source, make, viewKey]);
+  }, [make, windowKey, selected, viewKey]);
 
-  // The map: dark basemap, boundary tiles, muted area fills, car dots (clustered) and shop pins.
+  // The map: a standard light basemap, county context lines, ZIP fills in the iOS bands.
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
-    const pal = palette(containerRef.current);
-    const map = new MLMap({ container: containerRef.current, style: CARTO_DARK, center: [init.lng, init.lat], zoom: init.zoom, minZoom: 2, maxZoom: 17, attributionControl: { compact: true } });
+    const map = new MLMap({ container: containerRef.current, style: CARTO_LIGHT, center: [Number(p.get('lng')) || -115.1, Number(p.get('lat')) || 36.1], zoom: Number(p.get('z')) || 9.3, minZoom: 4, maxZoom: 16, attributionControl: { compact: true } });
     map.addControl(new NavigationControl({ showCompass: false }), 'bottom-right');
     map.on('load', () => {
-      map.addSource('bounds', { type: 'vector', tiles: [BOUNDARY_TILES], minzoom: 0, maxzoom: 9, attribution: 'Boundaries: U.S. Census Bureau 2020' });
-      map.addSource('cars', { type: 'geojson', data: { type: 'FeatureCollection', features: [] }, cluster: true, clusterRadius: 28, clusterMaxZoom: 13 });
-      map.addSource('shops', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
-      const color = ['case', ['!=', ['feature-state', 'entities'], null],
-        ['step', ['feature-state', 'entities'], pal.ramp[0], 1, pal.ramp[1], 2, pal.ramp[2], 3, pal.ramp[3], 4, pal.ramp[4]], 'transparent'] as unknown as ExpressionSpecification;
-      for (const lv of ['state', 'county', 'zcta'] as Level[]) {
-        map.addLayer({ id: `${lv}-fill`, type: 'fill', source: 'bounds', 'source-layer': SOURCE_LAYER[lv],
-          paint: { 'fill-color': color, 'fill-opacity': ['case', ['boolean', ['feature-state', 'hover'], false], 0.45, 0.18] }, layout: { visibility: 'none' } });
-        map.addLayer({ id: `${lv}-line`, type: 'line', source: 'bounds', 'source-layer': SOURCE_LAYER[lv],
-          paint: { 'line-color': pal.line, 'line-width': lv === 'state' ? 1 : 0.6, 'line-opacity': 0.35 }, layout: { visibility: 'none' } });
-      }
-      map.addLayer({ id: 'car-clusters', type: 'circle', source: 'cars', filter: ['has', 'point_count'],
-        paint: { 'circle-color': pal.accent, 'circle-opacity': 0.85, 'circle-stroke-color': pal.bg, 'circle-stroke-width': 1.5,
-          'circle-radius': ['step', ['get', 'point_count'], 12, 10, 16, 50, 20, 200, 26] } });
-      map.addLayer({ id: 'car-cluster-count', type: 'symbol', source: 'cars', filter: ['has', 'point_count'],
-        layout: { 'text-field': ['get', 'point_count_abbreviated'], 'text-size': 11 }, paint: { 'text-color': pal.bg } });
-      map.addLayer({ id: 'car-dots', type: 'circle', source: 'cars', filter: ['!', ['has', 'point_count']],
-        paint: { 'circle-color': pal.accent, 'circle-radius': ['case', ['boolean', ['feature-state', 'picked'], false], 9, 6], 'circle-stroke-color': pal.bg, 'circle-stroke-width': 1.5 } });
-      map.addLayer({ id: 'shop-pins', type: 'circle', source: 'shops',
-        paint: { 'circle-color': pal.shop, 'circle-radius': 6, 'circle-stroke-color': pal.bg, 'circle-stroke-width': 1.5 } });
-      setZoom(map.getZoom()); setReady(true);
+      map.addSource('bounds', { type: 'vector', tiles: [BOUNDARY_TILES], minzoom: 0, maxzoom: 9, attribution: 'ZIP areas: U.S. Census Bureau 2020' });
+      const fill = ['case', ['!=', ['feature-state', 'band'], null], ['step', ['feature-state', 'band'], BAND_RGBA[0], 1, BAND_RGBA[1], 2, BAND_RGBA[2], 3, BAND_RGBA[3]], 'rgba(0,0,0,0)'] as unknown as ExpressionSpecification;
+      map.addLayer({ id: 'zcta-fill', type: 'fill', source: 'bounds', 'source-layer': 'zctas', paint: { 'fill-color': fill, 'fill-opacity': 1 } });
+      map.addLayer({ id: 'zcta-line', type: 'line', source: 'bounds', 'source-layer': 'zctas', paint: { 'line-color': 'rgba(0,122,255,0.20)', 'line-width': 0.5 } });
+      map.addLayer({ id: 'zcta-selected', type: 'line', source: 'bounds', 'source-layer': 'zctas', paint: { 'line-color': 'rgb(0,122,255)', 'line-width': 1.6 }, filter: ['==', ['id'], -1] });
+      map.addLayer({ id: 'county-line', type: 'line', source: 'bounds', 'source-layer': 'counties', paint: { 'line-color': 'rgba(60,60,67,0.45)', 'line-width': 0.8 } });
+      setReady(true); setViewKey((k) => k + 1);
     });
-    map.on('moveend', () => { setZoom(map.getZoom()); setViewKey((k) => k + 1); });
+    map.on('idle', () => setViewKey((k) => k + 1));
     mapRef.current = map;
     return () => { map.remove(); mapRef.current = null; };
-  }, [init.lat, init.lng, init.zoom]);
+  }, [p]);
 
-  // Area fills follow the zoom; counts paint as feature state.
+  // What is in view: counties (to read) and ZIPs (to count).
   useEffect(() => {
     const map = mapRef.current;
     if (!ready || !map) return;
-    for (const lv of ['state', 'county', 'zcta'] as Level[]) {
-      const on = lv === level ? 'visible' : 'none';
-      map.setLayoutProperty(`${lv}-fill`, 'visibility', on); map.setLayoutProperty(`${lv}-line`, 'visibility', on);
-    }
-  }, [ready, level]);
-  const paint = useCallback((data: AreasResponse | null, lv: Level) => {
-    const map = mapRef.current;
-    if (!map) return;
-    const src = { source: 'bounds', sourceLayer: SOURCE_LAYER[lv] };
-    for (const key of countsRef.current.keys()) map.setFeatureState({ ...src, id: Number(key) }, { entities: null });
-    countsRef.current = new Map();
-    if (!data) return;
-    const b = breaks(data.areas.map((a) => a.entities));
-    for (const a of data.areas) {
-      const cls = a.entities >= b[3] ? 4 : a.entities >= b[2] ? 3 : a.entities >= b[1] ? 2 : a.entities >= b[0] ? 1 : 0;
-      map.setFeatureState({ ...src, id: Number(a.key) }, { entities: cls });
-      countsRef.current.set(a.key, a.entities);
-    }
-  }, []);
+    const counties = [...new Set(map.queryRenderedFeatures({ layers: ['county-line'] }).map((f) => String(f.properties.fips)))].sort();
+    const zips = new Set(map.queryRenderedFeatures({ layers: ['zcta-fill'] }).map((f) => String(f.properties.zcta)));
+    setCountiesInView((prev) => (prev.join() === counties.join() ? prev : counties));
+    setVisibleZips((prev) => (prev.size === zips.size && [...zips].every((z) => prev.has(z)) ? prev : zips));
+  }, [ready, viewKey]);
 
-  // The things in view: cars (or sold cars) and shops, plus the area counts for context.
+  // Read every county in view, in full, two at a time; keep what is already read this session.
   useEffect(() => {
-    const map = mapRef.current;
-    if (!ready || !map) return;
+    if (!countiesInView.length) return;
     const ctl = new AbortController();
-    const b = map.getBounds();
-    const bbox: [number, number, number, number] = [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()];
-    setBusy(true); setNote('');
-    const jobs: Promise<unknown>[] = [];
-    if (what === 'shops') {
-      setCars([]); (map.getSource('cars') as GeoJSONSource | undefined)?.setData({ type: 'FeatureCollection', features: [] });
-      jobs.push(readShops({ bbox }, ctl.signal).then((s) => { setShops(s); (map.getSource('shops') as GeoJSONSource | undefined)?.setData({ type: 'FeatureCollection', features: s.map((x) => ({ type: 'Feature', id: x.id, properties: { id: x.id, name: x.name }, geometry: { type: 'Point', coordinates: [x.lng, x.lat] } })) }); }));
-    } else {
-      setShops([]); (map.getSource('shops') as GeoJSONSource | undefined)?.setData({ type: 'FeatureCollection', features: [] });
-      jobs.push(readCars({ bbox, from: win.from, to: win.to, source: source || undefined, make: make || undefined }, ctl.signal).then((all) => {
-        const list = what === 'sold' ? all.filter((c) => (c.status ?? '').toLowerCase() === 'sold') : all;
-        setCars(list);
-        (map.getSource('cars') as GeoJSONSource | undefined)?.setData({ type: 'FeatureCollection', features: list.map((c) => ({ type: 'Feature', properties: { vehicle_id: c.vehicle_id }, geometry: { type: 'Point', coordinates: [c.lng, c.lat] } })) });
-      }));
-    }
-    let keys: string[] | undefined;
-    if (level === 'zcta') keys = [...new Set(map.queryRenderedFeatures({ layers: ['zcta-fill'] }).map((f) => String(f.properties?.zcta)))].slice(0, 2000);
-    if (level !== 'zcta' || keys?.length) {
-      jobs.push(readAreas({ level, layer: WHAT_LAYER[what], from: win.from, to: win.to, source: what === 'shops' ? undefined : source || undefined, keys }, ctl.signal)
-        .then((r) => { setAreas(r); paint(r, level); }));
-    } else { setAreas(null); paint(null, level); }
-    Promise.all(jobs).then(() => setBusy(false)).catch((e) => { if (e.name !== 'AbortError') { setNote(String(e.message ?? e)); setBusy(false); } });
+    const want = countiesInView.filter((c) => !cacheRef.current.has(c) && !loading.has(c));
+    if (!want.length) return;
+    setLoading((s) => new Set([...s, ...want]));
+    let i = 0;
+    const worker = async () => {
+      while (i < want.length && !ctl.signal.aborted) {
+        const fips = want[i++];
+        try {
+          const rows = await readCounty(fips, ctl.signal, (page) => setRowsByCounty((m) => new Map(m).set(fips, [...(m.get(fips) ?? []), ...page])));
+          cacheRef.current.set(fips, rows);
+          setRowsByCounty((m) => new Map(m).set(fips, rows));
+          setFailed((s) => { const n = new Set(s); n.delete(fips); return n; });
+        } catch (e) {
+          if ((e as Error).name !== 'AbortError') setFailed((s) => new Set([...s, fips]));
+        } finally {
+          setLoading((s) => { const n = new Set(s); n.delete(fips); return n; });
+        }
+      }
+    };
+    Promise.all([worker(), worker()]);
     return () => ctl.abort();
-  }, [ready, viewKey, what, win.from, win.to, source, make, level, paint]);
+  }, [countiesInView]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Hover an area for its count; click an area to zoom into it; click a dot to pick that car; click a cluster to zoom.
+  // The fold: every row of every county in view → ZIP groups, by make and window.
+  const from = useMemo(() => { const w = WINDOWS.find((x) => x.key === windowKey); return w?.days ? new Date(Date.now() - w.days * 86_400_000) : null; }, [windowKey]);
+  const rows = useMemo(() => countiesInView.flatMap((c) => rowsByCounty.get(c) ?? []), [countiesInView, rowsByCounty]);
+  const fold = useMemo(() => foldByZip(rows, { make: make || undefined, from }), [rows, make, from]);
+  const makes = useMemo(() => {
+    const m = new Map<string, Set<string>>();
+    for (const r of rows) { const k = (r.vehicles.make ?? '').trim(); if (k) (m.get(k) ?? m.set(k, new Set()).get(k)!).add(r.vehicles.id); }
+    return [...m.entries()].map(([k, v]) => [k, v.size] as const).sort((a, b) => b[1] - a[1]);
+  }, [rows]);
+  const visibleVehicles = useMemo(() => { const s = new Set<string>(); for (const z of visibleZips) for (const id of fold.groups.get(z)?.vehicles.keys() ?? []) s.add(id); return s.size; }, [fold, visibleZips]);
+  const complete = countiesInView.length > 0 && countiesInView.every((c) => cacheRef.current.has(c));
+
+  // Paint the bands.
+  const paint = useCallback(() => {
+    const map = mapRef.current;
+    if (!map || !ready) return;
+    const src = { source: 'bounds', sourceLayer: 'zctas' };
+    for (const z of paintedRef.current) map.setFeatureState({ ...src, id: Number(z) }, { band: null });
+    paintedRef.current = new Set();
+    for (const g of fold.groups.values()) { map.setFeatureState({ ...src, id: Number(g.zip) }, { band: band(g.vehicles.size) }); paintedRef.current.add(g.zip); }
+  }, [fold, ready]);
+  useEffect(() => { paint(); }, [paint, viewKey]);
+  useEffect(() => { const m = mapRef.current; if (m?.getLayer('zcta-selected')) m.setFilter('zcta-selected', ['==', ['id'], selected ? Number(selected) : -1]); }, [selected, ready]);
+
+  // Tap a ZIP.
   useEffect(() => {
     const map = mapRef.current;
     if (!ready || !map) return;
-    let hovered: { id: number; lv: Level } | null = null;
-    const nameOf = (f: MapGeoJSONFeature, lv: Level) => (lv === 'zcta' ? `ZIP ${f.properties.zcta}` : lv === 'state' ? String(f.properties.name) : `${f.properties.name} County`);
-    const onMove = (e: MapMouseEvent) => {
-      const dot = map.queryRenderedFeatures(e.point, { layers: ['car-dots', 'car-clusters', 'shop-pins'] })[0];
-      if (dot) { map.getCanvas().style.cursor = 'pointer'; setHover(null); return; }
-      const f = map.queryRenderedFeatures(e.point, { layers: [`${level}-fill`] })[0];
-      if (hovered) map.setFeatureState({ source: 'bounds', sourceLayer: SOURCE_LAYER[hovered.lv], id: hovered.id }, { hover: false });
-      hovered = null;
-      if (!f || f.id == null) { setHover(null); map.getCanvas().style.cursor = ''; return; }
-      hovered = { id: Number(f.id), lv: level };
-      map.setFeatureState({ source: 'bounds', sourceLayer: SOURCE_LAYER[level], id: Number(f.id) }, { hover: true });
-      map.getCanvas().style.cursor = 'zoom-in';
-      setHover({ name: nameOf(f, level), count: countsRef.current.get(String(f.properties[KEY_PROP[level]])) ?? 0 });
-    };
     const onClick = (e: MapMouseEvent) => {
-      const dot = map.queryRenderedFeatures(e.point, { layers: ['car-dots'] })[0];
-      if (dot) { const id = String(dot.properties.vehicle_id); setPicked(id); listRef.current?.querySelector<HTMLElement>(`[data-vehicle="${id}"]`)?.scrollIntoView({ block: 'nearest' }); return; }
-      const cluster = map.queryRenderedFeatures(e.point, { layers: ['car-clusters'] })[0];
-      if (cluster) { map.easeTo({ center: (cluster.geometry as unknown as { coordinates: [number, number] }).coordinates, zoom: Math.min(17, map.getZoom() + 2) }); return; }
-      const pin = map.queryRenderedFeatures(e.point, { layers: ['shop-pins'] })[0];
-      if (pin) { setPicked(String(pin.properties.id)); return; }
-      const f = map.queryRenderedFeatures(e.point, { layers: [`${level}-fill`] })[0];
-      if (f) map.fitBounds(bounds(f), { padding: 40, duration: 500 });
+      const f = map.queryRenderedFeatures(e.point, { layers: ['zcta-fill'] })[0] as MapGeoJSONFeature | undefined;
+      setSelected(f ? String(f.properties.zcta) : null);
     };
-    map.on('mousemove', onMove); map.on('click', onClick);
-    return () => { map.off('mousemove', onMove); map.off('click', onClick); };
-  }, [ready, level]);
+    const onMove = (e: MapMouseEvent) => { map.getCanvas().style.cursor = map.queryRenderedFeatures(e.point, { layers: ['zcta-fill'] }).length ? 'pointer' : ''; };
+    map.on('click', onClick); map.on('mousemove', onMove);
+    return () => { map.off('click', onClick); map.off('mousemove', onMove); };
+  }, [ready]);
 
-  const go = async (e: React.FormEvent) => {
+  const search = async (e: React.FormEvent) => {
     e.preventDefault();
-    const map = mapRef.current; if (!map || !query.trim()) return;
-    try {
-      const place = await findPlace(query);
-      if (!place) { setNote(`Nothing found for "${query.trim()}"`); return; }
-      setNote('');
-      if (place.bounds) map.fitBounds(place.bounds, { padding: 40, duration: 600 });
-      else if (place.center) map.flyTo({ center: place.center, zoom: 11, duration: 600 });
-    } catch (err) { setNote(String((err as Error).message ?? err)); }
+    const q = query.trim(); const map = mapRef.current; if (!q || !map) return;
+    if (/^\d{5}$/.test(q)) {
+      const b = await zipBounds(q);
+      if (!b) { setNote(`ZIP ${q} has no area`); return; }
+      setNote(''); map.fitBounds(b, { padding: 60, duration: 600 }); setSelected(q); return;
+    }
+    const hit = rows.find((r) => makeLabel(r).toLowerCase().includes(q.toLowerCase()) || r.vehicles.id === q);
+    if (!hit) { setNote(`No vehicle matching "${q}" in the loaded area`); return; }
+    setNote(''); window.location.href = `/vehicle/${hit.vehicles.id}`;
   };
-  const flyTo = (lng: number, lat: number) => mapRef.current?.easeTo({ center: [lng, lat], zoom: Math.max(mapRef.current.getZoom(), 12), duration: 400 });
 
-  const makes = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const c of cars) if (c.make) m.set(c.make, (m.get(c.make) ?? 0) + 1);
-    return [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, 12);
-  }, [cars]);
-  const count = what === 'shops' ? shops.length : cars.length;
-  const windowWord = days === 7 ? 'this week' : days === 30 ? 'this month' : days === 90 ? 'in 90 days' : 'this year';
-  const headline = busy && !count ? '…' : `${fmt(count)} ${WHAT_WORD[what]} here${what === 'shops' ? '' : ` ${windowWord}`}`;
-
-  const label: React.CSSProperties = { fontFamily: MAP_FONT, fontSize: 9, letterSpacing: 0.5, textTransform: 'uppercase', color: 'var(--om-muted)' };
-  const chip = (on: boolean): React.CSSProperties => ({ ...label, color: on ? 'var(--om-bg)' : 'var(--om-text-dim)', background: on ? 'var(--om-accent)' : 'transparent', border: '2px solid ' + (on ? 'var(--om-accent)' : 'var(--om-border-dim)'), padding: '4px 8px', cursor: 'pointer', marginRight: 4, marginBottom: 4 });
-  const row: React.CSSProperties = { display: 'flex', gap: 10, padding: '8px 10px', borderTop: '1px solid var(--om-rule)', cursor: 'pointer', alignItems: 'center' };
+  const group: ZipGroup | null = selected ? fold.groups.get(selected) ?? { zip: selected, vehicles: new Map() } : null;
+  const sheet = useMemo(() => {
+    if (!group) return null;
+    const sources = new Map<string, Set<string>>(); const mix = new Map<string, Set<string>>();
+    for (const [vid, obs] of group.vehicles) {
+      for (const r of obs) (sources.get(platformName(r.source_platform)) ?? sources.set(platformName(r.source_platform), new Set()).get(platformName(r.source_platform))!).add(vid);
+      const mk = (obs[0].vehicles.make ?? '').trim() || 'Make unrecorded';
+      (mix.get(mk) ?? mix.set(mk, new Set()).get(mk)!).add(vid);
+    }
+    const list = (m: Map<string, Set<string>>) => [...m.entries()].map(([k, v]) => [k, v.size] as const).sort((a, b) => b[1] - a[1]);
+    const vehicles = [...group.vehicles.entries()].sort((a, b) => ((a[1][0].observed_at ?? '') < (b[1][0].observed_at ?? '') ? 1 : -1));
+    return { sources: list(sources), mix: list(mix), vehicles };
+  }, [group]);
+  const windowLabel = WINDOWS.find((w) => w.key === windowKey)!.label;
 
   return (
-    <div className="one-map" data-testid="one-map">
-      <div ref={containerRef} className="one-map-canvas" />
+    <div className="om" data-testid="one-map">
+      <div ref={containerRef} className="om-canvas" />
 
-      <form onSubmit={go} className="one-map-search">
-        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="ZIP or city, e.g. 89101 or Las Vegas, NV" aria-label="Search a ZIP or city"
-          style={{ ...label, textTransform: 'none', fontSize: 13, color: 'var(--om-text)', background: 'var(--om-panel)', border: '2px solid var(--om-line)', padding: '8px 10px', width: '100%' }} />
-      </form>
-
-      {hover && <div className="one-map-hover" style={{ ...label, color: 'var(--om-text)', background: 'var(--om-panel)', border: '2px solid var(--om-line)', padding: '6px 10px' }}>
-        {hover.name}: <b>{fmt(hover.count)}</b> {WHAT_WORD[what]} · click to zoom in
-      </div>}
-
-      <div className="one-map-panel" ref={listRef}>
-        <div style={{ padding: '10px 10px 6px' }}>
-          <div style={{ fontFamily: MAP_FONT, fontSize: 20, fontWeight: 700, lineHeight: 1.1 }} data-testid="headline">{headline}</div>
-          {areas && <div style={{ ...label, marginTop: 4 }}>
-            {fmt(areas.totals.entities)} {WHAT_WORD[what]} across {fmt(areas.totals.areas)} {level === 'zcta' ? 'ZIPs in view' : level === 'state' ? 'states' : 'counties'}{what !== 'shops' ? ` ${windowWord}` : ''}
-            {areas.unkeyed.entities ? ` · ${fmt(areas.unkeyed.entities)} with no ${level === 'zcta' ? 'ZIP' : level}` : ''}
-          </div>}
-          <div style={{ marginTop: 8 }}>
-            {(['cars', 'sold', 'shops'] as What[]).map((w) => <button key={w} type="button" style={chip(w === what)} onClick={() => { setWhat(w); setPicked(null); }}>{w === 'cars' ? 'for sale' : w}</button>)}
-            {what !== 'shops' && DAY_CHOICES.map((d) => <button key={d} type="button" style={chip(d === days)} onClick={() => setDays(d)}>{d === 7 ? 'week' : d === 30 ? 'month' : d === 90 ? '90 days' : 'year'}</button>)}
-          </div>
-          {what !== 'shops' && makes.length > 1 && <div style={{ marginTop: 4 }}>
-            <button type="button" style={chip(!make)} onClick={() => setMake('')}>any make</button>
-            {makes.map(([m, n]) => <button key={m} type="button" style={chip(m === make)} onClick={() => setMake(m === make ? '' : m)}>{m} {n}</button>)}
-          </div>}
-          {what !== 'shops' && areas && areas.by_source.length > 1 && <div style={{ marginTop: 4 }}>
-            <button type="button" style={chip(!source)} onClick={() => setSource('')}>all sources</button>
-            {areas.by_source.slice(0, 6).map((s) => <button key={s.source} type="button" style={chip(s.source === source)} onClick={() => setSource(s.source === source ? '' : s.source)}>{s.source.replace(/_/g, ' ')} {fmt(s.entities)}</button>)}
-          </div>}
-          {note && <div style={{ ...label, marginTop: 6, color: 'var(--om-danger)', textTransform: 'none' }}>{note}</div>}
+      <div className="om-top">
+        <div className="om-row">
+          <button type="button" className="om-link" onClick={() => { setShowMakes((v) => !v); setShowWindows(false); }}>{make || 'All makes'} ▾</button>
+          <button type="button" className="om-link" onClick={() => { setShowWindows((v) => !v); setShowMakes(false); }}>{windowLabel} ▾</button>
+          <button type="button" className="om-link" aria-label="About this map" onClick={() => setShowInfo(true)}>ⓘ</button>
         </div>
-
-        {what === 'shops' ? shops.map((s) => (
-          <div key={s.id} data-vehicle={s.id} style={{ ...row, background: picked === s.id ? 'var(--om-rule)' : 'transparent' }} onClick={() => { setPicked(s.id); flyTo(s.lng, s.lat); }}>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontFamily: MAP_FONT, fontSize: 13, fontWeight: 700 }}>{s.name}</div>
-              <div style={label}>{s.kind?.replace(/_/g, ' ') ?? 'shop'}</div>
-            </div>
-            {s.slug && <a href={`/org/${s.slug}`} style={{ ...label, color: 'var(--om-accent)' }} onClick={(e) => e.stopPropagation()}>open</a>}
-          </div>
-        )) : cars.slice(0, 200).map((c) => (
-          <div key={c.vehicle_id} data-vehicle={c.vehicle_id} style={{ ...row, background: picked === c.vehicle_id ? 'var(--om-rule)' : 'transparent' }} onClick={() => { setPicked(c.vehicle_id); flyTo(c.lng, c.lat); }}>
-            {c.thumbnail ? <img src={c.thumbnail} alt="" width={64} height={48} loading="lazy" style={{ objectFit: 'cover', flex: 'none', background: 'var(--om-rule)' }} />
-              : <div style={{ width: 64, height: 48, flex: 'none', background: 'var(--om-rule)' }} />}
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontFamily: MAP_FONT, fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{title(c)}</div>
-              <div style={label}>{c.price ? money(c.price) + ' · ' : ''}{c.source?.replace(/_/g, ' ') ?? ''} · {ago(c.observed_at)}{(c.status ?? '').toLowerCase() === 'sold' ? ' · sold' : ''}</div>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <a href={`/vehicle/${c.vehicle_id}`} style={{ ...label, color: 'var(--om-accent)' }} onClick={(e) => e.stopPropagation()}>open</a>
-              {c.source_url && <a href={c.source_url} target="_blank" rel="noreferrer" style={{ ...label, color: 'var(--om-accent)' }} onClick={(e) => e.stopPropagation()}>listing</a>}
-            </div>
-          </div>
-        ))}
-        {!busy && count === 0 && <div style={{ ...label, padding: 10, textTransform: 'none' }}>Nothing here {what === 'shops' ? '' : windowWord}. Zoom out, widen the window, or search another place.</div>}
-        {cars.length > 200 && <div style={{ ...label, padding: 10 }}>first 200 of {fmt(cars.length)} · zoom in for the rest</div>}
+        <div className="om-count" data-testid="headline">
+          {loading.size && !complete ? <span className="om-spin" /> : null}
+          {complete || rows.length ? `${fmt(visibleVehicles)} vehicles in visible ZIPs · ${windowKey === 'all' ? 'captured history' : windowLabel.toLowerCase()}` : countiesInView.length ? 'Loading records…' : 'Move the map over the US'}
+        </div>
+        <div className="om-legend">
+          <span className="om-legend-title">Vehicles per ZIP</span>
+          {BANDS.map((b, i) => <span key={b} className="om-swatch"><i style={{ background: BAND_RGBA[i] }} />{b}</span>)}
+        </div>
+        {showMakes && <div className="om-menu">
+          <button type="button" className={make ? '' : 'on'} onClick={() => { setMake(''); setShowMakes(false); }}>All makes</button>
+          {makes.slice(0, 40).map(([m, n]) => <button key={m} type="button" className={m === make ? 'on' : ''} onClick={() => { setMake(m); setShowMakes(false); }}>{m} <span>{fmt(n)}</span></button>)}
+        </div>}
+        {showWindows && <div className="om-menu">
+          {WINDOWS.map((w) => <button key={w.key} type="button" className={w.key === windowKey ? 'on' : ''} onClick={() => { setWindowKey(w.key); setShowWindows(false); }}>{w.label}</button>)}
+        </div>}
       </div>
+
+      <div className="om-bottom">
+        <div className="om-row om-between">
+          <span>{selected ? `ZIP ${selected}` : 'Tap a ZIP to explore its activity'}</span>
+          {failed.size ? <span className="om-warn">Some records did not load · <button type="button" className="om-link" onClick={() => { setFailed(new Set()); setCountiesInView((c) => [...c]); }}>Retry</button></span> : null}
+          {fold.noZip ? <span className="om-muted">{fmt(fold.noZip)} records without a ZIP</span> : null}
+        </div>
+        <form onSubmit={search}><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="ZIP, or vehicle" aria-label="ZIP, or vehicle" /></form>
+        {note && <div className="om-warn">{note}</div>}
+      </div>
+
+      {group && sheet && (
+        <div className="om-sheet" data-testid="area-sheet">
+          <div className="om-row om-between">
+            <h2>ZIP {group.zip}</h2>
+            <button type="button" className="om-link" onClick={() => setSelected(null)}>Done</button>
+          </div>
+          <div className="om-muted">{make || 'All makes'} · {windowLabel}{complete ? '' : ' · still loading, counts are provisional'}</div>
+          <div className="om-metrics">
+            <div><b>{fmt(group.vehicles.size)}</b><span>Vehicles</span></div>
+            <div><b>{fmt(sheet.sources.length)}</b><span>Platforms</span></div>
+            <div><b>{fmt(sheet.mix.length)}</b><span>Makes</span></div>
+          </div>
+          <h3>Platforms represented</h3>
+          {sheet.sources.map(([s, n]) => <div key={s} className="om-row om-between om-line"><span>{s}</span><span>{fmt(n)} vehicles</span></div>)}
+          <h3>Vehicle mix</h3>
+          {sheet.mix.slice(0, 8).map(([m, n]) => <div key={m} className="om-bar"><span>{m}</span><i style={{ width: `${Math.max(4, (100 * n) / sheet.mix[0][1])}%` }} /><b>{fmt(n)}</b></div>)}
+          <h3>Vehicles</h3>
+          {sheet.vehicles.map(([vid, obs]) => (
+            <a key={vid} href={`/vehicle/${vid}`} className="om-vehicle">
+              {obs[0].vehicles.primary_image_url ? <img src={obs[0].vehicles.primary_image_url} alt="" width={56} height={42} loading="lazy" /> : <span className="om-noimg" />}
+              <span className="om-vtext">
+                <b>{makeLabel(obs[0])}</b>
+                <span className="om-muted">{obs.length} {obs.length === 1 ? 'record' : 'records'} · {platformName(obs[0].source_platform)} · {day(obs[0].observed_at)}</span>
+              </span>
+            </a>
+          ))}
+          {!group.vehicles.size && <div className="om-muted">No vehicles with ZIP evidence here{make ? ` for ${make}` : ''}{windowKey !== 'all' ? ` in ${windowLabel.toLowerCase()}` : ''}.</div>}
+        </div>
+      )}
+
+      {showInfo && (
+        <div className="om-sheet" role="dialog">
+          <div className="om-row om-between"><h2>Sources and coverage</h2><button type="button" className="om-link" onClick={() => setShowInfo(false)}>Done</button></div>
+          <p>Color shows distinct vehicles with source ZIP evidence in fixed bands: 1–4, 5–19, 20–99 and 100 or more. Unshaded areas have no matching mapped evidence in this loaded region; that does not establish an inactive market. These are not completed sales, current availability or bid counts.</p>
+          <p>ZIP areas are Census 2020 ZIP Code Tabulation Areas. Some postal ZIPs have no area, and ZIPs can cross county boundaries. Records without a source ZIP are counted at the bottom of the map.</p>
+          <p>The date window uses the record's observation date. Every vehicle shown is a public record and opens to its page.</p>
+        </div>
+      )}
     </div>
   );
 }
