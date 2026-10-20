@@ -3090,3 +3090,34 @@ distinct from the seller ledger, once owner profiles place assets.
 iOS-copy map (#2357). The lead's first repairs in this order: counts from map_facts at every zoom (8), the nested
 grains and the seller-ledger label (1, 2), click-through on every panel datum (5), sources first (3), then the readings
 (4, 7) once the like-for-like residual per sale exists.
+
+## 15. Decisions 2026-10-20: the stewardship chain and what a recorded sale is
+
+The owner delegated these two calls on 2026-10-20; they are written from his rules (the evidence ladder: store the
+narrow provable claim and never collapse it into a stronger one; the privacy masking spectrum: existence and shape are free, identity
+is locked, people never appear as something tracked).
+
+**Stewardship chain, private by default.** The owner periods folded from sold lots (`vehicle_ownerships` rows with
+`basis = 'auction_sale'`, written only by `fold_vehicle_ownership_periods`) stay private. Anon and signed-in readers see
+none of them (`vehicle_ownerships_fold_rows_read_guard`), and the reader view `v_vehicle_owner_periods` and the flag
+table are service_role only. The lot facts they come from are already public in `auction_events`; what stays private is the stitched,
+derived chain from handle to vehicle to dates. A public layer, when built, is a masked shape only: how many stewards, the
+first and last recorded dates, counts by `sale_confirmation`; never an identity or a handle. Opening the chain itself would be a new
+product decision, done by dropping the read guard.
+
+**A sold lot is a recorded sale, not a completed transfer.** A scraper observes the hammer and nothing after it, so the claim
+stored is the narrow one. Status of an auction-seeded `ownership_transfers` row, by evidence:
+
+| Evidence | Status | Why |
+|---|---|---|
+| hammer only (fold `sale_confirmation = 'recorded'`) | `recorded_unconfirmed` | the only thing observed |
+| the winner listed the car next (`confirmed_next_lot`) | `recorded_unconfirmed` | the stronger evidence lives on the period row; `completed` means title and payment finished in the deal pipeline, which no scraped sale proves |
+| the same seller listed the car again right after (`relist_same_seller`) | `cancelled`, `cancelled_at` = the relisting lot's event clock | direct evidence the sale did not hand the car on |
+
+The open milestones of a relabelled transfer become `not_observable`; the hammer (`agreement_reached`) stays completed. A transfer
+with a user on either side, any milestone beyond the hammer, a party communication or a trigger other than a lot is never touched.
+Every relabel is recorded in `ownership_transfer_relabels` (previous status, new status, reason, the lot and the evidence lot)
+and `revert_auction_transfer_relabels` puts it back, so later evidence (a bridge between two handles, a title) can flip a status.
+New seeds follow the same rule: `transfer-automator` seeds a lot as `recorded_unconfirmed` with the one hammer milestone and
+seeds nothing for a lot the fold flagged as relisted; `transfer-advance` creates the deal pipeline and moves the transfer to
+`in_progress` when a party engages. The listing-seeded path (a deal run through Nuke) keeps the full pipeline.

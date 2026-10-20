@@ -17,39 +17,15 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
 import { requireWriteAuth } from '../_shared/writeGuard.ts';
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import {
+  buildMilestones,
+  buildRecordedSaleMilestones,
+  lotWasRelisted,
+  RECORDED_STATUS,
+} from '../_shared/transferSeed.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE_KEY = projectSecretKey()!;
-
-// Default milestones seeded for every auction-triggered transfer.
-// Sequences are intentional gaps (10-step) so we can insert between them later.
-const AUCTION_MILESTONES = [
-  { sequence: 10,  milestone_type: 'agreement_reached',      required: true,  deadline_days: 1  },
-  { sequence: 20,  milestone_type: 'contact_exchanged',       required: true,  deadline_days: 3  },
-  { sequence: 30,  milestone_type: 'discussion_complete',     required: false, deadline_days: 7  },
-  { sequence: 40,  milestone_type: 'deposit_triggered',       required: true,  deadline_days: 5  },
-  { sequence: 50,  milestone_type: 'deposit_sent',            required: true,  deadline_days: 7  },
-  { sequence: 60,  milestone_type: 'deposit_received',        required: true,  deadline_days: 10 },
-  { sequence: 70,  milestone_type: 'deposit_confirmed',       required: true,  deadline_days: 12 },
-  { sequence: 80,  milestone_type: 'inspection_scheduled',    required: false, deadline_days: 14 },
-  { sequence: 90,  milestone_type: 'inspection_live',         required: false, deadline_days: 21 },
-  { sequence: 100, milestone_type: 'inspection_completed',    required: false, deadline_days: 25 },
-  { sequence: 110, milestone_type: 'full_payment_triggered',  required: true,  deadline_days: 28 },
-  { sequence: 120, milestone_type: 'full_payment_sent',       required: true,  deadline_days: 35 },
-  { sequence: 130, milestone_type: 'full_payment_received',   required: true,  deadline_days: 40 },
-  { sequence: 140, milestone_type: 'payment_confirmed',       required: true,  deadline_days: 42 },
-  { sequence: 150, milestone_type: 'title_sent',              required: true,  deadline_days: 45 },
-  { sequence: 160, milestone_type: 'title_in_transit',        required: true,  deadline_days: 50 },
-  { sequence: 170, milestone_type: 'title_received',          required: true,  deadline_days: 60 },
-  { sequence: 180, milestone_type: 'transfer_complete',       required: true,  deadline_days: 60 },
-];
-
-// Shipping milestones — appended when vehicle is not local pickup
-const SHIPPING_MILESTONES = [
-  { sequence: 155, milestone_type: 'shipping_requested',  required: true, deadline_days: 43 },
-  { sequence: 157, milestone_type: 'shipping_initiated',  required: true, deadline_days: 48 },
-  { sequence: 165, milestone_type: 'vehicle_arrived',     required: true, deadline_days: 58 },
-];
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -95,6 +71,11 @@ Deno.serve(async (req) => {
 // Creates an ownership_transfer from a sold auction_events row.
 // Idempotent — if transfer already exists for this trigger_id, returns it.
 //
+// A sold lot is a RECORDED SALE, not a completed transfer (2026-10-20): the transfer is seeded as recorded_unconfirmed with
+// only the completed agreement_reached milestone (a scraper observes the hammer and nothing after it). The deal pipeline is
+// created by transfer-advance if a party engages, which also moves the status to in_progress. A lot the fold has flagged as
+// relisted by the same seller is not a transfer and is not seeded. include_shipping no longer applies to this path.
+//
 // suppress_notifications:
 //   When true, skips the fire-and-forget notify-transfer-parties call.
 //   Required when running historical backfill (crons 223-227) to avoid
@@ -133,6 +114,11 @@ async function seedFromAuction(supabase: ReturnType<typeof createClient>, body: 
     return json({ transfer_id: existing.id, status: existing.status, created: false });
   }
 
+  // The same seller listed the vehicle again right after this lot: the recorded sale did not hand it on.
+  if (await lotWasRelisted(supabase, auction_event_id)) {
+    return json({ skipped: 'relist_same_seller', auction_event_id, created: false });
+  }
+
   const vehicle_id = ae.vehicle_id;
   const agreed_price = ae.winning_bid ?? ae.high_bid ?? null;
   const sale_date = ae.auction_end_date ?? ae.updated_at;
@@ -159,7 +145,7 @@ async function seedFromAuction(supabase: ReturnType<typeof createClient>, body: 
       trigger_table: 'auction_events',
       agreed_price,
       currency: 'USD',
-      status: 'in_progress',
+      status: RECORDED_STATUS,
       sale_date,
       inbox_email,
       from_identity_id: from_identity_id ?? undefined,
@@ -174,23 +160,12 @@ async function seedFromAuction(supabase: ReturnType<typeof createClient>, body: 
     return json({ error: 'Failed to create transfer', detail: transferErr }, 500);
   }
 
-  // Seed milestones
-  const milestones = buildMilestones(transfer.id, sale_date, include_shipping);
+  // The hammer is the only step observed: one milestone, already completed at the sale date.
+  const milestones = buildRecordedSaleMilestones(transfer.id, sale_date);
   const { error: msErr } = await supabase.from('transfer_milestones').insert(milestones);
   if (msErr) console.error('[transfer-automator] milestone insert error:', msErr);
 
-  // Mark the first milestone (agreement_reached) as completed at sale_date
-  await supabase
-    .from('transfer_milestones')
-    .update({ status: 'completed', completed_at: sale_date })
-    .eq('transfer_id', transfer.id)
-    .eq('milestone_type', 'agreement_reached');
-
-  // Set vehicles.current_transfer_id
-  await supabase
-    .from('vehicles')
-    .update({ current_transfer_id: transfer.id })
-    .eq('id', vehicle_id);
+  // vehicles.current_transfer_id is not set: it marks a transfer in progress, and a recorded sale is not one.
 
   // Notify parties — fire-and-forget, never blocks the seed response
   // Skip when suppress_notifications=true (e.g. historical backfill runs)
@@ -207,6 +182,7 @@ async function seedFromAuction(supabase: ReturnType<typeof createClient>, body: 
     from_identity_id,
     to_identity_id,
     agreed_price,
+    status: RECORDED_STATUS,
     milestones_seeded: milestones.length,
     created: true,
   });
@@ -392,26 +368,6 @@ async function updateContacts(supabase: ReturnType<typeof createClient>, body: {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-function buildMilestones(
-  transfer_id: string,
-  sale_date: string,
-  include_shipping: boolean,
-) {
-  const base = new Date(sale_date).getTime();
-  const allMilestones = include_shipping
-    ? [...AUCTION_MILESTONES, ...SHIPPING_MILESTONES].sort((a, b) => a.sequence - b.sequence)
-    : AUCTION_MILESTONES;
-
-  return allMilestones.map((m) => ({
-    transfer_id,
-    sequence: m.sequence,
-    milestone_type: m.milestone_type,
-    status: 'pending',
-    required: m.required,
-    deadline_at: new Date(base + m.deadline_days * 24 * 60 * 60 * 1000).toISOString(),
-  }));
-}
 
 async function resolveIdentity(
   supabase: ReturnType<typeof createClient>,
