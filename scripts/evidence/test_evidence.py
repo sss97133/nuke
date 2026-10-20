@@ -1171,6 +1171,32 @@ class ReviewSheet(SyntheticCase):
         multi = review_sheet.profile({'targets': [RT('evidence_link', truck206), RT('evidence_link', sub206)]}, lines)
         self.assertEqual((multi['asked_place'], payloads.answer_dimension(multi)), ('multi', []))
 
+    def test_an_image_only_row_states_its_question(self):
+        """(v6, AC1) "which truck is this?" lists the image with question image_candidate: a "where?" row."""
+        lines = review_sheet.lines_by_key(self.files)
+        img = self.files['candidates.combined.jsonl'][0]['row']['image_id']
+        cand = self.files['candidates.combined.jsonl'][0]['key']
+        q = {'text': 'Which truck is in this photo?', 'answer_hint': '<truck>', 'question': 'image_candidate',
+             'targets': [{'kind': 'image', 'key': img}]}
+        self.ctx.case['review']['questions'].append(q)
+        try:
+            rows, _decisions = self.rows()
+        finally:
+            self.ctx.case['review']['questions'].remove(q)
+        r = next(x for x in rows if x['question_text'] == q['text'])
+        p = r['profile']
+        self.assertEqual((p['question'], p['asked_place'], p['frame'], p['images']), ('image_candidate', None, 'subject',
+                                                                                    [img]))
+        self.assertIsNone(payloads.answer_problem({'decision': 'confirmed', 'vehicle_id': T}, p))
+        self.assertIsNotNone(payloads.answer_problem({'decision': 'confirmed'}, p))
+        self.assertEqual(review_sheet.run_row(r, {}), {'targets': [{'kind': 'image', 'id': img}],
+                                                       'question': 'image_candidate'})
+        self.assertEqual(record_answers.covers(r, 'image_candidate', cand, lines), 'slot')   # his answer lands there
+        for bad in ({'targets': [review_sheet.T('image', img)]},                             # names no question
+                    {'targets': [review_sheet.T('image_candidate', cand)], 'frame': 'also_in_frame'}):
+            with self.assertRaises(ValueError):
+                review_sheet.profile(bad, lines)
+
     def test_db_issue_stores_row_targets_and_leaves_off_rows_not_loaded(self):
         rows, decisions = self.rows()
         ids = {k: common.uuid5('id', k) for f in self.files if f.endswith('.jsonl') for k in

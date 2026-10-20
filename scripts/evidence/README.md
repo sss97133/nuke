@@ -103,8 +103,10 @@ an `@amount:<source>:<ref>` placeholder in db mode, in memory.
 - Rows: a photo lists its candidate and the image; an album its album link; a pair its claim; a contested payment its
   key and its unallocated links on this truck; a contradiction the contradicting link and the key; money in its key
   and links; an account its map row and the account; a document line with no payment found is a **who-paid** row
-  (`asks: party`, the one placement link), as is the case's "who paid for the truck" (the acquisition claim). Rows a
-  second reader or his objection disputed are asked again ("asked again") until a delivered sheet has asked them.
+  (`asks: party`, the one placement link), as is the case's "who paid for the truck" (the acquisition claim). A case
+  question that lists only an image states its `question` ("which truck is in this photo?" is `image_candidate`) and
+  optionally its `frame`. Rows a second reader or his objection disputed are asked again ("asked again") until a
+  delivered sheet has asked them.
 - The sheet opens with the read-back: every agent decision of the last 7 days, his reading of each answer and what
   the store recorded (or that it did not, and why).
 - Send the `.md` text as its own message, then `record_answers.py delivered --message-ref <source>:<message id>`.

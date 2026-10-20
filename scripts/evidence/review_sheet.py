@@ -153,6 +153,8 @@ def profile(row, lines):
     frame = None
     if q == 'image_candidate':
         frame = row.get('frame', 'subject') if not frames else (frames.pop() if len(frames) == 1 else 'mixed')
+        if frame not in ('subject', 'also_in_frame', 'mixed') or ('frame' in row and row['frame'] != frame):
+            raise ValueError('frame %s does not match the row\'s candidates (%s)' % (row.get('frame'), frame))
     link = 'album' if q == 'album_map' else None
     if q == 'evidence_link':
         link = 'placement' if not classes else (next(iter(classes)) if len(classes) == 1 else 'mixed')
@@ -173,9 +175,10 @@ def build_rows(ctx, files, read):
     rows, decisions = [], []
     lines = lines_by_key(files)
 
-    def add(section, question, targets, answer_hint=None, asks='place'):
-        row = {'row': len(rows) + 1, 'section': section, 'question_text': question, 'targets': targets,
+    def add(section, text, targets, answer_hint=None, asks='place', **stated):
+        row = {'row': len(rows) + 1, 'section': section, 'question_text': text, 'targets': targets,
                'answer_hint': answer_hint, 'asks': asks}
+        row.update({k: v for k, v in stated.items() if v is not None})     # question / frame a row states itself
         row['profile'] = profile(row, lines)
         rows.append(row)
 
@@ -186,9 +189,10 @@ def build_rows(ctx, files, read):
     answered_by_case = set()        # document lines a case who-paid row already asks about (its claim's support)
     for q in (ctx.case.get('review') or {}).get('questions') or []:
         if q.get('targets'):
+            # a row listing only images states its question ("which truck is this?" is image_candidate) and frame
             add(q.get('section', 'decision'), q['text'], [T(t.get('kind') or t['target_kind'], t['key'])
                                                          for t in q['targets']],
-                q.get('answer_hint'), q.get('asks', 'place'))
+                q.get('answer_hint'), q.get('asks', 'place'), question=q.get('question'), frame=q.get('frame'))
             if q.get('asks') == 'party':
                 for t in rows[-1]['targets']:
                     for s in (lines.get(t['key']) or {}).get('p_support') or []:
@@ -279,7 +283,8 @@ def build_rows(ctx, files, read):
             [T('account_entity', ln['key']), T('account', r['account_ref'])], 'yes / no, it is <entity>')
     # (v6, AC10) a row whose reading a second reader, the transcript check or his objection disputed is asked again
     for old, ref in reask(lines):
-        add('asked again', old['question_text'], old['targets'], old.get('answer_hint'), old.get('asks', 'place'))
+        add('asked again', old['question_text'], old['targets'], old.get('answer_hint'), old.get('asks', 'place'),
+            question=old.get('question'), frame=old.get('frame'))
         rows[-1]['reask_of'] = ref
     return rows, decisions
 
@@ -359,6 +364,8 @@ def run_row(r, ids):
     out = {'targets': [run_target(t, ids) for t in r['targets']], 'question': r['profile']['question']}
     if r['profile']['asks'] != 'place':
         out['asks'] = r['profile']['asks']
+    if r.get('frame'):
+        out['frame'] = r['frame']
     return out
 
 
