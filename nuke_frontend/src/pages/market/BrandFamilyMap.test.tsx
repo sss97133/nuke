@@ -180,3 +180,11 @@ it('reads every GM family before grouping and drills Truck through the complete 
   await act(async () => truck.click());
   expect(pick).toHaveBeenCalledWith('Chevrolet', 'pickup', 'Truck', true);
 });
+
+it('names the measured houses from the refresh receipt on each family card, not a list in code', async () => {
+  await act(async () => root.render(<BrandFamilyMap width={1000} height={600} onPickBrand={vi.fn()} onPickFamily={vi.fn()}
+    houses={['Bring a Trailer', 'Mecum', 'Bonhams', 'Cars & Bids']} />));
+  const tile = container.querySelector<HTMLButtonElement>('[title^="Porsche 911"]')!;
+  await act(async () => tile.focus());
+  expect(document.querySelector('[role="tooltip"]')?.textContent).toContain('measured at Bring a Trailer, Mecum, Bonhams and Cars & Bids');
+});

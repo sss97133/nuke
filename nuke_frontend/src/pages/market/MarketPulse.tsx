@@ -13,6 +13,8 @@ import { selectRowFacts, useMarketRowDetails, useMarketRowSpecs, vehicleIdentity
 import { useFinishEstimates, type FinishEstimate } from './useFinishEstimates';
 import { ringBids, startBidChime } from './bidChime';
 import { matchesEraRange } from '../../lib/market/familyEras';
+import { matchesFamilyScope } from './scopeMatch';
+export { matchesFamilyScope } from './scopeMatch';
 
 // The homepage: the live collector-car market as Nuke sees it right now.
 // Activity figures count the rows market_pulse_live() returns; rows open their canonical records.
@@ -405,24 +407,6 @@ function inWindow(a: LiveAuction, w: Window, now: number): boolean {
     case 'nr': return a.noReserve;
     default: return true;
   }
-}
-
-export function matchesFamilyScope(a: LiveAuction, familyName: string | null): boolean {
-  if (!familyName) return true;
-  const f = familyName.trim().toLowerCase();
-  if (!f || f === 'other models') return true;
-  const m = (a.model ?? '').trim().toLowerCase();
-  const t = (a.title ?? '').trim().toLowerCase();
-  const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const wordRe = new RegExp(`(^|[^a-z0-9])${esc(f)}($|[^a-z0-9])`, 'i');
-  if (m === f || m.startsWith(`${f} `) || m.startsWith(`${f}-`) || wordRe.test(m) || wordRe.test(t)) return true;
-  // A family whose members are its name plus a number: LC -> LC500, F-Series -> F-150, 3 Series -> 328i, C/K -> C10, K20.
-  const stems = /^(.+?)[- ]series$/.test(f) ? [f.replace(/[- ]series$/, '')]
-    : f.includes('/') ? f.split('/').map((s) => s.trim()).filter((s) => s.length > 0 && s.length <= 3)
-      : /[a-z]$/.test(f) ? [f] : [];
-  const make = (a.make ?? '').trim().toLowerCase();
-  return stems.some((s) => new RegExp(`^${esc(s)}-?\\d`, 'i').test(m)
-    || (!!make && new RegExp(`(^|\\s)${esc(make)}\\s+${esc(s)}-?\\d`, 'i').test(t)));
 }
 
 export function matchesModelScope(a: LiveAuction, model: string | null): boolean {

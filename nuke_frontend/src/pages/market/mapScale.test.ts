@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { batBaseline, callouts, fitName, gateMinForHorizon, moveFill, moveText, moveTextShort, pct, relativeMove, tileClass, tileName } from './mapScale';
+import { batBaseline, callouts, fitName, gateMinForHorizon, housesPhrase, measuredHouses, moveFill, moveText, moveTextShort, pct, relativeMove, tileClass, tileName, DEFAULT_MEASURED_HOUSES } from './mapScale';
 
 const brands = [
   { count: 28_480, dated: 20_000, sold_12m: 4_506, sold_prior_12m: 3_817 },
@@ -54,6 +54,43 @@ describe('a tile’s move', () => {
     expect(gateMinForHorizon('1w')).toBe(2);
     expect(gateMinForHorizon('upcoming')).toBe(4);
     expect(relativeMove({ count: 500, dated: 400, sold_12m: 7, sold_prior_12m: 5 }, base, true, gateMinForHorizon('upcoming')).kind).toBe('move');
+  });
+});
+
+describe('a brand measured over the stable houses (treemap_brand_market, read 2026-10-19)', () => {
+  // The measured houses are the ones held in full in both windows (v_market_house_coverage.qualified_measured):
+  // Bring a Trailer, Mecum and Bonhams. `count` is every house's confirmed sales; `dated` is the measured houses'.
+  const houses = ['Bring a Trailer', 'Mecum', 'Bonhams'];
+  const base = { sold: 60_000, prior: 52_000, move: 60_000 / 52_000 - 1 };
+  const chevrolet = { count: 51_134, dated: 36_207, sold_12m: 7_115, sold_prior_12m: 6_153 };
+  const harley = { count: 2_026, dated: 1_923, sold_12m: 532, sold_prior_12m: 378 };
+  const tesla = { count: 916, dated: 163, sold_12m: 33, sold_prior_12m: 33 };
+  it('reads Chevrolet and Harley-Davidson as a move, with the houses it was measured at', () => {
+    const c = relativeMove(chevrolet, base, true, 20, houses);
+    expect(c.kind).toBe('move');
+    if (c.kind === 'move') { expect(c.raw).toBeCloseTo(7_115 / 6_153 - 1, 9); expect(c.houses).toEqual(houses); }
+    const h = relativeMove(harley, base, true, 20, houses);
+    expect(h).toMatchObject({ kind: 'move', sold: 532, prior: 378, houses });
+  });
+  it('keeps Tesla "mostly unmeasured houses": 728 of its 916 sales are at Cars & Bids, which has no by-year census', () => {
+    const t = relativeMove(tesla, base, true, 20, houses);
+    expect(t).toMatchObject({ kind: 'few', why: 'share', sold: 33, prior: 33, houses });
+    expect(moveText(t)).toBe('mostly unmeasured houses');
+  });
+  it('never lends the measured houses\' move to a brand sold only at live-auction houses', () => {
+    // 600 confirmed sales, 25 of them at measured houses, which happen to clear the count gate both years.
+    const live = { count: 600, dated: 25, sold_12m: 25, sold_prior_12m: 22 };
+    expect(relativeMove(live, base, true, 20, houses)).toMatchObject({ kind: 'few', why: 'share' });
+    expect(relativeMove({ count: 600, dated: 0, sold_12m: 0, sold_prior_12m: 0 }, base, true, 20, houses)).toEqual({ kind: 'none' });
+    expect(relativeMove({ count: 600 }, base, true, 20, houses)).toEqual({ kind: 'none' });
+  });
+  it('names the houses from the refresh receipt, or the 2026-10-18 three when the receipt is absent', () => {
+    expect(measuredHouses(['Bring a Trailer', 'Mecum', 'Bonhams', 'Cars & Bids'])).toEqual(['Bring a Trailer', 'Mecum', 'Bonhams', 'Cars & Bids']);
+    expect(measuredHouses(null)).toBe(DEFAULT_MEASURED_HOUSES);
+    expect(measuredHouses([])).toBe(DEFAULT_MEASURED_HOUSES);
+    expect(housesPhrase(['Bring a Trailer', 'Mecum', 'Bonhams'])).toBe('Bring a Trailer, Mecum and Bonhams');
+    expect(housesPhrase(['Bring a Trailer'])).toBe('Bring a Trailer');
+    expect(relativeMove(chevrolet, base, true).kind === 'move' && 'houses' in relativeMove(chevrolet, base, true)).toBe(false);
   });
 });
 
