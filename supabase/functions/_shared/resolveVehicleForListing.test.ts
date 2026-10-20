@@ -36,11 +36,12 @@ function database(vehicles: Row[] = [], events: Row[] = [], failure?: { table: s
       const query = {
         select(_columns: string) { return query; },
         eq(column: string, value: string) { rows = rows.filter(row => row[column] === value); return query; },
+        in(column: string, values: string[]) { rows = rows.filter(row => values.includes(row[column] ?? '')); return query; },
         ilike(column: string, pattern: string) { read.pattern = pattern; rows = rows.filter(row => ilike(pattern).test(row[column] ?? '')); return query; },
         limit(value: number) { read.limit = value; return query; },
         abortSignal(value: AbortSignal) { read.signal = value; return query; },
         maybeSingle() { const reply = result(); return Promise.resolve({ ...reply, data: reply.data[0] ?? null,
-          error: reply.error ?? (reply.data.length > 1 ? new Error('multiple rows') : null) }); },
+          error: reply.error ?? (reply.data.length > 1 ? Object.assign(new Error('multiple rows'), { code: 'PGRST116' }) : null) }); },
         then(resolve: (value: ReturnType<typeof result>) => unknown) { return Promise.resolve(result()).then(resolve); },
       };
       return query;
@@ -125,4 +126,25 @@ Deno.test('Bonhams opt-out preserves lot-ID matching across alternate slug paths
   equal(await resolveExistingVehicleId(db, { url: 'https://bonhams.com/auction/12345/lot/67/newer-slug/', platform: 'bonhams',
     discoveryUrlIlikePattern: '%bonhams.com/auction/12345/lot/67/%' }), { vehicleId: 'bonhams-car' });
   equal(db.reads.at(-1)?.limit, 1);
+});
+
+Deno.test('a merged-away duplicate keeping its copy of the lot episode does not make the lot ambiguous', async () => {
+  const key = 'goodingco.com/lot/1970-example-coupe';
+  const db = database(
+    [{ id: 'live-car', status: 'active', deleted_at: null, discovery_url: url }, { id: 'merged-car', status: 'merged', deleted_at: null, discovery_url: url.replace('www.', '') }],
+    [{ vehicle_id: 'live-car', source_platform: 'gooding', source_listing_id: key }, { vehicle_id: 'merged-car', source_platform: 'gooding', source_listing_id: key }]);
+  equal(await resolveExistingVehicleId(db, options), { vehicleId: 'live-car' });
+});
+
+Deno.test('two live vehicles on one lot stay refused', async () => {
+  const key = 'goodingco.com/lot/1970-example-coupe';
+  const db = database(
+    [{ id: 'car-a', status: 'active', deleted_at: null }, { id: 'car-b', status: 'active', deleted_at: null }],
+    [{ vehicle_id: 'car-a', source_platform: 'gooding', source_listing_id: key }, { vehicle_id: 'car-b', source_platform: 'gooding', source_listing_id: key }]);
+  await refuses(() => resolveExistingVehicleId(db, options), 'multiple rows');
+});
+
+Deno.test('a merged-away alias URL does not make the exact listing ambiguous', async () => {
+  const db = database([{ id: 'live-car', status: 'active', deleted_at: null, discovery_url: url }, { id: 'merged-car', status: 'merged', deleted_at: null, discovery_url: url.replace('www.', '') }]);
+  equal(await resolveExistingVehicleId(db, options), { vehicleId: 'live-car' });
 });
