@@ -85,7 +85,7 @@ enum FixtureBackend {
                 log.record(rpc: "\(method == "PATCH" ? "update" : "insert") \(name)", args: row)
                 return (201, Data("[]".utf8))
             }
-            return table(name)
+            return table(name, query: url.query ?? "")
         }
         return (404, Data(#"{"message":"not served by the fixture backend"}"#.utf8))
     }
@@ -117,10 +117,13 @@ enum FixtureBackend {
             case "privacy-job": return ok(JobFixtures.quotesAcceptedForVisitor)
             default: return ok(JobFixtures.quotesNone)
             }
+        case "job_market_health_read": return ok(MarketHealthFixtures.read(days: scenario == "market-first-day" ? 1 : 3))
+        case "work_order_provider_matches_read": return ok(ProviderMatchFixtures.withClaimants)
         case "work_order_offers_read":
             switch scenario {
             case "offer": return ok(providerOffers)
             case "cosign": return ok(CosignFixtures.offers(customer: true))
+            case "claimant": return ok(ProviderMatchFixtures.offersWithOrganization())
             default: return ok(#"{"requirements":[],"accepted_providers":[],"viewer":{"context":"visitor","slots":[],"actions":[]}}"#)
             }
         case "work_order_invoices_read":
@@ -212,9 +215,12 @@ enum FixtureBackend {
 
     // MARK: Tables (PostgREST selects)
 
-    private static func table(_ name: String) -> (Int, Data) {
+    private static func table(_ name: String, query: String) -> (Int, Data) {
         switch name {
         case "vehicle_images": return ok(persona == .client ? PostJobFixtures.photos : "[]")
+        case "profiles" where query.contains("username=eq."):
+            // A /providers/:handle link: only @fixture_tech is a public handle here.
+            return ok(query.contains("username=eq.fixture_tech") ? #"[{"id":"\#(providerId)"}]"# : "[]")
         case "profiles": return ok(ParityFixtures.ownRow)
         case "tool_requirement_key_map": return ok(ParityFixtures.toolKeys)
         default: return ok("[]")

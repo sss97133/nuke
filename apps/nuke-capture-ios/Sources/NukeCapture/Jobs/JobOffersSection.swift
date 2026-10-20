@@ -73,9 +73,7 @@ struct JobOffersSection: View {
         .padding(.vertical, 2)
         ForEach(req.offers) { offer in
             VStack(alignment: .leading, spacing: 4) {
-                RootedValueView(label: "Offer from", value: offer.who,
-                                status: offer.acceptanceState == "accepted" ? .proven : .attributed,
-                                decay: OfferCopy.rung(offer.offerRung))
+                OfferFromRow(label: "Offer from", offer: offer)
                 ForEach(offer.lines) { line in
                     RootedValueView(label: JobCopy.lineLabel(line), value: JobCopy.linePrice(line),
                                     status: line.amount == nil ? .recorded : .attributed)
@@ -117,5 +115,21 @@ struct JobOffersSection: View {
     private func withdraw(_ action: JobAction) async {
         failure = nil
         if let reason = await OfferReaders.withdraw(action) { failure = "Couldn't withdraw. \(reason)" } else { onChanged?() }
+    }
+}
+
+/// Who an offer is from and the rung it was made at; an organization offer also carries its on_nuke label as a badge.
+struct OfferFromRow: View {
+    let label: String
+    let offer: JobOffer
+    var value: String? = nil
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            RootedValueView(label: label, value: value ?? offer.who,
+                            status: offer.acceptanceState == "accepted" ? .proven : .attributed,
+                            decay: OfferCopy.rung(offer.offerRung))
+            if offer.offerKind == "organization", let badge = offer.onNuke { OnNukeBadge(label: badge) }
+        }
     }
 }

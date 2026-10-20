@@ -1,8 +1,10 @@
 // ProviderMatches.swift — who could do this job: work_order_provider_matches_read, for its customer or shop owner.
 //
-// The reader lists provider accounts (an evidenced technician link, or an active shop membership or ownership),
-// ranked only by how many match inputs pass per request (skill, tools, shop space, area, availability, technician
-// profile); ties share a rank and every input is shown. A provider's service area is a band (city, state, radius,
+// The reader lists provider accounts (an evidenced technician link, an active shop membership or ownership, or a
+// verified business claim, with the businesses they can offer as in offers_as), ranked only by how many match
+// inputs pass per request (skill, tools, shop space, area, availability, technician profile); ties share a rank and
+// every input is shown. Supply records never pass an input (a skill input may carry supply_corroboration, labelled as
+// not skill evidence); businesses that can supply a request come apart in plan_b_suppliers. A provider's service area is a band (city, state, radius,
 // mobile) and their availability a standing window: both are self-claimed Signs. The reader returns no coordinates
 // and no contact fields. provider_profile_read adds standing (jobs, signed work days, evidence-derived skills,
 // vouches, active shops) with its basis. Offers and acceptance stay on work_order_offers_read; nothing here
@@ -82,6 +84,8 @@ struct ProviderMatchInput: Decodable, Equatable, Identifiable {
     let matchedCapabilities: [String]
     let statedCapabilities: [String]
     let cautions: [String]
+    /// Skill input: businesses they claimed that supplied this kind of thing before. Corroborating only; never a pass.
+    let supplyCorroboration: [String]
     var id: String { input }
 
     enum CodingKeys: String, CodingKey {
@@ -90,6 +94,11 @@ struct ProviderMatchInput: Decodable, Equatable, Identifiable {
         case firstAvailableDay = "first_available_day"
         case matchedCapabilities = "matched_capabilities"
         case statedCapabilities = "stated_capabilities"
+        case supplyCorroboration = "supply_corroboration"
+    }
+    private struct Supplied: Decodable {
+        struct Org: Decodable { let name: String? }
+        let organization: Org?
     }
     private struct Named: Decodable { let capability: String? }
 
@@ -105,6 +114,9 @@ struct ProviderMatchInput: Decodable, Equatable, Identifiable {
         matchedCapabilities = ((try? c.decode([Named].self, forKey: .matchedCapabilities)) ?? []).compactMap(\.capability)
         statedCapabilities = (try? c.decode([String].self, forKey: .statedCapabilities)) ?? []
         cautions = ((try? c.decode([Named].self, forKey: .cautions)) ?? []).compactMap(\.capability)
+        var seen = Set<String>()
+        supplyCorroboration = ((try? c.decode([Lossy<Supplied>].self, forKey: .supplyCorroboration)) ?? [])
+            .compactMap { $0.value?.organization?.name }.filter { seen.insert($0).inserted }
     }
 }
 
@@ -141,8 +153,24 @@ struct ProviderMatchRequirement: Decodable, Equatable, Identifiable {
 }
 
 struct ProviderMatch: Decodable, Equatable, Identifiable {
+    /// A business this provider can offer as: a verified claim on it (organization_verified_claimants).
+    struct OffersAs: Decodable, Equatable, Identifiable {
+        let organizationId: String
+        let name: String?
+        let onNuke: String?
+        var id: String { organizationId }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: JobCodingKey.self)
+            organizationId = try c.decode(String.self, forKey: JobCodingKey("organization_id"))
+            name = (try? c.decode(String.self, forKey: JobCodingKey("name"))).flatMap { $0.isEmpty ? nil : $0 }
+            onNuke = try? c.decode(String.self, forKey: JobCodingKey("on_nuke"))
+        }
+    }
+
     let rank: Int
     let provider: JobPerson?
+    let offersAs: [OffersAs]
     let listedBecause: [String]
     let linkState: String
     let passed: Int
@@ -157,6 +185,7 @@ struct ProviderMatch: Decodable, Equatable, Identifiable {
 
     enum CodingKeys: String, CodingKey {
         case rank, provider, passed, failed, unknown, requirements
+        case offersAs = "offers_as"
         case listedBecause = "listed_because"
         case linkState = "link_state"
         case inputsTotal = "inputs_total"
@@ -166,6 +195,7 @@ struct ProviderMatch: Decodable, Equatable, Identifiable {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         rank = (try? c.decode(Int.self, forKey: .rank)) ?? 0
         provider = try? c.decode(JobPerson.self, forKey: .provider)
+        offersAs = ((try? c.decode([Lossy<OffersAs>].self, forKey: .offersAs)) ?? []).compactMap(\.value)
         listedBecause = (try? c.decode([String].self, forKey: .listedBecause)) ?? []
         linkState = (try? c.decode(String.self, forKey: .linkState)) ?? "none"
         passed = (try? c.decode(Int.self, forKey: .passed)) ?? 0
@@ -195,10 +225,35 @@ struct ProviderMatch: Decodable, Equatable, Identifiable {
     var evidencedSkills: [String] { Self.distinct(inputs("skill").flatMap(\.matchedCapabilities)) }
     var statedSkills: [String] { Self.distinct(inputs("skill").flatMap(\.statedCapabilities)) }
     var skillCautions: [String] { Self.distinct(inputs("skill").flatMap(\.cautions)) }
+    var suppliedBy: [String] { Self.distinct(inputs("skill").flatMap(\.supplyCorroboration)) }
 
     private static func distinct(_ xs: [String]) -> [String] {
         var seen = Set<String>()
         return xs.filter { seen.insert($0).inserted }
+    }
+}
+
+/// Businesses with purchase records for one request: they can supply it. Listed apart from performers; supply never
+/// counts as evidence of doing the work.
+struct PlanBSupplierGroup: Decodable, Equatable, Identifiable {
+    let requirementId: String
+    let kind: String
+    let description: String?
+    let suppliers: [PlanBSupplier]
+    var id: String { requirementId }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: JobCodingKey.self)
+        requirementId = try c.decode(String.self, forKey: JobCodingKey("requirement_id"))
+        kind = (try? c.decode(String.self, forKey: JobCodingKey("requirement_kind"))) ?? "requirement"
+        description = (try? c.decode(String.self, forKey: JobCodingKey("description"))).flatMap { $0.isEmpty ? nil : $0 }
+        suppliers = ((try? c.decode([Lossy<PlanBSupplier>].self, forKey: JobCodingKey("suppliers"))) ?? []).compactMap(\.value)
+    }
+
+    var title: String {
+        let k = OfferCopy.kind(kind)
+        guard let description else { return k }
+        return "\(k): \(description)"
     }
 }
 
@@ -212,6 +267,7 @@ struct ProviderMatches: Decodable, Equatable {
     let vehicleLabel: JobVehicleLabel?
     var providers: [ProviderMatch]
     let unreadableProviders: Int
+    let planBSuppliers: [PlanBSupplierGroup]
     let inputs: [String]
     let jobArea: JobArea?
     let jobWindow: JobWindow?
@@ -229,6 +285,7 @@ struct ProviderMatches: Decodable, Equatable {
         case vehicleLabel = "vehicle_label"
         case jobArea = "job_area"
         case jobWindow = "job_window"
+        case planBSuppliers = "plan_b_suppliers"
     }
     private struct Coverage: Decodable {
         let requirements: Int?
@@ -248,6 +305,8 @@ struct ProviderMatches: Decodable, Equatable {
         for i in rows.indices { rows[i].position = i }
         providers = rows
         unreadableProviders = raw.count - rows.count
+        planBSuppliers = ((try? c.decode([Lossy<PlanBSupplierGroup>].self, forKey: .planBSuppliers)) ?? [])
+            .compactMap(\.value).filter { !$0.suppliers.isEmpty }
         inputs = (try? c.decode([String].self, forKey: .inputs)) ?? []
         jobArea = (try? c.decode(JobArea.self, forKey: .jobArea)).flatMap { $0.city == nil && $0.state == nil ? nil : $0 }
         jobWindow = try? c.decode(JobWindow.self, forKey: .jobWindow)
@@ -440,6 +499,7 @@ enum ProviderMatchCopy {
             case "evidenced_link": return "technician link backed by work"
             case "organization_member": return "shop member"
             case "organization_owner": return "shop owner"
+            case "verified_claimant": return "claimed a business on Nuke"
             default: return JobCopy.sentence(code).lowercased()
             }
         }
@@ -573,7 +633,7 @@ enum ProviderMatchCopy {
         }
         if read.providers.isEmpty {
             return read.providersConsidered == 0
-                ? "No provider accounts on Nuke qualify to be considered yet: none has a technician link backed by work or an active shop membership or ownership, other than you and the customer."
+                ? "No provider accounts on Nuke qualify to be considered yet: none has a technician link backed by work, an active shop membership or ownership, or a claimed business, other than you and the customer."
                 : "None of the \(considered) \(accounts) considered came back for this job."
         }
         return nil
@@ -592,7 +652,17 @@ enum ProviderMatchCopy {
     }
 
     static let mapNote = "Circles are the service areas providers state (a city and a radius, self-claimed), drawn around the city's center as Apple Maps places it. Nobody's exact location is shown; Nuke doesn't hold one."
-    static let screenNote = "Ranked only by how many checks each provider passes; ties share a rank and every check is shown. Service area and availability are what providers say; tools are claimed ownership. Nuke doesn't contact anyone from here: providers make offers on the job, and you accept one."
+    static let screenNote = "Ranked only by how many checks each provider passes; ties share a rank and every check is shown. Service area and availability are what providers say; tools are claimed ownership. Businesses that can supply parts or tools are listed separately and never ranked here. Nuke doesn't contact anyone from here: providers make offers on the job, and you accept one."
+
+    /// "Offers as Fixture Garage" (the badge carries the on_nuke label).
+    static func offersAs(_ o: ProviderMatch.OffersAs) -> String { "Offers as \(o.name ?? "an unnamed business")" }
+
+    static func suppliedBy(_ names: [String]) -> String {
+        "Their business \(names.joined(separator: ", ")) has supplied this before — not evidence they can do the work"
+    }
+
+    static let planBHeader = "Can supply this"
+    static let planBNote = "Businesses Nuke has purchase records for, by request. Supplying parts or tools isn't evidence of doing the work, so they aren't ranked with providers above. Only a business claimed on Nuke can receive requests; Nuke contacts nobody from here."
 }
 
 // MARK: - Readers (reads only)

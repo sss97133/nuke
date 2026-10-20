@@ -1,0 +1,15 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["JZ28MFU3VB.ag.nuke.capture"],
+        "components": [
+          { "/": "/jobs/*", "comment": "JobPage" },
+          { "/": "/providers/*", "comment": "ProviderProfilePage" },
+          { "/": "/org/*", "comment": "OrganizationRoutes" },
+          { "/": "/supplier-invite/*", "comment": "SupplierInvitePage" }
+        ]
+      }
+    ]
+  }
+}
