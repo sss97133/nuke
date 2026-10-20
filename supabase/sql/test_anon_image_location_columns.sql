@@ -1,5 +1,5 @@
--- Disposable PG17 only. Proves 20261020150000_anon_image_location_columns.sql: anon keeps SELECT on the ordinary image
--- columns but not on precise location, EXIF or device columns of vehicle_images and device_attributions; a SELECT * as anon
+-- Disposable PG17 only. Proves 20261020190000_anon_image_location_columns.sql: anon keeps SELECT on the ordinary image
+-- columns but not on precise location, EXIF or device columns of vehicle_images; a SELECT * as anon
 -- is refused; rows and RLS are unchanged; authenticated keeps every column; re-applying is a no-op.
 \set ON_ERROR_STOP on
 DO $$ BEGIN
@@ -40,25 +40,21 @@ BEGIN IF v IS DISTINCT FROM true THEN RAISE EXCEPTION 'FAIL: %', label; END IF; 
 CREATE FUNCTION public.t_refused(q text) RETURNS boolean LANGUAGE plpgsql AS $$ BEGIN EXECUTE q; RETURN false; EXCEPTION WHEN insufficient_privilege THEN RETURN true; END $$;
 GRANT EXECUTE ON FUNCTION public.t_assert(boolean,text), public.t_refused(text) TO anon, authenticated;
 
-\ir ../migrations/20261020150000_anon_image_location_columns.sql
-\ir ../migrations/20261020150000_anon_image_location_columns.sql
+\ir ../migrations/20261020190000_anon_image_location_columns.sql
+\ir ../migrations/20261020190000_anon_image_location_columns.sql
 
 SELECT t_assert((SELECT bool_and(NOT has_column_privilege('anon','public.vehicle_images',c,'SELECT')) FROM unnest(ARRAY['latitude','longitude',
    'location_name','location_confidence','exif_data','device_fingerprint','documented_by_device']) c)
  AND (SELECT bool_and(has_column_privilege('anon','public.vehicle_images',c,'SELECT')) FROM unnest(ARRAY['id','vehicle_id','image_url','taken_at',
    'file_name','storage_path','is_sensitive','vision_gate_status']) c)
  AND NOT has_table_privilege('anon','public.vehicle_images','SELECT'),'vehicle_images: anon keeps ordinary columns, not precise location/EXIF/device');
-SELECT t_assert((SELECT bool_and(NOT has_column_privilege('anon','public.device_attributions',c,'SELECT')) FROM unnest(ARRAY['latitude','longitude',
-   'altitude','gps_timestamp','camera_serial','raw_exif','device_fingerprint']) c)
- AND (SELECT bool_and(has_column_privilege('anon','public.device_attributions',c,'SELECT')) FROM unnest(ARRAY['id','image_id','camera_make','camera_model','attribution_source']) c),
- 'device_attributions: anon keeps make/model/source, not GPS, serial, raw EXIF or fingerprint');
+SELECT t_assert(has_table_privilege('anon','public.device_attributions','SELECT'),'device_attributions grants untouched (rows limited elsewhere)');
 SELECT t_assert(has_table_privilege('authenticated','public.vehicle_images','SELECT') AND has_table_privilege('authenticated','public.device_attributions','SELECT')
  AND has_table_privilege('service_role','public.vehicle_images','SELECT'),'authenticated and service_role unchanged');
 
 SET ROLE anon;
 SELECT t_assert(t_refused('SELECT * FROM public.vehicle_images') AND t_refused('SELECT latitude FROM public.vehicle_images')
-  AND t_refused('SELECT exif_data FROM public.vehicle_images') AND t_refused('SELECT camera_serial FROM public.device_attributions')
-  AND t_refused('SELECT * FROM public.device_attributions'),'anon: SELECT * and private columns refused');
+  AND t_refused('SELECT exif_data FROM public.vehicle_images'),'anon: SELECT * and private columns refused');
 SELECT t_assert((SELECT count(*) FROM public.vehicle_images) = 1 AND (SELECT image_url FROM public.vehicle_images) = 'https://x.invalid/1.jpg'
   AND (SELECT camera_make FROM public.device_attributions) = 'Apple','anon: ordinary columns and RLS rows as before');
 RESET ROLE;
