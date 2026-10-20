@@ -74,6 +74,11 @@ WHERE slug = 'iphoto';
 \ir ../migrations/20261020200000_market_sources_dealer_groups_and_cohorts.sql
 \ir ../migrations/20261020201000_market_sources_read_cohorts.sql
 \ir ../migrations/20261020201000_market_sources_read_cohorts.sql
+\ir ../migrations/20261020230000_market_sources_before_same_definition.sql
+\ir ../migrations/20261020230000_market_sources_before_same_definition.sql
+-- a week-earlier reading of the dealer under the old definition (BaT lots inside held, no venue lots), and one of BaT
+INSERT INTO public.market_source_days (day, source_slug, display_name, landed_lots)
+VALUES (current_date - 8, 'streetside-classics', 'Streetside Classics', 3150), (current_date - 8, 'bat', 'Bring a Trailer', 251000);
 
 SELECT pg_temp.ok('the species gains private_seller, labelled; the board table gains its four columns',
   public.source_species_label('private_seller') = 'Private sellers'
@@ -138,9 +143,9 @@ BEGIN
   PERFORM pg_temp.ok('the two groups follow the aggregators, count-only, with their units',
     groups = ARRAY['timed_auction', 'block_house', 'dealer', 'classifieds', 'auth_walled_marketplace', 'aggregator',
                    'private_seller', 'owner_private']
-    AND (SELECT g ->> 'label' = 'Private sellers' AND g ->> 'unit' = 'BaT lots, by seller cohort' AND g -> 'counts_as_held' = 'false'::jsonb
+    AND (SELECT g ->> 'label' = 'Private sellers' AND g ->> 'unit' = 'BaT lots' AND g -> 'counts_as_held' = 'false'::jsonb
          FROM jsonb_array_elements(b -> 'species_groups') g WHERE g ->> 'species' = 'private_seller')
-    AND (SELECT g ->> 'label' = 'Owner''s private data' AND g ->> 'unit' = 'vehicles with owner records' AND g -> 'counts_as_held' = 'false'::jsonb
+    AND (SELECT g ->> 'label' = 'Owner''s private data' AND g ->> 'unit' = 'vehicles' AND g -> 'counts_as_held' = 'false'::jsonb
          FROM jsonb_array_elements(b -> 'species_groups') g WHERE g ->> 'species' = 'owner_private'));
   PERFORM pg_temp.ok('dealers rank by held, then by venue lots: own stock first, the BaT-only dealer last',
     (SELECT array_agg(x ->> 0 ORDER BY o) FROM jsonb_array_elements(b -> 'rows') WITH ORDINALITY e(x, o) WHERE x ->> sp = 'dealer')
@@ -148,6 +153,11 @@ BEGIN
   SELECT x INTO r FROM jsonb_array_elements(b -> 'rows') x WHERE x ->> 0 = 'streetside-classics';
   PERFORM pg_temp.ok('a dealer row carries held apart from its venue lots',
     (r ->> held)::int = 15 AND (r ->> vl)::int = 3 AND r ->> vs = 'bat' AND r -> mb = 'null'::jsonb AND r -> ch = 'true'::jsonb);
+  PERFORM pg_temp.ok('a week-earlier reading taken before the venue lots were set apart is not the held count''s history',
+    r -> (held + 15) = 'null'::jsonb AND r -> (held + 16) = 'null'::jsonb);
+  SELECT x INTO r FROM jsonb_array_elements(b -> 'rows') x WHERE x ->> 0 = 'bat';
+  PERFORM pg_temp.ok('a source counted the same way a week earlier keeps its before reading',
+    (r ->> (held + 15))::int = 251000 AND (r ->> (held + 16))::date = current_date - 8);
   PERFORM pg_temp.ok('the cohorts rank by lots under Private sellers, with their members, never as listings held',
     (SELECT array_agg(x ->> 0 ORDER BY o) FROM jsonb_array_elements(b -> 'rows') WITH ORDINALITY e(x, o) WHERE x ->> sp = 'private_seller')
       = ARRAY['bat-sellers-none', 'bat-sellers-1', 'bat-sellers-2-9']
