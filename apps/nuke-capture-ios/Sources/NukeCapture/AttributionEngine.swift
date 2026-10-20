@@ -385,6 +385,24 @@ final class AttributionEngine: ObservableObject {
             }
         }
 
+        // The owner's own album is a sloppy but real lead (owner, 2026-10-20: "album helps at least get a
+        // sloppy id"). A photo in exactly one mapped album surfaces in the confirm sweep with that
+        // vehicle as a suggestion even before any pixel read. It files nothing: filing still needs a
+        // fresh vehicle-classified read (above), and bulk filing still needs a serial match.
+        var albumLeads = 0
+        for row in orphans where !completedIDs.contains(row.id) && suggestionByImage[row.id] == nil
+            && row.is_document != true && row.doc_flag != true && row.is_sensitive != true
+            && !localDocumentIDs.contains(row.id) {
+            guard let uuid = row.exif_data?.uuid, let albums = albumsByAsset[uuid], !albums.isEmpty else { continue }
+            let mapped = Self.mappedVehicles(for: albums, in: albumMap)
+            guard mapped.count == 1, let vid = mapped.first else { continue }
+            let names = albums.compactMap(\.name).prefix(2).joined(separator: " | ")
+            await suggest(imageId: row.id, vehicleId: vid, conf: 0.5, reasons: ["album_context", "album=\(names)"], onlyIfNone: true)
+            suggestionByImage[row.id] = vid
+            albumLeads += 1
+        }
+        if albumLeads > 0 { suggested += albumLeads }
+
         let readIDs = Set(signals.map { $0.row.id })
         let awaitingRead = orphans.filter { !completedIDs.contains($0.id) && !readIDs.contains($0.id) }.count
         lastSummary = (["\(completedIDs.count) filed (\(filing.byMethod.map { "\($0.key) \($0.value)" }.sorted().joined(separator: ", ")))",
@@ -728,12 +746,15 @@ final class AttributionEngine: ObservableObject {
             .execute().value
     }
 
-    private func suggest(imageId: String, vehicleId: String, conf: Double, reasons: [String]) async {
+    private func suggest(imageId: String, vehicleId: String, conf: Double, reasons: [String], onlyIfNone: Bool = false) async {
         do {
-            try await SupabaseService.client.from("vehicle_images")
+            // A weak lead (the album) never replaces a stronger earlier suggestion (a serial read).
+            var q = try SupabaseService.client.from("vehicle_images")
                 .update(SuggestUpdate(auto_suggested_vehicle_id: vehicleId,
                                       auto_suggestion_confidence: conf, auto_suggestion_reasons: reasons))
-                .eq("id", value: imageId).execute()
+                .eq("id", value: imageId)
+            if onlyIfNone { q = q.is("auto_suggested_vehicle_id", value: nil) }
+            try await q.execute()
         } catch { NSLog("attribution suggest: %@", String(describing: error)) }
     }
 
