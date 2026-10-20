@@ -22,7 +22,7 @@ import { useAuth } from './hooks/useAuth';
 const HomePage = React.lazy(() => import('./pages/HomePage'));
 const LandingPage = React.lazy(() => import('./pages/landing/LandingPage'));
 const ProductPage = React.lazy(() => import('./pages/landing/ProductPage'));
-const CountyListingMap = React.lazy(() => import('./components/map/CountyListingMap'));
+const OneMap = React.lazy(() => import('./components/map/OneMap'));
 const VehicleShowcase = React.lazy(() => import('./pages/showcase/VehicleShowcase'));
 const DeckPage = React.lazy(() => import('./pages/DeckPage'));
 const ShareWiring = React.lazy(() => import('./pages/ShareWiring'));
@@ -87,7 +87,7 @@ function RoutedApp() {
           <Route path="/" element={<HomeGate />} />
           <Route path="/products/:slug" element={<Suspense fallback={LazyFallback}><ProductPage /></Suspense>} />
           {/* One map: new listings per county. /atlas was the point map; it now opens the same map. */}
-          <Route path="/map" element={<Suspense fallback={LazyFallback}><div style={{ position: 'fixed', inset: 0 }}><CountyListingMap /></div></Suspense>} />
+          <Route path="/map" element={<Suspense fallback={LazyFallback}><div style={{ position: 'fixed', inset: 0 }}><OneMap /></div></Suspense>} />
           <Route path="/atlas" element={<Navigate to="/map" replace />} />
           <Route path="/showcase" element={<Suspense fallback={LazyFallback}><VehicleShowcase /></Suspense>} />
           <Route path="/showcase/:vehicleId" element={<Suspense fallback={LazyFallback}><VehicleShowcase /></Suspense>} />
