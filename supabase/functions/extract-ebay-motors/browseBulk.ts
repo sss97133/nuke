@@ -14,14 +14,15 @@
  *                disagreement was an 'Other Makes' or 'Other' category), checked against the title read by the shared title
  *                parser (ingest/vehicleTitle.ts); where the category says 'Other', the title's make (only when it is one of
  *                eBay's own Make values) and model words, each marked as a claim from the title
- *   for sale by  the For Sale By aspect filter, on vintage years (1991 and older): Private Seller, Dealer or Not Specified, as
- *                the seller declared it
+ *   for sale by  'Private Seller' as the seller declared it, from the For Sale By aspect filter, on vintage years (1991 and
+ *                older); a listing met only in its whole-year chunk has no For Sale By claim (Dealer and 'Not Specified'
+ *                cannot be asked apart: eBay ignores the filter value 'Not Specified')
  * A disagreement (title year against the filter's year, title make against the category's) leaves the listing unresolved with
  * both claims on it: a blip, never a guess.
  *
- * A pass walks the plan (one chunk per Model Year, vintage years split by For Sale By, in the owner's order: 1964-1973,
- * 1974-1991, 1930-1963, older, 1992-2005, newer), newest-listed first, 200 a page, and resumes across runs from
- * system_state 'ebay_browse_bulk'. Per page: what we hold is read by URL (episodes) and listing id (unresolved observations);
+ * A pass walks the plan (one chunk per Model Year, a vintage year's Private Seller chunk before it, in the owner's order:
+ * 1964-1973, 1974-1991, 1930-1963, older, 1992-2005, newer), newest-listed first, 200 a page, and resumes across runs from
+ * system_state 'ebay_browse_bulk'. Listings with no Model Year (147 of 35,625 on 2026-10-20) no filter reaches. Per page: what we hold is read by URL (episodes) and listing id (unresolved observations);
  * a held listing whose price and bid count match is skipped with no write; a changed one is updated (episode price, bid
  * count, the asking-price log for fixed prices; a new observation for a blip); a new one lands through landItem (the deleted
  * member redacted first, ingest, observation, episode, place). A page that lands or changes anything is stored once (gzip in
@@ -51,7 +52,7 @@ const PAGE = 200;
 const MAX_OFFSET = 10_000;                           // Browse refuses offset + limit beyond 10,000
 const RESUME_OVERLAP = 10;                           // a page resumed in a later run starts this many earlier (ended listings shift it)
 const BUCKET = "listing-snapshots";
-const FSB_ORDER = ["Private Seller", "Not Specified", "Dealer"];
+const PRIVATE = "Private Seller";
 
 // ---- identity from a summary (pure) ------------------------------------------------------------------------------------
 
@@ -137,22 +138,36 @@ export function yearRank(y: string): number {
 }
 
 export interface Plan {
-  year_aspect: string; fsb_aspect: string | null; total: number; planned: number; makes: string[]; chunks: Chunk[];
+  year_aspect: string; fsb_aspect: string | null; total: number;
+  planned: number;         // listings the year chunks reach (each listing once)
+  pages: number;           // search calls a full pass costs (the Private Seller chunks re-read inside their year)
+  unreachable: number;     // listings with no Model Year: a 'Not Specified' filter is ignored by eBay, so no chunk reaches them
+  makes: string[]; chunks: Chunk[];
 }
 
-/** The chunks from eBay's own counts: all years, and for vintage years the For Sale By split (exact counts per value). */
+/**
+ * The chunks from eBay's own counts, one per Model Year; a vintage year's Private Seller listings first (the seller-declared
+ * For Sale By, exact count per year), then the whole year (its private listings are held by then, so they write nothing).
+ * eBay ignores an aspect filter value of 'Not Specified' (read 2026-10-20: For Sale By:{Not Specified} and
+ * Model Year:{Not Specified} each returned the whole category, 35,624), so neither is a chunk.
+ */
 export function buildPlan(total: number, yearAspect: string, years: Map<string, number>, fsbAspect: string | null,
-  fsbYears: Map<string, Map<string, number>>, makes: string[]): Plan {
+  privateYears: Map<string, number>, makes: string[]): Plan {
   const chunks: Chunk[] = [];
-  const ys = [...years.entries()].filter(([, n]) => n > 0).sort((a, b) => yearRank(a[0]) - yearRank(b[0]) || a[0].localeCompare(b[0]));
-  const vals = [...fsbYears.keys()].sort((a, b) => (FSB_ORDER.indexOf(a) + 99) % 99 - (FSB_ORDER.indexOf(b) + 99) % 99);
+  const ys = [...years.entries()].filter(([y, n]) => n > 0 && /^\d{4}$/.test(y)).sort((a, b) => yearRank(a[0]) - yearRank(b[0]) || a[0].localeCompare(b[0]));
   for (const [y, n] of ys) {
-    const vintage = /^\d{4}$/.test(y) && Number(y) <= VINTAGE_MAX_YEAR;
-    const split = vintage && fsbAspect && vals.length ? vals.map((v) => ({ y, fsb: v, n: fsbYears.get(v)?.get(y) ?? 0 })).filter((c) => c.n > 0) : [];
-    if (split.length) chunks.push(...split); else chunks.push({ y, n });
+    const p = fsbAspect && Number(y) <= VINTAGE_MAX_YEAR ? privateYears.get(y) ?? 0 : 0;
+    if (p > 0) chunks.push({ y, fsb: PRIVATE, n: p });
+    chunks.push({ y, n });
   }
-  return { year_aspect: yearAspect, fsb_aspect: fsbAspect, total, planned: chunks.reduce((s, c) => s + Math.min(c.n, MAX_OFFSET), 0), makes, chunks };
+  const capped = (c: Chunk) => Math.min(c.n, MAX_OFFSET);
+  const unreachable = [...years.entries()].filter(([y]) => !/^\d{4}$/.test(y)).reduce((s, [, n]) => s + n, 0);
+  return { year_aspect: yearAspect, fsb_aspect: fsbAspect, total, planned: chunks.filter((c) => !c.fsb).reduce((s, c) => s + capped(c), 0),
+    pages: chunks.reduce((s, c) => s + Math.ceil(capped(c) / PAGE), 0), unreachable, makes, chunks };
 }
+
+/** A page whose total is far past its chunk's count was not filtered (an ignored value): it is not that chunk's listings. */
+export const filterIgnored = (pageTotal: number, c: Chunk) => pageTotal > Math.max(2 * c.n, c.n + 2 * PAGE);
 
 export const chunkFilter = (p: Plan, c: Chunk) =>
   aspectFilterFor(p.year_aspect, [c.y as unknown as number]) + (c.fsb && p.fsb_aspect ? `,${p.fsb_aspect}:{${c.fsb}}` : "");
@@ -163,15 +178,14 @@ async function planPass(client: BrowseClient, take: () => Promise<string | null>
   const d = top.aspectDistributions ?? [];
   const yName = distOf(d, YEAR_RE)?.localizedAspectName, fName = distOf(d, FSB_RE)?.localizedAspectName ?? null;
   if (!yName) return "category 6001 refinements list no Model Year aspect";
-  const fsbYears = new Map<string, Map<string, number>>();
-  for (const [v, n] of fName ? valuesOf(d, FSB_RE) : []) {
-    if (n <= 0) continue;
+  let privateYears = new Map<string, number>();
+  if (fName && (valuesOf(d, FSB_RE).get(PRIVATE) ?? 0) > 0) {
     why = await take(); if (why) return why;
-    const r = await client.search({ limit: 1, fieldgroups: "ASPECT_REFINEMENTS", aspectFilter: `categoryId:${CATEGORY_CARS_TRUCKS},${fName}:{${v}}` });
-    fsbYears.set(v, valuesOf(r.aspectDistributions ?? [], YEAR_RE));
+    const r = await client.search({ limit: 1, fieldgroups: "ASPECT_REFINEMENTS", aspectFilter: `categoryId:${CATEGORY_CARS_TRUCKS},${fName}:{${PRIVATE}}` });
+    if (!filterIgnored(r.total, { y: "", n: valuesOf(d, FSB_RE).get(PRIVATE)! })) privateYears = valuesOf(r.aspectDistributions ?? [], YEAR_RE);
   }
   const makes = [...valuesOf(d, MAKE_RE).keys()].filter((m) => !isOther(m));
-  return buildPlan(top.total, yName, valuesOf(d, YEAR_RE), fName, fsbYears, makes);
+  return buildPlan(top.total, yName, valuesOf(d, YEAR_RE), fName, privateYears, makes);
 }
 
 // ---- state (system_state, the crawlers' key-value store) ------------------------------------------------------------------
@@ -317,7 +331,7 @@ export interface BulkOptions {
 }
 
 export interface PageRow { chunk: string; offset: number; total: number; items: number; new: number; current: number; changed: number; skip: number;
-  landed: number; blips: number; rejected: number; skipped: number; updated: number; stored: boolean; complete: boolean; ms: Record<string, number> }
+  landed: number; blips: number; rejected: number; skipped: number; updated: number; stored: boolean; complete: boolean; ignored?: boolean; ms: Record<string, number> }
 export interface BulkReport extends Report {
   bulk: { pass_id: string | null; pass_started_at: string | null; chunk: string | null; position: string | null; planned: number | null; ebay_total: number | null;
     pages: PageRow[]; browse_calls: number; landed_new: number; updated: number; pass_done: boolean; pass_counts: PassCounts | null; gate: unknown; ms: number };
@@ -390,6 +404,12 @@ export async function bulk(supabase: any, client: BrowseClient, o: BulkOptions =
         new: 0, current: 0, changed: 0, skip: 0, landed: 0, blips: 0, rejected: 0, skipped: 0, updated: 0, stored: false, complete: true, ms: { fetch: now() - tf } };
       b.pages.push(row);
       pass.counts.pages++; pass.counts.calls++;
+      if (filterIgnored(page.total, chunk)) {               // eBay answered without the filter: not this chunk's listings
+        row.ignored = true; pass.i++; pass.offset = 0;
+        rep.errors.push(`chunk ${row.chunk}: eBay returned ${page.total} listings for a chunk of ${chunk.n}, so the filter was not applied; skipped`);
+        if (!o.dryRun) await store.write({ ...state, pass, runs });
+        continue;
+      }
 
       // 1. the deleted members go first (one read for the page), then what we hold
       const th = now();

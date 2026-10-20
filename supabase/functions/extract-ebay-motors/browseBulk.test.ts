@@ -3,7 +3,7 @@
 // currentBidPrice, bidCount, buyingOptions, categories, leafCategoryIds, image, additionalImages, seller, itemLocation,
 // itemEndDate, condition). Item ids, sellers and prices are invented.
 import { assert, assertEquals } from "jsr:@std/assert@1";
-import { buildPlan, bulk, categoryOf, compare, type Chunk, pageLookup, storedBody, summaryIdentity, yearRank } from "./browseBulk.ts";
+import { buildPlan, bulk, categoryOf, compare, type Chunk, filterIgnored, pageLookup, storedBody, summaryIdentity, yearRank } from "./browseBulk.ts";
 import { toLanding } from "./browseMap.ts";
 import { byDetailPriority, type Cand } from "./browseSweep.ts";
 import { handleHash } from "./deletedMembers.ts";
@@ -75,13 +75,24 @@ Deno.test("the landing takes the summary's identity exactly: complete goes to in
 
 // ---- plan ---------------------------------------------------------------------------------------------------------------
 
-Deno.test("the plan: owner's year order, vintage years split by For Sale By (private first), later years whole", () => {
+Deno.test("the plan: owner's year order, a vintage year's private sellers first, then the whole year; no 'Not Specified' chunk", () => {
   const years = new Map([["2024", 900], ["1967", 311], ["1985", 40], ["1955", 12], ["1925", 3], ["1999", 70], ["Not Specified", 6]]);
-  const fsb = new Map([["Dealer", new Map([["1967", 244], ["1985", 40], ["1955", 2], ["1925", 3]])], ["Private Seller", new Map([["1967", 37], ["1955", 10]])], ["Not Specified", new Map([["1967", 30]])]]);
-  const p = buildPlan(1342, "Model Year", years, "For Sale By", fsb, ["Ford"]);
+  const priv = new Map([["1967", 37], ["1955", 10], ["1999", 9]]);
+  const p = buildPlan(1342, "Model Year", years, "For Sale By", priv, ["Ford"]);
   assertEquals(p.chunks.map((c) => `${c.y}${c.fsb ? `/${c.fsb}` : ""}:${c.n}`),
-    ["1967/Private Seller:37", "1967/Not Specified:30", "1967/Dealer:244", "1985/Dealer:40", "1955/Private Seller:10", "1955/Dealer:2", "1925/Dealer:3", "1999:70", "2024:900", "Not Specified:6"]);
+    ["1967/Private Seller:37", "1967:311", "1985:40", "1955/Private Seller:10", "1955:12", "1925:3", "1999:70", "2024:900"]);
+  assertEquals([p.planned, p.pages, p.unreachable], [1336, 13, 6]);   // 2024 is 5 pages, 1967 is 2, every other chunk 1
   assertEquals([yearRank("1967"), yearRank("1980"), yearRank("1940"), yearRank("1920"), yearRank("2000"), yearRank("2020"), yearRank("Not Specified")], [1, 2, 3, 4, 5, 6, 7]);
+  // eBay ignores a filter value it does not hold: a page far past its chunk's count is not that chunk
+  assertEquals([filterIgnored(35624, { y: "1964", n: 20 }), filterIgnored(26, { y: "1964", n: 20 }), filterIgnored(430, { y: "1964", n: 20 })], [true, false, true]);
+});
+
+Deno.test("a chunk eBay answers unfiltered is skipped with an error, and the pass moves on", async () => {
+  const w = world(), store = memStore(), rec = recorder(w);
+  const unfiltered = Array.from({ length: 900 }, (_, i) => sum(String(8000 + i)));
+  const c = fakeClient({ [FILTER]: unfiltered }, { years: { "1967": 3 } });
+  const r = await bulk(fakeSb(w), c, { ledger: open, store, gate: gateOpen, land: rec.land as any });
+  assertEquals([r.bulk.pages[0].ignored, rec.landed.length, w.snapshots.length, store.get().pass.i, r.ok], [true, 0, 0, 1, false]);
 });
 
 // ---- the run, against a recorded world ------------------------------------------------------------------------------------
