@@ -25,7 +25,11 @@ const OUT = process.env.LIVE_OUT || path.resolve('logged-out-live-out');
 // at probe time is checked for errors only.
 const VEHICLES = (process.env.LIVE_VEHICLES ||
   '83f6f033-a3c3-4cf4-a85e-a60d2c588838,e08bf694-970f-4cbe-8a74-8715158a0f2e,be853856-e450-4d0e-b2a1-613391956ad6,ac070808-4cbd-4d03-9c39-2ec5b0f0708c').split(',');
-const PAGES = ['/', '/market', ...VEHICLES.map(v => `/vehicle/${v}`)];
+// A contributor's public profile: its photo gallery reads vehicle_images with an embed of vehicles and device_attributions.
+const PROFILE = process.env.LIVE_PROFILE || '01718395-bd19-47d3-b701-9867b653dd5b';
+const PAGES = ['/', '/market', `/profile/${PROFILE}`, ...VEHICLES.map(v => `/vehicle/${v}`)];
+// Reads a stranger's browser makes that no page load reliably triggers: policy-guarded tables and the gate on its own.
+const ANON_READS = ['observation_witnesses?select=id&witness_role=eq.derived&limit=1'];
 const ERROR_TEXT = /Failed to load|permission denied|Something went wrong|Application error/i;
 const API = /supabase\.co\/(rest|functions)\//;
 
@@ -88,6 +92,11 @@ for (const route of PAGES) {
   if (anonPhotos > 0 && seen.images === 0) {
     failures.push({ page: route, what: `the database admits ${anonPhotos} photos to anonymous readers; the page shows none`, detail: [] });
   }
+}
+for (const q of ANON_READS) {
+  if (!anonKey) break;
+  const res = await fetch(`${supabaseOrigin}/rest/v1/${q}`, { headers: { apikey: anonKey } }).catch(() => null);
+  if (res && !res.ok && res.status < 500) failures.push({ page: 'anon read', what: `${res.status} on ${q}`, detail: [(await res.text()).slice(0, 160)] });
 }
 // One phone-width pass on the owner's truck: the layout that most visitors use.
 await visit(`/vehicle/${VEHICLES[VEHICLES.length - 1]}`, true);

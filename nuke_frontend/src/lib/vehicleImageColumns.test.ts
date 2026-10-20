@@ -16,6 +16,16 @@ describe('signed-out image reads', () => {
     expect(out).toBe('id, image_url, ai_tier1:ai_scan_metadata->tier_1_analysis, taken_at');
   });
 
+  it('keeps embeds whole while dropping withheld columns', async () => {
+    session.current = null;
+    const out = await vehicleImageColumnsForViewer(`
+      id, exif_data, created_at,
+      vehicle:vehicles!vehicle_images_vehicle_id_fkey(id, is_public, year),
+      device_attributions(ghost_user_id, actual_contributor_id)
+    `);
+    expect(out).toBe('id, created_at, vehicle:vehicles!vehicle_images_vehicle_id_fkey(id, is_public, year), device_attributions(ghost_user_id, actual_contributor_id)');
+  });
+
   it('reads the view signed out and the table signed in; signed-in keeps every column', async () => {
     session.current = null;
     expect(await vehicleImageGallerySource()).toBe('vehicle_images_public');
