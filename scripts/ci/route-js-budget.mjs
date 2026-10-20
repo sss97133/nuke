@@ -25,6 +25,9 @@ export const BASELINE = path.join(ROOT, 'scripts', 'ci', 'route-js-budget.json')
 /** Route → the page modules a direct load needs (the router module and the page component it lazy-loads). */
 export const ROUTES = {
   vehicle: ['src/routes/modules/vehicle/routes.tsx', 'src/pages/VehicleProfile.tsx'],
+  // The vehicle page's main workspace mounts right after first paint; measured so a shared helper dragging in a heavy
+  // vendor chunk (clsx -> charts, 2026-10-19) is caught by never_initial.
+  vehicle_workspace: ['src/routes/modules/vehicle/routes.tsx', 'src/pages/VehicleProfile.tsx', 'src/pages/vehicle-profile/WorkspaceContent.tsx'],
   jobs: ['src/pages/jobs/JobsBoard.tsx'],
   job: ['src/pages/jobs/JobPage.tsx'],
   provider: ['src/pages/providers/ProviderProfilePage.tsx'],

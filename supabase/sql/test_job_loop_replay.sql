@@ -409,6 +409,8 @@ ALTER TABLE public.organizations ADD COLUMN IF NOT EXISTS services_offered text[
 CREATE TABLE IF NOT EXISTS public.city_geocode_lookup(city text, state text, latitude numeric, longitude numeric, sample_size integer, source text);
 \echo REPLAY 20261020173000_requirement_plan_b_listing_tier.sql
 \ir ../migrations/20261020173000_requirement_plan_b_listing_tier.sql
+\echo REPLAY 20261020183000_requirement_keyword_excluded_operation.sql
+\ir ../migrations/20261020183000_requirement_keyword_excluded_operation.sql
 \echo REPLAY 20261020184000_requirement_plan_b_listing_cache.sql
 \ir ../migrations/20261020184000_requirement_plan_b_listing_cache.sql
 -- Plan check and final state.
