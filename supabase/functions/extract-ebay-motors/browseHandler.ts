@@ -1,9 +1,10 @@
-/** HTTP surface of the Browse intake: POST {action: sweep | revisit | aspects | status | preview | archive | census | place |
- *  honour_deletions | member_handles}. */
+/** HTTP surface of the Browse intake: POST {action: sweep | revisit | auctions | aspects | status | preview | archive | census |
+ *  place | honour_deletions | member_handles}. */
 import { corsHeaders } from "../_shared/cors.ts";
 import { htmlToText } from "../_shared/htmlToText.ts";
 import { BrowseClient, yearAspect } from "./browseApi.ts";
 import { revisit, sweep } from "./browseSweep.ts";
+import { auctions } from "./browseAuctions.ts";
 import { toLanding } from "./browseMap.ts";
 import { censusRow, readCensus } from "./browseCensus.ts";
 import { emptyReport } from "./browseSweep.ts";
@@ -11,7 +12,7 @@ import { landArchived, validCaptures } from "./archiveLand.ts";
 import { placeBackfill } from "./browsePlace.ts";
 import { deletedLookup, honourDeletions, readStoredHandles, tombstoneItem } from "./deletedMembers.ts";
 
-export const BROWSE_ACTIONS = ["sweep", "revisit", "aspects", "status", "preview", "archive", "census", "place", "honour_deletions", "member_handles"];
+export const BROWSE_ACTIONS = ["sweep", "revisit", "auctions", "aspects", "status", "preview", "archive", "census", "place", "honour_deletions", "member_handles"];
 const json = (b: unknown, status = 200) => new Response(JSON.stringify(b), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
 export async function handleBrowse(supabase: any, body: any): Promise<Response> {
@@ -65,6 +66,13 @@ export async function handleBrowse(supabase: any, body: any): Promise<Response> 
       }
       case "revisit": {
         const rep = await revisit(supabase, client, { max: body.max });
+        return json(rep, rep.ok ? 200 : 500);
+      }
+      case "auctions": {         // open auctions -> the live board (browseAuctions.ts); cron ebay-motors-auctions / -pass
+        const rep = await auctions(supabase, client, {
+          maxPages: body.max_pages, maxItems: body.max_items, maxCalls: body.max_calls, dailyCap: body.daily_cap, floor: body.floor, blindCap: body.blind_cap,
+          maxEnded: body.max_ended, minMinutesLeft: body.min_minutes_left, dryRun: body.dry_run === true,
+        });
         return json(rep, rep.ok ? 200 : 500);
       }
       default: {
