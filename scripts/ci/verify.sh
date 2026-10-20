@@ -102,6 +102,8 @@ if node --test "$GD/no-pii-exposure.test.mjs" >"$CI_TMP_DIR/ci_pii_exposure_test
 else red "  ✗ pii-exposure detector contract FAILED"; cat "$CI_TMP_DIR/ci_pii_exposure_tests.out"; fail=1; fi
 if node "$GD/no-pii-exposure.mjs" >"$CI_TMP_DIR/ci_pii_exposure.out" 2>&1; then grn "  ✓ no new migration opens personal columns to anon/authenticated"
 else red "  ✗ a migration opens personal columns to anon/authenticated (scripts/guardrails/pii-exposure-allowlist.json)"; cat "$CI_TMP_DIR/ci_pii_exposure.out"; fail=1; fi
+if node --test "$ROOT/scripts/ci/flake-report.test.mjs" >"$CI_TMP_DIR/ci_flake_report_tests.out" 2>&1; then grn "  ✓ flake report contract"
+else red "  ✗ flake report contract FAILED"; cat "$CI_TMP_DIR/ci_flake_report_tests.out"; fail=1; fi
 if node --test "$ROOT/scripts/ci/typecheck-ratchet.test.mjs" >"$CI_TMP_DIR/ci_typecheck_ratchet_tests.out" 2>&1; then grn "  ✓ typecheck ratchet contract"
 else red "  ✗ typecheck ratchet contract FAILED"; cat "$CI_TMP_DIR/ci_typecheck_ratchet_tests.out"; fail=1; fi
 if node --test "$ROOT/scripts/discovery/buying-evidence.test.mjs" "$ROOT/scripts/discovery/buying-evidence-matching.test.mjs" "$ROOT/scripts/discovery/buying-evidence-plan.test.mjs" >"$CI_TMP_DIR/ci_buying_evidence_tests.out" 2>&1; then grn "  ✓ buying-evidence source, matching, plan and refusal contracts"

@@ -79,12 +79,20 @@ def sql(query):
 def refused(message):
     result=subprocess.run(psql+['-f',migration],text=True,capture_output=True,timeout=10)
     assert result.returncode and message in result.stderr, result.stdout+result.stderr
-def wait_for(query):
-    deadline=time.monotonic()+5
+def wait_for(query,seconds=5):
+    deadline=time.monotonic()+seconds
     while time.monotonic()<deadline:
         if sql(query)=='t': return
         time.sleep(.05)
     raise AssertionError('Fixture session did not reach expected state: '+query)
+# Mirrors the migration preflight. Run only before refusals that expect a later
+# message: an autovacuum worker on vehicles or a backend still exiting would
+# otherwise trip the idle-lane check on loaded CI runners.
+def wait_quiet():
+    wait_for("SELECT NOT (EXISTS(SELECT FROM pg_stat_activity WHERE pid<>pg_backend_pid() AND wait_event_type='Lock') "
+             "OR EXISTS(SELECT FROM pg_stat_activity WHERE pid<>pg_backend_pid() AND datname=current_database() "
+             "AND (state LIKE 'idle in transaction%' OR (state='active' AND query ~* '(\\mvehicles\\M|search_vehicles_)'))) "
+             "OR EXISTS(SELECT FROM pg_stat_progress_create_index WHERE pid<>pg_backend_pid()))",15)
 def session(name,query):
     p=subprocess.Popen(psql+['-q'],stdin=subprocess.PIPE,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,
                        text=True,env={**os.environ,'PGAPPNAME':name})
@@ -92,6 +100,7 @@ def session(name,query):
 def finish(p):
     p.stdin.write('\\q\n'); p.stdin.close(); assert p.wait(timeout=5)==0
 
+sql('ALTER TABLE public.vehicles SET (autovacuum_enabled=false, toast.autovacuum_enabled=false)')
 reader=session('rank_fixture_reader','SELECT pg_sleep(1) FROM public.vehicles LIMIT 1')
 try:
     wait_for("SELECT EXISTS(SELECT FROM pg_stat_activity WHERE application_name='rank_fixture_reader' AND state='active')")
@@ -128,6 +137,7 @@ print('PASS preflight refuses another active concurrent build')
 sql('DROP INDEX public.idx_vehicles_public_make_search_rank; '
     'CREATE INDEX idx_vehicles_public_make_search_rank ON public.vehicles(make)')
 before=sql("SELECT pg_get_indexdef('public.idx_vehicles_public_make_search_rank'::regclass)")
+wait_quiet()
 refused('Search rank index conflict or invalid state')
 assert sql("SELECT pg_get_indexdef('public.idx_vehicles_public_make_search_rank'::regclass)")==before
 print('PASS conflicting valid index is refused and retained unchanged')
@@ -138,9 +148,11 @@ print('PASS conflicting valid index is refused and retained unchanged')
 sql('DROP INDEX public.idx_vehicles_public_make_search_rank; DROP INDEX fixture_make_idx; '
     "INSERT INTO public.vehicles(id,year,make,model) SELECT 'ffffffff-ffff-ffff-ffff-ffffffffffff',2000,"
     "string_agg(md5(n::text),''),'wide fixture' FROM generate_series(1,300)n")
+wait_quiet()
 refused('index row requires')
 assert sql("SELECT NOT indisvalid FROM pg_index WHERE indexrelid='public.idx_vehicles_public_make_search_rank'::regclass")=='t'
 sql("DELETE FROM public.vehicles WHERE id='ffffffff-ffff-ffff-ffff-ffffffffffff'")
+wait_quiet()
 refused('Search rank index conflict or invalid state')
 assert sql("SELECT NOT indisvalid FROM pg_index WHERE indexrelid='public.idx_vehicles_public_make_search_rank'::regclass")=='t'
 print('PASS failed concurrent build leaves invalid index; retry refuses rather than silently accepting/dropping it')

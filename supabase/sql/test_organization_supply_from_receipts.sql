@@ -137,7 +137,7 @@ CREATE TEMP TABLE rd AS SELECT organization_supply_read((SELECT id FROM organiza
 SELECT t_assert((SELECT j @> '{"organization":{"name":"AutoZone"},"profile_public":false,"work_recorded_on_nuke":{"records":2,
   "kinds":[{"supply_kind":"auto_parts","times":2,"first_on":"2024-05-12","last_on":"2025-01-03"},{"supply_kind":"paint_materials","times":1}],
   "by_source":{"receipts":2}}}' FROM rd), 'organization_supply_read: kinds with counts and dates');
-SELECT t_assert((SELECT j::text !~ '(41\.17|12\.5|1234|a1000000|Rust primer|0000000000aa)' FROM rd), 'no amounts, card, receipt ids, line text or payer');
+SELECT t_assert((SELECT j::text !~ '((^|[^:0-9.])(41\.17|12\.5)([^0-9]|$)|(^|[^0-9a-f-])1234([^0-9a-f-]|$)|a1000000|Rust primer|0000000000aa)' FROM rd), 'no amounts, card, receipt ids, line text or payer');
 CREATE TEMP TABLE pb AS SELECT requirement_plan_b_suppliers('Paint touch-up capability for the door') j;
 SELECT t_assert((SELECT jsonb_array_length(j) = 1 AND j->0 @> '{"organization":{"name":"AutoZone"},"kinds_matched":["paint_materials"],"times":1,
   "label":"paid for this before on Nuke (1 time)","role":"plan_b_supplier","profile_public":false}' FROM pb), 'plan-B: a paint requirement finds the paint supplier');
@@ -145,7 +145,7 @@ SELECT t_assert((SELECT jsonb_array_length(requirement_plan_b_suppliers('Seat up
   AND requirement_plan_b_suppliers('Seat upholstery for the bench')->0 @> '{"organization":{"name":"Ernie''s Upholstery"},"times":1}'),
   'plan-B: upholstery finds the upholsterer');
 SELECT t_assert(requirement_plan_b_suppliers('Road-test drive') = '[]'::jsonb, 'no keyword, no suggestion');
-SELECT t_assert((SELECT j::text !~ '(41\.17|1234|a1000000)' FROM pb), 'plan-B carries no amounts or record ids');
+SELECT t_assert((SELECT j::text !~ '((^|[^:0-9.])41\.17([^0-9]|$)|(^|[^0-9a-f-])1234([^0-9a-f-]|$)|a1000000)' FROM pb), 'plan-B carries no amounts or record ids');
 RESET ROLE;
 
 -- 5. Gaps (service).

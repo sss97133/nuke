@@ -121,9 +121,10 @@ function violations(): string[] {
 }
 
 describe('private money columns', () => {
+  // Parses every source file (under 1 s locally, about 6x that on loaded CI runners), so it gets more than vitest's 5 s default.
   it('no web read selects, filters or returns the owner money columns of vehicles or organization_vehicles', () => {
     expect(violations()).toEqual([]);
-  });
+  }, 60_000);
 
   it('the shared vehicle column lists carry no private column', () => {
     for (const list of [VEHICLE_CARD_COLUMNS, VEHICLE_POPUP_COLUMNS]) {

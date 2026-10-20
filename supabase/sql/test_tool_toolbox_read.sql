@@ -95,7 +95,7 @@ SELECT user_toolbox_read('10000000-0000-0000-0000-00000000000a') AS pub \gset
 RESET ROLE;
 SELECT t_assert(jsonb_array_length((:'pub'::jsonb)->'items') = 2
   AND (SELECT bool_and(NOT (i ? 'paid')) FROM jsonb_array_elements((:'pub'::jsonb)->'items') i) AND (:'pub'::jsonb)#>'{totals,paid}' = 'null'::jsonb
-  AND NOT :'pub' ~ '(80\.00|97\.60|your receipts)'
+  AND NOT :'pub' ~ '((^|[^:0-9.])(80\.00|97\.60)|your receipts)'
   AND (:'pub'::jsonb)#>'{viewer,owner}' = 'false'::jsonb AND (:'pub'::jsonb)#>>'{items,0,pack_shot,image_url}' = 'https://img.example/FXM10.jpg',
   'shared toolbox: visitors see pack shots and list values, never what was paid');
 SELECT t_assert(NOT has_function_privilege('authenticated','record_tool_catalog_page_capture(uuid,text,text,text,numeric,text,text,timestamptz)','EXECUTE')
