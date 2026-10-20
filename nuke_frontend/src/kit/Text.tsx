@@ -10,6 +10,7 @@ type TextProps = {
   children: React.ReactNode;
   className?: string;
   title?: string;
+  id?: string;
   'aria-label'?: string;
   'aria-hidden'?: boolean;
 };

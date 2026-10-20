@@ -79,14 +79,14 @@ export default function MessagesPage() {
   const d = inbox.status === 'loaded' ? inbox.data : null;
   const incoming = arr(d?.incoming).map(obj).filter((o): o is JsonObject => !!o);
   const outgoing = arr(d?.outgoing).map(obj).filter((o): o is JsonObject => !!o);
-  return <main className="jb-page jb-scope" aria-label="Messages">
+  return <article className="jb-page jb-scope" aria-label="Messages">
     <div className="jb-intro">
       <Text role="entity" as="h1">Messages</Text>
       <Text role="body">Contact requests through Nuke. Your email and phone are never shared. <PrefetchLink to="/work">Work</PrefetchLink></Text>
       {d && leftTodayText(requestsLeft(d)) && <Text role="caption">{leftTodayText(requestsLeft(d))}</Text>}
     </div>
     {inbox.status === 'loading' && <Text role="caption">Loading…</Text>}
-    {inbox.status === 'failed' && <Text role="body" className="jb-warn">{inbox.reason}</Text>}
+    <div role="alert" className="jb-live">{inbox.status === 'failed' && <Text role="body" className="jb-warn">{inbox.reason}</Text>}</div>
     {d && <Section title="Incoming" coverage={{ n: incoming.length, of: incoming.length, grain: 'requests to you', as_of: str(d.as_of) }}>
       {incoming.length === 0 ? <Text role="body">No one has asked to contact you yet.</Text>
         : <ul className="jb-list">{incoming.map((i, k) => <RequestRow key={str(i.request_id) ?? k} item={i} incoming onChanged={load} />)}</ul>}
@@ -95,7 +95,7 @@ export default function MessagesPage() {
       {outgoing.length === 0 ? <Text role="body">You haven't contacted anyone yet.</Text>
         : <ul className="jb-list">{outgoing.map((i, k) => <RequestRow key={str(i.request_id) ?? k} item={i} incoming={false} onChanged={load} />)}</ul>}
     </Section>}
-  </main>;
+  </article>;
 }
 
 export function ContactThreadPage() {
@@ -123,13 +123,13 @@ export function ContactThreadPage() {
   const request = obj(d?.request);
   const messages = arr(d?.messages).map(obj).filter((o): o is JsonObject => !!o);
   const who = personLabel(request?.counterpart);
-  return <main className="jb-page jb-scope" aria-label="Conversation">
+  return <article className="jb-page jb-scope" aria-label="Conversation">
     <Masthead result={<Text role="caption">{request ? contactStatus(str(request.status)) : ''}</Text>}>
       <Text role="entity" as="h1">{d ? `Conversation with ${who}` : 'Conversation'}</Text>
     </Masthead>
     <Text role="body"><PrefetchLink to="/messages">All messages</PrefetchLink></Text>
     {thread.status === 'loading' && <Text role="caption">Loading…</Text>}
-    {thread.status === 'failed' && <Text role="body" className="jb-warn">{thread.reason}</Text>}
+    <div role="alert" className="jb-live">{thread.status === 'failed' && <Text role="body" className="jb-warn">{thread.reason}</Text>}</div>
     {d && <Section title="Messages" coverage={{ n: messages.length, of: messages.length, grain: 'messages', as_of: str(d.as_of) }}>
       <Text role="caption">{request?.recipient_kind === 'organization' ? "Only you and the shop's team can read this." : 'Only the two of you can read this.'}</Text>
       <Rows title="Conversation">
@@ -141,8 +141,8 @@ export function ContactThreadPage() {
           <textarea className="jb-input k-body" aria-label="Message" maxLength={2000} value={body} onChange={e => setBody(e.target.value)} /></label>
         <div className="jb-actions"><button type="button" className="btn-base btn-sm btn-primary" disabled={busy || !body.trim()} onClick={send}>
           <Text role="label">{busy ? 'Sending…' : 'Send'}</Text></button></div>
-        {failure && <Text role="body" className="jb-warn">{failure}</Text>}
+        <div role="alert" className="jb-live">{failure && <Text role="body" className="jb-warn">{failure}</Text>}</div>
       </div> : <Text role="caption">Messages open once the request is accepted.</Text>}
     </Section>}
-  </main>;
+  </article>;
 }

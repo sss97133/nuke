@@ -46,7 +46,7 @@ export function SignAction({ action, onSigned }: { action: JobAction; onSigned?:
         <ul className="job-list">{says.map(s => <li key={s}><Text role="body">{s}</Text></li>)}</ul>
         <Text role="label" as="h3">It does not say</Text>
         <ul className="job-list">{doesNotSay.map(s => <li key={s}><Text role="body">{s}</Text></li>)}</ul>
-        {phase.step === 'failed' && <Text role="body" as="p" className="job-sign__failure">{phase.reason}</Text>}
+        <div role="alert" className="jb-live">{phase.step === 'failed' && <Text role="body" as="p" className="job-sign__failure">{phase.reason}</Text>}</div>
         <div className="job-sign__buttons">
           <button type="button" className="job-button job-button--primary" disabled={phase.step === 'working'} onClick={sign}>
             <Text role="label">{phase.step === 'working' ? 'Signing…' : `Sign: ${title}`}</Text>
@@ -57,7 +57,7 @@ export function SignAction({ action, onSigned }: { action: JobAction; onSigned?:
         </div>
       </div>
     )}
-    {phase.step === 'done' && <Text role="caption">Signed. The job below is reloaded from the record.</Text>}
+    <div role="status" className="jb-live">{phase.step === 'done' && <Text role="caption">Signed. The job below is reloaded from the record.</Text>}</div>
   </div>;
 }
 

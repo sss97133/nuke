@@ -101,7 +101,7 @@ const JobsBoard: React.FC = () => {
   useEffect(() => { void load(null); }, [load]);
 
   const total = page?.coverage.total_open ?? 0;
-  return <main className="jb-page jb-scope">
+  return <article className="jb-page jb-scope">
     <div className="jb-intro">
       <Text role="entity" as="h1">Jobs looking for someone</Text>
       {page && <Text role="body">{openRequestsSentence(total)}. <PrefetchLink to="/work/market">How the job market is forming</PrefetchLink></Text>}
@@ -109,7 +109,7 @@ const JobsBoard: React.FC = () => {
         ? "How your record lines up, item by item. There's no score, and nothing rules you out."
         : <>Sign in to see how your record lines up. <PrefetchLink to="/login">Sign in</PrefetchLink></>}</Text>}
     </div>
-    {refusal && <Text role="body" className="jb-warn">{refusal}</Text>}
+    <div role="alert" className="jb-live">{refusal && <Text role="body" className="jb-warn">{refusal}</Text>}</div>
     {page && <Section title="Open requests" coverage={{ n: rows.length, of: total, grain: 'open requests shown', as_of: page.as_of }}>
       {rows.length === 0
         ? <Text role="body">No open requests right now.</Text>
@@ -126,7 +126,7 @@ const JobsBoard: React.FC = () => {
       requestTitle={offering.description || requirementKind(offering.requirement_kind)} onClose={() => setOffering(null)} />}
     {contacting && <ContactSheet requirementId={contacting.requirement_id}
       contextLabel={`${requirementKind(contacting.requirement_kind)} on ${contacting.display_title || 'this job'}`} onClose={() => setContacting(null)} />}
-  </main>;
+  </article>;
 };
 
 export default JobsBoard;

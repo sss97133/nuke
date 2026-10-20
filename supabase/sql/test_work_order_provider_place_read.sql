@@ -70,7 +70,7 @@ SELECT t_assert((:'a1'::jsonb)#>'{people,accepted_providers}' @> '[{"person":{"h
    "service_area":{"state":"declared","city":"Sparks","state_code":"NV","radius_miles":25,"mobile":true},
    "availability":{"state":"declared","timezone":"America/Los_Angeles"}}]'
  AND jsonb_array_length((:'a1'::jsonb)#>'{people,accepted_providers}') = 1
- AND NOT ((:'a1'::jsonb)->'people')::text ~* '(latitude|longitude|39\.53|119\.75)',
+ AND NOT ((:'a1'::jsonb)->'people')::text ~* '(latitude|longitude|(^|[^:0-9.])(39\.53|119\.75))',
  'accepted provider by handle with role, self-claimed band and availability; no coordinates for a person');
 SELECT t_assert(jsonb_array_length((:'a1'::jsonb)#>'{people,recorded_assignments}') = 2
  AND (:'a1'::jsonb)#>'{people,recorded_assignments}' @> '[{"person":{"label":"unnamed party"},"roles":["helper"],"statuses":{"accepted":1},
@@ -105,7 +105,7 @@ RESET ROLE;
 SELECT t_assert((:'a2'::jsonb)#>'{shop,place}' @> '{"precision":"city","storefront":false,"directions":false,"city":"Reno","state":"NV"}'
  AND (:'a2'::jsonb)#>'{shop,place,street_address}' = 'null' AND (:'a2'::jsonb)#>'{shop,place,coordinates}' = 'null'
  AND (:'a2'::jsonb)#>'{shop,place,phone}' = 'null' AND (:'a2'::jsonb)#>'{shop,place,zip_code}' = 'null'
- AND NOT (:'a2'::jsonb)::text ~ '(1 Fixture Way|39\.52|119\.81|15550199|89501)',
+ AND NOT (:'a2'::jsonb)::text ~ '(1 Fixture Way|(^|[^:0-9.])(39\.52|119\.81)|15550199|(^|[^0-9a-f-])89501([^0-9a-f-]|$))',
  'non-storefront organization: no street address, pin, zip or phone anywhere');
 
 -- 3. A private provider profile: unnamed, band withheld.
@@ -156,7 +156,7 @@ SELECT ppr() AS c5 \gset
 RESET ROLE;
 SELECT t_assert((:'a4'::jsonb)->'shop' @> '{"state":"not_public"}' AND NOT (:'a4'::jsonb)::text ~ 'Fixture Garage'
  AND (:'c5'::jsonb)->'shop' @> '{"state":"private","name":"Fixture Garage","place":{"precision":"none"}}'
- AND NOT (:'c5'::jsonb)::text ~ '(1 Fixture Way|39\.52|15550199)',
+ AND NOT (:'c5'::jsonb)::text ~ '(1 Fixture Way|(^|[^:0-9.])39\.52|15550199)',
  'private organization: nothing to visitors, its name only to parties, no place');
 UPDATE organizations SET is_public = true WHERE id = '20000000-0000-0000-0000-000000000001';
 

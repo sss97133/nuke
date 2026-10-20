@@ -13,7 +13,8 @@
 .job-rail--compact { display: inline-grid; grid-template-columns: repeat(7, 14px); gap: 2px; margin: 0; }
 .job-rail--compact .job-rail__cell { padding: 0; border-top: 0; }
 .job-rail__cell--attributed, .job-rail__cell--pending { border-top-color: var(--text); }
-.job-rail__cell--recorded, .job-rail__cell--absent, .job-rail__cell--missing, .job-rail__cell--withheld { opacity: 0.45; }
+/* Dim only the decorative glyph (aria-hidden); labels keep the theme's readable text colours. */
+.job-rail__cell--recorded > .k-measure, .job-rail__cell--absent > .k-measure, .job-rail__cell--missing > .k-measure, .job-rail__cell--withheld > .k-measure { opacity: 0.45; }
 .job-rail__cell--conflicting { border-top-color: var(--warning, var(--text)); }
 .job-legend { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 12px; }
 
@@ -21,7 +22,7 @@
 .job-stage { display: grid; gap: 4px; padding: 6px 0 6px 8px; border-left: 2px solid var(--border); }
 .job-stage--attributed, .job-stage--pending { border-left-color: var(--text); }
 .job-stage--conflicting { border-left-color: var(--warning, var(--text)); }
-.job-stage--recorded { opacity: 0.7; }
+.job-stage--recorded { border-left-style: dashed; }
 .job-stage__head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
 .job-stage__head h3, .job-sign h3 { margin: 0; }
 .job-stage__conflicts { padding-left: 6px; border-left: 2px solid var(--warning, var(--text)); }
@@ -48,3 +49,6 @@
 /* Job rows on a vehicle or provider page. */
 .job-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 4px 12px; padding: 4px 0; border-bottom: 1px solid var(--border); }
 .job-row__main { display: grid; gap: 2px; min-width: 0; }
+
+/* Live regions stay mounted so announcements fire; while empty they take no space in grid layouts. */
+.jb-live:empty { position: absolute; }

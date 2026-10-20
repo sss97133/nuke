@@ -360,9 +360,9 @@ const ProviderSetupPage: React.FC = () => {
     return mine.every(it => it.state === 'done') ? 'done' : 'to do';
   };
 
-  if (!userId) return <main className="jb-page jb-scope"><Text role="body">Sign in to set up your provider page.</Text></main>;
+  if (!userId) return <article className="jb-page jb-scope"><Text role="body">Sign in to set up your provider page.</Text></article>;
 
-  return <main className="jb-page jb-scope">
+  return <article className="jb-page jb-scope">
     <div className="jb-intro">
       <Text role="entity" as="h1">Set up your provider page</Text>
       <Text role="body">Join, keep logging what you do with photos, and Nuke sends you jobs that fit. Each step is optional; skip any of them and come back later.</Text>
@@ -389,7 +389,7 @@ const ProviderSetupPage: React.FC = () => {
     </div>
     {sign && <SignSheet title={sign.title} says={sign.says} doesNotSay={sign.doesNotSay} confirmLabel={sign.confirmLabel} onConfirm={confirm}
       onClose={() => setSign(null)} busy={busy} failure={failure} done={done && <Text role="body" className="jb-done">{done}</Text>} />}
-  </main>;
+  </article>;
 };
 
 export default ProviderSetupPage;

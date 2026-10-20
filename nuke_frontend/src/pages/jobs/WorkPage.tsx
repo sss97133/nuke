@@ -98,13 +98,13 @@ const WorkPage: React.FC = () => {
     void loadJobs(null);
   }, [loadJobs, loadQueue]);
 
-  return <main className="jb-page jb-scope">
+  return <article className="jb-page jb-scope">
     <div className="jb-intro">
       <Text role="entity" as="h1">Work</Text>
       <Text role="body">What is waiting for your signature, and the jobs you are on. <PrefetchLink to="/jobs">Jobs looking for someone</PrefetchLink> · <PrefetchLink to="/work/market">The job market</PrefetchLink></Text>
       <Text role="body"><PrefetchLink to="/work/setup">Set up your provider page</PrefetchLink> so jobs that fit can find you.</Text>
     </div>
-    {refusal && <Text role="body" className="jb-warn">{refusal}</Text>}
+    <div role="alert" className="jb-live">{refusal && <Text role="body" className="jb-warn">{refusal}</Text>}</div>
     {queue && <Section title="Waiting for your signature" coverage={{ n: queue.coverage.returned, of: queue.coverage.total, grain: 'items', as_of: queue.as_of }}>
       {queue.items.length === 0
         ? <Text role="body">Nothing is waiting for your signature.</Text>
@@ -117,7 +117,7 @@ const WorkPage: React.FC = () => {
       {jobs.next_after && <div className="jb-more"><button type="button" className="btn-base btn-sm btn-secondary" onClick={() => void loadJobs(jobs.next_after)}>
         <Text role="label">More jobs</Text></button></div>}
     </Section>}
-  </main>;
+  </article>;
 };
 
 export default WorkPage;

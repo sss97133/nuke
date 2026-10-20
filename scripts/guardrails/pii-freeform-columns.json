@@ -1,0 +1,165 @@
+{
+ "about": "Free-form columns where the 2026-10-19 content audit (SEC4) found e-mail addresses or phone numbers in rows anon or a fresh signed-in account could read (up to 1,500 sampled rows per column; counts only). no-pii-exposure.mjs treats every column here as personal in static mode, and --live --content fails on a free-form column with contact details that is not listed. status: closed = no longer readable outside its parties; redacted = outsiders get text_redact_contact through the named readers, the raw column stays selectable; allowed = public by nature, with the reason.",
+ "columns": [
+  {
+   "table": "generated_invoices",
+   "columns": [
+    "html_content",
+    "notes",
+    "payment_token"
+   ],
+   "status": "closed",
+   "finding": "any signed-in account read all 8 invoices (policy true)",
+   "why": "Party-only reads since 20261020185000."
+  },
+  {
+   "table": "vehicles",
+   "columns": [
+    "description"
+   ],
+   "status": "redacted",
+   "finding": "phone numbers in 82 of 1,500 and e-mail addresses in 13 of 1,500 anon-visible descriptions (classiccars.com and eBay Motors dealer lines, some Craigslist sellers)",
+   "why": "Listing text is testimony and stays as captured; vehicle_row_read and get_vehicle_profile_data return it through vehicle_row_public_projection. Residual: direct REST selects of vehicles.description still return it."
+  },
+  {
+   "table": "vehicles",
+   "columns": [
+    "origin_metadata"
+   ],
+   "status": "redacted",
+   "finding": "private e-mail addresses in 2 of 1,500",
+   "why": "E-mail addresses redacted by vehicle_row_public_projection in the same readers; same residual."
+  },
+  {
+   "table": "description_discoveries",
+   "columns": [
+    "raw_extraction"
+   ],
+   "status": "allowed",
+   "finding": "phone numbers in 4 of 750",
+   "why": "Model extractions of the same listing descriptions. Residual: carries the sellers' numbers that the vehicle readers redact."
+  },
+  {
+   "table": "scrape_sources",
+   "columns": [
+    "contact_info"
+   ],
+   "status": "allowed",
+   "finding": "e-mail addresses in 104 and phone numbers in 178 of 576",
+   "why": "Published contact details of the source sites (dealers, auction houses, marketplaces)."
+  },
+  {
+   "table": "publication_pages",
+   "columns": [
+    "extracted_text"
+   ],
+   "status": "allowed",
+   "finding": "e-mail addresses in 116 and phone numbers in 15 of 1,500",
+   "why": "Text recognized from published magazines and catalogs, as printed."
+  },
+  {
+   "table": "v_library_search",
+   "columns": [
+    "extracted_text"
+   ],
+   "status": "allowed",
+   "finding": "same text as publication_pages",
+   "why": "Search view over publication_pages."
+  },
+  {
+   "table": "catalog_text_chunks",
+   "columns": [
+    "text_content"
+   ],
+   "status": "allowed",
+   "finding": "phone numbers in 56 of 56 (signed-in only)",
+   "why": "Published parts-catalog pages with the suppliers' order lines."
+  },
+  {
+   "table": "organizations",
+   "columns": [
+    "description",
+    "metadata",
+    "service_description"
+   ],
+   "status": "allowed",
+   "finding": "a few business e-mail addresses and phone numbers",
+   "why": "Businesses' own published descriptions."
+  },
+  {
+   "table": "businesses",
+   "columns": [
+    "description",
+    "metadata",
+    "service_description"
+   ],
+   "status": "allowed",
+   "finding": "as organizations",
+   "why": "Compatibility view over organizations."
+  },
+  {
+   "table": "organizations_compat",
+   "columns": [
+    "description"
+   ],
+   "status": "allowed",
+   "finding": "as organizations",
+   "why": "Compatibility view over organizations."
+  },
+  {
+   "table": "build_posts",
+   "columns": [
+    "content_text",
+    "content_html"
+   ],
+   "status": "allowed",
+   "finding": "phone numbers in 4 of 1,500",
+   "why": "Build-thread posts as their authors published them on the source forums."
+  },
+  {
+   "table": "deck_slides",
+   "columns": [
+    "content"
+   ],
+   "status": "allowed",
+   "finding": "2 business e-mail addresses in 15 slides",
+   "why": "The company's published deck with its own contact address."
+  },
+  {
+   "table": "vehicle_comments",
+   "columns": [
+    "comment_text"
+   ],
+   "status": "allowed",
+   "finding": "1 phone number in 26",
+   "why": "Written publicly by its author. Residual: comments should refuse contact details at write time as work requests do."
+  },
+  {
+   "table": "user_comments",
+   "columns": [
+    "comment_text"
+   ],
+   "status": "allowed",
+   "finding": "1 phone number in 32",
+   "why": "Same as vehicle_comments."
+  },
+  {
+   "table": "fb_sweep_jobs",
+   "columns": [
+    "metadata"
+   ],
+   "status": "allowed",
+   "finding": "1 phone-shaped number in 469",
+   "why": "Sweep job parameters (group and listing ids); no person found in the sample."
+  },
+  {
+   "table": "appraisal_canon_checks",
+   "columns": [
+    "evidence"
+   ],
+   "status": "allowed",
+   "finding": "a phone number in 2 of 5,635 rows (shape: P.O. box, city, phone)",
+   "why": "Vision evidence quoting documents photographed with the vehicle (dealer letterheads on window stickers and service records). Residual: a photographed private document would be quoted the same way."
+  }
+ ]
+}
