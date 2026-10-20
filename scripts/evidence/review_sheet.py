@@ -38,8 +38,10 @@ The sheet is review-<date>.md with a sidecar review-<date>.json (rows with targe
 and row count are over the .md bytes. In db mode the review run (evidence_open_run run_kind 'review', pass
 'review_sheet', config {sheet_sha256, items, sheet, rows}) is opened (running) before anything is sent, target ids come
 from the loader manifest (line key -> id), a row whose targets did not all load is left off the sheet, and the sheet is
-appended to the sheets index (loop/sheets.jsonl) that M10b reads. Send the .md text as the message, then record that
-message with `record_answers.py delivered`, which (v8) closes the review run once: the sheet is sent.
+appended to the sheets index (loop/sheets.jsonl) that M10b reads. The order, so no reply of his can predate the
+sheet's send time: (1) `record_answers.py send` closes the review run (the store's send time, written into the
+sidecar) and only then writes the .md (a db sheet is held as review-<date>.unsent until it is sent); (2) post the .md
+text as its own message; (3) `record_answers.py delivered` records that message.
 
 Usage: python3 scripts/evidence/review_sheet.py --dir <payload dir> --case <case.json> [--mode file|db]
        [--manifest load-manifest.json] [--user <owner>]
@@ -422,23 +424,27 @@ def render(ctx, rows, date, decisions=()):
 def issue(ctx, rows, decisions, date, out_dir, mode=common.FILE, rest=None, uid=None, ids=None, index=None):
     """Write the sheet and its sidecar; in db mode open its review run (running) with the per-row targets first and
     append the sheet to the sheets index (M10b matches its delivery by sha256). (v8) The run is closed once, when the
-    sheet is sent: record_answers.py delivered."""
+    sheet is sent. (v9) A db sheet is held until then: its text is written as review-<date>.unsent, and
+    record_answers.py send closes the run, records the store's send time in the sidecar and only then writes
+    review-<date>.md, the text to post. A file-mode sheet has no run: its .md is written now."""
     left = []
     if mode == common.DB:
         rows, left = resolve(rows, ids or {})
     md = render(ctx, rows, date, decisions)
     md_path = os.path.join(str(out_dir), 'review-%s.md' % date)
-    with open(md_path, 'w', encoding='utf-8') as f:
-        f.write(md)
     sha = common.sha256_bytes(md.encode('utf-8'))
     side = {'sheet': md_path, 'sheet_sha256': sha, 'items': len(rows), 'date': date, 'sheet_run': None, 'rows': rows,
-            'decisions': list(decisions), 'left_off_not_loaded': left, 'delivery': None}
+            'decisions': list(decisions), 'left_off_not_loaded': left, 'held': None, 'sent_at': None,
+            'delivery': None}
     if mode == common.DB and rows:
         side['sheet_run'] = rest.rpc('evidence_open_run', payloads.open_run(
             uid, 'review', 'review_sheet', common.producer('review_sheet.py'), common.code_version(),
             run_config(rows, sha, os.path.basename(md_path), ids or {})))
+        side['held'] = os.path.join(str(out_dir), 'review-%s.unsent' % date)
         append_index({'event': 'issued', 'sheet_run': side['sheet_run'], 'sheet_sha256': sha,
                       'sidecar': os.path.join(str(out_dir), 'review-%s.json' % date)}, index)
+    with open(side['held'] or md_path, 'w', encoding='utf-8') as f:
+        f.write(md)
     common.dump_json(os.path.join(str(out_dir), 'review-%s.json' % date), side)
     return side
 
@@ -488,8 +494,11 @@ def main():
         ids = (common.load_json(a.manifest or os.path.join(a.dir, 'load-manifest.json')).get('ids') or {})
     side = issue(ctx, rows, decisions, date, a.dir, a.mode, rest, uid, ids)
     print('review sheet %s: %d rows (%d left off: not loaded), %d decisions, sha256 %s, run %s' % (
-        side['sheet'], side['items'], len(side['left_off_not_loaded']), len(decisions), side['sheet_sha256'],
-        side['sheet_run'] or '(file mode)'))
+        side['held'] or side['sheet'], side['items'], len(side['left_off_not_loaded']), len(decisions),
+        side['sheet_sha256'], side['sheet_run'] or '(file mode)'))
+    if side['held']:
+        print('held until sent: record_answers.py send closes its review run and writes %s; post that text only then'
+              % side['sheet'])
     return 0
 
 

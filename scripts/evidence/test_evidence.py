@@ -858,6 +858,17 @@ class FakeRest:
         return {}
 
 
+class SentReader:
+    """q.sh as `send` reads it back: the review run's status and finished_at (the store's send time)."""
+
+    def __init__(self, status='done'):
+        self.status, self.at, self.calls = status, common.utc_now().isoformat(), []     # to the microsecond
+
+    def read(self, sql, params=None, tag=None):
+        self.calls.append((tag, params))
+        return [{'status': self.status, 'finished_at': self.at if self.status == 'done' else None}]
+
+
 class FakeReader:
     def __init__(self, io_n=0, locks=0, watch=None):
         self.io_n, self.locks, self.watch_rows = io_n, locks, watch or []
@@ -1069,9 +1080,11 @@ class DbMode(SyntheticCase):
         cfg = [a['p_config'] for fn, a in rest.calls if fn == 'evidence_open_run' and a['p_pass'] == 'review_sheet'][0]
         self.assertIsNone(payloads.review_rows_problem(cfg))
         self.assertTrue(all(r['question'] in payloads.C['review_questions'] for r in cfg['rows'].values()))
-        # (v8) the review run stays open until the sheet is sent; nothing decides
+        # (v8) the review run stays open until the sheet is sent, (v9) and the sheet is held until then; nothing decides
         self.assertFalse([a for fn, a in rest.calls if fn == 'evidence_close_run'
                           and a['p_run_id'] == report['review_sheet']['sheet_run']])
+        self.assertTrue(os.path.exists(report['review_sheet']['held']))
+        self.assertFalse(os.path.exists(report['review_sheet']['held'][:-len('.unsent')] + '.md'))
         self.assertNotIn('decide_evidence', fns)
 
     def test_db_loop_closes_its_run_failed_on_an_error(self):
@@ -1481,6 +1494,18 @@ class ReviewSheet(SyntheticCase):
         self.assertTrue(all(common.is_uuid(t.get('id') or '') or t.get('key')
                             for r in cfg['rows'].values() for t in r['targets']))
         self.assertEqual(review_sheet.load_index(idx)[side['sheet_run']]['sheet_sha256'], side['sheet_sha256'])
+        # (v9) held until sent: there is no text to post until `send` has closed the run and recorded the send time
+        self.assertEqual((os.path.exists(side['sheet']), os.path.exists(side['held'])), (False, True))
+        sent = SentReader()
+        with mock.patch.dict(os.environ, {'EVIDENCE_DB_WRITES': '1', 'EVIDENCE_SHEETS_INDEX': idx}), \
+                mock.patch.object(common, 'Rest', lambda *a, **k: rest), \
+                mock.patch.object(common, 'Reader', lambda *a, **k: sent), contextlib.redirect_stdout(io.StringIO()):
+            record_answers.send(mock.Mock(sheet=os.path.join(d, 'review-2031-06-01.json'), mode=common.DB,
+                                          user=testdata.OWNER), self.ctx)
+        after = common.load_json(os.path.join(d, 'review-2031-06-01.json'))
+        self.assertEqual((after['held'], after['sent_at'], os.path.exists(side['held'])), (None, sent.at, False))
+        self.assertEqual(common.sha256_bytes(Path(side['sheet']).read_bytes()), side['sheet_sha256'])
+        self.assertEqual([fn for fn, _a in rest.calls], ['evidence_open_run', 'evidence_close_run'])
 
 
 class Answers(SyntheticCase):
@@ -1493,7 +1518,16 @@ class Answers(SyntheticCase):
         side = review_sheet.issue(self.ctx, rows, decisions, date, d)
         return d, os.path.join(d, 'review-%s.json' % date), side
 
+    def send(self, sp, mode=common.FILE, status='done'):
+        """record_answers.py send: (db) the run is closed and its send time read back (a fake q.sh read)."""
+        sent = SentReader(status)
+        with contextlib.redirect_stdout(io.StringIO()), mock.patch.object(common, 'Reader', lambda *a, **k: sent):
+            record_answers.send(mock.Mock(sheet=sp, mode=mode, user=testdata.OWNER), self.ctx)
+        return sent
+
     def deliver(self, sp, ref='session-1:msg-0', mode=common.FILE):
+        """Send (before the sheet is posted), then record the message that posted it."""
+        self.send(sp, mode)
         with contextlib.redirect_stdout(io.StringIO()):
             record_answers.delivered(mock.Mock(sheet=sp, message_ref=ref, mode=mode), self.ctx)
 
@@ -1525,14 +1559,17 @@ class Answers(SyntheticCase):
         with self.assertRaises(SystemExit) as cm:                  # (v6, AC10; v9) a sheet takes answers once sent
             self.store(sp, ans, at='2031-06-01T18:00:00Z')
         self.assertIn('sheet_not_sent', str(cm.exception))
-        self.assertIn('delivered', str(cm.exception))
+        with self.assertRaises(SystemExit) as cm:                  # (v9) sent first, posted after: never the reverse
+            record_answers.delivered(mock.Mock(sheet=sp, message_ref='session-1:msg-0'), self.ctx)
+        self.assertIn('record_answers.py send first', str(cm.exception))
         for bad in ('msg-0', 'session 1:msg-0', 'session-1:msg:0', 'session-1/x:msg-0', 'session-1:' + 'x' * 200):
             with self.assertRaises(SystemExit):
                 self.deliver(sp, bad)
-        self.deliver(sp)
         sent = record_answers.sent_at(common.load_json(sp))
+        self.assertTrue(sent)
+        self.deliver(sp)
         self.deliver(sp, 'Session-1:MSG-0')                       # the same message again (the store lower-cases it)
-        self.assertEqual(record_answers.sent_at(common.load_json(sp)), sent)
+        self.assertEqual(record_answers.sent_at(common.load_json(sp)), sent)     # sending again changes nothing
         with self.assertRaises(SystemExit):                        # one delivery per sheet
             self.deliver(sp, 'session-1:msg-9')
         for ref in ('session-1:msg-0', 'msg-1', 'elsewhere:msg-0'):  # the delivery itself is not his reply, by any source
@@ -1754,11 +1791,14 @@ class Answers(SyntheticCase):
             photo = next(r for r in side['rows'] if r['section'] == 'photos')
             fake = FakeRest()
             with mock.patch.object(common, 'Rest', lambda *a, **k: fake):
-                with self.assertRaises(SystemExit) as cm:            # (v8) a review run is closed by its delivery
-                    self.deliver(sp)
+                with self.assertRaises(SystemExit) as cm:            # (v8) a review run is closed when it is sent
+                    self.send(sp)
                 self.assertIn('--mode db', str(cm.exception))
+                sent = self.send(sp, mode=common.DB)                  # (v9) before it is posted: the store's send time
+                self.assertEqual(sent.calls, [('sheet_sent', {'run': side['sheet_run'], 'uid': testdata.OWNER})])
+                self.assertEqual(record_answers.sent_at(common.load_json(sp)), sent.at)
+                self.deliver(sp, mode=common.DB)                     # sending again closes nothing; nor does posting
                 self.deliver(sp, mode=common.DB)
-                self.deliver(sp, mode=common.DB)                     # the same message again closes nothing
                 rc = self.store(sp, {str(painter['row']): {'verbatim': 'the second truck',
                                                            'answer': {'decision': 'rejected', 'vehicle_id': 'SUB'}},
                                      str(photo['row']): {'verbatim': 'not sure which one that is'}}, common.DB)
@@ -1779,21 +1819,24 @@ class Answers(SyntheticCase):
             self.assertLess(common.parse_ts(rec['p_message_at']), common.parse_ts(rec2['p_message_at']))
             self.assertEqual((rc['answers_run'], rc2['answers_run']),
                              ('00000000-0000-4000-8000-%012d' % 1, '00000000-0000-4000-8000-%012d' % 2))
-            self.assertEqual(review_sheet.load_index()[side['sheet_run']]['delivered_ref'], 'session-1:msg-0')
-            # a run the store no longer holds running is reported and the delivery recorded; any other refusal stops it
+            index = review_sheet.load_index()[side['sheet_run']]
+            self.assertEqual((index['delivered_ref'], index['sent_time']), ('session-1:msg-0', sent.at))
+            # a run already closed (an earlier send that stopped before writing the time) is read back and sent; any
+            # other refusal stops the send, and a run the store does not hold 'done' (withdrawn) is never posted
             _d2, sp2, _side2 = self.sheet('answers-db-closed', '2031-06-03')
             side2 = dict(common.load_json(sp2), sheet_run=testdata.U('sheet-run-closed'))
             common.dump_json(sp2, side2)
-            for err, recorded in ((common.RpcError('evidence_close_run', 400, '42501', 'permission denied'), False),
-                                  (common.RpcError('evidence_close_run', 400, 'P0001',
-                                                   'run %s is not a running run' % side2['sheet_run']), True)):
+            not_running = common.RpcError('evidence_close_run', 400, 'P0001',
+                                          'run %s is not a running run' % side2['sheet_run'])
+            for err, status, sent_ok in ((common.RpcError('evidence_close_run', 400, '42501', 'permission denied'),
+                                          'done', None), (not_running, 'aborted', False), (not_running, 'done', True)):
                 with mock.patch.object(common, 'Rest', lambda *a, **k: FakeRest(fail={'evidence_close_run': err})):
-                    if recorded:
-                        self.deliver(sp2, 'session-1:msg-3', common.DB)
+                    if sent_ok:
+                        self.send(sp2, common.DB, status)
                     else:
-                        with self.assertRaises(common.RpcError):
-                            self.deliver(sp2, 'session-1:msg-3', common.DB)
-                self.assertEqual(bool(common.load_json(sp2).get('delivery')), recorded)
+                        with self.assertRaises(SystemExit if sent_ok is False else common.RpcError):
+                            self.send(sp2, common.DB, status)
+                self.assertEqual(bool(record_answers.sent_at(common.load_json(sp2))), bool(sent_ok))
             # the store's refusals are reported, never retried, and nothing is kept: (v9) a message stored once (its
             # error names no run), a sheet never sent, a message older than the sheet's sending
             d4, sp4, _side4 = self.sheet('answers-db-refused', '2031-06-04')
@@ -1862,8 +1905,12 @@ class Transcript(SyntheticCase):
             ans = {str(painter['row']): {'verbatim': 'no, that was the second truck',
                                          'answer': {'decision': 'rejected', 'vehicle_id': 'SUB'}}}
 
-            # the chat's clock (the synthetic chat lies ahead of the real one): the sheet is recorded sent at 17:30
+            # the chat's clock (the synthetic chat lies ahead of the real one)
             clock = [common.parse_ts('2031-06-01T17:30:00Z')]
+
+            def send():
+                with contextlib.redirect_stdout(io.StringIO()), mock.patch.object(common, 'utc_now', lambda: clock[0]):
+                    record_answers.send(mock.Mock(sheet=sp, mode=common.FILE, user=testdata.OWNER), self.ctx)
 
             def deliver(r):
                 with contextlib.redirect_stdout(io.StringIO()), mock.patch.object(common, 'utc_now', lambda: clock[0]):
@@ -1876,6 +1923,11 @@ class Transcript(SyntheticCase):
                     record_answers.store(mock.Mock(sheet=sp, answers=ap, message_ref=r, mode=common.FILE,
                                                    user=testdata.OWNER, **kw), self.ctx)
                 return common.load_json(record_answers.receipt_path(sp, side, r))
+            send()                                                       # sent at 17:30, after the post at 17:01
+            with self.assertRaises(SystemExit) as cm:                    # (v9) posted before it was sent: refused
+                deliver(ref(1))
+            self.assertIn('before the sheet was sent', str(cm.exception))
+            common.dump_json(sp, dict(common.load_json(sp), sent_at='2031-06-01T17:00:30+00:00'))   # sent, then posted
             with self.assertRaises(SystemExit):                          # that message does not carry the sheet
                 deliver(ref(2))
             deliver(ref(1))

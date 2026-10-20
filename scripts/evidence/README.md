@@ -18,7 +18,7 @@ payment key or a rule `owner` capture time: `owner_answer_missing`) and never op
 | Checks | `checks.py` against the v9 CHECK rules and the privacy rules | the same; a violation stops the run |
 | Load | `loader.py` dry run: `load-plan.json` (every call, batch and gate, no network) | writer RPCs through PostgREST; `load-manifest.json` (line key -> id); every returned id appended to the manifest |
 | Exit test | `exit_test.py` against `readers.py`, a Python model of `vehicle_accounting_evidence` over the files | the read keyed by the owner through `scripts/data/q.sh`; stored as an `exit_test` run; the confirmed level waits on his decisions in the app |
-| Review | `review-<date>.md` + `.json` | the same, and a `review` run (opened running) holding the sheet's sha256, row count and each row's targets, question and asks; the sheet joins the sheets index; the run is closed once, when the sheet is sent |
+| Review | `review-<date>.md` + `.json` | a `review` run (opened running) holding the sheet's sha256, row count and each row's targets, question and asks; the sheet joins the sheets index and is held as `review-<date>.unsent` until `record_answers.py send` closes the run and records the store's send time; only then is the `.md` written |
 | Answers | a local receipt per message (sha256 and reading per row) | `evidence_record_answers`: his words stored per chat message with its time, written closed; nothing decided |
 | Promote, repin, publish, probe | print what they would call | the writers, one image per call |
 
@@ -125,11 +125,15 @@ an `@amount:<source>:<ref>` placeholder in db mode, in memory.
   again ("asked again") until a delivered sheet has asked them; (v9) a row of a sent db sheet is asked again by
   reference (`{"reask_of": "review:<sheet run>#<row>"}`): the writer copies it exactly as it was frozen, and the
   sidecar keeps the frozen row. A sheet lists at most 10,000 targets.
-- Send the `.md` text as its own message, then `record_answers.py delivered --message-ref <source>:<message id>`
-  (`--mode db` for a db sheet: it closes the review run, once). Record the delivery right after posting the sheet and
-  before he replies: (v9) the store takes only messages written after the run was closed. A message ref is
-  `<source>:<message id>`: one colon, no path, stored lower-cased; for a Claude session the session id and the
-  message's own uuid.
+- The order, so that no reply of his can predate the sheet (the store takes only messages written after the review
+  run was closed, `message_predates_sheet`): (1) `record_answers.py send --mode db` closes the review run, once, reads
+  back the store's send time (the run's `finished_at`), writes it into the sidecar (`sent_at`) and only then writes
+  `review-<date>.md`; a db sheet is held as `review-<date>.unsent` until then, so there is nothing to post before the
+  close, and a run the store does not hold `done` is never posted. (2) Post the `.md` text as its own message. (3)
+  `record_answers.py delivered --message-ref <source>:<message id>` records that message; it refuses a sheet not yet
+  sent, and a message the transcript dates before the send time. A file-mode sheet has no run: `send` records the
+  local clock. A message ref is `<source>:<message id>`: one colon, no path, stored lower-cased; for a Claude session
+  the session id and the message's own uuid.
 - `store` takes one message of his reply, a later message than the delivery: (v9) one answers run per chat message
   (a reply spread over several messages is stored message by message on the sheet it answers, one receipt each; a
   message id is stored once, whatever the source), written closed, with the message's own time: the transcript's when

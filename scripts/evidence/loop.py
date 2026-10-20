@@ -6,7 +6,9 @@ file mode (default)  build every pass from the case's inputs, validate the paylo
                      structural exit assertion.
 db mode              (refused unless EVIDENCE_DB_WRITES=1) the same build and checks, then: load through the writers
                      (the loop run stays open), the scoreboard, the review sheet when it is due (its review run
-                     stores each row's targets; it stays open until the sheet is sent), repin, promote per image he
+                     stores each row's targets; it stays open until the sheet is sent, and the sheet is held as
+                     review-<date>.unsent until then: record_answers.py send closes the run, records the store's send
+                     time and only then writes the .md to post), repin, promote per image he
                      decided, publish, pick the gap, close the loop run with the scoreboard and the gap. Every writer
                      call appends its returned ids to the manifest (loop/manifests/<UTC date>.jsonl); M10b reconciles
                      them, and any unmanifested row holds promotion and publication for the run. (v8) The loop never
@@ -153,7 +155,8 @@ def db_steps(ctx, a, report, rest, reader):
         weekday = (ctx.case.get('review') or {}).get('weekday', 6)          # Sunday; or when the queue passes 50
         if rows and (dt.date.fromisoformat(a.date).weekday() == weekday or len(rows) > 50):
             side = review_sheet.issue(ctx, rows, decisions, a.date, ctx.out, common.DB, rest, ctx.user_id, ld.ids)
-            report['review_sheet'] = {'rows': side['items'], 'sheet_run': side['sheet_run'],
+            report['review_sheet'] = {'rows': side['items'], 'sheet_run': side['sheet_run'], 'held': side['held'],
+                                      'next': 'record_answers.py send --mode db, then post the .md, then delivered',
                                       'left_off_not_loaded': len(side['left_off_not_loaded'])}
         if promotion_live:
             report['repin'] = repin.repin(rest, reader, ctx.user_id, parent=loop_run)

@@ -6,13 +6,16 @@ writes his word (an owner_statement link, an 'owner:' payment key, a rule 'owner
 or opens an owner_review run. His chat answers are stored word for word and wait for him: he confirms them himself,
 from his own step-up session in the app (evidence_answers_to_confirm lists what waits; the scoreboard's M15 counts it).
 
-delivered  the message that carried the sheet to him ('<source>:<message id>', exactly one colon, no path; for a Claude
-           session the session id and the message's own uuid). Send the review-<date>.md text as its own message: M10b
-           (and this command, when the transcript is on this Mac) matches it to the sheet by sha256. One delivery per
-           sheet. A db-issued sheet is sent now, so its review run is closed here, once (--mode db): record the delivery
-           right after posting the sheet and before he replies, because (v9) the store takes only messages written
-           after the run was closed. The disputed rows the sheet asks again are marked asked (loop/disputed.jsonl
-           'reasked'), so later sheets leave them off.
+The order, so that no reply of his can predate the sheet: send, then post, then delivered.
+send       before the sheet is posted: (--mode db) closes its review run once and reads back the store's send time (the
+           run's finished_at), writes that time into the sidecar (sent_at), and only then writes review-<date>.md, the
+           text to post (a db sheet is held as review-<date>.unsent until now). A file-mode sheet has no run: its send
+           time is the local clock. A run the store does not hold 'done' is never posted. Sending again changes nothing.
+delivered  after posting: the message that carried the sheet to him ('<source>:<message id>', exactly one colon, no
+           path; for a Claude session the session id and the message's own uuid). Post the review-<date>.md text as its
+           own message: M10b (and this command, when the transcript is on this Mac) matches it to the sheet by sha256,
+           and (v9) a message the transcript dates before the send time is refused. One delivery per sheet. The disputed
+           rows the sheet asks again are marked asked (loop/disputed.jsonl 'reasked'), so later sheets leave them off.
 store      one message of his reply, split per sheet row, with evidence_record_answers(owner, sheet run, message ref,
            rows, message time): (v9) one answers run per chat message, several per sheet (a reply spread over several
            messages is stored message by message on the sheet it answers, one receipt each), written closed. The store
@@ -41,7 +44,8 @@ dispute    his objection to a stored reading marks that answers run disputed the
 decide     retired (v8): decisions are his alone, in the app.
 
 Usage:
-  record_answers.py delivered  --sheet review-<date>.json --message-ref <source>:<message id> [--mode file|db]
+  record_answers.py send       --sheet review-<date>.json [--mode file|db] [--user <owner>]
+  record_answers.py delivered  --sheet review-<date>.json --message-ref <source>:<message id>
   record_answers.py store      --sheet review-<date>.json --answers <answers.json> --message-ref <source>:<message id>
                                [--message-at <ISO 8601 time of that message, when its transcript is not on this Mac>]
   record_answers.py second-read packet  --sheet review-<date>.json --answers <answers.json>
@@ -49,7 +53,7 @@ Usage:
                                         --second <read.json>
   record_answers.py dispute    --sheet review-<date>.json --receipt answers-<date>-<message>.json --row <n>
                                --message-ref <ref>
-  (each takes --case <case.json>; delivered and store take --mode file|db and --user)
+  (each takes --case <case.json>; send and store take --mode file|db and --user)
 """
 import argparse
 import datetime as dt
@@ -73,41 +77,77 @@ def answers_run_of(receipt):
 
 
 def sent_at(sheet):
-    """(v9) When the sheet was sent: recorded by `delivered` just before its review run was closed (older sidecars:
-    when the delivery was recorded)."""
-    d = sheet.get('delivery') or {}
-    return d.get('sent_at') or d.get('recorded_at')
+    """(v9) When the sheet was sent: the store's send time, recorded by `send` before the sheet was posted."""
+    return sheet.get('sent_at')
 
 
-# ---------------------------------------------------------------------------------------------------- delivery and store
+def send_time(sheet, uid, reader=None):
+    """The store's send time of a db sheet: its review run's finished_at, once the run is 'done' (read back through
+    q.sh; the writer compares every message time with it)."""
+    reader = reader or common.Reader()
+    rows = reader.read('select status, finished_at from evidence_runs where id = :run and user_id = :uid',
+                       {'run': sheet['sheet_run'], 'uid': uid}, tag='sheet_sent')
+    if not rows or rows[0].get('status') != 'done' or not rows[0].get('finished_at'):
+        raise SystemExit('review run %s is %s, not sent: do not post this sheet (a withdrawn sheet takes no answers)'
+                         % (sheet['sheet_run'], (rows[0].get('status') if rows else 'missing')))
+    return common.parse_ts(rows[0]['finished_at']).astimezone(dt.timezone.utc).isoformat()     # to the microsecond
+
+
+# ---------------------------------------------------------------------------------------------------- sending, delivery and store
+def send(a, ctx):
+    sheet = common.load_json(a.sheet)
+    if sent_at(sheet):
+        print('sheet %s was sent at %s: post %s as its own message, then record it with delivered'
+              % (sheet['date'], sent_at(sheet), sheet['sheet']))
+        return 0
+    if sheet.get('sheet_run'):
+        if getattr(a, 'mode', common.FILE) != common.DB:
+            raise SystemExit('the sheet has a review run: send it with --mode db, which closes the run')
+        try:
+            # (v8) a review run is opened running and closed once, when its sheet is sent
+            common.Rest().rpc('evidence_close_run', payloads.close_run(
+                sheet['sheet_run'], 'done', {'items': sheet['items'], 'sent': True}))
+        except common.RpcError as e:
+            if 'is not a running run' not in (e.message or ''):
+                raise
+        at = send_time(sheet, common.owner_id(getattr(a, 'user', None)))
+    else:
+        at = common.iso_utc(common.utc_now())             # a file-mode sheet: no run, the local clock
+    if sheet.get('held'):
+        os.replace(sheet['held'], sheet['sheet'])         # the text to post exists only now
+    sheet['held'], sheet['sent_at'] = None, at
+    common.dump_json(a.sheet, sheet)
+    if sheet.get('sheet_run'):
+        review_sheet.append_index({'event': 'sent', 'sheet_run': sheet['sheet_run'], 'sent_time': at})
+    print('sheet %s sent at %s%s: post %s now as its own message, then record it with delivered' % (
+        sheet['date'], at, ' (review run closed)' if sheet.get('sheet_run') else '', sheet['sheet']))
+    return 0
+
+
 def delivered(a, ctx):
     sheet = common.load_json(a.sheet)
     ref = payloads.norm_ref(a.message_ref)
     bad = payloads.message_ref_problem(ref)
     if bad:
         raise SystemExit(bad)
+    if not sent_at(sheet):
+        raise SystemExit('the sheet was not sent: run record_answers.py send first (it closes the review run and '
+                         'records the send time), and post the sheet only after that')
     d = sheet.get('delivery')
     if d and d.get('message_ref') != ref:
         raise SystemExit('the sheet was delivered by %s; one delivery per sheet (a new message is a new sheet)'
                          % d['message_ref'])
     first = d is None
-    if first and sheet.get('sheet_run') and getattr(a, 'mode', common.FILE) != common.DB:
-        raise SystemExit('the sheet has a review run: record its delivery with --mode db, which closes the run (sent)')
     msg = transcript.find(ref)
     if msg is not None and not transcript.carries_sheet(msg, sheet['sheet_sha256']):
         raise SystemExit('message %s does not carry this sheet as issued: send the review .md text as its own message'
                          % ref)
-    # (v9) taken before the close, so no message the store would take is older than it
-    at = common.iso_utc(common.utc_now())
-    if first and sheet.get('sheet_run'):
-        # (v8) a review run is opened running and closed once, when its sheet is sent
-        try:
-            common.Rest().rpc('evidence_close_run', payloads.close_run(
-                sheet['sheet_run'], 'done', {'items': sheet['items'], 'sent': True}))
-        except common.RpcError as e:
-            if 'is not a running run' not in (e.message or ''):
-                raise
-    sheet['delivery'] = d or {'message_ref': ref, 'recorded_at': at, 'sent_at': at}
+    posted = payloads.message_time((msg or {}).get('timestamp')) if msg else None
+    if posted is not None and posted < common.parse_ts(sent_at(sheet)):
+        raise SystemExit('message %s was posted at %s, before the sheet was sent (%s): replies written before the send '
+                         'time cannot be stored on it; issue a new sheet' % (ref, common.iso_utc(posted),
+                                                                            sent_at(sheet)))
+    sheet['delivery'] = d or {'message_ref': ref, 'recorded_at': common.iso_utc(common.utc_now())}
     sheet['delivery']['transcript'] = 'checked' if msg is not None else 'not on this Mac'
     common.dump_json(a.sheet, sheet)
     if first and sheet.get('sheet_run'):
@@ -118,9 +158,7 @@ def delivered(a, ctx):
             if r.get('reask_of'):
                 manifest.mark_disputed(dict(r['reask_of'], event='reasked', on_sheet=os.path.abspath(a.sheet),
                                             row_now=r['row'], delivered_ref=ref))
-    print('sheet %s delivered by %s (transcript %s%s)' % (sheet['date'], ref, sheet['delivery']['transcript'],
-                                                          '; review run closed' if first and sheet.get('sheet_run')
-                                                          else ''))
+    print('sheet %s delivered by %s (transcript %s)' % (sheet['date'], ref, sheet['delivery']['transcript']))
     return 0
 
 
@@ -225,10 +263,11 @@ def store(a, ctx):
     bad = payloads.message_ref_problem(ref)
     if bad:
         raise SystemExit(bad)
+    if not sent_at(sheet):
+        raise SystemExit('sheet_not_sent: the sheet was never sent (record_answers.py send, before it is posted)')
     delivery = (sheet.get('delivery') or {}).get('message_ref')
     if not delivery:
-        raise SystemExit('sheet_not_sent: record the message that delivered this sheet first (record_answers.py '
-                         'delivered)')
+        raise SystemExit('record the message that delivered this sheet first (record_answers.py delivered)')
     if payloads.message_id(ref) == payloads.message_id(delivery):
         raise SystemExit('his reply is a later message than the one that delivered the sheet')
     if payloads.message_id(ref) in stored_message_ids(a.sheet):
@@ -326,13 +365,14 @@ def dispute(a, ctx):
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split('\n')[0])
     sub = ap.add_subparsers(dest='cmd', required=True)
-    for name in ('delivered', 'store', 'dispute'):
+    for name in ('send', 'delivered', 'store', 'dispute'):
         s = sub.add_parser(name)
         s.add_argument('--sheet', required=True)
         s.add_argument('--case', required=True)
         s.add_argument('--mode', choices=[common.FILE, common.DB], default=common.FILE)
         s.add_argument('--user')
-        s.add_argument('--message-ref', required=True)
+        if name != 'send':
+            s.add_argument('--message-ref', required=True)
         if name == 'store':
             s.add_argument('--answers', required=True)
             s.add_argument('--message-at', help="(v9) the message's time as the chat shows it, when its transcript is "
@@ -357,7 +397,7 @@ def main():
     payloads.use_contract(ctx.contract)
     if a.cmd == 'second-read':
         return second_packet(a, ctx) if a.step == 'packet' else second_compare(a, ctx)
-    return {'delivered': delivered, 'store': store, 'dispute': dispute}[a.cmd](a, ctx)
+    return {'send': send, 'delivered': delivered, 'store': store, 'dispute': dispute}[a.cmd](a, ctx)
 
 
 if __name__ == '__main__':
