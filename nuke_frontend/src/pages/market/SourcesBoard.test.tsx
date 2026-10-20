@@ -24,6 +24,9 @@ import SourcesBoard, {
 } from './SourcesBoard';
 import { clearFamilySalesReads } from './FamilySalesChart';
 
+// Times print on the viewer's clock with the zone named; pin the zone so they read the same wherever the suite runs.
+process.env.TZ = 'America/Los_Angeles';
+
 // market_sources_read (20261018034000), shaped as production answers: columns, then one array per source by held lots, plus landing.
 const columns = ['source', 'name', 'category', 'house', 'held_lots', 'held_at', 'population', 'population_method',
   'population_confidence', 'population_at', 'map_sales', 'map_usd', 'sales_12m', 'usd_12m', 'sales_prior_12m',
@@ -240,7 +243,7 @@ it('ranks auction houses, marketplaces, and dealers apart, same row for each, as
   expect(rows[2].querySelector('.market-sources__landing i.off')).not.toBeNull();
   expect(container.querySelector('.market-sources__foot .market-sources__note')?.textContent)
     .toBe('not ranked: 2 capture channels, 2 aggregators, 1 shop');
-  expect(container.querySelector('.market-sources__note')?.textContent).toContain('held counts as of Oct 16, 10:27 UTC');
+  expect(container.querySelector('.market-sources__note')?.textContent).toContain('held counts as of Oct 16, 03:27 PDT');
 });
 
 it('switches the landing column to 24h hourly bars and 1h live bars when clicked, and opens the live hourly inspector on row click', async () => {
@@ -988,6 +991,65 @@ it('sorts filtered recent_vehicles in-memory (LATEST / HIGHEST PRICE / YEAR) wit
   expect(drill.querySelector('[data-testid="drill-cohort-filtered-count"]')?.textContent).toContain('2 of 4');
   expect(drill.querySelector('[data-testid="drill-cohort-sold-sellthrough"]')?.textContent).toContain('1 sold · 50%');
   expect(drill.querySelector('[data-testid="drill-cohort-median-sold-price"]')?.textContent).toContain('$168,000');
+});
+
+// Live 2026-10-20 05:23Z, eBay Motors: "Listings held 3,575" beside "+17,583 in 24 hours", a 1973 BMW "ACTIVE" with "no date" that
+// was a 2012 Internet Archive capture, and "4 sold · 10%" from the 40 rows shown over a window of 3,634 sold and 11,931 ended.
+it('counts the window, not the rows shown: held plus what landed since, archived captures marked and dated, the viewer\'s clock', async () => {
+  const archivedDetail = {
+    as_of: '2026-10-20T05:33:46Z', source: 'bat', hour: '2026-10-20T05:00:00Z', selected_hour: null,
+    bucket_5m: '2026-10-20T05:30:00Z', landed_15m: 252, landed_1h: 1228, landed_24h: 17800, landed_7d: 19109,
+    last_landed: '2026-10-20T05:23:50Z', hours24: hours(426), mins60: mins(81), days14: days(17800),
+    stats: { source: 'bat', name: 'Bring a Trailer', held_lots: 3575, held_at: '2026-10-19T10:27:00Z', held_since: 15776 },
+    window: { since: '2026-10-19T05:33:46Z', events: 18090, capped: false, sold: 3634, ended: 11931, live: 2525,
+      archived: 18073, sold_priced: 3634, median_sold_price: 9216 },
+    recent: [
+      { id: 'a1', source: 'bat', event_type: 'listing', event_status: 'active', price: 2102, year: 1973, make: 'BMW', model: '2002',
+        vin: null, mileage: 105683, record_date: '2012-01-19T22:00:09Z', title: null, raw_title: null, lot: '270894613734',
+        archived: true, captured_at: '2012-01-19T22:00:09Z', created_at: '2026-10-20T05:23:44Z' },
+      { id: 'a2', source: 'bat', event_type: 'listing', event_status: 'sold', price: 14999, year: 1973, make: 'Pontiac', model: 'Trans Am',
+        vin: '2V87Y3N112453', mileage: 11000, record_date: '2011-12-03T18:00:00Z', title: null, raw_title: null, lot: '2V87Y3N112453',
+        archived: true, captured_at: '2011-12-04T10:10:10Z', created_at: '2026-10-20T05:23:50Z' },
+    ],
+  };
+  fixture.rpc.mockImplementation((fn: string) => {
+    if (fn === 'market_sources_read') return Promise.resolve({ data: value, error: null });
+    if (fn === 'market_source_landing_read') return Promise.resolve({ data: archivedDetail, error: null });
+    return Promise.resolve({ data: null, error: { message: 'none' } });
+  });
+  await act(async () => root.render(<SourcesBoard />));
+  await act(async () => { (container.querySelector('li.market-sources__row') as HTMLLIElement).click(); });
+  const drill = container.querySelector('.market-sources__drill')!;
+
+  const heldKpi = drill.querySelector('.market-sources__drill-stats .market-sources__kpi strong')!;
+  expect(heldKpi.textContent).toContain('19,351');
+  expect(heldKpi.textContent).toContain('3,575 measured Oct 19, 03:27 PDT + 15,776 landed since');
+
+  expect(drill.querySelector('[data-testid="drill-cohort-filtered-count"]')?.textContent).toContain('18,090');
+  expect(drill.querySelector('[data-testid="drill-cohort-filtered-count"]')?.textContent).toContain('every record landed, 2 shown below');
+  expect(drill.querySelector('[data-testid="drill-cohort-sold-sellthrough"]')?.textContent).toContain('3,634 sold · 23%');
+  expect(drill.querySelector('[data-testid="drill-cohort-sold-sellthrough"]')?.textContent).toContain('of 15,565 concluded · 2,525 still open when landed');
+  expect(drill.querySelector('[data-testid="drill-cohort-median-sold-price"]')?.textContent).toContain('$9,216');
+  expect(drill.querySelector('[data-testid="drill-cohort-median-sold-price"]')?.textContent).toContain('3,634 priced sales');
+
+  const [sold, seen] = [...drill.querySelectorAll('li.market-sources__event')]; // newest landing first
+  expect(seen.querySelector('.market-sources__event-status')?.textContent).toContain('seen live');
+  expect(seen.querySelector('.market-sources__event-status')?.textContent).not.toContain('active');
+  expect(seen.querySelector('.market-sources__event-status')?.getAttribute('title')).toContain('captured this page on 2012-01-19');
+  expect(seen.querySelector('.market-sources__event-recdate')?.textContent).toContain('Jan 19, 2012');
+  expect(seen.querySelector('.market-sources__event-recdate')?.getAttribute('title')).toContain('Captured by the Internet Archive');
+  expect(sold.querySelector('.market-sources__event-status')?.textContent).toContain('sold');
+
+  // times are the viewer's, with the zone named: 05:23:50Z is 22:23:50 the evening before in Pacific time
+  expect(drill.textContent).toContain('Oct 19, 22:23:50 PDT');
+  expect(drill.textContent).not.toContain('UTC');
+  expect(drill.querySelector('.market-sources__hour-col.is-now')?.getAttribute('title')).toBe('22:00 PDT: +426 landed');
+
+  // a make filter can only narrow the rows shown, so the tiles fall back to them and say so
+  await act(async () => { (drill.querySelector('[data-testid="drill-make-pill-BMW"]') as HTMLButtonElement).click(); });
+  expect(drill.querySelector('[data-testid="drill-cohort-filtered-count"]')?.textContent).toContain('1 of 2');
+  expect(drill.querySelector('[data-testid="drill-cohort-filtered-count"]')?.textContent).toContain('of the 2 shown');
+  expect(drill.querySelector('[data-testid="drill-cohort-sold-sellthrough"]')?.textContent).toContain('0 sold');
 });
 
 it('prints a labelled reference as an estimate, apart from a census, and grades an earlier reference against it', async () => {

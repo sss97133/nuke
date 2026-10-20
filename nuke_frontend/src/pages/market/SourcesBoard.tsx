@@ -48,6 +48,22 @@ export type LandingRecentEvent = {
   vehicleId: string | null;
   sourceUrl: string | null;
   createdAt: string;
+  /** An Internet Archive capture of the source's page: its status and clocks are as of the capture, not now. */
+  archived?: boolean;
+  capturedAt?: string | null;
+};
+
+/** Every event landed in the drill-down's window (24 hours, or the selected hour), counted by the reader. */
+export type LandingWindow = {
+  since: string | null;
+  events: number;
+  capped: boolean;
+  sold: number;
+  ended: number;
+  live: number;
+  archived: number;
+  soldPriced: number;
+  medianSoldPrice: number | null;
 };
 
 export type SourceTopMakeEntry = {
@@ -85,6 +101,8 @@ export type SourceDrillStats = {
   house: string | null;
   held: number | null;
   heldAt: string | null;
+  /** Events landed after `heldAt`, when the held count was measured. */
+  heldSince?: number | null;
   population: number | null;
   populationMethod: string | null;
   populationConfidence: number | null;
@@ -115,6 +133,7 @@ export type SourceLandingDetail = {
   mins60: number[];
   days14: number[];
   stats: SourceDrillStats | null;
+  window?: LandingWindow | null;
   topMakes?: SourceTopMakeEntry[];
   topModels?: SourceTopModelEntry[];
   recent: LandingRecentEvent[];
@@ -426,10 +445,28 @@ export function parseSourceLanding(value: unknown): SourceLandingDetail | null {
       vehicleId: str(ev.vehicle_id) ?? str(ev.vehicleId),
       sourceUrl: str(ev.source_url) ?? str(ev.sourceUrl),
       createdAt,
+      archived: ev.archived === true,
+      capturedAt: str(ev.captured_at) ?? str(ev.capturedAt),
     });
   }
   const rawStats = v.stats && typeof v.stats === 'object' && !Array.isArray(v.stats)
     ? (v.stats as Record<string, unknown>)
+    : null;
+  const rawWindow = v.window && typeof v.window === 'object' && !Array.isArray(v.window)
+    ? (v.window as Record<string, unknown>)
+    : null;
+  const landingWindow: LandingWindow | null = rawWindow && num(rawWindow.events) != null
+    ? {
+        since: str(rawWindow.since),
+        events: num(rawWindow.events) ?? 0,
+        capped: rawWindow.capped === true,
+        sold: num(rawWindow.sold) ?? 0,
+        ended: num(rawWindow.ended) ?? 0,
+        live: num(rawWindow.live) ?? 0,
+        archived: num(rawWindow.archived) ?? 0,
+        soldPriced: num(rawWindow.sold_priced) ?? 0,
+        medianSoldPrice: num(rawWindow.median_sold_price),
+      }
     : null;
   const parsedTopMakes = parseTopMakesList(
     v.top_makes ?? v.topMakes ?? rawStats?.top_makes ?? rawStats?.topMakes,
@@ -445,6 +482,7 @@ export function parseSourceLanding(value: unknown): SourceLandingDetail | null {
         house: str(rawStats.house),
         held: num(rawStats.held_lots),
         heldAt: str(rawStats.held_at),
+        heldSince: num(rawStats.held_since),
         population: num(rawStats.population),
         populationMethod: str(rawStats.population_method),
         populationConfidence: num(rawStats.population_confidence),
@@ -475,6 +513,7 @@ export function parseSourceLanding(value: unknown): SourceLandingDetail | null {
     mins60: numArray(v.mins60, 12),
     days14: numArray(v.days14, 14),
     stats,
+    window: landingWindow,
     topMakes: parsedTopMakes.length > 0 ? parsedTopMakes : undefined,
     topModels: parsedTopModels.length > 0 ? parsedTopModels : undefined,
     recent,
@@ -545,11 +584,16 @@ function shortDay(iso: string | null) {
   const d = new Date(iso.length <= 10 ? `${iso}T00:00:00Z` : iso);
   return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
 }
+/** The viewer's zone at that instant ("PDT"); every clock the board prints reads on the viewer's own clock with its zone
+ * named (owner, 2026-10-16: "whats 18:52Z mean"). Record dates are calendar dates and stay as recorded. */
+function zoneName(d: Date): string {
+  return new Intl.DateTimeFormat('en-US', { timeZoneName: 'short' }).formatToParts(d).find((p) => p.type === 'timeZoneName')?.value ?? '';
+}
 function heldWhen(iso: string | null) {
   if (!iso) return '';
   const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? '' : d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit',
-    minute: '2-digit', hour12: false, timeZone: 'UTC' }) + ' UTC';
+  return Number.isNaN(d.getTime()) ? '' : `${d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit',
+    minute: '2-digit', hourCycle: 'h23' })} ${zoneName(d)}`;
 }
 export function formatAgo(iso: string | null, now = Date.now()): string {
   if (!iso) return 'never';
@@ -968,26 +1012,26 @@ function daySlotIso(endDayIso: string | null, indexFromStart: number, total = 14
   return new Date(base - (total - 1 - indexFromStart) * 86400_000).toISOString().slice(0, 10);
 }
 
+/** The hour a bar starts, on the viewer's clock ("22:00"); the zone is named beside it by zoneName. */
 function formatHourLabel(iso: string | null): string {
   if (!iso) return '';
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '';
-  return `${String(d.getUTCHours()).padStart(2, '0')}:00`;
+  return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
 }
 
 function formatExactTime(iso: string | null): string {
   if (!iso) return '—';
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '—';
-  return d.toLocaleString('en-US', {
+  return `${d.toLocaleString('en-US', {
     month: 'short',
     day: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
     second: '2-digit',
-    hour12: false,
-    timeZone: 'UTC',
-  }) + ' UTC';
+    hourCycle: 'h23',
+  })} ${zoneName(d)}`;
 }
 
 export type RecordDateSummary = {
@@ -1126,26 +1170,36 @@ function formatVinOrLot(ev: LandingRecentEvent): { text: string; isVin: boolean;
   };
 }
 
-function formatStatusCell(ev: LandingRecentEvent): { primary: string; meta: string; statusClass: string } {
+function formatStatusCell(ev: LandingRecentEvent): { primary: string; meta: string; statusClass: string; title: string | null } {
   const rawStatus = ev.eventStatus && ev.eventStatus !== 'unknown' ? ev.eventStatus : null;
-  const primary = rawStatus === 'reserve_not_met'
-    ? 'RNM'
-    : rawStatus
-      ? rawStatus.replace(/_/g, ' ')
-      : (ev.eventType ?? 'record');
-  const statusClass = rawStatus === 'sold'
-    ? 'is-sold'
-    : rawStatus === 'active' || rawStatus === 'live'
-      ? 'is-live'
-      : rawStatus === 'reserve_not_met' || rawStatus === 'unsold'
-        ? 'is-rnm'
-        : '';
+  // An archived capture's 'active' is the listing's state the day the Internet Archive saved the page, not now, and the page
+  // does not say how it ended.
+  const seenLive = ev.archived === true && (rawStatus === 'active' || rawStatus === 'live');
+  const primary = seenLive
+    ? 'seen live'
+    : rawStatus === 'reserve_not_met'
+      ? 'RNM'
+      : rawStatus
+        ? rawStatus.replace(/_/g, ' ')
+        : (ev.eventType ?? 'record');
+  const statusClass = seenLive
+    ? 'is-seen'
+    : rawStatus === 'sold'
+      ? 'is-sold'
+      : rawStatus === 'active' || rawStatus === 'live'
+        ? 'is-live'
+        : rawStatus === 'reserve_not_met' || rawStatus === 'unsold'
+          ? 'is-rnm'
+          : '';
+  const title = seenLive
+    ? `Live when the Internet Archive captured this page${ev.capturedAt ? ` on ${ev.capturedAt.slice(0, 10)}` : ''}; the capture does not say how it ended`
+    : null;
   const parts: string[] = [];
   if (ev.reserve === 'no_reserve') parts.push('NR');
   else if (ev.reserve === 'reserve') parts.push('R');
   if (ev.bidCount != null && ev.bidCount > 0) parts.push(`${ev.bidCount}b`);
   else if (rawStatus && ev.eventType && ev.eventType !== rawStatus) parts.push(ev.eventType);
-  return { primary, meta: parts.join(' · '), statusClass };
+  return { primary, meta: parts.join(' · '), statusClass, title };
 }
 
 export function resolveDrillTopMakes(
@@ -1491,6 +1545,12 @@ function SourceLandingInspector({
 
   const sortedRecent = sortDrillStreamEvents(filteredRecent, sortMode);
   const cohortSummary = computeDrillCohortSummary(filteredRecent, totalRecent);
+  // Unfiltered, the sold figures are the reader's count of every event landed in the window, not of the rows shown; a make,
+  // model or facet filter can only narrow the rows shown, so it falls back to them and says so.
+  const windowStats = !hasActiveDrillFilter ? detail?.window ?? null : null;
+  const windowConcluded = windowStats ? windowStats.sold + windowStats.ended : 0;
+  const windowSellThrough = windowStats && windowConcluded > 0 ? Math.round((windowStats.sold / windowConcluded) * 100) : null;
+  const windowScope = selectedHour ? `the ${formatHourLabel(selectedHour)} hour` : 'the last 24 hours';
   const activeFilterParts: string[] = [];
   if (selectedDrillMake) activeFilterParts.push(selectedDrillMake);
   if (selectedDrillModel) activeFilterParts.push(selectedDrillModel);
@@ -1507,6 +1567,10 @@ function SourceLandingInspector({
     activeFilterParts.length > 0 ? activeFilterParts.join(' · ') : 'All in stream';
 
   const statsHeld = detail?.stats?.held ?? row?.held ?? null;
+  // The held count is a daily fold with its own clock; what landed after that clock is counted live beside it.
+  const heldSince = detail?.stats?.heldSince ?? null;
+  const heldAtIso = detail?.stats?.heldAt ?? row?.heldAt ?? null;
+  const statsHeldNow = statsHeld != null ? statsHeld + (heldSince ?? 0) : null;
   const statsPop = detail?.stats?.population ?? row?.population ?? null;
   const statsMethod = detail?.stats?.populationMethod ?? row?.populationMethod ?? null;
   const statsConf = detail?.stats?.populationConfidence ?? row?.populationConfidence ?? null;
@@ -1546,7 +1610,7 @@ function SourceLandingInspector({
               className="market-sources__drill-filter"
               onClick={() => setSelectedHour(null)}
             >
-              Hour {formatHourLabel(selectedHour)} UTC ×
+              Hour {formatHourLabel(selectedHour)} {zoneName(new Date(selectedHour))} ×
             </button>
           ) : (
             <span className="market-sources__drill-live-tag">
@@ -1648,7 +1712,14 @@ function SourceLandingInspector({
             <span className="market-sources__kpi-label">
               {(row.species && SPECIES_HELD_LABELS[row.species]) ?? (row.category === 'marketplace' ? 'Listings held' : 'Lots held')}
             </span>
-            <strong>{statsHeld != null ? count(statsHeld) : '—'}</strong>
+            <strong>
+              {statsHeldNow != null ? count(statsHeldNow) : '—'}
+              {heldSince && statsHeld != null ? (
+                <small className="market-sources__sharenote">
+                  {count(statsHeld)} measured {heldWhen(heldAtIso)} + {count(heldSince)} landed since
+                </small>
+              ) : null}
+            </strong>
           </div>
           <div className="market-sources__kpi">
             <span className="market-sources__kpi-label">{row.currentInventory ? 'Source inventory' : 'Census & coverage'}</span>
@@ -1709,8 +1780,8 @@ function SourceLandingInspector({
       <div className="market-sources__drill-charts">
         <div className="market-sources__chart-box">
           <div className="market-sources__chart-head">
-            <span>Hourly ingestion · last 24 hours (UTC)</span>
-            <small>{selectedHour ? `Inspecting ${formatHourLabel(selectedHour)} UTC — click bar again for live` : 'Click any hour bar to inspect records from that hour'}</small>
+            <span>Hourly ingestion · last 24 hours ({zoneName(new Date())})</span>
+            <small>{selectedHour ? `Inspecting ${formatHourLabel(selectedHour)} ${zoneName(new Date(selectedHour))} — click bar again for live` : 'Click any hour bar to inspect records from that hour'}</small>
           </div>
           <div className="market-sources__hour-grid" role="group" aria-label="24 hourly ingestion bars">
             {hours24.map((n, idx) => {
@@ -1725,7 +1796,7 @@ function SourceLandingInspector({
                   type="button"
                   className={`market-sources__hour-col${isSelected ? ' is-selected' : ''}${isNow ? ' is-now' : ''}`}
                   onClick={() => slotIso && setSelectedHour((cur) => (cur === slotIso ? null : slotIso))}
-                  title={`${hourLabel} UTC: +${count(n)} landed`}
+                  title={`${hourLabel}${slotIso ? ` ${zoneName(new Date(slotIso))}` : ''}: +${count(n)} landed`}
                 >
                   <span className="market-sources__hour-val">{n > 0 ? compactCount(n) : ''}</span>
                   <svg className="market-sources__hour-track" viewBox="0 0 10 100" preserveAspectRatio="none" aria-hidden="true">
@@ -1792,7 +1863,7 @@ function SourceLandingInspector({
           <div className="market-sources__feed-title">
             <span>
               {selectedHour
-                ? `Structured records landed in ${formatHourLabel(selectedHour)} UTC`
+                ? `Structured records landed in ${formatHourLabel(selectedHour)} ${zoneName(new Date(selectedHour))}`
                 : `Structured ingestion stream · ${displayName}`}
             </span>
             <small>
@@ -2005,29 +2076,51 @@ function SourceLandingInspector({
           <div className="market-sources__cohort-bar" data-testid="drill-cohort-summary-bar" aria-label="Cohort summary KPI bar">
             <div className="market-sources__cohort-kpis" data-testid="drill-cohort-kpis">
               <div className="market-sources__cohort-kpi" data-testid="drill-cohort-filtered-count">
-                <span className="market-sources__kpi-label">Filtered Count</span>
+                <span className="market-sources__kpi-label">{windowStats ? 'Landed in window' : 'Filtered Count'}</span>
                 <strong>
-                  {hasActiveDrillFilter
-                    ? `${count(cohortSummary.filteredCount)} of ${count(cohortSummary.totalStreamCount)}`
-                    : count(cohortSummary.filteredCount)}
+                  {windowStats
+                    ? `${count(windowStats.events)}${windowStats.capped ? '+' : ''}`
+                    : hasActiveDrillFilter
+                      ? `${count(cohortSummary.filteredCount)} of ${count(cohortSummary.totalStreamCount)}`
+                      : count(cohortSummary.filteredCount)}
                 </strong>
-                <small className="market-sources__cohort-scope">{activeFilterLabel}</small>
+                <small className="market-sources__cohort-scope">
+                  {windowStats
+                    ? `${windowScope} · every record landed, ${count(totalRecent)} shown below`
+                    : hasActiveDrillFilter ? `${activeFilterLabel} · of the ${count(totalRecent)} shown` : activeFilterLabel}
+                </small>
               </div>
               <div className="market-sources__cohort-kpi" data-testid="drill-cohort-sold-sellthrough">
                 <span className="market-sources__kpi-label">Sold Count &amp; Sell-Through %</span>
                 <strong>
-                  {cohortSummary.filteredCount > 0 && cohortSummary.sellThroughPct != null
-                    ? `${count(cohortSummary.soldCount)} sold · ${cohortSummary.sellThroughPct}%`
-                    : '0 sold · —'}
+                  {windowStats
+                    ? windowSellThrough != null
+                      ? `${count(windowStats.sold)} sold · ${windowSellThrough}%`
+                      : `${count(windowStats.sold)} sold · —`
+                    : cohortSummary.filteredCount > 0 && cohortSummary.sellThroughPct != null
+                      ? `${count(cohortSummary.soldCount)} sold · ${cohortSummary.sellThroughPct}%`
+                      : '0 sold · —'}
                 </strong>
+                {windowStats ? (
+                  <small className="market-sources__cohort-scope">
+                    of {count(windowConcluded)} concluded · {count(windowStats.live)} still open when landed
+                  </small>
+                ) : null}
               </div>
               <div className="market-sources__cohort-kpi" data-testid="drill-cohort-median-sold-price">
                 <span className="market-sources__kpi-label">Median Sold Price</span>
                 <strong>
-                  {cohortSummary.medianSoldPrice != null && cohortSummary.medianSoldPrice > 0
-                    ? `$${count(cohortSummary.medianSoldPrice)}`
-                    : '—'}
+                  {windowStats
+                    ? windowStats.medianSoldPrice != null && windowStats.medianSoldPrice > 0
+                      ? `$${count(windowStats.medianSoldPrice)}`
+                      : '—'
+                    : cohortSummary.medianSoldPrice != null && cohortSummary.medianSoldPrice > 0
+                      ? `$${count(cohortSummary.medianSoldPrice)}`
+                      : '—'}
                 </strong>
+                {windowStats ? (
+                  <small className="market-sources__cohort-scope">{count(windowStats.soldPriced)} priced sales</small>
+                ) : null}
               </div>
             </div>
             <div
@@ -2116,7 +2209,12 @@ function SourceLandingInspector({
                     <span className="market-sources__event-time" title={`Ingested into Nuke at ${formatExactTime(ev.createdAt)}`}>
                       {formatAgo(ev.createdAt)}
                     </span>
-                    <span className="market-sources__event-recdate" title={recDate.fullTitle}>
+                    <span
+                      className="market-sources__event-recdate"
+                      title={ev.archived && ev.capturedAt && ev.recordDate === ev.capturedAt
+                        ? `Captured by the Internet Archive on ${recDate.dateText}; the page carries no date of its own`
+                        : recDate.fullTitle}
+                    >
                       <span className={`market-sources__recdate-val${recDate.kind === 'missing' ? ' is-missing' : ''}`}>
                         {recDate.dateText}
                       </span>
@@ -2210,7 +2308,7 @@ function SourceLandingInspector({
                     >
                       {ev.mileage != null && ev.mileage > 0 ? `${compactCount(ev.mileage)} mi` : '—'}
                     </span>
-                    <span className={`market-sources__event-status ${st.statusClass}`} title={`${st.primary}${st.meta ? ` · ${st.meta}` : ''}`}>
+                    <span className={`market-sources__event-status ${st.statusClass}`} title={st.title ?? `${st.primary}${st.meta ? ` · ${st.meta}` : ''}`}>
                       <strong>{st.primary}</strong>
                       {st.meta ? <small> · {st.meta}</small> : null}
                     </span>
