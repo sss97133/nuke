@@ -22,6 +22,7 @@ import { endedRow } from "../poll-listing-feeds/removal.ts";
 import { aspectFilterFor, BrowseClient, ItemGone, QuotaExceeded, yearAspect } from "./browseApi.ts";
 import { CLASS_RANK, classifySeller, linkVin, listingKey, TIERS, toLanding, type SellerClass } from "./browseMap.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { landPlace, newPlaceCtx } from "./browsePlace.ts";
 
 export const PLATFORM = "ebay_motors";
 const METHOD = "ebay_browse_api_v1";
@@ -41,6 +42,7 @@ export interface Report {
   year_aspect: string | null;
   per_tier: Record<string, { seen: number; held: number; new: number; fetched: number; landed: number }>;
   by_class: Record<string, number>; landed: number; blips: number; rejected: number; ingest_created: number; ingest_matched: number; linked_by_vin?: number; vin_conflicts?: number;
+  places?: Record<string, number>;
   errors: string[];
 }
 export const emptyReport = (action: string): Report => ({
@@ -49,6 +51,7 @@ export const emptyReport = (action: string): Report => ({
 });
 
 const itemUrl = (key: string) => `https://www.ebay.com/itm/${key}`;
+const placeCtx = newPlaceCtx();   // us_states and checked city points, read once per warm instance
 
 export async function heldKeys(supabase: any, keys: string[]): Promise<Set<string>> {
   const held = new Set<string>();
@@ -175,6 +178,18 @@ export async function landItem(supabase: any, raw: any, rep: Report, now = new D
     }
   } else if (vehicleId) {
     rep.errors.push(`listing event ${landing.listingKey}: no observation id, episode not written`);
+  }
+
+  // 5. where the listing says the car is (browsePlace.ts), on the capture's clock; Browse captures only
+  if (vehicleId && (opts.source ?? "ebay-browse-api") === "ebay-browse-api") {
+    try {
+      const p = await landPlace(supabase, placeCtx, { vehicleId, url: landing.url, observedAt: now, loc: raw.itemLocation,
+        description: landing.descriptionText, observationId: obs.observationId ?? null, snapshotId });
+      const k = p.disputed ? "disputed" : p.outcome === "written" ? `written_${p.grain}` : p.outcome;
+      rep.places = { ...(rep.places ?? {}), [k]: (rep.places?.[k] ?? 0) + 1 };
+    } catch (e) {
+      rep.errors.push(`place ${landing.listingKey}: ${(e as Error).message}`.slice(0, 300));
+    }
   }
   if (outcome === "landed") rep.landed++;
   return outcome;
