@@ -4,7 +4,7 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import './maplibreWorker';
 import './one-map.css';
 import { CARTO_LIGHT } from './constants';
-import { BAND_RGBA, BANDS, BOUNDARY_TILES, band, eligible, makeLabel, outcome, platformName, readArea, readAreas, readZip, zipBounds, type AreaLayers, type LocationRow } from './oneMapService';
+import { BAND_RGBA, BANDS, BOUNDARY_TILES, band, eligible, makeLabel, outcome, platformName, readArea, readAreas, readBusinesses, readSellers, readZip, zipBounds, type AreaLayers, type BusinessLink, type LocationRow, type SellerLink } from './oneMapService';
 
 /**
  * The web map as the iOS map, repaired by case 14 (docs/ledger/theory/data-machine-cases.md): the unit is the
@@ -34,7 +34,9 @@ export default function OneMap() {
   const [dolls, setDolls] = useState<{ zip: AreaLayers | null; county: AreaLayers | null; state: AreaLayers | null; us: number | null; countyNoZip: number | null }>({ zip: null, county: null, state: null, us: null, countyNoZip: null });
   const [rows, setRows] = useState<LocationRow[] | null>(null);
   const [rowsBusy, setRowsBusy] = useState(false);
-  const [pick, setPick] = useState<{ platform?: string; make?: string }>({});
+  const [pick, setPick] = useState<{ platform?: string; make?: string; seller?: string; business?: string }>({});
+  const [sellers, setSellers] = useState<SellerLink[] | null>(null);
+  const [businesses, setBusinesses] = useState<BusinessLink[] | null>(null);
   const [open, setOpen] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [showLayers, setShowLayers] = useState(false);
@@ -111,7 +113,13 @@ export default function OneMap() {
       readArea('zcta', selected.zip, win.from, win.to, ctl.signal), readArea('county', selected.county, win.from, win.to, ctl.signal), readArea('state', selected.state, win.from, win.to, ctl.signal),
       readAreas('state', layer, win.from, win.to, undefined, ctl.signal), readAreas('zcta', layer, win.from, win.to, [selected.zip], ctl.signal),
     ]).then(([z, c, s, us]) => setDolls({ zip: z, county: c, state: s, us: us.totals.entities + us.unkeyed.entities, countyNoZip: null })).catch((e) => { if (e.name !== 'AbortError') setNote(String(e.message ?? e)); });
-    readZip(selected.zip, selected.county, ctl.signal).then((r) => { setRows(r.filter(eligible)); setRowsBusy(false); }).catch((e) => { if (e.name !== 'AbortError') { setNote(String(e.message ?? e)); setRowsBusy(false); } });
+    setSellers(null); setBusinesses(null);
+    readZip(selected.zip, selected.county, ctl.signal).then((r) => {
+      const ok = r.filter(eligible); setRows(ok); setRowsBusy(false);
+      const ids = [...new Set(ok.map((x) => x.vehicles.id))];
+      readSellers(ids, ctl.signal).then(setSellers).catch(() => setSellers([]));
+      readBusinesses(ids, ctl.signal).then(setBusinesses).catch(() => setBusinesses([]));
+    }).catch((e) => { if (e.name !== 'AbortError') { setNote(String(e.message ?? e)); setRowsBusy(false); } });
     return () => ctl.abort();
   }, [selected, win.from, win.to, layer]);
 
@@ -151,7 +159,10 @@ export default function OneMap() {
   }, [rows]);
   const platforms = useMemo(() => { const m = new Map<string, Set<string>>(); for (const v of vehicles) for (const r of v) (m.get(platformName(r.source_platform)) ?? m.set(platformName(r.source_platform), new Set()).get(platformName(r.source_platform))!).add(v[0].vehicles.id); return [...m.entries()].map(([k, s]) => [k, s.size] as const).sort((a, b) => b[1] - a[1]); }, [vehicles]);
   const makes = useMemo(() => { const m = new Map<string, number>(); for (const v of vehicles) { const k = (v[0].vehicles.make ?? '').trim() || 'Make unrecorded'; m.set(k, (m.get(k) ?? 0) + 1); } return [...m.entries()].sort((a, b) => b[1] - a[1]); }, [vehicles]);
-  const shown = vehicles.filter((v) => (!pick.platform || v.some((r) => platformName(r.source_platform) === pick.platform)) && (!pick.make || ((v[0].vehicles.make ?? '').trim() || 'Make unrecorded') === pick.make));
+  const sellerRows = useMemo(() => { const m = new Map<string, { handle: string; vehicles: Set<string>; url: string | null }>(); for (const l of sellers ?? []) { const k = l.handle.toLowerCase(); const e = m.get(k) ?? { handle: l.handle, vehicles: new Set<string>(), url: null }; e.vehicles.add(l.vehicle_id); m.set(k, e); } return [...m.entries()].map(([k, e]) => ({ key: k, handle: e.handle, n: e.vehicles.size, vehicles: e.vehicles })).sort((a, b) => b.n - a.n); }, [sellers]);
+  const businessRows = useMemo(() => { const m = new Map<string, { b: BusinessLink; vehicles: Set<string> }>(); for (const l of businesses ?? []) { const e = m.get(l.id) ?? { b: l, vehicles: new Set<string>() }; e.vehicles.add(l.vehicle_id); m.set(l.id, e); } return [...m.values()].map((e) => ({ ...e.b, n: e.vehicles.size, vehicles: e.vehicles })).sort((a, b) => b.n - a.n); }, [businesses]);
+  const shown = vehicles.filter((v) => (!pick.platform || v.some((r) => platformName(r.source_platform) === pick.platform)) && (!pick.make || ((v[0].vehicles.make ?? '').trim() || 'Make unrecorded') === pick.make)
+    && (!pick.seller || sellerRows.find((s) => s.key === pick.seller)?.vehicles.has(v[0].vehicles.id)) && (!pick.business || businessRows.find((b) => b.id === pick.business)?.vehicles.has(v[0].vehicles.id)));
   const countyName = selected ? visible.counties.get(selected.county) ?? `County ${selected.county}` : '';
   const doll = (a: AreaLayers | null, key: string) => a?.layers.find((l) => l.layer === key);
 
@@ -209,6 +220,16 @@ export default function OneMap() {
           </table>
           <div className="om-muted">Counts are from the fold as of {dolls.zip?.layers[0]?.as_of?.slice(11, 16) ?? '…'} UTC. Records with no ZIP count in their county and state, not here.</div>
 
+          <h3>Sources: who sold here</h3>
+          {sellers == null ? <div className="om-muted">{rowsBusy ? 'Reading the ZIP\'s records…' : 'Reading sellers…'}</div> : sellerRows.length ? <>
+            {sellerRows.slice(0, 8).map((sr) => <button key={sr.key} type="button" className={`om-line om-row om-between om-pick ${pick.seller === sr.key ? 'on' : ''}`} onClick={() => setPick((x) => ({ ...x, seller: x.seller === sr.key ? undefined : sr.key }))}><span>{sr.handle} <a href={`https://bringatrailer.com/member/${encodeURIComponent(sr.handle)}/`} target="_blank" rel="noreferrer" className="om-link" onClick={(e) => e.stopPropagation()}>BaT</a></span><span>{fmt(sr.n)} {sr.n === 1 ? 'vehicle' : 'vehicles'}</span></button>)}
+            <div className="om-muted">Sellers known for {fmt(new Set(sellers.map((l) => l.vehicle_id)).size)} of {fmt(vehicles.length)} vehicles (Bring a Trailer lots); the rest have no seller identity captured yet.</div>
+          </> : <div className="om-muted">No seller identities captured for these vehicles yet.</div>}
+          {businessRows.length ? <>
+            <h3>Businesses linked to these vehicles</h3>
+            {businessRows.slice(0, 8).map((b) => <button key={b.id} type="button" className={`om-line om-row om-between om-pick ${pick.business === b.id ? 'on' : ''}`} onClick={() => setPick((x) => ({ ...x, business: x.business === b.id ? undefined : b.id }))}><span>{b.name}{b.kind ? <span className="om-muted"> · {b.kind.replace(/_/g, ' ')}</span> : null}{b.slug ? <> <a href={`/org/${b.slug}`} className="om-link" onClick={(e) => e.stopPropagation()}>open</a></> : null}</span><span>{fmt(b.n)} {b.n === 1 ? 'vehicle' : 'vehicles'}</span></button>)}
+          </> : null}
+
           <h3>Platforms represented</h3>
           {platforms.map(([s, n]) => <button key={s} type="button" className={`om-line om-row om-between om-pick ${pick.platform === s ? 'on' : ''}`} onClick={() => setPick((x) => ({ ...x, platform: x.platform === s ? undefined : s }))}><span>{s}</span><span>{fmt(n)} vehicles</span></button>)}
           {rowsBusy && !platforms.length && <div className="om-muted">Reading the ZIP's records…</div>}
@@ -216,7 +237,7 @@ export default function OneMap() {
           <h3>Vehicle mix</h3>
           {makes.slice(0, 10).map(([m, n]) => <button key={m} type="button" className={`om-bar om-pick ${pick.make === m ? 'on' : ''}`} onClick={() => setPick((x) => ({ ...x, make: x.make === m ? undefined : m }))}><span>{m}</span><i style={{ width: `${Math.max(4, (100 * n) / makes[0][1])}%` }} /><b>{fmt(n)}</b></button>)}
 
-          <h3>Vehicles{pick.platform || pick.make ? ` · ${[pick.make, pick.platform].filter(Boolean).join(' · ')}` : ''} ({fmt(shown.length)})</h3>
+          <h3>Vehicles{pick.platform || pick.make || pick.seller || pick.business ? ` · ${[pick.make, pick.platform, pick.seller && sellerRows.find((x) => x.key === pick.seller)?.handle, pick.business && businessRows.find((x) => x.id === pick.business)?.name].filter(Boolean).join(' · ')}` : ''} ({fmt(shown.length)})</h3>
           {shown.map((v) => {
             const first = v[0]; const o = outcome(first.vehicles); const isOpen = open === first.vehicles.id;
             return (
