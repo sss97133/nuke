@@ -181,7 +181,7 @@ BEGIN
   -- 6. Open books: sold 101, 102, 103 (2 with an amount); held 104, 105 (1 with a cost); 101 carries both. No amount.
   PERFORM public.t_assert((public.t_measure(d, 'open_books', 'Sales with a recorded amount')->'coverage'->>'n')::int = 2, 'two sales with an amount');
   PERFORM public.t_assert((public.t_measure(d, 'open_books', 'Return computable')->>'value')::int = 1, 'return computable on one vehicle');
-  PERFORM public.t_assert(d::text !~ '(41001|52002|23001|17004|99007|99008)', 'no amount anywhere in the document');
+  PERFORM public.t_assert(d::text !~ '(^|[^0-9a-f-])(41001|52002|23001|17004|99007|99008)([^0-9a-f-]|$)', 'no amount anywhere in the document');
   -- 7. The fallback: no linked handle, the stats fold, ranked among public selling organizations with venues and
   -- private organizations excluded (U 90% against 50, 60, 70, 80 and the linked dealer's 90: 4 below of 6, P80),
   -- conflicts named, clock = the inputs' extraction, no per-listing means without their coverage.

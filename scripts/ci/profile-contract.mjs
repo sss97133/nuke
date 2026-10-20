@@ -13,7 +13,10 @@
 //   fontSizes    distinct computed font sizes outside the kit's scale (20, 14, 10, 9, 8 px, and the dense entity
 //                and measure at 13 and 12 px) on text-bearing
 //                elements inside the profile: the count that falls as pages move onto the kit
-//   inlineStyled elements inside the profile carrying a style attribute
+//   inlineStyleSites distinct inline-style sites inside the profile: tag plus the sorted property names of its
+//                style attribute, so a new styled row of an existing kind (a bid, a photo) does not count again
+//   inlineStyled elements inside the profile carrying a style attribute (reported, never gated: it scales with the
+//                live page's content, and gating it failed every night from 2026-10-13 without a code change)
 //   snakeTokens  snake_case tokens in the visible text (internal vocabulary reaching a human)
 //   money        dollar amounts in the visible text (an anonymous reader's view of money)
 //   plateText    license-plate-looking text next to the word PLATE
@@ -31,7 +34,8 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '.
 const BASELINE = path.join(ROOT, 'scripts', 'ci', 'profile-baseline.json');
 const OUT = process.env.PROFILE_CONTRACT_OUT || path.join(ROOT, 'profile-contract-out');
 const SITE = process.env.PROFILE_CONTRACT_SITE || 'https://nuke.ag';
-const GATED = ['requests', 'errors', 'fontSizes', 'inlineStyled', 'snakeTokens', 'money', 'plateText', 'roleFonts'];
+const GATED = ['requests', 'errors', 'fontSizes', 'inlineStyleSites', 'snakeTokens', 'money', 'plateText', 'roleFonts'];
+const ADVISORY = ['inlineStyled'];
 
 const baseline = fs.existsSync(BASELINE) ? JSON.parse(fs.readFileSync(BASELINE, 'utf8')) : { vehicles: {} };
 const vehicles = Object.keys(baseline.vehicles || {});
@@ -72,6 +76,7 @@ async function measureOnce(id) {
       fontSizes: foreign.length,
       fontSizeList: [...sizes].sort((a, b) => parseFloat(a) - parseFloat(b)),
       inlineStyled: root.querySelectorAll('[style]').length,
+      inlineStyleSites: new Set([...root.querySelectorAll('[style]')].map(el => el.tagName + ':' + [...el.style].sort().join(','))).size,
       snakeTokens: (text.match(/\b[a-z]+_[a-z_]+\b/g) || []).length,
       money: (text.match(/\$\s?\d[\d,]*/g) || []).length,
       // a PLATE label followed by anything but the mask (an unmasked plate reads like 'PLATE Utah 04AP4')
@@ -91,7 +96,7 @@ for (const id of vehicles) {
   // Gate on the best pass (noise only inflates a reading); seed the floor from the worst pass
   // (so ordinary jitter on a timing-out reader stays under it). Structural metrics are identical across passes.
   const best = { ...passes[0], worst: {} };
-  for (const k of [...GATED, 'loadMs']) { best[k] = Math.min(...passes.map(p => p[k])); best.worst[k] = Math.max(...passes.map(p => p[k])); }
+  for (const k of [...GATED, ...ADVISORY, 'loadMs']) { best[k] = Math.min(...passes.map(p => p[k])); best.worst[k] = Math.max(...passes.map(p => p[k])); }
   best.errorSamples = [...new Set(passes.flatMap(p => p.errorSamples))].slice(0, 5);
   best.loggedOut = passes.every(p => p.loggedOut);
   results[id] = best;
@@ -108,8 +113,9 @@ for (const [id, r] of Object.entries(results)) {
     const limit = base == null ? null : base + (k === 'requests' ? REQUEST_TOLERANCE : k === 'errors' ? ERROR_TOLERANCE : 0);
     const mark = base == null ? '·' : cur > limit ? '✗' : cur < base ? '↓' : '=';
     if (limit != null && cur > limit) failed = true;
-    return `${k} ${cur}${base != null ? `/${base}` : ''} ${mark}`;
+    return `${k} ${cur}${base != null ? `/${base}` : ` (worst ${r.worst[k]})`} ${mark}`;
   });
+  for (const k of ADVISORY) cells.push(`${k} ${r[k]}${floor[k] != null ? `/${floor[k]}` : ''} (advisory)`);
   console.log(`${id.slice(0, 8)} ${r.title.slice(0, 40).padEnd(40)} loggedOut=${r.loggedOut} load=${r.loadMs}ms | ${cells.join('  ')}`);
   if (!r.loggedOut) { console.log('   probe invalid: the page did not render as a logged-out visitor'); failed = true; }
   if (r.errorSamples.length) for (const e of r.errorSamples) console.log('   error:', e);
@@ -119,7 +125,7 @@ fs.writeFileSync(path.join(OUT, 'results.json'), JSON.stringify(results, null, 1
 
 if (write) {
   const next = { generated: new Date().toISOString().slice(0, 10), note: baseline.note || 'Logged-out vehicle profile floors for scripts/ci/profile-contract.mjs. A metric may go down, never up. Re-seed with --write-baseline after a page gets better.', vehicles: {} };
-  for (const [id, r] of Object.entries(results)) next.vehicles[id] = Object.fromEntries(GATED.map(k => [k, r.worst[k]]));
+  for (const [id, r] of Object.entries(results)) next.vehicles[id] = Object.fromEntries([...GATED, ...ADVISORY].map(k => [k, r.worst[k]]));
   fs.writeFileSync(BASELINE, JSON.stringify(next, null, 2) + '\n');
   console.log('baseline written:', BASELINE);
   process.exit(0);

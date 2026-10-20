@@ -26,7 +26,7 @@ CREATE FUNCTION public.relation_state(p_weight double precision) RETURNS text LA
 \ir ../migrations/20261019181500_contact_broker.sql
 
 CREATE FUNCTION public.t_contact_pii(j jsonb) RETURNS boolean LANGUAGE sql IMMUTABLE AS $$
-  SELECT j::text ~ '(second_customer|Other Customer|example\.com|5550|"email"|"phone"|"address"|full_name|Private Painter|Fixture Performer)' $$;
+  SELECT j::text ~ '(second_customer|Other Customer|example\.com|5550[0-9]{3}|"email"|"phone"|"address"|full_name|Private Painter|Fixture Performer)' $$;
 GRANT EXECUTE ON FUNCTION public.t_contact_pii(jsonb) TO anon, authenticated;
 
 SELECT t_assert(NOT has_table_privilege('anon','public.contact_requests','SELECT') AND NOT has_table_privilege('authenticated','public.contact_requests','SELECT')

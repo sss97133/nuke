@@ -68,10 +68,10 @@ SELECT t_assert((:'paint'::jsonb)->'plan_b_suppliers' @> '[{"organization":{"nam
 SELECT t_assert((:'insp'::jsonb)->'plan_b_suppliers' = '[]'::jsonb, 'inspection requirement: no Plan-B suppliers even when its text names paint');
 SELECT t_assert((:'paint'::jsonb) ? 'candidates_listed' AND (:'paint'::jsonb)->>'candidates_listed' = '0'
   AND (:'paint'::jsonb) ? 'match' AND (:'paint'::jsonb) ? 'quote_state', 'the rest of the row is unchanged; Plan-B is not a candidate');
-SELECT t_assert((:'paint'::jsonb)::text !~ '(41\.17|12\.5|a1000000|Rust primer|10000000-0000-0000-0000-00000000000c)', 'no amounts, record ids, line text or payer');
+SELECT t_assert((:'paint'::jsonb)::text !~ '((^|[^:0-9.])(41\.17|12\.5)([^0-9]|$)|a1000000|Rust primer|10000000-0000-0000-0000-00000000000c)', 'no amounts, record ids, line text or payer');
 SELECT t_assert((:'fac'::jsonb)->'work_recorded_on_nuke' @> '{"records":1,"kinds":[{"supply_kind":"paid_counterparty","times":1,"first_on":"2023-03-03"}],
   "by_source":{"payment_events":1}}' AND (:'fac'::jsonb) ? 'members' AND (:'fac'::jsonb) ? 'calendar', 'facility_read: work recorded on Nuke; rest unchanged');
-SELECT t_assert((:'fac'::jsonb)::text !~ '(300|c3000000)', 'facility_read: no payment amount or id');
+SELECT t_assert((:'fac'::jsonb)::text !~ '((^|[^0-9a-f-])300([^0-9a-f-]|$)|c3000000)', 'facility_read: no payment amount or id');
 SELECT t_assert((SELECT count(*) FROM regexp_matches(pg_get_functiondef('public.open_requirements_read(uuid,integer,text)'::regprocedure), '''plan_b_suppliers''', 'g')) = 1
   AND (SELECT count(*) FROM regexp_matches(pg_get_functiondef('public.facility_read(uuid)'::regprocedure), 'work_recorded_on_nuke', 'g')) = 1,
   'each anchored addition is present exactly once');

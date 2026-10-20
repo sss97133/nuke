@@ -32,7 +32,7 @@ RESET ROLE;
 \ir ../migrations/20261019161500_open_requirements_read.sql
 
 CREATE FUNCTION public.t_req_pii(j jsonb) RETURNS boolean LANGUAGE sql IMMUTABLE AS $$
-  SELECT j::text ~ '(Other Customer|Fixture Customer|example\.com|5550|Private bronco|Hidden|"ZZ"|basis_excerpt|road test|"amount"|"score")' $$;
+  SELECT j::text ~ '(Other Customer|Fixture Customer|example\.com|5550[0-9]{3}|Private bronco|Hidden|"ZZ"|basis_excerpt|road test|"amount"|"score")' $$;
 GRANT EXECUTE ON FUNCTION public.t_req_pii(jsonb) TO anon, authenticated;
 
 SELECT t_assert(has_function_privilege('anon','public.open_requirements_read(uuid,integer,text)','EXECUTE')

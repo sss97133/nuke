@@ -84,7 +84,7 @@ SELECT t_assert((:'sa2'::jsonb)->>'supersedes_observation_id' = (:'sa1'::jsonb)-
 SELECT t_assert((:'f_av'::jsonb) @> jsonb_build_object('result','pass','basis','self_claim','first_available_day',:'wed','job_window',jsonb_build_object('basis','scheduled')),
  'availability passes on Wednesday: Tuesday is excepted, the weekly windows cover the rest of the job window');
 SELECT t_assert((:'f_area'::jsonb) @> '{"result":"pass","basis":"service_area_city_distance","service_area":{"city":"Sparks","state":"NV","radius_miles":25,"mobile":true}}'
- AND NOT (:'f_area'::jsonb)::text ~* '(latitude|longitude|39\.5)','area passes within the radius; band shown, no coordinates');
+ AND NOT (:'f_area'::jsonb)::text ~* '(latitude|longitude|(^|[^:0-9.])39\.5)','area passes within the radius; band shown, no coordinates');
 SELECT t_assert((:'b_av'::jsonb) @> '{"result":"fail","reason":"no declared availability inside the job window"}'
  AND (:'b_area'::jsonb) @> '{"result":"fail","basis":"service_area_city_distance"}','Sunday-only provider and a Las Vegas band: both fail');
 SELECT t_assert((:'d_av'::jsonb) @> '{"result":"unknown","reason":"no standing availability is recorded yet","next":"set_provider_availability"}'

@@ -25,6 +25,12 @@ Run the offline isolation and mode contracts with `node --test scripts/ci/verify
 They execute the verifier in fixture checkout roots with controlled commands. Legacy global
 scratch paths are translated only into the fixture namespace; tests never touch another gate's files.
 
+## Flaky jobs
+
+`node scripts/ci/flake-report.mjs [--hours 24] [--limit 200] [--logs] [--json]` lists jobs that failed and then
+passed on a rerun of the same run, ranked by how often, with the first failing contract or test when `--logs` is set.
+It reads Actions through `gh` and writes nothing. Its contract is `scripts/ci/flake-report.test.mjs`.
+
 ## What it checks
 
 | Check | Type | Baseline (2026-07-12) | Notes |
