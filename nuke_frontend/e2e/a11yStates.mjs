@@ -1,6 +1,7 @@
 // Every page built for the job loop, in the states a person reaches (signed out, signed in as each party, each Sign sheet
 // open), with fixtures in the live readers' shapes. a11y.e2e.mjs runs axe-core on each.
 import { persona } from './mockSupabase.mjs';
+import { activityNotes, activityReaders } from './activityFixtures.mjs';
 import { HASH, INSP, QUOTE, SCOPE_HASH, WO, emptyReader, header, inspection, invoices, jobPath, jobReaders, offers, operations, quotes, viewer } from './fixtures.mjs';
 
 export const CUSTOMER = persona('00000000-0000-4000-b000-00000000c001', 'e2ebuyer');
@@ -163,6 +164,11 @@ export const STATES = [
   { name: '/supplier-invite/:token redeemed + claim sheet', path: `/supplier-invite/${TOKEN}`, who: SHOP, readers: { redeem_supplier_invite: redeemed }, ready: 'Open the invite',
     act: async (page) => { await page.getByRole('button', { name: 'Open the invite' }).click(); await page.getByRole('button', { name: 'Claim E2E Parts' }).click(); await page.getByRole('dialog').waitFor(); } },
   { name: 'statement page', path: `/work-orders/statement?work_order_id=${WO}`, readers: { work_order_statement_read: statement }, ready: 'Install exhaust' },
+  // Header activity indicator (signed in), panel open: the header is outside the default scope, so audit the button and panel.
+  { name: 'header activity panel', path: '/work', who: CUSTOMER, readers: activityReaders(), tables: { user_notifications: activityNotes },
+    ready: 'Waiting for your signature',
+    act: async (page) => { await page.getByRole('button', { name: /^Activity / }).click(); await page.getByRole('region', { name: 'Activity' }).waitFor(); },
+    scope: '.activity' },
 ];
 
 export { SCOPE_HASH };
