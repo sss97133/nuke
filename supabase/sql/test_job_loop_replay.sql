@@ -400,6 +400,8 @@ CREATE TABLE IF NOT EXISTS public.organization_capabilities(id uuid PRIMARY KEY 
 \ir ../migrations/20261020130000_requirement_key_exclusions_trim_steering.sql
 \echo REPLAY 20261020135000_skill_supply_corroboration.sql
 \ir ../migrations/20261020135000_skill_supply_corroboration.sql
+\echo REPLAY 20261020155000_verified_claimant_roles.sql
+\ir ../migrations/20261020155000_verified_claimant_roles.sql
 \echo REPLAY 20261020160000_job_market_health.sql
 \ir ../migrations/20261020160000_job_market_health.sql
 ALTER TABLE public.organizations ADD COLUMN IF NOT EXISTS services_offered text[], ADD COLUMN IF NOT EXISTS service_radius_miles integer,
