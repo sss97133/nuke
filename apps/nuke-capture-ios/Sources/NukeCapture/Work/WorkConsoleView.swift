@@ -117,13 +117,21 @@ struct WorkConsoleContent: View {
             jobsSection
             JobsLookingSection(open: open, bridge: { if case .loaded(let me) = identity { return me.bridge } else { return nil } }())
             if showCapture {
+                // The sync, reading and tool controls are engineering detail: one row that opens them,
+                // not a screenful under the jobs (owner, 2026-10-20: "too much noise").
                 Section {
-                    Text("Sync, on-device reads and tools for photos taken at your work sites.")
-                        .font(.footnote).foregroundStyle(.secondary)
-                } header: {
-                    Text("Capture")
+                    NavigationLink {
+                        List { CaptureSections() }
+                            .navigationTitle("Capture")
+                            .navigationBarTitleDisplayMode(.inline)
+                    } label: {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Capture")
+                            Text("Sync, on-device reads and tools for photos at your work sites.")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
                 }
-                CaptureSections()
             }
         }
         .sheet(item: $signing) { item in
@@ -217,10 +225,14 @@ struct WorkConsoleContent: View {
             case .refused(let refusal):
                 JobRefusalRow(refusal: refusal)
             case .loaded(let page):
-                if page.rows.isEmpty {
+                // A job whose completion is on record is finished, not in motion. It moves to the
+                // collapsed Finished row below (owner, 2026-10-20: finished jobs on cars he no longer
+                // works were surfacing as live work).
+                let inMotion = page.rows.filter { $0.stageStates[.completion] != .recorded }
+                if inMotion.isEmpty {
                     Text("No jobs in motion.").font(.footnote).foregroundStyle(.secondary)
                 }
-                ForEach(page.rows) { row in
+                ForEach(inMotion) { row in
                     NavigationLink {
                         JobView(workOrderId: row.workOrderId, titleHint: row.headline, vehicleHint: row.vehicleLabel?.text)
                     } label: {
@@ -244,6 +256,23 @@ struct WorkConsoleContent: View {
         } footer: {
             if case .loaded(let page) = jobs {
                 Text(page.coverage?.sentence ?? "Total not available")
+            }
+        }
+        if case .loaded(let page) = jobs {
+            let finished = page.rows.filter { $0.stageStates[.completion] == .recorded }
+            if !finished.isEmpty {
+                let unpaid = finished.filter { $0.stageStates[.accounting] != .recorded && $0.stageStates[.accounting] != .withheld }.count
+                Section {
+                    DisclosureGroup("Finished · \(finished.count)" + (unpaid > 0 ? " · \(unpaid) with no payment on record" : "")) {
+                        ForEach(finished) { row in
+                            NavigationLink {
+                                JobView(workOrderId: row.workOrderId, titleHint: row.headline, vehicleHint: row.vehicleLabel?.text)
+                            } label: {
+                                JobRowView(row: row)
+                            }
+                        }
+                    }
+                }
             }
         }
     }
