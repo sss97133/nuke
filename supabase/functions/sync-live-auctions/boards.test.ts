@@ -52,6 +52,49 @@ Deno.test("parsePcarBoard reads each open item with dollars, bid count, close ti
   assertEquals(items[1].current_bid, null);
 });
 
+import { berlinWallClockIso, kickdownRssImages, parseKickdownList } from "./boards.ts";
+
+// Three cards of https://www.kickdown.com/en/auctions/live (2026-10-20 20:11Z), as served but trimmed: the watch-list star,
+// the 6-hour signed image links, the teaser text and the utility classes inside a card are cut. A lot closing within a day
+// (countdown with offset), one a week out with no bid yet ("Starting bid", printed German time after the 25 Oct clock
+// change) and one without reserve.
+const KD_CARD = (body: string) => `<div class="tw-auction-card-white tw-relative tw-group" ${body}`;
+const KD_BOARD = '<div>45 cars</div>' +
+  KD_CARD('id="auction_card_bf16c411738f"><div><div></div><a data-turbo="false" href="/en/postings/bf16c411738f-2008-porsche-911-997-turbo-in-de-32105-bad-salzuflen"><div><img alt="" /></div><div></div><div><div><div><div><div>41.000 €</div><div>Highest bid</div></div></div><div><div><span id="countdown" data-controller="countdown" data-countdown-end-time-value="2026-10-21 19:30:00 +0200" data-ending-text="Closing auction..."></span></div><div>21/10/2026 7:30 PM</div></div></div></div></a></div><a data-turbo="false" href="/en/postings/bf16c411738f-2008-porsche-911-997-turbo-in-de-32105-bad-salzuflen"><div><h3>Porsche 911 997 Turbo (2008)</h3><span><span>480 HP</span><span aria-hidden="true">·</span><span>97.014 km</span></span><div><p></p></div></div></a><div><div><turbo-frame loading="lazy" id="badge_Running"><span>Running</span></turbo-frame><turbo-frame loading="lazy" id="badge_Expert report"><a data-turbo="false" href="/en/postings/bf16c411738f-2008-porsche-911-997-turbo-in-de-32105-bad-salzuflen#photos-documents">Expert report</a></turbo-frame></div></div></div>') +
+  KD_CARD('id="auction_card_ee93a278586c"><div><div></div><a data-turbo="false" href="/en/postings/ee93a278586c-1947-willys-overland-jeepster-in-de-14797-potsdam"><div><img alt="" /></div><div></div><div><div><div><div><div>0 €</div><div>Starting bid</div></div></div><div><div>7 days</div><div>27/10/2026 7:45 PM</div></div></div></div></a></div><a data-turbo="false" href="/en/postings/ee93a278586c-1947-willys-overland-jeepster-in-de-14797-potsdam"><div><h3>Willys Overland Jeepster (1947)</h3><span><span>14.263 mi</span></span><div><p></p></div></div></a><div><div><turbo-frame loading="lazy" id="badge_Running"><span>Running</span></turbo-frame></div></div></div>') +
+  KD_CARD('id="auction_card_9a7e8f74b8a9"><div><div></div><a data-turbo="false" href="/en/postings/9a7e8f74b8a9-1977-audi-80-gls-in-de-23564-luebeck"><div><img alt="" /></div><div></div><div><div><div><div><div>1.700 €</div><div>Highest bid</div></div></div><div><div>2 days</div><div>22/10/2026 7:55 PM</div></div></div></div></a></div><a data-turbo="false" href="/en/postings/9a7e8f74b8a9-1977-audi-80-gls-in-de-23564-luebeck"><div><h3>Audi 80 GLS (1977)</h3><span><span>86 HP</span><span aria-hidden="true">·</span><span>69.638 km</span></span><div><p></p></div></div></a><div><div><turbo-frame loading="lazy" id="badge_Running"><span>Running</span></turbo-frame><turbo-frame loading="lazy" id="badge_Without reserve"><span>Without reserve</span></turbo-frame></div></div></div>') +
+  '<a href="/en/auctions/live?page=2">2</a>';
+
+Deno.test("parseKickdownList reads each running card's canonical link, euro bid, close time with offset and reserve", () => {
+  const { items, total, lastPage } = parseKickdownList(KD_BOARD);
+  assertEquals([items.length, total, lastPage], [3, 45, 2]);
+  assertEquals(items[0], {
+    id: "bf16c411738f",
+    url: "https://www.kickdown.com/postings/bf16c411738f-2008-porsche-911-997-turbo-in-de-32105-bad-salzuflen",
+    title: "Porsche 911 997 Turbo (2008)",
+    year: 2008,
+    current_bid: 41000,
+    currency: "EUR",
+    ends: "2026-10-21T19:30:00+02:00",
+    no_reserve: false,
+    running: true,
+  });
+  // the lot page of the Jeepster reads data-tab-title-ends-at-value="2026-10-27T19:45:00+01:00" (CET after the clock change)
+  assertEquals([items[1].current_bid, items[1].currency, items[1].ends], [null, "EUR", "2026-10-27T19:45:00+01:00"]);
+  assertEquals([items[2].current_bid, items[2].ends, items[2].no_reserve], [1700, "2026-10-22T19:55:00+02:00", true]);
+  assertEquals(berlinWallClockIso(2026, 1, 15, 20, 0), "2026-01-15T20:00:00+01:00");
+});
+
+Deno.test("kickdownRssImages maps each lot id to the feed's lasting image link", () => {
+  // One item of https://www.kickdown.com/en/auctions/live.rss (2026-10-20), content_encoded cut.
+  const item = "<item>\n      <media:image>https://www.kickdown.com/rails/active_storage/representations/redirect/eyJfcmFpbHMiOnsiZGF0YSI6Mjc1NjUzNCwicHVyIjoiYmxvYl9pZCJ9fQ==--365441b7f6cb2149a4969bde6f26e7ebef8e9d58/eyJfcmFpbHMiOnsiZGF0YSI6eyJmb3JtYXQiOiJqcGVnIiwicmVzaXplIjoiMTAwMHg3NTBeIiwiZXh0ZW50IjoiMTAwMHg3NTAiLCJncmF2aXR5IjoiY2VudGVyIiwiYXV0b19vcmllbnQiOnRydWUsInF1YWxpdHkiOiI4MCUifSwicHVyIjoidmFyaWF0aW9uIn19--853c794402a4d9508eeb1b8f3ea2123749aa81eb/Fahrzeug-1.jpg?locale=en</media:image>\n" + // gitleaks:allow (a public image link's blob digests, not secrets)
+    "      <title>Porsche 911 997 Turbo (2008), one previous owner, extensive service history, and extremely well-maintained, rated 2+, ceramic brakes</title>\n" +
+    "      <pubDate>Auktionsende: 21.10.2026 - 19:30</pubDate>\n      <link>https://www.kickdown.com/postings/bf16c411738f</link>\n    </item>";
+  const images = kickdownRssImages(`<rss><channel>${item}</channel></rss>`);
+  assertEquals([...images.keys()], ["bf16c411738f"]);
+  assertEquals(images.get("bf16c411738f")?.startsWith("https://www.kickdown.com/rails/active_storage/representations/redirect/"), true);
+});
+
 Deno.test("parsePcarBids reads the lot's bid history with Basta ids and clocks, not other arrays", () => {
   const bids = parsePcarBids(LOT);
   assertEquals(bids.map((b) => [b.id.slice(0, 8), b.amount, b.at, b.bidder, b.status]), [

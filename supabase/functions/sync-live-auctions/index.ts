@@ -8,6 +8,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
  * Sources:
  *   - BaT: Scrapes auctionsCurrentInitialData from /auctions/ page (no API key needed)
  *   - Collecting Cars: the site's public Typesense listing collection (production_listings)
+ *   - Kickdown: its server-rendered live board (bids in EUR, close times with offset); lot images from its live RSS feed
  *   - PCarMarket: its server-rendered live auction board (direct fetch); bids of lots that moved from the lot page
  *   - Bonhams: its public Typesense sale and lot index; bids of its online (timed) sales from its bidding platform
  *     (live.bonhams.com); lots of in-room catalog sales are written 'upcoming', never live
@@ -31,6 +32,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { firecrawlScrape } from "../_shared/firecrawl.ts";
 import { archiveFetch } from "../_shared/archiveFetch.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
+import { type KickdownCard, kickdownRssImages, parseKickdownList } from "./boards.ts";
 import { parseBatIdentityFromUrl, parseBatIdentityFromTitle } from "../_shared/batParser.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { mustWrite, softWrite } from '../_shared/writeResult.ts';
@@ -561,6 +563,67 @@ async function ingestPcarBids(
     }
   }
   return out;
+}
+
+// ============================================
+// Kickdown Sync (its server-rendered live board; images from its live RSS feed)
+// ============================================
+
+const KICKDOWN_UA = "NukeListingCollector/1.0 (+https://nuke.ag)";
+
+async function syncKickdown(): Promise<{ auctions: LiveAuction[]; error: string | null }> {
+  try {
+    const cards: KickdownCard[] = [];
+    let total: number | null = null;
+    for (let page = 1, last = 1; page <= Math.min(last, 10); page++) {
+      const { html, error } = await archiveFetch(`https://www.kickdown.com/en/auctions/live${page > 1 ? `?page=${page}` : ""}`, {
+        platform: "kickdown", skipCache: true, useFirecrawl: false, directFetchOptions: { publicOnly: true }, callerName: "sync-live-auctions",
+      });
+      if (error || !html) return { auctions: [], error: `Kickdown live board page ${page}: ${error ?? "no HTML"}` };
+      const board = parseKickdownList(html);
+      if (page === 1 && !board.items.length) return { auctions: [], error: "Kickdown live board: no cards parsed" };
+      cards.push(...board.items);
+      total ??= board.total;
+      last = board.lastPage;
+    }
+    if (total !== null && cards.length < total) return { auctions: [], error: `Kickdown live board: ${cards.length} of ${total} cars read` };
+    // The board's images are 6-hour signed S3 links; the house's live feed carries a Rails redirect link per lot that stays valid.
+    const images = new Map<string, string>();
+    for (let page = 1; page <= 10; page++) {
+      const res = await fetch(`https://www.kickdown.com/en/auctions/live.rss${page > 1 ? `?page=${page}` : ""}`, { headers: { "User-Agent": KICKDOWN_UA } }); // guardrail-allow: raw-fetch (house RSS feed)
+      if (!res.ok) break; // images are optional; the board itself was read
+      const got = kickdownRssImages(await res.text());
+      for (const [id, url] of got) images.set(id, url);
+      if (!got.size || images.size >= cards.length) break;
+    }
+    console.log(`[sync-live-auctions] Kickdown: ${cards.length} running auctions (board says ${total}), ${images.size} feed images`);
+    const now = new Date().toISOString();
+    return {
+      auctions: cards.filter((c) => c.running && c.year !== null).map((c) => {
+        const ident = parseBatIdentityFromTitle(`${c.year} ${c.title.replace(/\s*\(\d{4}\)\s*$/, "")}`, null);
+        return {
+          url: c.url,
+          title: c.title,
+          platform: "kickdown",
+          auction_end_date: c.ends ?? "",
+          current_bid: c.current_bid,
+          bid_count: null, // the board and lot page print no count
+          currency: c.currency,
+          no_reserve: c.no_reserve,
+          reserve_met: null,
+          year: c.year,
+          make: ident.make,
+          model: ident.model,
+          thumbnail_url: images.get(c.id) ?? null,
+          external_id: c.id,
+          raw_data: { source: "kickdown_live_board", synced_at: now },
+        };
+      }),
+      error: null,
+    };
+  } catch (e: unknown) {
+    return { auctions: [], error: `Kickdown sync failed: ${e instanceof Error ? e.message : String(e)}` };
+  }
 }
 
 // ============================================
@@ -1255,6 +1318,8 @@ async function updateSourceRegistry(
     .eq("slug", slug));
 }
 
+BOARD_SOURCES.kickdown = "kickdown"; // syncKickdown reads the house's complete live board
+
 // ============================================
 // Main Handler
 // ============================================
@@ -1347,6 +1412,7 @@ Deno.serve(async (req) => {
         "pcarmarket",
         "mecum",
         "barrett-jackson",
+        "kickdown",
         "rm-sothebys",
         "gooding",
         "bonhams",
@@ -1417,6 +1483,9 @@ Deno.serve(async (req) => {
           case "rm":
           case "rm-sothebys":
             syncResult = await syncRMSothebys();
+            break;
+          case "kickdown":
+            syncResult = await syncKickdown();
             break;
           case "gooding":
             syncResult = await syncGooding(supabase, !skipVehicleSync);

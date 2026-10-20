@@ -57,6 +57,93 @@ export function parsePcarBoard(html: string): { items: PcarBoardItem[]; totalPag
   return { items, totalPages: tp ? Number(tp[1]) : null };
 }
 
+/** One running auction on Kickdown's live board (its server-rendered /en/auctions/live pages). */
+export interface KickdownCard {
+  id: string;
+  url: string;
+  title: string;
+  year: number | null;
+  current_bid: number | null; // the highest bid; a card reading "Starting bid" has none yet
+  currency: string | null;
+  ends: string | null;
+  no_reserve: boolean;
+  running: boolean;
+}
+
+const KD_CURRENCY: Record<string, string> = { "€": "EUR", "£": "GBP", "$": "USD", CHF: "CHF" };
+
+/** Plain text of a card title: tags out (repeated until none is left), stray angle brackets out, then entities, &amp; last. */
+function kickdownText(html: string): string {
+  let s = html, prev: string;
+  do { prev = s; s = s.replace(/<[^<>]*>/g, ""); } while (s !== prev);
+  return s.replace(/[<>]/g, "").replace(/&quot;/g, '"').replace(/&#0?39;/g, "'").replace(/&amp;/g, "&").replace(/\s+/g, " ").trim();
+}
+const pad2 = (n: number) => String(n).padStart(2, "0");
+
+/** A Europe/Berlin wall-clock time as ISO with its offset (Kickdown prints close times more than a day out in German time). */
+export function berlinWallClockIso(y: number, mo: number, d: number, h: number, mi: number): string {
+  const wall = Date.UTC(y, mo - 1, d, h, mi);
+  const fmt = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Europe/Berlin", hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit",
+  });
+  const offsetAt = (t: number) => {
+    const p = Object.fromEntries(fmt.formatToParts(new Date(t)).map((x) => [x.type, x.value]));
+    return (Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute) - t) / 60_000;
+  };
+  let off = offsetAt(wall - 60 * 60_000);
+  off = offsetAt(wall - off * 60_000);
+  const a = Math.abs(off);
+  return `${y}-${pad2(mo)}-${pad2(d)}T${pad2(h)}:${pad2(mi)}:00${off < 0 ? "-" : "+"}${pad2(Math.floor(a / 60))}:${pad2(a % 60)}`;
+}
+
+/**
+ * The cards of one Kickdown live-board page, the board's car count and its last page number. Amounts are German-formatted
+ * ("41.000 €"); the close time is the countdown's own value with its offset ("2026-10-21 19:30:00 +0200") for a lot closing
+ * within a day, else the printed German time ("27/10/2026 7:45 PM" = 19:45+01:00, as the lot page's ends-at reads); the
+ * link is the page's canonical form (https://www.kickdown.com/postings/<id>-<slug>, no language prefix).
+ */
+export function parseKickdownList(html: string): { items: KickdownCard[]; total: number | null; lastPage: number } {
+  const items: KickdownCard[] = [];
+  for (const card of html.split('<div class="tw-auction-card-white').slice(1)) {
+    const id = card.match(/id="auction_card_([0-9a-f]+)"/)?.[1];
+    const slug = card.match(/href="\/[a-z]{2}\/postings\/([0-9a-f]+-[^"/#?]+)"/)?.[1];
+    const title = kickdownText(card.match(/<h3[^>]*>([\s\S]*?)<\/h3>/)?.[1] ?? "");
+    if (!id || !slug || !title) continue;
+    const price = card.match(/>\s*([\d.]+(?:,\d+)?)\s*(€|£|\$|CHF)\s*<\/div>\s*<div[^>]*>\s*(Highest bid|Starting bid)\s*</);
+    const end = card.match(/data-countdown-end-time-value="(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2}) ([+-]\d{2})(\d{2})"/);
+    const shown = card.match(/>(\d{2})\/(\d{2})\/(\d{4}) (\d{1,2}):(\d{2}) (AM|PM)</); // "22/10/2026 7:55 PM", German time
+    const shownIso = shown
+      ? berlinWallClockIso(+shown[3], +shown[2], +shown[1], (+shown[4] % 12) + (shown[6] === "PM" ? 12 : 0), +shown[5])
+      : null;
+    const year = title.match(/\((\d{4})\)\s*$/)?.[1];
+    items.push({
+      id,
+      url: `https://www.kickdown.com/postings/${slug}`,
+      title,
+      year: year ? Number(year) : null,
+      current_bid: price && price[3] === "Highest bid" ? Number(price[1].split(",")[0].replace(/\./g, "")) || null : null,
+      currency: price ? KD_CURRENCY[price[2]] ?? null : null,
+      ends: end ? `${end[1]}T${end[2]}${end[3]}:${end[4]}` : shownIso,
+      no_reserve: card.includes('id="badge_Without reserve"'),
+      running: card.includes('id="badge_Running"'),
+    });
+  }
+  const total = html.match(/>(\d+) cars</)?.[1];
+  const pages = [...html.matchAll(/auctions\/live\?page=(\d+)/g)].map((m) => Number(m[1]));
+  return { items, total: total ? Number(total) : null, lastPage: Math.max(1, ...pages) };
+}
+
+/** Lot id -> image from Kickdown's live RSS feed: a Rails redirect link that stays valid (the board's own are 6-hour signed S3 links). */
+export function kickdownRssImages(xml: string): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const item of xml.split("<item>").slice(1)) {
+    const id = item.match(/<link>https:\/\/www\.kickdown\.com\/postings\/([0-9a-f]+)<\/link>/)?.[1];
+    const image = item.match(/<media:image>([^<]+)<\/media:image>/)?.[1]?.replace(/&amp;/g, "&");
+    if (id && image) out.set(id, image);
+  }
+  return out;
+}
+
 /** One bid in a PCarMarket lot's bid history, with Basta's own id and time. */
 export interface PcarBid { id: string; amount: number; at: string; bidder: string | null; status: string | null }
 
