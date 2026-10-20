@@ -13,10 +13,10 @@ CREATE FUNCTION pg_temp.ck(p_desc text, p_line text) RETURNS jsonb LANGUAGE sql 
 CREATE FUNCTION pg_temp.tk(p_desc text, p_line text) RETURNS jsonb LANGUAGE sql AS
   $$ SELECT public.requirement_tool_keys(jsonb_build_object('description', p_desc, 'line_item_id', p_line), NULL) $$;
 
-SELECT t_assert(pg_temp.ck('Rust repair and panel welding', '51000000-0000-0000-0000-000000000001') = '[{"key":"exhaust_system","from":"reviewed_keyword"}]'
+SELECT t_assert(pg_temp.ck('Rust repair and panel welding', '51000000-0000-0000-0000-000000000001') = '[]'
  AND pg_temp.tk('MIG welder', '51000000-0000-0000-0000-000000000001') = '[]'
  AND pg_temp.tk('Body shop bay', '51000000-0000-0000-0000-000000000001') = '[]',
- 'corroded header bolts: no rust_body template keys (capability or tool); the operation keeps its own keyword key');
+ 'corroded header bolts: no rust_body template keys (capability or tool), and since 20261020183000 no keys from the operation either');
 SELECT t_assert(pg_temp.ck('Rust repair and panel welding', '51000000-0000-0000-0000-000000000002') = '[{"key":"rust_repair","from":"reviewed_template"},{"key":"welding_mig","from":"reviewed_template"}]'
  AND pg_temp.tk('MIG welder', '51000000-0000-0000-0000-000000000002') = '[{"key":"welding.mig","from":"reviewed_template"}]',
  'real rust repair keeps its template keys');
