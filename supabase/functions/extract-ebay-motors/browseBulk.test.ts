@@ -98,8 +98,8 @@ Deno.test("a chunk eBay answers unfiltered is skipped with an error, and the pas
 // ---- the run, against a recorded world ------------------------------------------------------------------------------------
 
 interface World {
-  episodes: { source_url: string; vehicle_id: string; current_price: number | null; event_status: string; bids: number | null }[];
-  blips: { source_identifier: string; vehicle_id: null; observed_at: string; amount: string | null }[];
+  episodes: { source_url: string; vehicle_id: string; current_price: number | null; event_status: string; bids: number | null; ppo?: string; ppc?: string }[];
+  blips: { source_identifier: string; vehicle_id: null; observed_at: string; amount: string | null; extraction_method?: string; po?: string; pc?: string }[];
   gone: Set<string>; lookups: number; snapshots: { sha: string; row: any }[]; uploads: { path: string; bytes: Uint8Array }[];
   updates: any[]; priceLog: any[];
 }
@@ -147,11 +147,14 @@ function recorder(w: World) {
   const land = async (_sb: any, item: any, _rep: any, at: string, opts: any) => {
     landed.push({ item, opts });
     const key = item.legacyItemId, price = Number(item.buyingOptions?.includes("AUCTION") ? item.currentBidPrice?.value : item.price?.value);
+    const o = opts.extra?.price_original ?? {};
     if (opts.identity?.year && opts.identity?.make && opts.identity?.model) {
-      w.episodes.push({ source_url: `https://www.ebay.com/itm/${key}`, vehicle_id: `veh-${key}`, current_price: price, event_status: "active", bids: item.bidCount ?? null });
+      w.episodes.push({ source_url: `https://www.ebay.com/itm/${key}`, vehicle_id: `veh-${key}`, current_price: price, event_status: "active", bids: item.bidCount ?? null,
+        ppo: o.amount == null ? undefined : String(o.amount), ppc: o.currency });
       return "landed" as const;
     }
-    w.blips.push({ source_identifier: key, vehicle_id: null, observed_at: at, amount: String(price) });
+    w.blips.push({ source_identifier: key, vehicle_id: null, observed_at: at, amount: String(price), extraction_method: opts.method,
+      po: o.amount == null ? undefined : String(o.amount), pc: o.currency });
     return "blip" as const;
   };
   return { land, landed };
@@ -211,6 +214,27 @@ Deno.test("a held listing whose price or bid count moved is updated, not landed 
   assertEquals(w.priceLog.map((p) => [p.vehicle_id, p.value, p.price_type]), [["veh-3001", 47500, "asking"]]);   // a bid is not an asking price
   assertEquals([rec.landed.length, rec.landed[0].item.legacyItemId, rec.landed[0].opts.hashRawData], [1, "3003", true]);
   assertEquals(compare(sum("9", { price: "1.00" }) as any, { kind: "episode", vehicle_id: "v", price: 1, bids: null, status: "ended" }), "skip");
+});
+
+Deno.test("a converted listing is compared on the seller's own price, not eBay's USD figure of the day", async () => {
+  const cad = (id: string, usd: string, own: string) => ({ ...sum(id), price: { value: usd, currency: "USD", convertedFromValue: own, convertedFromCurrency: "CAD" } });
+  const ep = (orig: number | null) => ({ kind: "episode" as const, vehicle_id: "v", price: 28000, bids: null, status: "active", orig, origCur: orig == null ? null : "CAD" });
+  assertEquals(compare(cad("1", "28343.14", "39995.00") as any, ep(39995)), "current");      // the rate moved, the seller did not
+  assertEquals(compare(cad("1", "26930.00", "37995.00") as any, ep(39995)), "changed");      // the seller dropped the price
+  assertEquals(compare(cad("1", "28343.14", "39995.00") as any, ep(null)), "changed");       // not recorded yet: one update records it
+  // a blip read another way (Firecrawl, Wayback) is read once from the page; one this lander wrote is compared on price
+  const blip = (method: string) => ({ kind: "blip" as const, price: 45000, observed_at: "2026-10-15T00:00:00Z", method, orig: null, origCur: null });
+  assertEquals([compare(sum("2") as any, blip("ebay_firecrawl_v1")), compare(sum("2") as any, blip("ebay_browse_search_v1"))], ["changed", "current"]);
+
+  const w = world(), store = memStore(), rec = recorder(w);
+  w.episodes.push({ source_url: "https://www.ebay.com/itm/3101", vehicle_id: "veh-3101", current_price: 28000, event_status: "active", bids: null });
+  w.episodes.push({ source_url: "https://www.ebay.com/itm/3102", vehicle_id: "veh-3102", current_price: 15999, event_status: "active", bids: null, ppo: "22500", ppc: "CAD" });
+  const pages = { [FILTER]: [cad("3101", "28343.14", "39995.00"), cad("3102", "13819.01", "19500.00")] };
+  const r = await bulk(fakeSb(w), fakeClient(pages), { ledger: open, store, gate: gateOpen, land: rec.land as any });
+  assertEquals([r.bulk.pages[0].changed, r.bulk.pages[0].updated], [2, 2]);
+  assertEquals(w.updates.map((u) => [u.metadata.price_original, u.metadata.price_changed_at != null]),
+    [[{ amount: 39995, currency: "CAD", converted: true }, false], [{ amount: 19500, currency: "CAD", converted: true }, true]]);
+  assertEquals(w.priceLog.map((p) => [p.vehicle_id, p.value, p.notes.includes("seller's price CAD 19500")]), [["veh-3102", 13819.01, true]]);
 });
 
 Deno.test("a deleted member is redacted before anything is stored or landed, with one lookup for the page", async () => {
