@@ -114,6 +114,27 @@ preserved. The large comment log is not published. Browser pulse uses the
 delivered row directly, with native bid/comment clocks and final price, instead
 of fetching again or waiting for the 60-second fallback refresh.
 
+## Native timing diagnostics, prepared October 21, 2026
+
+The existing collector emits `bat_live_collector_start_v1` and
+`bat_live_collector_end_v1` with a generated control-plane `collector_run_id`.
+Existing native intake requests carry that ID, a sequence and `native_collector=1`.
+At most twelve requests per worker request `bat_native_intake_timing_v1`, separating
+authentication, monitor/source/parent validation reads, preparation and canonical
+RPC duration. SDK fetch counts and runtime-limit counts apply only to the sampled
+native operation. The service-role guard still runs before diagnostic labels are
+accepted; the labels confer no authority and never enter source testimony.
+
+Start/end records expose selection/authentication timings and transport attempt,
+backoff, acknowledgement-processing and unfinished-work counts. They contain no
+source payloads, prices, credentials or headers. Attempt counts include retries and
+duplicates. A missing end record does not prove an empty queue or a completed worker.
+Use a bounded six-consecutive-start window with full lifetimes (eight-minute ceiling),
+then correlate existing dispatch metadata, native gateway timings and coverage
+predicates. A dispatch response alone does not establish collector survival;
+sampled timings and health snapshots do not establish continuous capture. No new
+fetches, scheduler/budget changes or additional telemetry tables are introduced.
+
 ## Focused evidence
 
 - Six deterministic Deno tests: captured source records, clock qualification,
