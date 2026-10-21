@@ -55,10 +55,11 @@ import { loadDescriptionInput, descriptionInputFingerprint, descriptionPreview }
 import { closingBatTargets, collectBatLive, batStreamIO } from "./liveStream.ts";
 import { BAT_LIVE_MODE } from "../_shared/batLiveEvents.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { retainFetchedCapture, type CaptureAcknowledgement } from "../_shared/archiveFetch.ts";
 declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void };
 
 // Extractor versioning - update on each significant change
-const EXTRACTOR_VERSION = 'extract-bat-core:4.5.2';
+const EXTRACTOR_VERSION = 'extract-bat-core:4.5.3';
 
 // Shared column list for the four vehicle-existence lookups below
 // (discovery_url / bat_auction_url / listing_url / update-existing-vehicle
@@ -1145,6 +1146,13 @@ Deno.serve(async (req) => {
     if (!serviceRoleKey) throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY");
 
     const body = await req.json().catch(() => ({}));
+    // The established rows-only policy remains the default. Retention is an explicit service-only canary.
+    if (body.retain_terminal_evidence !== undefined) {
+      if (typeof body.retain_terminal_evidence !== "boolean") throw new Error("retain_terminal_evidence must be boolean");
+      const writer = await authenticateWriter(req);
+      if (!writer.ok || writer.caller.kind !== "service_role") return new Response(JSON.stringify({ error: "Terminal retention requires service role" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
     if (body?.mode === "live_stream") {
       const writer = await authenticateWriter(req);
       if (!writer.ok || writer.caller.kind !== "service_role") {
@@ -1267,6 +1275,7 @@ Deno.serve(async (req) => {
     let sourceFetchedAt: string | null = null;
     let descriptionSnapshotId: string | null = null;
     let descriptionSnapshotCustody: { vehicleId?: string; matched?: boolean; sha256?: string | null } | undefined;
+    let terminalCapture: CaptureAcknowledgement | { status: "not_requested" | "not_terminal" | "cached_capture_unassessed" } = { status: "not_requested" };
 
     // Prefer existing DB snapshots (reduces BaT load + avoids bans). Can be disabled per-request.
     const preferSnapshot = body?.prefer_snapshot === false ? false : true;
@@ -1321,7 +1330,8 @@ Deno.serve(async (req) => {
         throw e;
       }
 
-      await trySaveHtmlSnapshot({
+      // The opt-in path retains the same response below, after terminal status is known.
+      if (!body.retain_terminal_evidence) await trySaveHtmlSnapshot({
         supabase,
         listingUrl: listingUrlNorm,
         httpStatus,
@@ -1341,6 +1351,20 @@ Deno.serve(async (req) => {
     // "Bid to $23,000 (Reserve Not Met)" on a lot whose record says "Sold on 04/11/2025 for
     // $24,000 to nocera76" (seller accepted after the close) — the record wins.
     const auction = summarizeAuction(html);
+    if (body.retain_terminal_evidence) {
+      terminalCapture = htmlSource === "snapshot" ? { status: "cached_capture_unassessed" }
+        : !auction.parsed || !(auction.sold || auction.reserveNotMet) ? { status: "not_terminal" }
+        : await retainFetchedCapture(supabase, { platform: "bat", url: listingUrlNorm, html, httpStatus,
+          fetchedAt: sourceFetchedAt!, metadata: { extractor: "extract-bat-core", extractor_version: EXTRACTOR_VERSION,
+            capture_scope: "terminal_result_canary_v1" } });
+      // Retention failure is visible without blocking independent testimony and native stream intake.
+      if (terminalCapture.status === "failed" || terminalCapture.status === "unavailable")
+        console.warn(`extract-bat-core terminal evidence: ${terminalCapture.reason}`);
+      if (htmlSource === "direct" && terminalCapture.status === "not_terminal") await trySaveHtmlSnapshot({
+        supabase, listingUrl: listingUrlNorm, httpStatus, success: true, fetchedAt: sourceFetchedAt,
+        errorMessage: null, html, metadata: { extractor: "extract-bat-core", mode: "free", user_agent: userAgent },
+      });
+    }
     // the comments JSON, parsed once: the first comment or bid is the auction's public start, the sale /
     // reserve-not-met record its close (Skylar: interactions on the timeline at their precise moments)
     const rawComments: any[] = readCommentsJson(html) ?? [];
@@ -3036,10 +3060,11 @@ Deno.serve(async (req) => {
         vehicles_updated: updatedIds.length,
         created_vehicle_ids: createdIds,
         updated_vehicle_ids: updatedIds,
-        issues: [],
+        issues: terminalCapture.status === "failed" || terminalCapture.status === "unavailable" ? ["terminal_evidence_" + terminalCapture.reason] : [],
         extraction_method: "direct_html_parsing_free_mode",
         timings: { ...timings, total_ms: Date.now() - phaseStart },
-        snapshot: "receipt_only",
+        snapshot: body.retain_terminal_evidence ? terminalCapture.status : "receipt_only",
+        terminal_capture: terminalCapture,
         auction: {
           record_parsed: auction.parsed,
           sold: saleNow,

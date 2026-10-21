@@ -67,7 +67,7 @@ const PROJECT = 'https://qkgaybvrernstplzjaam.supabase.co';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ZERO = '00000000-0000-0000-0000-000000000000';
 const PARENT_FIELDS = 'id,is_public,deleted_at,listing_kind,sale_status,auction_outcome,canonical_outcome,canonical_sold_price,canonical_platform,year,make,model,listing_url,discovery_url,condition_rating,body_style,engine_type,transmission,mileage';
-const READERS = new Set(['vehicle_price_facts', 'get_vehicle_specs', 'get_field_provenance', 'popup_vehicle_intel', 'vehicle_build_log_public']);
+const READERS = new Set(['vehicle_price_facts', 'get_vehicle_specs', 'get_field_provenance', 'popup_vehicle_intel', 'vehicle_build_log_public', 'valuation_by_ymm']);
 // Parent listing identity, supersession, capture metadata, clocks and text only; never the private child.
 const REPORT_SOURCE_FIELDS = 'id,vehicle_id,kind,is_superseded,source_id,source_url,observed_at,ingested_at,extraction_method,content_text,' +
   'source_captured_at:structured_data->>source_captured_at,source_capture_sha256:structured_data->>source_capture_sha256,' +
@@ -190,9 +190,9 @@ export function publicClient(config, fetcher = fetch) {
       if (scope === 'sold') q.set('sale_status', 'eq.sold');
       return request(`vehicles?${q}`);
     },
-    subjects(ids) {
-      if (!Array.isArray(ids) || ids.length < 1 || ids.length > 200 || !ids.every(id => UUID.test(id))) throw new AssayError('invalid_reader_scope');
-      const q = new URLSearchParams({ select: 'id,is_public,deleted_at,listing_kind', is_public: 'eq.true', deleted_at: 'is.null',
+    subjects(ids, withIdentity = false) {
+      if (typeof withIdentity !== 'boolean' || !Array.isArray(ids) || ids.length < 1 || ids.length > 200 || !ids.every(id => UUID.test(id))) throw new AssayError('invalid_reader_scope');
+      const q = new URLSearchParams({ select: 'id,is_public,deleted_at,listing_kind' + (withIdentity ? ',year,make,model' : ''), is_public: 'eq.true', deleted_at: 'is.null',
         or: '(listing_kind.is.null,listing_kind.neq.non_vehicle_item)', id: `in.(${ids.join(',')})`, order: 'id.asc', limit: String(ids.length) });
       return request(`vehicles?${q}`);
     },
@@ -236,6 +236,21 @@ export function publicClient(config, fetcher = fetch) {
     },
     rpc(name, args) {
       if (!READERS.has(name)) throw new AssayError('reader_not_allowed');
+      if (name === 'valuation_by_ymm') {
+        const keys = ['p_year', 'p_make', 'p_model', 'p_event_from', 'p_event_before', 'p_evidence_as_of', 'p_currency', 'p_knowledge_mode'];
+        if (!object(args) || Object.keys(args).length !== keys.length || keys.some(k => !Object.hasOwn(args, k))
+          || !Number.isInteger(args.p_year) || args.p_year < 1885 || args.p_year > new Date().getFullYear() + 2
+          || [args.p_make, args.p_model].some(v => typeof v !== 'string' || !v.trim() || v.length > 120)
+          || !['USD', 'EUR', 'GBP'].includes(args.p_currency) || !['known_at', 'retrospective'].includes(args.p_knowledge_mode)
+          || ![args.p_event_from, args.p_event_before, args.p_evidence_as_of].every(v => typeof v === 'string'
+            && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})$/.test(v) && Number.isFinite(Date.parse(v)))
+          || Date.parse(args.p_event_before) <= Date.parse(args.p_event_from)
+          || Date.parse(args.p_event_before) - Date.parse(args.p_event_from) > 2 * 86400_000
+          || Date.parse(args.p_event_before) > Date.now()
+          || args.p_knowledge_mode === 'known_at' && Date.parse(args.p_evidence_as_of) > Date.parse(args.p_event_before)
+          || Date.parse(args.p_evidence_as_of) > Date.now()) throw new AssayError('invalid_reader_scope');
+        return request(`rpc/${name}`, { method: 'POST', body: JSON.stringify(args) });
+      }
       if (name === 'vehicle_build_log_public') {
         // The opt-in overload only: the one-argument legacy reader is a different contract.
         if (!object(args) || Object.keys(args).sort().join() !== 'p_include_reported,p_vehicle_id' ||
