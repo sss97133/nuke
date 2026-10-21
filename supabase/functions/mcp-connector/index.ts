@@ -14,16 +14,23 @@ import {
 } from "../_shared/scopeGrammar.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { requireAdminOrService, requireWriteAuth } from "../_shared/writeGuard.ts";
+import {
+  checkAdvisorRateLimit,
+  handleAdvisorJsonRpc,
+  initAdvisorHandlers,
+  isAdvisorSurface,
+} from "./advisor/mod.ts";
 
 // =============================================================================
 // NUKE MCP CONNECTOR — Full-Resolution Vehicle Digital Twin Access
 // =============================================================================
 // Remote MCP server (Streamable HTTP transport) exposing the Nuke vehicle data
-// platform. 22 tools across 7 layers: schema discovery, search, deep graph,
-// market intelligence, reference library, vision, actors, and ingestion.
+// platform. Full catalog (~54 tools) on /mcp; ChatGPT allowlist via surface=chatgpt;
+// read-only Nuke Asset Advisor (7 cited tools) on /mcp/advisor — see ./ADVISOR.md.
 //
 // Protocol: MCP Streamable HTTP (2025-03-26)
-// Auth: X-API-Key (nk_live_...) or Authorization: Bearer (service role)
+// Auth: X-API-Key (nk_live_...) or Authorization: Bearer (service role);
+//       advisor + most reads allow anonymous (advisor has best-effort IP rate limit)
 // Deploy: supabase functions deploy mcp-connector --no-verify-jwt
 // =============================================================================
 
@@ -6148,6 +6155,13 @@ async function handleJsonRpc(body: JsonRpcRequest, chatgptSurface = false): Prom
 // HTTP ENTRY POINT
 // =============================================================================
 
+// Advisor surface handlers (read-only curated tools). Initialized once with the
+// same Supabase + edge proxy deps the full connector uses.
+initAdvisorHandlers({
+  sb: () => getSupabase(),
+  callEdgeApi,
+});
+
 Deno.serve(async (req: Request) => {
   // CORS preflight
   if (req.method === "OPTIONS") {
@@ -6157,6 +6171,7 @@ Deno.serve(async (req: Request) => {
   // ── Route by URL path (OAuth + MCP) ───────────────────────────────────
   const url = new URL(req.url);
   const path = url.pathname;
+  const advisorSurface = isAdvisorSurface(req);
 
   // OAuth discovery endpoints (GET)
   if (req.method === "GET") {
@@ -6206,6 +6221,66 @@ Deno.serve(async (req: Request) => {
       JSON.stringify(rpcError(undefined, -32700, "Parse error")),
       { status: 400, headers: { ...CORS, "Content-Type": "application/json" } },
     );
+  }
+
+  // Asset Advisor: read-only curated surface. No write/admin/SQL tools are registered.
+  // Anonymous reads are allowed with a best-effort per-IP rate limit; API keys skip it.
+  if (advisorSurface) {
+    const rate = checkAdvisorRateLimit(req);
+    if (!rate.ok) {
+      return new Response(
+        JSON.stringify(rpcError(body.id, -32000, "Rate limit exceeded on advisor surface")),
+        {
+          status: 429,
+          headers: {
+            ...CORS,
+            "Content-Type": "application/json",
+            "Retry-After": String(rate.retryAfterSec),
+          },
+        },
+      );
+    }
+    // If a key/bearer is presented, still validate it (bad key fails fast).
+    const authHeader = req.headers.get("Authorization");
+    const apiKey = req.headers.get("X-API-Key");
+    if (authHeader || apiKey) {
+      const auth = await authenticate(req);
+      if (!auth.ok) {
+        return new Response(
+          JSON.stringify(rpcError(body.id, -32000, auth.error || "Unauthorized")),
+          {
+            status: auth.status || 401,
+            headers: {
+              ...CORS,
+              "Content-Type": "application/json",
+              "WWW-Authenticate": `Bearer realm="nuke", resource_metadata="https://nuke.ag/.well-known/oauth-protected-resource"`,
+            },
+          },
+        );
+      }
+    }
+
+    const response = await handleAdvisorJsonRpc(body);
+    if (response === null) {
+      return new Response(null, { status: 202, headers: CORS });
+    }
+    const baseHeaders: Record<string, string> = { ...CORS };
+    if (body.method === "initialize") {
+      baseHeaders["Mcp-Session-Id"] = crypto.randomUUID();
+    }
+    const accept = req.headers.get("Accept") || "";
+    const wantSSE = accept.includes("text/event-stream");
+    if (wantSSE) {
+      const ssePayload = `event: message\ndata: ${JSON.stringify(response)}\n\n`;
+      return new Response(ssePayload, {
+        status: 200,
+        headers: { ...baseHeaders, "Content-Type": "text/event-stream", "Cache-Control": "no-cache" },
+      });
+    }
+    return new Response(JSON.stringify(response), {
+      status: 200,
+      headers: { ...baseHeaders, "Content-Type": "application/json" },
+    });
   }
 
   // Auth — required for write tools, optional for read tools.
@@ -6285,7 +6360,7 @@ Deno.serve(async (req: Request) => {
     }
   }
 
-  // Route to MCP handler
+  // Route to MCP handler (full catalog or ChatGPT allowlist — not advisor)
   const response = await handleJsonRpc(body, isChatGptSurface(req));
 
   // Notifications get 202 (no body)

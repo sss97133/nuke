@@ -84,6 +84,16 @@ outcome row is a thesis. A stack with an outcome ledger has a track record.
 - **Web**: [`nuke_frontend/`](nuke_frontend/) (Vite, React), deployed by Vercel.
 - **iOS**: the capture app in [`apps/`](apps/).
 
+## MCP: Nuke Asset Advisor
+
+Read-only, citation-first MCP for agents (`https://nuke.ag/mcp/advisor` after deploy). Full connector remains at `/mcp`.
+
+```json
+{ "mcpServers": { "nuke-asset-advisor": { "url": "https://nuke.ag/mcp/advisor" } } }
+```
+
+Install for Claude Code, Cursor, and Claude Desktop: [`supabase/functions/mcp-connector/ADVISOR.md`](supabase/functions/mcp-connector/ADVISOR.md).
+
 ## Read further
 
 | Question | Read |
@@ -92,6 +102,7 @@ outcome row is a thesis. A stack with an outcome ledger has a track record.
 | What are the stacks, and what does each one need? | [`data-machine-cases.md` §13](docs/ledger/theory/data-machine-cases.md#13-aspiration-twenty-stacks-the-model-must-be-able-to-carry-owner-2026-10-06) |
 | How do I work in this repo? | [`AGENTS.md`](AGENTS.md) |
 | Which function does X? | [`TOOLS.md`](TOOLS.md) |
+| How do agents install Nuke MCP? | [`supabase/functions/mcp-connector/ADVISOR.md`](supabase/functions/mcp-connector/ADVISOR.md) |
 
 <details>
 <summary>Daily measurements</summary>

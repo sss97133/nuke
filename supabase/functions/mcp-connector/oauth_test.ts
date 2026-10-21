@@ -22,6 +22,12 @@ const scopeAllowsWriteTier = (globalThis as any).__scopeAllowsWriteTier;
 const requireWriteAuth = (globalThis as any).__requireWriteAuth;
 const requireAdminOrService = (globalThis as any).__requireAdminOrService;
 type WriteTier = string;
+// Advisor surface stubs: oauth_test covers the default /mcp entry, not /mcp/advisor.
+const isAdvisorSurface = (_req: Request) => false;
+const checkAdvisorRateLimit = (_req: Request) => ({ ok: true as const });
+const handleAdvisorJsonRpc = async (_body: unknown) => null;
+const initAdvisorHandlers = (_deps: unknown) => {};
+const callEdgeApi = async () => ({});
 ` + slice("const CORS = {", "// ── Edge Function Proxy") + slice("interface JsonRpcRequest", "const sb = ()") + `
 const calls: Array<{ name: string; args: Record<string, unknown> }> = [];
 const TOOL_HANDLERS = Object.fromEntries(${JSON.stringify(handlerNames)}.map((name: string) =>
