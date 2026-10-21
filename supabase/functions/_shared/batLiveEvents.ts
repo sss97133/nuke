@@ -5,6 +5,7 @@
 import { buildAuctionCommentRows, sha256Hex, summarizeAuction } from "./batAuctionRecord.ts";
 
 export const BAT_LIVE_MODE = "bat_live_events_v1";
+export const BAT_LIVE_COLLECT_MODE = "bat_live_collect_v1";
 export const BAT_PUBLIC_SOCKET = "wss://ws-us3.pusher.com/app/dea479875ad558950918?protocol=7&client=js&version=7.0.0&flash=false";
 export interface BatLiveTarget {
   id: string; vehicle_id: string; post_id: number; source_url: string;

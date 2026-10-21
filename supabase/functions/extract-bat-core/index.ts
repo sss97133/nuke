@@ -52,14 +52,14 @@ import { sourceReadClock } from "./sourceReadClock.ts";
 import { auctionClose, planEndRows, writtenBeforeItsEnd, END_EVENT_TYPES, type EndRow } from "./auctionClose.ts";
 import { recordListingDescription } from "./descriptionObservation.ts";
 import { loadDescriptionInput, descriptionInputFingerprint, descriptionPreview } from "../discover-description-data/descriptionInput.ts";
-import { closingBatTargets, collectBatLive, batStreamIO } from "./liveStream.ts";
+import { handoffBatLiveCollection } from "./liveStream.ts";
 import { BAT_LIVE_MODE } from "../_shared/batLiveEvents.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { retainFetchedCapture, type CaptureAcknowledgement } from "../_shared/archiveFetch.ts";
 declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void };
 
 // Extractor versioning - update on each significant change
-const EXTRACTOR_VERSION = 'extract-bat-core:4.5.6';
+const EXTRACTOR_VERSION = 'extract-bat-core:4.5.7';
 
 // Shared column list for the four vehicle-existence lookups below
 // (discovery_url / bat_auction_url / listing_url / update-existing-vehicle
@@ -1165,17 +1165,9 @@ Deno.serve(async (req) => {
       }
       if (Object.keys(body).some(k => !["mode", "dry_run"].includes(k))
         || (body.dry_run !== undefined && typeof body.dry_run !== "boolean")) throw new Error("Invalid live stream selectors");
-      const db = createClient(supabaseUrl, serviceRoleKey, { global: { headers: { "X-Nuke-Writer": "extract-bat-core" } } });
-      const selectionStarted = performance.now();
-      const targets = await closingBatTargets(db);
-      const selectionMs = performance.now() - selectionStarted;
-      if (body.dry_run !== true && targets.length) {
-        EdgeRuntime.waitUntil(collectBatLive(targets, batStreamIO(supabaseUrl, serviceRoleKey,
-          { requestAt: nativeRequestStartedAt, authMs, selectionMs })));
-      }
-      return new Response(JSON.stringify({ success: true, mode: body.mode, dry_run: body.dry_run === true,
-        selected_lots: targets.length, collector_duration_seconds: 115, model_calls: 0,
-        transport: "public_pusher", targets: body.dry_run === true ? targets : undefined }),
+      const result = await handoffBatLiveCollection(supabaseUrl, serviceRoleKey, body.dry_run === true,
+        { requestAt: nativeRequestStartedAt, authMs });
+      return new Response(JSON.stringify(result),
         { status: body.dry_run === true ? 200 : 202, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
     if (body?.mode === "description_source") {
