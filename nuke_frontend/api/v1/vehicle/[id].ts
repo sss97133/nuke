@@ -67,9 +67,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     meta: {
       url: `https://nuke.ag/vehicle/${vehicle.id}`,
       api_url: `https://nuke.ag/api/v1/vehicle/${vehicle.id}`,
-      mcp_endpoint: 'https://nuke.ag/mcp',
-      mcp_tool: 'get_vehicle',
-      mcp_hint: 'For deeper data (events, images, comments, observations), connect via MCP at the endpoint above.',
+      mcp_endpoint: 'https://nuke.ag/mcp/advisor',
+      mcp_tool: 'get_asset',
+      mcp_hint: 'Cited asset reads: https://nuke.ag/mcp/advisor. Full connector remains at https://nuke.ag/mcp.',
     },
   });
 }

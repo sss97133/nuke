@@ -19,7 +19,28 @@ import {
 
 export const config = {
   matcher: ['/', '/market', '/journal', '/llms.txt', '/vehicle/:path*', '/api/v1/vehicle/:path*',
-    '/jobs', '/jobs/:path*', '/providers/:path*', '/org/:path*', '/sitemap-work.xml', '/login', '/work', '/work/setup'],
+    '/jobs', '/jobs/:path*', '/providers/:path*', '/org/:path*', '/sitemap-work.xml', '/login', '/work', '/work/setup',
+    '/docs', '/docs/:path*', '/api', '/.well-known/mcp.json'],
+};
+
+const MCP_SERVER_CARD = {
+  name: 'Nuke Asset Advisor',
+  description:
+    'Read-only, citation-first MCP for physical assets (vehicles first). Every claim carries sources, event dates, and confidence.',
+  url: 'https://nuke.ag/mcp/advisor',
+  version: '1.0.0',
+  protocol: '2025-03-26',
+  transport: 'streamable-http',
+  authentication: {
+    required: false,
+    note: 'Anonymous reads allowed. Optional X-API-Key for rate-limit identity.',
+  },
+  tools: [
+    'find_asset', 'get_asset', 'get_history', 'explain_field',
+    'value_asset', 'get_comps', 'get_coverage',
+  ],
+  documentation: 'https://nuke.ag/llms.txt',
+  full_connector: 'https://nuke.ag/mcp',
 };
 
 // ── Vehicle data config ──────────────────────────────────────────────────────
@@ -264,10 +285,17 @@ function llmsTxt(b: Board): string {
     '- [The data machine: nine layers from log to outcome](https://github.com/sss97133/nuke/blob/main/docs/ledger/theory/data-machine.md)',
     '- [Evidence: graded predictions and the stack registry](https://nuke.ag/evidence.md)',
     '', '## Use it',
-    '- [MCP endpoint](https://nuke.ag/mcp)',
+    '- [MCP Asset Advisor (read-only, cited)](https://nuke.ag/mcp/advisor)',
+    '- [MCP server card](https://nuke.ag/.well-known/mcp.json)',
+    '- [MCP full connector](https://nuke.ag/mcp)',
     '- [Vehicle API: GET /api/v1/vehicle/{id}](https://nuke.ag/api/v1/vehicle)',
     '- [Developers](https://nuke.ag/developers)',
     '- [Sitemap](https://nuke.ag/sitemap.xml)',
+    '', '## Nuke Asset Advisor',
+    'Install in any MCP client as a Streamable HTTP server at `https://nuke.ag/mcp/advisor`.',
+    'Anonymous reads are allowed. Tools: find_asset, get_asset, get_history, explain_field, value_asset, get_comps, get_coverage.',
+    'Every answer is an evidence envelope: cite source_name, source_url, and event_time; never invent missing fields — say not recorded.',
+    'event_time is the real-world sale/auction clock; ingested_at is when Nuke learned the row — do not conflate them.',
     '', '## Sources and their coverage',
   ];
   if (b) {
@@ -508,6 +536,35 @@ export default async function middleware(request: Request): Promise<Response | u
   // The base-HTML fetch below calls this deployment's own root; let it through to the static shell.
   if (request.headers.get(INTERNAL_HEADER)) return undefined;
 
+  // ── MCP server card (agent discovery) ──
+  if (url.pathname === '/.well-known/mcp.json') {
+    return new Response(JSON.stringify(MCP_SERVER_CARD, null, 2) + '\n', {
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Cache-Control': 'public, max-age=300',
+        'Access-Control-Allow-Origin': '*',
+      },
+    });
+  }
+
+  // ── Real 404s for unknown agent/docs paths (do not SPA-fallback as 200 HTML) ──
+  if (url.pathname === '/docs' || url.pathname.startsWith('/docs/')) {
+    return new Response(JSON.stringify({ error: 'not_found', path: url.pathname }), {
+      status: 404,
+      headers: { 'Content-Type': 'application/json; charset=utf-8', 'Access-Control-Allow-Origin': '*' },
+    });
+  }
+  if (url.pathname === '/api' || url.pathname === '/api/') {
+    return new Response(JSON.stringify({
+      error: 'not_found',
+      path: url.pathname,
+      hint: 'Use /api/v1/vehicle/{id}, /mcp/advisor, or https://nuke.ag/llms.txt',
+    }), {
+      status: 404,
+      headers: { 'Content-Type': 'application/json; charset=utf-8', 'Access-Control-Allow-Origin': '*' },
+    });
+  }
+
   // ── /llms.txt and the readable public pages ──
   if (url.pathname === '/llms.txt') {
     return new Response(llmsTxt(await fetchBoard()), {
@@ -569,9 +626,9 @@ export default async function middleware(request: Request): Promise<Response | u
         meta: {
           url: `https://nuke.ag/vehicle/${vehicle.id}`,
           api_url: `https://nuke.ag/api/v1/vehicle/${vehicle.id}`,
-          mcp_endpoint: 'https://nuke.ag/mcp',
-          mcp_tool: 'get_vehicle',
-          mcp_hint: 'For deeper data (events, images, comments, observations), connect via MCP at the endpoint above.',
+          mcp_endpoint: 'https://nuke.ag/mcp/advisor',
+          mcp_tool: 'get_asset',
+          mcp_hint: 'Cited asset reads: https://nuke.ag/mcp/advisor. Full connector remains at https://nuke.ag/mcp.',
         },
       }),
       {
@@ -637,8 +694,8 @@ export default async function middleware(request: Request): Promise<Response | u
         meta: {
           url: `https://nuke.ag/vehicle/${vehicle.id}`,
           api_url: `https://nuke.ag/api/v1/vehicle/${vehicle.id}`,
-          mcp_endpoint: 'https://nuke.ag/mcp',
-          mcp_tool: 'get_vehicle',
+          mcp_endpoint: 'https://nuke.ag/mcp/advisor',
+          mcp_tool: 'get_asset',
         },
       }),
       {

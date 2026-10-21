@@ -16,8 +16,9 @@ export default function handler(_req: VercelRequest, res: VercelResponse) {
       },
     },
     mcp: {
-      endpoint: 'https://nuke.ag/mcp',
-      description: 'Model Context Protocol endpoint for deeper vehicle data. Supports 22 tools including get_vehicle, query_vehicle_deep, and search.',
+      endpoint: 'https://nuke.ag/mcp/advisor',
+      server_card: 'https://nuke.ag/.well-known/mcp.json',
+      description: 'Nuke Asset Advisor — read-only cited tools (find_asset, get_asset, get_history, …). Full connector remains at https://nuke.ag/mcp.',
     },
     docs: 'https://nuke.ag/developers',
   });
