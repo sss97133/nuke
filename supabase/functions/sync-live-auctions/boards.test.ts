@@ -1,3 +1,4 @@
+import { parseMbAuctionList, parseMbLot } from "./boards.ts";
 import { assertEquals } from "jsr:@std/assert@1";
 import {
   type BonhamsSaleDoc, bonhamsLot, bonhamsLotPhase, bonhamsSaleKind, parseBonhamsBidStates, parsePcarBids, parsePcarBoard,
@@ -59,6 +60,43 @@ Deno.test("parsePcarBids reads the lot's bid history with Basta ids and clocks, 
     ["45acc0f7", 3000, "2026-10-16T14:48:04Z", "SuprDough", "WINNING"],
   ]);
   assertEquals(parsePcarBids("<html>no bids</html>"), []);
+});
+
+// Three cards of https://thembmarket.com/ajax/index.php?action=get_auction_list (type=live, 2026-10-20 20:03Z), as served:
+// a lot with a bid, a lot with none yet ("Bidding now open") and a parts lot.
+const MB_LIST =
+  '<div class="box"><a href="/1995-mercedes-benz-s600-1"><div class="auction-image"><img class="lazy" data-src="https://thembmarket.com/cdn-cgi/image/fit=contain,width=578,quality=90//uploads/listings/mark1/oct-2026-s600/gallery/5s2a6569.jpg" src="/uploads/placeholder-loading.png" alt="auction image"></div><div class="inner-text"><h3 >7k-Mile 1995 Mercedes-Benz S600</h3><div class="split"><div class="current-bid"><span class="bold color-pink pr-0">CURRENT BID: </span><span>$40,000</span></div><div class="ends-bid">ENDS IN: <span>5d </span></div></div><p></p></div><div class="split"><div></div><div class="btn-group"> <a href="/1995-mercedes-benz-s600-1" class="btn primary" type="submit">MORE DETAILS <i class="fas fa-arrow-right"></i></a></div></div></a></div>' +
+  '<div class="box"><a href="/2003-mercedes-benz-ml55-amg-2"><div class="auction-image"><img class="lazy" data-src="https://thembmarket.com/cdn-cgi/image/fit=contain,width=578,quality=90//uploads/listings/genevamotorcars/2003-ml55-silver/gallery/ml55-79-of-133.jpeg" src="/uploads/placeholder-loading.png" alt="auction image"></div><div class="inner-text"><h3 >47k-Mile 2003 Mercedes-Benz ML55 AMG</h3><div class="split"><div class="current-bid"><span class="bold color-pink pr-0">Bidding now open</div><div class="ends-bid">ENDS IN: <span>7d </span></div></div><p></p></div><div class="split"><div></div><div class="btn-group"> <a href="/2003-mercedes-benz-ml55-amg-2" class="btn primary" type="submit">MORE DETAILS <i class="fas fa-arrow-right"></i></a></div></div></a></div>' +
+  '<div class="box"><a href="/authentic-amg-steering-wheel-2"><div class="auction-image"><img src="https://thembmarket.com/cdn-cgi/image/fit=contain,width=578,quality=90//uploads/listings/smrlsn09/oct-2026-steering-wheel/img_0504.jpeg" alt="auction image"></div><div class="inner-text"><h3 >Authentic AMG Steering Wheel</h3><div class="split"><div class="current-bid"><span class="bold color-pink pr-0">CURRENT BID: </span><span>$400</span></div><div class="ends-bid">ENDS IN: <span>1d </span></div></div><p></p></div><div class="split"><div></div><div class="btn-group"> <a href="/authentic-amg-steering-wheel-2" class="btn primary" type="submit">MORE DETAILS <i class="fas fa-arrow-right"></i></a></div></div></a></div>';
+
+Deno.test("parseMbAuctionList reads each live card's link, title, bid in dollars and image; no bid yet reads null", () => {
+  const cards = parseMbAuctionList(MB_LIST);
+  assertEquals(cards.length, 3);
+  assertEquals(cards[0], {
+    slug: "1995-mercedes-benz-s600-1",
+    url: "https://thembmarket.com/1995-mercedes-benz-s600-1",
+    title: "7k-Mile 1995 Mercedes-Benz S600",
+    current_bid: 40000,
+    currency: "USD",
+    image: "https://thembmarket.com/cdn-cgi/image/fit=contain,width=578,quality=90//uploads/listings/mark1/oct-2026-s600/gallery/5s2a6569.jpg",
+  });
+  assertEquals([cards[1].slug, cards[1].current_bid, cards[1].currency], ["2003-mercedes-benz-ml55-amg-2", null, null]);
+  assertEquals([cards[2].title, cards[2].current_bid], ["Authentic AMG Steering Wheel", 400]);
+  assertEquals(parseMbAuctionList('<div class="no-results ajax-message ajax-error">No results found for the selected filters</div>'), []);
+});
+
+Deno.test("parseMbLot reads the close time from time_ends_ts, the bid count and the bid; a lot without bids counts 0", () => {
+  // From https://thembmarket.com/1995-mercedes-benz-s600-1 (2026-10-20 20:03Z; the page shows "ENDS ON 10/26/2026 03:50PM EST").
+  const s600 = '<div class="current-bid"><div><i class="fas fa-dollar-sign"></i>CURRENT BID </div><span>$40,000<span>' +
+    '<div class="bids-quantity"><div><a id="bid_history_btn" title="Bid History" href="#bid_history"><i class="fas fa-caret-down"></i></a>BID HISTORY </div><span><a id="bid_history_btn" title="Bid History" href="#bid_history">21</a></span></div>' +
+    '<input type="hidden" id="time_ends_ts" name="time_ends_ts" value="1793044200" >';
+  assertEquals(parseMbLot(s600), { ends: "2026-10-26T19:50:00.000Z", bid_count: 21, current_bid: 40000 });
+  // From https://thembmarket.com/1989-mercedes-benz-190e-2-6-1 (same read): no bid yet.
+  const noBid = '<div class="current-bid"><div><i class="fas fa-dollar-sign"></i>CURRENT BID </div><span>Bidding Now Open' +
+    '<div class="bids-quantity"><div><a id="bid_history_btn" title="Bid History" href="#bid_history"><i class="fas fa-caret-down"></i></a>BID HISTORY </div><span><a id="bid_history_btn" title="Bid History" href="#bid_history">Bidding Now Open</a></span></div>' +
+    '<input type="hidden" id="time_ends_ts" name="time_ends_ts" value="1793127000" >';
+  assertEquals(parseMbLot(noBid), { ends: "2026-10-27T18:50:00.000Z", bid_count: 0, current_bid: null });
+  assertEquals(parseMbLot("<html></html>"), { ends: null, bid_count: null, current_bid: null });
 });
 
 Deno.test("bonhamsLot keeps the www.bonhams.com url spelling, the lot's hammer time and the estimate in its currency", () => {
