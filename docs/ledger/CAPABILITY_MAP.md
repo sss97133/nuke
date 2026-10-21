@@ -134,7 +134,7 @@ Generated 2026-07-12 from the Canonical Ledger (`CANONICAL_LEDGER.md`, `ledger.j
 | Outbound webhooks | `webhooks-manage` — REGISTRATION ONLY; delivery is dead and tables webhook_endpoints/deliveries DO NOT EXIST (half-capability) † | webhooks-deliver (zombie) |
 | Transaction SMS | `send-transaction-sms` ⚠ (live FE path, source deleted — restore first) | all other sms-* fns (dead) |
 | Telegram / bots | CAPABILITY RETIRED (map's "@Sss97133_bot running" is FALSE) | telegram-* ×6, nuke-data-bot/tech-bot/nukeproof-bot/nuke-mini |
-| Conversational DB access | `mcp-connector` (prod /mcp per vercel.json) | nuke-data-bot (folded into mcp-connector 2026-03-20), mcp/ + mcp-servers/ root dirs |
+| Conversational DB access | `mcp-connector` (prod /mcp per vercel.json); read-only Asset Advisor surface at `/mcp/advisor` (same function, curated tools) | nuke-data-bot (folded into mcp-connector 2026-03-20), mcp/ + mcp-servers/ root dirs; do not mint a sibling advisor edge function |
 | Concierge | EXTERNAL REPO `~/lofficiel-concierge` (concierge-ground/house/partner) — never mint concierge code in nuke | nuke-repo concierge-notify/-webhook/-villa-discovery (deleted) |
 | **RESTORATION / WORK** | | |
 | Work record ledger | `work_sessions` table — write via `create-work-session-from-evidence` (UI) or mcp-connector `confirm_work_session` (agent) | `work-session` fn (ZERO callers — trap name), vehicle_jobs, work-intake-batch / sms-work-intake / telegram-restoration-bot / intelligent-work-detector (deleted). `work_orders` is no longer "0 rows ever": it is the job header (next row), linked to sessions only through an evidenced edge |
@@ -177,7 +177,7 @@ Generated 2026-07-12 from the Canonical Ledger (`CANONICAL_LEDGER.md`, `ledger.j
 | Org/place profile | `OrganizationProfile.tsx` (/org/:orgId) | Place.tsx, SubjectProfile.tsx (unrouted) |
 | Any new admin/list/landing page | DON'T — 59 routed-but-unlinked pages exist; search routes/ first | minting page N+1 |
 | **REPO / OPS** | | |
-| MCP server | `supabase/functions/mcp-connector` (prod); desktop package = mcp-server/ | mcp/ (Oct-25), mcp-servers/ (Mar-26) |
+| MCP server | `supabase/functions/mcp-connector` (prod `/mcp` + Asset Advisor `/mcp/advisor`); desktop package = mcp-server/; install doc `supabase/functions/mcp-connector/ADVISOR.md` | mcp/ (Oct-25), mcp-servers/ (Mar-26); parallel advisor edge functions |
 | Status / work logging | `DONE.md` via `claude-log-done` + docs/ for durable docs | root status-report .md files (35 dead examples) |
 | Scratch / staging output | `output/` (facts must still land in Nuke DB) | tmp/, root JSON/HTML dumps, new report .md files |
 | Frontend build output | `nuke_frontend/dist` (vercel.json outputDirectory) | root dist/ |
