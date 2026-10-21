@@ -256,7 +256,7 @@ Deno.test({
       }),
     );
     // Always pass — this is a status probe, not a gate, until deploy.
-    assert(ADVISOR_TOOLS.length === 5, "local catalog ready");
+    assert(ADVISOR_TOOLS.length === 7, "local catalog ready");
     void handleAdvisorJsonRpc;
     void initAdvisorHandlers;
   },

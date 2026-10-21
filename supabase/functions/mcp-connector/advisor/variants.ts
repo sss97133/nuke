@@ -57,6 +57,43 @@ export function isVariantMismatch(subject: VariantKey, candidate: VariantKey): b
   return true;
 }
 
+/** Normalize body style from structured fields or listing/title text. Never invents. */
+export function bodyBucket(s: string | null | undefined): string | null {
+  if (!s) return null;
+  const t = String(s).toLowerCase();
+  if (/cabrio|convertible|cab\b|cabriolet/.test(t)) return "cabriolet";
+  if (/targa/.test(t)) return "targa";
+  if (/coupe|coupé/.test(t)) return "coupe";
+  if (/sedan|saloon/.test(t)) return "sedan";
+  if (/wagon|estate|avant/.test(t)) return "wagon";
+  if (/suv|crossover/.test(t)) return "suv";
+  if (/roadster|spyder|spider/.test(t)) return "roadster";
+  return t.trim() || null;
+}
+
+/** Normalize transmission from structured fields or listing/title text. Never invents. */
+export function transBucket(s: string | null | undefined): string | null {
+  if (!s) return null;
+  const t = String(s).toLowerCase();
+  if (/g50/.test(t)) return "g50";
+  if (/915/.test(t)) return "915";
+  if (/tiptronic|pdk|automatic|auto\b|dct|dsg/.test(t)) return "automatic";
+  if (/manual|5[\s-]?speed|4[\s-]?speed|6[\s-]?speed|stick/.test(t)) return "manual";
+  return t.trim() || null;
+}
+
+/** Derive body/trans from title, URL, model, and listing text when columns are null. */
+export function deriveSpecFromText(blob: string | null | undefined): {
+  body_style: string | null;
+  transmission: string | null;
+} {
+  const t = blob || "";
+  return {
+    body_style: bodyBucket(t),
+    transmission: transBucket(t),
+  };
+}
+
 /** Normalize listing URLs for dedupe (trailing slash, quotes, marketplace- prefix). */
 export function canonicalListingUrl(url: string | null | undefined): string {
   if (!url) return "";

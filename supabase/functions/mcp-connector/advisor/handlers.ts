@@ -14,13 +14,25 @@ import {
 } from "./evidence.ts";
 import { handleEvaluateListing } from "./evaluate_listing.ts";
 import {
+  LIVE_VEHICLE_COLS,
+  dedupeEvents,
+  isAskOnlyPlatform,
+  liveVehicles,
+  resolveLiveVehicle,
+  resolveSpecFields,
+  type SpecFieldResult,
+} from "./ledger.ts";
+import {
+  bodyBucket,
   canonicalListingUrl,
   cleanListingUrl,
+  deriveSpecFromText,
   detectVariant,
   isLikelyPartsSale,
   isVariantMismatch,
   recentSaleSanityGuard,
   scoreSimilarity,
+  transBucket,
   type VariantKey,
 } from "./variants.ts";
 
@@ -164,13 +176,32 @@ export function createAdvisorHandlers(deps: AdvisorDeps): Record<
   string,
   (args: Record<string, unknown>) => Promise<AdvisorToolResult>
 > {
-  // Exactly the five catalog tools. Legacy helpers remain in-file for folding into responses.
+  // Catalog tools (find_listings + get_history enabled for deal-finding / history).
   return {
     find_asset: (args) => handleFindAsset(deps, args),
+    find_listings: (args) => handleFindListings(deps, args),
     get_asset: (args) => handleGetAsset(deps, args),
     get_comps: (args) => handleGetComps(deps, args),
+    get_history: (args) => handleGetHistory(deps, args),
     value_asset: (args) => handleValueAsset(deps, args),
     evaluate_listing: (args) => handleEvaluateListing(deps, args),
+  };
+}
+
+/** Claim opts from a SpecFieldResult — never invents a numeric confidence. */
+function claimFromSpec(spec: SpecFieldResult): {
+  confidence: number | null;
+  confidence_basis: SpecFieldResult["confidence_basis"];
+  citations: Citation[];
+  note?: string;
+} {
+  return {
+    confidence: spec.confidence,
+    confidence_basis: spec.confidence_basis,
+    citations: spec.citations,
+    note: spec.source === "none"
+      ? undefined
+      : `spec_source=${spec.source}`,
   };
 }
 
@@ -264,45 +295,79 @@ async function resolveSoldComps(
     model?: string | null;
     year?: number | null;
     limit?: number;
+    offset?: number;
+    body?: string | null;
+    transmission?: string | null;
+    miles_min?: number | null;
+    miles_max?: number | null;
   },
 ): Promise<{ comps: SoldComp[]; query: Record<string, unknown>; excluded: Record<string, number> }> {
-  const limit = Math.min(Math.max(Number(args.limit) || 10, 1), 25);
+  const limit = Math.min(Math.max(Number(args.limit) || 10, 1), 100);
+  const offset = Math.max(Number(args.offset) || 0, 0);
   const sb = deps.sb();
   let make = args.make ?? null;
   let model = args.model ?? null;
   let year = args.year ?? null;
   let excludeId: string | null = args.asset_id ? String(args.asset_id) : null;
   let subject: Record<string, unknown> | null = null;
+  let subjectTrim: string | null = null;
+  let subTrans: string | null = null;
+  let subBody: string | null = null;
+  let subMiles: number | null = null;
 
   if (args.asset_id) {
-    const { data: vrow } = await sb
-      .from("vehicles")
-      .select(
-        "id, year, make, model, trim, transmission, body_style, mileage, engine_type, listing_url, bat_auction_url, listing_title",
-      )
-      .eq("id", String(args.asset_id))
-      .maybeSingle();
-    if (vrow) {
-      subject = vrow;
-      make = make || (vrow.make as string);
-      model = model || (vrow.model as string);
-      year = year ?? (vrow.year as number | null);
-      excludeId = (vrow.id as string) || excludeId;
+    const live = await resolveLiveVehicle(sb, String(args.asset_id));
+    if (live.vehicle && live.resolved_id) {
+      subject = live.vehicle;
+      make = make || (live.vehicle.make as string);
+      model = model || (live.vehicle.model as string);
+      year = year ?? (live.vehicle.year as number | null);
+      excludeId = live.resolved_id;
+      const specs = await resolveSpecFields(sb, live.resolved_id, live.vehicle, [
+        "trim",
+        "body_style",
+        "transmission",
+        "mileage",
+      ]);
+      subjectTrim = specs.get("trim")?.value != null ? String(specs.get("trim")!.value) : null;
+      subBody = bodyBucket(
+        specs.get("body_style")?.value != null
+          ? String(specs.get("body_style")!.value)
+          : null,
+      );
+      subTrans = transBucket(
+        specs.get("transmission")?.value != null
+          ? String(specs.get("transmission")!.value)
+          : null,
+      );
+      const milesRaw = specs.get("mileage")?.value;
+      subMiles = milesRaw != null && Number.isFinite(Number(milesRaw)) ? Number(milesRaw) : null;
+      if (!subBody || !subTrans) {
+        const derived = deriveSpecFromText(
+          `${live.vehicle.model || ""} ${live.vehicle.trim || ""} ${subjectTrim || ""} ${
+            live.vehicle.listing_title || ""
+          } ${live.vehicle.listing_url || ""} ${live.vehicle.bat_auction_url || ""} ${
+            live.vehicle.description || ""
+          }`,
+        );
+        subBody = subBody || derived.body_style;
+        subTrans = subTrans || derived.transmission;
+      }
     }
   }
 
   if (!make) {
-    return { comps: [], query: { make, model, year, limit }, excluded: { no_make: 1 } };
+    return { comps: [], query: { make, model, year, limit, offset }, excluded: { no_make: 1 } };
   }
 
   const subjectVariant = detectVariant(
-    `${subject?.model || model || ""} ${subject?.trim || ""} ${subject?.listing_title || ""} ${
-      subject?.listing_url || ""
-    } ${subject?.bat_auction_url || ""}`,
+    `${subject?.model || model || ""} ${subjectTrim || subject?.trim || ""} ${
+      subject?.listing_title || ""
+    } ${subject?.listing_url || ""} ${subject?.bat_auction_url || ""}`,
   );
 
   const yearRange = 2;
-  const fetchLimit = Math.min(limit * 4, 60);
+  const fetchLimit = Math.min(Math.max(limit + offset, limit) * 4, 200);
   const { data: rpcRows, error: rpcErr } = await sb.rpc("get_comps_combined", {
     p_make: make,
     p_model: model,
@@ -342,23 +407,40 @@ async function resolveSoldComps(
       sold_date: row.sold_date ?? null,
       source_type: row.source_type ?? null,
       similarity_score: row.similarity_score ?? null,
+      body_style: row.body_style ?? null,
+      transmission: row.transmission ?? null,
     }));
   }
 
   const ids = rows.map((r) => String(r.vehicle_id || "")).filter(Boolean);
   const facts = await loadPriceFactsMap(sb, ids);
+  // Enrich body/trans from live vehicle rows when RPC omits them.
+  const { data: enrichRows } = ids.length
+    ? await liveVehicles(
+      sb,
+      "id, trim, body_style, canonical_body_style, transmission, transmission_type, listing_title, listing_url, bat_auction_url, mileage",
+    ).in("id", ids.slice(0, 120))
+    : { data: [] };
+  const enrichMap = new Map<string, Record<string, unknown>>(
+    (enrichRows || []).map((v: Record<string, unknown>) => [String(v.id), v]),
+  );
 
-  // Optional subject attribute boosts (reader-side; does not invent missing transmission).
-  const subTrans = subject?.transmission ? String(subject.transmission).toLowerCase() : null;
-  const subBody = subject?.body_style ? String(subject.body_style).toLowerCase() : null;
-  const subMiles = typeof subject?.mileage === "number" ? subject.mileage as number : null;
+  const filterBody = bodyBucket(args.body) || subBody;
+  const filterTrans = transBucket(args.transmission) || subTrans;
+  const milesMin = args.miles_min != null ? Number(args.miles_min) : null;
+  const milesMax = args.miles_max != null ? Number(args.miles_max) : null;
 
   const excluded: Record<string, number> = {
     not_sold: 0,
     ask_or_bid: 0,
+    ask_only_platform: 0,
+    no_sale_date: 0,
     no_amount: 0,
     hd_diesel_mismatch: 0,
     variant_mismatch: 0,
+    body_mismatch: 0,
+    transmission_mismatch: 0,
+    mileage_mismatch: 0,
     duplicate: 0,
     parts: 0,
   };
@@ -369,6 +451,21 @@ async function resolveSoldComps(
   for (const c of rows) {
     const id = c.vehicle_id ? String(c.vehicle_id) : null;
     const fact = id ? facts.get(id) : null;
+    const enrich = id ? enrichMap.get(id) : null;
+    const platform = String(
+      (c.platform as string) || (fact?.platform as string) || (enrich?.canonical_platform as string) ||
+        "",
+    );
+    const listingUrl = cleanListingUrl(
+      (c.listing_url as string) || (fact?.source_url as string) ||
+        (enrich?.listing_url as string) || (enrich?.bat_auction_url as string) || null,
+    );
+
+    if (isAskOnlyPlatform(platform, listingUrl)) {
+      excluded.ask_only_platform++;
+      continue;
+    }
+
     const amount = fact?.sold_amount != null
       ? Number(fact.sold_amount)
       : c.sale_price != null
@@ -383,30 +480,11 @@ async function resolveSoldComps(
       continue;
     }
     if (!basis && kind !== "sold") {
-      // vehicle_record comps without sale basis are often mislabeled asks.
-      if (!basis) {
-        excluded.not_sold++;
-        continue;
-      }
+      excluded.not_sold++;
+      continue;
     }
     if (amount == null || !(amount > 0)) {
       excluded.no_amount++;
-      continue;
-    }
-
-    const modelText = `${c.model || ""} ${c.trim || ""}`.toLowerCase();
-    if (subject?.model && /diesel|hd\b|2500|3500|dually/.test(modelText) &&
-      !/diesel|hd\b|2500|3500|dually/.test(String(subject.model).toLowerCase())) {
-      excluded.hd_diesel_mismatch++;
-      continue;
-    }
-
-    const listingUrl = cleanListingUrl(
-      (c.listing_url as string) || (fact?.source_url as string) || null,
-    );
-    const canon = canonicalListingUrl(listingUrl);
-    if (canon && seenUrl.has(canon)) {
-      excluded.duplicate++;
       continue;
     }
 
@@ -415,21 +493,75 @@ async function resolveSoldComps(
       : c.sold_date
       ? String(c.sold_date)
       : null;
-    const priceDateKey = soldDate ? `${Math.round(amount)}|${soldDate.slice(0, 10)}` : "";
-    if (priceDateKey && seenPriceDate.has(priceDateKey)) {
+    if (!soldDate) {
+      excluded.no_sale_date++;
+      continue;
+    }
+
+    const modelText = `${c.model || ""} ${c.trim || enrich?.trim || ""}`.toLowerCase();
+    if (
+      subject?.model && /diesel|hd\b|2500|3500|dually/.test(modelText) &&
+      !/diesel|hd\b|2500|3500|dually/.test(String(subject.model).toLowerCase())
+    ) {
+      excluded.hd_diesel_mismatch++;
+      continue;
+    }
+
+    const canon = canonicalListingUrl(listingUrl);
+    if (canon && seenUrl.has(canon)) {
       excluded.duplicate++;
       continue;
     }
 
-    const candBlob = `${c.model || ""} ${c.trim || ""} ${listingUrl || ""}`;
+    const priceDateKey = `${Math.round(amount)}|${soldDate.slice(0, 10)}`;
+    if (seenPriceDate.has(priceDateKey)) {
+      excluded.duplicate++;
+      continue;
+    }
+
+    const candBlob = `${c.model || ""} ${c.trim || enrich?.trim || ""} ${
+      enrich?.listing_title || ""
+    } ${listingUrl || ""}`;
     const candVariant = detectVariant(candBlob);
     if (isVariantMismatch(subjectVariant, candVariant)) {
       excluded.variant_mismatch++;
       continue;
     }
 
+    const derived = deriveSpecFromText(candBlob);
+    const candBody = bodyBucket(
+      (c.body_style as string) || (enrich?.body_style as string) ||
+        (enrich?.canonical_body_style as string) || derived.body_style,
+    );
+    const candTrans = transBucket(
+      (c.transmission as string) || (enrich?.transmission as string) ||
+        (enrich?.transmission_type as string) || derived.transmission,
+    );
+    const candMiles = typeof c.mileage === "number"
+      ? c.mileage
+      : typeof enrich?.mileage === "number"
+      ? enrich.mileage as number
+      : null;
+
+    if (filterBody && candBody && filterBody !== candBody) {
+      excluded.body_mismatch++;
+      continue;
+    }
+    if (filterTrans && candTrans && filterTrans !== candTrans) {
+      excluded.transmission_mismatch++;
+      continue;
+    }
+    if (milesMin != null && candMiles != null && candMiles < milesMin) {
+      excluded.mileage_mismatch++;
+      continue;
+    }
+    if (milesMax != null && candMiles != null && candMiles > milesMax) {
+      excluded.mileage_mismatch++;
+      continue;
+    }
+
     const parts = isLikelyPartsSale({
-      title: String(c.model || ""),
+      title: String(c.model || enrich?.listing_title || ""),
       url: listingUrl,
       model: String(c.model || ""),
       sale_price: amount,
@@ -439,15 +571,14 @@ async function resolveSoldComps(
     if (parts.parts) {
       excluded.parts++;
       flags.push(`parts_suspect:${parts.reason}`);
-      // Keep flagged but do not use as a peer sale in the returned set.
       continue;
     }
 
     if (canon) seenUrl.add(canon);
-    if (priceDateKey) seenPriceDate.add(priceDateKey);
+    seenPriceDate.add(priceDateKey);
 
     const cit = emptyCitation({
-      source_name: (c.platform as string) || (fact?.platform as string) || null,
+      source_name: platform || null,
       source_url: listingUrl,
       observation_id: null,
       event_time: soldDate,
@@ -467,9 +598,9 @@ async function resolveSoldComps(
       candidate: {
         year: c.year != null ? Number(c.year) : null,
         variant: candVariant,
-        body: c.body_style != null ? String(c.body_style).toLowerCase() : null,
-        transmission: c.transmission != null ? String(c.transmission) : null,
-        mileage: typeof c.mileage === "number" ? c.mileage : null,
+        body: candBody,
+        transmission: candTrans,
+        mileage: candMiles,
         model: c.model != null ? String(c.model) : null,
         sale_price: amount,
       },
@@ -480,14 +611,14 @@ async function resolveSoldComps(
       year: c.year,
       make: c.make,
       model: c.model,
-      trim: c.trim ?? null,
+      trim: c.trim ?? enrich?.trim ?? null,
       sale_price: amount,
-      mileage: c.mileage,
+      mileage: candMiles ?? c.mileage,
       sold_date: soldDate,
       listing_url: listingUrl,
-      platform: (c.platform as string) || (fact?.platform as string) || null,
-      transmission: c.transmission ?? null,
-      body_style: c.body_style ?? null,
+      platform: platform || null,
+      transmission: candTrans,
+      body_style: candBody,
       similarity_score: score,
       price_kind: "sold",
       sold_basis: basis,
@@ -499,14 +630,23 @@ async function resolveSoldComps(
 
   sold.sort((a, b) => Number(b.similarity_score || 0) - Number(a.similarity_score || 0));
   return {
-    comps: sold.slice(0, limit),
+    comps: sold.slice(offset, offset + limit),
     query: {
       make,
       model,
       year,
       limit,
+      offset,
       year_range: yearRange,
       subject_variant: subjectVariant,
+      subject_trim: subjectTrim,
+      subject_body: subBody,
+      subject_transmission: subTrans,
+      subject_mileage: subMiles,
+      filter_body: filterBody,
+      filter_transmission: filterTrans,
+      miles_min: milesMin,
+      miles_max: milesMax,
     },
     excluded,
   };
@@ -551,35 +691,34 @@ async function handleFindAsset(
   }
 
   const sb = deps.sb();
-  const selectCols =
-    "id, year, make, model, trim, vin, sale_price, mileage, primary_image_url, listing_url, bat_auction_url, nuke_estimate, location, auction_source, canonical_platform, updated_at, created_at";
+  const selectCols = LIVE_VEHICLE_COLS;
 
   // Prefer indexed equality paths. Full-text on VIN/URL tokens times out on the live fleet.
   const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   // Pre-1981 chassis numbers are often 8–11 chars (e.g. VW 1442612348); modern VINs are 17.
   const vinRe = /^[A-HJ-NPR-Z0-9]{8,17}$/i;
-  const looksUrl = /^https?:\/\//i.test(queryStr) || /bringatrailer\.com|carsandbids\.com|ebay\.com/i.test(queryStr);
+  const looksUrl = /^https?:\/\//i.test(queryStr) ||
+    /bringatrailer\.com|carsandbids\.com|ebay\.com/i.test(queryStr);
 
   let data: Record<string, unknown>[] | null = null;
   let error: { message: string } | null = null;
 
   if (uuidRe.test(queryStr)) {
-    const res = await sb.from("vehicles").select(selectCols).eq("id", queryStr).limit(1);
-    data = res.data;
-    error = res.error;
+    const live = await resolveLiveVehicle(sb, queryStr, selectCols);
+    data = live.vehicle ? [live.vehicle] : [];
   } else if (vinRe.test(queryStr.replace(/\s+/g, ""))) {
     const vin = queryStr.replace(/\s+/g, "").toUpperCase();
-    const res = await sb.from("vehicles").select(selectCols).eq("vin", vin).limit(limit);
+    const res = await liveVehicles(sb, selectCols).eq("vin", vin).limit(limit);
     data = res.data;
     error = res.error;
   } else if (looksUrl) {
     const url = queryStr.trim().replace(/\/$/, "");
     // Exact matches first (no .or() with raw URLs — : / break PostgREST filters).
     const exacts = await Promise.all([
-      sb.from("vehicles").select(selectCols).eq("listing_url", url).limit(limit),
-      sb.from("vehicles").select(selectCols).eq("listing_url", url + "/").limit(limit),
-      sb.from("vehicles").select(selectCols).eq("bat_auction_url", url).limit(limit),
-      sb.from("vehicles").select(selectCols).eq("bat_auction_url", url + "/").limit(limit),
+      liveVehicles(sb, selectCols).eq("listing_url", url).limit(limit),
+      liveVehicles(sb, selectCols).eq("listing_url", url + "/").limit(limit),
+      liveVehicles(sb, selectCols).eq("bat_auction_url", url).limit(limit),
+      liveVehicles(sb, selectCols).eq("bat_auction_url", url + "/").limit(limit),
     ]);
     const seen = new Set<string>();
     const merged: Record<string, unknown>[] = [];
@@ -605,8 +744,8 @@ async function handleFindAsset(
       for (const pat of patterns) {
         if (merged.length >= limit) break;
         const [a, b] = await Promise.all([
-          sb.from("vehicles").select(selectCols).ilike("listing_url", pat).limit(limit),
-          sb.from("vehicles").select(selectCols).ilike("bat_auction_url", pat).limit(limit),
+          liveVehicles(sb, selectCols).ilike("listing_url", pat).limit(limit),
+          liveVehicles(sb, selectCols).ilike("bat_auction_url", pat).limit(limit),
         ]);
         error = a.error || b.error || error;
         for (const row of [...(a.data || []), ...(b.data || [])]) {
@@ -624,11 +763,10 @@ async function handleFindAsset(
     const yearMatch = queryStr.match(/\b(19|20)\d{2}\b/);
     const year = yearMatch ? Number(yearMatch[0]) : null;
     const rest = queryStr.replace(/\b(19|20)\d{2}\b/g, " ").trim();
-    let query = sb.from("vehicles").select(selectCols).limit(limit);
+    let query = liveVehicles(sb, selectCols).limit(limit);
     if (year) query = query.eq("year", year);
     if (rest) {
       const parts = rest.split(/\s+/).filter(Boolean);
-      // Every token must match make OR model (AND across tokens).
       for (const p of parts) {
         query = query.or(`make.ilike.%${p}%,model.ilike.%${p}%`);
       }
@@ -640,24 +778,63 @@ async function handleFindAsset(
 
   if (error) return err(error.message, "find_asset");
 
-  let results = (data || []).map((v: Record<string, unknown>) => {
-    const cit = listingCitation(v);
-    const claims: Claim[] = [
-      recordedClaim("year", v.year, { citations: [cit], confidence: 0.8, confidence_basis: "source_trust" }),
-      recordedClaim("make", v.make, { citations: [cit], confidence: 0.8, confidence_basis: "source_trust" }),
-      recordedClaim("model", v.model, { citations: [cit], confidence: 0.8, confidence_basis: "source_trust" }),
-      recordedClaim("vin", v.vin, { citations: [cit], confidence: v.vin ? 0.9 : null, confidence_basis: v.vin ? "source_trust" : "none" }),
-      recordedClaim("sale_price", v.sale_price, { citations: [cit], confidence: v.sale_price != null ? 0.75 : null, confidence_basis: "source_trust" }),
-    ];
-    return {
-      asset_id: v.id,
+  // Follow merges to survivors and drop soft-deleted ghosts; dedupe by resolved id.
+  const resolvedRows: Record<string, unknown>[] = [];
+  const seenResolved = new Set<string>();
+  for (const raw of data || []) {
+    const live = await resolveLiveVehicle(sb, String(raw.id), selectCols);
+    if (!live.vehicle || !live.resolved_id) continue;
+    if (seenResolved.has(live.resolved_id)) continue;
+    seenResolved.add(live.resolved_id);
+    resolvedRows.push(live.vehicle);
+    if (resolvedRows.length >= limit) break;
+  }
+
+  let results: Array<Record<string, unknown>> = [];
+  for (const v of resolvedRows) {
+    const vid = String(v.id);
+    const specs = await resolveSpecFields(sb, vid, v, [
+      "year",
+      "make",
+      "model",
+      "vin",
+    ]);
+    const claims: Claim[] = [];
+    for (const field of ["year", "make", "model", "vin"] as const) {
+      const spec = specs.get(field)!;
+      claims.push(recordedClaim(field, spec.value, claimFromSpec(spec)));
+    }
+    const price = await priceFacts(sb, vid);
+    if (price?.sold) {
+      claims.push(
+        recordedClaim("sale_price", price.sold.amount, {
+          confidence: null,
+          confidence_basis: "none",
+          citations: [
+            emptyCitation({
+              source_name: listingCitation(v).source_name,
+              source_url: price.source_url || listingCitation(v).source_url,
+              observation_id: null,
+              event_time: price.sold.on ? String(price.sold.on) : null,
+              ingested_at: null,
+              is_superseded: false,
+            }),
+          ],
+          note: `Sale basis: ${price.sold.basis}; amount from ${price.sold.from}. Confidence deferred to supporting observations.`,
+        }),
+      );
+    } else {
+      claims.push(notRecordedClaim("sale_price", { checked_sources: ["vehicle_price_facts"] }));
+    }
+    results.push({
+      asset_id: vid,
       asset_type: "vehicle",
       label: [v.year, v.make, v.model].filter(Boolean).join(" "),
       listing_url: v.listing_url || v.bat_auction_url || null,
       primary_image_url: v.primary_image_url || null,
       claims,
-    };
-  });
+    });
+  }
 
   // VIN decode fallback when Nuke has no row for this VIN.
   const vinCandidate = queryStr.replace(/\s+/g, "").toUpperCase();
@@ -676,12 +853,14 @@ async function handleFindAsset(
       };
       const cit = emptyCitation({
         source_name: "NHTSA VPIC",
-        source_url: `https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVinValues/${vinCandidate}?format=json`,
+        source_url:
+          `https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVinValues/${vinCandidate}?format=json`,
         observation_id: null,
         event_time: null,
         ingested_at: new Date().toISOString(),
         is_superseded: false,
       });
+      // External decode — confidence null until graded against Nuke observations.
       results = [{
         asset_id: null,
         asset_type: "vehicle",
@@ -689,10 +868,30 @@ async function handleFindAsset(
         listing_url: null,
         primary_image_url: null,
         claims: [
-          recordedClaim("year", decoded.ModelYear || null, { citations: [cit], confidence: 0.7, confidence_basis: "source_trust" }),
-          recordedClaim("make", decoded.Make || null, { citations: [cit], confidence: 0.7, confidence_basis: "source_trust" }),
-          recordedClaim("model", decoded.Model || null, { citations: [cit], confidence: 0.7, confidence_basis: "source_trust" }),
-          recordedClaim("vin", vinCandidate, { citations: [cit], confidence: 0.95, confidence_basis: "source_trust" }),
+          recordedClaim("year", decoded.ModelYear || null, {
+            citations: [cit],
+            confidence: null,
+            confidence_basis: "none",
+            note: "NHTSA VPIC decode; not a Nuke observation",
+          }),
+          recordedClaim("make", decoded.Make || null, {
+            citations: [cit],
+            confidence: null,
+            confidence_basis: "none",
+            note: "NHTSA VPIC decode; not a Nuke observation",
+          }),
+          recordedClaim("model", decoded.Model || null, {
+            citations: [cit],
+            confidence: null,
+            confidence_basis: "none",
+            note: "NHTSA VPIC decode; not a Nuke observation",
+          }),
+          recordedClaim("vin", vinCandidate, {
+            citations: [cit],
+            confidence: null,
+            confidence_basis: "none",
+            note: "Input VIN echoed via NHTSA; no Nuke row",
+          }),
           notRecordedClaim("sale_price", { checked_sources: ["vehicles"] }),
         ],
       }];
@@ -732,10 +931,7 @@ async function handleFindListings(
 
   // Active asks + live auctions. Prefer is_for_sale; also include auction_live
   // (may carry high_bid rather than asking_price).
-  let query = sb
-    .from("vehicles")
-    .select(selectCols)
-    .is("deleted_at", null)
+  let query = liveVehicles(sb, selectCols)
     .or("is_for_sale.eq.true,sale_status.eq.auction_live")
     .order("listing_updated_at", { ascending: false, nullsFirst: false })
     .range(offset, offset + fetchLimit - 1);
@@ -826,8 +1022,8 @@ async function handleFindListings(
         `listing.${id}.${priceKind === "ask" ? "asking_price" : "high_bid"}`,
         displayAmount,
         {
-          confidence: stale ? 0.35 : 0.75,
-          confidence_basis: "source_trust",
+          confidence: null,
+          confidence_basis: "none",
           citations: [cit],
           note: stale
             ? "STALE ask — last_verified_at older than threshold; not a confirmed current offer"
@@ -907,97 +1103,44 @@ async function handleGetAsset(
 ): Promise<AdvisorToolResult> {
   const bad = unsupportedAsset(args, "get_asset");
   if (bad) return bad;
-  const vid = String(args.asset_id || "");
-  if (!vid) return err("asset_id is required", "get_asset");
+  const rawId = String(args.asset_id || "");
+  if (!rawId) return err("asset_id is required", "get_asset");
 
   const sb = deps.sb();
-  const { data: vehicle, error } = await sb
-    .from("vehicles")
-    .select(
-      "id, vin, year, make, model, trim, series, body_style, engine_type, engine_displacement, " +
-        "transmission, drivetrain, color, interior_color, mileage, " +
-        "canonical_platform, status, " +
-        "nuke_estimate, nuke_estimate_confidence, " +
-        "primary_image_url, image_count, observation_count, " +
-        "description, location, city, state, country, " +
-        "listing_url, bat_auction_url, created_at, updated_at",
-    )
-    .eq("id", vid)
-    .single();
-  if (error) return err(error.message, "get_asset");
-  if (!vehicle) return err("Asset not found", "get_asset");
+  const live = await resolveLiveVehicle(sb, rawId);
+  if (!live.vehicle || !live.resolved_id) {
+    return err("Asset not found (deleted, missing, or merge chain exhausted)", "get_asset");
+  }
+  const vid = live.resolved_id;
+  const vehicle = live.vehicle;
+  const row = vehicle as Record<string, unknown>;
 
-  const [price, obsRes] = await Promise.all([
+  const [price, specs] = await Promise.all([
     priceFacts(sb, vid),
-    sb
-      .from("vehicle_observations")
-      .select("id, kind, structured_data, confidence_score, observed_at, source_url, source_id, is_superseded, ingested_at")
-      .eq("vehicle_id", vid)
-      .eq("is_superseded", false)
-      .order("ingested_at", { ascending: false })
-      .limit(20),
+    resolveSpecFields(sb, vid, vehicle, IDENTITY_FIELDS),
   ]);
 
-  const obs = obsRes.data || [];
-  const sourceMap = await loadSources(sb, obs.map((o: { source_id: string }) => o.source_id));
-  type EnrichedObs = Record<string, unknown> & {
-    source_name: string | null;
-    source_trust: number | null;
-    structured_data: Record<string, unknown> | null;
-  };
-  const enriched: EnrichedObs[] = obs.map((o: Record<string, unknown>) => {
-    const src = sourceMap.get(o.source_id as string);
-    return {
-      ...o,
-      source_name: src?.display_name ?? null,
-      source_trust: src?.base_trust_score ?? null,
-      structured_data: (o.structured_data || null) as Record<string, unknown> | null,
-    };
-  });
-
-  const listingCit = listingCitation(vehicle as Record<string, unknown>);
+  const listingCit = listingCitation(row);
   const claims: Claim[] = [];
 
-  const row = vehicle as Record<string, unknown>;
-  const colorVal = row.color;
   for (const field of IDENTITY_FIELDS) {
-    const value = field === "exterior_color" ? colorVal : row[field];
-    const matchingObs = enriched.filter((o: EnrichedObs) => {
-      const sd = o.structured_data;
-      if (!sd) return false;
-      return fieldKeys(field).some((k) => sd[k] != null && sd[k] !== "");
-    });
-    const citations: Citation[] = matchingObs.length
-      ? matchingObs.slice(0, 3).map((o: EnrichedObs) => citationFromObservation(o))
-      : value != null && value !== ""
-      ? [listingCit]
-      : [];
-    const best = matchingObs[0];
-    const conf = best
-      ? resolveClaimConfidence(best.confidence_score as number | null, best.source_trust as number | null)
-      : value != null && value !== ""
-      ? { confidence: 0.7, confidence_basis: "source_trust" as const }
-      : { confidence: null, confidence_basis: "none" as const };
-
-    claims.push(
-      recordedClaim(field, value, {
-        ...conf,
-        citations,
-        note: matchingObs.length
-          ? undefined
-          : value != null && value !== ""
-          ? "Value from vehicle record; no matching observation structured_data key found."
-          : undefined,
-      }),
-    );
+    const spec = specs.get(field) || {
+      field,
+      value: null,
+      confidence: null,
+      confidence_basis: "none" as const,
+      citations: [] as Citation[],
+      source: "none" as const,
+    };
+    claims.push(recordedClaim(field, spec.value, claimFromSpec(spec)));
   }
 
-  // Price / sale as first-class claims with event_time from price facts or events
+  // Price / sale — confidence only when a supporting observation score exists (not hard-coded).
   if (price?.sold) {
     claims.push(
       recordedClaim("sale_price", price.sold.amount, {
-        confidence: 0.95,
-        confidence_basis: "claim_score",
+        confidence: null,
+        confidence_basis: "none",
         citations: [
           emptyCitation({
             source_name: listingCit.source_name,
@@ -1008,13 +1151,15 @@ async function handleGetAsset(
             is_superseded: false,
           }),
         ],
-        note: `Sale basis: ${price.sold.basis}; amount from ${price.sold.from}`,
+        note: `Sale basis: ${price.sold.basis}; amount from ${price.sold.from}. Confidence deferred pending observation link.`,
       }),
     );
   } else {
     claims.push(
       notRecordedClaim("sale_price", {
-        checked_sources: ["vehicle_price_facts", listingCit.source_name || "listing"].filter(Boolean) as string[],
+        checked_sources: ["vehicle_price_facts", listingCit.source_name || "listing"].filter(
+          Boolean,
+        ) as string[],
       }),
     );
   }
@@ -1038,10 +1183,13 @@ async function handleGetAsset(
       }),
     );
   } else {
-    claims.push(notRecordedClaim("nuke_estimate", { checked_sources: ["vehicle_price_facts", "nuke_estimates"] }));
+    claims.push(
+      notRecordedClaim("nuke_estimate", {
+        checked_sources: ["vehicle_price_facts", "nuke_estimates"],
+      }),
+    );
   }
 
-  // History + coverage folded in (no separate tools on this surface).
   const [{ data: events }, { count: eventCount }, { count: imageCount }] = await Promise.all([
     sb
       .from("vehicle_events")
@@ -1050,31 +1198,50 @@ async function handleGetAsset(
       )
       .eq("vehicle_id", vid)
       .order("sold_at", { ascending: false, nullsFirst: false })
-      .limit(25),
+      .limit(40),
     sb.from("vehicle_events").select("id", { count: "exact", head: true }).eq("vehicle_id", vid),
     sb.from("vehicle_images").select("id", { count: "exact", head: true }).eq("vehicle_id", vid),
   ]);
 
-  const history = (events || []).map((e: Record<string, unknown>) => ({
-    event_type: e.event_type ?? null,
-    event_status: e.event_status ?? null,
-    event_date: e.sold_at || e.ended_at || e.started_at || null,
-    sale_price: e.final_price ?? null,
-    high_bid: e.current_price ?? null,
-    asking_price: e.starting_price ?? null,
-    source_name: e.source_platform ?? null,
-    source_url: e.source_url ?? null,
-    venue: e.source_platform ?? null,
-  }));
+  const { events: dedupedEvents, duplicates_removed } = dedupeEvents(
+    (events || []) as Record<string, unknown>[],
+  );
+
+  const history = dedupedEvents.slice(0, 25).map((e: Record<string, unknown>) => {
+    const platform = String(e.source_platform || "");
+    const url = e.source_url ? String(e.source_url) : null;
+    const askSite = isAskOnlyPlatform(platform, url);
+    const status = String(e.event_status || "").toLowerCase();
+    let priceRole: "hammer" | "ask" | "high_bid_unsold" | "unknown" = "unknown";
+    if (askSite && (status === "sold" || e.final_price != null)) priceRole = "ask";
+    else if (status === "sold") priceRole = "hammer";
+    else if (status.includes("unsold") || status.includes("not_sold")) priceRole = "high_bid_unsold";
+    else if (status === "active" || status === "for_sale") priceRole = "ask";
+    return {
+      event_type: e.event_type ?? null,
+      event_status: e.event_status ?? null,
+      event_date: e.sold_at || e.ended_at || e.started_at || null,
+      sale_price: priceRole === "hammer" ? e.final_price ?? null : null,
+      high_bid: priceRole === "high_bid_unsold" ? e.final_price ?? e.current_price ?? null : null,
+      asking_price: priceRole === "ask"
+        ? e.final_price ?? e.starting_price ?? null
+        : e.starting_price ?? null,
+      price_role: priceRole,
+      source_name: e.source_platform ?? null,
+      source_url: e.source_url ?? null,
+      venue: e.source_platform ?? null,
+    };
+  });
 
   const recordedFields = IDENTITY_FIELDS.filter((f) => {
-    const v = f === "exterior_color" ? row.color : row[f];
-    return v != null && v !== "";
+    const spec = specs.get(f);
+    return spec && spec.value != null && spec.value !== "";
   });
   const missingFields = IDENTITY_FIELDS.filter((f) => !recordedFields.includes(f));
 
   return ok(
     makeEnvelope("get_asset", "vehicle", vid, claims, {
+      resolved_from: live.followed_merge ? rawId : null,
       status: row.status ?? null,
       location: {
         location: row.location ?? null,
@@ -1090,14 +1257,18 @@ async function handleGetAsset(
       },
       price,
       history,
+      event_duplicates_removed: duplicates_removed,
       coverage: {
         recorded_fields: recordedFields,
         missing_fields: missingFields,
-        observation_count: row.observation_count ?? enriched.length,
+        observation_count: row.observation_count ?? null,
         event_count: eventCount ?? history.length,
         image_count: imageCount ?? row.image_count ?? null,
+        spec_sources: Object.fromEntries(
+          [...specs.entries()].map(([k, v]) => [k, v.source]),
+        ),
       },
-      observation_count: row.observation_count ?? enriched.length,
+      observation_count: row.observation_count ?? null,
       image_count: imageCount ?? row.image_count ?? null,
     }),
   );
@@ -1109,10 +1280,15 @@ async function handleGetHistory(
 ): Promise<AdvisorToolResult> {
   const bad = unsupportedAsset(args, "get_history");
   if (bad) return bad;
-  const vid = String(args.asset_id || "");
-  if (!vid) return err("asset_id is required", "get_history");
+  const rawId = String(args.asset_id || "");
+  if (!rawId) return err("asset_id is required", "get_history");
   const limit = Math.min(Math.max(Number(args.limit) || 25, 1), 100);
   const sb = deps.sb();
+  const live = await resolveLiveVehicle(sb, rawId, "id");
+  if (!live.resolved_id) {
+    return err("Asset not found (deleted, missing, or merge chain exhausted)", "get_history");
+  }
+  const vid = live.resolved_id;
 
   const [eventsRes, obsRes] = await Promise.all([
     sb
@@ -1122,7 +1298,7 @@ async function handleGetHistory(
       )
       .eq("vehicle_id", vid)
       .order("ended_at", { ascending: false, nullsFirst: false })
-      .limit(limit),
+      .limit(Math.min(limit * 2, 150)),
     sb
       .from("vehicle_observations")
       .select(
@@ -1135,19 +1311,27 @@ async function handleGetHistory(
   if (eventsRes.error) return err(eventsRes.error.message, "get_history");
   if (obsRes.error) return err(obsRes.error.message, "get_history");
 
-  const events = eventsRes.data || [];
+  const { events: events, duplicates_removed } = dedupeEvents(
+    (eventsRes.data || []) as Record<string, unknown>[],
+  );
   const obs = obsRes.data || [];
   const sourceMap = await loadSources(sb, obs.map((o: { source_id: string }) => o.source_id));
 
   const claims: Claim[] = [];
   const timeline: Array<Record<string, unknown>> = [];
 
-  for (const ev of events) {
-    const eventTime = extractEventTime(null, [ev.sold_at, ev.ended_at, ev.started_at]);
-    const platform = ev.source_platform === "bat" ? "Bring a Trailer" : ev.source_platform;
+  for (const ev of events.slice(0, limit)) {
+    const eventTime = extractEventTime(null, [
+      ev.sold_at as string | null,
+      ev.ended_at as string | null,
+      ev.started_at as string | null,
+    ]);
+    const platformRaw = String(ev.source_platform || "");
+    const platform = platformRaw === "bat" ? "Bring a Trailer" : platformRaw || null;
+    const url = ev.source_url ? String(ev.source_url) : null;
     const cit = emptyCitation({
-      source_name: platform || null,
-      source_url: ev.source_url,
+      source_name: platform,
+      source_url: url,
       observation_id: null,
       event_time: eventTime,
       ingested_at: null,
@@ -1156,17 +1340,21 @@ async function handleGetHistory(
     const status = String(ev.event_status || "").toLowerCase();
     const etype = String(ev.event_type || "").toLowerCase();
     let priceRole: "hammer" | "ask" | "high_bid_unsold" | "unknown" = "unknown";
-    if (status === "sold" || etype.includes("sale")) priceRole = "hammer";
-    else if (status.includes("unsold") || status.includes("not_sold") || status === "bid_to") {
+    if (isAskOnlyPlatform(platformRaw, url) && (status === "sold" || ev.final_price != null)) {
+      priceRole = "ask";
+    } else if (status === "sold" || etype.includes("sale")) {
+      priceRole = "hammer";
+    } else if (status.includes("unsold") || status.includes("not_sold") || status === "bid_to") {
       priceRole = "high_bid_unsold";
     } else if (etype.includes("list") || status === "active" || status === "for_sale") {
       priceRole = "ask";
     }
     const label = `${ev.event_type || "event"}:${ev.event_status || "unknown"}`;
+    // No hard-coded confidence — price role is structural; score awaits observation link.
     claims.push(
       recordedClaim(`event.${ev.id}.final_price`, ev.final_price, {
-        confidence: ev.final_price != null && priceRole === "hammer" ? 0.9 : ev.final_price != null ? 0.55 : null,
-        confidence_basis: ev.final_price != null ? "claim_score" : "none",
+        confidence: null,
+        confidence_basis: "none",
         citations: [cit],
         note: `${label}; price_role=${priceRole}`,
       }),
@@ -1177,7 +1365,9 @@ async function handleGetHistory(
       event_type: ev.event_type,
       event_status: ev.event_status,
       price_role: priceRole,
-      final_price: ev.final_price,
+      final_price: priceRole === "hammer" ? ev.final_price : null,
+      asking_price: priceRole === "ask" ? ev.final_price ?? ev.starting_price : ev.starting_price,
+      high_bid: priceRole === "high_bid_unsold" ? ev.final_price : null,
       starting_price: ev.starting_price,
       bid_count: ev.bid_count,
       event_time: eventTime,
@@ -1250,12 +1440,15 @@ async function handleGetHistory(
   return ok(
     makeEnvelope("get_history", "vehicle", vid, claims, {
       timeline,
-      event_count: events.length,
+      event_count: Math.min(events.length, limit),
+      event_duplicates_removed: duplicates_removed,
       observation_count: obs.length,
       condition_option_noise_omitted: conditionOptionNoise,
+      resolved_from: live.followed_merge ? rawId : null,
       clocks_note:
         "event_time is the real-world sale/auction clock when known. observed_at on observations is often scrape time; ingested_at is when Nuke stored the row. " +
-        "price_role separates hammer / ask / high_bid_unsold — do not treat asks or unsolds as sales.",
+        "price_role separates hammer / ask / high_bid_unsold — do not treat asks or unsolds as sales. " +
+        "Ask-only platforms (Craigslist, Facebook, KSL, conceptcarz, unknown) never get price_role=hammer.",
     }),
   );
 }
@@ -1459,28 +1652,26 @@ async function handleValueAsset(
   if (!vid) return err("asset_id is required", "value_asset");
   const sb = deps.sb();
 
-  const { data: vehicle } = await sb
-    .from("vehicles")
-    .select(
-      "id, year, make, model, nuke_estimate, nuke_estimate_confidence, listing_url, bat_auction_url, canonical_platform, updated_at, created_at",
-    )
-    .eq("id", vid)
-    .maybeSingle();
-  if (!vehicle) return err("Asset not found", "value_asset");
+  const live = await resolveLiveVehicle(sb, vid);
+  if (!live.vehicle || !live.resolved_id) {
+    return err("Asset not found (deleted, missing, or merge chain exhausted)", "value_asset");
+  }
+  const resolvedId = live.resolved_id;
+  const vehicle = live.vehicle;
 
   const { data: estimates } = await sb
     .from("nuke_estimates")
     .select(
       "estimated_value, value_low, value_high, confidence_score, deal_score, heat_score, price_tier, calculated_at, methodology",
     )
-    .eq("vehicle_id", vid)
+    .eq("vehicle_id", resolvedId)
     .order("calculated_at", { ascending: false })
     .limit(1);
 
   const est = estimates?.[0] ?? null;
-  const price = await priceFacts(sb, vid);
+  const price = await priceFacts(sb, resolvedId);
   const { comps, excluded } = await resolveSoldComps(deps, {
-    asset_id: vid,
+    asset_id: resolvedId,
     make: vehicle.make as string,
     model: vehicle.model as string,
     year: vehicle.year as number,
@@ -1629,8 +1820,8 @@ async function handleValueAsset(
   if (price?.sold) {
     claims.push(
       recordedClaim("last_sale_price", price.sold.amount, {
-        confidence: 0.95,
-        confidence_basis: "claim_score",
+        confidence: null,
+        confidence_basis: "none",
         citations: [
           emptyCitation({
             source_name: listingCitation(vehicle as Record<string, unknown>).source_name,
@@ -1641,15 +1832,15 @@ async function handleValueAsset(
             is_superseded: false,
           }),
         ],
-        note: "Observed sale — not the model estimate",
+        note: "Observed sale — not the model estimate; confidence deferred to observation link",
       }),
     );
   }
   if (price?.ask) {
     claims.push(
       recordedClaim("asking_price", price.ask.amount, {
-        confidence: 0.7,
-        confidence_basis: "source_trust",
+        confidence: null,
+        confidence_basis: "none",
         citations: [listingCitation(vehicle as Record<string, unknown>)],
         note: "Ask — not a hammer price",
       }),
@@ -1657,7 +1848,8 @@ async function handleValueAsset(
   }
 
   return ok(
-    makeEnvelope("value_asset", "vehicle", vid, claims, {
+    makeEnvelope("value_asset", "vehicle", resolvedId, claims, {
+      resolved_from: live.followed_merge ? vid : null,
       value_low: valueLow,
       value_high: valueHigh,
       estimated_value: valuePoint,
@@ -1702,7 +1894,8 @@ async function handleGetComps(
 ): Promise<AdvisorToolResult> {
   const bad = unsupportedAsset(args, "get_comps");
   if (bad) return bad;
-  const limit = Math.min(Math.max(Number(args.limit) || 10, 1), 25);
+  const limit = Math.min(Math.max(Number(args.limit) || 10, 1), 100);
+  const offset = Math.max(Number(args.offset) || 0, 0);
 
   if (!args.asset_id && !args.make && !args.vin) {
     return err("Provide asset_id, or make(+model), or vin", "get_comps");
@@ -1715,10 +1908,9 @@ async function handleGetComps(
   let assetId = args.asset_id ? String(args.asset_id) : undefined;
 
   if (args.vin && !assetId) {
-    const { data: vrow } = await sb
-      .from("vehicles")
-      .select("id, year, make, model")
+    const { data: vrow } = await liveVehicles(sb, "id, year, make, model")
       .eq("vin", String(args.vin).toUpperCase())
+      .limit(1)
       .maybeSingle();
     if (vrow) {
       assetId = String(vrow.id);
@@ -1728,12 +1920,22 @@ async function handleGetComps(
     }
   }
 
+  if (assetId) {
+    const live = await resolveLiveVehicle(sb, assetId);
+    if (live.resolved_id) assetId = live.resolved_id;
+  }
+
   const { comps, query, excluded } = await resolveSoldComps(deps, {
     asset_id: assetId,
     make,
     model,
     year,
     limit,
+    offset,
+    body: typeof args.body === "string" ? args.body : null,
+    transmission: typeof args.transmission === "string" ? args.transmission : null,
+    miles_min: args.miles_min != null ? Number(args.miles_min) : null,
+    miles_max: args.miles_max != null ? Number(args.miles_max) : null,
   });
 
   if (!make && !assetId) {
@@ -1744,8 +1946,8 @@ async function handleGetComps(
   const out = comps.map((c, i) => {
     claims.push(
       recordedClaim(`comp.${i}.sale_price`, c.sale_price, {
-        confidence: c.sold_basis ? 0.9 : 0.7,
-        confidence_basis: "claim_score",
+        confidence: null,
+        confidence_basis: "none",
         citations: [c.citation],
         note: [
           c.year,
@@ -1753,6 +1955,8 @@ async function handleGetComps(
           c.model,
           c.sold_date ? `sold ${c.sold_date}` : "sold_date not recorded",
           `price_kind=sold`,
+          c.sold_basis ? `basis=${c.sold_basis}` : null,
+          c.similarity_score != null ? `similarity=${c.similarity_score}` : null,
         ]
           .filter(Boolean)
           .join(" · "),
@@ -1775,6 +1979,7 @@ async function handleGetComps(
       variant: c.variant,
       flags: c.flags,
       price_kind: "sold" as const,
+      result_type: "sold" as const,
       sold_basis: c.sold_basis,
       citation: c.citation,
     };
@@ -1784,7 +1989,8 @@ async function handleGetComps(
     claims.push(
       notRecordedClaim("comps", {
         checked_sources: ["get_comps_combined", "vehicle_price_facts"],
-        note: "No confirmed sold comps after excluding asks/bids/unbased vehicle_record prices.",
+        note:
+          "No confirmed sold comps after requiring sale date + price, excluding ask-only platforms, asks/bids, parts suspects, and variant mismatches.",
       }),
     );
   }
@@ -1793,10 +1999,13 @@ async function handleGetComps(
     makeEnvelope("get_comps", "vehicle", assetId ?? null, claims, {
       comps: out,
       count: out.length,
+      page: { limit, offset, next_offset: offset + out.length },
       query,
       excluded,
       note:
-        "Only price_kind=sold with a sale basis. Asks, unsold high bids, parts suspects, and variant mismatches are excluded. URLs are canonicalized for dedupe.",
+        "Only dated hammers with a real sale price. Ask-only platforms (Craigslist, Facebook, KSL, conceptcarz, unknown) excluded. " +
+        "Subject trim/body/transmission resolved from vehicle_field_consensus when asset_id is set. URLs canonicalized for dedupe. " +
+        "limit honors up to 100 with offset paging.",
     }),
   );
 }
