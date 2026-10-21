@@ -238,7 +238,8 @@ export function batStreamIO(url: string, key: string,
     }
     counts[`${kind}_http_attempts`]++;
     let response: Response;
-    try { response = await fetch(url, options); }
+    // Existing JSON recovery API and canonical intake; neither is an HTML page.
+    try { response = await fetch(url, options); } // guardrail-allow: raw-fetch (JSON APIs)
     catch (error) {
       // The runtime can refuse fetch before an HTTP response exists. Honor its
       // explicit delay across recovery, admission and coverage, without retries

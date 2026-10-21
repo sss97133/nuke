@@ -2518,7 +2518,8 @@ Deno.serve(async (req) => {
                 const results = await Promise.allSettled(
                   batch.map(async (ins) => {
                     try {
-                      const resp = await fetch(ins.image_url, {
+                      // Binary image bytes for hashing; archiveFetch returns page text.
+                      const resp = await fetch(ins.image_url, { // guardrail-allow: raw-fetch (binary image)
                         signal: AbortSignal.timeout(8000),
                         headers: { "Accept": "image/*" },
                       });
