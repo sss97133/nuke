@@ -37,6 +37,7 @@ export async function closingBatTargets(db: any): Promise<BatLiveTarget[]> {
 export interface BatStreamIO {
   admit(frames: BatLiveFrame[], heartbeats: unknown[]): Promise<void>;
   missed(target: BatLiveTarget): Promise<any>;
+  recoveryReadyAt?(): number;
   socket?: (url: string) => WebSocket;
 }
 
@@ -53,6 +54,7 @@ export async function collectBatLive(targets: BatLiveTarget[], io: BatStreamIO, 
   const expiresAt = Date.now() + durationMs;
   let stopped = false, socket: WebSocket | null = null, lastServerAt = 0, lastPingAt = 0;
   let lastHeartbeatAt = 0, lastRecoveryAt = 0, lastError: string | null = null;
+  let lastRecoveryStartedAt = -Infinity;
   let reconnectAt = 0;
   let admissionTask: Promise<void> | null = null;
   let heartbeatTask: Promise<void> | null = null;
@@ -80,15 +82,23 @@ export async function collectBatLive(targets: BatLiveTarget[], io: BatStreamIO, 
       }
       enqueue(target, "metadata-updated", data.metadata, requestedAt, "missed_comments");
       recoveryErrors.delete(target.id);
-    } catch (error) { recoveryErrors.set(target.id, `recovery:${String(error)}`.slice(0, 500)); }
+    } catch (error) {
+      recoveryErrors.set(target.id, `recovery:${String(error)}`.slice(0, 500));
+      // Keep rate-deferred work in this bounded queue. It has not become a
+      // semantic failure and need not wait for the next45-second catch-up pass.
+      if (!stopped && Date.now() < expiresAt && (io.recoveryReadyAt?.() ?? 0) > Date.now())
+        recoveryQueue.set(target.id, target);
+    }
     finally { recovery.delete(target.id); }
   };
   const pumpRecovery = () => {
     // Subscription acknowledgements can arrive for 200 lots at once. Keep
     // catch-up reads bounded while the independent socket/admission lanes run.
-    while (!stopped && Date.now() < expiresAt && recovery.size < 2 && recoveryQueue.size) {
+    while (!stopped && Date.now() < expiresAt && Date.now() >= (io.recoveryReadyAt?.() ?? 0)
+      && Date.now() - lastRecoveryStartedAt >= 1000 && recovery.size < 2 && recoveryQueue.size) {
       const target = recoveryQueue.values().next().value!;
       recoveryQueue.delete(target.id);
+      lastRecoveryStartedAt = Date.now();
       const task = recover(target);
       tasks.add(task);
       void task.finally(() => { tasks.delete(task); pumpRecovery(); });
@@ -176,6 +186,7 @@ export async function collectBatLive(targets: BatLiveTarget[], io: BatStreamIO, 
           .finally(() => { heartbeatTask = null; });
         lastHeartbeatAt = Date.now();
       }
+      pumpRecovery();
       await new Promise(resolve => setTimeout(resolve, Math.max(0, 1000 - (Date.now() - tickStartedAt))));
     }
   } finally {
@@ -202,6 +213,7 @@ export async function collectBatLive(targets: BatLiveTarget[], io: BatStreamIO, 
 export function batStreamIO(url: string, key: string): BatStreamIO {
   let retryAt = 0;
   const originRetryAt = new Map<string, number>();
+  const recoveryUrl = "https://bringatrailer.com/wp-admin/admin-ajax.php";
   const request = async (url: string, options: RequestInit) => {
     const origin = new URL(url).origin;
     if (Date.now() < Math.max(retryAt, originRetryAt.get(origin) ?? 0)) throw new Error("bat_live_transport_backoff");
@@ -226,16 +238,52 @@ export function batStreamIO(url: string, key: string): BatStreamIO {
     }
     return response;
   };
+  type Admission = { frames: BatLiveFrame[]; heartbeats: unknown[]; resolve: () => void; reject: (error: unknown) => void };
+  const admissions: Admission[] = [];
+  let admissionScheduled = false, admissionSending = false, combineAdmissions = true;
+  const scheduleAdmission = () => {
+    if (admissionScheduled || admissionSending || !admissions.length) return;
+    admissionScheduled = true;
+    queueMicrotask(async () => {
+      admissionScheduled = false;
+      admissionSending = true;
+      const group: Admission[] = [], frames: BatLiveFrame[] = [], heartbeats: unknown[] = [];
+      while (admissions.length && (combineAdmissions || !group.length) && frames.length + admissions[0].frames.length <= 50
+        && heartbeats.length + admissions[0].heartbeats.length <= 200) {
+        const item = admissions.shift()!;
+        group.push(item); frames.push(...item.frames); heartbeats.push(...item.heartbeats);
+      }
+      try {
+        // Capture and coverage queued in the same turn share the existing
+        // atomic RPC and acknowledgement, instead of competing HTTP requests.
+        const result = await request(`${url}/functions/v1/ingest-observation`, { method: "POST",
+          headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ mode: BAT_LIVE_MODE, frames, heartbeats }), signal: AbortSignal.timeout(10000) });
+        if (!result.ok || (await result.json()).success !== true) throw new Error(`live_intake_http_${result.status}`);
+        for (const item of group) item.resolve();
+      } catch (error) {
+        // An invalid coverage packet must not repeatedly contaminate otherwise
+        // valid source admission. After an explicit combined semantic refusal,
+        // later callers retain the original independent acknowledgement paths.
+        if (group.length > 1 && frames.length && heartbeats.length && error instanceof Error
+          && /^live_intake_http_(200|400|409|422|500)$/.test(error.message)) combineAdmissions = false;
+        for (const item of group) item.reject(error);
+      }
+      finally { admissionSending = false; scheduleAdmission(); }
+    });
+  };
   return {
     admit: async (frames, heartbeats) => {
-      const result = await request(`${url}/functions/v1/ingest-observation`, { method: "POST",
-        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ mode: BAT_LIVE_MODE, frames, heartbeats }), signal: AbortSignal.timeout(10000) });
-      if (!result.ok || (await result.json()).success !== true) throw new Error(`live_intake_http_${result.status}`);
+      if (frames.length > 50 || heartbeats.length > 200) throw new Error("invalid_bat_live_batch");
+      await new Promise<void>((resolve, reject) => {
+        admissions.push({ frames: [...frames], heartbeats: [...heartbeats], resolve, reject });
+        scheduleAdmission();
+      });
     },
+    recoveryReadyAt: () => Math.max(retryAt, originRetryAt.get(new URL(recoveryUrl).origin) ?? 0),
     missed: async target => {
       // Public JSON read endpoint used by BaT's own reconnect handler. No HTML.
-      const result = await request("https://bringatrailer.com/wp-admin/admin-ajax.php", { method: "POST",
+      const result = await request(recoveryUrl, { method: "POST",
         body: new URLSearchParams({ action: "bat_listing_missed_comments", listing_id: String(target.post_id), last_comment: String(target.last_comment_id) }),
         signal: AbortSignal.timeout(10000) });
       if (!result.ok) throw new Error(`missed_comments_http_${result.status}`);

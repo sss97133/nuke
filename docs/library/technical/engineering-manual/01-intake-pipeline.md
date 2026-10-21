@@ -26,12 +26,17 @@ reader's own ancestry label cannot certify that it selected the intended episode
 This bounded source-result check does not validate physical truth, fleet quality or valuation accuracy.
 
 The native closing collector keeps source recovery separate from live delivery. At most two
-catch-up reads run at once; queued or unfinished recovery remains visible as `recovery_pending`
+catch-up reads run at once, with at most one start per second per worker; queued or unfinished recovery remains visible as `recovery_pending`
 in coverage, and no new recovery starts after the existing collector deadline. Normal admission
 combines lots within the existing 50-frame canonical batch limit. A rejected mixed batch falls
 back to per-lot isolation; only acknowledged prefixes leave the buffer, including when new frames
 arrive during admission. The shared transport honors runtime rate-limit delays across all fetches
 and HTTP `Retry-After` per origin, so a source limit cannot block internal acknowledgement.
+Recovery waits in its queue during cooldown and rate-deferred reads retry only after transport
+availability. Frame and coverage requests queued together share one atomic admission within the
+same limits; an explicit combined semantic refusal restores independent requests so bad coverage
+cannot repeatedly block valid captured frames. Neither request receives a successful acknowledgement
+when their shared admission fails.
 Waiting is not a successful heartbeat or
 admission. These controls reduce requests; they do not relax the three-second coverage or
 two-second admission objectives, expand capacity, or certify continuous capture.

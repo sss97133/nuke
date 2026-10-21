@@ -59,7 +59,7 @@ import { retainFetchedCapture, type CaptureAcknowledgement } from "../_shared/ar
 declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void };
 
 // Extractor versioning - update on each significant change
-const EXTRACTOR_VERSION = 'extract-bat-core:4.5.4';
+const EXTRACTOR_VERSION = 'extract-bat-core:4.5.5';
 
 // Shared column list for the four vehicle-existence lookups below
 // (discovery_url / bat_auction_url / listing_url / update-existing-vehicle
