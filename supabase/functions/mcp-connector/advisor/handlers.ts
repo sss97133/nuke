@@ -186,7 +186,8 @@ async function handleFindAsset(
 
   // Prefer indexed equality paths. Full-text on VIN/URL tokens times out on the live fleet.
   const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  const vinRe = /^[A-HJ-NPR-Z0-9]{11,17}$/i;
+  // Pre-1981 chassis numbers are often 8–11 chars (e.g. VW 1442612348); modern VINs are 17.
+  const vinRe = /^[A-HJ-NPR-Z0-9]{8,17}$/i;
   const looksUrl = /^https?:\/\//i.test(queryStr) || /bringatrailer\.com|carsandbids\.com|ebay\.com/i.test(queryStr);
 
   let data: Record<string, unknown>[] | null = null;
@@ -203,36 +204,54 @@ async function handleFindAsset(
     error = res.error;
   } else if (looksUrl) {
     const url = queryStr.trim().replace(/\/$/, "");
-    // Two equality-style ilike lookups — avoid .or() with raw URLs (commas/special chars break filters).
-    const [a, b] = await Promise.all([
-      sb.from("vehicles").select(selectCols).ilike("listing_url", `%${url}%`).limit(limit),
-      sb.from("vehicles").select(selectCols).ilike("bat_auction_url", `%${url}%`).limit(limit),
+    // Exact matches first (no .or() with raw URLs — : / break PostgREST filters).
+    const exacts = await Promise.all([
+      sb.from("vehicles").select(selectCols).eq("listing_url", url).limit(limit),
+      sb.from("vehicles").select(selectCols).eq("listing_url", url + "/").limit(limit),
+      sb.from("vehicles").select(selectCols).eq("bat_auction_url", url).limit(limit),
+      sb.from("vehicles").select(selectCols).eq("bat_auction_url", url + "/").limit(limit),
     ]);
-    error = a.error || b.error;
     const seen = new Set<string>();
     const merged: Record<string, unknown>[] = [];
-    for (const row of [...(a.data || []), ...(b.data || [])]) {
-      const id = String(row.id);
-      if (seen.has(id)) continue;
-      seen.add(id);
-      merged.push(row);
-      if (merged.length >= limit) break;
+    for (const res of exacts) {
+      if (res.error) error = res.error;
+      for (const row of res.data || []) {
+        const id = String(row.id);
+        if (seen.has(id)) continue;
+        seen.add(id);
+        merged.push(row);
+      }
     }
-    data = merged;
+    if (merged.length) {
+      data = merged.slice(0, limit);
+    } else {
+      const path = url.replace(/^https?:\/\//i, "");
+      const [a, b] = await Promise.all([
+        sb.from("vehicles").select(selectCols).ilike("listing_url", `%${path}`).limit(limit),
+        sb.from("vehicles").select(selectCols).ilike("bat_auction_url", `%${path}`).limit(limit),
+      ]);
+      error = a.error || b.error || error;
+      for (const row of [...(a.data || []), ...(b.data || [])]) {
+        const id = String(row.id);
+        if (seen.has(id)) continue;
+        seen.add(id);
+        merged.push(row);
+        if (merged.length >= limit) break;
+      }
+      data = merged;
+    }
   } else {
-    // Year + make/model style queries: filter structured columns first, then light text search.
+    // Year + free text: do not assume token0 is make (e.g. "1974 Karmann Ghia").
     const yearMatch = queryStr.match(/\b(19|20)\d{2}\b/);
     const year = yearMatch ? Number(yearMatch[0]) : null;
-    const rest = queryStr.replace(/\b(19|20)\d{2}\b/, " ").trim();
+    const rest = queryStr.replace(/\b(19|20)\d{2}\b/g, " ").trim();
     let query = sb.from("vehicles").select(selectCols).limit(limit);
     if (year) query = query.eq("year", year);
     if (rest) {
       const parts = rest.split(/\s+/).filter(Boolean);
-      // Use ilike on make/model rather than search_vector for bounded latency.
-      if (parts.length >= 2) {
-        query = query.ilike("make", `%${parts[0]}%`).ilike("model", `%${parts.slice(1).join(" ")}%`);
-      } else if (parts.length === 1) {
-        query = query.or(`make.ilike.%${parts[0]}%,model.ilike.%${parts[0]}%`);
+      // Every token must match make OR model (AND across tokens).
+      for (const p of parts) {
+        query = query.or(`make.ilike.%${p}%,model.ilike.%${p}%`);
       }
     }
     const res = await query;
