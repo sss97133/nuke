@@ -140,11 +140,24 @@ Deno.test("handler get_history against fixture-backed mock returns BaT sale enve
   const events = fixture.query_market_history.events;
   const sourceId = obs[0]?.source_id;
 
+  const vehicleRow = {
+    id: VID,
+    year: 1974,
+    make: "Volkswagen",
+    model: "Karmann Ghia Coupe",
+    deleted_at: null,
+    merged_into_vehicle_id: null,
+    listing_url: "https://bringatrailer.com/listing/1974-volkswagen-karmann-ghia-coupe/",
+    updated_at: "2026-10-01T00:00:00Z",
+  };
+
   const handlers = createAdvisorHandlers({
     sb: () => ({
       from(table: string) {
         const rows =
-          table === "vehicle_events"
+          table === "vehicles"
+            ? [vehicleRow]
+            : table === "vehicle_events"
             ? events
             : table === "vehicle_observations"
             ? obs
@@ -156,11 +169,15 @@ Deno.test("handler get_history against fixture-backed mock returns BaT sale enve
               base_trust_score: 0.85,
             }]
             : [];
+        const single = table === "vehicles" ? vehicleRow : rows[0] ?? null;
         const api: Record<string, unknown> = {
           select() {
             return api;
           },
           eq() {
+            return api;
+          },
+          is() {
             return api;
           },
           in() {
@@ -171,6 +188,12 @@ Deno.test("handler get_history against fixture-backed mock returns BaT sale enve
           },
           limit() {
             return api;
+          },
+          maybeSingle() {
+            return Promise.resolve({ data: single, error: null });
+          },
+          single() {
+            return Promise.resolve({ data: single, error: null });
           },
           then(resolveCb: (v: unknown) => unknown, rejectCb?: (e: unknown) => unknown) {
             return Promise.resolve({ data: rows, error: null }).then(resolveCb, rejectCb);

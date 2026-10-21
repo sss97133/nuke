@@ -21,12 +21,17 @@ export const ASK_ONLY_PLATFORMS = new Set([
   "fb_marketplace",
   "ksl",
   "conceptcarz",
+  "jamesedition",
+  "classiccars",
+  "motorious",
+  "collectingcars",
+  "collecting_cars",
   "unknown",
   "",
 ]);
 
 const ASK_URL_RE =
-  /craigslist\.org|facebook\.com\/marketplace|marketplace\.facebook|ksl\.com|conceptcarz\.com/i;
+  /craigslist\.org|facebook\.com\/marketplace|marketplace\.facebook|ksl\.com|conceptcarz\.com|jamesedition\.com|classiccars\.com|motorious\.com|collectingcars\.com/i;
 
 export function isAskOnlyPlatform(platform: string | null | undefined, url?: string | null): boolean {
   const p = String(platform || "").toLowerCase().trim();
