@@ -449,19 +449,43 @@ is thirty calls per trace in sixty seconds. A one-second coverage path cannot fi
 before frame admission. More backoff cannot repair this inequality. External source APIs and
 ordinary database SDK requests are a separate boundary.
 
-**Prepared execution-owner change; architecture approval required before deployment:**
-`ingest-observation` may host the existing collector through service-only `bat_live_collect_v1`;
-core would make one authenticated handoff. Local admission remains inside the canonical writer,
+**Owner-approved execution-owner change deployed through #2457/#2458:**
+`ingest-observation` hosts the existing collector through service-only `bat_live_collect_v1`;
+core makes one authenticated handoff. Local admission remains inside the canonical writer,
 with fresh monitor/source/parent validation and the unchanged RPC. The selected identity acts
 only as a rejection fence after those fresh reads: changing a post ID must refuse the old
 channel's heartbeat too. Typed transient failures retain atomic prefixes without poison fanout;
 semantic refusals retain existing per-lot isolation. The first rollout preserves core's legacy
 adapter until the second reviewed handoff change. Dry-run retains its existing service-only
-manifest; it starts no source work. The implementation is preparation, not production authority.
+manifest; it starts no source work. Normal deployments 39686994480 and 39688643627 verified
+intake 168 and core 4.5.7/platform 195, with anonymous refusal and service-only dry-run.
 Keep the 3s/2s objectives, source budgets, 115s lifetime, grants, retention and episode holds.
 Bunched dispatch, recovery generations/ACK barriers and the measured RPC tail remain separate
 integrity blockers. The native SQL contracts now have an explicit CI setup path alongside a
 real HTTP-to-PostgreSQL coverage/refusal case, instead of being silently excluded.
+
+The 22:45:38–22:53:38 UTC late-day trace recorded eight starts, five completed approximately
+115-second lifetimes and three right-censored workers. Every completed worker made 111–116
+local admissions with zero nested intake HTTP calls, runtime rejections, failed admission
+groups, pending frames or unfinished recoveries. Nine core requests matched nine child
+handoffs, eight accepted and one idle. All 75 sampled admissions succeeded (sampled RPC max
+1,142.58 ms); this is a three-lot validation sample of already-closed relisted lots, not fleet
+or continuous active-lot coverage. All twelve health snapshots still failed. Their three
+monitors bind stubs, while the existing native terminal receipts and matching closed lots
+reside on canonical vehicles. Both health and dispatcher closure tests miss that relation;
+the dispatcher reactivates retired monitors. The known October 21 settlement population is
+242 closed lots, with 241 native receipts and 204 late native terminal admissions. It is not
+the source's full inventory, and resolving the stub relation must not erase its lateness QC.
+
+The separately prepared `20261021231915_bat_relisted_control_receipts.sql` corrects four
+closed-result predicates in the two existing SQL owners, using an unsuperseded native
+terminal receipt proving this stub and exact lot plus an unambiguous closed canonical holder.
+It preserves direct bindings, source cadence/budgets, locks, privileges and all testimony;
+function hashes refuse drift and make replay a no-op. The actual PostgreSQL contract
+reproduces reactivation, then verifies retirement and the reader, negative binding/receipt
+cases, preserved historical QC, authority and drift refusal. This production SQL change
+remains held for separate authorization. Dispatch bunching and recovery generation/ACK
+correctness remain open; no broader supported-answer gain is claimed.
 
 The retained sold gold case still lacks parser/parent attestations; repairing transport does
 not manufacture them or establish fleet-wide supported-answer gain.
