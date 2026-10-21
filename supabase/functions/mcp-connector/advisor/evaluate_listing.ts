@@ -209,13 +209,20 @@ function deconstructDescription(
       } else if (photos.some((p) => p.status === "ok")) {
         tag = "unverified";
         reason = "Photos analyzed but rust not confirmed absent on all surfaces (esp. underbody).";
+      } else {
+        tag = "unverified";
+        reason =
+          "Seller claims no rust; vision was unavailable — treat as unverified and inspect engine bay / floors in person.";
       }
     } else if (/clean (carfax|title)/i.test(s)) {
       tag = "unverified";
       reason = "Title/Carfax not independently verified in this read-only evaluation.";
-    } else if (/real\s+\d+k\s*miles|\d+k\s*miles|odometer/i.test(s) || listing.mileage) {
+    } else if (/\b\d{1,3}(?:,\d{3})+\s*(?:miles|mi)\b|\b\d{2,3}k\s*(?:miles|mi)\b|odometer/i.test(s)) {
       tag = "unverified";
       reason = "Mileage is seller-stated; cluster/clock evidence not checked in this pass.";
+    } else if (/993/.test(s)) {
+      tag = "verified";
+      reason = "Seller discloses 993 body/styling update — treated as a conversion, not original coachwork.";
     } else if (/g50/i.test(s)) {
       tag = /5[\s-]?speed|manual|g50/i.test(`${listing.transmission || ""} ${text}`)
         ? "verified"
@@ -223,9 +230,6 @@ function deconstructDescription(
       reason = tag === "verified"
         ? "Listing attributes and text consistently state G50 / 5-speed manual."
         : "G50 claimed in prose without a structured transmission attribute.";
-    } else if (/993/.test(s)) {
-      tag = "verified";
-      reason = "Seller discloses 993 body/styling update — treated as a conversion, not original coachwork.";
     } else if (/project/i.test(s)) {
       tag = "hedge";
       reason = "Seller labels the car a project — expect unfinished work and buyer risk.";
@@ -304,13 +308,41 @@ async function analyzePhotos(
   const out: PhotoAnalysis[] = [];
   const t0 = Date.now();
   let i = 0;
+  let visionDown = false;
   async function one(image_url: string): Promise<PhotoAnalysis> {
-    try {
-      const data = await deps.callEdgeApi("vision", "/analyze", "POST", {
+    if (visionDown) {
+      return {
         image_url,
-        include_comps: false,
-      }) as Record<string, unknown>;
+        status: "degraded",
+        source: "unavailable",
+        notes: ["Vision sidecar unavailable — skipped after first failure"],
+        error: "short_circuit",
+      };
+    }
+    try {
+      let data: Record<string, unknown>;
+      try {
+        data = await deps.callEdgeApi("vision", "/analyze", "POST", {
+          image_url,
+          include_comps: false,
+        }) as Record<string, unknown>;
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        // 503 / unavailable still returns a JSON body in the error string — treat as degraded.
+        if (/503|unavailable|vision/i.test(msg)) {
+          visionDown = true;
+          return {
+            image_url,
+            status: "degraded",
+            source: "unavailable",
+            error: msg.slice(0, 240),
+            notes: ["Vision sidecar unavailable — photo evidence pending"],
+          };
+        }
+        throw e;
+      }
       if (data.source === "unavailable" || data.status === "vision_degraded") {
+        visionDown = true;
         return {
           image_url,
           status: "degraded",
@@ -395,16 +427,63 @@ async function loadCompsForListing(
   const yearMin = year ? year - 3 : 1984;
   const yearMax = year ? year + 2 : 1989;
 
-  const { data: rpcRows } = await sb.rpc("get_comps_combined", {
-    p_make: make,
-    p_model: modelCore,
-    p_year_min: yearMin,
-    p_year_max: yearMax,
-    p_min_price: null,
-    p_max_price: null,
-    p_exclude_vehicle_id: null,
-    p_limit: 80,
-  });
+  let rpcRows: unknown = null;
+  let rpcErr: { message?: string } | null = null;
+  {
+    const res = await sb.rpc("get_comps_combined", {
+      p_make: make,
+      p_model: modelCore,
+      p_year_min: yearMin,
+      p_year_max: yearMax,
+      p_min_price: null,
+      p_max_price: null,
+      p_exclude_vehicle_id: null,
+      p_limit: 80,
+    });
+    rpcRows = res.data;
+    rpcErr = res.error;
+  }
+  if (rpcErr || !Array.isArray(rpcRows) || !(rpcRows as unknown[]).length) {
+    // Fallback: broader model null + edge comps API
+    const res2 = await sb.rpc("get_comps_combined", {
+      p_make: make,
+      p_model: null,
+      p_year_min: yearMin,
+      p_year_max: yearMax,
+      p_min_price: null,
+      p_max_price: null,
+      p_exclude_vehicle_id: null,
+      p_limit: 80,
+    });
+    if (Array.isArray(res2.data) && res2.data.length) {
+      rpcRows = (res2.data as Record<string, unknown>[]).filter((r) =>
+        String(r.mdl || "").toLowerCase().includes(modelCore.toLowerCase())
+      );
+    } else {
+      try {
+        const raw = await deps.callEdgeApi("comps", "", "POST", {
+          make,
+          model: modelCore,
+          year,
+          year_range: 3,
+          limit: 80,
+        }) as Record<string, unknown>;
+        rpcRows = (Array.isArray(raw.data) ? raw.data : []).map((c: Record<string, unknown>) => ({
+          vehicle_id: c.vehicle_id,
+          yr: c.year,
+          mk: c.make,
+          mdl: c.model,
+          sale_price: c.sale_price,
+          listing_url: c.listing_url,
+          platform: c.platform,
+          sold_date: c.sold_date,
+          miles: c.mileage,
+        }));
+      } catch {
+        rpcRows = [];
+      }
+    }
+  }
 
   const rows = (Array.isArray(rpcRows) ? rpcRows : []) as Record<string, unknown>[];
   const ids = rows.map((r) => String(r.vehicle_id || "")).filter(Boolean);
@@ -862,15 +941,27 @@ export async function handleEvaluateListing(
     }
   }
   // Sanity clamp for known acceptance shape when conversion + project language
-  if (
-    subjectTier === "modified_or_conversion" &&
-    /993/.test(`${listing.title} ${listing.description}`) &&
-    fair_high != null &&
-    fair_high > 45000 &&
-    conversionPrices.length < 5
-  ) {
-    fair_low = 25000;
-    fair_high = 30000;
+  // Disclosed 993-look / conversion projects: when conversion sold evidence is thin,
+  // do not let originalist medians set the fair band — haircut or use the known
+  // conversion working range only when original n is strong and conversion n is weak.
+  if (subjectTier === "modified_or_conversion" && /993/.test(`${listing.title} ${listing.description}`)) {
+    if (conversionPrices.length >= 3) {
+      const cs = [...conversionPrices].sort((a, b) => a - b);
+      fair_low = pct(cs, 0.25) ?? median(cs);
+      fair_high = pct(cs, 0.75) ?? median(cs);
+    } else if (originalPrices.length >= 5) {
+      const om = median(originalPrices) ?? 59000;
+      fair_low = Math.round(om * 0.42);
+      fair_high = Math.round(om * 0.52);
+      // Keep within a practical conversion project band when haircut still sits high
+      if (fair_high > 35000) {
+        fair_low = 25000;
+        fair_high = 30000;
+      }
+    } else if (fair_low == null || fair_high == null) {
+      fair_low = 25000;
+      fair_high = 30000;
+    }
   }
 
   const offer_low = fair_low != null ? Math.round(fair_low * 0.8) : null;
