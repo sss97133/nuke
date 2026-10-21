@@ -198,14 +198,14 @@ export default function ProfileHeader({ priceLotId }: { priceLotId?: string }) {
       ...eventRows.map(row => { const meta = row.metadata && typeof row.metadata === 'object' ? row.metadata : {};
         return { lotNumber: meta.lot_number ?? null, auctionName: meta.auction_name || meta.event_name || null, videoUrl: meta.video_url || null }; }),
     ];
-    // A broadcast presentation joins only the one lot the episode rows agree on, and only when they carry
-    // no recorded clip; a failed broadcast read adds nothing and does not fail the episode read.
+    // Join presentations bound to the agreed lot and exact episode even when it already names the broadcast:
+    // that URL may lack the lot offset. The recording consensus below refuses conflicting videos or offsets.
     const boundLots = [...new Set(candidates.map(c => String(c.lotNumber ?? '').trim()).filter(Boolean))];
     const episodeKeys = new Set([
       ...auctionRows.filter(row => typeof row.id === 'string' && row.id).map(row => `auction_events:${row.id}`),
       ...eventRows.filter(row => typeof row.id === 'string' && row.id).map(row => `vehicle_events:${row.id}`),
     ]);
-    const presentations = boundLots.length === 1 && !candidates.some(c => c.videoUrl) && !presentationRes?.error
+    const presentations = boundLots.length === 1 && !presentationRes?.error
       ? pickLotPresentations(presentationRes?.data as any[] | null, vehicleId, boundLots[0], episodeKeys) : [];
     candidates.push(...presentations.map(presentation => ({ lotNumber: boundLots[0], ...presentation })));
     setLotRead({ vehicleId, lotKey: targetLotKey, readAt, status: failed ? 'failed' : candidates.length ? 'matched' : 'unmatched', candidates });

@@ -101,6 +101,17 @@ const embed = (video: string, start: number) => `https://www.youtube.com/embed/$
 it('keeps a single exact matched-event clip useful in the actual price citation', async () => {
   presentations = [presentation()]; expect(await openRecording()).toBe(embed(currentVideo, 125));
 });
+it('fills the missing offset when the exact episode already names the same broadcast', async () => {
+  auctionRows[0].broadcast_video_url = `https://www.youtube.com/watch?v=${currentVideo}`;
+  presentations = [presentation()];
+  expect(await openRecording()).toBe(embed(currentVideo, 125));
+});
+it.each(['video', 'seek'])('withholds conflicting direct and matched presentation %s', async kind => {
+  auctionRows[0] = { ...auctionRows[0], broadcast_video_url: `https://www.youtube.com/watch?v=${currentVideo}`,
+    broadcast_timestamp_start: 125, broadcast_timestamp_end: 175 };
+  presentations = [presentation(currentEvent, kind === 'video' ? otherVideo : currentVideo, 900)];
+  expect(await openRecording()).toBeNull();
+});
 it('does not attach an explicitly different matched sale sharing vehicle and nominal lot', async () => {
   presentations = [presentation(otherEvent, otherVideo)]; expect(await openRecording()).toBeNull();
 });
