@@ -2,7 +2,7 @@ import { BAT_LIVE_MODE, BAT_PUBLIC_SOCKET, BatLiveBuffer, batUrl, type BatLiveFr
 
 import type { BatLiveDiagnostics } from "./batLive.ts";
 
-export const BAT_LIVE_COLLECT_MODE = "bat_live_collect_v1";
+export { BAT_LIVE_COLLECT_MODE } from "../_shared/batLiveEvents.ts";
 
 /** Existing minute cron hands off overlapping 115-second workers. A connection
  * multiplexes EVERY eligible closing lot; p_lots never caps live subscriptions.
