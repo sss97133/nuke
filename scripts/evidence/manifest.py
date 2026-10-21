@@ -1,0 +1,300 @@
+"""Manifest of the ids every writer call returned (PLAN section 0 and M10b; DESIGN-v5, guard-mechanism v4 #1).
+
+Every writer call the runner makes through common.Rest appends one JSON line to
+<EVIDENCE_MANIFEST_DIR, default loop/manifests>/<UTC date>.jsonl: the writer, the run, the ids the call created
+(`ids`; the decision ids also apart as `decision_ids`), the support rows it wrote per claim, the rows it returned
+without creating them (`existing`) and the per-row results. The runner only appends. The scoreboard's M10b matches
+every evidence row created in a window against these lines: a job's row that is not in the manifest is unmanifested
+and halts promotion.
+
+(v8) No job decides, so every decision recorded as his ('human:<uid>'), the rejections his confirm implies
+('implied:<decision>') and the rows his own decisions write (created_by 'human:<uid>': an owner_review row of his
+"no, it is Y", an owner statement and its support, an owner capture time) are never in this manifest: they are counted
+for the lead to match against the API request log (M10b steps 3 and 3b).
+
+A call whose outcome is unknown (a client timeout or a dropped connection) is recorded with outcome 'unknown' and no
+ids: if it committed, M10b shows its rows as unmanifested and the lead reads them.
+"""
+import collections
+import datetime as dt
+import json
+import os
+from pathlib import Path
+
+import common
+
+ID_KEYS = ('ids', 'decision_ids', 'existing')
+
+
+def _uuid(x):
+    return x if common.is_uuid(x or '') else None
+
+
+def _items(result):
+    return (result or {}).get('items') or [] if isinstance(result, dict) else []
+
+
+def returned(writer, args, result):
+    """The ids one writer call returned, by kind (draft.sql v5-v9 return shapes)."""
+    out = {'ids': [], 'decision_ids': [], 'existing': [], 'support': [], 'results': collections.Counter(),
+           'image_id': None}
+    args = args or {}
+    if writer in ('evidence_open_run', 'evidence_record_answers'):
+        if _uuid(result):
+            out['ids'].append(result)
+    elif writer == 'record_promotion_failure':
+        if _uuid(result):
+            out['decision_ids'].append(result)
+        out['image_id'] = args.get('p_image_id')
+    elif writer == 'propose_change_claim':
+        if _uuid(result):
+            out['ids'].append(result)
+            n = len(args.get('p_support') or [])
+            if n:
+                out['support'].append({'claim_id': result, 'count': n})
+        else:
+            out['results']['not_written'] += 1          # custody_bounds stays out where a sourced acquisition exists
+    elif writer == 'propose_claim_support':
+        if isinstance(result, int) and not isinstance(result, bool) and result:
+            out['support'].append({'claim_id': args.get('p_claim_id'), 'count': result})
+    elif writer == 'propose_image_candidates':
+        for it in _items(result):
+            out['results'][it.get('result') or 'none'] += 1
+            if _uuid(it.get('candidate_id')):
+                (out['ids'] if it.get('result') == 'proposed' else out['existing']).append(it['candidate_id'])
+            if _uuid(it.get('confirmed_candidate_id')):          # (v9) already_rejected: the subject he confirmed
+                out['existing'].append(it['confirmed_candidate_id'])
+        if isinstance(result, dict) and result.get('unchanged'):
+            out['results']['unchanged'] += int(result['unchanged'])
+    elif writer == 'propose_evidence_links':
+        for it in _items(result):
+            out['results'][it.get('result') or 'none'] += 1
+            if _uuid(it.get('link_id')):
+                (out['ids'] if it.get('result') in ('proposed', 'superseded') else out['existing']).append(it['link_id'])
+    elif writer in ('propose_capture_time_claims', 'propose_account_entities', 'record_day_context',
+                    'confirm_capture_times_by_rule'):
+        r = result if isinstance(result, dict) else {}
+        out['ids'] += [x for x in r.get('ids') or [] if _uuid(x)]
+        out['decision_ids'] += [x for x in r.get('decision_ids') or [] if _uuid(x)]
+        itemized = {it.get('result') or 'skipped' for it in r.get('skipped') or []}
+        for k, v in r.items():          # proposed, machine_confirmed, unchanged, (v7/v8) already_rejected, ... counts
+            if isinstance(v, int) and not isinstance(v, bool) and v and k not in itemized:
+                out['results'][k] += v          # (v9, M5) a result the writer also itemizes is counted once, below
+        for it in r.get('skipped') or []:
+            out['results'][it.get('result') or 'skipped'] += 1
+            if _uuid(it.get('id')):
+                out['existing'].append(it['id'])
+        if r.get('out_of_scope'):
+            out['results']['out_of_scope_context'] += len(r['out_of_scope'])
+    elif writer == 'evidence_probe_write':
+        r = result if isinstance(result, dict) else {}
+        if _uuid(r.get('probe_run')):
+            out['ids'].append(r['probe_run'])
+        out['results'][r.get('result') or 'none'] += 1
+    elif writer in ('promote_image', 'publish_image'):
+        r = result if isinstance(result, dict) else {}
+        out['image_id'] = args.get('p_image_id')
+        out['results'][r.get('result') or 'none'] += 1
+        if _uuid(r.get('promotion_id')):
+            out['existing'].append(r['promotion_id'])
+    elif writer == 'evidence_repin_after_merge':
+        r = result if isinstance(result, dict) else {}
+        for k in ('repinned', 'blocked'):
+            if r.get(k):
+                out['results'][k] += int(r[k])
+    elif writer == 'evidence_record_reverts':
+        if isinstance(result, int) and not isinstance(result, bool) and result:
+            out['results']['recorded'] += result
+    # every id the call created, decisions included, in one list (M10b matches against it)
+    seen = set()
+    out['ids'] = [x for x in out['ids'] + out['decision_ids'] if not (x in seen or seen.add(x))]
+    return out
+
+
+def run_of(writer, args, result):
+    if writer == 'evidence_open_run':
+        return _uuid(result)
+    a = args or {}
+    for k in ('p_run_id', 'p_gate_run_id', 'p_parent_run_id', 'p_sheet_run'):
+        if _uuid(a.get(k)):
+            return a[k]
+    return None
+
+
+class Manifest:
+    """Append-only JSONL, one line per writer call."""
+
+    def __init__(self, directory=None, clock=None):
+        self.dir = Path(directory or common.MANIFEST_DIR).expanduser()
+        self.clock = clock or common.utc_now
+
+    def path(self, when=None):
+        return self.dir / ('%s.jsonl' % (when or self.clock()).astimezone(dt.timezone.utc).date().isoformat())
+
+    def append(self, rec):
+        try:
+            self.dir.mkdir(parents=True, exist_ok=True)
+            with open(self.path(), 'a', encoding='utf-8') as f:
+                f.write(json.dumps(rec, sort_keys=True, default=str) + '\n')
+                f.flush()
+                os.fsync(f.fileno())
+        except OSError as e:
+            # the call committed but its ids are not recorded: M10b would halt promotion; stop now and say why
+            raise common.StopLoop('manifest_write_failed', '%s: %s' % (self.dir, e))
+        return rec
+
+    def record(self, writer, args, result):
+        r = returned(writer, args, result)
+        rec = {'at': common.iso_utc(self.clock()), 'writer': writer, 'run_id': run_of(writer, args, result),
+               'outcome': 'ok'}
+        for k in ID_KEYS + ('support',):
+            if r[k]:
+                rec[k] = r[k]
+        if r['results']:
+            rec['results'] = dict(r['results'])
+        if r['image_id']:
+            rec['image_id'] = r['image_id']
+        return self.append(rec)
+
+    def record_unknown(self, writer, args, code):
+        return self.append({'at': common.iso_utc(self.clock()), 'writer': writer, 'run_id': run_of(writer, args, None),
+                            'outcome': 'unknown', 'code': code})
+
+
+def _append(path, rec):
+    p = str(path)
+    os.makedirs(os.path.dirname(p), exist_ok=True)
+    with open(p, 'a', encoding='utf-8') as f:
+        f.write(json.dumps(dict(rec, at=common.iso_utc(common.utc_now())), sort_keys=True) + '\n')
+
+
+def _lines(path):
+    return common.read_jsonl(str(path)) if os.path.exists(str(path)) else []
+
+
+def disputed_ledger():
+    return common.loop_file('disputed.jsonl', 'EVIDENCE_DISPUTED')
+
+
+def disputed_runs(path=None):
+    """(v6, AC10) Answers runs whose stored reading a second reader, the transcript check or his objection disputed:
+    the next sheet asks the row again ((v8) the reading decides nothing; he sees his words before he confirms)."""
+    return sorted({e['answers_run'] for e in _lines(path or disputed_ledger()) if e.get('answers_run')})
+
+
+def disputed_rows(path=None):
+    """The disputed entries (an entry with no row disputes every answered row of its sheet)."""
+    return [e for e in _lines(path or disputed_ledger()) if e.get('answers_run') and e.get('event') != 'reasked']
+
+
+def reasked_rows(path=None):
+    """{(sheet, row)} that a delivered sheet has asked again ('reasked' events, record_answers.py delivered)."""
+    return {(e.get('sheet'), e.get('row')) for e in _lines(path or disputed_ledger()) if e.get('event') == 'reasked'}
+
+
+def mark_disputed(rec, path=None):
+    _append(path or disputed_ledger(), rec)
+
+
+def check_answers(runs, sheets, where=None):
+    """(v6, AC10; M10b item 5, kept in v8 for every stored answer) Each answers run against the chat: its sheet's
+    delivery message carries the sheet as issued, his reply comes after it and holds each row's verbatim words, and
+    (v9) the stored message time is the reply's own. runs: [{id, sheet_run, message_ref, message_at, rows: {"<n>":
+    {"verbatim"}}}] (read by q.sh; the words stay in memory); sheets: the sheets index (review_sheet)."""
+    import transcript
+    out = {'answers_runs': len(runs), 'checked': 0, 'unchecked': [], 'problems': [], 'no_delivery': []}
+    for r in runs:
+        sh = sheets.get(r.get('sheet_run')) or {}
+        if not sh.get('delivered_ref'):
+            out['no_delivery'].append(r['id'])
+            continue
+        res = transcript.check(sh.get('sheet_sha256'), sh['delivered_ref'], r.get('message_ref'),
+                               {k: (v or {}).get('verbatim') for k, v in (r.get('rows') or {}).items()}, where,
+                               r.get('message_at'))
+        if not res['checked']:
+            out['unchecked'].append(r['id'])
+        else:
+            out['checked'] += 1
+            if res['problems']:
+                out['problems'].append({'answers_run': r['id'], 'sheet_run': r.get('sheet_run'),
+                                        'sheet': sh.get('sidecar'), 'problems': res['problems']})
+    return out
+
+
+def load(directory, since, until=None):
+    """Manifest lines from the UTC-dated files covering since..until."""
+    d = Path(directory or common.MANIFEST_DIR).expanduser()
+    a = common.parse_ts(since).astimezone(dt.timezone.utc).date()
+    b = common.parse_ts(until or common.utc_now()).astimezone(dt.timezone.utc).date()
+    out = []
+    while a <= b:
+        p = d / ('%s.jsonl' % a.isoformat())
+        if p.exists():
+            out += common.read_jsonl(p)
+        a += dt.timedelta(days=1)
+    return out
+
+
+def reconcile(created, lines, examples=5, his_rows=None):
+    """M10b: every evidence row created in the window against the manifest.
+
+    created: {"<table>": [ids of rows a job wrote], "evidence_decisions": [{"id", "by", "decision", "run", "image"}],
+              "vehicle_change_claim_support": {"<claim id>": n}}; his_rows: {"<table>": n} rows his own decisions wrote
+    (created_by 'human:<uid>'). (v8) Neither his decisions (human:), nor the rejections his confirm implies
+    (implied:), nor the rows they write are the runner's: they are counted for the lead to match against the API
+    request log (steps 3 and 3b). A promotion-path decision (writer:...) matches by its run or image when the writer
+    returns no id."""
+    ids, runs, images = set(), set(), set()
+    support = collections.Counter()
+    reverts_recorded, unknown = 0, 0
+    for ln in lines:
+        ids |= set(ln.get('ids') or [])
+        if ln.get('run_id'):
+            runs.add(ln['run_id'])
+        if ln.get('writer') == 'evidence_open_run':
+            runs |= set(ln.get('ids') or [])
+        if ln.get('image_id'):
+            images.add(ln['image_id'])
+        for s in ln.get('support') or []:
+            support[s['claim_id']] += int(s['count'])
+        if ln.get('writer') == 'evidence_record_reverts':
+            reverts_recorded += int((ln.get('results') or {}).get('recorded', 0))
+        if ln.get('outcome') == 'unknown':
+            unknown += 1
+    missing = collections.OrderedDict()
+    human = implied = 0
+    for table, rows in created.items():
+        if table == 'vehicle_change_claim_support':
+            continue
+        miss = []
+        if table == 'evidence_decisions':
+            reverts = [d for d in rows or [] if d.get('decision') == 'revert_detected']
+            for d in rows or []:
+                by = d.get('by') or ''
+                if by.startswith('human:'):
+                    human += 1
+                    continue
+                if by.startswith('implied:'):
+                    implied += 1                         # (v8) only his own confirm implies a rejection
+                    continue
+                if by.startswith('writer:'):
+                    ok = d['id'] in ids or d.get('run') in runs or d.get('image') in images or (
+                        d.get('decision') == 'revert_detected' and len(reverts) <= reverts_recorded)
+                else:
+                    ok = d['id'] in ids
+                if not ok:
+                    miss.append(d['id'])
+        else:
+            miss = [x for x in rows or [] if x not in ids]
+        if miss:
+            missing[table] = miss
+    mismatch = [{'claim_id': c, 'rows': n, 'manifest': support.get(c, 0)}
+                for c, n in sorted((created.get('vehicle_change_claim_support') or {}).items())
+                if support.get(c, 0) != int(n)]
+    return {'unmanifested': sum(len(v) for v in missing.values()) + len(mismatch),
+            'by_table': {t: len(v) for t, v in missing.items()},
+            'examples': {t: v[:examples] for t, v in missing.items()},
+            'support_mismatch': mismatch[:examples],
+            'human_decisions_to_match_request_log': human, 'implied_by_his_decisions': implied,
+            'his_rows_to_match_his_decisions': sum(int(n or 0) for n in (his_rows or {}).values()),
+            'manifest_lines': len(lines), 'unknown_outcomes': unknown}

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!-- The re-pin safety net (PLAN section 5): evidence_repin_after_merge before the 03:20Z derive sweep. launchd
+       calendar times are local and 02:45Z moves with daylight saving, so the job wakes every 15 minutes and repin.py
+       acts only inside 02:45-03:00 UTC (and refuses 03:15-03:35Z). Same placeholders as ag.nuke.evidence-loop;
+       __DB_WRITES__ stays 0 until the promotion path (M1p) and the approved writers (M1e) are live. -->
+  <key>Label</key><string>ag.nuke.evidence-repin</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>-c</string>
+    <string>set -euo pipefail; WT="__WORKTREE__"; [ -d "$WT" ] || exit 0; cd "$WT"; exec /opt/homebrew/bin/dotenvx run -q -f "__HOME__/nuke/.env" -- python3 scripts/evidence/repin.py --mode __MODE__ --window-utc 02:45-03:00</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key><string>__HOME__/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    <key>EVIDENCE_DB_WRITES</key><string>__DB_WRITES__</string>
+  </dict>
+  <key>StartInterval</key><integer>900</integer>
+  <key>StandardOutPath</key><string>__OUT__/repin-launchd.log</string>
+  <key>StandardErrorPath</key><string>__OUT__/repin-launchd.log</string>
+</dict>
+</plist>
