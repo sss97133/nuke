@@ -30,6 +30,8 @@ export interface Stated {
   prefix: string | null;       // eBay's visible digits of the postal code ('801' of '801**'), or the first three of a full code
   postal_raw: string | null;   // the postal code exactly as eBay returned it
   country: string | null;
+  /** 'zip3_prefix' when the listing names no state and the state is the one state every ZIP of eBay's prefix is in. */
+  state_basis?: "zip3_prefix";
 }
 
 const clean = (s: unknown) => (typeof s === "string" && s.trim() ? s.trim().replace(/\s+/g, " ") : null);
@@ -119,7 +121,7 @@ export function placeRow(i: PlaceInput, s: Stated, d: Decision, pc: PointCheck, 
       // grain: the finest place the listing supports (zip: county and ZCTA exact; city: county from the city's point,
       // no ZIP; region: state only; null: nowhere). checks: how eBay's own fields judged the city's point.
       place: {
-        grain, postal_basis: d.postal_basis, prefix: s.prefix,
+        grain, postal_basis: d.postal_basis, prefix: s.prefix, ...(s.state_basis ? { state_basis: s.state_basis } : {}),
         checks: { point_state: pc.state, point_zip_prefix: pc.zip_prefix },
         dispute: d.dispute, described: mentions.length ? mentions : undefined,
       },
@@ -131,8 +133,30 @@ export function placeRow(i: PlaceInput, s: Stated, d: Decision, pc: PointCheck, 
 
 // ---- lookups and the write ---------------------------------------------------------------------------------------
 
-export interface PlaceCtx { states: StateRow[] | null; points: Map<string, PointCheck>; zips: Map<string, string | null> }
-export const newPlaceCtx = (): PlaceCtx => ({ states: null, points: new Map(), zips: new Map() });
+export interface PlaceCtx { states: StateRow[] | null; points: Map<string, PointCheck>; zips: Map<string, string | null>; prefixes?: Map<string, StateRow | null> }
+export const newPlaceCtx = (): PlaceCtx => ({ states: null, points: new Map(), zips: new Map(), prefixes: new Map() });
+
+/**
+ * A search summary's itemLocation is only eBay's masked postal code and the country ('891**', 'US'): no city, no state.
+ * The prefix places the car in a state only when every ZIP zip_to_fips holds under it is in that one state; a prefix
+ * that crosses a state line, or that zip_to_fips does not hold, places it nowhere. Never finer than the state.
+ */
+export function prefixState(prefix: string, fips: string[], states: StateRow[]): StateRow | null {
+  const st = [...new Set(fips.filter((f) => /^\d{5}$/.test(f)).map((f) => f.slice(0, 2)))];
+  return st.length === 1 ? states.find((s) => s.fips === st[0]) ?? null : null;
+}
+
+async function statedFromPrefix(supabase: any, ctx: PlaceCtx, s: Stated, states: StateRow[]): Promise<Stated> {
+  if (s.usps || s.state_text || !s.prefix || s.postal || (s.country !== null && s.country !== "US")) return s;
+  ctx.prefixes ??= new Map();
+  if (!ctx.prefixes.has(s.prefix)) {
+    const next = String(Number(s.prefix) + 1).padStart(3, "0");
+    const r = mustWrite("zip_to_fips prefix read", await supabase.from("zip_to_fips").select("fips").gte("zip", s.prefix).lt("zip", next).limit(1000));
+    ctx.prefixes.set(s.prefix, prefixState(s.prefix, (r.data ?? []).map((x: any) => String(x.fips)), states));
+  }
+  const st = ctx.prefixes.get(s.prefix);
+  return st ? { ...s, usps: st.usps, state_fips: st.fips, state_basis: "zip3_prefix" } : s;
+}
 
 async function statesOf(supabase: any, ctx: PlaceCtx): Promise<StateRow[]> {
   if (!ctx.states) ctx.states = (mustWrite("us_states read", await supabase.from("us_states").select("fips,usps,name").limit(100)).data ?? []) as StateRow[];
@@ -190,7 +214,7 @@ export type PlaceOutcome = "written" | "duplicate" | "no_state";
 /** Land one listing's place. Throws on a failed read or write (the caller counts it as an error). */
 export async function landPlace(supabase: any, ctx: PlaceCtx, i: PlaceInput): Promise<{ outcome: PlaceOutcome; grain: Grain | null; disputed: boolean }> {
   const states = await statesOf(supabase, ctx);
-  const s = statedPlace(i.loc, states);
+  const s = await statedFromPrefix(supabase, ctx, statedPlace(i.loc, states), states);
   const mentions = await validMentions(supabase, ctx, describedPlaces(i.description, states), states);
   const d = decide(s, mentions);
   const pc = d.grain && !d.dispute ? await checkedPoint(supabase, ctx, s) : { point: null, state: "not_checked", zip_prefix: "not_checked", county: null };

@@ -72,3 +72,19 @@ SELECT pg_temp.ok('a visitor cannot write the series or run the recorder; servic
 SELECT pg_temp.ok('the recorder job is registered once, every 15 minutes, bounded at 60 s',
   (SELECT count(*) FROM cron.job WHERE jobname = 'record-live-board-snapshot') = 1
   AND (SELECT schedule = '*/15 * * * *' AND command LIKE '%statement_timeout = ''60s''%record_live_board_snapshot()%' FROM cron.job WHERE jobname = 'record-live-board-snapshot'));
+
+-- 20261022080000: quarter-hour points for the last 48 hours, hourly before that.
+\ir ../migrations/20261022080000_live_board_share_quarter_hours.sql
+\ir ../migrations/20261022080000_live_board_share_quarter_hours.sql
+INSERT INTO public.live_board_snapshots (taken_at, house, bid_usd, lots, lots_with_bid) VALUES
+  (date_trunc('hour', now()) - interval '5 hours', 'bringatrailer', 5, 1, 1), (date_trunc('hour', now()) - interval '5 hours' + interval '15 minutes', 'bringatrailer', 6, 1, 1),
+  (date_trunc('hour', now()) - interval '5 hours' + interval '30 minutes', 'bringatrailer', 7, 1, 1),
+  (date_trunc('hour', now()) - interval '60 hours', 'bringatrailer', 8, 1, 1), (date_trunc('hour', now()) - interval '60 hours' + interval '15 minutes', 'bringatrailer', 9, 1, 1);
+SELECT pg_temp.ok('the last 48 hours come at every recorded quarter-hour',
+  (SELECT count(*) FROM jsonb_array_elements(public.live_board_share(168)->'points') p
+   WHERE p->>1 = 'bringatrailer' AND (p->>0)::timestamptz BETWEEN date_trunc('hour', now()) - interval '5 hours' AND date_trunc('hour', now()) - interval '4 hours 29 minutes') = 3);
+SELECT pg_temp.ok('readings older than 48 hours are thinned to the last of each hour',
+  (SELECT count(*) FROM jsonb_array_elements(public.live_board_share(168)->'points') p
+   WHERE p->>1 = 'bringatrailer' AND (p->>0)::timestamptz BETWEEN date_trunc('hour', now()) - interval '61 hours' AND date_trunc('hour', now()) - interval '59 hours') = 1
+  AND (SELECT (p->>2)::numeric FROM jsonb_array_elements(public.live_board_share(168)->'points') p
+       WHERE p->>1 = 'bringatrailer' AND (p->>0)::timestamptz BETWEEN date_trunc('hour', now()) - interval '61 hours' AND date_trunc('hour', now()) - interval '59 hours') = 9);

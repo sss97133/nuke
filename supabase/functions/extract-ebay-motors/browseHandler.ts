@@ -1,10 +1,11 @@
-/** HTTP surface of the Browse intake: POST {action: sweep | revisit | auctions | aspects | status | preview | archive | census |
+/** HTTP surface of the Browse intake: POST {action: sweep | revisit | auctions | bulk | aspects | status | preview | archive | census |
  *  place | honour_deletions | member_handles}. */
 import { corsHeaders } from "../_shared/cors.ts";
 import { htmlToText } from "../_shared/htmlToText.ts";
 import { BrowseClient, yearAspect } from "./browseApi.ts";
 import { revisit, sweep } from "./browseSweep.ts";
 import { auctions } from "./browseAuctions.ts";
+import { bulk } from "./browseBulk.ts";
 import { toLanding } from "./browseMap.ts";
 import { censusRow, readCensus } from "./browseCensus.ts";
 import { emptyReport } from "./browseSweep.ts";
@@ -12,7 +13,7 @@ import { landArchived, validCaptures } from "./archiveLand.ts";
 import { placeBackfill } from "./browsePlace.ts";
 import { deletedLookup, honourDeletions, readStoredHandles, tombstoneItem } from "./deletedMembers.ts";
 
-export const BROWSE_ACTIONS = ["sweep", "revisit", "auctions", "aspects", "status", "preview", "archive", "census", "place", "honour_deletions", "member_handles"];
+export const BROWSE_ACTIONS = ["sweep", "revisit", "auctions", "bulk", "aspects", "status", "preview", "archive", "census", "place", "honour_deletions", "member_handles"];
 const json = (b: unknown, status = 200) => new Response(JSON.stringify(b), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
 export async function handleBrowse(supabase: any, body: any): Promise<Response> {
@@ -75,10 +76,18 @@ export async function handleBrowse(supabase: any, body: any): Promise<Response> 
         });
         return json(rep, rep.ok ? 200 : 500);
       }
+      case "bulk": {             // every open listing from search pages, 200 a call (browseBulk.ts); cron ebay-motors-bulk
+        const rep = await bulk(supabase, client, {
+          maxCalls: body.max_calls, dailyCap: body.daily_cap, floor: body.floor, blindCap: body.blind_cap, maxLand: body.max_land,
+          maxUpdates: body.max_updates, budgetMs: body.budget_ms, concurrency: body.concurrency, photos: body.photos,
+          dryRun: body.dry_run === true, restart: body.restart === true,
+        });
+        return json(rep, rep.ok ? 200 : 500);
+      }
       default: {
         const rep = await sweep(supabase, client, {
           tiers: body.tiers, maxSearchPages: body.max_search_pages, maxItems: body.max_items, reserveCalls: body.reserve_calls,
-          blindCap: body.blind_cap, dryRun: body.dry_run === true, concurrency: body.concurrency,
+          blindCap: body.blind_cap, dryRun: body.dry_run === true, concurrency: body.concurrency, fromHeld: body.from_held,
         });
         return json(rep, rep.ok ? 200 : 500);
       }

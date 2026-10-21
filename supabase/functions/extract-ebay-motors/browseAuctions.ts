@@ -31,15 +31,15 @@ import { quotaDay } from "./partsFinder.ts";
 
 /** Counts one Browse call before it is made; returns why not when the day's cap is used or the ledger cannot be written. */
 export interface CallLedger { take(): Promise<string | null> }
-export function auctionLedger(supabase: any, cap: number, now = new Date()): CallLedger {
-  const key = `ebay-auctions:browse:${quotaDay(now)}`;
+export function auctionLedger(supabase: any, cap: number, now = new Date(), name = "ebay-auctions"): CallLedger {
+  const key = `${name}:browse:${quotaDay(now)}`;   // ebay-auctions, ebay-bulk (browseBulk.ts): one day's counter per action
   return {
     async take() {
       const { data, error } = await supabase.rpc("rate_limit_increment", {
         p_key: key, p_window_start: now.toISOString(), p_expires_at: new Date(now.getTime() + 26 * 3_600_000).toISOString(),
       });
-      if (error || typeof data !== "number") return "ledger: the auctions call ledger could not be written, so no eBay call was made";
-      if (data > cap) return `daily cap: the ${cap} Browse calls the auctions action may spend today are used (reset at midnight Pacific)`;
+      if (error || typeof data !== "number") return `ledger: the ${name} call ledger could not be written, so no eBay call was made`;
+      if (data > cap) return `daily cap: the ${cap} Browse calls the ${name} action may spend today are used (reset at midnight Pacific)`;
       return null;
     },
   };

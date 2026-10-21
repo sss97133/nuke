@@ -571,6 +571,8 @@ jobs:
         run: deno test --no-check --allow-env supabase/functions/extract-ebay-motors/parts.test.ts
       - name: Verify eBay open auctions reach the live board through the live-auction writer, end only after a complete pass with no outcome, and stop at the call budget
         run: deno test --no-check --allow-env supabase/functions/extract-ebay-motors/browseAuctions.test.ts
+      - name: Verify eBay search pages land every open listing once (identity from the query and category, a deleted member redacted, the page stored once), stop at their caps and resume
+        run: deno test --no-check --allow-env supabase/functions/extract-ebay-motors/browseBulk.test.ts
       - name: Verify a Barrett-Jackson lot written to a given vehicle never lands on a new vehicle, and its sale date is its own event's
         run: deno test supabase/functions/extract-barrett-jackson/
       - name: Verify Bonhams lot pages and titles extract deterministic series, trim, and body_style facets
