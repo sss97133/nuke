@@ -49,6 +49,31 @@ export const ADVISOR_TOOLS: AdvisorToolDef[] = [
     },
   },
   {
+    name: "evaluate_listing",
+    description:
+      "One-call evaluation of a public listing URL: fetch text+photos, run vision on photos (condition, mods, " +
+      "defects, warning lights, rust, text mismatches), tag each description claim verified/unverified/contradicted, " +
+      "pull sold/ask/no-sale comps with body/trans/miles/mod tiers, show local supply, fair/offer/predicted price, " +
+      "time-to-sell, and buyer types. Returns markdown summary + structured JSON; every number is cited. " +
+      "Read-only — does not write testimony." +
+      CITE,
+    inputSchema: {
+      type: "object",
+      properties: {
+        url: { type: "string", description: "Public listing URL (Craigslist, BaT, etc.)" },
+        asset_type: ASSET_TYPE,
+      },
+      required: ["url"],
+    },
+    outputSchema: ENVELOPE_OUTPUT_SCHEMA as unknown as Record<string, unknown>,
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      openWorldHint: true,
+      title: "Evaluate Listing URL",
+    },
+  },
+  {
     name: "find_listings",
     description:
       "Find assets currently offered for sale (asks), not sold comps. Filter by status=active, price range, " +
@@ -263,4 +288,5 @@ export const ADVISOR_INSTRUCTIONS =
   "(5) Prefer per-claim confidence; when confidence_basis is source_trust, say the score is source trust, not independent claim strength. " +
   "(6) Asking prices (price_kind=ask) are not sales; use find_listings for live inventory and get_comps only for confirmed sold comps. " +
   "(7) Treat stale listings (staleness=stale or live=false) as unverified — do not recommend them as current deals. " +
-  "(8) This surface has no write, admin, shop, or SQL tools.";
+  "(8) For a full deal memo on one URL, call evaluate_listing — it cites photos, claims, comps, supply, and value in one response. " +
+  "(9) This surface has no write, admin, shop, or SQL tools.";

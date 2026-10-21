@@ -12,6 +12,7 @@
   "tools": [
     "find_asset",
     "find_listings",
+    "evaluate_listing",
     "get_asset",
     "get_history",
     "explain_field",

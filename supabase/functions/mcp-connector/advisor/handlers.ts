@@ -12,6 +12,7 @@ import {
   type Claim,
   type Citation,
 } from "./evidence.ts";
+import { handleEvaluateListing } from "./evaluate_listing.ts";
 
 /** Minimal PostgREST-shaped client used by advisor handlers (avoids pulling supabase-js types into Deno tests). */
 // deno-lint-ignore no-explicit-any
@@ -156,6 +157,7 @@ export function createAdvisorHandlers(deps: AdvisorDeps): Record<
   return {
     find_asset: (args) => handleFindAsset(deps, args),
     find_listings: (args) => handleFindListings(deps, args),
+    evaluate_listing: (args) => handleEvaluateListing(deps, args),
     get_asset: (args) => handleGetAsset(deps, args),
     get_history: (args) => handleGetHistory(deps, args),
     explain_field: (args) => handleExplainField(deps, args),

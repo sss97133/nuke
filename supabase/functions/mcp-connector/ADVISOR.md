@@ -67,12 +67,13 @@ If your client only supports stdio, use a Streamable HTTP bridge, for example:
 
 ChatGPT / Grok Bot / other agents: add a custom MCP connector pointing at `https://nuke.ag/mcp/advisor`.
 
-## Tools (8)
+## Tools (9)
 
 | Tool | Job |
 |---|---|
 | `find_asset` | Search assets (VIN, URL, year/make/model, text) |
 | `find_listings` | Live for-sale asks (price/location/source/ends_before/paging); stale excluded by default |
+| `evaluate_listing` | One URL → fetch+vision+claim tags+comps+supply+value+buyers (markdown + JSON) |
 | `get_asset` | Identity + specs + price facts as cited claims |
 | `get_history` | Events + observations; `event_time` ≠ `ingested_at`; `price_role` separates ask/hammer/unsold |
 | `explain_field` | How Nuke knows one field |
