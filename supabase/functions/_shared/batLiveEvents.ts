@@ -92,8 +92,9 @@ export async function prepareBatLiveFrame(frame: BatLiveFrame, target: BatLiveTa
   };
 }
 
-/** One acknowledgement loop, ordered within each lot. A rejected lot retains
- * its complete unacknowledged prefix while independent lots can still drain. */
+/** One acknowledgement loop, ordered within each lot. The canonical batch owner
+ * already accepts multiple lots. Isolate a rejected batch without discarding its
+ * unacknowledged prefixes or making every healthy lot pay one HTTP round trip. */
 export class BatLiveBuffer {
   private frames: BatLiveFrame[] = [];
   private draining = false;
@@ -116,19 +117,30 @@ export class BatLiveBuffer {
     try {
       const rejected = new Set<string>();
       let firstFailure: unknown;
+      let isolate = this.failures.size > 0;
       while (true) {
         const next = this.frames.find(f => !rejected.has(f.monitored_auction_id));
         if (!next) break;
         const id = next.monitored_auction_id;
-        const batch = this.frames.filter(f => f.monitored_auction_id === id).slice(0, 50);
+        const batch = this.frames.filter(f => !rejected.has(f.monitored_auction_id)
+          && (!isolate || f.monitored_auction_id === id)).slice(0, 50);
+        const counts = new Map<string, number>();
+        for (const f of batch) counts.set(f.monitored_auction_id, (counts.get(f.monitored_auction_id) ?? 0) + 1);
         try {
           await this.admit(batch);
-          // Only remove the acknowledged prefix of this lot. Arrivals appended
+          // Only remove the acknowledged prefix of each lot. Arrivals appended
           // while admission waits, including repeated frame objects, stay queued.
-          let remaining = batch.length;
-          this.frames = this.frames.filter(f => f.monitored_auction_id !== id || remaining-- <= 0);
-          this.failures.delete(id);
+          this.frames = this.frames.filter(f => {
+            const remaining = counts.get(f.monitored_auction_id) ?? 0;
+            if (!remaining) return true;
+            counts.set(f.monitored_auction_id, remaining - 1);
+            return false;
+          });
+          for (const lot of counts.keys()) this.failures.delete(lot);
         } catch (error) {
+          // A mixed atomic rejection establishes no per-lot failure. Retry its
+          // unchanged prefixes separately; canonical intake remains idempotent.
+          if (counts.size > 1) { isolate = true; continue; }
           rejected.add(id);
           this.failures.set(id, `admission:${String(error)}`.slice(0, 500));
           firstFailure ??= error;

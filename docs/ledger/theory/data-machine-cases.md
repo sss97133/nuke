@@ -395,6 +395,27 @@ event), described (COMMENT ON), owned (a registry row) and read. Not fewer table
 
 The species is a column (2026-10-18): `observation_sources.species`, with `species_set` and the evidence it was read from (`species_evidence`); a listing takes its own species where its URL or metadata shows it (`v_listing_species`). The extractor's builder declares it from the source itself (`.claude/rules/extraction.md`, Source species), and the Sources board groups by it with the names above. Barn Finds is an aggregator (a curator: its posts point at eBay, Craigslist and Facebook listings), with its own 'BF Exclusive' ads as classifieds.
 
+### BaT native transport pressure — bounded repair, 2026-10-21
+
+At 18:47 UTC the live assay covered 0 of 24 eligible current subscriptions. In the 18:45–18:52:15 UTC
+log window, seven extractor background exceptions reported fetch rate limits during stream
+admission. Read-only closing-target selection took 0.383s cold and 0.350s warm for 27 targets;
+that is selection latency, not continuous capture. Existing code launched one recovery request
+per subscription and admitted lots separately, multiplying requests before acknowledgement.
+
+The existing collector now bounds recovery to two reads, preserves queued recovery as an
+explicit coverage gap and respects its original deadline. Its buffer combines healthy lots
+inside the existing 50-frame canonical admission limit, isolates atomic mixed failures and
+preserves unacknowledged per-lot prefixes. The transport honors runtime and HTTP rate-limit
+delays without extra fetches during the delay, with HTTP limits scoped to their server origin.
+Deterministic tests cover request reduction,
+cross-parent binding through actual HTTP intake, poison-lot isolation, arrivals during a pending
+acknowledgement, source-control liveness and truthful unfinished recovery. These are fixture
+claims; deployment and the identical live coverage/latency assay still need dated receipts.
+No source cadence, budget, capacity, schema, retained-sale admission or episode-v2 hold changes.
+The retained sold gold case still lacks parser/parent attestations; repairing transport does
+not manufacture them or establish fleet-wide supported-answer gain.
+
 ### Cars & Bids capture integrity — bounded repair, 2026-10-18
 
 The source question is whether a retained auction reading contains a usable keyed and clocked

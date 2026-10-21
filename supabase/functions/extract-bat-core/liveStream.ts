@@ -47,8 +47,10 @@ export async function collectBatLive(targets: BatLiveTarget[], io: BatStreamIO, 
   const acknowledged = new Set<string>();
   for (const target of targets) for (const type of ["single", "stats", "list"]) channels.set(`post;${type};${target.post_id}`, target);
   const recovery = new Set<string>();
+  const recoveryQueue = new Map<string, BatLiveTarget>();
   const recoveryErrors = new Map<string,string>();
   const tasks = new Set<Promise<void>>();
+  const expiresAt = Date.now() + durationMs;
   let stopped = false, socket: WebSocket | null = null, lastServerAt = 0, lastPingAt = 0;
   let lastHeartbeatAt = 0, lastRecoveryAt = 0, lastError: string | null = null;
   let reconnectAt = 0;
@@ -81,10 +83,22 @@ export async function collectBatLive(targets: BatLiveTarget[], io: BatStreamIO, 
     } catch (error) { recoveryErrors.set(target.id, `recovery:${String(error)}`.slice(0, 500)); }
     finally { recovery.delete(target.id); }
   };
+  const pumpRecovery = () => {
+    // Subscription acknowledgements can arrive for 200 lots at once. Keep
+    // catch-up reads bounded while the independent socket/admission lanes run.
+    while (!stopped && Date.now() < expiresAt && recovery.size < 2 && recoveryQueue.size) {
+      const target = recoveryQueue.values().next().value!;
+      recoveryQueue.delete(target.id);
+      const task = recover(target);
+      tasks.add(task);
+      void task.finally(() => { tasks.delete(task); pumpRecovery(); });
+    }
+  };
   const scheduleRecovery = (target: BatLiveTarget) => {
-    const task = recover(target);
-    tasks.add(task);
-    void task.finally(() => tasks.delete(task));
+    if (stopped || Date.now() >= expiresAt || recovery.has(target.id) || recoveryQueue.has(target.id)) return;
+    recoveryErrors.set(target.id, "recovery_pending");
+    recoveryQueue.set(target.id, target);
+    pumpRecovery();
   };
   const connect = () => {
     acknowledged.clear();
@@ -125,7 +139,6 @@ export async function collectBatLive(targets: BatLiveTarget[], io: BatStreamIO, 
   };
   connect();
   const currentSocket = (): WebSocket | null => socket;
-  const expiresAt = Date.now() + durationMs;
   try {
     while (Date.now() < expiresAt) {
       const tickStartedAt = Date.now();
@@ -167,6 +180,7 @@ export async function collectBatLive(targets: BatLiveTarget[], io: BatStreamIO, 
     }
   } finally {
     stopped = true;
+    recoveryQueue.clear();
     currentSocket()?.close();
     await Promise.allSettled([...tasks]);
     if (heartbeatTask) await heartbeatTask;
@@ -186,16 +200,42 @@ export async function collectBatLive(targets: BatLiveTarget[], io: BatStreamIO, 
 }
 
 export function batStreamIO(url: string, key: string): BatStreamIO {
+  let retryAt = 0;
+  const originRetryAt = new Map<string, number>();
+  const request = async (url: string, options: RequestInit) => {
+    const origin = new URL(url).origin;
+    if (Date.now() < Math.max(retryAt, originRetryAt.get(origin) ?? 0)) throw new Error("bat_live_transport_backoff");
+    let response: Response;
+    try { response = await fetch(url, options); }
+    catch (error) {
+      // The runtime can refuse fetch before an HTTP response exists. Honor its
+      // explicit delay across recovery, admission and coverage, without retries
+      // inside this transport. Unacknowledged frames stay in the existing buffer.
+      if (error instanceof Error && error.name === "RateLimitError") {
+        const delay = /Retry after (\d+)ms\b/i.exec(error.message);
+        retryAt = Date.now() + (delay ? Math.max(1000, Number(delay[1])) : 5000);
+      }
+      throw error;
+    }
+    if (response.status === 429) {
+      const value = response.headers.get("Retry-After");
+      const until = value && /^\d+(?:\.\d+)?$/.test(value) ? Date.now() + Number(value) * 1000 : Date.parse(value ?? "");
+      // A source HTTP limit must not stop acknowledgement of already captured
+      // data at our own intake. Runtime fetch limits, above, cover both origins.
+      originRetryAt.set(origin, Number.isFinite(until) ? Math.max(Date.now() + 1000, until) : Date.now() + 5000);
+    }
+    return response;
+  };
   return {
     admit: async (frames, heartbeats) => {
-      const result = await fetch(`${url}/functions/v1/ingest-observation`, { method: "POST",
+      const result = await request(`${url}/functions/v1/ingest-observation`, { method: "POST",
         headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
         body: JSON.stringify({ mode: BAT_LIVE_MODE, frames, heartbeats }), signal: AbortSignal.timeout(10000) });
       if (!result.ok || (await result.json()).success !== true) throw new Error(`live_intake_http_${result.status}`);
     },
     missed: async target => {
       // Public JSON read endpoint used by BaT's own reconnect handler. No HTML.
-      const result = await fetch("https://bringatrailer.com/wp-admin/admin-ajax.php", { method: "POST",
+      const result = await request("https://bringatrailer.com/wp-admin/admin-ajax.php", { method: "POST",
         body: new URLSearchParams({ action: "bat_listing_missed_comments", listing_id: String(target.post_id), last_comment: String(target.last_comment_id) }),
         signal: AbortSignal.timeout(10000) });
       if (!result.ok) throw new Error(`missed_comments_http_${result.status}`);
