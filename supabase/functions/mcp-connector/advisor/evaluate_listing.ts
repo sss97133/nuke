@@ -4,9 +4,11 @@
  */
 import {
   emptyCitation,
+  loadBestRecoveredSaleClocks,
   makeEnvelope,
   notRecordedClaim,
   recordedClaim,
+  resolveEventSaleClock,
   type AdvisorEnvelope,
   type Claim,
   type Citation,
@@ -1253,21 +1255,42 @@ export async function handleEvaluateListing(
     const { data: events } = await sb
       .from("vehicle_events")
       .select(
-        "id, event_type, event_status, sold_at, ended_at, started_at, final_price, current_price, starting_price, source_platform, source_url",
+        "id, event_type, event_status, sold_at, ended_at, started_at, final_price, current_price, starting_price, source_platform, source_url, sale_truth_role, sold_at_precision",
       )
       .eq("vehicle_id", matchedId)
       .order("sold_at", { ascending: false, nullsFirst: false })
       .limit(20);
-    priorSales = (events || []).map((e: Record<string, unknown>) => ({
-      event_type: e.event_type ?? null,
-      event_date: e.sold_at || e.ended_at || e.started_at || null,
-      sale_price: e.final_price ?? null,
-      high_bid: e.current_price ?? null,
-      asking_price: e.starting_price ?? null,
-      source_name: e.source_platform ?? null,
-      source_url: e.source_url ?? null,
-      venue: e.source_platform ?? null,
-    }));
+    const eventRows = (events || []) as Array<Record<string, unknown>>;
+    const recoveredClocks = await loadBestRecoveredSaleClocks(
+      sb,
+      eventRows.map((e) => String(e.id || "")),
+    );
+    priorSales = eventRows.map((e: Record<string, unknown>) => {
+      const clock = resolveEventSaleClock(
+        {
+          id: e.id as string,
+          sold_at: e.sold_at as string | null,
+          ended_at: e.ended_at as string | null,
+          started_at: e.started_at as string | null,
+          sold_at_precision: e.sold_at_precision as string | null,
+        },
+        recoveredClocks.get(String(e.id || "")),
+      );
+      return {
+        event_type: e.event_type ?? null,
+        event_status: e.event_status ?? null,
+        event_date: clock.event_time,
+        event_date_precision: clock.precision,
+        event_date_source: clock.clock_source,
+        sale_truth_role: e.sale_truth_role ?? null,
+        sale_price: e.final_price ?? null,
+        high_bid: e.current_price ?? null,
+        asking_price: e.starting_price ?? null,
+        source_name: e.source_platform ?? null,
+        source_url: e.source_url ?? null,
+        venue: e.source_platform ?? null,
+      };
+    });
     if (matchedSale && !priorSales.some((p) => Number(p.sale_price) === matchedSale.amount)) {
       priorSales.unshift({
         event_type: "sale",
