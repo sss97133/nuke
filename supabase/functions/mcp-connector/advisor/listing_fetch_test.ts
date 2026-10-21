@@ -32,3 +32,12 @@ Deno.test("parseListingHtml extracts CL 911 ask, photos, and identity", () => {
   assert(L.city === "Henderson" || /Henderson/i.test(L.location || ""), "location");
   assert(L.source === "craigslist", L.source);
 });
+
+Deno.test("parseListingHtml recovers identity from C&B URL when HTML is empty", () => {
+  const u = "https://carsandbids.com/auctions/KD60OD28/1995-porsche-911-turbo-coupe";
+  const L = parseListingHtml(u, "<html><body></body></html>", 200);
+  assert(L.year === 1995, `year=${L.year}`);
+  assert(L.make === "Porsche", `make=${L.make}`);
+  assert(/turbo/i.test(L.model || ""), `model=${L.model}`);
+  assert(L.source === "cars_and_bids", L.source);
+});

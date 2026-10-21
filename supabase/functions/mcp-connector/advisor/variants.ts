@@ -1,0 +1,268 @@
+/**
+ * Variant / trim / URL helpers shared by evaluate_listing, value_asset, and get_comps.
+ * Never invent identity — these only classify text already present.
+ */
+
+export type VariantKey =
+  | "turbo_s"
+  | "turbo"
+  | "gt2"
+  | "gt3"
+  | "rs"
+  | "speedster"
+  | "gunther_werks"
+  | "restomod"
+  | "base";
+
+const VARIANT_RULES: Array<{ key: Exclude<VariantKey, "base">; re: RegExp }> = [
+  { key: "gunther_werks", re: /gunther\s*werks|g[uü]nther\s*werks/i },
+  { key: "turbo_s", re: /turbo\s*[\-_]?s\b/i },
+  { key: "gt2", re: /\bgt[\s\-]?2\b/i },
+  { key: "gt3", re: /\bgt[\s\-]?3\b/i },
+  { key: "rs", re: /\b(?:carrera\s*)?rs\b|\b911\s*rs\b/i },
+  { key: "speedster", re: /speedster/i },
+  { key: "turbo", re: /\bturbo\b/i },
+  { key: "restomod", re: /restomod|singer\b/i },
+];
+
+/** Highest-priority specialty variant present in text, or base. */
+export function detectVariant(text: string | null | undefined): VariantKey {
+  const t = text || "";
+  if (!t.trim()) return "base";
+  for (const rule of VARIANT_RULES) {
+    if (rule.re.test(t)) return rule.key;
+  }
+  return "base";
+}
+
+/** Specialty markers that must not contaminate a base-car cohort (and vice versa). */
+export function specialtyVariants(v: VariantKey): boolean {
+  return v !== "base";
+}
+
+/**
+ * True when a candidate should be excluded from the subject's sold-comp pool.
+ * - Base subject: drop Turbo / RS / Speedster / Gunther / GT2/3 / restomod.
+ * - Specialty subject: drop comps that lack the same specialty (or a stricter sibling).
+ */
+export function isVariantMismatch(subject: VariantKey, candidate: VariantKey): boolean {
+  if (subject === "base") return specialtyVariants(candidate);
+  if (candidate === "base") return true;
+  if (subject === candidate) return false;
+  // Turbo S may use Turbo comps; Gunther is its own cohort.
+  if (subject === "turbo_s" && candidate === "turbo") return false;
+  if (subject === "turbo" && candidate === "turbo_s") return false;
+  if (subject === "restomod" && candidate === "gunther_werks") return false;
+  if (subject === "gunther_werks" && candidate === "restomod") return false;
+  return true;
+}
+
+/** Normalize listing URLs for dedupe (trailing slash, quotes, marketplace- prefix). */
+export function canonicalListingUrl(url: string | null | undefined): string {
+  if (!url) return "";
+  let u = String(url).trim();
+  // Quoted title stuck to URL: `"Title"https://...` or trailing `"`.
+  u = u.replace(/^["']+/, "").replace(/["']+$/, "");
+  const httpIdx = u.search(/https?:\/\//i);
+  if (httpIdx > 0) u = u.slice(httpIdx);
+  u = u.replace(/\/$/, "").toLowerCase();
+  u = u.replace(/marketplace-/i, "");
+  u = u.replace(/\/(auction|marketplace)\//, "/");
+  return u;
+}
+
+/** Strip a quoted title glued onto a URL field. */
+export function cleanListingUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  const raw = String(url).trim();
+  if (!raw) return null;
+  const httpIdx = raw.search(/https?:\/\//i);
+  const cleaned = (httpIdx >= 0 ? raw.slice(httpIdx) : raw).replace(/["']+$/, "").trim();
+  return cleaned || null;
+}
+
+/**
+ * Flag likely parts / junk sales (not whole-car comps).
+ * Uses title/URL language and extreme low prices for the year/make cohort.
+ */
+export function isLikelyPartsSale(input: {
+  title?: string | null;
+  url?: string | null;
+  model?: string | null;
+  sale_price?: number | null;
+  year?: number | null;
+}): { parts: boolean; reason: string | null } {
+  const blob = `${input.title || ""} ${input.url || ""} ${input.model || ""}`.toLowerCase();
+  if (/\bparts?\b|parting\s*out|project\s*car\s*for\s*parts|rolling\s*chassis|shell\s*only/.test(blob)) {
+    return { parts: true, reason: "title_or_url_parts_language" };
+  }
+  const price = input.sale_price;
+  if (price != null && price > 0 && price < 8000) {
+    // Air-cooled / exotic whole cars almost never hammer under $8k as complete cars.
+    if (/911|porsche|ferrari|lamborghini|gt2|gt3|turbo/i.test(blob) || (input.year != null && input.year <= 1998)) {
+      return { parts: true, reason: "implausibly_low_price_for_complete_car" };
+    }
+  }
+  return { parts: false, reason: null };
+}
+
+/** Soft similarity 0..1 from shared attributes (never a constant). */
+export function scoreSimilarity(input: {
+  subject: {
+    year?: number | null;
+    variant: VariantKey;
+    body?: string | null;
+    transmission?: string | null;
+    mileage?: number | null;
+    model?: string | null;
+  };
+  candidate: {
+    year?: number | null;
+    variant: VariantKey;
+    body?: string | null;
+    transmission?: string | null;
+    mileage?: number | null;
+    model?: string | null;
+    sale_price?: number | null;
+  };
+}): number {
+  let score = 0.35;
+  const { subject: s, candidate: c } = input;
+  if (s.year != null && c.year != null) {
+    const dy = Math.abs(s.year - c.year);
+    if (dy === 0) score += 0.18;
+    else if (dy === 1) score += 0.12;
+    else if (dy === 2) score += 0.06;
+    else if (dy >= 5) score -= 0.08;
+  }
+  if (s.variant === c.variant) score += 0.22;
+  else if (!isVariantMismatch(s.variant, c.variant)) score += 0.1;
+  else score -= 0.25;
+  if (s.body && c.body && s.body === c.body) score += 0.08;
+  if (s.transmission && c.transmission) {
+    const st = s.transmission.toLowerCase();
+    const ct = c.transmission.toLowerCase();
+    if (st === ct || (st.includes("manual") && ct.includes("manual"))) score += 0.06;
+  }
+  if (s.mileage != null && c.mileage != null && s.mileage > 0) {
+    const ratio = Math.abs(c.mileage - s.mileage) / Math.max(s.mileage, 1);
+    if (ratio <= 0.25) score += 0.08;
+    else if (ratio <= 0.5) score += 0.03;
+  }
+  if (s.model && c.model) {
+    const sm = s.model.toLowerCase();
+    const cm = c.model.toLowerCase();
+    if (sm === cm || sm.includes(cm) || cm.includes(sm)) score += 0.05;
+  }
+  return Math.max(0.05, Math.min(0.98, Number(score.toFixed(3))));
+}
+
+/**
+ * If a model estimate is more than 3× off a same-asset sale within 90 days,
+ * return a guard payload (caller lowers confidence and may rebases the estimate).
+ */
+export function recentSaleSanityGuard(input: {
+  estimate: number | null;
+  saleAmount: number | null;
+  saleOn: string | null;
+  nowMs?: number;
+}): {
+  triggered: boolean;
+  ratio: number | null;
+  days_since_sale: number | null;
+  message: string | null;
+} {
+  if (input.estimate == null || input.saleAmount == null || !(input.saleAmount > 0) || !input.saleOn) {
+    return { triggered: false, ratio: null, days_since_sale: null, message: null };
+  }
+  const t = Date.parse(input.saleOn);
+  if (!Number.isFinite(t)) {
+    return { triggered: false, ratio: null, days_since_sale: null, message: null };
+  }
+  const days = Math.round(((input.nowMs ?? Date.now()) - t) / 86_400_000);
+  if (days < 0 || days > 90) {
+    return { triggered: false, ratio: null, days_since_sale: days, message: null };
+  }
+  const ratio = input.estimate / input.saleAmount;
+  if (ratio <= 3 && ratio >= 1 / 3) {
+    return { triggered: false, ratio, days_since_sale: days, message: null };
+  }
+  const money = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
+  return {
+    triggered: true,
+    ratio,
+    days_since_sale: days,
+    message:
+      `Valuation ${money(input.estimate)} is more than 3× off this asset's sale of ` +
+      `${money(input.saleAmount)} on ${input.saleOn.slice(0, 10)} (${days}d ago); confidence lowered.`,
+  };
+}
+
+/** Pull year/make/model/turbo cues from a listing URL slug when HTML is empty (JS shells). */
+export function identityFromListingUrl(url: string): {
+  year: number | null;
+  make: string | null;
+  model: string | null;
+  title: string | null;
+  auction_id: string | null;
+} {
+  let year: number | null = null;
+  let make: string | null = null;
+  let model: string | null = null;
+  let title: string | null = null;
+  let auction_id: string | null = null;
+  try {
+    const u = new URL(url.startsWith("http") ? url : `https://${url}`);
+    const parts = u.pathname.split("/").filter(Boolean);
+    const auctionsIdx = parts.findIndex((p) => p === "auctions" || p === "auction");
+    if (auctionsIdx >= 0 && parts[auctionsIdx + 1]) {
+      auction_id = parts[auctionsIdx + 1]!;
+    }
+    const slug = parts[parts.length - 1] || "";
+    const tokens = slug.toLowerCase().split(/[-_]+/).filter(Boolean);
+    const yearTok = tokens.find((t) => /^(19|20)\d{2}$/.test(t));
+    if (yearTok) year = Number(yearTok);
+    const makes: Record<string, string> = {
+      porsche: "Porsche",
+      volkswagen: "Volkswagen",
+      vw: "Volkswagen",
+      bmw: "BMW",
+      mercedes: "Mercedes-Benz",
+      ford: "Ford",
+      chevrolet: "Chevrolet",
+      chevy: "Chevrolet",
+      ferrari: "Ferrari",
+      toyota: "Toyota",
+      honda: "Honda",
+      nissan: "Nissan",
+      audi: "Audi",
+      mazda: "Mazda",
+    };
+    for (const t of tokens) {
+      if (makes[t]) {
+        make = makes[t]!;
+        break;
+      }
+    }
+    const modelBits: string[] = [];
+    if (tokens.includes("911")) modelBits.push("911");
+    if (tokens.includes("turbo") && !tokens.includes("non")) {
+      modelBits.push(tokens.includes("s") && tokens.indexOf("s") > tokens.indexOf("turbo") ? "Turbo S" : "Turbo");
+    }
+    if (tokens.includes("carrera")) modelBits.push("Carrera");
+    if (tokens.includes("speedster")) modelBits.push("Speedster");
+    if (tokens.includes("cabriolet") || tokens.includes("cabrio") || tokens.includes("convertible")) {
+      modelBits.push("Cabriolet");
+    } else if (tokens.includes("coupe") || tokens.includes("coupé")) {
+      modelBits.push("Coupe");
+    }
+    if (tokens.includes("targa")) modelBits.push("Targa");
+    if (modelBits.length) model = modelBits.join(" ");
+    if (year || make || model) {
+      title = [year, make, model].filter(Boolean).join(" ");
+    }
+  } catch {
+    /* ignore */
+  }
+  return { year, make, model, title, auction_id };
+}

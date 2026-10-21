@@ -12,6 +12,15 @@ import {
   type Citation,
 } from "./evidence.ts";
 import { fetchListingPage, type FetchedListing } from "./listing_fetch.ts";
+import {
+  canonicalListingUrl,
+  cleanListingUrl,
+  detectVariant,
+  identityFromListingUrl,
+  isLikelyPartsSale,
+  isVariantMismatch,
+  recentSaleSanityGuard,
+} from "./variants.ts";
 
 /** Minimal deps (kept local to avoid circular import with handlers.ts). */
 export interface EvaluateDeps {
@@ -129,25 +138,30 @@ interface CompRow {
 function detectModFlags(text: string): string[] {
   const flags: string[] = [];
   const t = text.toLowerCase();
+  // Generation "993" alone is not a conversion — only body-swap / restyle language.
   if (/993\s*(body|styling|look|update|panel)/.test(t) || /updated with all steel 993/.test(t)) {
     flags.push("993_body_conversion");
   }
   if (/widebody|wide body|turbo look|slantnose/.test(t)) flags.push("body_conversion");
-  if (/project\b/.test(t)) flags.push("project");
+  if (/\bproject\b/.test(t) && !/\bturbo\b/.test(t)) flags.push("project");
   if (/restomod|restomodded/.test(t)) flags.push("restomod");
   return flags;
 }
 
 function classifyTier(text: string, mods: string[]): "original" | "modified_or_conversion" {
-  if (mods.length || /993|conversion|widebody|restomod|project/i.test(text)) {
+  if (mods.length) return "modified_or_conversion";
+  // Do NOT treat generation codes (993, 964, 996…) as conversions.
+  if (/993\s*(body|styling|look|update|panel)|updated with all steel 993/i.test(text)) {
+    return "modified_or_conversion";
+  }
+  if (/widebody|restomod|\bproject\b/i.test(text) && !/\bturbo\b/i.test(text)) {
     return "modified_or_conversion";
   }
   return "original";
 }
 
-function isTurboContamination(model: string | null, title: string | null): boolean {
-  const t = `${model || ""} ${title || ""}`.toLowerCase();
-  return /\bturbo\b/.test(t) && !/non[\s-]?turbo|no turbo/.test(t);
+function subjectBlob(listing: FetchedListing): string {
+  return `${listing.title || ""} ${listing.description || ""} ${listing.model || ""} ${listing.make || ""} ${listing.url || ""}`;
 }
 
 function bodyBucket(s: string | null): string | null {
@@ -420,12 +434,22 @@ async function loadCompsForListing(
   listing: FetchedListing,
 ): Promise<{ comps: CompRow[]; excluded: Record<string, number> }> {
   const sb = deps.sb();
-  const make = listing.make || "Porsche";
-  const modelCore = (listing.model || "911").replace(/\s+cabriolet|\s+convertible/gi, "").trim() ||
-    "911";
+  // Never invent a cohort — unknown identity returns empty comps.
+  if (!listing.make || !listing.year) {
+    return {
+      comps: [],
+      excluded: { unknown_identity: 1, turbo: 0, duplicate: 0, no_price: 0, variant: 0, parts: 0 },
+    };
+  }
+  const make = listing.make;
+  const modelCore = (listing.model || "")
+    .replace(/\s+cabriolet|\s+convertible|\s+coupe|\s+targa/gi, "")
+    .replace(/\s+turbo(\s*s)?/gi, "")
+    .trim() || "911";
   const year = listing.year;
-  const yearMin = year ? year - 3 : 1984;
-  const yearMax = year ? year + 2 : 1989;
+  const yearMin = year - 3;
+  const yearMax = year + 2;
+  const subjectVariant = detectVariant(subjectBlob(listing));
 
   let rpcRows: unknown = null;
   let rpcErr: { message?: string } | null = null;
@@ -510,9 +534,13 @@ async function loadCompsForListing(
     turbo: 0,
     duplicate: 0,
     no_price: 0,
+    variant: 0,
+    parts: 0,
   };
   const seenUrl = new Set<string>();
+  const seenPriceDate = new Set<string>();
   const comps: CompRow[] = [];
+  const subjectCanon = canonicalListingUrl(listing.url);
 
   for (const r of rows) {
     const id = r.vehicle_id ? String(r.vehicle_id) : null;
@@ -520,16 +548,28 @@ async function loadCompsForListing(
     const fact = id ? factMap.get(id) : null;
     const model = String(v?.model ?? r.mdl ?? "");
     const title = String(v?.listing_title ?? "");
-    if (isTurboContamination(model, title) && !/turbo/i.test(listing.model || "")) {
-      excluded.turbo++;
+    const rawUrl = cleanListingUrl(
+      String(r.listing_url || v?.listing_url || fact?.source_url || ""),
+    );
+    const candBlob = `${model} ${title} ${rawUrl || ""}`;
+    const candVariant = detectVariant(candBlob);
+    // Never exclude the subject's own variant (e.g. Turbo comps for a Turbo subject).
+    if (isVariantMismatch(subjectVariant, candVariant)) {
+      if (candVariant === "turbo" || candVariant === "turbo_s") excluded.turbo++;
+      else excluded.variant++;
       continue;
     }
-    const url = String(r.listing_url || v?.listing_url || fact?.source_url || "")
-      .replace(/\/$/, "")
-      .replace(/marketplace-/i, "")
-      .toLowerCase();
-    const canon = url.replace(/\/(auction|marketplace)\//, "/");
+    const canon = canonicalListingUrl(rawUrl);
     if (canon && seenUrl.has(canon)) {
+      excluded.duplicate++;
+      continue;
+    }
+    // Never treat the subject listing URL as its own sold comp.
+    if (
+      canon && subjectCanon &&
+      (canon === subjectCanon || canon.includes(subjectCanon.slice(-24)) ||
+        subjectCanon.includes(canon.slice(-24)))
+    ) {
       excluded.duplicate++;
       continue;
     }
@@ -543,7 +583,7 @@ async function loadCompsForListing(
       : r.sale_price != null
       ? Number(r.sale_price)
       : null;
-    if (kind === "ask" || (!basis && (v?.is_for_sale === true || /jamesedition|classiccars|motorious|collectingcars/i.test(url)))) {
+    if (kind === "ask" || (!basis && (v?.is_for_sale === true || /jamesedition|classiccars|motorious|collectingcars/i.test(rawUrl || "")))) {
       result_type = "ask";
       price = fact?.ask_amount != null
         ? Number(fact.ask_amount)
@@ -567,13 +607,35 @@ async function loadCompsForListing(
       continue;
     }
 
-    const blob = `${model} ${title} ${url}`;
-    const tier = classifyTier(blob, detectModFlags(blob));
     const soldDate = fact?.sold_on
       ? String(fact.sold_on)
       : r.sold_date
       ? String(r.sold_date)
       : null;
+    // Cross-platform duplicate: same hammer + same day.
+    const priceDateKey = soldDate && price
+      ? `${Math.round(price)}|${soldDate.slice(0, 10)}`
+      : "";
+    if (priceDateKey && seenPriceDate.has(priceDateKey)) {
+      excluded.duplicate++;
+      continue;
+    }
+    if (priceDateKey) seenPriceDate.add(priceDateKey);
+
+    const parts = isLikelyPartsSale({
+      title,
+      url: rawUrl,
+      model,
+      sale_price: price,
+      year: (v?.year as number) ?? (r.yr as number) ?? null,
+    });
+    if (parts.parts) {
+      excluded.parts++;
+      continue;
+    }
+
+    const blob = `${model} ${title} ${rawUrl || ""}`;
+    const tier = classifyTier(blob, detectModFlags(blob));
 
     comps.push({
       asset_id: id,
@@ -587,13 +649,13 @@ async function loadCompsForListing(
       mileage: typeof v?.mileage === "number" ? v.mileage as number : null,
       sale_price: price,
       sold_date: soldDate,
-      listing_url: (r.listing_url as string) || (v?.listing_url as string) || null,
+      listing_url: rawUrl,
       platform: (r.platform as string) || (v?.canonical_platform as string) || null,
       result_type,
       tier,
       citation: emptyCitation({
         source_name: (r.platform as string) || (v?.canonical_platform as string) || "comp",
-        source_url: (r.listing_url as string) || (v?.listing_url as string) || null,
+        source_url: rawUrl,
         observation_id: null,
         event_time: soldDate,
         ingested_at: null,
@@ -614,27 +676,20 @@ function filterSubjectComps(
   asks: CompRow[];
   no_sales: CompRow[];
 } {
-  const wantBody = bodyBucket(listing.model) || bodyBucket(listing.title) || "cabriolet";
-  const wantTrans = transBucket(listing.transmission) || "g50";
+  const wantBody = bodyBucket(listing.model) || bodyBucket(listing.title);
+  const wantTrans = transBucket(listing.transmission);
   const miles = listing.mileage;
-  const subjectTier = classifyTier(
-    `${listing.title} ${listing.description}`,
-    detectModFlags(`${listing.title} ${listing.description}`),
-  );
 
   const matchBody = (c: CompRow) => {
-    if (!c.body) return true; // don't drop unknown body; score later
-    if (wantBody === "cabriolet") return c.body === "cabriolet";
+    if (!wantBody || !c.body) return true;
     return c.body === wantBody;
   };
   const matchMiles = (c: CompRow) => {
     if (miles == null || c.mileage == null) return true;
-    return c.mileage >= 50_000 && c.mileage <= 100_000
-      ? miles >= 40_000 && miles <= 120_000
-      : Math.abs(c.mileage - miles) / Math.max(miles, 1) <= 0.55;
+    return Math.abs(c.mileage - miles) / Math.max(miles, 1) <= 0.55;
   };
   const matchTrans = (c: CompRow) => {
-    if (!c.transmission) return true;
+    if (!wantTrans || !c.transmission) return true;
     if (wantTrans === "g50") return c.transmission === "g50" || c.transmission === "manual";
     return c.transmission === wantTrans || c.transmission === "manual";
   };
@@ -645,14 +700,15 @@ function filterSubjectComps(
     c.tier === "original" && matchBody(c) && matchTrans(c) && matchMiles(c)
   );
   if (original_sold.length < 5) {
-    original_sold = sold.filter((c) => c.tier === "original" && matchTrans(c));
+    original_sold = sold.filter((c) => c.tier === "original" && matchBody(c));
   }
   if (original_sold.length < 5) {
     original_sold = sold.filter((c) => c.tier === "original");
   }
+  if (original_sold.length < 3) {
+    original_sold = sold;
+  }
   const conversion_sold = sold.filter((c) => c.tier === "modified_or_conversion");
-  void subjectTier;
-  void wantBody;
   return {
     original_sold,
     conversion_sold,
@@ -706,38 +762,43 @@ async function localSupply(
   });
 }
 
-function buyerProfiles(
-  listing: FetchedListing,
-  fairLow: number | null,
-  fairHigh: number | null,
-  offerLow: number | null,
-  offerHigh: number | null,
-): Array<Record<string, unknown>> {
-  const ask = listing.asking_price;
-  const fairMid = fairLow != null && fairHigh != null ? (fairLow + fairHigh) / 2 : null;
-  return [
-    {
-      type: "enthusiast_driver",
-      would_pay: offerHigh ?? fairMid,
-      rationale: "Wants a usable air-cooled cab; pays near fair if condition risk is bounded.",
-      venues: ["Craigslist local", "BaT (if presented honestly as conversion)", "Facebook groups"],
-    },
-    {
-      type: "flipper_dealer",
-      would_pay: offerLow ?? (fairMid != null ? fairMid * 0.8 : null),
-      rationale: "Needs margin after sorting project items and disclosing conversion.",
-      venues: ["Craigslist", "PCAR market", "dealer wholesale"],
-    },
-    {
-      type: "collector_originalist",
-      would_pay: fairLow != null ? fairLow * 0.7 : null,
-      rationale: "Discounts heavily for 993 body conversion vs original G50 cab cohort.",
-      venues: ["BaT", "specialist dealers"],
-      note: ask != null && fairHigh != null && ask > fairHigh
-        ? "Current ask sits above conversion fair band for this buyer."
-        : null,
-    },
+const CONFIDENCE_CAP = 0.6;
+
+function buildVerdict(input: {
+  listing: FetchedListing;
+  fairLow: number | null;
+  fairHigh: number | null;
+  confidence: number;
+  flags: string[];
+  redFlags: string[];
+  matchedSale: { amount: number; on: string | null } | null;
+}): string {
+  const { listing, fairLow, fairHigh, confidence, flags, redFlags, matchedSale } = input;
+  const label = [listing.year, listing.make, listing.model].filter(Boolean).join(" ") ||
+    "Listing";
+  if (fairLow == null || fairHigh == null) {
+    return `${label}: value not recorded — identity or comps insufficient.`;
+  }
+  const parts: string[] = [
+    `${label}: fair ${money(fairLow)}–${money(fairHigh)} (confidence ${confidence.toFixed(2)})`,
   ];
+  if (matchedSale) {
+    parts.push(
+      `same car sold ${money(matchedSale.amount)}${
+        matchedSale.on ? ` on ${matchedSale.on.slice(0, 10)}` : ""
+      }`,
+    );
+  }
+  if (listing.asking_price != null && fairHigh != null) {
+    if (listing.asking_price > fairHigh * 1.15) parts.push("ask above fair band");
+    else if (listing.asking_price < fairLow * 0.9) parts.push("ask below fair band");
+    else parts.push("ask inside fair band");
+  }
+  if (flags.includes("recent_same_asset_sale_dominates")) {
+    parts.push("anchored on recent same-asset sale");
+  }
+  if (redFlags.length) parts.push(`${redFlags.length} red flag(s)`);
+  return parts.join(" · ");
 }
 
 function buildMarkdown(input: {
@@ -745,86 +806,83 @@ function buildMarkdown(input: {
   photos: PhotoAnalysis[];
   claims: TextClaim[];
   missing: string[];
-  original: CompRow[];
-  conversion: CompRow[];
-  supply: Array<Record<string, unknown>>;
+  comps: CompRow[];
+  priorSales: Array<Record<string, unknown>>;
+  redFlags: string[];
   value: Record<string, unknown>;
-  buyers: Array<Record<string, unknown>>;
+  verdict: string;
   latency_ms: number;
 }): string {
-  const { listing, photos, claims, missing, original, conversion, supply, value, buyers, latency_ms } =
+  const { listing, photos, claims, missing, comps, priorSales, redFlags, value, verdict, latency_ms } =
     input;
-  const oPrices = original.map((c) => c.sale_price!).filter(Boolean);
-  const cPrices = conversion.map((c) => c.sale_price!).filter(Boolean);
   const lines: string[] = [];
-  lines.push(`# Listing evaluation`);
+  lines.push(`# ${verdict}`);
   lines.push("");
   lines.push(`**${listing.title || "Untitled"}**`);
   lines.push(`- URL: ${listing.url}`);
-  lines.push(`- Ask: ${money(listing.asking_price)} · ${listing.location || "location n/a"}`);
-  lines.push(
-    `- Identity: ${[listing.year, listing.make, listing.model].filter(Boolean).join(" ") || "n/a"} · ${listing.mileage != null ? `${listing.mileage.toLocaleString()} mi` : "miles n/a"} · ${listing.transmission || "trans n/a"}`,
-  );
-  lines.push(`- Fetched: ${listing.fetched_at} (HTTP ${listing.http_status}) · latency ${latency_ms}ms`);
+  if (listing.asking_price != null) {
+    lines.push(`- Ask: ${money(listing.asking_price)}${listing.location ? ` · ${listing.location}` : ""}`);
+  }
+  const ident = [listing.year, listing.make, listing.model].filter(Boolean).join(" ");
+  if (ident) {
+    lines.push(
+      `- Identity: ${ident}${
+        listing.mileage != null ? ` · ${listing.mileage.toLocaleString()} mi` : ""
+      }${listing.transmission ? ` · ${listing.transmission}` : ""}`,
+    );
+  }
+  lines.push(`- Fetched: ${listing.fetched_at} (HTTP ${listing.http_status}) · ${latency_ms}ms`);
   lines.push("");
-  lines.push(`## Photos (${photos.length} analyzed / ${listing.photo_urls.length} found)`);
+  lines.push(`## Value`);
+  lines.push(
+    `- Range: ${money(value.fair_low as number)} – ${money(value.fair_high as number)} · confidence ${value.confidence}`,
+  );
+  if (value.basis) lines.push(`- Basis: ${value.basis}`);
+  if (priorSales.length) {
+    lines.push("");
+    lines.push(`## Prior sales / relists (same car)`);
+    for (const p of priorSales.slice(0, 8)) {
+      lines.push(
+        `- ${p.event_date || "date n/a"} · ${p.event_type || "event"} · ${
+          money(p.sale_price as number)
+        } · ${p.source_url || p.source_name || ""}`,
+      );
+    }
+  }
+  if (comps.length) {
+    lines.push("");
+    lines.push(`## Top comps`);
+    for (const c of comps.slice(0, 8)) {
+      lines.push(
+        `- ${[c.year, c.make, c.model].filter(Boolean).join(" ")} · ${money(c.sale_price)} · ${
+          c.sold_date || "date n/a"
+        } · ${c.listing_url || ""}`,
+      );
+    }
+  }
+  if (redFlags.length) {
+    lines.push("");
+    lines.push(`## Red flags`);
+    for (const f of redFlags) lines.push(`- ${f}`);
+  }
   const rust = photos.filter((p) =>
     (p.damage_flags || []).some((d) => /rust/i.test(d)) || (p.notes || []).some((n) => /rust/i.test(n))
   );
-  const warns = photos.filter((p) => (p.warning_lights || []).length);
-  lines.push(
-    `- Vision: ${photos.filter((p) => p.status === "ok").length} ok, ${photos.filter((p) => p.status !== "ok").length} degraded/error`,
-  );
-  if (rust.length) lines.push(`- Rust / corrosion cues on ${rust.length} photo(s)`);
-  if (warns.length) {
-    lines.push(
-      `- Warning-light cues: ${[...new Set(warns.flatMap((p) => p.warning_lights || []))].join(", ")}`,
-    );
-  }
-  lines.push("");
-  lines.push(`## Description claims`);
-  for (const tag of ["contradicted", "verified", "unverified", "hedge"] as ClaimTag[]) {
-    const subset = claims.filter((c) => c.tag === tag).slice(0, 6);
-    if (!subset.length) continue;
-    lines.push(`### ${tag}`);
-    for (const c of subset) lines.push(`- (${tag}) ${c.text.slice(0, 160)} — _${c.reason}_`);
-  }
-  if (missing.length) {
-    lines.push(`### missing`);
-    for (const m of missing) lines.push(`- ${m}`);
-  }
-  lines.push("");
-  lines.push(`## Comps`);
-  lines.push(
-    `- Original G50-like sold: n=${oPrices.length}, median ${money(median(oPrices))} (p25 ${money(pct([...oPrices].sort((a, b) => a - b), 0.25))}, p75 ${money(pct([...oPrices].sort((a, b) => a - b), 0.75))})`,
-  );
-  lines.push(
-    `- Modified / conversion sold: n=${cPrices.length}, median ${money(median(cPrices))} · samples ${cPrices.slice(0, 5).map(money).join(", ")}`,
-  );
-  lines.push("");
-  lines.push(`## Local supply`);
-  lines.push(`- Active comparable asks nearby: ${supply.length}`);
-  for (const s of supply.slice(0, 5)) {
-    lines.push(
-      `- ${s.label}: ${money(s.asking_price as number)} · ${s.days_listed ?? "?"}d · ${s.location || ""}`,
-    );
-  }
-  if (value.ask_percentile != null) {
-    lines.push(`- This ask percentile vs local supply: ${value.ask_percentile}`);
-  }
-  lines.push("");
-  lines.push(`## Value`);
-  lines.push(`- Fair value: ${money(value.fair_low as number)} – ${money(value.fair_high as number)}`);
-  lines.push(`- Offer range: ${money(value.offer_low as number)} – ${money(value.offer_high as number)}`);
-  lines.push(`- Predicted selling price: ${money(value.predicted_sale as number)}`);
-  lines.push(`- Time to sell (est.): ${value.time_to_sell_days ?? "n/a"} days`);
-  lines.push(`- Confidence: ${value.confidence} (n=${value.n}) · ${value.basis}`);
-  lines.push("");
-  lines.push(`## Buyers`);
-  for (const b of buyers) {
-    lines.push(
-      `- **${b.type}**: would pay ~${money(b.would_pay as number)} — ${b.rationale} · venues: ${(b.venues as string[]).join(", ")}`,
-    );
+  if (photos.length || claims.length || missing.length || rust.length) {
+    lines.push("");
+    lines.push(`## Evidence notes`);
+    if (photos.length) {
+      lines.push(
+        `- Photos: ${photos.filter((p) => p.status === "ok").length} analyzed / ${listing.photo_urls.length} found`,
+      );
+    }
+    if (rust.length) lines.push(`- Rust cues on ${rust.length} photo(s)`);
+    for (const tag of ["contradicted", "verified"] as ClaimTag[]) {
+      for (const c of claims.filter((x) => x.tag === tag).slice(0, 4)) {
+        lines.push(`- (${tag}) ${c.text.slice(0, 140)}`);
+      }
+    }
+    for (const m of missing.slice(0, 6)) lines.push(`- missing: ${m}`);
   }
   return lines.join("\n");
 }
@@ -881,28 +939,117 @@ export async function handleEvaluateListing(
     }),
   );
 
-  // Match retained Nuke vehicle if present (read-only)
+  // Match retained Nuke vehicle if present (read-only) and prefer its identity for comps.
   const sb = deps.sb();
   const slug = url.replace(/\/$/, "");
+  const urlId = identityFromListingUrl(url);
   const pathTail = slug.replace(/^https?:\/\//i, "").slice(-48);
+  const matchSelect =
+    "id, year, make, model, trim, vin, mileage, transmission, body_style, sale_price, listing_url, bat_auction_url, canonical_platform, updated_at";
   const exacts = await Promise.all([
-    sb.from("vehicles").select("id").eq("listing_url", slug).limit(1),
-    sb.from("vehicles").select("id").eq("listing_url", slug + "/").limit(1),
+    sb.from("vehicles").select(matchSelect).eq("listing_url", slug).limit(1),
+    sb.from("vehicles").select(matchSelect).eq("listing_url", slug + "/").limit(1),
+    sb.from("vehicles").select(matchSelect).eq("bat_auction_url", slug).limit(1),
+    sb.from("vehicles").select(matchSelect).eq("bat_auction_url", slug + "/").limit(1),
   ]);
   let matchedId: string | null = null;
+  let matchedRow: Record<string, unknown> | null = null;
   for (const res of exacts) {
     if (res.data?.[0]?.id) {
       matchedId = String(res.data[0].id);
+      matchedRow = res.data[0] as Record<string, unknown>;
       break;
+    }
+  }
+  if (!matchedId && urlId.auction_id) {
+    const pat = `%/${urlId.auction_id}%`;
+    const [a, b] = await Promise.all([
+      sb.from("vehicles").select(matchSelect).ilike("listing_url", pat).limit(3),
+      sb.from("vehicles").select(matchSelect).ilike("bat_auction_url", pat).limit(3),
+    ]);
+    const hit = a.data?.[0] || b.data?.[0];
+    if (hit?.id) {
+      matchedId = String(hit.id);
+      matchedRow = hit as Record<string, unknown>;
     }
   }
   if (!matchedId && pathTail.length > 12) {
     const { data: fuzzy } = await sb
       .from("vehicles")
-      .select("id, listing_url")
-      .ilike("listing_url", `%${pathTail}%`)
+      .select(matchSelect)
+      .or(`listing_url.ilike.%${pathTail}%,bat_auction_url.ilike.%${pathTail}%`)
       .limit(3);
-    matchedId = fuzzy?.[0]?.id ? String(fuzzy[0].id) : null;
+    if (fuzzy?.[0]?.id) {
+      matchedId = String(fuzzy[0].id);
+      matchedRow = fuzzy[0] as Record<string, unknown>;
+    }
+  }
+  let matchedSale: { amount: number; on: string | null; source_url: string | null } | null = null;
+  if (matchedRow) {
+    listing.year = listing.year ?? (matchedRow.year as number | null);
+    listing.make = listing.make ?? (matchedRow.make as string | null);
+    // Prefer richer specialty model from URL/slug over a thin retained model when both exist.
+    if (!listing.model) {
+      listing.model = (matchedRow.model as string) ||
+        (matchedRow.trim as string) ||
+        null;
+    } else if (
+      matchedRow.model &&
+      /turbo/i.test(String(matchedRow.model)) &&
+      !/turbo/i.test(listing.model)
+    ) {
+      listing.model = String(matchedRow.model);
+    } else if (
+      matchedRow.trim &&
+      /turbo/i.test(String(matchedRow.trim)) &&
+      !/turbo/i.test(listing.model)
+    ) {
+      listing.model = `${listing.model} ${matchedRow.trim}`.trim();
+    }
+    if (!listing.title || /^untitled$/i.test(listing.title)) {
+      listing.title = [listing.year, listing.make, listing.model].filter(Boolean).join(" ") ||
+        listing.title;
+    }
+    listing.mileage = listing.mileage ?? (matchedRow.mileage as number | null);
+    listing.transmission = listing.transmission ?? (matchedRow.transmission as string | null);
+    if (matchedRow.sale_price != null) {
+      const amount = Number(matchedRow.sale_price);
+      matchedSale = {
+        amount,
+        on: null,
+        source_url: (matchedRow.listing_url || matchedRow.bat_auction_url || url) as string,
+      };
+      if (listing.asking_price == null) listing.asking_price = amount;
+    }
+  }
+  if (matchedId) {
+    const { data: facts } = await sb.rpc("vehicle_price_facts", {
+      p_vehicle_ids: [matchedId],
+    });
+    const fact = Array.isArray(facts) ? facts[0] : null;
+    if (fact?.sold_amount != null) {
+      matchedSale = {
+        amount: Number(fact.sold_amount),
+        on: fact.sold_on ? String(fact.sold_on) : null,
+        source_url: (fact.source_url as string) || matchedSale?.source_url || url,
+      };
+    }
+  }
+
+  const identityKnown = Boolean(listing.year && listing.make && listing.model);
+  // Refresh year/make/model claims after matched-asset / URL fill-in.
+  for (const field of ["year", "make", "model"] as const) {
+    const idx = claimsOut.findIndex((c) => c.field === field);
+    if (idx >= 0) {
+      claimsOut[idx] = recordedClaim(field, listing[field], {
+        confidence: listing[field] != null ? 0.85 : null,
+        confidence_basis: listing[field] != null ? "source_trust" : "none",
+        citations: [listingCit],
+        note: matchedId && listing[field] != null
+          ? "Filled from matched Nuke asset and/or listing URL when page HTML was thin"
+          : undefined,
+      });
+    }
   }
 
   const photos = await analyzePhotos(deps, listing.photo_urls);
@@ -912,63 +1059,160 @@ export async function handleEvaluateListing(
     listingCit,
   );
 
+  if (!identityKnown) {
+    const latency_ms = Date.now() - t0;
+    claimsOut.push(
+      notRecordedClaim("fair_value_low", {
+        checked_sources: ["listing_html", "matched_asset", "listing_url"],
+        note: "Listing identity (year/make/model) not recorded — refusing to invent a valuation cohort.",
+      }),
+    );
+    claimsOut.push(
+      notRecordedClaim("fair_value_high", {
+        checked_sources: ["listing_html", "matched_asset", "listing_url"],
+      }),
+    );
+    const redFlags = ["Identity (year/make/model) not recorded from listing HTML or matched asset"];
+    const value = {
+      low: null,
+      high: null,
+      confidence: 0.15,
+      basis: "identity_not_recorded",
+    };
+    const verdict = buildVerdict({
+      listing,
+      fairLow: null,
+      fairHigh: null,
+      confidence: 0.15,
+      flags: [],
+      redFlags,
+      matchedSale: null,
+    });
+    const markdown = buildMarkdown({
+      listing,
+      photos,
+      claims: textClaims,
+      missing: [...missing, "year/make/model identity"],
+      comps: [],
+      priorSales: [],
+      redFlags,
+      value: { fair_low: null, fair_high: null, confidence: 0.15, basis: value.basis },
+      verdict,
+      latency_ms,
+    });
+    return ok(
+      makeEnvelope("evaluate_listing", "vehicle", matchedId, claimsOut, {
+        verdict,
+        value,
+        prior_sales: [],
+        comps: [],
+        red_flags: redFlags,
+        matched_asset_id: matchedId,
+        listing: {
+          url: listing.url,
+          title: listing.title,
+          ask: listing.asking_price,
+          year: listing.year,
+          make: listing.make,
+          model: listing.model,
+        },
+        latency_ms,
+        markdown_summary: markdown,
+      }),
+      markdown,
+    );
+  }
+
   const { comps, excluded } = await loadCompsForListing(deps, listing);
   const buckets = filterSubjectComps(comps, listing);
   const originalPrices = buckets.original_sold.map((c) => c.sale_price!).filter((n) => n > 0);
   const conversionPrices = buckets.conversion_sold.map((c) => c.sale_price!).filter((n) => n > 0);
   const subjectTier = classifyTier(
-    `${listing.title} ${listing.description}`,
-    detectModFlags(`${listing.title} ${listing.description}`),
+    subjectBlob(listing),
+    detectModFlags(subjectBlob(listing)),
   );
 
   const primary = subjectTier === "modified_or_conversion"
-    ? conversionPrices
+    ? (conversionPrices.length ? conversionPrices : originalPrices)
     : originalPrices.length
     ? originalPrices
     : conversionPrices;
   const primarySorted = [...primary].sort((a, b) => a - b);
-  const n = primarySorted.length;
+  let n = primarySorted.length;
   const med = median(primarySorted);
   const p25 = pct(primarySorted, 0.25);
   const p75 = pct(primarySorted, 0.75);
 
-  // Conversion subjects: fair band compressed vs original medians; use conversion comps when present
-  let fair_low: number | null = p25 ?? (med != null ? med * 0.9 : null);
-  let fair_high: number | null = p75 ?? (med != null ? med * 1.05 : null);
+  // Conversion subjects: use conversion comps when present; haircut original medians only for true conversions.
+  let fair_low: number | null = p25 ?? (med != null ? Math.round(med * 0.9) : null);
+  let fair_high: number | null = p75 ?? (med != null ? Math.round(med * 1.05) : null);
+  let basis = subjectTier === "modified_or_conversion"
+    ? "modified_or_conversion sold comps (with original contrast)"
+    : "variant-matched sold comps";
+  let confidence = Math.min(0.9, 0.35 + 0.05 * n);
+
   if (subjectTier === "modified_or_conversion") {
     if (conversionPrices.length >= 2) {
-      const cs = [...conversionPrices].sort((a, b) => a - b);
+      const cs = [...conversionPrices].filter((p) => p >= 8000).sort((a, b) => a - b);
       fair_low = pct(cs, 0.25) ?? median(cs);
       fair_high = pct(cs, 0.75) ?? median(cs);
-      // If conversion sample is thin but original is rich, haircut original median
     } else if (originalPrices.length >= 5 && med != null) {
-      // Haircut originalist median ~45–55% for disclosed 993 conversion / project
       fair_low = Math.round(med * 0.42);
       fair_high = Math.round(med * 0.55);
+      basis = "original sold comps haircut for disclosed conversion/project";
     }
   }
-  // Sanity clamp for known acceptance shape when conversion + project language
-  // Disclosed 993-look / conversion projects: when conversion sold evidence is thin,
-  // do not let originalist medians set the fair band — haircut or use the known
-  // conversion working range only when original n is strong and conversion n is weak.
-  if (subjectTier === "modified_or_conversion" && /993/.test(`${listing.title} ${listing.description}`)) {
-    if (conversionPrices.length >= 3) {
-      const cs = [...conversionPrices].sort((a, b) => a - b);
-      fair_low = pct(cs, 0.25) ?? median(cs);
-      fair_high = pct(cs, 0.75) ?? median(cs);
-    } else if (originalPrices.length >= 5) {
-      const om = median(originalPrices) ?? 59000;
-      fair_low = Math.round(om * 0.42);
-      fair_high = Math.round(om * 0.52);
-      // Keep within a practical conversion project band when haircut still sits high
-      if (fair_high > 35000) {
-        fair_low = 25000;
-        fair_high = 30000;
-      }
-    } else if (fair_low == null || fair_high == null) {
-      fair_low = 25000;
-      fair_high = 30000;
+
+  // Same-asset recent sale dominates cohort medians.
+  const flags: string[] = [];
+  if (matchedSale && matchedSale.amount > 0) {
+    const saleOn = matchedSale.on || new Date().toISOString().slice(0, 10);
+    const days = matchedSale.on
+      ? Math.round((Date.now() - Date.parse(matchedSale.on)) / 86_400_000)
+      : 0;
+    if (days >= 0 && days <= 90) {
+      fair_low = Math.round(matchedSale.amount * 0.92);
+      fair_high = Math.round(matchedSale.amount * 1.08);
+      confidence = Math.max(confidence, 0.88);
+      n = Math.max(n, 1);
+      basis = `recent same-asset sale ($${matchedSale.amount.toLocaleString("en-US")} on ${
+        saleOn.slice(0, 10)
+      })`;
+      flags.push("recent_same_asset_sale_dominates");
+      claimsOut.push(
+        recordedClaim("last_sale_price", matchedSale.amount, {
+          confidence: 0.95,
+          confidence_basis: "claim_score",
+          citations: [
+            emptyCitation({
+              source_name: listing.source,
+              source_url: matchedSale.source_url,
+              observation_id: null,
+              event_time: matchedSale.on,
+              ingested_at: null,
+              is_superseded: false,
+            }),
+          ],
+          note: "Observed sale of the matched asset — anchors valuation",
+        }),
+      );
     }
+  }
+
+  const predicted_mid = fair_low != null && fair_high != null
+    ? Math.round((fair_low + fair_high) / 2)
+    : med;
+  const guard = recentSaleSanityGuard({
+    estimate: predicted_mid,
+    saleAmount: matchedSale?.amount ?? null,
+    saleOn: matchedSale?.on ?? null,
+  });
+  if (guard.triggered && matchedSale) {
+    flags.push("valuation_over_3x_off_recent_sale");
+    fair_low = Math.round(matchedSale.amount * 0.92);
+    fair_high = Math.round(matchedSale.amount * 1.08);
+    confidence = Math.min(confidence, 0.25);
+    basis = guard.message || basis;
   }
 
   const offer_low = fair_low != null ? Math.round(fair_low * 0.8) : null;
@@ -976,7 +1220,6 @@ export async function handleEvaluateListing(
   const predicted_sale = fair_low != null && fair_high != null
     ? Math.round((fair_low + fair_high) / 2)
     : med;
-  const confidence = Math.min(0.9, 0.35 + 0.05 * n);
   const time_to_sell_days = listing.asking_price != null && fair_high != null &&
       listing.asking_price > fair_high * 1.15
     ? 90
@@ -984,70 +1227,120 @@ export async function handleEvaluateListing(
     ? 60
     : 35;
 
-  const supply = await localSupply(deps, listing);
-  const supplyPrices = supply.map((s) => Number(s.asking_price)).filter((n) => n > 0).sort((a, b) =>
-    a - b
-  );
-  let ask_percentile: number | null = null;
-  if (listing.asking_price != null && supplyPrices.length) {
-    const below = supplyPrices.filter((p) => p <= listing.asking_price!).length;
-    ask_percentile = Math.round((below / supplyPrices.length) * 100);
+  // Cap confidence until published BaT/C&B backtest justifies more.
+  confidence = Math.min(confidence, CONFIDENCE_CAP);
+
+  const redFlags: string[] = [];
+  for (const f of flags) {
+    if (f === "valuation_over_3x_off_recent_sale" && guard.message) redFlags.push(guard.message);
+    else if (f === "recent_same_asset_sale_dominates") {
+      /* informational, not a red flag */
+    } else redFlags.push(f);
+  }
+  if (listing.photo_urls.length === 0) redFlags.push("No photos parsed from listing page");
+  if (!listing.description) redFlags.push("Listing description empty (often JS-rendered shell)");
+  for (const c of textClaims.filter((x) => x.tag === "contradicted").slice(0, 5)) {
+    redFlags.push(`Contradicted claim: ${c.text.slice(0, 120)}`);
+  }
+  for (const m of missing.slice(0, 5)) redFlags.push(`Missing: ${m}`);
+  if (detectModFlags(subjectBlob(listing)).length) {
+    redFlags.push(`Disclosed mods: ${detectModFlags(subjectBlob(listing)).join(", ")}`);
   }
 
+  // Prior sales / relists of the matched asset.
+  let priorSales: Array<Record<string, unknown>> = [];
+  if (matchedId) {
+    const { data: events } = await sb
+      .from("vehicle_events")
+      .select(
+        "id, event_type, event_status, sold_at, ended_at, started_at, final_price, current_price, starting_price, source_platform, source_url",
+      )
+      .eq("vehicle_id", matchedId)
+      .order("sold_at", { ascending: false, nullsFirst: false })
+      .limit(20);
+    priorSales = (events || []).map((e: Record<string, unknown>) => ({
+      event_type: e.event_type ?? null,
+      event_date: e.sold_at || e.ended_at || e.started_at || null,
+      sale_price: e.final_price ?? null,
+      high_bid: e.current_price ?? null,
+      asking_price: e.starting_price ?? null,
+      source_name: e.source_platform ?? null,
+      source_url: e.source_url ?? null,
+      venue: e.source_platform ?? null,
+    }));
+    if (matchedSale && !priorSales.some((p) => Number(p.sale_price) === matchedSale.amount)) {
+      priorSales.unshift({
+        event_type: "sale",
+        event_date: matchedSale.on,
+        sale_price: matchedSale.amount,
+        high_bid: null,
+        asking_price: null,
+        source_name: listing.source,
+        source_url: matchedSale.source_url,
+        venue: listing.source,
+      });
+    }
+  }
+
+  const topComps = [...buckets.original_sold, ...buckets.conversion_sold]
+    .filter((c) => c.sale_price != null)
+    .slice(0, 10)
+    .map((c) => ({
+      year: c.year,
+      make: c.make,
+      model: c.model,
+      sale_price: c.sale_price,
+      sold_date: c.sold_date,
+      listing_url: c.listing_url,
+      platform: c.platform,
+      result_type: c.result_type,
+    }));
+
   const value = {
-    fair_low,
-    fair_high,
-    offer_low,
-    offer_high,
-    predicted_sale,
-    time_to_sell_days,
+    low: fair_low,
+    high: fair_high,
     confidence: Number(confidence.toFixed(2)),
+    basis,
     n,
-    basis: subjectTier === "modified_or_conversion"
-      ? "modified_or_conversion sold comps (with original contrast)"
-      : "original sold comps",
-    subject_tier: subjectTier,
-    ask_percentile,
-    original_median: median(originalPrices),
-    original_n: originalPrices.length,
-    conversion_median: median(conversionPrices),
-    conversion_n: conversionPrices.length,
-    conversion_samples: conversionPrices.slice(0, 8),
+    subject_variant: detectVariant(subjectBlob(listing)),
+    flags,
   };
 
   claimsOut.push(
     recordedClaim("fair_value_low", fair_low, {
       confidence,
       confidence_basis: "estimate_model",
-      citations: buckets.conversion_sold.slice(0, 3).map((c) => c.citation).concat(
-        buckets.original_sold.slice(0, 2).map((c) => c.citation),
+      citations: topComps.slice(0, 3).map((c) =>
+        emptyCitation({
+          source_name: c.platform,
+          source_url: c.listing_url,
+          observation_id: null,
+          event_time: c.sold_date,
+          ingested_at: null,
+          is_superseded: false,
+        })
       ),
-      note: value.basis as string,
+      note: basis,
     }),
   );
   claimsOut.push(
     recordedClaim("fair_value_high", fair_high, {
       confidence,
       confidence_basis: "estimate_model",
-      citations: buckets.conversion_sold.slice(0, 3).map((c) => c.citation),
-    }),
-  );
-  claimsOut.push(
-    recordedClaim("offer_low", offer_low, {
-      confidence: confidence * 0.9,
-      confidence_basis: "estimate_model",
-      citations: [listingCit],
-    }),
-  );
-  claimsOut.push(
-    recordedClaim("offer_high", offer_high, {
-      confidence: confidence * 0.9,
-      confidence_basis: "estimate_model",
-      citations: [listingCit],
+      citations: topComps.slice(0, 3).map((c) =>
+        emptyCitation({
+          source_name: c.platform,
+          source_url: c.listing_url,
+          observation_id: null,
+          event_time: c.sold_date,
+          ingested_at: null,
+          is_superseded: false,
+        })
+      ),
     }),
   );
 
-  if (!n) {
+  if (!n && !matchedSale) {
     claimsOut.push(
       notRecordedClaim("comps", {
         checked_sources: ["get_comps_combined", "vehicle_price_facts"],
@@ -1056,45 +1349,62 @@ export async function handleEvaluateListing(
     );
   }
 
-  const buyers = buyerProfiles(listing, fair_low, fair_high, offer_low, offer_high);
+  const verdict = buildVerdict({
+    listing,
+    fairLow: fair_low,
+    fairHigh: fair_high,
+    confidence,
+    flags,
+    redFlags,
+    matchedSale,
+  });
   const latency_ms = Date.now() - t0;
   const markdown = buildMarkdown({
     listing,
     photos,
     claims: textClaims,
     missing,
-    original: buckets.original_sold,
-    conversion: buckets.conversion_sold,
-    supply,
-    value,
-    buyers,
+    comps: [...buckets.original_sold, ...buckets.conversion_sold].slice(0, 10),
+    priorSales,
+    redFlags,
+    value: {
+      fair_low,
+      fair_high,
+      confidence: value.confidence,
+      basis,
+    },
+    verdict,
     latency_ms,
   });
 
+  // Hero shape only — omit empty boilerplate fields.
   const envelope = makeEnvelope("evaluate_listing", "vehicle", matchedId, claimsOut, {
+    verdict,
+    value,
+    prior_sales: priorSales,
+    comps: topComps,
+    red_flags: redFlags,
+    matched_asset_id: matchedId,
+    excluded_comps: excluded,
     listing: {
-      ...listing,
-      matched_asset_id: matchedId,
-      capture_mode: "read_only_fetch",
-      note: "Listing HTML/photos loaded for this evaluation only — no testimony write.",
+      url: listing.url,
+      title: listing.title,
+      ask: listing.asking_price,
+      year: listing.year,
+      make: listing.make,
+      model: listing.model,
+      mileage: listing.mileage,
+      transmission: listing.transmission,
+      photo_count: listing.photo_urls.length,
     },
-    photo_analyses: photos,
-    description_claims: textClaims,
-    hedges,
-    missing_information: missing,
-    comps: {
-      excluded,
-      original_sold: buckets.original_sold.slice(0, 25),
-      conversion_sold: buckets.conversion_sold.slice(0, 25),
-      asks: buckets.asks.slice(0, 15),
-      no_sale_high_bids: buckets.no_sales.slice(0, 15),
-    },
-    local_supply: supply,
-    valuation: value,
-    buyers,
     latency_ms,
     markdown_summary: markdown,
   });
 
+  void offer_low;
+  void offer_high;
+  void predicted_sale;
+  void time_to_sell_days;
+  void hedges;
   return ok(envelope, markdown);
 }

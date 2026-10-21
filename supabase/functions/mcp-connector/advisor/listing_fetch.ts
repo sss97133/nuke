@@ -1,4 +1,5 @@
 /** Read-only listing page fetch + parse for evaluate_listing (no testimony writes). */
+import { identityFromListingUrl } from "./variants.ts";
 
 export interface FetchedListing {
   url: string;
@@ -205,17 +206,48 @@ export function parseListingHtml(url: string, html: string, httpStatus: number):
     photo_urls.push(m[0]!);
   }
 
-  // Identity from title
-  const identity = `${title || ""} ${description || ""}`;
+  // Identity from title / description; when HTML is a JS shell, fall back to URL slug.
+  const fromUrl = identityFromListingUrl(url);
+  if (fromUrl.auction_id) raw_attrs.auction_id = fromUrl.auction_id;
+  const identity = `${title || ""} ${description || ""} ${fromUrl.title || ""}`;
   const ym = identity.match(/\b(19|20)\d{2}\b/);
   if (!year && ym) year = Number(ym[0]);
+  if (!year && fromUrl.year) year = fromUrl.year;
+  const makeMatch = identity.match(
+    /\b(Porsche|Volkswagen|VW|BMW|Mercedes(?:-Benz)?|Ford|Chevrolet|Chevy|Ferrari|Jaguar|Lotus|Morris|Dodge|GMC|Toyota|Honda|Nissan|Audi|Mazda)\b/i,
+  );
+  if (makeMatch) {
+    const raw = makeMatch[1]!;
+    make = make || (/^vw$/i.test(raw) ? "Volkswagen" : /^chevy$/i.test(raw) ? "Chevrolet" : raw);
+  }
   if (/porsche/i.test(identity)) make = make || "Porsche";
+  if (/volkswagen|\bvw\b/i.test(identity)) make = make || "Volkswagen";
+  make = make || fromUrl.make;
   if (/\b911\b/i.test(identity)) model = model || "911";
+  if (/karmann\s*ghia/i.test(identity)) model = model || "Karmann Ghia";
   if (/cabriolet|cabrio|convertible/i.test(identity) && model && !/cab|convertible/i.test(model)) {
     model = `${model} Cabriolet`;
   }
+  if (/coupe/i.test(identity) && model && !/coupe/i.test(model) && /karmann/i.test(model)) {
+    model = `${model} Coupe`;
+  }
+  // Prefer URL slug model when it carries specialty trim the HTML missed (Turbo, etc.).
+  if (fromUrl.model) {
+    if (!model) model = fromUrl.model;
+    else if (/turbo/i.test(fromUrl.model) && !/turbo/i.test(model)) {
+      model = /911/.test(model) ? fromUrl.model : `${model} ${fromUrl.model}`;
+    }
+  }
+  if (!title && fromUrl.title) title = fromUrl.title;
   if (/g50/i.test(identity) && !transmission) transmission = "G50 5-speed manual";
   if (!transmission && /5[\s-]?speed|manual/i.test(identity)) transmission = "manual";
+
+  // BaT sold price often in "sold for $X" — still an observed sale, not an ask.
+  const soldFor = identity.match(/sold\s+for\s+\$?([\d,]+)/i);
+  if (soldFor && asking_price == null) {
+    asking_price = parseMoney(soldFor[1]);
+    raw_attrs.sold_price_from_page = String(asking_price);
+  }
 
   const milesClaim = identity.match(/\b(\d{1,3}(?:,\d{3})+)\s*(?:miles|mi)\b/i) ||
     identity.match(/\b(\d{2,3})k\s*(?:miles|mi)?\b/i);

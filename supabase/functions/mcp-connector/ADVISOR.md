@@ -67,21 +67,17 @@ If your client only supports stdio, use a Streamable HTTP bridge, for example:
 
 ChatGPT / Grok Bot / other agents: add a custom MCP connector pointing at `https://nuke.ag/mcp/advisor`.
 
-## Tools (9)
+## Tools (5)
 
 | Tool | Job |
 |---|---|
-| `find_asset` | Search assets (VIN, URL, year/make/model, text) |
-| `find_listings` | Live for-sale asks (price/location/source/ends_before/paging); stale excluded by default |
-| `evaluate_listing` | One URL → fetch+vision+claim tags+comps+supply+value+buyers (markdown + JSON) |
-| `get_asset` | Identity + specs + price facts as cited claims |
-| `get_history` | Events + observations; `event_time` ≠ `ingested_at`; `price_role` separates ask/hammer/unsold |
-| `explain_field` | How Nuke knows one field |
-| `value_asset` | `value_low`/`value_high`, comps used, resists max-comp; flags stale/thin estimates |
-| `get_comps` | Confirmed sold comps only (`price_kind=sold`); asks excluded |
-| `get_coverage` | Which fields are recorded vs `not recorded` |
+| `find_asset` | Find by VIN, listing URL, or year/make/model text |
+| `get_asset` | Identity, price facts, coverage, and sale/relist history |
+| `get_comps` | Variant-matched confirmed sales with source URLs and dates |
+| `value_asset` | Value range from recent same-asset sale and comps (confidence capped at 0.6) |
+| `evaluate_listing` | **Hero tool** — listing URL → verdict, value range, prior sales/relists, top comps, red flags |
 
-No write, admin, shop, or SQL tools. Anonymous reads allowed; best-effort per-IP rate limit on the advisor surface.
+History, coverage, and field provenance are folded into `get_asset` / response metadata. No `find_listings`, write, admin, shop, SQL, or legacy catalog tools on this surface. Anonymous reads allowed; best-effort per-IP rate limit.
 
 ## Evidence envelope
 
