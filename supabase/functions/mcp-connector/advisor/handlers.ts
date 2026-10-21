@@ -181,16 +181,65 @@ async function handleFindAsset(
   }
 
   const sb = deps.sb();
-  const tokens = queryStr.split(/\s+/).filter(Boolean);
-  const tsq = tokens.map((t) => t.replace(/[^a-zA-Z0-9]/g, "")).filter(Boolean).join(" & ");
-  let query = sb
-    .from("vehicles")
-    .select(
-      "id, year, make, model, trim, vin, sale_price, mileage, primary_image_url, listing_url, bat_auction_url, nuke_estimate, location, auction_source, canonical_platform, updated_at, created_at",
-    )
-    .limit(limit);
-  if (tsq) query = query.textSearch("search_vector", tsq, { type: "plain", config: "english" });
-  const { data, error } = await query;
+  const selectCols =
+    "id, year, make, model, trim, vin, sale_price, mileage, primary_image_url, listing_url, bat_auction_url, nuke_estimate, location, auction_source, canonical_platform, updated_at, created_at";
+
+  // Prefer indexed equality paths. Full-text on VIN/URL tokens times out on the live fleet.
+  const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const vinRe = /^[A-HJ-NPR-Z0-9]{11,17}$/i;
+  const looksUrl = /^https?:\/\//i.test(queryStr) || /bringatrailer\.com|carsandbids\.com|ebay\.com/i.test(queryStr);
+
+  let data: Record<string, unknown>[] | null = null;
+  let error: { message: string } | null = null;
+
+  if (uuidRe.test(queryStr)) {
+    const res = await sb.from("vehicles").select(selectCols).eq("id", queryStr).limit(1);
+    data = res.data;
+    error = res.error;
+  } else if (vinRe.test(queryStr.replace(/\s+/g, ""))) {
+    const vin = queryStr.replace(/\s+/g, "").toUpperCase();
+    const res = await sb.from("vehicles").select(selectCols).eq("vin", vin).limit(limit);
+    data = res.data;
+    error = res.error;
+  } else if (looksUrl) {
+    const url = queryStr.trim().replace(/\/$/, "");
+    // Two equality-style ilike lookups — avoid .or() with raw URLs (commas/special chars break filters).
+    const [a, b] = await Promise.all([
+      sb.from("vehicles").select(selectCols).ilike("listing_url", `%${url}%`).limit(limit),
+      sb.from("vehicles").select(selectCols).ilike("bat_auction_url", `%${url}%`).limit(limit),
+    ]);
+    error = a.error || b.error;
+    const seen = new Set<string>();
+    const merged: Record<string, unknown>[] = [];
+    for (const row of [...(a.data || []), ...(b.data || [])]) {
+      const id = String(row.id);
+      if (seen.has(id)) continue;
+      seen.add(id);
+      merged.push(row);
+      if (merged.length >= limit) break;
+    }
+    data = merged;
+  } else {
+    // Year + make/model style queries: filter structured columns first, then light text search.
+    const yearMatch = queryStr.match(/\b(19|20)\d{2}\b/);
+    const year = yearMatch ? Number(yearMatch[0]) : null;
+    const rest = queryStr.replace(/\b(19|20)\d{2}\b/, " ").trim();
+    let query = sb.from("vehicles").select(selectCols).limit(limit);
+    if (year) query = query.eq("year", year);
+    if (rest) {
+      const parts = rest.split(/\s+/).filter(Boolean);
+      // Use ilike on make/model rather than search_vector for bounded latency.
+      if (parts.length >= 2) {
+        query = query.ilike("make", `%${parts[0]}%`).ilike("model", `%${parts.slice(1).join(" ")}%`);
+      } else if (parts.length === 1) {
+        query = query.or(`make.ilike.%${parts[0]}%,model.ilike.%${parts[0]}%`);
+      }
+    }
+    const res = await query;
+    data = res.data;
+    error = res.error;
+  }
+
   if (error) return err(error.message, "find_asset");
 
   const results = (data || []).map((v: Record<string, unknown>) => {
@@ -527,9 +576,15 @@ async function handleExplainField(
   const sb = deps.sb();
   const keys = fieldKeys(field);
 
+  // Only select columns that exist on vehicles (aliases like odometer are observation keys, not columns).
+  const vehicleColumns = new Set([
+    "id", "year", "make", "model", "trim", "vin", "mileage", "color", "interior_color",
+    "body_style", "sale_price", "listing_url", "bat_auction_url", "canonical_platform",
+    "updated_at", "created_at", "engine_type", "transmission", "drivetrain", "description",
+  ]);
   const selectCols = [
     "id",
-    ...new Set(["year", "make", "model", "vin", "mileage", "color", "interior_color", "body_style", "sale_price", "listing_url", "bat_auction_url", "canonical_platform", "updated_at", "created_at", ...keys]),
+    ...[...vehicleColumns].filter((c) => c !== "id"),
   ].join(", ");
 
   const { data: vehicle, error: vErr } = await sb.from("vehicles").select(selectCols).eq("id", vid).maybeSingle();
@@ -731,8 +786,9 @@ async function handleValueAsset(
     source_name: "Nuke Estimate",
     source_url: null,
     observation_id: null,
-    event_time: est?.calculated_at ?? price?.estimate?.as_of ?? null,
-    ingested_at: est?.calculated_at ?? null,
+    // Model run time is not a market event — keep it on ingested_at only.
+    event_time: null,
+    ingested_at: est?.calculated_at ?? price?.estimate?.as_of ?? null,
     is_superseded: false,
   });
 
@@ -821,14 +877,75 @@ async function handleGetComps(
     return err("Provide asset_id, or make(+model), or vin", "get_comps");
   }
 
-  let raw: Record<string, unknown>;
-  try {
-    raw = (await deps.callEdgeApi("comps", "", "POST", body)) as Record<string, unknown>;
-  } catch (e) {
-    return err(e instanceof Error ? e.message : String(e), "get_comps");
+  // Prefer the SQL RPC directly (same engine as api-v1-comps). Edge proxy can 500 under load.
+  let rows: Record<string, unknown>[] = [];
+  let raw: Record<string, unknown> = {};
+  const sb = deps.sb();
+
+  let make = typeof body.make === "string" ? body.make : null;
+  let model = typeof body.model === "string" ? body.model : null;
+  let year = body.year != null ? Number(body.year) : null;
+  let excludeId: string | null = body.vehicle_id ? String(body.vehicle_id) : null;
+
+  if (body.vehicle_id || body.vin) {
+    let vq = sb.from("vehicles").select("id, year, make, model");
+    if (body.vehicle_id) vq = vq.eq("id", String(body.vehicle_id));
+    else vq = vq.eq("vin", String(body.vin).toUpperCase());
+    const { data: vrow } = await vq.maybeSingle();
+    if (vrow) {
+      make = make || (vrow.make as string);
+      model = model || (vrow.model as string);
+      year = year ?? (vrow.year as number | null);
+      excludeId = (vrow.id as string) || excludeId;
+    }
   }
 
-  const rows = Array.isArray(raw.data) ? raw.data : Array.isArray(raw) ? raw : [];
+  if (!make) {
+    return err("Could not resolve make for comps (provide asset_id or make)", "get_comps");
+  }
+
+  const yearRange = body.year_range != null ? Number(body.year_range) : 2;
+  const { data: rpcRows, error: rpcErr } = await sb.rpc("get_comps_combined", {
+    p_make: make,
+    p_model: model,
+    p_year_min: year != null ? year - yearRange : null,
+    p_year_max: year != null ? year + yearRange : null,
+    p_min_price: null,
+    p_max_price: null,
+    p_exclude_vehicle_id: excludeId,
+    p_limit: limit,
+  });
+
+  if (rpcErr) {
+    // Fallback to edge API once
+    try {
+      raw = (await deps.callEdgeApi("comps", "", "POST", body)) as Record<string, unknown>;
+      rows = Array.isArray(raw.data) ? raw.data as Record<string, unknown>[] : [];
+    } catch (e) {
+      return err(rpcErr.message || (e instanceof Error ? e.message : String(e)), "get_comps");
+    }
+  } else {
+    rows = (Array.isArray(rpcRows) ? rpcRows : []).map((row: Record<string, unknown>) => ({
+      vehicle_id: row.vehicle_id ?? null,
+      year: row.yr ?? null,
+      make: row.mk ?? null,
+      model: row.mdl ?? null,
+      trim: row.tr ?? null,
+      vin: row.vi ?? null,
+      sale_price: row.sale_price,
+      mileage: row.miles ?? null,
+      color: row.clr ?? null,
+      image_url: row.image_url ?? null,
+      location: row.loc ?? null,
+      listing_url: row.listing_url ?? null,
+      platform: row.platform ?? null,
+      platform_raw: row.platform ?? null,
+      sold_date: row.sold_date ?? null,
+      source_type: row.source_type ?? "auction_event",
+      similarity_score: row.similarity_score ?? null,
+    }));
+    raw = { query: { make, model, year, limit }, summary: { via: "get_comps_combined" } };
+  }
   const claims: Claim[] = [];
   const comps = rows.slice(0, limit).map((c: Record<string, unknown>, i: number) => {
     const cit = emptyCitation({
