@@ -74,6 +74,68 @@ Deno.test("bonhamsLot keeps the www.bonhams.com url spelling, the lot's hammer t
   assertEquals([lot.ends, lot.currency, lot.estimate_low, lot.estimate_high, lot.hammer], ["2026-10-30T17:00:00+00:00", "GBP", 20000, 30000, null]);
 });
 
+import { hagertyNextData, parseHagertySearch } from "./boards.ts";
+
+// Trimmed from https://www.hagerty.com/marketplace/_next/data/VZgKspeuluamCI5J6LeiO/search.json?sortBy=ending_soonest&type=auctions&forSale=true&page=2
+// (2026-10-20 19:4xZ): the Apollo cache of the auction search, two of its 33 edges (one with reserve, one without), values as served.
+const HAGERTY_PAGE = JSON.parse(
+  String.raw`{"__APOLLO_STATE__":{"AuctionVehicleSearchNode:{\"id\":\"9129b5ed-1806-4e5d-b107-c3c481e2c226\"}":{"__typename":"AuctionVehicleSearchNode","id":"9129b5ed-1806-4e5d-b107-c3c481e2c226","year":"1965","make":"Chevrolet","model":"C10","auctionTitle":"454-Powered Modified 1965 Chevrolet C10","hasReserve":true,"successfulBidCount":6,"location":{"__typename":"AuctionVehicleLocation","city":"Kenly","state":"North Carolina"},"mainPhoto":{"__typename":"SearchMediaItem","url":"https://hagerty-marketplace-prod.imgix.net/assets/DBfCmujnTlyG3uKYEUclZw.jpg"},"endDateTime":"2026-10-23T18:15:00.000Z","currentHighestBid":{"__typename":"MonetaryValue","amount":1050000},"hasBeenSold":false,"hasBeenSoldAfter":false,"status":"ACTIVE","auctionGarageId":"1cd2d67c-a527-45f4-a879-37e4d1a10920"},` +
+  String.raw`"AuctionVehicleSearchNode:{\"id\":\"5a670bc7-b1ed-4eda-b509-5111ca92f146\"}":{"__typename":"AuctionVehicleSearchNode","id":"5a670bc7-b1ed-4eda-b509-5111ca92f146","year":"1994","make":"Jeep","model":"Wrangler","auctionTitle":"1994 Jeep Wrangler Sahara 4.0","hasReserve":false,"successfulBidCount":23,"location":{"__typename":"AuctionVehicleLocation","city":"Ocala","state":"Florida"},"mainPhoto":{"__typename":"SearchMediaItem","url":"https://hagerty-marketplace-prod.imgix.net/assets/hUSsrjrSuAVTT_YD890yYA.jpg"},"endDateTime":"2026-10-23T18:20:00.000Z","currentHighestBid":{"__typename":"MonetaryValue","amount":655000},"hasBeenSold":false,"hasBeenSoldAfter":false,"status":"ACTIVE","auctionGarageId":"306f2038-35fe-4da1-9ee8-21a20ee7470e"},` +
+  String.raw`"ROOT_QUERY":{"__typename":"Query","marketplaceSearch":{"__typename":"MarketplaceSearch","search":{"__typename":"MarketplaceSearchResults","marketplaceExplore:{\"filters\":{\"forSale\":true,\"type\":\"AUCTIONS\"},\"sort\":\"ENDING_SOONEST\",\"query\":\"\"}":{"__typename":"MarketplaceExploreSearchResults","paginated:{\"page\":2,\"limit\":33}":{"__typename":"MarketplaceExploreConnection","totalCount":229,"pageInfo":{"__typename":"PageInfo","hasNextPage":true,"hasPreviousPage":true,"startCursor":null,"endCursor":null},"edges":[{"__typename":"MarketplaceExploreEdge","cursor":"WzE3OTI3NzkzMDAwMDAsIjkxMjliNWVkLTE4MDYtNGU1ZC1iMTA3LWMzYzQ4MWUyYzIyNiJd","node":{"__ref":"AuctionVehicleSearchNode:{\"id\":\"9129b5ed-1806-4e5d-b107-c3c481e2c226\"}"}},{"__typename":"MarketplaceExploreEdge","cursor":"WzE3OTI3Nzk2MDAwMDAsIjVhNjcwYmM3LWIxZWQtNGVkYS1iNTA5LTUxMTFjYTkyZjE0NiJd","node":{"__ref":"AuctionVehicleSearchNode:{\"id\":\"5a670bc7-b1ed-4eda-b509-5111ca92f146\"}"}}]}}}}}}}`,
+);
+
+Deno.test("parseHagertySearch reads each open auction with its link, dollars, bid count, close time and reserve", () => {
+  const { items, totalCount, limit } = parseHagertySearch(HAGERTY_PAGE);
+  assertEquals([totalCount, limit, items.length], [229, 33, 2]);
+  assertEquals(items[0], {
+    id: "9129b5ed-1806-4e5d-b107-c3c481e2c226",
+    url: "https://hagerty.com/marketplace/auction/1965-Chevrolet-C10/9129b5ed-1806-4e5d-b107-c3c481e2c226",
+    title: "454-Powered Modified 1965 Chevrolet C10",
+    year: 1965,
+    make: "Chevrolet",
+    model: "C10",
+    status: "ACTIVE",
+    current_bid: 10500,
+    bid_count: 6,
+    ends: "2026-10-23T18:15:00.000Z",
+    no_reserve: false,
+    currency: "USD",
+    image: "https://hagerty-marketplace-prod.imgix.net/assets/DBfCmujnTlyG3uKYEUclZw.jpg",
+    location: "Kenly, North Carolina",
+  });
+  assertEquals([items[1].no_reserve, items[1].current_bid, items[1].bid_count], [true, 6550, 23]);
+  assertEquals(parseHagertySearch({}).items, []);
+  // A parts lot of the same search (2026-10-20: "Speedline for Porsche 18x8.5/18x10 (Lot 5)", year "0000") has no vehicle year.
+  const parts = structuredClone(HAGERTY_PAGE);
+  parts.__APOLLO_STATE__['AuctionVehicleSearchNode:{"id":"9129b5ed-1806-4e5d-b107-c3c481e2c226"}'].year = "0000";
+  assertEquals(parseHagertySearch(parts).items[0].year, null);
+});
+
+Deno.test("parseHagertySearch spells the lot link as the page renders it (first space of each part a hyphen, the rest encoded)", () => {
+  // From the server-rendered page 1 of the same search: model "Custom Hot Rod", href /marketplace/auction/1935-Ford-Custom-Hot%20Rod/0688b6cc-...
+  const key = 'AuctionVehicleSearchNode:{"id":"0688b6cc-645c-4ada-9646-5005354a5e3f"}';
+  const node = {
+    __typename: "AuctionVehicleSearchNode", id: "0688b6cc-645c-4ada-9646-5005354a5e3f", year: "1935", make: "Ford", model: "Custom Hot Rod",
+    auctionTitle: "354 Hemi-Powered 1935 Ford Wagon Hot Rod 5-Speed", hasReserve: true, successfulBidCount: 19, endDateTime: "2026-10-21T18:15:00.000Z",
+    currentHighestBid: { __typename: "MonetaryValue", amount: 1500000 }, status: "ACTIVE",
+  };
+  const page = { __APOLLO_STATE__: { [key]: node, ROOT_QUERY: { marketplaceSearch: { search: {
+    'marketplaceExplore:{"filters":{"forSale":true,"type":"AUCTIONS"},"sort":"ENDING_SOONEST","query":""}': {
+      'paginated:{"page":1,"limit":33}': { totalCount: 229, edges: [{ node: { __ref: key } }] },
+    },
+  } } } } };
+  assertEquals(parseHagertySearch(page).items[0].url, "https://hagerty.com/marketplace/auction/1935-Ford-Custom-Hot%20Rod/0688b6cc-645c-4ada-9646-5005354a5e3f");
+});
+
+Deno.test("hagertyNextData reads the build id and page props the search page server-renders", () => {
+  const html = `<link rel="preload"/><script id="__NEXT_DATA__" type="application/json">{"props":{"pageProps":${JSON.stringify(HAGERTY_PAGE)},"__N_SSP":true},` +
+    `"page":"/search","query":{"sortBy":"ending_soonest","type":"auctions","forSale":"true"},"buildId":"VZgKspeuluamCI5J6LeiO","basePath":"/marketplace"}</script>`;
+  const next = hagertyNextData(html);
+  assertEquals(next?.buildId, "VZgKspeuluamCI5J6LeiO");
+  assertEquals(parseHagertySearch(next!.pageProps).items.length, 2);
+  assertEquals(hagertyNextData("<html>Just a moment...</html>"), null);
+});
+
 // Bonhams, captured 2026-10-20 ~19:45Z from api01.bonhams.com/search-proxy (Typesense "auctions" and "lots") and
 // live.bonhams.com/widget/lots/<sale AM id> (the bidding platform), trimmed to the fields read. Bidder registrations
 // (paddles) in the platform's answer are left out here and are never read.
