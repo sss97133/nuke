@@ -79,6 +79,8 @@ const UserSettingsDrawer: React.FC<UserSettingsDrawerProps> = ({ open: openProp,
     setSaving(field);
     try {
       await saveProfileField(field, value);
+    } catch (err: any) {
+      alert(err?.message || 'Failed to save');
     } finally {
       setSaving(null);
     }
