@@ -25,6 +25,17 @@ An independently established canonical `episodeId` is required for a passing sal
 reader's own ancestry label cannot certify that it selected the intended episode.
 This bounded source-result check does not validate physical truth, fleet quality or valuation accuracy.
 
+The native closing collector keeps source recovery separate from live delivery. At most two
+catch-up reads run at once; queued or unfinished recovery remains visible as `recovery_pending`
+in coverage, and no new recovery starts after the existing collector deadline. Normal admission
+combines lots within the existing 50-frame canonical batch limit. A rejected mixed batch falls
+back to per-lot isolation; only acknowledged prefixes leave the buffer, including when new frames
+arrive during admission. The shared transport honors runtime rate-limit delays across all fetches
+and HTTP `Retry-After` per origin, so a source limit cannot block internal acknowledgement.
+Waiting is not a successful heartbeat or
+admission. These controls reduce requests; they do not relax the three-second coverage or
+two-second admission objectives, expand capacity, or certify continuous capture.
+
 ---
 
 ## Key Tables and Functions
@@ -33,8 +44,8 @@ This bounded source-result check does not validate physical truth, fleet quality
 
 | Table | Purpose |
 |-------|---------|
-| `import_queue` | Central intake queue. Every URL to be processed enters here. |
-| `listing_page_snapshots` | Archived HTML/markdown of every page ever fetched. |
+| `import_queue` | Queued URL intake; feeds, native streams and retained replay also have existing routes. |
+| `listing_page_snapshots` | Source fetch receipts; bodies may be inline, protected in storage, or unavailable. |
 | `vehicles` | Destination table for extracted vehicle records. |
 | `vehicle_events` | Links vehicles to their source listings/auctions. |
 | `vehicle_images` | Images discovered during extraction. |
