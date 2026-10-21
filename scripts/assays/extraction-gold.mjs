@@ -117,7 +117,7 @@ function preciseClock(value) {
     ? BigInt(milliseconds) * 1000n + BigInt(((match[1] ?? '') + '000000').slice(3, 6)) : null;
 }
 
-export function gradeSelectedSale(lot, body, response, { vehicleId, cutoff, request } = {}) {
+export function gradeSelectedSale(lot, body, response, { vehicleId, episodeId, cutoff, request } = {}) {
   const result = (verdict, reasons, extra = {}) => ({ contract: 'selected_bat_sale_v1', key: lot.key,
     verdict, reasons, supported_answer: verdict === 'pass', ...extra });
   if (!UUID.test(vehicleId ?? '')) return result('not_assessed', ['explicit_subject_required']);
@@ -126,7 +126,7 @@ export function gradeSelectedSale(lot, body, response, { vehicleId, cutoff, requ
     || createHash('sha256').update(body).digest('hex') !== lot.evidence.sha256)
     return result('not_assessed', ['independent_source_hash_unverified']);
   const at = preciseClock(cutoff), captured = preciseClock(lot.evidence?.fetched_at);
-  if (at === null || captured === null || captured > at)
+  if (at === null || captured === null || captured > at || at > BigInt(Date.now()) * 1000n)
     return result('not_assessed', ['independent_source_clock_unavailable']);
   if (response?.ok !== true) return result('not_assessed', ['anonymous_reader_unavailable'], {
     reader_status: Number.isInteger(response?.status) ? response.status : null,
@@ -134,7 +134,8 @@ export function gradeSelectedSale(lot, body, response, { vehicleId, cutoff, requ
   const value = response.value, receipt = value?.receipt;
   if (value?.error || !receipt || receipt.method !== 'source_sale_price_midrank_v1'
     || !['known_at', 'retrospective'].includes(receipt.knowledge_mode) || preciseClock(receipt.evidence_as_of) !== at
-    || !Array.isArray(receipt.eligible) || receipt.cohort?.complete !== true || receipt.coverage?.complete !== true)
+    || !Array.isArray(receipt.eligible) || receipt.eligible.some(row => !row || typeof row !== 'object' || Array.isArray(row))
+    || receipt.cohort?.complete !== true || receipt.coverage?.complete !== true)
     return result('not_assessed', ['reader_contract_unavailable']);
   if (request && (value.query?.year !== request.p_year || value.query?.make !== request.p_make
     || value.query?.model !== request.p_model || Date.parse(receipt.event_from) !== Date.parse(request.p_event_from)
@@ -160,20 +161,24 @@ export function gradeSelectedSale(lot, body, response, { vehicleId, cutoff, requ
     || receipt.price_basis_rule !== 'bat_published_result_fee_separate_v1') reasons.push('selected_fee_basis_mismatch');
   const truthDate = lot.truth.sale_date?.one_of ?? [lot.truth.sale_date?.value ?? lot.truth.sale_date];
   if (!/^\d{4}-\d{2}-\d{2}$/.test(row.eventAt ?? '') || !truthDate.includes(row.eventAt)) reasons.push('selected_event_date_mismatch');
-  if (row.sourceSha256 !== lot.evidence.sha256 || !UUID.test(row.snapshotId ?? ''))
+  if (row.sourceSha256 !== lot.evidence.sha256 || !UUID.test(row.snapshotId ?? '')
+    || lot.evidence.snapshot_id && row.snapshotId !== lot.evidence.snapshot_id)
     reasons.push('selected_capture_mismatch');
   if (row.sourceEpisodeAncestry !== 'canonical_current_context_verified' || !UUID.test(row.sourceVehicleEventId ?? ''))
     reasons.push('selected_episode_unestablished');
+  if (!UUID.test(episodeId ?? '')) reasons.push('independent_episode_link_unavailable');
+  else if (row.sourceVehicleEventId !== episodeId) reasons.push('selected_episode_mismatch');
   const known = preciseClock(row.knownAt);
   const clocks = [row.snapshotFetchedAt, row.snapshotCreatedAt, row.parsedAt, row.derivedIngestedAt].filter(v => v != null).map(preciseClock);
   if (known === null || known > at || clocks.length < 3 || clocks.some(v => v === null || known !== null && v > known))
     reasons.push('selected_knowledge_boundary_invalid');
   // Never inspect an unused candidate to rescue a wrong selected result.
-  return result(reasons.length ? 'fail' : 'pass', reasons, { snapshot_id: row.snapshotId, knowledge_mode: receipt.knowledge_mode });
+  const verdict = reasons.length === 1 && reasons[0] === 'independent_episode_link_unavailable' ? 'not_assessed' : reasons.length ? 'fail' : 'pass';
+  return result(verdict, reasons, { snapshot_id: row.snapshotId, knowledge_mode: receipt.knowledge_mode });
 }
 
 /** An anonymous parent gate and bounded current-reader request; no source fetch, writes or inference. */
-export async function assaySelectedSale(lot, body, { vehicleId, cutoff, client, record = () => {} }) {
+export async function assaySelectedSale(lot, body, { vehicleId, episodeId, cutoff, client, record = () => {} }) {
   const preflight = gradeSelectedSale(lot, body, null, { vehicleId, cutoff });
   if (preflight.reasons[0] !== 'anonymous_reader_unavailable') return preflight;
   if (lot.house !== 'bat' || !['sold', 'not_sold'].includes(lot.stage) || lot.perishable)
@@ -201,7 +206,7 @@ export async function assaySelectedSale(lot, body, { vehicleId, cutoff, client, 
     p_knowledge_mode: preciseClock(cutoff) <= preciseClock(new Date(from.getTime() + 86400_000).toISOString()) ? 'known_at' : 'retrospective' };
   const response = await client.rpc('valuation_by_ymm', request);
   record({ key: lot.key, stage: 'selected_answer', request, response });
-  return gradeSelectedSale(lot, body, response, { vehicleId, cutoff, request });
+  return gradeSelectedSale(lot, body, response, { vehicleId, episodeId, cutoff, request });
 }
 
 function boundedFile(file, limit) {
@@ -375,14 +380,14 @@ async function main() {
       if (!lot) throw new Error('gold_reference_missing');
       let body = null;
       if (typeof c.bodyPath === 'string') body = boundedFile(resolve(dirname(file), c.bodyPath), 2_097_152);
-      results.push(await assaySelectedSale(lot, body, { vehicleId: c.vehicleId, cutoff: manifest.cutoff, client,
+      results.push(await assaySelectedSale(lot, body, { vehicleId: c.vehicleId, episodeId: c.episodeId, cutoff: manifest.cutoff, client,
         record: packet => readerRecords.push(packet) }));
       consecutiveReaderFailures = ['anonymous_reader_unavailable', 'anonymous_parent_unavailable'].includes(results.at(-1).reasons[0])
         ? consecutiveReaderFailures + 1 : 0;
     }
     writeFileSync(arg('--json'), JSON.stringify({ contract: 'selected_bat_sale_run_v1', measured_at: new Date().toISOString(),
       cutoff: manifest.cutoff, scope: 'explicit_gold_manifest_only', full_population: 'unmeasured',
-      anonymous_requests: client.requests, source_fetches: 0, model_calls: 0, results, reader_records: readerRecords }, null, 2), { flag: 'wx' });
+      anonymous_requests: client.requests, source_fetches: 0, model_calls: 0, results, reader_records: readerRecords }, null, 2), { flag: 'wx', mode: 0o600 });
     console.log(`Selected-answer QC: ${results.length} cases; ${results.filter(r => r.supported_answer).length} supported`);
     process.exitCode = results.some(r => r.verdict === 'fail') ? 1 : results.some(r => r.verdict !== 'pass') ? 2 : 0;
     return;

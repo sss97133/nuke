@@ -11,7 +11,9 @@ const sourceBody = Buffer.from('Synthetic independent terminal source: sold USD 
 const sourceHash = createHash('sha256').update(sourceBody).digest('hex');
 const vehicleId = '00000000-0000-4000-8000-000000000001';
 const snapshotId = '00000000-0000-4000-8000-000000000002';
+const episodeId = '00000000-0000-4000-8000-000000000003';
 const cutoff = '2026-01-05T00:00:00Z';
+const strictContext = { vehicleId, episodeId, cutoff };
 const strictLot = { key: 'synthetic', house: 'bat', stage: 'sold', url: 'https://bringatrailer.com/listing/synthetic/',
   evidence: { sha256: sourceHash, fetched_at: '2026-01-02T00:00:00Z' },
   truth: { year: 2000, make: 'Synthetic', model: { value: 'Example' }, outcome: 'sold', hammer_price: 12345, currency: 'USD', sale_date: '2026-01-01' } };
@@ -26,29 +28,33 @@ const selectedResponse = row => ({ ok: true, value: { receipt: { method: 'source
 
 test('strict selected-answer contract cannot be rescued by a correct unused candidate', () => {
   assert.equal(gradeField('hammer_price', 12345, [{ at: 'wrong_selected', value: 15000 }, { at: 'unused', value: 12345 }]).verdict, 'pass');
-  const wrong = gradeSelectedSale(strictLot, sourceBody, selectedResponse([{ ...selected, amount: 15000 }]), { vehicleId, cutoff });
+  const wrong = gradeSelectedSale(strictLot, sourceBody, selectedResponse([{ ...selected, amount: 15000 }]), strictContext);
   assert.equal(wrong.verdict, 'fail'); assert.equal(wrong.supported_answer, false);
   assert(wrong.reasons.includes('selected_amount_mismatch'));
-  assert.equal(gradeSelectedSale(strictLot, sourceBody, selectedResponse([selected]), { vehicleId, cutoff }).verdict, 'pass');
-  assert.equal(gradeSelectedSale(strictLot, sourceBody, selectedResponse([selected, { ...selected, amount: 15000 }]), { vehicleId, cutoff }).verdict, 'fail');
+  assert.equal(gradeSelectedSale(strictLot, sourceBody, selectedResponse([selected]), strictContext).verdict, 'pass');
+  assert.equal(gradeSelectedSale(strictLot, sourceBody, selectedResponse([selected, { ...selected, amount: 15000 }]), strictContext).verdict, 'fail');
+  assert.equal(gradeSelectedSale(strictLot, sourceBody, selectedResponse([selected]), { vehicleId, cutoff }).verdict, 'not_assessed');
 });
 
 test('strict selected answers require independently retained bytes and exact source, unit, episode and cutoff', () => {
   for (const patch of [{ vehicleId: snapshotId }, { sourceSha256: 'bad' }, { currency: 'EUR' },
     { outcome: 'reserve_not_met' }, { priceBasis: 'buyer_total' }, { sourceEpisodeAncestry: 'unestablished' },
     { amount: 12346 }, { eventAt: '2026-01-02' }, { knownAt: '2026-01-05T00:00:00.000001Z' },
-    { parsedAt: '2026-01-06T00:00:00Z' }]) {
-    assert.equal(gradeSelectedSale(strictLot, sourceBody, selectedResponse([{ ...selected, ...patch }]), { vehicleId, cutoff }).verdict, 'fail', JSON.stringify(patch));
+    { parsedAt: '2026-01-06T00:00:00Z' }, { sourceVehicleEventId: snapshotId }]) {
+    assert.equal(gradeSelectedSale(strictLot, sourceBody, selectedResponse([{ ...selected, ...patch }]), strictContext).verdict, 'fail', JSON.stringify(patch));
   }
   for (const body of [null, Buffer.from('different source')])
-    assert.equal(gradeSelectedSale(strictLot, body, selectedResponse([selected]), { vehicleId, cutoff }).verdict, 'not_assessed');
-  const withheld = gradeSelectedSale(strictLot, sourceBody, selectedResponse([]), { vehicleId, cutoff });
+    assert.equal(gradeSelectedSale(strictLot, body, selectedResponse([selected]), strictContext).verdict, 'not_assessed');
+  const withheld = gradeSelectedSale(strictLot, sourceBody, selectedResponse([]), strictContext);
   assert.equal(withheld.verdict, 'withheld'); assert.equal(withheld.supported_answer, false);
   assert.equal(gradeSelectedSale({ ...strictLot, truth: { ...strictLot.truth, outcome: 'not_sold' } }, sourceBody,
-    selectedResponse([selected]), { vehicleId, cutoff }).verdict, 'fail');
+    selectedResponse([selected]), strictContext).verdict, 'fail');
   const incomplete = selectedResponse([selected]); incomplete.value.receipt.coverage.complete = false;
-  assert.equal(gradeSelectedSale(strictLot, sourceBody, incomplete, { vehicleId, cutoff }).verdict, 'not_assessed');
+  assert.equal(gradeSelectedSale(strictLot, sourceBody, incomplete, strictContext).verdict, 'not_assessed');
   assert.equal(gradeSelectedSale(strictLot, sourceBody, selectedResponse([selected]), { cutoff }).verdict, 'not_assessed');
+  assert.equal(gradeSelectedSale(strictLot, sourceBody, selectedResponse([null]), strictContext).verdict, 'not_assessed');
+  assert.equal(gradeSelectedSale(strictLot, sourceBody, selectedResponse([selected]),
+    { ...strictContext, cutoff: '2999-01-01T00:00:00Z' }).verdict, 'not_assessed');
 });
 
 test('strict live path uses the existing anonymous bounded reader and makes no source request', async () => {
@@ -63,9 +69,9 @@ test('strict live path uses the existing anonymous bounded reader and makes no s
     response.receipt.knowledge_mode = args.p_knowledge_mode;
     return Response.json(response);
   });
-  assert.equal((await assaySelectedSale(strictLot, null, { vehicleId, cutoff, client })).verdict, 'not_assessed');
+  assert.equal((await assaySelectedSale(strictLot, null, { ...strictContext, client })).verdict, 'not_assessed');
   assert.equal(calls.length, 0);
-  assert.equal((await assaySelectedSale(strictLot, sourceBody, { vehicleId, cutoff, client })).verdict, 'pass');
+  assert.equal((await assaySelectedSale(strictLot, sourceBody, { ...strictContext, client })).verdict, 'pass');
   assert.equal(calls.length, 2); assert(calls[1].url.endsWith('/rest/v1/rpc/valuation_by_ymm'));
   assert.equal(calls[1].init.headers.Authorization, undefined);
   const args = JSON.parse(calls[1].init.body);

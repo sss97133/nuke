@@ -21,6 +21,8 @@ bytes match its SHA-256. Manifest contract: `selected_bat_sale_manifest_v1`, an 
 `cutoff`, and at most 20 `cases` containing gold `key`, expected `vehicleId` and optional `bodyPath`
 relative to the manifest. The CLI uses existing anonymous configuration only. Missing bodies or
 reader contracts are not assessed; withheld answers do not count as supported-answer gain.
+An independently established canonical `episodeId` is required for a passing sale verdict; a
+reader's own ancestry label cannot certify that it selected the intended episode.
 This bounded source-result check does not validate physical truth, fleet quality or valuation accuracy.
 
 ---
