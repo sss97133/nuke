@@ -1,9 +1,86 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { matches, gradeField, gradeLot, scorecard, normOutcome, candidates, lotSql, FIELDS } from './extraction-gold.mjs';
+import { createHash } from 'node:crypto';
+import { matches, gradeField, gradeLot, scorecard, normOutcome, candidates, lotSql, FIELDS, gradeSelectedSale, assaySelectedSale } from './extraction-gold.mjs';
+import { anonymousConfiguration, publicClient } from './public-reader-coverage.mjs';
 
 const fixture = JSON.parse(readFileSync(new URL('./extraction-gold-v1.json', import.meta.url), 'utf8'));
+
+const sourceBody = Buffer.from('Synthetic independent terminal source: sold USD 12345 on 2026-01-01');
+const sourceHash = createHash('sha256').update(sourceBody).digest('hex');
+const vehicleId = '00000000-0000-4000-8000-000000000001';
+const snapshotId = '00000000-0000-4000-8000-000000000002';
+const episodeId = '00000000-0000-4000-8000-000000000003';
+const cutoff = '2026-01-05T00:00:00Z';
+const strictContext = { vehicleId, episodeId, cutoff };
+const strictLot = { key: 'synthetic', house: 'bat', stage: 'sold', url: 'https://bringatrailer.com/listing/synthetic/',
+  evidence: { sha256: sourceHash, fetched_at: '2026-01-02T00:00:00Z' },
+  truth: { year: 2000, make: 'Synthetic', model: { value: 'Example' }, outcome: 'sold', hammer_price: 12345, currency: 'USD', sale_date: '2026-01-01' } };
+const selected = { vehicleId, sourceUrl: strictLot.url, sourceKey: 'bringatrailer.com/listing/synthetic',
+  amount: 12345, outcome: 'sold', currency: 'USD', eventAt: '2026-01-01', priceBasis: 'published_bid_excluding_fees',
+  snapshotId, sourceSha256: sourceHash, sourceVehicleEventId: '00000000-0000-4000-8000-000000000003',
+  sourceEpisodeAncestry: 'canonical_current_context_verified', snapshotFetchedAt: '2026-01-02T00:00:00Z',
+  snapshotCreatedAt: '2026-01-02T00:01:00Z', parsedAt: '2026-01-02T00:02:00Z', knownAt: '2026-01-02T00:02:00Z' };
+const selectedResponse = row => ({ ok: true, value: { receipt: { method: 'source_sale_price_midrank_v1',
+  knowledge_mode: 'known_at', evidence_as_of: cutoff, cohort: { complete: true }, coverage: { complete: true }, currency: 'USD',
+  price_basis: 'published_bid_excluding_fees', price_basis_rule: 'bat_published_result_fee_separate_v1', eligible: row } } });
+
+test('strict selected-answer contract cannot be rescued by a correct unused candidate', () => {
+  assert.equal(gradeField('hammer_price', 12345, [{ at: 'wrong_selected', value: 15000 }, { at: 'unused', value: 12345 }]).verdict, 'pass');
+  const wrong = gradeSelectedSale(strictLot, sourceBody, selectedResponse([{ ...selected, amount: 15000 }]), strictContext);
+  assert.equal(wrong.verdict, 'fail'); assert.equal(wrong.supported_answer, false);
+  assert(wrong.reasons.includes('selected_amount_mismatch'));
+  assert.equal(gradeSelectedSale(strictLot, sourceBody, selectedResponse([selected]), strictContext).verdict, 'pass');
+  assert.equal(gradeSelectedSale(strictLot, sourceBody, selectedResponse([selected, { ...selected, amount: 15000 }]), strictContext).verdict, 'fail');
+  assert.equal(gradeSelectedSale(strictLot, sourceBody, selectedResponse([selected]), { vehicleId, cutoff }).verdict, 'not_assessed');
+});
+
+test('strict selected answers require independently retained bytes and exact source, unit, episode and cutoff', () => {
+  for (const patch of [{ vehicleId: snapshotId }, { sourceSha256: 'bad' }, { currency: 'EUR' },
+    { outcome: 'reserve_not_met' }, { priceBasis: 'buyer_total' }, { sourceEpisodeAncestry: 'unestablished' },
+    { amount: 12346 }, { eventAt: '2026-01-02' }, { knownAt: '2026-01-05T00:00:00.000001Z' },
+    { parsedAt: '2026-01-06T00:00:00Z' }, { sourceVehicleEventId: snapshotId }]) {
+    assert.equal(gradeSelectedSale(strictLot, sourceBody, selectedResponse([{ ...selected, ...patch }]), strictContext).verdict, 'fail', JSON.stringify(patch));
+  }
+  for (const body of [null, Buffer.from('different source')])
+    assert.equal(gradeSelectedSale(strictLot, body, selectedResponse([selected]), strictContext).verdict, 'not_assessed');
+  const withheld = gradeSelectedSale(strictLot, sourceBody, selectedResponse([]), strictContext);
+  assert.equal(withheld.verdict, 'withheld'); assert.equal(withheld.supported_answer, false);
+  assert.equal(gradeSelectedSale({ ...strictLot, truth: { ...strictLot.truth, outcome: 'not_sold' } }, sourceBody,
+    selectedResponse([selected]), strictContext).verdict, 'fail');
+  const incomplete = selectedResponse([selected]); incomplete.value.receipt.coverage.complete = false;
+  assert.equal(gradeSelectedSale(strictLot, sourceBody, incomplete, strictContext).verdict, 'not_assessed');
+  assert.equal(gradeSelectedSale(strictLot, sourceBody, selectedResponse([selected]), { cutoff }).verdict, 'not_assessed');
+  assert.equal(gradeSelectedSale(strictLot, sourceBody, selectedResponse([null]), strictContext).verdict, 'not_assessed');
+  assert.equal(gradeSelectedSale(strictLot, sourceBody, selectedResponse([selected]),
+    { ...strictContext, cutoff: '2999-01-01T00:00:00Z' }).verdict, 'not_assessed');
+});
+
+test('strict live path uses the existing anonymous bounded reader and makes no source request', async () => {
+  const calls = [], client = publicClient(anonymousConfiguration({ SUPABASE_ANON_KEY: 'sb_publishable_synthetic' }), async (url, init) => {
+    calls.push({ url, init });
+    if (!init.body) return Response.json([{ id: vehicleId, is_public: true, deleted_at: null, listing_kind: null,
+      year: 2000, make: 'Synthetic', model: 'Example Special' }]);
+    const args = JSON.parse(init.body);
+    const response = selectedResponse([selected]).value;
+    response.query = { year: args.p_year, make: args.p_make, model: args.p_model };
+    Object.assign(response.receipt, { event_from: args.p_event_from, event_before: args.p_event_before });
+    response.receipt.knowledge_mode = args.p_knowledge_mode;
+    return Response.json(response);
+  });
+  assert.equal((await assaySelectedSale(strictLot, null, { ...strictContext, client })).verdict, 'not_assessed');
+  assert.equal(calls.length, 0);
+  assert.equal((await assaySelectedSale(strictLot, sourceBody, { ...strictContext, client })).verdict, 'pass');
+  assert.equal(calls.length, 2); assert(calls[1].url.endsWith('/rest/v1/rpc/valuation_by_ymm'));
+  assert.equal(calls[1].init.headers.Authorization, undefined);
+  const args = JSON.parse(calls[1].init.body);
+  assert.equal(args.p_model, 'Example Special');
+  assert.equal(args.p_knowledge_mode, 'retrospective'); assert.equal(args.p_event_from, '2026-01-01T00:00:00.000Z');
+  assert.throws(() => client.rpc('valuation_by_ymm', { ...args, p_knowledge_mode: 'known_at' }), /invalid_reader_scope/);
+  assert.throws(() => client.rpc('valuation_by_ymm', { ...args, p_subject_vehicle_id: vehicleId }), /invalid_reader_scope/);
+  assert.throws(() => client.rpc('valuation_by_ymm', { ...args, p_event_from: '2020-01-01T00:00:00Z' }), /invalid_reader_scope/);
+});
 
 test('fixture: every lot names house, platform, stage, url, evidence and known fields only', () => {
   const keys = new Set();

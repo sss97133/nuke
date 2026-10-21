@@ -1,4 +1,4 @@
-// Nuke Asset Advisor — curated read-only tool catalog (~7 asset-generic tools).
+// Nuke Asset Advisor — curated read-only tool catalog (5 tools that work).
 import { ENVELOPE_OUTPUT_SCHEMA } from "./evidence.ts";
 
 export interface AdvisorToolDef {
@@ -14,33 +14,24 @@ export interface AdvisorToolDef {
   };
 }
 
-const CITE =
-  " Always cite sources and event dates from the response claims[]; never invent missing values — report 'not recorded'.";
-
-const ASSET_TYPE = {
-  type: "string",
-  description: "Asset class. Defaults to 'vehicle'. Future: art, watch, etc.",
-  default: "vehicle",
-  enum: ["vehicle"],
-};
+const OUT = ENVELOPE_OUTPUT_SCHEMA as unknown as Record<string, unknown>;
 
 export const ADVISOR_TOOLS: AdvisorToolDef[] = [
   {
     name: "find_asset",
     description:
-      "Search Nuke for physical assets (vehicles first). Query by VIN, listing URL, year/make/model, or free text. " +
-      "Returns matched assets with cited identity claims." +
-      CITE,
+      "Find a vehicle in Nuke by VIN, listing URL, or year/make/model text. Use when you need an asset_id before get_asset, get_comps, or value_asset.",
     inputSchema: {
       type: "object",
       properties: {
-        query: { type: "string", description: "VIN, URL, year, '1974 Karmann Ghia', or free text" },
-        asset_type: ASSET_TYPE,
-        limit: { type: "number", description: "Max results (1-25, default 10)" },
+        query: {
+          type: "string",
+          description: "VIN, listing URL, or free text (e.g. '1995 Porsche 911 Turbo')",
+        },
       },
       required: ["query"],
     },
-    outputSchema: ENVELOPE_OUTPUT_SCHEMA as unknown as Record<string, unknown>,
+    outputSchema: OUT,
     annotations: {
       readOnlyHint: true,
       destructiveHint: false,
@@ -51,18 +42,15 @@ export const ADVISOR_TOOLS: AdvisorToolDef[] = [
   {
     name: "get_asset",
     description:
-      "Get one asset's identity, specs, and current price facts as cited claims. " +
-      "Missing fields return value 'not recorded' with checked_sources." +
-      CITE,
+      "Load one vehicle's identity, price facts, coverage, and sale/relist history with citations. Use after find_asset when you have an asset_id.",
     inputSchema: {
       type: "object",
       properties: {
-        asset_id: { type: "string", description: "Asset UUID (vehicle id today)" },
-        asset_type: ASSET_TYPE,
+        asset_id: { type: "string", description: "Vehicle UUID from find_asset" },
       },
       required: ["asset_id"],
     },
-    outputSchema: ENVELOPE_OUTPUT_SCHEMA as unknown as Record<string, unknown>,
+    outputSchema: OUT,
     annotations: {
       readOnlyHint: true,
       destructiveHint: false,
@@ -71,93 +59,21 @@ export const ADVISOR_TOOLS: AdvisorToolDef[] = [
     },
   },
   {
-    name: "get_history",
-    description:
-      "Provenance timeline for an asset: market events and observations. " +
-      "Each entry separates event_time (e.g. sold_at) from ingested_at." +
-      CITE,
-    inputSchema: {
-      type: "object",
-      properties: {
-        asset_id: { type: "string" },
-        asset_type: ASSET_TYPE,
-        limit: { type: "number", description: "Max events/observations (default 25)" },
-      },
-      required: ["asset_id"],
-    },
-    outputSchema: ENVELOPE_OUTPUT_SCHEMA as unknown as Record<string, unknown>,
-    annotations: {
-      readOnlyHint: true,
-      destructiveHint: false,
-      openWorldHint: false,
-      title: "Get Asset History",
-    },
-  },
-  {
-    name: "explain_field",
-    description:
-      "Explain how Nuke knows one field on an asset — observation testimony, field evidence, and consensus projection when available." +
-      CITE,
-    inputSchema: {
-      type: "object",
-      properties: {
-        asset_id: { type: "string" },
-        field: {
-          type: "string",
-          description: "Field name, e.g. mileage, exterior_color, sale_price, year, make, model",
-        },
-        asset_type: ASSET_TYPE,
-      },
-      required: ["asset_id", "field"],
-    },
-    outputSchema: ENVELOPE_OUTPUT_SCHEMA as unknown as Record<string, unknown>,
-    annotations: {
-      readOnlyHint: true,
-      destructiveHint: false,
-      openWorldHint: false,
-      title: "Explain Field",
-    },
-  },
-  {
-    name: "value_asset",
-    description:
-      "Return Nuke's valuation for an asset (estimate, range, confidence) with citations. " +
-      "Reads stored estimates; does not force a recompute." +
-      CITE,
-    inputSchema: {
-      type: "object",
-      properties: {
-        asset_id: { type: "string" },
-        asset_type: ASSET_TYPE,
-      },
-      required: ["asset_id"],
-    },
-    outputSchema: ENVELOPE_OUTPUT_SCHEMA as unknown as Record<string, unknown>,
-    annotations: {
-      readOnlyHint: true,
-      destructiveHint: false,
-      openWorldHint: false,
-      title: "Value Asset",
-    },
-  },
-  {
     name: "get_comps",
     description:
-      "Comparable sold assets for valuation context. Each comp is a cited sale with event_time = sold_date." +
-      CITE,
+      "Return comparable confirmed sales for a vehicle (variant-matched, deduped). Use to inspect peer hammers with source URLs and dates.",
     inputSchema: {
       type: "object",
       properties: {
-        asset_id: { type: "string", description: "Subject asset UUID (preferred)" },
+        asset_id: { type: "string", description: "Subject vehicle UUID (preferred)" },
         make: { type: "string" },
         model: { type: "string" },
         year: { type: "number" },
-        asset_type: ASSET_TYPE,
         limit: { type: "number", description: "Max comps (1-25, default 10)" },
       },
       required: [],
     },
-    outputSchema: ENVELOPE_OUTPUT_SCHEMA as unknown as Record<string, unknown>,
+    outputSchema: OUT,
     annotations: {
       readOnlyHint: true,
       destructiveHint: false,
@@ -166,25 +82,41 @@ export const ADVISOR_TOOLS: AdvisorToolDef[] = [
     },
   },
   {
-    name: "get_coverage",
+    name: "value_asset",
     description:
-      "Data coverage report for an asset: which key fields are recorded vs not recorded, " +
-      "observation/event/image counts, and sources consulted." +
-      CITE,
+      "Estimate value for a known asset_id from recent same-asset sales and variant-matched comps. Use when you already have the Nuke vehicle id.",
     inputSchema: {
       type: "object",
       properties: {
-        asset_id: { type: "string" },
-        asset_type: ASSET_TYPE,
+        asset_id: { type: "string", description: "Vehicle UUID" },
       },
       required: ["asset_id"],
     },
-    outputSchema: ENVELOPE_OUTPUT_SCHEMA as unknown as Record<string, unknown>,
+    outputSchema: OUT,
     annotations: {
       readOnlyHint: true,
       destructiveHint: false,
       openWorldHint: false,
-      title: "Get Coverage",
+      title: "Value Asset",
+    },
+  },
+  {
+    name: "evaluate_listing",
+    description:
+      "Evaluate a public listing URL: verdict, value range, prior sales/relists of the same car, top comps, and red flags. Prefer this for any 'is this a good buy?' question.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        url: { type: "string", description: "Public listing URL (BaT, Cars & Bids, Craigslist, …)" },
+      },
+      required: ["url"],
+    },
+    outputSchema: OUT,
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      openWorldHint: true,
+      title: "Evaluate Listing",
     },
   },
 ];
@@ -193,14 +125,13 @@ export const ADVISOR_TOOL_NAMES = new Set(ADVISOR_TOOLS.map((t) => t.name));
 
 export const ADVISOR_SERVER_INFO = {
   name: "nuke-asset-advisor",
-  version: "1.0.0",
+  version: "1.1.0",
   title: "Nuke Asset Advisor",
 };
 
 export const ADVISOR_INSTRUCTIONS =
-  "You are using the Nuke Asset Advisor — a read-only, citation-first ledger for physical assets (vehicles first). " +
-  "RULES: (1) Never fabricate asset facts. (2) Every answer must cite claims[].citations with source_name, source_url, and event_time when present. " +
-  "(3) event_time is the real-world event (e.g. sold_at); ingested_at is when Nuke learned it — never conflate them. " +
-  "(4) If value is 'not recorded', say so and name checked_sources; do not guess. " +
-  "(5) Prefer per-claim confidence; when confidence_basis is source_trust, say the score is source trust, not independent claim strength. " +
-  "(6) This surface has no write, admin, shop, or SQL tools.";
+  "Nuke Asset Advisor is a read-only, citation-first ledger for collector vehicles. " +
+  "Prefer evaluate_listing for any listing URL. Use find_asset → get_asset / get_comps / value_asset for known VINs or asset ids. " +
+  "Never invent missing values — report 'not recorded'. Every number must cite source_url and event_time when present. " +
+  "Asking prices are not sales. Confidence is capped at 0.6 until a published sale backtest justifies more. " +
+  "This surface has no write, admin, shop, SQL, or legacy catalog tools.";

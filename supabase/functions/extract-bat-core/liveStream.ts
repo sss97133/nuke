@@ -37,6 +37,7 @@ export async function closingBatTargets(db: any): Promise<BatLiveTarget[]> {
 export interface BatStreamIO {
   admit(frames: BatLiveFrame[], heartbeats: unknown[]): Promise<void>;
   missed(target: BatLiveTarget): Promise<any>;
+  recoveryReadyAt?(): number;
   socket?: (url: string) => WebSocket;
 }
 
@@ -47,10 +48,13 @@ export async function collectBatLive(targets: BatLiveTarget[], io: BatStreamIO, 
   const acknowledged = new Set<string>();
   for (const target of targets) for (const type of ["single", "stats", "list"]) channels.set(`post;${type};${target.post_id}`, target);
   const recovery = new Set<string>();
+  const recoveryQueue = new Map<string, BatLiveTarget>();
   const recoveryErrors = new Map<string,string>();
   const tasks = new Set<Promise<void>>();
+  const expiresAt = Date.now() + durationMs;
   let stopped = false, socket: WebSocket | null = null, lastServerAt = 0, lastPingAt = 0;
   let lastHeartbeatAt = 0, lastRecoveryAt = 0, lastError: string | null = null;
+  let lastRecoveryStartedAt = -Infinity;
   let reconnectAt = 0;
   let admissionTask: Promise<void> | null = null;
   let heartbeatTask: Promise<void> | null = null;
@@ -78,13 +82,33 @@ export async function collectBatLive(targets: BatLiveTarget[], io: BatStreamIO, 
       }
       enqueue(target, "metadata-updated", data.metadata, requestedAt, "missed_comments");
       recoveryErrors.delete(target.id);
-    } catch (error) { recoveryErrors.set(target.id, `recovery:${String(error)}`.slice(0, 500)); }
+    } catch (error) {
+      recoveryErrors.set(target.id, `recovery:${String(error)}`.slice(0, 500));
+      // Keep rate-deferred work in this bounded queue. It has not become a
+      // semantic failure and need not wait for the next45-second catch-up pass.
+      if (!stopped && Date.now() < expiresAt && (io.recoveryReadyAt?.() ?? 0) > Date.now())
+        recoveryQueue.set(target.id, target);
+    }
     finally { recovery.delete(target.id); }
   };
+  const pumpRecovery = () => {
+    // Subscription acknowledgements can arrive for 200 lots at once. Keep
+    // catch-up reads bounded while the independent socket/admission lanes run.
+    while (!stopped && Date.now() < expiresAt && Date.now() >= (io.recoveryReadyAt?.() ?? 0)
+      && Date.now() - lastRecoveryStartedAt >= 1000 && recovery.size < 2 && recoveryQueue.size) {
+      const target = recoveryQueue.values().next().value!;
+      recoveryQueue.delete(target.id);
+      lastRecoveryStartedAt = Date.now();
+      const task = recover(target);
+      tasks.add(task);
+      void task.finally(() => { tasks.delete(task); pumpRecovery(); });
+    }
+  };
   const scheduleRecovery = (target: BatLiveTarget) => {
-    const task = recover(target);
-    tasks.add(task);
-    void task.finally(() => tasks.delete(task));
+    if (stopped || Date.now() >= expiresAt || recovery.has(target.id) || recoveryQueue.has(target.id)) return;
+    recoveryErrors.set(target.id, "recovery_pending");
+    recoveryQueue.set(target.id, target);
+    pumpRecovery();
   };
   const connect = () => {
     acknowledged.clear();
@@ -125,7 +149,6 @@ export async function collectBatLive(targets: BatLiveTarget[], io: BatStreamIO, 
   };
   connect();
   const currentSocket = (): WebSocket | null => socket;
-  const expiresAt = Date.now() + durationMs;
   try {
     while (Date.now() < expiresAt) {
       const tickStartedAt = Date.now();
@@ -163,10 +186,12 @@ export async function collectBatLive(targets: BatLiveTarget[], io: BatStreamIO, 
           .finally(() => { heartbeatTask = null; });
         lastHeartbeatAt = Date.now();
       }
+      pumpRecovery();
       await new Promise(resolve => setTimeout(resolve, Math.max(0, 1000 - (Date.now() - tickStartedAt))));
     }
   } finally {
     stopped = true;
+    recoveryQueue.clear();
     currentSocket()?.close();
     await Promise.allSettled([...tasks]);
     if (heartbeatTask) await heartbeatTask;
@@ -186,16 +211,97 @@ export async function collectBatLive(targets: BatLiveTarget[], io: BatStreamIO, 
 }
 
 export function batStreamIO(url: string, key: string): BatStreamIO {
+  let retryAt = 0;
+  const originRetryAt = new Map<string, number>();
+  const recoveryUrl = "https://bringatrailer.com/wp-admin/admin-ajax.php";
+  const request = async (url: string, options: RequestInit) => {
+    const origin = new URL(url).origin;
+    if (Date.now() < Math.max(retryAt, originRetryAt.get(origin) ?? 0)) throw new Error("bat_live_transport_backoff");
+    let response: Response;
+    try { response = await fetch(url, options); }
+    catch (error) {
+      // The runtime can refuse fetch before an HTTP response exists. Honor its
+      // explicit delay across recovery, admission and coverage, without retries
+      // inside this transport. Unacknowledged frames stay in the existing buffer.
+      if (error instanceof Error && error.name === "RateLimitError") {
+        const delay = /Retry after (\d+)ms\b/i.exec(error.message);
+        retryAt = Date.now() + (delay ? Math.max(1000, Number(delay[1])) : 5000);
+      }
+      throw error;
+    }
+    if (response.status === 429) {
+      const value = response.headers.get("Retry-After");
+      const until = value && /^\d+(?:\.\d+)?$/.test(value) ? Date.now() + Number(value) * 1000 : Date.parse(value ?? "");
+      // A source HTTP limit must not stop acknowledgement of already captured
+      // data at our own intake. Runtime fetch limits, above, cover both origins.
+      originRetryAt.set(origin, Number.isFinite(until) ? Math.max(Date.now() + 1000, until) : Date.now() + 5000);
+    }
+    return response;
+  };
+  type Admission = { frames: BatLiveFrame[]; heartbeats: unknown[]; resolve: () => void; reject: (error: unknown) => void };
+  const admissions: Admission[] = [];
+  let admissionScheduled = false, framesSending = false, coverageSending = false, combineAdmissions = true;
+  const scheduleAdmission = () => {
+    if (admissionScheduled || !admissions.length) return;
+    admissionScheduled = true;
+    queueMicrotask(async () => {
+      admissionScheduled = false;
+      const group: Admission[] = [], frames: BatLiveFrame[] = [], heartbeats: unknown[] = [];
+      let framesBlocked = false, coverageBlocked = false;
+      for (let i = 0; i < admissions.length;) {
+        const item = admissions[i];
+        if ((item.frames.length > 0 && (framesSending || framesBlocked || frames.length + item.frames.length > 50))
+          || (item.heartbeats.length > 0 && (coverageSending || coverageBlocked || heartbeats.length + item.heartbeats.length > 200))) {
+          framesBlocked ||= item.frames.length > 0;
+          coverageBlocked ||= item.heartbeats.length > 0;
+          i++; continue;
+        }
+        admissions.splice(i, 1);
+        group.push(item); frames.push(...item.frames); heartbeats.push(...item.heartbeats);
+        if (!combineAdmissions) break;
+      }
+      if (!group.length) return;
+      if (frames.length) framesSending = true;
+      if (heartbeats.length) coverageSending = true;
+      // Preserve the original independent in-flight lanes. A request already
+      // waiting on coverage cannot hold later captured frames, or vice versa.
+      scheduleAdmission();
+      try {
+        // Capture and coverage queued in the same turn share the existing
+        // atomic RPC and acknowledgement, instead of competing HTTP requests.
+        const result = await request(`${url}/functions/v1/ingest-observation`, { method: "POST",
+          headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ mode: BAT_LIVE_MODE, frames, heartbeats }), signal: AbortSignal.timeout(10000) });
+        if (!result.ok || (await result.json()).success !== true) throw new Error(`live_intake_http_${result.status}`);
+        for (const item of group) item.resolve();
+      } catch (error) {
+        // An invalid coverage packet must not repeatedly contaminate otherwise
+        // valid source admission. After an explicit combined semantic refusal,
+        // later callers retain the original independent acknowledgement paths.
+        if (group.length > 1 && frames.length && heartbeats.length && error instanceof Error
+          && /^live_intake_http_(200|400|409|422|500)$/.test(error.message)) combineAdmissions = false;
+        for (const item of group) item.reject(error);
+      }
+      finally {
+        if (frames.length) framesSending = false;
+        if (heartbeats.length) coverageSending = false;
+        scheduleAdmission();
+      }
+    });
+  };
   return {
     admit: async (frames, heartbeats) => {
-      const result = await fetch(`${url}/functions/v1/ingest-observation`, { method: "POST",
-        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ mode: BAT_LIVE_MODE, frames, heartbeats }), signal: AbortSignal.timeout(10000) });
-      if (!result.ok || (await result.json()).success !== true) throw new Error(`live_intake_http_${result.status}`);
+      if ((!frames.length && !heartbeats.length) || frames.length > 50 || heartbeats.length > 200)
+        throw new Error("invalid_bat_live_batch");
+      await new Promise<void>((resolve, reject) => {
+        admissions.push({ frames: [...frames], heartbeats: [...heartbeats], resolve, reject });
+        scheduleAdmission();
+      });
     },
+    recoveryReadyAt: () => Math.max(retryAt, originRetryAt.get(new URL(recoveryUrl).origin) ?? 0),
     missed: async target => {
       // Public JSON read endpoint used by BaT's own reconnect handler. No HTML.
-      const result = await fetch("https://bringatrailer.com/wp-admin/admin-ajax.php", { method: "POST",
+      const result = await request(recoveryUrl, { method: "POST",
         body: new URLSearchParams({ action: "bat_listing_missed_comments", listing_id: String(target.post_id), last_comment: String(target.last_comment_id) }),
         signal: AbortSignal.timeout(10000) });
       if (!result.ok) throw new Error(`missed_comments_http_${result.status}`);

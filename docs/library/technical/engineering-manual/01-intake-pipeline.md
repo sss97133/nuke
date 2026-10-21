@@ -2,7 +2,46 @@
 
 ## What This Subsystem Does
 
-The intake pipeline is the front door of the entire platform. Every vehicle listing URL enters through a single queue table (`import_queue`), gets routed to the correct domain-specific extractor based on URL pattern matching, and either succeeds (creating or updating a vehicle record) or fails with categorized error tracking and exponential backoff retry. The pipeline also archives every fetched page to `listing_page_snapshots` so that extraction can be re-run against stored content without re-crawling.
+The import pipeline routes queued vehicle listing URLs through `import_queue` to domain-specific extractors, with categorized failures and bounded retries. Other existing paths include feed polling, source APIs, native streams and retained-capture replay; not every observation passes through this queue. `archiveFetch` can retain source bodies in `listing_page_snapshots`, but capture receipts do not universally contain replayable bytes. Check the specific capture's body or protected storage locator and hash before claiming retention.
+
+### Terminal evidence and selected-answer QC
+
+The BaT reader's default remains receipt-only. An explicit service-role request with
+`retain_terminal_evidence: true` can retain the already fetched terminal HTML through the existing
+archive owner. Its `terminal_capture` acknowledgement distinguishes retained or independently
+read-back existing bytes from unavailable/failed retention. A duplicate bodyless receipt is not
+backfilled or relabelled as historical retention. Cached captures remain unassessed by this option;
+ordinary ingestion and native streaming continue independently. This option does not enable a
+schedule, authorize a canary, admit a sale or certify public readiness.
+
+The existing gold assay keeps its legacy candidate-presence diagnostic. Opt-in
+`--selected-manifest /private/manifest.json --json /private/new-receipt.json` checks the exact
+anonymous `valuation_by_ymm` answer against independently hand-read gold evidence whose retained
+bytes match its SHA-256. Manifest contract: `selected_bat_sale_manifest_v1`, an explicit past
+`cutoff`, and at most 20 `cases` containing gold `key`, expected `vehicleId` and optional `bodyPath`
+relative to the manifest. The CLI uses existing anonymous configuration only. Missing bodies or
+reader contracts are not assessed; withheld answers do not count as supported-answer gain.
+An independently established canonical `episodeId` is required for a passing sale verdict; a
+reader's own ancestry label cannot certify that it selected the intended episode.
+This bounded source-result check does not validate physical truth, fleet quality or valuation accuracy.
+
+The native closing collector keeps source recovery separate from live delivery. At most two
+catch-up reads run at once, with at most one start per second per worker; queued or unfinished recovery remains visible as `recovery_pending`
+in coverage, and no new recovery starts after the existing collector deadline. Normal admission
+combines lots within the existing 50-frame canonical batch limit. A rejected mixed batch falls
+back to per-lot isolation; only acknowledged prefixes leave the buffer, including when new frames
+arrive during admission. The shared transport honors runtime rate-limit delays across all fetches
+and HTTP `Retry-After` per origin, so a source limit cannot block internal acknowledgement.
+Recovery waits in its queue during cooldown and rate-deferred reads retry only after transport
+availability. Frame and coverage requests queued together share one atomic admission within the
+same limits; an explicit combined semantic refusal restores independent requests so bad coverage
+cannot repeatedly block valid captured frames. Neither request receives a successful acknowledgement
+when their shared admission fails. A request already in flight cannot hold the opposite lane;
+overflow preserves order within each lane and does not add admission concurrency beyond the
+existing frame and coverage producers.
+Waiting is not a successful heartbeat or
+admission. These controls reduce requests; they do not relax the three-second coverage or
+two-second admission objectives, expand capacity, or certify continuous capture.
 
 ---
 
@@ -12,8 +51,8 @@ The intake pipeline is the front door of the entire platform. Every vehicle list
 
 | Table | Purpose |
 |-------|---------|
-| `import_queue` | Central intake queue. Every URL to be processed enters here. |
-| `listing_page_snapshots` | Archived HTML/markdown of every page ever fetched. |
+| `import_queue` | Queued URL intake; feeds, native streams and retained replay also have existing routes. |
+| `listing_page_snapshots` | Source fetch receipts; bodies may be inline, protected in storage, or unavailable. |
 | `vehicles` | Destination table for extracted vehicle records. |
 | `vehicle_events` | Links vehicles to their source listings/auctions. |
 | `vehicle_images` | Images discovered during extraction. |

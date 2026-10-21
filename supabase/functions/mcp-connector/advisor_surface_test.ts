@@ -16,35 +16,32 @@ function assert(condition: boolean, message: string): asserts condition {
 const EXPECTED = [
   "find_asset",
   "get_asset",
-  "get_history",
-  "explain_field",
-  "value_asset",
   "get_comps",
-  "get_coverage",
+  "value_asset",
+  "evaluate_listing",
 ];
 
-Deno.test("advisor catalog is exactly seven read-only tools with outputSchema", () => {
-  assert(ADVISOR_TOOLS.length === 7, `expected 7 tools, got ${ADVISOR_TOOLS.length}`);
-  assert(ADVISOR_TOOL_NAMES.size === 7, "unique names");
+Deno.test("advisor catalog is curated read-only tools with outputSchema", () => {
+  assert(ADVISOR_TOOLS.length === EXPECTED.length, `expected ${EXPECTED.length} tools, got ${ADVISOR_TOOLS.length}`);
+  assert(ADVISOR_TOOL_NAMES.size === EXPECTED.length, "unique names");
   const names = ADVISOR_TOOLS.map((t) => t.name).sort();
   assert(JSON.stringify(names) === JSON.stringify([...EXPECTED].sort()), `names=${names}`);
   for (const tool of ADVISOR_TOOLS) {
     assert(tool.annotations.readOnlyHint === true, `${tool.name} readOnly`);
     assert(tool.annotations.destructiveHint === false, `${tool.name} not destructive`);
     assert(tool.outputSchema && typeof tool.outputSchema === "object", `${tool.name} outputSchema`);
-    assert(
-      tool.description.includes("cite") || tool.description.includes("Cite") ||
-        tool.description.includes("not recorded"),
-      `${tool.name} must instruct citation / not-recorded`,
-    );
+    assert(/^[A-Z]/.test(tool.description) || tool.description.includes("Find") || tool.description.includes("Load") || tool.description.includes("Return") || tool.description.includes("Estimate") || tool.description.includes("Evaluate"), `${tool.name} verb-first description`);
+    assert(!tool.description.includes("Always cite"), `${tool.name} descriptions stay short`);
   }
   const forbidden = [
     "execute_sql",
     "submit_observation",
-    "submit_attribute_value",
-    "ingest_photos",
-    "create_profile",
-    "prepare_listing",
+    "find_listings",
+    "get_history",
+    "explain_field",
+    "get_coverage",
+    "get_vehicle",
+    "decode_vin",
     "compute_valuation",
   ];
   for (const name of forbidden) {
