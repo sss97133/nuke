@@ -664,7 +664,15 @@ async function handleFindListings(
       continue;
     }
 
-    const askAmount = fact?.ask_amount != null ? Number(fact.ask_amount) : Number(v.asking_price);
+    const askAmount = fact?.ask_amount != null
+      ? Number(fact.ask_amount)
+      : v.asking_price != null
+      ? Number(v.asking_price)
+      : null;
+    const bidAmount = fact?.bid_amount != null ? Number(fact.bid_amount) : null;
+    const displayAmount = askAmount ?? bidAmount;
+    if (displayAmount == null || !(displayAmount > 0)) continue;
+    const priceKind = askAmount != null ? "ask" : "bid";
     const cit = emptyCitation({
       source_name: (v.canonical_platform || v.auction_source || v.listing_source || "listing") as string,
       source_url: (v.listing_url || v.bat_auction_url || fact?.source_url || null) as string | null,
@@ -674,26 +682,38 @@ async function handleFindListings(
       is_superseded: false,
     });
     claims.push(
-      recordedClaim(`listing.${id}.asking_price`, askAmount, {
-        confidence: stale ? 0.35 : 0.75,
-        confidence_basis: "source_trust",
-        citations: [cit],
-        note: stale
-          ? "STALE ask — last_verified_at older than threshold; not a confirmed current offer"
-          : "Asking price (not a sale)",
-      }),
+      recordedClaim(
+        `listing.${id}.${priceKind === "ask" ? "asking_price" : "high_bid"}`,
+        displayAmount,
+        {
+          confidence: stale ? 0.35 : 0.75,
+          confidence_basis: "source_trust",
+          citations: [cit],
+          note: stale
+            ? "STALE ask — last_verified_at older than threshold; not a confirmed current offer"
+            : priceKind === "ask"
+            ? "Asking price (not a sale)"
+            : "Live auction high bid (not a sale)",
+        },
+      ),
     );
     listings.push({
       asset_id: id,
       asset_type: "vehicle",
       label: [v.year, v.make, v.model].filter(Boolean).join(" "),
-      price_kind: "ask",
+      price_kind: priceKind,
       asking_price: askAmount,
+      high_bid: bidAmount,
       sale_price: null,
-      live: auctionLive || (!stale && askAmount > 0),
+      live: auctionLive || (!stale && displayAmount > 0),
       auction_live: auctionLive,
       staleness: stale ? "stale" : verified ? "fresh" : "unknown",
       last_verified_at: verified,
+      // Retained CL capture URLs of the form craigslist.org/view/d/… routinely 404 on
+      // the public site; listing-clock freshness is not an HTTP HEAD check.
+      url_suspect: /craigslist\.org\/view\/d\//i.test(
+        String(v.listing_url || v.bat_auction_url || ""),
+      ),
       ends_at: v.auction_end_date || null,
       location: v.city || v.state || v.location || null,
       source: v.canonical_platform || v.auction_source || v.listing_source || null,
