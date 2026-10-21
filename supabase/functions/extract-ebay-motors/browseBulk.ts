@@ -210,18 +210,33 @@ export function systemStateStore(supabase: any): StateStore {
 
 // ---- what we hold ------------------------------------------------------------------------------------------------------
 
+/** The seller's own price as we last recorded it (metadata.price_original), for listings eBay converts to USD. */
+interface Orig { orig: number | null; origCur: string | null }
 export type Held =
-  | { kind: "episode"; vehicle_id: string; price: number | null; bids: number | null; status: string | null }
-  | { kind: "blip"; price: number | null; observed_at: string }
+  | ({ kind: "episode"; vehicle_id: string; price: number | null; bids: number | null; status: string | null } & Orig)
+  | ({ kind: "blip"; price: number | null; observed_at: string; method: string | null } & Orig)
   | { kind: "other"; why: string };
 const num = (v: unknown) => (v == null || v === "" || !Number.isFinite(Number(v)) ? null : Number(v));
 export const itemUrl = (key: string) => `https://www.ebay.com/itm/${key}`;
+
+/**
+ * The seller's own price. A listing in another currency (EBAY_CA, read 2026-10-20) comes back with price.value converted to USD
+ * at the day's rate and the seller's amount in convertedFromValue / convertedFromCurrency; its USD value moves with the rate
+ * while the seller's price stays put, so the seller's amount is what is compared.
+ */
+export function originalPrice(s: SearchSummary): { amount: number | null; currency: string | null; converted: boolean } {
+  const src = (s.buyingOptions?.includes("AUCTION") && s.currentBidPrice?.value ? s.currentBidPrice : s.price) as
+    { value?: string; currency?: string; convertedFromValue?: string; convertedFromCurrency?: string } | undefined;
+  const converted = src?.convertedFromValue != null && !!src?.convertedFromCurrency;
+  const n = Number(converted ? src!.convertedFromValue : src?.value);
+  return { amount: Number.isFinite(n) && n > 0 ? n : null, currency: (converted ? src!.convertedFromCurrency : src?.currency) ?? null, converted };
+}
 
 export async function heldListings(supabase: any, keys: string[], sourceId: string): Promise<Map<string, Held>> {
   const held = new Map<string, Held>();
   if (!keys.length) return held;
   const ev = mustWrite("held episodes read", await supabase.from("vehicle_events")
-    .select("source_url,vehicle_id,current_price,event_status,bids:metadata->>bid_count")
+    .select("source_url,vehicle_id,current_price,event_status,bids:metadata->>bid_count,po:metadata->price_original->>amount,pc:metadata->price_original->>currency,ppo:metadata->page->price_original->>amount,ppc:metadata->page->price_original->>currency")
     .in("source_url", keys.map(itemUrl)).eq("source_platform", PLATFORM).eq("event_type", "listing").limit(1000));
   const byKey = new Map<string, any[]>();
   for (const r of ev.data ?? []) {
@@ -230,36 +245,49 @@ export async function heldListings(supabase: any, keys: string[], sourceId: stri
   }
   for (const [k, rows] of byKey) {
     const linked = rows.filter((r) => r.vehicle_id);
+    const r = linked[0];
     held.set(k, linked.length === 1
-      ? { kind: "episode", vehicle_id: linked[0].vehicle_id, price: num(linked[0].current_price), bids: num(linked[0].bids), status: linked[0].event_status ?? null }
+      ? { kind: "episode", vehicle_id: r.vehicle_id, price: num(r.current_price), bids: num(r.bids), status: r.event_status ?? null,
+          orig: num(r.po ?? r.ppo), origCur: (r.po != null ? r.pc : r.ppc) ?? null }   // an update's record is newer than the landing's
       : { kind: "other", why: `${rows.length} episodes` });
   }
   const rest = keys.filter((k) => !held.has(k));
   if (rest.length) {
     const ob = mustWrite("held observations read", await supabase.from("vehicle_observations")
-      .select("source_identifier,vehicle_id,observed_at,amount:extraction_metadata->raw->price->>amount")
+      .select("source_identifier,vehicle_id,observed_at,extraction_method,amount:extraction_metadata->raw->price->>amount,po:extraction_metadata->raw->price_original->>amount,pc:extraction_metadata->raw->price_original->>currency")
       .eq("source_id", sourceId).eq("kind", "listing").in("source_identifier", rest).limit(1000));
     for (const r of ob.data ?? []) {
       const k = String(r.source_identifier);
       const prior = held.get(k);
       if (r.vehicle_id) { held.set(k, { kind: "other", why: "observation linked to a vehicle without an episode" }); continue; }
       if (prior?.kind === "other") continue;
-      if (!prior || (prior.kind === "blip" && String(r.observed_at) > prior.observed_at)) held.set(k, { kind: "blip", price: num(r.amount), observed_at: String(r.observed_at) });
+      if (!prior || (prior.kind === "blip" && String(r.observed_at) > prior.observed_at)) {
+        held.set(k, { kind: "blip", price: num(r.amount), observed_at: String(r.observed_at), method: r.extraction_method ?? null, orig: num(r.po), origCur: r.pc ?? null });
+      }
     }
   }
   return held;
 }
 
-/** current: held and unchanged (no write). changed: held, price or bid count moved. new: not held. */
+/** Whether the seller's price is the one we hold: the seller's own amount for a converted listing (unknown until recorded). */
+export function samePrice(s: SearchSummary, h: { price: number | null } & Orig): boolean {
+  const o = originalPrice(s);
+  return o.converted ? h.orig != null && h.origCur === o.currency && h.orig === o.amount : h.price === priceOf(s).amount;
+}
+
+/**
+ * current: held and unchanged (no write). changed: held, and the seller's price or the bid count moved, or a converted listing
+ * whose seller's price we have not recorded yet (one update records it), or a blip read some other way (Firecrawl, Wayback,
+ * getItem): it is read once from the page, whose year/make/model may resolve it. new: not held.
+ */
 export function compare(s: SearchSummary, h: Held | undefined): "new" | "current" | "changed" | "skip" {
   if (!h) return "new";
   if (h.kind === "other") return "skip";
-  const p = priceOf(s).amount;
-  if (h.kind === "blip") return h.price === p ? "current" : "changed";
+  if (h.kind === "blip") return h.method === METHOD && samePrice(s, h) ? "current" : "changed";
   if (h.status === "ended" || h.status === "sold") return "skip";            // an ended episode is not reopened from a summary
   const auction = s.buyingOptions?.includes("AUCTION") ?? false;
   const bidsSame = !auction || (h.bids ?? 0) === Number(s.bidCount ?? 0);
-  return h.price === p && bidsSame ? "current" : "changed";
+  return samePrice(s, h) && bidsSame ? "current" : "changed";
 }
 
 // ---- the stored page -----------------------------------------------------------------------------------------------------
@@ -437,21 +465,24 @@ export async function bulk(supabase: any, client: BrowseClient, o: BulkOptions =
         const upd = work.filter((w) => w.kind === "changed" && w.h?.kind === "episode").slice(0, Math.max(0, maxUpdates - updatedRun));
         await pool(upd, 4, async (w) => {
           const h = w.h as Extract<Held, { kind: "episode" }>;
-          const key = listingKey(w.s)!, p = priceOf(w.s);
+          const key = listingKey(w.s)!, p = priceOf(w.s), o = originalPrice(w.s);
+          // the seller's price moved (a converted listing whose seller's price we had not recorded is recorded, not a move)
+          const moved = o.converted ? h.orig != null && h.origCur === o.currency && h.orig !== o.amount : p.amount !== h.price;
           const ev = await writeVehicleEventByKey(supabase, {
             vehicle_id: h.vehicle_id, source_platform: PLATFORM, source_listing_id: key, source_url: itemUrl(key), event_type: "listing", updated_at: fetchedAt,
-            ...(p.amount != null ? { current_price: p.amount } : {}),
-            metadata: { source_observed_at: fetchedAt, last_checked_at: fetchedAt, price_changed_at: fetchedAt, price_before: h.price,
-              bid_count: w.s.bidCount ?? null, listing_ends_at: w.s.itemEndDate ?? null, price_snapshot_id: snapshotId },
+            ...(p.amount != null ? { current_price: p.amount } : {}),   // eBay's USD figure today; the seller's own is price_original
+            metadata: { source_observed_at: fetchedAt, last_checked_at: fetchedAt, bid_count: w.s.bidCount ?? null, listing_ends_at: w.s.itemEndDate ?? null,
+              price_snapshot_id: snapshotId, price_original: o, ...(moved ? { price_changed_at: fetchedAt, price_before: h.price, price_original_before: h.orig } : {}) },
           }, { preserveEventStatus: true, sourceObservedAt: fetchedAt });
           if (ev.action === "error") { rep.errors.push(`update ${key}: ${ev.error}`.slice(0, 300)); return; }
           updatedRun++;                                    // a skipped write (a newer read is on the episode) still used its turn
           if (ev.action === "skipped") return;
           row.updated++;
-          if (p.kind === "buy_it_now" && p.amount != null && p.amount !== h.price) {
+          if (p.kind === "buy_it_now" && p.amount != null && moved) {
             softWrite(`price log ${key}`, await supabase.from("vehicle_price_history").insert({
               vehicle_id: h.vehicle_id, price_type: "asking", value: p.amount, source: PLATFORM, as_of: fetchedAt, confidence: 70,
-              proof_type: "listing", proof_url: itemUrl(key), notes: `ebay item ${key} search page ${snapshotId}`,
+              proof_type: "listing", proof_url: itemUrl(key),
+              notes: `ebay item ${key} search page ${snapshotId}` + (o.converted ? `; seller's price ${o.currency} ${o.amount}, value is eBay's USD conversion` : ""),
             }), rep.errors);
           }
         });
@@ -470,7 +501,7 @@ export async function bulk(supabase: any, client: BrowseClient, o: BulkOptions =
             capture: "search_summary", search_page: { snapshot_id: snapshotId, offset, position: items.indexOf(w.s), aspect_filter: filter },
             identity_claims: id.claims, identity_conflict: id.conflict, title_parse: id.title, category: id.category, categories: w.s.categories ?? [],
             condition: w.s.condition ?? null, condition_id: w.s.conditionId ?? null, for_sale_by: id.claims.for_sale_by ?? null,
-            zip3: zip3Of(w.s.itemLocation?.postalCode), item_origin_date: w.s.itemOriginDate ?? null,
+            zip3: zip3Of(w.s.itemLocation?.postalCode), item_origin_date: w.s.itemOriginDate ?? null, price_original: originalPrice(w.s),
           };
           try {
             const r = await land(supabase, w.s, rep, fetchedAt, {
