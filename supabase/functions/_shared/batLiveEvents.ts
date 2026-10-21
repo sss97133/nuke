@@ -92,6 +92,13 @@ export async function prepareBatLiveFrame(frame: BatLiveFrame, target: BatLiveTa
   };
 }
 
+export class BatLiveAdmissionError extends Error {
+  constructor(readonly category: "transient" | "semantic", message: string) { super(message); }
+}
+export function isTransientBatLiveAdmission(error: unknown): boolean {
+  return error instanceof BatLiveAdmissionError && error.category === "transient";
+}
+
 /** One acknowledgement loop, ordered within each lot. The canonical batch owner
  * already accepts multiple lots. Isolate a rejected batch without discarding its
  * unacknowledged prefixes or making every healthy lot pay one HTTP round trip. */
@@ -99,6 +106,7 @@ export class BatLiveBuffer {
   private frames: BatLiveFrame[] = [];
   private draining = false;
   private failures = new Map<string, string>();
+  private semanticFailures = new Set<string>();
   constructor(private admit: (frames: BatLiveFrame[]) => Promise<void>, private capacity = 5000) {}
   get pending() { return this.frames.length; }
   get oldestReceivedAt() { return this.frames[0]?.received_at ?? null; }
@@ -117,7 +125,7 @@ export class BatLiveBuffer {
     try {
       const rejected = new Set<string>();
       let firstFailure: unknown;
-      let isolate = this.failures.size > 0;
+      let isolate = this.semanticFailures.size > 0;
       while (true) {
         const next = this.frames.find(f => !rejected.has(f.monitored_auction_id));
         if (!next) break;
@@ -136,12 +144,19 @@ export class BatLiveBuffer {
             counts.set(f.monitored_auction_id, remaining - 1);
             return false;
           });
-          for (const lot of counts.keys()) this.failures.delete(lot);
+          for (const lot of counts.keys()) { this.failures.delete(lot); this.semanticFailures.delete(lot); }
         } catch (error) {
+          if (isTransientBatLiveAdmission(error)) {
+            for (const lot of counts.keys()) this.failures.set(lot, `admission:${String(error)}`.slice(0, 500));
+            // Availability does not identify a poison lot. Preserve this atomic
+            // prefix and retry it once on the next drain, without fan-out.
+            throw error;
+          }
           // A mixed atomic rejection establishes no per-lot failure. Retry its
           // unchanged prefixes separately; canonical intake remains idempotent.
           if (counts.size > 1) { isolate = true; continue; }
           rejected.add(id);
+          this.semanticFailures.add(id);
           this.failures.set(id, `admission:${String(error)}`.slice(0, 500));
           firstFailure ??= error;
         }
