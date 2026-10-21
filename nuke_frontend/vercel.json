@@ -57,14 +57,6 @@
       "destination": "/api/examples/:path+"
     },
     {
-      "source": "/api",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/api/landing",
-      "destination": "/index.html"
-    },
-    {
       "source": "/api/v1/vehicle/:path*",
       "destination": "/api/v1/vehicle/:path*"
     },

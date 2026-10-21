@@ -67,6 +67,27 @@ describe('public face', () => {
     expect(out!.res.headers.get('content-type')).toContain('text/plain');
     expect(out!.body).toContain('github.com/sss97133/nuke');
     expect(out!.body).toContain('counted 2026-10-16');
+    expect(out!.body).toContain('nuke.ag/mcp/advisor');
+    expect(out!.body).toContain('Nuke Asset Advisor');
+  });
+
+  it('/.well-known/mcp.json is the Asset Advisor server card', async () => {
+    const out = await call('/.well-known/mcp.json');
+    expect(out!.res.status).toBe(200);
+    expect(out!.res.headers.get('content-type')).toContain('application/json');
+    const card = JSON.parse(out!.body);
+    expect(card.url).toBe('https://nuke.ag/mcp/advisor');
+    expect(card.tools).toContain('get_history');
+  });
+
+  it('/docs and bare /api return real 404 JSON, not the SPA shell', async () => {
+    for (const path of ['/docs', '/api']) {
+      const out = await call(path);
+      expect(out!.res.status).toBe(404);
+      expect(out!.res.headers.get('content-type')).toContain('application/json');
+      expect(out!.body).toContain('not_found');
+      expect(out!.body).not.toContain('<div id="root"');
+    }
   });
 
   it('sends a publishable key in apikey only, never as a Bearer token', async () => {
