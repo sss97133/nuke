@@ -644,7 +644,10 @@ async function handleFindListings(
     const id = String(v.id);
     const fact = facts.get(id);
     const verified = lastVerifiedAt(v);
-    const stale = isStaleVerified(verified, staleAfterDays) || fact?.price_live === false;
+    // vehicle_price_facts.price_live is only true for sale_status=auction_live — not a
+    // general ask freshness signal. Ask staleness is listing-clock based.
+    const stale = isStaleVerified(verified, staleAfterDays);
+    const auctionLive = fact?.price_live === true || String(v.sale_status || "") === "auction_live";
     // Prefer price_kind=ask; if facts say sold, this is not a live listing.
     if (fact?.price_kind === "sold" || fact?.sold_basis) {
       staleSkipped++;
@@ -670,7 +673,7 @@ async function handleFindListings(
         confidence_basis: "source_trust",
         citations: [cit],
         note: stale
-          ? "STALE ask — last_verified_at older than threshold or price_live=false; not a confirmed current offer"
+          ? "STALE ask — last_verified_at older than threshold; not a confirmed current offer"
           : "Asking price (not a sale)",
       }),
     );
@@ -681,7 +684,8 @@ async function handleFindListings(
       price_kind: "ask",
       asking_price: askAmount,
       sale_price: null,
-      live: fact?.price_live === true,
+      live: auctionLive || (!stale && askAmount > 0),
+      auction_live: auctionLive,
       staleness: stale ? "stale" : verified ? "fresh" : "unknown",
       last_verified_at: verified,
       ends_at: v.auction_end_date || null,
