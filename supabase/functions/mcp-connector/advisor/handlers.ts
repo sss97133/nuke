@@ -590,18 +590,24 @@ async function handleFindListings(
     "listing_source, is_for_sale, sale_status, auction_end_date, listing_updated_at, listing_posted_at, " +
     "updated_at, created_at, transmission, body_style";
 
+  // Active asks + live auctions. Prefer is_for_sale; also include auction_live
+  // (may carry high_bid rather than asking_price).
   let query = sb
     .from("vehicles")
     .select(selectCols)
-    .eq("is_for_sale", true)
     .is("deleted_at", null)
-    .not("asking_price", "is", null)
-    .gt("asking_price", 0)
+    .or("is_for_sale.eq.true,sale_status.eq.auction_live")
     .order("listing_updated_at", { ascending: false, nullsFirst: false })
     .range(offset, offset + fetchLimit - 1);
 
-  if (args.price_min != null) query = query.gte("asking_price", Number(args.price_min));
-  if (args.price_max != null) query = query.lte("asking_price", Number(args.price_max));
+  if (args.price_min != null) {
+    const min = Number(args.price_min);
+    query = query.or(`asking_price.gte.${min},sale_price.gte.${min}`);
+  }
+  if (args.price_max != null) {
+    const max = Number(args.price_max);
+    query = query.or(`asking_price.lte.${max},sale_price.lte.${max}`);
+  }
   if (args.make) query = query.ilike("make", `%${String(args.make)}%`);
   if (args.model) query = query.ilike("model", `%${String(args.model)}%`);
   if (args.year_from != null) query = query.gte("year", Number(args.year_from));
