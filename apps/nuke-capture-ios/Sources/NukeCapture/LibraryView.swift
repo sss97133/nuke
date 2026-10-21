@@ -6,6 +6,7 @@
 //   • data source + image requests + caching → LibraryStore.swift
 //   • glasses (classification / badges / personal) → LibraryGlasses.swift
 //   • fullscreen pager + zoom → LibraryDetail.swift
+//   • vehicle tag per photo (attached / suggested) → Library/LibraryVehicleTags.swift
 //   • THIS file → the grid screen + its cell, nothing else.
 
 import Photos
@@ -149,6 +150,7 @@ struct LibraryView: View {
         }
         .sheet(isPresented: $showDays) { LibraryDaysView() }   // the local-first day receipt
         .sheet(isPresented: $showAlbums) { LibraryAlbumsView() }
+        .task { await LibraryVehicleTagStore.shared.refreshIfStale() }
     }
 
     private func applyVerdict(approved: Bool) {
@@ -408,6 +410,7 @@ struct LibraryCell: View {
     var isSelected: Bool = false
     var localOnly: Bool = false
     @ObservedObject private var overlay = LibraryOverlayStore.shared
+    @ObservedObject private var vehicleTags = LibraryVehicleTagStore.shared
     @StateObject private var loader = LibraryThumbLoader()
     @State private var localID: String?
     @AppStorage("personalMode.v2") private var personalMode = PersonalMode.blur
@@ -420,6 +423,8 @@ struct LibraryCell: View {
     /// Unnecessary clutter (screenshot/doc/shopping) — the Vision gate softens it out
     /// of the way by DEFAULT (independent of the personal toggle). Owner-approve reveals.
     private var gatedJunk: Bool { localID.map { overlay.isGatedJunk($0) } ?? false }
+    /// The vehicle this photo's uploaded row is attached to, or suggested for (LibraryVehicleTags).
+    private var vehicleTag: LibraryVehicleTag? { localID.flatMap { vehicleTags.tag(for: $0) } }
 
     var body: some View {
         Color(.secondarySystemFill)
@@ -470,18 +475,22 @@ struct LibraryCell: View {
                 }
             }
             .overlay(alignment: .bottomLeading) {
-                // Vision-tag propagation, made visible (Blur has this; Nuke didn't): the
-                // label appears the instant the live classifier reads the photo; a dim dot
-                // means "not read yet". Toggle in the toolbar menu.
-                if showVisionTags && !selecting {
-                    Text(visionTag ?? "·")
-                        .font(.system(size: 8, weight: .semibold))
-                        .lineLimit(1)
-                        .padding(.horizontal, 3).padding(.vertical, 1)
-                        .background(.black.opacity(0.55), in: Capsule())
-                        .foregroundStyle(visionTag == nil ? .white.opacity(0.5) : .white)
-                        .padding(3)
+                VStack(alignment: .leading, spacing: 2) {
+                    // Vision-tag propagation, made visible (Blur has this; Nuke didn't): the
+                    // label appears the instant the live classifier reads the photo; a dim dot
+                    // means "not read yet". Toggle in the toolbar menu.
+                    if showVisionTags && !selecting {
+                        Text(visionTag ?? "·")
+                            .font(.system(size: 8, weight: .semibold))
+                            .lineLimit(1)
+                            .padding(.horizontal, 3).padding(.vertical, 1)
+                            .background(.black.opacity(0.55), in: Capsule())
+                            .foregroundStyle(visionTag == nil ? .white.opacity(0.5) : .white)
+                    }
+                    if let vehicleTag { LibraryVehicleTagChip(tag: vehicleTag) }
                 }
+                .padding(3)
+                .padding(.trailing, 14)
             }
             .clipped()
             .contentShape(Rectangle())

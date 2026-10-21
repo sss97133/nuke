@@ -53,7 +53,15 @@ struct LibraryDetailView: View {
                 }
             }
             .padding()
+
+            VStack {
+                Spacer()
+                LibraryVehicleTagBar(localIdentifier: LibraryStore.shared.asset(at: index)?.localIdentifier)
+                    .padding(.horizontal)
+                    .padding(.bottom, 24)
+            }
         }
+        .task { await LibraryVehicleTagStore.shared.refreshIfStale() }
         .sheet(isPresented: $showInfo) {
             if let asset = LibraryStore.shared.asset(at: index) {
                 LibraryInfoView(asset: asset, localOnly: localOnly)
