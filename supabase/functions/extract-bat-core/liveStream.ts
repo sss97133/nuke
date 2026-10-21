@@ -240,19 +240,32 @@ export function batStreamIO(url: string, key: string): BatStreamIO {
   };
   type Admission = { frames: BatLiveFrame[]; heartbeats: unknown[]; resolve: () => void; reject: (error: unknown) => void };
   const admissions: Admission[] = [];
-  let admissionScheduled = false, admissionSending = false, combineAdmissions = true;
+  let admissionScheduled = false, framesSending = false, coverageSending = false, combineAdmissions = true;
   const scheduleAdmission = () => {
-    if (admissionScheduled || admissionSending || !admissions.length) return;
+    if (admissionScheduled || !admissions.length) return;
     admissionScheduled = true;
     queueMicrotask(async () => {
       admissionScheduled = false;
-      admissionSending = true;
       const group: Admission[] = [], frames: BatLiveFrame[] = [], heartbeats: unknown[] = [];
-      while (admissions.length && (combineAdmissions || !group.length) && frames.length + admissions[0].frames.length <= 50
-        && heartbeats.length + admissions[0].heartbeats.length <= 200) {
-        const item = admissions.shift()!;
+      let framesBlocked = false, coverageBlocked = false;
+      for (let i = 0; i < admissions.length;) {
+        const item = admissions[i];
+        if ((item.frames.length > 0 && (framesSending || framesBlocked || frames.length + item.frames.length > 50))
+          || (item.heartbeats.length > 0 && (coverageSending || coverageBlocked || heartbeats.length + item.heartbeats.length > 200))) {
+          framesBlocked ||= item.frames.length > 0;
+          coverageBlocked ||= item.heartbeats.length > 0;
+          i++; continue;
+        }
+        admissions.splice(i, 1);
         group.push(item); frames.push(...item.frames); heartbeats.push(...item.heartbeats);
+        if (!combineAdmissions) break;
       }
+      if (!group.length) return;
+      if (frames.length) framesSending = true;
+      if (heartbeats.length) coverageSending = true;
+      // Preserve the original independent in-flight lanes. A request already
+      // waiting on coverage cannot hold later captured frames, or vice versa.
+      scheduleAdmission();
       try {
         // Capture and coverage queued in the same turn share the existing
         // atomic RPC and acknowledgement, instead of competing HTTP requests.
@@ -269,12 +282,17 @@ export function batStreamIO(url: string, key: string): BatStreamIO {
           && /^live_intake_http_(200|400|409|422|500)$/.test(error.message)) combineAdmissions = false;
         for (const item of group) item.reject(error);
       }
-      finally { admissionSending = false; scheduleAdmission(); }
+      finally {
+        if (frames.length) framesSending = false;
+        if (heartbeats.length) coverageSending = false;
+        scheduleAdmission();
+      }
     });
   };
   return {
     admit: async (frames, heartbeats) => {
-      if (frames.length > 50 || heartbeats.length > 200) throw new Error("invalid_bat_live_batch");
+      if ((!frames.length && !heartbeats.length) || frames.length > 50 || heartbeats.length > 200)
+        throw new Error("invalid_bat_live_batch");
       await new Promise<void>((resolve, reject) => {
         admissions.push({ frames: [...frames], heartbeats: [...heartbeats], resolve, reject });
         scheduleAdmission();

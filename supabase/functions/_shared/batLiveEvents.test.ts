@@ -464,11 +464,37 @@ Deno.test("coalescing preserves canonical ceilings and serializes overflow witho
     const io = batStreamIO("https://db.test", "test-key");
     await Promise.all([io.admit(Array(50).fill(frames[0]), []), io.admit(Array(50).fill(frames[1]), []),
       io.admit([], Array(200).fill({ monitored_auction_id: target.id }))]);
-    assert.deepEqual(bodies.map(b => [b.frames.length, b.heartbeats.length]), [[50, 0], [50, 200]]);
+    assert.deepEqual(bodies.map(b => [b.frames.length, b.heartbeats.length]), [[50, 200], [50, 0]]);
     assert.equal(peak, 1);
     await assert.rejects(() => io.admit(Array(51).fill(frames[0]), []), /invalid_bat_live_batch/);
     await assert.rejects(() => io.admit([], Array(201).fill({})), /invalid_bat_live_batch/);
+    await assert.rejects(() => io.admit([], []), /invalid_bat_live_batch/);
     assert.equal(bodies.length, 2);
+  } finally { globalThis.fetch = original; }
+});
+
+Deno.test("an already stalled request cannot hold the independent admission lane", async () => {
+  const original = globalThis.fetch;
+  try {
+    for (const firstIsCoverage of [true, false]) {
+      let release!: () => void, started!: () => void, secondAcknowledged = false;
+      const held = new Promise<Response>(resolve => { release = () => resolve(Response.json({ success: true })); });
+      const requested = new Promise<void>(resolve => { started = resolve; });
+      globalThis.fetch = async (_url, init) => {
+        const body = JSON.parse(String(init?.body));
+        if (Boolean(body.heartbeats.length) === firstIsCoverage) { started(); return await held; }
+        return Response.json({ success: true });
+      };
+      const io = batStreamIO("https://db.test", "test-key");
+      const first = firstIsCoverage ? io.admit([], [{}]) : io.admit([frames[0]], []);
+      await requested;
+      const second = (firstIsCoverage ? io.admit([frames[0]], []) : io.admit([], [{}]))
+        .then(() => { secondAcknowledged = true; });
+      try {
+        for (let i = 0; i < 50; i++) await Promise.resolve();
+        assert.equal(secondAcknowledged, true, "opposite lane acknowledges before the stalled request resolves");
+      } finally { release(); await Promise.all([first, second]); }
+    }
   } finally { globalThis.fetch = original; }
 });
 

@@ -36,7 +36,9 @@ Recovery waits in its queue during cooldown and rate-deferred reads retry only a
 availability. Frame and coverage requests queued together share one atomic admission within the
 same limits; an explicit combined semantic refusal restores independent requests so bad coverage
 cannot repeatedly block valid captured frames. Neither request receives a successful acknowledgement
-when their shared admission fails.
+when their shared admission fails. A request already in flight cannot hold the opposite lane;
+overflow preserves order within each lane and does not add admission concurrency beyond the
+existing frame and coverage producers.
 Waiting is not a successful heartbeat or
 admission. These controls reduce requests; they do not relax the three-second coverage or
 two-second admission objectives, expand capacity, or certify continuous capture.
