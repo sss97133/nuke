@@ -86,7 +86,7 @@ Deno.test("mixed collector batch reaches one canonical RPC with each lot bound t
     session_id: "00000000-0000-0000-0000-000000000010", at: "2026-10-21T19:00:00Z",
     connected: true, pending: 0, oldest_received_at: null, error: null }));
   const queue = new BatLiveBuffer(async frames => {
-    const response = await handler(new Request("https://db.test/functions/v1/ingest-observation", {
+    const response = await handler(new Request("https://db.test/functions/v1/ingest-observation?collector_run_id=00000000-0000-0000-0000-000000000010&collector_seq=1&trace_native=1", {
       method: "POST", headers: { Authorization: "Bearer test-key", "Content-Type": "application/json" },
       body: JSON.stringify({ mode: "bat_live_events_v1", frames, heartbeats }),
     }));

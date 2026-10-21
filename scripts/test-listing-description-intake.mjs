@@ -169,7 +169,7 @@ function canonicalIntake(options = {}) {
     });
     assert.equal(compiled.diagnostics?.length ?? 0, 0, `${filename.pathname} must transpile`);
     runInNewContext(compiled.outputText, {
-      exports: module.exports, module, Date, BigInt, URL, Request, Response, Headers,
+      exports: module.exports, module, Date, performance, BigInt, URL, Request, Response, Headers,
       TextEncoder, TextDecoder, Uint8Array, crypto: webcrypto, fetch: network, atob, btoa, setTimeout, clearTimeout, AbortSignal,
       console: { log() {}, warn() {}, error: (...args) => errors.push(args) },
       Deno: { env: { get: key => env[key] }, serve: callback => {
@@ -284,7 +284,7 @@ test('explicit historical append crosses actual canonical intake with exact arch
   assert.equal(row.structured_data.source_captured_at, f.snapshot.fetched_at);
   assert.equal(row.structured_data.source_archive_ingested_at, f.snapshot.created_at);
   assert.equal(row.structured_data.source_text_field, 'listing_page_snapshots.html:batParser.extractDescription');
-  assert.equal(row.structured_data.extractor_version, 'extract-bat-core:4.5.5');
+  assert.equal(row.structured_data.extractor_version, 'extract-bat-core:4.5.6');
   assert.equal(row.structured_data.source_event_time_status, 'unknown');
   assert.equal(row.raw_source_ref, `listing_page_snapshots:${f.snapshot.id}`);
   assert.equal(row.source_identifier, row.raw_source_ref);

@@ -36,7 +36,7 @@ import { BAT_LIVE_MODE } from "../_shared/batLiveEvents.ts";
 import { RETAINED_VIN_MODE, RETAINED_VIN_METHOD, retainedVinSelector,
   qualifyRetainedVinReference } from "./retainedVinReference.ts";
 import { RETAINED_VIN_BATCH_MODE, ingestRetainedVinBatch } from "./retainedVinBatch.ts";
-import { ingestBatLive } from "./batLive.ts";
+import { ingestBatLive, type BatLiveDiagnostics } from "./batLive.ts";
 import { RETAINED_REPORTED_WORK_MODE, retainedReportedWorkSelector, deriveRetainedReportedWork } from "./retainedReportedWork.ts";
 import { RETAINED_PROPERTY_KEYS, RETAINED_PROPERTY_MODES, RETAINED_INTERIOR_METHOD, retainedInteriorSelector, deriveRetainedInterior } from "./retainedInterior.ts";
 import { RETAINED_LISTING_DRAIN_MODE, drainRetainedListingProperties, RetainedBatchLookups } from "./retainedListingDrain.ts";
@@ -263,6 +263,7 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
   }
 
   let retainedListingBudget = false, retainedSaleBudget = false, historicalAskBudget = false;
+  let nativeDiagnostics: BatLiveDiagnostics | undefined;
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL") ?? "",
     projectSecretKey() ?? "",
@@ -279,10 +280,19 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
             if (target.origin !== new URL(Deno.env.get("SUPABASE_URL") ?? "").origin ||
               !allowed.test(target.pathname)) throw new Error("Unexpected retained source SDK target");
           }
-          return fetch(supabaseUrl, retainedListingBudget || retainedSaleBudget || historicalAskBudget ? {
+          const send = () => fetch(supabaseUrl, retainedListingBudget || retainedSaleBudget || historicalAskBudget ? {
             ...init, signal: AbortSignal.any([req.signal, AbortSignal.timeout(retainedSaleBudget || historicalAskBudget ? 10000 : 5000),
               ...(supplied ? [supplied] : [])]),
           } : init);
+          const trace = nativeDiagnostics;
+          if (!trace?.trace) return send();
+          trace.sdkFetches = (trace.sdkFetches ?? 0) + 1;
+          const at = performance.now();
+          return send().catch(error => {
+            if (error instanceof Error && error.name === "RateLimitError")
+              trace.sdkRuntimeLimits = (trace.sdkRuntimeLimits ?? 0) + 1;
+            throw error;
+          }).finally(() => { trace.sdkFetchMs = (trace.sdkFetchMs ?? 0) + performance.now() - at; });
         },
       },
     }
@@ -403,6 +413,7 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
       return ingestRetainedVinBatch(req, input as unknown as Record<string, unknown>, handleObservation);
     }
     if (input.mode === BAT_LIVE_MODE) {
+      const authStarted = performance.now();
       const denied = await requireWriteAuth(req);
       if (denied) return denied;
       const writer = await authenticateWriter(req);
@@ -410,7 +421,14 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
         return new Response(JSON.stringify({ error: "Live source admission requires service role" }),
           { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
-      return new Response(JSON.stringify(await ingestBatLive(supabase, input)),
+      // Diagnostic labels confer no authority and never enter source testimony.
+      const labels = new URL(req.url).searchParams, runId = labels.get("collector_run_id");
+      if (labels.get("trace_native") === "1" && /^[0-9a-f-]{36}$/i.test(runId ?? "")) {
+        nativeDiagnostics = { trace: true, collectorRunId: runId!,
+          sequence: /^\d{1,5}$/.test(labels.get("collector_seq") ?? "") ? Number(labels.get("collector_seq")) : undefined,
+          authMs: Math.round((performance.now() - authStarted) * 100) / 100 };
+      }
+      return new Response(JSON.stringify(await ingestBatLive(supabase, input, nativeDiagnostics)),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
     if (input.mode === RETAINED_IDENTITY_MODE) {

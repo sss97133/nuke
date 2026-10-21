@@ -421,6 +421,17 @@ unattempted recovery queued during cooldown, paces starts and coalesces frame/co
 within the existing limits. Shared failure acknowledges neither caller; an explicit semantic
 refusal restores independent requests. This follow-up still requires its own deployment and
 live verification; the first deployment did not establish continuous capture or fleet gain.
+PR #2452 deployed extractor 4.5.5 (platform 192) at 19:40 UTC. All twelve subsequent
+health samples also failed: 0–10 covered of 26–27 currently eligible subscriptions. These are
+current subscription snapshots, not a continuous or fleet denominator. Endpoint-wide intake
+latency mixes other modes and cannot locate the native stage responsible for the gap.
+The next bounded diagnostic extends the existing collector and intake: a control-plane run UUID
+joins start/end records to native request labels, and at most twelve sampled intake records per
+worker separate authentication, monitor/source/parent reads, preparation and canonical RPC time.
+Transport counters describe attempts, backoff and acknowledgement processing, not unique testimony
+or usable coverage. Missing end/timing records remain unknown. No source bodies, prices, headers
+or credentials are logged. Deployment and a six-start/full-lifetime trace remain pending; diagnostic
+delivery alone cannot close the capture-integrity assay.
 The retained sold gold case still lacks parser/parent attestations; repairing transport does
 not manufacture them or establish fleet-wide supported-answer gain.
 

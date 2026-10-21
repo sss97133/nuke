@@ -59,7 +59,7 @@ import { retainFetchedCapture, type CaptureAcknowledgement } from "../_shared/ar
 declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void };
 
 // Extractor versioning - update on each significant change
-const EXTRACTOR_VERSION = 'extract-bat-core:4.5.5';
+const EXTRACTOR_VERSION = 'extract-bat-core:4.5.6';
 
 // Shared column list for the four vehicle-existence lookups below
 // (discovery_url / bat_auction_url / listing_url / update-existing-vehicle
@@ -1134,8 +1134,10 @@ async function tryUpsertMileageTimelineEvent(args: {
 }
 
 Deno.serve(async (req) => {
+  const nativeRequestStartedAt = new Date().toISOString(), nativeAuthStarted = performance.now();
   // Writes are never anonymous: service key, signed-in user, or nothing (P0.2, 2026-09-27).
   const denied = await requireWriteAuth(req);
+  const nativeFirstAuthMs = performance.now() - nativeAuthStarted;
   if (denied) return denied;
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -1154,7 +1156,9 @@ Deno.serve(async (req) => {
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
     if (body?.mode === "live_stream") {
+      const roleStarted = performance.now();
       const writer = await authenticateWriter(req);
+      const authMs = nativeFirstAuthMs + performance.now() - roleStarted;
       if (!writer.ok || writer.caller.kind !== "service_role") {
         return new Response(JSON.stringify({ error: "Live collection requires service role" }),
           { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -1162,9 +1166,12 @@ Deno.serve(async (req) => {
       if (Object.keys(body).some(k => !["mode", "dry_run"].includes(k))
         || (body.dry_run !== undefined && typeof body.dry_run !== "boolean")) throw new Error("Invalid live stream selectors");
       const db = createClient(supabaseUrl, serviceRoleKey, { global: { headers: { "X-Nuke-Writer": "extract-bat-core" } } });
+      const selectionStarted = performance.now();
       const targets = await closingBatTargets(db);
+      const selectionMs = performance.now() - selectionStarted;
       if (body.dry_run !== true && targets.length) {
-        EdgeRuntime.waitUntil(collectBatLive(targets, batStreamIO(supabaseUrl, serviceRoleKey)));
+        EdgeRuntime.waitUntil(collectBatLive(targets, batStreamIO(supabaseUrl, serviceRoleKey,
+          { requestAt: nativeRequestStartedAt, authMs, selectionMs })));
       }
       return new Response(JSON.stringify({ success: true, mode: body.mode, dry_run: body.dry_run === true,
         selected_lots: targets.length, collector_duration_seconds: 115, model_calls: 0,
@@ -2511,7 +2518,8 @@ Deno.serve(async (req) => {
                 const results = await Promise.allSettled(
                   batch.map(async (ins) => {
                     try {
-                      const resp = await fetch(ins.image_url, {
+                      // Binary image bytes for hashing; archiveFetch returns page text.
+                      const resp = await fetch(ins.image_url, { // guardrail-allow: raw-fetch (binary image)
                         signal: AbortSignal.timeout(8000),
                         headers: { "Accept": "image/*" },
                       });

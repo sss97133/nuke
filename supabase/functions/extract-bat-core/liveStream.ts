@@ -38,12 +38,15 @@ export interface BatStreamIO {
   admit(frames: BatLiveFrame[], heartbeats: unknown[]): Promise<void>;
   missed(target: BatLiveTarget): Promise<any>;
   recoveryReadyAt?(): number;
+  started?(id: string, targets: number): void;
+  finished?(state: { pendingFrames: number; queuedRecoveryAtShutdown: number; recoveryReportedErrors: number }): void;
   socket?: (url: string) => WebSocket;
 }
 
 export async function collectBatLive(targets: BatLiveTarget[], io: BatStreamIO, durationMs = 115000) {
   if (!targets.length) return;
   const sessionId = crypto.randomUUID();
+  io.started?.(sessionId, targets.length);
   const channels = new Map<string, BatLiveTarget>();
   const acknowledged = new Set<string>();
   for (const target of targets) for (const type of ["single", "stats", "list"]) channels.set(`post;${type};${target.post_id}`, target);
@@ -191,45 +194,65 @@ export async function collectBatLive(targets: BatLiveTarget[], io: BatStreamIO, 
     }
   } finally {
     stopped = true;
+    const queuedRecoveryAtShutdown = recoveryQueue.size;
     recoveryQueue.clear();
-    currentSocket()?.close();
-    await Promise.allSettled([...tasks]);
-    if (heartbeatTask) await heartbeatTask;
-    if (admissionTask) await admissionTask;
-    try { await buffer.flush(); }
-    finally {
-      // Leave the other overlapping worker's session intact, even when this
-      // worker ends with a rejected lot still waiting for admission.
-      await io.admit([], targets.map(t => {
-        const status = buffer.statusFor(t.id);
-        return { monitored_auction_id: t.id, session_id: sessionId, at: new Date().toISOString(),
-          connected: false, pending: status.pending, oldest_received_at: status.oldestReceivedAt,
-          error: recoveryErrors.get(t.id) || status.error || lastError };
-      }));
+    try {
+      currentSocket()?.close();
+      await Promise.allSettled([...tasks]);
+      if (heartbeatTask) await heartbeatTask;
+      if (admissionTask) await admissionTask;
+      try { await buffer.flush(); }
+      finally {
+        // Leave the other overlapping worker's session intact, even when this
+        // worker ends with a rejected lot still waiting for admission.
+        await io.admit([], targets.map(t => {
+          const status = buffer.statusFor(t.id);
+          return { monitored_auction_id: t.id, session_id: sessionId, at: new Date().toISOString(),
+            connected: false, pending: status.pending, oldest_received_at: status.oldestReceivedAt,
+            error: recoveryErrors.get(t.id) || status.error || lastError };
+        }));
+      }
+    } finally {
+      io.finished?.({ pendingFrames: buffer.pending, queuedRecoveryAtShutdown,
+        recoveryReportedErrors: recoveryErrors.size });
     }
   }
 }
 
-export function batStreamIO(url: string, key: string): BatStreamIO {
+export function batStreamIO(url: string, key: string,
+  context: { requestAt?: string; authMs?: number; selectionMs?: number } = {},
+): BatStreamIO {
   let retryAt = 0;
+  let collectorRunId: string | undefined, nativeSequence = 0, traceIssued = 0;
+  const counts: Record<string, number> = { intake_http_attempts: 0, recovery_http_attempts: 0,
+    intake_backoff_skips: 0, recovery_backoff_skips: 0, runtime_rejections: 0, http429: 0,
+    failed_admission_groups: 0, ack_frame_attempts: 0, ack_heartbeat_attempts: 0 };
   const originRetryAt = new Map<string, number>();
   const recoveryUrl = "https://bringatrailer.com/wp-admin/admin-ajax.php";
   const request = async (url: string, options: RequestInit) => {
     const origin = new URL(url).origin;
-    if (Date.now() < Math.max(retryAt, originRetryAt.get(origin) ?? 0)) throw new Error("bat_live_transport_backoff");
+    const kind = origin === new URL(recoveryUrl).origin ? "recovery" : "intake";
+    if (Date.now() < Math.max(retryAt, originRetryAt.get(origin) ?? 0)) {
+      counts[`${kind}_backoff_skips`]++;
+      throw new Error("bat_live_transport_backoff");
+    }
+    counts[`${kind}_http_attempts`]++;
     let response: Response;
-    try { response = await fetch(url, options); }
+    // Existing JSON recovery API and canonical intake; neither is an HTML page.
+    try { response = await fetch(url, options); } // guardrail-allow: raw-fetch (JSON APIs)
     catch (error) {
       // The runtime can refuse fetch before an HTTP response exists. Honor its
       // explicit delay across recovery, admission and coverage, without retries
       // inside this transport. Unacknowledged frames stay in the existing buffer.
       if (error instanceof Error && error.name === "RateLimitError") {
+        counts.runtime_rejections++;
         const delay = /Retry after (\d+)ms\b/i.exec(error.message);
         retryAt = Date.now() + (delay ? Math.max(1000, Number(delay[1])) : 5000);
       }
       throw error;
     }
     if (response.status === 429) {
+      counts.http429++;
       const value = response.headers.get("Retry-After");
       const until = value && /^\d+(?:\.\d+)?$/.test(value) ? Date.now() + Number(value) * 1000 : Date.parse(value ?? "");
       // A source HTTP limit must not stop acknowledgement of already captured
@@ -269,12 +292,27 @@ export function batStreamIO(url: string, key: string): BatStreamIO {
       try {
         // Capture and coverage queued in the same turn share the existing
         // atomic RPC and acknowledgement, instead of competing HTTP requests.
-        const result = await request(`${url}/functions/v1/ingest-observation`, { method: "POST",
+        const endpoint = new URL(`${url}/functions/v1/ingest-observation`);
+        endpoint.searchParams.set("native_collector", "1");
+        const sequence = ++nativeSequence;
+        if (collectorRunId) {
+          endpoint.searchParams.set("collector_run_id", collectorRunId);
+          endpoint.searchParams.set("collector_seq", String(sequence));
+          // At most12 sampled intake records per worker; gateway timings retain
+          // the native-only query label for the other existing requests.
+          if (traceIssued < 12 && (sequence <= 4 || sequence % 16 === 0)) {
+            traceIssued++; endpoint.searchParams.set("trace_native", "1");
+          }
+        }
+        const result = await request(endpoint.href, { method: "POST",
           headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
           body: JSON.stringify({ mode: BAT_LIVE_MODE, frames, heartbeats }), signal: AbortSignal.timeout(10000) });
         if (!result.ok || (await result.json()).success !== true) throw new Error(`live_intake_http_${result.status}`);
+        counts.ack_frame_attempts += frames.length;
+        counts.ack_heartbeat_attempts += heartbeats.length;
         for (const item of group) item.resolve();
       } catch (error) {
+        counts.failed_admission_groups++;
         // An invalid coverage packet must not repeatedly contaminate otherwise
         // valid source admission. After an explicit combined semantic refusal,
         // later callers retain the original independent acknowledgement paths.
@@ -290,6 +328,18 @@ export function batStreamIO(url: string, key: string): BatStreamIO {
     });
   };
   return {
+    started: (id, targets) => {
+      collectorRunId = /^[0-9a-f-]{36}$/i.test(id) ? id : undefined;
+      console.info(JSON.stringify({ event: "bat_live_collector_start_v1", collector_run_id: collectorRunId,
+        at: new Date().toISOString(), request_at: context.requestAt, auth_ms: context.authMs,
+        target_selection_ms: context.selectionMs, targets }));
+    },
+    finished: state => {
+      console.info(JSON.stringify({ event: "bat_live_collector_end_v1", collector_run_id: collectorRunId,
+        at: new Date().toISOString(), transport: counts, sampled_intakes: traceIssued,
+        pending_frames: state.pendingFrames, queued_recoveries_at_shutdown: state.queuedRecoveryAtShutdown,
+        recovery_reported_errors: state.recoveryReportedErrors }));
+    },
     admit: async (frames, heartbeats) => {
       if ((!frames.length && !heartbeats.length) || frames.length > 50 || heartbeats.length > 200)
         throw new Error("invalid_bat_live_batch");
