@@ -14,6 +14,7 @@ function assert(condition: boolean, message: string): asserts condition {
 }
 
 const EXPECTED = [
+  "analyze_image",
   "find_asset",
   "find_listings",
   "get_asset",

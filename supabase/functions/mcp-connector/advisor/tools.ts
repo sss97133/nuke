@@ -93,7 +93,7 @@ export const ADVISOR_TOOLS: AdvisorToolDef[] = [
   {
     name: "get_comps",
     description:
-      "Return comparable confirmed sales (dated hammers only). Resolves subject trim/body/transmission from consensus. Excludes ask-only platforms. Dedupes by canonical URL. Supports limit up to 100 with offset paging and body/transmission/miles filters.",
+      "Return comparable market rows. Default result_type=sold (dated hammers only). Body/transmission derived from title/URL when columns are null. Filters: body, transmission, miles, mod_flag, year_min/max. Dedupes by canonical URL. limit up to 100 with offset paging.",
     inputSchema: {
       type: "object",
       properties: {
@@ -101,10 +101,21 @@ export const ADVISOR_TOOLS: AdvisorToolDef[] = [
         make: { type: "string" },
         model: { type: "string" },
         year: { type: "number" },
-        body: { type: "string", description: "cabriolet|coupe|targa|…" },
-        transmission: { type: "string", description: "manual|automatic|g50|…" },
+        year_min: { type: "number" },
+        year_max: { type: "number" },
+        body: { type: "string", description: "cabriolet|coupe|targa|cab|…" },
+        transmission: { type: "string", description: "manual|automatic|g50|915|…" },
         miles_min: { type: "number" },
         miles_max: { type: "number" },
+        mod_flag: {
+          type: "number",
+          description: "0=original/stock, 1=modified/restomod",
+        },
+        result_types: {
+          type: "array",
+          items: { type: "string", enum: ["sold", "no_sale_high_bid", "ask"] },
+          description: "Default [sold]. Asks never appear as sale_price.",
+        },
         limit: { type: "number", description: "Max comps (1-100, default 10)" },
         offset: { type: "number", description: "Paging offset" },
       },
@@ -176,13 +187,34 @@ export const ADVISOR_TOOLS: AdvisorToolDef[] = [
       title: "Evaluate Listing",
     },
   },
+  {
+    name: "analyze_image",
+    description:
+      "Run vision analysis on a listing photo URL or on photos attached to an asset_id (condition, damage, modifications). Ephemeral — does not write observations. Prefer evaluate_listing for a full listing URL.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        image_url: { type: "string", description: "Direct image URL" },
+        asset_id: { type: "string", description: "Optional vehicle UUID to pull recent photos" },
+        limit: { type: "number", description: "Max photos when using asset_id (1-8)" },
+      },
+      required: [],
+    },
+    outputSchema: OUT,
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      openWorldHint: true,
+      title: "Analyze Image",
+    },
+  },
 ];
 
 export const ADVISOR_TOOL_NAMES = new Set(ADVISOR_TOOLS.map((t) => t.name));
 
 export const ADVISOR_SERVER_INFO = {
   name: "nuke-asset-advisor",
-  version: "1.2.0",
+  version: "1.3.0",
   title: "Nuke Asset Advisor",
 };
 
@@ -190,8 +222,10 @@ export const ADVISOR_INSTRUCTIONS =
   "Nuke Asset Advisor is a read-only, citation-first ledger for collector vehicles. " +
   "Prefer evaluate_listing for any listing URL. Use find_listings for active asks. " +
   "Use find_asset → get_asset / get_comps / get_history / value_asset for known VINs or asset ids. " +
+  "Use analyze_image to read listing photos. " +
   "Never invent missing values — report 'not recorded'. Every number must cite source_url and event_time when present. " +
-  "Asking prices are not sales. Soft-deleted and merged vehicles are excluded; merges are followed to the survivor. " +
+  "Asking prices are not sales (result_type separates sold / no_sale_high_bid / ask). " +
+  "Soft-deleted and merged vehicles are excluded; merges are followed to the survivor. " +
   "Spec fields come from vehicle_field_consensus (then canonical columns, then observations) with observation citations — confidence is never hard-coded. " +
   "Confidence on estimates is capped at 0.6 until a published sale backtest justifies more. " +
   "This surface has no write, admin, shop, SQL, or legacy catalog tools.";

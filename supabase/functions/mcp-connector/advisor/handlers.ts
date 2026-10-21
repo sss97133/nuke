@@ -25,14 +25,18 @@ import {
 import {
   bodyBucket,
   canonicalListingUrl,
+  classifyCompResultType,
   cleanListingUrl,
   deriveSpecFromText,
+  detectModFlag,
   detectVariant,
+  implausibleSoldDate,
   isLikelyPartsSale,
   isVariantMismatch,
   recentSaleSanityGuard,
   scoreSimilarity,
   transBucket,
+  type CompResultType,
   type VariantKey,
 } from "./variants.ts";
 
@@ -176,7 +180,6 @@ export function createAdvisorHandlers(deps: AdvisorDeps): Record<
   string,
   (args: Record<string, unknown>) => Promise<AdvisorToolResult>
 > {
-  // Catalog tools (find_listings + get_history enabled for deal-finding / history).
   return {
     find_asset: (args) => handleFindAsset(deps, args),
     find_listings: (args) => handleFindListings(deps, args),
@@ -185,6 +188,7 @@ export function createAdvisorHandlers(deps: AdvisorDeps): Record<
     get_history: (args) => handleGetHistory(deps, args),
     value_asset: (args) => handleValueAsset(deps, args),
     evaluate_listing: (args) => handleEvaluateListing(deps, args),
+    analyze_image: (args) => handleAnalyzeImage(deps, args),
   };
 }
 
@@ -280,7 +284,9 @@ type SoldComp = {
   transmission: unknown;
   body_style: unknown;
   similarity_score: unknown;
-  price_kind: "sold";
+  price_kind: "sold" | "ask" | "bid";
+  result_type: CompResultType;
+  mod_flag: 0 | 1 | null;
   sold_basis: string | null;
   variant: VariantKey;
   flags: string[];
@@ -294,16 +300,24 @@ async function resolveSoldComps(
     make?: string | null;
     model?: string | null;
     year?: number | null;
+    year_min?: number | null;
+    year_max?: number | null;
     limit?: number;
     offset?: number;
     body?: string | null;
     transmission?: string | null;
     miles_min?: number | null;
     miles_max?: number | null;
+    mod_flag?: 0 | 1 | null;
+    /** Default: sold only. Pass ask / no_sale_high_bid to include those classes. */
+    result_types?: CompResultType[];
   },
 ): Promise<{ comps: SoldComp[]; query: Record<string, unknown>; excluded: Record<string, number> }> {
   const limit = Math.min(Math.max(Number(args.limit) || 10, 1), 100);
   const offset = Math.max(Number(args.offset) || 0, 0);
+  const wantedTypes = new Set<CompResultType>(
+    args.result_types?.length ? args.result_types : ["sold"],
+  );
   const sb = deps.sb();
   let make = args.make ?? null;
   let model = args.model ?? null;
@@ -367,12 +381,14 @@ async function resolveSoldComps(
   );
 
   const yearRange = 2;
-  const fetchLimit = Math.min(Math.max(limit + offset, limit) * 4, 200);
+  const yearMin = args.year_min ?? (year != null ? year - yearRange : null);
+  const yearMax = args.year_max ?? (year != null ? year + yearRange : null);
+  const fetchLimit = Math.min(Math.max(limit + offset, limit) * 5, 250);
   const { data: rpcRows, error: rpcErr } = await sb.rpc("get_comps_combined", {
     p_make: make,
     p_model: model,
-    p_year_min: year != null ? year - yearRange : null,
-    p_year_max: year != null ? year + yearRange : null,
+    p_year_min: yearMin,
+    p_year_max: yearMax,
     p_min_price: null,
     p_max_price: null,
     p_exclude_vehicle_id: excludeId,
@@ -429,18 +445,22 @@ async function resolveSoldComps(
   const filterTrans = transBucket(args.transmission) || subTrans;
   const milesMin = args.miles_min != null ? Number(args.miles_min) : null;
   const milesMax = args.miles_max != null ? Number(args.miles_max) : null;
+  const filterMod = args.mod_flag === 0 || args.mod_flag === 1 ? args.mod_flag : null;
 
   const excluded: Record<string, number> = {
     not_sold: 0,
     ask_or_bid: 0,
     ask_only_platform: 0,
+    result_type_filtered: 0,
     no_sale_date: 0,
+    implausible_date: 0,
     no_amount: 0,
     hd_diesel_mismatch: 0,
     variant_mismatch: 0,
     body_mismatch: 0,
     transmission_mismatch: 0,
     mileage_mismatch: 0,
+    mod_mismatch: 0,
     duplicate: 0,
     parts: 0,
   };
@@ -460,26 +480,40 @@ async function resolveSoldComps(
       (c.listing_url as string) || (fact?.source_url as string) ||
         (enrich?.listing_url as string) || (enrich?.bat_auction_url as string) || null,
     );
-
-    if (isAskOnlyPlatform(platform, listingUrl)) {
-      excluded.ask_only_platform++;
-      continue;
-    }
+    const titleBlob = `${enrich?.listing_title || ""} ${c.model || ""} ${c.trim || enrich?.trim || ""} ${
+      listingUrl || ""
+    }`;
 
     const amount = fact?.sold_amount != null
       ? Number(fact.sold_amount)
+      : fact?.ask_amount != null
+      ? Number(fact.ask_amount)
+      : fact?.bid_amount != null
+      ? Number(fact.bid_amount)
       : c.sale_price != null
       ? Number(c.sale_price)
       : null;
     const basis = fact?.sold_basis != null ? String(fact.sold_basis) : null;
     const kind = fact?.price_kind != null ? String(fact.price_kind) : null;
 
-    // Confirmed sales only — never promote asks / bids / estimates to comps.
-    if (kind === "ask" || kind === "bid" || kind === "estimate") {
-      excluded.ask_or_bid++;
+    const resultType = classifyCompResultType({
+      platform,
+      url: listingUrl,
+      price_kind: kind,
+      event_status: fact?.outcome != null ? String(fact.outcome) : null,
+      sold_basis: basis,
+    });
+    if (!wantedTypes.has(resultType)) {
+      if (resultType === "ask" || isAskOnlyPlatform(platform, listingUrl)) {
+        excluded.ask_only_platform++;
+      } else if (resultType === "no_sale_high_bid") {
+        excluded.ask_or_bid++;
+      } else {
+        excluded.result_type_filtered++;
+      }
       continue;
     }
-    if (!basis && kind !== "sold") {
+    if (resultType === "sold" && !basis && kind !== "sold") {
       excluded.not_sold++;
       continue;
     }
@@ -493,9 +527,16 @@ async function resolveSoldComps(
       : c.sold_date
       ? String(c.sold_date)
       : null;
-    if (!soldDate) {
+    if (resultType === "sold" && !soldDate) {
       excluded.no_sale_date++;
       continue;
+    }
+    if (soldDate) {
+      const dateCheck = implausibleSoldDate(soldDate, titleBlob);
+      if (dateCheck.bad) {
+        excluded.implausible_date++;
+        continue;
+      }
     }
 
     const modelText = `${c.model || ""} ${c.trim || enrich?.trim || ""}`.toLowerCase();
@@ -513,22 +554,21 @@ async function resolveSoldComps(
       continue;
     }
 
-    const priceDateKey = `${Math.round(amount)}|${soldDate.slice(0, 10)}`;
-    if (seenPriceDate.has(priceDateKey)) {
+    const priceDateKey = soldDate
+      ? `${Math.round(amount)}|${soldDate.slice(0, 10)}`
+      : `${Math.round(amount)}|${canon || id || ""}`;
+    if (priceDateKey && seenPriceDate.has(priceDateKey)) {
       excluded.duplicate++;
       continue;
     }
 
-    const candBlob = `${c.model || ""} ${c.trim || enrich?.trim || ""} ${
-      enrich?.listing_title || ""
-    } ${listingUrl || ""}`;
-    const candVariant = detectVariant(candBlob);
+    const candVariant = detectVariant(titleBlob);
     if (isVariantMismatch(subjectVariant, candVariant)) {
       excluded.variant_mismatch++;
       continue;
     }
 
-    const derived = deriveSpecFromText(candBlob);
+    const derived = deriveSpecFromText(titleBlob);
     const candBody = bodyBucket(
       (c.body_style as string) || (enrich?.body_style as string) ||
         (enrich?.canonical_body_style as string) || derived.body_style,
@@ -542,6 +582,7 @@ async function resolveSoldComps(
       : typeof enrich?.mileage === "number"
       ? enrich.mileage as number
       : null;
+    const candMod = detectModFlag(titleBlob);
 
     if (filterBody && candBody && filterBody !== candBody) {
       excluded.body_mismatch++;
@@ -559,9 +600,13 @@ async function resolveSoldComps(
       excluded.mileage_mismatch++;
       continue;
     }
+    if (filterMod != null && candMod != null && candMod !== filterMod) {
+      excluded.mod_mismatch++;
+      continue;
+    }
 
     const parts = isLikelyPartsSale({
-      title: String(c.model || enrich?.listing_title || ""),
+      title: String(enrich?.listing_title || c.model || ""),
       url: listingUrl,
       model: String(c.model || ""),
       sale_price: amount,
@@ -573,9 +618,10 @@ async function resolveSoldComps(
       flags.push(`parts_suspect:${parts.reason}`);
       continue;
     }
+    if (candMod === 1) flags.push("mod_flag:1");
 
     if (canon) seenUrl.add(canon);
-    seenPriceDate.add(priceDateKey);
+    if (priceDateKey) seenPriceDate.add(priceDateKey);
 
     const cit = emptyCitation({
       source_name: platform || null,
@@ -612,7 +658,7 @@ async function resolveSoldComps(
       make: c.make,
       model: c.model,
       trim: c.trim ?? enrich?.trim ?? null,
-      sale_price: amount,
+      sale_price: resultType === "sold" ? amount : amount,
       mileage: candMiles ?? c.mileage,
       sold_date: soldDate,
       listing_url: listingUrl,
@@ -620,7 +666,9 @@ async function resolveSoldComps(
       transmission: candTrans,
       body_style: candBody,
       similarity_score: score,
-      price_kind: "sold",
+      price_kind: resultType === "sold" ? "sold" : resultType === "ask" ? "ask" : "bid",
+      result_type: resultType,
+      mod_flag: candMod,
       sold_basis: basis,
       variant: candVariant,
       flags,
@@ -635,6 +683,8 @@ async function resolveSoldComps(
       make,
       model,
       year,
+      year_min: yearMin,
+      year_max: yearMax,
       limit,
       offset,
       year_range: yearRange,
@@ -645,8 +695,10 @@ async function resolveSoldComps(
       subject_mileage: subMiles,
       filter_body: filterBody,
       filter_transmission: filterTrans,
+      filter_mod_flag: filterMod,
       miles_min: milesMin,
       miles_max: milesMax,
+      result_types: [...wantedTypes],
     },
     excluded,
   };
@@ -1925,17 +1977,34 @@ async function handleGetComps(
     if (live.resolved_id) assetId = live.resolved_id;
   }
 
+  const resultTypesRaw = Array.isArray(args.result_types)
+    ? args.result_types.map(String)
+    : typeof args.result_type === "string"
+    ? [String(args.result_type)]
+    : ["sold"];
+  const resultTypes = resultTypesRaw.filter((t): t is CompResultType =>
+    t === "sold" || t === "no_sale_high_bid" || t === "ask"
+  );
+
   const { comps, query, excluded } = await resolveSoldComps(deps, {
     asset_id: assetId,
     make,
     model,
     year,
+    year_min: args.year_min != null ? Number(args.year_min) : null,
+    year_max: args.year_max != null ? Number(args.year_max) : null,
     limit,
     offset,
     body: typeof args.body === "string" ? args.body : null,
     transmission: typeof args.transmission === "string" ? args.transmission : null,
     miles_min: args.miles_min != null ? Number(args.miles_min) : null,
     miles_max: args.miles_max != null ? Number(args.miles_max) : null,
+    mod_flag: args.mod_flag === 0 || args.mod_flag === 1
+      ? args.mod_flag as 0 | 1
+      : args.mod_flag === "0" || args.mod_flag === "1"
+      ? Number(args.mod_flag) as 0 | 1
+      : null,
+    result_types: resultTypes.length ? resultTypes : ["sold"],
   });
 
   if (!make && !assetId) {
@@ -1944,8 +2013,13 @@ async function handleGetComps(
 
   const claims: Claim[] = [];
   const out = comps.map((c, i) => {
+    const priceField = c.result_type === "sold"
+      ? "sale_price"
+      : c.result_type === "ask"
+      ? "asking_price"
+      : "high_bid";
     claims.push(
-      recordedClaim(`comp.${i}.sale_price`, c.sale_price, {
+      recordedClaim(`comp.${i}.${priceField}`, c.sale_price, {
         confidence: null,
         confidence_basis: "none",
         citations: [c.citation],
@@ -1953,8 +2027,11 @@ async function handleGetComps(
           c.year,
           c.make,
           c.model,
-          c.sold_date ? `sold ${c.sold_date}` : "sold_date not recorded",
-          `price_kind=sold`,
+          c.sold_date ? `event ${c.sold_date}` : "event_time not recorded",
+          `result_type=${c.result_type}`,
+          c.body_style ? `body=${c.body_style}` : null,
+          c.transmission ? `trans=${c.transmission}` : null,
+          c.mod_flag != null ? `mod_flag=${c.mod_flag}` : null,
           c.sold_basis ? `basis=${c.sold_basis}` : null,
           c.similarity_score != null ? `similarity=${c.similarity_score}` : null,
         ]
@@ -1968,18 +2045,21 @@ async function handleGetComps(
       make: c.make,
       model: c.model,
       trim: c.trim,
-      sale_price: c.sale_price,
+      sale_price: c.result_type === "sold" ? c.sale_price : null,
+      asking_price: c.result_type === "ask" ? c.sale_price : null,
+      high_bid: c.result_type === "no_sale_high_bid" ? c.sale_price : null,
       mileage: c.mileage,
       sold_date: c.sold_date,
       listing_url: c.listing_url,
       platform: c.platform,
       transmission: c.transmission,
       body_style: c.body_style,
+      mod_flag: c.mod_flag,
       similarity_score: c.similarity_score,
       variant: c.variant,
       flags: c.flags,
-      price_kind: "sold" as const,
-      result_type: "sold" as const,
+      price_kind: c.price_kind,
+      result_type: c.result_type,
       sold_basis: c.sold_basis,
       citation: c.citation,
     };
@@ -1990,7 +2070,8 @@ async function handleGetComps(
       notRecordedClaim("comps", {
         checked_sources: ["get_comps_combined", "vehicle_price_facts"],
         note:
-          "No confirmed sold comps after requiring sale date + price, excluding ask-only platforms, asks/bids, parts suspects, and variant mismatches.",
+          "No comps after filters (dated hammers by default). Ask-only platforms never return as sale_price. " +
+          "Pass result_types to include no_sale_high_bid or ask.",
       }),
     );
   }
@@ -2003,9 +2084,9 @@ async function handleGetComps(
       query,
       excluded,
       note:
-        "Only dated hammers with a real sale price. Ask-only platforms (Craigslist, Facebook, KSL, conceptcarz, unknown) excluded. " +
-        "Subject trim/body/transmission resolved from vehicle_field_consensus when asset_id is set. URLs canonicalized for dedupe. " +
-        "limit honors up to 100 with offset paging.",
+        "Default result_type=sold requires a sale date + hammer basis. Body/transmission derived from title/URL when columns are null. " +
+        "Filters: body, transmission, miles_min/max, mod_flag, year_min/max. URLs canonicalized for dedupe. limit up to 100 with offset. " +
+        "Turbo/RS/Speedster never contaminate a base Carrera pool.",
     }),
   );
 }
@@ -2096,6 +2177,103 @@ async function handleGetCoverage(
         sources: sourceNames,
       },
       checked_sources: ["vehicles", "vehicle_events", "vehicle_observations", "vehicle_images", ...sourceNames],
+    }),
+  );
+}
+
+/** Read listing photos via api-v1-vision (YONO). Read-only; does not write observations. */
+async function handleAnalyzeImage(
+  deps: AdvisorDeps,
+  args: Record<string, unknown>,
+): Promise<AdvisorToolResult> {
+  const imageUrl = typeof args.image_url === "string" ? args.image_url.trim() : "";
+  const assetId = args.asset_id ? String(args.asset_id) : null;
+  if (!imageUrl && !assetId) {
+    return err("Provide image_url and/or asset_id", "analyze_image");
+  }
+
+  const urls: string[] = [];
+  if (imageUrl) urls.push(imageUrl);
+
+  if (assetId) {
+    const sb = deps.sb();
+    const live = await resolveLiveVehicle(sb, assetId, "id");
+    const vid = live.resolved_id || assetId;
+    const { data: imgs } = await sb
+      .from("vehicle_images")
+      .select("id, image_url, medium_url, large_url, thumbnail_url")
+      .eq("vehicle_id", vid)
+      .order("created_at", { ascending: false })
+      .limit(Math.min(Math.max(Number(args.limit) || 4, 1), 8));
+    for (const img of imgs || []) {
+      const u = img.large_url || img.medium_url || img.image_url || img.thumbnail_url;
+      if (u && !urls.includes(u)) urls.push(String(u));
+    }
+  }
+
+  if (!urls.length) {
+    return ok(
+      makeEnvelope("analyze_image", "vehicle", assetId, [
+        notRecordedClaim("images", {
+          checked_sources: ["vehicle_images", "image_url"],
+          note: "No image URLs available to analyze",
+        }),
+      ], { analyses: [], count: 0 }),
+    );
+  }
+
+  const analyses: Array<Record<string, unknown>> = [];
+  const claims: Claim[] = [];
+  for (const url of urls.slice(0, 8)) {
+    let data: Record<string, unknown> = {};
+    try {
+      data = await deps.callEdgeApi("vision", "/analyze", "POST", {
+        image_url: url,
+        asset_id: assetId,
+      }) as Record<string, unknown>;
+    } catch (e) {
+      data = { status: "error", error: e instanceof Error ? e.message : String(e) };
+    }
+    const cit = emptyCitation({
+      source_name: "nuke-vision",
+      source_url: url,
+      observation_id: null,
+      event_time: null,
+      ingested_at: new Date().toISOString(),
+      is_superseded: false,
+    });
+    const condition = data.condition_score ?? data.condition ?? null;
+    if (condition != null) {
+      claims.push(
+        recordedClaim(`image.condition_score`, condition, {
+          confidence: null,
+          confidence_basis: "none",
+          citations: [cit],
+          note: "Vision sidecar score — not a ledger observation until ingested",
+        }),
+      );
+    }
+    analyses.push({
+      image_url: url,
+      status: data.status ?? (data.error ? "error" : "ok"),
+      make: data.make ?? null,
+      condition_score: condition,
+      damage_flags: data.damage_flags ?? [],
+      modification_flags: data.modification_flags ?? [],
+      vehicle_zone: data.vehicle_zone ?? null,
+      notes: data.notes ?? [],
+      error: data.error ?? null,
+      citation: cit,
+    });
+  }
+
+  return ok(
+    makeEnvelope("analyze_image", "vehicle", assetId, claims, {
+      analyses,
+      count: analyses.length,
+      note:
+        "Vision output is ephemeral analysis for the caller. It is not written to vehicle_observations. " +
+        "Prefer evaluate_listing when you have a public listing URL (it runs vision on listing photos).",
     }),
   );
 }

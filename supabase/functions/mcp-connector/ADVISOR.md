@@ -67,17 +67,18 @@ If your client only supports stdio, use a Streamable HTTP bridge, for example:
 
 ChatGPT / Grok Bot / other agents: add a custom MCP connector pointing at `https://nuke.ag/mcp/advisor`.
 
-## Tools (7)
+## Tools (8)
 
 | Tool | Job |
 |---|---|
 | `find_asset` | Find by VIN, listing URL, or year/make/model text (live vehicles only; follows merges) |
 | `find_listings` | Active asks / live auctions with price, location, source, and staleness filters |
 | `get_asset` | Identity from `vehicle_field_consensus` → canonical → observations; price facts; deduped history |
-| `get_comps` | Dated hammers only; subject trim/body/trans from consensus; ask-site and URL dedupe |
+| `get_comps` | Dated hammers by default; body/trans derived from title/URL; filters + URL dedupe; `result_type` sold/ask/no_sale |
 | `get_history` | Deduped events + observations; ask-only platforms never get `price_role=hammer` |
 | `value_asset` | Value range from recent same-asset sale and comps (confidence capped at 0.6) |
 | `evaluate_listing` | **Hero tool** — listing URL → verdict, value range, prior sales/relists, top comps, red flags |
+| `analyze_image` | Vision on a photo URL or asset photos (ephemeral; does not write observations) |
 
 No write, admin, shop, SQL, or legacy catalog tools on this surface. Anonymous reads allowed; best-effort per-IP rate limit. Confidence on identity claims comes from consensus/observation scores — never hard-coded.
 
