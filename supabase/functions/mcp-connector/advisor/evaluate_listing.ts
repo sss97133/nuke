@@ -15,11 +15,13 @@ import { fetchListingPage, type FetchedListing } from "./listing_fetch.ts";
 import {
   canonicalListingUrl,
   cleanListingUrl,
+  bodyBucket,
   detectVariant,
   identityFromListingUrl,
   isLikelyPartsSale,
   isVariantMismatch,
   recentSaleSanityGuard,
+  transBucket,
 } from "./variants.ts";
 
 /** Minimal deps (kept local to avoid circular import with handlers.ts). */
@@ -162,25 +164,6 @@ function classifyTier(text: string, mods: string[]): "original" | "modified_or_c
 
 function subjectBlob(listing: FetchedListing): string {
   return `${listing.title || ""} ${listing.description || ""} ${listing.model || ""} ${listing.make || ""} ${listing.url || ""}`;
-}
-
-function bodyBucket(s: string | null): string | null {
-  if (!s) return null;
-  const t = s.toLowerCase();
-  if (/cabrio|convertible|cab\b/.test(t)) return "cabriolet";
-  if (/targa/.test(t)) return "targa";
-  if (/coupe|coupé/.test(t)) return "coupe";
-  return t;
-}
-
-function transBucket(s: string | null): string | null {
-  if (!s) return null;
-  const t = s.toLowerCase();
-  if (/g50/.test(t)) return "g50";
-  if (/915/.test(t)) return "915";
-  if (/tiptronic|pdk|automatic|auto\b/.test(t)) return "automatic";
-  if (/manual|5[\s-]?speed|4[\s-]?speed/.test(t)) return "manual";
-  return t;
 }
 
 function deconstructDescription(

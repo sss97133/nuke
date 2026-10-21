@@ -782,6 +782,8 @@ jobs:
           deno test --allow-read supabase/functions/mcp-connector/surface_test.ts
           deno test --allow-read supabase/functions/mcp-connector/advisor_evidence_test.ts
           deno test --allow-read supabase/functions/mcp-connector/advisor_surface_test.ts
+          deno test --allow-read supabase/functions/mcp-connector/advisor/ledger_test.ts
+          deno test --allow-read supabase/functions/mcp-connector/advisor/comps_csv_test.ts
           deno test --allow-read --allow-net supabase/functions/mcp-connector/advisor_live_e2e_test.ts
 
   vitest:

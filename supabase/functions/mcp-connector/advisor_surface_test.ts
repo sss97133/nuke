@@ -14,9 +14,12 @@ function assert(condition: boolean, message: string): asserts condition {
 }
 
 const EXPECTED = [
+  "analyze_image",
   "find_asset",
+  "find_listings",
   "get_asset",
   "get_comps",
+  "get_history",
   "value_asset",
   "evaluate_listing",
 ];
@@ -36,13 +39,12 @@ Deno.test("advisor catalog is curated read-only tools with outputSchema", () => 
   const forbidden = [
     "execute_sql",
     "submit_observation",
-    "find_listings",
-    "get_history",
     "explain_field",
     "get_coverage",
     "get_vehicle",
     "decode_vin",
     "compute_valuation",
+    "query_market_history",
   ];
   for (const name of forbidden) {
     assert(!ADVISOR_TOOL_NAMES.has(name), `${name} must not appear on advisor`);

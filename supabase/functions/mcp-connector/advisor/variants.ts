@@ -57,6 +57,125 @@ export function isVariantMismatch(subject: VariantKey, candidate: VariantKey): b
   return true;
 }
 
+/** Normalize body style from structured fields or listing/title text. Never invents. */
+export function bodyBucket(s: string | null | undefined): string | null {
+  if (!s) return null;
+  const t = String(s).toLowerCase().trim();
+  // CSV / hand labels use "cab"; listings use cabriolet/convertible.
+  if (t === "cab" || t === "cabriolet" || t === "convertible") return "cabriolet";
+  if (/cabrio|convertible|\bcab\b|cabriolet/.test(t)) return "cabriolet";
+  if (/targa/.test(t)) return "targa";
+  if (/coupe|coupé/.test(t)) return "coupe";
+  if (/speedster/.test(t)) return "speedster";
+  if (/sedan|saloon/.test(t)) return "sedan";
+  if (/wagon|estate|avant/.test(t)) return "wagon";
+  if (/suv|crossover/.test(t)) return "suv";
+  if (/roadster|spyder|spider/.test(t)) return "roadster";
+  return t || null;
+}
+
+/** 0 = original / stock; 1 = modified / restomod. Derived from title text when present. */
+export function detectModFlag(blob: string | null | undefined): 0 | 1 | null {
+  if (!blob || !String(blob).trim()) return null;
+  const t = String(blob).toLowerCase();
+  if (
+    /restomod|hot\s*rod|backdate|singer\b|gunther|outlaw|custom\s+build|widely\s+modified|heavily\s+modified|non[\s-]?original|replaced\s+engine|crate\s+engine/
+      .test(t)
+  ) {
+    return 1;
+  }
+  if (/numbers?\s*matching|original\s+engine|stock\s+engine|unmodified|factory\s+original/.test(t)) {
+    return 0;
+  }
+  return null;
+}
+
+/**
+ * Reject sold dates that contradict an auction year in the title/URL
+ * (e.g. Barrett-Jackson Scottsdale 2013 dated 2026-02-25).
+ */
+export function implausibleSoldDate(
+  soldDate: string | null | undefined,
+  blob: string | null | undefined,
+  nowMs = Date.now(),
+): { bad: boolean; reason: string | null } {
+  if (!soldDate) return { bad: true, reason: "missing_sold_date" };
+  const t = Date.parse(soldDate);
+  if (!Number.isFinite(t)) return { bad: true, reason: "unparseable_sold_date" };
+  if (t > nowMs + 86_400_000) return { bad: true, reason: "future_sold_date" };
+  const soldYear = new Date(t).getUTCFullYear();
+  const text = String(blob || "");
+  // Auction-year cues: "Scottsdale 2013", "/2013-", "2017 Barrett"
+  const years = [...text.matchAll(/\b(19|20)\d{2}\b/g)].map((m) => Number(m[0]));
+  // Prefer years that look like event years (not model years adjacent to make).
+  const eventYears = years.filter((y) => y >= 1995 && y <= new Date(nowMs).getUTCFullYear() + 1);
+  if (eventYears.length) {
+    // If every event-year cue is ≥5 years away from soldYear, treat as corrupted.
+    const close = eventYears.some((y) => Math.abs(y - soldYear) <= 1);
+    if (!close && eventYears.every((y) => Math.abs(y - soldYear) >= 5)) {
+      return { bad: true, reason: `sold_year_${soldYear}_vs_event_${eventYears.join("/")}` };
+    }
+  }
+  return { bad: false, reason: null };
+}
+
+export type CompResultType = "sold" | "no_sale_high_bid" | "ask";
+
+/** Classify a market row: never call an ask a sale. */
+export function classifyCompResultType(input: {
+  platform?: string | null;
+  url?: string | null;
+  price_kind?: string | null;
+  event_status?: string | null;
+  sold_basis?: string | null;
+}): CompResultType {
+  const platform = String(input.platform || "").toLowerCase();
+  const url = String(input.url || "");
+  const kind = String(input.price_kind || "").toLowerCase();
+  const status = String(input.event_status || "").toLowerCase();
+  if (
+    kind === "ask" ||
+    /craigslist|facebook|ksl|conceptcarz|jamesedition|classiccars|motorious|collectingcars/
+      .test(`${platform} ${url}`)
+  ) {
+    return "ask";
+  }
+  if (
+    kind === "bid" ||
+    status.includes("unsold") ||
+    status.includes("not_sold") ||
+    status === "bid_to" ||
+    status === "reserve_not_met"
+  ) {
+    return "no_sale_high_bid";
+  }
+  if (input.sold_basis || kind === "sold" || status === "sold") return "sold";
+  return "ask";
+}
+
+/** Normalize transmission from structured fields or listing/title text. Never invents. */
+export function transBucket(s: string | null | undefined): string | null {
+  if (!s) return null;
+  const t = String(s).toLowerCase();
+  if (/g50/.test(t)) return "g50";
+  if (/915/.test(t)) return "915";
+  if (/tiptronic|pdk|automatic|auto\b|dct|dsg/.test(t)) return "automatic";
+  if (/manual|5[\s-]?speed|4[\s-]?speed|6[\s-]?speed|stick/.test(t)) return "manual";
+  return t.trim() || null;
+}
+
+/** Derive body/trans from title, URL, model, and listing text when columns are null. */
+export function deriveSpecFromText(blob: string | null | undefined): {
+  body_style: string | null;
+  transmission: string | null;
+} {
+  const t = blob || "";
+  return {
+    body_style: bodyBucket(t),
+    transmission: transBucket(t),
+  };
+}
+
 /** Normalize listing URLs for dedupe (trailing slash, quotes, marketplace- prefix). */
 export function canonicalListingUrl(url: string | null | undefined): string {
   if (!url) return "";

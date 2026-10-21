@@ -160,6 +160,8 @@ reports/
 *.csv
 # ...except the K5 registry generator's inputs (docs/wiring/calc-data/reconcile_v5.py reads them)
 !docs/wiring/calc-data/inputs/*.csv
+# ...and advisor ground-truth comps fixtures
+!supabase/functions/mcp-connector/advisor/fixtures/*.csv
 
 # Agent state and logs
 .extraction-agent/
