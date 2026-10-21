@@ -243,7 +243,8 @@ export function byDetailPriority(a: Cand, b: Cand): number {
 
 /**
  * Listings landed from a search page (episode metadata.source 'ebay-browse-search', browseBulk.ts) that no getItem has read yet,
- * still open at least an hour: up to `max` vintage auctions ending soonest and up to `max` by tier. A seller-declared For Sale By
+ * still open at least an hour: up to `max` vintage auctions ending soonest and up to `max` by tier. A fixed-price listing with no
+ * end date (good 'til cancelled: 58 of the first 60 bulk landings, 2026-10-21) counts as open. A seller-declared For Sale By
  * (the bulk pass's aspect filter) decides the class; otherwise the heuristic claim the landing kept.
  */
 export async function summaryOnlyCandidates(supabase: any, max: number, now: number): Promise<Cand[]> {
@@ -251,10 +252,12 @@ export async function summaryOnlyCandidates(supabase: any, max: number, now: num
   const base = () => supabase.from("vehicle_events")
     .select("source_listing_id,item_id:metadata->>item_id,tier:metadata->>tier,ends:metadata->>listing_ends_at,opts:metadata->buying_options,loc:metadata->>location,cls:metadata->seller_class_claim->>value,fsb:metadata->page->for_sale_by->>value")
     .eq("source_platform", PLATFORM).eq("event_type", "listing").eq("metadata->>source", "ebay-browse-search").neq("event_status", "ended")
-    .not("metadata->>tier", "is", null).gt("metadata->>listing_ends_at", soon);
+    .not("metadata->>tier", "is", null);
   const [auc, tier] = await Promise.all([
-    base().contains("metadata", { buying_options: ["AUCTION"] }).order("metadata->>listing_ends_at", { ascending: true }).limit(max),
-    base().order("metadata->>tier", { ascending: true }).order("metadata->>listing_ends_at", { ascending: true }).limit(max),
+    base().contains("metadata", { buying_options: ["AUCTION"] }).gt("metadata->>listing_ends_at", soon)
+      .order("metadata->>listing_ends_at", { ascending: true }).limit(max),
+    base().or(`metadata->>listing_ends_at.is.null,metadata->>listing_ends_at.gt."${soon}"`)   // quoted: '.' and ':' are reserved in or()
+      .order("metadata->>tier", { ascending: true }).order("metadata->>listing_ends_at", { ascending: true, nullsFirst: false }).limit(max),
   ]);
   for (const r of [auc, tier]) if (r.error) throw new Error(`summary-only listings read failed: ${r.error.message}`);
   const out = new Map<string, Cand>();
