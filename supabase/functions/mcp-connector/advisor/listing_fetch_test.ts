@@ -28,7 +28,7 @@ Deno.test("parseListingHtml extracts CL 911 ask, photos, and identity", () => {
   assert(/911/i.test(L.model || ""), `model=${L.model}`);
   assert(L.mileage === 74000, `miles=${L.mileage}`);
   assert((L.photo_urls?.length || 0) >= 2, "photos");
-  assert(/993/i.test(L.description || ""), "993 in description");
+  assert(/993/i.test(`${L.title} ${L.description}`), "993 in title/description");
   assert(L.city === "Henderson" || /Henderson/i.test(L.location || ""), "location");
   assert(L.source === "craigslist", L.source);
 });

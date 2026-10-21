@@ -151,7 +151,10 @@ export function parseListingHtml(url: string, html: string, httpStatus: number):
 
   const ogDesc = html.match(/property="og:description"\s+content="([^"]+)"/i)?.[1] ||
     html.match(/name="description"\s+content="([^"]+)"/i)?.[1];
-  if (!description && ogDesc) description = decodeEntities(ogDesc);
+  if (ogDesc) {
+    const og = decodeEntities(ogDesc);
+    description = description ? `${og}\n\n${description}` : og;
+  }
 
   // Craigslist posting body — append so schema.org / og:description claims are retained
   const bodyMatch = html.match(/id="postingbody"[^>]*>([\s\S]*?)<\/section>/i) ||
