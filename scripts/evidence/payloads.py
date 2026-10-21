@@ -1,6 +1,6 @@
 """The writer contract: argument names, CHECK vocabularies and payload builders for the image-evidence writers.
 
-Source: draft.sql blocks M1a (tables and CHECKs), M1w (writers, readers) and M1p (promotion path), design v10 of
+Source: draft.sql blocks M1a (tables and CHECKs), M1w (writers, readers) and M1p (promotion path), design v11 of
 2026-10-20. Every pass builds its rows here, and checks.py validates against the same CONTRACT, so a later design
 revision that renames a field or a value is one edit in this module, or a JSON override passed as the case's
 `contract_overrides` (merged key by key; `renames` maps writer -> {old field: new field} and is applied to every row
@@ -36,6 +36,9 @@ v10: one list of payment sources, a journal entry among them and a P&L line not;
 and drops it from a fresh row, so a job never sends it; a capture time he rejected answers every instant on that day;
 a candidate stores the photo's own vehicle row (for a photo a merge moved, the row it came from), so results are
 matched by image id.
+v11: a sheet asks a question once (two rows re-asking one question are refused); a capture-time proposal may wait a
+moment on his decision for the same photo, then return already_rejected (a wait is normal); a candidate stores the
+row its photo is filed on whichever id of that truck the pass named, so candidate results stay keyed by image id.
 """
 import copy
 import datetime as dt
@@ -45,7 +48,7 @@ import re
 import common
 
 CONTRACT = {
-    'version': 'draft-v10-2026-10-20',
+    'version': 'draft-v11-2026-10-20',
     'pass_names': [
         'listing_class', 'time_offset', 'photos_join', 'photos_album', 'file_hash_twin', 'exif_neighbour',
         'day_context', 'legacy_suggestion', 'claim_import', 'jev_choice', 'paid_vision', 'combined', 'owner_review',

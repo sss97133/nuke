@@ -1,10 +1,11 @@
-"""File-mode model of the v10 readers (draft.sql M1w 2.5): vehicle_accounting_evidence and the day records it reads,
+"""File-mode model of the v11 readers (draft.sql M1w 2.5): vehicle_accounting_evidence and the day records it reads,
 computed over a payload directory instead of the store. Line keys stand in for row ids; the payload is one owner's,
 so the v5 user filter (p_user_id) is the directory itself. (v8) Reader shapes are v6's; every decision is his. (v10)
-His statements are never summed: they are listed apart under the top-level 'stated' (with the keyed payments that
-cover them; no costs band holds them); a statement needs his decision in the app, so in file mode it appears only when
-a payload carries one. A payment is dated by the one list of payment sources (a journal entry is one, a P&L line is
-not). Two or more current acquisition (or sale) claims are asked about (acquisition_conflict).
+His statements are never summed: (v11) they are listed under the top-level 'stated' {statements, undated} with no
+totals, each with whether it still counts and the keyed payments that cover it (no costs band holds them); a statement
+needs his decision in the app, so in file mode it appears only when a payload carries one. A payment is dated by the one
+list of payment sources (a journal entry is one, a P&L line is not). Two current acquisition (or sale) claims within 30
+days of each other are asked about (acquisition_conflict).
 
 It follows the SQL: identity = the vehicle plus the confirmed same_vehicle_as pairs, closed transitively (bounded);
 candidate status = the row's own decision, else (v9) rejected when his word on that photo, truck and frame role (any
@@ -308,32 +309,43 @@ def is_statement(link):
     return link.get('source_kind') == 'owner_statement' or (link.get('payment_key') or '').startswith('owner:')
 
 
-def statements(st, links, banded, claims, link_by_id):
-    """(v10, the lead's money decision) His confirmed statements, listed apart and never summed: each with the claim
-    or link it answers and the keyed payments that cover it (a payment of his matching its direction and category,
-    dated within 30 days of what it answers, or supporting the claim it answers; each payment covers its first
-    statement only). Cents are not read in file mode."""
+def statements(st, links_all, banded, claims, link_by_id, win=None):
+    """(v10, the lead's money decision; v11 shape) His confirmed statements, listed and never summed: {statements,
+    undated}, no totals. Each names the claim or link it answers (its status, whether it is current, and the day it is
+    about), whether it still counts (no longer when that row is rejected or replaced) and the keyed payments that cover
+    it (a payment of his matching its direction and category, dated within 30 days of what it answers or supporting the
+    claim it answers; each payment covers its first counting statement only). A windowed read lists the statements
+    whose day is inside the window, and the undated ones apart. Cents are not read in file mode."""
     def day(d, n):
         return (dt.date.fromisoformat(d) + dt.timedelta(days=n)).isoformat() if d else None
     claim_by_id = {c['id']: c for c in claims}
-    out, used = [], set()
-    rows = sorted((l for l in links if l.get('source_kind') == 'owner_statement' and l['status'] == 'confirmed'),
-                  key=lambda l: (st.order.get(l['id'], 0), l['id']))
-    for s in rows:
+    rows, undated, used = [], [], set()
+    for s in sorted((l for l in links_all if l.get('source_kind') == 'owner_statement' and l['status'] == 'confirmed'),
+                    key=lambda l: (st.order.get(l['id'], 0), l['id'])):
         ans = sorted((e for e in s.get('evidence') or [] if isinstance(e, dict) and e.get('kind') in ('claim', 'link')),
                      key=lambda e: e['kind'])
         kind, tid = (ans[0]['kind'], ans[0].get('id')) if ans else (None, None)
-        target = claim_by_id.get(tid) if kind == 'claim' else link_by_id.get(tid)
-        if kind == 'claim' and target:
-            lo, hi = day(target.get('occurred_from') or target.get('occurred_to'), -30), \
-                day(target.get('occurred_to') or target.get('occurred_from'), 30)
+        target = (claim_by_id.get(tid) if kind == 'claim' else link_by_id.get(tid)) or {}
+        if kind == 'claim':
+            on = s.get('occurred_on') or target.get('occurred_to') or target.get('occurred_from')
+            lo = day(target.get('occurred_from') or target.get('occurred_to'), -30)
+            hi = day(target.get('occurred_to') or target.get('occurred_from'), 30)
         else:
-            on = s.get('occurred_on') or (target or {}).get('occurred_on') or (target or {}).get('transaction_on')
+            on = s.get('occurred_on') or target.get('occurred_on') or target.get('transaction_on')
             lo, hi = day(on, -30), day(on, 30)
-        backing = {link_by_id[x['id']].get('payment_key') for x in (target or {}).get('support') or []
+        answers = {'kind': kind, 'id': tid, 'status': target.get('status'), 'current': True}   # file lines are current
+        if win and on is None:
+            undated.append({'link_id': s['id'], 'payment_key': s.get('payment_key'), 'direction': s.get('direction'),
+                            'cents': None, 'payer': s.get('payer') or 'unknown', 'payee': s.get('payee') or 'unknown',
+                            'answers': answers})
+            continue
+        if win and not win[0] <= on <= win[1]:
+            continue
+        counts = answers['status'] != 'rejected'
+        backing = {link_by_id[x['id']].get('payment_key') for x in target.get('support') or []
                    if kind == 'claim' and x['kind'] == 'evidence_link' and x['stance'] == 'supports' and x['id'] in link_by_id}
         cover = []
-        for b in banded:
+        for b in banded if counts else []:
             way = (b['is_out'] and not b['is_in']) if s.get('direction') == 'out' else \
                 (b['is_in'] and not b['is_out']) if s.get('direction') == 'in' else False
             if b['b'] == 'rejected' or not way or b['payment_key'] in used or \
@@ -342,19 +354,17 @@ def statements(st, links, banded, claims, link_by_id):
             if (lo and hi and b['paid_on'] and lo <= b['paid_on'] <= hi) or b['payment_key'] in backing:
                 cover.append(b['payment_key'])
         used |= set(cover)
-        out.append({'link_id': s['id'], 'payment_key': s.get('payment_key'), 'direction': s.get('direction'),
-                    'cents': None, 'category': s.get('cost_category'), 'on': s.get('occurred_on'),
-                    'payer': s.get('payer') or 'unknown', 'payee': s.get('payee') or 'unknown',
-                    'answers': {'kind': kind, 'id': tid, 'status': (target or {}).get('status'),
-                                'current': target is not None},
-                    'covered_cents': None, 'covered_by': sorted(cover)})
-    out.sort(key=lambda x: (x['on'] is None, x['on'] or '', x['link_id']))
-    return {'cents_out': 0 if not any(x['direction'] == 'out' for x in out) else None,
-            'cents_in': 0 if not any(x['direction'] == 'in' for x in out) else None, 'statements': out}
+        rows.append({'link_id': s['id'], 'payment_key': s.get('payment_key'), 'direction': s.get('direction'),
+                     'cents': None, 'category': s.get('cost_category'), 'on': s.get('occurred_on'),
+                     'payer': s.get('payer') or 'unknown', 'payee': s.get('payee') or 'unknown',
+                     'answers': dict(answers, on=on), 'counts': counts, 'covered_cents': None,
+                     'covered_by': sorted(cover)})
+    rows.sort(key=lambda x: (x['answers']['on'] is None, x['answers']['on'] or '', x['link_id']))
+    return {'statements': rows, 'undated': sorted(undated, key=lambda x: x['link_id'])}
 
 
 def accounting(files, vehicle, decisions=None, date_from=None, date_to=None, sessions=None):
-    """vehicle_accounting_evidence(vehicle, from, to, user) over payload files (v10)."""
+    """vehicle_accounting_evidence(vehicle, from, to, user) over payload files (v11)."""
     st = Store(files, decisions)
     ids = identity_set(st, vehicle)
     win = (date_from or '1900-01-01', date_to or '2999-12-31')
@@ -508,7 +518,7 @@ def accounting(files, vehicle, decisions=None, date_from=None, date_to=None, ses
             for l in sorted(unpaid, key=lambda l: l['source_key'])]}
     link_by_id = {l['id']: l for l in links_all}
     pay_ok = {x['payment_key']: x for x in banded}
-    stated = statements(st, links, banded, claims, link_by_id)
+    stated = statements(st, links_all, banded, claims, link_by_id, win if windowed else None)
 
     def backed(c, role, side):
         """A supporting payment of his, confirmed, with a known party; or (v7, F5; v8) his own who-paid statement,
@@ -551,11 +561,20 @@ def accounting(files, vehicle, decisions=None, date_from=None, date_to=None, ses
            for a, d in sorted(cov_open.items()) if d < newest]
     if cust['status'] != 'confirmed':
         oq.append({'q': 'custody_window', 'status': cust['status']})
-    # (v10, money F4) two or more current acquisition (or sale) claims: which one is the deal?
+    # (v10, money F4; v11) two current acquisition (or sale) claims within 30 days of each other: which is the deal?
+    def near(c, o):
+        def end(x, n):
+            d = x.get('occurred_from') or x.get('occurred_to') if n < 0 else x.get('occurred_to') or x.get('occurred_from')
+            return (dt.date.fromisoformat(d) + dt.timedelta(days=n)).isoformat() if d and n else d
+        cs, ce, os_, oe = end(c, -30), end(c, 0), end(o, -30), end(o, 0)
+        a = None if None in (os_, ce) else os_ <= ce                        # SQL's three values: an undated end is
+        b = None if None in (cs, oe) else cs <= oe                          # not known to be apart
+        return False if False in (a, b) else True
     for kind in ('acquisition', 'sale'):
-        deal = sorted(c['id'] for c in live if c['kind'] == kind and not c['_bound'])
-        if len(deal) > 1:
-            oq.append({'q': 'acquisition_conflict', 'kind': kind, 'claim_ids': deal})
+        deals = [c for c in live if c['kind'] == kind and not c['_bound']]
+        near_ids = sorted(c['id'] for c in deals if any(o['id'] != c['id'] and near(c, o) for o in deals))
+        if near_ids:
+            oq.append({'q': 'acquisition_conflict', 'kind': kind, 'claim_ids': near_ids})
     dayrec = day_records(st, ids, cust, win, sessions)
     work = [w for w in dayrec if w['own_photos'] > 0 or w['document_photos'] > 0]
     imgs = {ln['row']['image_id'] for ln in st.cands if ln['row'].get('vehicle_id') in ids}
@@ -659,8 +678,9 @@ def extract_m5(v):
                     x.get('payer'), x.get('payee')] for x in arr((v.get('money_received') or {}).get('payments'))],
         'undated_own_photos': v.get('undated_own_photos'), 'cover_to': v.get('money_sources_cover_to'),
         'payments_undated': [x.get('payment_key') for x in arr(v.get('payments_undated'))],
-        # (v10) his statements, apart and never summed: the key, the direction and the keyed payments that cover it
-        'stated': [[x.get('payment_key'), x.get('direction'), x.get('covered_by') or []]
+        # (v10/v11) his statements, listed and never summed: the key, the direction, whether it still counts and the
+        # keyed payments that cover it (ids only)
+        'stated': [[x.get('payment_key'), x.get('direction'), x.get('counts'), x.get('covered_by') or []]
                    for x in arr((v.get('stated') or {}).get('statements'))],
         'open_questions': arr(v.get('open_questions')),
         'claims': {c['id']: c for k in ('acquisition', 'sale') for c in arr(v.get(k))},

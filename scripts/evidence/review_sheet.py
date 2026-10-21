@@ -29,8 +29,10 @@ review run as {"reask_of": "review:<sheet run>#<row>"}: the writer copies that r
 question, asked place), and the sidecar keeps the frozen row; (v10) a job never sends asked_first (the writer sets it
 on a re-ask). (W3) A who-paid row never asks about a line of a payment source ((v10) a bank, card or ledger line, a
 payment event, a QB transaction or a journal entry; a P&L line is not one), keyed or not: its payer is its account's.
-(M8) A sheet lists at most 10,000 targets. (v10) Two or more current acquisition (or sale) claims on the truck
-(acquisition_conflict) are asked one row per claim: is this one the deal?
+(M8) A sheet lists at most 10,000 targets. (v10) Two current acquisition (or sale) claims on the truck
+((v11) within 30 days of each other: acquisition_conflict) are asked one row per claim: is this one the deal? (v11) A
+sheet asks a question once: one re-ask per first asking (a re-ask left off is marked asked with the one kept), and a
+fresh row a re-ask already asks is left off.
 
 Photos: one row per image. A thumbnail only for an image the phone's VisionEngine approved (vision_gate_status
 'approved'); any other image is listed by id, "review in the app". Thumbnails are local paths (the case's
@@ -316,7 +318,7 @@ def build_rows(ctx, files, read):
             [T('account_entity', ln['key']), T('account', r['account_ref'])], 'yes / no, it is <entity>')
     # (v6, AC10) a row whose stored reading a second reader, the transcript check or his objection disputed is asked
     # again
-    for old, ref, sent_ref in reask(lines):
+    for old, ref, sent_ref, first in reask(lines):
         if sent_ref:
             # (v9, W2) asked exactly as it was sent: the review run names that row (reask_of) and the writer copies
             # its frozen targets and question; the sidecar keeps them, with their ids, for the reading checks
@@ -326,15 +328,43 @@ def build_rows(ctx, files, read):
         else:
             add('asked again', old['question_text'], [{k: v for k, v in t.items() if k != 'id'} for t in old['targets']],
                 old.get('answer_hint'), old.get('asks', 'place'), question=old.get('question'), frame=old.get('frame'))
-        rows[-1]['reask_of'] = ref
-    return rows, decisions
+        rows[-1]['reask_of'], rows[-1]['asked_first'] = ref, first
+    return once(rows), decisions
+
+
+def once(rows):
+    """(v11) A sheet asks a question once (evidence_open_run refuses two rows re-asking one question): one re-ask per
+    first asking (asked_first, the question's key across sheets; kept in the sidecar, never sent: the writer sets it)
+    and per question and targets; a re-ask left off is asked by the one kept (also_reask_of: the delivery marks both
+    asked, so no later sheet asks it again). A fresh row whose question and targets a re-ask asks is left off, and two
+    fresh rows with one question and the same targets are one. Rows are numbered again."""
+    def sig(r):
+        return (r['profile']['question'], r['profile']['asks'], tuple(sorted((t['kind'], t['key']) for t in r['targets'])))
+    by, again = {}, []
+    for r in rows:
+        if not r.get('reask_of'):
+            continue
+        kept = by.get(('first', r['asked_first'])) or by.get(sig(r))
+        if kept:
+            kept.setdefault('also_reask_of', []).append(r['reask_of'])
+            continue
+        kept = dict(r)
+        by[('first', r['asked_first'])] = by[sig(r)] = kept
+        again.append(kept)
+    fresh, seen = [], set(by)
+    for r in rows:
+        if not r.get('reask_of') and sig(r) not in seen:
+            seen.add(sig(r))
+            fresh.append(r)
+    return [dict(r, row=n) for n, r in enumerate(fresh + again, 1)]
 
 
 def reask(lines):
-    """-> [(old row, {sheet, row}, 'review:<sheet run>#<row>' or None)]: the disputed rows of earlier sheets that no
-    delivered sheet has asked again, whose targets still exist, once each (manifest.disputed_rows; an entry with no
-    row disputes every row its answers run answered). (v9, W2) A row of a sent db sheet is named by its review run and
-    row: the writer copies it as it was frozen."""
+    """-> [(old row, {sheet, row}, 'review:<sheet run>#<row>' or None, first asking)]: the disputed rows of earlier
+    sheets that no delivered sheet has asked again, whose targets still exist, once each (manifest.disputed_rows; an
+    entry with no row disputes every row its answers run answered). (v9, W2) A row of a sent db sheet is named by its
+    review run and row: the writer copies it as it was frozen. (v10/v11) The first asking is the old row's own (it was
+    a re-ask), else that row: the key of the question across sheets."""
     import manifest
     import record_answers
     out, seen = [], manifest.reasked_rows()
@@ -357,8 +387,9 @@ def reask(lines):
             old = next((r for r in side.get('rows') or [] if r['row'] == n), None)
             if old and all(t['kind'] in KEY_KINDS + ('image',) or t['key'] in lines for t in old['targets']):
                 sent = side.get('sheet_run') and (side.get('delivery') or {}).get('message_ref')
-                out.append((old, {'sheet': e['sheet'], 'row': n},
-                            'review:%s#%d' % (side['sheet_run'], n) if sent else None))
+                ref = 'review:%s#%d' % (side['sheet_run'], n) if sent else None
+                out.append((old, {'sheet': e['sheet'], 'row': n}, ref,
+                            old.get('asked_first') or ref or '%s#%d' % (e['sheet'], n)))
     return out
 
 

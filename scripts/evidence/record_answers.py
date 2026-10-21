@@ -153,10 +153,11 @@ def delivered(a, ctx):
     if first and sheet.get('sheet_run'):
         review_sheet.append_index({'event': 'delivered', 'sheet_run': sheet['sheet_run'], 'delivered_ref': ref})
     if first:
-        # (v6, AC10) the disputed rows this sheet asks again are asked: later sheets leave them off
+        # (v6, AC10) the disputed rows this sheet asks again are asked: later sheets leave them off; (v11) so are the
+        # re-asks of the same question a row stands for (a sheet asks a question once)
         for r in sheet['rows']:
-            if r.get('reask_of'):
-                manifest.mark_disputed(dict(r['reask_of'], event='reasked', on_sheet=os.path.abspath(a.sheet),
+            for asked in ([r['reask_of']] if r.get('reask_of') else []) + (r.get('also_reask_of') or []):
+                manifest.mark_disputed(dict(asked, event='reasked', on_sheet=os.path.abspath(a.sheet),
                                             row_now=r['row'], delivered_ref=ref))
     print('sheet %s delivered by %s (transcript %s)' % (sheet['date'], ref, sheet['delivery']['transcript']))
     return 0

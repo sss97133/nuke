@@ -19,12 +19,15 @@ kept_stronger, unchanged, owner_answer_missing, entity_is_owners_call (the next 
 so are the refusals (image_not_eligible, vehicle_not_in_scope, source_not_users, vehicle_not_found). (v9) A photo's
 'already_rejected' (a truck he said no to, or a place other than the subject he confirmed) writes nothing and leaves
 the line off the sheet; skips a writer itemizes are counted once. (v10) A capture time on a day he rejected is
-'already_rejected' whatever its instant; image candidates are matched to their lines by image id (the store keeps the
-photo's own vehicle row). On a load larger than the pilot, the evidence tables are ANALYZEd between batches by the
-operator (the runner's read path runs SELECT only): unanalyzed rows slow each 500-row call from 0.2 s to 1.1 s at 10x. A claim his decision or his who-paid statement
-answers is never superseded: the line's support goes onto that claim (propose_claim_support) and is reported as
-claim_carries_owner_decision; a claim no longer current is claim_not_current. No job decides (v8): the loader never
-calls decide_evidence. Every id a writer returns goes to the manifest (common.Rest; manifest.py).
+'already_rejected' whatever its instant, and (v11) the call may first wait a moment on his decision for the same
+photo (the writer takes the photo's claim lock): a wait is normal, never an error. Image candidates are matched to
+their lines by image id: (v10, v11) the store keeps the row the photo is filed on (or the row a merge moved it from),
+whichever id of that truck the pass named. On a load larger than the pilot, the evidence tables are ANALYZEd between
+batches by the operator (the runner's read path runs SELECT only): unanalyzed rows slow each 500-row call from 0.2 s
+to 1.1 s at 10x. A claim his decision or his who-paid statement answers is never superseded: the line's support goes
+onto that claim (propose_claim_support) and is reported as claim_carries_owner_decision; a claim no longer current is
+claim_not_current. No job decides (v8): the loader never calls decide_evidence. Every id a writer returns goes to the
+manifest (common.Rest; manifest.py).
 
 Usage: python3 scripts/evidence/loader.py --dir <payload dir> --case <case.json> [--mode file|db] [--user <uuid>]
 """
@@ -294,8 +297,8 @@ class Loader:
 
     def read_back_candidates(self, run_key, lines):
         """Rows the writer left unchanged return no item: read their ids back (current row, same pass). (v10, trucks
-        F2) Matched by image id: the store keeps the photo's own vehicle row (for a photo a merge moved, the row it came
-        from), not always the vehicle the pass named; the vehicle decides only between two rows of one photo."""
+        F2; v11) Matched by image id: the store keeps the row the photo is filed on (or the row a merge moved it from),
+        whichever id of that truck the pass named; the vehicle decides only between two rows of one photo."""
         pass_name = lines[0]['p_run_id'][5:]
         if pass_name not in payloads.C['pass_names']:
             raise common.EvidenceError('unknown pass %s' % pass_name)

@@ -1,4 +1,4 @@
--- Image-evidence scoreboard (PLAN section 6; DESIGN-v5 section 11; v10). Read-only; run by scoreboard.py through q.sh.
+-- Image-evidence scoreboard (PLAN section 6; DESIGN-v5 section 11; v11). Read-only; run by scoreboard.py through q.sh.
 -- Parameters: :uid (the owner, from --user; never written into the repo), :vehicle_id (the exit-test vehicle),
 -- :chunk_from / :chunk_to (taken_at chunks; idx_vehicle_images_user_taken_at), :ids (a uuid list), :window_from /
 -- :window_to (the capture window), :since (the M10b window start). Each statement follows a "-- name: <measure>"
@@ -84,8 +84,9 @@ select jsonb_build_object(
                                                 x->>'to_account_ref', x->>'payer', x->>'payee'))
                from jsonb_array_elements(v->'money_received'->'payments') x),
   'undated_own_photos', v->'undated_own_photos', 'cover_to', v->'money_sources_cover_to',
-  -- (v10) his statements apart, never summed: key, direction and the keyed payments covering each (ids, no cents)
-  'stated', (select jsonb_agg(jsonb_build_array(x->>'payment_key', x->>'direction', x->'covered_by'))
+  -- (v10/v11) his statements, listed and never summed: key, direction, whether it still counts and the keyed payments
+  -- covering it (ids, no cents)
+  'stated', (select jsonb_agg(jsonb_build_array(x->>'payment_key', x->>'direction', x->'counts', x->'covered_by'))
                from jsonb_array_elements(coalesce(v->'stated'->'statements', '[]')) x),
   'open_questions', v->'open_questions') m5
 from (select public.vehicle_accounting_evidence(:vehicle_id, NULL, NULL, :uid) v) s;

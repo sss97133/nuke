@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Offline contracts for the image-evidence runner (draft.sql v10): every pass in file mode on synthetic pilot-shaped
+"""Offline contracts for the image-evidence runner (draft.sql v11): every pass in file mode on synthetic pilot-shaped
 inputs (no real id, amount, path, model, vendor or person name), the CHECK rules, the file-mode readers and the exit
 test, the loader's batching, gates and reported outcomes, db-mode refusal and stop conditions against a fake
 PostgREST, the manifest of returned ids and its M10b reconciliation, review rows that ask one question in one
@@ -689,22 +689,23 @@ class Readers(SyntheticCase):
                          (True, False, True, False))
 
     def test_statements_are_listed_apart_and_never_summed(self):
-        """(v10, the lead's money decision) his confirmed statement is never a payment of the bands: it is listed
-        under 'stated' with the row it answers and the keyed payments that cover it (each covers its first statement
-        only)."""
+        """(v10, the lead's money decision; v11 shape) his confirmed statement is never a payment of the bands: it is
+        listed under 'stated' {statements, undated}, no totals, with the row it answers (status, current, day), whether
+        it still counts, and the keyed payments that cover it (each covers its first counting statement only)."""
         jacket = next(ln['key'] for ln in self.files['links.jsonl'] if ln['key'].endswith('#line:paint@%s' % T[:8]))
+        dry = next(ln['key'] for ln in self.files['links.jsonl'] if ln['key'].endswith('#line:dry_ice@%s' % T[:8]))
         base = readers.accounting(self.files, T)
         pay = next(p for b, x in base['costs'].items() if b != 'asserted_unpaid' for p in x['payments']
                    if p['category'] and p['paid_on'])
 
-        def statement(n, on):
+        def statement(n, on, answers=jacket):
             ref = payloads.answer_ref(testdata.U('answers'), n)
             return {'key': 'link:%s@%s' % (ref, T[:8]), 'writer': 'propose_evidence_links', 'p_run_id': '@run:owner_review',
                     'row': {'vehicle_id': T, 'source_kind': 'owner_statement', 'external_ref': ref, 'role': 'payment_out',
                             'direction': 'out', 'payment_key': 'owner:' + ref, 'payer_entity': 'owner_business:synthetic',
                             'cost_category': pay['category'], 'occurred_on': on, 'join_key': 'his answer',
-                            'confidence': 1.0, 'evidence': [{'kind': 'link', 'id': jacket}]}}
-        first, second = statement(1, pay['paid_on']), statement(2, pay['paid_on'])
+                            'confidence': 1.0, 'evidence': [{'kind': 'link', 'id': answers}]}}
+        first, second = statement(1, pay['paid_on']), statement(2, pay['paid_on'], dry)
         f = dict(self.files, **{'links.jsonl': list(self.files['links.jsonl']) + [first, second]})
         v = readers.accounting(f, T, [{'target': first['key'], 'decision': 'confirmed'},
                                       {'target': second['key'], 'decision': 'confirmed'}])
@@ -713,11 +714,30 @@ class Readers(SyntheticCase):
         self.assertEqual(m5['bands'], readers.extract_m5(base)['bands'])            # the bands are unchanged
         st = {x['link_id']: x for x in v['stated']['statements']}
         self.assertEqual(st[first['key']]['answers'], {'kind': 'link', 'id': jacket, 'status': 'proposed',
-                                                       'current': True})
+                                                       'current': True, 'on': pay['paid_on']})
+        self.assertEqual((st[first['key']]['counts'], st[second['key']]['counts']), (True, True))
         self.assertIn(pay['payment_key'], st[first['key']]['covered_by'])
         self.assertNotIn(pay['payment_key'], st[second['key']]['covered_by'])     # one payment, its first statement
-        self.assertEqual(m5['stated'][0][:2], [first['row']['payment_key'], 'out'])
-        self.assertEqual(readers.accounting(self.files, T)['stated'], {'cents_out': 0, 'cents_in': 0, 'statements': []})
+        self.assertEqual(m5['stated'][0][:3], [first['row']['payment_key'], 'out', True])
+        self.assertEqual(set(v['stated']), {'statements', 'undated'})               # (v11) no totals
+        self.assertEqual(readers.accounting(self.files, T)['stated'], {'statements': [], 'undated': []})
+        # (v11) a statement whose row he rejected no longer counts and takes no cover: the next counting one does
+        no = readers.accounting(f, T, [{'target': first['key'], 'decision': 'confirmed'},
+                                       {'target': second['key'], 'decision': 'confirmed'},
+                                       {'target': jacket, 'decision': 'rejected'}])
+        st = {x['link_id']: x for x in no['stated']['statements']}
+        self.assertEqual((st[first['key']]['counts'], st[first['key']]['covered_by']), (False, []))
+        self.assertIn(pay['payment_key'], st[second['key']]['covered_by'])
+        # (v11) a windowed read lists the statements whose day is inside it; an undated one is listed apart
+        undated = statement(3, None)
+        undated['row']['evidence'] = []
+        g = dict(f, **{'links.jsonl': f['links.jsonl'] + [undated]})
+        dec = [{'target': x['key'], 'decision': 'confirmed'} for x in (first, second, undated)]
+        inside = readers.accounting(g, T, dec, date_from=pay['paid_on'], date_to=pay['paid_on'])['stated']
+        outside = readers.accounting(g, T, dec, date_from='2020-01-01', date_to='2020-12-31')['stated']
+        self.assertEqual(sorted(x['link_id'] for x in inside['statements']), sorted([first['key'], second['key']]))
+        self.assertEqual(([x['link_id'] for x in inside['undated']], outside['statements']), ([undated['key']], []))
+        self.assertEqual(readers.accounting(g, T, dec)['stated']['undated'], [])     # an all-evidence read lists all
 
     def test_two_current_acquisitions_are_asked_about(self):
         """(v10, money F4) two current acquisition claims on the truck: which one is the deal? An upper bound from
@@ -734,6 +754,11 @@ class Readers(SyntheticCase):
                       v['open_questions'])
         rejected = readers.accounting(self.files_with([other]), T, [{'target': other['key'], 'decision': 'rejected'}])
         self.assertFalse([q for q in rejected['open_questions'] if q['q'] == 'acquisition_conflict'])
+        # (v11) only for deals within 30 days of each other: a purchase a year apart is another deal
+        later = payloads.claim_line('claim:acquisition:later', 'ledger_vendor_date', payloads.change_claim(
+            T, 'custody', 'acquisition', 'bought back', 0.4, occurred_from='2032-06-01', occurred_to='2032-06-02'), [])
+        apart = readers.accounting(self.files_with([later]), T)
+        self.assertFalse([q for q in apart['open_questions'] if q['q'] == 'acquisition_conflict'])
 
     def test_a_journal_entry_dates_its_payment(self):
         """(v10, money F3/F5) one list of payment sources: a journal entry dates a payment; an order does not."""
@@ -866,7 +891,7 @@ class Loader(SyntheticCase):
 
 
 class FakeRest:
-    """Stands in for PostgREST: answers each writer the way draft.sql v10 does, records every call."""
+    """Stands in for PostgREST: answers each writer the way draft.sql v11 does, records every call."""
 
     def __init__(self, fail=None, links=None):
         self.calls = []
@@ -1518,16 +1543,42 @@ class ReviewSheet(SyntheticCase):
         self.assertEqual((multi['asked_place'], payloads.answer_dimension(multi)), ('multi', []))
 
     def test_two_current_acquisitions_are_asked_one_row_each(self):
-        """(v10, money F4) acquisition_conflict: one yes/no row per claim, a change-claim question each."""
+        """(v10, money F4) acquisition_conflict: one yes/no row per claim, a change-claim question each; (v11) a claim
+        another row of the sheet already asks about (its dated contradiction) is asked once."""
+        acq = 'claim:acquisition:%s' % T[:8]
         other = payloads.claim_line('claim:acquisition:again', 'ledger_vendor_date', payloads.change_claim(
             T, 'custody', 'acquisition', 'bought again?', 0.4, occurred_from='2031-02-01', occurred_to='2031-02-02'), [])
         f = dict(self.files, **{'change_claims.jsonl': list(self.files['change_claims.jsonl']) + [other]})
         rows, _d = review_sheet.build_rows(self.ctx, f, readers.accounting(f, T))
         deal = [r for r in rows if r['section'] == 'deal']
-        self.assertEqual(sorted(r['targets'][0]['key'] for r in deal),
-                         sorted(['claim:acquisition:%s' % T[:8], other['key']]))
-        self.assertTrue(all((r['profile']['question'], r['profile']['asks']) == ('change_claim', 'place')
-                            and '2 current acquisition claims' in r['question_text'] for r in deal))
+        self.assertEqual([r['targets'][0]['key'] for r in deal], [other['key']])
+        self.assertTrue((deal[0]['profile']['question'], deal[0]['profile']['asks']) == ('change_claim', 'place')
+                        and '2 current acquisition claims' in deal[0]['question_text'])
+        yes_no = [r for r in rows if r['profile']['asks'] == 'place' and [(t['kind'], t['key']) for t in r['targets']]
+                  == [('change_claim', acq)]]
+        self.assertEqual([r['section'] for r in yes_no], ['dates'])                 # asked once, by the dates row
+        self.assertEqual([r['row'] for r in rows], list(range(1, len(rows) + 1)))
+
+    def test_a_sheet_asks_a_question_once(self):
+        """(v11) one re-ask per first asking, and a fresh row a re-ask already asks is left off (the writer refuses
+        two rows re-asking one question)."""
+        rows, _d = self.rows()
+        painter = next(r for r in rows if 'also places it on' in r['question_text'] and pk('00206') in r['question_text'])
+        again = [dict(painter, section='asked again', reask_of={'sheet': 'a', 'row': 3}, asked_first='review:x#3'),
+                 dict(painter, section='asked again', reask_of={'sheet': 'b', 'row': 1}, asked_first='review:x#3'),
+                 dict(rows[0], section='asked again', reask_of={'sheet': 'a', 'row': 1}, asked_first='review:x#1'),
+                 # first asked on two sheets, both answers disputed: one question with the same targets, one row
+                 dict(rows[0], section='asked again', reask_of={'sheet': 'c', 'row': 1}, asked_first='review:y#1')]
+        out = review_sheet.once(rows + again)
+        self.assertEqual(len(out), len(rows) + 2 - 2)   # painter's and rows[0]'s fresh rows, the 2nd and 4th re-asks go
+        self.assertEqual([(r['asked_first'], r.get('also_reask_of')) for r in out if r.get('reask_of')],
+                         [('review:x#3', [{'sheet': 'b', 'row': 1}]), ('review:x#1', [{'sheet': 'c', 'row': 1}])])
+        self.assertFalse([r for r in out if not r.get('reask_of') and r['question_text'] == painter['question_text']])
+        self.assertEqual([r['row'] for r in out], list(range(1, len(out) + 1)))
+        self.assertEqual([r['row'] for r in rows[:3]], [1, 2, 3])                   # the rows given are not changed
+        self.assertFalse([r for r in again if r.get('also_reask_of')])
+        twice = review_sheet.once(rows + [dict(rows[1])])                         # two fresh rows, one question
+        self.assertEqual(len(twice), len(rows))
 
     def test_a_row_whose_targets_place_nothing_asks_about_none(self):
         """(v7, D6) a "no truck in frame" verdict or an unplaced line: asked place 'none', a yes/no row."""
@@ -1838,6 +1889,18 @@ class Answers(SyntheticCase):
             _d4, _sp4, side4 = self.sheet('answers-second-whole', '2031-06-22')
             self.assertEqual(sorted(r['reask_of']['row'] for r in side4['rows'] if r['section'] == 'asked again'),
                              sorted([acct['row'], photo['row']]))     # painter's row was asked again already
+
+    def test_a_re_ask_left_off_is_marked_asked_with_the_row_kept(self):
+        """(v11) the delivery marks asked every re-ask a kept row stands for, so no later sheet asks it again."""
+        ledger = os.path.join(self.tmp, 'disputed-once.jsonl')
+        with mock.patch.dict(os.environ, {'EVIDENCE_DISPUTED': ledger}):
+            _d, sp, side = self.sheet('answers-once')
+            side['rows'][0].update(reask_of={'sheet': '/x/review-2031-05-01.json', 'row': 3},
+                                   also_reask_of=[{'sheet': '/x/review-2031-05-08.json', 'row': 1}])
+            common.dump_json(sp, side)
+            self.deliver(sp)
+            self.assertEqual(manifest.reasked_rows(), {('/x/review-2031-05-01.json', 3),
+                                                       ('/x/review-2031-05-08.json', 1)})
 
     @mock.patch.dict(os.environ, {'EVIDENCE_DB_WRITES': '1'})
     def test_a_disputed_row_of_a_sent_db_sheet_is_asked_again_as_frozen(self):
