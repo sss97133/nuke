@@ -61,6 +61,7 @@ const sources = new Map([
   ['historicalAsks',compile('../supabase/functions/ingest-observation/historicalAsks.ts')],
   ['historicalAskIntake',compile('../supabase/functions/ingest-observation/historicalAskIntake.ts')],
   ['liveIntake',compile('../supabase/functions/ingest-observation/batLive.ts')],
+  ['liveCollector',compile('../supabase/functions/ingest-observation/batLiveCollector.ts')],
   ['liveEvents',compile('../supabase/functions/_shared/batLiveEvents.ts')],
   ['auctionRecord',compile('../supabase/functions/_shared/batAuctionRecord.ts')],
   ['property',compile('../supabase/functions/ingest-observation/imageProperties.ts')],
@@ -249,6 +250,7 @@ function fixture(options = {}) {
         if(specifier==='../_shared/archiveFetch.ts')return load('archive');
         if(specifier==='../_shared/batParser.ts')return load('parser');
         if(specifier==='./batLive.ts')return load('liveIntake');
+        if(specifier==='./batLiveCollector.ts')return load('liveCollector');
         if(specifier==='../_shared/batLiveEvents.ts')return load('liveEvents');
         if(specifier==='./batAuctionRecord.ts')return load('auctionRecord');
         if(specifier==='../_shared/writeGuard.ts')return load('guard');

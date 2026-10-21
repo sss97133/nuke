@@ -65,6 +65,19 @@ jobs:
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
+      - name: Verify native canonical collector through HTTP and PostgreSQL
+        env:
+          BAT_LIVE_PG_TEST: '1'
+          DB_CONTRACT_PSQL: psql
+        run: |
+          set -euo pipefail
+          fixture_file="$(mktemp /tmp/nuke-bat-prepared.XXXXXX)"
+          trap 'dropdb --if-exists nuke_soft_close_test; psql -X -v ON_ERROR_STOP=1 -d postgres -c "DROP ROLE IF EXISTS anon, authenticated, service_role"; rm -f "$fixture_file"' EXIT
+          deno run --node-modules-dir=none supabase/sql/prepare_bat_public_live_fixture.ts --stdout > "$fixture_file"
+          createdb nuke_soft_close_test
+          psql -X -v ON_ERROR_STOP=1 -v bat_fixture_json="$(cat "$fixture_file")" -d nuke_soft_close_test -f supabase/sql/test_bat_public_live_events.sql
+          psql -X -v ON_ERROR_STOP=1 -v bat_fixture_json="$(cat "$fixture_file")" -d nuke_soft_close_test -f supabase/sql/test_bat_live_relisted_lot_fold.sql
+          deno test --node-modules-dir=none --allow-env --allow-read --allow-run=psql --filter PostgreSQL supabase/functions/ingest-observation/batLiveCollector.test.ts
       - name: Run each database contract in its own fresh database
         run: scripts/ci/run-db-contracts.sh --ci-service
 

@@ -419,19 +419,50 @@ All twelve post-deployment health samples still failed; coverage ranged from 0 t
 records and 22 without errors, not a distinct-lot denominator. The next correction keeps
 unattempted recovery queued during cooldown, paces starts and coalesces frame/coverage admission
 within the existing limits. Shared failure acknowledges neither caller; an explicit semantic
-refusal restores independent requests. This follow-up still requires its own deployment and
-live verification; the first deployment did not establish continuous capture or fleet gain.
+refusal restores independent requests. The follow-up was delivered as PR #2452 below;
+the first deployment did not establish continuous capture or fleet gain.
 PR #2452 deployed extractor 4.5.5 (platform 192) at 19:40 UTC. All twelve subsequent
 health samples also failed: 0–10 covered of 26–27 currently eligible subscriptions. These are
 current subscription snapshots, not a continuous or fleet denominator. Endpoint-wide intake
 latency mixes other modes and cannot locate the native stage responsible for the gap.
-The next bounded diagnostic extends the existing collector and intake: a control-plane run UUID
+The bounded diagnostic extended the existing collector and intake: a control-plane run UUID
 joins start/end records to native request labels, and at most twelve sampled intake records per
 worker separate authentication, monitor/source/parent reads, preparation and canonical RPC time.
 Transport counters describe attempts, backoff and acknowledgement processing, not unique testimony
 or usable coverage. Missing end/timing records remain unknown. No source bodies, prices, headers
-or credentials are logged. Deployment and a six-start/full-lifetime trace remain pending; diagnostic
-delivery alone cannot close the capture-integrity assay.
+or credentials are logged. The dated trace below supplies deployment and runtime evidence;
+diagnostic delivery alone cannot close the capture-integrity assay.
+PR #2455 merged and deployed normally (4.5.6/platform 193, intake 166). The 20:29:40–20:37:40 UTC
+trace recorded seven starts, five matching completed 115-second lifetimes and two right-censored
+workers; one additional end had a start before the window. All six scheduled dispatches later
+reconciled to 202 responses. Their handlers began 2.49–96.59s after cron completion; this is not
+an exact queue-wait measurement. Every completed worker reached sixty successful nested intake
+calls, two runtime fetch rejections and hundreds of backoff skips. All 426 gateway-visible native
+intakes returned 200. Three of 35 early-biased stage samples exceeded two seconds in the RPC;
+none of those samples recorded an SDK runtime limit. All twelve health snapshots failed
+(0–14 covered of 26–29 currently eligible subscriptions). Eight cohort snapshots observed 34
+lot IDs, with 19 present at every snapshot; these are validation samples, not a source-fleet or
+continuous eligible-lot-time denominator. Zero supported-answer gain is established.
+
+The documented [nested-call budget](https://supabase.com/docs/guides/functions/recursive-functions)
+is thirty calls per trace in sixty seconds. A one-second coverage path cannot fit that budget
+before frame admission. More backoff cannot repair this inequality. External source APIs and
+ordinary database SDK requests are a separate boundary.
+
+**Prepared execution-owner change; architecture approval required before deployment:**
+`ingest-observation` may host the existing collector through service-only `bat_live_collect_v1`;
+core would make one authenticated handoff. Local admission remains inside the canonical writer,
+with fresh monitor/source/parent validation and the unchanged RPC. The selected identity acts
+only as a rejection fence after those fresh reads: changing a post ID must refuse the old
+channel's heartbeat too. Typed transient failures retain atomic prefixes without poison fanout;
+semantic refusals retain existing per-lot isolation. The first rollout preserves core's legacy
+adapter until the second reviewed handoff change. Dry-run retains its existing service-only
+manifest; it starts no source work. The implementation is preparation, not production authority.
+Keep the 3s/2s objectives, source budgets, 115s lifetime, grants, retention and episode holds.
+Bunched dispatch, recovery generations/ACK barriers and the measured RPC tail remain separate
+integrity blockers. The native SQL contracts now have an explicit CI setup path alongside a
+real HTTP-to-PostgreSQL coverage/refusal case, instead of being silently excluded.
+
 The retained sold gold case still lacks parser/parent attestations; repairing transport does
 not manufacture them or establish fleet-wide supported-answer gain.
 

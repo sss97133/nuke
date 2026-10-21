@@ -114,7 +114,7 @@ preserved. The large comment log is not published. Browser pulse uses the
 delivered row directly, with native bid/comment clocks and final price, instead
 of fetching again or waiting for the 60-second fallback refresh.
 
-## Native timing diagnostics, prepared October 21, 2026
+## Native timing diagnostics, delivered October 21, 2026
 
 The existing collector emits `bat_live_collector_start_v1` and
 `bat_live_collector_end_v1` with a generated control-plane `collector_run_id`.
@@ -134,6 +134,38 @@ then correlate existing dispatch metadata, native gateway timings and coverage
 predicates. A dispatch response alone does not establish collector survival;
 sampled timings and health snapshots do not establish continuous capture. No new
 fetches, scheduler/budget changes or additional telemetry tables are introduced.
+
+## Canonical collector preparation, October 21, 2026 — architecture hold
+
+The bounded diagnostic delivery established a repeatable nested Edge-call ceiling;
+current capture integrity still fails. The documented budget is 30 calls per trace
+per 60 seconds, incompatible with one-second cross-function coverage before frames.
+The prepared service-only `bat_live_collect_v1` mode keeps the 115-second collector
+inside `ingest-observation`, where each batch calls existing `ingestBatLive` with
+fresh monitor/source/parent reads and the unchanged canonical RPC. Core's prepared
+second step makes one authenticated handoff. Deploy intake first, then core, only
+after specific approval of this execution-owner change; normal CI is the only path.
+
+Only `mode` and optional boolean `dry_run` are accepted. Caller targets, URLs,
+credentials, duration, concurrency and retention overrides are refused. Dry-run
+and idle start no background task, source request or write. Dry-run preserves the
+existing service-only target manifest. Live acceptance returns a run ID and count;
+it does not promise collection completion. Every batch has its own SDK diagnostics
+and ten-second deadline, independent of the completed incoming handoff signal.
+The selected identity is a negative fence after fresh reads, never cached eligibility.
+A changed post, vehicle or URL refuses the old channel's coverage as well as frames.
+
+Local acknowledgement still waits for canonical success. Transient failures keep
+atomic prefixes without per-lot retry amplification; semantic failures can isolate
+poison. Independent frame/coverage lanes, per-lot FIFO, 50/200 ceilings and duplicate
+replay are preserved. Failed cleanup emits a terminal diagnostic and retains the
+unresolved state. The first rollout's compatibility adapter keeps current core
+behavior until the reviewed handoff step; the legacy batch endpoint stays available.
+
+No schema, grant, source budget, cron cadence, worker lifetime, capacity, retention
+or episode-v2 change is included. Recovery-generation correctness, dispatch bunching
+and RPC tail latency remain open even if the nested-call bottleneck is removed.
+Source-wide readiness, historical continuity and supported-answer gain remain unproved.
 
 ## Focused evidence
 
