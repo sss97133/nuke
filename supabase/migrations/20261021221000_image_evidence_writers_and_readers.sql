@@ -135,6 +135,13 @@
 -- (v11) What changed from v10 (DESIGN-v11 "Changes from v10"; the v10 round, patch level):
 --   * the day reader hands evidence_answered_elsewhere only the photos that carry his confirmed subject (a read with no
 --     statistics cost 1.4 s at 10x, v9 0.8 s);
+--   * (v11 patch, before merge) decide_evidence refuses another user's row ('not your evidence', 42501) right after loading
+--     it, before p_expected, a claim's day, a link's kind, a photo's state or a who-paid row's money is compared (79bfe891
+--     answered another user's candidate with its photo's current vehicle and his "no, it was <day>" with the claim's day);
+--     every target kind now refuses with that one message (a photo's was 'photo % is not yours to publish');
+--   * (v11 patch, before merge) propose_image_candidates' "same row again" test compares the stored evidence (a photo
+--     filed on a merged-away row was re-written on every run); a sheet asks one question once about one target, in any
+--     shape (re-check N1); acquisition_conflict asks once per group of claims within 30 days of each other (N2);
 --   * a capture-time proposal waits on the photo's current claim lock before its day check (R1: a Photos join racing
 --     his "no" to that day was machine-confirmed); a candidate stores the row the photo is filed on when that row is the
 --     truck the pass names (R2: photos a merge did not move); a sheet asks a question once (R3);
@@ -646,6 +653,20 @@ BEGIN
                 GROUP BY r.value->>'asked_first' HAVING count(*) > 1) THEN
       RAISE EXCEPTION 'a sheet asks a question once: two rows of this sheet re-ask the same question' USING ERRCODE = '22023';
     END IF;
+    -- (v11 patch, re-check N1) nor ask one question twice about one target, in any shape: two fresh rows, or a re-ask
+    -- (which carries the targets of the row it re-asks, frozen with it) beside a fresh row. A row's targets here are the
+    -- ones its answer lands on (evidence_answer_fits): its own targets of the question's kind, else the slot it names (an
+    -- image, a payment or source key, an account). Two rows that differ only in the slot they also list (two sources
+    -- contradicting one payment) ask different questions.
+    IF EXISTS (SELECT 1 FROM jsonb_each(v_rows) r
+                CROSS JOIN LATERAL jsonb_array_elements(r.value->'targets') t
+                WHERE t->>'kind' = r.value->>'question'
+                   OR (t->>'kind' IN ('image','payment','source','account')
+                       AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements(r.value->'targets') o WHERE o->>'kind' = r.value->>'question'))
+                GROUP BY r.value->>'question', coalesce(r.value->>'asks', 'place'), t->>'kind', coalesce(t->>'id', t->>'key')
+               HAVING count(DISTINCT r.key) > 1) THEN
+      RAISE EXCEPTION 'a sheet asks a question once: two rows of this sheet ask the same question about one target' USING ERRCODE = '22023';
+    END IF;
     v_config := v_config || jsonb_build_object('rows', v_rows);
   END IF;
   -- (v6, RU9) a payment source's coverage is a real date and names accounts; (RU4) closed_accounts are accounts whose
@@ -899,7 +920,7 @@ RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_tem
 DECLARE
   r evidence_runs%ROWTYPE; x jsonb; v_prev image_vehicle_candidates%ROWTYPE; v_new uuid; v_given uuid; v_veh uuid; v_cur uuid;
   v_has_prev boolean; v_out jsonb := '[]'::jsonb; n_new int := 0; n_same int := 0; v_scope uuid[];
-  v_img uuid; v_truck text; v_frame text; v_word text; v_wid uuid; v_store uuid;
+  v_img uuid; v_truck text; v_frame text; v_word text; v_wid uuid; v_store uuid; v_ev jsonb;
 BEGIN
   PERFORM public.evidence_assert_job();
   SELECT * INTO STRICT r FROM evidence_runs WHERE id = p_run_id AND status = 'running';
@@ -946,6 +967,12 @@ BEGIN
         FROM vehicle_images vi WHERE vi.id = v_img;
       v_store := coalesce(v_store, v_given);
     END IF;
+    -- (v11 patch, runner db harness) the evidence as it is stored: a row on another id of the named truck carries
+    -- named_by_pass, so the "same row again" test compares the stored form (79bfe891 compared the pass's own evidence and
+    -- re-wrote every undecided row of a photo filed on a merged-away row under a new id on each run)
+    v_ev := CASE WHEN v_store IS DISTINCT FROM v_given
+                 THEN x->'evidence' || jsonb_build_array(jsonb_build_object('kind','named_by_pass','id',v_given))
+                 ELSE x->'evidence' END;
     SELECT * INTO v_prev FROM image_vehicle_candidates
      WHERE image_id = v_img AND user_id = r.user_id                                 -- (v5, readers v4 #2) his row only
        AND coalesce(vehicle_id::text, subject_key, '-') = coalesce(v_store::text, x->>'subject_key', '-')
@@ -966,7 +993,7 @@ BEGIN
         v_out := v_out || jsonb_build_object('image_id', x->>'image_id', 'result', 'already_decided', 'candidate_id', v_prev.id); CONTINUE;
       END IF;
       IF v_prev.verdict = x->>'verdict' AND v_prev.confidence = (x->>'confidence')::numeric
-         AND v_prev.evidence = x->'evidence' AND v_prev.join_key = x->>'join_key'
+         AND v_prev.evidence = v_ev AND v_prev.join_key = x->>'join_key'
          AND v_prev.image_class = coalesce(x->>'image_class','own') AND v_prev.frame_role = coalesce(x->>'frame_role','subject') THEN
         n_same := n_same + 1; CONTINUE;
       END IF;
@@ -1016,9 +1043,7 @@ BEGIN
         r.pass, x->>'join_key', (x->>'confidence')::numeric, x->'probabilities',
         (SELECT array_agg(e::uuid) FROM jsonb_array_elements_text(coalesce(x->'candidate_set','[]')) e),
         (x->>'ambiguity_group')::uuid,
-        CASE WHEN v_store IS DISTINCT FROM v_given
-             THEN x->'evidence' || jsonb_build_array(jsonb_build_object('kind','named_by_pass','id',v_given))
-             ELSE x->'evidence' END,
+        v_ev,
         coalesce(x->>'image_class','own'), (x->>'album_link_id')::uuid,
         (x->>'pass_captured_on')::date, CASE WHEN v_has_prev THEN v_prev.id END, r.producer);
     n_new := n_new + 1;
@@ -2072,6 +2097,14 @@ BEGIN
         USING ERRCODE = '22023';
     END IF;
     v_id := p_target_ids[1];
+    -- (v11 patch, reviewer) whose row it is before anything about it is compared, as for every other decision
+    IF EXISTS (SELECT 1 FROM evidence_links WHERE p_target_kind = 'evidence_link' AND id = v_id AND superseded_by IS NULL
+                                              AND user_id IS DISTINCT FROM v_owner
+               UNION ALL
+               SELECT 1 FROM vehicle_change_claims WHERE p_target_kind = 'change_claim' AND id = v_id AND superseded_by IS NULL
+                                                    AND user_id IS DISTINCT FROM v_owner) THEN
+      RAISE EXCEPTION 'not your evidence' USING ERRCODE = '42501';
+    END IF;
     v_rt := (SELECT (e->>'id')::uuid FROM jsonb_array_elements(v_rowcfg->'targets') e
               WHERE e->>'kind' = p_target_kind AND e->>'id' ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' LIMIT 1);
     IF v_rt IS NULL OR NOT public.evidence_successor_of(p_target_kind, v_rt, v_id) THEN
@@ -2151,6 +2184,9 @@ BEGIN
       IF NOT FOUND THEN v_out := v_out || jsonb_build_object('id', v_id, 'result', 'not_current'); CONTINUE; END IF;
       v_user := c.user_id; v_vehicle := c.vehicle_id; v_image := c.image_id; v_verdict := c.verdict; v_frame := c.frame_role;
       v_subject := c.subject_key;
+      -- (v11 patch, reviewer) whose row it is, before any detail of it: 79bfe891 compared p_expected first and answered
+      -- another user's id with changed_since_review and that photo's current vehicle
+      IF v_user IS DISTINCT FROM v_owner THEN RAISE EXCEPTION 'not your evidence' USING ERRCODE = '42501'; END IF;
       IF p_expected IS NULL OR NOT (p_expected ? v_id::text) THEN
         RAISE EXCEPTION 'image decisions need p_expected for %', v_id USING ERRCODE = '22023';
       END IF;
@@ -2160,16 +2196,22 @@ BEGIN
       END IF;
     ELSIF p_target_kind IN ('evidence_link','album_map') THEN
       SELECT * INTO l FROM evidence_links WHERE id = v_id AND superseded_by IS NULL FOR UPDATE;
-      IF NOT FOUND OR (p_target_kind = 'album_map') <> (l.source_kind = 'photos_album') THEN
+      IF NOT FOUND THEN v_out := v_out || jsonb_build_object('id', v_id, 'result', 'not_current'); CONTINUE; END IF;
+      v_user := l.user_id; v_vehicle := l.vehicle_id;
+      -- (v11 patch, reviewer) whose row it is before its kind (an album link or not) is told
+      IF v_user IS DISTINCT FROM v_owner THEN RAISE EXCEPTION 'not your evidence' USING ERRCODE = '42501'; END IF;
+      IF (p_target_kind = 'album_map') <> (l.source_kind = 'photos_album') THEN
         v_out := v_out || jsonb_build_object('id', v_id, 'result', 'not_current'); CONTINUE;
       END IF;
-      v_user := l.user_id; v_vehicle := l.vehicle_id;
     ELSIF p_target_kind = 'change_claim' THEN
       SELECT user_id, CASE WHEN kind = 'worked_on' THEN NULL ELSE vehicle_id END INTO v_user, v_vehicle
         FROM vehicle_change_claims WHERE id = v_id AND superseded_by IS NULL;
     ELSIF p_target_kind = 'capture_time_claim' THEN
       SELECT * INTO t FROM image_capture_time_claims WHERE id = v_id AND superseded_by IS NULL FOR UPDATE;
       v_user := t.user_id;
+      -- (v11 patch, reviewer) whose claim it is before its day is compared with his answer (79bfe891 raised the day
+      -- error first, telling another user the claim's day)
+      IF v_user IS NOT NULL AND v_user IS DISTINCT FROM v_owner THEN RAISE EXCEPTION 'not your evidence' USING ERRCODE = '42501'; END IF;
       -- (v8) "no, it was <day>" names another day than the one this claim says
       IF v_day IS NOT NULL AND t.captured_on = v_day THEN
         RAISE EXCEPTION '"no, it was %" names the day this claim already says; a "no" names another day', v_day USING ERRCODE = '22023';
@@ -2179,14 +2221,13 @@ BEGIN
     ELSIF p_target_kind = 'account_entity' THEN
       SELECT user_id INTO v_user FROM evidence_account_entities WHERE id = v_id AND superseded_by IS NULL;
     ELSIF p_target_kind = 'image_publication' THEN
-      IF public.evidence_image_eligible(v_owner, v_id, v_scope) THEN
-        -- (v6, RU1) never another user's photo that his scope merely reaches (a worked_on claim he confirmed himself);
-        -- (v7, F3) only the photo's own user decides it: its user, else its vehicle's uploader, else its owner of record
-        -- (a contributor or editor of the vehicle does not)
-        IF public.evidence_image_user(v_id) IS DISTINCT FROM v_owner THEN
-          RAISE EXCEPTION 'photo % is not yours to publish', v_id USING ERRCODE = '42501';
-        END IF;
-        v_user := v_owner;
+      -- (v6, RU1) never another user's photo that his scope merely reaches (a worked_on claim he confirmed himself);
+      -- (v7, F3) only the photo's own user decides it: its user, else its vehicle's uploader, else its owner of record
+      -- (a contributor or editor of the vehicle does not). (v11 patch, reviewer) whose photo it is comes first, then
+      -- whether it is current and in his scope (79bfe891 checked those first for a photo that was not his)
+      IF EXISTS (SELECT 1 FROM vehicle_images WHERE id = v_id) THEN
+        IF public.evidence_image_user(v_id) IS DISTINCT FROM v_owner THEN RAISE EXCEPTION 'not your evidence' USING ERRCODE = '42501'; END IF;
+        IF public.evidence_image_eligible(v_owner, v_id, v_scope) THEN v_user := v_owner; END IF;
       END IF;
     ELSE
       RAISE EXCEPTION 'unknown target kind %', p_target_kind;
@@ -2701,6 +2742,7 @@ $$;
 --     direction, the claim or link it answers and its status, covered_cents and the keyed payments that could be it);
 --     it still closes who_paid / who_received. The open question acquisition_conflict names two or more current
 --     acquisition (or sale) claims on the truck.
+--   (v11 patch, re-check N2) acquisition_conflict asks once per group of claims within 30 days of each other.
 --   (v11, lead decision; money F1, F2, M1) 'stated' is lists only, never a total of statements: v10's cents_out /
 --     cents_in summed statements whose claim or link he had rejected, replaced or moved, and an undated statement in
 --     every windowed read. stated.statements: each statement dated by what it answers (answers.on), with 'counts' (what
@@ -2749,6 +2791,22 @@ claims AS (
     FROM vehicle_change_claims k LEFT JOIN evidence_runs er ON er.id = k.run_id
    WHERE k.vehicle_id IN (SELECT vid FROM ids) AND k.user_id = (SELECT uid FROM u) AND k.superseded_by IS NULL),
 claims_live AS (SELECT * FROM claims WHERE status <> 'rejected'),
+-- (v11 patch, re-check N2) the acquisition (sale) claims that could be one deal: claims of one kind whose windows overlap
+-- or fall within 30 days of each other form one group (a sweep over the claims ordered by start: a claim starts a new
+-- group when it begins more than 30 days after every earlier claim ended); a claim with no dates may be any deal, so a
+-- kind that has one is one group. acquisition_conflict asks once per group of two or more.
+deal_c AS (
+  SELECT c.id, c.kind, coalesce(c.occurred_from, c.occurred_to) AS f, coalesce(c.occurred_to, c.occurred_from) AS t,
+         bool_or(c.occurred_from IS NULL AND c.occurred_to IS NULL) OVER (PARTITION BY c.kind) AS kind_undated
+    FROM claims_live c WHERE c.kind IN ('acquisition','sale') AND NOT c.bound_only),
+deal_g AS (
+  SELECT d.id, d.kind,
+         CASE WHEN d.kind_undated THEN 0
+              ELSE sum(CASE WHEN d.prev_t IS NULL OR d.f - 30 > d.prev_t THEN 1 ELSE 0 END)
+                     OVER (PARTITION BY d.kind ORDER BY d.f, d.t, d.id) END AS grp
+    FROM (SELECT x.*, max(x.t) OVER (PARTITION BY x.kind ORDER BY x.f, x.t, x.id
+                                     ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING) AS prev_t
+            FROM deal_c x) d),
 links_all AS (
   SELECT l.*, d.decision AS owner_decision, d.created_at AS decided_at, coalesce(d.decision, 'proposed') AS status,
          coalesce(l.payer_entity, (SELECT m.entity_key FROM mapped m WHERE m.account_ref = l.from_account_ref)) AS payer,
@@ -3065,12 +3123,11 @@ SELECT jsonb_build_object(
         -- pass's bound aside: which one is the deal? (a refused re-write leaves the corrected reading as a second claim)
         -- (v11, M1) only claims whose windows overlap or fall within 30 days of each other (a claim with no dates
         -- conflicts with every other): a truck bought, sold and bought back has two deals, not a conflict
-        SELECT jsonb_build_object('q', 'acquisition_conflict', 'kind', c.kind, 'claim_ids', jsonb_agg(c.id ORDER BY c.id))
-          FROM claims_live c WHERE c.kind IN ('acquisition','sale') AND NOT c.bound_only
-           AND EXISTS (SELECT 1 FROM claims_live o WHERE o.kind = c.kind AND NOT o.bound_only AND o.id <> c.id
-                         AND (coalesce(o.occurred_from, o.occurred_to) - 30 <= coalesce(c.occurred_to, c.occurred_from)
-                              AND coalesce(c.occurred_from, c.occurred_to) - 30 <= coalesce(o.occurred_to, o.occurred_from)) IS NOT FALSE)
-         GROUP BY c.kind
+        -- (v11 patch, re-check N2) one question per group of such claims (two near-duplicate purchases in 2023 and two
+        -- in 2025 are two questions, not one about four claims)
+        SELECT jsonb_build_object('q', 'acquisition_conflict', 'kind', g.kind, 'claim_ids', jsonb_agg(g.id ORDER BY g.id))
+          FROM deal_g g
+         GROUP BY g.kind, g.grp HAVING count(*) > 1
       ) z), '[]')
 )
 $$;

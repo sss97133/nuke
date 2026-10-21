@@ -10,7 +10,8 @@
 --   * the template: M1w applied TWICE (the second apply succeeds and changes no function body, ACL, config, view or
 --     index), its 47 functions and 3 views as declared, M1a's er_one_answers_per_sheet dropped, 6 indexes created;
 --     then every group runs on its own copy of it, so no scenario sees another's rows;
---   * a statement that must print (RESULT) prints exactly the listed output, ids, timestamps and digests normalised;
+--   * a statement that must print (RESULT) prints exactly the listed output, all of it (a list the design cut at 2,000
+--     characters is rebuilt in full from the capture), ids, timestamps and digests normalised;
 --   * a statement that must fail (REFUSED) fails with the listed SQLSTATE and message, at top level (frame-sensitive);
 --   * scenario_v9.sql, scenario_v10.sql, scenario_v11.sql: already written as assertions, run as written;
 --   * every agent-channel decide_evidence call the v4-v7 scenarios made is refused (42501, no EXECUTE for service_role);
@@ -28,14 +29,17 @@
 --   F4 before ANALYZE (rows just loaded, no statistics yet) under 3 s;
 --   R-P1 under 2 s (the confirmation list it was raised against took 22 s);
 --   A4 under 3 s (it timed out at 15 s in design v9; its load analyzes only its first batch).
--- Measured where this file was built: 3 runs: F4 vehicle reads 0.15-0.38 s after ANALYZE, 0.56-1.56 s before;
---   R-P1 0.49-0.50 s after, 0.48 s before; A4 0.78-1.22 s.
+-- Measured where this file was built: 6 runs: F4 vehicle reads 0.10-0.38 s after ANALYZE, 0.38-1.56 s before;
+--   R-P1 0.32-0.50 s after, 0.31-0.48 s before; A4 0.51-1.22 s.
 -- Ids are random (gen_random_uuid() or replaced literals); names, ledger lines, files and messages are synthetic.
 -- ALLOW_RAW_TESTIMONY_WRITE: the INSERTs below write synthetic fixture rows into the stand-in tables of the disposable
 -- databases this file creates and drops; never a live database.
 -- The owner channel reads auth.sessions / auth.mfa_factors / auth.mfa_amr_claims: each owner session the scenarios use
 -- is seeded there (a verified totp factor enrolled 30 days ago, verified now); the negative sessions as the design
 -- sim seeds them (a factor enrolled today, a verification an hour old, an aal1 session).
+-- The vehicles and vehicle_images stand-ins carry live's SELECT policies (RLS on; 2 and 5 policies, as pg_policies has
+-- them): every signed-in read below runs under them. A scenario that sets RLS on one of them itself starts with that
+-- table's policies off, as the design sim captured it.
 \set ON_ERROR_STOP on
 \set QUIET on
 \pset pager off
@@ -189,7 +193,9 @@ END $$;
 CREATE FUNCTION public.t_out(label text, got text, want text) RETURNS void LANGUAGE plpgsql AS $$
 DECLARE norm text;
 BEGIN
-  SELECT left(replace(public.t_norm(coalesce(string_agg(regexp_replace(l, '\s+$', ''), ' \n ' ORDER BY n), '')), E'\t', ' '), 2000)
+  -- the whole printout: an expected value the design's lists cut at 2,000 characters is rebuilt in full from the
+  -- capture (the generator's full_expected), so no comparison stops at a cap
+  SELECT replace(public.t_norm(coalesce(string_agg(regexp_replace(l, '\s+$', ''), ' \n ' ORDER BY n), '')), E'\t', ' ')
     INTO norm
     FROM regexp_split_to_table(coalesce(got, ''), E'\n') WITH ORDINALITY AS x(l, n)
    WHERE btrim(l) <> '' AND l !~ '^(LOCATION|CONTEXT|DETAIL|HINT|QUERY|LINE \d+|Time):'
@@ -563,6 +569,31 @@ END;
 $function$;
 REVOKE ALL ON FUNCTION public.attribute_image_session(uuid[],uuid,uuid,text) FROM PUBLIC, anon, authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.attribute_image_session(uuid[],uuid,uuid,text) TO authenticated, service_role;
+-- live's SELECT policies on vehicles (2) and vehicle_images (5), as pg_policies has them (read 2026-10-20); the table,
+-- column and function they read that the stand-ins lack are empty stand-ins
+ALTER TABLE public.vehicle_images ADD COLUMN IF NOT EXISTS documented_by_user_id uuid;
+CREATE TABLE public.organization_vehicles (organization_id uuid, vehicle_id uuid);
+CREATE TABLE public.organization_contributors (organization_id uuid, user_id uuid, status text);
+CREATE FUNCTION public.vehicle_user_has_access(p_vehicle_id uuid, p_user_id uuid) RETURNS boolean LANGUAGE sql STABLE AS $$ SELECT false $$;
+ALTER TABLE public.vehicles ENABLE ROW LEVEL SECURITY;
+CREATE POLICY vehicles_private_select ON public.vehicles FOR SELECT USING (is_public = false AND (SELECT auth.uid()) IS NOT NULL
+  AND ((SELECT auth.uid()) = user_id OR (SELECT auth.uid()) = owner_id OR (SELECT auth.uid()) = uploaded_by
+       OR public.vehicle_user_has_access(id, (SELECT auth.uid()))));
+CREATE POLICY vehicles_public_select ON public.vehicles FOR SELECT USING (is_public = true OR auth.role() = 'service_role');
+ALTER TABLE public.vehicle_images ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Organization members can view org vehicle images" ON public.vehicle_images FOR SELECT USING (EXISTS (
+  SELECT 1 FROM public.organization_vehicles ov JOIN public.organization_contributors oc ON ov.organization_id = oc.organization_id
+   WHERE ov.vehicle_id = vehicle_images.vehicle_id AND oc.user_id = (SELECT auth.uid()) AND oc.status = 'active'));
+CREATE POLICY "Users can view images for public vehicles" ON public.vehicle_images FOR SELECT USING (
+  coalesce(is_sensitive, false) = false AND coalesce(is_superseded, false) = false
+  AND (vision_gate_status IS NULL OR vision_gate_status <> ALL (ARRAY['rejected_personal', 'rejected_misattributed', 'review_needed']))
+  AND EXISTS (SELECT 1 FROM public.vehicles v WHERE v.id = vehicle_images.vehicle_id AND v.is_public = true));
+CREATE POLICY "Users can view images for vehicles they own" ON public.vehicle_images FOR SELECT USING (EXISTS (
+  SELECT 1 FROM public.vehicles WHERE vehicles.id = vehicle_images.vehicle_id
+     AND (vehicles.user_id = auth.uid() OR vehicles.uploaded_by = auth.uid() OR vehicles.owner_id = auth.uid())));
+CREATE POLICY "Users can view their own images" ON public.vehicle_images FOR SELECT USING ((SELECT auth.uid()) = user_id);
+CREATE POLICY users_can_view_own_unorganized_images ON public.vehicle_images FOR SELECT USING (
+  vehicle_id IS NULL AND (user_id = auth.uid() OR documented_by_user_id = auth.uid()));
 RESET SESSION AUTHORIZATION;
 -- live event triggers (view_write_guard from 20261014214500, Supabase's ensure_rls), created by the superuser
 CREATE OR REPLACE FUNCTION public.view_write_guard()
@@ -705,6 +736,11 @@ SELECT t_assert(NOT has_function_privilege('service_role', 'public.decide_eviden
 SELECT t_assert((SELECT count(*) FILTER (WHERE tgenabled = 'A') FROM pg_trigger
                   WHERE tgname ~ '_(insert_guard|append_only|no_truncate)$' AND NOT tgisinternal) = 27,
   'M1a''s 27 guard triggers still fire ALWAYS');
+SELECT t_assert((SELECT count(*) FROM pg_policies WHERE schemaname = 'public' AND tablename = 'vehicles' AND cmd = 'SELECT') = 2
+                AND (SELECT count(*) FROM pg_policies WHERE schemaname = 'public' AND tablename = 'vehicle_images' AND cmd = 'SELECT') = 5
+                AND (SELECT bool_and(relrowsecurity) FROM pg_class
+                      WHERE oid IN ('public.vehicles'::regclass, 'public.vehicle_images'::regclass)),
+  'the stand-ins carry live''s SELECT policies, RLS on: vehicles 2, vehicle_images 5 (every group copies them)');
 SELECT current_setting('t.passed') AS g_passed \gset
 SELECT :passed_total + :g_passed AS passed_total \gset
 \c :main_db
@@ -1208,6 +1244,8 @@ CREATE DATABASE :"grp_db" TEMPLATE :"tmpl_db" STRATEGY FILE_COPY;   -- a file co
 \c :grp_db
 SET TimeZone = 'America/Los_Angeles'; SET DateStyle = 'ISO, MDY';
 \set ON_ERROR_STOP on
+-- this scenario sets RLS on vehicles itself: the template's live policies on it are taken off first, as captured
+DROP POLICY IF EXISTS "vehicles_private_select" ON public.vehicles; DROP POLICY IF EXISTS "vehicles_public_select" ON public.vehicles; ALTER TABLE public.vehicles DISABLE ROW LEVEL SECURITY;
 -- Local scratch only. (v11: the stated checks read the list; 'stated' carries no totals.)
 -- scenario_v10.sql: one check per v10 change of block M1w (DESIGN-v10 "Changes from v9", V10-1 ..
 -- V10-9), each the verify-v9 case it answers, written as PR-1's contract test is: ON_ERROR_STOP on; t_assert(<boolean>,
@@ -1635,7 +1673,9 @@ SET TimeZone = 'America/Los_Angeles'; SET DateStyle = 'ISO, MDY';
 -- (profiles, vehicles, vehicle_images, and the column changes live merge_into_primary / unmerge_vehicle make) are
 -- written by the admin session. The R1 race needs two sessions: it is race_r1.sh (contract-adjacent), not a check here.
 -- Cases: R2 verify-R2/r2_merge_unmoved; F1 verify-F1/f1 (A); M2 money-ship-v10/m5 (cover_many, cover_rejected);
--- F2 verify-F2/f2; R3 answers-trucks-v10/r3_question_key [d]; M1 money-ship-v10/k2_conflict (D).
+-- F2 verify-F2/f2; R3 answers-trucks-v10/r3_question_key [d]; M1 money-ship-v10/k2_conflict (D); (v11 patch) the runner
+-- db harness's probe-unchanged (V11-10), the re-check's N1 (V11-11), N2 (V11-12) and G1 (V11-1 made to require the lock);
+-- the reviewer's ownership-first case (V11-14: a stranger holding A's ids learns nothing of A's rows).
 -- ALLOW_RAW_TESTIMONY_WRITE (fixture rows in the stub tables of a throwaway database)
 \set ON_ERROR_STOP on
 \pset pager off
@@ -1670,8 +1710,9 @@ SELECT public.evidence_open_run(:'ua','pilot','ledger_vendor_date','script:v11',
 -- ------------------------------------------------------------------------------------------------ V11-1 (R1)
 :ADMIN
 SELECT t_assert((SELECT position('PERFORM 1 FROM image_capture_time_claims' in p.prosrc) BETWEEN 1 AND position('(v9, W1) the instant he rejected' in p.prosrc)
+                        AND p.prosrc ~ 'PERFORM 1 FROM image_capture_time_claims\s+WHERE image_id = \(x->>''image_id''\)::uuid AND user_id = r\.user_id AND superseded_by IS NULL FOR UPDATE;'
                    FROM pg_proc p WHERE p.oid = 'public.propose_capture_time_claims(uuid,jsonb)'::regprocedure),
-  'V11-1 R1: a capture-time proposal takes the photo''s current claim lock before its day check (the race itself: race_r1.sh)');
+  'V11-1 R1: a capture-time proposal locks the photo''s current claim (FOR UPDATE) before its day check (the race itself: race_r1.sh)');
 
 -- ------------------------------------------------------------------------------------------------ V11-2 (R2)
 -- V1 is merged into V3 as live merge_into_primary does: PM moves to V3 stamped merged_from V1; PB stays on V1 (the
@@ -1838,6 +1879,188 @@ SELECT t_assert(NOT EXISTS (SELECT 1 FROM jsonb_array_elements(public.vehicle_ac
                              WHERE q->>'q' = 'acquisition_conflict' AND q->'claim_ids' = (SELECT jsonb_agg(x ORDER BY x) FROM (VALUES (:'kc1'::uuid), (:'kc2'::uuid)) v(x))),
   'V11-7 M1: bought, sold and bought back is not a conflict; two purchases 19 days apart are');
 
+-- ------------------------------------------------------------------------------------------------ V11-10 (unchanged)
+-- the runner db harness's probe: photo PF filed on the merged-away row VB (VB merged into VK2), the pass names the survivor;
+-- photo PS filed on the survivor itself; the same lines in two runs of the pass
+-- ALLOW_RAW_TESTIMONY_WRITE (fixture rows in the stub tables of a throwaway database)
+SELECT gen_random_uuid() AS vk2, gen_random_uuid() AS vb2, gen_random_uuid() AS pf, gen_random_uuid() AS ps \gset
+:ADMIN
+INSERT INTO public.vehicles(id, owner_id) VALUES (:'vk2', :'ua'), (:'vb2', :'ua');
+UPDATE public.vehicles SET merged_into_vehicle_id = :'vk2', deleted_at = now(), status = 'merged' WHERE id = :'vb2';
+INSERT INTO public.vehicle_images(id, vehicle_id, user_id, taken_at) VALUES (:'pf', :'vb2', :'ua', '2024-06-20 18:00+00'), (:'ps', :'vk2', :'ua', '2024-06-21 18:00+00');
+:JOB
+SELECT public.evidence_open_run(:'ua','pilot','combined','script:v11','sha-u1','{}','{}',NULL,NULL,:'loop') AS ru1 \gset
+SELECT public.propose_image_candidates(:'ru1', ('[' ||
+  '{"image_id":"' || :'pf' || '","vehicle_id":"' || :'vk2' || '","verdict":"is_vehicle","join_key":"x","confidence":0.9,"evidence":[{"kind":"x"}],"pass_captured_on":"2024-06-20"},' ||
+  '{"image_id":"' || :'ps' || '","vehicle_id":"' || :'vk2' || '","verdict":"is_vehicle","join_key":"x","confidence":0.9,"evidence":[{"kind":"x"}],"pass_captured_on":"2024-06-21"}]')::jsonb) AS u1 \gset
+SELECT public.evidence_open_run(:'ua','pilot','combined','script:v11','sha-u2','{}','{}',NULL,NULL,:'loop') AS ru2 \gset
+SELECT public.propose_image_candidates(:'ru2', ('[' ||
+  '{"image_id":"' || :'pf' || '","vehicle_id":"' || :'vk2' || '","verdict":"is_vehicle","join_key":"x","confidence":0.9,"evidence":[{"kind":"x"}],"pass_captured_on":"2024-06-20"},' ||
+  '{"image_id":"' || :'ps' || '","vehicle_id":"' || :'vk2' || '","verdict":"is_vehicle","join_key":"x","confidence":0.9,"evidence":[{"kind":"x"}],"pass_captured_on":"2024-06-21"}]')::jsonb) AS u2 \gset
+SELECT t_assert((:'u1'::jsonb->>'proposed') = '2' AND (:'u2'::jsonb->>'proposed') = '0' AND (:'u2'::jsonb->>'unchanged') = '2'
+                AND (SELECT count(*) FROM public.image_vehicle_candidates WHERE image_id = :'pf') = 1
+                AND (SELECT vehicle_id FROM public.image_vehicle_candidates WHERE image_id = :'pf' AND superseded_by IS NULL) = :'vb2'
+                AND (SELECT count(*) FROM public.image_vehicle_candidates WHERE image_id = :'ps') = 1,
+  'V11-10 R2: the same line again is unchanged, for a photo filed on a merged-away row (stored on that row, named_by_pass) as for one on the named row');
+
+-- ------------------------------------------------------------------------------------------------ V11-11 (N1)
+SELECT gen_random_uuid() AS vn, gen_random_uuid() AS in1, gen_random_uuid() AS in2 \gset
+:ADMIN
+INSERT INTO public.vehicles(id, owner_id) VALUES (:'vn', :'ua');
+INSERT INTO public.vehicle_images(id, vehicle_id, user_id, taken_at) VALUES (:'in1', NULL, :'ua', '2024-06-22 18:00+00'), (:'in2', NULL, :'ua', '2024-06-23 18:00+00');
+:JOB
+SELECT public.propose_image_candidates(:'rc', ('[' ||
+  '{"image_id":"' || :'in1' || '","vehicle_id":"' || :'vn' || '","verdict":"is_vehicle","join_key":"x","confidence":0.9,"evidence":[{"kind":"x"}],"pass_captured_on":"2024-06-22"},' ||
+  '{"image_id":"' || :'in2' || '","vehicle_id":"' || :'vn' || '","verdict":"is_vehicle","join_key":"x","confidence":0.9,"evidence":[{"kind":"x"}],"pass_captured_on":"2024-06-23"}]')::jsonb) AS ncands \gset
+SELECT (:'ncands'::jsonb->'items'->0->>'candidate_id') AS cn1, (:'ncands'::jsonb->'items'->1->>'candidate_id') AS cn2 \gset
+\set ON_ERROR_STOP off
+SELECT public.evidence_open_run(:'ua','review','review_sheet','script:v11','sha', jsonb_build_object('sheet_sha256','n1a','items',2,'rows',jsonb_build_object(
+  '1', jsonb_build_object('targets', jsonb_build_array(jsonb_build_object('kind','image_candidate','id',:'cn1'))),
+  '2', jsonb_build_object('targets', jsonb_build_array(jsonb_build_object('kind','image_candidate','id',:'cn1'))))));
+\set ON_ERROR_STOP on
+SELECT t_refused('V11-11 N1: two fresh rows asking one question about one candidate are refused', :'SQLSTATE', :'LAST_ERROR_MESSAGE', '22023', 'a sheet asks a question once%');
+SELECT public.evidence_open_run(:'ua','review','review_sheet','script:v11','sha', jsonb_build_object('sheet_sha256','n1-root','items',1,'rows',jsonb_build_object(
+  '1', jsonb_build_object('targets', jsonb_build_array(jsonb_build_object('kind','image_candidate','id',:'cn1')))))) AS sn1 \gset
+SELECT public.evidence_close_run(:'sn1', 'done', '{}'::jsonb);
+\set ON_ERROR_STOP off
+SELECT public.evidence_open_run(:'ua','review','review_sheet','script:v11','sha', jsonb_build_object('sheet_sha256','n1b','items',2,'rows',jsonb_build_object(
+  '1', jsonb_build_object('reask_of', 'review:' || :'sn1' || '#1'),
+  '2', jsonb_build_object('targets', jsonb_build_array(jsonb_build_object('kind','image_candidate','id',:'cn1'))))));
+\set ON_ERROR_STOP on
+SELECT t_refused('V11-11 N1: a re-ask beside a fresh row on the target it re-asks is refused', :'SQLSTATE', :'LAST_ERROR_MESSAGE', '22023', 'a sheet asks a question once%');
+\set ON_ERROR_STOP off
+SELECT public.evidence_open_run(:'ua','review','review_sheet','script:v11','sha', jsonb_build_object('sheet_sha256','n1c','items',2,'rows',jsonb_build_object(
+  '1', jsonb_build_object('question','image_candidate','targets', jsonb_build_array(jsonb_build_object('kind','image','id',:'in1'))),
+  '2', jsonb_build_object('question','image_candidate','targets', jsonb_build_array(jsonb_build_object('kind','image','id',:'in1'))))));
+\set ON_ERROR_STOP on
+SELECT t_refused('V11-11 N1: two slot rows asking which truck one photo shows are refused', :'SQLSTATE', :'LAST_ERROR_MESSAGE', '22023', 'a sheet asks a question once%');
+SELECT public.propose_change_claim(:'rd', jsonb_build_object('vehicle_id',:'vn','claim_domain','custody','kind','acquisition','occurred_from','2024-03-01',
+  'occurred_to','2024-03-05','amount_cents',500000,'summary','bought','confidence',0.8), '[]'::jsonb) AS kn \gset
+SELECT public.propose_evidence_links(:'rl', ('[' ||
+  '{"vehicle_id":"' || :'vn' || '","source_kind":"bank_line","external_ref":"bank:v11-n1","occurred_on":"2024-03-04","direction":"out","amount_cents":9000,"role":"payment_out","payment_key":"bank:v11-n1","cost_category":"parts","from_account_ref":"bank_account:v11.main","join_key":"x","confidence":0.9,"evidence":[{"kind":"bank"}]},' ||
+  '{"vehicle_id":"' || :'vn' || '","source_kind":"message","external_ref":"msg:v11-n1a","occurred_on":"2024-03-04","direction":"out","role":"contradicts","payment_key":"bank:v11-n1","join_key":"msg","confidence":0.6,"evidence":[{"kind":"msg"}]},' ||
+  '{"vehicle_id":"' || :'vn' || '","source_kind":"message","external_ref":"msg:v11-n1b","occurred_on":"2024-03-05","direction":"out","role":"contradicts","payment_key":"bank:v11-n1","join_key":"msg","confidence":0.6,"evidence":[{"kind":"msg"}]}]')::jsonb) AS lkn \gset
+SELECT (:'lkn'::jsonb->'items'->1->>'link_id') AS conn1, (:'lkn'::jsonb->'items'->2->>'link_id') AS conn2 \gset
+SELECT public.evidence_open_run(:'ua','review','review_sheet','script:v11','sha', jsonb_build_object('sheet_sha256','n1-ok','items',6,'rows',jsonb_build_object(
+  '1', jsonb_build_object('targets', jsonb_build_array(jsonb_build_object('kind','image_candidate','id',:'cn1'))),
+  '2', jsonb_build_object('targets', jsonb_build_array(jsonb_build_object('kind','image_candidate','id',:'cn2'))),
+  '3', jsonb_build_object('question','capture_time_claim','targets', jsonb_build_array(jsonb_build_object('kind','image','id',:'in1'))),
+  '4', jsonb_build_object('targets', jsonb_build_array(jsonb_build_object('kind','change_claim','id',:'kn'))),
+  '5', jsonb_build_object('asks','party','targets', jsonb_build_array(jsonb_build_object('kind','change_claim','id',:'kn'))),
+  '6', jsonb_build_object('targets', jsonb_build_array(jsonb_build_object('kind','evidence_link','id',:'conn1'), jsonb_build_object('kind','payment','key','bank:v11-n1'))))))
+  AS sn_ok \gset
+SELECT public.evidence_open_run(:'ua','review','review_sheet','script:v11','sha', jsonb_build_object('sheet_sha256','n1-ok2','items',3,'rows',jsonb_build_object(
+  '1', jsonb_build_object('targets', jsonb_build_array(jsonb_build_object('kind','evidence_link','id',:'conn1'), jsonb_build_object('kind','payment','key','bank:v11-n1'))),
+  '2', jsonb_build_object('targets', jsonb_build_array(jsonb_build_object('kind','evidence_link','id',:'conn2'), jsonb_build_object('kind','payment','key','bank:v11-n1'))),
+  '3', jsonb_build_object('question','image_candidate','targets', jsonb_build_array(jsonb_build_object('kind','image','id',:'in1')))))) AS sn_ok2 \gset
+SELECT t_assert(:'sn_ok' <> '' AND :'sn_ok2' <> '',
+  'V11-11 N1: a sheet still opens with other candidates, another question on one photo, a place and a who-paid row on one claim, two sources contradicting one payment, and a candidate row beside a slot row on its photo');
+
+-- ------------------------------------------------------------------------------------------------ V11-12 (N2)
+-- truck F2: two near-duplicate purchases in 2023 and two in 2025 (a sale between); truck G: a chain within 30 days
+SELECT gen_random_uuid() AS vf2, gen_random_uuid() AS vg \gset
+:ADMIN
+INSERT INTO public.vehicles(id, owner_id) VALUES (:'vf2', :'ua'), (:'vg', :'ua');
+:JOB
+SELECT public.propose_change_claim(:'rd', jsonb_build_object('vehicle_id',:'vf2','claim_domain','custody','kind','acquisition','occurred_from','2023-03-01',
+  'occurred_to','2023-03-01','amount_cents',400000,'summary','bought','confidence',0.8), '[]'::jsonb) AS f23a \gset
+SELECT public.propose_change_claim(:'rd', jsonb_build_object('vehicle_id',:'vf2','claim_domain','custody','kind','acquisition','occurred_from','2023-03-15',
+  'occurred_to','2023-03-15','amount_cents',410000,'summary','bought (deal sheet)','confidence',0.8), '[]'::jsonb) AS f23b \gset
+SELECT public.propose_change_claim(:'rd', jsonb_build_object('vehicle_id',:'vf2','claim_domain','custody','kind','sale','occurred_from','2024-05-01',
+  'occurred_to','2024-05-01','amount_cents',450000,'summary','sold','confidence',0.8), '[]'::jsonb) AS f24s \gset
+SELECT public.propose_change_claim(:'rd', jsonb_build_object('vehicle_id',:'vf2','claim_domain','custody','kind','acquisition','occurred_from','2025-06-01',
+  'occurred_to','2025-06-01','amount_cents',380000,'summary','bought back','confidence',0.8), '[]'::jsonb) AS f25a \gset
+SELECT public.propose_change_claim(:'rd', jsonb_build_object('vehicle_id',:'vf2','claim_domain','custody','kind','acquisition','occurred_from','2025-06-20',
+  'occurred_to','2025-06-20','amount_cents',385000,'summary','bought back (deal sheet)','confidence',0.8), '[]'::jsonb) AS f25b \gset
+SELECT public.propose_change_claim(:'rd', jsonb_build_object('vehicle_id',:'vg','claim_domain','custody','kind','acquisition','occurred_from','2024-01-01',
+  'occurred_to','2024-01-01','amount_cents',100000,'summary','a','confidence',0.8), '[]'::jsonb) AS g1 \gset
+SELECT public.propose_change_claim(:'rd', jsonb_build_object('vehicle_id',:'vg','claim_domain','custody','kind','acquisition','occurred_from','2024-01-25',
+  'occurred_to','2024-01-25','amount_cents',100000,'summary','b','confidence',0.8), '[]'::jsonb) AS g2 \gset
+SELECT public.propose_change_claim(:'rd', jsonb_build_object('vehicle_id',:'vg','claim_domain','custody','kind','acquisition','occurred_from','2024-02-20',
+  'occurred_to','2024-02-20','amount_cents',100000,'summary','c','confidence',0.8), '[]'::jsonb) AS g3 \gset
+:OWNER
+SELECT (SELECT jsonb_agg(q->'claim_ids' ORDER BY q->'claim_ids'->>0) FROM jsonb_array_elements(public.vehicle_accounting_evidence(:'vf2')->'open_questions') q
+         WHERE q->>'q' = 'acquisition_conflict') AS f_q \gset
+SELECT t_assert(jsonb_array_length(:'f_q'::jsonb) = 2
+                AND :'f_q'::jsonb @> jsonb_build_array((SELECT jsonb_agg(x ORDER BY x) FROM (VALUES (:'f23a'::uuid), (:'f23b'::uuid)) v(x)))
+                AND :'f_q'::jsonb @> jsonb_build_array((SELECT jsonb_agg(x ORDER BY x) FROM (VALUES (:'f25a'::uuid), (:'f25b'::uuid)) v(x))),
+  'V11-12 N2: two separate conflicts on one truck are two questions, each naming its own pair');
+SELECT public.decide_evidence('change_claim', ARRAY[:'f23a']::uuid[], 'rejected', 'the deal sheet is right', 'app:v11-12', 'owner_app')->'items'->0->>'result' AS f23a_no \gset
+SELECT t_assert(:'f23a_no' = 'rejected'
+                AND (SELECT count(*) FROM jsonb_array_elements(public.vehicle_accounting_evidence(:'vf2')->'open_questions') q WHERE q->>'q' = 'acquisition_conflict') = 1
+                AND EXISTS (SELECT 1 FROM jsonb_array_elements(public.vehicle_accounting_evidence(:'vf2')->'open_questions') q
+                             WHERE q->>'q' = 'acquisition_conflict' AND q->'claim_ids' = (SELECT jsonb_agg(x ORDER BY x) FROM (VALUES (:'f25a'::uuid), (:'f25b'::uuid)) v(x)))
+                AND (SELECT count(*) FROM jsonb_array_elements(public.vehicle_accounting_evidence(:'vg')->'open_questions') q WHERE q->>'q' = 'acquisition_conflict') = 1
+                AND EXISTS (SELECT 1 FROM jsonb_array_elements(public.vehicle_accounting_evidence(:'vg')->'open_questions') q
+                             WHERE q->>'q' = 'acquisition_conflict' AND jsonb_array_length(q->'claim_ids') = 3),
+  'V11-12 N2: once he answers the 2023 pair only the 2025 pair is asked; claims chained within 30 days are one question');
+
+-- ------------------------------------------------------------------------------------------------ V11-14 (ownership first)
+-- the reviewer's case: a signed-in stranger B (his own aal2 session) holding ids of A's rows. Every decision refuses another
+-- user's row right after loading it ('not your evidence', 42501), before p_expected, a claim's day, a link's kind, a photo's
+-- state or a who-paid row's money is compared. 79bfe891 answered B's wrong p_expected with changed_since_review and the
+-- photo's current vehicle, B's "no, it was <the claim's day>" with the day error, the album and photo cases with not_current
+-- and the who-paid case with another message.
+SELECT gen_random_uuid() AS ub, gen_random_uuid() AS sb, gen_random_uuid() AS vbo, gen_random_uuid() AS po \gset
+SELECT auth.t_seed_session(:'sb', :'ub');
+\set STRANGER 'RESET ROLE; RESET SESSION AUTHORIZATION; SET SESSION AUTHORIZATION authenticator; SET ROLE authenticated; SET request.jwt.claim.role = ''authenticated''; SET request.jwt.claim.sub = ''' :ub '''; SET request.jwt.claims = ''{"sub":"' :ub '","role":"authenticated","aal":"aal2","session_id":"' :sb '","amr":[{"method":"totp","timestamp":1700000100}]}'';'
+:ADMIN
+INSERT INTO public.profiles(id) VALUES (:'ub');
+INSERT INTO public.vehicles(id, owner_id) VALUES (:'vbo', :'ub');
+INSERT INTO public.vehicle_images(id, vehicle_id, user_id, taken_at) VALUES (:'po', :'vw', :'ua', '2024-06-25 18:00+00');
+:JOB
+SELECT public.evidence_open_run(:'ua','pilot','time_offset','script:v11','sha','{}') AS rto \gset
+SELECT public.propose_image_candidates(:'rc', ('[{"image_id":"' || :'po' || '","vehicle_id":"' || :'vw' || '","verdict":"is_vehicle","join_key":"x","confidence":0.9,"evidence":[{"kind":"x"}],"pass_captured_on":"2024-06-25"}]')::jsonb)->'items'->0->>'candidate_id' AS oc \gset
+SELECT public.propose_capture_time_claims(:'rto', ('[{"image_id":"' || :'po' || '","stored_taken_at":"2024-06-25 18:00+00","corrected_taken_at":"2024-06-25 14:00:00+00","offset_seconds":14400,"captured_on":"2024-06-25","rule":"batch_offset_v1","batch_key":"v11o","witness":{"upload_day":"2024-06-26"},"confidence":0.6}]')::jsonb)->>'proposed' AS ot_n \gset
+SELECT id AS ot FROM public.image_capture_time_claims WHERE image_id = :'po' AND superseded_by IS NULL \gset
+SELECT public.propose_evidence_links(:'rl', ('[{"vehicle_id":"' || :'vw' || '","source_kind":"bank_line","external_ref":"bank:v11-o","occurred_on":"2024-06-25","direction":"out","amount_cents":5000,"role":"payment_out","payment_key":"bank:v11-o","cost_category":"parts","from_account_ref":"bank_account:v11.main","join_key":"x","confidence":0.9,"evidence":[{"kind":"bank"}]}]')::jsonb)->'items'->0->>'link_id' AS ol \gset
+SELECT public.propose_change_claim(:'rd', jsonb_build_object('vehicle_id',:'vw','claim_domain','custody','kind','sale','occurred_from','2024-07-01',
+  'occurred_to','2024-07-01','amount_cents',700000,'summary','sold','confidence',0.8), '[]'::jsonb) AS oclaim \gset
+-- B's own who-paid row about his own purchase, and his stored answer to it
+SELECT public.evidence_open_run(:'ub','pilot','deal_document','script:v11','sha','{}') AS rdb \gset
+SELECT public.propose_change_claim(:'rdb', jsonb_build_object('vehicle_id',:'vbo','claim_domain','custody','kind','acquisition','occurred_from','2024-02-01',
+  'occurred_to','2024-02-02','amount_cents',300000,'summary','B bought','confidence',0.8), '[]'::jsonb) AS kb \gset
+SELECT public.evidence_open_run(:'ub','review','review_sheet','script:v11','sha', jsonb_build_object('sheet_sha256','v11-b','items',1,'rows',jsonb_build_object(
+  '1', jsonb_build_object('asks','party','targets', jsonb_build_array(jsonb_build_object('kind','change_claim','id',:'kb')))))) AS sbw \gset
+SELECT public.evidence_close_run(:'sbw', 'done', '{}'::jsonb);
+SELECT pg_sleep(0.02);
+SELECT public.evidence_record_answers(:'ub', :'sbw', 'v11:b-' || :'tag', '{"1":{"verbatim":"I paid","answer":{"decision":"confirmed","entity_key":"owner"}}}'::jsonb, 'script:v11', 'sha', clock_timestamp()) AS abw \gset
+:STRANGER
+\set ON_ERROR_STOP off
+SELECT public.decide_evidence('image_candidate', ARRAY[:'oc']::uuid[], 'rejected', 'not that truck', 'app:v11-14a', 'owner_app', NULL, jsonb_build_object(:'oc', :'vbo'));
+\set ON_ERROR_STOP on
+SELECT t_refused('V11-14: B on A''s candidate with a wrong p_expected is refused, with no detail of it (79bfe891: changed_since_review and its photo''s current vehicle)', :'SQLSTATE', :'LAST_ERROR_MESSAGE', '42501', 'not your evidence');
+\set ON_ERROR_STOP off
+SELECT public.decide_evidence('capture_time_claim', ARRAY[:'ot']::uuid[], 'rejected', 'no', 'app:v11-14b', 'owner_app', NULL, NULL, NULL, NULL, NULL, '{"captured_on":"2024-06-25"}'::jsonb);
+\set ON_ERROR_STOP on
+SELECT t_refused('V11-14: B''s "no, it was <the day A''s claim says>" is refused before the day is compared (79bfe891: the day error)', :'SQLSTATE', :'LAST_ERROR_MESSAGE', '42501', 'not your evidence');
+\set ON_ERROR_STOP off
+SELECT public.decide_evidence('album_map', ARRAY[:'ol']::uuid[], 'confirmed', 'yes', 'app:v11-14c', 'owner_app');
+\set ON_ERROR_STOP on
+SELECT t_refused('V11-14: B on A''s link under the wrong kind is refused before its kind is told (79bfe891: not_current)', :'SQLSTATE', :'LAST_ERROR_MESSAGE', '42501', 'not your evidence');
+\set ON_ERROR_STOP off
+SELECT public.decide_evidence('image_publication', ARRAY[:'po']::uuid[], 'confirmed', 'publish it', 'app:v11-14d', 'owner_app');
+\set ON_ERROR_STOP on
+SELECT t_refused('V11-14: B on the publication of A''s photo is refused before its state and scope are read (79bfe891: not_current)', :'SQLSTATE', :'LAST_ERROR_MESSAGE', '42501', 'not your evidence');
+\set ON_ERROR_STOP off
+SELECT public.decide_evidence('change_claim', ARRAY[:'oclaim']::uuid[], 'confirmed', 'I paid', 'review:' || :'sbw' || '#1', 'owner_app', NULL, NULL, NULL, NULL,
+  'answers:' || :'abw' || '#1', '{"entity_key":"owner"}'::jsonb);
+\set ON_ERROR_STOP on
+SELECT t_refused('V11-14: B''s who-paid answer naming A''s claim is refused before the money is compared', :'SQLSTATE', :'LAST_ERROR_MESSAGE', '42501', 'not your evidence');
+:ADMIN
+SELECT t_assert(:'ot_n' = '1' AND :'oc' <> '' AND :'ol' <> ''
+                AND NOT EXISTS (SELECT 1 FROM public.evidence_decisions WHERE user_id = :'ub' OR target_id IN (:'oc', :'ot', :'ol', :'po', :'oclaim'))
+                AND NOT EXISTS (SELECT 1 FROM public.evidence_links WHERE user_id = :'ub' AND source_kind = 'owner_statement'),
+  'V11-14: nothing of B''s five attempts was written');
+:OWNER
+SELECT public.decide_evidence('image_candidate', ARRAY[:'oc']::uuid[], 'rejected', 'not that truck', 'app:v11-14e', 'owner_app', NULL, jsonb_build_object(:'oc', :'v3'))->'items'->0 AS o_own \gset
+\set ON_ERROR_STOP off
+SELECT public.decide_evidence('capture_time_claim', ARRAY[:'ot']::uuid[], 'rejected', 'no', 'app:v11-14f', 'owner_app', NULL, NULL, NULL, NULL, NULL, '{"captured_on":"2024-06-25"}'::jsonb);
+\set ON_ERROR_STOP on
+SELECT t_refused('V11-14 control: A''s own "no, it was <the day his claim says>" still gets the day error', :'SQLSTATE', :'LAST_ERROR_MESSAGE', '22023', '"no, it was 2024-06-25" names the day this claim already says%');
+SELECT t_assert(:'o_own'::jsonb->>'result' = 'changed_since_review' AND :'o_own'::jsonb->>'current_vehicle_id' = :'vw',
+  'V11-14 control: A''s own wrong p_expected still reads changed_since_review with his photo''s current vehicle');
+
 -- ------------------------------------------------------------------------------------------------ V11-8 (shape)
 SELECT t_assert((SELECT array_agg(k ORDER BY k) FROM jsonb_object_keys(public.vehicle_accounting_evidence(:'vf')->'stated') k) = ARRAY['statements','undated']
                 AND (SELECT bool_and(s ? 'counts' AND s->'answers' ? 'on' AND s->'answers' ? 'status' AND s->'answers' ? 'current' AND s ? 'covered_cents')
@@ -1856,8 +2079,8 @@ RESET ROLE; RESET SESSION AUTHORIZATION;
 \pset format aligned
 \pset tuples_only off
 SELECT coalesce(nullif(current_setting('t.passed', true), ''), '0') AS g_passed \gset
-SELECT t_assert(:g_passed = 13, 'group v11: every one of its 13 checks ran and passed');
-\echo 'group v11: 13 checks passed'
+SELECT t_assert(:g_passed = 28, 'group v11: every one of its 28 checks ran and passed');
+\echo 'group v11: 28 checks passed'
 SELECT :passed_total + :g_passed + 1 AS passed_total \gset
 \c :main_db
 DROP DATABASE :"grp_db" WITH (FORCE);
@@ -1870,6 +2093,8 @@ CREATE DATABASE :"grp_db" TEMPLATE :"tmpl_db" STRATEGY FILE_COPY;   -- a file co
 \c :grp_db
 SET TimeZone = 'America/Los_Angeles'; SET DateStyle = 'ISO, MDY';
 \set ON_ERROR_STOP on
+-- this scenario sets RLS on vehicles itself: the template's live policies on it are taken off first, as captured
+DROP POLICY IF EXISTS "vehicles_private_select" ON public.vehicles; DROP POLICY IF EXISTS "vehicles_public_select" ON public.vehicles; ALTER TABLE public.vehicles DISABLE ROW LEVEL SECURITY;
 -- the owner sessions this group uses, in the auth server's records
 SELECT auth.t_seed_session('11ccfd5a-4e40-50e2-87d5-332c6475234d', '6785a1bb-0000-4000-8000-0000000000a7', 'ok'), auth.t_seed_session('1df7673c-bcd5-573e-b376-066f35aa4376', '1e537477-0000-4000-8000-000000000055', 'ok'), auth.t_seed_session('270f15dd-0000-4000-8000-0000000005e5', '04a48522-bef4-4fe9-9b9c-4ccd2b8f90b8', 'ok'), auth.t_seed_session('270f15dd-0000-4000-8000-0000000007a7', '6785a1bb-0000-4000-8000-0000000000a7', 'ok'), auth.t_seed_session('270f15dd-0000-4000-8000-0000000007a8', '6785a1bb-0000-4000-8000-0000000000a7', 'ok'), auth.t_seed_session('270f15dd-0000-4000-8000-0000000007b7', '67da5926-0000-4000-8000-0000000000b7', 'ok'), auth.t_seed_session('270f15dd-0000-4000-8000-000000000ca7', '68976f27-0000-4000-8000-0000000000a7', 'ok'), auth.t_seed_session('270f15dd-0000-4000-8000-000000000db7', '7633bd04-0000-4000-8000-0000000000b7', 'ok'), auth.t_seed_session('2dc2a0ab-0000-4000-8000-000000000001', '68976f27-0000-4000-8000-0000000000a7', 'young'), auth.t_seed_session('2dc2a0ab-0000-4000-8000-000000000002', '68976f27-0000-4000-8000-0000000000a7', 'stale'), auth.t_seed_session('2dc2a0ab-0000-4000-8000-000000000003', '68976f27-0000-4000-8000-0000000000a7', 'aal1'), auth.t_seed_session('383e0d1f-0000-4000-8000-000000000ea7', '7b5ad4ca-0000-4000-8000-0000000000a7', 'ok'), auth.t_seed_session('383e0d1f-0000-4000-8000-000000000fb7', '8bd3804a-0000-4000-8000-0000000000b7', 'ok'), auth.t_seed_session('4ee0a7fb-0000-4000-8000-0000000005e5', '04a48522-bef4-4fe9-9b9c-4ccd2b8f90b8', 'ok'), auth.t_seed_session('8c94320d-ce16-5dbc-acce-2b827f37518b', '7b5ad4ca-0000-4000-8000-0000000000a7', 'ok'), auth.t_seed_session('c977a323-86a1-5352-9e06-c043fad24ab3', '1e537477-0000-4000-8000-000000000055', 'ok'), auth.t_seed_session('d2c467da-5e2d-5104-984e-22179882808e', '68976f27-0000-4000-8000-0000000000a7', 'ok');
 -- ---------------------------------------------------------------------------- scenario_h.sql
@@ -2059,7 +2284,7 @@ SELECT id AS c8805 FROM image_vehicle_candidates WHERE image_id='000873b0-0000-4
 \o :outf
 SELECT propose_capture_time_claims(:'r_time', '[
  {"image_id":"000873b0-0000-4000-8000-000000000119","stored_taken_at":"2024-01-19 02:10:00+00","corrected_taken_at":"2024-01-19 02:10:00+00","offset_seconds":0,"captured_on":"2024-01-18","rule":"photos_exif_join","witness":{"photos_uuid":"p1","stem":"DSC_1","unique_match":true},"confidence":0.99},
- {"image_id":"000873b0-0000-4000-8000-0000000000d1","stored_taken_at":"2024-04-21 01:00:00+00","corrected_taken_at":"2024-04-20 22:00:00+00","offset_seconds":10800,"captured_on":"2024-04-20","rule":"photos_exif_join","witness":{"photos_uuid":"p2","stem":"IMG_6079","unique_match":true},"confidence":0.99},
+ {"image_id":"000873b0-0000-4000-8000-0000000000d1","stored_taken_at":"2024-04-21 01:00:00+00","corrected_taken_at":"2024-04-20 22:00:00+00","offset_seconds":10800,"captured_on":"2024-04-20","rule":"photos_exif_join","witness":{"photos_uuid":"p2","stem":"IMG_8806","unique_match":true},"confidence":0.99},
  {"image_id":"000873b0-0000-4000-8000-000000000420","stored_taken_at":"2024-04-21 00:40:00+00","corrected_taken_at":"2024-04-20 21:38:00+00","offset_seconds":10920,"captured_on":"2024-04-20","rule":"photos_exif_join","witness":{"photos_uuid":"p3","stem":"IMG_8804","unique_match":true},"confidence":0.9},
  {"image_id":"000873b0-0000-4000-8000-000000000118","stored_taken_at":"2024-01-18 18:49:07+00","corrected_taken_at":"2024-01-18 18:49:07+00","offset_seconds":10800,"captured_on":"2024-01-18","rule":"photos_exif_join","witness":{"photos_uuid":"p4","stem":"IMG_8803","unique_match":true},"confidence":0.9}]');
 \o
@@ -3663,24 +3888,29 @@ SELECT id AS l_va FROM evidence_links WHERE user_id = :'UA' AND source_key = 'le
 SELECT id AS l_vs FROM evidence_links WHERE user_id = :'UA' AND source_key = 'pnl:v5:L101' AND superseded_by IS NULL \gset
 SELECT id AS l_con FROM evidence_links WHERE user_id = :'UA' AND source_key = 'msg:v5:c101' AND superseded_by IS NULL \gset
 SELECT (propose_account_entities(:'ra_acct', '[{"account_ref":"bank_account:v5.main","entity_key":"owner","confidence":0.6,"evidence":[{"kind":"ledger"}]}]')->'ids'->>0) AS a_main \gset
-SELECT evidence_open_run(:'UA','review','review_sheet','script:review','sha', jsonb_build_object('sheet_sha256','v5','items',4,'rows',jsonb_build_object(
+-- (v11 patch adapt) a sheet asks a question once about one target: v5's row 4 (the same link as row 3) is on a sheet of
+-- its own (rev4 #1, answers ans4 #1); nothing else of V3 changes
+SELECT evidence_open_run(:'UA','review','review_sheet','script:review','sha', jsonb_build_object('sheet_sha256','v5','items',3,'rows',jsonb_build_object(
   '1', jsonb_build_object('targets', jsonb_build_array(jsonb_build_object('kind','payment','key','bank:V5-L101'))),
   '2', jsonb_build_object('targets', jsonb_build_array(jsonb_build_object('kind','account','key','bank_account:v5.main'))),
-  '3', jsonb_build_object('targets', jsonb_build_array(jsonb_build_object('kind','evidence_link','id',:'l_va'))),
-  '4', jsonb_build_object('targets', jsonb_build_array(jsonb_build_object('kind','evidence_link','id',:'l_va')))))) AS rev \gset
+  '3', jsonb_build_object('targets', jsonb_build_array(jsonb_build_object('kind','evidence_link','id',:'l_va')))))) AS rev \gset
+SELECT evidence_open_run(:'UA','review','review_sheet','script:review','sha', jsonb_build_object('sheet_sha256','v5-4','items',1,'rows',jsonb_build_object(
+  '1', jsonb_build_object('targets', jsonb_build_array(jsonb_build_object('kind','evidence_link','id',:'l_va')))))) AS rev4 \gset
+SELECT public.evidence_close_run(:'rev4'::uuid, 'done', '{"sent":"v11_adapt"}'::jsonb) \g /dev/null
 \echo '    V3a an answer row must carry its structured reading (expect ERROR needs answer)'
 SELECT public.evidence_close_run(:'rev'::uuid, 'done', '{"sent":"v9_adapt"}'::jsonb) FROM public.evidence_runs WHERE id = :'rev'::uuid AND user_id = :'UA'::uuid AND status = 'running' AND run_kind = 'review' \g /dev/null
 \o :outf
 SELECT evidence_record_answers(:'UA', :'rev', 'session-sim:v5-0', '{"1":{"verbatim":"yes the A truck"}}', 'script:review', 'sha', now());
 \o
 \set got `cat :outf`
-SELECT t_out($l$human scenario_v5_h.sql:142 === V3 (rules-channels v4 #1) an agent decision is bound to his answer / V3a an answer row must carry its structured reading (expect ERROR needs answer)$l$, :'got', $e$<id>$e$);
+SELECT t_out($l$human scenario_v5_h.sql:146 === V3 (rules-channels v4 #1) an agent decision is bound to his answer / V3a an answer row must carry its structured reading (expect ERROR needs answer)$l$, :'got', $e$<id>$e$);
 SELECT public.evidence_close_run(:'rev'::uuid, 'done', '{"sent":"v9_adapt"}'::jsonb) FROM public.evidence_runs WHERE id = :'rev'::uuid AND user_id = :'UA'::uuid AND status = 'running' AND run_kind = 'review' \g /dev/null
 SELECT evidence_record_answers(:'UA', :'rev', 'session-sim:v5-1', jsonb_build_object(
   '1', jsonb_build_object('verbatim','yes that was for the A truck','answer',jsonb_build_object('decision','confirmed','vehicle_id',:'VA')),
   '2', jsonb_build_object('verbatim','that is my personal account','answer',jsonb_build_object('decision','confirmed','entity_key','owner')),
-  '3', jsonb_build_object('verbatim','not sure','answer',jsonb_build_object('decision','unsure')),
-  '4', jsonb_build_object('verbatim','no','answer',jsonb_build_object('decision','rejected'))), 'script:review', 'sha', now()) AS ans \gset
+  '3', jsonb_build_object('verbatim','not sure','answer',jsonb_build_object('decision','unsure'))), 'script:review', 'sha', now()) AS ans \gset
+SELECT evidence_record_answers(:'UA', :'rev4', 'session-sim:v5-1b', jsonb_build_object(
+  '1', jsonb_build_object('verbatim','no','answer',jsonb_build_object('decision','rejected'))), 'script:review', 'sha', now()) AS ans4 \gset
 \echo '    V3b "yes, the A truck": confirming the link that places it on another truck, or the contradiction here, is refused; confirming A''s link works (expect ERROR does not support; ERROR does not support; confirmed)'
 -- v8_human: the owner decides this himself, in his own step-up session (was an agent decision)
 RESET ROLE; RESET SESSION AUTHORIZATION; SET SESSION AUTHORIZATION authenticator; SET ROLE authenticated; SET request.jwt.claim.role = 'authenticated'; SET request.jwt.claim.sub = :'UA'; SET request.jwt.claims = '{"aal":"aal2","session_id":"11ccfd5a-4e40-50e2-87d5-332c6475234d","amr":[{"method":"totp","timestamp":1}]}';
@@ -3688,7 +3918,7 @@ RESET ROLE; RESET SESSION AUTHORIZATION; SET SESSION AUTHORIZATION authenticator
 SELECT decide_evidence('evidence_link', ARRAY[:'l_vs']::uuid[], 'confirmed', 'x', 'review:'||:'rev'||'#1', 'owner_app', :'UA', NULL, NULL, NULL, 'answers:'||:'ans'||'#1');
 \o
 \set got `cat :outf`
-SELECT t_out($l$human scenario_v5_h.sql:152 === V3 (rules-channels v4 #1) an agent decision is bound to his answer / V3b "yes, the A truck": confirming the link that places it on another truck, or the contradiction here, is refused; confirming A's link works (expect ERROR does not su$l$, :'got', $e${"items": [{"id": "<id>", "result": "not_on_answered_row", "answered_place": "<id>"}]}$e$);
+SELECT t_out($l$human scenario_v5_h.sql:157 === V3 (rules-channels v4 #1) an agent decision is bound to his answer / V3b "yes, the A truck": confirming the link that places it on another truck, or the contradiction here, is refused; confirming A's link works (expect ERROR does not su$l$, :'got', $e${"items": [{"id": "<id>", "result": "not_on_answered_row", "answered_place": "<id>"}]}$e$);
 :JOB
 -- v8_human: the owner decides this himself, in his own step-up session (was an agent decision)
 RESET ROLE; RESET SESSION AUTHORIZATION; SET SESSION AUTHORIZATION authenticator; SET ROLE authenticated; SET request.jwt.claim.role = 'authenticated'; SET request.jwt.claim.sub = :'UA'; SET request.jwt.claims = '{"aal":"aal2","session_id":"11ccfd5a-4e40-50e2-87d5-332c6475234d","amr":[{"method":"totp","timestamp":1}]}';
@@ -3696,7 +3926,7 @@ RESET ROLE; RESET SESSION AUTHORIZATION; SET SESSION AUTHORIZATION authenticator
 SELECT decide_evidence('evidence_link', ARRAY[:'l_con']::uuid[], 'confirmed', 'x', 'review:'||:'rev'||'#1', 'owner_app', :'UA', NULL, NULL, NULL, 'answers:'||:'ans'||'#1');
 \o
 \set got `cat :outf`
-SELECT t_out($l$human scenario_v5_h.sql:156 === V3 (rules-channels v4 #1) an agent decision is bound to his answer / V3b "yes, the A truck": confirming the link that places it on another truck, or the contradiction here, is refused; confirming A's link works (expect ERROR does not su$l$, :'got', $e${"items": [{"id": "<id>", "result": "not_on_answered_row"}]}$e$);
+SELECT t_out($l$human scenario_v5_h.sql:161 === V3 (rules-channels v4 #1) an agent decision is bound to his answer / V3b "yes, the A truck": confirming the link that places it on another truck, or the contradiction here, is refused; confirming A's link works (expect ERROR does not su$l$, :'got', $e${"items": [{"id": "<id>", "result": "not_on_answered_row"}]}$e$);
 :JOB
 -- v8_human: the owner decides this himself, in his own step-up session (was an agent decision)
 RESET ROLE; RESET SESSION AUTHORIZATION; SET SESSION AUTHORIZATION authenticator; SET ROLE authenticated; SET request.jwt.claim.role = 'authenticated'; SET request.jwt.claim.sub = :'UA'; SET request.jwt.claims = '{"aal":"aal2","session_id":"11ccfd5a-4e40-50e2-87d5-332c6475234d","amr":[{"method":"totp","timestamp":1}]}';
@@ -3704,7 +3934,7 @@ RESET ROLE; RESET SESSION AUTHORIZATION; SET SESSION AUTHORIZATION authenticator
 SELECT decide_evidence('evidence_link', ARRAY[:'l_va']::uuid[], 'confirmed', 'for the A truck', 'review:'||:'rev'||'#1', 'owner_app', :'UA', NULL, NULL, NULL, 'answers:'||:'ans'||'#1')->'items'->0->>'result';
 \o
 \set got `cat :outf`
-SELECT t_out($l$human scenario_v5_h.sql:160 === V3 (rules-channels v4 #1) an agent decision is bound to his answer / V3b "yes, the A truck": confirming the link that places it on another truck, or the contradiction here, is refused; confirming A's link works (expect ERROR does not su$l$, :'got', $e$confirmed$e$);
+SELECT t_out($l$human scenario_v5_h.sql:165 === V3 (rules-channels v4 #1) an agent decision is bound to his answer / V3b "yes, the A truck": confirming the link that places it on another truck, or the contradiction here, is refused; confirming A's link works (expect ERROR does not su$l$, :'got', $e$confirmed$e$);
 :JOB
 \echo '    V3c a pass re-proposes the account as a business after his answer "personal": that row cannot be confirmed under his answer (expect superseded row; ERROR written after his answers)'
 SELECT (propose_account_entities(:'ra_acct', '[{"account_ref":"bank_account:v5.main","entity_key":"owner_business:x","confidence":0.7,"evidence":[{"kind":"guess"}]}]')->'ids'->>0) AS a_main2 \gset
@@ -3714,7 +3944,7 @@ RESET ROLE; RESET SESSION AUTHORIZATION; SET SESSION AUTHORIZATION authenticator
 SELECT decide_evidence('account_entity', ARRAY[:'a_main2']::uuid[], 'confirmed', 'x', 'review:'||:'rev'||'#2', 'owner_app', :'UA', NULL, NULL, NULL, 'answers:'||:'ans'||'#2');
 \o
 \set got `cat :outf`
-SELECT t_out($l$human scenario_v5_h.sql:166 === V3 (rules-channels v4 #1) an agent decision is bound to his answer / V3c a pass re-proposes the account as a business after his answer "personal": that row cannot be confirmed under his answer (expect superseded row; ERROR written after$l$, :'got', $e${"items": [{"id": "<id>", "result": "row_changed_since_answer", "asked_target": "<id>"}]}$e$);
+SELECT t_out($l$human scenario_v5_h.sql:171 === V3 (rules-channels v4 #1) an agent decision is bound to his answer / V3c a pass re-proposes the account as a business after his answer "personal": that row cannot be confirmed under his answer (expect superseded row; ERROR written after$l$, :'got', $e${"items": [{"id": "<id>", "result": "row_changed_since_answer", "asked_target": "<id>"}]}$e$);
 :JOB
 \echo '    V3d an "unsure" answer decides nothing; a bare "no" decides only the target its row names, and only as a reject (expect ERROR not a yes or a no; ERROR does not support; rejected)'
 -- v8_human: the owner decides this himself, in his own step-up session (was an agent decision)
@@ -3723,23 +3953,23 @@ RESET ROLE; RESET SESSION AUTHORIZATION; SET SESSION AUTHORIZATION authenticator
 SELECT decide_evidence('evidence_link', ARRAY[:'l_va']::uuid[], 'rejected', 'x', 'review:'||:'rev'||'#3', 'owner_app', :'UA', NULL, NULL, NULL, 'answers:'||:'ans'||'#3');
 \o
 \set got `cat :outf`
-SELECT t_out($l$human scenario_v5_h.sql:171 === V3 (rules-channels v4 #1) an agent decision is bound to his answer / V3d an "unsure" answer decides nothing; a bare "no" decides only the target its row names, and only as a reject (expect ERROR not a yes or a no; ERROR does not support$l$, :'got', $e${"items": [{"id": "<id>", "result": "rejected", "decision_id": "<id>"}]}$e$);
+SELECT t_out($l$human scenario_v5_h.sql:176 === V3 (rules-channels v4 #1) an agent decision is bound to his answer / V3d an "unsure" answer decides nothing; a bare "no" decides only the target its row names, and only as a reject (expect ERROR not a yes or a no; ERROR does not support$l$, :'got', $e${"items": [{"id": "<id>", "result": "rejected", "decision_id": "<id>"}]}$e$);
 :JOB
 -- v8_human: the owner decides this himself, in his own step-up session (was an agent decision)
 RESET ROLE; RESET SESSION AUTHORIZATION; SET SESSION AUTHORIZATION authenticator; SET ROLE authenticated; SET request.jwt.claim.role = 'authenticated'; SET request.jwt.claim.sub = :'UA'; SET request.jwt.claims = '{"aal":"aal2","session_id":"11ccfd5a-4e40-50e2-87d5-332c6475234d","amr":[{"method":"totp","timestamp":1}]}';
 \o :outf
-SELECT decide_evidence('evidence_link', ARRAY[:'l_va']::uuid[], 'confirmed', 'x', 'review:'||:'rev'||'#4', 'owner_app', :'UA', NULL, NULL, NULL, 'answers:'||:'ans'||'#4');
+SELECT decide_evidence('evidence_link', ARRAY[:'l_va']::uuid[], 'confirmed', 'x', 'review:'||:'rev4'||'#1', 'owner_app', :'UA', NULL, NULL, NULL, 'answers:'||:'ans4'||'#1');
 \o
 \set got `cat :outf`
-SELECT t_out($l$human scenario_v5_h.sql:175 === V3 (rules-channels v4 #1) an agent decision is bound to his answer / V3d an "unsure" answer decides nothing; a bare "no" decides only the target its row names, and only as a reject (expect ERROR not a yes or a no; ERROR does not support$l$, :'got', $e${"items": [{"id": "<id>", "result": "confirmed", "decision_id": "<id>"}]}$e$);
+SELECT t_out($l$human scenario_v5_h.sql:180 === V3 (rules-channels v4 #1) an agent decision is bound to his answer / V3d an "unsure" answer decides nothing; a bare "no" decides only the target its row names, and only as a reject (expect ERROR not a yes or a no; ERROR does not support$l$, :'got', $e${"items": [{"id": "<id>", "result": "confirmed", "decision_id": "<id>"}]}$e$);
 :JOB
 -- v8_human: the owner decides this himself, in his own step-up session (was an agent decision)
 RESET ROLE; RESET SESSION AUTHORIZATION; SET SESSION AUTHORIZATION authenticator; SET ROLE authenticated; SET request.jwt.claim.role = 'authenticated'; SET request.jwt.claim.sub = :'UA'; SET request.jwt.claims = '{"aal":"aal2","session_id":"11ccfd5a-4e40-50e2-87d5-332c6475234d","amr":[{"method":"totp","timestamp":1}]}';
 \o :outf
-SELECT decide_evidence('evidence_link', ARRAY[:'l_va']::uuid[], 'rejected', 'no', 'review:'||:'rev'||'#4', 'owner_app', :'UA', NULL, NULL, NULL, 'answers:'||:'ans'||'#4')->'items'->0->>'result';
+SELECT decide_evidence('evidence_link', ARRAY[:'l_va']::uuid[], 'rejected', 'no', 'review:'||:'rev4'||'#1', 'owner_app', :'UA', NULL, NULL, NULL, 'answers:'||:'ans4'||'#1')->'items'->0->>'result';
 \o
 \set got `cat :outf`
-SELECT t_out($l$human scenario_v5_h.sql:179 === V3 (rules-channels v4 #1) an agent decision is bound to his answer / V3d an "unsure" answer decides nothing; a bare "no" decides only the target its row names, and only as a reject (expect ERROR not a yes or a no; ERROR does not support$l$, :'got', $e$rejected$e$);
+SELECT t_out($l$human scenario_v5_h.sql:184 === V3 (rules-channels v4 #1) an agent decision is bound to his answer / V3d an "unsure" answer decides nothing; a bare "no" decides only the target its row names, and only as a reject (expect ERROR not a yes or a no; ERROR does not support$l$, :'got', $e$rejected$e$);
 :JOB
 \echo '    V3e "no, it is Y" must reassign to the Y his answer names (expect ERROR the reassign vehicle must be the one his answer names)'
 SELECT evidence_open_run(:'UA','review','review_sheet','script:review','sha', jsonb_build_object('sheet_sha256','v5e','items',1,'rows',jsonb_build_object(
@@ -3753,7 +3983,7 @@ RESET ROLE; RESET SESSION AUTHORIZATION; SET SESSION AUTHORIZATION authenticator
 SELECT decide_evidence('evidence_link', ARRAY[:'l_va']::uuid[], 'rejected', 'x', 'review:'||:'rev_e'||'#1', 'owner_app', :'UA', NULL, :'VO', NULL, 'answers:'||:'ans_e'||'#1');
 \o
 \set got `cat :outf`
-SELECT t_out($l$human scenario_v5_h.sql:189 === V3 (rules-channels v4 #1) an agent decision is bound to his answer / V3e "no, it is Y" must reassign to the Y his answer names (expect ERROR the reassign vehicle must be the one his answer names)$l$, :'got', $e${"items": [{"id": "<id>", "result": "rejected", "decision_id": "<id>", "reassigned_to": "<id>", "reassign_result": {"items": [{"id": "<id>", "result": "confirmed", "decision_id": "<id>"}]}, "reassign_decision_id": "<id>"}]}$e$);
+SELECT t_out($l$human scenario_v5_h.sql:194 === V3 (rules-channels v4 #1) an agent decision is bound to his answer / V3e "no, it is Y" must reassign to the Y his answer names (expect ERROR the reassign vehicle must be the one his answer names)$l$, :'got', $e${"items": [{"id": "<id>", "result": "rejected", "decision_id": "<id>", "reassigned_to": "<id>", "reassign_result": {"items": [{"id": "<id>", "result": "confirmed", "decision_id": "<id>"}]}, "reassign_decision_id": "<id>"}]}$e$);
 :JOB
 
 \echo '=== V4 (rules-channels v4 #2) his newer app decision stands against an older chat answer, and an agent never implied-rejects his own confirm'
@@ -3764,7 +3994,7 @@ SELECT propose_image_candidates(:'ra_comb', jsonb_build_array(
   jsonb_build_object('image_id',:'IA3','vehicle_id',:'VS','verdict','is_vehicle','join_key','y','confidence',0.5,'evidence','[{"kind":"y"}]'::jsonb,'pass_captured_on','2024-02-02')))->'proposed';
 \o
 \set got `cat :outf`
-SELECT t_out($l$human scenario_v5_h.sql:194 === V4 (rules-channels v4 #2) his newer app decision stands against an older chat answer, and an agent never implied-rejects his own confirm$l$, :'got', $e$2$e$);
+SELECT t_out($l$human scenario_v5_h.sql:199 === V4 (rules-channels v4 #2) his newer app decision stands against an older chat answer, and an agent never implied-rejects his own confirm$l$, :'got', $e$2$e$);
 SELECT id AS c_a3 FROM image_vehicle_candidates WHERE image_id = :'IA3' AND vehicle_id = :'VA' AND superseded_by IS NULL \gset
 SELECT id AS c_s3 FROM image_vehicle_candidates WHERE image_id = :'IA3' AND vehicle_id = :'VS' AND superseded_by IS NULL \gset
 SELECT evidence_open_run(:'UA','review','review_sheet','script:review','sha', jsonb_build_object('sheet_sha256','v5b','items',1,'rows',jsonb_build_object(
@@ -3778,7 +4008,7 @@ SELECT evidence_record_answers(:'UA', :'rev_b', 'session-sim:v5-b', jsonb_build_
 SELECT decide_evidence('image_candidate', ARRAY[:'c_a3']::uuid[], 'rejected', 'not A', 'app:v5-tue', 'owner_app', NULL, jsonb_build_object(:'c_a3', NULL))->'items'->0->>'result';
 \o
 \set got `cat :outf`
-SELECT t_out($l$human scenario_v5_h.sql:206 === V4 (rules-channels v4 #2) his newer app decision stands against an older chat answer, and an agent never implied-rejects his own confirm / V4a Tuesday he rejects it in the app; Wednesday the job transcribes Monday's answer (expect rejec$l$, :'got', $e$rejected$e$);
+SELECT t_out($l$human scenario_v5_h.sql:211 === V4 (rules-channels v4 #2) his newer app decision stands against an older chat answer, and an agent never implied-rejects his own confirm / V4a Tuesday he rejects it in the app; Wednesday the job transcribes Monday's answer (expect rejec$l$, :'got', $e$rejected$e$);
 :JOB
 -- v8_human: the owner decides this himself, in his own step-up session (was an agent decision)
 RESET ROLE; RESET SESSION AUTHORIZATION; SET SESSION AUTHORIZATION authenticator; SET ROLE authenticated; SET request.jwt.claim.role = 'authenticated'; SET request.jwt.claim.sub = :'UA'; SET request.jwt.claims = '{"aal":"aal2","session_id":"11ccfd5a-4e40-50e2-87d5-332c6475234d","amr":[{"method":"totp","timestamp":1}]}';
@@ -3786,20 +4016,20 @@ RESET ROLE; RESET SESSION AUTHORIZATION; SET SESSION AUTHORIZATION authenticator
 SELECT decide_evidence('image_candidate', ARRAY[:'c_a3']::uuid[], 'confirmed', 'monday', 'review:'||:'rev_b'||'#1', 'owner_app', :'UA', jsonb_build_object(:'c_a3', NULL), NULL, NULL, 'answers:'||:'ans_b'||'#1')->'items'->0->>'result';
 \o
 \set got `cat :outf`
-SELECT t_out($l$human scenario_v5_h.sql:210 === V4 (rules-channels v4 #2) his newer app decision stands against an older chat answer, and an agent never implied-rejects his own confirm / V4a Tuesday he rejects it in the app; Wednesday the job transcribes Monday's answer (expect rejec$l$, :'got', $e$confirmed$e$);
+SELECT t_out($l$human scenario_v5_h.sql:215 === V4 (rules-channels v4 #2) his newer app decision stands against an older chat answer, and an agent never implied-rejects his own confirm / V4a Tuesday he rejects it in the app; Wednesday the job transcribes Monday's answer (expect rejec$l$, :'got', $e$confirmed$e$);
 :JOB
 \o :outf
 SELECT evidence_status('image_candidate', :'c_a3');
 \o
 \set got `cat :outf`
-SELECT t_out($l$human scenario_v5_h.sql:212 === V4 (rules-channels v4 #2) his newer app decision stands against an older chat answer, and an agent never implied-rejects his own confirm / V4a Tuesday he rejects it in the app; Wednesday the job transcribes Monday's answer (expect rejec$l$, :'got', $e$confirmed$e$);
+SELECT t_out($l$human scenario_v5_h.sql:217 === V4 (rules-channels v4 #2) his newer app decision stands against an older chat answer, and an agent never implied-rejects his own confirm / V4a Tuesday he rejects it in the app; Wednesday the job transcribes Monday's answer (expect rejec$l$, :'got', $e$confirmed$e$);
 \echo '    V4b he confirmed IA3 as the second truck in the app before a chat answer naming the A truck: the agent confirm stops, his confirm stays (expect confirmed; human_decision_stands; confirmed by human)'
 :OWNERA
 \o :outf
 SELECT decide_evidence('image_candidate', ARRAY[:'c_s3']::uuid[], 'confirmed', 'second truck', 'app:v5-thu', 'owner_app', NULL, jsonb_build_object(:'c_s3', NULL))->'items'->0->>'result';
 \o
 \set got `cat :outf`
-SELECT t_out($l$human scenario_v5_h.sql:215 === V4 (rules-channels v4 #2) his newer app decision stands against an older chat answer, and an agent never implied-rejects his own confirm / V4b he confirmed IA3 as the second truck in the app before a chat answer naming the A truck: the $l$, :'got', $e$confirmed$e$);
+SELECT t_out($l$human scenario_v5_h.sql:220 === V4 (rules-channels v4 #2) his newer app decision stands against an older chat answer, and an agent never implied-rejects his own confirm / V4b he confirmed IA3 as the second truck in the app before a chat answer naming the A truck: the $l$, :'got', $e$confirmed$e$);
 :JOB
 SELECT evidence_open_run(:'UA','review','review_sheet','script:review','sha', jsonb_build_object('sheet_sha256','v5c','items',1,'rows',jsonb_build_object(
   '1', jsonb_build_object('question','image_candidate','targets', jsonb_build_array(jsonb_build_object('kind','image','id',:'IA3')))))) AS rev_c \gset
@@ -3812,13 +4042,13 @@ RESET ROLE; RESET SESSION AUTHORIZATION; SET SESSION AUTHORIZATION authenticator
 SELECT decide_evidence('image_candidate', ARRAY[:'c_a3']::uuid[], 'confirmed', 'chat', 'review:'||:'rev_c'||'#1', 'owner_app', :'UA', jsonb_build_object(:'c_a3', NULL), NULL, NULL, 'answers:'||:'ans_c'||'#1')->'items'->0->>'result';
 \o
 \set got `cat :outf`
-SELECT t_out($l$human scenario_v5_h.sql:224 === V4 (rules-channels v4 #2) his newer app decision stands against an older chat answer, and an agent never implied-rejects his own confirm / V4b he confirmed IA3 as the second truck in the app before a chat answer naming the A truck: the $l$, :'got', $e$confirmed$e$);
+SELECT t_out($l$human scenario_v5_h.sql:229 === V4 (rules-channels v4 #2) his newer app decision stands against an older chat answer, and an agent never implied-rejects his own confirm / V4b he confirmed IA3 as the second truck in the app before a chat answer naming the A truck: the $l$, :'got', $e$confirmed$e$);
 :JOB
 \o :outf
 SELECT status || ' by ' || channel FROM v_evidence_status WHERE target_kind = 'image_candidate' AND target_id = :'c_s3';
 \o
 \set got `cat :outf`
-SELECT t_out($l$human scenario_v5_h.sql:226 === V4 (rules-channels v4 #2) his newer app decision stands against an older chat answer, and an agent never implied-rejects his own confirm / V4b he confirmed IA3 as the second truck in the app before a chat answer naming the A truck: the $l$, :'got', $e$rejected by implied$e$);
+SELECT t_out($l$human scenario_v5_h.sql:231 === V4 (rules-channels v4 #2) his newer app decision stands against an older chat answer, and an agent never implied-rejects his own confirm / V4b he confirmed IA3 as the second truck in the app before a chat answer naming the A truck: the $l$, :'got', $e$rejected by implied$e$);
 
 \echo '=== V5 (rules-channels v4 #3) the human channel needs a step-up session; the guard stamps it (expect ERROR step-up; aal2|t|["password", "totp"])'
 :JOB
@@ -3829,7 +4059,7 @@ SELECT propose_change_claim(:'ra_deal', jsonb_build_object('vehicle_id', :'VA', 
 SELECT decide_evidence('change_claim', ARRAY[:'paint']::uuid[], 'confirmed', 'yes', 'app:v5', 'owner_app');
 \set ON_ERROR_STOP on
 \set t_state :SQLSTATE
-SELECT t_refused($l$human scenario_v5_h.sql:232 === V5 (rules-channels v4 #3) the human channel needs a step-up session; the guard stamps it (expect ERROR step-up; aal2|t|["password", "totp"])$l$, :'LAST_ERROR_SQLSTATE', :'LAST_ERROR_MESSAGE', $s$42501$s$, $p$an owner decision needs a step-up (aal2) session: verify your second factor first$p$);
+SELECT t_refused($l$human scenario_v5_h.sql:237 === V5 (rules-channels v4 #3) the human channel needs a step-up session; the guard stamps it (expect ERROR step-up; aal2|t|["password", "totp"])$l$, :'LAST_ERROR_SQLSTATE', :'LAST_ERROR_MESSAGE', $s$42501$s$, $p$an owner decision needs a step-up (aal2) session: verify your second factor first$p$);
 \set SQLSTATE :t_state
 \set ERROR true
 :OWNERA
@@ -3837,12 +4067,12 @@ SELECT t_refused($l$human scenario_v5_h.sql:232 === V5 (rules-channels v4 #3) th
 SELECT decide_evidence('change_claim', ARRAY[:'paint']::uuid[], 'confirmed', 'yes', 'app:v5', 'owner_app')->'items'->0->>'result' IS NOT NULL AND true;
 \o
 \set got `cat :outf`
-SELECT t_out($l$human scenario_v5_h.sql:234 === V5 (rules-channels v4 #3) the human channel needs a step-up session; the guard stamps it (expect ERROR step-up; aal2|t|["password", "totp"])$l$, :'got', $e$t$e$);
+SELECT t_out($l$human scenario_v5_h.sql:239 === V5 (rules-channels v4 #3) the human channel needs a step-up session; the guard stamps it (expect ERROR step-up; aal2|t|["password", "totp"])$l$, :'got', $e$t$e$);
 \o :outf
 SELECT detail->>'aal' || '|' || (detail->>'session_id' IS NOT NULL)::text || '|' || (detail->'amr')::text FROM evidence_decisions WHERE target_id = :'paint';
 \o
 \set got `cat :outf`
-SELECT t_out($l$human scenario_v5_h.sql:235 === V5 (rules-channels v4 #3) the human channel needs a step-up session; the guard stamps it (expect ERROR step-up; aal2|t|["password", "totp"])$l$, :'got', $e$aal2|true|["password", "totp"]$e$);
+SELECT t_out($l$human scenario_v5_h.sql:240 === V5 (rules-channels v4 #3) the human channel needs a step-up session; the guard stamps it (expect ERROR step-up; aal2|t|["password", "totp"])$l$, :'got', $e$aal2|true|["password", "totp"]$e$);
 
 \echo '=== V6 (rules-channels v4 #4) whose money is his call: a pass may name only third parties (expect entity_is_owners_call twice; proposed; ERROR vcc_party_not_entity)'
 :JOB
@@ -3850,23 +4080,23 @@ SELECT t_out($l$human scenario_v5_h.sql:235 === V5 (rules-channels v4 #3) the hu
 SELECT propose_evidence_links(:'ra_gm', '[{"vehicle_id":"6785a1bb-0000-4000-8000-000000000001","source_kind":"gmail_order","external_ref":"gmail:v5:biz","occurred_on":"2024-03-02","direction":"out","amount_cents":5,"role":"assertion","payer_entity":"owner_business:x","join_key":"x","confidence":0.6,"evidence":[{"kind":"gmail"}]}]')->'items'->0->>'result';
 \o
 \set got `cat :outf`
-SELECT t_out($l$human scenario_v5_h.sql:239 === V6 (rules-channels v4 #4) whose money is his call: a pass may name only third parties (expect entity_is_owners_call twice; proposed; ERROR vcc_party_not_entity)$l$, :'got', $e$entity_is_owners_call$e$);
+SELECT t_out($l$human scenario_v5_h.sql:244 === V6 (rules-channels v4 #4) whose money is his call: a pass may name only third parties (expect entity_is_owners_call twice; proposed; ERROR vcc_party_not_entity)$l$, :'got', $e$entity_is_owners_call$e$);
 \o :outf
 SELECT propose_evidence_links(:'ra_gm', '[{"vehicle_id":"6785a1bb-0000-4000-8000-000000000001","source_kind":"gmail_order","external_ref":"gmail:v5:own","occurred_on":"2024-03-02","direction":"out","amount_cents":5,"role":"assertion","payer_entity":"owner","join_key":"x","confidence":0.6,"evidence":[{"kind":"gmail"}]}]')->'items'->0->>'result';
 \o
 \set got `cat :outf`
-SELECT t_out($l$human scenario_v5_h.sql:240 === V6 (rules-channels v4 #4) whose money is his call: a pass may name only third parties (expect entity_is_owners_call twice; proposed; ERROR vcc_party_not_entity)$l$, :'got', $e$entity_is_owners_call$e$);
+SELECT t_out($l$human scenario_v5_h.sql:245 === V6 (rules-channels v4 #4) whose money is his call: a pass may name only third parties (expect entity_is_owners_call twice; proposed; ERROR vcc_party_not_entity)$l$, :'got', $e$entity_is_owners_call$e$);
 \o :outf
 SELECT propose_evidence_links(:'ra_gm', '[{"vehicle_id":"6785a1bb-0000-4000-8000-000000000001","source_kind":"gmail_order","external_ref":"gmail:v5:vendor","occurred_on":"2024-03-02","direction":"out","amount_cents":5,"role":"assertion","payee_entity":"third_party:parts_store","join_key":"x","confidence":0.6,"evidence":[{"kind":"gmail"}]}]')->'items'->0->>'result';
 \o
 \set got `cat :outf`
-SELECT t_out($l$human scenario_v5_h.sql:241 === V6 (rules-channels v4 #4) whose money is his call: a pass may name only third parties (expect entity_is_owners_call twice; proposed; ERROR vcc_party_not_entity)$l$, :'got', $e$proposed$e$);
+SELECT t_out($l$human scenario_v5_h.sql:246 === V6 (rules-channels v4 #4) whose money is his call: a pass may name only third parties (expect entity_is_owners_call twice; proposed; ERROR vcc_party_not_entity)$l$, :'got', $e$proposed$e$);
 \set LAST_ERROR_SQLSTATE none
 \set ON_ERROR_STOP off
 SELECT propose_change_claim(:'ra_deal', jsonb_build_object('vehicle_id', :'VA', 'claim_domain','custody','kind','acquisition','occurred_from','2024-01-18','occurred_to','2024-01-19','party_entity','owner_business:x','summary','bought by the business','confidence',0.5), '[]');
 \set ON_ERROR_STOP on
 \set t_state :SQLSTATE
-SELECT t_refused($l$human scenario_v5_h.sql:242 === V6 (rules-channels v4 #4) whose money is his call: a pass may name only third parties (expect entity_is_owners_call twice; proposed; ERROR vcc_party_not_entity)$l$, :'LAST_ERROR_SQLSTATE', :'LAST_ERROR_MESSAGE', $s$23514$s$, $p$new row for relation "vehicle_change_claims" violates check constraint "vcc_party_not_entity"$p$);
+SELECT t_refused($l$human scenario_v5_h.sql:247 === V6 (rules-channels v4 #4) whose money is his call: a pass may name only third parties (expect entity_is_owners_call twice; proposed; ERROR vcc_party_not_entity)$l$, :'LAST_ERROR_SQLSTATE', :'LAST_ERROR_MESSAGE', $s$23514$s$, $p$new row for relation "vehicle_change_claims" violates check constraint "vcc_party_not_entity"$p$);
 \set SQLSTATE :t_state
 \set ERROR true
 
@@ -3876,25 +4106,25 @@ SELECT propose_evidence_links(:'ra_deal', jsonb_build_array(jsonb_build_object('
   'occurred_on','2024-01-18','direction','out','amount_cents',1,'role','payment_out','payment_key','owner:anything','join_key','x','confidence',0.95,'evidence','[{"kind":"x"}]'::jsonb)))->'items'->0->>'result';
 \o
 \set got `cat :outf`
-SELECT t_out($l$human scenario_v5_h.sql:245 === V7 (rules-channels v4 #5) a link on his word cites his stored answer (expect owner_answer_missing twice; proposed)$l$, :'got', $e$owner_answer_missing$e$);
+SELECT t_out($l$human scenario_v5_h.sql:250 === V7 (rules-channels v4 #5) a link on his word cites his stored answer (expect owner_answer_missing twice; proposed)$l$, :'got', $e$owner_answer_missing$e$);
 \o :outf
 SELECT propose_evidence_links(:'ra_deal', jsonb_build_array(jsonb_build_object('vehicle_id', :'VA', 'source_kind','note','external_ref','note:v5',
   'occurred_on','2024-01-18','direction','out','amount_cents',1,'role','payment_out','payment_key','owner:answers:'||gen_random_uuid()||'#1','join_key','x','confidence',0.95,'evidence','[{"kind":"x"}]'::jsonb)))->'items'->0->>'result';
 \o
 \set got `cat :outf`
-SELECT t_out($l$human scenario_v5_h.sql:247 === V7 (rules-channels v4 #5) a link on his word cites his stored answer (expect owner_answer_missing twice; proposed)$l$, :'got', $e$owner_answer_missing$e$);
+SELECT t_out($l$human scenario_v5_h.sql:252 === V7 (rules-channels v4 #5) a link on his word cites his stored answer (expect owner_answer_missing twice; proposed)$l$, :'got', $e$owner_answer_missing$e$);
 \set LAST_ERROR_SQLSTATE none
 \set ON_ERROR_STOP off
 SELECT evidence_open_run(:'UA','review','review_sheet','script:review','sha', jsonb_build_object('sheet_sha256','v5o','items',1,'rows',jsonb_build_object(
   '1', jsonb_build_object('asks','party','targets', jsonb_build_array(jsonb_build_object('kind','evidence_link','id',:'l_va')))))) AS rev_o \gset
 \set ON_ERROR_STOP on
 \set t_state :SQLSTATE
-SELECT t_refused($l$human scenario_v5_h.sql:249 === V7 (rules-channels v4 #5) a link on his word cites his stored answer (expect owner_answer_missing twice; proposed)$l$, :'LAST_ERROR_SQLSTATE', :'LAST_ERROR_MESSAGE', $s$22023$s$, $p$sheet row 1: this money has a payment source ({bank:V5-L101}); ask whose account paid it (an account row), not who paid$p$);
+SELECT t_refused($l$human scenario_v5_h.sql:254 === V7 (rules-channels v4 #5) a link on his word cites his stored answer (expect owner_answer_missing twice; proposed)$l$, :'LAST_ERROR_SQLSTATE', :'LAST_ERROR_MESSAGE', $s$22023$s$, $p$sheet row 1: this money has a payment source ({bank:V5-L101}); ask whose account paid it (an account row), not who paid$p$);
 \set SQLSTATE :t_state
 \set ERROR true
--- (scenario_v5_h.sql:251 not carried: it failed in the design sim only because an earlier refusal left a variable unset)
--- (scenario_v5_h.sql:252 not carried: it failed in the design sim only because an earlier refusal left a variable unset)
--- (scenario_v5_h.sql:254 not carried: it failed in the design sim only because an earlier refusal left a variable unset)
+-- (scenario_v5_h.sql:256 not carried: it failed in the design sim only because an earlier refusal left a variable unset)
+-- (scenario_v5_h.sql:257 not carried: it failed in the design sim only because an earlier refusal left a variable unset)
+-- (scenario_v5_h.sql:259 not carried: it failed in the design sim only because an earlier refusal left a variable unset)
 
 \echo '=== V8 (rules-channels v4 #8) a floor-set row he rejected is not reset by the next run and is left out of the day record (expect rejected; already_decided; 0)'
 SELECT (record_day_context(:'ra_day', '[{"day":"2024-02-01","place_cluster":"shop","vehicle_id":"6785a1bb-0000-4000-8000-000000000002","confidence":0.6,"basis":["custody_window"]}]')->'ids'->>0) AS fl \gset
@@ -3903,18 +4133,18 @@ SELECT (record_day_context(:'ra_day', '[{"day":"2024-02-01","place_cluster":"sho
 SELECT decide_evidence('day_context', ARRAY[:'fl']::uuid[], 'rejected', 'not in the shop that day', 'app:v5', 'owner_app')->'items'->0->>'result';
 \o
 \set got `cat :outf`
-SELECT t_out($l$human scenario_v5_h.sql:261 === V8 (rules-channels v4 #8) a floor-set row he rejected is not reset by the next run and is left out of the day record (expect rejected; already_decided; 0)$l$, :'got', $e$rejected$e$);
+SELECT t_out($l$human scenario_v5_h.sql:266 === V8 (rules-channels v4 #8) a floor-set row he rejected is not reset by the next run and is left out of the day record (expect rejected; already_decided; 0)$l$, :'got', $e$rejected$e$);
 :JOB
 \o :outf
 SELECT record_day_context(:'ra_day', '[{"day":"2024-02-01","place_cluster":"shop","vehicle_id":"6785a1bb-0000-4000-8000-000000000002","confidence":0.7,"basis":["custody_window"]}]')->'skipped'->0->>'result';
 \o
 \set got `cat :outf`
-SELECT t_out($l$human scenario_v5_h.sql:263 === V8 (rules-channels v4 #8) a floor-set row he rejected is not reset by the next run and is left out of the day record (expect rejected; already_decided; 0)$l$, :'got', $e$already_decided$e$);
+SELECT t_out($l$human scenario_v5_h.sql:268 === V8 (rules-channels v4 #8) a floor-set row he rejected is not reset by the next run and is left out of the day record (expect rejected; already_decided; 0)$l$, :'got', $e$already_decided$e$);
 \o :outf
 SELECT jsonb_array_length(coalesce(get_user_day_record(:'UA', '2024-02-01')->'floor_set', '[]'));
 \o
 \set got `cat :outf`
-SELECT t_out($l$human scenario_v5_h.sql:264 === V8 (rules-channels v4 #8) a floor-set row he rejected is not reset by the next run and is left out of the day record (expect rejected; already_decided; 0)$l$, :'got', $e$0$e$);
+SELECT t_out($l$human scenario_v5_h.sql:269 === V8 (rules-channels v4 #8) a floor-set row he rejected is not reset by the next run and is left out of the day record (expect rejected; already_decided; 0)$l$, :'got', $e$0$e$);
 
 \echo '=== V9 (readers v4 #3) coverage per payment-source account (expect 2025-06-30; awaiting_statement for the order after the card coverage with no account; unpaid_assertion for the order on the main account inside its coverage; awaiting_statement for 2026)'
 \o :outf
@@ -3924,7 +4154,7 @@ SELECT propose_evidence_links(:'ra_gm', '[
  {"vehicle_id":"6785a1bb-0000-4000-8000-000000000001","source_kind":"gmail_order","external_ref":"gmail:v5:late","occurred_on":"2026-03-01","direction":"out","amount_cents":7,"role":"assertion","from_account_ref":"bank_account:v5.main","join_key":"x","confidence":0.6,"evidence":[{"kind":"gmail"}]}]')->'proposed';
 \o
 \set got `cat :outf`
-SELECT t_out($l$human scenario_v5_h.sql:267 === V9 (readers v4 #3) coverage per payment-source account (expect 2025-06-30; awaiting_statement for the order after the card coverage with no account; unpaid_assertion for the order on the main account inside its coverage; awaiting_statem$l$, :'got', $e$3$e$);
+SELECT t_out($l$human scenario_v5_h.sql:272 === V9 (readers v4 #3) coverage per payment-source account (expect 2025-06-30; awaiting_statement for the order after the card coverage with no account; unpaid_assertion for the order on the main account inside its coverage; awaiting_statem$l$, :'got', $e$3$e$);
 \o :outf
 SELECT (v->>'money_sources_cover_to') || ' | ' ||
        (SELECT string_agg((q->>'ref') || '=' || (q->>'q'), ', ' ORDER BY q->>'ref') FROM jsonb_array_elements(v->'open_questions') q
@@ -3932,7 +4162,7 @@ SELECT (v->>'money_sources_cover_to') || ' | ' ||
   FROM (SELECT vehicle_accounting_evidence(:'VA', NULL, NULL, :'UA') v) x;
 \o
 \set got `cat :outf`
-SELECT t_out($l$human scenario_v5_h.sql:271 === V9 (readers v4 #3) coverage per payment-source account (expect 2025-06-30; awaiting_statement for the order after the card coverage with no account; unpaid_assertion for the order on the main account inside its coverage; awaiting_statem$l$, :'got', $e$2025-06-30 | gmail:v5:late=awaiting_statement, gmail:v5:main=unpaid_assertion, gmail:v5:noacct=awaiting_statement$e$);
+SELECT t_out($l$human scenario_v5_h.sql:276 === V9 (readers v4 #3) coverage per payment-source account (expect 2025-06-30; awaiting_statement for the order after the card coverage with no account; unpaid_assertion for the order on the main account inside its coverage; awaiting_statem$l$, :'got', $e$2025-06-30 | gmail:v5:late=awaiting_statement, gmail:v5:main=unpaid_assertion, gmail:v5:noacct=awaiting_statement$e$);
 
 \echo '=== V10 (readers v4 #4) the day record counts his own subject photos only (expect J20=2 and VA=1; also_in_frame apart; after he rejects X''s J20, J20=1)'
 \o :outf
@@ -3945,25 +4175,25 @@ SELECT propose_image_candidates(:'ra_comb', jsonb_build_array(
   jsonb_build_object('image_id',:'IZ','subject_key','label:J5-V5','verdict','is_vehicle','join_key','x','confidence',0.5,'evidence','[{"kind":"x"}]'::jsonb,'pass_captured_on','2024-04-10')))->'proposed';
 \o
 \set got `cat :outf`
-SELECT t_out($l$human scenario_v5_h.sql:277 === V10 (readers v4 #4) the day record counts his own subject photos only (expect J20=2 and VA=1; also_in_frame apart; after he rejects X's J20, J20=1)$l$, :'got', $e$6$e$);
+SELECT t_out($l$human scenario_v5_h.sql:282 === V10 (readers v4 #4) the day record counts his own subject photos only (expect J20=2 and VA=1; also_in_frame apart; after he rejects X's J20, J20=1)$l$, :'got', $e$6$e$);
 \o :outf
 SELECT (r->'no_row_subjects')::text || ' | ' || (r->'vehicles')::text || ' | ' || (r->'also_in_frame')::text FROM (SELECT get_user_day_record(:'UA', '2024-04-10') r) x;
 \o
 \set got `cat :outf`
-SELECT t_out($l$human scenario_v5_h.sql:284 === V10 (readers v4 #4) the day record counts his own subject photos only (expect J20=2 and VA=1; also_in_frame apart; after he rejects X's J20, J20=1)$l$, :'got', $e${"label:J5-V5": 1, "label:J20-V5": 2} | {"<id>": 1} | {"label:J20-V5": 1, "<id>": 1}$e$);
+SELECT t_out($l$human scenario_v5_h.sql:289 === V10 (readers v4 #4) the day record counts his own subject photos only (expect J20=2 and VA=1; also_in_frame apart; after he rejects X's J20, J20=1)$l$, :'got', $e${"label:J5-V5": 1, "label:J20-V5": 2} | {"<id>": 1} | {"label:J20-V5": 1, "<id>": 1}$e$);
 SELECT id AS cx FROM image_vehicle_candidates WHERE image_id = :'IX' AND subject_key = 'label:J20-V5' AND superseded_by IS NULL \gset
 :OWNERA
 \o :outf
 SELECT decide_evidence('image_candidate', ARRAY[:'cx']::uuid[], 'rejected', 'not the J20', 'app:v5', 'owner_app', NULL, jsonb_build_object(:'cx', NULL))->'items'->0->>'result';
 \o
 \set got `cat :outf`
-SELECT t_out($l$human scenario_v5_h.sql:287 === V10 (readers v4 #4) the day record counts his own subject photos only (expect J20=2 and VA=1; also_in_frame apart; after he rejects X's J20, J20=1)$l$, :'got', $e$rejected$e$);
+SELECT t_out($l$human scenario_v5_h.sql:292 === V10 (readers v4 #4) the day record counts his own subject photos only (expect J20=2 and VA=1; also_in_frame apart; after he rejects X's J20, J20=1)$l$, :'got', $e$rejected$e$);
 :JOB
 \o :outf
 SELECT (get_user_day_record(:'UA', '2024-04-10')->'no_row_subjects')::text;
 \o
 \set got `cat :outf`
-SELECT t_out($l$human scenario_v5_h.sql:289 === V10 (readers v4 #4) the day record counts his own subject photos only (expect J20=2 and VA=1; also_in_frame apart; after he rejects X's J20, J20=1)$l$, :'got', $e${"label:J5-V5": 1, "label:J20-V5": 1}$e$);
+SELECT t_out($l$human scenario_v5_h.sql:294 === V10 (readers v4 #4) the day record counts his own subject photos only (expect J20=2 and VA=1; also_in_frame apart; after he rejects X's J20, J20=1)$l$, :'got', $e${"label:J5-V5": 1, "label:J20-V5": 1}$e$);
 
 \echo '=== V11 (readers v4 #5) confirming one no-row subject of Z implied-rejects the other (expect confirmed; J5 rejected; 1 implied id returned)'
 SELECT id AS cz20 FROM image_vehicle_candidates WHERE image_id = :'IZ' AND subject_key = 'label:J20-V5' AND superseded_by IS NULL \gset
@@ -3974,7 +4204,7 @@ SELECT decide_evidence('image_candidate', ARRAY[:'cz20']::uuid[], 'confirmed', '
 SELECT :'z'::jsonb->'items'->0->>'result', evidence_status('image_candidate', :'cz5'), jsonb_array_length(:'z'::jsonb->'items'->0->'implied_decision_ids');
 \o
 \set got `cat :outf`
-SELECT t_out($l$human scenario_v5_h.sql:296 === V11 (readers v4 #5) confirming one no-row subject of Z implied-rejects the other (expect confirmed; J5 rejected; 1 implied id returned)$l$, :'got', $e$confirmed|rejected|1$e$);
+SELECT t_out($l$human scenario_v5_h.sql:301 === V11 (readers v4 #5) confirming one no-row subject of Z implied-rejects the other (expect confirmed; J5 rejected; 1 implied id returned)$l$, :'got', $e$confirmed|rejected|1$e$);
 
 \echo '=== V12 (readers v4 #6) one truck with three rows reads the same from each (expect 3|3|3)'
 :JOB
@@ -3985,12 +4215,12 @@ SELECT propose_change_claim(:'ra_id', jsonb_build_object('vehicle_id', :'VN', 'r
 SELECT decide_evidence('change_claim', ARRAY[:'p_nm', :'p_nt']::uuid[], 'confirmed', 'one truck', 'app:v5', 'owner_app') IS NOT NULL AND true;
 \o
 \set got `cat :outf`
-SELECT t_out($l$human scenario_v5_h.sql:303 === V12 (readers v4 #6) one truck with three rows reads the same from each (expect 3|3|3)$l$, :'got', $e$t$e$);
+SELECT t_out($l$human scenario_v5_h.sql:308 === V12 (readers v4 #6) one truck with three rows reads the same from each (expect 3|3|3)$l$, :'got', $e$t$e$);
 \o :outf
 SELECT cardinality(evidence_identity_set(:'VN', :'UA')) || '|' || cardinality(evidence_identity_set(:'VM', :'UA')) || '|' || cardinality(evidence_identity_set(:'VT', :'UA'));
 \o
 \set got `cat :outf`
-SELECT t_out($l$human scenario_v5_h.sql:304 === V12 (readers v4 #6) one truck with three rows reads the same from each (expect 3|3|3)$l$, :'got', $e$3|3|3$e$);
+SELECT t_out($l$human scenario_v5_h.sql:309 === V12 (readers v4 #6) one truck with three rows reads the same from each (expect 3|3|3)$l$, :'got', $e$3|3|3$e$);
 
 \echo '=== V13 (readers v4 #8) a window holding only the order of a payment whose bank line is outside it: not banded, listed under payments_outside_window (expect f | bank:V5-L202)'
 :JOB
@@ -3998,31 +4228,31 @@ SELECT t_out($l$human scenario_v5_h.sql:304 === V12 (readers v4 #6) one truck wi
 SELECT propose_evidence_links(:'ra_led', '[{"vehicle_id":"6785a1bb-0000-4000-8000-000000000001","source_kind":"ledger_line","external_ref":"ledger:V5:L202","occurred_on":"2025-01-24","direction":"out","amount_cents":30,"role":"payment_out","payment_key":"bank:V5-L202","from_account_ref":"bank_account:v5.main","join_key":"x","confidence":0.4,"evidence":[{"kind":"ledger"}]}]')->'proposed';
 \o
 \set got `cat :outf`
-SELECT t_out($l$human scenario_v5_h.sql:308 === V13 (readers v4 #8) a window holding only the order of a payment whose bank line is outside it: not banded, listed under payments_outside_window (expect f | bank:V5-L202)$l$, :'got', $e$1$e$);
+SELECT t_out($l$human scenario_v5_h.sql:313 === V13 (readers v4 #8) a window holding only the order of a payment whose bank line is outside it: not banded, listed under payments_outside_window (expect f | bank:V5-L202)$l$, :'got', $e$1$e$);
 \o :outf
 SELECT propose_evidence_links(:'ra_gm', '[{"vehicle_id":"6785a1bb-0000-4000-8000-000000000001","source_kind":"gmail_order","external_ref":"gmail:v5:l202","occurred_on":"2025-01-26","direction":"out","role":"assertion","payment_key":"bank:V5-L202","payment_join_confidence":0.8,"join_key":"x","confidence":0.8,"evidence":[{"kind":"gmail"}]}]')->'proposed';
 \o
 \set got `cat :outf`
-SELECT t_out($l$human scenario_v5_h.sql:309 === V13 (readers v4 #8) a window holding only the order of a payment whose bank line is outside it: not banded, listed under payments_outside_window (expect f | bank:V5-L202)$l$, :'got', $e$1$e$);
+SELECT t_out($l$human scenario_v5_h.sql:314 === V13 (readers v4 #8) a window holding only the order of a payment whose bank line is outside it: not banded, listed under payments_outside_window (expect f | bank:V5-L202)$l$, :'got', $e$1$e$);
 \o :outf
 SELECT (SELECT EXISTS (SELECT 1 FROM jsonb_each(v->'costs') b, jsonb_array_elements(coalesce(b.value->'payments','[]')) p WHERE p->>'payment_key' = 'bank:V5-L202'))::text
        || ' | ' || (SELECT string_agg(p->>'payment_key', ',') FROM jsonb_array_elements(v->'payments_outside_window') p)
   FROM (SELECT vehicle_accounting_evidence(:'VA', '2025-01-25', '2025-01-31', :'UA') v) x;
 \o
 \set got `cat :outf`
-SELECT t_out($l$human scenario_v5_h.sql:310 === V13 (readers v4 #8) a window holding only the order of a payment whose bank line is outside it: not banded, listed under payments_outside_window (expect f | bank:V5-L202)$l$, :'got', $e$false | bank:V5-L202$e$);
+SELECT t_out($l$human scenario_v5_h.sql:315 === V13 (readers v4 #8) a window holding only the order of a payment whose bank line is outside it: not banded, listed under payments_outside_window (expect f | bank:V5-L202)$l$, :'got', $e$false | bank:V5-L202$e$);
 
 \echo '=== V14 (readers v4 #9) an upper-bound acquisition and a dated sale: a photo after the sale is outside/after, who_paid is not asked of the bound, an undated own photo is counted (expect after; 2024-06-01 unknown; f; 1)'
 \o :outf
 SELECT propose_change_claim(:'ra_cb', jsonb_build_object('vehicle_id', :'VC', 'claim_domain','custody','kind','acquisition','occurred_to','2024-06-01','summary','first own photo','confidence',0.4), '[]') IS NOT NULL AND true;
 \o
 \set got `cat :outf`
-SELECT t_out($l$human scenario_v5_h.sql:315 === V14 (readers v4 #9) an upper-bound acquisition and a dated sale: a photo after the sale is outside/after, who_paid is not asked of the bound, an undated own photo is counted (expect after; 2024-06-01 unknown; f; 1)$l$, :'got', $e$t$e$);
+SELECT t_out($l$human scenario_v5_h.sql:320 === V14 (readers v4 #9) an upper-bound acquisition and a dated sale: a photo after the sale is outside/after, who_paid is not asked of the bound, an undated own photo is counted (expect after; 2024-06-01 unknown; f; 1)$l$, :'got', $e$t$e$);
 \o :outf
 SELECT propose_change_claim(:'ra_deal', jsonb_build_object('vehicle_id', :'VC', 'claim_domain','custody','kind','sale','occurred_from','2024-12-01','occurred_to','2024-12-05','summary','sold','confidence',0.7), '[]') IS NOT NULL AND true;
 \o
 \set got `cat :outf`
-SELECT t_out($l$human scenario_v5_h.sql:316 === V14 (readers v4 #9) an upper-bound acquisition and a dated sale: a photo after the sale is outside/after, who_paid is not asked of the bound, an undated own photo is counted (expect after; 2024-06-01 unknown; f; 1)$l$, :'got', $e$t$e$);
+SELECT t_out($l$human scenario_v5_h.sql:321 === V14 (readers v4 #9) an upper-bound acquisition and a dated sale: a photo after the sale is outside/after, who_paid is not asked of the bound, an undated own photo is counted (expect after; 2024-06-01 unknown; f; 1)$l$, :'got', $e$t$e$);
 \o :outf
 SELECT propose_image_candidates(:'ra_comb', jsonb_build_array(
   jsonb_build_object('image_id',:'IC1','vehicle_id',:'VC','verdict','is_vehicle','join_key','x','confidence',0.9,'evidence','[{"kind":"x"}]'::jsonb,'pass_captured_on','2024-06-01'),
@@ -4030,7 +4260,7 @@ SELECT propose_image_candidates(:'ra_comb', jsonb_build_array(
   jsonb_build_object('image_id',:'IC3','vehicle_id',:'VC','verdict','is_vehicle','join_key','x','confidence',0.9,'evidence','[{"kind":"x"}]'::jsonb)))->'proposed';
 \o
 \set got `cat :outf`
-SELECT t_out($l$human scenario_v5_h.sql:317 === V14 (readers v4 #9) an upper-bound acquisition and a dated sale: a photo after the sale is outside/after, who_paid is not asked of the bound, an undated own photo is counted (expect after; 2024-06-01 unknown; f; 1)$l$, :'got', $e$3$e$);
+SELECT t_out($l$human scenario_v5_h.sql:322 === V14 (readers v4 #9) an upper-bound acquisition and a dated sale: a photo after the sale is outside/after, who_paid is not asked of the bound, an undated own photo is counted (expect after; 2024-06-01 unknown; f; 1)$l$, :'got', $e$3$e$);
 \o :outf
 SELECT (SELECT string_agg((d->>'day') || ':' || (d->>'side'), ',') FROM jsonb_array_elements(v->'photo_days_outside_custody') d) || ' | ' ||
        (v->'photo_days_custody_unknown')::text || ' | ' ||
@@ -4038,7 +4268,7 @@ SELECT (SELECT string_agg((d->>'day') || ':' || (d->>'side'), ',') FROM jsonb_ar
   FROM (SELECT vehicle_accounting_evidence(:'VC', NULL, NULL, :'UA') v) x;
 \o
 \set got `cat :outf`
-SELECT t_out($l$human scenario_v5_h.sql:321 === V14 (readers v4 #9) an upper-bound acquisition and a dated sale: a photo after the sale is outside/after, who_paid is not asked of the bound, an undated own photo is counted (expect after; 2024-06-01 unknown; f; 1)$l$, :'got', $e$2025-06-01:after | ["2024-06-01"] | false | 1$e$);
+SELECT t_out($l$human scenario_v5_h.sql:326 === V14 (readers v4 #9) an upper-bound acquisition and a dated sale: a photo after the sale is outside/after, who_paid is not asked of the bound, an undated own photo is counted (expect after; 2024-06-01 unknown; f; 1)$l$, :'got', $e$2025-06-01:after | ["2024-06-01"] | false | 1$e$);
 
 \echo '=== V15 (guard-mechanism v4 #1) every id a writer creates is returned for the manifest (expect t t t)'
 \o :outf
@@ -4049,7 +4279,7 @@ SELECT (propose_capture_time_claims(:'ra_time', jsonb_build_array(jsonb_build_ob
   (propose_account_entities(:'ra_acct', '[{"account_ref":"bank_account:v5.card","entity_key":"owner","confidence":0.6,"evidence":[{"kind":"x"}]}]') ? 'ids');
 \o
 \set got `cat :outf`
-SELECT t_out($l$human scenario_v5_h.sql:327 === V15 (guard-mechanism v4 #1) every id a writer creates is returned for the manifest (expect t t t)$l$, :'got', $e$t|t|t$e$);
+SELECT t_out($l$human scenario_v5_h.sql:332 === V15 (guard-mechanism v4 #1) every id a writer creates is returned for the manifest (expect t t t)$l$, :'got', $e$t|t|t$e$);
 :ADMIN
 
 
@@ -4803,13 +5033,13 @@ SELECT decide_evidence('change_claim', ARRAY[:'bw']::uuid[], 'confirmed', 'yes',
 \o
 \set got `cat :outf`
 SELECT t_out($l$human scenario_v6_h.sql:409 === RU1 publication is per user, and only the photo's own user (or one who can edit its vehicle) decides it$l$, :'got', $e$confirmed$e$);
-\echo '    B (in scope through his own worked_on claim) decides the publication of A''s user_id-NULL photo on A''s truck (expect ERROR not yours to publish; v5: confirmed, and A''s status read it)'
+\echo '    B (in scope through his own worked_on claim) decides the publication of A''s user_id-NULL photo on A''s truck (expect ERROR not your evidence (v11; v6-v10: not yours to publish); v5: confirmed, and A''s status read it)'
 \set LAST_ERROR_SQLSTATE none
 \set ON_ERROR_STOP off
 SELECT decide_evidence('image_publication', ARRAY[:'I7']::uuid[], 'confirmed', 'publish it', 'owner_page:b', 'owner_page');
 \set ON_ERROR_STOP on
 \set t_state :SQLSTATE
-SELECT t_refused($l$human scenario_v6_h.sql:411 === RU1 publication is per user, and only the photo's own user (or one who can edit its vehicle) decides it / B (in scope through his own worked_on claim) decides the publication of A's user_id-NULL photo on A's truck (expect ERROR not your$l$, :'LAST_ERROR_SQLSTATE', :'LAST_ERROR_MESSAGE', $s$42501$s$, $p$photo % is not yours to publish$p$);
+SELECT t_refused($l$human scenario_v6_h.sql:411 === RU1 publication is per user, and only the photo's own user (or one who can edit its vehicle) decides it / B (in scope through his own worked_on claim) decides the publication of A's user_id-NULL photo on A's truck (expect ERROR not your$l$, :'LAST_ERROR_SQLSTATE', :'LAST_ERROR_MESSAGE', $s$42501$s$, $p$not your evidence$p$);
 \set SQLSTATE :t_state
 \set ERROR true
 :OWNERA
@@ -5725,19 +5955,19 @@ SELECT t_out($l$human scenario_v7_h.sql:352 === F2 an owner time claim replaces 
 
 -- ===================================================================================================================
 \echo '=== F3 publication of a user_id-NULL photo is the uploader''s, not the new owner of record''s'
-\echo '    (expect photo user = A; B refused: not yours to publish; A rejected; status rejected; v6: photo user B, B confirmed, A''s "no" ignored)'
+\echo '    (expect photo user = A; B refused: not your evidence (v11; v7-v10: not yours to publish); A rejected; status rejected; v6: photo user B, B confirmed, A''s "no" ignored)'
 \o :outf
 SELECT 'photo user is A: ' || (evidence_image_user(:'IB') = :'UA')::text;
 \o
 \set got `cat :outf`
-SELECT t_out($l$human scenario_v7_h.sql:357 === F3 publication of a user_id-NULL photo is the uploader's, not the new owner of record's / (expect photo user = A; B refused: not yours to publish; A rejected; status rejected; v6: photo user B, B confirmed, A's "no" ignored)$l$, :'got', $e$photo user is A: true$e$);
+SELECT t_out($l$human scenario_v7_h.sql:357 === F3 publication of a user_id-NULL photo is the uploader's, not the new owner of record's / (expect photo user = A; B refused: not your evidence (v11; v7-v10: not yours to publish); A rejected; status rejected; v6: photo user B, B confirm$l$, :'got', $e$photo user is A: true$e$);
 :OWNERB
 \set LAST_ERROR_SQLSTATE none
 \set ON_ERROR_STOP off
 SELECT decide_evidence('image_publication', ARRAY[:'IB']::uuid[], 'confirmed', 'publish it', 'owner_page:b', 'owner_page');
 \set ON_ERROR_STOP on
 \set t_state :SQLSTATE
-SELECT t_refused($l$human scenario_v7_h.sql:359 === F3 publication of a user_id-NULL photo is the uploader's, not the new owner of record's / (expect photo user = A; B refused: not yours to publish; A rejected; status rejected; v6: photo user B, B confirmed, A's "no" ignored)$l$, :'LAST_ERROR_SQLSTATE', :'LAST_ERROR_MESSAGE', $s$42501$s$, $p$photo % is not yours to publish$p$);
+SELECT t_refused($l$human scenario_v7_h.sql:359 === F3 publication of a user_id-NULL photo is the uploader's, not the new owner of record's / (expect photo user = A; B refused: not your evidence (v11; v7-v10: not yours to publish); A rejected; status rejected; v6: photo user B, B confirm$l$, :'LAST_ERROR_SQLSTATE', :'LAST_ERROR_MESSAGE', $s$42501$s$, $p$not your evidence$p$);
 \set SQLSTATE :t_state
 \set ERROR true
 :OWNERA
@@ -5745,13 +5975,13 @@ SELECT t_refused($l$human scenario_v7_h.sql:359 === F3 publication of a user_id-
 SELECT decide_evidence('image_publication', ARRAY[:'IB']::uuid[], 'rejected', 'keep it private', 'owner_page:a', 'owner_page')->'items'->0->>'result';
 \o
 \set got `cat :outf`
-SELECT t_out($l$human scenario_v7_h.sql:361 === F3 publication of a user_id-NULL photo is the uploader's, not the new owner of record's / (expect photo user = A; B refused: not yours to publish; A rejected; status rejected; v6: photo user B, B confirmed, A's "no" ignored)$l$, :'got', $e$rejected$e$);
+SELECT t_out($l$human scenario_v7_h.sql:361 === F3 publication of a user_id-NULL photo is the uploader's, not the new owner of record's / (expect photo user = A; B refused: not your evidence (v11; v7-v10: not yours to publish); A rejected; status rejected; v6: photo user B, B confirm$l$, :'got', $e$rejected$e$);
 :ADMIN
 \o :outf
 SELECT evidence_status('image_publication', :'IB');
 \o
 \set got `cat :outf`
-SELECT t_out($l$human scenario_v7_h.sql:363 === F3 publication of a user_id-NULL photo is the uploader's, not the new owner of record's / (expect photo user = A; B refused: not yours to publish; A rejected; status rejected; v6: photo user B, B confirmed, A's "no" ignored)$l$, :'got', $e$rejected$e$);
+SELECT t_out($l$human scenario_v7_h.sql:363 === F3 publication of a user_id-NULL photo is the uploader's, not the new owner of record's / (expect photo user = A; B refused: not your evidence (v11; v7-v10: not yours to publish); A rejected; status rejected; v6: photo user B, B confirm$l$, :'got', $e$rejected$e$);
 
 -- ===================================================================================================================
 \echo '=== F5 his who-paid statement closes who_paid'
@@ -9071,7 +9301,8 @@ SET TimeZone = 'America/Los_Angeles'; SET DateStyle = 'ISO, MDY';
 -- the owner sessions this group uses, in the auth server's records
 SELECT auth.t_seed_session('2dc2a0ab-0000-4000-8000-000000000003', '962bbddf-0000-4000-8000-0000000000b8', 'aal1'), auth.t_seed_session('3bb3c76e-0000-4000-8000-000000000ea8', '9490fc96-0000-4000-8000-0000000000a8', 'ok'), auth.t_seed_session('3bb3c76e-0000-4000-8000-000000000fb8', '962bbddf-0000-4000-8000-0000000000b8', 'ok');
 -- ---------------------------------------------------------------------------- replay_writers_r6_storage_minors.v9.sql
--- v9 replay of writers-v8 minors (M1-M8). Local scratch only. Sheets that were sent are closed done first (v9 stores
+-- v9 replay of writers-v8 minors (M1-M8). Local scratch only. (v11 patch adapt: a sheet asks a question once about one
+-- target, so M4's rows 2-3 and M8's 500x20 rows 2-500 name fresh ids instead of repeating c1.) Sheets that were sent are closed done first (v9 stores
 -- answers only on a sent sheet); M2 keeps its aborted and running sheets.
 -- Local scratch only (writers-v8, port 55522, database wv). Synthetic ids. Never production.
 -- ALLOW_RAW_TESTIMONY_WRITE (scratch fixture rows in the stub tables of a throwaway cluster)
@@ -9119,35 +9350,35 @@ SELECT evidence_open_run(:'UB','review','review_sheet','script:review','sha', js
 SELECT evidence_close_run(:'sa', 'done', '{}'::jsonb);
 \o
 \set got `cat :outf`
-SELECT t_out($l$r6 writers/r6_storage_minors.v9.sql:17 === M1 an answers run with no rows (rows {}) is stored, uses up the sheet and the message id (expect refused: no answer given)$l$, :'got', $e$$e$);
+SELECT t_out($l$r6 writers/r6_storage_minors.v9.sql:18 === M1 an answers run with no rows (rows {}) is stored, uses up the sheet and the message id (expect refused: no answer given)$l$, :'got', $e$$e$);
 \set LAST_ERROR_SQLSTATE none
 \set ON_ERROR_STOP off
 SELECT evidence_record_answers(:'UA', :'sa', 'chat:m-empty', '{}'::jsonb, 'script:answers', 'sha', now()) AS ae \gset
 \set ON_ERROR_STOP on
 \set t_state :SQLSTATE
-SELECT t_refused($l$r6 writers/r6_storage_minors.v9.sql:18 === M1 an answers run with no rows (rows {}) is stored, uses up the sheet and the message id (expect refused: no answer given)$l$, :'LAST_ERROR_SQLSTATE', :'LAST_ERROR_MESSAGE', $s$22023$s$, $p$a stored answer has at least one row$p$);
+SELECT t_refused($l$r6 writers/r6_storage_minors.v9.sql:19 === M1 an answers run with no rows (rows {}) is stored, uses up the sheet and the message id (expect refused: no answer given)$l$, :'LAST_ERROR_SQLSTATE', :'LAST_ERROR_MESSAGE', $s$22023$s$, $p$a stored answer has at least one row$p$);
 \set SQLSTATE :t_state
 \set ERROR true
--- (writers/r6_storage_minors.v9.sql:19 not carried: it failed in the design sim only because an earlier refusal left a variable unset)
+-- (writers/r6_storage_minors.v9.sql:20 not carried: it failed in the design sim only because an earlier refusal left a variable unset)
 \echo '    then his real answer to that sheet (v9: stored)'
 \o :outf
 SELECT 'real answer stored: ' || (evidence_record_answers(:'UA', :'sa', 'chat:m-real', jsonb_build_object('1', jsonb_build_object('verbatim','yes')), 'script:answers', 'sha', now()) IS NOT NULL);
 \o
 \set got `cat :outf`
-SELECT t_out($l$r6 writers/r6_storage_minors.v9.sql:21 === M1 an answers run with no rows (rows {}) is stored, uses up the sheet and the message id (expect refused: no answer given) / then his real answer to that sheet (v9: stored)$l$, :'got', $e$real answer stored: true$e$);
+SELECT t_out($l$r6 writers/r6_storage_minors.v9.sql:22 === M1 an answers run with no rows (rows {}) is stored, uses up the sheet and the message id (expect refused: no answer given) / then his real answer to that sheet (v9: stored)$l$, :'got', $e$real answer stored: true$e$);
 
 \echo '=== M2 answers stored on a sheet the job ABORTED (never sent) and on one still running (expect refused: the sheet he was sent is closed done)'
 \o :outf
 SELECT evidence_close_run(:'sb', 'aborted', '{}'::jsonb);
 \o
 \set got `cat :outf`
-SELECT t_out($l$r6 writers/r6_storage_minors.v9.sql:24 === M2 answers stored on a sheet the job ABORTED (never sent) and on one still running (expect refused: the sheet he was sent is closed done)$l$, :'got', $e$$e$);
+SELECT t_out($l$r6 writers/r6_storage_minors.v9.sql:25 === M2 answers stored on a sheet the job ABORTED (never sent) and on one still running (expect refused: the sheet he was sent is closed done)$l$, :'got', $e$$e$);
 \set LAST_ERROR_SQLSTATE none
 \set ON_ERROR_STOP off
 SELECT 'aborted sheet answers stored: ' || (evidence_record_answers(:'UA', :'sb', 'chat:m-ab', jsonb_build_object('1', jsonb_build_object('verbatim','yes')), 'script:answers', 'sha', now()) IS NOT NULL);
 \set ON_ERROR_STOP on
 \set t_state :SQLSTATE
-SELECT t_refused($l$r6 writers/r6_storage_minors.v9.sql:25 === M2 answers stored on a sheet the job ABORTED (never sent) and on one still running (expect refused: the sheet he was sent is closed done)$l$, :'LAST_ERROR_SQLSTATE', :'LAST_ERROR_MESSAGE', $s$22023$s$, $p$sheet_not_sent: sheet % is aborted, never sent (a sheet is closed done when it is sent); his answers are stored only on the sheet he was sent$p$);
+SELECT t_refused($l$r6 writers/r6_storage_minors.v9.sql:26 === M2 answers stored on a sheet the job ABORTED (never sent) and on one still running (expect refused: the sheet he was sent is closed done)$l$, :'LAST_ERROR_SQLSTATE', :'LAST_ERROR_MESSAGE', $s$22023$s$, $p$sheet_not_sent: sheet % is aborted, never sent (a sheet is closed done when it is sent); his answers are stored only on the sheet he was sent$p$);
 \set SQLSTATE :t_state
 \set ERROR true
 \set LAST_ERROR_SQLSTATE none
@@ -9155,7 +9386,7 @@ SELECT t_refused($l$r6 writers/r6_storage_minors.v9.sql:25 === M2 answers stored
 SELECT 'running sheet answers stored: ' || (evidence_record_answers(:'UA', :'sc', 'chat:m-run', jsonb_build_object('1', jsonb_build_object('verbatim','yes')), 'script:answers', 'sha', now()) IS NOT NULL);
 \set ON_ERROR_STOP on
 \set t_state :SQLSTATE
-SELECT t_refused($l$r6 writers/r6_storage_minors.v9.sql:26 === M2 answers stored on a sheet the job ABORTED (never sent) and on one still running (expect refused: the sheet he was sent is closed done)$l$, :'LAST_ERROR_SQLSTATE', :'LAST_ERROR_MESSAGE', $s$22023$s$, $p$sheet_not_sent: sheet % is running, never sent (a sheet is closed done when it is sent); his answers are stored only on the sheet he was sent$p$);
+SELECT t_refused($l$r6 writers/r6_storage_minors.v9.sql:27 === M2 answers stored on a sheet the job ABORTED (never sent) and on one still running (expect refused: the sheet he was sent is closed done)$l$, :'LAST_ERROR_SQLSTATE', :'LAST_ERROR_MESSAGE', $s$22023$s$, $p$sheet_not_sent: sheet % is running, never sent (a sheet is closed done when it is sent); his answers are stored only on the sheet he was sent$p$);
 \set SQLSTATE :t_state
 \set ERROR true
 
@@ -9164,38 +9395,38 @@ SELECT t_refused($l$r6 writers/r6_storage_minors.v9.sql:26 === M2 answers stored
 SELECT evidence_close_run(:'sbb', 'done', '{}'::jsonb);
 \o
 \set got `cat :outf`
-SELECT t_out($l$r6 writers/r6_storage_minors.v9.sql:29 === M3 message ids are unique across users: a store for user B under an id first refuses A's message, and the error names B's answers run$l$, :'got', $e$$e$);
+SELECT t_out($l$r6 writers/r6_storage_minors.v9.sql:30 === M3 message ids are unique across users: a store for user B under an id first refuses A's message, and the error names B's answers run$l$, :'got', $e$$e$);
 SELECT evidence_record_answers(:'UB', :'sbb', 'chatb:shared-id-7', jsonb_build_object('1', jsonb_build_object('verbatim','ok')), 'script:answers', 'sha', now()) AS ab \gset
 SELECT evidence_open_run(:'UA','review','review_sheet','script:review','sha', jsonb_build_object('sheet_sha256','e','items',1,'rows',replace(:'ROW1','CID',:'c1')::jsonb)) AS se \gset
 \o :outf
 SELECT evidence_close_run(:'se', 'done', '{}'::jsonb);
 \o
 \set got `cat :outf`
-SELECT t_out($l$r6 writers/r6_storage_minors.v9.sql:32 === M3 message ids are unique across users: a store for user B under an id first refuses A's message, and the error names B's answers run$l$, :'got', $e$$e$);
+SELECT t_out($l$r6 writers/r6_storage_minors.v9.sql:33 === M3 message ids are unique across users: a store for user B under an id first refuses A's message, and the error names B's answers run$l$, :'got', $e$$e$);
 \set LAST_ERROR_SQLSTATE none
 \set ON_ERROR_STOP off
 SELECT evidence_record_answers(:'UA', :'se', 'chat:shared-id-7', jsonb_build_object('1', jsonb_build_object('verbatim','yes')), 'script:answers', 'sha', now());
 \set ON_ERROR_STOP on
 \set t_state :SQLSTATE
-SELECT t_refused($l$r6 writers/r6_storage_minors.v9.sql:33 === M3 message ids are unique across users: a store for user B under an id first refuses A's message, and the error names B's answers run$l$, :'LAST_ERROR_SQLSTATE', :'LAST_ERROR_MESSAGE', $s$23505$s$, $p$message chat:shared-id-7 is already stored; a message is stored once$p$);
+SELECT t_refused($l$r6 writers/r6_storage_minors.v9.sql:34 === M3 message ids are unique across users: a store for user B under an id first refuses A's message, and the error names B's answers run$l$, :'LAST_ERROR_SQLSTATE', :'LAST_ERROR_MESSAGE', $s$23505$s$, $p$message chat:shared-id-7 is already stored; a message is stored once$p$);
 \set SQLSTATE :t_state
 \set ERROR true
 \o :outf
 SELECT '    the error above names B''s run: ' || (position(:'ab' in 'see the line above') > 0) || ' (v9: the message names no run; checked in scenario_v9)';
 \o
 \set got `cat :outf`
-SELECT t_out($l$r6 writers/r6_storage_minors.v9.sql:34 === M3 message ids are unique across users: a store for user B under an id first refuses A's message, and the error names B's answers run$l$, :'got', $e$    the error above names B's run: false (v9: the message names no run; checked in scenario_v9)$e$);
+SELECT t_out($l$r6 writers/r6_storage_minors.v9.sql:35 === M3 message ids are unique across users: a store for user B under an id first refuses A's message, and the error names B's answers run$l$, :'got', $e$    the error above names B's run: false (v9: the message names no run; checked in scenario_v9)$e$);
 
 \echo '=== M4 verbatim has no size bound: 3 rows x 2 MB stored (expect a bound)'
 SELECT evidence_open_run(:'UA','review','review_sheet','script:review','sha', jsonb_build_object('sheet_sha256','f','items',3,'rows',jsonb_build_object(
   '1', jsonb_build_object('targets', jsonb_build_array(jsonb_build_object('kind','image_candidate','id',:'c1'))),
-  '2', jsonb_build_object('targets', jsonb_build_array(jsonb_build_object('kind','image_candidate','id',:'c1'))),
-  '3', jsonb_build_object('targets', jsonb_build_array(jsonb_build_object('kind','image_candidate','id',:'c1')))))) AS sf \gset
+  '2', jsonb_build_object('targets', jsonb_build_array(jsonb_build_object('kind','image_candidate','id',gen_random_uuid()))),
+  '3', jsonb_build_object('targets', jsonb_build_array(jsonb_build_object('kind','image_candidate','id',gen_random_uuid())))))) AS sf \gset
 \o :outf
 SELECT evidence_close_run(:'sf', 'done', '{}'::jsonb);
 \o
 \set got `cat :outf`
-SELECT t_out($l$r6 writers/r6_storage_minors.v9.sql:41 === M4 verbatim has no size bound: 3 rows x 2 MB stored (expect a bound)$l$, :'got', $e$$e$);
+SELECT t_out($l$r6 writers/r6_storage_minors.v9.sql:42 === M4 verbatim has no size bound: 3 rows x 2 MB stored (expect a bound)$l$, :'got', $e$$e$);
 \set LAST_ERROR_SQLSTATE none
 \set ON_ERROR_STOP off
 SELECT evidence_record_answers(:'UA', :'sf', 'chat:m-big',
@@ -9203,10 +9434,10 @@ SELECT evidence_record_answers(:'UA', :'sf', 'chat:m-big',
                      '3', jsonb_build_object('verbatim', repeat('c', 2000000))), 'script:answers', 'sha', now()) AS abig \gset
 \set ON_ERROR_STOP on
 \set t_state :SQLSTATE
-SELECT t_refused($l$r6 writers/r6_storage_minors.v9.sql:42 === M4 verbatim has no size bound: 3 rows x 2 MB stored (expect a bound)$l$, :'LAST_ERROR_SQLSTATE', :'LAST_ERROR_MESSAGE', $s$22023$s$, $p$answer row 1: at most 20000 characters of his words per row$p$);
+SELECT t_refused($l$r6 writers/r6_storage_minors.v9.sql:43 === M4 verbatim has no size bound: 3 rows x 2 MB stored (expect a bound)$l$, :'LAST_ERROR_SQLSTATE', :'LAST_ERROR_MESSAGE', $s$22023$s$, $p$answer row 1: at most 20000 characters of his words per row$p$);
 \set SQLSTATE :t_state
 \set ERROR true
--- (writers/r6_storage_minors.v9.sql:45 not carried: it failed in the design sim only because an earlier refusal left a variable unset)
+-- (writers/r6_storage_minors.v9.sql:46 not carried: it failed in the design sim only because an earlier refusal left a variable unset)
 
 \echo '=== M5 propose_account_entities skips a row he decided silently: no item, no count (other writers report already_decided)'
 SELECT propose_account_entities(:'rm', '[{"account_ref":"bank_account:w.main","entity_key":"owner","confidence":0.7,"evidence":[{"kind":"x"}]}]'::jsonb)->'ids'->>0 AS acct \gset
@@ -9215,13 +9446,13 @@ SELECT propose_account_entities(:'rm', '[{"account_ref":"bank_account:w.main","e
 SELECT decide_evidence('account_entity', ARRAY[:'acct']::uuid[], 'confirmed', 'mine', 'app:accounts', 'owner_app')->'items'->0->>'result';
 \o
 \set got `cat :outf`
-SELECT t_out($l$r6 writers/r6_storage_minors.v9.sql:50 === M5 propose_account_entities skips a row he decided silently: no item, no count (other writers report already_decided)$l$, :'got', $e$confirmed$e$);
+SELECT t_out($l$r6 writers/r6_storage_minors.v9.sql:51 === M5 propose_account_entities skips a row he decided silently: no item, no count (other writers report already_decided)$l$, :'got', $e$confirmed$e$);
 :JOB
 \o :outf
 SELECT propose_account_entities(:'rm', '[{"account_ref":"bank_account:w.main","entity_key":"owner_business:shop","confidence":0.9,"evidence":[{"kind":"x"}]}]'::jsonb);
 \o
 \set got `cat :outf`
-SELECT t_out($l$r6 writers/r6_storage_minors.v9.sql:52 === M5 propose_account_entities skips a row he decided silently: no item, no count (other writers report already_decided)$l$, :'got', $e${"ids": [], "skipped": [{"id": "<id>", "result": "already_decided", "account_ref": "bank_account:w.main"}], "proposed": 0, "already_decided": 1}$e$);
+SELECT t_out($l$r6 writers/r6_storage_minors.v9.sql:53 === M5 propose_account_entities skips a row he decided silently: no item, no count (other writers report already_decided)$l$, :'got', $e${"ids": [], "skipped": [{"id": "<id>", "result": "already_decided", "account_ref": "bank_account:w.main"}], "proposed": 0, "already_decided": 1}$e$);
 
 \echo '=== M6 propose_capture_time_claims: owner_answer_missing is a bare count (which row? the runner cannot report it by image)'
 SELECT evidence_open_run(:'UA','pilot','time_offset','script:time','sha','{}') AS rt \gset
@@ -9231,7 +9462,7 @@ SELECT propose_capture_time_claims(:'rt', jsonb_build_array(
   jsonb_build_object('image_id',:'I3','stored_taken_at','2024-05-03 18:00+00','corrected_taken_at','2024-05-01 18:00+00','offset_seconds',172800,'captured_on','2024-05-01','rule','owner','witness','{}'::jsonb,'confidence',1)));
 \o
 \set got `cat :outf`
-SELECT t_out($l$r6 writers/r6_storage_minors.v9.sql:56 === M6 propose_capture_time_claims: owner_answer_missing is a bare count (which row? the runner cannot report it by image)$l$, :'got', $e${"ids": [], "proposed": 0, "unchanged": 0, "decision_ids": [], "kept_stronger": 0, "already_decided": 0, "already_rejected": 0, "machine_confirmed": 0, "image_not_eligible": 0, "stored_time_changed": 0, "owner_answer_missing": 2, "owner_answer_missing_ids": ["<id>", "<id>"]}$e$);
+SELECT t_out($l$r6 writers/r6_storage_minors.v9.sql:57 === M6 propose_capture_time_claims: owner_answer_missing is a bare count (which row? the runner cannot report it by image)$l$, :'got', $e${"ids": [], "proposed": 0, "unchanged": 0, "decision_ids": [], "kept_stronger": 0, "already_decided": 0, "already_rejected": 0, "machine_confirmed": 0, "image_not_eligible": 0, "stored_time_changed": 0, "owner_answer_missing": 2, "owner_answer_missing_ids": ["<id>", "<id>"]}$e$);
 
 \echo '=== M7 propose_change_claim p_supersedes names another user''s claim: nothing superseded, yet the new claim records it as its predecessor'
 SELECT evidence_open_run(:'UA','pilot','deal_document','script:deal','sha','{}') AS rd \gset
@@ -9242,11 +9473,11 @@ SELECT propose_change_claim(:'rdb', jsonb_build_object('vehicle_id',:'VB','claim
 SELECT propose_change_claim(:'rd', jsonb_build_object('vehicle_id',:'VA','claim_domain','custody','kind','acquisition','occurred_from','2024-02-01','summary','a bought','confidence',0.8), '[]'::jsonb, :'kb') AS ka \gset
 \set ON_ERROR_STOP on
 \set t_state :SQLSTATE
-SELECT t_refused($l$r6 writers/r6_storage_minors.v9.sql:64 === M7 propose_change_claim p_supersedes names another user's claim: nothing superseded, yet the new claim records it as its predecessor$l$, :'LAST_ERROR_SQLSTATE', :'LAST_ERROR_MESSAGE', $s$22023$s$, $p$claim % is not a current claim of this user: nothing to supersede$p$);
+SELECT t_refused($l$r6 writers/r6_storage_minors.v9.sql:65 === M7 propose_change_claim p_supersedes names another user's claim: nothing superseded, yet the new claim records it as its predecessor$l$, :'LAST_ERROR_SQLSTATE', :'LAST_ERROR_MESSAGE', $s$22023$s$, $p$claim % is not a current claim of this user: nothing to supersede$p$);
 \set SQLSTATE :t_state
 \set ERROR true
 :ADMIN
--- (writers/r6_storage_minors.v9.sql:66 not carried: it failed in the design sim only because an earlier refusal left a variable unset)
+-- (writers/r6_storage_minors.v9.sql:67 not carried: it failed in the design sim only because an earlier refusal left a variable unset)
 
 \echo '=== M8 the largest sheet the writer accepts: 500 rows x 200 targets (timed against the 10 s statement limit); then 500 x 20'
 :JOB
@@ -9259,16 +9490,16 @@ SELECT evidence_open_run(:'UA','review','review_sheet','script:review','sha', js
       CASE WHEN t = 1 THEN :'c1' ELSE gen_random_uuid()::text END)) FROM generate_series(1,200) t))) FROM generate_series(1,500) r))) IS NOT NULL AS big_sheet_opened;
 \set ON_ERROR_STOP on
 \set t_state :SQLSTATE
-SELECT t_refused($l$r6 writers/r6_storage_minors.v9.sql:73 === M8 the largest sheet the writer accepts: 500 rows x 200 targets (timed against the 10 s statement limit); then 500 x 20$l$, :'LAST_ERROR_SQLSTATE', :'LAST_ERROR_MESSAGE', $s$22023$s$, $p$a review sheet lists at most 10000 targets in all; split it$p$);
+SELECT t_refused($l$r6 writers/r6_storage_minors.v9.sql:74 === M8 the largest sheet the writer accepts: 500 rows x 200 targets (timed against the 10 s statement limit); then 500 x 20$l$, :'LAST_ERROR_SQLSTATE', :'LAST_ERROR_MESSAGE', $s$22023$s$, $p$a review sheet lists at most 10000 targets in all; split it$p$);
 \set SQLSTATE :t_state
 \set ERROR true
 \o :outf
 SELECT evidence_open_run(:'UA','review','review_sheet','script:review','sha', jsonb_build_object('sheet_sha256','big2','items',500,'rows',
   (SELECT jsonb_object_agg(r::text, jsonb_build_object('targets', (SELECT jsonb_agg(jsonb_build_object('kind','image_candidate','id',
-      CASE WHEN t = 1 THEN :'c1' ELSE gen_random_uuid()::text END)) FROM generate_series(1,20) t))) FROM generate_series(1,500) r))) IS NOT NULL AS sheet_500x20_opened;
+      CASE WHEN t = 1 AND r = 1 THEN :'c1' ELSE gen_random_uuid()::text END)) FROM generate_series(1,20) t))) FROM generate_series(1,500) r))) IS NOT NULL AS sheet_500x20_opened;
 \o
 \set got `cat :outf`
-SELECT t_out($l$r6 writers/r6_storage_minors.v9.sql:76 === M8 the largest sheet the writer accepts: 500 rows x 200 targets (timed against the 10 s statement limit); then 500 x 20$l$, :'got', $e$t$e$);
+SELECT t_out($l$r6 writers/r6_storage_minors.v9.sql:77 === M8 the largest sheet the writer accepts: 500 rows x 200 targets (timed against the 10 s statement limit); then 500 x 20$l$, :'got', $e$t$e$);
 \timing off
 
 
@@ -10633,6 +10864,8 @@ CREATE DATABASE :"grp_db" TEMPLATE :"tmpl_db" STRATEGY FILE_COPY;   -- a file co
 \c :grp_db
 SET TimeZone = 'America/Los_Angeles'; SET DateStyle = 'ISO, MDY';
 \set ON_ERROR_STOP on
+-- this scenario sets RLS on vehicles itself: the template's live policies on it are taken off first, as captured
+DROP POLICY IF EXISTS "vehicles_private_select" ON public.vehicles; DROP POLICY IF EXISTS "vehicles_public_select" ON public.vehicles; ALTER TABLE public.vehicles DISABLE ROW LEVEL SECURITY;
 -- the owner sessions this group uses, in the auth server's records
 SELECT auth.t_seed_session('2dc2a0ab-0000-4000-8000-000000000003', '962bbddf-0000-4000-8000-0000000000b8', 'aal1'), auth.t_seed_session('3bb3c76e-0000-4000-8000-000000000ea8', '9490fc96-0000-4000-8000-0000000000a8', 'ok'), auth.t_seed_session('3bb3c76e-0000-4000-8000-000000000fb8', '962bbddf-0000-4000-8000-0000000000b8', 'ok');
 -- ---------------------------------------------------------------------------- replay9_money-ship-v9_m5_reader_user.sql
@@ -11519,6 +11752,8 @@ CREATE DATABASE :"grp_db" TEMPLATE :"tmpl_db" STRATEGY FILE_COPY;   -- a file co
 \c :grp_db
 SET TimeZone = 'America/Los_Angeles'; SET DateStyle = 'ISO, MDY';
 \set ON_ERROR_STOP on
+-- this scenario sets RLS on vehicles itself: the template's live policies on it are taken off first, as captured
+DROP POLICY IF EXISTS "vehicles_private_select" ON public.vehicles; DROP POLICY IF EXISTS "vehicles_public_select" ON public.vehicles; ALTER TABLE public.vehicles DISABLE ROW LEVEL SECURITY;
 -- the owner sessions this group uses, in the auth server's records
 SELECT auth.t_seed_session('2dc2a0ab-0000-4000-8000-000000000003', '962bbddf-0000-4000-8000-0000000000b8', 'aal1'), auth.t_seed_session('3bb3c76e-0000-4000-8000-000000000ea8', '9490fc96-0000-4000-8000-0000000000a8', 'ok'), auth.t_seed_session('3bb3c76e-0000-4000-8000-000000000fb8', '962bbddf-0000-4000-8000-0000000000b8', 'ok');
 -- ---------------------------------------------------------------------------- replay9_trucks-v9_t4_session_split.sql
@@ -14373,6 +14608,8 @@ CREATE DATABASE :"grp_db" TEMPLATE :"tmpl_db" STRATEGY FILE_COPY;   -- a file co
 \c :grp_db
 SET TimeZone = 'America/Los_Angeles'; SET DateStyle = 'ISO, MDY';
 \set ON_ERROR_STOP on
+-- this scenario sets RLS on vehicles itself: the template's live policies on it are taken off first, as captured
+DROP POLICY IF EXISTS "vehicles_private_select" ON public.vehicles; DROP POLICY IF EXISTS "vehicles_public_select" ON public.vehicles; ALTER TABLE public.vehicles DISABLE ROW LEVEL SECURITY;
 -- the owner sessions this group uses, in the auth server's records
 -- (none)
 -- ---------------------------------------------------------------------------- replay10_answers-trucks-v10_r2_merge_unmoved.sql
@@ -14546,6 +14783,8 @@ CREATE DATABASE :"grp_db" TEMPLATE :"tmpl_db" STRATEGY FILE_COPY;   -- a file co
 \c :grp_db
 SET TimeZone = 'America/Los_Angeles'; SET DateStyle = 'ISO, MDY';
 \set ON_ERROR_STOP on
+-- this scenario sets RLS on vehicles itself: the template's live policies on it are taken off first, as captured
+DROP POLICY IF EXISTS "vehicles_private_select" ON public.vehicles; DROP POLICY IF EXISTS "vehicles_public_select" ON public.vehicles; ALTER TABLE public.vehicles DISABLE ROW LEVEL SECURITY;
 -- the owner sessions this group uses, in the auth server's records
 -- (none)
 -- ---------------------------------------------------------------------------- replay10_answers-trucks-v10_r3_question_key.sql
@@ -14807,6 +15046,8 @@ CREATE DATABASE :"grp_db" TEMPLATE :"tmpl_db" STRATEGY FILE_COPY;   -- a file co
 \c :grp_db
 SET TimeZone = 'America/Los_Angeles'; SET DateStyle = 'ISO, MDY';
 \set ON_ERROR_STOP on
+-- this scenario sets RLS on vehicles itself: the template's live policies on it are taken off first, as captured
+DROP POLICY IF EXISTS "vehicles_private_select" ON public.vehicles; DROP POLICY IF EXISTS "vehicles_public_select" ON public.vehicles; ALTER TABLE public.vehicles DISABLE ROW LEVEL SECURITY;
 -- the owner sessions this group uses, in the auth server's records
 -- (none)
 -- ---------------------------------------------------------------------------- replay10_answers-trucks-v10_r4_slot_rows.sql
@@ -14996,7 +15237,7 @@ ROLLBACK;
 \set got_1191 `cat :outf`
 -- the checks of the statements inside that transaction
 SELECT t_out($l$r10_03 answers-trucks-v10/r4_slot_rows.sql:60 $l$, :'got_1188', $e$$e$);
-SELECT t_out($l$r10_03 answers-trucks-v10/r4_slot_rows.sql:61 $l$, :'got_1189', $e$[c3] "vin:X" on truck A's row (A carries VIN X; one truck by VIN, not by key): {"id": "<id>", "result": "not_on_answered_row", "answered_place": "vin:VINR4E1204EEF210B"}$e$);
+SELECT t_out($l$r10_03 answers-trucks-v10/r4_slot_rows.sql:61 $l$, :'got_1189', $e$[c3] "vin:X" on truck A's row (A carries VIN X; one truck by VIN, not by key): {"id": "<id>", "result": "not_on_answered_row", "answered_place": "vin:VINR4EAEF05AD7DB1"}$e$);
 SELECT t_out($l$r10_03 answers-trucks-v10/r4_slot_rows.sql:62 $l$, :'got_1190', $e$[e1] a "no" on cF citing "it is the F truck": not_on_answered_row$e$);
 SELECT t_out($l$r10_03 answers-trucks-v10/r4_slot_rows.sql:63 $l$, :'got_1191', $e$$e$);
 
@@ -15019,6 +15260,8 @@ CREATE DATABASE :"grp_db" TEMPLATE :"tmpl_db" STRATEGY FILE_COPY;   -- a file co
 \c :grp_db
 SET TimeZone = 'America/Los_Angeles'; SET DateStyle = 'ISO, MDY';
 \set ON_ERROR_STOP on
+-- this scenario sets RLS on vehicles itself: the template's live policies on it are taken off first, as captured
+DROP POLICY IF EXISTS "vehicles_private_select" ON public.vehicles; DROP POLICY IF EXISTS "vehicles_public_select" ON public.vehicles; ALTER TABLE public.vehicles DISABLE ROW LEVEL SECURITY;
 -- the owner sessions this group uses, in the auth server's records
 -- (none)
 -- ---------------------------------------------------------------------------- replay10_answers-trucks-v10_r5_answered_elsewhere.sql
@@ -15223,6 +15466,8 @@ CREATE DATABASE :"grp_db" TEMPLATE :"tmpl_db" STRATEGY FILE_COPY;   -- a file co
 \c :grp_db
 SET TimeZone = 'America/Los_Angeles'; SET DateStyle = 'ISO, MDY';
 \set ON_ERROR_STOP on
+-- this scenario sets RLS on vehicles itself: the template's live policies on it are taken off first, as captured
+DROP POLICY IF EXISTS "vehicles_private_select" ON public.vehicles; DROP POLICY IF EXISTS "vehicles_public_select" ON public.vehicles; ALTER TABLE public.vehicles DISABLE ROW LEVEL SECURITY;
 -- the owner sessions this group uses, in the auth server's records
 -- (none)
 -- ---------------------------------------------------------------------------- replay10_answers-trucks-v10_r6_day_rejection.sql
@@ -15379,6 +15624,8 @@ CREATE DATABASE :"grp_db" TEMPLATE :"tmpl_db" STRATEGY FILE_COPY;   -- a file co
 \c :grp_db
 SET TimeZone = 'America/Los_Angeles'; SET DateStyle = 'ISO, MDY';
 \set ON_ERROR_STOP on
+-- this scenario sets RLS on vehicles itself: the template's live policies on it are taken off first, as captured
+DROP POLICY IF EXISTS "vehicles_private_select" ON public.vehicles; DROP POLICY IF EXISTS "vehicles_public_select" ON public.vehicles; ALTER TABLE public.vehicles DISABLE ROW LEVEL SECURITY;
 -- the owner sessions this group uses, in the auth server's records
 -- (none)
 -- ---------------------------------------------------------------------------- replay10_answers-trucks-v10_r7_j30_writer.sql
@@ -15885,7 +16132,7 @@ SELECT '  [conflict open] costs summed=' || (SELECT coalesce(sum((v->>'cents')::
        || ' | stated.statements(v11)=' || (:'va'::jsonb->'stated'->'statements')::text || '   (truth: one purchase, 680000)';
 \o
 \set got `cat :outf`
-SELECT t_out($l$r10_09 money-ship-v10/k2_conflict_v11form.sql:42 === A. V1: k0 answered (650000); the pass reads page 2 and (W4 refuses the re-write) proposes k1 (680000) / the sheet asks who paid k1 (who_paid is open on it); he answers$l$, :'got', $e$  [conflict open] costs summed=680000 | stated.statements(v11)=[{"on": null, "cents": 650000, "payee": "unknown", "payer": "owner", "counts": true, "answers": {"id": "<id>", "on": "2024-03-09", "kind": "claim", "status": "proposed", "current": true}, "link_id": "<id>", "category": "purchase", "direction": "out", "covered_by": ["bank:a-1"], "payment_key": "owner:answers:<id>#1", "covered_cents": 650000}, {"on": null, "cents": 680000, "payee": "unknown", "payer": "owner", "counts": true, "answers": {"id": "<id>", "on": "2024-03-09", "kind": "claim", "status": "proposed", "current": true}, "link_id": "<id>", "category": "purchase", "direction": "out", "covered_by": [], "payment_key": "owner:answers:<id>#1", "covered_cents": 0}]   (truth: one purchase, 680000)$e$);
+SELECT t_out($l$r10_09 money-ship-v10/k2_conflict_v11form.sql:42 === A. V1: k0 answered (650000); the pass reads page 2 and (W4 refuses the re-write) proposes k1 (680000) / the sheet asks who paid k1 (who_paid is open on it); he answers$l$, :'got', $e$  [conflict open] costs summed=680000 | stated.statements(v11)=[{"on": null, "cents": 680000, "payee": "unknown", "payer": "owner", "counts": true, "answers": {"id": "<id>", "on": "2024-03-09", "kind": "claim", "status": "proposed", "current": true}, "link_id": "<id>", "category": "purchase", "direction": "out", "covered_by": [], "payment_key": "owner:answers:<id>#1", "covered_cents": 0}, {"on": null, "cents": 650000, "payee": "unknown", "payer": "owner", "counts": true, "answers": {"id": "<id>", "on": "2024-03-09", "kind": "claim", "status": "proposed", "current": true}, "link_id": "<id>", "category": "purchase", "direction": "out", "covered_by": ["bank:a-1"], "payment_key": "owner:answers:<id>#1", "covered_cents": 650000}]   (truth: one purchase, 680000)$e$);
 \o :outf
 SELECT '    stated: cents=' || (s->>'cents') || ' covered=' || (s->>'covered_cents') || ' answers.status=' || (s->'answers'->>'status') FROM jsonb_array_elements(:'va'::jsonb->'stated'->'statements') s ORDER BY s->>'cents';
 \o
@@ -15908,7 +16155,7 @@ SELECT '  [conflict answered] costs summed=' || (SELECT coalesce(sum((v->>'cents
        || ' | stated.statements(v11)=' || (:'va'::jsonb->'stated'->'statements')::text || '   (truth: one purchase, 680000)';
 \o
 \set got `cat :outf`
-SELECT t_out($l$r10_09 money-ship-v10/k2_conflict_v11form.sql:49 === A. V1: k0 answered (650000); the pass reads page 2 and (W4 refuses the re-write) proposes k1 (680000) / he answers the conflict: k0 was the misread first page (he rejects k0 in the app)$l$, :'got', $e$  [conflict answered] costs summed=680000 | stated.statements(v11)=[{"on": null, "cents": 650000, "payee": "unknown", "payer": "owner", "counts": false, "answers": {"id": "<id>", "on": "2024-03-09", "kind": "claim", "status": "rejected", "current": true}, "link_id": "<id>", "category": "purchase", "direction": "out", "covered_by": [], "payment_key": "owner:answers:<id>#1", "covered_cents": 0}, {"on": null, "cents": 680000, "payee": "unknown", "payer": "owner", "counts": true, "answers": {"id": "<id>", "on": "2024-03-09", "kind": "claim", "status": "proposed", "current": true}, "link_id": "<id>", "category": "purchase", "direction": "out", "covered_by": ["bank:a-1"], "payment_key": "owner:answers:<id>#1", "covered_cents": 680000}]   (truth: one purchase, 680000)$e$);
+SELECT t_out($l$r10_09 money-ship-v10/k2_conflict_v11form.sql:49 === A. V1: k0 answered (650000); the pass reads page 2 and (W4 refuses the re-write) proposes k1 (680000) / he answers the conflict: k0 was the misread first page (he rejects k0 in the app)$l$, :'got', $e$  [conflict answered] costs summed=680000 | stated.statements(v11)=[{"on": null, "cents": 680000, "payee": "unknown", "payer": "owner", "counts": true, "answers": {"id": "<id>", "on": "2024-03-09", "kind": "claim", "status": "proposed", "current": true}, "link_id": "<id>", "category": "purchase", "direction": "out", "covered_by": ["bank:a-1"], "payment_key": "owner:answers:<id>#1", "covered_cents": 680000}, {"on": null, "cents": 650000, "payee": "unknown", "payer": "owner", "counts": false, "answers": {"id": "<id>", "on": "2024-03-09", "kind": "claim", "status": "rejected", "current": true}, "link_id": "<id>", "category": "purchase", "direction": "out", "covered_by": [], "payment_key": "owner:answers:<id>#1", "covered_cents": 0}]   (truth: one purchase, 680000)$e$);
 \o :outf
 SELECT '    stated: cents=' || (s->>'cents') || ' covered=' || (s->>'covered_cents') || ' by=' || (s->'covered_by')::text || ' answers.status=' || (s->'answers'->>'status') FROM jsonb_array_elements(:'va'::jsonb->'stated'->'statements') s ORDER BY s->>'cents';
 \o
@@ -17219,6 +17466,7 @@ SELECT 'statement ' || v.label || ': occurred_on=' || coalesce(l.occurred_on::te
 \set got `cat :outf`
 SELECT t_out($l$r10_16 verify-F2/f2_v11form.sql:31 $l$, :'got', $e$statement multi-day deal: occurred_on=NULL cents=500000 \n statement one-day deal (control): occurred_on=2024-04-02 cents=300000$e$);
 -- reads by the owner himself (authenticated), per window
+-- the design's list cut this expected value at 2,000 characters: the full value (2350 characters) from its capture
 \o :outf
 SELECT rpad(v.label, 24) || rpad(w, 6) || ' costs summed=' || coalesce((SELECT sum((b->>'cents')::bigint) FROM jsonb_each(x->'costs') e(k,b) WHERE b ? 'payments'), 0)
        || ' | stated.statements(v11)=' || (x->'stated'->'statements')::text || ' n=' || jsonb_array_length(x->'stated'->'statements')
@@ -17229,7 +17477,7 @@ SELECT rpad(v.label, 24) || rpad(w, 6) || ' costs summed=' || coalesce((SELECT s
        LATERAL (SELECT vehicle_accounting_evidence(vv.id, w.f, w.t) x) z ORDER BY v.label, w;
 \o
 \set got `cat :outf`
-SELECT t_out($l$r10_16 verify-F2/f2_v11form.sql:34 $l$, :'got', $e$multi-day deal          2024   costs summed=500000 | stated.statements(v11)=[{"on": null, "cents": 500000, "payee": "unknown", "payer": "owner", "counts": true, "answers": {"id": "<id>", "on": "2024-03-09", "kind": "claim", "status": "proposed", "current": true}, "link_id": "<id>", "category": "purchase", "direction": "out", "covered_by": ["bank:v-bal", "bank:v-dep"], "payment_key": "owner:answers:<id>#1", "covered_cents": 500000}] n=1 covered=500000 | payments_undated=[] \n multi-day deal          2025   costs summed=0 | stated.statements(v11)=[] n=0 covered=- | payments_undated=[] \n multi-day deal          2026   costs summed=0 | stated.statements(v11)=[] n=0 covered=- | payments_undated=[] \n multi-day deal          all    costs summed=500000 | stated.statements(v11)=[{"on": null, "cents": 500000, "payee": "unknown", "payer": "owner", "counts": true, "answers": {"id": "<id>", "on": "2024-03-09", "kind": "claim", "status": "proposed", "current": true}, "link_id": "<id>", "category": "purchase", "direction": "out", "covered_by": ["bank:v-bal", "bank:v-dep"], "payment_key": "owner:answers:<id>#1", "covered_cents": 500000}] n=1 covered=500000 | payments_undated=[] \n one-day deal (control)  2024   costs summed=300000 | stated.statements(v11)=[{"on": "2024-04-02", "cents": 300000, "payee": "unknown", "payer": "owner", "counts": true, "answers": {"id": "<id>", "on": "2024-04-02", "kind": "claim", "status": "proposed", "current": true}, "link_id": "<id>", "category": "purchase", "direction": "out", "covered_by": ["bank:v2"], "payment_key": "owner:answers:<id>#2", "covered_cents": 300000}] n=1 covered=300000 | payments_undated=[] \n one-day deal (control)  2025   costs summed=0 | stated.statements(v11)=[] n=0 covered=- | payments_undated=[] \n one-day deal (control)  2026   costs summed=0 | stated.statements(v11)=[] n=0 covered=- | payments_undated=[] \n one-day deal (control)  all    costs summed=300000 | stated.statements(v11)=[{"on": "2024-04-02", "cents": 300000, "p$e$);
+SELECT t_out($l$r10_16 verify-F2/f2_v11form.sql:34 $l$, :'got', $e$multi-day deal          2024   costs summed=500000 | stated.statements(v11)=[{"on": null, "cents": 500000, "payee": "unknown", "payer": "owner", "counts": true, "answers": {"id": "<id>", "on": "2024-03-09", "kind": "claim", "status": "proposed", "current": true}, "link_id": "<id>", "category": "purchase", "direction": "out", "covered_by": ["bank:v-bal", "bank:v-dep"], "payment_key": "owner:answers:<id>#1", "covered_cents": 500000}] n=1 covered=500000 | payments_undated=[] \n multi-day deal          2025   costs summed=0 | stated.statements(v11)=[] n=0 covered=- | payments_undated=[] \n multi-day deal          2026   costs summed=0 | stated.statements(v11)=[] n=0 covered=- | payments_undated=[] \n multi-day deal          all    costs summed=500000 | stated.statements(v11)=[{"on": null, "cents": 500000, "payee": "unknown", "payer": "owner", "counts": true, "answers": {"id": "<id>", "on": "2024-03-09", "kind": "claim", "status": "proposed", "current": true}, "link_id": "<id>", "category": "purchase", "direction": "out", "covered_by": ["bank:v-bal", "bank:v-dep"], "payment_key": "owner:answers:<id>#1", "covered_cents": 500000}] n=1 covered=500000 | payments_undated=[] \n one-day deal (control)  2024   costs summed=300000 | stated.statements(v11)=[{"on": "2024-04-02", "cents": 300000, "payee": "unknown", "payer": "owner", "counts": true, "answers": {"id": "<id>", "on": "2024-04-02", "kind": "claim", "status": "proposed", "current": true}, "link_id": "<id>", "category": "purchase", "direction": "out", "covered_by": ["bank:v2"], "payment_key": "owner:answers:<id>#2", "covered_cents": 300000}] n=1 covered=300000 | payments_undated=[] \n one-day deal (control)  2025   costs summed=0 | stated.statements(v11)=[] n=0 covered=- | payments_undated=[] \n one-day deal (control)  2026   costs summed=0 | stated.statements(v11)=[] n=0 covered=- | payments_undated=[] \n one-day deal (control)  all    costs summed=300000 | stated.statements(v11)=[{"on": "2024-04-02", "cents": 300000, "payee": "unknown", "payer": "owner", "counts": true, "answers": {"id": "<id>", "on": "2024-04-02", "kind": "claim", "status": "proposed", "current": true}, "link_id": "<id>", "category": "purchase", "direction": "out", "covered_by": ["bank:v2"], "payment_key": "owner:answers:<id>#2", "covered_cents": 300000}] n=1 covered=300000 | payments_undated=[]$e$);
 \o :outf
 SELECT rpad(v.label, 24) || 'statements listed over the three year reads (v11; a total no longer exists): ' || sum(jsonb_array_length(vehicle_accounting_evidence(vv.id, f, t)->'stated'->'statements'))
   FROM (VALUES (:'V1'::uuid), (:'V2'::uuid)) vv(id) JOIN vehicles v ON v.id = vv.id,
@@ -17264,6 +17512,8 @@ CREATE DATABASE :"grp_db" TEMPLATE :"tmpl_db" STRATEGY FILE_COPY;   -- a file co
 \c :grp_db
 SET TimeZone = 'America/Los_Angeles'; SET DateStyle = 'ISO, MDY';
 \set ON_ERROR_STOP on
+-- this scenario sets RLS on vehicles itself: the template's live policies on it are taken off first, as captured
+DROP POLICY IF EXISTS "vehicles_private_select" ON public.vehicles; DROP POLICY IF EXISTS "vehicles_public_select" ON public.vehicles; ALTER TABLE public.vehicles DISABLE ROW LEVEL SECURITY;
 -- the owner sessions this group uses, in the auth server's records
 -- (none)
 -- ---------------------------------------------------------------------------- replay10_verify-R2_r2_merge_unmoved.sql
@@ -17416,7 +17666,7 @@ SELECT '[7] statuses in his app, by photo: ' || (SELECT string_agg(CASE image_id
    FROM public.evidence_candidates_for_images(ARRAY[:'pa', :'pb', :'pm']::uuid[], :'ua'));
 \o
 \set got `cat :outf`
-SELECT t_out_unordered($l$r10_17 verify-R2/r2_merge_unmoved.sql:59 $l$, :'got', $e$[7] statuses in his app, by photo: PM row on V1=confirmed, PB row on V1=confirmed, PA row on V3=confirmed$e$);
+SELECT t_out_unordered($l$r10_17 verify-R2/r2_merge_unmoved.sql:59 $l$, :'got', $e$[7] statuses in his app, by photo: PB row on V1=confirmed, PM row on V1=confirmed, PA row on V3=confirmed$e$);
 
 
 RESET ROLE; RESET SESSION AUTHORIZATION;
@@ -17438,7 +17688,7 @@ CREATE DATABASE :"grp_db" TEMPLATE :"tmpl_db" STRATEGY FILE_COPY;   -- a file co
 SET TimeZone = 'America/Los_Angeles'; SET DateStyle = 'ISO, MDY';
 \set ON_ERROR_STOP on
 \set JOB 'RESET ROLE; RESET SESSION AUTHORIZATION; SET SESSION AUTHORIZATION authenticator; SET ROLE service_role; SET request.jwt.claim.role = ''service_role''; RESET request.jwt.claim.sub; SET request.jwt.claims = ''{"role":"service_role"}'';'
-SELECT gen_random_uuid() AS "B1", gen_random_uuid() AS "BIG", gen_random_uuid() AS "D", gen_random_uuid() AS "D2", gen_random_uuid() AS "D4", gen_random_uuid() AS "D5", gen_random_uuid() AS "D6", gen_random_uuid() AS "D7", gen_random_uuid() AS "DELV", gen_random_uuid() AS "GV", gen_random_uuid() AS "I1", gen_random_uuid() AS "I2", gen_random_uuid() AS "I9", gen_random_uuid() AS "J10", gen_random_uuid() AS "J30", gen_random_uuid() AS "MA", gen_random_uuid() AS "MV1", gen_random_uuid() AS "PA", gen_random_uuid() AS "PRIV", gen_random_uuid() AS "RD", gen_random_uuid() AS "RV", gen_random_uuid() AS "SRC", gen_random_uuid() AS "SUB", gen_random_uuid() AS "SV", gen_random_uuid() AS "TD", gen_random_uuid() AS "U", gen_random_uuid() AS "U4", gen_random_uuid() AS "U5", gen_random_uuid() AS "UA", gen_random_uuid() AS "V", gen_random_uuid() AS "VA", gen_random_uuid() AS "VO", gen_random_uuid() AS "VS", gen_random_uuid() AS "W", gen_random_uuid() AS "XD", gen_random_uuid() AS "a1", gen_random_uuid() AS "a12", gen_random_uuid() AS "a13", gen_random_uuid() AS "a14", gen_random_uuid() AS "a15", gen_random_uuid() AS "a1b", gen_random_uuid() AS "a1c", gen_random_uuid() AS "a2", gen_random_uuid() AS "a3", gen_random_uuid() AS "a4", gen_random_uuid() AS "a5", gen_random_uuid() AS "a6", gen_random_uuid() AS "a6b", gen_random_uuid() AS "a7", gen_random_uuid() AS "a8", gen_random_uuid() AS "a9", gen_random_uuid() AS "a_main2", gen_random_uuid() AS "acct_checking", gen_random_uuid() AS "acct_main", gen_random_uuid() AS "acct_share", gen_random_uuid() AS "af1", gen_random_uuid() AS "album_link", gen_random_uuid() AS "ans", gen_random_uuid() AS "ans1", gen_random_uuid() AS "ans2", gen_random_uuid() AS "ans_b", gen_random_uuid() AS "ans_c", gen_random_uuid() AS "ans_e", gen_random_uuid() AS "bpair", gen_random_uuid() AS "c1", gen_random_uuid() AS "c10", gen_random_uuid() AS "c106", gen_random_uuid() AS "c109", gen_random_uuid() AS "c11", gen_random_uuid() AS "c12", gen_random_uuid() AS "c13", gen_random_uuid() AS "c13b", gen_random_uuid() AS "c14b", gen_random_uuid() AS "c2", gen_random_uuid() AS "c2a", gen_random_uuid() AS "c2s", gen_random_uuid() AS "c3", gen_random_uuid() AS "c4", gen_random_uuid() AS "c5l", gen_random_uuid() AS "c5s", gen_random_uuid() AS "c5v", gen_random_uuid() AS "c6", gen_random_uuid() AS "c6m", gen_random_uuid() AS "c6n", gen_random_uuid() AS "c7", gen_random_uuid() AS "c8", gen_random_uuid() AS "c8805", gen_random_uuid() AS "c9", gen_random_uuid() AS "c_a3", gen_random_uuid() AS "ca1", gen_random_uuid() AS "ca1w", gen_random_uuid() AS "ca3", gen_random_uuid() AS "ca5", gen_random_uuid() AS "ca5r", gen_random_uuid() AS "caif", gen_random_uuid() AS "cb1", gen_random_uuid() AS "cb2", gen_random_uuid() AS "cb33", gen_random_uuid() AS "cb4", gen_random_uuid() AS "cb5", gen_random_uuid() AS "cb6", gen_random_uuid() AS "cbig", gen_random_uuid() AS "cdel", gen_random_uuid() AS "cdel2", gen_random_uuid() AS "ce_a", gen_random_uuid() AS "ce_b", gen_random_uuid() AS "cf1", gen_random_uuid() AS "cq3", gen_random_uuid() AS "cu1", gen_random_uuid() AS "f15", gen_random_uuid() AS "f15b", gen_random_uuid() AS "g_ans", gen_random_uuid() AS "g_cand", gen_random_uuid() AS "g_rev", gen_random_uuid() AS "j15_album", gen_random_uuid() AS "k1b", gen_random_uuid() AS "l10b", gen_random_uuid() AS "l12a", gen_random_uuid() AS "l12s", gen_random_uuid() AS "l204", gen_random_uuid() AS "l7", gen_random_uuid() AS "l9", gen_random_uuid() AS "l9b", gen_random_uuid() AS "l_00102", gen_random_uuid() AS "l_con", gen_random_uuid() AS "l_inflow", gen_random_uuid() AS "l_paint_j30", gen_random_uuid() AS "l_summit", gen_random_uuid() AS "l_va", gen_random_uuid() AS "l_vs", gen_random_uuid() AS "lu1", gen_random_uuid() AS "lu2", gen_random_uuid() AS "pair", gen_random_uuid() AS "ppair", gen_random_uuid() AS "r_comb2", gen_random_uuid() AS "rev", gen_random_uuid() AS "rev1", gen_random_uuid() AS "rev2", gen_random_uuid() AS "rev_b", gen_random_uuid() AS "rev_c", gen_random_uuid() AS "rev_e", gen_random_uuid() AS "s1", gen_random_uuid() AS "s12", gen_random_uuid() AS "s13", gen_random_uuid() AS "s14", gen_random_uuid() AS "s15", gen_random_uuid() AS "s1b", gen_random_uuid() AS "s1c", gen_random_uuid() AS "s2", gen_random_uuid() AS "s3b", gen_random_uuid() AS "s4", gen_random_uuid() AS "s5", gen_random_uuid() AS "s6", gen_random_uuid() AS "s6b", gen_random_uuid() AS "s7", gen_random_uuid() AS "s8", gen_random_uuid() AS "s9", gen_random_uuid() AS "sf1", gen_random_uuid() AS "t1", gen_random_uuid() AS "t8", gen_random_uuid() AS "worked" \gset
+SELECT gen_random_uuid() AS "B1", gen_random_uuid() AS "BIG", gen_random_uuid() AS "D", gen_random_uuid() AS "D2", gen_random_uuid() AS "D4", gen_random_uuid() AS "D5", gen_random_uuid() AS "D6", gen_random_uuid() AS "D7", gen_random_uuid() AS "DELV", gen_random_uuid() AS "GV", gen_random_uuid() AS "I1", gen_random_uuid() AS "I2", gen_random_uuid() AS "I9", gen_random_uuid() AS "J10", gen_random_uuid() AS "J30", gen_random_uuid() AS "MA", gen_random_uuid() AS "MV1", gen_random_uuid() AS "PA", gen_random_uuid() AS "PRIV", gen_random_uuid() AS "RD", gen_random_uuid() AS "RV", gen_random_uuid() AS "SRC", gen_random_uuid() AS "SUB", gen_random_uuid() AS "SV", gen_random_uuid() AS "TD", gen_random_uuid() AS "U", gen_random_uuid() AS "U4", gen_random_uuid() AS "U5", gen_random_uuid() AS "UA", gen_random_uuid() AS "V", gen_random_uuid() AS "VA", gen_random_uuid() AS "VO", gen_random_uuid() AS "VS", gen_random_uuid() AS "W", gen_random_uuid() AS "XD", gen_random_uuid() AS "a1", gen_random_uuid() AS "a12", gen_random_uuid() AS "a13", gen_random_uuid() AS "a14", gen_random_uuid() AS "a15", gen_random_uuid() AS "a1b", gen_random_uuid() AS "a1c", gen_random_uuid() AS "a2", gen_random_uuid() AS "a3", gen_random_uuid() AS "a4", gen_random_uuid() AS "a5", gen_random_uuid() AS "a6", gen_random_uuid() AS "a6b", gen_random_uuid() AS "a7", gen_random_uuid() AS "a8", gen_random_uuid() AS "a9", gen_random_uuid() AS "a_main2", gen_random_uuid() AS "acct_checking", gen_random_uuid() AS "acct_main", gen_random_uuid() AS "acct_share", gen_random_uuid() AS "af1", gen_random_uuid() AS "album_link", gen_random_uuid() AS "ans", gen_random_uuid() AS "ans1", gen_random_uuid() AS "ans2", gen_random_uuid() AS "ans4", gen_random_uuid() AS "ans_b", gen_random_uuid() AS "ans_c", gen_random_uuid() AS "ans_e", gen_random_uuid() AS "bpair", gen_random_uuid() AS "c1", gen_random_uuid() AS "c10", gen_random_uuid() AS "c106", gen_random_uuid() AS "c109", gen_random_uuid() AS "c11", gen_random_uuid() AS "c12", gen_random_uuid() AS "c13", gen_random_uuid() AS "c13b", gen_random_uuid() AS "c14b", gen_random_uuid() AS "c2", gen_random_uuid() AS "c2a", gen_random_uuid() AS "c2s", gen_random_uuid() AS "c3", gen_random_uuid() AS "c4", gen_random_uuid() AS "c5l", gen_random_uuid() AS "c5s", gen_random_uuid() AS "c5v", gen_random_uuid() AS "c6", gen_random_uuid() AS "c6m", gen_random_uuid() AS "c6n", gen_random_uuid() AS "c7", gen_random_uuid() AS "c8", gen_random_uuid() AS "c8805", gen_random_uuid() AS "c9", gen_random_uuid() AS "c_a3", gen_random_uuid() AS "ca1", gen_random_uuid() AS "ca1w", gen_random_uuid() AS "ca3", gen_random_uuid() AS "ca5", gen_random_uuid() AS "ca5r", gen_random_uuid() AS "caif", gen_random_uuid() AS "cb1", gen_random_uuid() AS "cb2", gen_random_uuid() AS "cb33", gen_random_uuid() AS "cb4", gen_random_uuid() AS "cb5", gen_random_uuid() AS "cb6", gen_random_uuid() AS "cbig", gen_random_uuid() AS "cdel", gen_random_uuid() AS "cdel2", gen_random_uuid() AS "ce_a", gen_random_uuid() AS "ce_b", gen_random_uuid() AS "cf1", gen_random_uuid() AS "cq3", gen_random_uuid() AS "cu1", gen_random_uuid() AS "f15", gen_random_uuid() AS "f15b", gen_random_uuid() AS "g_ans", gen_random_uuid() AS "g_cand", gen_random_uuid() AS "g_rev", gen_random_uuid() AS "j15_album", gen_random_uuid() AS "k1b", gen_random_uuid() AS "l10b", gen_random_uuid() AS "l12a", gen_random_uuid() AS "l12s", gen_random_uuid() AS "l204", gen_random_uuid() AS "l7", gen_random_uuid() AS "l9", gen_random_uuid() AS "l9b", gen_random_uuid() AS "l_00102", gen_random_uuid() AS "l_con", gen_random_uuid() AS "l_inflow", gen_random_uuid() AS "l_paint_j30", gen_random_uuid() AS "l_summit", gen_random_uuid() AS "l_va", gen_random_uuid() AS "l_vs", gen_random_uuid() AS "lu1", gen_random_uuid() AS "lu2", gen_random_uuid() AS "pair", gen_random_uuid() AS "ppair", gen_random_uuid() AS "r_comb2", gen_random_uuid() AS "rev", gen_random_uuid() AS "rev1", gen_random_uuid() AS "rev2", gen_random_uuid() AS "rev4", gen_random_uuid() AS "rev_b", gen_random_uuid() AS "rev_c", gen_random_uuid() AS "rev_e", gen_random_uuid() AS "s1", gen_random_uuid() AS "s12", gen_random_uuid() AS "s13", gen_random_uuid() AS "s14", gen_random_uuid() AS "s15", gen_random_uuid() AS "s1b", gen_random_uuid() AS "s1c", gen_random_uuid() AS "s2", gen_random_uuid() AS "s3b", gen_random_uuid() AS "s4", gen_random_uuid() AS "s5", gen_random_uuid() AS "s6", gen_random_uuid() AS "s6b", gen_random_uuid() AS "s7", gen_random_uuid() AS "s8", gen_random_uuid() AS "s9", gen_random_uuid() AS "sf1", gen_random_uuid() AS "t1", gen_random_uuid() AS "t8", gen_random_uuid() AS "worked" \gset
 :JOB
 \set LAST_ERROR_SQLSTATE none
 \set ON_ERROR_STOP off
@@ -17751,52 +18001,52 @@ SELECT t_refused($l$agent scenario_v4_money.sql:137 === out-of-scope truck (exit
 \set ON_ERROR_STOP off
 SELECT decide_evidence('evidence_link', ARRAY[:'l_vs']::uuid[], 'confirmed', 'x', 'review:'||:'rev'||'#1', 'owner_chat_review', :'UA', NULL, NULL, 'lead-v5', 'answers:'||:'ans'||'#1');
 \set ON_ERROR_STOP on
-SELECT t_refused($l$agent scenario_v5.sql:149 === V3 (rules-channels v4 #1) an agent decision is bound to his answer / V3b "yes, the A truck": confirming the link that places it on another truck, or the contradiction here, is refused; confirming A's link works (expect ERROR does not su$l$, :'LAST_ERROR_SQLSTATE', :'LAST_ERROR_MESSAGE', '42501', 'permission denied for function decide_evidence');
+SELECT t_refused($l$agent scenario_v5.sql:154 === V3 (rules-channels v4 #1) an agent decision is bound to his answer / V3b "yes, the A truck": confirming the link that places it on another truck, or the contradiction here, is refused; confirming A's link works (expect ERROR does not su$l$, :'LAST_ERROR_SQLSTATE', :'LAST_ERROR_MESSAGE', '42501', 'permission denied for function decide_evidence');
 \set LAST_ERROR_SQLSTATE none
 \set ON_ERROR_STOP off
 SELECT decide_evidence('evidence_link', ARRAY[:'l_con']::uuid[], 'confirmed', 'x', 'review:'||:'rev'||'#1', 'owner_chat_review', :'UA', NULL, NULL, 'lead-v5', 'answers:'||:'ans'||'#1');
 \set ON_ERROR_STOP on
-SELECT t_refused($l$agent scenario_v5.sql:150 === V3 (rules-channels v4 #1) an agent decision is bound to his answer / V3b "yes, the A truck": confirming the link that places it on another truck, or the contradiction here, is refused; confirming A's link works (expect ERROR does not su$l$, :'LAST_ERROR_SQLSTATE', :'LAST_ERROR_MESSAGE', '42501', 'permission denied for function decide_evidence');
+SELECT t_refused($l$agent scenario_v5.sql:155 === V3 (rules-channels v4 #1) an agent decision is bound to his answer / V3b "yes, the A truck": confirming the link that places it on another truck, or the contradiction here, is refused; confirming A's link works (expect ERROR does not su$l$, :'LAST_ERROR_SQLSTATE', :'LAST_ERROR_MESSAGE', '42501', 'permission denied for function decide_evidence');
 \set LAST_ERROR_SQLSTATE none
 \set ON_ERROR_STOP off
 SELECT decide_evidence('evidence_link', ARRAY[:'l_va']::uuid[], 'confirmed', 'for the A truck', 'review:'||:'rev'||'#1', 'owner_chat_review', :'UA', NULL, NULL, 'lead-v5', 'answers:'||:'ans'||'#1')->'items'->0->>'result';
 \set ON_ERROR_STOP on
-SELECT t_refused($l$agent scenario_v5.sql:151 === V3 (rules-channels v4 #1) an agent decision is bound to his answer / V3b "yes, the A truck": confirming the link that places it on another truck, or the contradiction here, is refused; confirming A's link works (expect ERROR does not su$l$, :'LAST_ERROR_SQLSTATE', :'LAST_ERROR_MESSAGE', '42501', 'permission denied for function decide_evidence');
+SELECT t_refused($l$agent scenario_v5.sql:156 === V3 (rules-channels v4 #1) an agent decision is bound to his answer / V3b "yes, the A truck": confirming the link that places it on another truck, or the contradiction here, is refused; confirming A's link works (expect ERROR does not su$l$, :'LAST_ERROR_SQLSTATE', :'LAST_ERROR_MESSAGE', '42501', 'permission denied for function decide_evidence');
 \set LAST_ERROR_SQLSTATE none
 \set ON_ERROR_STOP off
 SELECT decide_evidence('account_entity', ARRAY[:'a_main2']::uuid[], 'confirmed', 'x', 'review:'||:'rev'||'#2', 'owner_chat_review', :'UA', NULL, NULL, 'lead-v5', 'answers:'||:'ans'||'#2');
 \set ON_ERROR_STOP on
-SELECT t_refused($l$agent scenario_v5.sql:154 === V3 (rules-channels v4 #1) an agent decision is bound to his answer / V3c a pass re-proposes the account as a business after his answer "personal": that row cannot be confirmed under his answer (expect superseded row; ERROR written after$l$, :'LAST_ERROR_SQLSTATE', :'LAST_ERROR_MESSAGE', '42501', 'permission denied for function decide_evidence');
+SELECT t_refused($l$agent scenario_v5.sql:159 === V3 (rules-channels v4 #1) an agent decision is bound to his answer / V3c a pass re-proposes the account as a business after his answer "personal": that row cannot be confirmed under his answer (expect superseded row; ERROR written after$l$, :'LAST_ERROR_SQLSTATE', :'LAST_ERROR_MESSAGE', '42501', 'permission denied for function decide_evidence');
 \set LAST_ERROR_SQLSTATE none
 \set ON_ERROR_STOP off
 SELECT decide_evidence('evidence_link', ARRAY[:'l_va']::uuid[], 'rejected', 'x', 'review:'||:'rev'||'#3', 'owner_chat_review', :'UA', NULL, NULL, 'lead-v5', 'answers:'||:'ans'||'#3');
 \set ON_ERROR_STOP on
-SELECT t_refused($l$agent scenario_v5.sql:156 === V3 (rules-channels v4 #1) an agent decision is bound to his answer / V3d an "unsure" answer decides nothing; a bare "no" decides only the target its row names, and only as a reject (expect ERROR not a yes or a no; ERROR does not support$l$, :'LAST_ERROR_SQLSTATE', :'LAST_ERROR_MESSAGE', '42501', 'permission denied for function decide_evidence');
+SELECT t_refused($l$agent scenario_v5.sql:161 === V3 (rules-channels v4 #1) an agent decision is bound to his answer / V3d an "unsure" answer decides nothing; a bare "no" decides only the target its row names, and only as a reject (expect ERROR not a yes or a no; ERROR does not support$l$, :'LAST_ERROR_SQLSTATE', :'LAST_ERROR_MESSAGE', '42501', 'permission denied for function decide_evidence');
 \set LAST_ERROR_SQLSTATE none
 \set ON_ERROR_STOP off
-SELECT decide_evidence('evidence_link', ARRAY[:'l_va']::uuid[], 'confirmed', 'x', 'review:'||:'rev'||'#4', 'owner_chat_review', :'UA', NULL, NULL, 'lead-v5', 'answers:'||:'ans'||'#4');
+SELECT decide_evidence('evidence_link', ARRAY[:'l_va']::uuid[], 'confirmed', 'x', 'review:'||:'rev4'||'#1', 'owner_chat_review', :'UA', NULL, NULL, 'lead-v5', 'answers:'||:'ans4'||'#1');
 \set ON_ERROR_STOP on
-SELECT t_refused($l$agent scenario_v5.sql:157 === V3 (rules-channels v4 #1) an agent decision is bound to his answer / V3d an "unsure" answer decides nothing; a bare "no" decides only the target its row names, and only as a reject (expect ERROR not a yes or a no; ERROR does not support$l$, :'LAST_ERROR_SQLSTATE', :'LAST_ERROR_MESSAGE', '42501', 'permission denied for function decide_evidence');
+SELECT t_refused($l$agent scenario_v5.sql:162 === V3 (rules-channels v4 #1) an agent decision is bound to his answer / V3d an "unsure" answer decides nothing; a bare "no" decides only the target its row names, and only as a reject (expect ERROR not a yes or a no; ERROR does not support$l$, :'LAST_ERROR_SQLSTATE', :'LAST_ERROR_MESSAGE', '42501', 'permission denied for function decide_evidence');
 \set LAST_ERROR_SQLSTATE none
 \set ON_ERROR_STOP off
-SELECT decide_evidence('evidence_link', ARRAY[:'l_va']::uuid[], 'rejected', 'no', 'review:'||:'rev'||'#4', 'owner_chat_review', :'UA', NULL, NULL, 'lead-v5', 'answers:'||:'ans'||'#4')->'items'->0->>'result';
+SELECT decide_evidence('evidence_link', ARRAY[:'l_va']::uuid[], 'rejected', 'no', 'review:'||:'rev4'||'#1', 'owner_chat_review', :'UA', NULL, NULL, 'lead-v5', 'answers:'||:'ans4'||'#1')->'items'->0->>'result';
 \set ON_ERROR_STOP on
-SELECT t_refused($l$agent scenario_v5.sql:158 === V3 (rules-channels v4 #1) an agent decision is bound to his answer / V3d an "unsure" answer decides nothing; a bare "no" decides only the target its row names, and only as a reject (expect ERROR not a yes or a no; ERROR does not support$l$, :'LAST_ERROR_SQLSTATE', :'LAST_ERROR_MESSAGE', '42501', 'permission denied for function decide_evidence');
+SELECT t_refused($l$agent scenario_v5.sql:163 === V3 (rules-channels v4 #1) an agent decision is bound to his answer / V3d an "unsure" answer decides nothing; a bare "no" decides only the target its row names, and only as a reject (expect ERROR not a yes or a no; ERROR does not support$l$, :'LAST_ERROR_SQLSTATE', :'LAST_ERROR_MESSAGE', '42501', 'permission denied for function decide_evidence');
 \set LAST_ERROR_SQLSTATE none
 \set ON_ERROR_STOP off
 SELECT decide_evidence('evidence_link', ARRAY[:'l_va']::uuid[], 'rejected', 'x', 'review:'||:'rev_e'||'#1', 'owner_chat_review', :'UA', NULL, :'VO', 'lead-v5', 'answers:'||:'ans_e'||'#1');
 \set ON_ERROR_STOP on
-SELECT t_refused($l$agent scenario_v5.sql:165 === V3 (rules-channels v4 #1) an agent decision is bound to his answer / V3e "no, it is Y" must reassign to the Y his answer names (expect ERROR the reassign vehicle must be the one his answer names)$l$, :'LAST_ERROR_SQLSTATE', :'LAST_ERROR_MESSAGE', '42501', 'permission denied for function decide_evidence');
+SELECT t_refused($l$agent scenario_v5.sql:170 === V3 (rules-channels v4 #1) an agent decision is bound to his answer / V3e "no, it is Y" must reassign to the Y his answer names (expect ERROR the reassign vehicle must be the one his answer names)$l$, :'LAST_ERROR_SQLSTATE', :'LAST_ERROR_MESSAGE', '42501', 'permission denied for function decide_evidence');
 \set LAST_ERROR_SQLSTATE none
 \set ON_ERROR_STOP off
 SELECT decide_evidence('image_candidate', ARRAY[:'c_a3']::uuid[], 'confirmed', 'monday', 'review:'||:'rev_b'||'#1', 'owner_chat_review', :'UA', jsonb_build_object(:'c_a3', NULL), NULL, 'lead-v5', 'answers:'||:'ans_b'||'#1')->'items'->0->>'result';
 \set ON_ERROR_STOP on
-SELECT t_refused($l$agent scenario_v5.sql:183 === V4 (rules-channels v4 #2) his newer app decision stands against an older chat answer, and an agent never implied-rejects his own confirm / V4a Tuesday he rejects it in the app; Wednesday the job transcribes Monday's answer (expect rejec$l$, :'LAST_ERROR_SQLSTATE', :'LAST_ERROR_MESSAGE', '42501', 'permission denied for function decide_evidence');
+SELECT t_refused($l$agent scenario_v5.sql:188 === V4 (rules-channels v4 #2) his newer app decision stands against an older chat answer, and an agent never implied-rejects his own confirm / V4a Tuesday he rejects it in the app; Wednesday the job transcribes Monday's answer (expect rejec$l$, :'LAST_ERROR_SQLSTATE', :'LAST_ERROR_MESSAGE', '42501', 'permission denied for function decide_evidence');
 \set LAST_ERROR_SQLSTATE none
 \set ON_ERROR_STOP off
 SELECT decide_evidence('image_candidate', ARRAY[:'c_a3']::uuid[], 'confirmed', 'chat', 'review:'||:'rev_c'||'#1', 'owner_chat_review', :'UA', jsonb_build_object(:'c_a3', NULL), NULL, 'lead-v5', 'answers:'||:'ans_c'||'#1')->'items'->0->>'result';
 \set ON_ERROR_STOP on
-SELECT t_refused($l$agent scenario_v5.sql:194 === V4 (rules-channels v4 #2) his newer app decision stands against an older chat answer, and an agent never implied-rejects his own confirm / V4b he confirmed IA3 as the second truck in the app before a chat answer naming the A truck: the $l$, :'LAST_ERROR_SQLSTATE', :'LAST_ERROR_MESSAGE', '42501', 'permission denied for function decide_evidence');
+SELECT t_refused($l$agent scenario_v5.sql:199 === V4 (rules-channels v4 #2) his newer app decision stands against an older chat answer, and an agent never implied-rejects his own confirm / V4b he confirmed IA3 as the second truck in the app before a chat answer naming the A truck: the $l$, :'LAST_ERROR_SQLSTATE', :'LAST_ERROR_MESSAGE', '42501', 'permission denied for function decide_evidence');
 \set LAST_ERROR_SQLSTATE none
 \set ON_ERROR_STOP off
 SELECT decide_evidence('image_candidate', ARRAY[:'c1']::uuid[], 'confirmed', 'yes', 'review:'||:'s1'||'#1', 'owner_chat_review', :'UA', jsonb_build_object(:'c1', NULL), NULL, 'agent-v6', 'answers:'||:'a1'||'#1')->'items'->0->>'result';
