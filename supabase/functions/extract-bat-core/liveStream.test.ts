@@ -12,11 +12,11 @@ const target = { id: "00000000-0000-0000-0000-000000000001", vehicle_id: "000000
 
 async function fixture(run: (f: { calls: any[]; call: (body?: Record<string, unknown>, key?: string | null) => Promise<Response>;
   reply: (value: unknown, status?: number) => void; fail: () => void }) => Promise<void>) {
-  const keys = ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_SECRET_KEYS", "SUPABASE_PUBLISHABLE_KEYS"];
+  const keys = ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_SECRET_KEYS", "SUPABASE_PUBLISHABLE_KEYS", "SUPABASE_JWKS"];
   const saved = keys.map(k => Deno.env.get(k)), fetch = globalThis.fetch;
   const runtime = (globalThis as any).EdgeRuntime;
   Deno.env.set("SUPABASE_URL", "https://db.test"); Deno.env.set("SUPABASE_SERVICE_ROLE_KEY", "test-key");
-  Deno.env.delete("SUPABASE_SECRET_KEYS"); Deno.env.delete("SUPABASE_PUBLISHABLE_KEYS");
+  Deno.env.delete("SUPABASE_SECRET_KEYS"); Deno.env.delete("SUPABASE_PUBLISHABLE_KEYS"); Deno.env.delete("SUPABASE_JWKS");
   (globalThis as any).EdgeRuntime = { waitUntil: () => assert.fail("core cannot launch a collector") };
   const calls: any[] = [];
   let value: any = { success: true, mode: BAT_LIVE_COLLECT_MODE, dry_run: false, accepted: true,
@@ -66,6 +66,13 @@ Deno.test("actual core dry-run preserves the target manifest and idle keeps its 
 
 Deno.test("core service guard and selector validation refuse before any handoff", () => fixture(async f => {
   assert.equal((await f.call({}, null)).status, 401);
+  const signer = await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, ["sign", "verify"]);
+  Deno.env.set("SUPABASE_JWKS", JSON.stringify({ keys: [{ ...(await crypto.subtle.exportKey("jwk", signer.publicKey)), kid: "native-handoff-test", alg: "ES256", use: "sig" }] }));
+  const b64 = (s: Uint8Array) => btoa(String.fromCharCode(...s)).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/, "");
+  const enc = (o: unknown) => b64(new TextEncoder().encode(JSON.stringify(o)));
+  const input = `${enc({ alg: "ES256", kid: "native-handoff-test" })}.${enc({ role: "authenticated", sub: target.vehicle_id, exp: Math.floor(Date.now() / 1000) + 3600 })}`;
+  const signature = await crypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, signer.privateKey, new TextEncoder().encode(input));
+  assert.equal((await f.call({}, `${input}.${b64(new Uint8Array(signature))}`)).status, 403);
   for (const body of [{ targets: [] }, { duration: 1 }, { url: "https://example.invalid" }, { dry_run: "true" }])
     assert.equal((await f.call(body)).status, 500);
   assert.equal(f.calls.length, 0);
@@ -78,6 +85,9 @@ Deno.test("core refuses malformed child acceptance and never automatically retri
     const response = await f.call(), body = await response.json();
     assert.equal(response.status, 500); assert.notEqual(body.success, true); assert.equal(f.calls.length, before + 1);
   }
+  f.reply({ success: true, mode: BAT_LIVE_COLLECT_MODE, dry_run: false, accepted: true,
+    collector_run_id: runId, selected_lots: 1, collector_duration_seconds: 115, transport: "public_pusher" }, 200);
+  assert.equal((await f.call()).status, 500, "acceptance status must match its body contract");
   const before = f.calls.length; f.fail();
   const response = await f.call(), body = await response.json();
   assert.equal(response.status, 500); assert.notEqual(body.success, true); assert.equal(f.calls.length, before + 1);
