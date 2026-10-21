@@ -640,12 +640,19 @@ function filterSubjectComps(
   };
 
   const sold = comps.filter((c) => c.result_type === "sold");
-  const original_sold = sold.filter((c) =>
+  // Prefer tight filters; if too thin, relax body then miles so n is usable.
+  let original_sold = sold.filter((c) =>
     c.tier === "original" && matchBody(c) && matchTrans(c) && matchMiles(c)
   );
+  if (original_sold.length < 5) {
+    original_sold = sold.filter((c) => c.tier === "original" && matchTrans(c));
+  }
+  if (original_sold.length < 5) {
+    original_sold = sold.filter((c) => c.tier === "original");
+  }
   const conversion_sold = sold.filter((c) => c.tier === "modified_or_conversion");
-  // If subject is conversion, prefer conversion tier; still keep original for contrast
   void subjectTier;
+  void wantBody;
   return {
     original_sold,
     conversion_sold,
