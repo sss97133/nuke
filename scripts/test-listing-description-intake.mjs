@@ -284,7 +284,7 @@ test('explicit historical append crosses actual canonical intake with exact arch
   assert.equal(row.structured_data.source_captured_at, f.snapshot.fetched_at);
   assert.equal(row.structured_data.source_archive_ingested_at, f.snapshot.created_at);
   assert.equal(row.structured_data.source_text_field, 'listing_page_snapshots.html:batParser.extractDescription');
-  assert.equal(row.structured_data.extractor_version, 'extract-bat-core:4.5.2');
+  assert.equal(row.structured_data.extractor_version, 'extract-bat-core:4.5.3');
   assert.equal(row.structured_data.source_event_time_status, 'unknown');
   assert.equal(row.raw_source_ref, `listing_page_snapshots:${f.snapshot.id}`);
   assert.equal(row.source_identifier, row.raw_source_ref);
@@ -335,6 +335,14 @@ for (const role of ['authenticated','anon']) test(`${role} caller cannot read pr
   const result = await f.call({}, userToken(role));
   assert.equal(result.status, role === 'authenticated' ? 403 : 401);
   assert.equal(f.requests.length, 0, 'No protected source or private parent lookup before authorization');
+});
+
+for (const role of ['authenticated','anon']) test(`${role} cannot enable terminal evidence retention through actual core`, async () => {
+  const f = canonicalIntake({ core: true });
+  const result = await f.call({ retain_terminal_evidence: true }, userToken(role));
+  assert.equal(result.status, role === 'authenticated' ? 403 : 401);
+  assert.equal(f.requests.length, 0, 'Retention authorization precedes any source or database work');
+  assert.equal(f.intakes.length, 0);
 });
 
 for (const [name, body] of [ ['raw text override',{text:input.text}], ['batch',{vehicle_ids:[input.vehicleId]}],
