@@ -28,7 +28,7 @@
 --   F4 before ANALYZE (rows just loaded, no statistics yet) under 3 s;
 --   R-P1 under 2 s (the confirmation list it was raised against took 22 s);
 --   A4 under 3 s (it timed out at 15 s in design v9; its load analyzes only its first batch).
--- Measured where this file was built: 2 runs: F4 vehicle reads 0.15-0.38 s after ANALYZE, 0.61-1.56 s before;
+-- Measured where this file was built: 3 runs: F4 vehicle reads 0.15-0.38 s after ANALYZE, 0.56-1.56 s before;
 --   R-P1 0.49-0.50 s after, 0.48 s before; A4 0.78-1.22 s.
 -- Ids are random (gen_random_uuid() or replaced literals); names, ledger lines, files and messages are synthetic.
 -- ALLOW_RAW_TESTIMONY_WRITE: the INSERTs below write synthetic fixture rows into the stand-in tables of the disposable
@@ -65,6 +65,10 @@ GRANT anon, authenticated, service_role, authenticator TO dm_contract_evidence_o
 
 -- ================================================================================================ the template database
 -- ICU en-US collation (the design sim's ordering; the CI image's libc collation sorts '_' and case differently)
+-- Every database this file makes is named <main database, first 48 characters>_<suffix>: any such database a stopped
+-- earlier run left behind is dropped first (the runner's reset drops them after a failed run as well)
+SELECT format('DROP DATABASE IF EXISTS %I WITH (FORCE)', datname) FROM pg_database
+ WHERE left(datname, length(left(:'main_db', 48)) + 1) = left(:'main_db', 48) || '_' AND datname <> :'main_db' \gexec
 DROP DATABASE IF EXISTS :"tmpl_db" WITH (FORCE);
 CREATE DATABASE :"tmpl_db" TEMPLATE template0 OWNER dm_contract_evidence_owner LOCALE_PROVIDER icu ICU_LOCALE 'en-US' LOCALE 'C';
 \c :tmpl_db
@@ -16100,20 +16104,31 @@ SELECT t_out($l$r10_10 money-ship-v10/k3_payment_source.sql:26 === a who-paid ro
 SELECT source_kind, id FROM evidence_links WHERE user_id = :'UA' ORDER BY source_kind \g /dev/null
 \echo '  (each sheet opened at top level, one per kind; the helper''s answer beside it)'
 :JOB
+\o :outf
 \set ON_ERROR_STOP off
 SELECT format($f$SELECT '  %s helper=%s who-paid row: accepted ' || (evidence_open_run(%L,'review','review_sheet','script:review','sha', jsonb_build_object('sheet_sha256','k3-%s','items',1,'rows',jsonb_build_object('1', jsonb_build_object('asks','party','targets', jsonb_build_array(jsonb_build_object('kind','evidence_link','id',%L)))))) IS NOT NULL)$f$,
               rpad(source_kind, 15), public.evidence_is_payment_source(source_kind), :'UA', source_kind, id)
   FROM evidence_links WHERE user_id = :'UA' AND superseded_by IS NULL ORDER BY source_kind \gexec
 \set ON_ERROR_STOP on
-SELECT t_assert(:'ERROR' = 'true', $l$r10_10 money-ship-v10/k3_payment_source.sql:30 === a who-paid row on one link of each money kind (one sheet per kind) / (each sheet opened at top level, one per kind; the helper's answer beside it) (a \gexec: one of the statements it ran was refused; the design capture: 22023 sheet row 1: this money is a payment source line; ask whose account paid it (an account row), not who paid)$l$);
+\o
+\set got_1293 `cat :outf`
+SELECT t_out($l$r10_10 money-ship-v10/k3_payment_source.sql:30 === a who-paid row on one link of each money kind (one sheet per kind) / (each sheet opened at top level, one per kind; the helper's answer beside it) (the rows its statements printed: each accepted one)$l$, :'got_1293', $e$  calendar_item   helper=f who-paid row: accepted true \n   deal_document   helper=f who-paid row: accepted true \n   deal_jacket     helper=f who-paid row: accepted true \n   gmail_message   helper=f who-paid row: accepted true \n   gmail_order     helper=f who-paid row: accepted true \n   listing         helper=f who-paid row: accepted true \n   message         helper=f who-paid row: accepted true \n   note            helper=f who-paid row: accepted true \n   photos_item     helper=f who-paid row: accepted true \n   pnl_line        helper=f who-paid row: accepted true \n   receipt         helper=f who-paid row: accepted true \n   vehicle_field   helper=f who-paid row: accepted true \n   work_session    helper=f who-paid row: accepted true$e$);
+\o :outf
+SELECT string_agg(l.source_kind || '=' || public.evidence_is_payment_source(l.source_kind), ',' ORDER BY l.source_kind COLLATE "C")
+  FROM evidence_links l
+ WHERE l.user_id = :'UA' AND l.superseded_by IS NULL
+   AND NOT EXISTS (SELECT 1 FROM evidence_runs r WHERE r.run_kind = 'review' AND r.config->>'sheet_sha256' = 'k3-' || l.source_kind);
+\o
+\set got_1294 `cat :outf`
+SELECT t_out($l$r10_10 money-ship-v10/k3_payment_source.sql:30 === a who-paid row on one link of each money kind (one sheet per kind) / (each sheet opened at top level, one per kind; the helper's answer beside it) (the refused ones are exactly the five payment-source kinds: no sheet was opened for them)$l$, :'got_1294', $e$bank_line=true,journal_entry=true,ledger_line=true,payment_event=true,qb_transaction=true$e$);
 
 
 RESET ROLE; RESET SESSION AUTHORIZATION;
 \pset format aligned
 \pset tuples_only off
 SELECT coalesce(nullif(current_setting('t.passed', true), ''), '0') AS g_passed \gset
-SELECT t_assert(:g_passed = 6, 'group r10_10: every one of its 6 checks ran and passed');
-\echo 'group r10_10: 6 checks passed'
+SELECT t_assert(:g_passed = 7, 'group r10_10: every one of its 7 checks ran and passed');
+\echo 'group r10_10: 7 checks passed'
 SELECT :passed_total + :g_passed + 1 AS passed_total \gset
 \c :main_db
 DROP DATABASE :"grp_db" WITH (FORCE);

@@ -93,9 +93,12 @@ SQL
 }
 server_roles() { "${psql[@]}" -qAt -d postgres -c "SELECT string_agg(rolname, ',') FROM pg_roles"; }
 baseline="$(server_state)"; baseline_roles="$(server_roles)"
-reset_server() {  # drop the contract's database, then every role created since the first contract
+reset_server() {  # drop the contract's database and any other dm_ database it left (a contract that stops midway
+  # never reaches its own cleanup, and a database it made still holding objects of its roles makes DROP ROLE fail for
+  # every contract after it), then every role created since the first contract
   "$pg_bin/dropdb" --if-exists --force "$1" &&
     "${psql[@]}" -q -d postgres -v keep="$baseline_roles" <<'SQL'
+SELECT format('DROP DATABASE %I WITH (FORCE)', datname) FROM pg_database WHERE datname LIKE 'dm\_%' \gexec
 SELECT format('DROP ROLE %I', rolname) FROM pg_roles WHERE rolname <> ALL (string_to_array(:'keep', ',')) \gexec
 SQL
 }
@@ -111,11 +114,17 @@ for f in "${contracts[@]}"; do
   set -e
   t1="$(now)"; took="$(seconds "$t0" "$t1")"
   if $in_actions; then echo '::endgroup::'; fi
+  left="$("${psql[@]}" -qAt -d postgres -v db="$db" <<'SQL' || true
+SELECT string_agg('  left: database ' || datname || ' (dropped by the reset)', E'\n' ORDER BY datname)
+  FROM pg_database WHERE datname LIKE 'dm\_%' AND datname <> :'db'
+SQL
+)"
   if reset_server "$db" >"$log.reset" 2>&1; then
     changed="$(diff <(printf '%s\n' "$baseline") <(server_state) | sed -n 's/^< /  was: /p; s/^> /  now: /p' || true)"
   else
     changed="  reset failed: $(tr '\n' ' ' <"$log.reset")"
   fi
+  if [[ -n "$left" ]]; then changed="$left${changed:+$'\n'$changed}"; fi
   if [[ "$status" -ne 0 ]]; then
     result=fail
     echo "::error file=supabase/sql/$f,title=Database contract failed::$f failed (exit $status) after $took s"
