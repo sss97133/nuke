@@ -362,7 +362,22 @@ export interface PageRow { chunk: string; offset: number; total: number; items: 
   landed: number; blips: number; rejected: number; skipped: number; updated: number; stored: boolean; complete: boolean; ignored?: boolean; ms: Record<string, number> }
 export interface BulkReport extends Report {
   bulk: { pass_id: string | null; pass_started_at: string | null; chunk: string | null; position: string | null; planned: number | null; ebay_total: number | null;
-    pages: PageRow[]; browse_calls: number; landed_new: number; updated: number; pass_done: boolean; pass_counts: PassCounts | null; gate: unknown; ms: number };
+    pages: PageRow[]; browse_calls: number; landed_new: number; updated: number; pass_done: boolean; pass_counts: PassCounts | null; gate: unknown; ms: number;
+    trace_waits: number };
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, Math.max(0, ms)));
+
+/**
+ * The wait Supabase asks for when a function's calls to other functions exceed its per-trace budget
+ * (Deno.errors.RateLimitError, "Rate limit exceeded for trace <id>. Retry after <n>ms."). Each landing calls ingest once; on
+ * 2026-10-21 00:21Z the budget held 32 such calls a minute, so a run lands about 30, then waits out the window.
+ */
+export function traceRetryMs(e: unknown): number | null {
+  const name = (e as { name?: string })?.name, msg = String((e as Error)?.message ?? e);
+  const m = /Retry after (\d+)\s*ms/i.exec(msg);
+  if (name === "RateLimitError" || /rate limit exceeded for trace/i.test(msg)) return m ? Number(m[1]) : 60_000;
+  return null;
 }
 
 export async function ioGate(supabase: any): Promise<{ open: boolean; [k: string]: unknown }> {
@@ -380,7 +395,7 @@ export async function bulk(supabase: any, client: BrowseClient, o: BulkOptions =
   const gate = o.gate ?? (() => ioGate(supabase));
   const land = o.land ?? landItem;
   const b: BulkReport["bulk"] = { pass_id: null, pass_started_at: null, chunk: null, position: null, planned: null, ebay_total: null, pages: [],
-    browse_calls: 0, landed_new: 0, updated: 0, pass_done: false, pass_counts: null, gate: null, ms: 0 };
+    browse_calls: 0, landed_new: 0, updated: 0, pass_done: false, pass_counts: null, gate: null, ms: 0, trace_waits: 0 };
   const rep: BulkReport = { ...emptyReport(o.dryRun ? "bulk_dry_run" : "bulk"), bulk: b };
   let c0 = client.calls;
   const browse = () => client.calls - c0;
@@ -410,7 +425,7 @@ export async function bulk(supabase: any, client: BrowseClient, o: BulkOptions =
     b.pass_id = pass.id; b.pass_started_at = pass.started_at; b.planned = pass.plan.planned; b.ebay_total = pass.plan.total;
     const makes = new Set(pass.plan.makes.map(mkKey));
     const lookup = deletedLookup(supabase);
-    let landedRun = 0, updatedRun = 0, errorsBefore = rep.errors.length, resumed = state.pass?.id === pass.id && pass.offset > 0;
+    let landedRun = 0, updatedRun = 0, errorsBefore = rep.errors.length, resumed = state.pass?.id === pass.id && pass.offset > 0, pauseUntil = 0;
     const runs = (state.runs ?? 0) + 1;                  // runs that read a page, across passes
 
     while (!rep.stopped) {
@@ -495,7 +510,17 @@ export async function bulk(supabase: any, client: BrowseClient, o: BulkOptions =
         const todo = lands.slice(0, room);
         let done = 0;
         await pool(todo, conc, async (w) => {
-          if (late()) return;
+          for (let attempt = 0; attempt < 3; attempt++) {
+            if (pauseUntil > now()) {                      // the trace budget is spent: wait for its window if this run has the time
+              if (pauseUntil - t0 > budgetMs) return;
+              await sleep(pauseUntil - now());
+            }
+            if (late()) return;
+            const r = await landOne(w);
+            if (r !== "trace") return;
+          }
+        });
+        async function landOne(w: { s: SearchSummary; kind: "new" | "changed"; h?: Held }): Promise<"done" | "trace" | "failed"> {
           const id = summaryIdentity(w.s, chunk, filter, makes);
           const extra = {
             capture: "search_summary", search_page: { snapshot_id: snapshotId, offset, position: items.indexOf(w.s), aspect_filter: filter },
@@ -510,14 +535,23 @@ export async function bulk(supabase: any, client: BrowseClient, o: BulkOptions =
             });
             done++;
             if (r === "landed") row.landed++; else if (r === "blip") row.blips++; else if (r === "rejected") row.rejected++; else row.skipped++;
+            return "done";
           } catch (e) {
             if (e instanceof QuotaExceeded) throw e;
-            row.skipped++;
+            const wait = traceRetryMs(e);
+            if (wait != null) {                            // nothing was written yet (the throttled call is ingest's): try it again later
+              pauseUntil = Math.max(pauseUntil, now() + wait + 500);
+              b.trace_waits++;
+              return "trace";
+            }
+            row.skipped++; done++;                         // settled with an error: the next pass tries it again; the cursor moves on
             rep.errors.push(`land ${listingKey(w.s)}: ${(e as Error).message}`.slice(0, 300));
+            return "failed";
           }
-        });
+        }
         landedRun += done;
         row.ms.land = now() - tl;
+        // complete when every listing settled (landed, or failed with an error); one throttled or not reached is read again next run
         row.complete = done === lands.length && upd.length === work.filter((w) => w.kind === "changed" && w.h?.kind === "episode").length;
         pass.counts.landed += row.landed; pass.counts.blips += row.blips; pass.counts.rejected += row.rejected; pass.counts.skipped += row.skipped; pass.counts.updated += row.updated;
       }

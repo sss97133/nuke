@@ -3,7 +3,7 @@
 // currentBidPrice, bidCount, buyingOptions, categories, leafCategoryIds, image, additionalImages, seller, itemLocation,
 // itemEndDate, condition). Item ids, sellers and prices are invented.
 import { assert, assertEquals } from "jsr:@std/assert@1";
-import { buildPlan, bulk, categoryOf, compare, type Chunk, filterIgnored, pageLookup, storedBody, summaryIdentity, yearRank } from "./browseBulk.ts";
+import { buildPlan, bulk, categoryOf, compare, type Chunk, filterIgnored, pageLookup, storedBody, summaryIdentity, traceRetryMs, yearRank } from "./browseBulk.ts";
 import { toLanding } from "./browseMap.ts";
 import { byDetailPriority, type Cand } from "./browseSweep.ts";
 import { handleHash } from "./deletedMembers.ts";
@@ -299,6 +299,27 @@ Deno.test("cursor resume: each run continues where the last stopped, re-reading 
   assertEquals(new Set(rec.landed.map((l) => l.item.legacyItemId)).size, 450);
   assertEquals(rec.landed.length, 450);                   // nothing landed twice
   assertEquals([last.bulk.pass_done, store.get().pass.finished_at !== null, store.get().pass.counts.landed], [true, true, 450]);
+});
+
+Deno.test("a throttled landing waits out the trace window and is tried again; one that fails settles and the cursor moves on", async () => {
+  assertEquals([traceRetryMs(new Error("Rate limit exceeded for trace 01a1. Retry after 49787ms.")), traceRetryMs(new Error("boom"))], [49787, null]);
+  const w = world(), store = memStore(), rec = recorder(w);
+  let calls = 0;
+  const land = async (...a: any[]) => {
+    calls++;
+    if (calls === 2) throw new Error("Rate limit exceeded for trace 01a1. Retry after 5ms.");
+    if (a[1].legacyItemId === "9003") throw new Error("ingest timeout");
+    return await (rec.land as any)(...a);
+  };
+  const pages = { [FILTER]: [sum("9001"), sum("9002"), sum("9003"), sum("9004")] };
+  const r = await bulk(fakeSb(w), fakeClient(pages), { ledger: open, store, gate: gateOpen, land: land as any, concurrency: 1 });
+  assertEquals([r.bulk.trace_waits, r.bulk.pages[0].landed, r.bulk.pages[0].skipped, r.bulk.pages[0].complete, store.get().pass.i], [1, 3, 1, true, 1]);
+  assertEquals([new Set(rec.landed.map((l) => l.item.legacyItemId)).size, r.errors.length], [3, 1]);   // 9002 landed on its retry; 9003 is the one error
+  // a window that opens after the run's time budget: the throttled listing waits for the next run, and the page is read again
+  const w2 = world(), store2 = memStore();
+  const r2 = await bulk(fakeSb(w2), fakeClient(pages), { ledger: open, store: store2, gate: gateOpen, budgetMs: 1000, concurrency: 1,
+    land: (async () => { throw new Error("Rate limit exceeded for trace 01a2. Retry after 60000ms."); }) as any });
+  assertEquals([r2.bulk.pages[0].complete, store2.get().pass.offset, r2.ok], [false, 10, true]);
 });
 
 // ---- which listings get a full read first (the sweep) ----------------------------------------------------------------------
