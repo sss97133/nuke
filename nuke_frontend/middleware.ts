@@ -36,7 +36,7 @@ const MCP_SERVER_CARD = {
     note: 'Anonymous reads allowed. Optional X-API-Key for rate-limit identity.',
   },
   tools: [
-    'find_asset', 'get_asset', 'get_history', 'explain_field',
+    'find_asset', 'find_listings', 'get_asset', 'get_history', 'explain_field',
     'value_asset', 'get_comps', 'get_coverage',
   ],
   documentation: 'https://nuke.ag/llms.txt',
@@ -293,7 +293,7 @@ function llmsTxt(b: Board): string {
     '- [Sitemap](https://nuke.ag/sitemap.xml)',
     '', '## Nuke Asset Advisor',
     'Install in any MCP client as a Streamable HTTP server at `https://nuke.ag/mcp/advisor`.',
-    'Anonymous reads are allowed. Tools: find_asset, get_asset, get_history, explain_field, value_asset, get_comps, get_coverage.',
+    'Anonymous reads are allowed. Tools: find_asset, find_listings, get_asset, get_history, explain_field, value_asset, get_comps, get_coverage.',
     'Every answer is an evidence envelope: cite source_name, source_url, and event_time; never invent missing fields — say not recorded.',
     'event_time is the real-world sale/auction clock; ingested_at is when Nuke learned the row — do not conflate them.',
     '', '## Sources and their coverage',

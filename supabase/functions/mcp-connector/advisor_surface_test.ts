@@ -15,6 +15,7 @@ function assert(condition: boolean, message: string): asserts condition {
 
 const EXPECTED = [
   "find_asset",
+  "find_listings",
   "get_asset",
   "get_history",
   "explain_field",
@@ -23,9 +24,9 @@ const EXPECTED = [
   "get_coverage",
 ];
 
-Deno.test("advisor catalog is exactly seven read-only tools with outputSchema", () => {
-  assert(ADVISOR_TOOLS.length === 7, `expected 7 tools, got ${ADVISOR_TOOLS.length}`);
-  assert(ADVISOR_TOOL_NAMES.size === 7, "unique names");
+Deno.test("advisor catalog is curated read-only tools with outputSchema", () => {
+  assert(ADVISOR_TOOLS.length === EXPECTED.length, `expected ${EXPECTED.length} tools, got ${ADVISOR_TOOLS.length}`);
+  assert(ADVISOR_TOOL_NAMES.size === EXPECTED.length, "unique names");
   const names = ADVISOR_TOOLS.map((t) => t.name).sort();
   assert(JSON.stringify(names) === JSON.stringify([...EXPECTED].sort()), `names=${names}`);
   for (const tool of ADVISOR_TOOLS) {
