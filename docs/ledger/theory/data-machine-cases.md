@@ -413,6 +413,14 @@ cross-parent binding through actual HTTP intake, poison-lot isolation, arrivals 
 acknowledgement, source-control liveness and truthful unfinished recovery. These are fixture
 claims; deployment and the identical live coverage/latency assay still need dated receipts.
 No source cadence, budget, capacity, schema, retained-sale admission or episode-v2 hold changes.
+PR #2451 reached normal deployment at 19:13 UTC (extractor 4.5.4, platform version 191).
+All twelve post-deployment health samples still failed; coverage ranged from 0 to 21 of the
+22–24 currently eligible subscriptions. A later session inspection found 60 recovery-backoff
+records and 22 without errors, not a distinct-lot denominator. The next correction keeps
+unattempted recovery queued during cooldown, paces starts and coalesces frame/coverage admission
+within the existing limits. Shared failure acknowledges neither caller; an explicit semantic
+refusal restores independent requests. This follow-up still requires its own deployment and
+live verification; the first deployment did not establish continuous capture or fleet gain.
 The retained sold gold case still lacks parser/parent attestations; repairing transport does
 not manufacture them or establish fleet-wide supported-answer gain.
 

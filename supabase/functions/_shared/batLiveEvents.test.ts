@@ -271,12 +271,14 @@ Deno.test("runtime backoff covers all fetches; a source HTTP limit preserves int
   try {
     const io = batStreamIO("https://db.test", "test-key");
     await assert.rejects(() => io.admit([frames[0]], []), /Rate limit/);
+    assert.equal(io.recoveryReadyAt!(), time + 4930);
     time += 4929;
     await assert.rejects(() => io.missed(target), /transport_backoff/);
     await assert.rejects(() => io.admit([], [{ monitored_auction_id: target.id }]), /transport_backoff/);
     assert.equal(calls, 1);
     time++;
     await assert.rejects(() => io.missed(target), /missed_comments_http_429/);
+    assert.equal(io.recoveryReadyAt!(), time + 3000);
     await io.admit([frames[0]], []);
     assert.equal(calls, 3, "source HTTP backoff must not block captured data admission");
     time += 2999;
@@ -374,7 +376,7 @@ Deno.test("a stalled coverage acknowledgement cannot block source capture or spa
   } finally { clearTimeout(unblock); release(); }
 }));
 
-Deno.test("public collector covers all 20 simultaneous closings and recovers on subscription", () => withCollectorClock(async () => {
+Deno.test("public collector subscribes all 20 closings immediately while pacing their recovery", () => withCollectorClock(async () => {
   const targets = Array.from({ length: 20 }, (_, i) => ({ ...target,
     id: `00000000-0000-0000-0000-${String(i + 1).padStart(12,"0")}`, post_id: fixture.post_id + i }));
   const subscriptions: string[] = []; const recovered = new Set<number>(); const heartbeats: any[] = [];
@@ -382,14 +384,137 @@ Deno.test("public collector covers all 20 simultaneous closings and recovers on 
     const f = JSON.parse(raw);
     if (f.event === "pusher:subscribe") { subscriptions.push(f.data.channel);
       queueMicrotask(() => this.onmessage({ data: JSON.stringify({ event: "pusher_internal:subscription_succeeded", channel: f.data.channel, data: {} }) })); }
+    if (f.event === "pusher:ping") queueMicrotask(() => this.onmessage({ data: JSON.stringify({ event: "pusher:pong", data: {} }) }));
   } };
   await collectBatLive(targets, { socket: () => { queueMicrotask(() => socket.onmessage({ data: JSON.stringify({ event: "pusher:connection_established", data: {} }) })); return socket; },
     admit: async (_frames, h) => { heartbeats.push(...h); },
-    missed: async t => { recovered.add(t.post_id); return { comments: [], metadata: { post_id: t.post_id, current_numeric: 100, count: 1 } }; } }, 1100);
+    missed: async t => { recovered.add(t.post_id); return { comments: [], metadata: { post_id: t.post_id, current_numeric: 100, count: 1 } }; } }, 21000);
   assert.equal(subscriptions.length, 60);
   assert.equal(recovered.size, 20);
   assert.equal(new Set(heartbeats.map(h => h.monitored_auction_id)).size, 20);
 }));
+
+Deno.test("cooldown retains unattempted recovery and retries the deferred lot after transport availability", () => withCollectorClock(async () => {
+  const targets = Array.from({ length: 3 }, (_, i) => ({ ...target,
+    id: `00000000-0000-0000-0000-${String(i + 1).padStart(12, "0")}`, post_id: target.post_id + i }));
+  const calls: { id: string; at: number }[] = [], heartbeats: any[] = [];
+  let readyAt = 0;
+  const socket: any = { readyState: 1, close() { this.readyState = 3; this.onclose?.(); }, send(raw: string) {
+    const f = JSON.parse(raw);
+    if (f.event === "pusher:subscribe") queueMicrotask(() => this.onmessage({ data: JSON.stringify({
+      event: "pusher_internal:subscription_succeeded", channel: f.data.channel, data: {} }) }));
+    if (f.event === "pusher:ping") queueMicrotask(() => this.onmessage({ data: JSON.stringify({ event: "pusher:pong", data: {} }) }));
+  } };
+  await collectBatLive(targets, {
+    socket: () => { queueMicrotask(() => socket.onmessage({ data: JSON.stringify({ event: "pusher:connection_established", data: {} }) })); return socket; },
+    recoveryReadyAt: () => readyAt,
+    admit: async (_frames, h) => { heartbeats.push(...h); },
+    missed: async t => {
+      calls.push({ id: t.id, at: Date.now() });
+      if (calls.length === 1) { readyAt = Date.now() + 5000; throw new Error("source HTTP429"); }
+      return { comments: [], metadata: { post_id: t.post_id, current_numeric: 100, count: 1 } };
+    },
+  }, 8100);
+  assert.equal(calls.length, 4, "three lots and exactly one rate-deferred retry");
+  assert.ok(calls.slice(1).every(c => c.at >= readyAt));
+  assert.ok(calls.slice(1).every((c, i) => c.at - calls[i].at >= 1000));
+  assert.equal(calls[3].id, calls[0].id, "deferred lot keeps its queue entry");
+  assert.ok(heartbeats.some(h => h.connected && h.monitored_auction_id === targets[1].id && h.error === "recovery_pending"));
+  assert.ok(heartbeats.filter(h => h.connected).every(h => !h.error?.includes("transport_backoff")));
+  assert.ok(heartbeats.some(h => h.connected && h.monitored_auction_id === targets[0].id && h.error === null));
+}));
+
+Deno.test("simultaneous captured frames and coverage share one canonical acknowledgement", async () => {
+  const original = globalThis.fetch;
+  const bodies: any[] = [];
+  let fail = false;
+  globalThis.fetch = async (_url, init) => {
+    bodies.push(JSON.parse(String(init?.body)));
+    return Response.json({ success: !fail });
+  };
+  try {
+    const io = batStreamIO("https://db.test", "test-key");
+    const heartbeat = { monitored_auction_id: target.id, connected: true };
+    await Promise.all([io.admit([frames[0]], []), io.admit([], [heartbeat])]);
+    assert.equal(bodies.length, 1);
+    assert.deepEqual(bodies[0].frames, [frames[0]]);
+    assert.deepEqual(bodies[0].heartbeats, [heartbeat]);
+    fail = true;
+    const results = await Promise.allSettled([io.admit([frames[1]], []), io.admit([], [heartbeat])]);
+    assert.equal(bodies.length, 2);
+    assert.ok(results.every(r => r.status === "rejected"), "neither side gets a false acknowledgement");
+    fail = false;
+    await io.admit([frames[1]], [heartbeat]);
+    assert.equal(bodies.length, 3);
+  } finally { globalThis.fetch = original; }
+});
+
+Deno.test("coalescing preserves canonical ceilings and serializes overflow without dropping requests", async () => {
+  const original = globalThis.fetch;
+  const bodies: any[] = [];
+  let active = 0, peak = 0;
+  globalThis.fetch = async (_url, init) => {
+    active++; peak = Math.max(peak, active);
+    bodies.push(JSON.parse(String(init?.body)));
+    await Promise.resolve();
+    active--;
+    return Response.json({ success: true });
+  };
+  try {
+    const io = batStreamIO("https://db.test", "test-key");
+    await Promise.all([io.admit(Array(50).fill(frames[0]), []), io.admit(Array(50).fill(frames[1]), []),
+      io.admit([], Array(200).fill({ monitored_auction_id: target.id }))]);
+    assert.deepEqual(bodies.map(b => [b.frames.length, b.heartbeats.length]), [[50, 200], [50, 0]]);
+    assert.equal(peak, 1);
+    await assert.rejects(() => io.admit(Array(51).fill(frames[0]), []), /invalid_bat_live_batch/);
+    await assert.rejects(() => io.admit([], Array(201).fill({})), /invalid_bat_live_batch/);
+    await assert.rejects(() => io.admit([], []), /invalid_bat_live_batch/);
+    assert.equal(bodies.length, 2);
+  } finally { globalThis.fetch = original; }
+});
+
+Deno.test("an already stalled request cannot hold the independent admission lane", async () => {
+  const original = globalThis.fetch;
+  try {
+    for (const firstIsCoverage of [true, false]) {
+      let release!: () => void, started!: () => void, secondAcknowledged = false;
+      const held = new Promise<Response>(resolve => { release = () => resolve(Response.json({ success: true })); });
+      const requested = new Promise<void>(resolve => { started = resolve; });
+      globalThis.fetch = async (_url, init) => {
+        const body = JSON.parse(String(init?.body));
+        if (Boolean(body.heartbeats.length) === firstIsCoverage) { started(); return await held; }
+        return Response.json({ success: true });
+      };
+      const io = batStreamIO("https://db.test", "test-key");
+      const first = firstIsCoverage ? io.admit([], [{}]) : io.admit([frames[0]], []);
+      await requested;
+      const second = (firstIsCoverage ? io.admit([frames[0]], []) : io.admit([], [{}]))
+        .then(() => { secondAcknowledged = true; });
+      try {
+        for (let i = 0; i < 50; i++) await Promise.resolve();
+        assert.equal(secondAcknowledged, true, "opposite lane acknowledges before the stalled request resolves");
+      } finally { release(); await Promise.all([first, second]); }
+    }
+  } finally { globalThis.fetch = original; }
+});
+
+Deno.test("rejected coverage cannot keep contaminating independent captured-frame admission", async () => {
+  const original = globalThis.fetch;
+  const bodies: any[] = [];
+  globalThis.fetch = async (_url, init) => {
+    const body = JSON.parse(String(init?.body)); bodies.push(body);
+    return Response.json({ success: !body.heartbeats.length }, { status: body.heartbeats.length ? 500 : 200 });
+  };
+  try {
+    const io = batStreamIO("https://db.test", "test-key");
+    const submit = () => Promise.allSettled([io.admit([frames[0]], []), io.admit([], [{ monitored_auction_id: target.id }])]);
+    assert.ok((await submit()).every(r => r.status === "rejected"));
+    const retry = await submit();
+    assert.equal(retry[0].status, "fulfilled");
+    assert.equal(retry[1].status, "rejected");
+    assert.deepEqual(bodies.map(b => [b.frames.length, b.heartbeats.length]), [[1, 1], [1, 0], [0, 1]]);
+  } finally { globalThis.fetch = original; }
+});
 
 Deno.test("one bid arriving by three transports with differently shaped frames is one observation key", async () => {
   const pusher = await prepareBatLiveFrame({ ...frames[0], transport: "public_pusher" }, target);

@@ -82,10 +82,13 @@ Deno.test("mixed collector batch reaches one canonical RPC with each lot bound t
     calls.push(JSON.parse(String((init as { body?: unknown } | undefined)?.body)));
     return respond({ recorded: 2, duplicates: 0 });
   };
+  const heartbeats = targets.map(t => ({ monitored_auction_id: t.id,
+    session_id: "00000000-0000-0000-0000-000000000010", at: "2026-10-21T19:00:00Z",
+    connected: true, pending: 0, oldest_received_at: null, error: null }));
   const queue = new BatLiveBuffer(async frames => {
     const response = await handler(new Request("https://db.test/functions/v1/ingest-observation", {
       method: "POST", headers: { Authorization: "Bearer test-key", "Content-Type": "application/json" },
-      body: JSON.stringify({ mode: "bat_live_events_v1", frames, heartbeats: [] }),
+      body: JSON.stringify({ mode: "bat_live_events_v1", frames, heartbeats }),
     }));
     assert.equal(response.status, 200);
   });
@@ -96,6 +99,7 @@ Deno.test("mixed collector batch reaches one canonical RPC with each lot bound t
     assert.equal(calls.length, 1);
     assert.deepEqual(calls[0].p_frames.map((f: any) => [f.monitored_auction_id, f.vehicle_id, f.post_id]),
       targets.map(t => [t.id, t.vehicle_id, t.post]));
+    assert.deepEqual(calls[0].p_heartbeats, heartbeats);
     assert.equal(queue.pending, 0);
   } finally {
     globalThis.fetch = original;
