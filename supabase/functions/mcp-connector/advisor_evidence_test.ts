@@ -7,6 +7,7 @@ import {
   notRecordedClaim,
   recordedClaim,
   resolveClaimConfidence,
+  resolveEventSaleClock,
   NOT_RECORDED,
 } from "./advisor/evidence.ts";
 
@@ -71,6 +72,43 @@ Deno.test("citationFromObservation keeps event_time out of ingested_at", () => {
   assert(cit.ingested_at?.startsWith("2026-03-24") === true, `ingested_at=${cit.ingested_at}`);
   assert(cit.event_time !== cit.ingested_at, "clocks must differ for BaT scrape-vs-sale case");
   assert(cit.observation_id === "2af8cd27-1edc-4c1d-b696-e75b13ef922f", "obs id");
+});
+
+Deno.test("resolveEventSaleClock prefers recovery when native clocks are absent", () => {
+  const recovered = {
+    event_id: "e1",
+    source_event_at: "2023-01-20T00:00:00.000Z",
+    precision: "day",
+    basis: "lot_run_day_within_auction",
+    confidence: 0.85,
+    observation_id: "o1",
+    citation_excerpt: "Mecum",
+    rule: "mecum_index_v1",
+  };
+  const undated = resolveEventSaleClock(
+    { id: "e1", sold_at: null, ended_at: null, started_at: null },
+    recovered,
+  );
+  assert(undated.clock_source === "recovery", `got ${undated.clock_source}`);
+  assert(undated.event_time?.startsWith("2023-01-20") === true, `got ${undated.event_time}`);
+
+  const dated = resolveEventSaleClock(
+    { id: "e1", sold_at: "2023-01-18T00:00:00Z", ended_at: null, started_at: null },
+    recovered,
+  );
+  assert(dated.clock_source === "sold_at", "native sold_at wins when not placeholder");
+
+  const placeholder = resolveEventSaleClock(
+    {
+      id: "e1",
+      sold_at: "2023-01-15T00:00:00Z",
+      ended_at: null,
+      started_at: null,
+      sold_at_precision: "month_placeholder",
+    },
+    recovered,
+  );
+  assert(placeholder.clock_source === "recovery", "high-confidence recovery beats placeholder");
 });
 
 Deno.test("envelope schema assert accepts advisor shape and rejects bad claims", () => {

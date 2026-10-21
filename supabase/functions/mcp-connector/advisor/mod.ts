@@ -17,13 +17,16 @@ export {
   assertEnvelopeShape,
   citationFromObservation,
   extractEventTime,
+  loadBestRecoveredSaleClocks,
   makeEnvelope,
   notRecordedClaim,
   recordedClaim,
   resolveClaimConfidence,
+  resolveEventSaleClock,
   type AdvisorEnvelope,
   type Claim,
   type Citation,
+  type RecoveredSaleClock,
 } from "./evidence.ts";
 export { initAdvisorHandlers, handleAdvisorJsonRpc } from "./protocol.ts";
 

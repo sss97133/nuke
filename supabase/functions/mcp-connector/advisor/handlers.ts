@@ -4,10 +4,12 @@ import {
   citationFromObservation,
   emptyCitation,
   extractEventTime,
+  loadBestRecoveredSaleClocks,
   makeEnvelope,
   notRecordedClaim,
   recordedClaim,
   resolveClaimConfidence,
+  resolveEventSaleClock,
   type AdvisorEnvelope,
   type Claim,
   type Citation,
@@ -1046,7 +1048,7 @@ async function handleGetAsset(
     sb
       .from("vehicle_events")
       .select(
-        "id, event_type, event_status, sold_at, ended_at, started_at, final_price, current_price, starting_price, source_platform, source_url, created_at",
+        "id, event_type, event_status, sold_at, ended_at, started_at, final_price, current_price, starting_price, source_platform, source_url, created_at, sale_truth_role, sold_at_precision",
       )
       .eq("vehicle_id", vid)
       .order("sold_at", { ascending: false, nullsFirst: false })
@@ -1055,17 +1057,37 @@ async function handleGetAsset(
     sb.from("vehicle_images").select("id", { count: "exact", head: true }).eq("vehicle_id", vid),
   ]);
 
-  const history = (events || []).map((e: Record<string, unknown>) => ({
-    event_type: e.event_type ?? null,
-    event_status: e.event_status ?? null,
-    event_date: e.sold_at || e.ended_at || e.started_at || null,
-    sale_price: e.final_price ?? null,
-    high_bid: e.current_price ?? null,
-    asking_price: e.starting_price ?? null,
-    source_name: e.source_platform ?? null,
-    source_url: e.source_url ?? null,
-    venue: e.source_platform ?? null,
-  }));
+  const eventRows = (events || []) as Array<Record<string, unknown>>;
+  const recoveredClocks = await loadBestRecoveredSaleClocks(
+    sb,
+    eventRows.map((e) => String(e.id || "")),
+  );
+  const history = eventRows.map((e: Record<string, unknown>) => {
+    const clock = resolveEventSaleClock(
+      {
+        id: e.id as string,
+        sold_at: e.sold_at as string | null,
+        ended_at: e.ended_at as string | null,
+        started_at: e.started_at as string | null,
+        sold_at_precision: e.sold_at_precision as string | null,
+      },
+      recoveredClocks.get(String(e.id || "")),
+    );
+    return {
+      event_type: e.event_type ?? null,
+      event_status: e.event_status ?? null,
+      event_date: clock.event_time,
+      event_date_precision: clock.precision,
+      event_date_source: clock.clock_source,
+      sale_truth_role: e.sale_truth_role ?? null,
+      sale_price: e.final_price ?? null,
+      high_bid: e.current_price ?? null,
+      asking_price: e.starting_price ?? null,
+      source_name: e.source_platform ?? null,
+      source_url: e.source_url ?? null,
+      venue: e.source_platform ?? null,
+    };
+  });
 
   const recordedFields = IDENTITY_FIELDS.filter((f) => {
     const v = f === "exterior_color" ? row.color : row[f];
@@ -1118,7 +1140,7 @@ async function handleGetHistory(
     sb
       .from("vehicle_events")
       .select(
-        "id, source_platform, source_url, event_type, event_status, started_at, ended_at, sold_at, final_price, starting_price, bid_count, comment_count, view_count",
+        "id, source_platform, source_url, event_type, event_status, started_at, ended_at, sold_at, final_price, starting_price, bid_count, comment_count, view_count, sale_truth_role, sold_at_precision",
       )
       .eq("vehicle_id", vid)
       .order("ended_at", { ascending: false, nullsFirst: false })
@@ -1126,7 +1148,7 @@ async function handleGetHistory(
     sb
       .from("vehicle_observations")
       .select(
-        "id, kind, content_text, structured_data, confidence_score, observed_at, source_url, source_id, is_superseded, ingested_at",
+        "id, kind, content_text, structured_data, confidence_score, observed_at, source_url, source_id, is_superseded, ingested_at, source_event_at",
       )
       .eq("vehicle_id", vid)
       .order("ingested_at", { ascending: false })
@@ -1138,37 +1160,64 @@ async function handleGetHistory(
   const events = eventsRes.data || [];
   const obs = obsRes.data || [];
   const sourceMap = await loadSources(sb, obs.map((o: { source_id: string }) => o.source_id));
+  const recoveredClocks = await loadBestRecoveredSaleClocks(
+    sb,
+    events.map((e: { id: string }) => e.id),
+  );
 
   const claims: Claim[] = [];
   const timeline: Array<Record<string, unknown>> = [];
 
   for (const ev of events) {
-    const eventTime = extractEventTime(null, [ev.sold_at, ev.ended_at, ev.started_at]);
+    const clock = resolveEventSaleClock(
+      {
+        id: ev.id,
+        sold_at: ev.sold_at,
+        ended_at: ev.ended_at,
+        started_at: ev.started_at,
+        sold_at_precision: ev.sold_at_precision,
+      },
+      recoveredClocks.get(String(ev.id)),
+    );
+    const eventTime = clock.event_time;
     const platform = ev.source_platform === "bat" ? "Bring a Trailer" : ev.source_platform;
     const cit = emptyCitation({
       source_name: platform || null,
       source_url: ev.source_url,
-      observation_id: null,
+      observation_id: clock.recovery?.observation_id ?? null,
       event_time: eventTime,
       ingested_at: null,
       is_superseded: false,
     });
     const status = String(ev.event_status || "").toLowerCase();
     const etype = String(ev.event_type || "").toLowerCase();
-    let priceRole: "hammer" | "ask" | "high_bid_unsold" | "unknown" = "unknown";
-    if (status === "sold" || etype.includes("sale")) priceRole = "hammer";
+    const truth = String(ev.sale_truth_role || "").toLowerCase();
+    let priceRole: "hammer" | "ask" | "high_bid_unsold" | "unverified_sale" | "unknown" = "unknown";
+    if (truth === "ask") priceRole = "ask";
+    else if (truth === "unverified_sale") priceRole = "unverified_sale";
+    else if (truth === "hammer" || status === "sold" || etype.includes("sale")) priceRole = "hammer";
     else if (status.includes("unsold") || status.includes("not_sold") || status === "bid_to") {
       priceRole = "high_bid_unsold";
     } else if (etype.includes("list") || status === "active" || status === "for_sale") {
       priceRole = "ask";
     }
     const label = `${ev.event_type || "event"}:${ev.event_status || "unknown"}`;
+    const conf =
+      ev.final_price != null && priceRole === "hammer"
+        ? 0.9
+        : ev.final_price != null && priceRole === "ask"
+        ? 0.55
+        : ev.final_price != null && priceRole === "unverified_sale"
+        ? 0.4
+        : ev.final_price != null
+        ? 0.55
+        : null;
     claims.push(
       recordedClaim(`event.${ev.id}.final_price`, ev.final_price, {
-        confidence: ev.final_price != null && priceRole === "hammer" ? 0.9 : ev.final_price != null ? 0.55 : null,
+        confidence: conf,
         confidence_basis: ev.final_price != null ? "claim_score" : "none",
         citations: [cit],
-        note: `${label}; price_role=${priceRole}`,
+        note: `${label}; price_role=${priceRole}; date_source=${clock.clock_source}; date_precision=${clock.precision ?? "unknown"}`,
       }),
     );
     timeline.push({
@@ -1177,10 +1226,13 @@ async function handleGetHistory(
       event_type: ev.event_type,
       event_status: ev.event_status,
       price_role: priceRole,
+      sale_truth_role: ev.sale_truth_role ?? null,
       final_price: ev.final_price,
       starting_price: ev.starting_price,
       bid_count: ev.bid_count,
       event_time: eventTime,
+      event_date_precision: clock.precision,
+      event_date_source: clock.clock_source,
       ingested_at: null,
       source_url: ev.source_url,
       source_name: platform,

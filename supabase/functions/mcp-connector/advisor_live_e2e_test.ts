@@ -123,7 +123,7 @@ Deno.test("live fixture: comps carry sold_date as event_time", async () => {
   assertEnvelopeShape(envelope);
 });
 
-Deno.test("handler get_history against fixture-backed mock returns BaT sale envelope", async () => {
+Deno.test("handler get_asset against fixture-backed mock cites BaT sale clock", async () => {
   const fixture: Fixture = JSON.parse(await Deno.readTextFile(FIXTURE_PATH));
   const obs = fixture.query_observations.observations.map((o) => ({
     id: o.id,
@@ -137,14 +137,35 @@ Deno.test("handler get_history against fixture-backed mock returns BaT sale enve
     is_superseded: o.is_superseded,
     ingested_at: o.ingested_at,
   }));
-  const events = fixture.query_market_history.events;
+  const events: Array<Record<string, unknown>> = fixture.query_market_history.events.map((e) => ({
+    ...e,
+    sale_truth_role: null,
+    sold_at_precision: null,
+  }));
   const sourceId = obs[0]?.source_id;
+  const vehicle = {
+    ...fixture.api_v1.data,
+    id: VID,
+    vin: fixture.api_v1.data.vin ?? null,
+    nuke_estimate: null,
+    nuke_estimate_confidence: null,
+    observation_count: obs.length,
+    image_count: 1,
+    description: null,
+    city: null,
+    state: null,
+    country: null,
+    created_at: fixture.api_v1.data.updated_at ?? null,
+  };
 
   const handlers = createAdvisorHandlers({
     sb: () => ({
       from(table: string) {
+        let head = false;
         const rows =
-          table === "vehicle_events"
+          table === "vehicles"
+            ? [vehicle]
+            : table === "vehicle_events"
             ? events
             : table === "vehicle_observations"
             ? obs
@@ -155,9 +176,12 @@ Deno.test("handler get_history against fixture-backed mock returns BaT sale enve
               display_name: "Bring a Trailer",
               base_trust_score: 0.85,
             }]
+            : table === "vehicle_images"
+            ? [{ id: "img-1" }]
             : [];
         const api: Record<string, unknown> = {
-          select() {
+          select(_cols?: string, opts?: { count?: string; head?: boolean }) {
+            if (opts?.head) head = true;
             return api;
           },
           eq() {
@@ -172,30 +196,67 @@ Deno.test("handler get_history against fixture-backed mock returns BaT sale enve
           limit() {
             return api;
           },
+          single() {
+            return Promise.resolve({ data: rows[0] ?? null, error: rows[0] ? null : { message: "missing" } });
+          },
           then(resolveCb: (v: unknown) => unknown, rejectCb?: (e: unknown) => unknown) {
-            return Promise.resolve({ data: rows, error: null }).then(resolveCb, rejectCb);
+            const payload = head
+              ? { data: null, error: null, count: rows.length }
+              : { data: rows, error: null };
+            return Promise.resolve(payload).then(resolveCb, rejectCb);
           },
         };
         return api;
       },
-      rpc() {
+      rpc(name: string) {
+        if (name === "vehicle_price_facts") {
+          return Promise.resolve({
+            data: [{
+              price_kind: "sold",
+              price_amount: 21000,
+              price_as_of: "2024-07-07T20:31:26+00:00",
+              price_live: false,
+              outcome: "sold",
+              sold_basis: "vehicle_events.sold_at",
+              sold_amount: 21000,
+              sold_on: "2024-07-07T20:31:26+00:00",
+              sold_amount_from: "final_price",
+              ask_amount: null,
+              ask_as_of: null,
+              bid_amount: null,
+              bid_on: null,
+              bid_from: null,
+              estimate_amount: null,
+              estimate_confidence: null,
+              estimate_as_of: null,
+              source_url: events[0]?.source_url ?? null,
+            }],
+            error: null,
+          });
+        }
+        if (name === "sale_date_recovery_best_for_events") {
+          return Promise.resolve({ data: [], error: null });
+        }
         return Promise.resolve({ data: null, error: null });
       },
     }) as never,
     callEdgeApi: async () => ({ data: [] }),
   });
 
-  const result = await handlers.get_history!({ asset_id: VID });
+  const result = await handlers.get_asset!({ asset_id: VID });
   assert(!result.isError, "no error");
   assertEnvelopeShape(result.structuredContent);
-  const saleClaim = result.structuredContent.claims.find((c) =>
-    typeof c.value === "number" && c.value === 21000 && c.citations[0]?.event_time?.startsWith("2024-07-07")
+  const history = (result.structuredContent.history || []) as Array<Record<string, unknown>>;
+  assert(history.length >= 1, "folded history present");
+  const dated = history.find((h) =>
+    String(h.event_date || "").startsWith("2024-07-07") && Number(h.sale_price) === 21000
   );
-  assert(Boolean(saleClaim), "must include cited $21000 BaT sale with 2024-07-07 event_time");
-  const listingCit = result.structuredContent.claims
-    .flatMap((c) => c.citations)
-    .find((c) => c.event_time?.startsWith("2024-07-07") && c.ingested_at?.startsWith("2026-"));
-  assert(Boolean(listingCit), "observation citation must keep event_time ≠ ingested_at");
+  assert(Boolean(dated), "history must include $21000 BaT sale dated 2024-07-07");
+  const saleClaim = result.structuredContent.claims.find((c) =>
+    c.field === "sale_price" && c.value === 21000 &&
+    c.citations.some((cit) => cit.event_time?.startsWith("2024-07-07"))
+  );
+  assert(Boolean(saleClaim), "must include cited $21000 sale_price with 2024-07-07 event_time");
 });
 
 Deno.test({
@@ -203,7 +264,7 @@ Deno.test({
   sanitizeResources: false,
   sanitizeOps: false,
   async fn() {
-    const res = await fetch(`https://nuke.ag/api/v1/vehicle/${VID}`);
+    const res = await fetch(`https://nuke.ag/api/v1/vehicle/${VID}`); // guardrail-allow: raw-fetch
     assert(res.ok, `status ${res.status}`);
     const body = await res.json();
     assert(body.data?.id === VID, "id");
@@ -221,7 +282,7 @@ Deno.test({
     // Until this PR is deployed, /mcp/advisor may not exist on the running function.
     // We still probe and record the status for the PR report — failure to reach the new
     // surface is expected pre-deploy and must not fail the suite.
-    const res = await fetch("https://nuke.ag/mcp/advisor", {
+    const res = await fetch("https://nuke.ag/mcp/advisor", { // guardrail-allow: raw-fetch
       method: "POST",
       headers: { "Content-Type": "application/json", Accept: "application/json" },
       body: JSON.stringify({

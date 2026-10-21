@@ -126,6 +126,7 @@ export function extractEventTime(
     "sold_at",
     "sale_date",
     "sale_on",
+    "source_event_at",
     "ended_at",
     "event_time",
     "occurred_at",
@@ -271,15 +272,124 @@ export function citationFromObservation(o: {
   observed_at?: string | null;
   source_trust?: number | null;
   confidence_score?: number | null;
+  source_event_at?: string | null;
 }): Citation {
   return emptyCitation({
     source_name: o.source_name ?? null,
     source_url: o.source_url ?? null,
     observation_id: o.id ?? null,
-    event_time: extractEventTime(o.structured_data ?? null),
+    event_time: extractEventTime(o.structured_data ?? null, [o.source_event_at]),
     ingested_at: o.ingested_at ?? null,
     is_superseded: Boolean(o.is_superseded),
   });
+}
+
+/** Best sale-date recovery observation per vehicle_events.id (by confidence_score). */
+export interface RecoveredSaleClock {
+  event_id: string;
+  source_event_at: string;
+  precision: string | null;
+  basis: string | null;
+  confidence: number | null;
+  observation_id: string | null;
+  citation_excerpt: string | null;
+  rule: string | null;
+}
+
+export async function loadBestRecoveredSaleClocks(
+  // deno-lint-ignore no-explicit-any
+  sb: any,
+  eventIds: string[],
+): Promise<Map<string, RecoveredSaleClock>> {
+  const map = new Map<string, RecoveredSaleClock>();
+  const ids = [...new Set(eventIds.filter(Boolean))];
+  if (!ids.length) return map;
+  const { data, error } = await sb.rpc("sale_date_recovery_best_for_events", {
+    p_event_ids: ids,
+  });
+  if (error || !Array.isArray(data)) return map;
+  for (const row of data) {
+    const eventId = row.event_id as string;
+    if (!eventId || map.has(eventId)) continue;
+    const at = row.source_event_at;
+    if (typeof at !== "string" || !at.trim()) continue;
+    map.set(eventId, {
+      event_id: eventId,
+      source_event_at: at,
+      precision: (row.precision as string) ?? null,
+      basis: (row.basis as string) ?? null,
+      confidence: row.confidence != null ? Number(row.confidence) : null,
+      observation_id: (row.observation_id as string) ?? null,
+      citation_excerpt: (row.citation_excerpt as string) ?? null,
+      rule: (row.rule as string) ?? null,
+    });
+  }
+  return map;
+}
+
+/**
+ * Prefer native sold_at/ended_at when present; otherwise the highest-confidence
+ * sale_date_recovery observation. Placeholder-flagged native clocks yield to a
+ * higher-confidence recovery observation when both exist.
+ */
+export function resolveEventSaleClock(
+  event: {
+    id?: string | null;
+    sold_at?: string | null;
+    ended_at?: string | null;
+    started_at?: string | null;
+    sold_at_precision?: string | null;
+  },
+  recovered: RecoveredSaleClock | null | undefined,
+): {
+  event_time: string | null;
+  clock_source: "sold_at" | "ended_at" | "started_at" | "recovery" | "none";
+  precision: string | null;
+  recovery: RecoveredSaleClock | null;
+} {
+  const nativeSold = typeof event.sold_at === "string" && event.sold_at.trim() ? event.sold_at : null;
+  const nativeEnded = typeof event.ended_at === "string" && event.ended_at.trim() ? event.ended_at : null;
+  const nativeStarted =
+    typeof event.started_at === "string" && event.started_at.trim() ? event.started_at : null;
+  const placeholder =
+    event.sold_at_precision === "month_placeholder" ||
+    event.sold_at_precision === "auction_level";
+  const rec = recovered && recovered.source_event_at ? recovered : null;
+  const recConf = rec?.confidence != null && Number.isFinite(rec.confidence) ? Number(rec.confidence) : 0;
+
+  if (nativeSold && !(placeholder && rec && recConf >= 0.7)) {
+    return {
+      event_time: normalizeTime(nativeSold),
+      clock_source: "sold_at",
+      precision: event.sold_at_precision ?? "day",
+      recovery: rec,
+    };
+  }
+  if (nativeEnded && !(placeholder && rec && recConf >= 0.7)) {
+    return {
+      event_time: normalizeTime(nativeEnded),
+      clock_source: "ended_at",
+      precision: event.sold_at_precision ?? null,
+      recovery: rec,
+    };
+  }
+  if (rec) {
+    return {
+      event_time: normalizeTime(rec.source_event_at),
+      clock_source: "recovery",
+      precision: rec.precision,
+      recovery: rec,
+    };
+  }
+  if (nativeStarted) {
+    return {
+      event_time: normalizeTime(nativeStarted),
+      clock_source: "started_at",
+      precision: null,
+      recovery: null,
+    };
+  }
+  return { event_time: null, clock_source: "none", precision: null, recovery: null };
 }
 
 export function assertEnvelopeShape(data: unknown): asserts data is AdvisorEnvelope {
