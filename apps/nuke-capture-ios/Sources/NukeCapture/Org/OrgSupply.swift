@@ -9,8 +9,8 @@
 // - claim_organization(p_organization_id, p_method domain_email | document, p_evidence): domain e-mail grants owner
 //   at once; a document goes to a reviewer and grants nothing until then.
 // - create_supplier_invite(p_organization_id, p_requirement_id): the job's customer gets a single-use link to share
-//   with a business not on Nuke yet; Nuke sends nothing. The app opens no universal links, so the link redeems on
-//   the web (share_path on nuke.ag).
+//   with a business not on Nuke yet; Nuke sends nothing. share_path is /supplier-invite/<token>, which the web
+//   redeems (SupplierInvitePage); the app opens that link as the same page in an in-app browser (AppLink).
 
 import SwiftUI
 import Supabase

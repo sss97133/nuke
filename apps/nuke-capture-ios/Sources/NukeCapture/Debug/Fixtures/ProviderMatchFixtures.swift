@@ -1,9 +1,13 @@
 // ProviderMatchFixtures.swift — work_order_provider_matches_read, work_order_offers_read and provider_profile_read JSON.
-// Test-only; never in the app bundle. Keys mirror the live readers on 2026-10-19 (pg_get_functiondef and a read as the
-// customer); ids, handles, places and amounts are synthetic. `liveEmpty` is the live envelope with its values replaced:
-// every customer-owned job had no requests that day, so the reader returned no providers. Provider rows follow the
-// live input helpers (open_requirement_skill/tools/facility/area/availability_input, provider_requirement_match).
+// DEBUG-only (unit tests and the UI-test fixture backend); never compiled into Release. Keys mirror the live readers on
+// 2026-10-19 (pg_get_functiondef and a read as the customer); ids, handles, places and amounts are synthetic.
+// `liveEmpty` is the live envelope with its values replaced: every customer-owned job had no requests that day, so the
+// reader returned no providers. Provider rows follow the live input helpers (open_requirement_skill/tools/facility/
+// area/availability_input, provider_requirement_match). `withClaimants` and `offersWithOrganization` add the S6/K3
+// shapes: offers_as and supply_corroboration on a provider, plan_b_suppliers (requirement_plan_b_suppliers), and an
+// organization offer at the verified_claimant rung whose provider carries on_nuke and evidence_rung.
 
+#if DEBUG
 enum ProviderMatchFixtures {
     static let workOrderId = "00000000-0000-4000-8000-0000000000a1"
     static let reqSkill = "00000000-0000-4000-8000-0000000000b1"
@@ -178,4 +182,54 @@ enum ProviderMatchFixtures {
      "availability":{"state":"not_declared","basis":"no set_provider_availability Sign"},
      "capabilities":{"items":[]},"work_record":{"jobs":{"jobs":0}},"facilities":[]}
     """
+
+    static let claimedOrg = "00000000-0000-4000-8000-0000000000f3"
+    static let supplierOrg = "00000000-0000-4000-8000-0000000000f4"
+    static let offerOrg = "00000000-0000-4000-8000-0000000000e3"
+    static let hashOrg = String(repeating: "cd", count: 32)
+
+    private static let supplyCorroboration = """
+    "supply_corroboration":[{"organization":{"kind":"organization","organization_id":"\(claimedOrg)","name":"Fixture Body Shop"},
+      "kind":"paint_supplies","capability":"paint_touch_up","times":2,"strength":"corroborating",
+      "basis":"organization supply evidence (receipts) of an organization you are a verified claimant for; not evidence of skill"}],
+    """
+
+    private static let planB = """
+    [{"requirement_id":"\(reqSkill)","requirement_kind":"skill","description":"Paint touch-up on the driver door","suppliers":[
+       {"organization":{"kind":"organization","organization_id":"\(supplierOrg)","name":"Fixture Paint Supply"},"profile_public":true,
+        "kinds_matched":["paint_supplies"],"times":3,"first_on":"2026-03-01","last_on":"2026-10-02",
+        "label":"paid for this before on Nuke (3 times)",
+        "on_nuke":{"state":"not_on_nuke_yet","label":"Not on Nuke yet","members_active":0,"owners_active":0,"verified_claimants":0,
+                   "claimed_via":[],"offer_capable":false,"claim":{"writer":"claim_organization","methods":["document"],"domain":null}},
+        "can_receive_requests":false,"role":"plan_b_supplier","supplier_result":"pass","supplier_label":"can supply this",
+        "basis":"retained purchase records resolved to this organization; no amounts or payers"},
+       {"organization":{"kind":"organization","organization_id":"\(claimedOrg)","name":"Fixture Body Shop"},"profile_public":true,
+        "kinds_matched":["paint_supplies"],"times":1,"first_on":"2026-08-01","last_on":"2026-08-01",
+        "label":"paid for this before on Nuke (1 time)",
+        "on_nuke":{"state":"claimed","label":"Claimed on Nuke","members_active":0,"owners_active":0,"verified_claimants":1,
+                   "claimed_via":["domain_email"],"offer_capable":true},
+        "can_receive_requests":true,"role":"plan_b_supplier","supplier_result":"pass","supplier_label":"can supply this"}]}]
+    """
+
+    /// The populated read after S6/K3: @fixture_tech is a verified claimant of Fixture Body Shop, whose receipts
+    /// corroborate (never pass) the paint skill; two businesses can supply the paint request.
+    static let withClaimants: String = populated
+        .replacingOccurrences(of: #""handle":"fixture_tech"},"listed_because":["evidenced_link"],"#,
+                              with: #""handle":"fixture_tech"},"listed_because":["evidenced_link","verified_claimant"],"offers_as":[{"kind":"organization","organization_id":"\#(claimedOrg)","name":"Fixture Body Shop","on_nuke":"Claimed on Nuke"}],"#)
+        .replacingOccurrences(of: #"[{"input":"skill","result":"pass","basis":"evidence_fold","#,
+                              with: #"[{"input":"skill","result":"pass","basis":"evidence_fold",\#(supplyCorroboration)"#)
+        .replacingOccurrences(of: #""providers":["#, with: #""plan_b_suppliers":\#(planB),"providers":["#)
+
+    /// work_order_offers_read with an organization offer on the paint request, made by a verified claimant.
+    static func offersWithOrganization() -> String {
+        let org = """
+        {"offer_id":"\(offerOrg)","offer_hash":"\(hashOrg)","offer_kind":"organization","offer_rung":"verified_claimant",
+         "provider":{"kind":"organization","organization_id":"\(claimedOrg)","name":"Fixture Body Shop","on_nuke":"Claimed on Nuke","evidence_rung":"verified_claimant"},
+         "performer":null,"facility":null,
+         "terms":{"lines":[{"description":"Blend and clear driver door","pricing_basis":"flat","amount":420,"currency":"USD"}]},
+         "acceptance":{"state":"not_accepted","accepted_at":null}},
+        """
+        return offers().replacingOccurrences(of: #"{"offer_id":"\#(offerTech)""#, with: org + #"{"offer_id":"\#(offerTech)""#)
+    }
 }
+#endif

@@ -84,6 +84,14 @@ targets:
       properties:
         com.apple.developer.applesignin:
           - Default
+        # ── Associated Domains (universal links) ── nuke.ag/jobs, /providers,
+        # /org and /supplier-invite open the app (AppLink.swift). The site
+        # serves nuke_frontend/public/.well-known/apple-app-site-association
+        # for JZ28MFU3VB.ag.nuke.capture. Like Sign in with Apple, the
+        # capability must ALSO be enabled on the App ID in the developer
+        # portal; the provisioning profiles are regenerated to carry it.
+        com.apple.developer.associated-domains:
+          - applinks:nuke.ag
     info:
       path: Generated/Info.plist
       properties:

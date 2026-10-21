@@ -29,6 +29,8 @@ struct NukeCaptureApp: App {
     /// The constellation's Explore path — the app without auth (read-only
     /// Map + sample profile). Cleared by the Profile tab's Sign In door.
     @AppStorage("exploreMode") private var exploreMode = false
+    /// A nuke.ag link handed over by iOS (universal link), shown as a sheet over whatever is on screen.
+    @State private var appLink: AppLink?
 
     init() {
         // Must happen during launch: registering after didFinishLaunching
@@ -113,6 +115,8 @@ struct NukeCaptureApp: App {
                     NavigationStack { ProviderSetupView() }
                 } else if let dbgOrg = ProcessInfo.processInfo.environment["NUKE_DEBUG_ORG"], !dbgOrg.isEmpty {
                     NavigationStack { OrganizationView(orgId: dbgOrg) }
+                } else if let dbgMatches = ProcessInfo.processInfo.environment["NUKE_DEBUG_PROVIDER_MATCHES"], !dbgMatches.isEmpty {
+                    NavigationStack { ProviderMatchesView(workOrderId: dbgMatches) }
                 } else if ProcessInfo.processInfo.environment["NUKE_DEBUG_JOBS_LOOKING"] == "1" {
                     // Work's "Jobs looking for someone" alone, over the live reader (no capture photos).
                     DebugJobsLookingHost()
@@ -164,8 +168,19 @@ struct NukeCaptureApp: App {
                 #endif
             }
             .environmentObject(session)
+            .onOpenURL { url in if let link = AppLink.parse(url) { appLink = link } }
+            .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { activity in
+                if let url = activity.webpageURL, let link = AppLink.parse(url) { appLink = link }
+            }
+            .sheet(item: $appLink) { link in AppLinkView(link: link).environmentObject(session) }
             #if DEBUG
             .overlay(alignment: .topLeading) { if FixtureBackend.isActive { FixtureWriteLogOverlay() } }
+            // NUKE_DEBUG_OPEN_URL=<nuke.ag link> routes it as if iOS had handed it over (UI tests; DEBUG only).
+            .task {
+                if let s = ProcessInfo.processInfo.environment["NUKE_DEBUG_OPEN_URL"], let url = URL(string: s) {
+                    appLink = AppLink.parse(url)
+                }
+            }
             #endif
         }
         .onChange(of: scenePhase) { _, phase in

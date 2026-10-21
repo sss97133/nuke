@@ -154,6 +154,8 @@ struct JobOffer: Decodable, Equatable, Identifiable {
     let offerKind: String?
     let offerRung: String?
     let provider: JobPerson?
+    /// An organization offer's on_nuke label ("Claimed on Nuke"), from organization_on_nuke.
+    let onNuke: String?
     let performer: JobPerson?
     let facility: JobPerson?
     let lines: [QuoteLine]
@@ -182,6 +184,7 @@ struct JobOffer: Decodable, Equatable, Identifiable {
         case offeredAt = "offered_at"
     }
     private struct Acceptance: Decodable { let state: String?; let accepted_at: String? }
+    private struct ProviderOnNuke: Decodable { let on_nuke: String? }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -190,6 +193,7 @@ struct JobOffer: Decodable, Equatable, Identifiable {
         offerKind = try? c.decode(String.self, forKey: .offerKind)
         offerRung = try? c.decode(String.self, forKey: .offerRung)
         provider = try? c.decode(JobPerson.self, forKey: .provider)
+        onNuke = (try? c.decode(ProviderOnNuke.self, forKey: .provider))?.on_nuke.flatMap { $0.isEmpty ? nil : $0 }
         performer = try? c.decode(JobPerson.self, forKey: .performer)
         facility = try? c.decode(JobPerson.self, forKey: .facility)
         lines = (try? c.decode(OfferTermsLines.self, forKey: .terms))?.lines ?? []
@@ -212,7 +216,13 @@ struct JobOffer: Decodable, Equatable, Identifiable {
     /// The hash an acceptance of this offer must carry.
     var acceptHash: String? { termsHash ?? offerHash }
 
-    var who: String { (offerKind == "organization" ? facility ?? provider : provider)?.text ?? "Unnamed party" }
+    /// An organization offer names the organization: work_order_offers_read puts its label on `provider`; older rows
+    /// carried it only as the facility.
+    var who: String {
+        guard offerKind == "organization" else { return provider?.text ?? "Unnamed party" }
+        let org = provider?.kind == "organization" ? provider : facility ?? provider
+        return org?.text ?? "Unnamed business"
+    }
 }
 
 /// Someone vouching for an offer's technician on this job: kinds, scope and an optional cut.
@@ -576,6 +586,7 @@ enum OfferCopy {
         case "co_sign"?: return "Vouched for by someone they worked with"
         case "authenticated_sign"?: return "Signed"
         case "organization_owner"?: return "Shop owner"
+        case "verified_claimant"?: return "Offered by someone who claimed this business on Nuke"
         case let other?: return JobCopy.sentence(other)
         }
     }
@@ -588,6 +599,7 @@ enum OfferCopy {
         case "co_sign"?: return "Vouched for by someone you worked with"
         case "authenticated_sign"?: return "Signed"
         case "organization_owner"?: return "Shop owner"
+        case "verified_claimant"?: return "You claimed this business on Nuke"
         case let other?: return JobCopy.sentence(other)
         }
     }

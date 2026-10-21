@@ -113,6 +113,7 @@ struct ProviderMatchesContent: View {
                             Button("Clear filters") { filters = [] }
                         }
                     }
+                    if !read.planBSuppliers.isEmpty { PlanBSuppliersSection(groups: read.planBSuppliers) }
                     otherOffers(read)
                 }
             }
@@ -248,6 +249,12 @@ struct ProviderMatchCard: View {
                 if let because = ProviderMatchCopy.listedBecause(match.listedBecause) {
                     Text(because).font(.caption).foregroundStyle(.secondary)
                 }
+                ForEach(match.offersAs) { org in
+                    HStack(spacing: 6) {
+                        Text(ProviderMatchCopy.offersAs(org)).font(.caption)
+                        if let badge = org.onNuke { OnNukeBadge(label: badge) }
+                    }
+                }
                 Text(ProviderMatchCopy.tally(match)).font(.caption).foregroundStyle(.secondary)
             }
             Spacer()
@@ -291,6 +298,9 @@ struct ProviderMatchCard: View {
         if !match.statedSkills.isEmpty {
             RootedValueView(label: "They say they do", value: match.statedSkills.map(ProviderMatchCopy.skill).joined(separator: ", "),
                             status: .pending, decay: "self-claim, not evidenced")
+        }
+        if !match.suppliedBy.isEmpty {
+            Text(ProviderMatchCopy.suppliedBy(match.suppliedBy)).font(.caption).foregroundStyle(.secondary)
         }
     }
 
@@ -359,8 +369,7 @@ struct ProviderOfferRow: View {
     var body: some View {
         let title = JobOffersSection.title(request)
         VStack(alignment: .leading, spacing: 4) {
-            RootedValueView(label: showWho ? "Offer from \(offer.who)" : "Offered on", value: title,
-                            status: offer.acceptanceState == "accepted" ? .proven : .attributed, decay: OfferCopy.rung(offer.offerRung))
+            OfferFromRow(label: showWho ? "Offer from \(offer.who)" : "Offered on", offer: offer, value: title)
             ForEach(offer.lines) { line in
                 RootedValueView(label: JobCopy.lineLabel(line), value: JobCopy.linePrice(line), status: line.amount == nil ? .recorded : .attributed)
             }
@@ -374,6 +383,53 @@ struct ProviderOfferRow: View {
                     .buttonStyle(.borderedProminent).controlSize(.small)
             }
         }
+    }
+}
+
+/// The server's on_nuke label as a small capsule; "Claimed on Nuke" is the one that can take requests.
+struct OnNukeBadge: View {
+    let label: String
+
+    var body: some View {
+        let claimed = label == "Claimed on Nuke"
+        Label(label, systemImage: claimed ? "checkmark.seal" : "building.2")
+            .font(.caption2.weight(.semibold))
+            .padding(.horizontal, 8).padding(.vertical, 3)
+            .background(Capsule().fill(claimed ? Color.accentColor.opacity(0.15) : Color.secondary.opacity(0.12)))
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(label)
+            .accessibilityIdentifier("onNuke.badge")
+    }
+}
+
+/// Businesses that can supply a request, apart from the ranked performers.
+struct PlanBSuppliersSection: View {
+    let groups: [PlanBSupplierGroup]
+
+    var body: some View {
+        Section {
+            ForEach(groups) { g in
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(g.title).font(.footnote.weight(.semibold)).lineLimit(2)
+                    ForEach(g.suppliers) { s in
+                        NavigationLink { OrganizationView(orgId: s.organizationId) } label: {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(s.name ?? "Unnamed business").font(.subheadline)
+                                Text("Paid for this before on Nuke (\(s.times) time\(s.times == 1 ? "" : "s"))")
+                                    .font(.caption).foregroundStyle(.secondary)
+                                if let label = s.onNuke?.label { OnNukeBadge(label: label) }
+                            }
+                        }
+                    }
+                }
+                .padding(.vertical, 2)
+            }
+        } header: {
+            Text(ProviderMatchCopy.planBHeader)
+        } footer: {
+            Text(ProviderMatchCopy.planBNote)
+        }
+        .id("job-plan-b-suppliers")
     }
 }
 

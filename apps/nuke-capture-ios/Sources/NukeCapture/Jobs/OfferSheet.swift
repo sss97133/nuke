@@ -142,7 +142,7 @@ struct AcceptOfferSheet: View {
             List {
                 Section {
                     RootedValueView(label: "Request", value: requirementTitle, status: .attributed)
-                    RootedValueView(label: "From", value: offer.who, status: .attributed, decay: OfferCopy.rung(offer.offerRung))
+                    OfferFromRow(label: "From", offer: offer)
                     if let w = OfferCopy.window(offer.availableFrom, offer.availableUntil) {
                         RootedValueView(label: "Available", value: w, status: .attributed)
                     }
