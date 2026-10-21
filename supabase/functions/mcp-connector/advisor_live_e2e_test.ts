@@ -123,7 +123,7 @@ Deno.test("live fixture: comps carry sold_date as event_time", async () => {
   assertEnvelopeShape(envelope);
 });
 
-Deno.test("handler get_history against fixture-backed mock returns BaT sale envelope", async () => {
+Deno.test("handler get_asset against fixture-backed mock returns BaT sale and history envelope", async () => {
   const fixture: Fixture = JSON.parse(await Deno.readTextFile(FIXTURE_PATH));
   const obs = fixture.query_observations.observations.map((o) => ({
     id: o.id,
@@ -139,6 +139,10 @@ Deno.test("handler get_history against fixture-backed mock returns BaT sale enve
   }));
   const events = fixture.query_market_history.events;
   const sourceId = obs[0]?.source_id;
+  const price = fixture.get_vehicle.price as {
+    kind: string; amount: number; as_of: string; live: boolean; outcome: string;
+    sold: { amount: number; on: string; basis: string; from: string }; source_url: string;
+  };
 
   const handlers = createAdvisorHandlers({
     sb: () => ({
@@ -172,30 +176,46 @@ Deno.test("handler get_history against fixture-backed mock returns BaT sale enve
           limit() {
             return api;
           },
+          single() {
+            assert(table === "vehicles", "only vehicle lookup is singular");
+            return Promise.resolve({ data: fixture.get_vehicle, error: null });
+          },
           then(resolveCb: (v: unknown) => unknown, rejectCb?: (e: unknown) => unknown) {
             return Promise.resolve({ data: rows, error: null }).then(resolveCb, rejectCb);
           },
         };
         return api;
       },
-      rpc() {
-        return Promise.resolve({ data: null, error: null });
+      rpc(name: string) {
+        assert(name === "vehicle_price_facts", "canonical price reader");
+        return Promise.resolve({ data: [{ price_kind: price.kind, price_amount: price.amount,
+          price_as_of: price.as_of, price_live: price.live, outcome: price.outcome,
+          sold_amount: price.sold.amount, sold_on: price.sold.on, sold_basis: price.sold.basis,
+          sold_amount_from: price.sold.from, source_url: price.source_url }], error: null });
       },
     }) as never,
     callEdgeApi: async () => ({ data: [] }),
   });
 
-  const result = await handlers.get_history!({ asset_id: VID });
+  const result = await handlers.get_asset!({ asset_id: VID });
   assert(!result.isError, "no error");
   assertEnvelopeShape(result.structuredContent);
   const saleClaim = result.structuredContent.claims.find((c) =>
-    typeof c.value === "number" && c.value === 21000 && c.citations[0]?.event_time?.startsWith("2024-07-07")
+    c.field === "sale_price" && c.value === 21000 && c.citations[0]?.event_time?.startsWith("2024-07-07")
   );
   assert(Boolean(saleClaim), "must include cited $21000 BaT sale with 2024-07-07 event_time");
-  const listingCit = result.structuredContent.claims
-    .flatMap((c) => c.citations)
-    .find((c) => c.event_time?.startsWith("2024-07-07") && c.ingested_at?.startsWith("2026-"));
-  assert(Boolean(listingCit), "observation citation must keep event_time ≠ ingested_at");
+  assert(result.structuredContent.tool === "get_asset", "current advisor surface");
+  assert(saleClaim!.citations[0].ingested_at === null, "price reader does not invent an ingestion clock");
+  const makeObs = obs.find((o) => (o.structured_data as Record<string, unknown>)?.make);
+  const makeCit = result.structuredContent.claims.find((c) => c.field === "make")?.citations
+    .find((c) => c.observation_id === makeObs?.id);
+  assert(Boolean(makeCit), "identity keeps its observation citation");
+  assert(makeCit!.event_time === null, "unknown source event clock stays unknown; observed_at is not promoted");
+  assert(makeCit!.ingested_at === makeObs!.ingested_at, "observation ingestion clock preserved");
+  assert(makeCit!.event_time !== makeCit!.ingested_at, "event_time ≠ ingested_at");
+  const history = result.structuredContent.history as Array<Record<string, unknown>>;
+  assert(history.some((e) => e.sale_price === 21000 && String(e.event_date).startsWith("2024-07-07")),
+    "current asset surface retains recorded sale history");
 });
 
 Deno.test({
