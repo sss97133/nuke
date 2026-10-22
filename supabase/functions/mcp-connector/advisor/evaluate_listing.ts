@@ -954,8 +954,10 @@ export async function handleEvaluateListing(
   ]);
   let matchedId: string | null = null;
   let matchedRow: Record<string, unknown> | null = null;
+  let matchMethod: string | null = null;
   for (const res of exacts) {
     if (res.data?.[0]?.id) {
+      matchMethod = "exact_url";
       matchedId = String(res.data[0].id);
       matchedRow = res.data[0] as Record<string, unknown>;
       break;
@@ -969,6 +971,7 @@ export async function handleEvaluateListing(
     ]);
     const hit = a.data?.[0] || b.data?.[0];
     if (hit?.id) {
+      matchMethod = "auction_id";
       matchedId = String(hit.id);
       matchedRow = hit as Record<string, unknown>;
     }
@@ -980,10 +983,21 @@ export async function handleEvaluateListing(
       .or(`listing_url.ilike.%${pathTail}%,bat_auction_url.ilike.%${pathTail}%`)
       .limit(3);
     if (fuzzy?.[0]?.id) {
+      matchMethod = "path_tail";
       matchedId = String(fuzzy[0].id);
       matchedRow = fuzzy[0] as Record<string, unknown>;
     }
   }
+  // Coverage: every listing handed to the advisor should already be in Nuke. Log hit/miss; misses are queued
+  // for ingest. Best effort, never blocks the evaluation.
+  try {
+    await sb.rpc("log_listing_coverage", {
+      p_tool: "evaluate_listing",
+      p_url: url,
+      p_vehicle_id: matchedId,
+      p_match_method: matchMethod,
+    });
+  } catch (_e) { /* coverage logging must not fail the evaluation */ }
   let matchedSale: { amount: number; on: string | null; source_url: string | null } | null = null;
   if (matchedRow) {
     listing.year = listing.year ?? (matchedRow.year as number | null);
