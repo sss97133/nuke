@@ -6,7 +6,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 const fixture = vi.hoisted(() => ({
-  videos: [] as unknown[], vehicle: null as unknown, metadataError: null as unknown,
+  videos: [] as unknown[], observations: [] as unknown[], observationError: null as unknown, vehicle: null as unknown, metadataError: null as unknown,
   videoRead: null as null | ((vehicleId: unknown) => Promise<{ data: unknown[]; error: null }>),
   historyRows: [] as unknown[], historyError: null as unknown,
   historyRead: null as null | ((source: unknown, lot: unknown) => Promise<{ data: unknown[]; error: null }>),
@@ -18,6 +18,7 @@ vi.mock('../../lib/supabase', () => ({ supabase: { from: vi.fn((table: string) =
   const builder = {
     select: (columns: string) => { query.columns = columns; return builder; },
     eq: (...args: unknown[]) => { query.filters.push(['eq', ...args]); return builder; },
+    in: (...args: unknown[]) => { query.filters.push(['in', ...args]); return builder; },
     is: (...args: unknown[]) => { query.filters.push(['is', ...args]); return builder; },
     or: (...args: unknown[]) => { query.filters.push(['or', ...args]); return builder; },
     not: (...args: unknown[]) => { query.filters.push(['not', ...args]); return builder; },
@@ -26,6 +27,7 @@ vi.mock('../../lib/supabase', () => ({ supabase: { from: vi.fn((table: string) =
       const source = query.filters.find(filter => filter[0] === 'eq' && filter[1] === 'source')?.[2];
       const result = lot ? fixture.historyRead?.(source, lot)
         ?? Promise.resolve({ data: fixture.historyRows, error: fixture.historyError })
+        : table === 'vehicle_observations' ? Promise.resolve({ data: fixture.observations, error: fixture.observationError })
         : fixture.videoRead?.(query.filters.find(filter => filter[0] === 'eq' && filter[1] === 'vehicle_id')?.[2])
         ?? Promise.resolve({ data: fixture.videos, error: null });
       return Object.assign(result, { limit: () => result });
@@ -49,9 +51,14 @@ const video = {
 };
 
 let container: HTMLDivElement, root: Root, client: QueryClient;
+let replayTime = 65;
+const replaySeek = vi.fn((time: number) => { replayTime = time; });
+const replayDestroy = vi.fn();
 beforeEach(() => {
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
   fixture.videos = [video];
+  fixture.observations = [];
+  fixture.observationError = null;
   fixture.videoRead = null;
   fixture.historyRows = [];
   fixture.historyError = null;
@@ -59,6 +66,15 @@ beforeEach(() => {
   fixture.vehicle = { id: subject, year: 1967, make: 'Chevrolet', model: 'Corvette' };
   fixture.metadataError = null;
   fixture.queries = [];
+  replayTime = 65; replaySeek.mockClear(); replayDestroy.mockClear();
+  vi.stubGlobal('YT', { Player: class {
+    getCurrentTime = () => replayTime;
+    seekTo = replaySeek;
+    destroy = replayDestroy;
+    constructor(_frame: unknown, options: { events: { onReady(event: unknown): void } }) {
+      options.events.onReady({ target: this });
+    }
+  } });
   client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   container = document.createElement('div');
   document.body.appendChild(container);
@@ -68,6 +84,125 @@ afterEach(async () => {
   await act(async () => root.unmount());
   client.clear();
   container.remove();
+  vi.useRealTimers(); vi.unstubAllGlobals();
+});
+
+it('exposes a failed evidence API read instead of treating it as an empty record', async () => {
+  fixture.videos = [];
+  fixture.observationError = { message: 'Legacy API keys are disabled' };
+  await render(<VehicleVideoSection vehicleId={subject} defaultCollapsed={false} />);
+  expect(container.querySelector('[role="alert"]')?.textContent).toContain('Could not load auction evidence');
+  expect(container.querySelector('button')?.textContent).toBe('Retry');
+});
+
+it('keeps recorded video links when the supplementary timed-evidence API fails', async () => {
+  fixture.observationError = { message: 'permission denied' };
+  await render(<VehicleVideoSection vehicleId={subject} defaultCollapsed={false} />);
+  expect(container.querySelector('img[alt="Video thumbnail"]')).not.toBeNull();
+  expect(container.querySelector('[role="status"]')?.textContent).toContain('Some timed auction evidence could not be loaded');
+});
+
+it('keeps distinct lot presentations in the same video minute', async () => {
+  fixture.videos = [];
+  fixture.observations = [65, 75].map((start, index) => ({
+    id: `presentation-${index}`, vehicle_id: subject, structured_data: {
+      property: 'broadcast_lot_presentation', media: { video_id: 'abcdefghijk', start_seconds: start, end_seconds: start + 5 },
+      value: { lot: `S${index + 1}` }, event_context: { auction_house: 'mecum' },
+    },
+  }));
+  await render(<VehicleVideoSection vehicleId={subject} defaultCollapsed={false} />);
+  expect(container.querySelectorAll('img[alt="Video thumbnail"]')).toHaveLength(2);
+});
+
+it('replays screen bids and descending asks from the player clock, then seeks the same player', async () => {
+  fixture.videos = [{ ...video,
+    displayed_bids: [{ t: 65, amount: 30000 }, { t: 85, amount: 35000 }],
+    displayed_asks: [{ t: 65, amount: 50000 }, { t: 80, amount: 40000 }],
+    screen_status_changes: [{ t: 90, status: 'reserve_off' }],
+  }];
+  await render(<VehicleVideoSection vehicleId={subject} defaultCollapsed={false} />);
+  vi.useFakeTimers();
+  await click(container.querySelector('img[alt="Video thumbnail"]'));
+  expect(replaySeek).toHaveBeenCalledWith(65, true);
+  const section = document.querySelector('[aria-label="Auction data replay"]')!;
+  expect(section.textContent).toContain('30,000');
+  expect(section.textContent).toContain('$50k ask');
+  expect(section.textContent).not.toContain('$40k ask');
+  expect(section.textContent).not.toContain('Reserve off');
+  replayTime = 82;
+  await act(async () => { await vi.advanceTimersByTimeAsync(250); });
+  expect(section.textContent).toContain('$40k ask');
+  expect(section.textContent).toContain('30,000');
+  expect(section.textContent).not.toContain('35,000');
+  const slider = section.querySelector('input')!;
+  expect(slider.disabled).toBe(false);
+  expect(slider.value).toBe('82');
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(slider, '95');
+    slider.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  expect(replaySeek).toHaveBeenLastCalledWith(95, true);
+  expect(section.textContent).toContain('Reserve off');
+  await click(document.querySelector('[aria-label="Close auction replay"]'));
+  expect(replayDestroy).toHaveBeenCalled();
+});
+
+it('ends with the timed no-sale evidence and does not treat the high bid as a sale', async () => {
+  fixture.videos = [{ ...video, winning_bid: null, outcome: null,
+    displayed_bids: [{ t: 65, amount: 140000 }],
+    screen_status_changes: [{ t: 103, status: 'current_bid' }],
+  }];
+  fixture.observations = [{ vehicle_id: subject, structured_data: {
+    property: 'outcome_label_displayed', value: 'bid_goes_on',
+    media: { video_id: 'abcdefghijk', start_seconds: 99 }, event_context: { lot: video.lot_number },
+  } }];
+  await render(<VehicleVideoSection vehicleId={subject} defaultCollapsed={false} />);
+  expect(container.querySelectorAll('img[alt="Video thumbnail"]')).toHaveLength(1);
+  vi.useFakeTimers();
+  await click(container.querySelector('img[alt="Video thumbnail"]'));
+  const section = document.querySelector('[aria-label="Auction data replay"]')!;
+  replayTime = 98;
+  await act(async () => { await vi.advanceTimersByTimeAsync(250); });
+  expect(section.querySelector('[role="status"]')).toBeNull();
+  replayTime = 99;
+  await act(async () => { await vi.advanceTimersByTimeAsync(250); });
+  expect(section.querySelector('[role="status"]')?.textContent).toBe('Bid goes on · unsold on block');
+  expect(section.textContent).toContain('140,000');
+  expect(section.textContent).not.toContain('Sold shown on broadcast');
+  replayTime = 105;
+  await act(async () => { await vi.advanceTimersByTimeAsync(250); });
+  expect(section.querySelector('[role="status"]')?.textContent).toContain('unsold on block');
+});
+
+it('compares the same elapsed lot time and exposes the reference without repeating the readouts', async () => {
+  fixture.videos = [{ ...video, displayed_bids: [{ t: 65, amount: 30000 }, { t: 85, amount: 35000 }],
+    comparison_presentations: [{ id: 'reference', lot: 'S2', title: 'Synthetic same-year convertible',
+      source_url: 'https://www.youtube.com/watch?v=lmnopqrstuv&t=300s',
+      start_seconds: 300, end_seconds: 420, displayed_bids: [{ t: 302, amount: 40000 }, { t: 310, amount: 45000 }],
+      displayed_outcome: 'sold', matching_basis: 'Same year and body', differences: 'Configuration unmatched' }],
+  }];
+  await render(<VehicleVideoSection vehicleId={subject} defaultCollapsed={false} />);
+  vi.useFakeTimers();
+  await click(container.querySelector('img[alt="Video thumbnail"]'));
+  const section = document.querySelector('[aria-label="Auction data replay"]')!;
+  expect(section.textContent).not.toContain('below');
+  expect(section.querySelector('.auction-replay__comparison')).toBeNull();
+  const overlay = section.querySelector('select')!;
+  await act(async () => {
+    overlay.value = 'reference';
+    overlay.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  replayTime = 82;
+  await act(async () => { await vi.advanceTimersByTimeAsync(250); });
+  expect(section.textContent).toContain('33% below S2 at +17s');
+  expect(section.textContent).not.toContain('Unrecorded');
+  expect(section.textContent).not.toContain('VIDEO POSITION');
+  expect(section.querySelector('details')?.open).toBe(false);
+  expect(section.querySelector('article a')?.getAttribute('href')).toContain('t=300s');
+  const gain = [...section.querySelectorAll('button')].find(button => button.textContent === '% gain')!;
+  await click(gain);
+  expect(gain.getAttribute('aria-pressed')).toBe('true');
+  expect(section.querySelector('svg')?.textContent).toContain('20%');
 });
 
 async function render(element: React.ReactNode) {

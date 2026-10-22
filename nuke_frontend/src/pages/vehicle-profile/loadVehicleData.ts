@@ -8,7 +8,7 @@
 import type React from 'react';
 import { buildAuctionPulseFromExternalListings, buildAuctionPulseFromReadResult } from './buildAuctionPulse';
 import { isMismatchedVehicleImage, scoreMoneyShot } from './imageFilterUtils';
-import { vehicleImageColumnsForViewer } from '../../lib/vehicleImageColumns';
+import { vehicleImageColumnsForViewer, vehicleImageGallerySource } from '../../lib/vehicleImageColumns';
 
 // ----- Hero Image Auto-Selection -----
 
@@ -120,6 +120,7 @@ export async function selectBestHeroImage(
     // Coalesce concurrent loads. Keep the recent window for owner-upload recency,
     // but read explicit primaries separately: recency alone can omit the primary.
     const projection = await vehicleImageColumnsForViewer('id, image_url, medium_url, large_url, photo_quality_score, zone_confidence, vehicle_zone, exif_data, taken_at, position, angle, ai_detected_angle, source, is_primary, is_document, is_duplicate, is_superseded, is_sensitive, image_vehicle_match_status, ai_processing_status, vision_gate_status, created_at, category, image_type');
+    const imageSource = await vehicleImageGallerySource();
     const readRows = async (query: any): Promise<any[]> => {
       const { data, error } = await query;
       if (error) console.warn('[selectBestHeroImage] query error:', error);
@@ -130,23 +131,24 @@ export async function selectBestHeroImage(
     if (prefetchedImages && prefetchedImages.length > 0) {
       const primaryRows = prefetchedImages.some((img) => img?.is_primary === true)
         ? []
-        : await readRows(supabase.from('vehicle_images').select(projection)
-          .eq('vehicle_id', vehicleId).eq('is_primary', true)
+        : await readRows(supabase.from(imageSource).select(projection)
+          .eq('vehicle_id', vehicleId).eq('vehicle_image_gallery_eligible', true).eq('is_primary', true)
           .order('created_at', { ascending: false }).limit(10));
       candidates = [...prefetchedImages, ...primaryRows];
     } else {
       let pending = inflightHeroCandidates.get(vehicleId);
       if (!pending) {
         const query = Promise.all([
-          readRows(supabase.from('vehicle_images').select(projection)
+          readRows(supabase.from(imageSource).select(projection)
             .eq('vehicle_id', vehicleId)
+            .eq('vehicle_image_gallery_eligible', true)
             .order('taken_at', { ascending: false, nullsFirst: false })
             .order('created_at', { ascending: false, nullsFirst: false })
             .order('is_primary', { ascending: false, nullsFirst: false })
             .order('photo_quality_score', { ascending: false, nullsFirst: false })
             .limit(60)),
-          readRows(supabase.from('vehicle_images').select(projection)
-            .eq('vehicle_id', vehicleId).eq('is_primary', true)
+          readRows(supabase.from(imageSource).select(projection)
+            .eq('vehicle_id', vehicleId).eq('vehicle_image_gallery_eligible', true).eq('is_primary', true)
             .order('created_at', { ascending: false }).limit(10)),
         ]).then(([recent, primary]) => [...recent, ...primary]);
         pending = query.finally(() => inflightHeroCandidates.delete(vehicleId));

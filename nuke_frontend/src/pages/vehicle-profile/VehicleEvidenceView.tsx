@@ -8,6 +8,7 @@ import { useFieldProvenance, citedFieldImages, provenanceCoverageUnavailable } f
 import { optimizeImageUrl } from '../../lib/imageOptimizer';
 import './vehicle-evidence.css';
 const ObservationTimeline = React.lazy(() => import('./ObservationTimeline'));
+const VehicleVideoSection = React.lazy(() => import('../../components/vehicle/VehicleVideoSection'));
 
 const FIELDS = [
   { field: 'color', label: 'EXTERIOR COLOR' },
@@ -57,6 +58,9 @@ const VehicleEvidenceView: React.FC = () => {
         <div><div className="ev-label">{vehicle.year} · {vehicle.make}</div><h1>{vehicle.model}{vehicle.body_style ? <span> / {vehicle.body_style}</span> : null}</h1></div>
         <div className="ev-identity"><span className="ev-label">VEHICLE IDENTITY</span><span>{vehicle.vin || 'VIN unknown'}</span>{inventory.data && <div className="ev-record-counts"><button type="button" onClick={() => document.querySelector('.ev-library')?.scrollIntoView({ block: 'start' })}>{inventory.data.total ?? images.length} images</button><button type="button" onClick={() => document.querySelector('.ev-coverage')?.scrollIntoView({ block: 'center' })}>{analyzed}/{images.length} completed</button><button type="button" onClick={() => { setShowHistory(true); document.querySelector('.ev-history')?.scrollIntoView({ block: 'start' }); }}>{observationCount} observations</button></div>}</div>
       </header>
+      <section className="ev-replay-section" aria-label="Auction replay">
+        <React.Suspense fallback={null}><VehicleVideoSection vehicleId={vehicle.id} defaultCollapsed={false} /></React.Suspense>
+      </section>
       <div className="ev-main-grid">
         <section className="ev-image-section" aria-label="Vehicle images">
           <figure className="ev-hero">

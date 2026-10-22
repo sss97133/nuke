@@ -542,6 +542,32 @@ What that commits the estimate to:
   contributions.
 
 
+### Live auction assessment and cross-venue peers, owner direction, October 22
+
+The owner rejected a replay that only animates screen amounts and compares one arbitrarily chosen car. The profile
+must cross-examine a vehicle's performance against its nearest evidenced peers across every retained venue, alongside
+broader model/year/generation and venue trends. One named auction is an optional evidence drill, never the market benchmark.
+
+Proposed implementation, not delivered analysis or a validated forecast:
+- Extend the existing sale-episode and family-index owners. Retain one contribution per source episode, separate repeated
+  sales of the same vehicle, and source-qualify outcome, currency, fee basis and date before amount comparisons. Retained
+  source URL groups establish observed activity, not confirmed sales. Report each venue's admitted and unresolved coverage.
+- Attribute body, engine/variant, transmission, originality, modifications, condition and provenance at the sale date.
+  Unknown and conflicting dimensions stay visible; present-day vehicle fields cannot silently supply historical matching.
+  Fit related cohorts jointly, with sparse configurations supported by broader cohorts and venue/time effects, rather
+  than multiplying overlapping cohort scores. Matching weights and contributions must be inspectable and evaluated.
+- Distinguish market movement, a subject's expected result and its observed auction performance. A sale-price range can
+  use qualified final results from any venue. A bid-path band additionally needs timed observations at comparable phases;
+  an auction with only a final result contributes that result, never an invented trajectory.
+- Preserve auctioneer requests, screen bids, acknowledged offers, reserve changes, on-block sale/no-sale and subsequent
+  negotiated sales as different evidence. A no-sale high bid never becomes a sold price or establishes an undisclosed reserve.
+- Test separate targets: on-block sale probability, final high bid, and hammer conditional on sale. Grade at declared
+  pre-lot and in-lot horizons against existing/simple baselines with chronological held-out sales. Distinguish retrospective
+  event replay from historical knowledge-as-of and prospective predictions. Model 33's BaT accuracy does not validate live-floor use.
+
+The opening assessment should explain the result and its uncertainty; synchronized video, cohort contributors and individual
+comparisons provide the evidence drill. The October 22 Corvette study is an offline diagnostic, not a deployed performance index.
+
 ## One scope drives the market page, and search sets it — owner direction, October 16
 
 The owner, on the home page: "lets say i want to drill into the tree map... i cant find mustang but i wanna explore
