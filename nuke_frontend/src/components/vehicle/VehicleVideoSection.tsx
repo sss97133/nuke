@@ -387,16 +387,18 @@ export const VehicleVideoSection: React.FC<VehicleVideoSectionProps> = ({
   vehicleId,
   defaultCollapsed = true
 }) => {
-  const { data: videos = [], isLoading: loading } = useVehicleVideos(vehicleId);
+  const { data: videos = [], isLoading: loading, isError, refetch } = useVehicleVideos(vehicleId);
   const [isCollapsed, setIsCollapsed] = useState(defaultCollapsed);
   const [activeModal, setActiveModal] = useState<VideoMoment | null>(null);
   useEffect(() => { setActiveModal(null); }, [vehicleId]);
 
   if (loading) return null;
+  if (isError) return <p role="alert">Could not load auction evidence. <button type="button" onClick={() => void refetch()}>Retry</button></p>;
   if (videos.length === 0) return null;
 
   return (
     <>
+      {videos.some(video => video.timed_evidence_read_failed) && <p role="status">Some timed auction evidence could not be loaded. <button type="button" onClick={() => void refetch()}>Retry</button></p>}
       <div className={`card ${isCollapsed ? 'is-collapsed' : ''}`}>
         <div
           className="card-header"

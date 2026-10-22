@@ -30,6 +30,7 @@ interface VideoMoment {
   screen_status_changes?: { t: number; status: string }[];
   matched_auction_event_id?: string | null;
   comparison_presentations?: ReplayComparison[];
+  timed_evidence_read_failed?: boolean;
 }
 
 const YOUTUBE_SOURCE_ID = 'e980c7bd-404f-41f6-8a17-1c7cabd1d8a4';
@@ -124,7 +125,8 @@ function screenAmounts(value: unknown, start: number, end?: number): ScreenAmoun
 }
 
 const videoKey = (m: VideoMoment) =>
-  `${m.broadcast_video_url.match(/[A-Za-z0-9_-]{11}(?=$|[&?#])/)?.[0]}:${Math.round(m.broadcast_timestamp_start / 60)}`;
+  JSON.stringify([m.broadcast_video_url.match(/[A-Za-z0-9_-]{11}(?=$|[&?#])/)?.[0] ?? m.broadcast_video_url,
+    m.lot_number, m.broadcast_timestamp_start, m.broadcast_timestamp_end]);
 
 export function useVehicleVideos(vehicleId: string) {
   return useQuery({
@@ -157,6 +159,7 @@ export function useVehicleVideos(vehicleId: string) {
 
       if (events.error) throw events.error;
       const moments = (events.data || []).filter(video => video.vehicle_id === vehicleId) as VideoMoment[];
+      if (presentations.error && moments.length === 0) throw presentations.error;
       // A failing broadcast read must not hide the recorded clips.
       const seen = new Set(moments.map(videoKey));
       for (const o of (presentations.error ? [] : presentations.data || []) as BroadcastPresentation[]) {
@@ -175,7 +178,8 @@ export function useVehicleVideos(vehicleId: string) {
         if (m && !seen.has(videoKey(m))) { seen.add(videoKey(m)); moments.push(m); }
       }
       const screenRows = presentations.error ? [] : presentations.data || [];
-      return moments.map(moment => withScreenOutcomes(moment, screenRows));
+      return moments.map(moment => ({ ...withScreenOutcomes(moment, screenRows),
+        timed_evidence_read_failed: !!presentations.error }));
     },
     enabled: !!vehicleId,
     staleTime: 5 * 60 * 1000,

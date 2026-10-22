@@ -6,7 +6,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 const fixture = vi.hoisted(() => ({
-  videos: [] as unknown[], observations: [] as unknown[], vehicle: null as unknown, metadataError: null as unknown,
+  videos: [] as unknown[], observations: [] as unknown[], observationError: null as unknown, vehicle: null as unknown, metadataError: null as unknown,
   videoRead: null as null | ((vehicleId: unknown) => Promise<{ data: unknown[]; error: null }>),
   historyRows: [] as unknown[], historyError: null as unknown,
   historyRead: null as null | ((source: unknown, lot: unknown) => Promise<{ data: unknown[]; error: null }>),
@@ -27,7 +27,7 @@ vi.mock('../../lib/supabase', () => ({ supabase: { from: vi.fn((table: string) =
       const source = query.filters.find(filter => filter[0] === 'eq' && filter[1] === 'source')?.[2];
       const result = lot ? fixture.historyRead?.(source, lot)
         ?? Promise.resolve({ data: fixture.historyRows, error: fixture.historyError })
-        : table === 'vehicle_observations' ? Promise.resolve({ data: fixture.observations, error: null })
+        : table === 'vehicle_observations' ? Promise.resolve({ data: fixture.observations, error: fixture.observationError })
         : fixture.videoRead?.(query.filters.find(filter => filter[0] === 'eq' && filter[1] === 'vehicle_id')?.[2])
         ?? Promise.resolve({ data: fixture.videos, error: null });
       return Object.assign(result, { limit: () => result });
@@ -58,6 +58,7 @@ beforeEach(() => {
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
   fixture.videos = [video];
   fixture.observations = [];
+  fixture.observationError = null;
   fixture.videoRead = null;
   fixture.historyRows = [];
   fixture.historyError = null;
@@ -84,6 +85,33 @@ afterEach(async () => {
   client.clear();
   container.remove();
   vi.useRealTimers(); vi.unstubAllGlobals();
+});
+
+it('exposes a failed evidence API read instead of treating it as an empty record', async () => {
+  fixture.videos = [];
+  fixture.observationError = { message: 'Legacy API keys are disabled' };
+  await render(<VehicleVideoSection vehicleId={subject} defaultCollapsed={false} />);
+  expect(container.querySelector('[role="alert"]')?.textContent).toContain('Could not load auction evidence');
+  expect(container.querySelector('button')?.textContent).toBe('Retry');
+});
+
+it('keeps recorded video links when the supplementary timed-evidence API fails', async () => {
+  fixture.observationError = { message: 'permission denied' };
+  await render(<VehicleVideoSection vehicleId={subject} defaultCollapsed={false} />);
+  expect(container.querySelector('img[alt="Video thumbnail"]')).not.toBeNull();
+  expect(container.querySelector('[role="status"]')?.textContent).toContain('Some timed auction evidence could not be loaded');
+});
+
+it('keeps distinct lot presentations in the same video minute', async () => {
+  fixture.videos = [];
+  fixture.observations = [65, 75].map((start, index) => ({
+    id: `presentation-${index}`, vehicle_id: subject, structured_data: {
+      property: 'broadcast_lot_presentation', media: { video_id: 'abcdefghijk', start_seconds: start, end_seconds: start + 5 },
+      value: { lot: `S${index + 1}` }, event_context: { auction_house: 'mecum' },
+    },
+  }));
+  await render(<VehicleVideoSection vehicleId={subject} defaultCollapsed={false} />);
+  expect(container.querySelectorAll('img[alt="Video thumbnail"]')).toHaveLength(2);
 });
 
 it('replays screen bids and descending asks from the player clock, then seeks the same player', async () => {
