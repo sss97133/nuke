@@ -1368,6 +1368,15 @@ collection telemetry remain available on demand. Last-new-record clocks do not e
 uptime or source revisit freshness. Future repairs must preserve the selected population and clock
 scope through the investigation, and attach the next failed user question to an existing owner.
 
+Follow-through prepared 2026-10-22: a period selection is a request, not a new label for the
+previous answer. Market movers and the map retain the successful answer's own horizon, baseline,
+counts and benchmark until the requested read succeeds. A missing custom baseline refuses that
+comparison; it cannot fall back to the ordinary prior window under the custom label. Pending and
+failed selections explicitly identify the retained answer. Deferred-response tests cover abandoned
+reads, baseline failure/recovery and the actual map benchmark; all three regression cases fail on
+the preceding implementation. This is a consumer-consistency repair, with no newly acquired fleet
+evidence or released collection hold.
+
 Stage: implemented and locally tested preparation; PR, deployment and runtime evidence are recorded
 separately in the private lane receipt. The previous historical-reader and reported-work holds are
 not released by this entry.

@@ -601,13 +601,13 @@ export default function FamilyMovers({
   onMoversData?: (data: ShareMovers | null, horizon: MoverHorizon, baseline: BaselineHorizon) => void;
 }) {
   const [internalHorizon, setInternalHorizon] = useState<MoverHorizon>(controlledHorizon ?? '1y');
-  const horizon = controlledHorizon ?? internalHorizon;
+  const requestedHorizon = controlledHorizon ?? internalHorizon;
   const setHorizon = (h: MoverHorizon) => {
     setInternalHorizon(h);
     onHorizonChange?.(h);
   };
   const [internalBaseline, setInternalBaseline] = useState<BaselineHorizon>(controlledBaseline ?? 'prior');
-  const baselineHorizon = controlledBaseline ?? internalBaseline;
+  const requestedBaseline = controlledBaseline ?? internalBaseline;
   const setBaselineHorizon = (b: BaselineHorizon) => {
     setInternalBaseline(b);
     onBaselineHorizonChange?.(b);
@@ -638,42 +638,35 @@ export default function FamilyMovers({
     };
   }, [infoOpen]);
 
-  const [data, setData] = useState<ShareMovers | null>(null);
-  const [initialReady, setInitialReady] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [bins, setBins] = useState<Map<string, number[]>>(new Map());
-
+  // Keep the period attached to its answer while a new selection is pending or fails.
+  const [receipt, setReceipt] = useState<{ data: ShareMovers; horizon: MoverHorizon; baseline: BaselineHorizon } | null>(null);
+  const [finishedKey, setFinishedKey] = useState<string | null>(null);
+  const requestKey = `${requestedHorizon}|${requestedBaseline}`;
+  const horizon = receipt?.horizon ?? requestedHorizon;
+  const baselineHorizon = receipt?.baseline ?? requestedBaseline;
+  const data = receipt?.data ?? null;
   const isCustomBase = baselineHorizon !== 'prior' && baselineHorizon !== horizon && !(horizon === 'upcoming' && baselineHorizon === '1m');
+  const pendingSelection = !receipt || receipt.horizon !== requestedHorizon || receipt.baseline !== requestedBaseline;
+  const loading = finishedKey !== requestKey;
+  const [bins, setBins] = useState<Map<string, number[]>>(new Map());
 
   useEffect(() => {
     let live = true;
-    setLoading(true);
-    if (!isCustomBase) {
-      readShareMovers(horizon).then((r) => {
-        if (!live) return;
-        setData(r);
-        onMoversData?.(r, horizon, baselineHorizon);
-        if (horizon === '1y' && r && (r.gaining.length > 0 || r.losing.length > 0)) {
-          setInitialReady(true);
-        } else if (r) {
-          setInitialReady(true);
-        }
-        setLoading(false);
-      });
-    } else {
-      const baseKey = baselineHorizon as Exclude<MoverHorizon, 'upcoming'>;
-      Promise.all([readShareMovers(horizon), readShareMovers(baseKey)]).then(async ([recentRes, baseRes]) => {
-        if (!live) return;
-        const combined = await resolveMoverLabels(recentRes && baseRes ? combineShareMovers(recentRes, baseRes, horizon, baseKey) : recentRes);
-        if (!live) return;
-        setData(combined);
-        onMoversData?.(combined, horizon, baselineHorizon);
-        if (combined) setInitialReady(true);
-        setLoading(false);
-      });
-    }
+    const custom = requestedBaseline !== 'prior' && requestedBaseline !== requestedHorizon
+      && !(requestedHorizon === 'upcoming' && requestedBaseline === '1m');
+    const read = custom
+      ? Promise.all([readShareMovers(requestedHorizon), readShareMovers(requestedBaseline as Exclude<MoverHorizon, 'upcoming'>)])
+        .then(([recent, base]) => resolveMoverLabels(recent && base
+          ? combineShareMovers(recent, base, requestedHorizon, requestedBaseline as Exclude<MoverHorizon, 'upcoming'>) : null))
+      : readShareMovers(requestedHorizon);
+    read.then((answer) => {
+      if (!live) return;
+      if (answer) setReceipt({ data: answer, horizon: requestedHorizon, baseline: requestedBaseline });
+      onMoversData?.(answer, requestedHorizon, requestedBaseline);
+      setFinishedKey(requestKey);
+    });
     return () => { live = false; };
-  }, [horizon, baselineHorizon, isCustomBase]);
+  }, [requestedHorizon, requestedBaseline, requestKey]);
 
   useEffect(() => {
     if (horizon !== '1y' || isCustomBase) return;
@@ -684,7 +677,6 @@ export default function FamilyMovers({
     return () => { live = false; };
   }, [data, horizon, isCustomBase]);
 
-  if (!initialReady && (!data || (!data.gaining.length && !data.losing.length))) return null;
   if (!data) return null;
 
   const meta = MOVER_HORIZONS.find((h) => h.key === horizon) ?? MOVER_HORIZONS[6];
@@ -811,7 +803,7 @@ export default function FamilyMovers({
         <div className="map-movers2__dial" role="group" aria-label="Relativity time horizon">
           <span className="map-movers2__dial-tag" aria-hidden="true">WINDOW</span>
           {MOVER_HORIZONS.map((h) => {
-            const active = h.key === horizon;
+            const active = h.key === requestedHorizon;
             return (
               <button
                 key={h.key}
@@ -829,9 +821,10 @@ export default function FamilyMovers({
         <div className="map-movers2__vs-dial" role="group" aria-label="Relativity baseline window">
           <span className="map-movers2__dial-tag" aria-hidden="true">VS</span>
           {BASELINE_HORIZONS.map((b) => {
-            const isMatchedPrior = b.key === 'prior' && (!isCustomBase);
-            const active = isMatchedPrior || (isCustomBase && b.key === baselineHorizon);
-            const disabled = b.key !== 'prior' && b.key === horizon;
+            const requestedCustom = requestedBaseline !== 'prior' && requestedBaseline !== requestedHorizon && !(requestedHorizon === 'upcoming' && requestedBaseline === '1m');
+            const isMatchedPrior = b.key === 'prior' && !requestedCustom;
+            const active = isMatchedPrior || (requestedCustom && b.key === requestedBaseline);
+            const disabled = b.key !== 'prior' && b.key === requestedHorizon;
             return (
               <button
                 key={b.key}
@@ -849,6 +842,9 @@ export default function FamilyMovers({
         </div>
       </div>
     </div>
+    {pendingSelection && <div className="map-movers2__none" role="status">
+      {loading ? 'Reading selected comparison…' : 'Selected comparison unavailable.'} Showing the last successful comparison.
+    </div>}
     <div className="map-movers2__sides">
       {side(isUpcoming ? meta.gainingTitle : 'Outpacing the market', data.gaining, 'up')}
       {side(isUpcoming ? meta.losingTitle : 'Trailing the market', data.losing, 'down')}

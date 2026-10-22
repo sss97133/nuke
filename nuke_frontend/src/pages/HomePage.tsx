@@ -1489,40 +1489,32 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
   // Data hooks
   const { data: rawBrandsData, loading: brandsLoading } = useTreemapBrands();
   const refresh = useTreemapRefresh();
-  const [horizon, setHorizon] = useState<MoverHorizon>('1y');
-  const [baselineHorizon, setBaselineHorizon] = useState<BaselineHorizon>('prior');
+  const [requestedHorizon, setHorizon] = useState<MoverHorizon>('1y');
+  const [requestedBaseline, setBaselineHorizon] = useState<BaselineHorizon>('prior');
+  const [moverReceipt, setMoverReceipt] = useState<{ data: ShareMovers; horizon: MoverHorizon; baseline: BaselineHorizon } | null>(null);
+  const horizon = moverReceipt?.horizon ?? '1y';
+  const baselineHorizon = moverReceipt?.baseline ?? 'prior';
+  const moversData = moverReceipt?.data ?? null;
   const isCustomBase = baselineHorizon !== 'prior' && baselineHorizon !== horizon && !(horizon === 'upcoming' && baselineHorizon === '1m');
   // The map's color is each tile's BaT move against BaT overall: the whole venue as the movers read it (every family,
   // makes too small for a tile included), so the map and the movers name one baseline; the brands' own sum until it reads.
-  const [moversData, setMoversData] = useState<ShareMovers | null>(null);
-  const [venue, setVenue] = useState<{ sold: number; prior: number; move: number } | null>(null);
   useEffect(() => {
     let live = true;
-    if (!isCustomBase) {
-      readShareMovers(horizon).then((v) => {
-        if (!live) return;
-        if (v) {
-          setMoversData(v);
-          if (v.bat.sold_prior_12m > 0) {
-            setVenue({ sold: v.bat.sold_12m, prior: v.bat.sold_prior_12m, move: v.bat.sold_12m / v.bat.sold_prior_12m - 1 });
-          }
-        }
-      });
-    } else {
-      const baseKey = baselineHorizon as Exclude<MoverHorizon, 'upcoming'>;
-      Promise.all([readShareMovers(horizon), readShareMovers(baseKey)]).then(([recentRes, baseRes]) => {
-        if (!live) return;
-        const v = recentRes && baseRes ? combineShareMovers(recentRes, baseRes, horizon, baseKey) : recentRes;
-        if (v) {
-          setMoversData(v);
-          if (v.bat.sold_prior_12m > 0) {
-            setVenue({ sold: v.bat.sold_12m, prior: v.bat.sold_prior_12m, move: v.bat.sold_12m / v.bat.sold_prior_12m - 1 });
-          }
-        }
-      });
-    }
+    const custom = requestedBaseline !== 'prior' && requestedBaseline !== requestedHorizon
+      && !(requestedHorizon === 'upcoming' && requestedBaseline === '1m');
+    const read = custom
+      ? Promise.all([readShareMovers(requestedHorizon), readShareMovers(requestedBaseline as Exclude<MoverHorizon, 'upcoming'>)])
+        .then(([recent, base]) => recent && base
+          ? combineShareMovers(recent, base, requestedHorizon, requestedBaseline as Exclude<MoverHorizon, 'upcoming'>) : null)
+      : readShareMovers(requestedHorizon);
+    read.then((data) => {
+      if (live && data) setMoverReceipt({ data, horizon: requestedHorizon, baseline: requestedBaseline });
+    });
     return () => { live = false; };
-  }, [horizon, baselineHorizon, isCustomBase]);
+  }, [requestedHorizon, requestedBaseline]);
+  const venue = moversData && moversData.bat.sold_prior_12m > 0
+    ? { sold: moversData.bat.sold_12m, prior: moversData.bat.sold_prior_12m, move: moversData.bat.sold_12m / moversData.bat.sold_prior_12m - 1 }
+    : null;
   const horizonMeta = useMemo(() => MOVER_HORIZONS.find((h) => h.key === horizon) ?? MOVER_HORIZONS[6], [horizon]);
   const gateMin = useMemo(
     () => (isCustomBase ? Math.min(gateMinForHorizon(horizon), gateMinForHorizon(baselineHorizon as MoverHorizon)) : gateMinForHorizon(horizon)),
@@ -3122,18 +3114,10 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
       {levelType === 'brands' && <details className="home-family-comparisons" open={!isNarrow}>
         <summary><Text role="label">Compare sales activity</Text></summary>
         <FamilyMovers
-        horizon={horizon}
+        horizon={requestedHorizon}
         onHorizonChange={setHorizon}
-        baselineHorizon={baselineHorizon}
+        baselineHorizon={requestedBaseline}
         onBaselineHorizonChange={setBaselineHorizon}
-        onMoversData={(d) => {
-          if (d) {
-            setMoversData(d);
-            if (d.bat.sold_prior_12m > 0) {
-              setVenue({ sold: d.bat.sold_12m, prior: d.bat.sold_prior_12m, move: d.bat.sold_12m / d.bat.sold_prior_12m - 1 });
-            }
-          }
-        }}
         onPick={(m) => {
           recordInterest('make', m.brand);
           setDrillStack([{ label: 'ALL MAKES' }, { label: m.brand, make: m.brand }, { label: m.family, make: m.brand, family: m.family_key }], undefined,
