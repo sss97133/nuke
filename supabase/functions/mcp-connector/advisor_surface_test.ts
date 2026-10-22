@@ -7,6 +7,8 @@ import {
   isAdvisorSurface,
 } from "./advisor/mod.ts";
 import { handleAdvisorJsonRpc, initAdvisorHandlers } from "./advisor/protocol.ts";
+// budget_options unit tests ride along with this CI-run file.
+import "./advisor/budget_test.ts";
 import { assertEnvelopeShape } from "./advisor/evidence.ts";
 
 function assert(condition: boolean, message: string): asserts condition {
@@ -19,6 +21,7 @@ const EXPECTED = [
   "get_comps",
   "value_asset",
   "evaluate_listing",
+  "budget_options",
 ];
 
 Deno.test("advisor catalog is curated read-only tools with outputSchema", () => {
@@ -30,7 +33,7 @@ Deno.test("advisor catalog is curated read-only tools with outputSchema", () => 
     assert(tool.annotations.readOnlyHint === true, `${tool.name} readOnly`);
     assert(tool.annotations.destructiveHint === false, `${tool.name} not destructive`);
     assert(tool.outputSchema && typeof tool.outputSchema === "object", `${tool.name} outputSchema`);
-    assert(/^[A-Z]/.test(tool.description) || tool.description.includes("Find") || tool.description.includes("Load") || tool.description.includes("Return") || tool.description.includes("Estimate") || tool.description.includes("Evaluate"), `${tool.name} verb-first description`);
+    assert(/^[A-Z]/.test(tool.description) || tool.description.includes("Find") || tool.description.includes("Load") || tool.description.includes("Return") || tool.description.includes("Estimate") || tool.description.includes("Evaluate") || tool.description.includes("Rank"), `${tool.name} verb-first description`);
     assert(!tool.description.includes("Always cite"), `${tool.name} descriptions stay short`);
   }
   const forbidden = [
