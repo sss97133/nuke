@@ -50,7 +50,13 @@ export default function FinancialEvidenceRestore({ onRestored }: { onRestored?: 
         setResult(totals); setCompletedBundles(index + 1); onRestored?.();
       }
     } catch (e) { if (mounted.current && epoch === identityEpoch.current) setError(e instanceof Error ? e.message : 'Recovery stopped. Retry the same bundle to resume.'); }
-    finally { running.current = null; if (mounted.current) setBusy(false); }
+    finally {
+      running.current = null;
+      if (mounted.current) {
+        if (controller.signal.aborted && epoch === identityEpoch.current) setError('Recovery paused. Resume the selected bundles to continue.');
+        setBusy(false);
+      }
+    }
   }
   return <section aria-label="Restore retained accounting evidence">
     <h2>Restore retained accounting evidence</h2>

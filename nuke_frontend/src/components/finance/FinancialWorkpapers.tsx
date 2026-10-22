@@ -10,6 +10,14 @@ type Control = { record_kind: string; year: string; account: string | null; curr
 type Workpapers = { records: SavedRecord[]; total_rows: number; next_after: string | null; controls_valid: boolean; controls: Control[] };
 const pageSize = 100;
 
+// Readable label only; the retained source description is never rewritten.
+export function recordDescription(value?: string): string {
+  return (value || '').split('|').map(part => {
+    const cleaned = part.replace(/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi, '');
+    return (cleaned === part ? part : cleaned.replace(/^[\s,;]+|[\s,;]+$/g, '')).trim();
+  }).filter(Boolean).join(' · ');
+}
+
 export function displayMoney(value: string | number | null, currency: string | null): string {
   if (value === null || value === '' || !Number.isFinite(Number(value))) return 'Unknown';
   const amount = Number(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 6 });
@@ -123,7 +131,7 @@ export default function FinancialWorkpapers({ revision, onOpen }: { revision: nu
         {view === 'records' ? <>
           <p className="accounting-muted">Year {selectedYear || 'not recorded'}. Search and filters cover the {data.records.length} records loaded on source page {pages.length}, not all {data.total_rows.toLocaleString('en-US')} records. Source pages follow saved record order, not date or priority.</p>
           <div className="accounting-table-wrap"><table><thead><tr><th>Date</th><th>Transaction / decision</th><th>Account</th><th>Classification</th><th>Amount</th><th>Evidence</th></tr></thead><tbody>{records.slice(offset, offset + 25).map(row => <tr key={row.id}>
-            <td>{row.record.date || row.record.year}</td><td><span className="accounting-record-description">{row.record.description || 'Saved record'}</span><small>{row.record.record_kind === 'retained_bank_movement' ? 'Bank movement' : 'Bookkeeping decision'}</small></td><td>{row.record.account || 'Not recorded'}</td><td>{row.record.section || 'Unclassified'}<small>{row.record.category}</small></td><td className="accounting-number">{displayMoney(row.record.amount, row.record.currency)}</td><td><button type="button" onClick={() => onOpen(row.document_id, row.record)}>View evidence</button></td>
+            <td>{row.record.date || row.record.year}</td><td><span className="accounting-record-description">{recordDescription(row.record.description) || 'Saved record'}</span><small>{row.record.record_kind === 'retained_bank_movement' ? 'Bank movement' : 'Bookkeeping decision'}</small></td><td>{row.record.account || 'Not recorded'}</td><td>{row.record.section || 'Unclassified'}<small>{row.record.category}</small></td><td className="accounting-number">{displayMoney(row.record.amount, row.record.currency)}</td><td><button type="button" onClick={() => onOpen(row.document_id, row.record)}>View evidence</button></td>
           </tr>)}</tbody></table></div>
           {!records.length && <p>No matches in this loaded source page. Clear filters or load another source page.</p>}
         </> : <>

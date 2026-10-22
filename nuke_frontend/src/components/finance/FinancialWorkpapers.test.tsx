@@ -6,7 +6,7 @@ const fixture = vi.hoisted(() => ({ invoke: vi.fn(), listener: null as null | ((
 vi.mock('../../lib/supabase', () => ({ supabase: { functions: { invoke: fixture.invoke }, auth: {
   onAuthStateChange(listener: (event: string) => void) { fixture.listener = listener; return { data: { subscription: { unsubscribe() {} } } }; },
 } } }));
-import FinancialWorkpapers, { yearOverview } from './FinancialWorkpapers';
+import FinancialWorkpapers, { yearOverview, recordDescription } from './FinancialWorkpapers';
 let container: HTMLDivElement; let root: Root;
 const empty = () => ({ records: [], total_rows: 0, next_after: null, controls_valid: true, controls: [] });
 const response = (data: unknown) => ({ data: { data }, error: null });
@@ -116,4 +116,20 @@ it('bounds loaded record inspection to 25 and withholds partial account sums', a
   await act(async () => Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'Accounts')!.click());
   expect(container.querySelector('tbody')?.textContent).toContain('Unknown');
   expect(container.textContent).not.toContain('98,765.43');
+});
+
+it('removes full UUID display tokens while preserving source description and ordinary identifiers', async () => {
+  const original = 'PayPal | 12345678-1234-1234-1234-123456789abc | 87654321-4321-4321-4321-cba987654321 | Subscription SKU AB-123 VIN 1HGCM82633A004352';
+  expect(recordDescription(original)).toBe('PayPal · Subscription SKU AB-123 VIN 1HGCM82633A004352');
+  expect(recordDescription('PayPal | Synthetic subscription | 12345678-1234-1234-1234-123456789abc, 87654321-4321-4321-4321-cba987654321')).toBe('PayPal · Synthetic subscription');
+  expect(recordDescription('Merchant, Inc. | SKU AB-123')).toBe('Merchant, Inc. · SKU AB-123');
+  const saved = record('source-row', original);
+  fixture.invoke.mockResolvedValue(response({...empty(),records:[saved],total_rows:1}));
+  const open = vi.fn();
+  await act(async () => root.render(<FinancialWorkpapers revision={0} onOpen={open}/>));
+  await act(async () => Array.from(container.querySelectorAll('button')).find(b=>b.textContent==='Records')!.click());
+  expect(container.querySelector('.accounting-record-description')?.textContent).toBe(recordDescription(original));
+  await act(async () => Array.from(container.querySelectorAll('button')).find(b=>b.textContent==='View evidence')!.click());
+  expect(open.mock.calls[0][1].description).toBe(original);
+  expect(saved.record.description).toBe(original);
 });

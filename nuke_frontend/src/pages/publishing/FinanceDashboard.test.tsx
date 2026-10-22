@@ -211,3 +211,23 @@ it('keeps the chosen bookkeeping record distinct from its batch and defers payme
   await act(async () => { items.open=true; items.dispatchEvent(new Event('toggle')); });
   expect(fixture.calls.some(c=>c.action==='read')).toBe(true);
 });
+
+it('keeps exact UUID-bearing bank evidence behind source details and labels owner decisions plainly', async () => {
+  const original = 'PayPal | Synthetic subscription | 12345678-1234-1234-1234-123456789abc, 87654321-4321-4321-4321-cba987654321';
+  fixture.results.tax_read = { records:[{id:'bank',document_id:'doc',record:{record_kind:'retained_bank_movement',local_id:'bank',year:'2025',date:'2025-02-20',account:'PayPal',section:'Owner',category:'Personal',amount:'-14',currency:'USD',description:original}}],total_rows:1,next_after:null,controls_valid:true,controls:[] };
+  fixture.results.financial_review_queue = {data:[{id:'concern',document_id:'doc',concern_type:'montant_non_corrobore',status:'pending',detail:'Retained amount requires source review'}],count:1};
+  fixture.results.financial_document_extractions = {data:[{id:'technical-first',field_key:'retained_relationships',value_normalized:{evidence:{quote:'Owner attributed statement'}}},{id:'owner',field_key:'owner_personal_purpose_resolution_20261022',value_normalized:{value:'Personal purpose',evidence:{quote:'Owner attributed statement'}},document:{source_filename:'book.csv'}},{id:'batch',field_key:'retained_accounting_batch',value_normalized:{value:{source_kind:'derived_retained_snapshot',record_count:25}}}],count:2};
+  await act(async () => root.render(<FinanceDashboard/>));
+  expect(container.textContent).toContain('Amount needs corroboration');
+  await act(async () => Array.from(container.querySelectorAll('button')).find(b=>b.textContent==='Records')!.click());
+  await act(async () => Array.from(container.querySelectorAll('button')).find(b=>b.textContent==='View evidence')!.click());
+  const dialog=container.querySelector('dialog')!;
+  expect(dialog.querySelector('.accounting-selected-record h3')?.textContent).toBe('PayPal · Synthetic subscription');
+  const source=Array.from(dialog.querySelectorAll('details')).find(d=>d.querySelector('summary')?.textContent==='Original source description')!;
+  expect(source.open).toBe(false); expect(source.querySelector('p')?.textContent).toBe(original);
+  expect(Array.from(dialog.querySelectorAll('.accounting-evidence-field h4')).map(h=>h.textContent)).toEqual(['Owner decision']);
+  expect(dialog.querySelector('blockquote')?.textContent).toBe('Owner attributed statement');
+  const technical=Array.from(dialog.querySelectorAll('details')).find(d=>d.querySelector('summary')?.textContent==='Technical source references')!;
+  expect(technical.open).toBe(false); expect(technical.textContent).toContain('derived_retained_snapshot');
+  expect(dialog.textContent).toContain('Field reference: owner_personal_purpose_resolution_20261022');
+});
