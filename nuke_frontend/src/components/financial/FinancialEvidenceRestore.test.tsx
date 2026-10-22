@@ -86,6 +86,22 @@ it('clears the queue and ignores late progress and success after an account swit
     expect(f.container.textContent).not.toContain('first.json');
     expect(f.container.textContent).not.toContain('Verified 1 originals');
     expect(f.container.textContent).not.toContain('revisions acknowledged');
+    expect(f.container.textContent).not.toContain('Recovery paused');
     expect(f.container.querySelector('button')!.disabled).toBe(true);
+  } finally { await f.close(); }
+});
+
+it('reports same-account manual abort as paused and resumes without requesting sign-in', async () => {
+  const f = await queueFixture();
+  restore.mockImplementationOnce((_file, _progress, signal: AbortSignal) => new Promise((_resolve, reject) => signal.addEventListener('abort', () => reject(new Error('Sign in to the original account to resume.'))))).mockResolvedValue(restored);
+  try {
+    await act(async () => f.container.querySelector('button')!.click());
+    await act(async () => f.container.querySelectorAll('button')[1].click());
+    expect(f.container.textContent).toContain('Recovery paused. Resume the selected bundles to continue.');
+    expect(f.container.textContent).not.toContain('Sign in to the original account');
+    expect(f.container.querySelector('button')!.disabled).toBe(false);
+    await act(async () => f.container.querySelector('button')!.click());
+    expect(f.container.textContent).toContain('3 of 3 bundles verified');
+    expect(f.container.textContent).not.toContain('Recovery paused');
   } finally { await f.close(); }
 });

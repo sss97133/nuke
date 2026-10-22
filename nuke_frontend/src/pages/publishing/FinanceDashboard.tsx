@@ -19,7 +19,7 @@ import { supabase } from '../../lib/supabase';
 import FinancialSourceReview from '../../components/financial/FinancialSourceReview';
 import FinancialDocumentLines from '../../components/finance/FinancialDocumentLines';
 import FinancialEvidenceRestore from '../../components/financial/FinancialEvidenceRestore';
-import FinancialWorkpapers, { displayMoney, type SavedRecord } from '../../components/finance/FinancialWorkpapers';
+import FinancialWorkpapers, { displayMoney, recordDescription, type SavedRecord } from '../../components/finance/FinancialWorkpapers';
 import FinancialDocumentIntake from '../../components/finance/FinancialDocumentIntake';
 import { processExistingFinancialDocument } from '../../services/financialEvidenceIntake';
 
@@ -154,7 +154,11 @@ function RedactedDocumentSource({ row }: { row: ExtractionEvidence }) {
   </div>;
 }
 
-const humanLabel = (value: string | null | undefined) => (value || 'Not recorded').replace(/_/g, ' ').replace(/\b[a-f0-9]{24,}\b/g, '').trim();
+const humanLabel = (value: string | null | undefined) => {
+  if (value === 'montant_non_corrobore') return 'Amount needs corroboration';
+  if (value?.startsWith('owner_personal_purpose_resolution_')) return 'Owner decision';
+  return (value || 'Not recorded').replace(/_/g, ' ').replace(/\b[a-f0-9]{24,}\b/g, '').trim();
+};
 function EvidenceValue({ value, depth = 0 }: { value: unknown; depth?: number }) {
   if (value === null || value === undefined) return <span>Not recorded</span>;
   if (typeof value !== 'object') return <span>{String(value)}</span>;
@@ -172,7 +176,7 @@ function EvidenceDialog({ documentId, record, onClose, trigger }: { trigger: HTM
   }, []);
   return <dialog className="accounting-evidence-dialog" ref={dialog} aria-label="Accounting evidence" onCancel={event => { event.preventDefault(); onClose(); }}>
     <div className="accounting-dialog-heading"><h2>Accounting evidence</h2><button type="button" autoFocus onClick={onClose}>Close evidence</button></div>
-    {record && <section className="accounting-selected-record" aria-label="Selected accounting record"><h3>{record.description || 'Selected transaction'}</h3><p>{record.date || record.year} · {record.account || 'Account not recorded'} · {displayMoney(record.amount, record.currency)}</p><p><strong>{record.section || 'Unclassified'}</strong>{record.category && ` · ${record.category}`}</p>{record.status && <p>{record.status}</p>}<p>{record.decision || 'No accounting decision has been recorded for this movement.'}</p><p className="accounting-muted">This is the selected record. Its retained source may be a bank export or bookkeeping batch; it is not necessarily a receipt.</p></section>}
+    {record && <section className="accounting-selected-record" aria-label="Selected accounting record"><h3>{recordDescription(record.description) || 'Selected transaction'}</h3><p>{record.date || record.year} · {record.account || 'Account not recorded'} · {displayMoney(record.amount, record.currency)}</p><p><strong>{record.section || 'Unclassified'}</strong>{record.category && ` · ${record.category}`}</p>{record.status && <p>{record.status}</p>}<p>{record.decision || 'No accounting decision has been recorded for this movement.'}</p><p className="accounting-muted">This is the selected record. Its retained source may be a bank export or bookkeeping batch; it is not necessarily a receipt.</p>{record.description && <details><summary>Original source description</summary><p>{record.description}</p></details>}</section>}
     <DocumentEvidence key={documentId} documentId={documentId} record={record} />
   </dialog>;
 }
@@ -209,22 +213,23 @@ function DocumentEvidence({ documentId, record }: { documentId: string; record: 
     const value = (row.value_normalized as { value?: { source_key?: string; scope_source_keys?: string[] } })?.value;
     return !record?.source_key || (!value?.source_key && !value?.scope_source_keys) || value.source_key === record.source_key || value.scope_source_keys?.includes(record.source_key);
   });
+  const readableRows = currentRows.filter(row => !/^(retained_relationships|retained_accounting_batch|canonical_|.*sha256)/.test(row.field_key));
   return <section aria-label="Retained document evidence">
     <h3>Supporting source</h3><p>{sourceName || 'Retained document'}{sourceName?.endsWith('.csv') ? ' · bank export or bookkeeping source' : ''}</p>
     <p className="accounting-muted">{state} Newest first; source page {page + 1}.</p>
-    {currentRows.filter(row => !/^(retained_relationships|canonical_|.*sha256)/.test(row.field_key)).map(row => {
+    {readableRows.map(row => {
       const envelope = row.value_normalized as { value?: unknown; evidence?: { quote?: string; source_file?: string; source_sheet?: string; source_row?: string | number }; method?: string } | null;
       const quote = envelope?.evidence?.quote;
-      const firstQuote = quote && currentRows.find(candidate => (candidate.value_normalized as { evidence?: { quote?: string } })?.evidence?.quote === quote)?.id === row.id;
+      const firstQuote = quote && readableRows.find(candidate => (candidate.value_normalized as { evidence?: { quote?: string } })?.evidence?.quote === quote)?.id === row.id;
       return <article key={row.id} className="accounting-evidence-field"><h4>{row.field_key.startsWith('retained_workpaper_classification_') ? 'Retained bookkeeping classification' : humanLabel(row.field_key)}</h4>
         {row.field_key === 'redacted_source' ? <RedactedDocumentSource row={row} /> : <EvidenceValue value={envelope && typeof envelope === 'object' && 'value' in envelope ? envelope.value : row.value_normalized} />}
         {firstQuote && <><blockquote>{quote.length > 500 ? `${quote.slice(0, 500)}…` : quote}</blockquote>{quote.length > 500 && <details><summary>Complete source quotation</summary><blockquote>{quote}</blockquote></details>}</>}
         {envelope?.evidence && (envelope.evidence.source_file || envelope.evidence.source_sheet || envelope.evidence.source_row) && <p className="accounting-muted">Source: {[envelope.evidence.source_file, envelope.evidence.source_sheet, envelope.evidence.source_row].filter(value => value !== undefined && value !== null).join(' · ')}</p>}
         <p className="accounting-muted">Recorded {row.created_at ? formatDate(row.created_at) : 'date unknown'} · {humanLabel(row.extractor)}{row.extractor_model ? ` · ${row.extractor_model}` : ''}</p>
-        <details><summary>Provenance and technical details</summary><p>Retained interpretation; this alone does not establish expense recognition.</p><pre>{JSON.stringify(row.value_normalized, null, 2) ?? 'unknown'}</pre><p>Evidence reference: {row.id}</p></details>
+        <details><summary>Provenance and technical details</summary><p>Retained interpretation; this alone does not establish expense recognition.</p><pre>{JSON.stringify(row.value_normalized, null, 2) ?? 'unknown'}</pre><p>Field reference: {row.field_key}</p><p>Evidence reference: {row.id}</p></details>
       </article>;
     })}
-    {currentRows.some(row => /^(retained_relationships|canonical_|.*sha256)/.test(row.field_key)) && <details><summary>Technical source references</summary>{currentRows.filter(row => /^(retained_relationships|canonical_|.*sha256)/.test(row.field_key)).map(row => <article key={row.id}><h4>{humanLabel(row.field_key)}</h4><pre>{JSON.stringify(row.value_normalized, null, 2)}</pre></article>)}</details>}
+    {currentRows.some(row => /^(retained_relationships|retained_accounting_batch|canonical_|.*sha256)/.test(row.field_key)) && <details><summary>Technical source references</summary>{currentRows.filter(row => /^(retained_relationships|retained_accounting_batch|canonical_|.*sha256)/.test(row.field_key)).map(row => <article key={row.id}><h4>{humanLabel(row.field_key)}</h4><pre>{JSON.stringify(row.value_normalized, null, 2)}</pre></article>)}</details>}
     {rows.some(row => row.is_superseded) && <details><summary>Earlier interpretations on this page ({rows.filter(row => row.is_superseded).length})</summary>{rows.filter(row => row.is_superseded).map(row => <article key={row.id}><strong>{humanLabel(row.field_key)}</strong><p>Superseded interpretation · {row.created_at}</p><pre>{JSON.stringify(row.value_normalized, null, 2)}</pre></article>)}</details>}
     <div className="accounting-pagination"><button type="button" disabled={page === 0} onClick={() => setPage(p => p - 1)}>Newer evidence</button><button type="button" disabled={(page + 1) * PAGE_SIZE >= (count ?? 0)} onClick={() => setPage(p => p + 1)}>Older evidence</button></div>
     <details onToggle={event => setShowLines(event.currentTarget.open)}><summary>{sourceName?.toLowerCase().endsWith('.csv') ? 'Source items and payment comparison' : 'Receipt items and payment comparison'}</summary>{showLines && <FinancialDocumentLines key={`${documentId}:${reviewRevision}`} documentId={documentId} />}</details>
@@ -407,7 +412,7 @@ export default function FinanceDashboard() {
         <div style={s.tableWrap}><table style={s.table}>
           <thead><tr><th style={s.th}>Priority</th><th style={s.th}>Concern</th><th style={s.th}>Evidence document</th><th style={s.th}>Detail</th></tr></thead>
           <tbody>{currentConcerns.slice(sourceOffset, sourceOffset + 25).map(c => <tr key={c.id}>
-            <td style={s.td}>{c.priority}</td><td style={s.td}>{c.concern_type}</td>
+            <td style={s.td}>{c.priority}</td><td style={s.td}>{humanLabel(c.concern_type)}<details><summary>Source concern reference</summary>{c.concern_type}</details></td>
             <td style={s.tdMono}><button type="button" onClick={() => openEvidence(c.document_id)}>View evidence</button></td>
             <td style={s.td}>{c.detail || 'No detail recorded'}{concernRevision(c) === 'unversioned' && <div>Unversioned concern</div>}{concernRevision(c) === 'unknown' && <div>Revision lineage unavailable; still requires review</div>}<details><summary>Concern reference</summary>{c.id}</details></td>
           </tr>)}</tbody>
