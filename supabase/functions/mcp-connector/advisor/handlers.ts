@@ -427,6 +427,19 @@ async function resolveSoldComps(
   const seenUrl = new Set<string>();
   const seenPriceDate = new Set<string>();
 
+  // Debug: candidates whose raw price the sale-truth rules would drop, and which rule actually dropped them.
+  const truthHitIds = new Set<string>();
+  const truthDroppedIds = new Set<string>();
+  for (const c of rows) {
+    const id = c.vehicle_id ? String(c.vehicle_id) : null;
+    const t = id ? saleTruth.get(id) : undefined;
+    const raw = c.sale_price != null ? Number(c.sale_price) : null;
+    if (id && t && raw != null && (
+      (!t.has_verified_sold && t.ask_prices.some((p) => Math.abs(p - raw) < 1)) ||
+      (t.dup_prices.some((p) => Math.abs(p - raw) < 1) && !t.verified_prices.some((p) => Math.abs(p - raw) < 1))
+    )) truthHitIds.add(id);
+  }
+
   for (const c of rows) {
     const id = c.vehicle_id ? String(c.vehicle_id) : null;
     const fact = id ? facts.get(id) : null;
@@ -460,12 +473,14 @@ async function resolveSoldComps(
     if (truth && !truth.has_verified_sold &&
       truth.ask_prices.some((p) => Math.abs(p - amount) < 1)) {
       excluded.ask_or_bid++;
+      if (id) truthDroppedIds.add(id);
       continue;
     }
     // Overnight dedup: a price only a duplicate-marked event supports is the same sale counted twice.
     if (truth && truth.dup_prices.some((p) => Math.abs(p - amount) < 1) &&
       !truth.verified_prices.some((p) => Math.abs(p - amount) < 1)) {
       excluded.duplicate++;
+      if (id) truthDroppedIds.add(id);
       continue;
     }
     const unverifiedOnly = !!truth && truth.has_unverified && !truth.has_verified_sold;
@@ -576,6 +591,11 @@ async function resolveSoldComps(
   }
 
   sold.sort((a, b) => Number(b.similarity_score || 0) - Number(a.similarity_score || 0));
+  const soldIds = new Set(sold.map((s) => String(s.asset_id ?? "")));
+  excluded.sale_truth_candidates = truthHitIds.size;
+  excluded.sale_truth_dropped_by_truth_rule = truthDroppedIds.size;
+  excluded.sale_truth_dropped_by_earlier_check = [...truthHitIds].filter((i) => !truthDroppedIds.has(i) && !soldIds.has(i)).length;
+  excluded.sale_truth_still_in_comps = [...truthHitIds].filter((i) => soldIds.has(i)).length;
   return {
     comps: sold.slice(0, limit),
     query: {
@@ -1599,15 +1619,29 @@ async function handleValueAsset(
     }
   }
 
+  // A stale stored estimate, or one outside the confirmed-comps range, never wins over the comps.
+  const storedCalcAt = est?.calculated_at ?? price?.estimate?.as_of ?? null;
+  const storedStale = valuePoint != null && (storedCalcAt == null || isStaleVerified(storedCalcAt, 180));
+  const minComp = soldPrices.length ? soldPrices[0]! : null;
+  const storedOutside = valuePoint != null && soldPrices.length >= 3 && minComp != null && maxComp != null &&
+    (valuePoint < minComp || valuePoint > maxComp);
+  const storedDisagrees = valuePoint != null && med != null && soldPrices.length >= 3 &&
+    (storedOutside || Math.abs(valuePoint - med) / med > 0.25);
+  const storedValue = valuePoint;
+  let noEstimateReason: string | null = null;
+
   if (estimateSource !== "recent_same_asset_sale") {
     if (med != null && soldPrices.length >= 3) {
       const equalsMax = maxComp != null && valuePoint != null && Math.abs(valuePoint - maxComp) < 1;
       const aboveBand = valuePoint != null && p75 != null && valuePoint > p75 * 1.15;
-      if (valuePoint == null || equalsMax || aboveBand) {
+      if (valuePoint == null || storedStale || storedOutside || equalsMax || aboveBand) {
         valuePoint = med;
         valueLow = p25 ?? med;
         valueHigh = p75 ?? med;
         estimateSource = "sold_comps_median";
+        if (storedValue == null) flags.push("no_stored_estimate_used_comps");
+        if (storedStale) flags.push("stored_estimate_stale_replaced_by_comps");
+        if (storedOutside) flags.push("stored_estimate_outside_comp_range");
         if (equalsMax) flags.push("stored_estimate_matched_max_comp");
         if (aboveBand) flags.push("stored_estimate_above_comp_band");
         flags.push("used_median_of_confirmed_sales");
@@ -1616,14 +1650,19 @@ async function handleValueAsset(
         valueHigh = valueHigh ?? p75 ?? med;
         flags.push("filled_range_from_sold_comps");
       }
-    } else if (valuePoint == null && med != null) {
-      valuePoint = med;
-      valueLow = p25 ?? med;
-      valueHigh = p75 ?? med;
-      estimateSource = "sold_comps_median";
-      flags.push("no_stored_estimate_used_comps");
+    } else if (valuePoint == null || storedStale) {
+      // Fewer than 3 confirmed comps and no fresh stored estimate: say so instead of guessing.
+      noEstimateReason = valuePoint == null
+        ? `only ${soldPrices.length} confirmed sold comp(s) (need 3) and no stored estimate`
+        : `stored estimate is stale (older than 180 days) and only ${soldPrices.length} confirmed sold comp(s) (need 3)`;
+      valuePoint = null;
+      valueLow = null;
+      valueHigh = null;
+      estimateSource = "none";
+      flags.push("no_estimate_insufficient_evidence");
     }
   }
+  if (storedDisagrees) flags.push("stored_estimate_disagrees_with_comps");
 
   const guard = recentSaleSanityGuard({
     estimate: valuePoint,
@@ -1640,7 +1679,7 @@ async function handleValueAsset(
   }
 
   const calculatedAt = est?.calculated_at ?? price?.estimate?.as_of ?? price?.sold?.on ?? null;
-  const estimateStale = estimateSource !== "recent_same_asset_sale" &&
+  const estimateStale = estimateSource === "nuke_estimates" &&
     (isStaleVerified(calculatedAt, 180) || soldPrices.length < 3);
   if (estimateStale) flags.push(soldPrices.length < 3 ? "thin_comp_set" : "estimate_older_than_180d");
 
@@ -1671,6 +1710,7 @@ async function handleValueAsset(
     );
     let confVal = Math.min(conf.confidence ?? 0.5, CONFIDENCE_CAP);
     if (estimateStale) confVal = Math.min(confVal, 0.45);
+    if (storedDisagrees) confVal = Math.min(confVal, 0.35);
     if (guard.triggered) confVal = Math.min(confVal, 0.25);
     if (estimateSource === "recent_same_asset_sale") confVal = Math.min(CONFIDENCE_CAP, 0.55);
     const confAdj = { confidence: confVal, confidence_basis: "estimate_model" as const };
@@ -1700,6 +1740,7 @@ async function handleValueAsset(
     claims.push(
       notRecordedClaim("estimated_value", {
         checked_sources: ["nuke_estimates", "vehicle_price_facts", "get_comps_combined"],
+        ...(noEstimateReason ? { note: noEstimateReason } : {}),
       }),
     );
   }
@@ -1741,6 +1782,10 @@ async function handleValueAsset(
       estimated_value: valuePoint,
       estimate_source: estimateSource,
       estimate_stale: estimateStale,
+      no_estimate_reason: noEstimateReason,
+      stored_estimate: storedValue,
+      stored_estimate_stale: storedStale,
+      confidence: claims.find((c) => c.field === "estimated_value")?.confidence ?? null,
       flags,
       comps_used: comps.map((c) => ({
         asset_id: c.asset_id,
