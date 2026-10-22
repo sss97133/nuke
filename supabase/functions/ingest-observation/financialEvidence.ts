@@ -59,7 +59,8 @@ export async function ingestFinancialEvidence(db: Client, userId: string, input:
       : { status: 200, body: { data: result.data, expense_posted: false } };
   }
   if (body && typeof body === "object" && !Array.isArray(body) && body.action === "read") {
-    if (Object.keys(body).some(k => !["mode", "action", "document_id", "original_sha256"].includes(k)) ||
+    if (Object.keys(body).some(k => !["mode", "action", "document_id", "original_sha256", "include_context"].includes(k)) ||
+        (body.include_context !== undefined && typeof body.include_context !== "boolean") ||
         Boolean(body.document_id) === Boolean(body.original_sha256) ||
         (body.document_id && !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(body.document_id)) ||
         (body.original_sha256 && !/^[a-f0-9]{64}$/.test(body.original_sha256)))
@@ -69,7 +70,7 @@ export async function ingestFinancialEvidence(db: Client, userId: string, input:
     if (!read.error && (read.data as any)?.document?.id) {
       const accounting = await db.rpc("read_financial_accounting", { p_owner_id: userId, p_document_id: (read.data as any).document.id });
       return accounting.error ? { status: 503, body: { error: "Accounting evidence read unavailable" } }
-        : { status: 200, body: { data: await withContext(db, userId, accounting.data) } };
+        : { status: 200, body: { data: body.include_context === false ? accounting.data : await withContext(db, userId, accounting.data) } };
     }
     return read.error ? { status: 503, body: { error: "Financial evidence read unavailable" } }
       : { status: 200, body: { data: read.data } };

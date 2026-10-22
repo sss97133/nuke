@@ -73,6 +73,19 @@ Deno.test("workpaper reads enforce scope and bounded owner-derived pagination", 
   assert.equal((await ingestFinancialEvidence(db,actor,{action:"tax_read",limit:50},async()=>true)).status,200);
   assert.deepEqual(calls,[{name:"read_financial_tax_workpapers",args:{p_owner_id:actor,p_after:null,p_limit:50}}]);
 });
+Deno.test("restore read skips optional candidates while retaining exact accounting evidence", async()=>{
+  const {db}=fixture(); const calls: {name:string; args:unknown}[]=[];
+  const accounting={document:{id:actor,owner_id:actor,content_sha256:hash},fields:[],lines:[],accounting_records:[{source_key:hash}],concerns:[{code:"review_required"}]};
+  db.rpc=async(name:string,args:unknown)=>{calls.push({name,args});return {data:name==="read_financial_evidence"?{document:{id:actor}}:accounting,error:null} as any;};
+  const result=await ingestFinancialEvidence(db,actor,{action:"read",document_id:actor,include_context:false},async()=>true);
+  assert.equal(result.status,200);
+  assert.deepEqual(result.body.data,accounting);
+  assert.deepEqual(calls.map(call=>call.name),["read_financial_evidence","read_financial_accounting"]);
+  assert.ok(calls.every(call=>(call.args as any).p_owner_id===actor));
+  calls.length=0;
+  assert.equal((await ingestFinancialEvidence(db,actor,{action:"read",document_id:actor,include_context:"false"},async()=>true)).status,400);
+  assert.equal(calls.length,0);
+});
 import { cleanPng } from "./financialEvidence.ts";
 import { deflateSync } from "node:zlib";
 function png(extra=false) {
