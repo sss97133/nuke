@@ -646,6 +646,9 @@ jobs:
           deno-version: v2.x
       - name: Verify daily close reconciliation through canonical native intake
         run: node --test scripts/check-auction-reconciliation.test.mjs
+      - name: Verify relisted native receipts retire locator monitors without hiding QC failures
+        # Mixed-runtime fixture supabase/sql/test_bat_relisted_controls.sql is executed by this harness.
+        run: node --test scripts/check-bat-relisted-controls.test.mjs
       - name: Verify late recovery watermarks and raw comment cache authorization
         run: node --test scripts/check-structure-review-closeout.test.mjs
       - name: Verify retained source account admission and conflict preservation

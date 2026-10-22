@@ -135,16 +135,18 @@ predicates. A dispatch response alone does not establish collector survival;
 sampled timings and health snapshots do not establish continuous capture. No new
 fetches, scheduler/budget changes or additional telemetry tables are introduced.
 
-## Canonical collector preparation, October 21, 2026 — architecture hold
+## Canonical collector deployment, October 21, 2026
 
 The bounded diagnostic delivery established a repeatable nested Edge-call ceiling;
 current capture integrity still fails. The documented budget is 30 calls per trace
 per 60 seconds, incompatible with one-second cross-function coverage before frames.
-The prepared service-only `bat_live_collect_v1` mode keeps the 115-second collector
+The deployed service-only `bat_live_collect_v1` mode keeps the 115-second collector
 inside `ingest-observation`, where each batch calls existing `ingestBatLive` with
-fresh monitor/source/parent reads and the unchanged canonical RPC. Core's prepared
-second step makes one authenticated handoff. Deploy intake first, then core, only
-after specific approval of this execution-owner change; normal CI is the only path.
+fresh monitor/source/parent reads and the unchanged canonical RPC. Core makes one
+authenticated handoff. The owner approved the ordered rollout: intake #2457 merged
+`9de2f6bf` and normally deployed through run 39686994480; core #2458 merged `d3ee5cfd`
+and deployed through 39688643627. Live core is 4.5.7/platform 195; intake is 168.
+Anonymous refusal and service-only dry-run passed without launching collection.
 
 Only `mode` and optional boolean `dry_run` are accepted. Caller targets, URLs,
 credentials, duration, concurrency and retention overrides are refused. Dry-run
@@ -159,13 +161,47 @@ Local acknowledgement still waits for canonical success. Transient failures keep
 atomic prefixes without per-lot retry amplification; semantic failures can isolate
 poison. Independent frame/coverage lanes, per-lot FIFO, 50/200 ceilings and duplicate
 replay are preserved. Failed cleanup emits a terminal diagnostic and retains the
-unresolved state. The first rollout's compatibility adapter keeps current core
-behavior until the reviewed handoff step; the legacy batch endpoint stays available.
+unresolved state. The compatibility adapter and legacy batch endpoint remain for
+the reviewed rollback path; the active core route uses the single handoff.
 
 No schema, grant, source budget, cron cadence, worker lifetime, capacity, retention
 or episode-v2 change is included. Recovery-generation correctness, dispatch bunching
 and RPC tail latency remain open even if the nested-call bottleneck is removed.
 Source-wide readiness, historical continuity and supported-answer gain remain unproved.
+
+The 22:45:38–22:53:38 UTC trace observed eight starts, five matching completed workers
+and three right-censored workers. Each completed worker ran 115.3–115.6 seconds and
+made 111–116 local admissions, with zero nested intake HTTP attempts, runtime
+rejections, admission failures, pending frames or unfinished recoveries. Nine core
+requests matched nine child handoffs (eight accepted, one idle). All 75 sampled
+admissions returned success; sampled RPC maximum was 1,142.58 ms. This validates the
+mechanism on three already-closed relisted lots, not the earlier larger active cohort.
+ACK/retry counts are not distinct testimony. Eight minute-cron runs succeeded; all
+seven observed dispatch IDs later reconciled to 202. Cron completion to handler was
+2.7–90.0 seconds, not an exact queue-wait measurement. Snapshot polling missed two
+in-window dispatch IDs; their unknown correlations are not fabricated.
+
+All twelve health snapshots still failed: three eligible lots, either zero or three
+covered, and zero admission-overdue lots. Each monitor binds a locator stub, while
+its existing native terminal receipt and matching closed lot are on a canonical
+vehicle. Health and scheduler predicates inspect only the stub's vehicle ID, so
+the scheduler reactivates retired monitors. Daily settlement is a separate known-lot
+measure: 242/242 known lots closed, 241/242 with native terminal receipts, and 204
+late native terminal admissions at the October 21 observation. Source inventory
+and continuous capture completeness remain unverified; terminal-capture QC remains
+failed. Zero supported-answer gain is established.
+
+**Prepared SQL correction; separate production authorization required:** migration
+`20261021231915_bat_relisted_control_receipts.sql` changes four closure predicates
+in existing `get_live_auction_health(date)` and `bat_live_pull_run`. The fallback
+requires an unsuperseded native sale-result receipt proving the exact locator/lot
+binding, a closed canonical lot on its holder and no conflicting holder. It keeps
+direct bindings, historical lateness failures, testimony, source budgets, cadence,
+locks and privileges. Exact before/after function hashes fence drift and replay.
+The real PostgreSQL contract reuses canonical six-frame intake and existing guarded
+fixtures; it reproduces false reactivation, prevents it after the patch, preserves
+unresolved/unrelated/conflicting cases and refuses function drift. This preparation
+has not changed production SQL.
 
 ## Focused evidence
 
