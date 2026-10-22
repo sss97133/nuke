@@ -35,6 +35,8 @@ jobs:
           supabase/functions/ingest-observation/financialCandidates_test.ts
           supabase/functions/ingest-observation/financialCandidateContext_test.ts
           supabase/functions/ingest-observation/financialPngPixels.test.ts
+      - name: Install locked source-processing dependencies
+        run: npm ci
       - name: Verify deterministic source masking and metadata removal
         run: node --test scripts/receipts/redacted-source.test.mjs
 
