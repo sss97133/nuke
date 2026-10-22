@@ -25,6 +25,8 @@ import {
   type VariantKey,
 } from "./variants.ts";
 
+import { rankBudgetOptions, budgetEnvelope, type SegmentStat, type MarketSignal } from "./budget.ts";
+
 /** Minimal PostgREST-shaped client used by advisor handlers (avoids pulling supabase-js types into Deno tests). */
 // deno-lint-ignore no-explicit-any
 export type AdvisorDb = any;
@@ -229,13 +231,14 @@ export function createAdvisorHandlers(deps: AdvisorDeps): Record<
   string,
   (args: Record<string, unknown>) => Promise<AdvisorToolResult>
 > {
-  // Exactly the five catalog tools. Legacy helpers remain in-file for folding into responses.
+  // Exactly the six catalog tools. Legacy helpers remain in-file for folding into responses.
   return {
     find_asset: (args) => handleFindAsset(deps, args),
     get_asset: (args) => handleGetAsset(deps, args),
     get_comps: (args) => handleGetComps(deps, args),
     value_asset: (args) => handleValueAsset(deps, args),
     evaluate_listing: (args) => handleEvaluateListing(deps, args),
+    budget_options: (args) => handleBudgetOptions(deps, args),
   };
 }
 
@@ -2229,4 +2232,20 @@ async function handleGetCoverage(
       checked_sources: ["vehicles", "vehicle_events", "vehicle_observations", "vehicle_images", ...sourceNames],
     }),
   );
+}
+
+async function handleBudgetOptions(deps: AdvisorDeps, args: Record<string, unknown>): Promise<AdvisorToolResult> {
+  const budget = Number(args.budget_usd);
+  if (!Number.isFinite(budget) || budget <= 0) return err("budget_usd must be a positive number", "budget_options");
+  const limit = Math.min(Math.max(Number(args.limit) || 6, 1), 12);
+  const sb = deps.sb();
+  const { data: latest } = await sb.from("market_segment_stats").select("run_id").order("created_at", { ascending: false }).limit(1);
+  const runId = latest?.[0]?.run_id;
+  const { data: stats, error } = runId
+    ? await sb.from("market_segment_stats").select("*").eq("run_id", runId).lte("median_price", budget)
+    : { data: [], error: null };
+  if (error) return err(`market_segment_stats: ${error.message}`, "budget_options");
+  const { data: sig } = await sb.from("market_signal").select("label,as_of,gate_passed").order("created_at", { ascending: false }).limit(1);
+  const options = rankBudgetOptions(budget, (stats ?? []) as SegmentStat[], limit);
+  return ok(budgetEnvelope(budget, options, (sig?.[0] as MarketSignal | undefined) ?? null));
 }
