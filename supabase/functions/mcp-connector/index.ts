@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { RECEIPT_TOOLS, RECEIPT_TOOL_NAME, callReceiptIntake } from "./receiptTools.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
   getAttribute,
@@ -99,7 +100,7 @@ interface AuthResult {
 
 async function authenticate(req: Request): Promise<AuthResult> {
   const authHeader = req.headers.get("Authorization");
-  const apiKey = req.headers.get("X-API-Key");
+  let apiKey = req.headers.get("X-API-Key");
 
   // 1. Service role key
   if (authHeader?.startsWith("Bearer ")) {
@@ -111,7 +112,8 @@ async function authenticate(req: Request): Promise<AuthResult> {
     if (alt && token === alt) {
       return { ok: true, userId: "service-role", scopes: ["admin"] };
     }
-    // No other bearer token is accepted, including the ones this function used to mint without a login.
+    // Only new stateful OAuth credentials enter the existing key authority. Legacy JWTs stay rejected.
+    if (/^nuke_oauth_[a-f0-9]{64}$/.test(token)) apiKey = token;
     if (!apiKey) return { ok: false, error: "Invalid or expired token", status: 401 };
   }
 
@@ -134,6 +136,7 @@ async function authenticate(req: Request): Promise<AuthResult> {
           : "Invalid API key";
       return { ok: false, error: msg, status: data?.error === "rate_limit_exceeded" ? 429 : 401 };
     }
+    if (apiKey.startsWith("nuke_oauth_") && (!data.key_id || !data.user_id)) return {ok:false,error:"OAuth account identity missing",status:401};
     // API-key scopes: honor a `scopes` array from the rate-limit RPC if present, else default to
     // autonomous-observations (read + write:observations). Canonical needs an explicit grant.
     const keyScopes = Array.isArray(data.scopes) && data.scopes.length
@@ -252,6 +255,7 @@ interface ToolDef {
 }
 
 const TOOLS: ToolDef[] = [
+  ...RECEIPT_TOOLS,
   // ── Schema Discovery ──────────────────────────────────────────────────
   {
     name: "describe_platform",
@@ -6307,6 +6311,17 @@ Deno.serve(async (req: Request) => {
   const ADMIN_OR_SERVICE_TOOLS = new Set(["execute_sql"]);
   if (body.method === "tools/call") {
     const toolName = body?.params?.name as string | undefined;
+    if (toolName === RECEIPT_TOOL_NAME) {
+      if (isChatGptSurface(req)) return new Response(JSON.stringify(rpcError(body.id,-32601,"Tool not available on this surface")),{status:200,headers:{...CORS,"Content-Type":"application/json"}});
+      const upstream = await callReceiptIntake(req, (body.params?.arguments ?? {}) as Record<string, unknown>, SUPABASE_URL);
+      let parsed = true;
+      const result = await upstream.json().catch(() => {parsed=false;return {error:"Invalid intake response"};});
+      return new Response(JSON.stringify(rpcResult(body.id, upstream.ok && parsed ? toolOk(result) : {content:[{type:"text",text:JSON.stringify(result)}],isError:true})), {
+        status: upstream.status === 401 || upstream.status === 403 ? upstream.status : 200,
+        headers: {...CORS,"Content-Type":"application/json",...(upstream.status===401 ? {"WWW-Authenticate":'Bearer realm="nuke", resource_metadata="https://nuke.ag/.well-known/oauth-protected-resource"'} : {})},
+      });
+    }
+
     const authHeader = req.headers.get("Authorization");
     const apiKey = req.headers.get("X-API-Key");
     const requiredTier: WriteTier | undefined = toolName ? WRITE_TIERS[toolName] : undefined;

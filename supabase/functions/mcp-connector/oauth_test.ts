@@ -28,6 +28,9 @@ const checkAdvisorRateLimit = (_req: Request) => ({ ok: true as const });
 const handleAdvisorJsonRpc = async (_body: unknown) => null;
 const initAdvisorHandlers = (_deps: unknown) => {};
 const callEdgeApi = async () => ({});
+const RECEIPT_TOOLS = [{name:"receipt_intake",description:"receipt",inputSchema:{type:"object",properties:{}}}];
+const RECEIPT_TOOL_NAME = "receipt_intake";
+const callReceiptIntake = async (req: Request,args:unknown) => (globalThis as any).__receiptIntake(req,args);
 ` + slice("const CORS = {", "// ── Edge Function Proxy") + slice("interface JsonRpcRequest", "const sb = ()") + `
 const calls: Array<{ name: string; args: Record<string, unknown> }> = [];
 const TOOL_HANDLERS = Object.fromEntries(${JSON.stringify(handlerNames)}.map((name: string) =>
@@ -159,4 +162,35 @@ Deno.test("execute_sql is gated like nlq-sql: anonymous 401, signed-in non-admin
   // The service key: allowed.
   const service = await toolCall("execute_sql", { query: "select 1" }, { authorization: "Bearer sb_secret_test_key" });
   assert(service.status === 200 && dispatched() === 2 && calls[1].name === "execute_sql", `service key: ${service.status}`);
+});
+
+Deno.test("new opaque OAuth credentials use key authority; receipt forwarding retains caller", async () => {
+ (globalThis as any).__apiKeyCheck={data:{allowed:true,user_id:"real-user",key_id:"key-id",scopes:["read","write:observations"]},error:null};
+ const token="nuke_oauth_"+"a".repeat(64);
+ const authenticated=await toolCall("submit_observation",{}, {authorization:`Bearer ${token}`});
+ assert(authenticated.status===200,"new OAuth token failed existing key authority");
+ (globalThis as any).__apiKeyCheck={data:{allowed:false,error:"invalid_api_key"},error:null};
+ const revoked=await toolCall("search_vehicles",{}, {authorization:`Bearer ${token}`});
+ assert(revoked.status===401,"revoked OAuth token accepted");
+ (globalThis as any).__apiKeyCheck={data:{allowed:true,user_id:"real-user",key_id:"key-id",scopes:["read","write:observations"]},error:null};
+ let observed="";
+ (globalThis as any).__receiptIntake=(req:Request)=>{observed=req.headers.get("authorization")??"";return new Response(JSON.stringify({ok:true}),{status:200});};
+ const res=await toolCall("receipt_intake",{}, {Authorization:`Bearer ${token}`});
+ assert(res.status===200 && observed===`Bearer ${token}`,"receipt caller was replaced");
+ (globalThis as any).__receiptIntake=()=>new Response(JSON.stringify({error:"unauthorized"}),{status:401});
+ const denied=await toolCall("receipt_intake",{});
+ assert(denied.status===401 && !!denied.headers.get("www-authenticate"),"receipt login challenge missing");
+ (globalThis as any).__apiKeyCheck={data:{allowed:false},error:null};
+});
+
+Deno.test("private receipt route rejects public ChatGPT surface and preserves forbidden status",async()=>{
+ let forwarded=false;
+ (globalThis as any).__receiptIntake=()=>{forwarded=true;return new Response(JSON.stringify({error:"forbidden"}),{status:403});};
+ const blocked=await toolCall("receipt_intake",{}, {"x-nuke-surface":"chatgpt"});
+ assert(!forwarded && (await blocked.json()).error.code===-32601,"private receipt escaped surface allowlist");
+ const forbidden=await toolCall("receipt_intake",{}, {Authorization:"Bearer nuke_oauth_"+"a".repeat(64)});
+ assert(forbidden.status===403,"forbidden status lost");
+ (globalThis as any).__receiptIntake=()=>new Response("not JSON",{status:200});
+ const malformed=await toolCall("receipt_intake",{});
+ assert((await malformed.json()).result.isError===true,"malformed successful response accepted");
 });

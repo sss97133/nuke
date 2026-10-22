@@ -43,6 +43,7 @@ const EnhancedDealerInventory = React.lazy(() => import('../components/organizat
 const BaTBulkImporter = React.lazy(() => import('../components/dealer/BaTBulkImporter'));
 const MarketplaceComplianceForm = React.lazy(() => import('../components/organization/MarketplaceComplianceForm'));
 const OrganizationNotifications = React.lazy(() => import('../components/organization/OrganizationNotifications'));
+const OrganizationAccountingMembership = React.lazy(() => import('../components/organization/OrganizationAccountingMembership'));
 const VehicleInquiryModal = React.lazy(() => import('../components/organization/VehicleInquiryModal'));
 const OrganizationServiceTab = React.lazy(() => import('../components/organization/OrganizationServiceTab').then(m => ({ default: m.OrganizationServiceTab })));
 const OrganizationAuctionsTab = React.lazy(() => import('../components/organization/OrganizationAuctionsTab').then(m => ({ default: m.OrganizationAuctionsTab })));
@@ -3442,6 +3443,9 @@ export default function OrganizationProfile() {
               {(intelligence?.effectiveType === 'auction_house' ? 'People' : 'Contributors')} ({contributors.length})
             </div>
             <div className="card-body">
+              {organization?.id ? <Suspense fallback={<p>Loading membership…</p>}>
+                <OrganizationAccountingMembership organizationId={organization.id} />
+              </Suspense> : null}
               {contributors.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: 'var(--space-8)', color: 'var(--text-muted)', fontSize: '12px' }}>
                   {intelligence?.effectiveType === 'auction_house' ? 'No people yet' : 'No contributors yet'}
@@ -3471,7 +3475,7 @@ export default function OrganizationProfile() {
                           {contributor.profiles?.full_name || contributor.profiles?.username}
                 </div>
                         <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                          @{contributor.profiles?.username} · {contributor.role}
+                          @{contributor.profiles?.username} · {contributor.role === 'accountant' ? 'ACCOUNTING' : contributor.role}
                   </div>
                       </div>
                       <div style={{ textAlign: 'right' }}>
