@@ -84,6 +84,9 @@
   font-family: 'Courier New', monospace; font-variant-numeric: tabular-nums; white-space: nowrap;
   overflow: hidden; text-overflow: ellipsis; }
 .map-movers2__price { text-align: right; }
+.map-movers2__investigation { grid-column: 1 / -1; display: flex; align-items: baseline; justify-content: space-between;
+  gap: 8px; padding-bottom: 3px; font-size: 11px; line-height: 1.4; color: var(--text-secondary); }
+.map-movers2__action { flex: none; color: var(--text); text-decoration: underline; text-underline-offset: 2px; }
 .map-movers2__none { font-size: 11px; color: var(--text-secondary); padding: 4px 0; }
 .map-movers2__axis { stroke: var(--border); stroke-width: 1; }
 .map-movers2__zero { stroke: var(--text-secondary); stroke-width: 1; }

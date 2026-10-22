@@ -1068,3 +1068,81 @@ SELECT pg_temp.ok('identical migration retry preserves exact function definition
     =(SELECT definition FROM repaired_definition));
 SELECT pg_temp.ok('correction assay leaves no waiting lock cascade',
   NOT EXISTS(SELECT 1 FROM pg_stat_activity WHERE wait_event_type='Lock'));
+
+-- A changed interpretation must reach the actual browser consumer, rather
+-- than ending at this SQL assertion. Export only synthetic sanitized responses
+-- when CI supplies a local output path; no production testimony is modified.
+SELECT pg_temp.base();
+DO $$ BEGIN
+  FOR n IN 101..110 LOOP
+    PERFORM pg_temp.seed(n);
+    UPDATE public.vehicles SET model='Control' WHERE id=md5('vehicle-'||n)::uuid;
+  END LOOP;
+END $$;
+SELECT pg_temp.seed(11);
+SELECT pg_temp.admit(11);
+UPDATE public.vehicles SET owner_id='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' WHERE id=md5('vehicle-11')::uuid;
+INSERT INTO public.vehicle_events(id,vehicle_id,source_platform,source_url,event_type,event_status,final_price,sold_at)
+VALUES(md5('correction-ui-event')::uuid,md5('vehicle-11')::uuid,'bat','https://bringatrailer.com/listing/synthetic-11/',
+  'auction','sold',11000,'2025-06-15T00:00:00Z');
+CREATE TEMP TABLE correction_ui_receipts(stage text PRIMARY KEY,result jsonb);
+CREATE TEMP TABLE correction_ui_original AS SELECT id,to_jsonb(o) AS original FROM public.vehicle_observations o;
+GRANT INSERT,SELECT ON correction_ui_receipts TO anon;
+SET ROLE anon;
+INSERT INTO correction_ui_receipts VALUES
+  ('before',pg_temp.read()),
+  ('earlierBefore',pg_temp.read('{"mode":"known_at","known":"2026-01-02T06:00:00Z","before":"2026-01-03T00:00:00Z"}')),
+  ('unaffectedBefore',public.valuation_by_ymm(1970,'Synthetic','Control',
+    p_event_before=>'2026-01-01T00:00:00Z',p_event_from=>'2024-01-01T00:00:00Z',p_evidence_as_of=>'2026-01-03T00:00:00Z'));
+RESET ROLE;
+INSERT INTO public.listing_page_snapshots(id,listing_url,fetched_at,success,http_status,html,platform,metadata,html_sha256,created_at)
+SELECT md5('correction-ui-capture')::uuid,listing_url,fetched_at,success,http_status,
+  'PRIVATE SYNTHETIC CORRECTION Sold for <strong>USD $2,000</strong> <span>on 6/15/25',platform,metadata,
+  encode(sha256(convert_to('PRIVATE SYNTHETIC CORRECTION Sold for <strong>USD $2,000</strong> <span>on 6/15/25','UTF8')),'hex'),
+  '2026-01-02T12:00:00Z'
+FROM public.listing_page_snapshots WHERE id=md5('snapshot-11')::uuid;
+SELECT pg_temp.admit(11,'{"amount":2000}','{"ingested_at":"2026-01-02T12:00:00Z"}',md5('correction-ui-capture')::uuid);
+CREATE TEMP TABLE correction_ui_successor AS SELECT id FROM public.vehicle_observations
+  WHERE source_snapshot_id=md5('correction-ui-capture')::uuid;
+GRANT SELECT ON correction_ui_original,correction_ui_successor TO service_role;
+SELECT set_config('fixture.role','service_role',false);
+SET ROLE service_role;
+SELECT public.supersede_observation_relay((SELECT id FROM correction_ui_original),(SELECT id FROM correction_ui_successor),
+  'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','disposable changed-amount consumer assay');
+RESET ROLE;
+SET ROLE anon;
+INSERT INTO correction_ui_receipts VALUES
+  ('after',pg_temp.read()),
+  ('earlierReplay',pg_temp.read('{"mode":"known_at","known":"2026-01-02T06:00:00Z","before":"2026-01-03T00:00:00Z"}')),
+  ('unaffectedAfter',public.valuation_by_ymm(1970,'Synthetic','Control',
+    p_event_before=>'2026-01-01T00:00:00Z',p_event_from=>'2024-01-01T00:00:00Z',p_evidence_as_of=>'2026-01-03T00:00:00Z'));
+RESET ROLE;
+SELECT pg_temp.ok('changed amount reaches anonymous current consumer with unchanged episode denominator',
+  (SELECT result#>>'{stats,sold_count}' FROM correction_ui_receipts WHERE stage='after')='11'
+  AND (SELECT (result#>>'{receipt,percentile}')::numeric FROM correction_ui_receipts WHERE stage='after')=50
+  AND EXISTS(SELECT FROM correction_ui_receipts r CROSS JOIN LATERAL jsonb_array_elements(r.result#>'{receipt,eligible}') e
+    WHERE r.stage='after' AND e->>'amount'='2000' AND e->>'derivedObservationId'=(SELECT id::text FROM correction_ui_successor)));
+SELECT pg_temp.ok('changed-amount correction preserves earlier replay and unrelated comparison',
+  (SELECT pg_temp.semantic_result(result) FROM correction_ui_receipts WHERE stage='earlierBefore')
+    =(SELECT pg_temp.semantic_result(result) FROM correction_ui_receipts WHERE stage='earlierReplay')
+  AND (SELECT pg_temp.semantic_result(result) FROM correction_ui_receipts WHERE stage='unaffectedBefore')
+    =(SELECT pg_temp.semantic_result(result) FROM correction_ui_receipts WHERE stage='unaffectedAfter'));
+SELECT pg_temp.ok('changed-amount correction retains original testimony',
+  (SELECT to_jsonb(o)-ARRAY['is_superseded','superseded_by','superseded_at','lineage_chain']
+    =p.original-ARRAY['is_superseded','superseded_by','superseded_at','lineage_chain']
+   FROM public.vehicle_observations o JOIN correction_ui_original p ON p.id=o.id));
+UPDATE public.vehicles SET is_public=false WHERE id=md5('vehicle-11')::uuid;
+SET ROLE anon;
+INSERT INTO correction_ui_receipts VALUES ('withdrawn',pg_temp.read());
+RESET ROLE;
+SELECT pg_temp.ok('private parent is withdrawn from the current anonymous source set',
+  (SELECT result#>>'{stats,sold_count}' FROM correction_ui_receipts WHERE stage='withdrawn')='10'
+  AND NOT EXISTS(SELECT FROM correction_ui_receipts r CROSS JOIN LATERAL jsonb_array_elements(r.result#>'{receipt,eligible}') e
+    WHERE r.stage='withdrawn' AND e->>'vehicleId'=md5('vehicle-11')::uuid::text));
+\if :{?correction_receipts_path}
+\pset tuples_only on
+\pset format unaligned
+\o :correction_receipts_path
+SELECT jsonb_object_agg(stage,result) FROM correction_ui_receipts;
+\o
+\endif

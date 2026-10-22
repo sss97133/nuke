@@ -2,7 +2,7 @@
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it } from 'vitest';
-import { MarketCard, VenueMix, type MarketNode } from './MarketTile';
+import { MapLegend, MarketCard, VenueMix, type MarketNode } from './MarketTile';
 
 let root: Root, container: HTMLDivElement;
 beforeEach(() => {
@@ -10,6 +10,18 @@ beforeEach(() => {
   container = document.createElement('div'); document.body.append(container); root = createRoot(container);
 });
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); });
+
+it('keeps the measurement key visible and discloses the scale and coverage on demand', async () => {
+  await act(async () => root.render(<MapLegend base={{ sold: 110, prior: 100, move: .1 }} clock=" · updated 1 h ago" basis="ledger" />));
+  expect(container.querySelector('.map-legend__key')?.textContent).toBe('Color: sales volume vs market · Area: recorded sale dollars, all years · updated 1 h ago');
+  const method = container.querySelector<HTMLDetailsElement>('.map-legend__method')!;
+  expect(method.open).toBe(false);
+  expect(method.querySelectorAll('.map-legend__swatch')).toHaveLength(9);
+  expect(method.textContent).toContain('dollars of confirmed sales');
+  expect(method.textContent).not.toContain('the strongest colors mean');
+  await act(async () => method.querySelector('summary')!.click());
+  expect(method.open).toBe(true);
+});
 
 // treemap_populations().by_house as skylar-b7 measured it on the v2 fold (2026-10-15).
 const byHouse = [

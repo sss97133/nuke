@@ -16,6 +16,7 @@ const fixture = vi.hoisted(() => ({ client: {} as any }));
 vi.mock('../lib/supabase', () => ({ supabase: fixture.client }));
 
 import HomePage, { TreemapHomePage } from './HomePage';
+import { clearFamilySalesReads } from './market/FamilySalesChart';
 let root: Root, container: HTMLDivElement;
 
 beforeEach(() => {
@@ -96,6 +97,7 @@ async function renderTreemap(query = 'tab=market') {
   await act(async () => root.render(<BrowserRouter><TreemapHomePage embedded onBrowse={() => {}} /></BrowserRouter>));
 }
 function loadingMessages() { return [...container.querySelectorAll('div')].filter(el => el.childElementCount === 0 && el.textContent === 'LOADING...'); }
+
 
 describe('map loading belongs to its current level', () => {
   it('shows the initial brand read until its real response arrives', async () => {
@@ -296,4 +298,37 @@ describe('phone vehicle browsing', () => {
     expect(container.querySelector('select[aria-label="Choose a model"]')).not.toBeNull();
 
   });
+});
+
+it('opens family sales history directly from a market-change finding', async () => {
+  clearFamilySalesReads();
+  const mover = { brand: 'Porsche', family_key: '911', family: '911', sold_12m: 60, sold_prior_12m: 40,
+    usd_12m: 3_000_000, usd_prior_12m: 2_000_000, share_move: .3, share_lo: .1, share_hi: .5, se: .1, avg_price_move: -.1 };
+  installTreemapReads({ treemap_family_sales: Promise.resolve({ error: null, data: { rows: [['00000000-0000-4000-8000-000000000001', '2026-08-01', 50000, 'Bring a Trailer', 1970, '911']], n: 1, truncated: false } }), treemap_family_share_movers: Promise.resolve({ error: null, data: {
+    as_of: '2026-10-22T00:00:00Z', min_sales: 30, families: 10, eligible: 5, significant: 1,
+    bat: { sold_12m: 1100, sold_prior_12m: 1000, usd_12m: 1_100_000, usd_prior_12m: 1_000_000 }, gaining: [mover], losing: [],
+  } }) });
+  await renderTreemap();
+  const finding = container.querySelector<HTMLButtonElement>('button.map-movers2__row')!;
+  expect(finding.textContent).toContain('Inspect sales');
+  await act(async () => finding.click());
+  expect(window.location.search).toContain('make=Porsche');
+  expect(window.location.search).toContain('family=911');
+  expect(window.location.search).toContain('family_view=sales');
+  expect([...container.querySelectorAll('.family-view__option[aria-pressed="true"]')].some(button => button.textContent === 'Sales')).toBe(true);
+  expect(container.querySelector('.family-sales')).not.toBeNull();
+  expect(fixture.client.rpc).toHaveBeenCalledWith('treemap_family_sales', expect.objectContaining({ p_brand: 'Porsche', p_family_key: '911' }));
+});
+
+it('restores the sales investigation from its URL and records a switch back to names', async () => {
+  installTreemapReads();
+  await renderTreemap('tab=market&make=Porsche&family=911&family_view=sales');
+  const active = () => [...container.querySelectorAll('.family-view__option[aria-pressed="true"]')].map(button => button.textContent);
+  expect(active()).toContain('Sales');
+  const names = [...container.querySelectorAll<HTMLButtonElement>('.family-view__option')].find(button => button.textContent === 'Names')!;
+  await act(async () => names.click());
+  expect(window.location.search).not.toContain('family_view');
+  expect(active()).toContain('Names');
+  await navigate('/?tab=market&make=Porsche&family=911&family_view=sales');
+  expect(active()).toContain('Sales');
 });
