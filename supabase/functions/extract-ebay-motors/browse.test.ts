@@ -2,7 +2,7 @@
 import { assertEquals } from "jsr:@std/assert@1";
 import { aspectFilterFor, yearAspect } from "./browseApi.ts";
 import { tallyZip3, zip3Of, censusRow, pickupFilter } from "./browseCensus.ts";
-import { classifySeller, fullSizeImage, imagesOf, linkVin, tierOfYear, toLanding, vinOf } from "./browseMap.ts";
+import { classifySeller, fullSizeImage, imagesOf, itemPagePhotos, linkVin, tierOfYear, toLanding, vinOf } from "./browseMap.ts";
 import { sweep } from "./browseSweep.ts";
 import { htmlToText } from "../_shared/htmlToText.ts";
 
@@ -16,6 +16,14 @@ const item = {
     { name: "VIN (Vehicle Identification Number)", value: "CE149Z123456" }, { name: "Exterior Color", value: "Green" }, { name: "Engine", value: "350ci V8" }],
   seller: { username: "dusty_garage_77", feedbackScore: 12, feedbackPercentage: "100.0" }, itemCreationDate: "2026-10-14T08:00:00.000Z", itemEndDate: "2026-11-13T08:00:00.000Z",
 };
+
+Deno.test("item gallery preserves photo order and excludes video posters and unrelated images", () => {
+  const image = (id: string, label: string) => `<button class="ux-image-grid-item image-treatment" aria-label="${label}"><img alt="${label}" src="https://i.ebayimg.com/images/g/${id}/s-l140.webp"></button>`;
+  const html = image('FIRST', 'Picture 1 of 2') + image('POSTER', 'Video 1 of 1') + image('SECOND', 'Picture 2 of 2')
+    + image('FIRST', 'Picture 1 of 2') + '<img src="https://i.ebayimg.com/images/g/RELATED/s-l1600.webp">';
+  assertEquals(itemPagePhotos(html), ['https://i.ebayimg.com/images/g/FIRST/s-l1600.webp', 'https://i.ebayimg.com/images/g/SECOND/s-l1600.webp']);
+  assertEquals(itemPagePhotos('<p>No gallery captured</p>'), []);
+});
 
 Deno.test("full-size photos, deduplicated", () => {
   assertEquals(fullSizeImage("https://i.ebayimg.com/images/g/AAA/s-l225.jpg"), "https://i.ebayimg.com/images/g/AAA/s-l1600.jpg");
