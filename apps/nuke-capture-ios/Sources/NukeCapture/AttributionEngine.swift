@@ -793,7 +793,7 @@ final class AttributionEngine: ObservableObject {
         frames.compactMap { f in
             guard f.exactVIN, !f.isDocument, !f.isSensitive, let vin = f.vin?.uppercased() else { return nil }
             if VisionEngine.isValidVIN(vin) { return (f.imageID, vin, 0.95) }
-            if (8...16).contains(vin.count), f.contextualMake != nil,
+            if (5...16).contains(vin.count), f.contextualMake != nil,
                vin.contains(where: \.isNumber) { return (f.imageID, vin, 0.8) }
             return nil
         }
