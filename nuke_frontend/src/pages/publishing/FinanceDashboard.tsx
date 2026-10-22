@@ -13,6 +13,7 @@
  * nothing else (no empty tables, no dead boxes).
  */
 
+import '../../styles/accounting.css';
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import FinancialSourceReview from '../../components/financial/FinancialSourceReview';
@@ -41,6 +42,7 @@ interface DealFlowRow {
 
 export interface FinancialDocumentRow {
   id: string;
+  source_filename?: string | null;
   duplicate_of: string | null;
   doc_type: string | null;
   document_number: string | null;
@@ -280,7 +282,7 @@ export default function FinanceDashboard() {
         supabase
           .from('financial_documents')
           .select(
-            'id, duplicate_of, doc_type, document_number, document_date, issuer_name_raw, recipient_name_raw, amount_ttc, currency, deal_number, review_status', { count: 'exact' }
+            'id, source_filename, duplicate_of, doc_type, document_number, document_date, issuer_name_raw, recipient_name_raw, amount_ttc, currency, deal_number, review_status', { count: 'exact' }
           )
           .order('document_date', { ascending: false, nullsFirst: false })
           .order('id')
@@ -325,13 +327,19 @@ export default function FinanceDashboard() {
 
   // ── Render ────────────────────────────────────────────────────
   return (
-    <div style={s.container}>
-      <h1 style={s.header}>ACCOUNTING</h1>
-      <FinancialDocumentIntake onComplete={documentId => { setSelectedDocument(documentId); setSessionRevision(n => n + 1); }} />
-      <FinancialEvidenceRestore onRestored={() => { setPage(0); setSessionRevision(n => n + 1); }} />
+    <div className="accounting-page" style={s.container}>
+      <header className="accounting-header"><div><span className="accounting-eyebrow">PRIVATE ACCOUNT</span><h1>Accounting</h1><p>Your books, the documents behind them, and what still needs review.</p></div>
+        <button type="button" onClick={() => setSessionRevision(n => n + 1)}>Refresh records</button></header>
       <FinancialWorkpapers revision={sessionRevision} onOpen={setSelectedDocument} />
+      <div className="accounting-review-note"><strong>Tax review is a separate step</strong><p>Saved records do not establish that reconciliation, tax adjustments, signatures or filing are complete. Review the supporting decisions before using these figures in a return.</p></div>
+      <details className="accounting-disclosure"><summary>Add documents <span>Receipts, invoices and supporting files</span></summary>
+        <FinancialDocumentIntake onComplete={documentId => { setSelectedDocument(documentId); setSessionRevision(n => n + 1); }} />
+      </details>
+      <details className="accounting-disclosure accounting-advanced"><summary>Advanced: recover existing books <span>Import a prepared recovery bundle</span></summary>
+        <FinancialEvidenceRestore onRestored={() => { setPage(0); setSessionRevision(n => n + 1); }} />
+      </details>
       {loading ? <div style={s.loadingText}>LOADING</div> : noRecords ? <div style={s.accessLine}>
-        No financial records are visible to this session. Sign in to your account, then add documents or recover your existing records.
+        No source documents are visible in this view yet. Use Add documents or the recovery tools above.
       </div> : <>
       {errors.map(error => <p role="alert" key={error}>{error}</p>)}
       <p>Page {page + 1}: {docs.length} of {counts.docs ?? 'unknown'} visible documents; {concerns.length} of {counts.concerns ?? 'unknown'} pending concern records across revision history.
@@ -418,15 +426,15 @@ export default function FinanceDashboard() {
 
       {/* DOCUMENTS */}
       {docs.length > 0 && (
-        <div style={s.section}>
-          <div style={s.sectionLabel}>DOCUMENTS</div>
+        <details className="accounting-disclosure" style={s.section}>
+          <summary>Source documents <span>{docs.length} shown on this page</span></summary>
           <div style={s.tableWrap}>
             <table style={s.table}>
               <thead>
                 <tr>
                   <th style={s.th}>DATE</th>
                   <th style={s.th}>TYPE</th>
-                  <th style={s.th}>NUMBER</th>
+                  <th style={s.th}>SOURCE DOCUMENT</th>
                   <th style={s.th}>ISSUER</th>
                   <th style={s.th}>RECIPIENT</th>
                   <th style={s.thRight}>AMOUNT TTC</th>
@@ -439,8 +447,8 @@ export default function FinanceDashboard() {
                 {docs.map((d) => (
                   <tr key={d.id} id={`financial-document-${d.id}`} style={s.tr}>
                     <td style={s.tdMono}>{formatDate(d.document_date)}</td>
-                    <td style={s.td}>{d.doc_type || '—'}</td>
-                    <td style={s.tdMono}>{d.document_number || '—'}<br /><button type="button" onClick={() => setSelectedDocument(d.id)}>View evidence</button></td>
+                    <td style={s.td}>{d.doc_type || 'Not classified'}</td>
+                    <td style={s.tdMono}>{d.source_filename || d.document_number || 'Source document'}<br /><button type="button" onClick={() => setSelectedDocument(d.id)}>View evidence</button></td>
                     <td style={s.td}>{d.issuer_name_raw || '—'}</td>
                     <td style={s.td}>{d.recipient_name_raw || '—'}</td>
                     <td style={s.tdRight}>{formatAmount(d.amount_ttc)}</td>
@@ -452,7 +460,7 @@ export default function FinanceDashboard() {
               </tbody>
             </table>
           </div>
-        </div>
+        </details>
       )}
       </>}
     </div>

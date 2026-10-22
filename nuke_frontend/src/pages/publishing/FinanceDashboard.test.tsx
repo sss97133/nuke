@@ -36,7 +36,7 @@ it('keeps reader failures distinct from no records or access', async () => {
   fixture.results.financial_documents = { error: { message: 'unavailable' }, data: null, count: null };
   await act(async () => root.render(<FinanceDashboard />));
   expect(container.textContent).toContain('invoice totals are unknown');
-  expect(container.textContent).not.toContain('No financial records are visible');
+  expect(container.textContent).not.toContain('No source documents are visible');
 });
 it('reads pending concerns independently of vehicle/deal allocation and opens retained interpretations', async () => {
   fixture.results.financial_review_queue = { data: [{ id: 'concern-1', document_id: 'doc-1', concern_type: 'cut_off', priority: 'high', status: 'pending', detail: 'Date requires corroboration' }], count: 201 };
@@ -70,7 +70,7 @@ it('clears private data and evidence selection on session changes', async () => 
   fixture.results = {};
   await act(async () => fixture.authChanged!());
   expect(container.textContent).not.toContain('Synthetic merchant');
-  expect(container.textContent).toContain('No financial records are visible');
+  expect(container.textContent).toContain('No source documents are visible');
 });
 it('paginates evidence revisions beyond the first page', async () => {
   fixture.results.financial_documents = { data: [invoice()], count: 1 };
@@ -155,4 +155,15 @@ it('requests only the bound private derivative and exposes download failures', a
   expect(fixture.downloads).toEqual([`user-documents/${v.storage_path}`]);
   expect(container.textContent).toContain('could not be verified or loaded');
   expect(container.querySelector('img')).toBeNull();
+});
+
+it('names retained source files and keeps recovery mounted inside a closed advanced panel', async () => {
+  fixture.results.financial_documents = { data: [invoice({ source_filename: 'example-bank-export.csv', doc_type: null, document_number: null })], count: 1 };
+  await act(async () => root.render(<FinanceDashboard />));
+  expect(container.textContent).toContain('example-bank-export.csv');
+  expect(fixture.calls.find(c => c.table === 'financial_documents').fields).toContain('source_filename');
+  const advanced = container.querySelector('.accounting-advanced') as HTMLDetailsElement;
+  expect(advanced.open).toBe(false);
+  expect(advanced.querySelector('input[type="file"]')).not.toBeNull();
+  expect(container.textContent).toContain('Tax review is a separate step');
 });

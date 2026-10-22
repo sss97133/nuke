@@ -1,4 +1,4 @@
-// Nuke Asset Advisor — curated read-only tool catalog (5 tools that work).
+// Nuke Asset Advisor — curated read-only tool catalog (6 tools that work).
 import { ENVELOPE_OUTPUT_SCHEMA } from "./evidence.ts";
 
 export interface AdvisorToolDef {
@@ -119,6 +119,26 @@ export const ADVISOR_TOOLS: AdvisorToolDef[] = [
       title: "Evaluate Listing",
     },
   },
+  {
+    name: "budget_options",
+    description:
+      "Rank what kinds of collector cars a budget typically buys: segments whose all-in cost (hammer + buyer fee + transport + paperwork) fits, with sales counts, price ranges, 3-year trend and why. Options, not financial advice.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        budget_usd: { type: "number", description: "Total budget in US dollars, all-in (e.g. 75000)" },
+        limit: { type: "number", description: "Max options (1-12, default 6)" },
+      },
+      required: ["budget_usd"],
+    },
+    outputSchema: OUT,
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      openWorldHint: false,
+      title: "Budget Options",
+    },
+  },
 ];
 
 export const ADVISOR_TOOL_NAMES = new Set(ADVISOR_TOOLS.map((t) => t.name));
@@ -131,7 +151,7 @@ export const ADVISOR_SERVER_INFO = {
 
 export const ADVISOR_INSTRUCTIONS =
   "Nuke Asset Advisor is a read-only, citation-first ledger for collector vehicles. " +
-  "Prefer evaluate_listing for any listing URL. Use find_asset → get_asset / get_comps / value_asset for known VINs or asset ids. " +
+  "Prefer evaluate_listing for any listing URL. Use find_asset → get_asset / get_comps / value_asset for known VINs or asset ids. Use budget_options for 'what can I buy with $X'. " +
   "Never invent missing values — report 'not recorded'. Every number must cite source_url and event_time when present. " +
   "Asking prices are not sales. Confidence is capped at 0.6 until a published sale backtest justifies more. " +
   "This surface has no write, admin, shop, SQL, or legacy catalog tools.";

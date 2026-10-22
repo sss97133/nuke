@@ -142,3 +142,7 @@ Note: a listing observation for the same car can have `observed_at` / `ingested_
 This surface lives inside `supabase/functions/mcp-connector` (same CAPABILITY_MAP owner as `/mcp`). After merge, the usual `supabase-deploy` workflow publishes the function. Vercel already rewrites `/mcp/:path*` to the connector, so `/mcp/advisor` needs no new rewrite.
 
 Sample request/response (Karmann Ghia BaT sale): `fixtures/advisor-sample-response.json`.
+
+## budget_options
+
+`budget_options { budget_usd, limit? }` ranks make x era segments whose typical all-in cost (hammer + 5% buyer fee capped $7,500 + $1,800 enclosed transport + $600 paperwork) is 45-100% of the budget. Data: `market_segment_stats` (latest run). Market temperature comes from `market_signal` as a heating/cooling/flat label only (the timing model failed its backtest gate). Options, not financial advice.
