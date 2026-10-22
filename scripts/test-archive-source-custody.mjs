@@ -58,6 +58,7 @@ const sources = new Map([
   ['writeRules',compile('../supabase/functions/batch-extract-snapshots/writeRules.ts')],
   ['snapshotCompare',compile('../supabase/functions/batch-extract-snapshots/snapshotCompare.ts')],
   ['intake',compile('../supabase/functions/ingest-observation/index.ts')],
+  ['receiptIntake',compile('../supabase/functions/ingest-artifact/receiptIntake.ts')],
   ['historicalAsks',compile('../supabase/functions/ingest-observation/historicalAsks.ts')],
   ['historicalAskIntake',compile('../supabase/functions/ingest-observation/historicalAskIntake.ts')],
   ['liveIntake',compile('../supabase/functions/ingest-observation/batLive.ts')],
@@ -254,6 +255,7 @@ function fixture(options = {}) {
         if(specifier==='../_shared/batLiveEvents.ts')return load('liveEvents');
         if(specifier==='./batAuctionRecord.ts')return load('auctionRecord');
         if(specifier==='../_shared/writeGuard.ts')return load('guard');
+        if(specifier==='../ingest-artifact/receiptIntake.ts')return load('receiptIntake');
         if(specifier==='./supabaseKeys.ts'||specifier==='../_shared/supabaseKeys.ts')return load('keys');
         if(specifier==='./batSaleQueue.ts')return load('batSaleQueue');
         if(specifier==='./aiGate.ts')return load('aiGate');
