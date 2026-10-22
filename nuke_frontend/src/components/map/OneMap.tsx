@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Map as MLMap, NavigationControl, type ExpressionSpecification, type MapGeoJSONFeature, type MapMouseEvent } from 'maplibre-gl';
+import { Map as MLMap, NavigationControl, type MapGeoJSONFeature, type MapMouseEvent } from 'maplibre-gl';
+import type { ExpressionSpecification } from '@maplibre/maplibre-gl-style-spec';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import './maplibreWorker';
 import './one-map.css';

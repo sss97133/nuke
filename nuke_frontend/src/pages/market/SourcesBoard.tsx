@@ -705,10 +705,10 @@ export function landingState(
     return { active: true, text: `+${count(row.landed24)} today` };
   }
 
-  if (!row.lastLanded) return { active: false, text: 'idle 14+ days' };   // the landing log keeps 14 days
+  if (!row.lastLanded) return { active: false, text: 'no new records in 14d' };   // This log does not measure source checks.
   const t = Date.parse(row.lastLanded);
-  if (Number.isNaN(t)) return { active: false, text: 'idle' };
-  return { active: false, text: `idle since ${new Date(t).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })}` };
+  if (Number.isNaN(t)) return { active: false, text: 'last new record unknown' };
+  return { active: false, text: `last new record ${new Date(t).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })}` };
 }
 
 function DayBars({ days, mode = '14d' }: { days: number[]; mode?: LandingHorizon }) {
@@ -1979,6 +1979,7 @@ export function SourcesBoardView({
   const [horizon, setHorizon] = useState<LandingHorizon>('14d');
   const [openSource, setOpenSource] = useState<string | null>(() => resolveInitialSource(data.rows, initialSource));
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [showCollection, setShowCollection] = useState(false);
   // Groups the reader opened past their top rows (a long group, such as the dealers, shows its top and a show-all).
   const [openGroups, setOpenGroups] = useState<Set<string>>(() => new Set());
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -2027,7 +2028,7 @@ export function SourcesBoardView({
   };
 
   return (
-    <section className="market-sources" aria-label="Sources, ranked by what we hold">
+    <section className={`market-sources${showCollection ? ' market-sources--collection' : ''}`} aria-label="Sources, ranked by what we hold">
       <svg width="0" height="0" aria-hidden="true" className="market-sources__defs">
         <defs>
           <pattern id="market-sources-hatch" width="4" height="4" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
@@ -2037,11 +2038,14 @@ export function SourcesBoardView({
       </svg>
       <div className="market-sources__head">
         <span className="market-sources__title">{scopedLabel}</span>
-        <span className="market-sources__note">
+        <button type="button" className="market-sources__collection-toggle" aria-pressed={showCollection}
+          onClick={() => setShowCollection(value => !value)}>Collection detail</button>
+        {showCollection && <span className="market-sources__note">
           {scoped
             ? `ranked by ${count(scoped.total)} ${scoped.label} sales with a date, last 5 years${scoped.unattributed ? ` (${count(scoped.unattributed)} at houses not listed)` : ''} · held, landing and live count each source’s whole catalogue`
             : 'ranked by what we hold · a source moves up as more of it lands'}{heldAt ? ` · held counts as of ${heldWhen(heldAt)}` : ''}
-        </span>
+          {' · Changes are net records since each saved baseline. New records do not establish source-check freshness.'}
+        </span>}
         {!scoped && houseMix && <VenueMix rows={houseMix.rows} clock={houseMix.clock} />}
         <div className="market-sources__cat-filters" role="group" aria-label="Filter sources by category">
           <button
@@ -2064,7 +2068,7 @@ export function SourcesBoardView({
             </button>
           ))}
         </div>
-        {data.landing.landed1h > 0 ? (
+        {showCollection && data.landing.landed1h > 0 ? (
           <button
             type="button"
             className={`market-sources__live-summary${openSource === '__ALL__' ? ' is-open' : ''}`}
@@ -2082,7 +2086,7 @@ export function SourcesBoardView({
           <div className="market-sources__cols">
             <span>#</span><span className="market-sources__group-title">{g.title}</span><span className="n">{g.unit}</span>
             <span>source inventory</span>
-            <span className="market-sources__col-landing">
+            {showCollection && <span className="market-sources__col-landing">
               <button
                 type="button"
                 className="market-sources__col-toggle"
@@ -2104,7 +2108,7 @@ export function SourcesBoardView({
                   </button>
                 ))}
               </span>
-            </span>
+            </span>}
             <span>{scoped ? `${scoped.short} sales, last 12 months` : 'sales, last 12 months'}</span><span className="n">live now</span>
           </div>
           <ol className="market-sources__rows">
@@ -2157,7 +2161,7 @@ export function SourcesBoardView({
                     </button>
                     <span className="market-sources__held n" title={r.heldAt ? `held as of ${heldWhen(r.heldAt)}` : undefined}>
                       {r.held != null ? count(r.held) : '—'}
-                      {week != null && week !== 0
+                      {showCollection && week != null && week !== 0
                         ? <small className={week > 0 ? 'up' : 'down'}> {week > 0 ? '+' : '−'}{count(Math.abs(week))} since {shortDay(r.beforeDay)}</small>
                         : null}
                       {r.venueLots != null && r.venueLots > 0 && r.members == null
@@ -2182,7 +2186,7 @@ export function SourcesBoardView({
                         {s.reference ? <small className="market-sources__sharenote">{s.reference}</small> : null}
                       </span>
                     </span>
-                    <button
+                    {showCollection && <button
                       type="button"
                       className={`market-sources__landing${isOpen ? ' is-open' : ''}`}
                       onClick={(e) => {
@@ -2195,7 +2199,7 @@ export function SourcesBoardView({
                       <i className={land.active ? (r.landed15m > 0 ? 'on live' : 'on') : 'off'} aria-hidden="true" />
                       <span className={`market-sources__landtext${land.active ? '' : ' idle'}`}>{land.text}</span>
                       <DayBars days={binsForHorizon(r)} mode={horizon} />
-                    </button>
+                    </button>}
                     {scoped ? (() => {
                       const sc = scoped.bySource.get(r.source);
                       return (

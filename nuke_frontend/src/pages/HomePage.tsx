@@ -1437,6 +1437,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
   const setDrillStack = useCallback((
     updater: DrillLevel[] | ((prev: DrillLevel[]) => DrillLevel[]),
     axisOverride?: FamilyFacetAxis,
+    viewOverride?: 'sales' | 'names',
   ) => {
     if (axisOverride !== undefined) {
       facetAxisRef.current = axisOverride;
@@ -1447,7 +1448,12 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
     drillStackRef.current = next;
     setDrillStackState(next);
     const axisForUrl = axisOverride !== undefined ? axisOverride : facetAxisRef.current;
-    setSearchParams((curr) => applyDrillStackToSearchParams(curr, next, axisForUrl), { preventScrollReset: true });
+    setSearchParams((curr) => {
+      const params = applyDrillStackToSearchParams(curr, next, axisForUrl);
+      if (viewOverride === 'sales' && params.get('family')) params.set('family_view', 'sales');
+      else params.delete('family_view');
+      return params;
+    }, { preventScrollReset: true });
   }, [setSearchParams]);
   const currentLevel = drillStack[drillStack.length - 1];
   const selectedEra = searchParams.get('era');
@@ -1466,7 +1472,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
   // matchMedia is absent in jsdom and some embedded webviews; without it the page is treated as wide.
   const canMatchMedia = typeof window !== 'undefined' && typeof window.matchMedia === 'function';
   const [isNarrow, setIsNarrow] = useState(() => canMatchMedia && window.matchMedia('(max-width: 640px)').matches);
-  const [phoneBrowseView, setPhoneBrowseView] = useState<'list' | 'map'>('list');
+  const [phoneBrowseView, setPhoneBrowseView] = useState<'list' | 'map'>(() => searchParams.get('family_view') === 'sales' ? 'map' : 'list');
   const phoneList = isNarrow && phoneBrowseView === 'list';
   useEffect(() => {
     if (!canMatchMedia) return;
@@ -1578,7 +1584,17 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
   // The top level as brands, or as brands with their families inside (finviz's map of the market).
   const [brandView, setBrandView] = useState<'brands' | 'nested'>('brands');
   // A family keeps its model names as clickable treemap tiles; the sales chart is shown below when embedded (or via the switch).
-  const [familyView, setFamilyView] = useState<'sales' | 'names'>('names');
+  const urlFamilyView = searchParams.get('family_view') === 'sales' ? 'sales' : 'names';
+  const [familyView, setFamilyViewState] = useState<'sales' | 'names'>(urlFamilyView);
+  const setFamilyView = useCallback((view: 'sales' | 'names') => {
+    setFamilyViewState(view);
+    setSearchParams(curr => {
+      const next = new URLSearchParams(curr);
+      if (view === 'sales' && next.get('family')) next.set('family_view', 'sales');
+      else next.delete('family_view');
+      return next;
+    }, { preventScrollReset: true });
+  }, [setSearchParams]);
   const setFacetAxis = useCallback((nextAxis: FamilyFacetAxis) => {
     facetAxisRef.current = nextAxis;
     setFacetAxisState(nextAxis);
@@ -1596,12 +1612,13 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
     setSearchParams((curr) => applyDrillStackToSearchParams(curr, nextStack, nextAxis), { preventScrollReset: true });
   }, [setSearchParams]);
   useEffect(() => {
-    setFamilyView('names');
+    setFamilyViewState(urlFamilyView);
+    if (urlFamilyView === 'sales') setPhoneBrowseView('map');
     const truck = isGmTruckBrand(currentLevel.make) && drillStack.find((d) => d.family && !d.model)?.label === 'Truck';
     const resolvedAxis = urlAxis ?? (truck && !currentLevel.model ? 'series' : 'raw');
     facetAxisRef.current = resolvedAxis;
     setFacetAxisState(resolvedAxis);
-  }, [currentLevel.make, currentLevel.family, urlAxis, drillStack.find((d) => d.family && !d.model)?.label]);
+  }, [currentLevel.make, currentLevel.family, urlAxis, urlFamilyView, drillStack.find((d) => d.family && !d.model)?.label]);
 
   // Family-wide sales (5-year dated window via treemap_family_sales): enables direct Family -> Years -> Vehicles navigation
   // and Era filtering without requiring a fragmented raw model string first.
@@ -3119,7 +3136,14 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
         }}
         onPick={(m) => {
           recordInterest('make', m.brand);
-          setDrillStack([{ label: 'ALL MAKES' }, { label: m.brand, make: m.brand }, { label: m.family, make: m.brand, family: m.family_key }]);
+          setDrillStack([{ label: 'ALL MAKES' }, { label: m.brand, make: m.brand }, { label: m.family, make: m.brand, family: m.family_key }], undefined,
+            horizon === 'upcoming' ? 'names' : 'sales');
+          // Open the family sales history for investigation. It retains its own
+          // labelled multi-venue scope; upcoming supply keeps the family browse.
+          if (horizon !== 'upcoming') {
+            setFamilyViewState('sales');
+            setPhoneBrowseView('map');
+          }
         }} />
       </details>}
 

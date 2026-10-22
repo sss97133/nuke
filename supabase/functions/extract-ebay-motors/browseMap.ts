@@ -47,6 +47,18 @@ export function fullSizeImage(url: string): string {
   return url.replace(/\/s-l\d+(\.\w+)?(?=$|\?)/i, "/s-l1600$1");
 }
 
+/** The item gallery labels photos separately from video posters. Keep its order,
+ * rather than scanning recommendation, seller-template and video images as photos. */
+export function itemPagePhotos(html: string): string[] {
+  const photos: string[] = [];
+  for (const match of html.matchAll(/<button\b[^>]*\bclass=["'][^"']*\bux-image-grid-item\b[^"']*["'][^>]*>[\s\S]*?<\/button>/gi)) {
+    if (!/\baria-label=["']Picture \d+ of \d+["']/i.test(match[0])) continue;
+    const url = match[0].match(/<img\b[^>]*\bsrc=["'](https:\/\/i\.ebayimg\.com\/images\/[^"']+)["']/i)?.[1];
+    if (url) photos.push(fullSizeImage(url.replace(/&amp;/g, '&')));
+  }
+  return [...new Set(photos)];
+}
+
 export function imagesOf(item: EbayItem): string[] {
   const out: string[] = [];
   for (const u of [item.image?.imageUrl, ...(item.additionalImages ?? []).map((i) => i.imageUrl)]) {

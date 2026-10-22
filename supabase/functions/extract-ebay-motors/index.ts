@@ -27,6 +27,7 @@ import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { BROWSE_ACTIONS, handleBrowse } from './browseHandler.ts';
 import { handleParts } from './partsFinder.ts';
 import { insertMissingVehicleImages } from '../_shared/vehicleImageWrite.ts';
+import { itemPagePhotos } from './browseMap.ts';
 
 // ============================================================================
 // TYPES
@@ -598,6 +599,8 @@ function extractDescription(html: string): string | null {
 }
 
 function extractImages(html: string): string[] {
+  const gallery = itemPagePhotos(html);
+  if (gallery.length > 0 || /\bux-image-grid-item\b/.test(html)) return gallery;
   const images: string[] = [];
   const seen = new Set<string>();
 

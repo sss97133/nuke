@@ -50,7 +50,13 @@
 .market-sheet__open { flex: 1; background: var(--text); color: var(--bg); }
 .market-sheet__close { background: transparent; color: var(--text); }
 
-.map-legend { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.map-legend { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; min-width: 0; }
+.map-legend__key { font-size: 11px; color: var(--text-secondary); }
+.map-legend__method { font-size: 11px; min-width: 0; }
+.map-legend__method[open] { flex-basis: 100%; }
+.map-legend__method > summary { cursor: pointer; }
+.map-legend__method > summary:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+.map-legend__method[open] > summary { margin-bottom: 6px; }
 .map-legend__scale { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
 .map-legend__stop { display: inline-flex; align-items: center; gap: 4px; }
 .map-legend__swatch { display: inline-block; width: 28px; height: 12px; border: 1px solid var(--border); box-sizing: border-box; }
@@ -93,3 +99,4 @@
 .venue-mix__names { display: flex; flex-wrap: wrap; gap: 4px 12px; padding-bottom: 8px; font-size: 12px; color: var(--text); font-variant-numeric: tabular-nums; }
 .venue-mix__n { flex-basis: 100%; color: var(--text-secondary); font-size: 11px; font-family: 'Courier New', monospace; }
 @media (max-width: 640px) { .venue-mix__summary { min-height: 44px; } }
+@media (max-width: 760px) { .map-legend__method > summary { min-height: 44px; display: flex; align-items: center; } }
