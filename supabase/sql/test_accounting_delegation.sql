@@ -77,6 +77,31 @@ UPDATE auth.users SET banned_until=NULL WHERE email='reviewer@example.invalid';
 SELECT finish_mcp_oauth_login('session','22222222-2222-4222-8222-222222222222','code');
 UPDATE auth.users SET deleted_at=now() WHERE email='reviewer@example.invalid';
 DO $$ BEGIN BEGIN PERFORM exchange_mcp_oauth_credential('authorization_code','code','client','http://localhost:8123/callback','challenge','sha256_'||repeat('a',64),'sha256_'||repeat('b',64)); RAISE EXCEPTION 'deleted exchange accepted'; EXCEPTION WHEN insufficient_privilege THEN NULL; END; END $$;
+-- Successful exchange, PKCE/client binding, refresh rotation and revocation use real SQL.
+UPDATE auth.users SET deleted_at=NULL WHERE email='reviewer@example.invalid';
+DO $$ DECLARE first_key uuid; second_key uuid; result jsonb;
+BEGIN
+ BEGIN PERFORM exchange_mcp_oauth_credential('authorization_code','code','other-client','http://localhost:8123/callback','challenge','sha256_'||repeat('a',64),'sha256_'||repeat('b',64)); RAISE EXCEPTION 'wrong client exchanged'; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+ BEGIN PERFORM exchange_mcp_oauth_credential('authorization_code','code','client','https://wrong.example.invalid','challenge','sha256_'||repeat('a',64),'sha256_'||repeat('b',64)); RAISE EXCEPTION 'wrong redirect exchanged'; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+ BEGIN PERFORM exchange_mcp_oauth_credential('authorization_code','code','client','http://localhost:8123/callback','wrong-challenge','sha256_'||repeat('a',64),'sha256_'||repeat('b',64)); RAISE EXCEPTION 'wrong PKCE exchanged'; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+ result:=exchange_mcp_oauth_credential('authorization_code','code','client','http://localhost:8123/callback','challenge','sha256_'||repeat('a',64),'sha256_'||repeat('b',64));
+ first_key:=(result->>'key_id')::uuid;
+ IF result->>'user_id'<>'22222222-2222-4222-8222-222222222222' OR result->'scopes'<>'["mcp:tools","accounting:read"]'::jsonb
+ OR NOT EXISTS(SELECT 1 FROM api_keys WHERE id=first_key AND user_id='22222222-2222-4222-8222-222222222222' AND key_hash='sha256_'||repeat('a',64) AND is_active AND expires_at>now() AND scopes=ARRAY['mcp:tools','accounting:read']) THEN RAISE EXCEPTION 'credential binding lost'; END IF;
+ BEGIN PERFORM exchange_mcp_oauth_credential('authorization_code','code','client','http://localhost:8123/callback','challenge','sha256_'||repeat('c',64),'sha256_'||repeat('d',64)); RAISE EXCEPTION 'code replay accepted'; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+ -- An unrelated client cannot revoke either access or refresh credentials.
+ PERFORM revoke_mcp_oauth_credential('sha256_'||repeat('a',64),'other-client');
+ PERFORM revoke_mcp_oauth_credential('sha256_'||repeat('b',64),'other-client');
+ IF NOT EXISTS(SELECT 1 FROM api_keys WHERE id=first_key AND is_active) THEN RAISE EXCEPTION 'wrong client revoked'; END IF;
+ BEGIN PERFORM exchange_mcp_oauth_credential('refresh_token','sha256_'||repeat('b',64),'other-client',NULL,NULL,'sha256_'||repeat('c',64),'sha256_'||repeat('d',64)); RAISE EXCEPTION 'wrong client refreshed'; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+ result:=exchange_mcp_oauth_credential('refresh_token','sha256_'||repeat('b',64),'client',NULL,NULL,'sha256_'||repeat('c',64),'sha256_'||repeat('d',64));
+ second_key:=(result->>'key_id')::uuid;
+ IF second_key=first_key OR EXISTS(SELECT 1 FROM api_keys WHERE id=first_key AND is_active) OR NOT EXISTS(SELECT 1 FROM api_keys WHERE id=second_key AND is_active AND user_id='22222222-2222-4222-8222-222222222222' AND scopes=ARRAY['mcp:tools','accounting:read']) THEN RAISE EXCEPTION 'refresh did not rotate bound key'; END IF;
+ BEGIN PERFORM exchange_mcp_oauth_credential('refresh_token','sha256_'||repeat('b',64),'client',NULL,NULL,'sha256_'||repeat('e',64),'sha256_'||repeat('f',64)); RAISE EXCEPTION 'old refresh replay accepted'; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+ PERFORM revoke_mcp_oauth_credential('sha256_'||repeat('c',64),'client');
+ IF EXISTS(SELECT 1 FROM api_keys WHERE id=second_key AND is_active) THEN RAISE EXCEPTION 'revoke kept active access'; END IF;
+ BEGIN PERFORM exchange_mcp_oauth_credential('refresh_token','sha256_'||repeat('d',64),'client',NULL,NULL,'sha256_'||repeat('e',64),'sha256_'||repeat('f',64)); RAISE EXCEPTION 'revoked credential refreshed'; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+END $$;
 ROLLBACK;
 -- Independent sessions prove key/grant locks serialize admission against revocation.
 CREATE EXTENSION dblink;

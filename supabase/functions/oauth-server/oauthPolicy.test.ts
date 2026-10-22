@@ -1,6 +1,7 @@
 import {validOAuthLogin,validOAuthScope,validCodeVerifier,validRedirectUri,DEFAULT_OAUTH_SCOPE} from './oauthPolicy.ts';
 function assert(v:unknown){if(!v)throw new Error('Assertion failed');}
 Deno.test('OAuth scope ceiling and PKCE/client binding',()=>{
+ assert(!DEFAULT_OAUTH_SCOPE.split(' ').includes('accounting:correct'));
  const p={redirect_uri:'https://client.test/cb',scope:DEFAULT_OAUTH_SCOPE,code_challenge:'a'.repeat(43),code_challenge_method:'S256'};
  const c={redirect_uris:[p.redirect_uri],token_endpoint_auth_method:'none'};
  assert(validOAuthLogin(p,c));assert(!validOAuthLogin({...p,redirect_uri:'https://evil.test'},c));assert(!validOAuthLogin({...p,code_challenge_method:'plain'},c));assert(!validOAuthLogin({...p,code_challenge:''},c));

@@ -347,7 +347,7 @@ export default function FinanceDashboard() {
     async function load() {
       if (!ownerId) { setLoading(false); return; }
       const [dealRes, docRes, queueRes] = await Promise.all([
-        shared ? Promise.resolve({ data: [], error: null, count: 0 }) : supabase
+        shared ? Promise.resolve({ data: [], error: null, count: null }) : supabase
           .from('v_financial_deal_flow')
           .select(
             'deal_number, deal_type, deal_direction, advertiser_name_raw, counterparty_name_raw, invoiced_total, credited_total, currency, invoice_count, document_count, first_invoice_date, mixed_currency', { count: 'exact' }
@@ -414,7 +414,7 @@ export default function FinanceDashboard() {
     <AccountingBookContext.Provider value={{ ownerId, shared }}><div className="accounting-page" style={s.container}>
       <header className="accounting-header"><div><span className="accounting-eyebrow">PRIVATE ACCOUNT</span><h1>Accounting</h1><p>Your books, the documents behind them, and what still needs review.</p></div>
         <button type="button" onClick={() => setSessionRevision(n => n + 1)}>Refresh records</button></header>
-      {actorId && <label>Active book <select aria-label="Active accounting book" value={ownerId} onChange={e => { setOwnerId(e.target.value); setSelectedDocument(null); setSelectedRecord(null); setDocs([]); setConcerns([]); setDeals([]); setPage(0); }}><option value={actorId}>My books</option>{grants.filter(g => g.member_id === actorId && g.active).map(g => <option key={g.id} value={g.owner_id}>{g.owner_name} · shared books ({g.can_correct ? 'review and correct' : 'review'})</option>)}</select></label>}
+      {actorId && <label>Active book <select aria-label="Active accounting book" value={ownerId} onChange={e => { setOwnerId(e.target.value); setSourceView('summary'); setSelectedDocument(null); setSelectedRecord(null); setDocs([]); setConcerns([]); setDeals([]); setPage(0); }}><option value={actorId}>My books</option>{grants.filter(g => g.member_id === actorId && g.active).map(g => <option key={g.id} value={g.owner_id}>{g.owner_name} · shared books ({g.can_correct ? 'review and correct' : 'review'})</option>)}</select></label>}
       {shared && <p>Shared accounting application access. Corrections through your connected agent retain your identity and the owner's canonical book. Document intake and access management remain with the owner.</p>}
       <FinancialWorkpapers key={ownerId} revision={sessionRevision} onOpen={openEvidence} />
       <p className="accounting-muted accounting-tax-note">Tax review is a separate step. Saved records are not a filing or a completed reconciliation.</p>
@@ -426,7 +426,8 @@ export default function FinanceDashboard() {
       </details>
       </div>
       {selectedDocument && <EvidenceDialog trigger={evidenceTrigger.current} documentId={selectedDocument} record={selectedRecord} onClose={() => { setSelectedDocument(null); setSelectedRecord(null); }} />}
-      <nav className="accounting-tabs" aria-label="Source and review views">{(['summary', 'review', 'documents', 'deals'] as const).map(tab => <button type="button" key={tab} aria-current={sourceView === tab ? 'page' : undefined} onClick={() => setSourceView(tab)}>{tab === 'summary' ? 'Review summary' : tab === 'review' ? 'Review questions' : tab === 'documents' ? 'Source documents' : 'Deals'}</button>)}</nav>
+      {shared && <p>Deal rollups are not included in this shared-book view. Saved bookkeeping records, controls and source evidence remain available above.</p>}
+      <nav className="accounting-tabs" aria-label="Source and review views">{(['summary', 'review', 'documents', 'deals'] as const).filter(tab => !shared || tab !== 'deals').map(tab => <button type="button" key={tab} aria-current={sourceView === tab ? 'page' : undefined} onClick={() => setSourceView(tab)}>{tab === 'summary' ? 'Review summary' : tab === 'review' ? 'Review questions' : tab === 'documents' ? 'Source documents' : 'Deals'}</button>)}</nav>
       {loading ? <div style={s.loadingText}>LOADING</div> : noRecords ? <div style={s.accessLine}>
         No source documents are visible in this view yet. Use Add documents or the recovery tools above.
       </div> : <>

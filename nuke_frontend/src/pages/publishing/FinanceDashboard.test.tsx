@@ -62,6 +62,7 @@ it('does not render mixed-currency rollups as a single monetary total', async ()
   fixture.results.v_financial_deal_flow = { data: [{ deal_number: 'synthetic', mixed_currency: true, invoiced_total: 999, credited_total: 99 }], count: 1 };
   await act(async () => root.render(<FinanceDashboard />));
   await act(async () => Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'Deals')!.click());
+  expect(fixture.calls.find(c => c.table === 'v_financial_deal_flow').filter).toEqual(['owner_id', '11111111-1111-4111-8111-111111111111']);
   expect(container.textContent).toContain('MIXED CURRENCIES');
   expect(container.textContent).not.toContain('999.00');
 });
@@ -241,5 +242,7 @@ it('switches shared book reads without unmounting the owner recovery queue', asy
   await act(async () => { selector.value = '22222222-2222-4222-8222-222222222222'; selector.dispatchEvent(new Event('change', { bubbles: true })); });
   expect(container.querySelector('input[type="file"][multiple]')).toBe(recovery);
   expect(recovery?.closest('[hidden]')).not.toBeNull();
+  expect(container.textContent).toContain('Deal rollups are not included');
+  expect(Array.from(container.querySelectorAll('button')).some(b => b.textContent === 'Deals')).toBe(false);
   expect(fixture.calls.filter(c => c.table === 'financial_documents').at(-1).filter).toEqual(['owner_id', '22222222-2222-4222-8222-222222222222']);
 });
