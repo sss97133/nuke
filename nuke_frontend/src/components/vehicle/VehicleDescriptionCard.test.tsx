@@ -32,7 +32,7 @@ describe('existing public profile description card',()=>{
   expect(container.querySelector(`a[href="/vehicle/${id}/observation/${sourceId}"]`)).not.toBeNull();
   expect(container.textContent).toContain('2020-01-01T00:00:00Z');expect(container.textContent).toContain('2022-01-01T00:00:00Z');
   expect(container.textContent).toContain('Captured: Date unknown');expect(container.textContent).toContain('Original listing event date unknown');
-  expect(container.textContent).toContain('Original source completeness unknown');expect(container.textContent).toContain('Stored confidence: 0.6');
+  expect(container.textContent).toContain('Original source completeness unknown');expect(container.textContent).toContain('Model self-score (not corroboration): 0.6');
   expect(container.querySelector('script')).toBeNull();expect(fixture.invoke).not.toHaveBeenCalled();expect(fixture.update).not.toHaveBeenCalled();
   expect(fixture.rpc).toHaveBeenCalledWith('get_vehicle_specs',{p_vehicle_id:id});
  });
