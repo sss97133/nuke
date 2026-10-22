@@ -21,7 +21,7 @@ import { segmentLots } from './segment-lots.mjs';
 import { resolveBroadcastEvent } from '../lib/broadcast-evidence.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const PIPELINE = 'broadcast-overlay-ocr-v1';
+const PIPELINE = 'broadcast-overlay-ocr-v2';
 const LOG_ROOT = path.join(os.homedir(), 'nuke-logs', 'broadcast-ingestion');
 const WORK_ROOT = path.join(os.tmpdir(), 'broadcast-work');
 const OCR_BIN = path.join(os.homedir(), '.cache', 'nuke-broadcast', 'vision-ocr');
@@ -195,6 +195,7 @@ function observationFor(p, resolution, meta, publisherName, capturedAt) {
       value: {
         lot: p.lot, title_displayed: p.title, sale_displayed: p.sale,
         bid_ladder: p.bid_ladder, first_displayed_bid: p.first_displayed_bid, final_displayed_bid: p.final_displayed_bid,
+        displayed_bid_readings: p.displayed_bid_readings, ask_ladder: p.ask_ladder,
         asks_displayed: p.asks_displayed, status_changes: p.status_changes, reserve_off_at_s: p.reserve_off_at_s,
         displayed_outcome: p.displayed_outcome, overlay_samples: p.overlay_samples, overlay_coverage: p.overlay_coverage,
       },

@@ -109,3 +109,18 @@ test('an overlay gap shorter than the merge window does not split a lot', () => 
   assert.equal(out.length, 1);
   assert.deepEqual(out[0].bid_ladder.map(b => b.amount), [75000, 90000]);
 });
+
+test('retains descending asks and corrected screen bids independently of the filtered ladder', () => {
+  const readings = [
+    { ...reading(0, 'S1', 30000), displayed_ask: 50000 },
+    { ...reading(1, 'S1', 30000), displayed_ask: 50000 },
+    { ...reading(2, 'S1', 35000), displayed_ask: 40000 },
+    { ...reading(3, 'S1', 35000), displayed_ask: 35000 },
+    { ...reading(4, 'S1', 30000), displayed_ask: 35000 },
+  ];
+  const [lot] = segmentLots(readings);
+  assert.deepEqual(lot.ask_ladder, [{ t: 0, amount: 50000 }, { t: 2, amount: 40000 }, { t: 3, amount: 35000 }]);
+  assert.deepEqual(lot.displayed_bid_readings, [{ t: 0, amount: 30000 }, { t: 2, amount: 35000 }, { t: 4, amount: 30000 }]);
+  assert.equal(lot.bid_ladder.at(-1).amount, 35000);
+  assert.equal(lot.displayed_outcome, 'unknown');
+});

@@ -48,6 +48,18 @@ function bidLadder(items) {
   return ladder.filter(step => !(step.later_lower_display > support(step.amount)));
 }
 
+// Keep the measured screen sequence beside the filtered ladder. A descending ask,
+// correction or OCR dip must remain replayable without becoming an accepted bid.
+function displayedChanges(items, field) {
+  const changes = [];
+  for (const item of items) {
+    const amount = item[field];
+    if (!Number.isFinite(amount) || amount < 0 || changes.at(-1)?.amount === amount) continue;
+    changes.push({ t: item.t, amount });
+  }
+  return changes;
+}
+
 // Outcome graphics flash for about a second; the overlay parser already restricts them to their position.
 const TERMINAL = new Set(['sold', 'bid_goes_on', 'no_sale']);
 
@@ -100,6 +112,8 @@ export function segmentLots(readings, { sampleSeconds = 1 } = {}) {
       overlay_samples: items.length,
       overlay_coverage: Number((items.length * sampleSeconds / (end - start + sampleSeconds)).toFixed(3)),
       bid_ladder: ladder,
+      displayed_bid_readings: displayedChanges(items, 'displayed_bid'),
+      ask_ladder: displayedChanges(items, 'displayed_ask'),
       first_displayed_bid: ladder[0]?.amount ?? null,
       final_displayed_bid: ladder.at(-1)?.amount ?? null,
       asks_displayed: [...new Set(items.map(i => i.displayed_ask).filter(v => v != null))],

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { momentFromPresentation } from './useVehicleVideos';
+import { momentFromPresentation, withScreenOutcomes } from './useVehicleVideos';
 
 const presentation = {
   id: '35aa2b0c-f680-43cb-a7bf-479f259b89c6',
@@ -46,5 +46,39 @@ describe('momentFromPresentation', () => {
     const unknown = momentFromPresentation({ ...presentation,
       structured_data: { ...presentation.structured_data, value: { lot: 'S138', displayed_outcome: 'unknown' } } })!;
     expect(unknown.outcome).toBeNull();
+  });
+
+  it('retains descending timed asks and raw screen readings without promoting them to bid outcomes', () => {
+    const m = momentFromPresentation({ ...presentation, structured_data: { ...presentation.structured_data,
+      value: { ...presentation.structured_data.value,
+        ask_ladder: [{ t: 6709, amount: 50000 }, { t: 6715, amount: 35000 }, { t: 7000, amount: 1 }],
+        displayed_bid_readings: [{ t: 6710, amount: 30000 }, { t: 6711, amount: 25000 }],
+        bid_ladder: [{ t: 6710, amount: 30000 }, { t: NaN, amount: 1 }, { t: 6711, amount: Infinity }],
+        status_changes: [{ t: 6718, status: 'reserve_off' }, { t: 7000, status: 'sold' }],
+      } } })!;
+    expect(m.displayed_asks).toEqual([{ t: 6709, amount: 50000 }, { t: 6715, amount: 35000 }]);
+    expect(m.raw_displayed_bids).toEqual([{ t: 6710, amount: 30000 }, { t: 6711, amount: 25000 }]);
+    expect(m.displayed_bids).toEqual([{ t: 6710, amount: 30000 }]);
+    expect(m.screen_status_changes).toEqual([{ t: 6718, status: 'reserve_off' }]);
+    expect(m.winning_bid).toBeNull();
+  });
+
+  it('binds a retained Bid Goes On frame to the exact video/lot interval without inventing a sale', () => {
+    const moment = momentFromPresentation(presentation)!;
+    const frame = { vehicle_id: moment.vehicle_id, structured_data: {
+      property: 'outcome_label_displayed', value: 'bid_goes_on', media: { video_id: 'c9fxArnD3IY', start_seconds: 6800 },
+      event_context: { lot: 'S138' },
+    } };
+    const out = withScreenOutcomes(moment, [frame]);
+    expect(out.screen_status_changes).toEqual([{ t: 6800, status: 'bid_goes_on' }]);
+    expect(out.winning_bid).toBeNull();
+    const withDisplay = { ...moment, screen_status_changes: [{ t: 6800, status: 'current_bid' }] };
+    expect(withScreenOutcomes(withDisplay, [frame]).screen_status_changes).toEqual([
+      { t: 6800, status: 'current_bid' }, { t: 6800, status: 'bid_goes_on' },
+    ]);
+    expect(withScreenOutcomes(moment, [{ ...frame, vehicle_id: 'other' }]).screen_status_changes).toEqual([]);
+    expect(withScreenOutcomes(moment, [{ ...frame, structured_data: { ...frame.structured_data,
+      media: { ...frame.structured_data.media, start_seconds: 7000 } } }]).screen_status_changes).toEqual([]);
+    expect(withScreenOutcomes(moment, [frame, { ...frame, structured_data: { ...frame.structured_data, value: 'sold' } }]).screen_status_changes).toEqual([]);
   });
 });
