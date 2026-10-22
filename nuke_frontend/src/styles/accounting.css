@@ -36,3 +36,44 @@
  .accounting-page summary span { display:block; margin:4px 0 0 18px; }
  .accounting-year { padding:14px; }
 }
+/* Meeting overview and bounded inspection. */
+.accounting-page .accounting-header { padding:16px 0 12px; margin-bottom:14px; }
+.accounting-page .accounting-years { margin:12px 0; }
+.accounting-page .accounting-year { padding:14px 18px; }
+.accounting-page .accounting-year dl { display:flex; flex-wrap:wrap; gap:18px 36px; margin:10px 0 0; }
+.accounting-page .accounting-year dl>div { display:block; padding:0; }
+.accounting-page .accounting-year dd { margin-top:4px; font-size:20px; }
+.accounting-tabs { display:flex; flex-wrap:wrap; gap:6px; margin:12px 0; }
+.accounting-page .accounting-tabs button[aria-current="page"],.accounting-page .accounting-tabs button[aria-current="page"]:hover { background:var(--text); color:var(--bg); }
+.accounting-filters { display:flex; flex-wrap:wrap; align-items:end; gap:12px; margin:16px 0; }
+.accounting-filters label { display:flex; flex-direction:column; gap:4px; font-size:12px; }
+.accounting-page select,.accounting-page input[type="search"] { font:14px Arial,sans-serif; padding:8px; color:var(--text); background:var(--bg); border:2px solid var(--border); min-height:36px; }
+.accounting-attention { display:grid; grid-template-columns:1fr 2fr; gap:18px; padding:12px 0; border-top:2px solid var(--border); }
+.accounting-attention p { margin:4px 0 8px; font-size:12px; }
+.accounting-table-wrap { overflow-x:auto; }
+.accounting-record-description { display:block; max-width:38ch; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+.accounting-page td small { display:block; color:var(--text-secondary); margin-top:4px; }
+.accounting-pagination { display:flex; align-items:center; flex-wrap:wrap; gap:10px; margin:12px 0; font-size:12px; }
+.accounting-evidence-dialog { width:min(880px,calc(100vw - 32px)); max-height:calc(100dvh - 32px); box-sizing:border-box; overflow:auto; padding:20px; border:2px solid var(--border); background:var(--bg); color:var(--text); }
+.accounting-evidence-dialog::backdrop { background:rgb(0 0 0 / 55%); }
+.accounting-dialog-heading { display:flex; justify-content:space-between; gap:16px; align-items:center; }
+.accounting-selected-record { padding:14px 0; border-bottom:2px solid var(--border); }
+.accounting-page .accounting-selected-record h3 { font-size:18px; overflow-wrap:anywhere; }
+.accounting-evidence-field { border-bottom:2px solid var(--border); padding:12px 0; overflow-wrap:anywhere; }
+.accounting-evidence-field h4 { font-size:14px; margin:0 0 8px; text-transform:capitalize; }
+.accounting-evidence-values { margin:0; }
+.accounting-evidence-values>div { display:grid; grid-template-columns:minmax(100px,1fr) 3fr; gap:14px; padding:4px 0; }
+.accounting-evidence-values dt { color:var(--text-secondary); text-transform:capitalize; }
+.accounting-evidence-values dd { margin:0; }
+.accounting-evidence-dialog pre { white-space:pre-wrap; overflow-wrap:anywhere; font-size:11px; max-height:400px; overflow:auto; }
+@media(max-width:600px) { .accounting-attention { grid-template-columns:1fr; } .accounting-evidence-dialog { padding:12px; } .accounting-evidence-values>div { display:block; } }
+@media print { .accounting-page button,.accounting-page nav,.accounting-page details,.accounting-page .accounting-filters,.accounting-evidence-dialog { display:none!important; } .accounting-page { font-size:11px; } .accounting-year { break-inside:avoid; } }
+.accounting-top-accounts { margin:16px 0; }
+.accounting-page .accounting-top-accounts h3 { font-size:15px; }
+.accounting-top-accounts ol { padding:0; list-style:none; margin:8px 0; }
+.accounting-top-accounts li { display:flex; align-items:center; justify-content:space-between; gap:12px; border-bottom:2px solid var(--border); padding:4px 0; }
+.accounting-top-accounts strong { font:14px 'Courier New',monospace; white-space:nowrap; }
+
+@media print { .accounting-page .accounting-top-accounts button { display:inline!important; border:0; padding:0; background:none; color:inherit; text-align:left; } }
+.accounting-table-wrap table { min-width:720px; }
+.accounting-table-wrap td:first-child { white-space:nowrap; }

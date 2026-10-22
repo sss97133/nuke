@@ -3,7 +3,7 @@ import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 const fixture = vi.hoisted(() => ({ results: {} as Record<string, any>, calls: [] as any[], downloads: [] as string[], authChanged: null as null | (() => void) }));
-vi.mock('../../lib/supabase', () => ({ supabase: { functions: { invoke: async () => ({ data: { data: { lines: [] } }, error: null }) }, storage: { from(bucket: string) { return { async download(path: string) { fixture.downloads.push(`${bucket}/${path}`); return { data: null, error: new Error('not available') }; } }; } }, auth: { getUser: async () => ({ data: { user: null }, error: null }), onAuthStateChange(callback: () => void) { fixture.authChanged = callback; return { data: { subscription: { unsubscribe() {} } } }; } }, from(table: string) {
+vi.mock('../../lib/supabase', () => ({ supabase: { functions: { invoke: async (_name: string, { body }: any) => { fixture.calls.push({ action: body.action }); return { data: { data: fixture.results[body.action] || { lines: [] } }, error: null }; } }, storage: { from(bucket: string) { return { async download(path: string) { fixture.downloads.push(`${bucket}/${path}`); return { data: null, error: new Error('not available') }; } }; } }, auth: { getUser: async () => ({ data: { user: null }, error: null }), onAuthStateChange(callback: () => void) { fixture.authChanged = callback; return { data: { subscription: { unsubscribe() {} } } }; } }, from(table: string) {
   const call: any = { table }; fixture.calls.push(call);
   const q: any = {
     select(fields: string) { call.fields = fields; return q; },
@@ -42,12 +42,14 @@ it('reads pending concerns independently of vehicle/deal allocation and opens re
   fixture.results.financial_review_queue = { data: [{ id: 'concern-1', document_id: 'doc-1', concern_type: 'cut_off', priority: 'high', status: 'pending', detail: 'Date requires corroboration' }], count: 201 };
   fixture.results.financial_document_extractions = { data: [{ id: 'revision-1', field_key: 'amount_ttc', value_normalized: 100, extractor: 'synthetic', is_superseded: true, superseded_by: 'revision-2' }], count: 1 };
   await act(async () => root.render(<FinanceDashboard />));
+  await act(async () => Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'Review questions')!.click());
   expect(container.textContent).toContain('1 of 201 pending concern records across revision history');
   const queueCall = fixture.calls.find(c => c.table === 'financial_review_queue');
   expect(queueCall.filter).toEqual(['status', 'pending']);
   expect(queueCall.range).toEqual([0, 199]);
+  if (!Array.from(container.querySelectorAll('button')).some(b => b.textContent === 'View evidence')) await act(async () => Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'Source documents')!.click());
   await act(async () => Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'View evidence')!.click());
-  expect(container.textContent).toContain('Superseded by revision-2');
+  expect(container.textContent).toContain('Superseded interpretation');
   expect(container.textContent).toContain('Interpretations are not posted expenses');
   const evidenceCall = fixture.calls.find(c => c.table === 'financial_document_extractions');
   expect(evidenceCall.filter).toEqual(['document_id', 'doc-1']);
@@ -59,6 +61,7 @@ it('reads pending concerns independently of vehicle/deal allocation and opens re
 it('does not render mixed-currency rollups as a single monetary total', async () => {
   fixture.results.v_financial_deal_flow = { data: [{ deal_number: 'synthetic', mixed_currency: true, invoiced_total: 999, credited_total: 99 }], count: 1 };
   await act(async () => root.render(<FinanceDashboard />));
+  await act(async () => Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'Deals')!.click());
   expect(container.textContent).toContain('MIXED CURRENCIES');
   expect(container.textContent).not.toContain('999.00');
 });
@@ -66,6 +69,7 @@ it('does not render mixed-currency rollups as a single monetary total', async ()
 it('clears private data and evidence selection on session changes', async () => {
   fixture.results.financial_documents = { data: [invoice()], count: 1 };
   await act(async () => root.render(<FinanceDashboard />));
+  await act(async () => Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'Source documents')!.click());
   expect(container.textContent).toContain('Synthetic merchant');
   fixture.results = {};
   await act(async () => fixture.authChanged!());
@@ -76,6 +80,7 @@ it('paginates evidence revisions beyond the first page', async () => {
   fixture.results.financial_documents = { data: [invoice()], count: 1 };
   fixture.results.financial_document_extractions = { data: [], count: 250 };
   await act(async () => root.render(<FinanceDashboard />));
+  if (!Array.from(container.querySelectorAll('button')).some(b => b.textContent === 'View evidence')) await act(async () => Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'Source documents')!.click());
   await act(async () => Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'View evidence')!.click());
   await act(async () => Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'Older evidence')!.click());
   expect(fixture.calls.filter(c => c.table === 'financial_document_extractions').at(-1).range).toEqual([200, 399]);
@@ -91,6 +96,7 @@ it('retires superseded interpretation questions from the active queue without re
   expect(concernRevision(unknown)).toBe('unknown');
   fixture.results.financial_review_queue = { data: [old, current, unknown], count: 3 };
   await act(async () => root.render(<FinanceDashboard />));
+  await act(async () => Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'Review questions')!.click());
   const activeTable = container.querySelector('section[aria-label="Pending accounting concerns"] table')!;
   expect(activeTable.textContent).not.toContain('Old date question');
   expect(activeTable.textContent).toContain('Current payment question');
@@ -138,9 +144,10 @@ it('withholds unreviewed and superseded sources and never falls back to original
     { id: 'source-retired', field_key: 'redacted_source', value_normalized: v, is_superseded: true, document: { owner_id: 'owner', content_sha256: v.source_sha256 } },
   ], count: 2 };
   await act(async () => root.render(<FinanceDashboard />));
+  if (!Array.from(container.querySelectorAll('button')).some(b => b.textContent === 'View evidence')) await act(async () => Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'Source documents')!.click());
   await act(async () => Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'View evidence')!.click());
   expect(container.textContent).toContain('awaits a hash-linked redaction review');
-  expect(container.textContent).toContain('Source display review superseded');
+  expect(container.textContent).toContain('Superseded interpretation');
   expect(fixture.downloads).toEqual([]);
   expect(container.querySelector('img')).toBeNull();
 });
@@ -151,6 +158,7 @@ it('requests only the bound private derivative and exposes download failures', a
     { id: 'source-reviewed', field_key: 'redacted_source', value_normalized: v, document: { owner_id: 'owner', content_sha256: v.source_sha256 } },
   ], count: 1 };
   await act(async () => root.render(<FinanceDashboard />));
+  if (!Array.from(container.querySelectorAll('button')).some(b => b.textContent === 'View evidence')) await act(async () => Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'Source documents')!.click());
   await act(async () => Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'View evidence')!.click());
   expect(fixture.downloads).toEqual([`user-documents/${v.storage_path}`]);
   expect(container.textContent).toContain('could not be verified or loaded');
@@ -160,10 +168,46 @@ it('requests only the bound private derivative and exposes download failures', a
 it('names retained source files and keeps recovery mounted inside a closed advanced panel', async () => {
   fixture.results.financial_documents = { data: [invoice({ source_filename: 'example-bank-export.csv', doc_type: null, document_number: null })], count: 1 };
   await act(async () => root.render(<FinanceDashboard />));
+  await act(async () => Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'Source documents')!.click());
   expect(container.textContent).toContain('example-bank-export.csv');
   expect(fixture.calls.find(c => c.table === 'financial_documents').fields).toContain('source_filename');
   const advanced = container.querySelector('.accounting-advanced') as HTMLDetailsElement;
   expect(advanced.open).toBe(false);
   expect(advanced.querySelector('input[type="file"]')).not.toBeNull();
   expect(container.textContent).toContain('Tax review is a separate step');
+});
+
+it('opens readable evidence with source quote, closed technical detail, and restores focus on Escape', async () => {
+  fixture.results.financial_documents = { data: [invoice()], count: 1 };
+  fixture.results.financial_document_extractions = { data: [{ id:'readable',field_key:'retained_workpaper_classification_one',value_normalized:{value:{classification:{section:'Owner',category:'Personal subscription',decision:'Retained prior classification'}},evidence:{quote:'Original workbook says personal',source_sheet:'Transactions',source_row:12}},extractor:'retained_source',document:{source_filename:'bookkeeping.csv'} }],count:1 };
+  await act(async () => root.render(<FinanceDashboard/>));
+  await act(async () => Array.from(container.querySelectorAll('button')).find(b=>b.textContent==='Source documents')!.click());
+  const trigger = Array.from(container.querySelectorAll('button')).find(b=>b.textContent==='View evidence')!;
+  trigger.focus();
+  await act(async () => trigger.click());
+  const dialog = container.querySelector('dialog')!;
+  expect(dialog.hasAttribute('open')).toBe(true);
+  expect(dialog.textContent).toContain('Personal subscription');
+  expect(dialog.querySelector('blockquote')?.textContent).toBe('Original workbook says personal');
+  expect(dialog.textContent).toContain('Transactions · 12');
+  expect(dialog.querySelectorAll('details[open]')).toHaveLength(0);
+  expect(dialog.querySelector('canvas')).toBeNull();
+  await act(async () => dialog.dispatchEvent(new Event('cancel',{bubbles:false,cancelable:true})));
+  expect(container.querySelector('dialog')).toBeNull();
+  expect(document.activeElement).toBe(trigger);
+});
+
+it('keeps the chosen bookkeeping record distinct from its batch and defers payment context until requested', async () => {
+  fixture.results.tax_read = { records: [{ id:'bank-row',document_id:'batch-doc',record:{record_kind:'retained_bank_movement',local_id:'bank-one',source_key:'selected-key',year:'2025',date:'2025-02-20',account:'Checking',section:'Owner',category:'Personal subscription',amount:'-13.99',currency:'USD',description:'Chosen synthetic subscription',decision:'Owner-confirmed personal purpose'} }], total_rows:1,next_after:null,controls_valid:true,controls:[] };
+  fixture.results.financial_document_extractions = {data:[{id:'selected-field',field_key:'classification',value_normalized:{value:{source_key:'selected-key',classification:{category:'Personal subscription'}}},document:{source_filename:'batch.csv'}},{id:'other-field',field_key:'other_record',value_normalized:{value:{source_key:'other-key',description:'UNRELATED BATCH RECORD'}}}],count:2};
+  await act(async () => root.render(<FinanceDashboard/>));
+  await act(async () => Array.from(container.querySelectorAll('button')).find(b=>b.textContent==='Records')!.click());
+  await act(async () => Array.from(container.querySelectorAll('button')).find(b=>b.textContent==='View evidence')!.click());
+  const dialog = container.querySelector('dialog')!;
+  expect(dialog.querySelector('[aria-label="Selected accounting record"]')?.textContent).toContain('Chosen synthetic subscription');
+  expect(dialog.textContent).not.toContain('UNRELATED BATCH RECORD');
+  expect(fixture.calls.filter(c=>c.action && c.action!=='tax_read')).toHaveLength(0);
+  const items = Array.from(dialog.querySelectorAll('details')).find(d=>d.querySelector('summary')?.textContent==='Source items and payment comparison')!;
+  await act(async () => { items.open=true; items.dispatchEvent(new Event('toggle')); });
+  expect(fixture.calls.some(c=>c.action==='read')).toBe(true);
 });
