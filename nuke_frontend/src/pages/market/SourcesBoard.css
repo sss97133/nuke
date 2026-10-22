@@ -29,7 +29,7 @@
   grid-template-columns: 22px minmax(205px, 1.45fr) 115px minmax(140px, 1.15fr) minmax(200px, 1.2fr) minmax(120px, 0.95fr) 85px; }
 .market-sources__cols { font-size: 9px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
   color: var(--text-secondary); padding: 2px 0 4px; border-bottom: 1px solid var(--border); }
-.market-sources__cols .n { white-space: normal; line-height: 1.4; }
+.market-sources .market-sources__cols .n { white-space: normal; line-height: 1.4; }
 .market-sources .n { text-align: right; font-family: 'Courier New', monospace; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .market-sources__rows { list-style: none; margin: 0; padding: 0; }
 .market-sources__row { padding: 4px 0; border-bottom: 1px solid var(--border); font-size: 12px; cursor: pointer; }
