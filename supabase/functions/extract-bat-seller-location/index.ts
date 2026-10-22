@@ -14,7 +14,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { parseBatLocation } from "./parse.ts";
 
-type Row = { id: string; listing_url: string; html: string | null; html_storage_path: string | null; fetched_at?: string };
+type Row = { id: string; listing_url: string; html_storage_path: string | null; fetched_at?: string };
 
 Deno.serve(async (req) => {
   const denied = await requireWriteAuth(req); if (denied) return denied;
@@ -22,7 +22,8 @@ Deno.serve(async (req) => {
   const limit = Math.min(Math.max(Number(body.limit) || 200, 1), 500);
   const runId = String(body.run_id || `bat-loc-${new Date().toISOString().slice(0, 10)}`);
   const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-  const cols = "id, listing_url, html, html_storage_path, fetched_at";
+  // html is fetched per row inside the worker loop: selecting 500 inline pages at once exceeded the worker memory limit (546).
+  const cols = "id, listing_url, html_storage_path, fetched_at";
   const base = () => sb.from("listing_page_snapshots").select(cols).eq("platform", "bat").eq("success", true);
 
   let mode: "manual" | "drain" | "recent" | "idle" = "manual";
@@ -53,7 +54,8 @@ Deno.serve(async (req) => {
 
   const out: Record<string, unknown>[] = [];
   const work = async (r: Row) => {
-    let html = r.html;
+    const { data: h } = await sb.from("listing_page_snapshots").select("html").eq("id", r.id).maybeSingle();
+    let html = (h?.html as string | null) ?? null;
     if (!html && r.html_storage_path) {
       const { data: blob } = await sb.storage.from("listing-snapshots").download(r.html_storage_path);
       html = blob ? await blob.text() : null;
@@ -61,7 +63,7 @@ Deno.serve(async (req) => {
     const loc = html ? parseBatLocation(html) : null;
     if (loc) out.push({ snapshot_id: r.id, listing_url: r.listing_url, ...loc, run_id: runId });
   };
-  for (let i = 0; i < rows.length; i += 10) await Promise.all(rows.slice(i, i + 10).map(work));
+  for (let i = 0; i < rows.length; i += 5) await Promise.all(rows.slice(i, i + 5).map(work));
   if (out.length) {
     const { error: e2 } = await sb.from("bat_seller_locations").upsert(out, { onConflict: "snapshot_id", ignoreDuplicates: true });
     if (e2) return Response.json({ ok: false, error: e2.message }, { status: 500 });
