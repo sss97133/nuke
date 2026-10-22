@@ -41,6 +41,18 @@ it('rejects auth/agent overrides in any revision before upload', async () => {
   const b = bundle(); Object.assign(b.items[0].revisions[1].revision, { actor_context: { kind: 'service_role' } });
   await expect(restoreFinancialEvidence(file(b))).rejects.toThrow(); expect(mocks.upload).not.toHaveBeenCalled();
 });
+it.each([['JPG', 'image/jpeg'], ['jpeg', 'image/jpeg'], ['png', 'image/png'], ['webp', 'image/webp'], ['heic', 'image/heic'], ['pdf', 'application/pdf'], ['csv', 'text/csv']])('uses the private bucket-supported type for %s', async (extension, mime) => {
+  const b = bundle(); b.items[0].original.source_filename = `source.${extension}`;
+  await restoreFinancialEvidence(file(b));
+  expect(mocks.upload.mock.calls[0][1].type).toBe(mime);
+  expect(mocks.upload.mock.calls[0][2].contentType).toBe(mime);
+});
+it('rejects a late unsupported original format before any upload', async () => {
+  const b = bundle();
+  b.items.push({ ...b.items[0], original: { ...b.items[0].original, sha256: 'b'.repeat(64), source_filename: 'unsupported.numbers' } });
+  await expect(restoreFinancialEvidence(file(b))).rejects.toThrow('Original format is not supported');
+  expect(mocks.upload).not.toHaveBeenCalled(); expect(mocks.invoke).not.toHaveBeenCalled();
+});
 it('cancellation cannot begin an upload', async () => {
   const controller = new AbortController(); controller.abort();
   await expect(restoreFinancialEvidence(file(bundle()), undefined, controller.signal)).rejects.toThrow(); expect(mocks.upload).not.toHaveBeenCalled();

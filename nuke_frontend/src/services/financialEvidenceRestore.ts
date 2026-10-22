@@ -2,6 +2,7 @@ import { supabase } from '../lib/supabase';
 
 const MAX_BUNDLE = 50 * 1024 * 1024;
 const MAX_ORIGINAL = 10 * 1024 * 1024;
+const ORIGINAL_MIME: Record<string, string> = { pdf: 'application/pdf', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', heic: 'image/heic', csv: 'text/csv' };
 const HASH = /^[a-f0-9]{64}$/;
 const DECIMAL = /^-?\d{1,12}(\.\d{1,6})?$/;
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
@@ -111,7 +112,7 @@ export async function validateFinancialRestoreBundle(file: File): Promise<Item[]
     requireShape(object(raw) && keys(raw, ['original', 'revisions']) && object(raw.original));
     const o = raw.original;
     requireShape(keys(o, ['sha256', 'source_filename', 'source_kind', 'base64']) && typeof o.sha256 === 'string' && HASH.test(o.sha256) && !hashes.has(o.sha256));
-    requireShape(bounded(o.source_filename, 255) && /^[^/\\\x00-\x1f]+\.(pdf|png|jpe?g|webp|heic|csv|numbers)$/i.test(o.source_filename));
+    requireShape(bounded(o.source_filename, 255) && /^[^/\\\x00-\x1f]+\.(pdf|png|jpe?g|webp|heic|csv)$/i.test(o.source_filename), 'Original format is not supported by private document storage.');
     requireShape(['email_attachment', 'email_body', 'scan', 'upload', 'bank_export', 'other'].includes(String(o.source_kind)));
     requireShape(bounded(o.base64, Math.ceil(MAX_ORIGINAL / 3) * 4) && base64Shape(o.base64));
     let bytes: Uint8Array;
@@ -170,7 +171,7 @@ export async function restoreFinancialEvidence(file: File, onProgress: (p: Resto
       await check(); const extension = item.original.source_filename.split('.').pop()!.toLowerCase();
       const path = `${ownerId}/financial-recovery/${item.original.sha256}.${extension}`;
       onProgress({ stage: 'uploading', completed, total });
-      const uploaded = await supabase.storage.from('user-documents').upload(path, new Blob([item.bytes as BlobPart]), { upsert: false, contentType: extension === 'csv' ? 'text/csv' : 'application/octet-stream' });
+      const uploaded = await supabase.storage.from('user-documents').upload(path, new Blob([item.bytes as BlobPart], { type: ORIGINAL_MIME[extension] }), { upsert: false, contentType: ORIGINAL_MIME[extension] });
       await check();
       if (uploaded.error && String((uploaded.error as { statusCode?: string }).statusCode) !== '409') throw new Error('Private upload failed. Retry the same bundle to resume.');
       // A storage conflict is not proof of custody: sanctioned admission below hashes held bytes.
