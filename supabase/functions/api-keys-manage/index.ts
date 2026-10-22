@@ -7,6 +7,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
+import { validateSelfServiceScopes } from "./scopeValidation.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const corsHeaders = {
@@ -104,6 +105,15 @@ Deno.serve(async (req) => {
         );
       }
 
+      let scopes: string[];
+      try {
+        scopes = validateSelfServiceScopes(body.scopes);
+      } catch (error) {
+        return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "Invalid scopes" }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
       // Generate secure API key
       const rawKey = generateApiKey();
       const keyPrefix = rawKey.substring(0, 8);
@@ -122,7 +132,7 @@ Deno.serve(async (req) => {
           name: body.name,
           key_hash: keyHash,
           key_prefix: keyPrefix,
-          scopes: body.scopes || ["read", "write"],
+          scopes,
           is_active: true,
           rate_limit_per_hour: 1000,
           rate_limit_remaining: 1000,

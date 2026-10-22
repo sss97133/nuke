@@ -2,8 +2,8 @@
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-const fixture = vi.hoisted(() => ({ results: {} as Record<string, any>, calls: [] as any[], downloads: [] as string[], authChanged: null as null | (() => void) }));
-vi.mock('../../lib/supabase', () => ({ supabase: { functions: { invoke: async (_name: string, { body }: any) => { fixture.calls.push({ action: body.action }); return { data: { data: fixture.results[body.action] || { lines: [] } }, error: null }; } }, storage: { from(bucket: string) { return { async download(path: string) { fixture.downloads.push(`${bucket}/${path}`); return { data: null, error: new Error('not available') }; } }; } }, auth: { getUser: async () => ({ data: { user: null }, error: null }), onAuthStateChange(callback: () => void) { fixture.authChanged = callback; return { data: { subscription: { unsubscribe() {} } } }; } }, from(table: string) {
+const fixture = vi.hoisted(() => ({ results: {} as Record<string, any>, calls: [] as any[], downloads: [] as string[], authChanged: null as null | (() => void), listeners: new Set<() => void>() }));
+vi.mock('../../lib/supabase', () => ({ supabase: { rpc: async () => ({ data: fixture.results.grants || [], error: null }), functions: { invoke: async (_name: string, { body }: any) => { fixture.calls.push({ action: body.action }); return { data: { data: fixture.results[body.action] || { lines: [] } }, error: null }; } }, storage: { from(bucket: string) { return { async download(path: string) { fixture.downloads.push(`${bucket}/${path}`); return { data: null, error: new Error('not available') }; } }; } }, auth: { getUser: async () => ({ data: { user: { id: '11111111-1111-4111-8111-111111111111' } }, error: null }), onAuthStateChange(callback: () => void) { fixture.listeners.add(callback); fixture.authChanged = () => { for (const listener of [...fixture.listeners]) listener(); }; return { data: { subscription: { unsubscribe() { fixture.listeners.delete(callback); } } } }; } }, from(table: string) {
   const call: any = { table }; fixture.calls.push(call);
   const q: any = {
     select(fields: string) { call.fields = fields; return q; },
@@ -23,7 +23,7 @@ const invoice = (extra: Partial<FinancialDocumentRow> = {}): FinancialDocumentRo
 });
 beforeEach(() => {
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
-  fixture.calls = []; fixture.results = {}; fixture.downloads = [];
+  fixture.calls = []; fixture.results = {}; fixture.downloads = []; fixture.listeners.clear();
   container = document.createElement('div'); document.body.appendChild(container); root = createRoot(container);
 });
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); });
@@ -52,7 +52,7 @@ it('reads pending concerns independently of vehicle/deal allocation and opens re
   expect(container.textContent).toContain('Superseded interpretation');
   expect(container.textContent).toContain('Interpretations are not posted expenses');
   const evidenceCall = fixture.calls.find(c => c.table === 'financial_document_extractions');
-  expect(evidenceCall.filter).toEqual(['document_id', 'doc-1']);
+  expect(evidenceCall.filter).toEqual(['owner_id', '11111111-1111-4111-8111-111111111111']);
   expect(evidenceCall.fields).not.toContain('value_raw');
   expect(evidenceCall.range).toEqual([0, 199]);
   await act(async () => Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'Next page')!.click());
@@ -230,4 +230,16 @@ it('keeps exact UUID-bearing bank evidence behind source details and labels owne
   const technical=Array.from(dialog.querySelectorAll('details')).find(d=>d.querySelector('summary')?.textContent==='Technical source references')!;
   expect(technical.open).toBe(false); expect(technical.textContent).toContain('derived_retained_snapshot');
   expect(dialog.textContent).toContain('Field reference: owner_personal_purpose_resolution_20261022');
+});
+
+it('switches shared book reads without unmounting the owner recovery queue', async () => {
+  fixture.results.grants = [{ id: 'grant', owner_id: '22222222-2222-4222-8222-222222222222', member_id: '11111111-1111-4111-8111-111111111111', active: true, can_correct: true, owner_name: 'Shared owner' }];
+  await act(async () => root.render(<FinanceDashboard />));
+  const recovery = container.querySelector('input[type="file"][multiple]');
+  expect(recovery).not.toBeNull();
+  const selector = container.querySelector('select[aria-label="Active accounting book"]') as HTMLSelectElement;
+  await act(async () => { selector.value = '22222222-2222-4222-8222-222222222222'; selector.dispatchEvent(new Event('change', { bubbles: true })); });
+  expect(container.querySelector('input[type="file"][multiple]')).toBe(recovery);
+  expect(recovery?.closest('[hidden]')).not.toBeNull();
+  expect(fixture.calls.filter(c => c.table === 'financial_documents').at(-1).filter).toEqual(['owner_id', '22222222-2222-4222-8222-222222222222']);
 });

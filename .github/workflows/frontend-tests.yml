@@ -28,7 +28,13 @@ jobs:
           node-version: '25'
       - name: Verify account intake, retained context and private source contracts
         run: >-
-          deno test --node-modules-dir=none --allow-env
+          deno test --node-modules-dir=none --allow-env --allow-read
+          supabase/functions/ingest-observation/financialDelegation.test.ts
+          supabase/functions/mcp-connector/accountingTools.test.ts
+          supabase/functions/mcp-connector/oauth_test.ts
+          supabase/functions/oauth-server/oauthPolicy.test.ts
+          supabase/functions/oauth-server/http.test.ts
+          supabase/functions/api-keys-manage/scopeValidation.test.ts
           supabase/functions/ingest-observation/financialEvidence.test.ts
           supabase/functions/ingest-observation/financialEvidenceHandler.test.ts
           supabase/functions/ingest-observation/financialProcessing.test.ts

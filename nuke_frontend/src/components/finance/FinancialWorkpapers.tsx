@@ -1,3 +1,4 @@
+import { useAccountingBook } from './AccountingBookContext';
 import { useEffect, useRef, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 
@@ -51,6 +52,7 @@ const overviewAmount = (amount: bigint | null, currency: string | null) => amoun
 
 
 export default function FinancialWorkpapers({ revision, onOpen }: { revision: number; onOpen: (documentId: string, record: SavedRecord['record']) => void }) {
+  const { ownerId, shared } = useAccountingBook();
   const [view, setView] = useState<'overview' | 'records' | 'accounts'>('overview');
   const [year, setYear] = useState('');
   const [query, setQuery] = useState('');
@@ -78,7 +80,7 @@ export default function FinancialWorkpapers({ revision, onOpen }: { revision: nu
     const request = ++generation.current;
     setData(null); setError('');
     void supabase.functions.invoke('ingest-observation', { body: {
-      mode: 'financial_evidence_v1', action: 'tax_read', limit: pageSize, ...(cursor ? { after: cursor } : {}),
+      mode: 'financial_evidence_v1', action: 'tax_read', ...(shared ? { owner_user_id: ownerId } : {}), limit: pageSize, ...(cursor ? { after: cursor } : {}),
     } }).then(({ data: response, error: failure }) => {
       if (cancelled || generation.current !== request) return;
       const result = response?.data;
@@ -88,7 +90,7 @@ export default function FinancialWorkpapers({ revision, onOpen }: { revision: nu
       setData(result);
     }).catch(() => { if (!cancelled && generation.current === request) setError('Saved bookkeeping could not load. Its totals are unknown.'); });
     return () => { cancelled = true; if (generation.current === request) generation.current++; };
-  }, [cursor, revision, sessionRevision]);
+  }, [cursor, revision, sessionRevision, ownerId, shared]);
   useEffect(() => { setTablePage(0); }, [view, query, account, kind, unclassified, cursor, year]);
   const controls = data?.controls.filter(row => row.record_kind === 'retained_ledger_decision') || [];
   const years = [...new Set((data?.controls || []).map(row => row.year).filter(value => typeof value === 'string'))].sort().reverse();

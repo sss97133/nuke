@@ -1,3 +1,6 @@
+import SharedAccountingOriginal from '../../components/finance/SharedAccountingOriginal';
+import AccountingAccess, { type BookGrant } from '../../components/finance/AccountingAccess';
+import { AccountingBookContext, useAccountingBook } from '../../components/finance/AccountingBookContext';
 /**
  * FinanceDashboard
  *
@@ -126,6 +129,7 @@ export async function verifySourceRaster(bytes: ArrayBuffer, source: RedactedSou
 }
 
 function RedactedDocumentSource({ row }: { row: ExtractionEvidence }) {
+  const { shared } = useAccountingBook();
   const document = Array.isArray(row.document) ? (row.document.length === 1 ? row.document[0] : null) : row.document;
   const source = reviewedSource(row.value_normalized, document?.owner_id, document?.content_sha256);
   const [url, setUrl] = useState<string | null>(null);
@@ -133,7 +137,7 @@ function RedactedDocumentSource({ row }: { row: ExtractionEvidence }) {
   useEffect(() => {
     let cancelled = false, objectUrl: string | null = null;
     setUrl(null); setError(false);
-    if (!source || row.is_superseded) return;
+    if (!source || row.is_superseded || shared) return;
     supabase.storage.from(source.bucket).download(source.storage_path).then(async ({ data, error }) => {
       if (error || !data) throw new Error('Derivative unavailable');
       const bytes = await data.arrayBuffer();
@@ -182,6 +186,7 @@ function EvidenceDialog({ documentId, record, onClose, trigger }: { trigger: HTM
 }
 
 function DocumentEvidence({ documentId, record }: { documentId: string; record: SavedRecord['record'] | null }) {
+  const { ownerId, shared } = useAccountingBook();
   const [rows, setRows] = useState<ExtractionEvidence[]>([]);
   const [state, setState] = useState('Loading retained evidence…');
   const [page, setPage] = useState(0);
@@ -195,7 +200,7 @@ function DocumentEvidence({ documentId, record }: { documentId: string; record: 
     setRows([]); setCount(null); setState('Loading retained evidence…');
     Promise.resolve(supabase.from('financial_document_extractions')
       .select('id, field_key, value_normalized, extractor, extractor_model, is_superseded, superseded_by, created_at, document:financial_documents(owner_id, content_sha256, source_filename)', { count: 'exact' })
-      .eq('document_id', documentId).order('created_at', { ascending: false }).order('id')
+      .eq('document_id', documentId).eq('owner_id', ownerId || '').order('created_at', { ascending: false }).order('id')
       .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1))
       .then(({ data, error, count }) => {
         if (cancelled) return;
@@ -205,7 +210,7 @@ function DocumentEvidence({ documentId, record }: { documentId: string; record: 
         setState(`${data?.length || 0} of ${count ?? 'unknown'} visible extraction records. Interpretations are not posted expenses.`);
       }).catch(() => { if (!cancelled) setState('Retained evidence could not load.'); });
     return () => { cancelled = true; };
-  }, [documentId, page, reviewRevision]);
+  }, [documentId, page, reviewRevision, ownerId]);
   const sourceDocument = rows[0]?.document;
   const sourceName = (Array.isArray(sourceDocument) ? sourceDocument[0] : sourceDocument)?.source_filename;
   const imageSource = !!sourceName && /\.(jpe?g|png|webp|heic)$/i.test(sourceName);
@@ -233,7 +238,8 @@ function DocumentEvidence({ documentId, record }: { documentId: string; record: 
     {rows.some(row => row.is_superseded) && <details><summary>Earlier interpretations on this page ({rows.filter(row => row.is_superseded).length})</summary>{rows.filter(row => row.is_superseded).map(row => <article key={row.id}><strong>{humanLabel(row.field_key)}</strong><p>Superseded interpretation · {row.created_at}</p><pre>{JSON.stringify(row.value_normalized, null, 2)}</pre></article>)}</details>}
     <div className="accounting-pagination"><button type="button" disabled={page === 0} onClick={() => setPage(p => p - 1)}>Newer evidence</button><button type="button" disabled={(page + 1) * PAGE_SIZE >= (count ?? 0)} onClick={() => setPage(p => p + 1)}>Older evidence</button></div>
     <details onToggle={event => setShowLines(event.currentTarget.open)}><summary>{sourceName?.toLowerCase().endsWith('.csv') ? 'Source items and payment comparison' : 'Receipt items and payment comparison'}</summary>{showLines && <FinancialDocumentLines key={`${documentId}:${reviewRevision}`} documentId={documentId} />}</details>
-    <details><summary>Source processing tools</summary><button type="button" disabled={processing} onClick={async () => {
+    {shared && ownerId && <SharedAccountingOriginal ownerId={ownerId} documentId={documentId} />}
+    {!shared && <details><summary>Source processing tools</summary><button type="button" disabled={processing} onClick={async () => {
       setProcessing(true); setProcessingMessage('Processing retained source…');
       try {
         const result = await processExistingFinancialDocument(documentId);
@@ -243,7 +249,7 @@ function DocumentEvidence({ documentId, record }: { documentId: string; record: 
     }}>{processing ? 'Processing…' : 'Resume document processing'}</button>{processingMessage && <p role="status">{processingMessage}</p>}
       {imageSource ? <FinancialSourceReview key={documentId} documentId={documentId} onComplete={() => setReviewRevision(n => n + 1)} /> : <p>Image privacy review is available for image originals. This source is not currently identified as a supported image.</p>}
       <details><summary>Document reference</summary>{documentId}</details>
-    </details>
+    </details>}
   </section>;
 }
 
@@ -284,6 +290,27 @@ function formatAmount(n: number | null): string {
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function FinanceDashboard() {
+  const [actorId, setActorId] = useState('');
+  const [ownerId, setOwnerId] = useState('');
+  const [grants, setGrants] = useState<BookGrant[]>([]);
+  const [grantRevision, setGrantRevision] = useState(0);
+  const shared = !!ownerId && ownerId !== actorId;
+  useEffect(() => {
+    let cancelled = false;
+    void supabase.auth.getUser().then(async ({ data }) => {
+      if (cancelled) return;
+      const id = data.user?.id || ''; setActorId(id); setOwnerId(current => current || id);
+      const result = await supabase.rpc('list_accounting_access').then(result => result, () => ({ data: null, error: true }));
+      if (cancelled) return;
+      const rows: BookGrant[] = result.error || !Array.isArray(result.data) ? [] : result.data;
+      setGrants(rows); setOwnerId(current => current === id || rows.some(g => g.owner_id === current && g.member_id === id && g.active) ? current : id);
+    }).catch(() => { if (!cancelled) { setActorId(''); setOwnerId(''); setGrants([]); } });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(event => {
+      if (event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED') return;
+      cancelled = true; setActorId(''); setOwnerId(''); setGrants([]); setGrantRevision(n => n + 1);
+    });
+    return () => { cancelled = true; subscription.unsubscribe(); };
+  }, [grantRevision]);
   const generation = useRef(0);
   const [deals, setDeals] = useState<DealFlowRow[]>([]);
   const [docs, setDocs] = useState<FinancialDocumentRow[]>([]);
@@ -318,12 +345,14 @@ export default function FinanceDashboard() {
     setCounts({ docs: null, deals: null, concerns: null });
 
     async function load() {
+      if (!ownerId) { setLoading(false); return; }
       const [dealRes, docRes, queueRes] = await Promise.all([
-        supabase
+        shared ? Promise.resolve({ data: [], error: null, count: 0 }) : supabase
           .from('v_financial_deal_flow')
           .select(
             'deal_number, deal_type, deal_direction, advertiser_name_raw, counterparty_name_raw, invoiced_total, credited_total, currency, invoice_count, document_count, first_invoice_date, mixed_currency', { count: 'exact' }
           )
+          .eq('owner_id', ownerId)
           .order('invoiced_total', { ascending: false })
           .limit(PAGE_SIZE),
         supabase
@@ -331,12 +360,13 @@ export default function FinanceDashboard() {
           .select(
             'id, source_filename, duplicate_of, doc_type, document_number, document_date, issuer_name_raw, recipient_name_raw, amount_ttc, currency, deal_number, review_status', { count: 'exact' }
           )
+          .eq('owner_id', ownerId)
           .order('document_date', { ascending: false, nullsFirst: false })
           .order('id')
           .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1),
         supabase.from('financial_review_queue')
           .select('id, document_id, concern_type, priority, status, detail, confidence_factors, document:financial_documents(attributes)', { count: 'exact' })
-          .eq('status', 'pending')
+          .eq('owner_id', ownerId).eq('status', 'pending')
           .order('created_at', { ascending: true }).order('id')
           .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1),
       ]);
@@ -364,7 +394,7 @@ export default function FinanceDashboard() {
     return () => {
       cancelled = true; if (generation.current === request) generation.current++;
     };
-  }, [page, sessionRevision]);
+  }, [page, sessionRevision, ownerId, shared]);
 
   const noRecords = !errors.length && page === 0 && deals.length === 0 && docs.length === 0 && concerns.length === 0 && !selectedDocument;
 
@@ -381,17 +411,20 @@ export default function FinanceDashboard() {
 
   // ── Render ────────────────────────────────────────────────────
   return (
-    <div className="accounting-page" style={s.container}>
+    <AccountingBookContext.Provider value={{ ownerId, shared }}><div className="accounting-page" style={s.container}>
       <header className="accounting-header"><div><span className="accounting-eyebrow">PRIVATE ACCOUNT</span><h1>Accounting</h1><p>Your books, the documents behind them, and what still needs review.</p></div>
         <button type="button" onClick={() => setSessionRevision(n => n + 1)}>Refresh records</button></header>
-      <FinancialWorkpapers revision={sessionRevision} onOpen={openEvidence} />
+      {actorId && <label>Active book <select aria-label="Active accounting book" value={ownerId} onChange={e => { setOwnerId(e.target.value); setSelectedDocument(null); setSelectedRecord(null); setDocs([]); setConcerns([]); setDeals([]); setPage(0); }}><option value={actorId}>My books</option>{grants.filter(g => g.member_id === actorId && g.active).map(g => <option key={g.id} value={g.owner_id}>{g.owner_name} · shared books ({g.can_correct ? 'review and correct' : 'review'})</option>)}</select></label>}
+      {shared && <p>Shared accounting application access. Corrections through your connected agent retain your identity and the owner's canonical book. Document intake and access management remain with the owner.</p>}
+      <FinancialWorkpapers key={ownerId} revision={sessionRevision} onOpen={openEvidence} />
       <p className="accounting-muted accounting-tax-note">Tax review is a separate step. Saved records are not a filing or a completed reconciliation.</p>
-      <details className="accounting-disclosure"><summary>Add documents <span>Receipts, invoices and supporting files</span></summary>
+      <div hidden={shared}><AccountingAccess grants={grants} actorId={actorId} onChanged={() => setGrantRevision(n => n + 1)} /><details className="accounting-disclosure"><summary>Add documents <span>Receipts, invoices and supporting files</span></summary>
         <FinancialDocumentIntake onComplete={documentId => { openEvidence(documentId); setSessionRevision(n => n + 1); }} />
       </details>
       <details className="accounting-disclosure accounting-advanced"><summary>Advanced: recover existing books <span>Import a prepared recovery bundle</span></summary>
         <FinancialEvidenceRestore onRestored={() => { setPage(0); setSessionRevision(n => n + 1); }} />
       </details>
+      </div>
       {selectedDocument && <EvidenceDialog trigger={evidenceTrigger.current} documentId={selectedDocument} record={selectedRecord} onClose={() => { setSelectedDocument(null); setSelectedRecord(null); }} />}
       <nav className="accounting-tabs" aria-label="Source and review views">{(['summary', 'review', 'documents', 'deals'] as const).map(tab => <button type="button" key={tab} aria-current={sourceView === tab ? 'page' : undefined} onClick={() => setSourceView(tab)}>{tab === 'summary' ? 'Review summary' : tab === 'review' ? 'Review questions' : tab === 'documents' ? 'Source documents' : 'Deals'}</button>)}</nav>
       {loading ? <div style={s.loadingText}>LOADING</div> : noRecords ? <div style={s.accessLine}>
@@ -522,7 +555,7 @@ export default function FinanceDashboard() {
       )}
       {sourceView !== 'summary' && <div className="accounting-pagination"><span>{sourceRowCount ? sourceOffset + 1 : 0}–{Math.min(sourceOffset + 25, sourceRowCount)} of {sourceRowCount} loaded rows</span><button type="button" disabled={sourceOffset === 0} onClick={() => setSourceTablePage(value => value - 1)}>Previous 25 sources</button><button type="button" disabled={sourceOffset + 25 >= sourceRowCount} onClick={() => setSourceTablePage(value => value + 1)}>Next 25 sources</button></div>}
       </>}
-    </div>
+    </div></AccountingBookContext.Provider>
   );
 }
 

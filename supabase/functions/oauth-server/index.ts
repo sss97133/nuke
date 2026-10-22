@@ -7,10 +7,9 @@
  * One edge function, path-dispatched. Vercel rewrites point /.well-known/* and
  * /oauth/* at this function.
  *
- * Issued access tokens are Supabase-compatible JWTs (HS256 with SUPABASE_JWT_SECRET,
- * aud='authenticated', sub=user_id, role='authenticated'). mcp-connector and other
- * NUKE edge functions validate them via the existing apiKeyAuth.ts → supabase.auth.getUser()
- * path — no new validation logic.
+ * Issued access tokens are opaque, revocable credentials backed by existing api_keys.
+ * The browser confirms the actual user; account membership remains the resource authority.
+ * Legacy self-minted JWTs are never accepted as these credentials.
  *
  * Authentication is via Supabase magic link. /oauth/authorize renders a minimal
  * email-input page; submitting it generates a Supabase magic link whose redirect
@@ -22,7 +21,8 @@
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
-import { create as createJWT, getNumericDate } from "https://deno.land/x/djwt@v3.0.2/mod.ts";
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { OAUTH_SCOPES, DEFAULT_OAUTH_SCOPE, validOAuthScope, validOAuthLogin, validCodeVerifier, validRedirectUri } from "./oauthPolicy.ts";
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -37,7 +37,7 @@ const CALLBACK_ENDPOINT = `${ISSUER}/oauth/callback`;
 const CALLBACK_FINISH_ENDPOINT = `${ISSUER}/oauth/callback-finish`;
 const MCP_RESOURCE = `${ISSUER}/mcp`;
 
-const SCOPES_SUPPORTED = ["events:read", "events:write", "events:write:all", "read", "write"];
+const SCOPES_SUPPORTED = OAUTH_SCOPES;
 const ACCESS_TOKEN_TTL_SECONDS = 60 * 60;          // 1 hour
 const REFRESH_TOKEN_TTL_SECONDS = 60 * 60 * 24 * 30; // 30 days
 const CODE_TTL_SECONDS = 60 * 10;                  // 10 minutes
@@ -55,7 +55,7 @@ const CORS = {
 function jsonResp(body: unknown, status = 200, extra: Record<string, string> = {}): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...CORS, "content-type": "application/json", ...extra },
+    headers: { ...CORS, "content-type": "application/json", "cache-control": "no-store", ...extra },
   });
 }
 
@@ -67,6 +67,9 @@ function htmlResp(html: string, status = 200): Response {
       "content-type": "text/html; charset=utf-8",
       "cache-control": "no-store",
       "x-content-type-options": "nosniff",
+      "x-frame-options": "DENY",
+      "content-security-policy": "frame-ancestors 'none'",
+      "referrer-policy": "no-referrer",
     },
   });
 }
@@ -122,57 +125,9 @@ function maskLen(v: string | null | undefined): number {
 }
 
 function makeServiceClient() {
-  return createClient(getEnv("SUPABASE_URL"), getEnv("SUPABASE_SERVICE_ROLE_KEY"), {
+  return createClient(getEnv("SUPABASE_URL"), projectSecretKey()!, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
-}
-
-// HMAC key for signing Supabase-compatible JWTs.
-//
-// The signing secret MUST be the same secret Supabase Auth uses to sign its own JWTs,
-// so that supabase.auth.getUser(token) accepts our tokens. In .env this lives under
-// SUPABASE_JWT_SECRET. In deployed edge-function secrets we have to use a non-SUPABASE_
-// prefixed name (Supabase CLI blocks setting SUPABASE_* secrets), so we look up
-// JWT_SIGNING_SECRET first and fall back to SUPABASE_JWT_SECRET for local-dev convenience.
-// The two MUST hold the same value — set via:
-//   dotenvx run -- bash -c 'supabase secrets set JWT_SIGNING_SECRET="$SUPABASE_JWT_SECRET"'
-async function hmacKey(): Promise<CryptoKey> {
-  const secret = Deno.env.get("JWT_SIGNING_SECRET") ?? Deno.env.get("SUPABASE_JWT_SECRET");
-  if (!secret) throw new Error("Missing env: JWT_SIGNING_SECRET (or SUPABASE_JWT_SECRET for local dev)");
-  return crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(secret),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign", "verify"],
-  );
-}
-
-async function mintAccessToken(userId: string, email: string, scopes: string[]): Promise<string> {
-  const key = await hmacKey();
-  const payload = {
-    aud: "authenticated",
-    role: "authenticated",
-    sub: userId,
-    email,
-    iss: `${getEnv("SUPABASE_URL")}/auth/v1`,
-    iat: getNumericDate(0),
-    exp: getNumericDate(ACCESS_TOKEN_TTL_SECONDS),
-    nuke_oauth: { scopes, source: "oauth-server" },
-  };
-  return await createJWT({ alg: "HS256", typ: "JWT" }, payload, key);
-}
-
-async function mintRefreshToken(userId: string, clientId: string): Promise<string> {
-  const key = await hmacKey();
-  const payload = {
-    sub: userId,
-    cid: clientId,
-    type: "refresh",
-    iat: getNumericDate(0),
-    exp: getNumericDate(REFRESH_TOKEN_TTL_SECONDS),
-  };
-  return await createJWT({ alg: "HS256", typ: "JWT" }, payload, key);
 }
 
 // ── Route: GET /.well-known/oauth-authorization-server ───────────────────────
@@ -188,7 +143,7 @@ function handleAuthServerMetadata(): Response {
     scopes_supported: SCOPES_SUPPORTED,
     response_types_supported: ["code"],
     grant_types_supported: ["authorization_code", "refresh_token"],
-    token_endpoint_auth_methods_supported: ["none", "client_secret_post"],
+    token_endpoint_auth_methods_supported: ["none"],
     code_challenge_methods_supported: ["S256"],
     service_documentation: `${ISSUER}/api/docs`,
   });
@@ -240,13 +195,14 @@ async function handleDcr(req: Request): Promise<Response> {
     return jsonResp({ error: "invalid_redirect_uri", error_description: "At least one redirect_uri is required" }, 400);
   }
   for (const u of redirectUris) {
-    try { new URL(u); } catch {
+    if (!validRedirectUri(u)) {
       return jsonResp({ error: "invalid_redirect_uri", error_description: `Invalid redirect_uri: ${u}` }, 400);
     }
   }
 
   const clientId = "nuke_" + randomToken(16);
   const tokenAuthMethod = body.token_endpoint_auth_method ?? "none";
+  if (tokenAuthMethod !== "none" || !validOAuthScope(body.scope ?? DEFAULT_OAUTH_SCOPE)) return jsonResp({error:"invalid_client_metadata"},400);
   let clientSecret: string | undefined;
   let clientSecretHash: string | null = null;
   if (tokenAuthMethod !== "none") {
@@ -267,7 +223,7 @@ async function handleDcr(req: Request): Promise<Response> {
       ? body.response_types
       : ["code"],
     token_endpoint_auth_method: tokenAuthMethod,
-    scope: body.scope ?? "events:write events:read",
+    scope: body.scope ?? DEFAULT_OAUTH_SCOPE,
   });
 
   if (error) {
@@ -283,7 +239,7 @@ async function handleDcr(req: Request): Promise<Response> {
     grant_types: body.grant_types ?? ["authorization_code", "refresh_token"],
     response_types: body.response_types ?? ["code"],
     token_endpoint_auth_method: tokenAuthMethod,
-    scope: body.scope ?? "events:write events:read",
+    scope: body.scope ?? DEFAULT_OAUTH_SCOPE,
   };
   if (clientSecret) resp.client_secret = clientSecret;
 
@@ -298,7 +254,8 @@ async function handleAuthorize(req: Request): Promise<Response> {
   const clientId = params.get("client_id") ?? "";
   const redirectUri = params.get("redirect_uri") ?? "";
   const responseType = params.get("response_type") ?? "code";
-  const scope = params.get("scope") ?? "events:write events:read";
+  const scope = params.get("scope") ?? DEFAULT_OAUTH_SCOPE;
+  if (!validOAuthScope(scope)) return errorPage("Unsupported OAuth scope");
   const state = params.get("state") ?? "";
   const codeChallenge = params.get("code_challenge") ?? "";
   const codeChallengeMethod = params.get("code_challenge_method") ?? "S256";
@@ -316,16 +273,16 @@ async function handleAuthorize(req: Request): Promise<Response> {
 
   if (!clientId) return errorPage("missing client_id");
   if (!redirectUri) return errorPage("missing redirect_uri");
-  if (responseType !== "code") return redirectError(redirectUri, state, "unsupported_response_type");
-  if (!codeChallenge) return redirectError(redirectUri, state, "invalid_request", "PKCE required: code_challenge");
-  if (codeChallengeMethod !== "S256") return redirectError(redirectUri, state, "invalid_request", "code_challenge_method must be S256");
+  if (responseType !== "code") return errorPage("Unsupported response type");
+  if (!codeChallenge) return errorPage("PKCE required: code_challenge");
+  if (codeChallengeMethod !== "S256") return errorPage("code_challenge_method must be S256");
 
   const supabase = makeServiceClient();
-  const { data: client } = await supabase.from("oauth_clients").select("client_id, redirect_uris, client_name").eq("client_id", clientId).maybeSingle();
+  const { data: client } = await supabase.from("oauth_clients").select("client_id, redirect_uris, client_name, token_endpoint_auth_method").eq("client_id", clientId).maybeSingle();
   if (!client) return errorPage(`unknown client_id: ${clientId}`);
 
   const allowed = (client.redirect_uris as string[] | null | undefined) ?? [];
-  if (!allowed.includes(redirectUri)) return errorPage(`redirect_uri not registered for this client: ${redirectUri}`);
+  if (!validOAuthLogin({redirect_uri:redirectUri,scope,code_challenge:codeChallenge,code_challenge_method:codeChallengeMethod},client)) return errorPage(`redirect_uri not registered for this client: ${redirectUri}`);
 
   // Render minimal login page. User enters email; submit POSTs to /oauth/login.
   const escapedClientName = String(client.client_name ?? "the application").replace(/[<>&"']/g, (c) => ({"<":"&lt;",">":"&gt;","&":"&amp;",'"':"&quot;","'":"&#39;"}[c] as string));
@@ -363,7 +320,7 @@ async function handleAuthorize(req: Request): Promise<Response> {
 <body>
   <div class="card">
     <h1>Connect ${escapedClientName} to NUKE</h1>
-    <p><strong>${escapedClientName}</strong> wants permission to write vehicle events on your behalf.</p>
+    <p><strong>${escapedClientName}</strong> requests the permissions listed below for your account. Shared accounting access additionally requires an explicit book-owner grant. Accounting read includes private source evidence; accounting correct permits attributed revisions and preserves history.</p>
     <div class="meta scopes">
       <span class="pill">scope</span> ${scope.split(" ").filter(Boolean).map((s) => `<code>${s.replace(/[<>&"']/g, "")}</code>`).join(" ")}
     </div>
@@ -427,6 +384,9 @@ async function handleLogin(req: Request): Promise<Response> {
     return errorPage("Malformed oauth_params");
   }
 
+  const oauthClient = await makeServiceClient().from("oauth_clients").select("redirect_uris,token_endpoint_auth_method").eq("client_id", oauthParams.client_id).maybeSingle();
+  oauthParams.scope ??= DEFAULT_OAUTH_SCOPE;
+  if (!validOAuthLogin(oauthParams, oauthClient.data)) return errorPage("Invalid OAuth client, redirect, scope, or PKCE challenge");
   const sessionId = randomToken(24);
   logEvent("oauth_login_session_created", {
     session_id: sessionId,
@@ -499,7 +459,7 @@ async function handleCallback(req: Request): Promise<Response> {
   // But fragments aren't visible server-side. Supabase also supports ?token=...&type=magiclink
   // via verifyOtp. We'll look for either the access_token param OR a token (one-time-token).
   // Fall back to a second flow: PKCE-style code flow where ?code=... is provided.
-  const accessToken = url.searchParams.get("access_token");
+  let accessToken = url.searchParams.get("access_token");
   const tokenHash = url.searchParams.get("token_hash") ?? url.searchParams.get("token");
   const codeParam = url.searchParams.get("code");
 
@@ -519,52 +479,53 @@ async function handleCallback(req: Request): Promise<Response> {
   if (!userId && tokenHash) {
     const { data: v } = await supabase.auth.verifyOtp({ type: "magiclink", token_hash: tokenHash } as any).catch(() => ({ data: null }));
     userId = (v as any)?.user?.id ?? null;
+    accessToken = (v as any)?.session?.access_token ?? accessToken;
   }
   if (!userId && codeParam) {
     const { data: v } = await supabase.auth.exchangeCodeForSession(codeParam).catch(() => ({ data: null }));
     userId = (v as any)?.user?.id ?? null;
+    accessToken = (v as any)?.session?.access_token ?? accessToken;
   }
 
-  // Last resort: return an HTML page with JS that reads the URL fragment and POSTs
-  // back to /oauth/callback-finish. Supabase magic-link redirects often put the token in
-  // the fragment.
-  if (!userId) {
-    logEvent("oauth_callback_fragment_fallback", { session_id: sessionId });
-    return htmlResp(`<!doctype html><meta charset="utf-8"><title>Finishing login</title>
-<body style="font-family: Arial, sans-serif; max-width: 420px; margin: 80px auto; padding: 24px; border: 2px solid #111;">
-<h1 style="font-size: 14px; letter-spacing: 2px; text-transform: uppercase;">Finishing login</h1>
-<p style="font-size: 13px;">Completing the connection… this should take a second.</p>
+  const { data: client } = await supabase.from('oauth_clients').select('client_name').eq('client_id',sess.client_id).maybeSingle();
+  const escape = (value: unknown) => String(value ?? '').replace(/[<>&"']/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'}[c]!));
+  // Authentication never constitutes client consent. Even an unsolicited magic link
+  // stops here and shows the stored client, redirect destination and exact permissions.
+  return htmlResp(`<!doctype html><meta charset="utf-8"><title>Approve connection</title>
+<body style="font-family:Arial;max-width:520px;margin:48px auto;padding:24px;border:2px solid #111">
+<h1>Approve this connection</h1><p><strong>${escape(client?.client_name || 'Registered client')}</strong> requests access as your account.</p>
+<p>Client: ${escape(sess.client_id)}<br>Returns to: ${escape(sess.redirect_uri)}</p>
+<p>Requested permissions: <strong>${escape(sess.scope)}</strong></p>
+<p>Accounting read includes private books and original evidence. Accounting correct permits attributed corrections, preserving originals and prior interpretations. Shared books require the owner's explicit application grant. No filing, payment or SQL permission is granted.</p>
+<button id="approve" type="button">Approve these permissions</button><p id="status" role="status"></p>
 <script>
-(async () => {
-  const frag = new URLSearchParams(location.hash.replace(/^#/, ""));
-  const access_token = frag.get("access_token");
-  if (!access_token) {
-    document.body.innerHTML += '<p style="color:#b00020">No access_token in callback URL. Try the magic link again.</p>';
-    return;
-  }
-  const u = new URL(location.href);
-  u.hash = "";
-  const params = new URLSearchParams({ session: ${JSON.stringify(sessionId)}, access_token });
-  // Absolute URL — defensive against webview base resolution quirks (anthropics/claude-ai-mcp#8).
-  const res = await fetch("${CALLBACK_FINISH_ENDPOINT}?" + params.toString(), { method: "POST" });
-  if (res.redirected) { location.href = res.url; return; }
-  if (res.ok) {
-    const j = await res.json().catch(() => ({}));
-    if (j.redirect) { location.href = j.redirect; return; }
-  }
-  document.body.innerHTML += '<p style="color:#b00020">Could not finish login. ' + (await res.text()).slice(0,200) + '</p>';
+(() => {
+ const frag = new URLSearchParams(location.hash.replace(/^#/,''));
+ const access_token = ${JSON.stringify(accessToken).replace(/</g,'\\u003c')} || frag.get('access_token');
+ history.replaceState(null,'',location.pathname + '?session=' + encodeURIComponent(${JSON.stringify(sessionId).replace(/</g,'\\u003c')}));
+ const button=document.getElementById('approve'), status=document.getElementById('status');
+ button.addEventListener('click', async () => {
+  button.disabled=true;
+  if(!access_token){status.textContent='Sign-in could not be verified. Request a new connection.';return;}
+  const params = new URLSearchParams({ session: ${JSON.stringify(sessionId).replace(/</g,'\\u003c')}, access_token, consent: 'approve' });
+  try {
+   const res=await fetch('${CALLBACK_FINISH_ENDPOINT}',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body: params.toString()});
+   const result=await res.json();
+   if(res.ok && result.redirect){location.href=result.redirect;return;}
+   status.textContent='Connection refused or expired. Request a new connection.';
+  } catch {status.textContent='Connection could not finish. Try again.';button.disabled=false;}
+ });
 })();
-</script>
-</body>`);
-  }
+</script></body>`);
 
-  return finishCallback(sessionId, userId);
 }
 
 async function handleCallbackFinish(req: Request): Promise<Response> {
-  const url = new URL(req.url);
-  const sessionId = url.searchParams.get("session") ?? "";
-  const accessToken = url.searchParams.get("access_token") ?? "";
+  if (!req.headers.get("content-type")?.includes("application/x-www-form-urlencoded")) return jsonResp({error:"invalid_request"},400);
+  const form = new URLSearchParams(await req.text());
+  if (form.get("consent") !== "approve" || req.headers.get("origin") !== new URL(ISSUER).origin) return jsonResp({error:"explicit_consent_required"},403);
+  const sessionId = form.get("session") ?? "";
+  const accessToken = form.get("access_token") ?? "";
   logEvent("oauth_callback_finish", {
     session_id: sessionId || null,
     access_token_len: maskLen(accessToken),
@@ -574,33 +535,14 @@ async function handleCallbackFinish(req: Request): Promise<Response> {
   const { data: u } = await supabase.auth.getUser(accessToken);
   const userId = u?.user?.id;
   if (!userId) return jsonResp({ error: "could not resolve user from access_token" }, 400);
-  return finishCallback(sessionId, userId);
+  return finishCallback(sessionId, userId, true);
 }
 
-async function finishCallback(sessionId: string, userId: string): Promise<Response> {
+async function finishCallback(sessionId: string, userId: string, jsonRedirect = false): Promise<Response> {
   const supabase = makeServiceClient();
-  const { data: sess, error: sErr } = await supabase.from("oauth_login_sessions")
-    .select("*").eq("session_id", sessionId).maybeSingle();
-  if (sErr || !sess) return errorPage("session not found");
-
-  // Generate authorization code, store with PKCE binding.
   const code = randomToken(32);
-  const { error: codeErr } = await supabase.from("oauth_authorization_codes").insert({
-    code,
-    client_id: sess.client_id,
-    user_id: userId,
-    redirect_uri: sess.redirect_uri,
-    scope: sess.scope,
-    code_challenge: sess.code_challenge,
-    code_challenge_method: sess.code_challenge_method,
-    expires_at: new Date(Date.now() + CODE_TTL_SECONDS * 1000).toISOString(),
-  });
-  if (codeErr) {
-    console.error("[oauth-server] auth code insert:", codeErr.message);
-    return errorPage("Could not issue authorization code");
-  }
-
-  await supabase.from("oauth_login_sessions").update({ completed_at: new Date().toISOString(), user_id: userId }).eq("session_id", sessionId);
+  const { data: sess, error } = await supabase.rpc("finish_mcp_oauth_login", {p_session_id:sessionId,p_user_id:userId,p_code:code});
+  if (error || !sess) return errorPage("Invalid, expired, or completed login session");
 
   const redir = new URL(sess.redirect_uri);
   redir.searchParams.set("code", code);
@@ -614,11 +556,7 @@ async function finishCallback(sessionId: string, userId: string): Promise<Respon
     redirect_uri: sess.redirect_uri,
   });
 
-  // For browser flow: redirect. For fetch-based polling, return JSON with redirect URL.
-  return new Response(JSON.stringify({ redirect: redir.toString() }), {
-    status: 200,
-    headers: { ...CORS, "content-type": "application/json", location: redir.toString() },
-  });
+  return jsonRedirect ? jsonResp({redirect:redir.toString()}) : redirectResp(redir.toString());
 }
 
 // ── Route: POST /oauth/token ─────────────────────────────────────────────────
@@ -645,123 +583,32 @@ async function handleToken(req: Request): Promise<Response> {
   return jsonResp({ error: "unsupported_grant_type" }, 400);
 }
 
-async function handleTokenAuthCode(body: Record<string, string>): Promise<Response> {
-  const { code, client_id, redirect_uri, code_verifier } = body;
-  logEvent("oauth_token_authorization_code", {
-    grant_type: "authorization_code",
-    client_id: client_id ?? null,
-    redirect_uri: redirect_uri ?? null,
-    code_len: maskLen(code),
-    code_verifier_len: maskLen(code_verifier),
-  });
-  if (!code || !client_id || !redirect_uri || !code_verifier) {
-    return jsonResp({ error: "invalid_request", error_description: "Missing required parameters" }, 400);
+async function exchangeCredential(body: Record<string,string>): Promise<Response> {
+  const refresh = body.grant_type === "refresh_token";
+  if (!body.client_id || (refresh ? !/^nuke_refresh_[a-f0-9]{64}$/.test(body.refresh_token ?? "") : !body.code || !body.redirect_uri || !validCodeVerifier(body.code_verifier))) {
+    return jsonResp({error:"invalid_grant"},400);
   }
-
-  const supabase = makeServiceClient();
-  const { data: row, error } = await supabase.from("oauth_authorization_codes").select("*").eq("code", code).maybeSingle();
-  if (error || !row) return jsonResp({ error: "invalid_grant", error_description: "code not found" }, 400);
-  if (row.used_at) return jsonResp({ error: "invalid_grant", error_description: "code already used" }, 400);
-  if (new Date(row.expires_at) < new Date()) return jsonResp({ error: "invalid_grant", error_description: "code expired" }, 400);
-  if (row.client_id !== client_id) return jsonResp({ error: "invalid_grant", error_description: "client_id mismatch" }, 400);
-  if (row.redirect_uri !== redirect_uri) return jsonResp({ error: "invalid_grant", error_description: "redirect_uri mismatch" }, 400);
-
-  // PKCE verification.
-  const expected = await base64UrlSha256(code_verifier);
-  if (expected !== row.code_challenge) {
-    logEvent("oauth_token_pkce_mismatch", {
-      client_id,
-      code_verifier_len: maskLen(code_verifier),
-      expected_len: maskLen(expected),
-      stored_challenge_len: maskLen(row.code_challenge),
-    });
-    return jsonResp({ error: "invalid_grant", error_description: "PKCE verification failed" }, 400);
-  }
-
-  // Mark code used (one-time).
-  await supabase.from("oauth_authorization_codes").update({ used_at: new Date().toISOString() }).eq("code", code);
-
-  // Get user email (claim hydration).
-  const { data: userRec } = await supabase.auth.admin.getUserById(row.user_id);
-  const email = userRec?.user?.email ?? "";
-  const scopes = (row.scope ?? "events:write events:read").split(" ").filter(Boolean);
-
-  const accessToken = await mintAccessToken(row.user_id, email, scopes);
-  const refreshToken = await mintRefreshToken(row.user_id, client_id);
-
-  await supabase.from("oauth_clients").update({ last_used_at: new Date().toISOString() }).eq("client_id", client_id);
-
-  logEvent("oauth_token_issued", {
-    grant_type: "authorization_code",
-    client_id,
-    user_id: row.user_id,
-    scopes,
-    access_token_len: maskLen(accessToken),
-    refresh_token_len: maskLen(refreshToken),
-    expires_in: ACCESS_TOKEN_TTL_SECONDS,
+  const accessToken = "nuke_oauth_" + randomToken(32);
+  const refreshToken = ["nuke_refresh_", randomToken(32)].join("");
+  const {data,error} = await makeServiceClient().rpc("exchange_mcp_oauth_credential", {
+    p_grant_type: body.grant_type,
+    p_credential: refresh ? "sha256_" + await sha256Hex(body.refresh_token) : body.code,
+    p_client_id: body.client_id, p_redirect_uri: refresh ? null : body.redirect_uri,
+    p_challenge: refresh ? null : await base64UrlSha256(body.code_verifier),
+    p_access_hash: "sha256_" + await sha256Hex(accessToken),
+    p_refresh_hash: "sha256_" + await sha256Hex(refreshToken),
   });
-
-  return jsonResp({
-    access_token: accessToken,
-    token_type: "Bearer",
-    expires_in: ACCESS_TOKEN_TTL_SECONDS,
-    refresh_token: refreshToken,
-    scope: scopes.join(" "),
-  });
+  if(error || !data) return jsonResp({error:"invalid_grant"},400);
+  return jsonResp({access_token:accessToken,token_type:"Bearer",expires_in:ACCESS_TOKEN_TTL_SECONDS,refresh_token:refreshToken,scope:data.scopes.join(" ")});
 }
-
-async function handleTokenRefresh(body: Record<string, string>): Promise<Response> {
-  const { refresh_token, client_id } = body;
-  logEvent("oauth_token_refresh", {
-    grant_type: "refresh_token",
-    client_id: client_id ?? null,
-    refresh_token_len: maskLen(refresh_token),
-  });
-  if (!refresh_token) return jsonResp({ error: "invalid_request", error_description: "refresh_token required" }, 400);
-
-  const key = await hmacKey();
-  const { verify } = await import("https://deno.land/x/djwt@v3.0.2/mod.ts");
-  let payload: any;
-  try {
-    payload = await verify(refresh_token, key);
-  } catch {
-    return jsonResp({ error: "invalid_grant", error_description: "refresh_token invalid" }, 400);
-  }
-  if (payload.type !== "refresh") return jsonResp({ error: "invalid_grant" }, 400);
-  if (client_id && payload.cid !== client_id) return jsonResp({ error: "invalid_grant", error_description: "client_id mismatch" }, 400);
-
-  const supabase = makeServiceClient();
-  const { data: userRec } = await supabase.auth.admin.getUserById(String(payload.sub));
-  const email = userRec?.user?.email ?? "";
-  const scopes = ["events:write", "events:read"];
-  const accessToken = await mintAccessToken(String(payload.sub), email, scopes);
-  const refreshNew = await mintRefreshToken(String(payload.sub), String(payload.cid));
-
-  logEvent("oauth_token_issued", {
-    grant_type: "refresh_token",
-    client_id: String(payload.cid),
-    user_id: String(payload.sub),
-    scopes,
-    access_token_len: maskLen(accessToken),
-    refresh_token_len: maskLen(refreshNew),
-    expires_in: ACCESS_TOKEN_TTL_SECONDS,
-  });
-
-  return jsonResp({
-    access_token: accessToken,
-    token_type: "Bearer",
-    expires_in: ACCESS_TOKEN_TTL_SECONDS,
-    refresh_token: refreshNew,
-    scope: scopes.join(" "),
-  });
-}
-
-// ── Route: POST /oauth/revoke ────────────────────────────────────────────────
-
-async function handleRevoke(_req: Request): Promise<Response> {
-  logEvent("oauth_revoke");
-  // Stateless tokens — true revocation requires a denylist. Stub for spec compliance.
-  return jsonResp({}, 200);
+async function handleTokenAuthCode(body: Record<string,string>): Promise<Response> { return exchangeCredential({...body,grant_type:"authorization_code"}); }
+async function handleTokenRefresh(body: Record<string,string>): Promise<Response> { return exchangeCredential({...body,grant_type:"refresh_token"}); }
+async function handleRevoke(req: Request): Promise<Response> {
+  const form = new URLSearchParams(await req.text());
+  const token = form.get("token") ?? ""; const client = form.get("client_id") ?? "";
+  if (!client || !token) return jsonResp({error:"invalid_request"},400);
+  const {error} = await makeServiceClient().rpc("revoke_mcp_oauth_credential",{p_token_hash:"sha256_"+await sha256Hex(token),p_client_id:client});
+  return error ? jsonResp({error:"server_error"},503) : jsonResp({});
 }
 
 // ── Dispatch ─────────────────────────────────────────────────────────────────
