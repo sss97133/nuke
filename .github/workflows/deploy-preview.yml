@@ -18,6 +18,10 @@ concurrency:
 jobs:
   deploy-preview:
     runs-on: ubuntu-latest
+    env:
+      # CI has no local project link. Keep preview and production on the same project.
+      VERCEL_ORG_ID: team_XppaY5WVxdsJ7Lrw8q2l9NFi
+      VERCEL_PROJECT_ID: prj_VkFdy6K0osTSOfR6wRpb5TVYsgA5
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -25,7 +29,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
           cache-dependency-path: nuke_frontend/package-lock.json
 
@@ -34,26 +38,32 @@ jobs:
         run: npm ci
 
       - name: Install Vercel CLI
-        run: npm install --global vercel@latest
+        run: npm install --global vercel@52.0.0
 
       - name: Pull Vercel Environment Information
         working-directory: ./nuke_frontend
-        run: vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: vercel pull --yes --environment=preview
 
       - name: Build Project Artifacts
         working-directory: ./nuke_frontend
-        run: vercel build --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: vercel build
 
       - name: Deploy Project Artifacts to Vercel
-        working-directory: ./nuke_frontend
-        run: vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }}
-
-      - name: Get Preview URL
         id: deploy
         working-directory: ./nuke_frontend
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: |
-          URL=$(vercel inspect --token=${{ secrets.VERCEL_TOKEN }} | grep -o 'https://[^ ]*' | head -1 || echo "https://nuke.vercel.app")
-          echo "url=$URL" >> $GITHUB_OUTPUT
+          URL=$(vercel deploy --prebuilt)
+          if [[ ! "$URL" =~ ^https://[a-zA-Z0-9-]+\.vercel\.app$ ]]; then
+            echo "Vercel did not return a deployment URL" >&2
+            exit 1
+          fi
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
 
       - name: Comment Preview URL
         uses: actions/github-script@v7

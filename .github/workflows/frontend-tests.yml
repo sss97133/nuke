@@ -65,6 +65,19 @@ jobs:
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
+      - name: Verify native canonical collector through HTTP and PostgreSQL
+        env:
+          BAT_LIVE_PG_TEST: '1'
+          DB_CONTRACT_PSQL: psql
+        run: |
+          set -euo pipefail
+          fixture_file="$(mktemp /tmp/nuke-bat-prepared.XXXXXX)"
+          trap 'dropdb --if-exists nuke_soft_close_test; psql -X -v ON_ERROR_STOP=1 -d postgres -c "DROP ROLE IF EXISTS anon, authenticated, service_role"; rm -f "$fixture_file"' EXIT
+          deno run --node-modules-dir=none supabase/sql/prepare_bat_public_live_fixture.ts --stdout > "$fixture_file"
+          createdb nuke_soft_close_test
+          psql -X -v ON_ERROR_STOP=1 -v bat_fixture_json="$(cat "$fixture_file")" -d nuke_soft_close_test -f supabase/sql/test_bat_public_live_events.sql
+          psql -X -v ON_ERROR_STOP=1 -v bat_fixture_json="$(cat "$fixture_file")" -d nuke_soft_close_test -f supabase/sql/test_bat_live_relisted_lot_fold.sql
+          deno test --node-modules-dir=none --allow-env --allow-read --allow-run=psql --filter PostgreSQL supabase/functions/ingest-observation/batLiveCollector.test.ts
       - name: Run each database contract in its own fresh database
         run: scripts/ci/run-db-contracts.sh --ci-service
 
@@ -633,6 +646,9 @@ jobs:
           deno-version: v2.x
       - name: Verify daily close reconciliation through canonical native intake
         run: node --test scripts/check-auction-reconciliation.test.mjs
+      - name: Verify relisted native receipts retire locator monitors without hiding QC failures
+        # Mixed-runtime fixture supabase/sql/test_bat_relisted_controls.sql is executed by this harness.
+        run: node --test scripts/check-bat-relisted-controls.test.mjs
       - name: Verify late recovery watermarks and raw comment cache authorization
         run: node --test scripts/check-structure-review-closeout.test.mjs
       - name: Verify retained source account admission and conflict preservation
@@ -646,7 +662,7 @@ jobs:
       - name: Verify extract-bat-core writes an end event only after the close, and its page read clock
         run: deno test supabase/functions/extract-bat-core/auctionClose.test.ts supabase/functions/extract-bat-core/sourceReadClock.test.ts
       - name: Verify native BaT frames, per-lot admission isolation and coverage
-        run: deno test --node-modules-dir=none supabase/functions/_shared/batLiveEvents.test.ts
+        run: deno test --node-modules-dir=none --allow-env --allow-read supabase/functions/_shared/batLiveEvents.test.ts supabase/functions/extract-bat-core/liveStream.test.ts
       - name: Verify the Craigslist attribute block (parser, queue payload, funnel, VIN landing, ledger row)
         run: deno test --allow-read=supabase/functions/extract-craigslist/fixtures,supabase/functions/extract-ksl/fixtures,supabase/functions/extract-classiccars/fixtures,supabase/functions/extract-collecting-cars/fixtures supabase/functions/extract-craigslist/ supabase/functions/extract-ksl/ supabase/functions/extract-classiccars/ supabase/functions/extract-collecting-cars/ supabase/functions/extract-vehicle-data-ai/normalize.test.ts supabase/functions/ingest/craigslistCapture.test.ts supabase/functions/ingest/classifiedEvent.test.ts supabase/functions/ingest/vinGate.test.ts supabase/functions/ingest/repostMatch.test.ts
       - name: Verify permitted Facebook capture, revisits, retry and custody acknowledgements

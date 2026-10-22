@@ -1,41 +1,13 @@
 import { strict as assert } from "node:assert";
 import fixture from "./batLiveEvents.fixture.json" with { type: "json" };
-import { BatLiveBuffer, prepareBatLiveFrame, type BatLiveFrame, type BatLiveTarget } from "./batLiveEvents.ts";
+import { BatLiveBuffer, BatLiveAdmissionError, prepareBatLiveFrame, type BatLiveFrame, type BatLiveTarget } from "./batLiveEvents.ts";
 import { batStreamIO, collectBatLive } from "../extract-bat-core/liveStream.ts";
 
 const target: BatLiveTarget = { id: "00000000-0000-0000-0000-000000000001", vehicle_id: "00000000-0000-0000-0000-000000000002",
   post_id: fixture.post_id, source_url: fixture.source_url, last_comment_id: 0 };
 const frames = fixture.events.map(f => ({ ...f, monitored_auction_id: target.id, transport: "public_pusher" as const }));
 
-// Control the collector's clock and waits together. Real one-second timers can
-// wake just before its threshold, making short fixtures skip a heartbeat/ping.
-async function withCollectorClock(run:()=>Promise<void>) {
-  const realNow=Date.now,realSetTimeout=globalThis.setTimeout,realClearTimeout=globalThis.clearTimeout;
-  let now=realNow(),nextId=0,pump:ReturnType<typeof globalThis.setTimeout>|undefined;
-  const timers=new Map<number,{at:number;run:()=>void}>();
-  const schedule=()=>{
-    if(pump!==undefined||!timers.size)return;
-    pump=realSetTimeout(()=>{
-      pump=undefined;
-      const next=[...timers].sort((a,b)=>a[1].at-b[1].at||a[0]-b[0])[0];
-      if(next){timers.delete(next[0]);now=Math.max(now,next[1].at);next[1].run();}
-      schedule();
-    },0);
-  };
-  Date.now=()=>now;
-  globalThis.setTimeout=((handler:Parameters<typeof setTimeout>[0],delay=0,...args:unknown[])=>{
-    assert.equal(typeof handler,"function");
-    const id=++nextId;
-    timers.set(id,{at:now+Math.max(0,delay),run:()=>{(handler as (...args:unknown[])=>void)(...args);}});
-    schedule();return id;
-  }) as unknown as typeof globalThis.setTimeout;
-  globalThis.clearTimeout=(id)=>{if(typeof id==="number")timers.delete(id);};
-  try { await run(); }
-  finally {
-    if(pump!==undefined)realClearTimeout(pump);
-    Date.now=realNow;globalThis.setTimeout=realSetTimeout;globalThis.clearTimeout=realClearTimeout;
-  }
-}
+import { withCollectorClock } from "./batLiveTestClock.ts";
 
 Deno.test("captured native bid and final record retain source clocks, identities and result", async () => {
   const bid = await prepareBatLiveFrame(frames[0], target);
@@ -530,4 +502,22 @@ Deno.test("one bid arriving by three transports with differently shaped frames i
   // a different bid (different comment id) still gets its own key
   const other = await prepareBatLiveFrame(frames[1], target);
   assert.notEqual(other.source_identifier, pusher.source_identifier);
+});
+
+Deno.test("transient mixed admission preserves one batch without poison fanout or later forced isolation", async () => {
+  const inputs = [frames[0], { ...frames[1], monitored_auction_id: "00000000-0000-0000-0000-000000000099" }];
+  let unavailable = true;
+  const calls: BatLiveFrame[][] = [];
+  const queue = new BatLiveBuffer(async batch => {
+    calls.push([...batch]);
+    if (unavailable) throw new BatLiveAdmissionError("transient", "database unavailable");
+  });
+  inputs.forEach(f => queue.push(f));
+  await assert.rejects(() => queue.flush(), /database unavailable/);
+  assert.deepEqual(calls, [inputs]);
+  assert.equal(queue.pending, 2);
+  unavailable = false;
+  await queue.flush();
+  assert.deepEqual(calls, [inputs, inputs], "a prior transient status cannot force per-lot admission");
+  assert.equal(queue.pending, 0);
 });
