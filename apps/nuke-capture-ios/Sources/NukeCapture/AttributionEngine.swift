@@ -134,7 +134,7 @@ final class AttributionEngine: ObservableObject {
     /// vehicle, thresholds, audit through attribute_testimony). If it refuses or is not deployed,
     /// an inexact identifier read falls back to a suggestion.
     @discardableResult
-    func run(limit: Int = 200, ocrBudget: Int = 200) async -> Bool {
+    func run(limit: Int = 2000, ocrBudget: Int = 200) async -> Bool {
         guard !isRunning else { return false }
         guard let userId = SupabaseService.currentUserId else { lastSummary = "Not signed in"; return false }
         isRunning = true
@@ -255,6 +255,7 @@ final class AttributionEngine: ObservableObject {
                 contextualYear: albumLabel?.year, contextualMake: albumLabel?.make, contextualModel: albumLabel?.model,
                 albumContextAmbiguous: assetID.map { albumContext.ambiguous.contains($0) } ?? false)
         }
+        await uploadVINReads(captureFrames)
         let identityGroups = Self.vinAnchoredCaptureGroups(captureFrames)
         // Persist contextual 2–3 source reading receipts before any VIN profile write.
         // They use image_observations' protected reading-only lane; no subject membership is asserted.
@@ -646,10 +647,13 @@ final class AttributionEngine: ObservableObject {
         return "\(day)|\(lat),\(lon)"
     }
 
-    /// Build tight identity groups from fresh source reads. Every member is within
-    /// Five minutes and 25 m of one exact VIN anchor in this pass. The run key is
+    /// Build identity groups from fresh source reads. Every member is within five minutes and
+    /// 25 m of the anchor or of another member (chained), and within 45 min of one exact VIN anchor. The run key is
     /// the relation; camera make/model/lens metadata is not a device identity.
     /// A competing VIN anchor in that neighborhood makes the whole fold ambiguous.
+    /// The widest a VIN-anchored shoot may reach from its anchor (chained 5 min / 25 m hops).
+    nonisolated static let setWindowSeconds: TimeInterval = 45 * 60
+
     nonisolated static func vinAnchoredCaptureGroups(_ frames: [VINCaptureFrame]) -> [VINCaptureGroup] {
         func captureDate(_ value: String?) -> Date? {
             guard let value else { return nil }
@@ -679,6 +683,10 @@ final class AttributionEngine: ObservableObject {
             if !secondHasContext { return true }
             return firstHasContext && first.0 == second.0 && first.1 == second.1 && first.2 == second.2
         }
+        func withinSetWindow(_ a: VINCaptureFrame, _ b: VINCaptureFrame) -> Bool {
+            guard let ta = captureDate(a.takenAt), let tb = captureDate(b.takenAt) else { return false }
+            return abs(ta.timeIntervalSince(tb)) <= setWindowSeconds
+        }
         let anchors = frames.filter { frame in
             frame.exactVIN && !frame.isDocument && !frame.isSensitive &&
             frame.fileHash?.range(of: "^[a-f0-9]{64}$", options: .regularExpression) != nil &&
@@ -692,11 +700,27 @@ final class AttributionEngine: ObservableObject {
         var groups: [VINCaptureGroup] = []
         for anchor in anchors where emitted.insert(anchor.vin!).inserted {
             guard !anchors.contains(where: { $0.vin != anchor.vin && near(anchor, $0) }) else { continue }
-            let neighbors = frames.filter { $0.isVehicle && !$0.isDocument && !$0.isSensitive && near(anchor, $0) && albumContextAgrees(anchor, $0) }
-            let members = neighbors.filter { frame in
-                Set(anchors.filter { near($0, frame) }.compactMap(\.vin)) == [anchor.vin!]
+            // A shoot runs 20–40 minutes: grow the set through frames that are each within 5 min / 25 m
+            // of an admitted frame, up to the set window from the anchor. A frame near a competing anchor is
+            // never admitted (so the walk stops there); a competing anchor near this one makes it ambiguous.
+            let eligible = frames.filter { $0.isVehicle && !$0.isDocument && !$0.isSensitive && albumContextAgrees(anchor, $0) &&
+                withinSetWindow(anchor, $0) }
+            var members: [VINCaptureFrame] = []
+            var admitted = Set<String>(), frontier = [anchor], ambiguous = false
+            while let cur = frontier.popLast(), !ambiguous {
+                if anchors.contains(where: { $0.vin != anchor.vin && withinSetWindow(anchor, $0) && near(cur, $0) }) { ambiguous = true; break }
+                for f in eligible where !admitted.contains(f.imageID) && f.imageID != anchor.imageID && near(cur, f) {
+                    guard Set(anchors.filter { near($0, f) }.compactMap(\.vin)).isSubset(of: [anchor.vin!]) else { continue }
+                    admitted.insert(f.imageID); members.append(f); frontier.append(f)
+                }
             }
+            guard !ambiguous else { continue }
             guard !members.isEmpty else { continue }
+            if members.count > 99, let t0 = captureDate(anchor.takenAt) {   // server takes 2–100 images: keep the closest
+                members = Array(members.sorted {
+                    abs((captureDate($0.takenAt) ?? t0).timeIntervalSince(t0)) < abs((captureDate($1.takenAt) ?? t0).timeIntervalSince(t0))
+                }.prefix(99))
+            }
             let ids = Array(Set([anchor.imageID] + members.map(\.imageID))).sorted()
             guard (2...100).contains(ids.count) else { continue }
             groups.append(VINCaptureGroup(vin: anchor.vin!, year: anchor.contextualYear, make: anchor.contextualMake,
@@ -729,21 +753,62 @@ final class AttributionEngine: ObservableObject {
         return vehicles
     }
 
+    /// Every unfiled photo, newest first, paged by 200 up to `limit` (hard cap 5,000) so a backlog
+    /// older than the newest 200 still gets its filing pass. The OCR budget still bounds per-run work.
+    nonisolated static let orphanPageSize = 200
+    nonisolated static let orphanHardCap = 5000
+    nonisolated static func orphanPageRanges(limit: Int) -> [ClosedRange<Int>] {
+        let total = min(orphanHardCap, max(1, limit))
+        return stride(from: 0, to: total, by: orphanPageSize).map { $0...(min($0 + orphanPageSize, total) - 1) }
+    }
+
     private func fetchOrphans(userId: String, limit: Int) async throws -> [OrphanRow] {
-        return try await SupabaseService.client.from("vehicle_images")
-            .select("id, latitude, longitude, taken_at, is_document, doc_flag, is_sensitive, exif_data, file_hash")
-            .eq("user_id", value: userId)
-            .is("vehicle_id", value: nil)
-            .eq("source", value: Config.sourceTag)
-            .neq("image_url", value: "")          // metadata-only rows have no picture to file
-            .not("is_superseded", operator: .is, value: true)
-            .not("is_duplicate", operator: .is, value: true)
-            .or("vision_gate_status.is.null,vision_gate_status.not.in.(rejected_personal,rejected_misattributed)")
-            // A newly uploaded historic or undated photo still deserves its first filing pass.
-            .order("created_at", ascending: false)
-            .order("id", ascending: false)
-            .limit(min(200, max(1, limit)))
-            .execute().value
+        var out: [OrphanRow] = []
+        var seen = Set<String>()
+        for range in Self.orphanPageRanges(limit: limit) {
+            let page: [OrphanRow] = try await SupabaseService.client.from("vehicle_images")
+                .select("id, latitude, longitude, taken_at, is_document, doc_flag, is_sensitive, exif_data, file_hash")
+                .eq("user_id", value: userId)
+                .is("vehicle_id", value: nil)
+                .eq("source", value: Config.sourceTag)
+                .neq("image_url", value: "")          // metadata-only rows have no picture to file
+                .not("is_superseded", operator: .is, value: true)
+                .not("is_duplicate", operator: .is, value: true)
+                .or("vision_gate_status.is.null,vision_gate_status.not.in.(rejected_personal,rejected_misattributed)")
+                // A newly uploaded historic or undated photo still deserves its first filing pass.
+                .order("created_at", ascending: false)
+                .order("id", ascending: false)
+                .range(from: range.lowerBound, to: range.upperBound)
+                .execute().value
+            for row in page where seen.insert(row.id).inserted { out.append(row) }
+            if page.count < range.count { break }
+        }
+        return out
+    }
+
+    /// The phone's exact identifier read, uploaded so the server can link without re-running OCR.
+    /// Only fills an empty vehicle_vin; never overwrites a stored read.
+    private struct VINReadUpdate: Encodable { let vehicle_vin: String; let vehicle_vin_confidence: Double }
+    nonisolated static func vinReadUploads(_ frames: [VINCaptureFrame]) -> [(imageID: String, vin: String, confidence: Double)] {
+        frames.compactMap { f in
+            guard f.exactVIN, !f.isDocument, !f.isSensitive, let vin = f.vin?.uppercased() else { return nil }
+            if VisionEngine.isValidVIN(vin) { return (f.imageID, vin, 0.95) }
+            if (8...16).contains(vin.count), f.contextualMake != nil,
+               vin.contains(where: \.isNumber) { return (f.imageID, vin, 0.8) }
+            return nil
+        }
+    }
+
+    private func uploadVINReads(_ frames: [VINCaptureFrame]) async {
+        for u in Self.vinReadUploads(frames) {
+            do {
+                try await SupabaseService.client.from("vehicle_images")
+                    .update(VINReadUpdate(vehicle_vin: u.vin, vehicle_vin_confidence: u.confidence))
+                    .eq("id", value: u.imageID)
+                    .is("vehicle_vin", value: nil)
+                    .execute()
+            } catch { NSLog("attribution vin upload: %@", String(describing: error)) }
+        }
     }
 
     private func suggest(imageId: String, vehicleId: String, conf: Double, reasons: [String], onlyIfNone: Bool = false) async {
