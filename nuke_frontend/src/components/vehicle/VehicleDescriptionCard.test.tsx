@@ -40,6 +40,14 @@ describe('existing public profile description card',()=>{
   fixture.single.mockResolvedValue({data:{description:null},error:null});await render();expect(container.textContent).toContain(text);
   expect(container.textContent).not.toContain('No description yet');
  });
+ it('shows identical canonical and preserved text once while keeping its source link',async()=>{
+  fixture.single.mockResolvedValue({data:{description:text,description_source:'external_import'},error:null});
+  await render();
+  expect(container.textContent?.split(text)).toHaveLength(2);
+  expect(container.querySelector('a[href="https://source.invalid/listing"]')).not.toBeNull();
+  const record=Array.from(container.querySelectorAll('details')).find(d=>d.querySelector('summary')?.textContent==='Source record');
+  expect(record?.open).toBe(false);
+ });
  it('failed/denied optional reader hides source prose and preserves manual text',async()=>{
   fixture.rpc.mockResolvedValue({data:null,error:{message:'denied'}});await render();expect(container.textContent).toContain('Manual summary');
   expect(container.textContent).not.toContain(text);expect(container.querySelector('a')).toBeNull();

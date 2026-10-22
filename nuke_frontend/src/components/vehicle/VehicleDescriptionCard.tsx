@@ -143,6 +143,7 @@ export const VehicleDescriptionCard: React.FC<VehicleDescriptionCardProps> = ({
   };
 
   const isEmpty = !description || description.trim().length === 0;
+  const summaryRepeatsSource = listingDescriptions.some(entry => entry.text.trim() === description.trim());
 
   // Progressive density: hide entirely when no description and user can't edit
   if (isEmpty && !isEditable && listingDescriptions.length === 0) return null;
@@ -220,7 +221,7 @@ export const VehicleDescriptionCard: React.FC<VehicleDescriptionCardProps> = ({
               <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
                 No description yet. Use Generate or Edit to create one.
               </div>
-            ) : !isEmpty ? (
+            ) : !isEmpty && !summaryRepeatsSource ? (
               <div>
                 <div style={{ fontFamily: 'Arial, Helvetica, sans-serif', fontSize: '11px', lineHeight: 1.7, whiteSpace: 'pre-wrap', color: 'var(--text)' }}>
                   {description}
@@ -250,9 +251,11 @@ export const VehicleDescriptionCard: React.FC<VehicleDescriptionCardProps> = ({
                 <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '8px' }}>
                   <a href={entry.source_url} target="_blank" rel="noopener noreferrer">Listing source ↗</a>
                   {' · '}<a href={`/vehicle/${vehicleId}/observation/${entry.source_observation_id}`}>Observation ↗</a>
+                  <details><summary>Source record</summary>
                   <div>Recorded observation: {formatEntryDate(entry.recorded_observed_at)} · Captured: {formatEntryDate(entry.source_captured_at)} · Received: {formatEntryDate(entry.ingested_at)}</div>
                   <div>Original listing event date unknown. Original source completeness unknown. Preserved text shown without shortening.</div>
                   <div>Method: {entry.extraction_method || 'Unknown'} · Stored confidence: {entry.confidence ?? 'Unknown'}</div>
+                  </details>
                 </div>
               </details>
             ))}
