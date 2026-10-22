@@ -6,9 +6,40 @@ type SavedRecord = { id: string; document_id: string; record: {
   section: string | null; category: string | null; amount: string | null; currency: string | null;
   description?: string; decision?: string; status?: string;
 } };
-type Control = { record_kind: string; year: string; account: string | null; currency: string | null; section: string | null; rows: number; retained_amount: string | number | null };
+type Control = { record_kind: string; year: string; account: string | null; currency: string | null; section: string | null; rows: number; missing_amounts?: number; retained_amount: string | number | null };
 type Workpapers = { records: SavedRecord[]; total_rows: number; next_after: string | null; controls_valid: boolean; controls: Control[] };
 const pageSize = 100;
+
+export function displayMoney(value: string | number | null, currency: string | null): string {
+  if (value === null || value === '' || !Number.isFinite(Number(value))) return 'Unknown';
+  const amount = Number(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 6 });
+  return `${amount} ${currency || '(currency unknown)'}`;
+}
+
+// Aggregate complete server controls, never the current page of records or bank movements.
+export function yearOverview(controls: Control[]) {
+  const invalid = new Set<string>();
+  const groups = new Map<string, { year: string; currency: string | null; revenue: bigint | null; expense: bigint | null }>();
+  for (const row of controls) {
+    if (row.record_kind !== 'retained_ledger_decision' || !['Revenue', 'Expense'].includes(row.section || '')) continue;
+    const key = JSON.stringify([row.year, row.currency]);
+    const group = groups.get(key) || { year: row.year, currency: row.currency, revenue: null, expense: null };
+    const value = String(row.retained_amount ?? '');
+    const field = row.section === 'Revenue' ? 'revenue' : 'expense';
+    const fieldKey = `${key}:${field}`;
+    if ((row.missing_amounts ?? 0) > 0 || !/^-?\d+(?:\.\d{1,6})?$/.test(value)) {
+      invalid.add(fieldKey); group[field] = null; groups.set(key, group); continue;
+    }
+    if (invalid.has(fieldKey)) continue;
+    const [whole, fraction = ''] = value.replace('-', '').split('.');
+    const scaled = (BigInt(whole) * 1000000n + BigInt(fraction.padEnd(6, '0'))) * (value.startsWith('-') ? -1n : 1n);
+    group[field] = (group[field] ?? 0n) + scaled;
+    groups.set(key, group);
+  }
+  return [...groups.values()].sort((a, b) => b.year.localeCompare(a.year));
+}
+const overviewAmount = (amount: bigint | null, currency: string | null) => amount === null ? 'Not available' : displayMoney(Number(amount) / 1000000, currency);
+
 
 export default function FinancialWorkpapers({ revision, onOpen }: { revision: number; onOpen: (documentId: string) => void }) {
   const [pages, setPages] = useState<(string | null)[]>([null]);
@@ -43,27 +74,34 @@ export default function FinancialWorkpapers({ revision, onOpen }: { revision: nu
     return () => { cancelled = true; if (generation.current === request) generation.current++; };
   }, [cursor, revision, sessionRevision]);
   const controls = data?.controls.filter(row => row.record_kind === 'retained_ledger_decision') || [];
-  return <section aria-label="Saved bookkeeping">
-    <h2>Saved bookkeeping</h2>
-    <p>Retained bookkeeping decisions and bank movements stay separate. Reconciliation and tax adjustments remain under review.</p>
+  return <section className="accounting-books" aria-label="Saved bookkeeping">
+    <div className="accounting-section-heading"><div><span className="accounting-eyebrow">YOUR BOOKS</span><h2>Year overview</h2></div></div>
+    <p className="accounting-muted">Income and expenses recorded in your books. Bank movements are kept separate.</p>
     {error ? <p role="alert">{error}</p> : !data ? <p role="status">Loading saved bookkeeping…</p> : <>
-      <p>{data.total_rows} saved records. {data.controls_valid ? 'No repeated record identifiers were found.' : 'Repeated records need review; the subtotals are withheld.'}</p>
+      <div className="accounting-notice"><strong>{data.total_rows.toLocaleString('en-US')} records available</strong><p>This view covers records saved to this account so far. Recovery may be partial; completeness has not been confirmed. These are bookkeeping figures, not finalized taxable income or filing status.</p>
+        {!data.controls_valid && <p role="alert">Repeated records need review; the subtotals are withheld.</p>}</div>
+      {data.controls_valid && <div className="accounting-years">{yearOverview(controls).map(group => <article className="accounting-year" key={`${group.year}:${group.currency}`}>
+        <div className="accounting-section-heading"><h3>{group.year}</h3><span className="accounting-eyebrow">{group.currency || 'CURRENCY UNKNOWN'}</span></div>
+        <dl><div><dt>Recorded income</dt><dd>{overviewAmount(group.revenue, group.currency)}</dd></div><div><dt>Recorded expenses</dt><dd>{overviewAmount(group.expense, group.currency)}</dd></div>
+        </dl>
+        <p className="accounting-muted">Available records · tax adjustments not determined here</p>
+      </article>)}</div>}
       {data.total_rows === 0 && <p>No bookkeeping records have been recovered into this account yet.</p>}
-      {data.controls_valid && controls.length > 0 && <details><summary>Bookkeeping subtotals by year and account</summary>
+      {data.controls_valid && controls.length > 0 && <details className="accounting-disclosure"><summary>Account breakdown <span>Income, expenses and other classifications</span></summary>
         <p>These retain the source classifications. They are not finalized taxable income. Unknown currencies are shown explicitly.</p>
         <div style={{ overflowX: 'auto' }}><table><thead><tr><th>Year</th><th>Account</th><th>Classification</th><th>Amount</th><th>Currency</th><th>Records</th></tr></thead>
-          <tbody>{controls.map((row, i) => <tr key={i}><td>{row.year}</td><td>{row.account || 'Unresolved'}</td><td>{row.section || 'Unresolved'}</td><td>{row.retained_amount ?? 'Unknown'}</td><td>{row.currency || 'Unresolved'}</td><td>{row.rows}</td></tr>)}</tbody>
+          <tbody>{controls.map((row, i) => <tr key={i}><td>{row.year}</td><td>{row.account || 'Unresolved'}</td><td>{row.section || 'Unresolved'}</td><td className="accounting-number">{displayMoney(row.retained_amount, row.currency)}</td><td>{row.currency || 'Unresolved'}</td><td>{row.rows}</td></tr>)}</tbody>
         </table></div></details>}
-      {data.records.length > 0 && <><div style={{ overflowX: 'auto' }}><table><thead><tr><th>Date</th><th>Record</th><th>Account</th><th>Classification</th><th>Amount</th><th>Decision and proof</th></tr></thead>
+      {data.records.length > 0 && <details className="accounting-disclosure"><summary>Browse individual records <span>Decisions, bank activity and supporting evidence</span></summary><div style={{ overflowX: 'auto' }}><table><thead><tr><th>Date</th><th>Record</th><th>Account</th><th>Classification</th><th>Amount</th><th>Decision and proof</th></tr></thead>
         <tbody>{data.records.map(row => <tr key={row.id}>
           <td>{row.record.date || row.record.year}</td><td>{row.record.record_kind === 'retained_bank_movement' ? 'Bank movement' : 'Bookkeeping decision'}<div>{row.record.description || row.record.local_id}</div></td>
           <td>{row.record.account || 'Unresolved'}</td><td>{row.record.section || 'Unresolved'}{row.record.category && <div>{row.record.category}</div>}</td>
-          <td>{row.record.amount ?? 'Unknown'} {row.record.currency || '(currency unresolved)'}</td>
+          <td className="accounting-number">{displayMoney(row.record.amount, row.record.currency)}</td>
           <td>{row.record.status}<details><summary>Retained decision</summary>{row.record.decision || 'No decision recorded.'}</details><button type="button" onClick={() => onOpen(row.document_id)}>View evidence</button></td>
         </tr>)}</tbody></table></div>
         <p>Page {pages.length}</p><button type="button" disabled={pages.length === 1} onClick={() => setPages(previous => previous.slice(0, -1))}>Previous records</button>{' '}
         <button type="button" disabled={!data.next_after || pages.length * pageSize >= data.total_rows} onClick={() => setPages(previous => [...previous, data.next_after])}>Next records</button>
-      </>}
+      </details>}
     </>}
   </section>;
 }
