@@ -153,7 +153,7 @@ async function upsertPostVehicle(supabase: Supabase, o: { url: string; platform:
   const { data: inserted, error: insErr } = await supabase.from("vehicles").insert(vehicleRow).select("id").maybeSingle();
   if (insErr) throw new Error(insErr?.message || String(insErr));
   if (!inserted) throw new Error("Vehicle insert returned no data");
-  await landIdentifierClaims(supabase, { vehicleId: inserted.id, text: (vehicleRow as any).description, sourceUrl: (vehicleRow as any).listing_url ?? (vehicleRow as any).discovery_url, extractor: "extract-barn-finds-listing" });
+  await landIdentifierClaims(supabase, { vehicleId: inserted.id, text: (vehicleRow as any).description, sourceUrl: (vehicleRow as any).listing_url ?? (vehicleRow as any).discovery_url, title: (vehicleRow as any).listing_title ?? null, extractor: "extract-barn-finds-listing" });
   return { id: inserted.id };
 }
 

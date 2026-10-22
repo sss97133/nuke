@@ -220,7 +220,7 @@ Deno.serve(async (req: Request) => {
             { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         }
         vehicleId = created.id;
-        await landIdentifierClaims(supabase, { vehicleId, text: (vehicleData as any).description, sourceUrl: (vehicleData as any).listing_url ?? (vehicleData as any).discovery_url, extractor: 'extract-jamesedition' });
+        await landIdentifierClaims(supabase, { vehicleId, text: (vehicleData as any).description, sourceUrl: (vehicleData as any).listing_url ?? (vehicleData as any).discovery_url, title: (vehicleData as any).listing_title ?? null, extractor: 'extract-jamesedition' });
       }
 
       // Fire-and-forget observation write

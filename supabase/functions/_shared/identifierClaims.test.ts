@@ -34,3 +34,9 @@ Deno.test("replica wheels and 'a tribute to precision' are not replica cars", ()
   assertEquals(readIdentifierClaims("Chromed Brazilian replica wheels wear matching caps. Every mile a tribute to precision.").is_replica, false);
   assertEquals(readIdentifierClaims("This Porsche 356 Roadster replica was manufactured by Intermeccanica in 2018").is_replica, true);
 });
+Deno.test("body precedence: title beats Speedster heritage prose; rule beats text", () => {
+  const prose = "built with the same chassis as the final Speedsters and the Speedster lineage";
+  assertEquals(readIdentifierClaims(prose, { title: "1964 Porsche 356C Coupe" }).body_style, "COUPE");
+  assertEquals(readIdentifierClaims("a lovely Speedster-inspired car", { bodyFromRule: "COUPE" }).body_style, "COUPE");
+  assertEquals(readIdentifierClaims("a lovely Speedster", {}).body_style_basis, "text");
+});

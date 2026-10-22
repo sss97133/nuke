@@ -9,7 +9,7 @@ export interface IdentifierClaim { kind: IdentifierKind; value: string | null; q
 export type BodyStyle = "SPEEDSTER" | "CONVERTIBLE_D" | "CABRIOLET" | "ROADSTER" | "HARDTOP" | "COUPE";
 export interface IdentifierRead {
   identifiers: IdentifierClaim[];
-  body_style: BodyStyle | null; body_style_quote: string | null;
+  body_style: BodyStyle | null; body_style_quote: string | null; body_style_basis: "title" | "rule" | "text" | null;
   is_replica: boolean; replica_quote: string | null;
   numbers_claim: "matching" | "non_matching" | null; numbers_quote: string | null;
   documented_by: Array<"kardex" | "coa">;
@@ -30,9 +30,11 @@ function quoteAround(text: string, start: number, end: number): string {
   return text.slice(s, e).trim();
 }
 
-export function readIdentifierClaims(text: string | null | undefined): IdentifierRead {
+/** Body-style precedence: the listing title, then the chassis rule range (bodyFromRule, e.g. from
+ * identifier_rule_for), then the description text. */
+export function readIdentifierClaims(text: string | null | undefined, opts: { title?: string | null; bodyFromRule?: BodyStyle | null } = {}): IdentifierRead {
   const t = text ?? "";
-  const out: IdentifierRead = { identifiers: [], body_style: null, body_style_quote: null, is_replica: false,
+  const out: IdentifierRead = { identifiers: [], body_style: null, body_style_quote: null, body_style_basis: null, is_replica: false,
     replica_quote: null, numbers_claim: null, numbers_quote: null, documented_by: [] };
   const seen = new Set<string>();
   for (const [kind, re] of LABELS) {
@@ -58,6 +60,11 @@ export function readIdentifierClaims(text: string | null | undefined): Identifie
     ["CONVERTIBLE_D", /\bconvertible[- ]?["“]?D\b["”]?/i], ["SPEEDSTER", /\bspeedster\b/i], ["HARDTOP", /\b(?:karmann )?hard[- ]?top coupe\b|\bkarmann hardtop\b|\bnotchback\b/i],
     ["ROADSTER", /\broadster\b/i], ["CABRIOLET", /\bcabriolet\b|\bcabrio\b/i], ["COUPE", /\bcoup[eé]\b/i],
   ];
-  for (const [bs, re] of bodies) { const m = re.exec(t); if (m) { out.body_style = bs; out.body_style_quote = quoteAround(t, m.index, m.index + m[0].length); break; } }
+  const first = (src: string) => { for (const [bs, re] of bodies) { const m = re.exec(src); if (m) return { bs, m }; } return null; };
+  const fromTitle = opts.title ? first(opts.title) : null;
+  const fromText = first(t);
+  if (fromTitle) { out.body_style = fromTitle.bs; out.body_style_quote = opts.title!.trim(); out.body_style_basis = "title"; }
+  else if (opts.bodyFromRule) { out.body_style = opts.bodyFromRule; out.body_style_quote = null; out.body_style_basis = "rule"; }
+  else if (fromText) { out.body_style = fromText.bs; out.body_style_quote = quoteAround(t, fromText.m.index!, fromText.m.index! + fromText.m[0].length); out.body_style_basis = "text"; }
   return out;
 }

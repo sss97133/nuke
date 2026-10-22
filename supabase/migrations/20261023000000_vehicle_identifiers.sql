@@ -81,7 +81,7 @@ $$;
 CREATE OR REPLACE FUNCTION public.land_identifier_claims(p_vehicle_id uuid, p_read jsonb, p_source_url text, p_extractor text,
   p_source_kind text DEFAULT 'listing_text', p_source_image_id uuid DEFAULT NULL, p_run_id uuid DEFAULT NULL)
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
-DECLARE v record; c jsonb; n int := 0; rr record;
+DECLARE v record; c jsonb; n int := 0; rr record; v_rule_body text; v_body text;
 BEGIN
   SELECT id, make, model FROM vehicles WHERE id = p_vehicle_id INTO v;
   IF v.id IS NULL THEN RETURN jsonb_build_object('status','no_vehicle'); END IF;
@@ -94,8 +94,11 @@ BEGIN
       least(1, greatest(0, (c->>'confidence')::numeric + CASE WHEN rr.rule_status = 'in_range' THEN 0.1 WHEN rr.rule_status = 'out_of_range' THEN -0.3 ELSE 0 END)),
       rr.rule_id, CASE WHEN c->>'value' IS NULL THEN 'unchecked' ELSE rr.rule_status END)
     ON CONFLICT DO NOTHING;
-    GET DIAGNOSTICS n = ROW_COUNT; 
+    IF c->>'kind' = 'chassis' AND rr.rule_status = 'in_range' THEN v_rule_body := coalesce(v_rule_body, rr.body_style); END IF;
   END LOOP;
+  -- Body-style precedence: title, then the chassis rule range, then description text.
+  v_body := CASE WHEN p_read->>'body_style_basis' = 'title' THEN p_read->>'body_style'
+                 ELSE coalesce(v_rule_body, p_read->>'body_style') END;
   -- Vehicle labels: fill only when empty; never overwrite a human or earlier value.
   UPDATE vehicles SET
     is_replica = coalesce(is_replica, CASE WHEN (p_read->>'is_replica')::boolean THEN true END),
@@ -103,7 +106,7 @@ BEGIN
     numbers_state = coalesce(numbers_state, p_read->>'numbers_claim'),
     numbers_quote = coalesce(numbers_quote, p_read->>'numbers_quote'),
     numbers_documented_by = coalesce(numbers_documented_by, nullif(ARRAY(SELECT jsonb_array_elements_text(p_read->'documented_by')), '{}')),
-    canonical_body_style = coalesce(canonical_body_style, p_read->>'body_style'),
+    canonical_body_style = coalesce(canonical_body_style, CASE WHEN (p_read->>'is_replica')::boolean THEN NULL ELSE v_body END),
     body_style_quote = coalesce(body_style_quote, p_read->>'body_style_quote')
   WHERE id = p_vehicle_id;
   RETURN jsonb_build_object('status','ok');

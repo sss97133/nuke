@@ -1182,7 +1182,7 @@ async function saveVehicle(
     if (insertErr) throw new Error(`Vehicle insert failed: ${insertErr.message} (${insertErr.code})`);
     vehicleId = inserted.id;
     isNew = true;
-    await landIdentifierClaims(supabase, { vehicleId, text: (cleanData as any).description, sourceUrl: (cleanData as any).listing_url ?? (cleanData as any).discovery_url, extractor: "extract-mecum" });
+    await landIdentifierClaims(supabase, { vehicleId, text: (cleanData as any).description, sourceUrl: (cleanData as any).listing_url ?? (cleanData as any).discovery_url, title: (cleanData as any).listing_title ?? null, extractor: "extract-mecum" });
   }
 
   // Fire-and-forget observation write

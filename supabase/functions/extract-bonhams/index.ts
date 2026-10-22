@@ -1380,7 +1380,7 @@ async function saveVehicle(
     }
     if (ins.error) throw new Error(`Vehicle insert failed: ${ins.error.message}`);
     targetId = ins.data?.id || null;
-    await landIdentifierClaims(supabase, { vehicleId: targetId, text: (vehicleData as any).description, sourceUrl: (vehicleData as any).listing_url ?? (vehicleData as any).discovery_url, extractor: "extract-bonhams" });
+    await landIdentifierClaims(supabase, { vehicleId: targetId, text: (vehicleData as any).description, sourceUrl: (vehicleData as any).listing_url ?? (vehicleData as any).discovery_url, title: (vehicleData as any).listing_title ?? null, extractor: "extract-bonhams" });
     if (action !== "linked_by_vin") action = "created";
     console.log(`[Bonhams] ${action} vehicle: ${targetId}`);
   }

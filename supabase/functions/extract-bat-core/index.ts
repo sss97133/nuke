@@ -2970,7 +2970,7 @@ Deno.serve(async (req) => {
       captureSha256: await sha256Hex(html), snapshotId: descriptionSnapshotId,
       snapshotCustody: descriptionSnapshotCustody,
     }) : { status: "unavailable", reason: "Vehicle unresolved" };
-    await landIdentifierClaims(supabase, { vehicleId, text: descriptionRaw, sourceUrl: listingUrlCanonical, extractor: "extract-bat-core" });
+    await landIdentifierClaims(supabase, { vehicleId, text: descriptionRaw, sourceUrl: listingUrlCanonical, title: identity?.title ?? null, extractor: "extract-bat-core" });
     if (descriptionReceipt.status === "failed" || descriptionReceipt.status === "refused") {
       console.warn(`[BAT] description receipt ${descriptionReceipt.status}: ${descriptionReceipt.reason}`);
     }
