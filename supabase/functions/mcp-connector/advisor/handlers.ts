@@ -142,6 +142,52 @@ async function priceFacts(sb: AdvisorDb, vid: string) {
   };
 }
 
+/** All-in buyer cost per vehicle (hammer + published buyer premium + cited estimates). Never throws. */
+async function allInCosts(sb: AdvisorDb, ids: string[]): Promise<Map<string, Record<string, unknown>>> {
+  const out = new Map<string, Record<string, unknown>>();
+  const uniq = [...new Set(ids.filter(Boolean))];
+  if (!uniq.length) return out;
+  try {
+    const { data, error } = await sb.rpc("all_in_buyer_cost_for_vehicles", { p_vehicle_ids: uniq });
+    if (error || !Array.isArray(data)) return out;
+    for (const r of data as Array<{ vehicle_id: string; all_in: Record<string, unknown> | null }>) {
+      if (r?.vehicle_id && r.all_in) out.set(String(r.vehicle_id), r.all_in);
+    }
+  } catch {
+    // all-in cost is additive context; a missing RPC must not break valuation.
+  }
+  return out;
+}
+
+function allInSummary(a: Record<string, unknown> | undefined | null) {
+  if (!a) return null;
+  const total = (a.all_in_cost ?? null) as Record<string, unknown> | null;
+  return {
+    hammer: a.hammer ?? null,
+    stored_price: a.stored_price ?? null,
+    stored_price_basis: a.stored_price_basis ?? null,
+    stored_price_includes_premium: a.stored_price_includes_premium ?? null,
+    buyer_premium: Array.isArray(a.components)
+      ? ((a.components as Array<Record<string, unknown>>).find((c) => c.item === "buyer_premium")?.amount ?? null)
+      : null,
+    all_in_known: total?.known ?? null,
+    all_in_estimated_mid: total?.estimated_mid ?? null,
+  };
+}
+
+/** Fitted 2026-10-22 by time-ordered backtest; see backtest.md in nuke-strategy. */
+export const VALUATION_THRESHOLDS = { minComps: 4, staleDays: 180, disagreement: 0.10 } as const;
+
+/** Backtested P(within 20%) table. Rows: comps 3-4, 5-9, 10+; cols: IQR/median <10%,10-20,20-30,30-50,>=50%. */
+export function calibratedConfidence(nComps: number, dispersion: number | null): number {
+  const T = [[0.527, 0.432, 0.381, 0.336, 0.276], [0.578, 0.499, 0.423, 0.364, 0.294], [0.848, 0.635, 0.503, 0.403, 0.31]];
+  if (nComps < 3) return 0.3;
+  const row = nComps >= 10 ? 2 : nComps >= 5 ? 1 : 0;
+  if (dispersion == null || !Number.isFinite(dispersion)) return T[row]![4]!;
+  const col = dispersion < 0.1 ? 0 : dispersion < 0.2 ? 1 : dispersion < 0.3 ? 2 : dispersion < 0.5 ? 3 : 4;
+  return T[row]![col]!;
+}
+
 function listingCitation(vehicle: Record<string, unknown>): Citation {
   const platform = vehicle.canonical_platform || vehicle.auction_source;
   const name =
@@ -230,6 +276,66 @@ async function loadPriceFactsMap(
     const { data } = await sb.rpc("vehicle_price_facts", { p_vehicle_ids: chunk });
     for (const row of data || []) {
       map.set(String(row.vehicle_id), row);
+    }
+  }
+  return map;
+}
+
+type SaleTruth = {
+  ask_prices: number[];
+  dup_prices: number[];
+  verified_prices: number[];
+  has_verified_sold: boolean;
+  has_unverified: boolean;
+};
+
+/**
+ * Per-vehicle sale-truth roles from vehicle_events (PR #2454 flags).
+ * ask = orphan-backfill asking price (not a sale); unverified_sale = index "sold" without price.
+ * duplicate = overnight sale dedup (sale_dedup_v*) marked this event a twin of a canonical sale, often on
+ *   another vehicle; it is never sold support. Null / hammer / hammer_unverified roles count as sold support.
+ * Comps rows come from auction_events / vehicles (get_comps_scored), which carry no dedup flag, so the
+ * caller matches the comp price against these per-vehicle event prices. Fail-open on read errors.
+ */
+async function loadSaleTruthMap(
+  sb: AdvisorDb,
+  ids: string[],
+): Promise<Map<string, SaleTruth>> {
+  const map = new Map<string, SaleTruth>();
+  const unique = [...new Set(ids.filter(Boolean))];
+  for (let i = 0; i < unique.length; i += 40) {
+    const chunk = unique.slice(i, i + 40);
+    try {
+      const { data } = await sb
+        .from("vehicle_events")
+        .select("vehicle_id, sale_truth_role, final_price")
+        .in("vehicle_id", chunk)
+        .eq("event_status", "sold");
+      for (const row of data || []) {
+        const vid = String(row.vehicle_id);
+        const t = map.get(vid) ?? {
+          ask_prices: [],
+          dup_prices: [],
+          verified_prices: [],
+          has_verified_sold: false,
+          has_unverified: false,
+        };
+        const role = row.sale_truth_role != null ? String(row.sale_truth_role) : null;
+        const price = row.final_price != null ? Number(row.final_price) : null;
+        if (role === "duplicate") {
+          if (price != null && price > 0) t.dup_prices.push(price);
+        } else if (role === "ask") {
+          if (price != null && price > 0) t.ask_prices.push(price);
+        } else if (role === "unverified_sale") {
+          t.has_unverified = true;
+        } else if (price != null && price > 0) {
+          t.has_verified_sold = true;
+          t.verified_prices.push(price);
+        }
+        map.set(vid, t);
+      }
+    } catch {
+      // sale_truth_role not readable: keep legacy behaviour for this chunk.
     }
   }
   return map;
@@ -347,6 +453,7 @@ async function resolveSoldComps(
 
   const ids = rows.map((r) => String(r.vehicle_id || "")).filter(Boolean);
   const facts = await loadPriceFactsMap(sb, ids);
+  const saleTruth = await loadSaleTruthMap(sb, ids);
 
   // Optional subject attribute boosts (reader-side; does not invent missing transmission).
   const subTrans = subject?.transmission ? String(subject.transmission).toLowerCase() : null;
@@ -365,6 +472,19 @@ async function resolveSoldComps(
   const sold: SoldComp[] = [];
   const seenUrl = new Set<string>();
   const seenPriceDate = new Set<string>();
+
+  // Debug: candidates whose raw price the sale-truth rules would drop, and which rule actually dropped them.
+  const truthHitIds = new Set<string>();
+  const truthDroppedIds = new Set<string>();
+  for (const c of rows) {
+    const id = c.vehicle_id ? String(c.vehicle_id) : null;
+    const t = id ? saleTruth.get(id) : undefined;
+    const raw = c.sale_price != null ? Number(c.sale_price) : null;
+    if (id && t && raw != null && (
+      (!t.has_verified_sold && t.ask_prices.some((p) => Math.abs(p - raw) < 1)) ||
+      (t.dup_prices.some((p) => Math.abs(p - raw) < 1) && !t.verified_prices.some((p) => Math.abs(p - raw) < 1))
+    )) truthHitIds.add(id);
+  }
 
   for (const c of rows) {
     const id = c.vehicle_id ? String(c.vehicle_id) : null;
@@ -393,6 +513,23 @@ async function resolveSoldComps(
       excluded.no_amount++;
       continue;
     }
+
+    // Sale-truth flags: a price that only an asking-price event supports is not a sale.
+    const truth = id ? saleTruth.get(id) : undefined;
+    if (truth && !truth.has_verified_sold &&
+      truth.ask_prices.some((p) => Math.abs(p - amount) < 1)) {
+      excluded.ask_or_bid++;
+      if (id) truthDroppedIds.add(id);
+      continue;
+    }
+    // Overnight dedup: a price only a duplicate-marked event supports is the same sale counted twice.
+    if (truth && truth.dup_prices.some((p) => Math.abs(p - amount) < 1) &&
+      !truth.verified_prices.some((p) => Math.abs(p - amount) < 1)) {
+      excluded.duplicate++;
+      if (id) truthDroppedIds.add(id);
+      continue;
+    }
+    const unverifiedOnly = !!truth && truth.has_unverified && !truth.has_verified_sold;
 
     const modelText = `${c.model || ""} ${c.trim || ""}`.toLowerCase();
     if (subject?.model && /diesel|hd\b|2500|3500|dually/.test(modelText) &&
@@ -436,6 +573,7 @@ async function resolveSoldComps(
       year: c.year != null ? Number(c.year) : null,
     });
     const flags: string[] = [];
+    if (unverifiedOnly) flags.push("sold_unverified");
     if (parts.parts) {
       excluded.parts++;
       flags.push(`parts_suspect:${parts.reason}`);
@@ -488,7 +626,8 @@ async function resolveSoldComps(
       platform: (c.platform as string) || (fact?.platform as string) || null,
       transmission: c.transmission ?? null,
       body_style: c.body_style ?? null,
-      similarity_score: score,
+      // sold_unverified comps are down-weighted, not dropped.
+      similarity_score: unverifiedOnly && typeof score === "number" ? Math.round(score * 0.5 * 10) / 10 : score,
       price_kind: "sold",
       sold_basis: basis,
       variant: candVariant,
@@ -498,6 +637,11 @@ async function resolveSoldComps(
   }
 
   sold.sort((a, b) => Number(b.similarity_score || 0) - Number(a.similarity_score || 0));
+  const soldIds = new Set(sold.map((s) => String(s.asset_id ?? "")));
+  excluded.sale_truth_candidates = truthHitIds.size;
+  excluded.sale_truth_dropped_by_truth_rule = truthDroppedIds.size;
+  excluded.sale_truth_dropped_by_earlier_check = [...truthHitIds].filter((i) => !truthDroppedIds.has(i) && !soldIds.has(i)).length;
+  excluded.sale_truth_still_in_comps = [...truthHitIds].filter((i) => soldIds.has(i)).length;
   return {
     comps: sold.slice(0, limit),
     query: {
@@ -1487,6 +1631,7 @@ async function handleValueAsset(
     limit: 15,
   });
 
+  const allIn = await allInCosts(sb, [vid, ...comps.map((c) => String(c.asset_id))]);
   const soldPrices = comps
     .map((c) => c.sale_price)
     .filter((n): n is number => typeof n === "number" && n > 0)
@@ -1521,15 +1666,35 @@ async function handleValueAsset(
     }
   }
 
+  // Thresholds fitted by a time-ordered backtest over 353,316 sold events (docs: backtest 2026-10-22):
+  // error flattens from 4 comps (3->4 saves 1.1pt median APE, later comps <0.5pt each); estimates are
+  // >=1pt worse from 180 days; once a stored estimate is >10% off the fresh comp median the comps win.
+  const MIN_COMPS = VALUATION_THRESHOLDS.minComps;
+  const STALE_DAYS = VALUATION_THRESHOLDS.staleDays;
+  // A stale stored estimate, or one outside the confirmed-comps range, never wins over the comps.
+  const storedCalcAt = est?.calculated_at ?? price?.estimate?.as_of ?? null;
+  const storedStale = valuePoint != null && (storedCalcAt == null || isStaleVerified(storedCalcAt, STALE_DAYS));
+  const minComp = soldPrices.length ? soldPrices[0]! : null;
+  const storedOutside = valuePoint != null && soldPrices.length >= MIN_COMPS && minComp != null && maxComp != null &&
+    (valuePoint < minComp || valuePoint > maxComp);
+  const storedDisagrees = valuePoint != null && med != null && soldPrices.length >= MIN_COMPS &&
+    (storedOutside || Math.abs(valuePoint - med) / med > VALUATION_THRESHOLDS.disagreement);
+  const storedValue = valuePoint;
+  let noEstimateReason: string | null = null;
+
   if (estimateSource !== "recent_same_asset_sale") {
-    if (med != null && soldPrices.length >= 3) {
+    if (med != null && soldPrices.length >= MIN_COMPS) {
       const equalsMax = maxComp != null && valuePoint != null && Math.abs(valuePoint - maxComp) < 1;
       const aboveBand = valuePoint != null && p75 != null && valuePoint > p75 * 1.15;
-      if (valuePoint == null || equalsMax || aboveBand) {
+      if (valuePoint == null || storedStale || storedOutside || storedDisagrees || equalsMax || aboveBand) {
         valuePoint = med;
         valueLow = p25 ?? med;
         valueHigh = p75 ?? med;
         estimateSource = "sold_comps_median";
+        if (storedValue == null) flags.push("no_stored_estimate_used_comps");
+        if (storedStale) flags.push("stored_estimate_stale_replaced_by_comps");
+        if (storedOutside) flags.push("stored_estimate_outside_comp_range");
+        if (storedDisagrees) flags.push("stored_estimate_replaced_by_comps_disagreement");
         if (equalsMax) flags.push("stored_estimate_matched_max_comp");
         if (aboveBand) flags.push("stored_estimate_above_comp_band");
         flags.push("used_median_of_confirmed_sales");
@@ -1538,14 +1703,19 @@ async function handleValueAsset(
         valueHigh = valueHigh ?? p75 ?? med;
         flags.push("filled_range_from_sold_comps");
       }
-    } else if (valuePoint == null && med != null) {
-      valuePoint = med;
-      valueLow = p25 ?? med;
-      valueHigh = p75 ?? med;
-      estimateSource = "sold_comps_median";
-      flags.push("no_stored_estimate_used_comps");
+    } else if (valuePoint == null || storedStale) {
+      // Fewer than MIN_COMPS confirmed comps and no fresh stored estimate: say so instead of guessing.
+      noEstimateReason = valuePoint == null
+        ? `only ${soldPrices.length} confirmed sold comp(s) (need ${MIN_COMPS}) and no stored estimate`
+        : `stored estimate is stale (older than ${STALE_DAYS} days) and only ${soldPrices.length} confirmed sold comp(s) (need ${MIN_COMPS})`;
+      valuePoint = null;
+      valueLow = null;
+      valueHigh = null;
+      estimateSource = "none";
+      flags.push("no_estimate_insufficient_evidence");
     }
   }
+  if (storedDisagrees) flags.push("stored_estimate_disagrees_with_comps");
 
   const guard = recentSaleSanityGuard({
     estimate: valuePoint,
@@ -1562,12 +1732,12 @@ async function handleValueAsset(
   }
 
   const calculatedAt = est?.calculated_at ?? price?.estimate?.as_of ?? price?.sold?.on ?? null;
-  const estimateStale = estimateSource !== "recent_same_asset_sale" &&
-    (isStaleVerified(calculatedAt, 180) || soldPrices.length < 3);
-  if (estimateStale) flags.push(soldPrices.length < 3 ? "thin_comp_set" : "estimate_older_than_180d");
+  const estimateStale = estimateSource === "nuke_estimates" &&
+    (isStaleVerified(calculatedAt, STALE_DAYS) || soldPrices.length < MIN_COMPS);
+  if (estimateStale) flags.push(soldPrices.length < MIN_COMPS ? "thin_comp_set" : "estimate_older_than_180d");
 
-  // Cap confidence at 0.6 until a published BaT/C&B backtest justifies more.
-  const CONFIDENCE_CAP = 0.6;
+  // Confidence = backtested P(actual sale within 20% of estimate), by comp count and IQR/median spread.
+  const CONFIDENCE_CAP = calibratedConfidence(soldPrices.length, med != null && p25 != null && p75 != null && med > 0 ? (p75 - p25) / med : null);
   const claims: Claim[] = [];
   const sourceUrl = price?.source_url ||
     (vehicle.listing_url as string) ||
@@ -1591,14 +1761,15 @@ async function handleValueAsset(
       est?.confidence_score ?? price?.estimate?.confidence ?? (soldPrices.length >= 5 ? 70 : 45),
       null,
     );
-    let confVal = Math.min(conf.confidence ?? 0.5, CONFIDENCE_CAP);
-    if (estimateStale) confVal = Math.min(confVal, 0.45);
+    let confVal = estimateSource === "sold_comps_median" ? CONFIDENCE_CAP : Math.min(conf.confidence ?? 0.5, CONFIDENCE_CAP);
+    if (estimateStale) confVal = Math.min(confVal, 0.36);
+    if (storedDisagrees) confVal = Math.min(confVal, 0.30);
     if (guard.triggered) confVal = Math.min(confVal, 0.25);
-    if (estimateSource === "recent_same_asset_sale") confVal = Math.min(CONFIDENCE_CAP, 0.55);
+    if (estimateSource === "recent_same_asset_sale") confVal = 0.55;
     const confAdj = { confidence: confVal, confidence_basis: "estimate_model" as const };
     const noteParts = [...flags];
     if (guard.message) noteParts.push(guard.message);
-    noteParts.push("confidence capped at 0.6 pending published sale backtest");
+    noteParts.push(`confidence = backtested share of sales within 20% (${soldPrices.length} comps)`);
     claims.push(
       recordedClaim("estimated_value", valuePoint, {
         ...confAdj,
@@ -1622,6 +1793,7 @@ async function handleValueAsset(
     claims.push(
       notRecordedClaim("estimated_value", {
         checked_sources: ["nuke_estimates", "vehicle_price_facts", "get_comps_combined"],
+        ...(noEstimateReason ? { note: noEstimateReason } : {}),
       }),
     );
   }
@@ -1663,10 +1835,19 @@ async function handleValueAsset(
       estimated_value: valuePoint,
       estimate_source: estimateSource,
       estimate_stale: estimateStale,
+      no_estimate_reason: noEstimateReason,
+      stored_estimate: storedValue,
+      stored_estimate_stale: storedStale,
+      confidence: claims.find((c) => c.field === "estimated_value")?.confidence ?? null,
       flags,
+      // Hammer vs all-in: the stored sale price can be hammer-only or include the buyer premium
+      // depending on platform; all_in_cost carries the breakdown with cited fee terms.
+      hammer: (allIn.get(vid)?.hammer as number | undefined) ?? null,
+      all_in_cost: allIn.get(vid) ?? null,
       comps_used: comps.map((c) => ({
         asset_id: c.asset_id,
         sale_price: c.sale_price,
+        all_in: allInSummary(allIn.get(String(c.asset_id))),
         sold_date: c.sold_date,
         platform: c.platform,
         listing_url: c.listing_url,
@@ -1741,6 +1922,7 @@ async function handleGetComps(
   }
 
   const claims: Claim[] = [];
+  const allIn = await allInCosts(sb, comps.map((c) => String(c.asset_id)));
   const out = comps.map((c, i) => {
     claims.push(
       recordedClaim(`comp.${i}.sale_price`, c.sale_price, {
@@ -1765,6 +1947,8 @@ async function handleGetComps(
       model: c.model,
       trim: c.trim,
       sale_price: c.sale_price,
+      hammer: (allIn.get(String(c.asset_id))?.hammer as number | undefined) ?? null,
+      all_in_cost: allIn.get(String(c.asset_id)) ?? null,
       mileage: c.mileage,
       sold_date: c.sold_date,
       listing_url: c.listing_url,
@@ -1796,7 +1980,7 @@ async function handleGetComps(
       query,
       excluded,
       note:
-        "Only price_kind=sold with a sale basis. Asks, unsold high bids, parts suspects, and variant mismatches are excluded. URLs are canonicalized for dedupe.",
+        "sale_price is the stored price; hammer and all_in_cost show whether it includes the buyer premium and the all-in buyer cost (published fee schedule + cited transport/paperwork estimates). Only price_kind=sold with a sale basis. Asks, unsold high bids, parts suspects, and variant mismatches are excluded. URLs are canonicalized for dedupe.",
     }),
   );
 }
