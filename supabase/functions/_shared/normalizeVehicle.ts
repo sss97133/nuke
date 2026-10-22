@@ -259,6 +259,26 @@ export function normalizeMake(make: string | null | undefined): string | null {
     .join(trimmed.includes('-') ? '-' : ' ');
 }
 
+/** A conjunction is evidence of a broken identity boundary, not an unfamiliar marque. */
+export function isIdentityConjunction(value: unknown): boolean {
+  return typeof value === 'string' && /^(and|or|&)$/i.test(value.trim());
+}
+
+/** Multiple explicitly joined model years cannot establish one vehicle identity. */
+export function hasMultipleModelYears(value: unknown): boolean {
+  if (typeof value !== 'string') return false;
+  // Intake text may include prose about restoration/service years. Only the
+  // leading identity segment is evidence here; do not classify its history.
+  const segment = value.trim().split(/[.;\n]|\b(?:restored|rebuilt|refurbished|serviced)\b/i, 1)[0];
+  const firstYear = segment.search(/\b(?:18|19|20)\d{2}\b/);
+  if (firstYear < 0) return false;
+  const identity = segment.slice(firstYear);
+  // A joined pair can repeat make/model between years. This is a reason to
+  // withhold single-vehicle identity, not proof of the number/type of assets.
+  return /^(?:18|19|20)\d{2}[\s-]*(?:and|&)[\s-]*(?:18|19|20)\d{2}\b/i.test(identity) ||
+    /^(?:18|19|20)\d{2}[\s-]+[^.;\n]{1,80}?[\s-]+(?:and|&)[\s-]+(?:18|19|20)\d{2}\b/i.test(identity);
+}
+
 /** Word-to-number map for transmission parsing */
 const WORD_TO_NUM: Record<string, string> = {
   'two': '2', 'three': '3', 'four': '4', 'five': '5',
@@ -589,7 +609,15 @@ export function normalizeVehicleFields(data: Record<string, any>): Record<string
     }
   }
 
-  if (data.make) data.make = normalizeMake(data.make);
+  // A model supplied in the make slot must survive an existing make-alias rewrite.
+  // Do not expand this into a manufacturer whitelist: obscure marques remain claims.
+  if (typeof data.make === 'string') {
+    const modelMake = ({ pantera: 'Pantera', scout: 'Scout', 'range rover': 'Range Rover' } as Record<string, string>)[data.make.trim().toLowerCase()];
+    if (modelMake && !new RegExp('^' + modelMake + '(?:\\b|$)', 'i').test(String(data.model ?? '').trim())) {
+      data.model = [modelMake, data.model].filter(Boolean).join(' ');
+    }
+    data.make = normalizeMake(data.make);
+  }
   if (data.model !== undefined) data.model = normalizeModel(data.model);
   if (data.vin) data.vin = normalizeVin(data.vin);
   if (data.year) data.year = normalizeYear(data.year);

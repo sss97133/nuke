@@ -139,6 +139,73 @@ function assert(condition: boolean, message: string) {
 const OPENAI_NO_CREDITS =
   '{"success":false,"error":"OpenAI API error: 429 - {\\n \\"error\\": {\\n \\"message\\": \\"You have no credits remaining. Add credits to continue using the API';
 
+Deno.test({
+  name: "explicit intake identity cannot bypass a multi-vehicle source title",
+  sanitizeOps: false, sanitizeResources: false,
+  fn: async () => {
+    const response = await ingest({ year: 1970, make: "Honda", model: "C70", enrich: false,
+      text: "1970 Honda C70 and 1980 Honda C70" });
+    equal(response.result.status, "rejected");
+    assert(response.result.issues.includes("multiple_model_years_unresolved"), "source title must reach admission");
+    equal(vehicleInserts().length, 0);
+  },
+});
+
+Deno.test({
+  name: "ambiguous URL intake retains a blip; failed custody cannot become a permanent skip",
+  sanitizeOps: false, sanitizeResources: false,
+  fn: async () => {
+    const body = { url: 'https://bringatrailer.com/listing/1970-honda-c70/', year: 1970, make: 'Honda', model: 'C70', enrich: false,
+      text: '1970 Honda C70 and 1980 Honda C70' };
+    clWorld = {};
+    try {
+      const retained = await ingest(body);
+      equal(retained.result.status, 'unresolved');
+      assert(Boolean(retained.result.blip?.observation_id), 'durable observation required');
+      equal(vehicleInserts().length, 0);
+      const write = writes().find(r => r.path === '/rest/v1/vehicle_observations');
+      assert(Boolean(write), 'source claims must be written');
+      const stored = JSON.parse(write!.body!);
+      equal(stored.vehicle_id, null);
+      clWorld = { failObservation: true };
+      const failed = await ingest(body);
+      equal(failed.result.status, 'error');
+      equal(failed.result.error, 'identity_hold_receipt_failed');
+      equal(vehicleInserts().length, 0);
+    } finally { clWorld = null; }
+  },
+});
+
+Deno.test({
+  name: "BaT extractor hold is terminal even with a usable slug or explicit caller identity",
+  sanitizeOps: false, sanitizeResources: false,
+  fn: async () => {
+    for (const explicit of [false, true]) for (const retained of [false, true]) {
+      extractor = () => json({ error: retained ? 'identity_admission_hold' : 'identity_hold_receipt_failed',
+        blip: retained ? { observation: 'written', observation_id: 'held-observation' } : { observation: 'error' },
+        issues: ['multiple_model_years_unresolved'] }, retained ? 422 : 503);
+      const response = await ingest({ url: 'https://bringatrailer.com/listing/1970-honda-c70/',
+        ...(explicit ? { year: 1970, make: 'Honda', model: 'C70' } : {}) });
+      equal(response.result.status, retained ? 'unresolved' : 'error');
+      equal(vehicleInserts().length, 0);
+      equal(writes().length, 0);
+    }
+  },
+});
+
+Deno.test({
+  name: "intake retains a numeric model on a whole vehicle with included parts",
+  sanitizeOps: false, sanitizeResources: false,
+  fn: async () => {
+    const response = await ingest({ year: 1970, make: "BMW", model: "2002", enrich: false,
+      text: "1970 BMW 2002 with Parts Collection" });
+    equal(response.result.status, "created");
+    equal(vehicleInserts().length, 1);
+    const vehicle = JSON.parse(vehicleInserts()[0].body!);
+    equal(vehicle.make, "BMW"); equal(vehicle.model, "2002");
+  },
+});
+
 const SLUG_VENUES: Array<{ platform: string; url: string; extractor: string }> = [
   { platform: "classiccars", url: "https://classiccars.com/listings/view/2089229/1993-chevrolet-corvette-for-sale-in-cleveland-ohio-44128", extractor: "extract-classiccars" },
   { platform: "mecum", url: "https://www.mecum.com/lots/1177355/2005-hummer-h2", extractor: "extract-mecum" },

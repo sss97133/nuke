@@ -27,6 +27,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { parse as parseHtml } from "https://esm.sh/parse5@7.3.0";
 import { archiveFetch, readArchivedPage } from "../_shared/archiveFetch.ts";
+import { retainIdentityHold, hasIdentityHold } from "../_shared/retainIdentityHold.ts";
 import { qualityGate } from "../_shared/extractionQualityGate.ts";
 import { cleanVehicleFields } from "../_shared/pollutionDetector.ts";
 import { writeObservation } from "../_shared/observationWriter.ts";
@@ -1021,13 +1022,6 @@ async function saveVehicle(
   ]);
 
   const urlMatchIds = Array.from(new Set([...(byDiscoveryUrl ?? []).map((r: any) => r.id), ...(byListingUrl ?? []).map((r: any) => r.id)]));
-  if (urlMatchIds.length > 1) {
-    // If a split duplicate pair exists (e.g. one row with listing_url and another with discovery_url), merge into primary
-    const primaryCandidate = urlMatchIds[0];
-    for (let i = 1; i < urlMatchIds.length; i++) {
-      await supabase.rpc("merge_into_primary", { primary_id: primaryCandidate, dup_id: urlMatchIds[i] }).catch(() => {});
-    }
-  }
 
   let existingId = forceVehicleId || queueEntry?.vehicle_id || urlMatchIds[0];
 
@@ -1044,6 +1038,7 @@ async function saveVehicle(
   }
 
   const rawData: Record<string, unknown> = {
+    listing_title: vehicle.title,
     year: vehicle.year,
     make: vehicle.make,
     model: vehicle.model,
@@ -1085,8 +1080,21 @@ async function saveVehicle(
   });
 
   if (gate.action === "reject") {
+    if (hasIdentityHold(gate.issues)) {
+      const receipt = await retainIdentityHold(value => writeObservation(supabase, value),
+        { platform: 'mecum', url: vehicle.url }, rawData, gate.issues);
+      if (!receipt.observation_id) throw new Error('identity_hold_receipt_failed: ' + receipt.errors.join('; '));
+    }
     console.warn(`[MECUM] Quality gate REJECTED ${vehicle.url}: ${gate.issues.join(", ")}`);
     throw new Error(`Quality gate rejected (score=${gate.score}): ${gate.issues.slice(0, 3).join(", ")}`);
+  }
+
+  if (urlMatchIds.length > 1) {
+    // If a split duplicate pair exists (e.g. one row with listing_url and another with discovery_url), merge into primary
+    const primaryCandidate = urlMatchIds[0];
+    for (let i = 1; i < urlMatchIds.length; i++) {
+      await supabase.rpc("merge_into_primary", { primary_id: primaryCandidate, dup_id: urlMatchIds[i] }).catch(() => {});
+    }
   }
 
   if (gate.action === "flag_for_review") {
@@ -1452,9 +1460,22 @@ Deno.serve(async (req) => {
 
       // Vehicle rows for lots with no vehicle yet; cleaned and gated like the page path.
       const newRows: { lot: IndexLot; row: Record<string, unknown> }[] = [];
+      const identityHeld = new Set<string>();
       for (const l of todo) {
+        // Existing URL matches must not bypass identity admission and project a new sale.
+        const claims = { year: l.year, make: l.make, model: l.model, listing_title: l.title };
+        const admission = qualityGate(claims, { source: 'mecum', scoreOnly: true });
+        if (hasIdentityHold(admission.issues)) {
+          if (!dryRun) {
+            const receipt = await retainIdentityHold(value => writeObservation(supabase, value),
+              { platform: 'mecum', url: l.url }, { ...l, listing_title: l.title }, admission.issues);
+            if (!receipt.observation_id) throw new Error('identity_hold_receipt_failed: ' + receipt.errors.join('; '));
+          }
+          identityHeld.add(l.lot_id); out.rejected_by_gate++; continue;
+        }
         if (vehicleByKey.has(mecumLotKey(l.url))) { out.linked_to_existing_vehicle++; continue; }
         const raw: Record<string, unknown> = {
+          listing_title: l.title,
           year: l.year,
           make: l.make,
           model: l.model,
@@ -1495,7 +1516,14 @@ Deno.serve(async (req) => {
         };
         const cleaned = cleanVehicleFields(raw, { platform: "mecum" });
         const gate = qualityGate(cleaned as Record<string, any>, { source: "mecum", sourceType: "auction" });
-        if (gate.action === "reject") { out.rejected_by_gate++; continue; }
+        if (gate.action === "reject") {
+          if (!dryRun && hasIdentityHold(gate.issues)) {
+            const receipt = await retainIdentityHold(value => writeObservation(supabase, value),
+              { platform: 'mecum', url: l.url }, raw, gate.issues);
+            if (!receipt.observation_id) throw new Error('identity_hold_receipt_failed: ' + receipt.errors.join('; '));
+          }
+          out.rejected_by_gate++; continue;
+        }
         const row: Record<string, unknown> = { status: "active" };
         for (const [k, v] of Object.entries(gate.cleaned)) if (v !== null && v !== undefined) row[k] = v;
         newRows.push({ lot: l, row });
@@ -1523,7 +1551,7 @@ Deno.serve(async (req) => {
         }
       }
 
-      const landed = todo.filter((l) => vehicleIdFor.has(l.lot_id));
+      const landed = todo.filter((l) => !identityHeld.has(l.lot_id) && vehicleIdFor.has(l.lot_id));
       const eventRows = landed.map((l) => ({
         vehicle_id: vehicleIdFor.get(l.lot_id)!,
         source_platform: "mecum",

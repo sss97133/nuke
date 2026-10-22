@@ -19,6 +19,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 import { normalizeVehicleFields, normalizeMake } from "../_shared/normalizeVehicle.ts";
 import { qualityGate } from "../_shared/extractionQualityGate.ts";
+import { retainIdentityHold, hasIdentityHold } from "../_shared/retainIdentityHold.ts";
 import { validateVINChecksum } from "../_shared/intelligence-layer.ts";
 import { decodeVin } from "../_shared/vin-decoder.ts";
 import { archiveFetch } from "../_shared/archiveFetch.ts";
@@ -858,7 +859,7 @@ interface EnrichedData {
 
 type EnrichResult =
   | { ok: true; data: EnrichedData }
-  | { ok: false; skipped?: boolean; error: string };
+  | { ok: false; skipped?: boolean; error: string; identityHold?: { blip?: IngestResult["blip"]; issues?: string[] } };
 
 async function tryAutoEnrich(url: string, platform: string): Promise<EnrichResult> {
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -884,6 +885,11 @@ async function tryAutoEnrich(url: string, platform: string): Promise<EnrichResul
       });
       if (!resp.ok) {
         const bodyText = await resp.text().catch(() => "");
+        let held: any = null;
+        try { held = JSON.parse(bodyText); } catch { /* non-JSON transport failure */ }
+        if (['identity_admission_hold', 'identity_hold_receipt_failed'].includes(held?.error)) {
+          return { ok: false, error: held.error, identityHold: { blip: held.blip, issues: held.issues } };
+        }
         return { ok: false, error: `extract-bat-core HTTP ${resp.status}: ${bodyText.slice(0, 200)}` };
       }
       const core = await resp.json();
@@ -1003,6 +1009,9 @@ async function tryAutoEnrich(url: string, platform: string): Promise<EnrichResul
 
     if (!resp.ok) {
       const bodyText = await resp.text().catch(() => "");
+      if (/identity_hold_receipt_failed|Quality gate rejected/i.test(bodyText)) {
+        return { ok: false, error: 'identity_admission_requires_review', identityHold: {} };
+      }
       return { ok: false, error: `${extractorName} HTTP ${resp.status}: ${bodyText.slice(0, 200)}` };
     }
 
@@ -1344,6 +1353,12 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
           };
         }
       } else {
+        if (enrichResult.identityHold) {
+          const { blip, issues } = enrichResult.identityHold;
+          return { status: blip?.observation_id ? 'unresolved' : 'error', blip, issues,
+            reason: 'identity_admission_hold', source: platform, external_id: externalId,
+            ...(blip?.observation_id ? {} : { error: enrichResult.error }) };
+        }
         enrichmentSkipped = enrichResult.skipped === true;
         enrichmentError = enrichResult.error;
         console.error(`Enrichment failed for ${listingUrl} (${platform}): ${enrichmentError}`);
@@ -1376,6 +1391,21 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
     if (platform === "craigslist" && capture && parsed.year && parsed.make && !parsed.model) {
       modelCitation = modelFromText(input.description || input.notes, parsed.year, parsed.make);
       if (modelCitation) { parsed.model = modelCitation.value; (parsed as any).modelSource = "listing_text"; }
+    }
+    // Run identity admission before missing-field fallback and before matching an
+    // existing vehicle. The original listing is retained, never relabelled.
+    const sourceClaims = { year: input.year ?? parsed.year, make: input.make ?? parsed.make,
+      model: input.model ?? parsed.model, listing_title: input.text ?? null,
+      description: input.description ?? input.notes, image_urls: input.image_urls,
+      ...captureAnswer() };
+    const admission = qualityGate(sourceClaims, { source: platform, scoreOnly: true });
+    if (admission.identity.status === 'unresolved' && hasIdentityHold(admission.issues) && listingUrl) {
+      const blip = await retainIdentityHold(value => writeObservation(supabaseAdmin, value),
+        { platform: platform === 'bring_a_trailer' ? 'bat' : platform, url: listingUrl }, sourceClaims, admission.issues);
+      return { status: blip.observation_id ? 'unresolved' : 'error', blip,
+        reason: 'identity_admission_hold', issues: admission.issues,
+        ...(blip.observation_id ? {} : { error: 'identity_hold_receipt_failed' }),
+        source: platform, external_id: externalId, ...captureAnswer() };
     }
     if ((!parsed.year || !parsed.make || !parsed.model) && platform === "craigslist" && capture) {
       // A blip: the post, its text, photos, place and clocks, retained with no vehicle (AGENTS.md).
@@ -1447,6 +1477,7 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
     // Normalize + validate before writing to DB. Catches: wrong make from
     // VIN, RPO codes in body_style, impossible fuel/year combos, garbage.
     const candidateData: Record<string, any> = {
+      listing_title: input.text ?? null,
       year: parsed.year ?? input.year,
       make: parsed.make ?? input.make,
       model: parsed.model ?? input.model,

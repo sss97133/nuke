@@ -202,6 +202,8 @@ Deno.serve(async (req) => {
 
         // Run quality gate on proposed data
         const gateInput = {
+          listing_title: identity.title,
+          listing_kind: essentials.listing_category?.toLowerCase() === "parts" ? "non_vehicle_item" : vehicle.listing_kind,
           year: identity.year || vehicle.year,
           make: identity.make || vehicle.make,
           model: identity.model || vehicle.model,

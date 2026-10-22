@@ -9,6 +9,7 @@
 import { chassisFromListItemText } from "./batChassis.ts";
 import { readOwnAuctionEnd } from "./batAuctionRecord.ts";
 import { readBatPartyLine } from "./batSellerType.ts";
+import { hasMultipleModelYears, isIdentityConjunction } from "./normalizeVehicle.ts";
 
 export const BAT_PARSER_VERSION = "batParser:1.0.0";
 
@@ -163,7 +164,11 @@ export function parseBatIdentityFromUrl(listingUrl: string): BatIdentity {
     // ("coyote-powered-1967-ford-mustang-gt-fastback", "no-reserve-11k-kilometer-1988-mercedes-benz-560sel",
     // "30-years-owned-…"). Everything before the year is a descriptor, never the make (427 of 264,668
     // archived lots, measured 2026-09-27; live rows had make "Coyote-Powered").
-    const m = u.pathname.match(/\/listing\/(?:[^/]*?-)?((?:18|19|20)\d{2})-([^/]+)\/?$/i);
+    const path = u.pathname.match(/\/listing\/([^/]+)\/?$/i)?.[1] ?? '';
+    if (hasMultipleModelYears(path)) return { year: null, make: null, model: null, title: path.replace(/-/g, ' ') };
+    // Search the first year boundary; an optional prefix can greedily skip it
+    // and reinterpret BMW's 2002 model as the year.
+    const m = path.match(/(?:^|-)((?:18|19|20)\d{2})-(.+)$/i);
     if (!m?.[1] || !m?.[2]) return { year: null, make: null, model: null, title: null };
     const year = Number(m[1]);
     if (!Number.isFinite(year) || year < 1885 || year > new Date().getFullYear() + 1) {
@@ -178,6 +183,7 @@ export function parseBatIdentityFromUrl(listingUrl: string): BatIdentity {
 
     const parts = slug.split("-").filter(Boolean);
     if (parts.length < 2) return { year, make: null, model: null, title: null };
+    if (isIdentityConjunction(parts[0])) return { year, make: null, model: null, title: path.replace(/-/g, ' ') };
 
     let make: string | null = null;
     let model: string | null = null;
@@ -258,10 +264,12 @@ export function readBatTaxonomy(html: string): BatTaxonomy {
 export function parseBatIdentityFromTitle(rawTitle: string, knownMake?: string | null): BatIdentity {
   const title = cleanBatTitle(String(rawTitle || ""));
   if (!title) return { year: null, make: null, model: null, title: null };
+  if (hasMultipleModelYears(title)) return { year: null, make: null, model: null, title };
   const ym = title.match(/\b(18[89]\d|19\d{2}|20\d{2})\b/);
   const yearRaw = ym ? Number(ym[1]) : null;
   const year = yearRaw !== null && yearRaw >= 1885 && yearRaw <= new Date().getFullYear() + 1 ? yearRaw : null;
   const km = String(knownMake || "").trim();
+  if (isIdentityConjunction(km)) return { year, make: null, model: null, title };
   if (km) {
     const i = title.toLowerCase().indexOf(km.toLowerCase());
     if (i >= 0) {
@@ -273,6 +281,7 @@ export function parseBatIdentityFromTitle(rawTitle: string, knownMake?: string |
   const after = title.slice(title.indexOf(ym[0]) + ym[0].length).trim();
   const parts = after.split(/\s+/).filter(Boolean);
   if (!parts.length) return { year, make: km || null, model: null, title };
+  if (isIdentityConjunction(parts[0])) return { year, make: null, model: null, title };
   // multi-word makes as titles spell them ("Alfa Romeo", "Land Rover", "Aston Martin", "De Tomaso", "AM General");
   // hyphenated ones ("Mercedes-Benz", "Rolls-Royce", "Austin-Healey") are already one token
   const exp = multiWordMakes[parts[0].toLowerCase()];

@@ -19,6 +19,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
 import { normalizeListingUrlKey } from '../_shared/listingUrl.ts';
 import { resolveExistingVehicleId } from '../_shared/resolveVehicleForListing.ts';
+import { retainIdentityHold, hasIdentityHold } from "../_shared/retainIdentityHold.ts";
 import { qualityGate } from '../_shared/extractionQualityGate.ts';
 import { cleanVehicleFields, stripHtmlTags } from '../_shared/pollutionDetector.ts';
 import { normalizeVehicleFields } from '../_shared/normalizeVehicle.ts';
@@ -666,6 +667,7 @@ export async function saveToDatabase(
 
   // Normalize fields before quality gate
   const rawVehicleData: Record<string, any> = normalizeVehicleFields({
+    listing_title: extracted.title,
     year: extracted.year,
     make: extracted.make,
     model: extracted.model,
@@ -683,6 +685,11 @@ export async function saveToDatabase(
   const gate = qualityGate(cleanedData, { source: 'gooding', sourceType: 'auction' });
 
   if (gate.action === 'reject') {
+    if (hasIdentityHold(gate.issues)) {
+      const receipt = await retainIdentityHold(value => writeObservation(supabase, value),
+        { platform: 'gooding', url: extracted.url }, { ...extracted, listing_title: extracted.title }, gate.issues);
+      if (!receipt.observation_id) throw new Error('identity_hold_receipt_failed: ' + receipt.errors.join('; '));
+    }
     console.warn(`[gooding] Quality gate REJECTED ${extracted.url}: ${gate.issues.join(', ')}`);
     throw new Error(`Quality gate rejected (score=${gate.score}): ${gate.issues.slice(0, 3).join(', ')}`);
   }

@@ -16,7 +16,7 @@
 
 import { containsHtml, isPollutedField, cleanFieldValue } from "./pollutionDetector.ts";
 import { validateVINChecksum } from "./intelligence-layer.ts";
-import { normalizeMake, normalizeVehicleFields } from "./normalizeVehicle.ts";
+import { normalizeVehicleFields, isIdentityConjunction, hasMultipleModelYears } from "./normalizeVehicle.ts";
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -28,6 +28,8 @@ export interface FieldConfidence {
 }
 
 export interface QualityGateResult {
+  /** Structural admission only; a populated label is still an attributed claim, never verified identity. */
+  identity: { status: "source_claim" | "unresolved" | "not_single_vehicle" };
   /** Whether the data passes minimum quality threshold */
   pass: boolean;
   /** Quality score 0-1 */
@@ -68,6 +70,15 @@ export function qualityGate(
 
   // Work on a copy
   const data = { ...vehicleData };
+  // Refuse promotion to a single vehicle, not retention of the source listing.
+  // Return the source fields unchanged for rejected inputs; callers can retain
+  // them with their existing capture/rejection receipt instead of inventing identity.
+  const invalidMake = isIdentityConjunction(data.make);
+  const multiAsset = [data.listing_title, data.title, data.bat_listing_title].some(hasMultipleModelYears);
+  const partsLot = [data.listing_title, data.title, data.bat_listing_title, data.model]
+    .some(value => typeof value === 'string' && /\bparts\s+(?:lot|collection)\b/i.test(value) &&
+      !/\b(?:with|plus|including|includes)\b.*\bparts\s+(?:lot|collection)\b/i.test(value));
+  const explicitlyNonVehicle = data.listing_kind === 'non_vehicle_item';
 
   // ── Check 1: Identity fields (year/make/model) ──────────────────────
   let identityScore = 0;
@@ -139,14 +150,6 @@ export function qualityGate(
         issues.push(`polluted_${field}: "${String(data[field]).slice(0, 50)}"`);
         if (!options.scoreOnly) data[field] = null;
       }
-    }
-  }
-
-  // ── Check 3b: Make canonicalization ─────────────────────────────────
-  if (data.make && !options.scoreOnly) {
-    const normalized = normalizeMake(data.make);
-    if (normalized && normalized !== data.make) {
-      data.make = normalized;
     }
   }
 
@@ -295,12 +298,20 @@ export function qualityGate(
     }
   }
 
+  if (invalidMake) issues.push("identity_boundary_conjunction");
+  if (multiAsset) issues.push("multiple_model_years_unresolved");
+  if (partsLot) issues.push("parts_lot_not_single_vehicle");
+  const heldIdentity = !explicitlyNonVehicle && (invalidMake || multiAsset || partsLot);
+  if (heldIdentity) action = "reject";
+  const completeIdentity = Boolean(data.make && data.model && data.year);
+
   return {
+    identity: { status: explicitlyNonVehicle ? "not_single_vehicle" : heldIdentity || !completeIdentity ? "unresolved" : "source_claim" },
     pass: action !== "reject",
     score: Math.round(score * 1000) / 1000,
     issues,
     action,
-    cleaned: options.scoreOnly ? vehicleData : data,
+    cleaned: options.scoreOnly || heldIdentity ? vehicleData : data,
   };
 }
 

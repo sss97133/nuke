@@ -42,6 +42,7 @@ import { decideLotAttribution, mergeEventMetadata, monitorForSeller, type BatEve
 import { parseLocation } from "../_shared/parseLocation.ts";
 import { normalizeVehicleFields } from "../_shared/normalizeVehicle.ts";
 import { qualityGate } from "../_shared/extractionQualityGate.ts";
+import { retainIdentityHold, hasIdentityHold } from "../_shared/retainIdentityHold.ts";
 import { batchUpsertWithProvenance, quarantineRecord, type ProvenanceMetadata } from "../_shared/batUpsertWithProvenance.ts";
 import { writeObservation } from "../_shared/observationWriter.ts";
 import { readCommentsJson, readOwnAuctionEnd, summarizeAuction, vinCheckDigitOk, buildAuctionCommentRows, linkAuctionCommentIdentities, sha256Hex } from "../_shared/batAuctionRecord.ts";
@@ -1416,6 +1417,16 @@ Deno.serve(async (req) => {
 
     const batCategory = essentials.listing_category ? String(essentials.listing_category).trim() : null;
     const listingKind = batCategory && batCategory.toLowerCase() === "parts" ? "non_vehicle_item" : "vehicle";
+    // Covers inserts AND updates before any identity/sale projection writes.
+    const identityClaims = { ...identity, listing_title: identity.title, listing_kind: listingKind };
+    const admission = qualityGate(identityClaims, { source: 'bat', scoreOnly: true });
+    if (admission.identity.status === 'unresolved' && hasIdentityHold(admission.issues)) {
+      const blip = await retainIdentityHold(value => writeObservation(supabase, value),
+        { platform: 'bat', url: listingUrlCanonical }, identityClaims, admission.issues);
+      return new Response(JSON.stringify({ ok: false, error: blip.observation_id ? 'identity_admission_hold' : 'identity_hold_receipt_failed',
+        status: blip.observation_id ? 'unresolved' : 'error', blip, issues: admission.issues }),
+        { status: blip.observation_id ? 422 : 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
     const descriptionRaw = extractDescription(html);
     const description = normalizeDescriptionSummary(descriptionRaw);
     const images = extractImages(html);

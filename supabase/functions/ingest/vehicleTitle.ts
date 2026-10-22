@@ -1,6 +1,6 @@
 // Vehicle identity from a listing title: year, then the longest matching make, then the model words.
 // Shared by ingest and extract-facebook-marketplace, so a Facebook card and its ingest landing read one identity.
-import { normalizeMake, isGarbageMake } from "../_shared/normalizeVehicle.ts";
+import { normalizeMake, isGarbageMake, isIdentityConjunction, hasMultipleModelYears } from "../_shared/normalizeVehicle.ts";
 
 // Title-parsing make list — includes common aliases for matching.
 // normalizeMake() from normalizeVehicle.ts handles canonical form conversion.
@@ -123,6 +123,7 @@ function modelFromWords(text: string, year: number | null): string | null {
 
 export function parseVehicleTitle(text: string): ParsedVehicle {
   if (!text) return { year: null, make: null, model: null };
+  if (hasMultipleModelYears(text)) return { year: null, make: null, model: null };
 
   // Strip common prefixes
   const cleaned = text
@@ -136,6 +137,7 @@ export function parseVehicleTitle(text: string): ParsedVehicle {
 
   // Get text after year
   const afterYear = cleaned.slice(cleaned.indexOf(yearMatch[0]) + yearMatch[0].length).trim();
+  if (isIdentityConjunction(afterYear.split(/\s+/)[0])) return { year, make: null, model: null };
   const lower = afterYear.toLowerCase();
 
   for (const { make, re } of MAKE_MATCHERS) {
@@ -169,6 +171,7 @@ export function parseVehicleTitle(text: string): ParsedVehicle {
   let mi = 0;
   while (mi < words.length && isGarbageMake(words[mi])) mi++;
   const candidate = words[mi] || null;
+  if (isIdentityConjunction(candidate)) return { year, make: null, model: null };
   const make = candidate && !isGarbageMake(candidate) ? candidate : null;
   return {
     year,
