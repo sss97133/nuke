@@ -1752,6 +1752,10 @@ async function handleValueAsset(
       valueHigh = adjusted.high;
       estimateSource = adjusted.comps_estimate != null ? "adjusted_comps" : "adjusted_own_sale";
       noEstimateReason = null;
+      for (const stale of ["used_median_of_confirmed_sales", "no_estimate_insufficient_evidence"]) {
+        const i = flags.indexOf(stale);
+        if (i >= 0) flags.splice(i, 1);
+      }
       flags.push(adjusted.own_sale_estimate != null ? "blended_own_prior_sale_time_adjusted" : "comps_time_channel_mileage_adjusted");
     }
   }
