@@ -409,7 +409,7 @@ async function resolveSoldComps(
 
   const yearRange = 2;
   const fetchLimit = Math.min(limit * 4, 60);
-  const { data: rpcRows, error: rpcErr } = await sb.rpc("get_comps_combined", {
+  const compsArgs = {
     p_make: make,
     p_model: model,
     p_year_min: year != null ? year - yearRange : null,
@@ -418,7 +418,12 @@ async function resolveSoldComps(
     p_max_price: null,
     p_exclude_vehicle_id: excludeId,
     p_limit: fetchLimit,
-  });
+  };
+  let { data: rpcRows, error: rpcErr } = await sb.rpc("get_comps_combined", compsArgs);
+  // Under load the comps RPC can hit its 10s statement timeout; retry once so a busy moment
+  // is not reported as "no comps", and say so in query.comps_query_error if it still fails.
+  if (rpcErr) ({ data: rpcRows, error: rpcErr } = await sb.rpc("get_comps_combined", compsArgs));
+  const compsQueryError = rpcErr ? String(rpcErr.message || rpcErr) : null;
 
   let rows: Record<string, unknown>[] = [];
   if (rpcErr) {
@@ -651,6 +656,8 @@ async function resolveSoldComps(
       limit,
       year_range: yearRange,
       subject_variant: subjectVariant,
+      model_matching: "exact, substring, or model_spelling_key (punctuation/spacing/transmission words ignored); trim variants hard-blocked",
+      ...(compsQueryError ? { comps_query_error: compsQueryError } : {}),
     },
     excluded,
   };
@@ -1763,7 +1770,7 @@ async function handleValueAsset(
     );
     let confVal = estimateSource === "sold_comps_median" ? CONFIDENCE_CAP : Math.min(conf.confidence ?? 0.5, CONFIDENCE_CAP);
     if (estimateStale) confVal = Math.min(confVal, 0.36);
-    if (storedDisagrees) confVal = Math.min(confVal, 0.30);
+    if (storedDisagrees && estimateSource === "nuke_estimates") confVal = Math.min(confVal, 0.30);
     if (guard.triggered) confVal = Math.min(confVal, 0.25);
     if (estimateSource === "recent_same_asset_sale") confVal = 0.55;
     const confAdj = { confidence: confVal, confidence_basis: "estimate_model" as const };
