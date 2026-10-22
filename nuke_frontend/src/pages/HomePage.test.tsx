@@ -332,3 +332,30 @@ it('restores the sales investigation from its URL and records a switch back to n
   await navigate('/?tab=market&make=Porsche&family=911&family_view=sales');
   expect(active()).toContain('Sales');
 });
+
+it('keeps map amounts and benchmark together until the requested period succeeds', async () => {
+  vi.resetModules();
+  const { TreemapHomePage: FreshHome } = await import('./HomePage');
+  installTreemapReads();
+  const originalRpc = fixture.client.rpc;
+  let finishDay!: (result: any) => void;
+  const dayRead = new Promise(resolve => { finishDay = resolve; });
+  const answer = (day: boolean) => ({
+    as_of: '2026-10-22T00:00:00Z', min_sales: 1, families: 10, eligible: 5, significant: 1,
+    bat: { sold_12m: day ? 20 : 1100, sold_prior_12m: day ? 10 : 1000, usd_12m: 100000, usd_prior_12m: 100000 },
+    brand_moves: { Porsche: { sold_12m: 8, sold_prior_12m: 2, usd_12m: 80000, usd_prior_12m: 20000 } },
+    gaining: [], losing: [],
+  });
+  fixture.client.rpc = vi.fn((name: string, args: any) => name === 'treemap_family_share_movers'
+    ? args?.p_horizon === '1d' ? dayRead : Promise.resolve({ data: answer(false), error: null })
+    : originalRpc(name, args));
+  await act(async () => root.render(<BrowserRouter><FreshHome embedded onBrowse={() => {}} /></BrowserRouter>));
+  const windowButtons = container.querySelector('[aria-label="Relativity time horizon"]')!;
+  const day = [...windowButtons.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent === '1D')!;
+  await act(async () => day.click());
+  expect(container.querySelector('.map-legend__prose')?.textContent ?? container.querySelector('.map-legend')?.textContent).toContain('1,000 → 1,100');
+  expect(container.querySelector('.map-movers2__rel-window')?.textContent).toBe('LAST 1Y VS PRIOR 1Y');
+  await act(async () => finishDay({ data: answer(true), error: null }));
+  expect(container.querySelector('.map-legend')?.textContent).toContain('10 → 20');
+  expect(container.querySelector('.map-movers2__rel-window')?.textContent).toBe('LAST 24H VS PRIOR 24H');
+});
