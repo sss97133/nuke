@@ -793,7 +793,7 @@ jobs:
         run: |
           deno test --allow-read supabase/functions/mcp-connector/oauth_test.ts
           deno test --allow-read supabase/functions/mcp-connector/surface_test.ts
-          deno test --allow-read --allow-env supabase/functions/oauth-server/http.test.ts supabase/functions/oauth-server/oauthPolicy.test.ts supabase/functions/api-keys-manage/scopeValidation.test.ts supabase/functions/ingest-artifact/receiptIntake.test.ts supabase/functions/mcp-connector/receiptTools.test.ts
+          deno test --node-modules-dir=none --allow-read --allow-env supabase/functions/oauth-server/http.test.ts supabase/functions/oauth-server/oauthPolicy.test.ts supabase/functions/api-keys-manage/scopeValidation.test.ts supabase/functions/ingest-artifact/receiptIntake.test.ts supabase/functions/mcp-connector/receiptTools.test.ts
           deno test --allow-read supabase/functions/mcp-connector/advisor_evidence_test.ts
           deno test --allow-read supabase/functions/mcp-connector/advisor_surface_test.ts
           deno test --allow-read --allow-net supabase/functions/mcp-connector/advisor_live_e2e_test.ts
