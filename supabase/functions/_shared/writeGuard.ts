@@ -55,7 +55,7 @@ const JWKS_TTL_MS = 10 * 60 * 1000;
 export type WriteCaller =
   | { kind: "service_role"; via: "secret-key" | "jwt" | "remote" }
   | { kind: "user"; userId: string; via: "jwt" | "remote" }
-  | { kind: "api_key"; userId: string | null; agentId: string | null; scopes: string[] }
+  | { kind: "api_key"; userId: string | null; agentId: string | null; keyId?: string | null; scopes: string[] }
   | { kind: "anonymous"; via: "exception" };
 
 export type WriteAuthResult =
@@ -294,7 +294,7 @@ async function judgeApiKey(
   });
   if (error) return { ok: false, status: 401, reason: `api key check failed: ${error.message}` };
   const result = data as {
-    allowed?: boolean; user_id?: string; scopes?: string[]; agent_registration_id?: string | null; error?: string;
+    allowed?: boolean; user_id?: string; key_id?: string; scopes?: string[]; agent_registration_id?: string | null; error?: string;
   };
   if (!result?.allowed) return { ok: false, status: 401, reason: `api key ${result?.error ?? "rejected"}` };
   const scopes = result.scopes ?? [];
@@ -304,7 +304,7 @@ async function judgeApiKey(
   }
   return {
     ok: true,
-    caller: { kind: "api_key", userId: result.user_id ?? null, agentId: result.agent_registration_id ?? null, scopes },
+    caller: { kind: "api_key", userId: result.user_id ?? null, agentId: result.agent_registration_id ?? null, keyId: result.key_id ?? null, scopes },
   };
 }
 
@@ -344,6 +344,11 @@ export async function authenticateWriter(req: Request, opts: WriteGuardOptions =
       }
     }
     const token = extractToken(req);
+    if (opts.apiKeys && token && /^nuke_oauth_[a-f0-9]{64}$/.test(token)) {
+      const oauth = await judgeApiKey(token, opts.apiKeys, deps);
+      if (oauth.ok && (oauth.caller.kind !== "api_key" || !oauth.caller.keyId || !oauth.caller.userId)) return {ok:false,status:401,reason:"OAuth account identity missing"};
+      return oauth;
+    }
     const verdict: WriteAuthResult = token
       ? await judgeToken(token, deps)
       : { ok: false, status: 401, reason: "no token" };

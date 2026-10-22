@@ -47,6 +47,7 @@ import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { HISTORICAL_ASK_MODE, HISTORICAL_ASK_PROFILE } from "./historicalAsks.ts";
 import { HISTORICAL_ASK_METHOD, historicalAskStore, ingestHistoricalAsk, HistoricalAskRefusal } from "./historicalAskIntake.ts";
 import { TITLE_FACET_KEYS, TITLE_FACET_METHOD, TITLE_FACET_MODE, titleFacetSelector, deriveTitleFacet } from "./titleFacets.ts";
+import { admitReceiptEvidence } from "../ingest-artifact/receiptIntake.ts";
 
 declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void };
 
@@ -303,6 +304,16 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
 
   try {
     let input: ObservationInput = await req.json();
+    if (input.mode === "receipt_evidence_v1") {
+      const denied = await requireWriteAuth(req);
+      if (denied) return denied;
+      const writer = await authenticateWriter(req);
+      if (!writer.ok || writer.caller.kind !== "service_role") return new Response(JSON.stringify({ error: "Receipt evidence admission requires internal service authentication" }), { status: 403, headers: corsHeaders });
+      return admitReceiptEvidence(input as unknown as Record<string, unknown>, supabase);
+    }
+    if (input.extraction_method === "receipt_evidence_v1" || input.structured_data?.claim_contract === "receipt_evidence_v1") {
+      return new Response(JSON.stringify({ error: "Receipt evidence requires its protected intake mode" }), { status: 403, headers: corsHeaders });
+    }
     if (input.mode === CAB_LISTING_CAPTURE_MODE) {
       const denied = await requireWriteAuth(req);
       if (denied) return denied;

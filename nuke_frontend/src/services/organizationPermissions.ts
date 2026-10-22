@@ -22,7 +22,7 @@ export interface OrgPermissions {
   canLinkVehicles: boolean;
   canUploadImages: boolean;
   canCreateEvents: boolean;
-  role: 'owner' | 'manager' | 'employee' | 'contributor' | 'viewer' | null;
+  role: 'owner' | 'manager' | 'employee' | 'accountant' | 'contributor' | 'viewer' | null;
   isDiscoverer: boolean;
   isLegalOwner: boolean;
 }
@@ -109,7 +109,7 @@ export const getOrgPermissions = async (
     contributorRole === 'contributor';
 
   return {
-    canView: org?.is_public || hasEditAccess || false,
+    canView: org?.is_public || hasEditAccess || contributorRole === 'accountant' || false,
     canEdit: hasEditAccess,
     canDelete: hasFullAccess,
     canManageMembers: hasFullAccess,
@@ -219,6 +219,8 @@ export const canManageMembers = async (orgId: string, userId: string | null): Pr
  */
 export const getRoleBadge = (role: string | null): { text: string; color: string } => {
   switch (role) {
+    case 'accountant':
+      return { text: 'ACCOUNTING', color: 'var(--info)' };
     case 'owner':
     case 'co_founder':
       return { text: 'OWNER', color: 'var(--accent)' };
