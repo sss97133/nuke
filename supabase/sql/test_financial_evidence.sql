@@ -80,7 +80,11 @@ ALTER TABLE financial_documents ADD CHECK ((review_status = ANY (ARRAY['unreview
 ALTER TABLE financial_documents ADD CHECK ((source_kind = ANY (ARRAY['email_attachment'::text, 'email_body'::text, 'scan'::text, 'upload'::text, 'bank_export'::text, 'other'::text])));
 ALTER TABLE financial_documents ENABLE ROW LEVEL SECURITY;
 CREATE POLICY own_read ON financial_documents FOR SELECT TO authenticated USING(owner_id=auth.uid());
-GRANT SELECT ON financial_documents TO authenticated;
+-- Mirror live owner mutations so custody bypasses are exercised under real grants.
+CREATE POLICY own_insert ON financial_documents FOR INSERT TO authenticated WITH CHECK(owner_id=auth.uid());
+CREATE POLICY own_update ON financial_documents FOR UPDATE TO authenticated USING(owner_id=auth.uid()) WITH CHECK(owner_id=auth.uid());
+CREATE POLICY own_delete ON financial_documents FOR DELETE TO authenticated USING(owner_id=auth.uid());
+GRANT SELECT,INSERT,UPDATE,DELETE ON financial_documents TO authenticated;
 CREATE TABLE public.financial_document_extractions(
 id uuid DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY,
 owner_id uuid NOT NULL,
@@ -209,11 +213,59 @@ BEGIN
  IF EXISTS(SELECT 1 FROM financial_document_extractions old JOIN financial_document_extractions new ON old.superseded_by=new.id WHERE old.field_key<>new.field_key) THEN RAISE EXCEPTION 'misbound field lineage'; END IF;
  RAISE NOTICE 'PASS replay/conflict, complete revision, stale/partial/duplicate/privacy refusal, exact field lineage and API readback';
 END $$;
+DO $$
+DECLARE mutation text;
+BEGIN
+ FOREACH mutation IN ARRAY ARRAY[
+   'content_sha256=repeat(''b'',64)', 'storage_path=''rebound.pdf''',
+   'attributes=attributes - ''intake_mode''', 'attributes=jsonb_set(attributes,''{runs}'',''[]'')',
+   'privacy_tier=''published'''
+ ] LOOP
+   BEGIN
+     EXECUTE 'UPDATE financial_documents SET ' || mutation;
+     RAISE EXCEPTION 'service custody mutation accepted: %',mutation;
+   EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+ END LOOP;
+ RAISE NOTICE 'PASS service cannot rebind original, remove marker/history, or publish';
+END $$;
 SELECT set_config('request.jwt.claim.role','authenticated',true),set_config('request.jwt.claim.sub','11111111-1111-4111-8111-111111111111',true);
 SET LOCAL ROLE authenticated;
 DO $$ BEGIN
  IF (SELECT count(*) FROM financial_documents)<>1 OR (SELECT count(*) FROM financial_document_extractions WHERE NOT is_superseded)<>1 THEN RAISE EXCEPTION 'owner reader roundtrip failed'; END IF;
  IF has_function_privilege(current_user,'ingest_financial_evidence(uuid,jsonb,jsonb,jsonb)','EXECUTE') THEN RAISE EXCEPTION 'unverified direct admission granted'; END IF;
+END $$;
+DO $$
+DECLARE mutation text;
+BEGIN
+ FOREACH mutation IN ARRAY ARRAY[
+   'content_sha256=repeat(''b'',64)', 'storage_path=''rebound.pdf''',
+   'attributes=''{}''::jsonb', 'attributes=jsonb_set(attributes,''{runs}'',''[]'')'
+ ] LOOP
+   BEGIN
+     EXECUTE 'UPDATE financial_documents SET ' || mutation;
+     RAISE EXCEPTION 'owner custody mutation accepted: %',mutation;
+   EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+ END LOOP;
+ BEGIN
+   DELETE FROM financial_documents;
+   RAISE EXCEPTION 'owner deleted admitted original';
+ EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+ BEGIN
+   INSERT INTO financial_documents(owner_id,attributes) VALUES(auth.uid(),'{"intake_mode":"financial_evidence_v1","runs":[]}');
+   RAISE EXCEPTION 'owner forged admission';
+ EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+ BEGIN
+   INSERT INTO financial_documents(owner_id,attributes) VALUES(auth.uid(),'{"runs":[]}');
+   RAISE EXCEPTION 'owner forged unmarked revision history';
+ EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+ INSERT INTO financial_documents(owner_id,source_filename) VALUES(auth.uid(),'legacy');
+ UPDATE financial_documents SET source_filename='legacy-updated' WHERE source_filename='legacy';
+ BEGIN
+   UPDATE financial_documents SET attributes='{"intake_mode":"financial_evidence_v1"}' WHERE source_filename='legacy-updated';
+   RAISE EXCEPTION 'owner promoted legacy original';
+ EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+ DELETE FROM financial_documents WHERE source_filename='legacy-updated';
+ RAISE NOTICE 'PASS authenticated OLD/NEW custody, forgery and history guards; legacy unaffected';
 END $$;
 SELECT set_config('request.jwt.claim.sub','22222222-2222-4222-8222-222222222222',true);
 DO $$ BEGIN

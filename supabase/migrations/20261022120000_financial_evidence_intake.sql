@@ -2,6 +2,53 @@ BEGIN;
 SET LOCAL statement_timeout = '10s';
 SET LOCAL lock_timeout = '1s';
 
+-- Owner table grants must not bypass verified original custody or revision history.
+CREATE OR REPLACE FUNCTION public.guard_financial_evidence_document()
+RETURNS trigger LANGUAGE plpgsql SET search_path=public,pg_temp AS $$
+DECLARE old_reserved boolean := false; new_reserved boolean := false;
+BEGIN
+  IF TG_OP <> 'INSERT' THEN
+    old_reserved := OLD.attributes ?| ARRAY['intake_mode','runs'];
+  END IF;
+  IF TG_OP <> 'DELETE' THEN
+    new_reserved := NEW.attributes ?| ARRAY['intake_mode','runs'];
+  END IF;
+  IF NOT (old_reserved OR new_reserved) THEN
+    IF TG_OP='DELETE' THEN RETURN OLD; ELSE RETURN NEW; END IF;
+  END IF;
+  IF coalesce(auth.role(),'') <> 'service_role' THEN
+    RAISE EXCEPTION 'verified financial document custody requires service admission' USING ERRCODE='42501';
+  END IF;
+  IF TG_OP='DELETE' THEN
+    RAISE EXCEPTION 'financial evidence originals cannot be deleted' USING ERRCODE='42501';
+  END IF;
+  IF TG_OP='UPDATE' THEN
+    IF ROW(NEW.id,NEW.owner_id,NEW.content_sha256,NEW.logical_index,NEW.storage_path,
+           NEW.source_filename,NEW.source_kind,NEW.byte_size,NEW.created_at)
+       IS DISTINCT FROM
+       ROW(OLD.id,OLD.owner_id,OLD.content_sha256,OLD.logical_index,OLD.storage_path,
+           OLD.source_filename,OLD.source_kind,OLD.byte_size,OLD.created_at)
+       OR NEW.attributes->'intake_mode' IS DISTINCT FROM OLD.attributes->'intake_mode'
+       OR NEW.privacy_tier IS DISTINCT FROM OLD.privacy_tier THEN
+      RAISE EXCEPTION 'financial evidence original custody is immutable' USING ERRCODE='42501';
+    END IF;
+    IF jsonb_typeof(NEW.attributes->'runs') IS DISTINCT FROM 'array'
+       OR jsonb_typeof(OLD.attributes->'runs') IS DISTINCT FROM 'array' THEN
+      RAISE EXCEPTION 'financial evidence revision history must be retained' USING ERRCODE='42501';
+    END IF;
+    IF jsonb_array_length(NEW.attributes->'runs') < jsonb_array_length(OLD.attributes->'runs')
+       OR EXISTS (SELECT 1 FROM jsonb_array_elements(OLD.attributes->'runs') WITH ORDINALITY r(value,n)
+          WHERE NEW.attributes->'runs'->(r.n::integer-1) IS DISTINCT FROM r.value) THEN
+      RAISE EXCEPTION 'financial evidence revision history is append-only' USING ERRCODE='42501';
+    END IF;
+  END IF;
+  RETURN NEW;
+END $$;
+REVOKE ALL ON FUNCTION public.guard_financial_evidence_document() FROM PUBLIC,anon,authenticated;
+CREATE TRIGGER financial_evidence_document_custody
+BEFORE INSERT OR UPDATE OR DELETE ON public.financial_documents
+FOR EACH ROW EXECUTE FUNCTION public.guard_financial_evidence_document();
+
 -- Existing financial document/cell/review model; no bookkeeping entries are created.
 -- Only ingest-observation calls this after authenticating the account and hashing held bytes.
 CREATE OR REPLACE FUNCTION public.ingest_financial_evidence(
