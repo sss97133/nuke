@@ -142,6 +142,39 @@ async function priceFacts(sb: AdvisorDb, vid: string) {
   };
 }
 
+/** All-in buyer cost per vehicle (hammer + published buyer premium + cited estimates). Never throws. */
+async function allInCosts(sb: AdvisorDb, ids: string[]): Promise<Map<string, Record<string, unknown>>> {
+  const out = new Map<string, Record<string, unknown>>();
+  const uniq = [...new Set(ids.filter(Boolean))];
+  if (!uniq.length) return out;
+  try {
+    const { data, error } = await sb.rpc("all_in_buyer_cost_for_vehicles", { p_vehicle_ids: uniq });
+    if (error || !Array.isArray(data)) return out;
+    for (const r of data as Array<{ vehicle_id: string; all_in: Record<string, unknown> | null }>) {
+      if (r?.vehicle_id && r.all_in) out.set(String(r.vehicle_id), r.all_in);
+    }
+  } catch {
+    // all-in cost is additive context; a missing RPC must not break valuation.
+  }
+  return out;
+}
+
+function allInSummary(a: Record<string, unknown> | undefined | null) {
+  if (!a) return null;
+  const total = (a.all_in_cost ?? null) as Record<string, unknown> | null;
+  return {
+    hammer: a.hammer ?? null,
+    stored_price: a.stored_price ?? null,
+    stored_price_basis: a.stored_price_basis ?? null,
+    stored_price_includes_premium: a.stored_price_includes_premium ?? null,
+    buyer_premium: Array.isArray(a.components)
+      ? ((a.components as Array<Record<string, unknown>>).find((c) => c.item === "buyer_premium")?.amount ?? null)
+      : null,
+    all_in_known: total?.known ?? null,
+    all_in_estimated_mid: total?.estimated_mid ?? null,
+  };
+}
+
 function listingCitation(vehicle: Record<string, unknown>): Citation {
   const platform = vehicle.canonical_platform || vehicle.auction_source;
   const name =
@@ -1585,6 +1618,7 @@ async function handleValueAsset(
     limit: 15,
   });
 
+  const allIn = await allInCosts(sb, [vid, ...comps.map((c) => String(c.asset_id))]);
   const soldPrices = comps
     .map((c) => c.sale_price)
     .filter((n): n is number => typeof n === "number" && n > 0)
@@ -1787,9 +1821,14 @@ async function handleValueAsset(
       stored_estimate_stale: storedStale,
       confidence: claims.find((c) => c.field === "estimated_value")?.confidence ?? null,
       flags,
+      // Hammer vs all-in: the stored sale price can be hammer-only or include the buyer premium
+      // depending on platform; all_in_cost carries the breakdown with cited fee terms.
+      hammer: (allIn.get(vid)?.hammer as number | undefined) ?? null,
+      all_in_cost: allIn.get(vid) ?? null,
       comps_used: comps.map((c) => ({
         asset_id: c.asset_id,
         sale_price: c.sale_price,
+        all_in: allInSummary(allIn.get(String(c.asset_id))),
         sold_date: c.sold_date,
         platform: c.platform,
         listing_url: c.listing_url,
@@ -1864,6 +1903,7 @@ async function handleGetComps(
   }
 
   const claims: Claim[] = [];
+  const allIn = await allInCosts(sb, comps.map((c) => String(c.asset_id)));
   const out = comps.map((c, i) => {
     claims.push(
       recordedClaim(`comp.${i}.sale_price`, c.sale_price, {
@@ -1888,6 +1928,8 @@ async function handleGetComps(
       model: c.model,
       trim: c.trim,
       sale_price: c.sale_price,
+      hammer: (allIn.get(String(c.asset_id))?.hammer as number | undefined) ?? null,
+      all_in_cost: allIn.get(String(c.asset_id)) ?? null,
       mileage: c.mileage,
       sold_date: c.sold_date,
       listing_url: c.listing_url,
@@ -1919,7 +1961,7 @@ async function handleGetComps(
       query,
       excluded,
       note:
-        "Only price_kind=sold with a sale basis. Asks, unsold high bids, parts suspects, and variant mismatches are excluded. URLs are canonicalized for dedupe.",
+        "sale_price is the stored price; hammer and all_in_cost show whether it includes the buyer premium and the all-in buyer cost (published fee schedule + cited transport/paperwork estimates). Only price_kind=sold with a sale basis. Asks, unsold high bids, parts suspects, and variant mismatches are excluded. URLs are canonicalized for dedupe.",
     }),
   );
 }
