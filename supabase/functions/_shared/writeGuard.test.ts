@@ -394,3 +394,16 @@ Deno.test("knownSecretKeys: every named secret key and the platform's secret key
   assertEquals(knownSecretKeys(envOf({ ...baseEnv, SUPABASE_SERVICE_ROLE_KEY: LEGACY_SERVICE_JWT })).sort(), [CRON_KEY, DEFAULT_KEY].sort());
   assertEquals(knownSecretKeys(envOf({ SERVICE_ROLE_KEY: "sb_secret_test_deleted_01" })), []);
 });
+
+Deno.test("opaque OAuth Bearer uses revocable API key identity and rejects identityless results",async()=>{
+ const original=globalThis.fetch;let result:Record<string,unknown>={allowed:true,user_id:"user-fixture",key_id:"key-fixture",scopes:["receipts:read"]};
+ globalThis.fetch=async()=>new Response(JSON.stringify(result),{headers:{"content-type":"application/json"}});
+ try{
+ const request=req({authorization:"Bearer nuke_oauth_"+"a".repeat(64)});
+ const options={apiKeys:{endpoint:"receipt-test"},deps:deps()};
+ const good=await authenticateWriter(request,options);assertEquals(good.ok,true);
+ if(good.ok && good.caller.kind==='api_key')assertEquals(good.caller.keyId,'key-fixture');
+ result={allowed:true,user_id:"user-fixture",scopes:["receipts:read"]};assertEquals((await authenticateWriter(request,options)).ok,false);
+ result={allowed:false,error:"invalid_api_key"};assertEquals((await authenticateWriter(request,options)).ok,false);
+ }finally{globalThis.fetch=original;}
+});

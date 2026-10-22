@@ -1,3 +1,4 @@
+import { ACCOUNTING_TOOLS, ACCOUNTING_TOOL_NAME, callAccounting } from "./accountingTools.ts";
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
@@ -99,7 +100,8 @@ interface AuthResult {
 
 async function authenticate(req: Request): Promise<AuthResult> {
   const authHeader = req.headers.get("Authorization");
-  const apiKey = req.headers.get("X-API-Key");
+  let apiKey = req.headers.get("X-API-Key");
+  let opaqueOAuth = false;
 
   // 1. Service role key
   if (authHeader?.startsWith("Bearer ")) {
@@ -111,7 +113,8 @@ async function authenticate(req: Request): Promise<AuthResult> {
     if (alt && token === alt) {
       return { ok: true, userId: "service-role", scopes: ["admin"] };
     }
-    // No other bearer token is accepted, including the ones this function used to mint without a login.
+    if (/^nuke_oauth_[a-f0-9]{64}$/.test(token)) { apiKey = token; opaqueOAuth = true; }
+    // Legacy self-issued JWTs are not credentials.
     if (!apiKey) return { ok: false, error: "Invalid or expired token", status: 401 };
   }
 
@@ -134,6 +137,7 @@ async function authenticate(req: Request): Promise<AuthResult> {
           : "Invalid API key";
       return { ok: false, error: msg, status: data?.error === "rate_limit_exceeded" ? 429 : 401 };
     }
+    if (opaqueOAuth && (!data.user_id || !data.key_id || !Array.isArray(data.scopes) || !data.scopes.length)) return { ok: false, error: "Invalid OAuth credential", status: 401 };
     // API-key scopes: honor a `scopes` array from the rate-limit RPC if present, else default to
     // autonomous-observations (read + write:observations). Canonical needs an explicit grant.
     const keyScopes = Array.isArray(data.scopes) && data.scopes.length
@@ -252,6 +256,7 @@ interface ToolDef {
 }
 
 const TOOLS: ToolDef[] = [
+  ...ACCOUNTING_TOOLS,
   // ── Schema Discovery ──────────────────────────────────────────────────
   {
     name: "describe_platform",
@@ -6281,6 +6286,17 @@ Deno.serve(async (req: Request) => {
       status: 200,
       headers: { ...baseHeaders, "Content-Type": "application/json" },
     });
+  }
+
+  if (body.method === 'tools/call' && body.params?.name === ACCOUNTING_TOOL_NAME) {
+    if (isChatGptSurface(req)) return new Response(JSON.stringify(rpcError(body.id, -32602, 'Tool not available on this public surface')), { headers: { ...CORS, 'Content-Type': 'application/json' } });
+    try {
+      const result = await callAccounting(req, (body.params.arguments || {}) as Record<string, unknown>, SUPABASE_URL);
+      if ('authenticationRequired' in result) return new Response(JSON.stringify(rpcError(body.id, -32000, 'Accounting sign-in required')), { status: 401, headers: { ...CORS, 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'WWW-Authenticate': 'Bearer realm="nuke", resource_metadata="https://nuke.ag/.well-known/oauth-protected-resource"' } });
+      return new Response(JSON.stringify(rpcResult(body.id, result)), { headers: { ...CORS, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
+    } catch {
+      return new Response(JSON.stringify(rpcResult(body.id, { isError: true, content: [{ type: 'text', text: 'Accounting service unavailable' }] })), { headers: { ...CORS, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
+    }
   }
 
   // Auth — required for write tools, optional for read tools.

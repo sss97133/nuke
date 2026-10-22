@@ -1,3 +1,4 @@
+import { delegatedFinancialEvidence } from "./financialDelegation.ts";
 /**
  * INGEST OBSERVATION
  *
@@ -306,6 +307,15 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
     let input: ObservationInput = await req.json();
     if (input.mode === FINANCIAL_EVIDENCE_MODE) {
       const action = (input as unknown as { action?: string }).action ?? "submit";
+      if ('owner_user_id' in input || action === 'contexts' || action === 'correct' || action === 'original') {
+        const options = { apiKeys: { endpoint: 'ingest-observation', requiredScopes: [] } };
+        const identity = await authenticateWriter(req, options);
+        const result = identity.ok ? await delegatedFinancialEvidence(supabase, identity.caller, input, async () => {
+          const current = await authenticateWriter(req, options);
+          return current.ok ? current.caller : null;
+        }) : { status: 401, body: { error: 'Accounting sign-in required' } };
+        return new Response(JSON.stringify(result.body), { status: result.status, headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
+      }
       const options = { apiKeys: { endpoint: "ingest-observation", requiredScopes: [["read", "tax_read"].includes(action) ? "read" : "write"] } };
       const identity = await authenticateWriter(req, options);
       const actor = identity.ok ? financialActor(identity.caller, action) : null;

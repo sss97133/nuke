@@ -1,10 +1,11 @@
+import { ACCOUNTING_TOOLS } from './accountingTools.ts';
 // Run: deno test --allow-read supabase/functions/mcp-connector/surface_test.ts
 // Load the actual definitions and protocol handlers without starting HTTP, reading
 // credentials, or reaching the database. Tool handlers are spies, so denied calls
 // must fail before dispatch and allowed calls must preserve their arguments.
 const source = await Deno.readTextFile(new URL("./index.ts", import.meta.url));
 const handlerNames = [...source.matchAll(/^  (\w+): handle\w+,$/gm)].map((m) => m[1]);
-const moduleSource = source.slice(source.indexOf("interface JsonRpcRequest"), source.indexOf("const sb = ()")) + `
+const moduleSource = `const ACCOUNTING_TOOLS = ${JSON.stringify(ACCOUNTING_TOOLS)};\n` + source.slice(source.indexOf("interface JsonRpcRequest"), source.indexOf("const sb = ()")) + `
 const calls: Array<{ name: string; args: Record<string, unknown> }> = [];
 const TOOL_HANDLERS = Object.fromEntries(${JSON.stringify(handlerNames)}.map((name: string) =>
   [name, async (args: Record<string, unknown>) => { calls.push({ name, args }); return toolOk({ name, args }); }]));
@@ -25,8 +26,8 @@ Deno.test("ChatGPT lists and dispatches only the public allowlist for either sur
   ];
   const publicSet = new Set(publicNames);
   const allNames = connector.TOOLS.map((tool: { name: string }) => tool.name);
-  assert(allNames.length === 54 && new Set(allNames).size === 54, "Full catalog must retain 54 unique tools");
-  assert(handlerNames.length === 54, "Every tool must have a handler");
+  assert(allNames.length === 55 && new Set(allNames).size === 55, "Full catalog must retain 54 generic tools plus one accounting bridge");
+  assert(handlerNames.length === 54, "The 54 generic tools retain handlers; accounting uses the authenticated HTTP bridge");
   for (const tool of connector.TOOLS) {
     for (const hint of ["readOnlyHint", "destructiveHint", "openWorldHint"]) {
       assert(typeof tool.annotations[hint] === "boolean", `${tool.name} is missing ${hint}`);
@@ -54,6 +55,7 @@ Deno.test("ChatGPT lists and dispatches only the public allowlist for either sur
     assert(JSON.stringify(names) === JSON.stringify((curated ? publicNames : allNames).slice().sort()), "Incorrect tool list");
     for (const name of [...allNames, "future_private_tool", "constructor", "__proto__"]) {
       if (!curated && !allNames.includes(name)) continue;
+      if (!curated && name === 'accounting_books') continue; // The original-credential HTTP bridge is covered in oauth_test.ts.
       const count = connector.calls.length;
       const args = { probe: name };
       const call = await connector.handleJsonRpc({ jsonrpc: "2.0", id: 2, method: "tools/call", params: { name, arguments: args } }, surface);

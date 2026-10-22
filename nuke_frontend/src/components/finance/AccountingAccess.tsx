@@ -1,0 +1,18 @@
+import { useEffect, useRef, useState } from 'react';
+import { supabase } from '../../lib/supabase';
+export type BookGrant = { id: string; owner_id: string; member_id: string; owner_name: string; member_name: string; member_email: string; active: boolean; can_correct: boolean };
+type Member = { id: string; email: string; username: string | null; full_name: string | null };
+export default function AccountingAccess({ grants, actorId, onChanged }: { grants: BookGrant[]; actorId: string; onChanged: () => void }) {
+  const [lookup, setLookup] = useState(''), [member, setMember] = useState<Member | null>(null), [access, setAccess] = useState('review'), [message, setMessage] = useState(''), [busy, setBusy] = useState(false);
+  const epoch = useRef(0);
+  useEffect(() => { epoch.current++; setLookup(''); setMember(null); setMessage(''); setBusy(false); setAccess('review'); return () => { epoch.current++; }; }, [actorId]);
+  const find = async () => { const token = ++epoch.current; setMember(null); setBusy(true); const result = await supabase.rpc('find_accounting_member', { p_lookup: lookup }).then(result => result, () => ({ data: null, error: true })); if (epoch.current !== token) return; setBusy(false); setMember(result.error ? null : result.data); setMessage(result.error ? 'No unique confirmed account found. Enter the exact username or email.' : 'Check this existing account before granting access.'); };
+  const update = async (id: string, permission: string) => { const token = ++epoch.current; setBusy(true); const result = await supabase.rpc('set_accounting_access', { p_member_id: id, p_access: permission }).then(result => result, () => ({ data: null, error: true })); if (epoch.current !== token) return; setBusy(false); setMessage(result.error ? 'Access could not be changed.' : permission === 'revoke' ? 'Accounting application access revoked for future reads and corrections. Independent developer permissions are unchanged.' : 'Accounting application access granted. The reviewer signs in with their own account.'); if (!result.error) { setMember(null); onChanged(); } };
+  return <details className="accounting-disclosure"><summary>Accounting access <span>Invite an existing account to review your books</span></summary>
+    <p>Review includes private books and source evidence. Correction access adds attributed revisions, preserving originals and history. It does not grant payments, filing, SQL or access management.</p>
+    <label>Exact username or email <input value={lookup} onChange={e => { epoch.current++; setBusy(false); setMember(null); setLookup(e.target.value); }} /></label> <button type="button" disabled={busy || lookup.trim().length < 3} onClick={find}>Find account</button>
+    {member && <section aria-label="Confirm accounting account"><p>{member.full_name || member.username || 'Existing account'} · {member.username || 'No username'} · Login: <strong>{member.email}</strong></p><label>Access <select value={access} onChange={e => setAccess(e.target.value)}><option value="review">Review books and evidence</option><option value="correct">Review and correct with attribution</option></select></label> <button type="button" disabled={busy} onClick={() => update(member.id, access)}>Grant this account access</button></section>}
+    {message && <p role="status">{message}</p>}
+    {grants.filter(g => g.owner_id === actorId && g.active).map(g => <p key={g.id}>{g.member_name} · {g.member_email} · {g.can_correct ? 'Review and correct' : 'Review'} <button type="button" disabled={busy} onClick={() => update(g.member_id, 'revoke')}>Revoke access</button></p>)}
+  </details>;
+}

@@ -8,7 +8,7 @@ export function financialActor(caller: { kind: string; userId?: string | null; s
   if (caller.kind === "api_key" && !caller.scopes?.includes(["read", "tax_read"].includes(action) ? "read" : "write")) return null;
   return caller.userId;
 }
-export async function ingestFinancialEvidence(db: Client, userId: string, input: unknown, stillAuthorized: () => Promise<boolean>, actorContext: { kind: string; agent_id?: string | null } = { kind: "user" }): Promise<{ status: number; body: Record<string, unknown> }> {
+export async function ingestFinancialEvidence(db: Client, userId: string, input: unknown, stillAuthorized: () => Promise<boolean>, actorContext: { kind: string; agent_id?: string | null; [key: string]: unknown } = { kind: "user" }): Promise<{ status: number; body: Record<string, unknown> }> {
   const body = input as Record<string, any>;
   if (body?.action === "process") {
     const processed = await processFinancialEvidence(db, userId, input, stillAuthorized,

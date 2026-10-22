@@ -14,6 +14,9 @@ const slice = (from: string, to?: string) => {
 const handlerNames = [...source.matchAll(/^  (\w+): handle\w+,$/gm)].map((m) => m[1]);
 const entry = slice("Deno.serve(async (req: Request)");
 const moduleSource = `
+const ACCOUNTING_TOOLS = [];
+const ACCOUNTING_TOOL_NAME = 'accounting_books';
+const callAccounting = async () => (globalThis as any).__accountingResult;
 const SUPABASE_URL = "https://example.supabase.co";
 const SERVICE_ROLE_KEY = "sb_secret_test_key";
 const projectSecretKey = () => SERVICE_ROLE_KEY;
@@ -159,4 +162,30 @@ Deno.test("execute_sql is gated like nlq-sql: anonymous 401, signed-in non-admin
   // The service key: allowed.
   const service = await toolCall("execute_sql", { query: "select 1" }, { authorization: "Bearer sb_secret_test_key" });
   assert(service.status === 200 && dispatched() === 2 && calls[1].name === "execute_sql", `service key: ${service.status}`);
+});
+
+Deno.test('accounting authentication failure provides a reconnect challenge', async () => {
+ (globalThis as any).__accountingResult = { authenticationRequired: true, isError: true, content: [] };
+ const result = await toolCall('accounting_books', { action: 'contexts' });
+ assert(result.status === 401, 'missing accounting credential did not challenge');
+ assert(!!result.headers.get('WWW-Authenticate')?.includes('oauth-protected-resource'), 'missing resource challenge');
+});
+Deno.test('opaque accounting scope permits ordinary public reads but no generic writes or SQL', async () => {
+ (globalThis as any).__apiKeyCheck = { data: { allowed: true, user_id: 'member', key_id: 'key', scopes: ['accounting:read','accounting:correct'] }, error: null };
+ const headers = { authorization: 'Bearer nuke_oauth_' + 'a'.repeat(64) };
+ const read = await toolCall('search_vehicles', { query: 'synthetic' }, headers);
+ assert(read.status === 200, 'valid opaque credential refused public reader');
+ const write = await toolCall('submit_observation', {}, headers);
+ assert(write.status === 403, 'accounting scope became generic write permission');
+ const sql = await toolCall('execute_sql', { query: 'select 1' }, headers);
+ assert(sql.status === 401 || sql.status === 403, 'accounting scope became SQL permission');
+ (globalThis as any).__apiKeyCheck = undefined;
+});
+
+Deno.test('private accounting bridge cannot bypass the ChatGPT public surface allowlist', async () => {
+ (globalThis as any).__accountingResult = { content: [{ type: 'text', text: 'private result' }] };
+ const response = await toolCall('accounting_books', { action: 'contexts' }, { 'x-nuke-surface': 'chatgpt' });
+ const result = await response.json();
+ assert(result.error?.code === -32602, 'private accounting tool bypassed curated surface');
+ assert(!JSON.stringify(result).includes('private result'), 'private bridge dispatched');
 });

@@ -59,6 +59,7 @@ const sources = new Map([
   ['snapshotCompare',compile('../supabase/functions/batch-extract-snapshots/snapshotCompare.ts')],
   ['intake',compile('../supabase/functions/ingest-observation/index.ts')],
   ['financialEvidence',compile('../supabase/functions/ingest-observation/financialEvidence.ts')],
+  ['financialDelegation',compile('../supabase/functions/ingest-observation/financialDelegation.ts')],
   ['financialProcessing',compile('../supabase/functions/ingest-observation/financialProcessing.ts')],
   ['financialCandidateContext',compile('../supabase/functions/ingest-observation/financialCandidateContext.ts')],
   ['financialCandidates',compile('../supabase/functions/ingest-observation/financialCandidates.ts')],
@@ -292,6 +293,7 @@ function fixture(options = {}) {
         if(specifier==='./historicalAsks.ts')return load('historicalAsks');
         if(specifier==='./historicalAskIntake.ts')return load('historicalAskIntake');
         if(specifier==='./financialEvidence.ts')return load('financialEvidence');
+        if(specifier==='./financialDelegation.ts')return load('financialDelegation');
         if(specifier==='./financialProcessing.ts')return load('financialProcessing');
         if(specifier==='./financialCandidateContext.ts')return load('financialCandidateContext');
         if(specifier==='./financialCandidates.ts')return load('financialCandidates');

@@ -1,3 +1,4 @@
+import { useAccountingBook } from './AccountingBookContext';
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 
@@ -74,6 +75,7 @@ function AccountingContextSummary({ context }: { context: AccountingContext | nu
 }
 
 export default function FinancialDocumentLines({ documentId }: { documentId: string }) {
+  const { ownerId, shared } = useAccountingBook();
   const [lines,setLines]=useState<FinancialLine[]>([]);
   const [error,setError]=useState<string|null>(null);
   const [context,setContext]=useState<AccountingContext|null>(null);
@@ -84,7 +86,7 @@ export default function FinancialDocumentLines({ documentId }: { documentId: str
       if(event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED') return;
       cancelled=true;setLines([]);setError(null);setContext(null);
     });
-    void supabase.functions.invoke('ingest-observation',{body:{mode:'financial_evidence_v1',action:'read',document_id:documentId}})
+    void supabase.functions.invoke('ingest-observation',{body:{mode:'financial_evidence_v1',action:'read',document_id:documentId,...(shared ? {owner_user_id:ownerId} : {})}})
       .then(({data,error})=>{
         if(cancelled)return;
         if(error || data?.error){setError('Document items could not load.');return;}
@@ -93,6 +95,6 @@ export default function FinancialDocumentLines({ documentId }: { documentId: str
         setLines(data.data.lines);
       }).catch(()=>{if(!cancelled)setError('Document items could not load.');});
     return()=>{cancelled=true;subscription.unsubscribe();};
-  },[documentId]);
+  },[documentId,ownerId,shared]);
   return <>{error && <p role="status">{error}</p>}<AccountingContextSummary context={context}/><FinancialLineTable lines={lines}/></>;
 }

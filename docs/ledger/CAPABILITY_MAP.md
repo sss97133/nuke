@@ -184,3 +184,7 @@ Generated 2026-07-12 from the Canonical Ledger (`CANONICAL_LEDGER.md`, `ledger.j
 | Frontend build output | `nuke_frontend/dist` (vercel.json outputDirectory) | root dist/ |
 | Agent loop coordination | `.claude/` (HANDOFF.md, agents/active, checkpoints) | `.ralph/` + root symlinks (frozen 2026-03-10 — NOT the live ralph coordinator edge fn) |
 | Photo-sync ops | `~/.nuke/run-photo-sync.sh` via ag.nuke.photo-sync launchd | NukePhotoSync.app |
+
+### Accounting application delegation
+
+`accounting_access_grants` binds an explicit book owner to a confirmed account with review or attributed-correction permission. Owner-only `find_accounting_member` / `set_accounting_access` and `list_accounting_access` back the Accounting access UI; organization roles do not imply access. `authorize_financial_access` checks and locks live actor/key/grant authority for the existing `ingest_financial_evidence` writer, preserving the canonical owner and real contributor. `financial_evidence_v1` delegated reads/corrections/private originals and MCP `accounting_books` reuse the current store. See [shared accounting access](../accounting-shared-access.md); no independent receipt ledger or arbitrary SQL capability is introduced.
