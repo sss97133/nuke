@@ -64,7 +64,10 @@ interface LiveAuction {
   url: string;
   title: string;
   platform: string;
-  auction_end_date: string;
+  /** The house's close for this lot. null when the source does not give one: never estimated (2026-10-22). */
+  auction_end_date: string | null;
+  /** Why auction_end_date is null; written to origin_metadata.auction_end_date_missing_reason. */
+  end_date_missing_reason?: string | null;
   current_bid: number | null;
   bid_count: number | null;
   no_reserve: boolean;
@@ -426,7 +429,10 @@ async function syncViaFirecrawlExtract(
         url,
         title: a.title || externalId,
         platform,
-        auction_end_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        // The extract carries no close time. It used to write now + 7 days, an invented date that comps and the
+        // live board read as the lot's real close (266 Cars & Bids rows superseded 2026-10-22). Unknown stays null.
+        auction_end_date: null,
+        end_date_missing_reason: "firecrawl extract gives no close time",
         current_bid: null,
         bid_count: null,
         no_reserve: false,
@@ -989,21 +995,6 @@ async function syncCarsAndBids(): Promise<{ auctions: LiveAuction[]; error: stri
 
     console.log(`[sync-live-auctions] Cars & Bids: Found ${foundUrls.size} auction URLs`);
 
-    // Try to extract end times from page data (C&B embeds auction end timestamps)
-    // Pattern: data-end-time="...", endTime, auctionEnd, or ISO timestamps near auction IDs
-    const endTimePatterns = [
-      /data-(?:end|auction-end)(?:-time)?=["']([^"']+)["']/gi,
-      /"endTime"\s*:\s*"([^"]+)"/gi,
-      /"auction_end"\s*:\s*"([^"]+)"/gi,
-    ];
-    const globalEndTimes: string[] = [];
-    for (const pattern of endTimePatterns) {
-      let etMatch;
-      while ((etMatch = pattern.exec(html)) !== null) {
-        globalEndTimes.push(etMatch[1]);
-      }
-    }
-
     // Extract auction data from card elements
     const auctions: LiveAuction[] = [];
 
@@ -1022,13 +1013,16 @@ async function syncCarsAndBids(): Promise<{ auctions: LiveAuction[]; error: stri
       // C&B auctions typically last 7 days from listing; use parsed end time if found
       const endTimeRegex = new RegExp(`${id}[^}]*?"(?:endTime|end_time|auction_end)"\\s*:\\s*"([^"]+)"`, "i");
       const etMatch = endTimeRegex.exec(html);
-      const endDate = etMatch ? etMatch[1] : (globalEndTimes.shift() || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString());
+      // Only a time keyed to this lot's id is its close. A page-wide list of end times (removed) is not tied to any lot:
+      // shifting from it handed one lot another's close, and with none left it invented now + 7 days (2026-10-22).
+      const endDate = etMatch ? etMatch[1] : null;
 
       auctions.push({
         url,
         title,
         platform: "cars-and-bids",
         auction_end_date: endDate,
+        end_date_missing_reason: endDate ? null : "C&B homepage gives no close time for this lot",
         current_bid: null,
         bid_count: null,
         no_reserve: false, // Would need to parse from page
@@ -1078,7 +1072,13 @@ async function syncToDatabase(
   // is a feed or parse fault, not a live lot, and must not become an auction_live placeholder nothing ever ends
   // (a Collecting Cars row read 2027-02-25 for six months, 2026-09-27). Such lots are skipped and named, not capped.
   const horizon = Date.now() + 14 * 86_400_000;
-  const impossible = auctions.filter(a => { const t = Date.parse(a.auction_end_date); return !Number.isFinite(t) || t > horizon; });
+  // A lot whose source gives no close (auction_end_date null, with end_date_missing_reason) is written with a null
+  // end and the reason, never a made-up one; the upsert keeps a close already on record (20261023101500).
+  const impossible = auctions.filter(a => {
+    if (a.auction_end_date === null) return false;
+    const t = Date.parse(a.auction_end_date);
+    return !Number.isFinite(t) || t > horizon;
+  });
   if (impossible.length > 0) {
     console.warn(`[sync-live-auctions] ${platform}: ${impossible.length} lots skipped, auction_end_date unparseable or more than 14 days out: ${impossible.slice(0, 3).map(a => `${a.url} ${a.auction_end_date}`).join(", ")}`);
   }
@@ -1105,6 +1105,9 @@ async function syncToDatabase(
         currency: auction.currency ?? null,
         thumbnail_url: auction.thumbnail_url,
         last_sync: now,
+        auction_end_date_missing_reason: auction.auction_end_date === null
+          ? (auction.end_date_missing_reason ?? "source gives no close time")
+          : null,
         ...auction.raw_data,
       },
       updated_at: now,
@@ -1450,6 +1453,7 @@ Deno.serve(async (req) => {
             const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
             const serviceKey = projectSecretKey() ?? "";
             const endingSoon = syncResult.auctions.filter(a => {
+              if (!a.auction_end_date) return false;
               const hoursLeft = (new Date(a.auction_end_date).getTime() - Date.now()) / (1000 * 60 * 60);
               return hoursLeft > 0 && hoursLeft <= 6 && a.current_bid && a.current_bid > 0;
             });
