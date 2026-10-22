@@ -1073,7 +1073,7 @@ async function syncToDatabase(
   // (a Collecting Cars row read 2027-02-25 for six months, 2026-09-27). Such lots are skipped and named, not capped.
   const horizon = Date.now() + 14 * 86_400_000;
   // A lot whose source gives no close (auction_end_date null, with end_date_missing_reason) is written with a null
-  // end and the reason, never a made-up one; the upsert keeps a close already on record (20261023100000).
+  // end and the reason, never a made-up one; the upsert keeps a close already on record (20261023101500).
   const impossible = auctions.filter(a => {
     if (a.auction_end_date === null) return false;
     const t = Date.parse(a.auction_end_date);

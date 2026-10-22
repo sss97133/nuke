@@ -1,5 +1,5 @@
 -- Empty disposable PG17 only: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_live_upsert_end_unknown -f this-file.sql
--- Contract for 20261023100000_live_upsert_keep_end_date_when_unknown.sql, on the live function as of 2026-10-16 plus
+-- Contract for 20261023101500_live_upsert_keep_end_date_when_unknown.sql, on the live function as of 2026-10-16 plus
 -- 20261018040000 and 20261022070000: a payload with no close (NULL auction_end_date) keeps the close on record and is
 -- not a change by itself; a real close still overwrites; a new row with no close is inserted with NULL; the migration
 -- is idempotent; a drifted function stops it unchanged.
@@ -37,8 +37,8 @@ SELECT public.upsert_live_auction_vehicles('[{"listing_url":"https://example.tes
 SELECT pg_temp.ok('before the migration a payload with no close erases the close on record (the defect, reproduced)',
   (SELECT auction_end_date IS NULL FROM public.vehicles WHERE listing_url = 'https://example.test/lot/1'));
 
-\ir ../migrations/20261023100000_live_upsert_keep_end_date_when_unknown.sql
-\ir ../migrations/20261023100000_live_upsert_keep_end_date_when_unknown.sql
+\ir ../migrations/20261023101500_live_upsert_keep_end_date_when_unknown.sql
+\ir ../migrations/20261023101500_live_upsert_keep_end_date_when_unknown.sql
 SELECT pg_temp.ok('re-applying the migration is a no-op (one coalesce)',
   (SELECT count(*) FROM regexp_matches((SELECT prosrc FROM pg_proc WHERE proname = 'upsert_live_auction_vehicles'), 'coalesce\(excluded\.auction_end_date', 'g')) = 1);
 
@@ -56,7 +56,7 @@ SELECT pg_temp.ok('a new lot with no close is inserted with NULL and the reason'
 
 CREATE OR REPLACE FUNCTION public.upsert_live_auction_vehicles(p_rows jsonb) RETURNS integer LANGUAGE sql AS $$ SELECT 0 $$;
 \set ON_ERROR_STOP off
-\ir ../migrations/20261023100000_live_upsert_keep_end_date_when_unknown.sql
+\ir ../migrations/20261023101500_live_upsert_keep_end_date_when_unknown.sql
 \set ON_ERROR_STOP on
 SELECT pg_temp.ok('a drifted function stops the migration unchanged',
   (SELECT prosrc FROM pg_proc WHERE proname = 'upsert_live_auction_vehicles') = ' SELECT 0 ');
