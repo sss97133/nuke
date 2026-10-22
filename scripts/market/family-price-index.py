@@ -193,6 +193,9 @@ BANDS = {
     ('Chevrolet', '2fb29b44-c07a-4802-b3eb-3e093ada1f27'): [
         (1969, 1972, 'k5-69-72', '1969–72'), (1973, 1991, 'k5-73-91', '1973–91')],
 }
+# The family fold resolves Corvette to the NHTSA-backed canonical row. Keep the
+# older catalogue identity compatible, but do not let the active family lose C1–C8.
+BANDS[('Chevrolet', '0916df62-aa86-48a8-a672-8923f58aa730')] = BANDS[('Chevrolet', '3f3e7278-f47c-412f-b6fc-0ab5d8485924')]
 F430_KEY = ('Ferrari', 'ec22b618-7511-4cc5-ab1a-684c210f7b1c')
 VENUE_OF = {'Bring a Trailer': 'bat', 'Mecum': 'mecum', 'Barrett-Jackson': 'bj', "RM Sotheby's": 'house', 'Gooding & Co': 'house',
             'Bonhams': 'house', 'Broad Arrow': 'house', 'Cars & Bids': 'online', 'PCarMarket': 'online', 'Collecting Cars': 'online',
@@ -1044,6 +1047,13 @@ def self_test():
     check('generation bands: a 1969 Mustang is g1-69-73, a 2021 Corvette c8, a 1955 Ford F-100 in no band is a decade',
           gen_of(1969, BANDS[('Ford', '8a8271f8-d299-4b55-837a-35ca919f8937')])[0] == 'g1-69-73'
           and gen_of(2021, BANDS[('Chevrolet', '3f3e7278-f47c-412f-b6fc-0ab5d8485924')])[0] == 'c8' and gen_of(1955, None)[0] == '1950s')
+    current_corvette = '0916df62-aa86-48a8-a672-8923f58aa730'
+    cf, _ = build_frame(COLS, [
+        [str(y), 'Corvette', y, 'Mecum', 100000, '2026-01-17', None, '4-Speed Manual', f'{y} Chevrolet Corvette']
+        for y in (1962, 1967, 1968)
+    ], 'Chevrolet', current_corvette, '2026-10-22')
+    check('active Corvette family keeps generation boundaries and generation comparison groups',
+          cf.gen.tolist() == ['c1', 'c2', 'c3'] and chip_scheme(cf, 'Chevrolet', current_corvette)[0] == 'generation')
     # the fit recovers a known drift that the plain median misreads
     rows, today = _synthetic()
     payload, info = fit_family(COLS, rows, 'Brand', 'zed-key', today.isoformat(), seed=2)

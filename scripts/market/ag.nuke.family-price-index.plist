@@ -11,13 +11,14 @@
        A failure on a family leaves its previous rows in place; the exit status is 1 when a family failed, a write did not land when read
        back, or the 40-minute budget ran out. Per-run receipt: ~/nuke-logs/family-price-index/run-<UTC>.json; log: launchd.log beside it.
        Install only after the migration (20261018050000_family_price_index.sql) is live: the job reads its functions.
+       Use the installed scientific Python 3.14: Homebrew's floating python3 moved to 3.15 on October 17 without numpy/pandas.
        Installed copy: ~/Library/LaunchAgents/ag.nuke.family-price-index.plist (launchctl bootout + bootstrap after an edit). Added 2026-10-16. -->
   <key>Label</key><string>ag.nuke.family-price-index</string>
   <key>ProgramArguments</key>
   <array>
     <string>/bin/bash</string>
     <string>-c</string>
-    <string>set -uo pipefail; D="$HOME/Library/Caches/nuke-family-price-index-runner"; mkdir -p "$D" "$HOME/nuke-logs/family-price-index"; git fetch -q origin main || exit 1; git show origin/main:scripts/market/family-price-index.py &gt; "$D/family-price-index.py" || exit 1; echo "$(date -u +%FT%TZ) $(git rev-parse --short origin/main)"; exec dotenvx run -q -- python3 "$D/family-price-index.py"</string>
+    <string>set -uo pipefail; D="$HOME/Library/Caches/nuke-family-price-index-runner"; mkdir -p "$D" "$HOME/nuke-logs/family-price-index"; git fetch -q origin main || exit 1; git show origin/main:scripts/market/family-price-index.py &gt; "$D/family-price-index.py" || exit 1; echo "$(date -u +%FT%TZ) $(git rev-parse --short origin/main)"; exec dotenvx run -q -- python3.14 "$D/family-price-index.py"</string>
   </array>
   <key>WorkingDirectory</key><string>/Users/skylar/nuke</string>
   <key>EnvironmentVariables</key>
