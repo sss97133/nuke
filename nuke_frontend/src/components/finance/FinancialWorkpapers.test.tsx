@@ -6,7 +6,7 @@ const fixture = vi.hoisted(() => ({ invoke: vi.fn(), listener: null as null | ((
 vi.mock('../../lib/supabase', () => ({ supabase: { functions: { invoke: fixture.invoke }, auth: {
   onAuthStateChange(listener: (event: string) => void) { fixture.listener = listener; return { data: { subscription: { unsubscribe() {} } } }; },
 } } }));
-import FinancialWorkpapers from './FinancialWorkpapers';
+import FinancialWorkpapers, { yearOverview } from './FinancialWorkpapers';
 let container: HTMLDivElement; let root: Root;
 const empty = () => ({ records: [], total_rows: 0, next_after: null, controls_valid: true, controls: [] });
 const response = (data: unknown) => ({ data: { data }, error: null });
@@ -36,7 +36,7 @@ it('only ledger controls become subtotals; currencies remain partitioned with un
   ] }));
   await act(async () => root.render(<FinancialWorkpapers revision={0} onOpen={() => {}} />));
   const rows = Array.from(container.querySelectorAll('tbody tr'));
-  expect(rows).toHaveLength(3); expect(rows[0].textContent).toContain('20.01USD'); expect(rows[1].textContent).toContain('30.02EUR');
+  expect(rows).toHaveLength(3); expect(rows[0].textContent).toContain('20.01 USD'); expect(rows[1].textContent).toContain('30.02 EUR');
   expect(rows[2].textContent).toContain('UnknownUnresolved'); expect(container.textContent).not.toContain('99999.99');
 });
 it('invalid duplicate controls withhold subtotals', async () => {
@@ -68,4 +68,22 @@ it('account switch synchronously invalidates late prior-account response before 
   });
   expect(container.textContent).not.toContain('PRIVATE OLD ACCOUNT');
   expect(container.textContent).toContain('No bookkeeping records have been recovered');
+});
+
+it('year overview uses all server controls, preserves refunds and unknowns, never bank cashflow', async () => {
+  const base = { record_kind: 'retained_ledger_decision', year: '2024', account: 'A', section: 'Expense', currency: 'USD', rows: 1 };
+  const controls = [{ ...base, retained_amount: '1234.56' }, { ...base, retained_amount: '-34.56' },
+    { ...base, section: 'Revenue', retained_amount: '2000' }, { ...base, currency: 'EUR', retained_amount: '50' },
+    { ...base, record_kind: 'retained_bank_movement', retained_amount: '999999' }];
+  expect(yearOverview(controls)[0]).toMatchObject({ revenue: 2000000000n, expense: 1200000000n, currency: 'USD' });
+  expect(yearOverview([...controls, { ...base, retained_amount: null }])[0].expense).toBeNull();
+  expect(yearOverview([{ ...base, retained_amount: '100', missing_amounts: 1 }])[0].expense).toBeNull();
+  fixture.invoke.mockResolvedValue(response({ ...empty(), total_rows: 750, records: [record()], controls }));
+  await act(async () => root.render(<FinancialWorkpapers revision={0} onOpen={() => {}} />));
+  expect(container.textContent).toContain('750 records available');
+  expect(container.textContent).toContain('Recovery may be partial');
+  expect(container.querySelector('.accounting-years')?.textContent).toContain('1,200.00 USD');
+  expect(container.querySelector('.accounting-years')?.textContent).not.toContain('999,999');
+  expect(container.textContent).not.toContain('Bookkeeping difference');
+  expect(container.querySelectorAll('details[open]')).toHaveLength(0);
 });

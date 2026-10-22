@@ -1,0 +1,38 @@
+/* Private accounting surface: typography and disclosure only. */
+.accounting-page { font-size:14px; line-height:1.55; padding-bottom:48px!important; }
+.accounting-page .accounting-header { display:flex; align-items:center; justify-content:space-between; gap:20px; padding:28px 0 20px; border-bottom:2px solid var(--border); margin-bottom:24px; }
+.accounting-page h1 { font-size:28px; line-height:1.2; margin:4px 0 8px; }
+.accounting-page h2 { font-size:20px; margin:4px 0; }
+.accounting-page h3 { font-size:24px; margin:0; }
+.accounting-page p { margin:8px 0 14px; max-width:85ch; }
+.accounting-eyebrow { font-size:9px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--text-secondary); }
+.accounting-muted,.accounting-page summary span { color:var(--text-secondary); font-size:12px; font-weight:400; }
+.accounting-section-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.accounting-notice,.accounting-review-note { padding:16px; border:2px solid var(--border); background:var(--surface,var(--bg)); margin:18px 0; }
+.accounting-notice p,.accounting-review-note p { margin-bottom:0; font-size:13px; }
+.accounting-years { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr)); gap:16px; margin:20px 0; }
+.accounting-year { border:2px solid var(--border); padding:20px; }
+.accounting-year dl { margin:20px 0 8px; }
+.accounting-year dl>div { display:flex; flex-wrap:wrap; align-items:baseline; justify-content:space-between; gap:8px; padding:8px 0; }
+.accounting-year dt { font-size:13px; color:var(--text-secondary); }
+.accounting-year dd { margin:0; font:bold 17px 'Courier New',monospace; }
+.accounting-page .accounting-disclosure { border-top:2px solid var(--border); padding:14px 0; margin:8px 0; }
+.accounting-page summary { cursor:pointer; font-weight:700; padding:6px 0; }
+.accounting-page summary span { display:inline-block; margin-left:12px; }
+.accounting-page details[open]>summary { margin-bottom:16px; }
+.accounting-page button { appearance:none; border:2px solid var(--border); border-radius:0; background:var(--surface,var(--bg)); color:var(--text); padding:8px 12px; font:700 12px Arial,sans-serif; cursor:pointer; min-height:36px; }
+.accounting-page button:hover:not(:disabled) { background:var(--bg-secondary,var(--border)); }
+.accounting-page button:disabled { opacity:.45; cursor:default; }
+.accounting-page :is(button,summary,input):focus-visible { outline:2px solid var(--text); outline-offset:3px; }
+.accounting-page table { width:100%; border-collapse:collapse; margin:14px 0; text-align:left; }
+.accounting-page th { font:700 9px Arial,sans-serif; text-transform:uppercase; letter-spacing:.06em; color:var(--text-secondary); border-bottom:2px solid var(--border); padding:10px; }
+.accounting-page td { font-size:13px; padding:12px 10px; vertical-align:top; border-bottom:2px solid var(--border); overflow-wrap:anywhere; }
+.accounting-page td>div { margin-top:5px; }
+.accounting-number { text-align:right; font-family:'Courier New',monospace; white-space:nowrap; }
+.accounting-page .accounting-advanced { color:var(--text-secondary); }
+.accounting-page input { max-width:100%; }
+@media(max-width:600px) {
+ .accounting-page .accounting-header { align-items:flex-start; flex-direction:column; }
+ .accounting-page summary span { display:block; margin:4px 0 0 18px; }
+ .accounting-year { padding:14px; }
+}
