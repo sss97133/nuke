@@ -534,6 +534,7 @@ async function loadCompsForListing(
     turbo: 0,
     duplicate: 0,
     no_price: 0,
+    no_sold_date: 0,
     variant: 0,
     parts: 0,
   };
@@ -612,6 +613,11 @@ async function loadCompsForListing(
       : r.sold_date
       ? String(r.sold_date)
       : null;
+    // Confirmed sold comps require a date; undated sales stay out of peer sets.
+    if (result_type === "sold" && !soldDate) {
+      excluded.no_sold_date++;
+      continue;
+    }
     // Cross-platform duplicate: same hammer + same day.
     const priceDateKey = soldDate && price
       ? `${Math.round(price)}|${soldDate.slice(0, 10)}`

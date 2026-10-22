@@ -244,6 +244,9 @@ type SoldComp = {
   sale_price: number | null;
   mileage: unknown;
   sold_date: string | null;
+  sold_date_precision: string | null;
+  sold_date_confidence: number | null;
+  sold_date_observation_id: string | null;
   listing_url: string | null;
   platform: string | null;
   transmission: unknown;
@@ -329,20 +332,33 @@ async function resolveSoldComps(
       rows = [];
     }
   } else {
-    rows = (Array.isArray(rpcRows) ? rpcRows : []).map((row: Record<string, unknown>) => ({
-      vehicle_id: row.vehicle_id ?? null,
-      year: row.yr ?? null,
-      make: row.mk ?? null,
-      model: row.mdl ?? null,
-      trim: row.tr ?? null,
-      sale_price: row.sale_price,
-      mileage: row.miles ?? null,
-      listing_url: row.listing_url ?? null,
-      platform: row.platform ?? null,
-      sold_date: row.sold_date ?? null,
-      source_type: row.source_type ?? null,
-      similarity_score: row.similarity_score ?? null,
-    }));
+    rows = (Array.isArray(rpcRows) ? rpcRows : []).map((row: Record<string, unknown>) => {
+      const breakdown = (row.score_breakdown || null) as Record<string, unknown> | null;
+      return {
+        vehicle_id: row.vehicle_id ?? null,
+        year: row.yr ?? null,
+        make: row.mk ?? null,
+        model: row.mdl ?? null,
+        trim: row.tr ?? null,
+        sale_price: row.sale_price,
+        mileage: row.miles ?? null,
+        listing_url: row.listing_url ?? null,
+        platform: row.platform ?? null,
+        sold_date: row.sold_date ?? null,
+        source_type: row.source_type ?? null,
+        similarity_score: row.similarity_score ?? null,
+        score_breakdown: breakdown,
+        sold_date_precision: breakdown?.date_precision != null
+          ? String(breakdown.date_precision)
+          : null,
+        sold_date_confidence: breakdown?.date_confidence != null
+          ? Number(breakdown.date_confidence)
+          : null,
+        sold_date_observation_id: breakdown?.date_observation_id != null
+          ? String(breakdown.date_observation_id)
+          : null,
+      };
+    });
   }
 
   const ids = rows.map((r) => String(r.vehicle_id || "")).filter(Boolean);
@@ -357,6 +373,7 @@ async function resolveSoldComps(
     not_sold: 0,
     ask_or_bid: 0,
     no_amount: 0,
+    no_sold_date: 0,
     hd_diesel_mismatch: 0,
     variant_mismatch: 0,
     duplicate: 0,
@@ -415,11 +432,30 @@ async function resolveSoldComps(
       : c.sold_date
       ? String(c.sold_date)
       : null;
-    const priceDateKey = soldDate ? `${Math.round(amount)}|${soldDate.slice(0, 10)}` : "";
-    if (priceDateKey && seenPriceDate.has(priceDateKey)) {
+    // Undated sales are not comps — date recovery must fill sold_at / sale_date first.
+    if (!soldDate) {
+      excluded.no_sold_date++;
+      continue;
+    }
+    const priceDateKey = `${Math.round(amount)}|${soldDate.slice(0, 10)}`;
+    if (seenPriceDate.has(priceDateKey)) {
       excluded.duplicate++;
       continue;
     }
+    const datePrecision = c.sold_date_precision != null
+      ? String(c.sold_date_precision)
+      : fact?.sold_on
+      ? "day"
+      : null;
+    const dateConfidence = typeof c.sold_date_confidence === "number" &&
+        Number.isFinite(c.sold_date_confidence)
+      ? Number(c.sold_date_confidence)
+      : datePrecision
+      ? 0.85
+      : null;
+    const dateObservationId = c.sold_date_observation_id != null
+      ? String(c.sold_date_observation_id)
+      : null;
 
     const candBlob = `${c.model || ""} ${c.trim || ""} ${listingUrl || ""}`;
     const candVariant = detectVariant(candBlob);
@@ -449,7 +485,7 @@ async function resolveSoldComps(
     const cit = emptyCitation({
       source_name: (c.platform as string) || (fact?.platform as string) || null,
       source_url: listingUrl,
-      observation_id: null,
+      observation_id: dateObservationId,
       event_time: soldDate,
       ingested_at: null,
       is_superseded: false,
@@ -484,6 +520,9 @@ async function resolveSoldComps(
       sale_price: amount,
       mileage: c.mileage,
       sold_date: soldDate,
+      sold_date_precision: datePrecision,
+      sold_date_confidence: dateConfidence,
+      sold_date_observation_id: dateObservationId,
       listing_url: listingUrl,
       platform: (c.platform as string) || (fact?.platform as string) || null,
       transmission: c.transmission ?? null,
@@ -1118,15 +1157,15 @@ async function handleGetHistory(
     sb
       .from("vehicle_events")
       .select(
-        "id, source_platform, source_url, event_type, event_status, started_at, ended_at, sold_at, final_price, starting_price, bid_count, comment_count, view_count",
+        "id, source_platform, source_url, event_type, event_status, started_at, ended_at, sold_at, final_price, starting_price, bid_count, comment_count, view_count, metadata",
       )
       .eq("vehicle_id", vid)
-      .order("ended_at", { ascending: false, nullsFirst: false })
+      .order("sold_at", { ascending: false, nullsFirst: false })
       .limit(limit),
     sb
       .from("vehicle_observations")
       .select(
-        "id, kind, content_text, structured_data, confidence_score, observed_at, source_url, source_id, is_superseded, ingested_at",
+        "id, kind, content_text, structured_data, confidence_score, observed_at, source_url, source_id, is_superseded, ingested_at, source_event_at, source_event_time_precision, observed_at_basis, citation_excerpt, source_vehicle_event_id, extraction_method",
       )
       .eq("vehicle_id", vid)
       .order("ingested_at", { ascending: false })
@@ -1138,19 +1177,52 @@ async function handleGetHistory(
   const events = eventsRes.data || [];
   const obs = obsRes.data || [];
   const sourceMap = await loadSources(sb, obs.map((o: { source_id: string }) => o.source_id));
+  const recoveryByEvent = new Map<string, Record<string, unknown>>();
+  for (const o of obs) {
+    if (o.extraction_method === "sold_at_date_recovery_v1" && o.source_vehicle_event_id) {
+      recoveryByEvent.set(String(o.source_vehicle_event_id), o);
+    }
+  }
 
   const claims: Claim[] = [];
   const timeline: Array<Record<string, unknown>> = [];
 
   for (const ev of events) {
-    const eventTime = extractEventTime(null, [ev.sold_at, ev.ended_at, ev.started_at]);
+    const meta = (ev.metadata || null) as Record<string, unknown> | null;
+    const recoveryMeta = (meta?.sold_at_date_recovery || null) as Record<string, unknown> | null;
+    const recoveryObs = recoveryByEvent.get(String(ev.id));
+    const eventTime = extractEventTime(null, [
+      recoveryObs?.source_event_at ?? null,
+      ev.sold_at,
+      ev.ended_at,
+      ev.started_at,
+    ]);
+    const datePrecision = recoveryMeta?.precision != null
+      ? String(recoveryMeta.precision)
+      : recoveryObs?.source_event_time_precision != null
+      ? String(recoveryObs.source_event_time_precision)
+      : ev.sold_at || ev.ended_at
+      ? "day"
+      : null;
+    const dateConfidence = recoveryMeta?.confidence != null
+      ? Number(recoveryMeta.confidence)
+      : typeof recoveryObs?.confidence_score === "number"
+      ? Number(recoveryObs.confidence_score)
+      : ev.sold_at || ev.ended_at
+      ? 0.9
+      : null;
+    const observationId = recoveryMeta?.observation_id != null
+      ? String(recoveryMeta.observation_id)
+      : recoveryObs?.id != null
+      ? String(recoveryObs.id)
+      : null;
     const platform = ev.source_platform === "bat" ? "Bring a Trailer" : ev.source_platform;
     const cit = emptyCitation({
       source_name: platform || null,
       source_url: ev.source_url,
-      observation_id: null,
+      observation_id: observationId,
       event_time: eventTime,
-      ingested_at: null,
+      ingested_at: recoveryObs?.ingested_at != null ? String(recoveryObs.ingested_at) : null,
       is_superseded: false,
     });
     const status = String(ev.event_status || "").toLowerCase();
@@ -1163,12 +1235,22 @@ async function handleGetHistory(
       priceRole = "ask";
     }
     const label = `${ev.event_type || "event"}:${ev.event_status || "unknown"}`;
+    const priceConf = ev.final_price != null && priceRole === "hammer"
+      ? (dateConfidence ?? 0.9)
+      : ev.final_price != null
+      ? 0.55
+      : null;
     claims.push(
       recordedClaim(`event.${ev.id}.final_price`, ev.final_price, {
-        confidence: ev.final_price != null && priceRole === "hammer" ? 0.9 : ev.final_price != null ? 0.55 : null,
+        confidence: priceConf,
         confidence_basis: ev.final_price != null ? "claim_score" : "none",
         citations: [cit],
-        note: `${label}; price_role=${priceRole}`,
+        note: [
+          label,
+          `price_role=${priceRole}`,
+          datePrecision ? `date_precision=${datePrecision}` : "date_precision=unknown",
+          recoveryMeta?.rule ? `date_rule=${recoveryMeta.rule}` : null,
+        ].filter(Boolean).join("; "),
       }),
     );
     timeline.push({
@@ -1181,7 +1263,11 @@ async function handleGetHistory(
       starting_price: ev.starting_price,
       bid_count: ev.bid_count,
       event_time: eventTime,
-      ingested_at: null,
+      sold_date_precision: datePrecision,
+      sold_date_confidence: dateConfidence,
+      sold_date_observation_id: observationId,
+      date_recovery_rule: recoveryMeta?.rule != null ? String(recoveryMeta.rule) : null,
+      ingested_at: recoveryObs?.ingested_at ?? null,
       source_url: ev.source_url,
       source_name: platform,
     });
@@ -1254,7 +1340,9 @@ async function handleGetHistory(
       observation_count: obs.length,
       condition_option_noise_omitted: conditionOptionNoise,
       clocks_note:
-        "event_time is the real-world sale/auction clock when known. observed_at on observations is often scrape time; ingested_at is when Nuke stored the row. " +
+        "event_time is the real-world sale/auction clock when known (including sold_at filled by date-recovery observations). " +
+        "sold_date_precision is day|event_window|minute; sold_date_confidence and sold_date_observation_id cite the recovery row when present. " +
+        "observed_at on observations is often scrape time; ingested_at is when Nuke stored the row. " +
         "price_role separates hammer / ask / high_bid_unsold — do not treat asks or unsolds as sales.",
     }),
   );
@@ -1742,9 +1830,14 @@ async function handleGetComps(
 
   const claims: Claim[] = [];
   const out = comps.map((c, i) => {
+    const conf = typeof c.sold_date_confidence === "number" && Number.isFinite(c.sold_date_confidence)
+      ? c.sold_date_confidence
+      : c.sold_basis
+      ? 0.9
+      : 0.7;
     claims.push(
       recordedClaim(`comp.${i}.sale_price`, c.sale_price, {
-        confidence: c.sold_basis ? 0.9 : 0.7,
+        confidence: conf,
         confidence_basis: "claim_score",
         citations: [c.citation],
         note: [
@@ -1752,6 +1845,7 @@ async function handleGetComps(
           c.make,
           c.model,
           c.sold_date ? `sold ${c.sold_date}` : "sold_date not recorded",
+          c.sold_date_precision ? `precision=${c.sold_date_precision}` : null,
           `price_kind=sold`,
         ]
           .filter(Boolean)
@@ -1767,6 +1861,9 @@ async function handleGetComps(
       sale_price: c.sale_price,
       mileage: c.mileage,
       sold_date: c.sold_date,
+      sold_date_precision: c.sold_date_precision,
+      sold_date_confidence: c.sold_date_confidence,
+      sold_date_observation_id: c.sold_date_observation_id,
       listing_url: c.listing_url,
       platform: c.platform,
       transmission: c.transmission,
@@ -1784,7 +1881,7 @@ async function handleGetComps(
     claims.push(
       notRecordedClaim("comps", {
         checked_sources: ["get_comps_combined", "vehicle_price_facts"],
-        note: "No confirmed sold comps after excluding asks/bids/unbased vehicle_record prices.",
+        note: "No confirmed sold comps after excluding asks/bids/unbased vehicle_record prices and undated sales.",
       }),
     );
   }
@@ -1796,7 +1893,7 @@ async function handleGetComps(
       query,
       excluded,
       note:
-        "Only price_kind=sold with a sale basis. Asks, unsold high bids, parts suspects, and variant mismatches are excluded. URLs are canonicalized for dedupe.",
+        "Only price_kind=sold with a sale basis and a sold_date. Asks, undated sales, unsold high bids, parts suspects, and variant mismatches are excluded. Precision/confidence come from date-recovery observations when present.",
     }),
   );
 }
