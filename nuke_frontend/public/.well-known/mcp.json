@@ -2,7 +2,7 @@
   "name": "Nuke Asset Advisor",
   "description": "Read-only, citation-first MCP for physical assets (vehicles first). Every claim carries sources, event dates, and confidence.",
   "url": "https://nuke.ag/mcp/advisor",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "protocol": "2025-03-26",
   "transport": "streamable-http",
   "authentication": {
@@ -11,14 +11,10 @@
   },
   "tools": [
     "find_asset",
-    "find_listings",
-    "evaluate_listing",
     "get_asset",
-    "get_history",
-    "explain_field",
-    "value_asset",
     "get_comps",
-    "get_coverage"
+    "value_asset",
+    "evaluate_listing"
   ],
   "documentation": "https://nuke.ag/llms.txt",
   "full_connector": "https://nuke.ag/mcp"

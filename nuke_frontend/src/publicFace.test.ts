@@ -77,7 +77,9 @@ describe('public face', () => {
     expect(out!.res.headers.get('content-type')).toContain('application/json');
     const card = JSON.parse(out!.body);
     expect(card.url).toBe('https://nuke.ag/mcp/advisor');
-    expect(card.tools).toContain('get_history');
+    expect(card.tools).toContain('evaluate_listing');
+    expect(card.tools).toContain('find_asset');
+    expect(card.tools).toHaveLength(5);
   });
 
   it('/docs and bare /api return real 404 JSON, not the SPA shell', async () => {
