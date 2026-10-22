@@ -18,7 +18,7 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
-import { classifyImage, type ClassificationResult } from "./classifier.ts";
+import { classifyImage, isDocumentFrame, ledgerPromptText, type ClassificationResult } from "./classifier.ts";
 import { persistPipelineState, type PipelineReceipt } from "./persistence.ts";
 import { runClassifierAssay } from "./classifierAssay.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
@@ -313,10 +313,17 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Step 2: Classify image type (Gemini Flash)
-    const classification = await classifyImage(image_url,
-      Deno.env.get("GOOGLE_AI_API_KEY") ?? Deno.env.get("GEMINI_API_KEY") ??
-      Deno.env.get("GOOGLE_API_KEY") ?? Deno.env.get("free_api_key"));
+    // Step 2: Classify image type (Gemini Flash), read against the vehicle's ledger when filed.
+    const classifierKey = Deno.env.get("GOOGLE_AI_API_KEY") ?? Deno.env.get("GEMINI_API_KEY") ??
+      Deno.env.get("GOOGLE_API_KEY") ?? Deno.env.get("free_api_key");
+    let ledgerContext: string | undefined;
+    if (vehicle_id && classifierKey) {
+      try {
+        const { data: packet } = await supabase.rpc("build_vehicle_context_packet", { p_vehicle_id: vehicle_id, p_photo_limit: 50 });
+        if (packet) ledgerContext = ledgerPromptText(packet);
+      } catch { ledgerContext = undefined; } // context is an aid; its absence never blocks classification
+    }
+    const classification = await classifyImage(image_url, classifierKey, globalThis.fetch, { context: ledgerContext });
     // A missing classifier is operational failure, not visual testimony. No
     // second paid model or deep queue is automatically invoked to rescue it.
     if (classification.classifier_ok === false) {
@@ -334,6 +341,10 @@ Deno.serve(async (req) => {
     // Merge Apple ML hints into classification if Gemini didn't detect vehicle hints
     if (appleLabels.length > 0 && !classification.vehicle_hints?.make) {
       classification.description = `${classification.description} [Apple ML: ${appleLabels.join(', ')}]`;
+    }
+    // Document gate BEFORE any condition/damage route: a scanned record goes to the receipt path.
+    if (isDocumentFrame(null, image_url, appleLabels) && !["receipt_document", "vin_plate"].includes(classification.image_type)) {
+      classification.image_type = "receipt_document";
     }
     console.log(`[photo-pipeline] Classified as: ${classification.image_type} (${classification.confidence})`);
 

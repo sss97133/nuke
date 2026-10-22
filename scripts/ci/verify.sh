@@ -86,6 +86,8 @@ if [ "${CI_BUILD:-0}" = 1 ]; then
 fi
 
 echo "• guardrails (ratchet)…"
+if node --test "$ROOT/scripts/lib/ledger-context.test.mjs" >"$CI_TMP_DIR/ci_ledger_context_tests.out" 2>&1; then grn "  ✓ image ledger-context acceptance (A/B/C)"
+else red "  ✗ image ledger-context acceptance FAILED"; cat "$CI_TMP_DIR/ci_ledger_context_tests.out"; fail=1; fi
 if node --test "$GD/no-swallowed-write-errors.test.mjs" >"$CI_TMP_DIR/ci_swallowed_tests.out" 2>&1; then grn "  ✓ swallowed-write-error detector contract"
 else red "  ✗ swallowed-write-error detector contract FAILED"; cat "$CI_TMP_DIR/ci_swallowed_tests.out"; fail=1; fi
 if node --test "$ROOT/scripts/check-image-observation-health.test.mjs" >"$CI_TMP_DIR/ci_image_health_tests.out" 2>&1; then grn "  ✓ image-health failure assays"

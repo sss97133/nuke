@@ -49,6 +49,7 @@ globalThis.fetch = (async (input, init) => {
     if (url.origin === project && url.pathname === "/rest/v1/vehicle_field_evidence") {
       return rejectEvidence ? Response.json({ message: "synthetic evidence rejection" }, { status: 400 }) : Response.json([]);
     }
+    if (url.origin === project && url.pathname === "/rest/v1/rpc/build_vehicle_context_packet") return Response.json(null);
     if (url.origin === project && url.pathname === "/rest/v1/rpc/auto_match_image_to_vehicles") {
       return Response.json(gpsMatch ? [gpsMatch] : []);
     }

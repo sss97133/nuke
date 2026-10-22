@@ -51,6 +51,7 @@ import { dirname } from 'path';
 import { createHash } from 'crypto';
 import { fileURLToPath } from 'node:url';
 import { projectImageProperties, applyImagePropertyClaims } from './lib/image-property-projection.mjs';
+import { documentGate, packetPromptText } from './lib/ledger-context.mjs';
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -752,8 +753,19 @@ async function prepare() {
     if (fromUrl && /\.(jpe?g|png|heic|webp)$/i.test(fromUrl)) return fromUrl;
     return `${r.id}.jpg`;
   };
+  // LEDGER CONTEXT (image-context-review.md): interpret each frame against the vehicle's
+  // ledger — identity, description claims, receipts, timeline, ordered photos, Y/M/M baseline.
+  // Written once beside the worklist; each line carries the document gate and the prompt text.
+  const { data: packet, error: packetErr } = await sb.rpc('build_vehicle_context_packet', { p_vehicle_id: VEHICLE_ID });
+  if (packetErr) console.error(`prepare: context packet unavailable (${packetErr.message}); continuing without ledger context`);
+  if (packet) writeFileSync(`${WORKLIST}.context.json`, JSON.stringify(packet, null, 2) + '\n');
+  const ledgerText = packetPromptText(packet);
   const lines = pending.map((r) =>
     JSON.stringify({
+      ledger_context_file: packet ? `${WORKLIST}.context.json` : null,
+      ledger_context: ledgerText || null,
+      // Runs BEFORE any condition/damage call: a document gets work_record/provenance claims only.
+      document_gate: documentGate({ file_name: r.file_name, image_url: r.image_url, apple_ml_labels: r.apple_ml_labels }),
       image_id: r.id,
       vehicle_id: VEHICLE_ID,
       image_url: r.image_url,
