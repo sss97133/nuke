@@ -6289,6 +6289,7 @@ Deno.serve(async (req: Request) => {
   }
 
   if (body.method === 'tools/call' && body.params?.name === ACCOUNTING_TOOL_NAME) {
+    if (isChatGptSurface(req)) return new Response(JSON.stringify(rpcError(body.id, -32602, 'Tool not available on this public surface')), { headers: { ...CORS, 'Content-Type': 'application/json' } });
     try {
       const result = await callAccounting(req, (body.params.arguments || {}) as Record<string, unknown>, SUPABASE_URL);
       if ('authenticationRequired' in result) return new Response(JSON.stringify(rpcError(body.id, -32000, 'Accounting sign-in required')), { status: 401, headers: { ...CORS, 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'WWW-Authenticate': 'Bearer realm="nuke", resource_metadata="https://nuke.ag/.well-known/oauth-protected-resource"' } });

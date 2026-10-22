@@ -181,3 +181,11 @@ Deno.test('opaque accounting scope permits ordinary public reads but no generic 
  assert(sql.status === 401 || sql.status === 403, 'accounting scope became SQL permission');
  (globalThis as any).__apiKeyCheck = undefined;
 });
+
+Deno.test('private accounting bridge cannot bypass the ChatGPT public surface allowlist', async () => {
+ (globalThis as any).__accountingResult = { content: [{ type: 'text', text: 'private result' }] };
+ const response = await toolCall('accounting_books', { action: 'contexts' }, { 'x-nuke-surface': 'chatgpt' });
+ const result = await response.json();
+ assert(result.error?.code === -32602, 'private accounting tool bypassed curated surface');
+ assert(!JSON.stringify(result).includes('private result'), 'private bridge dispatched');
+});
