@@ -178,9 +178,10 @@ describe('selectBestHeroImage', () => {
     const client = imageClient(recent, [primary]);
     expect((await selectBestHeroImage('older-primary', client))?.url).toBe(primary.image_url);
     expect(client.calls).toEqual([
-      { filters: { vehicle_id: 'older-primary' }, limit: 60 },
-      { filters: { vehicle_id: 'older-primary', is_primary: true }, limit: 10 },
+      { filters: { vehicle_id: 'older-primary', vehicle_image_gallery_eligible: true }, limit: 60 },
+      { filters: { vehicle_id: 'older-primary', vehicle_image_gallery_eligible: true, is_primary: true }, limit: 10 },
     ]);
+    expect(client.from).toHaveBeenCalledWith('vehicle_images_public');
   });
 
   it('still prefers the newest eligible owner exterior to an older explicit primary', async () => {
