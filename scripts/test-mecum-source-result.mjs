@@ -280,6 +280,7 @@ function previewFixture(options = {}) {
         if (specifier === '../_shared/qualityGate.ts' || specifier === '../_shared/extractionQualityGate.ts') return { qualityGate: () => assert.fail('No extraction/write path') };
         if (specifier === '../_shared/pollutionDetector.ts') return { cleanVehicleFields: () => assert.fail('No profile mutation') };
         if (specifier === '../_shared/observationWriter.ts') return { writeObservation: () => assert.fail('No testimony intake') };
+        if (specifier === '../_shared/landIdentifierClaims.ts') return { landIdentifierClaims: () => assert.fail('No identifier intake in the preview') };
         assert.fail('Unexpected import: ' + specifier);
       },
     });

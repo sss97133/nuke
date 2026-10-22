@@ -36,6 +36,7 @@ import { mustWrite, softWrite } from "../_shared/writeResult.ts";
 import { extractStructuredLotFacets, indexLot, parseSaleFacet, priorSaleFacet, saleDay, summarizePriorSale, type IndexLot } from "./indexLot.ts";
 import { fillOnlyIdentity, landedStatus, vinConflictHolder } from "./identityFill.ts";
 import { patchForLiveRow, writeVehicleEventByKey } from "../_shared/vehicleEventWrite.ts";
+import { landIdentifierClaims } from "../_shared/landIdentifierClaims.ts";
 
 const EXTRACTOR_VERSION = "2.0.0";
 const TARGETS_TAG = "mecum-targets:1";
@@ -1181,6 +1182,7 @@ async function saveVehicle(
     if (insertErr) throw new Error(`Vehicle insert failed: ${insertErr.message} (${insertErr.code})`);
     vehicleId = inserted.id;
     isNew = true;
+    await landIdentifierClaims(supabase, { vehicleId, text: (cleanData as any).description, sourceUrl: (cleanData as any).listing_url ?? (cleanData as any).discovery_url, title: (cleanData as any).listing_title ?? null, extractor: "extract-mecum" });
   }
 
   // Fire-and-forget observation write

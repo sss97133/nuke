@@ -38,6 +38,7 @@ import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { extractGeneralBodyStyle, extractVehicleFacets } from "../_shared/vehicleFacets.ts";
 import { normalizeVehicleFields } from "../_shared/normalizeVehicle.ts";
+import { landIdentifierClaims } from "../_shared/landIdentifierClaims.ts";
 
 const EXTRACTOR_VERSION = "bonhams-v3";
 
@@ -1379,6 +1380,7 @@ async function saveVehicle(
     }
     if (ins.error) throw new Error(`Vehicle insert failed: ${ins.error.message}`);
     targetId = ins.data?.id || null;
+    await landIdentifierClaims(supabase, { vehicleId: targetId, text: (vehicleData as any).description, sourceUrl: (vehicleData as any).listing_url ?? (vehicleData as any).discovery_url, title: (vehicleData as any).listing_title ?? null, extractor: "extract-bonhams" });
     if (action !== "linked_by_vin") action = "created";
     console.log(`[Bonhams] ${action} vehicle: ${targetId}`);
   }
