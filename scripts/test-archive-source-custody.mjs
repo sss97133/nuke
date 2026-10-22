@@ -59,6 +59,9 @@ const sources = new Map([
   ['snapshotCompare',compile('../supabase/functions/batch-extract-snapshots/snapshotCompare.ts')],
   ['intake',compile('../supabase/functions/ingest-observation/index.ts')],
   ['financialEvidence',compile('../supabase/functions/ingest-observation/financialEvidence.ts')],
+  ['financialProcessing',compile('../supabase/functions/ingest-observation/financialProcessing.ts')],
+  ['financialCandidateContext',compile('../supabase/functions/ingest-observation/financialCandidateContext.ts')],
+  ['financialCandidates',compile('../supabase/functions/ingest-observation/financialCandidates.ts')],
   ['historicalAsks',compile('../supabase/functions/ingest-observation/historicalAsks.ts')],
   ['historicalAskIntake',compile('../supabase/functions/ingest-observation/historicalAskIntake.ts')],
   ['liveIntake',compile('../supabase/functions/ingest-observation/batLive.ts')],
@@ -289,6 +292,9 @@ function fixture(options = {}) {
         if(specifier==='./historicalAsks.ts')return load('historicalAsks');
         if(specifier==='./historicalAskIntake.ts')return load('historicalAskIntake');
         if(specifier==='./financialEvidence.ts')return load('financialEvidence');
+        if(specifier==='./financialProcessing.ts')return load('financialProcessing');
+        if(specifier==='./financialCandidateContext.ts')return load('financialCandidateContext');
+        if(specifier==='./financialCandidates.ts')return load('financialCandidates');
         if(specifier==='../_shared/batAuctionRecord.ts')return load('auctionRecord');
         if(specifier==='../_shared/observationContentHash.ts')return load('hash');
         if(specifier==='../ingest-observation/imageProperties.ts')return load('property');

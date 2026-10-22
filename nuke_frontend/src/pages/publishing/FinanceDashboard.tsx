@@ -13,8 +13,14 @@
  * nothing else (no empty tables, no dead boxes).
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
+import FinancialSourceReview from '../../components/financial/FinancialSourceReview';
+import FinancialDocumentLines from '../../components/finance/FinancialDocumentLines';
+import FinancialEvidenceRestore from '../../components/financial/FinancialEvidenceRestore';
+import FinancialWorkpapers from '../../components/finance/FinancialWorkpapers';
+import FinancialDocumentIntake from '../../components/finance/FinancialDocumentIntake';
+import { processExistingFinancialDocument } from '../../services/financialEvidenceIntake';
 
 // ─── Row types (local — do not import types that may not exist) ────────────
 
@@ -70,6 +76,80 @@ export function concernRevision(row: ReviewConcern): 'current' | 'superseded' | 
 interface ExtractionEvidence {
   id: string; field_key: string; value_normalized: unknown; extractor: string;
   extractor_model: string | null; is_superseded: boolean; superseded_by: string | null; created_at: string | null;
+  document?: { owner_id: string; content_sha256: string } | { owner_id: string; content_sha256: string }[] | null;
+}
+
+interface RedactedSource {
+  contract: string; source_sha256: string; derivative_sha256: string; bucket: string; storage_path: string;
+  mime_type: string; width: number; height: number; policy_version: string;
+  verification: { pixel_masks: boolean; metadata_removed: boolean; embedded_text_removed: boolean;
+    visual_reviewed: boolean; reviewer: string; reviewed_at: string };
+}
+
+export function reviewedSource(value: unknown, ownerId?: string, sourceHash?: string): RedactedSource | null {
+  const envelope = value as { value?: unknown } | null;
+  const v = (envelope && typeof envelope === 'object' && 'value' in envelope ? envelope.value : value) as RedactedSource | null;
+  if (!v || !ownerId || !sourceHash || v.contract !== 'financial_redacted_source_v1' ||
+    v.source_sha256 !== sourceHash || !/^[a-f0-9]{64}$/.test(v.derivative_sha256) ||
+    v.bucket !== 'user-documents' || v.mime_type !== 'image/png' || v.policy_version !== 'financial-private-v1' ||
+    v.storage_path !== `${ownerId}/redacted/${sourceHash}/${v.derivative_sha256}.png` ||
+    ![v.width, v.height].every(n => Number.isSafeInteger(n) && n > 0) || v.width * v.height > 80_000_000 ||
+    v.verification?.pixel_masks !== true || v.verification?.metadata_removed !== true ||
+    v.verification?.embedded_text_removed !== true || v.verification?.visual_reviewed !== true ||
+    typeof v.verification?.reviewer !== 'string' || !v.verification.reviewer.trim() ||
+    !Number.isFinite(Date.parse(v.verification.reviewed_at))) return null;
+  return v;
+}
+
+export async function verifySourceRaster(bytes: ArrayBuffer, source: RedactedSource) {
+  const b = new Uint8Array(bytes);
+  if (b.length < 45 || b.length > 20 * 1024 * 1024 ||
+    [137, 80, 78, 71, 13, 10, 26, 10].some((n, i) => b[i] !== n)) throw new Error('Invalid raster');
+  const hash = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))).map(n => n.toString(16).padStart(2, '0')).join('');
+  if (hash !== source.derivative_sha256) throw new Error('Derivative hash mismatch');
+  const view = new DataView(bytes);
+  let offset = 8, data = false, ended = false;
+  while (offset + 12 <= b.length) {
+    const length = view.getUint32(offset);
+    const type = String.fromCharCode(...b.slice(offset + 4, offset + 8));
+    if (offset + length + 12 > b.length || !['IHDR', 'IDAT', 'IEND'].includes(type)) throw new Error('Unexpected PNG metadata or text');
+    if (offset === 8) {
+      if (type !== 'IHDR' || length !== 13 || view.getUint32(16) !== source.width || view.getUint32(20) !== source.height || b[24] !== 8 || b[25] !== 2) throw new Error('Unexpected raster geometry');
+    } else if (type === 'IHDR') throw new Error('Repeated PNG header');
+    if (type === 'IDAT') data = true;
+    offset += length + 12;
+    if (type === 'IEND') { ended = length === 0 && data && offset === b.length; break; }
+  }
+  if (!ended) throw new Error('Incomplete raster');
+}
+
+function RedactedDocumentSource({ row }: { row: ExtractionEvidence }) {
+  const document = Array.isArray(row.document) ? (row.document.length === 1 ? row.document[0] : null) : row.document;
+  const source = reviewedSource(row.value_normalized, document?.owner_id, document?.content_sha256);
+  const [url, setUrl] = useState<string | null>(null);
+  const [error, setError] = useState(false);
+  useEffect(() => {
+    let cancelled = false, objectUrl: string | null = null;
+    setUrl(null); setError(false);
+    if (!source || row.is_superseded) return;
+    supabase.storage.from(source.bucket).download(source.storage_path).then(async ({ data, error }) => {
+      if (error || !data) throw new Error('Derivative unavailable');
+      const bytes = await data.arrayBuffer();
+      await verifySourceRaster(bytes, source);
+      if (cancelled) return;
+      objectUrl = URL.createObjectURL(new Blob([bytes], { type: 'image/png' }));
+      setUrl(objectUrl);
+    }).catch(() => { if (!cancelled) setError(true); });
+    return () => { cancelled = true; if (objectUrl) URL.revokeObjectURL(objectUrl); };
+  }, [row]);
+  if (row.is_superseded) return <p>Source display review superseded.</p>;
+  if (!source) return <p>Source display awaits a hash-linked redaction review.</p>;
+  return <div>
+    <p>Private redacted copy · Review attributed to {source.verification.reviewer} · {source.verification.reviewed_at}</p>
+    {error ? <p>Redacted source could not be verified or loaded.</p> : url ?
+      <img src={url} width={source.width} height={source.height} alt="Reviewed redacted document" style={{ maxWidth: '100%', height: 'auto' }} /> : <p>Verifying redacted source…</p>}
+    <p>Line regions have not been established; no image overlay is asserted.</p>
+  </div>;
 }
 
 function DocumentEvidence({ documentId }: { documentId: string }) {
@@ -77,11 +157,14 @@ function DocumentEvidence({ documentId }: { documentId: string }) {
   const [state, setState] = useState('Loading retained evidence…');
   const [page, setPage] = useState(0);
   const [count, setCount] = useState<number | null>(null);
+  const [reviewRevision, setReviewRevision] = useState(0);
+  const [processing, setProcessing] = useState(false);
+  const [processingMessage, setProcessingMessage] = useState('');
   useEffect(() => {
     let cancelled = false;
     setRows([]); setCount(null); setState('Loading retained evidence…');
     Promise.resolve(supabase.from('financial_document_extractions')
-      .select('id, field_key, value_normalized, extractor, extractor_model, is_superseded, superseded_by, created_at', { count: 'exact' })
+      .select('id, field_key, value_normalized, extractor, extractor_model, is_superseded, superseded_by, created_at, document:financial_documents(owner_id, content_sha256)', { count: 'exact' })
       .eq('document_id', documentId).order('created_at', { ascending: false }).order('id')
       .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1))
       .then(({ data, error, count }) => {
@@ -92,15 +175,27 @@ function DocumentEvidence({ documentId }: { documentId: string }) {
         setState(`${data?.length || 0} of ${count ?? 'unknown'} visible extraction records. Interpretations are not posted expenses.`);
       }).catch(() => { if (!cancelled) setState('Retained evidence could not load.'); });
     return () => { cancelled = true; };
-  }, [documentId, page]);
+  }, [documentId, page, reviewRevision]);
   return <section aria-label="Retained document evidence" style={s.section}>
     <h2 style={s.sectionLabel}>RETAINED DOCUMENT EVIDENCE</h2>
     <p>{state} Newest first; page {page + 1}.</p>
     <details><summary>Document reference</summary>{documentId}</details>
+    <button type="button" disabled={processing} onClick={async () => {
+      setProcessing(true); setProcessingMessage('Processing retained source…');
+      try {
+        const result = await processExistingFinancialDocument(documentId);
+        setProcessingMessage(result.status === 'complete' ? 'Document processing complete. Review the accounting results.' : result.status === 'blocked' ? 'Source retained. Processing needs attention; inspect the evidence and concerns below.' : 'Source retained. Reconciliation needs review; inspect the evidence and concerns below.');
+        setReviewRevision(n => n + 1);
+      } catch (error) { setProcessingMessage(error instanceof Error ? error.message : 'Processing failed. Retry this retained source.'); }
+      finally { setProcessing(false); }
+    }}>{processing ? 'Processing…' : 'Resume document processing'}</button>
+    {processingMessage && <p role="status">{processingMessage}</p>}
+    <FinancialDocumentLines key={`${documentId}:${reviewRevision}`} documentId={documentId} />
+    <FinancialSourceReview key={documentId} documentId={documentId} onComplete={() => setReviewRevision(n => n + 1)} />
     <button type="button" disabled={page === 0} onClick={() => setPage(p => p - 1)}>Newer evidence</button>{' '}
     <button type="button" disabled={(page + 1) * PAGE_SIZE >= (count ?? 0)} onClick={() => setPage(p => p + 1)}>Older evidence</button>
     {rows.map(row => <div key={row.id} style={s.td}>
-      <strong>{row.field_key}</strong>: {JSON.stringify(row.value_normalized) ?? 'unknown'}
+      <strong>{row.field_key}</strong>: {row.field_key === 'redacted_source' ? <RedactedDocumentSource row={row} /> : JSON.stringify(row.value_normalized) ?? 'unknown'}
       <div>{row.extractor} {row.extractor_model} · {row.created_at || 'unknown recording date'}</div>
       <details><summary>Evidence reference</summary>{row.id}</details>
       <div>{row.is_superseded ? `Superseded by ${row.superseded_by || 'unknown revision'}` : 'Retained interpretation; acceptance not established'}</div>
@@ -145,6 +240,7 @@ function formatAmount(n: number | null): string {
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function FinanceDashboard() {
+  const generation = useRef(0);
   const [deals, setDeals] = useState<DealFlowRow[]>([]);
   const [docs, setDocs] = useState<FinancialDocumentRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -157,15 +253,17 @@ export default function FinanceDashboard() {
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+      generation.current++;
       setDocs([]); setDeals([]); setConcerns([]); setSelectedDocument(null); setErrors([]);
       setCounts({ docs: null, deals: null, concerns: null });
       setPage(0); setLoading(true); setSessionRevision(n => n + 1);
     });
-    return () => subscription.unsubscribe();
+    return () => { generation.current++; subscription.unsubscribe(); };
   }, []);
 
   useEffect(() => {
     let cancelled = false;
+    const request = ++generation.current;
     setLoading(true);
     setErrors([]);
     setCounts({ docs: null, deals: null, concerns: null });
@@ -194,7 +292,7 @@ export default function FinanceDashboard() {
           .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1),
       ]);
 
-      if (cancelled) return;
+      if (cancelled || generation.current !== request) return;
 
       setErrors([
         ...(dealRes.error ? ['Deal flow could not load.'] : []),
@@ -209,37 +307,17 @@ export default function FinanceDashboard() {
     }
 
     load().catch(() => {
-      if (cancelled) return;
+      if (cancelled || generation.current !== request) return;
       setDeals([]); setDocs([]); setConcerns([]);
       setErrors(['Financial records could not load. Totals and review coverage are unknown.']);
       setLoading(false);
     });
     return () => {
-      cancelled = true;
+      cancelled = true; if (generation.current === request) generation.current++;
     };
   }, [page, sessionRevision]);
 
-  // ── Loading guard ─────────────────────────────────────────────
-  if (loading) {
-    return (
-      <div style={s.container}>
-        <h1 style={s.header}>PUBLISHING FINANCE</h1>
-        <div style={s.loadingText}>LOADING</div>
-      </div>
-    );
-  }
-
-  // ── Access guard: owner-RLS'd tables return zero rows for non-operators ──
-  if (!errors.length && page === 0 && deals.length === 0 && docs.length === 0 && concerns.length === 0) {
-    return (
-      <div style={s.container}>
-        <h1 style={s.header}>PUBLISHING FINANCE</h1>
-        <div style={s.accessLine}>
-          No financial records are visible to this session. Financial data is owner-scoped; sign in with the appropriate operator account.
-        </div>
-      </div>
-    );
-  }
+  const noRecords = !errors.length && page === 0 && deals.length === 0 && docs.length === 0 && concerns.length === 0 && !selectedDocument;
 
   const currencyTotals = invoicePageTotals(docs);
   const currentConcerns = concerns.filter(c => concernRevision(c) !== 'superseded');
@@ -248,8 +326,13 @@ export default function FinanceDashboard() {
   // ── Render ────────────────────────────────────────────────────
   return (
     <div style={s.container}>
-      <h1 style={s.header}>PUBLISHING FINANCE</h1>
-
+      <h1 style={s.header}>ACCOUNTING</h1>
+      <FinancialDocumentIntake onComplete={documentId => { setSelectedDocument(documentId); setSessionRevision(n => n + 1); }} />
+      <FinancialEvidenceRestore onRestored={() => { setPage(0); setSessionRevision(n => n + 1); }} />
+      <FinancialWorkpapers revision={sessionRevision} onOpen={setSelectedDocument} />
+      {loading ? <div style={s.loadingText}>LOADING</div> : noRecords ? <div style={s.accessLine}>
+        No financial records are visible to this session. Sign in to your account, then add documents or recover your existing records.
+      </div> : <>
       {errors.map(error => <p role="alert" key={error}>{error}</p>)}
       <p>Page {page + 1}: {docs.length} of {counts.docs ?? 'unknown'} visible documents; {concerns.length} of {counts.concerns ?? 'unknown'} pending concern records across revision history.
         {' '}{deals.length} of {counts.deals ?? 'unknown'} visible deals shown. Invoice amounts below cover this document page only, exclude marked duplicates, and are not recognized expenses.</p>
@@ -371,6 +454,7 @@ export default function FinanceDashboard() {
           </div>
         </div>
       )}
+      </>}
     </div>
   );
 }

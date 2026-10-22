@@ -55,6 +55,11 @@ export const UserDropdown: React.FC<UserDropdownProps> = ({
             Inbox
           </button>
           <button onClick={() => go('/work')}>Work</button>
+          <button
+            onMouseEnter={() => { void import('../../pages/publishing/FinanceDashboard').catch(() => {}); }}
+            onFocus={() => { void import('../../pages/publishing/FinanceDashboard').catch(() => {}); }}
+            onClick={() => go('/accounting')}
+          >Accounting</button>
           <button onClick={() => go('/messages')}>Messages</button>
           <button onClick={() => { onOpenNotifications(); onClose(); }}>
             <span>Notifications</span>

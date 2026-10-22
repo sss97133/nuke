@@ -306,7 +306,7 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
     let input: ObservationInput = await req.json();
     if (input.mode === FINANCIAL_EVIDENCE_MODE) {
       const action = (input as unknown as { action?: string }).action ?? "submit";
-      const options = { apiKeys: { endpoint: "ingest-observation", requiredScopes: [action === "read" ? "read" : "write"] } };
+      const options = { apiKeys: { endpoint: "ingest-observation", requiredScopes: [["read", "tax_read"].includes(action) ? "read" : "write"] } };
       const identity = await authenticateWriter(req, options);
       const actor = identity.ok ? financialActor(identity.caller, action) : null;
       if (!actor) return new Response(

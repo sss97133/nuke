@@ -2,8 +2,8 @@
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-const fixture = vi.hoisted(() => ({ results: {} as Record<string, any>, calls: [] as any[], authChanged: null as null | (() => void) }));
-vi.mock('../../lib/supabase', () => ({ supabase: { auth: { onAuthStateChange(callback: () => void) { fixture.authChanged = callback; return { data: { subscription: { unsubscribe() {} } } }; } }, from(table: string) {
+const fixture = vi.hoisted(() => ({ results: {} as Record<string, any>, calls: [] as any[], downloads: [] as string[], authChanged: null as null | (() => void) }));
+vi.mock('../../lib/supabase', () => ({ supabase: { functions: { invoke: async () => ({ data: { data: { lines: [] } }, error: null }) }, storage: { from(bucket: string) { return { async download(path: string) { fixture.downloads.push(`${bucket}/${path}`); return { data: null, error: new Error('not available') }; } }; } }, auth: { getUser: async () => ({ data: { user: null }, error: null }), onAuthStateChange(callback: () => void) { fixture.authChanged = callback; return { data: { subscription: { unsubscribe() {} } } }; } }, from(table: string) {
   const call: any = { table }; fixture.calls.push(call);
   const q: any = {
     select(fields: string) { call.fields = fields; return q; },
@@ -13,7 +13,8 @@ vi.mock('../../lib/supabase', () => ({ supabase: { auth: { onAuthStateChange(cal
     then(resolve: any, reject: any) { return Promise.resolve(fixture.results[table] || { data: [], count: 0, error: null }).then(resolve, reject); },
   }; return q;
 } } }));
-import FinanceDashboard, { invoicePageTotals, concernRevision, type FinancialDocumentRow } from './FinanceDashboard';
+import FinanceDashboard, { invoicePageTotals, concernRevision, reviewedSource, verifySourceRaster, type FinancialDocumentRow } from './FinanceDashboard';
+import { webcrypto } from 'node:crypto';
 let container: HTMLDivElement; let root: Root;
 const invoice = (extra: Partial<FinancialDocumentRow> = {}): FinancialDocumentRow => ({
   id: 'doc-1', duplicate_of: null, doc_type: 'facture', document_number: 'synthetic', document_date: '2026-01-01',
@@ -22,7 +23,7 @@ const invoice = (extra: Partial<FinancialDocumentRow> = {}): FinancialDocumentRo
 });
 beforeEach(() => {
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
-  fixture.calls = []; fixture.results = {};
+  fixture.calls = []; fixture.results = {}; fixture.downloads = [];
   container = document.createElement('div'); document.body.appendChild(container); root = createRoot(container);
 });
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); });
@@ -99,4 +100,59 @@ it('retires superseded interpretation questions from the active queue without re
   expect(history.textContent).toContain('Old date question');
   expect(history.textContent).toContain('retain their pending status');
   expect(old.status).toBe('pending');
+});
+
+const derivative = () => ({ contract: 'financial_redacted_source_v1', source_sha256: 'a'.repeat(64), derivative_sha256: 'b'.repeat(64),
+  bucket: 'user-documents', storage_path: `owner/redacted/${'a'.repeat(64)}/${'b'.repeat(64)}.png`, mime_type: 'image/png',
+  width: 1, height: 1, policy_version: 'financial-private-v1', verification: { pixel_masks: true, metadata_removed: true,
+    embedded_text_removed: true, visual_reviewed: true, reviewer: 'Synthetic reviewer', reviewed_at: '2026-01-01T00:00:00Z' } });
+it('requires private owner/source/hash binding and attributed visual review before source display', () => {
+  const v = derivative();
+  expect(reviewedSource(v, 'owner', v.source_sha256)).toEqual(v);
+  expect(reviewedSource({ value: v, method: 'synthetic', evidence: { source: 'synthetic' } }, 'owner', v.source_sha256)).toEqual(v);
+  expect(reviewedSource(v, 'other-owner', v.source_sha256)).toBeNull();
+  expect(reviewedSource(v, 'owner', 'c'.repeat(64))).toBeNull();
+  expect(reviewedSource({ ...v, storage_path: 'https://example.test/original.png' }, 'owner', v.source_sha256)).toBeNull();
+  expect(reviewedSource({ ...v, verification: { ...v.verification, visual_reviewed: false } }, 'owner', v.source_sha256)).toBeNull();
+});
+it('rejects tampered or metadata-bearing derivatives even when a review claim is present', async () => {
+  vi.stubGlobal('crypto', webcrypto);
+  // Synthetic RGB PNG. Parser checks dimensions/chunks before the browser decodes it.
+  const chunk = (type: string, data: number[]) => [...[0, 0, 0, data.length], ...Array.from(type).map(c => c.charCodeAt(0)), ...data, 0, 0, 0, 0];
+  const png = (extra: number[] = []) => new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10,
+    ...chunk('IHDR', [0, 0, 0, 1, 0, 0, 0, 1, 8, 2, 0, 0, 0]), ...extra, ...chunk('IDAT', [1]), ...chunk('IEND', [])]).buffer;
+  const bytes = png();
+  const hash = async (b: ArrayBuffer) => Array.from(new Uint8Array(await webcrypto.subtle.digest('SHA-256', b))).map(n => n.toString(16).padStart(2, '0')).join('');
+  const source = { ...derivative(), derivative_sha256: await hash(bytes) };
+  await expect(verifySourceRaster(bytes, source)).resolves.toBeUndefined();
+  await expect(verifySourceRaster(bytes, derivative())).rejects.toThrow('hash mismatch');
+  const metadata = png(chunk('tEXt', [65, 0, 66]));
+  await expect(verifySourceRaster(metadata, { ...source, derivative_sha256: await hash(metadata) })).rejects.toThrow('metadata');
+  vi.unstubAllGlobals();
+});
+it('withholds unreviewed and superseded sources and never falls back to original storage', async () => {
+  fixture.results.financial_documents = { data: [invoice()], count: 1 };
+  const v = derivative();
+  fixture.results.financial_document_extractions = { data: [
+    { id: 'source-pending', field_key: 'redacted_source', value_normalized: { ...v, verification: { ...v.verification, visual_reviewed: false } }, document: { owner_id: 'owner', content_sha256: v.source_sha256 } },
+    { id: 'source-retired', field_key: 'redacted_source', value_normalized: v, is_superseded: true, document: { owner_id: 'owner', content_sha256: v.source_sha256 } },
+  ], count: 2 };
+  await act(async () => root.render(<FinanceDashboard />));
+  await act(async () => Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'View evidence')!.click());
+  expect(container.textContent).toContain('awaits a hash-linked redaction review');
+  expect(container.textContent).toContain('Source display review superseded');
+  expect(fixture.downloads).toEqual([]);
+  expect(container.querySelector('img')).toBeNull();
+});
+it('requests only the bound private derivative and exposes download failures', async () => {
+  fixture.results.financial_documents = { data: [invoice()], count: 1 };
+  const v = derivative();
+  fixture.results.financial_document_extractions = { data: [
+    { id: 'source-reviewed', field_key: 'redacted_source', value_normalized: v, document: { owner_id: 'owner', content_sha256: v.source_sha256 } },
+  ], count: 1 };
+  await act(async () => root.render(<FinanceDashboard />));
+  await act(async () => Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'View evidence')!.click());
+  expect(fixture.downloads).toEqual([`user-documents/${v.storage_path}`]);
+  expect(container.textContent).toContain('could not be verified or loaded');
+  expect(container.querySelector('img')).toBeNull();
 });
