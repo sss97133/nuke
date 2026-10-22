@@ -3,7 +3,7 @@ import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 const fixture = vi.hoisted(() => ({ results: {} as Record<string, any>, calls: [] as any[], downloads: [] as string[], authChanged: null as null | (() => void) }));
-vi.mock('../../lib/supabase', () => ({ supabase: { functions: { invoke: async () => ({ data: { data: { lines: [] } }, error: null }) }, storage: { from(bucket: string) { return { async download(path: string) { fixture.downloads.push(`${bucket}/${path}`); return { data: null, error: new Error('not available') }; } }; } }, auth: { onAuthStateChange(callback: () => void) { fixture.authChanged = callback; return { data: { subscription: { unsubscribe() {} } } }; } }, from(table: string) {
+vi.mock('../../lib/supabase', () => ({ supabase: { functions: { invoke: async () => ({ data: { data: { lines: [] } }, error: null }) }, storage: { from(bucket: string) { return { async download(path: string) { fixture.downloads.push(`${bucket}/${path}`); return { data: null, error: new Error('not available') }; } }; } }, auth: { getUser: async () => ({ data: { user: null }, error: null }), onAuthStateChange(callback: () => void) { fixture.authChanged = callback; return { data: { subscription: { unsubscribe() {} } } }; } }, from(table: string) {
   const call: any = { table }; fixture.calls.push(call);
   const q: any = {
     select(fields: string) { call.fields = fields; return q; },

@@ -13,10 +13,12 @@
  * nothing else (no empty tables, no dead boxes).
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import FinancialSourceReview from '../../components/financial/FinancialSourceReview';
 import FinancialDocumentLines from '../../components/finance/FinancialDocumentLines';
+import FinancialEvidenceRestore from '../../components/financial/FinancialEvidenceRestore';
+import FinancialWorkpapers from '../../components/finance/FinancialWorkpapers';
 import FinancialDocumentIntake from '../../components/finance/FinancialDocumentIntake';
 import { processExistingFinancialDocument } from '../../services/financialEvidenceIntake';
 
@@ -238,6 +240,7 @@ function formatAmount(n: number | null): string {
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function FinanceDashboard() {
+  const generation = useRef(0);
   const [deals, setDeals] = useState<DealFlowRow[]>([]);
   const [docs, setDocs] = useState<FinancialDocumentRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -250,15 +253,17 @@ export default function FinanceDashboard() {
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+      generation.current++;
       setDocs([]); setDeals([]); setConcerns([]); setSelectedDocument(null); setErrors([]);
       setCounts({ docs: null, deals: null, concerns: null });
       setPage(0); setLoading(true); setSessionRevision(n => n + 1);
     });
-    return () => subscription.unsubscribe();
+    return () => { generation.current++; subscription.unsubscribe(); };
   }, []);
 
   useEffect(() => {
     let cancelled = false;
+    const request = ++generation.current;
     setLoading(true);
     setErrors([]);
     setCounts({ docs: null, deals: null, concerns: null });
@@ -287,7 +292,7 @@ export default function FinanceDashboard() {
           .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1),
       ]);
 
-      if (cancelled) return;
+      if (cancelled || generation.current !== request) return;
 
       setErrors([
         ...(dealRes.error ? ['Deal flow could not load.'] : []),
@@ -302,13 +307,13 @@ export default function FinanceDashboard() {
     }
 
     load().catch(() => {
-      if (cancelled) return;
+      if (cancelled || generation.current !== request) return;
       setDeals([]); setDocs([]); setConcerns([]);
       setErrors(['Financial records could not load. Totals and review coverage are unknown.']);
       setLoading(false);
     });
     return () => {
-      cancelled = true;
+      cancelled = true; if (generation.current === request) generation.current++;
     };
   }, [page, sessionRevision]);
 
@@ -321,10 +326,12 @@ export default function FinanceDashboard() {
   // ── Render ────────────────────────────────────────────────────
   return (
     <div style={s.container}>
-      <h1 style={s.header}>PUBLISHING FINANCE</h1>
+      <h1 style={s.header}>ACCOUNTING</h1>
       <FinancialDocumentIntake onComplete={documentId => { setSelectedDocument(documentId); setSessionRevision(n => n + 1); }} />
+      <FinancialEvidenceRestore onRestored={() => { setPage(0); setSessionRevision(n => n + 1); }} />
+      <FinancialWorkpapers revision={sessionRevision} onOpen={setSelectedDocument} />
       {loading ? <div style={s.loadingText}>LOADING</div> : noRecords ? <div style={s.accessLine}>
-        No financial records are visible to this session. Financial data is owner-scoped; sign in with the appropriate operator account.
+        No financial records are visible to this session. Sign in to your account, then add documents or recover your existing records.
       </div> : <>
       {errors.map(error => <p role="alert" key={error}>{error}</p>)}
       <p>Page {page + 1}: {docs.length} of {counts.docs ?? 'unknown'} visible documents; {concerns.length} of {counts.concerns ?? 'unknown'} pending concern records across revision history.
