@@ -160,6 +160,24 @@ async function allInCosts(sb: AdvisorDb, ids: string[]): Promise<Map<string, Rec
   return out;
 }
 
+/**
+ * Hammer-basis price for a sale. The adjustments in adjust.ts (channel effects, own-sale blend) were
+ * fitted on hammer prices (all_in_buyer_cost -> hammer, else the stored price), so live inputs must be
+ * on the same basis: a Broad Arrow / Mecum / RM price stored with the buyer premium is converted back
+ * to its hammer, otherwise the premium would be counted on top of the fitted channel effect.
+ * Only converts when the all-in record describes this same stored price.
+ */
+export function hammerBasis(price: number, allIn: Record<string, unknown> | undefined | null): { amount: number; converted: boolean } {
+  if (!allIn || !(price > 0)) return { amount: price, converted: false };
+  const stored = Number(allIn.stored_price);
+  const hammer = Number(allIn.hammer);
+  if (allIn.stored_price_includes_premium === true && Number.isFinite(stored) && Math.abs(stored - price) < 1 &&
+    Number.isFinite(hammer) && hammer > 0 && hammer <= price) {
+    return { amount: hammer, converted: true };
+  }
+  return { amount: price, converted: false };
+}
+
 function allInSummary(a: Record<string, unknown> | undefined | null) {
   if (!a) return null;
   const total = (a.all_in_cost ?? null) as Record<string, unknown> | null;
@@ -268,13 +286,27 @@ function listingSlugFromUrl(url: string): string | null {
 async function loadPriceFactsMap(
   sb: AdvisorDb,
   ids: string[],
-): Promise<Map<string, Record<string, unknown>>> {
-  const map = new Map<string, Record<string, unknown>>();
+): Promise<Map<string, Record<string, unknown>> & { failedChunks?: number; lastError?: string }> {
+  const map: Map<string, Record<string, unknown>> & { failedChunks?: number; lastError?: string } = new Map();
+  map.failedChunks = 0;
   const unique = [...new Set(ids.filter(Boolean))];
-  // vehicle_price_facts is cheap for small batches; chunk to avoid timeouts.
+  // vehicle_price_facts is cheap for small batches; chunk to avoid timeouts. A failed chunk would
+  // leave every comp in it without a sale basis (and so dropped as not_sold), so retry with backoff
+  // and count chunks that still fail; resolveSoldComps reports them as a degraded lookup.
   for (let i = 0; i < unique.length; i += 40) {
     const chunk = unique.slice(i, i + 40);
-    const { data } = await sb.rpc("vehicle_price_facts", { p_vehicle_ids: chunk });
+    let data: Record<string, unknown>[] | null = null;
+    let error: { message?: string } | null = null;
+    for (const waitMs of COMPS_RETRY_BACKOFF_MS) {
+      if (waitMs > 0) await new Promise((r) => setTimeout(r, waitMs));
+      ({ data, error } = await sb.rpc("vehicle_price_facts", { p_vehicle_ids: chunk }));
+      if (!error) break;
+    }
+    if (error) {
+      map.failedChunks++;
+      map.lastError = String(error.message || error);
+      continue;
+    }
     for (const row of data || []) {
       map.set(String(row.vehicle_id), row);
     }
@@ -363,6 +395,17 @@ type SoldComp = {
   citation: Citation;
 };
 
+/** Waits before each comps RPC attempt (first is immediate). */
+export const COMPS_RETRY_BACKOFF_MS = [0, 400, 1200, 3000];
+
+export type CompsLookup = {
+  ok: boolean;
+  degraded: boolean;
+  attempts: number;
+  source: string;
+  error: string | null;
+};
+
 async function resolveSoldComps(
   deps: AdvisorDeps,
   args: {
@@ -372,7 +415,7 @@ async function resolveSoldComps(
     year?: number | null;
     limit?: number;
   },
-): Promise<{ comps: SoldComp[]; query: Record<string, unknown>; excluded: Record<string, number> }> {
+): Promise<{ comps: SoldComp[]; query: Record<string, unknown>; excluded: Record<string, number>; lookup: CompsLookup }> {
   const limit = Math.min(Math.max(Number(args.limit) || 10, 1), 25);
   const sb = deps.sb();
   let make = args.make ?? null;
@@ -399,7 +442,12 @@ async function resolveSoldComps(
   }
 
   if (!make) {
-    return { comps: [], query: { make, model, year, limit }, excluded: { no_make: 1 } };
+    return {
+      comps: [],
+      query: { make, model, year, limit },
+      excluded: { no_make: 1 },
+      lookup: { ok: false, degraded: true, attempts: 0, source: "none", error: "no make to search on" },
+    };
   }
 
   const subjectVariant = detectVariant(
@@ -420,11 +468,22 @@ async function resolveSoldComps(
     p_exclude_vehicle_id: excludeId,
     p_limit: fetchLimit,
   };
-  let { data: rpcRows, error: rpcErr } = await sb.rpc("get_comps_combined", compsArgs);
-  // Under load the comps RPC can hit its 10s statement timeout; retry once so a busy moment
-  // is not reported as "no comps", and say so in query.comps_query_error if it still fails.
-  if (rpcErr) ({ data: rpcRows, error: rpcErr } = await sb.rpc("get_comps_combined", compsArgs));
+  // Under load the comps RPC can hit its 10s statement timeout. Retry with backoff; if every
+  // attempt and the edge fallback fail, report lookup.ok=false so callers never present an
+  // empty result as "no comparable sales".
+  let rpcRows: unknown = null;
+  let rpcErr: { message?: string } | null = null;
+  let attempts = 0;
+  for (const waitMs of COMPS_RETRY_BACKOFF_MS) {
+    if (waitMs > 0) await new Promise((r) => setTimeout(r, waitMs));
+    attempts++;
+    ({ data: rpcRows, error: rpcErr } = await sb.rpc("get_comps_combined", compsArgs));
+    if (!rpcErr) break;
+  }
   const compsQueryError = rpcErr ? String(rpcErr.message || rpcErr) : null;
+  let lookupSource = "get_comps_combined";
+  let lookupOk = !rpcErr;
+  let lookupError = compsQueryError;
 
   let rows: Record<string, unknown>[] = [];
   if (rpcErr) {
@@ -436,9 +495,13 @@ async function resolveSoldComps(
         year,
         limit: fetchLimit,
       })) as Record<string, unknown>;
-      rows = Array.isArray(raw.data) ? raw.data as Record<string, unknown>[] : [];
-    } catch {
+      if (!Array.isArray(raw?.data)) throw new Error("comps fallback returned no data array");
+      rows = raw.data as Record<string, unknown>[];
+      lookupSource = "edge_comps_fallback";
+      lookupOk = true;
+    } catch (e) {
       rows = [];
+      lookupSource = `failed: ${e instanceof Error ? e.message : String(e)}`;
     }
   } else {
     rows = (Array.isArray(rpcRows) ? rpcRows : []).map((row: Record<string, unknown>) => ({
@@ -459,6 +522,10 @@ async function resolveSoldComps(
 
   const ids = rows.map((r) => String(r.vehicle_id || "")).filter(Boolean);
   const facts = await loadPriceFactsMap(sb, ids);
+  if (facts.failedChunks) {
+    lookupOk = false;
+    lookupError = `vehicle_price_facts failed for ${facts.failedChunks} chunk(s): ${facts.lastError}`;
+  }
   const saleTruth = await loadSaleTruthMap(sb, ids);
 
   // Optional subject attribute boosts (reader-side; does not invent missing transmission).
@@ -661,6 +728,13 @@ async function resolveSoldComps(
       ...(compsQueryError ? { comps_query_error: compsQueryError } : {}),
     },
     excluded,
+    lookup: {
+      ok: lookupOk,
+      degraded: !lookupOk || lookupSource !== "get_comps_combined",
+      attempts,
+      source: lookupSource,
+      error: lookupError,
+    },
   };
 }
 
@@ -1631,7 +1705,7 @@ async function handleValueAsset(
 
   const est = estimates?.[0] ?? null;
   const price = await priceFacts(sb, vid);
-  const { comps, excluded } = await resolveSoldComps(deps, {
+  const { comps, excluded, lookup: compsLookup } = await resolveSoldComps(deps, {
     asset_id: vid,
     make: vehicle.make as string,
     model: vehicle.model as string,
@@ -1725,20 +1799,40 @@ async function handleValueAsset(
   }
   if (storedDisagrees) flags.push("stored_estimate_disagrees_with_comps");
 
+  // A failed comps lookup is not "no comparable sales": never estimate from an empty or partial comp set.
+  if (!compsLookup.ok && estimateSource !== "recent_same_asset_sale") {
+    valuePoint = null;
+    valueLow = null;
+    valueHigh = null;
+    estimateSource = "comps_lookup_failed";
+    noEstimateReason = `comps lookup failed after ${compsLookup.attempts} attempt(s): ${compsLookup.error ?? compsLookup.source}; retry later`;
+    flags.length = 0;
+    flags.push("comps_lookup_failed");
+  }
+
   // Backtest-fitted adjustments (advisor/adjust.ts): time index, channel, mileage, recency, own prior sale.
+  // All inputs on hammer basis, matching the fit (see hammerBasis).
   let adjusted: AdjResult | null = null;
-  if (estimateSource !== "nuke_estimates" || storedStale) {
+  let hammerConversions = 0;
+  if (compsLookup.ok && (estimateSource !== "nuke_estimates" || storedStale)) {
     let index: IndexSeries = [];
     try {
       const { data: ix } = await sb.from("advisor_make_price_index").select("month, idx")
         .eq("make", String(vehicle.make || "").toLowerCase()).order("month", { ascending: true }).limit(1000);
       index = (ix ?? []).map((r: Record<string, unknown>) => ({ month: String(r.month), idx: Number(r.idx) }));
     } catch { index = []; }
-    const ownSale = price?.sold?.amount != null && price.sold.on
-      ? { amount: Number(price.sold.amount), on: String(price.sold.on), platform: price.source_url ?? vehicle.canonical_platform }
+    const ownHammer = price?.sold?.amount != null ? hammerBasis(Number(price.sold.amount), allIn.get(vid)) : null;
+    if (ownHammer?.converted) hammerConversions++;
+    const ownSale = ownHammer && price?.sold?.on
+      ? { amount: ownHammer.amount, on: String(price.sold.on), platform: price.source_url ?? vehicle.canonical_platform }
       : null;
+    const compsHammer = comps.map((c) => {
+      const h = hammerBasis(Number(c.sale_price), allIn.get(String(c.asset_id)));
+      if (h.converted) hammerConversions++;
+      return h.amount;
+    });
     adjusted = adjustedEstimate({
-      comps: comps.map((c) => ({ sale_price: Number(c.sale_price), sold_date: c.sold_date ? String(c.sold_date) : null, platform: c.platform ?? c.listing_url, mileage: c.mileage })),
+      comps: comps.map((c, i) => ({ sale_price: compsHammer[i]!, sold_date: c.sold_date ? String(c.sold_date) : null, platform: c.platform ?? c.listing_url, mileage: c.mileage })),
       minComps: MIN_COMPS,
       index,
       asOf: new Date().toISOString(),
@@ -1880,6 +1974,10 @@ async function handleValueAsset(
       value_high: valueHigh,
       estimated_value: valuePoint,
       estimate_source: estimateSource,
+      // adjusted_* estimates are hammer prices (buyer premium excluded); add the venue premium for all-in.
+      price_basis: estimateSource.startsWith("adjusted_") ? "hammer" : "stored_sale_price",
+      degraded: !compsLookup.ok || compsLookup.degraded,
+      comps_lookup: compsLookup,
       estimate_stale: estimateStale,
       no_estimate_reason: noEstimateReason,
       stored_estimate: storedValue,
@@ -1887,7 +1985,7 @@ async function handleValueAsset(
       confidence: claims.find((c) => c.field === "estimated_value")?.confidence ?? null,
       flags,
       adjustments: adjusted
-        ? { comps_estimate: adjusted.comps_estimate, own_sale_estimate: adjusted.own_sale_estimate, spread: Number.isFinite(adjusted.spread) ? adjusted.spread : null, ...adjusted.steps, method: "bt4 backtest 2026-10-22: make index + channel + mileage + recency(1460d) + own sale" }
+        ? { price_basis: "hammer", hammer_conversions: hammerConversions, comps_estimate: adjusted.comps_estimate, own_sale_estimate: adjusted.own_sale_estimate, spread: Number.isFinite(adjusted.spread) ? adjusted.spread : null, ...adjusted.steps, method: "bt4 backtest 2026-10-22: make index + channel + mileage + recency(1460d) + own sale" }
         : null,
       // Hammer vs all-in: the stored sale price can be hammer-only or include the buyer premium
       // depending on platform; all_in_cost carries the breakdown with cited fee terms.
@@ -1958,7 +2056,7 @@ async function handleGetComps(
     }
   }
 
-  const { comps, query, excluded } = await resolveSoldComps(deps, {
+  const { comps, query, excluded, lookup } = await resolveSoldComps(deps, {
     asset_id: assetId,
     make,
     model,
@@ -1968,6 +2066,13 @@ async function handleGetComps(
 
   if (!make && !assetId) {
     return err("Could not resolve make for comps (provide asset_id or make)", "get_comps");
+  }
+  if (!lookup.ok) {
+    // Never report an empty or partial comp set as valid when the lookup itself failed.
+    return err(
+      `Comps lookup failed after ${lookup.attempts} attempt(s) (${lookup.error ?? lookup.source}); this is not "no comparable sales" — retry later`,
+      "get_comps",
+    );
   }
 
   const claims: Claim[] = [];
@@ -2028,6 +2133,8 @@ async function handleGetComps(
       count: out.length,
       query,
       excluded,
+      degraded: lookup.degraded,
+      comps_lookup: lookup,
       note:
         "sale_price is the stored price; hammer and all_in_cost show whether it includes the buyer premium and the all-in buyer cost (published fee schedule + cited transport/paperwork estimates). Only price_kind=sold with a sale basis. Asks, unsold high bids, parts suspects, and variant mismatches are excluded. URLs are canonicalized for dedupe.",
     }),
