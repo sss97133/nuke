@@ -321,12 +321,21 @@ Deno.serve(async (req) => {
     // second paid model or deep queue is automatically invoked to rescue it.
     if (classification.classifier_ok === false) {
       const detail = classification.classifier_receipt;
+      // A classifier outage is not evidence against the photo's own capture signals. Before 2026-10-22 this
+      // branch returned before Step 3, so 3,534 unfiled phone photos never got a VIN or GPS attempt
+      // (nuke-strategy/image-linking-review.md). Resolution here uses only signals that do not depend on
+      // the classifier: the uploaded VIN read and the possession-gated GPS matcher, filed by attribute_testimony.
+      let failedAttribution: AttributionReceipt | null = null;
+      if (!vehicle_id) {
+        const resolved = await resolveVehicle(image_id, user_id, classification);
+        if (resolved) failedAttribution = await fileResolvedVehicle(image_id, resolved);
+      }
       await persistImageState(image_id, {
         ...receipt(image_id, "failed"), classifier_model: detail?.model ?? null,
         classifier_attempts: detail?.attempts ?? 0, failure_phase: detail?.failure_phase,
         error_class: detail?.error_class, http_status: detail?.http_status,
       }, { ai_processing_status: "failed", ai_processing_completed_at: new Date().toISOString() },
-      { pipeline_version: "v2", classifier_failed: true, classification }, processingSource);
+      { pipeline_version: "v2", classifier_failed: true, classification, attribution: failedAttribution }, processingSource);
       return new Response(JSON.stringify({ success: false, image_id, classifier_ok: false,
         state_persisted: true, error_class: detail?.error_class, classifier_attempts: detail?.attempts ?? 0 }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -544,6 +553,31 @@ async function resolveVehicle(
     if (vinMatch) {
       console.log(`[photo-pipeline] Vehicle resolved via VIN: ${classification.vin_detected}`);
       return { vehicle_id: vinMatch.id, signal: "vin_in_frame", confidence: null };
+    }
+  }
+
+  // Strategy 1b: a VIN read carried on the row itself (vehicle_vin, written at upload by the phone's on-device OCR or
+  // by a cited text-read pass). Only an exact match on one of this user's own vehicles, from a read of at least 0.9
+  // that is not on a document, files here; a document VIN names a capture set instead (capture_sets_build).
+  const { data: vinRow } = await supabase
+    .from("vehicle_images")
+    .select("vehicle_vin, vehicle_vin_confidence, is_document, doc_flag")
+    .eq("id", imageId)
+    .maybeSingle();
+  const rowVin = typeof vinRow?.vehicle_vin === "string" ? vinRow.vehicle_vin.trim().toUpperCase() : "";
+  if (userId && rowVin.length >= 8 && Number(vinRow?.vehicle_vin_confidence ?? 0) >= 0.9 &&
+      vinRow?.is_document !== true && vinRow?.doc_flag !== true) {
+    const { data: owned } = await supabase
+      .from("vehicles")
+      .select("id")
+      .eq("vin", rowVin)
+      .or(`owner_id.eq.${userId},user_id.eq.${userId}`)
+      .is("deleted_at", null)
+      .is("merged_into_vehicle_id", null)
+      .limit(2);
+    if (owned?.length === 1) {
+      console.log(`[photo-pipeline] Vehicle resolved via uploaded VIN read`);
+      return { vehicle_id: owned[0].id, signal: "vin_in_frame", confidence: Number(vinRow?.vehicle_vin_confidence) };
     }
   }
 
