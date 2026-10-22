@@ -35,9 +35,10 @@ it('only ledger controls become subtotals; currencies remain partitioned with un
     { record_kind: 'retained_bank_movement', year: '2024', account: 'A', section: null, currency: 'USD', retained_amount: '99999.99', rows: 1 },
   ] }));
   await act(async () => root.render(<FinancialWorkpapers revision={0} onOpen={() => {}} />));
+  await act(async () => Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'Accounts')!.click());
   const rows = Array.from(container.querySelectorAll('tbody tr'));
   expect(rows).toHaveLength(3); expect(rows[0].textContent).toContain('20.01 USD'); expect(rows[1].textContent).toContain('30.02 EUR');
-  expect(rows[2].textContent).toContain('UnknownUnresolved'); expect(container.textContent).not.toContain('99999.99');
+  expect(rows[2].textContent).toContain('Unknown'); expect(container.textContent).not.toContain('99999.99');
 });
 it('invalid duplicate controls withhold subtotals', async () => {
   fixture.invoke.mockResolvedValue(response({ ...empty(), total_rows: 2, controls_valid: false, controls: [{ record_kind: 'retained_ledger_decision', retained_amount: '999.99' }] }));
@@ -49,10 +50,11 @@ it('pages with server cursors and opens the retained source document', async () 
     .mockResolvedValueOnce(response({ ...empty(), total_rows: 101, records: [record('row2', 'Second page')], next_after: 'cursor2' }))
     .mockResolvedValueOnce(response({ ...empty(), total_rows: 101, records: [record()], next_after: 'cursor1' }));
   await act(async () => root.render(<FinancialWorkpapers revision={0} onOpen={open} />));
-  await act(async () => Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'View evidence')!.click()); expect(open).toHaveBeenCalledWith('doc');
+  await act(async () => Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'Records')!.click());
+  await act(async () => Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'View evidence')!.click()); expect(open).toHaveBeenCalledWith('doc', record().record);
   await act(async () => Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'Next records')!.click());
   expect(fixture.invoke.mock.calls[1][1].body).toEqual({ mode: 'financial_evidence_v1', action: 'tax_read', limit: 100, after: 'cursor1' });
-  expect(container.textContent).toContain('Second page'); expect(container.textContent).toContain('Page 2');
+  expect(container.textContent).toContain('Second page'); expect(container.textContent).toContain('Source page 2');
   expect(Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'Next records')!.disabled).toBe(true);
   await act(async () => Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'Previous records')!.click());
   expect(fixture.invoke.mock.calls[2][1].body.after).toBeUndefined();
@@ -84,6 +86,34 @@ it('year overview uses all server controls, preserves refunds and unknowns, neve
   expect(container.textContent).toContain('Recovery may be partial');
   expect(container.querySelector('.accounting-years')?.textContent).toContain('1,200.00 USD');
   expect(container.querySelector('.accounting-years')?.textContent).not.toContain('999,999');
-  expect(container.textContent).not.toContain('Bookkeeping difference');
+  expect(container.textContent).toContain('Bookkeeping difference');
   expect(container.querySelectorAll('details[open]')).toHaveLength(0);
+});
+
+it('defaults to the latest book year and scopes records and bank attention to the selected year', async () => {
+  const control = { record_kind: 'retained_ledger_decision', year: '2024', account: 'Account', section: 'Expense', currency: 'USD', retained_amount: '12.50', rows: 1 };
+  fixture.invoke.mockResolvedValue(response({ ...empty(), records: [record(), {...record('later'),record:{...record().record,year:'2025',description:'Later year record'}}], total_rows: 3, controls: [control, {...control,year:'2025'}, {...control,year:'2026',record_kind:'retained_bank_movement',section:null,rows:530}] }));
+  await act(async () => root.render(<FinancialWorkpapers revision={0} onOpen={() => {}} />));
+  const year = container.querySelector('select')!;
+  expect(year.value).toBe('2025');
+  expect(container.textContent).toContain('0 unclassified bank movements');
+  await act(async () => Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'Records')!.click());
+  expect(container.querySelector('tbody')?.textContent).toContain('Later year record');
+  expect(container.querySelector('tbody')?.textContent).not.toContain('Retained part');
+  await act(async () => { year.value = '2024'; year.dispatchEvent(new Event('change', {bubbles:true})); });
+  expect(container.querySelector('tbody')?.textContent).toContain('Retained part');
+  expect(container.querySelector('tbody')?.textContent).not.toContain('Later year record');
+});
+it('bounds loaded record inspection to 25 and withholds partial account sums', async () => {
+  fixture.invoke.mockResolvedValue(response({...empty(),records:Array.from({length:60},(_,i)=>record(`r${i}`,`Record ${i}`)),total_rows:7767,controls:[{record_kind:'retained_ledger_decision',year:'2024',account:'Account',section:'Expense',currency:'USD',retained_amount:'98765.43',missing_amounts:1,rows:60}]}));
+  await act(async () => root.render(<FinancialWorkpapers revision={0} onOpen={()=>{}}/>));
+  expect(container.querySelector('table')).toBeNull();
+  await act(async () => Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'Records')!.click());
+  expect(container.querySelectorAll('tbody tr')).toHaveLength(25);
+  expect(container.textContent).toContain('not all 7,767 records');
+  await act(async () => Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'Next 25')!.click());
+  expect(container.querySelector('tbody')?.textContent).toContain('Record 25');
+  await act(async () => Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'Accounts')!.click());
+  expect(container.querySelector('tbody')?.textContent).toContain('Unknown');
+  expect(container.textContent).not.toContain('98,765.43');
 });
