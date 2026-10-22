@@ -2,9 +2,10 @@ import React, { useEffect, useRef, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { restoreFinancialEvidence, type RestoreProgress, type RestoreResult } from '../../services/financialEvidenceRestore';
 
-/** One-time recovery of an explicitly selected retained-evidence bundle. */
+/** Recovery of explicitly selected retained-evidence bundles, one at a time. */
 export default function FinancialEvidenceRestore({ onRestored }: { onRestored?: () => void }) {
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
+  const [completedBundles, setCompletedBundles] = useState(0);
   const [progress, setProgress] = useState<RestoreProgress | null>(null);
   const [result, setResult] = useState<RestoreResult | null>(null);
   const [error, setError] = useState('');
@@ -20,7 +21,7 @@ export default function FinancialEvidenceRestore({ onRestored }: { onRestored?: 
       if (!mounted.current) return;
       if (owner !== next) {
         identityEpoch.current++;
-        running.current?.abort(); setFile(null); setResult(null); setProgress(null); setError('');
+        running.current?.abort(); setFiles([]); setCompletedBundles(0); setResult(null); setProgress(null); setError('');
         if (input.current) input.current.value = '';
       }
       owner = next; setSignedIn(!!next);
@@ -34,29 +35,38 @@ export default function FinancialEvidenceRestore({ onRestored }: { onRestored?: 
     return () => { mounted.current = false; running.current?.abort(); data.subscription.unsubscribe(); };
   }, []);
   async function restore() {
-    if (!file || !signedIn || running.current) return;
+    if (!files.length || completedBundles === files.length || !signedIn || running.current) return;
     const epoch = identityEpoch.current;
     const controller = new AbortController(); running.current = controller;
-    setBusy(true); setError(''); setResult(null);
+    setBusy(true); setError(''); setProgress(null);
     try {
-      const restored = await restoreFinancialEvidence(file, p => { if (mounted.current && epoch === identityEpoch.current && !controller.signal.aborted) setProgress(p); }, controller.signal);
-      if (mounted.current && epoch === identityEpoch.current && !controller.signal.aborted) { setResult(restored); onRestored?.(); }
+      let totals = result ?? { documents: 0, revisions: 0, verified: 0, expense_posted: false as const, tax_ready: false as const };
+      for (let index = completedBundles; index < files.length; index++) {
+        if (!mounted.current || epoch !== identityEpoch.current || controller.signal.aborted) break;
+        setProgress(null);
+        const restored = await restoreFinancialEvidence(files[index], p => { if (mounted.current && epoch === identityEpoch.current && !controller.signal.aborted) setProgress(p); }, controller.signal);
+        if (!mounted.current || epoch !== identityEpoch.current || controller.signal.aborted) break;
+        totals = { ...totals, documents: totals.documents + restored.documents, revisions: totals.revisions + restored.revisions, verified: totals.verified + restored.verified };
+        setResult(totals); setCompletedBundles(index + 1); onRestored?.();
+      }
     } catch (e) { if (mounted.current && epoch === identityEpoch.current) setError(e instanceof Error ? e.message : 'Recovery stopped. Retry the same bundle to resume.'); }
     finally { running.current = null; if (mounted.current) setBusy(false); }
   }
   return <section aria-label="Restore retained accounting evidence">
     <h2>Restore retained accounting evidence</h2>
-    <p>Choose your recovery bundle to bring existing records into this signed-in account. Retained decisions and source references stay attached; restoration does not post expenses or complete tax review.</p>
-    {!signedIn && <p>Sign in to select a recovery bundle.</p>}
-    <label>Recovery bundle <input ref={input} type="file" accept=".json,application/json" disabled={busy || !signedIn} onChange={e => {
-      setFile(e.target.files?.[0] ?? null); setError(''); setResult(null); setProgress(null);
+    <p>Choose one or more recovery bundles to bring existing records into this signed-in account. Retained decisions and source references stay attached; restoration does not post expenses or complete tax review.</p>
+    {!signedIn && <p>Sign in to select recovery bundles.</p>}
+    <label>Recovery bundles <input ref={input} type="file" multiple accept=".json,application/json" disabled={busy || !signedIn} onChange={e => {
+      setFiles(Array.from(e.target.files ?? [])); setCompletedBundles(0); setError(''); setResult(null); setProgress(null);
     }} /></label>{' '}
-    <button type="button" disabled={!file || busy || !signedIn} onClick={restore}>Restore selected bundle</button>{' '}
+    <button type="button" disabled={!files.length || completedBundles === files.length || busy || !signedIn} onClick={restore}>{completedBundles > 0 && completedBundles < files.length ? 'Resume selected bundles' : 'Restore selected bundles'}</button>{' '}
     {busy && <button type="button" onClick={() => running.current?.abort()}>Stop after current request</button>}
     <div role="status" aria-live="polite">
+      {files.length > 0 && <p>{completedBundles} of {files.length} bundles verified.{completedBundles < files.length && ` ${busy ? 'Current' : 'Next'} bundle: ${files[completedBundles].name}`}</p>}
       {busy && progress && <p>{progress.stage === 'validating' ? 'Validating the entire bundle before uploading…' : `${progress.stage}: ${progress.completed} of ${progress.total} revisions acknowledged.`}</p>}
       {result && <p>Verified {result.verified} originals and {result.revisions} retained revisions. Accounting and tax review remain open.</p>}
     </div>
-    {error && <p role="alert">{error} Previously acknowledged records remain retained; retrying this bundle reuses the same revisions.</p>}
+    <p>Bundles run one at a time. Keep this page open. After a reload, select the remaining bundles; replaying a bundle reuses its retained revisions.</p>
+    {error && <p role="alert">{error} Previously acknowledged records remain retained; resume retries the unfinished bundle and skips bundles verified in this selection.</p>}
   </section>;
 }
