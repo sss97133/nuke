@@ -703,7 +703,7 @@ export default function FamilyMovers({
     ? `${isUpcoming ? 'Upcoming supply' : 'Sales'} in ${meta.recentUnit} (${meta.label}) against ${baseMeta.recentUnit} (${baseMeta.label}) baseline`
     : meta.windowLabel;
 
-  const row = (m: ShareMover, dir: 'up' | 'down') => {
+  const row = (m: ShareMover, dir: 'up' | 'down', lead: boolean) => {
     const key = `${m.brand}|${m.family_key}`;
     const rowBins = m.bins ?? (horizon === '1y' && !isCustomBase ? bins.get(key) : undefined);
     const countsText = isCustomBase && baseMeta
@@ -724,12 +724,18 @@ export default function FamilyMovers({
       <span className="map-movers2__counts">{countsText}</span>
       <span className="map-movers2__price">{m.avg_price_move == null ? '' : `${priceLabel} ${pct(m.avg_price_move)}`}</span>
       {rowBins ? <Spark bins={rowBins} direction={dir} /> : <span />}
+      {!isUpcoming && <span className="map-movers2__investigation">
+        <span>{!lead ? '' : m.avg_price_move == null || m.avg_price_move === 0
+          ? 'Which years and configurations account for the sales change?'
+          : `${m.avg_price_move < 0 ? 'Lower' : 'Higher'} average amounts: a different vehicle mix, or changed prices for similar cars?`}</span>
+        <span className="map-movers2__action">Inspect sales →</span>
+      </span>}
     </button>;
   };
 
   const side = (title: string, list: ShareMover[], dir: 'up' | 'down') => <div className="map-movers2__side">
     <div className="map-movers2__title">{title}</div>
-    {list.length ? list.map((m) => row(m, dir)) : <div className="map-movers2__none">{loading ? 'reading window…' : 'no real changes'}</div>}
+    {list.length ? list.map((m, index) => row(m, dir, index === 0)) : <div className="map-movers2__none">{loading ? 'reading window…' : 'no qualifying changes'}</div>}
   </div>;
 
   return <div className="map-movers2" role="group" aria-label="Model families selling more and less">
@@ -770,9 +776,9 @@ export default function FamilyMovers({
                 <>
                   {activeWindowProse}, after taking out overall upcoming supply pace ({pct(paceBatMove)},{' '}
                   {data.bat.sold_prior_12m.toLocaleString('en-US')} sold → {data.bat.sold_12m.toLocaleString('en-US')} upcoming). A family is
-                  listed only when its upcoming wave is bigger than luck explains; the bar is the likely range, from half the pace (−50%) to
+                  listed only when it passes the reader's count and statistical thresholds; the bar is the estimated range, from half the pace (−50%) to
                   twice the pace (+100%). {data.significant.toLocaleString('en-US')} of {data.eligible.toLocaleString('en-US')} families with{' '}
-                  {data.min_sales}+ lots each {meta.eachWindowLabel} shifted for real ({data.families.toLocaleString('en-US')} families read).
+                  {data.min_sales}+ lots each {meta.eachWindowLabel} passed selection ({data.families.toLocaleString('en-US')} families read).
                   Avg ask = live current bids, catalog mid-estimates, and active classified asks against recent sold prices. Sources:{' '}
                   {data.sources
                     ? `${data.sources.bat_live.toLocaleString('en-US')} live Bring a Trailer auctions, ${data.sources.auction_calendar.toLocaleString('en-US')} scheduled auction calendar lots${data.sources.facebook_marketplace > 0 ? `, and ${data.sources.facebook_marketplace.toLocaleString('en-US')} active Facebook Marketplace captures` : ''}.`
@@ -782,9 +788,9 @@ export default function FamilyMovers({
                 <>
                   {activeWindowProse}, after taking out the market's own growth ({pct(paceBatMove)},{' '}
                   {data.bat.sold_prior_12m.toLocaleString('en-US')} → {data.bat.sold_12m.toLocaleString('en-US')}). A family is listed only when its
-                  change is bigger than luck explains; the bar is the likely range, from half as many sales (−50%) to twice as many (+100%).
+                  change passes the reader's count and statistical thresholds; the bar is the estimated range, from half as many sales (−50%) to twice as many (+100%).
                   {' '}{data.significant.toLocaleString('en-US')} of {data.eligible.toLocaleString('en-US')} families with {data.min_sales}+ measured sales each
-                  {' '}{meta.eachWindowLabel} changed for real ({data.families.toLocaleString('en-US')} families read). Avg sale = dollars divided by cars sold, so it
+                  {' '}{meta.eachWindowLabel} passed selection ({data.families.toLocaleString('en-US')} families read). Avg sale = dollars divided by cars sold, so it
                   moves with which cars sold. Measured at auction houses we hold in full both years: today Bring a Trailer, Mecum and Bonhams.
                 </>
               )}
@@ -844,8 +850,8 @@ export default function FamilyMovers({
       </div>
     </div>
     <div className="map-movers2__sides">
-      {side(meta.gainingTitle, data.gaining, 'up')}
-      {side(meta.losingTitle, data.losing, 'down')}
+      {side(isUpcoming ? meta.gainingTitle : 'Outpacing the market', data.gaining, 'up')}
+      {side(isUpcoming ? meta.losingTitle : 'Trailing the market', data.losing, 'down')}
     </div>
   </div>;
 }

@@ -3,6 +3,7 @@ import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { MemoryRouter, useNavigate } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
 const fixture = vi.hoisted(() => ({ rpc: vi.fn(), from: vi.fn() }));
 vi.mock('../lib/supabase', () => ({ supabase: { rpc: fixture.rpc, from: fixture.from } }));
 import Valuation from './Valuation';
@@ -14,7 +15,7 @@ function evidence(n = 10, currency = 'USD') {
   return { query: { year: 1970, make: 'Synthetic', model: 'Coupe' }, stats: { sold_count: n, median: n>=10 ? (n+1)*500 : null,
     p10: n>=10 ? 1000+(n-1)*100 : null, p90: n>=10 ? 1000+(n-1)*900 : null, min: n>=10 ? 1000 : null, max: n>=10 ? n*1000 : null,
       avg: n>=10 ? (n+1)*500 : null, last_sale: '2025-06-15', first_sale: '2025-06-15', avg_bid_count: null, avg_comment_count: null }, comparables: [],
-    receipt: { cohort: { key: 'synthetic', label: '1970 Synthetic Coupe', basis: 'registered_same_year_model_context', complete: true }, eligible,
+    receipt: { method: 'source_sale_price_midrank_v1', cohort: { key: 'synthetic', label: '1970 Synthetic Coupe', basis: 'registered_same_year_model_context', complete: true }, eligible,
       event_from: '2024-01-01T00:00:00Z', event_before: '2026-01-01T00:00:00Z', evidence_as_of: '2026-01-02T00:00:00Z', computed_at: '2026-01-03T00:00:00Z',
       knowledge_mode: 'retrospective', currency, minimum_sales: 10, coverage: { member_rows: 20, qualified_sales: n, condition_scalar_recorded: 0,
         body_recorded: 4, engine_recorded: 3, transmission_recorded: 2, conflicting_source_lots: 1,
@@ -63,6 +64,97 @@ beforeEach(() => {
   container=document.createElement('div'); document.body.appendChild(container); root=createRoot(container);
 });
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+
+describe('comparison evidence revisions in the actual page', () => {
+  it('retains both receipts, exposes changed inputs and recalculates the same amount reference', async () => {
+    const prior = evidence(), next = evidence();
+    next.receipt.eligible[0].amount = 12000;
+    fixture.rpc.mockResolvedValueOnce({ data: prior, error: null }).mockResolvedValueOnce({ data: next, error: null });
+    await render(); await submit();
+    const panel = container.querySelector('[aria-label="Evidence changes since previous lookup"]');
+    expect(panel?.textContent).toContain('0 entered · 0 left · 1 revised');
+    expect(panel?.textContent).toContain('percentile: 45.0 → 35.0');
+    expect(panel?.textContent).toContain('Changed fields: amount');
+    const saved = await exportedReceipt();
+    expect(saved.sourceReceipt).toEqual(next.receipt);
+    expect(saved.evidenceRevision.previousSourceReceipt).toEqual(prior.receipt);
+    expect(saved.evidenceRevision.before.comparison.percentile).toBe(45);
+    expect(saved.evidenceRevision.after.comparison.percentile).toBe(35);
+    await enter('Amount reference', '8000');
+    expect(panel?.textContent).toContain('percentile: 75.0 → 65.0');
+    expect(fixture.rpc).toHaveBeenCalledTimes(2);
+  });
+  it('preserves the last successful pair after a failed refresh and clears it for another requested cohort', async () => {
+    fixture.rpc.mockResolvedValueOnce({ data: evidence(11), error: null }).mockResolvedValueOnce({ data: evidence(), error: null });
+    await render(); await submit();
+    const previous = (await exportedReceipt()).evidenceRevision;
+    fixture.rpc.mockResolvedValueOnce({ data: null, error: { message: 'refresh failed' } });
+    await submit();
+    expect((await exportedReceipt()).evidenceRevision).toEqual(previous);
+    await enter('Model', 'Roadster');
+    expect(container.querySelector('[aria-label="Evidence changes since previous lookup"]')).toBeNull();
+    const next = evidence(); next.query.model = 'Roadster';
+    fixture.rpc.mockResolvedValueOnce({ data: next, error: null });
+    await submit();
+    expect((await exportedReceipt()).evidenceRevision).toBeNull();
+  });
+  it('withholds revision counts when the resolved rolling window changes', async () => {
+    const next = evidence(); next.receipt.event_from = '2024-01-02T00:00:00Z';
+    fixture.rpc.mockResolvedValueOnce({ data: evidence(), error: null }).mockResolvedValueOnce({ data: next, error: null });
+    await render(); await submit();
+    const panel = container.querySelector('[aria-label="Evidence changes since previous lookup"]');
+    expect(panel?.textContent).toContain('comparison scope changed');
+    expect(panel?.textContent).not.toContain('0 entered');
+    expect((await exportedReceipt()).evidenceRevision.counts).toBeNull();
+  });
+  it('pins a default sales window for an explicit evidence refresh', async () => {
+    await render('year=1970&make=Synthetic&model=Coupe&price=5000');
+    expect(fixture.rpc.mock.calls[0][1]).toMatchObject({ p_event_from: null, p_event_before: null });
+    await submit();
+    expect(fixture.rpc.mock.calls[1][1]).toMatchObject({ p_event_from: '2024-01-01T00:00:00Z', p_event_before: '2026-01-01T00:00:00Z', p_evidence_as_of: null });
+    expect((await exportedReceipt()).evidenceRevision.counts).toMatchObject({ before: 10, after: 10, unchanged: 10 });
+  });
+});
+
+// CI feeds this suite output from the actual tracked PostgreSQL reader and
+// supersession writer. Ordinary unit runs do not pretend to exercise Postgres.
+describe.skipIf(!process.env.NUKE_SALE_CORRECTION_RECEIPTS)('PostgreSQL correction reaches the public comparison page', () => {
+  const receipts = () => JSON.parse(readFileSync(process.env.NUKE_SALE_CORRECTION_RECEIPTS!, 'utf8'));
+  it('shows the sanctioned correction, keeps the earlier inputs and leaves the control evaluation unchanged', async () => {
+    const actual = receipts();
+    fixture.rpc.mockResolvedValueOnce({ data: actual.before, error: null }).mockResolvedValueOnce({ data: actual.after, error: null });
+    await render(); await submit();
+    const panel = container.querySelector('[aria-label="Evidence changes since previous lookup"]');
+    expect(panel?.textContent).toContain('0 entered · 0 left · 1 revised');
+    expect(panel?.textContent).toContain('percentile: 40.9 → 50.0');
+    const saved = await exportedReceipt();
+    expect(saved.evidenceRevision.previousSourceReceipt).toEqual(actual.before.receipt);
+    expect(saved.sourceReceipt).toEqual(actual.after.receipt);
+    const change = saved.evidenceRevision.changes[0];
+    expect(change.before.amount).toBe(11000); expect(change.after.amount).toBe(2000);
+    expect(change.before.derivedObservationId).not.toBe(change.after.derivedObservationId);
+    expect(actual.earlierReplay.receipt.eligible).toEqual(actual.earlierBefore.receipt.eligible);
+    expect(actual.unaffectedAfter.receipt.eligible).toEqual(actual.unaffectedBefore.receipt.eligible);
+    // Replay from the retained earlier response, without querying today's DB.
+    const { comparePriceToSourceSales } = await import('../lib/dealRead/batComps');
+    expect(comparePriceToSourceSales(saved.evidenceRevision.previousSourceReceipt.eligible, {
+      cohort: saved.evidenceRevision.before.comparison.cohort, subject: saved.evidenceRevision.before.comparison.subject,
+      eventFrom: saved.evidenceRevision.before.comparison.eventFrom, eventBefore: saved.evidenceRevision.before.comparison.eventBefore,
+      evidenceAsOf: saved.evidenceRevision.before.comparison.evidenceAsOf, computedAt: saved.evidenceRevision.before.comparison.computedAt,
+      knowledgeMode: saved.evidenceRevision.before.comparison.knowledgeMode, minimumSales: actual.before.receipt.minimum_sales,
+    })).toEqual(saved.evidenceRevision.before.comparison);
+  });
+  it('withdraws the affected episode after the public parent becomes private', async () => {
+    const actual = receipts();
+    fixture.rpc.mockResolvedValueOnce({ data: actual.after, error: null }).mockResolvedValueOnce({ data: actual.withdrawn, error: null });
+    await render(); await submit();
+    const saved = await exportedReceipt();
+    expect(saved.evidenceRevision.counts).toMatchObject({ before: 11, after: 10, left: 1, revised: 0 });
+    expect(saved.evidenceRevision.changes[0].after).toBeNull();
+    expect(saved.sourceReceipt.eligible).toHaveLength(10);
+    expect(container.querySelector('.source-sales-records')?.textContent).not.toContain('synthetic-11/');
+  });
+});
 
 describe('qualified cohort sale-price reader UI', () => {
   it('reads bounded public current labels without using them as sale-time features or changing the receipt', async () => {

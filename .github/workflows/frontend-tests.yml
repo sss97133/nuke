@@ -768,7 +768,7 @@ jobs:
       - name: Create disposable source-sale receipt database
         run: createdb dm_refinement_sale_receipt
       - name: Verify actual valuation reader, source custody and price-cutoff contracts
-        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_sale_receipt -f scripts/discovery/valuation-source-sale-receipt-test.sql -f supabase/sql/test_sale_residuals_source_integration.sql -f supabase/sql/test_sale_residual_worker_source_integration.sql
+        run: psql -X -v ON_ERROR_STOP=1 -v correction_receipts_path="$RUNNER_TEMP/sale-correction-receipts.json" -d dm_refinement_sale_receipt -f scripts/discovery/valuation-source-sale-receipt-test.sql -f supabase/sql/test_sale_residuals_source_integration.sql -f supabase/sql/test_sale_residual_worker_source_integration.sql
       - name: Create disposable canonical price helper database
         run: createdb dm_refinement_price_facts_ci
       - name: Verify price helper equivalence, lazy dates and invoker privacy
@@ -780,6 +780,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
+      - name: Install locked comparison consumer dependencies
+        run: npm ci --prefix nuke_frontend
+      - name: Verify PostgreSQL correction and withdrawal reach the comparison page
+        working-directory: nuke_frontend
+        env:
+          NUKE_SALE_CORRECTION_RECEIPTS: ${{ runner.temp }}/sale-correction-receipts.json
+        run: ./node_modules/.bin/vitest run src/pages/Valuation.test.tsx src/lib/dealRead/batComps.test.ts
       - name: Verify complete organization listing folds and public profile reader
         run: PGDATABASE=dm_refinement_org_activity_ci node scripts/test-organization-listing-activity.mjs
       - name: Create disposable classifieds listing-history database

@@ -194,12 +194,12 @@ it('says how much of its own total we hold, in the total\'s terms', () => {
   expect(money(null)).toBe('');
 });
 
-it('says whether a source is landing data now, or since when it has been idle, across 14d / 24h / 1h horizons', () => {
+it('reports arrivals without claiming that a collector stopped, across 14d / 24h / 1h horizons', () => {
   expect(landingState({ landed24: 151435, lastLanded: '2026-10-16T10:00:00Z' })).toEqual({ active: true, text: '+151,435 today' });
   expect(landingState({ landed24: 2055, landed1h: 18, lastLanded: '2026-10-16T10:46:00Z' }, '24h')).toEqual({ active: true, text: '+18/hr · 2,055 24h' });
   expect(landingState({ landed24: 2055, landed1h: 18, landed15m: 6, lastLanded: '2026-10-16T10:46:00Z' }, '1h')).toEqual({ active: true, text: '+6/15m · 18 1h' });
-  expect(landingState({ landed24: 0, lastLanded: '2026-10-03T14:00:00Z' })).toEqual({ active: false, text: 'idle since Oct 3' });
-  expect(landingState({ landed24: 0, lastLanded: null })).toEqual({ active: false, text: 'idle 14+ days' });
+  expect(landingState({ landed24: 0, lastLanded: '2026-10-03T14:00:00Z' })).toEqual({ active: false, text: 'last new record Oct 3' });
+  expect(landingState({ landed24: 0, lastLanded: null })).toEqual({ active: false, text: 'no new records in 14d' });
   expect(shortName('eBay Motors (Browse API)')).toBe('eBay Motors');
   expect(shortName('Bring a Trailer')).toBe('Bring a Trailer');
 });
@@ -212,10 +212,31 @@ it('draws 24 months ending at the board\'s month, empty months as zero', () => {
   expect(bars.reduce((a, b) => a + b, 0)).toBe(4500);
 });
 
+it('keeps collection telemetry on demand while preserving source inventory, sales and live lots', async () => {
+  fixture.rpc.mockResolvedValue({ data: value, error: null });
+  await act(async () => root.render(<SourcesBoard />));
+  expect(container.querySelector('.market-sources__landing')).toBeNull();
+  expect(container.querySelector('.market-sources__live-summary')).toBeNull();
+  expect(container.querySelector('.market-sources__held')?.textContent).toBe('252,399');
+  expect(container.querySelector('.market-sources__recent')?.textContent).toContain('39,173');
+  expect(container.querySelector('.market-sources__sharetext')?.textContent).toBe('95% of 264,746');
+  const toggle = container.querySelector<HTMLButtonElement>('.market-sources__collection-toggle')!;
+  expect(toggle.getAttribute('aria-pressed')).toBe('false');
+  await act(async () => toggle.click());
+  expect(toggle.getAttribute('aria-pressed')).toBe('true');
+  expect(container.querySelector('.market-sources__held')?.textContent).toContain('+1,399 since Oct 9');
+  expect(container.textContent).toContain('last new record Oct 3');
+  expect(container.textContent).toContain('New records do not establish source-check freshness');
+  await act(async () => toggle.click());
+  expect(container.querySelector('.market-sources__landing')).toBeNull();
+  expect(fixture.rpc).toHaveBeenCalledTimes(1);
+});
+
 it('ranks auction houses, marketplaces, and dealers apart, same row for each, as the reader orders them', async () => {
   fixture.rpc.mockImplementation((fn: string) => Promise.resolve(fn === 'market_sources_read'
     ? { data: value, error: null } : { data: null, error: { message: 'none' } }));
   await act(async () => root.render(<SourcesBoard />));
+  await act(async () => (container.querySelector('.market-sources__collection-toggle') as HTMLButtonElement).click());
   expect(fixture.rpc).toHaveBeenCalledWith('market_sources_read');
   const groups = [...container.querySelectorAll('.market-sources__group')];
   expect(groups.map((g) => g.querySelector('.market-sources__group-title')?.textContent)).toEqual(['Auction houses', 'Marketplaces', 'Dealers']);
@@ -243,7 +264,7 @@ it('ranks auction houses, marketplaces, and dealers apart, same row for each, as
   expect(rows[2].querySelector('.market-sources__sharetext')?.textContent).toBe('their total unknown');
   expect(rows[1].querySelector('.market-sources__landtext')?.textContent).toBe('+151,435 today');
   expect(rows[1].querySelectorAll('.market-sources__days rect')).toHaveLength(14);
-  expect(rows[2].querySelector('.market-sources__landtext')?.textContent).toBe('idle since Oct 3');
+  expect(rows[2].querySelector('.market-sources__landtext')?.textContent).toBe('last new record Oct 3');
   expect(rows[2].querySelector('.market-sources__landing i.off')).not.toBeNull();
   expect(container.querySelector('.market-sources__foot .market-sources__note')?.textContent)
     .toBe('not ranked: 2 capture channels, 2 aggregators, 1 shop');
@@ -257,6 +278,7 @@ it('switches the landing column to 24h hourly bars and 1h live bars when clicked
     return Promise.resolve({ data: null, error: { message: 'none' } });
   });
   await act(async () => root.render(<SourcesBoard />));
+  await act(async () => (container.querySelector('.market-sources__collection-toggle') as HTMLButtonElement).click());
 
   // Click the "landing, last 14 days" column header toggle -> switches to 24h (hourly)
   const colToggle = container.querySelector('.market-sources__col-toggle') as HTMLButtonElement;
@@ -301,6 +323,7 @@ it('sorts the stream by any column header, and again to reverse', async () => {
     return Promise.resolve({ data: null, error: { message: 'none' } });
   });
   await act(async () => root.render(<SourcesBoard />));
+  await act(async () => (container.querySelector('.market-sources__collection-toggle') as HTMLButtonElement).click());
   await act(async () => { (container.querySelector('button.market-sources__landing') as HTMLButtonElement).click(); });
   const drill = container.querySelector('.market-sources__drill')!;
   const years = () => [...drill.querySelectorAll('li.market-sources__event .market-sources__event-year')].map((n) => n.textContent);
@@ -385,6 +408,7 @@ it('keeps dealer category context in the inspector and filters without repeating
   });
 
   await act(async () => root.render(<SourcesBoard />));
+  await act(async () => (container.querySelector('.market-sources__collection-toggle') as HTMLButtonElement).click());
 
   const filterButtons = [...container.querySelectorAll('.market-sources__cat-pill')] as HTMLButtonElement[];
   expect(filterButtons.map((b) => b.textContent)).toEqual(['ALL', 'AUCTION HOUSE', 'MARKETPLACE', 'DEALER / CONSIGNOR']);
@@ -737,6 +761,7 @@ it('scopes the board to a drilled family: ranked by its sales, the rest behind a
   fixture.rpc.mockImplementation((fn: string) => Promise.resolve(fn === 'market_sources_read' ? { data: value, error: null }
     : fn === 'treemap_family_sales' ? { data: lc, error: null } : { data: null, error: { message: 'none' } }));
   await act(async () => root.render(<SourcesBoard scope={{ make: 'Lexus', family: 'fam-lc', familyName: 'LC' }} />));
+  await act(async () => (container.querySelector('.market-sources__collection-toggle') as HTMLButtonElement).click());
   expect(fixture.rpc).toHaveBeenCalledWith('treemap_family_sales', { p_brand: 'Lexus', p_family_key: 'fam-lc', p_limit: 15000 });
   expect(container.querySelector('.market-sources__title')?.textContent).toBe('Sources · Lexus LC');
   expect(container.querySelector('.market-sources__note')?.textContent).toContain('ranked by 5 Lexus LC sales with a date, last 5 years');
@@ -832,6 +857,7 @@ it('groups the board by species with the doc\'s names, aggregators apart, and sh
     return Promise.resolve({ data: null, error: { message: 'none' } });
   });
   await act(async () => root.render(<SourcesBoard />));
+  await act(async () => (container.querySelector('.market-sources__collection-toggle') as HTMLButtonElement).click());
   const groups = [...container.querySelectorAll('.market-sources__group')];
   expect(groups.map((g) => g.querySelector('.market-sources__group-title')?.textContent)).toEqual(
     ['Timed with soft close', 'Block houses', 'Dealer sites', 'Classifieds', 'Aggregators', 'Private sellers', "Owner's private data"]);

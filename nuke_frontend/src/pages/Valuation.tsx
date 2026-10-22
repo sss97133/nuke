@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { comparePriceToSourceSales, type DatedSourceSale, type SaleComparisonOptions } from '../lib/dealRead/batComps';
+import { comparePriceToSourceSales, compareSaleEvidenceEvaluations, type SourceSaleEvidence as SaleEvidence, type SaleComparisonOptions } from '../lib/dealRead/batComps';
 import { PrefetchLink } from '../components/PrefetchLink';
 import '../styles/unified-design-system.css';
 import SourceSaleDistribution from '../components/market/SourceSaleDistribution';
@@ -43,19 +43,12 @@ type Stats = {
   possible_outlier?: boolean;
 };
 
-/** Sanitized ancestry already returned by the qualified public reader. */
-type SaleEvidence = DatedSourceSale & {
-  snapshotId?: string | null; sourceSha256?: string | null;
-  snapshotFetchedAt?: string | null; snapshotCreatedAt?: string | null; parsedAt?: string | null;
-  sourceVerification?: string | null; derivedObservationId?: string | null; derivedIngestedAt?: string | null;
-  sourceVehicleEventId?: string | null; sourceEpisodeAncestry?: string | null; sourceParser?: string | null; admissionParser?: string | null;
-};
-
 type ValuationResult = {
   query: { year: number | null; make: string; model: string | null };
   stats: Stats;
   comparables: Comparable[];
   receipt: {
+    method?: string;
     cohort: { key: string; label: string; basis: string; complete: boolean };
     eligible: SaleEvidence[]; event_from: string; event_before: string; evidence_as_of: string; computed_at: string;
     knowledge_mode: 'retrospective' | 'known_at'; currency: string; minimum_sales: number;
@@ -73,6 +66,8 @@ type ValuationRequest = {
   p_event_before: string | null; p_event_from: string | null; p_evidence_as_of: null;
   p_currency: string; p_price: null; p_subject_vehicle_id: string | null; p_knowledge_mode: 'retrospective';
 };
+
+type ValuationLookup = { result: ValuationResult; request: ValuationRequest; contextKey: string };
 
 const formatPrice = (n: number | null | undefined, currency: string) => {
   if (n == null) return '—';
@@ -101,6 +96,17 @@ function canonicalBatSource(value: string | null): string | null {
   } catch { return null; }
 }
 
+function receiptSubject(lookup: ValuationLookup): Pick<SaleComparisonOptions['subject'], 'vehicleId' | 'sourceUrl' | 'exclusionBasis'> {
+  const requested = lookup.request.p_subject_vehicle_id, receipt = lookup.result.receipt;
+  if (!requested || receipt.sale_population_basis !== 'source_qualified_episodes_of_current_public_members') return { vehicleId: requested };
+  const subject = receipt.subject, source = canonicalBatSource(subject?.source_url ?? null);
+  if (opaqueId(requested) && subject?.vehicle_id === requested && subject.exclusion_basis === 'exact_source_episode'
+    && source === subject.source_url && subject.source_key === source?.replace('https://', '').replace(/\/$/, '')) {
+    return { vehicleId: requested, sourceUrl: source, exclusionBasis: 'exact_source_episode' };
+  }
+  return { vehicleId: requested, exclusionBasis: 'unestablished' };
+}
+
 // Design system tokens (strict — 8 to 12px only)
 const FS = {
   micro: 'var(--fs-8)',
@@ -124,7 +130,9 @@ export default function Valuation() {
   const [currency, setCurrency] = useState(params.get('currency') || 'USD');
   const [loadingKey, setLoadingKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [lookup, setLookup] = useState<{ result: ValuationResult; request: ValuationRequest; contextKey: string } | null>(null);
+  // Retain one prior successful receipt in memory. Failed/stale requests cannot
+  // replace either side; changing the requested scope starts a new comparison.
+  const [lookup, setLookup] = useState<(ValuationLookup & { previous: ValuationLookup | null }) | null>(null);
   const latestRequest = useRef(0);
   const initialLookup = useRef<Promise<Awaited<ReturnType<typeof supabase.rpc>>> | null>(null);
   const filters = useRef<HTMLDetailsElement>(null);
@@ -152,10 +160,11 @@ export default function Valuation() {
 
     setLoadingKey(requestedContextKey);
     setError(null);
+    const previousReceipt = lookup?.contextKey === requestedContextKey ? lookup.result.receipt : null;
     const request: ValuationRequest = {
       p_year: parsedYear, p_make: trimmedMake, p_model: trimmedModel || null,
-      p_event_before: eventBefore ? `${eventBefore}T00:00:00Z` : null,
-      p_event_from: eventFrom ? `${eventFrom}T00:00:00Z` : null, p_evidence_as_of: null, p_currency: currency,
+      p_event_before: eventBefore ? `${eventBefore}T00:00:00Z` : previousReceipt?.event_before ?? null,
+      p_event_from: eventFrom ? `${eventFrom}T00:00:00Z` : previousReceipt?.event_from ?? null, p_evidence_as_of: null, p_currency: currency,
       p_price: null, p_subject_vehicle_id: subjectVehicleId, p_knowledge_mode: 'retrospective',
     };
 
@@ -186,7 +195,9 @@ export default function Valuation() {
         || data.query?.year !== request.p_year || data.query?.make !== request.p_make || data.query?.model !== request.p_model) {
         throw new Error('Returned evidence does not match the requested comparison.');
       }
-      setLookup({ result: data as ValuationResult, request, contextKey: requestedContextKey });
+      setLookup(prior => ({ result: data as ValuationResult, request, contextKey: requestedContextKey,
+        previous: prior?.contextKey === requestedContextKey
+          ? { result: prior.result, request: prior.request, contextKey: prior.contextKey } : null }));
       setSourcePage(0);
     } catch (e: any) {
       if (requestId === latestRequest.current) setError(e?.code === '57014' || /statement timeout/i.test(e?.message ?? '')
@@ -195,7 +206,7 @@ export default function Valuation() {
     } finally {
       if (requestId === latestRequest.current) setLoadingKey(null);
     }
-  }, [year, make, model, eventFrom, eventBefore, currency, candidatePrice, subjectVehicleId, setParams]);
+  }, [year, make, model, eventFrom, eventBefore, currency, candidatePrice, subjectVehicleId, setParams, lookup]);
 
   useEffect(() => () => { latestRequest.current++; }, []);
 
@@ -229,22 +240,29 @@ export default function Valuation() {
   const fmtUsd = (n: number | null | undefined) => formatPrice(n, outputCurrency);
   const fmtUsdFull = (n: number | null | undefined) => formatPriceFull(n, outputCurrency);
   const changedFilters = lookup != null && lookup.contextKey !== filterKey;
-  const subjectEvidence = useMemo((): Pick<SaleComparisonOptions['subject'], 'vehicleId' | 'sourceUrl' | 'exclusionBasis'> => {
-    const requested = lookup?.request.p_subject_vehicle_id;
-    if (!requested || receipt?.sale_population_basis !== 'source_qualified_episodes_of_current_public_members') return { vehicleId: requested };
-    const subject = receipt.subject, source = canonicalBatSource(subject?.source_url ?? null);
-    if (opaqueId(requested) && subject?.vehicle_id === requested && subject.exclusion_basis === 'exact_source_episode'
-      && source === subject.source_url && subject.source_key === source?.replace('https://', '').replace(/\/$/, '')) {
-      return { vehicleId: requested, sourceUrl: source, exclusionBasis: 'exact_source_episode' };
-    }
-    return { vehicleId: requested, exclusionBasis: 'unestablished' };
-  }, [receipt, lookup]);
+  const subjectEvidence = useMemo(() => lookup ? receiptSubject(lookup) : {}, [lookup]);
   const comparison = useMemo(() => receipt && !changedFilters ? comparePriceToSourceSales(receipt.eligible, {
     cohort: receipt.cohort,
     subject: { amount: candidatePrice.trim() ? Number(candidatePrice) : null, currency: receipt.currency, priceBasis: 'published_bid_excluding_fees', ...subjectEvidence },
     eventFrom: receipt.event_from, eventBefore: receipt.event_before, evidenceAsOf: receipt.evidence_as_of,
     computedAt: receipt.computed_at, knowledgeMode: receipt.knowledge_mode, minimumSales: receipt.minimum_sales,
   }) : null, [receipt, candidatePrice, subjectEvidence, changedFilters]);
+  const evidenceRevision = useMemo(() => {
+    if (!lookup?.previous || !comparison || changedFilters) return null;
+    const prior = lookup.previous.result.receipt;
+    const earlier = comparePriceToSourceSales(prior.eligible, {
+      cohort: prior.cohort,
+      subject: { amount: comparison.subject.amount, currency: prior.currency, priceBasis: 'published_bid_excluding_fees', ...receiptSubject(lookup.previous) },
+      eventFrom: prior.event_from, eventBefore: prior.event_before, evidenceAsOf: prior.evidence_as_of,
+      computedAt: prior.computed_at, knowledgeMode: prior.knowledge_mode, minimumSales: prior.minimum_sales,
+    });
+    const current = lookup.result.receipt;
+    return compareSaleEvidenceEvaluations({ comparison: earlier, readerMethod: prior.method,
+      populationBasis: prior.sale_population_basis, minimumSales: prior.minimum_sales,
+      memberRows: prior.coverage.member_rows, exclusions: prior.exclusions },
+    { comparison, readerMethod: current.method, populationBasis: current.sale_population_basis,
+      minimumSales: current.minimum_sales, memberRows: current.coverage.member_rows, exclusions: current.exclusions });
+  }, [lookup, comparison, changedFilters]);
   const empty = result && stats && stats.sold_count === 0;
   const sourceEvidence = useMemo(() => receipt ? comparePriceToSourceSales(receipt.eligible, {
     cohort: receipt.cohort, subject: { amount: null, currency: receipt.currency, priceBasis: 'published_bid_excluding_fees', ...subjectEvidence },
@@ -391,11 +409,47 @@ export default function Valuation() {
       </form>
       </details>
       {changedFilters && <p role="status" style={{ fontSize: FS.body }}>Filters changed. Compare again to load matching evidence; the previous receipt remains available below.</p>}
+      {evidenceRevision && <details aria-label="Evidence changes since previous lookup" style={{ border: '2px solid var(--text)', padding: 10, marginBottom: 12, fontSize: FS.body }}>
+        <summary>{evidenceRevision.counts
+          ? `Evidence refresh: ${evidenceRevision.counts.entered} entered · ${evidenceRevision.counts.left} left · ${evidenceRevision.counts.revised} revised · ${evidenceRevision.counts.evidenceChanged} with changed evidence`
+          : 'Evidence refresh uses a different comparison scope'}</summary>
+        {evidenceRevision.reasons.length > 0 ? <p>The receipts cannot establish an evidence-change comparison: {evidenceRevision.reasons.map(r => r.replace(/_/g, ' ')).join(' · ')}.</p> : <>
+          <p>Previous and refreshed receipts use the same population rule, sales window, units and amount reference. These differences describe retained evidence; they do not measure market movement.</p>
+          <div>Public cohort records: {evidenceRevision.before.memberRows} → {evidenceRevision.after.memberRows}. Qualified source episodes: {evidenceRevision.counts!.before} → {evidenceRevision.counts!.after}.</div>
+          <div>Evidence cutoff: {evidenceRevision.before.comparison.evidenceAsOf} → {evidenceRevision.after.comparison.evidenceAsOf}.</div>
+          {comparison?.subject.amount != null && <div>At the same {fmtUsdFull(comparison.subject.amount)} amount reference, percentile: {evidenceRevision.before.comparison.percentile?.toFixed(1) ?? 'unavailable'} → {evidenceRevision.after.comparison.percentile?.toFixed(1) ?? 'unavailable'}. The previous receipt is recalculated at this reference.</div>}
+          {evidenceRevision.before.comparison.reasons.length > 0 && <div>Previous calculation withheld: {evidenceRevision.before.comparison.reasons.map(r => r.replace(/_/g, ' ')).join(' · ')}.</div>}
+          {evidenceRevision.after.comparison.reasons.length > 0 && <div>Refreshed calculation withheld: {evidenceRevision.after.comparison.reasons.map(r => r.replace(/_/g, ' ')).join(' · ')}.</div>}
+          {!evidenceRevision.changes.length && <p>No qualified source-episode values or evidence references changed.</p>}
+          {!!evidenceRevision.changes.length && <>
+            <p>“Left” means absent from the refreshed qualified set. The reader does not establish a per-episode reason. “Changed evidence” means ancestry or availability changed while the sale values stayed the same.</p>
+            <ol>{evidenceRevision.changes.slice(0, SOURCE_PAGE_SIZE).map(change => {
+              const source = canonicalBatSource(change.after?.sourceUrl ?? change.before?.sourceUrl ?? null);
+              return <li key={change.sourceKey}>
+                <strong>{{ entered: 'Entered', left: 'Left', revised: 'Revised', evidence_changed: 'Changed evidence' }[change.kind]}</strong>{' · '}
+                {source ? <a href={source} target="_blank" rel="noopener noreferrer">{change.sourceKey}</a> : change.sourceKey}
+                <div>Previous: {change.before ? `${fmtUsdFull(change.before.amount)} · ${change.before.eventAt}` : 'not in qualified set'} → Refreshed: {change.after ? `${fmtUsdFull(change.after.amount)} · ${change.after.eventAt}` : 'not in qualified set'}.</div>
+                {!!change.fields.length && <div>Changed fields: {change.fields.join(', ')}.</div>}
+                <details><summary>Evidence references before and after</summary>
+                  <div>Previous capture: {opaqueId(change.before?.snapshotId) ?? 'unrecorded'} · interpretation: {opaqueId(change.before?.derivedObservationId) ?? 'unrecorded'} · parser: {parserReference(change.before?.sourceParser)}.</div>
+                  <div>Refreshed capture: {opaqueId(change.after?.snapshotId) ?? 'unrecorded'} · interpretation: {opaqueId(change.after?.derivedObservationId) ?? 'unrecorded'} · parser: {parserReference(change.after?.sourceParser)}.</div>
+                </details>
+              </li>;
+            })}</ol>
+            {evidenceRevision.changes.length > SOURCE_PAGE_SIZE && <div>Showing the first {SOURCE_PAGE_SIZE} of {evidenceRevision.changes.length} changed episodes in source-key order. Save the receipt for the complete difference.</div>}
+          </>}
+          {!!evidenceRevision.exclusionChanges.length && <details><summary>Changes in aggregate exclusion counts</summary>
+            <p>These counts describe capture presentations. They cannot explain why a particular episode left.</p>
+            <ul>{evidenceRevision.exclusionChanges.map(change => <li key={change.reason}>{change.reason.replace(/_/g, ' ')}: {change.before} → {change.after}</li>)}</ul>
+          </details>}
+        </>}
+        <p>Both receipts stay in this page session until the next successful lookup. Save this evidence receipt below to retain both inputs and calculations. Earlier database membership is not reconstructed.</p>
+      </details>}
       {receipt && <details aria-label="Sale comparison evidence" style={{ border: '2px solid var(--text)', padding: 10, marginBottom: 12, fontSize: FS.body }}>
         <summary>Scope, exclusions and source receipt</summary>
         <strong>{comparison?.percentile == null ? 'Price percentile unavailable' : `${comparison.percentile.toFixed(1)} percentile in recorded sales`}</strong>
         {changedFilters && <div>Compare again to apply the changed cohort, currency, date or vehicle.</div>}
-        <div>{loading ? 'Refreshing evidence. The receipt below is the last completed lookup.' : 'Refresh evidence to include newly admitted source evidence. Save this receipt to keep this calculation.'}</div>
+        <div>{loading ? 'Refreshing evidence. The receipt below is the last completed lookup.' : 'Refresh evidence within this sales window to include newly admitted source evidence. Adjust the sales window to include newer sales. Save this receipt to keep this calculation.'}</div>
         <div>{receipt.cohort.label} · {receipt.coverage.qualified_sales} qualified source lots from {receipt.coverage.member_rows} public cohort records · {receipt.currency}</div>
         <div>{result?.query.year == null ? 'All recorded model years' : `Recorded model year ${result.query.year}`} · {result?.query.make} {result?.query.model}. Recorded membership is browse context; generations, condition and equipment are not matched.</div>
         {result?.query.year == null && ['exact_recorded_year_model_context', 'exact_recorded_make_model_context_all_years'].includes(receipt.cohort.basis) && <div>Exact recorded make/model labels across years. Related model variants may be absent; this is a different population from a registered model context.</div>}
@@ -420,7 +474,9 @@ export default function Valuation() {
             if (!comparison || !lookup) return;
             const resolvedRequest = { ...lookup.request, p_event_from: receipt.event_from, p_event_before: receipt.event_before,
               p_evidence_as_of: receipt.evidence_as_of, p_currency: receipt.currency, p_knowledge_mode: receipt.knowledge_mode };
-            const url = URL.createObjectURL(new Blob([JSON.stringify({ exportedAt: new Date().toISOString(), request: lookup.request, resolvedRequest, sourceReceipt: receipt, comparison },null,2)], { type: 'application/json' }));
+            const url = URL.createObjectURL(new Blob([JSON.stringify({ exportedAt: new Date().toISOString(), request: lookup.request, resolvedRequest, sourceReceipt: receipt, comparison,
+              evidenceRevision: evidenceRevision ? { ...evidenceRevision, previousSourceReceipt: lookup.previous?.result.receipt,
+                previousRequest: lookup.previous?.request } : null },null,2)], { type: 'application/json' }));
             const a = document.createElement('a'); a.href=url; a.download='sale-comparison-receipt.json'; a.click(); URL.revokeObjectURL(url);
           }}>Save this evidence receipt</button>
         </details>

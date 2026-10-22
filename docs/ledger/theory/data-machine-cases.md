@@ -1334,6 +1334,44 @@ interpretation, prove its actual downstream consumer and reproduce the earlier e
 Then test a separately selected held-out case and report correction cost and regressions. The bounded
 conflict assay does not close C28 or establish repeated autonomous representation development.
 
+### Correction reaches the public comparison page, prepared 2026-10-22
+
+The public `/valuation` consumer now retains its previous successful sanitized source receipt
+through an explicit evidence refresh. Refresh pins the resolved sales window and advances the
+evidence lookup. The existing `comparePriceToSourceSales` calculator evaluates both receipts at
+the same user-supplied amount; `compareSaleEvidenceEvaluations` identifies entered, departed,
+revised and ancestry-only source episodes. Different population rules, units, windows, methods,
+minimums or subject contexts refuse an evidence-change comparison. A changed amount reference
+recalculates both sides and is labelled as such. A failed or stale response preserves the last
+successful pair. One prior response is retained in page memory; the existing export contains both
+source receipts, calculations and the complete difference. This is a saved-response replay, not
+reconstruction of historical cohort membership. An absent episode has no invented withdrawal
+reason; aggregate capture exclusions are explicitly separate.
+
+The existing disposable PostgreSQL source-sale assay now passes synthetic responses from the
+actual `supersede_observation_relay` and `valuation_by_ymm` into the actual page's browser-DOM
+suite in CI. A supported source-amount interpretation changes from 11,000 to 2,000 synthetic USD;
+the 5,000 reference moves from 40.9091 to 50 percentile across the same eleven episodes. Original
+testimony and the earlier knowledge-cutoff answer survive; a separately seeded ten-sale control
+cohort is unchanged. A private-parent control removes the affected current episode. Admission in
+this fixture is synthetic producer admission: this proves the existing SQL writer/reader and
+frontend connection, not an extraction-accuracy gain, independent physical truth or newly ready
+fleet answers. Full fleet supported-answer coverage remains unmeasured. No production testimony,
+source activation, job, grant or pricing-policy change is part of this increment; existing holds
+remain in force.
+
+Owner screenshots redirected the same iteration toward the public market: family-change rows
+open the existing family-sales history, where year/model slices can challenge a mixed-vehicle
+average. That history has its own labelled five-year, multi-venue scope; it is not asserted to be
+the exact contributor population of the mover receipt. This does not establish a configuration premium. Color-scale methodology and source
+collection telemetry remain available on demand. Last-new-record clocks do not establish collector
+uptime or source revisit freshness. Future repairs must preserve the selected population and clock
+scope through the investigation, and attach the next failed user question to an existing owner.
+
+Stage: implemented and locally tested preparation; PR, deployment and runtime evidence are recorded
+separately in the private lane receipt. The previous historical-reader and reported-work holds are
+not released by this entry.
+
 ### What is inefficient today (measured 2026-10-06)
 
 - **The definition was spread** over six documents, five views, one prompt file and a shift folder outside the repo;
