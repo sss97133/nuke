@@ -44,3 +44,18 @@ it('rejects PostgreSQL-incompatible null bytes and integer-overflow page numbers
  const page=bundle();page.items[0].revisions[0].revision.fields[0].page_number=2147483648;
  expect(await validateFinancialRestoreBundle(file(page)).then(()=>false,()=>true)).toBe(true);
 });
+it('validates multi-megabyte original bytes without recursive regex stack exhaustion', async()=>{
+ const bytes=Buffer.alloc(3*1024*1024+1,97),b=bundle();
+ const originalSha=createHash('sha256').update(bytes).digest('hex');
+ b.items[0].original={...b.items[0].original,sha256:originalSha,source_filename:'large.jpeg',base64:bytes.toString('base64')};
+ b.items[0].revisions[0].revision.fields[0].evidence={source_sha256:originalSha};
+ const items=await validateFinancialRestoreBundle(file(b));
+ expect(items[0].bytes.length).toBe(bytes.length);
+ expect(Buffer.compare(Buffer.from(items[0].bytes),bytes)).toBe(0);
+});
+it('rejects invalid base64 length, interior/excess padding and alphabet',async()=>{
+ for(const encoded of ['YQ=','Y=Q=','YQ====','Y?==','====']){
+   const b=bundle();b.items[0].original.base64=encoded;
+   expect(await validateFinancialRestoreBundle(file(b)).then(()=>false,()=>true)).toBe(true);
+ }
+});

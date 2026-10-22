@@ -16,6 +16,17 @@ function requireShape(condition: unknown, message = 'Invalid retained evidence b
 }
 function keys(x: Json, allowed: string[]) { return Object.keys(x).every(k => allowed.includes(k)); }
 function bounded(x: unknown, max: number): x is string { return typeof x === 'string' && x.length > 0 && x.length <= max; }
+// A repeated-group regex can exhaust the engine stack on ordinary image bytes.
+// Scan once with constant auxiliary space; padding is legal only at the end.
+function base64Shape(value: string): boolean {
+  if (value.length % 4 !== 0) return false;
+  const padding = value.endsWith('==') ? 2 : value.endsWith('=') ? 1 : 0;
+  for (let i = 0; i < value.length - padding; i++) {
+    const c = value.charCodeAt(i);
+    if (!(c >= 65 && c <= 90 || c >= 97 && c <= 122 || c >= 48 && c <= 57 || c === 43 || c === 47)) return false;
+  }
+  return true;
+}
 async function digest(bytes: Uint8Array) {
   return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes as BufferSource)), b => b.toString(16).padStart(2, '0')).join('');
 }
@@ -102,7 +113,7 @@ export async function validateFinancialRestoreBundle(file: File): Promise<Item[]
     requireShape(keys(o, ['sha256', 'source_filename', 'source_kind', 'base64']) && typeof o.sha256 === 'string' && HASH.test(o.sha256) && !hashes.has(o.sha256));
     requireShape(bounded(o.source_filename, 255) && /^[^/\\\x00-\x1f]+\.(pdf|png|jpe?g|webp|heic|csv|numbers)$/i.test(o.source_filename));
     requireShape(['email_attachment', 'email_body', 'scan', 'upload', 'bank_export', 'other'].includes(String(o.source_kind)));
-    requireShape(bounded(o.base64, Math.ceil(MAX_ORIGINAL / 3) * 4) && /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(o.base64));
+    requireShape(bounded(o.base64, Math.ceil(MAX_ORIGINAL / 3) * 4) && base64Shape(o.base64));
     let bytes: Uint8Array;
     try { bytes = Uint8Array.from(atob(o.base64), c => c.charCodeAt(0)); } catch { throw new Error('Invalid original encoding.'); }
     bytesTotal += bytes.length; requireShape(bytes.length > 0 && bytes.length <= MAX_ORIGINAL && bytesTotal <= MAX_BUNDLE);
