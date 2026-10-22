@@ -44,7 +44,7 @@
 .accounting-page .accounting-year dl>div { display:block; padding:0; }
 .accounting-page .accounting-year dd { margin-top:4px; font-size:20px; }
 .accounting-tabs { display:flex; flex-wrap:wrap; gap:6px; margin:12px 0; }
-.accounting-tabs button[aria-current="page"] { background:var(--text); color:var(--bg); }
+.accounting-page .accounting-tabs button[aria-current="page"],.accounting-page .accounting-tabs button[aria-current="page"]:hover { background:var(--text); color:var(--bg); }
 .accounting-filters { display:flex; flex-wrap:wrap; align-items:end; gap:12px; margin:16px 0; }
 .accounting-filters label { display:flex; flex-direction:column; gap:4px; font-size:12px; }
 .accounting-page select,.accounting-page input[type="search"] { font:14px Arial,sans-serif; padding:8px; color:var(--text); background:var(--bg); border:2px solid var(--border); min-height:36px; }
