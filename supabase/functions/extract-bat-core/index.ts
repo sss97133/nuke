@@ -56,6 +56,7 @@ import { handoffBatLiveCollection } from "./liveStream.ts";
 import { BAT_LIVE_MODE } from "../_shared/batLiveEvents.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { retainFetchedCapture, type CaptureAcknowledgement } from "../_shared/archiveFetch.ts";
+import { landIdentifierClaims } from "../_shared/landIdentifierClaims.ts";
 declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void };
 
 // Extractor versioning - update on each significant change
@@ -2969,6 +2970,7 @@ Deno.serve(async (req) => {
       captureSha256: await sha256Hex(html), snapshotId: descriptionSnapshotId,
       snapshotCustody: descriptionSnapshotCustody,
     }) : { status: "unavailable", reason: "Vehicle unresolved" };
+    await landIdentifierClaims(supabase, { vehicleId, text: descriptionRaw, sourceUrl: listingUrlCanonical, extractor: "extract-bat-core" });
     if (descriptionReceipt.status === "failed" || descriptionReceipt.status === "refused") {
       console.warn(`[BAT] description receipt ${descriptionReceipt.status}: ${descriptionReceipt.reason}`);
     }
