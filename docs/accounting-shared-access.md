@@ -2,7 +2,7 @@
 
 An owner uses **Accounting → Accounting access** to find an existing account by exact username or email. Review the displayed account before granting **Review** or **Review and correct**. A username lookup shows only a masked login; entering an exact email confirms that supplied email. This grants access to one canonical owner's books; it does not copy the books or share a login. The reviewer selects that owner's **shared books** in Accounting.
 
-Review includes saved records, book controls, retained interpretations, review questions and private original evidence. Corrections append a complete attributed interpretation to the same original and name its current revision. Earlier evidence stays retained. No expenses are posted automatically. Source processing, recovery and grant management remain owner actions.
+Review includes saved records, book controls, retained interpretations, review questions and private original evidence. Corrections append a complete attributed interpretation to the same original and name its current revision. Earlier evidence stays retained. No expenses are posted automatically. Source processing, recovery and grant management remain owner actions. Shared-book deal rollups are not yet available; the shared view labels this limit explicitly.
 
 ## Claude Code
 
