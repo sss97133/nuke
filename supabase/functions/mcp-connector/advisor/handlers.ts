@@ -235,6 +235,66 @@ async function loadPriceFactsMap(
   return map;
 }
 
+type SaleTruth = {
+  ask_prices: number[];
+  dup_prices: number[];
+  verified_prices: number[];
+  has_verified_sold: boolean;
+  has_unverified: boolean;
+};
+
+/**
+ * Per-vehicle sale-truth roles from vehicle_events (PR #2454 flags).
+ * ask = orphan-backfill asking price (not a sale); unverified_sale = index "sold" without price.
+ * duplicate = overnight sale dedup (sale_dedup_v*) marked this event a twin of a canonical sale, often on
+ *   another vehicle; it is never sold support. Null / hammer / hammer_unverified roles count as sold support.
+ * Comps rows come from auction_events / vehicles (get_comps_scored), which carry no dedup flag, so the
+ * caller matches the comp price against these per-vehicle event prices. Fail-open on read errors.
+ */
+async function loadSaleTruthMap(
+  sb: AdvisorDb,
+  ids: string[],
+): Promise<Map<string, SaleTruth>> {
+  const map = new Map<string, SaleTruth>();
+  const unique = [...new Set(ids.filter(Boolean))];
+  for (let i = 0; i < unique.length; i += 40) {
+    const chunk = unique.slice(i, i + 40);
+    try {
+      const { data } = await sb
+        .from("vehicle_events")
+        .select("vehicle_id, sale_truth_role, final_price")
+        .in("vehicle_id", chunk)
+        .eq("event_status", "sold");
+      for (const row of data || []) {
+        const vid = String(row.vehicle_id);
+        const t = map.get(vid) ?? {
+          ask_prices: [],
+          dup_prices: [],
+          verified_prices: [],
+          has_verified_sold: false,
+          has_unverified: false,
+        };
+        const role = row.sale_truth_role != null ? String(row.sale_truth_role) : null;
+        const price = row.final_price != null ? Number(row.final_price) : null;
+        if (role === "duplicate") {
+          if (price != null && price > 0) t.dup_prices.push(price);
+        } else if (role === "ask") {
+          if (price != null && price > 0) t.ask_prices.push(price);
+        } else if (role === "unverified_sale") {
+          t.has_unverified = true;
+        } else if (price != null && price > 0) {
+          t.has_verified_sold = true;
+          t.verified_prices.push(price);
+        }
+        map.set(vid, t);
+      }
+    } catch {
+      // sale_truth_role not readable: keep legacy behaviour for this chunk.
+    }
+  }
+  return map;
+}
+
 type SoldComp = {
   asset_id: string | null;
   year: unknown;
@@ -347,6 +407,7 @@ async function resolveSoldComps(
 
   const ids = rows.map((r) => String(r.vehicle_id || "")).filter(Boolean);
   const facts = await loadPriceFactsMap(sb, ids);
+  const saleTruth = await loadSaleTruthMap(sb, ids);
 
   // Optional subject attribute boosts (reader-side; does not invent missing transmission).
   const subTrans = subject?.transmission ? String(subject.transmission).toLowerCase() : null;
@@ -394,6 +455,21 @@ async function resolveSoldComps(
       continue;
     }
 
+    // Sale-truth flags: a price that only an asking-price event supports is not a sale.
+    const truth = id ? saleTruth.get(id) : undefined;
+    if (truth && !truth.has_verified_sold &&
+      truth.ask_prices.some((p) => Math.abs(p - amount) < 1)) {
+      excluded.ask_or_bid++;
+      continue;
+    }
+    // Overnight dedup: a price only a duplicate-marked event supports is the same sale counted twice.
+    if (truth && truth.dup_prices.some((p) => Math.abs(p - amount) < 1) &&
+      !truth.verified_prices.some((p) => Math.abs(p - amount) < 1)) {
+      excluded.duplicate++;
+      continue;
+    }
+    const unverifiedOnly = !!truth && truth.has_unverified && !truth.has_verified_sold;
+
     const modelText = `${c.model || ""} ${c.trim || ""}`.toLowerCase();
     if (subject?.model && /diesel|hd\b|2500|3500|dually/.test(modelText) &&
       !/diesel|hd\b|2500|3500|dually/.test(String(subject.model).toLowerCase())) {
@@ -436,6 +512,7 @@ async function resolveSoldComps(
       year: c.year != null ? Number(c.year) : null,
     });
     const flags: string[] = [];
+    if (unverifiedOnly) flags.push("sold_unverified");
     if (parts.parts) {
       excluded.parts++;
       flags.push(`parts_suspect:${parts.reason}`);
@@ -488,7 +565,8 @@ async function resolveSoldComps(
       platform: (c.platform as string) || (fact?.platform as string) || null,
       transmission: c.transmission ?? null,
       body_style: c.body_style ?? null,
-      similarity_score: score,
+      // sold_unverified comps are down-weighted, not dropped.
+      similarity_score: unverifiedOnly && typeof score === "number" ? Math.round(score * 0.5 * 10) / 10 : score,
       price_kind: "sold",
       sold_basis: basis,
       variant: candVariant,
