@@ -26,6 +26,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.117.3";
 import { normalizeListingUrl, normalizeVin } from "../_shared/urlNormalization.ts";
+import { FINANCIAL_EVIDENCE_MODE, financialActor, ingestFinancialEvidence } from "./financialEvidence.ts";
 import { requireWriteAuth, authenticateWriter } from "../_shared/writeGuard.ts";
 import { checkRateLimit, getClientIp } from "../_shared/rateLimit.ts";
 import { validateObservationProperty, isSupportedImagePropertyKey, isImageReadingKey } from "./imageProperties.ts";
@@ -303,6 +304,25 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
 
   try {
     let input: ObservationInput = await req.json();
+    if (input.mode === FINANCIAL_EVIDENCE_MODE) {
+      const action = (input as unknown as { action?: string }).action ?? "submit";
+      const options = { apiKeys: { endpoint: "ingest-observation", requiredScopes: [action === "read" ? "read" : "write"] } };
+      const identity = await authenticateWriter(req, options);
+      const actor = identity.ok ? financialActor(identity.caller, action) : null;
+      if (!actor) return new Response(
+        JSON.stringify({ error: "Financial evidence requires your account and matching scope" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      const result = await ingestFinancialEvidence(supabase, actor, input, async () => {
+        const current = await authenticateWriter(req, options);
+        return current.ok && financialActor(current.caller, action) === actor;
+      }, identity.ok && identity.caller.kind === "api_key"
+        ? { kind: "api_key", agent_id: identity.caller.agentId }
+        : { kind: "user" });
+      return new Response(JSON.stringify(result.body), {
+        status: result.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     if (input.mode === CAB_LISTING_CAPTURE_MODE) {
       const denied = await requireWriteAuth(req);
       if (denied) return denied;

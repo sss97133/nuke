@@ -765,6 +765,30 @@ dates, holder/vehicle allocations, unit conflicts and uncovered categories; and 
 new receipt changes the outcome. Carefully documented cases can validate these mechanisms before any population
 claim about improvement returns. This refinement is a design contract; it installs no relation, ROI reader or fold.
 
+**Owner refinement, 2026-10-22: accounting operates in the model.** Tax reconciliation is the
+immediate consumer. Agents work from admitted financial evidence and existing decisions, opening
+source images or repeating OCR only for a named unresolved reading. Reviewed workbooks are import
+sources or reader exports, not a parallel system of record. Reuse the existing financial document,
+extraction, payment, allocation and review-queue owners; bridge receipts and deal jackets through
+evidenced relationships rather than duplicate purchases. Inspect their live policies and writers
+before admitting evidence. A stored photo or completed visual review is not a posted expense.
+
+Independent phases retain independent outcomes: source interpretation, economic-item identity and
+duplicate control, expense recognition, settlement/refund/reimbursement, and vehicle/job allocation.
+An unresolved vehicle does not by itself block an established expense. A receipt uploader, library
+holder, photographer, instrument holder and expense beneficiary are different roles; never fill one
+from another by default. Source claims, owner statements, agent interpretations and accepted
+accounting decisions keep their own attribution, clocks and correction history.
+
+Parallel agents may process different phases through the same sanctioned model. Idempotency is
+required at source and economic-item grains; source-byte deduplication alone cannot prevent counting
+an invoice and its payment twice. Ask the owner only for material facts that retained evidence cannot
+resolve, carrying prior answers forward. The acceptance path is admission → model query → supported
+decision or typed exception → revised accounting reader, including a duplicate, a full refund,
+a later corrected reading and a cross-owner refusal. Report persisted usable coverage and remaining
+exceptions, not workbook iterations. This contract does not lift existing source/privacy holds or
+authorize an agent to impersonate the owner at a Sign boundary.
+
 ## 11. Whole market evidence and immediate vehicle questions
 
 **Owner direction, 2026-10-04.** A red 1963 split-window Corvette lead exposed failures in retrieval,
