@@ -175,6 +175,19 @@ function allInSummary(a: Record<string, unknown> | undefined | null) {
   };
 }
 
+/** Fitted 2026-10-22 by time-ordered backtest; see backtest.md in nuke-strategy. */
+export const VALUATION_THRESHOLDS = { minComps: 4, staleDays: 180, disagreement: 0.10 } as const;
+
+/** Backtested P(within 20%) table. Rows: comps 3-4, 5-9, 10+; cols: IQR/median <10%,10-20,20-30,30-50,>=50%. */
+export function calibratedConfidence(nComps: number, dispersion: number | null): number {
+  const T = [[0.527, 0.432, 0.381, 0.336, 0.276], [0.578, 0.499, 0.423, 0.364, 0.294], [0.848, 0.635, 0.503, 0.403, 0.31]];
+  if (nComps < 3) return 0.3;
+  const row = nComps >= 10 ? 2 : nComps >= 5 ? 1 : 0;
+  if (dispersion == null || !Number.isFinite(dispersion)) return T[row]![4]!;
+  const col = dispersion < 0.1 ? 0 : dispersion < 0.2 ? 1 : dispersion < 0.3 ? 2 : dispersion < 0.5 ? 3 : 4;
+  return T[row]![col]!;
+}
+
 function listingCitation(vehicle: Record<string, unknown>): Citation {
   const platform = vehicle.canonical_platform || vehicle.auction_source;
   const name =
@@ -1653,22 +1666,27 @@ async function handleValueAsset(
     }
   }
 
+  // Thresholds fitted by a time-ordered backtest over 353,316 sold events (docs: backtest 2026-10-22):
+  // error flattens from 4 comps (3->4 saves 1.1pt median APE, later comps <0.5pt each); estimates are
+  // >=1pt worse from 180 days; once a stored estimate is >10% off the fresh comp median the comps win.
+  const MIN_COMPS = VALUATION_THRESHOLDS.minComps;
+  const STALE_DAYS = VALUATION_THRESHOLDS.staleDays;
   // A stale stored estimate, or one outside the confirmed-comps range, never wins over the comps.
   const storedCalcAt = est?.calculated_at ?? price?.estimate?.as_of ?? null;
-  const storedStale = valuePoint != null && (storedCalcAt == null || isStaleVerified(storedCalcAt, 180));
+  const storedStale = valuePoint != null && (storedCalcAt == null || isStaleVerified(storedCalcAt, STALE_DAYS));
   const minComp = soldPrices.length ? soldPrices[0]! : null;
-  const storedOutside = valuePoint != null && soldPrices.length >= 3 && minComp != null && maxComp != null &&
+  const storedOutside = valuePoint != null && soldPrices.length >= MIN_COMPS && minComp != null && maxComp != null &&
     (valuePoint < minComp || valuePoint > maxComp);
-  const storedDisagrees = valuePoint != null && med != null && soldPrices.length >= 3 &&
-    (storedOutside || Math.abs(valuePoint - med) / med > 0.25);
+  const storedDisagrees = valuePoint != null && med != null && soldPrices.length >= MIN_COMPS &&
+    (storedOutside || Math.abs(valuePoint - med) / med > VALUATION_THRESHOLDS.disagreement);
   const storedValue = valuePoint;
   let noEstimateReason: string | null = null;
 
   if (estimateSource !== "recent_same_asset_sale") {
-    if (med != null && soldPrices.length >= 3) {
+    if (med != null && soldPrices.length >= MIN_COMPS) {
       const equalsMax = maxComp != null && valuePoint != null && Math.abs(valuePoint - maxComp) < 1;
       const aboveBand = valuePoint != null && p75 != null && valuePoint > p75 * 1.15;
-      if (valuePoint == null || storedStale || storedOutside || equalsMax || aboveBand) {
+      if (valuePoint == null || storedStale || storedOutside || storedDisagrees || equalsMax || aboveBand) {
         valuePoint = med;
         valueLow = p25 ?? med;
         valueHigh = p75 ?? med;
@@ -1676,6 +1694,7 @@ async function handleValueAsset(
         if (storedValue == null) flags.push("no_stored_estimate_used_comps");
         if (storedStale) flags.push("stored_estimate_stale_replaced_by_comps");
         if (storedOutside) flags.push("stored_estimate_outside_comp_range");
+        if (storedDisagrees) flags.push("stored_estimate_replaced_by_comps_disagreement");
         if (equalsMax) flags.push("stored_estimate_matched_max_comp");
         if (aboveBand) flags.push("stored_estimate_above_comp_band");
         flags.push("used_median_of_confirmed_sales");
@@ -1685,10 +1704,10 @@ async function handleValueAsset(
         flags.push("filled_range_from_sold_comps");
       }
     } else if (valuePoint == null || storedStale) {
-      // Fewer than 3 confirmed comps and no fresh stored estimate: say so instead of guessing.
+      // Fewer than MIN_COMPS confirmed comps and no fresh stored estimate: say so instead of guessing.
       noEstimateReason = valuePoint == null
-        ? `only ${soldPrices.length} confirmed sold comp(s) (need 3) and no stored estimate`
-        : `stored estimate is stale (older than 180 days) and only ${soldPrices.length} confirmed sold comp(s) (need 3)`;
+        ? `only ${soldPrices.length} confirmed sold comp(s) (need ${MIN_COMPS}) and no stored estimate`
+        : `stored estimate is stale (older than ${STALE_DAYS} days) and only ${soldPrices.length} confirmed sold comp(s) (need ${MIN_COMPS})`;
       valuePoint = null;
       valueLow = null;
       valueHigh = null;
@@ -1714,11 +1733,11 @@ async function handleValueAsset(
 
   const calculatedAt = est?.calculated_at ?? price?.estimate?.as_of ?? price?.sold?.on ?? null;
   const estimateStale = estimateSource === "nuke_estimates" &&
-    (isStaleVerified(calculatedAt, 180) || soldPrices.length < 3);
-  if (estimateStale) flags.push(soldPrices.length < 3 ? "thin_comp_set" : "estimate_older_than_180d");
+    (isStaleVerified(calculatedAt, STALE_DAYS) || soldPrices.length < MIN_COMPS);
+  if (estimateStale) flags.push(soldPrices.length < MIN_COMPS ? "thin_comp_set" : "estimate_older_than_180d");
 
-  // Cap confidence at 0.6 until a published BaT/C&B backtest justifies more.
-  const CONFIDENCE_CAP = 0.6;
+  // Confidence = backtested P(actual sale within 20% of estimate), by comp count and IQR/median spread.
+  const CONFIDENCE_CAP = calibratedConfidence(soldPrices.length, med != null && p25 != null && p75 != null && med > 0 ? (p75 - p25) / med : null);
   const claims: Claim[] = [];
   const sourceUrl = price?.source_url ||
     (vehicle.listing_url as string) ||
@@ -1742,15 +1761,15 @@ async function handleValueAsset(
       est?.confidence_score ?? price?.estimate?.confidence ?? (soldPrices.length >= 5 ? 70 : 45),
       null,
     );
-    let confVal = Math.min(conf.confidence ?? 0.5, CONFIDENCE_CAP);
-    if (estimateStale) confVal = Math.min(confVal, 0.45);
-    if (storedDisagrees) confVal = Math.min(confVal, 0.35);
+    let confVal = estimateSource === "sold_comps_median" ? CONFIDENCE_CAP : Math.min(conf.confidence ?? 0.5, CONFIDENCE_CAP);
+    if (estimateStale) confVal = Math.min(confVal, 0.36);
+    if (storedDisagrees) confVal = Math.min(confVal, 0.30);
     if (guard.triggered) confVal = Math.min(confVal, 0.25);
-    if (estimateSource === "recent_same_asset_sale") confVal = Math.min(CONFIDENCE_CAP, 0.55);
+    if (estimateSource === "recent_same_asset_sale") confVal = 0.55;
     const confAdj = { confidence: confVal, confidence_basis: "estimate_model" as const };
     const noteParts = [...flags];
     if (guard.message) noteParts.push(guard.message);
-    noteParts.push("confidence capped at 0.6 pending published sale backtest");
+    noteParts.push(`confidence = backtested share of sales within 20% (${soldPrices.length} comps)`);
     claims.push(
       recordedClaim("estimated_value", valuePoint, {
         ...confAdj,
