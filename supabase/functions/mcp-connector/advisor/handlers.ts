@@ -1,4 +1,5 @@
 // Read-only handlers for the Nuke Asset Advisor surface.
+import { adjustedEstimate, type AdjResult, type IndexSeries } from "./adjust.ts";
 import {
   AGENT_CITATION_RULES,
   citationFromObservation,
@@ -1613,7 +1614,7 @@ async function handleValueAsset(
   const { data: vehicle } = await sb
     .from("vehicles")
     .select(
-      "id, year, make, model, nuke_estimate, nuke_estimate_confidence, listing_url, bat_auction_url, canonical_platform, updated_at, created_at",
+      "id, year, make, model, mileage, nuke_estimate, nuke_estimate_confidence, listing_url, bat_auction_url, canonical_platform, updated_at, created_at",
     )
     .eq("id", vid)
     .maybeSingle();
@@ -1724,6 +1725,37 @@ async function handleValueAsset(
   }
   if (storedDisagrees) flags.push("stored_estimate_disagrees_with_comps");
 
+  // Backtest-fitted adjustments (advisor/adjust.ts): time index, channel, mileage, recency, own prior sale.
+  let adjusted: AdjResult | null = null;
+  if (estimateSource !== "nuke_estimates" || storedStale) {
+    let index: IndexSeries = [];
+    try {
+      const { data: ix } = await sb.from("advisor_make_price_index").select("month, idx")
+        .eq("make", String(vehicle.make || "").toLowerCase()).order("month", { ascending: true }).limit(1000);
+      index = (ix ?? []).map((r: Record<string, unknown>) => ({ month: String(r.month), idx: Number(r.idx) }));
+    } catch { index = []; }
+    const ownSale = price?.sold?.amount != null && price.sold.on
+      ? { amount: Number(price.sold.amount), on: String(price.sold.on), platform: price.source_url ?? vehicle.canonical_platform }
+      : null;
+    adjusted = adjustedEstimate({
+      comps: comps.map((c) => ({ sale_price: Number(c.sale_price), sold_date: c.sold_date ? String(c.sold_date) : null, platform: c.platform ?? c.listing_url, mileage: c.mileage })),
+      minComps: MIN_COMPS,
+      index,
+      asOf: new Date().toISOString(),
+      subjectPlatform: vehicle.canonical_platform || "bat",
+      subjectMileage: typeof vehicle.mileage === "number" ? vehicle.mileage as number : null,
+      ownSale,
+    });
+    if (adjusted) {
+      valuePoint = adjusted.estimate;
+      valueLow = adjusted.low;
+      valueHigh = adjusted.high;
+      estimateSource = adjusted.comps_estimate != null ? "adjusted_comps" : "adjusted_own_sale";
+      noEstimateReason = null;
+      flags.push(adjusted.own_sale_estimate != null ? "blended_own_prior_sale_time_adjusted" : "comps_time_channel_mileage_adjusted");
+    }
+  }
+
   const guard = recentSaleSanityGuard({
     estimate: valuePoint,
     saleAmount: price?.sold?.amount != null ? Number(price.sold.amount) : null,
@@ -1753,7 +1785,7 @@ async function handleValueAsset(
   const cit = emptyCitation({
     source_name: estimateSource === "recent_same_asset_sale"
       ? "Same-asset sale"
-      : estimateSource === "sold_comps_median"
+      : estimateSource === "sold_comps_median" || estimateSource.startsWith("adjusted_")
       ? "Confirmed sold comps"
       : "Nuke Estimate",
     source_url: sourceUrl,
@@ -1773,6 +1805,9 @@ async function handleValueAsset(
     if (storedDisagrees && estimateSource === "nuke_estimates") confVal = Math.min(confVal, 0.30);
     if (guard.triggered) confVal = Math.min(confVal, 0.25);
     if (estimateSource === "recent_same_asset_sale") confVal = 0.55;
+    if (adjusted && (estimateSource === "adjusted_comps" || estimateSource === "adjusted_own_sale")) {
+      confVal = estimateSource === "adjusted_own_sale" ? Math.min(adjusted.confidence, 0.55) : adjusted.confidence;
+    }
     const confAdj = { confidence: confVal, confidence_basis: "estimate_model" as const };
     const noteParts = [...flags];
     if (guard.message) noteParts.push(guard.message);
@@ -1847,6 +1882,9 @@ async function handleValueAsset(
       stored_estimate_stale: storedStale,
       confidence: claims.find((c) => c.field === "estimated_value")?.confidence ?? null,
       flags,
+      adjustments: adjusted
+        ? { comps_estimate: adjusted.comps_estimate, own_sale_estimate: adjusted.own_sale_estimate, spread: Number.isFinite(adjusted.spread) ? adjusted.spread : null, ...adjusted.steps, method: "bt4 backtest 2026-10-22: make index + channel + mileage + recency(1460d) + own sale" }
+        : null,
       // Hammer vs all-in: the stored sale price can be hammer-only or include the buyer premium
       // depending on platform; all_in_cost carries the breakdown with cited fee terms.
       hammer: (allIn.get(vid)?.hammer as number | undefined) ?? null,
