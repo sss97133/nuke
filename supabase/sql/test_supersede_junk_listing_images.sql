@@ -85,6 +85,10 @@ CREATE TRIGGER trg_sync_vehicle_primary_image AFTER DELETE OR UPDATE OF is_prima
 \ir ../migrations/20261019001500_supersede_other_lot_listing_images.sql
 \ir ../migrations/20261021050000_supersede_unsaved_ebay_archive_photos.sql
 \ir ../migrations/20261021050000_supersede_unsaved_ebay_archive_photos.sql
+CREATE TABLE public.listing_page_snapshots (id uuid PRIMARY KEY, platform text, listing_url text, http_status int, html_sha256 text);
+CREATE TABLE public.vehicle_events (vehicle_id uuid, source_url text);
+\ir ../migrations/20261022211905_ebay_gallery_video_poster_corrections.sql
+\ir ../migrations/20261022211905_ebay_gallery_video_poster_corrections.sql
 
 SELECT pg_temp.ok('junk: Cars & Bids sidebar thumbnails', bool_and(public.is_junk_listing_image_url(u))) FROM unnest(ARRAY[
   'https://media.carsandbids.com/cdn-cgi/image/width=148,height=126,quality=70/abc/photos/x.jpg',
@@ -336,3 +340,31 @@ SELECT pg_temp.ok('only service_role may call the writer',
   has_function_privilege('service_role', 'public.supersede_junk_listing_images(uuid[], boolean, jsonb)', 'EXECUTE')
   AND NOT has_function_privilege('anon', 'public.supersede_junk_listing_images(uuid[], boolean, jsonb)', 'EXECUTE')
   AND NOT has_function_privilege('authenticated', 'public.supersede_junk_listing_images(uuid[], boolean, jsonb)', 'EXECUTE'));
+
+INSERT INTO public.vehicles VALUES ('00000000-0000-4000-8000-000000000012', true, 'https://i.ebayimg.com/images/g/REAL/s-l1600.webp');
+INSERT INTO public.vehicle_images (id, vehicle_id, image_url, source, position, is_primary) VALUES
+ ('00000000-0000-4000-9000-000000001201','00000000-0000-4000-8000-000000000012','https://i.ebayimg.com/images/g/REAL/s-l1600.webp','ebay_motors',0,true),
+ ('00000000-0000-4000-9000-000000001202','00000000-0000-4000-8000-000000000012','https://i.ebayimg.com/images/g/POSTER/s-l1600.webp','ebay_motors',1,false);
+INSERT INTO public.listing_page_snapshots VALUES ('00000000-0000-4000-7000-000000001200','ebay_motors','https://www.ebay.com/itm/123456789012',200,'fixture-hash');
+INSERT INTO public.vehicle_events VALUES ('00000000-0000-4000-8000-000000000012','https://www.ebay.com/itm/123456789012');
+CREATE TEMP TABLE poster_receipt AS SELECT '[{"image_id":"00000000-0000-4000-9000-000000001202","answer":"video_poster","snapshot_id":"00000000-0000-4000-7000-000000001200","html_sha256":"fixture-hash","gallery_label":"Video 1 of 1","method":"ebay_item_gallery_labels_v1","image_key":"POSTER"}]'::jsonb p;
+SELECT pg_temp.ok('poster dry run reports exactly one without changing its row',
+ (public.supersede_junk_listing_images(ARRAY['00000000-0000-4000-8000-000000000012']::uuid[],false,(SELECT p FROM poster_receipt))->>'video_poster_rows')='1'
+ AND (SELECT is_superseded IS NOT TRUE FROM public.vehicle_images WHERE id='00000000-0000-4000-9000-000000001202'));
+SELECT pg_temp.ok('poster apply supersedes exactly one',
+ (public.supersede_junk_listing_images(ARRAY['00000000-0000-4000-8000-000000000012']::uuid[],true,(SELECT p FROM poster_receipt))->'tally'->>'superseded')='1');
+SELECT pg_temp.ok('poster preserved with citation; real photo and lead untouched',
+ (SELECT is_superseded AND image_url='https://i.ebayimg.com/images/g/POSTER/s-l1600.webp' AND ai_scan_metadata->'supersession'->>'reason'='listing_video_poster'
+ FROM public.vehicle_images WHERE id='00000000-0000-4000-9000-000000001202')
+ AND (SELECT is_superseded IS NOT TRUE AND is_primary FROM public.vehicle_images WHERE id='00000000-0000-4000-9000-000000001201')
+ AND (SELECT primary_image_url='https://i.ebayimg.com/images/g/REAL/s-l1600.webp' FROM public.vehicles WHERE id='00000000-0000-4000-8000-000000000012'));
+SELECT pg_temp.ok('poster repeat is a no-op',
+ (public.supersede_junk_listing_images(ARRAY['00000000-0000-4000-8000-000000000012']::uuid[],true,(SELECT p FROM poster_receipt))->'tally'->>'superseded')='0');
+SELECT pg_temp.ok('wrong hash refuses whole correction', pg_temp.raises($q$
+ SELECT public.supersede_junk_listing_images(ARRAY['00000000-0000-4000-8000-000000000012']::uuid[],true,
+ jsonb_set((SELECT p FROM poster_receipt),'{0,html_sha256}','"wrong"'))$q$));
+SELECT pg_temp.ok('photo label refuses correction', pg_temp.raises($q$
+ SELECT public.supersede_junk_listing_images(ARRAY['00000000-0000-4000-8000-000000000012']::uuid[],true,
+ jsonb_set((SELECT p FROM poster_receipt),'{0,gallery_label}','"Picture 1 of 20"'))$q$));
+SELECT pg_temp.ok('wrong vehicle refuses correction', pg_temp.raises($q$
+ SELECT public.supersede_junk_listing_images(ARRAY['00000000-0000-4000-8000-000000000011']::uuid[],true,(SELECT p FROM poster_receipt))$q$));
