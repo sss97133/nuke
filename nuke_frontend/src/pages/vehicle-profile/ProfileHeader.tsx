@@ -192,7 +192,8 @@ export default function ProfileHeader({ priceLotId }: { priceLotId?: string }) {
     const eventRows = eventRes?.error ? [] : matchingRows(eventRes?.data as any[] | null);
     const candidates: SaleLotProvenance[] = [
       ...auctionRows.map(row => ({ lotNumber: row.lot_number ?? null,
-        videoUrl: row.broadcast_video_url || row.broadcast_video_id || null,
+        videoUrl: row.broadcast_video_url || (/^[A-Za-z0-9_-]{11}$/.test(row.broadcast_video_id ?? '')
+          ? `https://www.youtube.com/watch?v=${row.broadcast_video_id}` : row.broadcast_video_id || null),
         startSeconds: typeof row.broadcast_timestamp_start === 'number' ? row.broadcast_timestamp_start : null,
         endSeconds: typeof row.broadcast_timestamp_end === 'number' ? row.broadcast_timestamp_end : null })),
       ...eventRows.map(row => { const meta = row.metadata && typeof row.metadata === 'object' ? row.metadata : {};
