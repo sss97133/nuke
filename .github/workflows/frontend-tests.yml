@@ -16,6 +16,28 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
 
 jobs:
+  financial-evidence-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '25'
+      - name: Verify account intake, retained context and private source contracts
+        run: >-
+          deno test --node-modules-dir=none --allow-env
+          supabase/functions/ingest-observation/financialEvidence.test.ts
+          supabase/functions/ingest-observation/financialEvidenceHandler.test.ts
+          supabase/functions/ingest-observation/financialProcessing.test.ts
+          supabase/functions/ingest-observation/financialCandidates_test.ts
+          supabase/functions/ingest-observation/financialCandidateContext_test.ts
+          supabase/functions/ingest-observation/financialPngPixels.test.ts
+      - name: Verify deterministic source masking and metadata removal
+        run: node --test scripts/receipts/redacted-source.test.mjs
+
   autotrader-history-contract:
     runs-on: ubuntu-latest
     steps:
