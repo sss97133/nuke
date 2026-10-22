@@ -254,7 +254,7 @@ export const VehicleDescriptionCard: React.FC<VehicleDescriptionCardProps> = ({
                   <details><summary>Source record</summary>
                   <div>Recorded observation: {formatEntryDate(entry.recorded_observed_at)} · Captured: {formatEntryDate(entry.source_captured_at)} · Received: {formatEntryDate(entry.ingested_at)}</div>
                   <div>Original listing event date unknown. Original source completeness unknown. Preserved text shown without shortening.</div>
-                  <div>Method: {entry.extraction_method || 'Unknown'} · Stored confidence: {entry.confidence ?? 'Unknown'}</div>
+                  <div>Method: {entry.extraction_method || 'Unknown'} · Model self-score (not corroboration): {entry.confidence ?? 'Unknown'}</div>
                   </details>
                 </div>
               </details>

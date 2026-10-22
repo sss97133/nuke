@@ -112,6 +112,11 @@ const FieldEvidencePopup: React.FC<FieldEvidencePopupProps> = ({
           ? <p role="status">The resolved value could not be read. Source reports below remain attributed claims.</p>
           : !resolvedValue && <p>The canonical value is unknown. Source reports below remain attributed claims.</p>}
         {isEngineProperty && resolvedValue && <p>Resolved from retained reports; this does not establish factory or current physical configuration.</p>}
+        {field === 'vin' && (provenance.data as any).identifier_consensus?.citation_summary && <p role="status" data-testid="identifier-consensus">
+          {(provenance.data as any).identifier_consensus.status === 'resolved' ? 'Corroborated by ' : 'Claimed by '}
+          {(provenance.data as any).identifier_consensus.citation_summary}
+          {(provenance.data as any).identifier_consensus.status === 'conflict' ? ' · sources disagree' : ''}
+        </p>}
         {evidence?.hasConflict && evidence.conflictType === 'genuine'
           ? <p role="status">Source claims differ. No resolution is established by this display.</p>
           : sortedSources.length > 1 && <p role="status">Multiple source claims are shown. This display does not establish whether differences have been resolved.</p>}
@@ -238,7 +243,7 @@ const FieldEvidencePopup: React.FC<FieldEvidencePopupProps> = ({
             </>}
           </details>}
           <div style={{ color: 'var(--text-secondary)' }}>Observation time: {obs.observed_at ? new Date(obs.observed_at).toLocaleString() : 'Unknown'} · Ingest time: {obs.ingested_at ? new Date(obs.ingested_at).toLocaleString() : 'Unavailable'}</div>
-          <div style={{ color: 'var(--text-secondary)' }}>Method: {obs.extraction_method || 'Unavailable'} · Stored confidence: {obs.confidence == null ? 'Unavailable' : obs.confidence}</div>
+          <div style={{ color: 'var(--text-secondary)' }}>Method: {obs.extraction_method || 'Unavailable'} · Model self-score (not corroboration): {obs.confidence == null ? 'Unavailable' : obs.confidence}</div>
         </div>
       ))}
       {/* A zone match identifies an area to inspect; it does not support a particular claim. */}

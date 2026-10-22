@@ -440,6 +440,8 @@ const VehicleDossierPanel: React.FC = () => {
   const { evidence, loading, error: evidenceError } = useFieldEvidence(vehicle?.id);
   const configuration = useFieldProvenance(vehicle?.id || '', 'engine_configuration');
   const displacement = useFieldProvenance(vehicle?.id || '', 'engine_displacement_l');
+  const vinRead = useFieldProvenance(vehicle?.id || '', 'vin');
+  const vinConsensus = (vinRead.data as any)?.identifier_consensus as { status?: string; canonical_value?: string; citation_summary?: string } | undefined;
   const engineReads: Record<string, typeof configuration> = { engine_configuration: configuration, engine_displacement_l: displacement };
   const engineValue = (field: string) => {
     const read = engineReads[field];
@@ -693,6 +695,10 @@ const VehicleDossierPanel: React.FC = () => {
                 }
                 let displayValue = fmtVal(field, pv);
                 if (engineReads[field]) displayValue = engineValue(field);
+                if (field === 'vin' && !displayValue && vinConsensus?.status === 'resolved' && vinConsensus.canonical_value) {
+                  // Column empty: resolve from cited claims; format rules only flag.
+                  displayValue = `${vinConsensus.canonical_value}${vinConsensus.citation_summary ? ` · ${vinConsensus.citation_summary}` : ''}`;
+                }
                 if (field === 'vin' && !displayValue) displayValue = 'Unknown';
                 let fieldLabel = FIELD_LABELS[field] || field.toUpperCase().replace(/_/g, ' ');
                 if (field === 'sale_price') {
