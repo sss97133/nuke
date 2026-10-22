@@ -181,6 +181,41 @@ Deno.test("bonhamsLot carries the platform ids, image, no-reserve flag and a EUR
      "2026-10-30T17:00:00+00:00", 50000, 70000, null, false]);
 });
 
+import { parseIssimiAuctions } from "./boards.ts";
+
+// Two of the 414 initialAuctions of https://www.issimi.com/listings (__NEXT_DATA__, read 2026-10-20 20:2xZ), fields trimmed,
+// values as served (the bidder and payment fields of the top bid are cut): the house's last timed auction (3 days, closed
+// 2026-06-18) and an offer listing with no bidding window. No ISSIMI auction was open on 2026-10-20.
+const ISSIMI_PAGE = JSON.parse(
+  '{"initialAuctions":[{"id":741,"slug":"2022-porsche-taycan-turbo-s","reservePrice":99000,"currency":"USD","auctionStartDateTime":"2026-06-15T15:45:20.1238493+00:00","auctionEndDateTime":"2026-06-18T15:46:18.5768765+00:00","auctionType":"PublicAuction","status":"Ended","topBid":{"auctionId":741,"id":550,"bidAmount":94600,"bidDateTime":"2026-06-18T15:44:18.5768765+00:00"},"allBidsCount":null,"heroImageUrl":null,"vehicle":{"make":"Porsche","model":"Taycan Turbo S","year":2022,"carDisplayName":"2022 Porsche Taycan Turbo S","vehicleType":"Car","location":"San Carlos, CA","images":[{"url":"https://issimi-vehicles-cdn.b-cdn.net/publicamlvehiclemanagement/VehicleDetails/763/timestamped-1772182667152-1-Porsche-A54741.jpeg","description":"","category":"Exterior","isFeatured":true,"order":0}]}},' +
+  '{"id":747,"slug":"1990-mercedes-benz-190e-evo-ii","reservePrice":345000,"currency":"USD","auctionStartDateTime":null,"auctionEndDateTime":null,"auctionType":"PublicAuction","status":"Listed","topBid":{},"allBidsCount":null,"heroImageUrl":null,"vehicle":{"make":"Mercedes-Benz","model":"190E EVO II","year":1990,"carDisplayName":"1990 Mercedes-Benz 190E EVO II","vehicleType":"Car","location":"San Carlos, CA"}}],"auctionsType":"all"}',
+);
+
+Deno.test("parseIssimiAuctions reads timed public auctions with top bid, currency and close; offer listings are not auctions", () => {
+  const during = parseIssimiAuctions(ISSIMI_PAGE, Date.parse("2026-06-17T12:00:00Z"));
+  assertEquals(during, [{
+    id: 741,
+    url: "https://www.issimi.com/vehicles/2022-porsche-taycan-turbo-s",
+    title: "2022 Porsche Taycan Turbo S",
+    year: 2022,
+    make: "Porsche",
+    model: "Taycan Turbo S",
+    current_bid: 94600,
+    currency: "USD",
+    starts: "2026-06-15T15:45:20.123Z",
+    ends: "2026-06-18T15:46:18.576Z",
+    no_reserve: false,
+    image: "https://issimi-vehicles-cdn.b-cdn.net/publicamlvehiclemanagement/VehicleDetails/763/timestamped-1772182667152-1-Porsche-A54741.jpeg",
+    open: false, // the served status is Ended
+  }]);
+  // as read on 2026-10-20: nothing open
+  assertEquals(parseIssimiAuctions(ISSIMI_PAGE, Date.parse("2026-10-20T20:20:00Z")).filter((a) => a.open), []);
+  const running = structuredClone(ISSIMI_PAGE);
+  running.initialAuctions[0].status = "Listed";
+  assertEquals(parseIssimiAuctions(running, Date.parse("2026-06-17T12:00:00Z"))[0].open, true);
+  assertEquals(parseIssimiAuctions(running, Date.parse("2026-06-18T15:46:19Z"))[0].open, false);
+});
+
 // Broad Arrow's bidding site, read 2026-10-20 19:36Z (fields trimmed; values as served). The page's state line from
 // https://bid.broadarrowauctions.com/ with two of its six sales: the in-room Las Vegas sale and a timed online sale.
 const BA_PAGE = `<script>\n        viewVars = {"currentRouteName":"upcoming-auctions","brand":"broadarrowauctions","auctions":{"result_page":[` +
