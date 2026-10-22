@@ -8,9 +8,11 @@ INSERT INTO public.vehicles (make, year) SELECT (ARRAY['Porsche','Mazda','Ford']
 ANALYZE public.vehicles;
 SET enable_seqscan = off;
 DO $t$
-DECLARE plan text;
+DECLARE plan text := ''; l text;
 BEGIN
-  EXECUTE 'EXPLAIN SELECT 1 FROM public.vehicles WHERE lower(make) = lower(''porsche'') AND year BETWEEN 1990 AND 1995' INTO plan;
+  FOR l IN EXECUTE 'EXPLAIN SELECT 1 FROM public.vehicles WHERE lower(make) = lower(''porsche'') AND year BETWEEN 1990 AND 1995' LOOP
+    plan := plan || l || E'\n';
+  END LOOP;
   IF plan NOT LIKE '%idx_vehicles_lower_make_year%' THEN
     RAISE EXCEPTION 'comps filter does not use idx_vehicles_lower_make_year: %', plan;
   END IF;
