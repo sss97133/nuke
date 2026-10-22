@@ -58,6 +58,7 @@ const sources = new Map([
   ['writeRules',compile('../supabase/functions/batch-extract-snapshots/writeRules.ts')],
   ['snapshotCompare',compile('../supabase/functions/batch-extract-snapshots/snapshotCompare.ts')],
   ['intake',compile('../supabase/functions/ingest-observation/index.ts')],
+  ['financialEvidence',compile('../supabase/functions/ingest-observation/financialEvidence.ts')],
   ['historicalAsks',compile('../supabase/functions/ingest-observation/historicalAsks.ts')],
   ['historicalAskIntake',compile('../supabase/functions/ingest-observation/historicalAskIntake.ts')],
   ['liveIntake',compile('../supabase/functions/ingest-observation/batLive.ts')],
@@ -287,6 +288,7 @@ function fixture(options = {}) {
         if(specifier==='./retainedIdentity.ts')return load('retainedIdentity');
         if(specifier==='./historicalAsks.ts')return load('historicalAsks');
         if(specifier==='./historicalAskIntake.ts')return load('historicalAskIntake');
+        if(specifier==='./financialEvidence.ts')return load('financialEvidence');
         if(specifier==='../_shared/batAuctionRecord.ts')return load('auctionRecord');
         if(specifier==='../_shared/observationContentHash.ts')return load('hash');
         if(specifier==='../ingest-observation/imageProperties.ts')return load('property');
