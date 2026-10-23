@@ -56,7 +56,7 @@ final class VisionDecisionTests: XCTestCase {
             decidedAt: Date(timeIntervalSince1970: 1_800_000_000))
         XCTAssertEqual(r.labels.count, 5)
         XCTAssertEqual(r.labels.first, .init(id: "car", score: 0.912))
-        XCTAssertEqual(VisionDecisionLog.encodeLabels(r.labels).prefix(30), #"[{"id":"car","score":0.912},{"#)
+        XCTAssertTrue(VisionDecisionLog.encodeLabels(r.labels).hasPrefix(#"[{"id":"car","score":0.912},"#))
         XCTAssertEqual(VisionDecisionLog.decodeLabels(VisionDecisionLog.encodeLabels(r.labels)), r.labels)
         log.record(r)
         log.record(r)   // upsert, not a duplicate
