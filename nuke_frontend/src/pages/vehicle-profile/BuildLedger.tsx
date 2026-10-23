@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { CollapsibleWidget } from '../../components/ui/CollapsibleWidget';
 import { askAgent } from '../../components/agent/askAgent';
-import { useBuildLedger, type BuildLedgerEntry, type BuildLedgerGroup } from './hooks/useBuildLedger';
+import PrefetchLink from '../../components/PrefetchLink';
+import { useBuildLedger, type BookCostEntry, type BookCostTotal, type BuildLedgerEntry, type BuildLedgerGroup } from './hooks/useBuildLedger';
 
 // ── Formatting ──
 
@@ -242,6 +243,91 @@ const SummaryCard: React.FC<{ label: string; amount: number; sub: string; color:
   </div>
 );
 
+// ── In the accounts: costs the accounting book assigns to this vehicle ──
+
+const fmtMoney = (n: number, currency: string) =>
+  currency === 'USD' ? fmt(n) : `${currency} ${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+const KIND_LABEL: Record<string, string> = { parts_purchase: 'PARTS', labor_payment: 'LABOR' };
+
+// Read-only: a booked cost has no confirmation strip and never opens the agent. It is changed in the accounting book,
+// which the expanded row links to.
+const BookCostRow: React.FC<{ entry: BookCostEntry }> = ({ entry }) => {
+  const [expanded, setExpanded] = useState(false);
+  const who = !entry.assignedBy ? 'Not recorded' : entry.assignedBy === entry.bookOwnerId ? 'Book owner' : 'Book reviewer';
+  const kv = (k: string, v: React.ReactNode) => (
+    <div key={k} style={{ display: 'grid', gridTemplateColumns: '84px 1fr', gap: '6px', marginBottom: '3px', alignItems: 'baseline' }}>
+      <span style={{ fontSize: '8px', fontWeight: 700, letterSpacing: '0.1em', color: 'var(--vp-pencil)', textTransform: 'uppercase' }}>{k}</span>
+      <span style={{ ...monoNum, fontSize: '8px', wordBreak: 'break-word', color: 'var(--vp-ink)' }}>{v}</span>
+    </div>
+  );
+  return (
+    <div style={{ marginBottom: '2px' }}>
+      <div
+        onClick={() => setExpanded(v => !v)}
+        style={{
+          display: 'grid', gridTemplateColumns: '58px 1fr auto auto', gap: '2px 8px', alignItems: 'center',
+          padding: '4px 6px', cursor: 'pointer', userSelect: 'none', border: '2px solid var(--vp-ghost)',
+          background: expanded ? 'var(--vp-row-alt, #fafafa)' : 'transparent',
+        }}
+      >
+        <span style={{ ...monoNum, fontSize: '8px', color: 'var(--vp-pencil)' }}>{fmtDate(entry.date)}</span>
+        <span style={{ minWidth: 0, overflow: 'hidden' }}>
+          <span style={{ fontSize: '8px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {expanded ? '▾' : '▸'} {entry.description || 'Unnamed expense'}
+          </span>
+          <span style={{ fontSize: '8px', color: 'var(--vp-pencil)', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {entry.category}
+          </span>
+        </span>
+        <span>{entry.kind && <Chip text={KIND_LABEL[entry.kind] ?? label(entry.kind)} color="var(--vp-ink, #111)" />}</span>
+        <span style={{ ...monoNum, fontSize: '9px', fontWeight: 700, textAlign: 'right', minWidth: '64px', color: entry.allocated == null ? 'var(--vp-pencil)' : 'var(--vp-ink)' }}>
+          {entry.allocated == null ? 'AMOUNT NOT SET' : fmtMoney(entry.allocated, entry.currency)}
+        </span>
+      </div>
+      {expanded && (
+        <div style={{ borderLeft: '2px solid var(--vp-ghost)', borderRight: '2px solid var(--vp-ghost)', borderBottom: '2px solid var(--vp-ghost)', padding: '6px 8px', background: 'var(--vp-row-alt, #fafafa)' }}>
+          {kv('Basis', entry.basis ?? 'No reason recorded')}
+          {kv('Assigned by', `${who}${entry.assignedMethod ? ` · ${entry.assignedMethod}` : ''}`)}
+          {entry.bookAmount != null && entry.allocated !== entry.bookAmount && kv('Booked expense', fmtMoney(entry.bookAmount, entry.currency))}
+          {entry.account && kv('Paid from', entry.account)}
+          {entry.ledgerId && kv('Ledger id', entry.ledgerId)}
+          <div style={{ marginTop: '4px', fontSize: '8px' }}>
+            <PrefetchLink to={`/accounting?book=${entry.bookOwnerId}${entry.year ? `&year=${entry.year}` : ''}`}>Open in accounting</PrefetchLink>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const BookSection: React.FC<{ entries: BookCostEntry[]; totals: BookCostTotal[]; alongsideAudit: boolean }> = ({ entries, totals, alongsideAudit }) => (
+  <div style={{ marginBottom: '10px' }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', borderBottom: '2px solid var(--vp-ink)', padding: '3px 0 2px', marginBottom: '4px' }}>
+      <span style={{ fontSize: '9px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>In the accounts</span>
+      <span style={{ fontSize: '8px', color: 'var(--vp-pencil)', ...monoNum, letterSpacing: '0.04em' }}>
+        {entries.length} {entries.length === 1 ? 'ENTRY' : 'ENTRIES'}
+      </span>
+    </div>
+    <div style={{ fontSize: '8px', color: 'var(--vp-pencil)', lineHeight: 1.5, marginBottom: '6px' }}>
+      Booked expenses the accounts assign to this vehicle, with the reason recorded for each.
+      {alongsideAudit ? ' Kept apart from the totals above: a purchase can appear both here and above.' : ''}
+    </div>
+    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(totals.length, 2)}, 1fr)`, gap: '2px', marginBottom: '6px' }}>
+      {totals.map(t => (
+        <div key={t.currency} style={{ border: '2px solid var(--vp-ghost)', borderTop: '3px solid var(--vp-ink, #111)', padding: '6px 8px' }}>
+          <div style={{ fontSize: '8px', color: 'var(--vp-pencil)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>Assigned in the accounts</div>
+          <div style={{ ...monoNum, fontSize: '13px', fontWeight: 700 }}>{fmtMoney(t.total, t.currency)}</div>
+          <div style={{ fontSize: '8px', color: 'var(--vp-pencil)', textTransform: 'uppercase', letterSpacing: '0.04em', marginTop: '1px' }}>
+            {t.entries} {t.entries === 1 ? 'entry' : 'entries'}{t.unsplit ? ` · ${t.unsplit} amount not set` : ''}
+          </div>
+        </div>
+      ))}
+    </div>
+    {entries.map(e => <BookCostRow key={e.id} entry={e} />)}
+  </div>
+);
+
 // ── Main ──
 
 interface BuildLedgerProps {
@@ -258,9 +344,10 @@ const BuildLedger: React.FC<BuildLedgerProps> = ({ vehicleId }) => {
       variant="profile"
       title="Build Ledger"
       defaultCollapsed={false}
-      badge={<span className="widget__count">DRAFT · {data.entryCount} ENTRIES</span>}
+      badge={<span className="widget__count">{data.hasAudit ? `DRAFT · ${data.entryCount} ENTRIES` : ''}{data.hasAudit && data.book.length ? ' · ' : ''}{data.book.length ? `${data.book.length} BOOKED` : ''}</span>}
     >
       <div style={{ fontFamily: 'var(--vp-font-sans)', fontSize: '9px', lineHeight: 1.6 }}>
+        {data.hasAudit && <>
         {/* Provenance banner — this is an evidence-tiered draft, not a settled ledger */}
         <div style={{ fontSize: '8px', color: 'var(--vp-pencil)', lineHeight: 1.5, marginBottom: '6px' }}>
           Evidence-tiered reconstruction from receipts, bank, and messages
@@ -290,6 +377,9 @@ const BuildLedger: React.FC<BuildLedgerProps> = ({ vehicleId }) => {
         </div>
 
         {data.groups.map(g => <GroupSection key={g.eventType} group={g} />)}
+        </>}
+
+        {data.book.length > 0 && <BookSection entries={data.book} totals={data.bookTotals} alongsideAudit={data.hasAudit} />}
 
         <div style={{ fontSize: '8px', color: 'var(--vp-pencil)', textTransform: 'uppercase', letterSpacing: '0.06em', marginTop: '2px' }}>
           Every entry expands to its verbatim source citation.
