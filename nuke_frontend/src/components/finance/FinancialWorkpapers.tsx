@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { expenseUseKey, type ExpenseUse } from '../../services/financialExpenseUse';
 import { remember, remembered } from './accountingMemory';
+import RecordClassifier, { type ClassifyTarget } from './RecordClassifier';
 
 export type SavedRecord = { id: string; document_id: string; record: {
   record_kind: string; local_id: string; year: string; date: string | null; account: string | null;
@@ -57,7 +58,10 @@ const overviewAmount = (amount: bigint | null, currency: string | null) => amoun
 
 
 export default function FinancialWorkpapers({ revision, onOpen }: { revision: number; onOpen: (documentId: string, record: SavedRecord['record']) => void }) {
-  const { ownerId, shared, liveRevision } = useAccountingBook();
+  const { ownerId, shared, liveRevision, canCorrect } = useAccountingBook();
+  const [selecting, setSelecting] = useState(false);
+  const [selected, setSelected] = useState<Map<string, ClassifyTarget>>(() => new Map());
+  const [classifying, setClassifying] = useState(false);
   const [uses, setUses] = useState<Record<string, ExpenseUse>>({});
   const [useError, setUseError] = useState(false);
   const [view, setView] = useState<'overview' | 'records' | 'accounts'>('overview');
@@ -119,6 +123,8 @@ export default function FinancialWorkpapers({ revision, onOpen }: { revision: nu
     return () => { cancelled = true; };
   }, [rows, ownerId]);
   useEffect(() => { setTablePage(0); }, [view, query, account, kind, unclassified, sort, year]);
+  // A selection belongs to the filter it was made in; changing what is listed starts a new one.
+  useEffect(() => { setSelected(new Map()); }, [view, query, account, kind, unclassified, year, ownerId]);
   const controls = data?.controls.filter(row => row.record_kind === 'retained_ledger_decision') || [];
   const years = [...new Set((data?.controls || []).map(row => row.year).filter(value => typeof value === 'string'))].sort().reverse();
   const latestBookYear = controls.filter(row => row.section === 'Revenue' || row.section === 'Expense').map(row => row.year).filter((value): value is string => !!value).sort().at(-1);
@@ -155,6 +161,24 @@ export default function FinancialWorkpapers({ revision, onOpen }: { revision: nu
   const sortBy = (column: SortColumn) => setSort(current => ({ column, descending: current.column === column ? !current.descending : column === 'record_date' || column === 'amount_value' }));
   const sortable = (column: SortColumn, label: string) => <th aria-sort={sort.column === column ? (sort.descending ? 'descending' : 'ascending') : undefined}><button type="button" className="accounting-sort" onClick={() => sortBy(column)}>{label}{sort.column === column ? (sort.descending ? ' ↓' : ' ↑') : ''}</button></th>;
   const chip = (label: string, pressed: boolean, onPress: () => void) => <button type="button" aria-pressed={pressed} onClick={onPress}>{label}</button>;
+  const selectable = (rows || []).filter(row => !!row.record.source_key);
+  const toggle = (row: SavedRecord) => {
+    const key = row.record.source_key;
+    if (!key) return;
+    setSelected(current => { const next = new Map(current); if (next.has(key)) next.delete(key); else next.set(key, { documentId: row.document_id, record: row.record }); return next; });
+  };
+  const pageSelected = selectable.length > 0 && selectable.every(row => selected.has(row.record.source_key!));
+  const togglePage = () => setSelected(current => {
+    const next = new Map(current);
+    for (const row of selectable) if (pageSelected) next.delete(row.record.source_key!); else next.set(row.record.source_key!, { documentId: row.document_id, record: row.record });
+    return next;
+  });
+  // Saved classifications show at once; the shared ledger's own refresh follows.
+  const classified = (changed: ClassifyTarget[]) => {
+    const byKey = new Map(changed.map(item => [item.record.source_key, item.record]));
+    setRows(current => current && current.map(row => row.record.source_key && byKey.has(row.record.source_key) ? { ...row, record: { ...row.record, ...byKey.get(row.record.source_key)! } } : row));
+    setSelected(current => { const next = new Map(current); for (const key of byKey.keys()) if (key) next.delete(key); return next; });
+  };
   const accountRows = controls.filter(row => row.year === selectedYear && (!account || row.account === account) && matches([row.account, row.section, row.currency]));
   const accounts = [...new Set((data?.controls || []).map(row => row.account).filter((value): value is string => !!value))].sort();
   const offset = Math.min(tablePage, Math.max(0, Math.ceil(accountRows.length / 25) - 1)) * 25;
@@ -188,12 +212,20 @@ export default function FinancialWorkpapers({ revision, onOpen }: { revision: nu
             {chip('Bank movements', kind === 'retained_bank_movement' && !unclassified, () => { setKind('retained_bank_movement'); setUnclassified(false); })}
             {chip('Unclassified', unclassified, () => { setKind('retained_bank_movement'); setUnclassified(current => !current); })}
           </div>}
+          {view === 'records' && canCorrect && <div className="accounting-chips">{chip(selecting ? 'Done' : 'Select', selecting, () => { setSelecting(current => !current); setSelected(new Map()); })}</div>}
         </div>
+        {view === 'records' && selecting && <div className="accounting-selection-bar" role="region" aria-label="Selected records">
+          <span>{selected.size ? `${selected.size} selected` : 'Tap records to select them'}</span>
+          <button type="button" className="accounting-primary" disabled={!selected.size} onClick={() => setClassifying(true)}>Classify…</button>
+          <button type="button" disabled={!selected.size} onClick={() => setSelected(new Map())}>Clear</button>
+        </div>}
+        {classifying && <ClassifyDialog targets={[...selected.values()]} onChanged={classified} onClose={() => setClassifying(false)} />}
         {view === 'records' ? <>
           <p className="accounting-muted">Year {selectedYear || 'not recorded'}. Search and filters cover every saved record of the year, newest first.</p>
           {rowsError && <p role="alert">{rowsError}</p>}
           {!rows && !rowsError && <p role="status">Loading saved records…</p>}
-          {rows && <div className="accounting-table-wrap"><table><thead><tr>{sortable('record_date', 'Date')}<th>Transaction / decision</th>{sortable('account', 'Account')}{sortable('section', 'Classification')}{sortable('amount_value', 'Amount')}<th>Vehicle / shop use</th><th>Evidence</th></tr></thead><tbody>{rows.map(row => <tr key={row.id} className="accounting-row" onClick={() => onOpen(row.document_id, row.record)}>
+          {rows && <div className="accounting-table-wrap"><table><thead><tr>{selecting && <th className="accounting-select"><input type="checkbox" aria-label="Select every record on this page" checked={pageSelected} disabled={!selectable.length} onChange={togglePage} /></th>}{sortable('record_date', 'Date')}<th>Transaction / decision</th>{sortable('account', 'Account')}{sortable('section', 'Classification')}{sortable('amount_value', 'Amount')}<th>Vehicle / shop use</th><th>Evidence</th></tr></thead><tbody>{rows.map(row => <tr key={row.id} className="accounting-row" aria-selected={selecting ? selected.has(row.record.source_key || '') : undefined} onClick={() => selecting ? toggle(row) : onOpen(row.document_id, row.record)}>
+            {selecting && <td className="accounting-select"><input type="checkbox" aria-label={`Select ${recordDescription(row.record.description) || 'record'}`} checked={selected.has(row.record.source_key || '')} disabled={!row.record.source_key} onClick={event => event.stopPropagation()} onChange={() => toggle(row)} /></td>}
             <td>{row.record.date || row.record.year}</td><td><span className="accounting-record-description">{recordDescription(row.record.description) || 'Saved record'}</span><small>{row.record.record_kind === 'retained_bank_movement' ? 'Bank movement' : 'Bookkeeping decision'}</small></td><td>{row.record.account || 'Not recorded'}</td><td>{row.record.section || 'Unclassified'}<small>{row.record.category}</small></td><td className="accounting-number">{displayMoney(row.record.amount, row.record.currency)}</td><td>{row.record.section === 'Expense' && row.record.record_kind === 'retained_ledger_decision' ? useError ? 'Use unavailable' : row.record.source_key && uses[row.record.source_key]?.destination_label || 'Unassigned' : '—'}</td><td><button type="button" onClick={event => { event.stopPropagation(); onOpen(row.document_id, row.record); }}>View evidence</button></td>
           </tr>)}</tbody></table></div>}
           {rows && !rows.length && <p>No saved records match these filters for {selectedYear}.</p>}
@@ -207,4 +239,25 @@ export default function FinancialWorkpapers({ revision, onOpen }: { revision: nu
       </>}
     </>}
   </section>;
+}
+
+/** The selection, frozen for the dialog's life so its outcome stays readable while the list behind it refreshes. */
+function ClassifyDialog({ targets, onChanged, onClose }: { targets: ClassifyTarget[]; onChanged: (records: ClassifyTarget[]) => void; onClose: () => void }) {
+  const [items, setItems] = useState(targets);
+  const dialog = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    const element = dialog.current;
+    if (element && !element.open) { if (typeof element.showModal === 'function') element.showModal(); else element.setAttribute('open', ''); }
+    return () => { if (element?.open && typeof element.close === 'function') element.close(); };
+  }, []);
+  return <dialog className="accounting-evidence-dialog" ref={dialog} aria-label="Classify selected records" onCancel={event => { event.preventDefault(); onClose(); }}>
+    <div className="accounting-dialog-heading"><h2>Classify {items.length} record{items.length === 1 ? '' : 's'}</h2><button type="button" autoFocus onClick={onClose}>Close</button></div>
+    <ul className="accounting-selection-list">{items.slice(0, 6).map(({ record }) => <li key={record.source_key}><span>{record.date || record.year}</span><span className="accounting-record-description">{recordDescription(record.description) || 'Saved record'}</span><span className="accounting-number">{displayMoney(record.amount, record.currency)}</span><small>{record.section || 'Unclassified'}{record.category ? ` · ${record.category}` : ''}</small></li>)}
+      {items.length > 6 && <li className="accounting-muted">and {items.length - 6} more</li>}</ul>
+    <RecordClassifier targets={items} onChanged={changed => {
+      const byKey = new Map(changed.map(item => [item.record.source_key, item.record]));
+      setItems(current => current.map(item => byKey.has(item.record.source_key) ? { ...item, record: { ...item.record, ...byKey.get(item.record.source_key)! } } : item));
+      onChanged(changed);
+    }} />
+  </dialog>;
 }
