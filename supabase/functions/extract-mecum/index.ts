@@ -24,6 +24,7 @@
  *      — Service-only, hash-verified retained-source preview; never writes
  */
 
+import { mecumAuctionEndDate } from "./auctionEndDate.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { parse as parseHtml } from "https://esm.sh/parse5@7.3.0";
 import { archiveFetch, readArchivedPage } from "../_shared/archiveFetch.ts";
@@ -1223,13 +1224,20 @@ async function saveVehicle(
   // Create auction event
   const { data: existingEvent } = await supabase
     .from("auction_events")
-    .select("id")
+    .select("id, auction_end_date")
     .eq("vehicle_id", vehicleId)
     .eq("source", "mecum")
     .eq("source_url", vehicle.url)
     .limit(1)
     .maybeSingle();
+  // The page path left auction_end_date null (the batch path set it), so ~199k Mecum events had no sale date.
+  const auctionEndDate = mecumAuctionEndDate(vehicle, sale);
 
+  if (existingEvent && auctionEndDate && !(existingEvent as { auction_end_date: string | null }).auction_end_date) {
+    const { error: upErr } = await supabase.from("auction_events").update({ auction_end_date: auctionEndDate } as never)
+      .eq("id", (existingEvent as { id: string }).id).is("auction_end_date", null);
+    if (upErr) console.warn(`[MECUM] auction_events end date update failed for ${vehicle.url}: ${upErr.message}`);
+  }
   if (!existingEvent) {
     {
       // The insert result is read: a missing column here went unseen for months (this insert named sale_price, which the
@@ -1243,6 +1251,7 @@ async function saveVehicle(
         source_listing_id: vehicle.lot_number || null,
         winning_bid: vehicle.status === "sold" ? vehicle.sale_price || null : null,
         high_bid: vehicle.status !== "sold" ? vehicle.sale_price || null : null,
+        auction_end_date: auctionEndDate,
       });
       if (aeErr) console.warn(`[MECUM] auction_events insert failed for ${vehicle.url}: ${aeErr.message}`);
     }
