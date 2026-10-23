@@ -78,7 +78,8 @@
 .accounting-table-wrap table { min-width:720px; }
 .accounting-table-wrap td:first-child { white-space:nowrap; }
 
-/* Records: toggle chips, sortable headings and tappable rows. */
+/* Book picker, records toggle chips, sortable headings and tappable rows. */
+.accounting-book-picker { display:flex; flex-direction:column; gap:6px; margin:12px 0 4px; }
 .accounting-chips { display:flex; flex-wrap:wrap; gap:6px; }
 .accounting-page .accounting-chips button[aria-pressed="true"],.accounting-page .accounting-chips button[aria-pressed="true"]:hover { background:var(--text); color:var(--bg); }
 .accounting-page th .accounting-sort { font:inherit; text-transform:inherit; letter-spacing:inherit; color:inherit; border:0; padding:0; min-height:0; background:none; white-space:nowrap; }

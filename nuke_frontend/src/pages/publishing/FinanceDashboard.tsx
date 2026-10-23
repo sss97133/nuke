@@ -3,6 +3,7 @@ import AccountingAccess, { type BookGrant } from '../../components/finance/Accou
 import { AccountingBookContext, useAccountingBook } from '../../components/finance/AccountingBookContext';
 import { useAccountingRevision } from '../../components/finance/useAccountingRevision';
 import ExpenseUseEditor from '../../components/finance/ExpenseUseEditor';
+import { remember, remembered } from '../../components/finance/accountingMemory';
 /**
  * FinanceDashboard
  *
@@ -295,6 +296,7 @@ function formatAmount(n: number | null): string {
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function FinanceDashboard() {
+  // The active book and year are remembered per browser (accountingMemory); the server still decides access.
   const [actorId, setActorId] = useState('');
   const [ownerId, setOwnerId] = useState('');
   const [grants, setGrants] = useState<BookGrant[]>([]);
@@ -306,11 +308,12 @@ export default function FinanceDashboard() {
     let cancelled = false;
     void supabase.auth.getUser().then(async ({ data }) => {
       if (cancelled) return;
-      const id = data.user?.id || ''; setActorId(id); setOwnerId(current => current || id);
+      // A remembered book waits for the grants so the screen never loads a book this account cannot read.
+      const id = data.user?.id || ''; setActorId(id); setOwnerId(current => current || (remembered('book') ? '' : id));
       const result = await supabase.rpc('list_accounting_access').then(result => result, () => ({ data: null, error: true }));
       if (cancelled) return;
       const rows: BookGrant[] = result.error || !Array.isArray(result.data) ? [] : result.data;
-      setGrants(rows); setOwnerId(current => current === id || rows.some(g => g.owner_id === current && g.member_id === id && g.active) ? current : id);
+      setGrants(rows); setOwnerId(current => { const wanted = current || remembered('book') || id; return wanted === id || rows.some(g => g.owner_id === wanted && g.member_id === id && g.active) ? wanted : id; });
     }).catch(() => { if (!cancelled) { setActorId(''); setOwnerId(''); setGrants([]); } });
     const { data: { subscription } } = supabase.auth.onAuthStateChange(event => {
       if (event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED') return;
@@ -421,7 +424,7 @@ export default function FinanceDashboard() {
     <AccountingBookContext.Provider value={{ ownerId, shared, canCorrect, liveRevision: live.revision }}><div className="accounting-page" style={s.container}>
       <header className="accounting-header"><div><span className="accounting-eyebrow">PRIVATE ACCOUNT</span><h1>Accounting</h1><p>Your books, the documents behind them, and what still needs review.</p></div>
         <button type="button" onClick={() => setSessionRevision(n => n + 1)}>Refresh records</button></header>
-      {actorId && <label>Active book <select aria-label="Active accounting book" value={ownerId} onChange={e => { setOwnerId(e.target.value); setSourceView('summary'); setSelectedDocument(null); setSelectedRecord(null); setDocs([]); setConcerns([]); setDeals([]); setPage(0); }}><option value={actorId}>My books</option>{grants.filter(g => g.member_id === actorId && g.active).map(g => <option key={g.id} value={g.owner_id}>{g.owner_name} · shared books ({g.can_correct ? 'review and correct' : 'review'})</option>)}</select></label>}
+      {actorId && <div className="accounting-book-picker"><span className="accounting-eyebrow" id="accounting-book-label">Active book</span><div className="accounting-chips" role="group" aria-label="Active accounting book" aria-labelledby="accounting-book-label">{[{ id: actorId, label: 'My books' }, ...grants.filter(g => g.member_id === actorId && g.active).map(g => ({ id: g.owner_id, label: `${g.owner_name} · shared books (${g.can_correct ? 'review and correct' : 'review'})` }))].map(bookOption => <button type="button" key={bookOption.id} aria-pressed={ownerId === bookOption.id} onClick={() => { if (ownerId === bookOption.id) return; remember('book', bookOption.id); setOwnerId(bookOption.id); setSourceView('summary'); setSelectedDocument(null); setSelectedRecord(null); setDocs([]); setConcerns([]); setDeals([]); setPage(0); }}>{bookOption.label}</button>)}</div></div>}
       <p className="accounting-muted" role="status">{live.message}</p>
       {shared && <p>Shared books. Your corrections retain your identity and appear in the same ledger for the owner and other reviewers.</p>}
       <FinancialWorkpapers key={ownerId} revision={sessionRevision} onOpen={openEvidence} />

@@ -25,6 +25,10 @@ const invoice = (extra: Partial<FinancialDocumentRow> = {}): FinancialDocumentRo
 beforeEach(() => {
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
   fixture.calls = []; fixture.results = {}; fixture.downloads = []; fixture.listeners.clear();
+  // Node's own experimental localStorage global shadows jsdom's and is undefined here; give the page a plain one.
+  const stored = new Map<string, string>();
+  Object.defineProperty(window, 'localStorage', { configurable: true, value: { getItem: (key: string) => stored.get(key) ?? null, setItem: (key: string, value: string) => { stored.set(key, String(value)); }, removeItem: (key: string) => { stored.delete(key); }, clear: () => stored.clear() } });
+  window.history.replaceState(null, '', '/accounting');
   container = document.createElement('div'); document.body.appendChild(container); root = createRoot(container);
 });
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); });
@@ -239,11 +243,26 @@ it('switches shared book reads without unmounting the owner recovery queue', asy
   await act(async () => root.render(<FinanceDashboard />));
   const recovery = container.querySelector('input[type="file"][multiple]');
   expect(recovery).not.toBeNull();
-  const selector = container.querySelector('select[aria-label="Active accounting book"]') as HTMLSelectElement;
-  await act(async () => { selector.value = '22222222-2222-4222-8222-222222222222'; selector.dispatchEvent(new Event('change', { bubbles: true })); });
+  await act(async () => Array.from(container.querySelectorAll<HTMLButtonElement>('[aria-label="Active accounting book"] button')).find(b => b.textContent?.startsWith('Shared owner'))!.click());
+  expect(container.querySelector('[aria-label="Active accounting book"] button[aria-pressed="true"]')?.textContent).toBe('Shared owner · shared books (review and correct)');
   expect(container.querySelector('input[type="file"][multiple]')).toBe(recovery);
   expect(recovery?.closest('[hidden]')).not.toBeNull();
   expect(container.textContent).toContain('Deal rollups are not included');
   expect(Array.from(container.querySelectorAll('button')).some(b => b.textContent === 'Deals')).toBe(false);
   expect(fixture.calls.filter(c => c.table === 'financial_documents').at(-1).filter).toEqual(['owner_id', '22222222-2222-4222-8222-222222222222']);
+  expect(window.localStorage.getItem('accounting.book')).toBe('22222222-2222-4222-8222-222222222222');
+  expect(new URL(window.location.href).searchParams.get('book')).toBe('22222222-2222-4222-8222-222222222222');
+});
+it('opens on the remembered book when a grant covers it, and never loads one it cannot read', async () => {
+  fixture.results.grants = [{ id: 'grant', owner_id: '22222222-2222-4222-8222-222222222222', member_id: '11111111-1111-4111-8111-111111111111', active: true, can_correct: true, owner_name: 'Shared owner' }];
+  window.localStorage.setItem('accounting.book', '22222222-2222-4222-8222-222222222222');
+  await act(async () => root.render(<FinanceDashboard />));
+  expect(container.querySelector('[aria-label="Active accounting book"] button[aria-pressed="true"]')?.textContent).toContain('Shared owner');
+  expect(new Set(fixture.calls.filter(c => c.table === 'financial_documents').map(c => c.filter[1]))).toEqual(new Set(['22222222-2222-4222-8222-222222222222']));
+  await act(async () => root.unmount()); fixture.calls = [];
+  window.history.replaceState(null, '', '/accounting?book=33333333-3333-4333-8333-333333333333');
+  root = createRoot(container);
+  await act(async () => root.render(<FinanceDashboard />));
+  expect(container.querySelector('[aria-label="Active accounting book"] button[aria-pressed="true"]')?.textContent).toBe('My books');
+  expect(new Set(fixture.calls.filter(c => c.table === 'financial_documents').map(c => c.filter[1]))).toEqual(new Set(['11111111-1111-4111-8111-111111111111']));
 });
