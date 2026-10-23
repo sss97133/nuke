@@ -38,32 +38,33 @@ jobs:
         working-directory: ./nuke_frontend
         run: npm ci
 
-      - name: Build project
-        working-directory: ./nuke_frontend
-        run: |
-          echo "🔨 Building project..."
-          npm run build || {
-            echo "❌ Build failed!"
-            echo "Checking for common issues..."
-            ls -la src/components/parts/ || echo "parts directory missing"
-            echo "Full build error:"
-            exit 1
-          }
-        env:
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
-
       - name: Install Vercel CLI
         run: npm install --global vercel@52.0.0
+
+      # Build here and upload the result, as deploy-preview.yml does. A remote build waits in Vercel's build queue
+      # behind every preview: on 2026-10-23 three production runs uploaded in 2 s and then sat in "Building..." for
+      # 20+ minutes (runs 39909158062, 39982338424, 39987080378) while every later merge queued behind them.
+      # The build uses the project's production environment pulled from Vercel, exactly as the remote build did.
+      - name: Pull Vercel production settings
+        working-directory: ./nuke_frontend
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: vercel pull --yes --environment=production
+
+      - name: Build project
+        working-directory: ./nuke_frontend
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: vercel build --prod
 
       - name: Deploy to Vercel Production
         working-directory: ./nuke_frontend
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: |
-          # Deploy to the Vercel project that owns the custom domain (nuke.ag).
-          # Run from the frontend so its SPA rewrites and dist output are used.
-          DEPLOY_URL=$(vercel deploy --prod --force --yes)
+          # Deploy to the Vercel project that owns the custom domain (nuke.ag), from the frontend so its SPA rewrites
+          # and output are used; the prebuilt output needs no build on Vercel.
+          DEPLOY_URL=$(vercel deploy --prebuilt --prod --yes)
           if [[ ! "$DEPLOY_URL" =~ ^https://[a-zA-Z0-9-]+\.vercel\.app$ ]]; then
             echo "Vercel did not return a deployment URL" >&2
             exit 1
