@@ -21,6 +21,7 @@ struct WorkConsoleView: View {
     @State private var notifications: JobLoad<NotificationPage> = .loading
     @State private var loadingMore = false
     @State private var showAccount = false
+    @State private var showPaperwork = false
 
     var body: some View {
         NavigationStack {
@@ -34,6 +35,14 @@ struct WorkConsoleView: View {
                 .navigationTitle("Work")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button {
+                            showPaperwork = true
+                        } label: {
+                            Image(systemName: "doc.viewfinder")
+                        }
+                        .accessibilityLabel("Paperwork")
+                    }
                     ToolbarItem(placement: .topBarTrailing) {
                         Button {
                             showAccount = true
@@ -46,7 +55,10 @@ struct WorkConsoleView: View {
                 .sheet(isPresented: $showAccount) {
                     AccountView()
                 }
-                .task { await load() }
+                .fullScreenCover(isPresented: $showPaperwork) {
+                    PaperworkScanView()
+                }
+                .task { PaperworkQueue.shared.kick(); await load() }
                 .refreshable {
                     await load()
                     if showCapture { await CaptureSections.syncNow() }
