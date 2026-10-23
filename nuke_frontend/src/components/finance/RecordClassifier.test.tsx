@@ -2,8 +2,8 @@
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-const fixture = vi.hoisted(() => ({ classify: vi.fn(), categories: [] as { section: string; category: string; records: number }[], saved: 0 }));
-vi.mock('../../lib/supabase', () => ({ supabase: { from() { const q = { select: () => q, eq: () => q, order: () => q, limit: async () => ({ data: fixture.categories, error: null }) }; return q; } } }));
+const fixture = vi.hoisted(() => ({ classify: vi.fn(), rpc: vi.fn(), categories: [] as { section: string; category: string; records: number }[], saved: 0 }));
+vi.mock('../../lib/supabase', () => ({ supabase: { rpc: fixture.rpc, from() { const q = { select: () => q, eq: () => q, order: () => q, limit: async () => ({ data: fixture.categories, error: null }) }; return q; } } }));
 vi.mock('../../services/financialRecordClassification', async importOriginal => ({ ...await importOriginal<object>(), classifyRecords: fixture.classify }));
 import RecordClassifier, { forgetAccountingCategories, type ClassifyTarget } from './RecordClassifier';
 import { AccountingBookContext } from './AccountingBookContext';
@@ -18,6 +18,7 @@ const press = async (text: string) => { await act(async () => button(text).click
 beforeEach(() => {
   (globalThis as unknown as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
   forgetAccountingCategories(); fixture.classify.mockReset(); changed.mockReset(); fixture.saved = 0;
+  fixture.rpc.mockReset(); fixture.rpc.mockResolvedValue({ data: [], error: null });
   fixture.categories = [{ section: 'Expense', category: 'Tech & software subscriptions', records: 653 }, { section: 'Transfer', category: 'Transfer between own accounts', records: 758 }, { section: 'Expense', category: 'Car restoration — parts & materials', records: 462 }, { section: 'Owner', category: 'Personal - not deductible', records: 527 }];
   window.addEventListener('accounting-saved', () => { fixture.saved++; });
   node = document.createElement('div'); document.body.append(node); root = createRoot(node);
@@ -68,4 +69,26 @@ it('classifies a selection with one revision per source and summarizes the outco
 it('review-only access never presents a save action', async () => {
   await act(async () => render([{ documentId: 'doc', record: record('a') }], false));
   expect(node.querySelector('fieldset')).toBeNull(); expect(node.textContent).toContain('Review access'); expect(fixture.classify).not.toHaveBeenCalled();
+});
+
+it('shows how similar transactions were classified and applies one with a tap', async () => {
+  fixture.rpc.mockResolvedValue({ data: [{ section: 'Expense', category: 'Travel for shoots and car business', records: 7, similarity: 0.42 }, { section: 'Reference', category: 'PayPal authorization hold', records: 4, similarity: 0.83 }], error: null });
+  fixture.classify.mockResolvedValue({ saved: ['a'.repeat(64)], unchanged: [], conflicts: [], records: [{ ...record('a'), section: 'Expense', category: 'Travel for shoots and car business' }] });
+  await act(async () => render([{ documentId: 'doc', record: record('a', { description: 'SPIRIT AIRLINES ONBOAR | General PayPal Debit Card Transaction | ' }) }]));
+  expect(fixture.rpc).toHaveBeenCalledWith('accounting_similar_classifications', { p_owner_id: owner, p_description: 'SPIRIT AIRLINES ONBOAR | General PayPal Debit Card Transaction | ', p_exclude_source_key: 'a'.repeat(64), p_limit: 25 });
+  const chips = [...node.querySelectorAll('[aria-label="Similar transactions"] button')];
+  expect(chips.map(b => b.textContent)).toEqual(['Expense · Travel for shoots and car business 7', 'Reference · PayPal authorization hold 4']);
+  await act(async () => (chips[0] as HTMLButtonElement).click());
+  expect(chips[0].getAttribute('aria-pressed')).toBe('true');
+  await press('Save classification');
+  expect(fixture.classify.mock.calls[0][3]).toEqual({ section: 'Expense', category: 'Travel for shoots and car business', note: '' });
+});
+
+it('a selection or a failed lookup shows no similar transactions', async () => {
+  fixture.rpc.mockResolvedValue({ data: null, error: new Error('unavailable') });
+  await act(async () => render([{ documentId: 'doc', record: record('a') }]));
+  expect(node.querySelector('[aria-label="Similar transactions"]')).toBeNull(); expect(node.textContent).not.toContain('Looking for similar');
+  fixture.rpc.mockClear();
+  await act(async () => render([{ documentId: 'doc', record: record('a') }, { documentId: 'doc', record: record('b') }]));
+  expect(fixture.rpc).not.toHaveBeenCalled();
 });
