@@ -610,7 +610,7 @@ final class SyncEngine: ObservableObject {
         // A PhotoKit-triggered pass or refresh wake can upload without reopening the app.
         // File mapped albums after that pass too; this path reads metadata, never originals.
         if uploaded > metadataOnly, !Task.isCancelled {
-            await AttributionEngine.shared.run(limit: 500, ocrBudget: 0)
+            await AttributionEngine.shared.runAutomatic(limit: 500, ocrBudget: 0)
         }
         // One bounded comparison of already acknowledged sources, including retries from an
         // earlier pass. Visual analysis availability never changes upload or filing success.

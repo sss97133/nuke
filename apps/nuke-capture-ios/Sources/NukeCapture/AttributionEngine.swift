@@ -114,6 +114,32 @@ final class AttributionEngine: ObservableObject {
 
     // ─── Run ───────────────────────────────────────────────────────────────────
 
+    // ─── Automatic-run gate (foreground + post-sync) ─────────────────────────
+    // Foreground, every sync with uploads and every library change used to re-run the whole pass,
+    // keeping the phone hot. Automatic runs now skip when the device is seriously hot or in Low
+    // Power Mode and run at most once per 15 minutes. Explicit calls to `run` are unaffected.
+    static let automaticInterval: TimeInterval = 15 * 60
+    static let lastAutomaticRunKey = "AttributionEngine.lastAutomaticRun"
+
+    nonisolated static func shouldRunAutomatic(now: Date, lastRun: Date?, tooHot: Bool, lowPower: Bool,
+                                               interval: TimeInterval = automaticInterval) -> Bool {
+        if tooHot || lowPower { return false }
+        guard let lastRun else { return true }
+        // A clock moved backwards does not hold attribution off forever.
+        return now.timeIntervalSince(lastRun) >= interval || now < lastRun
+    }
+
+    @discardableResult
+    func runAutomatic(limit: Int, ocrBudget: Int, defaults: UserDefaults = .standard) async -> Bool {
+        let now = Date()
+        let last = defaults.object(forKey: Self.lastAutomaticRunKey) as? Date
+        guard Self.shouldRunAutomatic(now: now, lastRun: last, tooHot: SyncEngine.deviceTooHot,
+                                      lowPower: ProcessInfo.processInfo.isLowPowerModeEnabled) else { return false }
+        guard !isRunning else { return false }
+        defaults.set(now, forKey: Self.lastAutomaticRunKey)
+        return await run(limit: limit, ocrBudget: ocrBudget)
+    }
+
     /// Attribute this device's orphan photos (uploaded rows with no vehicle). Returns true on a
     /// clean pass.
     ///
@@ -160,9 +186,21 @@ final class AttributionEngine: ObservableObject {
             v.vin.map { (serial: $0, vehicleId: v.id) }
         })
         let catalog = LibraryStore.shared.albumCatalog
-        let localPhotos = Dictionary(((catalog?.photos ?? []) + (catalog?.albums.flatMap(\.photos) ?? []))
-            .map { ($0.localIdentifier, $0) }, uniquingKeysWith: { first, _ in first })
         let method = LibraryIngest.identityMethodVersion
+        // Build the catalog index and read every retained source review in ONE detached task
+        // (off the main actor) instead of a whole-catalog dictionary on main plus a hop per orphan.
+        let orphanAssetIDs = orphans.compactMap { $0.exif_data?.uuid }
+        let (localPhotos, cachedReviews) = await Task.detached(priority: .utility) {
+            () -> ([String: LocalAlbumPhoto], [String: LocalAlbumImageReview]) in
+            let photos = Dictionary(((catalog?.photos ?? []) + (catalog?.albums.flatMap(\.photos) ?? []))
+                .map { ($0.localIdentifier, $0) }, uniquingKeysWith: { first, _ in first })
+            var reviews: [String: LocalAlbumImageReview] = [:]
+            for id in orphanAssetIDs where reviews[id] == nil {
+                guard let photo = photos[id] else { continue }
+                if let r = try? LocalStore.shared.albumImageReview(for: photo, methodVersion: method) { reviews[id] = r }
+            }
+            return (photos, reviews)
+        }.value
         let identityRunID = UUID().uuidString.lowercased()
 
         guard !orphans.isEmpty else { lastSummary = "No orphan photos to attribute"; return true }
@@ -180,12 +218,7 @@ final class AttributionEngine: ObservableObject {
             guard let assetID = row.exif_data?.uuid else { skippedNonLocal += 1; continue }
             // Foreground sync has a zero *new* OCR budget. It must still consume original-byte
             // reads already retained by LibraryIngest, qualified by source and method version.
-            let cached: LocalAlbumImageReview?
-            if let photo = localPhotos[assetID] {
-                cached = try? await Task.detached {
-                    try LocalStore.shared.albumImageReview(for: photo, methodVersion: method)
-                }.value
-            } else { cached = nil }
+            let cached = cachedReviews[assetID]
             let lines: [String]
             let isVehicle: Bool
             let identityReadAt: Date
@@ -256,7 +289,8 @@ final class AttributionEngine: ObservableObject {
                 albumContextAmbiguous: assetID.map { albumContext.ambiguous.contains($0) } ?? false)
         }
         await uploadVINReads(captureFrames)
-        let identityGroups = Self.vinAnchoredCaptureGroups(captureFrames)
+        // anchors × frames × frontier: run off the main actor.
+        let identityGroups = await Task.detached(priority: .utility) { Self.vinAnchoredCaptureGroups(captureFrames) }.value
         // Persist contextual 2–3 source reading receipts before any VIN profile write.
         // They use image_observations' protected reading-only lane; no subject membership is asserted.
         if !identityGroups.isEmpty {
