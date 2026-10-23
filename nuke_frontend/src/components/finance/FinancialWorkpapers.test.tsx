@@ -2,11 +2,13 @@
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-const fixture = vi.hoisted(() => ({ invoke: vi.fn(), from: vi.fn(), listener: null as null | ((event: string) => void) }));
+const fixture = vi.hoisted(() => ({ invoke: vi.fn(), from: vi.fn(), classify: vi.fn(), listener: null as null | ((event: string) => void) }));
 vi.mock('../../lib/supabase', () => ({ supabase: { functions: { invoke: fixture.invoke }, from: fixture.from, auth: {
   onAuthStateChange(listener: (event: string) => void) { fixture.listener = listener; return { data: { subscription: { unsubscribe() {} } } }; },
 } } }));
+vi.mock('../../services/financialRecordClassification', async importOriginal => ({ ...await importOriginal<object>(), classifyRecords: fixture.classify }));
 import FinancialWorkpapers, { yearOverview, recordDescription, searchPattern } from './FinancialWorkpapers';
+import { forgetAccountingCategories } from './RecordClassifier';
 import { AccountingBookContext } from './AccountingBookContext';
 let container: HTMLDivElement; let root: Root;
 const empty = () => ({ records: [], total_rows: 0, next_after: null, controls_valid: true, controls: [] });
@@ -19,7 +21,7 @@ const record = (id = 'row1', description = 'Retained part') => ({ id, document_i
 type Query = { calls: [string, unknown[]][]; then: (resolve: (value: unknown) => unknown) => Promise<unknown> } & Record<string, unknown>;
 const table = (result: { data?: unknown; count?: number | null; error?: unknown }) => {
   const query = { calls: [] } as unknown as Query;
-  for (const method of ['select', 'eq', 'is', 'or', 'order', 'range']) query[method] = (...args: unknown[]) => { query.calls.push([method, args]); return query; };
+  for (const method of ['select', 'eq', 'is', 'or', 'order', 'range', 'limit', 'in']) query[method] = (...args: unknown[]) => { query.calls.push([method, args]); return query; };
   query.then = resolve => Promise.resolve({ data: [], count: 0, error: null, ...result }).then(resolve);
   return query;
 };
@@ -27,7 +29,7 @@ const queries = () => fixture.from.mock.results.map(r => r.value as Query);
 const filters = (query: Query, method: string) => query.calls.filter(([m]: [string, unknown[]]) => m === method).map(([, args]: [string, unknown[]]) => args);
 const book = (ui: React.ReactNode) => <AccountingBookContext.Provider value={{ ownerId: 'owner', shared: false, canCorrect: true, liveRevision: '0' }}>{ui}</AccountingBookContext.Provider>;
 beforeEach(() => {
-  (globalThis as unknown as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true; fixture.invoke.mockReset(); fixture.from.mockReset();
+  (globalThis as unknown as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true; fixture.invoke.mockReset(); fixture.from.mockReset(); fixture.classify.mockReset(); forgetAccountingCategories();
   fixture.invoke.mockResolvedValue(response(empty()));
   fixture.from.mockImplementation(() => table({}));
   // Node's own experimental localStorage global shadows jsdom's and is undefined here; give the page a plain one.
@@ -212,4 +214,38 @@ it('removes full UUID display tokens while preserving source description and ord
   await act(async () => Array.from(container.querySelectorAll('button')).find(b=>b.textContent==='View evidence')!.click());
   expect(open.mock.calls[0][1].description).toBe(original);
   expect(saved.record.description).toBe(original);
+});
+
+it('select mode: tap rows to select them, classify the selection in one sheet, and the rows change at once', async () => {
+  const movement = (id: string, key: string) => ({ id, document_id: 'doc', record: { record_kind: 'retained_bank_movement', local_id: `bank:${key}`, year: '2025', date: '2025-03-01', account: 'Checking', section: null, category: '', amount: '-9.99', currency: 'USD', description: `SHOP ${key}`, source_key: key.repeat(64) } });
+  fixture.invoke.mockResolvedValue(response({ ...empty(), total_rows: 2, controls: [{ record_kind: 'retained_bank_movement', year: '2025', account: 'Checking', section: null, currency: 'USD', retained_amount: '-19.98', rows: 2 }] }));
+  fixture.from.mockImplementation((name: string) => name === 'v_financial_accounting_records' ? table({ data: [movement('r1', 'a'), movement('r2', 'b')], count: 2 }) : table({ data: [{ section: 'Owner', category: 'Personal - not deductible', records: 527 }] }));
+  fixture.classify.mockImplementation(async (_owner: string, _document: string, targets: { source_key: string }[]) => ({ saved: targets.map(t => t.source_key), unchanged: [], conflicts: [], records: targets.map(t => ({ ...movement('x', t.source_key[0]).record, section: 'Owner', category: 'Personal - not deductible' })) }));
+  const open = vi.fn();
+  await act(async () => root.render(book(<FinancialWorkpapers revision={0} onOpen={open} />)));
+  await act(async () => Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'Records')!.click());
+  await act(async () => Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'Select')!.click());
+  expect(container.textContent).toContain('Tap records to select them');
+  await act(async () => (container.querySelector('tbody tr') as HTMLElement).click());
+  expect(open).not.toHaveBeenCalled(); expect(container.textContent).toContain('1 selected');
+  await act(async () => (container.querySelector('thead input[type="checkbox"]') as HTMLInputElement).click());
+  expect(container.textContent).toContain('2 selected');
+  expect(container.querySelectorAll('tbody tr[aria-selected="true"]')).toHaveLength(2);
+  await act(async () => Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'Classify…')!.click());
+  const sheet = container.querySelector('dialog[aria-label="Classify selected records"]')!;
+  expect(sheet.querySelector('h2')?.textContent).toBe('Classify 2 records');
+  expect(sheet.querySelectorAll('.accounting-selection-list li')).toHaveLength(2);
+  await act(async () => Array.from(sheet.querySelectorAll('button')).find(b => b.textContent === 'Owner')!.click());
+  await act(async () => Array.from(sheet.querySelectorAll('button')).find(b => b.textContent === 'Personal - not deductible')!.click());
+  await act(async () => Array.from(sheet.querySelectorAll('button')).find(b => b.textContent === 'Classify 2 records')!.click());
+  expect(fixture.classify).toHaveBeenCalledTimes(1);
+  expect(fixture.classify.mock.calls[0][2]).toEqual([{ source_key: 'a'.repeat(64), section: null, category: '' }, { source_key: 'b'.repeat(64), section: null, category: '' }]);
+  expect(sheet.textContent).toContain('Saved 2 records as Owner · Personal - not deductible.');
+  expect(container.querySelector('tbody')?.textContent).toContain('Personal - not deductible');
+  expect(container.textContent).toContain('Tap records to select them');
+  await act(async () => Array.from(sheet.querySelectorAll('button')).find(b => b.textContent === 'Close')!.click());
+  expect(container.querySelector('dialog[aria-label="Classify selected records"]')).toBeNull();
+  await act(async () => Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'Done')!.click());
+  await act(async () => (container.querySelector('tbody tr') as HTMLElement).click());
+  expect(open).toHaveBeenCalledTimes(1);
 });

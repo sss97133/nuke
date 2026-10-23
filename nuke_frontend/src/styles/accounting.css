@@ -86,6 +86,21 @@
 .accounting-page th[aria-sort] .accounting-sort { color:var(--text); }
 .accounting-page .accounting-row { cursor:pointer; transition:background 180ms cubic-bezier(0.16,1,0.3,1); }
 .accounting-page .accounting-row:hover { background:var(--bg-secondary,var(--border)); }
+/* Classification: section chips, most-used category chips, then the field, note and save. */
+.accounting-classifier { padding:16px 0; border-bottom:2px solid var(--border); }
+.accounting-page .accounting-classifier h3 { font-size:18px; }
+.accounting-classifier fieldset { border:0; padding:0; margin:12px 0; display:grid; gap:12px; }
+.accounting-classifier label { display:flex; flex-direction:column; gap:4px; }
+.accounting-classifier input,.accounting-classifier textarea { font:14px Arial,sans-serif; padding:8px; color:var(--text); background:var(--bg); border:2px solid var(--border); }
+.accounting-classifier textarea { min-height:60px; }
+.accounting-page .accounting-primary:not(:disabled),.accounting-page .accounting-primary:hover:not(:disabled) { background:var(--text); color:var(--bg); }
+/* Select mode: a checkbox column, highlighted rows and a toolbar that stays in reach at the bottom while scrolling. */
+.accounting-page .accounting-select { width:36px; padding-right:0; }
+.accounting-select input { width:18px; height:18px; margin:0; cursor:pointer; }
+.accounting-page tr[aria-selected="true"] { background:var(--bg-secondary,var(--border)); }
+.accounting-selection-bar { position:sticky; bottom:0; z-index:1; display:flex; align-items:center; flex-wrap:wrap; gap:10px; padding:10px 0; background:var(--bg); border-top:2px solid var(--border); font-size:13px; }
+.accounting-selection-list { list-style:none; padding:0; margin:12px 0; }
+.accounting-selection-list li { display:flex; flex-wrap:wrap; align-items:baseline; gap:10px; padding:6px 0; border-bottom:2px solid var(--border); font-size:13px; }
 .accounting-use-editor { padding:16px 0; border-bottom:2px solid var(--border); }
 .accounting-page .accounting-use-editor h3 { font-size:18px; }
 .accounting-use-editor fieldset { border:0; padding:0; margin:12px 0; display:grid; gap:12px; }
