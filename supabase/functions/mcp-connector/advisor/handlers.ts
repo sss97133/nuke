@@ -2184,7 +2184,7 @@ async function handleGetCoverage(
   if (error) return err(error.message, "get_coverage");
   if (!vehicle) return err("Asset not found", "get_coverage");
 
-  const [eventsCount, obsCount, imgCount, sourcesRes] = await Promise.all([
+  const [eventsCount, obsCount, imgCount, sourcesRes, estimateRes] = await Promise.all([
     sb.from("vehicle_events").select("id", { count: "exact", head: true }).eq("vehicle_id", vid),
     sb.from("vehicle_observations").select("id", { count: "exact", head: true }).eq("vehicle_id", vid),
     sb.from("vehicle_images").select("id", { count: "exact", head: true }).eq("vehicle_id", vid),
@@ -2194,6 +2194,15 @@ async function handleGetCoverage(
       .eq("vehicle_id", vid)
       .eq("is_superseded", false)
       .limit(100),
+    sb
+      .from("nuke_estimates")
+      .select(
+        "estimated_value, value_low, value_high, confidence_score, confidence_interval_pct, signal_weights, deal_score, deal_score_label, heat_score, heat_score_label, model_version, input_count, calculated_at, is_stale",
+      )
+      .eq("vehicle_id", vid)
+      .order("calculated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
   ]);
 
   const sourceMap = await loadSources(
@@ -2235,6 +2244,7 @@ async function handleGetCoverage(
   // Force not-recorded shape for empties (recordedClaim already does this)
   const recorded = claims.filter((c) => c.value !== "not recorded").length;
   const missing = claims.length - recorded;
+  const estimate = estimateRes.error ? null : estimateRes.data ?? null;
 
   return ok(
     makeEnvelope("get_coverage", "vehicle", vid, claims, {
@@ -2247,9 +2257,43 @@ async function handleGetCoverage(
         observation_count: obsCount.count ?? row.observation_count ?? 0,
         image_count: imgCount.count ?? row.image_count ?? 0,
         data_quality_score: row.data_quality_score ?? null,
+        data_quality_score_note:
+          "Profile-level completeness signal. Do not treat it as calibrated factual accuracy without the supporting evidence and score components.",
         sources: sourceNames,
       },
-      checked_sources: ["vehicles", "vehicle_events", "vehicle_observations", "vehicle_images", ...sourceNames],
+      estimate: estimate
+        ? {
+            estimated_value: estimate.estimated_value,
+            value_low: estimate.value_low,
+            value_high: estimate.value_high,
+            confidence_score: estimate.confidence_score,
+            confidence_interval_pct: estimate.confidence_interval_pct,
+            signal_weights: estimate.signal_weights,
+            deal_score: estimate.deal_score,
+            deal_score_label: estimate.deal_score_label,
+            heat_score: estimate.heat_score,
+            heat_score_label: estimate.heat_score_label,
+            model_version: estimate.model_version,
+            input_count: estimate.input_count,
+            calculated_at: estimate.calculated_at,
+            is_stale: estimate.is_stale,
+            interpretation:
+              "Derived valuation output. Read signal_weights, input_count, model_version, calculated_at, and is_stale with the value; this is not an independently verified sale outcome.",
+          }
+        : {
+            status: "not recorded",
+            note: estimateRes.error
+              ? "The valuation ledger could not be read for this asset."
+              : "No valuation row is recorded for this asset.",
+          },
+      checked_sources: [
+        "vehicles",
+        "vehicle_events",
+        "vehicle_observations",
+        "vehicle_images",
+        "nuke_estimates",
+        ...sourceNames,
+      ],
     }),
   );
 }
