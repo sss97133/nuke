@@ -29,6 +29,13 @@ final class LibraryStore: NSObject, ObservableObject, PHPhotoLibraryChangeObserv
     /// a multi-MB snapshot; it used to run 2-4 times per open plus once per library change.
     private var lastAlbumRefresh: Date?
     private var pendingChangeRefresh: Task<Void, Never>?
+    /// The PhotoKit fetches the current catalog was read from. Library changes are applied to the
+    /// catalog incrementally through `PHChange.changeDetails(for:)` against these, instead of
+    /// re-enumerating every photo and album (a multi-second, hot full rescan per change burst).
+    private var catalogSources: CatalogSources?
+    /// Set when a change could not be applied incrementally: the next non-forced refresh
+    /// ignores the cooldown and rescans.
+    private var catalogStale = false
 
     private let imageManager = PHCachingImageManager()
     private let scale = UIScreen.main.scale
@@ -109,7 +116,7 @@ final class LibraryStore: NSObject, ObservableObject, PHPhotoLibraryChangeObserv
             await withCheckedContinuation { albumRefreshWaiters.append($0) }
             return
         }
-        if !force, let last = lastAlbumRefresh, Date().timeIntervalSince(last) < 60, albumCatalog != nil { return }
+        if !force, !catalogStale, let last = lastAlbumRefresh, Date().timeIntervalSince(last) < 60, albumCatalog != nil { return }
         refreshingAlbums = true
         defer {
             refreshingAlbums = false
@@ -119,8 +126,11 @@ final class LibraryStore: NSObject, ObservableObject, PHPhotoLibraryChangeObserv
         }
         repeat {
             albumRefreshPending = false
-            let catalog = await Task.detached(priority: .utility) { Self.readAlbums() }.value
+            catalogStale = false
+            let read = await Task.detached(priority: .utility) { Self.readAlbums() }.value
+            let catalog = read.catalog
             albumCatalog = catalog
+            catalogSources = read.sources
             do {
                 try await Task.detached { try LocalStore.shared.recordAlbumCatalog(catalog) }.value
                 albumError = nil
@@ -131,20 +141,93 @@ final class LibraryStore: NSObject, ObservableObject, PHPhotoLibraryChangeObserv
         } while albumRefreshPending
     }
 
-    private nonisolated static func readAlbums() -> LocalAlbumCatalog {
+    /// Read the catalog for screens that only need it present (attribution, profile): the cached
+    /// in-memory or stored catalog, kept current incrementally; a full read only when none exists.
+    func ensureAlbumCatalog() async {
+        if albumCatalog != nil, !catalogStale { return }
+        if albumCatalog == nil {
+            let stored = await Task.detached(priority: .utility) { try? LocalStore.shared.latestAlbumCatalog() }.value
+            if albumCatalog == nil, let stored { albumCatalog = stored }
+        }
+        // A stored snapshot has no live fetches to diff against; the next library change (or the
+        // library screen's own cooldown refresh) rescans. Only no catalog at all forces a read now.
+        if albumCatalog == nil || catalogStale { await refreshAlbums() }
+    }
+
+    /// The live PhotoKit fetches behind a catalog snapshot (PHFetchResult is immutable and
+    /// thread-safe to read).
+    struct CatalogSources: @unchecked Sendable {
+        var photos: PHFetchResult<PHAsset>
+        var collections: PHFetchResult<PHAssetCollection>?
+        var topLevel: PHFetchResult<PHCollection>?
+        var albums: [String: PHFetchResult<PHAsset>]
+    }
+
+    private nonisolated static func photo(_ asset: PHAsset) -> LocalAlbumPhoto {
+        // Modification time is a source-version hint, never a capture date.
+        LocalAlbumPhoto(localIdentifier: asset.localIdentifier,
+                        sourceVersion: asset.modificationDate.map { String($0.timeIntervalSince1970) })
+    }
+
+    /// One fetch's change as a membership delta, or nil when PhotoKit can only offer a new
+    /// result (no incremental info) and the caller must rescan.
+    private nonisolated static func delta(_ d: PHFetchResultChangeDetails<PHAsset>) -> CatalogDelta? {
+        guard d.hasIncrementalChanges else { return nil }
+        return CatalogDelta(removed: Set(d.removedObjects.map(\.localIdentifier)),
+                            upserted: (d.insertedObjects + d.changedObjects).map(photo))
+    }
+
+    /// Apply a PhotoKit change to the catalog in place. Returns false when the change needs a
+    /// full rescan (no catalog, no sources, album/folder structure changed, or no incremental info).
+    private func applyIncremental(_ change: PHChange) -> Bool {
+        guard let catalog = albumCatalog, var sources = catalogSources, !refreshingAlbums else { return false }
+        var photoDelta: CatalogDelta?
+        if let d = change.changeDetails(for: sources.photos) {
+            guard let delta = Self.delta(d) else { return false }
+            photoDelta = delta
+            sources.photos = d.fetchResultAfterChanges
+        }
+        // Album added/removed/renamed or folders moved: structure, not membership — rescan.
+        if let c = sources.collections, change.changeDetails(for: c) != nil { return false }
+        if let t = sources.topLevel, change.changeDetails(for: t) != nil { return false }
+        var albumDeltas: [String: CatalogDelta] = [:]
+        for (id, fetch) in sources.albums {
+            guard let d = change.changeDetails(for: fetch) else { continue }
+            guard let delta = Self.delta(d) else { return false }
+            albumDeltas[id] = delta
+            sources.albums[id] = d.fetchResultAfterChanges
+        }
+        catalogSources = sources
+        guard photoDelta != nil || !albumDeltas.isEmpty else { return true }
+        albumCatalog = Self.applying(catalog, photos: photoDelta, albums: albumDeltas, at: Date())
+        return true
+    }
+
+    /// Pure merge of membership deltas into a catalog (unit-tested).
+    nonisolated static func applying(_ catalog: LocalAlbumCatalog, photos: CatalogDelta?,
+                                     albums: [String: CatalogDelta], at date: Date) -> LocalAlbumCatalog {
+        let mergedAlbums = catalog.albums.map { album -> LocalPhotoAlbum in
+            guard let d = albums[album.id] else { return album }
+            return LocalPhotoAlbum(id: album.id, name: album.name, folderPath: album.folderPath,
+                                   sourceKind: album.sourceKind, photos: d.applied(to: album.photos))
+        }
+        return LocalAlbumCatalog(accessScope: catalog.accessScope, observedAt: date, albums: mergedAlbums,
+                                 photos: photos.map { $0.applied(to: catalog.photos ?? []) } ?? catalog.photos)
+    }
+
+    private nonisolated static func readAlbums() -> (catalog: LocalAlbumCatalog, sources: CatalogSources?) {
         let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
         guard status == .authorized || status == .limited else {
-            return LocalAlbumCatalog(accessScope: "unavailable", observedAt: Date(), albums: [], photos: [])
+            return (LocalAlbumCatalog(accessScope: "unavailable", observedAt: Date(), albums: [], photos: []), nil)
         }
         let options = PHFetchOptions()
         options.predicate = NSPredicate(format: "mediaType == %d", PHAssetMediaType.image.rawValue)
         var visible: [LocalAlbumPhoto] = []
-        PHAsset.fetchAssets(with: options).enumerateObjects { asset, _, _ in
-            visible.append(LocalAlbumPhoto(localIdentifier: asset.localIdentifier,
-                sourceVersion: asset.modificationDate.map { String($0.timeIntervalSince1970) }))
-        }
+        let allPhotos = PHAsset.fetchAssets(with: options)
+        allPhotos.enumerateObjects { asset, _, _ in visible.append(photo(asset)) }
         if status == .limited {
-            return LocalAlbumCatalog(accessScope: "limited", observedAt: Date(), albums: [], photos: visible)
+            return (LocalAlbumCatalog(accessScope: "limited", observedAt: Date(), albums: [], photos: visible),
+                    CatalogSources(photos: allPhotos, collections: nil, topLevel: nil, albums: [:]))
         }
         var paths: [String: [String]] = [:]
         func walk(_ collections: PHFetchResult<PHCollection>, path: [String]) {
@@ -157,21 +240,22 @@ final class LibraryStore: NSObject, ObservableObject, PHPhotoLibraryChangeObserv
                 }
             }
         }
-        walk(PHCollectionList.fetchTopLevelUserCollections(with: nil), path: [])
+        let topLevel = PHCollectionList.fetchTopLevelUserCollections(with: nil)
+        walk(topLevel, path: [])
         let collections = PHAssetCollection.fetchAssetCollections(with: .album, subtype: .any, options: nil)
         var albums: [LocalPhotoAlbum] = []
+        var albumFetches: [String: PHFetchResult<PHAsset>] = [:]
         collections.enumerateObjects { album, _, _ in
             var photos: [LocalAlbumPhoto] = []
-            PHAsset.fetchAssets(in: album, options: options).enumerateObjects { asset, _, _ in
-                // Modification time is a source-version hint, never a capture date.
-                let version = asset.modificationDate.map { String($0.timeIntervalSince1970) }
-                photos.append(LocalAlbumPhoto(localIdentifier: asset.localIdentifier, sourceVersion: version))
-            }
+            let fetch = PHAsset.fetchAssets(in: album, options: options)
+            albumFetches[album.localIdentifier] = fetch
+            fetch.enumerateObjects { asset, _, _ in photos.append(photo(asset)) }
             albums.append(LocalPhotoAlbum(id: album.localIdentifier, name: album.localizedTitle,
                 folderPath: paths[album.localIdentifier] ?? [],
                 sourceKind: String(album.assetCollectionSubtype.rawValue), photos: photos))
         }
-        return LocalAlbumCatalog(accessScope: "full", observedAt: Date(), albums: albums.sorted { $0.id < $1.id }, photos: visible)
+        return (LocalAlbumCatalog(accessScope: "full", observedAt: Date(), albums: albums.sorted { $0.id < $1.id }, photos: visible),
+                CatalogSources(photos: allPhotos, collections: collections, topLevel: topLevel, albums: albumFetches))
     }
 
     /// Grid request options — OPPORTUNISTIC: PhotoKit delivers a cached low-res
@@ -247,15 +331,49 @@ final class LibraryStore: NSObject, ObservableObject, PHPhotoLibraryChangeObserv
                 assets = details.fetchResultAfterChanges
                 count = assets.count
             }
-            // An album rename/member edit can happen without changing the global
-            // asset fetch. It must still produce a new human/source snapshot, once the burst
-            // settles: iCloud delivers changes in storms, each used to re-read the library.
+            // Apply membership changes to the catalog in place (inserted/removed/changed per
+            // fetch). Only a change PhotoKit cannot express incrementally, or one to album/folder
+            // structure, marks the catalog stale for a full rescan. Either way the burst settles
+            // first: iCloud delivers changes in storms.
+            if refreshingAlbums { albumRefreshPending = true; return }
+            let incremental = applyIncremental(changeInstance)
+            if !incremental { catalogStale = true }
             pendingChangeRefresh?.cancel()
             pendingChangeRefresh = Task { @MainActor [weak self] in
                 try? await Task.sleep(for: .seconds(30))
-                guard !Task.isCancelled else { return }
-                await self?.refreshAlbums(force: true)
+                guard !Task.isCancelled, let self else { return }
+                if self.catalogStale {
+                    await self.refreshAlbums()
+                } else if let catalog = self.albumCatalog {
+                    // Persist the incrementally updated snapshot once per burst.
+                    do {
+                        try await Task.detached { try LocalStore.shared.recordAlbumCatalog(catalog) }.value
+                        self.albumError = nil
+                    } catch { self.albumError = "Album organization could not be saved. Try again." }
+                }
             }
         }
+    }
+}
+
+/// One fetch's membership change: ids removed, photos inserted or changed (by local identifier).
+struct CatalogDelta: Equatable, Sendable {
+    let removed: Set<String>
+    let upserted: [LocalAlbumPhoto]
+
+    /// Drop removed ids, replace changed photos in place, append new ones in delta order.
+    func applied(to photos: [LocalAlbumPhoto]) -> [LocalAlbumPhoto] {
+        var updates: [String: LocalAlbumPhoto] = [:]
+        for p in upserted { updates[p.localIdentifier] = p }
+        var out: [LocalAlbumPhoto] = []
+        out.reserveCapacity(photos.count + upserted.count)
+        var present = Set<String>()
+        for p in photos where !removed.contains(p.localIdentifier) && present.insert(p.localIdentifier).inserted {
+            out.append(updates[p.localIdentifier] ?? p)
+        }
+        for p in upserted where !removed.contains(p.localIdentifier) && present.insert(p.localIdentifier).inserted {
+            out.append(p)
+        }
+        return out
     }
 }
