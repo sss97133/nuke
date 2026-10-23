@@ -407,7 +407,13 @@ export type CompsLookup = {
   attempts: number;
   source: string;
   error: string | null;
+  /** Basis of every sale_price in this comp set: one basis, never mixed. "legacy_mixed" = basis-aware RPC had no rows. */
+  price_basis?: CompsPriceBasis;
 };
+
+/** Comps are hammer prices (premium excluded) unless asked otherwise; gross and net-to-owner are separate contexts. */
+export type CompsPriceBasis = "hammer" | "gross_incl_premium" | "net_to_owner" | "legacy_mixed";
+export const DEFAULT_COMPS_BASIS: Exclude<CompsPriceBasis, "legacy_mixed"> = "hammer";
 
 async function resolveSoldComps(
   deps: AdvisorDeps,
@@ -461,7 +467,8 @@ async function resolveSoldComps(
 
   const yearRange = 2;
   const fetchLimit = Math.min(limit * 4, 60);
-  const compsArgs = {
+  const compsArgs: Record<string, unknown> = {
+    p_basis: DEFAULT_COMPS_BASIS,
     p_make: make,
     p_model: model,
     p_year_min: year != null ? year - yearRange : null,
@@ -483,8 +490,20 @@ async function resolveSoldComps(
     ({ data: rpcRows, error: rpcErr } = await sb.rpc("get_comps_combined", compsArgs));
     if (!rpcErr) break;
   }
+  let priceBasis: CompsPriceBasis = DEFAULT_COMPS_BASIS;
+  if (!rpcErr && Array.isArray(rpcRows) && rpcRows.length === 0) {
+    // Typed basis columns are still being backfilled; fall back to the legacy (mixed-basis) RPC, labelled as such
+    // and reported degraded, rather than return no comps.
+    const { p_basis: _basis, ...legacyArgs } = compsArgs;
+    const legacy = await sb.rpc("get_comps_combined", legacyArgs);
+    attempts++;
+    if (!legacy.error && Array.isArray(legacy.data) && legacy.data.length) {
+      rpcRows = legacy.data;
+      priceBasis = "legacy_mixed";
+    }
+  }
   const compsQueryError = rpcErr ? String(rpcErr.message || rpcErr) : null;
-  let lookupSource = "get_comps_combined";
+  let lookupSource = priceBasis === "legacy_mixed" ? "get_comps_combined_legacy_mixed_basis" : "get_comps_combined";
   let lookupOk = !rpcErr;
   let lookupError = compsQueryError;
 
@@ -737,6 +756,7 @@ async function resolveSoldComps(
       attempts,
       source: lookupSource,
       error: lookupError,
+      price_basis: lookupSource.startsWith("get_comps_combined") ? priceBasis : "legacy_mixed",
     },
   };
 }
