@@ -83,6 +83,9 @@ final class AttributionEngine: ObservableObject {
         let is_document: Bool
         let labels: [String]
         let vin_candidates: [String]
+        /// Each on-device read with its source (framework/request/revision) and confidence.
+        /// Omitted when the cached read predates OnDeviceAnalysis.
+        let on_device: [OnDeviceObservation]?
     }
     private struct DeviceReadingRequest: Encodable {
         let mode = "record_device_reading"
@@ -111,6 +114,7 @@ final class AttributionEngine: ObservableObject {
         let vinCandidates: [String]
         let isDocument: Bool
         let session: String
+        var onDevice: [OnDeviceObservation] = []
     }
     private struct SuggestUpdate: Encodable {
         let auto_suggested_vehicle_id: String
@@ -231,6 +235,7 @@ final class AttributionEngine: ObservableObject {
             let labels: [String]
             let sourceVINCandidates: [String]
             let isDocument: Bool
+            let onDevice: [OnDeviceObservation]
             if let cached, cached.inputSHA256 == row.file_hash {
                 lines = cached.textLines + cached.vinCandidates
                 isVehicle = cached.isVehicle
@@ -240,6 +245,7 @@ final class AttributionEngine: ObservableObject {
                     isScreenshot: VisionEngine.isScreenshot(localIdentifier: assetID), ocrLines: cached.textLines)
                 let classic = Set(VisionEngine.labelledClassicSerialCandidates(in: cached.textLines))
                 sourceVINCandidates = isDocument ? [] : cached.vinCandidates.filter { VisionEngine.isValidVIN($0) || classic.contains($0) }
+                onDevice = OnDeviceAnalysis.uploadable(cached.onDeviceObservations, isDocument: isDocument)
             } else {
                 guard read < ocrBudget else { continue }
                 guard let photo = localPhotos[assetID] else { skippedNonLocal += 1; continue }
@@ -263,6 +269,7 @@ final class AttributionEngine: ObservableObject {
                     isScreenshot: VisionEngine.isScreenshot(localIdentifier: assetID), ocrLines: review.textLines)
                 let classic = Set(VisionEngine.labelledClassicSerialCandidates(in: review.textLines))
                 sourceVINCandidates = isDocument ? [] : review.vinCandidates.filter { VisionEngine.isValidVIN($0) || classic.contains($0) }
+                onDevice = OnDeviceAnalysis.uploadable(review.onDeviceObservations, isDocument: isDocument)
             }
             let match = isDocument || knownVINs.isEmpty ? nil : VisionEngine.matchSerial(in: lines, known: knownVINs)
             let classicIdentifiers = Set(VisionEngine.labelledClassicSerialCandidates(in: lines))
@@ -278,7 +285,7 @@ final class AttributionEngine: ObservableObject {
                                   vinRead: match?.vin ?? unknown, unknownVIN: unknown,
                                   identityReadAt: identityReadAt, labels: labels,
                                   vinCandidates: sourceVINCandidates, isDocument: isDocument,
-                                  session: sessionKey(row)))
+                                  session: sessionKey(row), onDevice: onDevice))
         }
 
         let albumContext = Self.albumContextByAsset()
@@ -616,7 +623,8 @@ final class AttributionEngine: ObservableObject {
                 let items = selected.map { signal in IdentitySourceItem(image_id: signal.row.id,
                     read_at: ISO8601DateFormatter().string(from: signal.identityReadAt),
                     is_vehicle: signal.isVehicle, is_document: signal.isDocument,
-                    labels: Array(signal.labels.prefix(12)), vin_candidates: Array(signal.vinCandidates.prefix(8))) }
+                    labels: Array(signal.labels.prefix(12)), vin_candidates: Array(signal.vinCandidates.prefix(8)),
+                    on_device: signal.onDevice.isEmpty ? nil : signal.onDevice) }
                 let hashes = Dictionary(uniqueKeysWithValues: selected.compactMap { signal in
                     signal.row.file_hash.map { (signal.row.id, $0) }
                 })

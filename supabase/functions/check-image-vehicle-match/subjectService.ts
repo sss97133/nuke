@@ -128,7 +128,33 @@ export interface DeviceSourceReadRequest {
   identity_run_id?: string; identity_method_version?: string;
   device_privacy_receipts?: Record<string, unknown>;
   observations?: Array<{ image_id: string; read_at: string; is_vehicle: boolean; is_document: boolean;
-    labels: string[]; vin_candidates: string[] }>;
+    labels: string[]; vin_candidates: string[]; on_device?: unknown }>;
+}
+
+const ON_DEVICE_KINDS = new Set(["ocr_text", "vin", "classic_serial", "plate", "classification_label", "scene_zone"]);
+export const ON_DEVICE_OBSERVATION_LIMIT = 40;
+const shortText = (value: unknown, max: number) => typeof value === "string" && value.length > 0 && value.length <= max;
+
+/** Per-read on-device observations (iOS OnDeviceAnalysis): each keeps its source and confidence.
+ * Malformed entries are dropped, never stored; identifiers must pass the same check as vin_candidates.
+ * Pure so the stored receipt shape is pinned by tests. */
+export function sanitizeOnDeviceObservations(raw: unknown): Array<Record<string, unknown>> | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const out: Array<Record<string, unknown>> = [];
+  for (const item of raw.slice(0, ON_DEVICE_OBSERVATION_LIMIT)) {
+    if (!item || typeof item !== "object" || Array.isArray(item)) continue;
+    const o = item as Record<string, unknown>, src = o.source as Record<string, unknown> | undefined;
+    if (typeof o.kind !== "string" || !ON_DEVICE_KINDS.has(o.kind) || !shortText(o.value, 120) ||
+      typeof o.confidence !== "number" || !Number.isFinite(o.confidence) || o.confidence < 0 || o.confidence > 1 ||
+      !src || typeof src !== "object" || !shortText(src.framework, 40) || !shortText(src.model, 60) ||
+      !Number.isInteger(src.revision) || !shortText(src.os_version, 40) || !shortText(src.method, 60) ||
+      (o.repaired !== undefined && typeof o.repaired !== "boolean")) continue;
+    if ((o.kind === "vin" || o.kind === "classic_serial") && !isDeviceVehicleIdentifier(o.value)) continue;
+    out.push({ kind: o.kind, value: o.value, confidence: o.confidence,
+      source: { framework: src.framework, model: src.model, revision: src.revision, os_version: src.os_version, method: src.method },
+      ...(typeof o.repaired === "boolean" ? { repaired: o.repaired } : {}) });
+  }
+  return out;
 }
 
 /** Retain a fresh, cheap on-device read in the existing protected reading lane.
@@ -171,6 +197,12 @@ export async function retainDeviceSourceReading(store: SubjectStore, request: De
     capture_context: { device_fingerprint: source.device_fingerprint ?? null,
       latitude: source.latitude ?? null, longitude: source.longitude ?? null } }));
   const byId = new Map(observations.map(item => [item.image_id, item]));
+  // Store exactly the validated fields; on_device only when the phone sent it.
+  const retained = observations.map(item => {
+    const onDevice = sanitizeOnDeviceObservations(item.on_device);
+    return { image_id: item.image_id, read_at: item.read_at, is_vehicle: item.is_vehicle, is_document: item.is_document,
+      labels: item.labels, vin_candidates: item.vin_candidates, ...(onDevice ? { on_device: onDevice } : {}) };
+  });
   const envelope: SubjectEnvelope = { user_id: request.user_id, method: SUBJECT_METHOD,
     run_key: request.identity_run_id, provider: "Apple Vision (on-device)", model: request.identity_method_version,
     read_at: readAt, inputs, subjects: [], frames: ids.map(image_id => { const item = byId.get(image_id)!; return {
@@ -179,7 +211,7 @@ export async function retainDeviceSourceReading(store: SubjectStore, request: De
     candidate_scope: { kind: "account_associated_terminal_vehicles", vehicle_ids: [], retrieved: 0, exhausted: false,
       truncated: false, reference_photos_assessed: 0, unavailable_references: [], global_novelty_asserted: false },
     raw_model_reading: { kind: "on_device_identity_read_v1", identity_run_id: request.identity_run_id,
-      identity_method_version: request.identity_method_version, observations } };
+      identity_method_version: request.identity_method_version, observations: retained } };
   const persisted: string[] = [];
   for (const id of ids) persisted.push(await store.retainReading(id, envelope));
   return { method: SUBJECT_METHOD, status: "reading_retained", persisted_image_ids: persisted,

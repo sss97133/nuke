@@ -338,6 +338,10 @@ struct LocalAlbumImageReview: Codable, FetchableRecord, PersistableRecord, Senda
     let labelsJSON: String
     let vinCandidatesJSON: String
     let textLinesJSON: String
+    /// [OnDeviceObservation] JSON (source + confidence per read). Nil on reads made before v11.
+    var onDeviceJSON: String? = nil
+
+    var onDeviceObservations: [OnDeviceObservation] { OnDeviceAnalysis.decode(onDeviceJSON) }
 
     var vinCandidates: [String] {
         (try? JSONDecoder().decode([String].self, from: Data(vinCandidatesJSON.utf8))) ?? []
@@ -664,6 +668,9 @@ final class LocalStore {
                 t.column("cachedAt", .datetime).notNull()
                 t.primaryKey(["userId", "scopeKey", "pageOffset"])
             }
+        }
+        m.registerMigration("v11_album_review_on_device_observations") { db in
+            try db.alter(table: "photo_album_image_review") { t in t.add(column: "onDeviceJSON", .text) }
         }
         return m
     }
