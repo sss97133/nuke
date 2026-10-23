@@ -1,0 +1,409 @@
+{
+ "source": "https://bid.goodingco.com/ajax/lots/?n=100&o=0&order_by=auction_date+lot_number&order=desc+asc&fieldset=timed-auction+reserve-status+absentee-bid+highest-live-bid+summary&auctionId=1-84OYL5&paramsType=server (fetched 2026-10-20; lots 2, 19 and 43, each document whole but its bidder registration)",
+ "result_page": [
+  {
+   "row_id": "1-8DT8RZ",
+   "type": "auction-lot-summary",
+   "self_url": "https://production2-server.auctionmobility.com/v1/auction-lot/1-8DT8RZ/summary",
+   "watch_url": "https://production2-server.auctionmobility.com/v1/auction-lot/1-8DT8RZ/watch",
+   "detail_url": "https://production2-server.auctionmobility.com/v1/auction-lot/1-8DT8RZ/",
+   "lot_number": 2,
+   "status": "sold",
+   "title": "Goodyear Tire Sign",
+   "last_updated": "2023-12-08T17:04:00Z",
+   "lot_number_extension": "",
+   "starting_price": "25.00",
+   "hide_estimate": false,
+   "estimate_low": "12000.00",
+   "estimate_high": "18000.00",
+   "quantity": null,
+   "condition": null,
+   "highlight": null,
+   "bid_table": null,
+   "truncated_description": "Without Reserve<br><br><p>Circa 1950s Goodyear sign made of porcelain-coated steel. </p>\n<p><strong>Letter Dimensions</strong>: 60 x 50 x 6 in. <br/>\n<strong>Shoe Dimensions</strong>: 120 x 40 x 6 in.</p>",
+   "bidding_enabled": true,
+   "lot_symbols": null,
+   "estimate_symbols": null,
+   "buyers_premium_amount": null,
+   "commodity_type": null,
+   "commodity_quantity": null,
+   "perfect_condition": false,
+   "artist": null,
+   "dimensions": null,
+   "cover_thumbnail": "https://images-cdn.auctionmobility.com/is3/auctionmobility-static/yJzz-1-NERL3/1-8DT8RZ/2_1.jpg",
+   "auction_lot_group": null,
+   "currency_code": "USD",
+   "artist_records": [],
+   "when_produced": null,
+   "package_type": null,
+   "color": null,
+   "is_mixed_lot": false,
+   "estimate_low_hk": null,
+   "estimate_high_hk": null,
+   "preferred_order": null,
+   "lot_group": null,
+   "external_info_url": null,
+   "minimum_autosell_amount": null,
+   "extended_end_time": "2023-12-08T17:04:00Z",
+   "timed_auction_bid": {
+    "row_id": "1-8G0LZZ",
+    "absentee_bid_id": "1-8G0JX2",
+    "amount": "8000.00",
+    "amount_percentage": null,
+    "created_at": "2023-12-08T16:55:33.515Z",
+    "updated_at": "2023-12-08T16:55:33.515Z"
+   },
+   "monthly_revenue": null,
+   "auction": {
+    "row_id": "1-84OYL5",
+    "type": "auction-summary",
+    "self_url": "https://production2-server.auctionmobility.com/v1/auction/1-84OYL5/summary",
+    "detail_url": "https://production2-server.auctionmobility.com/v1/auction/1-84OYL5/",
+    "auction_type": "timed",
+    "title": "Geared Online | December",
+    "time_start": "2023-12-04T17:00:00Z",
+    "time_start_live_auction": null,
+    "time_start_proxy_bidding": null,
+    "duration": "P4D",
+    "timezone": "America/Los_Angeles",
+    "truncated_description": "The Geared Online auction series offers a selection of lots with and without reserve, providing a brilliant selection of automotive history for every level of collector. Gooding & Company houses all available lots at the company’s Southern California facility, providing interested bidders the unique opportunity to conduct on-site inspections of the online offerings and interact with our marque expert specialists. The auction house invites you to speak with a Gooding & Company staff member for more information on viewing and inspection, as well as on how to consign for upcoming Geared Online sales.",
+    "last_updated": "2023-10-12T00:21:38Z",
+    "auction_code": null,
+    "banner": null,
+    "subtitle": null,
+    "viewing_information": "All Geared Online lots are available for viewing and inspection, by appointment only, at Gooding & Company’s Southern California facility. Appointments are available weekdays 9am to 5pm from Monday, November 27, through Friday, December 8. Please email clientservices@goodingco.com or call 310.899.1960 to make arrangements.",
+    "publication_status": "full",
+    "bidder_registration_allowed": true,
+    "location_name": null,
+    "percentage_bidding": false,
+    "bid_table": {
+     "0.00": [
+      "25.00"
+     ],
+     "1000.00": [
+      "50.00"
+     ],
+     "2500.00": [
+      "100.00"
+     ],
+     "5000.00": [
+      "250.00"
+     ],
+     "10000.00": [
+      "500.00"
+     ],
+     "25000.00": [
+      "1000.00"
+     ],
+     "100000.00": [
+      "5000.00"
+     ],
+     "500000.00": [
+      "10000.00"
+     ],
+     "1000000.00": [
+      "20000.00"
+     ]
+    },
+    "active_lot_count": 0,
+    "lot_count": 48,
+    "sold_lot_count": 43,
+    "effective_end_time": "2023-12-08T20:08:00Z",
+    "require_approval": null,
+    "extend_by_auction": false,
+    "extended_end_time": null,
+    "cover_thumbnail": "https://images-cdn.auctionmobility.com/is3/auctionmobility-static/WGuc-1-NERL3/1-8DVN12/1690cac9-e821-477a-8520-925eaffe6021",
+    "total_sold_value": null,
+    "total_hammer_price": "3496725.00",
+    "minimum_buyers_premium": "0.00",
+    "default_buyers_premium": null,
+    "currency_code": "USD",
+    "realtime_server_url": null,
+    "conditions_of_sale_url": null,
+    "contact_notes": null,
+    "contact_condition_report_email": null,
+    "is_times_the_money": false,
+    "lot_url": "https://production2-server.auctionmobility.com/v1/auction/1-84OYL5/lots",
+    "_detail_url": "/auctions/1-84OYL5/geared-online-december",
+    "_slug": "geared-online-december"
+   },
+   "absentee_bid": null,
+   "sold_price": "8000.00",
+   "highest_live_bid": null,
+   "reserve_met": true,
+   "state_sequence_number": 29,
+   "_detail_url": "/lots/view/1-8DT8RZ/goodyear-tire-sign",
+   "_slug": "goodyear-tire-sign"
+  },
+  {
+   "row_id": "1-8DT8SX",
+   "type": "auction-lot-summary",
+   "self_url": "https://production2-server.auctionmobility.com/v1/auction-lot/1-8DT8SX/summary",
+   "watch_url": "https://production2-server.auctionmobility.com/v1/auction-lot/1-8DT8SX/watch",
+   "detail_url": "https://production2-server.auctionmobility.com/v1/auction-lot/1-8DT8SX/",
+   "lot_number": 19,
+   "status": "sold",
+   "title": "1957 Porsche 356 A Speedster",
+   "last_updated": "2023-12-08T18:13:49Z",
+   "lot_number_extension": "",
+   "starting_price": "25.00",
+   "hide_estimate": false,
+   "estimate_low": "275000.00",
+   "estimate_high": "350000.00",
+   "quantity": null,
+   "condition": null,
+   "highlight": null,
+   "bid_table": null,
+   "truncated_description": "Coachwork by Reutter<br><br>Without Reserve<br><br><strong>Chassis</strong>: 83955<br><strong>Engine</strong>: 67384<br><br>An Ideal Restoration Candidate – A California “Blue Plate” Speedster<br>Delivered New to Hoffman Motors of New York Finished in Elfenbein (Ivory)<br>Retains Matching-Numbers Engine per Copy of Porsche Kardex<br>Recently Discovered in Long-Term, Single Family Ownership<br>Eligible for Numerous Rallies, Concours, and Porsche Club Events<br><br>1,582 CC Type 616/1 Air-Cooled Flat 4-Cylinder Engine<br>Twin Zenith 32 NDIX Carburetors<br>60 BHP at 4,500 RPM<br>4-Speed Manual Transaxle<br>4-Wheel Hydraulic Drum Brakes <br>4-Wheel Independent Suspension with Torsion Bars and Shock Absorbers<br><br><p>Introduced in late 1954, the Porsche 356 Speedster was a true dual-purpose sports car – one that could serve as both daily transportation and, with minor modifications, a successful weekend race car. </p>\n<p>Originally priced at $2,995 – well below Porsche’s Coupe and Cabriolet models – the Speedster was equipped with a stylish, cut-down windscreen, racy bucket seats, minimal folding soft top, and side curtains in place of standard roll-up windows. These features reduced the car’s weight and made it ideally suited to competition use. It was not long before the 356 Speedster established itself as a dominant force in sports car racing. </p>\n<p>With its competition record, brilliant driving dynamics, and quality build, the Speedster was a favorite among sports car enthusiasts – particularly in California, where top-down motoring was possible almost every day of the year. The fact that celebrities such as James Dean and Steve McQueen owned Speedsters contributed greatly to the model’s iconoclastic image.  </p>\n<p>According to the accompanying copy of its Porsche Kardex, this 356 A Speedster, chassis 83955, was completed on October 18, 1957. Originally finished in <em>Elfenbein</em> (Ivory, Code 704) and equipped with US-specification equipment, this Porsche was delivered new to official North American distributor Hoffman Motors of New York.  </p>\n<p>Little is known of the Speedster’s early history, but by the mid-1970s it had apparently made its way to California, where it was repainted silver and sold to Frederick Myeron of Orangevale. He registered the car on vanity plates reading “FM356A.” The car remained in his ownership for at least 25 years before its recent sale to the consignor. </p>\n<p>Parked in static storage for decades and presented today in as-found, unrestored condition, this highly sought-after 1957 356 A Speedster is a prime candidate for a complete concours-quality restoration. </p>\n<p>An accompanying copy of the Porsche Kardex confirms that the Speedster’s engine is the original matching-number unit (no. 67384) and notes a replacement transaxle fitted in 1963. Additionally, the hood and deck lid are stamped with the last digit or digits of the chassis number and the car’s factory data tags are visible in the driver’s door jamb and front compartment. There is corrosion apparent in the battery box, floor pan, and lower sections of the body. It is accompanied by a selection of additional wheels and the soft top frame. </p>\n<p>Today, the Porsche possesses the charm of a bygone era thanks to its period, fiberglass hardtop, club badges, coupe seats, headlight stone guards, and 1970s-era California blue-and-yellow license plates. An exciting, fresh-to-market restoration project, this 356 A Speedster has a bright future ahead.  </p>\n<p><em> *Please note that this vehicle is titled 1958 and by its engine number.  Please also note that the VIN listed on the title contains a typographical error; the second to last character of the VIN is listed as a “6”, but is in fact an “8”. Please also note that this vehicle has been in long-term static storage and may not be currently operational. It will require mechanical attention prior to road use.</em></p>",
+   "bidding_enabled": true,
+   "lot_symbols": null,
+   "estimate_symbols": null,
+   "buyers_premium_amount": null,
+   "commodity_type": null,
+   "commodity_quantity": null,
+   "perfect_condition": false,
+   "artist": null,
+   "dimensions": null,
+   "cover_thumbnail": "https://images-cdn.auctionmobility.com/is3/auctionmobility-static/Wui8-1-NERL3/1-8DT8SX/19_1.jpg",
+   "auction_lot_group": null,
+   "currency_code": "USD",
+   "artist_records": [],
+   "when_produced": null,
+   "package_type": null,
+   "color": null,
+   "is_mixed_lot": false,
+   "estimate_low_hk": null,
+   "estimate_high_hk": null,
+   "preferred_order": null,
+   "lot_group": null,
+   "external_info_url": null,
+   "minimum_autosell_amount": null,
+   "extended_end_time": "2023-12-08T18:13:49Z",
+   "timed_auction_bid": {
+    "row_id": "1-8G130P",
+    "absentee_bid_id": "1-8G0LQD",
+    "amount": "245000.00",
+    "amount_percentage": null,
+    "created_at": "2023-12-08T18:10:49.400Z",
+    "updated_at": "2023-12-08T18:10:49.400Z"
+   },
+   "monthly_revenue": null,
+   "auction": {
+    "row_id": "1-84OYL5",
+    "type": "auction-summary",
+    "self_url": "https://production2-server.auctionmobility.com/v1/auction/1-84OYL5/summary",
+    "detail_url": "https://production2-server.auctionmobility.com/v1/auction/1-84OYL5/",
+    "auction_type": "timed",
+    "title": "Geared Online | December",
+    "time_start": "2023-12-04T17:00:00Z",
+    "time_start_live_auction": null,
+    "time_start_proxy_bidding": null,
+    "duration": "P4D",
+    "timezone": "America/Los_Angeles",
+    "truncated_description": "The Geared Online auction series offers a selection of lots with and without reserve, providing a brilliant selection of automotive history for every level of collector. Gooding & Company houses all available lots at the company’s Southern California facility, providing interested bidders the unique opportunity to conduct on-site inspections of the online offerings and interact with our marque expert specialists. The auction house invites you to speak with a Gooding & Company staff member for more information on viewing and inspection, as well as on how to consign for upcoming Geared Online sales.",
+    "last_updated": "2023-10-12T00:21:38Z",
+    "auction_code": null,
+    "banner": null,
+    "subtitle": null,
+    "viewing_information": "All Geared Online lots are available for viewing and inspection, by appointment only, at Gooding & Company’s Southern California facility. Appointments are available weekdays 9am to 5pm from Monday, November 27, through Friday, December 8. Please email clientservices@goodingco.com or call 310.899.1960 to make arrangements.",
+    "publication_status": "full",
+    "bidder_registration_allowed": true,
+    "location_name": null,
+    "percentage_bidding": false,
+    "bid_table": {
+     "0.00": [
+      "25.00"
+     ],
+     "1000.00": [
+      "50.00"
+     ],
+     "2500.00": [
+      "100.00"
+     ],
+     "5000.00": [
+      "250.00"
+     ],
+     "10000.00": [
+      "500.00"
+     ],
+     "25000.00": [
+      "1000.00"
+     ],
+     "100000.00": [
+      "5000.00"
+     ],
+     "500000.00": [
+      "10000.00"
+     ],
+     "1000000.00": [
+      "20000.00"
+     ]
+    },
+    "active_lot_count": 0,
+    "lot_count": 48,
+    "sold_lot_count": 43,
+    "effective_end_time": "2023-12-08T20:08:00Z",
+    "require_approval": null,
+    "extend_by_auction": false,
+    "extended_end_time": null,
+    "cover_thumbnail": "https://images-cdn.auctionmobility.com/is3/auctionmobility-static/WGuc-1-NERL3/1-8DVN12/1690cac9-e821-477a-8520-925eaffe6021",
+    "total_sold_value": null,
+    "total_hammer_price": "3496725.00",
+    "minimum_buyers_premium": "0.00",
+    "default_buyers_premium": null,
+    "currency_code": "USD",
+    "realtime_server_url": null,
+    "conditions_of_sale_url": null,
+    "contact_notes": null,
+    "contact_condition_report_email": null,
+    "is_times_the_money": false,
+    "lot_url": "https://production2-server.auctionmobility.com/v1/auction/1-84OYL5/lots",
+    "_detail_url": "/auctions/1-84OYL5/geared-online-december",
+    "_slug": "geared-online-december"
+   },
+   "absentee_bid": null,
+   "sold_price": "245000.00",
+   "highest_live_bid": null,
+   "reserve_met": null,
+   "state_sequence_number": 31,
+   "_detail_url": "/lots/view/1-8DT8SX/1957-porsche-356-a-speedster",
+   "_slug": "1957-porsche-356-a-speedster"
+  },
+  {
+   "row_id": "1-8DT8U9",
+   "type": "auction-lot-summary",
+   "self_url": "https://production2-server.auctionmobility.com/v1/auction-lot/1-8DT8U9/summary",
+   "watch_url": "https://production2-server.auctionmobility.com/v1/auction-lot/1-8DT8U9/watch",
+   "detail_url": "https://production2-server.auctionmobility.com/v1/auction-lot/1-8DT8U9/",
+   "lot_number": 43,
+   "status": "reserve_not_met",
+   "title": "1973 Porsche 911 Carrera RS 2.7 Lightweight",
+   "last_updated": "2023-12-08T19:48:00Z",
+   "lot_number_extension": "",
+   "starting_price": "650000.00",
+   "hide_estimate": false,
+   "estimate_low": "1300000.00",
+   "estimate_high": "1600000.00",
+   "quantity": null,
+   "condition": null,
+   "highlight": null,
+   "bid_table": null,
+   "truncated_description": "<strong>Chassis</strong>: 9113600269<br><strong>Engine</strong>: 6630290<br><br>One of Only 200 Factory M471 Lightweights Built<br>One of Just Four RS 2.7 Lightweights Produced in Gulf Blue<br>Desirable First-Series Example with Matching-Numbers Engine and Gearbox per Factory Records<br>Documented by Porsche Specialist Kobus Cantraine<br>Accompanied by Extensive Documentation, Historical Photos, and Invoices<br><br>2,681 CC SOHC Flat 6-Cylinder Engine<br>Bosch Mechanical Fuel Injection<br>210 BHP at 6,300 RPM<br>5-Speed Manual Transaxle<br>4-Wheel Ventilated Disc Brakes<br>Front and Rear Independent Suspension with Torsion Bars<br><br><p>The Carrera RS of 1973 was conceived as a pure homologation special, as Porsche needed to build 500 road-going examples to qualify the new car for FIA Group 4 GT racing. The RS was a substantially modified version of the already potent 2.4-liter 911 S. By increasing displacement to 2.7 liters, introducing various weight-saving measures, stiffening the suspension, and fitting aerodynamic aids, Porsche created an unrivaled sports car. In total, just 1,580 examples of the 2.7 RS were built, of which a mere 200 were completed in race-oriented M471 Sport or Lightweight specification. </p>\n<p>Designed primarily as a racing car that still retained its everyday utility, these rare M471 models were initially constructed using a lightweight body shell with thin Glaverbel glass, fiberglass bumpers, and an aluminum-framed fiberglass engine lid molded into the famous “ducktail” spoiler. In order to save weight wherever possible, many of the 911’s standard features were discarded entirely or simply replaced with lighter and simpler items. </p>\n<p>Whereas the M472 Touring models were often fully trimmed and highly optioned, the M471 Lightweights featured a business-like cockpit, spartanly furnished with cloth-covered Recaro bucket seats, simplified door panels, and thin felt carpeting. In the most extreme instances, cars were even delivered without a glove box door, clock, or sun visors. </p>\n<p>A definitive dual-purpose sports car, striking an ideal balance between the thoroughbred 2.8 RSR and the well-appointed M472 Touring models, Carrera 2.7 RS Lightweights were generally sold to gentlemen drivers who used them to great effect in circuit racing, rallies, and hill climbs. </p>\n<p>This first-series M471 Lightweight, chassis 9113600269, was built in late 1972 and delivered new to the official Porsche importer in Sweden, Volkswagen Sverige, in Södertälje. It was finished in the legendary Porsche racing color of Gulf Blue, recalling the dominant 917s of the early 1970s. Only 18 Carrera RS 2.7s were finished in this stunning hue, and of those, just four were Lightweights. In addition to the M471 Lightweight package, this RS was optioned from new with a limited-slip differential and left and right headrests. The Lightweight was sold to its first owner in Sweden in March 1973, and according to documents on file, it was next sold to Swedish mechanic Bertill Karlsson in August 1974 following an accident, photos of which are on file. Karlsson reportedly purchased the car from an insurance company and repaired it after hours in the Porsche dealership where he worked, including replacing the car’s roof. In 1976, the RS was sold by Karlsson to fellow Swede Lars Sundman, who kept it until he sold it to an owner in the US in 1987. </p>\n<p>The Porsche was then owned by several US-based collectors, including robotics pioneer and classic car collector Ron Green of Atlanta. In 2011, the RS was purchased by a private European collector and in 2012 it was sold by renowned specialists Maxted-Page Limited to a prominent UK-based Porsche collector. Invoices on file document over £15,000 in mechanical work and maintenance carried out by Maxted-Page from 2011–2020.</p>\n<p>A report on file from Belgian RS 2.7 specialist Kobus Cantraine outlines this example’s history and notes that the chassis number located in the front trunk was scanned with magnetic resonance and found to be original. The report further states Cantraine’s opinion that the dashboard production number is “untouched and absolutely original, exactly how it has left the factory in 1972.” Cantraine also points out a unique feature of this RS – the fact that the car’s chassis number is also found stamped in the engine bay, a feature specific to Swedish-delivery cars. </p>\n<p>The RS was acquired by the consignor via Mr. Cantraine in 2021, joining his impressive stable of the finest limited-production Porsches. With its well-documented history and rarity as a first-series Lightweight, this example is already an important, highly collectible sports car. One of just four Lightweights originally finished in Gulf Blue, this RS 2.7 is an ideally specified Porsche from one of the firm’s most glorious periods. </p>",
+   "bidding_enabled": true,
+   "lot_symbols": null,
+   "estimate_symbols": null,
+   "buyers_premium_amount": null,
+   "commodity_type": null,
+   "commodity_quantity": null,
+   "perfect_condition": false,
+   "artist": null,
+   "dimensions": null,
+   "cover_thumbnail": "https://images-cdn.auctionmobility.com/is3/auctionmobility-static/zx5P-1-NERL3/1-8DT8U9/43_1.jpg",
+   "auction_lot_group": null,
+   "currency_code": "USD",
+   "artist_records": [],
+   "when_produced": null,
+   "package_type": null,
+   "color": null,
+   "is_mixed_lot": false,
+   "estimate_low_hk": null,
+   "estimate_high_hk": null,
+   "preferred_order": null,
+   "lot_group": null,
+   "external_info_url": null,
+   "minimum_autosell_amount": null,
+   "extended_end_time": "2023-12-08T19:48:00Z",
+   "timed_auction_bid": null,
+   "monthly_revenue": null,
+   "auction": {
+    "row_id": "1-84OYL5",
+    "type": "auction-summary",
+    "self_url": "https://production2-server.auctionmobility.com/v1/auction/1-84OYL5/summary",
+    "detail_url": "https://production2-server.auctionmobility.com/v1/auction/1-84OYL5/",
+    "auction_type": "timed",
+    "title": "Geared Online | December",
+    "time_start": "2023-12-04T17:00:00Z",
+    "time_start_live_auction": null,
+    "time_start_proxy_bidding": null,
+    "duration": "P4D",
+    "timezone": "America/Los_Angeles",
+    "truncated_description": "The Geared Online auction series offers a selection of lots with and without reserve, providing a brilliant selection of automotive history for every level of collector. Gooding & Company houses all available lots at the company’s Southern California facility, providing interested bidders the unique opportunity to conduct on-site inspections of the online offerings and interact with our marque expert specialists. The auction house invites you to speak with a Gooding & Company staff member for more information on viewing and inspection, as well as on how to consign for upcoming Geared Online sales.",
+    "last_updated": "2023-10-12T00:21:38Z",
+    "auction_code": null,
+    "banner": null,
+    "subtitle": null,
+    "viewing_information": "All Geared Online lots are available for viewing and inspection, by appointment only, at Gooding & Company’s Southern California facility. Appointments are available weekdays 9am to 5pm from Monday, November 27, through Friday, December 8. Please email clientservices@goodingco.com or call 310.899.1960 to make arrangements.",
+    "publication_status": "full",
+    "bidder_registration_allowed": true,
+    "location_name": null,
+    "percentage_bidding": false,
+    "bid_table": {
+     "0.00": [
+      "25.00"
+     ],
+     "1000.00": [
+      "50.00"
+     ],
+     "2500.00": [
+      "100.00"
+     ],
+     "5000.00": [
+      "250.00"
+     ],
+     "10000.00": [
+      "500.00"
+     ],
+     "25000.00": [
+      "1000.00"
+     ],
+     "100000.00": [
+      "5000.00"
+     ],
+     "500000.00": [
+      "10000.00"
+     ],
+     "1000000.00": [
+      "20000.00"
+     ]
+    },
+    "active_lot_count": 0,
+    "lot_count": 48,
+    "sold_lot_count": 43,
+    "effective_end_time": "2023-12-08T20:08:00Z",
+    "require_approval": null,
+    "extend_by_auction": false,
+    "extended_end_time": null,
+    "cover_thumbnail": "https://images-cdn.auctionmobility.com/is3/auctionmobility-static/WGuc-1-NERL3/1-8DVN12/1690cac9-e821-477a-8520-925eaffe6021",
+    "total_sold_value": null,
+    "total_hammer_price": "3496725.00",
+    "minimum_buyers_premium": "0.00",
+    "default_buyers_premium": null,
+    "currency_code": "USD",
+    "realtime_server_url": null,
+    "conditions_of_sale_url": null,
+    "contact_notes": null,
+    "contact_condition_report_email": null,
+    "is_times_the_money": false,
+    "lot_url": "https://production2-server.auctionmobility.com/v1/auction/1-84OYL5/lots",
+    "_detail_url": "/auctions/1-84OYL5/geared-online-december",
+    "_slug": "geared-online-december"
+   },
+   "absentee_bid": null,
+   "sold_price": null,
+   "highest_live_bid": null,
+   "reserve_met": false,
+   "state_sequence_number": 26,
+   "_detail_url": "/lots/view/1-8DT8U9/1973-porsche-911-carrera-rs-27-lightweight",
+   "_slug": "1973-porsche-911-carrera-rs-27-lightweight"
+  }
+ ],
+ "query_info": {
+  "base_query": "https://production2-server.auctionmobility.com/v1/auction/1-84OYL5/lots?order_by=auction_date+lot_number&order=desc+asc&fieldset=timed-auction+reserve-status+absentee-bid+highest-live-bid+summary",
+  "next_page": null,
+  "prev_page": null,
+  "page_size": 100,
+  "page_start_offset": 0,
+  "total_num_results": 48
+ },
+ "responseCode": 200
+}

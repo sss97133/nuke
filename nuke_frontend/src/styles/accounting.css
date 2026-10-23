@@ -1,0 +1,141 @@
+/* Private accounting surface: typography and disclosure only. */
+.accounting-page { font-size:14px; line-height:1.55; padding-bottom:48px!important; }
+.accounting-page .accounting-header { display:flex; align-items:center; justify-content:space-between; gap:20px; padding:28px 0 20px; border-bottom:2px solid var(--border); margin-bottom:24px; }
+.accounting-page h1 { font-size:28px; line-height:1.2; margin:4px 0 8px; }
+.accounting-page h2 { font-size:20px; margin:4px 0; }
+.accounting-page h3 { font-size:24px; margin:0; }
+.accounting-page p { margin:8px 0 14px; max-width:85ch; }
+.accounting-eyebrow { font-size:9px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--text-secondary); }
+.accounting-muted,.accounting-page summary span { color:var(--text-secondary); font-size:12px; font-weight:400; }
+.accounting-section-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.accounting-notice,.accounting-review-note { padding:16px; border:2px solid var(--border); background:var(--surface,var(--bg)); margin:18px 0; }
+.accounting-notice p,.accounting-review-note p { margin-bottom:0; font-size:13px; }
+.accounting-years { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr)); gap:16px; margin:20px 0; }
+.accounting-year { border:2px solid var(--border); padding:20px; }
+.accounting-year dl { margin:20px 0 8px; }
+.accounting-year dl>div { display:flex; flex-wrap:wrap; align-items:baseline; justify-content:space-between; gap:8px; padding:8px 0; }
+.accounting-year dt { font-size:13px; color:var(--text-secondary); }
+.accounting-year dd { margin:0; font:bold 17px 'Courier New',monospace; }
+.accounting-page .accounting-disclosure { border-top:2px solid var(--border); padding:14px 0; margin:8px 0; }
+.accounting-page summary { cursor:pointer; font-weight:700; padding:6px 0; }
+.accounting-page summary span { display:inline-block; margin-left:12px; }
+.accounting-page details[open]>summary { margin-bottom:16px; }
+.accounting-page button { appearance:none; border:2px solid var(--border); border-radius:0; background:var(--surface,var(--bg)); color:var(--text); padding:8px 12px; font:700 12px Arial,sans-serif; cursor:pointer; min-height:36px; }
+.accounting-page button:hover:not(:disabled) { background:var(--bg-secondary,var(--border)); }
+.accounting-page button:disabled { opacity:.45; cursor:default; }
+.accounting-page :is(button,summary,input):focus-visible { outline:2px solid var(--text); outline-offset:3px; }
+.accounting-page table { width:100%; border-collapse:collapse; margin:14px 0; text-align:left; }
+.accounting-page th { font:700 9px Arial,sans-serif; text-transform:uppercase; letter-spacing:.06em; color:var(--text-secondary); border-bottom:2px solid var(--border); padding:10px; }
+.accounting-page td { font-size:13px; padding:12px 10px; vertical-align:top; border-bottom:2px solid var(--border); overflow-wrap:anywhere; }
+.accounting-page td>div { margin-top:5px; }
+.accounting-number { text-align:right; font-family:'Courier New',monospace; white-space:nowrap; }
+.accounting-page .accounting-advanced { color:var(--text-secondary); }
+.accounting-page input { max-width:100%; }
+@media(max-width:600px) {
+ .accounting-page .accounting-header { align-items:flex-start; flex-direction:column; }
+ .accounting-page summary span { display:block; margin:4px 0 0 18px; }
+ .accounting-year { padding:14px; }
+}
+/* Meeting overview and bounded inspection. */
+.accounting-page .accounting-header { padding:16px 0 12px; margin-bottom:14px; }
+.accounting-page .accounting-years { margin:12px 0; }
+.accounting-page .accounting-year { padding:14px 18px; }
+.accounting-page .accounting-year dl { display:flex; flex-wrap:wrap; gap:18px 36px; margin:10px 0 0; }
+.accounting-page .accounting-year dl>div { display:block; padding:0; }
+.accounting-page .accounting-year dd { margin-top:4px; font-size:20px; }
+.accounting-tabs { display:flex; flex-wrap:wrap; gap:6px; margin:12px 0; }
+.accounting-page .accounting-tabs button[aria-current="page"],.accounting-page .accounting-tabs button[aria-current="page"]:hover { background:var(--text); color:var(--bg); }
+.accounting-filters { display:flex; flex-wrap:wrap; align-items:end; gap:12px; margin:16px 0; }
+.accounting-filters label { display:flex; flex-direction:column; gap:4px; font-size:12px; }
+.accounting-page select,.accounting-page input[type="search"] { font:14px Arial,sans-serif; padding:8px; color:var(--text); background:var(--bg); border:2px solid var(--border); min-height:36px; }
+.accounting-attention { display:grid; grid-template-columns:1fr 2fr; gap:18px; padding:12px 0; border-top:2px solid var(--border); }
+.accounting-attention p { margin:4px 0 8px; font-size:12px; }
+.accounting-table-wrap { overflow-x:auto; }
+.accounting-record-description { display:block; max-width:38ch; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+.accounting-page td small { display:block; color:var(--text-secondary); margin-top:4px; }
+.accounting-pagination { display:flex; align-items:center; flex-wrap:wrap; gap:10px; margin:12px 0; font-size:12px; }
+.accounting-evidence-dialog { width:min(880px,calc(100vw - 32px)); max-height:calc(100dvh - 32px); box-sizing:border-box; overflow:auto; padding:20px; border:2px solid var(--border); background:var(--bg); color:var(--text); }
+.accounting-evidence-dialog::backdrop { background:rgb(0 0 0 / 55%); }
+.accounting-dialog-heading { display:flex; justify-content:space-between; gap:16px; align-items:center; }
+.accounting-selected-record { padding:14px 0; border-bottom:2px solid var(--border); }
+.accounting-page .accounting-selected-record h3 { font-size:18px; overflow-wrap:anywhere; }
+.accounting-evidence-field { border-bottom:2px solid var(--border); padding:12px 0; overflow-wrap:anywhere; }
+.accounting-evidence-field h4 { font-size:14px; margin:0 0 8px; text-transform:capitalize; }
+.accounting-evidence-values { margin:0; }
+.accounting-evidence-values>div { display:grid; grid-template-columns:minmax(100px,1fr) 3fr; gap:14px; padding:4px 0; }
+.accounting-evidence-values dt { color:var(--text-secondary); text-transform:capitalize; }
+.accounting-evidence-values dd { margin:0; }
+.accounting-evidence-dialog pre { white-space:pre-wrap; overflow-wrap:anywhere; font-size:11px; max-height:400px; overflow:auto; }
+@media(max-width:600px) { .accounting-attention { grid-template-columns:1fr; } .accounting-evidence-dialog { padding:12px; } .accounting-evidence-values>div { display:block; } }
+@media print { .accounting-page button,.accounting-page nav,.accounting-page details,.accounting-page .accounting-filters,.accounting-evidence-dialog { display:none!important; } .accounting-page { font-size:11px; } .accounting-year { break-inside:avoid; } }
+.accounting-top-accounts { margin:16px 0; }
+.accounting-page .accounting-top-accounts h3 { font-size:15px; }
+.accounting-top-accounts ol { padding:0; list-style:none; margin:8px 0; }
+.accounting-top-accounts li { display:flex; align-items:center; justify-content:space-between; gap:12px; border-bottom:2px solid var(--border); padding:4px 0; }
+.accounting-top-accounts strong { font:14px 'Courier New',monospace; white-space:nowrap; }
+
+@media print { .accounting-page .accounting-top-accounts button { display:inline!important; border:0; padding:0; background:none; color:inherit; text-align:left; } }
+.accounting-table-wrap table { min-width:720px; }
+.accounting-table-wrap td:first-child { white-space:nowrap; }
+
+/* Book picker, records toggle chips, sortable headings and tappable rows. */
+.accounting-book-picker { display:flex; flex-direction:column; gap:6px; margin:12px 0 4px; }
+.accounting-chips { display:flex; flex-wrap:wrap; gap:6px; }
+.accounting-page .accounting-chips button[aria-pressed="true"],.accounting-page .accounting-chips button[aria-pressed="true"]:hover { background:var(--text); color:var(--bg); }
+.accounting-page th .accounting-sort { font:inherit; text-transform:inherit; letter-spacing:inherit; color:inherit; border:0; padding:0; min-height:0; background:none; white-space:nowrap; }
+.accounting-page th[aria-sort] .accounting-sort { color:var(--text); }
+.accounting-page .accounting-row { cursor:pointer; transition:background 180ms cubic-bezier(0.16,1,0.3,1); }
+.accounting-page .accounting-row:hover { background:var(--bg-secondary,var(--border)); }
+/* Classification: section chips, most-used category chips, then the field, note and save. */
+.accounting-classifier { padding:16px 0; border-bottom:2px solid var(--border); }
+.accounting-page .accounting-classifier h3 { font-size:18px; }
+.accounting-classifier fieldset { border:0; padding:0; margin:12px 0; display:grid; gap:12px; }
+.accounting-classifier label { display:flex; flex-direction:column; gap:4px; }
+.accounting-classifier input,.accounting-classifier textarea { font:14px Arial,sans-serif; padding:8px; color:var(--text); background:var(--bg); border:2px solid var(--border); }
+.accounting-classifier textarea { min-height:60px; }
+.accounting-similar p { margin:0 0 6px; }
+.accounting-count { display:inline-block; margin-left:6px; font:400 11px 'Courier New',monospace; opacity:.7; }
+.accounting-page .accounting-primary:not(:disabled),.accounting-page .accounting-primary:hover:not(:disabled) { background:var(--text); color:var(--bg); }
+/* Select mode: a checkbox column, highlighted rows and a toolbar that stays in reach at the bottom while scrolling. */
+.accounting-page .accounting-select { width:36px; padding-right:0; }
+.accounting-select input { width:18px; height:18px; margin:0; cursor:pointer; }
+.accounting-page tr[aria-selected="true"] { background:var(--bg-secondary,var(--border)); }
+.accounting-selection-bar { position:sticky; bottom:0; z-index:1; display:flex; align-items:center; flex-wrap:wrap; gap:10px; padding:10px 0; background:var(--bg); border-top:2px solid var(--border); font-size:13px; }
+.accounting-selection-list { list-style:none; padding:0; margin:12px 0; }
+.accounting-selection-list li { display:flex; flex-wrap:wrap; align-items:baseline; gap:10px; padding:6px 0; border-bottom:2px solid var(--border); font-size:13px; }
+/* Change feed: one line for the latest revision, the recent list behind a disclosure. */
+.accounting-activity { margin:0 0 12px; font-size:13px; }
+.accounting-page .accounting-activity-latest { margin:0 0 2px; }
+.accounting-page .accounting-activity summary { font-size:12px; padding:2px 0; }
+.accounting-page .accounting-activity details[open]>summary { margin-bottom:6px; }
+.accounting-activity-list { list-style:none; padding:0; margin:0; max-height:320px; overflow:auto; border-top:2px solid var(--border); }
+.accounting-page .accounting-activity-list button { display:flex; flex-wrap:wrap; align-items:baseline; gap:6px; width:100%; min-height:0; padding:8px 0; border:0; border-bottom:2px solid var(--border); background:none; text-align:left; font:13px Arial,sans-serif; }
+.accounting-new { display:inline-block; padding:1px 6px; font:700 9px Arial,sans-serif; letter-spacing:.08em; text-transform:uppercase; background:var(--text); color:var(--bg); }
+.accounting-use-editor { padding:16px 0; border-bottom:2px solid var(--border); }
+.accounting-page .accounting-use-editor h3 { font-size:18px; }
+.accounting-use-editor fieldset { border:0; padding:0; margin:12px 0; display:grid; gap:12px; }
+.accounting-use-editor label { display:flex; flex-direction:column; gap:4px; }
+.accounting-use-editor input,.accounting-use-editor textarea { font:14px Arial,sans-serif; padding:8px; color:var(--text); background:var(--bg); border:2px solid var(--border); }
+.accounting-use-editor textarea { min-height:72px; }
+
+/* Phones: each record is a tappable card (date and amount, then the description, then classification and account);
+   the sortable headings become a row of sort chips. Vehicle/shop use and the evidence button live in the evidence view. */
+@media (max-width:640px) {
+ .accounting-page .accounting-table-wrap .accounting-records-table { min-width:0; }
+ .accounting-records-table thead tr { display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
+ .accounting-page .accounting-records-table thead th { border:0; padding:0 0 8px; }
+ .accounting-page .accounting-records-table thead th.accounting-cell-desc,.accounting-page .accounting-records-table th.accounting-cell-use,.accounting-page .accounting-records-table th.accounting-cell-evidence,
+ .accounting-page .accounting-records-table tbody td.accounting-cell-use,.accounting-page .accounting-records-table tbody td.accounting-cell-evidence { display:none; }
+ .accounting-page .accounting-records-table th .accounting-sort { border:2px solid var(--border); padding:6px 10px; min-height:32px; }
+ .accounting-page .accounting-records-table th[aria-sort] .accounting-sort { background:var(--text); color:var(--bg); }
+ .accounting-records-table tbody tr { display:grid; grid-template-columns:1fr auto; grid-template-areas:"date amount" "desc desc" "class account"; column-gap:12px; row-gap:3px; padding:12px 0; border-bottom:2px solid var(--border); }
+ .accounting-records-table.accounting-selecting tbody tr { grid-template-columns:auto 1fr auto; grid-template-areas:"select date amount" "select desc desc" "select class account"; }
+ .accounting-page .accounting-records-table tbody td { display:block; border:0; padding:0; }
+ .accounting-records-table td.accounting-select { grid-area:select; align-self:center; }
+ .accounting-records-table td.accounting-cell-date { grid-area:date; font-size:12px; color:var(--text-secondary); }
+ .accounting-records-table td.accounting-cell-amount { grid-area:amount; }
+ .accounting-records-table td.accounting-cell-desc { grid-area:desc; }
+ .accounting-records-table td.accounting-cell-class { grid-area:class; }
+ .accounting-records-table td.accounting-cell-account { grid-area:account; text-align:right; font-size:12px; color:var(--text-secondary); }
+ .accounting-records-table .accounting-record-description { max-width:none; white-space:normal; }
+}

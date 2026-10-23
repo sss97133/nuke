@@ -23,6 +23,21 @@ export async function vehicleImageRowColumns(): Promise<'*'> {
   return ((await signedIn()) ? '*' : VEHICLE_IMAGE_PUBLIC_COLUMNS) as '*';
 }
 
+// Split a select list on commas outside parentheses, so an embed such as `vehicle:vehicles(id, year)` stays whole.
+function splitTopLevel(list: string): string[] {
+  const out: string[] = [];
+  let depth = 0;
+  let start = 0;
+  for (let i = 0; i < list.length; i++) {
+    const ch = list[i];
+    if (ch === '(') depth++;
+    else if (ch === ')') depth--;
+    else if (ch === ',' && depth === 0) { out.push(list.slice(start, i)); start = i + 1; }
+  }
+  out.push(list.slice(start));
+  return out;
+}
+
 /** The given select list, minus the columns anon may not read when signed out. */
 export async function vehicleImageColumnsForViewer<T extends string>(columns: T): Promise<T> {
   if (await signedIn()) return columns;
@@ -30,7 +45,7 @@ export async function vehicleImageColumnsForViewer<T extends string>(columns: T)
   // An item may be a column, an alias of a JSON path (`exif_camera:exif_data->camera`) or a path; what it reads is the
   // part after the alias, up to the first arrow.
   const reads = (item: string) => item.replace(/^[A-Za-z_][A-Za-z0-9_]*:(?!:)/, '').split('->')[0].trim();
-  return columns.split(',').map((c) => c.trim()).filter((c) => c && !excluded.has(reads(c))).join(', ') as T;
+  return splitTopLevel(columns).map((c) => c.trim()).filter((c) => c && !excluded.has(reads(c))).join(', ') as T;
 }
 
 /**

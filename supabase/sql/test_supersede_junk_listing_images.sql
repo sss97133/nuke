@@ -83,6 +83,12 @@ CREATE TRIGGER trg_sync_vehicle_primary_image AFTER DELETE OR UPDATE OF is_prima
 \ir ../migrations/20261018210000_supersede_junk_listing_images.sql
 \ir ../migrations/20261019001500_supersede_other_lot_listing_images.sql
 \ir ../migrations/20261019001500_supersede_other_lot_listing_images.sql
+\ir ../migrations/20261021050000_supersede_unsaved_ebay_archive_photos.sql
+\ir ../migrations/20261021050000_supersede_unsaved_ebay_archive_photos.sql
+CREATE TABLE public.listing_page_snapshots (id uuid PRIMARY KEY, platform text, listing_url text, http_status int, html_sha256 text);
+CREATE TABLE public.vehicle_events (vehicle_id uuid, source_url text);
+\ir ../migrations/20261022211905_ebay_gallery_video_poster_corrections.sql
+\ir ../migrations/20261022211905_ebay_gallery_video_poster_corrections.sql
 
 SELECT pg_temp.ok('junk: Cars & Bids sidebar thumbnails', bool_and(public.is_junk_listing_image_url(u))) FROM unnest(ARRAY[
   'https://media.carsandbids.com/cdn-cgi/image/width=148,height=126,quality=70/abc/photos/x.jpg',
@@ -137,7 +143,7 @@ CREATE TEMP TABLE ids AS SELECT ARRAY(SELECT id FROM public.vehicles ORDER BY id
 -- Dry run.
 CREATE TEMP TABLE dry AS SELECT public.supersede_junk_listing_images((SELECT a FROM ids), false) AS r;
 SELECT pg_temp.ok('dry run reports the junk rows, other-lot cards, junk covers, nominees and the vehicle with none',
-  (r->'tally') = '{"junk_rows": 7, "other_lot_rows": 2, "superseded": 0, "junk_primary": 3, "nominated": 2, "no_usable_image": 1, "junk_primary_after": 3}'::jsonb
+  (r->'tally') = '{"junk_rows": 7, "other_lot_rows": 2, "archive_unsaved_rows": 0, "superseded": 0, "junk_primary": 3, "nominated": 2, "cleared": 0, "no_usable_image": 1, "junk_primary_after": 3}'::jsonb
   AND r->'no_usable_image' = '["00000000-0000-4000-8000-000000000003"]'::jsonb) FROM dry;
 SELECT pg_temp.ok('dry run changes nothing',
   NOT EXISTS (SELECT * FROM public.vehicle_images EXCEPT SELECT * FROM before_images)
@@ -146,7 +152,7 @@ SELECT pg_temp.ok('dry run changes nothing',
 -- Apply.
 CREATE TEMP TABLE applied AS SELECT public.supersede_junk_listing_images((SELECT a FROM ids), true) AS r;
 SELECT pg_temp.ok('apply supersedes the 7 junk rows and 2 other-lot cards and repairs both covers it can',
-  (r->'tally') = '{"junk_rows": 7, "other_lot_rows": 2, "superseded": 9, "junk_primary": 3, "nominated": 2, "no_usable_image": 1, "junk_primary_after": 1}'::jsonb)
+  (r->'tally') = '{"junk_rows": 7, "other_lot_rows": 2, "archive_unsaved_rows": 0, "superseded": 9, "junk_primary": 3, "nominated": 2, "cleared": 0, "no_usable_image": 1, "junk_primary_after": 1}'::jsonb)
   FROM applied;
 SELECT pg_temp.ok('every junk row and other-lot card is superseded, unflagged and timestamped; no other row is',
   bool_and((is_superseded IS TRUE) = (public.is_junk_listing_image_url(image_url)
@@ -181,7 +187,7 @@ SELECT pg_temp.ok('the skip setting is restored after the call',
 -- Rerun.
 CREATE TEMP TABLE rerun AS SELECT public.supersede_junk_listing_images((SELECT a FROM ids), true) AS r;
 SELECT pg_temp.ok('a rerun is a no-op',
-  (r->'tally') = '{"junk_rows": 0, "other_lot_rows": 0, "superseded": 0, "junk_primary": 1, "nominated": 0, "no_usable_image": 1, "junk_primary_after": 1}'::jsonb)
+  (r->'tally') = '{"junk_rows": 0, "other_lot_rows": 0, "archive_unsaved_rows": 0, "superseded": 0, "junk_primary": 1, "nominated": 0, "cleared": 0, "no_usable_image": 1, "junk_primary_after": 1}'::jsonb)
   FROM rerun;
 
 -- Other lots' cards, judged against the gallery of the same capture.
@@ -230,13 +236,13 @@ CREATE TEMP TABLE ids2 AS SELECT ARRAY['00000000-0000-4000-8000-000000000005', '
 
 CREATE TEMP TABLE dry2 AS SELECT public.supersede_junk_listing_images((SELECT a FROM ids2), false) AS r;
 SELECT pg_temp.ok('dry run counts the other-lot cards once (the 148x126 card is junk) and the other-lot cover',
-  (r->'tally') = '{"junk_rows": 1, "other_lot_rows": 5, "superseded": 0, "junk_primary": 1, "nominated": 1, "no_usable_image": 0, "junk_primary_after": 1}'::jsonb)
+  (r->'tally') = '{"junk_rows": 1, "other_lot_rows": 5, "archive_unsaved_rows": 0, "superseded": 0, "junk_primary": 1, "nominated": 1, "cleared": 0, "no_usable_image": 0, "junk_primary_after": 1}'::jsonb)
   FROM dry2;
 SELECT pg_temp.ok('dry run changes nothing', NOT EXISTS (SELECT * FROM public.vehicle_images EXCEPT SELECT * FROM before_images2));
 
 CREATE TEMP TABLE applied2 AS SELECT public.supersede_junk_listing_images((SELECT a FROM ids2), true) AS r;
 SELECT pg_temp.ok('apply supersedes the 6 cards and repairs the other-lot cover',
-  (r->'tally') = '{"junk_rows": 1, "other_lot_rows": 5, "superseded": 6, "junk_primary": 1, "nominated": 1, "no_usable_image": 0, "junk_primary_after": 0}'::jsonb)
+  (r->'tally') = '{"junk_rows": 1, "other_lot_rows": 5, "archive_unsaved_rows": 0, "superseded": 6, "junk_primary": 1, "nominated": 1, "cleared": 0, "no_usable_image": 0, "junk_primary_after": 0}'::jsonb)
   FROM applied2;
 SELECT pg_temp.ok('exactly the other lots'' cards are superseded',
   array_agg(id ORDER BY id) FILTER (WHERE is_superseded IS TRUE) = ARRAY['00000000-0000-4000-9000-000000000606',
@@ -255,14 +261,110 @@ SELECT pg_temp.ok('no row deleted and no image_url edited',
   AND NOT EXISTS (SELECT b.id FROM before_images2 b JOIN public.vehicle_images v USING (id) WHERE v.image_url IS DISTINCT FROM b.image_url));
 CREATE TEMP TABLE rerun2 AS SELECT public.supersede_junk_listing_images((SELECT a FROM ids2), true) AS r;
 SELECT pg_temp.ok('a rerun is a no-op',
-  (r->'tally') = '{"junk_rows": 0, "other_lot_rows": 0, "superseded": 0, "junk_primary": 0, "nominated": 0, "no_usable_image": 0, "junk_primary_after": 0}'::jsonb)
+  (r->'tally') = '{"junk_rows": 0, "other_lot_rows": 0, "archive_unsaved_rows": 0, "superseded": 0, "junk_primary": 0, "nominated": 0, "cleared": 0, "no_usable_image": 0, "junk_primary_after": 0}'::jsonb)
   FROM rerun2;
+
+-- eBay archive photos the Wayback Machine never saved (20261021050000). V8: one capture, cover probed not_archived, two
+-- more photos, a BaT photo from another door. V9: one capture, nothing else; cover probed not_archived. V10: a capture
+-- whose cover was probed held and a second photo probed not_archived: left alone. V11: a probe naming V8's cover but V11
+-- not in the call's list: ignored.
+SELECT pg_temp.ok('the capture prefix is read only from Wayback eBay photo links',
+  public.ebay_archive_photo_capture('https://web.archive.org/web/20100328171610im_/http://i.ebayimg.com/05/!BozrCWQBmk~$(KGrHqQH-C4EuZWTkim+BLo8d1Pzi!~~_35.JPG')
+    = 'https://web.archive.org/web/20100328171610im_/'
+  AND public.ebay_archive_photo_capture('https://web.archive.org/web/20061228063424im_/http://i9.ebayimg.com/06/i/08/56/b4/18_1.JPG') IS NOT NULL
+  AND public.ebay_archive_photo_capture('http://i.ebayimg.com/05/x_35.JPG') IS NULL
+  AND public.ebay_archive_photo_capture('https://web.archive.org/web/20100328171610im_/http://example.com/a.jpg') IS NULL);
+INSERT INTO public.vehicles VALUES
+  ('00000000-0000-4000-8000-000000000008', true, 'https://web.archive.org/web/20100328171610im_/http://i.ebayimg.com/05/a~~_35.JPG'),
+  ('00000000-0000-4000-8000-000000000009', true, 'https://web.archive.org/web/20130601103112im_/http://i.ebayimg.com/00/s/x/$T2eC1~~60_1.JPG'),
+  ('00000000-0000-4000-8000-000000000010', true, 'https://web.archive.org/web/20130602051408im_/http://i.ebayimg.com/00/s/y/$(KGrHqV~~60_1.JPG'),
+  ('00000000-0000-4000-8000-000000000011', true, NULL);
+INSERT INTO public.vehicle_images (id, vehicle_id, image_url, source, position, is_primary, created_at) VALUES
+  ('00000000-0000-4000-9000-000000000801', '00000000-0000-4000-8000-000000000008', 'https://web.archive.org/web/20100328171610im_/http://i.ebayimg.com/05/a~~_35.JPG', 'ebay_motors', 0, true, '2026-10-20 06:29'),
+  ('00000000-0000-4000-9000-000000000802', '00000000-0000-4000-8000-000000000008', 'https://web.archive.org/web/20100328171610im_/http://i.ebayimg.com/16/b~~_35.JPG', 'ebay_motors', 1, false, '2026-10-20 06:29'),
+  ('00000000-0000-4000-9000-000000000803', '00000000-0000-4000-8000-000000000008', 'https://web.archive.org/web/20100328171610im_/http://i.ebayimg.com/21/c~~_35.JPG', 'ebay_motors', 2, false, '2026-10-20 06:29'),
+  ('00000000-0000-4000-9000-000000000804', '00000000-0000-4000-8000-000000000008', 'https://bringatrailer.com/wp-content/uploads/2022/04/car.jpg', 'bat_import', 0, false, '2026-04-12'),
+  ('00000000-0000-4000-9000-000000000901', '00000000-0000-4000-8000-000000000009', 'https://web.archive.org/web/20130601103112im_/http://i.ebayimg.com/00/s/x/$T2eC1~~60_1.JPG', 'ebay_motors', 0, true, '2026-10-20 06:29'),
+  ('00000000-0000-4000-9000-000000001001', '00000000-0000-4000-8000-000000000010', 'https://web.archive.org/web/20130602051408im_/http://i.ebayimg.com/00/s/y/$(KGrHqV~~60_1.JPG', 'ebay_motors', 0, true, '2026-10-20 06:29'),
+  ('00000000-0000-4000-9000-000000001002', '00000000-0000-4000-8000-000000000010', 'https://web.archive.org/web/20130602051408im_/http://i.ebayimg.com/00/s/y/$(KGrHqW~~60_3.JPG', 'ebay_motors', 1, false, '2026-10-20 06:29');
+TRUNCATE public.recompute_calls;
+CREATE TEMP TABLE before_images3 AS SELECT * FROM public.vehicle_images;
+CREATE TEMP TABLE ids3 AS SELECT ARRAY['00000000-0000-4000-8000-000000000008', '00000000-0000-4000-8000-000000000009',
+  '00000000-0000-4000-8000-000000000010']::uuid[] AS a;
+CREATE TEMP TABLE probes3 AS SELECT '[
+  {"image_id": "00000000-0000-4000-9000-000000000801", "answer": "not_archived", "probed_at": "2026-10-20T07:10:00Z", "method": "GET im_"},
+  {"image_id": "00000000-0000-4000-9000-000000000901", "answer": "not_archived", "probed_at": "2026-10-20T07:10:02Z", "method": "GET im_"},
+  {"image_id": "00000000-0000-4000-9000-000000001001", "answer": "held", "probed_at": "2026-10-20T07:10:04Z", "method": "GET im_"},
+  {"image_id": "00000000-0000-4000-9000-000000001002", "answer": "not_archived", "probed_at": "2026-10-20T07:10:06Z", "method": "GET im_"}
+]'::jsonb AS p;
+
+SELECT pg_temp.ok('without probe answers no archive photo is judged',
+  (public.supersede_junk_listing_images((SELECT a FROM ids3), false)->'tally'->>'archive_unsaved_rows') = '0');
+CREATE TEMP TABLE dry3 AS SELECT public.supersede_junk_listing_images((SELECT a FROM ids3), false, (SELECT p FROM probes3)) AS r;
+SELECT pg_temp.ok('dry run: V8''s three and V9''s one archive rows, two dead covers (one to the BaT photo, one cleared)',
+  (r->'tally') = '{"junk_rows": 0, "other_lot_rows": 0, "archive_unsaved_rows": 4, "superseded": 0, "junk_primary": 2, "nominated": 1, "cleared": 1, "no_usable_image": 0, "junk_primary_after": 2}'::jsonb)
+  FROM dry3;
+SELECT pg_temp.ok('dry run changes nothing', NOT EXISTS (SELECT * FROM public.vehicle_images EXCEPT SELECT * FROM before_images3));
+
+CREATE TEMP TABLE applied3 AS SELECT public.supersede_junk_listing_images((SELECT a FROM ids3), true, (SELECT p FROM probes3)) AS r;
+SELECT pg_temp.ok('apply supersedes the 4 unsaved archive rows and fixes both covers',
+  (r->'tally') = '{"junk_rows": 0, "other_lot_rows": 0, "archive_unsaved_rows": 4, "superseded": 4, "junk_primary": 2, "nominated": 1, "cleared": 1, "no_usable_image": 0, "junk_primary_after": 0}'::jsonb)
+  FROM applied3;
+SELECT pg_temp.ok('exactly V8''s and V9''s archive rows are superseded, each with its capture''s probe receipt',
+  array_agg(id ORDER BY id) FILTER (WHERE is_superseded IS TRUE) = ARRAY['00000000-0000-4000-9000-000000000801',
+    '00000000-0000-4000-9000-000000000802', '00000000-0000-4000-9000-000000000803', '00000000-0000-4000-9000-000000000901']::uuid[]
+  AND bool_and(ai_scan_metadata->'supersession'->>'reason' = 'archive_did_not_save_photo'
+               AND ai_scan_metadata->'supersession'->'probe'->>'answer' = 'not_archived') FILTER (WHERE is_superseded IS TRUE))
+  FROM public.vehicle_images WHERE vehicle_id = ANY(ARRAY(SELECT unnest(a) FROM ids3));
+SELECT pg_temp.ok('V8''s cover is its BaT photo; V9 has no cover left; V10 (a held cover) is untouched',
+  (SELECT primary_image_url FROM public.vehicles WHERE id = '00000000-0000-4000-8000-000000000008') = 'https://bringatrailer.com/wp-content/uploads/2022/04/car.jpg'
+  AND (SELECT primary_image_url FROM public.vehicles WHERE id = '00000000-0000-4000-8000-000000000009') IS NULL
+  AND (SELECT primary_image_url FROM public.vehicles WHERE id = '00000000-0000-4000-8000-000000000010') = 'https://web.archive.org/web/20130602051408im_/http://i.ebayimg.com/00/s/y/$(KGrHqV~~60_1.JPG');
+SELECT pg_temp.ok('no row deleted and no image_url edited',
+  (SELECT count(*) FROM public.vehicle_images) = (SELECT count(*) FROM before_images3)
+  AND NOT EXISTS (SELECT b.id FROM before_images3 b JOIN public.vehicle_images v USING (id) WHERE v.image_url IS DISTINCT FROM b.image_url));
+SELECT pg_temp.ok('a probe for a vehicle outside the call is ignored',
+  (public.supersede_junk_listing_images(ARRAY['00000000-0000-4000-8000-000000000011']::uuid[], false, (SELECT p FROM probes3))->'tally'->>'archive_unsaved_rows') = '0');
+CREATE TEMP TABLE rerun3 AS SELECT public.supersede_junk_listing_images((SELECT a FROM ids3), true, (SELECT p FROM probes3)) AS r;
+SELECT pg_temp.ok('a rerun is a no-op',
+  (r->'tally') = '{"junk_rows": 0, "other_lot_rows": 0, "archive_unsaved_rows": 0, "superseded": 0, "junk_primary": 0, "nominated": 0, "cleared": 0, "no_usable_image": 0, "junk_primary_after": 0}'::jsonb)
+  FROM rerun3;
+SELECT pg_temp.ok('probe answers must be an array', pg_temp.raises(
+  $q$SELECT public.supersede_junk_listing_images(ARRAY['00000000-0000-4000-8000-000000000008']::uuid[], false, '{"a": 1}'::jsonb)$q$));
 
 -- Bounds and grants.
 SELECT pg_temp.ok('an empty list is refused', pg_temp.raises($q$SELECT public.supersede_junk_listing_images('{}'::uuid[], false)$q$));
 SELECT pg_temp.ok('more than 100 vehicles is refused', pg_temp.raises(
   $q$SELECT public.supersede_junk_listing_images(ARRAY(SELECT gen_random_uuid() FROM generate_series(1, 101)), false)$q$));
 SELECT pg_temp.ok('only service_role may call the writer',
-  has_function_privilege('service_role', 'public.supersede_junk_listing_images(uuid[], boolean)', 'EXECUTE')
-  AND NOT has_function_privilege('anon', 'public.supersede_junk_listing_images(uuid[], boolean)', 'EXECUTE')
-  AND NOT has_function_privilege('authenticated', 'public.supersede_junk_listing_images(uuid[], boolean)', 'EXECUTE'));
+  has_function_privilege('service_role', 'public.supersede_junk_listing_images(uuid[], boolean, jsonb)', 'EXECUTE')
+  AND NOT has_function_privilege('anon', 'public.supersede_junk_listing_images(uuid[], boolean, jsonb)', 'EXECUTE')
+  AND NOT has_function_privilege('authenticated', 'public.supersede_junk_listing_images(uuid[], boolean, jsonb)', 'EXECUTE'));
+
+INSERT INTO public.vehicles VALUES ('00000000-0000-4000-8000-000000000012', true, 'https://i.ebayimg.com/images/g/REAL/s-l1600.webp');
+INSERT INTO public.vehicle_images (id, vehicle_id, image_url, source, position, is_primary) VALUES
+ ('00000000-0000-4000-9000-000000001201','00000000-0000-4000-8000-000000000012','https://i.ebayimg.com/images/g/REAL/s-l1600.webp','ebay_motors',0,true),
+ ('00000000-0000-4000-9000-000000001202','00000000-0000-4000-8000-000000000012','https://i.ebayimg.com/images/g/POSTER/s-l1600.webp','ebay_motors',1,false);
+INSERT INTO public.listing_page_snapshots VALUES ('00000000-0000-4000-7000-000000001200','ebay_motors','https://www.ebay.com/itm/123456789012',200,'fixture-hash');
+INSERT INTO public.vehicle_events VALUES ('00000000-0000-4000-8000-000000000012','https://www.ebay.com/itm/123456789012');
+CREATE TEMP TABLE poster_receipt AS SELECT '[{"image_id":"00000000-0000-4000-9000-000000001202","answer":"video_poster","snapshot_id":"00000000-0000-4000-7000-000000001200","html_sha256":"fixture-hash","gallery_label":"Video 1 of 1","method":"ebay_item_gallery_labels_v1","image_key":"POSTER"}]'::jsonb p;
+SELECT pg_temp.ok('poster dry run reports exactly one without changing its row',
+ (public.supersede_junk_listing_images(ARRAY['00000000-0000-4000-8000-000000000012']::uuid[],false,(SELECT p FROM poster_receipt))->>'video_poster_rows')='1'
+ AND (SELECT is_superseded IS NOT TRUE FROM public.vehicle_images WHERE id='00000000-0000-4000-9000-000000001202'));
+SELECT pg_temp.ok('poster apply supersedes exactly one',
+ (public.supersede_junk_listing_images(ARRAY['00000000-0000-4000-8000-000000000012']::uuid[],true,(SELECT p FROM poster_receipt))->'tally'->>'superseded')='1');
+SELECT pg_temp.ok('poster preserved with citation; real photo and lead untouched',
+ (SELECT is_superseded AND image_url='https://i.ebayimg.com/images/g/POSTER/s-l1600.webp' AND ai_scan_metadata->'supersession'->>'reason'='listing_video_poster'
+ FROM public.vehicle_images WHERE id='00000000-0000-4000-9000-000000001202')
+ AND (SELECT is_superseded IS NOT TRUE AND is_primary FROM public.vehicle_images WHERE id='00000000-0000-4000-9000-000000001201')
+ AND (SELECT primary_image_url='https://i.ebayimg.com/images/g/REAL/s-l1600.webp' FROM public.vehicles WHERE id='00000000-0000-4000-8000-000000000012'));
+SELECT pg_temp.ok('poster repeat is a no-op',
+ (public.supersede_junk_listing_images(ARRAY['00000000-0000-4000-8000-000000000012']::uuid[],true,(SELECT p FROM poster_receipt))->'tally'->>'superseded')='0');
+SELECT pg_temp.ok('wrong hash refuses whole correction', pg_temp.raises($q$
+ SELECT public.supersede_junk_listing_images(ARRAY['00000000-0000-4000-8000-000000000012']::uuid[],true,
+ jsonb_set((SELECT p FROM poster_receipt),'{0,html_sha256}','"wrong"'))$q$));
+SELECT pg_temp.ok('photo label refuses correction', pg_temp.raises($q$
+ SELECT public.supersede_junk_listing_images(ARRAY['00000000-0000-4000-8000-000000000012']::uuid[],true,
+ jsonb_set((SELECT p FROM poster_receipt),'{0,gallery_label}','"Picture 1 of 20"'))$q$));
+SELECT pg_temp.ok('wrong vehicle refuses correction', pg_temp.raises($q$
+ SELECT public.supersede_junk_listing_images(ARRAY['00000000-0000-4000-8000-000000000011']::uuid[],true,(SELECT p FROM poster_receipt))$q$));

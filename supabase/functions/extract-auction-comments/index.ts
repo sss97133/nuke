@@ -3,6 +3,7 @@
  * Pulls all comments from a BaT auction and analyzes them
  */
 
+import { isBatSystemSoldComment, parseBatPageResult, plausibleBatSalePrice } from './batResult.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { DOMParser } from 'https://deno.land/x/deno_dom@v0.1.38/deno-dom-wasm.ts'
 import { requireWriteAuth } from '../_shared/writeGuard.ts';
@@ -524,7 +525,7 @@ Deno.serve(async (req) => {
       // Detect comment type
       const isSeller = el.classList.contains('bat_seller_comment')
       const isBid = text.includes('bid placed by')
-      const isSold = text.includes('Sold on') || text.includes('sold for')
+      const isSold = isBatSystemSoldComment(text) // "sold for" in user prose is not the sale line
       
       const comment_type = 
         isSold ? 'sold' :
@@ -723,10 +724,12 @@ Deno.serve(async (req) => {
         return m?.[1] ? String(m[1]).trim() : null
       })()
 
+      // The page's own result banner wins over comments: a "Bid to" listing did not sell, whatever a comment says.
+      const pageResult = parseBatPageResult(html)
       const inferredFinalPrice =
-        (typeof extListing?.final_price === 'number' && Number.isFinite(extListing.final_price) && extListing.final_price > 0)
-          ? Math.floor(extListing.final_price)
-          : (inferredSoldPriceFromComment || null)
+        pageResult?.kind === 'bid_to' ? null
+        : pageResult?.kind === 'sold' ? pageResult.amount
+        : (plausibleBatSalePrice(extListing?.final_price) ?? plausibleBatSalePrice(inferredSoldPriceFromComment))
 
       const inferredSaleDate = (() => {
         // Prefer an existing event date; else fall back to the SOLD system comment's
@@ -740,6 +743,7 @@ Deno.serve(async (req) => {
 
       const inferredStatus = (() => {
         const s = String(extListing?.event_status || '').toLowerCase()
+        if (pageResult?.kind === 'bid_to') return 'ended'
         if (s === 'sold') return 'sold'
         if (s === 'active' || s === 'live') return 'active'
         if (s === 'ended' || s === 'complete' || s === 'completed') return 'ended'

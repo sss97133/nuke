@@ -651,6 +651,29 @@ enum OfferReaders {
         }
     }
 
+    /// One job's open requirements, filtered on the server (work_order_open_requirements_read).
+    /// Until that reader is deployed, falls back to the marketplace page filtered on the device.
+    static func openRequirements(workOrderId: String) async -> JobLoad<OpenRequirements> {
+        struct P: Encodable { let p_work_order_id: String; let p_limit: Int }
+        do {
+            let data = try await SupabaseService.client.rpc("work_order_open_requirements_read",
+                params: P(p_work_order_id: workOrderId, p_limit: 100)).execute().data
+            return .loaded(try JobReaders.decode(OpenRequirements.self, from: data))
+        } catch {
+            NSLog("NukeCapture work_order_open_requirements_read unavailable, falling back: %@", String(describing: error))
+            let page = await openRequirements(limit: 100)
+            guard case .loaded(let all) = page else { return page }
+            return .loaded(onlyWorkOrder(all, workOrderId))
+        }
+    }
+
+    /// The device-side filter the fallback applies (unit-tested).
+    static func onlyWorkOrder(_ page: OpenRequirements, _ workOrderId: String) -> OpenRequirements {
+        var out = page
+        out.rows = page.rows.filter { $0.workOrderId == workOrderId }
+        return out
+    }
+
     static func offers(workOrderId: String) async -> JobLoad<WorkOrderOffers> {
         await JobReaders.call("work_order_offers_read") {
             try await SupabaseService.client.rpc("work_order_offers_read", params: ["p_work_order_id": workOrderId]).execute().data

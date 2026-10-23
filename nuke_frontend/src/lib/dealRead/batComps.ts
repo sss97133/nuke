@@ -502,6 +502,15 @@ export interface DatedSourceSale {
   conditionEvidence: 'listing_claim' | 'structured' | 'visual' | 'unknown';
 }
 
+/** Sanitized ancestry from valuation_by_ymm, never raw source bodies. */
+export interface SourceSaleEvidence extends DatedSourceSale {
+  snapshotId?: string | null; sourceSha256?: string | null;
+  snapshotFetchedAt?: string | null; snapshotCreatedAt?: string | null; parsedAt?: string | null;
+  sourceVerification?: string | null; derivedObservationId?: string | null; derivedIngestedAt?: string | null;
+  sourceVehicleEventId?: string | null; sourceEpisodeAncestry?: string | null;
+  sourceParser?: string | null; admissionParser?: string | null;
+}
+
 export interface SaleComparisonOptions {
   cohort: { key: string; label: string; basis: string; complete: boolean };
   subject: { amount: number | null; currency: string | null; priceBasis: DatedSourceSale['priceBasis']; sourceUrl?: string | null; vehicleId?: string | null;
@@ -644,6 +653,60 @@ export function comparePriceToSourceSales(rows: readonly DatedSourceSale[], opts
     distribution: reasons.length ? null : summary,
     eligible, excluded,
   };
+}
+
+export interface SaleEvidenceEvaluation {
+  comparison: ReturnType<typeof comparePriceToSourceSales>;
+  readerMethod?: string;
+  populationBasis?: string;
+  minimumSales: number;
+  memberRows: number;
+  exclusions: Readonly<Record<string, number>>;
+}
+
+/** Compare two retained evaluations, never infer why a source disappeared.
+ * Same population rule/window/units/reference are required. Membership may
+ * change under that rule; knowledge cutoffs may advance. This is evidence
+ * revision, not market movement or a reconstruction of historical membership.
+ */
+export function compareSaleEvidenceEvaluations(before: SaleEvidenceEvaluation, after: SaleEvidenceEvaluation) {
+  const scope = (input: SaleEvidenceEvaluation) => {
+    const c = input.comparison;
+    return [input.readerMethod, input.populationBasis ?? null, c.method, c.quantileMethod,
+      c.cohort.key, c.cohort.basis, c.cohort.complete, c.eventFrom, c.eventBefore, c.knowledgeMode,
+      c.priceAdjustment, input.minimumSales, c.subject.amount, c.subject.currency, c.subject.priceBasis,
+      c.subject.vehicleId ?? null, c.subject.sourceUrl ?? null, c.subject.exclusionBasis ?? null];
+  };
+  const reasons: string[] = [];
+  if (!before.readerMethod || !after.readerMethod) reasons.push('reader_method_unknown');
+  if (JSON.stringify(scope(before)) !== JSON.stringify(scope(after))) reasons.push('comparison_scope_changed');
+  if (!before.comparison.cohort.complete || !after.comparison.cohort.complete) reasons.push('population_incomplete');
+  if ([before, after].some(e => e.comparison.reasons.includes('invalid_cutoffs') || e.comparison.reasons.includes('knowledge_after_comparison'))) reasons.push('invalid_cutoffs');
+  if (Date.parse(after.comparison.evidenceAsOf) < Date.parse(before.comparison.evidenceAsOf)) reasons.push('evidence_cutoff_moved_backwards');
+  const previous = new Map(before.comparison.eligible.map(row => [row.sourceKey, row as SourceSaleEvidence]));
+  const current = new Map(after.comparison.eligible.map(row => [row.sourceKey, row as SourceSaleEvidence]));
+  const changes: Array<{ sourceKey: string; kind: 'entered' | 'left' | 'revised' | 'evidence_changed';
+    before: SourceSaleEvidence | null; after: SourceSaleEvidence | null; fields: string[] }> = [];
+  const values = ['vehicleId', 'amount', 'outcome', 'eventAt', 'currency', 'priceBasis', 'unitSource', 'conditionEvidence'] as const;
+  const ancestry = ['knownAt', 'snapshotId', 'sourceSha256', 'snapshotFetchedAt', 'snapshotCreatedAt', 'parsedAt',
+    'sourceVerification', 'derivedObservationId', 'derivedIngestedAt', 'sourceVehicleEventId',
+    'sourceEpisodeAncestry', 'sourceParser', 'admissionParser'] as const;
+  if (!reasons.length) for (const key of [...new Set([...previous.keys(), ...current.keys()])].sort()) {
+    const prior = previous.get(key) ?? null, next = current.get(key) ?? null;
+    const changedValues = prior && next ? values.filter(field => prior[field] !== next[field]) : [];
+    const changedAncestry = prior && next ? ancestry.filter(field => (prior[field] ?? null) !== (next[field] ?? null)) : [];
+    const kind = !prior ? 'entered' : !next ? 'left' : changedValues.length ? 'revised' : changedAncestry.length ? 'evidence_changed' : null;
+    if (kind) changes.push({ sourceKey: key, kind, before: prior, after: next, fields: [...changedValues, ...changedAncestry] });
+  }
+  const exclusionChanges = !reasons.length ? [...new Set([...Object.keys(before.exclusions), ...Object.keys(after.exclusions)])].sort()
+    .filter(reason => (before.exclusions[reason] ?? 0) !== (after.exclusions[reason] ?? 0))
+    .map(reason => ({ reason, before: before.exclusions[reason] ?? 0, after: after.exclusions[reason] ?? 0 })) : [];
+  return { method: 'source_sale_evidence_revision_v1' as const, reasons, changes, exclusionChanges,
+    counts: reasons.length ? null : { before: previous.size, after: current.size,
+      entered: changes.filter(c => c.kind === 'entered').length, left: changes.filter(c => c.kind === 'left').length,
+      revised: changes.filter(c => c.kind === 'revised').length, evidenceChanged: changes.filter(c => c.kind === 'evidence_changed').length,
+      unchanged: [...previous.keys()].filter(key => current.has(key)).length - changes.filter(c => c.before && c.after).length },
+    before, after };
 }
 
 export interface SaleCaptureRef { table: string; id: string }

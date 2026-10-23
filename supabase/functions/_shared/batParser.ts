@@ -8,6 +8,7 @@
  */
 import { chassisFromListItemText } from "./batChassis.ts";
 import { readOwnAuctionEnd } from "./batAuctionRecord.ts";
+import { readBatPartyLine } from "./batSellerType.ts";
 
 export const BAT_PARSER_VERSION = "batParser:1.0.0";
 
@@ -968,8 +969,9 @@ export function parseBaTHTML(html: string): ParsedListing {
   }
 
   // Party type
-  const partyMatch = html.match(/Private Party or Dealer:\s*(.*?)(?:<|$)/i);
-  if (partyMatch) result.party_type = partyMatch[1].replace(/<[^>]+>/g, "").trim();
+  // BaT writes "<strong>Private Party or Dealer</strong>: Dealer" (the colon after the tag); the earlier
+  // /Private Party or Dealer:/ pattern matched none of 300 sampled lot pages (2026-10-20).
+  result.party_type = readBatPartyLine(html).party_type_raw;
 
   // Lot number
   const lotMatch = html.match(/Lot<\/strong>\s*#?(\d+)/i);

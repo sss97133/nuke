@@ -44,8 +44,36 @@ Testimony is the rows that record what was observed, by whom, from what source a
 - Keep `merged_from_vehicle_id` populated on anything moved across vehicles.
 - Why: on 2026-05-01 an agent deleted a wrongly merged auction event instead of relinking it to a stub vehicle,
   and orphaned a real vehicle's history for good. Background: `docs/library/intellectual/contemplations/the-trust-invariant.md`.
+- The image evidence store is testimony too: `image_vehicle_candidates`, `image_capture_time_claims`,
+  `evidence_links`, `evidence_account_entities`, `vehicle_change_claims`, `vehicle_change_claim_support`,
+  `user_day_vehicle_context` and `evidence_decisions`. Their rows are written only by the evidence writers named in
+  AGENTS.md "Row writes", called as top-level PostgREST RPC; triggers fired ALWAYS refuse anything else. They are never
+  updated in place: a newer row supersedes an older one with the `superseded_by` / `superseded_at` stamp (these tables
+  have no `is_superseded`), and `evidence_decisions` is append-only (a later decision wins).
+- `evidence_runs` is the store's run log. A run's kind, config and scope never change; `evidence_close_run` closes a
+  running run, once, setting its close columns. The owner's stored answers (`review_answers` runs) are written
+  closed, so the guard refuses any later change to them; a review sheet (`review` run) keeps the rows and targets it was
+  written with.
+- No agent records an owner decision, and no agent uses or obtains an owner session (his JWT, cookies, a signed-in
+  browser). Owner decisions come only from his own step-up (aal2) session (`decide_evidence`; service_role cannot call
+  it). Agents store his chat answers word for word (`evidence_record_answers`); a stored answer decides nothing until
+  he confirms it himself in the app. Evidence decisions are excluded from the delegated-sign register
+  (`owner_delegated_sign_register`): no Sign an agent makes on his behalf records one, because `decide_evidence` reads
+  the auth server's own session and factor records (an aal2 session stepped up with his verified second factor, enrolled
+  at least 7 days earlier, within the last 15 minutes), which a delegated Sign does not satisfy.
+- Where that is enforced: by the writers migration (M1w, `20261021221000`, not live until it deploys), which grants
+  `decide_evidence` to authenticated only and refuses a job caller in its body. The tables' guard (`20261021220000`,
+  live) still lists `decide_evidence` among the writer names and would admit an `agent:` decision from a service-role
+  job through it; until the writers migration deploys, no writer exists at all.
+- A data-only restore of these tables is a reviewed migration written for that restore, in one transaction: drop the 27
+  guard triggers, load the rows, recreate the triggers `ENABLE ALWAYS` exactly as
+  `20261021220000_image_evidence_tables.sql` does, and check that all 27 fire ALWAYS. Never `DISABLE TRIGGER`.
 
 ## Grants, policies and public reads
 - A migration that revokes or narrows a grant or policy on a table the public site reads (`vehicle_images`, `vehicles`, `vehicle_events` ...) is not done at "tests pass". Before it merges, grep every consumer: PostgREST filters and computed-column functions that take the whole row (`vehicle_image_gallery_eligible`), `select=*`, joins and RLS policies in other tables. A whole-row reference needs every column, so column grants break it.
+- Every public reader (a SECURITY DEFINER function anon can execute, or a view anon can select) states the whole
+  visibility test on `vehicles` itself: `is_public = true AND deleted_at IS NULL` (and `listing_kind` when it lists
+  vehicles). A filter on `is_public` alone served 298 deleted ghost rows as a make's inventory (2026-10-20,
+  `search_vehicles_browse`, fixed in #2345); a matview folded without the test publishes them nightly.
 - After it deploys, run `node scripts/ci/logged-out-live.mjs` (also runs on every deploy and every 30 minutes, and opens an issue named "Live site broken for logged-out visitors"). Say "live" only with its output.
 - Why: 2026-10-19, #2293 limited anon to column grants; every logged-out gallery failed with 42501 for hours while every check was green. Fixed by #2320 / #2322; the live check is #2323.

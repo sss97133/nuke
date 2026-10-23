@@ -10,7 +10,10 @@
 --     seller recorded apart; no handle reaches the board;
 --   * each owner_private source ranks by the vehicles its observations cover, counting only;
 --   * the reader appends venue_lots, venue_slug and members, lists the two groups after the aggregators, keeps all three
---     count-only groups out of landing totals, and source_species_gaps() stays empty.
+--     count-only groups out of landing totals, and source_species_gaps() stays empty;
+--   * (20261021003000) a source counted neither by monitored auctions nor by dealer stats reads its open listing rows
+--     landed in 24 hours with a stated end ahead as live, one per listing url; the other two keep their counts; eBay
+--     Motors' evidence is restated and a later-dated restatement is left alone.
 \ir test_source_species.sql
 
 -- what the writer reads beyond the species contract's tables, with their live types (2026-10-19)
@@ -198,3 +201,92 @@ SELECT pg_temp.ok('the writer and the reader are still definers with a pinned se
    WHERE proname IN ('record_market_source_day', 'market_sources_read'))
   AND NOT has_function_privilege('public', 'public.record_market_source_day()', 'execute')
   AND NOT has_function_privilege('public', 'public.market_sources_read()', 'execute'));
+
+-- Live lots from listing rows (20261021003000). eBay Motors is neither a monitored auction source nor a dealer: on
+-- 2026-10-20 it read "0 live" beside 17 open Browse listings. Its open listing episodes landed in 24 hours whose stated end
+-- is ahead now count, one per listing url; a source the monitored auctions or dealer stats count keeps that count.
+-- what the reader reads beyond the contracts above, with their live types (2026-10-20)
+ALTER TABLE public.vehicle_events
+  ADD COLUMN event_type text, ADD COLUMN event_status text, ADD COLUMN ended_at timestamptz, ADD COLUMN source_listing_id text;
+CREATE FUNCTION public.safe_to_timestamptz(val text) RETURNS timestamptz LANGUAGE plpgsql IMMUTABLE AS $f$
+BEGIN
+  RETURN val::timestamptz;
+EXCEPTION WHEN OTHERS THEN
+  RETURN NULL;
+END
+$f$;
+INSERT INTO public.market_source_days (day, source_slug, display_name, category, landed_lots)
+SELECT current_date, 'ebay_motors', 'eBay Motors', 'marketplace', 20
+WHERE NOT EXISTS (SELECT 1 FROM public.market_source_days WHERE day = current_date AND source_slug = 'ebay_motors');
+INSERT INTO public.vehicle_events (source_platform, created_at, event_type, event_status, ended_at, source_url, metadata)
+SELECT v.p, now() - v.ago, v.t, v.s, now() - v.ended_ago, v.u, v.m FROM (VALUES
+  -- counted: two listings, the first landed on two vehicle rows
+  ('ebay_motors', interval '1 hour', 'listing', 'active', NULL::interval, 'https://www.ebay.com/itm/1',
+   jsonb_build_object('listing_ends_at', now() + interval '3 days', 'source_observed_at', now() - interval '1 hour')),
+  ('ebay_motors', interval '50 minutes', 'listing', 'active', NULL, 'https://www.ebay.com/itm/1',
+   jsonb_build_object('listing_ends_at', now() + interval '3 days')),
+  ('ebay_motors', interval '2 hours', 'listing', 'active', NULL, 'https://www.ebay.com/itm/2',
+   jsonb_build_object('listing_ends_at', now() + interval '1 day', 'last_checked_at', now() - interval '10 minutes')),
+  -- not counted: ended by status, ended by clock, past its stated end, landed over a day ago, an archived page's end,
+  -- a malformed end, an auction episode, no stated end
+  ('ebay_motors', interval '1 hour', 'listing', 'ended', NULL, 'https://www.ebay.com/itm/3',
+   jsonb_build_object('listing_ends_at', now() + interval '3 days')),
+  ('ebay_motors', interval '1 hour', 'listing', 'active', interval '5 minutes', 'https://www.ebay.com/itm/4',
+   jsonb_build_object('listing_ends_at', now() + interval '3 days')),
+  ('ebay_motors', interval '1 hour', 'listing', 'active', NULL, 'https://www.ebay.com/itm/5',
+   jsonb_build_object('listing_ends_at', now() - interval '1 hour')),
+  ('ebay_motors', interval '30 hours', 'listing', 'active', NULL, 'https://www.ebay.com/itm/6',
+   jsonb_build_object('listing_ends_at', now() + interval '3 days')),
+  ('ebay_motors', interval '1 hour', 'listing', 'active', NULL, 'https://www.ebay.com/itm/7',
+   '{"listing_ends_at": "2011-01-06T05:46:41.000Z"}'::jsonb),
+  ('ebay_motors', interval '1 hour', 'listing', 'active', NULL, 'https://www.ebay.com/itm/8', '{"listing_ends_at": "not-a-time"}'::jsonb),
+  ('ebay_motors', interval '1 hour', 'auction', 'active', NULL, 'https://www.ebay.com/itm/9',
+   jsonb_build_object('listing_ends_at', now() + interval '3 days')),
+  ('ebay_motors', interval '1 hour', 'listing', 'active', NULL, 'https://www.ebay.com/itm/10', '{}'::jsonb),
+  -- open listing rows of sources the other two counters already count
+  ('bat', interval '1 hour', 'listing', 'active', NULL, 'https://bringatrailer.com/listing/x',
+   jsonb_build_object('listing_ends_at', now() + interval '3 days')),
+  ('streetside-classics', interval '1 hour', 'listing', 'active', NULL, 'https://streetsideclassics.com/v/1',
+   jsonb_build_object('listing_ends_at', now() + interval '3 days')),
+  ('streetside-classics', interval '1 hour', 'listing', 'active', NULL, 'https://streetsideclassics.com/v/2',
+   jsonb_build_object('listing_ends_at', now() + interval '3 days'))
+  ) v(p, ago, t, s, ended_ago, u, m);
+\ir ../migrations/20261021003000_market_sources_live_from_listing_rows.sql
+\ir ../migrations/20261021003000_market_sources_live_from_listing_rows.sql
+
+SET ROLE anon;
+DO $$
+DECLARE b jsonb := public.market_sources_read();
+  lv int; la int; ev int; sp int;
+  r jsonb;
+BEGIN
+  SELECT i - 1 INTO lv FROM jsonb_array_elements_text(b -> 'columns') WITH ORDINALITY c(n, i) WHERE n = 'live_lots';
+  SELECT i - 1 INTO la FROM jsonb_array_elements_text(b -> 'columns') WITH ORDINALITY c(n, i) WHERE n = 'live_at';
+  SELECT i - 1 INTO ev FROM jsonb_array_elements_text(b -> 'columns') WITH ORDINALITY c(n, i) WHERE n = 'species_evidence';
+  SELECT i - 1 INTO sp FROM jsonb_array_elements_text(b -> 'columns') WITH ORDINALITY c(n, i) WHERE n = 'species';
+  PERFORM pg_temp.ok('the board keeps its 35 columns', jsonb_array_length(b -> 'columns') = 35 AND lv = 17 AND la = 18);
+  SELECT x INTO r FROM jsonb_array_elements(b -> 'rows') x WHERE x ->> 0 = 'ebay_motors';
+  PERFORM pg_temp.ok('eBay Motors reads its open listings landed in 24 hours as live, one per listing url, at its latest check',
+    (r ->> lv)::int = 2 AND abs(extract(epoch FROM (r ->> la)::timestamptz - (now() - interval '10 minutes'))) < 60);
+  SELECT x INTO r FROM jsonb_array_elements(b -> 'rows') x WHERE x ->> 0 = 'bat';
+  PERFORM pg_temp.ok('a monitored auction source keeps its monitored count; its listing rows are not added', (r ->> lv)::int = 3);
+  SELECT x INTO r FROM jsonb_array_elements(b -> 'rows') x WHERE x ->> 0 = 'streetside-classics';
+  PERFORM pg_temp.ok('a dealer keeps its active listings count; its listing rows are not added', (r ->> lv)::int = 1);
+  SELECT x INTO r FROM jsonb_array_elements(b -> 'rows') x WHERE x ->> 0 = 'ebay_motors';
+  PERFORM pg_temp.ok('eBay Motors'' evidence says the Browse API works and dates the active-listing total, species and rule kept',
+    r -> ev ->> 'examined_at' = '2026-10-20'
+    AND r -> ev ->> 'seen' LIKE 'Read through the eBay Browse API with an application token, working since 2026-10-19%'
+    AND r -> ev ->> 'seen' LIKE '%35,576 active listings by the Browse search total with no keywords, counted 2026-10-20 04:25Z%'
+    AND r -> ev ->> 'seen' LIKE '%Archived eBay item pages from the Internet Archive also land%'
+    AND r -> ev ->> 'seen' NOT LIKE '%token-gated%'
+    AND r -> ev ->> 'listing_rule' LIKE '%CLASSIFIED_AD%'
+    AND r ->> sp = 'auth_walled_marketplace');
+END $$;
+RESET ROLE;
+-- a later-dated restatement of the evidence is left alone by a replay
+UPDATE public.observation_sources SET species_evidence = species_evidence || '{"examined_at": "2026-11-01", "seen": "later"}'
+ WHERE slug = 'ebay_motors';
+\ir ../migrations/20261021003000_market_sources_live_from_listing_rows.sql
+SELECT pg_temp.ok('a later-dated restatement of the evidence is left alone by a replay',
+  (SELECT species_evidence ->> 'seen' = 'later' AND species_evidence ->> 'examined_at' = '2026-11-01'
+   FROM public.observation_sources WHERE slug = 'ebay_motors'));

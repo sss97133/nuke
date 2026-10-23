@@ -548,9 +548,13 @@ final class SyncEngine: ObservableObject {
             case .offSite(let reason):
                 skipped += 1
                 gates[reason, default: 0] += 1
+                VisionDecisionLog.shared.record(.init(assetId: asset.localIdentifier, source: "sync",
+                    category: VisionDecisionRecord.gateCategory, reason: reason))
             case .notOwnCamera:
                 skipped += 1
                 gates["not_own_camera", default: 0] += 1
+                VisionDecisionLog.shared.record(.init(assetId: asset.localIdentifier, source: "sync",
+                    category: VisionDecisionRecord.gateCategory, reason: "not_own_camera"))
             case .heldPrivate:
                 heldPrivate += 1
             case .deduped:
@@ -610,7 +614,7 @@ final class SyncEngine: ObservableObject {
         // A PhotoKit-triggered pass or refresh wake can upload without reopening the app.
         // File mapped albums after that pass too; this path reads metadata, never originals.
         if uploaded > metadataOnly, !Task.isCancelled {
-            await AttributionEngine.shared.run(limit: 500, ocrBudget: 0)
+            await AttributionEngine.shared.runAutomatic(limit: 500, ocrBudget: 0)
         }
         // One bounded comparison of already acknowledged sources, including retries from an
         // earlier pass. Visual analysis availability never changes upload or filing success.
@@ -959,6 +963,10 @@ final class SyncEngine: ObservableObject {
         let pixelsEligible: Bool
         let labels: [String]
         var privacyReceipt: DevicePrivacyReceipt? = nil
+        /// The on-device rule outcome, for the local decision log (ids and labels only).
+        var decision: VisionDecision? = nil
+        var scoredLabels: [(String, Float)] = []
+        var hasFace = false
     }
 
     nonisolated static func prepare(_ data: Data, userId: String? = nil,
@@ -970,6 +978,7 @@ final class SyncEngine: ObservableObject {
         var eligible = false
         var labels: [String] = []
         var privacyReceipt: DevicePrivacyReceipt?
+        var decision: VisionDecision?, scored: [(String, Float)] = [], face = false
         // Owner triage only matters for our own camera's frames; skip the decode otherwise.
         if make == "Apple" {
             guard let cg = decode(data) else { throw VisionEngine.TriageFailure.imageUndecodable }
@@ -977,13 +986,15 @@ final class SyncEngine: ObservableObject {
             if let failure = t.failure { throw failure }
             labels = t.labels
             eligible = t.pixelsEligible
+            decision = t.decision; scored = t.scoredLabels; face = t.hasFace
             if eligible, let evidence = t.privacyEvidence, let userId {
                 privacyReceipt = DevicePrivacyReceipt.make(original: data, image: cg, evidence: evidence, userId: userId)
             }
         }
         return PreparedOriginal(cameraMake: make, cameraModel: model,
                                 exifCaptureDate: CameraEXIF.captureDate(from: data),
-                                pixelsEligible: eligible, labels: labels, privacyReceipt: privacyReceipt)
+                                pixelsEligible: eligible, labels: labels, privacyReceipt: privacyReceipt,
+                                decision: decision, scoredLabels: scored, hasFace: face)
     }
 
     /// Gates first on metadata alone (no bytes read), then the original, then the upload.
@@ -1032,6 +1043,10 @@ final class SyncEngine: ObservableObject {
         let prep: PreparedOriginal
         do { prep = try await Self.prepare(data, userId: userId) }
         catch { return noteFailure(id, message: "\(filename): \(error.localizedDescription)") }
+        if let decision = prep.decision {
+            VisionDecisionLog.shared.record(.init(assetId: id, source: "sync", decision: decision,
+                                                  labels: prep.scoredLabels, hasFace: prep.hasFace))
+        }
         // ── Gate 2 (ownership): require Apple camera EXIF ──
         // iMessage-received photos have EXIF stripped → make == nil.
         guard prep.cameraMake == "Apple" else { markAssetSeen(id); return .notOwnCamera }

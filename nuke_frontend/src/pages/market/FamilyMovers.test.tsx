@@ -58,6 +58,9 @@ it('lists families gaining and losing share of BaT, volume apart from the averag
   expect(rows[0].querySelector('.map-movers2__move')?.textContent).toBe('▲155%');
   expect(rows[0].querySelector('.map-movers2__counts')?.textContent).toBe('38 → 109 sold');
   expect(rows[0].querySelector('.map-movers2__price')?.textContent).toBe('avg sale ▼12%');
+  expect(rows[0].textContent).toContain('Lower average amounts: a different vehicle mix, or changed prices for similar cars?');
+  expect(rows[0].textContent).toContain('Inspect sales →');
+  expect(container.textContent).toContain('Outpacing the market');
   expect(rows[0].querySelector('path.map-movers2__mark')).not.toBeNull();
   expect(rows[1].querySelector('circle.map-movers2__mark')).not.toBeNull();
   expect(container.querySelector('.map-movers2__relativity')?.textContent).toContain('RELATIVITY');
@@ -67,7 +70,7 @@ it('lists families gaining and losing share of BaT, volume apart from the averag
     'UPCOMING', '1D', '1W', '1M', '3M', '6M', '1Y', '5Y',
   ]);
   expect(container.querySelector('.map-movers2__base')?.textContent).toContain("after taking out the market's own growth (▲12%, 34,598 → 38,879)");
-  expect(container.querySelector('.map-movers2__base')?.textContent).toContain('61 of 150 families with 30+ measured sales each year changed for real');
+  expect(container.querySelector('.map-movers2__base')?.textContent).toContain('61 of 150 families with 30+ measured sales each year passed selection');
   expect(container.querySelector('.map-movers2__base')?.textContent).not.toMatch(/standard error|SE range|log axis/);
   await act(async () => (rows[1] as HTMLButtonElement).click());
   expect(onPick).toHaveBeenCalledWith(expect.objectContaining({ brand: 'Acura', family_key: 'fint', family: 'Integra' }));
@@ -346,4 +349,49 @@ it('does not replace a newer window when an earlier model-label lookup finishes'
   await act(async () => finish({ data: overlayModels, error: null }));
   expect(container.querySelector('.map-movers2__rel-window')?.textContent).toBe('LAST 1Y VS PRIOR 1Y');
   expect(container.textContent).not.toContain('Jimny');
+});
+
+it('keeps a delayed answer attached to its period and ignores an abandoned read', async () => {
+  const { default: Fresh } = await import('./FamilyMovers');
+  let finishDay!: (answer: any) => void;
+  let finishWeek!: (answer: any) => void;
+  fixture.rpc.mockImplementation((fn: string, args: any) => {
+    if (fn !== 'treemap_family_share_movers') return Promise.resolve({ data: null, error: null });
+    if (args?.p_horizon === '1d') return new Promise(resolve => { finishDay = resolve; });
+    if (args?.p_horizon === '1w') return new Promise(resolve => { finishWeek = resolve; });
+    return Promise.resolve({ data: value, error: null });
+  });
+  const onMoversData = vi.fn();
+  const props = { onPick: vi.fn(), onMoversData };
+  await act(async () => root.render(<Fresh {...props} horizon="1y" />));
+  await act(async () => root.render(<Fresh {...props} horizon="1d" />));
+  expect(container.querySelector('.map-movers2__rel-window')?.textContent).toBe('LAST 1Y VS PRIOR 1Y');
+  expect(container.querySelector('.map-movers2__counts')?.textContent).toBe('38 → 109 sold');
+  expect(container.querySelector('[role="status"]')?.textContent).toContain('Reading selected comparison');
+  await act(async () => root.render(<Fresh {...props} horizon="1w" />));
+  const week = { ...value, gaining: [{ ...value.gaining[0], sold_12m: 7, sold_prior_12m: 3 }] };
+  await act(async () => finishWeek({ data: week, error: null }));
+  expect(container.querySelector('.map-movers2__rel-window')?.textContent).toBe('LAST 7D VS PRIOR 7D');
+  expect(container.querySelector('.map-movers2__counts')?.textContent).toBe('3 → 7 sold');
+  await act(async () => finishDay({ data: value, error: null }));
+  expect(container.querySelector('.map-movers2__counts')?.textContent).toBe('3 → 7 sold');
+  expect(container.querySelector('[role="status"]')).toBeNull();
+  expect(onMoversData).not.toHaveBeenCalledWith(expect.anything(), '1d', 'prior');
+});
+
+it('refuses an unavailable custom baseline and lets another selection recover', async () => {
+  const { default: Fresh } = await import('./FamilyMovers');
+  fixture.rpc.mockImplementation((fn: string, args: any) => Promise.resolve(
+    fn === 'treemap_family_share_movers' && args?.p_horizon !== '5y'
+      ? { data: value, error: null } : { data: null, error: { message: 'unavailable' } }));
+  const onMoversData = vi.fn();
+  const props = { onPick: vi.fn(), onMoversData };
+  await act(async () => root.render(<Fresh {...props} horizon="1y" />));
+  await act(async () => root.render(<Fresh {...props} horizon="1y" baselineHorizon="5y" />));
+  expect(container.querySelector('.map-movers2__rel-window')?.textContent).toBe('LAST 1Y VS PRIOR 1Y');
+  expect(container.querySelector('[role="status"]')?.textContent).toContain('Selected comparison unavailable');
+  expect(onMoversData).toHaveBeenLastCalledWith(null, '1y', '5y');
+  await act(async () => root.render(<Fresh {...props} horizon="1w" baselineHorizon="prior" />));
+  expect(container.querySelector('.map-movers2__rel-window')?.textContent).toBe('LAST 7D VS PRIOR 7D');
+  expect(container.querySelector('[role="status"]')).toBeNull();
 });

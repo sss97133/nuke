@@ -40,6 +40,7 @@ const DealerRoutes = React.lazy(() => import('./modules/dealer/routes'));
 const AdminRoutes = React.lazy(() => import('./modules/admin/routes'));
 const MarketplaceRoutes = React.lazy(() => import('./modules/marketplace/routes'));
 const PublishingRoutes = React.lazy(() => import('./modules/publishing/routes'));
+const FinanceDashboard = React.lazy(() => import('../pages/publishing/FinanceDashboard'));
 
 // Auth / callbacks (still referenced by many pages/components)
 const Login = React.lazy(() => import('../components/auth/Login'));
@@ -126,6 +127,8 @@ const JobPage = React.lazy(() => {
   if (typeof window !== 'undefined') warmJobRoute(window.location.pathname);
   return import('../pages/jobs/JobPage');
 });
+// Parts to buy for a job: listings approved for its parts, one link each to eBay (work_order_operations_read)
+const JobPartsHandoff = React.lazy(() => import('../pages/jobs/JobPartsHandoff'));
 const ProviderProfilePage = React.lazy(() => import('../pages/providers/ProviderProfilePage'));
 const MessagesPage = React.lazy(() => import('../pages/messages/MessagesPage'));
 const SupplierInvitePage = React.lazy(() => import('../pages/orgs/SupplierInvitePage'));
@@ -181,6 +184,7 @@ export const DomainRoutes = () => {
         <Route path="/market/*" element={<MarketplaceRoutes />} />
         {/* Publishing: editorial production, publications, credits — separate from vehicles */}
         <Route path="/publishing/*" element={<PublishingRoutes />} />
+        <Route path="/accounting" element={<ProtectedRoute><FinanceDashboard /></ProtectedRoute>} />
 
         {/* ── Legacy Route Compatibility Shims ─────────────────────────── */}
         <Route path="/vehicles" element={<Navigate to="/vehicle/list" replace />} />
@@ -221,6 +225,7 @@ export const DomainRoutes = () => {
         <Route path="/u/:handle" element={<UserProfile />} />
         {/* Jobs (work orders) and provider work records — public, read-first; Signs only where the server offers them */}
         <Route path="/jobs/:workOrderId" element={<JobPage />} />
+        <Route path="/jobs/:workOrderId/parts" element={<JobPartsHandoff />} />
         <Route path="/providers/actor/:actorId" element={<ProviderProfilePage />} />
         <Route path="/providers/:handle" element={<ProviderProfilePage />} />
         {/* Statement: work_order_statement_read is open data; payments stay party-only from the server */}

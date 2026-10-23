@@ -158,7 +158,7 @@ final class LibraryIngest: ObservableObject {
     /// image analysis may have been wrong anywhere upstream, so it cannot qualify
     /// as the VIN/classification read that anchors a capture-session fold.
     static var identityMethodVersion: String {
-        "vehicle-identity-context-fold-v3:\(VNClassifyImageRequest.defaultRevision):\(VNRecognizeTextRequest.defaultRevision)"
+        "vehicle-identity-context-fold-v3:\(VNClassifyImageRequest.defaultRevision):\(VNRecognizeTextRequest.defaultRevision):\(OnDeviceAnalysis.methodVersion)"
     }
 
     /// Read every selected source image, including already-bound photos. Album
@@ -240,6 +240,12 @@ final class LibraryIngest: ObservableObject {
         let version = asset.modificationDate.map { String($0.timeIntervalSince1970) }
         guard version == photo.sourceVersion else { return .pending("source versions changed") }
         guard let data = try? await SyncEngine.requestOriginalData(for: asset, allowNetwork: allowNetwork) else { return .pending("originals unavailable") }
+        // Decode + Vision + OCR allocate autoreleased CoreGraphics/Vision objects per photo; drain
+        // them per item so a long review pass does not accumulate memory (and heat) until it ends.
+        return autoreleasepool { reviewLoaded(photo, asset: asset, version: version, data: data, method: method) }
+    }
+
+    private nonisolated static func reviewLoaded(_ photo: LocalAlbumPhoto, asset: PHAsset, version: String?, data: Data, method: String) -> AlbumPhotoReviewResult {
         // Source measurements have their own writer. An unavailable classifier
         // must not prevent true capture facts from reaching the user's record.
         let (make, model) = CameraEXIF.cameraInfo(from: data)
@@ -256,8 +262,11 @@ final class LibraryIngest: ObservableObject {
         // album/session vehicle. Several readings remain several possible subjects.
         // Preserve all source text, including pre-1981 serials that the existing
         // modern 17-character VIN detector cannot recognize. Never force a match.
-        let textLines = asset.mediaSubtypes.contains(.photoScreenshot) ? [] : VisionEngine.recognizeText(cg)
-        let vins = Array(Set(VisionEngine.vinCandidates(in: textLines) +
+        // One OCR pass yields both the lines and the scored observations (source + confidence).
+        let analysis = OnDeviceAnalysis.analyze(cg, classification: classification,
+                                                readText: !asset.mediaSubtypes.contains(.photoScreenshot))
+        let textLines = analysis.textLines
+        let vins = Array(Set(VisionEngine.vinCandidates(in: textLines) + VisionEngine.checkedVINs(in: textLines) +
             VisionEngine.labelledClassicSerialCandidates(in: textLines))).sorted()
         let encoder = JSONEncoder()
         guard let labelData = try? encoder.encode(labels), let vinData = try? encoder.encode(vins),
@@ -266,13 +275,15 @@ final class LibraryIngest: ObservableObject {
         // Populate existing offline glasses from these same original bytes; disjoint
         // writers leave owner approval and prior vehicle bindings untouched.
         LocalStore.shared.classify(localIdentifier: photo.localIdentifier,
-            isVehicle: classification.isVehicle, isPersonal: face && !classification.isVehicle,
+            isVehicle: classification.isVehicle, isPersonal: VisionDecisionLog.shared.recordLibrary(assetId: photo.localIdentifier,
+                classification, face: face, isScreenshot: asset.mediaSubtypes.contains(.photoScreenshot)),
             hasPerson: face, labels: labels)
         let review = LocalAlbumImageReview(id: LocalStore.albumDigest(identity), localIdentifier: photo.localIdentifier,
             sourceVersion: version, inputSHA256: input, methodVersion: method, analyzedAt: Date(),
             isVehicle: classification.isVehicle, hasPerson: face,
             labelsJSON: String(decoding: labelData, as: UTF8.self), vinCandidatesJSON: String(decoding: vinData, as: UTF8.self),
-            textLinesJSON: String(decoding: textData, as: UTF8.self))
+            textLinesJSON: String(decoding: textData, as: UTF8.self),
+            onDeviceJSON: OnDeviceAnalysis.encode(analysis.observations))
         return .init(review: review, pendingReason: nil)
     }
 
@@ -400,6 +411,11 @@ final class LibraryIngest: ObservableObject {
         guard let data = try? await SyncEngine.requestOriginalData(for: item.asset, allowNetwork: mode == .full) else {
             return false   // iCloud unavailable / threw → stays out of the skip-set, retried later
         }
+        // Per-item pool: the original bytes, decoded frame and Vision results are released per photo.
+        return autoreleasepool { processLoaded(item, data: data, mode: mode) }
+    }
+
+    private nonisolated static func processLoaded(_ item: Item, data: Data, mode: Mode) -> Bool {
         let date = CameraEXIF.captureDate(from: data)
         let (make, model) = CameraEXIF.cameraInfo(from: data)
 
@@ -436,7 +452,8 @@ final class LibraryIngest: ObservableObject {
             let labels = Array(cls.labels.prefix(12).map { $0.0 })
             LocalStore.shared.classify(localIdentifier: item.lid,
                                        isVehicle: cls.isVehicle,
-                                       isPersonal: face && !cls.isVehicle,
+                                       isPersonal: VisionDecisionLog.shared.recordLibrary(assetId: item.lid, cls, face: face,
+                                           isScreenshot: item.asset.mediaSubtypes.contains(.photoScreenshot)),
                                        hasPerson: face,
                                        labels: labels)
         }

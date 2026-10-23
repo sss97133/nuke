@@ -63,6 +63,9 @@ final class LibraryOverlayStore: ObservableObject {
     /// A cell appeared — classify it cheap, on-device, cached, OFF the scroll path.
     func note(_ localIdentifier: String) {
         guard !seen.contains(localIdentifier) else { return }
+        // Bound the dedup set: a long scroll through a large library would otherwise grow it
+        // forever. Clearing only re-allows a (cached, cheap) classify of an id seen again.
+        if seen.count >= Self.seenCap { seen = Set(queue) }
         seen.insert(localIdentifier)
         queue.append(localIdentifier)
         if !running { running = true; Task { await run() } }
@@ -113,7 +116,9 @@ final class LibraryOverlayStore: ObservableObject {
     /// classifies OFF the main actor, applies back on main.
     private func run() async {
         await withTaskGroup(of: Void.self) { group in
-            for _ in 0..<4 {
+            // Warm phone or Low Power Mode: one lane instead of four, so the grid's classifier
+            // does not keep the Neural Engine saturated while the owner holds the device.
+            for _ in 0..<Self.laneCount() {
                 group.addTask { [weak self] in
                     while let lid = await self?.nextLID() {
                         let info = await Self.resolve(lid)
@@ -124,6 +129,12 @@ final class LibraryOverlayStore: ObservableObject {
         }
         running = false
         if !queue.isEmpty { running = true; Task { await run() } }   // ids that arrived mid-drain
+    }
+
+    static let seenCap = 4000
+    nonisolated static func laneCount(thermal: ProcessInfo.ThermalState = ProcessInfo.processInfo.thermalState,
+                                      lowPower: Bool = ProcessInfo.processInfo.isLowPowerModeEnabled) -> Int {
+        (thermal.rawValue >= ProcessInfo.ThermalState.fair.rawValue || lowPower) ? 1 : 4
     }
 
     /// Newest first: the cells on screen now, ahead of ones already scrolled past.

@@ -34,6 +34,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { callTier, parseJsonResponse } from "../_shared/agentTiers.ts";
 import { writeObservation } from "../_shared/observationWriter.ts";
+import { vinExcerpt } from "./vinCitation.ts";
 import { authenticateWriter, requireWriteAuth } from "../_shared/writeGuard.ts";
 import { drainBatSaleQueue } from "./batSaleQueue.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
@@ -262,7 +263,7 @@ Deno.serve(async (req) => {
           if (snapUrl) {
             const { data: snaps } = await supabase
               .from("listing_page_snapshots")
-              .select("html, html_storage_path, markdown")
+              .select("id, html, html_storage_path, markdown")
               .eq("listing_url", snapUrl)
               .eq("platform", platform)
               .eq("success", true)
@@ -320,7 +321,7 @@ Deno.serve(async (req) => {
           // First try inline HTML, then fall back to storage
           const { data: snaps } = await supabase
             .from("listing_page_snapshots")
-            .select("html, html_storage_path, markdown")
+            .select("id, html, html_storage_path, markdown")
             .in("listing_url", [...normalizedUrls])
             .eq("platform", platform)
             .eq("success", true)
@@ -553,8 +554,12 @@ Deno.serve(async (req) => {
           for (const f of fieldsUpdated) {
             if (updatePayload[f] !== undefined) obsFields[f] = updatePayload[f];
           }
+          // A VIN carries its receipt: the snapshot it was read from and the verbatim text around it.
+          const vinExcerptText = obsFields.vin ? vinExcerpt(snapshotHtml, String(obsFields.vin)) : null;
           writeObservation(supabase, {
             vehicleId: vehicle.id,
+            ...(snapshot?.id ? { sourceSnapshotId: snapshot.id } : {}),
+            ...(vinExcerptText ? { citationExcerpt: vinExcerptText } : {}),
             source: {
               platform,
               url: vehicleUrl || vehicle.bat_auction_url || vehicle.listing_url || vehicle.discovery_url || "",

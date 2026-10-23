@@ -5,7 +5,8 @@
 --     the old read would have put first for that vehicle under that caller's row policies (primary first, then earliest),
 --     and nothing for a vehicle the old read returns nothing for;
 --   * it never returns an image a caller's policies hide: private vehicles of others, sensitive, superseded or vision-gated
---     images of public vehicles;
+--     images of public vehicles; and, from 20261021030000, never a superseded or vision-gated image to anyone, owner and
+--     organization members included (the policies show them those rows; a card does not use them);
 --   * a vehicle whose primary image is hidden from the caller falls back to the earliest image they can see;
 --   * it reads a vehicle with thousands of images through the indexes (one primary probe, one backward probe), not by sorting them;
 --   * anon, authenticated and service_role execute it, PUBLIC does not; it is SECURITY DEFINER with a pinned search_path;
@@ -138,6 +139,7 @@ SELECT public.t_assert((SELECT image_url FROM old_reads WHERE who = 'anon' AND v
 
 -- 2. The migration.
 \ir ../migrations/20261014040500_vehicle_card_images.sql
+\ir ../migrations/20261021030500_vehicle_card_images_gate_for_everyone.sql
 
 CREATE TEMP TABLE new_reads (who text, vehicle_id uuid, image_url text, thumbnail_url text, medium_url text, variants jsonb, is_primary boolean);
 GRANT ALL ON new_reads TO anon, authenticated;
@@ -163,6 +165,31 @@ SELECT public.t_assert(NOT EXISTS (
     WHERE o.image_url IS DISTINCT FROM n.image_url), 'for anon, owner, member and stranger: the same image per vehicle as the old read, none extra, none missing');
 SELECT public.t_assert((SELECT count(*) FROM new_reads WHERE who = 'a') = 7 AND (SELECT count(*) FROM new_reads WHERE who = 'b') = 7
   AND (SELECT count(*) FROM new_reads WHERE who = 'c') = 7 AND (SELECT count(*) FROM new_reads WHERE who = 'anon') = 6, 'the counts per caller: anon 6 public vehicles, plus one private vehicle each for owner, member and stranger');
+
+-- 3b. Owners and contributors: the row policies show them a gated photo of their own vehicle, a card never does.
+--     13 private, owned by a: primary held (review_needed), a superseded newer one, one clean approved    14 private, in organization o1 (member b):
+--     primary rejected_misattributed + one clean   15 private, owned by a: only gated photos (rejected_personal, review_needed)
+INSERT INTO public.vehicles (id, user_id, is_public) VALUES (public.t_vid(13), public.t_uid('a'), false), (public.t_vid(14), NULL, false), (public.t_vid(15), public.t_uid('a'), false);
+INSERT INTO public.organization_vehicles VALUES ('c0000000-0000-0000-0000-0000000000c1', public.t_vid(14));
+SELECT public.t_img(13, '13p', true, 10, p_gate => 'review_needed'), public.t_img(13, '13s', false, 50, p_superseded => true), public.t_img(13, '13a', false, 30);
+SELECT public.t_img(14, '14p', true, 10, p_gate => 'rejected_misattributed'), public.t_img(14, '14a', false, 20);
+SELECT public.t_img(15, '15a', true, 10, p_gate => 'rejected_personal'), public.t_img(15, '15b', false, 20, p_gate => 'review_needed');
+CREATE TEMP TABLE own_reads (who text, vehicle_id uuid, image_url text, policy_first text);
+GRANT ALL ON own_reads TO authenticated;
+SET ROLE authenticated; SET test.auth_role = 'authenticated';
+SET test.auth_uid = 'a0000000-0000-0000-0000-00000000000a';
+INSERT INTO own_reads SELECT 'a', c.vehicle_id, c.image_url, (SELECT o.image_url FROM public.t_old_first(ARRAY[c.vehicle_id]) o) FROM public.vehicle_card_images(ARRAY[public.t_vid(13), public.t_vid(15)]) c;
+SET test.auth_uid = 'b0000000-0000-0000-0000-00000000000b';
+INSERT INTO own_reads SELECT 'b', c.vehicle_id, c.image_url, (SELECT o.image_url FROM public.t_old_first(ARRAY[c.vehicle_id]) o) FROM public.vehicle_card_images(ARRAY[public.t_vid(14), public.t_vid(15)]) c;
+RESET ROLE;
+SELECT public.t_assert((SELECT image_url FROM own_reads WHERE who = 'a' AND vehicle_id = public.t_vid(13)) = 'f-13a'
+  AND (SELECT policy_first FROM own_reads WHERE who = 'a' AND vehicle_id = public.t_vid(13)) = 'f-13p',
+  'owner: the card skips the held primary and the superseded photo (the row policies would have returned the held primary)');
+SELECT public.t_assert((SELECT image_url FROM own_reads WHERE who = 'b' AND vehicle_id = public.t_vid(14)) = 'f-14a'
+  AND (SELECT policy_first FROM own_reads WHERE who = 'b' AND vehicle_id = public.t_vid(14)) = 'f-14p',
+  'organization member: the card skips the rejected primary of the organization''s vehicle');
+SELECT public.t_assert(NOT EXISTS (SELECT FROM own_reads WHERE vehicle_id = public.t_vid(15)),
+  'a vehicle whose only photos are gated has no card photo, for its owner too, and nobody else sees the private vehicle');
 
 -- 4. What each caller must and must not get.
 SELECT public.t_assert((SELECT image_url FROM new_reads WHERE who = 'anon' AND vehicle_id = public.t_vid(1)) = 'f-1p'
@@ -218,6 +245,7 @@ INSERT INTO public.vehicle_images (vehicle_id, image_url, is_primary) SELECT pub
 SELECT public.t_assert((SELECT count(*) FROM public.vehicle_card_images(ARRAY(SELECT public.t_vid(2000 + g) FROM generate_series(1, 1200) g))) = 1000,
   'at most 1,000 distinct ids are read');
 
--- 8. A second run of the migration is a no-op.
+-- 8. A second run of the migrations is a no-op.
 \ir ../migrations/20261014040500_vehicle_card_images.sql
+\ir ../migrations/20261021030500_vehicle_card_images_gate_for_everyone.sql
 SELECT 'vehicle_card_images contract: PASS' AS result;

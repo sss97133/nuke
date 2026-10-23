@@ -269,6 +269,7 @@ function previewFixture(options = {}) {
         if (specifier === './supabaseKeys.ts' || specifier === '../_shared/supabaseKeys.ts') return load('keys');
         if (specifier === '../_shared/vehicleEventWrite.ts') return { patchForLiveRow: () => assert.fail('No event write in the preview'), writeVehicleEventByKey: () => assert.fail('No event write in the preview') };
         if (specifier === './indexLot.ts') return { indexLot: () => assert.fail('No index read in the preview'), parseSaleFacet: () => assert.fail('No index read in the preview') };
+        if (specifier === './auctionEndDate.ts') return { mecumAuctionEndDate: () => null };
         if (specifier === '../_shared/writeResult.ts') return { mustWrite: () => assert.fail('No write in the preview'), softWrite: () => assert.fail('No write in the preview') };
         if (specifier === './identityFill.ts') return { fillOnlyIdentity: () => assert.fail('No identity write in the preview') };
         if (specifier === './rscPost.ts') return { postFromFlight: () => assert.fail('No app-router lot read in the preview') };
@@ -280,6 +281,7 @@ function previewFixture(options = {}) {
         if (specifier === '../_shared/qualityGate.ts' || specifier === '../_shared/extractionQualityGate.ts') return { qualityGate: () => assert.fail('No extraction/write path') };
         if (specifier === '../_shared/pollutionDetector.ts') return { cleanVehicleFields: () => assert.fail('No profile mutation') };
         if (specifier === '../_shared/observationWriter.ts') return { writeObservation: () => assert.fail('No testimony intake') };
+        if (specifier === '../_shared/landIdentifierClaims.ts') return { landIdentifierClaims: () => assert.fail('No identifier intake in the preview') };
         assert.fail('Unexpected import: ' + specifier);
       },
     });

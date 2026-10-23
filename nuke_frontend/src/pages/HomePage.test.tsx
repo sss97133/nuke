@@ -16,6 +16,7 @@ const fixture = vi.hoisted(() => ({ client: {} as any }));
 vi.mock('../lib/supabase', () => ({ supabase: fixture.client }));
 
 import HomePage, { TreemapHomePage } from './HomePage';
+import { clearFamilySalesReads } from './market/FamilySalesChart';
 let root: Root, container: HTMLDivElement;
 
 beforeEach(() => {
@@ -96,6 +97,7 @@ async function renderTreemap(query = 'tab=market') {
   await act(async () => root.render(<BrowserRouter><TreemapHomePage embedded onBrowse={() => {}} /></BrowserRouter>));
 }
 function loadingMessages() { return [...container.querySelectorAll('div')].filter(el => el.childElementCount === 0 && el.textContent === 'LOADING...'); }
+
 
 describe('map loading belongs to its current level', () => {
   it('shows the initial brand read until its real response arrives', async () => {
@@ -296,4 +298,64 @@ describe('phone vehicle browsing', () => {
     expect(container.querySelector('select[aria-label="Choose a model"]')).not.toBeNull();
 
   });
+});
+
+it('opens family sales history directly from a market-change finding', async () => {
+  clearFamilySalesReads();
+  const mover = { brand: 'Porsche', family_key: '911', family: '911', sold_12m: 60, sold_prior_12m: 40,
+    usd_12m: 3_000_000, usd_prior_12m: 2_000_000, share_move: .3, share_lo: .1, share_hi: .5, se: .1, avg_price_move: -.1 };
+  installTreemapReads({ treemap_family_sales: Promise.resolve({ error: null, data: { rows: [['00000000-0000-4000-8000-000000000001', '2026-08-01', 50000, 'Bring a Trailer', 1970, '911']], n: 1, truncated: false } }), treemap_family_share_movers: Promise.resolve({ error: null, data: {
+    as_of: '2026-10-22T00:00:00Z', min_sales: 30, families: 10, eligible: 5, significant: 1,
+    bat: { sold_12m: 1100, sold_prior_12m: 1000, usd_12m: 1_100_000, usd_prior_12m: 1_000_000 }, gaining: [mover], losing: [],
+  } }) });
+  await renderTreemap();
+  const finding = container.querySelector<HTMLButtonElement>('button.map-movers2__row')!;
+  expect(finding.textContent).toContain('Inspect sales');
+  await act(async () => finding.click());
+  expect(window.location.search).toContain('make=Porsche');
+  expect(window.location.search).toContain('family=911');
+  expect(window.location.search).toContain('family_view=sales');
+  expect([...container.querySelectorAll('.family-view__option[aria-pressed="true"]')].some(button => button.textContent === 'Sales')).toBe(true);
+  expect(container.querySelector('.family-sales')).not.toBeNull();
+  expect(fixture.client.rpc).toHaveBeenCalledWith('treemap_family_sales', expect.objectContaining({ p_brand: 'Porsche', p_family_key: '911' }));
+});
+
+it('restores the sales investigation from its URL and records a switch back to names', async () => {
+  installTreemapReads();
+  await renderTreemap('tab=market&make=Porsche&family=911&family_view=sales');
+  const active = () => [...container.querySelectorAll('.family-view__option[aria-pressed="true"]')].map(button => button.textContent);
+  expect(active()).toContain('Sales');
+  const names = [...container.querySelectorAll<HTMLButtonElement>('.family-view__option')].find(button => button.textContent === 'Names')!;
+  await act(async () => names.click());
+  expect(window.location.search).not.toContain('family_view');
+  expect(active()).toContain('Names');
+  await navigate('/?tab=market&make=Porsche&family=911&family_view=sales');
+  expect(active()).toContain('Sales');
+});
+
+it('keeps map amounts and benchmark together until the requested period succeeds', async () => {
+  vi.resetModules();
+  const { TreemapHomePage: FreshHome } = await import('./HomePage');
+  installTreemapReads();
+  const originalRpc = fixture.client.rpc;
+  let finishDay!: (result: any) => void;
+  const dayRead = new Promise(resolve => { finishDay = resolve; });
+  const answer = (day: boolean) => ({
+    as_of: '2026-10-22T00:00:00Z', min_sales: 1, families: 10, eligible: 5, significant: 1,
+    bat: { sold_12m: day ? 20 : 1100, sold_prior_12m: day ? 10 : 1000, usd_12m: 100000, usd_prior_12m: 100000 },
+    brand_moves: { Porsche: { sold_12m: 8, sold_prior_12m: 2, usd_12m: 80000, usd_prior_12m: 20000 } },
+    gaining: [], losing: [],
+  });
+  fixture.client.rpc = vi.fn((name: string, args: any) => name === 'treemap_family_share_movers'
+    ? args?.p_horizon === '1d' ? dayRead : Promise.resolve({ data: answer(false), error: null })
+    : originalRpc(name, args));
+  await act(async () => root.render(<BrowserRouter><FreshHome embedded onBrowse={() => {}} /></BrowserRouter>));
+  const windowButtons = container.querySelector('[aria-label="Relativity time horizon"]')!;
+  const day = [...windowButtons.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent === '1D')!;
+  await act(async () => day.click());
+  expect(container.querySelector('.map-legend__prose')?.textContent ?? container.querySelector('.map-legend')?.textContent).toContain('1,000 → 1,100');
+  expect(container.querySelector('.map-movers2__rel-window')?.textContent).toBe('LAST 1Y VS PRIOR 1Y');
+  await act(async () => finishDay({ data: answer(true), error: null }));
+  expect(container.querySelector('.map-legend')?.textContent).toContain('10 → 20');
+  expect(container.querySelector('.map-movers2__rel-window')?.textContent).toBe('LAST 24H VS PRIOR 24H');
 });

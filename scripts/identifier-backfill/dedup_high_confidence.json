@@ -1,0 +1,2059 @@
+[
+ {
+  "chassis": "56306",
+  "rule": "356A T1 COUPE 55001-59099",
+  "high_confidence": true,
+  "profiles": [
+   {
+    "id": "0029a621-96b3-4189-b94a-00fc184fd0f5",
+    "year": 1956,
+    "model": "356A Sunroof Coupe",
+    "body": "COUPE",
+    "vin": "56306",
+    "sale_price": 160000,
+    "from": "vin"
+   },
+   {
+    "id": "f123dcc8-9ab7-42c4-98bd-8c1dbe0d54fa",
+    "year": 1956,
+    "model": "356a 'outlaw' coupe",
+    "body": "COUPE",
+    "vin": null,
+    "sale_price": 127500,
+    "from": "text"
+   }
+  ]
+ },
+ {
+  "chassis": "89748",
+  "rule": "356B ROADSTER 86831-89849",
+  "high_confidence": true,
+  "profiles": [
+   {
+    "id": "0060d564-ceb2-4528-8e87-c1310038da64",
+    "year": 1962,
+    "model": "356B Twin Grille Roadster",
+    "body": "ROADSTER",
+    "vin": "89748",
+    "sale_price": null,
+    "from": "vin"
+   },
+   {
+    "id": "bfb490e6-a28b-48cc-9a16-c4aab03fd4f9",
+    "year": 1962,
+    "model": "356B Twin Grille Roadster",
+    "body": "ROADSTER",
+    "vin": null,
+    "sale_price": 265000,
+    "from": "text"
+   }
+  ]
+ },
+ {
+  "chassis": "210935",
+  "rule": "356B T6 COUPE 210001-214400",
+  "high_confidence": true,
+  "profiles": [
+   {
+    "id": "032896f3-218c-430c-919b-fc6d0e012f10",
+    "year": 1963,
+    "model": "356 B",
+    "body": "COUPE",
+    "vin": "210935",
+    "sale_price": 44000,
+    "from": "vin"
+   },
+   {
+    "id": "93f0a35a-f0b2-4505-8bb7-f3bb69ae7677",
+    "year": 1963,
+    "model": "356B Coupe",
+    "body": "COUPE",
+    "vin": "P608873",
+    "sale_price": 44000,
+    "from": "text"
+   }
+  ]
+ },
+ {
+  "chassis": "156986",
+  "rule": "356B CABRIOLET 152476-158700",
+  "high_confidence": true,
+  "profiles": [
+   {
+    "id": "0622e127-f4e1-4191-ab50-5a5e543704d6",
+    "year": 1962,
+    "model": "356",
+    "body": "CABRIOLET",
+    "vin": null,
+    "sale_price": null,
+    "from": "text"
+   },
+   {
+    "id": "2f0fde58-44a9-4e06-a89e-b76d583fece5",
+    "year": 1962,
+    "model": "356 Cabriolet",
+    "body": "CABRIOLET",
+    "vin": "156986",
+    "sale_price": 110000,
+    "from": "vin"
+   }
+  ]
+ },
+ {
+  "chassis": "83100",
+  "rule": "356A SPEEDSTER 81901-84954",
+  "high_confidence": true,
+  "profiles": [
+   {
+    "id": "065a1cb1-c3a0-42a5-b1c4-e049752054fe",
+    "year": 1957,
+    "model": "356a speedster",
+    "body": "SPEEDSTER",
+    "vin": null,
+    "sale_price": null,
+    "from": "text"
+   },
+   {
+    "id": "941a6f26-5638-4f95-9b20-e4bc2ad30f5b",
+    "year": 1957,
+    "model": "356a speedster coachwork by reutter",
+    "body": "SPEEDSTER",
+    "vin": null,
+    "sale_price": 255000,
+    "from": "text"
+   }
+  ]
+ },
+ {
+  "chassis": "84294",
+  "rule": "356A SPEEDSTER 81901-84954",
+  "high_confidence": true,
+  "profiles": [
+   {
+    "id": "0b4527e1-0e71-4d73-bb5c-d97f17fdff02",
+    "year": 1958,
+    "model": "356a speedster",
+    "body": "SPEEDSTER",
+    "vin": null,
+    "sale_price": null,
+    "from": "text"
+   },
+   {
+    "id": "8009c63c-4c48-4d99-b7f7-0f56ecc4c5b8",
+    "year": 1958,
+    "model": "356a speedster",
+    "body": "SPEEDSTER",
+    "vin": null,
+    "sale_price": 210000,
+    "from": "text"
+   }
+  ]
+ },
+ {
+  "chassis": "87790",
+  "rule": "356B ROADSTER 86831-89849",
+  "high_confidence": true,
+  "profiles": [
+   {
+    "id": "0ccd5bab-be54-48f3-b582-1c8a863ca845",
+    "year": 1960,
+    "model": "356b 1600 roadster",
+    "body": "ROADSTER",
+    "vin": null,
+    "sale_price": 85000,
+    "from": "text"
+   },
+   {
+    "id": "baa6638b-331c-45f0-a506-9673c3462242",
+    "year": 1960,
+    "model": "356b 1600 roadster",
+    "body": "ROADSTER",
+    "vin": null,
+    "sale_price": null,
+    "from": "text"
+   }
+  ]
+ },
+ {
+  "chassis": "219848",
+  "rule": "356C COUPE 215001-222580",
+  "high_confidence": true,
+  "profiles": [
+   {
+    "id": "0ea7d48f-5ad2-41b9-9e06-a4dfbb9a68f4",
+    "year": 1964,
+    "model": "356",
+    "body": "COUPE",
+    "vin": null,
+    "sale_price": null,
+    "from": "text"
+   },
+   {
+    "id": "75c8ae62-121a-4560-83cc-21912dc6c0d0",
+    "year": 1964,
+    "model": "356",
+    "body": "COUPE",
+    "vin": null,
+    "sale_price": null,
+    "from": "text"
+   }
+  ]
+ },
+ {
+  "chassis": "214229",
+  "rule": "356B T6 COUPE 210001-214400",
+  "high_confidence": true,
+  "profiles": [
+   {
+    "id": "10f989f9-e548-48d5-9081-56d76d7ef7f7",
+    "year": 1963,
+    "model": "356 Super 90",
+    "body": "COUPE",
+    "vin": null,
+    "sale_price": null,
+    "from": "text"
+   },
+   {
+    "id": "48b16c39-8407-4fd8-a482-25a8d59c1ed1",
+    "year": 1963,
+    "model": "356 B SUPER 90",
+    "body": "COUPE",
+    "vin": null,
+    "sale_price": null,
+    "from": "text"
+   },
+   {
+    "id": "764901b7-d4b3-4594-a1b9-a58beab90801",
+    "year": 1963,
+    "model": "356 Super 90",
+    "body": "COUPE",
+    "vin": null,
+    "sale_price": null,
+    "from": "text"
+   },
+   {
+    "id": "796226e5-5a6b-4416-a05c-54cdb3a5f9e7",
+    "year": 1963,
+    "model": "356 B SUPER 90",
+    "body": "COUPE",
+    "vin": null,
+    "sale_price": null,
+    "from": "text"
+   },
+   {
+    "id": "8825e5bd-b31f-4ab9-9e04-02f6d143f66d",
+    "year": 1963,
+    "model": "356 B SUPER 90",
+    "body": "COUPE",
+    "vin": null,
+    "sale_price": null,
+    "from": "text"
+   },
+   {
+    "id": "88cadced-c5da-486d-b5a6-276d2f6dd1d3",
+    "year": 1963,
+    "model": "356 B SUPER 90",
+    "body": "COUPE",
+    "vin": null,
+    "sale_price": null,
+    "from": "text"
+   },
+   {
+    "id": "a2436d80-51db-4f00-b265-fafc321b5992",
+    "year": 1963,
+    "model": "356 B SUPER 90",
+    "body": "COUPE",
+    "vin": null,
+    "sale_price": null,
+    "from": "text"
+   },
+   {
+    "id": "c35e177e-99a1-48ba-9472-609d3d47a959",
+    "year": 1963,
+    "model": "356 Super 90",
+    "body": "COUPE",
+    "vin": null,
+    "sale_price": null,
+    "from": "text"
+   },
+   {
+    "id": "dab06193-b8a8-48f0-91a7-63ce3146c5c5",
+    "year": 1963,
+    "model": "356 B Super 90",
+    "body": "COUPE",
+    "vin": null,
+    "sale_price": null,
+    "from": "text"
+   }
+  ]
+ },
+ {
+  "chassis": "121076",
+  "rule": "356B COUPE 108918-125239",
+  "high_confidence": true,
+  "profiles": [
+   {
+    "id": "11bf4ae6-5e42-4910-84c9-748afc364df1",
+    "year": 1962,
+    "model": "356B 13",
+    "body": "COUPE",
+    "vin": "121076",
+    "sale_price": 70000,
+    "from": "vin"
+   },
+   {
+    "id": "9afc0a6a-92c6-4ff9-a186-e8053a5493e2",
+    "year": 1962,
+    "model": "356 B \"T6\" 1600 Coupe",
+    "body": "COUPE",
+    "vin": null,
+    "sale_price": 89600,
+    "from": "text"
+   }
+  ]
+ },
+ {
+  "chassis": "129388",
+  "rule": "356C COUPE 126001-131930",
+  "high_confidence": true,
+  "profiles": [
+   {
+    "id": "11ed161a-ed55-4179-a068-29b261613850",
+    "year": 1964,
+    "model": "356",
+    "body": "COUPE",
+    "vin": null,
+    "sale_price": null,
+    "from": "text"
+   },
+   {
+    "id": "c631746b-c5bb-4258-b500-9d114f62aef0",
+    "year": 1964,
+    "model": "356C Coupe",
+    "body": "COUPE",
+    "vin": "129388",
+    "sale_price": 87000,
+    "from": "vin"
+   }
+  ]
+ },
+ {
+  "chassis": "58295",
+  "rule": "356A T1 COUPE 55001-59099",
+  "high_confidence": true,
+  "profiles": [
+   {
+    "id": "12b46c22-51a3-4951-951c-b3068b930846",
+    "year": 1957,
+    "model": "356a 1500 carrera gs",
+    "body": "COUPE",
+    "vin": null,
+    "sale_price": 385000,
+    "from": "text"
+   },
+   {
+    "id": "4035344a-9e00-4522-bb13-f560d4329456",
+    "year": 1957,
+    "model": "356a carrera 1500 gs coupe",
+    "body": "COUPE",
+    "vin": null,
+    "sale_price": null,
+    "from": "text"
+   },
+   {
+    "id": "fa9b3cec-59bf-42d1-9a36-bda66ec79027",
+    "year": 1957,
+    "model": "356A GS Carrera Coupe",
+    "body": "COUPE",
+    "vin": "58295",
+    "sale_price": null,
+    "from": "vin"
+   }
+  ]
+ },
+ {
+  "chassis": "89621",
+  "rule": "356B ROADSTER 86831-89849",
+  "high_confidence": true,
+  "profiles": [
+   {
+    "id": "13a1352a-e2c3-4cb2-96dc-e65c961d1732",
+    "year": 1962,
+    "model": "356B Twin Grille Roadster",
+    "body": "ROADSTER",
+    "vin": "89621",
+    "sale_price": 14000,
+    "from": "vin"
+   },
+   {
+    "id": "a0ff0233-d019-40e3-ac49-c1a27e0810ee",
+    "year": 1962,
+    "model": "356B Twin Grille Roadster",
+    "body": "ROADSTER",
+    "vin": null,
+    "sale_price": 14000,
+    "from": "text"
+   }
+  ]
+ },
+ {
+  "chassis": "115350",
+  "rule": "356B COUPE 108918-125239",
+  "high_confidence": true,
+  "profiles": [
+   {
+    "id": "15ef51a5-e5e2-487e-9e9b-31080487bfb9",
+    "year": 1961,
+    "model": "356 b t5 1600 coup\u00e9",
+    "body": "COUPE",
+    "vin": null,
+    "sale_price": 36000,
+    "from": "text"
+   },
+   {
+    "id": "fb336f71-0b99-4bbc-b81b-586fe1ffa04d",
+    "year": 1961,
+    "model": "356 B 1600 Super Coupe",
+    "body": "COUPE",
+    "vin": "115350",
+    "sale_price": null,
+    "from": "vin"
+   }
+  ]
+ },
+ {
+  "chassis": "117885",
+  "rule": "356B COUPE 108918-125239",
+  "high_confidence": true,
+  "profiles": [
+   {
+    "id": "1770ba58-0775-461a-a1f7-4880b516626a",
+    "year": 1962,
+    "model": "356 COUPE Super 90",
+    "body": "COUPE",
+    "vin": null,
+    "sale_price": null,
+    "from": "text"
+   },
+   {
+    "id": "555e8631-6c2a-447f-8036-ba2e5327bb63",
+    "year": 1962,
+    "model": "356 B Coupe",
+    "body": "COUPE",
+    "vin": "117885",
+    "sale_price": null,
+    "from": "vin"
+   }
+  ]
+ },
+ {
+  "chassis": "210198",
+  "rule": "356B T6 COUPE 210001-214400",
+  "high_confidence": true,
+  "profiles": [
+   {
+    "id": "178bcfdd-4579-4c23-99f0-fe0371559972",
+    "year": 1962,
+    "model": "356",
+    "body": "COUPE",
+    "vin": null,
+    "sale_price": null,
+    "from": "text"
+   },
+   {
+    "id": "384afbba-e9c8-4479-97ed-92e14fbe9cb9",
+    "year": 1962,
+    "model": "356",
+    "body": "COUPE",
+    "vin": null,
+    "sale_price": null,
+    "from": "text"
+   },
+   {
+    "id": "75d7cfc3-0f67-45b0-a3db-eb5a72661736",
+    "year": 1962,
+    "model": "356",
+    "body": "COUPE",
+    "vin": null,
+    "sale_price": null,
+    "from": "text"
+   },
+   {
+    "id": "768af8c6-ad06-4758-9024-300a90b0ecbc",
+    "year": 1962,
+    "model": "356",
+    "body": "COUPE",
+    "vin": null,
+    "sale_price": null,
+    "from": "text"
+   },
+   {
+    "id": "ea09c58d-0ea8-4252-9fa7-9a1e60fbe41e",
+    "year": 1962,
+    "model": "356",
+    "body": "COUPE",
+    "vin": null,
+    "sale_price": null,
+    "from": "text"
+   },
+   {
+    "id": "ebaf5002-4f06-4318-beaf-09df800c3934",
+    "year": 1962,
+    "model": "356",
+    "body": "COUPE",
+    "vin": null,
+    "sale_price": null,
+    "from": "text"
+   }
+  ]
+ },
+ {
+  "chassis": "83337",
+  "rule": "356A SPEEDSTER 81901-84954",
+  "high_confidence": true,
+  "profiles": [
+   {
+    "id": "18ebb52f-6d3c-449c-8c7f-2d67725c336b",
+    "year": 1957,
+    "model": "356",
+    "body": "SPEEDSTER",
+    "vin": null,
+    "sale_price": null,
+    "from": "text"
+   },
+   {
+    "id": "3b736ff5-0916-435e-b479-be1b0d824737",
+    "year": 1957,
+    "model": "356A Speedster",
+    "body": "SPEEDSTER",
+    "vin": "83337",
+    "sale_price": 202000,
+    "from": "vin"
+   }
+  ]
+ },
+ {
+  "chassis": "217501",
+  "rule": "356C COUPE 215001-222580",
+  "high_confidence": true,
+  "profiles": [
+   {
+    "id": "1983f55f-7005-4923-a22d-4c21a26d3ed5",
+    "year": 1964,
+    "model": "356SC",
+    "body": "COUPE",
+    "vin": null,
+    "sale_price": 77000,
+    "from": "text"
+   },
+   {
+    "id": "8d9c6f43-788c-40cb-9b4d-d09bbc8adbc0",
+    "year": 1964,
+    "model": "356SC",
+    "body": "COUPE",
+    "vin": "217501",
+    "sale_price": null,
+    "from": "vin"
+   }
+  ]
+ },
+ {
+  "chassis": "160742",
+  "rule": "356C CABRIOLET 159001-162175",
+  "high_confidence": true,
+  "profiles": [
+   {
+    "id": "1b7c1454-375f-4910-911a-d46722415539",
+    "year": 1965,
+    "model": "356 C \"Emory Outlaw\" Cabriolet",
+    "body": "CABRIOLET",
+    "vin": null,
+    "sale_price": null,
+    "from": "text"
+   },
+   {
+    "id": "3e1fdfbb-d889-4ed6-b164-90d9b6c55164",
+    "year": 1964,
+    "model": "356 C \"Emory Outlaw\" Cabriolet",
+    "body": "CABRIOLET",
+    "vin": null,
+    "sale_price": null,
+    "from": "text"
+   },
+   {
+    "id": "600ad426-1419-46f0-b04e-71a45f24a667",
+    "year": 1964,
+    "model": "356C Cabriolet Emory Outlaw",
+    "body": "CABRIOLET",
+    "vin": "160742",
+    "sale_price": null,
+    "from": "vin"
+   }
+  ]
+ },
+ {
+  "chassis": "80697",
+  "rule": "pre-A SPEEDSTER 80001-81900",
+  "high_confidence": true,
+  "profiles": [
+   {
+    "id": "1d30a0e2-a94e-4ae7-a90c-b4d203b49ad8",
+    "year": 1955,
+    "model": "356a speedster",
+    "body": "SPEEDSTER",
+    "vin": null,
+    "sale_price": 86000,
+    "from": "text"
+   },
+   {
+    "id": "1daff0e5-5314-4be7-b1e3-dbbe92959588",
+    "year": 1955,
+    "model": "356 Pre-A Speedster",
+    "body": "SPEEDSTER",
+    "vin": "80697",
+    "sale_price": null,
+    "from": "vin"
+   }
+  ]
+ },
+ {
+  "chassis": "114590",
+  "rule": "356B COUPE 108918-125239",
+  "high_confidence": true,
+  "profiles": [
+   {
+    "id": "1df2cd05-7def-4cbd-992c-cdf997dd748a",
+    "year": 1961,
+    "model": "356 outlaw",
+    "body": "COUPE",
+    "vin": "114590",
+    "sale_price": 125000,
+    "from": "vin"
+   },
+   {
+    "id": "7344201d-86e8-448f-af3b-f5e4eadd6cf3",
+    "year": 1961,
+    "model": "356 B 'Outlaw'",
+    "body": "COUPE",
+    "vin": null,
+    "sale_price": null,
+    "from": "text"
+   }
+  ]
+ },
+ {
+  "chassis": "60077",
+  "rule": "pre-A CABRIOLET 60001-61000",
+  "high_confidence": true,
+  "profiles": [
+   {
+    "id": "1df31e80-3a35-48d9-874a-38bc803619f8",
+    "year": 1953,
+    "model": "356 Pre-A \u201cKnickscheibe\u201d 1500 Cabriolet",
+    "body": "CABRIOLET",
+    "vin": null,
+    "sale_price": null,
+    "from": "text"
+   },
+   {
+    "id": "edb35b6f-ee3c-409f-a8e2-6093c3a18f4b",
+    "year": 1953,
+    "model": "356 Pre-A Cabriolet",
+    "body": "CABRIOLET",
+    "vin": "60077",
+    "sale_price": null,
+    "from": "vin"
+   }
+  ]
+ },
+ {
+  "chassis": "85720",
+  "rule": "356A T2 CONVERTIBLE_D 85501-86830",
+  "high_confidence": true,
+  "profiles": [
+   {
+    "id": "2024af3a-bb50-44ce-ab71-155e32e77335",
+    "year": 1959,
+    "model": "356A",
+    "body": "CONVERTIBLE_D",
+    "vin": "85720",
+    "sale_price": null,
+    "from": "vin"
+   },
+   {
+    "id": "4b85a0aa-db98-496b-affe-323b46f45ab0",
+    "year": 1958,
+    "model": "356a 1600 super convertible d",
+    "body": "CONVERTIBLE_D",
+    "vin": null,
+    "sale_price": 175000,
+    "from": "text"
+   }
+  ]
+ },
+ {
+  "chassis": "56083",
+  "rule": "356A T1 COUPE 55001-59099",
+  "high_confidence": true,
+  "profiles": [
+   {
+    "id": "21862206-f47e-4d98-8a62-0c48596ca3ab",
+    "year": 1956,
+    "model": "356a carrera gs",
+    "body": "COUPE",
+    "vin": null,
+    "sale_price": 392500,
+    "from": "text"
+   },
+   {
+    "id": "9b120c3c-794e-49ba-ad26-7b990dcb28c3",
+    "year": 1956,
+    "model": "356 A 1500 GS Carrera Custom",
+    "body": "COUPE",
+    "vin": "56083",
+    "sale_price": null,
+    "from": "vin"
+   }
+  ]
+ },
+ {
+  "chassis": "156635",
+  "rule": "356B CABRIOLET 152476-158700",
+  "high_confidence": true,
+  "profiles": [
+   {
+    "id": "2264dd0a-a5e0-48d2-b3b4-4b90906d676a",
+    "year": 1962,
+    "model": "356 B \"T6\" 1600 Super Cabriolet",
+    "body": "CABRIOLET",
+    "vin": null,
+    "sale_price": 168000,
+    "from": "text"
+   },
+   {
+    "id": "6567276e-aafe-44ca-8485-f430cb5552c5",
+    "year": 1962,
+    "model": "356B",
+    "body": "CABRIOLET",
+    "vin": "156635",
+    "sale_price": 199900,
+    "from": "vin"
+   }
+  ]
+ },
+ {
+  "chassis": "89753",
+  "rule": "356B ROADSTER 86831-89849",
+  "high_confidence": true,
+  "profiles": [
+   {
+    "id": "23e6479c-10c4-4c3c-80f8-893fbb3a554c",
+    "year": 1962,
+    "model": "356 1600 b t6 roadster",
+    "body": "ROADSTER",
+    "vin": null,
+    "sale_price": 150000,
+    "from": "text"
+   },
+   {
+    "id": "bebdfd88-18d5-4cf6-8dbf-04327a2039df",
+    "year": 1962,
+    "model": "356B 1600S Twin Grille Roadster",
+    "body": "ROADSTER",
+    "vin": "89753",
+    "sale_price": 295000,
+    "from": "vin"
+   }
+  ]
+ },
+ {
+  "chassis": "52257",
+  "rule": "pre-A COUPE 50001-55000",
+  "high_confidence": true,
+  "profiles": [
+   {
+    "id": "28013c02-5861-482f-873b-64bb748e0311",
+    "year": 1954,
+    "model": "356",
+    "body": "COUPE",
+    "vin": "52257",
+    "sale_price": 235000,
+    "from": "vin"
+   },
+   {
+    "id": "5ecd2a86-326a-49e5-8f22-93e694352755",
+    "year": 1954,
+    "model": "356 pre-a 1500 coupe",
+    "body": "COUPE",
+    "vin": null,
+    "sale_price": 230000,
+    "from": "text"
+   },
+   {
+    "id": "b6654a02-688b-437e-9272-1c1cc04918c3",
+    "year": 1954,
+    "model": "356 pre-a 1500 coupe",
+    "body": "COUPE",
+    "vin": null,
+    "sale_price": null,
+    "from": "text"
+   }
+  ]
+ },
+ {
+  "chassis": "105294",
+  "rule": "356A COUPE 100001-108917",
+  "high_confidence": true,
+  "profiles": [
+   {
+    "id": "282122ee-f19e-4ede-80f5-a2249d2f047e",
+    "year": 1959,
+    "model": "356A 1600 Carrera GS Coupe",
+    "body": "COUPE",
+    "vin": "105294",
+    "sale_price": 699999,
+    "from": "vin"
+   },
+   {
+    "id": "e33c745d-b6c7-4b34-8033-1ee8fa458831",
+    "year": 1959,
+    "model": "356A Carrera Coupe",
+    "body": "COUPE",
+    "vin": null,
+    "sale_price": 699999,
+    "from": "text"
+   }
+  ]
+ },
+ {
+  "chassis": "200627",
+  "rule": "356B T5 HARDTOP 200001-202299",
+  "high_confidence": true,
+  "profiles": [
+   {
+    "id": "2939045d-1ca2-407f-b719-bf3e0d03d0e4",
+    "year": 1961,
+    "model": "356",
+    "body": "HARDTOP",
+    "vin": null,
+    "sale_price": null,
+    "from": "text"
+   },
+   {
+    "id": "eefa4949-fe12-483e-b900-8bf4702ed1e7",
+    "year": 1961,
+    "model": "356B Notchback Race Car",
+    "body": "HARDTOP",
+    "vin": "200627",
+    "sale_price": null,
+    "from": "vin"
+   }
+  ]
+ },
+ {
+  "chassis": "210980",
+  "rule": "356B T6 COUPE 210001-214400",
+  "high_confidence": true,
+  "profiles": [
+   {
+    "id": "296a7b45-46b9-4a94-ac22-cb1103d738c7",
+    "year": 1963,
+    "model": "356",
+    "body": "COUPE",
+    "vin": null,
+    "sale_price": null,
+    "from": "text"
+   },
+   {
+    "id": "6cfb8d0e-edb2-4252-a3b3-fb942726a73a",
+    "year": 1963,
+    "model": "356",
+    "body": "COUPE",
+    "vin": null,
+    "sale_price": null,
+    "from": "text"
+   },
+   {
+    "id": "7aeaa035-8a65-4b24-876d-f1fca3bcb953",
+    "year": 1963,
+    "model": "356",
+    "body": "COUPE",
+    "vin": null,
+    "sale_price": null,
+    "from": "text"
+   },
+   {
+    "id": "946e4853-df06-4f19-bf0c-b85db7f7b12f",
+    "year": 1963,
+    "model": "356",
+    "body": "COUPE",
+    "vin": null,
+    "sale_price": null,
+    "from": "text"
+   },
+   {
+    "id": "9c523cd5-24c9-4db0-94cd-c3e870060d9d",
+    "year": 1963,
+    "model": "356",
+    "body": "COUPE",
+    "vin": null,
+    "sale_price": null,
+    "from": "text"
+   },
+   {
+    "id": "c0fab57b-431b-41fc-980c-996db5d5c4ab",
+    "year": 1962,
+    "model": "356 B Super 90 Coupe",
+    "body": "COUPE",
+    "vin": "210980",
+    "sale_price": 85800,
+    "from": "vin"
+   },
+   {
+    "id": "ea73fbeb-fe4c-487b-83d1-a5832d52643c",
+    "year": 1963,
+    "model": "356",
+    "body": "COUPE",
+    "vin": null,
+    "sale_price": null,
+    "from": "text"
+   }
+  ]
+ },
+ {
+  "chassis": "88423",
+  "rule": "356B ROADSTER 86831-89849",
+  "high_confidence": true,
+  "profiles": [
+   {
+    "id": "2ce63f2c-4761-4c89-be63-60e2f9417fae",
+    "year": 1960,
+    "model": "356b super 90 roadster",
+    "body": "ROADSTER",
+    "vin": null,
+    "sale_price": null,
+    "from": "text"
+   },
+   {
+    "id": "56018a7b-efaa-435e-bd09-67e6160fe550",
+    "year": 1960,
+    "model": "356B Super 90 Roadster",
+    "body": "ROADSTER",
+    "vin": "88423",
+    "sale_price": null,
+    "from": "vin"
+   }
+  ]
+ },
+ {
+  "chassis": "89720",
+  "rule": "356B ROADSTER 86831-89849",
+  "high_confidence": true,
+  "profiles": [
+   {
+    "id": "2f18205c-5d85-447d-914c-277c44829c98",
+    "year": 1962,
+    "model": "356B Twin Grille Roadster",
+    "body": "ROADSTER",
+    "vin": "89720",
+    "sale_price": null,
+    "from": "vin"
+   },
+   {
+    "id": "46daaf8f-bbf1-4faa-8445-5766b7ecd2cd",
+    "year": 1962,
+    "model": "356b twin grill roadster",
+    "body": "ROADSTER",
+    "vin": null,
+    "sale_price": 150000,
+    "from": "text"
+   }
+  ]
+ },
+ {
+  "chassis": "56515",
+  "rule": "356A T1 COUPE 55001-59099",
+  "high_confidence": true,
+  "profiles": [
+   {
+    "id": "321ca4ff-258e-4c6d-99b4-33bf959a80c0",
+    "year": 1956,
+    "model": "356A Sunroof Coupe",
+    "body": "COUPE",
+    "vin": "56515",
+    "sale_price": 175000,
+    "from": "vin"
+   },
+   {
+    "id": "fadf14b5-e3d0-4622-a15c-37951ca8c318",
+    "year": 1956,
+    "model": "356 A Coupe 'Outlaw'",
+    "body": "COUPE",
+    "vin": null,
+    "sale_price": null,
+    "from": "text"
+   }
+  ]
+ },
+ {
+  "chassis": "82639",
+  "rule": "356A SPEEDSTER 81901-84954",
+  "high_confidence": true,
+  "profiles": [
+   {
+    "id": "32d34fe6-e69a-473b-a7e9-49a5a9b7529d",
+    "year": 1957,
+    "model": "356A Speedster",
+    "body": "SPEEDSTER",
+    "vin": "82639",
+    "sale_price": 325000,
+    "from": "vin"
+   },
+   {
+    "id": "c0a89368-b2c2-4dd1-8f28-91e65c1cb335",
+    "year": 1956,
+    "model": "356a 1600 speedster",
+    "body": "SPEEDSTER",
+    "vin": null,
+    "sale_price": null,
+    "from": "text"
+   }
+  ]
+ },
+ {
+  "chassis": "60771",
+  "rule": "pre-A CABRIOLET 60001-61000",
+  "high_confidence": true,
+  "profiles": [
+   {
+    "id": "35d6b60d-10d2-4632-ac99-1aa902abcf81",
+    "year": 1955,
+    "model": "356 pre-a 1500 continental cabriolet",
+    "body": "CABRIOLET",
+    "vin": null,
+    "sale_price": 167500,
+    "from": "text"
+   },
+   {
+    "id": "5883f792-67c8-4140-a6c6-dc547ee8ac9a",
+    "year": 1955,
+    "model": "356 pre-a 1500 continental cabriolet",
+    "body": "CABRIOLET",
+    "vin": null,
+    "sale_price": null,
+    "from": "text"
+   },
+   {
+    "id": "eee0c3c8-6236-481b-809c-03afcf012281",
+    "year": 1955,
+    "model": "356 pre-a continental cabriolet",
+    "body": "CABRIOLET",
+    "vin": null,
+    "sale_price": 270000,
+    "from": "text"
+   }
+  ]
+ },
+ {
+  "chassis": "123581",
+  "rule": "356B COUPE 108918-125239",
+  "high_confidence": true,
+  "profiles": [
+   {
+    "id": "3b0492db-af30-4397-be74-dc1c8e894683",
+    "year": 1963,
+    "model": "356",
+    "body": "COUPE",
+    "vin": null,
+    "sale_price": null,
+    "from": "text"
+   },
+   {
+    "id": "6a8ae792-5e4c-4424-ab66-7009a0e462b7",
+    "year": 1963,
+    "model": "356",
+    "body": "COUPE",
+    "vin": null,
+    "sale_price": null,
+    "from": "text"
+   }
+  ]
+ },
+ {
+  "chassis": "154422",
+  "rule": "356B CABRIOLET 152476-158700",
+  "high_confidence": true,
+  "profiles": [
+   {
+    "id": "3fd36685-78e2-4154-ba6a-90c477f217b3",
+    "year": 1960,
+    "model": "356 B Cabriolet",
+    "body": "CABRIOLET",
+    "vin": "154422",
+    "sale_price": null,
+    "from": "vin"
+   },
+   {
+    "id": "5eeb3805-74ff-4d2d-a61d-864f73edd65f",
+    "year": 1961,
+    "model": "356b cabriolet",
+    "body": "CABRIOLET",
+    "vin": null,
+    "sale_price": 44500,
+    "from": "text"
+   }
+  ]
+ },
+ {
+  "chassis": "80926",
+  "rule": "pre-A SPEEDSTER 80001-81900",
+  "high_confidence": true,
+  "profiles": [
+   {
+    "id": "41113a9e-b27f-4eee-a34f-f509aaab8b19",
+    "year": 1955,
+    "model": "356 'pre-a' 1600 speedster",
+    "body": "SPEEDSTER",
+    "vin": null,
+    "sale_price": null,
+    "from": "text"
+   },
+   {
+    "id": "49d88d98-bb73-4cc9-ae54-8e757c5037ba",
+    "year": 1955,
+    "model": "356 'pre-a' 1600 speedster",
+    "body": "SPEEDSTER",
+    "vin": null,
+    "sale_price": 510000,
+    "from": "text"
+   }
+  ]
+ },
+ {
+  "chassis": "83490",
+  "rule": "356A SPEEDSTER 81901-84954",
+  "high_confidence": true,
+  "profiles": [
+   {
+    "id": "4259eb2b-e7f8-434f-9cfa-7e1b86c7aeb9",
+    "year": 1957,
+    "model": "356 A Speedster",
+    "body": "SPEEDSTER",
+    "vin": "83490",
+    "sale_price": 313000,
+    "from": "vin"
+   },
+   {
+    "id": "881e71e5-83e9-4055-8e41-fe9a3dac10f7",
+    "year": 1957,
+    "model": "356a speedster",
+    "body": "SPEEDSTER",
+    "vin": null,
+    "sale_price": 74000,
+    "from": "text"
+   }
+  ]
+ },
+ {
+  "chassis": "83552",
+  "rule": "356A SPEEDSTER 81901-84954",
+  "high_confidence": true,
+  "profiles": [
+   {
+    "id": "43e5d6b3-6d25-428c-8f21-5eb583e379c2",
+    "year": 1957,
+    "model": "356A Speedster",
+    "body": "SPEEDSTER",
+    "vin": "83552",
+    "sale_price": null,
+    "from": "vin"
+   },
+   {
+    "id": "b0678a7b-2011-4813-887e-04830fe8c676",
+    "year": 1957,
+    "model": "356 speedster",
+    "body": "SPEEDSTER",
+    "vin": null,
+    "sale_price": null,
+    "from": "text"
+   }
+  ]
+ },
+ {
+  "chassis": "82856",
+  "rule": "356A SPEEDSTER 81901-84954",
+  "high_confidence": true,
+  "profiles": [
+   {
+    "id": "487b536c-6b66-49d0-816f-48048528aa2a",
+    "year": 1957,
+    "model": "356",
+    "body": "SPEEDSTER",
+    "vin": "82856",
+    "sale_price": 172700,
+    "from": "vin"
+   },
+   {
+    "id": "a3d9053d-79a2-41bb-bad0-ca672636034d",
+    "year": 1957,
+    "model": "356 Speedster",
+    "body": "SPEEDSTER",
+    "vin": null,
+    "sale_price": null,
+    "from": "text"
+   }
+  ]
+ },
+ {
+  "chassis": "54035",
+  "rule": "pre-A COUPE 50001-55000",
+  "high_confidence": true,
+  "profiles": [
+   {
+    "id": "49333c60-0132-4aab-9370-57c4af73049f",
+    "year": 1955,
+    "model": "356 1500 Continental Coupe",
+    "body": "COUPE",
+    "vin": "54035",
+    "sale_price": null,
+    "from": "vin"
+   },
+   {
+    "id": "eefb8a11-cdaf-4d3a-988e-d12ccf8196b7",
+    "year": 1955,
+    "model": "356 pre-a 1500 continental coupe",
+    "body": "COUPE",
+    "vin": null,
+    "sale_price": 197500,
+    "from": "text"
+   }
+  ]
+ },
+ {
+  "chassis": "82642",
+  "rule": "356A SPEEDSTER 81901-84954",
+  "high_confidence": true,
+  "profiles": [
+   {
+    "id": "4abf9a69-bfc0-49c2-a87d-59c31fb28355",
+    "year": 1956,
+    "model": "356a speedster",
+    "body": "SPEEDSTER",
+    "vin": null,
+    "sale_price": null,
+    "from": "text"
+   },
+   {
+    "id": "948fea38-2344-447a-9bec-6c8e68414279",
+    "year": 1956,
+    "model": "356 a 1600 speedster",
+    "body": "SPEEDSTER",
+    "vin": null,
+    "sale_price": 120000,
+    "from": "text"
+   }
+  ]
+ },
+ {
+  "chassis": "84140",
+  "rule": "356A SPEEDSTER 81901-84954",
+  "high_confidence": true,
+  "profiles": [
+   {
+    "id": "4cc6d206-8ccf-4a5d-af01-fd7499677026",
+    "year": 1958,
+    "model": "356a t2 1600 speedster",
+    "body": "SPEEDSTER",
+    "vin": null,
+    "sale_price": 480000,
+    "from": "text"
+   },
+   {
+    "id": "92e4f5c8-eda1-4905-93b9-cce56e78f91f",
+    "year": 1958,
+    "model": "356a 1600 t2 speedster",
+    "body": "SPEEDSTER",
+    "vin": null,
+    "sale_price": null,
+    "from": "text"
+   }
+  ]
+ },
+ {
+  "chassis": "80903",
+  "rule": "pre-A SPEEDSTER 80001-81900",
+  "high_confidence": true,
+  "profiles": [
+   {
+    "id": "4d287fe6-045e-4d95-9408-7b2957a00f0f",
+    "year": 1955,
+    "model": "356 1500S Speedster",
+    "body": "SPEEDSTER",
+    "vin": "80903",
+    "sale_price": null,
+    "from": "vin"
+   },
+   {
+    "id": "afd69450-5f05-4c9e-ae95-1a4f70de85fb",
+    "year": 1956,
+    "model": "356 pre-a 1500 super speedster",
+    "body": "SPEEDSTER",
+    "vin": null,
+    "sale_price": 325000,
+    "from": "text"
+   }
+  ]
+ },
+ {
+  "chassis": "84389",
+  "rule": "356A SPEEDSTER 81901-84954",
+  "high_confidence": true,
+  "profiles": [
+   {
+    "id": "4d49a2ca-2638-4add-bf79-728e2e640919",
+    "year": 1958,
+    "model": "356a t2 1600 speedster",
+    "body": "SPEEDSTER",
+    "vin": null,
+    "sale_price": 465000,
+    "from": "text"
+   },
+   {
+    "id": "d27f18c0-02a2-44f7-a97f-c135b42e60f3",
+    "year": 1958,
+    "model": "356A Speedster",
+    "body": "SPEEDSTER",
+    "vin": "84389",
+    "sale_price": 400000,
+    "from": "vin"
+   }
+  ]
+ },
+ {
+  "chassis": "82794",
+  "rule": "356A SPEEDSTER 81901-84954",
+  "high_confidence": true,
+  "profiles": [
+   {
+    "id": "4e33fd99-578b-464e-9eb0-eaaeb7fbe44e",
+    "year": 1956,
+    "model": "356a speedster t-1",
+    "body": "SPEEDSTER",
+    "vin": null,
+    "sale_price": 160000,
+    "from": "text"
+   },
+   {
+    "id": "e92981d6-7c46-4f73-aa6b-ff9fcca4ddfa",
+    "year": 1956,
+    "model": "356A 1600S Speedster",
+    "body": "SPEEDSTER",
+    "vin": "82794",
+    "sale_price": null,
+    "from": "vin"
+   }
+  ]
+ },
+ {
+  "chassis": "80745",
+  "rule": "pre-A SPEEDSTER 80001-81900",
+  "high_confidence": true,
+  "profiles": [
+   {
+    "id": "50744bad-12a5-467a-9801-fa03cd90ae25",
+    "year": 1955,
+    "model": "356 pre-a speedster",
+    "body": "SPEEDSTER",
+    "vin": null,
+    "sale_price": null,
+    "from": "text"
+   },
+   {
+    "id": "d9370885-c8b3-45b3-ace1-7ea063310795",
+    "year": 1955,
+    "model": "356 pre-a speedster",
+    "body": "SPEEDSTER",
+    "vin": null,
+    "sale_price": null,
+    "from": "text"
+   }
+  ]
+ },
+ {
+  "chassis": "219652",
+  "rule": "356C COUPE 215001-222580",
+  "high_confidence": true,
+  "profiles": [
+   {
+    "id": "58234561-2c61-4136-b5d0-51a606ee77af",
+    "year": 1965,
+    "model": "356",
+    "body": "COUPE",
+    "vin": null,
+    "sale_price": null,
+    "from": "text"
+   },
+   {
+    "id": "7a0555a8-2b4c-409c-9b5a-047b4aa9157d",
+    "year": 1965,
+    "model": "356",
+    "body": "COUPE",
+    "vin": null,
+    "sale_price": null,
+    "from": "text"
+   },
+   {
+    "id": "b1fbde02-b1d8-4f2e-ab71-4f974321bd0c",
+    "year": 1965,
+    "model": "356",
+    "body": "COUPE",
+    "vin": null,
+    "sale_price": null,
+    "from": "text"
+   }
+  ]
+ },
+ {
+  "chassis": "159571",
+  "rule": "356C CABRIOLET 159001-162175",
+  "high_confidence": true,
+  "profiles": [
+   {
+    "id": "5a6edc9b-a200-4006-afaa-8222cd8f93b8",
+    "year": 1963,
+    "model": "356 C Carrera 2 Cabriolet By Reutter",
+    "body": "CABRIOLET",
+    "vin": null,
+    "sale_price": 702500,
+    "from": "text"
+   },
+   {
+    "id": "ec83c4a1-83c7-4a26-b67b-85876c1678f6",
+    "year": 1964,
+    "model": "356 C Carrera 2 Cabriolet",
+    "body": "CABRIOLET",
+    "vin": "159571",
+    "sale_price": null,
+    "from": "vin"
+   }
+  ]
+ },
+ {
+  "chassis": "89024",
+  "rule": "356B ROADSTER 86831-89849",
+  "high_confidence": true,
+  "profiles": [
+   {
+    "id": "5dfe3915-934b-4552-8e56-2b01c6bc739b",
+    "year": 1961,
+    "model": "356b roadster",
+    "body": "ROADSTER",
+    "vin": null,
+    "sale_price": 225000,
+    "from": "text"
+   },
+   {
+    "id": "d66756c9-70cd-4310-ab71-121cbe81c671",
+    "year": 1961,
+    "model": "356B Roadster",
+    "body": "ROADSTER",
+    "vin": "89024",
+    "sale_price": 252000,
+    "from": "vin"
+   }
+  ]
+ },
+ {
+  "chassis": "89351",
+  "rule": "356B ROADSTER 86831-89849",
+  "high_confidence": true,
+  "profiles": [
+   {
+    "id": "5e6395fd-d3d3-49ee-9ac8-ff6e532b76e0",
+    "year": 1961,
+    "model": "356B",
+    "body": "ROADSTER",
+    "vin": null,
+    "sale_price": null,
+    "from": "text"
+   },
+   {
+    "id": "f5cd0f6f-5326-42ac-8611-6dbbcf0d45c5",
+    "year": 1961,
+    "model": "356B 1600S Roadster",
+    "body": "ROADSTER",
+    "vin": "89351",
+    "sale_price": 182600,
+    "from": "vin"
+   }
+  ]
+ },
+ {
+  "chassis": "89410",
+  "rule": "356B ROADSTER 86831-89849",
+  "high_confidence": true,
+  "profiles": [
+   {
+    "id": "5f6b34a0-ea82-4d5c-9754-eb20a85abd92",
+    "year": 1961,
+    "model": "356",
+    "body": "ROADSTER",
+    "vin": null,
+    "sale_price": null,
+    "from": "text"
+   },
+   {
+    "id": "c8c6fdd9-8769-4ce3-86dc-5a4aa8e5e1d2",
+    "year": 1961,
+    "model": "356",
+    "body": "ROADSTER",
+    "vin": null,
+    "sale_price": null,
+    "from": "text"
+   },
+   {
+    "id": "eb39807a-08ea-4913-8c5b-1cf334db58ad",
+    "year": 1961,
+    "model": "356",
+    "body": "ROADSTER",
+    "vin": null,
+    "sale_price": null,
+    "from": "text"
+   }
+  ]
+ },
+ {
+  "chassis": "81021",
+  "rule": "pre-A SPEEDSTER 80001-81900",
+  "high_confidence": true,
+  "profiles": [
+   {
+    "id": "6466aacd-a81b-419e-aa6a-63377dbf2c4b",
+    "year": 1955,
+    "model": "356 Speedster",
+    "body": "SPEEDSTER",
+    "vin": null,
+    "sale_price": null,
+    "from": "text"
+   },
+   {
+    "id": "960d2a61-e6d8-4dac-a5e7-cad52986fd64",
+    "year": 1955,
+    "model": "356 Speedster",
+    "body": "SPEEDSTER",
+    "vin": null,
+    "sale_price": null,
+    "from": "text"
+   }
+  ]
+ },
+ {
+  "chassis": "121298",
+  "rule": "356B COUPE 108918-125239",
+  "high_confidence": true,
+  "profiles": [
+   {
+    "id": "6f4240b6-5ee8-44fc-8e9a-cd3afae5d95b",
+    "year": 1963,
+    "model": "356B Carrera 2",
+    "body": "COUPE",
+    "vin": "121298",
+    "sale_price": null,
+    "from": "vin"
+   },
+   {
+    "id": "8275cfea-38da-482a-ac83-4a28ada743c9",
+    "year": 1963,
+    "model": "356c carrera 2 2000gs coup\u00e9",
+    "body": "COUPE",
+    "vin": "121298ENGNE",
+    "sale_price": null,
+    "from": "text"
+   }
+  ]
+ },
+ {
+  "chassis": "83376",
+  "rule": "356A SPEEDSTER 81901-84954",
+  "high_confidence": true,
+  "profiles": [
+   {
+    "id": "71b6e809-37ce-4484-98b8-940316d90cf7",
+    "year": 1957,
+    "model": "356a 1600 speedster",
+    "body": "SPEEDSTER",
+    "vin": null,
+    "sale_price": 270000,
+    "from": "text"
+   },
+   {
+    "id": "b7d18bbe-2030-4d5e-aa9c-80e0c9b04e64",
+    "year": 1957,
+    "model": "356a 1600 speedster",
+    "body": "SPEEDSTER",
+    "vin": null,
+    "sale_price": null,
+    "from": "text"
+   }
+  ]
+ },
+ {
+  "chassis": "110856",
+  "rule": "356B COUPE 108918-125239",
+  "high_confidence": true,
+  "profiles": [
+   {
+    "id": "7379fb8d-197d-42c1-bbe2-fdb3399c45d2",
+    "year": 1960,
+    "model": "356B Super 90 GT Coupe",
+    "body": "COUPE",
+    "vin": null,
+    "sale_price": null,
+    "from": "text"
+   },
+   {
+    "id": "c34a151d-b5d5-41d1-b19c-b6ae7338bab1",
+    "year": 1960,
+    "model": "356B Super 90 GT Coupe",
+    "body": "COUPE",
+    "vin": "110856",
+    "sale_price": null,
+    "from": "vin"
+   }
+  ]
+ },
+ {
+  "chassis": "84933",
+  "rule": "356A SPEEDSTER 81901-84954",
+  "high_confidence": true,
+  "profiles": [
+   {
+    "id": "7736530b-5b44-4659-a75c-b30f2e475a47",
+    "year": 1959,
+    "model": "356 A 1600 Super GT Speedster",
+    "body": "SPEEDSTER",
+    "vin": "84933",
+    "sale_price": null,
+    "from": "vin"
+   },
+   {
+    "id": "ef983173-6684-43f7-8aee-9f01d8d1039d",
+    "year": 1959,
+    "model": "356A 1600 Super GT Speedster",
+    "body": "SPEEDSTER",
+    "vin": null,
+    "sale_price": null,
+    "from": "text"
+   }
+  ]
+ },
+ {
+  "chassis": "50279",
+  "rule": "pre-A COUPE 50001-55000",
+  "high_confidence": true,
+  "profiles": [
+   {
+    "id": "79849b60-10ed-4cb2-8a8d-6a87338592c2",
+    "year": 1953,
+    "model": "356 pre-a coupe",
+    "body": "COUPE",
+    "vin": null,
+    "sale_price": 164000,
+    "from": "text"
+   },
+   {
+    "id": "ce8f2e05-cbc5-4343-bee9-e23dc37d82b5",
+    "year": 1953,
+    "model": "356 'Pre-A' Coupe",
+    "body": "COUPE",
+    "vin": "50279",
+    "sale_price": 201600,
+    "from": "vin"
+   }
+  ]
+ },
+ {
+  "chassis": "85589",
+  "rule": "356A T2 CONVERTIBLE_D 85501-86830",
+  "high_confidence": true,
+  "profiles": [
+   {
+    "id": "7ff6114b-d1d4-4cfb-95f7-4efe6ab20abf",
+    "year": 1959,
+    "model": "356A 1600S Convertible D",
+    "body": "CONVERTIBLE_D",
+    "vin": null,
+    "sale_price": null,
+    "from": "text"
+   },
+   {
+    "id": "96efa8f4-ef8f-42b0-823e-6656e85ff869",
+    "year": 1959,
+    "model": "356A 1600S Convertible D",
+    "body": "CONVERTIBLE_D",
+    "vin": "85589",
+    "sale_price": 318000,
+    "from": "vin"
+   }
+  ]
+ },
+ {
+  "chassis": "15051",
+  "rule": "pre-A CABRIOLET 15001-15116",
+  "high_confidence": true,
+  "profiles": [
+   {
+    "id": "803af308-7ccf-4c9d-abd2-edfa746285d7",
+    "year": 1952,
+    "model": "356 pre-a 1500s cabriolet",
+    "body": "CABRIOLET",
+    "vin": null,
+    "sale_price": null,
+    "from": "text"
+   },
+   {
+    "id": "8a99244d-871f-4514-a1a9-c9abf4524252",
+    "year": 1952,
+    "model": "356 Pre-A 1500S Reutter",
+    "body": "CABRIOLET",
+    "vin": "15051",
+    "sale_price": null,
+    "from": "vin"
+   }
+  ]
+ },
+ {
+  "chassis": "159637",
+  "rule": "356C CABRIOLET 159001-162175",
+  "high_confidence": true,
+  "profiles": [
+   {
+    "id": "81e48c52-90df-4c18-9281-062f8886d03f",
+    "year": 1964,
+    "model": "356 C 1600 Cabriolet",
+    "body": "CABRIOLET",
+    "vin": null,
+    "sale_price": 112000,
+    "from": "text"
+   },
+   {
+    "id": "d0892cb9-a8da-4494-bae8-01971a31b830",
+    "year": 1964,
+    "model": "356",
+    "body": "CABRIOLET",
+    "vin": "159637",
+    "sale_price": 129980,
+    "from": "vin"
+   }
+  ]
+ },
+ {
+  "chassis": "84333",
+  "rule": "356A SPEEDSTER 81901-84954",
+  "high_confidence": true,
+  "profiles": [
+   {
+    "id": "82cd8ab1-8685-44cd-90aa-2f20157047ea",
+    "year": 1958,
+    "model": "356A Speedster",
+    "body": "SPEEDSTER",
+    "vin": "84333",
+    "sale_price": null,
+    "from": "vin"
+   },
+   {
+    "id": "9ad3eff3-8fee-4a33-b8b5-45ccfb2cb3d0",
+    "year": 1958,
+    "model": "356A 1600 Speedster",
+    "body": "SPEEDSTER",
+    "vin": null,
+    "sale_price": null,
+    "from": "text"
+   },
+   {
+    "id": "d4b568e4-50dd-4536-9fc6-810badee816a",
+    "year": 1958,
+    "model": "356 A 1600 Speedster by Reutter",
+    "body": "SPEEDSTER",
+    "vin": null,
+    "sale_price": 224000,
+    "from": "text"
+   }
+  ]
+ },
+ {
+  "chassis": "52409",
+  "rule": "pre-A COUPE 50001-55000",
+  "high_confidence": true,
+  "profiles": [
+   {
+    "id": "837da20e-8af3-47f5-af8c-d32f9b5d55f4",
+    "year": 1954,
+    "model": "356 Pre-A \"Knickscheibe\" 1500 Coupe",
+    "body": "COUPE",
+    "vin": "52409",
+    "sale_price": 250000,
+    "from": "vin"
+   },
+   {
+    "id": "a7a610ed-a8f8-42b4-b804-f27c09e8f5a6",
+    "year": 1954,
+    "model": "356 Pre-A \"Knickscheibe\" 1500 Coupe",
+    "body": "COUPE",
+    "vin": null,
+    "sale_price": 173600,
+    "from": "text"
+   }
+  ]
+ },
+ {
+  "chassis": "152136",
+  "rule": "356A T2 CABRIOLET 150001-152475",
+  "high_confidence": true,
+  "profiles": [
+   {
+    "id": "8cb4252f-c920-4e67-bc3c-c3afff3ad275",
+    "year": 1959,
+    "model": "356 A 1600 Cabriolet",
+    "body": "CABRIOLET",
+    "vin": null,
+    "sale_price": 232400,
+    "from": "text"
+   },
+   {
+    "id": "b10a3dd0-ba74-4684-8fb0-ee9688faa748",
+    "year": 1959,
+    "model": "356A 1600 Cabriolet",
+    "body": "CABRIOLET",
+    "vin": "152136",
+    "sale_price": 160000,
+    "from": "vin"
+   }
+  ]
+ },
+ {
+  "chassis": "118461",
+  "rule": "356B COUPE 108918-125239",
+  "high_confidence": true,
+  "profiles": [
+   {
+    "id": "95be92b1-501a-47fd-86b4-bb921a1c6d60",
+    "year": 1962,
+    "model": "356B",
+    "body": "COUPE",
+    "vin": null,
+    "sale_price": 71500,
+    "from": "text"
+   },
+   {
+    "id": "f23888ef-4ba8-40f9-94da-098ac92dd81f",
+    "year": 1962,
+    "model": "356B Super 90 Coupe",
+    "body": "COUPE",
+    "vin": "118461",
+    "sale_price": 70000,
+    "from": "vin"
+   }
+  ]
+ },
+ {
+  "chassis": "83973",
+  "rule": "356A SPEEDSTER 81901-84954",
+  "high_confidence": true,
+  "profiles": [
+   {
+    "id": "a1bb71d4-4a43-4735-8cbe-4bd72660cec1",
+    "year": 1958,
+    "model": "356A Speedster",
+    "body": "SPEEDSTER",
+    "vin": "83973",
+    "sale_price": null,
+    "from": "vin"
+   },
+   {
+    "id": "f1c4d3b1-2f49-4832-8e33-edbd16a672a0",
+    "year": 1958,
+    "model": "356 A Speedster",
+    "body": "SPEEDSTER",
+    "vin": null,
+    "sale_price": null,
+    "from": "text"
+   }
+  ]
+ },
+ {
+  "chassis": "83066",
+  "rule": "356A SPEEDSTER 81901-84954",
+  "high_confidence": true,
+  "profiles": [
+   {
+    "id": "a4b3862c-4ac9-4b38-880e-f83e2b406b20",
+    "year": 1957,
+    "model": "356A Speedster",
+    "body": "SPEEDSTER",
+    "vin": "83066",
+    "sale_price": null,
+    "from": "vin"
+   },
+   {
+    "id": "f469d031-834a-419c-b5a3-5b0a8c58a224",
+    "year": 1957,
+    "model": "356a t1 speedster",
+    "body": "SPEEDSTER",
+    "vin": null,
+    "sale_price": 260000,
+    "from": "text"
+   }
+  ]
+ },
+ {
+  "chassis": "110858",
+  "rule": "356B COUPE 108918-125239",
+  "high_confidence": true,
+  "profiles": [
+   {
+    "id": "aa644071-1b1e-46e3-bf88-96eabbd30e5d",
+    "year": 1960,
+    "model": "356 B 1600 GS/GT Carrera Coupe",
+    "body": "COUPE",
+    "vin": "110858",
+    "sale_price": null,
+    "from": "vin"
+   },
+   {
+    "id": "f1217b62-3805-4073-931c-567d2c526158",
+    "year": 1960,
+    "model": "356B Carrera 1600 GT Coupe",
+    "body": "COUPE",
+    "vin": null,
+    "sale_price": null,
+    "from": "text"
+   }
+  ]
+ },
+ {
+  "chassis": "118725",
+  "rule": "356B COUPE 108918-125239",
+  "high_confidence": true,
+  "profiles": [
+   {
+    "id": "b1544d56-3d97-4698-856d-fbd501e04f52",
+    "year": 1962,
+    "model": "356",
+    "body": "COUPE",
+    "vin": null,
+    "sale_price": null,
+    "from": "text"
+   },
+   {
+    "id": "b56d684c-d716-4501-ad39-e3f35ed2ec9d",
+    "year": 1962,
+    "model": "356B Coupe",
+    "body": "COUPE",
+    "vin": "118725",
+    "sale_price": null,
+    "from": "vin"
+   }
+  ]
+ },
+ {
+  "chassis": "56118",
+  "rule": "356A T1 COUPE 55001-59099",
+  "high_confidence": true,
+  "profiles": [
+   {
+    "id": "ba7bed49-aeac-45c5-b84e-718d1f6c5b37",
+    "year": 1956,
+    "model": "356a 1500 carrera gs coupe",
+    "body": "COUPE",
+    "vin": null,
+    "sale_price": 370000,
+    "from": "text"
+   },
+   {
+    "id": "d1a46efc-4afe-486d-be57-8c46cc6d006e",
+    "year": 1956,
+    "model": "356a 1500 carrera gs coupe",
+    "body": "COUPE",
+    "vin": null,
+    "sale_price": null,
+    "from": "text"
+   }
+  ]
+ },
+ {
+  "chassis": "84882",
+  "rule": "356A SPEEDSTER 81901-84954",
+  "high_confidence": true,
+  "profiles": [
+   {
+    "id": "bbf4e43b-1d01-4079-bcfa-de5d1d78c7db",
+    "year": 1958,
+    "model": "356A Speedster",
+    "body": "SPEEDSTER",
+    "vin": "84882",
+    "sale_price": null,
+    "from": "vin"
+   },
+   {
+    "id": "fb70e875-8e59-49e2-80cd-01a1ebe2bfd7",
+    "year": 1958,
+    "model": "356a t2 1600 speedster",
+    "body": "SPEEDSTER",
+    "vin": null,
+    "sale_price": 270000,
+    "from": "text"
+   }
+  ]
+ },
+ {
+  "chassis": "83543",
+  "rule": "356A SPEEDSTER 81901-84954",
+  "high_confidence": true,
+  "profiles": [
+   {
+    "id": "bfe547ce-1eee-4ef4-b1e1-178b981cc563",
+    "year": 1957,
+    "model": "356a 1600 speedster",
+    "body": "SPEEDSTER",
+    "vin": null,
+    "sale_price": 425000,
+    "from": "text"
+   },
+   {
+    "id": "f2dbf225-ae99-4811-aa28-cdb7f7340472",
+    "year": 1957,
+    "model": "356a 1600 speedster",
+    "body": "SPEEDSTER",
+    "vin": null,
+    "sale_price": 400000,
+    "from": "text"
+   }
+  ]
+ },
+ {
+  "chassis": "215894",
+  "rule": "356C COUPE 215001-222580",
+  "high_confidence": true,
+  "profiles": [
+   {
+    "id": "c24a4ecd-4814-4a11-9aef-5ef8e1e470af",
+    "year": 1964,
+    "model": "356 'c' 1964 Coupe",
+    "body": "COUPE",
+    "vin": null,
+    "sale_price": null,
+    "from": "text"
+   },
+   {
+    "id": "dd71d1c8-41bd-4f91-987b-3412db2fb495",
+    "year": 1964,
+    "model": "356C Coupe",
+    "body": "COUPE",
+    "vin": "215894",
+    "sale_price": null,
+    "from": "vin"
+   }
+  ]
+ }
+]

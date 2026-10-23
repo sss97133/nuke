@@ -1,4 +1,8 @@
 \set ON_ERROR_STOP on
+\if :{?bat_fixture_path}
+\else
+\set bat_fixture_path /private/tmp/nuke-bat-prepared-fixture.json
+\endif
 -- OFFLINE ONLY (database nuke_soft_close_test). Contract test for 20261014060000_bat_live_fold_relisted_lot.sql.
 -- ALLOW_RAW_TESTIMONY_WRITE: the fixture rows below go to a disposable offline database, never to production.
 -- Incident (2026-10-14): a relisted car's lot has its events on the car's original vehicle, while the monitor binds the stub
@@ -55,7 +59,11 @@ CREATE TABLE public.auction_comments(id uuid PRIMARY KEY DEFAULT gen_random_uuid
 CREATE TABLE public.pipeline_registry(table_name text,column_name text,owned_by text,description text,do_not_write_directly boolean,
   write_via text,UNIQUE(table_name,column_name));
 CREATE TABLE public.fixture_frames(doc jsonb);
-INSERT INTO public.fixture_frames VALUES(pg_read_file('/private/tmp/nuke-bat-prepared-fixture.json')::jsonb);
+\if :{?bat_fixture_json}
+INSERT INTO public.fixture_frames VALUES(:'bat_fixture_json'::jsonb);
+\else
+INSERT INTO public.fixture_frames VALUES(pg_read_file(:'bat_fixture_path')::jsonb);
+\endif
 CREATE TABLE net.calls(id bigint GENERATED ALWAYS AS IDENTITY,body jsonb);
 CREATE TABLE net._http_response(id bigint,timed_out boolean,status_code integer,created timestamptz);
 CREATE FUNCTION net.http_post(url text,headers jsonb,body jsonb,timeout_milliseconds integer) RETURNS bigint LANGUAGE plpgsql AS $$

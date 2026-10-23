@@ -14,12 +14,23 @@ const slice = (from: string, to?: string) => {
 const handlerNames = [...source.matchAll(/^  (\w+): handle\w+,$/gm)].map((m) => m[1]);
 const entry = slice("Deno.serve(async (req: Request)");
 const moduleSource = `
+const ACCOUNTING_TOOLS = [];
+const ACCOUNTING_TOOL_NAME = 'accounting_books';
+const callAccounting = async () => (globalThis as any).__accountingResult;
 const SUPABASE_URL = "https://example.supabase.co";
 const SERVICE_ROLE_KEY = "sb_secret_test_key";
 const projectSecretKey = () => SERVICE_ROLE_KEY;
-const getSupabase = () => ({ rpc: async () => ({ data: { allowed: false }, error: null }) });
+const getSupabase = () => ({ rpc: async () => (globalThis as any).__apiKeyCheck ?? ({ data: { allowed: false }, error: null }) });
 const scopeAllowsWriteTier = (globalThis as any).__scopeAllowsWriteTier;
+const requireWriteAuth = (globalThis as any).__requireWriteAuth;
+const requireAdminOrService = (globalThis as any).__requireAdminOrService;
 type WriteTier = string;
+// Advisor surface stubs: oauth_test covers the default /mcp entry, not /mcp/advisor.
+const isAdvisorSurface = (_req: Request) => false;
+const checkAdvisorRateLimit = (_req: Request) => ({ ok: true as const });
+const handleAdvisorJsonRpc = async (_body: unknown) => null;
+const initAdvisorHandlers = (_deps: unknown) => {};
+const callEdgeApi = async () => ({});
 ` + slice("const CORS = {", "// ── Edge Function Proxy") + slice("interface JsonRpcRequest", "const sb = ()") + `
 const calls: Array<{ name: string; args: Record<string, unknown> }> = [];
 const TOOL_HANDLERS = Object.fromEntries(${JSON.stringify(handlerNames)}.map((name: string) =>
@@ -29,6 +40,21 @@ export const handle = ` + entry.slice("Deno.serve".length) + `
 export { calls };
 `;
 (globalThis as Record<string, unknown>).__scopeAllowsWriteTier = scopeAllowsWriteTier;
+// Stand-ins for the real _shared/writeGuard helpers (verified against the project JWKS + admin_users there; proven in
+// writeGuard.test.ts). They encode the contract the connector relies on, keyed off the Authorization header, so this
+// test proves execute_sql is routed through requireWriteAuth then requireAdminOrService and honors their verdicts:
+//   Bearer sb_secret_test_key → service key (both pass)        Bearer admin-jwt  → verified admin (both pass)
+//   Bearer user-jwt          → verified non-admin (writeAuth passes, admin check 403)   anything else → no token (writeAuth 401)
+const PASSES_WRITE = new Set(["Bearer sb_secret_test_key", "Bearer admin-jwt", "Bearer user-jwt"]);
+const IS_ADMIN_OR_SERVICE = new Set(["Bearer sb_secret_test_key", "Bearer admin-jwt"]);
+(globalThis as Record<string, unknown>).__requireWriteAuth = async (req: Request) =>
+  PASSES_WRITE.has(req.headers.get("authorization") ?? "")
+    ? null
+    : new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: { "WWW-Authenticate": 'Bearer realm="nuke", resource_metadata="https://nuke.ag/.well-known/oauth-protected-resource"' } });
+(globalThis as Record<string, unknown>).__requireAdminOrService = async (req: Request) =>
+  IS_ADMIN_OR_SERVICE.has(req.headers.get("authorization") ?? "")
+    ? null
+    : new Response(JSON.stringify({ error: "forbidden", reason: "admins only" }), { status: 403 });
 const connector = await import(`data:application/typescript,${encodeURIComponent(moduleSource)}`);
 const handle = connector.handle as (req: Request) => Promise<Response>;
 const calls = connector.calls as Array<{ name: string; args: Record<string, unknown> }>;
@@ -101,4 +127,65 @@ Deno.test("a token in the retired format is refused on write and read tools; the
 
   const service = await toolCall("create_profile", { name: "probe" }, { authorization: "Bearer sb_secret_test_key" });
   assert(service.status === 200 && dispatched() === 2 && calls[1].name === "create_profile", `service key: ${service.status}`);
+});
+
+Deno.test("execute_sql is gated like nlq-sql: anonymous 401, signed-in non-admin 403, verified admin 200, service key 200", async () => {
+  calls.length = 0;
+
+  const anonymous = await toolCall("execute_sql", { query: "select 1" });
+  assert(anonymous.status === 401 && (anonymous.headers.get("www-authenticate") ?? "").includes("nuke.ag"),
+    `execute_sql without auth: ${anonymous.status}`);
+
+  // A signed-in non-admin (a verified user JWT, no admin_users row): passes requireWriteAuth, refused by the admin check.
+  const nonAdmin = await toolCall("execute_sql", { query: "select 1" }, { authorization: "Bearer user-jwt" });
+  assert(nonAdmin.status === 403, `execute_sql as a signed-in non-admin: ${nonAdmin.status}`);
+
+  // An API key (admin scope or not): no Authorization bearer, so requireWriteAuth refuses it — like nlq-sql.
+  const adminKey = await toolCall("execute_sql", { query: "select 1" }, { "x-api-key": "nk_live_probe" });
+  assert(adminKey.status === 401, `execute_sql with an API key: ${adminKey.status}`);
+
+  // A tool name that is not a string cannot be coerced into a gated name (typeof check in both the gate and
+  // handleToolsCall). With no auth it reaches the dispatcher, which rejects it before any handler runs.
+  const odd = await handle(new Request(FN, {
+    method: "POST",
+    headers: { "content-type": "application/json", accept: "application/json" },
+    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: ["execute_sql"], arguments: {} } }),
+  }));
+  const oddBody = await odd.json();
+  assert(oddBody.error?.code === -32602, `a tool name that is not a string: ${JSON.stringify(oddBody)}`);
+  assert(dispatched() === 0, `execute_sql dispatched before an allowed caller: ${JSON.stringify(calls)}`);
+
+  // A verified active admin (via the connector's own OAuth/JWT path): allowed.
+  const admin = await toolCall("execute_sql", { query: "select 1" }, { authorization: "Bearer admin-jwt" });
+  assert(admin.status === 200 && dispatched() === 1 && calls[0].name === "execute_sql", `verified admin: ${admin.status}`);
+
+  // The service key: allowed.
+  const service = await toolCall("execute_sql", { query: "select 1" }, { authorization: "Bearer sb_secret_test_key" });
+  assert(service.status === 200 && dispatched() === 2 && calls[1].name === "execute_sql", `service key: ${service.status}`);
+});
+
+Deno.test('accounting authentication failure provides a reconnect challenge', async () => {
+ (globalThis as any).__accountingResult = { authenticationRequired: true, isError: true, content: [] };
+ const result = await toolCall('accounting_books', { action: 'contexts' });
+ assert(result.status === 401, 'missing accounting credential did not challenge');
+ assert(!!result.headers.get('WWW-Authenticate')?.includes('oauth-protected-resource'), 'missing resource challenge');
+});
+Deno.test('opaque accounting scope permits ordinary public reads but no generic writes or SQL', async () => {
+ (globalThis as any).__apiKeyCheck = { data: { allowed: true, user_id: 'member', key_id: 'key', scopes: ['accounting:read','accounting:correct'] }, error: null };
+ const headers = { authorization: 'Bearer nuke_oauth_' + 'a'.repeat(64) };
+ const read = await toolCall('search_vehicles', { query: 'synthetic' }, headers);
+ assert(read.status === 200, 'valid opaque credential refused public reader');
+ const write = await toolCall('submit_observation', {}, headers);
+ assert(write.status === 403, 'accounting scope became generic write permission');
+ const sql = await toolCall('execute_sql', { query: 'select 1' }, headers);
+ assert(sql.status === 401 || sql.status === 403, 'accounting scope became SQL permission');
+ (globalThis as any).__apiKeyCheck = undefined;
+});
+
+Deno.test('private accounting bridge cannot bypass the ChatGPT public surface allowlist', async () => {
+ (globalThis as any).__accountingResult = { content: [{ type: 'text', text: 'private result' }] };
+ const response = await toolCall('accounting_books', { action: 'contexts' }, { 'x-nuke-surface': 'chatgpt' });
+ const result = await response.json();
+ assert(result.error?.code === -32602, 'private accounting tool bypassed curated surface');
+ assert(!JSON.stringify(result).includes('private result'), 'private bridge dispatched');
 });

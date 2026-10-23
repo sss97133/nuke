@@ -49,6 +49,7 @@ const sources = new Map([
   ['hash', compile('../supabase/functions/_shared/observationContentHash.ts')],
   ['bat', compile('../supabase/functions/_shared/batParser.ts')],
   ['chassis', compile('../supabase/functions/_shared/batChassis.ts')],
+  ['sellerType', compile('../supabase/functions/_shared/batSellerType.ts')],
   ['record', compile('../supabase/functions/_shared/batAuctionRecord.ts')],
 ]);
 
@@ -179,6 +180,7 @@ function fixture(options = {}) {
         if (specifier === './reportedWorkProposals.ts') return load('proposals');
         if (specifier === '../_shared/batParser.ts') return load('bat');
         if (specifier === './batChassis.ts') return load('chassis');
+        if (specifier === './batSellerType.ts') return load('sellerType');
         if (specifier === './batAuctionRecord.ts') return load('record');
         if (specifier === '../_shared/observationContentHash.ts') return load('hash');
         if (specifier === '../_shared/writeGuard.ts') return load('guard');

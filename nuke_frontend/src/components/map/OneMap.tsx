@@ -1,308 +1,273 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Map as MLMap, NavigationControl, type ExpressionSpecification, type GeoJSONSource, type MapGeoJSONFeature, type MapMouseEvent } from 'maplibre-gl';
+import { Map as MLMap, NavigationControl, type MapGeoJSONFeature, type MapMouseEvent } from 'maplibre-gl';
+import type { ExpressionSpecification } from '@maplibre/maplibre-gl-style-spec';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import './one-map.css';
 import './maplibreWorker';
-import { CARTO_DARK, MAP_FONT } from './constants';
-import {
-  BOUNDARY_TILES, readArea, readAreas, readLayers, readPoints, window as dayWindow,
-  type AreaResponse, type AreasResponse, type Level, type MapLayerDef,
-} from './oneMapService';
+import './one-map.css';
+import { CARTO_LIGHT } from './constants';
+import { BAND_RGBA, BANDS, BOUNDARY_TILES, band, eligible, makeLabel, outcome, platformName, readArea, readAreas, readBusinesses, readSellers, readZip, zipBounds, type AreaLayers, type BusinessLink, type LocationRow, type SellerLink } from './oneMapService';
 
 /**
- * The one map (docs/proposals/2026-10-19-one-map.md): one surface for every map-oriented number. Zoom sets the level
- * (state, county, ZIP, then points); a layer picker says what is counted; the window and source filter it; an area
- * click shows that place's activity across every layer. Boundaries are static tiles from storage; every count is a
- * map_facts row read through map-vehicles, never counted here.
+ * The web map as the iOS map, repaired by case 14 (docs/ledger/theory/data-machine-cases.md): the unit is the
+ * selected ZIP; the counts at every zoom are map_facts rows (a sum, never a scan, so nothing spins); the ZIP panel
+ * shows its readings nested in county, state and country with the records that carry no ZIP counted at their grain;
+ * the map says it is the seller ledger of an area, not vehicles present; every datum on the panel opens.
  */
 
-const LEVEL_BY_ZOOM = (z: number): Level | 'point' => (z < 5 ? 'state' : z < 8 ? 'county' : z < 11 ? 'zcta' : 'point');
-const SOURCE_LAYER: Record<Level, string> = { state: 'states', county: 'counties', zcta: 'zctas' };
-const KEY_PROP: Record<Level, string> = { state: 'fips', county: 'fips', zcta: 'zcta' };
-const LEVEL_WORD: Record<Level | 'point', string> = { state: 'STATE', county: 'COUNTY', zcta: 'ZIP', point: 'POINT' };
-const NO_KEY_WORD: Record<Level, string> = { state: 'no state', county: 'no county', zcta: 'no ZIP' };
-const DAY_CHOICES = [1, 7, 30, 90, 365];
-/** The palette lives in one-map.css; MapLibre paint needs the resolved values. */
-function palette(el: HTMLElement) {
-  const cs = getComputedStyle(el);
-  const v = (name: string) => cs.getPropertyValue(name).trim();
-  return { ramp: [0, 1, 2, 3, 4].map((i) => v(`--om-ramp-${i}`)), line: v('--om-line'), accent: v('--om-accent'), bg: v('--om-bg') };
-}
-
+const WINDOWS = [{ key: '30', label: 'Last 30 days', days: 30 }, { key: '90', label: 'Last 90 days', days: 90 }, { key: '365', label: 'Last year', days: 365 }];
+const LAYER_WORD: Record<string, string> = { vehicle: 'vehicles', listing: 'listings', sale: 'sales', organization: 'shops' };
 const fmt = (n: number) => n.toLocaleString('en-US');
 const money = (n: number | null | undefined) => (n == null ? '' : `$${Math.round(n).toLocaleString('en-US')}`);
-
-function readUrl() {
-  const p = new URLSearchParams(window.location.search);
-  const days = Number(p.get('days'));
-  return {
-    layer: p.get('layer') ?? 'listing',
-    days: DAY_CHOICES.includes(days) ? days : 30,
-    source: p.get('source') ?? '',
-    lng: Number(p.get('lng')) || -98, lat: Number(p.get('lat')) || 39, zoom: Number(p.get('z')) || 4.2,
-  };
-}
-
-function breaks(values: number[]): number[] {
-  const v = values.filter((x) => x > 0).sort((a, b) => a - b);
-  if (!v.length) return [1, 2, 3, 4];
-  const q = (p: number) => v[Math.min(v.length - 1, Math.floor(p * v.length))];
-  return [q(0.2), q(0.4), q(0.6), q(0.8)];
-}
+const day = (iso: string | null) => (iso ? iso.slice(0, 10) : 'date unknown');
+const utc = (d: Date) => d.toISOString().slice(0, 10);
 
 export default function OneMap() {
-  const init = useMemo(readUrl, []);
+  const p = useMemo(() => new URLSearchParams(window.location.search), []);
   const mapRef = useRef<MLMap | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const [layers, setLayers] = useState<MapLayerDef[]>([]);
-  const [layer, setLayer] = useState(init.layer);
-  const [days, setDays] = useState(init.days);
-  const [source, setSource] = useState(init.source);
-  const [zoom, setZoom] = useState(init.zoom);
   const [ready, setReady] = useState(false);
-  const [areas, setAreas] = useState<AreasResponse | null>(null);
-  const [hover, setHover] = useState<{ key: string; name: string } | null>(null);
-  const [picked, setPicked] = useState<{ key: string; name: string; level: Level } | null>(null);
-  const [pickedData, setPickedData] = useState<AreaResponse | null>(null);
-  const [pointPanel, setPointPanel] = useState<Record<string, unknown> | null>(null);
-  const [pointCount, setPointCount] = useState<number | null>(null);
-  const [status, setStatus] = useState<string>('');
-  const [error, setError] = useState<string>('');
-  const level = LEVEL_BY_ZOOM(zoom);
-  const win = useMemo(() => dayWindow(days), [days]);
-  const countsRef = useRef<Map<string, number>>(new Map());
+  const [viewKey, setViewKey] = useState(0);
+  const [layer, setLayer] = useState(p.get('layer') && p.get('layer')! in LAYER_WORD ? p.get('layer')! : 'vehicle');
+  const [windowKey, setWindowKey] = useState(WINDOWS.some((w) => w.key === p.get('window')) ? p.get('window')! : '365');
+  const [visible, setVisible] = useState<{ zips: string[]; counties: Map<string, string> }>({ zips: [], counties: new Map() });
+  const [inView, setInView] = useState<{ total: number; areas: number; asOf: string | null } | null>(null);
+  const [selected, setSelected] = useState<{ zip: string; county: string; state: string } | null>(null);
+  const [dolls, setDolls] = useState<{ zip: AreaLayers | null; county: AreaLayers | null; state: AreaLayers | null; us: number | null; countyNoZip: number | null }>({ zip: null, county: null, state: null, us: null, countyNoZip: null });
+  const [rows, setRows] = useState<LocationRow[] | null>(null);
+  const [rowsBusy, setRowsBusy] = useState(false);
+  const [pick, setPick] = useState<{ platform?: string; make?: string; seller?: string; business?: string }>({});
+  const [sellers, setSellers] = useState<SellerLink[] | null>(null);
+  const [businesses, setBusinesses] = useState<BusinessLink[] | null>(null);
+  const [open, setOpen] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
+  const [showLayers, setShowLayers] = useState(false);
+  const [showWindows, setShowWindows] = useState(false);
+  const [showInfo, setShowInfo] = useState(false);
+  const [note, setNote] = useState('');
+  const paintedRef = useRef<Set<string>>(new Set());
+  const win = useMemo(() => { const d = WINDOWS.find((w) => w.key === windowKey)!.days; return { from: utc(new Date(Date.now() - d * 86_400_000)), to: utc(new Date()) }; }, [windowKey]);
+  const windowLabel = WINDOWS.find((w) => w.key === windowKey)!.label;
 
-  // URL state: layer, window, source, view.
   useEffect(() => {
     const m = mapRef.current;
     const url = new URL(window.location.href);
-    url.searchParams.set('layer', layer); url.searchParams.set('days', String(days));
-    if (source) url.searchParams.set('source', source); else url.searchParams.delete('source');
+    url.searchParams.set('layer', layer); url.searchParams.set('window', windowKey);
+    if (selected) url.searchParams.set('zip', selected.zip); else url.searchParams.delete('zip');
     if (m) { const c = m.getCenter(); url.searchParams.set('lng', c.lng.toFixed(3)); url.searchParams.set('lat', c.lat.toFixed(3)); url.searchParams.set('z', m.getZoom().toFixed(2)); }
     window.history.replaceState(null, '', url);
-  }, [layer, days, source, zoom]);
+  }, [layer, windowKey, selected, viewKey]);
 
-  useEffect(() => { readLayers().then(setLayers).catch((e) => setError(String(e.message ?? e))); }, []);
-
-  // The map: a dark basemap, our boundary tiles, one fill per level, outlines, and a point layer.
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
-    const pal = palette(containerRef.current);
-    const map = new MLMap({
-      container: containerRef.current, style: CARTO_DARK, center: [init.lng, init.lat], zoom: init.zoom,
-      minZoom: 2, maxZoom: 16, attributionControl: { compact: true },
-    });
+    const map = new MLMap({ container: containerRef.current, style: CARTO_LIGHT, center: [Number(p.get('lng')) || -115.1, Number(p.get('lat')) || 36.1], zoom: Number(p.get('z')) || 9.3, minZoom: 4, maxZoom: 16, attributionControl: { compact: true } });
     map.addControl(new NavigationControl({ showCompass: false }), 'bottom-right');
     map.on('load', () => {
-      map.addSource('bounds', { type: 'vector', tiles: [BOUNDARY_TILES], minzoom: 0, maxzoom: 9,
-        attribution: 'Boundaries: U.S. Census Bureau 2020' });
-      map.addSource('points', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
-      const color = ['case', ['!=', ['feature-state', 'entities'], null],
-        ['step', ['feature-state', 'entities'], pal.ramp[0], 1, pal.ramp[1], 2, pal.ramp[2], 3, pal.ramp[3], 4, pal.ramp[4]], 'transparent'] as unknown as ExpressionSpecification;
-      for (const lv of ['state', 'county', 'zcta'] as Level[]) {
-        map.addLayer({ id: `${lv}-fill`, type: 'fill', source: 'bounds', 'source-layer': SOURCE_LAYER[lv],
-          paint: { 'fill-color': color, 'fill-opacity': ['case', ['boolean', ['feature-state', 'hover'], false], 0.9, 0.55] }, layout: { visibility: 'none' } });
-        map.addLayer({ id: `${lv}-line`, type: 'line', source: 'bounds', 'source-layer': SOURCE_LAYER[lv],
-          paint: { 'line-color': pal.line, 'line-width': lv === 'state' ? 1 : 0.5, 'line-opacity': 0.5 }, layout: { visibility: 'none' } });
-      }
-      map.addLayer({ id: 'points-circle', type: 'circle', source: 'points',
-        paint: { 'circle-radius': ['case', ['has', 'count'], ['min', 24, ['+', 6, ['*', 2, ['sqrt', ['get', 'count']]]]], 5],
-          'circle-color': pal.accent, 'circle-stroke-color': pal.bg, 'circle-stroke-width': 1, 'circle-opacity': 0.9 } });
-      setZoom(map.getZoom());
-      setReady(true);
+      map.addSource('bounds', { type: 'vector', tiles: [BOUNDARY_TILES], minzoom: 0, maxzoom: 9, attribution: 'ZIP areas: U.S. Census Bureau 2020' });
+      const fill = ['case', ['!=', ['feature-state', 'band'], null], ['step', ['feature-state', 'band'], BAND_RGBA[0], 1, BAND_RGBA[1], 2, BAND_RGBA[2], 3, BAND_RGBA[3]], 'rgba(0,0,0,0)'] as unknown as ExpressionSpecification;
+      map.addLayer({ id: 'zcta-fill', type: 'fill', source: 'bounds', 'source-layer': 'zctas', paint: { 'fill-color': fill, 'fill-opacity': 1 } });
+      map.addLayer({ id: 'zcta-line', type: 'line', source: 'bounds', 'source-layer': 'zctas', paint: { 'line-color': 'rgba(0,122,255,0.20)', 'line-width': 0.5 } });
+      map.addLayer({ id: 'zcta-selected', type: 'line', source: 'bounds', 'source-layer': 'zctas', paint: { 'line-color': 'rgb(0,122,255)', 'line-width': 1.6 }, filter: ['==', ['id'], -1] });
+      map.addLayer({ id: 'county-fill', type: 'fill', source: 'bounds', 'source-layer': 'counties', paint: { 'fill-color': 'rgba(0,0,0,0)' } });
+      map.addLayer({ id: 'county-line', type: 'line', source: 'bounds', 'source-layer': 'counties', paint: { 'line-color': 'rgba(60,60,67,0.45)', 'line-width': 0.8 } });
+      setReady(true); setViewKey((k) => k + 1);
     });
-    map.on('moveend', () => setZoom(map.getZoom()));
+    map.on('idle', () => setViewKey((k) => k + 1));
     mapRef.current = map;
     return () => { map.remove(); mapRef.current = null; };
-  }, [init.lat, init.lng, init.zoom]);
+  }, [p]);
 
-  // Paint the current level's counts as feature state with quantile steps.
-  const paint = useCallback((data: AreasResponse | null, lv: Level) => {
+  // The ZIPs and counties in view.
+  useEffect(() => {
     const map = mapRef.current;
-    if (!map || !map.getSource('bounds')) return;
-    const src = { source: 'bounds', sourceLayer: SOURCE_LAYER[lv] };
-    for (const key of countsRef.current.keys()) map.setFeatureState({ ...src, id: Number(key) }, { entities: null });
-    countsRef.current = new Map();
-    if (!data) return;
-    const b = breaks(data.areas.map((a) => a.entities));
-    for (const a of data.areas) {
-      const cls = a.entities >= b[3] ? 4 : a.entities >= b[2] ? 3 : a.entities >= b[1] ? 2 : a.entities >= b[0] ? 1 : 0;
-      map.setFeatureState({ ...src, id: Number(a.key) }, { entities: cls });
-      countsRef.current.set(a.key, a.entities);
-    }
+    if (!ready || !map) return;
+    const zips = [...new Set(map.queryRenderedFeatures({ layers: ['zcta-fill'] }).map((f) => String(f.properties.zcta)))].sort();
+    const counties = new Map<string, string>();
+    for (const f of map.queryRenderedFeatures({ layers: ['county-fill'] })) counties.set(String(f.properties.fips), String(f.properties.name));
+    setVisible((prev) => (prev.zips.join() === zips.join() && prev.counties.size === counties.size ? prev : { zips, counties }));
+  }, [ready, viewKey]);
+
+  // The counts: one facts read for the ZIPs in view, painted as bands. A sum, never a scan.
+  const paint = useCallback((counts: Map<string, number>) => {
+    const map = mapRef.current; if (!map) return;
+    const src = { source: 'bounds', sourceLayer: 'zctas' };
+    for (const z of paintedRef.current) if (!counts.has(z)) map.setFeatureState({ ...src, id: Number(z) }, { band: null });
+    for (const [z, n] of counts) map.setFeatureState({ ...src, id: Number(z) }, { band: band(n) });
+    paintedRef.current = new Set(counts.keys());
   }, []);
-
-  // Which level is drawn follows the zoom.
   useEffect(() => {
-    const map = mapRef.current;
-    if (!ready || !map || !map.getLayer('state-fill')) return;
-    for (const lv of ['state', 'county', 'zcta'] as Level[]) {
-      const on = lv === level ? 'visible' : 'none';
-      map.setLayoutProperty(`${lv}-fill`, 'visibility', on);
-      map.setLayoutProperty(`${lv}-line`, 'visibility', on);
-    }
-    map.setLayoutProperty('points-circle', 'visibility', level === 'point' ? 'visible' : 'none');
-  }, [ready, level, zoom]);
-
-  // The numbers for the level in view.
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!ready || !map) return;
+    if (!ready || !visible.zips.length) { setInView(null); return; }
     const ctl = new AbortController();
-    if (level === 'point') {
-      const b = map.getBounds();
-      setStatus('POINTS…');
-      readPoints({ bbox: `${b.getWest()},${b.getSouth()},${b.getEast()},${b.getNorth()}`, zoom: Math.round(zoom), from: win.from, to: win.to, source: source || undefined }, ctl.signal)
-        .then((fc) => { (map.getSource('points') as GeoJSONSource | undefined)?.setData(fc as never); setPointCount(fc.features.length); setStatus(''); })
-        .catch((e) => { if (e.name !== 'AbortError') setError(String(e.message ?? e)); });
-      return () => ctl.abort();
-    }
-    let keys: string[] | undefined;
-    if (level === 'zcta') {
-      if (!map.getLayer('zcta-fill')) return;
-      keys = [...new Set(map.queryRenderedFeatures({ layers: ['zcta-fill'] }).map((f) => String(f.properties?.zcta)))].slice(0, 2000);
-      if (!keys.length) { setAreas(null); paint(null, level); return; }
-    }
-    setStatus('COUNTING…');
-    readAreas({ level, layer, from: win.from, to: win.to, source: source || undefined, keys }, ctl.signal)
-      .then((r) => { setAreas(r); paint(r, level); setStatus(''); setError(''); })
-      .catch((e) => { if (e.name !== 'AbortError') { setError(String(e.message ?? e)); setStatus(''); } });
+    readAreas('zcta', layer, win.from, win.to, visible.zips.slice(0, 2000), ctl.signal)
+      .then((r) => { paint(new Map(r.areas.map((a) => [a.key, a.entities]))); setInView({ total: r.totals.entities, areas: r.totals.areas, asOf: r.as_of }); setNote(''); })
+      .catch((e) => { if (e.name !== 'AbortError') setNote(String(e.message ?? e)); });
     return () => ctl.abort();
-  }, [ready, level, layer, win.from, win.to, source, zoom, paint]);
+  }, [ready, visible, layer, win.from, win.to, paint]);
 
-  // Hover and click on areas and points.
+  useEffect(() => { const m = mapRef.current; if (m?.getLayer('zcta-selected')) m.setFilter('zcta-selected', ['==', ['id'], selected ? Number(selected.zip) : -1]); }, [selected, ready]);
+
+  // The selected ZIP: its dolls from the facts, its rows from the ledger.
+  useEffect(() => {
+    if (!selected) { setDolls({ zip: null, county: null, state: null, us: null, countyNoZip: null }); setRows(null); return; }
+    const ctl = new AbortController();
+    setRowsBusy(true); setPick({}); setOpen(null);
+    Promise.all([
+      readArea('zcta', selected.zip, win.from, win.to, ctl.signal), readArea('county', selected.county, win.from, win.to, ctl.signal), readArea('state', selected.state, win.from, win.to, ctl.signal),
+      readAreas('state', layer, win.from, win.to, undefined, ctl.signal), readAreas('zcta', layer, win.from, win.to, [selected.zip], ctl.signal),
+    ]).then(([z, c, s, us]) => setDolls({ zip: z, county: c, state: s, us: us.totals.entities + us.unkeyed.entities, countyNoZip: null })).catch((e) => { if (e.name !== 'AbortError') setNote(String(e.message ?? e)); });
+    setSellers(null); setBusinesses(null);
+    readZip(selected.zip, selected.county, ctl.signal).then((r) => {
+      const ok = r.filter(eligible); setRows(ok); setRowsBusy(false);
+      const ids = [...new Set(ok.map((x) => x.vehicles.id))];
+      readSellers(ids, ctl.signal).then(setSellers).catch(() => setSellers([]));
+      readBusinesses(ids, ctl.signal).then(setBusinesses).catch(() => setBusinesses([]));
+    }).catch((e) => { if (e.name !== 'AbortError') { setNote(String(e.message ?? e)); setRowsBusy(false); } });
+    return () => ctl.abort();
+  }, [selected, win.from, win.to, layer]);
+
+  // Tap a ZIP (its county and state come from the tiles under the tap).
   useEffect(() => {
     const map = mapRef.current;
     if (!ready || !map) return;
-    let hovered: { id: number; lv: Level } | null = null;
-    const nameOf = (f: MapGeoJSONFeature, lv: Level) => (lv === 'zcta' ? `ZIP ${f.properties.zcta}` : lv === 'state' ? String(f.properties.name) : `${f.properties.name} County`);
-    const onMove = (e: MapMouseEvent) => {
-      if (level === 'point') return;
-      const f = map.queryRenderedFeatures(e.point, { layers: [`${level}-fill`] })[0];
-      if (hovered) map.setFeatureState({ source: 'bounds', sourceLayer: SOURCE_LAYER[hovered.lv], id: hovered.id }, { hover: false });
-      hovered = null;
-      if (!f || f.id == null) { setHover(null); map.getCanvas().style.cursor = ''; return; }
-      hovered = { id: Number(f.id), lv: level };
-      map.setFeatureState({ source: 'bounds', sourceLayer: SOURCE_LAYER[level], id: Number(f.id) }, { hover: true });
-      map.getCanvas().style.cursor = 'pointer';
-      setHover({ key: String(f.properties[KEY_PROP[level]]), name: nameOf(f, level) });
-    };
     const onClick = (e: MapMouseEvent) => {
-      if (level === 'point') {
-        const p = map.queryRenderedFeatures(e.point, { layers: ['points-circle'] })[0];
-        setPointPanel(p ? (p.properties as Record<string, unknown>) : null);
-        return;
-      }
-      const f = map.queryRenderedFeatures(e.point, { layers: [`${level}-fill`] })[0];
-      if (!f) { setPicked(null); setPickedData(null); return; }
-      setPicked({ key: String(f.properties[KEY_PROP[level]]), name: nameOf(f, level), level });
+      const z = map.queryRenderedFeatures(e.point, { layers: ['zcta-fill'] })[0] as MapGeoJSONFeature | undefined;
+      const c = map.queryRenderedFeatures(e.point, { layers: ['county-fill'] })[0] as MapGeoJSONFeature | undefined;
+      if (!z || !c) { setSelected(null); return; }
+      setSelected({ zip: String(z.properties.zcta), county: String(c.properties.fips), state: String(c.properties.state) });
     };
-    map.on('mousemove', onMove); map.on('click', onClick);
-    return () => { map.off('mousemove', onMove); map.off('click', onClick); };
-  }, [ready, level]);
+    const onMove = (e: MapMouseEvent) => { map.getCanvas().style.cursor = map.queryRenderedFeatures(e.point, { layers: ['zcta-fill'] }).length ? 'pointer' : ''; };
+    map.on('click', onClick); map.on('mousemove', onMove);
+    return () => { map.off('click', onClick); map.off('mousemove', onMove); };
+  }, [ready]);
 
-  useEffect(() => {
-    if (!picked) return;
-    const ctl = new AbortController();
-    readArea({ level: picked.level, key: picked.key, from: win.from, to: win.to }, ctl.signal).then(setPickedData).catch((e) => { if (e.name !== 'AbortError') setError(String(e.message ?? e)); });
-    return () => ctl.abort();
-  }, [picked, win.from, win.to]);
+  const search = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const q = query.trim(); const map = mapRef.current; if (!q || !map) return;
+    if (!/^\d{5}$/.test(q)) { setNote('Search takes a five-digit ZIP'); return; }
+    const b = await zipBounds(q);
+    if (!b) { setNote(`ZIP ${q} has no area`); return; }
+    setNote(''); map.fitBounds(b, { padding: 60, duration: 600 });
+    map.once('idle', () => {
+      const c = map.queryRenderedFeatures(map.project([(b[0] + b[2]) / 2, (b[1] + b[3]) / 2]), { layers: ['county-fill'] })[0];
+      if (c) setSelected({ zip: q, county: String(c.properties.fips), state: String(c.properties.state) });
+    });
+  };
 
-  const def = layers.find((l) => l.layer === layer);
-  const hoverCount = hover ? countsRef.current.get(hover.key) : undefined;
-  const noun = def ? (def.entity === 'image' ? 'photos' : def.entity === 'organization' ? 'organizations' : `${layer}s`) : layer;
-  const headline = areas
-    ? `${fmt(areas.totals.entities)} ${noun.toUpperCase()}${layer === 'organization' ? ' TODAY' : ` IN ${days === 1 ? '24 HOURS' : `${days} DAYS`}`}`
-    : level === 'point' ? `${pointCount == null ? '' : fmt(pointCount) + ' '}POINTS IN VIEW` : '';
+  // The rows folded: vehicles once, newest first; platforms and makes as filters that are buttons.
+  const vehicles = useMemo(() => {
+    const m = new Map<string, LocationRow[]>();
+    for (const r of rows ?? []) (m.get(r.vehicles.id) ?? m.set(r.vehicles.id, []).get(r.vehicles.id)!).push(r);
+    return [...m.values()].sort((a, b) => ((a[0].observed_at ?? '') < (b[0].observed_at ?? '') ? 1 : -1));
+  }, [rows]);
+  const platforms = useMemo(() => { const m = new Map<string, Set<string>>(); for (const v of vehicles) for (const r of v) (m.get(platformName(r.source_platform)) ?? m.set(platformName(r.source_platform), new Set()).get(platformName(r.source_platform))!).add(v[0].vehicles.id); return [...m.entries()].map(([k, s]) => [k, s.size] as const).sort((a, b) => b[1] - a[1]); }, [vehicles]);
+  const makes = useMemo(() => { const m = new Map<string, number>(); for (const v of vehicles) { const k = (v[0].vehicles.make ?? '').trim() || 'Make unrecorded'; m.set(k, (m.get(k) ?? 0) + 1); } return [...m.entries()].sort((a, b) => b[1] - a[1]); }, [vehicles]);
+  const sellerRows = useMemo(() => { const m = new Map<string, { handle: string; vehicles: Set<string>; url: string | null }>(); for (const l of sellers ?? []) { const k = l.handle.toLowerCase(); const e = m.get(k) ?? { handle: l.handle, vehicles: new Set<string>(), url: null }; e.vehicles.add(l.vehicle_id); m.set(k, e); } return [...m.entries()].map(([k, e]) => ({ key: k, handle: e.handle, n: e.vehicles.size, vehicles: e.vehicles })).sort((a, b) => b.n - a.n); }, [sellers]);
+  const businessRows = useMemo(() => { const m = new Map<string, { b: BusinessLink; vehicles: Set<string> }>(); for (const l of businesses ?? []) { const e = m.get(l.id) ?? { b: l, vehicles: new Set<string>() }; e.vehicles.add(l.vehicle_id); m.set(l.id, e); } return [...m.values()].map((e) => ({ ...e.b, n: e.vehicles.size, vehicles: e.vehicles })).sort((a, b) => b.n - a.n); }, [businesses]);
+  const shown = vehicles.filter((v) => (!pick.platform || v.some((r) => platformName(r.source_platform) === pick.platform)) && (!pick.make || ((v[0].vehicles.make ?? '').trim() || 'Make unrecorded') === pick.make)
+    && (!pick.seller || sellerRows.find((s) => s.key === pick.seller)?.vehicles.has(v[0].vehicles.id)) && (!pick.business || businessRows.find((b) => b.id === pick.business)?.vehicles.has(v[0].vehicles.id)));
+  const countyName = selected ? visible.counties.get(selected.county) ?? `County ${selected.county}` : '';
+  const doll = (a: AreaLayers | null, key: string) => a?.layers.find((l) => l.layer === key);
 
-  const label: React.CSSProperties = { fontFamily: MAP_FONT, fontSize: 8, letterSpacing: 0.5, textTransform: 'uppercase', color: 'var(--om-muted)' };
-  const panel: React.CSSProperties = { position: 'absolute', zIndex: 5, background: 'var(--om-panel)', border: '2px solid var(--om-line)', color: 'var(--om-text)', fontFamily: MAP_FONT, padding: 10 };
-  const btn = (on: boolean): React.CSSProperties => ({ ...label, color: on ? 'var(--om-bg)' : 'var(--om-text-dim)', background: on ? 'var(--om-accent)' : 'transparent', border: '2px solid ' + (on ? 'var(--om-accent)' : 'var(--om-border-dim)'), padding: '3px 6px', cursor: 'pointer', marginRight: 4, marginBottom: 4 });
-
+  const word = LAYER_WORD[layer];
   return (
-    <div className="one-map" style={{ position: 'relative', width: '100%', height: '100%', background: 'var(--om-bg)' }} data-testid="one-map">
-      <div ref={containerRef} style={{ position: 'absolute', inset: 0 }} />
+    <div className="om" data-testid="one-map">
+      <div ref={containerRef} className="om-canvas" />
 
-      <div style={{ ...panel, top: 12, left: 12, width: 300 }}>
-        <div style={{ fontSize: 22, fontWeight: 700, lineHeight: 1.1, minHeight: 26 }} data-testid="headline">{headline || (error ? 'NO ANSWER' : status || '…')}</div>
-        <div style={{ ...label, marginTop: 4 }}>
-          {['state', 'county', 'zcta', 'point'].map((lv) => (
-            <span key={lv} style={{ marginRight: 8, color: lv === level ? 'var(--om-accent)' : 'var(--om-quiet)', fontWeight: lv === level ? 700 : 400 }}>{LEVEL_WORD[lv as Level | 'point']}</span>
-          ))}
-          <span style={{ color: 'var(--om-quiet)' }}>· zoom sets the level</span>
+      <div className="om-top">
+        <div className="om-row">
+          <button type="button" className="om-link" onClick={() => { setShowLayers((v) => !v); setShowWindows(false); }}>{word[0].toUpperCase() + word.slice(1)} ▾</button>
+          <button type="button" className="om-link" onClick={() => { setShowWindows((v) => !v); setShowLayers(false); }}>{windowLabel} ▾</button>
+          <button type="button" className="om-link" aria-label="About this map" onClick={() => setShowInfo(true)}>ⓘ</button>
         </div>
-        {areas && (
-          <div style={{ ...label, marginTop: 6, color: 'var(--om-text-dim)' }}>
-            {fmt(areas.totals.areas)} {level === 'zcta' ? 'ZIPS IN VIEW' : level === 'state' ? 'STATES' : 'COUNTIES'} ·{' '}
-            {fmt(areas.unkeyed.entities)} {NO_KEY_WORD[level as Level]}{areas.undated.entities ? ` · ${fmt(areas.undated.entities)} undated` : ''}
-            {areas.totals.value > 0 && def?.value_basis ? ` · ${money(areas.totals.value)} ${def.value_basis}` : ''}
-            {areas.as_of ? ` · as of ${new Date(areas.as_of).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}` : ''}
-          </div>
-        )}
-        <div style={{ marginTop: 10 }}>
-          <div style={label}>LAYER</div>
-          {layers.map((l) => (
-            <button key={l.layer} type="button" style={btn(l.layer === layer)} title={l.rule} onClick={() => { setLayer(l.layer); setPicked(null); setPickedData(null); }}>{l.layer}</button>
-          ))}
+        <div className="om-count" data-testid="headline">
+          {inView ? `${fmt(inView.total)} ${word} in ${fmt(inView.areas)} ZIPs in view · ${windowLabel.toLowerCase()}` : visible.zips.length ? 'Counting…' : 'Zoom in to ZIPs'}
         </div>
-        {layer !== 'organization' && (
-          <div style={{ marginTop: 6 }}>
-            <div style={label}>WINDOW</div>
-            {DAY_CHOICES.map((d) => <button key={d} type="button" style={btn(d === days)} onClick={() => setDays(d)}>{d === 1 ? '24H' : `${d}D`}</button>)}
-          </div>
-        )}
-        {areas && areas.by_source.length > 1 && (
-          <div style={{ marginTop: 6 }}>
-            <div style={label}>SOURCE</div>
-            <button type="button" style={btn(!source)} onClick={() => setSource('')}>all</button>
-            {areas.by_source.slice(0, 8).map((s) => <button key={s.source} type="button" style={btn(s.source === source)} onClick={() => setSource(s.source)}>{s.source} {fmt(s.entities)}</button>)}
-          </div>
-        )}
-        {def && <div style={{ ...label, marginTop: 8, color: 'var(--om-faint)', textTransform: 'none', letterSpacing: 0, fontSize: 9 }} title={def.rule}>
-          One {def.entity} counts once, on its {def.clock.split(',')[0]}.{def.value_basis ? ` Value: ${def.value_basis}.` : ''}
-        </div>}
-        {error && <div style={{ ...label, marginTop: 6, color: 'var(--om-danger)', textTransform: 'none' }}>{error}</div>}
+        <div className="om-muted">Where vehicles were sold from, not where they are now.</div>
+        <div className="om-legend">
+          <span className="om-legend-title">{word[0].toUpperCase() + word.slice(1)} per ZIP</span>
+          {BANDS.map((b, i) => <span key={b} className="om-swatch"><i style={{ background: BAND_RGBA[i] }} />{b}</span>)}
+        </div>
+        {showLayers && <div className="om-menu">{Object.entries(LAYER_WORD).map(([k, w]) => <button key={k} type="button" className={k === layer ? 'on' : ''} onClick={() => { setLayer(k); setShowLayers(false); }}>{w[0].toUpperCase() + w.slice(1)}</button>)}</div>}
+        {showWindows && <div className="om-menu">{WINDOWS.map((w) => <button key={w.key} type="button" className={w.key === windowKey ? 'on' : ''} onClick={() => { setWindowKey(w.key); setShowWindows(false); }}>{w.label}</button>)}</div>}
       </div>
 
-      {hover && level !== 'point' && (
-        <div style={{ ...panel, top: 12, right: 12, padding: '6px 10px', pointerEvents: 'none' }} data-testid="hover">
-          <div style={{ ...label, color: 'var(--om-text)' }}>{hover.name}</div>
-          <div style={{ fontSize: 18, fontWeight: 700 }}>{hoverCount == null ? '0' : fmt(hoverCount)} <span style={{ fontSize: 9 }}>{noun.toUpperCase()}</span></div>
+      <div className="om-bottom">
+        <div className="om-row om-between">
+          <span>{selected ? `ZIP ${selected.zip} · ${countyName}` : 'Tap a ZIP to explore its activity'}</span>
+          {note && <span className="om-warn">{note}</span>}
+        </div>
+        <form onSubmit={search}><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="ZIP" aria-label="ZIP" /></form>
+      </div>
+
+      {selected && (
+        <div className="om-sheet" data-testid="area-sheet">
+          <div className="om-row om-between"><h2>ZIP {selected.zip}</h2><button type="button" className="om-link" onClick={() => setSelected(null)}>Done</button></div>
+          <div className="om-muted">{countyName} · {windowLabel} · seller ledger: where vehicles were sold from</div>
+
+          <h3>This ZIP inside its county, state and country</h3>
+          <table className="om-dolls" data-testid="dolls">
+            <thead><tr><th /><th>ZIP</th><th>{countyName}</th><th>State</th><th>US</th></tr></thead>
+            <tbody>
+              {(['listing', 'sale', 'vehicle', 'organization'] as const).map((k) => (
+                <tr key={k} className={k === layer ? 'on' : ''}>
+                  <td><button type="button" className="om-link" onClick={() => setLayer(k)}>{LAYER_WORD[k]}</button></td>
+                  <td>{dolls.zip ? fmt(doll(dolls.zip, k)?.entities ?? 0) : '…'}</td>
+                  <td>{dolls.county ? fmt(doll(dolls.county, k)?.entities ?? 0) : '…'}</td>
+                  <td>{dolls.state ? fmt(doll(dolls.state, k)?.entities ?? 0) : '…'}</td>
+                  <td>{k === layer && dolls.us != null ? fmt(dolls.us) : ''}</td>
+                </tr>
+              ))}
+              {dolls.zip && doll(dolls.zip, 'sale')?.priced ? <tr><td>sold for, average</td><td>{money(doll(dolls.zip, 'sale')!.avg)}</td><td>{money(doll(dolls.county, 'sale')?.avg)}</td><td>{money(doll(dolls.state, 'sale')?.avg)}</td><td /></tr> : null}
+            </tbody>
+          </table>
+          <div className="om-muted">Counts are from the fold as of {dolls.zip?.layers[0]?.as_of?.slice(11, 16) ?? '…'} UTC. Records with no ZIP count in their county and state, not here.</div>
+
+          <h3>Sources: who sold here</h3>
+          {sellers == null ? <div className="om-muted">{rowsBusy ? 'Reading the ZIP\'s records…' : 'Reading sellers…'}</div> : sellerRows.length ? <>
+            {sellerRows.slice(0, 8).map((sr) => <button key={sr.key} type="button" className={`om-line om-row om-between om-pick ${pick.seller === sr.key ? 'on' : ''}`} onClick={() => setPick((x) => ({ ...x, seller: x.seller === sr.key ? undefined : sr.key }))}><span>{sr.handle} <a href={`https://bringatrailer.com/member/${encodeURIComponent(sr.handle)}/`} target="_blank" rel="noreferrer" className="om-link" onClick={(e) => e.stopPropagation()}>BaT</a></span><span>{fmt(sr.n)} {sr.n === 1 ? 'vehicle' : 'vehicles'}</span></button>)}
+            <div className="om-muted">Sellers known for {fmt(new Set(sellers.map((l) => l.vehicle_id)).size)} of {fmt(vehicles.length)} vehicles (Bring a Trailer lots); the rest have no seller identity captured yet.</div>
+          </> : <div className="om-muted">No seller identities captured for these vehicles yet.</div>}
+          {businessRows.length ? <>
+            <h3>Businesses linked to these vehicles</h3>
+            {businessRows.slice(0, 8).map((b) => <button key={b.id} type="button" className={`om-line om-row om-between om-pick ${pick.business === b.id ? 'on' : ''}`} onClick={() => setPick((x) => ({ ...x, business: x.business === b.id ? undefined : b.id }))}><span>{b.name}{b.kind ? <span className="om-muted"> · {b.kind.replace(/_/g, ' ')}</span> : null}{b.slug ? <> <a href={`/org/${b.slug}`} className="om-link" onClick={(e) => e.stopPropagation()}>open</a></> : null}</span><span>{fmt(b.n)} {b.n === 1 ? 'vehicle' : 'vehicles'}</span></button>)}
+          </> : null}
+
+          <h3>Platforms represented</h3>
+          {platforms.map(([s, n]) => <button key={s} type="button" className={`om-line om-row om-between om-pick ${pick.platform === s ? 'on' : ''}`} onClick={() => setPick((x) => ({ ...x, platform: x.platform === s ? undefined : s }))}><span>{s}</span><span>{fmt(n)} vehicles</span></button>)}
+          {rowsBusy && !platforms.length && <div className="om-muted">Reading the ZIP's records…</div>}
+
+          <h3>Vehicle mix</h3>
+          {makes.slice(0, 10).map(([m, n]) => <button key={m} type="button" className={`om-bar om-pick ${pick.make === m ? 'on' : ''}`} onClick={() => setPick((x) => ({ ...x, make: x.make === m ? undefined : m }))}><span>{m}</span><i style={{ width: `${Math.max(4, (100 * n) / makes[0][1])}%` }} /><b>{fmt(n)}</b></button>)}
+
+          <h3>Vehicles{pick.platform || pick.make || pick.seller || pick.business ? ` · ${[pick.make, pick.platform, pick.seller && sellerRows.find((x) => x.key === pick.seller)?.handle, pick.business && businessRows.find((x) => x.id === pick.business)?.name].filter(Boolean).join(' · ')}` : ''} ({fmt(shown.length)})</h3>
+          {shown.map((v) => {
+            const first = v[0]; const o = outcome(first.vehicles); const isOpen = open === first.vehicles.id;
+            return (
+              <div key={first.vehicles.id} className="om-vehicle-block">
+                <button type="button" className="om-vehicle" onClick={() => setOpen(isOpen ? null : first.vehicles.id)}>
+                  {first.vehicles.primary_image_url ? <img src={first.vehicles.primary_image_url} alt="" width={56} height={42} loading="lazy" /> : <span className="om-noimg" />}
+                  <span className="om-vtext">
+                    <b>{makeLabel(first)}</b>
+                    <span className="om-muted">{o.word ? `${o.word}${o.price ? ' ' + money(o.price) : ''} · ` : ''}{v.length} {v.length === 1 ? 'record' : 'records'} · {platformName(first.source_platform)} · {day(first.observed_at)}</span>
+                  </span>
+                </button>
+                {isOpen && <div className="om-records">
+                  <a href={`/vehicle/${first.vehicles.id}`} className="om-link">Open the vehicle</a>
+                  {v.map((r) => <div key={r.id} className="om-record"><span>{day(r.observed_at)} · {r.source_type ?? 'record'} · {platformName(r.source_platform)}{r.postal_code ? ` · ${r.postal_code}` : ''}</span>{r.source_url && <a href={r.source_url} target="_blank" rel="noreferrer" className="om-link">source</a>}</div>)}
+                </div>}
+              </div>
+            );
+          })}
+          {rows && !shown.length && <div className="om-muted">No records here{pick.platform || pick.make ? ' for that pick' : ''}.</div>}
         </div>
       )}
 
-      {picked && (
-        <div style={{ ...panel, bottom: 12, left: 12, width: 300 }} data-testid="area-panel">
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <div style={{ fontSize: 14, fontWeight: 700 }}>{picked.name}</div>
-            <button type="button" style={btn(false)} onClick={() => { setPicked(null); setPickedData(null); }}>close</button>
-          </div>
-          <div style={{ ...label, marginBottom: 6 }}>{LEVEL_WORD[picked.level]} {picked.key} · last {days} days</div>
-          {pickedData ? pickedData.layers.map((r) => (
-            <div key={r.layer} style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--om-rule)', padding: '3px 0' }}>
-              <span style={{ ...label, color: 'var(--om-text-dim)' }}>{r.layer}</span>
-              <span style={{ fontSize: 12 }}>{fmt(r.entities)}{r.avg != null ? <span style={{ color: 'var(--om-muted)' }}> · avg {money(r.avg)}</span> : null}</span>
-            </div>
-          )) : <div style={label}>…</div>}
-        </div>
-      )}
-
-      {pointPanel && level === 'point' && (
-        <div style={{ ...panel, bottom: 12, left: 12, width: 300 }} data-testid="point-panel">
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <div style={{ fontSize: 14, fontWeight: 700 }}>
-              {'count' in pointPanel ? `${fmt(Number(pointPanel.count))} vehicles here` : [pointPanel.year, pointPanel.make, pointPanel.model].filter(Boolean).join(' ') || 'vehicle'}
-            </div>
-            <button type="button" style={btn(false)} onClick={() => setPointPanel(null)}>close</button>
-          </div>
-          {!('count' in pointPanel) && (
-            <div style={{ ...label, color: 'var(--om-text-dim)', marginTop: 4 }}>
-              {String(pointPanel.event_label ?? pointPanel.event_type ?? '')} · {String(pointPanel.source ?? '')} · {String(pointPanel.observed_at ?? '').slice(0, 10)}
-              {pointPanel.price ? ` · ${money(Number(pointPanel.price))}` : ''}
-              {pointPanel.vehicle_id ? <> · <a href={`/vehicle/${pointPanel.vehicle_id}`} style={{ color: 'var(--om-accent)' }}>open</a></> : null}
-              {pointPanel.source_url ? <> · <a href={String(pointPanel.source_url)} target="_blank" rel="noreferrer" style={{ color: 'var(--om-accent)' }}>listing</a></> : null}
-            </div>
-          )}
+      {showInfo && (
+        <div className="om-sheet" role="dialog">
+          <div className="om-row om-between"><h2>What this map shows</h2><button type="button" className="om-link" onClick={() => setShowInfo(false)}>Done</button></div>
+          <p>Each ZIP is shaded by the count of the chosen kind of record in the window: vehicles (each once, at its newest observation), listings (each vehicle once, on the day first seen listed), sales (sold events), shops. The bands are fixed: 1–4, 5–19, 20–99, 100 or more.</p>
+          <p>A location is where a vehicle was sold or offered from, usually the seller's place. Sold vehicles usually leave. This is the seller ledger of an area, not the vehicles present in it.</p>
+          <p>Records that carry no ZIP count in their county or state and are shown there. ZIP areas are Census 2020 ZIP Code Tabulation Areas; some postal ZIPs have no area, and ZIPs cross county lines.</p>
+          <p>Counts come from a fold refreshed every 10 minutes (last 3 days) and nightly (the year). Every vehicle shown is a public record and opens to its page and its sources.</p>
         </div>
       )}
     </div>

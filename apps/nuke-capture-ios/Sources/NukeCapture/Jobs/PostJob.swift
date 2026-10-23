@@ -113,7 +113,7 @@ struct PostJobPhoto: Decodable, Equatable, Identifiable {
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         self.init(id: try c.decode(String.self, forKey: .id), imageURL: try? c.decode(String.self, forKey: .imageURL),
-                  capturedAt: (try? c.decode(String.self, forKey: .takenAt)) ?? (try? c.decode(String.self, forKey: .createdAt)),
+                  capturedAt: try? c.decode(String.self, forKey: .takenAt),  // upload time is not capture time
                   isSensitive: (try? c.decode(Bool.self, forKey: .isSensitive)) ?? false,
                   isSuperseded: (try? c.decode(Bool.self, forKey: .isSuperseded)) ?? false,
                   gate: try? c.decode(String.self, forKey: .gate))
@@ -132,13 +132,14 @@ struct PostJobPhoto: Decodable, Equatable, Identifiable {
 // MARK: - Readers and writers
 
 enum PostJobReaders {
-    /// Your own uploads of this vehicle, newest first (the server re-checks every one on attach).
+    /// Your own uploads of this vehicle, newest taken first, undated last (the server re-checks every one on attach).
     static func photos(vehicleId: String, limit: Int = 60) async -> [PostJobPhoto] {
         guard let uid = SupabaseService.currentUserId else { return [] }
         return (try? await SupabaseService.client.from("vehicle_images")
             .select("id,image_url,taken_at,created_at,is_sensitive,is_superseded,vision_gate_status")
             .eq("vehicle_id", value: vehicleId)
             .eq("user_id", value: uid)
+            .order("taken_at", ascending: false, nullsFirst: false)
             .order("created_at", ascending: false)
             .limit(limit)
             .execute().value) ?? []

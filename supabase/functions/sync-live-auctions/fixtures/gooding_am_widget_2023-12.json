@@ -1,0 +1,50 @@
+{
+ "source": "POST https://bid.goodingco.com/widget/lots/1-84OYL5 {\"lot_ids\":[\"1-8DT8SX\",\"1-8DT8U9\"]} (fetched 2026-10-20; the call the lot page's bid box makes), trimmed to the fields read: no consignor, reserve, description or bidder fields",
+ "result_page": [
+  {
+   "row_id": "1-8DT8SX",
+   "lot_number": 19,
+   "title": "1957 Porsche 356 A Speedster",
+   "status": "sold",
+   "starting_price": "25.00",
+   "extended_end_time": "2023-12-08T18:13:49.307Z",
+   "cover_thumbnail": "https://images-cdn.auctionmobility.com/is3/auctionmobility-static/Wui8-1-NERL3/1-8DT8SX/19_1.jpg",
+   "live_bid_timed_count": 54,
+   "timed_auction_bid": {
+    "amount": "245000.00",
+    "created_at": null
+   },
+   "auction": {
+    "row_id": "1-84OYL5",
+    "auction_type": "timed",
+    "title": "Geared Online | December",
+    "time_start": "2023-12-04T17:00:00.000Z",
+    "duration": {
+     "days": 4
+    },
+    "currency_code": "USD"
+   }
+  },
+  {
+   "row_id": "1-8DT8U9",
+   "lot_number": 43,
+   "title": "1973 Porsche 911 Carrera RS 2.7 Lightweight",
+   "status": "reserve_not_met",
+   "starting_price": "650000.00",
+   "extended_end_time": "2023-12-08T19:48:00.000Z",
+   "cover_thumbnail": "https://images-cdn.auctionmobility.com/is3/auctionmobility-static/zx5P-1-NERL3/1-8DT8U9/43_1.jpg",
+   "live_bid_timed_count": 36,
+   "timed_auction_bid": null,
+   "auction": {
+    "row_id": "1-84OYL5",
+    "auction_type": "timed",
+    "title": "Geared Online | December",
+    "time_start": "2023-12-04T17:00:00.000Z",
+    "duration": {
+     "days": 4
+    },
+    "currency_code": "USD"
+   }
+  }
+ ]
+}

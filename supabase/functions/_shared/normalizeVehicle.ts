@@ -315,15 +315,25 @@ export function normalizeDrivetrain(dt: string | null | undefined): string | nul
   return DRIVETRAIN_MAP[trimmed.toLowerCase()] || trimmed;
 }
 
+/** Label words that can lead a chassis/VIN value ("Chassis no.", "No.", "VIN #"). */
+const VIN_LEAD_LABEL = /^(?:(?:vin|chassis|frame|serial|car)\s*(?:no\b\.?|number\b|num\b\.?|#)?\s*[:#]?\s*|(?:no\b\.?|number\b|#)\s*[:#]?\s*)+/i;
+/** A following label ends the value ("X Engine no. Y", "X Body no. Y"). */
+const VIN_TRAIL_LABEL = /\s*\b(?:engine|eng\.|motor|body|gearbox|transmission|coachwork|chassis|frame|registration|reg\.)\b.*$/i;
+
 /**
- * Normalize a VIN: uppercase, trim, validate length.
- * Returns null for invalid/placeholder VINs.
+ * Normalize a VIN or chassis number: drop a leading label ("Chassis no.", "No."), cut at a following label ("Engine no."),
+ * remove separators (space, dash, dot, slash), uppercase. Never deletes letters: a value with anything else left
+ * (words, "|", "$") is not a chassis number and returns null, and a 17-character VIN holding I, O or Q is invalid.
+ * Returns null for invalid/placeholder values.
  */
 export function normalizeVin(vin: string | null | undefined): string | null {
   if (!vin || typeof vin !== 'string') return null;
-  const cleaned = vin.trim().toUpperCase().replace(/[^A-HJ-NPR-Z0-9]/g, '');
+  const value = vin.trim().replace(VIN_LEAD_LABEL, '').replace(VIN_TRAIL_LABEL, '');
+  const cleaned = value.toUpperCase().replace(/[\s.\/-]+/g, '');
+  if (!/^[A-Z0-9]+$/.test(cleaned)) return null;
   // VINs are 17 chars for modern, 6-13 for classics
   if (cleaned.length < 6 || cleaned.length > 17) return null;
+  if (cleaned.length === 17 && /[IOQ]/.test(cleaned)) return null;
   // Reject obvious placeholders
   if (/^[0]+$/.test(cleaned) || /^[X]+$/i.test(cleaned) || cleaned === 'UNKNOWN') return null;
   return cleaned;

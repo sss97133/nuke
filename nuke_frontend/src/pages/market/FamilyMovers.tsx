@@ -601,13 +601,13 @@ export default function FamilyMovers({
   onMoversData?: (data: ShareMovers | null, horizon: MoverHorizon, baseline: BaselineHorizon) => void;
 }) {
   const [internalHorizon, setInternalHorizon] = useState<MoverHorizon>(controlledHorizon ?? '1y');
-  const horizon = controlledHorizon ?? internalHorizon;
+  const requestedHorizon = controlledHorizon ?? internalHorizon;
   const setHorizon = (h: MoverHorizon) => {
     setInternalHorizon(h);
     onHorizonChange?.(h);
   };
   const [internalBaseline, setInternalBaseline] = useState<BaselineHorizon>(controlledBaseline ?? 'prior');
-  const baselineHorizon = controlledBaseline ?? internalBaseline;
+  const requestedBaseline = controlledBaseline ?? internalBaseline;
   const setBaselineHorizon = (b: BaselineHorizon) => {
     setInternalBaseline(b);
     onBaselineHorizonChange?.(b);
@@ -638,42 +638,35 @@ export default function FamilyMovers({
     };
   }, [infoOpen]);
 
-  const [data, setData] = useState<ShareMovers | null>(null);
-  const [initialReady, setInitialReady] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [bins, setBins] = useState<Map<string, number[]>>(new Map());
-
+  // Keep the period attached to its answer while a new selection is pending or fails.
+  const [receipt, setReceipt] = useState<{ data: ShareMovers; horizon: MoverHorizon; baseline: BaselineHorizon } | null>(null);
+  const [finishedKey, setFinishedKey] = useState<string | null>(null);
+  const requestKey = `${requestedHorizon}|${requestedBaseline}`;
+  const horizon = receipt?.horizon ?? requestedHorizon;
+  const baselineHorizon = receipt?.baseline ?? requestedBaseline;
+  const data = receipt?.data ?? null;
   const isCustomBase = baselineHorizon !== 'prior' && baselineHorizon !== horizon && !(horizon === 'upcoming' && baselineHorizon === '1m');
+  const pendingSelection = !receipt || receipt.horizon !== requestedHorizon || receipt.baseline !== requestedBaseline;
+  const loading = finishedKey !== requestKey;
+  const [bins, setBins] = useState<Map<string, number[]>>(new Map());
 
   useEffect(() => {
     let live = true;
-    setLoading(true);
-    if (!isCustomBase) {
-      readShareMovers(horizon).then((r) => {
-        if (!live) return;
-        setData(r);
-        onMoversData?.(r, horizon, baselineHorizon);
-        if (horizon === '1y' && r && (r.gaining.length > 0 || r.losing.length > 0)) {
-          setInitialReady(true);
-        } else if (r) {
-          setInitialReady(true);
-        }
-        setLoading(false);
-      });
-    } else {
-      const baseKey = baselineHorizon as Exclude<MoverHorizon, 'upcoming'>;
-      Promise.all([readShareMovers(horizon), readShareMovers(baseKey)]).then(async ([recentRes, baseRes]) => {
-        if (!live) return;
-        const combined = await resolveMoverLabels(recentRes && baseRes ? combineShareMovers(recentRes, baseRes, horizon, baseKey) : recentRes);
-        if (!live) return;
-        setData(combined);
-        onMoversData?.(combined, horizon, baselineHorizon);
-        if (combined) setInitialReady(true);
-        setLoading(false);
-      });
-    }
+    const custom = requestedBaseline !== 'prior' && requestedBaseline !== requestedHorizon
+      && !(requestedHorizon === 'upcoming' && requestedBaseline === '1m');
+    const read = custom
+      ? Promise.all([readShareMovers(requestedHorizon), readShareMovers(requestedBaseline as Exclude<MoverHorizon, 'upcoming'>)])
+        .then(([recent, base]) => resolveMoverLabels(recent && base
+          ? combineShareMovers(recent, base, requestedHorizon, requestedBaseline as Exclude<MoverHorizon, 'upcoming'>) : null))
+      : readShareMovers(requestedHorizon);
+    read.then((answer) => {
+      if (!live) return;
+      if (answer) setReceipt({ data: answer, horizon: requestedHorizon, baseline: requestedBaseline });
+      onMoversData?.(answer, requestedHorizon, requestedBaseline);
+      setFinishedKey(requestKey);
+    });
     return () => { live = false; };
-  }, [horizon, baselineHorizon, isCustomBase]);
+  }, [requestedHorizon, requestedBaseline, requestKey]);
 
   useEffect(() => {
     if (horizon !== '1y' || isCustomBase) return;
@@ -684,7 +677,6 @@ export default function FamilyMovers({
     return () => { live = false; };
   }, [data, horizon, isCustomBase]);
 
-  if (!initialReady && (!data || (!data.gaining.length && !data.losing.length))) return null;
   if (!data) return null;
 
   const meta = MOVER_HORIZONS.find((h) => h.key === horizon) ?? MOVER_HORIZONS[6];
@@ -703,7 +695,7 @@ export default function FamilyMovers({
     ? `${isUpcoming ? 'Upcoming supply' : 'Sales'} in ${meta.recentUnit} (${meta.label}) against ${baseMeta.recentUnit} (${baseMeta.label}) baseline`
     : meta.windowLabel;
 
-  const row = (m: ShareMover, dir: 'up' | 'down') => {
+  const row = (m: ShareMover, dir: 'up' | 'down', lead: boolean) => {
     const key = `${m.brand}|${m.family_key}`;
     const rowBins = m.bins ?? (horizon === '1y' && !isCustomBase ? bins.get(key) : undefined);
     const countsText = isCustomBase && baseMeta
@@ -724,12 +716,18 @@ export default function FamilyMovers({
       <span className="map-movers2__counts">{countsText}</span>
       <span className="map-movers2__price">{m.avg_price_move == null ? '' : `${priceLabel} ${pct(m.avg_price_move)}`}</span>
       {rowBins ? <Spark bins={rowBins} direction={dir} /> : <span />}
+      {!isUpcoming && <span className="map-movers2__investigation">
+        <span>{!lead ? '' : m.avg_price_move == null || m.avg_price_move === 0
+          ? 'Which years and configurations account for the sales change?'
+          : `${m.avg_price_move < 0 ? 'Lower' : 'Higher'} average amounts: a different vehicle mix, or changed prices for similar cars?`}</span>
+        <span className="map-movers2__action">Inspect sales →</span>
+      </span>}
     </button>;
   };
 
   const side = (title: string, list: ShareMover[], dir: 'up' | 'down') => <div className="map-movers2__side">
     <div className="map-movers2__title">{title}</div>
-    {list.length ? list.map((m) => row(m, dir)) : <div className="map-movers2__none">{loading ? 'reading window…' : 'no real changes'}</div>}
+    {list.length ? list.map((m, index) => row(m, dir, index === 0)) : <div className="map-movers2__none">{loading ? 'reading window…' : 'no qualifying changes'}</div>}
   </div>;
 
   return <div className="map-movers2" role="group" aria-label="Model families selling more and less">
@@ -770,9 +768,9 @@ export default function FamilyMovers({
                 <>
                   {activeWindowProse}, after taking out overall upcoming supply pace ({pct(paceBatMove)},{' '}
                   {data.bat.sold_prior_12m.toLocaleString('en-US')} sold → {data.bat.sold_12m.toLocaleString('en-US')} upcoming). A family is
-                  listed only when its upcoming wave is bigger than luck explains; the bar is the likely range, from half the pace (−50%) to
+                  listed only when it passes the reader's count and statistical thresholds; the bar is the estimated range, from half the pace (−50%) to
                   twice the pace (+100%). {data.significant.toLocaleString('en-US')} of {data.eligible.toLocaleString('en-US')} families with{' '}
-                  {data.min_sales}+ lots each {meta.eachWindowLabel} shifted for real ({data.families.toLocaleString('en-US')} families read).
+                  {data.min_sales}+ lots each {meta.eachWindowLabel} passed selection ({data.families.toLocaleString('en-US')} families read).
                   Avg ask = live current bids, catalog mid-estimates, and active classified asks against recent sold prices. Sources:{' '}
                   {data.sources
                     ? `${data.sources.bat_live.toLocaleString('en-US')} live Bring a Trailer auctions, ${data.sources.auction_calendar.toLocaleString('en-US')} scheduled auction calendar lots${data.sources.facebook_marketplace > 0 ? `, and ${data.sources.facebook_marketplace.toLocaleString('en-US')} active Facebook Marketplace captures` : ''}.`
@@ -782,9 +780,9 @@ export default function FamilyMovers({
                 <>
                   {activeWindowProse}, after taking out the market's own growth ({pct(paceBatMove)},{' '}
                   {data.bat.sold_prior_12m.toLocaleString('en-US')} → {data.bat.sold_12m.toLocaleString('en-US')}). A family is listed only when its
-                  change is bigger than luck explains; the bar is the likely range, from half as many sales (−50%) to twice as many (+100%).
+                  change passes the reader's count and statistical thresholds; the bar is the estimated range, from half as many sales (−50%) to twice as many (+100%).
                   {' '}{data.significant.toLocaleString('en-US')} of {data.eligible.toLocaleString('en-US')} families with {data.min_sales}+ measured sales each
-                  {' '}{meta.eachWindowLabel} changed for real ({data.families.toLocaleString('en-US')} families read). Avg sale = dollars divided by cars sold, so it
+                  {' '}{meta.eachWindowLabel} passed selection ({data.families.toLocaleString('en-US')} families read). Avg sale = dollars divided by cars sold, so it
                   moves with which cars sold. Measured at auction houses we hold in full both years: today Bring a Trailer, Mecum and Bonhams.
                 </>
               )}
@@ -805,7 +803,7 @@ export default function FamilyMovers({
         <div className="map-movers2__dial" role="group" aria-label="Relativity time horizon">
           <span className="map-movers2__dial-tag" aria-hidden="true">WINDOW</span>
           {MOVER_HORIZONS.map((h) => {
-            const active = h.key === horizon;
+            const active = h.key === requestedHorizon;
             return (
               <button
                 key={h.key}
@@ -823,9 +821,10 @@ export default function FamilyMovers({
         <div className="map-movers2__vs-dial" role="group" aria-label="Relativity baseline window">
           <span className="map-movers2__dial-tag" aria-hidden="true">VS</span>
           {BASELINE_HORIZONS.map((b) => {
-            const isMatchedPrior = b.key === 'prior' && (!isCustomBase);
-            const active = isMatchedPrior || (isCustomBase && b.key === baselineHorizon);
-            const disabled = b.key !== 'prior' && b.key === horizon;
+            const requestedCustom = requestedBaseline !== 'prior' && requestedBaseline !== requestedHorizon && !(requestedHorizon === 'upcoming' && requestedBaseline === '1m');
+            const isMatchedPrior = b.key === 'prior' && !requestedCustom;
+            const active = isMatchedPrior || (requestedCustom && b.key === requestedBaseline);
+            const disabled = b.key !== 'prior' && b.key === requestedHorizon;
             return (
               <button
                 key={b.key}
@@ -843,9 +842,12 @@ export default function FamilyMovers({
         </div>
       </div>
     </div>
+    {pendingSelection && <div className="map-movers2__none" role="status">
+      {loading ? 'Reading selected comparison…' : 'Selected comparison unavailable.'} Showing the last successful comparison.
+    </div>}
     <div className="map-movers2__sides">
-      {side(meta.gainingTitle, data.gaining, 'up')}
-      {side(meta.losingTitle, data.losing, 'down')}
+      {side(isUpcoming ? meta.gainingTitle : 'Outpacing the market', data.gaining, 'up')}
+      {side(isUpcoming ? meta.losingTitle : 'Trailing the market', data.losing, 'down')}
     </div>
   </div>;
 }

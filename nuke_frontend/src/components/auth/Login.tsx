@@ -15,6 +15,7 @@ const Login = () => {
   const [message, setMessage] = useState<string | null>(null);
   const location = useLocation();
   const [searchParams] = useSearchParams();
+  const accountingInvite = searchParams.get('returnUrl') === '/accounting' && searchParams.get('provider') === 'apple';
   const [mode, setMode] = useState<'signin' | 'signup'>(() => {
     const modeParam = searchParams.get('mode');
     if (modeParam === 'signup' || location.pathname === '/signup') return 'signup';
@@ -250,9 +251,26 @@ const Login = () => {
           <div style={{ width: '320px' }}>
             {/* Header */}
             <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-              <h1 className="heading-1" style={{ marginBottom: '8px' }}>Nuke</h1>
-              <p className="text text-muted">An observational ledger for physical assets</p>
+              <h1 className="heading-1" style={{ marginBottom: '8px' }}>{accountingInvite ? 'Accounting access is ready' : 'Nuke'}</h1>
+              <p className="text text-muted">{accountingInvite ? 'Sign in with Apple to open your shared Nuke books.' : 'An observational ledger for physical assets'}</p>
             </div>
+
+            {accountingInvite ? (
+              <>
+                {error && <div className="alert alert-error" role="alert" style={{ marginBottom: '16px' }}>{error}</div>}
+                <button
+                  onClick={handleAppleLogin}
+                  className="button button-primary w-full"
+                  disabled={loading}
+                >
+                  {loading ? 'Connecting...' : 'Continue with Apple'}
+                </button>
+                <p className="text text-muted" style={{ fontSize: '11px', textAlign: 'center', marginTop: '16px' }}>
+                  Use the Apple sign-in linked to your existing Nuke account. You’ll return to Accounting after sign-in.
+                </p>
+              </>
+            ) : (
+              <>
 
             {/* Sign in / Sign up toggle */}
             <div style={{
@@ -521,6 +539,8 @@ const Login = () => {
               <p style={{ fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center', margin: 0 }}>
                 Phone sign-in creates an account if you don't have one.
               </p>
+            )}
+              </>
             )}
           </div>
         </div>

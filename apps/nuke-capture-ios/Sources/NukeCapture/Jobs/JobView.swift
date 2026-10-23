@@ -79,6 +79,8 @@ struct JobView: View {
     }
 
     private func load() async {
+        // Every reader that does not depend on another starts at once; only facility (needs the
+        // offers' requirements) and the supplier rows (need the publication's party) wait.
         async let p = JobReaders.jobPath(workOrderId: workOrderId)
         async let r = JobReaders.resources(workOrderId: workOrderId)
         async let q = JobReaders.quotes(workOrderId: workOrderId)
@@ -89,6 +91,8 @@ struct JobView: View {
         async let w = ProviderPlaceReaders.read(workOrderId: workOrderId)
         async let e = SupabaseService.currentUserId == nil ? JobLoad<EvidenceCandidates>.loading
             : await CloseoutReaders.evidenceCandidates(workOrderId: workOrderId)
+        async let ops = IssueQuoteReaders.operations(workOrderId: workOrderId)
+        async let pub = PublicationReaders.read(workOrderId: workOrderId)
         let loaded = await (p, r, q, o, i)
         invoices = await v
         evidence = await e
@@ -99,14 +103,17 @@ struct JobView: View {
         quotes = loaded.2
         offers = loaded.3
         inspections = loaded.4
-        operations = await IssueQuoteReaders.operations(workOrderId: workOrderId)
         let requirements: [RequirementOffers] = { if case .loaded(let o) = loaded.3 { return o.requirements } else { return [] } }()
-        facility = await FacilityReaders.job(workOrderId: workOrderId, requirements: requirements)
-        publication = await PublicationReaders.read(workOrderId: workOrderId)
-        // The customer sees which businesses supplied the job's needs before; rows come from the open-requirements reader.
-        if case .loaded(let pub) = publication, pub.party, case .loaded(let page) = await OfferReaders.openRequirements(limit: 100) {
-            supplierRows = page.rows.filter { $0.workOrderId == workOrderId }
+        async let fac = FacilityReaders.job(workOrderId: workOrderId, requirements: requirements)
+        operations = await ops
+        publication = await pub
+        // The customer sees which businesses supplied the job's needs before: this job's open
+        // requirements, filtered on the server (falls back to the marketplace page filtered here).
+        if case .loaded(let pubRead) = publication, pubRead.party,
+           case .loaded(let page) = await OfferReaders.openRequirements(workOrderId: workOrderId) {
+            supplierRows = page.rows
         }
+        facility = await fac
     }
 }
 

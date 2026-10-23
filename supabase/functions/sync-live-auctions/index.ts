@@ -9,17 +9,20 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
  *   - BaT: Scrapes auctionsCurrentInitialData from /auctions/ page (no API key needed)
  *   - Collecting Cars: the site's public Typesense listing collection (production_listings)
  *   - PCarMarket: its server-rendered live auction board (direct fetch); bids of lots that moved from the lot page
- *   - Bonhams: its public Typesense lot index, open Cars sales
+ *   - Bonhams: its public Typesense sale and lot index; bids of its online (timed) sales from its bidding platform
+ *     (live.bonhams.com); lots of in-room catalog sales are written 'upcoming', never live
+ *   - Broad Arrow: its bidding site's timed online sales (sale list hourly, lot list with top bids every run)
+ *   - Gooding: its bidding platform's open timed lots (bid.goodingco.com /ajax/lots JSON), identity from its catalog
  *   - Cars & Bids: Uses Firecrawl (Cloudflare protected)
- *   - Mecum, Barrett-Jackson, RM Sotheby's, Gooding: Firecrawl scrape + extract
- * Collecting Cars, PCarMarket and Bonhams boards are complete lists: after the vehicles upsert each is handed to
+ *   - Mecum, Barrett-Jackson: Firecrawl scrape + extract; RM Sotheby's has no readable live bid (see syncRMSothebys)
+ * Collecting Cars, PCarMarket, Bonhams, Broad Arrow and Gooding boards are complete lists: after the vehicles upsert each is handed to
  * live_auction_board_sync, the monitored_auctions schedule writer for those houses (BaT's is bat_live_pull_run).
  *
  * Deploy: supabase functions deploy sync-live-auctions --no-verify-jwt
  *
  * Usage:
  *   POST {"action": "sync"}                      - sync all platforms
- *   POST {"action": "sync", "platform": "bat"}   - sync specific platform (bat, cc, cab, pcarmarket, mecum, barrett-jackson, rm-sothebys, gooding, bonhams)
+ *   POST {"action": "sync", "platform": "bat"}   - sync specific platform (bat, cc, cab, pcarmarket, mecum, barrett-jackson, rm-sothebys, gooding, bonhams, broad-arrow)
  *   POST {"action": "sync", "platforms": ["collecting-cars", "pcarmarket", "bonhams"]} - sync several
  *   POST {"action": "status"}                    - get current live auction stats
  */
@@ -30,8 +33,16 @@ import { archiveFetch } from "../_shared/archiveFetch.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { parseBatIdentityFromUrl, parseBatIdentityFromTitle } from "../_shared/batParser.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
-import { mustWrite } from '../_shared/writeResult.ts';
-import { type BonhamsLotDoc, bonhamsLot, type PcarBoardItem, parsePcarBids, parsePcarBoard } from "./boards.ts";
+import { mustWrite, softWrite } from '../_shared/writeResult.ts';
+import {
+  type BonhamsBidState, type BonhamsLotDoc, type BonhamsSaleDoc, bonhamsLot, bonhamsLotPhase, bonhamsSaleKind,
+  type PcarBoardItem, parseBonhamsBidStates, parsePcarBids, parsePcarBoard,
+} from "./boards.ts";
+import { type AmLotDoc, amOpenTimedSales, amSales, amTimedLot, BROAD_ARROW_BID } from "./boards.ts";
+import {
+  goodingBoardLot, type GoodingCatalogLot, goodingCatalogFor, goodingLinkPlan, type GoodingLot, goodingUrlVariants,
+  type GoodingVehicleRow, goodingWithBidState, parseGoodingLots,
+} from "./boards.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -53,7 +64,10 @@ interface LiveAuction {
   url: string;
   title: string;
   platform: string;
-  auction_end_date: string;
+  /** The house's close for this lot. null when the source does not give one: never estimated (2026-10-22). */
+  auction_end_date: string | null;
+  /** Why auction_end_date is null; written to origin_metadata.auction_end_date_missing_reason. */
+  end_date_missing_reason?: string | null;
   current_bid: number | null;
   bid_count: number | null;
   no_reserve: boolean;
@@ -64,6 +78,8 @@ interface LiveAuction {
   thumbnail_url: string | null;
   external_id: string | null;
   currency?: string | null;
+  /** auction_live unless the house says otherwise: a catalog lot is 'upcoming', a lot whose bidding closed 'ended'. */
+  sale_status?: "auction_live" | "upcoming" | "ended";
   raw_data: Record<string, unknown>;
 }
 
@@ -413,7 +429,10 @@ async function syncViaFirecrawlExtract(
         url,
         title: a.title || externalId,
         platform,
-        auction_end_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        // The extract carries no close time. It used to write now + 7 days, an invented date that comps and the
+        // live board read as the lot's real close (266 Cars & Bids rows superseded 2026-10-22). Unknown stays null.
+        auction_end_date: null,
+        end_date_missing_reason: "firecrawl extract gives no close time",
         current_bid: null,
         bid_count: null,
         no_reserve: false,
@@ -577,92 +596,361 @@ async function syncBarrettJackson(): Promise<{ auctions: LiveAuction[]; error: s
 }
 
 // ============================================
-// RM Sotheby's Sync (Firecrawl)
+// RM Sotheby's: no live-bid source
 // ============================================
 
+// RM's timed online sales list their lots publicly (api/search/SearchLots: estimate, scheduled close, no-reserve), but
+// a lot's current bid reaches its page only over RM's bid socket (wss://bid-service-*.rmsothebys.com/ws/timed/listen/),
+// which closes every connection whose Origin is not RM's own site: "1003 Invalid origin" with no Origin and with
+// https://nuke.ag (2026-10-20). The Firecrawl extract this replaced wrote auction pages as lots with an invented
+// seven-day close. RM's catalog lots come from extract-rmsothebys.
 async function syncRMSothebys(): Promise<{ auctions: LiveAuction[]; error: string | null }> {
-  return syncViaFirecrawlExtract(
-    "rm-sothebys",
-    "https://rmsothebys.com/en/auctions",
-    /rmsothebys\.com\//i,
-    { waitFor: 4000 }
-  );
+  return { auctions: [], error: "RM Sotheby's: no live-bid source (its bid socket admits only rmsothebys.com origins); lots come from extract-rmsothebys" };
 }
 
 // ============================================
-// Gooding Sync (Firecrawl)
+// Gooding Sync (its bidding platform's open timed lots, direct JSON; identity from its catalog)
 // ============================================
 
-async function syncGooding(): Promise<{ auctions: LiveAuction[]; error: string | null }> {
-  return syncViaFirecrawlExtract(
-    "gooding",
-    "https://www.goodingco.com/auctions/",
-    /goodingco\.com\//i,
-    { waitFor: 4000 }
-  );
+const GOODING_BID = "https://bid.goodingco.com";
+const GOODING_CATALOG = "https://cdn.goodingco.com/graphql";
+const GOODING_UA = "NukeListingCollector/1.0 (+https://nuke.ag)";
+const GOODING_LOT_FIELDS = "timed-auction reserve-status absentee-bid highest-live-bid summary";
+const GOODING_BLOCKED = "blocked or rate-limited";
+const GOODING_CATALOG_QUERY = `query GetVehiclesAndFilters($filtersInput: FiltersInput!, $pageNumber: Int, $sortBy: SortBy!, $hitsPerPage: Int) {
+  getVehicles(filtersInput: $filtersInput, pageNumber: $pageNumber, sortBy: $sortBy, updateFilters: false, hitsPerPage: $hitsPerPage) {
+    vehicles { slug title itemType make model modelYear lotNumber hasReservePrice upcomingAuctionEndDate lotAuctionMobilityId auctionAuctionMobilityId cloudinaryImages { public_id } }
+  }
+}`;
+
+// deno-lint-ignore no-explicit-any
+type GoodingDb = { from: (table: string) => any }; // the vehicles reads and fill-only writes below
+
+/** One JSON read from Gooding, politely: our own user agent, one request at a time, a block or rate limit stops the read. */
+async function goodingJson(url: string, init: { method?: string; headers?: Record<string, string>; body?: string } = {}): Promise<unknown> {
+  const res = await fetch(url, { method: init.method, body: init.body, signal: AbortSignal.timeout(20_000), // guardrail-allow: raw-fetch (house JSON API)
+    headers: { "User-Agent": GOODING_UA, Accept: "application/json", ...init.headers } });
+  if (res.status === 403 || res.status === 429) throw new Error(`${new URL(url).host} answered ${res.status} (${GOODING_BLOCKED}); read stopped`);
+  if (!res.ok) throw new Error(`${new URL(url).host} HTTP ${res.status}`);
+  return await res.json();
+}
+
+/**
+ * Gooding's open timed lots (Geared Online and any timed sale) from its bidding platform, bid.goodingco.com: every lot of
+ * a timed sale that has not ended (the lot list), then the open lots' bid box state (leading bid, bid count, the close
+ * each extension moved). Nothing open costs two small requests. In-room sales (Pebble Beach, Amelia, the
+ * Gooding Christie's sales registered through christies.com) take bids only in the room and are not read here. Each open
+ * vehicle lot carries its catalog identity and the catalog lot URL in the spelling vehicles hold; a vehicle that holds the
+ * lot only as discovery_url gets it as listing_url first, so the live upsert updates that vehicle rather than minting a
+ * twin (goodingLinkPlan). The list is complete: lots that left it leave the schedule in live_auction_board_sync.
+ */
+async function syncGooding(
+  supabase: GoodingDb,
+  link: boolean,
+): Promise<{ auctions: LiveAuction[]; error: string | null; write_errors?: string[] }> {
+  try {
+    const now = Date.now();
+    const page = (params: Record<string, string>, o: number) => goodingJson(`${GOODING_BID}/ajax/lots/?${new URLSearchParams({
+      n: "100", order_by: "auction_date lot_number", order: "asc asc", fieldset: GOODING_LOT_FIELDS, paramsType: "server", ...params, o: String(o),
+    })}`);
+    const readAll = async (params: Record<string, string>) => {
+      const out: GoodingLot[] = [];
+      for (let o: number | null = 0, i = 0; o !== null && i < 10; i++) {
+        const p = parseGoodingLots(await page(params, o), now);
+        out.push(...p.lots);
+        o = p.next;
+      }
+      return out;
+    };
+    // the platform's "upcoming" lots are those of sales whose end is still ahead, running sales included
+    const lots = await readAll({ lotsRange: "upcoming", auction_type: "timed timed_then_live" });
+    // the newest timed sale filed as past is read whole only if it still has active lots
+    const newest = parseGoodingLots(await page({ lotsRange: "past", auction_type: "timed timed_then_live", n: "1", order: "desc asc" }, 0), now).lots[0];
+    if (newest?.am_auction_id && (newest.auction_active_lots ?? 0) > 0 && !lots.some((l) => l.am_auction_id === newest.am_auction_id)) {
+      lots.push(...await readAll({ auctionId: newest.am_auction_id }));
+    }
+    const listed = lots.filter((l) => l.phase === "open");
+    const phases = lots.reduce((m, l) => ({ ...m, [l.phase]: (m[l.phase] ?? 0) + 1 }), {} as Record<string, number>);
+    console.log(`[sync-live-auctions] Gooding: ${lots.length} timed-sale lots on bid.goodingco.com ${JSON.stringify(phases)}`);
+    if (!listed.length) return { auctions: [], error: null };
+
+    // The open lots' bid box state (widget/lots, the call the lot page makes; 50 lots a call, 0.6 s apart): the leading
+    // bid, the bid count and the close each extension moved. If it fails, the lot list's bids stand without a count.
+    const states = new Map<string, BonhamsBidState>();
+    let widgetError: string | null = null;
+    try {
+      const bySale = new Map<string, string[]>();
+      for (const l of listed) if (l.am_auction_id) bySale.set(l.am_auction_id, [...(bySale.get(l.am_auction_id) ?? []), l.am_lot_id]);
+      let calls = 0;
+      for (const [sale, ids] of bySale) {
+        for (let i = 0; i < ids.length; i += 50) {
+          if (calls++) await new Promise((r) => setTimeout(r, 600));
+          const body = await goodingJson(`${GOODING_BID}/widget/lots/${encodeURIComponent(sale)}`, {
+            method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ lot_ids: ids.slice(i, i + 50) }),
+          });
+          for (const s of parseBonhamsBidStates(body)) states.set(s.am_lot_id, s);
+        }
+      }
+    } catch (e) {
+      widgetError = e instanceof Error ? e.message : String(e);
+      if (widgetError.includes(GOODING_BLOCKED)) throw e; // a refusal stops the read and is recorded, never worked around
+    }
+    const open = listed.map((l) => goodingWithBidState(l, states.get(l.am_lot_id), now)).filter((l) => l.phase === "open");
+
+    // Catalog identity. ENDING_SOONEST lists lots of sales still ahead first; read until every open lot is matched.
+    const catalog: GoodingCatalogLot[] = [];
+    let catalogError: string | null = null;
+    try {
+      for (let p = 0; p < 8; p++) {
+        const r = await goodingJson(GOODING_CATALOG, {
+          method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer" },
+          body: JSON.stringify({ query: GOODING_CATALOG_QUERY, variables: { filtersInput: {}, pageNumber: p, sortBy: "ENDING_SOONEST", hitsPerPage: 100 } }),
+        }) as { data?: { getVehicles?: { vehicles?: GoodingCatalogLot[] } }; errors?: { message?: string }[] };
+        if (r.errors?.length) throw new Error(r.errors[0].message ?? "GraphQL error");
+        const vs = r.data?.getVehicles?.vehicles ?? [];
+        catalog.push(...vs);
+        if (open.every((l) => goodingCatalogFor(l, catalog)) || vs.length < 100 || vs.some((v) => Number(v.upcomingAuctionEndDate) >= 9_999_999_999_999)) break;
+      }
+    } catch (e) {
+      catalogError = e instanceof Error ? e.message : String(e); // the lots still read, under the platform's lot pages
+      if (catalogError.includes(GOODING_BLOCKED)) throw e;
+    }
+    const rows = open.map((lot) => ({ lot, cat: goodingCatalogFor(lot, catalog) }))
+      .map((r) => ({ ...r, ...goodingBoardLot(r.lot, r.cat) }))
+      .filter((r) => r.vehicle && r.url);
+
+    // The vehicles already holding these lots, under either URL column and every spelling.
+    const held: GoodingVehicleRow[] = [];
+    const spellings = [...new Set(rows.flatMap((r) => goodingUrlVariants(r.url!)))];
+    for (let i = 0; i < spellings.length; i += 50) {
+      const chunk = spellings.slice(i, i + 50);
+      for (const column of ["listing_url", "discovery_url"]) {
+        const { data, error } = await supabase.from("vehicles").select("id, listing_url, discovery_url").in(column, chunk).is("deleted_at", null);
+        if (error) throw new Error(`Gooding vehicle lookup: ${error.message}`);
+        held.push(...(data ?? []) as GoodingVehicleRow[]);
+      }
+    }
+    const writeErrors: string[] = [];
+    const auctions: LiveAuction[] = [];
+    for (const r of rows) {
+      const plan = goodingLinkPlan(r.url!, held);
+      if (plan.link === "claim" && link) {
+        // fill only: the vehicle holds this lot as discovery_url and has no listing_url
+        const claimed = await supabase.from("vehicles").update({ listing_url: plan.url }).eq("id", plan.vehicle_id!).is("listing_url", null);
+        if (softWrite(`gooding listing_url claim ${plan.vehicle_id}`, claimed, writeErrors)) continue; // never write a twin
+      }
+      const ident = r.cat ? { year: r.year, make: r.make, model: r.model } : parseBatIdentityFromTitle(r.title, null);
+      auctions.push({
+        url: plan.url,
+        title: r.title,
+        platform: "gooding",
+        auction_end_date: r.lot.ends ?? "",
+        current_bid: r.lot.current_bid,
+        bid_count: r.lot.bid_count,
+        currency: r.lot.currency,
+        no_reserve: r.no_reserve,
+        reserve_met: r.lot.reserve_met,
+        year: ident.year,
+        make: ident.make,
+        model: ident.model,
+        thumbnail_url: r.image,
+        external_id: r.lot.am_lot_id,
+        raw_data: {
+          source: "gooding_am_lots", sale: r.lot.sale, am_auction_id: r.lot.am_auction_id, lot_number: r.lot.lot_number,
+          bid_url: r.lot.bid_url, bid_at: r.lot.bid_at, opening_bid: r.lot.opening_bid, estimate_low: r.lot.estimate_low,
+          estimate_high: r.lot.estimate_high, item_type: r.item_type, catalog: r.cat ? "matched" : (catalogError ?? "unmatched"),
+          bid_state: states.has(r.lot.am_lot_id) ? "bid_box" : (widgetError ?? "lot_list"),
+          link: plan.link, state_sequence: r.lot.state_sequence, synced_at: new Date().toISOString(),
+        },
+      });
+    }
+    console.log(`[sync-live-auctions] Gooding: ${open.length} open lots, ${auctions.length} vehicles on the board` +
+      `${catalogError ? ` (catalog: ${catalogError})` : ""}${widgetError ? ` (bid box: ${widgetError})` : ""}`);
+    return { auctions, error: null, write_errors: writeErrors };
+  } catch (e: unknown) {
+    return { auctions: [], error: `Gooding sync failed: ${e instanceof Error ? e.message : String(e)}` };
+  }
+}
+
+/**
+ * Gooding lots no vehicle held were just written under their catalog URL: give that row the same discovery_url (fill only),
+ * so extract-gooding, which resolves a lot by discovery_url, enriches the row instead of inserting a twin.
+ */
+async function goodingFillDiscovery(supabase: GoodingDb, auctions: LiveAuction[]): Promise<string[]> {
+  const errors: string[] = [];
+  // catalog lot URLs only: a lot the catalog did not match is written under the platform's lot page, which no intake keys on
+  for (const a of auctions.filter((x) => x.raw_data.link === "new" && goodingUrlVariants(x.url).length > 1)) {
+    softWrite(`gooding discovery_url fill ${a.url}`, await supabase.from("vehicles").update({ discovery_url: a.url })
+      .eq("listing_url", a.url).is("discovery_url", null).is("deleted_at", null), errors);
+  }
+  return errors;
 }
 
 // ============================================
-// Bonhams Motoring Sync (public Typesense lot index, open Cars sales)
+// Bonhams Motoring Sync (public Typesense sale + lot index; bids from its bidding platform)
 // ============================================
 
 const BONHAMS_TS_HOST = "https://api01.bonhams.com/search-proxy/collections";
 const BONHAMS_TS_KEY = "7YZqOyG0twgst4ACc2VuCyZxpGAYzM0weFTLCC20FQY"; // the site's public search-only key (extract-bonhams-typesense)
+// Bonhams' bidding platform (Auction Mobility): the call the lot page's own bid box makes for a sale's lots
+const BONHAMS_BIDS_URL = "https://live.bonhams.com/widget/lots/";
+const BONHAMS_UA = "NukeLiveBidReader/1.0 (+https://nuke.ag)";
 
+/**
+ * Only an online (timed) sale with bidding open carries live bids: each lot's leading bid, bid count and its own close
+ * (moved by extensions) come from the bidding platform, 50 lots a call, 0.6 s apart; a refused call stops the read.
+ * An in-room sale (Typesense auctionType PUBLIC; the platform's sale type 'live') has estimates and a sale date only:
+ * its lots are written 'upcoming' and stay on the auction calendar, never on the live board.
+ */
 async function syncBonhams(): Promise<{ auctions: LiveAuction[]; error: string | null }> {
   try {
     const get = async (collection: string, params: Record<string, string>) => {
       const res = await fetch(`${BONHAMS_TS_HOST}/${collection}/documents/search?${new URLSearchParams(params)}`, { // guardrail-allow: raw-fetch (house JSON API)
-        headers: { "X-TYPESENSE-API-KEY": BONHAMS_TS_KEY, Accept: "application/json" },
+        headers: { "X-TYPESENSE-API-KEY": BONHAMS_TS_KEY, Accept: "application/json", "User-Agent": BONHAMS_UA },
       });
       if (!res.ok) throw new Error(`Bonhams Typesense ${collection} HTTP ${res.status}`);
       return await res.json();
     };
+    const bidStates = async (amSale: string, amLots: string[]) => {
+      const out = new Map<string, BonhamsBidState>();
+      for (let i = 0; i < amLots.length; i += 50) {
+        if (i > 0) await new Promise((r) => setTimeout(r, 600));
+        const res = await fetch(`${BONHAMS_BIDS_URL}${encodeURIComponent(amSale)}`, { // guardrail-allow: raw-fetch (house JSON API)
+          method: "POST",
+          headers: { "Content-Type": "application/json", Accept: "application/json", "User-Agent": BONHAMS_UA },
+          body: JSON.stringify({ lot_ids: amLots.slice(i, i + 50) }),
+          signal: AbortSignal.timeout(15_000),
+        });
+        if (!res.ok) throw new Error(`Bonhams bidding platform sale ${amSale} HTTP ${res.status}`);
+        for (const s of parseBonhamsBidStates(await res.json())) out.set(s.am_lot_id, s);
+      }
+      return out;
+    };
     const today = new Date().toISOString().slice(0, 10);
-    const a = await get("auctions", { q: "*", query_by: "brand", per_page: "60", filter_by: "departments.code:=MOT-CAR", sort_by: "dates.end.timestamp:desc" });
+    const now = Date.now();
+    const a = await get("auctions", { q: "*", query_by: "brand", per_page: "60", filter_by: "departments.code:=[MOT-CAR,MOT-CYC]", sort_by: "dates.end.timestamp:desc" });
     // deno-lint-ignore no-explicit-any
-    const sales = (a.hits ?? []).map((h: any) => h.document).filter((d: any) => !d.flags?.isAuctionEnded && String(d.dates?.end?.datetime ?? "").slice(0, 10) >= today);
+    const sales = (a.hits ?? []).map((h: any) => h.document as BonhamsSaleDoc)
+      .filter((d: BonhamsSaleDoc) => bonhamsSaleKind(d) !== "ended" && String(d.dates?.end?.datetime ?? "").slice(0, 10) >= today);
     const auctions: LiveAuction[] = [];
+    const kinds: string[] = [];
     for (const sale of sales) {
+      const kind = bonhamsSaleKind(sale);
+      kinds.push(`${sale.id}:${kind}`);
+      // an online sale's motorcycles bid live too; in-room catalog lots are read for cars only, as before
+      const depts = kind === "live_bid" ? "[MOT-CAR,MOT-CYC]" : "MOT-CAR";
+      const docs: BonhamsLotDoc[] = [];
       for (let page = 1; page <= 4; page++) {
-        const r = await get("lots", { q: "*", query_by: "title", per_page: "250", page: String(page), filter_by: `auctionId:=${sale.id} && department.code:=MOT-CAR` });
+        const r = await get("lots", { q: "*", query_by: "title", per_page: "250", page: String(page), filter_by: `auctionId:=${sale.id} && department.code:=${depts}` });
         // deno-lint-ignore no-explicit-any
-        for (const doc of (r.hits ?? []).map((h: any) => h.document as BonhamsLotDoc)) {
-          if (!doc.lotId || doc.lotId === "0") continue; // not yet catalogued: no lot number, no lot page
-          const lot = bonhamsLot(doc);
-          if (!lot.title || !lot.url.includes("/lot/")) continue;
-          const ident = parseBatIdentityFromTitle(lot.title.replace(/\s+(Chassis|Registration|Frame|Engine) no\..*$/i, ""), null);
-          auctions.push({
-            url: lot.url,
-            title: lot.title,
-            platform: "bonhams",
-            auction_end_date: lot.ends ?? "",
-            current_bid: lot.hammer,
-            bid_count: null,
-            currency: lot.currency,
-            no_reserve: false,
-            reserve_met: null,
-            year: ident.year,
-            make: ident.make,
-            model: ident.model,
-            thumbnail_url: null,
-            external_id: lot.external_id,
-            raw_data: { source: "bonhams_typesense_lots", sale_id: sale.id, sale_title: sale.auctionTitle ?? null, status: lot.status,
-                        estimate_low: lot.estimate_low, estimate_high: lot.estimate_high, synced_at: new Date().toISOString() },
-          });
-        }
+        docs.push(...(r.hits ?? []).map((h: any) => h.document as BonhamsLotDoc));
         if ((r.hits ?? []).length < 250) break;
       }
+      const lots = docs.filter((d) => d.lotId && d.lotId !== "0") // not yet catalogued: no lot number, no lot page
+        .map(bonhamsLot).filter((l) => l.title && l.url.includes("/lot/"));
+      const amSale = lots.find((l) => l.am_sale_id)?.am_sale_id;
+      const states = kind === "live_bid" && amSale
+        ? await bidStates(amSale, lots.flatMap((l) => (l.am_lot_id ? [l.am_lot_id] : [])))
+        : new Map<string, BonhamsBidState>();
+      for (const lot of lots) {
+        const bid = lot.am_lot_id ? states.get(lot.am_lot_id) : undefined;
+        const phase = bonhamsLotPhase(kind, bid, now);
+        const ident = parseBatIdentityFromTitle(lot.title.replace(/\s+(Chassis|Registration|Frame|Engine) no\..*$/i, ""), null);
+        auctions.push({
+          url: lot.url,
+          title: lot.title,
+          platform: "bonhams",
+          auction_end_date: (phase === "upcoming" ? null : bid?.ends) ?? lot.ends ?? "",
+          current_bid: phase === "upcoming" ? null : bid?.current_bid ?? null, // a bid placed; the opening bid is not one
+          bid_count: phase === "upcoming" ? null : bid?.bid_count ?? null,
+          currency: lot.currency ?? bid?.currency ?? null,
+          sale_status: phase === "live" ? "auction_live" : phase === "closed" ? "ended" : "upcoming",
+          no_reserve: lot.no_reserve,
+          reserve_met: null,
+          year: ident.year,
+          make: ident.make,
+          model: ident.model,
+          thumbnail_url: lot.image ?? bid?.image ?? null,
+          external_id: lot.external_id,
+          raw_data: { source: "bonhams_typesense_lots", sale_id: sale.id, sale_title: sale.auctionTitle ?? null, sale_kind: kind,
+                      status: lot.status, estimate_low: lot.estimate_low, estimate_high: lot.estimate_high,
+                      ...(bid ? { bid_source: "bonhams_bidding_platform", bid_status: bid.status, bid_at: bid.bid_at, opening_bid: bid.opening_bid } : {}),
+                      synced_at: new Date().toISOString() },
+        });
+      }
     }
-    console.log(`[sync-live-auctions] Bonhams: ${sales.length} open Cars sales, ${auctions.length} lots`);
+    const live = auctions.filter((x) => x.sale_status === "auction_live");
+    console.log(`[sync-live-auctions] Bonhams: ${sales.length} open motoring sales (${kinds.join(", ")}), ${auctions.length} lots, ${live.length} live (${live.filter((x) => x.current_bid).length} with a bid)`);
     return { auctions, error: null };
   } catch (e: unknown) {
     return { auctions: [], error: `Bonhams sync failed: ${e instanceof Error ? e.message : String(e)}` };
   }
 }
 
+// ============================================
+// Broad Arrow Sync (timed online sales on its bidding site)
+// ============================================
+
+// Its in-room sales are bid only in the room; its timed online sales (car sales such as "Global Icons: Zoute Online",
+// and memorabilia and art sales, whose lots are not vehicles) show each lot's top bid and its soft-close end. The sale
+// list changes when a sale is scheduled, so an hour-old capture of it serves; each open sale's lot list is read fresh.
+const BA_UA = "NukeListingCollector/1.0 (+https://nuke.ag)";
+
+async function syncBroadArrow(): Promise<{ auctions: LiveAuction[]; error: string | null }> {
+  try {
+    const now = Date.now();
+    // A direct fetch, not archiveFetch: the shared fetcher mistakes this page's own "log in" strings for a login wall
+    // (AUTH_REQUIRED, 9 failed runs on 2026-10-20) and the page is public.
+    const home = await fetch(`${BROAD_ARROW_BID}/`, { headers: { "User-Agent": BA_UA, Accept: "text/html" }, redirect: "manual", signal: AbortSignal.timeout(20_000) }); // guardrail-allow: raw-fetch (house public page)
+    if (!home.ok) return { auctions: [], error: `Broad Arrow sale list: HTTP ${home.status}` };
+    const html = await home.text();
+    const all = amSales(html);
+    if (all.length === 0) return { auctions: [], error: "Broad Arrow sale list: no sales parsed" };
+    const sales = amOpenTimedSales(all, now);
+    const auctions: LiveAuction[] = [];
+    for (const sale of sales) {
+      for (let o = 0, total = 1; o < total && o < 1000; o += 100) {
+        const q = new URLSearchParams({ n: "100", o: String(o), order_by: "auction_date lot_number", order: "desc asc",
+          fieldset: "timed-auction reserve-status summary", auctionId: sale.row_id, paramsType: "server" });
+        const res = await fetch(`${BROAD_ARROW_BID}/ajax/lots/?${q}`, { headers: { "User-Agent": BA_UA, Accept: "application/json" } }); // guardrail-allow: raw-fetch (house JSON API)
+        if (!res.ok) throw new Error(`lots of sale ${sale.row_id}: HTTP ${res.status}`);
+        const page = await res.json();
+        total = Number(page?.query_info?.total_num_results ?? 0);
+        for (const doc of (page?.result_page ?? []) as AmLotDoc[]) {
+          const lot = amTimedLot(doc, sale, now);
+          if (!lot.open || !lot.vehicle) continue;
+          const ident = parseBatIdentityFromTitle(lot.title, null);
+          auctions.push({
+            url: lot.url,
+            title: lot.title,
+            platform: "broad-arrow",
+            auction_end_date: lot.ends ?? "",
+            current_bid: lot.current_bid,
+            bid_count: null, // the lot list states no bid count
+            currency: lot.currency,
+            no_reserve: false, // not stated on the lot list (reserve_met is kept)
+            reserve_met: lot.reserve_met,
+            year: ident.year,
+            make: ident.make,
+            model: ident.model,
+            thumbnail_url: lot.image_url,
+            external_id: lot.external_id,
+            raw_data: { source: "broad_arrow_timed_lots", sale_id: sale.row_id, sale_title: sale.title ?? null, lot_number: lot.lot_number,
+                        status: lot.status, bid_at: lot.bid_at, opening_bid: lot.opening_bid, estimate_low: lot.estimate_low,
+                        estimate_high: lot.estimate_high, synced_at: new Date().toISOString() },
+          });
+        }
+      }
+    }
+    console.log(`[sync-live-auctions] Broad Arrow: ${all.length} sales listed, ${sales.length} timed sales open, ${auctions.length} vehicle lots open`);
+    return { auctions, error: null };
+  } catch (e: unknown) {
+    return { auctions: [], error: `Broad Arrow sync failed: ${e instanceof Error ? e.message : String(e)}` };
+  }
+}
+
 /** The houses whose open board is read complete and scheduled by live_auction_board_sync (slug per platform). */
-const BOARD_SOURCES: Record<string, string> = { "collecting-cars": "collecting-cars", pcarmarket: "pcarmarket", bonhams: "bonhams" };
+const BOARD_SOURCES: Record<string, string> = { "collecting-cars": "collecting-cars", pcarmarket: "pcarmarket", bonhams: "bonhams", "broad-arrow": "broad-arrow", gooding: "gooding" };
 
 // ============================================
 // Cars & Bids Sync (Firecrawl)
@@ -707,21 +995,6 @@ async function syncCarsAndBids(): Promise<{ auctions: LiveAuction[]; error: stri
 
     console.log(`[sync-live-auctions] Cars & Bids: Found ${foundUrls.size} auction URLs`);
 
-    // Try to extract end times from page data (C&B embeds auction end timestamps)
-    // Pattern: data-end-time="...", endTime, auctionEnd, or ISO timestamps near auction IDs
-    const endTimePatterns = [
-      /data-(?:end|auction-end)(?:-time)?=["']([^"']+)["']/gi,
-      /"endTime"\s*:\s*"([^"]+)"/gi,
-      /"auction_end"\s*:\s*"([^"]+)"/gi,
-    ];
-    const globalEndTimes: string[] = [];
-    for (const pattern of endTimePatterns) {
-      let etMatch;
-      while ((etMatch = pattern.exec(html)) !== null) {
-        globalEndTimes.push(etMatch[1]);
-      }
-    }
-
     // Extract auction data from card elements
     const auctions: LiveAuction[] = [];
 
@@ -740,13 +1013,16 @@ async function syncCarsAndBids(): Promise<{ auctions: LiveAuction[]; error: stri
       // C&B auctions typically last 7 days from listing; use parsed end time if found
       const endTimeRegex = new RegExp(`${id}[^}]*?"(?:endTime|end_time|auction_end)"\\s*:\\s*"([^"]+)"`, "i");
       const etMatch = endTimeRegex.exec(html);
-      const endDate = etMatch ? etMatch[1] : (globalEndTimes.shift() || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString());
+      // Only a time keyed to this lot's id is its close. A page-wide list of end times (removed) is not tied to any lot:
+      // shifting from it handed one lot another's close, and with none left it invented now + 7 days (2026-10-22).
+      const endDate = etMatch ? etMatch[1] : null;
 
       auctions.push({
         url,
         title,
         platform: "cars-and-bids",
         auction_end_date: endDate,
+        end_date_missing_reason: endDate ? null : "C&B homepage gives no close time for this lot",
         current_bid: null,
         bid_count: null,
         no_reserve: false, // Would need to parse from page
@@ -796,7 +1072,13 @@ async function syncToDatabase(
   // is a feed or parse fault, not a live lot, and must not become an auction_live placeholder nothing ever ends
   // (a Collecting Cars row read 2027-02-25 for six months, 2026-09-27). Such lots are skipped and named, not capped.
   const horizon = Date.now() + 14 * 86_400_000;
-  const impossible = auctions.filter(a => { const t = Date.parse(a.auction_end_date); return !Number.isFinite(t) || t > horizon; });
+  // A lot whose source gives no close (auction_end_date null, with end_date_missing_reason) is written with a null
+  // end and the reason, never a made-up one; the upsert keeps a close already on record (20261023101500).
+  const impossible = auctions.filter(a => {
+    if (a.auction_end_date === null) return false;
+    const t = Date.parse(a.auction_end_date);
+    return !Number.isFinite(t) || t > horizon;
+  });
   if (impossible.length > 0) {
     console.warn(`[sync-live-auctions] ${platform}: ${impossible.length} lots skipped, auction_end_date unparseable or more than 14 days out: ${impossible.slice(0, 3).map(a => `${a.url} ${a.auction_end_date}`).join(", ")}`);
   }
@@ -808,8 +1090,8 @@ async function syncToDatabase(
       year: auction.year,
       make: auction.make,
       model: auction.model,
-      auction_status: "active",
-      sale_status: "auction_live",
+      auction_status: auction.sale_status === "ended" ? "ended" : "active",
+      sale_status: auction.sale_status ?? "auction_live",
       auction_end_date: auction.auction_end_date,
       sale_price: auction.current_bid,
       primary_image_url: auction.thumbnail_url || undefined,
@@ -823,6 +1105,9 @@ async function syncToDatabase(
         currency: auction.currency ?? null,
         thumbnail_url: auction.thumbnail_url,
         last_sync: now,
+        auction_end_date_missing_reason: auction.auction_end_date === null
+          ? (auction.end_date_missing_reason ?? "source gives no close time")
+          : null,
         ...auction.raw_data,
       },
       updated_at: now,
@@ -953,6 +1238,7 @@ async function updateSourceRegistry(
     "rm-sothebys": "rm-sothebys",
     "gooding": "gooding",
     "bonhams": "bonhams",
+    "broad-arrow": "broadarrow",
   };
 
   const slug = slugMap[platform];
@@ -1025,6 +1311,7 @@ Deno.serve(async (req) => {
         else if (url.includes("rmsothebys")) platform = "rm-sothebys";
         else if (url.includes("goodingco")) platform = "gooding";
         else if (url.includes("bonhams.com")) platform = "bonhams";
+        else if (/^https?:\/\/([a-z0-9-]+\.)*broadarrowauctions\.com\//i.test(url)) platform = "broad-arrow";
         byPlatform[platform] = (byPlatform[platform] || 0) + 1;
       }
 
@@ -1066,6 +1353,7 @@ Deno.serve(async (req) => {
         "rm-sothebys",
         "gooding",
         "bonhams",
+        "broad-arrow",
       ];
       const platforms: string[] = Array.isArray(body.platforms) && body.platforms.length
         ? body.platforms.map(String)
@@ -1102,7 +1390,7 @@ Deno.serve(async (req) => {
         }
 
         const startTime = Date.now();
-        let syncResult: { auctions: LiveAuction[]; error: string | null };
+        let syncResult: { auctions: LiveAuction[]; error: string | null; write_errors?: string[] };
 
         // Fetch from platform
         switch (platform) {
@@ -1134,10 +1422,13 @@ Deno.serve(async (req) => {
             syncResult = await syncRMSothebys();
             break;
           case "gooding":
-            syncResult = await syncGooding();
+            syncResult = await syncGooding(supabase, !skipVehicleSync);
             break;
           case "bonhams":
             syncResult = await syncBonhams();
+            break;
+          case "broad-arrow":
+            syncResult = await syncBroadArrow();
             break;
           default:
             syncResult = { auctions: [], error: `Unknown platform: ${platform}` };
@@ -1162,6 +1453,7 @@ Deno.serve(async (req) => {
             const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
             const serviceKey = projectSecretKey() ?? "";
             const endingSoon = syncResult.auctions.filter(a => {
+              if (!a.auction_end_date) return false;
               const hoursLeft = (new Date(a.auction_end_date).getTime() - Date.now()) / (1000 * 60 * 60);
               return hoursLeft > 0 && hoursLeft <= 6 && a.current_bid && a.current_bid > 0;
             });
@@ -1185,6 +1477,9 @@ Deno.serve(async (req) => {
         let dbStats = { new_count: 0, updated_count: 0, ended_count: 0, write_errors: [] as string[] };
         if (!skipVehicleSync && !syncResult.error) {
           dbStats = await syncToDatabase(supabase, syncResult.auctions, normalizedPlatform);
+        }
+        if (normalizedPlatform === "gooding" && !skipVehicleSync && !syncResult.error) {
+          dbStats.write_errors.push(...(syncResult.write_errors ?? []), ...await goodingFillDiscovery(supabase, syncResult.auctions));
         }
 
         // Board-synced houses: the same complete board goes to the monitored_auctions schedule writer; lots whose bid
@@ -1232,13 +1527,16 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Cleanup: mark expired auctions as ended (catches C&B 7-day defaults and any stale auctions)
+      // Cleanup: mark expired auctions as ended (catches C&B 7-day defaults and any stale auctions). 'ended' says the
+      // clock ran out; no reader observed a result here, so it is never written as 'not_sold'.
       try {
         const { count: endedCount } = await supabase
           .from("vehicles")
-          .update({ auction_status: "ended", sale_status: "not_sold" })
+          .update({ auction_status: "ended", sale_status: "ended" })
           .eq("auction_status", "active")
-          .neq("platform_source", "bringatrailer") // BaT soft-close clocks require a native terminal record.
+          // BaT soft-close clocks require a native terminal record. eBay Motors lots are ended by their own reader
+          // (extract-ebay-motors auctions) as 'ended': eBay's API cannot say sold or unsold, so 'not_sold' would be invented.
+          .not("platform_source", "in", "(bringatrailer,ebay-motors)")
           .lt("auction_end_date", new Date().toISOString())
           .not("auction_end_date", "is", null)
           .select("id", { count: "exact", head: true });

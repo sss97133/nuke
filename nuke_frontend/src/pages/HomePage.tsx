@@ -1437,6 +1437,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
   const setDrillStack = useCallback((
     updater: DrillLevel[] | ((prev: DrillLevel[]) => DrillLevel[]),
     axisOverride?: FamilyFacetAxis,
+    viewOverride?: 'sales' | 'names',
   ) => {
     if (axisOverride !== undefined) {
       facetAxisRef.current = axisOverride;
@@ -1447,7 +1448,12 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
     drillStackRef.current = next;
     setDrillStackState(next);
     const axisForUrl = axisOverride !== undefined ? axisOverride : facetAxisRef.current;
-    setSearchParams((curr) => applyDrillStackToSearchParams(curr, next, axisForUrl), { preventScrollReset: true });
+    setSearchParams((curr) => {
+      const params = applyDrillStackToSearchParams(curr, next, axisForUrl);
+      if (viewOverride === 'sales' && params.get('family')) params.set('family_view', 'sales');
+      else params.delete('family_view');
+      return params;
+    }, { preventScrollReset: true });
   }, [setSearchParams]);
   const currentLevel = drillStack[drillStack.length - 1];
   const selectedEra = searchParams.get('era');
@@ -1466,7 +1472,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
   // matchMedia is absent in jsdom and some embedded webviews; without it the page is treated as wide.
   const canMatchMedia = typeof window !== 'undefined' && typeof window.matchMedia === 'function';
   const [isNarrow, setIsNarrow] = useState(() => canMatchMedia && window.matchMedia('(max-width: 640px)').matches);
-  const [phoneBrowseView, setPhoneBrowseView] = useState<'list' | 'map'>('list');
+  const [phoneBrowseView, setPhoneBrowseView] = useState<'list' | 'map'>(() => searchParams.get('family_view') === 'sales' ? 'map' : 'list');
   const phoneList = isNarrow && phoneBrowseView === 'list';
   useEffect(() => {
     if (!canMatchMedia) return;
@@ -1483,40 +1489,32 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
   // Data hooks
   const { data: rawBrandsData, loading: brandsLoading } = useTreemapBrands();
   const refresh = useTreemapRefresh();
-  const [horizon, setHorizon] = useState<MoverHorizon>('1y');
-  const [baselineHorizon, setBaselineHorizon] = useState<BaselineHorizon>('prior');
+  const [requestedHorizon, setHorizon] = useState<MoverHorizon>('1y');
+  const [requestedBaseline, setBaselineHorizon] = useState<BaselineHorizon>('prior');
+  const [moverReceipt, setMoverReceipt] = useState<{ data: ShareMovers; horizon: MoverHorizon; baseline: BaselineHorizon } | null>(null);
+  const horizon = moverReceipt?.horizon ?? '1y';
+  const baselineHorizon = moverReceipt?.baseline ?? 'prior';
+  const moversData = moverReceipt?.data ?? null;
   const isCustomBase = baselineHorizon !== 'prior' && baselineHorizon !== horizon && !(horizon === 'upcoming' && baselineHorizon === '1m');
   // The map's color is each tile's BaT move against BaT overall: the whole venue as the movers read it (every family,
   // makes too small for a tile included), so the map and the movers name one baseline; the brands' own sum until it reads.
-  const [moversData, setMoversData] = useState<ShareMovers | null>(null);
-  const [venue, setVenue] = useState<{ sold: number; prior: number; move: number } | null>(null);
   useEffect(() => {
     let live = true;
-    if (!isCustomBase) {
-      readShareMovers(horizon).then((v) => {
-        if (!live) return;
-        if (v) {
-          setMoversData(v);
-          if (v.bat.sold_prior_12m > 0) {
-            setVenue({ sold: v.bat.sold_12m, prior: v.bat.sold_prior_12m, move: v.bat.sold_12m / v.bat.sold_prior_12m - 1 });
-          }
-        }
-      });
-    } else {
-      const baseKey = baselineHorizon as Exclude<MoverHorizon, 'upcoming'>;
-      Promise.all([readShareMovers(horizon), readShareMovers(baseKey)]).then(([recentRes, baseRes]) => {
-        if (!live) return;
-        const v = recentRes && baseRes ? combineShareMovers(recentRes, baseRes, horizon, baseKey) : recentRes;
-        if (v) {
-          setMoversData(v);
-          if (v.bat.sold_prior_12m > 0) {
-            setVenue({ sold: v.bat.sold_12m, prior: v.bat.sold_prior_12m, move: v.bat.sold_12m / v.bat.sold_prior_12m - 1 });
-          }
-        }
-      });
-    }
+    const custom = requestedBaseline !== 'prior' && requestedBaseline !== requestedHorizon
+      && !(requestedHorizon === 'upcoming' && requestedBaseline === '1m');
+    const read = custom
+      ? Promise.all([readShareMovers(requestedHorizon), readShareMovers(requestedBaseline as Exclude<MoverHorizon, 'upcoming'>)])
+        .then(([recent, base]) => recent && base
+          ? combineShareMovers(recent, base, requestedHorizon, requestedBaseline as Exclude<MoverHorizon, 'upcoming'>) : null)
+      : readShareMovers(requestedHorizon);
+    read.then((data) => {
+      if (live && data) setMoverReceipt({ data, horizon: requestedHorizon, baseline: requestedBaseline });
+    });
     return () => { live = false; };
-  }, [horizon, baselineHorizon, isCustomBase]);
+  }, [requestedHorizon, requestedBaseline]);
+  const venue = moversData && moversData.bat.sold_prior_12m > 0
+    ? { sold: moversData.bat.sold_12m, prior: moversData.bat.sold_prior_12m, move: moversData.bat.sold_12m / moversData.bat.sold_prior_12m - 1 }
+    : null;
   const horizonMeta = useMemo(() => MOVER_HORIZONS.find((h) => h.key === horizon) ?? MOVER_HORIZONS[6], [horizon]);
   const gateMin = useMemo(
     () => (isCustomBase ? Math.min(gateMinForHorizon(horizon), gateMinForHorizon(baselineHorizon as MoverHorizon)) : gateMinForHorizon(horizon)),
@@ -1578,7 +1576,17 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
   // The top level as brands, or as brands with their families inside (finviz's map of the market).
   const [brandView, setBrandView] = useState<'brands' | 'nested'>('brands');
   // A family keeps its model names as clickable treemap tiles; the sales chart is shown below when embedded (or via the switch).
-  const [familyView, setFamilyView] = useState<'sales' | 'names'>('names');
+  const urlFamilyView = searchParams.get('family_view') === 'sales' ? 'sales' : 'names';
+  const [familyView, setFamilyViewState] = useState<'sales' | 'names'>(urlFamilyView);
+  const setFamilyView = useCallback((view: 'sales' | 'names') => {
+    setFamilyViewState(view);
+    setSearchParams(curr => {
+      const next = new URLSearchParams(curr);
+      if (view === 'sales' && next.get('family')) next.set('family_view', 'sales');
+      else next.delete('family_view');
+      return next;
+    }, { preventScrollReset: true });
+  }, [setSearchParams]);
   const setFacetAxis = useCallback((nextAxis: FamilyFacetAxis) => {
     facetAxisRef.current = nextAxis;
     setFacetAxisState(nextAxis);
@@ -1596,12 +1604,13 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
     setSearchParams((curr) => applyDrillStackToSearchParams(curr, nextStack, nextAxis), { preventScrollReset: true });
   }, [setSearchParams]);
   useEffect(() => {
-    setFamilyView('names');
+    setFamilyViewState(urlFamilyView);
+    if (urlFamilyView === 'sales') setPhoneBrowseView('map');
     const truck = isGmTruckBrand(currentLevel.make) && drillStack.find((d) => d.family && !d.model)?.label === 'Truck';
     const resolvedAxis = urlAxis ?? (truck && !currentLevel.model ? 'series' : 'raw');
     facetAxisRef.current = resolvedAxis;
     setFacetAxisState(resolvedAxis);
-  }, [currentLevel.make, currentLevel.family, urlAxis, drillStack.find((d) => d.family && !d.model)?.label]);
+  }, [currentLevel.make, currentLevel.family, urlAxis, urlFamilyView, drillStack.find((d) => d.family && !d.model)?.label]);
 
   // Family-wide sales (5-year dated window via treemap_family_sales): enables direct Family -> Years -> Vehicles navigation
   // and Era filtering without requiring a fragmented raw model string first.
@@ -3105,21 +3114,20 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
       {levelType === 'brands' && <details className="home-family-comparisons" open={!isNarrow}>
         <summary><Text role="label">Compare sales activity</Text></summary>
         <FamilyMovers
-        horizon={horizon}
+        horizon={requestedHorizon}
         onHorizonChange={setHorizon}
-        baselineHorizon={baselineHorizon}
+        baselineHorizon={requestedBaseline}
         onBaselineHorizonChange={setBaselineHorizon}
-        onMoversData={(d) => {
-          if (d) {
-            setMoversData(d);
-            if (d.bat.sold_prior_12m > 0) {
-              setVenue({ sold: d.bat.sold_12m, prior: d.bat.sold_prior_12m, move: d.bat.sold_12m / d.bat.sold_prior_12m - 1 });
-            }
-          }
-        }}
         onPick={(m) => {
           recordInterest('make', m.brand);
-          setDrillStack([{ label: 'ALL MAKES' }, { label: m.brand, make: m.brand }, { label: m.family, make: m.brand, family: m.family_key }]);
+          setDrillStack([{ label: 'ALL MAKES' }, { label: m.brand, make: m.brand }, { label: m.family, make: m.brand, family: m.family_key }], undefined,
+            horizon === 'upcoming' ? 'names' : 'sales');
+          // Open the family sales history for investigation. It retains its own
+          // labelled multi-venue scope; upcoming supply keeps the family browse.
+          if (horizon !== 'upcoming') {
+            setFamilyViewState('sales');
+            setPhoneBrowseView('map');
+          }
         }} />
       </details>}
 

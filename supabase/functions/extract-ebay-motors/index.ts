@@ -25,7 +25,9 @@ import { writeObservation } from "../_shared/observationWriter.ts";
 import { requireWriteAuth } from '../_shared/writeGuard.ts';
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { BROWSE_ACTIONS, handleBrowse } from './browseHandler.ts';
+import { handleParts } from './partsFinder.ts';
 import { insertMissingVehicleImages } from '../_shared/vehicleImageWrite.ts';
+import { itemPagePhotos } from './browseMap.ts';
 
 // ============================================================================
 // TYPES
@@ -597,6 +599,8 @@ function extractDescription(html: string): string | null {
 }
 
 function extractImages(html: string): string[] {
+  const gallery = itemPagePhotos(html);
+  if (gallery.length > 0 || /\bux-image-grid-item\b/.test(html)) return gallery;
   const images: string[] = [];
   const seen = new Set<string>();
 
@@ -765,6 +769,8 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json();
+    // Parts finder for a job (partsFinder.ts): signed-in users, its own capped share of the Browse quota; writes nothing.
+    if (body?.action === 'parts') return await handleParts(req, body);
     // Browse API intake (official API, keys in function secrets); the Firecrawl single-URL path below is the older door.
     if (BROWSE_ACTIONS.includes(body?.action)) {
       const supabase = createClient(Deno.env.get('SUPABASE_URL')!, projectSecretKey()!);

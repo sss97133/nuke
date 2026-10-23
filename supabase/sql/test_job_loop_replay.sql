@@ -417,9 +417,16 @@ CREATE TABLE IF NOT EXISTS public.city_geocode_lookup(city text, state text, lat
 \ir ../migrations/20261020184000_requirement_plan_b_listing_cache.sql
 \echo REPLAY 20261020186500_work_order_provider_matches_materialize.sql
 \ir ../migrations/20261020186500_work_order_provider_matches_materialize.sql
+\echo REPLAY 20261022013000_work_order_part_listing_approvals.sql
+\ir ../migrations/20261022013000_work_order_part_listing_approvals.sql
+\echo REPLAY 20261023200100_work_order_open_requirements_read.sql
+\ir ../migrations/20261023200100_work_order_open_requirements_read.sql
 -- Plan check and final state.
 \set replay_problems `scripts/ci/job-loop-replay-check.sh | tr '\n' ' '`
 SELECT t_assert(btrim(:'replay_problems') = '', 'replay plan covers the build in filename order: ' || COALESCE(NULLIF(btrim(:'replay_problems'), ''), 'ok'));
+SELECT t_assert(position('AND w.id = p_work_order_id' IN pg_get_functiondef('public.work_order_open_requirements_read(uuid,uuid,integer,text)'::regprocedure)) > 0
+  AND has_function_privilege('anon', 'public.work_order_open_requirements_read(uuid,uuid,integer,text)', 'EXECUTE'),
+  'work_order_open_requirements_read derives from open_requirements_read with the one-job filter');
 SELECT t_assert(public.work_order_change_orders_live() AND prosrc LIKE '%change_order IS NOT NULL%',
   'signature-queue hooks keep the change-order definitions (20261019213000) after 20261019214500')
 FROM pg_proc WHERE oid = 'public.work_order_quote_is_change_order(uuid)'::regprocedure;

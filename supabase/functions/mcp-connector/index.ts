@@ -1,3 +1,4 @@
+import { ACCOUNTING_TOOLS, ACCOUNTING_TOOL_NAME, callAccounting } from "./accountingTools.ts";
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
@@ -13,16 +14,24 @@ import {
   type WriteTier,
 } from "../_shared/scopeGrammar.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { requireAdminOrService, requireWriteAuth } from "../_shared/writeGuard.ts";
+import {
+  checkAdvisorRateLimit,
+  handleAdvisorJsonRpc,
+  initAdvisorHandlers,
+  isAdvisorSurface,
+} from "./advisor/mod.ts";
 
 // =============================================================================
 // NUKE MCP CONNECTOR — Full-Resolution Vehicle Digital Twin Access
 // =============================================================================
 // Remote MCP server (Streamable HTTP transport) exposing the Nuke vehicle data
-// platform. 22 tools across 7 layers: schema discovery, search, deep graph,
-// market intelligence, reference library, vision, actors, and ingestion.
+// platform. Full catalog (~54 tools) on /mcp; ChatGPT allowlist via surface=chatgpt;
+// read-only Nuke Asset Advisor (7 cited tools) on /mcp/advisor — see ./ADVISOR.md.
 //
 // Protocol: MCP Streamable HTTP (2025-03-26)
-// Auth: X-API-Key (nk_live_...) or Authorization: Bearer (service role)
+// Auth: X-API-Key (nk_live_...) or Authorization: Bearer (service role);
+//       advisor + most reads allow anonymous (advisor has best-effort IP rate limit)
 // Deploy: supabase functions deploy mcp-connector --no-verify-jwt
 // =============================================================================
 
@@ -91,7 +100,8 @@ interface AuthResult {
 
 async function authenticate(req: Request): Promise<AuthResult> {
   const authHeader = req.headers.get("Authorization");
-  const apiKey = req.headers.get("X-API-Key");
+  let apiKey = req.headers.get("X-API-Key");
+  let opaqueOAuth = false;
 
   // 1. Service role key
   if (authHeader?.startsWith("Bearer ")) {
@@ -103,7 +113,8 @@ async function authenticate(req: Request): Promise<AuthResult> {
     if (alt && token === alt) {
       return { ok: true, userId: "service-role", scopes: ["admin"] };
     }
-    // No other bearer token is accepted, including the ones this function used to mint without a login.
+    if (/^nuke_oauth_[a-f0-9]{64}$/.test(token)) { apiKey = token; opaqueOAuth = true; }
+    // Legacy self-issued JWTs are not credentials.
     if (!apiKey) return { ok: false, error: "Invalid or expired token", status: 401 };
   }
 
@@ -126,6 +137,7 @@ async function authenticate(req: Request): Promise<AuthResult> {
           : "Invalid API key";
       return { ok: false, error: msg, status: data?.error === "rate_limit_exceeded" ? 429 : 401 };
     }
+    if (opaqueOAuth && (!data.user_id || !data.key_id || !Array.isArray(data.scopes) || !data.scopes.length)) return { ok: false, error: "Invalid OAuth credential", status: 401 };
     // API-key scopes: honor a `scopes` array from the rate-limit RPC if present, else default to
     // autonomous-observations (read + write:observations). Canonical needs an explicit grant.
     const keyScopes = Array.isArray(data.scopes) && data.scopes.length
@@ -244,6 +256,7 @@ interface ToolDef {
 }
 
 const TOOLS: ToolDef[] = [
+  ...ACCOUNTING_TOOLS,
   // ── Schema Discovery ──────────────────────────────────────────────────
   {
     name: "describe_platform",
@@ -6091,7 +6104,7 @@ function handleToolsList(req: JsonRpcRequest, chatgptSurface = false): JsonRpcRe
 
 async function handleToolsCall(req: JsonRpcRequest, chatgptSurface = false): Promise<JsonRpcResponse> {
   const params = req.params as { name: string; arguments?: Record<string, unknown> } | undefined;
-  if (!params?.name) {
+  if (!params?.name || typeof params.name !== "string") {
     return rpcError(req.id, -32602, "Missing tool name");
   }
 
@@ -6147,6 +6160,13 @@ async function handleJsonRpc(body: JsonRpcRequest, chatgptSurface = false): Prom
 // HTTP ENTRY POINT
 // =============================================================================
 
+// Advisor surface handlers (read-only curated tools). Initialized once with the
+// same Supabase + edge proxy deps the full connector uses.
+initAdvisorHandlers({
+  sb: () => getSupabase(),
+  callEdgeApi,
+});
+
 Deno.serve(async (req: Request) => {
   // CORS preflight
   if (req.method === "OPTIONS") {
@@ -6156,6 +6176,7 @@ Deno.serve(async (req: Request) => {
   // ── Route by URL path (OAuth + MCP) ───────────────────────────────────
   const url = new URL(req.url);
   const path = url.pathname;
+  const advisorSurface = isAdvisorSurface(req);
 
   // OAuth discovery endpoints (GET)
   if (req.method === "GET") {
@@ -6207,6 +6228,77 @@ Deno.serve(async (req: Request) => {
     );
   }
 
+  // Asset Advisor: read-only curated surface. No write/admin/SQL tools are registered.
+  // Anonymous reads are allowed with a best-effort per-IP rate limit; API keys skip it.
+  if (advisorSurface) {
+    const rate = checkAdvisorRateLimit(req);
+    if (!rate.ok) {
+      return new Response(
+        JSON.stringify(rpcError(body.id, -32000, "Rate limit exceeded on advisor surface")),
+        {
+          status: 429,
+          headers: {
+            ...CORS,
+            "Content-Type": "application/json",
+            "Retry-After": String(rate.retryAfterSec),
+          },
+        },
+      );
+    }
+    // If a key/bearer is presented, still validate it (bad key fails fast).
+    const authHeader = req.headers.get("Authorization");
+    const apiKey = req.headers.get("X-API-Key");
+    if (authHeader || apiKey) {
+      const auth = await authenticate(req);
+      if (!auth.ok) {
+        return new Response(
+          JSON.stringify(rpcError(body.id, -32000, auth.error || "Unauthorized")),
+          {
+            status: auth.status || 401,
+            headers: {
+              ...CORS,
+              "Content-Type": "application/json",
+              "WWW-Authenticate": `Bearer realm="nuke", resource_metadata="https://nuke.ag/.well-known/oauth-protected-resource"`,
+            },
+          },
+        );
+      }
+    }
+
+    const response = await handleAdvisorJsonRpc(body);
+    if (response === null) {
+      return new Response(null, { status: 202, headers: CORS });
+    }
+    const baseHeaders: Record<string, string> = { ...CORS };
+    if (body.method === "initialize") {
+      baseHeaders["Mcp-Session-Id"] = crypto.randomUUID();
+    }
+    const accept = req.headers.get("Accept") || "";
+    const wantSSE = accept.includes("text/event-stream");
+    if (wantSSE) {
+      const ssePayload = `event: message\ndata: ${JSON.stringify(response)}\n\n`;
+      return new Response(ssePayload, {
+        status: 200,
+        headers: { ...baseHeaders, "Content-Type": "text/event-stream", "Cache-Control": "no-cache" },
+      });
+    }
+    return new Response(JSON.stringify(response), {
+      status: 200,
+      headers: { ...baseHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  if (body.method === 'tools/call' && body.params?.name === ACCOUNTING_TOOL_NAME) {
+    if (isChatGptSurface(req)) return new Response(JSON.stringify(rpcError(body.id, -32602, 'Tool not available on this public surface')), { headers: { ...CORS, 'Content-Type': 'application/json' } });
+    try {
+      const result = await callAccounting(req, (body.params.arguments || {}) as Record<string, unknown>, SUPABASE_URL);
+      if ('authenticationRequired' in result) return new Response(JSON.stringify(rpcError(body.id, -32000, 'Accounting sign-in required')), { status: 401, headers: { ...CORS, 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'WWW-Authenticate': 'Bearer realm="nuke", resource_metadata="https://nuke.ag/.well-known/oauth-protected-resource"' } });
+      return new Response(JSON.stringify(rpcResult(body.id, result)), { headers: { ...CORS, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
+    } catch {
+      return new Response(JSON.stringify(rpcResult(body.id, { isError: true, content: [{ type: 'text', text: 'Accounting service unavailable' }] })), { headers: { ...CORS, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
+    }
+  }
+
   // Auth — required for write tools, optional for read tools.
   // When a write tool is called without valid auth, return 401 + WWW-Authenticate
   // pointing at the OAuth resource metadata, which names https://nuke.ag (magic-link login)
@@ -6224,15 +6316,26 @@ Deno.serve(async (req: Request) => {
     link_account: "canonical",
     verify_account_link: "canonical",
   };
+  // execute_sql hands the caller's text to public.execute_sql, which runs it as the database owner. It is gated like
+  // nlq-sql: the service key, or a verified-JWT caller who is an active admin (admin_users). _shared/writeGuard judges
+  // the JWT itself (ES256 against the project JWKS) and looks up admin_users, because the connector's own API-key auth
+  // cannot judge a user JWT. Anonymous → 401, a signed-in non-admin or an API key → 403/401.
+  const ADMIN_OR_SERVICE_TOOLS = new Set(["execute_sql"]);
   if (body.method === "tools/call") {
     const toolName = body?.params?.name as string | undefined;
     const authHeader = req.headers.get("Authorization");
     const apiKey = req.headers.get("X-API-Key");
     const requiredTier: WriteTier | undefined = toolName ? WRITE_TIERS[toolName] : undefined;
     const isWrite = Boolean(requiredTier);
+    const adminOrService = typeof toolName === "string" && ADMIN_OR_SERVICE_TOOLS.has(toolName);
 
-    // If auth is provided, always validate it (so a bad key fails fast even on read tools).
-    if (authHeader || apiKey) {
+    if (adminOrService) {
+      // Does not go through the connector's own authenticate(): writeGuard verifies the token and the admin row.
+      const denied = (await requireWriteAuth(req, { headers: CORS })) ??
+        (await requireAdminOrService(req, { headers: CORS }));
+      if (denied) return denied;
+    } else if (authHeader || apiKey) {
+      // If auth is provided, always validate it (so a bad key fails fast even on read tools).
       const auth = await authenticate(req);
       if (!auth.ok) {
         return new Response(
@@ -6273,7 +6376,7 @@ Deno.serve(async (req: Request) => {
     }
   }
 
-  // Route to MCP handler
+  // Route to MCP handler (full catalog or ChatGPT allowlist — not advisor)
   const response = await handleJsonRpc(body, isChatGptSurface(req));
 
   // Notifications get 202 (no body)

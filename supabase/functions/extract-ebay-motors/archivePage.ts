@@ -31,6 +31,7 @@ export interface ArchivedItemPage {
   sellerFeedbackCount: number | null;
   description: string;
   images: string[];                // original eBay image URLs, one per photo, largest size seen
+  photoSizes: string[][];          // each photo's URLs at the sizes the page names, largest first (images[i] = photoSizes[i][0])
 }
 
 const decode = (s: string) =>
@@ -99,15 +100,68 @@ export function plausibleVin(raw: string | undefined): string | null {
   return /^[A-Z0-9]{5,17}$/.test(v) && /\d{3}/.test(v) && !/X{3,}|\*/.test(v) ? v : null;
 }
 
-function imagesOf(html: string): string[] {
-  const best = new Map<string, { url: string; size: number }>();
-  for (const m of html.matchAll(/https?:\/\/i\d*\.ebayimg\.com\/[^"'\s<>)]+?_(\d+)\.(?:JPG|jpg|jpeg|PNG|png)/g)) {
-    const key = m[0].replace(/_\d+\.(?:JPG|jpg|jpeg|PNG|png)$/, "");
-    const size = { 1: 3, 57: 4, 35: 2, 12: 1, 3: 3, 14: 0 }[Number(m[1])] ?? 0;
-    const have = best.get(key);
-    if (!have || size > have.size) best.set(key, { url: m[0], size });
+// An eBay photo URL ends in _<size>.JPG; photo ids may contain ")" ("$(KGrHgoH-CQEkJwwr(3WBKZ)8hTC6w~~").
+const PHOTO_URL = /https?:\/\/i\d*\.ebayimg\.com\/[^"'\s<>]+?_(\d+)\.(?:JPG|jpg|jpeg|PNG|png)/g;
+const photoKey = (url: string) => url.replace(/_\d+\.(?:JPG|jpg|jpeg|PNG|png)$/, "");
+// Largest first: 57 (1600), 3 (800 zoom / supersize), 12 (500), 1 (400), 35 (300 main), 2 (viewport), 0 and 14 (thumbnails).
+const SIZE_RANK: Record<number, number> = { 57: 7, 3: 6, 12: 5, 1: 4, 35: 3, 2: 2, 0: 1, 14: 0 };
+// Where an item page lists the item's own photos: the 2006-09 slideshow arrays ("ss0ImageUrls = descImageUrls = [[...]]"), the
+// 2006-09 photo-hosting block (links to "#ebayphotohosting", and the picture under its anchor), the 2009-14 view selector's
+// image data ("imgData", "mnImgData", "thImgData", "hiResImgData") and og:image. A store logo, a seller's description or
+// template image and another item's picture sit outside them.
+const GALLERY = [
+  /ImageUrls\s*=\s*(?:descImageUrls\s*=\s*)?\[\s*\[[\s\S]{0,60000}?\]\s*\]/g,
+  /<a[^>]+#ebayphotohosting"[^>]*>[\s\S]{0,600}?<\/a>/g,
+  /<a name="ebayphotohosting"><\/a>[\s\S]{0,200}?<img[^>]*>/g,
+  /"?(?:mn|th|hiRes)?[iI]mgData"?\s*:\s*(?:\[[^\]]*\]|\{[^}]*\})/g,
+  /<meta[^>]+property="og:image"[^>]*>/gi,
+];
+
+/** The item's own photos (the photo viewer's), cover first: each photo's URLs at the sizes the page names (thumbnails left
+ *  out), largest first. A gallery
+ *  block inside the seller's description, or a photo-hosting link naming another item, is another listing's (sellers paste
+ *  an earlier listing's description, slideshow and all: item 160078932594's 2007 page carries 250073639703's 24 photos). */
+function photosOf(html: string, itemId: string | null): string[][] {
+  const descStart = html.search(/<div[^>]+id="ngvi_desc_div"[^>]*>/i);
+  const endAt = descStart < 0 ? -1 : html.slice(descStart, descStart + 400_000).search(DESC_END);
+  const descEnd = endAt < 0 ? -1 : descStart + endAt; // only a description whose end eBay's next section marks
+  const own = new Set<string>();
+  for (const re of GALLERY) for (const g of html.matchAll(re)) {
+    const at = g.index ?? 0, names = g[0].match(/[?&;]item=(\d{9,13})/)?.[1];
+    if ((at >= descStart && at < descEnd) || (names && itemId && names !== itemId)) continue;
+    for (const m of g[0].matchAll(PHOTO_URL)) own.add(photoKey(m[0]));
   }
-  return [...best.values()].map((v) => v.url);
+  const sizes = new Map<string, Map<string, number>>();
+  for (const m of html.matchAll(PHOTO_URL)) {
+    const key = photoKey(m[0]), rank = SIZE_RANK[Number(m[1])] ?? 2; // an unlisted size (2007 "_4", 640x480) is a photo
+    if (own.has(key) && rank >= 2) (sizes.get(key) ?? sizes.set(key, new Map()).get(key)!).set(m[0], rank);
+  }
+  return [...sizes.values()].map((s) => [...s.entries()].sort((a, b) => b[1] - a[1]).map(([u]) => u));
+}
+
+export interface PhotoProbe { status: number; servedTimestamp: string | null; image: boolean }
+const tsDays = (ts: string) => Date.UTC(+ts.slice(0, 4), +ts.slice(4, 6) - 1, +ts.slice(6, 8)) / 86_400_000;
+
+/** Which of a page's photos the Wayback Machine serves (archivedImageUrl), cover first, each photo at up to three of its
+ *  sizes, largest first. The archive kept few eBay photos (2 of 98 vehicles' covers probed 2026-10-20, both the 400px size
+ *  og:image names), so a cover served at no size ends the check. A photo counts only when an image comes back from a capture
+ *  within a year of the page's: the archive answers an uncaptured address with its nearest capture, and one years away is a
+ *  later picture at that address. Returns the served URL of each held photo, in page order. */
+export async function archivedPhotos(photos: string[][], timestamp: string, probe: (url: string) => Promise<PhotoProbe>, max = 12) {
+  const held: string[] = [];
+  let checked = 0;
+  for (const [i, sizes] of photos.slice(0, max).entries()) {
+    let got: string | null = null;
+    for (const url of sizes.slice(0, 3)) {
+      const r = await probe(archivedImageUrl(timestamp, url)).catch(() => null);
+      checked++;
+      const near = !!r?.servedTimestamp && Math.abs(tsDays(r.servedTimestamp) - tsDays(timestamp)) <= 366;
+      if (r?.image && r.status === 200 && near) { got = url; break; }
+    }
+    if (got) held.push(got);
+    else if (i === 0) break;
+  }
+  return { held, checked, listed: photos.length };
 }
 
 // The seller's description sits inline after ngvi_desc_div, often in a dealer template whose own nested <div>s close early;
@@ -135,7 +189,7 @@ export function parseArchivedItemPage(html: string, originalUrl = ""): ArchivedI
   const text = textOf(html);
   const titleTag = decode(html.match(/<title>([\s\S]*?)<\/title>/i)?.[1] ?? "").replace(/\s+/g, " ").trim();
   const h1 = html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i)?.[1];
-  const tagTitle = titleTag.replace(/^eBay Motors:\s*/i, "").replace(/\s*\(item \d+.*$/i, "").replace(/\s*[|:]\s*eBay( Motors)?.*$/i, "").replace(/\s+in\s+[^|]+$/, "").trim();
+  const tagTitle = titleTag.replace(/^eBay Motors:\s*/i, "").replace(/\s*\(item \d+.*$/i, "").replace(/\s*[|:]\s*eBay( Motors)?.*$/i, "").replace(/\s+-\s+eBay( Motors)?$/i, "").replace(/\s+in\s+[^|]+$/, "").trim();
   const title = (h1 ? textOf(h1) : "") || tagTitle || null;
   const itemId = text.match(/Item number:\s*(\d{9,13})/)?.[1] ?? titleTag.match(/\(item (\d{9,13})/)?.[1] ?? null;
 
@@ -186,19 +240,20 @@ export function parseArchivedItemPage(html: string, originalUrl = ""): ArchivedI
     if (specifics[k] !== undefined) { if (n) specifics[k] = n; else delete specifics[k]; }
   }
   const seller = text.match(/Seller info\s+(?:Member id\s+)?([A-Za-z0-9._*\-]{2,64})\s*\(\s*(?:Feedback Score Of\s*)?(\d+)\s*\)/);
-  const descHtml = descriptionHtml(html);
+  const descHtml = descriptionHtml(html), photos = photosOf(html, itemId);
   return {
     itemId, title, outcome, endedAt: endedText ? endedAtIso(endedText) : null, endedText, priceShown, priceLabel, bids,
     reserveNotMet, specifics,
     location: specifics["Location"] ?? text.match(/Item [Ll]ocation:\s*([^:]{3,80}?)(?:,\s*United States)?\s+(?:A reserve|Seller info|Ships to|Shipping|Sells to|Coverage|Start of layer)/)?.[1]?.trim() ?? null,
     sellerUsername: seller?.[1] ?? null, sellerFeedbackCount: seller ? Number(seller[2]) : null,
-    description: textOf(descHtml).slice(0, 20000), images: imagesOf(html),
+    description: textOf(descHtml).slice(0, 20000), images: photos.map((s) => s[0]), photoSizes: photos,
   };
 }
 
-/** The page in the shape every eBay door lands through (toLanding); photos point at their archived copies. */
-export function archivedPageToItem(p: ArchivedItemPage, timestamp: string): EbayItem {
-  const images = p.images.map((u) => archivedImageUrl(timestamp, u));
+/** The page in the shape every eBay door lands through (toLanding); photos point at their archived copies, and only the
+ *  photos the archive was found to serve (`held`, from archivedPhotos) land. The page's full photo list stays on the page. */
+export function archivedPageToItem(p: ArchivedItemPage, timestamp: string, held: string[]): EbayItem {
+  const images = held.map((u) => archivedImageUrl(timestamp, u));
   const [city, state] = (p.location ?? "").split(",").map((s) => s.trim());
   const auction = p.bids !== null || /bid/i.test(p.priceLabel ?? "");
   const mileage = p.specifics["Mileage"]?.replace(/\s*miles?$/i, "");

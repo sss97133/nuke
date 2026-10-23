@@ -1204,9 +1204,13 @@ async function saveVehicle(
 
   // Create auction event (non-fatal)
   try {
+    // The docket's event date (cited from the lot page) is the sale date. Without it the row's
+    // auction_end_date was left null and later filled with the ingest date, so 13.7k Barrett-Jackson
+    // sales read as 2026 in comps (fixed 2026-10-22, backup public.bak_r5_bj_sale_dates).
+    const auctionEndDate = episodeSoldAt(vehicle.status, vehicle.event_date);
     const { data: existingEvent } = await supabase
       .from("auction_events")
-      .select("id")
+      .select("id, auction_end_date")
       .eq("vehicle_id", vehicleId)
       .eq("source", "barrett-jackson")
       .eq("source_url", vehicle.url)
@@ -1221,7 +1225,11 @@ async function saveVehicle(
         outcome: vehicle.status?.toLowerCase() === "sold" ? "sold" : "listed",
         winning_bid: vehicle.sale_price || null,
         lot_number: vehicle.lot_number || null,
+        auction_end_date: auctionEndDate,
       }));
+    } else if (auctionEndDate && (existingEvent as { auction_end_date: string | null }).auction_end_date?.slice(0, 10) !== auctionEndDate.slice(0, 10)) {
+      softWrite('auction_events end date', await supabase.from("auction_events")
+        .update({ auction_end_date: auctionEndDate }).eq("id", (existingEvent as { id: string }).id));
     }
   } catch (e) {
     console.warn(`[BJ] Auction event insert failed (non-fatal): ${e instanceof Error ? e.message : String(e)}`);

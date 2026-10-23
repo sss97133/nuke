@@ -2,7 +2,8 @@ import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { useSearchParams, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useViewHistory } from '../hooks/useViewHistory';
-import { useSearch, type BrowseParams, type BrowseResult, type BrowseStatsData } from '../components/layout/hooks/useSearch';
+import { useSearch, type BrowseParams, type BrowseResult } from '../components/layout/hooks/useSearch';
+import SourceBrowse from './browse/SourceBrowse';
 
 // ────────────────────────────────────────────────────────────
 // TYPES
@@ -821,6 +822,11 @@ const BrowseVehicles: React.FC = () => {
   const [searchParams] = useSearchParams();
   const make = searchParams.get('make') || '';
   const model = searchParams.get('model') || '';
+
+  // /browse?source=<slug>[&make=…[&model=…]] is one source's own holdings (browse_source_read), not the all-sources
+  // sold-make grid below; without a source this page is unchanged.
+  const source = (searchParams.get('source') || '').trim();
+  if (source) return <SourceBrowse source={source} make={make} model={model} />;
 
   // Determine depth: 0 = all makes, 1 = models for a make, 2 = vehicles for make+model
   const hasScope = ['yearMin', 'yearMax', 'bodyStyle', 'era'].some(key => searchParams.has(key));

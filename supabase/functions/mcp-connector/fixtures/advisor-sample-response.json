@@ -1,0 +1,392 @@
+{
+  "request": {
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "tools/call",
+    "params": {
+      "name": "get_history",
+      "arguments": {
+        "asset_id": "14123fbf-7eb6-4dd6-b0ca-bbc83db06a28",
+        "asset_type": "vehicle"
+      }
+    }
+  },
+  "response": {
+    "jsonrpc": "2.0",
+    "id": 1,
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"asset_type\": \"vehicle\",\n  \"asset_id\": \"14123fbf-7eb6-4dd6-b0ca-bbc83db06a28\",\n  \"tool\": \"get_history\",\n  \"as_of\": \"2026-10-21T16:44:56.942Z\",\n  \"agent_instructions\": \"Cite every non-missing claim with its source_name, source_url, and event_time when present. Never treat ingested_at or scrape clocks as the event date. If value is 'not recorded', say so and list checked_sources — do not invent a value.\",\n  \"claims\": [\n    {\n      \"field\": \"event.5b7eb028-008b-4b22-8e0f-1a3c1c15925c.final_price\",\n      \"value\": 21000,\n      \"confidence\": 0.9,\n      \"confidence_basis\": \"claim_score\",\n      \"citations\": [\n        {\n          \"source_name\": \"Bring a Trailer\",\n          \"source_url\": \"https://bringatrailer.com/listing/1974-volkswagen-karmann-ghia-coupe-5\",\n          \"observation_id\": null,\n          \"event_time\": \"2024-07-07T20:31:26.000Z\",\n          \"ingested_at\": null,\n          \"is_superseded\": false\n        }\n      ],\n      \"note\": \"auction:sold\"\n    },\n    {\n      \"field\": \"event.a832f1a9-a709-4776-97dd-a77e3ce471c7.final_price\",\n      \"value\": 21000,\n      \"confidence\": 0.9,\n      \"confidence_basis\": \"claim_score\",\n      \"citations\": [\n        {\n          \"source_name\": \"Bring a Trailer\",\n          \"source_url\": \"https://bringatrailer.com/listing/1974-volkswagen-karmann-ghia-coupe-5\",\n          \"observation_id\": null,\n          \"event_time\": \"2024-07-07T00:00:00.000Z\",\n          \"ingested_at\": null,\n          \"is_superseded\": false\n        }\n      ],\n      \"note\": \"auction:sold\"\n    },\n    {\n      \"field\": \"observation.8537728c-35be-45bc-9520-6d3454b135e0\",\n      \"value\": 21000,\n      \"confidence\": 0.85,\n      \"confidence_basis\": \"source_trust\",\n      \"citations\": [\n        {\n          \"source_name\": \"Bring a Trailer\",\n          \"source_url\": \"https://bringatrailer.com/listing/1974-volkswagen-karmann-ghia-coupe-5\",\n          \"observation_id\": \"8537728c-35be-45bc-9520-6d3454b135e0\",\n          \"event_time\": null,\n          \"ingested_at\": \"2026-07-26T01:41:40.975554+00:00\",\n          \"is_superseded\": false\n        }\n      ],\n      \"note\": \"kind=sale_result; observed_at(scrape_or_declared)=2026-07-26T01:41:40.96+00:00\"\n    },\n    {\n      \"field\": \"observation.2af8cd27-1edc-4c1d-b696-e75b13ef922f\",\n      \"value\": 21000,\n      \"confidence\": 0.85,\n      \"confidence_basis\": \"source_trust\",\n      \"citations\": [\n        {\n          \"source_name\": \"Bring a Trailer\",\n          \"source_url\": \"https://bringatrailer.com/listing/1974-volkswagen-karmann-ghia-coupe-5\",\n          \"observation_id\": \"2af8cd27-1edc-4c1d-b696-e75b13ef922f\",\n          \"event_time\": \"2024-07-07T00:00:00.000Z\",\n          \"ingested_at\": \"2026-03-24T07:36:25.128748+00:00\",\n          \"is_superseded\": false\n        }\n      ],\n      \"note\": \"kind=listing; observed_at(scrape_or_declared)=2026-01-31T12:10:27.625508+00:00\"\n    },\n    {\n      \"field\": \"observation.6c5dbfde-14bf-4ede-8910-40ded058bfe1\",\n      \"value\": \"1974 | Volkswagen | Karmann Ghia Coupe | $21000 | sold\",\n      \"confidence\": 0.9,\n      \"confidence_basis\": \"claim_score\",\n      \"citations\": [\n        {\n          \"source_name\": \"Bring a Trailer\",\n          \"source_url\": \"https://bringatrailer.com/listing/1974-volkswagen-karmann-ghia-coupe-5\",\n          \"observation_id\": \"6c5dbfde-14bf-4ede-8910-40ded058bfe1\",\n          \"event_time\": \"2024-07-07\",\n          \"ingested_at\": \"2026-03-24T08:27:34.370182+00:00\",\n          \"is_superseded\": false\n        }\n      ],\n      \"note\": \"kind=sale_result; observed_at(scrape_or_declared)=2024-07-07T00:00:00+00:00\"\n    },\n    {\n      \"field\": \"observation.82bc48e6-cbc9-461b-8b16-0f59a304fe1d\",\n      \"value\": \"Published sold result: USD 21000 on 2024-07-07 (date grain; fees excluded).\",\n      \"confidence\": 1,\n      \"confidence_basis\": \"claim_score\",\n      \"citations\": [\n        {\n          \"source_name\": \"Bring a Trailer\",\n          \"source_url\": \"https://bringatrailer.com/listing/1974-volkswagen-karmann-ghia-coupe-5/\",\n          \"observation_id\": \"82bc48e6-cbc9-461b-8b16-0f59a304fe1d\",\n          \"event_time\": null,\n          \"ingested_at\": \"2026-10-08T18:22:33.853589+00:00\",\n          \"is_superseded\": false\n        }\n      ],\n      \"note\": \"kind=sale_result; observed_at(scrape_or_declared)=2024-07-07T00:00:00+00:00\"\n    }\n  ],\n  \"timeline\": [\n    {\n      \"kind\": \"market_event\",\n      \"id\": \"5b7eb028-008b-4b22-8e0f-1a3c1c15925c\",\n      \"event_type\": \"auction\",\n      \"event_status\": \"sold\",\n      \"final_price\": 21000,\n      \"bid_count\": 11,\n      \"event_time\": \"2024-07-07T20:31:26.000Z\",\n      \"ingested_at\": null,\n      \"source_url\": \"https://bringatrailer.com/listing/1974-volkswagen-karmann-ghia-coupe-5\",\n      \"source_name\": \"Bring a Trailer\"\n    },\n    {\n      \"kind\": \"market_event\",\n      \"id\": \"a832f1a9-a709-4776-97dd-a77e3ce471c7\",\n      \"event_type\": \"auction\",\n      \"event_status\": \"sold\",\n      \"final_price\": 21000,\n      \"bid_count\": 11,\n      \"event_time\": \"2024-07-07T00:00:00.000Z\",\n      \"ingested_at\": null,\n      \"source_url\": \"https://bringatrailer.com/listing/1974-volkswagen-karmann-ghia-coupe-5\",\n      \"source_name\": \"Bring a Trailer\"\n    },\n    {\n      \"kind\": \"observation\",\n      \"id\": \"8537728c-35be-45bc-9520-6d3454b135e0\",\n      \"observation_kind\": \"sale_result\",\n      \"value_summary\": 21000,\n      \"confidence\": 0.85,\n      \"confidence_basis\": \"source_trust\",\n      \"event_time\": null,\n      \"ingested_at\": \"2026-07-26T01:41:40.975554+00:00\",\n      \"observed_at\": \"2026-07-26T01:41:40.96+00:00\",\n      \"is_superseded\": false,\n      \"source_name\": \"Bring a Trailer\",\n      \"source_url\": \"https://bringatrailer.com/listing/1974-volkswagen-karmann-ghia-coupe-5\"\n    },\n    {\n      \"kind\": \"observation\",\n      \"id\": \"2af8cd27-1edc-4c1d-b696-e75b13ef922f\",\n      \"observation_kind\": \"listing\",\n      \"value_summary\": 21000,\n      \"confidence\": 0.85,\n      \"confidence_basis\": \"source_trust\",\n      \"event_time\": \"2024-07-07T00:00:00.000Z\",\n      \"ingested_at\": \"2026-03-24T07:36:25.128748+00:00\",\n      \"observed_at\": \"2026-01-31T12:10:27.625508+00:00\",\n      \"is_superseded\": false,\n      \"source_name\": \"Bring a Trailer\",\n      \"source_url\": \"https://bringatrailer.com/listing/1974-volkswagen-karmann-ghia-coupe-5\"\n    },\n    {\n      \"kind\": \"observation\",\n      \"id\": \"6c5dbfde-14bf-4ede-8910-40ded058bfe1\",\n      \"observation_kind\": \"sale_result\",\n      \"value_summary\": \"1974 | Volkswagen | Karmann Ghia Coupe | $21000 | sold\",\n      \"confidence\": 0.9,\n      \"confidence_basis\": \"claim_score\",\n      \"event_time\": \"2024-07-07\",\n      \"ingested_at\": \"2026-03-24T08:27:34.370182+00:00\",\n      \"observed_at\": \"2024-07-07T00:00:00+00:00\",\n      \"is_superseded\": false,\n      \"source_name\": \"Bring a Trailer\",\n      \"source_url\": \"https://bringatrailer.com/listing/1974-volkswagen-karmann-ghia-coupe-5\"\n    },\n    {\n      \"kind\": \"observation\",\n      \"id\": \"82bc48e6-cbc9-461b-8b16-0f59a304fe1d\",\n      \"observation_kind\": \"sale_result\",\n      \"value_summary\": \"Published sold result: USD 21000 on 2024-07-07 (date grain; fees excluded).\",\n      \"confidence\": 1,\n      \"confidence_basis\": \"claim_score\",\n      \"event_time\": null,\n      \"ingested_at\": \"2026-10-08T18:22:33.853589+00:00\",\n      \"observed_at\": \"2024-07-07T00:00:00+00:00\",\n      \"is_superseded\": false,\n      \"source_name\": \"Bring a Trailer\",\n      \"source_url\": \"https://bringatrailer.com/listing/1974-volkswagen-karmann-ghia-coupe-5/\"\n    }\n  ],\n  \"event_count\": 2,\n  \"observation_count\": 4,\n  \"clocks_note\": \"event_time is the real-world sale/auction clock when known. observed_at on observations is often scrape time; ingested_at is when Nuke stored the row.\"\n}"
+        }
+      ],
+      "structuredContent": {
+        "asset_type": "vehicle",
+        "asset_id": "14123fbf-7eb6-4dd6-b0ca-bbc83db06a28",
+        "tool": "get_history",
+        "as_of": "2026-10-21T16:44:56.942Z",
+        "agent_instructions": "Cite every non-missing claim with its source_name, source_url, and event_time when present. Never treat ingested_at or scrape clocks as the event date. If value is 'not recorded', say so and list checked_sources — do not invent a value.",
+        "claims": [
+          {
+            "field": "event.5b7eb028-008b-4b22-8e0f-1a3c1c15925c.final_price",
+            "value": 21000,
+            "confidence": 0.9,
+            "confidence_basis": "claim_score",
+            "citations": [
+              {
+                "source_name": "Bring a Trailer",
+                "source_url": "https://bringatrailer.com/listing/1974-volkswagen-karmann-ghia-coupe-5",
+                "observation_id": null,
+                "event_time": "2024-07-07T20:31:26.000Z",
+                "ingested_at": null,
+                "is_superseded": false
+              }
+            ],
+            "note": "auction:sold"
+          },
+          {
+            "field": "event.a832f1a9-a709-4776-97dd-a77e3ce471c7.final_price",
+            "value": 21000,
+            "confidence": 0.9,
+            "confidence_basis": "claim_score",
+            "citations": [
+              {
+                "source_name": "Bring a Trailer",
+                "source_url": "https://bringatrailer.com/listing/1974-volkswagen-karmann-ghia-coupe-5",
+                "observation_id": null,
+                "event_time": "2024-07-07T00:00:00.000Z",
+                "ingested_at": null,
+                "is_superseded": false
+              }
+            ],
+            "note": "auction:sold"
+          },
+          {
+            "field": "observation.8537728c-35be-45bc-9520-6d3454b135e0",
+            "value": 21000,
+            "confidence": 0.85,
+            "confidence_basis": "source_trust",
+            "citations": [
+              {
+                "source_name": "Bring a Trailer",
+                "source_url": "https://bringatrailer.com/listing/1974-volkswagen-karmann-ghia-coupe-5",
+                "observation_id": "8537728c-35be-45bc-9520-6d3454b135e0",
+                "event_time": null,
+                "ingested_at": "2026-07-26T01:41:40.975554+00:00",
+                "is_superseded": false
+              }
+            ],
+            "note": "kind=sale_result; observed_at(scrape_or_declared)=2026-07-26T01:41:40.96+00:00"
+          },
+          {
+            "field": "observation.2af8cd27-1edc-4c1d-b696-e75b13ef922f",
+            "value": 21000,
+            "confidence": 0.85,
+            "confidence_basis": "source_trust",
+            "citations": [
+              {
+                "source_name": "Bring a Trailer",
+                "source_url": "https://bringatrailer.com/listing/1974-volkswagen-karmann-ghia-coupe-5",
+                "observation_id": "2af8cd27-1edc-4c1d-b696-e75b13ef922f",
+                "event_time": "2024-07-07T00:00:00.000Z",
+                "ingested_at": "2026-03-24T07:36:25.128748+00:00",
+                "is_superseded": false
+              }
+            ],
+            "note": "kind=listing; observed_at(scrape_or_declared)=2026-01-31T12:10:27.625508+00:00"
+          },
+          {
+            "field": "observation.6c5dbfde-14bf-4ede-8910-40ded058bfe1",
+            "value": "1974 | Volkswagen | Karmann Ghia Coupe | $21000 | sold",
+            "confidence": 0.9,
+            "confidence_basis": "claim_score",
+            "citations": [
+              {
+                "source_name": "Bring a Trailer",
+                "source_url": "https://bringatrailer.com/listing/1974-volkswagen-karmann-ghia-coupe-5",
+                "observation_id": "6c5dbfde-14bf-4ede-8910-40ded058bfe1",
+                "event_time": "2024-07-07",
+                "ingested_at": "2026-03-24T08:27:34.370182+00:00",
+                "is_superseded": false
+              }
+            ],
+            "note": "kind=sale_result; observed_at(scrape_or_declared)=2024-07-07T00:00:00+00:00"
+          },
+          {
+            "field": "observation.82bc48e6-cbc9-461b-8b16-0f59a304fe1d",
+            "value": "Published sold result: USD 21000 on 2024-07-07 (date grain; fees excluded).",
+            "confidence": 1,
+            "confidence_basis": "claim_score",
+            "citations": [
+              {
+                "source_name": "Bring a Trailer",
+                "source_url": "https://bringatrailer.com/listing/1974-volkswagen-karmann-ghia-coupe-5/",
+                "observation_id": "82bc48e6-cbc9-461b-8b16-0f59a304fe1d",
+                "event_time": null,
+                "ingested_at": "2026-10-08T18:22:33.853589+00:00",
+                "is_superseded": false
+              }
+            ],
+            "note": "kind=sale_result; observed_at(scrape_or_declared)=2024-07-07T00:00:00+00:00"
+          }
+        ],
+        "timeline": [
+          {
+            "kind": "market_event",
+            "id": "5b7eb028-008b-4b22-8e0f-1a3c1c15925c",
+            "event_type": "auction",
+            "event_status": "sold",
+            "final_price": 21000,
+            "bid_count": 11,
+            "event_time": "2024-07-07T20:31:26.000Z",
+            "ingested_at": null,
+            "source_url": "https://bringatrailer.com/listing/1974-volkswagen-karmann-ghia-coupe-5",
+            "source_name": "Bring a Trailer"
+          },
+          {
+            "kind": "market_event",
+            "id": "a832f1a9-a709-4776-97dd-a77e3ce471c7",
+            "event_type": "auction",
+            "event_status": "sold",
+            "final_price": 21000,
+            "bid_count": 11,
+            "event_time": "2024-07-07T00:00:00.000Z",
+            "ingested_at": null,
+            "source_url": "https://bringatrailer.com/listing/1974-volkswagen-karmann-ghia-coupe-5",
+            "source_name": "Bring a Trailer"
+          },
+          {
+            "kind": "observation",
+            "id": "8537728c-35be-45bc-9520-6d3454b135e0",
+            "observation_kind": "sale_result",
+            "value_summary": 21000,
+            "confidence": 0.85,
+            "confidence_basis": "source_trust",
+            "event_time": null,
+            "ingested_at": "2026-07-26T01:41:40.975554+00:00",
+            "observed_at": "2026-07-26T01:41:40.96+00:00",
+            "is_superseded": false,
+            "source_name": "Bring a Trailer",
+            "source_url": "https://bringatrailer.com/listing/1974-volkswagen-karmann-ghia-coupe-5"
+          },
+          {
+            "kind": "observation",
+            "id": "2af8cd27-1edc-4c1d-b696-e75b13ef922f",
+            "observation_kind": "listing",
+            "value_summary": 21000,
+            "confidence": 0.85,
+            "confidence_basis": "source_trust",
+            "event_time": "2024-07-07T00:00:00.000Z",
+            "ingested_at": "2026-03-24T07:36:25.128748+00:00",
+            "observed_at": "2026-01-31T12:10:27.625508+00:00",
+            "is_superseded": false,
+            "source_name": "Bring a Trailer",
+            "source_url": "https://bringatrailer.com/listing/1974-volkswagen-karmann-ghia-coupe-5"
+          },
+          {
+            "kind": "observation",
+            "id": "6c5dbfde-14bf-4ede-8910-40ded058bfe1",
+            "observation_kind": "sale_result",
+            "value_summary": "1974 | Volkswagen | Karmann Ghia Coupe | $21000 | sold",
+            "confidence": 0.9,
+            "confidence_basis": "claim_score",
+            "event_time": "2024-07-07",
+            "ingested_at": "2026-03-24T08:27:34.370182+00:00",
+            "observed_at": "2024-07-07T00:00:00+00:00",
+            "is_superseded": false,
+            "source_name": "Bring a Trailer",
+            "source_url": "https://bringatrailer.com/listing/1974-volkswagen-karmann-ghia-coupe-5"
+          },
+          {
+            "kind": "observation",
+            "id": "82bc48e6-cbc9-461b-8b16-0f59a304fe1d",
+            "observation_kind": "sale_result",
+            "value_summary": "Published sold result: USD 21000 on 2024-07-07 (date grain; fees excluded).",
+            "confidence": 1,
+            "confidence_basis": "claim_score",
+            "event_time": null,
+            "ingested_at": "2026-10-08T18:22:33.853589+00:00",
+            "observed_at": "2024-07-07T00:00:00+00:00",
+            "is_superseded": false,
+            "source_name": "Bring a Trailer",
+            "source_url": "https://bringatrailer.com/listing/1974-volkswagen-karmann-ghia-coupe-5/"
+          }
+        ],
+        "event_count": 2,
+        "observation_count": 4,
+        "clocks_note": "event_time is the real-world sale/auction clock when known. observed_at on observations is often scrape time; ingested_at is when Nuke stored the row."
+      }
+    }
+  },
+  "get_asset_structuredContent_abridged": {
+    "asset_type": "vehicle",
+    "asset_id": "14123fbf-7eb6-4dd6-b0ca-bbc83db06a28",
+    "tool": "get_asset",
+    "as_of": "2026-10-21T16:44:56.942Z",
+    "agent_instructions": "Cite every non-missing claim with its source_name, source_url, and event_time when present. Never treat ingested_at or scrape clocks as the event date. If value is 'not recorded', say so and list checked_sources — do not invent a value.",
+    "claims": [
+      {
+        "field": "year",
+        "value": 1974,
+        "confidence": 0.85,
+        "confidence_basis": "source_trust",
+        "citations": [
+          {
+            "source_name": "Bring a Trailer",
+            "source_url": "https://bringatrailer.com/listing/1974-volkswagen-karmann-ghia-coupe-5",
+            "observation_id": "8537728c-35be-45bc-9520-6d3454b135e0",
+            "event_time": null,
+            "ingested_at": "2026-07-26T01:41:40.975554+00:00",
+            "is_superseded": false
+          }
+        ]
+      },
+      {
+        "field": "make",
+        "value": "Volkswagen",
+        "confidence": 0.85,
+        "confidence_basis": "source_trust",
+        "citations": [
+          {
+            "source_name": "Bring a Trailer",
+            "source_url": "https://bringatrailer.com/listing/1974-volkswagen-karmann-ghia-coupe-5",
+            "observation_id": "8537728c-35be-45bc-9520-6d3454b135e0",
+            "event_time": null,
+            "ingested_at": "2026-07-26T01:41:40.975554+00:00",
+            "is_superseded": false
+          }
+        ]
+      },
+      {
+        "field": "model",
+        "value": "Karmann Ghia Coupe",
+        "confidence": 0.85,
+        "confidence_basis": "source_trust",
+        "citations": [
+          {
+            "source_name": "Bring a Trailer",
+            "source_url": "https://bringatrailer.com/listing/1974-volkswagen-karmann-ghia-coupe-5",
+            "observation_id": "8537728c-35be-45bc-9520-6d3454b135e0",
+            "event_time": null,
+            "ingested_at": "2026-07-26T01:41:40.975554+00:00",
+            "is_superseded": false
+          }
+        ]
+      },
+      {
+        "field": "trim",
+        "value": "not recorded",
+        "confidence": null,
+        "confidence_basis": "none",
+        "citations": [],
+        "checked_sources": []
+      },
+      {
+        "field": "vin",
+        "value": "1442612348",
+        "confidence": 0.7,
+        "confidence_basis": "source_trust",
+        "citations": [
+          {
+            "source_name": "Bring a Trailer",
+            "source_url": "https://bringatrailer.com/listing/1974-volkswagen-karmann-ghia-coupe-5/",
+            "observation_id": null,
+            "event_time": null,
+            "ingested_at": "2026-10-08T19:54:00.268561+00:00",
+            "is_superseded": false
+          }
+        ],
+        "note": "Value from vehicle record; no matching observation structured_data key found."
+      },
+      {
+        "field": "body_style",
+        "value": "Coupe",
+        "confidence": 0.85,
+        "confidence_basis": "source_trust",
+        "citations": [
+          {
+            "source_name": "Bring a Trailer",
+            "source_url": "https://bringatrailer.com/listing/1974-volkswagen-karmann-ghia-coupe-5",
+            "observation_id": "8537728c-35be-45bc-9520-6d3454b135e0",
+            "event_time": null,
+            "ingested_at": "2026-07-26T01:41:40.975554+00:00",
+            "is_superseded": false
+          }
+        ]
+      },
+      {
+        "field": "exterior_color",
+        "value": "Green",
+        "confidence": 0.85,
+        "confidence_basis": "source_trust",
+        "citations": [
+          {
+            "source_name": "Bring a Trailer",
+            "source_url": "https://bringatrailer.com/listing/1974-volkswagen-karmann-ghia-coupe-5",
+            "observation_id": "8537728c-35be-45bc-9520-6d3454b135e0",
+            "event_time": null,
+            "ingested_at": "2026-07-26T01:41:40.975554+00:00",
+            "is_superseded": false
+          }
+        ]
+      },
+      {
+        "field": "interior_color",
+        "value": "Tan Vinyl",
+        "confidence": 0.85,
+        "confidence_basis": "source_trust",
+        "citations": [
+          {
+            "source_name": "Bring a Trailer",
+            "source_url": "https://bringatrailer.com/listing/1974-volkswagen-karmann-ghia-coupe-5",
+            "observation_id": "8537728c-35be-45bc-9520-6d3454b135e0",
+            "event_time": null,
+            "ingested_at": "2026-07-26T01:41:40.975554+00:00",
+            "is_superseded": false
+          }
+        ]
+      }
+    ],
+    "status": "active",
+    "location": {
+      "location": "Malvern, Pennsylvania 19355",
+      "city": "Malvern",
+      "state": "PA",
+      "country": "USA"
+    },
+    "links": {
+      "listing_url": "https://bringatrailer.com/listing/1974-volkswagen-karmann-ghia-coupe-5/",
+      "bat_auction_url": "https://bringatrailer.com/listing/1974-volkswagen-karmann-ghia-coupe-5",
+      "primary_image_url": "https://bringatrailer.com/wp-content/uploads/2024/06/1974-Ghia-Exterior-25-35939.jpg",
+      "profile_url": "https://nuke.ag/vehicle/14123fbf-7eb6-4dd6-b0ca-bbc83db06a28"
+    },
+    "price": {
+      "kind": "sold",
+      "amount": 21000,
+      "as_of": "2024-07-07T00:00:00+00:00",
+      "live": false,
+      "outcome": "sold",
+      "sold": {
+        "amount": 21000,
+        "on": "2024-07-07",
+        "basis": "status",
+        "from": "sale_price"
+      },
+      "ask": null,
+      "bid": {
+        "amount": 21000,
+        "on": "2024-07-07",
+        "from": "high_bid"
+      },
+      "estimate": {
+        "amount": 16500,
+        "confidence": 70,
+        "as_of": "2026-02-08T15:29:23.928054+00:00"
+      },
+      "source_url": "https://bringatrailer.com/listing/1974-volkswagen-karmann-ghia-coupe-5/"
+    },
+    "observation_count": 4,
+    "image_count": 120
+  }
+}

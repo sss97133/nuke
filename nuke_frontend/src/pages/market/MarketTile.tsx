@@ -176,12 +176,15 @@ export function MarketSheet({ node, move, base, onOpen, onClose, windowLabel, ga
 
 const SWATCHES = ['−50%', '−33%', '−17%', '0', '+17%', '+33%', '+50%'];
 
-/** The legend: seven swatches with their values, the hatch and the blank, and one line of what the map counts. */
+/** Keep the measurement key visible; disclose the scale and methodology on demand. */
 export function MapLegend({ base, clock, basis, windowLabel, houses }: { base: Baseline | null; clock: string; basis: MapBasis; windowLabel?: string; houses?: readonly string[] | null }) {
   const winPhrase = windowLabel ? ` (${windowLabel})` : ' than a year ago';
   const measured = housesPhrase(measuredHouses(houses));
   return (
     <div className="map-legend">
+      <span className="map-legend__key">Color: sales volume vs market · Area: {basis === 'bat12' ? 'measured sale dollars, last 12 months' : 'recorded sale dollars, all years'}{clock}</span>
+      <details className="map-legend__method">
+      <summary>How measured</summary>
       <div className="map-legend__scale" aria-label="color scale">
         {SWATCHES.map((label, i) => (
           <span key={label} className="map-legend__stop">
@@ -194,10 +197,10 @@ export function MapLegend({ base, clock, basis, windowLabel, houses }: { base: B
       </div>
       <div className="map-legend__receipt">
         Color: is each tile selling more or less{winPhrase}, after taking out the market’s own growth
-        {base ? ` (${pct(base.move)}, ${num(base.prior)} → ${num(base.sold)})` : ''}; the strongest colors mean 50% or more either way, and
-        the label gives the exact figure. A move is measured only at auction houses we hold in full in both years: today
+        {base ? ` (${pct(base.move)}, ${num(base.prior)} → ${num(base.sold)})` : ''}. A move is measured only at auction houses we hold in full in both years: today
         {' '}{measured}; others join as their records fill in. Size: {basis === 'bat12' ? 'measured dollars, last 12 months' : 'dollars of confirmed sales at every auction house, all years; striped where the measured houses hold under half the sales'}. Prices not adjusted for inflation{clock}.
       </div>
+      </details>
     </div>
   );
 }

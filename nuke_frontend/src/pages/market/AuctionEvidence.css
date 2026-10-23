@@ -216,6 +216,9 @@
 .market-chip[aria-pressed="true"] { background: var(--text); color: var(--bg); border-color: var(--text); }
 .market-chip[aria-pressed="true"] .k-label, .market-chip[aria-pressed="true"] .k-measure { color: inherit; }
 .market-no-reserve { display: inline-block; align-self: flex-start; margin-top: 6px; padding: 2px 5px; background: var(--yellow-200); color: var(--text); }
+.market-chips--houses { padding-right: 8px; border-right: 2px solid var(--border); }
+.market-lot-house { margin-top: 6px; }
+.market-figure__note { flex-basis: 100%; margin: 0; }
 .market-board__scope { padding: 4px 8px; border-bottom: 2px solid var(--border); }
 /* The drawer: how the bidding went, what is being asked and said, the rest of the car. */
 .market-inspection-header { flex-wrap: wrap; overflow-wrap: normal; }
@@ -244,3 +247,42 @@
 .market-lot-finish__likely { stroke: var(--text-secondary); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
 .market-lot-finish__bid { stroke: var(--text); stroke-width: 2.5; vector-effect: non-scaling-stroke; }
 @media (max-width: 760px) { .market-lot-finish { justify-items: start; } }
+
+/* The houses: each by its own mark (public/source-logos); the name only when no mark is hosted. */
+.market-house-mark { display: inline-block; vertical-align: middle; height: 18px; width: auto; max-width: 96px; object-fit: contain; }
+.market-house-mark--name { white-space: nowrap; }
+:root[data-theme="dark"] .market-house-mark--dark { filter: invert(1); }
+:root[data-theme="light"] .market-house-mark--light { filter: invert(1); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .market-house-mark--dark { filter: invert(1); }
+}
+.market-venue__marks { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; }
+.market-chips--houses .market-chip { align-items: center; }
+/* What a clicked figure opens into: the board's total as a price chart, and the houses as a watchlist. */
+.market-stock { display: grid; gap: 8px; padding: 10px 8px; border-bottom: 2px solid var(--border); }
+.market-stock__top { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 8px; }
+.market-stock__price { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 14px; }
+.market-stock__chg { font: 700 14px 'Courier New', monospace; }
+.market-stock .is-up, .market-stock__chg.is-up { color: var(--success); }
+.market-stock .is-down, .market-stock__chg.is-down { color: var(--error); }
+.market-stock__ranges { display: flex; gap: 4px; }
+.market-stock__chart { width: 100%; height: 260px; display: block; touch-action: pan-y; background: var(--bg); border: 2px solid var(--border); }
+.market-stock__grid { stroke: var(--border); stroke-width: 1; stroke-dasharray: 2 4; }
+.market-stock__tick { font: 10px 'Courier New', monospace; fill: var(--text-secondary); }
+.market-stock__area { opacity: 0.12; }
+.market-stock__line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.market-stock__last { stroke-width: 1; stroke-dasharray: 4 3; }
+.market-stock__tag { font: 700 10px 'Courier New', monospace; fill: #fff; }
+.market-stock__cross { stroke: var(--text-secondary); stroke-width: 1; }
+.market-stock__tip { fill: var(--bg); stroke: var(--border); stroke-width: 1; }
+.market-stock__tipv { font: 700 12px 'Courier New', monospace; fill: var(--text); }
+.market-stock__tipt { font: 10px 'Courier New', monospace; fill: var(--text-secondary); }
+.market-stock__empty { padding: 28px 12px; border: 2px solid var(--border); }
+.market-stock__watch { width: 100%; border-collapse: collapse; }
+.market-stock__watch th, .market-stock__watch td { padding: 6px 8px; border-top: 1px solid var(--border); text-align: right; }
+.market-stock__watch thead th { text-align: right; font: 700 9px Arial, sans-serif; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-secondary); border-top: 0; }
+.market-stock__watch th:first-child, .market-stock__watch thead th:first-child { text-align: left; }
+.market-stock__spark { width: 80px; height: 24px; display: block; margin-left: auto; }
+.market-stock__spark polyline { fill: none; stroke-width: 1.5; }
+.market-stock__spark--none { text-align: right; color: var(--text-secondary); }
+@media (max-width: 600px) { .market-stock__watch th:nth-child(3), .market-stock__watch td:nth-child(3) { display: none; } }

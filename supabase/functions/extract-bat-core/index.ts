@@ -1,6 +1,8 @@
+// identifier claims: redeploy after #2477 deploy run 39842460458 stopped before the functions step.
 /**
  * extract-bat-core
  *
+ * Version: 4.5.2 — the lot's own "Private Party or Dealer" line lands in auction_events.seller_type (raw text in raw_data.party_type_raw) (2026-10-20)
  * Version: 4.5.1 — a withdrawn lot is closed: outcome 'cancelled', end = its "Withdrawn on" stamp (2026-10-15)
  * Version: 4.5.0 — an end event only once the auction is over; the lot's own end, never the widget's (2026-10-15)
  * - A running lot gets no auction_sold / auction_reserve_not_met / auction_ended row and no end-dated mileage reading
@@ -36,6 +38,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { normalizeListingUrlKey } from "../_shared/listingUrl.ts";
+import { decideLotAttribution, mergeEventMetadata, monitorForSeller, type BatEventRow } from "./sellerAttribution.ts";
 import { parseLocation } from "../_shared/parseLocation.ts";
 import { normalizeVehicleFields } from "../_shared/normalizeVehicle.ts";
 import { qualityGate } from "../_shared/extractionQualityGate.ts";
@@ -43,19 +46,22 @@ import { batchUpsertWithProvenance, quarantineRecord, type ProvenanceMetadata } 
 import { writeObservation } from "../_shared/observationWriter.ts";
 import { readCommentsJson, readOwnAuctionEnd, summarizeAuction, vinCheckDigitOk, buildAuctionCommentRows, linkAuctionCommentIdentities, sha256Hex } from "../_shared/batAuctionRecord.ts";
 import { parseBatIdentityFromUrl, parseBatIdentityFromTitle, readBatTaxonomy } from "../_shared/batParser.ts";
+import { readBatPartyLine, type BatSellerType } from "../_shared/batSellerType.ts";
 import { chassisFromListItemText, isIdentityGradeVin } from "../_shared/batChassis.ts";
 import { authenticateWriter, requireWriteAuth } from "../_shared/writeGuard.ts";
 import { sourceReadClock } from "./sourceReadClock.ts";
 import { auctionClose, planEndRows, writtenBeforeItsEnd, END_EVENT_TYPES, type EndRow } from "./auctionClose.ts";
 import { recordListingDescription } from "./descriptionObservation.ts";
 import { loadDescriptionInput, descriptionInputFingerprint, descriptionPreview } from "../discover-description-data/descriptionInput.ts";
-import { closingBatTargets, collectBatLive, batStreamIO } from "./liveStream.ts";
+import { handoffBatLiveCollection } from "./liveStream.ts";
 import { BAT_LIVE_MODE } from "../_shared/batLiveEvents.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { retainFetchedCapture, type CaptureAcknowledgement } from "../_shared/archiveFetch.ts";
+import { landIdentifierClaims } from "../_shared/landIdentifierClaims.ts";
 declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void };
 
 // Extractor versioning - update on each significant change
-const EXTRACTOR_VERSION = 'extract-bat-core:4.5.1';
+const EXTRACTOR_VERSION = 'extract-bat-core:4.5.7';
 
 // Shared column list for the four vehicle-existence lookups below
 // (discovery_url / bat_auction_url / listing_url / update-existing-vehicle
@@ -298,6 +304,9 @@ function extractTitleIdentity(html: string, listingUrl: string): { title: string
 
 function extractEssentials(html: string): {
   seller_username: string | null;
+  /** BaT's own "Private Party or Dealer" line as stated, and its normalized value (_shared/batSellerType.ts) */
+  party_type_raw: string | null;
+  seller_type: BatSellerType | null;
   buyer_username: string | null;
   location: string | null;
   lot_number: string | null;
@@ -718,8 +727,12 @@ function extractEssentials(html: string): {
   if (!reserve_status && hasGotAway) reserve_status = "reserve_not_met";
   if (!reserve_status && sale_price) reserve_status = "reserve_met";
 
+  const partyLine = readBatPartyLine(win);
+
   return {
     seller_username,
+    party_type_raw: partyLine.party_type_raw,
+    seller_type: partyLine.seller_type,
     buyer_username,
     location,
     lot_number,
@@ -1123,8 +1136,10 @@ async function tryUpsertMileageTimelineEvent(args: {
 }
 
 Deno.serve(async (req) => {
+  const nativeRequestStartedAt = new Date().toISOString(), nativeAuthStarted = performance.now();
   // Writes are never anonymous: service key, signed-in user, or nothing (P0.2, 2026-09-27).
   const denied = await requireWriteAuth(req);
+  const nativeFirstAuthMs = performance.now() - nativeAuthStarted;
   if (denied) return denied;
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -1135,22 +1150,26 @@ Deno.serve(async (req) => {
     if (!serviceRoleKey) throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY");
 
     const body = await req.json().catch(() => ({}));
-    if (body?.mode === "live_stream") {
+    // The established rows-only policy remains the default. Retention is an explicit service-only canary.
+    if (body.retain_terminal_evidence !== undefined) {
+      if (typeof body.retain_terminal_evidence !== "boolean") throw new Error("retain_terminal_evidence must be boolean");
       const writer = await authenticateWriter(req);
+      if (!writer.ok || writer.caller.kind !== "service_role") return new Response(JSON.stringify({ error: "Terminal retention requires service role" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    if (body?.mode === "live_stream") {
+      const roleStarted = performance.now();
+      const writer = await authenticateWriter(req);
+      const authMs = nativeFirstAuthMs + performance.now() - roleStarted;
       if (!writer.ok || writer.caller.kind !== "service_role") {
         return new Response(JSON.stringify({ error: "Live collection requires service role" }),
           { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
       if (Object.keys(body).some(k => !["mode", "dry_run"].includes(k))
         || (body.dry_run !== undefined && typeof body.dry_run !== "boolean")) throw new Error("Invalid live stream selectors");
-      const db = createClient(supabaseUrl, serviceRoleKey, { global: { headers: { "X-Nuke-Writer": "extract-bat-core" } } });
-      const targets = await closingBatTargets(db);
-      if (body.dry_run !== true && targets.length) {
-        EdgeRuntime.waitUntil(collectBatLive(targets, batStreamIO(supabaseUrl, serviceRoleKey)));
-      }
-      return new Response(JSON.stringify({ success: true, mode: body.mode, dry_run: body.dry_run === true,
-        selected_lots: targets.length, collector_duration_seconds: 115, model_calls: 0,
-        transport: "public_pusher", targets: body.dry_run === true ? targets : undefined }),
+      const result = await handoffBatLiveCollection(supabaseUrl, serviceRoleKey, body.dry_run === true,
+        { requestAt: nativeRequestStartedAt, authMs });
+      return new Response(JSON.stringify(result),
         { status: body.dry_run === true ? 200 : 202, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
     if (body?.mode === "description_source") {
@@ -1257,6 +1276,7 @@ Deno.serve(async (req) => {
     let sourceFetchedAt: string | null = null;
     let descriptionSnapshotId: string | null = null;
     let descriptionSnapshotCustody: { vehicleId?: string; matched?: boolean; sha256?: string | null } | undefined;
+    let terminalCapture: CaptureAcknowledgement | { status: "not_requested" | "not_terminal" | "cached_capture_unassessed" } = { status: "not_requested" };
 
     // Prefer existing DB snapshots (reduces BaT load + avoids bans). Can be disabled per-request.
     const preferSnapshot = body?.prefer_snapshot === false ? false : true;
@@ -1311,7 +1331,8 @@ Deno.serve(async (req) => {
         throw e;
       }
 
-      await trySaveHtmlSnapshot({
+      // The opt-in path retains the same response below, after terminal status is known.
+      if (!body.retain_terminal_evidence) await trySaveHtmlSnapshot({
         supabase,
         listingUrl: listingUrlNorm,
         httpStatus,
@@ -1331,6 +1352,20 @@ Deno.serve(async (req) => {
     // "Bid to $23,000 (Reserve Not Met)" on a lot whose record says "Sold on 04/11/2025 for
     // $24,000 to nocera76" (seller accepted after the close) — the record wins.
     const auction = summarizeAuction(html);
+    if (body.retain_terminal_evidence) {
+      terminalCapture = htmlSource === "snapshot" ? { status: "cached_capture_unassessed" }
+        : !auction.parsed || !(auction.sold || auction.reserveNotMet) ? { status: "not_terminal" }
+        : await retainFetchedCapture(supabase, { platform: "bat", url: listingUrlNorm, html, httpStatus,
+          fetchedAt: sourceFetchedAt!, metadata: { extractor: "extract-bat-core", extractor_version: EXTRACTOR_VERSION,
+            capture_scope: "terminal_result_canary_v1" } });
+      // Retention failure is visible without blocking independent testimony and native stream intake.
+      if (terminalCapture.status === "failed" || terminalCapture.status === "unavailable")
+        console.warn(`extract-bat-core terminal evidence: ${terminalCapture.reason}`);
+      if (htmlSource === "direct" && terminalCapture.status === "not_terminal") await trySaveHtmlSnapshot({
+        supabase, listingUrl: listingUrlNorm, httpStatus, success: true, fetchedAt: sourceFetchedAt,
+        errorMessage: null, html, metadata: { extractor: "extract-bat-core", mode: "free", user_agent: userAgent },
+      });
+    }
     // the comments JSON, parsed once: the first comment or bid is the auction's public start, the sale /
     // reserve-not-met record its close (Skylar: interactions on the timeline at their precise moments)
     const rawComments: any[] = readCommentsJson(html) ?? [];
@@ -2477,7 +2512,8 @@ Deno.serve(async (req) => {
                 const results = await Promise.allSettled(
                   batch.map(async (ins) => {
                     try {
-                      const resp = await fetch(ins.image_url, {
+                      // Binary image bytes for hashing; archiveFetch returns page text.
+                      const resp = await fetch(ins.image_url, { // guardrail-allow: raw-fetch (binary image)
                         signal: AbortSignal.timeout(8000),
                         headers: { "Accept": "image/*" },
                       });
@@ -2656,11 +2692,13 @@ Deno.serve(async (req) => {
     // Resolve seller_username → organization via bat_seller_monitors
     if (vehicleId && essentials.seller_username) {
       try {
-        const { data: monitor } = await supabase
+        // ILIKE treats "_" and "%" as wildcards: fetch candidates, then require an exact handle match.
+        const { data: monitorRows } = await supabase
           .from("bat_seller_monitors")
-          .select("organization_id")
+          .select("organization_id, seller_username")
           .ilike("seller_username", essentials.seller_username)
-          .maybeSingle();
+          .limit(5);
+        const monitor = monitorForSeller(essentials.seller_username, monitorRows || []);
 
         if (monitor?.organization_id) {
           // Upsert external_identity
@@ -2699,25 +2737,46 @@ Deno.serve(async (req) => {
               { onConflict: "organization_id,vehicle_id,relationship_type", ignoreDuplicates: true }
             );
 
-          // Wire vehicle_events
-          await supabase
+          // Wire vehicle_events: the lot being read only. The seller on this page is this lot's seller;
+          // other BaT lots of the same vehicle (resales by someone else) keep whatever they had.
+          const lotUrlKey = normalizeListingUrlKey(listingUrlCanonical);
+          const { data: lotRows } = await supabase
             .from("vehicle_events")
-            .update({
-              source_organization_id: monitor.organization_id,
-              ...(eiId ? { seller_external_identity_id: eiId } : {}),
-            })
+            .select("id, source_url, source_listing_id, source_organization_id, metadata")
             .eq("vehicle_id", vehicleId)
             .eq("source_platform", "bat")
-            .is("source_organization_id", null);
-
-          // Store ownership classification in event metadata for audit
-          if (relType !== "sold_by") {
-            await supabase
+            .or(`source_listing_id.eq.${lotUrlKey},source_url.eq.${listingUrlCanonical}`);
+          const decision = decideLotAttribution({
+            lotSellerHandle: essentials.seller_username,
+            monitors: monitorRows || [],
+            lotUrl: listingUrlCanonical,
+            events: (lotRows || []) as BatEventRow[],
+          });
+          for (const eventId of decision.attributeEventIds) {
+            const { error: attrErr } = await supabase
               .from("vehicle_events")
-              .update({ metadata: { ownership_classification: relType } })
-              .eq("vehicle_id", vehicleId)
-              .eq("source_platform", "bat")
-              .eq("source_organization_id", monitor.organization_id);
+              .update({
+                source_organization_id: monitor.organization_id,
+                ...(eiId ? { seller_external_identity_id: eiId } : {}),
+              })
+              .eq("id", eventId)
+              .is("source_organization_id", null);
+            if (attrErr) console.warn(`vehicle_events attribution failed (non-fatal): ${attrErr.message}`);
+          }
+
+          // Store ownership classification in event metadata for audit. Merge into this lot's metadata:
+          // a plain { metadata: {...} } update replaces the whole jsonb (it dropped seller_username,
+          // buyer_username, lot_number and images from ~0.6% of BaT events).
+          if (relType !== "sold_by") {
+            for (const row of ((lotRows || []) as BatEventRow[]).filter((r) =>
+              decision.attributeEventIds.includes(r.id) || r.source_organization_id === monitor.organization_id
+            )) {
+              const { error: metaErr } = await supabase
+                .from("vehicle_events")
+                .update({ metadata: mergeEventMetadata(row.metadata, { ownership_classification: relType }) })
+                .eq("id", row.id);
+              if (metaErr) console.warn(`vehicle_events metadata merge failed (non-fatal): ${metaErr.message}`);
+            }
           }
         }
       } catch (e: any) {
@@ -2762,6 +2821,9 @@ Deno.serve(async (req) => {
           winning_bid: hasSale ? essentials.sale_price : null,
           winning_bidder: hasSale ? (essentials.buyer_username || null) : null,
           seller_name: essentials.seller_username || null,
+          // BaT's own line for this lot. Left out of the payload when the page has no recognized value, so a
+          // later read of a page without it cannot null a type an earlier read stored.
+          ...(essentials.seller_type ? { seller_type: essentials.seller_type } : {}),
           total_bids: essentials.bid_count || null,
           unique_bidders: auction.parsed ? auction.uniqueBidders : null,
           comments_count: essentials.comment_count || null,
@@ -2773,6 +2835,8 @@ Deno.serve(async (req) => {
             extractor: "extract-bat-core",
             source_read: readClock.source_read,
             listing_url: listingUrlCanonical,
+            // the "Private Party or Dealer" line exactly as the page states it (seller_type is its normalized value)
+            party_type_raw: essentials.party_type_raw,
             listing_details: {
               vin: essentials.vin,
               mileage: essentials.mileage,
@@ -2907,6 +2971,7 @@ Deno.serve(async (req) => {
       captureSha256: await sha256Hex(html), snapshotId: descriptionSnapshotId,
       snapshotCustody: descriptionSnapshotCustody,
     }) : { status: "unavailable", reason: "Vehicle unresolved" };
+    await landIdentifierClaims(supabase, { vehicleId, text: descriptionRaw, sourceUrl: listingUrlCanonical, title: identity?.title ?? null, extractor: "extract-bat-core" });
     if (descriptionReceipt.status === "failed" || descriptionReceipt.status === "refused") {
       console.warn(`[BAT] description receipt ${descriptionReceipt.status}: ${descriptionReceipt.reason}`);
     }
@@ -2998,10 +3063,11 @@ Deno.serve(async (req) => {
         vehicles_updated: updatedIds.length,
         created_vehicle_ids: createdIds,
         updated_vehicle_ids: updatedIds,
-        issues: [],
+        issues: terminalCapture.status === "failed" || terminalCapture.status === "unavailable" ? ["terminal_evidence_" + terminalCapture.reason] : [],
         extraction_method: "direct_html_parsing_free_mode",
         timings: { ...timings, total_ms: Date.now() - phaseStart },
-        snapshot: "receipt_only",
+        snapshot: body.retain_terminal_evidence ? terminalCapture.status : "receipt_only",
+        terminal_capture: terminalCapture,
         auction: {
           record_parsed: auction.parsed,
           sold: saleNow,

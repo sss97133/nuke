@@ -328,6 +328,8 @@ struct ActorVehiclesView: View {
         do {
             let links: [Link] = try await SupabaseService.client.from("organization_vehicles")
                 .select("vehicle_id").eq("organization_id", value: orgId).eq("relationship_type", value: role)
+                // When the relationship began (start_date), not when the row was ingested; undated last.
+                .order("start_date", ascending: false, nullsFirst: false)
                 .order("created_at", ascending: false).limit(Self.linkCap).execute().value
             linked = links.count
             var seen = Set<String>()

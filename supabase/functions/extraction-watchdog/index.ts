@@ -305,13 +305,16 @@ async function runRecoveryActions(supabase: any, health: QueueHealth): Promise<s
 
   // Use RPC for bulk updates — Supabase JS .update().in() is unreliable and .limit() doesn't work on updates.
   // These run as raw SQL through a simple RPC wrapper for reliability.
+  // execute_recovery_sql runs any text as the database owner; migration 20261021230000 takes EXECUTE away from
+  // service_role. supabase-js returns that refusal instead of throwing, so each step throws it into its fallback.
 
   // ── 2. Skip hopeless items (too many attempts, will never work) ──
   try {
-    const { data: skipResult } = await supabase.rpc("execute_recovery_sql", {
+    const { data: skipResult, error: skipRpcErr } = await supabase.rpc("execute_recovery_sql", {
       p_sql: `UPDATE import_queue SET status = 'skipped', error_message = 'Skipped: exceeded max attempts'
               WHERE status = 'pending' AND attempts >= ${THRESHOLDS.max_attempts_before_skip}`,
     });
+    if (skipRpcErr) throw skipRpcErr;
     const skipCount = skipResult?.[0]?.affected ?? 0;
     if (skipCount > 0) {
       actions.push(`Skipped ${skipCount} items that failed ${THRESHOLDS.max_attempts_before_skip}+ times — they'll never succeed`);
@@ -332,10 +335,11 @@ async function runRecoveryActions(supabase: any, health: QueueHealth): Promise<s
 
   // ── 3. Mark duplicates as complete (data already exists) ──
   try {
-    const { data: dupeResult } = await supabase.rpc("execute_recovery_sql", {
+    const { data: dupeResult, error: dupeRpcErr } = await supabase.rpc("execute_recovery_sql", {
       p_sql: `UPDATE import_queue SET status = 'complete', error_message = 'Duplicate - data already exists'
               WHERE status IN ('failed', 'pending') AND failure_category = 'duplicate'`,
     });
+    if (dupeRpcErr) throw dupeRpcErr;
     const dupeCount = dupeResult?.[0]?.affected ?? 0;
     if (dupeCount > 0) {
       actions.push(`Resolved ${dupeCount} duplicates — we already have this data`);
@@ -355,13 +359,14 @@ async function runRecoveryActions(supabase: any, health: QueueHealth): Promise<s
 
   // ── 4. Skip gone/deleted items (404, 410, taken down) ──
   try {
-    const { data: goneResult } = await supabase.rpc("execute_recovery_sql", {
+    const { data: goneResult, error: goneRpcErr } = await supabase.rpc("execute_recovery_sql", {
       p_sql: `UPDATE import_queue SET status = 'skipped'
               WHERE status IN ('pending', 'failed')
               AND (error_message ILIKE '%410%' OR error_message ILIKE '%Gone%'
                    OR error_message ILIKE '%404%' OR error_message ILIKE '%not found%'
                    OR error_message ILIKE '%listing has ended%' OR error_message ILIKE '%no longer available%')`,
     });
+    if (goneRpcErr) throw goneRpcErr;
     const goneCount = goneResult?.[0]?.affected ?? 0;
     if (goneCount > 0) {
       actions.push(`Skipped ${goneCount} listings that no longer exist`);
@@ -381,12 +386,13 @@ async function runRecoveryActions(supabase: any, health: QueueHealth): Promise<s
 
   // ── 5. Unstick retryable items with no next_attempt_at ──
   try {
-    const { data: orphanResult } = await supabase.rpc("execute_recovery_sql", {
+    const { data: orphanResult, error: orphanRpcErr } = await supabase.rpc("execute_recovery_sql", {
       p_sql: `UPDATE import_queue SET next_attempt_at = now()
               WHERE status = 'pending' AND attempts >= 1
               AND attempts < ${THRESHOLDS.max_attempts_before_skip}
               AND next_attempt_at IS NULL`,
     });
+    if (orphanRpcErr) throw orphanRpcErr;
     const orphanCount = orphanResult?.[0]?.affected ?? 0;
     if (orphanCount > 0) {
       actions.push(`Unstuck ${orphanCount} items that were stuck with no retry time — queued for retry now`);
@@ -411,7 +417,7 @@ async function runRecoveryActions(supabase: any, health: QueueHealth): Promise<s
   // by older code paths (process-import-queue) are permanently orphaned — never retried.
   // Any failed item with remaining attempts should be given another chance.
   try {
-    const { data: rescueResult } = await supabase.rpc("execute_recovery_sql", {
+    const { data: rescueResult, error: rescueRpcErr } = await supabase.rpc("execute_recovery_sql", {
       p_sql: `UPDATE import_queue
               SET status = 'pending',
                   next_attempt_at = now() + interval '5 minutes',
@@ -427,12 +433,15 @@ async function runRecoveryActions(supabase: any, health: QueueHealth): Promise<s
                 AND error_message NOT ILIKE '%requires login%'
                 AND error_message NOT ILIKE '%permanently unavailable%'`,
     });
+    if (rescueRpcErr) throw rescueRpcErr;
     const rescueCount = rescueResult?.[0]?.affected ?? 0;
     if (rescueCount > 0) {
       actions.push(`Rescued ${rescueCount} orphaned failed items back to pending for retry`);
     }
   } catch (err) {
+    // No supabase-js fallback for this step: report that it did not run instead of passing silently.
     console.error("[Watchdog] Rescue failed items error:", err);
+    actions.push(`Rescue of failed items did not run: ${(err as { message?: string })?.message ?? String(err)}`);
   }
 
   // ── 6. Per-source circuit breaker ──

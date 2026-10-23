@@ -759,3 +759,18 @@ export function sellerAssessmentConditionScore(a: SellerAssessment): Record<stri
 }
 
 export const SELLER_ASSESSMENT_VERSION = 'bonhams-mph-100pt-v1';
+
+/**
+ * A Bonhams "preview-lot" URL (/auction/{sale}/preview-lot/{id}/...) is a showcase card, not a lot of that sale: often a car
+ * sold at an earlier sale, shown to promote this one. Its offer carries no hammer (the JSON-LD "price" read 5 and 11 on
+ * 2026-10-23) and OutOfStock availability, which the catalog import used to record as a sale.
+ */
+export function isBonhamsPreviewLotUrl(u: string | null | undefined): boolean {
+  return /\/auction\/\d+\/preview-lot\//i.test(u ?? "");
+}
+
+/** A catalog offer's result: sold only for a real lot whose offer is OutOfStock; preview cards are never a sale. */
+export function catalogOfferIsSold(url: string | null | undefined, availability: string | null | undefined): boolean {
+  if (isBonhamsPreviewLotUrl(url)) return false;
+  return (availability ?? "").includes("OutOfStock");
+}

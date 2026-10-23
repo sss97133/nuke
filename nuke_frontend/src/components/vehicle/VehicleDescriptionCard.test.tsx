@@ -32,13 +32,21 @@ describe('existing public profile description card',()=>{
   expect(container.querySelector(`a[href="/vehicle/${id}/observation/${sourceId}"]`)).not.toBeNull();
   expect(container.textContent).toContain('2020-01-01T00:00:00Z');expect(container.textContent).toContain('2022-01-01T00:00:00Z');
   expect(container.textContent).toContain('Captured: Date unknown');expect(container.textContent).toContain('Original listing event date unknown');
-  expect(container.textContent).toContain('Original source completeness unknown');expect(container.textContent).toContain('Stored confidence: 0.6');
+  expect(container.textContent).toContain('Original source completeness unknown');expect(container.textContent).toContain('Model self-score (not corroboration): 0.6');
   expect(container.querySelector('script')).toBeNull();expect(fixture.invoke).not.toHaveBeenCalled();expect(fixture.update).not.toHaveBeenCalled();
   expect(fixture.rpc).toHaveBeenCalledWith('get_vehicle_specs',{p_vehicle_id:id});
  });
  it('shows existing listing prose even when the canonical description is empty',async()=>{
   fixture.single.mockResolvedValue({data:{description:null},error:null});await render();expect(container.textContent).toContain(text);
   expect(container.textContent).not.toContain('No description yet');
+ });
+ it('shows identical canonical and preserved text once while keeping its source link',async()=>{
+  fixture.single.mockResolvedValue({data:{description:text,description_source:'external_import'},error:null});
+  await render();
+  expect(container.textContent?.split(text)).toHaveLength(2);
+  expect(container.querySelector('a[href="https://source.invalid/listing"]')).not.toBeNull();
+  const record=Array.from(container.querySelectorAll('details')).find(d=>d.querySelector('summary')?.textContent==='Source record');
+  expect(record?.open).toBe(false);
  });
  it('failed/denied optional reader hides source prose and preserves manual text',async()=>{
   fixture.rpc.mockResolvedValue({data:null,error:{message:'denied'}});await render();expect(container.textContent).toContain('Manual summary');

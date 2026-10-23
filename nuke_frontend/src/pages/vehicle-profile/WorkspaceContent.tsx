@@ -172,6 +172,13 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
           className="vp-col-left vehicle-profile-left-column"
           style={{ width: `${leftPct}%` }}
         >
+          {/* Read the retained seller account before tools or requests for more data.
+              The description card owns its disclosure and empty-state guard. */}
+          <React.Suspense fallback={null}>
+            <VehicleDescriptionCard vehicleId={vehicle.id} initialDescription={vehicle.description}
+              isEditable={canEdit} onUpdate={() => {}} />
+          </React.Suspense>
+
           {/* Buyers: inspect before you buy, when the listing plan has checklist items */}
           {isPublic && !(isRowOwner || isVerifiedOwner) && (
             <React.Suspense fallback={null}>
@@ -195,7 +202,7 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
           )}
 
           {/* Vehicle Dossier — provenance-rich field panel */}
-          <CollapsibleWidget variant="profile" title="Source claims & specifications" defaultCollapsed={true}>
+          <CollapsibleWidget variant="profile" title="Source claims & specifications" defaultCollapsed={false}>
             <React.Suspense fallback={null}><VehicleDossierPanel /></React.Suspense>
           </CollapsibleWidget>
 
@@ -259,13 +266,6 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
             <VehicleWorkCard vehicleId={vehicle.id} signedIn={!!session?.user?.id}
               vehicleTitle={[vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(' ')} />
           </React.Suspense>
-
-          {/* Description */}
-          <CollapsibleWidget variant="profile" title="Source description" defaultCollapsed={true}>
-            <React.Suspense fallback={null}><VehicleDescriptionCard
-              vehicleId={vehicle.id} initialDescription={vehicle.description} isEditable={canEdit} onUpdate={() => {}}
-            /></React.Suspense>
-          </CollapsibleWidget>
 
           {/* Comments & Bids — right after description for natural reading flow */}
           {/* The legacy profile count covers a different collection. Let the

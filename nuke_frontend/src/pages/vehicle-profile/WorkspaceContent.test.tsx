@@ -9,7 +9,7 @@ vi.mock('../../components/vehicle/VehicleCommentsCard', () => ({
   VehicleCommentsCard: (props: any) => { fixture.comments(props); return <div data-testid="comment-reader">Comments &amp; Bids</div>; },
 }));
 vi.mock('./WorkMemorySection', () => ({ default: () => null }));
-vi.mock('./VehicleDossierPanel', () => ({ default: () => null }));
+vi.mock('./VehicleDossierPanel', () => ({ default: () => <div data-testid="specifications">Retained specifications</div> }));
 vi.mock('../../components/vehicle/VehicleLedgerDocumentsCard', () => ({ VehicleLedgerDocumentsCard: () => null }));
 vi.mock('../../components/PartsQuoteGenerator', () => ({ PartsQuoteGenerator: () => null }));
 vi.mock('./InvestmentLedger', () => ({ default: () => null }));
@@ -21,7 +21,7 @@ vi.mock('./VehicleFindingsCard', () => ({ default: () => null }));
 vi.mock('../../components/vehicle/BuyerQuestionPreview', () => ({ default: () => null }));
 vi.mock('../../components/vehicle/ExternalListingCard', () => ({ default: () => null }));
 vi.mock('../../components/vehicle/VehicleReferenceLibrary', () => ({ default: () => null }));
-vi.mock('../../components/vehicle/VehicleDescriptionCard', () => ({ default: () => null }));
+vi.mock('../../components/vehicle/VehicleDescriptionCard', () => ({ default: () => <section data-testid="description">Seller description</section> }));
 vi.mock('../../components/images/BundleReviewQueue', () => ({ default: () => null }));
 vi.mock('../../components/images/ImageGallery', () => ({ default: () => null }));
 vi.mock('../../components/vehicle/VehicleVideoSection', () => ({ default: () => null }));
@@ -67,4 +67,12 @@ it.each([0, undefined, 73])('opens the subject reader independently of the legac
 it('does not mount a child reader before a parent vehicle exists', async () => {
   fixture.context.vehicle = null; await mount();
   expect(fixture.comments).not.toHaveBeenCalled(); expect(host.textContent).toBe('');
+});
+it('opens the retained description and specifications without a second disclosure gate', async () => {
+  await mount();
+  const left = host.querySelector('.vehicle-profile-left-column')!;
+  expect(left.firstElementChild?.getAttribute('data-testid')).toBe('description');
+  expect(host.querySelectorAll('[data-testid=description]')).toHaveLength(1);
+  expect(host.querySelector('[data-testid=description]')?.closest('.collapsible-widget--profile')).toBeNull();
+  expect(host.querySelector('[data-testid=specifications]')).not.toBeNull();
 });

@@ -5,7 +5,7 @@
     "tsconfig.app.json",
     "tsconfig.node.json"
   ],
-  "total": 444,
+  "total": 441,
   "files": {
     "nuke_frontend/src/branding/ModeSwitcher.tsx": 1,
     "nuke_frontend/src/components/AdminDashboard.tsx": 1,
@@ -36,7 +36,6 @@
     "nuke_frontend/src/components/deck/Editable.tsx": 1,
     "nuke_frontend/src/components/image-viewer/ImageUploader.tsx": 2,
     "nuke_frontend/src/components/image/EnhancedImageTagger.tsx": 20,
-    "nuke_frontend/src/components/map/PublicMap.tsx": 1,
     "nuke_frontend/src/components/market/MarketMap.tsx": 2,
     "nuke_frontend/src/components/organization/OrganizationCard.tsx": 1,
     "nuke_frontend/src/components/organization/OrganizationNotifications.tsx": 1,
@@ -103,7 +102,6 @@
     "nuke_frontend/src/pages/developers/index.tsx": 1,
     "nuke_frontend/src/pages/market/MarketInventoryMap.test.tsx": 1,
     "nuke_frontend/src/pages/market/MarketPulse.test.tsx": 3,
-    "nuke_frontend/src/pages/market/SourcesBoard.tsx": 2,
     "nuke_frontend/src/pages/market/heat-fixture.contract.test.ts": 1,
     "nuke_frontend/src/pages/market/useMarketPulse.test.tsx": 1,
     "nuke_frontend/src/pages/market/useMarketPulse.ts": 1,

@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 const fixture = vi.hoisted(() => ({ rpc: vi.fn(), from: vi.fn() }));
 vi.mock('../../lib/supabase', () => ({ supabase: { rpc: fixture.rpc, from: fixture.from } }));
-import { assertPulseColumns, fetchPulse, parseTape, PULSE_COLUMNS, readInventoryTaxonomy, useMarketPulse, withTapeBids } from './useMarketPulse';
+import { assertPulseColumns, bidBucket, fetchBoard, houseName, fetchPulse, moneyIn, parseTape, usdBid, PULSE_COLUMNS, readInventoryTaxonomy, useMarketPulse, withTapeBids } from './useMarketPulse';
 
 afterEach(() => { vi.useRealTimers(); vi.clearAllMocks(); });
 
@@ -195,5 +195,52 @@ describe('the payload names its slots', () => {
     const pulse = await fetchPulse();
     expect(pulse.auctions[0].currentBid).toBe(650000);
     expect(() => assertPulseColumns(undefined)).not.toThrow();
+  });
+});
+
+describe('every house on one board', () => {
+  const bat = ['bat-1', 1995, 'Ford', 'Mustang', 30000, '2026-10-20T00:00:00Z', '2026-10-10T00:00:00Z', '2026-10-09T00:00:00Z', null, false, 'https://bringatrailer.com/listing/bat-1/'];
+  const cc = ['cc-1', 1994, 'Porsche', '911', 44694, '2026-10-19T00:00:00Z', '2026-10-10T00:00:00Z', '2026-10-09T00:00:00Z', null, true,
+    'https://collectingcars.com/for-sale/a', '1994 Porsche 911', 'collecting-cars', 'gbp'];
+  const board = (houses: unknown) => fixture.rpc.mockImplementation(async (name: string) => name === 'market_pulse_live_houses'
+    ? houses : { data: { auctions: [bat] }, error: null });
+
+  it('puts the houses beside BaT in close order, each lot with its house and an upper-case currency; BaT reads USD', async () => {
+    board({ data: { auctions: [cc], houses: [{ house: 'collecting-cars', lots: 1, read_at: '2026-10-10T00:00:00Z', on_board: true },
+      { house: 'cars-and-bids', lots: 9, read_at: '2026-10-08T00:00:00Z', on_board: false }] }, error: null });
+    const b = await fetchBoard();
+    expect(b.auctions.map(a => [a.id, a.house, a.currency])).toEqual([['cc-1', 'collecting-cars', 'GBP'], ['bat-1', 'bringatrailer', 'USD']]);
+    expect(b.auctions[0]).toMatchObject({ band: null, serverHeat: null, noReserve: true, title: '1994 Porsche 911', make: 'PORSCHE' });
+    expect(b.houses.map(h => [h.house, h.onBoard])).toEqual([['bringatrailer', true], ['collecting-cars', true], ['cars-and-bids', false]]);
+    expect(b.housesFailed).toBe(false);
+  });
+  it('names a house by the label its row sends, with no edit here', async () => {
+    board({ data: { auctions: [], houses: [{ house: 'new-house', label: 'New House Auctions', lots: 2, read_at: null, on_board: true }] }, error: null });
+    await fetchBoard();
+    expect(houseName('new-house')).toBe('New House Auctions');
+    expect(houseName('new-house', true)).toBe('New House Auctions');
+    expect(houseName('bringatrailer', true)).toBe('BaT');
+    expect(houseName('never-sent')).toBe('never-sent');
+  });
+  it("keeps BaT's board and says so when the other houses cannot be read", async () => {
+    board({ data: null, error: new Error('boom') });
+    const b = await fetchBoard();
+    expect(b.auctions.map(a => a.id)).toEqual(['bat-1']);
+    expect(b.housesFailed).toBe(true);
+    expect(b.houses).toEqual([]);
+  });
+  it('adds only dollars: a foreign bid is never a dollar amount, and is its own range', () => {
+    expect(usdBid({ currentBid: 100, currency: 'USD' })).toBe(100);
+    expect(usdBid({ currentBid: 100, currency: 'GBP' })).toBeNull();
+    expect(usdBid({ currentBid: null, currency: 'USD' })).toBeNull();
+    expect(bidBucket(44694, 'GBP')).toBe('otherCurrency');
+    expect(bidBucket(null, 'GBP')).toBe('unknown');
+    expect(bidBucket(44694)).toBe('25k50k');
+  });
+  it('writes a bid in its own currency', () => {
+    expect(moneyIn(65000, 'USD')).toBe('$65,000');
+    expect(moneyIn(44694, 'GBP').replace(/\s/g, ' ')).toBe('GBP 44,694');
+    expect(moneyIn(null, 'EUR')).toBe('—');
+    expect(moneyIn(1_200_000, 'USD', true)).toBe('$1.2M');
   });
 });

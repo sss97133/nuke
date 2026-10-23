@@ -50,6 +50,7 @@ const sources = new Map([
   ['archive',compile('../supabase/functions/_shared/archiveFetch.ts')],
   ['parser',compile('../supabase/functions/_shared/batParser.ts')],
   ['chassis',compile('../supabase/functions/_shared/batChassis.ts')],
+  ['sellerType',compile('../supabase/functions/_shared/batSellerType.ts')],
   ['handler',compile('../supabase/functions/batch-extract-snapshots/index.ts')],
   ['batSaleQueue',compile('../supabase/functions/batch-extract-snapshots/batSaleQueue.ts')],
   ['aiGate',compile('../supabase/functions/batch-extract-snapshots/aiGate.ts')],
@@ -57,9 +58,15 @@ const sources = new Map([
   ['writeRules',compile('../supabase/functions/batch-extract-snapshots/writeRules.ts')],
   ['snapshotCompare',compile('../supabase/functions/batch-extract-snapshots/snapshotCompare.ts')],
   ['intake',compile('../supabase/functions/ingest-observation/index.ts')],
+  ['financialEvidence',compile('../supabase/functions/ingest-observation/financialEvidence.ts')],
+  ['financialDelegation',compile('../supabase/functions/ingest-observation/financialDelegation.ts')],
+  ['financialProcessing',compile('../supabase/functions/ingest-observation/financialProcessing.ts')],
+  ['financialCandidateContext',compile('../supabase/functions/ingest-observation/financialCandidateContext.ts')],
+  ['financialCandidates',compile('../supabase/functions/ingest-observation/financialCandidates.ts')],
   ['historicalAsks',compile('../supabase/functions/ingest-observation/historicalAsks.ts')],
   ['historicalAskIntake',compile('../supabase/functions/ingest-observation/historicalAskIntake.ts')],
   ['liveIntake',compile('../supabase/functions/ingest-observation/batLive.ts')],
+  ['liveCollector',compile('../supabase/functions/ingest-observation/batLiveCollector.ts')],
   ['liveEvents',compile('../supabase/functions/_shared/batLiveEvents.ts')],
   ['auctionRecord',compile('../supabase/functions/_shared/batAuctionRecord.ts')],
   ['property',compile('../supabase/functions/ingest-observation/imageProperties.ts')],
@@ -244,9 +251,11 @@ function fixture(options = {}) {
         if(specifier==='./firecrawl.ts')return {firecrawlScrape:()=>assert.fail('No paid fetch')};
         if(specifier==='./batParser.ts')return load('parser');
         if(specifier==='./batChassis.ts')return load('chassis');
+        if(specifier==='./batSellerType.ts')return load('sellerType');
         if(specifier==='../_shared/archiveFetch.ts')return load('archive');
         if(specifier==='../_shared/batParser.ts')return load('parser');
         if(specifier==='./batLive.ts')return load('liveIntake');
+        if(specifier==='./batLiveCollector.ts')return load('liveCollector');
         if(specifier==='../_shared/batLiveEvents.ts')return load('liveEvents');
         if(specifier==='./batAuctionRecord.ts')return load('auctionRecord');
         if(specifier==='../_shared/writeGuard.ts')return load('guard');
@@ -283,6 +292,11 @@ function fixture(options = {}) {
         if(specifier==='./retainedIdentity.ts')return load('retainedIdentity');
         if(specifier==='./historicalAsks.ts')return load('historicalAsks');
         if(specifier==='./historicalAskIntake.ts')return load('historicalAskIntake');
+        if(specifier==='./financialEvidence.ts')return load('financialEvidence');
+        if(specifier==='./financialDelegation.ts')return load('financialDelegation');
+        if(specifier==='./financialProcessing.ts')return load('financialProcessing');
+        if(specifier==='./financialCandidateContext.ts')return load('financialCandidateContext');
+        if(specifier==='./financialCandidates.ts')return load('financialCandidates');
         if(specifier==='../_shared/batAuctionRecord.ts')return load('auctionRecord');
         if(specifier==='../_shared/observationContentHash.ts')return load('hash');
         if(specifier==='../ingest-observation/imageProperties.ts')return load('property');
@@ -290,6 +304,7 @@ function fixture(options = {}) {
         if(specifier==='../_shared/cors.ts')return {corsHeaders:{'Access-Control-Allow-Origin':'*'}};
         if(specifier==='../_shared/writeResult.ts')return {mustWrite:(_label,result)=>result,softWrite:()=>null};
         if(specifier==='../_shared/identityMatch.ts')return {identityConflict:()=>null};
+        if(specifier==='./vinCitation.ts')return {vinExcerpt:()=>null,pageText:value=>value};
         assert.fail(`Unexpected import ${specifier}`);
       }});
     return exports;

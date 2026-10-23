@@ -94,6 +94,8 @@ enum CapturedListings {
             .order("id", ascending: false)
             .limit(pageSize)
             .execute().value
+        // Show by when the listing was observed at its source; rows without that clock go last.
+        rows.sort { EventTime.newestFirst(ProfileClock.date($0.source_observed_at), ProfileClock.date($1.source_observed_at), tie: ($0.created_at ?? "", $1.created_at ?? "")) }
         let ids = Array(Set(rows.compactMap(\.vehicle_id)))
         var parents: [String: CapturedListing.Parent] = [:]
         if !ids.isEmpty {

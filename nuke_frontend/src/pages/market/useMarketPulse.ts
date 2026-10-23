@@ -16,7 +16,9 @@ export interface LiveAuction {
   imageUrl: string | null;
   noReserve: boolean;
   listingUrl: string | null;
-  title: string | null; // the listing's own title as BaT publishes it
+  title: string | null; // the listing's own title as its house publishes it
+  house: string; // platform slug: 'bringatrailer' for the BaT board, the house's own for the others
+  currency: string; // ISO code the house records the bid in; BaT's board carries none and reads USD
   // Expected-price band from comparable BaT sales on the lot's model page (hammer_predictions, model 31;
   // scripts/market/live-bands.mjs). Null when the lot isn't priced (no confident model page or < 5 comps).
   band: { p10: number; p50: number; p90: number; tier: string; comps: number } | null;
@@ -65,6 +67,46 @@ export interface MarketPulse {
   /** v3 payloads: the three numbers the verdict uses and the track record behind its sentence; null before v3. */
   thresholds: { hot: number; cold: number; maxHours: number } | null;
   backtest: BacktestRow[] | null;
+  /** Houses that have open lots and how they stand: on this board, or held off because their reader stopped. Empty
+   *  when only the BaT board was read. */
+  houses: HouseStatus[];
+  /** The other houses' read failed; the board is BaT's alone. */
+  housesFailed: boolean;
+}
+
+export interface HouseStatus { house: string; lots: number; readAt: number | null; onBoard: boolean }
+
+export const BAT_HOUSE = 'bringatrailer';
+
+/** Display names for the houses the live board reads. */
+export const HOUSE_NAMES: Record<string, string> = {
+  bringatrailer: 'Bring a Trailer', 'collecting-cars': 'Collecting Cars', pcarmarket: 'PCarMarket', 'cars-and-bids': 'Cars & Bids',
+};
+export const HOUSE_SHORT: Record<string, string> = {
+  bringatrailer: 'BaT', 'collecting-cars': 'Collecting Cars', pcarmarket: 'PCarMarket', 'cars-and-bids': 'Cars & Bids',
+};
+// Labels the houses read sent with the payload (live_board_houses.label): a house added there needs no edit here.
+const SENT_LABELS = new Map<string, string>();
+export function houseName(house: string, short = false): string {
+  return (short ? HOUSE_SHORT : HOUSE_NAMES)[house] ?? SENT_LABELS.get(house) ?? house;
+}
+
+/** The bid in US dollars, or null when the lot is not bid in dollars or has no bid. No rate table exists, so a
+ *  foreign-currency bid is never converted or added into a dollar figure. */
+export function usdBid(a: Pick<LiveAuction, 'currentBid' | 'currency'>): number | null {
+  return a.currency === 'USD' ? a.currentBid : null;
+}
+
+/** A bid in its own currency, e.g. "£44,694" or "€38,250"; dollars read "$65,000". */
+export function moneyIn(n: number | null | undefined, currency: string, compact = false): string {
+  if (n == null) return '—';
+  const opts: Intl.NumberFormatOptions = compact && Math.abs(n) >= 10_000
+    ? { notation: 'compact', maximumFractionDigits: Math.abs(n) >= 1_000_000 ? 1 : 0 } : { maximumFractionDigits: 0 };
+  try {
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency, currencyDisplay: currency === 'USD' ? 'symbol' : 'code', ...opts }).format(n);
+  } catch {
+    return `${currency} ${Math.round(n).toLocaleString('en-US')}`;
+  }
 }
 
 // Lots BaT lists without a parsed make (wheel sets, replicas) are grouped under this label.
@@ -78,10 +120,12 @@ export const BID_BUCKETS = [
   { id: '50k100k', label: '$50,000–99,999' },
   { id: '100kplus', label: '$100,000+' },
   { id: 'unknown', label: 'Unrecorded' },
+  { id: 'otherCurrency', label: 'Bid in another currency' },
 ] as const;
 export type BidBucket = typeof BID_BUCKETS[number]['id'];
 
-export function bidBucket(bid: number | null): BidBucket {
+export function bidBucket(bid: number | null, currency = 'USD'): BidBucket {
+  if (bid != null && currency !== 'USD') return 'otherCurrency';
   if (bid == null || !Number.isFinite(bid) || bid < 0) return 'unknown';
   if (bid < 10_000) return 'under10k';
   if (bid < 25_000) return '10k25k';
@@ -94,9 +138,9 @@ export function currentBidDistribution(auctions: LiveAuction[]) {
   const counts = Object.fromEntries(BID_BUCKETS.map(b => [b.id, 0])) as Record<BidBucket, number>;
   const bids: number[] = [];
   for (const a of auctions) {
-    const bucket = bidBucket(a.currentBid);
+    const bucket = bidBucket(a.currentBid, a.currency);
     counts[bucket] += 1;
-    if (bucket !== 'unknown') bids.push(a.currentBid as number);
+    if (bucket !== 'unknown' && bucket !== 'otherCurrency') bids.push(a.currentBid as number);
   }
   bids.sort((a, b) => a - b);
   const mid = Math.floor(bids.length / 2);
@@ -174,11 +218,14 @@ export async function fetchPulse(): Promise<MarketPulse> {
       noReserve: r[9] === true,
       listingUrl: r[10],
       title: r[11] ?? null,
+      house: BAT_HOUSE,
+      currency: 'USD',
       band: r[13] != null && r[12] != null && r[14] != null
         ? { p10: Number(r[12]), p50: Number(r[13]), p90: Number(r[14]), tier: String(r[15] ?? ''), comps: Number(r[16] ?? 0) }
         : null,
       serverHeat: serverHeatOf(r[17]),
     })),
+    houses: [], housesFailed: false,
     curve: (data?.curve as BidCurve | undefined) ?? null,
     thresholds: data?.thresholds && data.thresholds.hot != null
       ? { hot: Number(data.thresholds.hot), cold: Number(data.thresholds.cold), maxHours: Number(data.thresholds.max_hours) }
@@ -190,6 +237,46 @@ export async function fetchPulse(): Promise<MarketPulse> {
           runAt: b.run_at ?? null, population: b.population ?? null, lotsSold: b.lots_sold == null ? null : Number(b.lots_sold), source: b.source ?? null,
         })).filter((b) => Number.isFinite(b.horizonHours) && Number.isFinite(b.hotAbove) && Number.isFinite(b.coldBelow))
       : null,
+  };
+}
+
+type HouseRow = [
+  string, number | null, string | null, string | null, number | null, string, string, string, string | null, boolean,
+  string | null, string | null, string, string,
+];
+
+/** The other houses' open lots (market_pulse_live_houses), in the board's shape; no band or verdict (those are BaT's). */
+export async function fetchHouses(): Promise<{ auctions: LiveAuction[]; houses: HouseStatus[] }> {
+  const { data, error } = await supabase.rpc('market_pulse_live_houses');
+  if (error) throw error;
+  const rows = ((data?.auctions ?? []) as HouseRow[]);
+  return {
+    auctions: rows.map((r) => ({
+      id: r[0], year: r[1], make: r[2] ? r[2].toUpperCase() : NO_MAKE, model: r[3],
+      currentBid: r[4] == null ? null : Number(r[4]),
+      endsAt: Date.parse(r[5]), updatedAt: Date.parse(r[6]), listedAt: Date.parse(r[7]),
+      imageUrl: r[8], noReserve: r[9] === true, listingUrl: r[10], title: r[11] ?? null,
+      house: r[12], currency: String(r[13] || 'USD').toUpperCase(), band: null, serverHeat: null,
+    })),
+    houses: Array.isArray(data?.houses)
+      ? (data.houses as { house: string; label?: string | null; lots: number; read_at: string | null; on_board: boolean }[]).map((h) => {
+          if (h.label) SENT_LABELS.set(h.house, h.label);
+          return { house: h.house, lots: Number(h.lots), readAt: h.read_at ? Date.parse(h.read_at) : null, onBoard: h.on_board === true };
+        })
+      : [],
+  };
+}
+
+/** Every live auction on the board: BaT's (with its bands, verdicts and baseline) and the other houses' beside it.
+ *  Without the other houses' read the board is BaT's alone and says so. */
+export async function fetchBoard(): Promise<MarketPulse> {
+  const [bat, others] = await Promise.all([fetchPulse(), fetchHouses().then((h) => ({ ok: true as const, ...h }), () => ({ ok: false as const }))]);
+  if (!others.ok) return { ...bat, housesFailed: true };
+  const batHouse: HouseStatus = { house: BAT_HOUSE, lots: bat.auctions.length, readAt: bat.syncedAt, onBoard: true };
+  return {
+    ...bat,
+    auctions: [...bat.auctions, ...others.auctions].sort((a, b) => a.endsAt - b.endsAt),
+    houses: [batHouse, ...others.houses],
   };
 }
 
@@ -336,8 +423,8 @@ export function withTapeBids(auctions: LiveAuction[], best: ReadonlyMap<string, 
 
 export function useMarketPulse() {
   const query = useQuery({
-    queryKey: ['market-pulse-live'],
-    queryFn: fetchPulse,
+    queryKey: ['market-pulse-board'],
+    queryFn: fetchBoard,
     refetchInterval: REFETCH_MS,
     staleTime: REFETCH_MS / 2,
     retry: 1,

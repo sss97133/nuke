@@ -40,6 +40,7 @@ export const OwnershipDetailsPopup: React.FC<OwnershipDetailsPopupProps> = ({
             owner_profile:profiles!owner_profile_id(id, full_name, username)
           `)
           .eq('vehicle_id', vehicleId)
+          .is('owner_identity_id', null) // user-keyed holdings only; auction-folded periods are read through v_vehicle_owner_periods
           .order('start_date', { ascending: false });
 
         if (ownershipResult.error) {
@@ -49,6 +50,7 @@ export const OwnershipDetailsPopup: React.FC<OwnershipDetailsPopupProps> = ({
             .from('vehicle_ownerships')
             .select('*')
             .eq('vehicle_id', vehicleId)
+            .is('owner_identity_id', null)
             .order('start_date', { ascending: false });
           
           if (!fallbackResult.error) {

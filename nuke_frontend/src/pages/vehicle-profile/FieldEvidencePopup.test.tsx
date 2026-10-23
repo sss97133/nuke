@@ -41,7 +41,7 @@ describe('canonical value -> attributed observation', () => {
     expect(html).toContain('href="/vehicle/local-vehicle/observation/local-observation"');
     expect(html).toContain('href="https://example.com/listing"');
     expect(html).toContain('Ingest time: Unavailable'); expect(html).toContain('Method: Unavailable');
-    expect(html).toContain('Stored confidence: 0.6');
+    expect(html).toContain('Model self-score (not corroboration): 0.6');
   });
   it('does not hide a report with no usable link or turn repeated reports into independent support', () => {
     fixture.provenance.data.observations[0].source_url = 'javascript:alert(1)';

@@ -395,6 +395,101 @@ event), described (COMMENT ON), owned (a registry row) and read. Not fewer table
 
 The species is a column (2026-10-18): `observation_sources.species`, with `species_set` and the evidence it was read from (`species_evidence`); a listing takes its own species where its URL or metadata shows it (`v_listing_species`). The extractor's builder declares it from the source itself (`.claude/rules/extraction.md`, Source species), and the Sources board groups by it with the names above. Barn Finds is an aggregator (a curator: its posts point at eBay, Craigslist and Facebook listings), with its own 'BF Exclusive' ads as classifieds.
 
+### BaT native transport pressure — bounded repair, 2026-10-21
+
+At 18:47 UTC the live assay covered 0 of 24 eligible current subscriptions. In the 18:45–18:52:15 UTC
+log window, seven extractor background exceptions reported fetch rate limits during stream
+admission. Read-only closing-target selection took 0.383s cold and 0.350s warm for 27 targets;
+that is selection latency, not continuous capture. Existing code launched one recovery request
+per subscription and admitted lots separately, multiplying requests before acknowledgement.
+
+The existing collector now bounds recovery to two reads, preserves queued recovery as an
+explicit coverage gap and respects its original deadline. Its buffer combines healthy lots
+inside the existing 50-frame canonical admission limit, isolates atomic mixed failures and
+preserves unacknowledged per-lot prefixes. The transport honors runtime and HTTP rate-limit
+delays without extra fetches during the delay, with HTTP limits scoped to their server origin.
+Deterministic tests cover request reduction,
+cross-parent binding through actual HTTP intake, poison-lot isolation, arrivals during a pending
+acknowledgement, source-control liveness and truthful unfinished recovery. These are fixture
+claims; deployment and the identical live coverage/latency assay still need dated receipts.
+No source cadence, budget, capacity, schema, retained-sale admission or episode-v2 hold changes.
+PR #2451 reached normal deployment at 19:13 UTC (extractor 4.5.4, platform version 191).
+All twelve post-deployment health samples still failed; coverage ranged from 0 to 21 of the
+22–24 currently eligible subscriptions. A later session inspection found 60 recovery-backoff
+records and 22 without errors, not a distinct-lot denominator. The next correction keeps
+unattempted recovery queued during cooldown, paces starts and coalesces frame/coverage admission
+within the existing limits. Shared failure acknowledges neither caller; an explicit semantic
+refusal restores independent requests. The follow-up was delivered as PR #2452 below;
+the first deployment did not establish continuous capture or fleet gain.
+PR #2452 deployed extractor 4.5.5 (platform 192) at 19:40 UTC. All twelve subsequent
+health samples also failed: 0–10 covered of 26–27 currently eligible subscriptions. These are
+current subscription snapshots, not a continuous or fleet denominator. Endpoint-wide intake
+latency mixes other modes and cannot locate the native stage responsible for the gap.
+The bounded diagnostic extended the existing collector and intake: a control-plane run UUID
+joins start/end records to native request labels, and at most twelve sampled intake records per
+worker separate authentication, monitor/source/parent reads, preparation and canonical RPC time.
+Transport counters describe attempts, backoff and acknowledgement processing, not unique testimony
+or usable coverage. Missing end/timing records remain unknown. No source bodies, prices, headers
+or credentials are logged. The dated trace below supplies deployment and runtime evidence;
+diagnostic delivery alone cannot close the capture-integrity assay.
+PR #2455 merged and deployed normally (4.5.6/platform 193, intake 166). The 20:29:40–20:37:40 UTC
+trace recorded seven starts, five matching completed 115-second lifetimes and two right-censored
+workers; one additional end had a start before the window. All six scheduled dispatches later
+reconciled to 202 responses. Their handlers began 2.49–96.59s after cron completion; this is not
+an exact queue-wait measurement. Every completed worker reached sixty successful nested intake
+calls, two runtime fetch rejections and hundreds of backoff skips. All 426 gateway-visible native
+intakes returned 200. Three of 35 early-biased stage samples exceeded two seconds in the RPC;
+none of those samples recorded an SDK runtime limit. All twelve health snapshots failed
+(0–14 covered of 26–29 currently eligible subscriptions). Eight cohort snapshots observed 34
+lot IDs, with 19 present at every snapshot; these are validation samples, not a source-fleet or
+continuous eligible-lot-time denominator. Zero supported-answer gain is established.
+
+The documented [nested-call budget](https://supabase.com/docs/guides/functions/recursive-functions)
+is thirty calls per trace in sixty seconds. A one-second coverage path cannot fit that budget
+before frame admission. More backoff cannot repair this inequality. External source APIs and
+ordinary database SDK requests are a separate boundary.
+
+**Owner-approved execution-owner change deployed through #2457/#2458:**
+`ingest-observation` hosts the existing collector through service-only `bat_live_collect_v1`;
+core makes one authenticated handoff. Local admission remains inside the canonical writer,
+with fresh monitor/source/parent validation and the unchanged RPC. The selected identity acts
+only as a rejection fence after those fresh reads: changing a post ID must refuse the old
+channel's heartbeat too. Typed transient failures retain atomic prefixes without poison fanout;
+semantic refusals retain existing per-lot isolation. The first rollout preserves core's legacy
+adapter until the second reviewed handoff change. Dry-run retains its existing service-only
+manifest; it starts no source work. Normal deployments 39686994480 and 39688643627 verified
+intake 168 and core 4.5.7/platform 195, with anonymous refusal and service-only dry-run.
+Keep the 3s/2s objectives, source budgets, 115s lifetime, grants, retention and episode holds.
+Bunched dispatch, recovery generations/ACK barriers and the measured RPC tail remain separate
+integrity blockers. The native SQL contracts now have an explicit CI setup path alongside a
+real HTTP-to-PostgreSQL coverage/refusal case, instead of being silently excluded.
+
+The 22:45:38–22:53:38 UTC late-day trace recorded eight starts, five completed approximately
+115-second lifetimes and three right-censored workers. Every completed worker made 111–116
+local admissions with zero nested intake HTTP calls, runtime rejections, failed admission
+groups, pending frames or unfinished recoveries. Nine core requests matched nine child
+handoffs, eight accepted and one idle. All 75 sampled admissions succeeded (sampled RPC max
+1,142.58 ms); this is a three-lot validation sample of already-closed relisted lots, not fleet
+or continuous active-lot coverage. All twelve health snapshots still failed. Their three
+monitors bind stubs, while the existing native terminal receipts and matching closed lots
+reside on canonical vehicles. Both health and dispatcher closure tests miss that relation;
+the dispatcher reactivates retired monitors. The known October 21 settlement population is
+242 closed lots, with 241 native receipts and 204 late native terminal admissions. It is not
+the source's full inventory, and resolving the stub relation must not erase its lateness QC.
+
+The separately prepared `20261021231915_bat_relisted_control_receipts.sql` corrects four
+closed-result predicates in the two existing SQL owners, using an unsuperseded native
+terminal receipt proving this stub and exact lot plus an unambiguous closed canonical holder.
+It preserves direct bindings, source cadence/budgets, locks, privileges and all testimony;
+function hashes refuse drift and make replay a no-op. The actual PostgreSQL contract
+reproduces reactivation, then verifies retirement and the reader, negative binding/receipt
+cases, preserved historical QC, authority and drift refusal. This production SQL change
+remains held for separate authorization. Dispatch bunching and recovery generation/ACK
+correctness remain open; no broader supported-answer gain is claimed.
+
+The retained sold gold case still lacks parser/parent attestations; repairing transport does
+not manufacture them or establish fleet-wide supported-answer gain.
+
 ### Cars & Bids capture integrity — bounded repair, 2026-10-18
 
 The source question is whether a retained auction reading contains a usable keyed and clocked
@@ -669,6 +764,30 @@ cost to source evidence; demonstrate one charge counted once across multiple doc
 dates, holder/vehicle allocations, unit conflicts and uncovered categories; and retain prior as-of results when a
 new receipt changes the outcome. Carefully documented cases can validate these mechanisms before any population
 claim about improvement returns. This refinement is a design contract; it installs no relation, ROI reader or fold.
+
+**Owner refinement, 2026-10-22: accounting operates in the model.** Tax reconciliation is the
+immediate consumer. Agents work from admitted financial evidence and existing decisions, opening
+source images or repeating OCR only for a named unresolved reading. Reviewed workbooks are import
+sources or reader exports, not a parallel system of record. Reuse the existing financial document,
+extraction, payment, allocation and review-queue owners; bridge receipts and deal jackets through
+evidenced relationships rather than duplicate purchases. Inspect their live policies and writers
+before admitting evidence. A stored photo or completed visual review is not a posted expense.
+
+Independent phases retain independent outcomes: source interpretation, economic-item identity and
+duplicate control, expense recognition, settlement/refund/reimbursement, and vehicle/job allocation.
+An unresolved vehicle does not by itself block an established expense. A receipt uploader, library
+holder, photographer, instrument holder and expense beneficiary are different roles; never fill one
+from another by default. Source claims, owner statements, agent interpretations and accepted
+accounting decisions keep their own attribution, clocks and correction history.
+
+Parallel agents may process different phases through the same sanctioned model. Idempotency is
+required at source and economic-item grains; source-byte deduplication alone cannot prevent counting
+an invoice and its payment twice. Ask the owner only for material facts that retained evidence cannot
+resolve, carrying prior answers forward. The acceptance path is admission → model query → supported
+decision or typed exception → revised accounting reader, including a duplicate, a full refund,
+a later corrected reading and a cross-owner refusal. Report persisted usable coverage and remaining
+exceptions, not workbook iterations. This contract does not lift existing source/privacy holds or
+authorize an agent to impersonate the owner at a Sign boundary.
 
 ## 11. Whole market evidence and immediate vehicle questions
 
@@ -1214,6 +1333,53 @@ The next acceptance case must use an existing sanctioned supersession owner, rev
 interpretation, prove its actual downstream consumer and reproduce the earlier evaluation receipt.
 Then test a separately selected held-out case and report correction cost and regressions. The bounded
 conflict assay does not close C28 or establish repeated autonomous representation development.
+
+### Correction reaches the public comparison page, prepared 2026-10-22
+
+The public `/valuation` consumer now retains its previous successful sanitized source receipt
+through an explicit evidence refresh. Refresh pins the resolved sales window and advances the
+evidence lookup. The existing `comparePriceToSourceSales` calculator evaluates both receipts at
+the same user-supplied amount; `compareSaleEvidenceEvaluations` identifies entered, departed,
+revised and ancestry-only source episodes. Different population rules, units, windows, methods,
+minimums or subject contexts refuse an evidence-change comparison. A changed amount reference
+recalculates both sides and is labelled as such. A failed or stale response preserves the last
+successful pair. One prior response is retained in page memory; the existing export contains both
+source receipts, calculations and the complete difference. This is a saved-response replay, not
+reconstruction of historical cohort membership. An absent episode has no invented withdrawal
+reason; aggregate capture exclusions are explicitly separate.
+
+The existing disposable PostgreSQL source-sale assay now passes synthetic responses from the
+actual `supersede_observation_relay` and `valuation_by_ymm` into the actual page's browser-DOM
+suite in CI. A supported source-amount interpretation changes from 11,000 to 2,000 synthetic USD;
+the 5,000 reference moves from 40.9091 to 50 percentile across the same eleven episodes. Original
+testimony and the earlier knowledge-cutoff answer survive; a separately seeded ten-sale control
+cohort is unchanged. A private-parent control removes the affected current episode. Admission in
+this fixture is synthetic producer admission: this proves the existing SQL writer/reader and
+frontend connection, not an extraction-accuracy gain, independent physical truth or newly ready
+fleet answers. Full fleet supported-answer coverage remains unmeasured. No production testimony,
+source activation, job, grant or pricing-policy change is part of this increment; existing holds
+remain in force.
+
+Owner screenshots redirected the same iteration toward the public market: family-change rows
+open the existing family-sales history, where year/model slices can challenge a mixed-vehicle
+average. That history has its own labelled five-year, multi-venue scope; it is not asserted to be
+the exact contributor population of the mover receipt. This does not establish a configuration premium. Color-scale methodology and source
+collection telemetry remain available on demand. Last-new-record clocks do not establish collector
+uptime or source revisit freshness. Future repairs must preserve the selected population and clock
+scope through the investigation, and attach the next failed user question to an existing owner.
+
+Follow-through prepared 2026-10-22: a period selection is a request, not a new label for the
+previous answer. Market movers and the map retain the successful answer's own horizon, baseline,
+counts and benchmark until the requested read succeeds. A missing custom baseline refuses that
+comparison; it cannot fall back to the ordinary prior window under the custom label. Pending and
+failed selections explicitly identify the retained answer. Deferred-response tests cover abandoned
+reads, baseline failure/recovery and the actual map benchmark; all three regression cases fail on
+the preceding implementation. This is a consumer-consistency repair, with no newly acquired fleet
+evidence or released collection hold.
+
+Stage: implemented and locally tested preparation; PR, deployment and runtime evidence are recorded
+separately in the private lane receipt. The previous historical-reader and reported-work holds are
+not released by this entry.
 
 ### What is inefficient today (measured 2026-10-06)
 
@@ -3033,3 +3199,91 @@ adds a `stripe` documentation source, an immutable processor-payment projection,
 the current invoice balance, a webhook recorder idempotent on Stripe event and session ids, and anchored edits so
 reconciliation counts processor receipts and the customer's job actions offer `pay_invoice`. The webhook now routes
 by purchase type. Collection only: no transfer, payout or release; the live key is not exercised by tests.
+
+## 14. The map: place as where a user participates (owner, 2026-10-20)
+
+**Owner direction, 2026-10-20 09:12–09:25 PT**, on the web map that copies the iOS map (#2357), in his words:
+"i actually still prefer we focus on selected zip but we need more nesting dolls metrics because a lot of data is being
+hidden cuz it doesnt have a zip associated." "when we are drilling in to a map what are we hoping to find? we want to see
+the sources of the vehicles thats why maybe having the addresses of the prominent businesses would surface at a certain
+point, the color of the fill permeating from them." "the side menu i dont get to click which violates click through."
+"i wanna find cool things, i wanna see metrics on past listings more than the listings themselves because previous
+listings that are done and sold really only exist to provide data intelligence on the area and then finding the current
+listing is perhaps more priority because available listings is where a user can participate, the other area a user can
+participate is by discovering other users, or service providers active in that zip or zone. that doesnt yet exist...
+being able to follow or participate with those other users becomes a thing we start to ruminate on." "as for the vehicle
+list... whats that point in its current state. the data is bland... id wanna see the vehicles performance on the market."
+"eventually the view will transform... as the system is adopted people will provide their live profiles of vehicles
+present in the area. sold vehicles travel out of the zip usually... so what it shows is actually a little bit misleading
+we are currently showing a historic ledger of vehicles that sold thru that zip... usually more of an indication of the
+location of the seller." "the metrics dont differentiate listing type." "i zoom out and it just spins." "the theories
+havent been written on what we aspire to do."
+
+**The theory, as the lead reads it (to be corrected by the owner, not by agents).**
+
+1. **The unit stays the selected ZIP.** The view is navigation, not the cohort. A ZIP's reading sits inside its
+   county, its state and the country, and shows all four at once (nesting dolls), because records that carry no ZIP
+   are not missing: they are county-grain or state-grain evidence and count at the grain they have. "11,080 records
+   without a ZIP" is a coverage statement, not a footnote. (map_facts already holds the three grains with their
+   "no key" rows; the panel must show them.)
+2. **A place has two different facts, and the map must say which it is showing.** (a) *Where a vehicle was sold from*:
+   the seller's location at listing time, which is what every location observation is today; a sold vehicle has usually
+   left that ZIP. (b) *Where a vehicle is present*: an owner's live profile placing the asset there, which exists only as
+   adoption grows. Today's map is (a) and must label itself as the seller ledger of the area, never as "vehicles here".
+3. **Drilling in looks for sources.** The question behind the drill is "who is selling here": dealers, consignors,
+   auction houses, private sellers. Prominent businesses with addresses surface at a zoom, and the fill is attributable
+   to them (the color permeates from its sources). The ZIP panel leads with its top sources and their share, each
+   opening to the organization.
+4. **Past listings are intelligence; current listings are participation.** Done and sold episodes exist to produce the
+   area's numbers (what sells, sell-through, time to sell, like-for-like premium against the same cars elsewhere, trend);
+   they are shown as readings, not as a list. Available listings are the list, first, because they are where a user can
+   act. The third kind of participation is people: other users and service providers active in the zone, to discover
+   and follow (not built; see the organization layer and actors).
+5. **Every datum on the panel is a button.** Platforms, mix, metrics, records: each opens to its rows and its evidence.
+   A "1 record" line that does not open is a tenet-1 failure.
+6. **Metrics differentiate the kind of episode.** Listing, sale, sighting and bid are different layers (map_layers) and
+   are never summed as "vehicles".
+7. **A vehicle row carries its market performance**, not its name: outcome (sold, reserve not met, withdrawn, live),
+   price against its cohort's expectation, bids, days, relist count. Where the engine has no cohort, "too few to tell".
+8. **Speed is a fold, not a read.** Counts and readings at every zoom come from map_facts (sum over areas in
+   milliseconds); the raw records are read only for the selected ZIP. Reading every county in view is what spins.
+
+**Open for the owner to settle (not for agents):** the comparison that "performance" means (the car's national
+like-for-like cohort, the lead's default; or the ZIP's own past); and the second fact (vehicle presence) as a layer
+distinct from the seller ledger, once owner profiles place assets.
+
+**Status.** Theory written 2026-10-20; nothing in it is built beyond map_facts (#2331), map_layers (#2324) and the
+iOS-copy map (#2357). The lead's first repairs in this order: counts from map_facts at every zoom (8), the nested
+grains and the seller-ledger label (1, 2), click-through on every panel datum (5), sources first (3), then the readings
+(4, 7) once the like-for-like residual per sale exists.
+
+## 15. Decisions 2026-10-20: the stewardship chain and what a recorded sale is
+
+The owner delegated these two calls on 2026-10-20; they are written from his rules (the evidence ladder: store the
+narrow provable claim and never collapse it into a stronger one; the privacy masking spectrum: existence and shape are free, identity
+is locked, people never appear as something tracked).
+
+**Stewardship chain, private by default.** The owner periods folded from sold lots (`vehicle_ownerships` rows with
+`basis = 'auction_sale'`, written only by `fold_vehicle_ownership_periods`) stay private. Anon and signed-in readers see
+none of them (`vehicle_ownerships_fold_rows_read_guard`), and the reader view `v_vehicle_owner_periods` and the flag
+table are service_role only. The lot facts they come from are already public in `auction_events`; what stays private is the stitched,
+derived chain from handle to vehicle to dates. A public layer, when built, is a masked shape only: how many stewards, the
+first and last recorded dates, counts by `sale_confirmation`; never an identity or a handle. Opening the chain itself would be a new
+product decision, done by dropping the read guard.
+
+**A sold lot is a recorded sale, not a completed transfer.** A scraper observes the hammer and nothing after it, so the claim
+stored is the narrow one. Status of an auction-seeded `ownership_transfers` row, by evidence:
+
+| Evidence | Status | Why |
+|---|---|---|
+| hammer only (fold `sale_confirmation = 'recorded'`) | `recorded_unconfirmed` | the only thing observed |
+| the winner listed the car next (`confirmed_next_lot`) | `recorded_unconfirmed` | the stronger evidence lives on the period row; `completed` means title and payment finished in the deal pipeline, which no scraped sale proves |
+| the same seller listed the car again right after (`relist_same_seller`) | `cancelled`, `cancelled_at` = the relisting lot's event clock | direct evidence the sale did not hand the car on |
+
+The open milestones of a relabelled transfer become `not_observable`; the hammer (`agreement_reached`) stays completed. A transfer
+with a user on either side, any milestone beyond the hammer, a party communication or a trigger other than a lot is never touched.
+Every relabel is recorded in `ownership_transfer_relabels` (previous status, new status, reason, the lot and the evidence lot)
+and `revert_auction_transfer_relabels` puts it back, so later evidence (a bridge between two handles, a title) can flip a status.
+New seeds follow the same rule: `transfer-automator` seeds a lot as `recorded_unconfirmed` with the one hammer milestone and
+seeds nothing for a lot the fold flagged as relisted; `transfer-advance` creates the deal pipeline and moves the transfer to
+`in_progress` when a party engages. The listing-seeded path (a deal run through Nuke) keeps the full pipeline.

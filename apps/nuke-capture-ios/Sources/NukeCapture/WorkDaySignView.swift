@@ -25,6 +25,8 @@ final class WorkDaySignEngine: ObservableObject {
         let sessionDate: String        // yyyy-MM-dd
         let durationMinutes: Int
         let vehicleLabel: String
+        var vehicleMake: String? = nil
+        var vehicleModel: String? = nil
         static func == (a: WorkDay, b: WorkDay) -> Bool { a.id == b.id }
     }
 
@@ -47,7 +49,7 @@ final class WorkDaySignEngine: ObservableObject {
     private struct SessionRow: Decodable {
         let id: String; let vehicle_id: String?; let session_date: String; let duration_minutes: Int?
     }
-    private struct ImageRow: Decodable { let image_url: String? }
+    private struct ImageRow: Decodable { let image_url: String?; let vision_analyzed_at: String?; let hint: PhotoVehicleCheck.Hint? }
     private struct SignParams: Encodable { let p_session_id: String; let p_confirm: Bool }
     private struct BulkSignParams: Encodable { let p_session_ids: [String]; let p_confirm: Bool }
 
@@ -82,7 +84,9 @@ final class WorkDaySignEngine: ObservableObject {
             days = rows.map { r in
                 WorkDay(id: r.id, vehicleId: r.vehicle_id, sessionDate: r.session_date,
                         durationMinutes: r.duration_minutes ?? 0,
-                        vehicleLabel: r.vehicle_id.flatMap { byId[$0]?.label } ?? "UNKNOWN VEHICLE")
+                        vehicleLabel: r.vehicle_id.flatMap { byId[$0]?.label } ?? "UNKNOWN VEHICLE",
+                        vehicleMake: r.vehicle_id.flatMap { byId[$0]?.make },
+                        vehicleModel: r.vehicle_id.flatMap { byId[$0]?.model })
             }
             loaded = true
         } catch {
@@ -91,11 +95,13 @@ final class WorkDaySignEngine: ObservableObject {
         }
     }
 
-    /// The day's actual photos — the proof you confirm on (that vehicle, that day).
-    func photos(for day: WorkDay) async -> [String] {
-        guard let vid = day.vehicleId else { return [] }
+    /// The day's actual photos — the proof you confirm on (that vehicle, that day) — and how many of
+    /// them a vision pass has read. A day filed by date and place alone has no visual evidence that
+    /// the photos show this car (2026-10-19: Mustang photos proposed for a '79 truck).
+    func photoReads(for day: WorkDay) async -> (urls: [String], checked: Int, verdict: PhotoVehicleCheck.Verdict) {
+        guard let vid = day.vehicleId else { return ([], 0, .noReads) }
         let rows: [ImageRow] = (try? await SupabaseService.client.from("vehicle_images")
-            .select("image_url")
+            .select("image_url,vision_analyzed_at,hint:ai_scan_metadata->classification->vehicle_hints")
             .eq("vehicle_id", value: vid)
             .gte("taken_at", value: "\(day.sessionDate)T00:00:00")
             .lte("taken_at", value: "\(day.sessionDate)T23:59:59.999")
@@ -103,7 +109,10 @@ final class WorkDaySignEngine: ObservableObject {
             .order("taken_at", ascending: true)
             .limit(12)
             .execute().value) ?? []
-        return rows.compactMap { $0.image_url }.filter { !$0.isEmpty }
+        let shown = rows.filter { !($0.image_url ?? "").isEmpty }
+        return (shown.compactMap { $0.image_url },
+                shown.filter { $0.vision_analyzed_at != nil || $0.hint != nil }.count,
+                PhotoVehicleCheck.verdict(hints: shown.compactMap(\.hint), make: day.vehicleMake, model: day.vehicleModel))
     }
 
     /// Confirm one day → owner-confirmed labor (Tier 4). Drops it from the deck.
@@ -266,6 +275,8 @@ private struct DayCard: View {
     let day: WorkDaySignEngine.WorkDay
     @ObservedObject private var engine = WorkDaySignEngine.shared
     @State private var photos: [String] = []
+    @State private var checked = 0
+    @State private var verdict: PhotoVehicleCheck.Verdict = .noReads
     @State private var loaded = false
     @State private var busy = false
 
@@ -325,6 +336,19 @@ private struct DayCard: View {
                         }
                     }
 
+                    if case .conflicts(let readAs, let n, let of) = verdict {
+                        Text("PHOTOS READ AS \(readAs.uppercased()) (\(n) OF \(of) READ) — NOT \(day.vehicleLabel). Likely the wrong vehicle; Skip unless you know better.")
+                            .font(.caption2.weight(.bold)).foregroundStyle(.red)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    if loaded, !photos.isEmpty, checked < photos.count {
+                        Text(checked == 0
+                             ? "NOT VISION-CHECKED: filed by date and place. Check the photos are this vehicle before you confirm."
+                             : "\(checked) OF \(photos.count) PHOTOS VISION-CHECKED. Check the rest are this vehicle.")
+                            .font(.caption2.weight(.semibold)).foregroundStyle(.yellow)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
                     HStack(spacing: 12) {
                         Button {
                             busy = true
@@ -363,7 +387,7 @@ private struct DayCard: View {
                         }
                     }
 
-                    Text("Looks like this truck? Confirm if the photos match — value becomes real only when you sign. If it's the wrong vehicle, tap Skip.")
+                    Text("Is this the same vehicle? Confirm if the photos match — value becomes real only when you sign. If it's the wrong vehicle, tap Skip.")
                         .font(.caption2).foregroundStyle(.white.opacity(0.55))
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -375,7 +399,10 @@ private struct DayCard: View {
         }
         .ignoresSafeArea()
         .task {
-            photos = await engine.photos(for: day)
+            let read = await engine.photoReads(for: day)
+            photos = read.urls
+            checked = read.checked
+            verdict = read.verdict
             loaded = true
         }
     }

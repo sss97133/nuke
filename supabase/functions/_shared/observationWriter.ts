@@ -71,6 +71,10 @@ export interface ObservationInput {
    * already on it and a receipt for each would only repeat them. Omitted = every field is processed, as before.
    */
   testimonyOnly?: string[];
+  /** listing_page_snapshots.id the fields were read from. Omitted = column left NULL, as before. */
+  sourceSnapshotId?: string;
+  /** Verbatim text from that document backing the fields (e.g. the VIN line). Omitted = NULL, as before. */
+  citationExcerpt?: string;
 }
 
 export interface WriteResult {
@@ -184,6 +188,8 @@ export async function writeObservation(
     agentDurationMs,
     testimonyOnly,
     unresolved,
+    sourceSnapshotId,
+    citationExcerpt,
   } = params;
 
   // The fields the vehicle row and the evidence ledger see; the observation row always keeps all of `fields`.
@@ -226,6 +232,8 @@ export async function writeObservation(
     agentModel,
     agentCostCents,
     agentDurationMs,
+    sourceSnapshotId,
+    citationExcerpt,
   }).catch((e: any) => {
     errors.push(`observation: ${e?.message || e}`);
     return null;
@@ -330,6 +338,8 @@ async function writeObservationRow(
     agentModel?: string;
     agentCostCents?: number;
     agentDurationMs?: number;
+    sourceSnapshotId?: string;
+    citationExcerpt?: string;
   },
 ): Promise<{ observationId: string; duplicate: boolean } | null> {
   const resolvedSource = await resolveSource(supabase, params.source.platform);
@@ -405,6 +415,8 @@ async function writeObservationRow(
       agent_cost_cents: params.agentCostCents,
       agent_duration_ms: params.agentDurationMs,
       extracted_by: WRITER_VERSION,
+      ...(params.sourceSnapshotId ? { source_snapshot_id: params.sourceSnapshotId } : {}),
+      ...(params.citationExcerpt ? { citation_excerpt: params.citationExcerpt } : {}),
     })
     .select("id")
     .maybeSingle();

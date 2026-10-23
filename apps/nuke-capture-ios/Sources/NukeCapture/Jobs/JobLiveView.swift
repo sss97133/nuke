@@ -27,6 +27,9 @@ struct JobLiveView: View {
     @State private var checking = false
     @State private var selectedStep: String?
     @State private var appeared = false
+    /// Polls in a row that brought nothing new; the wait doubles with each (capped), resets on news.
+    @State private var idlePolls = 0
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         ScrollView {
@@ -42,7 +45,12 @@ struct JobLiveView: View {
         }
         .background(Color(.systemGroupedBackground))
         .safeAreaInset(edge: .bottom) { nextStepBar }
-        .task(id: workOrderId) { await watch() }
+        // Watch only while the app is in front: backgrounding cancels the loop; returning restarts it
+        // with a full read. Leaving the screen cancels it as before.
+        .task(id: "\(workOrderId)|\(scenePhase == .active)") {
+            guard scenePhase == .active else { return }
+            await watch()
+        }
         .refreshable { await poll(full: true) }
         .onAppear { withAnimation(.spring(response: 0.6, dampingFraction: 0.85)) { appeared = true } }
     }
@@ -264,11 +272,14 @@ struct JobLiveView: View {
     // MARK: Polling
 
     private func watch() async {
+        idlePolls = 0
         await poll(full: true)
         while !Task.isCancelled {
-            try? await Task.sleep(for: .seconds(ActivityCopy.pollInterval(live)))
+            try? await Task.sleep(for: .seconds(ActivityCopy.backoffInterval(ActivityCopy.pollInterval(live), idlePolls: idlePolls)))
             if Task.isCancelled { break }
+            let before = (live?.version, feed.count)
             await poll(full: false)
+            idlePolls = (live?.version, feed.count) == before ? idlePolls + 1 : 0
         }
     }
 

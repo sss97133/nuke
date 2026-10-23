@@ -1,0 +1,111 @@
+[
+ {
+  "chassis": "5142",
+  "rule": "pre-A COUPE 5001-5600",
+  "high_confidence": false,
+  "profiles": [
+   {
+    "id": "08af30d5-8684-4e0b-b306-4ecfda09691f",
+    "year": 1951,
+    "model": "356",
+    "body": "COUPE",
+    "vin": null,
+    "sale_price": null,
+    "from": "text"
+   },
+   {
+    "id": "6343553d-ea72-49af-b7fb-f39dc2911403",
+    "year": 1951,
+    "model": "356 cabriolet",
+    "body": "CABRIOLET",
+    "vin": null,
+    "sale_price": null,
+    "from": "text"
+   }
+  ]
+ },
+ {
+  "chassis": "89427",
+  "rule": "356B ROADSTER 86831-89849",
+  "high_confidence": false,
+  "profiles": [
+   {
+    "id": "19fd660d-acfb-4a30-a2dd-353b052c48fe",
+    "year": 1961,
+    "model": "356 B Roadster",
+    "body": "ROADSTER",
+    "vin": "89427",
+    "sale_price": 165000,
+    "from": "vin"
+   },
+   {
+    "id": "9227168f-f81f-4f4b-a3c7-41f467ddf190",
+    "year": 1961,
+    "model": "356b t5 cabriolet coachwork by d'ieteren et fr\u00e8res",
+    "body": "CABRIOLET",
+    "vin": null,
+    "sale_price": 122500,
+    "from": "text"
+   }
+  ]
+ },
+ {
+  "chassis": "804359",
+  "rule": null,
+  "high_confidence": false,
+  "profiles": [
+   {
+    "id": "3a7d9357-2961-4314-a7ff-61dca0ca898b",
+    "year": 1958,
+    "model": "356",
+    "body": "SPEEDSTER",
+    "vin": null,
+    "sale_price": null,
+    "from": "text"
+   },
+   {
+    "id": "acc99430-1c7a-429f-95fc-87d00579c4f7",
+    "year": 1958,
+    "model": "356",
+    "body": "SPEEDSTER",
+    "vin": null,
+    "sale_price": null,
+    "from": "text"
+   }
+  ]
+ },
+ {
+  "chassis": "82042",
+  "rule": "356A SPEEDSTER 81901-84954",
+  "high_confidence": false,
+  "profiles": [
+   {
+    "id": "58de1a2e-1959-4926-af3e-e73ff8fa4114",
+    "year": 1956,
+    "model": "356",
+    "body": "REPLICA",
+    "vin": null,
+    "sale_price": null,
+    "from": "text"
+   },
+   {
+    "id": "6c2d3154-0517-4c92-ae36-03554ecadf7a",
+    "year": 1956,
+    "model": "356",
+    "body": "REPLICA",
+    "vin": null,
+    "sale_price": null,
+    "from": "text"
+   },
+   {
+    "id": "e75af5b4-61d4-4114-a83f-239d53bf062a",
+    "year": 1956,
+    "model": "356",
+    "body": "REPLICA",
+    "vin": null,
+    "sale_price": null,
+    "from": "text"
+   }
+  ]
+ }
+]

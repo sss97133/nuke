@@ -1,3 +1,4 @@
+// identifier claims: redeploy after #2477 deploy run 39842460458 stopped before the functions step.
 /**
  * BONHAMS EXTRACTOR v3 — Quality-gated, archive-aware extraction.
  *
@@ -32,12 +33,15 @@ import { recordRevision } from "../_shared/revision.ts";
 import { mustWrite, softWrite } from "../_shared/writeResult.ts";
 import {
   bonhamsLotPageUrl, type LotPage, parseLotPage, type SellerAssessment, SELLER_ASSESSMENT_VERSION, sellerAssessmentConditionScore,
+  catalogOfferIsSold,
+  isBonhamsPreviewLotUrl,
 } from "./lotPage.ts";
 import { fetchPage } from "../_shared/hybridFetcher.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { extractGeneralBodyStyle, extractVehicleFacets } from "../_shared/vehicleFacets.ts";
 import { normalizeVehicleFields } from "../_shared/normalizeVehicle.ts";
+import { landIdentifierClaims } from "../_shared/landIdentifierClaims.ts";
 
 const EXTRACTOR_VERSION = "bonhams-v3";
 
@@ -1053,6 +1057,8 @@ async function extractCatalog(catalogUrl: string): Promise<{
 
     const name = offer.name || "";
     const url = offer.url || "";
+    // Preview cards are not lots of this sale (often a car sold elsewhere); landing them made 8 false sales by 2026-10-23.
+    if (isBonhamsPreviewLotUrl(url)) continue;
     const price = typeof offer.price === "number" ? offer.price : null;
     const priceCurrency = offer.priceCurrency || null;
     const availability = offer.availability || null;
@@ -1083,6 +1089,12 @@ async function extractCatalog(catalogUrl: string): Promise<{
 
   console.log(`[Bonhams] Catalog: ${lots.length} vehicle lots from ${auctionName}`);
   return { auctionId, auctionName, auctionDate, auctionLocation, lots };
+}
+
+/** Sale and lot of a Bonhams lot URL under any host or slug ("27530/138"); lot 0 (preview) keeps its slug. */
+function bonhamsLotKey(u: string | null | undefined): string | null {
+  const m = (u ?? "").match(/\/auction\/(\d+)\/lot\/([^/?#]+)(?:\/([^/?#]+))?/i);
+  return m ? (m[2] === "0" ? `${m[1]}/0/${m[3] ?? ""}` : `${m[1]}/${m[2]}`) : null;
 }
 
 /** The same lot under any host or slug: .../auction/{sale}/lot/{lot}/ (the trigram index on discovery_url serves it). */
@@ -1379,6 +1391,7 @@ async function saveVehicle(
     }
     if (ins.error) throw new Error(`Vehicle insert failed: ${ins.error.message}`);
     targetId = ins.data?.id || null;
+    await landIdentifierClaims(supabase, { vehicleId: targetId, text: (vehicleData as any).description, sourceUrl: (vehicleData as any).listing_url ?? (vehicleData as any).discovery_url, title: (vehicleData as any).listing_title ?? null, extractor: "extract-bonhams" });
     if (action !== "linked_by_vin") action = "created";
     console.log(`[Bonhams] ${action} vehicle: ${targetId}`);
   }
@@ -1600,11 +1613,15 @@ if (import.meta.main) Deno.serve(async (req) => {
             html = blob ? await blob.text() : null;
           }
           const page = html ? parseLotPage(html) : null;
-          const { data: evs } = it.vehicle_id
-            ? await supabase.from("vehicle_events").select("vehicle_id, source_url, source_listing_id").eq("source_platform", "bonhams").eq("vehicle_id", it.vehicle_id).limit(1)
+          // Land only on this lot's own episode. A vehicle can carry several Bonhams lots; taking any one of them landed one
+          // lot's page (chassis, hammer, photos) on another lot's vehicle (e.g. a 2022 Ford GT lot on a 1954 Lambretta).
+          const itLot = bonhamsLotKey(String(it.listing_url));
+          const { data: vehEvs } = it.vehicle_id && itLot
+            ? await supabase.from("vehicle_events").select("vehicle_id, source_url, source_listing_id").eq("source_platform", "bonhams").eq("vehicle_id", it.vehicle_id).limit(50)
             : { data: null };
-          if (!page || !evs?.length) {
-            await supabase.rpc("release_revision_item", { p_id: it.id, p_next_action: "refetch", p_detail: { why: !page ? "no parsable retained capture" : "no episode to land on" } });
+          const evs = ((vehEvs ?? []) as Array<{ vehicle_id: string; source_url: string; source_listing_id: string }>).filter((e) => bonhamsLotKey(e.source_url) === itLot);
+          if (!page || !evs.length) {
+            await supabase.rpc("release_revision_item", { p_id: it.id, p_next_action: "refetch", p_detail: { why: !page ? "no parsable retained capture" : "no episode for this lot on the vehicle" } });
             out.released_refetch++;
             continue;
           }
@@ -1884,8 +1901,8 @@ if (import.meta.main) Deno.serve(async (req) => {
               profile_origin: "bonhams_catalog_import",
               is_public: true,
               status: "active",
-              sale_status: lot.availability?.includes("OutOfStock") ? "sold" : "available",
-              auction_outcome: lot.availability?.includes("OutOfStock") ? "sold" : null,
+              sale_status: catalogOfferIsSold(lot.url, lot.availability) ? "sold" : "available",
+              auction_outcome: catalogOfferIsSold(lot.url, lot.availability) ? "sold" : null,
               auction_end_date: catalog.auctionDate,
               extractor_version: EXTRACTOR_VERSION,
               origin_metadata: {
@@ -1946,10 +1963,10 @@ if (import.meta.main) Deno.serve(async (req) => {
                     event_type: "auction",
                     source_url: lot.url,
                     source_listing_id: listingUrlKey || lot.lotNumber || catalog.auctionId,
-                    event_status: lot.availability?.includes("OutOfStock") ? "sold" : "active",
+                    event_status: catalogOfferIsSold(lot.url, lot.availability) ? "sold" : "active",
                     ended_at: catalog.auctionDate,
                     final_price: lot.price,
-                    sold_at: lot.availability?.includes("OutOfStock") ? catalog.auctionDate : null,
+                    sold_at: catalogOfferIsSold(lot.url, lot.availability) ? catalog.auctionDate : null,
                     metadata: {
                       lot_number: lot.lotNumber,
                       sale_id: catalog.auctionId,

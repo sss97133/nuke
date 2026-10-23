@@ -17,6 +17,8 @@ export interface SearchSummary extends EbayItem { thumbnailImages?: unknown[] }
 export interface SearchPage {
   total: number; itemSummaries: SearchSummary[]; next: string | null;
   aspectDistributions?: { localizedAspectName?: string; aspectValueDistributions?: { localizedAspectValue?: string; matchCount?: number }[] }[];
+  /** The response body as eBay returned it (the bulk lander stores it as the page's capture). */
+  raw?: any;
 }
 
 export class BrowseClient {
@@ -73,7 +75,7 @@ export class BrowseClient {
     if (opts.fieldgroups) p.fieldgroups = opts.fieldgroups;
     const j = await this.get("/buy/browse/v1/item_summary/search", p);
     if (j?.__notFound) return { total: 0, itemSummaries: [], next: null };
-    return { total: Number(j.total ?? 0), itemSummaries: j.itemSummaries ?? [], next: j.next ?? null, aspectDistributions: j.refinement?.aspectDistributions ?? j.aspectDistributions };
+    return { total: Number(j.total ?? 0), itemSummaries: j.itemSummaries ?? [], next: j.next ?? null, aspectDistributions: j.refinement?.aspectDistributions ?? j.aspectDistributions, raw: j };
   }
 
   /** The category's aspect names and values with counts. The Year aspect is read from here, never assumed. */

@@ -17,6 +17,12 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    # A hung `vercel deploy --prod` held the vercel-production concurrency group for 2 h on 2026-10-23
+    # (run 39909158062); every later push was queued, then cancelled. A build plus deploy takes under 10 min.
+    timeout-minutes: 25
+    env:
+      VERCEL_ORG_ID: team_XppaY5WVxdsJ7Lrw8q2l9NFi
+      VERCEL_PROJECT_ID: prj_VkFdy6K0osTSOfR6wRpb5TVYsgA5
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -32,62 +38,42 @@ jobs:
         working-directory: ./nuke_frontend
         run: npm ci
 
+      - name: Install Vercel CLI
+        run: npm install --global vercel@52.0.0
+
+      # Build here and upload the result, as deploy-preview.yml does. A remote build waits in Vercel's build queue
+      # behind every preview: on 2026-10-23 three production runs uploaded in 2 s and then sat in "Building..." for
+      # 20+ minutes (runs 39909158062, 39982338424, 39987080378) while every later merge queued behind them.
+      # The build uses the project's production environment pulled from Vercel, exactly as the remote build did.
+      - name: Pull Vercel production settings
+        working-directory: ./nuke_frontend
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: vercel pull --yes --environment=production
+
       - name: Build project
         working-directory: ./nuke_frontend
-        run: |
-          echo "🔨 Building project..."
-          npm run build || {
-            echo "❌ Build failed!"
-            echo "Checking for common issues..."
-            ls -la src/components/parts/ || echo "parts directory missing"
-            echo "Full build error:"
-            exit 1
-          }
         env:
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
-
-      - name: Install Vercel CLI
-        run: npm install --global vercel@49.2.0
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          # vercel build reinstalls with the pulled production environment (NODE_ENV=production), which omits
+          # devDependencies, and vite is one ("vite: not found", run 39995114865). Keep them, as Vercel's own build does.
+          NPM_CONFIG_INCLUDE: dev
+        run: vercel build --prod
 
       - name: Deploy to Vercel Production
         working-directory: ./nuke_frontend
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: |
-          echo "🚀 Deploying to Vercel production..."
-
-          # Deploy to the Vercel project that owns the custom domain (nuke.ag).
-          # IMPORTANT: Deploying from dist/ creates/targets a separate "dist" project and does NOT update nuke.ag.
-          # Deploy from the frontend subdirectory so Vercel uses nuke_frontend/vercel.json (SPA rewrites) and the correct dist output.
-          set +e
-          DEPLOY_OUTPUT=$(vercel deploy --prod --force --yes --token=${{ secrets.VERCEL_TOKEN }} --scope nzero --name nuke 2>&1)
-          DEPLOY_EXIT=$?
-          set -e
-
-          echo "--- Vercel Deployment Output ---"
-          echo "$DEPLOY_OUTPUT"
-          echo "--- End Output ---"
-
-          if [ $DEPLOY_EXIT -ne 0 ]; then
-            echo "❌ Vercel deployment failed with exit code: $DEPLOY_EXIT"
+          # Deploy to the Vercel project that owns the custom domain (nuke.ag), from the frontend so its SPA rewrites
+          # and output are used; the prebuilt output needs no build on Vercel.
+          DEPLOY_URL=$(vercel deploy --prebuilt --prod --yes)
+          if [[ ! "$DEPLOY_URL" =~ ^https://[a-zA-Z0-9-]+\.vercel\.app$ ]]; then
+            echo "Vercel did not return a deployment URL" >&2
             exit 1
           fi
-          
-          # Extract deployment URL (try multiple patterns)
-          DEPLOY_URL=$(echo "$DEPLOY_OUTPUT" | grep -oE 'https://[a-zA-Z0-9-]+\.vercel\.app' | head -1 || echo "")
-          
-          if [ -z "$DEPLOY_URL" ]; then
-            # Try alternative URL pattern
-            DEPLOY_URL=$(echo "$DEPLOY_OUTPUT" | grep -oE 'https://[^ ]*\.vercel\.app' | head -1 || echo "")
-          fi
-          
-          if [ -z "$DEPLOY_URL" ]; then
-            echo "⚠️  Could not extract deployment URL from output"
-            echo "Deployment may have succeeded - check Vercel dashboard: https://vercel.com/dashboard"
-            echo "Exit code was: $DEPLOY_EXIT"
-          else
-            echo "✅ Deployment successful: $DEPLOY_URL"
-            echo "DEPLOY_URL=$DEPLOY_URL" >> $GITHUB_ENV
-          fi
+          echo "DEPLOY_URL=$DEPLOY_URL" >> "$GITHUB_ENV"
+          echo "Deployment ready: $DEPLOY_URL"
 
       - name: Deployment Summary
         run: |

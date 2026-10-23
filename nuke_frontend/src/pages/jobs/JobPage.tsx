@@ -20,6 +20,7 @@ import { completionActions, completionState } from './signDrafts';
 import './job-page.css';
 const BestMatches = React.lazy(() => import('./BestMatches'));
 const JobSuppliers = React.lazy(() => import('./JobSuppliers'));
+const PartsFinder = React.lazy(() => import('./PartsFinder'));
 
 const READERS = {
   operations: { rpc: 'work_order_operations_read', title: 'Operations' },
@@ -79,12 +80,14 @@ function StageBlock({ stage }: { stage: Stage }) {
 
 // MARK: - Sections, one per reader. Each renders nothing when its reader has nothing to say.
 
-function OperationsSection({ d }: { d: JsonObject }) {
+function OperationsSection({ d, workOrderId }: { d: JsonObject; workOrderId: string }) {
   const ops = arr(d.operations).map(obj).filter((o): o is JsonObject => !!o);
   const parts = arr(d.parts).map(obj).filter((o): o is JsonObject => !!o);
   const labor = arr(d.labor).map(obj).filter((o): o is JsonObject => !!o);
   if (!ops.length && !parts.length && !labor.length) return null;
   const c = obj(d.coverage);
+  const approved = (p: JsonObject) => arr(p.approved_listings).length;
+  const approvedTotal = parts.reduce((n, p) => n + approved(p), 0);
   return <Section title="Operations" coverage={cov(ops.length, num(c?.operations) ?? ops.length, 'operations', d.as_of)}>
     <Text role="caption" as="p">Prices are open: recorded line prices, not payments.</Text>
     <Rows title="Operations" count={ops.length}>
@@ -100,8 +103,13 @@ function OperationsSection({ d }: { d: JsonObject }) {
       {parts.map((p, i) => <Row key={str(p.id) ?? i} label={[str(p.part_name) ?? 'Part', str(p.brand)].filter(Boolean).join(' · ')} role="measure">
         {[num(p.quantity) !== null && num(p.unit_price) !== null ? `${num(p.quantity)} × ${money(num(p.unit_price), 'USD')}` : null,
           p.is_comped === true ? 'comped' : num(p.total_price) !== null ? `${money(num(p.total_price), 'USD')} total` : null].filter(Boolean).join(' · ') || 'Not priced'}
+        {approved(p) > 0 ? ` · ${approved(p)} approved on eBay` : ''}
       </Row>)}
     </Rows>
+    {approvedTotal > 0 && <Text role="body" as="p">
+      <PrefetchLink className="job-link" to={`/jobs/${workOrderId}/parts`}>Parts to buy</PrefetchLink>
+      {` — ${approvedTotal === 1 ? 'one approved listing' : `${approvedTotal} approved listings`}, each with its link to eBay.`}
+    </Text>}
     <Rows title="Labor" count={labor.length}>
       {labor.map((l, i) => {
         const hours = num(l.hours), rate = num(l.hourly_rate);
@@ -459,7 +467,11 @@ export default function JobPage() {
       <div className="job-stages">{stages.map(s => <StageBlock key={s.key} stage={s} />)}</div>
     </Section>
 
-    {r('operations') && <OperationsSection d={r('operations')!} />}
+    {r('operations') && <OperationsSection d={r('operations')!} workOrderId={workOrderId} />}
+    {vehicleId && str(obj(r('operations')?.part_approval)?.approver_role) && <React.Suspense fallback={null}>
+      <PartsFinder workOrderId={workOrderId} vehicleId={vehicleId} onApproved={reload}
+        parts={arr(r('operations')!.parts).map(obj).filter((o): o is JsonObject => !!o)} />
+    </React.Suspense>}
     {r('resources') && <ResourcesSection d={r('resources')!} />}
     {r('offers') && <OffersSection d={r('offers')!} onSigned={reload} />}
     {viewer && (viewer.slots.includes('customer') || viewer.slots.includes('org_owner')) && <React.Suspense fallback={null}><BestMatches workOrderId={workOrderId} /></React.Suspense>}

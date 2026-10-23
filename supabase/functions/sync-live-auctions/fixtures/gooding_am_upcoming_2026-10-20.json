@@ -1,0 +1,13 @@
+{
+ "result_page": [],
+ "query_info": {
+  "base_query": "https://production2-server.auctionmobility.com/v1/auction-lot/upcoming/2026-10-20T19:45:57Z?order_by=auction_date+lot_number&order=asc+asc&fieldset=timed-auction+reserve-status+absentee-bid+highest-live-bid+summary&auction_type=timed+timed_then_live",
+  "next_page": null,
+  "prev_page": null,
+  "page_size": 100,
+  "page_start_offset": 0,
+  "total_num_results": 0
+ },
+ "responseCode": 200,
+ "source": "https://bid.goodingco.com/ajax/lots/?n=100&o=0&order_by=auction_date+lot_number&order=asc+asc&fieldset=timed-auction+reserve-status+absentee-bid+highest-live-bid+summary&lotsRange=upcoming&paramsType=server&auction_type=timed+timed_then_live (fetched 2026-10-20 19:45Z)"
+}

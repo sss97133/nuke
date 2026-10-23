@@ -5,6 +5,7 @@ import {
   batSlug, yearFromSlug, classifyEngine, textFeatures, buildCompSet, quantile, median,
   summarize, shareBelow, windowComps, MIN_READABLE_DESCRIPTION,
   comparePriceToSourceSales, type DatedSourceSale, type SaleComparisonOptions,
+  compareSaleEvidenceEvaluations, type SaleEvidenceEvaluation, type SourceSaleEvidence,
   selectSourceSalePopulation, type SourceSaleCapture, type SalePopulationOptions, type SaleRelevanceClaim,
   type VehicleCompRow, type BatListingRow,
 } from './batComps';
@@ -30,6 +31,74 @@ const saleOptions = (over: Partial<SaleComparisonOptions> = {}): SaleComparisonO
   eventFrom: '2024-01-01T00:00:00Z', eventBefore: '2026-01-01T00:00:00Z',
   evidenceAsOf: '2026-01-02T00:00:00Z', computedAt: '2026-01-03T00:00:00Z',
   knowledgeMode: 'retrospective', ...over,
+});
+
+describe('retained source-sale evaluation changes', () => {
+  const rows = () => Array.from({ length: 10 }, (_, i) => sourceSale(i + 1));
+  const evaluate = (sales: SourceSaleEvidence[], options = saleOptions()): SaleEvidenceEvaluation => ({
+    comparison: comparePriceToSourceSales(sales, options), readerMethod: 'source_sale_price_midrank_v1',
+    populationBasis: 'source_qualified_episodes_of_current_public_members', minimumSales: options.minimumSales ?? 10,
+    memberRows: 20, exclusions: {},
+  });
+  it('separates entered, departed, revised and ancestry-only changes without changing either input', () => {
+    const before = evaluate(rows()), next = rows().slice(1);
+    next[0] = { ...next[0], amount: 12000 };
+    const after = evaluate([...next.slice(0, 2), { ...next[2], knownAt: '2025-07-01T00:00:00Z' }, ...next.slice(3), sourceSale(11)]);
+    after.exclusions = { source_body_unavailable: 1 };
+    const frozen = structuredClone({ before, after });
+    const result = compareSaleEvidenceEvaluations(before, after);
+    expect(result.counts).toEqual({ before: 10, after: 10, entered: 1, left: 1, revised: 1, evidenceChanged: 1, unchanged: 7 });
+    expect(result.changes.find(c => c.kind === 'left')).toMatchObject({ before: { amount: 1000 }, after: null, fields: [] });
+    expect(result.changes.find(c => c.kind === 'revised')?.fields).toEqual(['amount']);
+    expect(result.exclusionChanges).toEqual([{ reason: 'source_body_unavailable', before: 0, after: 1 }]);
+    expect(result.before.comparison.percentile).toBe(45);
+    expect(result.after.comparison.percentile).toBe(25);
+    expect({ before, after }).toEqual(frozen);
+    expect(compareSaleEvidenceEvaluations(before, evaluate([...after.comparison.eligible].reverse())).changes).toEqual(result.changes);
+  });
+  it('records new interpretation references without claiming a changed outcome', () => {
+    const first: SourceSaleEvidence[] = rows();
+    first[0] = { ...first[0], derivedObservationId: 'original', sourceParser: 'batParser:v1' };
+    const next = first.map((row, i) => i === 0 ? { ...row, derivedObservationId: 'successor', sourceParser: 'batParser:v2' } : row);
+    const result = compareSaleEvidenceEvaluations(evaluate(first), evaluate(next));
+    expect(result.changes).toHaveLength(1);
+    expect(result.changes[0]).toMatchObject({ kind: 'evidence_changed', fields: ['derivedObservationId', 'sourceParser'] });
+    expect(result.before.comparison.percentile).toEqual(result.after.comparison.percentile);
+  });
+  it('retains the earlier answer when the revised population falls below the minimum', () => {
+    const before = evaluate(rows()), after = evaluate(rows().map((row, i) => i === 0 ? { ...row, outcome: 'not_sold' } : row));
+    const result = compareSaleEvidenceEvaluations(before, after);
+    expect(result.counts?.left).toBe(1);
+    expect(result.before.comparison.percentile).toBe(45);
+    expect(result.after.comparison.percentile).toBeNull();
+    expect(result.after.comparison.reasons).toContain('insufficient_sales');
+    expect(result.changes[0].after).toBeNull(); // No invented explanation for absence in a qualified-only receipt.
+  });
+  it.each(['cohort', 'window', 'amount', 'currency', 'minimum', 'method', 'population', 'knowledge'])(
+    'refuses to call a changed %s an evidence revision', field => {
+      const before = evaluate(rows()), after = evaluate(rows());
+      if (field === 'cohort') after.comparison.cohort.key = 'different';
+      if (field === 'window') after.comparison.eventBefore = '2025-12-01T00:00:00Z';
+      if (field === 'amount') after.comparison.subject.amount = 6000;
+      if (field === 'currency') after.comparison.subject.currency = 'EUR';
+      if (field === 'minimum') after.minimumSales = 11;
+      if (field === 'method') after.readerMethod = 'changed_reader';
+      if (field === 'population') after.populationBasis = 'different';
+      if (field === 'knowledge') after.comparison.knowledgeMode = 'known_at';
+      const result = compareSaleEvidenceEvaluations(before, after);
+      expect(result.reasons).toContain('comparison_scope_changed');
+      expect(result.counts).toBeNull(); expect(result.changes).toEqual([]);
+    });
+  it('allows later evidence cutoffs but refuses unknown methods, incomplete populations and backwards cutoffs', () => {
+    const before = evaluate(rows()), after = evaluate(rows(), saleOptions({ evidenceAsOf: '2026-01-03T00:00:00Z' }));
+    expect(compareSaleEvidenceEvaluations(before, after).changes).toEqual([]);
+    expect(compareSaleEvidenceEvaluations(before, after).counts?.unchanged).toBe(10);
+    expect(compareSaleEvidenceEvaluations(after, before).reasons).toContain('evidence_cutoff_moved_backwards');
+    after.readerMethod = undefined;
+    expect(compareSaleEvidenceEvaluations(before, after).reasons).toContain('reader_method_unknown');
+    before.comparison.cohort.complete = false;
+    expect(compareSaleEvidenceEvaluations(before, after).reasons).toContain('population_incomplete');
+  });
 });
 
 describe('dated source sale percentile contract', () => {

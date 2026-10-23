@@ -1,3 +1,4 @@
+import { delegatedFinancialEvidence } from "./financialDelegation.ts";
 /**
  * INGEST OBSERVATION
  *
@@ -26,17 +27,19 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.117.3";
 import { normalizeListingUrl, normalizeVin } from "../_shared/urlNormalization.ts";
+import { FINANCIAL_EVIDENCE_MODE, financialActor, ingestFinancialEvidence } from "./financialEvidence.ts";
 import { requireWriteAuth, authenticateWriter } from "../_shared/writeGuard.ts";
 import { checkRateLimit, getClientIp } from "../_shared/rateLimit.ts";
 import { validateObservationProperty, isSupportedImagePropertyKey, isImageReadingKey } from "./imageProperties.ts";
 import { observationContentHash, observationClockMicroseconds } from "../_shared/observationContentHash.ts";
 import { readPinnedArchivedPage } from "../_shared/archiveFetch.ts";
 import { parseQualifiedBaTSale } from "../_shared/batParser.ts";
-import { BAT_LIVE_MODE } from "../_shared/batLiveEvents.ts";
+import { BAT_LIVE_MODE, type BatLiveFrame } from "../_shared/batLiveEvents.ts";
+import { BAT_LIVE_COLLECT_MODE, closingBatTargets, collectBatLive, batStreamIO } from "./batLiveCollector.ts";
 import { RETAINED_VIN_MODE, RETAINED_VIN_METHOD, retainedVinSelector,
   qualifyRetainedVinReference } from "./retainedVinReference.ts";
 import { RETAINED_VIN_BATCH_MODE, ingestRetainedVinBatch } from "./retainedVinBatch.ts";
-import { ingestBatLive } from "./batLive.ts";
+import { ingestBatLive, type BatLiveDiagnostics } from "./batLive.ts";
 import { RETAINED_REPORTED_WORK_MODE, retainedReportedWorkSelector, deriveRetainedReportedWork } from "./retainedReportedWork.ts";
 import { RETAINED_PROPERTY_KEYS, RETAINED_PROPERTY_MODES, RETAINED_INTERIOR_METHOD, retainedInteriorSelector, deriveRetainedInterior } from "./retainedInterior.ts";
 import { RETAINED_LISTING_DRAIN_MODE, drainRetainedListingProperties, RetainedBatchLookups } from "./retainedListingDrain.ts";
@@ -46,6 +49,8 @@ import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { HISTORICAL_ASK_MODE, HISTORICAL_ASK_PROFILE } from "./historicalAsks.ts";
 import { HISTORICAL_ASK_METHOD, historicalAskStore, ingestHistoricalAsk, HistoricalAskRefusal } from "./historicalAskIntake.ts";
 import { TITLE_FACET_KEYS, TITLE_FACET_METHOD, TITLE_FACET_MODE, titleFacetSelector, deriveTitleFacet } from "./titleFacets.ts";
+
+declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void };
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -263,6 +268,7 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
   }
 
   let retainedListingBudget = false, retainedSaleBudget = false, historicalAskBudget = false;
+  let nativeDiagnostics: BatLiveDiagnostics | undefined;
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL") ?? "",
     projectSecretKey() ?? "",
@@ -279,10 +285,19 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
             if (target.origin !== new URL(Deno.env.get("SUPABASE_URL") ?? "").origin ||
               !allowed.test(target.pathname)) throw new Error("Unexpected retained source SDK target");
           }
-          return fetch(supabaseUrl, retainedListingBudget || retainedSaleBudget || historicalAskBudget ? {
+          const send = () => fetch(supabaseUrl, retainedListingBudget || retainedSaleBudget || historicalAskBudget ? {
             ...init, signal: AbortSignal.any([req.signal, AbortSignal.timeout(retainedSaleBudget || historicalAskBudget ? 10000 : 5000),
               ...(supplied ? [supplied] : [])]),
           } : init);
+          const trace = nativeDiagnostics;
+          if (!trace?.trace) return send();
+          trace.sdkFetches = (trace.sdkFetches ?? 0) + 1;
+          const at = performance.now();
+          return send().catch(error => {
+            if (error instanceof Error && error.name === "RateLimitError")
+              trace.sdkRuntimeLimits = (trace.sdkRuntimeLimits ?? 0) + 1;
+            throw error;
+          }).finally(() => { trace.sdkFetchMs = (trace.sdkFetchMs ?? 0) + performance.now() - at; });
         },
       },
     }
@@ -290,6 +305,34 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
 
   try {
     let input: ObservationInput = await req.json();
+    if (input.mode === FINANCIAL_EVIDENCE_MODE) {
+      const action = (input as unknown as { action?: string }).action ?? "submit";
+      if ('owner_user_id' in input || action === 'contexts' || action === 'correct' || action === 'original') {
+        const options = { apiKeys: { endpoint: 'ingest-observation', requiredScopes: [] } };
+        const identity = await authenticateWriter(req, options);
+        const result = identity.ok ? await delegatedFinancialEvidence(supabase, identity.caller, input, async () => {
+          const current = await authenticateWriter(req, options);
+          return current.ok ? current.caller : null;
+        }) : { status: 401, body: { error: 'Accounting sign-in required' } };
+        return new Response(JSON.stringify(result.body), { status: result.status, headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
+      }
+      const options = { apiKeys: { endpoint: "ingest-observation", requiredScopes: [["read", "tax_read"].includes(action) ? "read" : "write"] } };
+      const identity = await authenticateWriter(req, options);
+      const actor = identity.ok ? financialActor(identity.caller, action) : null;
+      if (!actor) return new Response(
+        JSON.stringify({ error: "Financial evidence requires your account and matching scope" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      const result = await ingestFinancialEvidence(supabase, actor, input, async () => {
+        const current = await authenticateWriter(req, options);
+        return current.ok && financialActor(current.caller, action) === actor;
+      }, identity.ok && identity.caller.kind === "api_key"
+        ? { kind: "api_key", agent_id: identity.caller.agentId }
+        : { kind: "user" });
+      return new Response(JSON.stringify(result.body), {
+        status: result.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     if (input.mode === CAB_LISTING_CAPTURE_MODE) {
       const denied = await requireWriteAuth(req);
       if (denied) return denied;
@@ -402,7 +445,64 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
       }
       return ingestRetainedVinBatch(req, input as unknown as Record<string, unknown>, handleObservation);
     }
+    if (input.mode === BAT_LIVE_COLLECT_MODE) {
+      const requestAt = new Date().toISOString(), authStarted = performance.now();
+      const denied = await requireWriteAuth(req);
+      if (denied) return denied;
+      const writer = await authenticateWriter(req);
+      if (!writer.ok || writer.caller.kind !== "service_role") return new Response(
+        JSON.stringify({ error: "Live collection requires service role" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      const authMs = performance.now() - authStarted;
+      if (req.method !== "POST") return new Response(JSON.stringify({ error: "POST required" }),
+        { status: 405, headers: { ...corsHeaders, "Content-Type": "application/json", Allow: "POST" } });
+      if (Object.keys(input).some(key => !["mode", "dry_run"].includes(key))
+        || (input.dry_run !== undefined && typeof input.dry_run !== "boolean")) return new Response(
+          JSON.stringify({ error: "Invalid live collection selectors" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      const selectionStarted = performance.now(), targets = await closingBatTargets(supabase);
+      const selectionMs = performance.now() - selectionStarted, dryRun = input.dry_run === true;
+      const accepted = !dryRun && targets.length > 0, runId = accepted ? crypto.randomUUID() : null;
+      if (accepted) {
+        const selectedBindings = new Map(targets.map(target => [target.id, { ...target }]));
+        const admitBatch = async (frames: BatLiveFrame[], heartbeats: unknown[], diagnostics?: BatLiveDiagnostics) => {
+          // Each batch owns its SDK diagnostics/deadline, including concurrent
+          // independent lanes. The incoming handoff may finish before this work.
+          const deadline = AbortSignal.timeout(10000);
+          const db = createClient(Deno.env.get("SUPABASE_URL") ?? "", projectSecretKey() ?? "", {
+            auth: { persistSession: false, autoRefreshToken: false },
+            global: { headers: { "X-Nuke-Writer": "ingest-observation" }, fetch: (supabaseUrl, init) => {
+              const supplied = (init as { signal?: AbortSignal } | undefined)?.signal;
+              if (diagnostics) diagnostics.sdkFetches = (diagnostics.sdkFetches ?? 0) + 1;
+              const at = performance.now();
+              return fetch(supabaseUrl, { ...init, signal: AbortSignal.any([deadline, ...(supplied ? [supplied] : [])]) })
+                .catch(error => {
+                  if (diagnostics && error instanceof Error && error.name === "RateLimitError")
+                    diagnostics.sdkRuntimeLimits = (diagnostics.sdkRuntimeLimits ?? 0) + 1;
+                  throw error;
+                }).finally(() => {
+                  if (diagnostics) diagnostics.sdkFetchMs = (diagnostics.sdkFetchMs ?? 0) + performance.now() - at;
+                });
+            } },
+          });
+          return await ingestBatLive(db, { mode: BAT_LIVE_MODE, frames, heartbeats }, diagnostics, selectedBindings);
+        };
+        EdgeRuntime.waitUntil(collectBatLive(targets, batStreamIO(Deno.env.get("SUPABASE_URL") ?? "",
+          projectSecretKey() ?? "", { requestAt, authMs, selectionMs }, admitBatch), 115000, runId!)
+          .catch(() => {
+            // Pending/offline coverage and the end record remain the authority.
+            // Report failed cleanup without an unhandled background rejection.
+            console.error(JSON.stringify({ event: "bat_live_collector_failed_v1", collector_run_id: runId,
+              at: new Date().toISOString(), outcome: "failed_or_unacknowledged" }));
+          }));
+      }
+      return new Response(JSON.stringify({ success: true, mode: BAT_LIVE_COLLECT_MODE, dry_run: dryRun,
+        accepted, collector_run_id: runId, selected_lots: targets.length, collector_duration_seconds: 115,
+        transport: "public_pusher", targets: dryRun ? targets : undefined }),
+        { status: accepted ? 202 : 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
     if (input.mode === BAT_LIVE_MODE) {
+      const authStarted = performance.now();
       const denied = await requireWriteAuth(req);
       if (denied) return denied;
       const writer = await authenticateWriter(req);
@@ -410,7 +510,14 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
         return new Response(JSON.stringify({ error: "Live source admission requires service role" }),
           { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
-      return new Response(JSON.stringify(await ingestBatLive(supabase, input)),
+      // Diagnostic labels confer no authority and never enter source testimony.
+      const labels = new URL(req.url).searchParams, runId = labels.get("collector_run_id");
+      if (labels.get("trace_native") === "1" && /^[0-9a-f-]{36}$/i.test(runId ?? "")) {
+        nativeDiagnostics = { trace: true, collectorRunId: runId!,
+          sequence: /^\d{1,5}$/.test(labels.get("collector_seq") ?? "") ? Number(labels.get("collector_seq")) : undefined,
+          authMs: Math.round((performance.now() - authStarted) * 100) / 100 };
+      }
+      return new Response(JSON.stringify(await ingestBatLive(supabase, input, nativeDiagnostics)),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
     if (input.mode === RETAINED_IDENTITY_MODE) {

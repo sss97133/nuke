@@ -1,3 +1,4 @@
+// identifier claims: redeploy after #2477 deploy run 39842460458 stopped before the functions step.
 /**
  * Barn Finds listing extractor
  *
@@ -30,6 +31,7 @@ import { articleAndComments, type BarnFindsPost, parseBarnFindsPost } from "./pa
 import { bindableSubject, type CitedListing, citedListings, type ListingLink } from "./citations.ts";
 import { type Binding, bindToListing, citationMetadata, identityAgrees, mergePostVehicle, resolveCitedListing } from "./bind.ts";
 import { fetchHeldImageUrls, insertMissingVehicleImages } from "../_shared/vehicleImageWrite.ts";
+import { landIdentifierClaims } from "../_shared/landIdentifierClaims.ts";
 
 const USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36";
 
@@ -152,6 +154,7 @@ async function upsertPostVehicle(supabase: Supabase, o: { url: string; platform:
   const { data: inserted, error: insErr } = await supabase.from("vehicles").insert(vehicleRow).select("id").maybeSingle();
   if (insErr) throw new Error(insErr?.message || String(insErr));
   if (!inserted) throw new Error("Vehicle insert returned no data");
+  await landIdentifierClaims(supabase, { vehicleId: inserted.id, text: (vehicleRow as any).description, sourceUrl: (vehicleRow as any).listing_url ?? (vehicleRow as any).discovery_url, title: (vehicleRow as any).listing_title ?? null, extractor: "extract-barn-finds-listing" });
   return { id: inserted.id };
 }
 

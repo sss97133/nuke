@@ -1,3 +1,4 @@
+// identifier claims: redeploy after #2477 deploy run 39842460458 stopped before the functions step.
 /**
  * JAMESEDITION EXTRACTOR
  *
@@ -24,6 +25,7 @@ import { writeObservation } from '../_shared/observationWriter.ts';
 import { requireWriteAuth } from '../_shared/writeGuard.ts';
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { parseListingMarkdown, parseListingUrls } from "./listingParser.ts";
+import { landIdentifierClaims } from "../_shared/landIdentifierClaims.ts";
 
 const VERSION = '1.1.1';
 const JAMESEDITION_SOURCE_ID = '77c149de-7866-4a7c-ad24-3423ee6c1f22';
@@ -219,6 +221,7 @@ Deno.serve(async (req: Request) => {
             { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         }
         vehicleId = created.id;
+        await landIdentifierClaims(supabase, { vehicleId, text: (vehicleData as any).description, sourceUrl: (vehicleData as any).listing_url ?? (vehicleData as any).discovery_url, title: (vehicleData as any).listing_title ?? null, extractor: 'extract-jamesedition' });
       }
 
       // Fire-and-forget observation write

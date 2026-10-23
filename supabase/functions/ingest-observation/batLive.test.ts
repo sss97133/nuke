@@ -1,5 +1,6 @@
 import { strict as assert } from "node:assert";
 import fixture from "../_shared/batLiveEvents.fixture.json" with { type: "json" };
+import { BatLiveBuffer, type BatLiveFrame } from "../_shared/batLiveEvents.ts";
 
 const saved = [Deno.env.get("SUPABASE_URL"), Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")];
 Deno.env.set("SUPABASE_URL", "https://db.test");
@@ -51,6 +52,55 @@ Deno.test("native bidder link reaches the existing source-bound RPC through the 
     assert.deepEqual(calls[0].p_heartbeats, []);
     assert.equal((await handler(request({ ...frame, data: { ...data, post_id: fixture.post_id + 1 } }))).status, 500);
     assert.equal(calls.length, 1);
+  } finally {
+    globalThis.fetch = original;
+    for (const [i, key] of ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"].entries()) {
+      if (saved[i] === undefined) Deno.env.delete(key); else Deno.env.set(key, saved[i]!);
+    }
+  }
+});
+
+Deno.test("mixed collector batch reaches one canonical RPC with each lot bound to its own parent", async () => {
+  Deno.env.set("SUPABASE_URL", "https://db.test");
+  Deno.env.set("SUPABASE_SERVICE_ROLE_KEY", "test-key");
+  const original = globalThis.fetch;
+  const source = "00000000-0000-0000-0000-000000000009";
+  const targets = [1, 2].map(i => ({ id: `00000000-0000-0000-0000-${String(i).padStart(12, "0")}`,
+    vehicle_id: `00000000-0000-0000-0000-${String(i + 2).padStart(12, "0")}`,
+    post: fixture.post_id + i, url: `https://bringatrailer.com/listing/synthetic-lot-${i}/` }));
+  const calls: any[] = [];
+  const respond = (value: unknown) => Response.json(value);
+  globalThis.fetch = async (resource, init) => {
+    const url = new URL(typeof resource === "string" ? resource : resource instanceof URL ? resource.href : resource.url);
+    assert.equal(url.hostname, "db.test");
+    if (url.pathname === "/rest/v1/monitored_auctions") return respond(targets.map(t => ({ id: t.id,
+      source_id: source, vehicle_id: t.vehicle_id, external_auction_url: t.url, stream_state: {} })));
+    if (url.pathname === "/rest/v1/live_auction_sources") return respond({ id: source });
+    if (url.pathname === "/rest/v1/vehicles") return respond(targets.map(t => ({ id: t.vehicle_id,
+      listing_url: t.url, origin_metadata: { source: "bat_auctions_page", external_id: String(t.post) } })));
+    assert.equal(url.pathname, "/rest/v1/rpc/ingest_bat_live_events");
+    calls.push(JSON.parse(String((init as { body?: unknown } | undefined)?.body)));
+    return respond({ recorded: 2, duplicates: 0 });
+  };
+  const heartbeats = targets.map(t => ({ monitored_auction_id: t.id,
+    session_id: "00000000-0000-0000-0000-000000000010", at: "2026-10-21T19:00:00Z",
+    connected: true, pending: 0, oldest_received_at: null, error: null }));
+  const queue = new BatLiveBuffer(async frames => {
+    const response = await handler(new Request("https://db.test/functions/v1/ingest-observation?collector_run_id=00000000-0000-0000-0000-000000000010&collector_seq=1&trace_native=1", {
+      method: "POST", headers: { Authorization: "Bearer test-key", "Content-Type": "application/json" },
+      body: JSON.stringify({ mode: "bat_live_events_v1", frames, heartbeats }),
+    }));
+    assert.equal(response.status, 200);
+  });
+  try {
+    targets.forEach(t => queue.push({ ...fixture.events[3], monitored_auction_id: t.id,
+      data: { ...fixture.events[3].data, post_id: t.post }, transport: "public_pusher" } as BatLiveFrame));
+    await queue.flush();
+    assert.equal(calls.length, 1);
+    assert.deepEqual(calls[0].p_frames.map((f: any) => [f.monitored_auction_id, f.vehicle_id, f.post_id]),
+      targets.map(t => [t.id, t.vehicle_id, t.post]));
+    assert.deepEqual(calls[0].p_heartbeats, heartbeats);
+    assert.equal(queue.pending, 0);
   } finally {
     globalThis.fetch = original;
     for (const [i, key] of ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"].entries()) {

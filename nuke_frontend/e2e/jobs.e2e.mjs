@@ -417,3 +417,52 @@ describe('job market', () => {
     await ctx.close();
   });
 });
+
+describe('parts from eBay', () => {
+  // Finder reply in the shape extract-ebay-motors action "parts" returns (synthetic values; parts.test.ts covers eBay's shapes).
+  const listing = { item_id: '157375338850', item_url: 'https://www.ebay.com/itm/157375338850?fits=Year%3A1983', title: 'E2E mechanical fuel pump',
+    image_url: null, price: 23.59, currency: 'USD', shipping: 0, shipping_basis: 'free', total: 23.59, condition: 'New', condition_id: '1000',
+    condition_class: 0, seller: { username: 'e2eseller', feedback_percentage: 99.9, feedback_score: 6000 }, item_location: { postal_prefix: '372**', country: 'US' },
+    fit: 'exact', fit_properties: [{ name: 'Year', value: '1983' }], part_match: { state: 'names_part', word: 'pump' }, title_years_other: null,
+    observed_at: new Date().toISOString(), rank: 1, why: ['Exact fit: eBay matched Year 1983', '$23.59 delivered: lowest of 12'] };
+  const finder = { ok: true, refused: null, calls: { browse: 1, taxonomy: 7 }, quota: { daily_cap: 300, used_today: 5 },
+    parts: [{ query: 'Borla S-Type muffler', status: 'searched', ebay_total: 12, read: 12, exact_read: 12, possible_read: 0, unknown_read: 0,
+      category: { id: '33555', name: 'Exhaust' }, observed_at: listing.observed_at, browse_calls: 1, shortlist: [listing],
+      fitment: { established: true, note: 'eBay checks fit on Year, Make, Model', steps: [] } }] };
+
+  it('a shop owner searches, reads why, and approves one listing only at the Sign, with a reason', async () => {
+    const v = viewer('org_member', ['org_owner']);
+    const ops = { ...operations, part_approval: { approver_role: 'organization_owner' } };
+    const { ctx, page, writes } = await open(`/jobs/${WO}`, { who: SHOP, readers: jobReaders(v, { work_order_operations_read: ops }),
+      functions: { 'extract-ebay-motors': finder } });
+    await page.getByRole('region', { name: 'Parts from eBay' }).waitFor();
+    await page.getByRole('checkbox', { name: 'Borla S-Type muffler' }).check();
+    await page.getByRole('button', { name: 'Find exact-fit listings (1)' }).click();
+    const link = page.getByRole('link', { name: 'Open on eBay' });
+    await link.waitFor();
+    assert.equal(await link.getAttribute('href'), listing.item_url);
+    await page.getByRole('button', { name: 'Approve for this job' }).click();
+    assert.deepEqual(writes, []);
+    await page.getByRole('button', { name: 'Sign: approve this listing' }).click();
+    const args = await waitForWrite(writes, 'approve_job_part_listing');
+    assert.equal(args.p_work_order_id, WO);
+    assert.equal(args.p_work_order_part_id, 'part-1');
+    assert.equal(args.p_reason, 'Exact fit: eBay matched Year 1983; $23.59 delivered: lowest of 12');
+    assert.equal(args.p_listing.item_id, '157375338850');
+    assert.equal(args.p_listing.fit, 'exact');
+    await ctx.close();
+  });
+
+  it('a visitor gets no finder; the hand-off page lists the approved listing with its eBay link', async () => {
+    const approved = { ...operations.parts[0], approved_listings: [{ approval_id: 'ap-1', approved_at: listing.observed_at, approver_role: 'organization_owner', listing }] };
+    const ops = { ...operations, part_approval: { approver_role: null }, parts: [approved] };
+    const { ctx, page, writes } = await open(`/jobs/${WO}`, { readers: jobReaders(viewer('visitor'), { work_order_operations_read: ops }) });
+    await page.getByRole('link', { name: 'Parts to buy' }).waitFor();
+    assert.equal(await page.getByRole('region', { name: 'Parts from eBay' }).count(), 0);
+    await page.getByRole('link', { name: 'Parts to buy' }).click();
+    await page.getByRole('heading', { name: 'Parts to buy' }).waitFor();
+    assert.equal(await page.getByRole('link', { name: 'Open on eBay' }).getAttribute('href'), listing.item_url);
+    assert.deepEqual(writes, []);
+    await ctx.close();
+  });
+});

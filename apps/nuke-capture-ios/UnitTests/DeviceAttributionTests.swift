@@ -147,6 +147,37 @@ final class DeviceAttributionTests: XCTestCase {
         ]).isEmpty)
     }
 
+    func testShootWindowChainsThroughAWalkaroundButStopsAtTheSetWindow() {
+        let vin = "1GCEK14L9EJ147915"
+        // 4 min / ~11 m hops for 56 minutes; only the frames within 45 min of the anchor join.
+        var frames = [capture("plate", vin: vin, exact: true)]
+        for i in 1...14 {
+            frames.append(capture("walk\(i)", time: String(format: "2026-10-18T12:%02d:00Z", i * 4), lat: 37 + Double(i) * 0.0001, vehicle: true))
+        }
+        let groups = AttributionEngine.vinAnchoredCaptureGroups(frames)
+        XCTAssertEqual(groups.count, 1)
+        XCTAssertEqual(groups.first?.vehicleFrameCount, 11)
+        XCTAssertFalse(groups.first?.imageIDs.contains("walk12") ?? true, "a frame past the 45 min set window stays out")
+    }
+
+    func testOrphanPagingCoversTheWholeBacklogInPagesOf200() {
+        XCTAssertEqual(AttributionEngine.orphanPageRanges(limit: 450), [0...199, 200...399, 400...449])
+        XCTAssertEqual(AttributionEngine.orphanPageRanges(limit: 0), [0...0])
+        XCTAssertEqual(AttributionEngine.orphanPageRanges(limit: 1_000_000).count, 25)
+    }
+
+    func testVINReadUploadsOnlyExactSourceReads() {
+        let ups = AttributionEngine.vinReadUploads([
+            capture("plate", vin: "1gcek14l9ej147915", exact: true),
+            capture("fuzzy", vin: "1GCEK14L9EJ147915", exact: false),
+            capture("doc", vin: "1GCEK14L9EJ147915", exact: true, document: true),
+            capture("classic", vin: "215618", exact: true, make: "Porsche"),
+            capture("classic-nomake", vin: "215618", exact: true),
+        ])
+        XCTAssertEqual(ups.map(\.imageID), ["plate", "classic"])
+        XCTAssertEqual(ups.first?.vin, "1GCEK14L9EJ147915")
+    }
+
     func testCaptureSessionRequestCarriesSourceBoundAnchorAndFreshRunKey() throws {
         let request = AttributionEngine.DeviceProfileRequest(basis: "capture_session", vin: "1GCEK14L9EJ147915",
             serial: nil, year: nil, make: nil, model: nil, album_name: nil, album_native_id: nil,

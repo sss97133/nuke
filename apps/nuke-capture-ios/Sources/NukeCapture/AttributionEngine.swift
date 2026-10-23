@@ -32,7 +32,10 @@ final class AttributionEngine: ObservableObject {
     @Published private(set) var suggestionByImage: [String: String] = [:]
 
     // ─── DB shapes ───────────────────────────────────────────────────────────
-    private struct VehicleRow: Decodable { let id: String; let vin: String? }
+    private struct VehicleRow: Decodable {
+        let id: String; let vin: String?
+        var body_style: String? = nil; var canonical_body_style: String? = nil; var model: String? = nil
+    }
     private struct Exif: Decodable { let uuid: String? }
     private struct OrphanRow: Decodable {
         let id: String
@@ -60,6 +63,9 @@ final class AttributionEngine: ObservableObject {
         let contextualMake: String?
         let contextualModel: String?
         let albumContextAmbiguous: Bool
+        /// The read matched one of the owner's own vehicles exactly (roster match), so a classic
+        /// serial needs no album context to be worth uploading.
+        var rosterMatch: Bool = false
     }
     struct VINCaptureGroup: Equatable, Sendable {
         let vin: String
@@ -77,6 +83,9 @@ final class AttributionEngine: ObservableObject {
         let is_document: Bool
         let labels: [String]
         let vin_candidates: [String]
+        /// Each on-device read with its source (framework/request/revision) and confidence.
+        /// Omitted when the cached read predates OnDeviceAnalysis.
+        let on_device: [OnDeviceObservation]?
     }
     private struct DeviceReadingRequest: Encodable {
         let mode = "record_device_reading"
@@ -105,6 +114,7 @@ final class AttributionEngine: ObservableObject {
         let vinCandidates: [String]
         let isDocument: Bool
         let session: String
+        var onDevice: [OnDeviceObservation] = []
     }
     private struct SuggestUpdate: Encodable {
         let auto_suggested_vehicle_id: String
@@ -113,6 +123,32 @@ final class AttributionEngine: ObservableObject {
     }
 
     // ─── Run ───────────────────────────────────────────────────────────────────
+
+    // ─── Automatic-run gate (foreground + post-sync) ─────────────────────────
+    // Foreground, every sync with uploads and every library change used to re-run the whole pass,
+    // keeping the phone hot. Automatic runs now skip when the device is seriously hot or in Low
+    // Power Mode and run at most once per 15 minutes. Explicit calls to `run` are unaffected.
+    static let automaticInterval: TimeInterval = 15 * 60
+    static let lastAutomaticRunKey = "AttributionEngine.lastAutomaticRun"
+
+    nonisolated static func shouldRunAutomatic(now: Date, lastRun: Date?, tooHot: Bool, lowPower: Bool,
+                                               interval: TimeInterval = automaticInterval) -> Bool {
+        if tooHot || lowPower { return false }
+        guard let lastRun else { return true }
+        // A clock moved backwards does not hold attribution off forever.
+        return now.timeIntervalSince(lastRun) >= interval || now < lastRun
+    }
+
+    @discardableResult
+    func runAutomatic(limit: Int, ocrBudget: Int, defaults: UserDefaults = .standard) async -> Bool {
+        let now = Date()
+        let last = defaults.object(forKey: Self.lastAutomaticRunKey) as? Date
+        guard Self.shouldRunAutomatic(now: now, lastRun: last, tooHot: SyncEngine.deviceTooHot,
+                                      lowPower: ProcessInfo.processInfo.isLowPowerModeEnabled) else { return false }
+        guard !isRunning else { return false }
+        defaults.set(now, forKey: Self.lastAutomaticRunKey)
+        return await run(limit: limit, ocrBudget: ocrBudget)
+    }
 
     /// Attribute this device's orphan photos (uploaded rows with no vehicle). Returns true on a
     /// clean pass.
@@ -134,7 +170,7 @@ final class AttributionEngine: ObservableObject {
     /// vehicle, thresholds, audit through attribute_testimony). If it refuses or is not deployed,
     /// an inexact identifier read falls back to a suggestion.
     @discardableResult
-    func run(limit: Int = 200, ocrBudget: Int = 200) async -> Bool {
+    func run(limit: Int = 2000, ocrBudget: Int = 200) async -> Bool {
         guard !isRunning else { return false }
         guard let userId = SupabaseService.currentUserId else { lastSummary = "Not signed in"; return false }
         isRunning = true
@@ -154,15 +190,27 @@ final class AttributionEngine: ObservableObject {
         }
         // Sync also runs on PhotoKit changes and refresh wakes. Do not depend on the delayed
         // screen task to populate the album catalog before trying to file its new photos.
-        await LibraryStore.shared.refreshAlbums()
+        await LibraryStore.shared.ensureAlbumCatalog()
         let knownVINs = knownVehicles.compactMap { $0.vin?.uppercased() }.filter { $0.count >= 8 }
         let vinToVehicle = Self.unambiguousSerialVehicles(knownVehicles.compactMap { v in
             v.vin.map { (serial: $0, vehicleId: v.id) }
         })
         let catalog = LibraryStore.shared.albumCatalog
-        let localPhotos = Dictionary(((catalog?.photos ?? []) + (catalog?.albums.flatMap(\.photos) ?? []))
-            .map { ($0.localIdentifier, $0) }, uniquingKeysWith: { first, _ in first })
         let method = LibraryIngest.identityMethodVersion
+        // Build the catalog index and read every retained source review in ONE detached task
+        // (off the main actor) instead of a whole-catalog dictionary on main plus a hop per orphan.
+        let orphanAssetIDs = orphans.compactMap { $0.exif_data?.uuid }
+        let (localPhotos, cachedReviews) = await Task.detached(priority: .utility) {
+            () -> ([String: LocalAlbumPhoto], [String: LocalAlbumImageReview]) in
+            let photos = Dictionary(((catalog?.photos ?? []) + (catalog?.albums.flatMap(\.photos) ?? []))
+                .map { ($0.localIdentifier, $0) }, uniquingKeysWith: { first, _ in first })
+            var reviews: [String: LocalAlbumImageReview] = [:]
+            for id in orphanAssetIDs where reviews[id] == nil {
+                guard let photo = photos[id] else { continue }
+                if let r = try? LocalStore.shared.albumImageReview(for: photo, methodVersion: method) { reviews[id] = r }
+            }
+            return (photos, reviews)
+        }.value
         let identityRunID = UUID().uuidString.lowercased()
 
         guard !orphans.isEmpty else { lastSummary = "No orphan photos to attribute"; return true }
@@ -180,18 +228,14 @@ final class AttributionEngine: ObservableObject {
             guard let assetID = row.exif_data?.uuid else { skippedNonLocal += 1; continue }
             // Foreground sync has a zero *new* OCR budget. It must still consume original-byte
             // reads already retained by LibraryIngest, qualified by source and method version.
-            let cached: LocalAlbumImageReview?
-            if let photo = localPhotos[assetID] {
-                cached = try? await Task.detached {
-                    try LocalStore.shared.albumImageReview(for: photo, methodVersion: method)
-                }.value
-            } else { cached = nil }
+            let cached = cachedReviews[assetID]
             let lines: [String]
             let isVehicle: Bool
             let identityReadAt: Date
             let labels: [String]
             let sourceVINCandidates: [String]
             let isDocument: Bool
+            let onDevice: [OnDeviceObservation]
             if let cached, cached.inputSHA256 == row.file_hash {
                 lines = cached.textLines + cached.vinCandidates
                 isVehicle = cached.isVehicle
@@ -201,6 +245,7 @@ final class AttributionEngine: ObservableObject {
                     isScreenshot: VisionEngine.isScreenshot(localIdentifier: assetID), ocrLines: cached.textLines)
                 let classic = Set(VisionEngine.labelledClassicSerialCandidates(in: cached.textLines))
                 sourceVINCandidates = isDocument ? [] : cached.vinCandidates.filter { VisionEngine.isValidVIN($0) || classic.contains($0) }
+                onDevice = OnDeviceAnalysis.uploadable(cached.onDeviceObservations, isDocument: isDocument)
             } else {
                 guard read < ocrBudget else { continue }
                 guard let photo = localPhotos[assetID] else { skippedNonLocal += 1; continue }
@@ -224,6 +269,7 @@ final class AttributionEngine: ObservableObject {
                     isScreenshot: VisionEngine.isScreenshot(localIdentifier: assetID), ocrLines: review.textLines)
                 let classic = Set(VisionEngine.labelledClassicSerialCandidates(in: review.textLines))
                 sourceVINCandidates = isDocument ? [] : review.vinCandidates.filter { VisionEngine.isValidVIN($0) || classic.contains($0) }
+                onDevice = OnDeviceAnalysis.uploadable(review.onDeviceObservations, isDocument: isDocument)
             }
             let match = isDocument || knownVINs.isEmpty ? nil : VisionEngine.matchSerial(in: lines, known: knownVINs)
             let classicIdentifiers = Set(VisionEngine.labelledClassicSerialCandidates(in: lines))
@@ -239,7 +285,7 @@ final class AttributionEngine: ObservableObject {
                                   vinRead: match?.vin ?? unknown, unknownVIN: unknown,
                                   identityReadAt: identityReadAt, labels: labels,
                                   vinCandidates: sourceVINCandidates, isDocument: isDocument,
-                                  session: sessionKey(row)))
+                                  session: sessionKey(row), onDevice: onDevice))
         }
 
         let albumContext = Self.albumContextByAsset()
@@ -253,9 +299,12 @@ final class AttributionEngine: ObservableObject {
                 isDocument: s.isDocument || s.row.is_document == true || s.row.doc_flag == true,
                 isSensitive: s.row.is_sensitive == true,
                 contextualYear: albumLabel?.year, contextualMake: albumLabel?.make, contextualModel: albumLabel?.model,
-                albumContextAmbiguous: assetID.map { albumContext.ambiguous.contains($0) } ?? false)
+                albumContextAmbiguous: assetID.map { albumContext.ambiguous.contains($0) } ?? false,
+                rosterMatch: s.vinVehicleId != nil && s.vinDist == 0)
         }
-        let identityGroups = Self.vinAnchoredCaptureGroups(captureFrames)
+        await uploadVINReads(captureFrames)
+        // anchors × frames × frontier: run off the main actor.
+        let identityGroups = await Task.detached(priority: .utility) { Self.vinAnchoredCaptureGroups(captureFrames) }.value
         // Persist contextual 2–3 source reading receipts before any VIN profile write.
         // They use image_observations' protected reading-only lane; no subject membership is asserted.
         if !identityGroups.isEmpty {
@@ -366,6 +415,34 @@ final class AttributionEngine: ObservableObject {
         let sessionVehicle = Self.unambiguousSerialVehicles(signals.compactMap { signal in
             signal.vinVehicleId.map { (serial: signal.session, vehicleId: $0) }
         })
+        // Candidate-set routing for close-ups with no identifier of their own: only the few vehicles
+        // plausible that day survive the hard constraints, and only a clear margin is a strong lead.
+        let filedThisRun = fileItems.filter { completedIDs.contains($0.image_id) }
+            .map { FiledPhoto(id: $0.image_id, vehicle_id: $0.vehicle_id, taken_at: nil, latitude: nil, longitude: nil) }
+        let filedHistory = (try? await fetchFiledContext(userId: userId,
+            around: signals.compactMap { LocalDay.parse($0.row.taken_at) })) ?? []
+        let rowsByID = Dictionary(signals.map { ($0.row.id, $0.row) }, uniquingKeysWith: { a, _ in a })
+        let filedAnchors = filedHistory + filedThisRun.map { f in
+            let r = rowsByID[f.id]
+            return FiledPhoto(id: f.id, vehicle_id: f.vehicle_id, taken_at: r?.taken_at, latitude: r?.latitude, longitude: r?.longitude)
+        }
+        var albumVehicleByImage: [String: String] = [:]
+        for row in orphans {
+            guard let uuid = row.exif_data?.uuid, let albums = albumsByAsset[uuid] else { continue }
+            let mapped = Self.mappedVehicles(for: albums, in: albumMap)
+            if mapped.count == 1, let v = mapped.first { albumVehicleByImage[row.id] = v }
+        }
+        let bodyByVehicle = Dictionary(knownVehicles.map {
+            ($0.id, BodyClass.ofVehicle(bodyStyle: $0.canonical_body_style ?? $0.body_style, model: $0.model))
+        }, uniquingKeysWith: { a, _ in a })
+        let routed = Self.routeCloseUps(
+            inputs: signals.filter { !completedIDs.contains($0.row.id) }.map {
+                RouteInput(id: $0.row.id, takenAt: $0.row.taken_at, latitude: $0.row.latitude, longitude: $0.row.longitude,
+                           labels: $0.labels, isDocument: $0.isDocument,
+                           identifierVehicleID: $0.vinDist == 0 ? $0.vinVehicleId : nil)
+            },
+            filed: filedAnchors, bodyByVehicle: bodyByVehicle, albumVehicleByImage: albumVehicleByImage)
+
         var suggested = 0, unresolved = 0
         for s in signals where !completedIDs.contains(s.row.id) {
             if s.isDocument { unresolved += 1; continue }
@@ -375,7 +452,15 @@ final class AttributionEngine: ObservableObject {
                               reasons: ["vin_ocr_match", "edit_distance=\(s.vinDist ?? 0)"])
                 suggestionByImage[s.row.id] = vid
                 suggested += 1
-            } else if let vid = sessionVehicle[s.session.uppercased()], s.isVehicle {
+            } else if let r = routed[s.row.id], let lead = r.decision.lead {
+                // A clear margin keeps its score; a contested lead stays below every bulk-filing bar.
+                await suggest(imageId: s.row.id, vehicleId: lead.0,
+                              conf: r.decision.isClear ? lead.1 : min(lead.1, 0.79), reasons: lead.2)
+                suggestionByImage[s.row.id] = lead.0
+                suggested += 1
+            } else if let vid = sessionVehicle[s.session.uppercased()], s.isVehicle,
+                      (routed[s.row.id]?.candidateCount ?? 0) <= 1 {
+                // Never spread one VIN across a cell where more than one vehicle was plausible that day.
                 await suggest(imageId: s.row.id, vehicleId: vid, conf: 0.80,
                               reasons: ["session_inheritance", "vin_anchored_session", "session=\(s.session)"])
                 suggestionByImage[s.row.id] = vid
@@ -384,6 +469,24 @@ final class AttributionEngine: ObservableObject {
                 unresolved += 1
             }
         }
+
+        // The owner's own album is a sloppy but real lead (owner, 2026-10-20: "album helps at least get a
+        // sloppy id"). A photo in exactly one mapped album surfaces in the confirm sweep with that
+        // vehicle as a suggestion even before any pixel read. It files nothing: filing still needs a
+        // fresh vehicle-classified read (above), and bulk filing still needs a serial match.
+        var albumLeads = 0
+        for row in orphans where !completedIDs.contains(row.id) && suggestionByImage[row.id] == nil
+            && row.is_document != true && row.doc_flag != true && row.is_sensitive != true
+            && !localDocumentIDs.contains(row.id) {
+            guard let uuid = row.exif_data?.uuid, let albums = albumsByAsset[uuid], !albums.isEmpty else { continue }
+            let mapped = Self.mappedVehicles(for: albums, in: albumMap)
+            guard mapped.count == 1, let vid = mapped.first else { continue }
+            let names = albums.compactMap(\.name).prefix(2).joined(separator: " | ")
+            await suggest(imageId: row.id, vehicleId: vid, conf: 0.5, reasons: ["album_context", "album=\(names)"], onlyIfNone: true)
+            suggestionByImage[row.id] = vid
+            albumLeads += 1
+        }
+        if albumLeads > 0 { suggested += albumLeads }
 
         let readIDs = Set(signals.map { $0.row.id })
         let awaitingRead = orphans.filter { !completedIDs.contains($0.id) && !readIDs.contains($0.id) }.count
@@ -520,7 +623,8 @@ final class AttributionEngine: ObservableObject {
                 let items = selected.map { signal in IdentitySourceItem(image_id: signal.row.id,
                     read_at: ISO8601DateFormatter().string(from: signal.identityReadAt),
                     is_vehicle: signal.isVehicle, is_document: signal.isDocument,
-                    labels: Array(signal.labels.prefix(12)), vin_candidates: Array(signal.vinCandidates.prefix(8))) }
+                    labels: Array(signal.labels.prefix(12)), vin_candidates: Array(signal.vinCandidates.prefix(8)),
+                    on_device: signal.onDevice.isEmpty ? nil : signal.onDevice) }
                 let hashes = Dictionary(uniqueKeysWithValues: selected.compactMap { signal in
                     signal.row.file_hash.map { (signal.row.id, $0) }
                 })
@@ -621,17 +725,117 @@ final class AttributionEngine: ObservableObject {
     // ─── Helpers ───────────────────────────────────────────────────────────────
 
     /// Day + ~100m GPS cell = one work session = one truck (the sequence unit).
+    // ─── Candidate-set routing (see CandidateRouting.swift) ──────────────────
+
+    struct FiledPhoto: Decodable, Sendable, Equatable {
+        let id: String
+        let vehicle_id: String
+        let taken_at: String?
+        let latitude: Double?
+        let longitude: Double?
+    }
+    struct RouteInput: Sendable, Equatable {
+        let id: String
+        let takenAt: String?
+        let latitude: Double?
+        let longitude: Double?
+        let labels: [String]
+        let isDocument: Bool
+        let identifierVehicleID: String?
+    }
+    struct RouteResult: Sendable, Equatable {
+        let decision: RoutingDecision
+        let candidateCount: Int
+    }
+
+    /// The owner's filed photos within 14 days of the orphans' days: positional anchors and the
+    /// "worked on recently at this place" prior. Read-only; a failure only weakens routing.
+    private func fetchFiledContext(userId: String, around dates: [Date]) async throws -> [FiledPhoto] {
+        guard let lo = dates.min(), let hi = dates.max() else { return [] }
+        let f = ISO8601DateFormatter()
+        return try await SupabaseService.client.from("vehicle_images")
+            .select("id, vehicle_id, taken_at, latitude, longitude")
+            .eq("user_id", value: userId)
+            .not("vehicle_id", operator: .is, value: "null")
+            .not("is_duplicate", operator: .is, value: true)
+            .gte("taken_at", value: f.string(from: lo.addingTimeInterval(-14 * 86_400)))
+            .lte("taken_at", value: f.string(from: hi.addingTimeInterval(86_400)))
+            .order("taken_at", ascending: false)
+            .limit(1000)
+            .execute().value
+    }
+
+    /// Pure: route each orphan without its own identifier among only the vehicles plausible for its
+    /// local day and place. Known vehicles (`bodyByVehicle`) are the owner's associated roster; a
+    /// vehicle outside it is `not_held` and locked out.
+    nonisolated static func routeCloseUps(inputs: [RouteInput], filed: [FiledPhoto], bodyByVehicle: [String: BodyClass],
+                                          albumVehicleByImage: [String: String],
+                                          timeZone: TimeZone = .current) -> [String: RouteResult] {
+        let orphanPhotos = inputs.map { i in
+            RoutingPhoto(id: i.id, takenAt: LocalDay.parse(i.takenAt), latitude: i.latitude, longitude: i.longitude,
+                         labels: i.labels, kind: PhotoKind.of(labels: i.labels, isDocument: i.isDocument),
+                         identifierVehicleID: i.identifierVehicleID)
+        }
+        let filedPhotos = filed.map { f in
+            RoutingPhoto(id: f.id, takenAt: LocalDay.parse(f.taken_at), latitude: f.latitude, longitude: f.longitude,
+                         filedVehicleID: f.vehicle_id)
+        }
+        let all = orphanPhotos + filedPhotos
+        let shoots = ShootSegmenter.segment(all)
+        var shootOf: [String: [RoutingPhoto]] = [:]
+        for shoot in shoots { for p in shoot { shootOf[p.id] = shoot } }
+        // Day activity: identifier reads and filed photos, keyed by the local day.
+        var activeByDay: [String: Set<String>] = [:]
+        for p in all {
+            guard let t = p.takenAt, let v = p.identifierVehicleID ?? p.filedVehicleID else { continue }
+            activeByDay[LocalDay.key(t, timeZone: timeZone), default: []].insert(v)
+        }
+        var out: [String: RouteResult] = [:]
+        for p in orphanPhotos where p.identifierVehicleID == nil {
+            guard let t = p.takenAt, let shoot = shootOf[p.id] else { continue }
+            let day = LocalDay.key(t, timeZone: timeZone)
+            let active = activeByDay[day] ?? []
+            let recent = Set(filedPhotos.filter { f in
+                guard let ft = f.takenAt, ft <= t.addingTimeInterval(86_400), t.timeIntervalSince(ft) <= 14 * 86_400 else { return false }
+                return (ShootSegmenter.meters(f, p) ?? .infinity) <= ShootSegmenter.maxMoveMeters
+            }.compactMap(\.filedVehicleID))
+            let album = albumVehicleByImage[p.id]
+            let ids = active.union(recent).union(album.map { [$0] } ?? [])
+            let candidates = ids.sorted().map { v in
+                RoutingCandidate(vehicleID: v, bodyClass: bodyByVehicle[v] ?? .unknown,
+                                 possession: bodyByVehicle[v] == nil ? .notHeld : .unknown,
+                                 activeThatDay: active.contains(v), recentAtLocation: recent.contains(v),
+                                 albumMapped: album == v)
+            }
+            guard !candidates.isEmpty else { continue }
+            out[p.id] = RouteResult(decision: CandidateRouter.decide(p, shoot: shoot, candidates: candidates),
+                                    candidateCount: candidates.count)
+        }
+        return out
+    }
+
     private func sessionKey(_ r: OrphanRow) -> String {
-        let day = (r.taken_at ?? "nodate").prefix(10)
-        let lat = r.latitude.map { (($0 * 1000).rounded() / 1000) } ?? 0
-        let lon = r.longitude.map { (($0 * 1000).rounded() / 1000) } ?? 0
+        Self.sessionKey(takenAt: r.taken_at, latitude: r.latitude, longitude: r.longitude)
+    }
+
+    /// The owner's local working day (not the UTC prefix, which rolls over at 5 PM in California)
+    /// plus a ~100 m cell.
+    nonisolated static func sessionKey(takenAt: String?, latitude: Double?, longitude: Double?,
+                                       timeZone: TimeZone = .current) -> String {
+        let day = LocalDay.key(taken: takenAt, timeZone: timeZone)
+        let r = latitude, l = longitude
+        let lat = r.map { (($0 * 1000).rounded() / 1000) } ?? 0
+        let lon = l.map { (($0 * 1000).rounded() / 1000) } ?? 0
         return "\(day)|\(lat),\(lon)"
     }
 
-    /// Build tight identity groups from fresh source reads. Every member is within
-    /// Five minutes and 25 m of one exact VIN anchor in this pass. The run key is
+    /// Build identity groups from fresh source reads. Every member is within five minutes and
+    /// 25 m of the anchor or of another member (chained), and within 45 min of one exact VIN anchor. The run key is
     /// the relation; camera make/model/lens metadata is not a device identity.
     /// A competing VIN anchor in that neighborhood makes the whole fold ambiguous.
+    /// The widest a VIN-anchored shoot may reach from its anchor (chained 5 min / 25 m hops).
+    nonisolated static let setWindowSeconds: TimeInterval = 45 * 60
+
     nonisolated static func vinAnchoredCaptureGroups(_ frames: [VINCaptureFrame]) -> [VINCaptureGroup] {
         func captureDate(_ value: String?) -> Date? {
             guard let value else { return nil }
@@ -661,6 +865,10 @@ final class AttributionEngine: ObservableObject {
             if !secondHasContext { return true }
             return firstHasContext && first.0 == second.0 && first.1 == second.1 && first.2 == second.2
         }
+        func withinSetWindow(_ a: VINCaptureFrame, _ b: VINCaptureFrame) -> Bool {
+            guard let ta = captureDate(a.takenAt), let tb = captureDate(b.takenAt) else { return false }
+            return abs(ta.timeIntervalSince(tb)) <= setWindowSeconds
+        }
         let anchors = frames.filter { frame in
             frame.exactVIN && !frame.isDocument && !frame.isSensitive &&
             frame.fileHash?.range(of: "^[a-f0-9]{64}$", options: .regularExpression) != nil &&
@@ -674,11 +882,27 @@ final class AttributionEngine: ObservableObject {
         var groups: [VINCaptureGroup] = []
         for anchor in anchors where emitted.insert(anchor.vin!).inserted {
             guard !anchors.contains(where: { $0.vin != anchor.vin && near(anchor, $0) }) else { continue }
-            let neighbors = frames.filter { $0.isVehicle && !$0.isDocument && !$0.isSensitive && near(anchor, $0) && albumContextAgrees(anchor, $0) }
-            let members = neighbors.filter { frame in
-                Set(anchors.filter { near($0, frame) }.compactMap(\.vin)) == [anchor.vin!]
+            // A shoot runs 20–40 minutes: grow the set through frames that are each within 5 min / 25 m
+            // of an admitted frame, up to the set window from the anchor. A frame near a competing anchor is
+            // never admitted (so the walk stops there); a competing anchor near this one makes it ambiguous.
+            let eligible = frames.filter { $0.isVehicle && !$0.isDocument && !$0.isSensitive && albumContextAgrees(anchor, $0) &&
+                withinSetWindow(anchor, $0) }
+            var members: [VINCaptureFrame] = []
+            var admitted = Set<String>(), frontier = [anchor], ambiguous = false
+            while let cur = frontier.popLast(), !ambiguous {
+                if anchors.contains(where: { $0.vin != anchor.vin && withinSetWindow(anchor, $0) && near(cur, $0) }) { ambiguous = true; break }
+                for f in eligible where !admitted.contains(f.imageID) && f.imageID != anchor.imageID && near(cur, f) {
+                    guard Set(anchors.filter { near($0, f) }.compactMap(\.vin)).isSubset(of: [anchor.vin!]) else { continue }
+                    admitted.insert(f.imageID); members.append(f); frontier.append(f)
+                }
             }
+            guard !ambiguous else { continue }
             guard !members.isEmpty else { continue }
+            if members.count > 99, let t0 = captureDate(anchor.takenAt) {   // server takes 2–100 images: keep the closest
+                members = Array(members.sorted {
+                    abs((captureDate($0.takenAt) ?? t0).timeIntervalSince(t0)) < abs((captureDate($1.takenAt) ?? t0).timeIntervalSince(t0))
+                }.prefix(99))
+            }
             let ids = Array(Set([anchor.imageID] + members.map(\.imageID))).sorted()
             guard (2...100).contains(ids.count) else { continue }
             groups.append(VINCaptureGroup(vin: anchor.vin!, year: anchor.contextualYear, make: anchor.contextualMake,
@@ -705,35 +929,83 @@ final class AttributionEngine: ObservableObject {
         for start in stride(from: 0, to: ids.count, by: 200) {
             let chunk = Array(ids[start..<min(start + 200, ids.count)])
             let rows: [VehicleRow] = try await SupabaseService.client.from("vehicles")
-                .select("id, vin").in("id", values: chunk).execute().value
+                .select("id, vin, body_style, canonical_body_style, model").in("id", values: chunk).execute().value
             vehicles.append(contentsOf: rows)
         }
         return vehicles
     }
 
-    private func fetchOrphans(userId: String, limit: Int) async throws -> [OrphanRow] {
-        return try await SupabaseService.client.from("vehicle_images")
-            .select("id, latitude, longitude, taken_at, is_document, doc_flag, is_sensitive, exif_data, file_hash")
-            .eq("user_id", value: userId)
-            .is("vehicle_id", value: nil)
-            .eq("source", value: Config.sourceTag)
-            .neq("image_url", value: "")          // metadata-only rows have no picture to file
-            .not("is_superseded", operator: .is, value: true)
-            .not("is_duplicate", operator: .is, value: true)
-            .or("vision_gate_status.is.null,vision_gate_status.not.in.(rejected_personal,rejected_misattributed)")
-            // A newly uploaded historic or undated photo still deserves its first filing pass.
-            .order("created_at", ascending: false)
-            .order("id", ascending: false)
-            .limit(min(200, max(1, limit)))
-            .execute().value
+    /// Every unfiled photo, newest first, paged by 200 up to `limit` (hard cap 5,000) so a backlog
+    /// older than the newest 200 still gets its filing pass. The OCR budget still bounds per-run work.
+    nonisolated static let orphanPageSize = 200
+    nonisolated static let orphanHardCap = 5000
+    nonisolated static func orphanPageRanges(limit: Int) -> [ClosedRange<Int>] {
+        let total = min(orphanHardCap, max(1, limit))
+        return stride(from: 0, to: total, by: orphanPageSize).map { $0...(min($0 + orphanPageSize, total) - 1) }
     }
 
-    private func suggest(imageId: String, vehicleId: String, conf: Double, reasons: [String]) async {
+    private func fetchOrphans(userId: String, limit: Int) async throws -> [OrphanRow] {
+        var out: [OrphanRow] = []
+        var seen = Set<String>()
+        for range in Self.orphanPageRanges(limit: limit) {
+            let page: [OrphanRow] = try await SupabaseService.client.from("vehicle_images")
+                .select("id, latitude, longitude, taken_at, is_document, doc_flag, is_sensitive, exif_data, file_hash")
+                .eq("user_id", value: userId)
+                .is("vehicle_id", value: nil)
+                .eq("source", value: Config.sourceTag)
+                .neq("image_url", value: "")          // metadata-only rows have no picture to file
+                .not("is_superseded", operator: .is, value: true)
+                .not("is_duplicate", operator: .is, value: true)
+                .or("vision_gate_status.is.null,vision_gate_status.not.in.(rejected_personal,rejected_misattributed)")
+                // A newly uploaded historic or undated photo still deserves its first filing pass.
+                .order("created_at", ascending: false)
+                .order("id", ascending: false)
+                .range(from: range.lowerBound, to: range.upperBound)
+                .execute().value
+            for row in page where seen.insert(row.id).inserted { out.append(row) }
+            if page.count < range.count { break }
+        }
+        // Fetched by upload so new arrivals get their first pass; filed by when they were taken,
+        // newest first, undated last (upload time is not event time).
+        return out.sorted { EventTime.newestFirst(EventTime.clock(takenAt: $0.taken_at), EventTime.clock(takenAt: $1.taken_at), tie: ($0.id, $1.id)) }
+    }
+
+    /// The phone's exact identifier read, uploaded so the server can link without re-running OCR.
+    /// Only fills an empty vehicle_vin; never overwrites a stored read.
+    private struct VINReadUpdate: Encodable { let vehicle_vin: String; let vehicle_vin_confidence: Double }
+    nonisolated static func vinReadUploads(_ frames: [VINCaptureFrame]) -> [(imageID: String, vin: String, confidence: Double)] {
+        frames.compactMap { f in
+            guard f.exactVIN, !f.isDocument, !f.isSensitive, let vin = f.vin?.uppercased() else { return nil }
+            if VisionEngine.isValidVIN(vin) { return (f.imageID, vin, 0.95) }
+            guard (5...16).contains(vin.count), vin.contains(where: \.isNumber) else { return nil }
+            // A roster match is an exact read of one of the owner's own serials (#2513 accepts ≥ 0.8).
+            if f.rosterMatch { return (f.imageID, vin, 0.9) }
+            if f.contextualMake != nil { return (f.imageID, vin, 0.8) }
+            return nil
+        }
+    }
+
+    private func uploadVINReads(_ frames: [VINCaptureFrame]) async {
+        for u in Self.vinReadUploads(frames) {
+            do {
+                try await SupabaseService.client.from("vehicle_images")
+                    .update(VINReadUpdate(vehicle_vin: u.vin, vehicle_vin_confidence: u.confidence))
+                    .eq("id", value: u.imageID)
+                    .is("vehicle_vin", value: nil)
+                    .execute()
+            } catch { NSLog("attribution vin upload: %@", String(describing: error)) }
+        }
+    }
+
+    private func suggest(imageId: String, vehicleId: String, conf: Double, reasons: [String], onlyIfNone: Bool = false) async {
         do {
-            try await SupabaseService.client.from("vehicle_images")
+            // A weak lead (the album) never replaces a stronger earlier suggestion (a serial read).
+            var q = try SupabaseService.client.from("vehicle_images")
                 .update(SuggestUpdate(auto_suggested_vehicle_id: vehicleId,
                                       auto_suggestion_confidence: conf, auto_suggestion_reasons: reasons))
-                .eq("id", value: imageId).execute()
+                .eq("id", value: imageId)
+            if onlyIfNone { q = q.is("auto_suggested_vehicle_id", value: nil) }
+            try await q.execute()
         } catch { NSLog("attribution suggest: %@", String(describing: error)) }
     }
 

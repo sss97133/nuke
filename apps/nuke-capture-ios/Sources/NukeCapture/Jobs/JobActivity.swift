@@ -216,4 +216,11 @@ enum ActivityCopy {
     static func pollInterval(_ live: JobActivity.Live?) -> Int {
         min(max(live?.pollAfterSeconds ?? 60, 10), 600)
     }
+
+    /// The server's interval doubled for each quiet poll in a row, capped at 10 minutes, so an open
+    /// screen on a job with no news stops waking the radio every few seconds.
+    static func backoffInterval(_ base: Int, idlePolls: Int) -> Int {
+        let doubled = base << min(max(idlePolls, 0), 6)
+        return min(max(doubled, base), 600)
+    }
 }
