@@ -32,8 +32,17 @@ final class ParityUITests: XCTestCase {
 
     @discardableResult
     private func reveal(_ el: XCUIElement, in app: XCUIApplication, up: Bool = true, tries: Int = 16) -> XCUIElement {
+        // Scroll in short drags so a List row is not flung past (and recycled away) between checks;
+        // if it still overshoots, come back the other way before giving up.
+        func drag(_ forward: Bool) {
+            let a = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: forward ? 0.62 : 0.38))
+            let b = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: forward ? 0.38 : 0.62))
+            a.press(forDuration: 0.05, thenDragTo: b)
+        }
         var n = 0
-        while !(el.exists && el.isHittable) && n < tries { if up { app.swipeUp() } else { app.swipeDown() }; n += 1 }
+        while !(el.exists && el.isHittable) && n < tries * 2 { drag(up); n += 1 }
+        n = 0
+        while !(el.exists && el.isHittable) && n < tries * 2 { drag(!up); n += 1 }
         XCTAssertTrue(el.exists, "not found: \(el)")
         return el
     }
