@@ -1,6 +1,6 @@
 \set ON_ERROR_STOP on
 \ir test_financial_accounting.sql
-\ir ../migrations/20261023200000_financial_accounting_records_view.sql
+\ir ../migrations/20261023200300_financial_accounting_records_view.sql
 \ir ../migrations/20261023201000_financial_accounting_records_view_grants.sql
 \ir ../migrations/20261023233000_financial_accounting_categories_view.sql
 BEGIN;

@@ -1,7 +1,7 @@
 -- ============================================================================================
 --  BACKFILL — occurred_at / ingest_kind for existing rows.          *** DO NOT RUN UNREVIEWED ***
 --  Requires Skylar's explicit approval. Not a migration; nothing applies this automatically.
---  Prerequisite: migration 20261023220000_event_time_stamping.sql applied.
+--  Prerequisite: migration 20261023220050_event_time_stamping.sql applied.
 -- ============================================================================================
 -- Rules (same as supabase/functions/_shared/eventTime.ts):
 --   occurred_at = the row's own event clock, never created_at; future clocks (>48h ahead) ignored.
