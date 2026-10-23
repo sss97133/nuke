@@ -77,3 +77,10 @@
 @media print { .accounting-page .accounting-top-accounts button { display:inline!important; border:0; padding:0; background:none; color:inherit; text-align:left; } }
 .accounting-table-wrap table { min-width:720px; }
 .accounting-table-wrap td:first-child { white-space:nowrap; }
+
+.accounting-use-editor { padding:16px 0; border-bottom:2px solid var(--border); }
+.accounting-page .accounting-use-editor h3 { font-size:18px; }
+.accounting-use-editor fieldset { border:0; padding:0; margin:12px 0; display:grid; gap:12px; }
+.accounting-use-editor label { display:flex; flex-direction:column; gap:4px; }
+.accounting-use-editor input,.accounting-use-editor textarea { font:14px Arial,sans-serif; padding:8px; color:var(--text); background:var(--bg); border:2px solid var(--border); }
+.accounting-use-editor textarea { min-height:72px; }

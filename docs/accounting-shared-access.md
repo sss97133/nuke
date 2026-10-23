@@ -4,6 +4,14 @@ An owner uses **Accounting → Accounting access** to find an existing account b
 
 Review includes saved records, book controls, retained interpretations, review questions and private original evidence. Corrections append a complete attributed interpretation to the same original and name its current revision. Earlier evidence stays retained. No expenses are posted automatically. Source processing, recovery and grant management remain owner actions. Shared-book deal rollups are not yet available; the shared view labels this limit explicitly.
 
+## Working together in Accounting
+
+The owner and reviewers select the same canonical book. The screen checks bounded document metadata every five seconds while visible and refreshes current records, controls and open evidence when that metadata changes. It pauses background reads in hidden tabs and reports sync failures; it does not export or rebuild a PDF. This refresh currently supports fewer than 1,000 source documents per book and reports live updates unavailable at that limit.
+
+Open an expense's evidence to edit **Vehicle or shop use**. A reviewer with correction access can choose shop use, an accessible recipient vehicle, or unassigned, enter the assigned amount and record the reason. Partial assignments keep the remainder unassigned; this editor currently records one destination per expense. It preserves the recognized expense amount, other records in the source batch, item evidence and unresolved current concerns. It does not turn a bank movement into another expense or change a tax position.
+
+Unsaved edits remain intact when another reviewer changes the source. The screen requires a reload before saving a conflicting draft, and the existing writer independently refuses a superseded revision. The authenticated contributor is recorded by that writer. A book grant does not add vehicle permissions: the picker includes only the book-owner vehicles the current reviewer can already read.
+
 ## Claude Code
 
 Connect the existing Nuke MCP endpoint with the reviewer's own login. For example, in the appropriate MCP configuration:

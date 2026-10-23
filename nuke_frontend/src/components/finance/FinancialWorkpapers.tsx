@@ -1,6 +1,7 @@
 import { useAccountingBook } from './AccountingBookContext';
 import { useEffect, useRef, useState } from 'react';
 import { supabase } from '../../lib/supabase';
+import { expenseUseKey, type ExpenseUse } from '../../services/financialExpenseUse';
 
 export type SavedRecord = { id: string; document_id: string; record: {
   record_kind: string; local_id: string; year: string; date: string | null; account: string | null;
@@ -52,7 +53,9 @@ const overviewAmount = (amount: bigint | null, currency: string | null) => amoun
 
 
 export default function FinancialWorkpapers({ revision, onOpen }: { revision: number; onOpen: (documentId: string, record: SavedRecord['record']) => void }) {
-  const { ownerId, shared } = useAccountingBook();
+  const { ownerId, shared, liveRevision } = useAccountingBook();
+  const [uses, setUses] = useState<Record<string, ExpenseUse>>({});
+  const [useError, setUseError] = useState(false);
   const [view, setView] = useState<'overview' | 'records' | 'accounts'>('overview');
   const [year, setYear] = useState('');
   const [query, setQuery] = useState('');
@@ -65,6 +68,7 @@ export default function FinancialWorkpapers({ revision, onOpen }: { revision: nu
   const [error, setError] = useState('');
   const [sessionRevision, setSessionRevision] = useState(0);
   const generation = useRef(0);
+  const scope = useRef('');
   const cursor = pages[pages.length - 1];
   useEffect(() => { setPages([null]); }, [revision]);
   useEffect(() => {
@@ -78,19 +82,37 @@ export default function FinancialWorkpapers({ revision, onOpen }: { revision: nu
   useEffect(() => {
     let cancelled = false;
     const request = ++generation.current;
-    setData(null); setError('');
+    const nextScope = `${ownerId}:${cursor}`;
+    if (scope.current !== nextScope) { setData(null); setUses({}); scope.current = nextScope; }
+    setError('');
     void supabase.functions.invoke('ingest-observation', { body: {
       mode: 'financial_evidence_v1', action: 'tax_read', ...(shared ? { owner_user_id: ownerId } : {}), limit: pageSize, ...(cursor ? { after: cursor } : {}),
     } }).then(({ data: response, error: failure }) => {
       if (cancelled || generation.current !== request) return;
       const result = response?.data;
       if (failure || response?.error || !Array.isArray(result?.records) || !Array.isArray(result?.controls) || !Number.isSafeInteger(result?.total_rows) || result.total_rows < 0 || typeof result.controls_valid !== 'boolean' || !(result.next_after === null || typeof result.next_after === 'string')) {
-        setError('Saved bookkeeping could not load. Its totals are unknown.'); return;
+        setData(null); setUses({}); setError('Saved bookkeeping could not load. Its totals are unknown.'); return;
       }
       setData(result);
     }).catch(() => { if (!cancelled && generation.current === request) setError('Saved bookkeeping could not load. Its totals are unknown.'); });
     return () => { cancelled = true; if (generation.current === request) generation.current++; };
-  }, [cursor, revision, sessionRevision, ownerId, shared]);
+  }, [cursor, revision, sessionRevision, ownerId, shared, liveRevision]);
+  useEffect(() => {
+    let cancelled = false;
+    const keys = (data?.records || []).map(row => row.record.source_key).filter((key): key is string => !!key).map(expenseUseKey);
+    if (!ownerId || !keys.length) { setUses({}); setUseError(false); return; }
+    void Promise.resolve(supabase.from('financial_document_extractions').select('document_id, field_key, value_normalized').eq('owner_id', ownerId).eq('is_superseded', false).in('field_key', keys).limit(pageSize)).then(result => {
+      if (cancelled) return;
+      const next: Record<string, ExpenseUse> = {};
+      setUseError(!!result.error);
+      if (!result.error) for (const field of result.data || []) {
+        const value = (field.value_normalized as { value?: ExpenseUse })?.value;
+        if (value?.source_key && typeof value.destination_label === 'string' && data?.records.some(row => row.document_id === field.document_id && row.record.source_key === value.source_key)) next[value.source_key] = value;
+      }
+      setUses(next);
+    }).catch(() => { if (!cancelled) { setUses({}); setUseError(true); } });
+    return () => { cancelled = true; };
+  }, [data, ownerId]);
   useEffect(() => { setTablePage(0); }, [view, query, account, kind, unclassified, cursor, year]);
   const controls = data?.controls.filter(row => row.record_kind === 'retained_ledger_decision') || [];
   const years = [...new Set((data?.controls || []).map(row => row.year).filter(value => typeof value === 'string'))].sort().reverse();
@@ -132,8 +154,8 @@ export default function FinancialWorkpapers({ revision, onOpen }: { revision: nu
         </div>
         {view === 'records' ? <>
           <p className="accounting-muted">Year {selectedYear || 'not recorded'}. Search and filters cover the {data.records.length} records loaded on source page {pages.length}, not all {data.total_rows.toLocaleString('en-US')} records. Source pages follow saved record order, not date or priority.</p>
-          <div className="accounting-table-wrap"><table><thead><tr><th>Date</th><th>Transaction / decision</th><th>Account</th><th>Classification</th><th>Amount</th><th>Evidence</th></tr></thead><tbody>{records.slice(offset, offset + 25).map(row => <tr key={row.id}>
-            <td>{row.record.date || row.record.year}</td><td><span className="accounting-record-description">{recordDescription(row.record.description) || 'Saved record'}</span><small>{row.record.record_kind === 'retained_bank_movement' ? 'Bank movement' : 'Bookkeeping decision'}</small></td><td>{row.record.account || 'Not recorded'}</td><td>{row.record.section || 'Unclassified'}<small>{row.record.category}</small></td><td className="accounting-number">{displayMoney(row.record.amount, row.record.currency)}</td><td><button type="button" onClick={() => onOpen(row.document_id, row.record)}>View evidence</button></td>
+          <div className="accounting-table-wrap"><table><thead><tr><th>Date</th><th>Transaction / decision</th><th>Account</th><th>Classification</th><th>Amount</th><th>Vehicle / shop use</th><th>Evidence</th></tr></thead><tbody>{records.slice(offset, offset + 25).map(row => <tr key={row.id}>
+            <td>{row.record.date || row.record.year}</td><td><span className="accounting-record-description">{recordDescription(row.record.description) || 'Saved record'}</span><small>{row.record.record_kind === 'retained_bank_movement' ? 'Bank movement' : 'Bookkeeping decision'}</small></td><td>{row.record.account || 'Not recorded'}</td><td>{row.record.section || 'Unclassified'}<small>{row.record.category}</small></td><td className="accounting-number">{displayMoney(row.record.amount, row.record.currency)}</td><td>{row.record.section === 'Expense' && row.record.record_kind === 'retained_ledger_decision' ? useError ? 'Use unavailable' : row.record.source_key && uses[row.record.source_key]?.destination_label || 'Unassigned' : '—'}</td><td><button type="button" onClick={() => onOpen(row.document_id, row.record)}>View evidence</button></td>
           </tr>)}</tbody></table></div>
           {!records.length && <p>No matches in this loaded source page. Clear filters or load another source page.</p>}
         </> : <>

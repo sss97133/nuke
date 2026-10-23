@@ -29,7 +29,8 @@ async function handler(req, res) {
   }
 
   const headers = {};
-  for (const name of ['content-type', 'cookie', 'authorization', 'accept']) {
+  // 'origin' must reach the edge function: /oauth/callback-finish only accepts consent posted from https://nuke.ag.
+  for (const name of ['content-type', 'cookie', 'authorization', 'accept', 'origin']) {
     if (req.headers[name]) headers[name] = req.headers[name];
   }
   const qs = url.searchParams.toString();
