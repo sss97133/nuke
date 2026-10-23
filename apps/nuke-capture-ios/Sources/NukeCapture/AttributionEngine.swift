@@ -154,7 +154,7 @@ final class AttributionEngine: ObservableObject {
         }
         // Sync also runs on PhotoKit changes and refresh wakes. Do not depend on the delayed
         // screen task to populate the album catalog before trying to file its new photos.
-        await LibraryStore.shared.refreshAlbums()
+        await LibraryStore.shared.ensureAlbumCatalog()
         let knownVINs = knownVehicles.compactMap { $0.vin?.uppercased() }.filter { $0.count >= 8 }
         let vinToVehicle = Self.unambiguousSerialVehicles(knownVehicles.compactMap { v in
             v.vin.map { (serial: $0, vehicleId: v.id) }

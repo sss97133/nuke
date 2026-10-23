@@ -444,7 +444,7 @@ struct ProfileView: View {
         .task(id: userId) {
             guard isOwn else { return }
             await loadPhotoEvidence()
-            await LibraryStore.shared.refreshAlbums()
+            await LibraryStore.shared.ensureAlbumCatalog()
             await loadPhotoEvidence()
             // OCR over originals: on a charger at a nominal temperature only (LibraryIngest).
             if LibraryIngest.mayReviewInForeground {
