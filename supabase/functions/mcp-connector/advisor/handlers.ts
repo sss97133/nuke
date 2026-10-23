@@ -407,7 +407,7 @@ export type CompsLookup = {
   attempts: number;
   source: string;
   error: string | null;
-  /** Basis of every sale_price in this comp set: one basis, never mixed. "legacy_mixed" = basis-aware RPC had no rows. */
+  /** Basis of every sale_price in this comp set: one basis, never mixed. "legacy_mixed" = edge comps fallback (basis not typed). */
   price_basis?: CompsPriceBasis;
 };
 
@@ -490,20 +490,10 @@ async function resolveSoldComps(
     ({ data: rpcRows, error: rpcErr } = await sb.rpc("get_comps_combined", compsArgs));
     if (!rpcErr) break;
   }
-  let priceBasis: CompsPriceBasis = DEFAULT_COMPS_BASIS;
-  if (!rpcErr && Array.isArray(rpcRows) && rpcRows.length === 0) {
-    // Typed basis columns are still being backfilled; fall back to the legacy (mixed-basis) RPC, labelled as such
-    // and reported degraded, rather than return no comps.
-    const { p_basis: _basis, ...legacyArgs } = compsArgs;
-    const legacy = await sb.rpc("get_comps_combined", legacyArgs);
-    attempts++;
-    if (!legacy.error && Array.isArray(legacy.data) && legacy.data.length) {
-      rpcRows = legacy.data;
-      priceBasis = "legacy_mixed";
-    }
-  }
+  // Typed basis columns are backfilled: an empty hammer-basis result means no comps, never a mixed-basis fallback.
+  const priceBasis: CompsPriceBasis = DEFAULT_COMPS_BASIS;
   const compsQueryError = rpcErr ? String(rpcErr.message || rpcErr) : null;
-  let lookupSource = priceBasis === "legacy_mixed" ? "get_comps_combined_legacy_mixed_basis" : "get_comps_combined";
+  let lookupSource = "get_comps_combined";
   let lookupOk = !rpcErr;
   let lookupError = compsQueryError;
 
