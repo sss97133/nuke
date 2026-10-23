@@ -1087,6 +1087,12 @@ async function extractCatalog(catalogUrl: string): Promise<{
   return { auctionId, auctionName, auctionDate, auctionLocation, lots };
 }
 
+/** Sale and lot of a Bonhams lot URL under any host or slug ("27530/138"); lot 0 (preview) keeps its slug. */
+function bonhamsLotKey(u: string | null | undefined): string | null {
+  const m = (u ?? "").match(/\/auction\/(\d+)\/lot\/([^/?#]+)(?:\/([^/?#]+))?/i);
+  return m ? (m[2] === "0" ? `${m[1]}/0/${m[3] ?? ""}` : `${m[1]}/${m[2]}`) : null;
+}
+
 /** The same lot under any host or slug: .../auction/{sale}/lot/{lot}/ (the trigram index on discovery_url serves it). */
 function lotIlikePattern(url: string): string | null {
   const m = url.match(/\/auction\/(\d+)\/lot\/([^/?#]+)(?:\/([^/?#]+))?/i);
@@ -1603,11 +1609,15 @@ if (import.meta.main) Deno.serve(async (req) => {
             html = blob ? await blob.text() : null;
           }
           const page = html ? parseLotPage(html) : null;
-          const { data: evs } = it.vehicle_id
-            ? await supabase.from("vehicle_events").select("vehicle_id, source_url, source_listing_id").eq("source_platform", "bonhams").eq("vehicle_id", it.vehicle_id).limit(1)
+          // Land only on this lot's own episode. A vehicle can carry several Bonhams lots; taking any one of them landed one
+          // lot's page (chassis, hammer, photos) on another lot's vehicle (e.g. a 2022 Ford GT lot on a 1954 Lambretta).
+          const itLot = bonhamsLotKey(String(it.listing_url));
+          const { data: vehEvs } = it.vehicle_id && itLot
+            ? await supabase.from("vehicle_events").select("vehicle_id, source_url, source_listing_id").eq("source_platform", "bonhams").eq("vehicle_id", it.vehicle_id).limit(50)
             : { data: null };
-          if (!page || !evs?.length) {
-            await supabase.rpc("release_revision_item", { p_id: it.id, p_next_action: "refetch", p_detail: { why: !page ? "no parsable retained capture" : "no episode to land on" } });
+          const evs = ((vehEvs ?? []) as Array<{ vehicle_id: string; source_url: string; source_listing_id: string }>).filter((e) => bonhamsLotKey(e.source_url) === itLot);
+          if (!page || !evs.length) {
+            await supabase.rpc("release_revision_item", { p_id: it.id, p_next_action: "refetch", p_detail: { why: !page ? "no parsable retained capture" : "no episode for this lot on the vehicle" } });
             out.released_refetch++;
             continue;
           }
