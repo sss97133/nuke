@@ -5,7 +5,10 @@ import { useAccountingBook } from './AccountingBookContext';
 import type { SavedRecord } from './FinancialWorkpapers';
 
 type Vehicle = { id: string; year: number | null; make: string | null; model: string | null; vin: string | null };
+type PhotoDays = { vehicle_id: string; photo_days: string[]; images: number };
 const vehicleLabel = (v: Vehicle) => [v.year, v.make, v.model, v.vin ? `VIN …${v.vin.slice(-6)}` : 'VIN not recorded'].filter(Boolean).join(' ');
+const shortDay = (day: string) => new Date(`${day}T12:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+const dayList = (days: string[]) => days.length < 2 ? shortDay(days[0]) : `${days.slice(0, -1).map(shortDay).join(', ')} and ${shortDay(days[days.length - 1])}`;
 export default function ExpenseUseEditor({ documentId, record, onSaved, onCurrentRecord }: { documentId: string; record: SavedRecord['record']; onSaved: () => void; onCurrentRecord?: (record: SavedRecord['record']) => void }) {
   const { ownerId, canCorrect, liveRevision } = useAccountingBook();
   const [snapshot, setSnapshot] = useState<ExpenseSnapshot | null>(null);
@@ -13,7 +16,7 @@ export default function ExpenseUseEditor({ documentId, record, onSaved, onCurren
   const [vehicleId, setVehicleId] = useState(''), [amount, setAmount] = useState(''), [basis, setBasis] = useState('');
   const [dirty, setDirty] = useState(false), [conflict, setConflict] = useState(false), [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('Loading current use…'), [vehicles, setVehicles] = useState<Vehicle[]>([]), [search, setSearch] = useState('');
-  const [vehicleMessage, setVehicleMessage] = useState('');
+  const [vehicleMessage, setVehicleMessage] = useState(''), [photoDays, setPhotoDays] = useState<PhotoDays[]>([]);
   const current = useRef({ snapshot, dirty }); current.current = { snapshot, dirty };
   const latest = useRef<ExpenseSnapshot | null>(null), epoch = useRef(0);
   const pending = useRef<ReturnType<typeof expenseUseCorrection> | null>(null);
@@ -26,7 +29,7 @@ export default function ExpenseUseEditor({ documentId, record, onSaved, onCurren
   };
   useEffect(() => {
     epoch.current++; current.current = { snapshot: null, dirty: false }; latest.current = null; pending.current = null;
-    setSnapshot(null); setDirty(false); setConflict(false); setBusy(false); setVehicles([]); setSearch('');
+    setSnapshot(null); setDirty(false); setConflict(false); setBusy(false); setVehicles([]); setSearch(''); setPhotoDays([]);
     return () => { epoch.current++; };
   }, [ownerId, documentId, record.source_key]);
   useEffect(() => {
@@ -50,7 +53,22 @@ export default function ExpenseUseEditor({ documentId, record, onSaved, onCurren
       .catch(() => { if (!cancelled) { setVehicles([]); setVehicleMessage('Vehicles could not load. Your assignment has not changed.'); } });
     return () => { cancelled = true; };
   }, [type, ownerId]);
+  // The owner's vehicles photographed from the day before to three days after this purchase: the likely recipients.
+  useEffect(() => {
+    setPhotoDays([]);
+    if (type !== 'vehicle' || !ownerId || !record.date) return;
+    let cancelled = false;
+    void Promise.resolve(supabase.rpc('accounting_vehicle_photo_days', { p_owner_id: ownerId, p_date: record.date }))
+      .then(({ data, error }) => { if (!cancelled && !error && Array.isArray(data)) setPhotoDays(data as PhotoDays[]); })
+      .catch(() => { /* suggestions are optional; the search still works */ });
+    return () => { cancelled = true; };
+  }, [type, ownerId, record.date]);
   const edit = () => { current.current.dirty = true; setDirty(true); pending.current = null; };
+  const choosePhotographed = (row: PhotoDays) => {
+    setVehicleId(row.vehicle_id);
+    if (!basis.trim()) setBasis(`Photographed ${dayList(row.photo_days)} (${row.images} photos), around the ${shortDay(record.date!)} purchase`);
+    edit();
+  };
   const reload = async () => {
     if (!ownerId || !record.source_key) return;
     const generation = epoch.current; setBusy(true);
@@ -84,7 +102,9 @@ export default function ExpenseUseEditor({ documentId, record, onSaved, onCurren
     {canCorrect && snapshot ? <>
       <fieldset disabled={busy}><legend>Assign this expense</legend>
         <label>Use <select value={type} onChange={e => { setType(e.target.value as ExpenseUse['use_type']); edit(); }}><option value="unassigned">Unassigned</option><option value="shop">Shop</option><option value="vehicle">Vehicle</option><option value="software">{EXPENSE_USE_LABELS.software}</option><option value="image_production">{EXPENSE_USE_LABELS.image_production}</option></select></label>
-        {type === 'vehicle' && <><label>Find vehicle <input type="search" value={search} onChange={e => setSearch(e.target.value)} placeholder="Year, model or VIN" /></label><p>{vehicleMessage}</p><label>Recipient vehicle <select value={vehicleId} onChange={e => { setVehicleId(e.target.value); edit(); }}><option value="">Choose a vehicle</option>{snapshot.use?.vehicle_id && !choices.some(v => v.id === snapshot.use!.vehicle_id) && <option value={snapshot.use.vehicle_id}>{snapshot.use.destination_label}</option>}{choices.map(v => <option key={v.id} value={v.id}>{vehicleLabel(v)}</option>)}</select></label></>}
+        {type === 'vehicle' && <><label>Find vehicle <input type="search" value={search} onChange={e => setSearch(e.target.value)} placeholder="Year, model or VIN" /></label><p>{vehicleMessage}</p>
+          {photoDays.some(row => vehicles.some(v => v.id === row.vehicle_id)) && <div className="accounting-similar"><p className="accounting-muted">Photographed around {shortDay(record.date!)} (from the day before to three days after)</p>
+            <div className="accounting-chips" role="group" aria-label="Vehicles photographed around this date">{photoDays.map(row => { const v = vehicles.find(x => x.id === row.vehicle_id); return v && <button type="button" key={row.vehicle_id} aria-pressed={row.vehicle_id === vehicleId} title={`${row.images} photos on ${dayList(row.photo_days)}`} onClick={() => choosePhotographed(row)}>{[v.year, v.make, v.model].filter(Boolean).join(' ')} · {row.photo_days.length === 1 ? '1 day' : `${row.photo_days.length} days`}</button>; })}</div></div>}<label>Recipient vehicle <select value={vehicleId} onChange={e => { setVehicleId(e.target.value); edit(); }}><option value="">Choose a vehicle</option>{snapshot.use?.vehicle_id && !choices.some(v => v.id === snapshot.use!.vehicle_id) && <option value={snapshot.use.vehicle_id}>{snapshot.use.destination_label}</option>}{choices.map(v => <option key={v.id} value={v.id}>{vehicleLabel(v)}</option>)}</select></label></>}
         {type !== 'unassigned' && <label>Amount assigned <input inputMode="decimal" value={amount} onChange={e => { setAmount(e.target.value); edit(); }} placeholder={snapshot.record.amount || ''} /></label>}
         <label>Reason / source <textarea value={basis} maxLength={500} onChange={e => { setBasis(e.target.value); edit(); }} /></label>
       </fieldset>
