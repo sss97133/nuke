@@ -8,6 +8,7 @@ type BookRecord = SavedRecord['record'];
 export type ClassifyTarget = { documentId: string; record: BookRecord };
 type Category = { section: string; category: string; records: number };
 type Conflict = ClassificationConflict & ClassifyTarget;
+type Similar = { section: string; category: string; records: number; similarity: number };
 
 const loaded = new Map<string, Promise<Category[]>>();
 /** The classifications this book already uses, most used first. Read once per book; refreshed after a save. */
@@ -36,6 +37,7 @@ export default function RecordClassifier({ targets, onChanged }: { targets: Clas
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [conflicts, setConflicts] = useState<Conflict[]>([]);
+  const [similar, setSimilar] = useState<Similar[] | null>(null);
   const mounted = useRef(true);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   useEffect(() => { setSection(single?.section || ''); setCategory(single?.category || ''); setNote(''); setMessage(''); setConflicts([]); }, [selection]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -45,6 +47,16 @@ export default function RecordClassifier({ targets, onChanged }: { targets: Clas
     accountingCategories(ownerId).then(rows => { if (!cancelled) setCategories(rows); }).catch(() => { if (!cancelled) setCategories([]); });
     return () => { cancelled = true; };
   }, [ownerId]);
+  // How the book classified the most similar transactions: context for one record, loaded while the editor is in use.
+  useEffect(() => {
+    setSimilar(null);
+    if (!ownerId || !single?.description) return;
+    let cancelled = false;
+    void Promise.resolve(supabase.rpc('accounting_similar_classifications', { p_owner_id: ownerId, p_description: single.description, p_exclude_source_key: single.source_key ?? null, p_limit: 25 }))
+      .then(({ data, error }) => { if (!cancelled) setSimilar(error || !Array.isArray(data) ? [] : data as Similar[]); })
+      .catch(() => { if (!cancelled) setSimilar([]); });
+    return () => { cancelled = true; };
+  }, [ownerId, selection]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const totals = new Map<string, number>();
   for (const row of categories || []) totals.set(row.section, (totals.get(row.section) || 0) + row.records);
@@ -104,6 +116,9 @@ export default function RecordClassifier({ targets, onChanged }: { targets: Clas
     <h3>{targets.length === 1 ? 'Classification' : `Classify ${targets.length} records`}</h3>
     {single && <p>Now <strong>{classificationLabel(single.section, single.category)}</strong></p>}
     {canCorrect ? <fieldset disabled={busy}>
+      {single?.description && similar === null && <p className="accounting-muted">Looking for similar transactions…</p>}
+      {!!similar?.length && <div className="accounting-similar"><p className="accounting-muted">Similar transactions in this book were classified as</p>
+        <div className="accounting-chips" role="group" aria-label="Similar transactions">{similar.slice(0, 5).map(row => <button type="button" key={`${row.section}:${row.category}`} aria-pressed={row.section === section && row.category === category} onClick={() => { setSection(row.section); setCategory(row.category); }}>{classificationLabel(row.section, row.category)} <span className="accounting-count">{row.records}</span></button>)}</div></div>}
       <div className="accounting-chips" role="group" aria-label="Section">{sections.map(name => <button type="button" key={name} aria-pressed={name === section} onClick={() => { if (name !== section) { setSection(name); setCategory(''); } }}>{name}</button>)}</div>
       {categories && !sections.length && <label>Section <input value={section} maxLength={80} onChange={event => setSection(event.target.value)} /></label>}
       {suggestions.length > 0 && <div className="accounting-chips" role="group" aria-label="Most used categories">{suggestions.slice(0, 6).map(row => <button type="button" key={row.category} aria-pressed={row.category === category} onClick={() => setCategory(row.category)}>{row.category}</button>)}</div>}

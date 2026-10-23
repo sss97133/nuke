@@ -93,6 +93,8 @@
 .accounting-classifier label { display:flex; flex-direction:column; gap:4px; }
 .accounting-classifier input,.accounting-classifier textarea { font:14px Arial,sans-serif; padding:8px; color:var(--text); background:var(--bg); border:2px solid var(--border); }
 .accounting-classifier textarea { min-height:60px; }
+.accounting-similar p { margin:0 0 6px; }
+.accounting-count { display:inline-block; margin-left:6px; font:400 11px 'Courier New',monospace; opacity:.7; }
 .accounting-page .accounting-primary:not(:disabled),.accounting-page .accounting-primary:hover:not(:disabled) { background:var(--text); color:var(--bg); }
 /* Select mode: a checkbox column, highlighted rows and a toolbar that stays in reach at the bottom while scrolling. */
 .accounting-page .accounting-select { width:36px; padding-right:0; }
