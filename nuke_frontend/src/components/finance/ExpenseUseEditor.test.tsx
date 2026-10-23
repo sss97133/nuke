@@ -61,9 +61,10 @@ it('review-only access never presents a save action', async () => {
 it('suggests the vehicles photographed around the purchase, fills the reason from their photo dates and saves that vehicle', async () => {
   const blazer = '33333333-3333-4333-8333-333333333333', mustang = '44444444-4444-4444-8444-444444444444';
   const query: any = { select: () => query, or: () => query, is: () => query, order: () => query,
-    limit: () => Promise.resolve({ data: [{ id: blazer, year: 1977, make: 'Chevrolet', model: 'Blazer', vin: null }, { id: mustang, year: 1966, make: 'Ford', model: 'Mustang', vin: null }], error: null }) };
+    limit: () => Promise.resolve({ data: [{ id: blazer, year: 1977, make: 'Chevrolet', model: 'Blazer', vin: null }, { id: mustang, year: 1966, make: 'Ford', model: 'Mustang', vin: '6R07C219593' },
+      { id: '55555555-5555-4555-8555-555555555555', year: 1971, make: 'Ford', model: 'Bronco', vin: null }], error: null }) };
   fixture.from.mockReturnValue(query);
-  fixture.rpc.mockResolvedValue({ data: [{ vehicle_id: blazer, photo_days: ['2024-06-10', '2024-06-12'], images: 41 }], error: null });
+  fixture.rpc.mockResolvedValue({ data: [{ vehicle_id: blazer, photo_days: ['2024-06-10', '2024-06-12'], images: 41 }, { vehicle_id: mustang, photo_days: ['2024-06-13'], images: 7 }], error: null });
   const dated = { ...record, date: '2024-06-11' };
   fixture.read.mockResolvedValue({ ...snapshot(), record: dated, lines: [{ attributes: { accounting_record: dated } }] });
   await act(async () => render('one', true, dated));
@@ -72,7 +73,9 @@ it('suggests the vehicles photographed around the purchase, fills the reason fro
   expect(node.textContent).toContain('Photographed around Jun 11');
   const chip = [...node.querySelectorAll('button')].find(b => b.textContent?.includes('Blazer'))!;
   expect(chip.textContent).toBe('1977 Chevrolet Blazer · 2 days');
-  expect([...node.querySelectorAll('button')].some(b => b.textContent?.includes('Mustang'))).toBe(false);
+  // Profiles that share a year, make and model are told apart by their VIN tail; a vehicle not photographed gets no chip.
+  expect([...node.querySelectorAll('button')].find(b => b.textContent?.includes('Mustang'))!.textContent).toBe('1966 Ford Mustang …219593 · 1 day');
+  expect([...node.querySelectorAll('button')].some(b => b.textContent?.includes('Bronco'))).toBe(false);
   await act(async () => chip.click());
   expect(chip.getAttribute('aria-pressed')).toBe('true');
   expect(node.querySelectorAll('select')[1].value).toBe(blazer);
