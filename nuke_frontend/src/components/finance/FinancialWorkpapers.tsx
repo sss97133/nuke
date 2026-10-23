@@ -130,9 +130,10 @@ export default function FinancialWorkpapers({ revision, onOpen }: { revision: nu
   // filtered, searched and sorted in the database, 25 per page. The row policies of the book apply to the reader.
   useEffect(() => {
     if (view !== 'records' || !ownerId) { setRows(null); setRowCount(null); setRowsError(''); return; }
+    const bookId: string = ownerId;
     let cancelled = false;
     const run = () => {
-      let request = supabase.from('v_financial_accounting_records').select('id, document_id, record', { count: 'exact' }).eq('owner_id', ownerId);
+      let request = supabase.from('v_financial_accounting_records').select('id, document_id, record', { count: 'exact' }).eq('owner_id', bookId);
       if (selectedYear) request = request.eq('year', selectedYear);
       if (account) request = request.eq('account', account);
       if (kind) request = request.eq('record_kind', kind);
