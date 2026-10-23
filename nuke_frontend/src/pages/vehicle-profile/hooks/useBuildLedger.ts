@@ -40,6 +40,37 @@ export interface BuildLedgerGroup {
   statedPendingTotal: number;
 }
 
+// A cost the accounting book assigns to this vehicle (expense-use cell on a booked Expense), read through the
+// accounting_vehicle_costs RPC: only for a caller who can read that book AND has vehicle access. A separate type from
+// BuildLedgerEntry on purpose: it never enters the audit groups, totals or confirmation count (no blending, no
+// double counting with audit rows that cite the same payment).
+export interface BookCostEntry {
+  id: string; // the book cell id, never a vehicle_observations id
+  bookOwnerId: string;
+  documentId: string;
+  ledgerId: string | null;
+  year: string | null;
+  date: string | null;
+  description: string;
+  account: string | null;
+  category: string | null;
+  kind: BuildEventType | null;
+  allocated: number | null; // null: the amount is still to be split between this vehicle and other items
+  bookAmount: number | null;
+  currency: string;
+  basis: string | null;
+  assignedBy: string | null;
+  assignedMethod: string | null;
+  assignedAt: string | null;
+}
+
+export interface BookCostTotal {
+  currency: string;
+  total: number;
+  entries: number;
+  unsplit: number;
+}
+
 export interface BuildLedgerData {
   groups: BuildLedgerGroup[];
   documentedTotal: number;
@@ -47,7 +78,17 @@ export interface BuildLedgerData {
   pendingCount: number;
   entryCount: number;
   auditRun: string | null;
+  hasAudit: boolean;
+  book: BookCostEntry[];
+  bookTotals: BookCostTotal[];
   hasData: boolean;
+}
+
+// Book category → ledger group label for a booked cost; null when the category names neither (or both).
+export function bookCostKind(category: string | null): BuildEventType | null {
+  const c = (category ?? '').toLowerCase();
+  const parts = /parts|materials/.test(c), labor = /labou?r|subcontract|machining/.test(c);
+  return parts === labor ? null : parts ? 'parts_purchase' : 'labor_payment';
 }
 
 const GROUP_ORDER: { type: BuildEventType; label: string }[] = [
@@ -123,12 +164,56 @@ export function useBuildLedger(vehicleId: string | undefined) {
     staleTime: 10 * 60 * 1000,
   });
 
+  // Costs assigned to this vehicle in the accounting book. Same silent degrade as above: no book access, no vehicle
+  // access or a not-yet-applied migration yields no rows.
+  const { data: bookRows, isLoading: bookLoading } = useQuery({
+    queryKey: ['build-ledger', vehicleId, 'book'],
+    queryFn: async (): Promise<BookCostEntry[]> => {
+      if (!vehicleId) return [];
+      const { data, error: rpcErr } = await supabase.rpc('accounting_vehicle_costs', { p_vehicle_id: vehicleId });
+      if (rpcErr || !Array.isArray(data)) return [];
+      return (data as Record<string, unknown>[]).map((r): BookCostEntry => ({
+        id: String(r.use_id),
+        bookOwnerId: String(r.book_owner_id),
+        documentId: String(r.document_id),
+        ledgerId: str(r.ledger_id),
+        year: str(r.record_year),
+        date: str(r.record_date),
+        description: str(r.description) ?? '',
+        account: str(r.account),
+        category: str(r.category),
+        kind: bookCostKind(str(r.category)),
+        allocated: r.allocated_amount != null && !Number.isNaN(Number(r.allocated_amount)) ? Number(r.allocated_amount) : null,
+        bookAmount: r.book_amount != null && !Number.isNaN(Number(r.book_amount)) ? Number(r.book_amount) : null,
+        currency: str(r.currency) ?? 'USD',
+        basis: str(r.basis),
+        assignedBy: str(r.assigned_by),
+        assignedMethod: str(r.assigned_method),
+        assignedAt: str(r.assigned_at),
+      }));
+    },
+    enabled: !!vehicleId && vehicleId.length >= 20,
+    staleTime: 10 * 60 * 1000,
+  });
+
   const data = useMemo<BuildLedgerData>(() => {
     const rows = rawRows ?? [];
+    const book = [...(bookRows ?? [])].sort((a, b) => (a.date ?? '').localeCompare(b.date ?? ''));
+    // Per currency, summed in cents; an unsplit assignment is counted, never summed.
+    const byCurrency = new Map<string, { cents: number; entries: number; unsplit: number }>();
+    for (const e of book) {
+      const t = byCurrency.get(e.currency) ?? { cents: 0, entries: 0, unsplit: 0 };
+      t.entries += 1;
+      if (e.allocated == null) t.unsplit += 1; else t.cents += Math.round(e.allocated * 100);
+      byCurrency.set(e.currency, t);
+    }
+    const bookTotals: BookCostTotal[] = [...byCurrency.entries()].sort(([a], [b]) => a.localeCompare(b))
+      .map(([currency, t]) => ({ currency, total: t.cents / 100, entries: t.entries, unsplit: t.unsplit }));
     if (rows.length === 0) {
       return {
         groups: [], documentedTotal: 0, statedPendingTotal: 0,
-        pendingCount: 0, entryCount: 0, auditRun: null, hasData: false,
+        pendingCount: 0, entryCount: 0, auditRun: null, hasAudit: false,
+        book, bookTotals, hasData: book.length > 0,
       };
     }
 
@@ -152,9 +237,12 @@ export function useBuildLedger(vehicleId: string | undefined) {
       pendingCount: rows.filter(e => e.needsOwnerConfirmation).length,
       entryCount: rows.length,
       auditRun: rows.find(e => e.auditRun)?.auditRun ?? null,
+      hasAudit: true,
+      book,
+      bookTotals,
       hasData: true,
     };
-  }, [rawRows]);
+  }, [rawRows, bookRows]);
 
-  return { data, loading: isLoading, error: error?.message ?? null };
+  return { data, loading: isLoading || bookLoading, error: error?.message ?? null };
 }
