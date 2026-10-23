@@ -2,6 +2,7 @@
 \ir test_financial_accounting.sql
 \ir ../migrations/20261023200000_financial_accounting_records_view.sql
 \ir ../migrations/20261023201000_financial_accounting_records_view_grants.sql
+\ir ../migrations/20261023233000_financial_accounting_categories_view.sql
 BEGIN;
 INSERT INTO auth.users(id) VALUES ('11111111-1111-4111-8111-111111111111'),('22222222-2222-4222-8222-222222222222');
 SELECT set_config('request.jwt.claim.role','service_role',true);
@@ -36,6 +37,20 @@ BEGIN
  IF NOT EXISTS(SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relname='v_financial_accounting_records' AND c.reloptions @> ARRAY['security_invoker=true']) THEN RAISE EXCEPTION 'view must run as the caller'; END IF;
  IF EXISTS(SELECT 1 FROM information_schema.role_table_grants WHERE table_schema='public' AND table_name='v_financial_accounting_records' AND grantee IN ('anon','PUBLIC')) THEN RAISE EXCEPTION 'anon must not read the books'; END IF;
  IF EXISTS(SELECT 1 FROM information_schema.role_table_grants WHERE table_schema='public' AND table_name='v_financial_accounting_records' AND grantee IN ('authenticated','service_role') AND privilege_type<>'SELECT') THEN RAISE EXCEPTION 'readers hold a write privilege on the view'; END IF;
+ -- Categories in use: one row per classified section/category of the current run, counted; the superseded unclassified
+ -- reading and other books never appear; read-only and caller-scoped like the records view.
+ IF (SELECT count(*) FROM v_financial_accounting_categories WHERE owner_id=u)<>2
+   OR NOT EXISTS(SELECT 1 FROM v_financial_accounting_categories WHERE owner_id=u AND section='Expense' AND category='Synthetic parts' AND records=1)
+   OR NOT EXISTS(SELECT 1 FROM v_financial_accounting_categories WHERE owner_id=u AND section='Expense' AND category='' AND records=1)
+   OR EXISTS(SELECT 1 FROM v_financial_accounting_categories WHERE section IS NULL)
+   OR (SELECT coalesce(sum(records),0) FROM v_financial_accounting_categories WHERE owner_id=u)<>(SELECT count(*) FROM v_financial_accounting_records WHERE owner_id=u AND section IS NOT NULL)
+ THEN RAISE EXCEPTION 'categories view does not match the classified current records'; END IF;
+ -- The ledger decision of the fixture carries no category: it counts under an empty category, never NULL.
+ IF EXISTS(SELECT 1 FROM v_financial_accounting_categories WHERE category IS NULL) THEN RAISE EXCEPTION 'category must be text'; END IF;
+ IF (SELECT count(*) FROM v_financial_accounting_categories WHERE owner_id='22222222-2222-4222-8222-222222222222')<>0 THEN RAISE EXCEPTION 'categories crossed books'; END IF;
+ IF NOT EXISTS(SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relname='v_financial_accounting_categories' AND c.reloptions @> ARRAY['security_invoker=true']) THEN RAISE EXCEPTION 'categories view must run as the caller'; END IF;
+ IF EXISTS(SELECT 1 FROM information_schema.role_table_grants WHERE table_schema='public' AND table_name='v_financial_accounting_categories' AND (grantee IN ('anon','PUBLIC') OR (grantee IN ('authenticated','service_role') AND privilege_type<>'SELECT'))) THEN RAISE EXCEPTION 'categories view grants must be select-only for readers'; END IF;
  RAISE NOTICE 'PASS current accounting records view: current run only, record columns, book isolation, read-only, caller-scoped';
+ RAISE NOTICE 'PASS accounting categories view: classified pairs counted from current records, isolated, select-only';
 END $$;
 ROLLBACK;
