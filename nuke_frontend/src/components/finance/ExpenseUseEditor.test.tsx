@@ -1,0 +1,49 @@
+// @vitest-environment jsdom
+import React, { act } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+const fixture = vi.hoisted(() => ({ read: vi.fn(), invoke: vi.fn() }));
+vi.mock('../../lib/supabase', () => ({ supabase: { functions: { invoke: fixture.invoke } } }));
+vi.mock('../../services/financialExpenseUse', async importOriginal => ({ ...await importOriginal<object>(), readExpenseSnapshot: fixture.read }));
+import ExpenseUseEditor from './ExpenseUseEditor';
+import { AccountingBookContext } from './AccountingBookContext';
+const key = 'a'.repeat(64), owner = '11111111-1111-4111-8111-111111111111';
+const record = { record_kind: 'retained_ledger_decision', local_id: 'expense', year: '2025', date: null, account: 'Checking', section: 'Expense', category: 'Supplies', amount: '100.00', currency: 'USD', source_key: key };
+const snapshot = (runId = owner, use: any = null) => ({ document: { owner_id: owner, content_sha256: 'b'.repeat(64), storage_path: `${owner}/source.csv`, source_filename: 'source.csv', source_kind: 'bank_export' }, fields: [{ field_key: 'source', value_raw: 'Retained', value_type: 'text', value_normalized: { value: 'Retained', evidence: { quote: 'Original' } } }], lines: [{ attributes: { accounting_record: record } }], record, runId, use });
+let node: HTMLDivElement, root: Root;
+const render = (revision: string, canCorrect = true) => root.render(<AccountingBookContext.Provider value={{ ownerId: owner, shared: true, canCorrect, liveRevision: revision }}><ExpenseUseEditor documentId={owner} record={record} onSaved={() => {}} /></AccountingBookContext.Provider>);
+const change = async (element: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement, value: string) => {
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(element instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : element instanceof HTMLSelectElement ? HTMLSelectElement.prototype : HTMLInputElement.prototype, 'value')!.set!.call(element, value);
+    element.dispatchEvent(new Event(element instanceof HTMLSelectElement ? 'change' : 'input', { bubbles: true }));
+  });
+};
+beforeEach(() => { (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true; fixture.read.mockReset(); fixture.invoke.mockReset(); fixture.read.mockResolvedValue(snapshot()); node = document.createElement('div'); document.body.append(node); root = createRoot(node); });
+afterEach(async () => { await act(async () => root.unmount()); node.remove(); });
+it('preserves a dirty draft and blocks saving when another reviewer changes its source', async () => {
+  await act(async () => render('one'));
+  await change(node.querySelector('select')!, 'shop');
+  await change(node.querySelector('input')!, '40');
+  await change(node.querySelector('textarea')!, 'Shared shop supplies');
+  fixture.read.mockResolvedValue(snapshot('22222222-2222-4222-8222-222222222222'));
+  await act(async () => render('two'));
+  expect(node.textContent).toContain('Your unsaved draft is preserved');
+  expect(node.querySelector('input')!.value).toBe('40');
+  expect([...node.querySelectorAll('button')].find(b => b.textContent === 'Save use assignment')!.disabled).toBe(true);
+  expect(fixture.invoke).not.toHaveBeenCalled();
+});
+it('submits a partial assignment through the existing attributed correction writer and reads it back', async () => {
+  await act(async () => render('one'));
+  await change(node.querySelector('select')!, 'shop'); await change(node.querySelector('input')!, '40'); await change(node.querySelector('textarea')!, 'Shared shop supplies');
+  fixture.invoke.mockResolvedValue({ data: { data: { expense_posted: false } }, error: null });
+  fixture.read.mockResolvedValue(snapshot('22222222-2222-4222-8222-222222222222', { source_key: key, use_type: 'shop', destination_label: 'Shop', vehicle_id: null, allocated_amount: '40.000000', unallocated_amount: '60.000000', basis: 'Shared shop supplies' }));
+  await act(async () => [...node.querySelectorAll('button')].find(b => b.textContent === 'Save use assignment')!.click());
+  const request = fixture.invoke.mock.calls[0][1].body;
+  expect(request.action).toBe('correct'); expect(request.owner_user_id).toBe(owner); expect(request.revision.supersedes_run_id).toBe(owner);
+  expect(request.revision.fields.at(-1).value_normalized.unallocated_amount).toBe('60.000000');
+  expect(node.textContent).toContain('Saved to the shared ledger');
+});
+it('review-only access never presents a save action', async () => {
+  await act(async () => render('one', false));
+  expect(node.querySelector('fieldset')).toBeNull(); expect(node.textContent).toContain('Review access'); expect(fixture.invoke).not.toHaveBeenCalled();
+});

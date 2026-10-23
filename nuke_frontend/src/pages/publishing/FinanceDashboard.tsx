@@ -1,6 +1,8 @@
 import SharedAccountingOriginal from '../../components/finance/SharedAccountingOriginal';
 import AccountingAccess, { type BookGrant } from '../../components/finance/AccountingAccess';
 import { AccountingBookContext, useAccountingBook } from '../../components/finance/AccountingBookContext';
+import { useAccountingRevision } from '../../components/finance/useAccountingRevision';
+import ExpenseUseEditor from '../../components/finance/ExpenseUseEditor';
 /**
  * FinanceDashboard
  *
@@ -181,12 +183,13 @@ function EvidenceDialog({ documentId, record, onClose, trigger }: { trigger: HTM
   return <dialog className="accounting-evidence-dialog" ref={dialog} aria-label="Accounting evidence" onCancel={event => { event.preventDefault(); onClose(); }}>
     <div className="accounting-dialog-heading"><h2>Accounting evidence</h2><button type="button" autoFocus onClick={onClose}>Close evidence</button></div>
     {record && <section className="accounting-selected-record" aria-label="Selected accounting record"><h3>{recordDescription(record.description) || 'Selected transaction'}</h3><p>{record.date || record.year} · {record.account || 'Account not recorded'} · {displayMoney(record.amount, record.currency)}</p><p><strong>{record.section || 'Unclassified'}</strong>{record.category && ` · ${record.category}`}</p>{record.status && <p>{record.status}</p>}<p>{record.decision || 'No accounting decision has been recorded for this movement.'}</p><p className="accounting-muted">This is the selected record. Its retained source may be a bank export or bookkeeping batch; it is not necessarily a receipt.</p>{record.description && <details><summary>Original source description</summary><p>{record.description}</p></details>}</section>}
+    {record?.record_kind === 'retained_ledger_decision' && record.section === 'Expense' && record.source_key && <ExpenseUseEditor documentId={documentId} record={record} onSaved={() => window.dispatchEvent(new Event('accounting-saved'))} />}
     <DocumentEvidence key={documentId} documentId={documentId} record={record} />
   </dialog>;
 }
 
 function DocumentEvidence({ documentId, record }: { documentId: string; record: SavedRecord['record'] | null }) {
-  const { ownerId, shared } = useAccountingBook();
+  const { ownerId, shared, liveRevision } = useAccountingBook();
   const [rows, setRows] = useState<ExtractionEvidence[]>([]);
   const [state, setState] = useState('Loading retained evidence…');
   const [page, setPage] = useState(0);
@@ -210,7 +213,7 @@ function DocumentEvidence({ documentId, record }: { documentId: string; record: 
         setState(`${data?.length || 0} of ${count ?? 'unknown'} visible extraction records. Interpretations are not posted expenses.`);
       }).catch(() => { if (!cancelled) setState('Retained evidence could not load.'); });
     return () => { cancelled = true; };
-  }, [documentId, page, reviewRevision, ownerId]);
+  }, [documentId, page, reviewRevision, ownerId, liveRevision]);
   const sourceDocument = rows[0]?.document;
   const sourceName = (Array.isArray(sourceDocument) ? sourceDocument[0] : sourceDocument)?.source_filename;
   const imageSource = !!sourceName && /\.(jpe?g|png|webp|heic)$/i.test(sourceName);
@@ -295,6 +298,8 @@ export default function FinanceDashboard() {
   const [grants, setGrants] = useState<BookGrant[]>([]);
   const [grantRevision, setGrantRevision] = useState(0);
   const shared = !!ownerId && ownerId !== actorId;
+  const live = useAccountingRevision(ownerId);
+  const canCorrect = !!actorId && (ownerId === actorId || grants.some(g => g.owner_id === ownerId && g.member_id === actorId && g.active && g.can_correct));
   useEffect(() => {
     let cancelled = false;
     void supabase.auth.getUser().then(async ({ data }) => {
@@ -394,7 +399,7 @@ export default function FinanceDashboard() {
     return () => {
       cancelled = true; if (generation.current === request) generation.current++;
     };
-  }, [page, sessionRevision, ownerId, shared]);
+  }, [page, sessionRevision, ownerId, shared, live.revision]);
 
   const noRecords = !errors.length && page === 0 && deals.length === 0 && docs.length === 0 && concerns.length === 0 && !selectedDocument;
 
@@ -411,11 +416,12 @@ export default function FinanceDashboard() {
 
   // ── Render ────────────────────────────────────────────────────
   return (
-    <AccountingBookContext.Provider value={{ ownerId, shared }}><div className="accounting-page" style={s.container}>
+    <AccountingBookContext.Provider value={{ ownerId, shared, canCorrect, liveRevision: live.revision }}><div className="accounting-page" style={s.container}>
       <header className="accounting-header"><div><span className="accounting-eyebrow">PRIVATE ACCOUNT</span><h1>Accounting</h1><p>Your books, the documents behind them, and what still needs review.</p></div>
         <button type="button" onClick={() => setSessionRevision(n => n + 1)}>Refresh records</button></header>
       {actorId && <label>Active book <select aria-label="Active accounting book" value={ownerId} onChange={e => { setOwnerId(e.target.value); setSourceView('summary'); setSelectedDocument(null); setSelectedRecord(null); setDocs([]); setConcerns([]); setDeals([]); setPage(0); }}><option value={actorId}>My books</option>{grants.filter(g => g.member_id === actorId && g.active).map(g => <option key={g.id} value={g.owner_id}>{g.owner_name} · shared books ({g.can_correct ? 'review and correct' : 'review'})</option>)}</select></label>}
-      {shared && <p>Shared accounting application access. Corrections through your connected agent retain your identity and the owner's canonical book. Document intake and access management remain with the owner.</p>}
+      <p className="accounting-muted" role="status">{live.message}</p>
+      {shared && <p>Shared books. Your corrections retain your identity and appear in the same ledger for the owner and other reviewers.</p>}
       <FinancialWorkpapers key={ownerId} revision={sessionRevision} onOpen={openEvidence} />
       <p className="accounting-muted accounting-tax-note">Tax review is a separate step. Saved records are not a filing or a completed reconciliation.</p>
       <div hidden={shared}><AccountingAccess grants={grants} actorId={actorId} onChanged={() => setGrantRevision(n => n + 1)} /><details className="accounting-disclosure"><summary>Add documents <span>Receipts, invoices and supporting files</span></summary>
