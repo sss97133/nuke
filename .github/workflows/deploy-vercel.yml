@@ -55,6 +55,9 @@ jobs:
         working-directory: ./nuke_frontend
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          # vercel build reinstalls with the pulled production environment (NODE_ENV=production), which omits
+          # devDependencies, and vite is one ("vite: not found", run 39995114865). Keep them, as Vercel's own build does.
+          NPM_CONFIG_INCLUDE: dev
         run: vercel build --prod
 
       - name: Deploy to Vercel Production
