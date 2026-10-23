@@ -957,7 +957,9 @@ final class AttributionEngine: ObservableObject {
             for row in page where seen.insert(row.id).inserted { out.append(row) }
             if page.count < range.count { break }
         }
-        return out
+        // Fetched by upload so new arrivals get their first pass; filed by when they were taken,
+        // newest first, undated last (upload time is not event time).
+        return out.sorted { EventTime.newestFirst(EventTime.clock(takenAt: $0.taken_at), EventTime.clock(takenAt: $1.taken_at), tie: ($0.id, $1.id)) }
     }
 
     /// The phone's exact identifier read, uploaded so the server can link without re-running OCR.

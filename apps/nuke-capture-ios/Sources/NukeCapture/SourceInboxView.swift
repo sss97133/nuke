@@ -47,7 +47,7 @@ struct VehiclePrivatePhotosSection: View {
     private var owner: String? { session.isSignedIn ? SupabaseService.currentUserId : nil }
     private var ready: [SourceInboxRead.Photo] {
         photos.filter { $0.source_state == "ready" && $0.image_url != nil }.sorted {
-            ($0.taken_at ?? $0.created_at ?? "") < ($1.taken_at ?? $1.created_at ?? "")
+            EventTime.oldestFirst(EventTime.clock(takenAt: $0.taken_at), EventTime.clock(takenAt: $1.taken_at), tie: ($0.id.uuidString, $1.id.uuidString))
         }
     }
     private var gallery: [VehicleGalleryImage] {
@@ -232,7 +232,7 @@ private struct SourcePhotoRow: View {
             }.clipped().clipShape(RoundedRectangle(cornerRadius: 6))
             VStack(alignment: .leading, spacing: 4) {
                 RootedValueView(label: "Source", value: sourceLabel(photo), status: .recorded,
-                    decay: ProfileClock.date(photo.created_at).map { "Uploaded " + $0.formatted(date: .abbreviated, time: .shortened) })
+                    decay: EventTime.label(EventTime.clock(takenAt: photo.taken_at)))
                 Text(subjectLabel(photo)).font(.caption).foregroundStyle(.secondary)
             }
         }.padding(.vertical, 3)

@@ -100,7 +100,7 @@ struct VehicleGalleryImage: Decodable, Identifiable {
         let photographicCategories: Set<String> = ["exterior_body", "interior", "engine_mechanical", "undercarriage", "exterior_detail"]
         func latest(_ rows: [Self]) -> Self? {
             rows.filter { !$0.excludedFromHero && photographicCategories.contains(($0.image_category ?? "").lowercased()) }
-                .max { ($0.taken_at ?? $0.created_at ?? "") < ($1.taken_at ?? $1.created_at ?? "") }
+                .min { EventTime.newestFirst(EventTime.clock(takenAt: $0.taken_at), EventTime.clock(takenAt: $1.taken_at), tie: ($0.id.uuidString, $1.id.uuidString)) }
         }
         return latest(candidates) ?? latest(gallery)
     }

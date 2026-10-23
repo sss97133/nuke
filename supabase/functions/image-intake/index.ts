@@ -11,6 +11,18 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { projectPublishableKey, projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { eventStamp } from "../_shared/eventTime.ts";
+
+// Until migration 20261023220000 is applied, occurred_at/ingest_kind don't exist; retry without them
+// rather than drop the photo.
+async function insertImage(supabase: any, payload: Record<string, unknown>, select: string) {
+  const first = await supabase.from("vehicle_images").insert(payload).select(select).maybeSingle();
+  if (first.error && /occurred_at|ingest_kind/.test(first.error.message ?? "")) {
+    const { occurred_at: _o, ingest_kind: _k, ...rest } = payload;
+    return await supabase.from("vehicle_images").insert(rest).select(select).maybeSingle();
+  }
+  return first;
+}
 
 const supabase = createClient(
   Deno.env.get("SUPABASE_URL")!,
@@ -417,6 +429,7 @@ Deno.serve(async (req) => {
           };
           // Write structured fields to real columns (not just metadata JSONB)
           if (img.takenAt) insertPayload.taken_at = img.takenAt;
+          Object.assign(insertPayload, eventStamp(img.takenAt));
           if (img.latitude) insertPayload.latitude = img.latitude;
           if (img.longitude) insertPayload.longitude = img.longitude;
           if (img.appleLabels?.length) insertPayload.apple_ml_labels = img.appleLabels;
@@ -427,11 +440,7 @@ Deno.serve(async (req) => {
             insertPayload.duplicate_of = duplicateOf;
           }
 
-          const { data: insertedImage } = await supabase
-            .from("vehicle_images")
-            .insert(insertPayload)
-            .select("id, source, source_url, phash")
-            .maybeSingle();
+          const { data: insertedImage } = await insertImage(supabase, insertPayload, "id, source, source_url, phash");
 
           // Fire-and-forget: record appearance in image_source_appearances
           if (insertedImage) {
@@ -465,13 +474,14 @@ Deno.serve(async (req) => {
               },
             };
             if (img.takenAt) unassignedPayload.taken_at = img.takenAt;
+            Object.assign(unassignedPayload, eventStamp(img.takenAt));
             if (img.latitude) unassignedPayload.latitude = img.latitude;
             if (img.longitude) unassignedPayload.longitude = img.longitude;
             if (img.appleLabels?.length) unassignedPayload.apple_ml_labels = img.appleLabels;
             if (img.vehicleScore != null) unassignedPayload.vehicle_score = img.vehicleScore;
             if (fileHash) unassignedPayload.file_hash = fileHash;
 
-            const { data: viData, error: viErr } = await supabase.from("vehicle_images").insert(unassignedPayload).select("id").maybeSingle();
+            const { data: viData, error: viErr } = await insertImage(supabase, unassignedPayload, "id");
             if (viErr) {
               console.error(`vehicle_images insert failed: ${viErr.message} code=${viErr.code}`, JSON.stringify(viErr));
               // Surface error in response for debugging
