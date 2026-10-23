@@ -43,6 +43,17 @@ it('submits a partial assignment through the existing attributed correction writ
   expect(request.revision.fields.at(-1).value_normalized.unallocated_amount).toBe('60.000000');
   expect(node.textContent).toContain('Saved to the shared ledger');
 });
+it('assigns an expense to a NUKE activity without asking for a vehicle', async () => {
+  await act(async () => render('one'));
+  await change(node.querySelector('select')!, 'software');
+  expect(node.querySelectorAll('select')).toHaveLength(1);
+  await change(node.querySelector('input')!, '100'); await change(node.querySelector('textarea')!, 'Hosting for the Nuke platform');
+  fixture.invoke.mockResolvedValue({ data: { data: { expense_posted: false } }, error: null });
+  fixture.read.mockResolvedValue(snapshot('22222222-2222-4222-8222-222222222222', { source_key: key, use_type: 'software', destination_label: 'NUKE software development', vehicle_id: null, allocated_amount: '100.000000', unallocated_amount: '0.000000', basis: 'Hosting for the Nuke platform' }));
+  await act(async () => [...node.querySelectorAll('button')].find(b => b.textContent === 'Save use assignment')!.click());
+  expect(fixture.invoke.mock.calls[0][1].body.revision.fields.at(-1).value_normalized).toMatchObject({ use_type: 'software', destination_label: 'NUKE software development', vehicle_id: null, unallocated_amount: '0.000000' });
+  expect(node.textContent).toContain('Saved to the shared ledger');
+});
 it('review-only access never presents a save action', async () => {
   await act(async () => render('one', false));
   expect(node.querySelector('fieldset')).toBeNull(); expect(node.textContent).toContain('Review access'); expect(fixture.invoke).not.toHaveBeenCalled();

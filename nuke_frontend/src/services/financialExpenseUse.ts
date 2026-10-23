@@ -1,7 +1,12 @@
 import { supabase } from '../lib/supabase';
 
 type Json = Record<string, any>;
-export type ExpenseUse = { source_key: string; use_type: 'shop' | 'vehicle' | 'unassigned'; destination_label: string; vehicle_id: string | null; allocated_amount: string | null; unallocated_amount: string; basis: string; status?: string };
+/** Shop and vehicle serve the restoration business; software and image_production are the two NUKE LTD activities. */
+export const EXPENSE_USE_TYPES = ['shop', 'vehicle', 'software', 'image_production', 'unassigned'] as const;
+export type ExpenseUseType = typeof EXPENSE_USE_TYPES[number];
+export const EXPENSE_USE_LABELS: Record<Exclude<ExpenseUseType, 'vehicle'>, string> = { shop: 'Shop', software: 'NUKE software development', image_production: 'Photography & image production', unassigned: 'Unassigned' };
+const useTypes: readonly string[] = EXPENSE_USE_TYPES;
+export type ExpenseUse = { source_key: string; use_type: ExpenseUseType; destination_label: string; vehicle_id: string | null; allocated_amount: string | null; unallocated_amount: string; basis: string; status?: string };
 export type ExpenseSnapshot = { document: Json; fields: Json[]; lines: Json[]; concerns?: Json[]; record: Json; runId: string; use: ExpenseUse | null };
 const object = (v: unknown): v is Json => !!v && typeof v === 'object' && !Array.isArray(v);
 const hash = /^[a-f0-9]{64}$/;
@@ -27,14 +32,14 @@ export async function readExpenseSnapshot(ownerId: string, documentId: string, s
   if (!record || record.record_kind !== 'retained_ledger_decision' || record.section !== 'Expense' || !hash.test(sourceKey) || runs.size !== 1 || !uuid.test(String([...runs][0]))) throw new Error('A complete current expense revision is required.');
   const field = data.fields.find((f: Json) => f.field_key === expenseUseKey(sourceKey));
   const use = field?.value_normalized?.value;
-  if (use && (!object(use) || use.source_key !== sourceKey || !['shop', 'vehicle', 'unassigned'].includes(use.use_type) || typeof use.destination_label !== 'string' || typeof use.basis !== 'string')) throw new Error('Expense-use reference conflict.');
+  if (use && (!object(use) || use.source_key !== sourceKey || !useTypes.includes(use.use_type) || typeof use.destination_label !== 'string' || typeof use.basis !== 'string')) throw new Error('Expense-use reference conflict.');
   return { document: original.data, fields: data.fields, lines: data.lines, concerns: data.concerns || [], record, runId: String([...runs][0]), use: use || null };
 }
 
 /** Complete attributed correction through the existing writer and stale-run gate. */
 export function expenseUseCorrection(snapshot: ExpenseSnapshot, use: ExpenseUse, requestId: string) {
   const { document: doc, record } = snapshot;
-  if (!hash.test(record.source_key) || use.source_key !== record.source_key || !['shop', 'vehicle', 'unassigned'].includes(use.use_type)) throw new Error('Choose an expense destination.');
+  if (!hash.test(record.source_key) || use.source_key !== record.source_key || !useTypes.includes(use.use_type)) throw new Error('Choose an expense destination.');
   if (use.basis.trim().length < 1 || use.basis.length > 500 || use.destination_label.length > 200) throw new Error('Add a short reason for the assignment.');
   if (use.use_type === 'vehicle' ? !uuid.test(use.vehicle_id || '') : use.vehicle_id !== null) throw new Error('Select the actual recipient vehicle.');
   const total = decimalUnits(record.amount ?? '');
