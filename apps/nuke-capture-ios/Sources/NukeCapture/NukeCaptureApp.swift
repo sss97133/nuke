@@ -196,7 +196,7 @@ struct NukeCaptureApp: App {
                     }
                     // File what the owner's albums already say (no image reading, so it is cheap
                     // enough for the foreground); serial reads wait for the charging job.
-                    await AttributionEngine.shared.run(limit: 500, ocrBudget: 0)
+                    await AttributionEngine.shared.runAutomatic(limit: 500, ocrBudget: 0)
                 }
                 // Freshen the local store from the newest photos' true EXIF so the day
                 // receipt renders offline. DEFERRED + low-priority + small: the head pass
@@ -214,6 +214,7 @@ struct NukeCaptureApp: App {
                     // charging at a nominal temperature, never as a cost of opening the app.
                     if LibraryIngest.mayReviewInForeground {
                         await LibraryIngest.shared.runAlbumReview(budget: 24)
+                        // Already gated to charging at nominal temperature; files the reads just made.
                         await AttributionEngine.shared.run(limit: 500, ocrBudget: 0)
                     }
                     await LibraryIngest.shared.syncNativeAlbums()
