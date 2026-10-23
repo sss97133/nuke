@@ -1,0 +1,1 @@
+UPDATE auction_events ae SET auction_end_date=l.old_value FROM auction_end_date_backfill_log l WHERE l.run_id='aed_backfill_v3_bj_rundate_20261023' AND l.auction_event_id=ae.id AND ae.auction_end_date=l.new_value;
