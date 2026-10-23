@@ -414,11 +414,13 @@ struct VehicleDetailView: View {
         .task(id: vehicleId) { await loadSpecs() }
         .task(id: vehicleId) { if mapContext == nil { await loadProfileRead() } }
         .task(id: vehicleId) { if mapContext == nil { await loadValuation() } }
-        .task(id: vehicleId) { if mapContext == nil { await loadVehicleDays() } }
-        .task(id: vehicleId) { if mapContext == nil { await loadSaleHistory() } }
         .task(id: vehicleId) { if mapContext == nil { await subscribePulse() } }
-        .task(id: vehicleId) { if mapContext == nil { await loadBookends() } }
-        .task(id: vehicleId) { if mapContext == nil { await loadEngagement() } }
+        // Below the fold: start once the header/gallery pass has landed, so the
+        // first screen's reads aren't competing with sections nobody sees yet.
+        .task(id: belowFoldKey) { if mapContext == nil, loaded { await loadVehicleDays() } }
+        .task(id: belowFoldKey) { if mapContext == nil, loaded { await loadSaleHistory() } }
+        .task(id: belowFoldKey) { if mapContext == nil, loaded { await loadBookends() } }
+        .task(id: belowFoldKey) { if mapContext == nil, loaded { await loadEngagement() } }
         .sheet(item: $provenanceDrill) { drill in
             FieldProvenanceSheet(vehicleId: vehicleId, drill: drill)
         }
@@ -791,23 +793,13 @@ struct VehicleDetailView: View {
             coverRow = nil; return
         }
         do {
-            let rows: [VehicleGalleryImage] = try await VehicleGalleryImage.eligible(SupabaseService.client
-                .from("vehicle_images")
-                .select("id,image_url,thumbnail_url,is_primary,taken_at,labels,ai_processing_status,is_document,image_category,created_at,vision_gate_agent_reasoning,source,photo_imported_at:exif_data->>imported_at,photo_listing_url:exif_data->>source_url")
-                .eq("vehicle_id", value: vehicleId)
-                .eq("image_url", value: cover))
-                .limit(1)
-                .execute().value
+            let rows = try await VehicleImageLoader.cover(vehicleId: vehicleId, url: cover)
             coverRow = rows.first { !$0.excludedFromHero }
             if coverRow == nil {
                 // Imported listing covers need not share the scalar cover's thumbnail URL.
                 // An explicitly selected, viewer-permitted gallery row is distinct from
                 // taking an arbitrary unclassified frame from gallery pagination.
-                let selected: [VehicleGalleryImage] = try await VehicleGalleryImage.eligible(SupabaseService.client
-                    .from("vehicle_images")
-                    .select("id,image_url,thumbnail_url,is_primary,taken_at,labels,ai_processing_status,is_document,image_category,created_at,vision_gate_agent_reasoning,source,photo_imported_at:exif_data->>imported_at,photo_listing_url:exif_data->>source_url")
-                    .eq("vehicle_id", value: vehicleId).eq("is_primary", value: true))
-                    .limit(1).execute().value
+                let selected = try await VehicleImageLoader.primary(vehicleId: vehicleId)
                 coverRow = selected.first { !$0.excludedFromHero }
             }
         } catch {
@@ -816,14 +808,7 @@ struct VehicleDetailView: View {
     }
     private func loadHero() async {
         do {
-            heroCandidates = try await VehicleGalleryImage.eligible(SupabaseService.client
-                .from("vehicle_images")
-                .select("id,image_url,thumbnail_url,is_primary,taken_at,labels,ai_processing_status,is_document,image_category,created_at,vision_gate_agent_reasoning,source,photo_imported_at:exif_data->>imported_at,photo_listing_url:exif_data->>source_url")
-                .eq("vehicle_id", value: vehicleId)
-                .eq("image_category", value: "exterior_body"))
-                .order("taken_at", ascending: false, nullsFirst: false)
-                .limit(200)
-                .execute().value
+            heroCandidates = try await VehicleImageLoader.heroCandidates(vehicleId: vehicleId)
         } catch {
             NSLog("NukeCapture hero candidates fetch failed: %@", String(describing: error))
         }
@@ -1731,6 +1716,16 @@ struct VehicleDetailView: View {
     }
 
     private func load() async {
+        // Header, first gallery page and the viewer relationship are independent
+        // reads — run them together instead of back to back.
+        async let header: Void = loadHeader()
+        async let gallery: Void = loadGalleryPage(reset: true)
+        async let relationship: Void = loadRelationship()
+        _ = await (header, gallery, relationship)
+        loaded = true
+    }
+
+    private func loadHeader() async {
         do {
             // One select covers header + spec table.
             let rows: [VehicleHeaderRow] = try await SupabaseService.client
@@ -1746,17 +1741,14 @@ struct VehicleDetailView: View {
             loadError = "Load failed"
             NSLog("NukeCapture vehicle detail load failed: %@", String(describing: error))
         }
-        // Gallery is independent — a load failure here never blocks the spec
-        // sheet. First page only; the rest streams in as the grid scrolls.
-        await loadGalleryPage(reset: true)
-        // ASSET window — the viewer's relationship. Owner-scoped via RLS; a
-        // signed-out viewer or a non-owner simply gets no rows → nil → the
-        // section doesn't render (no false ownership claim).
-        await loadRelationship()
-        loaded = true
+        // Gallery (first page) and the ASSET relationship (owner-scoped via RLS;
+        // non-owner → nil → section hidden) load alongside this in load().
     }
 
     private static let galleryPageSize = 60
+
+    /// Keys the deferred below-the-fold loads: they fire once per vehicle, after `loaded`.
+    private var belowFoldKey: String { "\(vehicleId)|\(loaded)" }
 
     private func loadMapEvidence() async {
         guard let context = mapContext, !mapEvidenceLoading else { return }
@@ -1854,8 +1846,7 @@ struct VehicleDetailView: View {
         do {
             let request = VehicleGalleryImage.eligible(SupabaseService.client
                 .from("vehicle_images")
-                .select("id,image_url,thumbnail_url,is_primary,taken_at,labels,ai_processing_status,is_document,image_category,created_at,vision_gate_agent_reasoning,source,photo_imported_at:exif_data->>imported_at,photo_listing_url:exif_data->>source_url",
-                        count: reset ? .exact : nil)
+                .select(VehicleImageLoader.columns, count: reset ? .exact : nil)
                 .eq("vehicle_id", value: vehicleId))
             // created_at is only an indexed paging order for a source listing's gallery, never a label.
             let response = try await request
@@ -2060,11 +2051,7 @@ struct VehicleDetailView: View {
     /// is read as absent and the section stays hidden (review 2026-10-13, finding 16).
     private func image(id: UUID) async -> VehicleGalleryImage? {
         do {
-            let rows: [VehicleGalleryImage] = try await VehicleGalleryImage.eligible(SupabaseService.client
-                .from("vehicle_images")
-                .select("id,image_url,thumbnail_url,is_primary,taken_at,labels,ai_processing_status,is_document,image_category,created_at,vision_gate_agent_reasoning,source,photo_imported_at:exif_data->>imported_at,photo_listing_url:exif_data->>source_url")
-                .eq("id", value: id.uuidString.lowercased()))
-                .limit(1).execute().value
+            let rows = try await VehicleImageLoader.image(id: id)
             return rows.first
         } catch {
             NSLog("NukeCapture bookend image fetch failed: %@", String(describing: error))
@@ -2237,272 +2224,10 @@ private struct DayDrillSheet: View {
         guard let d = f.date(from: day.day),
               let next = Calendar.current.date(byAdding: .day, value: 1, to: d) else { return }
         do {
-            photos = try await VehicleGalleryImage.eligible(SupabaseService.client
-                .from("vehicle_images")
-                .select("id,image_url,thumbnail_url,is_primary,taken_at,labels,ai_processing_status,is_document,image_category,created_at,vision_gate_agent_reasoning,source,photo_imported_at:exif_data->>imported_at,photo_listing_url:exif_data->>source_url")
-                .eq("vehicle_id", value: vehicleId)
-                .gte("taken_at", value: day.day)
-                .lt("taken_at", value: f.string(from: next)))
-                .order("taken_at", ascending: true)
-                .limit(200)
-                .execute().value
+            photos = try await VehicleImageLoader.day(vehicleId: vehicleId, from: day.day, to: f.string(from: next))
         } catch {
             NSLog("NukeCapture day drill load failed: %@", String(describing: error))
         }
-    }
-}
-
-// A real photo viewer (the Photos-app idiom): swipe between, pinch/pan/double-tap zoom,
-// a filmstrip scrubber, date caption, cached full-res. Tap toggles chrome. Analysis is
-// still one tap away (the drill survives) — never a parallel atom view (don't-mint).
-struct FullScreenGalleryView: View {
-    let photos: [VehicleGalleryImage]
-    var onAnalyze: ((VehicleGalleryImage) -> Void)? = nil
-    @State private var index: Int
-    @State private var showChrome = true
-    @Environment(\.dismiss) private var dismiss
-
-    init(photos: [VehicleGalleryImage], startIndex: Int = 0,
-         onAnalyze: ((VehicleGalleryImage) -> Void)? = nil) {
-        self.photos = photos
-        self.onAnalyze = onAnalyze
-        _index = State(initialValue: min(max(startIndex, 0), max(photos.count - 1, 0)))
-    }
-    // Legacy shim — the two callers that pass bare URL strings (hero fallback, cohort zoom).
-    init(images: [String]) {
-        self.init(photos: images.map {
-            VehicleGalleryImage(id: UUID(), image_url: $0, thumbnail_url: nil, is_primary: nil,
-                                taken_at: nil, labels: nil, ai_processing_status: nil,
-                                image_category: nil, created_at: nil, vision_gate_agent_reasoning: nil)
-        })
-    }
-
-    private var current: VehicleGalleryImage? { photos.indices.contains(index) ? photos[index] : nil }
-
-    var body: some View {
-        ZStack {
-            Color.black.ignoresSafeArea()
-            TabView(selection: $index) {
-                ForEach(Array(photos.enumerated()), id: \.offset) { i, img in
-                    ZoomableImage(url: img.image_url).tag(i).ignoresSafeArea()
-                }
-            }
-            .tabViewStyle(.page(indexDisplayMode: .never))
-            .onTapGesture { withAnimation(.easeInOut(duration: 0.2)) { showChrome.toggle() } }
-
-            if showChrome {
-                VStack(spacing: 0) {
-                    HStack {
-                        Button { dismiss() } label: {
-                            Image(systemName: "xmark").font(.headline.weight(.semibold))
-                                .foregroundStyle(.white).padding(10).background(.black.opacity(0.4), in: Circle())
-                        }
-                        Spacer()
-                        if let c = current, onAnalyze != nil {
-                            Button { onAnalyze?(c) } label: {
-                                Label("Analysis", systemImage: "sparkle.magnifyingglass")
-                                    .font(.subheadline.weight(.medium)).foregroundStyle(.white)
-                                    .padding(.horizontal, 12).padding(.vertical, 8)
-                                    .background(.black.opacity(0.4), in: Capsule())
-                            }
-                        }
-                    }
-                    .padding(.horizontal, 16).padding(.top, 8)
-                    Spacer()
-                    if let image = current, image.isImported {
-                        Text("Listing photo · capture date unknown").font(.footnote.weight(.medium)).foregroundStyle(.white)
-                            .padding(.horizontal, 10).padding(.vertical, 5)
-                            .background(.black.opacity(0.4), in: Capsule())
-                            .padding(.bottom, 6)
-                    } else if let at = current?.taken_at, !at.isEmpty {
-                        Text(prettyDate(at)).font(.footnote.weight(.medium)).foregroundStyle(.white)
-                            .padding(.horizontal, 10).padding(.vertical, 5)
-                            .background(.black.opacity(0.4), in: Capsule())
-                            .padding(.bottom, 6)
-                    }
-                    scrubber.padding(.bottom, 8)
-                }
-                .transition(.opacity)
-            }
-        }
-        .statusBarHidden()
-    }
-
-    private var scrubber: some View {
-        ScrollViewReader { proxy in
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 4) {
-                    ForEach(Array(photos.enumerated()), id: \.offset) { i, img in
-                        Button { withAnimation(.snappy(duration: 0.2)) { index = i } } label: {
-                            CachedAsyncImage(url: NukeImage.thumb(img.image_url, width: 120)) { im in
-                                im.resizable().scaledToFill()
-                            } placeholder: { Color.white.opacity(0.1) }
-                            .frame(width: i == index ? 46 : 34, height: i == index ? 46 : 34)
-                            .clipShape(RoundedRectangle(cornerRadius: 4))
-                            .overlay(RoundedRectangle(cornerRadius: 4)
-                                .strokeBorder(.white, lineWidth: i == index ? 2 : 0))
-                            .id(i)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(.horizontal, 16)
-            }
-            .frame(height: 54)
-            .onChange(of: index) { _, new in withAnimation { proxy.scrollTo(new, anchor: .center) } }
-        }
-    }
-
-    private func prettyDate(_ s: String) -> String {
-        let iso = ISO8601DateFormatter(); iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        let d = iso.date(from: s) ?? {
-            let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"; return f.date(from: String(s.prefix(10)))
-        }()
-        guard let d else { return String(s.prefix(10)) }
-        let out = DateFormatter(); out.dateStyle = .long
-        return out.string(from: d)
-    }
-}
-
-// Pinch-to-zoom + pan-while-zoomed + double-tap toggle, clamped 1…4×. A 2048-pixel render
-// (enough for 2× zoom on a phone), not the raw original: a 3–10 MB HEIC decoded whole per page
-// was the "loads full res" heat (owner, 2026-10-15). Resets on page change.
-private struct ZoomableImage: View {
-    let url: String?
-    @State private var scale: CGFloat = 1
-    @State private var lastScale: CGFloat = 1
-    @State private var offset: CGSize = .zero
-    @State private var lastOffset: CGSize = .zero
-
-    var body: some View {
-        GeometryReader { geo in
-            CachedAsyncImage(url: NukeImage.thumb(url, width: 2048)) { image in
-                image.resizable().scaledToFit()
-            } placeholder: {
-                Color.black.overlay { ProgressView().tint(.white) }
-            }
-            .frame(width: geo.size.width, height: geo.size.height)
-            .scaleEffect(scale)
-            .offset(offset)
-            .gesture(MagnificationGesture()
-                .onChanged { v in scale = min(max(lastScale * v, 1), 4) }
-                .onEnded { _ in
-                    lastScale = scale
-                    if scale <= 1 { withAnimation(.spring) { offset = .zero; lastOffset = .zero } }
-                })
-            .simultaneousGesture(DragGesture()
-                .onChanged { v in
-                    if scale > 1 {
-                        offset = CGSize(width: lastOffset.width + v.translation.width,
-                                        height: lastOffset.height + v.translation.height)
-                    }
-                }
-                .onEnded { _ in lastOffset = offset })
-            .onTapGesture(count: 2) {
-                withAnimation(.spring) {
-                    if scale > 1 { scale = 1; lastScale = 1; offset = .zero; lastOffset = .zero }
-                    else { scale = 2.5; lastScale = 2.5 }
-                }
-            }
-        }
-    }
-}
-
-// ─── VALUE TRAJECTORY ────────────────────────────────────────────────────────
-// The thesis: a built car has ONE sale (the purchase) then ACCRUING documented
-// investment — value you BUILD over time, not wait for a resale to reveal. Reads
-// get_vehicle_investment_timeline (receipts, dated). Undated receipts are summarized
-// honestly, never plotted (no date to place them). Headline includes the acquisition
-// so the curve total ($33.5K) doesn't look broken next to the parts-only proof ledger.
-struct InvestmentTimeline: Decodable {
-    let points: [Point]?
-    let final_cumulative_dated: Double?
-    let total_with_undated: Double?
-    let baseline: Point?
-    let undated: Undated?
-    struct Point: Decodable, Identifiable {
-        let date: String?; let kind: String?; let delta: Double?
-        let proven: Bool?; let cumulative: Double?
-        var id: String { (date ?? "") + (kind ?? "") + String(cumulative ?? 0) }
-        var day: Date? {
-            guard let s = date else { return nil }
-            let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"; return f.date(from: String(s.prefix(10)))
-        }
-    }
-    struct Undated: Decodable { let n: Int?; let total: Double? }
-}
-
-struct ValueTrajectoryView: View {
-    let vehicleId: String
-    @State private var t: InvestmentTimeline?
-
-    private func money(_ v: Double) -> String { v.formatted(.currency(code: "USD").precision(.fractionLength(0))) }
-    private func moneyK(_ v: Double) -> String {
-        v >= 1000 ? "$\((v/1000).formatted(.number.precision(.fractionLength(v < 10000 ? 1 : 0))))k" : money(v)
-    }
-
-    var body: some View {
-        Group {
-        if let t, let pts = (t.points ?? []).filter({ $0.day != nil && $0.cumulative != nil }) as [InvestmentTimeline.Point]?,
-           pts.count >= 2 {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("VALUE BUILT")
-                    .font(.system(.caption2, design: .monospaced)).foregroundStyle(.secondary)
-                    .padding(.horizontal, 16)
-
-                HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    Text(moneyK(t.total_with_undated ?? t.final_cumulative_dated ?? 0))
-                        .font(.system(.title, design: .monospaced).weight(.semibold))
-                    Text("invested").font(.caption2).foregroundStyle(.secondary)
-                }
-                .padding(.horizontal, 16)
-                if let b = t.baseline?.delta {
-                    Text("incl. \(money(b)) acquisition · the value you build, not wait to sell")
-                        .font(.system(size: 10, design: .monospaced)).foregroundStyle(.tertiary)
-                        .padding(.horizontal, 16)
-                }
-
-                Chart {
-                    ForEach(pts) { p in
-                        AreaMark(x: .value("Date", p.day!), y: .value("Invested", p.cumulative!))
-                            .foregroundStyle(.linearGradient(colors: [Color.accentColor.opacity(0.28), Color.accentColor.opacity(0.02)],
-                                                             startPoint: .top, endPoint: .bottom))
-                        LineMark(x: .value("Date", p.day!), y: .value("Invested", p.cumulative!))
-                            .foregroundStyle(Color.accentColor).interpolationMethod(.monotone)
-                    }
-                    if let first = pts.first, let d = first.day {
-                        PointMark(x: .value("Date", d), y: .value("Invested", first.cumulative!))
-                            .foregroundStyle(Color.accentColor).symbolSize(40)
-                            .annotation(position: .topLeading) {
-                                Text("bought").font(.system(size: 9, design: .monospaced)).foregroundStyle(.secondary)
-                            }
-                    }
-                }
-                .chartYScale(domain: 0...((pts.compactMap { $0.cumulative }.max() ?? 1) * 1.12))
-                .chartYAxis {
-                    AxisMarks(position: .leading, values: .automatic(desiredCount: 4)) { v in
-                        AxisGridLine(); AxisValueLabel { if let d = v.as(Double.self) { Text(moneyK(d)) } }
-                    }
-                }
-                .frame(height: 170).padding(.horizontal, 16)
-
-                if let u = t.undated, let ut = u.total, ut > 0 {
-                    Text("+ \(money(ut)) from \(u.n ?? 0) undated receipts — real spend, no date to place it on the curve")
-                        .font(.system(size: 10, design: .monospaced)).foregroundStyle(.tertiary)
-                        .padding(.horizontal, 16)
-                }
-            }
-            .padding(.bottom, 16)
-        }
-        }
-        .task(id: vehicleId) { await fetch() }
-    }
-
-    private func fetch() async {
-        struct P: Encodable { let p_vehicle: String }
-        t = try? await SupabaseService.client
-            .rpc("get_vehicle_investment_timeline", params: P(p_vehicle: vehicleId))
-            .execute().value
     }
 }
 
@@ -3336,7 +3061,7 @@ struct FieldProvenanceSheet: View {
                     }
                 }
             }
-            .refreshable { await load() }
+            .refreshable { VehicleImageLoader.invalidate(vehicleId: vehicleId); await load() }
             .navigationTitle(drill.label)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
