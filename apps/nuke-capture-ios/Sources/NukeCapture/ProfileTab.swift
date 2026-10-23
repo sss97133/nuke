@@ -303,6 +303,7 @@ struct ProfileView: View {
     @State private var syncFailureText: String?
     @State private var syncError = false          // failed link-ledger load ≠ a fresh account
     @ObservedObject private var engine = SyncEngine.shared
+    @Environment(\.scenePhase) private var scenePhase
 
     // Recent meaningful work — the few latest UNDERSTOOD days, each a STORY (not a
     // bare photo count). Replaces the old exhaustive 1,740-row day ledger: the
@@ -428,30 +429,22 @@ struct ProfileView: View {
         }
         .sheet(isPresented: $showAlbums) { LibraryAlbumsView(userId: userId) }
         // (openVehicle sheet moved onto garageSection — avoids two .sheet on one view)
-        .task(id: userId) { await load() }
-        .task(id: userId) { await loadSync() }   // owner-only inside loadSync
-        .task(id: userId) { await loadGarage() }
         .onReceive(NotificationCenter.default.publisher(for: SubjectResolutionEngine.didChange)) { _ in
             Task { await loadGarage() }
         }
-        .task(id: userId) { await loadLatest() }
-        .task(id: userId) { await loadProducer() }
-        .task(id: userId) {
-            guard isOwn else { return }
-            do { affiliations = try await OrgAffiliationsSection.load(userId: userId); affiliationsFailure = nil }
-            catch { if affiliations.isEmpty { affiliationsFailure = ReadFailure.text(error) } }
-        }
-        .task(id: userId) {
-            guard isOwn else { return }
-            await loadPhotoEvidence()
-            await LibraryStore.shared.refreshAlbums()
-            await loadPhotoEvidence()
-            // OCR over originals: on a charger at a nominal temperature only (LibraryIngest).
-            if LibraryIngest.mayReviewInForeground {
-                await libraryIngest.runAlbumReview(budget: 24)
+        // One appear pass: the reads run concurrently; photo evidence loads once, after the catalog refresh.
+        .task(id: userId) { await loadOnAppear() }
+        // The ingestion card's server half: refresh while visible and active, paused in the background.
+        .task(id: "\(userId)|\(scenePhase == .active)") {
+            guard isOwn, scenePhase == .active else { return }
+            while !Task.isCancelled {
+                let wait = IngestionRefresh.next(for: ingestionState)
+                do { try await Task.sleep(for: .seconds(wait)) } catch { return }
+                await loadSync()
             }
-            await libraryIngest.syncNativeAlbums()
-            await loadPhotoEvidence()
+        }
+        .onChange(of: engine.isSyncing) { _, syncing in
+            if !syncing && isOwn && scenePhase == .active { Task { await loadSync() } }
         }
         .onChange(of: libraryIngest.running) { _, running in
             if !running && isOwn { Task { await loadPhotoEvidence() } }
@@ -481,6 +474,84 @@ struct ProfileView: View {
             if let photoEvidenceError { Text(photoEvidenceError).font(.caption).foregroundStyle(.secondary) }
             if let summary = libraryIngest.albumSyncSummary { Text(summary).font(.caption).foregroundStyle(.secondary) }
         }
+    }
+
+    private func loadOnAppear() async {
+        async let profileRead: Void = load()
+        async let syncRead: Void = loadSync()   // owner-only inside loadSync
+        async let garageRead: Void = loadGarage()
+        async let latestRead: Void = loadLatest()
+        async let producerRead: Void = loadProducer()
+        async let affiliationsRead: Void = loadAffiliations()
+        async let photoRead: Void = runPhotoPipeline()
+        _ = await (profileRead, syncRead, garageRead, latestRead, producerRead, affiliationsRead, photoRead)
+    }
+
+    private func loadAffiliations() async {
+        guard isOwn else { return }
+        do { affiliations = try await OrgAffiliationsSection.load(userId: userId); affiliationsFailure = nil }
+        catch { if affiliations.isEmpty { affiliationsFailure = ReadFailure.text(error) } }
+    }
+
+    /// Catalog refresh → ONE evidence load → optional on-device review → native album sync.
+    /// Review completion reloads evidence through `onChange(libraryIngest.running)`; the album
+    /// sync reloads only when it reports a change.
+    private func runPhotoPipeline() async {
+        guard isOwn else { return }
+        await LibraryStore.shared.refreshAlbums()
+        guard !Task.isCancelled else { return }
+        await loadPhotoEvidence()
+        // OCR over originals: on a charger at a nominal temperature only (LibraryIngest).
+        if LibraryIngest.mayReviewInForeground {
+            await libraryIngest.runAlbumReview(budget: 24)
+        }
+        let before = libraryIngest.albumSyncSummary
+        await libraryIngest.syncNativeAlbums()
+        if libraryIngest.albumSyncSummary != before { await loadPhotoEvidence() }
+    }
+
+    private var ingestionSnapshot: IngestionSnapshot {
+        var s = IngestionSnapshot()
+        s.isPaused = engine.isPaused; s.thermalHold = engine.thermalHold; s.authProblem = engine.authProblem
+        s.isSyncing = engine.isSyncing; s.uploadsPending = engine.backfillRemaining; s.uploadsThisPass = engine.totalSynced
+        s.scanning = libraryIngest.running || engine.isReconciling
+        s.scanned = libraryIngest.scanned; s.scanTarget = libraryIngest.target
+        s.lastDeviceSync = engine.lastSyncDate
+        if let e = photoEvidence { s.matched = e.matched; s.suggested = e.conflicted; s.unresolved = e.unresolved }
+        if let sync {
+            s.serverSynced = sync.synced_total; s.serverAnalyzed = sync.analyzed_total
+            s.serverPending = sync.pending_total; s.serverFiled = sync.filed_total
+            s.lastServerSync = IngestionRefresh.parse(sync.last_synced_at)
+        }
+        s.serverError = syncError
+        return s
+    }
+    private var ingestionState: IngestionState { IngestionState.derive(ingestionSnapshot) }
+
+    @ViewBuilder private var ingestionCard: some View {
+        let snap = ingestionSnapshot
+        let state = IngestionState.derive(snap)
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 8) {
+                if state.isActive { ProgressView().controlSize(.small) }
+                else { Image(systemName: state.systemImage).foregroundStyle(.secondary) }
+                Text(state.title).font(.subheadline.weight(.medium)).monospacedDigit()
+            }
+            let details = [
+                snap.matched > 0 ? "\(snap.matched.formatted()) matched" : nil,
+                snap.suggested > 0 ? "\(snap.suggested.formatted()) suggested" : nil,
+                snap.unresolved > 0 ? "\(snap.unresolved.formatted()) unmatched" : nil,
+                snap.uploadsPending > 0 && state != .uploading(snap.uploadsPending) ? "\(snap.uploadsPending.formatted()) waiting to upload" : nil
+            ].compactMap { $0 }
+            if !details.isEmpty {
+                Text(details.joined(separator: " · ")).font(.caption).monospacedDigit().foregroundStyle(.secondary)
+            }
+            if let last = snap.lastSync {
+                Text("Last sync \(RelativeDateTimeFormatter().localizedString(for: last, relativeTo: Date()))")
+                    .font(.caption2).foregroundStyle(.tertiary)
+            }
+        }
+        .accessibilityElement(children: .combine)
     }
 
     private func loadPhotoEvidence() async {
@@ -965,6 +1036,7 @@ struct ProfileView: View {
     // (PROVENANCE: never a lone "—" row for absent data).
     @ViewBuilder private var syncSection: some View {
         Section {
+            ingestionCard
             // Identity confirmation — this handle IS the linked account.
             if let who = profile?.username ?? profile?.full_name {
                 LabeledContent("Linked account") {
