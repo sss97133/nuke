@@ -87,7 +87,7 @@ export default function FinancialWorkpapers({ revision, onOpen }: { revision: nu
   useEffect(() => {
     let cancelled = false;
     const request = ++generation.current;
-    if (scope.current !== ownerId) { setData(null); setRows(null); setRowCount(null); setUses({}); scope.current = ownerId; }
+    if (scope.current !== (ownerId || '')) { setData(null); setRows(null); setRowCount(null); setUses({}); scope.current = ownerId || ''; }
     setError('');
     void supabase.functions.invoke('ingest-observation', { body: {
       mode: 'financial_evidence_v1', action: 'tax_read', ...(shared ? { owner_user_id: ownerId } : {}), limit: 1,
