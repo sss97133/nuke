@@ -135,3 +135,13 @@ Deno.test('a page without lot data is not a lot page', () => {
   equal(parseLotPage('<script id="__NEXT_DATA__" type="application/json">{"props":{"pageProps":{}}}</script>'), null);
   equal(parseLotPage('<script id="__NEXT_DATA__" type="application/json">not json</script>'), null);
 });
+
+Deno.test('a preview-lot card is never a sale; a real OutOfStock lot is', async () => {
+  const { isBonhamsPreviewLotUrl, catalogOfferIsSold } = await import('./lotPage.ts');
+  const preview = 'https://cars.bonhams.com/auction/32391/preview-lot/6113944/1956-mercedes-benz-300sl-gullwing-coupe/';
+  equal(isBonhamsPreviewLotUrl(preview), true);
+  equal(catalogOfferIsSold(preview, 'https://schema.org/OutOfStock'), false);
+  equal(isBonhamsPreviewLotUrl('https://cars.bonhams.com/auction/32042/lot/352/x/'), false);
+  equal(catalogOfferIsSold('https://cars.bonhams.com/auction/32042/lot/352/x/', 'https://schema.org/OutOfStock'), true);
+  equal(catalogOfferIsSold('https://cars.bonhams.com/auction/32042/lot/352/x/', 'https://schema.org/InStock'), false);
+});

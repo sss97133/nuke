@@ -33,6 +33,8 @@ import { recordRevision } from "../_shared/revision.ts";
 import { mustWrite, softWrite } from "../_shared/writeResult.ts";
 import {
   bonhamsLotPageUrl, type LotPage, parseLotPage, type SellerAssessment, SELLER_ASSESSMENT_VERSION, sellerAssessmentConditionScore,
+  catalogOfferIsSold,
+  isBonhamsPreviewLotUrl,
 } from "./lotPage.ts";
 import { fetchPage } from "../_shared/hybridFetcher.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
@@ -1055,6 +1057,8 @@ async function extractCatalog(catalogUrl: string): Promise<{
 
     const name = offer.name || "";
     const url = offer.url || "";
+    // Preview cards are not lots of this sale (often a car sold elsewhere); landing them made 8 false sales by 2026-10-23.
+    if (isBonhamsPreviewLotUrl(url)) continue;
     const price = typeof offer.price === "number" ? offer.price : null;
     const priceCurrency = offer.priceCurrency || null;
     const availability = offer.availability || null;
@@ -1897,8 +1901,8 @@ if (import.meta.main) Deno.serve(async (req) => {
               profile_origin: "bonhams_catalog_import",
               is_public: true,
               status: "active",
-              sale_status: lot.availability?.includes("OutOfStock") ? "sold" : "available",
-              auction_outcome: lot.availability?.includes("OutOfStock") ? "sold" : null,
+              sale_status: catalogOfferIsSold(lot.url, lot.availability) ? "sold" : "available",
+              auction_outcome: catalogOfferIsSold(lot.url, lot.availability) ? "sold" : null,
               auction_end_date: catalog.auctionDate,
               extractor_version: EXTRACTOR_VERSION,
               origin_metadata: {
@@ -1959,10 +1963,10 @@ if (import.meta.main) Deno.serve(async (req) => {
                     event_type: "auction",
                     source_url: lot.url,
                     source_listing_id: listingUrlKey || lot.lotNumber || catalog.auctionId,
-                    event_status: lot.availability?.includes("OutOfStock") ? "sold" : "active",
+                    event_status: catalogOfferIsSold(lot.url, lot.availability) ? "sold" : "active",
                     ended_at: catalog.auctionDate,
                     final_price: lot.price,
-                    sold_at: lot.availability?.includes("OutOfStock") ? catalog.auctionDate : null,
+                    sold_at: catalogOfferIsSold(lot.url, lot.availability) ? catalog.auctionDate : null,
                     metadata: {
                       lot_number: lot.lotNumber,
                       sale_id: catalog.auctionId,
