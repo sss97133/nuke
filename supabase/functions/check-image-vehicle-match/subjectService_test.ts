@@ -1,4 +1,4 @@
-import { resolveSubjectBatch, retainDeviceSourceReading, subjectOwnerId, supabaseSubjectStore, type CandidateScope, type SubjectEnvelope, type SubjectReading,
+import { resolveSubjectBatch, retainDeviceSourceReading, sanitizeOnDeviceObservations, subjectOwnerId, supabaseSubjectStore, type CandidateScope, type SubjectEnvelope, type SubjectReading,
   type SubjectSource, type SubjectStore, type SubjectDependencies, type CaptureProfileRequest } from "./subjectService.ts";
 import type { VisionInputCapture } from "./inputCustody.ts";
 import { projectSourceIdentities, sourceAliases, sourceIdentityRecords, attachSourceIdentityRecords } from "./sourceIdentity.ts";
@@ -577,4 +577,36 @@ Deno.test("retain unprojected provider proposals so a projection repair needs no
   await f.run();
   equal(f.readings[0].confidence_basis.visual_subject_reading_v1?.envelope.raw_model_reading, raw);
   equal(f.counts.models, 1);
+});
+Deno.test("on-device observations keep source and confidence; malformed or unverifiable entries are dropped", async () => {
+  const source = { framework: "Apple Vision", model: "VNRecognizeTextRequest", revision: 3, os_version: "iOS 26.0.0", method: "nuke-ondevice-v1" };
+  const kept = sanitizeOnDeviceObservations([
+    { kind: "vin", value: "1HGCM82633A004352", confidence: 0.91, source, repaired: false },
+    { kind: "vin", value: "1HGCM82633A004353", confidence: 0.91, source },           // bad check digit
+    { kind: "scene_zone", value: "engine_bay", confidence: 0.4, source: { ...source, model: "VNClassifyImageRequest" } },
+    { kind: "ocr_text", value: "x", confidence: 1.4, source },                          // out of range
+    { kind: "embedding", value: "x", confidence: 0.5, source },                         // unknown kind
+    { kind: "plate", value: "7ABC123", confidence: 0.6, source: { ...source, extra: "dropped" }, secret: "dropped" },
+  ])!;
+  equal(kept.map(o => o.value), ["1HGCM82633A004352", "engine_bay", "7ABC123"]);
+  equal(kept[0], { kind: "vin", value: "1HGCM82633A004352", confidence: 0.91, source, repaired: false });
+  equal("secret" in kept[2], false); equal("extra" in (kept[2].source as Record<string, unknown>), false);
+  equal(sanitizeOnDeviceObservations(undefined), undefined);
+
+  const f = fixture();
+  const result = await retainDeviceSourceReading(f.store, { user_id: uid, image_ids: ids.slice(0, 2),
+    expected_source_hashes: Object.fromEntries(f.sources.slice(0, 2).map(s => [s.id, s.file_hash])),
+    identity_run_id: "30000000-0000-4000-8000-000000000001", identity_method_version: "vehicle-identity-context-fold-v3:vision-1",
+    observations: [
+      { image_id: ids[0], read_at: "2026-10-02T00:00:00Z", is_vehicle: false, is_document: false,
+        labels: ["VIN plate"], vin_candidates: ["1HGCM82633A004352"],
+        on_device: [{ kind: "vin", value: "1HGCM82633A004352", confidence: 0.91, source, repaired: false }] },
+      { image_id: ids[1], read_at: "2026-10-02T00:00:01Z", is_vehicle: true, is_document: false,
+        labels: ["car"], vin_candidates: [] },
+    ] }, new Date("2026-10-02T00:00:02Z"));
+  equal(result.status, "reading_retained");
+  const raw = f.readings[0].confidence_basis.visual_subject_reading_v1!.envelope.raw_model_reading as
+    { observations: Array<Record<string, unknown>> };
+  equal(raw.observations[0].on_device, [{ kind: "vin", value: "1HGCM82633A004352", confidence: 0.91, source, repaired: false }]);
+  equal("on_device" in raw.observations[1], false);
 });

@@ -158,7 +158,7 @@ final class LibraryIngest: ObservableObject {
     /// image analysis may have been wrong anywhere upstream, so it cannot qualify
     /// as the VIN/classification read that anchors a capture-session fold.
     static var identityMethodVersion: String {
-        "vehicle-identity-context-fold-v3:\(VNClassifyImageRequest.defaultRevision):\(VNRecognizeTextRequest.defaultRevision)"
+        "vehicle-identity-context-fold-v3:\(VNClassifyImageRequest.defaultRevision):\(VNRecognizeTextRequest.defaultRevision):\(OnDeviceAnalysis.methodVersion)"
     }
 
     /// Read every selected source image, including already-bound photos. Album
@@ -262,8 +262,11 @@ final class LibraryIngest: ObservableObject {
         // album/session vehicle. Several readings remain several possible subjects.
         // Preserve all source text, including pre-1981 serials that the existing
         // modern 17-character VIN detector cannot recognize. Never force a match.
-        let textLines = asset.mediaSubtypes.contains(.photoScreenshot) ? [] : VisionEngine.recognizeText(cg)
-        let vins = Array(Set(VisionEngine.vinCandidates(in: textLines) +
+        // One OCR pass yields both the lines and the scored observations (source + confidence).
+        let analysis = OnDeviceAnalysis.analyze(cg, classification: classification,
+                                                readText: !asset.mediaSubtypes.contains(.photoScreenshot))
+        let textLines = analysis.textLines
+        let vins = Array(Set(VisionEngine.vinCandidates(in: textLines) + VisionEngine.checkedVINs(in: textLines) +
             VisionEngine.labelledClassicSerialCandidates(in: textLines))).sorted()
         let encoder = JSONEncoder()
         guard let labelData = try? encoder.encode(labels), let vinData = try? encoder.encode(vins),
@@ -279,7 +282,8 @@ final class LibraryIngest: ObservableObject {
             sourceVersion: version, inputSHA256: input, methodVersion: method, analyzedAt: Date(),
             isVehicle: classification.isVehicle, hasPerson: face,
             labelsJSON: String(decoding: labelData, as: UTF8.self), vinCandidatesJSON: String(decoding: vinData, as: UTF8.self),
-            textLinesJSON: String(decoding: textData, as: UTF8.self))
+            textLinesJSON: String(decoding: textData, as: UTF8.self),
+            onDeviceJSON: OnDeviceAnalysis.encode(analysis.observations))
         return .init(review: review, pendingReason: nil)
     }
 
