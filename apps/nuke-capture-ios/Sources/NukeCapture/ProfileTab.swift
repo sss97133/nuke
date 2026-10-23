@@ -288,11 +288,15 @@ struct ProfileView: View {
     // Stewardship and contribution are separate current relationships. A newly
     // photographed vehicle remains visible without implying that the photographer owns it.
     // Only previous ownership belongs in collapsed history.
-    private var currentGarage: [GarageVehicle] { garage.filter { $0.relationship == "owner" } }
-    private var contributedGarage: [GarageVehicle] { garage.filter { $0.relationship == "contributor" } }
-    private var pastGarage: [GarageVehicle] { garage.filter { $0.relationship == "previously_owned" } }
+    // Intake placeholders (e.g. "UNRESOLVED / Intake Quarantine") are holding areas, not vehicles:
+    // kept out of the fleet lists and shown apart (PhotoPresentation.isPlaceholderVehicle).
+    private var realGarage: [GarageVehicle] { garage.filter { !$0.isPlaceholder } }
+    private var heldGarage: [GarageVehicle] { garage.filter(\.isPlaceholder) }
+    private var currentGarage: [GarageVehicle] { realGarage.filter { $0.relationship == "owner" } }
+    private var contributedGarage: [GarageVehicle] { realGarage.filter { $0.relationship == "contributor" } }
+    private var pastGarage: [GarageVehicle] { realGarage.filter { $0.relationship == "previously_owned" } }
     private var otherRelationships: [String] {
-        Array(Set(garage.map(\.relationship))).filter { !["owner", "previously_owned", "contributor"].contains($0) }.sorted()
+        Array(Set(realGarage.map(\.relationship))).filter { !["owner", "previously_owned", "contributor"].contains($0) }.sorted()
     }
 
     // Owner-only: the phone↔record link, made visible. `sync` is the record's
@@ -738,7 +742,7 @@ struct ProfileView: View {
             // view is the SwiftUI pitfall where the second silently fails to present.
         }
         ForEach(otherRelationships, id: \.self) { role in
-            let rows = garage.filter { $0.relationship == role }
+            let rows = realGarage.filter { $0.relationship == role }
             Section(rows.first?.relationshipLabel ?? role) {
                 ForEach(rows) { v in garageRow(v) }
             }
@@ -763,6 +767,26 @@ struct ProfileView: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+            }
+        }
+        if isOwn {
+            Section {
+                NavigationLink {
+                    ProfilePhotosView(userId: userId, vehicles: garage)
+                } label: {
+                    Label("Your photos", systemImage: "photo.on.rectangle.angled")
+                }
+                ForEach(heldGarage) { v in
+                    LabeledContent("Intake holding area") {
+                        Text("\(v.image_count.formatted()) photos · not a vehicle").font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+            } header: {
+                Text("Photos")
+            } footer: {
+                if !heldGarage.isEmpty {
+                    Text("Photos waiting to be re-homed appear under Your photos → Needs sorting, not as a vehicle.")
+                }
             }
         }
         if isOwn && SupabaseService.currentUserId == userId.lowercased() && !unresolvedGarageSources.isEmpty {
