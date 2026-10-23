@@ -40,6 +40,11 @@ it('refuses unsupported vehicle IDs, source replacement and missing reasons', ()
   const source = snapshot(); source.fields[0].field_key = 'redacted_source';
   expect(() => expenseUseCorrection(source, use(), 'bad')).toThrow('specialized');
 });
+it('assigns an expense to a NUKE activity without a vehicle', () => {
+  const result = expenseUseCorrection(snapshot(), { ...use('100.00'), use_type: 'software', destination_label: 'NUKE software development' }, 'software');
+  expect(result.revision.fields.at(-1)?.value_normalized).toMatchObject({ use_type: 'software', vehicle_id: null, allocated_amount: '100.000000', unallocated_amount: '0.000000' });
+  expect(() => expenseUseCorrection(snapshot(), { ...use(), use_type: 'image_production', vehicle_id: '22222222-2222-4222-8222-222222222222' }, 'bad')).toThrow('recipient');
+});
 it('can withdraw an assignment while keeping the entire recognized expense unassigned', () => {
   const result = expenseUseCorrection(snapshot(), { ...use(), use_type: 'unassigned', allocated_amount: null, destination_label: 'Unassigned' }, 'withdraw');
   expect(result.revision.fields.at(-1)?.value_normalized).toMatchObject({ allocated_amount: '0.000000', unallocated_amount: '100.000000' });

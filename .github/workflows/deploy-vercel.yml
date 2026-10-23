@@ -17,6 +17,9 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    # A hung `vercel deploy --prod` held the vercel-production concurrency group for 2 h on 2026-10-23
+    # (run 39909158062); every later push was queued, then cancelled. A build plus deploy takes under 10 min.
+    timeout-minutes: 25
     env:
       VERCEL_ORG_ID: team_XppaY5WVxdsJ7Lrw8q2l9NFi
       VERCEL_PROJECT_ID: prj_VkFdy6K0osTSOfR6wRpb5TVYsgA5
