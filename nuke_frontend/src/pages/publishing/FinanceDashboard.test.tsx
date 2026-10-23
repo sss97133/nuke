@@ -3,14 +3,15 @@ import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 const fixture = vi.hoisted(() => ({ results: {} as Record<string, any>, calls: [] as any[], downloads: [] as string[], authChanged: null as null | (() => void), listeners: new Set<() => void>() }));
-vi.mock('../../lib/supabase', () => ({ supabase: { rpc: async () => ({ data: fixture.results.grants || [], error: null }), functions: { invoke: async (_name: string, { body }: any) => { fixture.calls.push({ action: body.action }); return { data: { data: fixture.results[body.action] || { lines: [] } }, error: null }; } }, storage: { from(bucket: string) { return { async download(path: string) { fixture.downloads.push(`${bucket}/${path}`); return { data: null, error: new Error('not available') }; } }; } }, auth: { getUser: async () => ({ data: { user: { id: '11111111-1111-4111-8111-111111111111' } }, error: null }), onAuthStateChange(callback: () => void) { fixture.listeners.add(callback); fixture.authChanged = () => { for (const listener of [...fixture.listeners]) listener(); }; return { data: { subscription: { unsubscribe() { fixture.listeners.delete(callback); } } } }; } }, from(table: string) {
+vi.mock('../../lib/supabase', () => ({ supabase: { rpc: async () => ({ data: fixture.results.grants || [], error: null }), functions: { invoke: async (_name: string, { body }: any) => { fixture.calls.push({ action: body.action }); return { data: { data: fixture.results[body.action] || { lines: [] } }, error: null }; } }, channel() { return { on() { return this; }, subscribe() { return this; } }; }, removeChannel() {}, storage: { from(bucket: string) { return { async download(path: string) { fixture.downloads.push(`${bucket}/${path}`); return { data: null, error: new Error('not available') }; } }; } }, auth: { getUser: async () => ({ data: { user: { id: '11111111-1111-4111-8111-111111111111' } }, error: null }), onAuthStateChange(callback: () => void) { fixture.listeners.add(callback); fixture.authChanged = () => { for (const listener of [...fixture.listeners]) listener(); }; return { data: { subscription: { unsubscribe() { fixture.listeners.delete(callback); } } } }; } }, from(table: string) {
   const call: any = { table }; fixture.calls.push(call);
   const q: any = {
     select(fields: string) { call.fields = fields; return q; },
     eq(field: string, value: unknown) { call.filter = [field, value]; return q; },
-    order() { return q; }, limit() { return q; },
+    order() { return q; }, limit() { return q; }, in() { return q; }, single() { return q; }, is() { return q; }, or() { return q; },
     range(a: number, b: number) { call.range = [a, b]; return q; },
-    then(resolve: any, reject: any) { return Promise.resolve(fixture.results[table] || { data: [], count: 0, error: null }).then(resolve, reject); },
+    // The records table reads the current records view; serve the tax_read fixture's records through it.
+    then(resolve: any, reject: any) { return Promise.resolve(fixture.results[table] || (table === 'v_financial_accounting_records' && fixture.results.tax_read ? { data: fixture.results.tax_read.records, count: fixture.results.tax_read.records.length, error: null } : { data: [], count: 0, error: null })).then(resolve, reject); },
   }; return q;
 } } }));
 import FinanceDashboard, { invoicePageTotals, concernRevision, reviewedSource, verifySourceRaster, type FinancialDocumentRow } from './FinanceDashboard';
@@ -24,6 +25,10 @@ const invoice = (extra: Partial<FinancialDocumentRow> = {}): FinancialDocumentRo
 beforeEach(() => {
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
   fixture.calls = []; fixture.results = {}; fixture.downloads = []; fixture.listeners.clear();
+  // Node's own experimental localStorage global shadows jsdom's and is undefined here; give the page a plain one.
+  const stored = new Map<string, string>();
+  Object.defineProperty(window, 'localStorage', { configurable: true, value: { getItem: (key: string) => stored.get(key) ?? null, setItem: (key: string, value: string) => { stored.set(key, String(value)); }, removeItem: (key: string) => { stored.delete(key); }, clear: () => stored.clear() } });
+  window.history.replaceState(null, '', '/accounting');
   container = document.createElement('div'); document.body.appendChild(container); root = createRoot(container);
 });
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); });
@@ -171,7 +176,7 @@ it('names retained source files and keeps recovery mounted inside a closed advan
   await act(async () => root.render(<FinanceDashboard />));
   await act(async () => Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'Source documents')!.click());
   expect(container.textContent).toContain('example-bank-export.csv');
-  expect(fixture.calls.find(c => c.table === 'financial_documents').fields).toContain('source_filename');
+  expect(fixture.calls.find(c => c.table === 'financial_documents' && c.range).fields).toContain('source_filename');
   const advanced = container.querySelector('.accounting-advanced') as HTMLDetailsElement;
   expect(advanced.open).toBe(false);
   expect(advanced.querySelector('input[type="file"]')).not.toBeNull();
@@ -238,11 +243,26 @@ it('switches shared book reads without unmounting the owner recovery queue', asy
   await act(async () => root.render(<FinanceDashboard />));
   const recovery = container.querySelector('input[type="file"][multiple]');
   expect(recovery).not.toBeNull();
-  const selector = container.querySelector('select[aria-label="Active accounting book"]') as HTMLSelectElement;
-  await act(async () => { selector.value = '22222222-2222-4222-8222-222222222222'; selector.dispatchEvent(new Event('change', { bubbles: true })); });
+  await act(async () => Array.from(container.querySelectorAll<HTMLButtonElement>('[aria-label="Active accounting book"] button')).find(b => b.textContent?.startsWith('Shared owner'))!.click());
+  expect(container.querySelector('[aria-label="Active accounting book"] button[aria-pressed="true"]')?.textContent).toBe('Shared owner · shared books (review and correct)');
   expect(container.querySelector('input[type="file"][multiple]')).toBe(recovery);
   expect(recovery?.closest('[hidden]')).not.toBeNull();
   expect(container.textContent).toContain('Deal rollups are not included');
   expect(Array.from(container.querySelectorAll('button')).some(b => b.textContent === 'Deals')).toBe(false);
   expect(fixture.calls.filter(c => c.table === 'financial_documents').at(-1).filter).toEqual(['owner_id', '22222222-2222-4222-8222-222222222222']);
+  expect(window.localStorage.getItem('accounting.book')).toBe('22222222-2222-4222-8222-222222222222');
+  expect(new URL(window.location.href).searchParams.get('book')).toBe('22222222-2222-4222-8222-222222222222');
+});
+it('opens on the remembered book when a grant covers it, and never loads one it cannot read', async () => {
+  fixture.results.grants = [{ id: 'grant', owner_id: '22222222-2222-4222-8222-222222222222', member_id: '11111111-1111-4111-8111-111111111111', active: true, can_correct: true, owner_name: 'Shared owner' }];
+  window.localStorage.setItem('accounting.book', '22222222-2222-4222-8222-222222222222');
+  await act(async () => root.render(<FinanceDashboard />));
+  expect(container.querySelector('[aria-label="Active accounting book"] button[aria-pressed="true"]')?.textContent).toContain('Shared owner');
+  expect(new Set(fixture.calls.filter(c => c.table === 'financial_documents').map(c => c.filter[1]))).toEqual(new Set(['22222222-2222-4222-8222-222222222222']));
+  await act(async () => root.unmount()); fixture.calls = [];
+  window.history.replaceState(null, '', '/accounting?book=33333333-3333-4333-8333-333333333333');
+  root = createRoot(container);
+  await act(async () => root.render(<FinanceDashboard />));
+  expect(container.querySelector('[aria-label="Active accounting book"] button[aria-pressed="true"]')?.textContent).toBe('My books');
+  expect(new Set(fixture.calls.filter(c => c.table === 'financial_documents').map(c => c.filter[1]))).toEqual(new Set(['11111111-1111-4111-8111-111111111111']));
 });

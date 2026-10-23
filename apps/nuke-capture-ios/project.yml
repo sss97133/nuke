@@ -113,6 +113,10 @@ targets:
         NSPhotoLibraryUsageDescription: >-
           Photos taken at your work sites join your record. Everything else
           stays on this phone.
+        # ── Camera ── Paperwork scan mode only (VisionKit document camera for receipts,
+        # work orders and titles). Nothing else in the app opens the camera.
+        NSCameraUsageDescription: >-
+          Scan receipts, work orders and titles into your record.
         # ── Background Modes capability (fetch/processing via BGTaskScheduler) ──
         # The "capability" in Xcode's UI is just these plist keys; no
         # entitlement file is required for fetch/processing.

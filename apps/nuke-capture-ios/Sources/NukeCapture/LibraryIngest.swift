@@ -240,6 +240,12 @@ final class LibraryIngest: ObservableObject {
         let version = asset.modificationDate.map { String($0.timeIntervalSince1970) }
         guard version == photo.sourceVersion else { return .pending("source versions changed") }
         guard let data = try? await SyncEngine.requestOriginalData(for: asset, allowNetwork: allowNetwork) else { return .pending("originals unavailable") }
+        // Decode + Vision + OCR allocate autoreleased CoreGraphics/Vision objects per photo; drain
+        // them per item so a long review pass does not accumulate memory (and heat) until it ends.
+        return autoreleasepool { reviewLoaded(photo, asset: asset, version: version, data: data, method: method) }
+    }
+
+    private nonisolated static func reviewLoaded(_ photo: LocalAlbumPhoto, asset: PHAsset, version: String?, data: Data, method: String) -> AlbumPhotoReviewResult {
         // Source measurements have their own writer. An unavailable classifier
         // must not prevent true capture facts from reaching the user's record.
         let (make, model) = CameraEXIF.cameraInfo(from: data)
@@ -400,6 +406,11 @@ final class LibraryIngest: ObservableObject {
         guard let data = try? await SyncEngine.requestOriginalData(for: item.asset, allowNetwork: mode == .full) else {
             return false   // iCloud unavailable / threw → stays out of the skip-set, retried later
         }
+        // Per-item pool: the original bytes, decoded frame and Vision results are released per photo.
+        return autoreleasepool { processLoaded(item, data: data, mode: mode) }
+    }
+
+    private nonisolated static func processLoaded(_ item: Item, data: Data, mode: Mode) -> Bool {
         let date = CameraEXIF.captureDate(from: data)
         let (make, model) = CameraEXIF.cameraInfo(from: data)
 

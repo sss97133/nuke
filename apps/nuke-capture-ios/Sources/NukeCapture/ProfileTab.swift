@@ -498,7 +498,7 @@ struct ProfileView: View {
     /// sync reloads only when it reports a change.
     private func runPhotoPipeline() async {
         guard isOwn else { return }
-        await LibraryStore.shared.refreshAlbums()
+        await LibraryStore.shared.ensureAlbumCatalog()
         guard !Task.isCancelled else { return }
         await loadPhotoEvidence()
         // OCR over originals: on a charger at a nominal temperature only (LibraryIngest).
