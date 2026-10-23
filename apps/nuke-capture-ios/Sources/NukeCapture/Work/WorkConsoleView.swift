@@ -123,6 +123,7 @@ struct WorkConsoleContent: View {
 
     var body: some View {
         List {
+            PrioritiesSection()
             signatureSection
             ContactInboxSection(inbox: inbox, onChanged: onInboxChanged)
             NotificationsSection(page: notifications, onChanged: onNotificationsChanged)
