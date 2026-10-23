@@ -30,7 +30,26 @@ beforeEach(() => {
   (globalThis as unknown as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true; fixture.invoke.mockReset(); fixture.from.mockReset();
   fixture.invoke.mockResolvedValue(response(empty()));
   fixture.from.mockImplementation(() => table({}));
+  // Node's own experimental localStorage global shadows jsdom's and is undefined here; give the page a plain one.
+  const stored = new Map<string, string>();
+  Object.defineProperty(window, 'localStorage', { configurable: true, value: { getItem: (key: string) => stored.get(key) ?? null, setItem: (key: string, value: string) => { stored.set(key, String(value)); }, removeItem: (key: string) => { stored.delete(key); }, clear: () => stored.clear() } });
+  window.history.replaceState(null, '', '/accounting');
   container = document.createElement('div'); document.body.append(container); root = createRoot(container);
+});
+it('remembers the chosen year for the next visit and reads it back from the address', async () => {
+  const control = { record_kind: 'retained_ledger_decision', year: '2024', account: 'Account', section: 'Expense', currency: 'USD', retained_amount: '12.50', rows: 1 };
+  fixture.invoke.mockResolvedValue(response({ ...empty(), total_rows: 2, controls: [control, { ...control, year: '2025' }] }));
+  window.localStorage.setItem('accounting.year', '2024');
+  await act(async () => root.render(book(<FinancialWorkpapers revision={0} onOpen={() => {}} />)));
+  const year = container.querySelector('select')!;
+  expect(year.value).toBe('2024');
+  await act(async () => { year.value = '2025'; year.dispatchEvent(new Event('change', { bubbles: true })); });
+  expect(window.localStorage.getItem('accounting.year')).toBe('2025');
+  expect(new URL(window.location.href).searchParams.get('year')).toBe('2025');
+  await act(async () => root.unmount()); root = createRoot(container);
+  window.localStorage.setItem('accounting.year', '2024'); window.history.replaceState(null, '', '/accounting?year=2025');
+  await act(async () => root.render(book(<FinancialWorkpapers revision={0} onOpen={() => {}} />)));
+  expect(container.querySelector('select')!.value).toBe('2025');
 });
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); });
 it('failed reads remain unknown and never display zero records', async () => {

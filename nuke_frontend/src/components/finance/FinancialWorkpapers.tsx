@@ -2,6 +2,7 @@ import { useAccountingBook } from './AccountingBookContext';
 import { useEffect, useRef, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { expenseUseKey, type ExpenseUse } from '../../services/financialExpenseUse';
+import { remember, remembered } from './accountingMemory';
 
 export type SavedRecord = { id: string; document_id: string; record: {
   record_kind: string; local_id: string; year: string; date: string | null; account: string | null;
@@ -60,7 +61,7 @@ export default function FinancialWorkpapers({ revision, onOpen }: { revision: nu
   const [uses, setUses] = useState<Record<string, ExpenseUse>>({});
   const [useError, setUseError] = useState(false);
   const [view, setView] = useState<'overview' | 'records' | 'accounts'>('overview');
-  const [year, setYear] = useState('');
+  const [year, setYear] = useState(() => remembered('year'));
   const [query, setQuery] = useState('');
   const [account, setAccount] = useState('');
   const [kind, setKind] = useState('');
@@ -160,7 +161,7 @@ export default function FinancialWorkpapers({ revision, onOpen }: { revision: nu
   const recordsOffset = tablePage * pageSize;
   const changeView = (next: typeof view) => { setView(next); setQuery(''); setAccount(''); setKind(''); setUnclassified(false); setTablePage(0); };
   return <section className="accounting-books" aria-label="Saved bookkeeping">
-    <div className="accounting-section-heading"><h2>Your books</h2><label>Year <select value={selectedYear || ''} onChange={event => setYear(event.target.value)}>{years.map(value => <option key={value}>{value}</option>)}</select></label></div>
+    <div className="accounting-section-heading"><h2>Your books</h2><label>Year <select value={selectedYear || ''} onChange={event => { setYear(event.target.value); remember('year', event.target.value); }}>{years.map(value => <option key={value}>{value}</option>)}</select></label></div>
     <nav className="accounting-tabs" aria-label="Bookkeeping views">{(['overview', 'records', 'accounts'] as const).map(tab => <button type="button" key={tab} aria-current={view === tab ? 'page' : undefined} onClick={() => changeView(tab)}>{tab === 'overview' ? 'Overview' : tab === 'records' ? 'Records' : 'Accounts'}</button>)}</nav>
     {error ? <p role="alert">{error}</p> : !data ? <p role="status">Loading saved bookkeeping…</p> : <>
       {!data.controls_valid && <p role="alert">Repeated records need review; the subtotals are withheld.</p>}
