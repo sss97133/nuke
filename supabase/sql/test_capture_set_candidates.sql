@@ -14,7 +14,7 @@ CREATE SCHEMA IF NOT EXISTS auth;
 CREATE OR REPLACE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS $$ SELECT NULL::uuid $$;
 CREATE TABLE public.vehicles(id uuid PRIMARY KEY, deleted_at timestamptz, merged_into_vehicle_id uuid);
 CREATE TABLE public.vehicle_images(id uuid PRIMARY KEY, user_id uuid, vehicle_id uuid);
-\ir ../migrations/20261023200000_capture_set_candidates.sql
+\ir ../migrations/20261023220000_capture_set_candidates.sql
 
 CREATE FUNCTION pg_temp.assert_true(ok boolean, label text) RETURNS void LANGUAGE plpgsql AS $$
 BEGIN IF ok IS DISTINCT FROM true THEN RAISE EXCEPTION 'FAIL: %', label; END IF; END $$;
@@ -51,6 +51,6 @@ SELECT pg_temp.assert_true(public.capture_set_candidates_revert('00000000-0000-4
   'revert reports one revoked row');
 SELECT pg_temp.assert_true((SELECT count(*) FROM capture_set_candidates WHERE revoked_at IS NULL) = 0
   AND (SELECT count(*) FROM capture_set_candidates) = 1, 'revert revokes the run and keeps the row');
-\ir revert_20261023200000_capture_set_candidates.sql
+\ir revert_20261023220000_capture_set_candidates.sql
 SELECT pg_temp.assert_true(to_regclass('public.capture_set_candidates') IS NULL, 'down migration drops the table');
 \echo 'PASS test_capture_set_candidates'

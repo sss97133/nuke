@@ -20,7 +20,7 @@
 --   and its body type is compatible with the shoot's dominant shape (e.g. a pickup-shaped shoot never goes to a car).
 -- band: 'clear' (inside the band measured at >= 95% precision on held-out filed shoots), 'likely', 'weak', 'tie'.
 -- Revert: capture_set_candidates_revert(run, reason) revokes a run; the table can be dropped with
--- supabase/sql/revert_20261023200000_capture_set_candidates.sql.
+-- supabase/sql/revert_20261023220000_capture_set_candidates.sql.
 SET lock_timeout = '5s';
 SET statement_timeout = '60s';
 
