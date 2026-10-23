@@ -4,6 +4,7 @@ import { AccountingBookContext, useAccountingBook } from '../../components/finan
 import { useAccountingRevision } from '../../components/finance/useAccountingRevision';
 import ExpenseUseEditor from '../../components/finance/ExpenseUseEditor';
 import RecordClassifier from '../../components/finance/RecordClassifier';
+import AccountingActivity from '../../components/finance/AccountingActivity';
 import { remember, remembered } from '../../components/finance/accountingMemory';
 /**
  * FinanceDashboard
@@ -306,6 +307,8 @@ export default function FinanceDashboard() {
   const shared = !!ownerId && ownerId !== actorId;
   const live = useAccountingRevision(ownerId);
   const canCorrect = !!actorId && (ownerId === actorId || grants.some(g => g.owner_id === ownerId && g.member_id === actorId && g.active && g.can_correct));
+  // Names for the change feed come from the grants this account already lists; nobody else's profile is read.
+  const people: Record<string, string> = Object.fromEntries([...grants.flatMap(g => [[g.owner_id, g.owner_name], [g.member_id, g.member_name]]), ...(actorId ? [[actorId, 'You']] : [])]);
   useEffect(() => {
     let cancelled = false;
     void supabase.auth.getUser().then(async ({ data }) => {
@@ -428,6 +431,7 @@ export default function FinanceDashboard() {
         <button type="button" onClick={() => setSessionRevision(n => n + 1)}>Refresh records</button></header>
       {actorId && <div className="accounting-book-picker"><span className="accounting-eyebrow" id="accounting-book-label">Active book</span><div className="accounting-chips" role="group" aria-label="Active accounting book" aria-labelledby="accounting-book-label">{[{ id: actorId, label: 'My books' }, ...grants.filter(g => g.member_id === actorId && g.active).map(g => ({ id: g.owner_id, label: `${g.owner_name} · shared books (${g.can_correct ? 'review and correct' : 'review'})` }))].map(bookOption => <button type="button" key={bookOption.id} aria-pressed={ownerId === bookOption.id} onClick={() => { if (ownerId === bookOption.id) return; remember('book', bookOption.id); setOwnerId(bookOption.id); setSourceView('summary'); setSelectedDocument(null); setSelectedRecord(null); setDocs([]); setConcerns([]); setDeals([]); setPage(0); }}>{bookOption.label}</button>)}</div></div>}
       <p className="accounting-muted" role="status">{live.message}</p>
+      <AccountingActivity people={people} onOpen={documentId => openEvidence(documentId)} />
       {shared && <p>Shared books. Your corrections retain your identity and appear in the same ledger for the owner and other reviewers.</p>}
       <FinancialWorkpapers key={ownerId} revision={sessionRevision} onOpen={openEvidence} />
       <p className="accounting-muted accounting-tax-note">Tax review is a separate step. Saved records are not a filing or a completed reconciliation.</p>

@@ -101,6 +101,14 @@
 .accounting-selection-bar { position:sticky; bottom:0; z-index:1; display:flex; align-items:center; flex-wrap:wrap; gap:10px; padding:10px 0; background:var(--bg); border-top:2px solid var(--border); font-size:13px; }
 .accounting-selection-list { list-style:none; padding:0; margin:12px 0; }
 .accounting-selection-list li { display:flex; flex-wrap:wrap; align-items:baseline; gap:10px; padding:6px 0; border-bottom:2px solid var(--border); font-size:13px; }
+/* Change feed: one line for the latest revision, the recent list behind a disclosure. */
+.accounting-activity { margin:0 0 12px; font-size:13px; }
+.accounting-page .accounting-activity-latest { margin:0 0 2px; }
+.accounting-page .accounting-activity summary { font-size:12px; padding:2px 0; }
+.accounting-page .accounting-activity details[open]>summary { margin-bottom:6px; }
+.accounting-activity-list { list-style:none; padding:0; margin:0; max-height:320px; overflow:auto; border-top:2px solid var(--border); }
+.accounting-page .accounting-activity-list button { display:flex; flex-wrap:wrap; align-items:baseline; gap:6px; width:100%; min-height:0; padding:8px 0; border:0; border-bottom:2px solid var(--border); background:none; text-align:left; font:13px Arial,sans-serif; }
+.accounting-new { display:inline-block; padding:1px 6px; font:700 9px Arial,sans-serif; letter-spacing:.08em; text-transform:uppercase; background:var(--text); color:var(--bg); }
 .accounting-use-editor { padding:16px 0; border-bottom:2px solid var(--border); }
 .accounting-page .accounting-use-editor h3 { font-size:18px; }
 .accounting-use-editor fieldset { border:0; padding:0; margin:12px 0; display:grid; gap:12px; }

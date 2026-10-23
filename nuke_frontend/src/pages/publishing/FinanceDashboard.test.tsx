@@ -3,7 +3,7 @@ import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 const fixture = vi.hoisted(() => ({ results: {} as Record<string, any>, calls: [] as any[], downloads: [] as string[], authChanged: null as null | (() => void), listeners: new Set<() => void>() }));
-vi.mock('../../lib/supabase', () => ({ supabase: { rpc: async () => ({ data: fixture.results.grants || [], error: null }), functions: { invoke: async (_name: string, { body }: any) => { fixture.calls.push({ action: body.action }); return { data: { data: fixture.results[body.action] || { lines: [] } }, error: null }; } }, channel() { return { on() { return this; }, subscribe() { return this; } }; }, removeChannel() {}, storage: { from(bucket: string) { return { async download(path: string) { fixture.downloads.push(`${bucket}/${path}`); return { data: null, error: new Error('not available') }; } }; } }, auth: { getUser: async () => ({ data: { user: { id: '11111111-1111-4111-8111-111111111111' } }, error: null }), onAuthStateChange(callback: () => void) { fixture.listeners.add(callback); fixture.authChanged = () => { for (const listener of [...fixture.listeners]) listener(); }; return { data: { subscription: { unsubscribe() { fixture.listeners.delete(callback); } } } }; } }, from(table: string) {
+vi.mock('../../lib/supabase', () => ({ supabase: { rpc: async (name: string) => ({ data: name === 'accounting_recent_activity' ? fixture.results.activity || [] : fixture.results.grants || [], error: null }), functions: { invoke: async (_name: string, { body }: any) => { fixture.calls.push({ action: body.action }); return { data: { data: fixture.results[body.action] || { lines: [] } }, error: null }; } }, channel() { return { on() { return this; }, subscribe() { return this; } }; }, removeChannel() {}, storage: { from(bucket: string) { return { async download(path: string) { fixture.downloads.push(`${bucket}/${path}`); return { data: null, error: new Error('not available') }; } }; } }, auth: { getUser: async () => ({ data: { user: { id: '11111111-1111-4111-8111-111111111111' } }, error: null }), onAuthStateChange(callback: () => void) { fixture.listeners.add(callback); fixture.authChanged = () => { for (const listener of [...fixture.listeners]) listener(); }; return { data: { subscription: { unsubscribe() { fixture.listeners.delete(callback); } } } }; } }, from(table: string) {
   const call: any = { table }; fixture.calls.push(call);
   const q: any = {
     select(fields: string) { call.fields = fields; return q; },
@@ -265,4 +265,13 @@ it('opens on the remembered book when a grant covers it, and never loads one it 
   await act(async () => root.render(<FinanceDashboard />));
   expect(container.querySelector('[aria-label="Active accounting book"] button[aria-pressed="true"]')?.textContent).toBe('My books');
   expect(new Set(fixture.calls.filter(c => c.table === 'financial_documents').map(c => c.filter[1]))).toEqual(new Set(['11111111-1111-4111-8111-111111111111']));
+});
+
+it('names who changed the shared book from the listed grants and opens the changed source', async () => {
+  fixture.results.grants = [{ id: 'grant', owner_id: '22222222-2222-4222-8222-222222222222', member_id: '11111111-1111-4111-8111-111111111111', active: true, can_correct: true, owner_name: 'Shared owner', member_name: 'Reviewer' }];
+  fixture.results.activity = [{ document_id: 'changed-doc', source_filename: 'accounting-source-0241.csv', run_id: 'run', actor_user_id: '22222222-2222-4222-8222-222222222222', method: 'authenticated-record-classification', recorded_at: new Date().toISOString(), records_changed: 2, first_reading: false }];
+  await act(async () => root.render(<FinanceDashboard />));
+  expect(container.querySelector('.accounting-activity-latest')?.textContent).toBe('Latest Shared owner classified 2 records · accounting-source-0241.csv · just now');
+  await act(async () => (container.querySelector('.accounting-activity-list button') as HTMLButtonElement).click());
+  expect(container.querySelector('dialog[aria-label="Accounting evidence"]')).not.toBeNull();
 });
