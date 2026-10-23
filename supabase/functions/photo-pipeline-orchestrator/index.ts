@@ -19,7 +19,7 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { classifyImage, type ClassificationResult } from "./classifier.ts";
-import { persistPipelineState, type PipelineReceipt } from "./persistence.ts";
+import { persistPipelineState, rowVinQualifies, type PipelineReceipt } from "./persistence.ts";
 import { runClassifierAssay } from "./classifierAssay.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
@@ -557,16 +557,15 @@ async function resolveVehicle(
   }
 
   // Strategy 1b: a VIN read carried on the row itself (vehicle_vin, written at upload by the phone's on-device OCR or
-  // by a cited text-read pass). Only an exact match on one of this user's own vehicles, from a read of at least 0.9
-  // that is not on a document, files here; a document VIN names a capture set instead (capture_sets_build).
+  // by a cited text-read pass). Only an exact match on one of this user's own vehicles, from a full-VIN read of at least 0.9
+  // (or a classic chassis serial read of at least 0.8) that is not on a document, files here; a document VIN names a capture set instead (capture_sets_build).
   const { data: vinRow } = await supabase
     .from("vehicle_images")
     .select("vehicle_vin, vehicle_vin_confidence, is_document, doc_flag")
     .eq("id", imageId)
     .maybeSingle();
-  const rowVin = typeof vinRow?.vehicle_vin === "string" ? vinRow.vehicle_vin.trim().toUpperCase() : "";
-  if (userId && rowVin.length >= 8 && Number(vinRow?.vehicle_vin_confidence ?? 0) >= 0.9 &&
-      vinRow?.is_document !== true && vinRow?.doc_flag !== true) {
+  const rowVin = rowVinQualifies(vinRow?.vehicle_vin, vinRow?.vehicle_vin_confidence, vinRow?.is_document, vinRow?.doc_flag);
+  if (userId && rowVin) {
     const { data: owned } = await supabase
       .from("vehicles")
       .select("id")

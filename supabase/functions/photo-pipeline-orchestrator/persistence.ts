@@ -69,3 +69,16 @@ export async function persistPipelineState(
   }
   throw new Error("photo_pipeline_metadata_conflict_budget_exhausted");
 }
+
+/** An on-device VIN read uploaded with the photo (vehicle_vin) that may file it by exact match to one owned vehicle:
+ * a full VIN read at >= 0.9, or a 5-16 char classic chassis serial (iOS writes these at 0.8 when the album names a make).
+ * Never from a document; a document VIN only names a capture set. */
+export function rowVinQualifies(vin: unknown, confidence: unknown, isDocument: unknown, docFlag: unknown): string | null {
+  if (isDocument === true || docFlag === true || typeof vin !== "string") return null;
+  const v = vin.trim().toUpperCase();
+  const c = Number(confidence ?? 0);
+  if (!Number.isFinite(c)) return null;
+  if (v.length >= 17) return c >= 0.9 ? v : null;
+  if (v.length >= 5 && /[0-9]/.test(v) && /^[A-Z0-9-]+$/.test(v)) return c >= 0.8 ? v : null;
+  return null;
+}
