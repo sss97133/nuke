@@ -32,7 +32,10 @@ final class AttributionEngine: ObservableObject {
     @Published private(set) var suggestionByImage: [String: String] = [:]
 
     // ─── DB shapes ───────────────────────────────────────────────────────────
-    private struct VehicleRow: Decodable { let id: String; let vin: String? }
+    private struct VehicleRow: Decodable {
+        let id: String; let vin: String?
+        var body_style: String? = nil; var canonical_body_style: String? = nil; var model: String? = nil
+    }
     private struct Exif: Decodable { let uuid: String? }
     private struct OrphanRow: Decodable {
         let id: String
@@ -60,6 +63,9 @@ final class AttributionEngine: ObservableObject {
         let contextualMake: String?
         let contextualModel: String?
         let albumContextAmbiguous: Bool
+        /// The read matched one of the owner's own vehicles exactly (roster match), so a classic
+        /// serial needs no album context to be worth uploading.
+        var rosterMatch: Bool = false
     }
     struct VINCaptureGroup: Equatable, Sendable {
         let vin: String
@@ -286,7 +292,8 @@ final class AttributionEngine: ObservableObject {
                 isDocument: s.isDocument || s.row.is_document == true || s.row.doc_flag == true,
                 isSensitive: s.row.is_sensitive == true,
                 contextualYear: albumLabel?.year, contextualMake: albumLabel?.make, contextualModel: albumLabel?.model,
-                albumContextAmbiguous: assetID.map { albumContext.ambiguous.contains($0) } ?? false)
+                albumContextAmbiguous: assetID.map { albumContext.ambiguous.contains($0) } ?? false,
+                rosterMatch: s.vinVehicleId != nil && s.vinDist == 0)
         }
         await uploadVINReads(captureFrames)
         // anchors × frames × frontier: run off the main actor.
@@ -401,6 +408,34 @@ final class AttributionEngine: ObservableObject {
         let sessionVehicle = Self.unambiguousSerialVehicles(signals.compactMap { signal in
             signal.vinVehicleId.map { (serial: signal.session, vehicleId: $0) }
         })
+        // Candidate-set routing for close-ups with no identifier of their own: only the few vehicles
+        // plausible that day survive the hard constraints, and only a clear margin is a strong lead.
+        let filedThisRun = fileItems.filter { completedIDs.contains($0.image_id) }
+            .map { FiledPhoto(id: $0.image_id, vehicle_id: $0.vehicle_id, taken_at: nil, latitude: nil, longitude: nil) }
+        let filedHistory = (try? await fetchFiledContext(userId: userId,
+            around: signals.compactMap { LocalDay.parse($0.row.taken_at) })) ?? []
+        let rowsByID = Dictionary(signals.map { ($0.row.id, $0.row) }, uniquingKeysWith: { a, _ in a })
+        let filedAnchors = filedHistory + filedThisRun.map { f in
+            let r = rowsByID[f.id]
+            return FiledPhoto(id: f.id, vehicle_id: f.vehicle_id, taken_at: r?.taken_at, latitude: r?.latitude, longitude: r?.longitude)
+        }
+        var albumVehicleByImage: [String: String] = [:]
+        for row in orphans {
+            guard let uuid = row.exif_data?.uuid, let albums = albumsByAsset[uuid] else { continue }
+            let mapped = Self.mappedVehicles(for: albums, in: albumMap)
+            if mapped.count == 1, let v = mapped.first { albumVehicleByImage[row.id] = v }
+        }
+        let bodyByVehicle = Dictionary(knownVehicles.map {
+            ($0.id, BodyClass.ofVehicle(bodyStyle: $0.canonical_body_style ?? $0.body_style, model: $0.model))
+        }, uniquingKeysWith: { a, _ in a })
+        let routed = Self.routeCloseUps(
+            inputs: signals.filter { !completedIDs.contains($0.row.id) }.map {
+                RouteInput(id: $0.row.id, takenAt: $0.row.taken_at, latitude: $0.row.latitude, longitude: $0.row.longitude,
+                           labels: $0.labels, isDocument: $0.isDocument,
+                           identifierVehicleID: $0.vinDist == 0 ? $0.vinVehicleId : nil)
+            },
+            filed: filedAnchors, bodyByVehicle: bodyByVehicle, albumVehicleByImage: albumVehicleByImage)
+
         var suggested = 0, unresolved = 0
         for s in signals where !completedIDs.contains(s.row.id) {
             if s.isDocument { unresolved += 1; continue }
@@ -410,7 +445,15 @@ final class AttributionEngine: ObservableObject {
                               reasons: ["vin_ocr_match", "edit_distance=\(s.vinDist ?? 0)"])
                 suggestionByImage[s.row.id] = vid
                 suggested += 1
-            } else if let vid = sessionVehicle[s.session.uppercased()], s.isVehicle {
+            } else if let r = routed[s.row.id], let lead = r.decision.lead {
+                // A clear margin keeps its score; a contested lead stays below every bulk-filing bar.
+                await suggest(imageId: s.row.id, vehicleId: lead.0,
+                              conf: r.decision.isClear ? lead.1 : min(lead.1, 0.79), reasons: lead.2)
+                suggestionByImage[s.row.id] = lead.0
+                suggested += 1
+            } else if let vid = sessionVehicle[s.session.uppercased()], s.isVehicle,
+                      (routed[s.row.id]?.candidateCount ?? 0) <= 1 {
+                // Never spread one VIN across a cell where more than one vehicle was plausible that day.
                 await suggest(imageId: s.row.id, vehicleId: vid, conf: 0.80,
                               reasons: ["session_inheritance", "vin_anchored_session", "session=\(s.session)"])
                 suggestionByImage[s.row.id] = vid
@@ -674,10 +717,107 @@ final class AttributionEngine: ObservableObject {
     // ─── Helpers ───────────────────────────────────────────────────────────────
 
     /// Day + ~100m GPS cell = one work session = one truck (the sequence unit).
+    // ─── Candidate-set routing (see CandidateRouting.swift) ──────────────────
+
+    struct FiledPhoto: Decodable, Sendable, Equatable {
+        let id: String
+        let vehicle_id: String
+        let taken_at: String?
+        let latitude: Double?
+        let longitude: Double?
+    }
+    struct RouteInput: Sendable, Equatable {
+        let id: String
+        let takenAt: String?
+        let latitude: Double?
+        let longitude: Double?
+        let labels: [String]
+        let isDocument: Bool
+        let identifierVehicleID: String?
+    }
+    struct RouteResult: Sendable, Equatable {
+        let decision: RoutingDecision
+        let candidateCount: Int
+    }
+
+    /// The owner's filed photos within 14 days of the orphans' days: positional anchors and the
+    /// "worked on recently at this place" prior. Read-only; a failure only weakens routing.
+    private func fetchFiledContext(userId: String, around dates: [Date]) async throws -> [FiledPhoto] {
+        guard let lo = dates.min(), let hi = dates.max() else { return [] }
+        let f = ISO8601DateFormatter()
+        return try await SupabaseService.client.from("vehicle_images")
+            .select("id, vehicle_id, taken_at, latitude, longitude")
+            .eq("user_id", value: userId)
+            .not("vehicle_id", operator: .is, value: "null")
+            .not("is_duplicate", operator: .is, value: true)
+            .gte("taken_at", value: f.string(from: lo.addingTimeInterval(-14 * 86_400)))
+            .lte("taken_at", value: f.string(from: hi.addingTimeInterval(86_400)))
+            .order("taken_at", ascending: false)
+            .limit(1000)
+            .execute().value
+    }
+
+    /// Pure: route each orphan without its own identifier among only the vehicles plausible for its
+    /// local day and place. Known vehicles (`bodyByVehicle`) are the owner's associated roster; a
+    /// vehicle outside it is `not_held` and locked out.
+    nonisolated static func routeCloseUps(inputs: [RouteInput], filed: [FiledPhoto], bodyByVehicle: [String: BodyClass],
+                                          albumVehicleByImage: [String: String],
+                                          timeZone: TimeZone = .current) -> [String: RouteResult] {
+        let orphanPhotos = inputs.map { i in
+            RoutingPhoto(id: i.id, takenAt: LocalDay.parse(i.takenAt), latitude: i.latitude, longitude: i.longitude,
+                         labels: i.labels, kind: PhotoKind.of(labels: i.labels, isDocument: i.isDocument),
+                         identifierVehicleID: i.identifierVehicleID)
+        }
+        let filedPhotos = filed.map { f in
+            RoutingPhoto(id: f.id, takenAt: LocalDay.parse(f.taken_at), latitude: f.latitude, longitude: f.longitude,
+                         filedVehicleID: f.vehicle_id)
+        }
+        let all = orphanPhotos + filedPhotos
+        let shoots = ShootSegmenter.segment(all)
+        var shootOf: [String: [RoutingPhoto]] = [:]
+        for shoot in shoots { for p in shoot { shootOf[p.id] = shoot } }
+        // Day activity: identifier reads and filed photos, keyed by the local day.
+        var activeByDay: [String: Set<String>] = [:]
+        for p in all {
+            guard let t = p.takenAt, let v = p.identifierVehicleID ?? p.filedVehicleID else { continue }
+            activeByDay[LocalDay.key(t, timeZone: timeZone), default: []].insert(v)
+        }
+        var out: [String: RouteResult] = [:]
+        for p in orphanPhotos where p.identifierVehicleID == nil {
+            guard let t = p.takenAt, let shoot = shootOf[p.id] else { continue }
+            let day = LocalDay.key(t, timeZone: timeZone)
+            let active = activeByDay[day] ?? []
+            let recent = Set(filedPhotos.filter { f in
+                guard let ft = f.takenAt, ft <= t.addingTimeInterval(86_400), t.timeIntervalSince(ft) <= 14 * 86_400 else { return false }
+                return (ShootSegmenter.meters(f, p) ?? .infinity) <= ShootSegmenter.maxMoveMeters
+            }.compactMap(\.filedVehicleID))
+            let album = albumVehicleByImage[p.id]
+            let ids = active.union(recent).union(album.map { [$0] } ?? [])
+            let candidates = ids.sorted().map { v in
+                RoutingCandidate(vehicleID: v, bodyClass: bodyByVehicle[v] ?? .unknown,
+                                 possession: bodyByVehicle[v] == nil ? .notHeld : .unknown,
+                                 activeThatDay: active.contains(v), recentAtLocation: recent.contains(v),
+                                 albumMapped: album == v)
+            }
+            guard !candidates.isEmpty else { continue }
+            out[p.id] = RouteResult(decision: CandidateRouter.decide(p, shoot: shoot, candidates: candidates),
+                                    candidateCount: candidates.count)
+        }
+        return out
+    }
+
     private func sessionKey(_ r: OrphanRow) -> String {
-        let day = (r.taken_at ?? "nodate").prefix(10)
-        let lat = r.latitude.map { (($0 * 1000).rounded() / 1000) } ?? 0
-        let lon = r.longitude.map { (($0 * 1000).rounded() / 1000) } ?? 0
+        Self.sessionKey(takenAt: r.taken_at, latitude: r.latitude, longitude: r.longitude)
+    }
+
+    /// The owner's local working day (not the UTC prefix, which rolls over at 5 PM in California)
+    /// plus a ~100 m cell.
+    nonisolated static func sessionKey(takenAt: String?, latitude: Double?, longitude: Double?,
+                                       timeZone: TimeZone = .current) -> String {
+        let day = LocalDay.key(taken: takenAt, timeZone: timeZone)
+        let r = latitude, l = longitude
+        let lat = r.map { (($0 * 1000).rounded() / 1000) } ?? 0
+        let lon = l.map { (($0 * 1000).rounded() / 1000) } ?? 0
         return "\(day)|\(lat),\(lon)"
     }
 
@@ -781,7 +921,7 @@ final class AttributionEngine: ObservableObject {
         for start in stride(from: 0, to: ids.count, by: 200) {
             let chunk = Array(ids[start..<min(start + 200, ids.count)])
             let rows: [VehicleRow] = try await SupabaseService.client.from("vehicles")
-                .select("id, vin").in("id", values: chunk).execute().value
+                .select("id, vin, body_style, canonical_body_style, model").in("id", values: chunk).execute().value
             vehicles.append(contentsOf: rows)
         }
         return vehicles
@@ -827,8 +967,10 @@ final class AttributionEngine: ObservableObject {
         frames.compactMap { f in
             guard f.exactVIN, !f.isDocument, !f.isSensitive, let vin = f.vin?.uppercased() else { return nil }
             if VisionEngine.isValidVIN(vin) { return (f.imageID, vin, 0.95) }
-            if (5...16).contains(vin.count), f.contextualMake != nil,
-               vin.contains(where: \.isNumber) { return (f.imageID, vin, 0.8) }
+            guard (5...16).contains(vin.count), vin.contains(where: \.isNumber) else { return nil }
+            // A roster match is an exact read of one of the owner's own serials (#2513 accepts ≥ 0.8).
+            if f.rosterMatch { return (f.imageID, vin, 0.9) }
+            if f.contextualMake != nil { return (f.imageID, vin, 0.8) }
             return nil
         }
     }
