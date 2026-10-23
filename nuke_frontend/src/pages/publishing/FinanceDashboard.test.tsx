@@ -8,7 +8,7 @@ vi.mock('../../lib/supabase', () => ({ supabase: { rpc: async () => ({ data: fix
   const q: any = {
     select(fields: string) { call.fields = fields; return q; },
     eq(field: string, value: unknown) { call.filter = [field, value]; return q; },
-    order() { return q; }, limit() { return q; },
+    order() { return q; }, limit() { return q; }, in() { return q; }, single() { return q; },
     range(a: number, b: number) { call.range = [a, b]; return q; },
     then(resolve: any, reject: any) { return Promise.resolve(fixture.results[table] || { data: [], count: 0, error: null }).then(resolve, reject); },
   }; return q;
@@ -171,7 +171,7 @@ it('names retained source files and keeps recovery mounted inside a closed advan
   await act(async () => root.render(<FinanceDashboard />));
   await act(async () => Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'Source documents')!.click());
   expect(container.textContent).toContain('example-bank-export.csv');
-  expect(fixture.calls.find(c => c.table === 'financial_documents').fields).toContain('source_filename');
+  expect(fixture.calls.find(c => c.table === 'financial_documents' && c.range).fields).toContain('source_filename');
   const advanced = container.querySelector('.accounting-advanced') as HTMLDetailsElement;
   expect(advanced.open).toBe(false);
   expect(advanced.querySelector('input[type="file"]')).not.toBeNull();
