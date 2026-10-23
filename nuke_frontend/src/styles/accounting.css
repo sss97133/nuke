@@ -107,3 +107,25 @@
 .accounting-use-editor label { display:flex; flex-direction:column; gap:4px; }
 .accounting-use-editor input,.accounting-use-editor textarea { font:14px Arial,sans-serif; padding:8px; color:var(--text); background:var(--bg); border:2px solid var(--border); }
 .accounting-use-editor textarea { min-height:72px; }
+
+/* Phones: each record is a tappable card (date and amount, then the description, then classification and account);
+   the sortable headings become a row of sort chips. Vehicle/shop use and the evidence button live in the evidence view. */
+@media (max-width:640px) {
+ .accounting-page .accounting-table-wrap .accounting-records-table { min-width:0; }
+ .accounting-records-table thead tr { display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
+ .accounting-page .accounting-records-table thead th { border:0; padding:0 0 8px; }
+ .accounting-page .accounting-records-table thead th.accounting-cell-desc,.accounting-page .accounting-records-table th.accounting-cell-use,.accounting-page .accounting-records-table th.accounting-cell-evidence,
+ .accounting-page .accounting-records-table tbody td.accounting-cell-use,.accounting-page .accounting-records-table tbody td.accounting-cell-evidence { display:none; }
+ .accounting-page .accounting-records-table th .accounting-sort { border:2px solid var(--border); padding:6px 10px; min-height:32px; }
+ .accounting-page .accounting-records-table th[aria-sort] .accounting-sort { background:var(--text); color:var(--bg); }
+ .accounting-records-table tbody tr { display:grid; grid-template-columns:1fr auto; grid-template-areas:"date amount" "desc desc" "class account"; column-gap:12px; row-gap:3px; padding:12px 0; border-bottom:2px solid var(--border); }
+ .accounting-records-table.accounting-selecting tbody tr { grid-template-columns:auto 1fr auto; grid-template-areas:"select date amount" "select desc desc" "select class account"; }
+ .accounting-page .accounting-records-table tbody td { display:block; border:0; padding:0; }
+ .accounting-records-table td.accounting-select { grid-area:select; align-self:center; }
+ .accounting-records-table td.accounting-cell-date { grid-area:date; font-size:12px; color:var(--text-secondary); }
+ .accounting-records-table td.accounting-cell-amount { grid-area:amount; }
+ .accounting-records-table td.accounting-cell-desc { grid-area:desc; }
+ .accounting-records-table td.accounting-cell-class { grid-area:class; }
+ .accounting-records-table td.accounting-cell-account { grid-area:account; text-align:right; font-size:12px; color:var(--text-secondary); }
+ .accounting-records-table .accounting-record-description { max-width:none; white-space:normal; }
+}
