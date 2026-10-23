@@ -1,6 +1,7 @@
 \set ON_ERROR_STOP on
 \ir test_financial_accounting.sql
 \ir ../migrations/20261023200000_financial_accounting_records_view.sql
+\ir ../migrations/20261023201000_financial_accounting_records_view_grants.sql
 BEGIN;
 INSERT INTO auth.users(id) VALUES ('11111111-1111-4111-8111-111111111111'),('22222222-2222-4222-8222-222222222222');
 SELECT set_config('request.jwt.claim.role','service_role',true);
@@ -34,6 +35,7 @@ BEGIN
  IF EXISTS(SELECT 1 FROM pg_rewrite WHERE ev_class='public.v_financial_accounting_records'::regclass AND rulename<>'_RETURN') THEN RAISE EXCEPTION 'view carries a write rule'; END IF;
  IF NOT EXISTS(SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relname='v_financial_accounting_records' AND c.reloptions @> ARRAY['security_invoker=true']) THEN RAISE EXCEPTION 'view must run as the caller'; END IF;
  IF EXISTS(SELECT 1 FROM information_schema.role_table_grants WHERE table_schema='public' AND table_name='v_financial_accounting_records' AND grantee IN ('anon','PUBLIC')) THEN RAISE EXCEPTION 'anon must not read the books'; END IF;
+ IF EXISTS(SELECT 1 FROM information_schema.role_table_grants WHERE table_schema='public' AND table_name='v_financial_accounting_records' AND grantee IN ('authenticated','service_role') AND privilege_type<>'SELECT') THEN RAISE EXCEPTION 'readers hold a write privilege on the view'; END IF;
  RAISE NOTICE 'PASS current accounting records view: current run only, record columns, book isolation, read-only, caller-scoped';
 END $$;
 ROLLBACK;
