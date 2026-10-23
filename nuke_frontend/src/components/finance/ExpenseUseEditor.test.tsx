@@ -99,3 +99,15 @@ it('asks for no suggestions when the expense has no date', async () => {
   expect(fixture.rpc).not.toHaveBeenCalled();
   expect(node.textContent).not.toContain('Photographed around');
 });
+it('finds a vehicle by its full VIN although the label shows only the last six characters', async () => {
+  const roadster = '66666666-6666-4666-8666-666666666666';
+  const query: any = { select: () => query, or: () => query, is: () => query, order: () => query,
+    limit: () => Promise.resolve({ data: [{ id: roadster, year: 1932, make: 'Ford', model: 'Hot Rod', vin: 'AZ370615' },
+      { id: '77777777-7777-4777-8777-777777777777', year: 1977, make: 'Chevrolet', model: 'Blazer', vin: 'CKR187F127263' }], error: null }) };
+  fixture.from.mockReturnValue(query);
+  await act(async () => render('one'));
+  await change(node.querySelector('select')!, 'vehicle');
+  await change(node.querySelector('input[type="search"]') as HTMLInputElement, 'AZ370615');
+  const options = [...node.querySelectorAll('select')[1].querySelectorAll('option')].map(o => o.value).filter(Boolean);
+  expect(options).toEqual([roadster]);
+});

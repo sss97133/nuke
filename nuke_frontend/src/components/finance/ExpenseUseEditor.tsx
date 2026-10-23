@@ -95,7 +95,8 @@ export default function ExpenseUseEditor({ documentId, record, onSaved, onCurren
     } catch (error) { if (epoch.current === generation) setMessage(error instanceof Error ? error.message : 'Save could not be confirmed. Your draft is preserved.'); }
     finally { if (epoch.current === generation) setBusy(false); }
   };
-  const choices = vehicles.filter(v => search.toLowerCase().split(/\s+/).every(token => vehicleLabel(v).toLowerCase().includes(token)));
+  // The label shows only the VIN's last six characters; search the full VIN too, so a pasted VIN finds its vehicle.
+  const choices = vehicles.filter(v => search.toLowerCase().split(/\s+/).every(token => `${vehicleLabel(v)} ${v.vin ?? ''}`.toLowerCase().includes(token)));
   return <section className="accounting-use-editor" aria-label="Expense use">
     <h3>Expense use</h3><p role="status">{message}</p>
     {snapshot && <p>Recorded expense: {snapshot.record.amount} {snapshot.record.currency}. {snapshot.use?.unallocated_amount && `Unassigned: ${snapshot.use.unallocated_amount} ${snapshot.record.currency}.`}</p>}
