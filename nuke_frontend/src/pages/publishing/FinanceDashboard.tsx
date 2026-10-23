@@ -172,7 +172,9 @@ function EvidenceValue({ value, depth = 0 }: { value: unknown; depth?: number })
   const entries = Object.entries(value as Record<string, unknown>).filter(([key, item]) => item !== null && item !== '' && !/(?:sha256|source_key|local_id|storage_path|run_id|source_reference|auth_context)/.test(key));
   return <dl className="accounting-evidence-values">{entries.slice(0, 10).map(([key, item]) => <div key={key}><dt>{humanLabel(key)}</dt><dd>{typeof item === 'object' && !Array.isArray(item) && /^(classification|decision|attribution)$/.test(key) && depth < 2 ? <EvidenceValue value={item} depth={depth + 1} /> : typeof item === 'object' ? Array.isArray(item) ? `${item.length} retained entries` : 'Structured source evidence; available in technical details' : String(item)}</dd></div>)}</dl>;
 }
-function EvidenceDialog({ documentId, record, onClose, trigger }: { trigger: HTMLElement | null; documentId: string; record: SavedRecord['record'] | null; onClose: () => void }) {
+function EvidenceDialog({ documentId, record: selectedRecord, onClose, trigger }: { trigger: HTMLElement | null; documentId: string; record: SavedRecord['record'] | null; onClose: () => void }) {
+  const [record, setRecord] = useState(selectedRecord);
+  useEffect(() => { setRecord(selectedRecord); }, [documentId, selectedRecord]);
   const dialog = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     const previous = trigger;
@@ -183,7 +185,7 @@ function EvidenceDialog({ documentId, record, onClose, trigger }: { trigger: HTM
   return <dialog className="accounting-evidence-dialog" ref={dialog} aria-label="Accounting evidence" onCancel={event => { event.preventDefault(); onClose(); }}>
     <div className="accounting-dialog-heading"><h2>Accounting evidence</h2><button type="button" autoFocus onClick={onClose}>Close evidence</button></div>
     {record && <section className="accounting-selected-record" aria-label="Selected accounting record"><h3>{recordDescription(record.description) || 'Selected transaction'}</h3><p>{record.date || record.year} · {record.account || 'Account not recorded'} · {displayMoney(record.amount, record.currency)}</p><p><strong>{record.section || 'Unclassified'}</strong>{record.category && ` · ${record.category}`}</p>{record.status && <p>{record.status}</p>}<p>{record.decision || 'No accounting decision has been recorded for this movement.'}</p><p className="accounting-muted">This is the selected record. Its retained source may be a bank export or bookkeeping batch; it is not necessarily a receipt.</p>{record.description && <details><summary>Original source description</summary><p>{record.description}</p></details>}</section>}
-    {record?.record_kind === 'retained_ledger_decision' && record.section === 'Expense' && record.source_key && <ExpenseUseEditor documentId={documentId} record={record} onSaved={() => window.dispatchEvent(new Event('accounting-saved'))} />}
+    {record?.record_kind === 'retained_ledger_decision' && record.section === 'Expense' && record.source_key && <ExpenseUseEditor documentId={documentId} record={record} onCurrentRecord={setRecord} onSaved={() => window.dispatchEvent(new Event('accounting-saved'))} />}
     <DocumentEvidence key={documentId} documentId={documentId} record={record} />
   </dialog>;
 }

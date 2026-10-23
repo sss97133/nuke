@@ -6,7 +6,7 @@ import type { SavedRecord } from './FinancialWorkpapers';
 
 type Vehicle = { id: string; year: number | null; make: string | null; model: string | null; vin: string | null };
 const vehicleLabel = (v: Vehicle) => [v.year, v.make, v.model, v.vin ? `VIN …${v.vin.slice(-6)}` : 'VIN not recorded'].filter(Boolean).join(' ');
-export default function ExpenseUseEditor({ documentId, record, onSaved }: { documentId: string; record: SavedRecord['record']; onSaved: () => void }) {
+export default function ExpenseUseEditor({ documentId, record, onSaved, onCurrentRecord }: { documentId: string; record: SavedRecord['record']; onSaved: () => void; onCurrentRecord?: (record: SavedRecord['record']) => void }) {
   const { ownerId, canCorrect, liveRevision } = useAccountingBook();
   const [snapshot, setSnapshot] = useState<ExpenseSnapshot | null>(null);
   const [type, setType] = useState<ExpenseUse['use_type']>('unassigned');
@@ -19,6 +19,7 @@ export default function ExpenseUseEditor({ documentId, record, onSaved }: { docu
   const pending = useRef<ReturnType<typeof expenseUseCorrection> | null>(null);
   const apply = (value: ExpenseSnapshot) => {
     current.current = { snapshot: value, dirty: false };
+    onCurrentRecord?.(value.record as SavedRecord['record']);
     setSnapshot(value); setType(value.use?.use_type || 'unassigned'); setVehicleId(value.use?.vehicle_id || '');
     setAmount(value.use?.allocated_amount ?? ''); setBasis(value.use?.basis || ''); setDirty(false); setConflict(false); pending.current = null;
     setMessage(value.use ? `Current use: ${value.use.destination_label}` : 'This expense has no assigned vehicle or shop use yet.');
