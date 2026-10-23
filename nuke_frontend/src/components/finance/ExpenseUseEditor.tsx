@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { supabase } from '../../lib/supabase';
-import { expenseUseCorrection, readExpenseSnapshot, type ExpenseSnapshot, type ExpenseUse } from '../../services/financialExpenseUse';
+import { EXPENSE_USE_LABELS, expenseUseCorrection, readExpenseSnapshot, type ExpenseSnapshot, type ExpenseUse } from '../../services/financialExpenseUse';
 import { useAccountingBook } from './AccountingBookContext';
 import type { SavedRecord } from './FinancialWorkpapers';
 
@@ -22,7 +22,7 @@ export default function ExpenseUseEditor({ documentId, record, onSaved, onCurren
     onCurrentRecord?.(value.record as SavedRecord['record']);
     setSnapshot(value); setType(value.use?.use_type || 'unassigned'); setVehicleId(value.use?.vehicle_id || '');
     setAmount(value.use?.allocated_amount ?? ''); setBasis(value.use?.basis || ''); setDirty(false); setConflict(false); pending.current = null;
-    setMessage(value.use ? `Current use: ${value.use.destination_label}` : 'This expense has no assigned vehicle or shop use yet.');
+    setMessage(value.use ? `Current use: ${value.use.destination_label}` : 'This expense has no assigned use yet.');
   };
   useEffect(() => {
     epoch.current++; current.current = { snapshot: null, dirty: false }; latest.current = null; pending.current = null;
@@ -65,7 +65,7 @@ export default function ExpenseUseEditor({ documentId, record, onSaved, onCurren
       const chosen = vehicles.find(v => v.id === vehicleId);
       if (type === 'vehicle' && !chosen && snapshot.use?.vehicle_id !== vehicleId) throw new Error('Choose an accessible recipient vehicle.');
       const use: ExpenseUse = { source_key: record.source_key, use_type: type, vehicle_id: type === 'vehicle' ? vehicleId : null,
-        destination_label: type === 'shop' ? 'Shop' : type === 'vehicle' ? chosen ? vehicleLabel(chosen) : snapshot.use!.destination_label : 'Unassigned',
+        destination_label: type === 'vehicle' ? chosen ? vehicleLabel(chosen) : snapshot.use!.destination_label : EXPENSE_USE_LABELS[type],
         allocated_amount: type === 'unassigned' ? '0' : amount, unallocated_amount: '', basis: basis.trim() };
       pending.current ||= expenseUseCorrection(snapshot, use, crypto.randomUUID());
       const result = await supabase.functions.invoke('ingest-observation', { body: pending.current });
@@ -78,12 +78,12 @@ export default function ExpenseUseEditor({ documentId, record, onSaved, onCurren
     finally { if (epoch.current === generation) setBusy(false); }
   };
   const choices = vehicles.filter(v => search.toLowerCase().split(/\s+/).every(token => vehicleLabel(v).toLowerCase().includes(token)));
-  return <section className="accounting-use-editor" aria-label="Expense vehicle or shop use">
-    <h3>Vehicle or shop use</h3><p role="status">{message}</p>
+  return <section className="accounting-use-editor" aria-label="Expense use">
+    <h3>Expense use</h3><p role="status">{message}</p>
     {snapshot && <p>Recorded expense: {snapshot.record.amount} {snapshot.record.currency}. {snapshot.use?.unallocated_amount && `Unassigned: ${snapshot.use.unallocated_amount} ${snapshot.record.currency}.`}</p>}
     {canCorrect && snapshot ? <>
       <fieldset disabled={busy}><legend>Assign this expense</legend>
-        <label>Use <select value={type} onChange={e => { setType(e.target.value as ExpenseUse['use_type']); edit(); }}><option value="unassigned">Unassigned</option><option value="shop">Shop</option><option value="vehicle">Vehicle</option></select></label>
+        <label>Use <select value={type} onChange={e => { setType(e.target.value as ExpenseUse['use_type']); edit(); }}><option value="unassigned">Unassigned</option><option value="shop">Shop</option><option value="vehicle">Vehicle</option><option value="software">{EXPENSE_USE_LABELS.software}</option><option value="image_production">{EXPENSE_USE_LABELS.image_production}</option></select></label>
         {type === 'vehicle' && <><label>Find vehicle <input type="search" value={search} onChange={e => setSearch(e.target.value)} placeholder="Year, model or VIN" /></label><p>{vehicleMessage}</p><label>Recipient vehicle <select value={vehicleId} onChange={e => { setVehicleId(e.target.value); edit(); }}><option value="">Choose a vehicle</option>{snapshot.use?.vehicle_id && !choices.some(v => v.id === snapshot.use!.vehicle_id) && <option value={snapshot.use.vehicle_id}>{snapshot.use.destination_label}</option>}{choices.map(v => <option key={v.id} value={v.id}>{vehicleLabel(v)}</option>)}</select></label></>}
         {type !== 'unassigned' && <label>Amount assigned <input inputMode="decimal" value={amount} onChange={e => { setAmount(e.target.value); edit(); }} placeholder={snapshot.record.amount || ''} /></label>}
         <label>Reason / source <textarea value={basis} maxLength={500} onChange={e => { setBasis(e.target.value); edit(); }} /></label>
