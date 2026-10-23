@@ -455,6 +455,7 @@ async function loadCompsForListing(
   let rpcErr: { message?: string } | null = null;
   {
     const res = await sb.rpc("get_comps_combined", {
+      p_basis: "hammer",
       p_make: make,
       p_model: modelCore,
       p_year_min: yearMin,
