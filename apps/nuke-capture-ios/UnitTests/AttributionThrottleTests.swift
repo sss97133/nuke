@@ -32,9 +32,9 @@ final class AttributionThrottleTests: XCTestCase {
     }
 
     func testGlassesLanesDropWhenWarm() {
-        XCTAssertEqual(LibraryGlasses.laneCount(thermal: .nominal, lowPower: false), 4)
-        XCTAssertEqual(LibraryGlasses.laneCount(thermal: .fair, lowPower: false), 1)
-        XCTAssertEqual(LibraryGlasses.laneCount(thermal: .critical, lowPower: false), 1)
-        XCTAssertEqual(LibraryGlasses.laneCount(thermal: .nominal, lowPower: true), 1)
+        XCTAssertEqual(LibraryOverlayStore.laneCount(thermal: .nominal, lowPower: false), 4)
+        XCTAssertEqual(LibraryOverlayStore.laneCount(thermal: .fair, lowPower: false), 1)
+        XCTAssertEqual(LibraryOverlayStore.laneCount(thermal: .critical, lowPower: false), 1)
+        XCTAssertEqual(LibraryOverlayStore.laneCount(thermal: .nominal, lowPower: true), 1)
     }
 }
