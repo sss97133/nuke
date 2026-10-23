@@ -283,17 +283,18 @@ enum VisionEngine {
                                    classifyImage: (CGImage) -> Classification? = { classify($0) },
                                    detectFace: (CGImage) throws -> Bool = { try detectProminentFace($0) }) -> ContributorVerdict {
         guard let cls = classifyImage(cg) else { return .unavailable(reason: TriageFailure.classifierUnavailable.localizedDescription) }
-        let top3 = Array(cls.labels.prefix(3).map { $0.0 })
-        if isUnnecessary(labels: top3, isScreenshot: false) {
+        if VisionDecision.clutter(labels: cls.labels, isScreenshot: false) != nil {
             return .hold(reason: "clutter")
         }
         let face: Bool
         do { face = try detectFace(cg) }
         catch { return .unavailable(reason: TriageFailure.faceDetectorUnavailable.localizedDescription) }
-        if face && !cls.isVehicle {
-            return .hold(reason: "prominent_face")
+        let decision = VisionDecision.decide(labels: cls.labels, isVehicle: cls.isVehicle, face: face)
+        switch decision.category {
+        case .work: return .allow
+        case .workWithPeople: return .hold(reason: "people_in_frame")   // no pre-upload redaction exists
+        case .sensitive, .notWork: return .hold(reason: "prominent_face")
         }
-        return .allow
     }
 
     // MARK: - 1d. Owner triage (pixels vs metadata-only, pre-upload)
@@ -321,6 +322,10 @@ enum VisionEngine {
         /// Operational failure, never a personal/clutter verdict or upload permission.
         let failure: TriageFailure?
         var privacyEvidence: DevicePrivacyReceipt.Evidence? = nil
+        /// The categorised rule outcome (work / not_work / sensitive / work_with_people) for the local log.
+        var decision: VisionDecision? = nil
+        var scoredLabels: [(String, Float)] = []
+        var hasFace = false
     }
 
     static func triage(_ cg: CGImage, labelCap: Int = 12,
@@ -337,9 +342,9 @@ enum VisionEngine {
         // vehicle); everything else is work evidence, including a part close-up or a tape measure
         // on a fuse-box opening that Apple does not label "vehicle". The previous rule required an
         // affirmative vehicle label, so measurement shots went up as metadata only.
-        let clutter = isUnnecessary(labels: Array(labels.prefix(3)), isScreenshot: false)
-        if clutter {
-            return TriageResult(pixelsEligible: false, labels: labels, isVehicle: cls.isVehicle, classified: true, failure: nil)
+        if let clutter = VisionDecision.clutter(labels: cls.labels, isScreenshot: false) {
+            return TriageResult(pixelsEligible: false, labels: labels, isVehicle: cls.isVehicle, classified: true, failure: nil,
+                                decision: clutter, scoredLabels: cls.labels)
         }
         let face: Bool
         do { face = try detectFace(cg) }
@@ -347,12 +352,15 @@ enum VisionEngine {
             return TriageResult(pixelsEligible: false, labels: labels, isVehicle: cls.isVehicle, classified: true,
                                 failure: .faceDetectorUnavailable)
         }
-        let personal = face && !cls.isVehicle
-        return TriageResult(pixelsEligible: !clutter && !personal, labels: labels,
+        // People in a work frame are a soft signal (the photo counts as work) but the pixels stay
+        // on the phone: no on-device pre-upload redaction exists (see VisionDecision.swift).
+        let decision = VisionDecision.decide(labels: cls.labels, isVehicle: cls.isVehicle, face: face)
+        return TriageResult(pixelsEligible: decision.pixelsEligible, labels: labels,
                             isVehicle: cls.isVehicle, classified: true, failure: nil,
                             privacyEvidence: .init(labels: cls.labels, prominentFace: face, isVehicle: cls.isVehicle,
                                 maxCoreConfidence: cls.maxCoreConfidence,
-                                totalVehicleConfidence: cls.labels.filter { allVehicleLabels.contains($0.0) }.reduce(0) { $0 + $1.1 }))
+                                totalVehicleConfidence: cls.labels.filter { allVehicleLabels.contains($0.0) }.reduce(0) { $0 + $1.1 }),
+                            decision: decision, scoredLabels: cls.labels, hasFace: face)
     }
 
     /// Classify one library photo by its PHAsset id — the cheap, on-device
@@ -390,7 +398,9 @@ enum VisionEngine {
             // doesn't tag "vehicle". (Was `!isVehicle || face`, which blurred every untagged
             // work photo — the arbitrary over-blur.) hasPerson is carried so the Select tool
             // can let the owner resolve the genuinely borderline (person + vehicle) cases.
-            let isPersonal = face && !cls.isVehicle
+            // People with vehicle/part/tool/shop context are a soft signal, not personal.
+            let isPersonal = VisionDecision.decide(labels: cls.labels, isVehicle: cls.isVehicle, face: face).isPersonal
+                && face   // documents keep their own (non-face) handling; personal stays face-driven here
             return (cls.isVehicle, isPersonal, face, labels)
         }.value
     }

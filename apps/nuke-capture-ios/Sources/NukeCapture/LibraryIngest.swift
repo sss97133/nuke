@@ -266,7 +266,8 @@ final class LibraryIngest: ObservableObject {
         // Populate existing offline glasses from these same original bytes; disjoint
         // writers leave owner approval and prior vehicle bindings untouched.
         LocalStore.shared.classify(localIdentifier: photo.localIdentifier,
-            isVehicle: classification.isVehicle, isPersonal: face && !classification.isVehicle,
+            isVehicle: classification.isVehicle, isPersonal: VisionDecisionLog.shared.recordLibrary(assetId: photo.localIdentifier,
+                classification, face: face, isScreenshot: asset.mediaSubtypes.contains(.photoScreenshot)),
             hasPerson: face, labels: labels)
         let review = LocalAlbumImageReview(id: LocalStore.albumDigest(identity), localIdentifier: photo.localIdentifier,
             sourceVersion: version, inputSHA256: input, methodVersion: method, analyzedAt: Date(),
@@ -436,7 +437,8 @@ final class LibraryIngest: ObservableObject {
             let labels = Array(cls.labels.prefix(12).map { $0.0 })
             LocalStore.shared.classify(localIdentifier: item.lid,
                                        isVehicle: cls.isVehicle,
-                                       isPersonal: face && !cls.isVehicle,
+                                       isPersonal: VisionDecisionLog.shared.recordLibrary(assetId: item.lid, cls, face: face,
+                                           isScreenshot: item.asset.mediaSubtypes.contains(.photoScreenshot)),
                                        hasPerson: face,
                                        labels: labels)
         }
