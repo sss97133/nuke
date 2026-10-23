@@ -46,7 +46,7 @@ final class PhotoPrivacyReadTests: XCTestCase {
         let cg = try image()
         let cases: [([String], Bool, Bool, Bool)] = [
             (["car"], true, false, true), (["machinery"], false, false, true),
-            (["car"], true, true, true), (["person"], false, true, false),
+            (["car"], true, true, false), (["person"], false, true, false),  // face + car: pixels held, no pre-upload redaction
             (["document", "car"], true, false, false), (["receipt"], false, false, false),
         ]
         for (labels, vehicle, face, eligible) in cases {

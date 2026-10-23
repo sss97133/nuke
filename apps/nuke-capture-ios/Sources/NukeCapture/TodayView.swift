@@ -77,6 +77,10 @@ struct CaptureSections: View {
                     .font(.footnote).foregroundStyle(.secondary)
             }
         }
+        Section {
+            NavigationLink("Photo filter decisions") { VisionDecisionCountsView() }
+                .font(.footnote)
+        }
         if engine.gaveUpCount > 0 {
             Section {
                 Text("\(engine.gaveUpCount) photos failed three times and are no longer retried on open. The last error: \(engine.lastError ?? "not recorded").")
