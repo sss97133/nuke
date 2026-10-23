@@ -207,6 +207,7 @@ enum NotificationReaders {
             let response = try await SupabaseService.client.from(table)
                 .select(columns, count: .exact)
                 .eq("user_id", value: uid)
+                // A notification is raised live: its created_at is its event time (no upload backlog).
                 .order("created_at", ascending: false)
                 .limit(limit)
                 .execute()

@@ -32,6 +32,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 import { requireOwnerOrService, requireWriteAuth } from "../_shared/writeGuard.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { eventStamp, receiptOccurredAt } from "../_shared/eventTime.ts";
 
 interface ReceiptRow {
   id: string;
@@ -310,13 +311,20 @@ Deno.serve(async (req) => {
       const observationId = ingestJson.observation_id as string;
 
       // Mark the receipt as submitted (idempotent re-runs are safe).
-      const { error: markErr } = await supabase
+      // Event time: the transaction date, not the upload. Received = when the receipt was uploaded.
+      const stamp = eventStamp(receiptOccurredAt(r), new Date(r.upload_date ?? Date.now()));
+      const marked = {
+        submitted_observation_id: observationId,
+        submitted_at: new Date().toISOString(),
+      };
+      let { error: markErr } = await supabase
         .from("receipts")
-        .update({
-          submitted_observation_id: observationId,
-          submitted_at: new Date().toISOString(),
-        })
+        .update({ ...marked, ...stamp })
         .eq("id", r.id);
+      if (markErr && /occurred_at|ingest_kind/.test(markErr.message ?? "")) {
+        // Migration 20261023220000 not applied yet: still mark the receipt.
+        ({ error: markErr } = await supabase.from("receipts").update(marked).eq("id", r.id));
+      }
 
       if (markErr) {
         result.errors++;

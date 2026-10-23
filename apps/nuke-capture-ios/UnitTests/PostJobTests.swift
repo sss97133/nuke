@@ -46,7 +46,7 @@ final class PostJobTests: XCTestCase {
         XCTAssertEqual(photos.filter { $0.refusal == nil }.map(\.id), ["i1", "i2"])
         XCTAssertEqual(photos.compactMap(\.refusal), ["sensitive", "personal", "replaced by a newer copy"])
         XCTAssertEqual(photos[0].capturedAt, "2026-10-10T10:00:00Z")
-        XCTAssertEqual(photos[1].capturedAt, "2026-10-09T11:00:00Z")
+        XCTAssertNil(photos[1].capturedAt)  // undated: upload time is not capture time
     }
 
     func testPostBodyAndLocalChecks() throws {
