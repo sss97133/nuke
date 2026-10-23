@@ -1,0 +1,236 @@
+[
+ {
+  "v": "cb3c06d4-0783-4f6a-be0f-3371b86ff1b0",
+  "src": "mecum",
+  "url": "https://www.mecum.com/lots/1127180/1968-volkswagen-beetle/",
+  "bat": 32000.0,
+  "other": 3513.0,
+  "bd": "2023-06-30",
+  "od": "2024-08-15"
+ },
+ {
+  "v": "69fe6726-38f2-477e-b2bf-627ef1ea60a1",
+  "src": "mecum",
+  "url": "https://www.mecum.com/lots/1138485/1994-ford-bronco-xlt/",
+  "bat": 141000.0,
+  "other": 24393.0,
+  "bd": "2022-09-29",
+  "od": "2025-01-08"
+ },
+ {
+  "v": "8cc3bbd2-fb9e-44fe-8add-a13e6c2dc7a4",
+  "src": "pcarmarket",
+  "url": "https://pcarmarket.com/auction/2005-porsche-911-carrera-11",
+  "bat": 25800.0,
+  "other": 27000.0,
+  "bd": "2026-01-23",
+  "od": "2025-02-17"
+ },
+ {
+  "v": "6a87da68-1fda-4d3d-8eba-0a0e3893a551",
+  "src": "mecum",
+  "url": "https://www.mecum.com/lots/1164654/1967-pontiac-gto-hardtop/",
+  "bat": 2000.0,
+  "other": 77406.0,
+  "bd": "2023-11-04",
+  "od": "2026-01-18"
+ },
+ {
+  "v": "6711ff65-3555-4fe2-b02f-6ddb03683c01",
+  "src": "pcarmarket",
+  "url": "https://pcarmarket.com/auction/2002-porsche-996-gt2-5",
+  "bat": 40000.0,
+  "other": 41000.0,
+  "bd": "2023-05-22",
+  "od": "2022-12-20"
+ },
+ {
+  "v": "590fc0eb-5c44-41ec-b751-4b430cd510ec",
+  "src": "mecum",
+  "url": "https://mecum.com/lots/1142842/2008-bentley-continental-gtc",
+  "bat": 29000.0,
+  "other": 26317.0,
+  "bd": "2020-09-14",
+  "od": "2025-05-15"
+ },
+ {
+  "v": "be36dd12-7ce4-4b1a-8b65-5ebed28961b4",
+  "src": "mecum",
+  "url": "https://www.mecum.com/lots/1132309/1966-mercury-comet-cyclone-gt-hardtop/",
+  "bat": 59000.0,
+  "other": 24734.0,
+  "bd": "2025-09-01",
+  "od": "2025-01-16"
+ },
+ {
+  "v": "89e23063-fb48-4acc-9e84-7f2a36086330",
+  "src": "mecum",
+  "url": "https://www.mecum.com/lots/1141580/1976-jeep-cj-7/",
+  "bat": 5000.0,
+  "other": 60520.0,
+  "bd": "2024-06-29",
+  "od": "2025-03-18"
+ },
+ {
+  "v": "73a956e4-5b98-40af-b97e-9ea8d22b023f",
+  "src": "mecum",
+  "url": "https://www.mecum.com/lots/1139793/2004-jeep-wrangler-rubicon/",
+  "bat": 73000.0,
+  "other": 143622.0,
+  "bd": "2022-01-18",
+  "od": "2025-03-19"
+ },
+ {
+  "v": "c4bb48c6-fbbc-46c8-859c-9fd9ebe7dad9",
+  "src": "mecum",
+  "url": "https://www.mecum.com/lots/1144116/1969-chevrolet-camaro/",
+  "bat": 1000.0,
+  "other": 76043.0,
+  "bd": "2021-12-09",
+  "od": "2025-05-15"
+ },
+ {
+  "v": "a3156de4-9e42-4e10-9e80-e9d1a65d9cee",
+  "src": "mecum",
+  "url": "https://www.mecum.com/lots/1134416/2000-bmw-m-roadster/",
+  "bat": 42000.0,
+  "other": 29051.0,
+  "bd": "2024-03-17",
+  "od": "2025-01-15"
+ },
+ {
+  "v": "14da3bb6-3f7d-473f-be98-a3810770cf5a",
+  "src": "mecum",
+  "url": "https://www.mecum.com/lots/1137824/1966-lincoln-continental-convertible/",
+  "bat": 68000.0,
+  "other": 86887.0,
+  "bd": "2024-10-04",
+  "od": "2025-03-20"
+ },
+ {
+  "v": "014db63f-10e8-42aa-96de-a857a978f0db",
+  "src": "mecum",
+  "url": "https://www.mecum.com/lots/1143325/1964-cadillac-deville-convertible/",
+  "bat": 51000.0,
+  "other": 1769.0,
+  "bd": "2022-08-22",
+  "od": "2025-03-18"
+ },
+ {
+  "v": "c3975b56-b939-4cbf-a83e-77be31324858",
+  "src": "mecum",
+  "url": "https://www.mecum.com/lots/1163081/1967-buick-gs-400-convertible",
+  "bat": 59000.0,
+  "other": 32884.0,
+  "bd": "2022-12-21",
+  "od": "2026-01-13"
+ },
+ {
+  "v": "f957110e-c1cc-40c3-851f-c465f8653446",
+  "src": "pcarmarket",
+  "url": "https://pcarmarket.com/auction/1978-bmw-e21-320i",
+  "bat": 44000.0,
+  "other": 43000.0,
+  "bd": "2021-12-10",
+  "od": "2023-09-14"
+ },
+ {
+  "v": "d3efb553-3b5c-43b7-a5a2-0a9af519def1",
+  "src": "mecum",
+  "url": "https://www.mecum.com/lots/1155369/1966-chevrolet-corvette-coupe",
+  "bat": 43000.0,
+  "other": 112.0,
+  "bd": "2025-08-12",
+  "od": "2026-01-15"
+ },
+ {
+  "v": "71453faa-3c9c-4ff7-aa84-1f6500dfb429",
+  "src": "pcarmarket",
+  "url": "https://pcarmarket.com/auction/1999-bmw-z3-coupe-28",
+  "bat": 45500.0,
+  "other": 43000.0,
+  "bd": "2024-11-13",
+  "od": "2024-11-22"
+ },
+ {
+  "v": "7cb9d225-f8cf-4887-ae40-4271e1c88e28",
+  "src": "pcarmarket",
+  "url": "https://pcarmarket.com/auction/2000-bmw-z8-1",
+  "bat": 11000.0,
+  "other": 200.0,
+  "bd": "2022-05-24",
+  "od": "2021-10-07"
+ },
+ {
+  "v": "586b825d-20da-453d-ae1e-54ccf397f1c3",
+  "src": "pcarmarket",
+  "url": "https://pcarmarket.com/auction/2000-bmw-m5-5",
+  "bat": 29000.0,
+  "other": 16000.0,
+  "bd": "2019-07-03",
+  "od": "2025-11-13"
+ },
+ {
+  "v": "73031456-029c-412d-a7e1-90695be42274",
+  "src": "mecum",
+  "url": "https://mecum.com/lots/1098371/1988-mazda-rx-7-turbo-10th-anniversary",
+  "bat": 45000.0,
+  "other": 713.0,
+  "bd": "2020-12-31",
+  "od": "2024-01-06"
+ },
+ {
+  "v": "ed7e19f0-d33b-49ca-912f-635373125d8a",
+  "src": "mecum",
+  "url": "https://mecum.com/lots/1119877/1980-ferrari-308-gtsi",
+  "bat": 22000.0,
+  "other": 62935.0,
+  "bd": "2022-05-16",
+  "od": "2024-05-18"
+ },
+ {
+  "v": "b201ce3f-8850-4944-8e0e-7bd2f3d4ad3d",
+  "src": "mecum",
+  "url": "https://mecum.com/lots/1123839/1968-pontiac-gto",
+  "bat": 35000.0,
+  "other": 21114.0,
+  "bd": "2018-06-13",
+  "od": "2024-08-17"
+ },
+ {
+  "v": "45671f06-0fcc-4aa6-ba7d-6fba3c31710b",
+  "src": "mecum",
+  "url": "https://mecum.com/lots/1124073/2001-ferrari-360-spider",
+  "bat": 37000.0,
+  "other": 6013.0,
+  "bd": "2019-12-03",
+  "od": "2024-08-17"
+ },
+ {
+  "v": "7dd0d48b-a097-40cd-a9f0-127d3e2537e3",
+  "src": "mecum",
+  "url": "https://mecum.com/lots/1131054/1966-chevrolet-corvette-coupe",
+  "bat": 44000.0,
+  "other": 42836.0,
+  "bd": "2024-09-02",
+  "od": "2025-01-11"
+ },
+ {
+  "v": "83c01bb8-424f-4cb5-a6c6-11ed66e9c97e",
+  "src": "mecum",
+  "url": "https://mecum.com/lots/1151702/1953-jaguar-xk120-se-roadster",
+  "bat": 80000.0,
+  "other": 37704.0,
+  "bd": "2020-10-12",
+  "od": "2026-01-31"
+ },
+ {
+  "v": "d29d5bb6-770e-4116-af1f-cfa8490cc3fd",
+  "src": "mecum",
+  "url": "https://www.mecum.com/lots/1140518/1967-pontiac-firebird-400-convertible/",
+  "bat": 58000.0,
+  "other": 44176.0,
+  "bd": "2022-05-07",
+  "od": "2025-03-21"
+ }
+]
