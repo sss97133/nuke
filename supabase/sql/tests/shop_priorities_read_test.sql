@@ -54,4 +54,23 @@ BEGIN
   IF r.score <> 3 OR NOT ('pending_or_quoted:1' = ANY (r.reasons)) THEN RAISE EXCEPTION 'k15: % %', r.score, r.reasons; END IF;
   RAISE NOTICE 'shop_priorities_read fixture test passed';
 END $$;
+
+-- Reuse: a recorded user_sites row wins over GPS clustering, and an image in a confident emergent cluster
+-- resolved to the K15 counts as a K15 sighting.
+INSERT INTO public.user_sites (user_id, name, lat, lon, radius_m, source)
+VALUES ('00000000-0000-0000-0000-000000000001', 'SITE T', 40.0001, -100.0001, 150, 'ignition');
+WITH c AS (INSERT INTO public.emergent_vehicle_clusters (resolved_to_vehicle_id, confidence)
+           VALUES ('10000000-0000-0000-0000-000000000003', 0.9) RETURNING id),
+     i AS (INSERT INTO public.vehicle_images (user_id, taken_at, latitude, longitude)
+           VALUES ('00000000-0000-0000-0000-000000000001', now() - interval '1 day', 40.0002, -100.0002) RETURNING id)
+INSERT INTO public.image_observations (image_id, cluster_id) SELECT i.id, c.id FROM i, c;
+DO $$
+DECLARE r record;
+BEGIN
+  SELECT * INTO r FROM public.lot_presence_read() WHERE vehicle_id = '10000000-0000-0000-0000-000000000003';
+  IF r.lot_center->>'source' <> 'user_sites: SITE T' THEN RAISE EXCEPTION 'site not reused: %', r.lot_center; END IF;
+  IF r.status <> 'on_lot' OR r.lot_photos_unassigned <> 1 THEN RAISE EXCEPTION 'cluster not reused: % %', r.status, r.lot_photos_unassigned; END IF;
+  IF cardinality(r.evidence_image_ids) < 1 OR r.possession IS NULL THEN RAISE EXCEPTION 'evidence missing'; END IF;
+  RAISE NOTICE 'reuse fixture test passed';
+END $$;
 ROLLBACK;

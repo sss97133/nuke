@@ -43,7 +43,7 @@ RETURNS TABLE (
   vehicle_id uuid, year integer, make text, model text, vin text, status text, confidence text,
   lot_photos integer, lot_photos_unassigned integer, lot_days integer,
   first_seen_at_lot timestamptz, last_seen_at_lot timestamptz, last_seen_elsewhere timestamptz,
-  merged_record_ids uuid[], lot_center jsonb
+  merged_record_ids uuid[], lot_center jsonb, possession text, evidence_image_ids uuid[]
 )
 LANGUAGE plpgsql STABLE SECURITY DEFINER
 SET search_path TO 'pg_catalog', 'public'
@@ -78,13 +78,45 @@ BEGIN
     SELECT round(lat / cell) AS cy, round(lng / cell) AS cx, count(DISTINCT taken_at::date) AS days
     FROM mine GROUP BY 1, 2
   ),
-  lot AS (SELECT cy, cx FROM cells ORDER BY days DESC, cy, cx LIMIT 1),
+  -- Reuse IgnitionEngine's user_sites (radius under 1 km), scored by distinct photo days inside each.
+  site AS (
+    SELECT us.id, us.lat, us.lon, us.radius_m::float8 AS r, us.name,
+      (SELECT count(DISTINCT m.taken_at::date) FROM mine m
+        WHERE (m.lat - us.lat) ^ 2 + ((m.lng - us.lon) * cos(radians(us.lat))) ^ 2 <= (us.radius_m / 111320.0) ^ 2) AS days
+    FROM public.user_sites us
+    WHERE us.user_id = v_user AND us.radius_m < 1000
+    ORDER BY 6 DESC, us.id LIMIT 1
+  ),
+  -- The densest grid cell of the user's photo GPS, scored by days across it and its 8 neighbours.
+  grid AS (
+    SELECT c.cy, c.cx,
+      (SELECT count(DISTINCT m.taken_at::date) FROM mine m
+        WHERE abs(round(m.lat / cell) - c.cy) <= 1 AND abs(round(m.lng / cell) - c.cx) <= 1) AS days
+    FROM (SELECT cy, cx FROM cells ORDER BY days DESC, cy, cx LIMIT 1) c
+  ),
+  -- A recorded site wins unless the photo cluster shows clearly more activity (the site is stale or off-centre).
+  lot AS (
+    SELECT s.lat, s.lon, s.r, NULL::float8 AS cy, NULL::float8 AS cx,
+           'user_sites: ' || coalesce(s.name, s.id::text) AS src
+    FROM site s WHERE s.days >= coalesce((SELECT g.days FROM grid g), 0)
+    UNION ALL
+    SELECT g.cy * cell, g.cx * cell, NULL, g.cy, g.cx, 'densest cluster of your photo GPS'
+    FROM grid g WHERE NOT EXISTS (SELECT 1 FROM site s WHERE s.days >= g.days)
+  ),
   tagged AS (
     SELECT m.*,
-      (abs(round(m.lat / cell) - lot.cy) <= 1 AND abs(round(m.lng / cell) - lot.cx) <= 1) AS at_lot,
+      CASE WHEN lot.r IS NOT NULL
+           THEN (m.lat - lot.lat) ^ 2 + ((m.lng - lot.lon) * cos(radians(lot.lat))) ^ 2 <= (lot.r / 111320) ^ 2
+           ELSE abs(round(m.lat / cell) - lot.cy) <= 1 AND abs(round(m.lng / cell) - lot.cx) <= 1 END AS at_lot,
       coalesce(m.vehicle_id,
                CASE WHEN coalesce(m.auto_suggestion_confidence, 0) >= min_conf THEN m.auto_suggested_vehicle_id END,
-               m.suggested_vehicle_id) AS raw_vid
+               m.suggested_vehicle_id,
+               -- Reuse emergent_vehicle_clusters: an image in a confident cluster resolved to a vehicle.
+               (SELECT c.resolved_to_vehicle_id FROM public.image_observations o
+                  JOIN public.emergent_vehicle_clusters c ON c.id = o.cluster_id
+                 WHERE o.image_id = m.id AND o.is_active IS NOT FALSE AND c.is_active IS NOT FALSE
+                   AND c.resolved_to_vehicle_id IS NOT NULL AND coalesce(c.confidence, 0) >= min_conf
+                 ORDER BY c.confidence DESC LIMIT 1)) AS raw_vid
     FROM mine m CROSS JOIN lot
   ),
   ident AS (
@@ -99,7 +131,8 @@ BEGIN
       min(i.taken_at) FILTER (WHERE i.at_lot) AS first_lot,
       max(i.taken_at) FILTER (WHERE i.at_lot) AS last_lot,
       max(i.taken_at) FILTER (WHERE NOT i.at_lot) AS last_else,
-      array_agg(DISTINCT i.raw_vid) FILTER (WHERE i.raw_vid <> i.vid) AS merged
+      array_agg(DISTINCT i.raw_vid) FILTER (WHERE i.raw_vid <> i.vid) AS merged,
+      (array_agg(i.id ORDER BY i.taken_at DESC) FILTER (WHERE i.at_lot))[1:5] AS ev
     FROM ident i GROUP BY i.vid
   )
   -- on_lot: photographed at the lot within the window. departed: seen elsewhere afterwards, or the lot
@@ -114,8 +147,11 @@ BEGIN
     CASE WHEN g.n_days >= 3 THEN 'high' WHEN g.n_lot >= 10 THEN 'medium' ELSE 'low' END,
     g.n_lot, g.n_unassigned, g.n_days, g.first_lot, g.last_lot, g.last_else,
     coalesce(g.merged, '{}'::uuid[]),
-    (SELECT jsonb_build_object('lat', round((lot.cy * cell)::numeric, 4), 'lng', round((lot.cx * cell)::numeric, 4),
-                               'source', 'densest cluster of your photo GPS') FROM lot)
+    (SELECT jsonb_build_object('lat', round(lot.lat::numeric, 4), 'lng', round(lot.lon::numeric, 4),
+                               'radius_m', lot.r, 'source', lot.src) FROM lot),
+    -- Reuse the existing possession reader rather than scoring possession a second time.
+    public.user_vehicle_possession_at(v_user, g.vid, p_as_of),
+    coalesce(g.ev, '{}'::uuid[])
   FROM agg g JOIN public.vehicles v ON v.id = g.vid
   WHERE g.last_lot IS NOT NULL AND v.deleted_at IS NULL;
 END
@@ -260,7 +296,7 @@ BEGIN
           'status', ps.status, 'confidence', ps.confidence, 'lot_photos', ps.lot_photos,
           'first_seen_at_lot', ps.first_seen_at_lot, 'last_seen_at_lot', ps.last_seen_at_lot,
           'evidence', jsonb_build_object('lot_days', ps.lot_days, 'lot_photos_unassigned', ps.lot_photos_unassigned,
-            'merged_record_ids', to_jsonb(ps.merged_record_ids), 'lot_center', ps.lot_center, 'vin', ps.vin)) END,
+            'merged_record_ids', to_jsonb(ps.merged_record_ids), 'lot_center', ps.lot_center, 'vin', ps.vin, 'possession', ps.possession, 'evidence_image_ids', to_jsonb(ps.evidence_image_ids))) END,
         'held', CASE WHEN h.vehicle_id IS NOT NULL THEN jsonb_strip_nulls(jsonb_build_object(
           -- Ownership on a shared lot stays low-confidence until evidence converges (an org link alone).
           'ownership_confidence', 'low',
