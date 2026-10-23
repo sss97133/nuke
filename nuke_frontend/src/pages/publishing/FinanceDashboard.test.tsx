@@ -8,9 +8,10 @@ vi.mock('../../lib/supabase', () => ({ supabase: { rpc: async () => ({ data: fix
   const q: any = {
     select(fields: string) { call.fields = fields; return q; },
     eq(field: string, value: unknown) { call.filter = [field, value]; return q; },
-    order() { return q; }, limit() { return q; }, in() { return q; }, single() { return q; },
+    order() { return q; }, limit() { return q; }, in() { return q; }, single() { return q; }, is() { return q; }, or() { return q; },
     range(a: number, b: number) { call.range = [a, b]; return q; },
-    then(resolve: any, reject: any) { return Promise.resolve(fixture.results[table] || { data: [], count: 0, error: null }).then(resolve, reject); },
+    // The records table reads the current records view; serve the tax_read fixture's records through it.
+    then(resolve: any, reject: any) { return Promise.resolve(fixture.results[table] || (table === 'v_financial_accounting_records' && fixture.results.tax_read ? { data: fixture.results.tax_read.records, count: fixture.results.tax_read.records.length, error: null } : { data: [], count: 0, error: null })).then(resolve, reject); },
   }; return q;
 } } }));
 import FinanceDashboard, { invoicePageTotals, concernRevision, reviewedSource, verifySourceRaster, type FinancialDocumentRow } from './FinanceDashboard';

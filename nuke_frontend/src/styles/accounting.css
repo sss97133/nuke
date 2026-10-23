@@ -78,6 +78,13 @@
 .accounting-table-wrap table { min-width:720px; }
 .accounting-table-wrap td:first-child { white-space:nowrap; }
 
+/* Records: toggle chips, sortable headings and tappable rows. */
+.accounting-chips { display:flex; flex-wrap:wrap; gap:6px; }
+.accounting-page .accounting-chips button[aria-pressed="true"],.accounting-page .accounting-chips button[aria-pressed="true"]:hover { background:var(--text); color:var(--bg); }
+.accounting-page th .accounting-sort { font:inherit; text-transform:inherit; letter-spacing:inherit; color:inherit; border:0; padding:0; min-height:0; background:none; white-space:nowrap; }
+.accounting-page th[aria-sort] .accounting-sort { color:var(--text); }
+.accounting-page .accounting-row { cursor:pointer; transition:background 180ms cubic-bezier(0.16,1,0.3,1); }
+.accounting-page .accounting-row:hover { background:var(--bg-secondary,var(--border)); }
 .accounting-use-editor { padding:16px 0; border-bottom:2px solid var(--border); }
 .accounting-page .accounting-use-editor h3 { font-size:18px; }
 .accounting-use-editor fieldset { border:0; padding:0; margin:12px 0; display:grid; gap:12px; }
