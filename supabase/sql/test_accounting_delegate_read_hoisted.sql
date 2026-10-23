@@ -1,6 +1,6 @@
 \set ON_ERROR_STOP on
 \ir test_accounting_delegation.sql
-\ir ../migrations/20261023220000_accounting_delegate_read_hoisted.sql
+\ir ../migrations/20261023220500_accounting_delegate_read_hoisted.sql
 -- test_accounting_delegation.sql leaves its users and a revoked grant behind; reuse them. The fixture schema grants
 -- authenticated nothing on the line, cell and concern tables (production does); grant the table reads so the row
 -- policies are what decide.
