@@ -106,5 +106,5 @@ DROP FUNCTION IF EXISTS public.document_ingest_revoke(uuid);
 DROP TABLE IF EXISTS public.capture_set_rescore_queue;
 DROP TABLE IF EXISTS public.document_coverage_targets;
 DROP TABLE IF EXISTS public.document_evidence;
-DROP TABLE IF EXISTS public.document_pages;
+DROP TABLE IF EXISTS public.capture_document_pages;
 DROP TABLE IF EXISTS public.document_batches;

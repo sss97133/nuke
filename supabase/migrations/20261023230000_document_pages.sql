@@ -1,4 +1,6 @@
 -- Camera-roll document path: pages photographed with the regular iPhone camera arrive through
+-- (Named capture_document_pages: public.document_pages already holds manual/book pages. A first apply
+-- stopped after creating the empty document_batches table; this file is idempotent over that.)
 -- capture_relay_ios like any car photo. A router (edge function document-page-router) classifies
 -- them and registers each page here. Registered pages:
 --   * are excluded from capture_sets_build (no 2026 "car set", no GPS/time/visual reference);
@@ -29,7 +31,7 @@ CREATE TABLE IF NOT EXISTS public.document_batches (
   revoked_at     timestamptz
 );
 
-CREATE TABLE IF NOT EXISTS public.document_pages (
+CREATE TABLE IF NOT EXISTS public.capture_document_pages (
   image_id         uuid PRIMARY KEY,
   user_id          uuid NOT NULL,
   batch_id         uuid REFERENCES public.document_batches(id) ON DELETE SET NULL,
@@ -49,8 +51,8 @@ CREATE TABLE IF NOT EXISTS public.document_pages (
   revoked_at       timestamptz,
   CHECK ((date_source = 'ocr') = (doc_date IS NOT NULL))
 );
-CREATE INDEX IF NOT EXISTS document_pages_user_doc ON public.document_pages (user_id, doc_key, page_no);
-CREATE INDEX IF NOT EXISTS document_pages_run ON public.document_pages (run_id);
+CREATE INDEX IF NOT EXISTS document_pages_user_doc ON public.capture_document_pages (user_id, doc_key, page_no);
+CREATE INDEX IF NOT EXISTS document_pages_run ON public.capture_document_pages (run_id);
 
 CREATE TABLE IF NOT EXISTS public.document_evidence (
   id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -123,19 +125,19 @@ $$;
 -- Withdraw everything one router run wrote (pages leave the exclusion, evidence stops counting).
 CREATE OR REPLACE FUNCTION public.document_ingest_revoke(p_run uuid)
 RETURNS jsonb LANGUAGE sql SECURITY DEFINER SET search_path TO 'public', 'pg_temp' AS $$
-  WITH a AS (UPDATE document_pages SET revoked_at = now() WHERE run_id = p_run AND revoked_at IS NULL RETURNING 1),
+  WITH a AS (UPDATE capture_document_pages SET revoked_at = now() WHERE run_id = p_run AND revoked_at IS NULL RETURNING 1),
        b AS (UPDATE document_evidence SET revoked_at = now() WHERE run_id = p_run AND revoked_at IS NULL RETURNING 1),
        c AS (UPDATE document_batches SET revoked_at = now() WHERE run_id = p_run AND revoked_at IS NULL RETURNING 1)
   SELECT jsonb_build_object('pages', (SELECT count(*) FROM a), 'evidence', (SELECT count(*) FROM b), 'batches', (SELECT count(*) FROM c))
 $$;
 
 ALTER TABLE public.document_batches ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.document_pages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.capture_document_pages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.document_evidence ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.document_coverage_targets ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.capture_set_rescore_queue ENABLE ROW LEVEL SECURITY;
 DO $$ DECLARE t text; BEGIN
-  FOREACH t IN ARRAY ARRAY['document_batches','document_pages','document_evidence','document_coverage_targets','capture_set_rescore_queue'] LOOP
+  FOREACH t IN ARRAY ARRAY['document_batches','capture_document_pages','document_evidence','document_coverage_targets','capture_set_rescore_queue'] LOOP
     EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', t || '_owner_read', t);
     EXECUTE format('CREATE POLICY %I ON public.%I FOR SELECT TO authenticated USING (user_id = auth.uid())', t || '_owner_read', t);
     EXECUTE format('REVOKE ALL ON public.%I FROM anon, authenticated', t);
@@ -149,7 +151,7 @@ GRANT EXECUTE ON FUNCTION public.document_period_coverage(uuid, date) TO authent
 REVOKE ALL ON FUNCTION public.document_ingest_revoke(uuid) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.document_ingest_revoke(uuid) TO service_role;
 
--- capture_sets_build: live definition (from 20261023180000) plus one NOT EXISTS on document_pages.
+-- capture_sets_build: live definition (from 20261023180000) plus one NOT EXISTS on capture_document_pages.
 CREATE OR REPLACE FUNCTION public.capture_sets_build(p_user uuid, p_gap_s integer DEFAULT 480, p_radius_m numeric DEFAULT 100, p_oncar_conf numeric DEFAULT NULL::numeric, p_doc_conf numeric DEFAULT NULL::numeric)
  RETURNS TABLE(set_key text, t0 timestamp with time zone, t1 timestamp with time zone, n integer, image_ids uuid[], unlinked_ids uuid[], filed_vehicle_ids uuid[], vin_keys text[], anchors jsonb, decision text, target_vehicle_id uuid, proposed_vin text, confidence numeric, reasons text[])
  LANGUAGE plpgsql
@@ -171,7 +173,7 @@ BEGIN
     FROM vehicle_images vi
     WHERE vi.user_id = p_user AND vi.source = 'capture_relay_ios' AND vi.taken_at IS NOT NULL
       AND nullif(vi.image_url, '') IS NOT NULL
-      AND NOT EXISTS (SELECT 1 FROM document_pages dp WHERE dp.image_id = vi.id AND dp.revoked_at IS NULL)
+      AND NOT EXISTS (SELECT 1 FROM capture_document_pages dp WHERE dp.image_id = vi.id AND dp.revoked_at IS NULL)
     WINDOW w AS (ORDER BY vi.taken_at, vi.id)
   ), g AS MATERIALIZED (
     SELECT p.*, sum(CASE WHEN p.pt IS NULL OR extract(epoch FROM p.taken_at - p.pt) > p_gap_s

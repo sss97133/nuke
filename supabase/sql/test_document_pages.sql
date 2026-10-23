@@ -1,4 +1,4 @@
--- document_pages: registered pages leave capture sets, evidence enqueues a debounced ±7 day rescore,
+-- capture_document_pages: registered pages leave capture sets, evidence enqueues a debounced ±7 day rescore,
 -- coverage scales, revoke by run, and revert restores capture_sets_build.
 \set ON_ERROR_STOP on
 DO $$ BEGIN
@@ -33,14 +33,14 @@ SELECT pg_temp.assert_true((SELECT sum(n) FROM capture_sets_build('11111111-1111
 
 INSERT INTO document_batches(id, user_id, label_image_id, box, vehicle_hint, year_hint, opened_at, run_id)
 VALUES ('22222222-2222-2222-2222-222222222222','11111111-1111-1111-1111-111111111111','00000000-0000-0000-0000-000000000001','Box 3','K5 Blazer',1979,'2026-10-22 10:00Z','33333333-3333-3333-3333-333333333333');
-INSERT INTO document_pages(image_id, user_id, batch_id, doc_key, is_label_card, classifier, run_id) VALUES
+INSERT INTO capture_document_pages(image_id, user_id, batch_id, doc_key, is_label_card, classifier, run_id) VALUES
  ('00000000-0000-0000-0000-000000000001','11111111-1111-1111-1111-111111111111','22222222-2222-2222-2222-222222222222','label',true,'gemini-flash','33333333-3333-3333-3333-333333333333');
-INSERT INTO document_pages(image_id, user_id, batch_id, doc_key, page_no, classifier, doc_date, date_source, run_id) VALUES
+INSERT INTO capture_document_pages(image_id, user_id, batch_id, doc_key, page_no, classifier, doc_date, date_source, run_id) VALUES
  ('00000000-0000-0000-0000-000000000002','11111111-1111-1111-1111-111111111111','22222222-2222-2222-2222-222222222222','d1',1,'gemini-flash','2019-05-10','ocr','33333333-3333-3333-3333-333333333333');
 SELECT pg_temp.assert_true((SELECT sum(n) FROM capture_sets_build('11111111-1111-1111-1111-111111111111')) = 1, 'registered pages excluded');
 
 DO $$ BEGIN
-  INSERT INTO document_pages(image_id, user_id, doc_key, classifier, doc_date, date_source, run_id)
+  INSERT INTO capture_document_pages(image_id, user_id, doc_key, classifier, doc_date, date_source, run_id)
   VALUES (gen_random_uuid(), gen_random_uuid(), 'x', 'c', '2020-01-01', 'none', gen_random_uuid());
   RAISE EXCEPTION 'FAIL: dated page without ocr source accepted';
 EXCEPTION WHEN check_violation THEN NULL; END $$;
@@ -63,7 +63,7 @@ SELECT pg_temp.assert_true(document_period_coverage('11111111-1111-1111-1111-111
 SELECT pg_temp.assert_true((SELECT count(*) FROM vehicle_images WHERE vehicle_id IS NOT NULL) = 0, 'never files');
 
 \ir revert_20261023230000_document_pages.sql
-SELECT pg_temp.assert_true(to_regclass('public.document_pages') IS NULL, 'revert drops tables');
-SELECT pg_temp.assert_true(position('document_pages' in pg_get_functiondef('public.capture_sets_build(uuid,integer,numeric,numeric,numeric)'::regprocedure)) = 0, 'revert restores capture_sets_build');
+SELECT pg_temp.assert_true(to_regclass('public.capture_document_pages') IS NULL, 'revert drops tables');
+SELECT pg_temp.assert_true(position('capture_document_pages' in pg_get_functiondef('public.capture_sets_build(uuid,integer,numeric,numeric,numeric)'::regprocedure)) = 0, 'revert restores capture_sets_build');
 SELECT pg_temp.assert_true((SELECT sum(n) FROM capture_sets_build('11111111-1111-1111-1111-111111111111')) = 3, 'restored function works');
 \echo 'document_pages: all assertions passed'
