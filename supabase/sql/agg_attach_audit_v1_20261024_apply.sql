@@ -1,5 +1,5 @@
 -- Run agg_attach_audit_v1_20261024: flag every conceptcarz-attached event that fails the aggregator attach rule
--- (20261026071000_aggregator_event_attach_guard: chassis/VIN match or cited same-lot match) as attached to the wrong vehicle.
+-- (20261026081000_aggregator_event_attach_guard: chassis/VIN match or cited same-lot match) as attached to the wrong vehicle.
 -- Writes only vehicle_events.source_suspect (+ 'vehicle_id'), source_suspect_reason/run_id/at. No price, vehicle or attachment moves.
 -- A flagged event whose final_price equals its vehicle's sale_price makes that price untrusted through
 -- vehicle_sale_price_untrusted / vehicle_sale_price_untrusted_ids (unless an unflagged event on the vehicle vouches for it).
