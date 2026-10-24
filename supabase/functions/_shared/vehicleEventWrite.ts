@@ -36,6 +36,23 @@ type LiveRow = { id: string; metadata: Record<string, unknown> | null; sold_at?:
 export interface VehicleEventWritePolicy {
   preserveEventStatus?: boolean;
   sourceObservedAt?: string;
+  /** Writer name stored as extraction_method on insert (e.g. 'extract-mecum'). Never overwrites a row-supplied value. */
+  writer?: string;
+  /** Run id stored as extraction_run_id on insert; defaults to one id per isolate. */
+  runId?: string;
+}
+
+// One run id per isolate (edge invocation lifetime), so rows from one run can be found and reverted together.
+const ISOLATE_RUN_ID = `${new Date().toISOString().slice(0, 10)}:${crypto.randomUUID()}`;
+
+/** Provenance for a new row: the caller's writer/run, else this lander's name, so no insert reaches the trigger unattributed. */
+export function withProvenance(row: VehicleEventRow, policy: VehicleEventWritePolicy): VehicleEventRow {
+  const writer = policy.writer ?? `vehicleEventWrite:${row.source_platform}`;
+  return {
+    ...row,
+    extraction_method: row.extraction_method ?? writer,
+    extraction_run_id: row.extraction_run_id ?? policy.runId ?? `${writer}:${ISOLATE_RUN_ID}`,
+  };
 }
 
 const CLOCK_FIELDS = ['sold_at', 'ended_at'] as const;
@@ -116,7 +133,7 @@ export async function writeVehicleEventByKey(supabase: Client, row: VehicleEvent
   if (sel.error) return err(sel.error);
   if (Array.isArray(sel.data) && sel.data.length > 0) return await updateLive(supabase, sel.data[0] as LiveRow, row, policy);
 
-  const ins = await supabase.from('vehicle_events').insert(row).select('id').limit(1);
+  const ins = await supabase.from('vehicle_events').insert(withProvenance(row, policy)).select('id').limit(1);
   if (!ins.error) {
     const id = Array.isArray(ins.data) && ins.data.length > 0 ? (ins.data[0] as { id?: string }).id ?? null : null;
     return { action: 'inserted', id };
@@ -127,4 +144,10 @@ export async function writeVehicleEventByKey(supabase: Client, row: VehicleEvent
     if (Array.isArray(again.data) && again.data.length > 0) return await updateLive(supabase, again.data[0] as LiveRow, row, policy);
   }
   return err(ins.error);
+}
+
+/** writeVehicleEventByKey bound to a writer name, so every insert from that function carries its extraction_method. */
+export function vehicleEventWriterFor(writer: string) {
+  return (supabase: Client, row: VehicleEventRow, policy: VehicleEventWritePolicy = {}) =>
+    writeVehicleEventByKey(supabase, row, { writer, ...policy });
 }

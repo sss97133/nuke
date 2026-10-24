@@ -37,7 +37,8 @@ import { postFromFlight } from "./rscPost.ts";
 import { mustWrite, softWrite } from "../_shared/writeResult.ts";
 import { extractStructuredLotFacets, indexLot, parseSaleFacet, priorSaleFacet, saleDay, summarizePriorSale, type IndexLot } from "./indexLot.ts";
 import { fillOnlyIdentity, landedStatus, vinConflictHolder } from "./identityFill.ts";
-import { patchForLiveRow, writeVehicleEventByKey } from "../_shared/vehicleEventWrite.ts";
+import { patchForLiveRow, vehicleEventWriterFor } from "../_shared/vehicleEventWrite.ts";
+const writeVehicleEventByKey = vehicleEventWriterFor("extract-mecum");
 import { landIdentifierClaims } from "../_shared/landIdentifierClaims.ts";
 
 const EXTRACTOR_VERSION = "2.0.0";

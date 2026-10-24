@@ -34,7 +34,8 @@
 import { normalizeDrivetrain, normalizeTransmission } from "../_shared/normalizeVehicle.ts";
 import { pickCapture, type CraigslistCapture } from "../_shared/craigslistAttributes.ts";
 import type { ObservationInput, WriteResult } from "../_shared/observationWriter.ts";
-import { writeVehicleEventByKey, type VehicleEventWriteResult } from "../_shared/vehicleEventWrite.ts";
+import { vehicleEventWriterFor, type VehicleEventWriteResult } from "../_shared/vehicleEventWrite.ts";
+const writeVehicleEventByKey = vehicleEventWriterFor("ingest:craigslist-capture");
 import { recordSellerTypes } from "../_shared/sellerType.ts";
 import { craigslistSellerTypeRow } from "./craigslistSellerType.ts";
 

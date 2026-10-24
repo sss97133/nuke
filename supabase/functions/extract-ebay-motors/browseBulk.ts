@@ -34,7 +34,8 @@
  * the database IO gate (firecrawl_io_gate) is closed. A page cut short by a cap is read again next run.
  */
 import { mustWrite, softWrite } from "../_shared/writeResult.ts";
-import { writeVehicleEventByKey } from "../_shared/vehicleEventWrite.ts";
+import { vehicleEventWriterFor } from "../_shared/vehicleEventWrite.ts";
+const writeVehicleEventByKey = vehicleEventWriterFor("extract-ebay-motors:browse-bulk");
 import { normalizeMake } from "../_shared/normalizeVehicle.ts";
 import { parseVehicleTitle } from "../ingest/vehicleTitle.ts";
 import { aspectFilterFor, type BrowseClient, CATEGORY_CARS_TRUCKS, QuotaExceeded, type SearchPage, type SearchSummary } from "./browseApi.ts";
