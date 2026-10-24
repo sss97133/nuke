@@ -23,6 +23,7 @@
  *   POST { "action": "stats" }                       -- Queue statistics
  */
 
+import { odometerMilesFromText } from "../_shared/odometerText.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { readCatalogPages } from "./catalogProbe.ts";
 import { archiveFetch, readArchivedPage } from "../_shared/archiveFetch.ts";
@@ -661,32 +662,9 @@ function extractImageUrls(html: string): string[] {
 
 function extractMileageFromText(vehicle: BJVehicle, text: string): void {
   if (vehicle.mileage) return;
-
-  const mileagePatterns = [
-    /(\d[\d,]*)\s*(?:actual|original|documented|indicated)\s*miles/i,
-    /mileage\s*(?:of|:)?\s*(\d[\d,]*)/i,
-    /odometer\s*(?:reads?|shows?|indicates?|:)?\s*(\d[\d,]*)/i,
-    /(\d[\d,]*)\s*miles\s*(?:on\s*(?:the\s*)?(?:odometer|clock))/i,
-    /only\s*(\d[\d,]*)\s*miles/i,
-    /(\d[\d,]*)\s*total\s*miles/i,
-    /(\d[\d,]*)\s*actual\s*miles/i,
-    /showing\s*(\d[\d,]*)\s*miles/i,
-    // BJ often has "X,XXX miles" in parenthetical notes
-    /[.\s](\d[\d,]+)\s*miles\s*\(/i,
-    // Generic "X,XXX miles" at sentence boundary (last resort, use carefully)
-    /\b(\d{1,3}(?:,\d{3})+)\s*miles\b/i,
-  ];
-
-  for (const pattern of mileagePatterns) {
-    const match = text.match(pattern);
-    if (match) {
-      const miles = parseInt(match[1].replace(/,/g, ""), 10);
-      if (miles > 0 && miles < 1_000_000) {
-        vehicle.mileage = miles;
-        return;
-      }
-    }
-  }
+  // Odometer context required (shared with Bonhams): skips "120 miles per hour", "55 mpg", "601hp".
+  const miles = odometerMilesFromText(text);
+  if (miles && miles < 1_000_000) vehicle.mileage = miles;
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────

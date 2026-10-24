@@ -61,3 +61,19 @@ Deno.test("og:image is the photo fallback", () => {
   const parsed = parseListingHtml("https://example.com/car/1", html, 200);
   if (parsed.photo_urls[0] !== "https://cdn.example.com/car.jpg") throw new Error(JSON.stringify(parsed.photo_urls));
 });
+
+Deno.test("live BaT auction: page price is a current bid, never an asking price", async () => {
+  const { detectAuctionState } = await import("./listing_fetch.ts");
+  const until = Math.floor(Date.now() / 1000) + 6 * 86400;
+  const html = `<html><head><meta property="og:title" content="No Reserve: 26k-Mile 1994 Mazda MX-5 Miata M Edition 5-Speed">
+<script type="application/ld+json">{"@type":"Product","name":"No Reserve: 26k-Mile 1994 Mazda MX-5 Miata M Edition 5-Speed","offers":{"@type":"Offer","priceCurrency":"USD","price":12000}}</script></head>
+<body><span class="listing-available-countdown" data-countdown="1" data-until="${until}"></span><a href="#listing-bid">Place Bid</a></body></html>`;
+  const L = parseListingHtml("https://bringatrailer.com/listing/1994-mazda-mx-5-miata-146/", html, 200);
+  assert(L.listing_kind === "auction_live", `kind=${L.listing_kind}`);
+  assert(L.current_bid === 12000, `bid=${L.current_bid}`);
+  assert(L.asking_price === null, `ask=${L.asking_price}`);
+  assert(L.auction_end_at === new Date(until * 1000).toISOString(), `end=${L.auction_end_at}`);
+  // Ended auction (end time in the past) is not live.
+  const past = detectAuctionState(`<span class="date-localize" data-ends="1600000000"></span> Sold for USD $24,500`);
+  assert(!past.live && past.ended, "ended");
+});
