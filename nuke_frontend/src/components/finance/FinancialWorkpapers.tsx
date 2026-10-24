@@ -73,7 +73,7 @@ export default function FinancialWorkpapers({ revision, onOpen }: { revision: nu
   const [sort, setSort] = useState<{ column: SortColumn; descending: boolean }>({ column: 'record_date', descending: true });
   const [tablePage, setTablePage] = useState(0);
   const [rows, setRows] = useState<SavedRecord[] | null>(null);
-  const [rowCount, setRowCount] = useState<number | null>(null);
+  const [hasMoreRows, setHasMoreRows] = useState(false);
   const [rowsError, setRowsError] = useState('');
   const [data, setData] = useState<Workpapers | null>(null);
   const [error, setError] = useState('');
@@ -85,14 +85,14 @@ export default function FinancialWorkpapers({ revision, onOpen }: { revision: nu
     const { data: { subscription } } = supabase.auth.onAuthStateChange(event => {
       if (event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED') return;
       generation.current++;
-      setData(null); setRows(null); setRowCount(null); setRowsError(''); setError(''); setView('overview'); setQuery(''); setAccount(''); setKind(''); setUnclassified(false); setTablePage(0); setYear(''); setSessionRevision(n => n + 1);
+      setData(null); setRows(null); setHasMoreRows(false); setRowsError(''); setError(''); setView('overview'); setQuery(''); setAccount(''); setKind(''); setUnclassified(false); setTablePage(0); setYear(''); setSessionRevision(n => n + 1);
     });
     return () => { generation.current++; subscription.unsubscribe(); };
   }, []);
   useEffect(() => {
     let cancelled = false;
     const request = ++generation.current;
-    if (scope.current !== (ownerId || '')) { setData(null); setRows(null); setRowCount(null); setUses({}); scope.current = ownerId || ''; }
+    if (scope.current !== (ownerId || '')) { setData(null); setRows(null); setHasMoreRows(false); setUses({}); scope.current = ownerId || ''; }
     setError('');
     void supabase.functions.invoke('ingest-observation', { body: {
       mode: 'financial_evidence_v1', action: 'tax_read', ...(shared ? { owner_user_id: ownerId } : {}), limit: 1,
@@ -136,22 +136,24 @@ export default function FinancialWorkpapers({ revision, onOpen }: { revision: nu
   // Records are read server-side from v_financial_accounting_records: every current record of the selected year,
   // filtered, searched and sorted in the database, 25 per page. The row policies of the book apply to the reader.
   useEffect(() => {
-    if (view !== 'records' || !ownerId) { setRows(null); setRowCount(null); setRowsError(''); return; }
+    if (view !== 'records' || !ownerId) { setRows(null); setHasMoreRows(false); setRowsError(''); return; }
     const bookId: string = ownerId;
     let cancelled = false;
+    setRows(null); setHasMoreRows(false); setRowsError('');
     const run = () => {
-      let request = supabase.from('v_financial_accounting_records').select('id, document_id, record', { count: 'exact' }).eq('owner_id', bookId);
+      let request = supabase.from('v_financial_accounting_records').select('id, document_id, record').eq('owner_id', bookId);
       if (selectedYear) request = request.eq('year', selectedYear);
       if (account) request = request.eq('account', account);
       if (kind) request = request.eq('record_kind', kind);
       if (unclassified) request = request.eq('record_kind', 'retained_bank_movement').is('section', null);
       const term = searchPattern(query);
       if (term !== '**') request = request.or(['description', 'category', 'decision', 'status', 'amount', 'account'].map(column => `${column}.ilike.${term}`).join(','));
-      void Promise.resolve(request.order(sort.column, { ascending: !sort.descending, nullsFirst: false }).order('id').range(tablePage * pageSize, tablePage * pageSize + pageSize - 1)).then(result => {
+      void Promise.resolve(request.order(sort.column, { ascending: !sort.descending, nullsFirst: false }).order('id').range(tablePage * pageSize, tablePage * pageSize + pageSize)).then(result => {
         if (cancelled) return;
-        if (result.error || !Array.isArray(result.data) || !Number.isSafeInteger(result.count)) { setRows(null); setRowCount(null); setRowsError('Saved records could not load.'); return; }
-        setRowsError(''); setRows(result.data as SavedRecord[]); setRowCount(result.count);
-      }).catch(() => { if (!cancelled) { setRows(null); setRowCount(null); setRowsError('Saved records could not load.'); } });
+        if (result.error || !Array.isArray(result.data)) { setRows(null); setHasMoreRows(false); setRowsError('Saved records could not load.'); return; }
+        const page = result.data as SavedRecord[];
+        setRowsError(''); setRows(page.slice(0, pageSize)); setHasMoreRows(page.length > pageSize);
+      }).catch(() => { if (!cancelled) { setRows(null); setHasMoreRows(false); setRowsError('Saved records could not load.'); } });
     };
     // Typing is debounced; every other change (filters, paging, refresh) reads at once.
     const typing = searched.current !== query; searched.current = query;
@@ -234,7 +236,7 @@ export default function FinancialWorkpapers({ revision, onOpen }: { revision: nu
           {data.controls_valid && <div className="accounting-table-wrap"><table><thead><tr><th>Account</th><th>Classification</th><th>Amount</th><th>Records</th></tr></thead><tbody>{accountRows.slice(offset, offset + 25).map((row, i) => <tr key={i}><td>{row.account || 'Unresolved'}</td><td>{row.section || 'Unresolved'}</td><td className="accounting-number">{displayMoney(row.missing_amounts ? null : row.retained_amount, row.currency)}</td><td>{row.rows}</td></tr>)}</tbody></table></div>}
           {!accountRows.length && <p>No account classifications match this filter.</p>}
         </>}
-        {view === 'records' ? <div className="accounting-pagination"><span>{rowCount === null ? 'Matches unknown' : `${rows?.length ? recordsOffset + 1 : 0}–${recordsOffset + (rows?.length ?? 0)} of ${rowCount.toLocaleString('en-US')} matches`}</span><button type="button" disabled={recordsOffset === 0} onClick={() => setTablePage(value => value - 1)}>Previous 25</button><button type="button" disabled={rowCount === null || recordsOffset + pageSize >= rowCount} onClick={() => setTablePage(value => value + 1)}>Next 25</button></div>
+        {view === 'records' ? <div className="accounting-pagination"><span>{rows === null ? 'Matches unavailable' : rows.length ? `Showing ${recordsOffset + 1}–${recordsOffset + rows.length} records${hasMoreRows ? '; more available' : ''}` : 'No matching records'}</span><button type="button" disabled={recordsOffset === 0} onClick={() => setTablePage(value => value - 1)}>Previous 25</button><button type="button" disabled={!hasMoreRows} onClick={() => setTablePage(value => value + 1)}>Next 25</button></div>
         : <div className="accounting-pagination"><span>{accountRows.length ? offset + 1 : 0}–{Math.min(offset + 25, accountRows.length)} of {accountRows.length} matches</span><button type="button" disabled={offset === 0} onClick={() => setTablePage(value => value - 1)}>Previous 25</button><button type="button" disabled={offset + 25 >= accountRows.length} onClick={() => setTablePage(value => value + 1)}>Next 25</button></div>}
       </>}
     </>}
