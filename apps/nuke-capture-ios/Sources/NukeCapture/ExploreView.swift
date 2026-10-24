@@ -193,7 +193,9 @@ struct ExploreView: View {
             // Reclaim the title bar on the landing — the tab already says "Explore",
             // and the Map/Pulse toggle is the real header. (Restored while searching so
             // the search field keeps its chrome.)
-            .toolbar(isSearching ? .visible : .hidden, for: .navigationBar)
+            // The navigation bar stays visible: .searchable lives in it, so hiding it on the
+            // landing hid the ONLY search field (the Map's "search a ZIP" prompt and vehicle
+            // search were unreachable until something else set the query).
             .searchable(text: $query, prompt: landingMode == .map ? "ZIP, or vehicle" : "Year, make, or model")
             .navigationDestination(for: VehicleHeaderRow.self) { v in
                 // PUSH (back chevron) — kills the Done-only dead-end.
