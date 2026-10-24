@@ -267,7 +267,7 @@ function previewFixture(options = {}) {
         if (specifier === '../_shared/archiveFetch.ts') return load('archive');
         if (specifier === '../_shared/writeGuard.ts') return load('guard');
         if (specifier === './supabaseKeys.ts' || specifier === '../_shared/supabaseKeys.ts') return load('keys');
-        if (specifier === '../_shared/vehicleEventWrite.ts') return { patchForLiveRow: () => assert.fail('No event write in the preview'), writeVehicleEventByKey: () => assert.fail('No event write in the preview') };
+        if (specifier === '../_shared/vehicleEventWrite.ts') return { patchForLiveRow: () => assert.fail('No event write in the preview'), writeVehicleEventByKey: () => assert.fail('No event write in the preview'), vehicleEventWriterFor: () => () => assert.fail('No event write in the preview') };
         if (specifier === './indexLot.ts') return { indexLot: () => assert.fail('No index read in the preview'), parseSaleFacet: () => assert.fail('No index read in the preview') };
         if (specifier === './auctionEndDate.ts') return { mecumAuctionEndDate: () => null };
         if (specifier === '../_shared/writeResult.ts') return { mustWrite: () => assert.fail('No write in the preview'), softWrite: () => assert.fail('No write in the preview') };
