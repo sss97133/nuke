@@ -24,6 +24,7 @@
  *      — Service-only, hash-verified retained-source preview; never writes
  */
 
+import { mileageFromMecumMarkdown } from "./markdownMileage.ts";
 import { mecumAuctionEndDate } from "./auctionEndDate.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { parse as parseHtml } from "https://esm.sh/parse5@7.3.0";
@@ -741,24 +742,11 @@ function parseMarkdown(markdown: string, url: string): MecumVehicle {
   if (specs['MAKE']) vehicle.make = titleCase(specs['MAKE']);
   if (specs['MODEL']) vehicle.model = titleCase(specs['MODEL']);
 
-  // Mileage
-  const subtitleMileage = markdown.match(/^[^#\n].+?([\d,]+)\s*(?:actual\s+)?[Mm]iles/m);
-  if (subtitleMileage) {
-    const miles = parseInt(subtitleMileage[1].replace(/,/g, ''), 10);
-    if (miles > 0 && miles < 1_000_000) {
-      vehicle.mileage = miles;
-      vehicle.mileage_source = "subtitle";
-    }
-  }
-  if (!vehicle.mileage) {
-    const highlightsMileage = markdown.match(/^- .*([\d,]+)\s*(?:actual\s+)?[Mm]iles/m);
-    if (highlightsMileage) {
-      const miles = parseInt(highlightsMileage[1].replace(/,/g, ''), 10);
-      if (miles > 0 && miles < 1_000_000) {
-        vehicle.mileage = miles;
-        vehicle.mileage_source = "highlights";
-      }
-    }
+  // Mileage (subtitle, then highlights; speeds and mpg skipped — see markdownMileage.ts)
+  const mdMileage = mileageFromMecumMarkdown(markdown);
+  if (mdMileage) {
+    vehicle.mileage = mdMileage.mileage;
+    vehicle.mileage_source = mdMileage.source;
   }
 
   // Sold status
