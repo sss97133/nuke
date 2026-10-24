@@ -2,7 +2,8 @@
 -- NULL = not assessed (legacy). 'unverified' = amount from a source known to mix estimates/averages
 -- with sale prices, not yet checked against a primary source. 'verified' = matched a cited primary
 -- source. 'contradicted' = a cited primary source disagrees (or lot did not sell); amount kept, not used.
--- Comps (get_comps_scored, both overloads) exclude unverified/contradicted. shadow_sale_prices is NOT
+-- Comps (get_comps_scored, both overloads) exclude unverified/contradicted. A vehicles.sale_price that
+-- disagrees with a verified event price is treated as stale and also excluded. shadow_sale_prices is NOT
 -- changed here (it reads auction_events; the shadow workstream owns it).
 ALTER TABLE public.vehicle_events
   ADD COLUMN IF NOT EXISTS price_verification text,
@@ -93,8 +94,9 @@ BEGIN
       -- price_verification: a vehicles.sale_price copied from an unverified/contradicted event is not a comp
       AND NOT EXISTS (
         SELECT 1 FROM vehicle_events pv
-        WHERE pv.vehicle_id = v.id AND pv.final_price = v.sale_price
-          AND pv.price_verification IN ('unverified', 'contradicted')
+        WHERE pv.vehicle_id = v.id
+          AND ((pv.final_price = v.sale_price AND pv.price_verification IN ('unverified', 'contradicted'))
+            OR (pv.final_price <> v.sale_price AND pv.price_verification = 'verified'))
       )
       AND (p_exclude_vehicle_id IS NULL OR v.id != p_exclude_vehicle_id)
       AND NOT EXISTS (
