@@ -5,7 +5,7 @@ MF.append("cd4739c3-ff79-4e32-a271-06f20cc891c8"); MF.append("858983da-1a2f-4484
 # LM_USABLE_DUMP=<agent-tools id of a dump_lm_usable.sql result> replaces the frozen MF dumps with
 # one read of auction_event_listing_mileage_usable (suspect rows and suspect vehicles excluded).
 import os
-if os.environ.get('LM_USABLE_DUMP'): MF=[os.environ['LM_USABLE_DUMP']]
+if os.environ.get('LM_USABLE_DUMP'): MF=os.environ['LM_USABLE_DUMP'].split(',')  # comma-separated ids allowed
 LM={}; TMU=set()
 for f in MF:
   for l in rd(f).split('\n'):
