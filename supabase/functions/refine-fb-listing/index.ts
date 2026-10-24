@@ -14,6 +14,7 @@ import { corsHeaders } from "../_shared/cors.ts";
 import { isGarbageMake } from "../_shared/normalizeVehicle.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { flagPlaceholderMileage } from "../_shared/odometer.ts";
 
 // Googlebot works for FB Marketplace individual listings (bingbot blocked as of 2026-03)
 const GOOGLEBOT_UA =
@@ -545,6 +546,8 @@ Deno.serve(async (req) => {
                 .update(vehicleUpdates)
                 .eq("id", listing.vehicle_id);
             }
+            // sentinel odometers (99999, 123456, ...) get a suspect status row next to the write (best-effort)
+            if (typeof vehicleUpdates.mileage === "number") await flagPlaceholderMileage(supabase, listing.vehicle_id, vehicleUpdates.mileage, "refine_fb_listing", listingUrl);
           }
 
           totalFields += fieldsExtracted;
@@ -962,6 +965,7 @@ Deno.serve(async (req) => {
               .update(vehicleUpdates)
               .eq("id", listing.vehicle_id);
           }
+          if (typeof vehicleUpdates.mileage === "number") await flagPlaceholderMileage(supabase, listing.vehicle_id, vehicleUpdates.mileage, "refine_fb_listing", listing.url || null);
         }
 
         results.push({ facebook_id: listing.facebook_id, success: true, fields_extracted: fieldsExtracted });
