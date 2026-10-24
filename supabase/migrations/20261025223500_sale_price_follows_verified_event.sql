@@ -15,6 +15,7 @@ declare
   v_latest vehicle_events%rowtype;
   v_price  integer;
   v_cur    integer;
+  v_status text;
 begin
   if new.vehicle_id is null or new.price_verification is distinct from 'verified' or new.event_status is distinct from 'sold' then
     return null;
@@ -37,8 +38,8 @@ begin
   end if;
 
   v_price := round(v_latest.final_price)::integer;
-  select sale_price into v_cur from vehicles where id = new.vehicle_id;
-  if v_cur is not distinct from v_price then
+  select sale_price, sale_status into v_cur, v_status from vehicles where id = new.vehicle_id;
+  if v_cur is not distinct from v_price and v_status is not distinct from 'sold' then
     return null;
   end if;
 
