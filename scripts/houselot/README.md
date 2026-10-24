@@ -36,3 +36,10 @@ Steps (each file runs in a rolled-back transaction first; statement_timeout 50s)
 - `apply_agg_houselot_alias.sql` is the normal matcher on cand4a/cand4b: both must be unique and agree, one cc event per house event,
   price-conflict hold unchanged. `python3 batches.py apply_agg_houselot_alias.sql agg_houselot_v4_20261024 OUT`.
 - Revert: `revert_agg_houselot_v4_20261024.sql`.
+
+## RM Sotheby's ingest and run agg_houselot_v5_20261024
+`rm_ingest/fetch.py` reads each candidate sale from rmsothebys.com `api/search/SearchLots` (3 s between requests; auction codes and dates from `/results/YYYY`).
+`match.py` confirms the house: a sold RM lot in a candidate sale with the event's year, make word and at least 60% of its title words (price only breaks ties; a partial title needs the price within 20%).
+`mksql.py` inserts each confirmed lot additively (skips a lot already held; reuses a vehicle with the same listing or discovery URL, else creates one): run `rm_ingest_v1_20261024`, cited link, price and currency as RM states, lot number with `lot_number_source_url`.
+`cand5.py` builds cand5a (first word) and cand5b (all words) counted over every lot of the candidate sales; `apply_agg_houselot_rm_v5.sql` is the usual matcher with the price hold.
+Reverts: `revert_agg_houselot_v5_20261024.sql`, then `rm_ingest/revert_rm_ingest_v1_20261024.sql` (soft: retracts events, sets vehicles.deleted_at).
