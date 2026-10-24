@@ -51,3 +51,9 @@ and its source are written to `metadata.attach_basis.fx`. A non-USD price with n
 It never attaches to a vehicle created by `rm_ingest_v1_20261024`. Revert: `revert_agg_houselot_v6_20261024.sql`.
 Trial 2026-10-24 (rolled back): all 232 v5-held events target rm_ingest vehicles, so 0 attach and the run was not applied.
 Of the 11 non-USD held events, only 1 agrees within 20% after conversion (GBP 55,000 at BoE 1.5912 = $87,516 vs 85,000; conceptcarz currency assumed USD).
+## Near-miss run (agg_houselot_v7_20261024)
+`nearmiss_classify.py` takes cand4a-unique / cand4b-zero events and keeps those whose title words missing from the house lot are body/spec
+words only, dropping any whose body word conflicts with a different body word in the lot (e.g. Fastback vs convertible).
+`apply_agg_houselot_nearmiss_v7.sql` attaches with: cited lot, one cc event per house event, not a verified/contradicted sale, price within
+20% in USD (CAD via fx_boc_cad_usd_v1_20261024), target vehicle created before 2026-10-24, live, not rm_ingest, no year_suspect, house event
+identity-confirmed. Applied 2026-10-24: 6 attached, 5 copied prices marked untrusted. Revert: `revert_agg_houselot_v7_20261024.sql`.
