@@ -1,17 +1,18 @@
 -- mv_treemap_outcomes.sold_amount on trusted USD: untrusted sale_price (vehicle_sale_price_untrusted_ids) -> NULL; non-USD sale_price -> sale_price_usd;
 -- winning_bid/bat_sold_price/sold_price fallbacks only for USD rows. Rebuilds the 9 dependent views/matviews with unchanged definitions, indexes, comments, grants.
--- USER-FACING (market map). Needs Skylar OK before applying.
-DROP VIEW IF EXISTS public.v_market_measurement_coverage;
-DROP VIEW IF EXISTS public.v_market_house_coverage;
-DROP MATERIALIZED VIEW IF EXISTS public.mv_treemap_sale_models;
-DROP MATERIALIZED VIEW IF EXISTS public.mv_treemap_sale_brands;
-DROP MATERIALIZED VIEW IF EXISTS public.mv_family_year_prices_v1;
-DROP MATERIALIZED VIEW IF EXISTS public.mv_family_year_prices;
-DROP MATERIALIZED VIEW IF EXISTS public.mv_family_sales;
-DROP MATERIALIZED VIEW IF EXISTS public.mv_family_market;
-DROP MATERIALIZED VIEW IF EXISTS public.mv_brand_market;
-DROP MATERIALIZED VIEW IF EXISTS public.mv_treemap_outcomes;
-CREATE MATERIALIZED VIEW public.mv_treemap_outcomes AS
+-- USER-FACING (market map). Approved by Skylar 2026-10-24.
+--
+-- As applied to live (the full build exceeds the SQL API's 2-minute limit, so no DROP/CREATE in place):
+--   Part 1 ran as one-off pg_cron job 674 (SET LOCAL statement_timeout raises the postgres role's 10s default):
+--     builds every object under a <name>_new name, indexes as <index>_tmp. Live objects were untouched while it ran.
+--   Part 2 ran as one short transaction (lock_timeout 5s): renames live objects to <name>_bak / <index>_bak, then
+--     <name>_new -> <name> and <index>_tmp -> <index>. Dependents follow their parents by OID, so the _bak set stays a
+--     consistent copy of the previous state. Rollback: supabase/rollbacks/20261026030000_treemap_outcomes_usd_trusted_down.sql
+--     (rename swap back while the _bak set exists) or ..._down_rebuild.sql (full rebuild of the old definitions).
+
+-- Part 1: build
+SET LOCAL statement_timeout = '3600s';
+CREATE MATERIALIZED VIEW public.mv_treemap_outcomes_new AS
  SELECT id,
     brand_name,
     model,
@@ -57,21 +58,21 @@ CREATE MATERIALIZED VIEW public.mv_treemap_outcomes AS
          OFFSET 0) s
   WHERE sale_basis IS NOT NULL OR (sale_status = ANY (ARRAY['not_sold'::text, 'unsold'::text, 'bid_to'::text])) OR reserve_status = 'reserve_not_met'::text OR (auction_outcome = ANY (ARRAY['reserve_not_met'::text, 'no_sale'::text]))
 WITH DATA;
-CREATE UNIQUE INDEX mv_treemap_outcomes_id ON public.mv_treemap_outcomes USING btree (id);
-CREATE INDEX mv_treemap_outcomes_cell ON public.mv_treemap_outcomes USING btree (lower(brand_name), lower(model), year);
-COMMENT ON MATERIALIZED VIEW public.mv_treemap_outcomes IS 'The market map''s fold: one row per public vehicle record (is_public, undeleted, not a non_vehicle_item lot, a make that resolves to canonical_makes or passes the text filter) with a known outcome. outcome = sold when vehicle_sale_basis() is not null (sale_basis says which basis), else not_sold for vehicle_price_facts'' no-sale states; unknown outcomes are not here. sold_amount is vehicle_price_facts'' sold_amount (nominal, no currency on the row). Refreshed by treemap_refresh_all (daily, job 175). 2026-10-14. source_name = market_venue_label(auction_source, canonical_platform) (20261016153000).';
-REVOKE ALL ON public.mv_treemap_outcomes FROM PUBLIC, anon, authenticated, service_role;
-GRANT INSERT, SELECT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public.mv_treemap_outcomes TO service_role;
-GRANT SELECT ON public.mv_treemap_outcomes TO anon;
-GRANT SELECT ON public.mv_treemap_outcomes TO authenticated;
-CREATE MATERIALIZED VIEW public.mv_brand_market AS
+CREATE UNIQUE INDEX mv_treemap_outcomes_id_tmp ON public.mv_treemap_outcomes_new USING btree (id);
+CREATE INDEX mv_treemap_outcomes_cell_tmp ON public.mv_treemap_outcomes_new USING btree (lower(brand_name), lower(model), year);
+COMMENT ON MATERIALIZED VIEW public.mv_treemap_outcomes_new IS 'The market map''s fold: one row per public vehicle record (is_public, undeleted, not a non_vehicle_item lot, a make that resolves to canonical_makes or passes the text filter) with a known outcome. outcome = sold when vehicle_sale_basis() is not null (sale_basis says which basis), else not_sold for vehicle_price_facts'' no-sale states; unknown outcomes are not here. sold_amount is vehicle_price_facts'' sold_amount (nominal, no currency on the row). Refreshed by treemap_refresh_all (daily, job 175). 2026-10-14. source_name = market_venue_label(auction_source, canonical_platform) (20261016153000).';
+REVOKE ALL ON public.mv_treemap_outcomes_new FROM PUBLIC, anon, authenticated, service_role;
+GRANT INSERT, SELECT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public.mv_treemap_outcomes_new TO service_role;
+GRANT SELECT ON public.mv_treemap_outcomes_new TO anon;
+GRANT SELECT ON public.mv_treemap_outcomes_new TO authenticated;
+CREATE MATERIALIZED VIEW public.mv_brand_market_new AS
  WITH o AS (
          SELECT o.brand_name,
             o.outcome,
             o.sold_amount,
             o.year,
             COALESCE(v.sale_date, v.bat_sale_date) AS sale_date
-           FROM mv_treemap_outcomes o
+           FROM mv_treemap_outcomes_new o
              JOIN vehicles v ON v.id = o.id
         ), b AS (
          SELECT o.brand_name AS name,
@@ -119,13 +120,13 @@ CREATE MATERIALIZED VIEW public.mv_brand_market AS
     now() AS as_of
    FROM b
 WITH DATA;
-CREATE UNIQUE INDEX mv_brand_market_name ON public.mv_brand_market USING btree (name);
-COMMENT ON MATERIALIZED VIEW public.mv_brand_market IS 'One row per brand from confirmed sales: dollars, sell-through, the p10-p90 price band, the model year that trades, and the last 12 months against the 12 before. Refreshed by treemap_refresh_all.';
-REVOKE ALL ON public.mv_brand_market FROM PUBLIC, anon, authenticated, service_role;
-GRANT INSERT, SELECT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public.mv_brand_market TO anon;
-GRANT INSERT, SELECT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public.mv_brand_market TO authenticated;
-GRANT INSERT, SELECT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public.mv_brand_market TO service_role;
-CREATE MATERIALIZED VIEW public.mv_family_market AS
+CREATE UNIQUE INDEX mv_brand_market_name_tmp ON public.mv_brand_market_new USING btree (name);
+COMMENT ON MATERIALIZED VIEW public.mv_brand_market_new IS 'One row per brand from confirmed sales: dollars, sell-through, the p10-p90 price band, the model year that trades, and the last 12 months against the 12 before. Refreshed by treemap_refresh_all.';
+REVOKE ALL ON public.mv_brand_market_new FROM PUBLIC, anon, authenticated, service_role;
+GRANT INSERT, SELECT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public.mv_brand_market_new TO anon;
+GRANT INSERT, SELECT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public.mv_brand_market_new TO authenticated;
+GRANT INSERT, SELECT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public.mv_brand_market_new TO service_role;
+CREATE MATERIALIZED VIEW public.mv_family_market_new AS
  WITH name_map AS MATERIALIZED (
          SELECT u.make_k,
             u.model_l,
@@ -166,7 +167,7 @@ CREATE MATERIALIZED VIEW public.mv_family_market AS
             lower(v.make) AS make_l,
             lower(btrim(COALESCE(o.model, ''::text))) AS model_l,
             (o.source_name = ANY (ARRAY['Bring a Trailer'::text, 'Mecum'::text, 'Bonhams'::text])) AND o.sold_amount > 0::numeric AS bat
-           FROM mv_treemap_outcomes o
+           FROM mv_treemap_outcomes_new o
              JOIN vehicles v ON v.id = o.id
         ), f AS (
          SELECT o.brand_name,
@@ -250,13 +251,13 @@ CREATE MATERIALIZED VIEW public.mv_family_market AS
             ELSE family_id::text
         END), model_key
 WITH DATA;
-CREATE UNIQUE INDEX mv_family_market_key ON public.mv_family_market USING btree (brand, family_key, model_key);
-COMMENT ON MATERIALIZED VIEW public.mv_family_market IS 'One row per brand, factory model family (canonical_models key, or "other": no family, or under 3 sales in the brand) and model name (lower(btrim(model))) from confirmed sales: dollars, sold, sell-through inputs, and (bat_*) the last 12 months against the 12 before on the measured houses (Bring a Trailer, Mecum, Bonhams).';
-REVOKE ALL ON public.mv_family_market FROM PUBLIC, anon, authenticated, service_role;
-GRANT INSERT, SELECT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public.mv_family_market TO anon;
-GRANT INSERT, SELECT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public.mv_family_market TO authenticated;
-GRANT INSERT, SELECT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public.mv_family_market TO service_role;
-CREATE MATERIALIZED VIEW public.mv_family_sales AS
+CREATE UNIQUE INDEX mv_family_market_key_tmp ON public.mv_family_market_new USING btree (brand, family_key, model_key);
+COMMENT ON MATERIALIZED VIEW public.mv_family_market_new IS 'One row per brand, factory model family (canonical_models key, or "other": no family, or under 3 sales in the brand) and model name (lower(btrim(model))) from confirmed sales: dollars, sold, sell-through inputs, and (bat_*) the last 12 months against the 12 before on the measured houses (Bring a Trailer, Mecum, Bonhams).';
+REVOKE ALL ON public.mv_family_market_new FROM PUBLIC, anon, authenticated, service_role;
+GRANT INSERT, SELECT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public.mv_family_market_new TO anon;
+GRANT INSERT, SELECT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public.mv_family_market_new TO authenticated;
+GRANT INSERT, SELECT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public.mv_family_market_new TO service_role;
+CREATE MATERIALIZED VIEW public.mv_family_sales_new AS
  WITH name_map AS MATERIALIZED (
          SELECT u.make_k,
             u.model_l,
@@ -294,7 +295,7 @@ CREATE MATERIALIZED VIEW public.mv_family_sales AS
             lower(o.brand_name) AS brand_l,
             lower(v.make) AS make_l,
             lower(btrim(COALESCE(o.model, ''::text))) AS model_l
-           FROM mv_treemap_outcomes o
+           FROM mv_treemap_outcomes_new o
              JOIN vehicles v ON v.id = o.id
           WHERE o.sold_amount > 0::numeric AND COALESCE(v.sale_date, v.bat_sale_date) IS NOT NULL
         ), f AS (
@@ -316,10 +317,10 @@ CREATE MATERIALIZED VIEW public.mv_family_sales AS
              LEFT JOIN name_map nb ON nb.make_k = o.brand_l AND nb.model_l = o.model_l
              LEFT JOIN name_map nm ON nm.make_k = o.make_l AND nm.model_l = o.model_l
         ), named AS (
-         SELECT DISTINCT mv_family_market.brand,
-            mv_family_market.family_key
-           FROM mv_family_market
-          WHERE mv_family_market.family_key <> 'other'::text
+         SELECT DISTINCT mv_family_market_new.brand,
+            mv_family_market_new.family_key
+           FROM mv_family_market_new
+          WHERE mv_family_market_new.family_key <> 'other'::text
         )
  SELECT f.id AS vehicle_id,
     f.brand_name AS brand,
@@ -332,14 +333,14 @@ CREATE MATERIALIZED VIEW public.mv_family_sales AS
    FROM f
      LEFT JOIN named ON named.brand = f.brand_name AND named.family_key = f.family_id
 WITH DATA;
-CREATE UNIQUE INDEX mv_family_sales_vehicle ON public.mv_family_sales USING btree (vehicle_id);
-CREATE INDEX mv_family_sales_family_date ON public.mv_family_sales USING btree (brand, family_key, sale_date DESC);
-COMMENT ON MATERIALIZED VIEW public.mv_family_sales IS 'Dated confirmed sales with an amount, keyed to (brand, family_key) the way mv_family_market keys them.';
-REVOKE ALL ON public.mv_family_sales FROM PUBLIC, anon, authenticated, service_role;
-GRANT INSERT, SELECT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public.mv_family_sales TO anon;
-GRANT INSERT, SELECT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public.mv_family_sales TO authenticated;
-GRANT INSERT, SELECT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public.mv_family_sales TO service_role;
-CREATE MATERIALIZED VIEW public.mv_family_year_prices AS
+CREATE UNIQUE INDEX mv_family_sales_vehicle_tmp ON public.mv_family_sales_new USING btree (vehicle_id);
+CREATE INDEX mv_family_sales_family_date_tmp ON public.mv_family_sales_new USING btree (brand, family_key, sale_date DESC);
+COMMENT ON MATERIALIZED VIEW public.mv_family_sales_new IS 'Dated confirmed sales with an amount, keyed to (brand, family_key) the way mv_family_market keys them.';
+REVOKE ALL ON public.mv_family_sales_new FROM PUBLIC, anon, authenticated, service_role;
+GRANT INSERT, SELECT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public.mv_family_sales_new TO anon;
+GRANT INSERT, SELECT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public.mv_family_sales_new TO authenticated;
+GRANT INSERT, SELECT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public.mv_family_sales_new TO service_role;
+CREATE MATERIALIZED VIEW public.mv_family_year_prices_new AS
  WITH listing AS (
          SELECT m.vehicle_id,
             m.price::numeric AS price,
@@ -373,7 +374,7 @@ CREATE MATERIALIZED VIEW public.mv_family_year_prices AS
             v.deleted_at IS NULL AND v.is_public IS TRUE AND v.year IS NOT NULL AND (v.listing_kind IS NULL OR v.listing_kind <> 'non_vehicle_item'::text) AS listable
            FROM vehicles v
           WHERE (v.id IN ( SELECT o.id
-                   FROM mv_treemap_outcomes o
+                   FROM mv_treemap_outcomes_new o
                   WHERE o.year IS NOT NULL
                 UNION
                  SELECT l.vehicle_id
@@ -389,7 +390,7 @@ CREATE MATERIALIZED VIEW public.mv_family_year_prices AS
             lower(COALESCE(v.model, ''::text)) AS model_l,
             v.page,
             v.mileage AS miles
-           FROM mv_treemap_outcomes o
+           FROM mv_treemap_outcomes_new o
              JOIN vehicle_rows v ON v.id = o.id
           WHERE o.year IS NOT NULL
         ), asked AS (
@@ -629,13 +630,13 @@ CREATE MATERIALIZED VIEW public.mv_family_year_prices AS
      LEFT JOIN vsj vj ON vj.basis = a.basis AND vj.pool = a.pool AND vj.year = a.year
   WHERE a.n > 0
 WITH DATA;
-CREATE UNIQUE INDEX mv_family_year_prices_key ON public.mv_family_year_prices USING btree (family_id, year, basis);
-COMMENT ON MATERIALIZED VIEW public.mv_family_year_prices IS 'Private unbuilt beside copy: same year-price rules; cache named and conflict expressions once. Reader stays on populated original until separately validated build and rename.';
-REVOKE ALL ON public.mv_family_year_prices FROM PUBLIC, anon, authenticated, service_role;
-GRANT INSERT, SELECT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public.mv_family_year_prices TO service_role;
-GRANT SELECT ON public.mv_family_year_prices TO anon;
-GRANT SELECT ON public.mv_family_year_prices TO authenticated;
-CREATE MATERIALIZED VIEW public.mv_family_year_prices_v1 AS
+CREATE UNIQUE INDEX mv_family_year_prices_key_tmp ON public.mv_family_year_prices_new USING btree (family_id, year, basis);
+COMMENT ON MATERIALIZED VIEW public.mv_family_year_prices_new IS 'Private unbuilt beside copy: same year-price rules; cache named and conflict expressions once. Reader stays on populated original until separately validated build and rename.';
+REVOKE ALL ON public.mv_family_year_prices_new FROM PUBLIC, anon, authenticated, service_role;
+GRANT INSERT, SELECT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public.mv_family_year_prices_new TO service_role;
+GRANT SELECT ON public.mv_family_year_prices_new TO anon;
+GRANT SELECT ON public.mv_family_year_prices_new TO authenticated;
+CREATE MATERIALIZED VIEW public.mv_family_year_prices_v1_new AS
  WITH listing AS (
          SELECT m.vehicle_id,
             m.price::numeric AS price,
@@ -669,7 +670,7 @@ CREATE MATERIALIZED VIEW public.mv_family_year_prices_v1 AS
             v.deleted_at IS NULL AND v.is_public IS TRUE AND v.year IS NOT NULL AND (v.listing_kind IS NULL OR v.listing_kind <> 'non_vehicle_item'::text) AS listable
            FROM vehicles v
           WHERE (v.id IN ( SELECT o.id
-                   FROM mv_treemap_outcomes o
+                   FROM mv_treemap_outcomes_new o
                   WHERE o.year IS NOT NULL
                 UNION
                  SELECT l.vehicle_id
@@ -685,7 +686,7 @@ CREATE MATERIALIZED VIEW public.mv_family_year_prices_v1 AS
             lower(COALESCE(v.model, ''::text)) AS model_l,
             v.page,
             v.mileage AS miles
-           FROM mv_treemap_outcomes o
+           FROM mv_treemap_outcomes_new o
              JOIN vehicle_rows v ON v.id = o.id
           WHERE o.year IS NOT NULL
         ), asked AS (
@@ -925,10 +926,10 @@ CREATE MATERIALIZED VIEW public.mv_family_year_prices_v1 AS
      LEFT JOIN vsj vj ON vj.basis = a.basis AND vj.pool = a.pool AND vj.year = a.year
   WHERE a.n > 0
 WITH DATA;
-CREATE UNIQUE INDEX mv_family_year_prices_key_v1 ON public.mv_family_year_prices_v1 USING btree (family_id, year, basis);
-COMMENT ON MATERIALIZED VIEW public.mv_family_year_prices_v1 IS 'Pre-optimization year-price fold retained privately for reversible rename; no public readers.';
-REVOKE ALL ON public.mv_family_year_prices_v1 FROM PUBLIC, anon, authenticated, service_role;
-CREATE MATERIALIZED VIEW public.mv_treemap_sale_brands AS
+CREATE UNIQUE INDEX mv_family_year_prices_key_v1_tmp ON public.mv_family_year_prices_v1_new USING btree (family_id, year, basis);
+COMMENT ON MATERIALIZED VIEW public.mv_family_year_prices_v1_new IS 'Pre-optimization year-price fold retained privately for reversible rename; no public readers.';
+REVOKE ALL ON public.mv_family_year_prices_v1_new FROM PUBLIC, anon, authenticated, service_role;
+CREATE MATERIALIZED VIEW public.mv_treemap_sale_brands_new AS
  SELECT brand_name AS name,
     count(*) FILTER (WHERE sold_amount > 0::numeric) AS count,
     sum(sold_amount) FILTER (WHERE sold_amount > 0::numeric)::bigint AS value,
@@ -942,17 +943,17 @@ CREATE MATERIALIZED VIEW public.mv_treemap_sale_brands AS
     count(*) AS auction_count,
     round(avg(bat_bids) FILTER (WHERE sold_amount > 0::numeric AND bat_bids > 0))::integer AS avg_bids,
     round(avg(bat_watchers) FILTER (WHERE sold_amount > 0::numeric AND bat_watchers > 0))::integer AS avg_watchers
-   FROM mv_treemap_outcomes o
+   FROM mv_treemap_outcomes_new o
   GROUP BY brand_name
  HAVING count(*) FILTER (WHERE sold_amount > 0::numeric) >= 5
 WITH DATA;
-CREATE UNIQUE INDEX mv_treemap_sale_brands_name ON public.mv_treemap_sale_brands USING btree (name);
-COMMENT ON MATERIALIZED VIEW public.mv_treemap_sale_brands IS 'The map''s makes, from mv_treemap_outcomes: count = confirmed sales with an amount (the area), median_price = their median, null under 5 sales (the color), value/min/max over the same sales, sold_count = confirmed sales, auction_count = known outcomes. Makes with fewer than 5 sales are left out. 2026-10-14.';
-REVOKE ALL ON public.mv_treemap_sale_brands FROM PUBLIC, anon, authenticated, service_role;
-GRANT INSERT, SELECT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public.mv_treemap_sale_brands TO service_role;
-GRANT SELECT ON public.mv_treemap_sale_brands TO anon;
-GRANT SELECT ON public.mv_treemap_sale_brands TO authenticated;
-CREATE MATERIALIZED VIEW public.mv_treemap_sale_models AS
+CREATE UNIQUE INDEX mv_treemap_sale_brands_name_tmp ON public.mv_treemap_sale_brands_new USING btree (name);
+COMMENT ON MATERIALIZED VIEW public.mv_treemap_sale_brands_new IS 'The map''s makes, from mv_treemap_outcomes: count = confirmed sales with an amount (the area), median_price = their median, null under 5 sales (the color), value/min/max over the same sales, sold_count = confirmed sales, auction_count = known outcomes. Makes with fewer than 5 sales are left out. 2026-10-14.';
+REVOKE ALL ON public.mv_treemap_sale_brands_new FROM PUBLIC, anon, authenticated, service_role;
+GRANT INSERT, SELECT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public.mv_treemap_sale_brands_new TO service_role;
+GRANT SELECT ON public.mv_treemap_sale_brands_new TO anon;
+GRANT SELECT ON public.mv_treemap_sale_brands_new TO authenticated;
+CREATE MATERIALIZED VIEW public.mv_treemap_sale_models_new AS
  SELECT brand_name,
     model AS name,
     count(*) FILTER (WHERE sold_amount > 0::numeric) AS count,
@@ -967,18 +968,18 @@ CREATE MATERIALIZED VIEW public.mv_treemap_sale_models AS
     count(*) AS auction_count,
     round(avg(bat_bids) FILTER (WHERE sold_amount > 0::numeric AND bat_bids > 0))::integer AS avg_bids,
     round(avg(bat_watchers) FILTER (WHERE sold_amount > 0::numeric AND bat_watchers > 0))::integer AS avg_watchers
-   FROM mv_treemap_outcomes o
+   FROM mv_treemap_outcomes_new o
   WHERE model IS NOT NULL
   GROUP BY brand_name, model
  HAVING count(*) FILTER (WHERE sold_amount > 0::numeric) > 0
 WITH DATA;
-CREATE UNIQUE INDEX mv_treemap_sale_models_brand_name ON public.mv_treemap_sale_models USING btree (brand_name, name);
-COMMENT ON MATERIALIZED VIEW public.mv_treemap_sale_models IS 'The map''s models per make, from mv_treemap_outcomes, with the columns of mv_treemap_sale_brands; every model with at least one confirmed sale with an amount. 2026-10-14.';
-REVOKE ALL ON public.mv_treemap_sale_models FROM PUBLIC, anon, authenticated, service_role;
-GRANT INSERT, SELECT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public.mv_treemap_sale_models TO service_role;
-GRANT SELECT ON public.mv_treemap_sale_models TO anon;
-GRANT SELECT ON public.mv_treemap_sale_models TO authenticated;
-CREATE VIEW public.v_market_house_coverage AS
+CREATE UNIQUE INDEX mv_treemap_sale_models_brand_name_tmp ON public.mv_treemap_sale_models_new USING btree (brand_name, name);
+COMMENT ON MATERIALIZED VIEW public.mv_treemap_sale_models_new IS 'The map''s models per make, from mv_treemap_outcomes, with the columns of mv_treemap_sale_brands; every model with at least one confirmed sale with an amount. 2026-10-14.';
+REVOKE ALL ON public.mv_treemap_sale_models_new FROM PUBLIC, anon, authenticated, service_role;
+GRANT INSERT, SELECT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public.mv_treemap_sale_models_new TO service_role;
+GRANT SELECT ON public.mv_treemap_sale_models_new TO anon;
+GRANT SELECT ON public.mv_treemap_sale_models_new TO authenticated;
+CREATE VIEW public.v_market_house_coverage_new AS
  WITH pop AS (
          SELECT DISTINCT ON ((market_venue_label(o_1.slug))) o_1.slug AS source_slug,
             market_venue_label(o_1.slug) AS house,
@@ -1009,21 +1010,21 @@ CREATE VIEW public.v_market_house_coverage AS
           WHERE market_venue_label(mv_source_target_landed.source_slug) IS NOT NULL
           GROUP BY (market_venue_label(mv_source_target_landed.source_slug))
         ), outc AS (
-         SELECT mv_treemap_outcomes.source_name AS house,
-            count(*) FILTER (WHERE mv_treemap_outcomes.sold_amount > 0::numeric) AS confirmed_sold,
-            sum(mv_treemap_outcomes.sold_amount) FILTER (WHERE mv_treemap_outcomes.sold_amount > 0::numeric)::bigint AS confirmed_usd
-           FROM mv_treemap_outcomes
-          WHERE mv_treemap_outcomes.source_name IS NOT NULL
-          GROUP BY mv_treemap_outcomes.source_name
+         SELECT mv_treemap_outcomes_new.source_name AS house,
+            count(*) FILTER (WHERE mv_treemap_outcomes_new.sold_amount > 0::numeric) AS confirmed_sold,
+            sum(mv_treemap_outcomes_new.sold_amount) FILTER (WHERE mv_treemap_outcomes_new.sold_amount > 0::numeric)::bigint AS confirmed_usd
+           FROM mv_treemap_outcomes_new
+          WHERE mv_treemap_outcomes_new.source_name IS NOT NULL
+          GROUP BY mv_treemap_outcomes_new.source_name
         ), dated AS (
-         SELECT mv_family_sales.source AS house,
+         SELECT mv_family_sales_new.source AS house,
             count(*) AS dated_sold,
-            count(*) FILTER (WHERE mv_family_sales.sale_date > (CURRENT_DATE - 365) AND mv_family_sales.sale_date <= CURRENT_DATE) AS sold_12m,
-            count(*) FILTER (WHERE mv_family_sales.sale_date > (CURRENT_DATE - 730) AND mv_family_sales.sale_date <= (CURRENT_DATE - 365)) AS sold_prior_12m,
-            sum(mv_family_sales.usd) FILTER (WHERE mv_family_sales.sale_date > (CURRENT_DATE - 365) AND mv_family_sales.sale_date <= CURRENT_DATE)::bigint AS usd_12m,
-            sum(mv_family_sales.usd) FILTER (WHERE mv_family_sales.sale_date > (CURRENT_DATE - 730) AND mv_family_sales.sale_date <= (CURRENT_DATE - 365))::bigint AS usd_prior_12m
-           FROM mv_family_sales
-          GROUP BY mv_family_sales.source
+            count(*) FILTER (WHERE mv_family_sales_new.sale_date > (CURRENT_DATE - 365) AND mv_family_sales_new.sale_date <= CURRENT_DATE) AS sold_12m,
+            count(*) FILTER (WHERE mv_family_sales_new.sale_date > (CURRENT_DATE - 730) AND mv_family_sales_new.sale_date <= (CURRENT_DATE - 365)) AS sold_prior_12m,
+            sum(mv_family_sales_new.usd) FILTER (WHERE mv_family_sales_new.sale_date > (CURRENT_DATE - 365) AND mv_family_sales_new.sale_date <= CURRENT_DATE)::bigint AS usd_12m,
+            sum(mv_family_sales_new.usd) FILTER (WHERE mv_family_sales_new.sale_date > (CURRENT_DATE - 730) AND mv_family_sales_new.sale_date <= (CURRENT_DATE - 365))::bigint AS usd_prior_12m
+           FROM mv_family_sales_new
+          GROUP BY mv_family_sales_new.source
         )
  SELECT o.house,
     p.source_slug,
@@ -1048,25 +1049,25 @@ CREATE VIEW public.v_market_house_coverage AS
      LEFT JOIN lan l ON l.house = o.house
      LEFT JOIN dated d ON d.house = o.house
   ORDER BY o.confirmed_sold DESC, o.house;
-COMMENT ON VIEW public.v_market_house_coverage IS 'Per-venue market qualification fold joining source_census (population & per-year by_year enumeration), mv_source_target_landed (landed lots), mv_treemap_outcomes (confirmed sales), and mv_family_sales (dated sales). A house earns qualified_measured = true when it has a per-year census and we hold >=90% of its enumerated lots.';
-REVOKE ALL ON public.v_market_house_coverage FROM PUBLIC, anon, authenticated, service_role;
-GRANT INSERT, SELECT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public.v_market_house_coverage TO anon;
-GRANT INSERT, SELECT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public.v_market_house_coverage TO authenticated;
-GRANT INSERT, SELECT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public.v_market_house_coverage TO service_role;
-CREATE VIEW public.v_market_measurement_coverage AS
+COMMENT ON VIEW public.v_market_house_coverage_new IS 'Per-venue market qualification fold joining source_census (population & per-year by_year enumeration), mv_source_target_landed (landed lots), mv_treemap_outcomes (confirmed sales), and mv_family_sales (dated sales). A house earns qualified_measured = true when it has a per-year census and we hold >=90% of its enumerated lots.';
+REVOKE ALL ON public.v_market_house_coverage_new FROM PUBLIC, anon, authenticated, service_role;
+GRANT INSERT, SELECT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public.v_market_house_coverage_new TO anon;
+GRANT INSERT, SELECT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public.v_market_house_coverage_new TO authenticated;
+GRANT INSERT, SELECT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public.v_market_house_coverage_new TO service_role;
+CREATE VIEW public.v_market_measurement_coverage_new AS
  WITH hc AS (
          SELECT count(*) AS total_houses,
-            count(*) FILTER (WHERE v_market_house_coverage.qualified_measured) AS measured_houses,
-            sum(v_market_house_coverage.confirmed_sold)::bigint AS total_sold,
-            sum(v_market_house_coverage.dated_sold)::bigint AS total_dated_sold,
-            sum(v_market_house_coverage.confirmed_sold) FILTER (WHERE v_market_house_coverage.qualified_measured)::bigint AS measured_house_sold,
-            sum(v_market_house_coverage.dated_sold) FILTER (WHERE v_market_house_coverage.qualified_measured)::bigint AS measured_house_dated_sold
-           FROM v_market_house_coverage
+            count(*) FILTER (WHERE v_market_house_coverage_new.qualified_measured) AS measured_houses,
+            sum(v_market_house_coverage_new.confirmed_sold)::bigint AS total_sold,
+            sum(v_market_house_coverage_new.dated_sold)::bigint AS total_dated_sold,
+            sum(v_market_house_coverage_new.confirmed_sold) FILTER (WHERE v_market_house_coverage_new.qualified_measured)::bigint AS measured_house_sold,
+            sum(v_market_house_coverage_new.dated_sold) FILTER (WHERE v_market_house_coverage_new.qualified_measured)::bigint AS measured_house_dated_sold
+           FROM v_market_house_coverage_new
         ), outc_id AS (
-         SELECT count(*) FILTER (WHERE mv_treemap_outcomes.sold_amount > 0::numeric) AS sold_total,
-            count(*) FILTER (WHERE mv_treemap_outcomes.sold_amount > 0::numeric AND NULLIF(btrim(mv_treemap_outcomes.model), ''::text) IS NOT NULL) AS sold_with_model,
-            count(*) FILTER (WHERE mv_treemap_outcomes.sold_amount > 0::numeric AND NULLIF(btrim(mv_treemap_outcomes.model), ''::text) IS NULL) AS sold_null_model
-           FROM mv_treemap_outcomes
+         SELECT count(*) FILTER (WHERE mv_treemap_outcomes_new.sold_amount > 0::numeric) AS sold_total,
+            count(*) FILTER (WHERE mv_treemap_outcomes_new.sold_amount > 0::numeric AND NULLIF(btrim(mv_treemap_outcomes_new.model), ''::text) IS NOT NULL) AS sold_with_model,
+            count(*) FILTER (WHERE mv_treemap_outcomes_new.sold_amount > 0::numeric AND NULLIF(btrim(mv_treemap_outcomes_new.model), ''::text) IS NULL) AS sold_null_model
+           FROM mv_treemap_outcomes_new
         ), fam_cov AS (
          SELECT sum(m.sold)::bigint AS total_sold,
             sum(m.sold) FILTER (WHERE m.family_key <> 'other'::text)::bigint AS keyed_sold,
@@ -1075,15 +1076,15 @@ CREATE VIEW public.v_market_measurement_coverage AS
             count(DISTINCT ROW(m.brand, m.family_key)) FILTER (WHERE m.family_key <> 'other'::text) AS total_families,
             count(DISTINCT ROW(m.brand, m.family_key)) FILTER (WHERE m.family_key <> 'other'::text AND m.f_sold_12m >= 20::numeric AND m.f_sold_prior_12m >= 20::numeric) AS families_passing_count,
             count(DISTINCT ROW(m.brand, m.family_key)) FILTER (WHERE m.family_key <> 'other'::text AND m.f_sold_12m >= 20::numeric AND m.f_sold_prior_12m >= 20::numeric AND m.f_dated >= (0.5 * m.f_sold)) AS families_colored
-           FROM ( SELECT mv_family_market.brand,
-                    mv_family_market.family_key,
-                    mv_family_market.sold,
-                    mv_family_market.usd,
-                    sum(mv_family_market.sold) OVER (PARTITION BY mv_family_market.brand, mv_family_market.family_key) AS f_sold,
-                    sum(mv_family_market.bat_dated) OVER (PARTITION BY mv_family_market.brand, mv_family_market.family_key) AS f_dated,
-                    sum(mv_family_market.bat_sold_12m) OVER (PARTITION BY mv_family_market.brand, mv_family_market.family_key) AS f_sold_12m,
-                    sum(mv_family_market.bat_sold_prior_12m) OVER (PARTITION BY mv_family_market.brand, mv_family_market.family_key) AS f_sold_prior_12m
-                   FROM mv_family_market) m
+           FROM ( SELECT mv_family_market_new.brand,
+                    mv_family_market_new.family_key,
+                    mv_family_market_new.sold,
+                    mv_family_market_new.usd,
+                    sum(mv_family_market_new.sold) OVER (PARTITION BY mv_family_market_new.brand, mv_family_market_new.family_key) AS f_sold,
+                    sum(mv_family_market_new.bat_dated) OVER (PARTITION BY mv_family_market_new.brand, mv_family_market_new.family_key) AS f_dated,
+                    sum(mv_family_market_new.bat_sold_12m) OVER (PARTITION BY mv_family_market_new.brand, mv_family_market_new.family_key) AS f_sold_12m,
+                    sum(mv_family_market_new.bat_sold_prior_12m) OVER (PARTITION BY mv_family_market_new.brand, mv_family_market_new.family_key) AS f_sold_prior_12m
+                   FROM mv_family_market_new) m
         ), brand_cov AS (
          SELECT count(*) AS total_brands,
             count(*) FILTER (WHERE treemap_brand_market.sold_12m >= 20 AND treemap_brand_market.sold_prior_12m >= 20) AS brands_passing_count,
@@ -1094,12 +1095,12 @@ CREATE VIEW public.v_market_measurement_coverage AS
             ( SELECT count(*) AS count
                    FROM family_price_change
                   WHERE family_price_change.method = 'hedonic_v1'::text AND family_price_change.change_12m IS NOT NULL) AS fitted_families
-           FROM ( SELECT mv_family_sales.brand,
-                    mv_family_sales.family_key
-                   FROM mv_family_sales
-                  WHERE mv_family_sales.family_key <> 'other'::text AND mv_family_sales.usd >= 500 AND mv_family_sales.sale_date >= '2016-01-01'::date AND mv_family_sales.sale_date <= CURRENT_DATE
-                  GROUP BY mv_family_sales.brand, mv_family_sales.family_key
-                 HAVING count(*) >= 150 AND count(*) FILTER (WHERE mv_family_sales.sale_date > (CURRENT_DATE - 365)) >= 30 AND count(*) FILTER (WHERE mv_family_sales.sale_date > (CURRENT_DATE - 730) AND mv_family_sales.sale_date <= (CURRENT_DATE - 365)) >= 30) e
+           FROM ( SELECT mv_family_sales_new.brand,
+                    mv_family_sales_new.family_key
+                   FROM mv_family_sales_new
+                  WHERE mv_family_sales_new.family_key <> 'other'::text AND mv_family_sales_new.usd >= 500 AND mv_family_sales_new.sale_date >= '2016-01-01'::date AND mv_family_sales_new.sale_date <= CURRENT_DATE
+                  GROUP BY mv_family_sales_new.brand, mv_family_sales_new.family_key
+                 HAVING count(*) >= 150 AND count(*) FILTER (WHERE mv_family_sales_new.sale_date > (CURRENT_DATE - 365)) >= 30 AND count(*) FILTER (WHERE mv_family_sales_new.sale_date > (CURRENT_DATE - 730) AND mv_family_sales_new.sale_date <= (CURRENT_DATE - 365)) >= 30) e
         )
  SELECT layer,
     measure,
@@ -1176,8 +1177,51 @@ CREATE VIEW public.v_market_measurement_coverage AS
             hed_cov.eligible_families,
             'families'::text
            FROM hed_cov) s;
-COMMENT ON VIEW public.v_market_measurement_coverage IS 'Recursive self-improvement (RSI) coverage scoreboard for the market treemap & price-index stack across baseline, log, dimension, residual, key, fold, and prediction layers.';
-REVOKE ALL ON public.v_market_measurement_coverage FROM PUBLIC, anon, authenticated, service_role;
-GRANT INSERT, SELECT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public.v_market_measurement_coverage TO anon;
-GRANT INSERT, SELECT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public.v_market_measurement_coverage TO authenticated;
-GRANT INSERT, SELECT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public.v_market_measurement_coverage TO service_role;
+COMMENT ON VIEW public.v_market_measurement_coverage_new IS 'Recursive self-improvement (RSI) coverage scoreboard for the market treemap & price-index stack across baseline, log, dimension, residual, key, fold, and prediction layers.';
+REVOKE ALL ON public.v_market_measurement_coverage_new FROM PUBLIC, anon, authenticated, service_role;
+GRANT INSERT, SELECT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public.v_market_measurement_coverage_new TO anon;
+GRANT INSERT, SELECT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public.v_market_measurement_coverage_new TO authenticated;
+GRANT INSERT, SELECT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public.v_market_measurement_coverage_new TO service_role;
+
+-- Part 2: swap
+SET LOCAL lock_timeout = '5s';
+ALTER MATERIALIZED VIEW public.mv_treemap_outcomes RENAME TO mv_treemap_outcomes_bak;
+ALTER MATERIALIZED VIEW public.mv_brand_market RENAME TO mv_brand_market_bak;
+ALTER MATERIALIZED VIEW public.mv_family_market RENAME TO mv_family_market_bak;
+ALTER MATERIALIZED VIEW public.mv_family_sales RENAME TO mv_family_sales_bak;
+ALTER MATERIALIZED VIEW public.mv_family_year_prices RENAME TO mv_family_year_prices_bak;
+ALTER MATERIALIZED VIEW public.mv_family_year_prices_v1 RENAME TO mv_family_year_prices_v1_bak;
+ALTER MATERIALIZED VIEW public.mv_treemap_sale_brands RENAME TO mv_treemap_sale_brands_bak;
+ALTER MATERIALIZED VIEW public.mv_treemap_sale_models RENAME TO mv_treemap_sale_models_bak;
+ALTER VIEW public.v_market_house_coverage RENAME TO v_market_house_coverage_bak;
+ALTER VIEW public.v_market_measurement_coverage RENAME TO v_market_measurement_coverage_bak;
+ALTER INDEX public.mv_treemap_outcomes_id RENAME TO mv_treemap_outcomes_id_bak;
+ALTER INDEX public.mv_treemap_outcomes_cell RENAME TO mv_treemap_outcomes_cell_bak;
+ALTER INDEX public.mv_brand_market_name RENAME TO mv_brand_market_name_bak;
+ALTER INDEX public.mv_family_market_key RENAME TO mv_family_market_key_bak;
+ALTER INDEX public.mv_family_sales_vehicle RENAME TO mv_family_sales_vehicle_bak;
+ALTER INDEX public.mv_family_sales_family_date RENAME TO mv_family_sales_family_date_bak;
+ALTER INDEX public.mv_family_year_prices_key RENAME TO mv_family_year_prices_key_bak;
+ALTER INDEX public.mv_family_year_prices_key_v1 RENAME TO mv_family_year_prices_key_v1_bak;
+ALTER INDEX public.mv_treemap_sale_brands_name RENAME TO mv_treemap_sale_brands_name_bak;
+ALTER INDEX public.mv_treemap_sale_models_brand_name RENAME TO mv_treemap_sale_models_brand_name_bak;
+ALTER MATERIALIZED VIEW public.mv_treemap_outcomes_new RENAME TO mv_treemap_outcomes;
+ALTER MATERIALIZED VIEW public.mv_brand_market_new RENAME TO mv_brand_market;
+ALTER MATERIALIZED VIEW public.mv_family_market_new RENAME TO mv_family_market;
+ALTER MATERIALIZED VIEW public.mv_family_sales_new RENAME TO mv_family_sales;
+ALTER MATERIALIZED VIEW public.mv_family_year_prices_new RENAME TO mv_family_year_prices;
+ALTER MATERIALIZED VIEW public.mv_family_year_prices_v1_new RENAME TO mv_family_year_prices_v1;
+ALTER MATERIALIZED VIEW public.mv_treemap_sale_brands_new RENAME TO mv_treemap_sale_brands;
+ALTER MATERIALIZED VIEW public.mv_treemap_sale_models_new RENAME TO mv_treemap_sale_models;
+ALTER VIEW public.v_market_house_coverage_new RENAME TO v_market_house_coverage;
+ALTER VIEW public.v_market_measurement_coverage_new RENAME TO v_market_measurement_coverage;
+ALTER INDEX public.mv_treemap_outcomes_id_tmp RENAME TO mv_treemap_outcomes_id;
+ALTER INDEX public.mv_treemap_outcomes_cell_tmp RENAME TO mv_treemap_outcomes_cell;
+ALTER INDEX public.mv_brand_market_name_tmp RENAME TO mv_brand_market_name;
+ALTER INDEX public.mv_family_market_key_tmp RENAME TO mv_family_market_key;
+ALTER INDEX public.mv_family_sales_vehicle_tmp RENAME TO mv_family_sales_vehicle;
+ALTER INDEX public.mv_family_sales_family_date_tmp RENAME TO mv_family_sales_family_date;
+ALTER INDEX public.mv_family_year_prices_key_tmp RENAME TO mv_family_year_prices_key;
+ALTER INDEX public.mv_family_year_prices_key_v1_tmp RENAME TO mv_family_year_prices_key_v1;
+ALTER INDEX public.mv_treemap_sale_brands_name_tmp RENAME TO mv_treemap_sale_brands_name;
+ALTER INDEX public.mv_treemap_sale_models_brand_name_tmp RENAME TO mv_treemap_sale_models_brand_name;
