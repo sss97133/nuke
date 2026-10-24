@@ -1,5 +1,19 @@
 import pickle,numpy as np,hashlib,json,sys,resource,itertools,os
-if os.path.exists('pcache.npz'):
+# pcache.npz is only reused when it was built from the current feat_v11.pkl + feat4_v11.pkl (content hash).
+# v17's filtered run once reused the unfiltered run's cache, so the exclusion never reached the comp sets.
+def _featkey():
+  hh=hashlib.sha256()
+  for fn in ('feat_v11.pkl','feat4_v11.pkl'):
+    with open(fn,'rb') as f:
+      for b in iter(lambda:f.read(1<<24),b''): hh.update(b)
+  return hh.hexdigest()
+FEATKEY=_featkey()
+def _cache_ok():
+  if os.environ.get('PCACHE_REBUILD') or not os.path.exists('pcache.npz'): return False
+  with np.load('pcache.npz') as c: ok='key' in c.files and str(c['key'])==FEATKEY
+  if not ok: print('pcache.npz stale (feature hash differs); rebuilding from feat_v11.pkl',file=sys.stderr)
+  return ok
+if _cache_ok():
   _c=np.load('pcache.npz')
   N=int(_c['N']); f5=_c['f5']; f4=_c['f4']; te=f5==0; p=_c['p']; e=_c['e']; lo=_c['lo']; hi=_c['hi']; lv=_c['lv']; TM=_c['TM']; TMU=_c['TMU']; TMISS=~np.isfinite(TM)
   lp=np.log(p); WIN=[3,3,9]; h=lambda v:int(hashlib.md5(v.encode()).hexdigest()[:8],16)

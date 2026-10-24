@@ -167,7 +167,10 @@ struct ActorProfileView: View {
                     ForEach(Array(read.sections.enumerated()), id: \.offset) { _, section in
                         switch section {
                         case .measures(let m): MeasuresCard(section: m)
-                        case .table(let t): RoleTableCard(table: t, orgId: route.id)
+                        // The role drill reads organization_vehicles by organization id. An
+                        // identity's id is not an organization id, so its rows opened an
+                        // always-empty "No public vehicles" page: they stay plain rows there.
+                        case .table(let t): RoleTableCard(table: t, orgId: route.kind == "organization" ? route.id : nil)
                         default: EmptyView()
                         }
                     }
@@ -217,7 +220,8 @@ struct ActorProfileView: View {
 /// The vehicles-by-role table: each role a door to the vehicles behind it.
 struct RoleTableCard: View {
     let table: ProfileSection.Table
-    let orgId: String
+    /// nil when the actor is not an organization: rows show counts but are not doors.
+    let orgId: String?
 
     private static func label(_ role: String) -> String {
         switch role {
@@ -240,19 +244,24 @@ struct RoleTableCard: View {
                 if row.count >= 3 {
                     let role = row[0].value.text
                     let total = Self.count(row[1].value.text) + Self.count(row[2].value.text)
-                    NavigationLink {
-                        ActorVehiclesView(orgId: orgId, role: role, title: Self.label(role), total: total)
-                    } label: {
-                        HStack {
-                            Text(Self.label(role)).font(.subheadline)
-                            Spacer()
-                            Text("\(row[1].value.text) active · \(row[2].value.text) past")
-                                .font(.caption.monospaced()).foregroundStyle(.secondary)
+                    let line = HStack {
+                        Text(Self.label(role)).font(.subheadline)
+                        Spacer()
+                        Text("\(row[1].value.text) active · \(row[2].value.text) past")
+                            .font(.caption.monospaced()).foregroundStyle(.secondary)
+                        if orgId != nil && total > 0 {
                             Image(systemName: "chevron.right").font(.caption2).foregroundStyle(.tertiary)
                         }
-                        .contentShape(Rectangle())
                     }
-                    .buttonStyle(.plain)
+                    // A door only where it leads somewhere: an organization with vehicles in the role.
+                    if let orgId, total > 0 {
+                        NavigationLink {
+                            ActorVehiclesView(orgId: orgId, role: role, title: Self.label(role), total: total)
+                        } label: { line.contentShape(Rectangle()) }
+                        .buttonStyle(.plain)
+                    } else {
+                        line
+                    }
                 }
             }
             Text(table.coverage.sentence).font(.system(size: 10, design: .monospaced)).foregroundStyle(.tertiary)
@@ -273,6 +282,7 @@ struct ActorVehiclesView: View {
     @State private var rows: [VehicleHeaderRow] = []
     @State private var linked = 0
     @State private var loaded = false
+    @State private var failed = false
 
     /// How many links one drill-down reads, and how many of their vehicles it shows.
     static let linkCap = 500
@@ -292,7 +302,15 @@ struct ActorVehiclesView: View {
 
     var body: some View {
         ScrollView {
-            Text(loaded ? Self.header(shown: rows.count, total: total, linked: linked) : "Reading…")
+            if failed {
+                // A failed read used to print "No public vehicles in this role" — a lie.
+                ContentUnavailableView {
+                    Label("Couldn't load these vehicles", systemImage: "wifi.exclamationmark")
+                } actions: {
+                    Button("Retry") { Task { failed = false; loaded = false; await load() } }
+                }
+            }
+            Text(!loaded ? "Reading…" : failed ? "" : Self.header(shown: rows.count, total: total, linked: linked))
                 .font(.system(size: 9, design: .monospaced)).foregroundStyle(.tertiary)
                 .frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 16).padding(.vertical, 6)
             LazyVGrid(columns: columns, spacing: 2) {
@@ -344,6 +362,7 @@ struct ActorVehiclesView: View {
             }
         } catch {
             NSLog("NukeCapture actor vehicles read failed: %@", String(describing: error))
+            failed = true
         }
         loaded = true
     }

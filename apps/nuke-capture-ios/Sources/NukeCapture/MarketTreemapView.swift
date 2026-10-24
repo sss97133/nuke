@@ -137,6 +137,13 @@ struct MarketTreemapView: View {
     @State private var dragBase: CGSize? = nil     // pan at drag start
     private var chromeInset: CGFloat { filters.isEmpty ? 175 : 220 } // includes the direct inspection action
     @State private var nodes: [TreemapNode] = []
+    /// Records the backend could not attribute to this dimension ("Unresolved"). Shown as a
+    /// stated count, never as a tile: at model level it was 396k records, bigger than every
+    /// real cohort combined, so a gray box swallowed most of the canvas and the map stopped
+    /// reading to scale.
+    @State private var unresolved = 0
+    /// Flips once the first layout lands so tiles grow in from their final rects.
+    @State private var appeared = false
     @State private var loading = true
     @State private var failed = false
     // Rank-spread of the active lens across the visible nodes (plan: quantile-rank
@@ -486,7 +493,11 @@ struct MarketTreemapView: View {
                         // Canvas is taller than the viewport (pan to see the tail), but not
                         // SO tall that the big makes stretch into full-width bands — 1.7·H
                         // keeps the head packing as a 2D mosaic (finviz), tail still one pan away.
-                        let canvasH = VH * 1.7
+                        // To scale: the whole population fits ONE screen at zoom 1, so tile
+                        // area is the true share of what's shown (it was 1.7 screens tall, so
+                        // the first view was a crop and the shares never added up). Pinch to
+                        // read the small tail.
+                        let canvasH = VH
                         let laid = squarify(nodes, in: CGRect(x: 0, y: 0, width: W, height: canvasH))
                         ZStack(alignment: .topLeading) {
                             ForEach(laid, id: \.node.id) { item in
@@ -496,8 +507,14 @@ struct MarketTreemapView: View {
                                 drillCell(item.node, labelTopInset: max(0, chromeInset - item.rect.minY))
                                     .frame(width: item.rect.width * zoom, height: item.rect.height * zoom)
                                     .offset(x: item.rect.minX * zoom, y: item.rect.minY * zoom)
+                                    .opacity(appeared ? 1 : 0)
+                                    .scaleEffect(appeared ? 1 : 0.92, anchor: .topLeading)
                             }
                         }
+                        // Life: tiles glide to new sizes when a pivot or refresh changes the
+                        // numbers instead of snapping, and fade up on first load.
+                        .animation(.spring(response: 0.45, dampingFraction: 0.85), value: nodes)
+                        .onAppear { withAnimation(.easeOut(duration: 0.35)) { appeared = true } }
                         .frame(width: W * zoom, height: canvasH * zoom, alignment: .topLeading)
                         .offset(pan)
                         .frame(width: W, height: VH, alignment: .topLeading)
@@ -732,6 +749,8 @@ struct MarketTreemapView: View {
             HStack(spacing: 8) {
                 Text(total.formatted()).font(.system(.subheadline, design: .rounded).weight(.semibold))
                     .monospacedDigit()
+                    .contentTransition(.numericText(value: Double(total)))
+                    .animation(.snappy, value: total)
                 Text(truncated ? "in top \(nodes.count) \(groupBy.label.lowercased())s" : "records shown")
                     .font(.system(.caption)).foregroundStyle(.secondary)
                 Spacer(minLength: 6)
@@ -758,6 +777,11 @@ struct MarketTreemapView: View {
             // its clock. mv_market_pulse and mv_market_position filter on is_public only, so
             // deleted and non-vehicle records are inside the count; cron job 502 refreshes both
             // nightly at 03:40Z and the RPCs do not return that clock, so the schedule is stated.
+            if unresolved > 0 {
+                Text("+\(unresolved.formatted()) records not yet matched to a \(groupBy.label.lowercased()) (not drawn)")
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundStyle(.secondary)
+            }
             Text("public vehicle records, deleted included, by \(groupBy.label.lowercased()) · market views refreshed nightly 03:40Z")
                 .font(.system(size: 9, design: .monospaced))
                 .foregroundStyle(.tertiary)
@@ -803,6 +827,37 @@ struct MarketTreemapView: View {
         }
     }
 
+    /// Pull the "Unresolved" bucket out of the drawn tiles and fold case/whitespace
+    /// duplicates ("red" + "Red", "Silver" stray rows) into one tile so the labels read
+    /// cleanly and the areas are not split. Counts are summed, never invented.
+    static func clean(_ rows: [TreemapNode]) -> (nodes: [TreemapNode], unresolved: Int) {
+        var unresolved = 0
+        var order: [String] = []
+        var merged: [String: TreemapNode] = [:]
+        for n in rows.sorted(by: { $0.count > $1.count }) {
+            let name = n.name.trimmingCharacters(in: .whitespacesAndNewlines)
+            if name.isEmpty || name.caseInsensitiveCompare("Unresolved") == .orderedSame {
+                unresolved += n.count; continue
+            }
+            let key = name.lowercased()
+            if let first = merged[key] {
+                merged[key] = TreemapNode(name: first.name, count: first.count + n.count,
+                                          value: first.value + n.value, median_price: first.median_price,
+                                          sold_count: first.sold_count.map { $0 + (n.sold_count ?? 0) },
+                                          avg_year: first.avg_year, image_url: first.image_url,
+                                          sell_through: first.sell_through, price_n: first.price_n,
+                                          auction_med: first.auction_med, market_med: first.market_med)
+            } else {
+                order.append(key)
+                merged[key] = TreemapNode(name: name, count: n.count, value: n.value, median_price: n.median_price,
+                                          sold_count: n.sold_count, avg_year: n.avg_year, image_url: n.image_url,
+                                          sell_through: n.sell_through, price_n: n.price_n,
+                                          auction_med: n.auction_med, market_med: n.market_med)
+            }
+        }
+        return (order.compactMap { merged[$0] }.sorted { $0.count > $1.count }, unresolved)
+    }
+
     private func load() async {
         defer { recomputeRank() }   // re-spread the lens whenever the node set changes
         // The folded-tail sub-page renders injected nodes directly — no RPC.
@@ -820,13 +875,14 @@ struct MarketTreemapView: View {
                     .rpc("market_position", params: MarketPulseParams(p_dimension: "make", p_limit: 250))
                     .execute().value
                 let sorted = prows.filter { $0.volume > 0 }.sorted { $0.volume > $1.volume }
-                nodes = sorted.map { TreemapNode(name: $0.name, count: $0.volume, value: $0.volume,
+                let raw = sorted.map { TreemapNode(name: $0.name, count: $0.volume, value: $0.volume,
                                                  median_price: $0.median_price, sold_count: nil,
                                                  avg_year: $0.avg_year, image_url: nil,
                                                  sell_through: $0.sell_through,
                                                  price_n: $0.price_n,
                                                  auction_med: $0.auction_med,
                                                  market_med: $0.market_med) }
+                (nodes, unresolved) = Self.clean(raw)
                 tail = nil; loading = false
                 return
             }
@@ -846,7 +902,7 @@ struct MarketTreemapView: View {
             // Industry standard (finviz market heatmap): show EVERY category, sized to
             // scale — no "Other" bucket, no data hidden. The power-law tail is small
             // cells (that's the truth), labeled only where they fit; drill for the rest.
-            nodes = rows.filter { $0.count > 0 }.sorted { $0.count > $1.count }
+            (nodes, unresolved) = Self.clean(rows.filter { $0.count > 0 })
             tail = nil
             loading = false
         } catch {
