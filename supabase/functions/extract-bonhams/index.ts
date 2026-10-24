@@ -1374,6 +1374,9 @@ async function saveVehicle(
   if (targetId) {
     const g0 = await guardTarget(targetId);
     if (g0.refused) return await refuse(targetId, g0.refused);
+    // A no-sale lot (upcoming, bought in, withdrawn) never writes the sale fields of an existing vehicle: its null price and
+    // auction date would replace a sale another lot recorded. The vehicles_guard_sale_fields trigger enforces the same.
+    if (extracted.auction_status !== "sold") { delete g0.update.sale_price; delete g0.update.sale_date; delete g0.update.sale_status; }
     let { error } = await supabase.from("vehicles").update(g0.update).eq("id", targetId);
     const other = error ? vinClash(error.message) : null;
     if (error && other) {
