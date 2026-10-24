@@ -8,6 +8,13 @@ for f in MF:
     p=l.split('|')
     if len(p)==4 and p[3]=='t': TMU.add((p[0],p[1]))
     elif len(p)==4 and p[2]: LM[(p[0],p[1])]=float(p[2])
+# Drop listing mileage flagged suspect (public.mileage_value_status, status suspect;
+# see supabase/migrations/20261026030000_mileage_plausibility_status.sql). Fresh dumps should read
+# auction_event_listing_mileage_usable instead.
+import os
+_sf=os.path.join(os.path.dirname(os.path.abspath(__file__)),'..','suspect_mileage_vehicle_ids.txt')
+SUS=set(open(_sf).read().split()) if os.path.exists(_sf) else set()
+LM={k:v for k,v in LM.items() if k[0] not in SUS}
 SEGV={}
 for f in VF:
   for l in rd(f).split('\n'):

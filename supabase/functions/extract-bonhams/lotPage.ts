@@ -1,3 +1,5 @@
+import { extractOdometerFromText } from "../_shared/odometerText.ts";
+import { toMiles } from "../_shared/odometer.ts";
 // A Bonhams lot page, read for what the search index does not carry: the whole photo gallery at full size, the sale's
 // name, venue and dates, the saleroom notices, the footnotes, the 100-point Seller's Assessment (Bonhams MPH) and the
 // condition-report / catalogue links. The page is a Next.js shell whose __NEXT_DATA__ holds the lot and its auction;
@@ -163,20 +165,9 @@ export function extractSpecsFromContent(text: string): {
   let interior_color: string | null = null;
   let body_style: string | null = null;
 
-  // Mileage
-  const mileagePatterns = [
-    /(\d{1,3}(?:,\d{3})*)\s*(?:miles|mi)\b/i,
-    /mileage[^:]*:?\s*(\d{1,3}(?:,\d{3})*)/i,
-    /odometer[^:]*:?\s*(\d{1,3}(?:,\d{3})*)/i,
-    /(\d{1,3}(?:,\d{3})*)\s*km\b/i,
-  ];
-  for (const p of mileagePatterns) {
-    const m = text.match(p);
-    if (m) {
-      const num = parseInt(m[1].replace(/,/g, ''));
-      if (num > 0 && num < 10_000_000) { mileage = num; break; }
-    }
-  }
+  // Mileage: odometer context required (see _shared/odometerText.ts); stored in miles.
+  const od = extractOdometerFromText(text);
+  if (od) mileage = toMiles(od);
 
   // Engine from description (first line often has "XXXci OHV V8" or "X.XL Turbo")
   const enginePatterns = [
