@@ -43,3 +43,11 @@ Steps (each file runs in a rolled-back transaction first; statement_timeout 50s)
 `mksql.py` inserts each confirmed lot additively (skips a lot already held; reuses a vehicle with the same listing or discovery URL, else creates one): run `rm_ingest_v1_20261024`, cited link, price and currency as RM states, lot number with `lot_number_source_url`.
 `cand5.py` builds cand5a (first word) and cand5b (all words) counted over every lot of the candidate sales; `apply_agg_houselot_rm_v5.sql` is the usual matcher with the price hold.
 Reverts: `revert_agg_houselot_v5_20261024.sql`, then `rm_ingest/revert_rm_ingest_v1_20261024.sql` (soft: retracts events, sets vehicles.deleted_at).
+
+## FX-aware price hold (agg_houselot_v6_20261024)
+`apply_agg_houselot_fx_v6.sql` is the v5 matcher with the price hold in USD: the house and conceptcarz prices are each converted at their
+sale-date rate by `fx_usd_rate` (provider order from `fx_rate_provider_preference`: boe for GBP, ecb for EUR), and the rate, its date
+and its source are written to `metadata.attach_basis.fx`. A non-USD price with no rate within 7 days stays held (CAD has no rates loaded).
+It never attaches to a vehicle created by `rm_ingest_v1_20261024`. Revert: `revert_agg_houselot_v6_20261024.sql`.
+Trial 2026-10-24 (rolled back): all 232 v5-held events target rm_ingest vehicles, so 0 attach and the run was not applied.
+Of the 11 non-USD held events, only 1 agrees within 20% after conversion (GBP 55,000 at BoE 1.5912 = $87,516 vs 85,000; conceptcarz currency assumed USD).
