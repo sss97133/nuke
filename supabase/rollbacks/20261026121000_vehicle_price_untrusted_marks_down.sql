@@ -1,4 +1,4 @@
--- Rollback of 20261026112000_vehicle_price_untrusted_marks: restore the 20261026091000 function and view.
+-- Rollback of 20261026121000_vehicle_price_untrusted_marks: restore the 20261026091000 function and view.
 -- The marks table is kept (never dropped); it is inert once the readers stop consulting it.
 SET lock_timeout = '10s';
 create or replace function public.vehicle_sale_price_untrusted(p_vehicle_id uuid, p_sale_price numeric)

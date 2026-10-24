@@ -3,7 +3,7 @@
 -- real vehicle (run agg_reattach_v1_20261024), the price it copied onto the old vehicle would lose its only untrusted marker and
 -- read as trusted again. A mark pins (vehicle_id, sale_price) as untrusted with a reason and run id; no price is moved.
 -- A mark applies only while vehicles.sale_price still equals the marked price, and is retired by setting retired_at (never deleted).
--- Rollback: supabase/rollbacks/20261026112000_vehicle_price_untrusted_marks_down.sql
+-- Rollback: supabase/rollbacks/20261026121000_vehicle_price_untrusted_marks_down.sql
 SET lock_timeout = '10s';
 
 create table if not exists public.vehicle_sale_price_untrusted_marks (

@@ -1,4 +1,4 @@
--- Isolated PostgreSQL 17 contract for 20261026112000_vehicle_price_untrusted_marks.sql (on 20261026091000). Synthetic rows only.
+-- Isolated PostgreSQL 17 contract for 20261026121000_vehicle_price_untrusted_marks.sql (on 20261026091000). Synthetic rows only.
 --   createdb dm_refinement_price_marks_ci
 --   psql -X -v ON_ERROR_STOP=1 -d dm_refinement_price_marks_ci -f supabase/sql/test_aggregator_event_attach_guard.sql
 -- Cases: conceptcarz insert by price+date alone refused; chassis = VIN, VIN suffix (>=6) accepted; short-fragment suffix refused;
@@ -28,7 +28,7 @@ CREATE FUNCTION public.correct_vehicle_sale_provenance_batch(p_rows jsonb, p_ass
  RETURNS jsonb LANGUAGE sql AS $$ INSERT INTO public.sync_calls VALUES (p_rows) RETURNING p_rows $$;
 
 \ir ../migrations/20261026091000_aggregator_event_attach_guard.sql
-\ir ../migrations/20261026112000_vehicle_price_untrusted_marks.sql
+\ir ../migrations/20261026121000_vehicle_price_untrusted_marks.sql
 CREATE TRIGGER trg_sync_vehicle_sale_price_from_verified_event AFTER INSERT OR UPDATE ON public.vehicle_events
   FOR EACH ROW EXECUTE FUNCTION public.sync_vehicle_sale_price_from_verified_event();
 
@@ -52,7 +52,7 @@ UPDATE public.vehicle_sale_price_untrusted_marks SET retired_at = now();
 SELECT pg_temp.ok(NOT public.vehicle_sale_price_untrusted('00000000-0000-0000-0000-00000000000a', 50000)
   AND NOT EXISTS (SELECT 1 FROM public.vehicle_sale_price_untrusted_ids WHERE vehicle_id = '00000000-0000-0000-0000-00000000000a'), 'a retired mark no longer applies');
 SELECT pg_temp.ok(NOT EXISTS (SELECT 1 FROM public.vehicle_sale_price_untrusted_ids WHERE vehicle_id = '00000000-0000-0000-0000-00000000000b'), 'chassis-matched event on its vehicle: unaffected');
-\ir ../rollbacks/20261026112000_vehicle_price_untrusted_marks_down.sql
+\ir ../rollbacks/20261026121000_vehicle_price_untrusted_marks_down.sql
 SELECT pg_temp.ok(to_regclass('public.vehicle_sale_price_untrusted_marks') IS NOT NULL, 'rollback keeps the marks table');
 UPDATE public.vehicle_sale_price_untrusted_marks SET retired_at = NULL;
 SELECT pg_temp.ok(NOT public.vehicle_sale_price_untrusted('00000000-0000-0000-0000-00000000000a', 50000), 'after rollback readers ignore marks');
