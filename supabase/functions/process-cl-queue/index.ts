@@ -7,7 +7,8 @@ import { normalizeVehicleFields } from '../_shared/normalizeVehicle.ts'
 import { archiveFetch } from '../_shared/archiveFetch.ts'
 import { requireWriteAuth } from '../_shared/writeGuard.ts';
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
-import { writeVehicleEventByKey } from '../_shared/vehicleEventWrite.ts'
+import { vehicleEventWriterFor } from '../_shared/vehicleEventWrite.ts'
+const writeVehicleEventByKey = vehicleEventWriterFor('process-cl-queue')
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',

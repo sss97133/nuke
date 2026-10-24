@@ -4,7 +4,8 @@
  * episode is the capture's time, not the read's; an ended page's outcome is written as the page states it.
  */
 import { htmlToText } from "../_shared/htmlToText.ts";
-import { writeVehicleEventByKey } from "../_shared/vehicleEventWrite.ts";
+import { vehicleEventWriterFor } from "../_shared/vehicleEventWrite.ts";
+const writeVehicleEventByKey = vehicleEventWriterFor("extract-ebay-motors:archive");
 import { toLanding } from "./browseMap.ts";
 import { landItem, PLATFORM, type Report } from "./browseSweep.ts";
 import { archivedPageToItem, type ArchivedOutcome, archivedPhotos, parseArchivedItemPage, type PhotoProbe } from "./archivePage.ts";
