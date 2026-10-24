@@ -271,17 +271,22 @@ private struct SourcePhotoDetail: View {
                                 onDrill: savedAt == nil && photo.image_url != nil ? {
                                     withAnimation { source.scrollTo("qualified-source-photo", anchor: .top) }
                                 } : nil)
+                            #if DEBUG
                             Text("\(reading.provider) · \(reading.model)").font(.caption).foregroundStyle(.secondary)
+                            #endif
                             ForEach(reading.unresolved_reasons, id: \.self) { reason in
                                 Text(SubjectResolutionCopy.reason(reason)).font(.caption).foregroundStyle(.secondary)
                             }
+                            #if DEBUG
                             DisclosureGroup("Source evidence") {
                                 Text("Observation \(reading.id.uuidString.lowercased())")
                                 Text("Source SHA-256 \(reading.input.source_sha256)")
                                 Text("Consumed SHA-256 \(reading.input.input_sha256)")
                             }.font(.caption2).textSelection(.enabled)
+                            #endif
                         }
                     }
+                    #if DEBUG
                     if let identity = photo.source_identity {
                         DisclosureGroup("Attribution history") {
                             RootedValueView(label: "Source identity", value: identity.source_photo_count == 1 ? "One audited photograph" : "Source identity unresolved", status: .recorded)
@@ -292,6 +297,7 @@ private struct SourcePhotoDetail: View {
                             ForEach(identity.audit_ids, id: \.self) { audit in Text("Attribution audit \(audit.uuidString.lowercased())") }
                         }.font(.caption2).textSelection(.enabled)
                     }
+                    #endif
                     if photo.readings.isEmpty, let contexts = photo.retained_contexts, !contexts.isEmpty {
                         ForEach(contexts) { context in
                             VStack(alignment: .leading, spacing: 5) {
@@ -299,11 +305,13 @@ private struct SourcePhotoDetail: View {
                                     decay: ProfileClock.date(context.read_at).map { "Read " + $0.formatted(date: .abbreviated, time: .shortened) })
                                 Text("Earlier analysis remains recorded; it is not a current identity or permission to show this photograph.")
                                     .font(.caption).foregroundStyle(.secondary)
+                                #if DEBUG
                                 DisclosureGroup("Reading evidence") {
                                     Text("Observation \(context.id.uuidString.lowercased())")
                                     Text("Original input receipt \(context.receipt_image_id.uuidString.lowercased())")
                                     Text("\(context.provider) · \(context.model)")
                                 }.font(.caption2).textSelection(.enabled)
+                                #endif
                             }
                         }
                     }
