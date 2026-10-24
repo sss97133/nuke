@@ -1,1 +1,2 @@
-begin; update public.vehicles v set data_quality_flags = b.old_flags from public.backup_agg_held_yearflag_v1_20261024 b where v.id=b.vehicle_id and v.data_quality_flags->'year_suspect'->>'run_id'='agg_held_yearflag_v1_20261024'; commit;
+-- caller controls the transaction (wrap in BEGIN ... ROLLBACK for tests); no COMMIT here
+update public.vehicles v set data_quality_flags = b.old_flags from public.backup_agg_held_yearflag_v1_20261024 b where v.id=b.vehicle_id and v.data_quality_flags->'year_suspect'->>'run_id'='agg_held_yearflag_v1_20261024'; 
