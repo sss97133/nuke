@@ -58,7 +58,7 @@ it('review-only access never presents a save action', async () => {
   await act(async () => render('one', false));
   expect(node.querySelector('fieldset')).toBeNull(); expect(node.textContent).toContain('Review access'); expect(fixture.invoke).not.toHaveBeenCalled();
 });
-it('suggests the vehicles photographed around the purchase, fills the reason from their photo dates and saves that vehicle', async () => {
+it('suggests the vehicles photographed around the purchase as context; a photo date alone never fills the reason', async () => {
   const blazer = '33333333-3333-4333-8333-333333333333', mustang = '44444444-4444-4444-8444-444444444444';
   const query: any = { select: () => query, or: () => query, is: () => query, order: () => query,
     limit: () => Promise.resolve({ data: [{ id: blazer, year: 1977, make: 'Chevrolet', model: 'Blazer', vin: null }, { id: mustang, year: 1966, make: 'Ford', model: 'Mustang', vin: '6R07C219593' },
@@ -79,11 +79,17 @@ it('suggests the vehicles photographed around the purchase, fills the reason fro
   await act(async () => chip.click());
   expect(chip.getAttribute('aria-pressed')).toBe('true');
   expect(node.querySelectorAll('select')[1].value).toBe(blazer);
-  expect(node.querySelector('textarea')!.value).toBe('Photographed Jun 10 and Jun 12 (41 photos), around the Jun 11 purchase');
+  // Owner rule: never the date alone. The chip selects the vehicle; the reviewer writes what ties it.
+  expect(node.querySelector('textarea')!.value).toBe('');
+  expect(node.textContent).toContain('Photo dates are context only');
   await change(node.querySelectorAll('input')[1] as HTMLInputElement, '100');
+  const saveButton = () => [...node.querySelectorAll('button')].find(b => b.textContent === 'Save use assignment')!;
+  expect(saveButton().disabled).toBe(true);
+  await change(node.querySelector('textarea')!, 'Work order names this Blazer');
+  expect(saveButton().disabled).toBe(false);
   fixture.invoke.mockResolvedValue({ data: { data: { expense_posted: false } }, error: null });
-  await act(async () => [...node.querySelectorAll('button')].find(b => b.textContent === 'Save use assignment')!.click());
-  expect(fixture.invoke.mock.calls[0][1].body.revision.fields.at(-1).value_normalized).toMatchObject({ use_type: 'vehicle', vehicle_id: blazer, destination_label: '1977 Chevrolet Blazer VIN not recorded' });
+  await act(async () => saveButton().click());
+  expect(fixture.invoke.mock.calls[0][1].body.revision.fields.at(-1).value_normalized).toMatchObject({ use_type: 'vehicle', vehicle_id: blazer, destination_label: '1977 Chevrolet Blazer VIN not recorded', basis: 'Work order names this Blazer' });
 });
 it('asks for no suggestions when the expense has no date', async () => {
   const query: any = { select: () => query, or: () => query, is: () => query, order: () => query, limit: () => Promise.resolve({ data: [], error: null }) };
@@ -92,4 +98,16 @@ it('asks for no suggestions when the expense has no date', async () => {
   await change(node.querySelector('select')!, 'vehicle');
   expect(fixture.rpc).not.toHaveBeenCalled();
   expect(node.textContent).not.toContain('Photographed around');
+});
+it('finds a vehicle by its full VIN although the label shows only the last six characters', async () => {
+  const roadster = '66666666-6666-4666-8666-666666666666';
+  const query: any = { select: () => query, or: () => query, is: () => query, order: () => query,
+    limit: () => Promise.resolve({ data: [{ id: roadster, year: 1932, make: 'Ford', model: 'Hot Rod', vin: 'AZ370615' },
+      { id: '77777777-7777-4777-8777-777777777777', year: 1977, make: 'Chevrolet', model: 'Blazer', vin: 'CKR187F127263' }], error: null }) };
+  fixture.from.mockReturnValue(query);
+  await act(async () => render('one'));
+  await change(node.querySelector('select')!, 'vehicle');
+  await change(node.querySelector('input[type="search"]') as HTMLInputElement, 'AZ370615');
+  const options = [...node.querySelectorAll('select')[1].querySelectorAll('option')].map(o => o.value).filter(Boolean);
+  expect(options).toEqual([roadster]);
 });
