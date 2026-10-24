@@ -1,7 +1,7 @@
 -- Run agg_houselot_v1_20261024: move a flagged conceptcarz event to the vehicle of a cited house event (same house, sale window,
 -- year, make, model tokens all in the house lot title; unique under both cand2 and cand3 rules; one cc event per house event).
 -- Held: no house lot number, verified sold cc events, and price-contradicted pairs (house sold price known and >20% apart).
--- Lot: house source_listing_id, else vehicle_events.lot_number (cited page), else the Bonhams /lot/N/ in the URL.
+-- Lot: house source_listing_id (Mecum only when catalog-shaped like F257; page ids such as 483533 are ignored), else vehicle_events.lot_number (cited page), else the Bonhams /lot/N/ in the URL.
 -- Basis: metadata.attach_basis kind same_lot citing the house event and ITS lot number (the conceptcarz row carries none).
 create table if not exists public.backup_agg_houselot_v1_20261024 (
   event_id uuid primary key, from_vehicle_id uuid not null, to_vehicle_id uuid not null, cited_event_id uuid not null, lot_number text,
@@ -9,8 +9,8 @@ create table if not exists public.backup_agg_houselot_v1_20261024 (
   old_attach_basis jsonb, final_price numeric, from_sale_price integer, from_marked boolean, run_id text not null, moved_at timestamptz not null default now());
 alter table public.backup_agg_houselot_v1_20261024 enable row level security;
 with c as (
-  select c3.event_id, c3.from_vehicle_id, c3.to_vehicle_id, c3.cited_event_id, c3.house, c3.title, c3.win_lo, c3.win_hi, he.source_url cited_url, case when nullif(btrim(he.source_listing_id),'') is null then he.lot_number_source_url end lot_src,
-    coalesce(nullif(btrim(he.source_listing_id),''), case when he.lot_number_source_url is not null then nullif(btrim(he.lot_number),'') end, substring(he.source_url from '(?i)bonhams\.com/auction/\d+/lot/([0-9A-Za-z]+)/')) lot,
+  select c3.event_id, c3.from_vehicle_id, c3.to_vehicle_id, c3.cited_event_id, c3.house, c3.title, c3.win_lo, c3.win_hi, he.source_url cited_url, case when (case when he.source_platform='mecum' and btrim(he.source_listing_id) !~ '^[A-Z]{1,3}[0-9]{1,4}(\.[0-9]{1,2})?$' then null else nullif(btrim(he.source_listing_id),'') end) is null then he.lot_number_source_url end lot_src,
+    coalesce(case when he.source_platform='mecum' and btrim(he.source_listing_id) !~ '^[A-Z]{1,3}[0-9]{1,4}(\.[0-9]{1,2})?$' then null else nullif(btrim(he.source_listing_id),'') end, case when he.lot_number_source_url is not null then nullif(btrim(he.lot_number),'') end, substring(he.source_url from '(?i)bonhams\.com/auction/\d+/lot/([0-9A-Za-z]+)/')) lot,
     e.source_suspect, e.source_suspect_reason, e.source_suspect_run_id, e.source_suspect_at, e.metadata, e.final_price, v.sale_price from_sale_price,
     count(*) over (partition by c3.cited_event_id) k, he.final_price hp, he.event_status hs
   from public.agg_houselot_v1_20261024_cand3 c3
