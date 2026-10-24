@@ -7,6 +7,7 @@
 import { chromium, Page, Browser, BrowserContext } from 'playwright';
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
+import { odometerMilesFromText } from '../supabase/functions/_shared/odometerText.ts';
 dotenv.config({ path: '.env.local' });
 
 const supabase = createClient(
@@ -227,9 +228,8 @@ async function extractFullLotData(page: Page, url: string): Promise<BonhamsFullD
         result.status = 'unknown';
       }
 
-      // Extract mileage - Bonhams often uses km or miles
-      const mileageMatch = bodyText.match(/([\d,]+)\s*(?:miles|km|kilometers)/i);
-      result.mileage = mileageMatch ? parseInt(mileageMatch[1].replace(/,/g, ''), 10) : null;
+      // Mileage is read outside the browser with the shared odometer-context check (below).
+      result.bodyText = bodyText;
 
       // Extract location and sale date
       const locationMatch = bodyText.match(/(?:Location|Sale)[:\s]*([^,\n]+(?:,\s*[^,\n]+)?)/i);
@@ -312,6 +312,11 @@ async function extractFullLotData(page: Page, url: string): Promise<BonhamsFullD
 
       return result;
     });
+
+    // Odometer context required (shared with the edge extractors): the first "<n> miles|km" on a
+    // Bonhams page is often a speed ("304 km/h"), an economy figure or a rally distance. Miles.
+    data.mileage = odometerMilesFromText(data.bodyText);
+    delete data.bodyText;
 
     // Try to extract gallery images
     const galleryImages = await extractGalleryImages(page);

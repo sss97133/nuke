@@ -61,7 +61,7 @@ struct WorthBracketView: View {
                 .font(compact ? .body.weight(.medium) : .title3.weight(.medium))
                 .foregroundStyle(ink)
             if !compact {
-                Text("A documented build isn't a comp average. We won't put a number on it until the analysis includes this build's investment — see the ledger below.")
+                Text("This car has documented build work, so similar-car prices don't apply. We'll show a value once that work is counted. See the spending below.")
                     .font(.system(.caption2, design: .monospaced))
                     .foregroundStyle(dim)
                     .fixedSize(horizontal: false, vertical: true)
@@ -171,7 +171,7 @@ private struct ValuationDetailSheet: View {
                         }
                     }
                     if valuation.isThin {
-                        Label("Rough placeholder — most of the model has no data for this vehicle yet. Not a valuation.",
+                        Label("Rough guess — we don't have enough data on this car yet. Not a valuation.",
                               systemImage: "exclamationmark.triangle")
                             .font(.caption).foregroundStyle(.orange)
                     }
@@ -209,7 +209,7 @@ private struct ValuationDetailSheet: View {
                         // "outlier" or claim 77% confidence — those need market data we
                         // haven't pulled. The honesty: it's OUR intake gap, not a verdict
                         // on the vehicle. (Deal/Demand/Confidence are suppressed while thin.)
-                        Label("Not measured yet — the deal, demand, and confidence read need market data we haven't pulled. That's an intake gap on our side, not a verdict on this vehicle.",
+                        Label("Not enough sales data yet. That's missing data on our side, not a judgment of this car.",
                               systemImage: "tray")
                             .font(.caption).foregroundStyle(.secondary)
                     } else {
@@ -228,7 +228,7 @@ private struct ValuationDetailSheet: View {
                             warn: valuation.is_stale == true)
                     }
                     if valuation.is_circular == true {
-                        Label("Circular — derived from this vehicle's own asking price, not independent comps.",
+                        Label("Based on this car's own asking price, not on sales of similar cars.",
                               systemImage: "arrow.triangle.2.circlepath")
                             .font(.caption).foregroundStyle(.orange)
                     }
@@ -335,7 +335,7 @@ struct CompsDrillView: View {
                     }
                 } else if loadError {
                     ContentUnavailableView {
-                        Label("Couldn't load comps", systemImage: "exclamationmark.triangle")
+                        Label("Couldn't load similar sales", systemImage: "exclamationmark.triangle")
                     } description: { Text("The read failed. Retry.") } actions: {
                         Button("Retry") { Task { loaded = false; loadError = false; await load() } }
                             .buttonStyle(.borderedProminent)

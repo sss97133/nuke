@@ -10,7 +10,7 @@ The owner and reviewers select the same canonical book. The screen checks bounde
 
 Open an expense's evidence to edit **Vehicle or shop use**. A reviewer with correction access can choose shop use, an accessible recipient vehicle, or unassigned, enter the assigned amount and record the reason. Partial assignments keep the remainder unassigned; this editor currently records one destination per expense. It preserves the recognized expense amount, other records in the source batch, item evidence and unresolved current concerns. It does not turn a bank movement into another expense or change a tax position.
 
-Unsaved edits remain intact when another reviewer changes the source. The screen requires a reload before saving a conflicting draft, and the existing writer independently refuses a superseded revision. The authenticated contributor is recorded by that writer. A book grant does not add vehicle permissions: the picker includes only the book-owner vehicles the current reviewer can already read.
+Unsaved edits remain intact when another reviewer changes the source. The screen requires a reload before saving a conflicting draft, and the existing writer independently refuses a superseded revision. The authenticated contributor is recorded by that writer. A book grant does not add vehicle permissions: the picker includes only the book-owner vehicles the current reviewer can already read. Photo dates near the expense appear as suggestion chips; they are context only, never a reason by themselves, and the reviewer must write what shows the vehicle received the item. A vehicle's Build ledger lists the costs assigned to it in the book (`accounting_vehicle_costs`) only for someone who can read the book and also has access to that vehicle.
 
 ## Claude Code
 

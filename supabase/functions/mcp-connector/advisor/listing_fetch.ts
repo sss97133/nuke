@@ -23,6 +23,68 @@ export interface FetchedListing {
   photo_urls: string[];
   raw_attrs: Record<string, string>;
   source: string;
+  /** Set when the fetch landed on a login / checkpoint wall instead of the listing. */
+  blocked_reason?: string | null;
+  /** auction_live: the page price is a current bid, never an asking price. */
+  listing_kind?: "auction_live" | "auction_ended" | "fixed_price" | null;
+  /** Live auction high bid (not an ask, not a sale). */
+  current_bid?: number | null;
+  /** Auction end time (ISO) when the page states it. */
+  auction_end_at?: string | null;
+}
+
+/**
+ * Live auction state from the page. BaT renders a countdown with data-until (epoch seconds) while
+ * bidding is open; ended pages show "Sold for" / "Bid to" instead. Exported for tests.
+ */
+export function detectAuctionState(html: string, nowMs = Date.now()): {
+  live: boolean;
+  ended: boolean;
+  end_at: string | null;
+} {
+  const until = html.match(/listing-available-countdown[^>]*data-until="(\d{9,11})"/i)?.[1] ||
+    html.match(/data-until="(\d{9,11})"[^>]*listing-available-countdown/i)?.[1] ||
+    html.match(/data-ends="(\d{9,11})"/i)?.[1] ||
+    html.match(/"end_timestamp"\s*:\s*(\d{9,11})/)?.[1] ||
+    null;
+  const endMs = until ? Number(until) * 1000 : null;
+  const end_at = endMs != null && Number.isFinite(endMs) ? new Date(endMs).toISOString() : null;
+  const endedText = /\b(?:Sold\s+for|Bid\s+to)\s+(?:USD\s*)?\$[\d,]+/i.test(html) &&
+    !/listing-available-countdown/i.test(html);
+  if (endMs != null && endMs > nowMs && /listing-available-countdown|Place Bid|CURRENTLY LIVE/i.test(html)) {
+    return { live: true, ended: false, end_at };
+  }
+  if (endMs != null && endMs <= nowMs) return { live: false, ended: true, end_at };
+  return { live: false, ended: endedText, end_at };
+}
+
+/**
+ * A login, checkpoint, or consent wall instead of the listing (e.g. facebook.com/login after a
+ * redirect). Never cite such a page as the listing source. Exported for tests.
+ */
+export function detectLoginWall(requestedUrl: string, finalUrl: string, html: string): string | null {
+  let path = "";
+  let host = "";
+  try {
+    const u = new URL(finalUrl || requestedUrl);
+    path = u.pathname.toLowerCase();
+    host = u.hostname.toLowerCase();
+  } catch {
+    return null;
+  }
+  const loginPath = /^\/(?:login|log-in|signin|sign-in|sign_in|checkpoint|auth|account\/login|accounts\/login|users\/sign_in|uas\/login)(?:[\/.?#]|$)/
+    .test(path) || /^accounts\.google\./.test(host) || /^login\./.test(host);
+  if (loginPath) return `redirected to a login page (${host}${path})`;
+  const t = html.slice(0, 200_000);
+  const title = (t.match(/<title[^>]*>([^<]*)/i)?.[1] || "").trim().toLowerCase();
+  if (
+    /^(?:log in|log into|sign in|login)\b/.test(title) ||
+    /facebook\.com/.test(host) && (/id="login_form"/i.test(t) || /you must log in to continue/i.test(t)) ||
+    /^(?:facebook|instagram)$/.test(title) && /id="login_form"|name="login"/i.test(t)
+  ) {
+    return `page is a login wall (${host})`;
+  }
+  return null;
 }
 
 function absUrl(href: string, base: string): string {
@@ -63,6 +125,30 @@ function uniq(urls: string[]): string[] {
     if (seen.has(key)) continue;
     seen.add(key);
     out.push(u);
+  }
+  return out;
+}
+
+/** Photo URLs from BaT's data-gallery-items attribute (large, else full/small). */
+export function batGalleryPhotoUrls(html: string, base: string): string[] {
+  const out: string[] = [];
+  for (const m of html.matchAll(/data-gallery-items=(?:"([^"]*)"|'([^']*)')/gi)) {
+    const raw = decodeEntities(m[1] ?? m[2] ?? "");
+    let arr: unknown;
+    try {
+      arr = JSON.parse(raw);
+    } catch {
+      continue;
+    }
+    if (!Array.isArray(arr)) continue;
+    for (const it of arr as Array<Record<string, unknown>>) {
+      const pick = (k: string) => {
+        const v = it?.[k] as { url?: unknown } | string | undefined;
+        return typeof v === "string" ? v : typeof v?.url === "string" ? v.url : null;
+      };
+      const u = pick("large") || pick("full") || pick("url") || pick("small");
+      if (u && /^https?:|^\//i.test(u)) out.push(absUrl(u, base));
+    }
   }
   return out;
 }
@@ -206,6 +292,35 @@ export function parseListingHtml(url: string, html: string, httpStatus: number):
     photo_urls.push(m[0]!);
   }
 
+  // BaT: gallery JSON lives HTML-entity-encoded in data-gallery-items.
+  photo_urls.push(...batGalleryPhotoUrls(html, url));
+  // Generic fallback: og:image / twitter:image.
+  if (!photo_urls.length) {
+    for (const m of html.matchAll(/<meta[^>]+(?:property|name)=["'](?:og:image(?::secure_url)?|twitter:image)["'][^>]*>/gi)) {
+      const c = m[0].match(/content=["']([^"']+)["']/i)?.[1];
+      if (c && /^https?:|^\//i.test(decodeEntities(c))) photo_urls.push(absUrl(decodeEntities(c), url));
+    }
+  }
+
+  // Live auction: the schema.org offer / price span is the current high bid, not a seller's ask.
+  let listing_kind: FetchedListing["listing_kind"] = null;
+  let current_bid: number | null = null;
+  let auction_end_at: string | null = null;
+  if (source === "bat" || source === "cars_and_bids" || source === "ebay") {
+    const st = detectAuctionState(html);
+    auction_end_at = st.end_at;
+    if (st.live) {
+      listing_kind = "auction_live";
+      current_bid = asking_price;
+      asking_price = null;
+      if (current_bid != null) raw_attrs.current_bid = String(current_bid);
+    } else if (st.ended) {
+      listing_kind = "auction_ended";
+    }
+  } else if (asking_price != null) {
+    listing_kind = "fixed_price";
+  }
+
   // Identity from title / description; when HTML is a JS shell, fall back to URL slug.
   const fromUrl = identityFromListingUrl(url);
   if (fromUrl.auction_id) raw_attrs.auction_id = fromUrl.auction_id;
@@ -244,7 +359,7 @@ export function parseListingHtml(url: string, html: string, httpStatus: number):
 
   // BaT sold price often in "sold for $X" — still an observed sale, not an ask.
   const soldFor = identity.match(/sold\s+for\s+\$?([\d,]+)/i);
-  if (soldFor && asking_price == null) {
+  if (soldFor && asking_price == null && listing_kind !== "auction_live") {
     asking_price = parseMoney(soldFor[1]);
     raw_attrs.sold_price_from_page = String(asking_price);
   }
@@ -286,6 +401,9 @@ export function parseListingHtml(url: string, html: string, httpStatus: number):
     photo_urls: uniq(photo_urls).slice(0, 24),
     raw_attrs,
     source,
+    listing_kind,
+    current_bid,
+    auction_end_at,
   };
 }
 
@@ -303,6 +421,12 @@ export async function fetchListingPage(url: string): Promise<FetchedListing> {
       redirect: "follow",
     });
     const html = await res.text();
+    const wall = detectLoginWall(url, res.url || url, html);
+    if (wall) {
+      // Keep the requested URL as the listing URL; never cite the wall page.
+      const blank = parseListingHtml(url, "", res.status);
+      return { ...blank, title: null, year: null, make: null, model: null, blocked_reason: wall };
+    }
     return parseListingHtml(res.url || url, html, res.status);
   } finally {
     clearTimeout(t);

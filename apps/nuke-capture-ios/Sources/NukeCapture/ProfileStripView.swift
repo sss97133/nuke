@@ -808,7 +808,7 @@ struct ClaimSourceSheet: View {
                         Button {
                             fullProvenance = spec
                         } label: {
-                            Label("Full provenance", systemImage: "doc.text.magnifyingglass")
+                            Label("Where this came from", systemImage: "doc.text.magnifyingglass")
                         }
                     }
                 }
