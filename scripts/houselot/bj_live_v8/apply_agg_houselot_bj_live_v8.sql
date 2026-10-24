@@ -23,7 +23,8 @@ with c0 as (
   join public.vehicles v on v.id=a.from_vehicle_id
   join public.vehicles tv on tv.id=a.to_vehicle_id and tv.deleted_at is null and tv.status is distinct from 'merged' and tv.merged_into_vehicle_id is null
        and tv.created_at < '2026-10-24' and not coalesce(tv.data_quality_flags ? 'year_suspect', false) and tv.year=a.title_year
-  where a.n_cand=1
+  where (select coalesce(array_agg(distinct replace(m[1],' ','') order by replace(m[1],' ','')),'{}') from regexp_matches(regexp_replace(lower(a.title),'(\d)[ -](\d)\s*l\M','\1.\2l','g'),'\m(hemi|sohc|dohc|boss|supercharged|[0-9]{3}(?=[ -]*(?:ci|cid|cu|cubic)\M)|[0-9]\.[0-9] ?l)\M','g') m) = (select coalesce(array_agg(distinct replace(m[1],' ','') order by replace(m[1],' ','')),'{}') from regexp_matches(regexp_replace(lower(substring(he.source_url from '(?i)/vehicle/([^/?#]+)')),'(\d)[ -](\d)\s*l\M','\1.\2l','g'),'\m(hemi|sohc|dohc|boss|supercharged|[0-9]{3}(?=[ -]*(?:ci|cid|cu|cubic)\M)|[0-9]\.[0-9] ?l)\M','g') m)  -- engine words (hemi, 427 ci, 4.0l ...) must agree; one-sided = conflict
+    and a.n_cand=1
     and 'vehicle_id'=any(coalesce(e.source_suspect,'{}'))
     and e.price_verification is distinct from 'contradicted' and (e.price_verification='verified' and e.event_status='sold') is not true
     and not exists (select 1 from public.vehicle_events r where r.vehicle_id=a.to_vehicle_id and r.extraction_run_id='rm_ingest_v1_20261024')
