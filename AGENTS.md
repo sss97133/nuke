@@ -176,7 +176,10 @@ permanent record. Write both as `type(scope): summary`, at most 72 characters. T
 - Work in your own worktree:
   `git worktree add ~/.worktrees/<task> -b <branch> origin/main`, then
   `ln -s ~/nuke/nuke_frontend/node_modules ~/.worktrees/<task>/nuke_frontend/node_modules` so the
-  pre-commit type check finds `tsc` (a fresh worktree has no dependencies installed). When the PR is
+  pre-commit type check finds `tsc` (a fresh worktree has no dependencies installed). Before pushing a
+  migration run `scripts/hooks/pre-push` (or set `git config core.hooksPath scripts/hooks` once per clone): it fails
+  when a migration version is shared within your branch or with origin/main. CI enforces the same check
+  (`validate` runs it against a freshly fetched latest main) and fails the PR. When the PR is
   merged, `git worktree remove ~/.worktrees/<task>`; the branch may stay. A worktree is about 500 MB,
   and on 2026-10-13 the laptop held 404 of them (382 GB) with 14 GB of disk left.
 - When several sessions run, one lane list says who owns what: `.claude/LANES.md` in the shared checkout

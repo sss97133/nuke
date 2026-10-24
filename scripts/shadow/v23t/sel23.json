@@ -1,0 +1,75 @@
+{
+"pick": [
+"T_seg"
+],
+"best": {
+"all": 0.2555,
+"L0": 0.2253,
+"L1": 0.3178,
+"L2": 0.3854,
+"bat": 0.2555
+},
+"log": [
+{
+"groups": [],
+"all": 0.2581,
+"L0": 0.2301,
+"L1": 0.3186,
+"L2": 0.3866,
+"bat": 0.2581
+},
+{
+"groups": [
+"T_seg"
+],
+"all": 0.2555,
+"L0": 0.2253,
+"L1": 0.3178,
+"L2": 0.3854,
+"bat": 0.2555
+},
+{
+"groups": [
+"T_fam"
+],
+"all": 0.2582,
+"L0": 0.226,
+"L1": 0.3183,
+"L2": 0.3905,
+"bat": 0.2582
+},
+{
+"groups": [
+"W_wide"
+],
+"all": 0.2591,
+"L0": 0.229,
+"L1": 0.3179,
+"L2": 0.4075,
+"bat": 0.2591
+},
+{
+"groups": [
+"T_seg",
+"T_fam"
+],
+"all": 0.2579,
+"L0": 0.2248,
+"L1": 0.3201,
+"L2": 0.4002,
+"bat": 0.2578
+},
+{
+"groups": [
+"T_seg",
+"W_wide"
+],
+"all": 0.256,
+"L0": 0.2242,
+"L1": 0.3154,
+"L2": 0.4048,
+"bat": 0.2559
+}
+],
+"rule": "# Pre-registered rule: greedy forward over groups T_seg (segment 90/365-day index), T_fam (shrunk family 90/365-day index), W_wide (wide same-model comps); add the group that lowers mean validation MdAPE (all levels) most, if by >= 0.001."
+}

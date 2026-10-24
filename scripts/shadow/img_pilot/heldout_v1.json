@@ -1,0 +1,16 @@
+{
+"n": 300,
+"base_v21": 0.2376,
+"intercept": 0.2453,
+"cond": 0.2467,
+"cond+orig": 0.2457,
+"cond+orig+conf": 0.2455,
+"delta_cond_orig_vs_intercept": 0.0039,
+"ci95": [
+-0.0178,
+0.0262
+],
+"corr_resid_cond": -0.227,
+"corr_resid_orig": -0.162,
+"spearman_cond_logp_vs_pred": -0.192
+}

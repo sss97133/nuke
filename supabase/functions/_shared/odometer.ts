@@ -47,3 +47,60 @@ export function odometerColumns(o: Odometer | null, writer: string, sourceUrl?: 
     mileage_normalized_source: writer,
   };
 }
+
+// Placeholder ("sentinel") odometer values that sellers type when the real reading is unknown.
+// Rule placeholder_sentinel_v1 (run mileage_status_placeholder_v1_20261024): the value is kept on
+// vehicles.mileage but a public.mileage_value_status row (status 'suspect') hides it from loaders
+// and valuation readers. 1 / 12 / 123 / 9999 are deliberately excluded (too often real).
+export const PLACEHOLDER_MILEAGES: ReadonlySet<number> = new Set([
+  1234, 11111, 12345, 99999, 111111, 123456, 222222, 333333, 444444, 555555, 666666, 777777, 888888,
+  999999, 1111111, 1234567, 9999999,
+]);
+
+export function isPlaceholderMileage(v: number | null | undefined): boolean {
+  return typeof v === "number" && PLACEHOLDER_MILEAGES.has(v);
+}
+
+export interface MileageStatusRow {
+  vehicle_id: string;
+  field: "vehicles.mileage";
+  value: number;
+  status: "suspect";
+  reason: "placeholder_sentinel";
+  source_url: string | null;
+  evidence: string;
+  run_id: string;
+  old_vehicle_mileage: number;
+}
+
+/** mileage_value_status row for a placeholder value, or null when the value is not a sentinel. */
+export function placeholderMileageStatusRow(
+  vehicleId: string, miles: number | null | undefined, writer: string, sourceUrl?: string | null,
+): MileageStatusRow | null {
+  if (!vehicleId || !isPlaceholderMileage(miles)) return null;
+  return {
+    vehicle_id: vehicleId, field: "vehicles.mileage", value: miles as number, status: "suspect",
+    reason: "placeholder_sentinel", source_url: sourceUrl ?? null,
+    evidence: `rule placeholder_sentinel_v1 (_shared/odometer.ts isPlaceholderMileage): value ${miles} written by ${writer}; status only, vehicles.mileage unchanged`,
+    run_id: `placeholder_sentinel_v1_writer_${writer}`, old_vehicle_mileage: miles as number,
+  };
+}
+
+// deno-lint-ignore no-explicit-any
+type MinimalClient = { from: (t: string) => any };
+
+/** Best-effort: flag a just-written placeholder mileage. Never throws; logs on error. */
+export async function flagPlaceholderMileage(
+  client: MinimalClient, vehicleId: string, miles: number | null | undefined, writer: string, sourceUrl?: string | null,
+): Promise<boolean> {
+  const row = placeholderMileageStatusRow(vehicleId, miles, writer, sourceUrl);
+  if (!row) return false;
+  try {
+    const { error } = await client.from("mileage_value_status").insert(row);
+    if (error) { console.error(`[odometer] placeholder flag ${vehicleId}: ${error.message}`); return false; }
+    return true;
+  } catch (e) {
+    console.error(`[odometer] placeholder flag ${vehicleId}: ${e instanceof Error ? e.message : e}`);
+    return false;
+  }
+}

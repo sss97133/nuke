@@ -279,10 +279,17 @@ async function processReceipt(imageId: string, imageUrl: string, vehicleId: stri
       .limit(1)
       .maybeSingle();
 
-    // Store receipt parts
+    // Paying user = owner of the uploaded receipt image
+    const { data: imgRow, error: imgErr } = await supabase
+      .from("vehicle_images").select("user_id").eq("id", imageId).maybeSingle();
+    if (imgErr || !imgRow?.user_id) {
+      throw new Error(`receipt ${imageId}: cannot resolve paying user: ${imgErr?.message ?? "no user_id"}`);
+    }
+
+    // Store parts against the work session (errors surfaced, not swallowed)
     if (receiptData.items && receiptData.items.length > 0) {
       for (const item of receiptData.items) {
-        await supabase.from("work_session_parts").insert({
+        const { error: partErr } = await supabase.from("work_session_parts").insert({
           work_session_id: activeSession?.id || null,
           vehicle_id: vehicleId,
           part_name: item.name,
@@ -292,28 +299,53 @@ async function processReceipt(imageId: string, imageUrl: string, vehicleId: stri
           vendor: receiptData.vendor_name,
           receipt_image_id: imageId,
           receipt_date: receiptData.receipt_date
-        }).catch(e => console.error("Failed to insert part:", e));
+        });
+        if (partErr) throw new Error(`receipt ${imageId}: work_session_parts insert failed: ${partErr.message}`);
       }
     }
 
-    // Also store full receipt record
-    await supabase.from("vehicle_receipts").upsert({
+    // Canonical receipt row (receipts + receipt_items). vehicle_receipts is a read-only view.
+    // receipt_date comes only from the page; never default to the capture/processing day.
+    const { data: receiptRow, error: rcptErr } = await supabase.from("receipts").insert({
+      user_id: imgRow.user_id,
       vehicle_id: vehicleId,
-      receipt_type: "parts",
-      amount: receiptData.total_amount,
-      currency: "USD",
-      vendor_name: receiptData.vendor_name,
-      description: receiptData.items?.map((i: any) => i.name).join(", ") || "Receipt",
-      receipt_date: receiptData.receipt_date || today,
-      image_url: imageUrl,
-      metadata: receiptData,
-      verified: false
-    }, { onConflict: "id" }).catch(e => console.error("Failed to store receipt:", e));
+      file_url: imageUrl,
+      vendor_name: receiptData.vendor_name ?? null,
+      receipt_date: receiptData.receipt_date || null,
+      total_amount: receiptData.total_amount ?? null,
+      tax_amount: receiptData.tax_amount ?? null,
+      payment_method: receiptData.payment_method ?? null,
+      scope_type: "vehicle",
+      source_document_table: "vehicle_images",
+      source_document_id: imageId,
+      status: "extracted",
+      raw_extraction: { engine: "auto-sort-photos", data: receiptData }
+    }).select("id").single();
+    if (rcptErr || !receiptRow) throw new Error(`receipt ${imageId}: receipts insert failed: ${rcptErr?.message}`);
+
+    if (receiptData.items && receiptData.items.length > 0) {
+      const { error: itemsErr } = await supabase.from("receipt_items").insert(
+        receiptData.items.map((i: any) => ({
+          receipt_id: receiptRow.id,
+          description: i.name ?? null,
+          quantity: i.quantity ?? null,
+          unit_price: i.unit_price ?? null,
+          total_price: i.total ?? null
+        }))
+      );
+      if (itemsErr) throw new Error(`receipt ${receiptRow.id}: receipt_items insert failed: ${itemsErr.message}`);
+    }
+
+    // Gated linker (tie + type gates, page dates); held receipts stay held.
+    const { data: link, error: linkErr } = await supabase.rpc("receipt_link_one", { p_receipt: receiptRow.id });
+    if (linkErr) throw new Error(`receipt ${receiptRow.id}: receipt_link_one failed: ${linkErr.message}`);
+    console.log(`receipt ${receiptRow.id} link: ${link?.status} ${link?.basis ?? link?.hold_reason}`);
 
     console.log(`Processed receipt: ${receiptData.vendor_name} - $${receiptData.total_amount}`);
 
   } catch (error) {
     console.error("Receipt processing failed:", error);
+    throw error;
   }
 }
 
@@ -362,7 +394,12 @@ async function applyClassification(result: ClassificationResult, autoApply: bool
 
       // If it's a receipt, extract the details
       if (result.detected_features.is_receipt && imageData?.image_url) {
-        processReceipt(result.image_id, imageData.image_url, result.suggested_vehicle_id);
+        try {
+          await processReceipt(result.image_id, imageData.image_url, result.suggested_vehicle_id);
+        } catch (e) {
+          // surfaced in the response, not swallowed
+          (result as any).receipt_error = e instanceof Error ? e.message : String(e);
+        }
       }
     }
   }

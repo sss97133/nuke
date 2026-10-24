@@ -2,12 +2,23 @@ import json,re,numpy as np,collections,resource,pickle,datetime,math
 src=open('../v9/load_v9.py').read().split('VA={}')[0]; exec(src)
 MF=["b3e98ba9-8a95-42e4-8540-9fb63ea93088","ecd20f67-b763-4b4e-ae48-5b8aea55ed41","1fe3341f-eb7b-457b-8d92-e866d33d5e53","83d1c671-01d6-4220-86b3-59ac7fa4a925","3caecdb4-94be-4c84-95f0-7167e25c8f1e","68c8ca7d-e1bf-40a8-870b-1b55560c555d","4354af4f-a8bc-4522-a1e3-6b9973637eed"]
 MF.append("cd4739c3-ff79-4e32-a271-06f20cc891c8"); MF.append("858983da-1a2f-4484-96fb-ffbc48479124")
+# LM_USABLE_DUMP=<agent-tools id of a dump_lm_usable.sql result> replaces the frozen MF dumps with
+# one read of auction_event_listing_mileage_usable (suspect rows and suspect vehicles excluded).
+import os
+if os.environ.get('LM_USABLE_DUMP'): MF=os.environ['LM_USABLE_DUMP'].split(',')  # comma-separated ids allowed
 LM={}; TMU=set()
 for f in MF:
   for l in rd(f).split('\n'):
     p=l.split('|')
     if len(p)==4 and p[3]=='t': TMU.add((p[0],p[1]))
     elif len(p)==4 and p[2]: LM[(p[0],p[1])]=float(p[2])
+# Skip vehicles whose mileage is flagged suspect (public.mileage_value_status, status suspect; see
+# supabase/migrations/20261026030000_mileage_plausibility_status.sql). Applies to frozen MF dumps
+# and, as a second guard, to LM_USABLE_DUMP. Refresh the id list with:
+#   select string_agg(distinct vehicle_id::text, ' ') from mileage_value_status where status='suspect' and superseded_at is null
+_sf=os.path.join(os.path.dirname(os.path.abspath(__file__)),'..','suspect_mileage_vehicle_ids.txt')
+SUS=set(open(_sf).read().split()) if os.path.exists(_sf) else set()
+LM={k:v for k,v in LM.items() if k[0] not in SUS}; TMU={k for k in TMU if k[0] not in SUS}
 SEGV={}
 for f in VF:
   for l in rd(f).split('\n'):

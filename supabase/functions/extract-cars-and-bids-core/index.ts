@@ -30,6 +30,7 @@ import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { batchFromTargets, discoverTargets, reviseCab, recaptureCab } from "./targets.ts";
 import { cabCapturePredatesResult, cabLotPhotos, parseCabDepth } from "./cabPage.ts";
 import { cleanCabText, extractCabFacets } from "./cabFacets.ts";
+import { mileageFromCabTitle } from "./titleMileage.ts";
 import { recordSellerTypes, sellerTypeRow } from "../_shared/sellerType.ts";
 import { insertMissingVehicleImages } from "../_shared/vehicleImageWrite.ts";
 import { fillOnlyIdentity, identityConflict, REVISION_DIFFERENT_CAR } from "../_shared/identityMatch.ts";
@@ -179,8 +180,7 @@ function parseCabHtml(html: string, sourceUrl?: string): CabExtractedData {
         result.make = ymm[2].trim();
         result.model = ymm[3].trim();
       }
-      const mi = ogTitle.match(/~?([\d,]+)\s*Miles/i);
-      if (mi) result.mileage = parseInt(mi[1].replace(/,/g, ''), 10) || null;
+      result.mileage = mileageFromCabTitle(ogTitle); // speeds/mpg skipped (titleMileage.ts)
     }
 
     // h1 as title fallback

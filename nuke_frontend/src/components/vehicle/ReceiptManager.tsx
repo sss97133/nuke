@@ -26,6 +26,7 @@ export default function ReceiptManager({ vehicleId, canEdit }: ReceiptManagerPro
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     receipt_type: 'maintenance' as const,
@@ -41,27 +42,34 @@ export default function ReceiptManager({ vehicleId, canEdit }: ReceiptManagerPro
   }, [vehicleId]);
 
   const loadReceipts = async () => {
-    try {
-      // Try to load from vehicle_receipts table, fall back gracefully if not exists
-      const { data, error } = await supabase
-        .from('vehicle_receipts')
-        .select('*')
-        .eq('vehicle_id', vehicleId)
-        .order('receipt_date', { ascending: false });
-
-      if (!error && data) {
-        setReceipts(data);
-      } else {
-        // Table doesn't exist, use empty array for now
-        console.debug('Receipts table not available, using mock data');
-        setReceipts([]);
-      }
-    } catch (err) {
-      console.debug('Receipts feature not available');
+    // Canonical store is receipts; vehicle_receipts is a read-only view of gated links.
+    const { data, error } = await supabase
+      .from('receipts')
+      .select('id, vehicle_id, vendor_name, receipt_date, total_amount, file_url, status, created_by, created_at, raw_extraction')
+      .eq('vehicle_id', vehicleId)
+      .order('receipt_date', { ascending: false, nullsFirst: false });
+    if (error) {
+      console.error('Failed to load receipts:', error);
+      setLoadError(error.message);
       setReceipts([]);
-    } finally {
-      setLoading(false);
+    } else {
+      setLoadError(null);
+      setReceipts((data || []).map((r: any) => ({
+        id: r.id,
+        vehicle_id: r.vehicle_id,
+        receipt_type: (r.raw_extraction?.receipt_type ?? 'other') as Receipt['receipt_type'],
+        amount: Number(r.total_amount ?? 0),
+        currency: 'USD',
+        vendor_name: r.vendor_name ?? '',
+        description: r.raw_extraction?.description ?? '',
+        receipt_date: r.receipt_date ?? '',
+        image_url: r.file_url && r.file_url !== 'manual-entry' ? r.file_url : undefined,
+        verified: r.status === 'processed',
+        created_by: r.created_by,
+        created_at: r.created_at
+      })));
     }
+    setLoading(false);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -88,7 +96,8 @@ export default function ReceiptManager({ vehicleId, canEdit }: ReceiptManagerPro
           .from('vehicle-images')
           .upload(fileName, formData.image_file);
 
-        if (!uploadError && uploadData) {
+        if (uploadError) throw uploadError;
+        if (uploadData) {
           const { data: urlData } = supabase.storage
             .from('vehicle-images')
             .getPublicUrl(uploadData.path);
@@ -96,44 +105,29 @@ export default function ReceiptManager({ vehicleId, canEdit }: ReceiptManagerPro
         }
       }
 
-      // Save receipt record
-      const receiptData = {
-        vehicle_id: vehicleId,
-        receipt_type: formData.receipt_type,
-        amount: parseFloat(formData.amount),
-        currency: 'USD',
-        vendor_name: formData.vendor_name,
-        description: formData.description,
-        receipt_date: formData.receipt_date,
-        image_url: imageUrl,
-        verified: false
-      };
+      // Save to canonical receipts, then run the gated linker (tie + type gates).
+      const { data: auth } = await supabase.auth.getUser();
+      if (!auth?.user) throw new Error('Not signed in');
+      const { data: inserted, error } = await supabase
+        .from('receipts')
+        .insert({
+          user_id: auth.user.id,
+          created_by: auth.user.id,
+          vehicle_id: vehicleId,
+          file_url: imageUrl ?? 'manual-entry',
+          vendor_name: formData.vendor_name,
+          receipt_date: formData.receipt_date || null,
+          total_amount: parseFloat(formData.amount),
+          scope_type: 'vehicle',
+          status: 'extracted',
+          raw_extraction: { engine: 'manual_entry', receipt_type: formData.receipt_type, description: formData.description }
+        })
+        .select('id')
+        .single();
+      if (error || !inserted) throw error ?? new Error('Receipt insert returned no row');
 
-      const { error } = await supabase
-        .from('vehicle_receipts')
-        .insert([receiptData]);
-
-      if (error) {
-        if (error.message.includes('relation') || error.message.includes('does not exist')) {
-          // Store in timeline events base table as a fallback
-          await supabase.from('timeline_events').insert({
-            vehicle_id: vehicleId,
-            event_type: 'maintenance',
-            source: 'user_input',
-            title: `Receipt: ${formData.vendor_name}`,
-            description: `${formData.description}\nAmount: $${formData.amount}`,
-            event_date: formData.receipt_date,
-            metadata: {
-              receipt_type: formData.receipt_type,
-              amount: parseFloat(formData.amount),
-              vendor: formData.vendor_name,
-              image_url: imageUrl
-            }
-          });
-        } else {
-          throw error;
-        }
-      }
+      const { error: linkError } = await supabase.rpc('receipt_link_one', { p_receipt: inserted.id });
+      if (linkError) throw linkError;
 
       // Reset form
       setFormData({
@@ -150,7 +144,7 @@ export default function ReceiptManager({ vehicleId, canEdit }: ReceiptManagerPro
       alert('Receipt added successfully!');
     } catch (err) {
       console.error('Error adding receipt:', err);
-      alert('Failed to add receipt. Please try again.');
+      alert(`Failed to add receipt: ${err instanceof Error ? err.message : (err as any)?.message ?? String(err)}`);
     } finally {
       setUploading(false);
     }
@@ -286,6 +280,7 @@ export default function ReceiptManager({ vehicleId, canEdit }: ReceiptManagerPro
 
   return (
     <div className="card">
+      {loadError && <div className="card-body" role="alert">Could not load receipts: {loadError}</div>}
       <div className="card-header">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span>Receipts & Expenses</span>

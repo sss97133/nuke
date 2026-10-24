@@ -1,0 +1,154 @@
+{
+"pick": [
+"G3_seller",
+"G1d_cond_desc"
+],
+"best": {
+"all": 0.2581,
+"L0": 0.2301,
+"L1": 0.3186,
+"L2": 0.3866,
+"bat": 0.2581
+},
+"log": [
+{
+"groups": [],
+"all": 0.2647,
+"L0": 0.2336,
+"L1": 0.3261,
+"L2": 0.4042,
+"bat": 0.2646
+},
+{
+"groups": [
+"G1d_cond_desc"
+],
+"all": 0.2629,
+"L0": 0.2332,
+"L1": 0.3297,
+"L2": 0.4165,
+"bat": 0.2629
+},
+{
+"groups": [
+"G1s_cond_seller_cmt"
+],
+"all": 0.2623,
+"L0": 0.2335,
+"L1": 0.3273,
+"L2": 0.3946,
+"bat": 0.2622
+},
+{
+"groups": [
+"G1c_cond_commenter"
+],
+"all": 0.2635,
+"L0": 0.2356,
+"L1": 0.3283,
+"L2": 0.4154,
+"bat": 0.2635
+},
+{
+"groups": [
+"G2_svc_prov_own"
+],
+"all": 0.2611,
+"L0": 0.2329,
+"L1": 0.327,
+"L2": 0.4294,
+"bat": 0.261
+},
+{
+"groups": [
+"G3_seller"
+],
+"all": 0.2594,
+"L0": 0.228,
+"L1": 0.3169,
+"L2": 0.4126,
+"bat": 0.2593
+},
+{
+"groups": [
+"G3_seller",
+"G1d_cond_desc"
+],
+"all": 0.2581,
+"L0": 0.2301,
+"L1": 0.3186,
+"L2": 0.3866,
+"bat": 0.2581
+},
+{
+"groups": [
+"G3_seller",
+"G1s_cond_seller_cmt"
+],
+"all": 0.2607,
+"L0": 0.2311,
+"L1": 0.3213,
+"L2": 0.3958,
+"bat": 0.2606
+},
+{
+"groups": [
+"G3_seller",
+"G1c_cond_commenter"
+],
+"all": 0.2623,
+"L0": 0.2306,
+"L1": 0.3184,
+"L2": 0.4056,
+"bat": 0.2623
+},
+{
+"groups": [
+"G3_seller",
+"G2_svc_prov_own"
+],
+"all": 0.2595,
+"L0": 0.2318,
+"L1": 0.3198,
+"L2": 0.4111,
+"bat": 0.2594
+},
+{
+"groups": [
+"G3_seller",
+"G1d_cond_desc",
+"G1s_cond_seller_cmt"
+],
+"all": 0.2593,
+"L0": 0.2293,
+"L1": 0.3202,
+"L2": 0.3794,
+"bat": 0.2593
+},
+{
+"groups": [
+"G3_seller",
+"G1d_cond_desc",
+"G1c_cond_commenter"
+],
+"all": 0.261,
+"L0": 0.2287,
+"L1": 0.3192,
+"L2": 0.3863,
+"bat": 0.2609
+},
+{
+"groups": [
+"G3_seller",
+"G1d_cond_desc",
+"G2_svc_prov_own"
+],
+"all": 0.2589,
+"L0": 0.2291,
+"L1": 0.3189,
+"L2": 0.3965,
+"bat": 0.2587
+}
+],
+"rule": "# G3 seller comments/answers; add the group that lowers mean validation MdAPE (all levels) most, if by >= 0.001."
+}

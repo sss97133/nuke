@@ -1,0 +1,346 @@
+{
+ "lam": 0.0005,
+ "sweep_fold1": {
+  "0": [
+   -0.0925,
+   4,
+   0.0468
+  ],
+  "0.0005": [
+   -0.0949,
+   4,
+   0.0252
+  ],
+  "0.002": [
+   -0.0896,
+   4,
+   0.0269
+  ],
+  "0.01": [
+   -0.0874,
+   3,
+   0.0321
+  ],
+  "0.05": [
+   -0.0869,
+   3,
+   0.024
+  ]
+ },
+ "prior": {
+  "med_abs_log_err": [
+   0.3114,
+   0.2892,
+   0.3157,
+   0.2683,
+   0.2602,
+   0.2757,
+   0.2202,
+   0.2841,
+   0.2573,
+   0.2734
+  ],
+  "width": [
+   1.308,
+   1.075,
+   1.075,
+   1.075,
+   1.075,
+   1.075,
+   1.075,
+   1.075,
+   1.075,
+   1.075
+  ],
+  "cov80": [
+   0.771,
+   0.797,
+   0.744,
+   0.818,
+   0.826,
+   0.826,
+   0.824,
+   0.791,
+   0.821,
+   0.871
+  ],
+  "score_min": [
+   10.1,
+   22.5,
+   27.2,
+   29.4,
+   30.5,
+   31.7,
+   32.6,
+   33.5,
+   34.7,
+   36.5
+  ],
+  "n_distinct_scores": 1585,
+  "spearman_decile_vs_err": -0.6,
+  "adjacent_increases": 4,
+  "bottom_minus_top": 0.0379,
+  "rho_row_score_err": -0.083,
+  "rho_row_score_width": -0.1096
+ },
+ "cal": {
+  "med_abs_log_err": [
+   0.3175,
+   0.2966,
+   0.3053,
+   0.2825,
+   0.2551,
+   0.2684,
+   0.2468,
+   0.2496,
+   0.2848,
+   0.2461
+  ],
+  "width": [
+   1.308,
+   1.075,
+   1.074,
+   1.074,
+   1.075,
+   1.075,
+   1.075,
+   1.075,
+   1.075,
+   1.075
+  ],
+  "cov80": [
+   0.759,
+   0.809,
+   0.741,
+   0.794,
+   0.809,
+   0.824,
+   0.838,
+   0.856,
+   0.803,
+   0.856
+  ],
+  "score_min": [
+   10.7,
+   24.0,
+   28.7,
+   30.9,
+   32.2,
+   33.3,
+   34.5,
+   35.7,
+   37.2,
+   38.9
+  ],
+  "n_distinct_scores": 1654,
+  "spearman_decile_vs_err": -0.782,
+  "adjacent_increases": 4,
+  "bottom_minus_top": 0.0715,
+  "rho_row_score_err": -0.0997,
+  "rho_row_score_width": 0.0676
+ },
+ "prior_f2": {
+  "med_abs_log_err": [
+   0.285,
+   0.2996,
+   0.2924,
+   0.2487,
+   0.2418,
+   0.2483,
+   0.2379,
+   0.2888,
+   0.2787,
+   0.2247
+  ],
+  "width": [
+   1.315,
+   1.075,
+   1.075,
+   1.075,
+   1.075,
+   1.075,
+   1.075,
+   1.075,
+   1.075,
+   1.075
+  ],
+  "cov80": [
+   0.788,
+   0.765,
+   0.782,
+   0.841,
+   0.882,
+   0.841,
+   0.847,
+   0.794,
+   0.806,
+   0.859
+  ],
+  "score_min": [
+   10.1,
+   23.5,
+   28.4,
+   29.9,
+   31.1,
+   32.1,
+   32.9,
+   33.8,
+   35.0,
+   36.8
+  ],
+  "n_distinct_scores": 1054,
+  "spearman_decile_vs_err": -0.576,
+  "adjacent_increases": 3,
+  "bottom_minus_top": 0.0603,
+  "rho_row_score_err": -0.0697,
+  "rho_row_score_width": -0.183
+ },
+ "cal_f2": {
+  "med_abs_log_err": [
+   0.2946,
+   0.3087,
+   0.2891,
+   0.2436,
+   0.2468,
+   0.2583,
+   0.2343,
+   0.2856,
+   0.2573,
+   0.2226
+  ],
+  "width": [
+   1.315,
+   1.075,
+   1.075,
+   1.075,
+   1.075,
+   1.075,
+   1.075,
+   1.075,
+   1.075,
+   1.075
+  ],
+  "cov80": [
+   0.782,
+   0.741,
+   0.829,
+   0.824,
+   0.835,
+   0.882,
+   0.865,
+   0.765,
+   0.829,
+   0.853
+  ],
+  "score_min": [
+   12.8,
+   27.4,
+   32.4,
+   34.0,
+   35.0,
+   35.8,
+   36.6,
+   37.3,
+   38.3,
+   39.8
+  ],
+  "n_distinct_scores": 1003,
+  "spearman_decile_vs_err": -0.685,
+  "adjacent_increases": 4,
+  "bottom_minus_top": 0.072,
+  "rho_row_score_err": -0.0843,
+  "rho_row_score_width": -0.1956
+ },
+ "fits": [
+  {
+   "test_fold": 1,
+   "b": -0.5178,
+   "w": {
+    "core_fields": 4.0,
+    "vin_identity": 13.61,
+    "house_sale": 13.87,
+    "house_lot_attach": 5.99,
+    "images": 15.25,
+    "receipts": 10.24,
+    "cited_claims": 7.33,
+    "cited_observations": 9.73,
+    "field_evidence": 7.14,
+    "odometer": 6.33,
+    "fx_citation": 2.0
+   },
+   "sat": {
+    "core_fields": 3.02,
+    "vin_identity": 1.04,
+    "house_sale": 3.08,
+    "house_lot_attach": 1.99,
+    "images": 38.58,
+    "receipts": 5.0,
+    "cited_claims": 9.36,
+    "cited_observations": 16.69,
+    "field_evidence": 9.5,
+    "odometer": 2.87,
+    "fx_citation": 1.0
+   }
+  },
+  {
+   "test_fold": 2,
+   "b": -0.5387,
+   "w": {
+    "core_fields": 4.0,
+    "vin_identity": 12.91,
+    "house_sale": 10.81,
+    "house_lot_attach": 6.0,
+    "images": 18.36,
+    "receipts": 10.1,
+    "cited_claims": 7.89,
+    "cited_observations": 7.58,
+    "field_evidence": 9.68,
+    "odometer": 6.33,
+    "fx_citation": 2.0
+   },
+   "sat": {
+    "core_fields": 3.02,
+    "vin_identity": 1.06,
+    "house_sale": 3.79,
+    "house_lot_attach": 2.08,
+    "images": 35.67,
+    "receipts": 5.04,
+    "cited_claims": 10.02,
+    "cited_observations": 15.32,
+    "field_evidence": 9.59,
+    "odometer": 2.91,
+    "fx_citation": 1.0
+   }
+  }
+ ],
+ "final": {
+  "a": 0.557145269825206,
+  "b": -0.7116194423659815,
+  "w": {
+   "core_fields": 3.993,
+   "vin_identity": 10.216,
+   "house_sale": 9.868,
+   "house_lot_attach": 6.032,
+   "images": 25.894,
+   "receipts": 8.991,
+   "cited_claims": 5.704,
+   "cited_observations": 7.596,
+   "field_evidence": 13.121,
+   "odometer": 7.084,
+   "fx_citation": 2.0
+  },
+  "sat": {
+   "core_fields": 2.95,
+   "vin_identity": 1.147,
+   "house_sale": 3.636,
+   "house_lot_attach": 2.075,
+   "images": 33.651,
+   "receipts": 5.027,
+   "cited_claims": 11.596,
+   "cited_observations": 13.756,
+   "field_evidence": 8.99,
+   "odometer": 2.497,
+   "fx_citation": 1.0
+  }
+ }
+}

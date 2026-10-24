@@ -1,4 +1,6 @@
 // Read-only handlers for the Nuke Asset Advisor surface.
+import { assetIdProblem, effectiveListingStatus } from "./asset_status.ts";
+import { rankFindResults } from "./find_rank.ts";
 import { adjustedEstimate, type AdjResult, type IndexSeries } from "./adjust.ts";
 import {
   AGENT_CITATION_RULES,
@@ -7,6 +9,8 @@ import {
   extractEventTime,
   makeEnvelope,
   notRecordedClaim,
+  publicSourceUrl,
+  sourceLabelForUrl,
   recordedClaim,
   resolveClaimConfidence,
   type AdvisorEnvelope,
@@ -14,11 +18,13 @@ import {
   type Citation,
 } from "./evidence.ts";
 import { handleEvaluateListing } from "./evaluate_listing.ts";
+import { classifyVinQuery } from "./vin.ts";
 import {
   canonicalListingUrl,
   cleanListingUrl,
   detectVariant,
   isLikelyPartsSale,
+  isGenerationMismatch,
   isVariantMismatch,
   recentSaleSanityGuard,
   scoreSimilarity,
@@ -209,6 +215,27 @@ export function calibratedConfidence(nComps: number, dispersion: number | null):
   return T[row]![col]!;
 }
 
+/** Event clock for a vehicle's listing: sale date, BaT sale date, or a past auction end. Null otherwise. */
+export function vehicleEventTime(vehicle: Record<string, unknown>, nowMs = Date.now()): string | null {
+  for (const k of ["sale_date", "bat_sale_date"]) {
+    const v = vehicle[k];
+    if (typeof v === "string" && Number.isFinite(Date.parse(v))) return v;
+  }
+  const end = vehicle.auction_end_date;
+  if (typeof end === "string" && end.trim()) {
+    const t = Date.parse(end);
+    if (Number.isFinite(t) && t <= nowMs) return new Date(t).toISOString();
+  }
+  return null;
+}
+
+/** Listing URL safe to show: http(s) only, plus a label when the stored reference is not a URL. */
+function publicListing(v: Record<string, unknown>): { listing_url: string | null; source_label: string | null } {
+  const raw = (v.listing_url || v.bat_auction_url || null) as string | null;
+  const url = publicSourceUrl(raw) ?? publicSourceUrl(v.bat_auction_url as string | null);
+  return { listing_url: url, source_label: url ? null : sourceLabelForUrl(raw) };
+}
+
 function listingCitation(vehicle: Record<string, unknown>): Citation {
   const platform = vehicle.canonical_platform || vehicle.auction_source;
   const name =
@@ -221,7 +248,8 @@ function listingCitation(vehicle: Record<string, unknown>): Citation {
     source_name: name,
     source_url: (vehicle.listing_url || vehicle.bat_auction_url || null) as string | null,
     observation_id: null,
-    event_time: null,
+    // The sale / auction end is the event; ingested_at (scrape time) never stands in for it.
+    event_time: vehicleEventTime(vehicle),
     ingested_at: (vehicle.updated_at || vehicle.created_at || null) as string | null,
     is_superseded: false,
   });
@@ -237,7 +265,8 @@ export function createAdvisorHandlers(deps: AdvisorDeps): Record<
     get_asset: (args) => handleGetAsset(deps, args),
     get_comps: (args) => handleGetComps(deps, args),
     value_asset: (args) => handleValueAsset(deps, args),
-    evaluate_listing: (args) => handleEvaluateListing(deps, args),
+    evaluate_listing: (args) =>
+      handleEvaluateListing({ ...deps, valueAsset: (id) => handleValueAsset(deps, { asset_id: id }) }, args),
     budget_options: (args) => handleBudgetOptions(deps, args),
   };
 }
@@ -551,6 +580,7 @@ async function resolveSoldComps(
     no_amount: 0,
     hd_diesel_mismatch: 0,
     variant_mismatch: 0,
+    generation_mismatch: 0,
     duplicate: 0,
     parts: 0,
   };
@@ -647,6 +677,21 @@ async function resolveSoldComps(
     const candVariant = detectVariant(candBlob);
     if (isVariantMismatch(subjectVariant, candVariant)) {
       excluded.variant_mismatch++;
+      continue;
+    }
+    // Same variant, different generation (e.g. 964 Turbo 3.6 comps for a 993 Turbo).
+    if (
+      isGenerationMismatch(
+        {
+          make,
+          model: String(subject?.model || model || ""),
+          year,
+          text: `${subject?.trim || ""} ${subject?.listing_title || ""} ${subject?.listing_url || ""} ${subject?.bat_auction_url || ""}`,
+        },
+        { make: (c.make as string) || make, model: String(c.model || ""), year: c.year != null ? Number(c.year) : null, text: candBlob },
+      )
+    ) {
+      excluded.generation_mismatch++;
       continue;
     }
 
@@ -791,12 +836,13 @@ async function handleFindAsset(
 
   const sb = deps.sb();
   const selectCols =
-    "id, year, make, model, trim, vin, sale_price, mileage, primary_image_url, listing_url, bat_auction_url, nuke_estimate, location, auction_source, canonical_platform, updated_at, created_at";
+    "id, year, make, model, trim, vin, sale_price, mileage, primary_image_url, listing_url, bat_auction_url, nuke_estimate, location, auction_source, canonical_platform, sale_date, bat_sale_date, auction_end_date, updated_at, created_at";
 
   // Prefer indexed equality paths. Full-text on VIN/URL tokens times out on the live fleet.
   const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  // Pre-1981 chassis numbers are often 8–11 chars (e.g. VW 1442612348); modern VINs are 17.
-  const vinRe = /^[A-HJ-NPR-Z0-9]{8,17}$/i;
+  // VIN only for a 17-char VIN or a pre-1981 chassis-number pattern with no spaces; free text such as
+  // "1972 Chevy C10" goes to text search (it used to decode to a 2012 KROSS KOUNTRY).
+  const vinQuery = classifyVinQuery(queryStr);
   const looksUrl = /^https?:\/\//i.test(queryStr) || /bringatrailer\.com|carsandbids\.com|ebay\.com/i.test(queryStr);
 
   let data: Record<string, unknown>[] | null = null;
@@ -806,8 +852,8 @@ async function handleFindAsset(
     const res = await sb.from("vehicles").select(selectCols).eq("id", queryStr).limit(1);
     data = res.data;
     error = res.error;
-  } else if (vinRe.test(queryStr.replace(/\s+/g, ""))) {
-    const vin = queryStr.replace(/\s+/g, "").toUpperCase();
+  } else if (vinQuery.kind !== "text") {
+    const vin = vinQuery.vin;
     const res = await sb.from("vehicles").select(selectCols).eq("vin", vin).limit(limit);
     data = res.data;
     error = res.error;
@@ -863,17 +909,20 @@ async function handleFindAsset(
     const yearMatch = queryStr.match(/\b(19|20)\d{2}\b/);
     const year = yearMatch ? Number(yearMatch[0]) : null;
     const rest = queryStr.replace(/\b(19|20)\d{2}\b/g, " ").trim();
-    let query = sb.from("vehicles").select(selectCols).limit(limit);
+    // Over-fetch, then rank in JS (exact year/make/model first, parts last).
+    let query = sb.from("vehicles").select(selectCols).limit(Math.min(limit * 4, 100));
     if (year) query = query.eq("year", year);
     if (rest) {
-      const parts = rest.split(/\s+/).filter(Boolean);
+      // Common make nicknames, so "1972 Chevy C10" finds Chevrolet rows.
+      const MAKE_ALIASES: Record<string, string> = { chevy: "chevrolet", vw: "volkswagen", merc: "mercedes", benz: "mercedes" };
+      const parts = rest.split(/\s+/).filter(Boolean).map((p) => MAKE_ALIASES[p.toLowerCase()] ?? p);
       // Every token must match make OR model (AND across tokens).
       for (const p of parts) {
         query = query.or(`make.ilike.%${p}%,model.ilike.%${p}%`);
       }
     }
     const res = await query;
-    data = res.data;
+    data = res.data ? rankFindResults(res.data as Record<string, unknown>[], rest.split(/\s+/).filter(Boolean), year).slice(0, limit) : res.data;
     error = res.error;
   }
 
@@ -892,16 +941,17 @@ async function handleFindAsset(
       asset_id: v.id,
       asset_type: "vehicle",
       label: [v.year, v.make, v.model].filter(Boolean).join(" "),
-      listing_url: v.listing_url || v.bat_auction_url || null,
+      ...publicListing(v),
       primary_image_url: v.primary_image_url || null,
       claims,
     };
   });
 
   // VIN decode fallback when Nuke has no row for this VIN.
-  const vinCandidate = queryStr.replace(/\s+/g, "").toUpperCase();
   let vin_decode: Record<string, unknown> | null = null;
-  if (!results.length && vinRe.test(vinCandidate)) {
+  // NHTSA decodes 17-char VINs only; a short chassis number would decode to an unrelated vehicle.
+  if (!results.length && vinQuery.kind === "vin17") {
+    const vinCandidate = vinQuery.vin;
     const decoded = await decodeVinNhtsa(vinCandidate);
     if (decoded) {
       vin_decode = {
@@ -912,6 +962,10 @@ async function handleFindAsset(
         trim: decoded.Trim || null,
         body_class: decoded.BodyClass || null,
         source: "nhtsa_vpic",
+        check_digit_valid: vinQuery.check_digit_valid,
+        ...(vinQuery.check_digit_valid ? {} : {
+          note: "Check digit (position 9) does not validate. Normal for many non-North-American VINs; otherwise likely a typo.",
+        }),
       };
       const cit = emptyCitation({
         source_name: "NHTSA VPIC",
@@ -926,6 +980,7 @@ async function handleFindAsset(
         asset_type: "vehicle",
         label: [decoded.ModelYear, decoded.Make, decoded.Model].filter(Boolean).join(" "),
         listing_url: null,
+        source_label: "NHTSA VPIC decode",
         primary_image_url: null,
         claims: [
           recordedClaim("year", decoded.ModelYear || null, { citations: [cit], confidence: 0.7, confidence_basis: "source_trust" }),
@@ -940,6 +995,7 @@ async function handleFindAsset(
 
   return ok(makeEnvelope("find_asset", "vehicle", null, [], {
     query: queryStr,
+    query_kind: vinQuery.kind === "text" ? (looksUrl ? "url" : uuidRe.test(queryStr) ? "asset_id" : "text") : vinQuery.kind,
     count: results.length,
     results,
     vin_decode,
@@ -1096,7 +1152,7 @@ async function handleFindListings(
       ends_at: v.auction_end_date || null,
       location: v.city || v.state || v.location || null,
       source: v.canonical_platform || v.auction_source || v.listing_source || null,
-      listing_url: v.listing_url || v.bat_auction_url || null,
+      ...publicListing(v),
       primary_image_url: v.primary_image_url || null,
       transmission: v.transmission || null,
       mileage: v.mileage || null,
@@ -1146,8 +1202,9 @@ async function handleGetAsset(
 ): Promise<AdvisorToolResult> {
   const bad = unsupportedAsset(args, "get_asset");
   if (bad) return bad;
-  const vid = String(args.asset_id || "");
-  if (!vid) return err("asset_id is required", "get_asset");
+  const vid = String(args.asset_id || "").trim();
+  const vidProblem = assetIdProblem(vid);
+  if (vidProblem) return err(vidProblem, "get_asset");
 
   const sb = deps.sb();
   const { data: vehicle, error } = await sb
@@ -1159,11 +1216,16 @@ async function handleGetAsset(
         "nuke_estimate, nuke_estimate_confidence, " +
         "primary_image_url, image_count, observation_count, " +
         "description, location, city, state, country, " +
-        "listing_url, bat_auction_url, created_at, updated_at",
+        "listing_url, bat_auction_url, created_at, updated_at, " +
+        "auction_status, reserve_status, sale_status, auction_end_date, sale_date, bat_sale_date",
     )
     .eq("id", vid)
     .single();
-  if (error) return err(error.message, "get_asset");
+  if (error && (error as { code?: string }).code === "PGRST116") return err("Asset not found", "get_asset");
+  if (error) {
+    console.error("get_asset query failed", error.message);
+    return err("Could not load asset (lookup failed)", "get_asset");
+  }
   if (!vehicle) return err("Asset not found", "get_asset");
 
   const [price, obsRes] = await Promise.all([
@@ -1314,7 +1376,8 @@ async function handleGetAsset(
 
   return ok(
     makeEnvelope("get_asset", "vehicle", vid, claims, {
-      status: row.status ?? null,
+      status: effectiveListingStatus(row),
+      record_status: row.status ?? null,
       location: {
         location: row.location ?? null,
         city: row.city ?? null,
@@ -1322,8 +1385,9 @@ async function handleGetAsset(
         country: row.country ?? null,
       },
       links: {
-        listing_url: row.listing_url ?? null,
-        bat_auction_url: row.bat_auction_url ?? null,
+        listing_url: publicSourceUrl(row.listing_url as string | null),
+        bat_auction_url: publicSourceUrl(row.bat_auction_url as string | null),
+        source_label: sourceLabelForUrl(row.listing_url as string | null),
         primary_image_url: row.primary_image_url ?? null,
         profile_url: `https://nuke.ag/vehicle/${vid}`,
       },
@@ -1348,8 +1412,9 @@ async function handleGetHistory(
 ): Promise<AdvisorToolResult> {
   const bad = unsupportedAsset(args, "get_history");
   if (bad) return bad;
-  const vid = String(args.asset_id || "");
-  if (!vid) return err("asset_id is required", "get_history");
+  const vid = String(args.asset_id || "").trim();
+  const vidProblem = assetIdProblem(vid);
+  if (vidProblem) return err(vidProblem, "get_history");
   const limit = Math.min(Math.max(Number(args.limit) || 25, 1), 100);
   const sb = deps.sb();
 
@@ -1508,6 +1573,8 @@ async function handleExplainField(
   const vid = String(args.asset_id || "");
   const field = String(args.field || "").trim();
   if (!vid || !field) return err("asset_id and field are required", "explain_field");
+  const vidProblem = assetIdProblem(vid);
+  if (vidProblem) return err(vidProblem, "explain_field");
   const sb = deps.sb();
   const keys = fieldKeys(field);
 
@@ -1694,14 +1761,15 @@ async function handleValueAsset(
 ): Promise<AdvisorToolResult> {
   const bad = unsupportedAsset(args, "value_asset");
   if (bad) return bad;
-  const vid = String(args.asset_id || "");
-  if (!vid) return err("asset_id is required", "value_asset");
+  const vid = String(args.asset_id || "").trim();
+  const vidProblem = assetIdProblem(vid);
+  if (vidProblem) return err(vidProblem, "value_asset");
   const sb = deps.sb();
 
   const { data: vehicle } = await sb
     .from("vehicles")
     .select(
-      "id, year, make, model, mileage, nuke_estimate, nuke_estimate_confidence, listing_url, bat_auction_url, canonical_platform, updated_at, created_at",
+      "id, year, make, model, mileage, nuke_estimate, nuke_estimate_confidence, listing_url, bat_auction_url, canonical_platform, sale_date, bat_sale_date, auction_end_date, updated_at, created_at",
     )
     .eq("id", vid)
     .maybeSingle();
@@ -2053,7 +2121,11 @@ async function handleGetComps(
   let make = typeof args.make === "string" ? args.make : null;
   let model = typeof args.model === "string" ? args.model : null;
   let year = args.year != null ? Number(args.year) : null;
-  let assetId = args.asset_id ? String(args.asset_id) : undefined;
+  let assetId = args.asset_id ? String(args.asset_id).trim() : undefined;
+  if (assetId) {
+    const idProblem = assetIdProblem(assetId);
+    if (idProblem) return err(idProblem, "get_comps");
+  }
 
   if (args.vin && !assetId) {
     const { data: vrow } = await sb
@@ -2160,8 +2232,9 @@ async function handleGetCoverage(
 ): Promise<AdvisorToolResult> {
   const bad = unsupportedAsset(args, "get_coverage");
   if (bad) return bad;
-  const vid = String(args.asset_id || "");
-  if (!vid) return err("asset_id is required", "get_coverage");
+  const vid = String(args.asset_id || "").trim();
+  const vidProblem = assetIdProblem(vid);
+  if (vidProblem) return err(vidProblem, "get_coverage");
   const sb = deps.sb();
 
   const { data: vehicle, error } = await sb

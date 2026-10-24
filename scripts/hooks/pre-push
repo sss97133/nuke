@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# Pre-push: fail when a migration version is shared, checking this checkout's files AND origin/main's.
+# CI enforces the same check (scripts/ci/verify.sh, run by the `validate` job); this hook only catches it earlier.
+# Install once per clone (worktrees share it): git config core.hooksPath scripts/hooks
+set -euo pipefail
+exec bash "$(git rev-parse --show-toplevel)/scripts/ci/migration-versions-vs-main.sh" origin/main
