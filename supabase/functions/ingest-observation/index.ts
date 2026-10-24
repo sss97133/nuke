@@ -602,7 +602,11 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
       const sourceId = retainedInteriorSelector(input as unknown as Record<string, unknown>);
       if (!sourceId) return new Response(JSON.stringify({ error: "Expected only a retained source selector" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      const read = (key: string, load: () => PromiseLike<any>) => batchLookups ? batchLookups.read(key, load) : load();
+      const readKeys: string[] = [];
+      const read = (key: string, load: () => PromiseLike<any>) => {
+        readKeys.push(key);return batchLookups ? batchLookups.read(key, load) : load();
+      };
+      try {
       const parent = await read(`parent:${sourceId}`, () => supabase.from("vehicle_observations")
         .select("id,vehicle_id,kind,is_superseded,property_id,subject_type,subject_id,source_id,source_url,source_identifier,observed_at,ingested_at,extraction_method,confidence_score,structured_data,extraction_metadata,content_text")
         .eq("id", sourceId).maybeSingle());
@@ -622,6 +626,7 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
       batchLookups?.remember(`source-slug:${source.data.slug}`, source);
       input = derived;
       retainedSourceId = sourceId;
+      } finally { batchLookups?.release(readKeys); }
     } else if (input.mode === TITLE_FACET_MODE) {
       const denied = await requireWriteAuth(req);
       if (denied) return denied;

@@ -40,11 +40,21 @@ export class RetainedBatchLookups {
     this.counts.reads_started++;
     const task = Promise.resolve().then(load);
     this.inFlight.set(key, task);
-    try { return await task; }
-    finally { this.inFlight.delete(key); }
+    // A successful read stays shared until its caller has qualified it and
+    // called remember() or release(): the caller awaits sibling reads first,
+    // so dropping it on settle let a concurrent item start a second read of
+    // the same key. Failed or empty results are released at once.
+    let result: any;
+    try { result = await task; }
+    catch (error) { this.inFlight.delete(key); throw error; }
+    if (result?.error || !result?.data) this.inFlight.delete(key);
+    return result;
   }
   stats() { return { ...this.counts }; }
+  /** End sharing for reads the caller did not remember (refused or failed). */
+  release(keys: Iterable<string>): void { for (const key of keys) this.inFlight.delete(key); }
   remember(key: string, result: any): void {
+    this.inFlight.delete(key);
     if (result?.error || !result?.data || this.rows.has(key) || this.rows.size >= 256) return;
     const size = new TextEncoder().encode(JSON.stringify(result.data)).length;
     if (this.bytes + size > 4 * 1024 * 1024) return;
