@@ -7,6 +7,8 @@ import {
   extractEventTime,
   makeEnvelope,
   notRecordedClaim,
+  publicSourceUrl,
+  sourceLabelForUrl,
   recordedClaim,
   resolveClaimConfidence,
   type AdvisorEnvelope,
@@ -209,6 +211,27 @@ export function calibratedConfidence(nComps: number, dispersion: number | null):
   return T[row]![col]!;
 }
 
+/** Event clock for a vehicle's listing: sale date, BaT sale date, or a past auction end. Null otherwise. */
+export function vehicleEventTime(vehicle: Record<string, unknown>, nowMs = Date.now()): string | null {
+  for (const k of ["sale_date", "bat_sale_date"]) {
+    const v = vehicle[k];
+    if (typeof v === "string" && Number.isFinite(Date.parse(v))) return v;
+  }
+  const end = vehicle.auction_end_date;
+  if (typeof end === "string" && end.trim()) {
+    const t = Date.parse(end);
+    if (Number.isFinite(t) && t <= nowMs) return new Date(t).toISOString();
+  }
+  return null;
+}
+
+/** Listing URL safe to show: http(s) only, plus a label when the stored reference is not a URL. */
+function publicListing(v: Record<string, unknown>): { listing_url: string | null; source_label: string | null } {
+  const raw = (v.listing_url || v.bat_auction_url || null) as string | null;
+  const url = publicSourceUrl(raw) ?? publicSourceUrl(v.bat_auction_url as string | null);
+  return { listing_url: url, source_label: url ? null : sourceLabelForUrl(raw) };
+}
+
 function listingCitation(vehicle: Record<string, unknown>): Citation {
   const platform = vehicle.canonical_platform || vehicle.auction_source;
   const name =
@@ -221,7 +244,8 @@ function listingCitation(vehicle: Record<string, unknown>): Citation {
     source_name: name,
     source_url: (vehicle.listing_url || vehicle.bat_auction_url || null) as string | null,
     observation_id: null,
-    event_time: null,
+    // The sale / auction end is the event; ingested_at (scrape time) never stands in for it.
+    event_time: vehicleEventTime(vehicle),
     ingested_at: (vehicle.updated_at || vehicle.created_at || null) as string | null,
     is_superseded: false,
   });
@@ -791,7 +815,7 @@ async function handleFindAsset(
 
   const sb = deps.sb();
   const selectCols =
-    "id, year, make, model, trim, vin, sale_price, mileage, primary_image_url, listing_url, bat_auction_url, nuke_estimate, location, auction_source, canonical_platform, updated_at, created_at";
+    "id, year, make, model, trim, vin, sale_price, mileage, primary_image_url, listing_url, bat_auction_url, nuke_estimate, location, auction_source, canonical_platform, sale_date, bat_sale_date, auction_end_date, updated_at, created_at";
 
   // Prefer indexed equality paths. Full-text on VIN/URL tokens times out on the live fleet.
   const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -892,7 +916,7 @@ async function handleFindAsset(
       asset_id: v.id,
       asset_type: "vehicle",
       label: [v.year, v.make, v.model].filter(Boolean).join(" "),
-      listing_url: v.listing_url || v.bat_auction_url || null,
+      ...publicListing(v),
       primary_image_url: v.primary_image_url || null,
       claims,
     };
@@ -926,6 +950,7 @@ async function handleFindAsset(
         asset_type: "vehicle",
         label: [decoded.ModelYear, decoded.Make, decoded.Model].filter(Boolean).join(" "),
         listing_url: null,
+        source_label: "NHTSA VPIC decode",
         primary_image_url: null,
         claims: [
           recordedClaim("year", decoded.ModelYear || null, { citations: [cit], confidence: 0.7, confidence_basis: "source_trust" }),
@@ -1096,7 +1121,7 @@ async function handleFindListings(
       ends_at: v.auction_end_date || null,
       location: v.city || v.state || v.location || null,
       source: v.canonical_platform || v.auction_source || v.listing_source || null,
-      listing_url: v.listing_url || v.bat_auction_url || null,
+      ...publicListing(v),
       primary_image_url: v.primary_image_url || null,
       transmission: v.transmission || null,
       mileage: v.mileage || null,
@@ -1159,7 +1184,7 @@ async function handleGetAsset(
         "nuke_estimate, nuke_estimate_confidence, " +
         "primary_image_url, image_count, observation_count, " +
         "description, location, city, state, country, " +
-        "listing_url, bat_auction_url, created_at, updated_at",
+        "listing_url, bat_auction_url, sale_date, bat_sale_date, auction_end_date, created_at, updated_at",
     )
     .eq("id", vid)
     .single();
@@ -1322,8 +1347,9 @@ async function handleGetAsset(
         country: row.country ?? null,
       },
       links: {
-        listing_url: row.listing_url ?? null,
-        bat_auction_url: row.bat_auction_url ?? null,
+        listing_url: publicSourceUrl(row.listing_url as string | null),
+        bat_auction_url: publicSourceUrl(row.bat_auction_url as string | null),
+        source_label: sourceLabelForUrl(row.listing_url as string | null),
         primary_image_url: row.primary_image_url ?? null,
         profile_url: `https://nuke.ag/vehicle/${vid}`,
       },
@@ -1701,7 +1727,7 @@ async function handleValueAsset(
   const { data: vehicle } = await sb
     .from("vehicles")
     .select(
-      "id, year, make, model, mileage, nuke_estimate, nuke_estimate_confidence, listing_url, bat_auction_url, canonical_platform, updated_at, created_at",
+      "id, year, make, model, mileage, nuke_estimate, nuke_estimate_confidence, listing_url, bat_auction_url, canonical_platform, sale_date, bat_sale_date, auction_end_date, updated_at, created_at",
     )
     .eq("id", vid)
     .maybeSingle();

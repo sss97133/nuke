@@ -102,10 +102,35 @@ export const ENVELOPE_OUTPUT_SCHEMA = {
   additionalProperties: true,
 } as const;
 
+/**
+ * Only http(s) URLs are clickable sources. Internal pseudo-schemes such as
+ * `conceptcarz://event/1866/1990 BMW E30 M3 ...` are not URLs: return null so agents never cite them.
+ */
+export function publicSourceUrl(url: string | null | undefined): string | null {
+  if (url == null) return null;
+  const u = String(url).trim();
+  if (!u) return null;
+  return /^https?:\/\/[^\s/$.?#][^\s]*$/i.test(u) ? u : null;
+}
+
+/** Human label for a non-public source reference, e.g. "conceptcarz (event 1866, no public URL)". */
+export function sourceLabelForUrl(url: string | null | undefined): string | null {
+  if (url == null) return null;
+  const m = String(url).trim().match(/^([a-z][a-z0-9+.-]*):\/\/(?:event\/(\d+))?/i);
+  if (!m || /^https?$/i.test(m[1]!)) return null;
+  return `${m[1]!.toLowerCase()}${m[2] ? ` (event ${m[2]}, no public URL)` : " (no public URL)"}`;
+}
+
 export function emptyCitation(partial: Partial<Citation> = {}): Citation {
+  const rawUrl = partial.source_url ?? null;
+  const url = publicSourceUrl(rawUrl);
+  const label = url == null ? sourceLabelForUrl(rawUrl) : null;
+  const name = partial.source_name ?? null;
   return {
-    source_name: partial.source_name ?? null,
-    source_url: partial.source_url ?? null,
+    source_name: label && (!name || /^(unknown|listing|comp)$/i.test(name) || label.startsWith(name.toLowerCase()))
+      ? label
+      : name,
+    source_url: url,
     observation_id: partial.observation_id ?? null,
     event_time: partial.event_time ?? null,
     ingested_at: partial.ingested_at ?? null,
