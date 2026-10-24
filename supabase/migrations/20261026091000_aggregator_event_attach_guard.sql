@@ -18,7 +18,7 @@
 -- PRICE TRUST: an event flagged source_suspect @> {vehicle_id} is treated like an unverified price in
 --   vehicle_sale_price_untrusted / vehicle_sale_price_untrusted_ids and can never vouch for the vehicle's price;
 --   sync_vehicle_sale_price_from_verified_event never copies from such an event. No price is moved.
--- Rollback: supabase/rollbacks/20261026081000_aggregator_event_attach_guard_down.sql
+-- Rollback: supabase/rollbacks/20261026091000_aggregator_event_attach_guard_down.sql
 -- Test: supabase/sql/test_aggregator_event_attach_guard.sql
 SET lock_timeout = '10s';
 

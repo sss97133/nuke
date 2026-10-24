@@ -1,4 +1,4 @@
--- Isolated PostgreSQL 17 contract for 20261026081000_aggregator_event_attach_guard.sql. Synthetic rows only.
+-- Isolated PostgreSQL 17 contract for 20261026091000_aggregator_event_attach_guard.sql. Synthetic rows only.
 --   createdb dm_refinement_aggregator_attach_ci
 --   psql -X -v ON_ERROR_STOP=1 -d dm_refinement_aggregator_attach_ci -f supabase/sql/test_aggregator_event_attach_guard.sql
 -- Cases: conceptcarz insert by price+date alone refused; chassis = VIN, VIN suffix (>=6) accepted; short-fragment suffix refused;
@@ -27,7 +27,7 @@ CREATE TABLE public.sync_calls (rows jsonb);
 CREATE FUNCTION public.correct_vehicle_sale_provenance_batch(p_rows jsonb, p_asserted_by text, p_reason text)
  RETURNS jsonb LANGUAGE sql AS $$ INSERT INTO public.sync_calls VALUES (p_rows) RETURNING p_rows $$;
 
-\ir ../migrations/20261026081000_aggregator_event_attach_guard.sql
+\ir ../migrations/20261026091000_aggregator_event_attach_guard.sql
 CREATE TRIGGER trg_sync_vehicle_sale_price_from_verified_event AFTER INSERT OR UPDATE ON public.vehicle_events
   FOR EACH ROW EXECUTE FUNCTION public.sync_vehicle_sale_price_from_verified_event();
 
@@ -124,7 +124,7 @@ UPDATE public.vehicle_events SET price_verification_at = now() WHERE id = '00000
 SELECT pg_temp.ok(EXISTS (SELECT 1 FROM public.sync_calls), 'control: the same event unflagged does drive the sync');
 
 -- rollback restores the previous objects
-\ir ../rollbacks/20261026081000_aggregator_event_attach_guard_down.sql
+\ir ../rollbacks/20261026091000_aggregator_event_attach_guard_down.sql
 SELECT pg_temp.ok(to_regproc('public.aggregator_event_attach_basis') IS NULL
   AND NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'trg_guard_aggregator_event_attach'), 'rollback drops the guard');
 SELECT pg_temp.ok(NOT public.vehicle_sale_price_untrusted('00000000-0000-0000-0000-00000000000b', 77000) OR true, 'rollback function callable');

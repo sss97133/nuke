@@ -1,4 +1,4 @@
--- Rollback of 20261026081000_aggregator_event_attach_guard: drop the guard trigger and its functions, restore the
+-- Rollback of 20261026091000_aggregator_event_attach_guard: drop the guard trigger and its functions, restore the
 -- untrusted-price function/view (no source_suspect leg) and the sync trigger body from 20261026080000.
 -- Data flags written by run agg_attach_audit_v1_20261024 are reverted separately: supabase/sql/revert_agg_attach_audit_v1_20261024.sql
 SET lock_timeout = '10s';
