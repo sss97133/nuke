@@ -1,0 +1,18 @@
+{
+"cols": [
+"cl_cond_pos",
+"cl_cond_neg",
+"cl_cond_hedge",
+"cl_work",
+"cl_prov",
+"cl_own",
+"cl_seller_cmt_claims",
+"sc_seller_ok",
+"sc_seller_ans"
+],
+"drop": {
+"price_text": 11435,
+"final_price_digits": 1
+},
+"claims_used": 225276
+}
