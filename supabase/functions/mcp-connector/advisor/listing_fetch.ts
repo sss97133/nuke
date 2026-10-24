@@ -67,6 +67,30 @@ function uniq(urls: string[]): string[] {
   return out;
 }
 
+/** Photo URLs from BaT's data-gallery-items attribute (large, else full/small). */
+export function batGalleryPhotoUrls(html: string, base: string): string[] {
+  const out: string[] = [];
+  for (const m of html.matchAll(/data-gallery-items=(?:"([^"]*)"|'([^']*)')/gi)) {
+    const raw = decodeEntities(m[1] ?? m[2] ?? "");
+    let arr: unknown;
+    try {
+      arr = JSON.parse(raw);
+    } catch {
+      continue;
+    }
+    if (!Array.isArray(arr)) continue;
+    for (const it of arr as Array<Record<string, unknown>>) {
+      const pick = (k: string) => {
+        const v = it?.[k] as { url?: unknown } | string | undefined;
+        return typeof v === "string" ? v : typeof v?.url === "string" ? v.url : null;
+      };
+      const u = pick("large") || pick("full") || pick("url") || pick("small");
+      if (u && /^https?:|^\//i.test(u)) out.push(absUrl(u, base));
+    }
+  }
+  return out;
+}
+
 function detectSource(url: string): string {
   const h = url.toLowerCase();
   if (h.includes("craigslist")) return "craigslist";
@@ -204,6 +228,16 @@ export function parseListingHtml(url: string, html: string, httpStatus: number):
   }
   for (const m of html.matchAll(/https:\/\/images\.craigslist\.org\/[^"' ]+_600x450\.(?:jpg|jpeg|png|webp)/gi)) {
     photo_urls.push(m[0]!);
+  }
+
+  // BaT: gallery JSON lives HTML-entity-encoded in data-gallery-items.
+  photo_urls.push(...batGalleryPhotoUrls(html, url));
+  // Generic fallback: og:image / twitter:image.
+  if (!photo_urls.length) {
+    for (const m of html.matchAll(/<meta[^>]+(?:property|name)=["'](?:og:image(?::secure_url)?|twitter:image)["'][^>]*>/gi)) {
+      const c = m[0].match(/content=["']([^"']+)["']/i)?.[1];
+      if (c && /^https?:|^\//i.test(decodeEntities(c))) photo_urls.push(absUrl(decodeEntities(c), url));
+    }
   }
 
   // Identity from title / description; when HTML is a JS shell, fall back to URL slug.

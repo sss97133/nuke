@@ -1,5 +1,5 @@
 // deno test --allow-read supabase/functions/mcp-connector/advisor/listing_fetch_test.ts
-import { parseListingHtml } from "./listing_fetch.ts";
+import { batGalleryPhotoUrls, parseListingHtml } from "./listing_fetch.ts";
 
 function assert(cond: boolean, msg: string): asserts cond {
   if (!cond) throw new Error(msg);
@@ -40,4 +40,24 @@ Deno.test("parseListingHtml recovers identity from C&B URL when HTML is empty", 
   assert(L.make === "Porsche", `make=${L.make}`);
   assert(/turbo/i.test(L.model || ""), `model=${L.model}`);
   assert(L.source === "cars_and_bids", L.source);
+});
+
+Deno.test("BaT data-gallery-items photos are parsed (entity-encoded JSON)", () => {
+  const items = [
+    { id: 1, large: { url: "https:\\/\\/bringatrailer.com\\/wp-content\\/uploads\\/2026\\/10\\/a.jpg" }, small: { url: "https://x/a-s.jpg" } },
+    { id: 2, large: { url: "https://bringatrailer.com/wp-content/uploads/2026/10/b.jpg" } },
+  ];
+  const attr = JSON.stringify(items).replace(/"/g, "&quot;");
+  const html = `<html><head><title>1994 Mazda MX-5 Miata M-Edition</title></head><body>` +
+    `<div data-gallery-items="${attr}"></div></body></html>`;
+  const got = batGalleryPhotoUrls(html, "https://bringatrailer.com/listing/1994-mazda-mx-5-miata-60/");
+  if (got.length !== 2 || !got[0].endsWith("/a.jpg") || got[0].includes("\\")) throw new Error(JSON.stringify(got));
+  const parsed = parseListingHtml("https://bringatrailer.com/listing/1994-mazda-mx-5-miata-60/", html, 200);
+  if (parsed.photo_urls.length !== 2) throw new Error(JSON.stringify(parsed.photo_urls));
+});
+
+Deno.test("og:image is the photo fallback", () => {
+  const html = `<html><head><meta property="og:image" content="https://cdn.example.com/car.jpg"/></head></html>`;
+  const parsed = parseListingHtml("https://example.com/car/1", html, 200);
+  if (parsed.photo_urls[0] !== "https://cdn.example.com/car.jpg") throw new Error(JSON.stringify(parsed.photo_urls));
 });
