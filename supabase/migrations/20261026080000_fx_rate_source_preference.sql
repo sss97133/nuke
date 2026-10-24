@@ -1,6 +1,116 @@
--- Rollback for 20261026080000_fx_rate_provider_preference.
--- Back up BoE rows first if wanted: create table backup_fx_boe as select * from fx_rates where provider <> 'ecb' and provider <> 'frb';
+-- FX rate provider as a first-class field, with a cited preference per currency.
+-- Before: fx_rates held one rate per currency/date (ECB only, GBP as an ECB EUR cross) and the vehicle row kept the
+-- provider only inside free-text sale_price_fx_source, so a hand-set Bank of England GBP rate was silently replaced by the
+-- ECB cross on the next correction (2026-10-24, d2111229).
+--  * fx_rates.provider (ecb | boe | frb), part of the key: several providers may cite the same day.
+--  * fx_rate_provider_preference(currency, provider, rank, justification, citation_url): the cited choice per currency.
+--      GBP: boe (Bank of England is the issuing central bank; XUDLUSS = its daily USD-per-GBP spot), then ecb cross.
+--      EUR: ecb (issuing central bank; direct USD per EUR reference rate).
+--      NZD: frb (Federal Reserve H.10 publishes USD per NZD directly), then ecb cross.
+--      AUD, CHF, DKK, HKD: ecb cross (the only provider loaded; one consistent published source).
+--    A currency with no row uses ecb, then any provider.
+--  * fx_usd_rate / vehicle_sale_price_fx_usd pick the most-preferred provider with a rate in the 7-day window
+--    (then the latest date of that provider); vehicle_sale_price_fx_usd_preferred also returns the provider.
+--  * vehicles.sale_price_fx_provider is written with the rate by correct_vehicle_sale_provenance_batch.
+--  * sync_vehicle_sale_price_from_verified_event ignores events held on identity (identity_check = 'mismatch' or
+--    source_suspect contains 'vehicle_id'), so a verified price on an unconfirmed lot stays on the event.
+-- BoE XUDLUSS rows are loaded out of band (run fx_boe_xudluss_v1_20261024).
+-- Rollback: supabase/rollbacks/20261026080000_fx_rate_source_preference_down.sql
+
 set lock_timeout = '5s';
+
+alter table public.fx_rates add column if not exists provider text;
+update public.fx_rates set provider = case when method like 'ecb%' then 'ecb' when method like 'frb%' then 'frb'
+                                            when method like 'boe%' then 'boe' else split_part(method, '_', 1) end
+ where provider is null;
+alter table public.fx_rates alter column provider set not null;
+alter table public.fx_rates drop constraint if exists fx_rates_pkey;
+alter table public.fx_rates add constraint fx_rates_pkey primary key (base_currency, quote_currency, rate_date, provider);
+comment on column public.fx_rates.provider is 'Publisher of the rate: ecb (ECB euro reference rates), boe (Bank of England database), frb (Federal Reserve H.10).';
+
+create table if not exists public.fx_rate_provider_preference (
+  currency text not null,
+  provider text not null,
+  rank int not null,
+  justification text not null,
+  citation_url text not null,
+  primary key (currency, provider)
+);
+comment on table public.fx_rate_provider_preference is 'Cited choice of fx_rates.provider per currency (lowest rank wins when it has a rate within 7 days of the sale).';
+alter table public.fx_rate_provider_preference enable row level security;
+do $$ begin
+  create policy fx_rate_provider_preference_public_read on public.fx_rate_provider_preference for select to anon, authenticated using (true);
+exception when duplicate_object then null; end $$;
+grant select on public.fx_rate_provider_preference to anon, authenticated;
+
+insert into public.fx_rate_provider_preference (currency, provider, rank, justification, citation_url) values
+ ('GBP','boe',1,'Bank of England is the issuing central bank for sterling; series XUDLUSS is its daily spot USD per GBP (4pm London).','https://www.bankofengland.co.uk/boeapps/database/fromshowcolumns.asp?Travel=NIxAZxSUx&FromSeries=1&ToSeries=50&DAT=RNG&FD=1&FM=Jan&FY=1975&TD=31&TM=Dec&TY=2026&FNY=Y&CSVF=TT&html.x=66&html.y=26&SeriesCodes=XUDLUSS&UsingCodes=Y&Filter=N&title=XUDLUSS&VPD=Y'),
+ ('GBP','ecb',2,'Fallback: ECB euro reference rates, USD per GBP as the EUR cross (USD/EUR divided by GBP/EUR).','https://www.ecb.europa.eu/stats/policy_and_exchange_rates/euro_reference_exchange_rates/html/index.en.html'),
+ ('EUR','ecb',1,'ECB is the issuing central bank for the euro; the euro reference rate gives USD per EUR directly.','https://www.ecb.europa.eu/stats/policy_and_exchange_rates/euro_reference_exchange_rates/html/index.en.html'),
+ ('NZD','frb',1,'Federal Reserve H.10 publishes USD per NZD directly (noon buying rates in New York).','https://www.federalreserve.gov/releases/h10/hist/'),
+ ('NZD','ecb',2,'Fallback: ECB EUR cross.','https://www.ecb.europa.eu/stats/policy_and_exchange_rates/euro_reference_exchange_rates/html/index.en.html'),
+ ('AUD','ecb',1,'ECB EUR cross: the provider loaded for AUD, one consistent published daily source.','https://www.ecb.europa.eu/stats/policy_and_exchange_rates/euro_reference_exchange_rates/html/index.en.html'),
+ ('CHF','ecb',1,'ECB EUR cross: the provider loaded for CHF, one consistent published daily source.','https://www.ecb.europa.eu/stats/policy_and_exchange_rates/euro_reference_exchange_rates/html/index.en.html'),
+ ('DKK','ecb',1,'ECB EUR cross: the provider loaded for DKK, one consistent published daily source.','https://www.ecb.europa.eu/stats/policy_and_exchange_rates/euro_reference_exchange_rates/html/index.en.html'),
+ ('HKD','ecb',1,'ECB EUR cross: the provider loaded for HKD, one consistent published daily source.','https://www.ecb.europa.eu/stats/policy_and_exchange_rates/euro_reference_exchange_rates/html/index.en.html')
+on conflict (currency, provider) do nothing;
+
+create or replace function public.fx_provider_rank(p_currency text, p_provider text)
+ returns int language sql stable parallel safe set search_path = public, pg_catalog as $$
+  select coalesce((select p.rank from public.fx_rate_provider_preference p where p.currency = upper(p_currency) and p.provider = p_provider),
+                  case when p_provider = 'ecb' then 50 else 100 end)
+$$;
+
+create or replace function public.fx_usd_rate(p_currency text, p_on date)
+RETURNS TABLE(rate numeric, rate_date date, source text, source_url text)
+LANGUAGE sql STABLE PARALLEL SAFE SET search_path = public, pg_catalog
+AS $$
+  SELECT 1::numeric, p_on, 'identity: amount already in USD'::text, NULL::text
+   WHERE upper(p_currency) = 'USD'
+  UNION ALL
+  SELECT x.rate, x.rate_date, x.source, x.source_url FROM (
+    SELECT f.rate, f.rate_date, f.source, f.source_url
+      FROM public.fx_rates f
+     WHERE upper(p_currency) <> 'USD' AND p_on IS NOT NULL
+       AND f.base_currency = upper(p_currency) AND f.quote_currency = 'USD'
+       AND f.rate_date <= p_on AND f.rate_date >= p_on - 7
+     ORDER BY public.fx_provider_rank(f.base_currency, f.provider), f.rate_date DESC LIMIT 1) x
+$$;
+
+create or replace function public.vehicle_sale_price_fx_usd_preferred(p_amount numeric, p_currency text, p_sale_date date)
+ RETURNS TABLE(amount_usd numeric, fx_rate numeric, fx_date date, fx_source text, fx_provider text)
+ LANGUAGE plpgsql STABLE SET search_path TO 'public', 'pg_temp'
+AS $function$
+DECLARE
+  v_fx fx_rates%ROWTYPE;
+BEGIN
+  IF p_amount IS NULL OR p_currency IS NULL OR upper(p_currency) = 'USD' THEN
+    RETURN QUERY SELECT NULL::numeric, NULL::numeric, NULL::date, NULL::text, NULL::text;
+    RETURN;
+  END IF;
+  IF p_sale_date IS NULL THEN
+    RAISE EXCEPTION 'vehicle_sale_price_fx_usd: % % has no sale_date to convert at', p_amount, p_currency;
+  END IF;
+  SELECT * INTO v_fx FROM fx_rates f
+  WHERE f.base_currency = upper(p_currency) AND f.quote_currency = 'USD'
+    AND f.rate_date <= p_sale_date AND f.rate_date >= p_sale_date - 7
+  ORDER BY fx_provider_rank(f.base_currency, f.provider), f.rate_date DESC LIMIT 1;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'vehicle_sale_price_fx_usd: no % -> USD rate in fx_rates within 7 days before %', upper(p_currency), p_sale_date;
+  END IF;
+  RETURN QUERY SELECT round(p_amount * v_fx.rate, 2), v_fx.rate, v_fx.rate_date,
+    v_fx.source || COALESCE(' (' || v_fx.source_url || ')', ''), v_fx.provider;
+END;
+$function$;
+
+create or replace function public.vehicle_sale_price_fx_usd(p_amount numeric, p_currency text, p_sale_date date)
+ RETURNS TABLE(amount_usd numeric, fx_rate numeric, fx_date date, fx_source text)
+ LANGUAGE sql STABLE SET search_path TO 'public', 'pg_temp'
+AS $$ select x.amount_usd, x.fx_rate, x.fx_date, x.fx_source from public.vehicle_sale_price_fx_usd_preferred(p_amount, p_currency, p_sale_date) x $$;
+
+alter table public.vehicles add column if not exists sale_price_fx_provider text;
+comment on column public.vehicles.sale_price_fx_provider is 'fx_rates.provider of sale_price_fx_rate (ecb | boe | frb), chosen by fx_rate_provider_preference.';
+
 CREATE OR REPLACE FUNCTION public.correct_vehicle_sale_provenance_batch(p_rows jsonb, p_asserted_by text DEFAULT 'agent'::text, p_reason text DEFAULT NULL::text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -39,6 +149,7 @@ DECLARE
   v_fx_rate  numeric;
   v_fx_fdate date;
   v_fx_src   text;
+  v_fx_prov  text;
   v_fx_amt   numeric;
   v_fx_date  date;
   v_fx_cur   text;
@@ -190,7 +301,7 @@ BEGIN
     -- check vehicles_sale_price_usd_required holds even when trg_vehicles_sale_currency_guard labels the row
     -- non-USD (it labels a NULL currency from the vehicle_events price the new amount matches; mirrored here).
     v_fx_hit := v_set ?| ARRAY['sale_price', 'sale_date', 'sale_price_currency'];
-    v_fx_usd := NULL; v_fx_rate := NULL; v_fx_fdate := NULL; v_fx_src := NULL;
+    v_fx_usd := NULL; v_fx_rate := NULL; v_fx_fdate := NULL; v_fx_src := NULL; v_fx_prov := NULL;
     IF v_fx_hit THEN
       v_fx_amt  := CASE WHEN v_set ? 'sale_price' THEN (v_set ->> 'sale_price')::integer ELSE v_veh.sale_price END;
       v_fx_date := CASE WHEN v_set ? 'sale_date'  THEN (v_set ->> 'sale_date')::date     ELSE v_veh.sale_date END;
@@ -203,8 +314,9 @@ BEGIN
           FROM vehicle_events e
          WHERE e.vehicle_id = v_id AND (e.final_price = v_fx_amt OR e.hammer_price = v_fx_amt);
       END IF;
-      SELECT x.amount_usd, x.fx_rate, x.fx_date, x.fx_source INTO v_fx_usd, v_fx_rate, v_fx_fdate, v_fx_src
-        FROM vehicle_sale_price_fx_usd(v_fx_amt, v_fx_cur, v_fx_date) x;
+      -- preferred provider per currency (fx_rate_provider_preference), so a re-correction reproduces the same rate
+      SELECT x.amount_usd, x.fx_rate, x.fx_date, x.fx_source, x.fx_provider INTO v_fx_usd, v_fx_rate, v_fx_fdate, v_fx_src, v_fx_prov
+        FROM vehicle_sale_price_fx_usd_preferred(v_fx_amt, v_fx_cur, v_fx_date) x;
     END IF;
 
     -- one UPDATE per vehicle: every trigger on vehicles fires once, not once per field
@@ -236,6 +348,7 @@ BEGIN
       sale_price_fx_rate   = CASE WHEN v_fx_hit THEN v_fx_rate ELSE sale_price_fx_rate END,
       sale_price_fx_date   = CASE WHEN v_fx_hit THEN v_fx_fdate ELSE sale_price_fx_date END,
       sale_price_fx_source = CASE WHEN v_fx_hit THEN v_fx_src ELSE sale_price_fx_source END,
+      sale_price_fx_provider = CASE WHEN v_fx_hit THEN v_fx_prov ELSE sale_price_fx_provider END,
       provenance_metadata = COALESCE(provenance_metadata, '{}'::jsonb) || jsonb_build_object(
         'sale_provenance_corrections',
           COALESCE(provenance_metadata -> 'sale_provenance_corrections', '[]'::jsonb) || v_audit)
@@ -249,16 +362,17 @@ BEGIN
              CASE WHEN v_set ? 'sale_price_currency' THEN upper(v_set ->> 'sale_price_currency') ELSE vv.sale_price_currency END
         INTO v_fx_amt, v_fx_date, v_fx_cur
       FROM vehicles vv WHERE vv.id = v_id;
-      SELECT * INTO v_fx FROM vehicle_sale_price_fx_usd(v_fx_amt, v_fx_cur, v_fx_date);
+      SELECT * INTO v_fx FROM vehicle_sale_price_fx_usd_preferred(v_fx_amt, v_fx_cur, v_fx_date);
       UPDATE vehicles SET
         sale_price_currency  = v_fx_cur,
         sale_price_usd       = v_fx.amount_usd,
         sale_price_fx_rate   = v_fx.fx_rate,
         sale_price_fx_date   = v_fx.fx_date,
-        sale_price_fx_source = v_fx.fx_source
+        sale_price_fx_source = v_fx.fx_source,
+        sale_price_fx_provider = v_fx.fx_provider
       WHERE id = v_id
-        AND (sale_price_currency, sale_price_usd, sale_price_fx_rate, sale_price_fx_date, sale_price_fx_source)
-            IS DISTINCT FROM (v_fx_cur, v_fx.amount_usd, v_fx.fx_rate, v_fx.fx_date, v_fx.fx_source);
+        AND (sale_price_currency, sale_price_usd, sale_price_fx_rate, sale_price_fx_date, sale_price_fx_source, sale_price_fx_provider)
+            IS DISTINCT FROM (v_fx_cur, v_fx.amount_usd, v_fx.fx_rate, v_fx.fx_date, v_fx.fx_source, v_fx.fx_provider);
     END IF;
 
     -- identity / link columns in their own statement, only when one of them is corrected: triggers declared
@@ -336,6 +450,9 @@ begin
     and e.final_price > 0
     and coalesce(e.sale_truth_role, '') <> 'duplicate'
     and coalesce(e.sold_at, e.ended_at) is not null
+    -- identity held: an event whose lot is not confirmed as this vehicle never sets its sale (2026-10-24, Maserati d2111229)
+    and coalesce(e.identity_check, '') <> 'mismatch'
+    and not ('vehicle_id' = any (coalesce(e.source_suspect, '{}'::text[])))
   order by coalesce(e.sold_at, e.ended_at) desc, e.price_verification_at desc nulls last
   limit 1;
 
@@ -383,54 +500,3 @@ begin
   return null;
 end;
 $function$;
-
-CREATE OR REPLACE FUNCTION public.fx_usd_rate(p_currency text, p_on date)
-RETURNS TABLE(rate numeric, rate_date date, source text, source_url text)
-LANGUAGE sql STABLE PARALLEL SAFE SET search_path = public, pg_catalog
-AS $$
-  SELECT 1::numeric, p_on, 'identity: amount already in USD'::text, NULL::text
-   WHERE upper(p_currency) = 'USD'
-  UNION ALL
-  SELECT * FROM (
-    SELECT f.rate, f.rate_date, f.source, f.source_url
-      FROM public.fx_rates f
-     WHERE upper(p_currency) <> 'USD' AND p_on IS NOT NULL
-       AND f.base_currency = upper(p_currency) AND f.quote_currency = 'USD'
-       AND f.rate_date <= p_on AND f.rate_date >= p_on - 7
-     ORDER BY f.rate_date DESC LIMIT 1) x
-$$;
-
-CREATE OR REPLACE FUNCTION public.vehicle_sale_price_fx_usd(p_amount numeric, p_currency text, p_sale_date date)
- RETURNS TABLE(amount_usd numeric, fx_rate numeric, fx_date date, fx_source text)
- LANGUAGE plpgsql STABLE SET search_path TO 'public', 'pg_temp'
-AS $function$
-DECLARE
-  v_fx fx_rates%ROWTYPE;
-BEGIN
-  IF p_amount IS NULL OR p_currency IS NULL OR upper(p_currency) = 'USD' THEN
-    RETURN QUERY SELECT NULL::numeric, NULL::numeric, NULL::date, NULL::text;
-    RETURN;
-  END IF;
-  IF p_sale_date IS NULL THEN
-    RAISE EXCEPTION 'vehicle_sale_price_fx_usd: % % has no sale_date to convert at', p_amount, p_currency;
-  END IF;
-  SELECT * INTO v_fx FROM fx_rates f
-  WHERE f.base_currency = upper(p_currency) AND f.quote_currency = 'USD'
-    AND f.rate_date <= p_sale_date AND f.rate_date >= p_sale_date - 7
-  ORDER BY f.rate_date DESC LIMIT 1;
-  IF NOT FOUND THEN
-    RAISE EXCEPTION 'vehicle_sale_price_fx_usd: no % -> USD rate in fx_rates within 7 days before %', upper(p_currency), p_sale_date;
-  END IF;
-  RETURN QUERY SELECT round(p_amount * v_fx.rate, 2), v_fx.rate, v_fx.rate_date,
-    v_fx.source || COALESCE(' (' || v_fx.source_url || ')', '');
-END;
-$function$;
-
-drop function if exists public.vehicle_sale_price_fx_usd_preferred(numeric, text, date);
-drop function if exists public.fx_provider_rank(text, text);
-drop table if exists public.fx_rate_provider_preference;
-delete from public.fx_rates where provider not in ('ecb', 'frb');
-alter table public.fx_rates drop constraint if exists fx_rates_pkey;
-alter table public.fx_rates add constraint fx_rates_pkey primary key (base_currency, quote_currency, rate_date);
-alter table public.fx_rates drop column if exists provider;
-alter table public.vehicles drop column if exists sale_price_fx_provider;
