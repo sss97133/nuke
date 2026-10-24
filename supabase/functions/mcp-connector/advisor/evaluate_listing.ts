@@ -790,7 +790,20 @@ function buildVerdict(input: {
       }`,
     );
   }
-  if (listing.asking_price != null && fairHigh != null) {
+  if (listing.listing_kind === "auction_live") {
+    // A live bid is not an ask: never say "ask below fair band" days before the close.
+    const ends = listing.auction_end_at ? `, ends ${listing.auction_end_at.slice(0, 10)}` : "";
+    if (listing.current_bid != null) {
+      const rel = listing.current_bid < fairLow
+        ? "below fair band so far"
+        : listing.current_bid > fairHigh
+        ? "above fair band"
+        : "inside fair band";
+      parts.push(`auction live, current bid ${money(listing.current_bid)} vs fair band (${rel}${ends})`);
+    } else {
+      parts.push(`auction live${ends}`);
+    }
+  } else if (listing.asking_price != null && fairHigh != null) {
     if (listing.asking_price > fairHigh * 1.15) parts.push("ask above fair band");
     else if (listing.asking_price < fairLow * 0.9) parts.push("ask below fair band");
     else parts.push("ask inside fair band");
@@ -821,7 +834,13 @@ function buildMarkdown(input: {
   lines.push("");
   lines.push(`**${listing.title || "Untitled"}**`);
   lines.push(`- URL: ${listing.url}`);
-  if (listing.asking_price != null) {
+  if (listing.listing_kind === "auction_live") {
+    lines.push(
+      `- Auction live · current bid ${money(listing.current_bid ?? null)}${
+        listing.auction_end_at ? ` · ends ${listing.auction_end_at}` : ""
+      } (a bid, not an asking price)`,
+    );
+  } else if (listing.asking_price != null) {
     lines.push(`- Ask: ${money(listing.asking_price)}${listing.location ? ` · ${listing.location}` : ""}`);
   }
   const ident = [listing.year, listing.make, listing.model].filter(Boolean).join(" ");
@@ -918,6 +937,18 @@ export async function handleEvaluateListing(
       note: "Seller ask from listing page (not a sale)",
     }),
   );
+  if (listing.listing_kind === "auction_live") {
+    claimsOut.push(
+      recordedClaim("current_bid", listing.current_bid ?? null, {
+        confidence: listing.current_bid != null ? 0.9 : null,
+        confidence_basis: "source_trust",
+        citations: [listingCit],
+        note: `Live auction high bid${
+          listing.auction_end_at ? ` (ends ${listing.auction_end_at})` : ""
+        } — not an asking price or a sale`,
+      }),
+    );
+  }
   claimsOut.push(
     recordedClaim("year", listing.year, {
       confidence: 0.8,
@@ -1027,7 +1058,8 @@ export async function handleEvaluateListing(
     }
     listing.mileage = listing.mileage ?? (matchedRow.mileage as number | null);
     listing.transmission = listing.transmission ?? (matchedRow.transmission as string | null);
-    if (matchedRow.sale_price != null) {
+    // A live auction's stored price is the running bid, not a sale: never anchor on it.
+    if (matchedRow.sale_price != null && listing.listing_kind !== "auction_live") {
       const amount = Number(matchedRow.sale_price);
       matchedSale = {
         amount,
@@ -1127,6 +1159,9 @@ export async function handleEvaluateListing(
           url: listing.url,
           title: listing.title,
           ask: listing.asking_price,
+          listing_kind: listing.listing_kind ?? null,
+          current_bid: listing.current_bid ?? null,
+          auction_end_at: listing.auction_end_at ?? null,
           year: listing.year,
           make: listing.make,
           model: listing.model,
@@ -1405,6 +1440,9 @@ export async function handleEvaluateListing(
       url: listing.url,
       title: listing.title,
       ask: listing.asking_price,
+      listing_kind: listing.listing_kind ?? null,
+      current_bid: listing.current_bid ?? null,
+      auction_end_at: listing.auction_end_at ?? null,
       year: listing.year,
       make: listing.make,
       model: listing.model,
