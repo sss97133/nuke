@@ -305,6 +305,7 @@ function fixture(options = {}) {
         if(specifier==='../_shared/writeResult.ts')return {mustWrite:(_label,result)=>result,softWrite:()=>null};
         if(specifier==='../_shared/identityMatch.ts')return {identityConflict:()=>null};
         if(specifier==='./vinCitation.ts')return {vinExcerpt:()=>null,pageText:value=>value};
+        if(specifier==='./lotYear.ts')return {applyLotSlugYear:()=>false};
         assert.fail(`Unexpected import ${specifier}`);
       }});
     return exports;

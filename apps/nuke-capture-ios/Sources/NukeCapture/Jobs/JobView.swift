@@ -350,7 +350,7 @@ struct JobPathContent: View {
                 JobRefusalRow(refusal: refusal)
             case .loaded(let r):
                 RootedValueView(label: "Requirements", value: "\(r.requirements)", status: .attributed)
-                RootedValueView(label: "Candidates found", value: "\(r.fulfillments)", status: .attributed)
+                RootedValueView(label: "Matches found", value: "\(r.fulfillments)", status: .attributed)
                 RootedValueView(label: "Sign-offs", value: "\(r.attestations)", status: .attributed,
                                 decay: "as reported by the source")
                 RootedValueView(label: "Specifications", value: "\(r.specifications)", status: .attributed)

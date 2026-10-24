@@ -1,6 +1,6 @@
 // Run: deno test supabase/functions/_shared/vehicleEventWrite.test.ts
 // The writer is tested through a stub PostgREST client that records each call and answers from a script.
-import { clocksLocked, writeVehicleEventByKey } from './vehicleEventWrite.ts';
+import { clocksLocked, writeVehicleEventByKey, vehicleEventWriterFor } from './vehicleEventWrite.ts';
 
 function equal(actual: unknown, expected: unknown) {
   if (JSON.stringify(actual) !== JSON.stringify(expected)) {
@@ -113,7 +113,21 @@ Deno.test('a new episode is inserted when no live row has the key', async () => 
   const { client, calls } = stubClient([{ data: [] }, { data: [{ id: 'e-2' }] }]);
   equal(await writeVehicleEventByKey(client, ROW), { action: 'inserted', id: 'e-2' });
   equal(calls.map((c) => c.op), ['select', 'insert']);
-  equal(calls[1].row, ROW);
+  const { extraction_method, extraction_run_id, ...rest } = calls[1].row as Record<string, unknown>;
+  equal(rest, ROW);
+  equal(extraction_method, 'vehicleEventWrite:gooding');
+  equal(String(extraction_run_id).startsWith('vehicleEventWrite:gooding:'), true);
+});
+
+Deno.test('a bound writer stamps its name and keeps a row-supplied method', async () => {
+  const write = vehicleEventWriterFor('extract-mecum');
+  const a = stubClient([{ data: [] }, { data: [{ id: 'e-9' }] }]);
+  await write(a.client, ROW, { runId: 'run-1' });
+  equal((a.calls[1].row as Record<string, unknown>).extraction_method, 'extract-mecum');
+  equal((a.calls[1].row as Record<string, unknown>).extraction_run_id, 'run-1');
+  const b = stubClient([{ data: [] }, { data: [{ id: 'e-10' }] }]);
+  await write(b.client, { ...ROW, extraction_method: 'api' });
+  equal((b.calls[1].row as Record<string, unknown>).extraction_method, 'api');
 });
 
 Deno.test('an insert that loses a race (23505) reads the other writer\'s row and updates it, respecting its lock', async () => {

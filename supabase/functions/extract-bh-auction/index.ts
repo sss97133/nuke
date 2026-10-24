@@ -25,6 +25,11 @@ import { writeObservation } from "../_shared/observationWriter.ts";
 import { requireWriteAuth } from '../_shared/writeGuard.ts';
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { insertMissingVehicleImages } from '../_shared/vehicleImageWrite.ts';
+import { odometerColumns, toMiles } from '../_shared/odometer.ts';
+
+// The page states km or miles; vehicles.mileage is miles, the source figure + unit go to odometer_*.
+const bhOdometer = (x: { mileage: number | null; mileage_unit: 'km' | 'miles' | null }) =>
+  x.mileage ? { value: x.mileage, unit: x.mileage_unit === 'km' ? 'km' as const : x.mileage_unit === 'miles' ? 'mi' as const : null } : null;
 
 // Direct fetch - BH Auction has no Cloudflare/bot protection
 async function fetchPage(url: string): Promise<{ html: string; success: boolean; error?: string }> {
@@ -698,7 +703,7 @@ Deno.serve(async (req) => {
           make: extracted.make,
           model: extracted.model,
           vin: extracted.vin || extracted.chassis_number,
-          mileage: extracted.mileage,
+          ...odometerColumns(bhOdometer(extracted), 'extract-bh-auction', extracted.url),
           color: extracted.exterior_color,
           interior_color: extracted.interior_color,
           transmission: extracted.transmission,
@@ -772,7 +777,7 @@ Deno.serve(async (req) => {
           if (extracted.model) obsFields.model = extracted.model;
           if (extracted.vin || extracted.chassis_number) obsFields.vin = extracted.vin || extracted.chassis_number;
           if (extracted.sale_price) obsFields.sale_price = extracted.sale_price;
-          if (extracted.mileage) obsFields.mileage = extracted.mileage;
+          if (extracted.mileage) obsFields.mileage = toMiles(bhOdometer(extracted)!);
           if (extracted.engine) obsFields.engine_size = extracted.engine;
           if (extracted.transmission) obsFields.transmission = extracted.transmission;
           if (extracted.exterior_color) obsFields.color = extracted.exterior_color;
@@ -879,7 +884,7 @@ Deno.serve(async (req) => {
               make: extracted.make,
               model: extracted.model,
               vin: extracted.vin || extracted.chassis_number,
-              mileage: extracted.mileage,
+              ...odometerColumns(bhOdometer(extracted), 'extract-bh-auction', extracted.url),
               color: extracted.exterior_color,
               transmission: extracted.transmission,
               engine_type: extracted.engine,

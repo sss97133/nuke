@@ -1113,7 +1113,7 @@ struct ProfileView: View {
                 LabeledContent("Status") {
                     Button("Retry") { Task { await loadSync() } }
                 }
-                Text("Couldn't load the sync ledger. \(syncFailureText ?? "The read failed.")")
+                Text("Couldn't load your sync history. \(syncFailureText ?? "Please try again.")")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

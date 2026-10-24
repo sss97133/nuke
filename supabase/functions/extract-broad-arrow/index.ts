@@ -42,6 +42,7 @@ import { writeVehicleEventByKey } from '../_shared/vehicleEventWrite.ts';
 import { archiveFetch } from '../_shared/archiveFetch.ts';
 import { fillOnlyIdentity, identityConflict } from '../_shared/identityMatch.ts';
 import { recordRevision } from '../_shared/revision.ts';
+import { type Odometer, odometerColumns, toMiles, unitFromText } from '../_shared/odometer.ts';
 import { parseEventPage, parseListingCards, type RosterCard } from './roster.ts';
 import { estimateCurrency, galleryImageId, isVinClash, parseLotPage } from './lotPage.ts';
 
@@ -72,6 +73,7 @@ interface BroadArrowExtracted {
 
   // Vehicle specs
   mileage: number | null;
+  odometer?: Odometer | null;
   engine: string | null;
   transmission: string | null;
   drivetrain: string | null;
@@ -470,9 +472,13 @@ export function parseFromMarkdown(markdown: string, html: string, url: string): 
   for (const pattern of mileagePatterns) {
     const match = combinedText.match(pattern);
     if (match && match[1]) {
-      const miles = parseInt(match[1].replace(/,/g, ''), 10);
-      if (miles > 0 && miles < 10_000_000) {
-        result.mileage = miles;
+      const num = parseInt(match[1].replace(/,/g, ''), 10);
+      if (num > 0 && num < 10_000_000) {
+        // Keep the stated unit; km used to be stored as miles here.
+        const idx = (match.index ?? 0) + match[0].length;
+        const after = combinedText.slice(idx, idx + 16).match(/^\s*\S+/)?.[0];
+        result.odometer = { value: num, unit: unitFromText(match[0]) ?? unitFromText(after) };
+        result.mileage = toMiles(result.odometer);
         break;
       }
     }
@@ -744,6 +750,7 @@ async function saveToDatabase(
     model: extracted.model,
     vin: extracted.vin || extracted.chassis_number || null,
     mileage: extracted.mileage,
+    ...(extracted.odometer ? odometerColumns(extracted.odometer, 'extract-broad-arrow', extracted.url) : {}),
     color: extracted.exterior_color,
     interior_color: extracted.interior_color,
     transmission: extracted.transmission,
@@ -1381,6 +1388,7 @@ if (import.meta.main) Deno.serve(async (req) => {
             lot_number: lot.lotNumber, auction_name: lot.saleName, auction_date: days?.starts_on ?? null,
             auction_status: lot.status === 'unknown' ? null : lot.status,
             mileage: lot.odometer ? (lot.odometer.unit === 'km' ? Math.round(lot.odometer.value * 0.621371) : lot.odometer.value) : null,
+            odometer: lot.odometer && (lot.odometer.unit === 'km' || lot.odometer.unit === 'mi') ? { value: lot.odometer.value, unit: lot.odometer.unit } : null,
             engine: null, transmission: null, drivetrain: null, exterior_color: null, interior_color: null, body_style: null,
             description: lot.description, image_urls: lot.imageUrls, scrape_ms: 0,
             extra_metadata: { sale_starts_on: days?.starts_on ?? null, sale_ends_on: days?.ends_on ?? null, currency: lot.currency ?? estimateCurrency(page.html), sold_amount: lot.status === 'sold' ? lot.soldPrice : null, odometer: lot.odometer, read_by: 'broad-arrow-targets' },

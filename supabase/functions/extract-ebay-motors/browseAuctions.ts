@@ -23,7 +23,8 @@
  * under `floor` calls left today by eBay's own counter. The schedule (migration *_ebay_motors_auctions_cron.sql) spends
  * about 370 a day of the app's 5,000.
  */
-import { writeVehicleEventByKey } from "../_shared/vehicleEventWrite.ts";
+import { vehicleEventWriterFor } from "../_shared/vehicleEventWrite.ts";
+const writeVehicleEventByKey = vehicleEventWriterFor("extract-ebay-motors:browse-auctions");
 import { BrowseClient, ItemGone, QuotaExceeded, type SearchSummary } from "./browseApi.ts";
 import { listingKey, yearOf, type EbayItem } from "./browseMap.ts";
 import { emptyReport, heldKeys, landItem, PLATFORM, pool, type Report } from "./browseSweep.ts";

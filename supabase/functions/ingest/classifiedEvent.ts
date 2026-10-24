@@ -10,7 +10,8 @@
  * re-read of the same listing updates the row. event_status stays 'unknown' (preserveEventStatus): a classified is
  * live when read, and its ending is recorded by a removal read, never guessed here.
  */
-import { writeVehicleEventByKey, type VehicleEventWriteResult } from "../_shared/vehicleEventWrite.ts";
+import { vehicleEventWriterFor, type VehicleEventWriteResult } from "../_shared/vehicleEventWrite.ts";
+const writeVehicleEventByKey = vehicleEventWriterFor("ingest:classified");
 import { recordSellerTypes, sellerTypeRow, type SellerType } from "../_shared/sellerType.ts";
 
 export type ClassifiedPlatform = "classiccars" | "ksl" | "facebook_marketplace";

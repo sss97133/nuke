@@ -129,12 +129,12 @@ struct SourceInboxSection: View {
     @EnvironmentObject private var session: SessionStore
     var body: some View {
         if session.isSignedIn && ObservedCarRead.ownAccount(userId, activeUserId: SupabaseService.currentUserId) != nil {
-            Section("Photo sources") {
+            Section("Your photos") {
                 NavigationLink { SourceInboxView(userId: userId) } label: {
                     Label {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("Uploaded photos")
-                            Text("Individual sources, including unknown subjects and earlier uploads")
+                            Text("Every photo you have uploaded, even ones not matched to a vehicle yet")
                                 .font(.caption).foregroundStyle(.secondary)
                         }
                     } icon: { Image(systemName: "photo.on.rectangle") }
@@ -158,10 +158,10 @@ struct SourceInboxView: View {
         List {
             if allowed {
                 Section {
-                    Text("Private source photos. A photograph can remain useful while its subject is unknown.")
+                    Text("Only you can see these. Photos stay here even if we have not matched them to a vehicle yet.")
                         .font(.footnote).foregroundStyle(.secondary)
                     if let savedAt {
-                        Text("Saved \(savedAt.formatted(date: .abbreviated, time: .shortened)). Refresh to check current source visibility.")
+                        Text("Saved \(savedAt.formatted(date: .abbreviated, time: .shortened)). Pull down to refresh.")
                             .font(.caption).foregroundStyle(.secondary)
                     }
                 }
@@ -174,13 +174,13 @@ struct SourceInboxView: View {
                         }
                     } footer: { SourceInboxCoverageView(coverage: page.coverage) }
                 }
-                if pages.first?.photos.isEmpty == true { Text("No uploaded source rows in this read.").foregroundStyle(.secondary) }
+                if pages.first?.photos.isEmpty == true { Text("No uploaded photos yet. Photos you add will show up here.").foregroundStyle(.secondary) }
                 if let failure { Text(failure).font(.caption).foregroundStyle(.secondary) }
                 if loading { ProgressView() }
                 else if let cursor = pages.last?.next_cursor {
                     Button("Earlier uploaded photos") { Task { await load(cursor: cursor) } }
                 }
-            } else { Text("Sign in to your own photo record.") }
+            } else { Text("Sign in to see your photos.") }
         }
         .navigationTitle("Uploaded photos").navigationBarTitleDisplayMode(.inline)
         .toolbar { if allowed { ToolbarItem(placement: .topBarTrailing) {
@@ -263,7 +263,7 @@ private struct SourcePhotoDetail: View {
                         $0.formatted(date: .abbreviated, time: .shortened)
                     } ?? "Unknown", status: .recorded)
                     Text(subjectLabel(photo)).font(.footnote).foregroundStyle(.secondary)
-                    if let savedAt { Text("Saved \(savedAt.formatted()). Current source visibility is unavailable.").font(.caption).foregroundStyle(.secondary) }
+                    if let savedAt { Text("Saved \(savedAt.formatted()). Showing a saved copy; reconnect to refresh.").font(.caption).foregroundStyle(.secondary) }
                     ForEach(photo.readings) { reading in
                         VStack(alignment: .leading, spacing: 5) {
                             RootedValueView(label: "Frame interpretation", value: frameLabel(reading.frame), status: .projected,
@@ -271,17 +271,22 @@ private struct SourcePhotoDetail: View {
                                 onDrill: savedAt == nil && photo.image_url != nil ? {
                                     withAnimation { source.scrollTo("qualified-source-photo", anchor: .top) }
                                 } : nil)
+                            #if DEBUG
                             Text("\(reading.provider) · \(reading.model)").font(.caption).foregroundStyle(.secondary)
+                            #endif
                             ForEach(reading.unresolved_reasons, id: \.self) { reason in
                                 Text(SubjectResolutionCopy.reason(reason)).font(.caption).foregroundStyle(.secondary)
                             }
+                            #if DEBUG
                             DisclosureGroup("Source evidence") {
                                 Text("Observation \(reading.id.uuidString.lowercased())")
                                 Text("Source SHA-256 \(reading.input.source_sha256)")
                                 Text("Consumed SHA-256 \(reading.input.input_sha256)")
                             }.font(.caption2).textSelection(.enabled)
+                            #endif
                         }
                     }
+                    #if DEBUG
                     if let identity = photo.source_identity {
                         DisclosureGroup("Attribution history") {
                             RootedValueView(label: "Source identity", value: identity.source_photo_count == 1 ? "One audited photograph" : "Source identity unresolved", status: .recorded)
@@ -292,6 +297,7 @@ private struct SourcePhotoDetail: View {
                             ForEach(identity.audit_ids, id: \.self) { audit in Text("Attribution audit \(audit.uuidString.lowercased())") }
                         }.font(.caption2).textSelection(.enabled)
                     }
+                    #endif
                     if photo.readings.isEmpty, let contexts = photo.retained_contexts, !contexts.isEmpty {
                         ForEach(contexts) { context in
                             VStack(alignment: .leading, spacing: 5) {
@@ -299,11 +305,13 @@ private struct SourcePhotoDetail: View {
                                     decay: ProfileClock.date(context.read_at).map { "Read " + $0.formatted(date: .abbreviated, time: .shortened) })
                                 Text("Earlier analysis remains recorded; it is not a current identity or permission to show this photograph.")
                                     .font(.caption).foregroundStyle(.secondary)
+                                #if DEBUG
                                 DisclosureGroup("Reading evidence") {
                                     Text("Observation \(context.id.uuidString.lowercased())")
                                     Text("Original input receipt \(context.receipt_image_id.uuidString.lowercased())")
                                     Text("\(context.provider) · \(context.model)")
                                 }.font(.caption2).textSelection(.enabled)
+                                #endif
                             }
                         }
                     }
@@ -312,7 +320,7 @@ private struct SourcePhotoDetail: View {
                             .font(.caption).foregroundStyle(.secondary)
                     }
                     if let coverage = read?.coverage { SourceInboxCoverageView(coverage: coverage) }
-                } else if read != nil { Text("Source unavailable in this read.").foregroundStyle(.secondary) }
+                } else if read != nil { Text("This photo isn't available right now.").foregroundStyle(.secondary) }
                 else if failure == nil { ProgressView() }
                 if let failure { Text(failure).font(.caption).foregroundStyle(.secondary) }
             }.padding()

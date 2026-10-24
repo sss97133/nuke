@@ -1,0 +1,4 @@
+# shadow v13b (experiment only; no live estimates, no shadow rows)
+- PIT attributes: transmission/colour from the earliest listing-sourced `field_evidence` row per (vehicle, field) instead of today's `vehicles` row (`feat_pit.py`, `eval_pit.py` -> `eval_v13pit.json`).
+- Learned model families (`fam.py`): within make, union-find over canonical models with name similarity >= s (char trigram Jaccard / prefix), price-level gap <= 0.7 log, half-year co-movement corr >= 0.3 when >= 4 overlapping half-years. Selected by forward rolling-origin on training rows only (`sel_v13b*.json`). Reference rows: `public.valuation_model_family_groups` run `model_family_v13b_20261024`.
+- `eval_v13b.py` uses the family median as base for L2 targets with family comps. Revert: `supabase/sql/revert_shadow_v13b.sql`.

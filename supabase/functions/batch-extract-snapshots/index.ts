@@ -39,6 +39,7 @@ import { authenticateWriter, requireWriteAuth } from "../_shared/writeGuard.ts";
 import { drainBatSaleQueue } from "./batSaleQueue.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { makeAiGate, noAiConflict, readNoAi, terminalQueueStatus } from "./aiGate.ts";
+import { applyLotSlugYear } from "./lotYear.ts";
 import { orphanVehicleIds } from "./queueRows.ts";
 import { isUniqueViolation, salePriceWritable } from "./writeRules.ts";
 import { mustWrite, softWrite } from '../_shared/writeResult.ts';
@@ -385,6 +386,8 @@ Deno.serve(async (req) => {
           parsed = fb.parsed;
           regexEmpty = fb.regexEmpty;
         }
+        // A platform whose lot slug starts with the model year (Gooding) cites it there; the model read the auction year.
+        if (applyLotSlugYear(parsed, platform, vehicleUrl)) console.log(`[lot-year] ${vehicle.id}: parsed year replaced by lot slug year ${parsed.year}`);
         // 'completed', or under no_ai 'regex_empty' for a row the regex could not read
         const terminal = terminalQueueStatus(noAi, regexEmpty);
 

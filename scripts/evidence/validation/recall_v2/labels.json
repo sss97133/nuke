@@ -1,0 +1,402 @@
+{
+"0": {
+"cond": 2,
+"repaint": "none",
+"own": "none",
+"work": "yes",
+"nm": "none",
+"mi": "38000"
+},
+"1": {
+"cond": 3,
+"repaint": "none",
+"own": "2018",
+"work": "yes",
+"nm": "none",
+"mi": "20000"
+},
+"2": {
+"cond": 3,
+"repaint": "none",
+"own": "2014",
+"work": "no",
+"nm": "none",
+"mi": "none"
+},
+"3": {
+"cond": 2,
+"repaint": "partial",
+"own": "none",
+"work": "yes",
+"nm": "none",
+"mi": "60000"
+},
+"4": {
+"cond": 2,
+"repaint": "none",
+"own": "none",
+"work": "yes",
+"nm": "none",
+"mi": "none"
+},
+"5": {
+"cond": 3,
+"repaint": "none",
+"own": "none",
+"work": "yes",
+"nm": "none",
+"mi": "60000"
+},
+"6": {
+"cond": 2,
+"repaint": "none",
+"own": "1982",
+"work": "no",
+"nm": "none",
+"mi": "26000"
+},
+"7": {
+"cond": 3,
+"repaint": "full",
+"own": "2019",
+"work": "yes",
+"nm": "false",
+"mi": "93000"
+},
+"8": {
+"cond": 2,
+"repaint": "none",
+"own": "2016",
+"work": "no",
+"nm": "none",
+"mi": "none"
+},
+"9": {
+"cond": 2,
+"repaint": "full",
+"own": "none",
+"work": "yes",
+"nm": "none",
+"mi": "none"
+},
+"10": {
+"cond": 2,
+"repaint": "none",
+"own": "2021",
+"work": "yes",
+"nm": "false",
+"mi": "none"
+},
+"11": {
+"cond": 4,
+"repaint": "none",
+"own": "none",
+"work": "yes",
+"nm": "none",
+"mi": "48000"
+},
+"12": {
+"cond": 2,
+"repaint": "full",
+"own": "2021",
+"work": "yes",
+"nm": "false",
+"mi": "none"
+},
+"13": {
+"cond": 2,
+"repaint": "none",
+"own": "2022",
+"work": "yes",
+"nm": "none",
+"mi": "none"
+},
+"14": {
+"cond": 3,
+"repaint": "full",
+"own": "none",
+"work": "yes",
+"nm": "false",
+"mi": "none"
+},
+"15": {
+"cond": 2,
+"repaint": "none",
+"own": "none",
+"work": "no",
+"nm": "none",
+"mi": "88000"
+},
+"16": {
+"cond": 2,
+"repaint": "none",
+"own": "none",
+"work": "no",
+"nm": "none",
+"mi": "63000"
+},
+"17": {
+"cond": 3,
+"repaint": "none",
+"own": "none",
+"work": "yes",
+"nm": "none",
+"mi": "93000"
+},
+"18": {
+"cond": 4,
+"repaint": "none",
+"own": "none",
+"work": "yes",
+"nm": "none",
+"mi": "none"
+},
+"19": {
+"cond": 3,
+"repaint": "none",
+"own": "none",
+"work": "yes",
+"nm": "none",
+"mi": "48600"
+},
+"20": {
+"cond": 2,
+"repaint": "none",
+"own": "none",
+"work": "no",
+"nm": "none",
+"mi": "none"
+},
+"21": {
+"cond": 2,
+"repaint": "none",
+"own": "2016",
+"work": "yes",
+"nm": "none",
+"mi": "39000"
+},
+"22": {
+"cond": 2,
+"repaint": "full",
+"own": "2025",
+"work": "yes",
+"nm": "none",
+"mi": "none"
+},
+"23": {
+"cond": 4,
+"repaint": "none",
+"own": "2020",
+"work": "yes",
+"nm": "false",
+"mi": "none"
+},
+"24": {
+"cond": 2,
+"repaint": "none",
+"own": "2017",
+"work": "yes",
+"nm": "none",
+"mi": "143000"
+},
+"25": {
+"cond": 2,
+"repaint": "full",
+"own": "2010",
+"work": "yes",
+"nm": "none",
+"mi": "17000"
+},
+"26": {
+"cond": 2,
+"repaint": "none",
+"own": "2015",
+"work": "yes",
+"nm": "false",
+"mi": "85500"
+},
+"27": {
+"cond": 2,
+"repaint": "none",
+"own": "2019",
+"work": "no",
+"nm": "none",
+"mi": "none"
+},
+"28": {
+"cond": 3,
+"repaint": "full",
+"own": "2024",
+"work": "yes",
+"nm": "false",
+"mi": "51000"
+},
+"29": {
+"cond": 3,
+"repaint": "full",
+"own": "2011",
+"work": "yes",
+"nm": "none",
+"mi": "74000"
+},
+"30": {
+"cond": 3,
+"repaint": "full",
+"own": "2020",
+"work": "yes",
+"nm": "false",
+"mi": "31000"
+},
+"31": {
+"cond": 2,
+"repaint": "none",
+"own": "none",
+"work": "no",
+"nm": "none",
+"mi": "none"
+},
+"32": {
+"cond": 3,
+"repaint": "full",
+"own": "2015",
+"work": "yes",
+"nm": "false",
+"mi": "76000"
+},
+"33": {
+"cond": 2,
+"repaint": "none",
+"own": "2022",
+"work": "yes",
+"nm": "none",
+"mi": "7000"
+},
+"34": {
+"cond": 3,
+"repaint": "none",
+"own": "2015",
+"work": "yes",
+"nm": "none",
+"mi": "46000"
+},
+"35": {
+"cond": 3,
+"repaint": "none",
+"own": "none",
+"work": "yes",
+"nm": "none",
+"mi": "113000"
+},
+"36": {
+"cond": 2,
+"repaint": "none",
+"own": "2023",
+"work": "yes",
+"nm": "none",
+"mi": "85000"
+},
+"37": {
+"cond": 3,
+"repaint": "none",
+"own": "rel:1",
+"work": "yes",
+"nm": "false",
+"mi": "4000"
+},
+"38": {
+"cond": 2,
+"repaint": "none",
+"own": "2023",
+"work": "no",
+"nm": "none",
+"mi": "82000"
+},
+"39": {
+"cond": 2,
+"repaint": "none",
+"own": "none",
+"work": "no",
+"nm": "none",
+"mi": "none"
+},
+"40": {
+"cond": 2,
+"repaint": "none",
+"own": "2014",
+"work": "yes",
+"nm": "false",
+"mi": "none"
+},
+"41": {
+"cond": 2,
+"repaint": "none",
+"own": "none",
+"work": "no",
+"nm": "none",
+"mi": "89000"
+},
+"42": {
+"cond": 3,
+"repaint": "none",
+"own": "none",
+"work": "yes",
+"nm": "none",
+"mi": "16000"
+},
+"43": {
+"cond": 3,
+"repaint": "full",
+"own": "2019",
+"work": "yes",
+"nm": "false",
+"mi": "24000"
+},
+"44": {
+"cond": 2,
+"repaint": "none",
+"own": "rel:1",
+"work": "yes",
+"nm": "none",
+"mi": "none"
+},
+"45": {
+"cond": 2,
+"repaint": "none",
+"own": "2018",
+"work": "no",
+"nm": "none",
+"mi": "76000"
+},
+"46": {
+"cond": 2,
+"repaint": "none",
+"own": "2024",
+"work": "no",
+"nm": "none",
+"mi": "49000"
+},
+"47": {
+"cond": 2,
+"repaint": "none",
+"own": "none",
+"work": "no",
+"nm": "none",
+"mi": "none"
+},
+"48": {
+"cond": 2,
+"repaint": "none",
+"own": "none",
+"work": "yes",
+"nm": "none",
+"mi": "none"
+},
+"49": {
+"cond": 2,
+"repaint": "none",
+"own": "none",
+"work": "no",
+"nm": "none",
+"mi": "none"
+}
+}

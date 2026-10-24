@@ -1006,7 +1006,7 @@ struct VehicleDetailView: View {
                 } header: {
                     Text("What's the \(spec.label.lowercased())?")
                 } footer: {
-                    Text("Your entry is recorded as your testimony — it's reviewed and rooted to you, never silently overwriting the record.")
+                    Text("We save this as coming from you. It gets reviewed and never quietly replaces what's already here.")
                 }
             }
             .navigationTitle("Add \(spec.label)")
@@ -3322,7 +3322,7 @@ struct FieldProvenanceSheet: View {
 
     private var emptyState: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("This value is on the vehicle record but isn't yet traced to an observation.")
+            Text("We have this on file but haven't confirmed where it came from yet.")
                 .font(.footnote).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }

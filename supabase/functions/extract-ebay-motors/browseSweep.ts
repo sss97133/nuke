@@ -13,7 +13,8 @@
  * Every write result is read: a failed write is an error in the run's report and a non-2xx answer.
  */
 import { writeObservation } from "../_shared/observationWriter.ts";
-import { writeVehicleEventByKey } from "../_shared/vehicleEventWrite.ts";
+import { vehicleEventWriterFor } from "../_shared/vehicleEventWrite.ts";
+const writeVehicleEventByKey = vehicleEventWriterFor("extract-ebay-motors:browse-sweep");
 import { mustWrite, softWrite } from "../_shared/writeResult.ts";
 import { identityConflict } from "../_shared/identityMatch.ts";
 import { recordRevision } from "../_shared/revision.ts";

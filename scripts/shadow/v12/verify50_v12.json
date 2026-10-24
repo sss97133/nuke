@@ -1,0 +1,604 @@
+[
+{
+"a": "51e969cf-9987-4712-8581-985ed3d40a43",
+"u": "https://www.mecum.com/lots/1178338/1959-chevrolet-apache-pickup/",
+"rule": "mecum_odometer_field",
+"stored_mi": 75628,
+"orig": 75628,
+"page_numbers": [
+75628
+],
+"ok": true,
+"checked_at": "2026-10-24T00:00:40"
+},
+{
+"a": "d600b597-dc34-4611-80bc-f0d93a31b7d1",
+"u": "https://www.mecum.com/lots/1178269/1971-dodge-challenger-r-t/",
+"rule": "mecum_odometer_field",
+"stored_mi": 40001,
+"orig": 40001,
+"page_numbers": [
+40001
+],
+"ok": true,
+"checked_at": "2026-10-24T00:00:45"
+},
+{
+"a": "3bea18e3-31b9-44d1-9d83-da3729cf6bca",
+"u": "https://www.mecum.com/lots/1174526/1968-ford-ranchero/",
+"rule": "mecum_odometer_field",
+"stored_mi": 68161,
+"orig": 68161,
+"page_numbers": [
+68161
+],
+"ok": true,
+"checked_at": "2026-10-24T00:00:49"
+},
+{
+"a": "4e7bb2ee-1715-4708-a0a9-7c5d3a6eb88a",
+"u": "https://www.mecum.com/lots/1181322/2018-lexus-lc500/",
+"rule": "mecum_odometer_field",
+"stored_mi": 23698,
+"orig": 23698,
+"page_numbers": [
+23698
+],
+"ok": true,
+"checked_at": "2026-10-24T00:00:53"
+},
+{
+"a": "e0e7326e-fcda-469c-b8e7-ee0660d880fa",
+"u": "https://www.mecum.com/lots/1178042/1966-shelby-gt350h-fastback/",
+"rule": "mecum_odometer_field",
+"stored_mi": 84114,
+"orig": 84114,
+"page_numbers": [
+84114
+],
+"ok": true,
+"checked_at": "2026-10-24T00:00:57"
+},
+{
+"a": "7ea1ba8c-e33c-4557-9689-60a636b3f536",
+"u": "https://www.mecum.com/lots/1179967/1970-chevrolet-corvette-coupe/",
+"rule": "mecum_odometer_field",
+"stored_mi": 7563,
+"orig": 7563,
+"page_numbers": [
+7563
+],
+"ok": true,
+"checked_at": "2026-10-24T00:01:02"
+},
+{
+"a": "2431a323-b593-4648-a70a-7e8e57c5c53d",
+"u": "https://www.mecum.com/lots/1179000/1969-dodge-super-bee-coupe/",
+"rule": "mecum_odometer_field",
+"stored_mi": 76216,
+"orig": 76216,
+"page_numbers": [
+76216
+],
+"ok": true,
+"checked_at": "2026-10-24T00:01:06"
+},
+{
+"a": "fd53517d-3df4-407c-b003-474c303596ab",
+"u": "https://www.mecum.com/lots/1178792/1932-ford-roadster/",
+"rule": "mecum_odometer_field",
+"stored_mi": 366,
+"orig": 366,
+"page_numbers": [
+366
+],
+"ok": true,
+"checked_at": "2026-10-24T00:01:10"
+},
+{
+"a": "5d0d9545-1541-4625-be19-130cf7f1decd",
+"u": "https://www.mecum.com/lots/1171978/1995-chevrolet-corvette-pace-car-edition-convertible/",
+"rule": "mecum_odometer_field",
+"stored_mi": 2185,
+"orig": 2185,
+"page_numbers": [
+2185
+],
+"ok": true,
+"checked_at": "2026-10-24T00:01:15"
+},
+{
+"a": "08fd7166-c081-40b1-a306-684661b939ca",
+"u": "https://www.mecum.com/lots/1176747/1961-pontiac-bonneville-convertible/",
+"rule": "mecum_odometer_field",
+"stored_mi": 67146,
+"orig": 67146,
+"page_numbers": [
+67146
+],
+"ok": true,
+"checked_at": "2026-10-24T00:01:19"
+},
+{
+"a": "1ad3f9b4-e24a-44eb-9274-c7a64b53e52d",
+"u": "https://www.mecum.com/lots/1178700/1998-ford-f-150-pickup/",
+"rule": "mecum_odometer_field",
+"stored_mi": 166210,
+"orig": 166210,
+"page_numbers": [
+166210
+],
+"ok": true,
+"checked_at": "2026-10-24T00:01:23"
+},
+{
+"a": "9bae04c0-f0a4-471f-a22b-464bbcd5912c",
+"u": "https://www.mecum.com/lots/1178696/1970-chevrolet-nova/",
+"rule": "mecum_odometer_field",
+"stored_mi": 73546,
+"orig": 73546,
+"page_numbers": [
+73546
+],
+"ok": true,
+"checked_at": "2026-10-24T00:01:27"
+},
+{
+"a": "1d225c76-77f7-4aa7-b0b6-fc70f4f9b920",
+"u": "https://www.mecum.com/lots/1180051/1972-chevrolet-k5-blazer/",
+"rule": "mecum_odometer_field",
+"stored_mi": 56272,
+"orig": 56272,
+"page_numbers": [
+56272
+],
+"ok": true,
+"checked_at": "2026-10-24T00:01:32"
+},
+{
+"a": "e3a577aa-d9f7-4da1-a571-bb87d75162c7",
+"u": "https://www.mecum.com/lots/1174519/1970-plymouth-cuda/",
+"rule": "mecum_odometer_field",
+"stored_mi": 97718,
+"orig": 97718,
+"page_numbers": [
+97718
+],
+"ok": true,
+"checked_at": "2026-10-24T00:01:36"
+},
+{
+"a": "0a36c2c0-89fa-467d-be81-edbb07c487d0",
+"u": "https://www.mecum.com/lots/1177216/1969-chevrolet-chevelle/",
+"rule": "mecum_odometer_field",
+"stored_mi": 107087,
+"orig": 107087,
+"page_numbers": [
+107087
+],
+"ok": true,
+"checked_at": "2026-10-24T00:01:40"
+},
+{
+"a": "bb274b3e-80ac-442b-a597-506422938aea",
+"u": "https://www.mecum.com/lots/1174604/1959-ford-fairlane-500-galaxie-sunliner/",
+"rule": "mecum_odometer_field",
+"stored_mi": 93457,
+"orig": 93457,
+"page_numbers": [
+93457
+],
+"ok": true,
+"checked_at": "2026-10-24T00:01:45"
+},
+{
+"a": "2fb96057-c06f-4252-9431-29d263cd190c",
+"u": "https://www.mecum.com/lots/1174552/1953-jaguar-xk120-fixed-head-coupe/",
+"rule": "mecum_odometer_field",
+"stored_mi": 19488,
+"orig": 19488,
+"page_numbers": [
+19488
+],
+"ok": true,
+"checked_at": "2026-10-24T00:01:49"
+},
+{
+"a": "fff88511-419d-44f2-833d-7147103e0f6e",
+"u": "https://www.mecum.com/lots/1176183/1968-dodge-charger-r-t/",
+"rule": "mecum_odometer_field",
+"stored_mi": 177,
+"orig": 177,
+"page_numbers": [
+177
+],
+"ok": true,
+"checked_at": "2026-10-24T00:01:53"
+},
+{
+"a": "e3b33bed-2d1d-40e1-bbcd-91aebe82ffb2",
+"u": "https://www.mecum.com/lots/1177264/1962-chevrolet-bel-air-bubble-top/",
+"rule": "mecum_odometer_field",
+"stored_mi": 38155,
+"orig": 38155,
+"page_numbers": [
+38155
+],
+"ok": true,
+"checked_at": "2026-10-24T00:01:57"
+},
+{
+"a": "33c9d49d-03e1-45a7-9d61-affc25bd2103",
+"u": "https://www.mecum.com/lots/1176095/1963-volkswagen-beetle-custom/",
+"rule": "mecum_odometer_field",
+"stored_mi": 58943,
+"orig": 58943,
+"page_numbers": [
+58943
+],
+"ok": true,
+"checked_at": "2026-10-24T00:02:02"
+},
+{
+"a": "8f358154-14cf-48b9-8545-89f99cc50710",
+"u": "https://www.mecum.com/lots/1179575/1971-dodge-charger/",
+"rule": "mecum_odometer_field",
+"stored_mi": 162,
+"orig": 162,
+"page_numbers": [
+162
+],
+"ok": true,
+"checked_at": "2026-10-24T00:02:06"
+},
+{
+"a": "1cbb66e2-b6aa-40b2-9198-05e1d72ba400",
+"u": "https://www.mecum.com/lots/1174570/1969-amc-amx/",
+"rule": "mecum_odometer_field",
+"stored_mi": 10684,
+"orig": 10684,
+"page_numbers": [
+10684
+],
+"ok": true,
+"checked_at": "2026-10-24T00:02:10"
+},
+{
+"a": "bac9c506-2277-48e9-a3c5-5ea43e753752",
+"u": "https://www.mecum.com/lots/1180048/1966-shelby-cobra-replica/",
+"rule": "mecum_odometer_field",
+"stored_mi": 4126,
+"orig": 4126,
+"page_numbers": [
+4126
+],
+"ok": true,
+"checked_at": "2026-10-24T00:02:15"
+},
+{
+"a": "6dc47dfe-1431-4c15-9cfb-c6c8406f135f",
+"u": "https://www.mecum.com/lots/1173284/1964-plymouth-barracuda-landau-prototype/",
+"rule": "mecum_odometer_field",
+"stored_mi": 52446,
+"orig": 52446,
+"page_numbers": [
+52446
+],
+"ok": true,
+"checked_at": "2026-10-24T00:02:19"
+},
+{
+"a": "47109203-eab5-4119-939b-64e26fdd8df8",
+"u": "https://www.mecum.com/lots/1179003/2007-ford-shelby-gt500/",
+"rule": "mecum_odometer_field",
+"stored_mi": 44399,
+"orig": 44399,
+"page_numbers": [
+44399
+],
+"ok": true,
+"checked_at": "2026-10-24T00:02:23"
+},
+{
+"a": "23c6894d-8dc2-4b24-9466-ec2e62855898",
+"u": "https://www.mecum.com/lots/1178716/1965-factory-five-shelby-cobra-replica-roadster/",
+"rule": "mecum_odometer_field",
+"stored_mi": 103,
+"orig": 103,
+"page_numbers": [
+103
+],
+"ok": true,
+"checked_at": "2026-10-24T00:02:28"
+},
+{
+"a": "5095d9ce-622d-4b1a-b153-fc8223b861da",
+"u": "https://www.mecum.com/lots/1174556/1956-cadillac-sixty-special-camper/",
+"rule": "mecum_odometer_field",
+"stored_mi": 54405,
+"orig": 54405,
+"page_numbers": [
+54405
+],
+"ok": true,
+"checked_at": "2026-10-24T00:02:32"
+},
+{
+"a": "0b368870-1469-4586-8030-37503bccdd66",
+"u": "https://www.mecum.com/lots/1178175/1965-chevrolet-corvette-convertible/",
+"rule": "mecum_odometer_field",
+"stored_mi": 99071,
+"orig": 99071,
+"page_numbers": [
+99071
+],
+"ok": true,
+"checked_at": "2026-10-24T00:02:36"
+},
+{
+"a": "58401821-b9b4-4f82-98ca-33fe2a9a6076",
+"u": "https://www.mecum.com/lots/1176607/1963-chevrolet-impala-ss-convertible/",
+"rule": "mecum_odometer_field",
+"stored_mi": 23000,
+"orig": 23000,
+"page_numbers": [
+23000
+],
+"ok": true,
+"checked_at": "2026-10-24T00:02:40"
+},
+{
+"a": "3cb045f1-a00d-46d1-9472-923de45867f9",
+"u": "https://www.mecum.com/lots/1181131/2020-ford-gt-mk-ii/",
+"rule": "mecum_odometer_field",
+"stored_mi": 96,
+"orig": 96,
+"page_numbers": [
+96
+],
+"ok": true,
+"checked_at": "2026-10-24T00:02:45"
+},
+{
+"a": "8d98cac1-b67c-4cac-b5e6-cacca71a976d",
+"u": "https://www.mecum.com/lots/1174597/1967-oldsmobile-442-convertible/",
+"rule": "mecum_odometer_field",
+"stored_mi": 2691,
+"orig": 2691,
+"page_numbers": [
+2691
+],
+"ok": true,
+"checked_at": "2026-10-24T00:02:49"
+},
+{
+"a": "a230e5ca-8fde-43cc-b513-21bdf9e6af0e",
+"u": "https://www.mecum.com/lots/1177850/1963-mercury-comet/",
+"rule": "mecum_odometer_field",
+"stored_mi": 21198,
+"orig": 21198,
+"page_numbers": [
+21198
+],
+"ok": true,
+"checked_at": "2026-10-24T00:02:53"
+},
+{
+"a": "b7054cc9-5944-4b27-99ef-2602cdbd4108",
+"u": "https://www.mecum.com/lots/1176898/1938-ford-custom-pickup/",
+"rule": "mecum_odometer_field",
+"stored_mi": 10530,
+"orig": 10530,
+"page_numbers": [
+10530
+],
+"ok": true,
+"checked_at": "2026-10-24T00:02:58"
+},
+{
+"a": "e43004b2-b3ca-4b33-96ac-ab9963c154c1",
+"u": "https://www.mecum.com/lots/1176097/1972-chevrolet-blazer/",
+"rule": "mecum_odometer_field",
+"stored_mi": 124,
+"orig": 124,
+"page_numbers": [
+124
+],
+"ok": true,
+"checked_at": "2026-10-24T00:03:02"
+},
+{
+"a": "b6175dfc-d45f-49db-900b-48cd54fc076c",
+"u": "https://www.mecum.com/lots/1178257/1970-chevrolet-nova-ss/",
+"rule": "mecum_odometer_field",
+"stored_mi": 84181,
+"orig": 84181,
+"page_numbers": [
+84181
+],
+"ok": true,
+"checked_at": "2026-10-24T00:03:06"
+},
+{
+"a": "a80c1348-690d-4a03-b732-cfc3d9500d5a",
+"u": "https://barrett-jackson.com/2026-palm-beach/docket/vehicle/1973-datsun-240z-custom-coupe-298218",
+"rule": "barrett_text_bullet_n_miles",
+"stored_mi": 36254,
+"orig": 36254,
+"page_numbers": [
+36254
+],
+"ok": true,
+"checked_at": "2026-10-24T00:03:11"
+},
+{
+"a": "217e4d4c-76aa-4384-8ab1-6bc2924f3372",
+"u": "https://barrett-jackson.com/2026-palm-beach/docket/vehicle/2021-ford-mustang-gt-custom-coupe-297839",
+"rule": "barrett_text_n_actual_miles",
+"stored_mi": 5671,
+"orig": 5671,
+"page_numbers": [
+5671
+],
+"ok": true,
+"checked_at": "2026-10-24T00:03:15"
+},
+{
+"a": "e3693bed-04f2-4e28-8ccf-a60b135c058b",
+"u": "https://barrett-jackson.com/2026-palm-beach/docket/vehicle/2006-dodge-viper-srt-10-297881",
+"rule": "barrett_text_bullet_n_miles",
+"stored_mi": 2659,
+"orig": 2659,
+"page_numbers": [
+2659
+],
+"ok": true,
+"checked_at": "2026-10-24T00:03:19"
+},
+{
+"a": "50b10222-9490-4cb2-a310-54f78c65d9d7",
+"u": "https://barrett-jackson.com/2026-palm-beach/docket/vehicle/1979-porsche-911-sc-298484",
+"rule": "barrett_text_n_actual_miles",
+"stored_mi": 40804,
+"orig": 40804,
+"page_numbers": [
+40804
+],
+"ok": true,
+"checked_at": "2026-10-24T00:03:24"
+},
+{
+"a": "16c3b202-f15e-45dc-ad40-31c177345fd0",
+"u": "https://barrett-jackson.com/2026-palm-beach/docket/vehicle/2007-chevrolet-corvette-convertible-298086",
+"rule": "barrett_text_bullet_n_miles",
+"stored_mi": 19515,
+"orig": 19515,
+"page_numbers": [
+19515
+],
+"ok": true,
+"checked_at": "2026-10-24T00:03:28"
+},
+{
+"a": "d4013cc1-ec74-432a-83a1-9403ba53bde0",
+"u": "https://barrett-jackson.com/2026-palm-beach/docket/vehicle/1970-oldsmobile-442-w-30-298467",
+"rule": "barrett_text_n_actual_miles",
+"stored_mi": 36852,
+"orig": 36852,
+"page_numbers": [
+35000,
+36852
+],
+"ok": true,
+"checked_at": "2026-10-24T00:03:32"
+},
+{
+"a": "87375d0b-04dd-4c4e-af94-ea19e2b36463",
+"u": "https://barrett-jackson.com/2026-palm-beach/docket/vehicle/2011-mercedes-benz-e350-cabriolet-298456",
+"rule": "barrett_text_n_actual_miles",
+"stored_mi": 63714,
+"orig": 63714,
+"page_numbers": [
+63714
+],
+"ok": true,
+"checked_at": "2026-10-24T00:03:37"
+},
+{
+"a": "5a89e7c3-6253-473c-8edf-f1b847b988f1",
+"u": "https://barrett-jackson.com/2026-palm-beach/docket/vehicle/1973-ford-bronco-sport-298013",
+"rule": "barrett_text_bullet_n_miles",
+"stored_mi": 49515,
+"orig": 79687,
+"page_numbers": [
+49515,
+79687
+],
+"ok": true,
+"checked_at": "2026-10-24T00:03:41"
+},
+{
+"a": "b50cd016-64a0-462c-adfc-e8e59ea2dd45",
+"u": "https://barrett-jackson.com/2026-palm-beach/docket/vehicle/2014-toyota-fj-cruiser-custom-suv-298449",
+"rule": "barrett_text_n_actual_miles",
+"stored_mi": 74235,
+"orig": 74235,
+"page_numbers": [
+74235
+],
+"ok": true,
+"checked_at": "2026-10-24T00:03:45"
+},
+{
+"a": "32848267-06c0-4979-8631-df58e42ce1ad",
+"u": "https://barrett-jackson.com/2026-palm-beach/docket/vehicle/1989-toyota-mr2-297873",
+"rule": "barrett_text_bullet_n_miles",
+"stored_mi": 71367,
+"orig": 71367,
+"page_numbers": [
+71367
+],
+"ok": true,
+"checked_at": "2026-10-24T00:03:50"
+},
+{
+"a": "64a23498-747d-4ac9-a709-d8cac5e95531",
+"u": "https://barrett-jackson.com/2026-palm-beach/docket/vehicle/2022-chevrolet-silverado-custom-pickup-298262",
+"rule": "barrett_text_n_actual_miles",
+"stored_mi": 6294,
+"orig": 6294,
+"page_numbers": [
+6294
+],
+"ok": true,
+"checked_at": "2026-10-24T00:03:54"
+},
+{
+"a": "1acfb642-3cd3-4bb7-a0ae-f3142b7c8553",
+"u": "https://barrett-jackson.com/2026-palm-beach/docket/vehicle/2015-ford-mustang-gt-pettys-garage-stage-2-298160",
+"rule": "barrett_text_n_actual_miles",
+"stored_mi": 8,
+"orig": 8,
+"page_numbers": [
+8
+],
+"ok": true,
+"checked_at": "2026-10-24T00:03:58"
+},
+{
+"a": "6fd51d7e-013d-4d80-b971-86e38fb6793b",
+"u": "https://barrett-jackson.com/2026-palm-beach/docket/vehicle/2013-bentley-continental-gtc-le-mans-edition-298420",
+"rule": "barrett_text_n_actual_miles",
+"stored_mi": 30982,
+"orig": 30982,
+"page_numbers": [
+30982
+],
+"ok": true,
+"checked_at": "2026-10-24T00:04:03"
+},
+{
+"a": "aded0cdc-7073-4366-8d27-b448510a2263",
+"u": "https://barrett-jackson.com/2026-palm-beach/docket/vehicle/2021-ford-f-250-custom-pickup-298579",
+"rule": "barrett_text_n_actual_miles",
+"stored_mi": 41903,
+"orig": 41903,
+"page_numbers": [
+41903
+],
+"ok": true,
+"checked_at": "2026-10-24T00:04:07"
+},
+{
+"a": "48617d26-2c10-4172-9470-718b7fb7a6ce",
+"u": "https://barrett-jackson.com/2026-palm-beach/docket/vehicle/2011-mercedes-benz-e350-cabriolet-298455",
+"rule": "barrett_text_n_actual_miles",
+"stored_mi": 76475,
+"orig": 76475,
+"page_numbers": [
+76475
+],
+"ok": true,
+"checked_at": "2026-10-24T00:04:11"
+}
+]

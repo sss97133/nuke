@@ -154,7 +154,7 @@ struct SubjectProfileView: View {
                         }
                         if let savedAt { savedNotice(savedAt) }
                         SubjectCoverageView(coverage: subject.coverage)
-                        Text("\(subject.images.count) shown of \(subject.image_count) qualified source photos")
+                        Text("\(subject.images.count) shown of \(subject.image_count) usable photos")
                             .font(.caption).foregroundStyle(.secondary)
                         if subject.coverage.truncated {
                             Text("This read is bounded; additional photos may remain unassessed.").font(.caption).foregroundStyle(.secondary)
