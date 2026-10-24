@@ -787,6 +787,19 @@ struct CountyZIPDrill: View {
         return !members.isEmpty && members.allSatisfy { reader.partitions[$0]?.complete == true }
     }
 
+    /// Metros with the most recorded vehicles (market_pulse metro dimension), used as
+    /// one-tap entry points when the map is zoomed out too far to read any county.
+    static let quickMetros: [(name: String, lat: Double, lon: Double)] = [
+        ("Los Angeles", 34.05, -118.25), ("Scottsdale", 33.49, -111.93),
+        ("Houston", 29.76, -95.37), ("Dallas", 32.78, -96.80),
+        ("South Florida", 26.40, -80.15), ("Indianapolis", 39.77, -86.16),
+    ]
+    static func rect(lat: Double, lon: Double, span: Double = 1.2) -> MKMapRect {
+        let a = MKMapPoint(CLLocationCoordinate2D(latitude: lat + span / 2, longitude: lon - span / 2))
+        let b = MKMapPoint(CLLocationCoordinate2D(latitude: lat - span / 2, longitude: lon + span / 2))
+        return MKMapRect(x: min(a.x, b.x), y: min(a.y, b.y), width: abs(b.x - a.x), height: abs(b.y - a.y))
+    }
+
     init(query: Binding<String>) {
         _query = query
         #if DEBUG
@@ -820,7 +833,18 @@ struct CountyZIPDrill: View {
                 }
                 .font(.subheadline.weight(.medium))
                 if readCounties.isEmpty {
-                    Text("Zoom into an area or search a ZIP").font(.caption).foregroundStyle(.secondary)
+                    // At country zoom no county is read (reportRegion reads only under 4° of
+                    // longitude), so the full-screen map was blank and inert. Offer one-tap jumps
+                    // into the busiest recorded metros instead of a dead canvas.
+                    Text("Pinch into an area, search a ZIP, or jump to:").font(.caption).foregroundStyle(.secondary)
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 6) {
+                            ForEach(Self.quickMetros, id: \.name) { m in
+                                Button(m.name) { focus = Self.rect(lat: m.lat, lon: m.lon) }
+                                    .buttonStyle(.bordered).controlSize(.small)
+                            }
+                        }
+                    }
                 } else if loading || geometryLoading || projectionBusy {
                     HStack(spacing: 6) {
                         ProgressView().controlSize(.mini)
