@@ -940,6 +940,12 @@ export async function handleEvaluateListing(
   } catch (e) {
     return err(`Failed to fetch listing: ${e instanceof Error ? e.message : String(e)}`);
   }
+  if (listing.blocked_reason) {
+    return err(
+      `Could not read listing: ${listing.blocked_reason}. The page needs a login, so no listing facts were read; ` +
+        "paste the listing text or try a public listing URL.",
+    );
+  }
   if (listing.http_status >= 400 && !listing.title && !listing.description) {
     return err(`Listing fetch returned HTTP ${listing.http_status}`);
   }

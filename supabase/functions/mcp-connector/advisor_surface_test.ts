@@ -9,6 +9,8 @@ import {
 import { handleAdvisorJsonRpc, initAdvisorHandlers } from "./advisor/protocol.ts";
 // budget_options unit tests ride along with this CI-run file.
 import "./advisor/budget_test.ts";
+// VIN-vs-text classification and login-wall detection ride along so CI runs them.
+import "./advisor/vin_test.ts";
 // Live-auction bid handling rides along so CI runs it.
 import "./advisor/listing_fetch_test.ts";
 import "./advisor/live_auction_verdict_test.ts";
