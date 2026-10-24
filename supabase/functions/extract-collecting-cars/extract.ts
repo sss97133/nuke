@@ -16,7 +16,11 @@ export interface CollectingCarsExtracted {
   price: number | null;
   price_amount: number | null;
   currency: string | null;
-  price_kind: "current_bid" | "sold" | null;
+  /** sold: hammer (stage sold); high_bid: the last bid of an ended lot that did not sell; current_bid: a live lot. */
+  price_kind: "current_bid" | "high_bid" | "sold" | null;
+  /** What the page says happened: sold, unsold, sealed_unsold (sealed-bid lot, no sale), live, or null. */
+  sale_outcome: "sold" | "unsold" | "sealed_unsold" | "live" | null;
+  sold_at: string | null;
   mileage: number | null;
   mileage_unit: "mi" | "km" | null;
   mileage_raw: string | null;
@@ -104,8 +108,16 @@ export function extractFromHtml(html: string, url: string): CollectingCarsExtrac
   const mileageNum = mileageRaw ? int(mileageRaw.replace(/,/g, "").match(/\d+/)?.[0]) : null;
   const unit = mileageRaw ? (/km|kilomet/i.test(mileageRaw) ? "km" : /mi/i.test(mileageRaw) ? "mi" : null) : null;
 
-  const sold = L.priceSold != null && Number(L.priceSold) > 0;
+  // The backfilled Collecting Cars sales (488 rows, audited 2026-10-23) were wrong in all three ways this guards: a bid read
+  // mid-auction kept as the price, an unsold or sealed-bid lot called sold, and a native-currency amount stored as dollars.
+  // A sale is the page's stage "sold" with priceSold; an ended lot without it is a high bid, never a price.
+  const stage = clean(L.stage)?.toLowerCase() ?? null;
+  const sold = (stage === null || stage === "sold") && L.priceSold != null && Number(L.priceSold) > 0;
+  const ended = stage !== null && stage !== "live" && stage !== "comingsoon" && !sold;
   const amount = sold ? Number(L.priceSold) : Number(L.currentBid) > 0 ? Number(L.currentBid) : null;
+  const sealed = clean(L.saleFormat)?.toLowerCase() === "sealed";
+  const outcome: CollectingCarsExtracted["sale_outcome"] = sold ? "sold" : ended ? (sealed ? "sealed_unsold" : "unsold") : stage === "live" ? "live" : null;
+  const kind: CollectingCarsExtracted["price_kind"] = amount === null ? null : sold ? "sold" : ended ? "high_bid" : "current_bid";
   const currency = clean(L.currencyCode)?.toUpperCase() ?? null;
 
   const images: string[] = [];
@@ -126,10 +138,12 @@ export function extractFromHtml(html: string, url: string): CollectingCarsExtrac
     model: clean(L.modelName),
     trim: clean(L.variantName),
     vin: clean(L.vin),
-    price: currency === "USD" ? amount : null,
+    price: currency === "USD" && kind !== "high_bid" ? amount : null,
     price_amount: amount,
     currency,
-    price_kind: amount === null ? null : sold ? "sold" : "current_bid",
+    price_kind: kind,
+    sale_outcome: outcome,
+    sold_at: sold ? iso(L.dtSoldUTC) : null,
     mileage: mileageNum && unit === "mi" ? mileageNum : mileageNum && unit === "km" ? Math.round(mileageNum * 0.621371) : null,
     mileage_unit: unit,
     mileage_raw: mileageRaw,
