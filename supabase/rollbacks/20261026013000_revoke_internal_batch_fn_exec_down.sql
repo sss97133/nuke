@@ -1,0 +1,10 @@
+-- Restores prior grants (PUBLIC, anon, authenticated could execute).
+grant execute on function public.reclassify_evidence_claims(uuid,uuid[]) to public, anon, authenticated;
+grant execute on function public.mine_bat_text_claims(uuid[],uuid,boolean) to public, anon, authenticated;
+grant execute on function public.mine_bat_text_claims(uuid[],uuid) to public, anon, authenticated;
+grant execute on function public.evidence_backfill_next(uuid,integer) to public, anon, authenticated;
+grant execute on function public.compute_evidence_features(uuid[],timestamptz[],uuid) to public, anon, authenticated;
+grant execute on function public.evidence_features_next(uuid,integer) to public, anon, authenticated;
+grant execute on function public.fill_graded_mileage(uuid[],uuid) to public, anon, authenticated;
+grant execute on function public.aed_backfill_shard(text,text) to public, anon, authenticated;
+grant execute on function public.sync_vehicle_sale_price_from_verified_event() to public, anon, authenticated;
