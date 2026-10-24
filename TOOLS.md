@@ -425,6 +425,7 @@ The conversational face of the same verbs the drill buttons use. Runs as the cal
 | Ground the agent in what exists | tool `list_garage()` | Never invent vehicle ids. |
 
 Ledger read set: `get_vehicle_build_ledger` returns `extraction_method IN ('audit_draft_v0','owner_confirmed_v1')`. A rejected entry's `owner_rejected_v1` successor is deliberately excluded — the ruling persists as testimony, the row leaves the ledger.
+Booked costs: `accounting_vehicle_costs(vehicle_id)` (SECURITY DEFINER) returns the current accounting-book expense uses assigned to the vehicle, for a caller who can read that book (owner or active accounting grant) AND has the vehicle access above. Its rows are keyed by the book cell id, never an observation id, so the confirmation tools cannot act on them; the Build ledger shows them as their own "In the accounts" group, never summed with the audit totals.
 
 ---
 
