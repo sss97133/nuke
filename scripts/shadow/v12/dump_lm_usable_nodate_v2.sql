@@ -1,3 +1,5 @@
+-- SUPERSEDED 2026-10-24 by scripts/shadow/v16/dump_lm_by_event.sql: its sale_result date source was
+-- backfill-sale-results copies of stale vehicles.sale_date (the 2026-01-12 stamps). Kept for v12-v15 reproducibility.
 -- Listing mileage for events with no auction_end_date, dated by the sale they belong to:
 -- 1) that event's own sale_result observation (same source_url, trailing slash ignored) sale_date;
 -- 2) else vehicles.sale_date, only when the vehicle has exactly one auction event.
