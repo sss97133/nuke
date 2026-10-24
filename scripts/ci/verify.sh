@@ -124,6 +124,8 @@ for rule in $DESIGN_RULES; do ratchet "design/$rule" "$(count_design $rule)" "$(
 if secrets_ok; then grn "  ✓ secrets clean"; else red "  ✗ SECRET DETECTED"; cat "$CI_TMP_DIR/ci_sec.out"; fail=1; fi
 if bash "$ROOT/scripts/ci/migration-versions-unique.sh" >"$CI_TMP_DIR/ci_migration_versions.out" 2>&1; then grn "  ✓ migration versions unique"
 else red "  ✗ two migration files share a version"; cat "$CI_TMP_DIR/ci_migration_versions.out"; fail=1; fi
+if bash "$ROOT/scripts/ci/migration-versions-vs-main.sh" origin/main >"$CI_TMP_DIR/ci_migration_vs_main.out" 2>&1; then grn "  ✓ migration versions unique against latest origin/main"
+else red "  ✗ a migration version collides with origin/main as merged"; cat "$CI_TMP_DIR/ci_migration_vs_main.out"; fail=1; fi
 ylw "  • schema-baked-labels $(count_labels) (advisory, non-blocking)"
 
 echo "──"

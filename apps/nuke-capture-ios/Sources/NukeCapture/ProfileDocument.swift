@@ -211,8 +211,7 @@ struct ClaimSource: Decodable, Equatable {
 
     /// A URL only when it is one the phone can open; the read ships listing URLs, never storage keys.
     var openableURL: URL? {
-        guard let url, url.lowercased().hasPrefix("http") else { return nil }
-        return URL(string: url)
+        WebLink.url(url)
     }
 
     var effectiveLotNumber: String? {

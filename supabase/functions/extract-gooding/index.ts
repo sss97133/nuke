@@ -15,6 +15,7 @@
  * - Sitemap discovery: POST { action: "discover" }
  */
 
+import { parseMileageFromText } from "./goodingText.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
 import { normalizeListingUrlKey } from '../_shared/listingUrl.ts';
@@ -222,47 +223,6 @@ function parseTransmissionFromSpecs(specs: string[]): string | null {
   return null;
 }
 
-/**
- * Parse mileage from highlight/note prose.
- * Examples: "Driven No More Than 500 Miles Since Restoration" → 500
- *           "Showing Less than 19,300 Miles" → 19300
- */
-function parseMileageFromText(text: string): number | null {
-  if (!text) return null;
-  const milesPatterns = [
-    /(\d{1,3}(?:,\d{3})*)\s*[-\s]?miles?\b/i,
-    /(\d{1,3}(?:,\d{3})*)\s*-mile\b/i,
-    /showing\s+(?:less\s+than\s+|approximately\s+|just\s+)?([0-9,]+)\s*miles?/i,
-    /driven\s+(?:no\s+more\s+than\s+|only\s+|just\s+)?([0-9,]+)\s*miles?/i,
-    /odometer\s+(?:shows?|reads?|indicates?)\s+([0-9,]+)\s*miles?/i,
-    /approximately\s+([0-9,]+)\s*miles?/i,
-    /only\s+([0-9,]+)\s*miles?/i,
-    /fewer\s+than\s+([0-9,]+)\s*miles?/i,
-    /less\s+than\s+([0-9,]+)\s*miles?/i,
-    /([0-9,]+)\s*miles?\s+(?:from\s+new|since\s+new|since\s+(?:restoration|rebuild|new))/i,
-  ];
-  for (const pattern of milesPatterns) {
-    const match = text.match(pattern);
-    if (match) {
-      const numStr = match[match.length - 1] || match[1];
-      const miles = parseInt(numStr.replace(/,/g, ''), 10);
-      if (miles > 0 && miles < 5_000_000) return miles;
-    }
-  }
-  // KM → miles
-  const kmPatterns = [
-    /(\d{1,3}(?:,\d{3})*)\s*[-\s]?km\b/i,
-    /(\d{1,3}(?:,\d{3})*)\s*k(?:ilo)?m(?:etres?|eters?)/i,
-  ];
-  for (const pattern of kmPatterns) {
-    const match = text.match(pattern);
-    if (match) {
-      const km = parseInt(match[1].replace(/,/g, ''), 10);
-      if (km > 0 && km < 5_000_000) return Math.round(km * 0.621371);
-    }
-  }
-  return null;
-}
 
 // ============================================================================
 // VIN EXTRACTION

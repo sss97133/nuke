@@ -787,6 +787,19 @@ struct CountyZIPDrill: View {
         return !members.isEmpty && members.allSatisfy { reader.partitions[$0]?.complete == true }
     }
 
+    /// Metros with the most recorded vehicles (market_pulse metro dimension), used as
+    /// one-tap entry points when the map is zoomed out too far to read any county.
+    static let quickMetros: [(name: String, lat: Double, lon: Double)] = [
+        ("Los Angeles", 34.05, -118.25), ("Scottsdale", 33.49, -111.93),
+        ("Houston", 29.76, -95.37), ("Dallas", 32.78, -96.80),
+        ("South Florida", 26.40, -80.15), ("Indianapolis", 39.77, -86.16),
+    ]
+    static func rect(lat: Double, lon: Double, span: Double = 1.2) -> MKMapRect {
+        let a = MKMapPoint(CLLocationCoordinate2D(latitude: lat + span / 2, longitude: lon - span / 2))
+        let b = MKMapPoint(CLLocationCoordinate2D(latitude: lat - span / 2, longitude: lon + span / 2))
+        return MKMapRect(x: min(a.x, b.x), y: min(a.y, b.y), width: abs(b.x - a.x), height: abs(b.y - a.y))
+    }
+
     init(query: Binding<String>) {
         _query = query
         #if DEBUG
@@ -820,7 +833,18 @@ struct CountyZIPDrill: View {
                 }
                 .font(.subheadline.weight(.medium))
                 if readCounties.isEmpty {
-                    Text("Zoom into an area or search a ZIP").font(.caption).foregroundStyle(.secondary)
+                    // At country zoom no county is read (reportRegion reads only under 4° of
+                    // longitude), so the full-screen map was blank and inert. Offer one-tap jumps
+                    // into the busiest recorded metros instead of a dead canvas.
+                    Text("Pinch into an area, search a ZIP, or jump to:").font(.caption).foregroundStyle(.secondary)
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 6) {
+                            ForEach(Self.quickMetros, id: \.name) { m in
+                                Button(m.name) { focus = Self.rect(lat: m.lat, lon: m.lon) }
+                                    .buttonStyle(.bordered).controlSize(.small)
+                            }
+                        }
+                    }
                 } else if loading || geometryLoading || projectionBusy {
                     HStack(spacing: 6) {
                         ProgressView().controlSize(.mini)
@@ -910,14 +934,14 @@ struct CountyZIPDrill: View {
         .sheet(isPresented: $showInfo) {
             NavigationStack {
                 List {
-                    Text("\(observations.count.formatted()) location observations read; \(summary.vehicleCount.formatted()) distinct vehicles in the selected date and make cohort. \(complete ? "All matching pages were read." : "The read is still incomplete.")")
+                    Text("\(observations.count.formatted()) location records found for \(summary.vehicleCount.formatted()) different vehicles matching your dates and make. \(complete ? "Everything has loaded." : "Still loading more.")")
                     if let latest { Text("Latest matched auction close: \(AuctionLocationClock.label(latest)) · UTC.") }
-                    Text("\(observations.filter { $0.auctionClock.date == nil }.count.formatted()) location records lack a supported auction close date; they remain in All time and are excluded from date ranges.")
+                    Text("\(observations.filter { $0.auctionClock.date == nil }.count.formatted()) records have no auction date, so they only show under All time.")
                     Text("Color shows distinct vehicles with source ZIP evidence in fixed bands: 1–4, 5–19, 20–99 and 100 or more. Unshaded areas have no matching mapped evidence in this loaded region; that does not establish an inactive market. These are not completed sales, current availability or bid counts. The date window uses the matching source auction's close date, as a UTC calendar day. End dates do not establish a completed sale. Conflicting or absent dates remain undated; intake dates never substitute for auction dates.")
                 Text("\(viewport?.counties.count ?? 0) counties intersect this screen. Captured ZIP history is read across their borders. This is not a census of every vehicle or every auction.")
                 Text("Completed region reads are reused for up to 10 minutes during this map session. Auction event dates and location intake dates are separate. This is a current read of recorded evidence, not an immutable historical snapshot.")
                     Text("ZIP areas are Census 2020 ZIP Code Tabulation Areas. Some postal ZIPs have no area, and ZIPs can cross county boundaries. County conflicts and missing source ZIPs remain available under Coverage.")
-                    Text("Street, building and parking-space scales require precise, dated presence evidence. Historical ZIP observations cannot answer whether a car is still there.")
+                    Text("We only know the ZIP code where a car was listed, not its exact spot, and not whether it is still there.")
                     Link("Census ZIP area definitions", destination: URL(string: "https://www.census.gov/programs-surveys/geography/guidance/geo-areas/zctas.html")!)
                 }
                 .navigationTitle("Sources and coverage").navigationBarTitleDisplayMode(.inline)
@@ -1863,10 +1887,10 @@ struct CountyZIPVehicles: View {
     var body: some View {
         List {
             Section {
-                Text("\(group.vehicles.count.formatted()) vehicles with historical location evidence")
+                Text("\(group.vehicles.count.formatted()) vehicles seen here in the past")
                     .font(.subheadline).foregroundStyle(.secondary)
                 if !group.isZIP {
-                    Text("These observations cannot establish a ZIP within the selected county.")
+                    Text("We know the county for these, but not the exact ZIP code.")
                         .font(.footnote).foregroundStyle(.secondary)
                 }
             }

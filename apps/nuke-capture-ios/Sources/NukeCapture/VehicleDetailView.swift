@@ -549,7 +549,7 @@ struct VehicleDetailView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         if let seller = auction.seller_name, !seller.isEmpty {
                             LabeledContent("Seller") {
-                                if let url = auction.source_url.flatMap(URL.init(string:)),
+                                if let url = WebLink.url(auction.source_url),
                                    url.host?.lowercased().replacingOccurrences(of: "www.", with: "") == "bringatrailer.com" {
                                     NavigationLink(seller) {
                                         MarketSellerView(handle: seller)
@@ -569,7 +569,7 @@ struct VehicleDetailView: View {
                     }.font(.subheadline)
                 }
                 ForEach(context.sourceURLs, id: \.self) { raw in
-                    if let url = URL(string: raw) {
+                    if let url = WebLink.url(raw) {
                         Link("\(sourceName(url)) listing", destination: url)
                             .font(.subheadline)
                     }
@@ -1006,7 +1006,7 @@ struct VehicleDetailView: View {
                 } header: {
                     Text("What's the \(spec.label.lowercased())?")
                 } footer: {
-                    Text("Your entry is recorded as your testimony — it's reviewed and rooted to you, never silently overwriting the record.")
+                    Text("We save this as coming from you. It gets reviewed and never quietly replaces what's already here.")
                 }
             }
             .navigationTitle("Add \(spec.label)")
@@ -1282,7 +1282,7 @@ struct VehicleDetailView: View {
         }
         .padding(.horizontal, 14).padding(.vertical, 11).contentShape(Rectangle())
 
-        if let u = s.url, let url = URL(string: u) {
+        if let url = WebLink.url(s.url) {
             Link(destination: url) { body }.buttonStyle(.plain)   // drills to the listing
         } else {
             body                                                   // honest non-link (no source)
@@ -3322,7 +3322,7 @@ struct FieldProvenanceSheet: View {
 
     private var emptyState: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("This value is on the vehicle record but isn't yet traced to an observation.")
+            Text("We have this on file but haven't confirmed where it came from yet.")
                 .font(.footnote).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -3337,9 +3337,7 @@ struct FieldProvenanceSheet: View {
     }
 
     private func webURL(_ raw: String?) -> URL? {
-        guard let raw, let url = URL(string: raw),
-              ["https", "http"].contains(url.scheme?.lowercased() ?? ""), url.host != nil else { return nil }
-        return url
+        WebLink.url(raw)
     }
 
     private func reviewClock(_ iso: String?) -> String? {
