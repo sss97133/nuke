@@ -1,4 +1,5 @@
 // Read-only handlers for the Nuke Asset Advisor surface.
+import { assetIdProblem, effectiveListingStatus } from "./asset_status.ts";
 import { adjustedEstimate, type AdjResult, type IndexSeries } from "./adjust.ts";
 import {
   AGENT_CITATION_RULES,
@@ -1146,8 +1147,9 @@ async function handleGetAsset(
 ): Promise<AdvisorToolResult> {
   const bad = unsupportedAsset(args, "get_asset");
   if (bad) return bad;
-  const vid = String(args.asset_id || "");
-  if (!vid) return err("asset_id is required", "get_asset");
+  const vid = String(args.asset_id || "").trim();
+  const vidProblem = assetIdProblem(vid);
+  if (vidProblem) return err(vidProblem, "get_asset");
 
   const sb = deps.sb();
   const { data: vehicle, error } = await sb
@@ -1159,11 +1161,16 @@ async function handleGetAsset(
         "nuke_estimate, nuke_estimate_confidence, " +
         "primary_image_url, image_count, observation_count, " +
         "description, location, city, state, country, " +
-        "listing_url, bat_auction_url, created_at, updated_at",
+        "listing_url, bat_auction_url, created_at, updated_at, " +
+        "auction_status, reserve_status, sale_status, auction_end_date, sale_date, bat_sale_date",
     )
     .eq("id", vid)
     .single();
-  if (error) return err(error.message, "get_asset");
+  if (error && (error as { code?: string }).code === "PGRST116") return err("Asset not found", "get_asset");
+  if (error) {
+    console.error("get_asset query failed", error.message);
+    return err("Could not load asset (lookup failed)", "get_asset");
+  }
   if (!vehicle) return err("Asset not found", "get_asset");
 
   const [price, obsRes] = await Promise.all([
@@ -1314,7 +1321,8 @@ async function handleGetAsset(
 
   return ok(
     makeEnvelope("get_asset", "vehicle", vid, claims, {
-      status: row.status ?? null,
+      status: effectiveListingStatus(row),
+      record_status: row.status ?? null,
       location: {
         location: row.location ?? null,
         city: row.city ?? null,
@@ -1348,8 +1356,9 @@ async function handleGetHistory(
 ): Promise<AdvisorToolResult> {
   const bad = unsupportedAsset(args, "get_history");
   if (bad) return bad;
-  const vid = String(args.asset_id || "");
-  if (!vid) return err("asset_id is required", "get_history");
+  const vid = String(args.asset_id || "").trim();
+  const vidProblem = assetIdProblem(vid);
+  if (vidProblem) return err(vidProblem, "get_history");
   const limit = Math.min(Math.max(Number(args.limit) || 25, 1), 100);
   const sb = deps.sb();
 
@@ -1508,6 +1517,8 @@ async function handleExplainField(
   const vid = String(args.asset_id || "");
   const field = String(args.field || "").trim();
   if (!vid || !field) return err("asset_id and field are required", "explain_field");
+  const vidProblem = assetIdProblem(vid);
+  if (vidProblem) return err(vidProblem, "explain_field");
   const sb = deps.sb();
   const keys = fieldKeys(field);
 
@@ -1694,8 +1705,9 @@ async function handleValueAsset(
 ): Promise<AdvisorToolResult> {
   const bad = unsupportedAsset(args, "value_asset");
   if (bad) return bad;
-  const vid = String(args.asset_id || "");
-  if (!vid) return err("asset_id is required", "value_asset");
+  const vid = String(args.asset_id || "").trim();
+  const vidProblem = assetIdProblem(vid);
+  if (vidProblem) return err(vidProblem, "value_asset");
   const sb = deps.sb();
 
   const { data: vehicle } = await sb
@@ -2053,7 +2065,11 @@ async function handleGetComps(
   let make = typeof args.make === "string" ? args.make : null;
   let model = typeof args.model === "string" ? args.model : null;
   let year = args.year != null ? Number(args.year) : null;
-  let assetId = args.asset_id ? String(args.asset_id) : undefined;
+  let assetId = args.asset_id ? String(args.asset_id).trim() : undefined;
+  if (assetId) {
+    const idProblem = assetIdProblem(assetId);
+    if (idProblem) return err(idProblem, "get_comps");
+  }
 
   if (args.vin && !assetId) {
     const { data: vrow } = await sb
@@ -2160,8 +2176,9 @@ async function handleGetCoverage(
 ): Promise<AdvisorToolResult> {
   const bad = unsupportedAsset(args, "get_coverage");
   if (bad) return bad;
-  const vid = String(args.asset_id || "");
-  if (!vid) return err("asset_id is required", "get_coverage");
+  const vid = String(args.asset_id || "").trim();
+  const vidProblem = assetIdProblem(vid);
+  if (vidProblem) return err(vidProblem, "get_coverage");
   const sb = deps.sb();
 
   const { data: vehicle, error } = await sb
