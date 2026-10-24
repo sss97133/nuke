@@ -83,21 +83,22 @@ it('reads records from the server view for the book and year, pages by 25 and op
   const open = vi.fn();
   const control = { record_kind: 'retained_ledger_decision', year: '2024', account: 'Account', section: 'Expense', currency: 'USD', retained_amount: '12.50', rows: 1 };
   fixture.invoke.mockResolvedValue(response({ ...empty(), total_rows: 51, controls: [control] }));
-  fixture.from.mockImplementationOnce(() => table({ data: [record()], count: 51 })).mockImplementationOnce(() => table({ data: [record('row2', 'Second page')], count: 51 }));
+  fixture.from.mockImplementationOnce(() => table({ data: Array.from({ length: 26 }, (_, i) => record(`row${i + 1}`, `Record ${i + 1}`)) })).mockImplementationOnce(() => table({ data: [record('row2', 'Second page')] }));
   await act(async () => root.render(book(<FinancialWorkpapers revision={0} onOpen={open} />)));
   expect(fixture.invoke.mock.calls[0][1].body).toEqual({ mode: 'financial_evidence_v1', action: 'tax_read', limit: 1 });
   expect(fixture.from).not.toHaveBeenCalled();
   await act(async () => Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'Records')!.click());
   expect(fixture.from).toHaveBeenCalledWith('v_financial_accounting_records');
   expect(filters(queries()[0], 'eq')).toEqual([['owner_id', 'owner'], ['year', '2024']]);
-  expect(filters(queries()[0], 'range')).toEqual([[0, 24]]);
+  expect(filters(queries()[0], 'select')).toEqual([['id, document_id, record']]);
+  expect(filters(queries()[0], 'range')).toEqual([[0, 25]]);
   expect(filters(queries()[0], 'order')[0]).toEqual(['record_date', { ascending: false, nullsFirst: false }]);
   expect(filters(queries()[0], 'or')).toEqual([]);
-  expect(container.textContent).toContain('1–1 of 51 matches');
+  expect(container.textContent).toContain('Showing 1–25 records; more available');
   await act(async () => Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'View evidence')!.click()); expect(open).toHaveBeenCalledWith('doc', record().record);
   await act(async () => Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'Next 25')!.click());
-  expect(filters(queries()[1], 'range')).toEqual([[25, 49]]);
-  expect(container.textContent).toContain('Second page'); expect(container.textContent).toContain('26–26 of 51 matches');
+  expect(filters(queries()[1], 'range')).toEqual([[25, 50]]);
+  expect(container.textContent).toContain('Second page'); expect(container.textContent).toContain('Showing 26–26 records');
 });
 it('sends filters and the search term to the server instead of filtering a loaded page', async () => {
   const control = { record_kind: 'retained_bank_movement', year: '2025', account: 'AFCU 8288', section: null, currency: 'USD', retained_amount: '1', rows: 3 };
