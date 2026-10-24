@@ -9,6 +9,8 @@ import {
 import { handleAdvisorJsonRpc, initAdvisorHandlers } from "./advisor/protocol.ts";
 // budget_options unit tests ride along with this CI-run file.
 import "./advisor/budget_test.ts";
+// Variant and 911 generation matching (variants_test) also rides along so CI runs it.
+import "./advisor/variants_test.ts";
 import { assertEnvelopeShape } from "./advisor/evidence.ts";
 
 function assert(condition: boolean, message: string): asserts condition {
