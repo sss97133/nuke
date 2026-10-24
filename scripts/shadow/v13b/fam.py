@@ -1,6 +1,9 @@
 # learned model-family grouping within make: name similarity (char-trigram Jaccard / prefix) + price co-movement of half-year series; union-find
 import pickle,numpy as np,collections,json,datetime
 G,V,LM,VS=pickle.load(open('../v12/comps_v11.pkl','rb')); G1=G[1]; del G
+# Defensive: comps_v11.pkl from load_v11.py already skips suspect-mileage vehicles; drop any left.
+import os as _os; _sf=_os.path.join(_os.path.dirname(_os.path.abspath(__file__)),'..','suspect_mileage_vehicle_ids.txt')
+if _os.path.exists(_sf): _S=set(open(_sf).read().split()); LM={k:v for k,v in LM.items() if k[0] not in _S}
 def tri(s): s=f'  {s} '; return {s[i:i+3] for i in range(len(s)-2)}
 def namesim(a,b):
   if not a or not b: return 0.

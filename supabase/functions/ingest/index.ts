@@ -17,6 +17,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
+import { flagPlaceholderMileage } from "../_shared/odometer.ts";
 import { normalizeVehicleFields, normalizeMake } from "../_shared/normalizeVehicle.ts";
 import { qualityGate } from "../_shared/extractionQualityGate.ts";
 import { validateVINChecksum } from "../_shared/intelligence-layer.ts";
@@ -679,6 +680,8 @@ async function matchOrCreateVehicle(
   if (error) {
     throw new Error(`Failed to create vehicle: ${error.message}`);
   }
+  // Placeholder odometers (99999, 123456, ...) stay on the row but are flagged suspect so readers skip them.
+  await flagPlaceholderMileage(supabaseAdmin, newVehicle.id, vehicleData.mileage as number | null | undefined, `ingest_${platform || "unknown"}`, parsed.url || null);
 
   // If we have multiple images, insert them to vehicle_images
   const allImages = parsed.imageUrls || (parsed.imageUrl ? [parsed.imageUrl] : []);
@@ -776,6 +779,7 @@ async function enrichVehicle(vehicleId: string, data: VehicleEnrichment, platfor
 
   if (Object.keys(updates).length > 0) {
     await supabaseAdmin.from("vehicles").update(updates).eq("id", vehicleId);
+    if (updates.mileage) await flagPlaceholderMileage(supabaseAdmin, vehicleId, updates.mileage as number, `ingest_${platform || "unknown"}`, data.url || null);
   }
 
   // Add any new images

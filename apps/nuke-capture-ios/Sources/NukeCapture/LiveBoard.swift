@@ -1270,8 +1270,13 @@ struct LiveBoardView: View {
                                                                            city: nil, state: nil)) {
                                         row(lot)
                                     }
+                                    .buttonStyle(.plain)
+                                    .listRowInsets(EdgeInsets())
+                                    .listRowSeparator(.hidden)
                                 } else {
                                     row(lot)   // a row without a readable vehicle id opens nothing, never a random record
+                                        .listRowInsets(EdgeInsets())
+                                        .listRowSeparator(.hidden)
                                 }
                             }
                         } header: {
@@ -1288,7 +1293,7 @@ struct LiveBoardView: View {
                                 }
                             }
                         } footer: {
-                            Text("Bring a Trailer runs every auction in US dollars; bids are as the board recorded them. Running hot or cold compares the bid with the typical bid at this point in the auction for cars priced like its comparable sales; Est. is the Model 33 live finish estimate with its 80% interval (low–high). Tap the tag for the reading and comparable sales.")
+                            Text("Bring a Trailer runs every auction in US dollars; bids are as the board recorded them. Similar cars sold is the 10th–90th percentile of comparable recorded sales, shown with 20 or more; Est. is the Model 33 live finish estimate with its 80% interval (low–high). Tap the tag for the reading and comparable sales.")
                         }
 
                     case .calendar:
@@ -1302,7 +1307,7 @@ struct LiveBoardView: View {
                 .sheet(item: $reading) { lot in
                     HeatReadingSheet(
                         lot: lot,
-                        heat: lot.heat(curve: board.curve, at: now),
+                        heat: LiveBoardView.showsHeatVerdict ? lot.heat(curve: board.curve, at: now) : nil,
                         finishEstimate: finishBoard?.byId[lot.id],
                         now: now
                     )
@@ -1557,75 +1562,106 @@ struct LiveBoardView: View {
         }
     }
 
+    /// The hot/cold verdict is retired from the feed (2026-10-24 owner review). Its own backtest,
+    /// carried in market_pulse_live.backtest, shows lots tagged hot sold above the band median at
+    /// almost exactly the rate of lots tagged cold (5 days out: 78.4% vs 78.1%; 12 hours: 91.5% vs
+    /// 87.6%), while 74% of eligible lots wore a tag. The band is a make/model-wide p10–p90 spanning
+    /// ~3× and the early-auction curve share is small, so the ratio swung wildly (e.g. a 2018 Camaro
+    /// ZL1 read "cold" against all Camaros). A tag that does not separate outcomes is not shown.
+    static let showsHeatVerdict = false
+
+    /// Comparable sales are shown as facts, only when there are enough of them to mean something.
+    static let minComps = 20
+
+    /// Full-width hero for a BaT lot: the board ships a 470×318 crop (?w=470&h=318&crop=1), soft
+    /// at full width. Ask BaT's CDN for a width that fills the screen; other hosts pass through.
+    static func heroURL(_ raw: String?) -> URL? {
+        guard let raw, var c = URLComponents(string: raw), let host = c.host?.lowercased(),
+              host == "bringatrailer.com" || host.hasSuffix(".bringatrailer.com") else { return NukeImage.thumb(raw, width: 1080) }
+        c.queryItems = [URLQueryItem(name: "w", value: "1080")]
+        return c.url
+    }
+    static let heroMaxPixel: CGFloat = 1280
+
     @ViewBuilder private func row(_ lot: LiveAuction) -> some View {
         let est = finishBoard?.byId[lot.id]
-        let heat = lot.heat(curve: board?.curve, at: now)
-        HStack(alignment: .top, spacing: 12) {
+        VStack(alignment: .leading, spacing: 0) {
+            // Edge-to-edge 4:3 hero with the price and clock over it, readable at a glance.
             Color(.secondarySystemFill)
-                .frame(width: 64, height: 48)
+                .aspectRatio(4 / 3, contentMode: .fit)
                 .overlay {
-                    CachedAsyncImage(url: NukeImage.thumb(lot.imageUrl, width: 200)) { i in
+                    CachedAsyncImage(url: Self.heroURL(lot.imageUrl), maxPixel: Self.heroMaxPixel) { i in
                         i.resizable().scaledToFill()
-                    } placeholder: { Image(systemName: "car.side").foregroundStyle(.secondary) }
-                }
-                .clipShape(RoundedRectangle(cornerRadius: 6))
-            VStack(alignment: .leading, spacing: 3) {
-                Text(lot.headline).font(.subheadline.weight(.semibold)).lineLimit(2)
-                HStack(spacing: 8) {
-                    // The web's bidNumber: dollars, as BaT reports every bid (#1061).
-                    if let bid = lot.currentBid, bid.isFinite {
-                        Text(Self.bidNumber(bid))
-                            .font(.system(.footnote, design: .monospaced).weight(.semibold)).monospacedDigit()
-                        Text("bid").font(.caption2.monospaced()).foregroundStyle(.secondary)
-                    } else {
-                        Text("no bid recorded").font(.caption2.monospaced()).foregroundStyle(.secondary)
-                    }
-                    if lot.noReserve {
-                        Text("NO RESERVE").font(.caption2.monospaced().weight(.semibold)).foregroundStyle(.secondary)
-                    }
-                    Spacer(minLength: 0)
-                    if let ends = lot.endsAtDate {
-                        TimelineView(.periodic(from: .now, by: 30)) { ctx in
-                            Text(Self.remaining(ends, now: ctx.date))
-                                .font(.caption2.monospaced()).monospacedDigit()
-                                .foregroundStyle(ends.timeIntervalSince(ctx.date) < 3600 ? .red : .secondary)
-                        }
+                    } placeholder: {
+                        Image(systemName: "car.side").font(.largeTitle).foregroundStyle(.tertiary)
                     }
                 }
-                // Model 33 live finish estimate + HeatTag reading, one tap away.
-                if est != nil || (heat != nil && heat?.state != .inLine) {
-                    HStack(spacing: 8) {
-                        if let heat, heat.state != .inLine {
-                            Button {
-                                reading = lot
-                            } label: {
-                                Text((heat.state == .hot ? "Running hot" : "Running cold") + " · " + Self.multiple(heat.ratio))
-                                    .font(.caption2.monospaced().weight(.semibold))
-                                    .foregroundStyle(heat.state == .hot ? Color.orange : Color.teal)
+                .clipped()
+                .overlay(alignment: .bottom) {
+                    LinearGradient(colors: [.clear, .black.opacity(0.7)], startPoint: .top, endPoint: .bottom)
+                        .frame(height: 110)
+                        .allowsHitTesting(false)
+                }
+                .overlay(alignment: .bottomLeading) {
+                    HStack(alignment: .lastTextBaseline) {
+                        VStack(alignment: .leading, spacing: 0) {
+                            if let bid = lot.currentBid, bid.isFinite {
+                                Text(Self.bidNumber(bid))
+                                    .font(.system(.title, design: .rounded).weight(.bold)).monospacedDigit()
+                                Text(lot.noReserve ? "current bid · no reserve" : "current bid")
+                                    .font(.caption.weight(.medium)).opacity(0.85)
+                            } else {
+                                Text("No bids yet").font(.title3.weight(.semibold))
                             }
-                            .buttonStyle(.borderless)
-                            .accessibilityLabel("Why \(lot.headline) is running \(heat.state == .hot ? "hot" : "cold")")
                         }
-                        if let est {
-                            Button {
-                                reading = lot
-                            } label: {
-                                HStack(spacing: 4) {
-                                    Text("Est. \(Self.bidNumber(est.estimate, compact: true))")
-                                        .font(.caption2.monospaced().weight(.semibold))
-                                    Text("(\(Self.bidNumber(est.low, compact: true))–\(Self.bidNumber(est.high, compact: true))\(est.grade.map { " · \($0)" } ?? ""))")
-                                        .font(.caption2.monospaced())
-                                        .foregroundStyle(.secondary)
-                                }
+                        Spacer(minLength: 8)
+                        if let ends = lot.endsAtDate {
+                            TimelineView(.periodic(from: .now, by: 30)) { ctx in
+                                let soon = ends.timeIntervalSince(ctx.date) < 3600
+                                Text(Self.remaining(ends, now: ctx.date))
+                                    .font(.subheadline.weight(.semibold)).monospacedDigit()
+                                    .padding(.horizontal, 10).padding(.vertical, 5)
+                                    .background(soon ? Color.red : Color.black.opacity(0.45), in: Capsule())
                             }
-                            .buttonStyle(.borderless)
-                            .accessibilityLabel("Model 33 finish estimate for \(lot.headline)")
                         }
                     }
+                    .foregroundStyle(.white)
+                    .padding(14)
+                }
+            VStack(alignment: .leading, spacing: 4) {
+                Text(lot.headline).font(.headline).lineLimit(2)
+                // Transparent context in place of the verdict: the bid beside what comparable
+                // cars actually sold for, with the sample size. Shown only with enough comps.
+                if let band = lot.band, band.comps >= Self.minComps, band.p10 > 0, band.p90 > 0 {
+                    Text("Similar cars sold \(Self.bidNumber(band.p10, compact: true))–\(Self.bidNumber(band.p90, compact: true)) · median \(Self.bidNumber(band.p50, compact: true)) · \(band.comps.formatted()) sales")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                if let est {
+                    Button { reading = lot } label: {
+                        Text("Est. finish \(Self.bidNumber(est.estimate, compact: true)) (\(Self.bidNumber(est.low, compact: true))–\(Self.bidNumber(est.high, compact: true)))")
+                            .font(.caption.weight(.semibold))
+                    }
+                    .buttonStyle(.borderless)
+                    .accessibilityLabel("Finish estimate for \(lot.headline)")
+                }
+                if Self.showsHeatVerdict, let heat = lot.heat(curve: board?.curve, at: now), heat.state != .inLine {
+                    Text((heat.state == .hot ? "Running hot" : "Running cold") + " · " + Self.multiple(heat.ratio))
+                        .font(.caption2.monospaced().weight(.semibold))
                 }
             }
+            .padding(.horizontal, 16).padding(.top, 10).padding(.bottom, 18)
         }
-        .padding(.vertical, 4)
+        .task(id: lot.id) { prefetch(after: lot) }
+    }
+
+    /// Warm the next few heroes so they are decoded before they scroll in.
+    private func prefetch(after lot: LiveAuction) {
+        guard let i = lots.firstIndex(where: { $0.id == lot.id }) else { return }
+        let next = lots.dropFirst(i + 1).prefix(3).compactMap { Self.heroURL($0.imageUrl) }
+        let px = Self.heroMaxPixel
+        for url in next where RemoteImageCache.shared.cached(url, maxPixel: px) == nil {
+            Task(priority: .utility) { _ = await RemoteImageCache.shared.image(url, maxPixel: px) }
+        }
     }
 
     static func remaining(_ ends: Date, now: Date) -> String {
