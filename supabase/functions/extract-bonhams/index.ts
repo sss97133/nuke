@@ -43,6 +43,8 @@ import { extractGeneralBodyStyle, extractVehicleFacets } from "../_shared/vehicl
 import { normalizeVehicleFields } from "../_shared/normalizeVehicle.ts";
 import { landIdentifierClaims } from "../_shared/landIdentifierClaims.ts";
 import { type Odometer, odometerColumns, toMiles, unitFromText } from "../_shared/odometer.ts";
+import { extractOdometerFromText } from "../_shared/odometerText.ts";
+export { extractOdometerFromText };
 
 const EXTRACTOR_VERSION = "bonhams-v3";
 
@@ -271,25 +273,13 @@ export function extractSpecsFromContent(text: string): {
   let interior_color: string | null = null;
   let body_style: string | null = null;
 
-  // Mileage
-  const mileagePatterns = [
-    /(\d{1,3}(?:,\d{3})*)\s*(?:miles|mi)\b/i,
-    /mileage[^:]*:?\s*(\d{1,3}(?:,\d{3})*)/i,
-    /odometer[^:]*:?\s*(\d{1,3}(?:,\d{3})*)/i,
-    /(\d{1,3}(?:,\d{3})*)\s*km\b/i,
-  ];
-  for (const p of mileagePatterns) {
-    const m = text.match(p);
-    if (m) {
-      const num = parseInt(m[1].replace(/,/g, ""));
-      if (num > 0 && num < 10_000_000) {
-        // Keep the unit the page stated (km pattern, or the word right after the number); mileage is miles.
-        const after = text.slice((m.index ?? 0) + m[0].length, (m.index ?? 0) + m[0].length + 16);
-        odometer = { value: num, unit: unitFromText(m[0]) ?? unitFromText(after.match(/^\s*\S+/)?.[0]) };
-        mileage = toMiles(odometer);
-        break;
-      }
-    }
+  // Mileage: only accept a number that sits in odometer context (odometer/mileage/indicated/showing/
+  // covered/from new...). Bare "N miles" / "N km" matched top speeds (km/h), fuel economy (mpg,
+  // "miles per gallon") and distances ("90 miles in an hour") and was stored as mileage.
+  const od = extractOdometerFromText(text);
+  if (od) {
+    odometer = od;
+    mileage = toMiles(od);
   }
 
   // Engine from description (first line often has "XXXci OHV V8" or "X.XL Turbo")
