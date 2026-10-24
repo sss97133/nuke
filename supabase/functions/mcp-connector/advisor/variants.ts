@@ -145,7 +145,9 @@ export function cleanListingUrl(url: string | null | undefined): string | null {
   const raw = String(url).trim();
   if (!raw) return null;
   const httpIdx = raw.search(/https?:\/\//i);
-  const cleaned = (httpIdx >= 0 ? raw.slice(httpIdx) : raw).replace(/["']+$/, "").trim();
+  // Non-http references (e.g. conceptcarz://event/...) are not clickable sources.
+  if (httpIdx < 0) return null;
+  const cleaned = raw.slice(httpIdx).replace(/["']+$/, "").trim();
   return cleaned || null;
 }
 
