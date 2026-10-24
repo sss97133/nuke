@@ -57,6 +57,74 @@ export function isVariantMismatch(subject: VariantKey, candidate: VariantKey): b
   return true;
 }
 
+/**
+ * Porsche 911 generation (930 / 964 / 993 / 996 / 997 / 991 / 992) from explicit text first, then
+ * model year. A 993 Turbo and a 964 Turbo 3.6 are both "turbo" but are different cars at very
+ * different prices, so comps must match generation too. Returns null when not a 911 or the year
+ * straddles a changeover without a text cue (unknown never excludes).
+ */
+export type Porsche911Generation = "901" | "930" | "964" | "993" | "996" | "997" | "991" | "992";
+
+export function detectGeneration(input: {
+  make?: string | null;
+  model?: string | null;
+  year?: number | null;
+  text?: string | null;
+}): Porsche911Generation | null {
+  const blob = `${input.make || ""} ${input.model || ""} ${input.text || ""}`.toLowerCase();
+  const isPorsche = /porsche/.test(blob);
+  const is911 = /\b911\b|\b9(?:30|64|93|96|97|91|92)\b|carrera|\bturbo\b|\bgt[\s-]?[23]\b|targa|speedster/.test(blob);
+  const otherModel = /\b(?:356|912|914|924|928|944|968|959|918)\b|boxster|cayman|cayenne|macan|panamera|taycan|carrera\s*gt\b/.test(blob) &&
+    !/\b911\b/.test(blob);
+  if (!isPorsche || !is911 || otherModel) return null;
+  // Explicit generation codes win (e.g. "964 Turbo 3.6", "993 Carrera 4S"). Skip "911" itself.
+  const code = blob.match(/(?:^|[^0-9.])(930|964|993|996|997|991|992)(?![0-9])(?!\s*(?:k\b|mi\b|miles|km))/);
+  if (code) return code[1] as Porsche911Generation;
+  const y = input.year ?? null;
+  if (y == null || !Number.isFinite(y)) return null;
+  const turbo = /\bturbo\b/.test(blob);
+  if (turbo) {
+    // 930 Turbo ran 1975-1989; 964 Turbo 1991-1994; 993 Turbo 1995-1998 (1996+ US).
+    if (y >= 1975 && y <= 1989) return "930";
+    if (y >= 1990 && y <= 1994) return "964";
+    if (y >= 1995 && y <= 1998) return "993";
+  }
+  if (y >= 1964 && y <= 1988) return "901";
+  if (y === 1989) return null; // 3.2 Carrera and 964 C4 overlap
+  if (y >= 1990 && y <= 1994) return "964";
+  if (y >= 1995 && y <= 1998) return "993";
+  if (y >= 1999 && y <= 2004) return "996";
+  if (y === 2005) return null; // 996 and 997 overlap
+  if (y >= 2006 && y <= 2011) return "997";
+  if (y === 2012) return null; // 997 and 991 overlap
+  if (y >= 2013 && y <= 2018) return "991";
+  if (y === 2019) return null; // 991 and 992 overlap
+  if (y >= 2020) return "992";
+  return null;
+}
+
+/** 964 Turbo came as 3.3 (1991-92) and 3.6 (1993-94); explicit displacement only, never guessed. */
+export function detectTurboDisplacement(text: string | null | undefined): "3.3" | "3.6" | null {
+  const t = (text || "").toLowerCase();
+  if (!/\bturbo\b/.test(t)) return null;
+  if (/\b3[.,]6\b/.test(t)) return "3.6";
+  if (/\b3[.,]3\b/.test(t)) return "3.3";
+  return null;
+}
+
+/** True when subject and candidate are different 911 generations (or 3.3 vs 3.6 Turbo). Unknown keeps. */
+export function isGenerationMismatch(
+  subject: { make?: string | null; model?: string | null; year?: number | null; text?: string | null },
+  candidate: { make?: string | null; model?: string | null; year?: number | null; text?: string | null },
+): boolean {
+  const sg = detectGeneration(subject);
+  const cg = detectGeneration({ ...candidate, make: candidate.make || subject.make });
+  if (sg && cg && sg !== cg) return true;
+  const sd = detectTurboDisplacement(`${subject.model || ""} ${subject.text || ""}`);
+  const cd = detectTurboDisplacement(`${candidate.model || ""} ${candidate.text || ""}`);
+  return !!(sd && cd && sd !== cd);
+}
+
 /** Normalize listing URLs for dedupe (trailing slash, quotes, marketplace- prefix). */
 export function canonicalListingUrl(url: string | null | undefined): string {
   if (!url) return "";

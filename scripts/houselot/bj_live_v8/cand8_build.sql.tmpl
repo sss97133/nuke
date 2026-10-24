@@ -1,0 +1,30 @@
+begin; set local statement_timeout='50s'; set local lock_timeout='5s';
+-- run agg_houselot_v8_20261024 inputs: flagged conceptcarz events with no B-J match in the 2026-10-24 snapshot, rematched against LIVE B-J
+-- sold events in the same sale window. Slug tokens = barrett-jackson URL /vehicle/<slug>. 8a: slug year = title year, slug make = cc make
+-- word, cc first model word in slug. 8b: 8a + every cc title word (2+ chars) in slug. n_cand counts distinct house vehicles.
+create table if not exists public.agg_houselot_v1_20261024_cand8 (event_id uuid primary key, from_vehicle_id uuid, title text, title_year int,
+  win_lo date, win_hi date, n8a int, n8b int, cited_event_id uuid, to_vehicle_id uuid, computed_at timestamptz default now());
+alter table public.agg_houselot_v1_20261024_cand8 enable row level security;
+with f as (
+  select c.event_id, c.from_vehicle_id, c.title, c.title_year, c.win_lo, c.win_hi,
+    regexp_split_to_array(btrim(lower(regexp_replace(regexp_replace(regexp_replace(c.title,'(?i)(convertible|coupe|hardtop|roadster|sedan|wagon|pickup)ch[a-z]*$','\1'),'^\d{4}\s*',''),'[^A-Za-z0-9]+',' ','g'))),' ') tw
+  from public.agg_houselot_v1_20261024_cand3 c join public.vehicle_events e on e.id=c.event_id and e.vehicle_id=c.from_vehicle_id
+  where c.house='bj' and c.n_cand=0 and c.win_lo is not null and 'vehicle_id'=any(coalesce(e.source_suspect,'{}')) and left(c.event_id::text,1)=':B'
+), h as (
+  select f.event_id, he.hid, he.hvid, he.slug
+  from f join public.agg_houselot_v1_20261024_bjlive he on he.sold_at >= f.win_lo and he.sold_at < f.win_hi + 1
+), p as (
+  select f.*, h.hid, h.hvid, h.slug from f join h using(event_id)
+  where h.slug like ' '||f.title_year||' '||f.tw[1]||' %' and array_length(f.tw,1)>=2 and position(' '||f.tw[2]||' ' in h.slug)>0
+), q as (
+  select p.*, not exists (select 1 from unnest(p.tw) w where length(w)>=2 and position(' '||w||' ' in p.slug)=0) allw from p
+), agg as (
+  select event_id, count(distinct hvid) n8a, count(distinct hvid) filter (where allw) n8b,
+    (array_agg(hid order by hid) filter (where allw))[1] hid_b
+  from q group by 1
+)
+insert into public.agg_houselot_v1_20261024_cand8 (event_id, from_vehicle_id, title, title_year, win_lo, win_hi, n8a, n8b, cited_event_id, to_vehicle_id)
+select f.event_id, f.from_vehicle_id, f.title, f.title_year, f.win_lo, f.win_hi, coalesce(a.n8a,0), coalesce(a.n8b,0),
+  case when a.n8b=1 then a.hid_b end, case when a.n8b=1 then (select vehicle_id from public.vehicle_events where id=a.hid_b) end
+from f left join agg a using(event_id) on conflict (event_id) do nothing;
+select ':B' b, count(*) n, count(*) filter (where n8a=1 and n8b=1) uniq from public.agg_houselot_v1_20261024_cand8 where left(event_id::text,1)=':B';

@@ -1,4 +1,10 @@
 #!/bin/bash
+# RETIRED 2026-10-24: this script copied vehicles.sale_date into sale_result observations as if it were a
+# source date ('sale_date', observed_at = v.sale_date). vehicles.sale_date held stale stamps (2026-01-12,
+# 2026-02-17..27), which then dated ~26k BaT lots wrongly. Sale dates must come from a cited source
+# (archived receipt event_day -> auction_event_end_date_provenance). Do not re-enable.
+echo "backfill-sale-results is retired: it writes vehicles.sale_date as a source date (see header)." >&2
+exit 1
 # Backfill sale_result observations from vehicles with sale_price and sale_date
 # Usage: ./scripts/backfill-sale-results.sh <vehicle.source> <obs_source.slug> [batch_size]
 

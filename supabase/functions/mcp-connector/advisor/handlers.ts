@@ -20,6 +20,7 @@ import {
   cleanListingUrl,
   detectVariant,
   isLikelyPartsSale,
+  isGenerationMismatch,
   isVariantMismatch,
   recentSaleSanityGuard,
   scoreSimilarity,
@@ -238,7 +239,8 @@ export function createAdvisorHandlers(deps: AdvisorDeps): Record<
     get_asset: (args) => handleGetAsset(deps, args),
     get_comps: (args) => handleGetComps(deps, args),
     value_asset: (args) => handleValueAsset(deps, args),
-    evaluate_listing: (args) => handleEvaluateListing(deps, args),
+    evaluate_listing: (args) =>
+      handleEvaluateListing({ ...deps, valueAsset: (id) => handleValueAsset(deps, { asset_id: id }) }, args),
     budget_options: (args) => handleBudgetOptions(deps, args),
   };
 }
@@ -552,6 +554,7 @@ async function resolveSoldComps(
     no_amount: 0,
     hd_diesel_mismatch: 0,
     variant_mismatch: 0,
+    generation_mismatch: 0,
     duplicate: 0,
     parts: 0,
   };
@@ -648,6 +651,21 @@ async function resolveSoldComps(
     const candVariant = detectVariant(candBlob);
     if (isVariantMismatch(subjectVariant, candVariant)) {
       excluded.variant_mismatch++;
+      continue;
+    }
+    // Same variant, different generation (e.g. 964 Turbo 3.6 comps for a 993 Turbo).
+    if (
+      isGenerationMismatch(
+        {
+          make,
+          model: String(subject?.model || model || ""),
+          year,
+          text: `${subject?.trim || ""} ${subject?.listing_title || ""} ${subject?.listing_url || ""} ${subject?.bat_auction_url || ""}`,
+        },
+        { make: (c.make as string) || make, model: String(c.model || ""), year: c.year != null ? Number(c.year) : null, text: candBlob },
+      )
+    ) {
+      excluded.generation_mismatch++;
       continue;
     }
 

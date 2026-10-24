@@ -18,6 +18,7 @@ import {
   detectVariant,
   identityFromListingUrl,
   isLikelyPartsSale,
+  isGenerationMismatch,
   isVariantMismatch,
   recentSaleSanityGuard,
 } from "./variants.ts";
@@ -32,6 +33,11 @@ export interface EvaluateDeps {
     method?: "GET" | "POST",
     body?: Record<string, unknown>,
   ) => Promise<unknown>;
+  /**
+   * value_asset for a matched Nuke asset. Injected by handlers.ts (no circular import) so
+   * evaluate_listing and value_asset return one valuation and one comp set for the same car.
+   */
+  valueAsset?: (assetId: string) => Promise<{ structuredContent: AdvisorEnvelope; isError?: boolean }>;
 }
 
 export interface AdvisorToolResult {
@@ -536,6 +542,7 @@ async function loadCompsForListing(
     duplicate: 0,
     no_price: 0,
     variant: 0,
+    generation: 0,
     parts: 0,
   };
   const seenUrl = new Set<string>();
@@ -558,6 +565,16 @@ async function loadCompsForListing(
     if (isVariantMismatch(subjectVariant, candVariant)) {
       if (candVariant === "turbo" || candVariant === "turbo_s") excluded.turbo++;
       else excluded.variant++;
+      continue;
+    }
+    // Same variant, different generation (e.g. 964 Turbo 3.6 comps for a 993 Turbo).
+    if (
+      isGenerationMismatch(
+        { make: listing.make, model: listing.model, year: listing.year, text: subjectBlob(listing) },
+        { make: (v?.make as string) ?? (r.mk as string) ?? null, model, year: (v?.year as number) ?? (r.yr as number) ?? null, text: candBlob },
+      )
+    ) {
+      excluded.generation++;
       continue;
     }
     const canon = canonicalListingUrl(rawUrl);
@@ -790,7 +807,20 @@ function buildVerdict(input: {
       }`,
     );
   }
-  if (listing.asking_price != null && fairHigh != null) {
+  if (listing.listing_kind === "auction_live") {
+    // A live bid is not an ask: never say "ask below fair band" days before the close.
+    const ends = listing.auction_end_at ? `, ends ${listing.auction_end_at.slice(0, 10)}` : "";
+    if (listing.current_bid != null) {
+      const rel = listing.current_bid < fairLow
+        ? "below fair band so far"
+        : listing.current_bid > fairHigh
+        ? "above fair band"
+        : "inside fair band";
+      parts.push(`auction live, current bid ${money(listing.current_bid)} vs fair band (${rel}${ends})`);
+    } else {
+      parts.push(`auction live${ends}`);
+    }
+  } else if (listing.asking_price != null && fairHigh != null) {
     if (listing.asking_price > fairHigh * 1.15) parts.push("ask above fair band");
     else if (listing.asking_price < fairLow * 0.9) parts.push("ask below fair band");
     else parts.push("ask inside fair band");
@@ -821,7 +851,13 @@ function buildMarkdown(input: {
   lines.push("");
   lines.push(`**${listing.title || "Untitled"}**`);
   lines.push(`- URL: ${listing.url}`);
-  if (listing.asking_price != null) {
+  if (listing.listing_kind === "auction_live") {
+    lines.push(
+      `- Auction live · current bid ${money(listing.current_bid ?? null)}${
+        listing.auction_end_at ? ` · ends ${listing.auction_end_at}` : ""
+      } (a bid, not an asking price)`,
+    );
+  } else if (listing.asking_price != null) {
     lines.push(`- Ask: ${money(listing.asking_price)}${listing.location ? ` · ${listing.location}` : ""}`);
   }
   const ident = [listing.year, listing.make, listing.model].filter(Boolean).join(" ");
@@ -924,6 +960,18 @@ export async function handleEvaluateListing(
       note: "Seller ask from listing page (not a sale)",
     }),
   );
+  if (listing.listing_kind === "auction_live") {
+    claimsOut.push(
+      recordedClaim("current_bid", listing.current_bid ?? null, {
+        confidence: listing.current_bid != null ? 0.9 : null,
+        confidence_basis: "source_trust",
+        citations: [listingCit],
+        note: `Live auction high bid${
+          listing.auction_end_at ? ` (ends ${listing.auction_end_at})` : ""
+        } — not an asking price or a sale`,
+      }),
+    );
+  }
   claimsOut.push(
     recordedClaim("year", listing.year, {
       confidence: 0.8,
@@ -1033,7 +1081,8 @@ export async function handleEvaluateListing(
     }
     listing.mileage = listing.mileage ?? (matchedRow.mileage as number | null);
     listing.transmission = listing.transmission ?? (matchedRow.transmission as string | null);
-    if (matchedRow.sale_price != null) {
+    // A live auction's stored price is the running bid, not a sale: never anchor on it.
+    if (matchedRow.sale_price != null && listing.listing_kind !== "auction_live") {
       const amount = Number(matchedRow.sale_price);
       matchedSale = {
         amount,
@@ -1133,6 +1182,9 @@ export async function handleEvaluateListing(
           url: listing.url,
           title: listing.title,
           ask: listing.asking_price,
+          listing_kind: listing.listing_kind ?? null,
+          current_bid: listing.current_bid ?? null,
+          auction_end_at: listing.auction_end_at ?? null,
           year: listing.year,
           make: listing.make,
           model: listing.model,
@@ -1236,6 +1288,57 @@ export async function handleEvaluateListing(
     basis = guard.message || basis;
   }
 
+  // Matched asset: value_asset is the single valuation path. Use its band and comp set so the two
+  // tools never disagree about the same car (public test: Miata 0 vs 15 comps, 993 Turbo $376k-$831k
+  // vs $210k-$332k).
+  let sharedComps: CompRow[] | null = null;
+  let sharedExcluded: Record<string, number> | null = null;
+  if (matchedId && deps.valueAsset) {
+    try {
+      const va = await deps.valueAsset(matchedId);
+      const sc = va.isError ? null : (va.structuredContent as unknown as Record<string, unknown>);
+      if (sc && !sc.error) {
+        const vLow = typeof sc.value_low === "number" ? sc.value_low : null;
+        const vHigh = typeof sc.value_high === "number" ? sc.value_high : null;
+        const used = Array.isArray(sc.comps_used) ? sc.comps_used as Record<string, unknown>[] : [];
+        const summary = (sc.comps_summary || {}) as Record<string, unknown>;
+        fair_low = vLow;
+        fair_high = vHigh;
+        n = typeof summary.count === "number" ? summary.count : used.length;
+        confidence = typeof sc.confidence === "number" ? sc.confidence : confidence;
+        basis = `value_asset (${String(sc.estimate_source || "unknown")}) for matched asset ${matchedId}`;
+        flags.push("shared_value_asset_valuation");
+        if (Array.isArray(sc.flags)) {
+          for (const f of sc.flags as string[]) if (!flags.includes(f)) flags.push(f);
+        }
+        sharedExcluded = (summary.excluded || null) as Record<string, number> | null;
+        sharedComps = used.map((c) => ({
+          asset_id: c.asset_id != null ? String(c.asset_id) : null,
+          year: (c.year as number) ?? null,
+          make: (c.make as string) ?? null,
+          model: (c.model as string) ?? null,
+          body: null,
+          transmission: null,
+          mileage: null,
+          sale_price: typeof c.sale_price === "number" ? c.sale_price : null,
+          sold_date: (c.sold_date as string) ?? null,
+          listing_url: (c.listing_url as string) ?? null,
+          platform: (c.platform as string) ?? null,
+          result_type: "sold" as const,
+          tier: "original" as const,
+          citation: emptyCitation({
+            source_name: (c.platform as string) || "comp",
+            source_url: (c.listing_url as string) ?? null,
+            observation_id: null,
+            event_time: (c.sold_date as string) ?? null,
+            ingested_at: null,
+            is_superseded: false,
+          }),
+        }));
+      }
+    } catch (_e) { /* fall back to the listing-only comp path below */ }
+  }
+
   const offer_low = fair_low != null ? Math.round(fair_low * 0.8) : null;
   const offer_high = fair_high != null ? Math.round(fair_high * 0.85) : null;
   const predicted_sale = fair_low != null && fair_high != null
@@ -1249,7 +1352,7 @@ export async function handleEvaluateListing(
     : 35;
 
   // Cap confidence until published BaT/C&B backtest justifies more.
-  confidence = Math.min(confidence, CONFIDENCE_CAP);
+  if (!sharedComps) confidence = Math.min(confidence, CONFIDENCE_CAP);
 
   const redFlags: string[] = [];
   for (const f of flags) {
@@ -1303,7 +1406,8 @@ export async function handleEvaluateListing(
     }
   }
 
-  const topComps = [...buckets.original_sold, ...buckets.conversion_sold]
+  const usedComps = sharedComps ?? [...buckets.original_sold, ...buckets.conversion_sold];
+  const topComps = usedComps
     .filter((c) => c.sale_price != null)
     .slice(0, 10)
     .map((c) => ({
@@ -1385,7 +1489,7 @@ export async function handleEvaluateListing(
     photos,
     claims: textClaims,
     missing,
-    comps: [...buckets.original_sold, ...buckets.conversion_sold].slice(0, 10),
+    comps: usedComps.slice(0, 10),
     priorSales,
     redFlags,
     value: {
@@ -1406,11 +1510,14 @@ export async function handleEvaluateListing(
     comps: topComps,
     red_flags: redFlags,
     matched_asset_id: matchedId,
-    excluded_comps: excluded,
+    excluded_comps: sharedExcluded ?? excluded,
     listing: {
       url: listing.url,
       title: listing.title,
       ask: listing.asking_price,
+      listing_kind: listing.listing_kind ?? null,
+      current_bid: listing.current_bid ?? null,
+      auction_end_at: listing.auction_end_at ?? null,
       year: listing.year,
       make: listing.make,
       model: listing.model,
