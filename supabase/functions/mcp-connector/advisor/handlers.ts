@@ -1,4 +1,5 @@
 // Read-only handlers for the Nuke Asset Advisor surface.
+import { rankFindResults } from "./find_rank.ts";
 import { adjustedEstimate, type AdjResult, type IndexSeries } from "./adjust.ts";
 import {
   AGENT_CITATION_RULES,
@@ -863,7 +864,8 @@ async function handleFindAsset(
     const yearMatch = queryStr.match(/\b(19|20)\d{2}\b/);
     const year = yearMatch ? Number(yearMatch[0]) : null;
     const rest = queryStr.replace(/\b(19|20)\d{2}\b/g, " ").trim();
-    let query = sb.from("vehicles").select(selectCols).limit(limit);
+    // Over-fetch, then rank in JS (exact year/make/model first, parts last).
+    let query = sb.from("vehicles").select(selectCols).limit(Math.min(limit * 4, 100));
     if (year) query = query.eq("year", year);
     if (rest) {
       const parts = rest.split(/\s+/).filter(Boolean);
@@ -873,7 +875,7 @@ async function handleFindAsset(
       }
     }
     const res = await query;
-    data = res.data;
+    data = res.data ? rankFindResults(res.data as Record<string, unknown>[], rest.split(/\s+/).filter(Boolean), year).slice(0, limit) : res.data;
     error = res.error;
   }
 
