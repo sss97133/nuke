@@ -28,6 +28,7 @@ import { normalizeListingUrlKey } from "../_shared/listingUrl.ts";
 import { resolveExistingVehicleId, discoveryUrlIlikePattern } from "../_shared/resolveVehicleForListing.ts";
 import { writeObservation } from "../_shared/observationWriter.ts";
 import { writeVehicleEventByKey } from "../_shared/vehicleEventWrite.ts";
+import { chassisFromLotUrl, pickChassis } from "./lotPage.ts";
 import { fillOnlyIdentity, identityConflict } from "../_shared/identityMatch.ts";
 import { recordRevision } from "../_shared/revision.ts";
 import { mustWrite, softWrite } from "../_shared/writeResult.ts";
@@ -43,6 +44,8 @@ import { extractGeneralBodyStyle, extractVehicleFacets } from "../_shared/vehicl
 import { normalizeVehicleFields } from "../_shared/normalizeVehicle.ts";
 import { landIdentifierClaims } from "../_shared/landIdentifierClaims.ts";
 import { type Odometer, odometerColumns, toMiles, unitFromText } from "../_shared/odometer.ts";
+import { extractOdometerFromText } from "../_shared/odometerText.ts";
+export { extractOdometerFromText };
 
 const EXTRACTOR_VERSION = "bonhams-v3";
 
@@ -70,10 +73,14 @@ const KNOWN_MAKES = [
 
 const VIN_REGEX = /\b([A-HJ-NPR-Z0-9]{17})\b/g;
 
+// The capture must start with a letter or digit: in page text that still holds the lot URL, "chassis-no-wp0zzz..."
+// used to match with the separator, giving "-NO-WP0ZZZ93ZDS00084" (cut at 20 chars) as the chassis.
 const CHASSIS_PATTERNS = [
-  /(?:chassis|frame)\s*(?:number|no\.?|#)?\s*:?\s*([A-Z0-9\-\/]{5,20})/i,
-  /(?:chassis|frame)\s+([A-Z0-9\-\/]{5,20})/i,
+  /\b(?:chassis|frame)\s*(?:number|no\.?|#)?\s*:?\s+([A-Z0-9][A-Z0-9\-\/]{4,24})\b/i,
+  /\b(?:chassis|frame)\s+([A-Z0-9][A-Z0-9\-\/]{4,24})\b/i,
 ];
+
+
 
 // ─── JSON-LD Parsing ────────────────────────────────────────────────────────
 
@@ -271,25 +278,13 @@ export function extractSpecsFromContent(text: string): {
   let interior_color: string | null = null;
   let body_style: string | null = null;
 
-  // Mileage
-  const mileagePatterns = [
-    /(\d{1,3}(?:,\d{3})*)\s*(?:miles|mi)\b/i,
-    /mileage[^:]*:?\s*(\d{1,3}(?:,\d{3})*)/i,
-    /odometer[^:]*:?\s*(\d{1,3}(?:,\d{3})*)/i,
-    /(\d{1,3}(?:,\d{3})*)\s*km\b/i,
-  ];
-  for (const p of mileagePatterns) {
-    const m = text.match(p);
-    if (m) {
-      const num = parseInt(m[1].replace(/,/g, ""));
-      if (num > 0 && num < 10_000_000) {
-        // Keep the unit the page stated (km pattern, or the word right after the number); mileage is miles.
-        const after = text.slice((m.index ?? 0) + m[0].length, (m.index ?? 0) + m[0].length + 16);
-        odometer = { value: num, unit: unitFromText(m[0]) ?? unitFromText(after.match(/^\s*\S+/)?.[0]) };
-        mileage = toMiles(odometer);
-        break;
-      }
-    }
+  // Mileage: only accept a number that sits in odometer context (odometer/mileage/indicated/showing/
+  // covered/from new...). Bare "N miles" / "N km" matched top speeds (km/h), fuel economy (mpg,
+  // "miles per gallon") and distances ("90 miles in an hour") and was stored as mileage.
+  const od = extractOdometerFromText(text);
+  if (od) {
+    odometer = od;
+    mileage = toMiles(od);
   }
 
   // Engine from description (first line often has "XXXci OHV V8" or "X.XL Turbo")
@@ -825,7 +820,7 @@ async function extractBonhamsLot(url: string): Promise<ExtractionResult> {
   const textVin = extractVinFromText(markdown || stripHtmlTags(html.slice(0, 50000)));
   const pageChassis = lotPage?.chassis ?? null;
   const vin = titleData.vin || (pageChassis && /^[A-HJ-NPR-Z0-9]{17}$/.test(pageChassis) ? pageChassis : null) || textVin.vin;
-  const chassis = titleData.chassis || pageChassis || textVin.chassis;
+  const chassis = pickChassis(titleData.chassis || pageChassis || textVin.chassis, chassisFromLotUrl(url));
 
   // 6. Auction metadata
   const auctionMeta = extractAuctionMeta(html, markdown, url, jsonLd);
@@ -1379,6 +1374,9 @@ async function saveVehicle(
   if (targetId) {
     const g0 = await guardTarget(targetId);
     if (g0.refused) return await refuse(targetId, g0.refused);
+    // A no-sale lot (upcoming, bought in, withdrawn) never writes the sale fields of an existing vehicle: its null price and
+    // auction date would replace a sale another lot recorded. The vehicles_guard_sale_fields trigger enforces the same.
+    if (extracted.auction_status !== "sold") { delete g0.update.sale_price; delete g0.update.sale_date; delete g0.update.sale_status; }
     let { error } = await supabase.from("vehicles").update(g0.update).eq("id", targetId);
     const other = error ? vinClash(error.message) : null;
     if (error && other) {

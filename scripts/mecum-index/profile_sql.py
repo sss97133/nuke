@@ -30,7 +30,8 @@ for hit in batch["lots"]:
         continue
     url = "https://www.mecum.com" + hit["permalink"]
     sold = hit.get("sold") == 1
-    price = hit.get("highest_bid_or_price") or None
+    # Older lots carry the hammer only in hammer_price_meta (same fallback as extract-mecum/indexLot.ts).
+    price = hit.get("highest_bid_or_price") or hit.get("hammer_price_meta") or None
     run = first(t, "run_date")
     vehicles.append({"year": int(year), "make": make, "model": first(t, "model"), "discovery_url": url,
                      "sale_price": price if sold else None, "sale_status": "sold" if sold else None,

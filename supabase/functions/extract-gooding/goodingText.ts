@@ -2,6 +2,7 @@
 // (childMarkdownRemark.html); provenance, exhibition and race history and documentation are separate fields. The extractor
 // used to read only item.note and the highlight bullets, so the narrative reached the database on 2 of 12 lots sampled on
 // 2026-10-15 while every retained capture held it. Pure functions, tested in goodingText.test.ts.
+import { odometerMilesFromText } from "../_shared/odometerText.ts";
 
 /** Lots not yet written up carry this stock line in item.description; it is not a description. */
 const PLACEHOLDER = /will be available closer to the auction/i;
@@ -72,4 +73,14 @@ export function buildFullDescription(prose: LotProse, note: string | null, highl
   const bullets = highlights.map((h) => htmlToText(h)).filter((h) => h.length > 5);
   if (bullets.length > 0) parts.push(bullets.join('\n'));
   return parts.length ? parts.join('\n\n').slice(0, DESCRIPTION_LIMIT) : null;
+}
+
+/**
+ * Odometer mileage from highlight/note prose, in miles, or null. Odometer context is required
+ * (shared _shared/odometerText.ts): "Showing Less than 19,300 Miles" -> 19300, but
+ * "220 Miles per Hour" and "60 Miles Per Gallon" are not mileage. km readings are converted.
+ */
+export function parseMileageFromText(text: string): number | null {
+  const miles = odometerMilesFromText(text);
+  return miles && miles < 5_000_000 ? miles : null;
 }

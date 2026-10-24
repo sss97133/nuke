@@ -12,6 +12,10 @@ import "./advisor/budget_test.ts";
 // Live-auction bid handling rides along so CI runs it.
 import "./advisor/listing_fetch_test.ts";
 import "./advisor/live_auction_verdict_test.ts";
+// evaluate_listing/value_asset agreement rides along so CI runs it.
+import "./advisor/shared_valuation_test.ts";
+// Variant and 911 generation matching (variants_test) also rides along so CI runs it.
+import "./advisor/variants_test.ts";
 import { assertEnvelopeShape } from "./advisor/evidence.ts";
 
 function assert(condition: boolean, message: string): asserts condition {
