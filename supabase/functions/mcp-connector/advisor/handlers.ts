@@ -238,7 +238,8 @@ export function createAdvisorHandlers(deps: AdvisorDeps): Record<
     get_asset: (args) => handleGetAsset(deps, args),
     get_comps: (args) => handleGetComps(deps, args),
     value_asset: (args) => handleValueAsset(deps, args),
-    evaluate_listing: (args) => handleEvaluateListing(deps, args),
+    evaluate_listing: (args) =>
+      handleEvaluateListing({ ...deps, valueAsset: (id) => handleValueAsset(deps, { asset_id: id }) }, args),
     budget_options: (args) => handleBudgetOptions(deps, args),
   };
 }
