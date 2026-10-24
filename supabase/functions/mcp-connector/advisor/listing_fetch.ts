@@ -23,6 +23,37 @@ export interface FetchedListing {
   photo_urls: string[];
   raw_attrs: Record<string, string>;
   source: string;
+  /** Set when the fetch landed on a login / checkpoint wall instead of the listing. */
+  blocked_reason?: string | null;
+}
+
+/**
+ * A login, checkpoint, or consent wall instead of the listing (e.g. facebook.com/login after a
+ * redirect). Never cite such a page as the listing source. Exported for tests.
+ */
+export function detectLoginWall(requestedUrl: string, finalUrl: string, html: string): string | null {
+  let path = "";
+  let host = "";
+  try {
+    const u = new URL(finalUrl || requestedUrl);
+    path = u.pathname.toLowerCase();
+    host = u.hostname.toLowerCase();
+  } catch {
+    return null;
+  }
+  const loginPath = /^\/(?:login|log-in|signin|sign-in|sign_in|checkpoint|auth|account\/login|accounts\/login|users\/sign_in|uas\/login)(?:[\/.?#]|$)/
+    .test(path) || /^accounts\.google\./.test(host) || /^login\./.test(host);
+  if (loginPath) return `redirected to a login page (${host}${path})`;
+  const t = html.slice(0, 200_000);
+  const title = (t.match(/<title[^>]*>([^<]*)/i)?.[1] || "").trim().toLowerCase();
+  if (
+    /^(?:log in|log into|sign in|login)\b/.test(title) ||
+    /facebook\.com/.test(host) && (/id="login_form"/i.test(t) || /you must log in to continue/i.test(t)) ||
+    /^(?:facebook|instagram)$/.test(title) && /id="login_form"|name="login"/i.test(t)
+  ) {
+    return `page is a login wall (${host})`;
+  }
+  return null;
 }
 
 function absUrl(href: string, base: string): string {
@@ -303,6 +334,12 @@ export async function fetchListingPage(url: string): Promise<FetchedListing> {
       redirect: "follow",
     });
     const html = await res.text();
+    const wall = detectLoginWall(url, res.url || url, html);
+    if (wall) {
+      // Keep the requested URL as the listing URL; never cite the wall page.
+      const blank = parseListingHtml(url, "", res.status);
+      return { ...blank, title: null, year: null, make: null, model: null, blocked_reason: wall };
+    }
     return parseListingHtml(res.url || url, html, res.status);
   } finally {
     clearTimeout(t);
