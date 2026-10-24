@@ -28,3 +28,11 @@ Steps (each file runs in a rolled-back transaction first; statement_timeout 50s)
    `revert_bj_lot_fill_v1_20261024.sql`.
 5. `agg_held_yearflag_v1_20261024.sql`: held VIN-match events where the vehicle's year is the wrong one get
    `vehicles.data_quality_flags.year_suspect` (flag only, no move).
+
+## Alias run (agg_houselot_v4_20261024)
+- `model_alias_v1.sql` creates `agg_houselot_model_alias_v1`: cited model-word aliases (make, cc word, house word, years, citation URL + quote).
+- `cand4.sql` (psql var `b` = first hex digit) builds `cand4a` (first word equal or cited alias) and `cand4b` (plus every title word
+  present as itself, joined to a neighbour such as `srt 10`/`srt10`, or via a cited alias) for events with no cand3 match.
+- `apply_agg_houselot_alias.sql` is the normal matcher on cand4a/cand4b: both must be unique and agree, one cc event per house event,
+  price-conflict hold unchanged. `python3 batches.py apply_agg_houselot_alias.sql agg_houselot_v4_20261024 OUT`.
+- Revert: `revert_agg_houselot_v4_20261024.sql`.
