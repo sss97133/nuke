@@ -4,7 +4,7 @@
 --    vehicle's sale_date is newer than the event's.
 --  * correct_vehicle_sale_provenance_batch: rows cited as verified_vehicle_event are skipped (returned as 'superseded')
 --    when the cited event is undated, older than the vehicle's sale_date, or a newer verified sold event exists.
--- Rollback: supabase/rollbacks/20261026050000_sale_price_latest_verified_by_date_down.sql
+-- Rollback: supabase/rollbacks/20261026052000_sale_price_latest_verified_by_date_down.sql
 
 CREATE OR REPLACE FUNCTION public.correct_vehicle_sale_provenance_batch(p_rows jsonb, p_asserted_by text DEFAULT 'agent'::text, p_reason text DEFAULT NULL::text)
  RETURNS jsonb
