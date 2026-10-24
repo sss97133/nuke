@@ -42,6 +42,7 @@ import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { extractGeneralBodyStyle, extractVehicleFacets } from "../_shared/vehicleFacets.ts";
 import { normalizeVehicleFields } from "../_shared/normalizeVehicle.ts";
 import { landIdentifierClaims } from "../_shared/landIdentifierClaims.ts";
+import { type Odometer, odometerColumns, toMiles, unitFromText } from "../_shared/odometer.ts";
 
 const EXTRACTOR_VERSION = "bonhams-v3";
 
@@ -255,6 +256,7 @@ function extractCurrency(raw: string | null): string | null {
 
 export function extractSpecsFromContent(text: string): {
   mileage: number | null;
+  odometer: Odometer | null;
   engine: string | null;
   transmission: string | null;
   exterior_color: string | null;
@@ -262,6 +264,7 @@ export function extractSpecsFromContent(text: string): {
   body_style: string | null;
 } {
   let mileage: number | null = null;
+  let odometer: Odometer | null = null;
   let engine: string | null = null;
   let transmission: string | null = null;
   let exterior_color: string | null = null;
@@ -279,7 +282,13 @@ export function extractSpecsFromContent(text: string): {
     const m = text.match(p);
     if (m) {
       const num = parseInt(m[1].replace(/,/g, ""));
-      if (num > 0 && num < 10_000_000) { mileage = num; break; }
+      if (num > 0 && num < 10_000_000) {
+        // Keep the unit the page stated (km pattern, or the word right after the number); mileage is miles.
+        const after = text.slice((m.index ?? 0) + m[0].length, (m.index ?? 0) + m[0].length + 16);
+        odometer = { value: num, unit: unitFromText(m[0]) ?? unitFromText(after.match(/^\s*\S+/)?.[0]) };
+        mileage = toMiles(odometer);
+        break;
+      }
     }
   }
 
@@ -349,7 +358,7 @@ export function extractSpecsFromContent(text: string): {
   // (checks "Drophead Coupé" / "Shooting Brake" / "Fixed-Head Coupé" before generic "Coupe")
   body_style = extractGeneralBodyStyle(text);
 
-  return { mileage, engine, transmission, exterior_color, interior_color, body_style };
+  return { mileage, odometer, engine, transmission, exterior_color, interior_color, body_style };
 }
 
 // ─── Image Extraction ───────────────────────────────────────────────────────
@@ -559,6 +568,7 @@ export interface ExtractionResult {
   vin: string | null;
   chassis_number: string | null;
   mileage: number | null;
+  odometer?: Odometer | null;
   engine: string | null;
   transmission: string | null;
   exterior_color: string | null;
@@ -840,6 +850,7 @@ async function extractBonhamsLot(url: string): Promise<ExtractionResult> {
     vin,
     chassis_number: chassis,
     mileage: specs.mileage,
+    odometer: specs.odometer,
     engine: specs.engine,
     transmission: specs.transmission,
     exterior_color: specs.exterior_color,
@@ -936,6 +947,7 @@ export function buildVehicleRecord(extracted: ExtractionResult): Record<string, 
       ? extracted.vin.toUpperCase()
       : (extracted.chassis_number ? extracted.chassis_number.toUpperCase() : null),
     mileage: extracted.mileage,
+    ...(extracted.odometer ? odometerColumns(extracted.odometer, "extract-bonhams", extracted.url) : {}),
     color: extracted.exterior_color,
     interior_color: extracted.interior_color,
     transmission: extracted.transmission,
