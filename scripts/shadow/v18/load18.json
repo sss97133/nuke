@@ -1,0 +1,31 @@
+{
+ "dup_by_platform": {
+  "bat/ae": 3201,
+  "mecum/ae": 1605,
+  "barrett-jackson/ae": 1259,
+  "pcarmarket/ae": 1293,
+  "cars_and_bids/ae": 13,
+  "bonhams/ae": 8,
+  "mecum/ve": 4329
+ },
+ "stats": {
+  "no_year_or_date": 12385,
+  "untrusted_vehicle": 432,
+  "wrong_vehicle_flag": 43,
+  "untrusted_vehicle_mecum": 190,
+  "mecum_no_year": 1,
+  "duplicate": 11708
+ },
+ "kept": 381137,
+ "by_platform": {
+  "mecum": 117022,
+  "barrett-jackson": 42801,
+  "bat": 181569,
+  "bonhams": 963,
+  "pcarmarket": 5348,
+  "cars_and_bids": 33078,
+  "collecting-cars": 356
+ },
+ "mecum_ve": 85073,
+ "with_mileage": 239843
+}
