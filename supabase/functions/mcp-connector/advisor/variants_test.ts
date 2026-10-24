@@ -2,8 +2,11 @@
 import {
   canonicalListingUrl,
   cleanListingUrl,
+  detectGeneration,
+  detectTurboDisplacement,
   detectVariant,
   identityFromListingUrl,
+  isGenerationMismatch,
   isLikelyPartsSale,
   isVariantMismatch,
   recentSaleSanityGuard,
@@ -76,4 +79,38 @@ Deno.test("3x recent-sale sanity guard", () => {
   });
   assert(g.triggered, "should trigger");
   assert(g.message != null && /3×/.test(g.message), g.message || "");
+});
+
+Deno.test("911 generation: 993 Turbo subject drops 964 Turbo 3.6 comps", () => {
+  const subject = { make: "Porsche", model: "911 Turbo", year: 1995, text: "https://carsandbids.com/auctions/KD60OD28/1995-porsche-911-turbo-coupe" };
+  assert(detectGeneration(subject) === "993", "1995 turbo is 993");
+  const c964 = { make: "Porsche", model: "911 Turbo 3.6", year: 1994, text: "1994 Porsche 964 Turbo 3.6" };
+  assert(detectGeneration(c964) === "964", "964 turbo 3.6");
+  assert(isGenerationMismatch(subject, c964), "993 vs 964 mismatch");
+  const c993 = { make: "Porsche", model: "911 Turbo", year: 1997, text: "https://bringatrailer.com/listing/1997-porsche-911-turbo-12/" };
+  assert(!isGenerationMismatch(subject, c993), "993 vs 993 keep");
+  // Explicit code beats year: a 1995 listing text that says 964 is a 964.
+  assert(detectGeneration({ make: "Porsche", model: "911", year: 1995, text: "964 Carrera RS" }) === "964", "text code wins");
+});
+
+Deno.test("911 generation: 930 vs 964 Turbo, 3.3 vs 3.6 Turbo, and overlap years", () => {
+  assert(detectGeneration({ make: "Porsche", model: "911 Turbo", year: 1987 }) === "930", "930");
+  assert(detectGeneration({ make: "Porsche", model: "911 Turbo", year: 1991 }) === "964", "964 turbo 3.3 era");
+  assert(isGenerationMismatch({ make: "Porsche", model: "911 Turbo", year: 1987 }, { make: "Porsche", model: "911 Turbo", year: 1992 }), "930 vs 964");
+  assert(detectTurboDisplacement("1994 Porsche 911 Turbo 3.6") === "3.6", "3.6");
+  assert(isGenerationMismatch(
+    { make: "Porsche", model: "911 Turbo 3.3", year: 1992 },
+    { make: "Porsche", model: "911 Turbo 3.6", year: 1994 },
+  ), "3.3 vs 3.6 mismatch");
+  // Changeover years without a code are unknown and never exclude.
+  assert(detectGeneration({ make: "Porsche", model: "911 Carrera", year: 2005 }) === null, "2005 overlap");
+  assert(!isGenerationMismatch({ make: "Porsche", model: "911 Carrera", year: 2005 }, { make: "Porsche", model: "911 Carrera", year: 2007 }), "unknown keeps");
+  // Mileage numbers are not generation codes.
+  assert(detectGeneration({ make: "Porsche", model: "911 Turbo", year: 1996, text: "964 miles" }) === "993", "964 miles ignored");
+});
+
+Deno.test("generation check only applies to Porsche 911s", () => {
+  assert(detectGeneration({ make: "Mazda", model: "MX-5 Miata", year: 1994 }) === null, "miata");
+  assert(detectGeneration({ make: "Porsche", model: "944 Turbo", year: 1987 }) === null, "944 turbo is not a 911");
+  assert(!isGenerationMismatch({ make: "BMW", model: "M3", year: 1995 }, { make: "BMW", model: "M3", year: 1990 }), "bmw untouched");
 });

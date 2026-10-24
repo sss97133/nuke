@@ -16,11 +16,13 @@ import {
   type Citation,
 } from "./evidence.ts";
 import { handleEvaluateListing } from "./evaluate_listing.ts";
+import { classifyVinQuery } from "./vin.ts";
 import {
   canonicalListingUrl,
   cleanListingUrl,
   detectVariant,
   isLikelyPartsSale,
+  isGenerationMismatch,
   isVariantMismatch,
   recentSaleSanityGuard,
   scoreSimilarity,
@@ -261,7 +263,8 @@ export function createAdvisorHandlers(deps: AdvisorDeps): Record<
     get_asset: (args) => handleGetAsset(deps, args),
     get_comps: (args) => handleGetComps(deps, args),
     value_asset: (args) => handleValueAsset(deps, args),
-    evaluate_listing: (args) => handleEvaluateListing(deps, args),
+    evaluate_listing: (args) =>
+      handleEvaluateListing({ ...deps, valueAsset: (id) => handleValueAsset(deps, { asset_id: id }) }, args),
     budget_options: (args) => handleBudgetOptions(deps, args),
   };
 }
@@ -575,6 +578,7 @@ async function resolveSoldComps(
     no_amount: 0,
     hd_diesel_mismatch: 0,
     variant_mismatch: 0,
+    generation_mismatch: 0,
     duplicate: 0,
     parts: 0,
   };
@@ -671,6 +675,21 @@ async function resolveSoldComps(
     const candVariant = detectVariant(candBlob);
     if (isVariantMismatch(subjectVariant, candVariant)) {
       excluded.variant_mismatch++;
+      continue;
+    }
+    // Same variant, different generation (e.g. 964 Turbo 3.6 comps for a 993 Turbo).
+    if (
+      isGenerationMismatch(
+        {
+          make,
+          model: String(subject?.model || model || ""),
+          year,
+          text: `${subject?.trim || ""} ${subject?.listing_title || ""} ${subject?.listing_url || ""} ${subject?.bat_auction_url || ""}`,
+        },
+        { make: (c.make as string) || make, model: String(c.model || ""), year: c.year != null ? Number(c.year) : null, text: candBlob },
+      )
+    ) {
+      excluded.generation_mismatch++;
       continue;
     }
 
@@ -819,8 +838,9 @@ async function handleFindAsset(
 
   // Prefer indexed equality paths. Full-text on VIN/URL tokens times out on the live fleet.
   const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  // Pre-1981 chassis numbers are often 8–11 chars (e.g. VW 1442612348); modern VINs are 17.
-  const vinRe = /^[A-HJ-NPR-Z0-9]{8,17}$/i;
+  // VIN only for a 17-char VIN or a pre-1981 chassis-number pattern with no spaces; free text such as
+  // "1972 Chevy C10" goes to text search (it used to decode to a 2012 KROSS KOUNTRY).
+  const vinQuery = classifyVinQuery(queryStr);
   const looksUrl = /^https?:\/\//i.test(queryStr) || /bringatrailer\.com|carsandbids\.com|ebay\.com/i.test(queryStr);
 
   let data: Record<string, unknown>[] | null = null;
@@ -830,8 +850,8 @@ async function handleFindAsset(
     const res = await sb.from("vehicles").select(selectCols).eq("id", queryStr).limit(1);
     data = res.data;
     error = res.error;
-  } else if (vinRe.test(queryStr.replace(/\s+/g, ""))) {
-    const vin = queryStr.replace(/\s+/g, "").toUpperCase();
+  } else if (vinQuery.kind !== "text") {
+    const vin = vinQuery.vin;
     const res = await sb.from("vehicles").select(selectCols).eq("vin", vin).limit(limit);
     data = res.data;
     error = res.error;
@@ -890,7 +910,9 @@ async function handleFindAsset(
     let query = sb.from("vehicles").select(selectCols).limit(limit);
     if (year) query = query.eq("year", year);
     if (rest) {
-      const parts = rest.split(/\s+/).filter(Boolean);
+      // Common make nicknames, so "1972 Chevy C10" finds Chevrolet rows.
+      const MAKE_ALIASES: Record<string, string> = { chevy: "chevrolet", vw: "volkswagen", merc: "mercedes", benz: "mercedes" };
+      const parts = rest.split(/\s+/).filter(Boolean).map((p) => MAKE_ALIASES[p.toLowerCase()] ?? p);
       // Every token must match make OR model (AND across tokens).
       for (const p of parts) {
         query = query.or(`make.ilike.%${p}%,model.ilike.%${p}%`);
@@ -923,9 +945,10 @@ async function handleFindAsset(
   });
 
   // VIN decode fallback when Nuke has no row for this VIN.
-  const vinCandidate = queryStr.replace(/\s+/g, "").toUpperCase();
   let vin_decode: Record<string, unknown> | null = null;
-  if (!results.length && vinRe.test(vinCandidate)) {
+  // NHTSA decodes 17-char VINs only; a short chassis number would decode to an unrelated vehicle.
+  if (!results.length && vinQuery.kind === "vin17") {
+    const vinCandidate = vinQuery.vin;
     const decoded = await decodeVinNhtsa(vinCandidate);
     if (decoded) {
       vin_decode = {
@@ -936,6 +959,10 @@ async function handleFindAsset(
         trim: decoded.Trim || null,
         body_class: decoded.BodyClass || null,
         source: "nhtsa_vpic",
+        check_digit_valid: vinQuery.check_digit_valid,
+        ...(vinQuery.check_digit_valid ? {} : {
+          note: "Check digit (position 9) does not validate. Normal for many non-North-American VINs; otherwise likely a typo.",
+        }),
       };
       const cit = emptyCitation({
         source_name: "NHTSA VPIC",
@@ -965,6 +992,7 @@ async function handleFindAsset(
 
   return ok(makeEnvelope("find_asset", "vehicle", null, [], {
     query: queryStr,
+    query_kind: vinQuery.kind === "text" ? (looksUrl ? "url" : uuidRe.test(queryStr) ? "asset_id" : "text") : vinQuery.kind,
     count: results.length,
     results,
     vin_decode,
