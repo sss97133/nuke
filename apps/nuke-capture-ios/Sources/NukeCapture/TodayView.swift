@@ -126,9 +126,9 @@ struct CaptureSections: View {
                 LiveT0Strip(atoms: engine.liveT0Atoms)
                     .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
             } header: {
-                Label("Just read · on-device", systemImage: "wand.and.stars")
+                Label("Just spotted", systemImage: "wand.and.stars")
             } footer: {
-                Text("Read on this phone in milliseconds — a detection, not confirmed work.")
+                Text("Spotted on this phone. A guess until you confirm it.")
                     .font(.caption2).foregroundStyle(.secondary)
             }
         }
@@ -294,20 +294,20 @@ private struct UnderstandingPanel: View {
                 } else {
                     HStack(spacing: 8) {
                         ProgressView().scaleEffect(0.7)
-                        Text("Reading the record…")
+                        Text("Sorting your photos…")
                             .font(.caption2).foregroundStyle(.secondary)
                     }
                     .listRowBackground(Color.clear)
                 }
             } header: {
-                Text("Understanding")
+                Text("What we found")
             } footer: {
-                Text("Your record assembling itself — frames becoming understood.")
+                Text("Your photos are being sorted into vehicles and jobs.")
                     .font(.caption2).foregroundStyle(.secondary)
             }
 
             if let u, !u.latest.isEmpty {
-                Section("Latest understood") {
+                Section("Recently sorted") {
                     ForEach(u.latest) { day in
                         NavigationLink {
                             DayReceiptView(userId: userId, date: day.date)
@@ -464,7 +464,7 @@ private struct LiveMetricsStrip: View {
             } else {
                 Button { showDays = true } label: { metricsFunnel }
                     .buttonStyle(.plain)
-                Text("Your record · tap for the day-by-day")
+                Text("Your work history · tap to see each day")
                     .font(.caption2).foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
