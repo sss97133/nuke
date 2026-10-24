@@ -1,0 +1,4 @@
+-- Soft revert (preferred, keeps history): revoke a run.
+--   UPDATE public.vehicle_listing_documents SET revoked_at = now(), revoked_reason = 'revert' WHERE run_id = '<run>' AND revoked_at IS NULL;
+-- Schema revert (only if the table holds no rows anyone needs; the table is new in this migration):
+--   DROP TABLE IF EXISTS public.vehicle_listing_documents;
