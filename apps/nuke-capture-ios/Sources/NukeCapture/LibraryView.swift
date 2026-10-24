@@ -215,7 +215,7 @@ struct LibraryAlbumsView: View {
                                 } label: {
                                     VStack(alignment: .leading, spacing: 3) {
                                         Text(vehicle.title)
-                                        Text("\(evidence.photos.filter { $0.candidateVehicleIds == [vehicle.id] }.count) exact serial reads · \(vehicle.relationshipLabel)")
+                                        Text("\(evidence.photos.filter { $0.candidateVehicleIds == [vehicle.id] }.count) photos matched by serial number · \(vehicle.relationshipLabel)")
                                             .font(.caption).foregroundStyle(.secondary)
                                     }
                                 }
@@ -224,7 +224,7 @@ struct LibraryAlbumsView: View {
                                 NavigationLink {
                                     LibraryAlbumPhotosView(userId: userId, needsIdentity: true)
                                 } label: {
-                                    LabeledContent("Unresolved vehicle frames", value: evidence.unresolved.formatted())
+                                    LabeledContent("Photos still to match", value: evidence.unresolved.formatted())
                                 }
                             }
                             if evidence.conflicted > 0 {
@@ -299,9 +299,9 @@ private struct LibraryAlbumPhotosView: View {
 
     private var scopeTitle: String {
         if let album { return album.name ?? "Album" }
-        if let id = candidateVehicleId { return evidence?.vehicles.first { $0.id == id }?.title ?? "Serial matches" }
+        if let id = candidateVehicleId { return evidence?.vehicles.first { $0.id == id }?.title ?? "Matched photos" }
         if albumId != nil { return "Album unavailable" }
-        return needsIdentity ? "Unresolved identity" : (conflictingIdentity ? "Conflicting identity" : (unreadOnly ? "Unread photos" : "Source photos"))
+        return needsIdentity ? "Photos still to match" : (conflictingIdentity ? "Photos that may show more than one vehicle" : (unreadOnly ? "Unread photos" : "Source photos"))
     }
 
     var body: some View {
