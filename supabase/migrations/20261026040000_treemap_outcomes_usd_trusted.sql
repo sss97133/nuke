@@ -3,11 +3,11 @@
 -- USER-FACING (market map). Approved by Skylar 2026-10-24.
 --
 -- As applied to live (the full build exceeds the SQL API's 2-minute limit, so no DROP/CREATE in place):
---   Part 1 ran as one-off pg_cron job 674 (SET LOCAL statement_timeout raises the postgres role's 10s default):
+--   Part 1 ran as one-off pg_cron job 674, 2026-10-24 01:37-02:5x PDT (SET LOCAL statement_timeout raises the postgres role's 10s default):
 --     builds every object under a <name>_new name, indexes as <index>_tmp. Live objects were untouched while it ran.
---   Part 2 ran as one short transaction (lock_timeout 5s): renames live objects to <name>_bak / <index>_bak, then
+--   Part 2 ran 2026-10-24 ~03:05 PDT as one short transaction (lock_timeout 5s): renames live objects to <name>_bak / <index>_bak, then
 --     <name>_new -> <name> and <index>_tmp -> <index>. Dependents follow their parents by OID, so the _bak set stays a
---     consistent copy of the previous state. Rollback: supabase/rollbacks/20261026030000_treemap_outcomes_usd_trusted_down.sql
+--     consistent copy of the previous state. Rollback: supabase/rollbacks/20261026040000_treemap_outcomes_usd_trusted_down.sql
 --     (rename swap back while the _bak set exists) or ..._down_rebuild.sql (full rebuild of the old definitions).
 
 -- Part 1: build

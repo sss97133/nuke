@@ -1,5 +1,5 @@
--- Fast revert of 20261026030000 while the *_bak objects exist: swap names back (new set becomes *_new).
--- If the _bak set was dropped, use 20261026030000_treemap_outcomes_usd_trusted_down_rebuild.sql instead.
+-- Fast revert of 20261026040000 while the *_bak objects exist: swap names back (new set becomes *_new).
+-- If the _bak set was dropped, use 20261026040000_treemap_outcomes_usd_trusted_down_rebuild.sql instead.
 SET LOCAL lock_timeout = '5s';
 ALTER MATERIALIZED VIEW public.mv_treemap_outcomes RENAME TO mv_treemap_outcomes_new;
 ALTER MATERIALIZED VIEW public.mv_brand_market RENAME TO mv_brand_market_new;
