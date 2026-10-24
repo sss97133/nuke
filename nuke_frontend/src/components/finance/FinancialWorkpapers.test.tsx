@@ -83,7 +83,7 @@ it('reads records from the server view for the book and year, pages by 25 and op
   const open = vi.fn();
   const control = { record_kind: 'retained_ledger_decision', year: '2024', account: 'Account', section: 'Expense', currency: 'USD', retained_amount: '12.50', rows: 1 };
   fixture.invoke.mockResolvedValue(response({ ...empty(), total_rows: 51, controls: [control] }));
-  fixture.from.mockImplementationOnce(() => table({ data: Array.from({ length: 26 }, (_, i) => record(`row${i + 1}`, `Record ${i + 1}`)) })).mockImplementationOnce(() => table({ data: [record('row2', 'Second page')] }));
+  fixture.from.mockImplementationOnce(() => table({ data: [record('row1'), ...Array.from({ length: 25 }, (_, i) => record(`row${i + 2}`, `Record ${i + 2}`))] })).mockImplementationOnce(() => table({ data: [record('row2', 'Second page')] }));
   await act(async () => root.render(book(<FinancialWorkpapers revision={0} onOpen={open} />)));
   expect(fixture.invoke.mock.calls[0][1].body).toEqual({ mode: 'financial_evidence_v1', action: 'tax_read', limit: 1 });
   expect(fixture.from).not.toHaveBeenCalled();
@@ -139,7 +139,7 @@ it('a failed record read says so and never shows an empty ledger', async () => {
   await act(async () => root.render(book(<FinancialWorkpapers revision={0} onOpen={() => {}} />)));
   await act(async () => Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'Records')!.click());
   expect(container.querySelector('[role="alert"]')?.textContent).toContain('Saved records could not load');
-  expect(container.querySelector('table')).toBeNull(); expect(container.textContent).toContain('Matches unknown');
+  expect(container.querySelector('table')).toBeNull(); expect(container.textContent).toContain('Matches unavailable');
   expect(container.textContent).not.toContain('No saved records match');
 });
 it('account switch synchronously invalidates late prior-account response before effect cleanup', async () => {
@@ -176,7 +176,7 @@ it('year overview uses all server controls, preserves refunds and unknowns, neve
 it('defaults to the latest book year and scopes records and bank attention to the selected year', async () => {
   const control = { record_kind: 'retained_ledger_decision', year: '2024', account: 'Account', section: 'Expense', currency: 'USD', retained_amount: '12.50', rows: 1 };
   fixture.invoke.mockResolvedValue(response({ ...empty(), total_rows: 3, controls: [control, {...control,year:'2025'}, {...control,year:'2026',record_kind:'retained_bank_movement',section:null,rows:530}] }));
-  fixture.from.mockImplementation(() => table({ data: [], count: 0 }));
+  fixture.from.mockImplementation(() => table({ data: [] }));
   await act(async () => root.render(book(<FinancialWorkpapers revision={0} onOpen={() => {}} />)));
   const year = container.querySelector('select')!;
   expect(year.value).toBe('2025');
@@ -189,12 +189,12 @@ it('defaults to the latest book year and scopes records and bank attention to th
 });
 it('shows one server page of 25 and withholds partial account sums', async () => {
   fixture.invoke.mockResolvedValue(response({...empty(),total_rows:7767,controls:[{record_kind:'retained_ledger_decision',year:'2024',account:'Account',section:'Expense',currency:'USD',retained_amount:'98765.43',missing_amounts:1,rows:60}]}));
-  fixture.from.mockImplementation(() => table({ data: Array.from({length:25},(_,i)=>record(`r${i}`,`Record ${i}`)), count: 7767 }));
+  fixture.from.mockImplementation(() => table({ data: Array.from({length:26},(_,i)=>record(`r${i}`,`Record ${i}`)) }));
   await act(async () => root.render(book(<FinancialWorkpapers revision={0} onOpen={()=>{}}/>)));
   expect(container.querySelector('table')).toBeNull();
   await act(async () => Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'Records')!.click());
   expect(container.querySelectorAll('tbody tr')).toHaveLength(25);
-  expect(container.textContent).toContain('1–25 of 7,767 matches');
+  expect(container.textContent).toContain('Showing 1–25 records; more available');
   await act(async () => Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'Accounts')!.click());
   expect(container.querySelector('tbody')?.textContent).toContain('Unknown');
   expect(container.textContent).not.toContain('98,765.43');
