@@ -15,7 +15,7 @@ Not a conflict when (a) the cited house lot page states the same engine, or (b) 
 Uncited → hold. Re-check of the 4 v7 attaches (all kept):
 | event | cc words | evidence |
 |---|---|---|
-| 02438677 2011 Infiniti G37 conv. | 3.7L | only engine (VQ37VHR) https://en.wikipedia.org/wiki/Infiniti_G#Fourth_generation_(2007%E2%80%932015); lot page engine "3.7L" https://www.mecum.com/lots/180679/2011-infiniti-g37-convertible/ |
-| 86f1ad49 2002 Jaguar Vanden Plas | 4.0L | only displacement (AJ-V8 4.0) https://en.wikipedia.org/wiki/Jaguar_XJ_(X308); lot page "4.0L" https://www.mecum.com/lots/124878/2002-jaguar-vanden-plas/ |
+| 02438677 2011 Infiniti G37 conv. | 3.7L | only engine for G37/370GT, all VQ37VHR 3.7L https://en.wikipedia.org/wiki/Nissan_Skyline_(V36); lot page engine "3.7L" https://www.mecum.com/lots/180679/2011-infiniti-g37-convertible/ |
+| 86f1ad49 2002 Jaguar Vanden Plas | 4.0L | US cars were 4.0L only (3.2L elsewhere) https://en.wikipedia.org/wiki/Jaguar_XJ_(X308); lot page "4.0L" https://www.mecum.com/lots/124878/2002-jaguar-vanden-plas/ |
 | 1ecf95fd 1981 Pontiac Trans Am | 301 CI | options 301/301T/305 → would conflict, but lot page engine "301 CI" https://www.mecum.com/lots/152901/1981-pontiac-trans-am/ |
 | f8f587d4 1964 Chrysler Newport | 361 CI | options 361/383 → would conflict, but lot page engine "361 CI" https://www.mecum.com/lots/152589/1964-chrysler-newport/ |
