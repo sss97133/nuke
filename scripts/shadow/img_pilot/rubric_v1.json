@@ -1,0 +1,10 @@
+{"version":"img-cond-rubric-v1","model":"open_clip ViT-B-32 laion2b_s34b_b79k, zero-shot, CPU",
+ "sources":["Hagerty Valuation Tools, 'About our conditions' (#1 Concours .. #4 Fair): https://www.hagerty.com/valuation-tools/about-our-conditions",
+            "Hagerty Media, 'What does a car's condition really look like?': https://www.hagerty.com/media/market-trends/hagerty-insider/what-does-a-cars-condition-really-look-like/"],
+ "condition":{"1":"a photo of a flawless concours-quality classic car with mirror-like paint and chrome, perfectly clean and correct",
+              "2":"a photo of an excellent like-new restored classic car with very good paint, chrome and interior, show quality",
+              "3":"a photo of a good classic car that looks nice from a distance but shows minor wear, small chips and aged finishes up close",
+              "4":"a photo of a fair worn classic car with visible flaws: faded or imperfect paint, dents, rust, pitted chrome, torn seats or cracked dash"},
+ "originality":{"original":"a photo of an unmodified factory-original classic car with stock wheels, trim and interior",
+                "modified":"a photo of a modified custom classic car with aftermarket wheels, lowered or lifted suspension, custom paint or a restomod interior"},
+ "aggregation":"per image softmax(100*cos) over the class prompts; car score = mean over its up-to-8 listing photos; cond_score = expected rating (1 best .. 4 worst); orig_score = P(original); confidence = (1 - normalized entropy of the mean distribution) * (1 - std of per-image expected rating / 1.5), clipped to [0,1]"}
