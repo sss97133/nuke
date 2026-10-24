@@ -28,6 +28,7 @@ import { normalizeListingUrlKey } from "../_shared/listingUrl.ts";
 import { resolveExistingVehicleId, discoveryUrlIlikePattern } from "../_shared/resolveVehicleForListing.ts";
 import { writeObservation } from "../_shared/observationWriter.ts";
 import { writeVehicleEventByKey } from "../_shared/vehicleEventWrite.ts";
+import { chassisFromLotUrl, pickChassis } from "./lotPage.ts";
 import { fillOnlyIdentity, identityConflict } from "../_shared/identityMatch.ts";
 import { recordRevision } from "../_shared/revision.ts";
 import { mustWrite, softWrite } from "../_shared/writeResult.ts";
@@ -72,10 +73,14 @@ const KNOWN_MAKES = [
 
 const VIN_REGEX = /\b([A-HJ-NPR-Z0-9]{17})\b/g;
 
+// The capture must start with a letter or digit: in page text that still holds the lot URL, "chassis-no-wp0zzz..."
+// used to match with the separator, giving "-NO-WP0ZZZ93ZDS00084" (cut at 20 chars) as the chassis.
 const CHASSIS_PATTERNS = [
-  /(?:chassis|frame)\s*(?:number|no\.?|#)?\s*:?\s*([A-Z0-9\-\/]{5,20})/i,
-  /(?:chassis|frame)\s+([A-Z0-9\-\/]{5,20})/i,
+  /\b(?:chassis|frame)\s*(?:number|no\.?|#)?\s*:?\s+([A-Z0-9][A-Z0-9\-\/]{4,24})\b/i,
+  /\b(?:chassis|frame)\s+([A-Z0-9][A-Z0-9\-\/]{4,24})\b/i,
 ];
+
+
 
 // ─── JSON-LD Parsing ────────────────────────────────────────────────────────
 
@@ -815,7 +820,7 @@ async function extractBonhamsLot(url: string): Promise<ExtractionResult> {
   const textVin = extractVinFromText(markdown || stripHtmlTags(html.slice(0, 50000)));
   const pageChassis = lotPage?.chassis ?? null;
   const vin = titleData.vin || (pageChassis && /^[A-HJ-NPR-Z0-9]{17}$/.test(pageChassis) ? pageChassis : null) || textVin.vin;
-  const chassis = titleData.chassis || pageChassis || textVin.chassis;
+  const chassis = pickChassis(titleData.chassis || pageChassis || textVin.chassis, chassisFromLotUrl(url));
 
   // 6. Auction metadata
   const auctionMeta = extractAuctionMeta(html, markdown, url, jsonLd);

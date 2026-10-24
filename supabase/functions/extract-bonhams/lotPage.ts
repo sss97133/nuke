@@ -765,3 +765,25 @@ export function catalogOfferIsSold(url: string | null | undefined, availability:
   if (isBonhamsPreviewLotUrl(url)) return false;
   return (availability ?? "").includes("OutOfStock");
 }
+
+/** Full chassis/frame number from a Bonhams lot URL slug ("...-chassis-no-wp0zzz93zds000846-engine-no-..."), or null. */
+export function chassisFromLotUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  let path: string;
+  try { path = new URL(url).pathname; } catch { path = url; }
+  const slug = path.replace(/\/+$/, "").split("/").pop() ?? "";
+  const m = slug.match(/(?:^|-)(?:chassis|frame)-no-([a-z0-9][a-z0-9-]*?)(?:-engine-no-.*)?$/i);
+  return m && m[1].replace(/-/g, "").length >= 4 ? m[1].toUpperCase() : null;
+}
+
+const alnum = (s: string) => s.toUpperCase().replace(/[^A-Z0-9]/g, "");
+
+/** Prefer the URL-slug chassis when the parsed one is missing, looks like a slug fragment, or is a cut-short prefix of it. */
+export function pickChassis(parsed: string | null, fromUrl: string | null): string | null {
+  if (!fromUrl) return parsed;
+  if (!parsed) return fromUrl;
+  const p = alnum(parsed.replace(/^-?NO-/i, "")), u = alnum(fromUrl);
+  if (/^-/.test(parsed) || /CHASSIS|ENGINE/i.test(parsed)) return fromUrl;
+  if (p.length < u.length && u.startsWith(p)) return fromUrl;
+  return parsed;
+}
