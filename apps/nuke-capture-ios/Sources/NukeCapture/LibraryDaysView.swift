@@ -273,7 +273,7 @@ private struct DayReceiptCard: View {
                     .font(.caption).foregroundStyle(.secondary).monospacedDigit()
                 if let vehicleLabel {
                     // The agent's read from pixels — presented as such, not as ownership.
-                    Text("\(vehicleLabel) — agent read, \(receipt.agentVehicleFrames) frames")
+                    Text("\(vehicleLabel) — found in \(receipt.agentVehicleFrames) photos")
                         .font(.caption).foregroundStyle(.secondary).monospacedDigit()
                 }
             }
