@@ -11,6 +11,8 @@ import { handleAdvisorJsonRpc, initAdvisorHandlers } from "./advisor/protocol.ts
 import "./advisor/budget_test.ts";
 // evaluate_listing/value_asset agreement rides along so CI runs it.
 import "./advisor/shared_valuation_test.ts";
+// Variant and 911 generation matching (variants_test) also rides along so CI runs it.
+import "./advisor/variants_test.ts";
 import { assertEnvelopeShape } from "./advisor/evidence.ts";
 
 function assert(condition: boolean, message: string): asserts condition {

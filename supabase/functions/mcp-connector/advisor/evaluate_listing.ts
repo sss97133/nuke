@@ -18,6 +18,7 @@ import {
   detectVariant,
   identityFromListingUrl,
   isLikelyPartsSale,
+  isGenerationMismatch,
   isVariantMismatch,
   recentSaleSanityGuard,
 } from "./variants.ts";
@@ -541,6 +542,7 @@ async function loadCompsForListing(
     duplicate: 0,
     no_price: 0,
     variant: 0,
+    generation: 0,
     parts: 0,
   };
   const seenUrl = new Set<string>();
@@ -563,6 +565,16 @@ async function loadCompsForListing(
     if (isVariantMismatch(subjectVariant, candVariant)) {
       if (candVariant === "turbo" || candVariant === "turbo_s") excluded.turbo++;
       else excluded.variant++;
+      continue;
+    }
+    // Same variant, different generation (e.g. 964 Turbo 3.6 comps for a 993 Turbo).
+    if (
+      isGenerationMismatch(
+        { make: listing.make, model: listing.model, year: listing.year, text: subjectBlob(listing) },
+        { make: (v?.make as string) ?? (r.mk as string) ?? null, model, year: (v?.year as number) ?? (r.yr as number) ?? null, text: candBlob },
+      )
+    ) {
+      excluded.generation++;
       continue;
     }
     const canon = canonicalListingUrl(rawUrl);

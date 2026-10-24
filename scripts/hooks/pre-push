@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# Pre-push: fail when a migration version is shared, checking this checkout's files AND origin/main's
+# (two branches that are each fine can still collide once both merge, as #2660/#2661 did on 2026-10-24).
+# Install once per clone (worktrees share it): git config core.hooksPath scripts/hooks
+set -euo pipefail
+root=$(git rev-parse --show-toplevel)
+bash "$root/scripts/ci/migration-versions-unique.sh" "$root/supabase/migrations"
+git fetch -q origin main 2>/dev/null || echo "pre-push: could not fetch origin/main; checked local files only"
+tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
+# files this branch removed or renamed since it forked from origin/main do not count on main's side
+gone=$(git diff --no-renames --name-only --diff-filter=D "$(git merge-base HEAD origin/main)" -- supabase/migrations | xargs -rn1 basename)
+{ ls "$root/supabase/migrations"; git ls-tree --name-only origin/main supabase/migrations/ 2>/dev/null | xargs -rn1 basename \
+    | grep -vxF -f <(printf '%s\n' $gone) || true; } | sort -u | while read -r f; do : > "$tmp/$f"; done
+bash "$root/scripts/ci/migration-versions-unique.sh" "$tmp" || { echo "pre-push: version collides with origin/main; rename yours (and its rollback)"; exit 1; }
