@@ -22,3 +22,19 @@ Run from a copy of `scripts/shadow/v12` + `meta_v11.npz`: `bash run17.sh` (A: un
 Pre-set rule: register only if better than v13b on all four. v17 loses 2025-07-01 -> NOT registered.
 v13b on the cleaned test set (`rescore_clean.py`, drops targets on flagged vehicles: 0 dropped) = its registered
 numbers exactly; the unfiltered rerun (A) reproduces all 16 v13b cells exactly.
+
+## 2026-10-24 correction: stale comp-set cache
+The filtered run B reused run A's `pcache.npz`: `exp_v11.py` loaded the cache whenever it existed, and `mkcache.py`
+re-saved what it had loaded. So the 44-comp wrong-vehicle drop reached `feat_v11.pkl` but never the comp sets, and
+`eval_v17.json` actually scored the unfiltered comp sets. Fix (in `scripts/shadow/v12/exp_v11.py` and `mkcache.py`):
+the cache stores the sha256 of `feat_v11.pkl` + `feat4_v11.pkl`. A cache with a different hash, or no hash, is
+rebuilt; `mkcache.py` always rebuilds. Re-scored with `rerun17.sh` (peak RSS 1.29 GB) → `eval_v17fix.json`:
+
+| split | v17 (fixed) | stale v17 | v13b |
+|---|---|---|---|
+| random | .2591 | .2567 | .2577 |
+| fwd 2024-07 | .2695 | .2677 | .2683 |
+| fwd 2025-01 | .2851 | .2842 | .2865 |
+| fwd 2025-07 | .2434 | .2462 | .2434 |
+
+Corrected v17 beats v13b on 1 of 4 splits (and ties 2025-07), so it is still not registered.
