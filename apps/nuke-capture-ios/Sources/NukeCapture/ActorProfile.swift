@@ -182,7 +182,7 @@ struct ActorProfileView: View {
                 } else if loaded {
                     ContentUnavailableView("Not a public profile",
                                            systemImage: "person.crop.circle.badge.questionmark",
-                                           description: Text("This actor is private, or its kind is not measured yet."))
+                                           description: Text("This profile is private or not available yet."))
                 } else {
                     ProgressView().frame(maxWidth: .infinity).padding(.top, 40)
                 }

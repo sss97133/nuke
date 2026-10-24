@@ -71,7 +71,7 @@ struct ConnectedAccountsView: View {
             } header: {
                 Text("Compute")
             } footer: {
-                Text("Cloud subject analysis uses Nuke's server credential and your prepaid Nuke wallet, funded on the web. It does not need a key of your own.")
+                Text("Cloud photo analysis is paid from your Nuke balance (add funds on the web). You don't need your own key.")
             }
 
             // ── Your own provider keys (optional) ─────────────────────────────
@@ -85,7 +85,7 @@ struct ConnectedAccountsView: View {
                         Button("Retry") { Task { await load() } }.font(.footnote)
                     }
                 } else if providers.isEmpty {
-                    Text("No provider key linked. Cloud subject analysis does not need one.")
+                    Text("No AI key linked. You don't need one for cloud photo analysis.")
                         .font(.footnote).foregroundStyle(.secondary)
                 } else {
                     ForEach(providers) { p in
@@ -107,7 +107,7 @@ struct ConnectedAccountsView: View {
             } header: {
                 Text("AI · your own keys (optional)")
             } footer: {
-                Text("Stored on your account. Cloud subject analysis does not run on these keys.")
+                Text("Saved to your account. Cloud photo analysis doesn't use these keys.")
             }
 
             // ── Accounting ─────────────────────────────────────────────────────
