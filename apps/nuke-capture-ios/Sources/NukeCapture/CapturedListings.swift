@@ -738,6 +738,7 @@ struct CapturedListingsView: View {
                     }
                     Section {
                         ForEach(board.rows) { row in
+                            Group {
                             if let uuid = row.vehicleUUID {
                                 NavigationLink(value: VehicleHeaderRow(id: uuid, year: row.year, make: row.make, model: row.model, trim: nil,
                                                                        primary_image_url: row.image, city: row.location, state: nil)) {
@@ -748,6 +749,9 @@ struct CapturedListingsView: View {
                             } else {
                                 askRowView(row)
                             }
+                            }
+                            .listRowInsets(EdgeInsets())
+                            .listRowSeparator(.hidden)
                         }
                     } header: {
                         Text(askCoverageSentence(board))
@@ -767,6 +771,7 @@ struct CapturedListingsView: View {
                 List {
                     Section {
                         ForEach(rows) { row in
+                            Group {
                             if let v = row.vehicle, let uuid = UUID(uuidString: v.id) {
                                 NavigationLink(value: VehicleHeaderRow(id: uuid, year: v.year, make: v.make, model: v.model, trim: nil,
                                                                        primary_image_url: v.primary_image_url, city: nil, state: nil)) {
@@ -777,6 +782,9 @@ struct CapturedListingsView: View {
                             } else {
                                 line(row)
                             }
+                            }
+                            .listRowInsets(EdgeInsets())
+                            .listRowSeparator(.hidden)
                         }
                     } header: {
                         Text(fallbackCoverageSentence).font(.system(size: 9, design: .monospaced)).textCase(nil)
@@ -904,49 +912,37 @@ struct CapturedListingsView: View {
     @ViewBuilder private func askRowView(_ row: AskRow) -> some View {
         let place = AskPlacement.placement(pos: row.position, ask: row.ask)
         let facts = row.listingFacts
-        HStack(alignment: .top, spacing: 12) {
-            Color(.secondarySystemFill)
-                .frame(width: 64, height: 48)
-                .overlay {
-                    CachedAsyncImage(url: NukeImage.thumb(row.image, width: 200)) { i in
-                        i.resizable().scaledToFill()
-                    } placeholder: { Image(systemName: "car.side").foregroundStyle(.secondary) }
-                }
-                .clipShape(RoundedRectangle(cornerRadius: 6))
+        VStack(alignment: .leading, spacing: 8) {
+            ListingHeroPhoto(raw: row.image, amountLabel: "ASKING",
+                             amount: row.ask > 0 ? AskPlacement.dollars(row.ask) : nil)
             VStack(alignment: .leading, spacing: 4) {
-                HStack(alignment: .firstTextBaseline) {
-                    Text(row.headline)
-                        .font(.subheadline.weight(.semibold))
-                        .lineLimit(2)
-                    Spacer(minLength: 4)
-                    Text(AskPlacement.dollars(row.ask))
-                        .font(.system(.footnote, design: .monospaced).weight(.semibold))
-                        .monospacedDigit()
-                }
+                Text(row.headline)
+                    .font(.headline)
+                    .lineLimit(2)
                 HStack(spacing: 6) {
                     Text(CapturedListings.sourceName(row.source).uppercased())
-                        .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                        .font(.system(size: 10, weight: .semibold, design: .monospaced))
                         .foregroundStyle(.secondary)
                     if let loc = row.location, !loc.isEmpty {
                         Text("· \(loc)")
-                            .font(.caption2)
+                            .font(.caption)
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                     }
                     Spacer(minLength: 0)
                     Text(ProfileClock.day(row.seen_at).map { "seen \($0)" } ?? "clock missing")
-                        .font(.system(size: 9, design: .monospaced))
+                        .font(.system(size: 10, design: .monospaced))
                         .foregroundStyle(.tertiary)
                 }
                 if !facts.isEmpty {
                     Text(facts)
-                        .font(.caption2.monospaced())
+                        .font(.caption.monospaced())
                         .foregroundStyle(.secondary)
                 }
                 if let place {
                     VStack(alignment: .leading, spacing: 3) {
                         Text(place.headline)
-                            .font(.caption2.weight(.semibold))
+                            .font(.caption.weight(.semibold))
                             .foregroundStyle(place.tone == .below ? Color.green : (place.tone == .above ? Color.orange : Color.primary))
                         AskPriceStripView(place: place)
                         Text(place.spreadLine)
@@ -966,8 +962,9 @@ struct CapturedListingsView: View {
                     .padding(.top, 2)
                 }
             }
+            .padding(.horizontal, 14)
         }
-        .padding(.vertical, 4)
+        .padding(.bottom, 14)
     }
 
     private func load() async {
@@ -990,33 +987,58 @@ struct CapturedListingsView: View {
     }
 
     @ViewBuilder private func line(_ row: CapturedListing) -> some View {
-        HStack(alignment: .top, spacing: 12) {
-            Color(.secondarySystemFill)
-                .frame(width: 64, height: 48)
-                .overlay {
-                    CachedAsyncImage(url: NukeImage.thumb(row.vehicle?.primary_image_url, width: 200)) { i in
-                        i.resizable().scaledToFill()
-                    } placeholder: { Image(systemName: "car.side").foregroundStyle(.secondary) }
-                }
-                .clipShape(RoundedRectangle(cornerRadius: 6))
+        VStack(alignment: .leading, spacing: 8) {
+            ListingHeroPhoto(raw: row.vehicle?.primary_image_url, amountLabel: "RECORDED AMOUNT",
+                             amount: row.current_price.flatMap { $0.isFinite ? Int($0.rounded()).formatted() : nil })
             VStack(alignment: .leading, spacing: 3) {
-                Text(row.headline).font(.subheadline.weight(.semibold)).lineLimit(2)
+                Text(row.headline).font(.headline).lineLimit(2)
                 HStack(spacing: 8) {
-                    if let p = row.current_price, p.isFinite {
-                        Text(Int(p.rounded()).formatted())
-                            .font(.system(.footnote, design: .monospaced).weight(.semibold)).monospacedDigit()
-                        Text("recorded amount · currency unrecorded").font(.caption2).foregroundStyle(.secondary)
-                    } else {
-                        Text("amount unrecorded").font(.caption2).foregroundStyle(.secondary)
-                    }
-                    Spacer(minLength: 0)
                     Text(CapturedListings.sourceName(row.source_platform).uppercased())
-                        .font(.system(size: 9, design: .monospaced)).foregroundStyle(.secondary)
+                        .font(.system(size: 10, weight: .semibold, design: .monospaced)).foregroundStyle(.secondary)
+                    Text(row.current_price == nil ? "amount unrecorded" : "currency unrecorded")
+                        .font(.caption).foregroundStyle(.secondary)
+                    Spacer(minLength: 0)
+                    Text(ProfileClock.day(row.clock).map { (row.source_observed_at != nil ? "seen " : "captured ") + $0 } ?? "clock missing")
+                        .font(.system(size: 10, design: .monospaced)).foregroundStyle(.tertiary)
                 }
-                Text(ProfileClock.day(row.clock).map { (row.source_observed_at != nil ? "seen " : "captured ") + $0 } ?? "clock missing")
-                    .font(.system(size: 9, design: .monospaced)).foregroundStyle(.tertiary)
             }
+            .padding(.horizontal, 14)
         }
-        .padding(.vertical, 4)
+        .padding(.bottom, 14)
+    }
+}
+
+/// Edge-to-edge 4:3 listing photo with the recorded amount over a gradient — the
+/// Listings tab's card head, same style as the Live board and the Explore feed.
+struct ListingHeroPhoto: View {
+    let raw: String?
+    let amountLabel: String
+    let amount: String?
+
+    var body: some View {
+        Color(.secondarySystemFill)
+            .aspectRatio(4.0 / 3.0, contentMode: .fit)
+            .overlay {
+                CachedAsyncImage(url: NukeImage.thumb(raw, width: 1080), maxPixel: 1280) { i in
+                    i.resizable().scaledToFill()
+                } placeholder: {
+                    Image(systemName: "car.side").font(.largeTitle).foregroundStyle(.secondary)
+                }
+            }
+            .clipped()
+            .overlay(alignment: .bottomLeading) {
+                if let amount {
+                    ZStack(alignment: .bottomLeading) {
+                        LinearGradient(colors: [.clear, .black.opacity(0.6)], startPoint: .center, endPoint: .bottom)
+                        VStack(alignment: .leading, spacing: 0) {
+                            Text(amountLabel).font(.system(size: 10, weight: .semibold, design: .monospaced))
+                            Text(amount).font(.system(size: 24, weight: .bold, design: .rounded)).monospacedDigit()
+                        }
+                        .foregroundStyle(.white)
+                        .padding(12)
+                    }
+                    .allowsHitTesting(false)
+                }
+            }
     }
 }
