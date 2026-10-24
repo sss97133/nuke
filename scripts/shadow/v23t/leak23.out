@@ -1,0 +1,2 @@
+LEAK TEST PASS {'targets_checked': 150, 'index_values_checked': 256, 'mismatch': 0, 'gate_vs_holdout_rows_identical': 128581}
+GUARD peak_rss_MB=729 exit=0
