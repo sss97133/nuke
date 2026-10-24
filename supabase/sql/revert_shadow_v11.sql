@@ -1,0 +1,10 @@
+-- Revert shadow v11 (additive only). Live estimates (nuke_estimates) were never touched.
+-- 1) retire model (shadow rows run 7e1d0c24-2026-4a10-9e00-0000000a5024 are ignored by model_version; no deletes needed):
+--    update public.shadow_valuation_models set notes = coalesce(notes,'')||' RETIRED' where model_version='shadow-v11-pit-gbm-mimiss';
+-- 2) ignore new odometer evidence in loaders: exclude auction_event_listing_mileage.run_id in
+--    ('7e1d0c24-2026-4a10-9e00-0000000a5022' -- BaT raw listing_details, 11,344 rows
+--    ,'7e1d0c24-2026-4a10-9e00-0000000a5023') -- vehicle text regex, 3,827 numeric + 508 TMU
+-- 3) schema (only after TMU rows are excluded/removed by the owner, since they have null mileage):
+-- alter table public.auction_event_listing_mileage drop constraint if exists auction_event_listing_mileage_value_or_tmu;
+-- alter table public.auction_event_listing_mileage drop column if exists mileage_tmu;
+-- alter table public.auction_event_listing_mileage alter column mileage_at_listing set not null;  -- fails while TMU rows exist
