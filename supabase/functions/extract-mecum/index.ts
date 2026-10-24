@@ -1863,7 +1863,7 @@ Deno.serve(async (req) => {
           const hits: any[] = [];
           for (const day of days.length ? days : [null]) {
             const filters = `taxonomies.auction_tax.name:"${priorValue}"` + (day ? ` AND taxonomies.run_date.name:"${day}"` : "");
-            const r = await algolia(`hitsPerPage=1000&filters=${encodeURIComponent(filters)}&attributesToRetrieve=${encodeURIComponent('["sold","bid_goes_on","highest_bid_or_price","taxonomies.lot_type","taxonomies.auction_tax"]')}&attributesToHighlight=[]&attributesToSnippet=[]`);
+            const r = await algolia(`hitsPerPage=1000&filters=${encodeURIComponent(filters)}&attributesToRetrieve=${encodeURIComponent('["sold","bid_goes_on","highest_bid_or_price","hammer_price_meta","taxonomies.lot_type","taxonomies.auction_tax"]')}&attributesToHighlight=[]&attributesToSnippet=[]`);
             hits.push(...(r.hits ?? []));
           }
           const [, , priorEnd] = priorValue.split("|");
