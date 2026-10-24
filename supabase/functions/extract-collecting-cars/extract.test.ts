@@ -14,7 +14,23 @@ Deno.test("identity, VIN, colours, engine, clocks", () => {
 
 Deno.test("a price in another currency is kept with its currency and is not written as dollars", () => {
   const x = extractFromHtml(html, url);
-  assertEquals([x.price, x.price_amount, x.currency, x.price_kind], [null, 111350, "NZD", "current_bid"]);
+  assertEquals([x.price, x.price_amount, x.currency, x.price_kind], [null, 111350, "NZD", "high_bid"]);
+});
+
+Deno.test("an ended unsold lot is not a sale: outcome unsold, last bid is a high bid, no sold_at", () => {
+  const x = extractFromHtml(html, url);
+  assertEquals([x.sale_outcome, x.sold_at], ["unsold", null]);
+});
+
+const swap = (h: string, from: string, to: string) => { assert(h.includes(from), from); return h.split(from).join(to); };
+
+Deno.test("a sold lot reads priceSold and dtSoldUTC; a USD sale is the price", () => {
+  let h = swap(html, '\\"stage\\":\\"unsold\\"', '\\"stage\\":\\"sold\\"');
+  h = swap(h, '\\"currencyCode\\":\\"nzd\\"', '\\"currencyCode\\":\\"usd\\"');
+  h = swap(h, '\\"priceSold\\":null', '\\"priceSold\\":120000');
+  h = swap(h, '\\"dtSoldUTC\\":null', '\\"dtSoldUTC\\":\\"2026-10-20 09:30:00\\"');
+  const x = extractFromHtml(h, url);
+  assertEquals([x.sale_outcome, x.price_kind, x.price, x.price_amount, x.currency, x.sold_at], ["sold", "sold", 120000, 120000, "USD", "2026-10-20T09:30:00.000Z"]);
 });
 
 Deno.test("odometer in km is converted to miles and the raw text is kept", () => {

@@ -155,7 +155,10 @@ async function queueNewListings(
         listing_year: year ? parseInt(year, 10) : null,
         listing_make: listing.productMake ?? listing.makeName,
         listing_model: listing.modelName,
-        listing_price: listing.currentBid,
+        // Not the current bid: it is a mid-auction number in the lot's own currency, and the queue column has no currency, so
+        // it was later read as a dollar sale price (Collecting Cars backfill audit 2026-10-23: 0 of 25 sampled correct). The
+        // bid, its currency and the stage stay in raw_data; the price comes from the lot page (extract-collecting-cars).
+        listing_price: null,
         thumbnail_url: listing.mainImageUrl,
         priority: listing.listingStage === "live" ? 70 : 50,
         raw_data: {
@@ -164,6 +167,8 @@ async function queueNewListings(
           bid_count: listing.noBids,
           auction_end_date: listing.dtStageEndsUTC,
           stage: listing.listingStage,
+          current_bid_native: listing.currentBid ?? null,
+          current_bid_kind: listing.listingStage === "live" ? "current_bid" : "last_bid_not_sale_price",
           location: listing.location,
           country: listing.countryCode,
           region: listing.regionCode,
