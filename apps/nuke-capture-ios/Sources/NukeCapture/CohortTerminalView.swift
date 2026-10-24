@@ -187,7 +187,7 @@ struct CohortTerminalView: View {
                 resolvedBody(t)
             } else if loadError {
                 ContentUnavailableView {
-                    Label("Couldn't load the cohort", systemImage: "exclamationmark.triangle")
+                    Label("Couldn't load similar cars", systemImage: "exclamationmark.triangle")
                 } description: {
                     Text(failureText ?? "The read failed.")
                 } actions: {
@@ -200,12 +200,12 @@ struct CohortTerminalView: View {
                 ContentUnavailableView {
                     Label("\(titleString) isn't tracked yet", systemImage: "binoculars")
                 } description: {
-                    Text("No sales, production, or cohort data for this year-make-model has reached the substrate yet.")
+                    Text("We don't have sales or production data for this year, make and model yet.")
                 }
             } else {
                 VStack(spacing: 10) {
                     ProgressView()
-                    Text("Assembling the cohort…")
+                    Text("Finding similar cars…")
                         .font(.system(.footnote, design: .monospaced))
                         .foregroundStyle(.secondary)
                 }
