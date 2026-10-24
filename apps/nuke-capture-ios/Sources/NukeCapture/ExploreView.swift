@@ -91,15 +91,18 @@ struct ExploreView: View {
         // (matches the NUKE_DEBUG_* deep-link pattern; DEBUG only, never ships).
         if ProcessInfo.processInfo.environment["NUKE_DEBUG_EXPLORE_MODE"] == "pulse" { return .treemap }
         if ProcessInfo.processInfo.environment["NUKE_DEBUG_EXPLORE_MODE"] == "live" { return .live }
+        if ProcessInfo.processInfo.environment["NUKE_DEBUG_EXPLORE_MODE"] == "feed" { return .feed }
         if ProcessInfo.processInfo.environment["NUKE_DEBUG_EXPLORE_MODE"] == "listings" { return .listings }
         if ProcessInfo.processInfo.environment["NUKE_DEBUG_EXPLORE_MODE"] == "map" { return .map }
         if ProcessInfo.processInfo.environment["NUKE_DEBUG_EXPLORE_MODE"] == "map" { return .map }
         #endif
         // Land where the web Market tab lands: the open board, the one population with a
         // recorded clock (market_pulse_live). Map, Pulse and Listings stay one tap away.
-        return .live
+        // Land on the passive picture feed (live lots + new classifieds); the lenses
+        // stay one tap away in the toggle.
+        return .feed
     }()
-    enum LandingMode: Hashable { case metros, treemap, map, live, listings }
+    enum LandingMode: Hashable { case metros, treemap, map, live, listings, feed }
 
     // 3-column square grid, 2pt gutters — the SEARCH-results photo grid.
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 2), count: 3)
@@ -190,10 +193,8 @@ struct ExploreView: View {
             }
             .navigationTitle("Explore")
             .navigationBarTitleDisplayMode(.inline)
-            // Reclaim the title bar on the landing — the tab already says "Explore",
-            // and the Map/Pulse toggle is the real header. (Restored while searching so
-            // the search field keeps its chrome.)
-            .toolbar(isSearching ? .visible : .hidden, for: .navigationBar)
+            // The search field lives in the navigation bar, so the bar stays visible:
+            // hiding it on the landing hid search entirely.
             .searchable(text: $query, prompt: landingMode == .map ? "ZIP, or vehicle" : "Year, make, or model")
             .navigationDestination(for: VehicleHeaderRow.self) { v in
                 // PUSH (back chevron) — kills the Done-only dead-end.
@@ -247,6 +248,7 @@ struct ExploreView: View {
                 case .map:     MarketMapView(query: $query)
                 case .treemap: MarketTreemapView()
                 // The open board from market_pulse_live, the reader the web Market tab stands on.
+                case .feed:    ExploreFeedView().padding(.top, 52)
                 case .live:    LiveBoardView().padding(.top, 52)
                 // Retained classified listings, the web Market tab's captured-listings read (#994).
                 case .listings: CapturedListingsView().padding(.top, 52)
@@ -256,6 +258,7 @@ struct ExploreView: View {
             // pivotable by make/model/year/metro/day). "Metros" retired — it was just
             // one grouping; it now lives inside the Pulse's Metro dimension.
             Picker("View", selection: $landingMode) {
+                Text("Feed").tag(LandingMode.feed)
                 Text("Map").tag(LandingMode.map)
                 Text("Pulse").tag(LandingMode.treemap)
                 Text("Live").tag(LandingMode.live)
