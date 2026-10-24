@@ -21,7 +21,7 @@ CREATE TABLE public.vehicle_events (id uuid PRIMARY KEY DEFAULT gen_random_uuid(
   metadata jsonb DEFAULT '{}', merged_from_vehicle_id uuid, sale_truth_role text, price_verification text,
   price_verification_source text, price_verification_at timestamptz, price_verification_run_id text,
   sold_at timestamptz, ended_at timestamptz, currency_code text, source_suspect text[], source_suspect_reason text,
-  source_suspect_run_id text, source_suspect_at timestamptz);
+  source_suspect_run_id text, source_suspect_at timestamptz, identity_check text);
 CREATE TABLE public.fx_rates (base_currency text, quote_currency text, rate_date date);
 CREATE TABLE public.sync_calls (rows jsonb);
 CREATE FUNCTION public.correct_vehicle_sale_provenance_batch(p_rows jsonb, p_asserted_by text, p_reason text)

@@ -179,8 +179,10 @@ begin
     and e.event_status = 'sold'
     and e.final_price > 0
     and coalesce(e.sale_truth_role, '') <> 'duplicate'
-    and not ('vehicle_id' = any(coalesce(e.source_suspect, '{}')))
     and coalesce(e.sold_at, e.ended_at) is not null
+    -- identity held: an event whose lot is not confirmed as this vehicle never sets its sale (2026-10-24, Maserati d2111229)
+    and coalesce(e.identity_check, '') <> 'mismatch'
+    and not ('vehicle_id' = any (coalesce(e.source_suspect, '{}'::text[])))
   order by coalesce(e.sold_at, e.ended_at) desc, e.price_verification_at desc nulls last
   limit 1;
 

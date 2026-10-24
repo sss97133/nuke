@@ -1,5 +1,5 @@
 -- Rollback of 20261026081000_aggregator_event_attach_guard: drop the guard trigger and its functions, restore the
--- untrusted-price function/view (no source_suspect leg) and the sync trigger body from 20261026052000.
+-- untrusted-price function/view (no source_suspect leg) and the sync trigger body from 20261026080000.
 -- Data flags written by run agg_attach_audit_v1_20261024 are reverted separately: supabase/sql/revert_agg_attach_audit_v1_20261024.sql
 SET lock_timeout = '10s';
 drop trigger if exists trg_guard_aggregator_event_attach on public.vehicle_events;
@@ -64,6 +64,9 @@ begin
     and e.final_price > 0
     and coalesce(e.sale_truth_role, '') <> 'duplicate'
     and coalesce(e.sold_at, e.ended_at) is not null
+    -- identity held: an event whose lot is not confirmed as this vehicle never sets its sale (2026-10-24, Maserati d2111229)
+    and coalesce(e.identity_check, '') <> 'mismatch'
+    and not ('vehicle_id' = any (coalesce(e.source_suspect, '{}'::text[])))
   order by coalesce(e.sold_at, e.ended_at) desc, e.price_verification_at desc nulls last
   limit 1;
 
@@ -111,4 +114,3 @@ begin
   return null;
 end;
 $function$;
-
