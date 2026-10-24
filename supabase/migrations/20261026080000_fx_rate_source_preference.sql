@@ -1,0 +1,502 @@
+-- FX rate provider as a first-class field, with a cited preference per currency.
+-- Before: fx_rates held one rate per currency/date (ECB only, GBP as an ECB EUR cross) and the vehicle row kept the
+-- provider only inside free-text sale_price_fx_source, so a hand-set Bank of England GBP rate was silently replaced by the
+-- ECB cross on the next correction (2026-10-24, d2111229).
+--  * fx_rates.provider (ecb | boe | frb), part of the key: several providers may cite the same day.
+--  * fx_rate_provider_preference(currency, provider, rank, justification, citation_url): the cited choice per currency.
+--      GBP: boe (Bank of England is the issuing central bank; XUDLUSS = its daily USD-per-GBP spot), then ecb cross.
+--      EUR: ecb (issuing central bank; direct USD per EUR reference rate).
+--      NZD: frb (Federal Reserve H.10 publishes USD per NZD directly), then ecb cross.
+--      AUD, CHF, DKK, HKD: ecb cross (the only provider loaded; one consistent published source).
+--    A currency with no row uses ecb, then any provider.
+--  * fx_usd_rate / vehicle_sale_price_fx_usd pick the most-preferred provider with a rate in the 7-day window
+--    (then the latest date of that provider); vehicle_sale_price_fx_usd_preferred also returns the provider.
+--  * vehicles.sale_price_fx_provider is written with the rate by correct_vehicle_sale_provenance_batch.
+--  * sync_vehicle_sale_price_from_verified_event ignores events held on identity (identity_check = 'mismatch' or
+--    source_suspect contains 'vehicle_id'), so a verified price on an unconfirmed lot stays on the event.
+-- BoE XUDLUSS rows are loaded out of band (run fx_boe_xudluss_v1_20261024).
+-- Rollback: supabase/rollbacks/20261026080000_fx_rate_source_preference_down.sql
+
+set lock_timeout = '5s';
+
+alter table public.fx_rates add column if not exists provider text;
+update public.fx_rates set provider = case when method like 'ecb%' then 'ecb' when method like 'frb%' then 'frb'
+                                            when method like 'boe%' then 'boe' else split_part(method, '_', 1) end
+ where provider is null;
+alter table public.fx_rates alter column provider set not null;
+alter table public.fx_rates drop constraint if exists fx_rates_pkey;
+alter table public.fx_rates add constraint fx_rates_pkey primary key (base_currency, quote_currency, rate_date, provider);
+comment on column public.fx_rates.provider is 'Publisher of the rate: ecb (ECB euro reference rates), boe (Bank of England database), frb (Federal Reserve H.10).';
+
+create table if not exists public.fx_rate_provider_preference (
+  currency text not null,
+  provider text not null,
+  rank int not null,
+  justification text not null,
+  citation_url text not null,
+  primary key (currency, provider)
+);
+comment on table public.fx_rate_provider_preference is 'Cited choice of fx_rates.provider per currency (lowest rank wins when it has a rate within 7 days of the sale).';
+alter table public.fx_rate_provider_preference enable row level security;
+do $$ begin
+  create policy fx_rate_provider_preference_public_read on public.fx_rate_provider_preference for select to anon, authenticated using (true);
+exception when duplicate_object then null; end $$;
+grant select on public.fx_rate_provider_preference to anon, authenticated;
+
+insert into public.fx_rate_provider_preference (currency, provider, rank, justification, citation_url) values
+ ('GBP','boe',1,'Bank of England is the issuing central bank for sterling; series XUDLUSS is its daily spot USD per GBP (4pm London).','https://www.bankofengland.co.uk/boeapps/database/fromshowcolumns.asp?Travel=NIxAZxSUx&FromSeries=1&ToSeries=50&DAT=RNG&FD=1&FM=Jan&FY=1975&TD=31&TM=Dec&TY=2026&FNY=Y&CSVF=TT&html.x=66&html.y=26&SeriesCodes=XUDLUSS&UsingCodes=Y&Filter=N&title=XUDLUSS&VPD=Y'),
+ ('GBP','ecb',2,'Fallback: ECB euro reference rates, USD per GBP as the EUR cross (USD/EUR divided by GBP/EUR).','https://www.ecb.europa.eu/stats/policy_and_exchange_rates/euro_reference_exchange_rates/html/index.en.html'),
+ ('EUR','ecb',1,'ECB is the issuing central bank for the euro; the euro reference rate gives USD per EUR directly.','https://www.ecb.europa.eu/stats/policy_and_exchange_rates/euro_reference_exchange_rates/html/index.en.html'),
+ ('NZD','frb',1,'Federal Reserve H.10 publishes USD per NZD directly (noon buying rates in New York).','https://www.federalreserve.gov/releases/h10/hist/'),
+ ('NZD','ecb',2,'Fallback: ECB EUR cross.','https://www.ecb.europa.eu/stats/policy_and_exchange_rates/euro_reference_exchange_rates/html/index.en.html'),
+ ('AUD','ecb',1,'ECB EUR cross: the provider loaded for AUD, one consistent published daily source.','https://www.ecb.europa.eu/stats/policy_and_exchange_rates/euro_reference_exchange_rates/html/index.en.html'),
+ ('CHF','ecb',1,'ECB EUR cross: the provider loaded for CHF, one consistent published daily source.','https://www.ecb.europa.eu/stats/policy_and_exchange_rates/euro_reference_exchange_rates/html/index.en.html'),
+ ('DKK','ecb',1,'ECB EUR cross: the provider loaded for DKK, one consistent published daily source.','https://www.ecb.europa.eu/stats/policy_and_exchange_rates/euro_reference_exchange_rates/html/index.en.html'),
+ ('HKD','ecb',1,'ECB EUR cross: the provider loaded for HKD, one consistent published daily source.','https://www.ecb.europa.eu/stats/policy_and_exchange_rates/euro_reference_exchange_rates/html/index.en.html')
+on conflict (currency, provider) do nothing;
+
+create or replace function public.fx_provider_rank(p_currency text, p_provider text)
+ returns int language sql stable parallel safe set search_path = public, pg_catalog as $$
+  select coalesce((select p.rank from public.fx_rate_provider_preference p where p.currency = upper(p_currency) and p.provider = p_provider),
+                  case when p_provider = 'ecb' then 50 else 100 end)
+$$;
+
+create or replace function public.fx_usd_rate(p_currency text, p_on date)
+RETURNS TABLE(rate numeric, rate_date date, source text, source_url text)
+LANGUAGE sql STABLE PARALLEL SAFE SET search_path = public, pg_catalog
+AS $$
+  SELECT 1::numeric, p_on, 'identity: amount already in USD'::text, NULL::text
+   WHERE upper(p_currency) = 'USD'
+  UNION ALL
+  SELECT x.rate, x.rate_date, x.source, x.source_url FROM (
+    SELECT f.rate, f.rate_date, f.source, f.source_url
+      FROM public.fx_rates f
+     WHERE upper(p_currency) <> 'USD' AND p_on IS NOT NULL
+       AND f.base_currency = upper(p_currency) AND f.quote_currency = 'USD'
+       AND f.rate_date <= p_on AND f.rate_date >= p_on - 7
+     ORDER BY public.fx_provider_rank(f.base_currency, f.provider), f.rate_date DESC LIMIT 1) x
+$$;
+
+create or replace function public.vehicle_sale_price_fx_usd_preferred(p_amount numeric, p_currency text, p_sale_date date)
+ RETURNS TABLE(amount_usd numeric, fx_rate numeric, fx_date date, fx_source text, fx_provider text)
+ LANGUAGE plpgsql STABLE SET search_path TO 'public', 'pg_temp'
+AS $function$
+DECLARE
+  v_fx fx_rates%ROWTYPE;
+BEGIN
+  IF p_amount IS NULL OR p_currency IS NULL OR upper(p_currency) = 'USD' THEN
+    RETURN QUERY SELECT NULL::numeric, NULL::numeric, NULL::date, NULL::text, NULL::text;
+    RETURN;
+  END IF;
+  IF p_sale_date IS NULL THEN
+    RAISE EXCEPTION 'vehicle_sale_price_fx_usd: % % has no sale_date to convert at', p_amount, p_currency;
+  END IF;
+  SELECT * INTO v_fx FROM fx_rates f
+  WHERE f.base_currency = upper(p_currency) AND f.quote_currency = 'USD'
+    AND f.rate_date <= p_sale_date AND f.rate_date >= p_sale_date - 7
+  ORDER BY fx_provider_rank(f.base_currency, f.provider), f.rate_date DESC LIMIT 1;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'vehicle_sale_price_fx_usd: no % -> USD rate in fx_rates within 7 days before %', upper(p_currency), p_sale_date;
+  END IF;
+  RETURN QUERY SELECT round(p_amount * v_fx.rate, 2), v_fx.rate, v_fx.rate_date,
+    v_fx.source || COALESCE(' (' || v_fx.source_url || ')', ''), v_fx.provider;
+END;
+$function$;
+
+create or replace function public.vehicle_sale_price_fx_usd(p_amount numeric, p_currency text, p_sale_date date)
+ RETURNS TABLE(amount_usd numeric, fx_rate numeric, fx_date date, fx_source text)
+ LANGUAGE sql STABLE SET search_path TO 'public', 'pg_temp'
+AS $$ select x.amount_usd, x.fx_rate, x.fx_date, x.fx_source from public.vehicle_sale_price_fx_usd_preferred(p_amount, p_currency, p_sale_date) x $$;
+
+alter table public.vehicles add column if not exists sale_price_fx_provider text;
+comment on column public.vehicles.sale_price_fx_provider is 'fx_rates.provider of sale_price_fx_rate (ecb | boe | frb), chosen by fx_rate_provider_preference.';
+
+CREATE OR REPLACE FUNCTION public.correct_vehicle_sale_provenance_batch(p_rows jsonb, p_asserted_by text DEFAULT 'agent'::text, p_reason text DEFAULT NULL::text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+DECLARE
+  c_allowed CONSTANT text[] := ARRAY[
+    'sale_price','sale_status','auction_outcome','reserve_status','high_bid','winning_bid',
+    'bat_sold_price','sold_price','sale_date','bat_sale_date','auction_end_date','bat_buyer',
+    'canonical_platform','msrp','msrp_source','listing_kind','year','make','model','bat_auction_url',
+    'asking_price','interior_color','color','bat_seller','seller_name',
+    'discovery_url','auction_source','normalized_model','normalized_series','sale_price_currency'];
+  c_numeric CONSTANT text[] := ARRAY['sale_price','high_bid','winning_bid','bat_sold_price','sold_price','msrp','year','asking_price'];
+  c_date    CONSTANT text[] := ARRAY['sale_date','bat_sale_date'];
+  v_row      jsonb;
+  v_source   jsonb;
+  v_id       uuid;
+  v_veh      vehicles%ROWTYPE;
+  v_field    text;
+  v_spec     jsonb;
+  v_orig     text;
+  v_new      text;
+  v_same     boolean;
+  v_set      jsonb;
+  v_audit    jsonb;
+  v_vehicles int := 0;
+  v_fields   int := 0;
+  v_noop     int := 0;
+  v_skipped  int := 0;
+  v_stale    jsonb := '[]'::jsonb;
+  v_missing  jsonb := '[]'::jsonb;
+  v_fx       record;
+  v_fx_hit   boolean;
+  v_fx_usd   numeric;
+  v_fx_rate  numeric;
+  v_fx_fdate date;
+  v_fx_src   text;
+  v_fx_prov  text;
+  v_fx_amt   numeric;
+  v_fx_date  date;
+  v_fx_cur   text;
+  v_evd      date;
+  v_superseded jsonb := '[]'::jsonb;
+BEGIN
+  IF p_rows IS NULL OR jsonb_typeof(p_rows) <> 'array' THEN
+    RAISE EXCEPTION 'correct_vehicle_sale_provenance_batch: p_rows must be a JSON array';
+  END IF;
+
+  PERFORM set_config('nuke.bulk_sale_correction', 'on', true);
+
+  FOR v_row IN SELECT value FROM jsonb_array_elements(p_rows) LOOP
+    v_id := (v_row ->> 'vehicle_id')::uuid;
+    v_source := v_row -> 'source';
+    -- owner testimony: a live observation of this vehicle, cited by id (who said it lives on that row)
+    IF v_source ->> 'type' = 'owner_observation' THEN
+      IF (v_source ->> 'observation_id') IS NULL OR NOT EXISTS (
+           SELECT 1 FROM vehicle_observations o
+           WHERE o.id = (v_source ->> 'observation_id')::uuid
+             AND o.vehicle_id = v_id
+             AND coalesce(o.is_superseded, false) = false) THEN
+        RAISE EXCEPTION 'correct_vehicle_sale_provenance_batch: owner_observation % is not a live observation of vehicle %',
+          v_source ->> 'observation_id', v_id;
+      END IF;
+      v_source := v_source || jsonb_build_object('ref', 'vehicle_observations/' || (v_source ->> 'observation_id'));
+    END IF;
+    IF v_source IS NULL OR v_source = '{}'::jsonb OR (v_source ->> 'ref') IS NULL THEN
+      RAISE EXCEPTION 'correct_vehicle_sale_provenance_batch: vehicle % has no source document with a ref -- corrections must be cited, never guessed', v_id;
+    END IF;
+    IF v_row -> 'corrections' IS NULL OR jsonb_typeof(v_row -> 'corrections') <> 'object' THEN
+      RAISE EXCEPTION 'correct_vehicle_sale_provenance_batch: vehicle % has no corrections object', v_id;
+    END IF;
+
+    SELECT * INTO v_veh FROM vehicles WHERE id = v_id FOR UPDATE;
+    IF NOT FOUND THEN
+      v_missing := v_missing || jsonb_build_array(v_id);
+      CONTINUE;
+    END IF;
+
+    -- a verified event only moves the vehicle's sale when it is the vehicle's latest sale by sale date
+    -- (2026-10-24: an older verified event overwrote a newer BaT sale). Superseded rows are reported, not written.
+    IF v_source ->> 'type' = 'verified_vehicle_event'
+       AND (v_row -> 'corrections') ?| ARRAY['sale_price', 'sale_date', 'sale_status'] THEN
+      SELECT (coalesce(e.sold_at, e.ended_at) AT TIME ZONE 'UTC')::date INTO v_evd
+      FROM vehicle_events e
+      WHERE e.id = (v_source ->> 'event_id')::uuid AND e.vehicle_id = v_id;
+      IF v_evd IS NULL
+         OR v_veh.sale_date > v_evd
+         OR EXISTS (SELECT 1 FROM vehicle_events e
+                    WHERE e.vehicle_id = v_id AND e.id <> (v_source ->> 'event_id')::uuid
+                      AND e.price_verification = 'verified' AND e.event_status = 'sold' AND e.final_price > 0
+                      AND coalesce(e.sale_truth_role, '') <> 'duplicate'
+                      AND (coalesce(e.sold_at, e.ended_at) AT TIME ZONE 'UTC')::date > v_evd) THEN
+        v_superseded := v_superseded || jsonb_build_array(jsonb_build_object(
+          'vehicle_id', v_id, 'event_id', v_source ->> 'event_id', 'event_date', v_evd, 'vehicle_sale_date', v_veh.sale_date));
+        CONTINUE;
+      END IF;
+    END IF;
+
+    v_set := '{}'::jsonb;
+    v_audit := '[]'::jsonb;
+
+    FOR v_field, v_spec IN SELECT key, value FROM jsonb_each(v_row -> 'corrections') LOOP
+      -- a JSON null spec is "no proposal for this field" (2026-09-27 incident); clearing a column is
+      -- said explicitly as {"value": null}. Anything else that is not an object is a caller bug.
+      IF v_spec IS NULL OR jsonb_typeof(v_spec) = 'null' THEN
+        v_skipped := v_skipped + 1;
+        CONTINUE;
+      END IF;
+      IF jsonb_typeof(v_spec) <> 'object' THEN
+        RAISE EXCEPTION 'correct_vehicle_sale_provenance_batch: vehicle % field % spec must be an object {value, expected?}, got %', v_id, v_field, jsonb_typeof(v_spec);
+      END IF;
+      IF NOT (v_field = ANY (c_allowed)) THEN
+        RAISE EXCEPTION 'correct_vehicle_sale_provenance_batch: unsupported field % (supported: %)', v_field, array_to_string(c_allowed, ', ');
+      END IF;
+
+      v_orig := CASE v_field
+        WHEN 'sale_price'         THEN v_veh.sale_price::text
+        WHEN 'sale_status'        THEN v_veh.sale_status
+        WHEN 'auction_outcome'    THEN v_veh.auction_outcome
+        WHEN 'reserve_status'     THEN v_veh.reserve_status
+        WHEN 'high_bid'           THEN v_veh.high_bid::text
+        WHEN 'winning_bid'        THEN v_veh.winning_bid::text
+        WHEN 'bat_sold_price'     THEN v_veh.bat_sold_price::text
+        WHEN 'sold_price'         THEN v_veh.sold_price::text
+        WHEN 'sale_date'          THEN v_veh.sale_date::text
+        WHEN 'bat_sale_date'      THEN v_veh.bat_sale_date::text
+        WHEN 'auction_end_date'   THEN v_veh.auction_end_date
+        WHEN 'bat_buyer'          THEN v_veh.bat_buyer
+        WHEN 'canonical_platform' THEN v_veh.canonical_platform
+        WHEN 'msrp'               THEN v_veh.msrp::text
+        WHEN 'msrp_source'        THEN v_veh.msrp_source
+        WHEN 'listing_kind'       THEN v_veh.listing_kind
+        WHEN 'year'               THEN v_veh.year::text
+        WHEN 'make'               THEN v_veh.make
+        WHEN 'model'              THEN v_veh.model
+        WHEN 'bat_auction_url'    THEN v_veh.bat_auction_url
+        WHEN 'asking_price'       THEN v_veh.asking_price::text
+        WHEN 'interior_color'     THEN v_veh.interior_color
+        WHEN 'color'              THEN v_veh.color
+        WHEN 'bat_seller'         THEN v_veh.bat_seller
+        WHEN 'seller_name'        THEN v_veh.seller_name
+        WHEN 'discovery_url'      THEN v_veh.discovery_url
+        WHEN 'auction_source'     THEN v_veh.auction_source
+        WHEN 'normalized_model'   THEN v_veh.normalized_model
+        WHEN 'normalized_series'  THEN v_veh.normalized_series
+        WHEN 'sale_price_currency' THEN v_veh.sale_price_currency
+      END;
+      v_new := v_spec ->> 'value';
+
+      -- typed no-op / expectation checks (25000 = 25000.00; 2024-03-01 = 2024-03-01)
+      v_same := CASE
+        WHEN v_field = ANY (c_numeric) THEN v_orig::numeric IS NOT DISTINCT FROM v_new::numeric
+        WHEN v_field = ANY (c_date)    THEN v_orig::date    IS NOT DISTINCT FROM v_new::date
+        ELSE v_orig IS NOT DISTINCT FROM v_new END;
+      IF v_same THEN
+        v_noop := v_noop + 1;
+        CONTINUE;
+      END IF;
+
+      IF v_spec ? 'expected' THEN
+        IF NOT (CASE
+          WHEN v_field = ANY (c_numeric) THEN v_orig::numeric IS NOT DISTINCT FROM (v_spec ->> 'expected')::numeric
+          WHEN v_field = ANY (c_date)    THEN v_orig::date    IS NOT DISTINCT FROM (v_spec ->> 'expected')::date
+          ELSE v_orig IS NOT DISTINCT FROM (v_spec ->> 'expected') END) THEN
+          v_stale := v_stale || jsonb_build_array(jsonb_build_object(
+            'vehicle_id', v_id, 'field', v_field, 'live', v_orig, 'expected', v_spec ->> 'expected', 'proposed', v_new));
+          CONTINUE;
+        END IF;
+      END IF;
+
+      v_set := v_set || jsonb_build_object(v_field, v_new);
+      v_audit := v_audit || jsonb_build_array(jsonb_build_object(
+        'field', v_field,
+        'original', v_orig,
+        'corrected', v_new,
+        'source', v_source,
+        'reason', COALESCE(v_row ->> 'reason', p_reason),
+        'asserted_by', p_asserted_by,
+        'asserted_at', now()));
+    END LOOP;
+
+    IF v_set = '{}'::jsonb THEN
+      CONTINUE;
+    END IF;
+
+    -- sale currency + USD resolved BEFORE the write and set in the same UPDATE as the amount, so the NOT VALID
+    -- check vehicles_sale_price_usd_required holds even when trg_vehicles_sale_currency_guard labels the row
+    -- non-USD (it labels a NULL currency from the vehicle_events price the new amount matches; mirrored here).
+    v_fx_hit := v_set ?| ARRAY['sale_price', 'sale_date', 'sale_price_currency'];
+    v_fx_usd := NULL; v_fx_rate := NULL; v_fx_fdate := NULL; v_fx_src := NULL; v_fx_prov := NULL;
+    IF v_fx_hit THEN
+      v_fx_amt  := CASE WHEN v_set ? 'sale_price' THEN (v_set ->> 'sale_price')::integer ELSE v_veh.sale_price END;
+      v_fx_date := CASE WHEN v_set ? 'sale_date'  THEN (v_set ->> 'sale_date')::date     ELSE v_veh.sale_date END;
+      v_fx_cur  := CASE WHEN v_set ? 'sale_price_currency' THEN upper(v_set ->> 'sale_price_currency') ELSE v_veh.sale_price_currency END;
+      IF v_fx_cur IS NULL AND v_fx_amt > 0 THEN
+        SELECT CASE WHEN count(DISTINCT upper(coalesce(e.currency_code, '?'))) = 1
+                     AND min(upper(e.currency_code)) IS NOT NULL AND min(upper(e.currency_code)) <> 'USD'
+                    THEN min(upper(e.currency_code)) END
+          INTO v_fx_cur
+          FROM vehicle_events e
+         WHERE e.vehicle_id = v_id AND (e.final_price = v_fx_amt OR e.hammer_price = v_fx_amt);
+      END IF;
+      -- preferred provider per currency (fx_rate_provider_preference), so a re-correction reproduces the same rate
+      SELECT x.amount_usd, x.fx_rate, x.fx_date, x.fx_source, x.fx_provider INTO v_fx_usd, v_fx_rate, v_fx_fdate, v_fx_src, v_fx_prov
+        FROM vehicle_sale_price_fx_usd_preferred(v_fx_amt, v_fx_cur, v_fx_date) x;
+    END IF;
+
+    -- one UPDATE per vehicle: every trigger on vehicles fires once, not once per field
+    UPDATE vehicles SET
+      sale_price         = CASE WHEN v_set ? 'sale_price'         THEN (v_set ->> 'sale_price')::integer      ELSE sale_price END,
+      sale_status        = CASE WHEN v_set ? 'sale_status'        THEN  v_set ->> 'sale_status'                ELSE sale_status END,
+      auction_outcome    = CASE WHEN v_set ? 'auction_outcome'    THEN  v_set ->> 'auction_outcome'            ELSE auction_outcome END,
+      reserve_status     = CASE WHEN v_set ? 'reserve_status'     THEN  v_set ->> 'reserve_status'             ELSE reserve_status END,
+      high_bid           = CASE WHEN v_set ? 'high_bid'           THEN (v_set ->> 'high_bid')::integer        ELSE high_bid END,
+      winning_bid        = CASE WHEN v_set ? 'winning_bid'        THEN (v_set ->> 'winning_bid')::integer     ELSE winning_bid END,
+      bat_sold_price     = CASE WHEN v_set ? 'bat_sold_price'     THEN (v_set ->> 'bat_sold_price')::numeric  ELSE bat_sold_price END,
+      sold_price         = CASE WHEN v_set ? 'sold_price'         THEN (v_set ->> 'sold_price')::integer      ELSE sold_price END,
+      sale_date          = CASE WHEN v_set ? 'sale_date'          THEN (v_set ->> 'sale_date')::date          ELSE sale_date END,
+      bat_sale_date      = CASE WHEN v_set ? 'bat_sale_date'      THEN (v_set ->> 'bat_sale_date')::date      ELSE bat_sale_date END,
+      auction_end_date   = CASE WHEN v_set ? 'auction_end_date'   THEN  v_set ->> 'auction_end_date'           ELSE auction_end_date END,
+      bat_buyer          = CASE WHEN v_set ? 'bat_buyer'          THEN  v_set ->> 'bat_buyer'                  ELSE bat_buyer END,
+      bat_seller         = CASE WHEN v_set ? 'bat_seller'         THEN  v_set ->> 'bat_seller'                 ELSE bat_seller END,
+      seller_name        = CASE WHEN v_set ? 'seller_name'        THEN  v_set ->> 'seller_name'                ELSE seller_name END,
+      canonical_platform = CASE WHEN v_set ? 'canonical_platform' THEN  v_set ->> 'canonical_platform'         ELSE canonical_platform END,
+      platform_source    = CASE WHEN v_set ? 'canonical_platform' THEN COALESCE(v_source ->> 'ref', 'correct_vehicle_sale_provenance') ELSE platform_source END,
+      msrp               = CASE WHEN v_set ? 'msrp'               THEN (v_set ->> 'msrp')::numeric            ELSE msrp END,
+      msrp_source        = CASE WHEN v_set ? 'msrp_source'        THEN  v_set ->> 'msrp_source'                ELSE msrp_source END,
+      listing_kind       = CASE WHEN v_set ? 'listing_kind'       THEN  v_set ->> 'listing_kind'               ELSE listing_kind END,
+      asking_price       = CASE WHEN v_set ? 'asking_price'       THEN (v_set ->> 'asking_price')::numeric    ELSE asking_price END,
+      interior_color     = CASE WHEN v_set ? 'interior_color'     THEN  v_set ->> 'interior_color'             ELSE interior_color END,
+      color              = CASE WHEN v_set ? 'color'              THEN  v_set ->> 'color'                      ELSE color END,
+      sale_price_currency  = CASE WHEN v_fx_hit THEN v_fx_cur ELSE sale_price_currency END,
+      sale_price_usd       = CASE WHEN v_fx_hit THEN v_fx_usd ELSE sale_price_usd END,
+      sale_price_fx_rate   = CASE WHEN v_fx_hit THEN v_fx_rate ELSE sale_price_fx_rate END,
+      sale_price_fx_date   = CASE WHEN v_fx_hit THEN v_fx_fdate ELSE sale_price_fx_date END,
+      sale_price_fx_source = CASE WHEN v_fx_hit THEN v_fx_src ELSE sale_price_fx_source END,
+      sale_price_fx_provider = CASE WHEN v_fx_hit THEN v_fx_prov ELSE sale_price_fx_provider END,
+      provenance_metadata = COALESCE(provenance_metadata, '{}'::jsonb) || jsonb_build_object(
+        'sale_provenance_corrections',
+          COALESCE(provenance_metadata -> 'sale_provenance_corrections', '[]'::jsonb) || v_audit)
+    WHERE id = v_id;
+
+    -- sale currency: sale_price is the native amount in sale_price_currency (NULL = legacy USD). Whenever the
+    -- amount, date or currency moves, sale_price_usd and its fx citation are re-derived from fx_rates at the
+    -- sale-date rate, in the same statement as the currency so vehicles_sale_price_usd_required always holds.
+    IF v_set ?| ARRAY['sale_price', 'sale_date', 'sale_price_currency'] THEN
+      SELECT vv.sale_price, vv.sale_date,
+             CASE WHEN v_set ? 'sale_price_currency' THEN upper(v_set ->> 'sale_price_currency') ELSE vv.sale_price_currency END
+        INTO v_fx_amt, v_fx_date, v_fx_cur
+      FROM vehicles vv WHERE vv.id = v_id;
+      SELECT * INTO v_fx FROM vehicle_sale_price_fx_usd_preferred(v_fx_amt, v_fx_cur, v_fx_date);
+      UPDATE vehicles SET
+        sale_price_currency  = v_fx_cur,
+        sale_price_usd       = v_fx.amount_usd,
+        sale_price_fx_rate   = v_fx.fx_rate,
+        sale_price_fx_date   = v_fx.fx_date,
+        sale_price_fx_source = v_fx.fx_source,
+        sale_price_fx_provider = v_fx.fx_provider
+      WHERE id = v_id
+        AND (sale_price_currency, sale_price_usd, sale_price_fx_rate, sale_price_fx_date, sale_price_fx_source, sale_price_fx_provider)
+            IS DISTINCT FROM (v_fx_cur, v_fx.amount_usd, v_fx.fx_rate, v_fx.fx_date, v_fx.fx_source, v_fx.fx_provider);
+    END IF;
+
+    -- identity / link columns in their own statement, only when one of them is corrected: triggers declared
+    -- UPDATE OF year/make/model (duplicate detection, auto services, VIN checks) then fire for identity moves
+    -- only, never for an ordinary sale correction (which lists none of these columns)
+    IF v_set ?| ARRAY['year', 'make', 'model'] THEN
+      UPDATE vehicles SET
+        year  = CASE WHEN v_set ? 'year'  THEN (v_set ->> 'year')::integer ELSE year END,
+        make  = CASE WHEN v_set ? 'make'  THEN  v_set ->> 'make'  ELSE make END,
+        model = CASE WHEN v_set ? 'model' THEN  v_set ->> 'model' ELSE model END
+      WHERE id = v_id;
+    END IF;
+    IF v_set ? 'bat_auction_url' THEN
+      UPDATE vehicles SET bat_auction_url = v_set ->> 'bat_auction_url' WHERE id = v_id;
+    END IF;
+    -- the other car's link and venue, laid over a lot row (2026-10-15 hybrid rows), corrected like bat_auction_url
+    IF v_set ?| ARRAY['discovery_url', 'auction_source'] THEN
+      UPDATE vehicles SET
+        discovery_url  = CASE WHEN v_set ? 'discovery_url'  THEN v_set ->> 'discovery_url'  ELSE discovery_url END,
+        auction_source = CASE WHEN v_set ? 'auction_source' THEN v_set ->> 'auction_source' ELSE auction_source END
+      WHERE id = v_id;
+    END IF;
+    -- after the identity statement: auto_normalize_vehicle_model (BEFORE UPDATE OF model, make, year) keeps the old
+    -- normalized model when the corrected model has no canonical match, so a cited value is written here, where that
+    -- trigger does not fire
+    IF v_set ?| ARRAY['normalized_model', 'normalized_series'] THEN
+      UPDATE vehicles SET
+        normalized_model  = CASE WHEN v_set ? 'normalized_model'  THEN v_set ->> 'normalized_model'  ELSE normalized_model END,
+        normalized_series = CASE WHEN v_set ? 'normalized_series' THEN v_set ->> 'normalized_series' ELSE normalized_series END
+      WHERE id = v_id;
+    END IF;
+
+    v_vehicles := v_vehicles + 1;
+    v_fields := v_fields + jsonb_array_length(v_audit);
+  END LOOP;
+
+  RETURN jsonb_build_object(
+    'ok', true,
+    'vehicles_corrected', v_vehicles,
+    'fields_corrected', v_fields,
+    'fields_noop', v_noop,
+    'fields_skipped_null_spec', v_skipped,
+    'stale', v_stale,
+    'missing', v_missing,
+    'superseded', v_superseded,
+    'asserted_by', p_asserted_by);
+END;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.sync_vehicle_sale_price_from_verified_event()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_latest vehicle_events%rowtype;
+  v_price  integer;
+  v_cur    integer;
+  v_status text;
+  v_cur_ccy text;
+  v_ccy    text;
+  v_cur_date date;
+  v_evd    date;
+begin
+  if new.vehicle_id is null or new.price_verification is distinct from 'verified' or new.event_status is distinct from 'sold' then
+    return null;
+  end if;
+
+  select * into v_latest
+  from vehicle_events e
+  where e.vehicle_id = new.vehicle_id
+    and e.price_verification = 'verified'
+    and e.event_status = 'sold'
+    and e.final_price > 0
+    and coalesce(e.sale_truth_role, '') <> 'duplicate'
+    and coalesce(e.sold_at, e.ended_at) is not null
+    -- identity held: an event whose lot is not confirmed as this vehicle never sets its sale (2026-10-24, Maserati d2111229)
+    and coalesce(e.identity_check, '') <> 'mismatch'
+    and not ('vehicle_id' = any (coalesce(e.source_suspect, '{}'::text[])))
+  order by coalesce(e.sold_at, e.ended_at) desc, e.price_verification_at desc nulls last
+  limit 1;
+
+  if not found or v_latest.id <> new.id
+     or v_latest.price_verification_source is null then
+    return null;
+  end if;
+
+  -- non-USD sales are written natively (sale_price + sale_price_currency) and converted to sale_price_usd at the
+  -- sale-date fx_rates rate by correct_vehicle_sale_provenance_batch; with no rate within 7 days, leave the row alone
+  v_evd := (coalesce(v_latest.sold_at, v_latest.ended_at) at time zone 'UTC')::date;
+  v_ccy := upper(coalesce(v_latest.currency_code, 'USD'));
+  if v_ccy <> 'USD' and (false or not exists (
+       select 1 from fx_rates f where f.base_currency = v_ccy and f.quote_currency = 'USD'
+         and f.rate_date <= v_evd
+         and f.rate_date >= v_evd - 7)) then
+    return null;
+  end if;
+
+  v_price := round(v_latest.final_price)::integer;
+  select sale_price, sale_status, upper(coalesce(sale_price_currency, 'USD')), sale_date
+    into v_cur, v_status, v_cur_ccy, v_cur_date from vehicles where id = new.vehicle_id;
+  -- the vehicle already carries a newer sale: an older verified event never overwrites it
+  if v_cur_date > v_evd then
+    return null;
+  end if;
+  if v_cur is not distinct from v_price and v_status is not distinct from 'sold' and v_cur_ccy = v_ccy then
+    return null;
+  end if;
+
+  perform correct_vehicle_sale_provenance_batch(
+    jsonb_build_array(jsonb_build_object(
+      'vehicle_id', new.vehicle_id,
+      'reason', 'latest verified sold event ' || v_latest.id,
+      'source', jsonb_build_object('type', 'verified_vehicle_event', 'ref', v_latest.price_verification_source,
+                                   'event_id', v_latest.id, 'run_id', v_latest.price_verification_run_id),
+      'corrections', jsonb_build_object(
+        'sale_price', jsonb_build_object('value', v_price),
+        'sale_status', jsonb_build_object('value', 'sold'),
+        'sale_date', jsonb_build_object('value', v_evd))
+        || case when v_cur_ccy <> v_ccy then jsonb_build_object('sale_price_currency', jsonb_build_object('value', v_ccy))
+                else '{}'::jsonb end)),
+    'trigger:sync_vehicle_sale_price_from_verified_event',
+    'sale_price follows the latest verified sold event');
+  return null;
+end;
+$function$;

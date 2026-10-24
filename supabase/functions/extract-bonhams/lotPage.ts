@@ -1,3 +1,5 @@
+import { extractOdometerFromText } from "../_shared/odometerText.ts";
+import { toMiles } from "../_shared/odometer.ts";
 // A Bonhams lot page, read for what the search index does not carry: the whole photo gallery at full size, the sale's
 // name, venue and dates, the saleroom notices, the footnotes, the 100-point Seller's Assessment (Bonhams MPH) and the
 // condition-report / catalogue links. The page is a Next.js shell whose __NEXT_DATA__ holds the lot and its auction;
@@ -163,20 +165,9 @@ export function extractSpecsFromContent(text: string): {
   let interior_color: string | null = null;
   let body_style: string | null = null;
 
-  // Mileage
-  const mileagePatterns = [
-    /(\d{1,3}(?:,\d{3})*)\s*(?:miles|mi)\b/i,
-    /mileage[^:]*:?\s*(\d{1,3}(?:,\d{3})*)/i,
-    /odometer[^:]*:?\s*(\d{1,3}(?:,\d{3})*)/i,
-    /(\d{1,3}(?:,\d{3})*)\s*km\b/i,
-  ];
-  for (const p of mileagePatterns) {
-    const m = text.match(p);
-    if (m) {
-      const num = parseInt(m[1].replace(/,/g, ''));
-      if (num > 0 && num < 10_000_000) { mileage = num; break; }
-    }
-  }
+  // Mileage: odometer context required (see _shared/odometerText.ts); stored in miles.
+  const od = extractOdometerFromText(text);
+  if (od) mileage = toMiles(od);
 
   // Engine from description (first line often has "XXXci OHV V8" or "X.XL Turbo")
   const enginePatterns = [
@@ -773,4 +764,26 @@ export function isBonhamsPreviewLotUrl(u: string | null | undefined): boolean {
 export function catalogOfferIsSold(url: string | null | undefined, availability: string | null | undefined): boolean {
   if (isBonhamsPreviewLotUrl(url)) return false;
   return (availability ?? "").includes("OutOfStock");
+}
+
+/** Full chassis/frame number from a Bonhams lot URL slug ("...-chassis-no-wp0zzz93zds000846-engine-no-..."), or null. */
+export function chassisFromLotUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  let path: string;
+  try { path = new URL(url).pathname; } catch { path = url; }
+  const slug = path.replace(/\/+$/, "").split("/").pop() ?? "";
+  const m = slug.match(/(?:^|-)(?:chassis|frame)-no-([a-z0-9][a-z0-9-]*?)(?:-engine-no-.*)?$/i);
+  return m && m[1].replace(/-/g, "").length >= 4 ? m[1].toUpperCase() : null;
+}
+
+const alnum = (s: string) => s.toUpperCase().replace(/[^A-Z0-9]/g, "");
+
+/** Prefer the URL-slug chassis when the parsed one is missing, looks like a slug fragment, or is a cut-short prefix of it. */
+export function pickChassis(parsed: string | null, fromUrl: string | null): string | null {
+  if (!fromUrl) return parsed;
+  if (!parsed) return fromUrl;
+  const p = alnum(parsed.replace(/^-?NO-/i, "")), u = alnum(fromUrl);
+  if (/^-/.test(parsed) || /CHASSIS|ENGINE/i.test(parsed)) return fromUrl;
+  if (p.length < u.length && u.startsWith(p)) return fromUrl;
+  return parsed;
 }

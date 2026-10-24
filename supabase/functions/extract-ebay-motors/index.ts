@@ -29,6 +29,7 @@ import { BROWSE_ACTIONS, handleBrowse } from './browseHandler.ts';
 import { handleParts } from './partsFinder.ts';
 import { insertMissingVehicleImages } from '../_shared/vehicleImageWrite.ts';
 import { itemPagePhotos } from './browseMap.ts';
+import { flagPlaceholderMileage } from '../_shared/odometer.ts';
 
 // ============================================================================
 // TYPES
@@ -937,6 +938,8 @@ Deno.serve(async (req) => {
         console.log(`Created new vehicle: ${vehicle_id}`);
       }
 
+      // sentinel odometers (99999, 123456, ...) get a suspect status row next to the write (best-effort)
+      if (vehicle_id && extracted.mileage) await flagPlaceholderMileage(supabase, vehicle_id, extracted.mileage, 'extract_ebay_motors', extracted.url || null);
       healthLogger.setVehicleId(vehicle_id);
 
       // Fire-and-forget observation write
