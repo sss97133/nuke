@@ -2339,13 +2339,13 @@ struct LedgerMapView: View {
             .disabled(loading)
             if level == .brands || level == .families {
                 DisclosureGroup("Compare sales activity", isExpanded: $comparisonEnabled) {
-                    Text("Activity share, not price change or appreciation. The comparison covers the reader’s measured cohort, not every sale in the ledger.")
+                    Text("Shows how much of the selling happens here, not whether prices went up. Based on the sales we track, not every sale.")
                         .font(.footnote).foregroundStyle(.secondary)
                     Text(comparisonScopeText).font(.caption).foregroundStyle(.secondary)
                     segmentedPill(options: LedgerMapScale.MapBasis.allCases, selection: $basis, label: \.label)
                         .disabled(!mapComparisonEnabled)
                     if !mapComparisonEnabled {
-                        Text("Custom windows are shown in the activity board below. The map stays neutral on the all-sales ledger because these windows can use different source cohorts.")
+                        Text("Custom date ranges are shown in the list below. The map keeps showing all sales.")
                             .font(.caption).foregroundStyle(.secondary)
                     }
                     relativityMoversCard

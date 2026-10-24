@@ -315,7 +315,7 @@ struct ExploreView: View {
                 } header: {
                     Text("Market pulse · by metro")
                 } footer: {
-                    Text("The live listings market — where vehicles move, what they cost, how fast. Tap a metro for its make breakdown; search a make or model for its cohort.")
+                    Text("The live listings market — where vehicles move, what they cost, how fast. Tap a metro for its make breakdown; search a make or model to see similar cars.")
                 }
             }
             .refreshable { await loadMetros(force: true) }
