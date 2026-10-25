@@ -4,15 +4,15 @@ import { createRoot, type Root } from 'react-dom/client';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
-const fixture = vi.hoisted(() => ({ rows: {} as Record<string, any[]>, fail: '', calls: [] as any[] }));
+const fixture = vi.hoisted(() => ({ rows: {} as Record<string, any[]>, fail: '', calls: [] as any[], hold: null as Promise<void> | null }));
 vi.mock('../lib/supabase', () => ({ supabase: {
   auth: { getUser: async () => ({ data: { user: { id: 'user' } } }) },
   from: (table: string) => {
     let rows = fixture.rows[table] ?? [];
-    const q: any = { then: (fn: any) => Promise.resolve({
+    const q: any = { then: (fn: any) => Promise.resolve(fixture.hold).then(() => ({
       data: table === fixture.fail ? null : rows,
       error: table === fixture.fail ? { message: 'unavailable' } : null,
-    }).then(fn) };
+    })).then(fn) };
     q.select = (...args: any[]) => { fixture.calls.push([table, 'select', ...args]); return q; };
     q.eq = (key: string, value: any) => { rows = rows.filter(r => r[key] === value); return q; };
     q.in = (key: string, values: any[]) => { rows = rows.filter(r => values.includes(r[key])); return q; };
@@ -20,6 +20,7 @@ vi.mock('../lib/supabase', () => ({ supabase: {
   },
   rpc: async (name: string, params: unknown) => {
     fixture.calls.push(['rpc', name, params]);
+    await fixture.hold;
     return { data: name === 'get_my_garage_owner_corrections'
       ? fixture.rows.garage_owner_corrections ?? [] : [], error: null };
   },
@@ -70,11 +71,17 @@ it('retains a declared prior relationship without inventing its dates or an acqu
 });
 
 let state: ReturnType<typeof useVehiclesDashboard>, root: Root, container: HTMLDivElement;
-const snapshots: { viewer: string | null; ids: string[]; loading: boolean }[] = [];
-function Harness({ viewer = 'user' }: { viewer?: string | null }) { state = useVehiclesDashboard(viewer); snapshots.push({viewer, ids: state.vehicles.map(v => v.id), loading: state.isLoading}); return null; }
+const snapshots: { viewer: string | null; ids: string[]; loading: boolean; dataIds: string[]; sources: string[]; warnings: string[]; error: string | null }[] = [];
+function Harness({ viewer = 'user' }: { viewer?: string | null }) {
+  state = useVehiclesDashboard(viewer);
+  snapshots.push({viewer, ids: state.vehicles.map(v => v.id), loading: state.isLoading,
+    dataIds: state.data?.my_vehicles.map(v => v.vehicle_id) ?? [], sources: state.unresolvedSources?.map(s => s.id) ?? [],
+    warnings: state.warnings ?? [], error: state.error});
+  return null;
+}
 beforeEach(() => {
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
-  fixture.rows = {}; fixture.fail = ''; fixture.calls = [];
+  fixture.rows = {}; fixture.fail = ''; fixture.calls = []; fixture.hold = null; snapshots.length = 0;
   container = document.createElement('div'); document.body.appendChild(container); root = createRoot(container);
 });
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); });
@@ -234,6 +241,35 @@ it('withholds a previous viewer garage in the first render after identity change
   await act(async () => root.render(<Harness viewer={null} />));
   expect(snapshots[0]).toMatchObject({ viewer: null, ids: [], loading: false });
 });
+
+it.each(['records', 'error'])('withholds prior viewer %s throughout the next viewer deferred read', async (prior) => {
+  seedGarage();
+  fixture.rows.garage_owner_corrections = [{ id: 'private-source', vehicle_id: null, observed_at: '2026-10-08',
+    correction: { unresolved_vehicle: { label: 'Private prior viewer source', stated_roles: ['shared_interest'] } },
+    source_excerpt: 'Synthetic prior viewer testimony.' }];
+  fixture.fail = prior === 'records' ? 'nuke_estimates' : 'vehicle_ownerships';
+  await act(async () => root.render(<Harness />));
+  if (prior === 'records') {
+    expect(state.vehicles).toHaveLength(2); expect(state.unresolvedSources).toHaveLength(1); expect(state.warnings).not.toEqual([]);
+  } else expect(state.error).not.toBeNull();
+
+  let release!: () => void;
+  fixture.hold = new Promise<void>(resolve => { release = resolve; });
+  fixture.fail = ''; fixture.rows.garage_owner_corrections = [];
+  fixture.rows.vehicle_ownerships = [period({ vehicle_id: 'other-car', owner_profile_id: 'other', role: 'owner', verification_id: null })];
+  fixture.rows.vehicles = [{ ...fixture.rows.vehicles[0], id: 'other-car' }];
+  snapshots.length = 0;
+  await act(async () => root.render(<Harness viewer="other" />));
+  await act(async () => root.render(<Harness viewer="other" />));
+  expect(snapshots.length).toBeGreaterThanOrEqual(2);
+  for (const snapshot of snapshots) expect(snapshot).toEqual({
+    viewer: 'other', ids: [], loading: true, dataIds: [], sources: [], warnings: [], error: null,
+  });
+  await act(async () => release());
+  expect(state.vehicles.map(v => v.id)).toEqual(['other-car']);
+  expect(state.unresolvedSources).toEqual([]); expect(state.warnings).toEqual([]); expect(state.error).toBeNull();
+});
+
 it('retains known vehicle relationships when optional estimates fail and reports unavailable coverage', async () => {
   seedGarage(); fixture.fail = 'nuke_estimates';
   await act(async () => root.render(<Harness />));
