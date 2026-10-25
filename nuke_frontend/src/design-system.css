@@ -3603,21 +3603,8 @@ body {
     z-index: 10000 !important;
   }
 
-  /* Fix button sizing on mobile - prevent explosion
-     MUST stay inside @media — was top-level before, broke every button on desktop
-     (header avatar, search actions, badge portals all got 6px 8px padding + 32px min-height) */
-@media (max-width: 767px) {
-  .button,
-  button {
-    width: auto !important;
-    max-width: 100% !important;
-    padding: var(--space-2) var(--space-3) !important;
-    font-size: 7pt !important;
-    min-width: auto !important;
-    min-height: 32px !important;
-  }
-}
-  
+/* Shared control tokens now own mobile sizing. Do not reset every button's
+   width, font and padding: icon controls and readable touch targets size themselves. */
   /* Specific fixes for inline buttons that shouldn't expand */
   .card-header button,
   [style*="justifyContent: 'space-between'"] button,
