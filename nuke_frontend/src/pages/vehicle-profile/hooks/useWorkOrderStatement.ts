@@ -6,11 +6,12 @@
  * Lookup is by work order id, vehicle id or public handle, never by name or e-mail.
  *
  * Mutations follow UniversalFieldEditor auto-save pattern:
- * optimistic state → DB write → recalc totals
+ * DB write → confirmed local update → recalc totals
  */
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useMemo, useCallback } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMemo, useCallback, useEffect, useRef } from 'react';
+import { useAuth } from '../../../hooks/useAuth';
 import { supabase } from '../../../lib/supabase';
 
 // ── Types ──
@@ -190,18 +191,35 @@ export async function readStatement(query: string): Promise<RawStatement | null>
 
 type EditableTable = 'work_order_parts' | 'work_order_labor' | 'work_order_payments';
 
+function requireChangedRow(count: number | null) {
+  if (count === 1) return;
+  throw new Error(count === 0
+    ? 'No record was changed. Reload the statement and check your access before retrying.'
+    : 'The saved change could not be confirmed. Reload the statement before retrying.');
+}
+
 // ── Hook ──
 
 export function useWorkOrderStatement(query: string | null) {
   const queryClient = useQueryClient();
-  const queryKey = ['work-order-statement', query];
+  const { user, loading: authLoading } = useAuth();
+  const queryKey = useMemo(() => ['work-order-statement', query, user?.id ?? 'anonymous'], [query, user?.id]);
+  const scope = useMemo(() => ({ query, viewerId: user?.id, authLoading }), [query, user?.id, authLoading]);
+  const activeScope = useRef<object | null>(scope);
+  activeScope.current = scope;
+  useEffect(() => {
+    activeScope.current = scope;
+    return () => { if (activeScope.current === scope) activeScope.current = null; };
+  }, [scope]);
 
-  const { data: result, isLoading, error, refetch } = useQuery({
+  const { data: queryResult, isLoading, error, refetch } = useQuery({
     queryKey,
-    queryFn: async (): Promise<StatementResult | null> => {
+    queryFn: async ({ signal }): Promise<StatementResult | null> => {
       if (!query) return null;
 
       const rpcData = await readStatement(query);
+      // Consuming the query signal cancels obsolete results, including their cache writes.
+      if (signal.aborted) throw new Error('Statement read cancelled.');
       if (!rpcData || rpcData.error) return null;
       if (Array.isArray(rpcData.matches)) return { matches: rpcData.matches as StatementMatch[] };
 
@@ -252,9 +270,10 @@ export function useWorkOrderStatement(query: string | null) {
       const moneyVisible = woArray.every((wo) => wo.money_visible === true);
       return { vehicle, contact, shop, workOrders, parts, labor, payments, totals: calcTotals(parts, labor, payments), moneyVisible };
     },
-    enabled: !!query,
+    enabled: !!query && !authLoading,
     staleTime: 5 * 60 * 1000,
   });
+  const result = authLoading ? undefined : queryResult;
   const data: StatementData | null = result && 'vehicle' in result ? result : null;
   const matches: StatementMatch[] | null = result && 'matches' in result ? result.matches : null;
 
@@ -266,27 +285,28 @@ export function useWorkOrderStatement(query: string | null) {
     // Get old value for audit log
     const oldValue = getOldValue(data, table, id, field);
 
-    // Optimistic update
-    queryClient.setQueryData<StatementResult | null>(queryKey, (old) => {
-      if (!old || !('vehicle' in old)) return old;
-      return applyFieldUpdate(old, table, id, field, value);
-    });
-
     // Get current user
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: { user: currentUser }, error: userError } = await supabase.auth.getUser();
+    if (userError) throw userError;
+    if (activeScope.current !== scope || !user || currentUser?.id !== user.id) throw new Error('The viewer changed. Reopen the statement before saving.');
 
-    const { error } = await supabase
+    const { error, count } = await supabase
       .from(table)
       .update({
         [field]: value,
-        updated_by: user?.id || null,
+        updated_by: currentUser.id,
         updated_at: new Date().toISOString(),
-      })
+      }, { count: 'exact' })
       .eq('id', id);
 
-    if (error) {
-      refetch();
-      throw error;
+    if (error) throw error;
+    requireChangedRow(count);
+    // Reflect the change only after the existing writer accepts it, in its original scope.
+    if (activeScope.current === scope) {
+      queryClient.setQueryData<StatementResult | null>(queryKey, (old) => {
+        if (!old || !('vehicle' in old)) return old;
+        return applyFieldUpdate(old, table, id, field, value);
+      });
     }
 
     // Audit log (fire and forget)
@@ -303,7 +323,7 @@ export function useWorkOrderStatement(query: string | null) {
         if (logErr) console.error('Audit log failed:', logErr);
       });
     }
-  }, [data, queryClient, queryKey, refetch]);
+  }, [data, queryClient, queryKey, scope, user]);
 
   const addRow = useCallback(async (
     table: EditableTable, workOrderId: string, defaults: Record<string, any> = {}
@@ -339,28 +359,26 @@ export function useWorkOrderStatement(query: string | null) {
 
     if (error) throw error;
 
-    // Add to state
-    refetch();
+    // A late result cannot refresh another viewer's statement.
+    if (activeScope.current === scope) refetch();
     return data;
-  }, [refetch]);
+  }, [refetch, scope]);
 
   const deleteRow = useCallback(async (table: EditableTable, id: string) => {
-    // Optimistic remove
+    const { error, count } = await supabase
+      .from(table)
+      .delete({ count: 'exact' })
+      .eq('id', id);
+
+    if (error) throw error;
+    requireChangedRow(count);
+    if (activeScope.current !== scope) return;
+    // Remove locally only after the existing writer accepts it.
     queryClient.setQueryData<StatementResult | null>(queryKey, (old) => {
       if (!old || !('vehicle' in old)) return old;
       return applyRowDelete(old, table, id);
     });
-
-    const { error } = await supabase
-      .from(table)
-      .delete()
-      .eq('id', id);
-
-    if (error) {
-      refetch();
-      throw error;
-    }
-  }, [queryClient, queryKey, refetch]);
+  }, [queryClient, queryKey, scope]);
 
   const toggleComp = useCallback(async (table: 'work_order_parts' | 'work_order_labor', id: string) => {
     const old = data;
@@ -398,7 +416,15 @@ export function useWorkOrderStatement(query: string | null) {
       updates.comp_retail_value = currentPrice;
     }
 
-    // Optimistic
+    const { error, count } = await supabase
+      .from(table)
+      .update(updates, { count: 'exact' })
+      .eq('id', id);
+
+    if (error) throw error;
+    requireChangedRow(count);
+    if (activeScope.current !== scope) return;
+    // Reflect the comp only after the existing writer accepts it.
     queryClient.setQueryData<StatementResult | null>(queryKey, (prev) => {
       if (!prev || !('vehicle' in prev)) return prev;
       let updated = applyFieldUpdate(prev, table, id, 'is_comped', newIsComped);
@@ -407,22 +433,12 @@ export function useWorkOrderStatement(query: string | null) {
       }
       return updated;
     });
-
-    const { error } = await supabase
-      .from(table)
-      .update(updates)
-      .eq('id', id);
-
-    if (error) {
-      refetch();
-      throw error;
-    }
-  }, [data, queryClient, queryKey, refetch]);
+  }, [data, queryClient, queryKey, scope]);
 
   return {
     data,
     matches,
-    loading: isLoading,
+    loading: authLoading || isLoading,
     error: error?.message ?? null,
     refetch,
     updateField,

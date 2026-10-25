@@ -7,6 +7,8 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const fixture = vi.hoisted(() => ({ rpc: vi.fn(), invoke: vi.fn() }));
+const auth = vi.hoisted(() => ({ user: null as {id:string} | null, loading: false }));
+vi.mock('../../hooks/useAuth', () => ({useAuth: () => auth}));
 vi.mock('../../lib/supabase', () => ({ supabase: { rpc: fixture.rpc, functions: { invoke: fixture.invoke } } }));
 import { buildEbayHref, ebayHref, ebayLinkNote } from './ebayLink';
 import JobPartsHandoff, { approvedParts, approvedTotals } from './JobPartsHandoff';
@@ -52,6 +54,7 @@ const ops = {
 
 let root: Root, host: HTMLDivElement;
 beforeEach(() => {
+  auth.user = null; auth.loading = false;
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   fixture.rpc.mockReset();
   fixture.rpc.mockImplementation(() => Promise.resolve({ data: ops, error: null }));
@@ -115,4 +118,13 @@ describe('parts hand-off page', () => {
     expect(rows.map(r => r.part.id)).toEqual(['p1']);
     expect(approvedTotals(rows)).toEqual({ totals: [['USD', 23.59]], unpriced: 1 });
   });
+});
+
+it('does not carry an approval reason across viewer changes or late reads', async () => {
+  const draw = async () => act(async () => root.render(<MemoryRouter initialEntries={[`/jobs/${WO}/parts`]}><Routes><Route path="/jobs/:workOrderId/parts" element={<JobPartsHandoff/>}/></Routes></MemoryRouter>));
+  auth.user={id:'viewer-a'};let finish!:(value:unknown)=>void;
+  fixture.rpc.mockImplementationOnce(()=>new Promise(resolve=>{finish=resolve;})); await draw();
+  auth.user=null;fixture.rpc.mockResolvedValue({data:ops,error:null});await draw();
+  await act(async()=>finish({data:{...ops,display_title:'PRIVATE APPROVAL REASON'},error:null}));
+  expect(host.textContent).not.toContain('PRIVATE APPROVAL REASON');expect(host.textContent).toContain('Fuel system');
 });
