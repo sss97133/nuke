@@ -7,6 +7,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { PrefetchLink } from '../../components/PrefetchLink';
+import { useAuth } from '../../hooks/useAuth';
 import { usePageTitle } from '../../hooks/usePageTitle';
 import { Masthead, Row, Rows, Section, Text } from '../../kit';
 import { arr, day, money, num, obj, slotWord, str, vehicleText, type JsonObject } from './jobRead';
@@ -36,14 +37,21 @@ export function approvedTotals(rows: { approvals: JsonObject[] }[]): { totals: [
 }
 
 export default function JobPartsHandoff() {
+  const { user, loading } = useAuth();
+  const { workOrderId = '' } = useParams<{ workOrderId: string }>();
+  if (loading) return <article className="job-page" aria-busy="true"><Text role="entity" as="h1">Loading the approved parts…</Text></article>;
+  return <PartsForViewer key={`${user?.id ?? 'anonymous'}:${workOrderId}`} viewerId={user?.id ?? null} />;
+}
+
+function PartsForViewer({ viewerId }: { viewerId: string | null }) {
   const { workOrderId = '' } = useParams<{ workOrderId: string }>();
   const [load, setLoad] = useState<Load>({ status: 'loading' });
   useEffect(() => {
     let cancelled = false;
     setLoad({ status: 'loading' });
-    readJob('work_order_operations_read', { p_work_order_id: workOrderId }).then(l => { if (!cancelled) setLoad(l); });
+    readJob('work_order_operations_read', { p_work_order_id: workOrderId }, viewerId).then(l => { if (!cancelled) setLoad(l); });
     return () => { cancelled = true; };
-  }, [workOrderId]);
+  }, [workOrderId, viewerId]);
   const d = load.status === 'loaded' ? load.data : null;
   const vehicle = vehicleText(d?.vehicle_label);
   usePageTitle(`Parts to buy${vehicle ? ` · ${vehicle}` : ''}`);
