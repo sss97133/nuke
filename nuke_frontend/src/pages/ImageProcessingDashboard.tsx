@@ -1,383 +1,222 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
-import { useNavigate } from 'react-router-dom';
+import { PrefetchLink } from '../components/PrefetchLink';
+import { usePageTitle } from '../hooks/usePageTitle';
 import '../styles/unified-design-system.css';
+import './ImageProcessingDashboard.css';
 
-interface ProcessingStats {
-  // Progress
-  total: number;
-  tier1Complete: number;
-  tier2Complete: number;
-  tier3Complete: number;
-  failed: number;
-  
-  // Performance
-  imagesPerMinute: number;
-  eta: string;
-  startTime: Date;
-  
-  // Costs
-  totalCost: number;
-  projectedCost: number;
-  avgCostPerImage: number;
-  modelUsage: Record<string, { count: number; cost: number; avgConfidence: number }>;
-  
-  // Quality
-  avgConfidence: number;
-  validationRate: number;
-  consensusRate: number;
-  
-  // Context
-  contextScores: {
-    rich: number;
-    good: number;
-    medium: number;
-    poor: number;
-  };
-
-  // Global coverage — from get_image_ecosystem_status() (image_coverage_by_vehicle counter
-  // rollup, NOT a 38.9M-row scan). Null until the counter has a refreshed row.
-  globalCoverage: {
-    photos: number; seenT1: number; placedT2: number; vehicles: number;
-    pctDeep: number; pctEngine: number; pctClip: number;
-  } | null;
-  
-  // Tables populated
-  tablesPopulated: Record<string, number>;
-  
-  // Recent activity
-  recentActivity: Array<{
-    imageId: string;
-    vehicleId: string;
-    tier: number;
-    model: string;
-    confidence: number;
-    cost: number;
-    contextScore: number;
-    timestamp: string;
-  }>;
-  
-  // Alerts
-  alerts: Array<{
-    severity: 'info' | 'warning' | 'error';
-    message: string;
-    action?: string;
-  }>;
+interface Activity {
+  observationId: string;
+  imageId: string | null;
+  vehicleId: string | null;
+  model: string | null;
+  confidence: number | null;
+  timestamp: string | null;
 }
 
+interface Coverage {
+  photos: number | null;
+  gated: number | null;
+  deep: number | null;
+  placed: number | null;
+  vehicles: number | null;
+  pctDeep: number | null;
+  pctEngine: number | null;
+  pctClip: number | null;
+}
+
+const numberOrUnknown = (value: unknown): number | null =>
+  typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null;
+const countOrUnknown = (value: unknown): number | null =>
+  typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : null;
+const showCount = (value: number | null | undefined) => value == null ? 'Unknown' : value.toLocaleString();
+const showPercent = (value: number | null | undefined) => value == null ? 'Unknown' : `${Math.round(value * 100)}%`;
+const showTime = (value: string | null) => value && Number.isFinite(Date.parse(value))
+  ? new Date(value).toLocaleString() : 'Time not reported';
+const errorMessage = (reason: unknown) => reason && typeof reason === 'object' && 'message' in reason
+  ? String(reason.message) : 'The reader did not respond. Try again.';
+
 export default function ImageProcessingDashboard() {
-  const navigate = useNavigate();
-  const [stats, setStats] = useState<ProcessingStats | null>(null);
+  usePageTitle('Image processing');
+  const [activity, setActivity] = useState<Activity[] | null>(null);
+  const [coverage, setCoverage] = useState<Coverage | null>(null);
+  const [feedError, setFeedError] = useState<string | null>(null);
+  const [coverageError, setCoverageError] = useState<string | null>(null);
+  const [feedReadAt, setFeedReadAt] = useState<string | null>(null);
+  const [coverageReadAt, setCoverageReadAt] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [autoRefresh, setAutoRefresh] = useState(false);
+  const [liveState, setLiveState] = useState<'connecting' | 'connected' | 'unavailable'>('connecting');
+  const generation = useRef(0);
+  const inFlight = useRef(false);
+  const lastFeedAttempt = useRef(0);
+
+  const loadStats = useCallback(async (includeCoverage = true) => {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    const request = ++generation.current;
+    lastFeedAttempt.current = Date.now();
+    setLoading(true);
+    try {
+      // Keep the existing bounded, index-ordered feed. It is a recent observation
+      // window, not an image count, worker heartbeat or full-corpus denominator.
+      const feedRead = async () => {
+        const result = await supabase.from('vehicle_observations')
+          .select('id, vehicle_id, observed_at, ingested_at, confidence_score, structured_data')
+          .eq('kind', 'condition')
+          .contains('structured_data', { analysis_kind: 'image_deep_byok' })
+          .order('ingested_at', { ascending: false })
+          .limit(20);
+        if (result.error) throw result.error;
+        if (!Array.isArray(result.data)) throw new Error('Recent activity returned no readable result.');
+        return result.data.map(a => {
+          const sd = (a.structured_data || {}) as { image_id?: string; agent_model?: string };
+          const confidence = numberOrUnknown(a.confidence_score);
+          return {
+            observationId: a.id,
+            imageId: typeof sd.image_id === 'string' ? sd.image_id : null,
+            vehicleId: a.vehicle_id,
+            model: typeof sd.agent_model === 'string' ? sd.agent_model : null,
+            confidence: confidence != null && confidence <= 1 ? confidence : null,
+            timestamp: a.ingested_at || a.observed_at || null,
+          };
+        });
+      };
+      const coverageRead = async () => {
+        // This existing RPC includes cascade evidence counts as well as the
+        // personal-corpus counter rollup. Do not call it for every feed event.
+        const { data, error } = await supabase.rpc('get_image_ecosystem_status');
+        if (error) throw error;
+        const cov = (data as { coverage?: Record<string, unknown> } | null)?.coverage;
+        if (!cov) return null;
+        return {
+          photos: countOrUnknown(cov.photos), gated: countOrUnknown(cov.gated_t0),
+          deep: countOrUnknown(cov.seen_t1), placed: countOrUnknown(cov.placed_t2),
+          vehicles: countOrUnknown(cov.vehicles), pctDeep: numberOrUnknown(cov.pct_deep),
+          pctEngine: numberOrUnknown(cov.pct_engine), pctClip: numberOrUnknown(cov.pct_clip),
+        };
+      };
+      const [feed, rollup] = await Promise.allSettled([feedRead(), includeCoverage ? coverageRead() : Promise.resolve(null)]);
+      if (request !== generation.current) return;
+      if (feed.status === 'fulfilled') {
+        setActivity(feed.value); setFeedError(null); setFeedReadAt(new Date().toISOString());
+      } else setFeedError(errorMessage(feed.reason));
+      if (includeCoverage) {
+        if (rollup.status === 'fulfilled') {
+          setCoverage(rollup.value); setCoverageError(null); setCoverageReadAt(new Date().toISOString());
+        } else setCoverageError(errorMessage(rollup.reason));
+      }
+    } finally {
+      if (request === generation.current) { inFlight.current = false; setLoading(false); }
+    }
+  }, []);
 
   useEffect(() => {
-    loadStats();
+    void loadStats();
+    return () => { generation.current++; inFlight.current = false; };
+  }, [loadStats]);
 
-    // Event-driven refresh: when a deep-analysis atom lands in vehicle_observations
-    // (the canonical sink), refresh the recent-activity feed. No polling — the old
-    // 2s setInterval fired four `count: exact, head: true` scans over the 38.9M-row
-    // vehicle_images table every tick, which times out / hammers the DB. The feed is
-    // bounded (LIMIT) and indexed, so it stays cheap.
+  useEffect(() => {
     if (!autoRefresh) return;
-    const channel = supabase
-      .channel('image-processing-updates')
-      .on('postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'vehicle_observations' },
-        (payload) => {
-          if ((payload.new as { kind?: string }).kind === 'condition') loadStats();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [autoRefresh]);
-
-  async function loadStats() {
-    try {
-      // Canonical deep-analysis marker = vehicle_images.ai_scan_metadata.byok_deep_analysis,
-      // surfaced as atoms in vehicle_observations (kind=condition, analysis_kind=image_deep_byok).
-      // The retired tier_1/2/3_analysis JSONB keys have no writer (tier_2/3 are 0 everywhere),
-      // so the old tier counters always read ~zero while thousands of images were deep-analyzed.
-      //
-      // We do NOT compute exact global totals here: counting the 38.9M-row vehicle_images table
-      // (or the 7.5M-row vehicle_observations table) on every render is not affordable client-side.
-      // The recent-activity feed below is bounded + index-ordered (ingested_at) and is the honest,
-      // cheap signal for "is the deep pipeline flowing right now."
-      //
-      // The true global rollup (total deep-analyzed, % coverage) IS wired below via
-      // get_image_ecosystem_status() — it sums the image_coverage_by_vehicle counter (~80 rows),
-      // never the 38.9M-row table. Do not reintroduce full-table head counts here.
-      const { data: recentAtoms } = await supabase
-        .from('vehicle_observations')
-        .select('id, vehicle_id, observed_at, ingested_at, confidence_score, structured_data')
-        .eq('kind', 'condition')
-        .contains('structured_data', { analysis_kind: 'image_deep_byok' })
-        .order('ingested_at', { ascending: false })
-        .limit(20);
-
-      const atoms = recentAtoms || [];
-
-      const recentActivity = atoms.map(a => {
-        const sd = (a.structured_data || {}) as {
-          image_id?: string; scene_type?: string; build_phase_guess?: string; agent_model?: string;
-        };
-        return {
-          imageId: sd.image_id || a.id,
-          vehicleId: a.vehicle_id,
-          tier: 0,
-          model: sd.agent_model || sd.scene_type || sd.build_phase_guess || 'byok',
-          confidence: Math.round((a.confidence_score ?? 0) * 100),
-          cost: 0,
-          contextScore: 0,
-          timestamp: a.ingested_at || a.observed_at || new Date().toISOString()
-        };
+    let active = true;
+    let pending: ReturnType<typeof setTimeout> | null = null;
+    setLiveState('connecting');
+    const channel = supabase.channel('image-processing-updates')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'vehicle_observations' }, payload => {
+        const row = payload.new as { kind?: string; structured_data?: { analysis_kind?: string } };
+        if (row.kind !== 'condition' || row.structured_data?.analysis_kind !== 'image_deep_byok' || document.visibilityState !== 'visible' || pending) return;
+        // Coalesce bursts; the recent feed refreshes at most once a minute.
+        pending = setTimeout(() => {
+          pending = null;
+          if (active && document.visibilityState === 'visible') void loadStats(false);
+        }, Math.max(0, 60_000 - (Date.now() - lastFeedAttempt.current)));
+      }).subscribe(status => {
+        if (active) setLiveState(status === 'SUBSCRIBED' ? 'connected' : status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED' ? 'unavailable' : 'connecting');
       });
+    return () => { active = false; if (pending) clearTimeout(pending); void supabase.removeChannel(channel); };
+  }, [autoRefresh, loadStats]);
 
-      // Window counts from the live feed only (NOT global totals — see note above).
-      const recentDeep = atoms.length;
-      const recentConfident = atoms.filter(a => (a.confidence_score ?? 0) >= 0.6).length;
-
-      // Global coverage from the DB-side rollup. get_image_ecosystem_status() reads the
-      // image_coverage_by_vehicle counter (bounded, ~80 rows) — never the 38.9M-row table.
-      let globalCoverage: ProcessingStats['globalCoverage'] = null;
-      try {
-        const { data: eco } = await supabase.rpc('get_image_ecosystem_status');
-        const cov = (eco as { coverage?: Record<string, number> } | null)?.coverage;
-        if (cov) globalCoverage = {
-          photos: cov.photos ?? 0, seenT1: cov.seen_t1 ?? 0, placedT2: cov.placed_t2 ?? 0,
-          vehicles: cov.vehicles ?? 0, pctDeep: cov.pct_deep ?? 0,
-          pctEngine: cov.pct_engine ?? 0, pctClip: cov.pct_clip ?? 0,
-        };
-      } catch { /* counter not refreshed yet — tile stays in pending state */ }
-
-      setStats({
-        globalCoverage,
-        total: recentDeep,
-        tier1Complete: recentDeep,
-        tier2Complete: recentConfident,
-        tier3Complete: 0,
-        failed: 0,
-        totalCost: 0,
-        modelUsage: {},
-        contextScores: { rich: 0, good: 0, medium: 0, poor: 0 },
-        recentActivity,
-        imagesPerMinute: 0,
-        eta: '',
-        startTime: new Date(),
-        avgCostPerImage: 0,
-        projectedCost: 0,
-        avgConfidence: 0,
-        validationRate: 0,
-        consensusRate: 0,
-        tablesPopulated: {},
-        alerts: []
-      });
-
-      setLoading(false);
-    } catch (error) {
-      console.error('Error loading stats:', error);
-      setLoading(false);
-    }
-  }
-
-  if (loading || !stats) {
-    return (
-      <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
-        Loading processing stats...
-      </div>
-    );
-  }
-
-  // These are WINDOW figures from the live recent-atom feed, not global totals.
-  // Percentages over a 20-row window are meaningless, so the tiles below show raw
-  // counts only. Global coverage % awaits the DB-side rollup (see loadStats TODO).
-  const confidentPercent = stats.tier1Complete > 0
-    ? (stats.tier2Complete / stats.tier1Complete) * 100
-    : 0;
-
+  const confident = activity?.filter(a => a.confidence != null && a.confidence >= 0.6).length;
+  const knownConfidence = activity?.filter(a => a.confidence != null).length;
   return (
-    <div style={{ padding: '24px', maxWidth: '1400px', margin: '0 auto' }}>
-      
-      {/* Header */}
-      <div style={{ marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+    <div className="image-processing-page">
+      <header className="image-processing-header">
         <div>
-          <button
-            onClick={() => navigate('/admin')}
-            className="button button-secondary cursor-button"
-            style={{ 
-              marginBottom: '16px',
-              fontSize: '11px', 
-              padding: '6px 12px',
-              border: '2px solid var(--border-light)',
-              transition: 'all 0.12s ease'
-            }}
-          >
-            ← Back to Mission Control
-          </button>
-          <h1 style={{ fontSize: '11px', fontWeight: 700, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-            Image Processing Dashboard
-          </h1>
-          <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-            Real-time AI analysis monitoring
-          </p>
+          <PrefetchLink to="/admin">← Mission Control</PrefetchLink>
+          <h1>Image processing</h1>
+          <p>Recent retained analysis and personal-corpus coverage.</p>
         </div>
-        <button
-          onClick={() => setAutoRefresh(!autoRefresh)}
-          className="button cursor-button"
-          style={{
-            padding: '8px 16px',
-            fontSize: '11px',
-            border: `2px solid ${autoRefresh ? 'var(--success)' : 'var(--border-light)'}`,
-            background: autoRefresh ? 'var(--success-light)' : 'var(--surface)',
-            color: autoRefresh ? 'var(--success)' : 'var(--text-muted)',
-            transition: 'all 0.12s ease'
-          }}
-        >
-          {autoRefresh ? 'AUTO-REFRESH ON' : 'AUTO-REFRESH PAUSED'}
-        </button>
+        <div className="image-processing-actions">
+          <button className="button button-primary" disabled={loading} onClick={() => void loadStats()}>{loading ? 'Refreshing…' : 'Refresh data'}</button>
+          <button className="button" aria-pressed={autoRefresh} onClick={() => setAutoRefresh(value => !value)}>{autoRefresh ? 'Feed updates on' : 'Feed updates off'}</button>
+        </div>
+      </header>
+      {loading && <p role="status">Reading processing data…</p>}
+      {autoRefresh && <p role="status" className={liveState === 'unavailable' ? 'image-processing-error' : 'image-processing-note'}>
+        {liveState === 'connected' ? 'Listening for analysis events. The recent feed updates at most once a minute while this page is visible; coverage updates with Refresh data.' : liveState === 'unavailable' ? 'Live updates are unavailable. Use Refresh data to read the latest results.' : 'Connecting to feed updates…'}
+      </p>}
+      {feedError && <p role="alert" className="image-processing-error">Recent activity could not be refreshed: {feedError} {activity !== null ? 'Showing the last successful feed.' : 'Activity counts are unknown.'}</p>}
+      {coverageError && <p role="alert" className="image-processing-error">Coverage could not be refreshed: {coverageError} {coverage !== null ? 'Showing the last successful coverage.' : 'Coverage is unknown.'}</p>}
+
+      <div className="image-processing-stats">
+        <section className="card image-processing-stat" aria-labelledby="image-processing-recent-title">
+          <h2 id="image-processing-recent-title">Recent analysis observations</h2>
+          <div className="image-processing-number">{showCount(activity?.length)}</div>
+          <p>Up to 20 latest matching observations, ordered by time received. These are not unique-image or fleet totals.</p>
+        </section>
+        <section className="card image-processing-stat" aria-labelledby="image-processing-confidence-title">
+          <h2 id="image-processing-confidence-title">Reported confidence ≥ 60%</h2>
+          <div className="image-processing-number">{showCount(confident)}</div>
+          <p>{activity !== null ? `${showCount(knownConfidence)} of ${activity.length} observations report confidence; ${activity.length - (knownConfidence ?? 0)} unknown.` : 'Confidence counts are unknown until the feed loads.'} Model confidence is not independent validation.</p>
+        </section>
+        <section className="card image-processing-stat" aria-labelledby="image-processing-coverage-title">
+          <h2 id="image-processing-coverage-title">Personal-corpus coverage</h2>
+          <div className="image-processing-number">{showPercent(coverage?.pctDeep)}</div>
+          <p>Deep-analysis markers among gated photos.</p>
+          <dl className="image-processing-coverage">
+            <dt>Deep / gated photos</dt><dd>{showCount(coverage?.deep)} / {showCount(coverage?.gated)}</dd>
+            <dt>Cached photos / vehicles</dt><dd>{showCount(coverage?.photos)} / {showCount(coverage?.vehicles)}</dd>
+            <dt>Engine placement / gated</dt><dd>{showPercent(coverage?.pctEngine)}</dd>
+            <dt>CLIP / placed photos</dt><dd>{showPercent(coverage?.pctClip)}</dd>
+          </dl>
+          <p>{coverageReadAt ? `Read ${showTime(coverageReadAt)}. Counter refresh time is not supplied by this reader.` : 'Coverage has not loaded.'}</p>
+          {!loading && !coverageError && coverage === null && <p>The reader has not reported a coverage rollup.</p>}
+        </section>
       </div>
 
-      {/* Live-window stats — figures from the recent deep-analysis atom feed, NOT global
-          totals. A real global coverage rollup awaits the DB-side aggregate (see loadStats). */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '24px' }}>
-
-        {/* Recent deep-analyzed atoms */}
-        <div className="card" style={{ padding: '16px', border: '2px solid var(--accent)' }}>
-          <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>
-            RECENT DEEP-ANALYSIS ATOMS
-          </div>
-          <div style={{ fontSize: '19px', fontWeight: 700 }}>
-            {stats.tier1Complete.toLocaleString()}
-          </div>
-          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
-            byok_deep_analysis · live window
-          </div>
+      <section className="card image-processing-feed" aria-labelledby="image-processing-feed-title">
+        <div className="image-processing-section-heading">
+          <h2 id="image-processing-feed-title">Recent activity</h2>
+          {feedReadAt && <p>Read {showTime(feedReadAt)}</p>}
         </div>
-
-        {/* High-confidence within window */}
-        <div className="card" style={{ padding: '16px', border: '2px solid var(--success)' }}>
-          <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>
-            HIGH CONFIDENCE (≥0.6)
-          </div>
-          <div style={{ fontSize: '19px', fontWeight: 700, marginBottom: '8px' }}>
-            {stats.tier2Complete.toLocaleString()}
-          </div>
-          <div style={{ height: '4px', background: 'var(--bg-secondary)', overflow: 'hidden' }}>
-            <div style={{ width: `${confidentPercent}%`, height: '100%', background: 'var(--success)' }} />
-          </div>
-          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
-            {confidentPercent.toFixed(0)}% of window
-          </div>
-        </div>
-
-        {/* Global coverage — DB-side rollup from get_image_ecosystem_status() */}
-        <div className="card" style={{ padding: '16px' }}>
-          <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>
-            GLOBAL COVERAGE
-          </div>
-          <div style={{ fontSize: '19px', fontWeight: 700, color: stats.globalCoverage ? 'var(--text)' : 'var(--text-muted)' }}>
-            {stats.globalCoverage ? `${Math.round(stats.globalCoverage.pctDeep * 100)}%` : '—'}
-          </div>
-          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
-            {stats.globalCoverage
-              ? `${stats.globalCoverage.seenT1.toLocaleString()} deep · ${Math.round(stats.globalCoverage.pctEngine * 100)}% engine · ${Math.round(stats.globalCoverage.pctClip * 100)}% CLIP · ${stats.globalCoverage.vehicles} vehicles`
-              : 'awaiting analysis-coverage rollup RPC'}
-          </div>
-        </div>
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '24px' }}>
-        {/* Recent Activity Feed */}
-        <div className="card">
-          <div className="card-header" style={{ fontSize: '11px', fontWeight: 700 }}>
-            RECENT ACTIVITY
-          </div>
-          <div className="card-body" style={{ padding: 0 }}>
-            {stats.recentActivity.map((activity, idx) => {
-              const timeAgo = Math.floor((Date.now() - new Date(activity.timestamp).getTime()) / 1000);
-              return (
-                <div 
-                  key={idx}
-                  style={{ 
-                    display: 'flex', 
-                    justifyContent: 'space-between', 
-                    padding: '12px 16px',
-                    borderBottom: '1px solid var(--border-light)'
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <div style={{ fontSize: '11px', fontFamily: "'Courier New', monospace", color: 'var(--text-muted)' }}>
-                      {activity.imageId.substring(0, 8)}
-                    </div>
-                    <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--accent)', textTransform: 'uppercase' }}>
-                      {activity.model}
-                    </div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                      {activity.confidence}% confidence
-                    </div>
-                  </div>
-                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                    {timeAgo < 60 ? `${timeAgo}s ago` : `${Math.floor(timeAgo / 60)}m ago`}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Pipeline marker reference */}
-        <div className="card">
-          <div className="card-header" style={{ fontSize: '11px', fontWeight: 700 }}>
-            DEPTH MARKER
-          </div>
-          <div className="card-body">
-            <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '16px' }}>
-              Analysis depth is read from the canonical BYOK marker, not the retired tier_1/2/3 keys.
-            </p>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '11px' }}>
-              <div>
-                <div style={{ fontWeight: 600, marginBottom: '2px' }}>image</div>
-                <code style={{ color: 'var(--text-muted)' }}>ai_scan_metadata.byok_deep_analysis</code>
+        {activity === null ? <p className="image-processing-empty">{loading ? 'Loading the recent feed…' : 'Recent activity is unavailable. Use Refresh data to retry.'}</p> : activity.length === 0 ? <p className="image-processing-empty">No matching recent analysis observations were returned. This does not establish that processing is stopped.</p> : (
+          <ul className="image-processing-list">
+            {activity.map(item => <li key={item.observationId}>
+              <div className="image-processing-activity">
+                <span className="image-processing-identity">{item.imageId ? `Image ${item.imageId.slice(0, 8)}` : `Observation ${item.observationId.slice(0, 8)}`}</span>
+                <span>{item.model || 'Model not reported'}</span>
+                <span>{item.confidence == null ? 'Confidence unknown' : `${Math.round(item.confidence * 100)}% reported confidence`}</span>
               </div>
-              <div>
-                <div style={{ fontWeight: 600, marginBottom: '2px' }}>atom</div>
-                <code style={{ color: 'var(--text-muted)' }}>vehicle_observations · kind=condition · analysis_kind=image_deep_byok</code>
+              <div className="image-processing-activity-context">
+                <span>Received: {showTime(item.timestamp)}</span>
+                {item.vehicleId && <PrefetchLink to={`/vehicle/${item.vehicleId}`}>Open vehicle</PrefetchLink>}
               </div>
-              <div>
-                <div style={{ fontWeight: 600, marginBottom: '2px' }}>per-vehicle / per-day depth</div>
-                <code style={{ color: 'var(--text-muted)' }}>get_vehicle_analysis_coverage() · get_vehicle_day_depth()</code>
-              </div>
-              <div>
-                <div style={{ fontWeight: 600, marginBottom: '2px' }}>global rollup</div>
-                <code style={{ color: 'var(--text-muted)' }}>get_image_ecosystem_status() · image_coverage_by_vehicle counter (no full scan)</code>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+            </li>)}
+          </ul>
+        )}
+      </section>
 
-      {/* Actions */}
-      <div style={{ marginTop: '24px', display: 'flex', gap: '12px' }}>
-        <button
-          onClick={loadStats}
-          className="button button-primary cursor-button"
-          style={{ padding: '10px 20px', fontSize: '11px' }}
-        >
-          REFRESH DATA
-        </button>
-        
-        <button
-          onClick={() => navigate('/admin/scripts')}
-          className="button button-secondary cursor-button"
-          style={{ padding: '10px 20px', fontSize: '11px' }}
-        >
-          SCRIPT CONTROL
-        </button>
-      </div>
+      <details className="card image-processing-reference">
+        <summary>How this is measured</summary>
+        <p>The feed reads condition observations marked <code>image_deep_byok</code>. A received observation is evidence of retained analysis, not a worker-health guarantee.</p>
+        <p>The existing <code>get_image_ecosystem_status()</code> reader reports the cached personal corpus (<code>is_external=false</code>). It does not establish coverage of all fleet images.</p>
+        <p>Deep and engine percentages use gated photos as their denominator. CLIP uses placed photos. Missing counters or zero-denominator ratios remain unknown.</p>
+        <p>Image depth uses <code>ai_scan_metadata.byok_deep_analysis</code>; coverage is maintained by the existing <code>image_coverage_by_vehicle</code> owner. Reading this page does not refresh that cache.</p>
+      </details>
+      <nav className="image-processing-actions" aria-label="Related operations">
+        <PrefetchLink to="/admin/scripts">Script coverage →</PrefetchLink>
+        <PrefetchLink to="/admin/status">System status →</PrefetchLink>
+      </nav>
     </div>
   );
 }
