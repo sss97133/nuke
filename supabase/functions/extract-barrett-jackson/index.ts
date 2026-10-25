@@ -1191,7 +1191,10 @@ async function saveVehicle(
       .select("id, auction_end_date")
       .eq("vehicle_id", vehicleId)
       .eq("source", "barrett-jackson")
-      .eq("source_url", vehicle.url)
+      // Match on the canonical URL: an exact source_url match missed www./non-www. spellings of the
+      // same lot and inserted ~10.4k twin rows (marked duplicate_of in 20261028120900, 2026-10-25).
+      .eq("canonical_listing_url", canonicalListingUrl(vehicle.url))
+      .is("duplicate_of", null)
       .limit(1)
       .maybeSingle();
 
@@ -1199,7 +1202,7 @@ async function saveVehicle(
       mustWrite('auction_events insert', await supabase.from("auction_events").insert({
         vehicle_id: vehicleId,
         source: "barrett-jackson",
-        source_url: vehicle.url,
+        source_url: canonicalListingUrl(vehicle.url),
         outcome: vehicle.status?.toLowerCase() === "sold" ? "sold" : "listed",
         winning_bid: vehicle.sale_price || null,
         lot_number: vehicle.lot_number || null,
@@ -1214,6 +1217,12 @@ async function saveVehicle(
   }
 
   return { vehicleId, isNew, fieldsUpdated, qualityScore: gate.score };
+}
+
+/** Same normalization as SQL public.canonical_listing_url(): lowercase, https, no www., no query/fragment, no trailing slash. */
+export function canonicalListingUrl(u: string): string {
+  return u.trim().toLowerCase().split("#")[0].split("?")[0]
+    .replace(/^https?:\/\/(www\.)?/, "https://").replace(/\/+$/, "");
 }
 
 // ─── Main handler ───────────────────────────────────────────────────────────
