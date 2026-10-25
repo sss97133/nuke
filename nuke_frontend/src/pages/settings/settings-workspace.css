@@ -1,0 +1,30 @@
+.settings-workspace { max-width: 1100px; margin: 0 auto; padding: 28px 18px 56px; min-width: 0; color: var(--text); font: var(--text-body)/1.5 var(--font-family); }
+.settings-workspace h1 { font-size: var(--text-title); font-weight: 700; line-height: 1.2; }
+.settings-workspace h2 { font-size: 18px; font-weight: 650; }
+.settings-page-heading { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 24px; }
+.settings-page-heading > * { min-width: 0; max-width: 100%; }
+.settings-reader-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 20px; }
+.settings-workspace button, .settings-workspace select, .settings-workspace input { min-height: var(--control-height); border-radius: var(--radius-sm); }
+.settings-workspace select, .settings-workspace input { max-width: 100%; color: var(--text); background: var(--surface); border: 1px solid var(--border); font: 16px/1.4 var(--font-family); padding: 8px 12px; }
+.settings-workspace a { color: var(--link); min-height: var(--control-height); display: inline-flex; align-items: center; }
+.settings-workspace :is(button, a, input, select):focus-visible { outline: 2px solid var(--border-focus); outline-offset: 3px; }
+.settings-surface { min-width: 0; padding: 20px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); }
+.settings-reader-error { border: 1px solid var(--border); border-left: 3px solid var(--error); border-radius: var(--radius); padding: 16px; margin-bottom: 20px; }
+.settings-muted, .settings-scope { color: var(--text-secondary); }
+.settings-scope { font-size: var(--text-callout); margin-bottom: 16px; }
+.settings-muted-surface { background: var(--bg); }
+.settings-event-kind { color: var(--text); background: var(--bg); }
+.settings-usage-fill { background: var(--action); }
+.settings-usage-chart { display: flex; align-items: flex-end; gap: 3px; height: 200px; overflow: hidden; }
+.settings-usage-day { height: 100%; flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: flex-end; }
+.settings-usage-bar-track { height: 160px; display: flex; align-items: flex-end; }
+.settings-usage-bar { width: 100%; background: var(--action); }
+.settings-usage-day-label { font-size: var(--text-caption); height: 40px; padding-top: 8px; white-space: nowrap; }
+.settings-usage-row:hover { background: var(--surface-hover); }
+.settings-usage .text-xs { font-size: var(--text-caption); }
+.settings-usage .text-sm { font-size: var(--text-callout); }
+.settings-usage table { min-width: 540px; }
+.settings-usage th { text-align: left; font-weight: 600; }
+.settings-usage th, .settings-usage td { padding: 12px; border-bottom: 1px solid var(--border); }
+.settings-usage .overflow-x-auto { overflow-x: auto; max-width: 100%; }
+@media (max-width: 600px) { .settings-workspace { padding: 24px 16px 40px; } .settings-surface { padding: 16px; } }
