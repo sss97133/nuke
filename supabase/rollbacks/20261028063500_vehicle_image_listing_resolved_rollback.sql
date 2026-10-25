@@ -1,4 +1,4 @@
--- Revert 20261028060000_vehicle_image_listing_resolved. The function holds no rows.
+-- Revert 20261028063500_vehicle_image_listing_resolved. The function holds no rows.
 -- Rows retired because the resolver implies them are un-retired by revert id (nothing is deleted).
 -- Run in psql with: -v revert_run_id=<retire run id, e.g. img_links_implied_retire_20261024>
 -- No COMMIT below: check the reported count, then COMMIT (or ROLLBACK) yourself. Repeat until 0 rows.

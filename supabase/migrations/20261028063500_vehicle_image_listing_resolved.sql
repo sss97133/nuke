@@ -11,7 +11,7 @@
 --           but not used to accept/reject: only 66% of Cloudinary /v<epoch>/ dates fell in the 0..150-day window.
 -- Images flagged in vehicle_image_nonvehicle_flags (not retired) are never derived. Listing = same normalized URL key
 -- and representative event as link_vehicle_images_to_listings. Additive only: one read-only function.
--- Revert: supabase/rollbacks/20261028060000_vehicle_image_listing_resolved_rollback.sql
+-- Revert: supabase/rollbacks/20261028063500_vehicle_image_listing_resolved_rollback.sql
 
 create or replace function public.vehicle_image_listing_resolved(p_vehicle_ids uuid[], p_include_stored boolean default true)
 returns table (image_id uuid, vehicle_id uuid, auction_event_id uuid, listing_url text, method text, confidence text,
