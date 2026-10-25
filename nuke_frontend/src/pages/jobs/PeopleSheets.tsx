@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { Text } from '../../kit';
+import { PrefetchLink } from '../../components/PrefetchLink';
 import { SignSheet } from './SignSheet';
-import { day, obj, parseAction, personLabel, str, type JobAction, type JsonObject } from './jobRead';
+import { day, num, obj, parseAction, personLabel, str, strings, type JobAction, type JsonObject } from './jobRead';
 import {
-  COSIGN_KINDS, actingFor, confirmBookingArgs, cosignArgs, facilityAssets, facilityChoices, reserveArgs, vouchArgs,
+  COSIGN_KINDS, actingFor, confirmBookingArgs, confirmWorkDayArgs, workDayConfirmationFailure, cosignArgs, facilityAssets, facilityChoices, reserveArgs, vouchArgs,
   type Asset, type CutBasis,
 } from './signDrafts';
 import { readJob } from './readJob';
@@ -171,5 +172,35 @@ export function ConfirmBookingSheet({ item, onClose, onDone }: { item: JsonObjec
     <div className="jb-field"><Text role="label">When</Text><Text role="body">{[day(str(clock?.from)), day(str(clock?.until))].filter(Boolean).join(' – ') || 'Not stated'}</Text></div>
     <div className="jb-field"><Text role="label">Asked by</Text><Text role="body">{personLabel(summary?.requested_by)}</Text></div>
     {summary?.capacity_free === false && <Text role="body" className="jb-warn">Every space on this asset looks taken then. Confirming may be refused.</Text>}
+  </SignSheet>;
+}
+
+/** Review a photo-derived work day before its owner records a self-confirmation. */
+export function ConfirmWorkDaySheet({ item, onClose, onDone }: { item: JsonObject; onClose: () => void; onDone: () => void }) {
+  const w = useWriter(data => workDayConfirmationFailure(data, str(item.ref_id) || ''));
+  const sign = obj(item.sign), summary = obj(item.summary), clock = obj(item.clock), vehicle = obj(item.vehicle);
+  const evidence = obj(summary?.evidence_counts);
+  const photos = num(evidence?.session_images), captureSpan = num(summary?.capture_span_minutes);
+  const vehicleId = str(vehicle?.vehicle_id);
+  const vehicleLabel = str(obj(item.vehicle_label)?.text) || 'Work day';
+  const says = strings(sign?.binds);
+  const doesNotSay = strings(sign?.does_not_bind);
+  const send = async () => {
+    const built = confirmWorkDayArgs(item);
+    if (!built.ok) { w.setFailure(built.error); return; }
+    await w.run('confirm_work_session', built.args);
+  };
+  return <SignSheet title="Review work day" says={says.length ? says : ['Self-confirmation of a photo-derived work day']}
+    doesNotSay={doesNotSay.length ? doesNotSay : ['Counterparty acceptance', 'Labor value', 'Payment']}
+    confirmLabel="Confirm this work day" onConfirm={send} busy={w.busy} failure={w.failure}
+    onClose={w.done ? () => { onDone(); onClose(); } : onClose}
+    done={w.done && <Text role="body" className="jb-done">Work day confirmed by you. Customer acceptance, labor value and payment remain separate.</Text>}>
+    <div className="jb-field"><Text role="label">Vehicle</Text><Text role="body">{vehicleLabel}</Text>
+      {vehicleId && <PrefetchLink to={`/vehicle/${encodeURIComponent(vehicleId)}`} target="_blank" rel="noopener noreferrer">Open vehicle and its photos (new tab)</PrefetchLink>}</div>
+    <div className="jb-field"><Text role="label">Recorded day</Text><Text role="body">{day(str(clock?.session_date)) || 'Not stated'}</Text></div>
+    {(photos !== null || captureSpan !== null) && <div className="jb-field"><Text role="label">Photo evidence</Text>
+      {photos !== null && <Text role="body">{photos} session photo{photos === 1 ? '' : 's'}</Text>}
+      {captureSpan !== null && <Text role="body">Photo capture span: {captureSpan} minutes. This is not measured labor time.</Text>}
+    </div>}
   </SignSheet>;
 }
