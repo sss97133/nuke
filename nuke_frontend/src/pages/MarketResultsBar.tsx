@@ -19,6 +19,6 @@ export function MarketResultsBar({ count, unavailable, hasMore, isLoading, searc
     <label>Search vehicles
       <input type="search" value={draft} onChange={event => { setDraft(event.target.value); onSearchChange(event.target.value); }} placeholder="Make, model, year…" />
     </label>
-    {hasActiveFilters && <button className="button button-secondary" onClick={onResetFilters}>Clear filters</button>}
+    {hasActiveFilters && <button className="button button-secondary" onClick={() => { setDraft(''); onResetFilters(); }}>Clear filters</button>}
   </div>;
 }

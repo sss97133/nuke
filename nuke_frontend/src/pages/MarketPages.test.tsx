@@ -127,3 +127,20 @@ it.each(['dashboard', 'detail'] as const)('shows loaded scope on %s without pres
   await act(async () => { await vi.advanceTimersByTimeAsync(200); });
   expect(fixture.feed.mock.lastCall?.[0].searchText).toBe('manual');
 });
+
+it.each(['dashboard', 'detail'] as const)('clears a pending search draft and its debounced URL update on %s', async page => {
+  vi.useFakeTimers();
+  await render(page, 'deal_score');
+  const input = host.querySelector<HTMLInputElement>('input[type="search"]')!;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, 'pending search');
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  expect(input.value).toBe('pending search');
+  expect(fixture.feed.mock.lastCall?.[0].searchText).toBe('');
+  await click('Clear filters');
+  expect(input.value).toBe('');
+  await act(async () => { await vi.advanceTimersByTimeAsync(200); });
+  expect(input.value).toBe('');
+  expect(fixture.feed.mock.lastCall?.[0].searchText).toBe('');
+});
