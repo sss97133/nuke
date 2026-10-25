@@ -759,7 +759,8 @@ async function saveToDatabase(
     body_style: extracted.body_style,
     description: extracted.description,
     sale_price: extracted.sale_price,
-    asking_price: extracted.estimate_high || null,
+    // Estimate is not a price: keep it in origin_metadata only (see 20261028040000)
+    asking_price: null,
     sale_status: extracted.auction_status === 'sold' ? 'sold' :
                  extracted.auction_status === 'not_sold' ? 'not_sold' :
                  extracted.auction_status === 'upcoming' ? 'upcoming' : null,
