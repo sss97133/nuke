@@ -70,7 +70,8 @@ it('retains a declared prior relationship without inventing its dates or an acqu
 });
 
 let state: ReturnType<typeof useVehiclesDashboard>, root: Root, container: HTMLDivElement;
-function Harness() { state = useVehiclesDashboard('user'); return null; }
+const snapshots: { viewer: string | null; ids: string[]; loading: boolean }[] = [];
+function Harness({ viewer = 'user' }: { viewer?: string | null }) { state = useVehiclesDashboard(viewer); snapshots.push({viewer, ids: state.vehicles.map(v => v.id), loading: state.isLoading}); return null; }
 beforeEach(() => {
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
   fixture.rows = {}; fixture.fail = ''; fixture.calls = [];
@@ -128,9 +129,9 @@ it('shows the recorded period and unknown estimate without a scalar-value action
   expect(markup).toContain('2020-01-01 → 2023-01-01');
   expect(markup).toContain('NOT ESTIMATED');
   expect(markup).not.toContain('SET VALUE');
-  expect(markup).not.toContain('REMOVE FROM GARAGE');
+  expect(container.querySelector('button[aria-label="Remove discovery from garage"]')).toBeNull();
   await act(async () => root.render(<MemoryRouter><GarageVehicleCard vehicle={{ ...vehicle, relationship_source: 'discovered' }} /></MemoryRouter>));
-  expect(container.innerHTML).toContain('REMOVE FROM GARAGE');
+  expect(container.querySelector('button[aria-label="Remove discovery from garage"]')).not.toBeNull();
 });
 
 it('keeps data confidence out of mechanical health in every card view', async () => {
@@ -216,9 +217,49 @@ it('shows a pending-only garage with exact source context and no physical vehicl
   expect(state.totalEstimatedValue).toBe(0);
   expect(state.data?.my_vehicles).toEqual([]);
   await act(async () => root.render(<MemoryRouter><GarageTab dashboard={state} /></MemoryRouter>));
-  expect(container.textContent).toContain('IDENTITY PENDING');
+  expect(container.textContent).toContain('Identity pending');
   expect(container.textContent).toContain('Synthetic shared vehicle');
   expect(container.querySelector('details')?.textContent).toContain('Synthetic shared interest, identity unknown.');
   expect(container.textContent).not.toContain('YOUR GARAGE IS EMPTY');
-  expect(container.querySelector('a[href*="/vehicle/"]')).toBeNull();
+  expect([...container.querySelectorAll('a[href*="/vehicle/"]')].filter(link => link.getAttribute('href') !== '/vehicle/add')).toEqual([]);
+});
+
+it('withholds a previous viewer garage in the first render after identity change or sign-out', async () => {
+  seedGarage(); await act(async () => root.render(<Harness />));
+  snapshots.length = 0;
+  await act(async () => root.render(<Harness viewer="other" />));
+  expect(snapshots[0]).toMatchObject({ viewer: 'other', ids: [], loading: true });
+  await act(async () => root.render(<Harness />));
+  snapshots.length = 0;
+  await act(async () => root.render(<Harness viewer={null} />));
+  expect(snapshots[0]).toMatchObject({ viewer: null, ids: [], loading: false });
+});
+it('retains known vehicle relationships when optional estimates fail and reports unavailable coverage', async () => {
+  seedGarage(); fixture.fail = 'nuke_estimates';
+  await act(async () => root.render(<Harness />));
+  expect(state.error).toBeNull(); expect(state.vehicles).toHaveLength(2);
+  expect(state.vehicles.every(v => v.estimated_value === null)).toBe(true);
+  expect(state.warnings).toContain('Recorded estimates are unavailable. Vehicle relationships remain visible.');
+});
+it('marks optional event reads unavailable without inventing zero activity', async () => {
+  seedGarage(); fixture.fail = 'vehicle_event_summary';
+  await act(async () => root.render(<Harness />));
+  expect(state.vehicles).toHaveLength(2);
+  expect(state.vehicles.every(v => v.event_count === null)).toBe(true);
+  expect(state.warnings).toContain('Event summaries are unavailable. Activity counts remain unknown.');
+});
+
+it('names real vehicle destinations and omits unsupported relationship and drag actions in every view', async () => {
+  seedGarage(); await act(async () => root.render(<Harness />));
+  const vehicle = state.vehicles[0];
+  for (const viewMode of ['GRID','LIST','COMPACT'] as const) {
+    await act(async () => root.render(<MemoryRouter><GarageVehicleCard vehicle={vehicle} viewMode={viewMode} /></MemoryRouter>));
+    expect(container.querySelector('a[aria-label]')?.getAttribute('aria-label')).toContain('Open 1970 EXAMPLE CAR');
+    expect(container.querySelector('a[aria-label]')?.getAttribute('href')).toBe(`/vehicle/${vehicle.id}`);
+    expect(container.querySelector('a [role="button"],a button')).toBeNull();
+    expect(container.querySelector('[draggable="true"]')).toBeNull();
+    expect(container.textContent).not.toMatch(/ASSIGN RELATIONSHIP|CATEGORIZE|ADD PHOTOS/);
+    if (viewMode !== 'COMPACT') expect(container.querySelector('.garage-card-open')?.textContent).toBe('View vehicle');
+  }
+  expect(fixture.calls.some(call => ['upsert','insert','update'].includes(call[1]))).toBe(false);
 });
