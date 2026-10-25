@@ -3,11 +3,12 @@ import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 const fixture = vi.hoisted(() => ({ results: {} as Record<string, any>, calls: [] as any[], downloads: [] as string[], authChanged: null as null | (() => void), listeners: new Set<() => void>() }));
+vi.mock('../../components/PrefetchLink', () => ({ default: ({ to, children, ...props }: any) => <a href={to} {...props}>{children}</a> }));
 vi.mock('../../lib/supabase', () => ({ supabase: { rpc: async (name: string) => ({ data: name === 'accounting_recent_activity' ? fixture.results.activity || [] : name === 'accounting_similar_classifications' ? fixture.results.similar || [] : fixture.results.grants || [], error: null }), functions: { invoke: async (_name: string, { body }: any) => { fixture.calls.push({ action: body.action }); return { data: { data: fixture.results[body.action] || { lines: [] } }, error: null }; } }, channel() { return { on() { return this; }, subscribe() { return this; } }; }, removeChannel() {}, storage: { from(bucket: string) { return { async download(path: string) { fixture.downloads.push(`${bucket}/${path}`); return { data: null, error: new Error('not available') }; } }; } }, auth: { getUser: async () => ({ data: { user: { id: '11111111-1111-4111-8111-111111111111' } }, error: null }), onAuthStateChange(callback: () => void) { fixture.listeners.add(callback); fixture.authChanged = () => { for (const listener of [...fixture.listeners]) listener(); }; return { data: { subscription: { unsubscribe() { fixture.listeners.delete(callback); } } } }; } }, from(table: string) {
   const call: any = { table }; fixture.calls.push(call);
   const q: any = {
     select(fields: string) { call.fields = fields; return q; },
-    eq(field: string, value: unknown) { call.filter = [field, value]; return q; },
+    eq(field: string, value: unknown) { call.filter = [field, value]; (call.filters ||= []).push([field, value]); return q; },
     order() { return q; }, limit() { return q; }, in() { return q; }, single() { return q; }, is() { return q; }, or() { return q; },
     range(a: number, b: number) { call.range = [a, b]; return q; },
     // The records table reads the current records view; serve the tax_read fixture's records through it.
@@ -43,6 +44,26 @@ it('keeps reader failures distinct from no records or access', async () => {
   expect(container.textContent).toContain('invoice totals are unknown');
   expect(container.textContent).not.toContain('No source documents are visible');
 });
+it('does not call a failed review queue clear or claim zero coverage', async () => {
+  fixture.results.financial_review_queue = { error: { message: 'unavailable' }, data: null, count: null };
+  await act(async () => root.render(<FinanceDashboard />));
+  expect(container.textContent).toContain('Source question coverage is unknown');
+  expect(container.textContent).not.toContain('0 current or unversioned source questions');
+  await act(async () => Array.from(container.querySelectorAll('button')).find(button => button.textContent === 'Review questions')!.click());
+  expect(container.textContent).toContain('Review concerns could not load');
+  expect(container.textContent).not.toContain('This queue is clear');
+});
+
+it('uses admitted use currency when opened without a selected bookkeeping entry', async () => {
+  fixture.results.financial_review_queue = { data: [{ id: 'question', document_id: 'doc', concern_type: 'source_review', status: 'pending' }], count: 1 };
+  fixture.results.financial_document_extractions = { data: [{ id: 'use', field_key: 'expense_use_example', value_normalized: { value: { destination_label: 'Shop supplies', allocated_amount: '12.00', unallocated_amount: '0.00', currency: 'USD' } } }], count: 1 };
+  await act(async () => root.render(<FinanceDashboard />));
+  await act(async () => Array.from(container.querySelectorAll('button')).find(button => button.textContent === 'View evidence')!.click());
+  const dialog = container.querySelector('dialog')!;
+  expect(dialog.textContent).toContain('12.00 USD');
+  expect(dialog.textContent).not.toContain('currency unknown');
+  expect(dialog.textContent).not.toContain('Open the use editor above');
+});
 it('reads pending concerns independently of vehicle/deal allocation and opens retained interpretations', async () => {
   fixture.results.financial_review_queue = { data: [{ id: 'concern-1', document_id: 'doc-1', concern_type: 'cut_off', priority: 'high', status: 'pending', detail: 'Date requires corroboration' }], count: 201 };
   fixture.results.financial_document_extractions = { data: [{ id: 'revision-1', field_key: 'amount_ttc', value_normalized: 100, extractor: 'synthetic', is_superseded: true, superseded_by: 'revision-2' }], count: 1 };
@@ -66,7 +87,9 @@ it('reads pending concerns independently of vehicle/deal allocation and opens re
 it('does not render mixed-currency rollups as a single monetary total', async () => {
   fixture.results.v_financial_deal_flow = { data: [{ deal_number: 'synthetic', mixed_currency: true, invoiced_total: 999, credited_total: 99 }], count: 1 };
   await act(async () => root.render(<FinanceDashboard />));
-  await act(async () => Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'Deals')!.click());
+  await act(async () => Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'Office settings')!.click());
+  expect(Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'View deal flow')!.closest('[hidden]')).toBeNull();
+  await act(async () => Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'View deal flow')!.click());
   expect(fixture.calls.find(c => c.table === 'v_financial_deal_flow').filter).toEqual(['owner_id', '11111111-1111-4111-8111-111111111111']);
   expect(container.textContent).toContain('MIXED CURRENCIES');
   expect(container.textContent).not.toContain('999.00');
@@ -247,7 +270,7 @@ it('switches shared book reads without unmounting the owner recovery queue', asy
   expect(container.querySelector('[aria-label="Active accounting book"] button[aria-pressed="true"]')?.textContent).toBe('Shared owner · shared books (review and correct)');
   expect(container.querySelector('input[type="file"][multiple]')).toBe(recovery);
   expect(recovery?.closest('[hidden]')).not.toBeNull();
-  expect(container.textContent).toContain('Deal rollups are not included');
+  expect(container.querySelector('nav[aria-label="Accounting office"]')?.textContent).not.toContain('Office settings');
   expect(Array.from(container.querySelectorAll('button')).some(b => b.textContent === 'Deals')).toBe(false);
   expect(fixture.calls.filter(c => c.table === 'financial_documents').at(-1).filter).toEqual(['owner_id', '22222222-2222-4222-8222-222222222222']);
   expect(window.localStorage.getItem('accounting.book')).toBe('22222222-2222-4222-8222-222222222222');
@@ -274,4 +297,29 @@ it('names who changed the shared book from the listed grants and opens the chang
   expect(container.querySelector('.accounting-activity-latest')?.textContent).toBe('Latest Shared owner classified 2 records · accounting-source-0241.csv · just now');
   await act(async () => (container.querySelector('.accounting-activity-list button') as HTMLButtonElement).click());
   expect(container.querySelector('dialog[aria-label="Accounting evidence"]')).not.toBeNull();
+});
+
+it('opens linked receipt items and returns to the selected entry without showing another expense associations', async () => {
+  const sourceId = '22222222-2222-4222-8222-222222222222';
+  const vehicleId = '33333333-3333-4333-8333-333333333333';
+  const jobId = '44444444-4444-4444-8444-444444444444';
+  fixture.results.tax_read = { records: [{ id: 'entry', document_id: 'batch-doc', record: { record_kind: 'retained_bank_movement', source_key: 'selected-key', local_id: 'entry', year: '2025', date: '2025-02-20', account: 'Checking', section: 'Owner', amount: '-12', currency: 'USD', description: 'Selected synthetic entry' } }], total_rows: 1, next_after: null, controls_valid: true, controls: [] };
+  fixture.results.financial_document_extractions = { data: [
+    { id: 'linked', field_key: 'expense_items_selected_1', value_normalized: { value: { expense_source_key: 'selected-key', stage: 'source_association_not_full_monetary_reconciliation', items: [{ description: 'Synthetic filter', document_id: sourceId, source_filename: 'receipt.pdf', line_number: 2, source_amount: '12.00', source_currency: 'USD', vehicle_id: vehicleId, work_order_id: jobId }] } }, document: { source_filename: 'batch.csv' } },
+    { id: 'unrelated', field_key: 'expense_items_other_1', value_normalized: { value: { expense_source_key: 'other-key', items: [{ description: 'UNRELATED PURCHASE' }] } } },
+  ], count: 2 };
+  await act(async () => root.render(<FinanceDashboard />));
+  await act(async () => Array.from(container.querySelectorAll('button')).find(button => button.textContent === 'Records')!.click());
+  await act(async () => Array.from(container.querySelectorAll('button')).find(button => button.textContent === 'View evidence')!.click());
+  let dialog = container.querySelector('dialog')!;
+  expect(dialog.textContent).toContain('Synthetic filter');
+  expect(dialog.textContent).not.toContain('UNRELATED PURCHASE');
+  expect(dialog.querySelector(`a[href="/vehicle/${vehicleId}"]`)).not.toBeNull();
+  expect(dialog.querySelector(`a[href="/jobs/${jobId}"]`)).not.toBeNull();
+  await act(async () => Array.from(dialog.querySelectorAll('button')).find(button => button.textContent?.startsWith('Open source'))!.click());
+  expect(fixture.calls.some(call => call.table === 'financial_document_extractions' && call.filters?.some(([key, value]: string[]) => key === 'document_id' && value === sourceId))).toBe(true);
+  dialog = container.querySelector('dialog')!;
+  expect(dialog.querySelector('[aria-label="Selected accounting record"]')).toBeNull();
+  await act(async () => Array.from(dialog.querySelectorAll('button')).find(button => button.textContent === '‹ Back to entry')!.click());
+  expect(container.querySelector('[aria-label="Selected accounting record"]')?.textContent).toContain('Selected synthetic entry');
 });

@@ -1,22 +1,21 @@
 import * as React from "react"
 
 // Nuke Design System — Input Component
-// Rules: 0px border-radius, --fs-9, height 28px, Arial, 1px border
+// Shared system type, native control sizing and canonical focus treatment
 // Keeps form-input class for base styles, adds explicit overrides
 
 export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   hasError?: boolean
 }
 
-const inputStyle: React.CSSProperties = { fontSize: "var(--fs-9, 9px)",
-  fontFamily: "Arial, sans-serif",
-  height: "28px",
+const inputStyle: React.CSSProperties = { fontSize: "max(16px, var(--text-body))",
+  fontFamily: "var(--font-family)",
+  height: "var(--control-height)",
   width: "100%",
   backgroundColor: "var(--bg, #f5f5f5)",
   color: "var(--text, #2a2a2a)",
   border: "1px solid var(--border, #cccccc)",
   padding: "0 var(--space-2, 8px)",
-  outline: "none",
   transition: "border-color 0.12s ease",
   boxSizing: "border-box", appearance: "none",
   WebkitAppearance: "none",

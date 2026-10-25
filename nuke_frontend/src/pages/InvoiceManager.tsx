@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import { usePageTitle } from '../hooks/usePageTitle';
+import './InvoiceManager.css';
 
 interface Invoice {
   id: string;
@@ -36,11 +37,23 @@ interface Invoice {
   };
 }
 
+const isClosedInvoice = (invoice: Invoice) =>
+  [invoice.status, invoice.payment_status].some(status => ['cancelled', 'canceled', 'void', 'voided'].includes(status));
+const canRecordPayment = (invoice: Invoice) =>
+  !isClosedInvoice(invoice) && invoice.payment_status !== 'paid' && Number.isFinite(invoice.amount_due) && invoice.amount_due > 0;
+const calendarDate = (value: string) => {
+  // Postgres date values represent a calendar day, not midnight UTC.
+  const date = new Date(/^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T00:00:00` : value);
+  return Number.isFinite(date.getTime()) ? date.toLocaleDateString() : '—';
+};
+
 const InvoiceManager: React.FC = () => {
+  usePageTitle('Invoices');
   // useAuth reads from global AuthContext — no getUser() / getSession() needed
   const { user } = useAuth();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [loading, setLoading] = useState(!user);
+  const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'draft' | 'sent' | 'unpaid' | 'paid'>('all');
   const [previewInvoice, setPreviewInvoice] = useState<Invoice | null>(null);
   const [myVehicles, setMyVehicles] = useState<Array<{ id: string; year: number | null; make: string | null; model: string | null; trim: string | null }>>([]);
@@ -48,11 +61,10 @@ const InvoiceManager: React.FC = () => {
   const [draftLimit, setDraftLimit] = useState<number>(5);
   const [draftBusy, setDraftBusy] = useState<boolean>(false);
   const [draftMessage, setDraftMessage] = useState<string>('');
-  const navigate = useNavigate();
 
   useEffect(() => {
     loadInvoices();
-  }, [filter]);
+  }, [filter, user?.id]);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -82,7 +94,9 @@ const InvoiceManager: React.FC = () => {
   }, [user?.id]);
 
   const loadInvoices = async () => {
+    if (!user) return;
     setLoading(true);
+    setErrorMessage(null);
     try {
       let query = supabase
         .from('generated_invoices')
@@ -101,7 +115,7 @@ const InvoiceManager: React.FC = () => {
           html_content,
           client:clients(client_name),
           event:timeline_events(
-            title, 
+            title,
             event_type,
             mileage_at_event,
             vehicle:vehicles(make, model, year, series, vin, license_plate)
@@ -132,7 +146,7 @@ const InvoiceManager: React.FC = () => {
         event_title: inv.event?.title || 'Unknown',
         event_type: inv.event?.event_type || null,
         mileage: inv.event?.mileage_at_event || null,
-        vehicle_name: inv.event?.vehicle 
+        vehicle_name: inv.event?.vehicle
           ? `${inv.event.vehicle.year} ${inv.event.vehicle.make} ${inv.event.vehicle.model}${inv.event.vehicle.series ? ' ' + inv.event.vehicle.series : ''}`
           : null,
         vehicle_vin: inv.event?.vehicle?.vin || null,
@@ -246,6 +260,7 @@ const InvoiceManager: React.FC = () => {
       setInvoices(formatted);
     } catch (error) {
       console.error('Error loading invoices:', error);
+      setErrorMessage('Invoices could not be loaded. Try again.');
     } finally {
       setLoading(false);
     }
@@ -282,6 +297,9 @@ const InvoiceManager: React.FC = () => {
   };
 
   const markAsSent = async (invoiceId: string) => {
+    const invoice = invoices.find(item => item.id === invoiceId);
+    if (!invoice || invoice.status !== 'draft' || isClosedInvoice(invoice)) return;
+    if (!window.confirm('Mark this invoice as sent? This records delivery you completed elsewhere; it does not send an email.')) return;
     try {
       const { error } = await supabase
         .from('generated_invoices')
@@ -292,13 +310,17 @@ const InvoiceManager: React.FC = () => {
       loadInvoices();
     } catch (error) {
       console.error('Error marking as sent:', error);
+      setErrorMessage('The sent status could not be saved. Try again.');
     }
   };
 
   const recordPayment = async (invoiceId: string, amount: number) => {
     try {
       const invoice = invoices.find(i => i.id === invoiceId);
-      if (!invoice) return;
+      if (!invoice || !canRecordPayment(invoice) || !Number.isFinite(amount) || amount <= 0) {
+        setErrorMessage('Enter a positive payment amount for an open invoice.');
+        return;
+      }
 
       const newAmountPaid = invoice.amount_paid + amount;
       const newAmountDue = invoice.total_amount - newAmountPaid;
@@ -306,7 +328,7 @@ const InvoiceManager: React.FC = () => {
 
       const { error } = await supabase
         .from('generated_invoices')
-        .update({ 
+        .update({
           amount_paid: newAmountPaid,
           amount_due: newAmountDue,
           payment_status: newStatus,
@@ -318,6 +340,7 @@ const InvoiceManager: React.FC = () => {
       loadInvoices();
     } catch (error) {
       console.error('Error recording payment:', error);
+      setErrorMessage('The payment could not be saved. Try again.');
     }
   };
 
@@ -351,40 +374,43 @@ const InvoiceManager: React.FC = () => {
   };
 
   return (
-    <div style={{ 
-      background: 'var(--bg)', 
-      minHeight: '100vh', 
-      padding: 'var(--space-4)' 
+    <div className="invoice-manager" style={{
+      background: 'var(--bg)',
+      minHeight: '100vh',
+      padding: 'var(--space-4)'
     }}>
       <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
         {/* Header */}
-        <div style={{ 
+        <div style={{
           marginBottom: 'var(--space-4)',
           display: 'flex',
           justifyContent: 'space-between',
-          alignItems: 'center'
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: 16
         }}>
-          <h1 style={{ 
-            fontSize: '14px', 
-            fontWeight: 700, 
+          <h1 style={{
+            fontSize: 'var(--text-title)',
+            fontWeight: 700,
             color: 'var(--text)',
             margin: 0
           }}>
             Invoice Manager
           </h1>
-          
+
           {/* Filters */}
-          <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)' }}>
             {(['all', 'draft', 'sent', 'unpaid', 'paid'] as const).map(f => (
               <button
                 key={f}
+                aria-pressed={filter === f}
                 onClick={() => setFilter(f)}
                 style={{
                   padding: '4px var(--space-2)',
-                  border: '2px solid var(--border)',
+                  border: '1px solid var(--border)',
                   background: filter === f ? 'var(--text)' : 'var(--surface)',
                   color: filter === f ? 'var(--surface)' : 'var(--text)',
-                  fontSize: '9px',
+                  fontSize: 'var(--text-caption)',
                   fontWeight: 700,
                   cursor: 'pointer',
                   transition: 'var(--transition)',
@@ -400,23 +426,24 @@ const InvoiceManager: React.FC = () => {
         {/* Draft generator (deterministic, no LLM) */}
         <div style={{
           background: 'var(--surface)',
-          border: '2px solid var(--border)',
+          border: '1px solid var(--border)',
           padding: 'var(--space-3)',
           marginBottom: 'var(--space-3)'
         }}>
-          <div style={{ fontSize: '10px', fontWeight: 700, marginBottom: '6px' }}>
+          <div style={{ fontSize: 'var(--text-callout)', fontWeight: 700, marginBottom: '6px' }}>
             Generate draft invoices from timeline evidence (deterministic)
           </div>
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
             <select
+              aria-label="Vehicle for draft invoices"
               value={draftVehicleId}
               onChange={(e) => setDraftVehicleId(e.target.value)}
               style={{
                 padding: '4px 6px',
-                border: '2px solid var(--border)',
+                border: '1px solid var(--border)',
                 background: 'var(--surface)',
-                fontSize: '9px',
-                minWidth: '240px'
+                width: '240px',
+                maxWidth: '100%'
               }}
             >
               {myVehicles.length === 0 ? (
@@ -437,9 +464,8 @@ const InvoiceManager: React.FC = () => {
               style={{
                 width: '70px',
                 padding: '4px 6px',
-                border: '2px solid var(--border)',
+                border: '1px solid var(--border)',
                 background: 'var(--surface)',
-                fontSize: '9px'
               }}
               title="How many events to consider"
             />
@@ -449,10 +475,10 @@ const InvoiceManager: React.FC = () => {
               disabled={draftBusy || !draftVehicleId}
               style={{
                 padding: '4px 10px',
-                border: '2px solid var(--border)',
+                border: '1px solid var(--border)',
                 background: 'var(--surface)',
                 color: 'var(--text)',
-                fontSize: '9px',
+                fontSize: 'var(--text-caption)',
                 fontWeight: 700,
                 cursor: draftBusy ? 'not-allowed' : 'pointer',
               }}
@@ -464,10 +490,10 @@ const InvoiceManager: React.FC = () => {
               disabled={draftBusy || !draftVehicleId}
               style={{
                 padding: '4px 10px',
-                border: '2px solid var(--text)',
+                border: '1px solid var(--text)',
                 background: 'var(--text)',
                 color: 'var(--surface)',
-                fontSize: '9px',
+                fontSize: 'var(--text-caption)',
                 fontWeight: 800,
                 cursor: draftBusy ? 'not-allowed' : 'pointer',
               }}
@@ -476,30 +502,34 @@ const InvoiceManager: React.FC = () => {
             </button>
 
             {draftMessage && (
-              <div style={{ fontSize: '9px', color: 'var(--text-secondary)' }}>
+              <div style={{ fontSize: 'var(--text-caption)', color: 'var(--text-secondary)' }}>
                 {draftMessage}
               </div>
             )}
           </div>
         </div>
 
+        {errorMessage && <div role="alert" className="invoice-notice">
+          {errorMessage} <button type="button" onClick={loadInvoices}>Refresh invoices</button>
+        </div>}
         {/* Invoice List */}
         {loading ? (
-          <div style={{ textAlign: 'center', padding: 'var(--space-6)', color: 'var(--text-secondary)', fontSize: '10px' }}>
+          <div style={{ textAlign: 'center', padding: 'var(--space-6)', color: 'var(--text-secondary)', fontSize: 'var(--text-callout)' }}>
             Loading invoices...
           </div>
         ) : invoices.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: 'var(--space-6)', color: 'var(--text-secondary)', fontSize: '10px' }}>
-            No invoices found
+          <div style={{ textAlign: 'center', padding: 'var(--space-6)', color: 'var(--text-secondary)', fontSize: 'var(--text-callout)' }}>
+            {errorMessage ? 'Invoice list unavailable' : 'No invoices found'}
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
             {invoices.map(invoice => (
               <div
+                className="invoice-row"
                 key={invoice.id}
                 style={{
                   background: 'var(--surface)',
-                  border: '2px solid var(--border)',
+                  border: '1px solid var(--border)',
                   padding: 'var(--space-3)',
                   display: 'flex',
                   justifyContent: 'space-between',
@@ -509,22 +539,22 @@ const InvoiceManager: React.FC = () => {
               >
                 {/* Invoice Info */}
                 <div style={{ flex: 1 }}>
-                  <div style={{ 
-                    fontSize: '10px', 
-                    fontWeight: 700, 
+                  <div style={{
+                    fontSize: 'var(--text-callout)',
+                    fontWeight: 700,
                     color: 'var(--text)',
                     marginBottom: '2px'
                   }}>
                     {invoice.invoice_number}
                   </div>
-                  <div style={{ fontSize: '9px', color: 'var(--text)', marginBottom: '4px' }}>
+                  <div style={{ fontSize: 'var(--text-caption)', color: 'var(--text)', marginBottom: '4px' }}>
                     {invoice.client_name || 'No client'} • <span style={{ textTransform: 'capitalize' }}>
                       {invoice.event_type ? invoice.event_type.replace('_', ' ') : invoice.event_title}
                     </span>
                   </div>
                   {invoice.vehicle_name && (
-                    <div style={{ 
-                      fontSize: '9px', 
+                    <div style={{
+                      fontSize: 'var(--text-caption)',
                       fontWeight: 600,
                       color: 'var(--text)',
                       background: 'var(--bg)',
@@ -535,15 +565,15 @@ const InvoiceManager: React.FC = () => {
                     }}>
                       {invoice.vehicle_name}
                       {invoice.vehicle_vin && (
-                        <span style={{ marginLeft: '8px', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', fontSize: '8px' }}>
+                        <span style={{ marginLeft: '8px', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', fontSize: 'var(--text-caption)' }}>
                           VIN: {invoice.vehicle_vin.slice(-8)}
                         </span>
                       )}
                     </div>
                   )}
-                  <div style={{ fontSize: '8px', color: 'var(--text-secondary)', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                    <span>Invoice: {new Date(invoice.invoice_date).toLocaleDateString()}</span>
-                    <span>Due: {new Date(invoice.due_date).toLocaleDateString()}</span>
+                  <div style={{ fontSize: 'var(--text-caption)', color: 'var(--text-secondary)', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                    <span>Invoice: {calendarDate(invoice.invoice_date)}</span>
+                    <span>Due: {calendarDate(invoice.due_date)}</span>
                     {invoice.mileage && (
                       <span>Mileage: {invoice.mileage.toLocaleString()} mi</span>
                     )}
@@ -555,16 +585,16 @@ const InvoiceManager: React.FC = () => {
 
                 {/* Amount */}
                 <div style={{ textAlign: 'right' }}>
-                  <div style={{ 
-                    fontSize: '11px', 
-                    fontWeight: 700, 
+                  <div style={{
+                    fontSize: '11px',
+                    fontWeight: 700,
                     fontFamily: 'var(--font-mono)',
                     color: 'var(--text)'
                   }}>
                     {formatCurrency(invoice.total_amount)}
                   </div>
-                  <div style={{ 
-                    fontSize: '8px', 
+                  <div style={{
+                    fontSize: 'var(--text-caption)',
                     color: getStatusColor(invoice.payment_status),
                     fontWeight: 600,
                     textTransform: 'uppercase'
@@ -574,7 +604,7 @@ const InvoiceManager: React.FC = () => {
                   {invoice.cashflow && invoice.amount_paid > 0 && (
                     <div
                       style={{
-                        fontSize: '8px',
+                        fontSize: 'var(--text-caption)',
                         marginTop: '2px',
                         color: getCashflowColor(invoice.cashflow.status),
                         fontWeight: 600,
@@ -588,15 +618,15 @@ const InvoiceManager: React.FC = () => {
                 </div>
 
                 {/* Actions */}
-                <div style={{ display: 'flex', gap: 'var(--space-1)' }}>
+                <div className="invoice-row-actions" style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-1)' }}>
                   <button
                     onClick={() => setPreviewInvoice(invoice)}
                     style={{
                       padding: '4px var(--space-2)',
-                      border: '2px solid var(--border)',
+                      border: '1px solid var(--border)',
                       background: 'var(--surface)',
                       color: 'var(--text)',
-                      fontSize: '9px',
+                      fontSize: 'var(--text-caption)',
                       fontWeight: 600,
                       cursor: 'pointer',
                       transition: 'var(--transition)'
@@ -604,39 +634,39 @@ const InvoiceManager: React.FC = () => {
                   >
                     PREVIEW
                   </button>
-                  
-                  {invoice.status === 'draft' && (
+
+                  {invoice.status === 'draft' && !isClosedInvoice(invoice) && (
                     <button
                       onClick={() => markAsSent(invoice.id)}
                       style={{
                         padding: '4px var(--space-2)',
-                        border: '2px solid var(--text)',
+                        border: '1px solid var(--text)',
                         background: 'var(--text)',
                         color: 'var(--surface)',
-                        fontSize: '9px',
+                        fontSize: 'var(--text-caption)',
                         fontWeight: 700,
                         cursor: 'pointer',
                         transition: 'var(--transition)'
                       }}
                     >
-                      SEND
+                      Mark as sent
                     </button>
                   )}
-                  
-                  {invoice.payment_status !== 'paid' && (
+
+                  {canRecordPayment(invoice) && (
                     <button
                       onClick={() => {
                         const amount = prompt('Enter payment amount:', invoice.amount_due.toString());
                         if (amount) {
-                          recordPayment(invoice.id, parseFloat(amount));
+                          recordPayment(invoice.id, Number(amount));
                         }
                       }}
                       style={{
                         padding: '4px var(--space-2)',
-                        border: '2px solid var(--success)',
+                        border: '1px solid var(--success)',
                         background: 'var(--success)',
                         color: 'var(--surface-elevated)',
-                        fontSize: '9px',
+                        fontSize: 'var(--text-caption)',
                         fontWeight: 700,
                         cursor: 'pointer',
                         transition: 'var(--transition)'
@@ -668,9 +698,10 @@ const InvoiceManager: React.FC = () => {
           onClick={() => setPreviewInvoice(null)}
         >
           <div
+            className="invoice-preview"
             style={{
               background: 'var(--surface)',
-              border: '2px solid var(--border)',
+              border: '1px solid var(--border)',
               maxWidth: '900px',
               width: '100%',
               maxHeight: '90vh',
@@ -679,25 +710,25 @@ const InvoiceManager: React.FC = () => {
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ 
-              display: 'flex', 
-              justifyContent: 'space-between', 
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
               alignItems: 'center',
               marginBottom: 'var(--space-3)',
               paddingBottom: 'var(--space-2)',
-              borderBottom: '2px solid var(--border)'
+              borderBottom: '1px solid var(--border)'
             }}>
-              <h2 style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text)', margin: 0 }}>
+              <h2 style={{ fontSize: 'var(--text-body)', fontWeight: 700, color: 'var(--text)', margin: 0 }}>
                 Invoice Preview - {previewInvoice.invoice_number}
               </h2>
               <button
                 onClick={() => setPreviewInvoice(null)}
                 style={{
                   padding: '4px var(--space-2)',
-                  border: '2px solid var(--border)',
+                  border: '1px solid var(--border)',
                   background: 'var(--surface)',
                   color: 'var(--text)',
-                  fontSize: '9px',
+                  fontSize: 'var(--text-caption)',
                   fontWeight: 700,
                   cursor: 'pointer',
                 }}
@@ -717,81 +748,23 @@ const InvoiceManager: React.FC = () => {
                 dangerouslySetInnerHTML={{ __html: previewInvoice.html_content }}
               />
             ) : (
-              <div style={{ 
-                padding: 'var(--space-4)', 
+              <div style={{
+                padding: 'var(--space-4)',
                 textAlign: 'center',
                 color: 'var(--text-secondary)',
-                fontSize: '10px'
+                fontSize: 'var(--text-callout)'
               }}>
                 No HTML content generated yet
               </div>
             )}
 
-            {/* Actions */}
-            <div style={{ 
-              marginTop: 'var(--space-4)',
-              display: 'flex',
-              gap: 'var(--space-2)',
-              paddingTop: 'var(--space-3)',
-              borderTop: '2px solid var(--border)'
-            }}>
-              <button
-                onClick={() => {
-                  // Future: Email functionality
-                  alert('Email functionality coming soon');
-                }}
-                style={{
-                  flex: 1,
-                  padding: '6px var(--space-3)',
-                  border: '2px solid var(--text)',
-                  background: 'var(--text)',
-                  color: 'var(--surface)',
-                  fontSize: '9px',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  transition: 'var(--transition)'
-                }}
-              >
-                EMAIL TO CLIENT
-              </button>
-              <button
-                onClick={() => {
-                  // Future: PDF generation
-                  alert('PDF generation coming soon');
-                }}
-                style={{
-                  flex: 1,
-                  padding: '6px var(--space-3)',
-                  border: '2px solid var(--border)',
-                  background: 'var(--surface)',
-                  color: 'var(--text)',
-                  fontSize: '9px',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  transition: 'var(--transition)'
-                }}
-              >
-                DOWNLOAD PDF
-              </button>
-              <button
-                onClick={() => {
-                  // Future: QuickBooks export
-                  alert('QuickBooks export coming soon');
-                }}
-                style={{
-                  flex: 1,
-                  padding: '6px var(--space-3)',
-                  border: '2px solid var(--border)',
-                  background: 'var(--surface)',
-                  color: 'var(--text)',
-                  fontSize: '9px',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  transition: 'var(--transition)'
-                }}
-              >
-                EXPORT TO QB
-              </button>
+            <div className="invoice-preview-actions">
+              <p id="invoice-delivery-unavailable">Email delivery, PDF downloads and QuickBooks export are not available from this page yet.</p>
+              <div>
+                <button type="button" disabled aria-describedby="invoice-delivery-unavailable">Email to client</button>
+                <button type="button" disabled aria-describedby="invoice-delivery-unavailable">Download PDF</button>
+                <button type="button" disabled aria-describedby="invoice-delivery-unavailable">Export to QuickBooks</button>
+              </div>
             </div>
           </div>
         </div>

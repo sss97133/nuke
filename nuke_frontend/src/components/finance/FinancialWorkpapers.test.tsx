@@ -250,3 +250,54 @@ it('select mode: tap rows to select them, classify the selection in one sheet, a
   await act(async () => (container.querySelector('tbody tr') as HTMLElement).click());
   expect(open).toHaveBeenCalledTimes(1);
 });
+
+it('drills an expense subtotal into its exact year, currency and ledger classification', async () => {
+  fixture.invoke.mockResolvedValue(response({ ...empty(), total_rows: 3, controls: [
+    { record_kind: 'retained_ledger_decision', year: '2025', account: 'Checking', section: 'Expense', currency: 'USD', retained_amount: '40', rows: 1 },
+    { record_kind: 'retained_ledger_decision', year: '2025', account: 'Checking', section: 'Expense', currency: 'EUR', retained_amount: '12', rows: 1 },
+    { record_kind: 'retained_bank_movement', year: '2025', account: 'Checking', section: null, currency: 'USD', retained_amount: '-40', rows: 1 },
+  ] }));
+  await act(async () => root.render(book(<FinancialWorkpapers revision={0} onOpen={() => {}} />)));
+  await act(async () => (container.querySelector('[aria-label="Inspect recorded expenses for 2025 USD"]') as HTMLButtonElement).click());
+  const request = queries().find(query => filters(query, 'select').some(args => args[0] === 'id, document_id, record'))!;
+  expect(filters(request, 'eq')).toEqual(expect.arrayContaining([['owner_id', 'owner'], ['year', '2025'], ['record_kind', 'retained_ledger_decision'], ['section', 'Expense'], ['currency', 'USD']]));
+});
+
+it('keeps unknown currency and account controls scoped when opening their entries', async () => {
+  fixture.invoke.mockResolvedValue(response({ ...empty(), total_rows: 1, controls: [
+    { record_kind: 'retained_ledger_decision', year: '2025', account: null, section: 'Expense', currency: null, retained_amount: null, rows: 1 },
+  ] }));
+  await act(async () => root.render(book(<FinancialWorkpapers revision={0} onOpen={() => {}} />)));
+  await act(async () => Array.from(container.querySelectorAll('button')).find(button => button.textContent === 'Accounts')!.click());
+  await act(async () => (container.querySelector('tbody button') as HTMLButtonElement).click());
+  const request = queries().find(query => filters(query, 'select').some(args => args[0] === 'id, document_id, record'))!;
+  expect(filters(request, 'is')).toEqual(expect.arrayContaining([['currency', null], ['account', null]]));
+});
+
+it('shows unresolved accounts when the account filter requests unknown', async () => {
+  fixture.invoke.mockResolvedValue(response({ ...empty(), total_rows: 2, controls: [
+    { record_kind: 'retained_ledger_decision', year: '2025', account: null, section: 'Expense', currency: 'USD', retained_amount: '15', rows: 1 },
+    { record_kind: 'retained_ledger_decision', year: '2025', account: 'Checking', section: 'Expense', currency: 'USD', retained_amount: '20', rows: 1 },
+  ] }));
+  await act(async () => root.render(book(<FinancialWorkpapers revision={0} onOpen={() => {}} />)));
+  await act(async () => Array.from(container.querySelectorAll('button')).find(button => button.textContent === 'Accounts')!.click());
+  const account = Array.from(container.querySelectorAll('label')).find(label => label.textContent?.startsWith('Account '))!.querySelector('select')!;
+  await act(async () => { account.value = '__unknown'; account.dispatchEvent(new Event('change', { bubbles: true })); });
+  expect(container.querySelector('tbody')?.textContent).toContain('Unresolved');
+  expect(container.querySelectorAll('tbody tr')).toHaveLength(1);
+  expect(container.textContent).not.toContain('No account classifications match');
+});
+
+it('replaces the unclassified constraint when choosing a classification', async () => {
+  fixture.invoke.mockResolvedValue(response({ ...empty(), total_rows: 2, controls: [
+    { record_kind: 'retained_ledger_decision', year: '2025', account: 'Checking', section: 'Expense', currency: 'USD', retained_amount: '20', rows: 1 },
+    { record_kind: 'retained_bank_movement', year: '2025', account: 'Checking', section: null, currency: 'USD', retained_amount: '-20', rows: 1 },
+  ] }));
+  await act(async () => root.render(book(<FinancialWorkpapers revision={0} onOpen={() => {}} />)));
+  await act(async () => Array.from(container.querySelectorAll('button')).find(button => button.textContent === 'Inspect unclassified movements')!.click());
+  const classification = Array.from(container.querySelectorAll('label')).find(label => label.textContent?.startsWith('Classification '))!.querySelector('select')!;
+  await act(async () => { classification.value = 'Expense'; classification.dispatchEvent(new Event('change', { bubbles: true })); });
+  const request = queries().at(-1)!;
+  expect(filters(request, 'eq')).toContainEqual(['section', 'Expense']);
+  expect(filters(request, 'is')).not.toContainEqual(['section', null]);
+});

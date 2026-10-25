@@ -237,7 +237,7 @@ const VehiclesDashboard: React.FC = () => {
         </h1>
         <div style={{ display: 'flex', gap: '8px' }}>
           <Link
-            to="/vehicle/list/legacy?tab=from_photos"
+            to="/photo-library"
             style={{
               padding: '6px 12px',
               fontSize: '9px',
@@ -247,10 +247,10 @@ const VehiclesDashboard: React.FC = () => {
               textDecoration: 'none',
               border: '1px solid var(--border)'}}
           >
-            From my photos
+            Photo library
           </Link>
           <Link
-            to="/vehicle/list/legacy"
+            to="/?tab=garage"
             style={{
               padding: '6px 12px',
               fontSize: '9px',
@@ -260,7 +260,7 @@ const VehiclesDashboard: React.FC = () => {
               textDecoration: 'none',
               border: '1px solid var(--border)'}}
           >
-            Legacy View
+            Garage
           </Link>
           <button
             type="button"

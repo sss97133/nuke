@@ -20,6 +20,7 @@ import { useToast } from '../../hooks/useToast';
 import VehicleCritiqueMode from './VehicleCritiqueMode';
 import { SmartInvoiceUploader } from '../SmartInvoiceUploader';
 import '../../styles/unified-design-system.css';
+import '../HeaderSearchLauncher.css';
 import { optimizeImageUrl } from '../../lib/imageOptimizer';
 
 /* ─── Platform detection for URL intent ─── */
@@ -1428,20 +1429,8 @@ export default function AIDataIngestionSearch() {
     >
       {/* Main Input Container - Extended responsive layout */}
       <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '4px',
-          background: 'var(--white)',
-          border: isDragging ? '2px solid var(--accent)' : '2px solid var(--border)',
-          padding: '4px 6px',
-          height: '28px',
-          transition: 'all 0.12s ease',
-          width: '100%',
-          minWidth: 0,
-          boxSizing: 'border-box',
-          overflow: 'hidden'
-        }}
+        className="hsl-box"
+        style={{ borderColor: isDragging ? 'var(--accent)' : undefined }}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
@@ -1572,40 +1561,14 @@ export default function AIDataIngestionSearch() {
             }, 200);
           }}
           disabled={isProcessing}
-          style={{
-            flex: 1,
-            border: 'none',
-            outline: 'none',
-            fontSize: '11px',
-            fontFamily: 'Arial, sans-serif',
-            background: 'transparent',
-            minWidth: '80px',
-            maxWidth: 'none',
-            height: '100%',
-            padding: '0 4px'
-          }}
+          className="hsl-input"
         />
 
         <button
           type="button"
           onClick={() => setActionsOpen((v) => !v)}
-          className="button-win95"
-          style={{
-            flexShrink: 0,
-            padding: '1px 3px',
-            fontSize: '9px',
-            height: '18px',
-            minWidth: '18px',
-            width: '18px',
-            opacity: 1,
-            whiteSpace: 'nowrap',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            marginLeft: '2px',
-            boxSizing: 'border-box',
-            lineHeight: '1'
-          }}
+          className="hsl-more"
+          aria-label={actionsOpen ? 'Hide actions' : 'Show actions'}
           title={actionsOpen ? 'Hide actions' : 'Show actions'}
         >
           ...

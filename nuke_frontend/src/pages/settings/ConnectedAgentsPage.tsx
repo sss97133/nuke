@@ -649,7 +649,7 @@ export default function ConnectedAgentsPage() {
   }'`}
         </pre>
         <div style={{ marginTop: '12px' }}>
-          <a href="/api/docs" style={{ fontSize: '12px', color: 'var(--accent)' }}>
+          <a href="/docs/api" style={{ fontSize: '12px', color: 'var(--accent)' }}>
             Full API documentation -&gt;
           </a>
         </div>

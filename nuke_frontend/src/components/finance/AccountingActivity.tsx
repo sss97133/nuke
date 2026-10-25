@@ -27,35 +27,47 @@ export function ago(iso: string, now = Date.now()): string {
  *  are marked New; tapping one opens its source. */
 export default function AccountingActivity({ people, onOpen }: { people: Record<string, string>; onOpen: (documentId: string) => void }) {
   const { ownerId, liveRevision } = useAccountingBook();
-  const [rows, setRows] = useState<Activity[] | null>(null);
-  const [failed, setFailed] = useState(false);
+  const [feed, setFeed] = useState<{ ownerId: string; rows: Activity[] | null; failed: boolean; loading: boolean } | null>(null);
+  const [retry, setRetry] = useState(0);
   const [now, setNow] = useState(() => Date.now());
-  const opened = useRef(new Date().toISOString());
-  useEffect(() => { opened.current = new Date().toISOString(); setRows(null); }, [ownerId]);
+  const opened = useRef(Date.now());
+  useEffect(() => { opened.current = Date.now(); }, [ownerId]);
   useEffect(() => {
     if (!ownerId) return;
     let cancelled = false;
+    setFeed(previous => previous?.ownerId === ownerId
+      ? { ...previous, loading: true }
+      : { ownerId, rows: null, failed: false, loading: true });
+    const fail = () => {
+      if (!cancelled) setFeed(previous => ({ ownerId, rows: previous?.ownerId === ownerId ? previous.rows : null, failed: true, loading: false }));
+    };
     void Promise.resolve(supabase.rpc('accounting_recent_activity', { p_owner_id: ownerId, p_limit: 20 })).then(({ data, error }) => {
       if (cancelled) return;
-      if (error || !Array.isArray(data)) { setFailed(true); return; }
-      setFailed(false); setRows(data as Activity[]); setNow(Date.now());
-    }).catch(() => { if (!cancelled) setFailed(true); });
+      if (error || !Array.isArray(data)) { fail(); return; }
+      setFeed({ ownerId, rows: data as Activity[], failed: false, loading: false }); setNow(Date.now());
+    }).catch(fail);
     return () => { cancelled = true; };
-  }, [ownerId, liveRevision]);
+  }, [ownerId, liveRevision, retry]);
   useEffect(() => { const timer = window.setInterval(() => setNow(Date.now()), 30000); return () => window.clearInterval(timer); }, []);
   const who = (row: Activity) => (row.actor_user_id && people[row.actor_user_id]) || 'A reviewer';
-  const fresh = (row: Activity) => row.recorded_at > opened.current && people[row.actor_user_id || ''] !== 'You';
-  if (!ownerId || (!rows && !failed)) return null;
-  if (failed && !rows) return <p className="accounting-muted">Recent changes are unavailable right now.</p>;
-  if (!rows?.length) return null;
-  const latest = rows[0];
-  const news = rows.filter(fresh).length;
-  return <section className="accounting-activity" aria-label="Recent changes">
-    <p className="accounting-activity-latest"><span className="accounting-eyebrow">Latest</span> <strong>{who(latest)}</strong> {activityWhat(latest)} <span className="accounting-muted">· {latest.source_filename || 'source'} · {ago(latest.recorded_at, now)}</span></p>
+  const fresh = (row: Activity) => Date.parse(row.recorded_at) > opened.current && people[row.actor_user_id || ''] !== 'You';
+  // A different book must never inherit the previous book's rows or error state.
+  if (!ownerId) return null;
+  if (feed?.ownerId !== ownerId || (!feed.rows && !feed.failed)) return <p role="status" className="accounting-muted">Loading recent changes…</p>;
+  const { rows, failed, loading } = feed;
+  if (!rows?.length && !failed) return <p role="status" className="accounting-muted">No recorded changes are visible for this book yet.</p>;
+  const latest = rows?.[0];
+  const news = rows?.filter(fresh).length || 0;
+  return <section className="accounting-activity" aria-label="Recent changes" aria-busy={loading}>
+    {failed && <p role="status" className="accounting-muted">
+      {rows?.length ? 'Showing the last loaded changes. New changes could not be loaded.' : 'Recent changes are unavailable right now.'}{' '}
+      <button type="button" disabled={loading} onClick={() => setRetry(value => value + 1)}>{loading ? 'Retrying…' : 'Try again'}</button>
+    </p>}
+    {latest && <><p className="accounting-activity-latest"><span className="accounting-eyebrow">{failed ? 'Last loaded' : 'Latest'}</span> <strong>{who(latest)}</strong> {activityWhat(latest)} <span className="accounting-muted">· {latest.source_filename || 'source'} · {ago(latest.recorded_at, now)}</span></p>
     <details><summary>Recent changes {news > 0 && <span className="accounting-new">{news} new</span>}</summary>
-      <ol className="accounting-activity-list">{rows.map(row => <li key={row.run_id}>
+      <ol className="accounting-activity-list">{rows?.map(row => <li key={row.run_id}>
         <button type="button" onClick={() => onOpen(row.document_id)}><strong>{who(row)}</strong> {activityWhat(row)}<span className="accounting-muted">{row.source_filename || 'source'} · {ago(row.recorded_at, now)}</span>{fresh(row) && <span className="accounting-new">New</span>}</button>
       </li>)}</ol>
-    </details>
+    </details></>}
   </section>;
 }

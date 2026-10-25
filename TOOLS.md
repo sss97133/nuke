@@ -164,7 +164,19 @@ Building a duplicate wastes compute, creates data forks, and breaks pipeline tra
 
 ---
 
-## Agent Hierarchy (Haiku/Sonnet/Opus)
+## Workspace agents
+
+For development-session routing, commands and handoffs use
+[Agent workspace](docs/AGENT_WORKFLOW.md) and the `nuke-work` skill. Its explicit
+profiles preserve the selected account and base permissions; they do not automatically
+dispatch jobs or establish model access. Use tools for routine checks, Sol for scoped
+engineering and Astra for ambiguous intent and hard decisions; Luna suits small jobs.
+
+## Application extraction agents (historical Haiku/Sonnet/Opus inventory)
+
+This inventory describes application endpoints, not the workspace's session router.
+Verify the affected endpoint's current implementation, live activity and authorization
+before invoking it. A listed operation is not permission to run a paid pipeline.
 
 | Intent | Use This | Notes |
 |--------|----------|-------|
@@ -173,7 +185,7 @@ Building a duplicate wastes compute, creates data forks, and breaks pipeline tra
 | Get agent system status | `agent-tier-router` with `{"action":"status"}` | Queue counts, tier health, cost estimates |
 | Get cost report | `agent-tier-router` with `{"action":"cost_report"}` | Cost breakdown by tier, savings vs Sonnet-only |
 | Run Opus strategy query | `agent-tier-router` with `{"action":"strategy","strategy_query":"..."}` | Source prioritization, market intel |
-| Extract listing with Haiku (cheap) | `haiku-extraction-worker` with `{"action":"extract_listing","url":"...","html":"..."}` | 3x cheaper than Sonnet |
+| Extract listing with Haiku | `haiku-extraction-worker` with `{"action":"extract_listing","url":"...","html":"..."}` | Verify the current model and cost before calling |
 | Parse title with Haiku | `haiku-extraction-worker` with `{"action":"parse_title","title":"..."}` | Fast YMM extraction |
 | Batch parse titles | `haiku-extraction-worker` with `{"action":"parse_titles","titles":["..."]}` | Single API call for many titles |
 | Process queue batch with Haiku | `haiku-extraction-worker` with `{"action":"batch_extract","batch_size":10}` | Pulls from import_queue |
@@ -182,10 +194,12 @@ Building a duplicate wastes compute, creates data forks, and breaks pipeline tra
 | Resolve edge case | `sonnet-supervisor` with `{"action":"resolve_edge_case","content":"..."}` | Complex vehicles (replicas, restomods) |
 | Quality report | `sonnet-supervisor` with `{"action":"quality_report"}` | Extraction quality metrics |
 
-### Tier Routing Rules
-- **Haiku** ($1/$5 per MTok): Routine extraction, title parsing, field extraction, simple classification
-- **Sonnet** ($3/$15 per MTok): Quality review, edge cases, multi-field validation, escalation decisions
-- **Opus** ($5/$25 per MTok): Source prioritization, market intelligence, pipeline optimization strategy
+### Historical extraction roles
+- **Haiku**: Routine extraction, title parsing, field extraction, simple classification
+- **Sonnet**: Quality review, edge cases, multi-field validation, escalation decisions
+- **Opus**: Source prioritization, market intelligence, pipeline optimization strategy
+
+Provider prices and subscription limits are not established by this dated inventory.
 
 ---
 
