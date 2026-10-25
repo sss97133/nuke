@@ -2,9 +2,9 @@
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-const fixture = vi.hoisted(() => ({ invoke: vi.fn(), from: vi.fn(), classify: vi.fn(), listener: null as null | ((event: string) => void) }));
+const fixture = vi.hoisted(() => ({ invoke: vi.fn(), from: vi.fn(), classify: vi.fn(), listener: null as null | ((event: string, session?: {user: {id: string}} | null) => void) }));
 vi.mock('../../lib/supabase', () => ({ supabase: { functions: { invoke: fixture.invoke }, from: fixture.from, auth: {
-  onAuthStateChange(listener: (event: string) => void) { fixture.listener = listener; return { data: { subscription: { unsubscribe() {} } } }; },
+  onAuthStateChange(listener: (event: string, session?: {user: {id: string}} | null) => void) { fixture.listener = listener; return { data: { subscription: { unsubscribe() {} } } }; },
 } } }));
 vi.mock('../../services/financialRecordClassification', async importOriginal => ({ ...await importOriginal<object>(), classifyRecords: fixture.classify }));
 import FinancialWorkpapers, { yearOverview, recordDescription, searchPattern } from './FinancialWorkpapers';
@@ -147,7 +147,7 @@ it('account switch synchronously invalidates late prior-account response before 
   fixture.invoke.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; })).mockResolvedValue(response(empty()));
   await act(async () => root.render(<FinancialWorkpapers revision={0} onOpen={() => {}} />));
   await act(async () => {
-    fixture.listener!('SIGNED_IN');
+    fixture.listener!('SIGNED_IN', { user: { id: 'next-owner' } });
     finish(response({ ...empty(), total_rows: 1, records: [record('old', 'PRIVATE OLD ACCOUNT')] }));
     await Promise.resolve();
   });
@@ -300,4 +300,52 @@ it('replaces the unclassified constraint when choosing a classification', async 
   const request = queries().at(-1)!;
   expect(filters(request, 'eq')).toContainEqual(['section', 'Expense']);
   expect(filters(request, 'is')).not.toContainEqual(['section', null]);
+});
+
+const clickBookButton = async (label: string) => act(async () => Array.from(container.querySelectorAll('button')).find(button => button.textContent === label)!.click());
+it('keeps records available while the summary is pending, then fails, and retries only the summary', async () => {
+  let finish!: (value: unknown) => void;
+  fixture.invoke.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+  fixture.from.mockImplementation(() => table({ data: [record()] }));
+  await act(async () => root.render(book(<FinancialWorkpapers viewerId="owner" revision={0} onOpen={() => {}} />)));
+  await clickBookButton('Records');
+  expect(container.textContent).toContain('Retained part'); expect(container.textContent).toContain('All years.');
+  expect(filters(queries()[0], 'eq')).toContainEqual(['owner_id', 'owner']);
+  expect(filters(queries()[0], 'eq').some(args => args[0] === 'year')).toBe(false);
+  await act(async () => finish({ data: null, error: new Error('summary timeout') }));
+  expect(container.textContent).toContain('totals are unknown'); expect(container.textContent).toContain('Retained part');
+  expect(container.textContent).not.toContain('No bookkeeping records');
+  const recordReads = fixture.from.mock.calls.filter(([name]) => name === 'v_financial_accounting_records').length;
+  await clickBookButton('Retry summary');
+  expect(fixture.invoke).toHaveBeenCalledTimes(2);
+  expect(fixture.from.mock.calls.filter(([name]) => name === 'v_financial_accounting_records')).toHaveLength(recordReads);
+  expect(container.textContent).toContain('Retained part');
+  expect(container.querySelector('button[aria-current="page"]')?.textContent).toBe('Records');
+});
+it('retries failed records independently when the summary is unavailable', async () => {
+  fixture.invoke.mockResolvedValue({ data: null, error: new Error('summary timeout') });
+  fixture.from.mockImplementationOnce(() => table({ data: null, error: new Error('records timeout') })).mockImplementation(() => table({ data: [record()] }));
+  await act(async () => root.render(book(<FinancialWorkpapers viewerId="owner" revision={0} onOpen={() => {}} />)));
+  await clickBookButton('Records'); expect(container.textContent).toContain('Saved records could not load');
+  await clickBookButton('Retry records'); expect(container.textContent).toContain('Retained part');
+  expect(fixture.invoke).toHaveBeenCalledTimes(1); expect(container.textContent).toContain('totals are unknown');
+});
+it('preserves current records and does not reread on same-viewer sign-in, initial session or token refresh', async () => {
+  fixture.from.mockImplementation(() => table({ data: [record()] }));
+  await act(async () => root.render(book(<FinancialWorkpapers viewerId="owner" revision={0} onOpen={() => {}} />)));
+  await clickBookButton('Records'); const reads = fixture.from.mock.calls.length;
+  await act(async () => { for (const event of ['INITIAL_SESSION', 'SIGNED_IN', 'TOKEN_REFRESHED']) fixture.listener!(event, {user:{id:'owner'}}); });
+  expect(container.textContent).toContain('Retained part');
+  expect(container.querySelector('button[aria-current="page"]')?.textContent).toBe('Records');
+  expect(fixture.invoke).toHaveBeenCalledTimes(1); expect(fixture.from).toHaveBeenCalledTimes(reads);
+});
+it('invalidates a pending record result immediately on signout before effect cleanup', async () => {
+  let finish!: (value: unknown) => void;
+  const pending = new Promise(resolve => { finish = resolve; });
+  const builder = table({}); builder.then = resolve => pending.then(resolve);
+  fixture.from.mockReturnValue(builder);
+  await act(async () => root.render(book(<FinancialWorkpapers viewerId="owner" revision={0} onOpen={() => {}} />)));
+  await clickBookButton('Records');
+  await act(async () => { fixture.listener!('SIGNED_OUT', null); finish({ data: [record('late', 'PRIVATE LATE RECORD')], error: null }); await Promise.resolve(); });
+  expect(container.textContent).not.toContain('PRIVATE LATE RECORD'); expect(container.querySelector('tbody')).toBeNull();
 });
