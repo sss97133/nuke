@@ -11,3 +11,8 @@ Deno.test("user prose is not a sale comment; tiny prices are rejected", () => {
   eq(plausibleBatSalePrice(95), null);
   eq(plausibleBatSalePrice(85000), 85000);
 });
+
+Deno.test("score-live-auctions markup: the real Bid to banner is not a sale", () => {
+  const page = '<script>{"textSoldOn":"Sold on"}</script><span class="info-value">Bid to <strong>USD $41,500</strong> <span class="date">on 10/10/25</span></span>"price": 41500';
+  eq(parseBatPageResult(page), { kind: "bid_to", amount: 41500 });
+});
