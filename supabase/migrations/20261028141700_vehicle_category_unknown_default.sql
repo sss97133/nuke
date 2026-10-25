@@ -5,6 +5,7 @@
 -- unverified default (every existing row got 'car' from the default; no writer sets it).
 -- Before/after recorded in vehicle_category_change_log. Revert: supabase/sql/revert_vehicle_category_unknown_default_v1.sql
 set local lock_timeout = '5s';
+set local statement_timeout = '50s';
 
 create table if not exists public.vehicle_category_change_log (
   id bigserial primary key,
