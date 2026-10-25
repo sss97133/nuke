@@ -229,12 +229,21 @@ it('opens readable evidence with source quote, closed technical detail, and rest
 it('keeps the chosen bookkeeping record distinct from its batch and defers payment context until requested', async () => {
   fixture.results.tax_read = { records: [{ id:'bank-row',document_id:'batch-doc',record:{record_kind:'retained_bank_movement',local_id:'bank-one',source_key:'selected-key',year:'2025',date:'2025-02-20',account:'Checking',section:'Owner',category:'Personal subscription',amount:'-13.99',currency:'USD',description:'Chosen synthetic subscription',decision:'Owner-confirmed personal purpose'} }], total_rows:1,next_after:null,controls_valid:true,controls:[] };
   fixture.results.financial_document_extractions = {data:[{id:'selected-field',field_key:'classification',value_normalized:{value:{source_key:'selected-key',classification:{category:'Personal subscription'}}},document:{source_filename:'batch.csv'}},{id:'other-field',field_key:'other_record',value_normalized:{value:{source_key:'other-key',description:'UNRELATED BATCH RECORD'}}}],count:2};
+  fixture.results.financial_document_extractions.data.push({id:'batch-note',field_key:'expense_use_legacy',value_normalized:{value:{destination_label:'BATCH-WIDE NOTE WITHOUT AN ENTRY LINK',allocated_amount:'10',unallocated_amount:'0'}}});
+  fixture.results.financial_document_extractions.count = 3;
   await act(async () => root.render(<FinanceDashboard/>));
   await act(async () => Array.from(container.querySelectorAll('button')).find(b=>b.textContent==='Records')!.click());
   await act(async () => Array.from(container.querySelectorAll('button')).find(b=>b.textContent==='View evidence')!.click());
   const dialog = container.querySelector('dialog')!;
   expect(dialog.querySelector('[aria-label="Selected accounting record"]')?.textContent).toContain('Chosen synthetic subscription');
   expect(dialog.textContent).not.toContain('UNRELATED BATCH RECORD');
+  const sourceNotes = dialog.querySelector<HTMLDetailsElement>('.accounting-source-notes')!;
+  expect(sourceNotes.open).toBe(false);
+  expect(sourceNotes.textContent).toContain('BATCH-WIDE NOTE WITHOUT AN ENTRY LINK');
+  expect(sourceNotes.textContent).toContain('not explicitly linked to the selected entry');
+  expect(sourceNotes.textContent).not.toContain('Personal subscription');
+  expect(sourceNotes.textContent).toContain('10.00 (currency unknown)');
+  expect(sourceNotes.textContent).not.toContain('10.00 USD');
   expect(fixture.calls.filter(c=>c.action && c.action!=='tax_read')).toHaveLength(0);
   const items = Array.from(dialog.querySelectorAll('details')).find(d=>d.querySelector('summary')?.textContent==='Source items and payment comparison')!;
   await act(async () => { items.open=true; items.dispatchEvent(new Event('toggle')); });
