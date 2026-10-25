@@ -7,7 +7,7 @@
  * offer" appears only where the job's offers reader (work_order_offers_read) gives this account an
  * offer action; "Contact via Nuke" only where the reader says contact is available.
  */
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Section, Text } from '../../kit';
 import { PrefetchLink } from '../../components/PrefetchLink';
 import { useAuthContext } from '../../contexts/AuthContext';
@@ -66,7 +66,13 @@ function RequirementRow({ row, offer, canContact, onOffer, onContact, inviter }:
 const JobsBoard: React.FC = () => {
   usePageTitle('Jobs looking for someone');
   const { session } = useAuthContext();
-  const signedIn = !!session?.user?.id;
+  const viewerId = session?.user?.id ?? null;
+  // Offers, invitations, matching context and open Sign drafts belong to one
+  // viewer. Replace them immediately even when two accounts are both signed in.
+  return <ViewerJobsBoard key={viewerId ?? 'visitor'} signedIn={!!viewerId} />;
+};
+
+const ViewerJobsBoard: React.FC<{ signedIn: boolean }> = ({ signedIn }) => {
   const inviterJobs = useInviterJobs(signedIn);
   const [page, setPage] = useState<OpenRequirementsRead | null>(null);
   const [rows, setRows] = useState<OpenRequirement[]>([]);
@@ -74,9 +80,10 @@ const JobsBoard: React.FC = () => {
   const [offers, setOffers] = useState<Record<string, JobAction>>({});
   const [offering, setOffering] = useState<OpenRequirement | null>(null);
   const [contacting, setContacting] = useState<OpenRequirement | null>(null);
+  const generation = useRef(0);
 
-  const loadOffers = useCallback(async (list: OpenRequirement[]) => {
-    if (!signedIn) return;
+  const loadOffers = useCallback(async (list: OpenRequirement[], scope: number) => {
+    if (!signedIn || scope !== generation.current) return;
     const ids = Array.from(new Set(list.map(r => r.work_order_id)));
     const found: Record<string, JobAction> = {};
     await Promise.all(ids.map(async id => {
@@ -86,19 +93,24 @@ const JobsBoard: React.FC = () => {
         if (a.action === 'offer' && typeof rid === 'string') found[rid] = a;
       }
     }));
-    setOffers(prev => ({ ...prev, ...found }));
+    if (scope === generation.current) setOffers(prev => ({ ...prev, ...found }));
   }, [signedIn]);
 
-  const load = useCallback(async (after: string | null) => {
+  const load = useCallback(async (after: string | null, scope = generation.current) => {
     const r = await JobReaders.openRequirements(after);
+    if (scope !== generation.current) return;
     if (r.refusal) { setRefusal(r.refusal.message); return; }
     setRefusal(null);
     setPage(r.data);
     setRows(prev => (after ? [...prev, ...r.data.rows] : r.data.rows));
-    void loadOffers(r.data.rows);
+    void loadOffers(r.data.rows, scope);
   }, [loadOffers]);
 
-  useEffect(() => { void load(null); }, [load]);
+  useEffect(() => {
+    const scope = ++generation.current;
+    void load(null, scope);
+    return () => { generation.current++; };
+  }, [load]);
 
   const total = page?.coverage.total_open ?? 0;
   return <article className="jb-page jb-scope">
