@@ -187,14 +187,14 @@ it('defaults to the latest book year and scopes records and bank attention to th
   expect(filters(queries()[1], 'eq')).toContainEqual(['year', '2024']);
   expect(container.textContent).toContain('No saved records match these filters for 2024');
 });
-it('shows one server page of 25 and withholds partial account sums', async () => {
+it('shows one server page of 100 and withholds partial account sums', async () => {
   fixture.invoke.mockResolvedValue(response({...empty(),total_rows:7767,controls:[{record_kind:'retained_ledger_decision',year:'2024',account:'Account',section:'Expense',currency:'USD',retained_amount:'98765.43',missing_amounts:1,rows:60}]}));
-  fixture.from.mockImplementation(() => table({ data: Array.from({length:26},(_,i)=>record(`r${i}`,`Record ${i}`)) }));
+  fixture.from.mockImplementation(() => table({ data: Array.from({length:101},(_,i)=>record(`r${i}`,`Record ${i}`)) }));
   await act(async () => root.render(book(<FinancialWorkpapers revision={0} onOpen={()=>{}}/>)));
   expect(container.querySelector('table')).toBeNull();
   await act(async () => Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'Records')!.click());
-  expect(container.querySelectorAll('tbody tr')).toHaveLength(25);
-  expect(container.textContent).toContain('Showing 1–25 records; more available');
+  expect(container.querySelectorAll('tbody tr')).toHaveLength(100);
+  expect(container.textContent).toContain('Showing 1–100 records; more available');
   await act(async () => Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'Accounts')!.click());
   expect(container.querySelector('tbody')?.textContent).toContain('Unknown');
   expect(container.textContent).not.toContain('98,765.43');
