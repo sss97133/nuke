@@ -33,11 +33,11 @@ export function fixture(options = {}) {
     static now() { return nowMs; }
   } : Date;
   const advance = ms => { if (options.timing) nowMs += ms; };
-  const calls = [], stored = new Map(), queued = new Map(); let serve, patchCount = 0;
+  const calls = [], stored = new Map(), queued = new Map(); let serve, patchCount = 0, feedReadCount = 0;
   const transport = async (input, init = {}) => {
     const url = new URL(input), method = init.method ?? 'GET';
     const body = init.body ? JSON.parse(init.body) : undefined;
-    calls.push({ path: url.pathname, method, body, at: runtimeDate.now() });
+    calls.push({ path: url.pathname, query: url.search, method, body, at: runtimeDate.now() });
     if (url.hostname === 'source.invalid') {
       advance(options.timing?.sourceMs ?? 0);
       if (options.sourceFailures?.[url.pathname]) return new Response('', { status: options.sourceFailures[url.pathname] });
@@ -52,7 +52,23 @@ export function fixture(options = {}) {
     }
     if (url.pathname === '/rest/v1/platform_config') return Response.json(options.controls ? { config_value: options.controls } : null);
     if (url.pathname === '/rest/v1/listing_feeds') {
-      if (method === 'GET') return Response.json(feeds);
+      if (method === 'GET') {
+        feedReadCount++;
+        if (options.feedReadFailureAt === feedReadCount) return Response.json({ code: 'FIXTURE', message: 'metadata unavailable' }, { status: 500 });
+        let selected = feeds.filter(row => row.enabled);
+        const source = url.searchParams.get('source_slug'), id = url.searchParams.get('id');
+        if (source?.startsWith('eq.')) selected = selected.filter(row => row.source_slug === source.slice(3));
+        if (source?.startsWith('neq.')) selected = selected.filter(row => row.source_slug !== source.slice(4));
+        if (id?.startsWith('eq.')) selected = selected.filter(row => row.id === id.slice(3));
+        selected.sort((a, b) => {
+          const time = (a.last_polled_at ? Date.parse(a.last_polled_at) : -Infinity)
+            - (b.last_polled_at ? Date.parse(b.last_polled_at) : -Infinity);
+          return time || (url.searchParams.get('order')?.includes('id.asc') ? a.id.localeCompare(b.id) : 0);
+        });
+        const offset = Number(url.searchParams.get('offset') || 0);
+        const limit = Math.min(Number(url.searchParams.get('limit') || 1000), options.feedApiCap ?? 1000);
+        return Response.json(selected.slice(offset, offset + limit));
+      }
       if (options.retainLedger) Object.assign(feeds.find(row => row.id === url.searchParams.get('id')?.slice(3)) ?? {}, body);
       return new Response(null, { status: 204 });
     }
@@ -291,8 +307,78 @@ const selectedFeeds = count => Array.from({ length: count }, (_, i) => ({
   source_slug: `house_${i % 4}`, feed_url: `https://source.invalid/feed${i}`,
 }));
 
+test('metadata pagination reaches a source beyond the 1,000-row API cap before selecting targets', async () => {
+  const feeds = selectedFeeds(1201).map((feed, i) => ({ ...feed, source_slug: i === 1200 ? 'single' : 'crowded',
+    last_polled_at: i === 1200 ? '2026-10-14T22:00:00Z' : '2026-10-14T21:00:00Z' }));
+  const f = fixture({ feeds, feedApiCap: 1000, controls: { max_feeds: 2, max_ingests: 2 }, timing: {} });
+  const result = await f.request({ batch_size: 2 });
+  assert.equal(result.status, 200);
+  assert.equal(result.body.feed_selection_complete, true);
+  const run = f.stored.get(result.body.receipt_id);
+  assert.equal(run.metadata.target_scope_complete, true);
+  assert.deepEqual(run.metadata.targets.map(target => target.source), ['crowded', 'single']);
+  const reads = f.calls.filter(call => call.path === '/rest/v1/listing_feeds' && call.method === 'GET');
+  assert.deepEqual(reads.map(call => new URLSearchParams(call.query).get('offset')), ['0', '500', '1000']);
+  assert(reads.every(call => new URLSearchParams(call.query).get('limit') === '500'));
+  assert(reads.every(call => new URLSearchParams(call.query).get('order') === 'last_polled_at.asc.nullsfirst,id.asc'));
+  assert(f.calls.findIndex(call => call.path.startsWith('/feed')) > f.calls.indexOf(reads.at(-1)));
+});
+
+for (const size of [1000, 2000, 2001]) {
+  test(`metadata boundary ${size} distinguishes exhaustion from the 2,001st sentinel`, async () => {
+    const feeds = selectedFeeds(size);
+    // The sentinel would win its source's priority if it leaked into selection.
+    if (size > 2000) feeds[2000].search_criteria = { tier: 1 };
+    feeds.reverse(); // Equal clocks still have a stable id order across pages.
+    const f = fixture({ feeds, controls: { max_feeds: 2, max_ingests: 2 }, feedApiCap: 1000 });
+    const result = await f.request({ batch_size: 2 });
+    assert.equal(result.status, 200);
+    assert.equal(result.body.feed_selection_complete, size <= 2000);
+    const run = f.stored.get(result.body.receipt_id);
+    assert.equal(run.metadata.target_scope_complete, size <= 2000);
+    assert.equal(run.metadata.targets.length, 2);
+    assert.equal(run.metadata.targets[0].target_id, selectedFeeds(1)[0].id);
+    assert.equal(result.body.throttle.attempted, 2);
+    const reads = f.calls.filter(call => call.path === '/rest/v1/listing_feeds' && call.method === 'GET');
+    assert.equal(reads.length, size === 1000 ? 3 : 5);
+    assert.equal(new URLSearchParams(reads.at(-1).query).get('limit'), size === 1000 ? '500' : '1');
+    assert(run.metadata.targets.every(target => target.target_id !== selectedFeeds(2001)[2000].id));
+  });
+}
+
+test('a later metadata page failure stops source work and never claims a complete target scope', async () => {
+  const f = fixture({ feeds: selectedFeeds(1201), feedReadFailureAt: 2 });
+  const result = await f.request({ batch_size: 40 });
+  assert.equal(result.status, 500);
+  const run = [...f.stored.values()][0];
+  assert.equal(run.status, 'failed');
+  assert.equal(run.metadata.target_scope_complete, null);
+  assert.equal(run.metadata.targets.length, 0);
+  assert(!f.calls.some(call => call.path.startsWith('/feed') || call.path === '/functions/v1/ingest'));
+  assert(!f.calls.some(call => call.path === '/rest/v1/listing_feeds' && call.method === 'PATCH'));
+});
+
+test('each metadata page retains enabled and explicit source filters', async () => {
+  const feeds = selectedFeeds(1201).map((feed, i) => ({ ...feed, source_slug: i % 2 ? 'included' : 'excluded' }));
+  feeds.push({ ...feeds[0], id: '00000000-0000-4000-8000-999999999999', enabled: false });
+  for (const body of [{ source: 'included' }, { exclude_source: 'excluded' }]) {
+    const f = fixture({ feeds, controls: { max_feeds: 2, max_ingests: 2 } });
+    const result = await f.request({ ...body, batch_size: 2 });
+    assert.equal(result.status, 200);
+    const run = f.stored.get(result.body.receipt_id);
+    assert(run.metadata.targets.every(target => target.source === 'included'));
+    const reads = f.calls.filter(call => call.path === '/rest/v1/listing_feeds' && call.method === 'GET');
+    assert.equal(reads.length, 2);
+    assert(reads.every(call => new URLSearchParams(call.query).get('enabled') === 'eq.true'));
+    assert(reads.every(call => new URLSearchParams(call.query).get('source_slug') === (body.source ? 'eq.included' : 'neq.excluded')));
+  }
+  const f = fixture({ feeds });
+  const result = await f.request({ feed_id: feeds[1200].id });
+  assert.equal(f.stored.get(result.body.receipt_id).metadata.targets[0].target_id, feeds[1200].id);
+});
+
 test('busy selected feeds finish across sources before the unchanged deadline, and next run reaches untouched feeds', async () => {
-  const f = fixture({ feeds: selectedFeeds(40), controls: { max_feeds: 40, max_ingests: 40 },
+  const f = fixture({ feeds: selectedFeeds(1200), controls: { max_feeds: 40, max_ingests: 40 },
     itemsPerFeed: 20, timing: { sourceMs: 1_000, ingestMs: 10_000 }, retainLedger: true });
   const first = await f.request({ batch_size: 40 });
   assert.equal(first.status, 200);
