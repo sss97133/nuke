@@ -1053,34 +1053,43 @@ Deno.serve(async (req) => {
         { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // Get feeds that are due for polling
-    let query = supabase
-      .from("listing_feeds")
-      .select("*")
-      .eq("enabled", true)
-      .order("last_polled_at", { ascending: true, nullsFirst: true })
-      .limit(2001);
-
-    if (feedId) {
-      query = query.eq("id", feedId);
-    } else if (source) {
-      query = query.eq("source_slug", source);
-    } else if (excludeSource) {
-      // The Craigslist-only job polls Craigslist alone, so the general job leaves it out (one site, one pacing clock).
-      query = query.neq("source_slug", excludeSource);
-    }
-
     // Read bounded enabled-feed metadata, including each source's latest
     // visit. Filtering before grouping hides that visit and lets a source
     // with hundreds of old metro feeds stay first forever.
+    // PostgREST caps a response at 1,000 rows: requesting 2,001 at once can
+    // silently look complete. Page below that cap, retaining the existing
+    // 2,000-candidate bound plus one sentinel. The id breaks equal-clock ties.
+    const feeds: any[] = [];
+    const metadataLimit = 2001;
+    const metadataPageSize = 500;
+    for (let offset = 0; offset < metadataLimit; offset += metadataPageSize) {
+      const pageSize = Math.min(metadataPageSize, metadataLimit - offset);
+      let query = supabase
+        .from("listing_feeds")
+        .select("*")
+        .eq("enabled", true)
+        .order("last_polled_at", { ascending: true, nullsFirst: true })
+        .order("id", { ascending: true })
+        .range(offset, offset + pageSize - 1);
 
-    const { data: feeds, error: feedError } = await query;
+      if (feedId) {
+        query = query.eq("id", feedId);
+      } else if (source) {
+        query = query.eq("source_slug", source);
+      } else if (excludeSource) {
+        // One site, one pacing clock: the general job leaves Craigslist to its own job.
+        query = query.neq("source_slug", excludeSource);
+      }
 
-    if (feedError) {
-      throw new Error(`Failed to fetch feeds: ${feedError.message}`);
+      const { data: page, error: feedError } = await query;
+      if (feedError || !Array.isArray(page)) {
+        throw new Error(`Failed to fetch feeds: ${feedError?.message ?? "invalid metadata response"}`);
+      }
+      feeds.push(...page);
+      if (page.length < pageSize) break;
     }
 
-    if (!feeds || feeds.length === 0) {
+    if (feeds.length === 0) {
       await runReceipt.select([], true, throttle);
       await runReceipt.finish('completed', 'no_due_targets');
       return new Response(
