@@ -222,16 +222,25 @@ BEGIN
                   WHEN m.sub = 'shipping' THEN 0.6 ELSE 0.6 END
       END AS conf
     FROM matched m
+  ), known_final AS MATERIALIZED (
+    -- One photo, one trace: when OCR read the same receipt photo (file stem) more than once with different totals, the
+    -- best-matched reading stands for the photo and the others are rereads (counted in the summary, not listed).
+    SELECT s.*, CASE WHEN s.kind = 'receipt' AND EXISTS (
+        SELECT 1 FROM known_scored o WHERE o.kind = 'receipt' AND o.key <> s.key AND o.refs && s.refs
+          AND (array_position(ARRAY['cited_expense','near_match','booked_not_expense','uncited'], o.st), -o.conf, o.key)
+            < (array_position(ARRAY['cited_expense','near_match','booked_not_expense','uncited'], s.st), -s.conf, s.key))
+      THEN 'reread' ELSE s.st END AS st2
+    FROM known_scored s
   ), rows_known AS (
     SELECT s.kind, s.key, s.keys, s.vid, s.d, NULL::date AS wend, s.vendor, s.ref_label AS ref, s.amt,
       CASE WHEN s.amt IS NULL THEN 'unknown' WHEN s.kind = 'timeline_cost' THEN 'claim' ELSE 'document' END AS basis,
-      NULL::numeric AS est_mid, s.st,
-      CASE s.st WHEN 'cited_expense' THEN s.exp_hits WHEN 'near_match' THEN s.near_hits ELSE s.other_hits END AS cited,
+      NULL::numeric AS est_mid, s.st2 AS st,
+      CASE s.st2 WHEN 'cited_expense' THEN s.exp_hits WHEN 'near_match' THEN s.near_hits ELSE s.other_hits END AS cited,
       round(s.conf::numeric, 3) AS conf,
       CASE WHEN s.amt IS NOT NULL THEN round(s.amt * s.conf::numeric, 2) END AS sc,
       jsonb_strip_nulls(jsonb_build_object('source', s.kind, 'subtype', s.sub, 'amount_check', s.ac, 'payment_channel', s.channel,
         'vehicle_linked', s.vid IS NOT NULL, 'references', to_jsonb(s.refs), 'what', s.what)) AS rs,
-      CASE s.st
+      CASE s.st2
         WHEN 'booked_not_expense' THEN format('A book line of %s near %s is not booked as an expense (%s). The %s %s shows a business purchase: reclassify it if it was.',
           s.amt, s.d, array_to_string(s.other_hits, '; '), coalesce(s.vendor, 'vendor'), CASE s.kind WHEN 'receipt' THEN 'receipt' ELSE s.sub END)
         ELSE CASE s.kind
@@ -249,7 +258,7 @@ BEGIN
           ELSE format('%s%s on %s%s. Find the charge or receipt%s.', coalesce(s.vendor || ' ', ''), coalesce(s.sub, 'trace'), s.d,
             coalesce(' for ' || s.amt, ''), coalesce(' (' || s.whr || ')', '')) END
       END AS lf
-    FROM known_scored s
+    FROM known_final s
   ), rows_eps AS (
     SELECT 'work_episode'::text AS kind, 'episode:' || w.vid || ':' || w.s AS key, ARRAY['episode:' || w.vid || ':' || w.s] AS keys,
       w.vid, w.s AS d, w.f AS wend, NULL::text AS vendor, NULL::text AS ref,

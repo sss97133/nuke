@@ -115,7 +115,10 @@ INSERT INTO receipts(user_id, vendor_name, receipt_date, total, document_kind, a
  ('33333333-3333-4333-8333-333333333333','Parts Store','2024-06-01',777.00,'parts_service','verified',NULL,'cash',NULL,'IMG_7012.json',false), -- another owner
  ('11111111-1111-4111-8111-111111111111','Tool Truck','2024-02-19',9000.00,'parts_service','verified',NULL,'financing',NULL,'IMG_7013.json',false), -- financed contract
  ('11111111-1111-4111-8111-111111111111','Wheel Works','2024-10-01',440.83,'parts_service','plausible',NULL,NULL,NULL,'IMG_7014.json',false), -- misread total of L-7
- ('11111111-1111-4111-8111-111111111111','Wheel Works','2024-10-20',300.00,'parts_service','verified',NULL,'cash',NULL,'IMG_7015.json',false); -- same vendor, total too far from L-7
+ ('11111111-1111-4111-8111-111111111111','Wheel Works','2024-10-20',300.00,'parts_service','verified',NULL,'cash',NULL,'IMG_7015.json',false), -- same vendor, total too far from L-7
+ ('11111111-1111-4111-8111-111111111111','Parts Store','2024-03-01',54.10,'parts_service','plausible',NULL,NULL,NULL,'1760000000009_IMG_7001.jpeg',false), -- reread of R1's photo
+ ('11111111-1111-4111-8111-111111111111','Bolt Bin','2024-11-05',25.00,'parts_service','plausible',NULL,'cash',NULL,'IMG_7017.json',false),  -- two readings of one photo,
+ ('11111111-1111-4111-8111-111111111111','Bolt Bin','2024-11-05',52.00,'parts_service','verified',NULL,'cash',NULL,'1760000000010_IMG_7017.jpeg',false); -- neither booked
 -- Photos: V shows primer on three days in September with no cell; H1..H5 each one assembly day inside their cells'
 -- windows; P only presence (no stage, no session); Z is another owner's car in primer; a receipt photo on V is skipped.
 INSERT INTO vehicle_images(vehicle_id, user_id, taken_at, fabrication_stage, source) VALUES
@@ -187,6 +190,9 @@ DO $$ DECLARE s record; g record; n int; BEGIN
  -- Near match: same vendor named in L-7, total within 1.00: cited, not listed; the 300.00 slip is too far off: a gap.
  IF EXISTS (SELECT 1 FROM got WHERE vendor = 'Wheel Works' AND amount = 440.83) THEN RAISE EXCEPTION 'a near match was listed as a gap'; END IF;
  IF NOT EXISTS (SELECT 1 FROM got WHERE vendor = 'Wheel Works' AND amount = 300.00 AND status = 'uncited') THEN RAISE EXCEPTION 'a far total on the same vendor must stay a gap'; END IF;
+ -- One photo, one trace: R1's photo reread at 54.10 is not a gap; of two unbooked readings of one photo the verified one stands.
+ IF EXISTS (SELECT 1 FROM got WHERE amount = 54.10) OR EXISTS (SELECT 1 FROM got WHERE vendor = 'Bolt Bin' AND amount = 25.00) THEN RAISE EXCEPTION 'a reread photo was listed'; END IF;
+ IF NOT EXISTS (SELECT 1 FROM got WHERE vendor = 'Bolt Bin' AND amount = 52.00 AND status = 'uncited') THEN RAISE EXCEPTION 'the better reading of an unbooked photo must stand'; END IF;
  -- Excluded: personal, superseded, refund, other year, other owner.
  IF EXISTS (SELECT 1 FROM got WHERE amount IN (500.00, 800.00, 30.00, 70.00, 777.00) OR vendor IN ('Restaurant','Old Read')) THEN RAISE EXCEPTION 'an excluded receipt leaked'; END IF;
  -- V's primer episode: no cell in its window: a gap priced from own history (p25 200, median 300), confidence 0.65.
@@ -213,9 +219,10 @@ DO $$ DECLARE s record; g record; n int; BEGIN
  IF (SELECT trace_key FROM got LIMIT 1) IS DISTINCT FROM (SELECT trace_key FROM got WHERE trace_kind <> 'summary' ORDER BY score DESC NULLS LAST LIMIT 1) THEN RAISE EXCEPTION 'not ranked by score'; END IF;
  SELECT * INTO s FROM got WHERE trace_kind = 'summary';
  IF (s.reasons->>'gaps')::int <> (SELECT count(*) FROM got WHERE status = 'uncited') THEN RAISE EXCEPTION 'summary gaps do not reconcile: %', s.reasons; END IF;
- IF (s.reasons->>'reclassification_candidates')::int <> 1 OR (s.reasons->>'near_matches')::int <> 1 OR (s.reasons->>'gap_amount_document')::numeric <> 140.00 + 80.00 + 33.33 + 59.90 + 9000.00 + 300.00
+ IF (s.reasons->>'reclassification_candidates')::int <> 1 OR (s.reasons->>'near_matches')::int <> 1 OR (s.reasons->>'gap_amount_document')::numeric <> 140.00 + 80.00 + 33.33 + 59.90 + 9000.00 + 300.00 + 52.00
     OR (s.reasons->>'gap_amount_claim')::numeric <> 350.00 + 2000.00 OR (s.reasons->>'gap_amount_estimated_p25')::numeric <> 200.00
-    OR s.amount <> 140.00 + 80.00 + 33.33 + 59.90 + 9000.00 + 300.00 + 350.00 + 2000.00 OR s.estimate_mid <> 200.00 THEN RAISE EXCEPTION 'summary dollars: % %', to_jsonb(s), s.reasons; END IF;
+    OR s.amount <> 140.00 + 80.00 + 33.33 + 59.90 + 9000.00 + 300.00 + 52.00 + 350.00 + 2000.00
+    OR (s.reasons->'by_kind_status'->>'receipt:reread')::int <> 2 OR s.estimate_mid <> 200.00 THEN RAISE EXCEPTION 'summary dollars: % %', to_jsonb(s), s.reasons; END IF;
  IF (s.reasons->'by_kind_status'->>'work_episode:cited_vehicle')::int <> 5 OR (s.reasons->'by_kind_status'->>'receipt:cited_expense')::int <> 2 THEN
   RAISE EXCEPTION 'summary counts cited traces: %', s.reasons; END IF;
  -- Limit 1: the single best gap plus the summary.
@@ -226,6 +233,6 @@ DO $$ DECLARE s record; g record; n int; BEGIN
     OR NOT has_function_privilege('authenticated','public.accounting_expense_footprints(uuid,integer,integer,jsonb)','EXECUTE') THEN RAISE EXCEPTION 'grants wrong'; END IF;
  IF (SELECT prosecdef FROM pg_proc WHERE proname = 'accounting_expense_footprints') THEN RAISE EXCEPTION 'the reader must run with the caller''s policies'; END IF;
  IF (SELECT provolatile FROM pg_proc WHERE proname = 'accounting_expense_footprints') <> 's' THEN RAISE EXCEPTION 'the reader must be STABLE (read-only)'; END IF;
- RAISE NOTICE 'PASS accounting_expense_footprints: cited by amount, stem, order number and vendor near match; reclassification; cash, covered-card, financed and duplicate receipts; own-history episode estimate; claims; external orders; ranking, summary, owner-only';
+ RAISE NOTICE 'PASS accounting_expense_footprints: cited by amount, stem, order number and vendor near match; reclassification; cash, covered-card, financed, duplicate and reread receipts; own-history episode estimate; claims; external orders; ranking, summary, owner-only';
 END $$;
 ROLLBACK;
