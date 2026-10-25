@@ -1005,7 +1005,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
       right: '6px',
       background: 'rgba(0, 0, 0, 0.75)',
       backdropFilter: 'blur(6px)',
-      color: thermalPriceColor || 'var(--surface-elevated)',
+      color: thermalPriceColor || 'var(--on-dark-overlay)',
       padding: isCompactCard ? '3px 6px' : '4px 8px',
       display: 'inline-flex',
       alignItems: 'center',
