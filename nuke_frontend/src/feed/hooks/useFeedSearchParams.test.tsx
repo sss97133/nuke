@@ -147,3 +147,40 @@ describe('feed presets retain their selected population', () => {
     expect(container.querySelector('[aria-label="Sort"]')?.textContent).toBe('newest');
   });
 });
+
+
+describe('pending search respects newer feed actions', () => {
+  it.each([
+    ['Sort', 'sort', 'popular'],
+    ['Interest preset', 'make', 'Porsche'],
+    ['Source preset', 'sources', 'bat'],
+    ['Table', 'view', 'technical'],
+  ])('merges search text into the latest %s selection', async (action, key, value) => {
+    vi.useFakeTimers();
+    window.history.replaceState({}, '', '/?tab=feed&make=BMW&sort=year');
+    await render(); await click('Search'); await click(action);
+    await act(async () => { vi.advanceTimersByTime(150); });
+    expect(params().get('q')).toBe('Porsche');
+    expect(params().get(key)).toBe(value);
+    expect(params().get('tab')).toBe('feed');
+    if (action === 'Interest preset') expect(params().get('sort')).toBe('popular');
+    if (action === 'Source preset') {
+      expect(params().has('today')).toBe(true);
+      expect(params().has('make')).toBe(false);
+      expect(params().has('sort')).toBe(false);
+    }
+  });
+  it('cancels pending search when Reset clears all selections', async () => {
+    vi.useFakeTimers();
+    window.history.replaceState({}, '', '/?tab=feed&make=BMW&sort=year');
+    await render(); await click('Search'); await click('Reset');
+    await act(async () => { vi.advanceTimersByTime(150); });
+    expect(window.location.search).toBe('?tab=feed');
+  });
+  it('does not mutate the URL after the feed controls unmount', async () => {
+    vi.useFakeTimers(); await render(); await click('Search');
+    await act(async () => root.render(null));
+    await act(async () => { vi.advanceTimersByTime(150); });
+    expect(window.location.search).toBe('?tab=feed');
+  });
+});

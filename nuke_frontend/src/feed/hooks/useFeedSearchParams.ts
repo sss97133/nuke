@@ -162,21 +162,19 @@ export function useFeedSearchParams(defaultCardsPerRow = 3): FeedSearchParamsRes
 
   // --- Push state to URL ---
   const pushState = useCallback(
-    (newState: FeedUrlState, debounceMs?: number) => {
-      const update = () => {
-        if (urlStatesEqual(currentState, newState)) return;
-        setSearchParams(paramsInCurrentView(newState, searchParams, defaultCardsPerRow), { replace: true });
-      };
-
-      if (debounceMs && debounceMs > 0) {
-        if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
-        debounceTimerRef.current = setTimeout(update, debounceMs);
-      } else {
-        update();
-      }
+    (newState: FeedUrlState) => {
+      if (urlStatesEqual(currentState, newState)) return;
+      setSearchParams(paramsInCurrentView(newState, searchParams, defaultCardsPerRow), { replace: true });
     },
     [currentState, searchParams, setSearchParams, defaultCardsPerRow],
   );
+
+  // A pending search owns only its text. Read the latest committed selections
+  // when it fires, instead of restoring the full URL snapshot from keystroke time.
+  const latestMutationRef = useRef({ currentState, pushState });
+  useEffect(() => {
+    latestMutationRef.current = { currentState, pushState };
+  }, [currentState, pushState]);
 
   // --- Mutation helpers ---
 
@@ -213,13 +211,14 @@ export function useFeedSearchParams(defaultCardsPerRow = 3): FeedSearchParamsRes
     [currentState, pushState],
   );
 
-  const setSearchText = useCallback(
-    (text: string) => {
-      // Debounce text input to avoid URL thrashing
-      pushState({ ...currentState, searchText: text }, 150);
-    },
-    [currentState, pushState],
-  );
+  const setSearchText = useCallback((text: string) => {
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    debounceTimerRef.current = setTimeout(() => {
+      debounceTimerRef.current = null;
+      const latest = latestMutationRef.current;
+      latest.pushState({ ...latest.currentState, searchText: text });
+    }, 150);
+  }, []);
 
   const setViewMode = useCallback(
     (mode: ViewMode) => {
@@ -246,6 +245,8 @@ export function useFeedSearchParams(defaultCardsPerRow = 3): FeedSearchParamsRes
   );
 
   const resetAll = useCallback(() => {
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    debounceTimerRef.current = null;
     pushState({
       filters: DEFAULT_FILTERS,
       sortBy: 'newest',
@@ -261,6 +262,7 @@ export function useFeedSearchParams(defaultCardsPerRow = 3): FeedSearchParamsRes
   useEffect(() => {
     return () => {
       if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
     };
   }, []);
 
