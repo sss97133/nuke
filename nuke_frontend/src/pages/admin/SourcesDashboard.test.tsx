@@ -26,10 +26,10 @@ beforeEach(() => {
   invoke.mockReset().mockResolvedValue({ data: { success: true }, error: null });
   host = document.createElement('div'); document.body.append(host); root = createRoot(host);
 });
-afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.unstubAllGlobals(); });
+afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.useRealTimers(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 async function render() { await act(async () => root.render(<SourcesDashboard />)); }
 async function enterUrl(url = 'https://example.com/listings') {
-  const input = host.querySelector('input')!;
+  const input = host.querySelector<HTMLInputElement>('#source-url')!;
   await act(async () => {
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, url);
     input.dispatchEvent(new Event('input', { bubbles: true }));
@@ -95,7 +95,7 @@ describe('explicit source onboarding', () => {
     expect(invoke).not.toHaveBeenCalled();
     await act(async () => { submit(); submit(); });
     expect(getSession).toHaveBeenCalledTimes(1);
-    expect(host.querySelector('input')?.disabled).toBe(true);
+    expect(host.querySelector<HTMLInputElement>('#source-url')?.disabled).toBe(true);
     expect(host.querySelector<HTMLButtonElement>('button[type="submit"]')?.disabled).toBe(true);
     await act(async () => pending.resolve({ data: { session: { access_token: 'test-token' } }, error: null }));
     expect(invoke).toHaveBeenCalledTimes(1);
@@ -103,14 +103,14 @@ describe('explicit source onboarding', () => {
       headers: { Authorization: 'Bearer test-token' }, body: { url: 'https://example.com/listings', phase: 'all' },
     });
     expect(host.textContent).toContain('Source onboarded');
-    expect(host.querySelector('input')?.value).toBe('');
+    expect(host.querySelector<HTMLInputElement>('#source-url')?.value).toBe('');
   });
   it('does not invoke onboarding without a session and preserves the entered URL', async () => {
     getSession.mockResolvedValue({ data: { session: null }, error: null });
     await render(); await enterUrl(); await act(async () => submit());
     expect(invoke).not.toHaveBeenCalled();
     expect(host.textContent).toContain('Sign in again');
-    expect(host.querySelector('input')?.value).toBe('https://example.com/listings');
+    expect(host.querySelector<HTMLInputElement>('#source-url')?.value).toBe('https://example.com/listings');
   });
   it('rejects a non-http URL before any authenticated request', async () => {
     await render(); await enterUrl('file:///tmp/source'); await act(async () => submit());
@@ -124,5 +124,39 @@ describe('explicit source onboarding', () => {
     expect(host.querySelector<HTMLButtonElement>('button[type="submit"]')?.disabled).toBe(false);
     await act(async () => submit());
     expect(invoke).toHaveBeenCalledTimes(2); expect(host.textContent).toContain('Source onboarded');
+  });
+});
+
+
+describe('optional Sources refresh', () => {
+  it('does not poll by default', async () => {
+    vi.useFakeTimers(); await render();
+    await act(async () => { await vi.advanceTimersByTimeAsync(180_000); });
+    expect(select).toHaveBeenCalledTimes(1); expect(rpc).toHaveBeenCalledTimes(1);
+  });
+  it('polls each minute only while visible and stops when disabled or unmounted', async () => {
+    vi.useFakeTimers();
+    const visibility = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible');
+    await render();
+    await act(async () => host.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click());
+    await act(async () => { await vi.advanceTimersByTimeAsync(59_999); });
+    expect(select).toHaveBeenCalledTimes(1);
+    await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+    expect(select).toHaveBeenCalledTimes(2);
+    visibility.mockReturnValue('hidden');
+    await act(async () => document.dispatchEvent(new Event('visibilitychange')));
+    await act(async () => { await vi.advanceTimersByTimeAsync(120_000); });
+    expect(select).toHaveBeenCalledTimes(2);
+    visibility.mockReturnValue('visible');
+    await act(async () => document.dispatchEvent(new Event('visibilitychange')));
+    expect(select).toHaveBeenCalledTimes(3);
+    await act(async () => host.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click());
+    await act(async () => { await vi.advanceTimersByTimeAsync(120_000); });
+    expect(select).toHaveBeenCalledTimes(3);
+    await act(async () => host.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click());
+    await act(async () => root.render(null));
+    expect(vi.getTimerCount()).toBe(0);
+    await act(async () => document.dispatchEvent(new Event('visibilitychange')));
+    expect(select).toHaveBeenCalledTimes(3);
   });
 });

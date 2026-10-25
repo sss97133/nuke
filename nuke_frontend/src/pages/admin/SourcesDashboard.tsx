@@ -79,6 +79,7 @@ export default function SourcesDashboard() {
   const [queueError, setQueueError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [autoRefresh, setAutoRefresh] = useState(false);
   const [addUrl, setAddUrl] = useState('');
   const [onboarding, setOnboarding] = useState(false);
   const [onboardResult, setOnboardResult] = useState<OnboardResult | null>(null);
@@ -127,9 +128,30 @@ export default function SourcesDashboard() {
   useEffect(() => {
     mounted.current = true;
     void fetchData();
-    const interval = setInterval(() => void fetchData(), 30000);
-    return () => { mounted.current = false; clearInterval(interval); };
+    return () => { mounted.current = false; };
   }, [fetchData]);
+
+  useEffect(() => {
+    if (!autoRefresh) return;
+    let interval: ReturnType<typeof setInterval> | null = null;
+    const schedule = () => {
+      if (interval) clearInterval(interval);
+      interval = null;
+      if (document.visibilityState === 'visible') {
+        interval = setInterval(() => void fetchData(), 60_000);
+      }
+    };
+    const onVisibilityChange = () => {
+      schedule();
+      if (document.visibilityState === 'visible') void fetchData();
+    };
+    schedule();
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      if (interval) clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
+  }, [autoRefresh, fetchData]);
 
   const handleOnboard = async () => {
     if (onboardPending.current || !addUrl.trim()) return;
@@ -206,9 +228,15 @@ export default function SourcesDashboard() {
               `${sources.length} registered · ${statusCounts.active || 0} active · ${statusCounts.monitoring || 0} monitoring`}
           </p>
         </div>
-        <button type="button" className="btn-base btn-secondary" disabled={refreshing} onClick={() => void fetchData()}>
-          {refreshing ? 'Refreshing…' : 'Refresh'}
-        </button>
+        <div className="sources-dashboard__refresh-controls">
+          <label className="sources-dashboard__auto-refresh">
+            <input type="checkbox" checked={autoRefresh} onChange={event => setAutoRefresh(event.target.checked)} />
+            Auto-refresh every minute while visible
+          </label>
+          <button type="button" className="btn-base btn-secondary" disabled={refreshing} onClick={() => void fetchData()}>
+            {refreshing ? 'Refreshing…' : 'Refresh'}
+          </button>
+        </div>
       </header>
 
       <form className="sources-dashboard__onboard" aria-busy={onboarding} onSubmit={event => { event.preventDefault(); void handleOnboard(); }}>
