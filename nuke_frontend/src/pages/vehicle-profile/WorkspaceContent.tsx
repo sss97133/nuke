@@ -456,51 +456,50 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
             </React.Suspense>
           )}
 
-          {/* Active gallery filter chip */}
-          {galleryFilter && (
-            <div className="gallery-filter-chip">
-              <span style={{ color: 'var(--text-secondary)' }}>FILTER:</span>
-              <span>{galleryFilter.zone || galleryFilter.category || galleryFilter.tag || 'Custom'}</span>
-              <a onClick={() => setGalleryFilter(null)} style={{
-                cursor: 'pointer', color: 'var(--text-disabled)', marginLeft: 'auto',
-              }}>&times; CLEAR</a>
-            </div>
-          )}
-
           {/* Gallery toolbar */}
-          <div className="widget__header gallery-header" style={{ flexShrink: 0, flexWrap: 'wrap' }}>
+          <div className="widget__header gallery-header">
+            {/* Active gallery filter chip */}
+            {galleryFilter && (
+              <div className="gallery-filter-chip">
+                <span style={{ color: 'var(--text-secondary)' }}>Filter:</span>
+                <span>{galleryFilter.zone || galleryFilter.category || galleryFilter.tag || 'Custom'}</span>
+                <button type="button" onClick={() => setGalleryFilter(null)}>Clear filter</button>
+              </div>
+            )}
             <div className="widget__header-left">
               <span className="widget__label">Images</span>
               <span className="widget__count">{vehicleImages.length || '—'}</span>
             </div>
-            <div className="widget__controls" style={{ flexWrap: 'wrap', gap: '4px' }}>
-              <div className="gallery-toolbar">
+            <div className="widget__controls">
+              <div className="gallery-toolbar" role="group" aria-label="Image view">
                 {(['ZONES', 'GRID', 'FULL', 'INFO', 'SESSIONS', 'CATEGORY', 'CHRONO', 'SOURCE'] as const).map((view) => (
                   <button
                     key={view}
                     type="button"
                     className={`gallery-btn ${view === galleryView ? 'gallery-btn--active' : ''}`}
+                    aria-pressed={view === galleryView}
                     onClick={() => {
                       setGalleryView(view);
                       if (galleryFilter) setGalleryFilter(null);
                     }}
                   >
-                    {view}
+                    {{ ZONES: 'Zones', GRID: 'Grid', FULL: 'Full size', INFO: 'Details', SESSIONS: 'Sessions', CATEGORY: 'Category', CHRONO: 'Timeline', SOURCE: 'Source' }[view]}
                   </button>
                 ))}
               </div>
-              <div className="gallery-slider-row">
-                <span className="gallery-slider-label">COLS</span>
+              <label className="gallery-slider-row">
+                <span className="gallery-slider-label">Columns</span>
                 <input
                   className="gallery-slider"
                   type="range"
+                  aria-label="Image columns"
                   min={1}
                   max={8}
                   value={galleryCols}
                   onChange={e => setGalleryCols(Number(e.target.value))}
                 />
-                <span className="gallery-slider-val">{galleryCols}</span>
-              </div>
+                <output className="gallery-slider-val">{galleryCols}</output>
+              </label>
             </div>
           </div>
 
