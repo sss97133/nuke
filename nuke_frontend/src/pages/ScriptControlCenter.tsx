@@ -1,26 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
-import { useNavigate } from 'react-router-dom';
+import PrefetchLink from '../components/PrefetchLink';
+import './ScriptControlCenter.css';
 import '../styles/unified-design-system.css';
 
 interface ScriptStatus {
   name: string;
   description: string;
   purpose: string;
-  status: 'running' | 'stopped' | 'error' | 'unknown';
-  progress: {
-    current: number | null; // null = not computed (the server says why)
-    total: number;
-    percent: number | null;
-  };
-  metrics: {
-    successRate: number;
-    cost: number | null;
-    rate: number; // items per minute
-    eta: string;
-  };
-  lastRun?: string;
-  errors: string[];
+  recorded: number | null;
+  note: string;
 }
 
 // One row per script from admin_script_center_progress() (migration 20260927170400).
@@ -36,394 +25,142 @@ const SCRIPTS = [
   {
     id: 'angle-setter',
     name: 'Angle Detection',
-    description: 'Sets angle for all images',
-    table: 'vehicle_images',
-    field: 'angle',
-    metric: 'COUNT(*) FILTER (WHERE angle IS NOT NULL)',
-    cost: 0.00008
+    description: 'Recorded image angles',
+    table: 'vehicle_images'
   },
   {
     id: 'tier1-processor',
     name: 'Tier 1 Organization',
     description: 'Basic categorization (angle, category, components)',
-    table: 'vehicle_images',
-    field: 'ai_scan_metadata',
-    metric: "COUNT(*) FILTER (WHERE ai_scan_metadata->'tier_1_analysis' IS NOT NULL)",
-    cost: 0.0001
+    table: 'vehicle_images'
   },
   {
     id: 'tier2-processor',
     name: 'Tier 2 Parts',
     description: 'Specific part identification',
-    table: 'vehicle_images',
-    field: 'ai_scan_metadata',
-    metric: "COUNT(*) FILTER (WHERE ai_scan_metadata->'tier_2_analysis' IS NOT NULL)",
-    cost: 0.0005
+    table: 'vehicle_images'
   },
   {
     id: 'tier3-processor',
     name: 'Tier 3 Expert',
-    description: 'Expert analysis with full context',
-    table: 'vehicle_images',
-    field: 'ai_scan_metadata',
-    metric: "COUNT(*) FILTER (WHERE ai_scan_metadata->'tier_3_analysis' IS NOT NULL)",
-    cost: 0.02
+    description: 'Stage 3 image analysis',
+    table: 'vehicle_images'
   },
   {
     id: 'gap-finder',
     name: 'Gap Identification',
     description: 'Find missing documentation',
-    table: 'missing_context_reports',
-    field: null,
-    metric: 'COUNT(*)',
-    cost: 0.02
+    table: 'missing_context_reports'
   },
   {
     id: 'completeness-calculator',
     name: 'Profile Completeness',
     description: 'Calculate vehicle profile scores',
-    table: 'vehicle_processing_summary',
-    field: 'profile_completeness_score',
-    metric: 'COUNT(*)',
-    cost: 0
+    table: 'vehicle_processing_summary'
   }
 ];
 
 export default function ScriptControlCenter() {
-  const navigate = useNavigate();
   const [scripts, setScripts] = useState<ScriptStatus[]>([]);
   const [loading, setLoading] = useState(true);
-  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [autoRefresh, setAutoRefresh] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [loadedAt, setLoadedAt] = useState<Date | null>(null);
+  const request = useRef(0);
+
+  const loadScriptStatus = useCallback(async () => {
+    const current = ++request.current;
+    setLoading(true);
+    setError(null);
+    try {
+      const { data, error: readError } = await supabase.rpc('admin_script_center_progress');
+      if (readError) throw readError;
+      if (!Array.isArray(data)) throw new Error('Coverage reader returned no result.');
+      const progressById = new Map<string, ScriptProgressRow>();
+      for (const row of data as ScriptProgressRow[]) progressById.set(row.script_id, row);
+      const next = SCRIPTS.map(script => {
+        const row = progressById.get(script.id);
+        const raw = row?.processed;
+        const value = row?.computed === true && (typeof raw === 'number' || (typeof raw === 'string' && /^\d+$/.test(raw))) ? Number(raw) : null;
+        const recorded = value != null && Number.isSafeInteger(value) && value >= 0 ? value : null;
+        return {
+          name: script.name, description: script.description,
+          purpose: row?.source_table || script.table,
+          recorded,
+          note: row?.note || (recorded == null ? 'No recorded count is available from this reader.' : 'Retained rows in this source; no eligible population or completion percentage is supplied.'),
+        };
+      });
+      if (current !== request.current) return;
+      setScripts(next);
+      setLoadedAt(new Date());
+    } catch (cause) {
+      if (current !== request.current) return;
+      setError(cause instanceof Error ? cause.message : 'Coverage could not be loaded. Try again.');
+    } finally {
+      if (current === request.current) setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    loadScriptStatus();
-    
-    if (autoRefresh) {
-      const interval = setInterval(loadScriptStatus, 5000);
-      return () => clearInterval(interval);
-    }
-  }, [autoRefresh]);
+    void loadScriptStatus();
+    return () => { request.current++; };
+  }, [loadScriptStatus]);
 
-  async function triggerScript(scriptName: string) {
-    console.log('Triggering:', scriptName);
-    
-    // Map script names to Edge Function endpoints or actions
-    const actions: Record<string, () => Promise<void>> = {
-      'Tier 1 Organization': async () => {
-        // Trigger batch processing
-        const { data, error } = await supabase.rpc('process_tier1_batch');
-        if (error) alert('Error: ' + error.message);
-        else alert('Triggered Tier 1 batch processing! Check progress in Monitor.');
-        loadScriptStatus();
-      },
-      'Tier 2 Parts': async () => {
-        alert('Tier 2 is scheduled to run automatically on suitable images. Check Monitor for progress.');
-      },
-      'Gap Identification': async () => {
-        alert('Gap finder runs automatically during Tier 2 analysis.');
-      },
-      'Profile Completeness': async () => {
-        // Could trigger a completeness recalculation
-        alert('Completeness scores update automatically on vehicle changes.');
-      }
-    };
+  useEffect(() => {
+    if (!autoRefresh || loading) return;
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') void loadScriptStatus();
+    }, 60_000);
+    return () => clearInterval(interval);
+  }, [autoRefresh, loading, loadScriptStatus]);
 
-    const action = actions[scriptName];
-    if (action) {
-      await action();
-    } else {
-      alert('Script trigger not implemented yet for: ' + scriptName);
-    }
-  }
-
-  async function loadScriptStatus() {
-    try {
-      const statusList: ScriptStatus[] = [];
-
-      // One admin-gated RPC per load (migration 20260927170400) instead of raw SQL per script;
-      // execute_sql is closed to user sessions. computed=false rows carry the reason in `note`.
-      const { data: progressRows, error: progressErr } = await supabase.rpc('admin_script_center_progress');
-      if (progressErr) console.warn('admin_script_center_progress:', progressErr.message);
-      const progressById = new Map<string, ScriptProgressRow>();
-      for (const r of (progressRows || []) as ScriptProgressRow[]) progressById.set(r.script_id, r);
-
-      for (const script of SCRIPTS) {
-        const status = await getScriptStatus(script, progressById.get(script.id));
-        statusList.push(status);
-      }
-
-      setScripts(statusList);
-      setLoading(false);
-    } catch (error) {
-      console.error('Error loading script status:', error);
-      setLoading(false);
-    }
-  }
-
-  async function getScriptStatus(script: (typeof SCRIPTS)[number], progressRow?: ScriptProgressRow): Promise<ScriptStatus> {
-    try {
-      // Get total images
-      const { count: total } = await supabase
-        .from('vehicle_images')
-        .select('id', { count: 'exact', head: true });
-
-      // Processed count from the RPC. null = not computed (43M-row vehicle_images scans cannot run
-      // inside a request; the server says so in `note`) — shown as unknown, never as 0.
-      const processed: number | null =
-        progressRow && progressRow.computed && progressRow.processed != null ? Number(progressRow.processed) : null;
-      if (progressRow && !progressRow.computed && progressRow.note) {
-        console.info(`${script.name}: ${progressRow.note}`);
-      }
-
-      const percent = processed != null && total && total > 0 ? (processed / total) * 100 : null;
-
-      // Check if actively processing (updated in last 2 minutes)
-      const { data: recentActivity } = await supabase
-        .from(script.table)
-        .select('created_at')
-        .gte('created_at', new Date(Date.now() - 120000).toISOString())
-        .limit(1);
-
-      const isRunning = recentActivity && recentActivity.length > 0;
-
-      return {
-        name: script.name,
-        description: script.description,
-        purpose: `Fills: ${script.table}.${script.field || 'rows'}`,
-        status: isRunning ? 'running' : processed != null && processed > 0 ? 'stopped' : 'unknown',
-        progress: {
-          current: processed,
-          total: total || 2742,
-          percent
-        },
-        metrics: {
-          successRate: 100, // TODO: track failures
-          cost: processed != null ? processed * script.cost : null,
-          rate: 0, // TODO: calculate
-          eta: '0m'
-        },
-        lastRun: recentActivity?.[0]?.created_at,
-        errors: []
-      };
-    } catch (error: any) {
-      return {
-        name: script.name,
-        description: script.description,
-        purpose: `Error loading status`,
-        status: 'error',
-        progress: { current: null, total: 0, percent: null },
-        metrics: { successRate: 0, cost: null, rate: 0, eta: 'N/A' },
-        errors: [error.message]
-      };
-    }
-  }
-
-  if (loading) {
+  if (loading && !loadedAt) {
     return (
-      <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
-        Loading scripts...
+      <div className="script-coverage" role="status">
+        Loading recorded coverage…
       </div>
     );
   }
 
   return (
-    <div style={{ padding: '24px', maxWidth: '1400px', margin: '0 auto' }}>
-      
-      {/* Header */}
-      <div style={{ marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+    <div className="script-coverage" aria-busy={loading}>
+      <header className="script-coverage__header">
         <div>
-          <button
-            onClick={() => navigate('/admin')}
-            className="button button-secondary cursor-button"
-            style={{ 
-              marginBottom: '16px',
-              fontSize: '11px', 
-              padding: '6px 12px',
-              border: '2px solid var(--border-light)',
-              transition: 'all 0.12s ease'
-            }}
-          >
-            ← Back to Mission Control
+          <PrefetchLink to="/admin">‹ Administration</PrefetchLink>
+          <h1>Processing coverage</h1>
+          <p>Recorded coverage for the legacy image-processing stages.</p>
+        </div>
+        <div className="script-coverage__actions">
+          <button type="button" className="button button-secondary" aria-pressed={autoRefresh} onClick={() => setAutoRefresh(value => !value)}>
+            {autoRefresh ? 'Auto-refresh on · 1 min' : 'Auto-refresh off'}
           </button>
-          <h1 style={{ fontSize: '11px', fontWeight: 700, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-            Script Control Center
-          </h1>
-          <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-            Monitor and control all processing scripts
-          </p>
+          <button type="button" className="button button-primary" disabled={loading} onClick={() => void loadScriptStatus()}>{loading ? 'Refreshing…' : 'Refresh coverage'}</button>
         </div>
-        <button
-          onClick={() => setAutoRefresh(!autoRefresh)}
-          className="button cursor-button"
-          style={{
-            padding: '8px 16px',
-            fontSize: '11px',
-            border: `2px solid ${autoRefresh ? 'var(--success)' : 'var(--border-light)'}`,
-            background: autoRefresh ? 'var(--success-light)' : 'var(--surface)',
-            color: autoRefresh ? 'var(--success)' : 'var(--text-muted)',
-            transition: 'all 0.12s ease'
-          }}
-        >
-          {autoRefresh ? 'AUTO-REFRESH ON' : 'AUTO-REFRESH PAUSED'}
-        </button>
+      </header>
+      <p>These counts do not establish whether a worker is running, successful, or complete. Cost and finish time are not measured here.</p>
+      <nav className="script-coverage__actions" aria-label="Processing monitors">
+        <PrefetchLink to="/admin/data-pulse">Data activity</PrefetchLink>
+        <PrefetchLink to="/admin/sources">Source intake</PrefetchLink>
+        <PrefetchLink to="/admin/image-processing">Image processing</PrefetchLink>
+      </nav>
+      {error && <div role="alert" className="script-coverage__error">{loadedAt ? 'Refresh failed; showing the last loaded coverage. ' : 'Coverage unavailable. '}{error}</div>}
+      {loadedAt && <p className="script-coverage__clock">Loaded {loadedAt.toLocaleString()}. Each source may have its own recording date.</p>}
+      <div className="script-coverage__grid">
+        {scripts.map(script => (
+          <section key={script.name} className="card" aria-label={script.name}>
+            <div className="card-body">
+              <h2>{script.name}</h2>
+              <p>{script.description}</p>
+              <dl>
+                <div><dt>Recorded rows</dt><dd>{script.recorded == null ? 'Not computed' : script.recorded.toLocaleString()}</dd></div>
+                <div><dt>Source</dt><dd><code>{script.purpose}</code></dd></div>
+              </dl>
+              <p>{script.note}</p>
+            </div>
+          </section>
+        ))}
       </div>
 
-      {/* Scripts Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '16px', marginBottom: '32px' }}>
-        {scripts.map((script) => {
-          const statusColor = 
-            script.status === 'running' ? 'var(--success)' :
-            script.status === 'stopped' ? 'var(--border-medium)' :
-            script.status === 'error' ? 'var(--error)' : 'var(--text-muted)';
-
-          return (
-            <div key={script.name} className="card" style={{ border: `2px solid ${statusColor}` }}>
-              <div className="card-body">
-                {/* Script Header */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
-                  <div>
-                    <h3 style={{ fontSize: '13px', fontWeight: 700, marginBottom: '4px' }}>{script.name}</h3>
-                    <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px' }}>{script.description}</p>
-                    <p style={{ fontSize: '11px', fontFamily: "'Courier New', monospace", color: 'var(--text-muted)' }}>{script.purpose}</p>
-                  </div>
-                  <div style={{ 
-                    fontSize: '11px', 
-                    fontWeight: 700, 
-                    textTransform: 'uppercase', 
-                    color: statusColor,
-                    border: `1px solid ${statusColor}`,
-                    padding: '2px 6px'}}>
-                    {script.status}
-                  </div>
-                </div>
-
-                {/* Progress Bar */}
-                <div style={{ marginBottom: '16px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '4px' }}>
-                    <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>PROGRESS</span>
-                    <span style={{ fontFamily: "'Courier New', monospace" }}>
-                      {script.progress.current == null ? '—' : script.progress.current.toLocaleString()} / {script.progress.total.toLocaleString()}
-                    </span>
-                  </div>
-                  <div style={{ height: '6px', background: 'var(--bg-secondary)', overflow: 'hidden' }}>
-                    <div 
-                      style={{ 
-                        height: '100%', 
-                        background: script.status === 'running' ? 'var(--success)' : 'var(--accent)',
-                        width: `${script.progress.percent ?? 0}%`,
-                        transition: 'width 0.3s ease'
-                      }}
-                    />
-                  </div>
-                  <div style={{ fontSize: '11px', textAlign: 'right', marginTop: '2px', color: 'var(--text-muted)' }}>
-                    {script.progress.percent == null ? 'not computed' : `${script.progress.percent.toFixed(1)}%`}
-                  </div>
-                </div>
-
-                {/* Metrics */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', marginBottom: '16px' }}>
-                  <div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>COST</div>
-                    <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--warning)' }}>
-                      {script.metrics.cost == null ? '—' : `$${script.metrics.cost.toFixed(4)}`}
-                    </div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>SUCCESS</div>
-                    <div style={{ fontSize: '13px', fontWeight: 700 }}>
-                      {script.metrics.successRate.toFixed(0)}%
-                    </div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>ETA</div>
-                    <div style={{ fontSize: '13px', fontWeight: 700 }}>
-                      {script.metrics.eta}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Actions */}
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <button
-                    className="button button-primary cursor-button"
-                    style={{ flex: 1, fontSize: '11px', padding: '8px' }}
-                    onClick={() => triggerScript(script.name)}
-                  >
-                    Trigger Now
-                  </button>
-                  <button
-                    className="button button-secondary cursor-button"
-                    style={{ fontSize: '11px', padding: '8px' }}
-                    onClick={() => window.open('/admin/image-processing', '_blank')}
-                  >
-                    Monitor
-                  </button>
-                </div>
-
-                {/* Last Run */}
-                {script.lastRun && (
-                  <div style={{ marginTop: '12px', fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center' }}>
-                    Last activity: {new Date(script.lastRun).toLocaleString()}
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Global Actions */}
-      <div style={{ marginBottom: '32px', display: 'flex', gap: '12px' }}>
-        <button
-          onClick={loadScriptStatus}
-          className="button button-primary cursor-button"
-          style={{ padding: '10px 20px', fontSize: '11px' }}
-        >
-          REFRESH ALL
-        </button>
-        <button
-          onClick={() => navigate('/admin/image-processing')}
-          className="button button-secondary cursor-button"
-          style={{ padding: '10px 20px', fontSize: '11px' }}
-        >
-          LEGACY DASHBOARD
-        </button>
-      </div>
-
-      {/* Summary Stats */}
-      <div className="card" style={{ border: '2px solid var(--border-light)' }}>
-        <div className="card-header" style={{ fontSize: '11px', fontWeight: 700 }}>
-          OVERALL PROGRESS
-        </div>
-        <div className="card-body">
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
-            <div>
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>TOTAL IMAGES</div>
-              <div style={{ fontSize: '16px', fontWeight: 700 }}>2,742</div>
-            </div>
-            <div>
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>ANGLES SET</div>
-              <div style={{ fontSize: '16px', fontWeight: 700 }}>
-                {scripts.find(s => s.name === 'Angle Detection')?.progress.current ?? '—'}
-              </div>
-            </div>
-            <div>
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>TOTAL COST</div>
-              <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--warning)' }}>
-                {scripts.some(s => s.metrics.cost == null)
-                  ? '—'
-                  : `$${scripts.reduce((sum, s) => sum + (s.metrics.cost ?? 0), 0).toFixed(4)}`}
-              </div>
-            </div>
-            <div>
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>ACTIVE SCRIPTS</div>
-              <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--success)' }}>
-                {scripts.filter(s => s.status === 'running').length}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }
