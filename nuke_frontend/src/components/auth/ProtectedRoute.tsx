@@ -49,7 +49,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
     return <Navigate to={`/login?returnUrl=${returnUrl}`} replace />;
   }
 
-  // Account changes must discard the prior viewer's local page state and
-  // pending component callbacks. Refreshing the same account preserves drafts.
+  // Account changes discard the prior viewer's local page state; late results
+  // cannot populate the next viewer's page. Same-account refresh preserves drafts.
   return <React.Fragment key={user.id}>{children ? children : <Outlet />}</React.Fragment>;
 }
