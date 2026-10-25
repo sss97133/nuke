@@ -2,9 +2,9 @@
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-const fixture = vi.hoisted(() => ({ results: {} as Record<string, any>, calls: [] as any[], downloads: [] as string[], authChanged: null as null | (() => void), listeners: new Set<() => void>() }));
+const fixture = vi.hoisted(() => ({ results: {} as Record<string, any>, calls: [] as any[], downloads: [] as string[], userId: '11111111-1111-4111-8111-111111111111' as string | null, authChanged: null as null | ((event?: string, id?: string | null) => void), listeners: new Set<(event: string, session: {user:{id:string}} | null) => void>() }));
 vi.mock('../../components/PrefetchLink', () => ({ default: ({ to, children, ...props }: any) => <a href={to} {...props}>{children}</a> }));
-vi.mock('../../lib/supabase', () => ({ supabase: { rpc: async (name: string) => ({ data: name === 'accounting_recent_activity' ? fixture.results.activity || [] : name === 'accounting_similar_classifications' ? fixture.results.similar || [] : fixture.results.grants || [], error: null }), functions: { invoke: async (_name: string, { body }: any) => { fixture.calls.push({ action: body.action }); return { data: { data: fixture.results[body.action] || { lines: [] } }, error: null }; } }, channel() { return { on() { return this; }, subscribe() { return this; } }; }, removeChannel() {}, storage: { from(bucket: string) { return { async download(path: string) { fixture.downloads.push(`${bucket}/${path}`); return { data: null, error: new Error('not available') }; } }; } }, auth: { getUser: async () => ({ data: { user: { id: '11111111-1111-4111-8111-111111111111' } }, error: null }), onAuthStateChange(callback: () => void) { fixture.listeners.add(callback); fixture.authChanged = () => { for (const listener of [...fixture.listeners]) listener(); }; return { data: { subscription: { unsubscribe() { fixture.listeners.delete(callback); } } } }; } }, from(table: string) {
+vi.mock('../../lib/supabase', () => ({ supabase: { rpc: async (name: string) => ({ data: name === 'accounting_recent_activity' ? fixture.results.activity || [] : name === 'accounting_similar_classifications' ? fixture.results.similar || [] : fixture.results.grants || [], error: null }), functions: { invoke: async (_name: string, { body }: any) => { fixture.calls.push({ action: body.action }); return { data: { data: fixture.results[body.action] || { lines: [] } }, error: null }; } }, channel() { return { on() { return this; }, subscribe() { return this; } }; }, removeChannel() {}, storage: { from(bucket: string) { return { async download(path: string) { fixture.downloads.push(`${bucket}/${path}`); return { data: null, error: new Error('not available') }; } }; } }, auth: { getUser: async () => ({ data: { user: fixture.userId ? { id: fixture.userId } : null }, error: null }), onAuthStateChange(callback: (event: string, session: {user:{id:string}} | null) => void) { fixture.listeners.add(callback); fixture.authChanged = (event = 'SIGNED_OUT', id = null) => { fixture.userId = id; for (const listener of [...fixture.listeners]) listener(event, id ? {user:{id}} : null); }; return { data: { subscription: { unsubscribe() { fixture.listeners.delete(callback); } } } }; } }, from(table: string) {
   const call: any = { table }; fixture.calls.push(call);
   const q: any = {
     select(fields: string) { call.fields = fields; return q; },
@@ -25,7 +25,7 @@ const invoice = (extra: Partial<FinancialDocumentRow> = {}): FinancialDocumentRo
 });
 beforeEach(() => {
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
-  fixture.calls = []; fixture.results = {}; fixture.downloads = []; fixture.listeners.clear();
+  fixture.calls = []; fixture.results = {}; fixture.downloads = []; fixture.listeners.clear(); fixture.userId = '11111111-1111-4111-8111-111111111111';
   // Node's own experimental localStorage global shadows jsdom's and is undefined here; give the page a plain one.
   const stored = new Map<string, string>();
   Object.defineProperty(window, 'localStorage', { configurable: true, value: { getItem: (key: string) => stored.get(key) ?? null, setItem: (key: string, value: string) => { stored.set(key, String(value)); }, removeItem: (key: string) => { stored.delete(key); }, clear: () => stored.clear() } });
@@ -331,4 +331,43 @@ it('opens linked receipt items and returns to the selected entry without showing
   expect(dialog.querySelector('[aria-label="Selected accounting record"]')).toBeNull();
   await act(async () => Array.from(dialog.querySelectorAll('button')).find(button => button.textContent === '‹ Back to entry')!.click());
   expect(container.querySelector('[aria-label="Selected accounting record"]')?.textContent).toContain('Selected synthetic entry');
+});
+
+it('keeps evidence and current reader results through same-viewer session notifications', async () => {
+  fixture.results.financial_documents = { data: [invoice()], count: 1 };
+  await act(async () => root.render(<FinanceDashboard />));
+  await act(async () => Array.from(container.querySelectorAll('button')).find(button => button.textContent === 'Source documents')!.click());
+  await act(async () => Array.from(container.querySelectorAll('button')).find(button => button.textContent === 'View evidence')!.click());
+  const calls = fixture.calls.length;
+  await act(async () => { for (const event of ['INITIAL_SESSION', 'SIGNED_IN', 'TOKEN_REFRESHED']) fixture.authChanged!(event, '11111111-1111-4111-8111-111111111111'); });
+  expect(container.querySelector('dialog')).not.toBeNull(); expect(container.textContent).toContain('Synthetic merchant');
+  expect(fixture.calls).toHaveLength(calls);
+});
+it('refuses a late former-viewer document result after an actual identity change', async () => {
+  let finish!: (value: unknown) => void;
+  fixture.results.financial_documents = new Promise(resolve => { finish = resolve; });
+  await act(async () => root.render(<FinanceDashboard />));
+  await act(async () => {
+    fixture.results.financial_documents = { data: [], count: 0 };
+    fixture.authChanged!('TOKEN_REFRESHED', '22222222-2222-4222-8222-222222222222');
+    finish({ data: [invoice({ issuer_name_raw: 'PRIVATE FORMER VIEWER' })], count: 1 });
+    await Promise.resolve();
+  });
+  expect(container.textContent).not.toContain('PRIVATE FORMER VIEWER');
+  expect(fixture.calls.filter(call => call.table === 'financial_documents').at(-1).filter).toEqual(['owner_id', '22222222-2222-4222-8222-222222222222']);
+});
+
+it('invalidates pending owner records at shared-book selection before effect cleanup', async () => {
+  fixture.results.grants = [{ id: 'grant', owner_id: '22222222-2222-4222-8222-222222222222', member_id: '11111111-1111-4111-8111-111111111111', active: true, can_correct: true, owner_name: 'Shared owner' }];
+  let finish!: (value: unknown) => void;
+  fixture.results.financial_documents = new Promise(resolve => { finish = resolve; });
+  await act(async () => root.render(<FinanceDashboard />));
+  await act(async () => {
+    fixture.results.financial_documents = { data: [], count: 0 };
+    Array.from(container.querySelectorAll<HTMLButtonElement>('[aria-label="Active accounting book"] button')).find(button => button.textContent?.startsWith('Shared owner'))!.click();
+    finish({ data: [invoice({ issuer_name_raw: 'PRIVATE OTHER BOOK' })], count: 1 });
+    await Promise.resolve();
+  });
+  expect(container.textContent).not.toContain('PRIVATE OTHER BOOK');
+  expect(fixture.calls.filter(call => call.table === 'financial_documents').at(-1).filter).toEqual(['owner_id', '22222222-2222-4222-8222-222222222222']);
 });
