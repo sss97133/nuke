@@ -23,7 +23,7 @@ import { remember, remembered } from '../../components/finance/accountingMemory'
  */
 
 import '../../styles/accounting.css';
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import FinancialSourceReview from '../../components/financial/FinancialSourceReview';
 import FinancialDocumentLines from '../../components/finance/FinancialDocumentLines';
@@ -363,6 +363,7 @@ function formatAmount(n: number | null): string {
 export default function FinanceDashboard() {
   // The active book and year are remembered per browser (accountingMemory); the server still decides access.
   const [actorId, setActorId] = useState('');
+  const actorIdentity = useRef<string | null>(null);
   const [ownerId, setOwnerId] = useState('');
   const [grants, setGrants] = useState<BookGrant[]>([]);
   const [grantRevision, setGrantRevision] = useState(0);
@@ -371,23 +372,6 @@ export default function FinanceDashboard() {
   const canCorrect = !!actorId && (ownerId === actorId || grants.some(g => g.owner_id === ownerId && g.member_id === actorId && g.active && g.can_correct));
   // Names for the change feed come from the grants this account already lists; nobody else's profile is read.
   const people: Record<string, string> = Object.fromEntries([...grants.flatMap(g => [[g.owner_id, g.owner_name], [g.member_id, g.member_name]]), ...(actorId ? [[actorId, 'You']] : [])]);
-  useEffect(() => {
-    let cancelled = false;
-    void supabase.auth.getUser().then(async ({ data }) => {
-      if (cancelled) return;
-      // A remembered book waits for the grants so the screen never loads a book this account cannot read.
-      const id = data.user?.id || ''; setActorId(id); setOwnerId(current => current || (remembered('book') ? '' : id));
-      const result = await supabase.rpc('list_accounting_access').then(result => result, () => ({ data: null, error: true }));
-      if (cancelled) return;
-      const rows: BookGrant[] = result.error || !Array.isArray(result.data) ? [] : result.data;
-      setGrants(rows); setOwnerId(current => { const wanted = current || remembered('book') || id; return wanted === id || rows.some(g => g.owner_id === wanted && g.member_id === id && g.active) ? wanted : id; });
-    }).catch(() => { if (!cancelled) { setActorId(''); setOwnerId(''); setGrants([]); } });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(event => {
-      if (event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED') return;
-      cancelled = true; setActorId(''); setOwnerId(''); setGrants([]); setGrantRevision(n => n + 1);
-    });
-    return () => { cancelled = true; subscription.unsubscribe(); };
-  }, [grantRevision]);
   const generation = useRef(0);
   const [deals, setDeals] = useState<DealFlowRow[]>([]);
   const [docs, setDocs] = useState<FinancialDocumentRow[]>([]);
@@ -407,15 +391,42 @@ export default function FinanceDashboard() {
   const [page, setPage] = useState(0);
   const [counts, setCounts] = useState<{ docs: number | null; deals: number | null; concerns: number | null }>({ docs: null, deals: null, concerns: null });
 
+  const bookIdentity = useRef('');
+  const selectBook = useCallback((next: string) => {
+    if (next === bookIdentity.current) return;
+    // Invalidate in the selection/grant callback, before a late prior-book read settles.
+    generation.current++; bookIdentity.current = next; setOwnerId(next);
+    setSourceView('summary'); setOfficeView('books'); setAddingDocument(false);
+    setSelectedDocument(null); setSelectedRecord(null); setDocs([]); setConcerns([]); setDeals([]); setErrors([]);
+    setCounts({ docs: null, deals: null, concerns: null }); setConcernsLoaded(false); setPage(0); setLoading(true);
+  }, []);
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
-      generation.current++;
+    let cancelled = false;
+    void supabase.auth.getUser().then(async ({ data }) => {
+      if (cancelled) return;
+      // A remembered book waits for the grants so the screen never loads a book this account cannot read.
+      const id = data.user?.id || ''; actorIdentity.current = id; setActorId(id); if (!bookIdentity.current && !remembered('book')) selectBook(id);
+      const result = await supabase.rpc('list_accounting_access').then(result => result, () => ({ data: null, error: true }));
+      if (cancelled) return;
+      const rows: BookGrant[] = result.error || !Array.isArray(result.data) ? [] : result.data;
+      setGrants(rows);
+      const wanted = bookIdentity.current || remembered('book') || id;
+      selectBook(wanted === id || rows.some(g => g.owner_id === wanted && g.member_id === id && g.active) ? wanted : id);
+    }).catch(() => { if (!cancelled) { setActorId(''); selectBook(''); setGrants([]); } });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      const nextActor = session?.user?.id || '';
+      if (actorIdentity.current === null && event === 'INITIAL_SESSION') { actorIdentity.current = nextActor; return; }
+      if (nextActor === actorIdentity.current && event !== 'SIGNED_OUT') return;
+      actorIdentity.current = nextActor;
+      cancelled = true; generation.current++;
+      setActorId(''); selectBook(''); setGrants([]); setGrantRevision(n => n + 1);
       setDocs([]); setDeals([]); setConcerns([]); setSelectedDocument(null); setSelectedRecord(null); setSourceQuery(''); setErrors([]);
       setCounts({ docs: null, deals: null, concerns: null });
       setPage(0); setLoading(true); setSessionRevision(n => n + 1);
+      setOfficeView('books'); setSourceView('summary'); setAddingDocument(false);
     });
-    return () => { generation.current++; subscription.unsubscribe(); };
-  }, []);
+    return () => { cancelled = true; subscription.unsubscribe(); };
+  }, [grantRevision, selectBook]);
 
   useEffect(() => {
     let cancelled = false;
@@ -496,7 +507,7 @@ export default function FinanceDashboard() {
     <AccountingBookContext.Provider value={{ ownerId, shared, canCorrect, liveRevision: live.revision }}><div className="accounting-page" style={s.container}>
       <header className="accounting-header"><div><span className="accounting-eyebrow">Your private office</span><h1>Accounting</h1><p>Follow the money. See the evidence. Add what you know.</p></div>
         <div className="accounting-header-actions">{!shared && <button type="button" className="accounting-primary" onClick={() => { setOfficeView('tools'); setAddingDocument(true); }}>Add documents</button>}<button type="button" onClick={() => setSessionRevision(n => n + 1)}>Refresh records</button></div></header>
-      {actorId && <div className="accounting-book-picker"><span className="accounting-eyebrow" id="accounting-book-label">Active book</span><div className="accounting-chips" role="group" aria-label="Active accounting book" aria-labelledby="accounting-book-label">{[{ id: actorId, label: 'My books' }, ...grants.filter(g => g.member_id === actorId && g.active).map(g => ({ id: g.owner_id, label: `${g.owner_name} · shared books (${g.can_correct ? 'review and correct' : 'review'})` }))].map(bookOption => <button type="button" key={bookOption.id} aria-pressed={ownerId === bookOption.id} onClick={() => { if (ownerId === bookOption.id) return; remember('book', bookOption.id); setOwnerId(bookOption.id); setSourceView('summary'); setOfficeView('books'); setAddingDocument(false); setSelectedDocument(null); setSelectedRecord(null); setDocs([]); setConcerns([]); setDeals([]); setPage(0); }}>{bookOption.label}</button>)}</div></div>}
+      {actorId && <div className="accounting-book-picker"><span className="accounting-eyebrow" id="accounting-book-label">Active book</span><div className="accounting-chips" role="group" aria-label="Active accounting book" aria-labelledby="accounting-book-label">{[{ id: actorId, label: 'My books' }, ...grants.filter(g => g.member_id === actorId && g.active).map(g => ({ id: g.owner_id, label: `${g.owner_name} · shared books (${g.can_correct ? 'review and correct' : 'review'})` }))].map(bookOption => <button type="button" key={bookOption.id} aria-pressed={ownerId === bookOption.id} onClick={() => { if (ownerId === bookOption.id) return; remember('book', bookOption.id); selectBook(bookOption.id); }}>{bookOption.label}</button>)}</div></div>}
       <p className="accounting-muted" role="status">{live.message}</p>
       <nav className="accounting-office-nav" aria-label="Accounting office">{([
         ['books', 'Books', 'Income, expenses and transactions'], ['documents', 'Source documents', 'Receipts and supporting files'],
@@ -505,7 +516,7 @@ export default function FinanceDashboard() {
       ] as const).filter(([tab]) => !shared || tab !== 'tools').map(([tab, label, hint]) => <button type="button" key={tab} aria-current={officeView === tab ? 'page' : undefined} title={hint} onClick={() => { setOfficeView(tab); setSourceView(tab === 'documents' || tab === 'review' ? tab : 'summary'); }}><span>{label}</span></button>)}</nav>
       <div hidden={officeView !== 'activity'}><h2>Recent activity</h2><p>Open a change to inspect the source and its current interpretation.</p><AccountingActivity people={people} onOpen={documentId => openEvidence(documentId)} /></div>
       {shared && <p>Shared books. Your corrections retain your identity and appear in the same ledger for the owner and other reviewers.</p>}
-      <div hidden={officeView !== 'books'}><FinancialWorkpapers key={ownerId} revision={sessionRevision} onOpen={openEvidence} />
+      <div hidden={officeView !== 'books'}>{ownerId && <FinancialWorkpapers key={`${actorId}:${ownerId}`} viewerId={actorId} revision={sessionRevision} onOpen={openEvidence} />}
       <p className="accounting-muted accounting-tax-note">Tax review is a separate step. Saved records are not a filing or a completed reconciliation.</p></div>
       <div hidden={shared || officeView !== 'tools'}><h2>Office settings</h2><AccountingAccess grants={grants} actorId={actorId} onChanged={() => setGrantRevision(n => n + 1)} /><details className="accounting-disclosure" open={addingDocument} onToggle={event => setAddingDocument(event.currentTarget.open)}><summary>Add documents <span>Receipts, invoices and supporting files</span></summary>
         <FinancialDocumentIntake onComplete={documentId => { openEvidence(documentId); setSessionRevision(n => n + 1); }} />
