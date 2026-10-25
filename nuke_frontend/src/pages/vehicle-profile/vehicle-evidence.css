@@ -46,9 +46,6 @@
 .ev-fields strong { display: block; font: 700 15px/1.25 Arial, sans-serif; margin-top: 8px; padding-right: 14px; }
 .ev-fields button > span:last-child { position: absolute; right: 10px; bottom: 13px; font-size: 13px; }
 .ev-detail { border: 2px solid var(--border); border-top: 0; padding: 12px; min-height: 240px; }
-.ev-detail .field-evidence-popup { font-size: 12px !important; padding: 0 !important; }
-.ev-detail .field-evidence-popup > div:first-child > div:last-child { font-size: 22px !important; line-height: 1.2; margin: 6px 0 16px; }
-.ev-detail .field-evidence-popup span { font-size: 11px !important; }
 .ev-detail a { color: var(--text); text-underline-offset: 3px; }
 .field-evidence-gap { border-left: 2px solid var(--text); padding: 8px 0 8px 12px; margin-top: 14px; }
 .field-evidence-gap p { font-size: 11px; }
@@ -108,3 +105,50 @@
 .ev-image-assessment strong { display: block; font: 700 15px/1.3 Arial, sans-serif; margin-top: 6px; }
 .ev-image-assessment p { font-size: 11px; }
 .ev-proof-limitation { border-left: 2px solid var(--border); padding-left: 10px; color: var(--text-secondary); }
+
+
+/* The same field reader is used in the inline record and in the popup stack. */
+.field-evidence-popup {
+  padding: 16px;
+  color: var(--text);
+  background: var(--surface);
+  font: var(--text-callout)/1.55 var(--font-family);
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.ev-detail .field-evidence-popup { padding: 0; }
+.field-evidence-heading { margin-bottom: 16px; }
+.field-evidence-value { margin-top: 4px; font-size: 22px; font-weight: 650; line-height: 1.3; }
+.field-evidence-value--identifier { font: 600 18px/1.4 var(--font-mono); }
+.field-evidence-popup .ev-label {
+  font: 600 var(--text-caption)/1.5 var(--font-family);
+  letter-spacing: 0;
+  color: var(--text-secondary);
+}
+.field-evidence-popup p, .field-evidence-popup .ev-image-assessment p { font-size: var(--text-callout); margin: 8px 0; }
+.field-evidence-popup .ev-footnote { font: var(--text-caption)/1.5 var(--font-family); }
+.field-evidence-popup a { color: var(--link); text-underline-offset: 3px; }
+.field-evidence-popup a:not(:has(img)) { display: inline-flex; align-items: center; min-height: var(--control-height); padding-block: 6px; }
+.field-evidence-popup a:focus-visible, .field-evidence-popup summary:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 3px; }
+.field-evidence-popup summary { min-height: var(--control-height); padding: 10px 0; cursor: pointer; color: var(--link); }
+.field-evidence-popup details { border-top: 1px solid var(--border); margin-top: 8px; }
+.field-evidence-section-title { font-weight: 650; padding: 10px 0; margin-bottom: 4px; border-bottom: 1px solid var(--border); }
+.field-evidence-decode, .field-evidence-source-claim { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 8px 12px; }
+.field-evidence-decode { padding-block: 8px; }
+.field-evidence-source-claim { padding: 10px 0; border-bottom: 1px solid var(--border); }
+.field-evidence-source-claim:last-child { border-bottom: 0; }
+.field-evidence-term { color: var(--text-secondary); font-size: var(--text-caption); }
+.field-evidence-report { padding: 16px 0; border-top: 1px solid var(--border); }
+.field-evidence-popup .ev-image-proof { border-top-width: 1px; }
+.field-evidence-popup .ev-image-proof > a { font-size: var(--text-callout); }
+.field-evidence-popup .ev-image-proof > a > span { min-height: var(--control-height); display: flex; align-items: center; }
+.field-evidence-popup .ev-image-assessment strong { font: 650 var(--text-body)/1.4 var(--font-family); }
+.field-evidence-popup .ev-proof-limitation { border-left-color: var(--border); }
+.field-evidence-related-images { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.field-evidence-related-images > a { position: relative; aspect-ratio: 1; overflow: hidden; border-radius: var(--radius-sm); }
+.field-evidence-related-images img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.field-evidence-related-images span { position: absolute; bottom: 0; left: 0; right: 0; padding: 4px 6px; font-size: var(--text-caption); line-height: 1.4; background: rgb(0 0 0 / 75%); color: #fff; }
+.field-evidence-read-status { padding: 12px; margin-top: 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg); }
+@media (max-width: 480px) {
+  .field-evidence-related-images { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

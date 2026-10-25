@@ -3,7 +3,7 @@ import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
-const fixture = vi.hoisted(() => ({ context: {} as any, comments: vi.fn() }));
+const fixture = vi.hoisted(() => ({ context: {} as any, comments: vi.fn(), gallery: vi.fn() }));
 vi.mock('./VehicleProfileContext', () => ({ useVehicleProfile: () => fixture.context }));
 vi.mock('../../components/vehicle/VehicleCommentsCard', () => ({
   VehicleCommentsCard: (props: any) => { fixture.comments(props); return <div data-testid="comment-reader">Comments &amp; Bids</div>; },
@@ -23,7 +23,7 @@ vi.mock('../../components/vehicle/ExternalListingCard', () => ({ default: () => 
 vi.mock('../../components/vehicle/VehicleReferenceLibrary', () => ({ default: () => null }));
 vi.mock('../../components/vehicle/VehicleDescriptionCard', () => ({ default: () => <section data-testid="description">Seller description</section> }));
 vi.mock('../../components/images/BundleReviewQueue', () => ({ default: () => null }));
-vi.mock('../../components/images/ImageGallery', () => ({ default: () => null }));
+vi.mock('../../components/images/ImageGallery', () => ({ default: (props: any) => { fixture.gallery(props); return null; } }));
 vi.mock('../../components/vehicle/VehicleVideoSection', () => ({ default: () => null }));
 vi.mock('./AnalysisSignalsSection', () => ({ default: () => null }));
 vi.mock('./VehicleIntelligencePanel', () => ({ default: () => null }));
@@ -47,7 +47,7 @@ beforeEach(() => {
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
   fixture.context = { vehicle: { id: 'offline-subject' }, session: null, totalCommentCount: 0,
     vehicleImages: [], fallbackListingImageUrls: [], observationCount: 0 };
-  fixture.comments.mockClear();
+  fixture.comments.mockClear(); fixture.gallery.mockClear();
   host = document.createElement('div'); document.body.append(host); root = createRoot(host);
 });
 afterEach(async () => { await act(async () => root.unmount()); host.remove(); });
@@ -75,4 +75,39 @@ it('opens the retained description and specifications without a second disclosur
   expect(host.querySelectorAll('[data-testid=description]')).toHaveLength(1);
   expect(host.querySelector('[data-testid=description]')?.closest('.collapsible-widget--profile')).toBeNull();
   expect(host.querySelector('[data-testid=specifications]')).not.toBeNull();
+});
+
+
+it('keeps every gallery view actionable and exposes the selected mode', async () => {
+  fixture.context.galleryFilter = { zone: 'mech_engine' };
+  fixture.context.setGalleryFilter = vi.fn();
+  await mount();
+  const buttons = [...host.querySelectorAll<HTMLButtonElement>('[aria-label="Image view"] button')];
+  expect(buttons).toHaveLength(8);
+  expect(buttons.find(button => button.textContent === 'Grid')?.getAttribute('aria-pressed')).toBe('true');
+  const modes = ['ZONES', 'GRID', 'FULL', 'INFO', 'SESSIONS', 'CATEGORY', 'CHRONO', 'SOURCE'];
+  for (const [index, button] of buttons.entries()) {
+    await act(async () => button.click());
+    expect(button.getAttribute('aria-pressed')).toBe('true');
+    expect(host.querySelectorAll('[aria-label="Image view"] [aria-pressed="true"]')).toHaveLength(1);
+    expect(fixture.gallery.mock.calls.at(-1)?.[0].galleryView).toBe(modes[index]);
+  }
+  expect(fixture.context.setGalleryFilter).toHaveBeenCalledWith(null);
+  const clear = [...host.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent === 'Clear filter')!;
+  expect(clear.closest('.gallery-header')).not.toBeNull();
+  fixture.context.setGalleryFilter.mockClear();
+  await act(async () => clear.click());
+  expect(fixture.context.setGalleryFilter).toHaveBeenCalledOnce();
+  expect(fixture.context.setGalleryFilter).toHaveBeenCalledWith(null);
+});
+it('labels image columns and updates the existing grid variable', async () => {
+  await mount();
+  const slider = host.querySelector<HTMLInputElement>('[aria-label="Image columns"]')!;
+  expect(slider.min).toBe('1'); expect(slider.max).toBe('8'); expect(slider.value).toBe('3');
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(slider, '2');
+    slider.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  expect(host.querySelector('.gallery-slider-val')?.textContent).toBe('2');
+  expect(host.querySelector<HTMLElement>('.vehicle-profile-right-column')?.style.getPropertyValue('--vp-gallery-cols')).toBe('2');
 });

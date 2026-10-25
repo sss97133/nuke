@@ -9,7 +9,7 @@ interface OrphanedVehicleBannerProps {
   onDismiss?: () => void;
 }
 
-const OrphanedVehicleBanner: React.FC<OrphanedVehicleBannerProps> = ({
+const VehicleNotice: React.FC<OrphanedVehicleBannerProps> = ({
   vehicle,
   session,
   permissions,
@@ -33,18 +33,23 @@ const OrphanedVehicleBanner: React.FC<OrphanedVehicleBannerProps> = ({
 
   // Only a banner that renders needs to know whether the vehicle has any image, and only whether it has one: ask for
   // one row, not an exact count (which runs the image row policy over every photo of the vehicle for every visitor).
-  const [hasImages, setHasImages] = useState(false);
+  const [imageStatus, setImageStatus] = useState<'pending' | 'present' | 'empty' | 'unavailable'>('pending');
+  const [imageAttempt, setImageAttempt] = useState(0);
   useEffect(() => {
     if (!showBanner || !vehicle?.id) return;
     let cancelled = false;
-    supabase
-      .from('vehicle_images')
-      .select('id')
-      .eq('vehicle_id', vehicle.id)
-      .limit(1)
-      .then(({ data }) => { if (!cancelled) setHasImages((data?.length ?? 0) > 0); });
+    setImageStatus('pending');
+    void (async () => {
+      try {
+        const { data, error } = await supabase.from('vehicle_images')
+          .select('id').eq('vehicle_id', vehicle.id).limit(1);
+        if (!cancelled) setImageStatus(error || !Array.isArray(data) ? 'unavailable' : data.length > 0 ? 'present' : 'empty');
+      } catch {
+        if (!cancelled) setImageStatus('unavailable');
+      }
+    })();
     return () => { cancelled = true; };
-  }, [showBanner, vehicle?.id]);
+  }, [showBanner, vehicle?.id, imageAttempt]);
 
   if (!showBanner) return null;
   if (dismissed) return null;
@@ -93,14 +98,19 @@ const OrphanedVehicleBanner: React.FC<OrphanedVehicleBannerProps> = ({
 
   const issues: string[] = [];
   if (!hasVIN) issues.push('Missing VIN');
-  if (!hasImages) issues.push('No images');
+  if (imageStatus === 'empty') issues.push('No images visible');
   if (!vehicle?.uploaded_by && !vehicle?.origin_organization_id) issues.push('No owner or organization');
 
   return (
     <div className="vp-attention-banner">
       <span className="vp-attention-banner__icon" aria-hidden="true">&#9650;</span>
-      <span>{issues.join(' \u00B7 ')}</span>
+      <div>
+        <span>{issues.join(' \u00B7 ')}</span>
+        {imageStatus === 'pending' && <div role="status">Checking images…</div>}
+        {imageStatus === 'unavailable' && <div role="status">Image status unavailable. Missing images have not been established.</div>}
+      </div>
       <div className="vp-attention-banner__actions">
+        {imageStatus === 'unavailable' && <button type="button" className="vp-attention-banner__action" onClick={() => setImageAttempt(attempt => attempt + 1)}>Retry image check</button>}
         {!hasVIN && (
           <button
             onClick={handleCompleteProfile}
@@ -130,6 +140,11 @@ const OrphanedVehicleBanner: React.FC<OrphanedVehicleBannerProps> = ({
     </div>
   );
 };
+
+// Keep notice dismissal and asynchronous reads scoped to the actual vehicle and viewer.
+const OrphanedVehicleBanner: React.FC<OrphanedVehicleBannerProps> = props => (
+  <VehicleNotice key={`${props.vehicle?.id || ''}:${props.session?.user?.id || 'public'}`} {...props} />
+);
 
 export default OrphanedVehicleBanner;
 

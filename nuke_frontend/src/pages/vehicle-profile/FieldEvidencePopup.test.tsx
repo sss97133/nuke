@@ -1,15 +1,17 @@
-import React from 'react';
+// @vitest-environment jsdom
+import React, { act } from 'react';
+import { createRoot } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FieldEvidenceGroup } from './hooks/useFieldEvidence';
 
-const fixture = vi.hoisted(() => ({ provenance: {} as any }));
+const fixture = vi.hoisted(() => ({ provenance: {} as any, inventory: {} as any }));
 vi.mock('./hooks/useFieldProvenance', async importOriginal => ({
   ...await importOriginal<typeof import('./hooks/useFieldProvenance')>(), useFieldProvenance: () => fixture.provenance,
 }));
 vi.mock('./hooks/useVehicleImageEvidence', async importOriginal => ({
   ...await importOriginal<typeof import('./hooks/useVehicleImageEvidence')>(),
-  useVehicleImageEvidence: () => ({ data: { images: [], complete: true }, isLoading: false }),
+  useVehicleImageEvidence: () => fixture.inventory,
 }));
 vi.mock('../../components/PrefetchLink', () => ({ default: ({ to, children }: any) => <a href={to}>{children}</a> }));
 vi.mock('../../components/popups/usePopup', () => ({ usePopup: () => ({ closeTop: vi.fn() }) }));
@@ -17,6 +19,7 @@ import FieldEvidencePopup from './FieldEvidencePopup';
 const render = (evidence?: FieldEvidenceGroup) => renderToStaticMarkup(<FieldEvidencePopup vehicleId="local-vehicle" field="vin" label="VIN" value="Unknown" evidence={evidence} />);
 
 beforeEach(() => {
+  fixture.inventory = { data: { images: [], complete: true }, isLoading: false, refetch: vi.fn() };
   fixture.provenance = { isLoading: false, error: null, data: { value: null, evidence: [], observations: [
     { id: 'local-observation', value: 'SOURCE-VIN', confidence: 0.6, source_url: 'https://example.com/listing', source_slug: 'listing-source', observed_at: '2026-10-03T12:00:00Z' },
   ] } };
@@ -142,4 +145,58 @@ describe('canonical value -> attributed observation', () => {
     expect(html).not.toContain('SUPPLIED-CLAIM');
     expect(html).not.toContain('canonical value is unknown');
   });
+});
+
+
+it('does not turn pending source or image reads into missing evidence', () => {
+  fixture.provenance = { isLoading: true, data: undefined };
+  let html = render();
+  expect(html).toContain('Reading source evidence');
+  expect(html).not.toContain('No source claim was returned');
+  expect(html).not.toContain('IMAGE CITATION MISSING');
+  fixture.provenance = { isLoading: false, data: { value: null, evidence: [], observations: [] } };
+  fixture.inventory = { isLoading: true, data: undefined };
+  html = render();
+  expect(html).toContain('Reading image evidence');
+  expect(html).not.toContain('IMAGE CITATION MISSING');
+});
+it('identifies which reader failed, retains attributed reports, and offers its retry', () => {
+  fixture.inventory.error = new Error('image reader unavailable');
+  let html = render();
+  expect(html).toContain('Image evidence could not be read');
+  expect(html).toContain('Retry image evidence');
+  expect(html).toContain('SOURCE-VIN');
+  expect(html).not.toContain('IMAGE CITATION MISSING');
+  expect(html).not.toContain('No source claim was returned');
+  fixture.inventory.error = null;
+  fixture.provenance.error = new Error('source reader unavailable');
+  html = render();
+  expect(html).toContain('Source evidence could not be read');
+  expect(html).toContain('Retry source evidence');
+  expect(html).not.toContain('Image evidence could not be read');
+});
+
+
+it('retries only the failed reader and disables its action while a retry is running', async () => {
+  (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
+  const sourceRetry = vi.fn(), imageRetry = vi.fn();
+  fixture.provenance.refetch = sourceRetry;
+  fixture.inventory.refetch = imageRetry;
+  fixture.inventory.error = new Error('image read failed');
+  const host = document.createElement('div'); document.body.append(host); const root = createRoot(host);
+  const mount = () => act(async () => root.render(<FieldEvidencePopup vehicleId="local-vehicle" field="vin" label="VIN" value="Unknown" />));
+  try {
+    await mount();
+    await act(async () => host.querySelector<HTMLButtonElement>('button')!.click());
+    expect(imageRetry).toHaveBeenCalledOnce(); expect(sourceRetry).not.toHaveBeenCalled();
+    fixture.inventory.isFetching = true;
+    await mount();
+    expect(host.querySelector<HTMLButtonElement>('button')!.disabled).toBe(true);
+    fixture.inventory.error = null;
+    fixture.provenance.error = new Error('source read failed');
+    await mount();
+    await act(async () => host.querySelector<HTMLButtonElement>('button')!.click());
+    expect(sourceRetry).toHaveBeenCalledOnce();
+    expect(imageRetry).toHaveBeenCalledOnce();
+  } finally { await act(async () => root.unmount()); host.remove(); }
 });

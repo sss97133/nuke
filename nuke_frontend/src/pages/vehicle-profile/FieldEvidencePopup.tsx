@@ -8,6 +8,7 @@
  */
 import React from 'react';
 import PrefetchLink from '../../components/PrefetchLink';
+import { Button } from '../../components/ui/button';
 import { usePopup } from '../../components/popups/usePopup';
 import { useVehicleImageEvidence, relatedFieldImages, hasImageAnalysis, webSourceUrl } from './hooks/useVehicleImageEvidence';
 import { useFieldProvenance, citedFieldImages, evidenceRelationLabel, provenanceCoverageUnavailable, formatProvenanceValue, groupRepeatedReports, ENGINE_PROPERTY_IDS } from './hooks/useFieldProvenance';
@@ -26,14 +27,14 @@ interface FieldEvidencePopupProps {
 }
 
 const SOURCE_LABELS: Record<string, string> = {
-  vin_decode: 'VIN DECODE (NHTSA)',
+  vin_decode: 'VIN decode (NHTSA)',
   nhtsa: 'NHTSA',
-  bat: 'BRING A TRAILER',
-  bat_import: 'BRING A TRAILER',
-  ai_extraction: 'AI EXTRACTION',
-  vision: 'VISION ANALYSIS',
-  user: 'USER INPUT',
-  enrichment: 'DATA ENRICHMENT',
+  bat: 'Bring a Trailer',
+  bat_import: 'Bring a Trailer',
+  ai_extraction: 'AI extraction',
+  vision: 'Vision analysis',
+  user: 'User input',
+  enrichment: 'Data enrichment',
 };
 
 const TRUST_ORDER = ['vin_decode', 'nhtsa', 'bat', 'user', 'ai_extraction', 'vision', 'enrichment'];
@@ -51,7 +52,7 @@ function sourceLabel(sourceType: string): string {
   for (const [key, label] of Object.entries(SOURCE_LABELS)) {
     if (s.includes(key)) return label;
   }
-  return sourceType.toUpperCase().replace(/_/g, ' ');
+  return sourceType.replace(/_/g, ' ');
 }
 
 const FieldEvidencePopup: React.FC<FieldEvidencePopupProps> = ({
@@ -79,31 +80,20 @@ const FieldEvidencePopup: React.FC<FieldEvidencePopupProps> = ({
   const sortedSources = [...sources].sort((a, b) => trustRank(a.source_type) - trustRank(b.source_type));
 
   if (!provenance.isLoading && provenance.data === null && !provenance.error) {
-    return <p role="status">Field evidence is unavailable or this record is private.</p>;
+    return <div className="field-evidence-popup"><p role="status">Field evidence is unavailable or this record is private.</p></div>;
   }
   if (provenanceCoverageUnavailable(provenance.data)) {
-    return <p role="status">Source evidence could not be loaded completely for this field. Coverage is unknown.</p>;
+    return <div className="field-evidence-popup"><p role="status">Source evidence could not be loaded completely for this field. Coverage is unknown.</p>
+      <Button type="button" variant="secondary" disabled={provenance.isFetching} onClick={() => void provenance.refetch()}>Retry source evidence</Button>
+    </div>;
   }
 
   return (
-    <div className="field-evidence-popup" style={{ fontFamily: 'Arial, sans-serif', fontSize: '9px', lineHeight: 1.6, padding: '8px' }}>
-      {/* Field value header */}
-      <div style={{ marginBottom: '8px' }}>
-        <div style={{
-          fontSize: '8px', fontWeight: 700, letterSpacing: '1px',
-          textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '2px',
-        }}>
-          {label}
-        </div>
-        {!isEngineProperty && <div style={{
-          fontFamily: field === 'vin' ? "'Courier New', monospace" : 'Arial, sans-serif',
-          fontSize: field === 'vin' ? '12px' : '11px',
-          fontWeight: 700,
-          letterSpacing: field === 'vin' ? '1.5px' : 'normal',
-        }}>
-          {value}
-        </div>}
-      </div>
+    <div className="field-evidence-popup">
+      <header className="field-evidence-heading">
+        <div className="ev-label">{label}</div>
+        {!isEngineProperty && <div className={`field-evidence-value${field === 'vin' ? ' field-evidence-value--identifier' : ''}`}>{value}</div>}
+      </header>
 
       {provenance.data && <div style={{ marginBottom: 8 }}>
         <span className="ev-label">{isEngineProperty ? 'RESOLVED SOURCE CLAIM' : 'CANONICAL VALUE'}</span>{' '}
@@ -125,20 +115,16 @@ const FieldEvidencePopup: React.FC<FieldEvidencePopupProps> = ({
       {/* VIN decode section */}
       {field === 'vin' && vinDecode && Object.keys(vinDecode).length > 0 && (
         <div style={{ marginBottom: '8px' }}>
-          <div style={{
-            fontSize: '8px', fontWeight: 700, letterSpacing: '0.5px',
-            textTransform: 'uppercase', color: 'var(--text-secondary)',
-            borderBottom: '1px solid var(--border)', paddingBottom: '2px', marginBottom: '4px',
-          }}>
-            NHTSA DECODE
+          <div className="field-evidence-section-title">
+            NHTSA decode
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr', gap: '1px 8px', fontSize: '8px' }}>
+          <div className="field-evidence-decode">
             {Object.entries(vinDecode)
               .filter(([, v]) => v != null && v !== '' && v !== 'Not Applicable')
               .slice(0, 12)
               .map(([k, v]) => (
                 <React.Fragment key={k}>
-                  <span style={{ color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  <span className="field-evidence-term">
                     {k.replace(/_/g, ' ')}
                   </span>
                   <span>{String(v)}</span>
@@ -152,28 +138,13 @@ const FieldEvidencePopup: React.FC<FieldEvidencePopupProps> = ({
       {/* Evidence sources */}
       {sortedSources.length > 0 && (
         <div style={{ marginBottom: '8px' }}>
-          <div style={{
-            fontSize: '8px', fontWeight: 700, letterSpacing: '0.5px',
-            textTransform: 'uppercase', color: 'var(--text-secondary)',
-            borderBottom: '1px solid var(--border)', paddingBottom: '2px', marginBottom: '4px',
-          }}>
-            {sortedSources.length} SOURCE CLAIM{sortedSources.length !== 1 ? 'S' : ''}
+          <div className="field-evidence-section-title">
+            {sortedSources.length} source claim{sortedSources.length !== 1 ? 's' : ''}
           </div>
           {sortedSources.map((src, i) => (
-            <div key={src.id || i} style={{
-              display: 'grid', gridTemplateColumns: 'auto 1fr',
-              gap: '0 8px', padding: '2px 0',
-              borderBottom: i < sortedSources.length - 1 ? '1px solid var(--border)' : 'none',
-            }}>
-              <span style={{
-                fontFamily: "'Courier New', monospace", fontSize: '7px', fontWeight: 700,
-                letterSpacing: '0.5px', color: 'var(--text-secondary)',
-              }}>
-                {sourceLabel(src.source_type)}
-              </span>
-              <span style={{ fontFamily: "'Courier New', monospace", fontSize: '9px' }}>
-                {src.field_value || '\u2014'}
-              </span>
+            <div key={src.id || i} className="field-evidence-source-claim">
+              <span className="field-evidence-term">{sourceLabel(src.source_type)}</span>
+              <span>{src.field_value || '\u2014'}</span>
             </div>
           ))}
         </div>
@@ -210,7 +181,7 @@ const FieldEvidencePopup: React.FC<FieldEvidencePopupProps> = ({
       )}
       {groupRepeatedReports((provenance.data?.observations || []).filter(obs => !imageObservations.some(imageObs => imageObs.observation_id === obs.id)),
         provenance.data?.canonical?.observation_id).map(({ report: obs, repeats }) => (
-        <div key={obs.id} style={{ padding: '6px 0', overflowWrap: 'anywhere' }}>
+        <div key={obs.id} className="field-evidence-report">
           <div className="ev-label">SOURCE REPORT · <PrefetchLink to={`/vehicle/${vehicleId}/observation/${obs.id}`} onClick={closeTop}>Inspect observation {obs.id}</PrefetchLink></div>
           {isEngineProperty && provenance.data?.canonical?.observation_id === obs.id && <div className="ev-label">RESOLVED REPORT</div>}
           {webSourceUrl(obs.source_url) ? <a href={webSourceUrl(obs.source_url)!} target="_blank" rel="noopener noreferrer">{obs.source_slug || 'Source observation'} ↗</a> : <span>{obs.source_slug || 'Source observation'} · Link unavailable</span>}
@@ -249,34 +220,21 @@ const FieldEvidencePopup: React.FC<FieldEvidencePopupProps> = ({
       {/* A zone match identifies an area to inspect; it does not support a particular claim. */}
       {!imagesLoading && images.length > 0 && (
         <div>
-          <div style={{
-            fontSize: '8px', fontWeight: 700, letterSpacing: '0.5px',
-            textTransform: 'uppercase', color: 'var(--text-secondary)',
-            borderBottom: '1px solid var(--border)', paddingBottom: '2px', marginBottom: '4px',
-          }}>
-            RELATED IMAGES · AREA MATCH ({images.length})
+          <div className="field-evidence-section-title">
+            Related images · Area match ({images.length})
           </div>
           <p>Area matches help inspection; they do not confirm {value}.</p>
-          <div style={{
-            display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)',
-            gap: '4px',
-          }}>
+          <div className="field-evidence-related-images">
             {images.map(img => (
-              <a href={img.image_url} target="_blank" rel="noopener noreferrer" key={img.id} style={{ position: 'relative', aspectRatio: '1', overflow: 'hidden' }}>
+              <a href={img.image_url} target="_blank" rel="noopener noreferrer" key={img.id} aria-label={`Inspect related image: ${(img.vehicle_zone || field).replace(/_/g, ' ')}`}>
                 <img
                   src={img.thumbnail_url || optimizeImageUrl(img.image_url, 'thumbnail') || img.image_url}
                   alt={img.vehicle_zone || field}
                   width={150} height={150}
                   loading="lazy"
-                  style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
                 />
                 {img.vehicle_zone && (
-                  <span style={{
-                    position: 'absolute', bottom: 0, left: 0, right: 0,
-                    fontSize: '6px', fontFamily: "'Courier New', monospace",
-                    background: 'rgba(0,0,0,0.6)', color: 'var(--bg)',
-                    padding: '1px 2px', textTransform: 'uppercase', letterSpacing: '0.05em',
-                  }}>
+                  <span>
                     {img.vehicle_zone.replace(/_/g, ' ')}
                   </span>
                 )}
@@ -286,8 +244,16 @@ const FieldEvidencePopup: React.FC<FieldEvidencePopupProps> = ({
         </div>
       )}
 
-      {imagesLoading && <p aria-live="polite">Reading image evidence…</p>}
-      {imageReadFailed && <p role="alert">Image evidence could not be read. Its absence has not been established.</p>}
+      {provenance.isLoading && <p role="status">Reading source evidence…</p>}
+      {inventory.isLoading && <p role="status">Reading image evidence…</p>}
+      {provenance.error && <div className="field-evidence-read-status">
+        <p role="alert">Source evidence could not be read. Its absence has not been established.</p>
+        <Button type="button" variant="secondary" disabled={provenance.isFetching} onClick={() => void provenance.refetch()}>Retry source evidence</Button>
+      </div>}
+      {inventory.error && <div className="field-evidence-read-status">
+        <p role="alert">Image evidence could not be read. Its absence has not been established.</p>
+        <Button type="button" variant="secondary" disabled={inventory.isFetching} onClick={() => void inventory.refetch()}>Retry image evidence</Button>
+      </div>}
       {!imagesLoading && !imageReadFailed && citations.length === 0 && (
         <div className="field-evidence-gap">
           <div className="ev-label">IMAGE CITATION MISSING</div>
