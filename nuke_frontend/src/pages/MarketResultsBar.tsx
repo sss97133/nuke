@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 
 /** Only the loaded rows establish the result count for these scoped feeds. */
-export function MarketResultsBar({ count, unavailable, hasMore, isLoading, searchText, onSearchChange, hasActiveFilters, onResetFilters }: {
+export function MarketResultsBar({ resetRevision, count, unavailable, hasMore, isLoading, searchText, onSearchChange, hasActiveFilters, onResetFilters }: {
+  resetRevision: number;
   count: number;
   unavailable: boolean;
   hasMore: boolean;
@@ -13,7 +14,7 @@ export function MarketResultsBar({ count, unavailable, hasMore, isLoading, searc
 }) {
   // URL updates are debounced; keep typing responsive between those updates.
   const [draft, setDraft] = useState(searchText);
-  useEffect(() => { setDraft(searchText); }, [searchText]);
+  useEffect(() => { setDraft(searchText); }, [searchText, resetRevision]);
   return <div className="market-results-bar">
     <p>{isLoading ? 'Loading vehicle results…' : unavailable ? 'Result count unavailable' : `${count.toLocaleString()} vehicle ${count === 1 ? 'record' : 'records'} loaded${hasMore ? ' · more available' : ''}`}</p>
     <label>Search vehicles

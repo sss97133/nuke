@@ -123,6 +123,8 @@ export default function MarketSegmentDetailPage() {
   } = useFeedSearchParams();
 
   const [fontSize, setFontSize] = useState(14);
+  const [resetRevision, setResetRevision] = useState(0);
+  const resetFilters = () => { setResetRevision(value => value + 1); resetAll(); };
   const [filtersCollapsed, setFiltersCollapsed] = useState(() => window.innerWidth < 768);
   const [showScores, setShowScores] = useState(false);
 
@@ -231,6 +233,7 @@ export default function MarketSegmentDetailPage() {
 
         {/* Feed stats strip */}
         <MarketResultsBar
+          resetRevision={resetRevision}
           count={vehicles.length}
           unavailable={feedQuery.isError && vehicles.length === 0}
           hasMore={feedQuery.hasNextPage ?? false}
@@ -238,7 +241,7 @@ export default function MarketSegmentDetailPage() {
           searchText={searchText}
           onSearchChange={setSearchText}
           hasActiveFilters={hasActiveFilters}
-          onResetFilters={resetAll}
+          onResetFilters={resetFilters}
         />
 
         {/* Toolbar */}
@@ -264,7 +267,7 @@ export default function MarketSegmentDetailPage() {
           <FeedFilterSidebar
             filters={filters}
             onFiltersChange={setFilters}
-            onResetAll={resetAll}
+            onResetAll={resetFilters}
             hasActiveFilters={hasActiveFilters}
             collapsed={filtersCollapsed}
             onToggleCollapsed={() => setFiltersCollapsed(!filtersCollapsed)}
@@ -278,7 +281,7 @@ export default function MarketSegmentDetailPage() {
             {feedQuery.isLoading ? (
               <FeedSkeleton cardsPerRow={cardsPerRow} rows={4} />
             ) : feedQuery.isError && vehicles.length === 0 ? null : vehicles.length === 0 ? (
-              <FeedEmptyState hasFilters={hasActiveFilters} onResetFilters={resetAll} />
+              <FeedEmptyState hasFilters={hasActiveFilters} onResetFilters={resetFilters} />
             ) : (
               <FeedLayout
                 vehicles={vehicles}

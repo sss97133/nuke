@@ -16,7 +16,7 @@ vi.mock('../lib/supabase', () => ({ supabase: { from: (table: string) => {
 } } }));
 vi.mock('../feed/components/AuctionClockProvider', () => ({ AuctionClockProvider: ({ children }: { children: React.ReactNode }) => <>{children}</> }));
 vi.mock('../feed/components/FeedToolbar', () => ({ FeedToolbar: ({ sort, onSortChange }: { sort: string; onSortChange: (sort: string) => void }) => <div><output>Selected sort: {sort}</output><button onClick={() => onSortChange('popular')}>Rank</button><button onClick={() => onSortChange('deal_score')}>Deals</button></div> }));
-vi.mock('../feed/components/FeedFilterSidebar', () => ({ FeedFilterSidebar: () => null }));
+vi.mock('../feed/components/FeedFilterSidebar', () => ({ FeedFilterSidebar: ({ onResetAll }: {onResetAll: () => void}) => <button onClick={onResetAll}>Reset sidebar filters</button> }));
 vi.mock('../feed/components/FeedLayout', () => ({ FeedLayout: ({ vehicles, hasNextPage }: { vehicles: { id: string }[]; hasNextPage: boolean }) => <div data-testid="feed-results" data-next-page={String(hasNextPage)}>{vehicles.map(item => <span key={item.id}>{item.id}</span>)}</div> }));
 vi.mock('../feed/components/FeedSkeleton', () => ({ FeedSkeleton: () => <p>Loading vehicles</p> }));
 vi.mock('../feed/components/FeedEmptyState', () => ({ FeedEmptyState: () => <p>Successful empty vehicle result</p> }));
@@ -128,7 +128,7 @@ it.each(['dashboard', 'detail'] as const)('shows loaded scope on %s without pres
   expect(fixture.feed.mock.lastCall?.[0].searchText).toBe('manual');
 });
 
-it.each(['dashboard', 'detail'] as const)('clears a pending search draft and its debounced URL update on %s', async page => {
+it.each([{page:'dashboard', action:'Clear filters'}, {page:'detail', action:'Clear filters'}, {page:'dashboard', action:'Reset sidebar filters'}, {page:'detail', action:'Reset sidebar filters'}] as const)('clears a pending search draft with $action on $page', async ({page, action}) => {
   vi.useFakeTimers();
   await render(page, 'deal_score');
   const input = host.querySelector<HTMLInputElement>('input[type="search"]')!;
@@ -138,7 +138,7 @@ it.each(['dashboard', 'detail'] as const)('clears a pending search draft and its
   });
   expect(input.value).toBe('pending search');
   expect(fixture.feed.mock.lastCall?.[0].searchText).toBe('');
-  await click('Clear filters');
+  await click(action);
   expect(input.value).toBe('');
   await act(async () => { await vi.advanceTimersByTimeAsync(200); });
   expect(input.value).toBe('');
