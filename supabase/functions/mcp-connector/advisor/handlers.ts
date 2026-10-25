@@ -371,13 +371,24 @@ async function loadSaleTruthMap(
   for (let i = 0; i < unique.length; i += 40) {
     const chunk = unique.slice(i, i + 40);
     try {
-      const { data } = await sb
-        .from("vehicle_events")
-        .select("vehicle_id, sale_truth_role, final_price")
-        .in("vehicle_id", chunk)
-        .eq("event_status", "sold");
+      const [{ data }, { data: excl }] = await Promise.all([
+        sb
+          .from("vehicle_events")
+          .select("id, vehicle_id, sale_truth_role, final_price")
+          .in("vehicle_id", chunk)
+          .eq("event_status", "sold"),
+        // suspect-platform (unresolved) and quarantined events are not sold support
+        sb.from("vehicle_event_comp_exclusions").select("event_id").in("vehicle_id", chunk),
+      ]);
+      const excluded = new Set((excl || []).map((r: Record<string, unknown>) => String(r.event_id)));
       for (const row of data || []) {
         const vid = String(row.vehicle_id);
+        if (excluded.has(String(row.id))) {
+          const tx = map.get(vid) ?? { ask_prices: [], dup_prices: [], verified_prices: [], has_verified_sold: false, has_unverified: false };
+          tx.has_unverified = true;
+          map.set(vid, tx);
+          continue;
+        }
         const t = map.get(vid) ?? {
           ask_prices: [],
           dup_prices: [],
