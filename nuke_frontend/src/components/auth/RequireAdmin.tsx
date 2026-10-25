@@ -56,5 +56,6 @@ export function RequireAdmin({ children }: RequireAdminProps) {
     return <Navigate to="/org/dashboard" replace state={{ accessDenied: true }} />;
   }
 
-  return children ? <>{children}</> : <Outlet />;
+  // Even two authorized admins must not share mounted private page state.
+  return <React.Fragment key={user.id}>{children ? children : <Outlet />}</React.Fragment>;
 }

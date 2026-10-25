@@ -49,5 +49,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
     return <Navigate to={`/login?returnUrl=${returnUrl}`} replace />;
   }
 
-  return children ? <>{children}</> : <Outlet />;
+  // Account changes must discard the prior viewer's local page state and
+  // pending component callbacks. Refreshing the same account preserves drafts.
+  return <React.Fragment key={user.id}>{children ? children : <Outlet />}</React.Fragment>;
 }
