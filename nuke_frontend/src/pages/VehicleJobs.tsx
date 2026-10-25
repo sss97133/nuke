@@ -17,11 +17,11 @@ export default function VehicleJobs() {
       <Text role="body">Review the work orders, plan the work, or post a request for this vehicle.</Text>
     </div>
     {!vehicleId ? <p role="alert">A vehicle is required to open its work.</p> : <>
-      <nav className="jb-actions" aria-label="Vehicle work navigation">
+      <nav className="jb-actions jb-vehicle-navigation" aria-label="Vehicle work navigation">
         <PrefetchLink to={`/vehicle/${vehicleId}`}>Back to vehicle</PrefetchLink>
         <PrefetchLink to={`/vehicle/${vehicleId}/mailbox`}>Open mailbox</PrefetchLink>
       </nav>
-      <VehicleWorkCard vehicleId={vehicleId} vehicleTitle="This vehicle" signedIn={!!user} />
+      <VehicleWorkCard vehicleId={vehicleId} vehicleTitle="This vehicle" signedIn={!!user} showVehicleTitle />
     </>}
   </article>;
 }

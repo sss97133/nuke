@@ -68,7 +68,7 @@ export function WorkPlanView({ vehicleId, plan, signedIn }: { vehicleId: string;
 
     <Section title="Check the identity first" coverage={{ n: agreeing, of: stated, grain: 'stated fields agree', as_of: asOf }}>
       {flagged.length === 0
-        ? <Text role="body">The details agree across sources ({agreeing} checked).</Text>
+        ? <Text role="body">{stated === 0 ? 'No identity fields were available to compare. Agreement is unassessed.' : `The details agree across sources (${agreeing} checked).`}</Text>
         : <Rows title="Differences">{flagged.map(f => <Row key={f} label={`${identityFieldLabel(f)} · ${identityStatusWord(fields[f]?.status)}`}>{identityValues(fields[f])}</Row>)}</Rows>}
       {vinState && vinState !== 'usable' && <Text role="caption">{vinDecodeLine(vinState)}</Text>}
       <Text role="caption">A difference doesn't say which source is right. The inspection does.</Text>

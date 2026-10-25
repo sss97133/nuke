@@ -6,6 +6,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { Section, Text } from '../../kit';
+import { VehicleIdentity } from '../../components/common/MakeIdentity';
 import { PrefetchLink } from '../../components/PrefetchLink';
 import { JobReaders, jobHref, slotWords, vehicleText, type VehicleWorkOrdersRead } from './jobsReaders';
 import { PublicationRow } from './Publication';
@@ -15,7 +16,7 @@ import './jobs.css';
 const WorkPlanPanel = React.lazy(() => import('./WorkPlanPanel'));
 const PostJobSheet = React.lazy(() => import('./PostJobSheet'));
 
-type Props = { vehicleId: string; vehicleTitle: string; signedIn: boolean };
+type Props = { vehicleId: string; vehicleTitle: string; signedIn: boolean; showVehicleTitle?: boolean };
 
 export default function VehicleWorkCard(props: Props) {
   const { user, loading } = useAuth();
@@ -23,7 +24,7 @@ export default function VehicleWorkCard(props: Props) {
   return <ViewerVehicleWorkCard key={`${user?.id ?? 'anonymous'}:${props.vehicleId}`} {...props} />;
 }
 
-function ViewerVehicleWorkCard({ vehicleId, vehicleTitle, signedIn }: Props) {
+function ViewerVehicleWorkCard({ vehicleId, vehicleTitle, signedIn, showVehicleTitle = false }: Props) {
   const [read, setRead] = useState<VehicleWorkOrdersRead | null>(null);
   const [planOpen, setPlanOpen] = useState(false);
   const [posting, setPosting] = useState(false);
@@ -62,14 +63,21 @@ function ViewerVehicleWorkCard({ vehicleId, vehicleTitle, signedIn }: Props) {
     return () => { generation.current++; pending.current = false; };
   }, [load]);
 
-  if (!read) return <div className="jb-scope"><section className="k-section" aria-label="Work on this vehicle"><Text role="label" as="h2">Work</Text>
+  if (!read) return <div className="jb-scope jb-vehicle-work"><section className="k-section" aria-label="Work on this vehicle"><Text role="label" as="h2">Work</Text>
     {loading ? <p role="status">Reading the work orders…</p> : <div role="alert"><Text role="body">{error || 'Work orders are unavailable.'}</Text>
       <button type="button" className="btn-base btn-sm btn-secondary" onClick={() => void load(null)}>Retry work orders</button></div>}
   </section></div>;
   const access = read.viewer.vehicle_access;
   const postAction = access?.can_post_work_request ? (read.viewer.actions ?? []).find(a => a.action === 'post_work_request') ?? null : null;
 
-  return <div className="jb-scope"><Section title="Work" coverage={{ n: read.rows.length, of: read.coverage.total_for_vehicle, grain: 'jobs on this vehicle', as_of: read.as_of }} ariaLabel="Work on this vehicle">
+  return <div className="jb-scope jb-vehicle-work">
+    {showVehicleTitle && <div className="jb-vehicle-context"><Text role="caption">Recorded vehicle</Text>
+      <h2>{read.vehicle_label?.make && read.vehicle_label?.model
+        ? <VehicleIdentity year={read.vehicle_label.year} make={read.vehicle_label.make} model={read.vehicle_label.model}
+          variants={read.vehicle_label.trim ? [{ kind: 'trim', value: read.vehicle_label.trim }] : []} />
+        : <Text role="entity">{vehicleText(read.vehicle_label) || 'Vehicle identity unavailable'}</Text>}</h2>
+    </div>}
+    <Section title="Work" coverage={{ n: read.rows.length, of: read.coverage.total_for_vehicle, grain: 'jobs on this vehicle', as_of: read.as_of }} ariaLabel="Work on this vehicle">
     {error && <div role="alert"><Text role="body">{error}</Text><button type="button" className="btn-base btn-sm btn-secondary" disabled={loading} onClick={() => void load(retryAfter)}>Retry work orders</button></div>}
     {loading && <p role="status">Reading more work orders…</p>}
     {publication.error && <div role="alert"><Text role="body">Publication status could not be loaded. {publication.error}</Text><button type="button" className="btn-base btn-sm btn-secondary" onClick={publication.reload}>Retry publication status</button></div>}

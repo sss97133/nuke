@@ -30,6 +30,7 @@ it('opens the existing route with canonical readers and preserves vehicle and ma
  await render(<Routes><Route path="/vehicle/:vehicleId/work" element={<VehicleJobs/>}/></Routes>);
  expect(host.querySelector(`a[href="/vehicle/${vehicle}"]`)).not.toBeNull();expect(host.querySelector(`a[href="/vehicle/${vehicle}/mailbox"]`)).not.toBeNull();
  expect(host.querySelector(`a[href="/jobs/${first}"]`)).not.toBeNull();
+ expect(host.querySelector('.jb-vehicle-context')?.textContent).toContain('Synthetic vehicle');
  expect(fixture.rpc.mock.calls.map(([name])=>name).sort()).toEqual(['vehicle_work_orders_read','vehicle_work_publication_read']);
  expect(host.textContent).not.toContain('Create Draft Work Items');
 });
@@ -99,4 +100,13 @@ it.each(['panel','callout'] as const)('keeps a loaded %s on ordinary renders and
 it('offers a work-plan retry after a failed reader rather than a claim that no plan exists',async()=>{
  fixture.rpc.mockRejectedValue(new Error('offline'));await render(<WorkPlanPanel vehicleId={vehicle} signedIn/>);
  expect(host.textContent).toContain('Work plan unavailable');fixture.rpc.mockResolvedValue(plan());await click('Retry work plan');expect(host.textContent).toContain('Synthetic listing claim');
+ expect(host.textContent).toContain('No identity fields were available to compare. Agreement is unassessed.');
+ expect(host.textContent).not.toContain('The details agree across sources');
+});
+
+it('shows unknown vehicle identity honestly when the standalone reader has no label',async()=>{
+ fixture.rpc.mockImplementation((name:string)=>Promise.resolve(name==='vehicle_work_orders_read'?{data:{...orders().data,vehicle_label:null},error:null}:publication));
+ await render(<Routes><Route path="/vehicle/:vehicleId/work" element={<VehicleJobs/>}/></Routes>);
+ expect(host.querySelector('.jb-vehicle-context')?.textContent).toContain('Vehicle identity unavailable');
+ expect(host.textContent).toContain('Example job');
 });
