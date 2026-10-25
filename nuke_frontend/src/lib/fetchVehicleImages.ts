@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { vehicleImageGallerySource, vehicleImageColumnsForViewer } from './vehicleImageColumns';
+import { createViewerScopedInflight } from './viewerScopedInflight';
 
 // PostgREST's row cap on this project (probed 2026-10-14: limit=1500 returns 1000 rows). Every page re-runs the whole
 // filter and sort over all of the vehicle's images and projects them before the page is cut, so the work of a gallery
@@ -36,7 +37,7 @@ interface FetchVehicleImagesOptions {
 // query (select ... order by position) was observed firing 2-4x per page load
 // (StrictMode double-mount + gallery/profile both resolving images). Concurrent
 // callers share one promise; entries clear on settle — coalescing, not caching.
-const inflightFetches = new Map<string, Promise<any[]>>();
+const coalesceImages = createViewerScopedInflight<any[]>();
 
 /**
  * Fetch all matching vehicle images even when a vehicle exceeds the REST row cap.
@@ -57,19 +58,15 @@ export async function fetchVehicleImages<T = any>(
   if (!vehicleId) return [];
 
   const key = `${vehicleId}|${selectClause}|${options.includeMismatchFilter ? 1 : 0}|${options.maxRows ?? 0}|${options.timeoutMs ?? 0}`;
-  const existing = inflightFetches.get(key);
-  if (existing) return existing as Promise<T[]>;
-
-  const pending = fetchVehicleImagesUncached<T>(vehicleId, selectClause, options)
-    .finally(() => inflightFetches.delete(key));
-  inflightFetches.set(key, pending as Promise<any[]>);
-  return pending;
+  return coalesceImages(supabase, key, assertCurrent =>
+    fetchVehicleImagesUncached<T>(vehicleId, selectClause, options, assertCurrent));
 }
 
 async function fetchVehicleImagesUncached<T = any>(
   vehicleId: string,
   selectClause: string,
   options: FetchVehicleImagesOptions = {},
+  assertCurrent: () => void = () => {},
 ): Promise<T[]> {
   const { maxRows, timeoutMs = DEFAULT_TIMEOUT_MS } = options;
   const deadline = Date.now() + Math.max(1000, timeoutMs);
@@ -83,6 +80,7 @@ async function fetchVehicleImagesUncached<T = any>(
   const source = await vehicleImageGallerySource();
   const columns = await vehicleImageColumnsForViewer(selectClause);
   const fetchPage = (from: number, withCount: boolean) => {
+    assertCurrent();
     const query = supabase
       .from(source)
       .select(columns, withCount ? { count: 'exact' } : undefined)
@@ -129,6 +127,7 @@ async function fetchVehicleImagesUncached<T = any>(
   // instead of mistaking the short page for the last one.
   if (rows.length > 0 && rows.length < pageSize && total > rows.length) pageSize = rows.length;
   const settle = (collected: T[]) => {
+    assertCurrent();
     options.onLoadCoverage?.({ loaded: collected.length, total: Math.max(total, collected.length) });
     return collected;
   };
