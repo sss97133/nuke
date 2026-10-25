@@ -1,9 +1,5 @@
-# moto_v2: motorcycle rule v2. Reference (cited): make lists per
-# Make/model lists are hand-written rules (moto_v2); no external source was fetched or verified.
-# Make/model lists are hand-written rules (moto_v2); no external source was fetched or verified.
-# List_of_Yamaha_motorcycles, List_of_Kawasaki_motorcycles, List_of_Suzuki_motorcycles,
-# List_of_BMW_motorcycles, List_of_Triumph_motorcycles (Triumph Engineering/Motorcycles vs Triumph Motor Company cars),
-# Make/model lists are hand-written rules (moto_v2); no external source was fetched or verified.
+# moto_v2: motorcycle rule v2. Make/model lists are hand-written extractor rules;
+# no external source (Wikipedia or other) was fetched or verified.
 import re
 REF='rule_based:moto_v2 extractor rule list; no external source fetched'
 def rx(p,s): return re.search(p,s) is not None
