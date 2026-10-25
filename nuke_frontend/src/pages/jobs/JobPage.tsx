@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { PrefetchLink } from '../../components/PrefetchLink';
+import { useAuth } from '../../hooks/useAuth';
 import { usePageTitle } from '../../hooks/usePageTitle';
 import { Masthead, Row, Rows, Section, Text, type Coverage } from '../../kit';
 import { JobStageRail, JobStageRailLegend } from './JobStageRail';
@@ -380,6 +381,13 @@ function InvoicesSection({ d, onSigned }: { d: JsonObject; onSigned: () => void 
 // MARK: - Page
 
 export default function JobPage() {
+  const { user, loading } = useAuth();
+  const { workOrderId = '' } = useParams<{ workOrderId: string }>();
+  if (loading) return <article className="job-page" aria-busy="true"><Text role="entity" as="h1">Loading the job…</Text></article>;
+  return <JobPageForViewer key={`${user?.id ?? 'anonymous'}:${workOrderId}`} viewerId={user?.id ?? null} />;
+}
+
+function JobPageForViewer({ viewerId }: { viewerId: string | null }) {
   const { workOrderId = '' } = useParams<{ workOrderId: string }>();
   const [path, setPath] = useState<Load>({ status: 'loading' });
   const [reads, setReads] = useState<Partial<Record<ReaderKey, Load>>>({});
@@ -391,12 +399,12 @@ export default function JobPage() {
     setPath({ status: 'loading' });
     setReads({});
     const args = { p_work_order_id: workOrderId };
-    readJob('work_order_job_path_read', args).then(l => { if (!cancelled) setPath(l); });
+    readJob('work_order_job_path_read', args, viewerId).then(l => { if (!cancelled) setPath(l); });
     for (const key of READER_KEYS) {
-      readJob(READERS[key].rpc, args).then(l => { if (!cancelled) setReads(r => ({ ...r, [key]: l })); });
+      readJob(READERS[key].rpc, args, viewerId).then(l => { if (!cancelled) setReads(r => ({ ...r, [key]: l })); });
     }
     return () => { cancelled = true; };
-  }, [workOrderId, nonce]);
+  }, [workOrderId, nonce, viewerId]);
 
   const p = loaded(path);
   const title = str(p?.display_title) ?? vehicleText(p?.vehicle_label) ?? 'Job';

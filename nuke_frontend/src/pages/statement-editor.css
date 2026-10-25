@@ -1,0 +1,20 @@
+.statement-cell-editor, .statement-status-editor { display: inline-flex; flex-direction: column; gap: 4px; max-width: 100%; }
+.statement-cell-editor input, .statement-status-editor select, .statement-cell-value { min-height: var(--control-height); max-width: 100%; font: inherit; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 6px; }
+.statement-cell-editor input { width: 100%; min-width: 0; }
+.statement-cell-value { text-align: inherit; overflow-wrap: anywhere; }
+.statement-save-error { color: var(--error-dark); font-size: var(--text-caption); white-space: normal; overflow-wrap: anywhere; }
+.statement-cell-editor [role="status"], .statement-status-editor [role="status"] { font-size: var(--text-caption); }
+.statement-edit .statement-comp { min-height: var(--control-height); min-width: var(--control-height); }
+@media (max-width: 600px) {
+  .statement-cell-editor input, .statement-status-editor select { font-size: 16px; }
+}
+
+.statement-work-order, .statement-payment-list { overflow-x: auto; max-width: 100%; }
+.statement-edit-grid { min-width: 710px; }
+.statement-payment-row { min-width: 540px; }
+.statement-edit-grid > *, .statement-payment-row > * { min-width: 0; }
+.statement-edit-grid .statement-cell-editor, .statement-edit-grid .statement-status-editor { width: 100%; }
+.statement-edit .statement-work-order button, .statement-edit > div > button { min-height: var(--control-height); }
+
+.statement-cell-editor button { min-height: var(--control-height); color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); }
+.statement-source { background: var(--surface); }

@@ -7,10 +7,11 @@
  * Open statement; payments and balances only for the viewer's own work orders; contact is brokered by Nuke.
  */
 
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import './statement-editor.css';
 import {
   useWorkOrderStatement,
   type PartRow,
@@ -909,63 +910,103 @@ const DEALER: typeof INV = {
 // ── Inline Cell Editor ──
 
 interface CellEditorProps {
-  value: any;
+  value: string | number | null | undefined;
   type?: 'text' | 'number';
   format?: 'currency' | 'plain';
-  onSave: (value: any) => void;
+  onSave: (value: string | number | null) => void | Promise<unknown>;
   style?: React.CSSProperties;
   placeholder?: string;
 }
 
-const CellEditor: React.FC<CellEditorProps> = ({ value, type = 'text', format = 'currency', onSave, style, placeholder }) => {
+function saveFailure(error: unknown): string {
+  return error && typeof error === 'object' && 'message' in error && typeof error.message === 'string'
+    ? error.message : 'The change could not be saved. Try again.';
+}
+
+export const CellEditor: React.FC<CellEditorProps> = ({ value, type = 'text', format = 'currency', onSave, style, placeholder }) => {
   const [editing, setEditing] = useState(false);
-  const [editValue, setEditValue] = useState(value ?? '');
+  const [editValue, setEditValue] = useState(String(value ?? ''));
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-  const saveRef = useRef<NodeJS.Timeout | undefined>(undefined);
+  const [error, setError] = useState<string | null>(null);
+  const saveRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const savedRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const inputRef = useRef<HTMLInputElement>(null);
+  const mounted = useRef(true);
+  const inFlight = useRef(false);
+  const cancelled = useRef(false);
+  const cancelTimer = () => { clearTimeout(saveRef.current); saveRef.current = undefined; };
 
-  useEffect(() => { setEditValue(value ?? ''); }, [value]);
-  useEffect(() => { if (editing && inputRef.current) { inputRef.current.focus(); inputRef.current.select(); } }, [editing]);
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; cancelTimer(); clearTimeout(savedRef.current); };
+  }, []);
+  useEffect(() => { if (!editing) setEditValue(String(value ?? '')); }, [value, editing]);
+  useEffect(() => { if (editing) { inputRef.current?.focus(); inputRef.current?.select(); } }, [editing]);
 
-  const doSave = useCallback(async (val: any) => {
+  const doSave = async (val: string) => {
+    cancelTimer();
+    if (inFlight.current || cancelled.current || !mounted.current) return;
     const parsed = type === 'number' ? (val === '' ? null : Number(val)) : val;
+    if (typeof parsed === 'number' && !Number.isFinite(parsed)) {
+      setError('Enter a finite number.');
+      return;
+    }
     if (parsed === value) { setEditing(false); return; }
+    inFlight.current = true;
     setSaving(true);
-    try { await onSave(parsed); setSaved(true); setTimeout(() => setSaved(false), 1500); } catch { setEditValue(value ?? ''); }
-    setSaving(false);
-    setEditing(false);
-  }, [value, type, onSave]);
+    setError(null);
+    try {
+      await onSave(parsed);
+      if (!mounted.current) return;
+      setSaved(true);
+      setEditing(false);
+      savedRef.current = setTimeout(() => setSaved(false), 1500);
+    } catch (failure) {
+      if (mounted.current) setError(saveFailure(failure));
+    } finally {
+      inFlight.current = false;
+      if (mounted.current) setSaving(false);
+    }
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setEditValue(e.target.value);
-    if (saveRef.current) clearTimeout(saveRef.current);
-    saveRef.current = setTimeout(() => doSave(e.target.value), 1500);
+    const nextValue = e.target.value;
+    setEditValue(nextValue);
+    setError(null);
+    cancelTimer();
+    saveRef.current = setTimeout(() => void doSave(nextValue), 1500);
   };
 
   if (editing) {
     return (
-      <div style={{ position: 'relative', ...style }}>
+      <span className="statement-cell-editor" style={style}>
         <input ref={inputRef} type={type} step={type === 'number' ? '0.01' : undefined} value={editValue}
+          aria-label={placeholder || 'Edit value'} aria-invalid={!!error} disabled={saving}
           onChange={handleChange}
-          onBlur={() => { if (saveRef.current) clearTimeout(saveRef.current); doSave(editValue); }}
-          onKeyDown={(e) => { if (e.key === 'Enter') { if (saveRef.current) clearTimeout(saveRef.current); doSave(editValue); } if (e.key === 'Escape') { setEditValue(value ?? ''); setEditing(false); } }}
+          onBlur={() => { if (!error) void doSave(editValue); }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') { e.preventDefault(); void doSave(editValue); }
+            if (e.key === 'Escape' && !inFlight.current) {
+              e.preventDefault(); cancelled.current = true; cancelTimer();
+              setEditValue(String(value ?? '')); setError(null); setEditing(false);
+            }
+          }}
           placeholder={placeholder}
-          style={{ width: '100%', border: '1px solid var(--vp-gulf-orange, #EE7623)', padding: '1px 4px', fontSize: 'inherit', fontFamily: 'inherit', fontWeight: 'inherit', textAlign: 'inherit', background: 'var(--bg)', color: 'var(--text)', outline: 'none' }}
         />
-        {saving && <span style={{ position: 'absolute', right: '-40px', top: '50%', transform: 'translateY(-50%)', fontSize: '7px', color: 'var(--vp-gulf-orange)', whiteSpace: 'nowrap' }}>saving...</span>}
-      </div>
+        {saving && <span role="status">Saving…</span>}
+        {error && <span role="alert" className="statement-save-error">{error} Your draft is still here.</span>
+        }
+        {error && <button type="button" onClick={() => void doSave(editValue)}>Retry save</button>}
+      </span>
     );
   }
 
   return (
-    <span onClick={() => setEditing(true)} style={{ cursor: 'pointer', padding: '0 2px', transition: 'background 150ms', ...style, ...(saved ? { background: 'rgba(0, 66, 37, 0.06)' } : {}) }}
-      onMouseEnter={(e) => { (e.target as HTMLElement).style.background = 'rgba(238, 118, 35, 0.06)'; }}
-      onMouseLeave={(e) => { (e.target as HTMLElement).style.background = saved ? 'rgba(0, 66, 37, 0.06)' : 'transparent'; }}
-      title="Click to edit"
-    >
+    <button type="button" className="statement-cell-value" onClick={() => { cancelled.current = false; setSaved(false); setEditing(true); }} style={style} title="Click to edit">
       {value != null && value !== '' ? (type === 'number' ? (format === 'currency' ? fmt(Number(value)) : String(value)) : value) : '\u2014'}
-    </span>
+      {saved && <span role="status"> Saved</span>}
+    </button>
   );
 };
 
@@ -992,18 +1033,38 @@ const LABOR_STATUSES = [
   { value: 'cancelled', label: 'CANCELLED', color: '#C8102E' },
 ];
 
-const StatusSelect: React.FC<{ value: string | null; options: { value: string; label: string; color: string }[]; onSave: (v: string) => void }> = ({ value, options, onSave }) => {
-  const current = options.find(o => o.value === value) || options[0];
+export const StatusSelect: React.FC<{ value: string | null; options: { value: string; label: string; color: string }[]; onSave: (v: string) => void | Promise<unknown> }> = ({ value, options, onSave }) => {
+  const { run, pending, error } = useStatementAction();
   return (
-    <select value={value || ''} onChange={(e) => onSave(e.target.value)}
-      style={{ appearance: 'none', WebkitAppearance: 'none', border: `1px solid ${current.color}`, color: current.color, background: 'transparent', padding: '1px 4px', fontSize: '6px', fontWeight: 700, fontFamily: 'Courier New', letterSpacing: '0.08em', textTransform: 'uppercase', cursor: 'pointer', maxWidth: '80px' }}>
-      {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-    </select>
+    <span className="statement-status-editor">
+      <select value={value || ''} aria-label="Status" disabled={pending} onChange={(e) => { const next = e.target.value; void run(() => onSave(next)); }}>
+        {!options.some(option => option.value === value) && <option value={value || ''}>{value || 'Unknown status'}</option>}
+        {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+      </select>
+      {pending && <span role="status">Saving…</span>}
+      {error && <span role="alert" className="statement-save-error">{error}</span>}
+    </span>
   );
 };
 
+function useStatementAction() {
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const inFlight = useRef(false);
+  const mounted = useRef(true);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+  const run = async (action: () => unknown | Promise<unknown>) => {
+    if (inFlight.current || !mounted.current) return;
+    inFlight.current = true; setPending(true); setError(null);
+    try { await action(); }
+    catch (failure) { if (mounted.current) setError(saveFailure(failure)); }
+    finally { inFlight.current = false; if (mounted.current) setPending(false); }
+  };
+  return { run, pending, error };
+}
 
-const EditView: React.FC<{ data: any; updateField: any; addRow: any; deleteRow: any; toggleComp: any; onInvoice: () => void }> = ({ data, updateField, addRow, deleteRow, toggleComp, onInvoice }) => {
+export const EditView: React.FC<{ data: any; updateField: any; addRow: any; deleteRow: any; toggleComp: any; onInvoice: () => void }> = ({ data, updateField, addRow, deleteRow, toggleComp, onInvoice }) => {
+  const { run, pending, error: actionError } = useStatementAction();
   const [showSource, setShowSource] = useState<Set<string>>(new Set());
   const toggleSource = (id: string) => setShowSource(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
 
@@ -1011,7 +1072,7 @@ const EditView: React.FC<{ data: any; updateField: any; addRow: any; deleteRow: 
   const E = editStyles;
 
   return (
-    <div style={E.page}>
+    <div style={E.page} className="statement-edit">
       <div style={E.container}>
         {/* Back to invoice */}
         <button onClick={onInvoice} style={E.backBtn}>BACK TO INVOICE</button>
@@ -1021,17 +1082,20 @@ const EditView: React.FC<{ data: any; updateField: any; addRow: any; deleteRow: 
           <span style={E.headerBalance}>{data.moneyVisible ? `Balance: ${fmt(data.totals.balance)}` : 'Payments shown to parties only'}</span>
         </div>
 
+        {pending && <p role="status">Saving the change…</p>}
+        {actionError && <p role="alert" className="statement-save-error">{actionError}</p>}
+
         {data.workOrders.map((wo: any) => {
           const woParts = data.parts[wo.id] || [];
           const woLabor = data.labor[wo.id] || [];
 
           return (
-            <div key={wo.id} style={E.woSection}>
+            <div key={wo.id} style={E.woSection} className="statement-work-order">
               <div style={E.woTitle}>{wo.title}</div>
 
               {/* Parts */}
               <div style={E.sectionLabel}>PARTS</div>
-              <div style={E.gridHead6}>
+              <div style={E.gridHead6} className="statement-edit-grid">
                 <span>Description</span><span style={E.r}>Supplier</span><span style={E.r}>Qty</span><span style={E.r}>Total</span><span style={E.c}>Comp</span><span>Status</span>
               </div>
               {woParts.map((part: PartRow) => {
@@ -1039,15 +1103,15 @@ const EditView: React.FC<{ data: any; updateField: any; addRow: any; deleteRow: 
                 const sourceTag = part.notes?.match(/Amazon/i) ? 'AMZN' : part.notes?.match(/gmail/i) ? 'GMAIL' : part.ai_extracted ? 'AI' : part.notes ? 'SRC' : null;
                 return (
                   <React.Fragment key={part.id}>
-                    <div style={{ ...E.gridRow6, opacity: part.is_comped || isDead ? 0.45 : 1 }}>
+                    <div className="statement-edit-grid" style={{ ...E.gridRow6, opacity: part.is_comped || isDead ? 0.45 : 1 }}>
                       <span style={E.name}>
-                        {sourceTag && <span onClick={() => toggleSource(part.id)} style={E.srcTag}>{sourceTag}</span>}
+                        {sourceTag && <button type="button" onClick={() => toggleSource(part.id)} className="statement-source" aria-label={`Source for ${part.part_name}`} aria-expanded={showSource.has(part.id)} style={E.srcTag}>{sourceTag}</button>}
                         <CellEditor value={part.part_name} onSave={(v) => updateField('work_order_parts', part.id, 'part_name', v)} />
                       </span>
                       <span style={{ ...E.mono, ...E.r }}><CellEditor value={part.supplier} onSave={(v) => updateField('work_order_parts', part.id, 'supplier', v)} placeholder="supplier" /></span>
                       <span style={{ ...E.mono, ...E.r }}><CellEditor value={part.quantity} type="number" format="plain" onSave={(v) => updateField('work_order_parts', part.id, 'quantity', v)} /></span>
                       <span style={{ ...E.mono, ...E.r, fontWeight: 700, textDecoration: part.is_comped || isDead ? 'line-through' : 'none' }}><CellEditor value={part.total_price} type="number" onSave={(v) => updateField('work_order_parts', part.id, 'total_price', v)} /></span>
-                      <span style={E.c}><span onClick={() => toggleComp('work_order_parts', part.id)} style={E.comp(part.is_comped)}>{part.is_comped ? '\u2713' : ''}</span></span>
+                      <span style={E.c}><button type="button" aria-label={`Comp ${part.part_name}`} aria-pressed={part.is_comped} disabled={pending} onClick={() => void run(() => toggleComp('work_order_parts', part.id))} className="statement-comp">{part.is_comped ? '\u2713' : '—'}</button></span>
                       <span><StatusSelect value={part.status} options={PART_STATUSES} onSave={(v) => updateField('work_order_parts', part.id, 'status', v)} /></span>
                     </div>
                     {showSource.has(part.id) && (
@@ -1056,11 +1120,11 @@ const EditView: React.FC<{ data: any; updateField: any; addRow: any; deleteRow: 
                   </React.Fragment>
                 );
               })}
-              <button onClick={() => addRow('work_order_parts', wo.id)} style={E.addBtn}>+ ADD PART</button>
+              <button disabled={pending} onClick={() => void run(() => addRow('work_order_parts', wo.id))} style={E.addBtn}>+ ADD PART</button>
 
               {/* Labor */}
               <div style={{ ...E.sectionLabel, marginTop: '12px' }}>LABOR</div>
-              <div style={E.gridHead6}>
+              <div style={E.gridHead6} className="statement-edit-grid">
                 <span>Task</span><span style={E.r}>Hours</span><span style={E.r}>Rate</span><span style={E.r}>Total</span><span style={E.c}>Comp</span><span>Status</span>
               </div>
               {woLabor.map((labor: LaborRow) => {
@@ -1068,15 +1132,15 @@ const EditView: React.FC<{ data: any; updateField: any; addRow: any; deleteRow: 
                 const sourceTag = labor.rate_source?.match(/iMessage/i) ? 'iMSG' : labor.rate_source?.match(/flat/i) ? 'FLAT' : labor.rate_source?.match(/book/i) ? 'BOOK' : labor.rate_source ? 'RATE' : null;
                 return (
                   <React.Fragment key={labor.id}>
-                    <div style={{ ...E.gridRow6, opacity: labor.is_comped || isDead ? 0.45 : 1 }}>
+                    <div className="statement-edit-grid" style={{ ...E.gridRow6, opacity: labor.is_comped || isDead ? 0.45 : 1 }}>
                       <span style={E.name}>
-                        {sourceTag && <span onClick={() => toggleSource(labor.id)} style={E.srcTag}>{sourceTag}</span>}
+                        {sourceTag && <button type="button" onClick={() => toggleSource(labor.id)} className="statement-source" aria-label={`Source for ${labor.task_name}`} aria-expanded={showSource.has(labor.id)} style={E.srcTag}>{sourceTag}</button>}
                         <CellEditor value={labor.task_name} onSave={(v) => updateField('work_order_labor', labor.id, 'task_name', v)} />
                       </span>
                       <span style={{ ...E.mono, ...E.r }}><CellEditor value={labor.hours} type="number" format="plain" onSave={(v) => updateField('work_order_labor', labor.id, 'hours', v)} /></span>
                       <span style={{ ...E.mono, ...E.r }}><CellEditor value={labor.hourly_rate} type="number" onSave={(v) => updateField('work_order_labor', labor.id, 'hourly_rate', v)} /></span>
                       <span style={{ ...E.mono, ...E.r, fontWeight: 700, textDecoration: labor.is_comped || isDead ? 'line-through' : 'none' }}><CellEditor value={labor.total_cost} type="number" onSave={(v) => updateField('work_order_labor', labor.id, 'total_cost', v)} /></span>
-                      <span style={E.c}><span onClick={() => toggleComp('work_order_labor', labor.id)} style={E.comp(labor.is_comped)}>{labor.is_comped ? '\u2713' : ''}</span></span>
+                      <span style={E.c}><button type="button" aria-label={`Comp ${labor.task_name}`} aria-pressed={labor.is_comped} disabled={pending} onClick={() => void run(() => toggleComp('work_order_labor', labor.id))} className="statement-comp">{labor.is_comped ? '\u2713' : '—'}</button></span>
                       <span><StatusSelect value={labor.status} options={LABOR_STATUSES} onSave={(v) => updateField('work_order_labor', labor.id, 'status', v)} /></span>
                     </div>
                     {showSource.has(labor.id) && (
@@ -1085,51 +1149,52 @@ const EditView: React.FC<{ data: any; updateField: any; addRow: any; deleteRow: 
                   </React.Fragment>
                 );
               })}
-              <button onClick={() => addRow('work_order_labor', wo.id)} style={E.addBtn}>+ ADD LABOR</button>
+              <button disabled={pending} onClick={() => void run(() => addRow('work_order_labor', wo.id))} style={E.addBtn}>+ ADD LABOR</button>
             </div>
           );
         })}
 
         {/* Payments */}
         <div style={E.sectionLabel}>PAYMENTS</div>
+        <div className="statement-payment-list" tabIndex={0} aria-label="Recorded payments">
         {data.workOrders.flatMap((wo: any) =>
           (data.payments[wo.id] || []).map((pm: PaymentRow) => (
-            <div key={pm.id} style={E.payRow}>
+            <div key={pm.id} style={E.payRow} className="statement-payment-row">
               <span style={E.mono}>{pm.payment_date ? fmtDateShort(pm.payment_date) : '—'}</span>
               <span style={E.mono}><CellEditor value={pm.payment_method} onSave={(v) => updateField('work_order_payments', pm.id, 'payment_method', v)} /></span>
               <span><CellEditor value={pm.memo} onSave={(v) => updateField('work_order_payments', pm.id, 'memo', v)} placeholder="memo" /></span>
               <span style={{ ...E.mono, ...E.r, fontWeight: 700, color: '#006847' }}><CellEditor value={pm.amount} type="number" onSave={(v) => updateField('work_order_payments', pm.id, 'amount', v)} /></span>
-              <span onClick={() => deleteRow('work_order_payments', pm.id)} style={{ cursor: 'pointer', color: '#ccc', fontSize: '9px' }} title="Delete">{'\u2715'}</span>
+              <button type="button" aria-label="Delete payment" disabled={pending} onClick={() => void run(() => deleteRow('work_order_payments', pm.id))}>{'\u2715'}</button>
             </div>
           ))
         )}
-        <button onClick={() => { const woId = data.workOrders[0]?.id; if (woId) addRow('work_order_payments', woId); }} style={E.addBtn}>+ ADD PAYMENT</button>
+        </div>
+        <button disabled={pending || !data.workOrders[0]} onClick={() => { const woId = data.workOrders[0]?.id; if (woId) void run(() => addRow('work_order_payments', woId)); }} style={E.addBtn}>+ ADD PAYMENT</button>
       </div>
     </div>
   );
 };
 
 const editStyles = {
-  page: { minHeight: '100vh', background: 'var(--bg)', color: 'var(--text)', fontFamily: 'Arial, sans-serif', fontSize: '9px', lineHeight: 1.6, padding: '20px' } as React.CSSProperties,
+  page: { minHeight: '100vh', background: 'var(--bg)', color: 'var(--text)', fontFamily: 'var(--font-family)', fontSize: 'var(--text-body)', lineHeight: 1.6, padding: '12px' } as React.CSSProperties,
   container: { maxWidth: '900px', margin: '0 auto' } as React.CSSProperties,
-  backBtn: { marginBottom: '12px', padding: '6px 14px', fontSize: '8px', fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.1em', border: '2px solid var(--border, #ccc)', background: 'transparent', color: 'var(--text-secondary, #888)', cursor: 'pointer', fontFamily: 'Arial' } as React.CSSProperties,
+  backBtn: { marginBottom: '12px', padding: '6px 14px', fontSize: 'var(--text-callout)', fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.1em', border: '2px solid var(--border, #ccc)', background: 'transparent', color: 'var(--text-secondary, #888)', cursor: 'pointer', fontFamily: 'var(--font-family)' } as React.CSSProperties,
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '2px solid var(--text)', marginBottom: '12px' } as React.CSSProperties,
-  headerTitle: { fontSize: '11px', fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.04em' } as React.CSSProperties,
-  headerBalance: { fontFamily: 'Courier New', fontSize: '12px', fontWeight: 700 } as React.CSSProperties,
+  headerTitle: { fontSize: 'var(--text-callout)', fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.04em' } as React.CSSProperties,
+  headerBalance: { fontFamily: 'var(--font-mono)', fontSize: 'var(--text-callout)', fontWeight: 700 } as React.CSSProperties,
   woSection: { marginBottom: '16px', padding: '10px 12px', border: '2px solid var(--border, #ccc)' } as React.CSSProperties,
-  woTitle: { fontSize: '9px', fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.04em', marginBottom: '8px' } as React.CSSProperties,
-  sectionLabel: { fontSize: '7px', fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.1em', color: 'var(--text-secondary, #888)', marginBottom: '4px' } as React.CSSProperties,
-  gridHead6: { display: 'grid', gridTemplateColumns: '1fr 90px 36px 70px 30px 80px', gap: '2px 6px', padding: '3px 0', borderBottom: '2px solid var(--text)', fontSize: '7px', fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.08em', color: 'var(--text-secondary, #888)' } as React.CSSProperties,
-  gridRow6: { display: 'grid', gridTemplateColumns: '1fr 90px 36px 70px 30px 80px', gap: '2px 6px', padding: '3px 0', borderBottom: '1px solid var(--border, #ddd)', fontSize: '8px', alignItems: 'center' } as React.CSSProperties,
-  payRow: { display: 'grid', gridTemplateColumns: '80px 80px 1fr 80px 20px', gap: '2px 6px', padding: '3px 0', borderBottom: '1px solid var(--border, #ddd)', fontSize: '8px', alignItems: 'center' } as React.CSSProperties,
-  name: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const } as React.CSSProperties,
-  mono: { fontFamily: 'Courier New', fontSize: '8px' } as React.CSSProperties,
+  woTitle: { fontSize: 'var(--text-callout)', fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.04em', marginBottom: '8px' } as React.CSSProperties,
+  sectionLabel: { fontSize: 'var(--text-callout)', fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.1em', color: 'var(--text-secondary, #888)', marginBottom: '4px' } as React.CSSProperties,
+  gridHead6: { display: 'grid', gridTemplateColumns: 'minmax(160px, 1fr) 100px 90px 100px 48px 140px', gap: '2px 6px', padding: '3px 0', borderBottom: '2px solid var(--text)', fontSize: 'var(--text-callout)', fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.08em', color: 'var(--text-secondary, #888)' } as React.CSSProperties,
+  gridRow6: { display: 'grid', gridTemplateColumns: 'minmax(160px, 1fr) 100px 90px 100px 48px 140px', gap: '2px 6px', padding: '3px 0', borderBottom: '1px solid var(--border, #ddd)', fontSize: 'var(--text-callout)', alignItems: 'center' } as React.CSSProperties,
+  payRow: { display: 'grid', gridTemplateColumns: '100px 100px minmax(160px, 1fr) 100px 44px', gap: '2px 6px', padding: '3px 0', borderBottom: '1px solid var(--border, #ddd)', fontSize: 'var(--text-callout)', alignItems: 'center' } as React.CSSProperties,
+  name: { minWidth: 0, whiteSpace: 'normal' as const } as React.CSSProperties,
+  mono: { fontFamily: 'var(--font-mono)', fontSize: 'var(--text-callout)' } as React.CSSProperties,
   r: { textAlign: 'right' as const } as React.CSSProperties,
   c: { textAlign: 'center' as const } as React.CSSProperties,
-  comp: (on: boolean): React.CSSProperties => ({ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '14px', height: '14px', border: '2px solid var(--text)', cursor: 'pointer', fontSize: '9px', fontWeight: 700, background: on ? '#EE7623' : 'transparent', color: on ? '#fff' : 'transparent', lineHeight: 1 }),
-  srcTag: { display: 'inline-block', padding: '0 3px', marginRight: '4px', fontSize: '5px', fontWeight: 700, fontFamily: 'Courier New', letterSpacing: '0.08em', textTransform: 'uppercase' as const, border: '1px solid var(--text-secondary, #888)', color: 'var(--text-secondary, #888)', cursor: 'pointer', verticalAlign: 'middle', lineHeight: '10px' } as React.CSSProperties,
-  prov: { padding: '4px 8px 6px 20px', background: 'var(--bg-secondary, #fafafa)', borderBottom: '1px solid var(--border, #ddd)', fontSize: '7px', fontFamily: 'Courier New', color: 'var(--text-secondary, #888)', lineHeight: 1.8 } as React.CSSProperties,
-  addBtn: { display: 'inline-block', padding: '4px 10px', marginTop: '4px', fontSize: '7px', fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.1em', border: '1px dashed var(--border, #ddd)', background: 'transparent', color: 'var(--text-secondary, #888)', cursor: 'pointer', fontFamily: 'Arial' } as React.CSSProperties,
+  srcTag: { display: 'inline-block', padding: '6px', marginRight: '4px', fontSize: 'var(--text-callout)', fontWeight: 700, fontFamily: 'var(--font-mono)', letterSpacing: '0.08em', textTransform: 'uppercase' as const, border: '1px solid var(--text-secondary, #888)', color: 'var(--text-secondary, #888)', cursor: 'pointer', verticalAlign: 'middle', lineHeight: 1.4 } as React.CSSProperties,
+  prov: { padding: '4px 8px 6px 20px', background: 'var(--bg-secondary, #fafafa)', borderBottom: '1px solid var(--border, #ddd)', fontSize: 'var(--text-callout)', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary, #888)', lineHeight: 1.8 } as React.CSSProperties,
+  addBtn: { display: 'inline-block', padding: '4px 10px', marginTop: '4px', fontSize: 'var(--text-callout)', fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.1em', border: '1px dashed var(--border, #ddd)', background: 'transparent', color: 'var(--text-secondary, #888)', cursor: 'pointer', fontFamily: 'var(--font-family)' } as React.CSSProperties,
 };
 
 
@@ -1144,9 +1209,14 @@ const WorkOrderStatement: React.FC = () => {
   const handle = searchParams.get('handle');
   const q = searchParams.get('q');
   const query = workOrderId ? `wo:${workOrderId}` : vehicleId ? `vehicle:${vehicleId}` : handle ? `handle:${handle}` : q || null;
+  const { user, loading: authLoading } = useAuth();
+  if (authLoading) return <p role="status">Loading the statement…</p>;
+  return <StatementForViewer key={`${user?.id ?? 'anonymous'}:${query}`} query={query} canEdit={!!user} />;
+};
+
+const StatementForViewer: React.FC<{query: string | null; canEdit: boolean}> = ({query, canEdit}) => {
   const [mode, setMode] = useState<'invoice' | 'edit'>('invoice');
   const [theme, setTheme] = useState<InvoiceTheme>('classic');
-  const { user } = useAuth();
 
   const { data, matches, loading, error, updateField, addRow, deleteRow, toggleComp } = useWorkOrderStatement(query);
 
@@ -1165,11 +1235,11 @@ const WorkOrderStatement: React.FC = () => {
   }
   if (error || !data) return <div style={center}>{error || 'No statement found for this lookup'}</div>;
 
-  if (mode === 'edit' && user) {
+  if (mode === 'edit' && canEdit) {
     return <EditView data={data} updateField={updateField} addRow={addRow} deleteRow={deleteRow} toggleComp={toggleComp} onInvoice={() => setMode('invoice')} />;
   }
 
-  return <InvoiceView data={data} onEdit={user ? () => setMode('edit') : undefined} theme={theme} onThemeChange={setTheme} />;
+  return <InvoiceView data={data} onEdit={canEdit ? () => setMode('edit') : undefined} theme={theme} onThemeChange={setTheme} />;
 };
 
 export default WorkOrderStatement;
