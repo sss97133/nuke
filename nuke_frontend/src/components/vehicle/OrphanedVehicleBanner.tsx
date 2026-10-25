@@ -97,75 +97,32 @@ const OrphanedVehicleBanner: React.FC<OrphanedVehicleBannerProps> = ({
   if (!vehicle?.uploaded_by && !vehicle?.origin_organization_id) issues.push('No owner or organization');
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '8px',
-        padding: '2px 12px',
-        fontSize: '9px',
-        fontFamily: 'Arial, sans-serif',
-        fontWeight: 600,
-        textTransform: 'uppercase' as const,
-        letterSpacing: '0.04em',
-        color: 'var(--text-secondary)',
-        borderBottom: '1px solid var(--border)',
-      }}
-    >
-      <span style={{ color: 'var(--warning)', fontSize: '10px' }}>&#9650;</span>
+    <div className="vp-attention-banner">
+      <span className="vp-attention-banner__icon" aria-hidden="true">&#9650;</span>
       <span>{issues.join(' \u00B7 ')}</span>
-      <div style={{ display: 'flex', gap: '6px', marginLeft: 'auto' }}>
+      <div className="vp-attention-banner__actions">
         {!hasVIN && (
           <button
             onClick={handleCompleteProfile}
-            style={{
-              background: 'transparent',
-              color: 'var(--text-secondary)',
-              border: '1px solid var(--border)',
-              padding: '1px 6px', fontSize: '8px',
-              fontWeight: 600,
-              cursor: 'pointer',
-              whiteSpace: 'nowrap',
-              textTransform: 'uppercase' as const,
-              letterSpacing: '0.04em',
-              fontFamily: 'Arial, sans-serif',
-            }}
+            className="vp-attention-banner__action"
           >
-            ADD VIN
+            Add VIN
           </button>
         )}
         {session?.user?.id && !vehicle?.uploaded_by && (
           <button
             onClick={handleClaim}
             disabled={isClaiming}
-            style={{
-              background: 'transparent',
-              color: 'var(--text-secondary)',
-              border: '1px solid var(--border)',
-              padding: '1px 6px', fontSize: '8px',
-              fontWeight: 600,
-              cursor: isClaiming ? 'wait' : 'pointer',
-              whiteSpace: 'nowrap',
-              textTransform: 'uppercase' as const,
-              letterSpacing: '0.04em',
-              fontFamily: 'Arial, sans-serif',
-            }}
+            className="vp-attention-banner__action"
           >
-            {isClaiming ? 'CLAIMING...' : 'CLAIM'}
+            {isClaiming ? 'Claiming…' : 'Claim'}
           </button>
         )}
       </div>
       <button
         onClick={handleDismiss}
-        style={{
-          background: 'transparent',
-          border: 'none',
-          color: 'var(--text-disabled)',
-          fontSize: '10px',
-          cursor: 'pointer',
-          padding: '0 2px',
-          lineHeight: 1,
-        }}
+        className="vp-attention-banner__dismiss"
+        aria-label="Dismiss vehicle notice"
         title="Dismiss"
       >
         &#215;

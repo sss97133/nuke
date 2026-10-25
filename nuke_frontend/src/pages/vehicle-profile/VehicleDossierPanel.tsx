@@ -261,15 +261,8 @@ const Badge: React.FC<{
 }> = ({ text, cls = 'badge-user', style }) => {
   const colors = BADGE_COLORS[cls] || BADGE_COLORS['badge-user'];
   return (
-    <span style={{
-      display: 'inline-block',
-      fontFamily: "'Courier New', Courier, monospace",
-      fontSize: '8px',
-      fontWeight: 700,
-      letterSpacing: '0.5px',
-      textTransform: 'uppercase',
-      padding: '1px 5px',
-      border: `2px solid ${colors.border}`,
+    <span className="vp-source-badge" style={{
+      border: `1px solid ${colors.border}`,
       background: colors.bg || 'var(--surface-elevated)',
       color: colors.color,
       lineHeight: 1.4,
@@ -324,26 +317,13 @@ const FieldRow: React.FC<{
         onMouseLeave={() => setHovered(false)}
         className="dossier-field-grid"
         style={{
-          display: 'grid',
-          gridTemplateColumns: '120px 1fr auto 20px',
-          alignItems: 'center',
-          padding: '4px 10px',
-          minHeight: '28px',
           cursor: group && group.sources.length > 0 ? 'pointer' : 'default',
           background: isOpen ? 'var(--surface-hover)' : (hovered && !isOpen ? 'var(--bg)' : 'transparent'),
           transition: 'background 180ms cubic-bezier(0.16, 1, 0.3, 1)',
         }}
       >
         {/* Label */}
-        <span style={{
-          fontFamily: 'Arial, sans-serif',
-          fontSize: '9px',
-          fontWeight: 700,
-          letterSpacing: '0.5px',
-          textTransform: 'uppercase',
-          color: 'var(--text-secondary)',
-          whiteSpace: 'nowrap',
-        }}>
+        <span className="dossier-field-label">
           {label}
         </span>
 
@@ -352,15 +332,7 @@ const FieldRow: React.FC<{
           role={onValueClick ? 'button' : undefined}
           tabIndex={onValueClick ? 0 : undefined}
           aria-label={onValueClick ? `${label}: ${displayValue}. Inspect evidence` : undefined}
-          style={{
-            fontFamily: field === 'vin' ? "'Courier New', Courier, monospace" : 'Arial, sans-serif',
-            fontSize: '10px',
-            color: 'var(--text)',
-            padding: '0 8px',
-            letterSpacing: field === 'vin' ? '1px' : 'normal',
-            cursor: onValueClick ? 'pointer' : undefined,
-            textDecoration: onValueClick ? 'underline dotted' : undefined,
-          }}
+          className={`dossier-field-value${field === 'vin' ? ' dossier-field-value--vin' : ''}`}
           onClick={onValueClick ? (e) => { e.stopPropagation(); onValueClick(); } : undefined}
           onKeyDown={onValueClick ? e => {
             if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); onValueClick(); }
@@ -369,21 +341,10 @@ const FieldRow: React.FC<{
           {displayValue || '\u2014'}
         </span>
 
-        {/* Source badges — only visible on hover or when expanded to reduce clutter */}
-        <span style={{
-          display: 'flex',
-          gap: '3px',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          opacity: hovered || isOpen ? 1 : 0.3,
-          transition: 'opacity 180ms cubic-bezier(0.16, 1, 0.3, 1)',
-        }}>
+        {/* Retain a readable source count even before a pointer hovers the row. */}
+        <span className="dossier-field-sources">
           {sourceBadges.length > 0 && !hovered && !isOpen ? (
-            <span style={{
-              fontFamily: "'Courier New', monospace",
-              fontSize: '7px',
-              color: 'var(--text-disabled)',
-            }}>
+            <span className="dossier-source-count" title={`${sourceBadges.length} source types`}>
               {sourceBadges.length}×
             </span>
           ) : (
@@ -398,19 +359,8 @@ const FieldRow: React.FC<{
         <button type="button" aria-label={`${isOpen ? 'Hide' : 'Show'} ${label} source claims`}
           aria-expanded={isOpen} aria-controls={`provenance-drawer-${field}`}
           disabled={!group || group.sources.length === 0}
-          onClick={e => { e.stopPropagation(); onToggle(); }} style={{
-          fontFamily: 'Arial, sans-serif',
-          fontSize: '8px',
-          color: 'var(--text-disabled)',
-          padding: 0,
-          border: 0,
-          background: 'transparent',
-          cursor: group && group.sources.length > 0 ? 'pointer' : 'default',
-          textAlign: 'center',
-          userSelect: 'none',
-          transition: 'transform 180ms cubic-bezier(0.16, 1, 0.3, 1)',
-          transform: isOpen ? 'rotate(90deg)' : 'none',
-        }}>
+          className="dossier-field-expand"
+          onClick={e => { e.stopPropagation(); onToggle(); }}>
           {group && group.sources.length > 0 ? '\u25B6' : ''}
         </button>
       </div>
@@ -618,23 +568,8 @@ const VehicleDossierPanel: React.FC = () => {
       </div>
 
       {/* Info Panel */}
-      <div style={{
-        background: 'var(--surface-elevated)',
-        border: '2px solid var(--accent)',
-        marginBottom: '8px',
-      }}>
-        <div style={{
-          fontFamily: 'Arial, sans-serif',
-          fontSize: '9px',
-          fontWeight: 700,
-          letterSpacing: '1px',
-          textTransform: 'uppercase',
-          padding: '6px 10px',
-          background: 'var(--surface)',
-          borderBottom: '1px solid var(--border)',
-        }}>
-          VEHICLE INFORMATION
-        </div>
+      <div className="vp-dossier-panel">
+        <div className="vp-dossier-panel__title">Vehicle information</div>
 
         {FIELD_GROUPS.map((fg, gi) => {
           // Collect visible fields for this group
@@ -673,16 +608,7 @@ const VehicleDossierPanel: React.FC = () => {
           return (
             <React.Fragment key={fg.label}>
               {gi > 0 && (
-                <div style={{
-                  fontFamily: 'Arial, sans-serif',
-                  fontSize: '8px',
-                  fontWeight: 700,
-                  letterSpacing: '1px',
-                  textTransform: 'uppercase',
-                  padding: '4px 10px',
-                  color: 'var(--text-disabled)',
-                  borderBottom: '1px solid var(--border)',
-                }}>
+                <div className="vp-dossier-panel__group">
                   {fg.label}
                 </div>
               )}
@@ -720,7 +646,7 @@ const VehicleDossierPanel: React.FC = () => {
                   // Open evidence popup for all fields
                   const vinDecode = field === 'vin' ? (v.origin_metadata?.vin_decode || v.vin_decode || null) : null;
                   openPopup(
-                    <React.Suspense fallback={<div style={{ padding: '12px', fontSize: '8px' }}>Loading evidence...</div>}>
+                    <React.Suspense fallback={<div style={{ padding: '12px', fontSize: 'var(--text-callout)' }}>Loading evidence...</div>}>
                       <FieldEvidencePopup
                         field={field}
                         label={fieldLabel}
@@ -754,16 +680,7 @@ const VehicleDossierPanel: React.FC = () => {
               {fg.label === 'POWERPLANT' && collapsedCount > 0 && (
                 <button type="button"
                   onClick={() => setPowerplantExpanded(true)}
-                  style={{
-                    fontFamily: 'Arial, sans-serif',
-                    fontSize: '7px',
-                    color: 'var(--text-disabled)',
-                    padding: '2px 10px 3px',
-                    cursor: 'pointer',
-                    letterSpacing: '0.3px',
-                    display: 'block', width: '100%', textAlign: 'left', background: 'transparent', border: 0,
-                    borderBottom: '1px solid var(--border)',
-                  }}
+                  className="vp-dossier-expand-fields"
                 >
                   {collapsedCount} original or overlapping field{collapsedCount > 1 ? 's' : ''} · expand
                 </button>
@@ -782,19 +699,7 @@ const VehicleDossierPanel: React.FC = () => {
           if (extFields.length === 0) return null;
           return (
             <>
-              <div style={{
-                fontFamily: 'Arial, sans-serif',
-                fontSize: '9px',
-                fontWeight: 700,
-                letterSpacing: '1px',
-                textTransform: 'uppercase',
-                padding: '6px 10px',
-                background: 'var(--surface)',
-                borderTop: '1px solid var(--border)',
-                borderBottom: '1px solid var(--border)',
-              }}>
-                EXTENDED SPECIFICATIONS
-              </div>
+              <div className="vp-dossier-panel__title">Extended specifications</div>
               {extFields.map(({ key, label, formatter }) => {
                 const raw = formatter ? formatter(v[key]) : String(v[key]);
                 const displayValue = sanitizeInlineValue(raw);
@@ -812,7 +717,7 @@ const VehicleDossierPanel: React.FC = () => {
                     isOpen={openDrawers.has(key)}
                     onToggle={() => toggleDrawer(key)}
                     onValueClick={() => openPopup(
-                      <React.Suspense fallback={<div style={{ padding: '12px', fontSize: '8px' }}>Loading evidence...</div>}>
+                      <React.Suspense fallback={<div style={{ padding: '12px', fontSize: 'var(--text-callout)' }}>Loading evidence...</div>}>
                         <FieldEvidencePopup
                           field={key}
                           label={label}
@@ -834,14 +739,8 @@ const VehicleDossierPanel: React.FC = () => {
       </div>
 
       {/* Claim presence uses a fixed core-field denominator, not a verification tier. */}
-      <div data-testid="source-claim-coverage" style={{
-        background: 'var(--surface-elevated)',
-        border: '2px solid var(--border)',
-        padding: '8px 10px',
-        marginBottom: '8px',
-        fontSize: '9px',
-      }}>
-        <div className="ev-label">SOURCE CLAIM COVERAGE</div>
+      <div data-testid="source-claim-coverage" className="vp-source-coverage">
+        <h4>Source claim coverage</h4>
         {evidenceError ? <p role="status">Source claim coverage unavailable.</p>
           : loading ? <p role="status">Loading source claim coverage…</p>
           : <>

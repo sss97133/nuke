@@ -380,3 +380,34 @@ it('enriches price claim popover with source-bound inline Mecum lot provenance w
   expect(document.body.textContent).toContain('Indy 2019');
   expect(document.body.textContent).toContain('Watch sale moment');
 });
+
+it('measures the masthead when its async document arrives and keeps the sticky stack current', async () => {
+  const height = vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(112);
+  const originalObserver = globalThis.ResizeObserver;
+  let resize: (() => void) | undefined;
+  const disconnect = vi.fn();
+  globalThis.ResizeObserver = class {
+    constructor(callback: () => void) { resize = callback; }
+    observe() {}
+    unobserve() {}
+    disconnect = disconnect;
+  } as unknown as typeof ResizeObserver;
+  try {
+    fixture.read = null;
+    await render();
+    expect(host.style.getPropertyValue('--vp-h-masthead')).toBe('');
+    fixture.read = mustangRead();
+    await render();
+    expect(host.style.getPropertyValue('--vp-h-masthead')).toBe('112px');
+    height.mockReturnValue(176);
+    act(() => resize?.());
+    expect(host.style.getPropertyValue('--vp-h-masthead')).toBe('176px');
+    fixture.read = null;
+    await render();
+    expect(disconnect).toHaveBeenCalledOnce();
+    expect(host.style.getPropertyValue('--vp-h-masthead')).toBe('');
+  } finally {
+    height.mockRestore();
+    globalThis.ResizeObserver = originalObserver;
+  }
+});
