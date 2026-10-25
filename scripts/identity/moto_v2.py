@@ -5,7 +5,7 @@
 # List_of_BMW_motorcycles, List_of_Triumph_motorcycles (Triumph Engineering/Motorcycles vs Triumph Motor Company cars),
 # Make/model lists are hand-written rules (moto_v2); no external source was fetched or verified.
 import re
-REF='wikipedia:List_of_motorcycle_manufacturers+per-brand model lists (moto_v2)'
+REF='rule_based:moto_v2 extractor rule list; no external source fetched'
 def rx(p,s): return re.search(p,s) is not None
 W=lambda p: r'(?<![a-z0-9])(?:'+p+r')(?![a-z])'
 NEG_ALL=W(r'atv|quad|quads|four ?wheeler|4 ?wheeler|utv|side ?by ?side|go ?-?kart|kart|snowmobile|sled|jet ?ski|jetski|wave ?runner|waverunner|watercraft|pwc|golf|boat|outboard|trailer|camper|motorhome|motor ?coach|rv|bicycle|pedal|sign|poster|neon|toy|model kit|diecast|die-cast|pedal car|tractor|mower|generator|engine only|crate engine|sedan|coupe|convertible|roadster car|station wagon|pickup|truck|van|atc ?\d*|3 ?wheeler atv')
