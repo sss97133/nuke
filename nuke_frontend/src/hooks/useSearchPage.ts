@@ -45,7 +45,7 @@ function detectPlatform(url: string): { label: string; short: string } | null {
 }
 
 export interface UrlExtraction {
-  status: 'detecting' | 'extracting' | 'success' | 'error';
+  status: 'ready' | 'detecting' | 'extracting' | 'success' | 'error';
   url: string;
   platform: { label: string; short: string } | null;
   vehicleId?: string;
@@ -222,7 +222,7 @@ export function useSearchPage() {
 
   // URL extraction state
   const [urlExtraction, setUrlExtraction] = useState<UrlExtraction | null>(null);
-  const urlExtractionRef = useRef<string | null>(null);
+  const activeUrlImport = useRef<{ url: string; version: number } | null>(null);
 
   // Detect make from query or URL params for browse_stats
   const detectedMake = useMemo(() => {
@@ -262,7 +262,6 @@ export function useSearchPage() {
       setBrowseStats(null);
       setLoading(false);
       setUrlExtraction(null);
-      urlExtractionRef.current = null;
       return cleanup;
     }
     lastQueryRef.current = q;
@@ -276,7 +275,7 @@ export function useSearchPage() {
 
     // UUID lookup is still a bounded visible-row read; absence is not a stall.
     if (UUID_RE.test(q)) {
-      setLoading(true); setUrlExtraction(null); urlExtractionRef.current = null;
+      setLoading(true); setUrlExtraction(null);
       Promise.resolve(supabase.from('vehicles').select('id').eq('id', q).maybeSingle())
         .then(({ data, error }) => {
           if (!isCurrent()) return;
@@ -288,55 +287,11 @@ export function useSearchPage() {
       return cleanup;
     }
 
-    // URL detection — skip search, go straight to ingestion
+    // A URL is an import preview. Only the explicit action below may start ingestion.
     if (looksLikeUrl(q)) {
       const url = URL_RE.test(q) ? q : `https://${q}`;
-
-      // Prevent duplicate extraction for same URL
-      if (urlExtractionRef.current === url) return cleanup;
-      urlExtractionRef.current = url;
-
-      const platform = detectPlatform(url);
-      setResults([]);
-      setSearchSummary('');
-      setSearchMeta(null);
-      setBrowseStats(null);
       setLoading(false);
-      setUrlExtraction({ status: 'extracting', url, platform });
-
-      // Fire extraction immediately — no fake delays
-      (async () => {
-        try {
-          const result = await ingestVehicle({ url, enrich: true });
-          if (!isCurrent()) return;
-
-          if (result.status === 'error' || result.status === 'rejected') {
-            const errorMsg = result.status === 'rejected'
-              ? `Quality too low (${result.issues?.join(', ') || 'insufficient data'})`
-              : (result.error || 'Extraction failed');
-            setUrlExtraction(prev => prev ? { ...prev, status: 'error', error: errorMsg } : null);
-            return;
-          }
-
-          // Got a vehicle — go straight to profile, no lingering
-          if (result.vehicle_id) {
-            track('url_ingest', { url, ok: true });
-            navigate(`/vehicle/${result.vehicle_id}`, { replace: true });
-            return;
-          }
-
-          // No vehicle_id returned — show error
-          setUrlExtraction(prev => prev ? {
-            ...prev,
-            status: 'error',
-            error: 'No vehicle data found at this URL',
-          } : null);
-        } catch (err: any) {
-          if (!isCurrent()) return;
-          setUrlExtraction(prev => prev ? { ...prev, status: 'error', error: err.message || 'Extraction failed' } : null);
-        }
-      })();
-
+      setUrlExtraction({ status: 'ready', url, platform: detectPlatform(url) });
       return cleanup;
     }
 
@@ -346,7 +301,6 @@ export function useSearchPage() {
     if (VIN_RE.test(q)) {
       const vin = q.toUpperCase();
       setUrlExtraction(null);
-      urlExtractionRef.current = null;
       setLoading(true);
       setResultFilter('all');
       setBrowseStats(null);
@@ -384,7 +338,6 @@ export function useSearchPage() {
 
     // Not a URL or a VIN — clear extraction state and do normal search
     setUrlExtraction(null);
-    urlExtractionRef.current = null;
     setLoading(true);
     setResultFilter('all');
 
@@ -484,6 +437,37 @@ export function useSearchPage() {
     });
     return cleanup;
   }, [query, navigate, detectedMake, parsedQuery.priceMin, parsedQuery.priceMax, searchAttempt]);
+
+  const startUrlImport = useCallback(async () => {
+    const q = query.trim();
+    if (!looksLikeUrl(q)) return;
+    const url = URL_RE.test(q) ? q : `https://${q}`;
+    const version = requestVersion.current;
+    if (activeUrlImport.current?.version === version) return;
+    const request = { url, version };
+    activeUrlImport.current = request;
+    const isCurrent = () => activeUrlImport.current === request && requestVersion.current === version;
+    setUrlExtraction({ status: 'extracting', url, platform: detectPlatform(url) });
+    try {
+      const result = await ingestVehicle({ url, enrich: true });
+      if (!isCurrent()) return;
+      if (result.status === 'error' || result.status === 'rejected') {
+        const message = result.status === 'rejected'
+          ? `Quality too low (${result.issues?.join(', ') || 'insufficient data'})`
+          : result.error || 'Import failed';
+        setUrlExtraction(previous => previous ? { ...previous, status: 'error', error: message } : null);
+      } else if (result.vehicle_id) {
+        track('url_ingest', { url, ok: true });
+        navigate(`/vehicle/${result.vehicle_id}`, { replace: true });
+      } else {
+        setUrlExtraction(previous => previous ? { ...previous, status: 'error', error: 'No vehicle data found at this URL' } : null);
+      }
+    } catch (failure: unknown) {
+      if (isCurrent()) setUrlExtraction(previous => previous ? { ...previous, status: 'error', error: failure instanceof Error ? failure.message : 'Import failed' } : null);
+    } finally {
+      if (activeUrlImport.current === request) activeUrlImport.current = null;
+    }
+  }, [query, navigate]);
 
   // Load more results
   const handleLoadMore = useCallback(async () => {
@@ -598,5 +582,6 @@ export function useSearchPage() {
     browseStats,
     detectedMake,
     urlExtraction,
+    startUrlImport,
   };
 }

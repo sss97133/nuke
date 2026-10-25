@@ -29,11 +29,12 @@ vi.mock('../lib/supabase', () => ({ supabase: {
   } },
 } }));
 import { useSearchPage } from './useSearchPage';
+import { ingestVehicle } from '../services/aiDataIngestion';
 let state: ReturnType<typeof useSearchPage>; let root: Root; let container: HTMLDivElement;
 function Harness() { state = useSearchPage(); return <div>{state.displayResults.map(r => <span key={r.id}>{r.id}</span>)}</div>; }
 beforeEach(() => {
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
-  fixture.params = new URLSearchParams({ q: 'cool cars under $30,000' }); fixture.requests = []; fixture.respond = null; fixture.rpcCalls = []; fixture.vin = null; fixture.stats = null; fixture.byId = null; fixture.navigate.mockReset();
+  fixture.params = new URLSearchParams({ q: 'cool cars under $30,000' }); fixture.requests = []; fixture.respond = null; fixture.rpcCalls = []; fixture.vin = null; fixture.stats = null; fixture.byId = null; fixture.navigate.mockReset(); vi.mocked(ingestVehicle).mockReset();
   container = document.createElement('div'); document.body.appendChild(container); root = createRoot(container);
 });
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); });
@@ -255,4 +256,43 @@ it('refreshes make/year filters from new URL intent and clears previous local fi
   fixture.params = new URLSearchParams({q:'cars',make:'Saab',yearMin:'2001',yearMax:'2009'});
   await act(async()=>root.render(<Harness/>));
   expect(state.filters).toMatchObject({make:'Saab',yearMin:'2001',yearMax:'2009',transmission:''});
+});
+
+
+it('previews a listing URL without starting an import on mount or rerender', async () => {
+  fixture.params = new URLSearchParams({q:'https://example.invalid/listing'});
+  await act(async()=>root.render(<Harness/>)); await act(async()=>root.render(<Harness/>));
+  expect(ingestVehicle).not.toHaveBeenCalled(); expect(state.urlExtraction?.status).toBe('ready');
+  expect(fixture.requests).toHaveLength(0);
+});
+
+it('imports only after the explicit action and blocks duplicate pending submissions', async () => {
+  fixture.params = new URLSearchParams({q:'www.example.invalid/listing'});
+  let finish!: (result:any)=>void; vi.mocked(ingestVehicle).mockImplementation(()=>new Promise(resolve=>{finish=resolve;}));
+  await act(async()=>root.render(<Harness/>)); let pending!:Promise<void>;
+  await act(async()=>{pending=state.startUrlImport(); void state.startUrlImport();});
+  expect(ingestVehicle).toHaveBeenCalledExactlyOnceWith({url:'https://www.example.invalid/listing',enrich:true});
+  expect(state.urlExtraction?.status).toBe('extracting');
+  await act(async()=>{finish({status:'matched',vehicle_id:'existing-vehicle'});await pending;});
+  expect(fixture.navigate).toHaveBeenCalledExactlyOnceWith('/vehicle/existing-vehicle',{replace:true});
+});
+
+it('does not navigate or replace the current query when a former URL import finishes late', async () => {
+  fixture.params = new URLSearchParams({q:'https://example.invalid/listing'});
+  let finish!: (result:any)=>void; vi.mocked(ingestVehicle).mockImplementation(()=>new Promise(resolve=>{finish=resolve;}));
+  await act(async()=>root.render(<Harness/>)); let pending!:Promise<void>;
+  await act(async()=>{pending=state.startUrlImport();});
+  fixture.params=new URLSearchParams({q:'volvo'});await act(async()=>root.render(<Harness/>));
+  await act(async()=>{finish({status:'created',vehicle_id:'late-vehicle'});await pending;});
+  expect(fixture.navigate).not.toHaveBeenCalled();expect(state.urlExtraction).toBeNull();expect(state.results).toHaveLength(5);
+});
+
+it('retains an import error for an explicit retry through the same helper', async () => {
+  fixture.params = new URLSearchParams({q:'https://example.invalid/listing'});
+  vi.mocked(ingestVehicle).mockResolvedValueOnce({status:'error',error:'Listing unavailable'}).mockResolvedValueOnce({status:'duplicate',vehicle_id:'existing'});
+  await act(async()=>root.render(<Harness/>));
+  await act(async()=>state.startUrlImport()); expect(state.urlExtraction).toMatchObject({status:'error',error:'Listing unavailable'});
+  expect(fixture.navigate).not.toHaveBeenCalled();
+  await act(async()=>state.startUrlImport()); expect(ingestVehicle).toHaveBeenCalledTimes(2);
+  expect(fixture.navigate).toHaveBeenCalledWith('/vehicle/existing',{replace:true});
 });

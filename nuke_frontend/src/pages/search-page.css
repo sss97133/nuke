@@ -5,12 +5,12 @@
 .search-page-input { display: flex; flex: 1; min-width: 0; align-items: center; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); padding-left: 12px; }
 .search-page-input input { min-width: 0; width: 100%; flex: 1; min-height: var(--control-height); border: 0; background: transparent; color: var(--text); font: inherit; outline-offset: -2px; }
 .search-page-input:focus-within { border-color: var(--border-focus); }
-.search-page-form .btn-base { flex-shrink: 0; }
+.search-page-form .btn-base { flex-shrink: 0; min-width: var(--control-height); }
 .search-page-error, .search-filter-panel { border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); margin-bottom: 16px; overflow: hidden; }
 .search-page-error { padding: 16px; }
 .search-page-error h2 { margin-top: 0; }
 .search-filter-panel button, .search-filter-panel input, .search-filter-panel select { min-height: var(--control-height); border-radius: var(--radius-sm); max-width: 100%; color: var(--text); }
-.search-filter-panel button { font-family: var(--font-family); }
+.search-filter-panel button { min-width: var(--control-height); font-family: var(--font-family); }
 .search-filter-panel input, .search-filter-panel select { min-width: 0; font: var(--text-callout)/1.4 var(--font-family); }
 .search-filter-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-top: 16px; }
 .search-filter-fields > div { min-width: 0; }
@@ -24,3 +24,9 @@
 .search-page .search-result-control[aria-pressed="true"] { color: var(--on-action); border-color: var(--action); background: var(--action); }
 .search-page .search-result-control:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
 @media (max-width: 600px) { .search-page select.search-result-control { font-size: 16px; } }
+
+.search-import-card { max-width: 560px; margin: 24px auto; padding: 20px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); }
+.search-import-card h2 { margin: 0 0 12px; }
+.search-import-platform { font-weight: 600; margin: 0; }
+.search-import-source { display: inline-flex; align-items: center; min-height: var(--control-height); color: var(--link); }
+.search-import-source:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }

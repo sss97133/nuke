@@ -13,92 +13,26 @@ import '../styles/unified-design-system.css';
 import './search-page.css';
 
 /* ─── URL Extraction Card ─── */
-function UrlExtractionCard({ extraction }: { extraction: UrlExtraction }) {
+function UrlExtractionCard({ extraction, onImport }: { extraction: UrlExtraction; onImport: () => void }) {
   const { status, url, platform, error } = extraction;
 
   let domain = '';
   try { domain = new URL(url).hostname.replace(/^www\./, ''); } catch { domain = url; }
 
   return (
-    <div style={{ maxWidth: '560px', margin: '40px auto', padding: '0 12px' }}>
-      <style>{`
-        @keyframes nuke-scan {
-          0% { transform: translateX(-100%); }
-          100% { transform: translateX(100%); }
-        }
-      `}</style>
-
-      <div style={{
-        border: '1px solid var(--border)',
-        background: 'var(--surface)',
-        overflow: 'hidden',
-      }}>
-        {status === 'extracting' && (
-          <div style={{ height: '3px', background: 'var(--border)', overflow: 'hidden', position: 'relative' }}>
-            <div style={{
-              position: 'absolute', top: 0, left: 0, width: '60%', height: '100%',
-              background: 'var(--text)',
-              animation: 'nuke-scan 1.2s ease-in-out infinite',
-            }} />
-          </div>
-        )}
-        {status === 'error' && (
-          <div style={{ height: '3px', background: 'var(--error, #c00)' }} />
-        )}
-
-        <div style={{ padding: '20px 24px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
-            {platform && (
-              <span style={{
-                background: 'var(--text)',
-                color: 'var(--bg)',
-                padding: '3px 10px',
-                fontWeight: 800,
-              }}>
-                {platform.short}
-              </span>
-            )}
-            <span style={{
-              color: 'var(--text-secondary)',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-            }}>
-              {domain}
-            </span>
-          </div>
-
-          {status === 'extracting' && (
-            <div style={{ fontWeight: 800, color: 'var(--text)' }}>
-              Extracting vehicle data...
-            </div>
-          )}
-
-          {status === 'error' && (
-            <>
-              <div style={{ fontWeight: 800, color: 'var(--text)', marginBottom: '8px' }}>
-                Extraction failed
-              </div>
-              <div style={{ color: 'var(--text-secondary)', marginBottom: '12px' }}>
-                {error}
-              </div>
-              <a
-                href={url}
-                target="_blank"
-                rel="noreferrer"
-                style={{
-                  fontWeight: 700,
-                  color: 'var(--text)',
-                  textDecoration: 'underline',
-                }}
-              >
-                Open original listing
-              </a>
-            </>
-          )}
-        </div>
-      </div>
-    </div>
+    <section className="search-import-card" aria-label="Listing import">
+      <h2>{status === 'ready' ? 'Import this listing' : status === 'error' ? 'Import failed' : 'Importing listing'}</h2>
+      {platform && <p className="search-import-platform">{platform.short}</p>}
+      <a href={url} target="_blank" rel="noreferrer" className="search-import-source">
+        Open original listing · {domain}
+      </a>
+      {status === 'ready' && <p>Read the listing and add or enrich its vehicle record.</p>}
+      {status === 'extracting' && <p role="status">Importing vehicle data…</p>}
+      {status === 'error' && <p role="alert">{error}</p>}
+      {(status === 'ready' || status === 'error') && <Button type="button" onClick={onImport}>
+        {status === 'ready' ? 'Import listing' : 'Retry import'}
+      </Button>}
+    </section>
   );
 }
 
@@ -149,6 +83,7 @@ export default function Search() {
     browseStats,
     detectedMake,
     urlExtraction,
+    startUrlImport,
   } = useSearchPage();
 
   const emptyState = useSearchEmptyState(!query);
@@ -165,7 +100,7 @@ export default function Search() {
 
       {/* URL Extraction */}
       {urlExtraction && (
-        <UrlExtractionCard extraction={urlExtraction} />
+        <UrlExtractionCard extraction={urlExtraction} onImport={() => void startUrlImport()} />
       )}
 
       {/* Active search: filters + results */}

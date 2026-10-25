@@ -261,7 +261,7 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
       {(results.length > 0 || searchSummary) && (
         <div style={{
           background: 'var(--surface)',
-          border: '2px solid var(--text)', padding: '10px 14px',
+          border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '10px 14px',
           marginBottom: '12px'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
@@ -461,7 +461,7 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
 
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
             <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-              <span style={{ fontSize: 'var(--text-caption)', fontWeight: 600, color: 'var(--text-secondary)' }}>Sort</span>
+              <span style={{ fontSize: 'var(--text-caption)', fontWeight: 600, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>Sort</span>
               <select className="search-result-control" aria-label="Sort search results"
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as any)}
