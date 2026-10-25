@@ -12,6 +12,7 @@ import { createClient } from '@supabase/supabase-js';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
+import { parseBatPageResult } from '../supabase/functions/extract-auction-comments/batResult.ts';
 
 // Get __dirname equivalent for ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -99,7 +100,7 @@ async function findVehiclesMissingSoldPrice(): Promise<VehicleMissingPrice[]> {
 /**
  * Scrape BaT listing for sold price
  */
-async function scrapeBaTPrice(batUrl: string): Promise<{ price: number | null; saleDate: string | null }> {
+async function scrapeBaTPrice(batUrl: string): Promise<{ price: number | null; saleDate: string | null; outcome?: string }> {
   try {
     console.log(`  📡 Scraping BaT: ${batUrl}`);
     
@@ -123,67 +124,18 @@ async function scrapeBaTPrice(batUrl: string): Promise<{ price: number | null; s
     const priceMatch = title.match(/\$([\d,]+)/);
     const dateMatch = title.match(/(\w+ \d+, \d{4})/);
 
-    // Try to find price in page content - more comprehensive patterns
-    let pagePrice = null;
-    const pricePatterns = [
-      /sold for \$([\d,]+)/i,
-      /final bid: \$([\d,]+)/i,
-      /high bid.*?\$([\d,]+)/i,
-      /reserve not met.*?\$([\d,]+)/i,
-      /reserve met.*?\$([\d,]+)/i,
-      /\$([\d,]+)\s*(?:was|is|final|sold)/i,
-      /USD\s*\$([\d,]+)/i,
-    ];
-
-    for (const pattern of pricePatterns) {
-      const match = html.match(pattern);
-      if (match) {
-        pagePrice = match[1].replace(/,/g, '');
-        break;
-      }
+    // Only BaT's own result banner counts. "Bid to" / Reserve Not Met is a high bid,
+    // never a sale price; high-bid, comment and seller-chatter patterns were recording
+    // unsold lots as sold.
+    const result = parseBatPageResult(html);
+    if (!result || result.kind !== 'sold') {
+      return { price: null, saleDate: null, outcome: result?.kind ?? 'unknown' };
     }
-
-    // Also check for JSON data in the page (BAT_VMS or similar)
-    const batVmsMatch = html.match(/var BAT_VMS = ({[^;]+});/);
-    if (batVmsMatch) {
-      try {
-        const batData = JSON.parse(batVmsMatch[1]);
-        // Look for highest bid in comments
-        if (batData.comments && Array.isArray(batData.comments)) {
-          let maxBid = 0;
-          for (const comment of batData.comments) {
-            if (comment.type === 'bat-bid' && comment.bidAmount && comment.bidAmount > maxBid) {
-              maxBid = comment.bidAmount;
-            }
-            // Also check for "Reserve not met" comments with prices
-            if (comment.content && comment.content.match(/reserve not met.*?\$([\d,]+)/i)) {
-              const reserveMatch = comment.content.match(/\$([\d,]+)/);
-              if (reserveMatch) {
-                const reservePrice = parseInt(reserveMatch[1].replace(/,/g, ''));
-                if (reservePrice > maxBid) maxBid = reservePrice;
-              }
-            }
-          }
-          if (maxBid > 0 && (!pagePrice || maxBid > parseInt(pagePrice))) {
-            pagePrice = maxBid.toString();
-          }
-        }
-      } catch (e) {
-        // JSON parse failed, ignore
-      }
-    }
-
-    // Check for seller comments mentioning sale price (e.g., "sold for $68K")
-    const sellerCommentMatch = html.match(/sold for \$?([\d,]+)K/i);
-    if (sellerCommentMatch) {
-      const kPrice = parseInt(sellerCommentMatch[1].replace(/,/g, '')) * 1000;
-      if (!pagePrice || kPrice > parseInt(pagePrice)) {
-        pagePrice = kPrice.toString();
-      }
-    }
+    const pagePrice = String(result.amount);
 
     const priceFromTitle = priceMatch ? parseInt(priceMatch[1].replace(/,/g, '')) : null;
-    const price = priceFromTitle || (pagePrice ? parseInt(pagePrice) : null);
+    const price = parseInt(pagePrice) || null;
+    void priceFromTitle;
     
     // Parse date from title
     let saleDate: string | null = null;
@@ -227,18 +179,7 @@ async function backfillSoldPrice(
         source = 'bat_scraped';
       }
     }
-    // Priority 3: Use asking_price if vehicle was for sale
-    if (!salePrice && vehicle.asking_price && vehicle.asking_price > 0) {
-      salePrice = vehicle.asking_price;
-      saleDate = vehicle.sale_date || null;
-      source = 'estimated_from_asking';
-    }
-    // Priority 4: Use current_value as fallback
-    if (!salePrice && vehicle.current_value && vehicle.current_value > 0) {
-      salePrice = vehicle.current_value;
-      saleDate = vehicle.sale_date || null;
-      source = 'estimated_from_value';
-    }
+    // Asking price and current value are not sale prices; never record them as sold.
 
     if (!salePrice || salePrice <= 0) {
       return {
