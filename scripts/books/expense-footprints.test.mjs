@@ -12,7 +12,7 @@ const OWNER = '11111111-1111-4111-8111-111111111111';
 test('marketplace history: year filter, money, exclusions, quoted titles', () => {
   const csv = 'date,total,order,title\n2024-03-02,"1,204.50",01-11111-22222,"Bumper, chrome ""rear"""\n' +
     '2024-04-01,12.00,01-11111-33333,Card (personal collectible)\n2025-01-02,5.00,01-1-1,Next year\n2024-05-01,abc,01-1-2,Bad total\n';
-  const t = ebayTraces(csvRecords(csv), { year: 2024, exclude: /\(personal/i });
+  const t = ebayTraces(csvRecords(csv), { year: 2024, exclude: '(PERSONAL' });
   assert.equal(t.length, 2);
   assert.deepEqual(t[0], { kind: 'marketplace_order', ref: '01-11111-22222', date: '2024-03-02', amount: '1204.50', vendor: 'eBay', what: 'Bumper, chrome "rear"', where: 'eBay purchase history' });
   assert.equal(t[1].amount, null, 'an unreadable total stays unknown, never guessed');

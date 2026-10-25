@@ -54,13 +54,13 @@ const money = v => {
 };
 const isoDay = v => (/^\d{4}-\d{2}-\d{2}$/.test(String(v ?? '')) ? String(v) : null);
 
-/** Marketplace purchase history rows (date,total,order,title) to order traces. */
+/** Marketplace purchase history rows (date,total,order,title) to order traces. `exclude` is a case-insensitive substring. */
 export function ebayTraces(records, { year, exclude } = {}) {
   const out = [];
   for (const r of records) {
     const date = isoDay(r.date); const amount = money(r.total);
     if (!date || (year && !date.startsWith(String(year)))) continue;
-    if (exclude && exclude.test(r.title || '')) continue;
+    if (exclude && (r.title || '').toLowerCase().includes(String(exclude).toLowerCase())) continue;
     out.push({ kind: 'marketplace_order', ref: r.order || undefined, date, amount, vendor: 'eBay', what: (r.title || '').slice(0, 200), where: 'eBay purchase history' });
   }
   return out;
@@ -195,7 +195,7 @@ export function markdown(rows, { year }) {
 // ---- CLI ----
 
 function args(argv) {
-  const a = { limit: 200, exclude: '\\(personal' };
+  const a = { limit: 200, exclude: '(personal' };
   for (let i = 0; i < argv.length; i++) {
     const k = argv[i]; const v = () => argv[++i];
     if (k === '--owner') a.owner = v(); else if (k === '--year') a.year = Number(v()); else if (k === '--out') a.out = v();
@@ -211,7 +211,7 @@ function args(argv) {
 async function main() {
   const a = args(process.argv.slice(2));
   const external = [];
-  if (a.ebay) external.push(...ebayTraces(csvRecords(fs.readFileSync(a.ebay, 'utf8')), { year: a.year, exclude: a.exclude ? new RegExp(a.exclude, 'i') : null }));
+  if (a.ebay) external.push(...ebayTraces(csvRecords(fs.readFileSync(a.ebay, 'utf8')), { year: a.year, exclude: a.exclude || null }));
   if (a.mail) external.push(...mailTraces(await readMailRows(path.join(os.homedir(), 'Library/Mail/V10/MailData/Envelope Index'), a.year), { year: a.year }));
   if (a.messages) external.push(...messageTraces(await readMessageRows(path.join(os.homedir(), 'Library/Messages/chat.db'), a.year), { year: a.year }));
   if (a.traces) external.push(...JSON.parse(fs.readFileSync(a.traces, 'utf8')));
