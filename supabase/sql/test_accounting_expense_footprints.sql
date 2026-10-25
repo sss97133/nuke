@@ -121,7 +121,9 @@ INSERT INTO receipts(user_id, vendor_name, receipt_date, total, document_kind, a
  ('11111111-1111-4111-8111-111111111111','Parts Store','2024-03-01',54.10,'parts_service','plausible',NULL,NULL,NULL,'1760000000009_IMG_7001.jpeg',false), -- reread of R1's photo
  ('11111111-1111-4111-8111-111111111111','Bolt Bin','2024-11-05',25.00,'parts_service','plausible',NULL,'cash',NULL,'IMG_7017.json',false),  -- two readings of one photo,
  ('11111111-1111-4111-8111-111111111111','Bolt Bin','2024-11-05',52.00,'parts_service','verified',NULL,'cash',NULL,'1760000000010_IMG_7017.jpeg',false), -- neither booked
- ('11111111-1111-4111-8111-111111111111','Trim Fabrics','2024-11-19',481.75,'parts_service','verified',NULL,NULL,NULL,'IMG_7018.json',false); -- charged in two parts (L-8 + L-9)
+ ('11111111-1111-4111-8111-111111111111','Trim Fabrics','2024-11-19',481.75,'parts_service','verified',NULL,NULL,NULL,'IMG_7018.json',false), -- charged in two parts (L-8 + L-9)
+ ('11111111-1111-4111-8111-111111111111','Trim Fabrics','2024-11-18',NULL,'parts_service','no_amount',NULL,NULL,NULL,'IMG_7019.json',false), -- unread total, vendor booked
+ ('11111111-1111-4111-8111-111111111111','Rare Racing','2024-11-18',NULL,'parts_service','no_amount',NULL,NULL,NULL,'IMG_7020.json',false); -- unread total, vendor not booked
 -- Photos: V shows primer on three days in September with no cell; H1..H5 each one assembly day inside their cells'
 -- windows; P only presence (no stage, no session); Z is another owner's car in primer; a receipt photo on V is skipped.
 INSERT INTO vehicle_images(vehicle_id, user_id, taken_at, fabrication_stage, source) VALUES
@@ -193,8 +195,10 @@ DO $$ DECLARE s record; g record; n int; BEGIN
  -- Near match: same vendor named in L-7, total within 1.00: cited, not listed; the 300.00 slip is too far off: a gap.
  IF EXISTS (SELECT 1 FROM got WHERE vendor = 'Wheel Works' AND amount = 440.83) THEN RAISE EXCEPTION 'a near match was listed as a gap'; END IF;
  IF NOT EXISTS (SELECT 1 FROM got WHERE vendor = 'Wheel Works' AND amount = 300.00 AND status = 'uncited') THEN RAISE EXCEPTION 'a far total on the same vendor must stay a gap'; END IF;
- -- A receipt charged in two parts is booked.
- IF EXISTS (SELECT 1 FROM got WHERE vendor = 'Trim Fabrics') THEN RAISE EXCEPTION 'a split charge was listed as a gap'; END IF;
+ -- A receipt charged in two parts is booked; so is an unread slip whose vendor is booked in its window.
+ IF EXISTS (SELECT 1 FROM got WHERE vendor = 'Trim Fabrics') THEN RAISE EXCEPTION 'a split charge or a booked vendor''s unread slip was listed: %', (SELECT jsonb_agg(trace_key) FROM got WHERE vendor = 'Trim Fabrics'); END IF;
+ SELECT * INTO g FROM got WHERE vendor = 'Rare Racing';
+ IF g.status <> 'uncited' OR g.amount IS NOT NULL OR g.amount_basis <> 'unknown' OR g.confidence <> 0.360 THEN RAISE EXCEPTION 'unread slip of an unbooked vendor: %', to_jsonb(g); END IF;
  -- One photo, one trace: R1's photo reread at 54.10 is not a gap; of two unbooked readings of one photo the verified one stands.
  IF EXISTS (SELECT 1 FROM got WHERE amount = 54.10) OR EXISTS (SELECT 1 FROM got WHERE vendor = 'Bolt Bin' AND amount = 25.00) THEN RAISE EXCEPTION 'a reread photo was listed'; END IF;
  IF NOT EXISTS (SELECT 1 FROM got WHERE vendor = 'Bolt Bin' AND amount = 52.00 AND status = 'uncited') THEN RAISE EXCEPTION 'the better reading of an unbooked photo must stand'; END IF;
@@ -224,7 +228,7 @@ DO $$ DECLARE s record; g record; n int; BEGIN
  IF (SELECT trace_key FROM got LIMIT 1) IS DISTINCT FROM (SELECT trace_key FROM got WHERE trace_kind <> 'summary' ORDER BY score DESC NULLS LAST LIMIT 1) THEN RAISE EXCEPTION 'not ranked by score'; END IF;
  SELECT * INTO s FROM got WHERE trace_kind = 'summary';
  IF (s.reasons->>'gaps')::int <> (SELECT count(*) FROM got WHERE status = 'uncited') THEN RAISE EXCEPTION 'summary gaps do not reconcile: %', s.reasons; END IF;
- IF (s.reasons->>'reclassification_candidates')::int <> 1 OR (s.reasons->>'near_matches')::int <> 2 OR (s.reasons->>'gap_amount_document')::numeric <> 140.00 + 80.00 + 33.33 + 59.90 + 9000.00 + 300.00 + 52.00
+ IF (s.reasons->>'reclassification_candidates')::int <> 1 OR (s.reasons->>'near_matches')::int <> 3 OR (s.reasons->>'gaps_amount_unknown')::int <> 1 OR (s.reasons->>'gap_amount_document')::numeric <> 140.00 + 80.00 + 33.33 + 59.90 + 9000.00 + 300.00 + 52.00
     OR (s.reasons->>'gap_amount_claim')::numeric <> 350.00 + 2000.00 OR (s.reasons->>'gap_amount_estimated_p25')::numeric <> 200.00
     OR s.amount <> 140.00 + 80.00 + 33.33 + 59.90 + 9000.00 + 300.00 + 52.00 + 350.00 + 2000.00
     OR (s.reasons->'by_kind_status'->>'receipt:reread')::int <> 2 OR s.estimate_mid <> 200.00 THEN RAISE EXCEPTION 'summary dollars: % %', to_jsonb(s), s.reasons; END IF;

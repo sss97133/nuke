@@ -8,8 +8,8 @@ SET LOCAL lock_timeout = '1s';
 -- Each trace is matched against the current book (v_financial_accounting_records) and the expense-use cells:
 --   cited_expense      an Expense record of the same amount (within 0.01) dated 5 days before to 30 days after the
 --                      trace, or an Expense record whose text names the trace's reference (receipt file stem, order no.)
---   near_match         (counted as booked) an Expense record naming the vendor within 1.00 or 5%, or two that add up
---                      to the amount (a split charge), same window
+--   near_match         (counted as booked) an Expense record naming the vendor within 1.00 or 5% (any amount when the
+--                      trace has none), or two that add up to the amount (a split charge), same window
 --   cited_vehicle      (work episodes) an Expense use cell on the same vehicle, dated 30 days before to 7 days after
 --   booked_not_expense the same amount and window on a book record outside Expense (Owner, Transfer, Reference...):
 --                      a reclassification candidate
@@ -183,11 +183,12 @@ BEGIN
   ), matched AS MATERIALIZED (
     SELECT k.*,
       -- Near match: an Expense record naming the same vendor, amount within 1.00 or 5% (misread totals, a credit
-      -- netted at charge time), same window. It counts as cited and is reported in the summary.
+      -- netted at charge time; any amount when the trace's total was not read), same window. It counts as cited and
+      -- is reported in the summary.
       (SELECT array_agg(b.local_id ORDER BY b.d) FROM (SELECT b.local_id, b.d FROM book b
-         WHERE b.section = 'Expense' AND k.amt IS NOT NULL AND length(k.vtok) >= 5 AND strpos(b.ltxt, k.vtok) > 0
-           AND abs(b.a - k.amt) <= greatest(1.00, 0.05 * k.amt) AND b.d BETWEEN k.d - 5 AND k.d + 30
-         ORDER BY abs(b.a - k.amt), b.d LIMIT 3) b) AS near_hits,
+         WHERE b.section = 'Expense' AND length(k.vtok) >= 5 AND strpos(b.ltxt, k.vtok) > 0
+           AND (k.amt IS NULL OR abs(b.a - k.amt) <= greatest(1.00, 0.05 * k.amt)) AND b.d BETWEEN k.d - 5 AND k.d + 30
+         ORDER BY abs(b.a - coalesce(k.amt, b.a)), b.d LIMIT 3) b) AS near_hits,
       -- Split charge: two Expense records naming the vendor in the window that add up to the trace amount.
       (SELECT ARRAY[x.l1, x.l2] FROM (SELECT b1.local_id AS l1, b2.local_id AS l2
          FROM book b1 JOIN book b2 ON b2.local_id > b1.local_id AND b2.section = 'Expense' AND strpos(b2.ltxt, k.vtok) > 0
