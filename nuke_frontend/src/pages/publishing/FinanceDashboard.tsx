@@ -277,21 +277,34 @@ function DocumentEvidence({ documentId, record, onOpenDocument }: { documentId: 
     return !record?.source_key || (!sourceKey && !value?.scope_source_keys) || sourceKey === record.source_key || (Array.isArray(value?.scope_source_keys) && value.scope_source_keys.includes(record.source_key));
   });
   const readableRows = currentRows.filter(row => !/^(retained_relationships|retained_accounting_batch|canonical_|.*sha256)/.test(row.field_key));
-  return <section aria-label="Retained document evidence">
-    <h3>Supporting source</h3><p>{sourceName || 'Retained document'}{sourceName?.endsWith('.csv') ? ' · bank export or bookkeeping source' : ''}</p>
-    <p className="accounting-muted">{state} Newest first; source page {page + 1}.</p>
-    {readableRows.map(row => {
+  // Batch-level notes can describe other entries. Keep them available without
+  // presenting an unscoped note as evidence specifically linked to this entry.
+  const sourceWideRows = record?.source_key ? readableRows.filter(row => {
+    if (row.field_key === 'redacted_source') return false;
+    const value = (row.value_normalized as { value?: { source_key?: string; expense_source_key?: string; scope_source_keys?: string[] } })?.value;
+    return !value?.source_key && !value?.expense_source_key && !value?.scope_source_keys;
+  }) : [];
+  const sourceWideIds = new Set(sourceWideRows.map(row => row.id));
+  const entryRows = readableRows.filter(row => !sourceWideIds.has(row.id));
+  const renderField = (row: ExtractionEvidence) => {
+      const entryContext = sourceWideIds.has(row.id) ? null : record;
       const envelope = row.value_normalized as { value?: unknown; evidence?: { quote?: string; source_file?: string; source_sheet?: string; source_row?: string | number }; method?: string } | null;
       const quote = envelope?.evidence?.quote;
-      const firstQuote = quote && readableRows.find(candidate => (candidate.value_normalized as { evidence?: { quote?: string } })?.evidence?.quote === quote)?.id === row.id;
+      const quoteRows = sourceWideIds.has(row.id) ? sourceWideRows : entryRows;
+      const firstQuote = quote && quoteRows.find(candidate => (candidate.value_normalized as { evidence?: { quote?: string } })?.evidence?.quote === quote)?.id === row.id;
       return <article key={row.id} className="accounting-evidence-field"><h4>{row.field_key.startsWith('retained_workpaper_classification_') ? 'Retained bookkeeping classification' : row.field_key.startsWith('expense_items_') ? 'Linked receipt items' : row.field_key.startsWith('expense_use_') ? 'Where this expense was used' : row.field_key.startsWith('expense_components_') ? 'Expense breakdown' : humanLabel(row.field_key)}</h4>
-        {row.field_key === 'redacted_source' ? <RedactedDocumentSource row={row} /> : <ExpenseEvidence fieldKey={row.field_key} value={envelope && typeof envelope === 'object' && 'value' in envelope ? envelope.value : row.value_normalized} currency={record?.currency} hasUseEditor={record?.record_kind === 'retained_ledger_decision' && record.section === 'Expense' && !!record.source_key} onOpenDocument={onOpenDocument} />}
+        {row.field_key === 'redacted_source' ? <RedactedDocumentSource row={row} /> : <ExpenseEvidence fieldKey={row.field_key} value={envelope && typeof envelope === 'object' && 'value' in envelope ? envelope.value : row.value_normalized} currency={entryContext?.currency} hasUseEditor={entryContext?.record_kind === 'retained_ledger_decision' && entryContext.section === 'Expense' && !!entryContext.source_key} onOpenDocument={onOpenDocument} />}
         {firstQuote && <><blockquote>{quote.length > 500 ? `${quote.slice(0, 500)}…` : quote}</blockquote>{quote.length > 500 && <details><summary>Complete source quotation</summary><blockquote>{quote}</blockquote></details>}</>}
         {envelope?.evidence && (envelope.evidence.source_file || envelope.evidence.source_sheet || envelope.evidence.source_row) && <p className="accounting-muted">Source: {[envelope.evidence.source_file, envelope.evidence.source_sheet, envelope.evidence.source_row].filter(value => value !== undefined && value !== null).join(' · ')}</p>}
         <p className="accounting-muted">Recorded {row.created_at ? formatDate(row.created_at) : 'date unknown'} · {humanLabel(row.extractor)}{row.extractor_model ? ` · ${row.extractor_model}` : ''}</p>
         <details><summary>Provenance and technical details</summary><p>Retained interpretation; this alone does not establish expense recognition.</p><pre>{JSON.stringify(row.value_normalized, null, 2) ?? 'unknown'}</pre><p>Field reference: {row.field_key}</p><p>Evidence reference: {row.id}</p></details>
       </article>;
-    })}
+  };
+  return <section aria-label="Retained document evidence">
+    <h3>Supporting source</h3><p>{sourceName || 'Retained document'}{sourceName?.endsWith('.csv') ? ' · bank export or bookkeeping source' : ''}</p>
+    <p className="accounting-muted">{state} Newest first; source page {page + 1}.</p>
+    {entryRows.map(renderField)}
+    {sourceWideRows.length > 0 && <details className="accounting-source-notes"><summary>Source-wide notes ({sourceWideRows.length})</summary><p>These notes belong to the source document or batch. They are not explicitly linked to the selected entry and may describe other records.</p>{sourceWideRows.map(renderField)}</details>}
     {currentRows.some(row => /^(retained_relationships|retained_accounting_batch|canonical_|.*sha256)/.test(row.field_key)) && <details><summary>Technical source references</summary>{currentRows.filter(row => /^(retained_relationships|retained_accounting_batch|canonical_|.*sha256)/.test(row.field_key)).map(row => <article key={row.id}><h4>{humanLabel(row.field_key)}</h4><pre>{JSON.stringify(row.value_normalized, null, 2)}</pre></article>)}</details>}
     {rows.some(row => row.is_superseded) && <details><summary>Earlier interpretations on this page ({rows.filter(row => row.is_superseded).length})</summary>{rows.filter(row => row.is_superseded).map(row => <article key={row.id}><strong>{humanLabel(row.field_key)}</strong><p>Superseded interpretation · {row.created_at}</p><pre>{JSON.stringify(row.value_normalized, null, 2)}</pre></article>)}</details>}
     <div className="accounting-pagination"><button type="button" disabled={page === 0} onClick={() => setPage(p => p - 1)}>Newer evidence</button><button type="button" disabled={(page + 1) * PAGE_SIZE >= (count ?? 0)} onClick={() => setPage(p => p + 1)}>Older evidence</button></div>

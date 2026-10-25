@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { useAcquisitionPipeline } from '../hooks/useAcquisitionPipeline';
 import type { PipelineEntry } from '../hooks/useAcquisitionPipeline';
@@ -36,9 +36,13 @@ function stalenessInfo(discoveryDate: string | null, stageUpdatedAt: string | nu
   return null;
 }
 
-function DealRow({ entry, onAction }: { entry: PipelineEntry; onAction: (id: string, action: string, params?: Record<string, unknown>) => void }) {
+function DealRow({ entry, onAction }: { entry: PipelineEntry; onAction: (id: string, action: string, params?: Record<string, unknown>) => Promise<boolean> }) {
   const [open, setOpen] = useState(false);
   const [inlineInput, setInlineInput] = useState<{ action: string; value: string } | null>(null);
+  const [inputError, setInputError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const inFlight = useRef(false);
+  const inputId = useId();
   const proof = entry.market_proof_data;
   const hasUrl = entry.discovery_url?.startsWith('http');
   const stale = stalenessInfo(entry.discovery_date, entry.stage_updated_at);
@@ -47,20 +51,26 @@ function DealRow({ entry, onAction }: { entry: PipelineEntry; onAction: (id: str
   const roi = proof?.roi_pct || 0;
   const location = [entry.location_city, entry.location_state].filter(Boolean).join(', ');
 
-  const submitInlineInput = () => {
-    if (!inlineInput) return;
+  const submitInlineInput = async () => {
+    if (!inlineInput || inFlight.current) return;
+    setInputError(null);
     const params: Record<string, unknown> = {};
     if (inlineInput.action === 'schedule_inspection') {
       params.shop_name = inlineInput.value.trim() || 'TBD';
-    } else if (inlineInput.action === 'make_offer') {
-      if (!inlineInput.value.trim()) return;
-      params.offer_amount = parseInt(inlineInput.value.replace(/[^0-9]/g, ''));
-    } else if (inlineInput.action === 'accept_deal') {
-      if (!inlineInput.value.trim()) return;
-      params.purchase_price = parseInt(inlineInput.value.replace(/[^0-9]/g, ''));
+    } else if (inlineInput.action === 'make_offer' || inlineInput.action === 'accept_deal') {
+      const amount = inlineInput.value.trim();
+      if (!/^(?:\d+(?:\.\d+)?|\.\d+)$/.test(amount) || !Number.isFinite(Number(amount)) || Number(amount) <= 0) {
+        setInputError('Enter an amount greater than zero using digits and a decimal point.');
+        return;
+      }
+      // These database columns are unconstrained numeric. Send decimal text to
+      // preserve the entered precision through JSON and the existing writer.
+      params[inlineInput.action === 'make_offer' ? 'offer_amount' : 'purchase_price'] = amount.startsWith('.') ? `0${amount}` : amount;
     }
-    onAction(entry.id, inlineInput.action, params);
-    setInlineInput(null);
+    inFlight.current = true; setSubmitting(true);
+    try {
+      if (await onAction(entry.id, inlineInput.action, params)) setInlineInput(null);
+    } finally { inFlight.current = false; setSubmitting(false); }
   };
 
   const nextAction: Record<string, { action: string; label: string }> = {
@@ -145,10 +155,10 @@ function DealRow({ entry, onAction }: { entry: PipelineEntry; onAction: (id: str
       {open && (
         <tr>
           <td colSpan={8} style={{ padding: 0, border: '1px solid var(--border-light)', background: 'var(--grey-50)' }}>
-            <div style={{ display: 'flex', gap: 'var(--space-5)', padding: 'var(--space-3) var(--space-4)', flexWrap: 'wrap' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 240px), 1fr))', gap: 'var(--space-5)', padding: 'var(--space-3) var(--space-4)' }}>
 
               {/* Economics */}
-              <div style={{ flex: 1, minWidth: 180 }}>
+              <div style={{ minWidth: 0 }}>
                 <div style={{ fontWeight: 700, marginBottom: 'var(--space-1)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Economics</div>
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <tbody>
@@ -180,7 +190,7 @@ function DealRow({ entry, onAction }: { entry: PipelineEntry; onAction: (id: str
 
               {/* Cost Breakdown */}
               {proof?.cost_breakdown && (
-                <div style={{ flex: 1, minWidth: 160 }}>
+                <div style={{ minWidth: 0 }}>
                   <div style={{ fontWeight: 700, marginBottom: 'var(--space-1)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Costs</div>
                   <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                     <tbody>
@@ -202,7 +212,7 @@ function DealRow({ entry, onAction }: { entry: PipelineEntry; onAction: (id: str
               )}
 
               {/* Actions + Notes */}
-              <div style={{ flex: 1, minWidth: 160 }}>
+              <div style={{ minWidth: 0 }}>
                 <div style={{ fontWeight: 700, marginBottom: 'var(--space-1)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Details</div>
                 {hasUrl && (
                   <a
@@ -246,6 +256,7 @@ function DealRow({ entry, onAction }: { entry: PipelineEntry; onAction: (id: str
                       e.stopPropagation();
                       const needsInput = ['schedule_inspection', 'make_offer', 'accept_deal'].includes(act.action);
                       if (needsInput) {
+                        setInputError(null);
                         setOpen(true);
                         setInlineInput({ action: act.action, value: '' });
                       } else {
@@ -258,22 +269,28 @@ function DealRow({ entry, onAction }: { entry: PipelineEntry; onAction: (id: str
                 )}
                 {inlineInput && (
                   <div style={{ marginTop: 'var(--space-3)' }} onClick={e => e.stopPropagation()}>
-                    <div style={{ marginBottom: 4, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.3px', fontSize: '11px' }}>
+                    <label htmlFor={inputId} style={{ display: 'block', marginBottom: 4, fontWeight: 700, fontSize: 'var(--text-callout)' }}>
                       {inlineInput.action === 'schedule_inspection' ? 'Shop Name' : inlineInput.action === 'make_offer' ? 'Offer Amount ($)' : 'Purchase Price ($)'}
-                    </div>
-                    <div style={{ display: 'flex', gap: 'var(--space-1)' }}>
+                    </label>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-1)' }}>
                       <input
-                        type={inlineInput.action === 'schedule_inspection' ? 'text' : 'number'}
+                        id={inputId}
+                        type="text"
+                        inputMode={inlineInput.action === 'schedule_inspection' ? 'text' : 'decimal'}
+                        disabled={submitting}
+                        aria-invalid={!!inputError}
+                        aria-describedby={inputError ? `${inputId}-error` : undefined}
                         value={inlineInput.value}
                         placeholder={inlineInput.action === 'schedule_inspection' ? 'Shop name...' : '0'}
-                        onChange={e => setInlineInput({ ...inlineInput, value: e.target.value })}
-                        onKeyDown={e => { if (e.key === 'Enter') submitInlineInput(); if (e.key === 'Escape') setInlineInput(null); }}
+                        onChange={e => { setInputError(null); setInlineInput({ ...inlineInput, value: e.target.value }); }}
+                        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); void submitInlineInput(); } if (e.key === 'Escape' && !inFlight.current) setInlineInput(null); }}
                         autoFocus
-                        style={{ flex: 1, padding: '4px 8px', fontFamily: "'Courier New', monospace", border: '1px solid var(--border-dark)', background: 'var(--surface)', color: 'var(--text)', fontSize: '11px' }}
+                        style={{ flex: '1 0 100%', width: '100%', minWidth: 0, minHeight: 'var(--control-height)', padding: '4px 8px', fontFamily: 'var(--font-family)', border: '1px solid var(--border-dark)', background: 'var(--surface)', color: 'var(--text)', fontSize: '16px' }}
                       />
-                      <button className="button button-primary" style={{ fontSize: '11px', padding: '2px 8px' }} onClick={submitInlineInput}>✓</button>
-                      <button className="button" style={{ fontSize: '11px', padding: '2px 8px' }} onClick={() => setInlineInput(null)}>✕</button>
+                      <button type="button" className="button button-primary" disabled={submitting} onClick={() => void submitInlineInput()}>{submitting ? 'Saving…' : 'Confirm'}</button>
+                      <button type="button" className="button" disabled={submitting} onClick={() => setInlineInput(null)}>Cancel</button>
                     </div>
+                    {inputError && <p id={`${inputId}-error`} role="alert" style={{ color: 'var(--error-dark)' }}>{inputError}</p>}
                   </div>
                 )}
               </div>
@@ -318,8 +335,10 @@ export default function AcquisitionPipeline() {
         params.contact_notes = 'Initial contact from pipeline';
       }
       await advanceStage(id, action, params);
+      return true;
     } catch (err) {
       setActionError(err instanceof Error ? err.message : String(err));
+      return false;
     }
   };
 
@@ -386,10 +405,11 @@ export default function AcquisitionPipeline() {
 
       {loading && <div style={{ padding: 'var(--space-4)', color: 'var(--text-muted)' }}>Loading...</div>}
       {error && <div style={{ padding: 'var(--space-3)', border: '1px solid var(--border-dark)', background: 'var(--grey-200)', marginBottom: 'var(--space-2)' }}>Error: {error}</div>}
-      {actionError && <div style={{ padding: 'var(--space-3)', border: '1px solid var(--border-dark)', background: 'var(--grey-200)', marginBottom: 'var(--space-2)' }}>{actionError}</div>}
+      {actionError && <div role="alert" style={{ padding: 'var(--space-3)', border: '1px solid var(--border-dark)', background: 'var(--grey-200)', marginBottom: 'var(--space-2)' }}>{actionError}</div>}
 
       {/* Table */}
       {!loading && (
+        <div role="region" aria-label="Acquisition records" tabIndex={0} style={{ overflowX: 'auto' }}>
         <table className="table" style={{ width: '100%' }}>
           <thead>
             <tr>
@@ -417,6 +437,7 @@ export default function AcquisitionPipeline() {
             )}
           </tbody>
         </table>
+        </div>
       )}
     </div>
   );

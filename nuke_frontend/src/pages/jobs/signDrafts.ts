@@ -468,6 +468,26 @@ export function confirmBookingArgs(item: JsonObject): Built<{ p_reservation_id: 
   return { ok: true, args: { p_reservation_id: id, p_hash: hash } };
 }
 
+/** Confirm only the work day named by this queue item's offered action; never turn it into a reversal. */
+export function confirmWorkDayArgs(item: JsonObject): Built<{ p_session_id: string; p_confirm: true }> {
+  const sign = obj(item.sign), hint = obj(sign?.args_hint);
+  const id = str(hint?.p_session_id);
+  if (item.kind !== 'work_session' || str(sign?.rpc) !== 'confirm_work_session' || !id || id !== str(item.ref_id) || hint?.p_confirm !== true) {
+    return fail('This work day cannot be confirmed from this queue item. Refresh the page and review it again.');
+  }
+  return { ok: true, args: { p_session_id: id, p_confirm: true } };
+}
+
+/** This existing writer reports refusals in JSON, even when the HTTP request succeeds. */
+export function workDayConfirmationFailure(data: unknown, sessionId: string): string | null {
+  const result = obj(data);
+  if (result?.ok === false && result.error === 'not_authorized') return 'Only the account that recorded this work day can confirm it.';
+  if (result?.ok !== true || result.confirmed !== true || result.session_id !== sessionId) {
+    return 'Nuke did not return a confirmation for this work day. Refresh the queue before trying again.';
+  }
+  return null;
+}
+
 // MARK: - Inspection findings, inspection access, job evidence
 
 export const VERDICTS: Array<{ key: string; title: string }> = [

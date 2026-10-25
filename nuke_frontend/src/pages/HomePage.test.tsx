@@ -7,12 +7,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('../hooks/useAuth', () => ({ useAuth: () => ({ user: null, loading: false }) }));
 vi.mock('../hooks/useVehiclesDashboard', () => ({ useVehiclesDashboard: () => ({}) }));
 vi.mock('../components/onboarding/OnboardingSlideshow', () => ({ OnboardingSlideshow: () => null }));
-vi.mock('./market/MarketInventory', () => ({ default: () => <div role="region" aria-label="Market screen" /> }));
-vi.mock('./market/SourcesBoard', () => ({ default: () => null }));
+vi.mock('./market/MarketInventory', () => ({ default: () => {
+  if (fixture.pendingPanel === 'market') throw fixture.pending;
+  return <div role="region" aria-label="Market screen" />;
+} }));
+vi.mock('./market/SourcesBoard', () => ({ default: () => {
+  if (fixture.pendingPanel === 'sources') throw fixture.pending;
+  return <div data-testid="sources-screen" />;
+} }));
 vi.mock('../feed/components/FeedPage', () => ({ default: () => <div role="region" aria-label="Feed screen" /> }));
 vi.mock('../components/garage/GarageTab', () => ({ default: () => <div role="region" aria-label="Garage screen" /> }));
 vi.mock('./intake/IntakePage', () => ({ default: () => null }));
-const fixture = vi.hoisted(() => ({ client: {} as any }));
+const fixture = vi.hoisted(() => ({ client: {} as any, pendingPanel: null as 'sources' | 'market' | null, pending: new Promise<never>(() => {}) }));
 vi.mock('../lib/supabase', () => ({ supabase: fixture.client }));
 
 import HomePage, { TreemapHomePage } from './HomePage';
@@ -20,6 +26,7 @@ import { clearFamilySalesReads } from './market/FamilySalesChart';
 let root: Root, container: HTMLDivElement;
 
 beforeEach(() => {
+  fixture.pendingPanel = null;
   for (const key of Object.keys(fixture.client)) delete fixture.client[key];
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
   // Node 25 exposes a native storage placeholder to Vitest's worker. Supply
@@ -59,12 +66,15 @@ describe('public market navigation', () => {
     await render();
     await navigate('/?tab=feed&make=Porsche');
     expect(screen()).toBe('Feed screen');
+    expect(document.title).toBe('Feed | Nuke');
     expect(container.querySelector('a[aria-current="page"]')?.textContent).toBe('Feed');
     await navigate('/?tab=garage');
     expect(screen()).toBe('Garage screen');
+    expect(document.title).toBe('Garage | Nuke');
     await navigate('/?tab=market&make=Porsche');
     expect(screen()).toBe('Market screen');
     expect(container.querySelectorAll('[role="region"]')).toHaveLength(1);
+    expect(document.title).toBe('Market | Nuke');
   });
   it('uses real links on mobile and defaults an unsupported tab to the market', async () => {
     await navigate('/?tab=invalid');
@@ -358,4 +368,24 @@ it('keeps map amounts and benchmark together until the requested period succeeds
   await act(async () => finishDay({ data: answer(true), error: null }));
   expect(container.querySelector('.map-legend')?.textContent).toContain('10 → 20');
   expect(container.querySelector('.map-movers2__rel-window')?.textContent).toBe('LAST 24H VS PRIOR 24H');
+});
+
+describe('independent market loading', () => {
+  it.each([
+    ['sources', 'Loading sources', '[aria-label="Market screen"]'],
+    ['market', 'Loading live auctions', '[data-testid="sources-screen"]'],
+  ] as const)('keeps the map and sibling visible while %s is loading', async (panel, label, sibling) => {
+    installTreemapReads();
+    fixture.pendingPanel = panel;
+    await render();
+    expect(container.querySelector('button.market-tile[aria-label="Porsche"]')).not.toBeNull();
+    expect(container.querySelector(sibling)).not.toBeNull();
+    expect(container.querySelector(`[role="status"][aria-label="${label}"]`)).not.toBeNull();
+    expect(container.querySelector('[aria-label="Loading view"]')).toBeNull();
+    fixture.pendingPanel = null;
+    await render();
+    expect(container.querySelector(`[role="status"][aria-label="${label}"]`)).toBeNull();
+    expect(container.querySelector('[aria-label="Market screen"]')).not.toBeNull();
+    expect(container.querySelector('[data-testid="sources-screen"]')).not.toBeNull();
+  });
 });

@@ -31,6 +31,7 @@
 .accounting-number { text-align:right; font-family:var(--font-mono); white-space:nowrap; }
 .accounting-page .accounting-advanced { color:var(--text-secondary); }
 .accounting-page input { max-width:100%; }
+.accounting-page input:not([type="checkbox"]):not([type="radio"]) { min-height:var(--control-height,44px); box-sizing:border-box; }
 @media(max-width:600px) {
  .accounting-page .accounting-header { align-items:flex-start; flex-direction:column; }
  .accounting-page summary span { display:block; margin:4px 0 0 18px; }
@@ -109,7 +110,7 @@
 .accounting-page .accounting-activity summary { font-size:12px; padding:2px 0; }
 .accounting-page .accounting-activity details[open]>summary { margin-bottom:6px; }
 .accounting-activity-list { list-style:none; padding:0; margin:0; max-height:320px; overflow:auto; border-top:1px solid var(--border); }
-.accounting-page .accounting-activity-list button { display:flex; flex-wrap:wrap; align-items:baseline; gap:6px; width:100%; min-height:0; padding:8px 0; border:0; border-bottom:1px solid var(--border); background:none; text-align:left; font:13px var(--font-family); }
+.accounting-page .accounting-activity-list button { display:flex; flex-wrap:wrap; align-items:baseline; gap:6px; width:100%; min-height:var(--control-height,44px); padding:8px 0; border:0; border-bottom:1px solid var(--border); background:none; text-align:left; font:13px var(--font-family); }
 .accounting-new { display:inline-block; padding:1px 6px; font:600 12px var(--font-family); letter-spacing:.08em; text-transform:uppercase; background:var(--text); color:var(--bg); }
 .accounting-use-editor { padding:16px 0; border-bottom:1px solid var(--border); }
 .accounting-page .accounting-use-editor h3 { font-size:18px; }
@@ -126,7 +127,7 @@
  .accounting-page .accounting-records-table thead th { border:0; padding:0 0 8px; }
  .accounting-page .accounting-records-table thead th.accounting-cell-desc,.accounting-page .accounting-records-table th.accounting-cell-use,.accounting-page .accounting-records-table th.accounting-cell-evidence,
  .accounting-page .accounting-records-table tbody td.accounting-cell-use,.accounting-page .accounting-records-table tbody td.accounting-cell-evidence { display:none; }
- .accounting-page .accounting-records-table th .accounting-sort { border:1px solid var(--border); padding:6px 10px; min-height:32px; }
+ .accounting-page .accounting-records-table th .accounting-sort { border:1px solid var(--border); padding:6px 10px; min-height:var(--control-height,44px); }
  .accounting-page .accounting-records-table th[aria-sort] .accounting-sort { background:var(--text); color:var(--bg); }
  .accounting-records-table tbody tr { display:grid; grid-template-columns:1fr auto; grid-template-areas:"date amount" "desc desc" "class account"; column-gap:12px; row-gap:3px; padding:12px 0; border-bottom:1px solid var(--border); }
  .accounting-records-table.accounting-selecting tbody tr { grid-template-columns:auto 1fr auto; grid-template-areas:"select date amount" "select desc desc" "select class account"; }
@@ -156,7 +157,7 @@
 .accounting-page .accounting-office-nav button { flex:1; white-space:nowrap; border:0; background:transparent; color:var(--text-secondary); }
 .accounting-page .accounting-office-nav button[aria-current="page"] { background:var(--accent-dim); color:var(--accent); }
 .accounting-page .accounting-tabs { display:inline-flex; padding:4px; background:var(--surface-hover); border-radius:var(--radius,12px); margin:16px 0 20px; }
-.accounting-page .accounting-tabs button { border:0; background:transparent; min-height:38px; }
+.accounting-page .accounting-tabs button { border:0; background:transparent; min-height:var(--control-height,44px); }
 .accounting-page .accounting-tabs button[aria-current="page"],.accounting-page .accounting-tabs button[aria-current="page"]:hover { background:var(--surface); color:var(--text); box-shadow:0 1px 4px rgb(0 0 0 / 8%); }
 .accounting-page .accounting-years { margin:0 0 12px; }
 .accounting-page .accounting-year { border:1px solid var(--border); border-radius:var(--radius-lg,18px); background:var(--surface); padding:24px; }
@@ -183,7 +184,7 @@
 .accounting-page .accounting-table-wrap table { margin:0; }
 .accounting-page th { font-size:12px; text-transform:none; letter-spacing:0; padding:14px 12px; }
 .accounting-page td { font-size:14px; padding:14px 12px; }
-.accounting-page .accounting-record-open { display:block; width:100%; text-align:left; padding:0; min-height:32px; border:0; background:transparent; color:var(--accent); }
+.accounting-page .accounting-record-open { display:block; width:100%; text-align:left; padding:0; min-height:var(--control-height,44px); border:0; background:transparent; color:var(--accent); }
 .accounting-page .accounting-record-description { max-width:46ch; }
 .accounting-page .accounting-evidence-dialog { width:min(880px,calc(100vw - 32px)); padding:28px; border:1px solid var(--border); border-radius:24px; background:var(--bg); box-shadow:var(--shadow-lg); }
 .accounting-dialog-heading h2 { font-size:22px; }
