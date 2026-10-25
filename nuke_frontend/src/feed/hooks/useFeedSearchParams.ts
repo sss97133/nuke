@@ -70,6 +70,15 @@ export interface FeedSearchParamsResult {
 // Hook
 // ---------------------------------------------------------------------------
 
+/** Feed state shares the home URL with its tab. Keep the caller's view when
+ * replacing filters, including a reset back to default filter values. */
+function paramsInCurrentView(state: FeedUrlState, current: URLSearchParams): URLSearchParams {
+  const next = serializeToUrl(state);
+  const tab = current.get('tab');
+  if (tab) next.set('tab', tab);
+  return next;
+}
+
 export function useFeedSearchParams(): FeedSearchParamsResult {
   const [searchParams, setSearchParams] = useSearchParams();
   const hydratedRef = useRef(false);
@@ -97,7 +106,7 @@ export function useFeedSearchParams(): FeedSearchParamsResult {
           imageFit: 'auto',
         };
 
-        const newParams = serializeToUrl(state);
+        const newParams = paramsInCurrentView(state, searchParams);
         if (newParams.toString()) {
           setSearchParams(newParams, { replace: true });
         }
@@ -153,7 +162,7 @@ export function useFeedSearchParams(): FeedSearchParamsResult {
     (newState: FeedUrlState, debounceMs?: number) => {
       const update = () => {
         if (urlStatesEqual(currentState, newState)) return;
-        setSearchParams(serializeToUrl(newState), { replace: true });
+        setSearchParams(paramsInCurrentView(newState, searchParams), { replace: true });
       };
 
       if (debounceMs && debounceMs > 0) {
@@ -163,7 +172,7 @@ export function useFeedSearchParams(): FeedSearchParamsResult {
         update();
       }
     },
-    [currentState, setSearchParams],
+    [currentState, searchParams, setSearchParams],
   );
 
   // --- Mutation helpers ---

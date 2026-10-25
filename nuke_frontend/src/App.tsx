@@ -14,6 +14,7 @@ import GlobalUploadStatus from './components/GlobalUploadStatus';
 import { SpeedInsights } from '@vercel/speed-insights/react';
 import { Toaster } from 'react-hot-toast';
 import AppLayout from './components/layout/AppLayout';
+import LoadingSkeleton from './components/common/LoadingSkeleton';
 import { DomainRoutes } from './routes/DomainRoutes';
 import ErrorBoundary from './components/ErrorBoundary';
 import { AuthErrorBoundary } from './components/auth/AuthErrorBoundary';
@@ -33,7 +34,7 @@ const queryClient = new QueryClient({
   },
 });
 
-const LazyFallback = <div style={{ height: '100vh', background: 'var(--bg)' }} />;
+const LazyFallback = <div className="p-6"><LoadingSkeleton variant="card-list" count={6} ariaLabel="Loading page" /></div>;
 
 /**
  * Home route gate — HomePage (in AppLayout) for everyone. Its first tab is the
