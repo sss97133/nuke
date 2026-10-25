@@ -1,5 +1,5 @@
 /* Job loop pages: layout only. Type comes from the kit roles (src/kit/kit.css); colors from
-   unified-design-system.css. Zero radius, zero shadow, 2px frames, 1px rules. */
+   unified-design-system.css. Shared native controls, grouped surfaces and readable sheets. */
 
 .jb-page { max-width: 980px; margin: 0 auto; padding: 0 12px 24px; }
 .jb-page > .k-section { padding-left: 0; padding-right: 0; }
@@ -12,7 +12,7 @@
 .jb-scope .k-section .k-section { padding-left: 0; padding-right: 0; }
 
 .jb-list { list-style: none; margin: 0; padding: 0; }
-.jb-row { display: grid; gap: 3px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.jb-row { display: grid; gap: 8px; padding: 16px 0; border-bottom: 1px solid var(--border); }
 .jb-row:last-child { border-bottom: 0; }
 .jb-row__head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
 .jb-row a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
@@ -31,13 +31,13 @@
 .jb-ol { margin: 0; padding-left: 20px; display: grid; gap: 3px; }
 
 .jb-sheet-backdrop { position: fixed; inset: 0; z-index: 11000; background: rgba(0, 0, 0, 0.6); display: flex; align-items: center; justify-content: center; padding: 16px; }
-.jb-sheet { width: 100%; max-width: 560px; max-height: 90vh; overflow: auto; background: var(--surface); border: 2px solid var(--text); color: var(--text); }
-.jb-sheet__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 12px; border-bottom: 2px solid var(--border); }
-.jb-sheet__body { display: grid; gap: 10px; padding: 10px 12px 12px; }
+.jb-sheet { width: 100%; max-width: 560px; max-height: calc(100dvh - 32px); overflow: auto; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); color: var(--text); }
+.jb-sheet__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 16px; border-bottom: 1px solid var(--border); }
+.jb-sheet__body { display: grid; gap: 16px; padding: 16px; }
 .jb-field { display: grid; gap: 3px; }
 .jb-field--row { display: flex; gap: 8px; align-items: end; flex-wrap: wrap; }
-.jb-input { box-sizing: border-box; width: 100%; padding: 4px 6px; border: 2px solid var(--border); border-radius: 0; background: var(--bg); color: var(--text); }
-.jb-input:focus { outline: 2px solid var(--text); outline-offset: 0; }
+.jb-input { box-sizing: border-box; width: 100%; padding: 10px 12px; min-height: var(--control-height); border: 1px solid var(--border); border-radius: var(--radius); font-size: var(--text-body); background: var(--bg); color: var(--text); }
+.jb-input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 textarea.jb-input { resize: vertical; min-height: 96px; }
 .jb-input--short { width: 72px; }
 .jb-choice { display: flex; gap: 12px; flex-wrap: wrap; }
@@ -60,5 +60,10 @@ textarea.jb-input { resize: vertical; min-height: 96px; }
 
 /* Live regions stay mounted so announcements fire; while empty they take no space in grid layouts. */
 .jb-live:empty { position: absolute; }
-/* .btn-primary inverts on hover; the kit label must follow or it drops to ~2.6:1 against --text. */
-.btn-primary:hover:not(:disabled) > .k-label { color: var(--surface); }
+.jb-sheet .btn-base { min-height: var(--control-height); min-width: var(--control-height); }
+
+@media (max-width: 600px) {
+  .jb-input { font-size: 16px; }
+  .jb-sheet-backdrop { align-items: flex-end; padding: 12px; }
+  .jb-sheet { max-height: calc(100dvh - 24px); }
+}

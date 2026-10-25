@@ -46,8 +46,8 @@ export interface FeedSearchParamsResult {
   /** Whether any non-default filters are active */
   hasActiveFilters: boolean;
 
-  /** Replace the full filter state */
-  setFilters: (filters: FilterState) => void;
+  /** Replace filters, optionally applying a preset sort in the same URL update. */
+  setFilters: (filters: FilterState, sortBy?: SortBy) => void;
   /** Merge partial filter changes */
   updateFilters: (partial: Partial<FilterState>) => void;
   /** Set sort field (resets to desc for most fields) */
@@ -70,7 +70,19 @@ export interface FeedSearchParamsResult {
 // Hook
 // ---------------------------------------------------------------------------
 
-export function useFeedSearchParams(): FeedSearchParamsResult {
+/** Feed state shares the home URL with its tab. Keep the caller's view when
+ * replacing filters, including a reset back to default filter values. */
+function paramsInCurrentView(state: FeedUrlState, current: URLSearchParams, defaultCardsPerRow: number): URLSearchParams {
+  const next = serializeToUrl(state);
+  const tab = current.get('tab');
+  if (tab) next.set('tab', tab);
+  // A chosen desktop-default 3 must remain explicit when a phone defaults to 2.
+  // Keep previous explicit choices shareable across viewport changes as well.
+  if (state.cardsPerRow !== defaultCardsPerRow || current.has('cols')) next.set('cols', String(state.cardsPerRow));
+  return next;
+}
+
+export function useFeedSearchParams(defaultCardsPerRow = 3): FeedSearchParamsResult {
   const [searchParams, setSearchParams] = useSearchParams();
   const hydratedRef = useRef(false);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -93,11 +105,11 @@ export function useFeedSearchParams(): FeedSearchParamsResult {
           sortDirection: legacySortDir,
           searchText: legacySearch,
           viewMode: 'grid',
-          cardsPerRow: 3,
+          cardsPerRow: defaultCardsPerRow,
           imageFit: 'auto',
         };
 
-        const newParams = serializeToUrl(state);
+        const newParams = paramsInCurrentView(state, searchParams, defaultCardsPerRow);
         if (newParams.toString()) {
           setSearchParams(newParams, { replace: true });
         }
@@ -107,8 +119,8 @@ export function useFeedSearchParams(): FeedSearchParamsResult {
 
   // --- Derive current state from URL ---
   const currentState = useMemo(
-    () => deserializeFromUrl(searchParams),
-    [searchParams],
+    () => deserializeFromUrl(searchParams, defaultCardsPerRow),
+    [searchParams, defaultCardsPerRow],
   );
 
   const { filters, sortBy, sortDirection, searchText, viewMode, cardsPerRow, imageFit } = currentState;
@@ -150,27 +162,27 @@ export function useFeedSearchParams(): FeedSearchParamsResult {
 
   // --- Push state to URL ---
   const pushState = useCallback(
-    (newState: FeedUrlState, debounceMs?: number) => {
-      const update = () => {
-        if (urlStatesEqual(currentState, newState)) return;
-        setSearchParams(serializeToUrl(newState), { replace: true });
-      };
-
-      if (debounceMs && debounceMs > 0) {
-        if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
-        debounceTimerRef.current = setTimeout(update, debounceMs);
-      } else {
-        update();
-      }
+    (newState: FeedUrlState) => {
+      if (urlStatesEqual(currentState, newState)) return;
+      setSearchParams(paramsInCurrentView(newState, searchParams, defaultCardsPerRow), { replace: true });
     },
-    [currentState, setSearchParams],
+    [currentState, searchParams, setSearchParams, defaultCardsPerRow],
   );
+
+  // A pending search owns only its text. Read the latest committed selections
+  // when it fires, instead of restoring the full URL snapshot from keystroke time.
+  const latestMutationRef = useRef({ currentState, pushState });
+  useEffect(() => {
+    latestMutationRef.current = { currentState, pushState };
+  }, [currentState, pushState]);
 
   // --- Mutation helpers ---
 
   const setFilters = useCallback(
-    (newFilters: FilterState) => {
-      pushState({ ...currentState, filters: newFilters });
+    (newFilters: FilterState, sortBy?: SortBy) => {
+      pushState({ ...currentState, filters: newFilters,
+        ...(sortBy ? { sortBy, sortDirection: sortBy === 'make' || sortBy === 'model' ? 'asc' : 'desc' } : {}),
+      });
     },
     [currentState, pushState],
   );
@@ -199,13 +211,14 @@ export function useFeedSearchParams(): FeedSearchParamsResult {
     [currentState, pushState],
   );
 
-  const setSearchText = useCallback(
-    (text: string) => {
-      // Debounce text input to avoid URL thrashing
-      pushState({ ...currentState, searchText: text }, 150);
-    },
-    [currentState, pushState],
-  );
+  const setSearchText = useCallback((text: string) => {
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    debounceTimerRef.current = setTimeout(() => {
+      debounceTimerRef.current = null;
+      const latest = latestMutationRef.current;
+      latest.pushState({ ...latest.currentState, searchText: text });
+    }, 150);
+  }, []);
 
   const setViewMode = useCallback(
     (mode: ViewMode) => {
@@ -232,21 +245,24 @@ export function useFeedSearchParams(): FeedSearchParamsResult {
   );
 
   const resetAll = useCallback(() => {
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    debounceTimerRef.current = null;
     pushState({
       filters: DEFAULT_FILTERS,
       sortBy: 'newest',
       sortDirection: 'desc',
       searchText: '',
       viewMode: 'grid',
-      cardsPerRow: 3,
+      cardsPerRow: defaultCardsPerRow,
       imageFit: 'auto',
     });
-  }, [pushState]);
+  }, [pushState, defaultCardsPerRow]);
 
   // --- Cleanup debounce on unmount ---
   useEffect(() => {
     return () => {
       if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
     };
   }, []);
 

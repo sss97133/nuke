@@ -2,7 +2,7 @@
  * HeroNewestPanel -- Live intake pulse of the collector car market.
  *
  * Shows what's pouring through the spout RIGHT NOW:
- * - Top line: "+32,386 TODAY" in big Courier New
+ * - Top line: intake count over the last 24 hours
  * - Source flow bars: horizontal proportional bars (BAT +3,091 | FB +2,118 etc)
  * - Make heatmap: mini treemap of top 10 arriving makes
  * - Price bracket bars: distribution by price
@@ -17,13 +17,12 @@ import { supabase } from '../../../lib/supabase';
 import type { HeroFilter } from '../HeroPanel';
 
 // ---------------------------------------------------------------------------
-// Types (match hero_newest() jsonb output)
+// Display types; the RPC boundary below maps its cnt/make_ingest fields.
 // ---------------------------------------------------------------------------
 
 interface SourceFlowItem {
   source: string;
   count: number;
-  count_1h: number;
 }
 
 interface MakeHeatmapItem {
@@ -37,11 +36,47 @@ interface PriceBracketItem {
 }
 
 interface NewestData {
-  total_24h: number;
-  total_1h: number;
+  total_24h: number | null;
+  total_1h: number | null;
   source_flow: SourceFlowItem[];
   make_heatmap: MakeHeatmapItem[];
   price_brackets: PriceBracketItem[];
+}
+
+// Counts must come from the reader. Missing totals remain unknown; malformed
+// breakdowns fail locally rather than taking down the entire feed or inventing 0.
+function parseNewestData(value: unknown): NewestData {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('Invalid intake response');
+  }
+  const raw = value as Record<string, unknown>;
+  const count = (value: unknown): number | null =>
+    typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : null;
+  const rows = (key: string, label: string) => {
+    const items = raw[key];
+    // jsonb_agg returns null when its cohort is empty.
+    if (items === null) return [];
+    if (!Array.isArray(items)) throw new Error(`Invalid intake ${key}`);
+    return items.map((item: unknown) => {
+      if (!item || typeof item !== 'object' || Array.isArray(item)) {
+        throw new Error(`Invalid intake ${key} row`);
+      }
+      const row = item as Record<string, unknown>;
+      const name = row[label];
+      const total = count(row.cnt);
+      if (typeof name !== 'string' || !name.trim() || total === null) {
+        throw new Error(`Invalid intake ${key} count or label`);
+      }
+      return { name, count: total };
+    });
+  };
+  return {
+    total_24h: count(raw.total_24h),
+    total_1h: count(raw.total_1h),
+    source_flow: rows('source_flow', 'source').map(({ name, count }) => ({ source: name, count })),
+    make_heatmap: rows('make_ingest', 'make').map(({ name, count }) => ({ make: name, count })),
+    price_brackets: rows('price_brackets', 'bracket').map(({ name, count }) => ({ bracket: name, count })),
+  };
 }
 
 // Source display names
@@ -93,7 +128,7 @@ function fmtNum(n: number): string {
 
 // Price bracket to filter mapping
 const BRACKET_FILTERS: Record<string, { priceMin?: number; priceMax?: number }> = {
-  'Under $5K': { priceMax: 5_000 },
+  'UNDER $5K': { priceMax: 5_000 },
   '$5-10K': { priceMin: 5_000, priceMax: 10_000 },
   '$10-25K': { priceMin: 10_000, priceMax: 25_000 },
   '$25-50K': { priceMin: 25_000, priceMax: 50_000 },
@@ -371,8 +406,8 @@ function PriceBracketBars({
               count={b.count}
               widthPct={pct}
               onClick={() => {
-                const f = BRACKET_FILTERS[b.bracket] ?? {};
-                onFilter({ ...f, sort: 'price_low' as any });
+                const f = BRACKET_FILTERS[b.bracket.toUpperCase()];
+                if (f) onFilter({ ...f, sort: 'price_low' });
               }}
             />
           );
@@ -462,12 +497,12 @@ export interface HeroNewestPanelProps {
 }
 
 export function HeroNewestPanel({ onFilter }: HeroNewestPanelProps) {
-  const { data, isLoading } = useQuery<NewestData>({
+  const { data, isLoading, isFetching, isError, refetch } = useQuery<NewestData>({
     queryKey: ['hero_newest'],
     queryFn: async () => {
       const { data: result, error } = await supabase.rpc('hero_newest');
       if (error) throw new Error(`hero_newest RPC error: ${error.message}`);
-      return result as unknown as NewestData;
+      return parseNewestData(result);
     },
     staleTime: 5 * 60_000,
     gcTime: 10 * 60_000,
@@ -486,9 +521,17 @@ export function HeroNewestPanel({ onFilter }: HeroNewestPanelProps) {
     });
     observer.observe(middleRef.current);
     return () => observer.disconnect();
-  }, []);
+  }, [data, isLoading]);
 
-  if (isLoading || !data) return <LoadingSkeleton />;
+  if (isLoading) return <LoadingSkeleton />;
+  if (isError || !data) return (
+    <div role="status" style={{ padding: 'var(--space-4)' }}>
+      <p className="k-body">Intake summary is unavailable. You can still browse the feed.</p>
+      <button type="button" className="btn-base btn-secondary" disabled={isFetching} onClick={() => void refetch()}>
+        {isFetching ? 'Trying again…' : 'Try again'}
+      </button>
+    </div>
+  );
 
   const sources = data.source_flow ?? [];
   const makes = data.make_heatmap ?? [];
@@ -502,14 +545,14 @@ export function HeroNewestPanel({ onFilter }: HeroNewestPanelProps) {
           fontFamily: "'Courier New', monospace", fontSize: '18px', fontWeight: 700,
           color: 'var(--text)', letterSpacing: '-0.5px',
         }}>
-          +{fmtNum(data.total_24h)} TODAY
+          {data.total_24h === null ? '24-hour total unavailable' : `+${fmtNum(data.total_24h)} LAST 24 HOURS`}
         </span>
-        {data.total_1h > 0 && (
+        {data.total_1h !== null && data.total_1h > 0 && (
           <span style={{
             fontFamily: "'Courier New', monospace", fontSize: '13px', fontWeight: 700,
             color: 'var(--text-secondary)',
           }}>
-            +{fmtNum(data.total_1h)} THIS HOUR
+            +{fmtNum(data.total_1h)} LAST HOUR
           </span>
         )}
         <div style={{ flex: 1 }} />

@@ -305,6 +305,7 @@ describe('WorkPage', () => {
   };
 
   it('lists signature items with the server words and job links, and payments only on the payee item', async () => {
+    fixture.session = { user: { id: CUSTOMER_UID } };
     fixture.rpc.mockImplementation(async (fn: string) => ({ data: fn === 'my_signature_queue' ? queue : jobs, error: null }));
     await render(<WorkPage />);
     const text = container.textContent ?? '';
