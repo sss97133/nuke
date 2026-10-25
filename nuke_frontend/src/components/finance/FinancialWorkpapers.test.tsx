@@ -79,11 +79,11 @@ it('invalid duplicate controls withhold subtotals', async () => {
   await act(async () => root.render(<FinancialWorkpapers revision={0} onOpen={() => {}} />));
   expect(container.textContent).toContain('subtotals are withheld'); expect(container.textContent).not.toContain('999.99');
 });
-it('reads records from the server view for the book and year, pages by 25 and opens the retained source document', async () => {
+it('reads records from the server view for the book and year, pages by 100 and opens the retained source document', async () => {
   const open = vi.fn();
   const control = { record_kind: 'retained_ledger_decision', year: '2024', account: 'Account', section: 'Expense', currency: 'USD', retained_amount: '12.50', rows: 1 };
-  fixture.invoke.mockResolvedValue(response({ ...empty(), total_rows: 51, controls: [control] }));
-  fixture.from.mockImplementationOnce(() => table({ data: [record('row1'), ...Array.from({ length: 25 }, (_, i) => record(`row${i + 2}`, `Record ${i + 2}`))] })).mockImplementationOnce(() => table({ data: [record('row2', 'Second page')] }));
+  fixture.invoke.mockResolvedValue(response({ ...empty(), total_rows: 151, controls: [control] }));
+  fixture.from.mockImplementationOnce(() => table({ data: [record('row1'), ...Array.from({ length: 100 }, (_, i) => record(`row${i + 2}`, `Record ${i + 2}`))] })).mockImplementationOnce(() => table({ data: [record('row2', 'Second page')] }));
   await act(async () => root.render(book(<FinancialWorkpapers revision={0} onOpen={open} />)));
   expect(fixture.invoke.mock.calls[0][1].body).toEqual({ mode: 'financial_evidence_v1', action: 'tax_read', limit: 1 });
   expect(fixture.from).not.toHaveBeenCalled();
@@ -91,14 +91,14 @@ it('reads records from the server view for the book and year, pages by 25 and op
   expect(fixture.from).toHaveBeenCalledWith('v_financial_accounting_records');
   expect(filters(queries()[0], 'eq')).toEqual([['owner_id', 'owner'], ['year', '2024']]);
   expect(filters(queries()[0], 'select')).toEqual([['id, document_id, record']]);
-  expect(filters(queries()[0], 'range')).toEqual([[0, 25]]);
+  expect(filters(queries()[0], 'range')).toEqual([[0, 100]]);
   expect(filters(queries()[0], 'order')[0]).toEqual(['record_date', { ascending: false, nullsFirst: false }]);
   expect(filters(queries()[0], 'or')).toEqual([]);
-  expect(container.textContent).toContain('Showing 1–25 records; more available');
+  expect(container.textContent).toContain('Showing 1–100 records; more available');
   await act(async () => Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'View evidence')!.click()); expect(open).toHaveBeenCalledWith('doc', record().record);
-  await act(async () => Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'Next 25')!.click());
-  expect(filters(queries()[1], 'range')).toEqual([[25, 50]]);
-  expect(container.textContent).toContain('Second page'); expect(container.textContent).toContain('Showing 26–26 records');
+  await act(async () => Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'Next 100')!.click());
+  expect(filters(queries()[1], 'range')).toEqual([[100, 200]]);
+  expect(container.textContent).toContain('Second page'); expect(container.textContent).toContain('Showing 101–101 records');
 });
 it('sends filters and the search term to the server instead of filtering a loaded page', async () => {
   const control = { record_kind: 'retained_bank_movement', year: '2025', account: 'AFCU 8288', section: null, currency: 'USD', retained_amount: '1', rows: 3 };
@@ -187,14 +187,14 @@ it('defaults to the latest book year and scopes records and bank attention to th
   expect(filters(queries()[1], 'eq')).toContainEqual(['year', '2024']);
   expect(container.textContent).toContain('No saved records match these filters for 2024');
 });
-it('shows one server page of 25 and withholds partial account sums', async () => {
+it('shows one server page of 100 and withholds partial account sums', async () => {
   fixture.invoke.mockResolvedValue(response({...empty(),total_rows:7767,controls:[{record_kind:'retained_ledger_decision',year:'2024',account:'Account',section:'Expense',currency:'USD',retained_amount:'98765.43',missing_amounts:1,rows:60}]}));
-  fixture.from.mockImplementation(() => table({ data: Array.from({length:26},(_,i)=>record(`r${i}`,`Record ${i}`)) }));
+  fixture.from.mockImplementation(() => table({ data: Array.from({length:101},(_,i)=>record(`r${i}`,`Record ${i}`)) }));
   await act(async () => root.render(book(<FinancialWorkpapers revision={0} onOpen={()=>{}}/>)));
   expect(container.querySelector('table')).toBeNull();
   await act(async () => Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'Records')!.click());
-  expect(container.querySelectorAll('tbody tr')).toHaveLength(25);
-  expect(container.textContent).toContain('Showing 1–25 records; more available');
+  expect(container.querySelectorAll('tbody tr')).toHaveLength(100);
+  expect(container.textContent).toContain('Showing 1–100 records; more available');
   await act(async () => Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'Accounts')!.click());
   expect(container.querySelector('tbody')?.textContent).toContain('Unknown');
   expect(container.textContent).not.toContain('98,765.43');
