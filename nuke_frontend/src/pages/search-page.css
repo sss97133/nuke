@@ -30,3 +30,5 @@
 .search-import-platform { font-weight: 600; margin: 0; }
 .search-import-source { display: inline-flex; align-items: center; min-height: var(--control-height); color: var(--link); }
 .search-import-source:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+
+.search-page .search-results-summary { border-radius: var(--radius-lg); }

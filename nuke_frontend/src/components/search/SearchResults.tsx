@@ -259,9 +259,9 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
     <div className="search-results" style={{ padding: '0' }}>
       {/* Search Summary header — only show if we have results or a summary message */}
       {(results.length > 0 || searchSummary) && (
-        <div style={{
+        <div className="search-results-summary" style={{
           background: 'var(--surface)',
-          border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '10px 14px',
+          border: '1px solid var(--border)', padding: '10px 14px',
           marginBottom: '12px'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
