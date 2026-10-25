@@ -4,16 +4,18 @@
  * Composes existing feed primitives (useFeedQuery, FeedLayout, VehicleCard, etc.)
  * into a market-first browse page. No new edge functions or DB tables.
  *
- * Default sort: deal_score (surfaces best deals first).
+ * Sort follows the URL and the shared feed contract, including Rank versus Deals.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
+import { useCallback, useMemo, useState } from 'react';
+import { PrefetchLink as Link } from '../components/PrefetchLink';
+import { useMarketSegments, type SegmentIndexRow } from '../hooks/useMarketSegments';
+import { usePageTitle } from '../hooks/usePageTitle';
+import './MarketPages.css';
 import { useFeedSearchParams } from '../feed/hooks/useFeedSearchParams';
 import { useFeedQuery } from '../feed/hooks/useFeedQuery';
 import { AuctionClockProvider } from '../feed/components/AuctionClockProvider';
-import { FeedStatsStrip } from '../feed/components/FeedStatsStrip';
+import { MarketResultsBar } from './MarketResultsBar';
 import { FeedToolbar } from '../feed/components/FeedToolbar';
 import { FeedFilterSidebar } from '../feed/components/FeedFilterSidebar';
 import { FeedLayout } from '../feed/components/FeedLayout';
@@ -21,162 +23,20 @@ import { FeedSkeleton } from '../feed/components/FeedSkeleton';
 import { FeedEmptyState } from '../feed/components/FeedEmptyState';
 import { VehicleCard } from '../feed/components/VehicleCard';
 import { BrandHeartbeat } from '../feed/components/heartbeat/BrandHeartbeat';
-import { FeedStatCard } from '../feed/components/FeedStatCard';
 import type { FeedVehicle } from '../feed/types/feed';
 
-/* ------------------------------------------------------------------ */
-/*  Types                                                              */
-/* ------------------------------------------------------------------ */
-
-interface MarketSegment {
-  segment_id: string;
-  slug: string;
-  name: string;
-  vehicle_count: number;
-  market_cap_usd: number | null;
-  change_7d_pct: number | null;
-}
-
-/* ------------------------------------------------------------------ */
-/*  Formatters                                                         */
-/* ------------------------------------------------------------------ */
-
-const fmtLargeUSD = (v: number) => {
-  if (v >= 1_000_000_000) return `$${(v / 1_000_000_000).toFixed(1)}B`;
-  if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(1)}M`;
-  if (v >= 1_000) return `$${(v / 1_000).toFixed(1)}K`;
-  return `$${v.toFixed(0)}`;
-};
-
-const fmtCount = (n: number) => {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(0)}K`;
-  return n.toLocaleString();
-};
-
-const fmtPct = (v: number | null) => {
-  if (v === null || Number.isNaN(v)) return null;
-  return `${v >= 0 ? '+' : ''}${v.toFixed(1)}%`;
-};
-
-/* ------------------------------------------------------------------ */
-/*  MarketSegmentsStrip — horizontal segment cards                     */
-/* ------------------------------------------------------------------ */
-
-function MarketSegmentsStrip({ segments, loading }: { segments: MarketSegment[]; loading: boolean }) {
-  if (loading) {
-    return (
-      <div style={{ display: 'flex', gap: 8, padding: '8px 16px', overflowX: 'auto' }}>
-        {[0, 1, 2, 3].map((i) => (
-          <div
-            key={i}
-            style={{
-              minWidth: 180,
-              height: 64,
-              border: '2px solid var(--border)',
-              padding: '10px 14px',
-              background: 'var(--surface)',
-              animation: 'pulse 1.5s ease-in-out infinite',
-            }}
-          />
-        ))}
-      </div>
-    );
-  }
-
-  if (segments.length === 0) return null;
-
-  return (
-    <div
-      style={{
-        display: 'flex',
-        gap: 8,
-        padding: '8px 16px',
-        overflowX: 'auto',
-        borderBottom: '1px solid var(--border)',
-      }}
-    >
-      {segments.map((seg) => {
-        const pct = fmtPct(seg.change_7d_pct);
-        const isUp = (seg.change_7d_pct ?? 0) > 0;
-        const isDown = (seg.change_7d_pct ?? 0) < 0;
-        return (
-          <Link
-            key={seg.segment_id}
-            to={`/market/segments/${seg.slug}`}
-            style={{
-              textDecoration: 'none',
-              color: 'inherit',
-              minWidth: 180,
-              border: '2px solid var(--border)',
-              padding: '10px 14px',
-              background: 'var(--surface)',
-              textAlign: 'left',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 4,
-              flexShrink: 0,
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-              <span style={{ fontFamily: 'Arial, sans-serif', fontSize: 11, fontWeight: 900 }}>
-                {seg.slug.toUpperCase()}
-              </span>
-              {pct && (
-                <span
-                  style={{
-                    fontFamily: "'Courier New', monospace",
-                    fontSize: 10,
-                    fontWeight: 700,
-                    color: isUp ? 'var(--success)' : isDown ? 'var(--error)' : 'var(--text)',
-                  }}
-                >
-                  {pct}
-                </span>
-              )}
-            </div>
-            <span style={{ fontFamily: 'Arial, sans-serif', fontSize: 9, color: 'var(--text-secondary)' }}>
-              {seg.name}
-            </span>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-              <span style={{ fontFamily: "'Courier New', monospace", fontSize: 10, color: 'var(--text-secondary)' }}>
-                {fmtCount(seg.vehicle_count)} vehicles
-              </span>
-              {seg.market_cap_usd != null && (
-                <span style={{ fontFamily: "'Courier New', monospace", fontSize: 10 }}>
-                  {fmtLargeUSD(seg.market_cap_usd)}
-                </span>
-              )}
-            </div>
-          </Link>
-        );
-      })}
-
-      {/* View All card */}
-      <Link
-        to="/market/segments"
-        style={{
-          textDecoration: 'none',
-          minWidth: 120,
-          border: '2px dashed var(--border)',
-          padding: '10px 14px',
-          background: 'transparent',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          flexShrink: 0,
-          fontFamily: 'Arial, sans-serif',
-          fontSize: 9,
-          fontWeight: 700,
-          textTransform: 'uppercase',
-          letterSpacing: '0.06em',
-          color: 'var(--text-secondary)',
-        }}
-      >
-        VIEW ALL &rarr;
-      </Link>
-    </div>
-  );
+// The current index supplies definitions; its count is a placeholder and its
+// market_cap_usd is fund AUM. Neither establishes measured vehicle coverage.
+function MarketSegmentsStrip({ segments, loading }: { segments: SegmentIndexRow[]; loading: boolean }) {
+  if (loading) return <p className="market-page-note" role="status">Loading segment definitions…</p>;
+  if (!segments.length) return null;
+  return <section className="market-segment-strip" aria-label="Segment definitions">
+    {segments.map(segment => <Link key={segment.segment_id} to={`/market/segments/${segment.slug}`} className="market-segment-preview">
+      <strong>{segment.name}</strong>
+      <span>{segment.description || 'Browse vehicles matching this definition'}</span>
+    </Link>)}
+    <Link className="market-segment-preview market-segment-more" to="/market/segments">All segment definitions →</Link>
+  </section>;
 }
 
 /* ------------------------------------------------------------------ */
@@ -184,6 +44,7 @@ function MarketSegmentsStrip({ segments, loading }: { segments: MarketSegment[];
 /* ------------------------------------------------------------------ */
 
 export default function MarketDashboard() {
+  usePageTitle('Vehicle market');
   const {
     filters,
     sortBy,
@@ -204,32 +65,19 @@ export default function MarketDashboard() {
   } = useFeedSearchParams();
 
   // Local display state
-  const [fontSize, setFontSize] = useState(12);
+  const [fontSize, setFontSize] = useState(14);
   const [filtersCollapsed, setFiltersCollapsed] = useState(() => window.innerWidth < 768);
   const [showScores, setShowScores] = useState(false);
   const [introVisible, setIntroVisible] = useState(() => !localStorage.getItem('nuke_market_intro_dismissed'));
 
-  // Segments (direct supabase query, no edge function)
-  const [segments, setSegments] = useState<MarketSegment[]>([]);
-  const [segmentsLoading, setSegmentsLoading] = useState(true);
+  // Reuse the segment page's existing reader/cache, displaying only the
+  // definition fields that this index actually supports.
+  const segmentQuery = useMarketSegments();
+  const segments = useMemo(() => [...(segmentQuery.data ?? [])].sort((a, b) => a.name.localeCompare(b.name)).slice(0, 8), [segmentQuery.data]);
 
-  useEffect(() => {
-    supabase
-      .from('market_segments_index')
-      .select('segment_id, slug, name, vehicle_count, market_cap_usd, change_7d_pct')
-      .order('market_cap_usd', { ascending: false, nullsFirst: false })
-      .limit(8)
-      .then(({ data }) => {
-        setSegments((data ?? []).filter(s => Number(s.vehicle_count || 0) > 0));
-        setSegmentsLoading(false);
-      });
-  }, []);
-
-  // Feed query — default sort is deal_score for market page
-  const effectiveSortBy = sortBy === 'popular' ? 'deal_score' : sortBy;
   const feedQuery = useFeedQuery({
     filters,
-    sortBy: effectiveSortBy,
+    sortBy,
     sortDirection,
     searchText,
   });
@@ -239,7 +87,6 @@ export default function MarketDashboard() {
     [feedQuery.data],
   );
 
-  const stats = feedQuery.data?.pages[0]?.stats ?? null;
 
   // Card renderer
   const renderCard = useCallback(
@@ -260,19 +107,12 @@ export default function MarketDashboard() {
   const singleMake = filters.makes.length === 1 ? filters.makes[0] : undefined;
   const singleModel = singleMake && filters.models.length === 1 ? filters.models[0] : undefined;
 
-  // Stat card renderer
-  const renderStatCard = useCallback(
-    (index: number) => <FeedStatCard index={index} stats={stats} />,
-    [stats, vehicles.length],
-  );
-
-  // CSS custom property for font size
   const feedStyle = useMemo(
     () =>
       ({
         '--feed-font-size': `${fontSize}px`,
-        '--feed-font-size-sm': `${Math.max(6, fontSize - 2)}px`,
-        '--feed-font-size-xs': `${Math.max(6, fontSize - 3)}px`,
+        '--feed-font-size-sm': `${Math.max(10, fontSize - 2)}px`,
+        '--feed-font-size-xs': `${Math.max(10, fontSize - 3)}px`,
         maxWidth: viewMode === 'technical' ? 'none' : '1600px',
         margin: '0 auto',
         minHeight: '100vh',
@@ -285,13 +125,17 @@ export default function MarketDashboard() {
     <AuctionClockProvider>
       <style>{`@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }`}</style>
 
-      <div className="fullscreen-content" style={feedStyle}>
+      <div className="fullscreen-content market-browse-page" style={feedStyle}>
         {/* Segments strip */}
-        <MarketSegmentsStrip segments={segments} loading={segmentsLoading} />
+        {segmentQuery.error && <div role="alert" className="market-reader-error">
+          <span>Segment definitions could not be refreshed. {segments.length > 0 ? 'Showing previous definitions.' : 'Vehicle browsing is still available below.'}</span>
+          <button className="button" disabled={segmentQuery.isFetching} onClick={() => void segmentQuery.refetch()}>Retry segments</button>
+        </div>}
+        <MarketSegmentsStrip segments={segments} loading={segmentQuery.isLoading} />
 
         {/* First-visit context */}
         {introVisible && (
-          <div style={{
+          <div className="market-intro" style={{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
@@ -299,13 +143,14 @@ export default function MarketDashboard() {
             padding: '6px 16px',
             borderBottom: '1px solid var(--border)',
             background: 'var(--surface)',
-            fontSize: 10,
-            fontFamily: "'Courier New', monospace",
+            fontSize: 'var(--text-callout)',
+            fontFamily: 'var(--font-family)',
             color: 'var(--text-secondary)',
           }}>
-            <span>CAPTURED VEHICLE RECORDS · scope and ordering follow the selected filters</span>
+            <span>Captured vehicle records · scope and ordering follow the selected filters</span>
             <button
               type="button"
+              aria-label="Dismiss market introduction"
               onClick={() => {
                 localStorage.setItem('nuke_market_intro_dismissed', '1');
                 setIntroVisible(false);
@@ -316,7 +161,7 @@ export default function MarketDashboard() {
                 color: 'var(--text-disabled)',
                 cursor: 'pointer',
                 fontSize: 10,
-                fontFamily: 'Arial, sans-serif',
+                fontFamily: 'var(--font-family)',
                 fontWeight: 700,
                 padding: '2px 4px',
                 flexShrink: 0,
@@ -328,8 +173,10 @@ export default function MarketDashboard() {
         )}
 
         {/* Feed stats strip — sticky search + result count */}
-        <FeedStatsStrip
-          stats={stats}
+        <MarketResultsBar
+          count={vehicles.length}
+          unavailable={feedQuery.isError && vehicles.length === 0}
+          hasMore={feedQuery.hasNextPage ?? false}
           isLoading={feedQuery.isLoading}
           searchText={searchText}
           onSearchChange={setSearchText}
@@ -339,7 +186,7 @@ export default function MarketDashboard() {
 
         {/* Toolbar — sort, view mode, density */}
         <FeedToolbar
-          sort={effectiveSortBy}
+          sort={sortBy}
           direction={sortDirection}
           viewMode={viewMode}
           cardsPerRow={cardsPerRow}
@@ -371,9 +218,13 @@ export default function MarketDashboard() {
               <BrandHeartbeat make={singleMake} model={singleModel} />
             )}
 
+            {feedQuery.isError && <div role="alert" className="market-reader-error">
+              <span>Vehicle results could not be refreshed. {vehicles.length > 0 ? 'Showing the last successful results.' : 'No result count is available.'}</span>
+              <button className="button" disabled={feedQuery.isFetching} onClick={() => void (feedQuery.isFetchNextPageError ? feedQuery.fetchNextPage() : feedQuery.refetch())}>Retry vehicles</button>
+            </div>}
             {feedQuery.isLoading ? (
               <FeedSkeleton cardsPerRow={cardsPerRow} rows={4} />
-            ) : vehicles.length === 0 ? (
+            ) : feedQuery.isError && vehicles.length === 0 ? null : vehicles.length === 0 ? (
               <FeedEmptyState hasFilters={hasActiveFilters} onResetFilters={resetAll} />
             ) : (
               <FeedLayout
@@ -381,13 +232,11 @@ export default function MarketDashboard() {
                 viewMode={viewMode}
                 cardsPerRow={cardsPerRow}
                 showScores={showScores}
-                hasNextPage={feedQuery.hasNextPage ?? false}
+                hasNextPage={!feedQuery.isError && (feedQuery.hasNextPage ?? false)}
                 isFetchingNextPage={feedQuery.isFetchingNextPage}
                 fetchNextPage={() => feedQuery.fetchNextPage()}
                 renderCard={renderCard}
-                renderStatCard={renderStatCard}
-                statCardInterval={5}
-                sort={effectiveSortBy}
+                sort={sortBy}
                 sortDirection={sortDirection}
                 onSortChange={setSortBy}
                 onDirectionChange={setSortDirection}
