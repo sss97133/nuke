@@ -64,7 +64,7 @@ export function ContactViaNuke({ contact, signedIn, recipient }: { contact: Json
       }
       setPhase('sent');
     } catch {
-      if (generation.current === attempt) { setFailure('The request could not be completed. Your message is still here.'); setPhase('confirming'); }
+      if (generation.current === attempt) { setFailure('The request could not be confirmed. Check Messages before trying again.'); setPhase('confirming'); }
     } finally {
       if (generation.current === attempt) pending.current = false;
     }

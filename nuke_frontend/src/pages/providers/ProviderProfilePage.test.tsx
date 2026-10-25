@@ -225,7 +225,7 @@ it('removes a contact draft on an actual viewer change without sending it', asyn
 it('surfaces rejected contact sends, preserves the reviewed draft, and requires a confirmed request id', async () => {
   fixture.user = { id: 'u-2' }; fixture.readers.provider_profile_read = publicContact(); await render(); await writeContact();
   fixture.rpc.mockRejectedValueOnce(new Error('offline')); await click('Send request');
-  expect(host.textContent).toContain('The request could not be completed'); expect(host.querySelector('textarea')?.value).toBe('Synthetic request');
+  expect(host.textContent).toContain('The request could not be confirmed. Check Messages before trying again.'); expect(host.querySelector('textarea')?.value).toBe('Synthetic request');
   fixture.rpc.mockResolvedValueOnce({ data: null, error: null }); await click('Send request'); expect(host.textContent).toContain('The request could not be confirmed'); expect(host.textContent).not.toContain('Request sent in Nuke');
   fixture.rpc.mockResolvedValueOnce({ data: { request_id: 'request-1', status: 'pending' }, error: null }); await click('Send request'); expect(host.textContent).toContain('Request sent in Nuke');
   expect(fixture.rpc).toHaveBeenLastCalledWith('request_contact', { p_context_kind: 'profile', p_context_id: 'u-1', p_message: 'Synthetic request', p_recipient_user_id: 'u-1', p_recipient_actor_id: null, p_recipient_organization_id: null });
