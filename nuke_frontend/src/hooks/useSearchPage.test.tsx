@@ -3,14 +3,16 @@ import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 const fixture = vi.hoisted(() => ({ params: new URLSearchParams(), requests: [] as any[], navigate: vi.fn(),
-  respond: null as null | ((request: any) => any), rpcCalls: [] as any[], vin: null as null | ((args: any) => any) }));
+  respond: null as null | ((request: any) => any), rpcCalls: [] as any[], vin: null as null | ((args: any) => any), stats: null as null | ((args: any) => any), byId: null as null | ((id: string) => any) }));
 vi.mock('react-router-dom', () => ({ useSearchParams: () => [fixture.params], useNavigate: () => fixture.navigate }));
 vi.mock('../lib/track', () => ({ track: vi.fn() }));
 vi.mock('../services/aiDataIngestion', () => ({ ingestVehicle: vi.fn() }));
 vi.mock('../lib/supabase', () => ({ supabase: {
+  from: () => { let id = ''; const chain: any = { select: () => chain, eq: (_key: string, value: string) => { id = value; return chain; }, maybeSingle: () => fixture.byId ? fixture.byId(id) : Promise.resolve({data:null,error:null}) }; return chain; },
   rpc: async (name: string, args: any) => {
     fixture.rpcCalls.push([name, args]);
     if (name === 'vehicle_by_vin_public' && fixture.vin) return fixture.vin(args);
+    if (name === 'browse_stats' && fixture.stats) return fixture.stats(args);
     return { data: null };
   },
   functions: { invoke: async (_name: string, request: any) => {
@@ -31,7 +33,7 @@ let state: ReturnType<typeof useSearchPage>; let root: Root; let container: HTML
 function Harness() { state = useSearchPage(); return <div>{state.displayResults.map(r => <span key={r.id}>{r.id}</span>)}</div>; }
 beforeEach(() => {
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
-  fixture.params = new URLSearchParams({ q: 'cool cars under $30,000' }); fixture.requests = []; fixture.respond = null; fixture.rpcCalls = []; fixture.vin = null;
+  fixture.params = new URLSearchParams({ q: 'cool cars under $30,000' }); fixture.requests = []; fixture.respond = null; fixture.rpcCalls = []; fixture.vin = null; fixture.stats = null; fixture.byId = null; fixture.navigate.mockReset();
   container = document.createElement('div'); document.body.appendChild(container); root = createRoot(container);
 });
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); });
@@ -203,4 +205,54 @@ it('says when the ledger holds no public vehicle with that VIN', async () => {
   expect(fixture.requests).toHaveLength(0);
   expect(state.results).toEqual([]);
   expect(state.searchSummary).toBe('No public vehicle with VIN WP0AA2A95ES123456 in the ledger.');
+});
+
+
+it('finishes a missing UUID lookup and offers retry after a failed UUID read', async () => {
+  fixture.params = new URLSearchParams({q:'00000000-0000-4000-8000-000000000001'});
+  await act(async () => root.render(<Harness />));
+  expect(state.loading).toBe(false); expect(state.searchSummary).toContain('No visible vehicle');
+  fixture.byId = async () => ({data:null,error:{message:'private backend detail'}});
+  await act(async () => state.retrySearch());
+  expect(state.searchError).toContain('could not'); expect(state.searchError).not.toContain('private');
+});
+
+it('ignores UUID navigation after the visitor chooses another query', async () => {
+  let finish!: (value:any)=>void;
+  fixture.params = new URLSearchParams({q:'00000000-0000-4000-8000-000000000001'});
+  fixture.byId = () => new Promise(resolve=>{finish=resolve;});
+  await act(async () => root.render(<Harness />));
+  fixture.params = new URLSearchParams({q:'volvo'}); await act(async()=>root.render(<Harness/>));
+  await act(async()=>finish({data:{id:'stale-vehicle'},error:null}));
+  expect(fixture.navigate).not.toHaveBeenCalled(); expect(state.results).toHaveLength(5);
+});
+
+it('rejects a stale same-query response after navigating away and back', async () => {
+  let finish!: (value:any)=>void; let seen=false;
+  fixture.params = new URLSearchParams({q:'volvo'});
+  fixture.respond = request => request.query==='volvo'&&!seen ? (seen=true,new Promise(resolve=>{finish=resolve;})) : page([vehicle(222)],0,null);
+  await act(async()=>root.render(<Harness/>));
+  fixture.params = new URLSearchParams({q:'saab'}); await act(async()=>root.render(<Harness/>));
+  fixture.params = new URLSearchParams({q:'volvo'}); await act(async()=>root.render(<Harness/>));
+  await act(async()=>finish(page([vehicle(111)],0,null)));
+  expect(state.results.map(r=>r.id)).toEqual(['vehicle_222']);
+});
+
+it('does not attach former-make statistics to the current query', async () => {
+  let finish!: (value:any)=>void;
+  fixture.params = new URLSearchParams({q:'volvo'});
+  fixture.stats = args => args.p_make==='Volvo' ? new Promise(resolve=>{finish=resolve;}) : {data:{total:7},error:null};
+  await act(async()=>root.render(<Harness/>));
+  fixture.params = new URLSearchParams({q:'saab'}); await act(async()=>root.render(<Harness/>));
+  await act(async()=>finish({data:{total:999},error:null}));
+  expect(state.browseStats?.total).toBe(7);
+});
+
+it('refreshes make/year filters from new URL intent and clears previous local filters', async () => {
+  fixture.params = new URLSearchParams({q:'cars',make:'Volvo',yearMin:'1990',yearMax:'2000'});
+  await act(async()=>root.render(<Harness/>));
+  await act(async()=>state.setFilters({...state.filters,transmission:'manual'}));
+  fixture.params = new URLSearchParams({q:'cars',make:'Saab',yearMin:'2001',yearMax:'2009'});
+  await act(async()=>root.render(<Harness/>));
+  expect(state.filters).toMatchObject({make:'Saab',yearMin:'2001',yearMax:'2009',transmission:''});
 });
