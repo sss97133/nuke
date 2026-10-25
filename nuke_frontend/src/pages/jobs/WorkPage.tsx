@@ -4,10 +4,11 @@
  * repeats the server's own words for what signing binds and does not bind. Work-day and booking
  * confirmations have review sheets here; job Signs run on the job page. A payment amount appears only on the payee's own confirmation item.
  */
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Section, Text } from '../../kit';
 import { PrefetchLink } from '../../components/PrefetchLink';
 import { usePageTitle } from '../../hooks/usePageTitle';
+import { useAuthContext } from '../../contexts/AuthContext';
 import {
   JobReaders, STAGES, binds, day, gapWord, jobHref, paymentLine, quoteTotals, signKindTitle, slotWords, stageWord, stateWord, vehicleText,
   type MyWorkOrdersRead, type SignQueueItem, type SignQueueRead, type WorkOrderRow,
@@ -84,25 +85,42 @@ function JobRow({ row }: { row: WorkOrderRow }) {
 
 const WorkPage: React.FC = () => {
   usePageTitle('Work');
+  const { session } = useAuthContext();
+  const viewerId = session?.user?.id ?? null;
+  // Queues, jobs and open confirmation drafts belong to this viewer. A new
+  // account must never inherit a prior account's Sign or private read state.
+  return viewerId ? <ViewerWorkPage key={viewerId} /> : null;
+};
+
+const ViewerWorkPage: React.FC = () => {
   const [queue, setQueue] = useState<SignQueueRead | null>(null);
   const [jobs, setJobs] = useState<MyWorkOrdersRead | null>(null);
   const [jobRows, setJobRows] = useState<WorkOrderRow[]>([]);
   const [refusal, setRefusal] = useState<string | null>(null);
+  const generation = useRef(0);
 
   const loadJobs = useCallback(async (after: string | null) => {
+    const scope = generation.current;
     const r = await JobReaders.myWorkOrders(after);
+    if (scope !== generation.current) return;
     if (r.refusal) { setRefusal(r.refusal.message); return; }
     setJobs(r.data);
     setJobRows(prev => (after ? [...prev, ...r.data.rows] : r.data.rows));
   }, []);
 
   const loadQueue = useCallback(() => {
-    void JobReaders.signatureQueue().then(r => { if (r.refusal) setRefusal(r.refusal.message); else setQueue(r.data); });
+    const scope = generation.current;
+    void JobReaders.signatureQueue().then(r => {
+      if (scope !== generation.current) return;
+      if (r.refusal) setRefusal(r.refusal.message); else setQueue(r.data);
+    });
   }, []);
 
   useEffect(() => {
+    generation.current++;
     loadQueue();
     void loadJobs(null);
+    return () => { generation.current++; };
   }, [loadJobs, loadQueue]);
 
   return <article className="jb-page jb-scope">

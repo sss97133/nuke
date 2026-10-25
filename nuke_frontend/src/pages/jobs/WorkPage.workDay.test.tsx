@@ -4,8 +4,9 @@ import { createRoot, type Root } from 'react-dom/client';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
-const fixture = vi.hoisted(() => ({ rpc: vi.fn(), writer: vi.fn(), items: [] as unknown[] }));
+const fixture = vi.hoisted(() => ({ rpc: vi.fn(), writer: vi.fn(), items: [] as unknown[], viewerId: 'viewer-a' as string | null }));
 vi.mock('../../lib/supabase', () => ({ supabase: { rpc: fixture.rpc } }));
+vi.mock('../../contexts/AuthContext', () => ({ useAuthContext: () => ({ session: fixture.viewerId ? { user: { id: fixture.viewerId } } : null }) }));
 vi.mock('../../components/PrefetchLink', () => ({ PrefetchLink: ({ to, children, ...props }: { to: string; children: React.ReactNode } & React.AnchorHTMLAttributes<HTMLAnchorElement>) => <a href={to} {...props}>{children}</a> }));
 import WorkPage from './WorkPage';
 
@@ -22,7 +23,7 @@ const click = async (element: HTMLElement) => { await act(async () => element.cl
 async function render() { await act(async () => root.render(<MemoryRouter><WorkPage /></MemoryRouter>)); }
 beforeEach(() => {
   (globalThis as unknown as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
-  fixture.items = [dayItem()]; fixture.rpc.mockReset(); fixture.writer.mockReset();
+  fixture.viewerId = 'viewer-a'; fixture.items = [dayItem()]; fixture.rpc.mockReset(); fixture.writer.mockReset();
   fixture.writer.mockResolvedValue({ data: { ok: true, confirmed: true, session_id: ID }, error: null });
   fixture.rpc.mockImplementation((name: string, args: unknown) => {
     if (name === 'confirm_work_session') return fixture.writer(args);
@@ -96,4 +97,66 @@ it('prevents duplicate submission and recovers from a rejected transport promise
   expect(button('Confirm this work day').disabled).toBe(false);
   expect(host.querySelector('[role="dialog"] [role="alert"]')?.textContent).toContain('Connection lost');
   expect(button('Done')).toBeUndefined();
+});
+
+it('removes the prior viewer queue and open confirmation draft when accounts change', async () => {
+  await render(); await click(button('Review work day'));
+  expect(host.querySelector('[role="dialog"]')).not.toBeNull();
+  fixture.viewerId = 'viewer-b'; fixture.items = [];
+  await render();
+  expect(host.querySelector('[role="dialog"]')).toBeNull();
+  expect(host.textContent).not.toContain('Synthetic truck');
+  expect(host.textContent).toContain('Nothing is waiting for your signature');
+  expect(fixture.writer).not.toHaveBeenCalled();
+  expect(fixture.rpc.mock.calls.filter(([name]) => name === 'my_signature_queue')).toHaveLength(2);
+});
+
+it('ignores late private queue and job responses from a previous viewer', async () => {
+  let finishQueue!: (value: unknown) => void, finishJobs!: (value: unknown) => void;
+  fixture.rpc.mockImplementation((name: string) => {
+    if (fixture.viewerId === 'viewer-a') return new Promise(resolve => {
+      if (name === 'my_signature_queue') finishQueue = resolve; else finishJobs = resolve;
+    });
+    return Promise.resolve({ error: null, data: name === 'my_signature_queue'
+      ? { items: [], coverage: { returned: 0, total: 0 } }
+      : { rows: [{ work_order_id: 'viewer-b-job', display_title: 'Viewer B job', slots: [], stage_states: {} }], coverage: { total_for_viewer: 1 }, next_after: null } });
+  });
+  await render();
+  fixture.viewerId = 'viewer-b'; await render();
+  expect(host.textContent).toContain('Viewer B job');
+  await act(async () => {
+    finishQueue({ error: null, data: { items: [dayItem()], coverage: { returned: 1, total: 1 } } });
+    finishJobs({ error: null, data: { rows: [{ work_order_id: 'viewer-a-job', display_title: 'Private A job', slots: [], stage_states: {} }], coverage: { total_for_viewer: 1 }, next_after: null } });
+  });
+  expect(host.textContent).not.toContain('Synthetic truck');
+  expect(host.textContent).not.toContain('Private A job');
+  expect(host.textContent).toContain('Viewer B job');
+  expect(button('Review work day')).toBeUndefined();
+});
+
+it('does not replay a submitted confirmation or show its late success to the next account', async () => {
+  let finish!: (value: unknown) => void;
+  const submittedBy: Array<string | null> = [];
+  fixture.writer.mockImplementationOnce(() => {
+    submittedBy.push(fixture.viewerId);
+    return new Promise(resolve => { finish = resolve; });
+  });
+  await render(); await click(button('Review work day')); await click(button('Confirm this work day'));
+  fixture.viewerId = 'viewer-b'; fixture.items = []; await render();
+  expect(host.querySelector('[role="dialog"]')).toBeNull();
+  await act(async () => finish({ data: { ok: true, confirmed: true, session_id: ID }, error: null }));
+  expect(submittedBy).toEqual(['viewer-a']);
+  expect(fixture.writer).toHaveBeenCalledOnce();
+  expect(host.textContent).not.toContain('Work day confirmed by you');
+  expect(host.textContent).toContain('Nothing is waiting for your signature');
+});
+
+it('clears viewer-owned state on sign-out and makes no anonymous private read', async () => {
+  await render(); await click(button('Review work day'));
+  const calls = fixture.rpc.mock.calls.length;
+  fixture.viewerId = null; await render();
+  expect(host.textContent).toBe('');
+  expect(host.querySelector('[role="dialog"]')).toBeNull();
+  expect(fixture.rpc).toHaveBeenCalledTimes(calls);
+  expect(fixture.writer).not.toHaveBeenCalled();
 });
