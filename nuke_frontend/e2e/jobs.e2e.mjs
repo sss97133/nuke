@@ -410,6 +410,8 @@ describe('job market', () => {
     const market = JSON.parse(readFileSync(new URL('../src/pages/work/marketFixture.json', import.meta.url), 'utf8'));
     const { ctx, page, writes } = await open('/work/market', { readers: { job_market_health_read: market } });
     await page.getByRole('heading', { name: 'The job market on Nuke' }).waitFor();
+    // The heading also renders while the reader is still counting.
+    await page.getByText('39 open requests', { exact: true }).waitFor();
     const text = await page.locator('article[aria-label="The job market on Nuke"]').innerText();
     for (const s of ['39 open requests', '1 technician linked by evidence', '23 requests have a backup supplier', '0 businesses claimed yet']) assert.ok(text.includes(s), `missing: ${s}`);
     assert.doesNotMatch(text, /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|@|\$\d/);

@@ -45,10 +45,10 @@ export type FacePage = {
  * discovery.test.ts fails when a rule here no longer appears there).
  */
 export const HEADER_CSS_RULES = [
-  ".k-entity  { font: 700 20px/1.1 Arial, sans-serif; letter-spacing: -0.02em; color: var(--text); }",
-  ".k-body    { font: 400 10px/1.5 Arial, sans-serif; color: var(--text); }",
-  ".k-caption { font: 400 9px/1.4 'Courier New', monospace; color: var(--text-secondary); }",
-  ".k-section { border-bottom: 2px solid var(--border); padding: 8px 12px; background: var(--surface); }",
+  ".k-entity  { font: 700 24px/1.2 var(--font-family); letter-spacing: -0.02em; color: var(--text); }",
+  ".k-body    { font: 400 15px/1.5 var(--font-family); color: var(--text); }",
+  ".k-caption { font: 400 12px/1.45 var(--font-family); color: var(--text-secondary); }",
+  ".k-section { border-bottom: 1px solid var(--border); padding: 16px; background: var(--surface); }",
   ".k-masthead { display: flex; align-items: center; gap: 12px; min-height: 36px; }",
   ".k-masthead__result { margin-left: auto; text-align: right; }",
   ".job-page { max-width: 960px; margin: 0 auto; }",
