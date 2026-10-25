@@ -1,0 +1,307 @@
+-- Typed source-trust downgrade for the orphan-backfill-v1 bulk writer.
+-- Citation: audit 2026-10-24 (notes-evidence.md, turn 20): orphan-backfill-v1 rows checkable against auction records were marked sold where the record is not sold 9.4% (205/2,181) and had a different sold price 3.2% (36/1,129), vs 0.13% and 0.17% for other writers on the same platforms.
+-- Its events count as low trust in comps and valuation unless corroborated by a cited page amount, a sold auction record
+-- for the same listing at the same price, or a live sold observation at the same price.
+-- Revert: conf5/revert_trust.sql (restores prior function bodies; trust rows are kept, retire with retired_at).
+do $$ begin create type public.source_trust_t as enum ('normal','low'); exception when duplicate_object then null; end $$;
+create table if not exists public.writer_source_trust (
+  writer text primary key, trust public.source_trust_t not null, reason text not null, citation text not null,
+  run_id text not null, set_at timestamptz not null default now(), retired_at timestamptz);
+alter table public.writer_source_trust enable row level security;
+insert into public.writer_source_trust (writer, trust, reason, citation, run_id) values
+ ('orphan-backfill-v1','low','bulk backfill labeled any priced row sold and classified asks as sales','audit 2026-10-24 (notes-evidence.md, turn 20): orphan-backfill-v1 rows checkable against auction records were marked sold where the record is not sold 9.4% (205/2,181) and had a different sold price 3.2% (36/1,129), vs 0.13% and 0.17% for other writers on the same platforms','writer_trust_v1_20261024')
+on conflict (writer) do nothing;
+create table if not exists public.vehicle_event_trust (
+  event_id uuid not null, run_id text not null, writer text not null, trust public.source_trust_t not null,
+  corroborated_by text, corroborated_price numeric, set_at timestamptz not null default now(), retired_at timestamptz,
+  primary key (event_id, run_id));
+alter table public.vehicle_event_trust enable row level security;
+create index if not exists vehicle_event_trust_live_idx on public.vehicle_event_trust (event_id) where retired_at is null;
+
+create or replace function public.stage_vehicle_event_trust_v1(p_run text, p_lo uuid, p_hi uuid) returns int
+language plpgsql set search_path = public as $$
+declare n int;
+begin
+  insert into vehicle_event_trust (event_id, run_id, writer, trust, corroborated_by, corroborated_price)
+  select e.id, p_run, e.extraction_method,
+         case when c.by is null then 'low' else 'normal' end::source_trust_t, c.by, c.price
+  from vehicle_events e
+  join writer_source_trust w on w.writer = e.extraction_method and w.retired_at is null and w.trust = 'low'
+  left join lateral (
+    select 'page:'||st.run_id by, st.amount price from sale_outcome_sweep_stage_v1 st
+      where st.event_id = e.id and st.kind = 'sold' and st.amount = e.final_price
+    union all
+    select 'auction_events:'||ae.id, e.final_price from auction_events ae
+      where ae.vehicle_id = e.vehicle_id and rtrim(ae.source_url,'/') = rtrim(e.source_url,'/') and ae.outcome = 'sold'
+        and e.final_price in (ae.hammer_price, ae.gross_price)
+    union all
+    select 'observation:'||o.rule, o.observed_price from price_basis_observation o
+      where o.tbl = 'vehicle_events' and o.event_id = e.id and o.superseded_at is null and o.observed_status = 'sold'
+        and o.observed_price = e.final_price and o.source_url is not null
+    limit 1) c on true
+  where e.id >= p_lo and e.id < p_hi
+  on conflict do nothing;
+  get diagnostics n = row_count; return n;
+end $$;
+
+create or replace function public.vehicle_event_low_trust(p_event_id uuid) returns boolean
+language sql stable parallel safe set search_path = public as $$
+  select exists (select 1 from vehicle_event_trust t where t.event_id = p_event_id and t.retired_at is null and t.trust = 'low')
+$$;
+revoke all on function public.stage_vehicle_event_trust_v1(text,uuid,uuid) from public, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.vehicle_sale_price_untrusted(p_vehicle_id uuid, p_sale_price numeric)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE PARALLEL SAFE
+AS $function$
+  select p_sale_price is not null and (
+    (exists (select 1 from public.vehicle_events lt where lt.vehicle_id = p_vehicle_id
+              and lt.final_price = p_sale_price and public.vehicle_event_low_trust(lt.id))
+     and not exists (select 1 from public.vehicle_events ok where ok.vehicle_id = p_vehicle_id
+              and ok.final_price = p_sale_price and not public.vehicle_event_low_trust(ok.id)
+              and ok.sale_truth_role is distinct from 'duplicate'))
+    or
+    (exists (select 1 from public.vehicle_events ns where ns.vehicle_id = p_vehicle_id
+              and ns.sale_outcome in ('bid_to','no_sale','withdrawn') and ns.final_price = p_sale_price)
+     and not exists (select 1 from public.vehicle_events ok where ok.vehicle_id = p_vehicle_id
+              and ok.final_price = p_sale_price and ok.sale_outcome = 'sold'))
+    or
+    exists (select 1 from public.vehicle_sale_price_untrusted_marks mk where mk.vehicle_id = p_vehicle_id
+              and mk.retired_at is null and mk.sale_price = p_sale_price)
+    or
+    (exists (select 1 from public.vehicle_events pv where pv.vehicle_id = p_vehicle_id
+              and (pv.price_verification in ('unverified','contradicted') or 'vehicle_id' = any(coalesce(pv.source_suspect, '{}')))
+              and pv.final_price = p_sale_price)
+     and not exists (select 1 from public.vehicle_events ok where ok.vehicle_id = p_vehicle_id
+              and ok.final_price = p_sale_price and (ok.price_verification is null or ok.price_verification = 'verified')
+              and ok.sale_truth_role is distinct from 'duplicate'
+              and not ('vehicle_id' = any(coalesce(ok.source_suspect, '{}')))))
+    or
+    (exists (select 1 from public.vehicle_events pv where pv.vehicle_id = p_vehicle_id
+              and pv.price_verification = 'verified' and pv.final_price <> p_sale_price
+              and not ('vehicle_id' = any(coalesce(pv.source_suspect, '{}'))))
+     and not exists (select 1 from public.vehicle_events ok where ok.vehicle_id = p_vehicle_id
+              and ok.price_verification = 'verified' and ok.final_price = p_sale_price
+              and not ('vehicle_id' = any(coalesce(ok.source_suspect, '{}')))))
+  )
+$function$;
+
+CREATE OR REPLACE FUNCTION public.get_comps_scored(p_basis price_basis_t, p_make text, p_model text DEFAULT NULL::text, p_year integer DEFAULT NULL::integer, p_year_range integer DEFAULT 5, p_engine_type text DEFAULT NULL::text, p_transmission text DEFAULT NULL::text, p_drivetrain text DEFAULT NULL::text, p_mileage integer DEFAULT NULL::integer, p_trim text DEFAULT NULL::text, p_body_style text DEFAULT NULL::text, p_min_price numeric DEFAULT NULL::numeric, p_max_price numeric DEFAULT NULL::numeric, p_exclude_vehicle_id uuid DEFAULT NULL::uuid, p_limit integer DEFAULT 20)
+ RETURNS TABLE(vehicle_id uuid, yr integer, mk text, mdl text, tr text, vi text, sale_price numeric, miles integer, clr text, image_url text, loc text, listing_url text, platform text, sold_date timestamp with time zone, source_type text, similarity_score numeric, score_breakdown jsonb, sale_price_native numeric, currency_code text, fx_rate numeric, fx_rate_date date, fx_source text, price_basis text)
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET statement_timeout TO '10s'
+AS $function$
+DECLARE
+  w_year        constant numeric := 15;
+  w_model       constant numeric := 25;
+  w_engine_cyl  constant numeric := 12;
+  w_engine_cfg  constant numeric := 5;
+  w_trans       constant numeric := 15;
+  w_drivetrain  constant numeric := 10;
+  w_mileage     constant numeric := 8;
+  w_body        constant numeric := 5;
+  w_trim_w      constant numeric := 5;
+
+  ref_trans     text;
+  ref_cyls      integer;
+  ref_eng_cfg   text;
+  ref_drive     text;
+BEGIN
+  IF p_basis IS NULL OR p_basis = 'unknown' THEN
+    RAISE EXCEPTION 'price basis required: pass p_basis = hammer | gross_incl_premium | net_to_owner (bases are never mixed)';
+  END IF;
+  ref_trans    := classify_transmission(p_transmission);
+  ref_cyls     := extract_cylinder_count(p_engine_type);
+  ref_eng_cfg  := extract_engine_config(p_engine_type);
+  ref_drive    := classify_drivetrain(p_drivetrain);
+
+  RETURN QUERY
+  WITH auction_cands AS (
+    SELECT
+      v.id, v.year, v.make, v.model, v.trim, v.vin,
+      (CASE p_basis WHEN 'hammer' THEN ae.hammer_price WHEN 'gross_incl_premium' THEN ae.gross_price WHEN 'net_to_owner' THEN ae.net_to_owner END) AS price, v.mileage, v.color,
+      v.primary_image_url, v.location, ae.source_url,
+      ae.source, ae.auction_end_date,
+      'auction_event'::text AS src_type,
+      ae.currency_code AS cur, (ae.auction_end_date AT TIME ZONE 'UTC')::date AS fx_on,
+      v.engine_type AS v_engine, v.transmission AS v_trans,
+      v.drivetrain AS v_drive, v.body_style AS v_body
+    FROM (select * from public.vehicles where listing_kind is distinct from 'non_vehicle_item' and id <> all (array(select q.row_id from public.record_quarantine q where q.tbl = 'vehicles' and q.released_at is null))) v
+    JOIN auction_events ae ON ae.vehicle_id = v.id
+    WHERE lower(v.make) = lower(p_make)
+      AND (p_model IS NULL OR lower(v.model) = lower(p_model) OR lower(v.model) LIKE '%' || lower(p_model) || '%' OR lower(p_model) LIKE '%' || lower(v.model) || '%'
+           OR (length(public.model_spelling_key(p_model)) >= 2 AND length(public.model_spelling_key(v.model)) >= 2 AND (public.model_spelling_key(v.model) LIKE '%' || public.model_spelling_key(p_model) || '%' OR public.model_spelling_key(p_model) LIKE '%' || public.model_spelling_key(v.model) || '%')))
+      AND (p_year IS NULL OR v.year BETWEEN p_year - LEAST(GREATEST(COALESCE(p_year_range, 5), 0), 50) AND p_year + LEAST(GREATEST(COALESCE(p_year_range, 5), 0), 50))
+      AND (CASE p_basis WHEN 'hammer' THEN ae.hammer_price WHEN 'gross_incl_premium' THEN ae.gross_price WHEN 'net_to_owner' THEN ae.net_to_owner END) > 0
+      AND ae.outcome = 'sold' AND NOT public.auction_event_typed_not_sold(ae.vehicle_id, ae.source_url)
+      AND NOT (COALESCE(ae.raw_data, '{}'::jsonb) ? 'duplicate_of')
+      AND (p_exclude_vehicle_id IS NULL OR v.id != p_exclude_vehicle_id)
+  ),
+  vehicle_cands AS (
+    SELECT
+      v.id, v.year, v.make, v.model, v.trim, v.vin,
+      (CASE p_basis WHEN 'hammer' THEN ve.hammer_price WHEN 'gross_incl_premium' THEN ve.gross_price WHEN 'net_to_owner' THEN ve.net_to_owner END) AS price, v.mileage, v.color,
+      v.primary_image_url, v.location, ve.source_url,
+      COALESCE(public.event_resolved_platform(ve.id, ve.source_suspect), ve.source_platform) AS source,
+      COALESCE(ve.sold_at, ve.ended_at) AS auction_end_date,
+      'vehicle_event'::text AS src_type,
+      NULL::text AS cur, COALESCE(ve.sold_at, ve.ended_at)::date AS fx_on,
+      v.engine_type AS v_engine, v.transmission AS v_trans,
+      v.drivetrain AS v_drive, v.body_style AS v_body
+    FROM (select * from public.vehicles where listing_kind is distinct from 'non_vehicle_item' and id <> all (array(select q.row_id from public.record_quarantine q where q.tbl = 'vehicles' and q.released_at is null))) v
+    JOIN vehicle_events ve ON ve.vehicle_id = v.id
+      AND NOT coalesce(ve.sale_outcome is not null and ve.sale_outcome <> 'sold', false)
+      AND (ve.source_suspect is null OR NOT public.vehicle_event_comp_excluded(ve.id, ve.source_suspect))
+      AND NOT public.vehicle_event_low_trust(ve.id)  -- writer_source_trust: low unless corroborated
+      AND ve.id <> all (array(select q.row_id from public.record_quarantine q where q.tbl = 'vehicle_events' and q.released_at is null))
+    WHERE lower(v.make) = lower(p_make)
+      AND (p_model IS NULL OR lower(v.model) = lower(p_model) OR lower(v.model) LIKE '%' || lower(p_model) || '%' OR lower(p_model) LIKE '%' || lower(v.model) || '%')
+      AND (p_year IS NULL OR v.year BETWEEN p_year - LEAST(GREATEST(COALESCE(p_year_range, 5), 0), 50) AND p_year + LEAST(GREATEST(COALESCE(p_year_range, 5), 0), 50))
+      AND ve.event_status = 'sold'
+      AND ve.price_verification IS DISTINCT FROM 'unverified' AND ve.price_verification IS DISTINCT FROM 'contradicted'
+      AND (CASE p_basis WHEN 'hammer' THEN ve.hammer_price WHEN 'gross_incl_premium' THEN ve.gross_price WHEN 'net_to_owner' THEN ve.net_to_owner END) > 0
+      AND v.deleted_at IS NULL
+      AND (p_exclude_vehicle_id IS NULL OR v.id != p_exclude_vehicle_id)
+      AND NOT EXISTS (
+        SELECT 1 FROM auction_events ae2
+        WHERE ae2.vehicle_id = v.id AND ae2.outcome = 'sold' AND (CASE p_basis WHEN 'hammer' THEN ae2.hammer_price WHEN 'gross_incl_premium' THEN ae2.gross_price WHEN 'net_to_owner' THEN ae2.net_to_owner END) > 0
+      )
+  ),
+  raw_cands AS (
+    SELECT * FROM auction_cands
+    UNION ALL
+    SELECT * FROM vehicle_cands
+  ),
+  -- native amount x sale-date USD rate (fx_usd_rate). NULL currency = legacy row, read as reported.
+  conv_cands AS (
+    SELECT r.*, r.price AS price_native, fx.rate AS fx_rate, fx.rate_date AS fx_rate_date,
+      CASE WHEN r.cur IS NULL THEN 'unconverted: currency_code unknown, amount read as reported' ELSE fx.source END AS fx_source,
+      CASE WHEN r.cur IS NULL THEN r.price::numeric ELSE round(r.price * fx.rate, 2) END AS price_usd
+    FROM raw_cands r
+    LEFT JOIN LATERAL (SELECT f.rate, f.rate_date, f.source FROM public.fx_usd_rate(r.cur, r.fx_on) f) fx ON r.cur IS NOT NULL
+  ),
+  all_cands AS (
+    SELECT * FROM conv_cands c
+    WHERE (c.cur IS NULL OR c.fx_rate IS NOT NULL)   -- foreign amount with no rate: excluded, never read as USD
+      AND (p_min_price IS NULL OR c.price_usd >= p_min_price)
+      AND (p_max_price IS NULL OR c.price_usd <= p_max_price)
+  ),
+  scored AS (
+    SELECT
+      c.id AS vehicle_id,
+      c.year AS yr,
+      c.make AS mk,
+      c.model AS mdl,
+      c.trim AS tr,
+      c.vin AS vi,
+      c.price_usd AS sale_price,
+      c.mileage AS miles,
+      c.color AS clr,
+      c.primary_image_url AS image_url,
+      c.location AS loc,
+      c.source_url AS listing_url,
+      c.source AS platform,
+      c.auction_end_date AS sold_date,
+      c.src_type AS source_type,
+      c.price_native, c.cur, c.fx_rate, c.fx_rate_date, c.fx_source,
+
+      -- Year score
+      (CASE WHEN p_year IS NOT NULL AND c.year IS NOT NULL
+        THEN w_year * GREATEST(0, 1.0 - ABS(c.year - p_year)::numeric / GREATEST(LEAST(GREATEST(COALESCE(p_year_range, 5), 0), 50), 1))
+        ELSE w_year * 0.5
+      END) AS s_year,
+
+      -- Model score
+      (CASE
+        WHEN p_model IS NULL THEN w_model * 0.5
+        WHEN lower(c.model) = lower(p_model) THEN w_model
+        WHEN length(public.model_spelling_key(p_model)) >= 2 AND public.model_spelling_key(c.model) = public.model_spelling_key(p_model) THEN w_model
+        WHEN lower(c.model) LIKE '%' || lower(p_model) || '%' THEN w_model * 0.7
+        WHEN lower(p_model) LIKE '%' || lower(c.model) || '%' THEN w_model * 0.6
+        WHEN lower(c.model) LIKE '%' || lower(split_part(p_model, ' ', 1)) || '%' THEN w_model * 0.4
+        ELSE 0
+      END) AS s_model,
+
+      -- Engine cylinder score
+      (CASE
+        WHEN ref_cyls IS NULL OR extract_cylinder_count(c.v_engine) IS NULL THEN w_engine_cyl * 0.3
+        WHEN extract_cylinder_count(c.v_engine) = ref_cyls THEN w_engine_cyl
+        WHEN ABS(extract_cylinder_count(c.v_engine) - ref_cyls) <= 2 THEN w_engine_cyl * 0.5
+        ELSE 0
+      END) AS s_engine_cyl,
+
+      -- Engine config score
+      (CASE
+        WHEN ref_eng_cfg IS NULL OR extract_engine_config(c.v_engine) IS NULL THEN w_engine_cfg * 0.3
+        WHEN extract_engine_config(c.v_engine) = ref_eng_cfg THEN w_engine_cfg
+        ELSE 0
+      END) AS s_engine_cfg,
+
+      -- Transmission score
+      (CASE
+        WHEN ref_trans IS NULL OR classify_transmission(c.v_trans) IS NULL THEN w_trans * 0.3
+        WHEN classify_transmission(c.v_trans) = ref_trans THEN w_trans
+        ELSE 0
+      END) AS s_trans,
+
+      -- Drivetrain score
+      (CASE
+        WHEN ref_drive IS NULL OR classify_drivetrain(c.v_drive) IS NULL THEN w_drivetrain * 0.3
+        WHEN classify_drivetrain(c.v_drive) = ref_drive THEN w_drivetrain
+        WHEN classify_drivetrain(c.v_drive) IN ('4WD','AWD') AND ref_drive IN ('4WD','AWD') THEN w_drivetrain * 0.8
+        ELSE 0
+      END) AS s_drivetrain,
+
+      -- Mileage score
+      (CASE
+        WHEN p_mileage IS NULL OR c.mileage IS NULL OR p_mileage = 0 THEN w_mileage * 0.3
+        WHEN ABS(c.mileage - p_mileage) <= p_mileage * 0.2 THEN w_mileage
+        WHEN ABS(c.mileage - p_mileage) <= p_mileage * 0.5 THEN w_mileage * 0.6
+        WHEN ABS(c.mileage - p_mileage) <= p_mileage * 1.0 THEN w_mileage * 0.3
+        ELSE 0
+      END) AS s_mileage,
+
+      -- Body style score
+      (CASE
+        WHEN p_body_style IS NULL OR c.v_body IS NULL THEN w_body * 0.3
+        WHEN lower(c.v_body) = lower(p_body_style) THEN w_body
+        WHEN lower(c.v_body) LIKE '%' || lower(p_body_style) || '%' THEN w_body * 0.6
+        ELSE 0
+      END) AS s_body,
+
+      -- Trim score
+      (CASE
+        WHEN p_trim IS NULL OR c.trim IS NULL THEN w_trim_w * 0.3
+        WHEN lower(c.trim) = lower(p_trim) THEN w_trim_w
+        WHEN lower(c.trim) LIKE '%' || lower(p_trim) || '%' THEN w_trim_w * 0.6
+        ELSE 0
+      END) AS s_trim
+
+    FROM all_cands c
+  )
+  SELECT
+    s.vehicle_id, s.yr, s.mk, s.mdl, s.tr, s.vi,
+    s.sale_price, s.miles, s.clr, s.image_url, s.loc,
+    s.listing_url, s.platform, s.sold_date, s.source_type,
+    ROUND(s.s_year + s.s_model + s.s_engine_cyl + s.s_engine_cfg + s.s_trans + s.s_drivetrain + s.s_mileage + s.s_body + s.s_trim, 1) AS similarity_score,
+    jsonb_build_object(
+      'year', ROUND(s.s_year, 1),
+      'model', ROUND(s.s_model, 1),
+      'engine_cyl', ROUND(s.s_engine_cyl, 1),
+      'engine_cfg', ROUND(s.s_engine_cfg, 1),
+      'transmission', ROUND(s.s_trans, 1),
+      'drivetrain', ROUND(s.s_drivetrain, 1),
+      'mileage', ROUND(s.s_mileage, 1),
+      'body_style', ROUND(s.s_body, 1),
+      'trim', ROUND(s.s_trim, 1)
+    ) AS score_breakdown,
+    s.price_native::numeric AS sale_price_native, s.cur AS currency_code, s.fx_rate, s.fx_rate_date, s.fx_source, p_basis::text
+  FROM scored s
+  ORDER BY
+    (s.s_year + s.s_model + s.s_engine_cyl + s.s_engine_cfg + s.s_trans + s.s_drivetrain + s.s_mileage + s.s_body + s.s_trim) DESC,
+    s.sold_date DESC NULLS LAST
+  LIMIT LEAST(GREATEST(COALESCE(p_limit, 20), 1), 200);
+END;
+$function$;
