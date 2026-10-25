@@ -12,8 +12,9 @@ export type SavedRecord = { id: string; document_id: string; record: {
 } };
 type Control = { record_kind: string; year: string; account: string | null; currency: string | null; section: string | null; rows: number; missing_amounts?: number; retained_amount: string | number | null };
 type Workpapers = { records: SavedRecord[]; total_rows: number; next_after: string | null; controls_valid: boolean; controls: Control[] };
-const pageSize = 25;
-type SortColumn = 'record_date' | 'amount_value' | 'account' | 'section';
+const defaultPageSize = 100;
+const pageSizes = [25, 50, 100, 250] as const;
+type SortColumn = 'record_date' | 'amount_value' | 'account' | 'section' | 'description';
 // PostgREST `or` filters are comma separated and use * as the wildcard; keep the search term to plain text.
 export const searchPattern = (query: string) => `*${query.trim().replace(/[%*,().\\]+/g, ' ').replace(/\s+/g, ' ').trim()}*`;
 
@@ -71,6 +72,7 @@ export default function FinancialWorkpapers({ revision, onOpen }: { revision: nu
   const [kind, setKind] = useState('');
   const [unclassified, setUnclassified] = useState(false);
   const [sort, setSort] = useState<{ column: SortColumn; descending: boolean }>({ column: 'record_date', descending: true });
+  const [rowsPerPage, setRowsPerPage] = useState<number>(defaultPageSize);
   const [tablePage, setTablePage] = useState(0);
   const [rows, setRows] = useState<SavedRecord[] | null>(null);
   const [hasMoreRows, setHasMoreRows] = useState(false);
@@ -110,7 +112,7 @@ export default function FinancialWorkpapers({ revision, onOpen }: { revision: nu
     let cancelled = false;
     const keys = (rows || []).map(row => row.record.source_key).filter((key): key is string => !!key).map(expenseUseKey);
     if (!ownerId || !keys.length) { setUses({}); setUseError(false); return; }
-    void Promise.resolve(supabase.from('financial_document_extractions').select('document_id, field_key, value_normalized').eq('owner_id', ownerId).eq('is_superseded', false).in('field_key', keys).limit(pageSize)).then(result => {
+    void Promise.resolve(supabase.from('financial_document_extractions').select('document_id, field_key, value_normalized').eq('owner_id', ownerId).eq('is_superseded', false).in('field_key', keys).limit(keys.length)).then(result => {
       if (cancelled) return;
       const next: Record<string, ExpenseUse> = {};
       setUseError(!!result.error);
@@ -134,7 +136,7 @@ export default function FinancialWorkpapers({ revision, onOpen }: { revision: nu
   const bankUnclassified = (data?.controls || []).filter(row => row.record_kind === 'retained_bank_movement' && row.year === selectedYear && !row.section).reduce((total, row) => total + row.rows, 0);
   const matches = (values: unknown[]) => values.join(' ').toLowerCase().includes(query.toLowerCase());
   // Records are read server-side from v_financial_accounting_records: every current record of the selected year,
-  // filtered, searched and sorted in the database, 25 per page. The row policies of the book apply to the reader.
+  // filtered, searched and sorted in the database. The row policies of the book apply to the reader.
   useEffect(() => {
     if (view !== 'records' || !ownerId) { setRows(null); setHasMoreRows(false); setRowsError(''); return; }
     const bookId: string = ownerId;
@@ -148,18 +150,20 @@ export default function FinancialWorkpapers({ revision, onOpen }: { revision: nu
       if (unclassified) request = request.eq('record_kind', 'retained_bank_movement').is('section', null);
       const term = searchPattern(query);
       if (term !== '**') request = request.or(['description', 'category', 'decision', 'status', 'amount', 'account'].map(column => `${column}.ilike.${term}`).join(','));
-      void Promise.resolve(request.order(sort.column, { ascending: !sort.descending, nullsFirst: false }).order('id').range(tablePage * pageSize, tablePage * pageSize + pageSize)).then(result => {
+      let ordered = request.order(sort.column, { ascending: !sort.descending, nullsFirst: false });
+      if (sort.column === 'section') ordered = ordered.order('category', { ascending: !sort.descending, nullsFirst: false });
+      void Promise.resolve(ordered.order('id').range(tablePage * rowsPerPage, tablePage * rowsPerPage + rowsPerPage)).then(result => {
         if (cancelled) return;
         if (result.error || !Array.isArray(result.data)) { setRows(null); setHasMoreRows(false); setRowsError('Saved records could not load.'); return; }
         const page = result.data as SavedRecord[];
-        setRowsError(''); setRows(page.slice(0, pageSize)); setHasMoreRows(page.length > pageSize);
+        setRowsError(''); setRows(page.slice(0, rowsPerPage)); setHasMoreRows(page.length > rowsPerPage);
       }).catch(() => { if (!cancelled) { setRows(null); setHasMoreRows(false); setRowsError('Saved records could not load.'); } });
     };
     // Typing is debounced; every other change (filters, paging, refresh) reads at once.
     const typing = searched.current !== query; searched.current = query;
     const handle = typing ? window.setTimeout(run, 250) : (run(), 0);
     return () => { cancelled = true; window.clearTimeout(handle); };
-  }, [view, ownerId, selectedYear, account, kind, unclassified, query, sort, tablePage, revision, sessionRevision, liveRevision]);
+  }, [view, ownerId, selectedYear, account, kind, unclassified, query, sort, tablePage, rowsPerPage, revision, sessionRevision, liveRevision]);
   const sortBy = (column: SortColumn) => setSort(current => ({ column, descending: current.column === column ? !current.descending : column === 'record_date' || column === 'amount_value' }));
   const sortable = (column: SortColumn, label: string) => <th aria-sort={sort.column === column ? (sort.descending ? 'descending' : 'ascending') : undefined}><button type="button" className="accounting-sort" onClick={() => sortBy(column)}>{label}{sort.column === column ? (sort.descending ? ' ↓' : ' ↑') : ''}</button></th>;
   const chip = (label: string, pressed: boolean, onPress: () => void) => <button type="button" aria-pressed={pressed} onClick={onPress}>{label}</button>;
@@ -183,8 +187,8 @@ export default function FinancialWorkpapers({ revision, onOpen }: { revision: nu
   };
   const accountRows = controls.filter(row => row.year === selectedYear && (!account || row.account === account) && matches([row.account, row.section, row.currency]));
   const accounts = [...new Set((data?.controls || []).map(row => row.account).filter((value): value is string => !!value))].sort();
-  const offset = Math.min(tablePage, Math.max(0, Math.ceil(accountRows.length / 25) - 1)) * 25;
-  const recordsOffset = tablePage * pageSize;
+  const offset = Math.min(tablePage, Math.max(0, Math.ceil(accountRows.length / rowsPerPage) - 1)) * rowsPerPage;
+  const recordsOffset = tablePage * rowsPerPage;
   const changeView = (next: typeof view) => { setView(next); setQuery(''); setAccount(''); setKind(''); setUnclassified(false); setTablePage(0); };
   return <section className="accounting-books" aria-label="Saved bookkeeping">
     <div className="accounting-section-heading"><h2>Your books</h2><label>Year <select value={selectedYear || ''} onChange={event => { setYear(event.target.value); remember('year', event.target.value); }}>{years.map(value => <option key={value}>{value}</option>)}</select></label></div>
@@ -208,6 +212,7 @@ export default function FinancialWorkpapers({ revision, onOpen }: { revision: nu
       {view !== 'overview' && <>
         <div className="accounting-filters"><label>{view === 'records' ? 'Search records' : 'Search account breakdown'}<input type="search" value={query} onChange={event => setQuery(event.target.value)} /></label>
           <label>Account <select value={account} onChange={event => setAccount(event.target.value)}><option value="">All accounts</option>{accounts.map(value => <option key={value}>{value}</option>)}</select></label>
+          <label>Rows per page <select value={rowsPerPage} onChange={event => { setRowsPerPage(Number(event.target.value)); setTablePage(0); }}>{pageSizes.map(size => <option key={size} value={size}>{size}</option>)}</select></label>
           {view === 'records' && <div className="accounting-chips" role="group" aria-label="Record type">
             {chip('All records', !kind && !unclassified, () => { setKind(''); setUnclassified(false); })}
             {chip('Bookkeeping decisions', kind === 'retained_ledger_decision', () => { setKind('retained_ledger_decision'); setUnclassified(false); })}
@@ -223,21 +228,21 @@ export default function FinancialWorkpapers({ revision, onOpen }: { revision: nu
         </div>}
         {classifying && <ClassifyDialog targets={[...selected.values()]} onChanged={classified} onClose={() => setClassifying(false)} />}
         {view === 'records' ? <>
-          <p className="accounting-muted">Year {selectedYear || 'not recorded'}. Search and filters cover every saved record of the year, newest first.</p>
+          <p className="accounting-muted">Year {selectedYear || 'not recorded'}. Search and filters cover every saved record of the year. Sort by Date, Transaction / decision, Account, Classification or Amount; newest date first by default.</p>
           {rowsError && <p role="alert">{rowsError}</p>}
           {!rows && !rowsError && <p role="status">Loading saved records…</p>}
-          {rows && <div className="accounting-table-wrap"><table className={selecting ? 'accounting-records-table accounting-selecting' : 'accounting-records-table'}><thead><tr>{selecting && <th className="accounting-select"><input type="checkbox" aria-label="Select every record on this page" checked={pageSelected} disabled={!selectable.length} onChange={togglePage} /></th>}{sortable('record_date', 'Date')}<th className="accounting-cell-desc">Transaction / decision</th>{sortable('account', 'Account')}{sortable('section', 'Classification')}{sortable('amount_value', 'Amount')}<th className="accounting-cell-use">Vehicle / shop use</th><th className="accounting-cell-evidence">Evidence</th></tr></thead><tbody>{rows.map(row => <tr key={row.id} className="accounting-row" aria-selected={selecting ? selected.has(row.record.source_key || '') : undefined} onClick={() => selecting ? toggle(row) : onOpen(row.document_id, row.record)}>
+          {rows && <div className="accounting-table-wrap"><table className={selecting ? 'accounting-records-table accounting-selecting' : 'accounting-records-table'}><thead><tr>{selecting && <th className="accounting-select"><input type="checkbox" aria-label="Select every record on this page" checked={pageSelected} disabled={!selectable.length} onChange={togglePage} /></th>}{sortable('record_date', 'Date')}{sortable('description', 'Transaction / decision')}{sortable('account', 'Account')}{sortable('section', 'Classification')}{sortable('amount_value', 'Amount')}<th className="accounting-cell-use">Vehicle / shop use</th><th className="accounting-cell-evidence">Evidence</th></tr></thead><tbody>{rows.map(row => <tr key={row.id} className="accounting-row" aria-selected={selecting ? selected.has(row.record.source_key || '') : undefined} onClick={() => selecting ? toggle(row) : onOpen(row.document_id, row.record)}>
             {selecting && <td className="accounting-select"><input type="checkbox" aria-label={`Select ${recordDescription(row.record.description) || 'record'}`} checked={selected.has(row.record.source_key || '')} disabled={!row.record.source_key} onClick={event => event.stopPropagation()} onChange={() => toggle(row)} /></td>}
             <td className="accounting-cell-date">{row.record.date || row.record.year}</td><td className="accounting-cell-desc"><span className="accounting-record-description">{recordDescription(row.record.description) || 'Saved record'}</span><small>{row.record.record_kind === 'retained_bank_movement' ? 'Bank movement' : 'Bookkeeping decision'}</small></td><td className="accounting-cell-account">{row.record.account || 'Not recorded'}</td><td className="accounting-cell-class">{row.record.section || 'Unclassified'}<small>{row.record.category}</small></td><td className="accounting-number accounting-cell-amount">{displayMoney(row.record.amount, row.record.currency)}</td><td className="accounting-cell-use">{row.record.section === 'Expense' && row.record.record_kind === 'retained_ledger_decision' ? useError ? 'Use unavailable' : row.record.source_key && uses[row.record.source_key]?.destination_label || 'Unassigned' : '—'}</td><td className="accounting-cell-evidence"><button type="button" onClick={event => { event.stopPropagation(); onOpen(row.document_id, row.record); }}>View evidence</button></td>
           </tr>)}</tbody></table></div>}
           {rows && !rows.length && <p>No saved records match these filters for {selectedYear}.</p>}
         </> : <>
           <p className="accounting-muted">Complete saved bookkeeping controls for {selectedYear}. Each row is an account classification, not an account balance. Bank movements are excluded.</p>
-          {data.controls_valid && <div className="accounting-table-wrap"><table><thead><tr><th>Account</th><th>Classification</th><th>Amount</th><th>Records</th></tr></thead><tbody>{accountRows.slice(offset, offset + 25).map((row, i) => <tr key={i}><td>{row.account || 'Unresolved'}</td><td>{row.section || 'Unresolved'}</td><td className="accounting-number">{displayMoney(row.missing_amounts ? null : row.retained_amount, row.currency)}</td><td>{row.rows}</td></tr>)}</tbody></table></div>}
+          {data.controls_valid && <div className="accounting-table-wrap"><table><thead><tr><th>Account</th><th>Classification</th><th>Amount</th><th>Records</th></tr></thead><tbody>{accountRows.slice(offset, offset + rowsPerPage).map((row, i) => <tr key={i}><td>{row.account || 'Unresolved'}</td><td>{row.section || 'Unresolved'}</td><td className="accounting-number">{displayMoney(row.missing_amounts ? null : row.retained_amount, row.currency)}</td><td>{row.rows}</td></tr>)}</tbody></table></div>}
           {!accountRows.length && <p>No account classifications match this filter.</p>}
         </>}
-        {view === 'records' ? <div className="accounting-pagination"><span>{rows === null ? 'Matches unavailable' : rows.length ? `Showing ${recordsOffset + 1}–${recordsOffset + rows.length} records${hasMoreRows ? '; more available' : ''}` : 'No matching records'}</span><button type="button" disabled={recordsOffset === 0} onClick={() => setTablePage(value => value - 1)}>Previous 25</button><button type="button" disabled={!hasMoreRows} onClick={() => setTablePage(value => value + 1)}>Next 25</button></div>
-        : <div className="accounting-pagination"><span>{accountRows.length ? offset + 1 : 0}–{Math.min(offset + 25, accountRows.length)} of {accountRows.length} matches</span><button type="button" disabled={offset === 0} onClick={() => setTablePage(value => value - 1)}>Previous 25</button><button type="button" disabled={offset + 25 >= accountRows.length} onClick={() => setTablePage(value => value + 1)}>Next 25</button></div>}
+        {view === 'records' ? <div className="accounting-pagination"><span>{rows === null ? 'Matches unavailable' : rows.length ? `Showing ${recordsOffset + 1}–${recordsOffset + rows.length} records${hasMoreRows ? '; more available' : ''}` : 'No matching records'}</span><button type="button" disabled={recordsOffset === 0} onClick={() => setTablePage(value => value - 1)}>Previous {rowsPerPage}</button><button type="button" disabled={!hasMoreRows} onClick={() => setTablePage(value => value + 1)}>Next {rowsPerPage}</button></div>
+        : <div className="accounting-pagination"><span>{accountRows.length ? offset + 1 : 0}–{Math.min(offset + rowsPerPage, accountRows.length)} of {accountRows.length} matches</span><button type="button" disabled={offset === 0} onClick={() => setTablePage(value => value - 1)}>Previous {rowsPerPage}</button><button type="button" disabled={offset + rowsPerPage >= accountRows.length} onClick={() => setTablePage(value => value + 1)}>Next {rowsPerPage}</button></div>}
       </>}
     </>}
   </section>;
