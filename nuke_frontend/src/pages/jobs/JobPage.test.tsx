@@ -5,6 +5,8 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const fixture = vi.hoisted(() => ({ readers: {} as Record<string, unknown>, rpc: vi.fn() }));
+const auth = vi.hoisted(() => ({ user: null as {id:string} | null, loading: false }));
+vi.mock('../../hooks/useAuth', () => ({useAuth: () => auth}));
 vi.mock('../../hooks/useIsMobile', () => ({ useIsMobile: () => false }));
 vi.mock('../../lib/supabase', () => ({ supabase: { rpc: fixture.rpc } }));
 import JobPage from './JobPage';
@@ -43,6 +45,7 @@ function quotes(viewer: object) {
 
 let root: Root, host: HTMLDivElement;
 beforeEach(() => {
+  auth.user = null; auth.loading = false;
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   fixture.readers = {};
   fixture.rpc.mockReset();
@@ -192,4 +195,30 @@ describe('JobPage on a direct load', () => {
     expect(host.querySelector('h1')?.textContent).toBe('Loading the job…');
     script.remove();
   });
+});
+
+it('clears party-only reads immediately when the viewer changes and preserves same-viewer results', async () => {
+  auth.user = {id:'viewer-a'};
+  const party = {...visitor, context:'party', slots:['performer'], party:true, money_visible:true};
+  fixture.readers.work_order_job_path_read = path(party);
+  fixture.readers.work_order_invoices_read = invoices(party, [{witness_side:'payee', amount:812.34, currency:'USD'}]);
+  await render(); expect(host.textContent).toContain('812.34');
+  const readCount = fixture.rpc.mock.calls.length;
+  auth.user = {id:'viewer-a'};
+  await render(); expect(fixture.rpc).toHaveBeenCalledTimes(readCount);
+  auth.user = null;
+  fixture.rpc.mockImplementation(() => new Promise(() => {}));
+  await render();
+  expect(host.textContent).not.toContain('812.34'); expect(host.textContent).not.toContain('777.77');
+  expect(host.querySelector('[aria-busy="true"]')).not.toBeNull();
+});
+
+it('ignores a former viewer response that arrives after the public viewer mounts', async () => {
+  auth.user = {id:'viewer-a'};
+  const pending: ((value:unknown)=>void)[] = [];
+  fixture.rpc.mockImplementation(() => new Promise(resolve => pending.push(resolve)));
+  await render(); auth.user = null;
+  fixture.rpc.mockResolvedValue({data:path(visitor),error:null}); await render();
+  await act(async()=>{ for(const finish of pending) finish({data:{...path({...visitor,party:true}),display_title:'PRIVATE LATE JOB'},error:null}); });
+  expect(host.textContent).not.toContain('PRIVATE LATE JOB'); expect(host.querySelector('h1')?.textContent).toBe('Synthetic exhaust job');
 });
