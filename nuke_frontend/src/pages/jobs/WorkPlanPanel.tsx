@@ -9,6 +9,7 @@
  * Sign with the reader's own inspection_scope.
  */
 import React, { useEffect, useState } from 'react';
+import { useAuth } from '../../hooks/useAuth';
 import { Section, Text, Rows, Row } from '../../kit';
 import { PrefetchLink } from '../../components/PrefetchLink';
 import { SignSheet } from './SignSheet';
@@ -117,17 +118,28 @@ export function WorkPlanView({ vehicleId, plan, signedIn }: { vehicleId: string;
 }
 
 export default function WorkPlanPanel({ vehicleId, signedIn }: { vehicleId: string; signedIn: boolean }) {
+  const { user, loading } = useAuth();
+  if (loading) return <p role="status">Checking the viewer for the work plan…</p>;
+  return <ViewerWorkPlan key={`${user?.id ?? 'anonymous'}:${vehicleId}`} vehicleId={vehicleId} signedIn={signedIn} />;
+}
+
+function ViewerWorkPlan({ vehicleId, signedIn }: { vehicleId: string; signedIn: boolean }) {
   const [plan, setPlan] = useState<WorkPlan | null>(null);
   const [refusal, setRefusal] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     let cancelled = false;
-    void JobReaders.plan(vehicleId).then(r => {
+    setPlan(null); setRefusal(null);
+    void JobReaders.plan(vehicleId).then(result => {
       if (cancelled) return;
-      if (r.refusal) setRefusal(r.refusal.message); else setPlan(r.data);
-    });
+      if (result.refusal) setRefusal(result.refusal.message);
+      else if (result.data) setPlan(result.data);
+      else setRefusal('The plan reader returned no result.');
+    }).catch(() => { if (!cancelled) setRefusal('The work plan could not be loaded.'); });
     return () => { cancelled = true; };
-  }, [vehicleId]);
-  if (refusal) return <Text role="body">No work plan for this vehicle: {refusal}</Text>;
-  if (!plan) return <Text role="caption">Reading the listing…</Text>;
+  }, [vehicleId, attempt]);
+  if (refusal) return <div role="alert"><Text role="body">Work plan unavailable: {refusal}</Text>
+    <button type="button" className="btn-base btn-sm btn-secondary" onClick={() => setAttempt(value => value + 1)}>Retry work plan</button></div>;
+  if (!plan) return <p role="status">Reading the listing…</p>;
   return <WorkPlanView vehicleId={vehicleId} plan={plan} signedIn={signedIn} />;
 }

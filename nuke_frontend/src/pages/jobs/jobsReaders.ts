@@ -113,7 +113,8 @@ export type VehicleWorkOrdersRead = {
   vehicle_label?: VehicleLabel;
   viewer: JobViewer & { vehicle_access?: VehicleAccess };
   rows: WorkOrderRow[];
-  coverage: { returned: number; total_for_vehicle: number };
+  next_after?: string | null;
+  coverage: { returned: number; total_for_vehicle: number; population?: string };
 };
 
 export type PlanField = { status: string; values?: Array<{ source: string; raw?: unknown; value?: unknown; field_path?: string }> };
@@ -200,10 +201,6 @@ export function refusalText(error: { message?: string; code?: string } | null | 
   return 'Nuke could not do that right now.';
 }
 
-/** One plan read per vehicle per page session: the inspection call-to-action and Plan the work share it. */
-const planCache = new Map<string, Promise<RpcResult<WorkPlan>>>();
-export const clearPlanCache = () => planCache.clear();
-
 export type MatchProvider = {
   rank: number;
   provider: { kind?: string; profile_id?: string; handle?: string | null; label?: string } | null;
@@ -228,16 +225,11 @@ export type MatchesRead = {
 export const JobReaders = {
   openRequirements: (after: string | null) => call<OpenRequirementsRead>('open_requirements_read', { p_after: after, p_limit: 25, p_kind: null }),
   offers: (workOrderId: string) => call<OffersRead>('work_order_offers_read', { p_work_order_id: workOrderId }),
-  plan: (vehicleId: string) => {
-    const cached = planCache.get(vehicleId);
-    if (cached) return cached;
-    const p = call<WorkPlan>('listing_work_plan_read', { p_vehicle_id: vehicleId });
-    planCache.set(vehicleId, p);
-    void p.then(r => { if (r.refusal) planCache.delete(vehicleId); });
-    return p;
-  },
+  // Plans can include private vehicle evidence. Mounted consumers retain their own
+  // result; a process-wide promise must not survive a change of viewer.
+  plan: (vehicleId: string) => call<WorkPlan>('listing_work_plan_read', { p_vehicle_id: vehicleId }),
   matches: (workOrderId: string) => call<MatchesRead>('work_order_provider_matches_read', { p_work_order_id: workOrderId, p_limit: 25 }),
-  vehicleWorkOrders: (vehicleId: string) => call<VehicleWorkOrdersRead>('vehicle_work_orders_read', { p_vehicle_id: vehicleId, p_after: null, p_limit: 25 }),
+  vehicleWorkOrders: (vehicleId: string, after: string | null = null) => call<VehicleWorkOrdersRead>('vehicle_work_orders_read', { p_vehicle_id: vehicleId, p_after: after, p_limit: 25 }),
   signatureQueue: () => call<SignQueueRead>('my_signature_queue', {}),
   myWorkOrders: (after: string | null) => call<MyWorkOrdersRead>('my_work_orders', { p_slot: null, p_after: after, p_limit: 25 }),
 };
