@@ -67,3 +67,13 @@ textarea.jb-input { resize: vertical; min-height: 96px; }
   .jb-sheet-backdrop { align-items: flex-end; padding: 12px; }
   .jb-sheet { max-height: calc(100dvh - 24px); }
 }
+
+/* Standalone vehicle work keeps the recorded identity beside its jobs. */
+.jb-vehicle-context { display: grid; gap: 8px; padding: 16px 0; }
+.jb-vehicle-context h2 { margin: 0; overflow-wrap: anywhere; }
+.jb-vehicle-navigation a { display: inline-flex; align-items: center; padding: 4px 8px; min-height: var(--control-height); color: var(--link); }
+@media (max-width: 767px) {
+  .jb-vehicle-work .btn-base { min-height: var(--control-height); }
+  .jb-vehicle-work .jb-actions > a,
+  .jb-vehicle-work .jb-row > a { display: flex; align-items: center; min-height: var(--control-height); }
+}

@@ -9,6 +9,7 @@ const fixture = vi.hoisted(() => ({
   rpc: vi.fn(),
   session: null as null | { user: { id: string } },
 }));
+vi.mock('../../hooks/useAuth', () => ({ useAuth: () => ({ user: null, loading: false }) }));
 vi.mock('../../lib/supabase', () => ({ supabase: { rpc: fixture.rpc } }));
 vi.mock('../../contexts/AuthContext', () => ({ useAuthContext: () => ({ session: fixture.session }) }));
 vi.mock('../../hooks/usePageTitle', () => ({ usePageTitle: () => {} }));

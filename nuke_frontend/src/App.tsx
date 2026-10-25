@@ -1,10 +1,10 @@
 import React, { Suspense } from 'react';
 import { BrowserRouter as Router, Route, Routes, useLocation, Navigate } from 'react-router-dom';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { BrandingProvider } from './branding/BrandingContext';
 import ModeAutoController from './branding/ModeAutoController';
 import { AuthProvider } from './contexts/AuthContext';
+import { ViewerWorkspace } from './components/auth/ViewerWorkspace';
 import { ToastProvider } from './components/ui/Toast';
 import { ToastProvider as OldToastProvider } from './hooks/useToast';
 import { UploadStatusProvider } from './contexts/UploadStatusContext';
@@ -27,12 +27,6 @@ const OneMap = React.lazy(() => import('./components/map/OneMap'));
 const VehicleShowcase = React.lazy(() => import('./pages/showcase/VehicleShowcase'));
 const DeckPage = React.lazy(() => import('./pages/DeckPage'));
 const ShareWiring = React.lazy(() => import('./pages/ShareWiring'));
-
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: { staleTime: 5 * 60 * 1000, retry: 1 },
-  },
-});
 
 const LazyFallback = <div className="p-6"><LoadingSkeleton variant="card-list" count={6} ariaLabel="Loading page" /></div>;
 
@@ -114,9 +108,8 @@ function RoutedApp() {
 
 export default function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-    {/* AuthProvider is outermost so every hook and page reads from the same
-        single cached session — no per-component getSession() calls needed. */}
+    /* AuthProvider is outermost so every hook and page reads from the same
+        single cached session — no per-component getSession() calls needed. */
     <AuthProvider>
     <ThemeProvider>
       <BrandingProvider>
@@ -125,7 +118,9 @@ export default function App() {
         <OldToastProvider>
           <UploadStatusProvider>
             <Router>
-              <RoutedApp />
+              <ViewerWorkspace fallback={LazyFallback}>
+                <RoutedApp />
+              </ViewerWorkspace>
             </Router>
           </UploadStatusProvider>
 
@@ -136,7 +131,6 @@ export default function App() {
       </BrandingProvider>
     </ThemeProvider>
     </AuthProvider>
-    </QueryClientProvider>
   );
 }
 

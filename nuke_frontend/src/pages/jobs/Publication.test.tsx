@@ -6,6 +6,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const fixture = vi.hoisted(() => ({ readers: {} as Record<string, unknown>, rpc: vi.fn() }));
+vi.mock('../../hooks/useAuth', () => ({ useAuth: () => ({ user: null, loading: false }) }));
 vi.mock('../../hooks/useIsMobile', () => ({ useIsMobile: () => false }));
 vi.mock('../../lib/supabase', () => ({ supabase: { rpc: fixture.rpc } }));
 import { JobPublication } from './Publication';

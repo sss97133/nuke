@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { Text } from '../../kit';
@@ -18,6 +18,9 @@ export function ContactViaNuke({ contact, signedIn, recipient }: { contact: Json
   const [message, setMessage] = useState('');
   const [failure, setFailure] = useState<string | null>(null);
   const [left, setLeft] = useState<number | null>(null);
+  const generation = useRef(0);
+  const pending = useRef(false);
+  useEffect(() => () => { generation.current++; pending.current = false; }, []);
   const open = signedIn && contact?.available === true;
   useEffect(() => {
     if (!open) return;
@@ -40,19 +43,31 @@ export function ContactViaNuke({ contact, signedIn, recipient }: { contact: Json
   }
 
   const send = async () => {
-    setPhase('sending');
-    setFailure(null);
+    if (pending.current) return;
+    pending.current = true;
+    const attempt = generation.current;
+    setPhase('sending'); setFailure(null);
     const recipientUser = str(request.recipient_user_id);
-    const { error } = await supabase.rpc('request_contact', {
-      p_context_kind: str(request.context_kind),
-      p_context_id: str(request.context_id),
-      p_message: message.trim(),
-      p_recipient_user_id: recipientUser,
-      p_recipient_actor_id: recipientUser ? null : str(request.recipient_actor_id),
-      p_recipient_organization_id: null,
-    });
-    if (error) { setFailure(refusal(error)); setPhase('confirming'); return; }
-    setPhase('sent');
+    try {
+      const { data, error } = await supabase.rpc('request_contact', {
+        p_context_kind: str(request.context_kind),
+        p_context_id: str(request.context_id),
+        p_message: message.trim(),
+        p_recipient_user_id: recipientUser,
+        p_recipient_actor_id: recipientUser ? null : str(request.recipient_actor_id),
+        p_recipient_organization_id: null,
+      });
+      if (generation.current !== attempt) return;
+      if (error) { setFailure(refusal(error)); setPhase('confirming'); return; }
+      if (!str(obj(data)?.request_id)) {
+        setFailure('The request could not be confirmed. Check Messages before trying again.'); setPhase('confirming'); return;
+      }
+      setPhase('sent');
+    } catch {
+      if (generation.current === attempt) { setFailure('The request could not be confirmed. Check Messages before trying again.'); setPhase('confirming'); }
+    } finally {
+      if (generation.current === attempt) pending.current = false;
+    }
   };
 
   if (phase === 'sent') return <div role="status"><Text role="body" as="p">Request sent in Nuke. Their answer shows in <a className="job-link" href="/messages">Messages</a>. Your email and phone are never shared.</Text></div>;
