@@ -259,9 +259,9 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
     <div className="search-results" style={{ padding: '0' }}>
       {/* Search Summary header — only show if we have results or a summary message */}
       {(results.length > 0 || searchSummary) && (
-        <div style={{
+        <div className="search-results-summary" style={{
           background: 'var(--surface)',
-          border: '2px solid var(--text)', padding: '10px 14px',
+          border: '1px solid var(--border)', padding: '10px 14px',
           marginBottom: '12px'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
@@ -293,14 +293,10 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
             {results.length > 0 && (
               <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
                 {filterBy !== 'all' && (
-                  <button
+                  <button type="button" className="search-result-control"
                     style={{
                       padding: '3px 8px',
-                      fontSize: '7.5pt',
                       fontWeight: 700,
-                      border: '2px solid var(--text)',
-                      background: 'var(--text)',
-                      color: 'var(--bg)',
                       cursor: 'pointer',
                     }}
                     onClick={() => setFilterBy('all')}
@@ -313,33 +309,19 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
                   if (count === 0) return null;
                   const isActive = filterBy === type;
                   return (
-                    <button
+                    <button type="button" className="search-result-control"
                       key={type}
+                      aria-pressed={isActive}
                       style={{
                         display: 'flex',
                         alignItems: 'center',
                         gap: '4px',
-                        background: isActive ? 'var(--text)' : 'var(--surface)',
-                        border: `2px solid ${isActive ? 'var(--text)' : 'var(--border)'}`,
-                        padding: '3px 8px', fontSize: '7.5pt',
+                        padding: '3px 8px',
                         fontWeight: 700,
-                        color: isActive ? 'var(--bg)' : 'var(--text)',
                         cursor: 'pointer',
                         transition: 'all 180ms cubic-bezier(0.16, 1, 0.3, 1)',
                       }}
                       onClick={() => { setFilterBy(type); setViewMode('cards'); }}
-                      onMouseEnter={(e) => {
-                        if (!isActive) {
-                          e.currentTarget.style.borderColor = 'var(--text)';
-                          e.currentTarget.style.background = 'var(--bg)';
-                        }
-                      }}
-                      onMouseLeave={(e) => {
-                        if (!isActive) {
-                          e.currentTarget.style.borderColor = 'var(--border)';
-                          e.currentTarget.style.background = 'var(--surface)';
-                        }
-                      }}
                     >
                       <span>{typeLabels[type] || type}</span>
                       <span style={{ opacity: 0.7, fontWeight: 600 }}>{count}</span>
@@ -367,14 +349,11 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
                 Jump into the slice you care about.
               </div>
             </div>
-            <button
+            <button type="button" className="search-result-control"
               onClick={() => setShowBazaar(false)}
               style={{
                 padding: '4px 8px',
-                fontSize: '11px',
                 fontWeight: 700,
-                border: '2px solid var(--text)',
-                background: 'var(--surface)',
                 cursor: 'pointer'
               }}
             >
@@ -396,18 +375,16 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
                       if (count === 0) return null;
                       const isActive = filterBy === type;
                       return (
-                        <button
+                        <button type="button" className="search-result-control"
                           key={type}
+                      aria-pressed={isActive}
                           onClick={() => {
                             setFilterBy(type);
                             setViewMode('cards');
                           }}
                           style={{
                             padding: '3px 6px',
-                            fontSize: '9px',
                             fontWeight: 700,
-                            border: `2px solid ${isActive ? 'var(--accent)' : 'var(--text)'}`,
-                            background: isActive ? 'var(--bg)' : 'var(--surface)',
                             cursor: 'pointer'
                           }}
                         >
@@ -467,18 +444,14 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
         }}>
           <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
             {(['cards', 'list'] as const).map(mode => (
-              <button
+              <button type="button" className="search-result-control"
                 key={mode}
+                aria-pressed={viewMode === mode}
                 onClick={() => setViewMode(mode)}
                 style={{
                   padding: '4px 10px',
-                  fontSize: '7.5pt',
                   fontWeight: 700,
-                  textTransform: 'uppercase',
-                  border: '2px solid var(--text)', background: viewMode === mode ? 'var(--text)' : 'var(--surface)',
-                  color: viewMode === mode ? 'var(--surface)' : 'var(--text)',
                   cursor: 'pointer',
-                  letterSpacing: '0.3px',
                 }}
               >
                 {mode === 'cards' ? 'Grid' : 'List'}
@@ -488,15 +461,12 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
 
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
             <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-              <span style={{ fontSize: '7.5pt', fontWeight: 600, color: 'var(--text-secondary)' }}>Sort</span>
-              <select
+              <span style={{ fontSize: 'var(--text-caption)', fontWeight: 600, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>Sort</span>
+              <select className="search-result-control" aria-label="Sort search results"
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as any)}
                 style={{
-                  fontSize: '7.5pt',
                   padding: '3px 6px',
-                  border: '2px solid var(--text)', background: 'var(--surface)',
-                  color: 'var(--text)',
                   fontWeight: 600,
                   cursor: 'pointer',
                 }}
@@ -537,15 +507,11 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
               : 'Try different keywords, check spelling, or search by make and model.'}
           </p>
           {filterBy !== 'all' && (
-            <button
+            <button type="button" className="search-result-control"
               onClick={() => setFilterBy('all')}
               style={{
                 padding: '6px 14px',
-                fontSize: '11px',
                 fontWeight: 700,
-                border: '2px solid var(--text)',
-                background: 'var(--surface)',
-                color: 'var(--text)',
                 cursor: 'pointer',
                 marginBottom: '20px',
               }}
@@ -904,18 +870,12 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
           justifyContent: 'center',
           padding: '24px 0 12px',
         }}>
-          <button
+          <button type="button" className="search-result-control"
             onClick={onLoadMore}
             disabled={loadingMore}
             style={{
               padding: '10px 32px',
-              fontSize: '11px',
               fontWeight: 700,
-              textTransform: 'uppercase',
-              letterSpacing: '0.5px',
-              border: '2px solid var(--text)',
-              background: loadingMore ? 'var(--surface)' : 'var(--bg)',
-              color: loadingMore ? 'var(--text-secondary)' : 'var(--text)',
               cursor: loadingMore ? 'not-allowed' : 'pointer',
               transition: 'all 180ms cubic-bezier(0.16, 1, 0.3, 1)',
             }}

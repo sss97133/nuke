@@ -1,5 +1,7 @@
 import React, { useRef, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
+import Link from '../components/PrefetchLink';
+import { Button } from '../components/ui/button';
 import { useSearchPage } from '../hooks/useSearchPage';
 import { useSearchEmptyState } from '../hooks/useSearchEmptyState';
 import SearchResults from '../components/search/SearchResults';
@@ -8,99 +10,29 @@ import { SearchStatsBar } from '../components/search/SearchStatsBar';
 import { SearchEmptyState } from '../components/search/SearchEmptyState';
 import type { UrlExtraction } from '../hooks/useSearchPage';
 import '../styles/unified-design-system.css';
+import './search-page.css';
 
 /* ─── URL Extraction Card ─── */
-function UrlExtractionCard({ extraction }: { extraction: UrlExtraction }) {
+function UrlExtractionCard({ extraction, onImport }: { extraction: UrlExtraction; onImport: () => void }) {
   const { status, url, platform, error } = extraction;
 
   let domain = '';
   try { domain = new URL(url).hostname.replace(/^www\./, ''); } catch { domain = url; }
 
   return (
-    <div style={{ maxWidth: '560px', margin: '40px auto', padding: '0 12px' }}>
-      <style>{`
-        @keyframes nuke-scan {
-          0% { transform: translateX(-100%); }
-          100% { transform: translateX(100%); }
-        }
-      `}</style>
-
-      <div style={{
-        border: '2px solid var(--text)',
-        background: 'var(--surface)',
-        overflow: 'hidden',
-      }}>
-        {status === 'extracting' && (
-          <div style={{ height: '3px', background: 'var(--border)', overflow: 'hidden', position: 'relative' }}>
-            <div style={{
-              position: 'absolute', top: 0, left: 0, width: '60%', height: '100%',
-              background: 'var(--text)',
-              animation: 'nuke-scan 1.2s ease-in-out infinite',
-            }} />
-          </div>
-        )}
-        {status === 'error' && (
-          <div style={{ height: '3px', background: 'var(--error, #c00)' }} />
-        )}
-
-        <div style={{ padding: '20px 24px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
-            {platform && (
-              <span style={{
-                background: 'var(--text)',
-                color: 'var(--bg)',
-                padding: '3px 10px',
-                fontSize: '10px',
-                fontWeight: 800,
-                letterSpacing: '1px',
-              }}>
-                {platform.short}
-              </span>
-            )}
-            <span style={{
-              fontFamily: "'Courier New', monospace",
-              fontSize: '11px',
-              color: 'var(--text-secondary)',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-            }}>
-              {domain}
-            </span>
-          </div>
-
-          {status === 'extracting' && (
-            <div style={{ fontSize: '15px', fontWeight: 800, color: 'var(--text)' }}>
-              Extracting vehicle data...
-            </div>
-          )}
-
-          {status === 'error' && (
-            <>
-              <div style={{ fontSize: '15px', fontWeight: 800, color: 'var(--text)', marginBottom: '8px' }}>
-                Extraction failed
-              </div>
-              <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '12px' }}>
-                {error}
-              </div>
-              <a
-                href={url}
-                target="_blank"
-                rel="noreferrer"
-                style={{
-                  fontSize: '11px',
-                  fontWeight: 700,
-                  color: 'var(--text)',
-                  textDecoration: 'underline',
-                }}
-              >
-                Open original listing
-              </a>
-            </>
-          )}
-        </div>
-      </div>
-    </div>
+    <section className="search-import-card" aria-label="Listing import">
+      <h2>{status === 'ready' ? 'Import this listing' : status === 'error' ? 'Import failed' : 'Importing listing'}</h2>
+      {platform && <p className="search-import-platform">{platform.short}</p>}
+      <a href={url} target="_blank" rel="noreferrer" className="search-import-source">
+        Open original listing · {domain}
+      </a>
+      {status === 'ready' && <p>Read the listing and add or enrich its vehicle record.</p>}
+      {status === 'extracting' && <p role="status">Importing vehicle data…</p>}
+      {status === 'error' && <p role="alert">{error}</p>}
+      {(status === 'ready' || status === 'error') && <Button type="button" onClick={onImport}>
+        {status === 'ready' ? 'Import listing' : 'Retry import'}
+      </Button>}
+    </section>
   );
 }
 
@@ -109,86 +41,22 @@ function SearchPageInput({ initialQuery }: { initialQuery: string }) {
   const [value, setValue] = useState(initialQuery);
   const [, setSearchParams] = useSearchParams();
   const inputRef = useRef<HTMLInputElement>(null);
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = (event: React.FormEvent) => {
+    event.preventDefault();
     const q = value.trim();
-    if (!q) return;
-    setSearchParams({ q });
+    setSearchParams(q ? { q } : {});
   };
-
   return (
-    <form onSubmit={handleSubmit} style={{ display: 'flex', gap: '0', width: '100%' }}>
-      <div style={{
-        flex: 1,
-        display: 'flex',
-        alignItems: 'center',
-        border: '2px solid var(--text)',
-        background: 'var(--surface)',
-        padding: '0 10px',
-        height: '36px',
-      }}>
-        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="var(--text-secondary)" strokeWidth="2" style={{ flexShrink: 0, marginRight: '8px' }}>
-          <circle cx="6.5" cy="6.5" r="5.5" />
-          <line x1="11" y1="11" x2="15" y2="15" />
-        </svg>
-        <input
-          ref={inputRef}
-          type="text"
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          placeholder="Search vehicles, VINs, makes, models..."
-          spellCheck={false}
-          autoComplete="off"
-          autoFocus={!initialQuery}
-          style={{
-            flex: 1,
-            border: 'none',
-            background: 'transparent',
-            outline: 'none',
-            fontFamily: 'Arial, sans-serif',
-            fontSize: '11px',
-            color: 'var(--text)',
-            padding: '0',
-          }}
-        />
-        {value && (
-          <button
-            type="button"
-            onClick={() => { setValue(''); inputRef.current?.focus(); }}
-            style={{
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              fontSize: '14px',
-              color: 'var(--text-secondary)',
-              padding: '0 4px',
-              lineHeight: 1,
-            }}
-          >
-            &times;
-          </button>
-        )}
+    <form onSubmit={handleSubmit} className="search-page-form" role="search">
+      <div className="search-page-input">
+        <input ref={inputRef} type="search" aria-label="Search vehicles and records"
+          value={value} onChange={event => setValue(event.target.value)}
+          placeholder="Vehicles, VINs, makes, models…" spellCheck={false}
+          autoComplete="off" autoFocus={!initialQuery} />
+        {value && <Button variant="ghost" type="button" aria-label="Clear search"
+          onClick={() => { setValue(''); setSearchParams({}); inputRef.current?.focus(); }}>×</Button>}
       </div>
-      <button
-        type="submit"
-        style={{
-          background: 'var(--text)',
-          color: 'var(--bg)',
-          border: '2px solid var(--text)',
-          borderLeft: 'none',
-          padding: '0 16px',
-          fontSize: '9px',
-          fontWeight: 800,
-          fontFamily: 'Arial, sans-serif',
-          textTransform: 'uppercase',
-          letterSpacing: '0.5px',
-          cursor: 'pointer',
-          height: '36px',
-        }}
-      >
-        SEARCH
-      </button>
+      <Button type="submit">Search</Button>
     </form>
   );
 }
@@ -210,16 +78,20 @@ export default function Search() {
     handleLoadMore,
     loadingMore,
     loadMoreError,
+    searchError,
+    retrySearch,
     browseStats,
     detectedMake,
     urlExtraction,
+    startUrlImport,
   } = useSearchPage();
 
   const emptyState = useSearchEmptyState(!query);
   const resultsRef = useRef<HTMLDivElement | null>(null);
 
   return (
-    <div style={{ padding: '12px', maxWidth: '1200px', margin: '0 auto' }}>
+    <main className="search-page">
+      <h1>Search</h1>
 
       {/* Search input — always visible on search page */}
       <div style={{ marginBottom: '16px' }}>
@@ -228,14 +100,14 @@ export default function Search() {
 
       {/* URL Extraction */}
       {urlExtraction && (
-        <UrlExtractionCard extraction={urlExtraction} />
+        <UrlExtractionCard extraction={urlExtraction} onImport={() => void startUrlImport()} />
       )}
 
       {/* Active search: filters + results */}
       {query && !urlExtraction && (
         <>
           {vehicleCount > 0 && (
-            <p style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+            <p style={{ color: 'var(--text-secondary)' }}>
               {displayVehicleCount} of {vehicleCount} loaded vehicle records shown.
               {' '}Recorded prices may be past sales, estimates, or asks. Current purchase availability is unverified.
               {(filters.priceMin || filters.priceMax) && ' Price bounds apply to these loaded records; unknown prices are excluded. This is not an exhaustive market shortlist.'}
@@ -243,14 +115,14 @@ export default function Search() {
           )}
           {/* Cohort terminal link — only when the query is a clean year-make-model */}
           {cohortTarget && (
-            <Link
+            <Link className="search-page-link"
               to={cohortTarget.path}
               style={{
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
                 gap: '12px',
-                border: '2px solid var(--text)',
+                border: '1px solid var(--border)',
                 background: 'var(--surface)',
                 padding: '10px 14px',
                 marginBottom: '12px',
@@ -261,14 +133,14 @@ export default function Search() {
               onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; }}
             >
               <div>
-                <div style={{ fontSize: '8px', fontWeight: 800, letterSpacing: '1.5px', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
+                <div style={{ fontWeight: 800, color: 'var(--text-muted)' }}>
                   Cohort Terminal
                 </div>
-                <div style={{ fontSize: '13px', fontWeight: 800, color: 'var(--text)' }}>
+                <div style={{ fontWeight: 800, color: 'var(--text)' }}>
                   {cohortTarget.label}
                 </div>
               </div>
-              <div style={{ fontSize: '10px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text)' }}>
+              <div style={{ fontWeight: 800, color: 'var(--text)' }}>
                 View terminal &rarr;
               </div>
             </Link>
@@ -286,7 +158,10 @@ export default function Search() {
 
           {/* Results */}
           <div ref={resultsRef}>
-            <SearchResults
+            {searchError ? <section className="search-page-error" role="alert">
+              <h2>Search unavailable</h2><p>{searchError}</p>
+              <Button type="button" variant="secondary" onClick={retrySearch}>Retry search</Button>
+            </section> : <SearchResults
               results={displayResults}
               searchSummary={searchSummary}
               loading={loading}
@@ -298,7 +173,7 @@ export default function Search() {
               onLoadMore={handleLoadMore}
               loadingMore={loadingMore}
               loadMoreError={loadMoreError}
-            />
+            />}
           </div>
 
           {/* Browse stats — context about the make */}
@@ -309,16 +184,12 @@ export default function Search() {
           {/* View in Feed link */}
           {displayResults.length > 0 && (
             <div style={{ padding: '12px 0', textAlign: 'right' }}>
-              <Link
+              <Link className="search-page-link"
                 to={`/?tab=feed&q=${encodeURIComponent(query)}`}
                 style={{
-                  fontFamily: "'Courier New', monospace",
-                  fontSize: '9px',
                   fontWeight: 800,
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.3px',
                   padding: '4px 14px',
-                  border: '2px solid var(--text)',
+                  border: '1px solid var(--border)',
                   background: 'var(--surface)',
                   color: 'var(--text)',
                   textDecoration: 'none',
@@ -345,6 +216,6 @@ export default function Search() {
           loading={emptyState.loading}
         />
       )}
-    </div>
+    </main>
   );
 }

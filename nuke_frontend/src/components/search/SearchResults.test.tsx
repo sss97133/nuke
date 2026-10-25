@@ -74,3 +74,14 @@ it('does not offer continuation for a truly exhausted empty result set', async (
   expect(container.querySelector('[role="status"]')).toBeNull();
   expect([...container.querySelectorAll('button')].some(button => button.textContent?.startsWith('Load more'))).toBe(false);
 });
+
+
+it('exposes sort and view controls with their current selection', async () => {
+  await act(async () => root.render(<SearchResults results={results} searchSummary="Loaded 1 result." />));
+  expect(container.querySelector('[aria-label="Sort search results"]')).not.toBeNull();
+  const grid = [...container.querySelectorAll('button')].find(button => button.textContent === 'Grid')!;
+  const list = [...container.querySelectorAll('button')].find(button => button.textContent === 'List')!;
+  expect(grid.getAttribute('aria-pressed')).toBe('true'); expect(list.getAttribute('aria-pressed')).toBe('false');
+  await act(async () => list.click());
+  expect(grid.getAttribute('aria-pressed')).toBe('false'); expect(list.getAttribute('aria-pressed')).toBe('true');
+});
