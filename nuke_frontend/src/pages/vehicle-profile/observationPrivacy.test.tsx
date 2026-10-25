@@ -7,6 +7,9 @@ import { publicObservationData, publicObservationArtifact } from './observationP
 import ObservationPage from './ObservationPage';
 import DayPage from './DayPage';
 
+// This contract inspects the resolved public reader, not the auth-loading gate.
+vi.mock('../../hooks/useAuth', () => ({ useAuth: () => ({ user: null, loading: false }) }));
+
 const { example, related } = vi.hoisted(() => ({
   example: {
     id: 'observation-example', vehicle_id: 'vehicle-example', kind: 'condition',
