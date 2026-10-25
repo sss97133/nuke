@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAccountingBook } from './AccountingBookContext';
+import { dollars, pacific, readActivityPasses, type ActivityPass } from '../../services/accountingCloseout';
 
 export type Activity = { document_id: string; source_filename: string | null; run_id: string; actor_user_id: string | null; method: string | null; recorded_at: string; records_changed: number; first_reading: boolean };
 
@@ -21,6 +22,45 @@ export function ago(iso: string, now = Date.now()): string {
   if (seconds < 3600) return `${Math.round(seconds / 60)} min ago`;
   if (seconds < 86400) return `${Math.round(seconds / 3600)} h ago`;
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+/** Who ran a pass: a person from the book's grants, or an agent named by its run family. */
+export function passWho(pass: ActivityPass, people: Record<string, string>): string {
+  const family = `${pass.run_family || ''} ${pass.method || ''}`;
+  if (/agent|sdk|reconciliation|import|-books\b/i.test(family)) {
+    const name = (pass.run_family || pass.method || 'agent').replace(/[-_]+/g, ' ').replace(/\s*\b20\d{6}\b.*$/, '').trim();
+    return `Agent · ${name}`;
+  }
+  return (pass.actor_user_id && people[pass.actor_user_id]) || 'A reviewer';
+}
+/** What a pass did, per year, in words. */
+export function passWhat(pass: ActivityPass): string {
+  const years = Object.entries(pass.years).sort(([a], [b]) => b.localeCompare(a))
+    .map(([year, y]) => `${year}: ${y.records.toLocaleString('en-US')} ${y.records === 1 ? 'record' : 'records'}${y.amount ? `, ${dollars(y.amount)} touched` : ''}`);
+  return [pass.records_changed ? `${pass.records_changed.toLocaleString('en-US')} ${pass.records_changed === 1 ? 'record' : 'records'} changed` : `${pass.revisions} evidence ${pass.revisions === 1 ? 'update' : 'updates'}`,
+    ...years, pass.questions_opened ? `${pass.questions_opened} ${pass.questions_opened === 1 ? 'question' : 'questions'} opened` : null].filter(Boolean).join(' · ');
+}
+
+/** One line per pass (agent run or person session), newest first. */
+export function ActivityPasses({ people, onOpen }: { people: Record<string, string>; onOpen: (documentId: string) => void }) {
+  const { ownerId, liveRevision } = useAccountingBook();
+  const [passes, setPasses] = useState<{ ownerId: string; rows: ActivityPass[] | null; failed: boolean } | null>(null);
+  useEffect(() => {
+    if (!ownerId) return;
+    let cancelled = false;
+    readActivityPasses(ownerId, 12).then(rows => { if (!cancelled) setPasses({ ownerId, rows, failed: false }); })
+      .catch(() => { if (!cancelled) setPasses(previous => ({ ownerId, rows: previous?.ownerId === ownerId ? previous.rows : null, failed: true })); });
+    return () => { cancelled = true; };
+  }, [ownerId, liveRevision]);
+  if (!ownerId || passes?.ownerId !== ownerId) return null;
+  if (!passes.rows?.length) return passes.failed ? <p role="status" className="accounting-muted">Passes could not load.</p> : null;
+  return <section aria-label="Changes by pass"><h3>Changes by pass</h3>
+    <ol className="accounting-activity-passes">{passes.rows.map(pass => <li key={`${pass.actor_user_id}:${pass.run_family}:${pass.method}:${pass.started_at}`}>
+      <button type="button" onClick={() => onOpen(pass.latest_document_id)}><strong>{passWho(pass, people)}</strong>
+        <span className="accounting-muted">{pacific(pass.started_at)}{pass.ended_at !== pass.started_at ? ` to ${pacific(pass.ended_at)}` : ''}{pass.partial ? ' (earlier part not shown)' : ''}</span>
+        <span>{passWhat(pass)}</span></button>
+    </li>)}</ol>
+  </section>;
 }
 
 /** The book's latest attributed revisions, refreshed with the shared ledger. Changes by others since this page opened
