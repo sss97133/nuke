@@ -10,7 +10,11 @@
  * resource — not a popup.
  */
 import React, { useEffect, useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
+import Link from '../../components/PrefetchLink';
+import { useAuth } from '../../hooks/useAuth';
+import { Button } from '../../components/ui/button';
+import './vehicle-evidence-detail.css';
 import { supabase } from '../../lib/supabase';
 import { optimizeImageUrl } from '../../lib/imageOptimizer';
 import { publicObservationData, publicObservationArtifact, OBSERVATION_PRIVACY_NOTICE } from './observationPrivacy';
@@ -75,7 +79,7 @@ const labelCase = (key: string): string =>
     .replace(/_/g, ' ')
     .replace(/\b\w/g, (c) => c.toUpperCase());
 
-const ObservationPage: React.FC = () => {
+const ObservationPageContent: React.FC = () => {
   const { vehicleId, obsId } = useParams<{ vehicleId: string; obsId: string }>();
   const [vehicle, setVehicle] = useState<VehicleSummary | null>(null);
   const [observation, setObs] = useState<ObservationRow | null>(null);
@@ -86,6 +90,9 @@ const ObservationPage: React.FC = () => {
   const [witnessImageUrl, setWitnessImageUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [readAttempt, setReadAttempt] = useState(0);
+  const [linksLoading, setLinksLoading] = useState(false);
+  const [linksUnavailable, setLinksUnavailable] = useState(false);
   const subject = `${vehicleId}:${obsId}`;
   const obs = loadedSubject === subject ? observation : null;
 
@@ -102,6 +109,8 @@ const ObservationPage: React.FC = () => {
     setRelated([]);
     setSupersededBy(null);
     setSupersedes(null);
+    setLinksLoading(false);
+    setLinksUnavailable(false);
 
     (async () => {
       try {
@@ -150,6 +159,7 @@ const ObservationPage: React.FC = () => {
 
         // Lineage walks — best-effort, non-blocking
         const lineageQueries: Promise<void>[] = [];
+        setLinksLoading(true);
         if (observation.superseded_by) {
           lineageQueries.push(
             supabase
@@ -161,8 +171,9 @@ const ObservationPage: React.FC = () => {
               .eq('vehicle_id', vehicleId)
               .abortSignal(controller.signal)
               .maybeSingle()
-              .then(({ data }) => {
-                if (!cancelled && data?.vehicle_id === vehicleId && data.id === observation.superseded_by) setSupersededBy(data as ObservationRow);
+              .then(({ data, error }) => {
+                if (!cancelled && error) setLinksUnavailable(true);
+                if (!cancelled && !error && data?.vehicle_id === vehicleId && data.id === observation.superseded_by) setSupersededBy(data as ObservationRow);
               }) as unknown as Promise<void>,
           );
         }
@@ -178,8 +189,9 @@ const ObservationPage: React.FC = () => {
               .eq('vehicle_id', vehicleId)
               .abortSignal(controller.signal)
               .maybeSingle()
-              .then(({ data }) => {
-                if (!cancelled && data?.vehicle_id === vehicleId && data.id === originalId) setSupersedes(data as ObservationRow);
+              .then(({ data, error }) => {
+                if (!cancelled && error) setLinksUnavailable(true);
+                if (!cancelled && !error && data?.vehicle_id === vehicleId && data.id === originalId) setSupersedes(data as ObservationRow);
               }) as unknown as Promise<void>,
           );
         }
@@ -198,8 +210,9 @@ const ObservationPage: React.FC = () => {
               .order('observed_at', { ascending: false })
               .limit(10)
               .abortSignal(controller.signal)
-              .then(({ data }) => {
-                if (!cancelled && data) {
+              .then(({ data, error }) => {
+                if (!cancelled && error) setLinksUnavailable(true);
+                if (!cancelled && !error && data) {
                   setRelated(
                     (data as any[]).filter(r => r.vehicle_id === vehicleId && r.id !== obsId).map((r) => ({
                       id: r.id,
@@ -214,7 +227,11 @@ const ObservationPage: React.FC = () => {
           );
         }
 
-        await Promise.allSettled(lineageQueries);
+        const linkReads = await Promise.allSettled(lineageQueries);
+        if (!cancelled) {
+          if (linkReads.some(result => result.status === 'rejected')) setLinksUnavailable(true);
+          setLinksLoading(false);
+        }
       } catch (failure) {
         if (!cancelled) {
           setObs(null);
@@ -236,7 +253,7 @@ const ObservationPage: React.FC = () => {
       controller.abort();
       window.clearTimeout(deadline);
     };
-  }, [vehicleId, obsId]);
+  }, [vehicleId, obsId, readAttempt]);
 
   // Original documents and OCR labels have no verified name-publication consent.
   const sourceArtifact = publicObservationArtifact();
@@ -253,22 +270,18 @@ const ObservationPage: React.FC = () => {
   }, [obs]);
 
   return (
-    <div
+    <div className="evidence-detail observation-evidence-detail"
       style={{
         maxWidth: 1100,
         margin: '0 auto',
         padding: '16px 12px 48px',
-        fontFamily: 'Arial, sans-serif',
-        color: 'var(--text, #1a1a1a)',
+        color: 'var(--text)',
       }}
     >
       <nav
         aria-label="breadcrumb"
         style={{
-          fontSize: 8,
-          letterSpacing: '0.08em',
-          textTransform: 'uppercase',
-          color: 'var(--text-secondary, #666)',
+          color: 'var(--text-secondary)',
           marginBottom: 12,
           fontWeight: 700,
         }}
@@ -288,64 +301,55 @@ const ObservationPage: React.FC = () => {
           </>
         )}
         <span style={{ margin: '0 6px' }}>/</span>
-        <span style={{ color: 'var(--text, #1a1a1a)' }}>Observation</span>
+        <span style={{ color: 'var(--text)' }}>Observation</span>
       </nav>
 
       {loading && !obs && (
-        <div role="status" style={{ fontSize: 10, color: 'var(--text-secondary)', padding: 12 }}>Loading observation…</div>
+        <div role="status" style={{ color: 'var(--text-secondary)', padding: 12 }}>Loading observation…</div>
       )}
 
       {error && (
         <div
           role="alert"
           style={{
-            fontSize: 10,
             color: 'var(--error, #c00)',
             padding: 12,
-            border: '2px solid var(--error, #c00)',
+            border: '1px solid var(--error)',
           }}
         >
-          {error}
+          <p>{error}</p>
+          <Button type="button" variant="secondary" onClick={() => setReadAttempt(value => value + 1)}>Retry read</Button>
         </div>
       )}
 
       {obs && (
         <>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginBottom: 4 }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: 12, marginBottom: 4 }}>
             <span
               style={{
-                fontSize: 8,
                 fontWeight: 700,
-                letterSpacing: '0.08em',
-                textTransform: 'uppercase',
-                border: '2px solid var(--text, #1a1a1a)',
+                border: '1px solid var(--border)',
                 padding: '2px 6px',
-                fontFamily: 'Arial, sans-serif',
               }}
             >
               {obs.kind}
             </span>
             <span
               style={{
-                fontSize: 9,
-                color: 'var(--text-secondary, #666)',
-                fontFamily: 'Courier New, monospace',
+                color: 'var(--text-secondary)',
               }}
             >
               {obs.source_slug || obs.source_name || '—'}
             </span>
-            {obs.confidence_score !== null && (
-              <span style={{ fontSize: 9, color: 'var(--text-secondary, #666)', fontFamily: 'Courier New, monospace' }}>
-                {Math.round((obs.confidence_score || 0) * 100)}%
+            {obs.confidence_score != null && Number.isFinite(obs.confidence_score) && (
+              <span style={{ color: 'var(--text-secondary)', }}>
+                Stored confidence: {Math.round(obs.confidence_score * 100)}% · Verification unassessed
               </span>
             )}
             {obs.is_superseded && (
               <span
                 style={{
-                  fontSize: 7,
                   fontWeight: 700,
-                  letterSpacing: '0.08em',
-                  textTransform: 'uppercase',
                   border: '1px solid var(--warning, #cc8800)',
                   color: 'var(--warning, #cc8800)',
                   padding: '1px 4px',
@@ -358,23 +362,19 @@ const ObservationPage: React.FC = () => {
 
           <h1
             style={{
-              fontSize: 14,
               fontWeight: 700,
               margin: '0 0 8px',
-              fontFamily: 'Arial, sans-serif',
               wordBreak: 'break-word',
             }}
           >
             {obsTitle}
           </h1>
 
-          <p style={{ fontSize: 10, color: 'var(--text-secondary, #666)' }}>{OBSERVATION_PRIVACY_NOTICE}</p>
+          <p style={{ color: 'var(--text-secondary)' }}>{OBSERVATION_PRIVACY_NOTICE}</p>
 
-          <div
+          <div className="evidence-metadata"
             style={{
-              fontSize: 9,
-              fontFamily: 'Courier New, monospace',
-              color: 'var(--text-secondary, #666)',
+              color: 'var(--text-secondary)',
               marginBottom: 16,
             }}
           >
@@ -391,14 +391,10 @@ const ObservationPage: React.FC = () => {
             <section style={{ marginBottom: 24 }}>
               <h2
                 style={{
-                  fontSize: 8,
                   fontWeight: 700,
-                  letterSpacing: '0.08em',
-                  textTransform: 'uppercase',
                   margin: '0 0 6px',
                   paddingBottom: 2,
-                  borderBottom: '2px solid var(--text, #1a1a1a)',
-                  fontFamily: 'Arial, sans-serif',
+                  borderBottom: '1px solid var(--border)',
                 }}
               >
                 Source Artifact
@@ -415,9 +411,7 @@ const ObservationPage: React.FC = () => {
                   target="_blank"
                   rel="noopener noreferrer"
                   style={{
-                    fontFamily: 'Courier New, monospace',
-                    fontSize: 9,
-                    color: 'var(--text, #1a1a1a)',
+                    color: 'var(--text)',
                     wordBreak: 'break-all',
                   }}
                 >
@@ -430,14 +424,10 @@ const ObservationPage: React.FC = () => {
                     to={`/vehicle/${vehicleId}/image/${imageId}`}
                     style={{
                       display: 'inline-block',
-                      fontFamily: 'Arial, sans-serif',
-                      fontSize: 7,
                       fontWeight: 700,
-                      letterSpacing: '0.08em',
-                      textTransform: 'uppercase',
-                      color: 'var(--text, #1a1a1a)',
+                      color: 'var(--text)',
                       textDecoration: 'none',
-                      border: '2px solid var(--text, #1a1a1a)',
+                      border: '1px solid var(--border)',
                       padding: '2px 6px',
                     }}
                   >
@@ -454,14 +444,10 @@ const ObservationPage: React.FC = () => {
             <section style={{ marginBottom: 24 }}>
               <h2
                 style={{
-                  fontSize: 8,
                   fontWeight: 700,
-                  letterSpacing: '0.08em',
-                  textTransform: 'uppercase',
                   margin: '0 0 6px',
                   paddingBottom: 2,
-                  borderBottom: '2px solid var(--text, #1a1a1a)',
-                  fontFamily: 'Arial, sans-serif',
+                  borderBottom: '1px solid var(--border)',
                 }}
               >
                 Structured Data
@@ -470,25 +456,26 @@ const ObservationPage: React.FC = () => {
             </section>
           )}
 
+          {linksLoading && <p role="status">Reading linked observations…</p>}
+          {linksUnavailable && <div className="evidence-read-notice">
+            <p role="status">Linked observations could not be read completely. Their absence has not been established.</p>
+            <Button type="button" variant="secondary" disabled={linksLoading} onClick={() => setReadAttempt(value => value + 1)}>Retry linked observations</Button>
+          </div>}
           {/* Supersession lineage */}
           {(supersededBy || supersedes) && (
             <section style={{ marginBottom: 24 }}>
               <h2
                 style={{
-                  fontSize: 8,
                   fontWeight: 700,
-                  letterSpacing: '0.08em',
-                  textTransform: 'uppercase',
                   margin: '0 0 6px',
                   paddingBottom: 2,
-                  borderBottom: '2px solid var(--text, #1a1a1a)',
-                  fontFamily: 'Arial, sans-serif',
+                  borderBottom: '1px solid var(--border)',
                 }}
               >
                 Supersession Lineage
               </h2>
               {supersedes && (
-                <div style={{ fontSize: 10, marginBottom: 4 }}>
+                <div style={{ marginBottom: 4 }}>
                   <span style={{ fontWeight: 700, marginRight: 6 }}>Supersedes:</span>
                   <Link to={`/vehicle/${vehicleId}/observation/${supersedes.id}`} style={{ color: 'inherit' }}>
                     {formatDate(supersedes.observed_at)} · {supersedes.kind}
@@ -496,7 +483,7 @@ const ObservationPage: React.FC = () => {
                 </div>
               )}
               {supersededBy && (
-                <div style={{ fontSize: 10, marginBottom: 4 }}>
+                <div style={{ marginBottom: 4 }}>
                   <span style={{ fontWeight: 700, marginRight: 6 }}>Superseded by:</span>
                   <Link to={`/vehicle/${vehicleId}/observation/${supersededBy.id}`} style={{ color: 'inherit' }}>
                     {formatDate(supersededBy.observed_at)} · {supersededBy.kind}
@@ -511,44 +498,35 @@ const ObservationPage: React.FC = () => {
             <section style={{ marginBottom: 24 }}>
               <h2
                 style={{
-                  fontSize: 8,
                   fontWeight: 700,
-                  letterSpacing: '0.08em',
-                  textTransform: 'uppercase',
                   margin: '0 0 6px',
                   paddingBottom: 2,
-                  borderBottom: '2px solid var(--text, #1a1a1a)',
-                  fontFamily: 'Arial, sans-serif',
+                  borderBottom: '1px solid var(--border)',
                 }}
               >
                 Other Observations From Same Merchant · {related.length}
               </h2>
-              <div style={{ border: '2px solid var(--text, #1a1a1a)' }}>
+              <div style={{ border: '1px solid var(--border)' }}>
                 {related.map((r, i) => (
                   <Link
                     key={r.id}
+                    className="evidence-related-row"
                     to={`/vehicle/${vehicleId}/observation/${r.id}`}
                     style={{
                       display: 'grid',
-                      gridTemplateColumns: '92px 70px 1fr',
                       gap: 8,
                       padding: '6px 8px',
-                      fontFamily: 'Arial, sans-serif',
-                      fontSize: 10,
-                      color: 'var(--text, #1a1a1a)',
+                      color: 'var(--text)',
                       textDecoration: 'none',
                       borderTop: i === 0 ? 'none' : '1px solid var(--text-disabled, #ddd)',
                     }}
                   >
-                    <span style={{ fontFamily: 'Courier New, monospace', fontSize: 9, color: 'var(--text-secondary)' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>
                       {r.observed_at ? r.observed_at.slice(0, 10) : '—'}
                     </span>
                     <span
                       style={{
-                        fontSize: 7,
                         fontWeight: 700,
-                        letterSpacing: '0.08em',
-                        textTransform: 'uppercase',
                         border: '1px solid var(--text, #1a1a1a)',
                         padding: '1px 4px',
                         textAlign: 'center',
@@ -636,21 +614,17 @@ const AnnotatedImage: React.FC<{
             type="button"
             onClick={() => setShowAnnotations((v) => !v)}
             style={{
-              fontSize: 8,
               fontWeight: 700,
-              letterSpacing: '0.08em',
-              textTransform: 'uppercase',
-              border: '2px solid var(--text, #1a1a1a)',
+              border: '1px solid var(--border)',
               padding: '3px 8px',
-              background: showAnnotations ? 'var(--text, #1a1a1a)' : 'transparent',
-              color: showAnnotations ? 'var(--bg, #fff)' : 'var(--text, #1a1a1a)',
+              background: showAnnotations ? 'var(--text)' : 'transparent',
+              color: showAnnotations ? 'var(--bg, #fff)' : 'var(--text)',
               cursor: 'pointer',
-              fontFamily: 'Arial, sans-serif',
             }}
           >
             {showAnnotations ? '● annotations on' : '○ annotations off'} ({bboxes.length})
           </button>
-          <span style={{ fontSize: 9, color: 'var(--text-secondary, #666)', fontFamily: 'Courier New, monospace' }}>
+          <span style={{ color: 'var(--text-secondary)', }}>
             green=component · red=damage · blue=text
           </span>
         </div>
@@ -660,7 +634,7 @@ const AnnotatedImage: React.FC<{
         target="_blank"
         rel="noopener noreferrer"
         aria-label="Open source artifact full size"
-        style={{ display: 'inline-block', border: '2px solid var(--text, #1a1a1a)', position: 'relative', maxWidth: '100%' }}
+        style={{ display: 'inline-block', border: '1px solid var(--border)', position: 'relative', maxWidth: '100%' }}
       >
         <div style={{ position: 'relative', display: 'inline-block', lineHeight: 0 }}>
           <img
@@ -729,44 +703,40 @@ const AnnotatedImage: React.FC<{
 const StructuredDataTable: React.FC<{ data: Record<string, unknown> }> = ({ data }) => {
   const rows = Object.entries(data).filter(([, v]) => v !== null && v !== undefined && v !== '');
   if (rows.length === 0) {
-    return <div style={{ fontSize: 9, color: 'var(--text-secondary, #666)' }}>(no fields)</div>;
+    return <div style={{ color: 'var(--text-secondary)' }}>(no fields)</div>;
   }
   return (
-    <div style={{ border: '2px solid var(--text, #1a1a1a)' }}>
+    <div style={{ border: '1px solid var(--border)' }}>
       {rows.map(([k, v], i) => {
         const isStr = typeof v === 'string';
         const looksUrl = isStr && /^https?:\/\//.test(v as string);
         const looksImg = looksUrl && isImageUrl(v as string);
         const isObj = typeof v === 'object';
         return (
-          <div
+          <div className="evidence-field-row"
             key={k}
             style={{
               display: 'grid',
-              gridTemplateColumns: '180px 1fr',
               gap: 12,
               padding: '6px 8px',
-              fontSize: 10,
               borderTop: i === 0 ? 'none' : '1px solid var(--text-disabled, #ddd)',
               alignItems: 'start',
             }}
           >
             <span
               style={{
-                fontFamily: 'Arial, sans-serif',
-                fontSize: 8,
                 fontWeight: 700,
-                letterSpacing: '0.06em',
-                textTransform: 'uppercase',
-                color: 'var(--text-secondary, #666)',
+                color: 'var(--text-secondary)',
               }}
             >
               {labelCase(k)}
             </span>
-            <span style={{ fontFamily: 'Courier New, monospace', fontSize: 10, wordBreak: 'break-word' }}>
+            <span style={{ wordBreak: 'break-word' }}>
               {looksImg ? (
                 <a href={v as string} target="_blank" rel="noopener noreferrer">
                   <img
+                    width={240}
+                    height={180}
                     src={optimizeImageUrl(v as string, 'small') || (v as string)}
                     alt={k}
                     loading="lazy"
@@ -786,7 +756,6 @@ const StructuredDataTable: React.FC<{ data: Record<string, unknown> }> = ({ data
                 <pre
                   style={{
                     margin: 0,
-                    fontSize: 9,
                     whiteSpace: 'pre-wrap',
                     wordBreak: 'break-all',
                     maxHeight: 200,
@@ -804,6 +773,15 @@ const StructuredDataTable: React.FC<{ data: Record<string, unknown> }> = ({ data
       })}
     </div>
   );
+};
+
+// Remount local reader state at the viewer/subject boundary; a token refresh for
+// the same user leaves the current inspection intact.
+const ObservationPage: React.FC = () => {
+  const { user, loading } = useAuth();
+  const { vehicleId, obsId } = useParams();
+  if (loading) return <main className="evidence-detail"><p role="status">Checking access…</p></main>;
+  return <ObservationPageContent key={`${user?.id || 'public'}:${vehicleId}:${obsId}`} />;
 };
 
 export default ObservationPage;

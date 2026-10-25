@@ -4,7 +4,8 @@ import { createRoot, type Root } from 'react-dom/client';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 // Offline contracts only; no synthetic testimony is written to production.
-const fixture = vi.hoisted(() => ({ route: { vehicleId: 'offline-vehicle', imageId: 'offline-image' }, read: vi.fn(), calls: [] as any[] }));
+const fixture = vi.hoisted(() => ({ route: { vehicleId: 'offline-vehicle', imageId: 'offline-image' }, auth: { user: { id: 'viewer-a' } as { id: string } | null, loading: false }, read: vi.fn(), calls: [] as any[] }));
+vi.mock('../../hooks/useAuth', () => ({ useAuth: () => fixture.auth }));
 vi.mock('react-router-dom', async original => ({ ...await original<typeof import('react-router-dom')>(), useParams: () => fixture.route }));
 vi.mock('../../lib/supabase', () => {
   const from = (table: string) => {
@@ -38,6 +39,7 @@ function read(c: any) {
 let root: Root, host: HTMLDivElement;
 beforeEach(() => {
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
+  fixture.auth = { user: { id: 'viewer-a' }, loading: false };
   fixture.route = { vehicleId: VEHICLE, imageId: IMAGE }; fixture.calls = []; fixture.read.mockReset(); fixture.read.mockImplementation(read);
   host = document.createElement('div'); document.body.append(host); root = createRoot(host);
 });
@@ -78,7 +80,7 @@ it('links a recorded witness to its actual vehicle and does not invent a parent 
 it('distinguishes failed raw/device reads from completed empty projections', async () => {
   fixture.read.mockImplementation(c => c.table === 'device_attributions' || c.table === 'observation_witnesses' && c.selected === '*' ? { data: null, error: { message: 'offline private permission' } } : read(c)); await mount();
   expect(host.querySelector('aside img')).not.toBeNull(); expect(host.textContent).toContain('Device metadata unavailable.');
-  expect(host.textContent).toContain('Read unavailable'); expect(host.textContent).toContain('0 rows returned'); expect(host.textContent).not.toContain('private permission');
+  expect(host.textContent?.match(/Read unavailable/g)).toHaveLength(4); expect(host.textContent).not.toContain('0 rows returned'); expect(host.textContent).not.toContain('private permission');
 });
 it('retains distinct witness roles as links without counting them as independent observations', async () => {
   fixture.read.mockImplementation(c => c.table === 'observation_witnesses' && c.selected !== '*' ? { data: ['source_image','install_witness'].map(witness_role => ({
@@ -119,4 +121,96 @@ it.each(['vehicles', 'vehicle_images'])('ends a stalled %s read at a finite dead
   await mount(); await act(async () => { await vi.advanceTimersByTimeAsync(10_000); });
   expect(host.querySelector('[role=alert]')).not.toBeNull(); expect(host.querySelector('[role=status]')).toBeNull(); expect(host.querySelector('aside')).toBeNull();
   expect(host.textContent).not.toContain('secret'); expect(fixture.calls.some(c => ['device_attributions','observation_witnesses'].includes(c.table))).toBe(false);
+});
+
+
+it('clears prior viewer data immediately on logout and while the next read is pending', async () => {
+  await mount();
+  expect(host.textContent).toContain('offline-source');
+  let finish: (value: any) => void = () => {};
+  fixture.read.mockImplementation(() => new Promise(resolve => { finish = resolve; }));
+  fixture.auth = { user: null, loading: false };
+  await mount();
+  expect(host.textContent).not.toContain('offline-source');
+  expect(host.querySelector('[role=status]')).not.toBeNull();
+  await act(async () => finish({ data: null, error: null }));
+  expect(host.querySelector('[role=alert]')).not.toBeNull();
+});
+it('waits for auth resolution and preserves the reader on a same-ID session refresh', async () => {
+  fixture.auth.loading = true; await mount();
+  expect(fixture.calls).toHaveLength(0);
+  fixture.auth.loading = false; await mount();
+  const calls = fixture.calls.length;
+  fixture.auth = { user: { id: 'viewer-a' }, loading: false };
+  await mount(); expect(fixture.calls).toHaveLength(calls);
+  expect(host.textContent).toContain('offline-source');
+  fixture.auth.loading = true; await mount();
+  expect(host.textContent).not.toContain('offline-source');
+});
+
+it('does not describe pending or failed device evidence as absent EXIF', async () => {
+  let release: (v: any) => void = () => {};
+  fixture.read.mockImplementation(c => c.table === 'device_attributions' ? new Promise(r => { release = r; }) : read(c));
+  await mount();
+  expect(host.querySelector('aside img')).not.toBeNull();
+  expect(host.textContent).not.toContain('no EXIF');
+  expect(host.textContent).toContain('Reading device metadata');
+  await act(async () => release({ data: null, error: { message: 'private failure' } }));
+  expect(host.textContent).toContain('Device metadata unavailable');
+  expect(host.textContent).not.toContain('no EXIF');
+  expect(host.textContent).not.toContain('private failure');
+});
+it('reports failed witness reads without claiming there are no related observations', async () => {
+  fixture.read.mockImplementation(c => c.table === 'observation_witnesses' ? { data: null, error: { message: 'private permission failure' } } : read(c));
+  await mount();
+  expect(host.querySelector('aside img')).not.toBeNull();
+  expect(host.textContent).toContain('Observation links unavailable');
+  expect(host.textContent).not.toContain('private permission');
+});
+
+it('shows an empty projection only after its upstream reader succeeds', async () => {
+  await mount();
+  expect(host.textContent).toContain('0 rows returned');
+  expect(host.textContent).toContain('No visible device metadata returned');
+  expect(host.textContent).not.toContain('Read unavailable');
+});
+it('keeps the verified image when an optional detail transport rejects and retries with the existing reader', async () => {
+  fixture.read.mockImplementation(c => c.table === 'vehicle_images' && !c.single ? Promise.reject(new Error('private detail failure')) : read(c));
+  await mount();
+  expect(host.querySelector('aside img')?.getAttribute('src')).toBe(SOURCE);
+  expect(host.textContent).toContain('Record details could not be read completely');
+  expect(host.textContent).not.toContain('private detail failure');
+  fixture.read.mockImplementation(read);
+  await act(async () => [...host.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent === 'Retry details')!.click());
+  expect(host.textContent).not.toContain('could not be read completely');
+  expect(host.textContent).toContain('vehicle_images · 1 row');
+});
+it('refuses an unsafe original image URL while keeping the visible metadata', async () => {
+  fixture.read.mockImplementation(c => c.table === 'vehicle_images' ? { data: c.single ? image({ image_url: 'javascript:alert(1)' }) : [], error: null } : read(c));
+  await mount();
+  expect(host.querySelector('aside img')).toBeNull();
+  expect(host.querySelector('a[href^="javascript:"]')).toBeNull();
+  expect(host.textContent).toContain('Original image URL unavailable');
+});
+it('does not publish a late viewer-A image after viewer B has replaced the reader', async () => {
+  let release: (v: any) => void = () => {};
+  fixture.read.mockImplementation(c => c.table === 'vehicle_images' ? new Promise(r => { release = r; }) : read(c));
+  await mount();
+  const oldSignal = fixture.calls.find(call => call.table === 'vehicle_images').signal;
+  fixture.auth.user = { id: 'viewer-b' };
+  fixture.read.mockImplementation(c => c.table === 'vehicles' ? { data: null, error: null } : read(c));
+  await mount(); expect(oldSignal.aborted).toBe(true);
+  await act(async () => release({ data: image(), error: null }));
+  expect(host.querySelector('aside')).toBeNull();
+  expect(host.textContent).not.toContain('offline-source');
+});
+
+it('offers retry when only a raw relation read is unavailable', async () => {
+  fixture.read.mockImplementation(c => c.table === 'observation_witnesses' && c.selected === '*' ? { data: null, error: { message: 'unavailable' } } : read(c));
+  await mount();
+  const retry = Array.from(host.querySelectorAll('button')).find(button => button.textContent === 'Retry details');
+  expect(retry).toBeDefined(); expect(host.querySelector('aside img')).not.toBeNull();
+  fixture.read.mockImplementation(read);
+  await act(async () => retry!.click());
+  expect(host.textContent).not.toContain('Read unavailable'); expect(host.textContent).not.toContain('Retry details');
 });

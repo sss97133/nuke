@@ -1,0 +1,43 @@
+/* Direct observation/image readers. Their existing access and privacy projections
+   own which evidence is visible; these rules only present the returned records. */
+.evidence-detail {
+  --evidence-sticky-top: calc(var(--header-height) + 12px);
+  max-width: 1380px; margin: 0 auto; padding: 16px 12px 48px;
+  color: var(--text); font: var(--text-body)/1.55 var(--font-family);
+  overflow-wrap: anywhere;
+}
+.evidence-detail h1 { font: 650 var(--text-title)/1.25 var(--font-family); margin: 12px 0 16px; }
+.evidence-detail h2 { font: 650 18px/1.4 var(--font-family); }
+.evidence-detail p { margin: 8px 0 12px; }
+.evidence-detail nav { font-size: var(--text-callout); }
+.evidence-detail a { color: var(--link); text-underline-offset: 3px; }
+.evidence-detail a:not(:has(img)) { min-height: var(--control-height); display: inline-flex; align-items: center; padding-block: 8px; }
+.evidence-detail a:focus-visible, .evidence-detail button:focus-visible, .evidence-table-scroll:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 3px; }
+.evidence-detail section, .image-evidence-media { min-width: 0; padding: 16px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); }
+.evidence-detail button:not(.btn-base) { min-height: var(--control-height); padding: 8px 12px; font: inherit; color: var(--link); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); cursor: pointer; }
+.evidence-metadata { font-size: var(--text-caption); color: var(--text-secondary); line-height: 1.6; }
+.evidence-read-notice { padding: 12px; margin: 12px 0; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
+.image-evidence-layout { grid-template-columns: minmax(0, 440px) minmax(0, 1fr); }
+.image-evidence-media { position: sticky; top: var(--evidence-sticky-top); }
+.image-evidence-media img { border-radius: var(--radius-sm); }
+.evidence-field-row { grid-template-columns: minmax(120px, .65fr) minmax(0, 1.35fr); }
+.evidence-field-row > :first-child { font-size: var(--text-caption); }
+.evidence-field-row > :last-child { font-variant-numeric: tabular-nums; }
+.evidence-related-row { grid-template-columns: 104px 100px minmax(0, 1fr); }
+.evidence-witness-row { grid-template-columns: 104px minmax(0, 1fr); }
+.evidence-witness-row > :nth-child(n+3) { grid-column: 1 / -1; }
+.evidence-substrate { font-size: var(--text-callout); }
+.evidence-substrate table { font: var(--text-caption)/1.5 var(--font-mono); }
+.evidence-substrate td > div { min-width: 120px; }
+.evidence-detail pre { font: var(--text-caption)/1.5 var(--font-mono); }
+.evidence-table-scroll { max-width: 100%; overscroll-behavior: contain; border-radius: var(--radius-sm); }
+@media (max-width: 900px) {
+  .image-evidence-layout { grid-template-columns: minmax(0, 1fr); }
+  .image-evidence-media { position: static; }
+}
+@media (max-width: 480px) {
+  .evidence-detail section, .image-evidence-media { padding: 12px; }
+  .evidence-field-row { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  .evidence-related-row { grid-template-columns: 104px minmax(0, 1fr); }
+  .evidence-related-row > :last-child { grid-column: 1 / -1; }
+}

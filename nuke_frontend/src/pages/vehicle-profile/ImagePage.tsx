@@ -7,9 +7,14 @@
  * that shares this image as evidence.
  */
 import React, { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
+import Link from '../../components/PrefetchLink';
+import { useAuth } from '../../hooks/useAuth';
+import { Button } from '../../components/ui/button';
+import './vehicle-evidence-detail.css';
 import { supabase } from '../../lib/supabase';
 import { vehicleImageRowColumns } from '../../lib/vehicleImageColumns';
+import { webSourceUrl } from './hooks/useVehicleImageEvidence';
 
 interface ImageRow {
   id: string;
@@ -72,17 +77,20 @@ interface SubstrateBundle {
   vehicles: Row[];
 }
 
-const ImagePage: React.FC = () => {
+const ImagePageContent: React.FC = () => {
   const { vehicleId, imageId } = useParams<{ vehicleId: string; imageId: string }>();
   const [vehicle, setVehicle] = useState<VehicleSummary | null>(null);
   const [imageRow, setImage] = useState<ImageRow | null>(null);
   const [loadedSubject, setLoadedSubject] = useState<string | null>(null);
   const [witnessed, setWitnessed] = useState<WitnessedObservation[]>([]);
   const [attribution, setAttribution] = useState<DeviceAttribution | null>(null);
-  const [attributionUnavailable, setAttributionUnavailable] = useState(false);
+  const [attributionStatus, setAttributionStatus] = useState<'pending' | 'ready' | 'unavailable'>('pending');
+  const [witnessStatus, setWitnessStatus] = useState<'pending' | 'ready' | 'unavailable'>('pending');
+  const [detailError, setDetailError] = useState(false);
   const [substrate, setSubstrate] = useState<SubstrateBundle | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [readAttempt, setReadAttempt] = useState(0);
   const image = loadedSubject === `${vehicleId}:${imageId}` ? imageRow : null;
 
   useEffect(() => {
@@ -97,10 +105,13 @@ const ImagePage: React.FC = () => {
     setImage(null);
     setWitnessed([]);
     setAttribution(null);
-    setAttributionUnavailable(false);
+    setAttributionStatus('pending');
+    setWitnessStatus('pending');
+    setDetailError(false);
     setSubstrate(null);
 
     (async () => {
+      let acceptedImage = false;
       try {
         const vehRes = await supabase
           .from('vehicles')
@@ -130,11 +141,12 @@ const ImagePage: React.FC = () => {
         if (!imgRes.data || imgRes.data.id !== imageId || imgRes.data.vehicle_id !== vehicleId) {
           throw new Error('Image unavailable for this vehicle.');
         }
+        acceptedImage = true;
         setImage(imgRes.data as ImageRow);
         setLoadedSubject(`${vehicleId}:${imageId}`);
 
         // Dependent reads only follow a visible, correctly bound image.
-        const [witRes, attribRes] = await Promise.all([
+        const [witnessRead, attributionRead] = await Promise.allSettled([
           supabase
             .from('observation_witnesses')
             .select(`
@@ -157,10 +169,12 @@ const ImagePage: React.FC = () => {
             .abortSignal(controller.signal)
             .maybeSingle(),
         ]);
-        if (!cancelled && attribRes?.data) setAttribution(attribRes.data as DeviceAttribution);
-
         if (cancelled) return;
-        setAttributionUnavailable(!!attribRes.error);
+        const witRes = witnessRead.status === 'fulfilled' ? witnessRead.value : { data: null, error: true };
+        const attribRes = attributionRead.status === 'fulfilled' ? attributionRead.value : { data: null, error: true };
+        if (!attribRes.error && attribRes.data) setAttribution(attribRes.data as DeviceAttribution);
+        setAttributionStatus(attribRes.error ? 'unavailable' : 'ready');
+        setWitnessStatus(witRes.error ? 'unavailable' : 'ready');
 
         if (!witRes.error && witRes.data) {
           const rows: WitnessedObservation[] = [];
@@ -204,12 +218,14 @@ const ImagePage: React.FC = () => {
         ].filter(([, result]) => (result as { error?: unknown }).error).map(([name]) => name as string);
         const obsIds = Array.from(new Set(witnessRows.map((r) => r.observation_id).filter(Boolean))) as string[];
 
+        // A failed bridge read cannot establish empty downstream collections.
+        if (witFullRes.error) unavailableRelations.push('vehicle_observations', 'observation_discoveries', 'observation_sources');
         let obsRows: Row[] = [];
         let discoveryRows: Row[] = [];
         let sourceRows: Row[] = [];
         if (obsIds.length > 0) {
           const obsRes = await supabase.from('vehicle_observations').select('*').in('id', obsIds).limit(200).abortSignal(controller.signal);
-          if (obsRes.error) unavailableRelations.push('vehicle_observations');
+          if (obsRes.error) unavailableRelations.push('vehicle_observations', 'observation_sources');
           obsRows = (obsRes.data || []) as Row[];
 
           const sourceIds = Array.from(new Set(obsRows.map((r) => r.source_id).filter(Boolean))) as string[];
@@ -243,7 +259,12 @@ const ImagePage: React.FC = () => {
         }
 
       } catch (failure) {
-        if (!cancelled) {
+        if (!cancelled && acceptedImage) {
+          // Failure in optional details does not erase the already verified image binding.
+          setDetailError(true);
+          setAttributionStatus(status => status === 'pending' ? 'unavailable' : status);
+          setWitnessStatus(status => status === 'pending' ? 'unavailable' : status);
+        } else if (!cancelled) {
           setImage(null);
           setLoadedSubject(null);
           const messages = ['Vehicle unavailable.', 'Unable to load this vehicle. Try again.',
@@ -262,7 +283,7 @@ const ImagePage: React.FC = () => {
       controller.abort();
       window.clearTimeout(deadline);
     };
-  }, [vehicleId, imageId]);
+  }, [vehicleId, imageId, readAttempt]);
 
   const vehLabel = vehicle && vehicle.id === vehicleId
     ? `${vehicle.year ?? ''} ${vehicle.make ?? ''} ${vehicle.model ?? ''} ${vehicle.trim ?? ''}`.replace(/\s+/g, ' ').trim()
@@ -271,23 +292,19 @@ const ImagePage: React.FC = () => {
   // Use the raw image_url. The Supabase render endpoint with only width set
   // defaults to resize=cover and produces distorted/cropped output on portrait
   // iPhone captures. For a single-image detail view, bandwidth is acceptable.
-  const renderSrc = image?.image_url || null;
+  const renderSrc = webSourceUrl(image?.image_url);
 
   return (
-    <div
+    <div className="evidence-detail image-evidence-detail"
       style={{
         padding: '12px 12px 24px',
-        fontFamily: 'Arial, sans-serif',
-        color: 'var(--text, #1a1a1a)',
+        color: 'var(--text)',
       }}
     >
       <nav
         aria-label="breadcrumb"
         style={{
-          fontSize: 8,
-          letterSpacing: '0.08em',
-          textTransform: 'uppercase',
-          color: 'var(--text-secondary, #666)',
+          color: 'var(--text-secondary)',
           marginBottom: 8,
           fontWeight: 700,
           display: 'flex',
@@ -300,14 +317,14 @@ const ImagePage: React.FC = () => {
           {vehLabel || 'Vehicle'}
         </Link>
         <span>/</span>
-        <span style={{ color: 'var(--text, #1a1a1a)' }}>Image</span>
+        <span style={{ color: 'var(--text)' }}>Image</span>
         {image?.vision_gate_status && (
-          <span style={{ border: '2px solid var(--text, #1a1a1a)', padding: '1px 5px' }}>
+          <span style={{ border: '1px solid var(--border)', padding: '1px 5px' }}>
             {image.vision_gate_status}
           </span>
         )}
         {image?.source && (
-          <span style={{ fontFamily: 'Courier New, monospace', textTransform: 'none', letterSpacing: 0 }}>
+          <span>
             {image.source}
           </span>
         )}
@@ -318,30 +335,29 @@ const ImagePage: React.FC = () => {
         )}
       </nav>
 
+      <h1>Image evidence</h1>
       {loading && !image && (
-        <div role="status" style={{ fontSize: 10, color: 'var(--text-secondary)', padding: 12 }}>Loading image…</div>
+        <div role="status" style={{ color: 'var(--text-secondary)', padding: 12 }}>Loading image…</div>
       )}
 
       {error && (
-        <div role="alert" style={{ fontSize: 10, color: 'var(--error, #c00)', padding: 12, border: '2px solid var(--error, #c00)' }}>
-          {error}
+        <div role="alert" style={{ color: 'var(--error, #c00)', padding: 12, border: '1px solid var(--error)' }}>
+          <p>{error}</p>
+          <Button type="button" variant="secondary" onClick={() => setReadAttempt(value => value + 1)}>Retry read</Button>
         </div>
       )}
 
       {image && (
-        <div
+        <div className="image-evidence-layout"
           style={{
             display: 'grid',
-            gridTemplateColumns: 'minmax(320px, 480px) 1fr',
             gap: 16,
             alignItems: 'start',
           }}
         >
           {/* LEFT: image pane, sticky so substrate scrolls beside it */}
-          <aside
+          <aside className="image-evidence-media"
             style={{
-              position: 'sticky',
-              top: 12,
               alignSelf: 'start',
               display: 'flex',
               flexDirection: 'column',
@@ -350,15 +366,17 @@ const ImagePage: React.FC = () => {
           >
             {renderSrc && (
               <a
-                href={image.image_url}
+                href={renderSrc!}
                 target="_blank"
                 rel="noopener noreferrer"
-                style={{ display: 'block', border: '2px solid var(--text, #1a1a1a)', lineHeight: 0 }}
+                style={{ display: 'block', border: '1px solid var(--border)', lineHeight: 0 }}
               >
                 <img
                   src={renderSrc}
                   alt={image.caption || image.file_name || 'Vehicle image'}
                   decoding="async"
+                  width={1200}
+                  height={900}
                   style={{
                     display: 'block',
                     width: '100%',
@@ -369,12 +387,13 @@ const ImagePage: React.FC = () => {
                 />
               </a>
             )}
+            {!renderSrc && <p role="status">Original image URL unavailable.</p>}
             {image.vision_gate_agent_reasoning && (
-              <div style={{ fontSize: 10, fontFamily: 'Arial, sans-serif', lineHeight: 1.4, color: 'var(--text, #1a1a1a)' }}>
+              <div style={{ lineHeight: 1.4, color: 'var(--text)' }}>
                 {image.vision_gate_agent_reasoning}
               </div>
             )}
-            <div style={{ fontSize: 9, fontFamily: 'Courier New, monospace', lineHeight: 1.5, color: 'var(--text-secondary, #666)' }}>
+            <div className="evidence-metadata" style={{ lineHeight: 1.5, color: 'var(--text-secondary)' }}>
               <div>id · {image.id}</div>
               {image.file_name && <div>file · {image.file_name}</div>}
               {image.taken_at && <div>taken · {image.taken_at.slice(0, 19).replace('T', ' ')}</div>}
@@ -382,13 +401,14 @@ const ImagePage: React.FC = () => {
             </div>
 
             {/* Chain of Custody — sourced from device_attributions */}
-            <div style={{ border: '2px solid var(--text, #1a1a1a)', padding: '6px 8px' }}>
-              <div style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', fontFamily: 'Arial, sans-serif', borderBottom: '2px solid var(--text, #1a1a1a)', paddingBottom: 2, marginBottom: 4 }}>
+            <div style={{ border: '1px solid var(--border)', padding: '6px 8px' }}>
+              <div style={{ fontWeight: 700, borderBottom: '1px solid var(--border)', paddingBottom: 2, marginBottom: 4 }}>
                 Device metadata
               </div>
-              {attributionUnavailable && <div style={{ fontSize: 9 }}>Device metadata unavailable.</div>}
-              {attribution ? (
-                <div style={{ fontSize: 9, fontFamily: 'Courier New, monospace', lineHeight: 1.5, color: 'var(--text, #1a1a1a)' }}>
+              {attributionStatus === 'pending' && <p role="status">Reading device metadata…</p>}
+              {attributionStatus === 'unavailable' && <p role="status">Device metadata unavailable. Its absence has not been established.</p>}
+              {attributionStatus === 'ready' && (attribution ? (
+                <div style={{ lineHeight: 1.5, color: 'var(--text)' }}>
                   {(attribution.camera_make || attribution.camera_model) && (
                     <div>device · {[attribution.camera_make, attribution.camera_model].filter(Boolean).join(' ')}</div>
                   )}
@@ -408,60 +428,53 @@ const ImagePage: React.FC = () => {
                   )}
                 </div>
               ) : (
-                <div style={{ fontSize: 9, fontFamily: 'Courier New, monospace', color: 'var(--text-secondary, #666)' }}>
-                  <div>unauthenticated · no EXIF identity captured</div>
+                <div style={{ color: 'var(--text-secondary)' }}>
+                  <div>No visible device metadata returned. Device identity is unknown.</div>
                   {image.source && <div>source · {image.source}</div>}
                 </div>
-              )}
+              ))}
             </div>
           </aside>
 
           {/* RIGHT: substrate pane */}
           <div style={{ minWidth: 0 }}>
+          {witnessStatus === 'pending' && <p role="status">Reading observation links…</p>}
+          {witnessStatus === 'unavailable' && <p role="status">Observation links unavailable. Their absence has not been established.</p>}
           {witnessed.length > 0 && (
             <section style={{ marginBottom: 16 }}>
               <h2
                 style={{
-                  fontSize: 8,
                   fontWeight: 700,
-                  letterSpacing: '0.08em',
-                  textTransform: 'uppercase',
                   margin: '0 0 4px',
                   paddingBottom: 2,
-                  borderBottom: '2px solid var(--text, #1a1a1a)',
-                  fontFamily: 'Arial, sans-serif',
+                  borderBottom: '1px solid var(--border)',
                 }}
               >
                 Recorded vehicle observation links · {witnessed.length}
               </h2>
-              <div style={{ fontSize: 9, marginBottom: 4 }}>One observation can have several source roles. Independent support remains unassessed.</div>
-              <div style={{ border: '2px solid var(--text, #1a1a1a)' }}>
+              <div style={{ marginBottom: 4 }}>One observation can have several source roles. Independent support remains unassessed.</div>
+              <div style={{ border: '1px solid var(--border)' }}>
                 {witnessed.map((w, i) => (
                   <Link
                     key={`${w.id}:${w.witness_role}`}
+                    className="evidence-witness-row"
                     to={`/vehicle/${w.vehicle_id}/observation/${w.id}`}
                     style={{
                       display: 'grid',
-                      gridTemplateColumns: '92px 80px 110px 1fr 80px',
                       gap: 8,
                       padding: '6px 8px',
-                      fontFamily: 'Arial, sans-serif',
-                      fontSize: 10,
-                      color: 'var(--text, #1a1a1a)',
+                      color: 'var(--text)',
                       textDecoration: 'none',
                       borderTop: i === 0 ? 'none' : '1px solid var(--text-disabled, #ddd)',
                       alignItems: 'center',
                     }}
                   >
-                    <span style={{ fontFamily: 'Courier New, monospace', fontSize: 9, color: 'var(--text-secondary)' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>
                       {w.observed_at ? w.observed_at.slice(0, 10) : '—'}
                     </span>
                     <span
                       style={{
-                        fontSize: 7,
                         fontWeight: 700,
-                        letterSpacing: '0.08em',
-                        textTransform: 'uppercase',
                         border: '1px solid var(--text, #1a1a1a)',
                         padding: '1px 4px',
                         textAlign: 'center',
@@ -469,13 +482,13 @@ const ImagePage: React.FC = () => {
                     >
                       {w.kind}
                     </span>
-                    <span style={{ fontFamily: 'Courier New, monospace', fontSize: 10 }}>
+                    <span>
                       {w.part_number || w.vendor || ''}
                     </span>
-                    <span style={{ overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
+                    <span>
                       {w.content_text || '—'}
                     </span>
-                    <span style={{ fontSize: 8, color: 'var(--text-secondary, #666)', textAlign: 'right' }}>
+                    <span style={{ color: 'var(--text-secondary)', textAlign: 'right' }}>
                       {w.witness_role}
                     </span>
                   </Link>
@@ -484,27 +497,24 @@ const ImagePage: React.FC = () => {
             </section>
           )}
 
+          {detailError && <div className="evidence-read-notice"><p role="status">Record details could not be read completely. Coverage is unknown.</p></div>}
+          {(detailError || witnessStatus === 'unavailable' || attributionStatus === 'unavailable' || !!substrate?.unavailableRelations.length) && <Button type="button" variant="secondary" disabled={loading} onClick={() => setReadAttempt(value => value + 1)}>Retry details</Button>}
+          {loading && !substrate && <p role="status">Reading record details…</p>}
           {substrate && (
             <section style={{ marginTop: 32 }}>
               <h2
                 style={{
-                  fontSize: 8,
                   fontWeight: 700,
-                  letterSpacing: '0.08em',
-                  textTransform: 'uppercase',
                   margin: '0 0 4px',
                   paddingBottom: 2,
-                  borderBottom: '2px solid var(--text, #1a1a1a)',
-                  fontFamily: 'Arial, sans-serif',
+                  borderBottom: '1px solid var(--border)',
                 }}
               >
                 Substrate · raw database rows touching this image
               </h2>
               <div
                 style={{
-                  fontSize: 9,
-                  fontFamily: 'Courier New, monospace',
-                  color: 'var(--text-secondary, #666)',
+                  color: 'var(--text-secondary)',
                   margin: '4px 0 12px',
                 }}
               >
@@ -534,14 +544,12 @@ const SubstrateTable: React.FC<{ name: string; rows: Record<string, unknown>[]; 
       <div
         style={{
           marginBottom: 12,
-          border: '2px solid var(--text, #1a1a1a)',
+          border: '1px solid var(--border)',
           padding: 8,
-          fontFamily: 'Courier New, monospace',
-          fontSize: 9,
-          color: 'var(--text-secondary, #666)',
+          color: 'var(--text-secondary)',
         }}
       >
-        <div style={{ fontWeight: 700, color: 'var(--text, #1a1a1a)' }}>{name}</div>
+        <div style={{ fontWeight: 700, color: 'var(--text)' }}>{name}</div>
         <div>{unavailable ? 'Read unavailable' : '0 rows returned'}</div>
       </div>
     );
@@ -553,28 +561,24 @@ const SubstrateTable: React.FC<{ name: string; rows: Record<string, unknown>[]; 
   }, new Set<string>()));
 
   return (
-    <div style={{ marginBottom: 16 }}>
+    <div className="evidence-substrate" style={{ marginBottom: 16 }}>
       <div
         style={{
-          fontFamily: 'Courier New, monospace',
-          fontSize: 10,
           fontWeight: 700,
           marginBottom: 2,
         }}
       >
         {name} · {rows.length} row{rows.length === 1 ? '' : 's'}
       </div>
-      <div style={{ overflowX: 'auto', border: '2px solid var(--text, #1a1a1a)' }}>
+      <div className="evidence-table-scroll" role="region" aria-label={`${name} returned rows`} tabIndex={0} style={{ overflowX: 'auto', border: '1px solid var(--border)' }}>
         <table
           style={{
             borderCollapse: 'collapse',
-            fontFamily: 'Courier New, monospace',
-            fontSize: 9,
             minWidth: '100%',
           }}
         >
           <thead>
-            <tr style={{ background: 'var(--text, #1a1a1a)', color: 'var(--bg, #fff)' }}>
+            <tr style={{ background: 'var(--surface-secondary)', color: 'var(--text)' }}>
               {cols.map((c) => (
                 <th
                   key={c}
@@ -582,9 +586,8 @@ const SubstrateTable: React.FC<{ name: string; rows: Record<string, unknown>[]; 
                     textAlign: 'left',
                     padding: '4px 8px',
                     fontWeight: 700,
-                    letterSpacing: '0.04em',
                     whiteSpace: 'nowrap',
-                    borderRight: '1px solid var(--bg, #fff)',
+                    borderRight: '1px solid var(--border)',
                   }}
                 >
                   {c}
@@ -617,7 +620,7 @@ const SubstrateTable: React.FC<{ name: string; rows: Record<string, unknown>[]; 
                         borderRight: '1px solid var(--text-disabled, #eee)',
                         maxWidth: isObj ? 520 : 360,
                         verticalAlign: 'top',
-                        color: v === null || v === undefined ? 'var(--text-secondary, #999)' : 'var(--text, #1a1a1a)',
+                        color: v === null || v === undefined ? 'var(--text-secondary, #999)' : 'var(--text)',
                         fontStyle: v === null || v === undefined ? 'italic' : 'normal',
                       }}
                       title={isObj ? undefined : display}
@@ -626,8 +629,9 @@ const SubstrateTable: React.FC<{ name: string; rows: Record<string, unknown>[]; 
                         style={{
                           padding: '4px 8px',
                           maxHeight: 180,
-                          overflow: isObj ? 'auto' : 'hidden',
-                          whiteSpace: isObj ? 'pre' : 'nowrap',
+                          overflow: 'auto',
+                          whiteSpace: 'pre-wrap',
+                          overflowWrap: 'anywhere',
                           textOverflow: isObj ? 'clip' : 'ellipsis',
                         }}
                       >
@@ -643,6 +647,15 @@ const SubstrateTable: React.FC<{ name: string; rows: Record<string, unknown>[]; 
       </div>
     </div>
   );
+};
+
+// Remount local reader state at the viewer/subject boundary; a token refresh for
+// the same user leaves the current inspection intact.
+const ImagePage: React.FC = () => {
+  const { user, loading } = useAuth();
+  const { vehicleId, imageId } = useParams();
+  if (loading) return <main className="evidence-detail"><p role="status">Checking access…</p></main>;
+  return <ImagePageContent key={`${user?.id || 'public'}:${vehicleId}:${imageId}`} />;
 };
 
 export default ImagePage;
