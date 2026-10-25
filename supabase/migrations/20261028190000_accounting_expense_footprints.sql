@@ -8,6 +8,8 @@ SET LOCAL lock_timeout = '1s';
 -- Each trace is matched against the current book (v_financial_accounting_records) and the expense-use cells:
 --   cited_expense      an Expense record of the same amount (within 0.01) dated 5 days before to 30 days after the
 --                      trace, or an Expense record whose text names the trace's reference (receipt file stem, order no.)
+--   near_match         (counted as booked) an Expense record naming the vendor within 1.00 or 5%, or two that add up
+--                      to the amount (a split charge), same window
 --   cited_vehicle      (work episodes) an Expense use cell on the same vehicle, dated 30 days before to 7 days after
 --   booked_not_expense the same amount and window on a book record outside Expense (Owner, Transfer, Reference...):
 --                      a reclassification candidate
@@ -186,6 +188,13 @@ BEGIN
          WHERE b.section = 'Expense' AND k.amt IS NOT NULL AND length(k.vtok) >= 5 AND strpos(b.ltxt, k.vtok) > 0
            AND abs(b.a - k.amt) <= greatest(1.00, 0.05 * k.amt) AND b.d BETWEEN k.d - 5 AND k.d + 30
          ORDER BY abs(b.a - k.amt), b.d LIMIT 3) b) AS near_hits,
+      -- Split charge: two Expense records naming the vendor in the window that add up to the trace amount.
+      (SELECT ARRAY[x.l1, x.l2] FROM (SELECT b1.local_id AS l1, b2.local_id AS l2
+         FROM book b1 JOIN book b2 ON b2.local_id > b1.local_id AND b2.section = 'Expense' AND strpos(b2.ltxt, k.vtok) > 0
+          AND b2.d BETWEEN k.d - 5 AND k.d + 30 AND abs(b1.a + b2.a - k.amt) <= 0.01
+         WHERE b1.section = 'Expense' AND k.amt IS NOT NULL AND length(k.vtok) >= 5 AND strpos(b1.ltxt, k.vtok) > 0
+           AND b1.d BETWEEN k.d - 5 AND k.d + 30 AND b1.record_kind = 'retained_ledger_decision' AND b2.record_kind = 'retained_ledger_decision'
+         LIMIT 1) x) AS split_hits,
       (SELECT array_agg(b.local_id ORDER BY b.d) FROM (SELECT b.local_id, b.d FROM book b
          WHERE b.section = 'Expense' AND ((k.amt IS NOT NULL AND abs(b.a - k.amt) <= 0.01 AND b.d BETWEEN k.d - 5 AND k.d + 30)
            OR EXISTS (SELECT 1 FROM unnest(k.refs) rf WHERE strpos(b.txt, rf) > 0 AND b.txt ~ ('(^|[^a-z0-9])' || rf || '([^a-z0-9]|$)')))
@@ -207,7 +216,7 @@ BEGIN
     FROM known k
   ), known_scored AS MATERIALIZED (
     SELECT m.*,
-      CASE WHEN m.exp_hits IS NOT NULL THEN 'cited_expense' WHEN m.near_hits IS NOT NULL THEN 'near_match'
+      CASE WHEN m.exp_hits IS NOT NULL THEN 'cited_expense' WHEN m.near_hits IS NOT NULL OR m.split_hits IS NOT NULL THEN 'near_match'
            WHEN m.other_hits IS NOT NULL THEN 'booked_not_expense' ELSE 'uncited' END AS st,
       CASE m.kind
         WHEN 'receipt' THEN least(0.95,
@@ -235,7 +244,7 @@ BEGIN
     SELECT s.kind, s.key, s.keys, s.vid, s.d, NULL::date AS wend, s.vendor, s.ref_label AS ref, s.amt,
       CASE WHEN s.amt IS NULL THEN 'unknown' WHEN s.kind = 'timeline_cost' THEN 'claim' ELSE 'document' END AS basis,
       NULL::numeric AS est_mid, s.st2 AS st,
-      CASE s.st2 WHEN 'cited_expense' THEN s.exp_hits WHEN 'near_match' THEN s.near_hits ELSE s.other_hits END AS cited,
+      CASE s.st2 WHEN 'cited_expense' THEN s.exp_hits WHEN 'near_match' THEN coalesce(s.near_hits, s.split_hits) ELSE s.other_hits END AS cited,
       round(s.conf::numeric, 3) AS conf,
       CASE WHEN s.amt IS NOT NULL THEN round(s.amt * s.conf::numeric, 2) END AS sc,
       jsonb_strip_nulls(jsonb_build_object('source', s.kind, 'subtype', s.sub, 'amount_check', s.ac, 'payment_channel', s.channel,
