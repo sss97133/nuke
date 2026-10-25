@@ -1,5 +1,6 @@
+-- caller controls the transaction (wrap in BEGIN ... ROLLBACK for tests); no COMMIT here
 -- Revert rm_fix2_v1_20261024
-begin; set local statement_timeout='50s';
+set local statement_timeout='50s';
 update public.vehicle_events e set metadata = e.metadata || jsonb_build_object('attach_basis', b.old_attach_basis) from public.backup_rm_fix2_v1_20261024_attach b where e.id=b.event_id and e.metadata->'attach_basis'->'lot_fix'->>'run_id'='rm_fix2_v1_20261024';
 alter table public.vehicle_events drop constraint if exists vehicle_events_attach_lot_not_url;
 update public.vehicles v set listing_kind=b.old_listing_kind, origin_metadata=b.old_origin_metadata from public.backup_rm_fix2_v1_20261024_nonvehicle b where v.id=b.vehicle_id;
@@ -1287,4 +1288,4 @@ update public.vehicles v set canonical_make_id=b.old_canonical_make_id from publ
 delete from public.canonical_make_era_rules where run_id='rm_fix2_v1_20261024';
 -- new canonical_makes rows and citations are left in place (no vehicles point at them after this revert); remove with:
 -- delete from public.canonical_make_citations where run_id='rm_fix2_v1_20261024'; delete from public.canonical_makes where canonical_name in ('MERCEDES-DMG','AMERICAN UNDERSLUNG','AMERICAN LAFRANCE','AMERICAN EAGLE');
-commit;
+
