@@ -4,9 +4,7 @@
  * Inline expandable provenance drawer for a single vehicle field.
  * Shows retained source claims, qualified scores and separately named clocks.
  *
- * Design system: Nuke utilitarian — Arial, 2px solid borders,
- * ALL CAPS labels, 9-10px body, greyscale/flat, no gradients/shadows/glows,
- * no emojis, no rounded corners.
+ * Typography follows the shared readable system tokens.
  */
 import React from 'react';
 import type { FieldEvidenceGroup, FieldEvidenceRow } from './hooks/useFieldEvidence';
@@ -84,32 +82,31 @@ const S = {
   } as React.CSSProperties,
 
   label: {
-    fontFamily: 'Arial, sans-serif',
-    fontSize: '9px',
+    fontFamily: 'var(--font-family)',
+    fontSize: 'var(--text-caption)',
     fontWeight: 700,
-    letterSpacing: '0.08em',
+    letterSpacing: 'normal',
     textTransform: 'uppercase' as const,
     color: 'var(--text-secondary)',
   } as React.CSSProperties,
 
   badge: {
-    fontFamily: 'Arial, sans-serif',
-    fontSize: '8px',
+    fontFamily: 'var(--font-family)',
+    fontSize: 'var(--text-caption)',
     fontWeight: 700,
-    letterSpacing: '0.04em',
+    letterSpacing: 'normal',
     textTransform: 'uppercase' as const,
     padding: '1px 4px',
     border: '1px solid var(--text-disabled)',
     background: 'var(--bg)',
     color: 'var(--text)',
     maxWidth: '100px',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap' as const,
+    overflowWrap: 'anywhere' as const,
+    whiteSpace: 'normal' as const,
   } as React.CSSProperties,
 
   body: {
-    padding: '6px 8px 8px',
+    padding: '12px',
     borderTop: '1px dashed var(--border)',
     borderBottom: '1px dashed var(--border)',
     background: 'var(--surface)',
@@ -125,30 +122,30 @@ const S = {
   } as React.CSSProperties,
 
   value: {
-    fontFamily: 'Arial, sans-serif',
-    fontSize: '10px',
+    fontFamily: 'var(--font-family)',
+    fontSize: 'var(--text-callout)',
     color: 'var(--text)',
     minWidth: 0,
     overflowWrap: 'anywhere' as const,
   } as React.CSSProperties,
 
   confLabel: {
-    fontFamily: 'Arial, sans-serif',
-    fontSize: '10px',
+    fontFamily: 'var(--font-family)',
+    fontSize: 'var(--text-caption)',
     fontWeight: 700,
     color: 'var(--text-secondary)',
   } as React.CSSProperties,
 
   timestamp: {
-    fontFamily: 'Arial, sans-serif',
-    fontSize: '10px',
+    fontFamily: 'var(--font-family)',
+    fontSize: 'var(--text-caption)',
     color: 'var(--text-secondary)',
     overflowWrap: 'anywhere' as const,
   } as React.CSSProperties,
 
   chevron: {
-    fontFamily: 'Arial, sans-serif',
-    fontSize: '9px',
+    fontFamily: 'var(--font-family)',
+    fontSize: 'var(--text-caption)',
     color: 'var(--text-disabled)',
     flexShrink: 0,
     transition: 'transform 0.15s ease-out',
@@ -198,6 +195,7 @@ const FieldProvenanceDrawer: React.FC<FieldProvenanceDrawerProps> = ({
         {/* Summary line */}
         <div style={{
           display: 'flex',
+          flexWrap: 'wrap',
           alignItems: 'center',
           gap: '6px',
           marginBottom: '4px',
@@ -205,7 +203,7 @@ const FieldProvenanceDrawer: React.FC<FieldProvenanceDrawerProps> = ({
           borderBottom: '1px solid var(--border)',
         }}>
           <span style={S.label}>CLAIM RECORDS</span>
-          <span style={{ ...S.label, color: 'var(--text-disabled)' }}>
+          <span style={S.label}>
             {totalSources} RECORD{totalSources !== 1 ? 'S' : ''}
           </span>
           {agreementCount > 1 && (
@@ -265,9 +263,9 @@ const FieldProvenanceDrawer: React.FC<FieldProvenanceDrawerProps> = ({
               <span
                 className="dossier-evidence-context"
                 style={{
-                  fontFamily: 'Arial, sans-serif',
+                  fontFamily: 'var(--font-family)',
                   gridColumn: '1 / -1',
-                  fontSize: '10px',
+                  fontSize: 'var(--text-caption)',
                   color: 'var(--text-secondary)',
                   overflowWrap: 'anywhere' as const,
                 }}
@@ -327,15 +325,15 @@ export const SourceBadge: React.FC<SourceBadgeProps> = ({ group, onClick }) => {
     >
       <span style={{
         ...S.badge,
-        fontSize: '8px',
+        fontSize: 'var(--text-caption)',
         padding: '0px 3px',
       }}>
         {getSourceLabel(primary.source_type)}
       </span>
       {totalSources > 1 && (
         <span style={{
-          fontFamily: 'Arial, sans-serif',
-          fontSize: '8px',
+          fontFamily: 'var(--font-family)',
+          fontSize: 'var(--text-caption)',
           color: 'var(--text-disabled)',
         }}>
           +{totalSources - 1}

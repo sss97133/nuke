@@ -198,46 +198,7 @@ const VehicleBadgeBar: React.FC = () => {
   };
 
   return (
-    <div className="vehicle-sub__badges" data-testid="vehicle-badge-bar" style={{ padding: '4px 12px', display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center', borderBottom: '1px solid var(--vp-ghost, #e0e0e0)' }}>
-      <style>{`
-        .vp-identity-mark {
-          display: inline-flex;
-          align-items: center;
-          gap: 5px;
-          padding: 2px 6px;
-          border: 1px solid var(--border, #333);
-          background: var(--bg, #0d0d0d);
-          color: inherit;
-          text-decoration: none;
-          cursor: pointer;
-          font-size: 9px;
-          font-weight: 800;
-          letter-spacing: 0.08em;
-          font-family: 'Courier New', monospace;
-          transition: border-color 180ms cubic-bezier(0.16, 1, 0.3, 1);
-        }
-        .vp-identity-mark:hover {
-          border-color: var(--text, #fff);
-        }
-        .vp-identity-mark__svg {
-          display: inline-flex;
-          align-items: center;
-          height: 15px;
-          width: 54px;
-        }
-        .vp-facet-chip {
-          font-size: 9px;
-          font-weight: 700;
-          letter-spacing: 0.06em;
-          color: inherit;
-          text-decoration: none;
-          cursor: pointer;
-          transition: border-color 180ms cubic-bezier(0.16, 1, 0.3, 1);
-        }
-        .vp-facet-chip:hover {
-          border-color: var(--text, #fff);
-        }
-      `}</style>
+    <div className="vehicle-sub__badges vp-badge-bar" data-testid="vehicle-badge-bar">
       {/* VETTED ERA & TRIM EMBLEMS */}
       {identityMarks.map((mark) => {
         const yr = typeof v?.year === 'number' ? v.year : null;
@@ -303,7 +264,7 @@ const VehicleBadgeBar: React.FC = () => {
               }
             }}
           >
-            SERIES · {facets.series}
+            Series · {facets.series}
           </a>
         );
       })()}
@@ -329,7 +290,7 @@ const VehicleBadgeBar: React.FC = () => {
               }
             }}
           >
-            TRIM · {facets.trim}
+            Trim · {facets.trim}
           </a>
         );
       })()}
@@ -355,7 +316,7 @@ const VehicleBadgeBar: React.FC = () => {
               }
             }}
           >
-            BODY · {facets.body}
+            Body · {facets.body}
           </a>
         );
       })()}
