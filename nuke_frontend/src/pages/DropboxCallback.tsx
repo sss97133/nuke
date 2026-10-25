@@ -1,20 +1,26 @@
-import React, { useEffect, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
+import React, { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { DROPBOX_OAUTH_STATE_KEY, readPendingDropboxAuthorization } from '../services/dropboxOAuth';
 import '../styles/unified-design-system.css';
 
 const DropboxCallback: React.FC = () => {
-  const [searchParams] = useSearchParams();
   const [status, setStatus] = useState<'processing' | 'success' | 'error'>('processing');
   const [error, setError] = useState<string | null>(null);
+  const [returnPath, setReturnPath] = useState<string | null>(null);
+  const processed = useRef(false);
+  const connectedToken = useRef<string | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
-    const handleCallback = async () => {
+    // React StrictMode replays effects; consume this callback only once per mount.
+    if (processed.current) return;
+    processed.current = true;
+    const handleCallback = () => {
       try {
         // Parse URL fragment for access token (implicit grant flow)
         const fragment = window.location.hash.substring(1);
         const params = new URLSearchParams(fragment);
+        window.history.replaceState(window.history.state, '', window.location.pathname + window.location.search);
         
         const accessToken = params.get('access_token');
         const tokenType = params.get('token_type');
@@ -23,61 +29,65 @@ const DropboxCallback: React.FC = () => {
         const errorParam = params.get('error');
 
         if (errorParam) {
-          throw new Error(`Dropbox authorization failed: ${errorParam}`);
+          throw new Error('Dropbox authorization was not completed. Return to your organization to connect again.');
+        }
+
+        const pending = readPendingDropboxAuthorization(localStorage.getItem(DROPBOX_OAUTH_STATE_KEY));
+        if (!state || !pending || state !== pending.state) {
+          throw new Error('This Dropbox connection could not be verified. Return to your organization to connect again.');
         }
 
         if (!accessToken) {
-          throw new Error('No access token received from Dropbox');
+          throw new Error('No access token received from Dropbox. Return to your organization to connect again.');
         }
-
-        // Verify state parameter (basic CSRF protection)
-        const savedState = localStorage.getItem('dropbox_oauth_state');
-        if (state !== savedState) {
-          console.warn('State parameter mismatch:', { received: state, saved: savedState });
-          // For development, continue but log the issue
-          // throw new Error('Invalid state parameter - possible CSRF attack');
+        const expiresSeconds = expiresIn === null ? null : Number(expiresIn);
+        if (expiresSeconds !== null && (!Number.isSafeInteger(expiresSeconds) || expiresSeconds <= 0 || !Number.isSafeInteger(Date.now() + expiresSeconds * 1000))) {
+          throw new Error('Dropbox returned an invalid token expiration. Return to your organization to connect again.');
         }
-
-        // Debug: Log token info
-        console.log('Dropbox OAuth Success:', {
-          tokenLength: accessToken.length,
-          tokenType,
-          expiresIn,
-          tokenPrefix: accessToken.substring(0, 20) + '...'
-        });
 
         // Store the access token with expiration
         localStorage.setItem('dropbox_access_token', accessToken);
         localStorage.setItem('dropbox_token_type', tokenType || 'bearer');
         
-        if (expiresIn) {
-          const expirationTime = Date.now() + (parseInt(expiresIn) * 1000);
+        if (expiresSeconds !== null) {
+          const expirationTime = Date.now() + expiresSeconds * 1000;
           localStorage.setItem('dropbox_token_expires', expirationTime.toString());
+        } else {
+          localStorage.removeItem('dropbox_token_expires');
         }
         
         // Clean up state
-        localStorage.removeItem('dropbox_oauth_state');
+        localStorage.removeItem(DROPBOX_OAUTH_STATE_KEY);
 
-        console.log('Dropbox access token stored successfully');
+        connectedToken.current = accessToken;
+        setReturnPath(pending.returnPath);
         setStatus('success');
-        
-        // Always redirect to vehicles page with categorize tab - let the route handle auth
-        const redirectToPhotoCategorizer = () => {
-          navigate('/login?returnUrl=' + encodeURIComponent('/vehicles?tab=categorize'));
-        };
-        
-        // Redirect after a brief success message
-        setTimeout(redirectToPhotoCategorizer, 2000);
 
       } catch (err) {
-        console.error('OAuth callback error:', err);
         setError(err instanceof Error ? err.message : 'Unknown error occurred');
         setStatus('error');
       }
     };
 
     handleCallback();
-  }, [navigate]);
+  }, []);
+
+  const startImport = () => {
+    if (!returnPath) return;
+    try {
+      // Another tab may have disconnected or connected a different account while
+      // this success screen waited. Do not import through a changed connection.
+      if (connectedToken.current && localStorage.getItem('dropbox_access_token') === connectedToken.current) {
+        navigate(returnPath);
+        return;
+      }
+    } catch {
+      // Unreadable storage cannot establish that this is the verified connection.
+    }
+    setReturnPath(null);
+    setError('The Dropbox connection changed. Return to your organization to connect again.');
+    setStatus('error');
+  };
 
   return (
     <div className="fade-in">
@@ -103,9 +113,11 @@ const DropboxCallback: React.FC = () => {
                   </div>
                   <h2 className="text-large font-bold mb-2 text-primary">Successfully Connected!</h2>
                   <p className="text text-muted mb-4">
-                    Your Dropbox account has been connected. Redirecting to import page...
+                    Your Dropbox account has been connected. Starting the import scans your organization's Dropbox inventory and syncs missing vehicle images.
                   </p>
-                  <div className="loading-spinner"></div>
+                  <button className="button button-primary" onClick={startImport}>
+                    Start Dropbox import
+                  </button>
                 </>
               )}
 
@@ -122,9 +134,9 @@ const DropboxCallback: React.FC = () => {
                   </p>
                   <button 
                     className="button button-primary"
-                    onClick={() => navigate('/dropbox-import')}
+                    onClick={() => navigate('/')}
                   >
-                    Try Again
+                    Return home
                   </button>
                 </>
               )}
