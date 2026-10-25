@@ -929,11 +929,14 @@ async function saveVehicle(
   // Ensure deterministic facet extraction has run on the vehicle before identity check & write
   applyBarrettJacksonVehicleFacets(vehicle);
 
-  // Check if vehicle already exists by URL
+  // Check if vehicle already exists by URL: every spelling of the canonical listing URL (http/https, www, trailing slash),
+  // oldest record first, so a re-crawl with a different spelling finds the existing vehicle instead of making a twin.
+  const urlSpellings = listingUrlSpellings(vehicle.url);
   const { data: byUrl } = await supabase
     .from("vehicles")
     .select("id")
-    .eq("discovery_url", vehicle.url)
+    .in("discovery_url", urlSpellings)
+    .order("created_at", { ascending: true })
     .limit(1)
     .maybeSingle();
 
@@ -941,8 +944,9 @@ async function saveVehicle(
   const { data: queueEntry } = await supabase
     .from("import_queue")
     .select("vehicle_id")
-    .eq("listing_url", vehicle.url)
+    .in("listing_url", urlSpellings)
     .not("vehicle_id", "is", null)
+    .order("created_at", { ascending: true })
     .limit(1)
     .maybeSingle();
 
