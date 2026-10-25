@@ -6,6 +6,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const fixture = vi.hoisted(() => ({ rpc: vi.fn(), session: null as null | { user: { id: string } } }));
+vi.mock('../../hooks/useAuth', () => ({ useAuth: () => ({ user: fixture.session?.user ?? null, loading: false }) }));
 vi.mock('../../lib/supabase', () => ({ supabase: { rpc: fixture.rpc } }));
 vi.mock('../../contexts/AuthContext', () => ({ useAuthContext: () => ({ session: fixture.session }) }));
 vi.mock('../../hooks/usePageTitle', () => ({ usePageTitle: () => {} }));
@@ -15,7 +16,7 @@ import JobsBoard from './JobsBoard';
 import BestMatches from './BestMatches';
 import InspectionCallout from './InspectionCallout';
 import { ContactSheet } from './JobSheets';
-import { clearPlanCache, matchReason, theirWords } from './jobsReaders';
+import { matchReason, theirWords } from './jobsReaders';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -45,7 +46,7 @@ async function render(node: React.ReactElement) {
 }
 const names = () => fixture.rpc.mock.calls.map(c => c[0]);
 
-beforeEach(() => { fixture.rpc.mockReset(); fixture.session = null; clearPlanCache(); });
+beforeEach(() => { fixture.rpc.mockReset(); fixture.session = null; });
 afterEach(() => { act(() => root?.unmount()); root = null; document.body.innerHTML = ''; });
 
 describe('match words', () => {

@@ -1,16 +1,25 @@
 /**
  * InspectionCallout — on a public vehicle page, when the listing plan (listing_work_plan_read) has checklist
  * items: "Get this car inspected before you buy", opening Plan the work with its Order an inspection Sign.
- * The plan is read once the slot scrolls into view and shared with the Work section. Nothing is recorded
+ * The plan is read once the slot scrolls into view and kept in this mounted callout. Nothing is recorded
  * about the visit.
  */
 import React, { useEffect, useRef, useState } from 'react';
+import { useAuth } from '../../hooks/useAuth';
 import { Text } from '../../kit';
 import { JobReaders, type WorkPlan } from './jobsReaders';
 import { WorkPlanView } from './WorkPlanPanel';
 import './jobs.css';
 
-export default function InspectionCallout({ vehicleId, signedIn }: { vehicleId: string; signedIn: boolean }) {
+type Props = { vehicleId: string; signedIn: boolean };
+
+export default function InspectionCallout(props: Props) {
+  const { user, loading } = useAuth();
+  if (loading) return null;
+  return <ViewerInspectionCallout key={`${user?.id ?? 'anonymous'}:${props.vehicleId}`} {...props} />;
+}
+
+function ViewerInspectionCallout({ vehicleId, signedIn }: Props) {
   const slot = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
   const [plan, setPlan] = useState<WorkPlan | null>(null);
@@ -28,7 +37,8 @@ export default function InspectionCallout({ vehicleId, signedIn }: { vehicleId: 
   useEffect(() => {
     if (!visible) return;
     let cancelled = false;
-    void JobReaders.plan(vehicleId).then(r => { if (!cancelled && r.data) setPlan(r.data); });
+    void JobReaders.plan(vehicleId).then(r => { if (!cancelled && r.data) setPlan(r.data); })
+      .catch(() => { if (!cancelled) setPlan(null); });
     return () => { cancelled = true; };
   }, [visible, vehicleId]);
 
