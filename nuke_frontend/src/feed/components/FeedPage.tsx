@@ -101,20 +101,18 @@ export default function FeedPage() {
   const handleInterestMakeClick = useCallback(
     (make: string) => {
       recordInterest('make', make);
-      setFilters({ ...DEFAULT_FILTERS, makes: [make] });
-      setSortBy('popular');
+      setFilters({ ...DEFAULT_FILTERS, makes: [make] }, 'popular');
     },
-    [recordInterest, setFilters, setSortBy],
+    [recordInterest, setFilters],
   );
 
   const handleInterestModelClick = useCallback(
     (model: string) => {
       recordInterest('model', model);
       // Try to infer the make from the model's top association
-      setFilters({ ...DEFAULT_FILTERS, models: [model] });
-      setSortBy('popular');
+      setFilters({ ...DEFAULT_FILTERS, models: [model] }, 'popular');
     },
-    [recordInterest, setFilters, setSortBy],
+    [recordInterest, setFilters],
   );
 
   // Local display settings (not URL-persisted)
@@ -149,14 +147,11 @@ export default function FeedPage() {
       if (filter.priceMax != null) {
         newFilters.priceMax = filter.priceMax;
       }
-      setFilters(newFilters);
-      if (filter.sort) {
-        setSortBy(filter.sort);
-      }
+      setFilters(newFilters, filter.sort);
       // Close the panel after filtering
       setActiveHeroPanel(null);
     },
-    [setFilters, setSortBy],
+    [setFilters],
   );
 
   const handleHeroPanelToggle = useCallback(
@@ -172,8 +167,7 @@ export default function FeedPage() {
       // If same metric clicked again, reset to defaults
       if (activeMetric === metric) {
         setActiveMetric(null);
-        setFilters(DEFAULT_FILTERS);
-        setSortBy('popular');
+        setFilters(DEFAULT_FILTERS, 'popular');
         return;
       }
 
@@ -182,32 +176,27 @@ export default function FeedPage() {
       switch (metric) {
         case 'vehicles':
           // Reset all filters — show everything
-          setFilters(DEFAULT_FILTERS);
-          setSortBy('popular');
+          setFilters(DEFAULT_FILTERS, 'popular');
           break;
         case 'value':
           // Sort by price high
-          setFilters(DEFAULT_FILTERS);
-          setSortBy('price_high');
+          setFilters(DEFAULT_FILTERS, 'price_high');
           break;
         case 'today':
           // Filter to today only
-          setFilters({ ...DEFAULT_FILTERS, addedTodayOnly: true });
-          setSortBy('newest');
+          setFilters({ ...DEFAULT_FILTERS, addedTodayOnly: true }, 'newest');
           break;
         case 'for_sale':
           // Filter to for-sale only
-          setFilters({ ...DEFAULT_FILTERS, forSale: true });
-          setSortBy('newest');
+          setFilters({ ...DEFAULT_FILTERS, forSale: true }, 'newest');
           break;
         case 'live':
           // Filter to for-sale + sort by feed rank (live auctions get +200 rank boost)
-          setFilters({ ...DEFAULT_FILTERS, forSale: true });
-          setSortBy('popular');
+          setFilters({ ...DEFAULT_FILTERS, forSale: true }, 'popular');
           break;
       }
     },
-    [activeMetric, setFilters, setSortBy],
+    [activeMetric, setFilters],
   );
 
   // Resolve 'auto' fit: contain for dense grids (>= 8 cols), cover otherwise

@@ -96,11 +96,12 @@ function deserializeFilters(params: URLSearchParams): FilterState {
   if (params.has('private')) filters.privateParty = true;
   if (params.has('dealer')) filters.dealer = true;
 
-  // Source exclusions: sources=-craigslist,-ksl,-bat
+  // Source selection: positive names include sources; a minus prefix excludes.
   const sources = params.get('sources');
   if (sources) {
     const parts = sources.split(',').map(s => s.trim()).filter(Boolean);
     const excluded: string[] = [];
+    const included: string[] = [];
     for (const part of parts) {
       if (part.startsWith('-')) {
         const key = part.slice(1);
@@ -112,9 +113,12 @@ function deserializeFilters(params: URLSearchParams): FilterState {
         if (key === 'classic') filters.hideClassic = true;
         if (key === 'dealer_sites') filters.hideDealerSites = true;
         if (key === 'dealer_listings') filters.hideDealerListings = true;
+      } else {
+        included.push(part);
       }
     }
     filters.hiddenSources = excluded;
+    filters.includedSources = included;
   }
 
   // Location
@@ -187,11 +191,11 @@ export function serializeToUrl(state: FeedUrlState): URLSearchParams {
   if (filters.privateParty) params.set('private', '');
   if (filters.dealer) params.set('dealer', '');
 
-  // Source exclusions
+  // Preserve the same includes/excludes the existing feed reader accepts.
   const excluded = collectExcludedSources(filters);
-  if (excluded.length > 0) {
-    params.set('sources', excluded.map(s => `-${s}`).join(','));
-  }
+  const included = [...new Set(filters.includedSources ?? [])].sort();
+  const sources = [...included, ...excluded.map(s => `-${s}`)];
+  if (sources.length > 0) params.set('sources', sources.join(','));
 
   // Location
   if (filters.zipCode) params.set('zip', filters.zipCode);

@@ -46,8 +46,8 @@ export interface FeedSearchParamsResult {
   /** Whether any non-default filters are active */
   hasActiveFilters: boolean;
 
-  /** Replace the full filter state */
-  setFilters: (filters: FilterState) => void;
+  /** Replace filters, optionally applying a preset sort in the same URL update. */
+  setFilters: (filters: FilterState, sortBy?: SortBy) => void;
   /** Merge partial filter changes */
   updateFilters: (partial: Partial<FilterState>) => void;
   /** Set sort field (resets to desc for most fields) */
@@ -181,8 +181,10 @@ export function useFeedSearchParams(defaultCardsPerRow = 3): FeedSearchParamsRes
   // --- Mutation helpers ---
 
   const setFilters = useCallback(
-    (newFilters: FilterState) => {
-      pushState({ ...currentState, filters: newFilters });
+    (newFilters: FilterState, sortBy?: SortBy) => {
+      pushState({ ...currentState, filters: newFilters,
+        ...(sortBy ? { sortBy, sortDirection: sortBy === 'make' || sortBy === 'model' ? 'asc' : 'desc' } : {}),
+      });
     },
     [currentState, pushState],
   );

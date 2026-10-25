@@ -13,6 +13,7 @@ function Controls({ defaultColumns = 3 }: { defaultColumns?: number }) {
     <output aria-label="Active view">{params.get('tab') ?? 'market'}</output>
     <output aria-label="Columns">{feed.cardsPerRow}</output>
     <output aria-label="Sort">{feed.sortBy}</output>
+    <output aria-label="Filters">{JSON.stringify(feed.filters)}</output>
     <button onClick={() => feed.setSortBy('popular')}>Sort</button>
     <button onClick={() => feed.setSortBy('finds')}>Finds</button>
     <button onClick={() => feed.setCardsPerRow(3)}>Three columns</button>
@@ -20,6 +21,13 @@ function Controls({ defaultColumns = 3 }: { defaultColumns?: number }) {
     <button onClick={() => feed.setViewMode('technical')}>Table</button>
     <button onClick={() => feed.setCardsPerRow(2)}>Density</button>
     <button onClick={() => feed.setSearchText('Porsche')}>Search</button>
+    <button onClick={() => {
+      feed.setFilters({ ...DEFAULT_FILTERS, makes: ['Porsche'] }, 'popular');
+    }}>Interest preset</button>
+    <button onClick={() => feed.updateFilters({ includedSources: ['bat'], hiddenSources: ['ksl'] })}>Source filter</button>
+    <button onClick={() => {
+      feed.setFilters({ ...DEFAULT_FILTERS, addedTodayOnly: true, includedSources: ['bat'] }, 'newest');
+    }}>Source preset</button>
     <button onClick={feed.resetAll}>Reset</button>
   </>;
 }
@@ -108,5 +116,34 @@ describe('responsive feed display defaults', () => {
     await render(); await click('Finds');
     expect(params().get('sort')).toBe('finds');
     expect(container.querySelector('[aria-label="Sort"]')?.textContent).toBe('finds');
+  });
+});
+
+describe('feed presets retain their selected population', () => {
+  const filters = () => JSON.parse(container.querySelector('[aria-label="Filters"]')!.textContent!);
+  it('keeps the selected make when an interest preset also changes sort', async () => {
+    await render(); await click('Interest preset');
+    expect(filters().makes).toEqual(['Porsche']);
+    expect(params().get('sort')).toBe('popular');
+  });
+  it('round-trips included source filters alongside source exclusions', async () => {
+    await render(); await click('Source filter');
+    expect(filters().includedSources).toEqual(['bat']);
+    expect(filters().hiddenSources).toEqual(['ksl']);
+    expect(params().get('sources')).toBe('bat,-ksl');
+    await click('Sort');
+    expect(filters().includedSources).toEqual(['bat']);
+    expect(filters().hideKsl).toBe(true);
+    await click('Reset');
+    expect(params().has('sources')).toBe(false);
+    expect(filters().includedSources).toEqual([]);
+  });
+  it('keeps a source and today-only window when a source preset changes sort', async () => {
+    window.history.replaceState({}, '', '/?tab=feed&sort=popular&make=Porsche');
+    await render(); await click('Source preset');
+    expect(filters().addedTodayOnly).toBe(true);
+    expect(filters().includedSources).toEqual(['bat']);
+    expect(filters().makes).toEqual([]);
+    expect(container.querySelector('[aria-label="Sort"]')?.textContent).toBe('newest');
   });
 });
