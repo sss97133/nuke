@@ -120,6 +120,7 @@ export default function ProfileHeader({ priceLotId }: { priceLotId?: string }) {
   const { vehicle, auctionPulse } = useVehicleProfile();
   const priceOwnedByLiveStack = isAuctionPresentation(auctionPulse) && !!auctionPulse?.listing_url && ['active', 'live'].includes(auctionPulse.listing_status);
   const doc = useProfileDocument(vehicle?.id, priceOwnedByLiveStack);
+  const hasMasthead = doc?.sections.some(section => section.kind === 'masthead') ?? false;
   const sticky = useRef<HTMLDivElement>(null);
   const stripBoundary = useRef<HTMLDivElement>(null);
   const [activeFacet, setActiveFacet] = useState<ProfileFacet | null>(null);
@@ -135,7 +136,7 @@ export default function ProfileHeader({ priceLotId }: { priceLotId?: string }) {
     const observer = new ResizeObserver(update);
     observer.observe(el);
     return () => { observer.disconnect(); page.style.removeProperty('--vp-h-masthead'); };
-  }, [vehicle?.id]);
+  }, [vehicle?.id, hasMasthead]);
   useEffect(() => setActiveFacet(null), [vehicle?.id]);
 
   const masthead = doc?.sections.find(s => s.kind === 'masthead');

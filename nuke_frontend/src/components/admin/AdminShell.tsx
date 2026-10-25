@@ -47,8 +47,6 @@ const tools: AdminNavItem[] = [
   { label: 'Business Intelligence', to: '/admin/business-intelligence' },
   { label: 'Price Editor', to: '/admin/price-editor' },
   { label: 'Price Import', to: '/admin/price-import' },
-  { label: 'Shipping Settings', to: '/admin/shipping-settings' },
-  { label: 'x402 Settings', to: '/admin/x402-settings' },
   { label: 'Scraper Dashboard', to: '/admin/scrapers', description: 'Monitor and trigger all scrapers' },
   { label: 'Unified Scrapers', to: '/admin/unified-scrapers', description: 'Unified scraper orchestrator dashboard' },
   { label: 'KSL Scraper', to: '/admin/ksl-scraper' },
