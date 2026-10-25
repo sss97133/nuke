@@ -126,7 +126,7 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
 
   if (loading) {
     return (
-      <div className="app-layout compact win95" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+      <div className="app-layout" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
         {/* Placeholder header keeps layout stable while auth resolves */}
         <div
           style={{
@@ -147,7 +147,7 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
 
   return (
     <GlobalDropZone>
-      <div className="app-layout compact win95">
+      <div className="app-layout">
         <a href="#main-content" className="sr-only focus:not-sr-only" style={{ position: 'absolute', left: '-9999px', top: 'auto', width: '1px', height: '1px', overflow: 'hidden', zIndex: 9999 }} onFocus={(e) => { e.currentTarget.style.position = 'fixed'; e.currentTarget.style.top = '0'; e.currentTarget.style.left = '0'; e.currentTarget.style.width = 'auto'; e.currentTarget.style.height = 'auto'; e.currentTarget.style.padding = '8px 16px'; e.currentTarget.style.background = 'var(--surface)'; e.currentTarget.style.color = 'var(--text)'; e.currentTarget.style.border = '2px solid var(--accent)'; }} onBlur={(e) => { e.currentTarget.style.position = 'absolute'; e.currentTarget.style.left = '-9999px'; e.currentTarget.style.width = '1px'; e.currentTarget.style.height = '1px'; }}>Skip to content</a>
 
         <UploadStatusBar />

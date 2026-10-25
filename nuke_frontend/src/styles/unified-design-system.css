@@ -1,23 +1,23 @@
 /**
  * UNIFIED NUKE DESIGN SYSTEM
  * Single source of truth for all styling
- * Date: October 21, 2025
+ * Native web foundation: October 24, 2026
  */
 
 /* ================================================
    DESIGN PRINCIPLES
    ================================================
-   - Font sizes: 8px-11px only (strict)
+   - System typography with readable roles; compact data remains opt-in
    - UNIT: Always px. Never pt. (8pt ≠ 8px — pt renders at 1.333× px)
-   - Colors: Moderate contrast (no pure black/white)
+   - Grouped surfaces with accessible text and semantic action colors
    - Spacing: 4px base unit
-   - Borders: 2px solid
-   - Transitions: 0.12s
-   - Font: Arial, monospace for numbers
+   - Thin separators; rounded controls and grouped surfaces
+   - Motion: short interactions, reduced-motion preference respected
+   - Font: platform system face, tabular figures for numbers
    ================================================ */
 
 /* Default (no data-theme) behaves like light */
-:root {
+html:root {
   /* User text scaling (accessibility) */
   --font-scale: 1;
   --fs-8: calc(8px * var(--font-scale));
@@ -27,25 +27,25 @@
   --fs-12: calc(12px * var(--font-scale));
 
   /* Background Colors - Moderate, not extreme */
-  --bg: #f5f5f5;           /* Light grey, NOT white */
-  --surface: #ebebeb;       /* Card backgrounds */
-  --surface-hover: #e0e0e0;
-  --surface-glass: rgba(235, 235, 235, 0.95);
+  --bg: #f2f2f7;           /* Grouped canvas */
+  --surface: #ffffff;       /* Grouped content */
+  --surface-hover: #e9e9ef;
+  --surface-glass: rgba(255, 255, 255, 0.92);
   
   /* Border Colors */
-  --border: #bdbdbd;        /* Medium grey */
-  --border-focus: #2a2a2a;  /* Dark grey, not blue */
+  --border: #d6d6de;        /* Subtle separator */
+  --border-focus: #0066cc;  /* Keyboard focus */
   
   /* Text Colors - Dark grey, NOT black */
-  --text: #2a2a2a;          /* Dark grey, readable */
-  --text-secondary: #666666;
+  --text: #1c1c1e;          /* Dark grey, readable */
+  --text-secondary: #63636b;
   --text-disabled: #999999;
   
   /* Accent Colors */
-  --accent: #2a2a2a;
-  --accent-dim: rgba(42, 42, 42, 0.08);
+  --accent: #0066cc;
+  --accent-dim: rgba(0, 102, 204, 0.09);
   --accent-bright: #000000;
-  --accent-alt: #2a2a2a;
+  --accent-alt: #0066cc;
   
   /* Status Colors */
   --success: #16825d;
@@ -76,8 +76,8 @@
   --info: #0ea5e9;
   --info-dim: rgba(14, 165, 233, 0.1);
   --link: var(--accent);
-  --shadow-lg: none;
-  --header-height: 40px;
+  --shadow-lg: 0 12px 40px rgb(0 0 0 / 14%);
+  --header-height: 42px;
   --danger: var(--error);
   --danger-bg: var(--error-dim);
   --primary: var(--accent);
@@ -99,14 +99,25 @@
   --space-6: 24px;
   
   /* Typography */
-  --font-family: Arial, sans-serif;
-  --font-mono: 'Courier New', monospace;
+  --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --text-body: calc(15px * var(--font-scale));
+  --text-callout: calc(14px * var(--font-scale));
+  --text-caption: calc(12px * var(--font-scale));
+  --text-title: calc(28px * var(--font-scale));
+  --control-height: 44px;
+  --action: #0066cc;
+  --action-hover: #0055ad;
+  --on-action: #ffffff;
+  --radius-sm: 8px;
+  --radius-lg: 18px;
+  --shadow: 0 2px 8px rgb(0 0 0 / 5%);
   
   /* Border */
-  --border-width: 2px;
+  --border-width: 1px;
 
   /* Border Radius */
-  --radius: 0px;
+  --radius: 12px;
 
   /* Transitions */
   --transition: 180ms cubic-bezier(0.16, 1, 0.3, 1);
@@ -116,23 +127,23 @@
    THEME TOKENS (LIGHT / DARK)
    ================================================ */
 
-:root[data-theme="light"] {
-  --bg: #f5f5f5;
-  --surface: #ebebeb;
-  --surface-hover: #e0e0e0;
-  --surface-glass: rgba(235, 235, 235, 0.95);
+html:root[data-theme="light"] {
+  --bg: #f2f2f7;
+  --surface: #ffffff;
+  --surface-hover: #e9e9ef;
+  --surface-glass: rgba(255, 255, 255, 0.92);
 
-  --border: #bdbdbd;
-  --border-focus: #2a2a2a;
+  --border: #d6d6de;
+  --border-focus: #0066cc;
 
-  --text: #2a2a2a;
-  --text-secondary: #666666;
+  --text: #1c1c1e;
+  --text-secondary: #63636b;
   --text-disabled: #999999;
 
-  --accent: #2a2a2a;
-  --accent-dim: rgba(42, 42, 42, 0.08);
+  --accent: #0066cc;
+  --accent-dim: rgba(0, 102, 204, 0.09);
   --accent-bright: #000000;
-  --accent-alt: #2a2a2a;
+  --accent-alt: #0066cc;
 
   /* Heatmap tokens (GitHub-style activity grid) */
   --heat-0: #ebedf0;
@@ -153,9 +164,9 @@
   --info-dim: rgba(14, 165, 233, 0.1);
   --info-bg: rgba(14, 165, 233, 0.08);
   --link: var(--accent);
-  --shadow-lg: none;
+  --shadow-lg: 0 12px 40px rgb(0 0 0 / 14%);
   --overlay: rgba(0, 0, 0, 0.5);
-  --header-height: 40px;
+  --header-height: 42px;
   --warning-bg: var(--warning-dim);
   --success-bg: var(--success-dim);
 
@@ -213,7 +224,7 @@
   --gray-900: #212121;
 
   /* ── Additional token aliases (resolve undefined refs) ─────────── */
-  --accent-rgb: 42, 42, 42;
+  --accent-rgb: 0, 102, 204;
   --blue-50: #eff6ff;
   --blue-100: #dbeafe;
   --blue-200: #bfdbfe;
@@ -258,8 +269,8 @@
   --border-light: var(--border);
   --border-medium: var(--border);
   --border-dark: var(--border-focus);
-  --font-size-small: var(--fs-8);
-  --font-size: var(--fs-9);
+  --font-size-small: var(--text-caption);
+  --font-size: var(--text-body);
   --white: #ffffff;
   --grey-50: #fafafa;
   --grey-100: #f5f5f5;
@@ -271,30 +282,30 @@
   --grey-700: #616161;
   --grey-800: #424242;
   --grey-900: #212121;
-  --shadow: none;
+  --shadow: 0 2px 8px rgb(0 0 0 / 5%);
   --shadow-inset: none;
   --leading-tight: 1.1;
-  --leading-normal: 1.2;
+  --leading-normal: 1.5;
 }
 
-:root[data-theme="dark"] {
-  --bg: #1e1e1e;
-  --surface: #252526;
-  --surface-hover: #2d2d30;
-  --surface-glass: rgba(37, 37, 38, 0.92);
+html:root[data-theme="dark"] {
+  --bg: #111113;
+  --surface: #1c1c1e;
+  --surface-hover: #2c2c2e;
+  --surface-glass: rgba(28, 28, 30, 0.94);
 
-  --border: #3e3e42;
-  --border-focus: #ebebeb;
+  --border: #3a3a3e;
+  --border-focus: #64aaff;
 
-  --text: #ebebeb;
-  --text-secondary: #a8a8a8;
+  --text: #f5f5f7;
+  --text-secondary: #aeaeb8;
   --text-disabled: #767676;
   --on-dark-overlay: #f5f5f5;
 
-  --accent: #ebebeb;
-  --accent-dim: rgba(235, 235, 235, 0.12);
+  --accent: #64aaff;
+  --accent-dim: rgba(100, 170, 255, 0.14);
   --accent-bright: #ffffff;
-  --accent-alt: #ebebeb;
+  --accent-alt: #64aaff;
 
   /* Heatmap tokens (muted for dark mode) */
   --heat-0: #2d2d30;
@@ -328,9 +339,9 @@
   --info-dim: rgba(56, 189, 248, 0.12);
   --info-bg: rgba(56, 189, 248, 0.08);
   --link: var(--accent);
-  --shadow-lg: none;
+  --shadow-lg: 0 12px 40px rgb(0 0 0 / 14%);
   --overlay: rgba(0, 0, 0, 0.6);
-  --header-height: 40px;
+  --header-height: 42px;
   --warning-bg: var(--warning-dim);
   --success-bg: var(--success-dim);
 
@@ -388,7 +399,7 @@
   --gray-900: var(--text);
 
   /* ── Additional token aliases (dark mode remaps) ────────────────── */
-  --accent-rgb: 204, 204, 204;
+  --accent-rgb: 100, 170, 255;
   --blue-50: rgba(59, 130, 246, 0.08);
   --blue-100: rgba(59, 130, 246, 0.12);
   --blue-200: rgba(59, 130, 246, 0.18);
@@ -428,8 +439,8 @@
   --border-light: var(--border);
   --border-medium: var(--border);
   --border-dark: var(--border-focus);
-  --font-size-small: var(--fs-8);
-  --font-size: var(--fs-9);
+  --font-size-small: var(--text-caption);
+  --font-size: var(--text-body);
   --white: var(--surface);
   --grey-50: var(--bg);
   --grey-100: var(--bg);
@@ -441,10 +452,10 @@
   --grey-700: var(--text-secondary);
   --grey-800: var(--text);
   --grey-900: var(--text);
-  --shadow: none;
+  --shadow: 0 2px 8px rgb(0 0 0 / 5%);
   --shadow-inset: none;
   --leading-tight: 1.1;
-  --leading-normal: 1.2;
+  --leading-normal: 1.5;
 }
 
 /* ================================================
@@ -452,7 +463,7 @@
    ================================================ */
 
 /* Greyscale: keep everything neutral, reduce status emphasis */
-:root[data-contrast="greyscale"] {
+html:root[data-contrast="greyscale"] {
   --accent: var(--text);
   --accent-alt: var(--text-secondary);
   --accent-dim: rgba(0, 0, 0, 0.08);
@@ -468,7 +479,7 @@
 }
 
 /* High contrast: optional accessibility mode */
-:root[data-theme="light"][data-contrast="high"] {
+html:root[data-theme="light"][data-contrast="high"] {
   --bg: #ffffff;
   --surface: #f2f2f2;
   --surface-hover: #e6e6e6;
@@ -486,7 +497,7 @@
   --accent-bright: #000000;
 }
 
-:root[data-theme="dark"][data-contrast="high"] {
+html:root[data-theme="dark"][data-contrast="high"] {
   --bg: #0a0a0a;
   --surface: #121212;
   --surface-hover: #1a1a1a;
@@ -508,22 +519,22 @@
    AUTOMOTIVE ACCENT COLORWAYS (accent-only by default)
    ================================================ */
 
-:root[data-accent="neutral"] {
-  --accent: #2a2a2a;
-  --accent-alt: #2a2a2a;
-  --accent-dim: rgba(42, 42, 42, 0.08);
+html:root[data-accent="neutral"] {
+  --accent: #0066cc;
+  --accent-alt: #0066cc;
+  --accent-dim: rgba(0, 102, 204, 0.09);
   --border-focus: var(--accent);
 }
 
-:root[data-theme="dark"][data-accent="neutral"] {
-  --accent: #ebebeb;
-  --accent-alt: #ebebeb;
-  --accent-dim: rgba(235, 235, 235, 0.12);
+html:root[data-theme="dark"][data-accent="neutral"] {
+  --accent: #64aaff;
+  --accent-alt: #64aaff;
+  --accent-dim: rgba(100, 170, 255, 0.14);
   --border-focus: var(--accent);
 }
 
 /* Gulf: orange primary, blue secondary */
-:root[data-accent="gulf"] {
+html:root[data-accent="gulf"] {
   --accent: #ff5f00;
   --accent-alt: #9dd9f3;
   --accent-dim: rgba(255, 95, 0, 0.12);
@@ -531,7 +542,7 @@
 }
 
 /* Martini: deep blue primary, red secondary */
-:root[data-accent="martini"] {
+html:root[data-accent="martini"] {
   --accent: #012169; /* navy */
   --accent-alt: #da291c; /* red */
   --accent-dim: rgba(1, 33, 105, 0.12);
@@ -539,7 +550,7 @@
 }
 
 /* Ricard: blue primary, yellow secondary */
-:root[data-accent="ricard"] {
+html:root[data-accent="ricard"] {
   --accent: #0033a0;
   --accent-alt: #ffcd00;
   --accent-dim: rgba(0, 51, 160, 0.12);
@@ -547,7 +558,7 @@
 }
 
 /* Ferrari Rosso Corsa */
-:root[data-accent="rosso"] {
+html:root[data-accent="rosso"] {
   --accent: #e4002b; /* Pantone example: 185 C */
   --accent-alt: #ffd100; /* yellow callout */
   --accent-dim: rgba(228, 0, 43, 0.12);
@@ -555,7 +566,7 @@
 }
 
 /* British Racing Green */
-:root[data-accent="brg"] {
+html:root[data-accent="brg"] {
   --accent: #00573f; /* Pantone example: 343 C */
   --accent-alt: #ffef00;
   --accent-dim: rgba(0, 87, 63, 0.12);
@@ -563,7 +574,7 @@
 }
 
 /* John Player Special: gold highlight */
-:root[data-accent="jps"] {
+html:root[data-accent="jps"] {
   --accent: #b9975b; /* gold */
   --accent-alt: #111111;
   --accent-dim: rgba(185, 151, 91, 0.14);
@@ -571,7 +582,7 @@
 }
 
 /* Jägermeister: orange */
-:root[data-accent="jaeger"] {
+html:root[data-accent="jaeger"] {
   --accent: #fe5000; /* Pantone example: 021 C */
   --accent-alt: #111111;
   --accent-dim: rgba(254, 80, 0, 0.12);
@@ -579,7 +590,7 @@
 }
 
 /* Alitalia: green primary, red secondary */
-:root[data-accent="alitalia"] {
+html:root[data-accent="alitalia"] {
   --accent: #009a44; /* Pantone example: 348 C */
   --accent-alt: #c8102e; /* Pantone example: 186 C */
   --accent-dim: rgba(0, 154, 68, 0.12);
@@ -587,7 +598,7 @@
 }
 
 /* BMW M: light blue primary, red secondary */
-:root[data-accent="bmw-m"] {
+html:root[data-accent="bmw-m"] {
   --accent: #00a3e0; /* Pantone example: 299 C */
   --accent-alt: #c8102e; /* Pantone example: 186 C */
   --accent-dim: rgba(0, 163, 224, 0.12);
@@ -595,7 +606,7 @@
 }
 
 /* McLaren papaya */
-:root[data-accent="papaya"] {
+html:root[data-accent="papaya"] {
   --accent: #ff5f1f;
   --accent-alt: #111111;
   --accent-dim: rgba(255, 95, 31, 0.12);
@@ -607,7 +618,7 @@
    ================================================ */
 
 /* Stars & Stripes: navy primary, red secondary */
-:root[data-accent="americana"] {
+html:root[data-accent="americana"] {
   --accent: #0a2342; /* Pantone example: 282 C */
   --accent-alt: #c8102e; /* Pantone example: 186 C */
   --accent-dim: rgba(10, 35, 66, 0.12);
@@ -615,7 +626,7 @@
 }
 
 /* Route 66: teal primary, sand secondary */
-:root[data-accent="route-66"] {
+html:root[data-accent="route-66"] {
   --accent: #005f73; /* Pantone example: 3035 C */
   --accent-alt: #d4a373; /* Pantone example: 4655 C */
   --accent-dim: rgba(0, 95, 115, 0.12);
@@ -623,7 +634,7 @@
 }
 
 /* Denim: deep indigo primary, canvas secondary */
-:root[data-accent="denim"] {
+html:root[data-accent="denim"] {
   --accent: #1b2a41; /* Pantone example: 2965 C */
   --accent-alt: #d6c9b4; /* Pantone example: 7534 C */
   --accent-dim: rgba(27, 42, 65, 0.12);
@@ -631,7 +642,7 @@
 }
 
 /* Desert Sun: warm orange primary */
-:root[data-accent="desert"] {
+html:root[data-accent="desert"] {
   --accent: #c95a00; /* Pantone example: 7576 C */
   --accent-alt: #7b4b2a; /* Pantone example: 7554 C */
   --accent-dim: rgba(201, 90, 0, 0.12);
@@ -643,7 +654,7 @@
    ================================================ */
 
 /* Camo: olive drab */
-:root[data-accent="camo-od"] {
+html:root[data-accent="camo-od"] {
   --accent: #4b5320;
   --accent-alt: #2a2a2a;
   --accent-dim: rgba(75, 83, 32, 0.14);
@@ -651,7 +662,7 @@
 }
 
 /* Camo: blaze hunting */
-:root[data-accent="camo-blaze"] {
+html:root[data-accent="camo-blaze"] {
   --accent: #fe5000;
   --accent-alt: #111111;
   --accent-dim: rgba(254, 80, 0, 0.12);
@@ -659,7 +670,7 @@
 }
 
 /* Camo: snow / hi-vis */
-:root[data-accent="camo-snow"] {
+html:root[data-accent="camo-snow"] {
   --accent: #f4f4f4;
   --accent-alt: #44d62c;
   --accent-dim: rgba(244, 244, 244, 0.16);
@@ -667,7 +678,7 @@
 }
 
 /* Mopar: Plum Crazy */
-:root[data-accent="mopar-plum"] {
+html:root[data-accent="mopar-plum"] {
   --accent: #5b2c83;
   --accent-alt: #111111;
   --accent-dim: rgba(91, 44, 131, 0.14);
@@ -675,7 +686,7 @@
 }
 
 /* Mopar: Sublime */
-:root[data-accent="mopar-sublime"] {
+html:root[data-accent="mopar-sublime"] {
   --accent: #44d62c;
   --accent-alt: #111111;
   --accent-dim: rgba(68, 214, 44, 0.16);
@@ -683,7 +694,7 @@
 }
 
 /* Mopar: Hemi Orange */
-:root[data-accent="mopar-hemi"] {
+html:root[data-accent="mopar-hemi"] {
   --accent: #ff5f00;
   --accent-alt: #111111;
   --accent-dim: rgba(255, 95, 0, 0.12);
@@ -691,7 +702,7 @@
 }
 
 /* Mopar: B5 Blue */
-:root[data-accent="mopar-b5"] {
+html:root[data-accent="mopar-b5"] {
   --accent: #00a3e0;
   --accent-alt: #111111;
   --accent-dim: rgba(0, 163, 224, 0.12);
@@ -699,7 +710,7 @@
 }
 
 /* Flames: heat */
-:root[data-accent="flames-heat"] {
+html:root[data-accent="flames-heat"] {
   --accent: #ff5f00;
   --accent-alt: #fe5000;
   --accent-dim: rgba(255, 95, 0, 0.12);
@@ -707,45 +718,31 @@
 }
 
 /* Flames: blue */
-:root[data-accent="flames-blue"] {
+html:root[data-accent="flames-blue"] {
   --accent: #0085ca;
   --accent-alt: #00a3e0;
   --accent-dim: rgba(0, 133, 202, 0.12);
   --border-focus: var(--accent);
 }
 
-/* ================================================
-   GLOBAL DESIGN SYSTEM RESETS
-   Zero border-radius and zero box-shadow everywhere.
-   These !important overrides catch any leaks from
-   third-party libraries, Tailwind utilities, or
-   inline styles that slip through.
-   ================================================ */
-
-/* GLOBAL ENFORCEMENT — Zero border-radius, zero shadows (design system mandate) */
-*,
-*::before,
-*::after {
-  border-radius: 0 !important;
-  box-shadow: none !important;
+/* Native controls keep their shapes and keyboard focus. Legacy route CSS is
+   allowed to keep explicit local styling; never erase all radii or outlines. */
+:where(button, a, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 3px;
 }
-
-/* Exception: range input thumbs need border-radius for usability */
-input[type="range"]::-webkit-slider-thumb {
-  border-radius: 50% !important;
-}
-input[type="range"]::-moz-range-thumb {
-  border-radius: 50% !important;
-}
+:where(button, input, select, textarea) { font-family: var(--font-family); }
+:where(input[type="checkbox"], input[type="radio"]) { accent-color: var(--action); }
+html:root[data-theme="dark"] { --action: #146bcc; --action-hover: #3973b8; }
 
 /* ================================================
    TYPOGRAPHY SYSTEM
    ================================================ */
 
-body {
+html body {
   font-family: var(--font-family);
-  font-size: var(--fs-10);
-  line-height: 1.3;
+  font-size: var(--text-body);
+  line-height: 1.5;
   background: var(--bg);
   color: var(--text);
   margin: 0;
@@ -768,7 +765,7 @@ body {
   display: none;               /* Chrome/Safari */
 }
 
-/* Font Sizes (STRICT - no others allowed) */
+/* Legacy compact data sizes. New prose and controls use the semantic roles. */
 .text-8  { font-size: var(--fs-8); }
 .text-9  { font-size: var(--fs-9); }
 .text-10 { font-size: var(--fs-10); }
@@ -780,21 +777,30 @@ body {
    ================================================ */
 
 /* Shared base — all .btn-* extend this implicitly via the component */
+html .button,
 .btn-base {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: 8px;
   font-family: var(--font-family);
   font-weight: 600;
   cursor: pointer;
   transition: var(--transition);
-  border-radius: 0;
+  border-radius: var(--radius);
   text-decoration: none;
   white-space: nowrap;
-  border: 2px solid transparent;
+  border: 1px solid transparent;
+  min-height: var(--control-height);
+  padding: 10px 16px;
+  font-size: var(--text-callout);
+  line-height: 1.2;
+  background: var(--surface);
+  color: var(--accent);
+  box-shadow: none;
 }
 
+html .button:disabled,
 .btn-base:disabled,
 .btn-base[aria-disabled="true"] {
   opacity: 0.45;
@@ -803,27 +809,29 @@ body {
 }
 
 /* Sizes */
-.btn-xs { padding: 1px 6px;  font-size: var(--fs-8); }
-.btn-sm { padding: 3px 8px;  font-size: var(--fs-9); }
-.btn-md { padding: 6px 12px; font-size: var(--fs-10); }
+.btn-xs { min-height: 32px; padding: 6px 10px; font-size: var(--text-caption); }
+html .button-small, .btn-sm { min-height: 36px; padding: 8px 12px; font-size: var(--text-caption); }
+.btn-md { min-height: var(--control-height); padding: 10px 16px; font-size: var(--text-callout); }
+.btn-lg { min-height: 48px; padding: 12px 20px; font-size: var(--text-body); }
+.btn-icon { width: var(--control-height); padding: 10px; }
 
 /* Variants */
-.btn-primary {
-  border-color: var(--text);
-  background: var(--surface);
-  color: var(--text);
+html .button-primary, .btn-primary {
+  border-color: transparent;
+  background: var(--action);
+  color: var(--on-action);
 }
-.btn-primary:hover:not(:disabled) {
-  background: var(--text);
-  color: var(--surface);
+html .button-primary:hover:not(:disabled), .btn-primary:hover:not(:disabled) {
+  background: var(--action-hover);
+  color: var(--on-action);
 }
 
-.btn-secondary {
+html .button-secondary, .btn-secondary {
   border-color: var(--border);
   background: var(--surface);
   color: var(--text);
 }
-.btn-secondary:hover:not(:disabled) {
+html .button-secondary:hover:not(:disabled), .btn-secondary:hover:not(:disabled) {
   background: var(--surface-hover);
   border-color: var(--accent);
 }
@@ -834,8 +842,8 @@ body {
   color: var(--error);
 }
 .btn-danger:hover:not(:disabled) {
-  background: var(--error);
-  color: var(--surface);
+  background: var(--error-dim);
+  box-shadow: inset 0 0 0 1px var(--error);
 }
 
 .btn-utility {
@@ -867,7 +875,7 @@ body {
   border-color: var(--border);
   background: var(--surface);
   color: var(--text-secondary);
-  border-radius: 0;
+  border-radius: var(--radius-sm);
 }
 .btn-tag:hover:not(:disabled) {
   border-color: var(--accent);
@@ -883,28 +891,30 @@ body {
    CARD SYSTEM
    ================================================ */
 
-.card {
+html .card {
   background: var(--surface);
-  border: 2px solid var(--border);
-  border-radius: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
   overflow: hidden;
 }
 
-.card-header {
-  padding: 12px;
-  border-bottom: 2px solid var(--border);
-  font-size: var(--fs-10);
+html .card-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  font-size: var(--text-body);
   font-weight: 700;
 }
 
-.card-body {
-  padding: 12px;
+html .card-body {
+  padding: 20px;
 }
 
 /* ================================================
    INPUT SYSTEM
    ================================================ */
 
+html .form-input,
+html .form-select,
 input[type="text"],
 input[type="number"],
 input[type="email"],
@@ -912,11 +922,11 @@ input[type="password"],
 textarea,
 select {
   width: 100%;
-  padding: 8px;
-  font-size: var(--fs-10);
+  padding: 10px 12px;
+  font-size: var(--text-body);
   font-family: var(--font-family);
-  border: 2px solid var(--border);
-  border-radius: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
   background: var(--bg);
   color: var(--text);
   box-sizing: border-box;
@@ -926,7 +936,6 @@ select {
 input:focus,
 textarea:focus,
 select:focus {
-  outline: none;
   border-color: var(--border-focus);
 }
 
@@ -1038,9 +1047,11 @@ select:focus {
     bottom: 0;
     left: 0;
     right: 0;
-    height: 56px;
-    background: var(--surface);
-    border-top: 2px solid var(--border);
+    height: calc(56px + env(safe-area-inset-bottom));
+    padding-bottom: env(safe-area-inset-bottom);
+    box-sizing: border-box;
+    background: var(--surface-glass);
+    border-top: 1px solid var(--border);
     display: flex;
     justify-content: space-around;
     align-items: center;
@@ -1053,8 +1064,11 @@ select:focus {
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: var(--fs-10) !important;
-    font-family: Arial, sans-serif;
+    flex-direction: column;
+    gap: 3px;
+    position: relative;
+    font-size: var(--text-caption);
+    font-family: var(--font-family);
     color: var(--text-disabled);
     text-decoration: none;
     border: none;
@@ -1064,12 +1078,12 @@ select:focus {
   }
 
   .mobile-bottom-nav-item.active {
-    color: var(--text) !important;
-    font-weight: 700 !important;
+    color: var(--accent);
+    font-weight: 700;
   }
 
   .main-content {
-    padding-bottom: 60px;
+    padding-bottom: calc(64px + env(safe-area-inset-bottom));
   }
 }
 
@@ -1086,3 +1100,34 @@ select:focus {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+/* Shared aliases used by pages that predate the UI primitives. */
+.btn-link { background: transparent; border-color: transparent; color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+html .form-select { min-height: var(--control-height); padding-right: 36px; appearance: none; }
+html .card-title { font-size: 18px; line-height: 1.3; font-weight: 650; }
+html .card-description { font-size: var(--text-callout); color: var(--text-secondary); line-height: 1.5; }
+html .card-footer { padding: 16px 20px; border-top: 1px solid var(--border); }
+html .page-header { padding: 24px 16px 16px; background: transparent; border-bottom: 1px solid var(--border); }
+html .page-title { font: 700 var(--text-title)/1.2 var(--font-family); letter-spacing: -.025em; }
+html .breadcrumbs { font-size: var(--text-caption); }
+@media (pointer: coarse) {
+  .btn-xs, .btn-sm, html .button-small { min-height: var(--control-height); }
+}
+/* iOS keeps focused form fields at the user's viewport scale at 16px and above. */
+@media (pointer: coarse), (max-width: 767px) {
+  html .form-input, html .form-select,
+  input[type="text"], input[type="number"], input[type="email"],
+  input[type="password"], input[type="tel"], input[type="search"],
+  input[type="url"], textarea, select { font-size: max(16px, var(--text-body)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  html:root { --transition: 0s; }
+  .btn-base, html .button, .mobile-bottom-nav-item { transition: none; }
+}
+
+html .form-input:focus-visible, html .form-select:focus-visible, html .button:focus-visible,
+.btn-base:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 3px; }
+
+.mobile-bottom-nav-item small { font: 500 10px/1.2 var(--font-family); }
+.mobile-bottom-nav-item--capture svg { background: var(--action); color: var(--on-action); border-radius: var(--radius-sm); box-sizing: content-box; padding: 3px 12px; }
+.mobile-bottom-nav-badge { position: absolute; top: 3px; left: calc(50% + 6px); background: var(--error); color: var(--on-action); font: 700 10px/16px var(--font-family); min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; }

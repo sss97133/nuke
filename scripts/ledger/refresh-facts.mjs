@@ -13,6 +13,7 @@
  * re-audit; this script never edits verdicts itself.
  *
  * Usage:  node scripts/ledger/refresh-facts.mjs          # refresh + drift report
+ *         node scripts/ledger/refresh-facts.mjs --codebase --out /private/path/inventory.json
  *         npm run ledger:facts
  * Needs:  supabase CLI authed (for the live deploy list); degrades with a warning if not.
  */
@@ -27,6 +28,20 @@ const OUT = path.join(REPO, "docs/ledger/facts.json");
 
 const sh = (cmd, args, opts = {}) =>
   execFileSync(cmd, args, { cwd: REPO, encoding: "utf8", maxBuffer: 64 * 1024 * 1024, ...opts });
+
+// Offline inventory is a separate evidence stage: no network calls, runtime verdicts or ledger edits.
+if (process.argv.includes('--codebase')) {
+  const output = process.argv[process.argv.indexOf('--out') + 1];
+  if (!process.argv.includes('--out') || !output || output.startsWith('--')) {
+    console.error('Usage: refresh-facts.mjs --codebase --out <inventory.json>');
+    process.exit(2);
+  }
+  const { inventoryCodebase } = await import('./codebase-inventory.mjs');
+  const inventory = inventoryCodebase(REPO);
+  writeFileSync(path.resolve(output), JSON.stringify(inventory, null, 2) + '\n');
+  console.log(JSON.stringify({ output: path.resolve(output), ...inventory.counts }, null, 2));
+  process.exit(0);
+}
 
 // 1. Edge-function dirs on disk
 const fnDirs = readdirSync(path.join(REPO, "supabase/functions"), { withFileTypes: true })

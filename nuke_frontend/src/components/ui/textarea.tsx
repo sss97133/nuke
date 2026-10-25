@@ -1,22 +1,21 @@
 import * as React from "react"
 
 // Nuke Design System — Textarea Component
-// Rules: 0px border-radius, --fs-9, min-height 60px, Arial, 1px border
+// Shared system type, readable line height and canonical focus treatment
 // Keeps form-input class for base styles, adds explicit overrides
 
 export interface TextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
   hasError?: boolean
 }
 
-const textareaStyle: React.CSSProperties = { fontSize: "var(--fs-9, 9px)",
-  fontFamily: "Arial, sans-serif",
-  minHeight: "60px",
+const textareaStyle: React.CSSProperties = { fontSize: "max(16px, var(--text-body))",
+  fontFamily: "var(--font-family)",
+  minHeight: "100px",
   width: "100%",
   backgroundColor: "var(--bg, #f5f5f5)",
   color: "var(--text, #2a2a2a)",
   border: "1px solid var(--border, #cccccc)",
   padding: "var(--space-1, 4px) var(--space-2, 8px)",
-  outline: "none",
   transition: "border-color 0.12s ease",
   boxSizing: "border-box", resize: "vertical",
   lineHeight: 1.5,

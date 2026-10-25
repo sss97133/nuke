@@ -19,18 +19,18 @@ interface AppHeaderProps {
 }
 
 const NAV_LINKS = [
-  { label: 'MARKET', to: '/?tab=market' },
-  { label: 'FEED', to: '/?tab=feed' },
-  { label: 'SEARCH', to: '/search' },
-  { label: 'GARAGE', to: '/?tab=garage' },
-  { label: 'JOURNAL', to: '/journal' },
-  { label: 'STACKS', to: '/stacks' },
+  { label: 'Market', to: '/?tab=market' },
+  { label: 'Feed', to: '/?tab=feed' },
+  { label: 'Search', to: '/search' },
+  { label: 'Garage', to: '/?tab=garage' },
+  { label: 'Journal', to: '/journal' },
+  { label: 'Stacks', to: '/stacks' },
 ];
 // Signed-in only: the work console (signature queue and the viewer's jobs).
-const SIGNED_IN_NAV_LINKS = [{ label: 'WORK', to: '/work' }, { label: 'MESSAGES', to: '/messages' }];
+const SIGNED_IN_NAV_LINKS = [{ label: 'Work', to: '/work' }, { label: 'Messages', to: '/messages' }];
 
 /**
- * AppHeader — One row, four zones, 40px.
+ * AppHeader — One row, four zones, 42px including its separator.
  *
  * [NUKE wordmark]  [nav links]  [command input (1fr)]  [upload + user]
  */
@@ -128,7 +128,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
               onClick={() => setShowUserDropdown(true)}
             />
           ) : (
-            <Link to="/login" className="header-login-btn">LOGIN</Link>
+            <Link to="/login" className="header-login-btn">Sign in</Link>
           )}
         </div>
       </div>

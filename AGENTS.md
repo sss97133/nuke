@@ -173,6 +173,15 @@ permanent record. Write both as `type(scope): summary`, at most 72 characters. T
   `feat(cad): engine assembly mesh at 1:1 scale`.
 
 ## Working alongside other agents
+
+- Preserve the owner's original outcome and later corrections in one current pickup;
+  a new detail does not replace the integrated task. Use existing tools for routine
+  checks, Luna for suitable small jobs, Sol for scoped engineering and Astra for gist,
+  difficult decisions and deep iteration. These are starting preferences, not automatic
+  routing or permission to spawn paid work. The [workspace workflow](docs/AGENT_WORKFLOW.md)
+  provides installed commands and a compact handoff; load it when routing or resuming
+  substantial work, not before every edit.
+
 - Work in your own worktree:
   `git worktree add ~/.worktrees/<task> -b <branch> origin/main`, then
   `ln -s ~/nuke/nuke_frontend/node_modules ~/.worktrees/<task>/nuke_frontend/node_modules` so the

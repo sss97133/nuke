@@ -70,7 +70,7 @@ export default function HeaderSearchLauncher({ className }: { className?: string
       <input type="text" className="hsl-input" placeholder={PLACEHOLDER} aria-label={LABEL}
         onPointerEnter={() => void loadSearch()} onFocus={() => activate(true)}
         onChange={e => { handoff.current.text = e.target.value; activate(true); }} />
-      <button type="button" className="button-win95 hsl-more" title="Show actions" aria-label="Show actions" onClick={() => activate(true)}>...</button>
+      <button type="button" className="hsl-more" title="Show actions" aria-label="Show actions" onClick={() => activate(true)}>...</button>
     </div>
   </div>;
 }

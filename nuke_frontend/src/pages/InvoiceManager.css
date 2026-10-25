@@ -1,0 +1,21 @@
+.invoice-manager { font-family: var(--font-family); }
+.invoice-manager button, .invoice-manager select, .invoice-manager input {
+  min-height: var(--control-height);
+  border-radius: var(--radius);
+  font-family: inherit;
+}
+.invoice-manager select, .invoice-manager input { font-size: var(--text-body); }
+.invoice-manager button:disabled { opacity: .55; cursor: not-allowed; }
+.invoice-row { border-radius: var(--radius-lg); flex-wrap: wrap; gap: 16px; }
+.invoice-row-actions { align-items: center; }
+.invoice-notice { padding: 16px; margin-bottom: 16px; border: 1px solid var(--border); border-radius: var(--radius); color: var(--error); }
+.invoice-preview-actions { margin-top: 20px; border-top: 1px solid var(--border); padding-top: 16px; }
+.invoice-preview-actions p { font-size: var(--text-callout); color: var(--text-secondary); }
+.invoice-preview-actions > div { display: flex; flex-wrap: wrap; gap: 8px; }
+.invoice-preview-actions button { padding: 8px 16px; border: 1px solid var(--border); background: var(--surface); color: var(--text); }
+@media (max-width: 600px) {
+  .invoice-manager select, .invoice-manager input { font-size: 16px; }
+  .invoice-row { align-items: flex-start; }
+  .invoice-row-actions { width: 100%; }
+}
+.invoice-preview { border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); }

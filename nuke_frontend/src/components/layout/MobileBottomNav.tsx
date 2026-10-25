@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
+import { Home, Layers, Plus, Inbox, UserRound } from 'lucide-react';
+import { PrefetchLink } from '../PrefetchLink';
 import { supabase } from '../../lib/supabase';
 
 export const MobileBottomNav: React.FC = () => {
@@ -25,53 +27,29 @@ export const MobileBottomNav: React.FC = () => {
   }, [location.pathname]); // refresh on nav
 
   const items = [
-    { to: '/', label: 'Home', match: (p: string) => p === '/' },
-    { to: '/stacks', label: 'Stacks', match: (p: string) => p.startsWith('/stacks') },
-    { to: '/capture', label: '+', match: (p: string) => p === '/capture', isAdd: true },
-    { to: '/inbox', label: 'Inbox', match: (p: string) => p.startsWith('/inbox') || p.startsWith('/photo-library'), badge: inboxCount },
-    { to: '/profile', label: 'Profile', match: (p: string) => p.startsWith('/profile') },
+    { to: '/', label: 'Home', icon: Home, match: (p: string) => p === '/' },
+    { to: '/stacks', label: 'Stacks', icon: Layers, match: (p: string) => p.startsWith('/stacks') },
+    { to: '/capture', label: 'Capture', icon: Plus, match: (p: string) => p === '/capture', isAdd: true },
+    { to: '/inbox', label: 'Inbox', icon: Inbox, match: (p: string) => p.startsWith('/inbox') || p.startsWith('/photo-library'), badge: inboxCount },
+    { to: '/profile', label: 'Profile', icon: UserRound, match: (p: string) => p.startsWith('/profile') },
   ];
 
   return (
     <nav className="mobile-bottom-nav" aria-label="Primary">
-      {items.map((item: any) => (
-        <Link
+      {items.map(item => (
+        <PrefetchLink
           key={item.to}
           to={item.to}
           aria-label={item.label}
-          className={`mobile-bottom-nav-item${item.match(location.pathname) ? ' active' : ''}`}
-          style={item.isAdd ? {
-            fontWeight: 700,
-            fontSize: '18px',
-            lineHeight: 1,
-            width: 40,
-            height: 40,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center', background: 'var(--accent)',
-            color: 'var(--bg)',
-            flexShrink: 0,
-          } : { position: 'relative' as const }}
+          aria-current={item.match(location.pathname) ? 'page' : undefined}
+          className={`mobile-bottom-nav-item${item.match(location.pathname) ? ' active' : ''}${item.isAdd ? ' mobile-bottom-nav-item--capture' : ''}`}
         >
-          {item.label}
-          {item.badge > 0 && (
-            <span style={{
-              position: 'absolute',
-              top: -2,
-              right: -2,
-              background: 'var(--error, #d13438)',
-              color: 'var(--surface-elevated)',
-              fontSize: '7px',
-              fontWeight: 700,
-              fontFamily: 'Arial, sans-serif',
-              minWidth: 14,
-              height: 14,
-              lineHeight: '14px',
-              textAlign: 'center',
-              padding: '0 3px',
-            }}>{item.badge > 999 ? '999+' : item.badge}</span>
+          <item.icon aria-hidden="true" size={21} strokeWidth={item.match(location.pathname) ? 2.3 : 1.8} />
+          <small>{item.label}</small>
+          {(item.badge ?? 0) > 0 && (
+            <span className="mobile-bottom-nav-badge">{(item.badge ?? 0) > 999 ? '999+' : item.badge}</span>
           )}
-        </Link>
+        </PrefetchLink>
       ))}
     </nav>
   );

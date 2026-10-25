@@ -48,10 +48,10 @@ html, body, #root {
   html, body, button, input, select, textarea {
     font-family: var(--font-family);
   }
-  h1 { font-size: var(--fs-11); font-weight: 700; }
-  h2 { font-size: var(--fs-10); font-weight: 700; }
-  h3 { font-size: var(--fs-10); font-weight: 600; }
-  h4, h5, h6 { font-size: var(--fs-9); font-weight: 600; }
+  h1 { font-size: var(--text-title); font-weight: 700; }
+  h2 { font-size: 22px; font-weight: 700; }
+  h3 { font-size: 18px; font-weight: 600; }
+  h4, h5, h6 { font-size: var(--text-body); font-weight: 600; }
 }
 
 /* ============================================================================
