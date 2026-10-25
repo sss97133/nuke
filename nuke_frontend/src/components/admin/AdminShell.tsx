@@ -2,6 +2,7 @@ import React from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAdminAccess } from '../../hooks/useAdminAccess';
 import { supabase } from '../../lib/supabase';
+import './AdminShell.css';
 
 type AdminNavItem = {
   label: string;
@@ -14,7 +15,7 @@ type NavCounts = Record<string, number>;
 
 const primary: AdminNavItem[] = [
   { label: 'Home', to: '/admin' },
-  { label: 'Transfers', to: '/admin/transfers', description: '32K in-progress transfers — advance milestones, log deals' },
+  { label: 'Transfers', to: '/admin/transfers', description: 'Advance transfer milestones and inspect deal records' },
   { label: 'Inbox', to: '/admin/inbox', countKey: 'inbox' },
   { label: 'Agent Inbox', to: '/admin/agent-inbox', countKey: 'agentInbox' },
   { label: 'Reviews', to: '/admin/reviews', description: 'Contributor onboarding, ownership review, queues', countKey: 'reviews' },
@@ -37,7 +38,7 @@ const operations: AdminNavItem[] = [
   { label: 'Sources', to: '/admin/sources', description: 'Source onboarding, coverage, and data flow' },
   { label: 'Extraction Monitor', to: '/admin/extraction-monitor' },
   { label: 'Data Quality', to: '/admin/data-quality', description: 'Field completion rates + enrichment workforce' },
-  { label: 'User Metrics', to: '/admin/user-metrics', description: '509K identity seeds across all sources' },
+  { label: 'User Metrics', to: '/admin/user-metrics', description: 'Inspect source identity records and activity' },
   { label: 'Extraction Review', to: '/admin/extraction-review' },
 ];
 
@@ -67,126 +68,29 @@ const experimental: AdminNavItem[] = [
 ];
 
 function NavBadge({ count }: { count: number }) {
-  if (count <= 0) return null;
-  return (
-    <span style={{
-      display: 'inline-block',
-      marginLeft: '6px',
-      padding: '0 5px',
-      fontSize: '9px',
-      fontWeight: 700,
-      fontFamily: "'Courier New', monospace",
-      color: 'var(--surface-elevated)',
-      backgroundColor: 'var(--error-dark, var(--error))', lineHeight: '14px',
-      verticalAlign: 'middle',
-    }}>
-      {count > 999 ? '999+' : count}
-    </span>
-  );
+  return count > 0 ? <span className="admin-nav-badge">{count > 999 ? '999+' : count}</span> : null;
 }
 
 function NavList({ items, counts }: { items: AdminNavItem[]; counts: NavCounts }) {
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
-      {items.map((item) => {
-        const count = item.countKey != null ? (counts[item.countKey] ?? 0) : 0;
-        return (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            style={({ isActive }) => ({
-              display: 'block',
-              padding: 'var(--space-2) var(--space-3)',
-              fontSize: '11px', backgroundColor: isActive ? 'var(--grey-100)' : 'transparent',
-              color: isActive ? 'var(--text)' : 'var(--text-muted)',
-              transition: 'all 0.12s ease',
-              textDecoration: 'none'
-            })}
-            className={({ isActive }) => isActive ? 'admin-nav-active' : 'admin-nav-inactive'}
-            title={item.description}
-            end={item.to === '/admin'}
-          >
-            <div style={{ fontWeight: 500, display: 'flex', alignItems: 'center' }}>
-              {item.label}
-              <NavBadge count={count} />
-            </div>
-            {item.description ? (
-              <div style={{
-                fontSize: '11px',
-                color: 'var(--text-muted)',
-                marginTop: '2px'
-              }}>{item.description}</div>
-            ) : null}
-          </NavLink>
-        );
-      })}
-    </div>
-  );
+  return <div className="admin-nav-list">{items.map(item => <NavLink key={item.to} to={item.to}
+    className={({ isActive }) => `admin-nav-link${isActive ? ' admin-nav-link--active' : ''}`}
+    title={item.description} end={item.to === '/admin'}>
+    <span className="admin-nav-link-title">{item.label}<NavBadge count={item.countKey ? counts[item.countKey] ?? 0 : 0} /></span>
+    {item.description && <span className="admin-nav-description">{item.description}</span>}
+  </NavLink>)}</div>;
 }
 
-function Section({
-  title,
-  items,
-  counts,
-  collapsed,
-  onToggle,
-  right,
-}: {
-  title: string;
-  items: AdminNavItem[];
-  counts: NavCounts;
-  collapsed?: boolean;
-  onToggle?: () => void;
-  right?: React.ReactNode;
+function Section({ title, items, counts, collapsed, onToggle }: {
+  title: string; items: AdminNavItem[]; counts: NavCounts; collapsed?: boolean; onToggle?: () => void;
 }) {
-  const sectionTotal = items.reduce((sum, item) => {
-    if (!item.countKey) return sum;
-    return sum + (counts[item.countKey] ?? 0);
-  }, 0);
-
-  return (
-    <div style={{ marginBottom: 'var(--space-6)' }}>
-      <div style={{
-        fontSize: '11px',
-        fontWeight: 600,
-        color: 'var(--text-muted)',
-        textTransform: 'uppercase',
-        letterSpacing: '0.5px',
-        marginBottom: 'var(--space-2)',
-        display: 'flex',
-        alignItems: 'baseline',
-        justifyContent: 'space-between',
-        gap: 'var(--space-2)',
-      }}>
-        {onToggle ? (
-          <button
-            type="button"
-            onClick={onToggle}
-            style={{
-              all: 'unset',
-              cursor: 'pointer',
-              display: 'inline-flex',
-              alignItems: 'baseline',
-              gap: '6px',
-            }}
-            title={collapsed ? 'Expand' : 'Collapse'}
-          >
-            <span style={{ fontFamily: "'Courier New', monospace" }}>{collapsed ? '+' : '-'}</span>
-            <span>{title}</span>
-            <span style={{ fontFamily: "'Courier New', monospace", opacity: 0.7 }}>({items.length})</span>
-            {sectionTotal > 0 && <NavBadge count={sectionTotal} />}
-          </button>
-        ) : (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-            {title} <span style={{ fontFamily: "'Courier New', monospace", opacity: 0.7 }}>({items.length})</span>
-            {sectionTotal > 0 && <NavBadge count={sectionTotal} />}
-          </div>
-        )}
-        {right ? <div style={{ textTransform: 'none' }}>{right}</div> : null}
-      </div>
-      {collapsed ? null : <NavList items={items} counts={counts} />}
-    </div>
-  );
+  const id = React.useId();
+  return <section className="admin-nav-section">
+    {onToggle ? <button type="button" className="admin-nav-section-toggle" onClick={onToggle}
+      aria-expanded={!collapsed} aria-controls={id}>
+      <span>{title} <span className="admin-nav-count">({items.length})</span></span><span aria-hidden="true">{collapsed ? '+' : '−'}</span>
+    </button> : <h2>{title} <span className="admin-nav-count">({items.length})</span></h2>}
+    <div id={id} hidden={!!collapsed}><NavList items={items} counts={counts} /></div>
+  </section>;
 }
 
 export default function AdminShell() {
@@ -195,6 +99,10 @@ export default function AdminShell() {
   const { loading, isAdmin } = useAdminAccess();
   const searchRef = React.useRef<HTMLInputElement | null>(null);
   const [query, setQuery] = React.useState('');
+  const [mobileNavOpen, setMobileNavOpen] = React.useState(false);
+  const [focusSearch, setFocusSearch] = React.useState(0);
+  React.useEffect(() => { setMobileNavOpen(false); }, [location.pathname]);
+  React.useEffect(() => { if (focusSearch) searchRef.current?.focus(); }, [focusSearch]);
   const [navCounts, setNavCounts] = React.useState<NavCounts>({});
 
   React.useEffect(() => {
@@ -266,7 +174,8 @@ export default function AdminShell() {
       const key = String(e.key || '').toLowerCase();
       if ((e.metaKey || e.ctrlKey) && key === 'k') {
         e.preventDefault();
-        searchRef.current?.focus();
+        setMobileNavOpen(true);
+        setFocusSearch(value => value + 1);
       }
       if (key === 'escape' && document.activeElement === searchRef.current) {
         setQuery('');
@@ -302,7 +211,7 @@ export default function AdminShell() {
   };
 
   const searchResults = q
-    ? allItems.filter((i: any) => matchItem(i)).slice(0, 40)
+    ? allItems.filter(matchItem).slice(0, 40)
     : [];
 
   if (loading) {
@@ -332,132 +241,34 @@ export default function AdminShell() {
     );
   }
 
-  return (
-    <div style={{ display: 'flex', minHeight: 'calc(100vh - 64px)' }}>
-      <aside style={{
-        width: '18rem',
-        borderRight: '2px solid var(--border-light)',
-        backgroundColor: 'var(--white)',
-        padding: 'var(--space-4)'
-      }}>
-        <div style={{ marginBottom: 'var(--space-4)' }}>
-          <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text)' }}>Admin</div>
-          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: 'var(--space-1)' }}>Central admin hub</div>
-        </div>
-
-        <div style={{ marginBottom: 'var(--space-4)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-2)' }}>
-            <input
-              ref={searchRef}
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search admin…"
-              style={{
-                width: '100%',
-                fontSize: '11px',
-                padding: '8px 10px', border: '2px solid var(--border-light)',
-                outline: 'none',
-              }}
-            />
-          </div>
-          <div style={{ marginTop: '6px', fontSize: '11px', color: 'var(--text-muted)' }}>
-            Tip: press <span style={{ fontFamily: "'Courier New', monospace" }}>⌘K</span> to focus.
-          </div>
-        </div>
-
-        {q ? (
-          <div style={{ marginBottom: 'var(--space-6)' }}>
-            <div style={{
-              fontSize: '11px',
-              fontWeight: 600,
-              color: 'var(--text-muted)',
-              textTransform: 'uppercase',
-              letterSpacing: '0.5px',
-              marginBottom: 'var(--space-2)',
-              display: 'flex',
-              alignItems: 'baseline',
-              justifyContent: 'space-between',
-              gap: 'var(--space-2)',
-            }}>
-              <div>Search results <span style={{ fontFamily: "'Courier New', monospace", opacity: 0.7 }}>({searchResults.length})</span></div>
-              <button
-                type="button"
-                onClick={() => setQuery('')}
-                style={{ all: 'unset', cursor: 'pointer', color: 'var(--text-muted)' }}
-              >
-                Clear
-              </button>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
-              {searchResults.map((item: any) => (
-                <NavLink
-                  key={item.to}
-                  to={item.to}
-                  style={({ isActive }) => ({
-                    display: 'block',
-                    padding: 'var(--space-2) var(--space-3)',
-                    fontSize: '11px', backgroundColor: isActive ? 'var(--grey-100)' : 'transparent',
-                    color: isActive ? 'var(--text)' : 'var(--text-muted)',
-                    transition: 'all 0.12s ease',
-                    textDecoration: 'none'
-                  })}
-                  title={item.description}
-                  end={item.to === '/admin'}
-                >
-                  <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '8px' }}>
-                    <div style={{ fontWeight: 500, display: 'flex', alignItems: 'center' }}>
-                      {item.label}
-                      {item.countKey && navCounts[item.countKey] > 0 && <NavBadge count={navCounts[item.countKey]} />}
-                    </div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: "'Courier New', monospace" }}>{item._section}</div>
-                  </div>
-                  {item.description ? (
-                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>{item.description}</div>
-                  ) : null}
-                </NavLink>
-              ))}
-              {searchResults.length === 0 ? (
-                <div style={{ fontSize: '11px', color: 'var(--text-muted)', padding: 'var(--space-2) var(--space-1)' }}>
-                  No matches.
-                </div>
-              ) : null}
-            </div>
-          </div>
-        ) : (
-          <>
-            <Section title="Primary" items={primary} counts={navCounts} />
-            <Section title="Operations" items={operations} counts={navCounts} />
-            <Section
-              title="Tools"
-              items={tools}
-              counts={navCounts}
-              collapsed={!showTools}
-              onToggle={() => setShowTools((v) => !v)}
-              right={<span style={{ fontFamily: "'Courier New', monospace" }}>{showTools ? 'shown' : 'hidden'}</span>}
-            />
-            <Section
-              title="Experimental"
-              items={experimental}
-              counts={navCounts}
-              collapsed={!showExperimental}
-              onToggle={() => setShowExperimental((v) => !v)}
-              right={<span style={{ fontFamily: "'Courier New', monospace" }}>{showExperimental ? 'shown' : 'hidden'}</span>}
-            />
-          </>
-        )}
-      </aside>
-
-      <main style={{ flex: 1, backgroundColor: 'var(--grey-100)' }}>
-        <div style={{ padding: 'var(--space-6)' }}>
-          <Outlet />
-        </div>
-      </main>
+  const currentLabel = allItems.find(item => item.to === location.pathname)?.label || 'Admin';
+  return <div className="admin-shell">
+    <div className="admin-shell-mobile-header">
+      <strong>{currentLabel}</strong>
+      <button type="button" className="button" aria-expanded={mobileNavOpen} aria-controls="admin-navigation"
+        onClick={() => setMobileNavOpen(open => !open)}>Admin navigation</button>
     </div>
-  );
+    <aside className="admin-shell-sidebar" id="admin-navigation" data-open={mobileNavOpen}
+      onClick={event => { if ((event.target as Element).closest('a[href]')) setMobileNavOpen(false); }}>
+      <header className="admin-nav-header"><strong>Admin</strong><span>Workspace operations</span></header>
+      <label className="admin-nav-search">Find an admin page
+        <input ref={searchRef} type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="Search pages…" />
+      </label>
+      <p className="admin-nav-shortcut">⌘K or Ctrl+K to search</p>
+      <nav aria-label="Admin pages">
+        {q ? <section className="admin-nav-section">
+          <div className="admin-nav-search-heading"><h2>Search results <span className="admin-nav-count">({searchResults.length})</span></h2>
+            <button type="button" className="button" onClick={() => setQuery('')}>Clear search</button></div>
+          <NavList items={searchResults} counts={navCounts} />
+          {searchResults.length === 0 && <p className="admin-nav-description" role="status">No admin pages match this search.</p>}
+        </section> : <>
+          <Section title="Primary" items={primary} counts={navCounts} />
+          <Section title="Operations" items={operations} counts={navCounts} />
+          <Section title="Tools" items={tools} counts={navCounts} collapsed={!showTools} onToggle={() => setShowTools(value => !value)} />
+          <Section title="Experimental" items={experimental} counts={navCounts} collapsed={!showExperimental} onToggle={() => setShowExperimental(value => !value)} />
+        </>}
+      </nav>
+    </aside>
+    <section className="admin-shell-content" aria-label="Admin page"><Outlet /></section>
+  </div>;
 }
-
-
-
-
-
-
