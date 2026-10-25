@@ -1,0 +1,16 @@
+.sell-dashboard { margin: 0 auto; max-width: 1400px; padding: 12px; font-size: var(--text-body); }
+.sell-dashboard select { font-size: var(--text-callout); max-width: 100%; }
+.sell-dashboard-messages { padding: 16px 14px; }
+.sell-dashboard-messages p { margin: 12px 0 0; }
+.sell-dashboard-messages [role="alert"] { color: var(--error-dark); }
+.sell-export-row { overflow-wrap: anywhere; }
+.sell-export-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.sell-export-actions button:disabled { cursor: wait; opacity: 0.6; }
+.sell-recorded-price { display: flex; flex-direction: column; gap: 2px; font-size: var(--text-callout); font-variant-numeric: tabular-nums; }
+.sell-recorded-price small { color: var(--text-secondary); font-size: var(--text-caption); }
+.sell-amount-note { margin: 0; padding: 12px 14px; color: var(--text-secondary); font-size: var(--text-callout); }
+
+@media (max-width: 600px) {
+  .sell-dashboard select { font-size: 16px; }
+  .sell-export-actions { width: 100%; }
+}
