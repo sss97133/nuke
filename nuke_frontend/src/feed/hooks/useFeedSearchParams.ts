@@ -72,14 +72,17 @@ export interface FeedSearchParamsResult {
 
 /** Feed state shares the home URL with its tab. Keep the caller's view when
  * replacing filters, including a reset back to default filter values. */
-function paramsInCurrentView(state: FeedUrlState, current: URLSearchParams): URLSearchParams {
+function paramsInCurrentView(state: FeedUrlState, current: URLSearchParams, defaultCardsPerRow: number): URLSearchParams {
   const next = serializeToUrl(state);
   const tab = current.get('tab');
   if (tab) next.set('tab', tab);
+  // A chosen desktop-default 3 must remain explicit when a phone defaults to 2.
+  // Keep previous explicit choices shareable across viewport changes as well.
+  if (state.cardsPerRow !== defaultCardsPerRow || current.has('cols')) next.set('cols', String(state.cardsPerRow));
   return next;
 }
 
-export function useFeedSearchParams(): FeedSearchParamsResult {
+export function useFeedSearchParams(defaultCardsPerRow = 3): FeedSearchParamsResult {
   const [searchParams, setSearchParams] = useSearchParams();
   const hydratedRef = useRef(false);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -102,11 +105,11 @@ export function useFeedSearchParams(): FeedSearchParamsResult {
           sortDirection: legacySortDir,
           searchText: legacySearch,
           viewMode: 'grid',
-          cardsPerRow: 3,
+          cardsPerRow: defaultCardsPerRow,
           imageFit: 'auto',
         };
 
-        const newParams = paramsInCurrentView(state, searchParams);
+        const newParams = paramsInCurrentView(state, searchParams, defaultCardsPerRow);
         if (newParams.toString()) {
           setSearchParams(newParams, { replace: true });
         }
@@ -116,8 +119,8 @@ export function useFeedSearchParams(): FeedSearchParamsResult {
 
   // --- Derive current state from URL ---
   const currentState = useMemo(
-    () => deserializeFromUrl(searchParams),
-    [searchParams],
+    () => deserializeFromUrl(searchParams, defaultCardsPerRow),
+    [searchParams, defaultCardsPerRow],
   );
 
   const { filters, sortBy, sortDirection, searchText, viewMode, cardsPerRow, imageFit } = currentState;
@@ -162,7 +165,7 @@ export function useFeedSearchParams(): FeedSearchParamsResult {
     (newState: FeedUrlState, debounceMs?: number) => {
       const update = () => {
         if (urlStatesEqual(currentState, newState)) return;
-        setSearchParams(paramsInCurrentView(newState, searchParams), { replace: true });
+        setSearchParams(paramsInCurrentView(newState, searchParams, defaultCardsPerRow), { replace: true });
       };
 
       if (debounceMs && debounceMs > 0) {
@@ -172,7 +175,7 @@ export function useFeedSearchParams(): FeedSearchParamsResult {
         update();
       }
     },
-    [currentState, searchParams, setSearchParams],
+    [currentState, searchParams, setSearchParams, defaultCardsPerRow],
   );
 
   // --- Mutation helpers ---
@@ -247,10 +250,10 @@ export function useFeedSearchParams(): FeedSearchParamsResult {
       sortDirection: 'desc',
       searchText: '',
       viewMode: 'grid',
-      cardsPerRow: 3,
+      cardsPerRow: defaultCardsPerRow,
       imageFit: 'auto',
     });
-  }, [pushState]);
+  }, [pushState, defaultCardsPerRow]);
 
   // --- Cleanup debounce on unmount ---
   useEffect(() => {

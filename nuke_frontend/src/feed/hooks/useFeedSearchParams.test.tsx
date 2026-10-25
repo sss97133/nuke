@@ -6,12 +6,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_FILTERS, REMEMBER_FILTERS_KEY, STORAGE_KEY } from '../../lib/filterPersistence';
 import { useFeedSearchParams } from './useFeedSearchParams';
 
-function Controls() {
-  const feed = useFeedSearchParams();
+function Controls({ defaultColumns = 3 }: { defaultColumns?: number }) {
+  const feed = useFeedSearchParams(defaultColumns);
   const [params] = useSearchParams();
   return <>
     <output aria-label="Active view">{params.get('tab') ?? 'market'}</output>
+    <output aria-label="Columns">{feed.cardsPerRow}</output>
+    <output aria-label="Sort">{feed.sortBy}</output>
     <button onClick={() => feed.setSortBy('popular')}>Sort</button>
+    <button onClick={() => feed.setSortBy('finds')}>Finds</button>
+    <button onClick={() => feed.setCardsPerRow(3)}>Three columns</button>
     <button onClick={() => feed.updateFilters({ makes: ['Porsche'] })}>Filter</button>
     <button onClick={() => feed.setViewMode('technical')}>Table</button>
     <button onClick={() => feed.setCardsPerRow(2)}>Density</button>
@@ -36,8 +40,8 @@ afterEach(async () => {
   await act(async () => root.unmount());
   container.remove(); vi.useRealTimers(); vi.unstubAllGlobals();
 });
-async function render() {
-  await act(async () => root.render(<BrowserRouter><Controls /></BrowserRouter>));
+async function render(defaultColumns = 3) {
+  await act(async () => root.render(<BrowserRouter><Controls defaultColumns={defaultColumns} /></BrowserRouter>));
 }
 async function click(label: string) {
   const button = [...container.querySelectorAll('button')].find(el => el.textContent === label)!;
@@ -76,5 +80,33 @@ describe('feed controls preserve their owning view', () => {
     expect(window.location.pathname).toBe('/market');
     expect(params().has('tab')).toBe(false);
     expect(params().get('sort')).toBe('popular');
+  });
+});
+
+describe('responsive feed display defaults', () => {
+  const columns = () => container.querySelector('[aria-label="Columns"]')?.textContent;
+  it('defaults to two columns on phones and keeps an explicit three-column choice on resize', async () => {
+    await render(2); expect(columns()).toBe('2');
+    await click('Three columns');
+    expect(params().get('cols')).toBe('3'); expect(columns()).toBe('3');
+    await render(3); expect(columns()).toBe('3');
+    await render(2); expect(columns()).toBe('3');
+    await click('Reset'); expect(columns()).toBe('2');
+  });
+  it('respects explicit density on arrival and after changing text filters', async () => {
+    window.history.replaceState({}, '', '/?tab=feed&cols=1');
+    await render(2); expect(columns()).toBe('1');
+    await click('Filter'); expect(params().get('cols')).toBe('1');
+    await render(3); expect(columns()).toBe('1');
+  });
+  it('uses the new viewport default only while no density is chosen', async () => {
+    await render(3); expect(columns()).toBe('3');
+    await render(2); expect(columns()).toBe('2');
+    await render(3); expect(columns()).toBe('3');
+  });
+  it('round-trips Finds instead of silently returning to Newest', async () => {
+    await render(); await click('Finds');
+    expect(params().get('sort')).toBe('finds');
+    expect(container.querySelector('[aria-label="Sort"]')?.textContent).toBe('finds');
   });
 });

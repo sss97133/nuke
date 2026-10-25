@@ -32,6 +32,7 @@ import type { FeedVehicle } from '../types/feed';
 import './FeedPage.css';
 
 export default function FeedPage() {
+  const isMobile = useIsMobile();
   const {
     filters,
     sortBy,
@@ -49,7 +50,7 @@ export default function FeedPage() {
     setCardsPerRow,
     setImageFit,
     resetAll,
-  } = useFeedSearchParams();
+  } = useFeedSearchParams(isMobile ? 2 : 3);
 
   // Restore scroll position when returning via back navigation
   useFeedScrollRestore();
@@ -117,8 +118,7 @@ export default function FeedPage() {
   );
 
   // Local display settings (not URL-persisted)
-  const [fontSize, setFontSize] = useState(10);
-  const isMobile = useIsMobile();
+  const [fontSize, setFontSize] = useState(14);
   const [filterOverride, setFilterOverride] = useState<boolean | null>(null);
   const filtersCollapsed = filterOverride ?? isMobile;
   const [showScores, setShowScores] = useState(false);

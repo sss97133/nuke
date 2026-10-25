@@ -39,7 +39,7 @@ const DEFAULT_CARDS_PER_ROW = 3;
 const VALID_SORT_BY: Set<string> = new Set([
   'year', 'make', 'model', 'mileage', 'newest', 'oldest', 'updated', 'popular',
   'price_high', 'price_low', 'volume', 'images', 'events', 'views',
-  'deal_score', 'heat_score',
+  'deal_score', 'heat_score', 'finds',
 ]);
 const VALID_SORT_DIR: Set<string> = new Set(['asc', 'desc']);
 const VALID_VIEW_MODE: Set<string> = new Set(['grid', 'gallery', 'technical']);
@@ -50,14 +50,14 @@ const DEFAULT_IMAGE_FIT: ImageFit = 'auto';
 // Deserialize: URLSearchParams -> FeedUrlState
 // ---------------------------------------------------------------------------
 
-export function deserializeFromUrl(params: URLSearchParams): FeedUrlState {
+export function deserializeFromUrl(params: URLSearchParams, defaultCardsPerRow = DEFAULT_CARDS_PER_ROW): FeedUrlState {
   return {
     filters: deserializeFilters(params),
     sortBy: deserializeSortBy(params),
     sortDirection: deserializeSortDir(params),
     searchText: params.get('q') || '',
     viewMode: deserializeViewMode(params),
-    cardsPerRow: deserializeCardsPerRow(params),
+    cardsPerRow: deserializeCardsPerRow(params, defaultCardsPerRow),
     imageFit: deserializeImageFit(params),
   };
 }
@@ -141,10 +141,10 @@ function deserializeViewMode(params: URLSearchParams): ViewMode {
   return VALID_VIEW_MODE.has(val) ? (val as ViewMode) : DEFAULT_VIEW_MODE;
 }
 
-function deserializeCardsPerRow(params: URLSearchParams): number {
+function deserializeCardsPerRow(params: URLSearchParams, defaultCardsPerRow: number): number {
   const val = parseInt(params.get('cols') || '', 10);
   if (Number.isFinite(val) && val >= 1 && val <= 16) return val;
-  return DEFAULT_CARDS_PER_ROW;
+  return defaultCardsPerRow;
 }
 
 function deserializeImageFit(params: URLSearchParams): ImageFit {

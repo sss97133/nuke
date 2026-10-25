@@ -1,14 +1,9 @@
-/**
- * FeedToolbar — Sort, view mode, density, and display controls.
- *
- * Sits above the feed grid. Compact, terminal-aesthetic.
- * Now includes font size and badge toggles for user control.
- */
-
-import { useMemo, type CSSProperties } from 'react';
+/** Feed sort, view and display settings. Shared by the feed and market pages. */
+import { useId, useMemo } from 'react';
 import type { SortBy, SortDirection, ViewMode } from '../../types/feedTypes';
 import type { ImageFit } from '../utils/feedUrlCodec';
 import type { HeroDimension } from './HeroPanel';
+import './FeedPage.css';
 
 export interface FeedToolbarProps {
   sort: SortBy;
@@ -34,248 +29,94 @@ export interface FeedToolbarProps {
 }
 
 const SORT_OPTIONS: { value: SortBy; label: string }[] = [
-  { value: 'popular', label: 'RANK' },
-  { value: 'newest', label: 'NEWEST' },
-  { value: 'oldest', label: 'OLDEST' },
-  { value: 'finds', label: 'FINDS' },
-  { value: 'deal_score', label: 'DEALS' },
-  { value: 'heat_score', label: 'HEAT' },
-  { value: 'price_high', label: 'PRICE \u2193' },
-  { value: 'price_low', label: 'PRICE \u2191' },
-  { value: 'year', label: 'YEAR' },
-  { value: 'mileage', label: 'MILES' },
+  { value: 'popular', label: 'Rank' }, { value: 'newest', label: 'Newest' },
+  { value: 'oldest', label: 'Oldest' }, { value: 'finds', label: 'Finds' },
+  { value: 'deal_score', label: 'Deals' }, { value: 'heat_score', label: 'Heat' },
+  { value: 'price_high', label: 'Price ↓' }, { value: 'price_low', label: 'Price ↑' },
+  { value: 'year', label: 'Year' }, { value: 'mileage', label: 'Mileage' },
 ];
-
-const VIEW_MODES: { value: ViewMode; label: string; title: string }[] = [
-  { value: 'grid', label: '\u25a6', title: 'Grid' },
-  { value: 'gallery', label: '\u2630', title: 'List' },
-  { value: 'technical', label: '\u25a4', title: 'Table' },
+const VIEW_MODES: { value: ViewMode; label: string }[] = [
+  { value: 'grid', label: 'Grid' }, { value: 'gallery', label: 'List' }, { value: 'technical', label: 'Table' },
 ];
-
-const chipBase: CSSProperties = {
-  fontFamily: 'Arial, sans-serif',
-  fontSize: '8px',
-  fontWeight: 700,
-  textTransform: 'uppercase',
-  letterSpacing: '0.3px',
-  padding: '5px 8px',
-  border: '1px solid var(--border)',
-  background: 'transparent',
-  color: 'var(--text-secondary)',
-  cursor: 'pointer',
-  transition: 'all 180ms cubic-bezier(0.16, 1, 0.3, 1)',
-};
-
-const chipActive: CSSProperties = {
-  ...chipBase,
-  borderColor: 'var(--text)',
-  color: 'var(--text)',
-  background: 'var(--surface-hover)',
-};
-
 const FIT_CYCLE: ImageFit[] = ['auto', 'cover', 'contain'];
-const FIT_LABELS: Record<ImageFit, string> = {
-  auto: 'FIT: AUTO',
-  cover: 'FIT: FILL',
-  contain: 'FIT: FULL',
-};
-
-// Map sort values to hero dimensions
+const FIT_LABELS: Record<ImageFit, string> = { auto: 'Auto', cover: 'Fill', contain: 'Full image' };
 const SORT_HERO_MAP: Partial<Record<SortBy, HeroDimension>> = {
-  newest: 'newest',
-  deal_score: 'deal_score',
-  heat_score: 'heat_score',
-  year: 'year',
-  price_high: 'price_high',
-  price_low: 'price_low',
-  mileage: 'mileage',
-  finds: 'finds',
+  newest: 'newest', deal_score: 'deal_score', heat_score: 'heat_score', year: 'year',
+  price_high: 'price_high', price_low: 'price_low', mileage: 'mileage', finds: 'finds',
 };
 
 export function FeedToolbar({
-  sort,
-  direction,
-  viewMode,
-  cardsPerRow,
-  fontSize,
-  showScores,
-  imageFit,
-  hasInterests,
-  activeHeroPanel,
-  onSortChange,
-  onDirectionChange,
-  onViewModeChange,
-  onCardsPerRowChange,
-  onFontSizeChange,
-  onToggleScores,
-  onImageFitChange,
-  onHeroPanelToggle,
+  sort, direction, viewMode, cardsPerRow, fontSize, showScores, imageFit, hasInterests, activeHeroPanel,
+  onSortChange, onDirectionChange, onViewModeChange, onCardsPerRowChange, onFontSizeChange,
+  onToggleScores, onImageFitChange, onHeroPanelToggle,
 }: FeedToolbarProps) {
-  const isTableView = viewMode === 'technical';
+  const id = useId();
+  const sortOptions = useMemo(() => SORT_OPTIONS.map(opt =>
+    hasInterests && opt.value === 'finds' ? { ...opt, label: 'For you' } : opt), [hasInterests]);
 
-  // Build sort options — replace FINDS with FOR YOU when user has interests
-  const sortOptions = useMemo(() => {
-    if (hasInterests) {
-      return SORT_OPTIONS.map((opt) =>
-        opt.value === 'finds' ? { value: 'finds' as SortBy, label: 'FOR YOU' } : opt,
-      );
+  const chooseSort = (value: SortBy) => {
+    const hero = SORT_HERO_MAP[value];
+    if (sort === value && hero && onHeroPanelToggle) {
+      onHeroPanelToggle(activeHeroPanel === hero ? null : hero);
+    } else if (sort === value) {
+      onDirectionChange(direction === 'asc' ? 'desc' : 'asc');
+    } else {
+      onSortChange(value);
+      onHeroPanelToggle?.(hero ?? null);
     }
-    return SORT_OPTIONS;
-  }, [hasInterests]);
+  };
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '8px',
-        padding: '6px 0',
-        borderBottom: '1px solid var(--border)',
-        flexWrap: 'wrap',
-      }}
-    >
-      {/* Sort chips — hidden in table view (columns are clickable) */}
-      {!isTableView && (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2px', alignItems: 'center' }}>
-          <span style={{
-            fontFamily: 'Arial, sans-serif', fontSize: '8px', fontWeight: 700,
-            textTransform: 'uppercase', color: 'var(--text-disabled)', marginRight: '4px',
-          }}>
-            SORT
-          </span>
-          {sortOptions.map((opt) => {
-            const heroDim = SORT_HERO_MAP[opt.value];
-            const isHeroActive = activeHeroPanel != null && heroDim === activeHeroPanel;
-            const isActive = sort === opt.value;
+    <div className="feed-toolbar">
+      {viewMode !== 'technical' && <div className="feed-toolbar__sort" role="group" aria-label="Sort vehicles">
+        <span className="feed-toolbar__label">Sort</span>
+        {sortOptions.map(opt => {
+          const active = sort === opt.value;
+          const hero = SORT_HERO_MAP[opt.value];
+          const expanded = hero != null && activeHeroPanel === hero;
+          return <button key={opt.value} type="button" className="feed-toolbar__chip"
+            aria-pressed={active} aria-expanded={hero && onHeroPanelToggle ? expanded : undefined}
+            onClick={() => chooseSort(opt.value)}>
+            {opt.label}{active && (direction === 'asc' ? ' ↑' : ' ↓')}
+          </button>;
+        })}
+      </div>}
 
-            // Hero panel indicator bar
-            const heroIndicator: CSSProperties = isHeroActive
-              ? { borderBottom: '2px solid var(--text)', paddingBottom: '3px' }
-              : {};
-
-            return (
-              <button
-                key={opt.value}
-                type="button"
-                onClick={() => {
-                  if (isActive && heroDim && onHeroPanelToggle) {
-                    // Already on this sort -- toggle hero panel
-                    if (isHeroActive) {
-                      onHeroPanelToggle(null);
-                    } else {
-                      onHeroPanelToggle(heroDim);
-                    }
-                  } else if (isActive) {
-                    onDirectionChange(direction === 'asc' ? 'desc' : 'asc');
-                  } else {
-                    onSortChange(opt.value);
-                    // Open hero panel for the new sort
-                    if (heroDim && onHeroPanelToggle) {
-                      onHeroPanelToggle(heroDim);
-                    } else if (onHeroPanelToggle) {
-                      onHeroPanelToggle(null);
-                    }
-                  }
-                }}
-                style={{
-                  ...(isActive ? chipActive : chipBase),
-                  ...heroIndicator,
-                }}
-              >
-                {opt.label}
-                {isActive && (direction === 'asc' ? ' \u2191' : ' \u2193')}
-              </button>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Spacer */}
-      <div style={{ flex: 1 }} />
-
-      {/* Font size control */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-        <span style={{
-          fontFamily: 'Arial, sans-serif', fontSize: '7px', fontWeight: 700,
-          color: 'var(--text-disabled)', textTransform: 'uppercase',
-        }}>
-          Aa
-        </span>
-        <input
-          type="range"
-          min={7}
-          max={14}
-          value={fontSize}
-          onChange={(e) => onFontSizeChange(Number(e.target.value))}
-          style={{ width: '50px', accentColor: 'var(--text-secondary)' }}
-          title={`Font size: ${fontSize}px`}
-        />
+      <div className="feed-toolbar__views" role="group" aria-label="Vehicle display">
+        {VIEW_MODES.map(view => <button key={view.value} type="button" className="feed-toolbar__chip"
+          aria-label={`${view.label} view`} aria-pressed={viewMode === view.value}
+          onClick={() => onViewModeChange(view.value)}>{view.label}</button>)}
       </div>
 
-      {/* Density slider (grid mode only) */}
-      {viewMode === 'grid' && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-          <span style={{
-            fontFamily: "'Courier New', monospace", fontSize: '9px',
-            color: 'var(--text-secondary)', minWidth: '16px', textAlign: 'right',
-          }}>
-            {cardsPerRow}
-          </span>
-          <input
-            type="range"
-            min={3}
-            max={12}
-            value={cardsPerRow}
-            onChange={(e) => onCardsPerRowChange(Number(e.target.value))}
-            style={{ width: '70px', accentColor: 'var(--text-secondary)' }}
-            title={`${cardsPerRow} columns`}
-          />
-        </div>
-      )}
-
-      {/* Image fit cycle (grid mode only) */}
-      {viewMode === 'grid' && (
-        <button
-          type="button"
-          onClick={() => {
-            const idx = FIT_CYCLE.indexOf(imageFit);
-            onImageFitChange(FIT_CYCLE[(idx + 1) % FIT_CYCLE.length]);
-          }}
-          style={{ ...chipBase, fontSize: '7px' }}
-          title="Cycle image fit: Auto (smart), Fill (crop to fill), Full (show entire image)"
-        >
-          {FIT_LABELS[imageFit]}
-        </button>
-      )}
-
-      {/* Score transparency toggle */}
-      <button
-        type="button"
-        onClick={onToggleScores}
-        style={showScores ? { ...chipActive, fontSize: '7px' } : { ...chipBase, fontSize: '7px' }}
-        title="Show rank score breakdown on cards"
-      >
-        {showScores ? 'SCORES ON' : 'SCORES'}
-      </button>
-
-      {/* View mode toggles */}
-      <div style={{ display: 'flex', gap: '2px' }}>
-        {VIEW_MODES.map((vm) => (
-          <button
-            key={vm.value}
-            type="button"
-            onClick={() => onViewModeChange(vm.value)}
-            style={{
-              ...(viewMode === vm.value ? chipActive : chipBase),
-              fontSize: '12px',
-              padding: '2px 6px',
-            }}
-            title={vm.title}
-          >
-            {vm.label}
+      <details className="feed-toolbar__display">
+        <summary>Display options</summary>
+        <div className="feed-toolbar__options">
+          <label className="feed-toolbar__range" htmlFor={`${id}-text`}>
+            <span>Text size</span><output>{fontSize} px</output>
+            <input id={`${id}-text`} type="range" min={8} max={18} value={fontSize}
+              aria-label="Card text size" aria-valuetext={`${fontSize} pixels`}
+              onChange={e => onFontSizeChange(Number(e.target.value))} />
+          </label>
+          {viewMode === 'grid' && <>
+            <label className="feed-toolbar__range" htmlFor={`${id}-columns`}>
+              <span>Columns</span><output>{cardsPerRow}</output>
+              <input id={`${id}-columns`} type="range" min={1} max={12} value={cardsPerRow}
+                aria-label="Vehicle columns" aria-valuetext={`${cardsPerRow} columns`}
+                onChange={e => onCardsPerRowChange(Number(e.target.value))} />
+            </label>
+            <button type="button" className="btn-base btn-secondary"
+              aria-label={`Image fit: ${FIT_LABELS[imageFit]}`}
+              title="Cycle image fit: Auto, Fill, or Full image"
+              onClick={() => onImageFitChange(FIT_CYCLE[(FIT_CYCLE.indexOf(imageFit) + 1) % FIT_CYCLE.length])}>
+              Images: {FIT_LABELS[imageFit]}
+            </button>
+          </>}
+          <button type="button" className="btn-base btn-secondary" aria-pressed={showScores}
+            title="Show rank score breakdown on cards" onClick={onToggleScores}>
+            {showScores ? 'Hide scores' : 'Show scores'}
           </button>
-        ))}
-      </div>
+        </div>
+      </details>
     </div>
   );
 }
