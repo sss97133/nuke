@@ -1,9 +1,9 @@
 # moto_v2: motorcycle rule v2. Reference (cited): make lists per
-# https://en.wikipedia.org/wiki/List_of_motorcycle_manufacturers ; model families per
-# Wikipedia model lists: List_of_Harley-Davidson_motorcycles, List_of_Honda_motorcycles,
+# Make/model lists are hand-written rules (moto_v2); no external source was fetched or verified.
+# Make/model lists are hand-written rules (moto_v2); no external source was fetched or verified.
 # List_of_Yamaha_motorcycles, List_of_Kawasaki_motorcycles, List_of_Suzuki_motorcycles,
 # List_of_BMW_motorcycles, List_of_Triumph_motorcycles (Triumph Engineering/Motorcycles vs Triumph Motor Company cars),
-# BMW car chassis codes (E/F/G + 2 digits) per Wikipedia BMW_chassis_code.
+# Make/model lists are hand-written rules (moto_v2); no external source was fetched or verified.
 import re
 REF='wikipedia:List_of_motorcycle_manufacturers+per-brand model lists (moto_v2)'
 def rx(p,s): return re.search(p,s) is not None
