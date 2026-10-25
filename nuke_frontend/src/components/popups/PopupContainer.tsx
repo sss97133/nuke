@@ -1,23 +1,8 @@
-/**
- * PopupContainer — Finder-style popup windows with minimize, expand, resize, and dock.
- *
- * Each popup:
- *   - White bg (#f5f5f5), 2px solid #2a2a2a border, zero radius
- *   - Title bar: #2a2a2a bg, white text, 9px UPPERCASE Arial
- *   - Title bar layout: TITLE | [search input] | [+] | [---] [X]
- *   - "+" toggles between default width and expanded (700px)
- *   - Minimize (---) collapses to title bar docked at viewport bottom
- *   - Resizable by dragging bottom-right corner
- *   - Scrollable content, max-height 70vh (or resized height)
- *   - Stack offset: +20px right, +20px down per layer
- *   - Dim overlay: rgba(0,0,0,0.2) behind the BOTTOM popup only
- *   - Draggable by title bar
- *   - 150ms ease transitions
- */
-
+/** Shared popup chrome. Source readers keep their own content and evidence semantics. */
 import React, { cloneElement, isValidElement, useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { PopupEntry } from './PopupStack';
+import './popup-container.css';
 
 interface Props {
   stack: PopupEntry[];
@@ -30,27 +15,6 @@ interface Props {
 const STACK_OFFSET = 20;
 const ANIM_DURATION = 150;
 const DEBOUNCE_MS = 300;
-
-// Shared button style for title bar controls (16x16, 2px border, Courier New, zero radius)
-const titleBarBtnBase: React.CSSProperties = {
-  width: 16,
-  height: 16,
-  padding: 0,
-  border: '2px solid rgba(255,255,255,0.3)',
-  borderRadius: 0,
-  background: 'none',
-  fontFamily: "'Courier New', Courier, monospace",
-  fontSize: '8px',
-  fontWeight: 700,
-  lineHeight: '12px',
-  textAlign: 'center',
-  cursor: 'pointer',
-  flexShrink: 0,
-  transition: `all ${ANIM_DURATION}ms ease`,
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-};
 
 export function PopupContainer({ stack, onClose, onCloseTop, onToggleMinimize, onToggleExpanded }: Props) {
   const activePopups = stack.filter((e) => !e.minimized);
@@ -117,8 +81,9 @@ export function PopupContainer({ stack, onClose, onCloseTop, onToggleMinimize, o
             zIndex: 9100,
             display: 'flex',
             flexDirection: 'row',
-            gap: 2,
-            padding: '0 4px 4px',
+            gap: 8,
+            padding: '8px',
+            overflowX: 'auto',
             pointerEvents: 'none',
           }}
         >
@@ -151,67 +116,12 @@ function MinimizedBar({
   onClose: () => void;
 }) {
   return (
-    <div
-      onClick={onRestore}
-      style={{
-        height: 24,
-        background: 'var(--surface, #f5f5f5)',
-        border: '2px solid #2a2a2a',
-        borderRadius: 0,
-        display: 'flex',
-        alignItems: 'center',
-        gap: 6,
-        padding: '0 8px',
-        cursor: 'pointer',
-        pointerEvents: 'auto',
-        maxWidth: 240,
-        transition: `background ${ANIM_DURATION}ms ease`,
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.background = 'var(--surface-hover, #e0e0e0)';
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.background = 'var(--surface, #f5f5f5)';
-      }}
-    >
-      <span
-        style={{
-          fontFamily: 'Arial, sans-serif',
-          fontSize: '9px',
-          fontWeight: 800,
-          textTransform: 'uppercase',
-          letterSpacing: '0.5px',
-          color: '#2a2a2a',
-          lineHeight: 1,
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
-          flex: 1,
-        }}
-      >
+    <div className="popup-dock-item">
+      <button type="button" className="popup-dock-restore" onClick={onRestore} aria-label={`Restore ${entry.title}`}>
         {entry.title}
-      </span>
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          onClose();
-        }}
-        style={{
-          ...titleBarBtnBase,
-          color: '#2a2a2a',
-          borderColor: 'rgba(0,0,0,0.2)',
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.color = '#000';
-          e.currentTarget.style.borderColor = '#2a2a2a';
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.color = '#2a2a2a';
-          e.currentTarget.style.borderColor = 'rgba(0,0,0,0.2)';
-        }}
-        aria-label="Close popup"
-      >
-        X
+      </button>
+      <button type="button" className="popup-window-control" onClick={onClose} aria-label={`Close ${entry.title}`}>
+        ×
       </button>
     </div>
   );
@@ -359,188 +269,40 @@ function PopupWindow({
   return (
     <div
       ref={popupRef}
+      className="popup-window"
+      role="dialog"
+      aria-label={entry.title}
       onClick={(e) => e.stopPropagation()}
       style={{
-        position: 'fixed',
         left: baseLeft,
         top: baseTop,
         width: effectiveWidth,
-        maxWidth: 'calc(100vw - 32px)',
         height: resized?.h ?? undefined,
-        background: '#f5f5f5',
-        border: '2px solid #2a2a2a',
-        borderRadius: 0,
         zIndex: 9001 + index,
-        display: 'flex',
-        flexDirection: 'column',
-        animation: `popupSlideIn ${ANIM_DURATION}ms ease`,
         transition: resizing.current ? undefined : `width ${ANIM_DURATION}ms ease`,
       }}
     >
-      {/* Title bar */}
-      <div
-        onMouseDown={handleMouseDown}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          background: '#2a2a2a',
-          padding: '6px 8px',
-          cursor: 'grab',
-          userSelect: 'none',
-          flexShrink: 0,
-          gap: 4,
-        }}
-      >
-        {/* Title */}
-        <span
-          style={{
-            fontFamily: 'Arial, sans-serif',
-            fontSize: '9px',
-            fontWeight: 800,
-            textTransform: 'uppercase',
-            letterSpacing: '0.5px',
-            color: '#fff',
-            lineHeight: 1,
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-            flexShrink: 0,
-            maxWidth: '35%',
-          }}
-        >
-          {entry.title}
-        </span>
-
-        {/* Search input */}
+      <div className="popup-window-header" onMouseDown={handleMouseDown}>
+        <span className="popup-window-title" title={entry.title}>{entry.title}</span>
         {entry.searchable && (
           <input
             data-popup-search
+            className="popup-window-search"
             type="text"
+            aria-label={`Search ${entry.title}`}
             value={rawSearch}
             onChange={handleSearchChange}
-            placeholder="SEARCH..."
-            style={{
-              flex: 1,
-              minWidth: 0,
-              height: 18,
-              padding: '0 4px',
-              fontFamily: "'Courier New', Courier, monospace",
-              fontSize: 8,
-              color: '#1a1a1a',
-              background: 'var(--surface, #f5f5f5)',
-              border: '2px solid var(--border, #555)',
-              borderRadius: 0,
-              outline: 'none',
-              lineHeight: '18px',
-            }}
+            placeholder="Search…"
           />
         )}
-
-        {/* Spacer when no search */}
-        {!entry.searchable && <div style={{ flex: 1 }} />}
-
-        {/* Expand toggle: + */}
-        <button
-          data-popup-btn
-          onClick={onToggleExpanded}
-          style={{
-            ...titleBarBtnBase,
-            color: entry.expanded ? '#2a2a2a' : 'rgba(255,255,255,0.6)',
-            background: entry.expanded ? '#fff' : 'none',
-            borderColor: entry.expanded ? '#fff' : 'rgba(255,255,255,0.3)',
-            fontSize: '10px',
-            lineHeight: '10px',
-          }}
-          onMouseEnter={(e) => {
-            if (!entry.expanded) {
-              e.currentTarget.style.color = '#fff';
-              e.currentTarget.style.borderColor = 'rgba(255,255,255,0.6)';
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (!entry.expanded) {
-              e.currentTarget.style.color = 'rgba(255,255,255,0.6)';
-              e.currentTarget.style.borderColor = 'rgba(255,255,255,0.3)';
-            }
-          }}
-          aria-label="Toggle expand"
-        >
-          +
+        <button type="button" data-popup-btn className="popup-window-control" onClick={onToggleExpanded} aria-label="Toggle expand" aria-pressed={entry.expanded}>
+          {entry.expanded ? '−' : '+'}
         </button>
-
-        {/* Minimize button */}
-        <button
-          data-popup-btn
-          onClick={onMinimize}
-          style={{
-            ...titleBarBtnBase,
-            color: 'rgba(255,255,255,0.6)',
-            borderColor: 'rgba(255,255,255,0.3)',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.color = '#fff';
-            e.currentTarget.style.borderColor = 'rgba(255,255,255,0.6)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.color = 'rgba(255,255,255,0.6)';
-            e.currentTarget.style.borderColor = 'rgba(255,255,255,0.3)';
-          }}
-          aria-label="Minimize popup"
-        >
-          &mdash;
-        </button>
-
-        {/* Close button */}
-        <button
-          data-popup-close
-          onClick={onClose}
-          style={{
-            ...titleBarBtnBase,
-            color: 'rgba(255,255,255,0.6)',
-            borderColor: 'rgba(255,255,255,0.3)',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.color = '#fff';
-            e.currentTarget.style.borderColor = 'rgba(255,255,255,0.6)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.color = 'rgba(255,255,255,0.6)';
-            e.currentTarget.style.borderColor = 'rgba(255,255,255,0.3)';
-          }}
-          aria-label="Close popup"
-        >
-          X
-        </button>
+        <button type="button" data-popup-btn className="popup-window-control" onClick={onMinimize} aria-label="Minimize popup">—</button>
+        <button type="button" data-popup-close className="popup-window-control" onClick={onClose} aria-label="Close popup">×</button>
       </div>
-
-      {/* Scrollable content */}
-      <div
-        style={{
-          overflowY: 'auto',
-          maxHeight: resized?.h ? undefined : '70vh',
-          flex: resized?.h ? 1 : undefined,
-          padding: 0,
-        }}
-      >
-        {contentWithProps}
-      </div>
-
-      {/* Resize handle — bottom-right corner */}
-      <div
-        data-popup-resize
-        onMouseDown={handleResizeMouseDown}
-        style={{
-          position: 'absolute',
-          right: 0,
-          bottom: 0,
-          width: 14,
-          height: 14,
-          cursor: 'nwse-resize',
-          zIndex: 1,
-          // Visual grip indicator
-          backgroundImage: `linear-gradient(135deg, transparent 50%, rgba(0,0,0,0.15) 50%, rgba(0,0,0,0.15) 60%, transparent 60%, transparent 75%, rgba(0,0,0,0.15) 75%, rgba(0,0,0,0.15) 85%, transparent 85%)`,
-        }}
-      />
+      <div className="popup-window-content">{contentWithProps}</div>
+      <div data-popup-resize className="popup-window-resize" onMouseDown={handleResizeMouseDown} />
     </div>
   );
 }
