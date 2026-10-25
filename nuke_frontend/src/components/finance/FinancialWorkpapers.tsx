@@ -203,7 +203,10 @@ export default function FinancialWorkpapers({ revision, onOpen, viewerId }: { re
     setSelected(current => { const next = new Map(current); for (const key of byKey.keys()) if (key) next.delete(key); return next; });
   };
   const accountRows = controls.filter(row => row.year === selectedYear && (!account || (account === '__unknown' ? row.account == null : row.account === account)) && matches([row.account, row.section, row.currency]));
-  const accounts = [...new Set((data?.controls || []).map(row => row.account).filter((value): value is string => !!value))].sort();
+  // A failed summary must not hide filters that still constrain the records reader.
+  const accounts = [...new Set([...(data?.controls || []).map(row => row.account), account !== '__unknown' ? account : ''].filter((value): value is string => !!value))].sort();
+  const sections = [...new Set([...controls.map(row => row.section), section !== '__unknown' ? section : ''].filter((value): value is string => !!value))].sort();
+  const currencies = [...new Set([...controls.map(row => row.currency), currency !== '__unknown' ? currency : ''].filter((value): value is string => !!value))].sort();
   const offset = Math.min(tablePage, Math.max(0, Math.ceil(accountRows.length / rowsPerPage) - 1)) * rowsPerPage;
   const recordsOffset = tablePage * rowsPerPage;
   const changeView = (next: typeof view) => { if (next === 'records' && !data && !year) setYear('__all'); setView(next); setQuery(''); setAccount(''); setKind(''); setSection(''); setCurrency(''); setUnclassified(false); setTablePage(0); };
@@ -234,7 +237,7 @@ export default function FinancialWorkpapers({ revision, onOpen, viewerId }: { re
       {data?.total_rows === 0 && !summaryLoading && view !== 'records' && <p>No bookkeeping records have been recovered into this account yet.</p>}
       {(view === 'records' || (view === 'accounts' && data && !summaryLoading)) && <>
         <div className="accounting-filters"><label>{view === 'records' ? 'Search records' : 'Search account breakdown'}<input type="search" value={query} onChange={event => setQuery(event.target.value)} /></label>
-          {view === 'records' && <><label>Classification <select value={section} onChange={event => { setSection(event.target.value); setUnclassified(false); }}><option value="">All classifications</option><option value="__unknown">Unclassified</option>{[...new Set(controls.map(row => row.section).filter((value): value is string => !!value))].sort().map(value => <option key={value}>{value}</option>)}</select></label><label>Currency <select value={currency} onChange={event => setCurrency(event.target.value)}><option value="">All currencies</option><option value="__unknown">Currency unknown</option>{[...new Set(controls.map(row => row.currency).filter((value): value is string => !!value))].sort().map(value => <option key={value}>{value}</option>)}</select></label></>}
+          {view === 'records' && <><label>Classification <select value={section} onChange={event => { setSection(event.target.value); setUnclassified(false); }}><option value="">All classifications</option><option value="__unknown">Unclassified</option>{sections.map(value => <option key={value}>{value}</option>)}</select></label><label>Currency <select value={currency} onChange={event => setCurrency(event.target.value)}><option value="">All currencies</option><option value="__unknown">Currency unknown</option>{currencies.map(value => <option key={value}>{value}</option>)}</select></label></>}
           <label>Account <select value={account} onChange={event => setAccount(event.target.value)}><option value="">All accounts</option><option value="__unknown">Account unknown</option>{accounts.map(value => <option key={value}>{value}</option>)}</select></label>
           <label>Rows per page <select value={rowsPerPage} onChange={event => { setRowsPerPage(Number(event.target.value)); setTablePage(0); }}>{pageSizes.map(size => <option key={size} value={size}>{size}</option>)}</select></label>
           {view === 'records' && <div className="accounting-chips" role="group" aria-label="Record type">

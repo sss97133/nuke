@@ -349,3 +349,21 @@ it('invalidates a pending record result immediately on signout before effect cle
   await act(async () => { fixture.listener!('SIGNED_OUT', null); finish({ data: [record('late', 'PRIVATE LATE RECORD')], error: null }); await Promise.resolve(); });
   expect(container.textContent).not.toContain('PRIVATE LATE RECORD'); expect(container.querySelector('tbody')).toBeNull();
 });
+
+it('keeps selected filter options visible and applied after summary controls fail', async () => {
+  fixture.invoke.mockResolvedValueOnce(response({ ...empty(), total_rows: 1, controls: [{ record_kind: 'retained_ledger_decision', year: '2024', account: 'Checking A', section: 'Expense', currency: 'USD', retained_amount: '12.50', rows: 1 }] })).mockResolvedValue({ data: null, error: new Error('summary timeout') });
+  fixture.from.mockImplementation(() => table({ data: [record()] }));
+  await act(async () => root.render(book(<FinancialWorkpapers viewerId="owner" revision={0} onOpen={() => {}} />)));
+  await clickBookButton('Records');
+  const select = (label: string) => Array.from(container.querySelectorAll('label')).find(node => node.textContent?.startsWith(label))!.querySelector('select')!;
+  for (const [label, value] of [['Classification ', 'Expense'], ['Currency ', 'USD'], ['Account ', 'Checking A']]) {
+    await act(async () => { select(label).value = value; select(label).dispatchEvent(new Event('change', {bubbles: true})); });
+  }
+  await act(async () => root.render(book(<FinancialWorkpapers viewerId="owner" revision={1} onOpen={() => {}} />)));
+  expect(container.textContent).toContain('totals are unknown');
+  for (const [label, value] of [['Classification ', 'Expense'], ['Currency ', 'USD'], ['Account ', 'Checking A']]) {
+    expect(select(label).value).toBe(value); expect(select(label).selectedOptions[0].textContent).toBe(value);
+  }
+  const request = queries().filter(query => filters(query, 'select').some(args => args[0] === 'id, document_id, record')).at(-1)!;
+  expect(filters(request, 'eq')).toEqual(expect.arrayContaining([['year','2024'], ['section','Expense'], ['currency','USD'], ['account','Checking A']]));
+});
