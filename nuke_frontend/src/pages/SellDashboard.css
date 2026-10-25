@@ -6,6 +6,9 @@
 .sell-export-row { overflow-wrap: anywhere; }
 .sell-export-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .sell-export-actions button:disabled { cursor: wait; opacity: 0.6; }
+.sell-recorded-price { display: flex; flex-direction: column; gap: 2px; font-size: var(--text-callout); font-variant-numeric: tabular-nums; }
+.sell-recorded-price small { color: var(--text-secondary); font-size: var(--text-caption); }
+.sell-amount-note { margin: 0; padding: 12px 14px; color: var(--text-secondary); font-size: var(--text-callout); }
 
 @media (max-width: 600px) {
   .sell-dashboard select { font-size: 16px; }

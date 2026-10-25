@@ -89,9 +89,16 @@ function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' });
 }
 
-function formatCurrency(cents: number | null | undefined): string {
-  if (cents == null) return '—';
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(cents / 100);
+function hasRecordedAmount(cents: unknown): cents is number {
+  return typeof cents === 'number' && Number.isSafeInteger(cents) && cents >= 0;
+}
+
+function formatRecordedAmount(cents: unknown): string {
+  if (!hasRecordedAmount(cents)) return 'Amount unknown';
+  // Keep cents exact. Neither the export reader nor its common writer contract
+  // provides a currency code, so do not apply USD or combine these amounts.
+  const value = BigInt(cents);
+  return `${(value / 100n).toLocaleString('en-US')}.${(value % 100n).toString().padStart(2, '0')}`;
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -133,11 +140,9 @@ function PlatformBadge({ platform, label }: { platform: string; label?: string |
 function StatsBar({ exports }: { exports: ExportWithVehicle[] }) {
   const active = exports.filter(e => e.status === 'active').length;
   const sold = exports.filter(e => e.status === 'sold').length;
-  const totalRevenue = exports
-    .filter(e => e.status === 'sold' && e.sold_price_cents)
-    .reduce((sum, e) => sum + (e.sold_price_cents || 0), 0);
+  const recordedSoldPrices = exports.filter(e => e.status === 'sold' && hasRecordedAmount(e.sold_price_cents)).length;
   const total = exports.length;
-  const convRate = total > 0 ? ((sold / total) * 100).toFixed(1) : '0';
+  const soldShare = total > 0 ? `${((sold / total) * 100).toFixed(1)}%` : 'Unknown';
 
   return (
     <div style={{
@@ -150,10 +155,10 @@ function StatsBar({ exports }: { exports: ExportWithVehicle[] }) {
     }}>
       {[
         { label: 'Loaded exports', value: String(total) },
-        { label: 'ACTIVE', value: String(active) },
-        { label: 'SOLD', value: String(sold) },
-        { label: 'REVENUE', value: formatCurrency(totalRevenue) },
-        { label: 'CONVERSION', value: `${convRate}%` },
+        { label: 'Active', value: String(active) },
+        { label: 'Marked sold', value: String(sold) },
+        { label: 'Sale prices recorded', value: `${recordedSoldPrices} / ${sold}` },
+        { label: 'Marked sold share', value: soldShare },
       ].map(s => (
         <div key={s.label} style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
           <span style={LABEL}>{s.label}</span>
@@ -234,9 +239,11 @@ function ExportRow({ exp, onStatusChange, busyId, disabled }: {
       <StatusBadge status={exp.status} />
 
       {/* Price */}
-      <span style={{ fontFamily: FONT_MONO, fontSize: 'var(--text-callout)', fontWeight: 700, minWidth: 70 }}>
-        {formatCurrency(exp.asking_price_cents)}
-      </span>
+      <div className="sell-recorded-price">
+        <span>Asking: {formatRecordedAmount(exp.asking_price_cents)}</span>
+        {exp.status === 'sold' && <span>Sale amount: {formatRecordedAmount(exp.sold_price_cents)}</span>}
+        <small>Currency not recorded</small>
+      </div>
 
       {/* Date */}
       <span style={{ ...LABEL, minWidth: 60 }}>
@@ -414,7 +421,10 @@ export default function SellDashboard() {
         {actionError && <p role="alert">{actionError}</p>}
         {statusMessage && <p role="status">{statusMessage}</p>}
       </div>
-      {hasLoaded && <StatsBar exports={exports} />}
+      {hasLoaded && <>
+        <StatsBar exports={exports} />
+        <p className="sell-amount-note">Counts describe the loaded export records. Currency is not recorded, so sale amounts are not added together. “Sale prices recorded” shows how many marked-sold records include an amount.</p>
+      </>}
 
       {/* Filters */}
       <div style={{

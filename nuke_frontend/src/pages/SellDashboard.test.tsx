@@ -91,3 +91,30 @@ it('does not follow an old writer response with reads after the page is unmounte
   await act(async () => finish({ success: true }));
   expect(fixture.read).toHaveBeenCalledTimes(1); expect(text()).toBe('Another page');
 });
+
+it('preserves exact cents without inventing a currency or combined revenue', async () => {
+  fixture.read.mockResolvedValueOnce(reply([{ ...listing('sold'), asking_price_cents: 125050, sold_price_cents: 105 }]));
+  await render();
+  expect(text()).toContain('Asking: 1,250.50'); expect(text()).toContain('Sale amount: 1.05');
+  expect(text()).toContain('Currency not recorded'); expect(text()).toContain('Sale prices recorded1 / 1');
+  expect(text()).not.toContain('$'); expect(text()).not.toContain('REVENUE');
+});
+
+it('keeps missing amounts unknown while counting an explicitly recorded zero', async () => {
+  fixture.read.mockResolvedValueOnce(reply([
+    { ...listing('sold'), id: 'sold-known', asking_price_cents: 0, sold_price_cents: 0 },
+    { ...listing('sold'), id: 'sold-unknown', asking_price_cents: null, sold_price_cents: null },
+  ]));
+  await render(); expect(text()).toContain('Sale prices recorded1 / 2');
+  expect(text()).toContain('Asking: 0.00'); expect(text()).toContain('Sale amount: 0.00');
+  expect(text()).toContain('Asking: Amount unknown'); expect(text()).toContain('Sale amount: Amount unknown');
+});
+
+it('formats safe integer cents exactly and refuses malformed or imprecise amounts', async () => {
+  fixture.read.mockResolvedValueOnce(reply([
+    { ...listing('sold'), id: 'safe', asking_price_cents: Number.MAX_SAFE_INTEGER, sold_price_cents: 1.5 },
+    { ...listing('sold'), id: 'unsafe', asking_price_cents: Number.MAX_SAFE_INTEGER + 1, sold_price_cents: '105' },
+  ]));
+  await render(); expect(text()).toContain('90,071,992,547,409.91');
+  expect(text()).toContain('Asking: Amount unknown'); expect(text()).toContain('Sale prices recorded0 / 2');
+});
