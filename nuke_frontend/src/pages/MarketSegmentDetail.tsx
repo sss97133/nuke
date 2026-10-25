@@ -7,19 +7,21 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
+import { PrefetchLink as Link } from '../components/PrefetchLink';
+import { usePageTitle } from '../hooks/usePageTitle';
+import './MarketPages.css';
 import { supabase } from '../lib/supabase';
 import { useFeedSearchParams } from '../feed/hooks/useFeedSearchParams';
 import { useFeedQuery } from '../feed/hooks/useFeedQuery';
 import { AuctionClockProvider } from '../feed/components/AuctionClockProvider';
-import { FeedStatsStrip } from '../feed/components/FeedStatsStrip';
+import { MarketResultsBar } from './MarketResultsBar';
 import { FeedToolbar } from '../feed/components/FeedToolbar';
 import { FeedFilterSidebar } from '../feed/components/FeedFilterSidebar';
 import { FeedLayout } from '../feed/components/FeedLayout';
 import { FeedSkeleton } from '../feed/components/FeedSkeleton';
 import { FeedEmptyState } from '../feed/components/FeedEmptyState';
 import { VehicleCard } from '../feed/components/VehicleCard';
-import { FeedStatCard } from '../feed/components/FeedStatCard';
 import type { FeedVehicle } from '../feed/types/feed';
 
 /* ------------------------------------------------------------------ */
@@ -35,42 +37,17 @@ interface SegmentMeta {
   year_max: number | null;
   makes: string[] | null;
   model_keywords: string[] | null;
-  vehicle_count: number;
-  market_cap_usd: number;
-  change_7d_pct: number | null;
-  change_30d_pct: number | null;
 }
 
 /* ------------------------------------------------------------------ */
 /*  Formatters                                                         */
 /* ------------------------------------------------------------------ */
 
-const fmtUSD = (v: number) => {
-  if (v >= 1_000_000_000) return `$${(v / 1_000_000_000).toFixed(1)}B`;
-  if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(1)}M`;
-  if (v >= 1_000) return `$${(v / 1_000).toFixed(1)}K`;
-  return `$${v.toFixed(0)}`;
-};
-
-const fmtCount = (n: number) => {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(0)}K`;
-  return n.toLocaleString();
-};
-
-const fmtPct = (v: number | null) => {
-  if (v === null || Number.isNaN(v)) return null;
-  return `${v >= 0 ? '+' : ''}${v.toFixed(1)}%`;
-};
-
 /* ------------------------------------------------------------------ */
 /*  SegmentHeader                                                      */
 /* ------------------------------------------------------------------ */
 
 function SegmentHeader({ seg }: { seg: SegmentMeta }) {
-  const pct7 = fmtPct(seg.change_7d_pct);
-  const pct30 = fmtPct(seg.change_30d_pct);
-
   // Build subtitle from criteria
   const parts: string[] = [];
   if (seg.year_min && seg.year_max && seg.year_min === seg.year_max) {
@@ -82,17 +59,17 @@ function SegmentHeader({ seg }: { seg: SegmentMeta }) {
   if (seg.model_keywords?.length) parts.push(seg.model_keywords.join(', '));
 
   return (
-    <div style={{ borderBottom: '2px solid var(--border)', padding: '16px', background: 'var(--surface)' }}>
+    <div className="market-segment-detail-header" style={{ borderBottom: '2px solid var(--border)', padding: '16px', background: 'var(--surface)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
         <div style={{ flex: 1, minWidth: 200 }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
-            <h1 style={{ margin: 0, fontSize: 19, fontWeight: 900 }}>{seg.name}</h1>
+            <h1 style={{ margin: 0, fontSize: 'var(--text-title)', fontWeight: 700 }}>{seg.name}</h1>
           </div>
           {seg.description && (
-            <div style={{ marginTop: 4, fontSize: 12, color: 'var(--text-secondary)' }}>{seg.description}</div>
+            <div style={{ marginTop: 4, fontSize: 'var(--text-callout)', color: 'var(--text-secondary)' }}>{seg.description}</div>
           )}
           {parts.length > 0 && (
-            <div style={{ marginTop: 4, fontSize: 11, color: 'var(--text-disabled)', fontFamily: "'Courier New', monospace" }}>
+            <div style={{ marginTop: 4, fontSize: 'var(--text-callout)', color: 'var(--text-secondary)', fontFamily: 'var(--font-family)' }}>
               {parts.join(' / ')}
             </div>
           )}
@@ -101,35 +78,13 @@ function SegmentHeader({ seg }: { seg: SegmentMeta }) {
         <Link
           to="/market/segments"
           className="button button-secondary"
-          style={{ textDecoration: 'none', color: 'inherit', fontSize: 11, padding: '4px 10px' }}
+          style={{ textDecoration: 'none', color: 'inherit', fontSize: 'var(--text-callout)', padding: '4px 10px' }}
         >
-          ALL SEGMENTS
+          All segments
         </Link>
       </div>
 
-      {/* Stats row */}
-      <div style={{
-        display: 'flex',
-        gap: 24,
-        marginTop: 12,
-        flexWrap: 'wrap',
-      }}>
-        {[
-          { label: 'VEHICLES', value: fmtCount(seg.vehicle_count) },
-          { label: 'MARKET CAP', value: fmtUSD(seg.market_cap_usd) },
-          ...(pct7 ? [{ label: '7D', value: pct7, color: (seg.change_7d_pct ?? 0) >= 0 ? 'var(--success)' : 'var(--error)' }] : []),
-          ...(pct30 ? [{ label: '30D', value: pct30, color: (seg.change_30d_pct ?? 0) >= 0 ? 'var(--success)' : 'var(--error)' }] : []),
-        ].map((s) => (
-          <div key={s.label}>
-            <div style={{ fontFamily: 'Arial, sans-serif', fontSize: 8, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-disabled)' }}>
-              {s.label}
-            </div>
-            <div style={{ fontFamily: "'Courier New', monospace", fontSize: 14, fontWeight: 700, color: (s as any).color ?? 'var(--text)' }}>
-              {s.value}
-            </div>
-          </div>
-        ))}
-      </div>
+      <p className="market-page-note">Browse captured vehicles matching this definition. The definition index does not supply a measured vehicle total or market value.</p>
     </div>
   );
 }
@@ -143,6 +98,7 @@ export default function MarketSegmentDetailPage() {
 
   // Segment metadata
   const [segment, setSegment] = useState<SegmentMeta | null>(null);
+  usePageTitle(segment?.name ?? 'Market segment');
   const [segLoading, setSegLoading] = useState(true);
   const [segError, setSegError] = useState<string | null>(null);
 
@@ -166,9 +122,13 @@ export default function MarketSegmentDetailPage() {
     resetAll,
   } = useFeedSearchParams();
 
-  const [fontSize, setFontSize] = useState(10);
+  const [fontSize, setFontSize] = useState(14);
+  const [resetRevision, setResetRevision] = useState(0);
+  const resetFilters = () => { setResetRevision(value => value + 1); resetAll(); };
   const [filtersCollapsed, setFiltersCollapsed] = useState(() => window.innerWidth < 768);
   const [showScores, setShowScores] = useState(false);
+
+  const [metadataAttempt, setMetadataAttempt] = useState(0);
 
   // Load segment metadata
   useEffect(() => {
@@ -177,11 +137,11 @@ export default function MarketSegmentDetailPage() {
     setSegLoading(true);
     setSegment(null);
     setSegError(null);
-    supabase
+    void Promise.resolve(supabase
       .from('market_segments_index')
-      .select('segment_id, slug, name, description, year_min, year_max, makes, model_keywords, vehicle_count, market_cap_usd, change_7d_pct, change_30d_pct')
+      .select('segment_id, slug, name, description, year_min, year_max, makes, model_keywords')
       .eq('slug', slug)
-      .maybeSingle()
+      .maybeSingle())
       .then(({ data, error }) => {
         if (cancelled) return;
         if (error) setSegError('The segment definition could not be read.');
@@ -195,16 +155,14 @@ export default function MarketSegmentDetailPage() {
             year_max: data.year_max,
             makes: data.makes,
             model_keywords: data.model_keywords,
-            vehicle_count: Number(data.vehicle_count || 0),
-            market_cap_usd: Number(data.market_cap_usd || 0),
-            change_7d_pct: data.change_7d_pct != null ? Number(data.change_7d_pct) : null,
-            change_30d_pct: data.change_30d_pct != null ? Number(data.change_30d_pct) : null,
           });
         }
         setSegLoading(false);
+      }).catch(() => {
+        if (!cancelled) { setSegError('The segment definition could not be read.'); setSegLoading(false); }
       });
     return () => { cancelled = true; };
-  }, [slug]);
+  }, [slug, metadataAttempt]);
 
   // Apply segment criteria to feed filters on load
   useEffect(() => {
@@ -217,11 +175,9 @@ export default function MarketSegmentDetailPage() {
     });
   }, [segment?.segment_id]); // only once when segment loads
 
-  // Feed query — default to deal_score for segment pages too
-  const effectiveSortBy = sortBy === 'popular' ? 'deal_score' : sortBy;
-  const feedQuery = useFeedQuery({ filters, sortBy: effectiveSortBy, sortDirection, searchText }, !!segment && !segError, segment?.segment_id);
+  // Keep the URL sort and segment membership in the existing feed contract.
+  const feedQuery = useFeedQuery({ filters, sortBy, sortDirection, searchText }, !!segment && !segError, segment?.segment_id);
   const vehicles = useMemo(() => feedQuery.data?.pages.flatMap((p) => p.items) ?? [], [feedQuery.data]);
-  const stats = feedQuery.data?.pages[0]?.stats ?? null;
 
   const renderCard = useCallback(
     (vehicle: FeedVehicle) => (
@@ -237,17 +193,12 @@ export default function MarketSegmentDetailPage() {
     [viewMode, cardsPerRow, showScores, imageFit],
   );
 
-  const renderStatCard = useCallback(
-    (index: number) => <FeedStatCard index={index} stats={stats} />,
-    [stats, vehicles.length],
-  );
-
   const feedStyle = useMemo(
     () =>
       ({
         '--feed-font-size': `${fontSize}px`,
-        '--feed-font-size-sm': `${Math.max(6, fontSize - 2)}px`,
-        '--feed-font-size-xs': `${Math.max(6, fontSize - 3)}px`,
+        '--feed-font-size-sm': `${Math.max(10, fontSize - 2)}px`,
+        '--feed-font-size-xs': `${Math.max(10, fontSize - 3)}px`,
         maxWidth: viewMode === 'technical' ? 'none' : '1600px',
         margin: '0 auto',
         minHeight: '100vh',
@@ -260,7 +211,8 @@ export default function MarketSegmentDetailPage() {
   if (!segLoading && !segment) {
     return (
       <div style={{ padding: 24, color: 'var(--text-secondary)', fontSize: 12 }}>
-        {segError || 'Segment not found.'}
+        <p role={segError ? 'alert' : undefined}>{segError || 'Segment not found.'}</p>
+        {segError && <button className="button" onClick={() => setMetadataAttempt(value => value + 1)}>Retry definition</button>}
         <div style={{ marginTop: 10 }}>
           <Link to="/market/segments" className="button button-secondary" style={{ textDecoration: 'none', color: 'inherit' }}>
             All Segments
@@ -272,7 +224,7 @@ export default function MarketSegmentDetailPage() {
 
   return (
     <AuctionClockProvider>
-      <div className="fullscreen-content" style={feedStyle}>
+      <div className="fullscreen-content market-browse-page" style={feedStyle}>
         {/* Segment header with metadata */}
         {segment && <SegmentHeader seg={segment} />}
         {segLoading && (
@@ -280,18 +232,21 @@ export default function MarketSegmentDetailPage() {
         )}
 
         {/* Feed stats strip */}
-        <FeedStatsStrip
-          stats={stats}
-          isLoading={feedQuery.isLoading}
+        <MarketResultsBar
+          resetRevision={resetRevision}
+          count={vehicles.length}
+          unavailable={feedQuery.isError && vehicles.length === 0}
+          hasMore={feedQuery.hasNextPage ?? false}
+          isLoading={segLoading || feedQuery.isLoading}
           searchText={searchText}
           onSearchChange={setSearchText}
           hasActiveFilters={hasActiveFilters}
-          onResetFilters={resetAll}
+          onResetFilters={resetFilters}
         />
 
         {/* Toolbar */}
         <FeedToolbar
-          sort={effectiveSortBy}
+          sort={sortBy}
           direction={sortDirection}
           viewMode={viewMode}
           cardsPerRow={cardsPerRow}
@@ -312,29 +267,31 @@ export default function MarketSegmentDetailPage() {
           <FeedFilterSidebar
             filters={filters}
             onFiltersChange={setFilters}
-            onResetAll={resetAll}
+            onResetAll={resetFilters}
             hasActiveFilters={hasActiveFilters}
             collapsed={filtersCollapsed}
             onToggleCollapsed={() => setFiltersCollapsed(!filtersCollapsed)}
           />
 
           <div style={{ flex: 1, minWidth: 0, padding: viewMode === 'grid' ? '4px' : '0' }}>
+            {feedQuery.isError && <div role="alert" className="market-reader-error">
+              <span>Vehicle results could not be refreshed. {vehicles.length > 0 ? 'Showing the last successful results.' : 'No result count is available.'}</span>
+              <button className="button" disabled={feedQuery.isFetching} onClick={() => void (feedQuery.isFetchNextPageError ? feedQuery.fetchNextPage() : feedQuery.refetch())}>Retry vehicles</button>
+            </div>}
             {feedQuery.isLoading ? (
               <FeedSkeleton cardsPerRow={cardsPerRow} rows={4} />
-            ) : vehicles.length === 0 ? (
-              <FeedEmptyState hasFilters={hasActiveFilters} onResetFilters={resetAll} />
+            ) : feedQuery.isError && vehicles.length === 0 ? null : vehicles.length === 0 ? (
+              <FeedEmptyState hasFilters={hasActiveFilters} onResetFilters={resetFilters} />
             ) : (
               <FeedLayout
                 vehicles={vehicles}
                 viewMode={viewMode}
                 cardsPerRow={cardsPerRow}
                 showScores={showScores}
-                hasNextPage={feedQuery.hasNextPage ?? false}
+                hasNextPage={!feedQuery.isError && (feedQuery.hasNextPage ?? false)}
                 isFetchingNextPage={feedQuery.isFetchingNextPage}
                 fetchNextPage={() => feedQuery.fetchNextPage()}
                 renderCard={renderCard}
-                renderStatCard={renderStatCard}
-                statCardInterval={5}
               />
             )}
           </div>

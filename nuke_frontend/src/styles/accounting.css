@@ -229,3 +229,6 @@
 .accounting-linked-item-heading>span { font-variant-numeric:tabular-nums; }
 .accounting-page .accounting-linked-items p { margin:6px 0; }
 .accounting-use-summary>strong { display:block; font-size:19px; margin:8px 0; }
+
+/* Evidence disclosures remain reliable touch targets when their labels fit one line. */
+.accounting-page .accounting-evidence-dialog summary { box-sizing:border-box; min-height:var(--control-height,44px); padding-top:10px; padding-bottom:10px; }
