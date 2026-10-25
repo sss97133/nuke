@@ -1,5 +1,5 @@
 /** Feed sort, view and display settings. Shared by the feed and market pages. */
-import { useId, useMemo } from 'react';
+import { useId } from 'react';
 import type { SortBy, SortDirection, ViewMode } from '../../types/feedTypes';
 import type { ImageFit } from '../utils/feedUrlCodec';
 import type { HeroDimension } from './HeroPanel';
@@ -13,7 +13,7 @@ export interface FeedToolbarProps {
   fontSize: number;
   showScores: boolean;
   imageFit: ImageFit;
-  /** Whether user has recorded interests (enables FOR YOU sort) */
+  /** Retained for callers; Finds recommendations have no live backing reader yet. */
   hasInterests?: boolean;
   /** Currently open hero panel dimension (for highlight state) */
   activeHeroPanel?: HeroDimension | null;
@@ -28,9 +28,12 @@ export interface FeedToolbarProps {
   onHeroPanelToggle?: (dimension: HeroDimension | null) => void;
 }
 
+// Finds is intentionally not offered: vehicle_finds and its feed view are absent
+// in production (verified 2026-10-25; already documented by the 2026-09-27 feed migration).
+// The URL codec still preserves legacy sort=finds so it never substitutes another score.
 const SORT_OPTIONS: { value: SortBy; label: string }[] = [
   { value: 'popular', label: 'Rank' }, { value: 'newest', label: 'Newest' },
-  { value: 'oldest', label: 'Oldest' }, { value: 'finds', label: 'Finds' },
+  { value: 'oldest', label: 'Oldest' },
   { value: 'deal_score', label: 'Deals' }, { value: 'heat_score', label: 'Heat' },
   { value: 'price_high', label: 'Price ↓' }, { value: 'price_low', label: 'Price ↑' },
   { value: 'year', label: 'Year' }, { value: 'mileage', label: 'Mileage' },
@@ -46,13 +49,11 @@ const SORT_HERO_MAP: Partial<Record<SortBy, HeroDimension>> = {
 };
 
 export function FeedToolbar({
-  sort, direction, viewMode, cardsPerRow, fontSize, showScores, imageFit, hasInterests, activeHeroPanel,
+  sort, direction, viewMode, cardsPerRow, fontSize, showScores, imageFit, activeHeroPanel,
   onSortChange, onDirectionChange, onViewModeChange, onCardsPerRowChange, onFontSizeChange,
   onToggleScores, onImageFitChange, onHeroPanelToggle,
 }: FeedToolbarProps) {
   const id = useId();
-  const sortOptions = useMemo(() => SORT_OPTIONS.map(opt =>
-    hasInterests && opt.value === 'finds' ? { ...opt, label: 'For you' } : opt), [hasInterests]);
 
   const chooseSort = (value: SortBy) => {
     const hero = SORT_HERO_MAP[value];
@@ -70,7 +71,7 @@ export function FeedToolbar({
     <div className="feed-toolbar">
       {viewMode !== 'technical' && <div className="feed-toolbar__sort" role="group" aria-label="Sort vehicles">
         <span className="feed-toolbar__label">Sort</span>
-        {sortOptions.map(opt => {
+        {SORT_OPTIONS.map(opt => {
           const active = sort === opt.value;
           const hero = SORT_HERO_MAP[opt.value];
           const expanded = hero != null && activeHeroPanel === hero;

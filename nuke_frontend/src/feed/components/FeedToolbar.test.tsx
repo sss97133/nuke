@@ -49,12 +49,19 @@ describe('feed display controls', () => {
     await click('Deals'); expect(props.onSortChange).toHaveBeenCalledWith('deal_score');
     expect(props.onHeroPanelToggle).toHaveBeenLastCalledWith('deal_score');
   });
-  it('cycles fit, exposes score selection and routes For you to the existing finds sort', async () => {
-    await render({ hasInterests: true }); await click('For you');
-    expect(props.onSortChange).toHaveBeenCalledWith('finds');
+  it('cycles fit and exposes score selection', async () => {
+    await render();
     await click('Images: Auto'); expect(props.onImageFitChange).toHaveBeenCalledWith('cover');
     await click('Show scores'); expect(props.onToggleScores).toHaveBeenCalledOnce();
     await render({ showScores: true });
     expect([...host.querySelectorAll('button')].find(el => el.textContent === 'Hide scores')?.getAttribute('aria-pressed')).toBe('true');
   });
+  it.each([false, true])('only offers backed sorts even with interests=%s', async hasInterests => {
+    await render({ hasInterests, sort: 'finds' });
+    const offered = [...host.querySelectorAll('[aria-label="Sort vehicles"] button')].map(el => el.textContent);
+    expect(offered).toEqual(['Rank', 'Newest', 'Oldest', 'Deals', 'Heat', 'Price ↓', 'Price ↑', 'Year', 'Mileage']);
+    expect(host.querySelector('[aria-label="Sort vehicles"] [aria-pressed="true"]')).toBeNull();
+    expect(props.onSortChange).not.toHaveBeenCalled();
+  });
+
 });
