@@ -1,4 +1,5 @@
 import { Dropbox } from 'dropbox';
+import { DROPBOX_OAUTH_STATE_KEY, validDropboxImportPath } from './dropboxOAuth';
 
 export interface DropboxConfig {
   clientId: string;
@@ -58,7 +59,6 @@ export class DropboxService {
       DropboxService.instance = new DropboxService(config);
     } else if (config && DropboxService.instance) {
       // Update existing instance with new config (especially access token)
-      console.log('Updating DropboxService with new token:', config.accessToken?.substring(0, 20) + '...');
       DropboxService.instance.dbx = new Dropbox({
         clientId: config.clientId,
         accessToken: config.accessToken,
@@ -70,22 +70,26 @@ export class DropboxService {
 
   // Force refresh instance with new token
   static refreshInstance(config: DropboxConfig): DropboxService {
-    console.log('Force refreshing DropboxService instance with new token');
     DropboxService.instance = new DropboxService(config);
     return DropboxService.instance;
   }
 
-  generateAuthUrl(): string {
+  generateAuthUrl(returnPath: string): string {
     const clientId = import.meta.env.VITE_DROPBOX_CLIENT_ID;
     if (!clientId) {
       throw new Error('Dropbox client ID not configured');
     }
+    const importPath = validDropboxImportPath(returnPath);
+    if (!importPath) {
+      throw new Error('Open Dropbox import from your organization before connecting.');
+    }
 
     const redirectUri = `${window.location.origin}/dropbox-callback`;
-    const state = Math.random().toString(36).substring(2, 15);
+    const state = Array.from(crypto.getRandomValues(new Uint8Array(32)), byte => byte.toString(16).padStart(2, '0')).join('');
     
-    // Store state for CSRF protection
-    localStorage.setItem('dropbox_oauth_state', state);
+    // One atomic record prevents concurrent tabs from pairing a nonce with the
+    // other tab's organization. Only the latest pending authorization is valid.
+    localStorage.setItem(DROPBOX_OAUTH_STATE_KEY, JSON.stringify({ state, returnPath: importPath }));
 
     // Force re-approval to ensure fresh token with updated scopes
     const authUrl = `https://www.dropbox.com/oauth2/authorize?` +
@@ -96,8 +100,6 @@ export class DropboxService {
       `state=${state}&` +
       `force_reapproval=true`;
     
-    console.log('Generated OAuth URL:', authUrl);
-    console.log('Requested scopes: files.metadata.read files.content.read account_info.read');
     return authUrl;
   }
 
@@ -121,31 +123,16 @@ export class DropboxService {
     }
 
     try {
-      // Debug: Test account access to verify token scopes
-      console.log('Testing account access to verify token scopes...');
+      // Verify account access without exposing account or token diagnostics.
       try {
-        const accountInfo = await this.dbx.usersGetCurrentAccount();
-        console.log('Account access successful:', accountInfo.result.name.display_name);
-        
-        // Try to get token info to see actual granted scopes
-        try {
-          const tokenInfo = await this.dbx.checkUser({});
-          console.log('Token info:', tokenInfo);
-        } catch (tokenError) {
-          console.log('Could not get token info:', tokenError);
-        }
-        
-      } catch (error) {
-        console.error('Account access failed:', error);
+        await this.dbx.usersGetCurrentAccount();
+      } catch {
         throw new Error('Token does not have account access');
       }
       let dropboxPath = path;
       if (path === '/' || path === '') {
         dropboxPath = '';
       }
-      
-      console.log('Listing folders for path:', dropboxPath);
-      console.log('Using access token from localStorage:', localStorage.getItem('dropbox_access_token')?.substring(0, 20) + '...');
       
       const response = await this.dbx.filesListFolder({
         path: dropboxPath,
@@ -161,16 +148,6 @@ export class DropboxService {
         modifiedAt: folder.server_modified
       }));
     } catch (error: any) {
-      console.error('Error listing folders:', error);
-      console.error('Error details:', {
-        status: error.status,
-        message: error.message,
-        error: error.error,
-        response: error.response,
-        error_summary: error.error?.error_summary,
-        error_tag: error.error?.error?.['.tag']
-      });
-      
       // Check if it's an authentication error
       if (error.status === 401) {
         throw new Error('Dropbox access token is invalid or expired. Please reconnect your account.');
