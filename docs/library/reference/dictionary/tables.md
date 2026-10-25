@@ -569,7 +569,7 @@ Tables are grouped by domain and sorted by row count within each group.
 | `data_quality_flags` | jsonb | YES | '{}' | JSONB map of specific data quality issues. Example: {"missing_vin": true, "price_outlier": true}. Updated by multiple pipeline steps. |
 | `current_transfer_id` | uuid | YES |  | FK to ownership_transfers. Non-null while a transfer is in_progress. Drives the TRANSFER PENDING badge in the vehicle header. Owned by ownership transfer system — do not write directly. |
 | `ownership_confirmed_at` | timestamp with time zone | YES |  | Timestamp of most recent completed title transfer (transfer_complete milestone). Represents legal ownership confirmation date. |
-| `vehicle_category` | text | YES | 'car' | What this vehicle is: car, truck, suv, motorcycle, boat, rv, commercial, farm, other |
+| `vehicle_category` | text | YES | (none; NULL = not yet known) | Stored category; rows before 2026-10-25 carry an unverified default 'car'. Read `vehicle_category_resolved` (cited evidence + confidence) |
 | `display_tier` | text | YES | 'browse' | Display prominence: featured (1955-1991 cool vehicles), browse (everything else), hidden (total junk) |
 | `price_confidence` | text | YES |  | Price reliability: fabricated (CZ average, mod100!=0), suspected_average (round but repeated), plausible (round, 2-5x), likely_real (round, unique), verified (cross-referenced) |
 | `cz_estimated_value` | numeric | YES |  | ConceptCarz site-wide model average ("Estimated Sale Value"). NOT a real transaction price. Preserved for reference. |
