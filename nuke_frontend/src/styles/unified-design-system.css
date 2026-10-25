@@ -839,7 +839,7 @@ html .button-secondary:hover:not(:disabled), .btn-secondary:hover:not(:disabled)
 .btn-danger {
   border-color: var(--error);
   background: var(--error-dim);
-  color: var(--error);
+  color: var(--error-dark);
 }
 .btn-danger:hover:not(:disabled) {
   background: var(--error-dim);
