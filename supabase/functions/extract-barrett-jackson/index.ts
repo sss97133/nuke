@@ -1141,7 +1141,9 @@ async function saveVehicle(
       .select("id, metadata, sold_at, ended_at")
       .eq("vehicle_id", vehicleId)
       .eq("source_platform", "barrettjackson")
-      .eq("source_url", vehicle.url)
+      // Any spelling of the same lot (www./non-www., http/https, trailing slash) is the same listing.
+      .in("source_url", listingUrlSpellings(vehicle.url))
+      .order("created_at", { ascending: true })
       .limit(1)
       .maybeSingle();
     const existingListing = liveRow as { id: string; metadata: Record<string, unknown> | null; sold_at: string | null; ended_at: string | null } | null;
@@ -1151,7 +1153,7 @@ async function saveVehicle(
       source_platform: "barrettjackson",
       source_listing_id: null,
       event_type: "auction",
-      source_url: vehicle.url,
+      source_url: canonicalListingUrl(vehicle.url),
       event_status: episodeStatus(vehicle.status),
       final_price: vehicle.sale_price || null,
       sold_at: episodeSoldAt(vehicle.status, vehicle.event_date),
@@ -1223,6 +1225,14 @@ async function saveVehicle(
 export function canonicalListingUrl(u: string): string {
   return u.trim().toLowerCase().split("#")[0].split("?")[0]
     .replace(/^https?:\/\/(www\.)?/, "https://").replace(/\/+$/, "");
+}
+
+/** The spellings of one listing URL that canonicalListingUrl() folds together, for exact-match lookups. */
+export function listingUrlSpellings(u: string): string[] {
+  const rest = canonicalListingUrl(u).replace(/^https:\/\//, "");
+  const out = new Set<string>([u]);
+  for (const scheme of ["https://", "http://"]) for (const www of ["", "www."]) for (const slash of ["", "/"]) out.add(scheme + www + rest + slash);
+  return [...out];
 }
 
 // ─── Main handler ───────────────────────────────────────────────────────────
