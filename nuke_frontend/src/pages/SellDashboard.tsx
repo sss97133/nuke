@@ -4,8 +4,10 @@
  * Route: /sell
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { PrefetchLink as Link } from '../components/PrefetchLink';
+import { usePageTitle } from '../hooks/usePageTitle';
+import './SellDashboard.css';
 import { supabase } from '../lib/supabase';
 import { ListingExportService, ListingExport } from '../services/listingExportService';
 
@@ -13,13 +15,13 @@ import { ListingExportService, ListingExport } from '../services/listingExportSe
 // Style constants
 // ---------------------------------------------------------------------------
 
-const FONT_BODY = 'Arial, sans-serif';
-const FONT_MONO = "'Courier New', Courier, monospace";
+const FONT_BODY = 'var(--font-family)';
+const FONT_MONO = 'var(--font-mono)';
 
 const LABEL: React.CSSProperties = {
-  textTransform: 'uppercase',
+  textTransform: 'none',
   letterSpacing: '0.5px',
-  fontSize: '8px',
+  fontSize: 'var(--text-callout)',
   fontWeight: 700,
   color: 'var(--text-secondary, #666666)',
   fontFamily: FONT_BODY,
@@ -27,11 +29,13 @@ const LABEL: React.CSSProperties = {
 
 const BUTTON: React.CSSProperties = {
   fontFamily: FONT_BODY,
-  fontSize: '9px',
+  fontSize: 'var(--text-callout)',
   fontWeight: 700,
-  textTransform: 'uppercase',
+  textTransform: 'none',
   letterSpacing: '0.5px',
-  padding: '6px 12px',
+  padding: '8px 12px',
+  minHeight: 'var(--control-height)',
+  boxSizing: 'border-box',
   border: '2px solid var(--border, #bdbdbd)',
   cursor: 'pointer',
   backgroundColor: 'transparent',
@@ -59,10 +63,10 @@ type StatusFilter = 'all' | ListingExport['status'];
 
 const STATUS_COLORS: Record<string, { bg: string; border: string; color: string }> = {
   prepared: { bg: 'var(--bg, #f5f5f5)', border: 'var(--border, #bdbdbd)', color: 'var(--text-secondary, #666666)' },
-  submitted: { bg: 'var(--bg, #f5f5f5)', border: 'var(--warning, #b05a00)', color: 'var(--warning, #b05a00)' },
+  submitted: { bg: 'var(--bg, #f5f5f5)', border: 'var(--warning, #b05a00)', color: 'var(--warning-dark)' },
   active: { bg: 'var(--bg, #f5f5f5)', border: 'var(--success, #16825d)', color: 'var(--success, #16825d)' },
   sold: { bg: 'var(--bg, #f5f5f5)', border: 'var(--text, #2a2a2a)', color: 'var(--text, #2a2a2a)' },
-  expired: { bg: 'var(--bg, #f5f5f5)', border: 'var(--error, #d13438)', color: 'var(--error, #d13438)' },
+  expired: { bg: 'var(--bg, #f5f5f5)', border: 'var(--error, #d13438)', color: 'var(--error-dark)' },
   cancelled: { bg: 'var(--bg, #f5f5f5)', border: 'var(--text-secondary, #666666)', color: 'var(--text-secondary, #666666)' },
 };
 
@@ -81,12 +85,20 @@ const PLATFORM_LABELS: Record<string, string> = {
 };
 
 function formatDate(iso: string): string {
+  if (!Number.isFinite(Date.parse(iso))) return 'Date unknown';
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' });
 }
 
-function formatCurrency(cents: number | null | undefined): string {
-  if (cents == null) return '—';
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(cents / 100);
+function hasRecordedAmount(cents: unknown): cents is number {
+  return typeof cents === 'number' && Number.isSafeInteger(cents) && cents >= 0;
+}
+
+function formatRecordedAmount(cents: unknown): string {
+  if (!hasRecordedAmount(cents)) return 'Amount unknown';
+  // Keep cents exact. Neither the export reader nor its common writer contract
+  // provides a currency code, so do not apply USD or combine these amounts.
+  const value = BigInt(cents);
+  return `${(value / 100n).toLocaleString('en-US')}.${(value % 100n).toString().padStart(2, '0')}`;
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -128,26 +140,25 @@ function PlatformBadge({ platform, label }: { platform: string; label?: string |
 function StatsBar({ exports }: { exports: ExportWithVehicle[] }) {
   const active = exports.filter(e => e.status === 'active').length;
   const sold = exports.filter(e => e.status === 'sold').length;
-  const totalRevenue = exports
-    .filter(e => e.status === 'sold' && e.sold_price_cents)
-    .reduce((sum, e) => sum + (e.sold_price_cents || 0), 0);
+  const recordedSoldPrices = exports.filter(e => e.status === 'sold' && hasRecordedAmount(e.sold_price_cents)).length;
   const total = exports.length;
-  const convRate = total > 0 ? ((sold / total) * 100).toFixed(1) : '0';
+  const soldShare = total > 0 ? `${((sold / total) * 100).toFixed(1)}%` : 'Unknown';
 
   return (
     <div style={{
       display: 'flex',
       gap: 20,
+      flexWrap: 'wrap',
       padding: '12px 14px',
       borderBottom: '2px solid var(--border, #bdbdbd)',
       backgroundColor: 'var(--bg, #f5f5f5)',
     }}>
       {[
-        { label: 'TOTAL', value: String(total) },
-        { label: 'ACTIVE', value: String(active) },
-        { label: 'SOLD', value: String(sold) },
-        { label: 'REVENUE', value: formatCurrency(totalRevenue) },
-        { label: 'CONVERSION', value: `${convRate}%` },
+        { label: 'Loaded exports', value: String(total) },
+        { label: 'Active', value: String(active) },
+        { label: 'Marked sold', value: String(sold) },
+        { label: 'Sale prices recorded', value: `${recordedSoldPrices} / ${sold}` },
+        { label: 'Marked sold share', value: soldShare },
       ].map(s => (
         <div key={s.label} style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
           <span style={LABEL}>{s.label}</span>
@@ -162,16 +173,19 @@ function StatsBar({ exports }: { exports: ExportWithVehicle[] }) {
 // Export Row
 // ---------------------------------------------------------------------------
 
-function ExportRow({ exp, onStatusChange }: {
+function ExportRow({ exp, onStatusChange, busyId, disabled }: {
   exp: ExportWithVehicle;
-  onStatusChange: (id: string, status: ListingExport['status']) => void;
+  onStatusChange: (id: string, status: ListingExport['status']) => Promise<void>;
+  busyId: string | null;
+  disabled: boolean;
 }) {
   const ymm = [exp.vehicle?.year, exp.vehicle?.make, exp.vehicle?.model]
-    .filter(Boolean).join(' ').toUpperCase() || 'UNKNOWN VEHICLE';
+    .filter(Boolean).join(' ') || 'Unknown vehicle';
 
   return (
-    <div style={{
+    <div className="sell-export-row" style={{
       display: 'flex',
+      flexWrap: 'wrap',
       alignItems: 'center',
       gap: 10,
       padding: '8px 14px',
@@ -184,6 +198,8 @@ function ExportRow({ exp, onStatusChange }: {
           <img
             src={exp.vehicle.primary_image_url}
             alt={ymm}
+            width={48}
+            height={36}
             style={{ width: 48, height: 36, objectFit: 'cover', border: '2px solid var(--border, #bdbdbd)' }}
           />
         ) : (
@@ -193,7 +209,7 @@ function ExportRow({ exp, onStatusChange }: {
             backgroundColor: 'var(--bg, #f5f5f5)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
-            <span style={{ ...LABEL, fontSize: '7px' }}>N/A</span>
+            <span style={{ ...LABEL, fontSize: 'var(--text-callout)' }}>N/A</span>
           </div>
         )}
       </Link>
@@ -202,29 +218,32 @@ function ExportRow({ exp, onStatusChange }: {
       <Link to={`/vehicle/${exp.vehicle_id}`} style={{
         textDecoration: 'none',
         fontFamily: FONT_BODY,
-        fontSize: '10px',
+        fontSize: 'var(--text-callout)',
         fontWeight: 700,
-        textTransform: 'uppercase',
+        textTransform: 'none',
         letterSpacing: '0.5px',
         color: 'var(--text, #2a2a2a)',
-        minWidth: 140,
+        minWidth: 0,
+        flex: '1 1 180px',
         overflow: 'hidden',
         textOverflow: 'ellipsis',
-        whiteSpace: 'nowrap',
+        whiteSpace: 'normal',
       }}>
         {ymm}
       </Link>
 
       {/* Platform */}
-      <PlatformBadge platform={exp.platform} label={(exp.metadata as any)?.channel_label} />
+      <PlatformBadge platform={exp.platform} label={typeof exp.metadata?.channel_label === 'string' ? exp.metadata.channel_label : null} />
 
       {/* Status */}
       <StatusBadge status={exp.status} />
 
       {/* Price */}
-      <span style={{ fontFamily: FONT_MONO, fontSize: '10px', fontWeight: 700, minWidth: 70 }}>
-        {formatCurrency(exp.asking_price_cents)}
-      </span>
+      <div className="sell-recorded-price">
+        <span>Asking: {formatRecordedAmount(exp.asking_price_cents)}</span>
+        {exp.status === 'sold' && <span>Sale amount: {formatRecordedAmount(exp.sold_price_cents)}</span>}
+        <small>Currency not recorded</small>
+      </div>
 
       {/* Date */}
       <span style={{ ...LABEL, minWidth: 60 }}>
@@ -240,37 +259,43 @@ function ExportRow({ exp, onStatusChange }: {
       <div style={{ flex: 1 }} />
 
       {/* Actions */}
-      <div style={{ display: 'flex', gap: 4 }}>
+      <div className="sell-export-actions">
         {exp.external_listing_url && (
           <button
-            onClick={() => window.open(exp.external_listing_url!, '_blank')}
-            style={{ ...BUTTON, padding: '3px 8px', fontSize: '8px' }}
+            onClick={() => window.open(exp.external_listing_url!, '_blank', 'noopener,noreferrer')}
+            style={{ ...BUTTON, padding: '3px 8px', fontSize: 'var(--text-callout)' }}
           >
-            VIEW
+            View listing
           </button>
         )}
         {exp.status === 'prepared' && (
           <button
-            onClick={() => onStatusChange(exp.id, 'submitted')}
-            style={{ ...BUTTON, padding: '3px 8px', fontSize: '8px' }}
+            className="button"
+            disabled={disabled}
+            onClick={() => void onStatusChange(exp.id, 'submitted')}
+            style={{ ...BUTTON, padding: '3px 8px', fontSize: 'var(--text-callout)' }}
           >
-            MARK SUBMITTED
+            {busyId === exp.id ? 'Saving…' : 'Mark submitted'}
           </button>
         )}
         {exp.status === 'submitted' && (
           <button
-            onClick={() => onStatusChange(exp.id, 'active')}
-            style={{ ...BUTTON, padding: '3px 8px', fontSize: '8px' }}
+            className="button"
+            disabled={disabled}
+            onClick={() => void onStatusChange(exp.id, 'active')}
+            style={{ ...BUTTON, padding: '3px 8px', fontSize: 'var(--text-callout)' }}
           >
-            MARK ACTIVE
+            {busyId === exp.id ? 'Saving…' : 'Mark active'}
           </button>
         )}
         {(exp.status === 'active' || exp.status === 'submitted') && (
           <button
-            onClick={() => onStatusChange(exp.id, 'sold')}
-            style={{ ...BUTTON, padding: '3px 8px', fontSize: '8px', borderColor: 'var(--success, #16825d)', color: 'var(--success, #16825d)' }}
+            className="button"
+            disabled={disabled}
+            onClick={() => void onStatusChange(exp.id, 'sold')}
+            style={{ ...BUTTON, padding: '3px 8px', fontSize: 'var(--text-callout)', borderColor: 'var(--success, #16825d)', color: 'var(--success, #16825d)' }}
           >
-            MARK SOLD
+            {busyId === exp.id ? 'Saving…' : 'Mark sold'}
           </button>
         )}
       </div>
@@ -283,48 +308,77 @@ function ExportRow({ exp, onStatusChange }: {
 // ---------------------------------------------------------------------------
 
 export default function SellDashboard() {
+  usePageTitle('Sell dashboard');
   const [exports, setExports] = useState<ExportWithVehicle[]>([]);
+  const [hasLoaded, setHasLoaded] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [readError, setReadError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const pending = useRef(false);
+  const reading = useRef(false);
+  const lifetime = useRef(0);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [platformFilter, setPlatformFilter] = useState<string>('all');
 
-  const fetchExports = useCallback(async () => {
+  const fetchExports = useCallback(async (): Promise<ExportWithVehicle[] | null> => {
+    if (reading.current) return null;
+    reading.current = true;
+    const scope = lifetime.current;
     setLoading(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { setLoading(false); return; }
-
-      const { data, error } = await supabase
-        .from('listing_exports')
-        .select(`
-          *,
-          vehicle:vehicles!listing_exports_vehicle_id_fkey (
-            year, make, model, primary_image_url
-          )
-        `)
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (scope !== lifetime.current) return null;
+      if (authError || !user) {
+        setExports([]); setHasLoaded(false);
+        throw authError || new Error('Sign in again to read your listing exports.');
+      }
+      const { data, error } = await supabase.from('listing_exports')
+        .select(`*, vehicle:vehicles!listing_exports_vehicle_id_fkey (year, make, model, primary_image_url)`)
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
-
+      if (scope !== lifetime.current) return null;
       if (error) throw error;
-      setExports((data || []) as ExportWithVehicle[]);
+      if (!Array.isArray(data)) throw new Error('The listing reader returned no readable result.');
+      const rows = data as ExportWithVehicle[];
+      setExports(rows); setHasLoaded(true); setReadError(null);
+      return rows;
     } catch (err) {
-      console.error('Error fetching exports:', err);
+      if (scope === lifetime.current) setReadError(err && typeof err === 'object' && 'message' in err ? String(err.message) : 'Could not load listing exports.');
+      return null;
     } finally {
-      setLoading(false);
+      if (scope === lifetime.current) { reading.current = false; setLoading(false); }
     }
   }, []);
 
-  useEffect(() => { fetchExports(); }, [fetchExports]);
+  useEffect(() => {
+    void fetchExports();
+    return () => { lifetime.current++; reading.current = false; };
+  }, [fetchExports]);
 
   const handleStatusChange = useCallback(async (id: string, status: ListingExport['status']) => {
-    const updates: Record<string, unknown> = {};
+    if (pending.current || reading.current || readError) return;
+    pending.current = true; setBusyId(id); setActionError(null); setStatusMessage(null);
+    const scope = lifetime.current;
+    const updates: Parameters<typeof ListingExportService.updateExportStatus>[2] = {};
     if (status === 'submitted') updates.submitted_at = new Date().toISOString();
     if (status === 'active') updates.activated_at = new Date().toISOString();
     if (status === 'sold' || status === 'expired' || status === 'cancelled') updates.ended_at = new Date().toISOString();
-
-    await ListingExportService.updateExportStatus(id, status, updates as any);
-    fetchExports();
-  }, [fetchExports]);
+    try {
+      const result = await ListingExportService.updateExportStatus(id, status, updates);
+      if (scope !== lifetime.current) return;
+      if (!result.success) throw new Error(result.error || 'The status update was refused.');
+      const rows = await fetchExports();
+      if (scope !== lifetime.current) return;
+      if (rows?.some(row => row.id === id && row.status === status)) setStatusMessage('Listing status updated.');
+      else setActionError('The updated status could not be confirmed. Refresh data to check this listing before trying again.');
+    } catch (err) {
+      if (scope === lifetime.current) setActionError(err && typeof err === 'object' && 'message' in err ? String(err.message) : 'Could not update the listing status.');
+    } finally {
+      if (scope === lifetime.current) { pending.current = false; setBusyId(null); }
+    }
+  }, [fetchExports, readError]);
 
   const filtered = exports.filter(e => {
     if (statusFilter !== 'all' && e.status !== statusFilter) return false;
@@ -335,7 +389,7 @@ export default function SellDashboard() {
   const uniquePlatforms = [...new Set(exports.map(e => e.platform))];
 
   return (
-    <div style={{ fontFamily: FONT_BODY, minHeight: '60vh' }}>
+    <div className="sell-dashboard" style={{ fontFamily: FONT_BODY, minHeight: '60vh' }}>
       {/* Page header */}
       <div style={{
         padding: '14px',
@@ -343,27 +397,40 @@ export default function SellDashboard() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
+        flexWrap: 'wrap',
+        gap: 12,
       }}>
-        <span style={{
-          fontSize: '14px',
+        <h1 style={{
+          margin: 0,
+          fontSize: 'var(--text-title)',
           fontWeight: 700,
-          textTransform: 'uppercase',
+          textTransform: 'none',
           letterSpacing: '0.5px',
         }}>
-          SELL DASHBOARD
-        </span>
-        <Link to="/?tab=garage" style={{ ...BUTTON, textDecoration: 'none', display: 'inline-block' }}>
-          BACK TO GARAGE
+          Sell dashboard
+        </h1>
+        <Link to="/?tab=garage" className="button" style={{ ...BUTTON, textDecoration: 'none', display: 'inline-block' }}>
+          Back to Garage
         </Link>
       </div>
 
       {/* Stats */}
-      <StatsBar exports={exports} />
+      <div className="sell-dashboard-messages">
+        <button className="button" disabled={loading || busyId !== null} onClick={() => { setStatusMessage(null); void fetchExports(); }}>{loading ? 'Refreshing…' : 'Refresh data'}</button>
+        {readError && <p role="alert">{readError} {hasLoaded ? 'Showing the last successful list. Refresh before changing a status.' : 'Your listing count is unknown.'}</p>}
+        {actionError && <p role="alert">{actionError}</p>}
+        {statusMessage && <p role="status">{statusMessage}</p>}
+      </div>
+      {hasLoaded && <>
+        <StatsBar exports={exports} />
+        <p className="sell-amount-note">Counts describe the loaded export records. Currency is not recorded, so sale amounts are not added together. “Sale prices recorded” shows how many marked-sold records include an amount.</p>
+      </>}
 
       {/* Filters */}
       <div style={{
         display: 'flex',
         gap: 8,
+        flexWrap: 'wrap',
         padding: '8px 14px',
         borderBottom: '2px solid var(--border, #bdbdbd)',
         alignItems: 'center',
@@ -372,13 +439,12 @@ export default function SellDashboard() {
 
         {/* Status filter */}
         <select
+          aria-label="Listing status"
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
           style={{
             fontFamily: FONT_BODY,
-            fontSize: '9px',
-            fontWeight: 700,
-            textTransform: 'uppercase',
+            minHeight: 'var(--control-height)',
             padding: '4px 8px',
             border: '2px solid var(--border, #bdbdbd)',
             backgroundColor: 'var(--bg, #f5f5f5)',
@@ -396,13 +462,12 @@ export default function SellDashboard() {
 
         {/* Platform filter */}
         <select
+          aria-label="Listing platform"
           value={platformFilter}
           onChange={(e) => setPlatformFilter(e.target.value)}
           style={{
             fontFamily: FONT_BODY,
-            fontSize: '9px',
-            fontWeight: 700,
-            textTransform: 'uppercase',
+            minHeight: 'var(--control-height)',
             padding: '4px 8px',
             border: '2px solid var(--border, #bdbdbd)',
             backgroundColor: 'var(--bg, #f5f5f5)',
@@ -417,26 +482,26 @@ export default function SellDashboard() {
 
         <div style={{ flex: 1 }} />
         <span style={{ ...LABEL }}>
-          {filtered.length} LISTING{filtered.length !== 1 ? 'S' : ''}
+          {hasLoaded ? `${filtered.length} loaded listing${filtered.length !== 1 ? 's' : ''}` : 'Listings not loaded'}
         </span>
       </div>
 
       {/* Listings */}
-      {loading ? (
-        <div style={{ textAlign: 'center', padding: 40, ...LABEL, fontSize: '10px' }}>
-          LOADING...
+      {loading && !hasLoaded ? (
+        <div style={{ textAlign: 'center', padding: 40, ...LABEL, fontSize: 'var(--text-callout)' }}>
+          Loading listing exports…
         </div>
-      ) : filtered.length === 0 ? (
+      ) : !hasLoaded ? null : filtered.length === 0 ? (
         <div style={{ textAlign: 'center', padding: 40 }}>
-          <div style={{ ...LABEL, fontSize: '10px', marginBottom: 8 }}>NO LISTINGS YET</div>
-          <div style={{ ...LABEL, fontSize: '9px', color: 'var(--text-secondary, #666666)' }}>
-            GO TO A VEHICLE PROFILE AND USE "COMPOSE & AUTOFILL" TO CREATE YOUR FIRST LISTING
+          <div style={{ ...LABEL, marginBottom: 8 }}>{exports.length ? 'No listings match these filters' : 'No listing exports yet'}</div>
+          <div style={{ ...LABEL, fontSize: 'var(--text-callout)', color: 'var(--text-secondary, #666666)' }}>
+            {exports.length ? 'Choose another status or platform to see your loaded listings.' : 'Open a vehicle from your Garage and use “Compose & Autofill” to prepare a listing.'}
           </div>
         </div>
       ) : (
         <div>
           {filtered.map(exp => (
-            <ExportRow key={exp.id} exp={exp} onStatusChange={handleStatusChange} />
+            <ExportRow key={exp.id} exp={exp} onStatusChange={handleStatusChange} busyId={busyId} disabled={busyId !== null || loading || !!readError} />
           ))}
         </div>
       )}
