@@ -119,7 +119,7 @@ function UsageDashboard({ userId }: { userId: string }) {
       setResourceBreakdown([...resources].map(([resource, count]) => ({ resource, count })).sort((a, b) => b.count - a.count));
       setErrors(failures); setLoading(false);
     })();
-    return () => { generation.current++; };
+    return () => { generation.current = request + 1; };
   }, [userId, timeRange, attempt]);
 
   function formatDate(dateStr: string) {
@@ -160,7 +160,7 @@ function UsageDashboard({ userId }: { userId: string }) {
         <select
           aria-label="Usage period"
           value={timeRange}
-          onChange={(e) => setTimeRange(e.target.value as any)}
+          onChange={(e) => setTimeRange(e.target.value as '7d' | '30d' | '90d')}
           className="px-3 py-2 border"
         >
           <option value="7d">Last 7 UTC days</option>

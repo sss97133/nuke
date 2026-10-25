@@ -3,29 +3,41 @@ import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
-const fixture = vi.hoisted(() => ({ auth: { user: { id: 'viewer-a' }, loading: false } as any, calls: [] as any[], results: [] as any[] }));
+type FixtureLog = { id: string; resource: string; action: string; resource_id: string | null; timestamp: string };
+type FixtureKey = { id: string; name: string; last_used_at: string | null; rate_limit_remaining: number | null };
+type QueryResult = { count?: number | null; data?: FixtureLog[] | FixtureKey[] | null; error?: { message: string } | null };
+type QueryCall = { table: string; filters: Record<string, unknown>; orders: [string, { ascending: boolean }][]; fields?: string; options?: { count?: string; head?: boolean }; limit?: number };
+type MockQuery = {
+  select(fields: string, options?: QueryCall['options']): MockQuery;
+  eq(key: string, value: unknown): MockQuery;
+  gte(key: string, value: unknown): MockQuery;
+  order(key: string, options: { ascending: boolean }): MockQuery;
+  limit(limit: number): MockQuery;
+  then(resolve: (value: QueryResult) => unknown, reject?: (reason: unknown) => unknown): Promise<unknown>;
+};
+const fixture = vi.hoisted(() => ({ auth: { user: { id: 'viewer-a' }, loading: false } as { user: { id: string } | null; loading: boolean }, calls: [] as QueryCall[], results: [] as (QueryResult | Promise<QueryResult>)[] }));
 vi.mock('../../hooks/useAuth', () => ({ useAuth: () => fixture.auth }));
-vi.mock('../../components/PrefetchLink', () => ({ default: ({ to, children }: any) => <a href={to}>{children}</a> }));
+vi.mock('../../components/PrefetchLink', () => ({ default: ({ to, children }: { to: string; children: React.ReactNode }) => <a href={to}>{children}</a> }));
 vi.mock('../../lib/supabase', () => ({ supabase: { from: (table: string) => {
-  const call: any = { table, filters: {}, orders: [] }; fixture.calls.push(call);
-  const result = fixture.results.shift();
-  const query: any = {
-    select: (fields: string, options?: any) => { call.fields = fields; call.options = options; return query; },
-    eq: (key: string, value: any) => { call.filters[key] = value; return query; },
-    gte: (key: string, value: any) => { call.filters[key] = value; return query; },
-    order: (key: string, options: any) => { call.orders.push([key, options]); return query; },
+  const call: QueryCall = { table, filters: {}, orders: [] }; fixture.calls.push(call);
+  const result = fixture.results.shift() ?? { error: { message: 'Unexpected mock read' } };
+  const query: MockQuery = {
+    select: (fields: string, options?: QueryCall['options']) => { call.fields = fields; call.options = options; return query; },
+    eq: (key: string, value: unknown) => { call.filters[key] = value; return query; },
+    gte: (key: string, value: unknown) => { call.filters[key] = value; return query; },
+    order: (key: string, options: { ascending: boolean }) => { call.orders.push([key, options]); return query; },
     limit: (limit: number) => { call.limit = limit; return query; },
-    then: (resolve: any, reject: any) => Promise.resolve(result).then(resolve, reject),
+    then: (resolve: (value: QueryResult) => unknown, reject?: (reason: unknown) => unknown) => Promise.resolve(result).then(resolve, reject),
   }; return query;
 } } }));
 import UsageDashboardPage from './UsageDashboardPage';
 let root: Root, host: HTMLDivElement;
-const success = (logs: any[] = [], keys: any[] = []) => [
+const success = (logs: FixtureLog[] = [], keys: FixtureKey[] = []): QueryResult[] => [
   { count: 123, error: null }, { count: 0, error: null }, { count: 23, error: null }, { data: logs, error: null }, { data: keys, error: null },
 ];
 const log = (i: number) => ({ id: `request-${i}`, resource: 'vehicles', action: 'read', resource_id: null, timestamp: new Date().toISOString() });
 beforeEach(() => {
-  (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
+  (globalThis as unknown as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
   fixture.auth = { user: { id: 'viewer-a' }, loading: false }; fixture.calls = []; fixture.results = success();
   host = document.createElement('div'); document.body.append(host); root = createRoot(host);
 });
@@ -47,7 +59,7 @@ it('uses a sentinel and labels capped charts as a loaded sample, not all traffic
   fixture.results = success(Array.from({ length: 101 }, (_, index) => log(index)));
   await mount();
   expect(fixture.calls[3].limit).toBe(101);
-  expect(fixture.calls[3].orders.map((order: any[]) => order[0])).toEqual(['timestamp', 'id']);
+  expect(fixture.calls[3].orders.map((order) => order[0])).toEqual(['timestamp', 'id']);
   expect(host.textContent).toContain('Newest 100 loaded requests');
   expect(host.textContent).toContain('More requests exist; these charts are a partial sample');
   expect(host.textContent).toContain('Showing 50 of 100 matching loaded requests');
@@ -71,7 +83,7 @@ it('retries the readers and clears the unknown state on recovery', async () => {
 });
 it('waits for auth and isolates late responses after a viewer changes', async () => {
   fixture.auth.loading = true; await mount(); expect(fixture.calls).toHaveLength(0);
-  let resolve!: (value: any) => void;
+  let resolve!: (value: QueryResult) => void;
   fixture.results = [new Promise(done => { resolve = done; }), ...success().slice(1)];
   fixture.auth.loading = false; await mount();
   fixture.auth.user = { id: 'viewer-b' }; fixture.results = success([log(2)]); await mount();
