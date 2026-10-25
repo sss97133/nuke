@@ -64,9 +64,9 @@ export default function ExpenseUseEditor({ documentId, record, onSaved, onCurren
     return () => { cancelled = true; };
   }, [type, ownerId, record.date]);
   const edit = () => { current.current.dirty = true; setDirty(true); pending.current = null; };
+  // A photo date is context, never proof (owner rule: "Never the date alone"), so a chip only selects the vehicle.
   const choosePhotographed = (row: PhotoDays) => {
     setVehicleId(row.vehicle_id);
-    if (!basis.trim()) setBasis(`Photographed ${dayList(row.photo_days)} (${row.images} photos), around the ${shortDay(record.date!)} purchase`);
     edit();
   };
   const reload = async () => {
@@ -95,7 +95,8 @@ export default function ExpenseUseEditor({ documentId, record, onSaved, onCurren
     } catch (error) { if (epoch.current === generation) setMessage(error instanceof Error ? error.message : 'Save could not be confirmed. Your draft is preserved.'); }
     finally { if (epoch.current === generation) setBusy(false); }
   };
-  const choices = vehicles.filter(v => search.toLowerCase().split(/\s+/).every(token => vehicleLabel(v).toLowerCase().includes(token)));
+  // The label shows only the VIN's last six characters; search the full VIN too, so a pasted VIN finds its vehicle.
+  const choices = vehicles.filter(v => search.toLowerCase().split(/\s+/).every(token => `${vehicleLabel(v)} ${v.vin ?? ''}`.toLowerCase().includes(token)));
   return <section className="accounting-use-editor" aria-label="Expense use">
     <h3>Expense use</h3><p role="status">{message}</p>
     {snapshot && <p>Recorded expense: {snapshot.record.amount} {snapshot.record.currency}. {snapshot.use?.unallocated_amount && `Unassigned: ${snapshot.use.unallocated_amount} ${snapshot.record.currency}.`}</p>}
@@ -104,11 +105,12 @@ export default function ExpenseUseEditor({ documentId, record, onSaved, onCurren
         <label>Use <select value={type} onChange={e => { setType(e.target.value as ExpenseUse['use_type']); edit(); }}><option value="unassigned">Unassigned</option><option value="shop">Shop</option><option value="vehicle">Vehicle</option><option value="software">{EXPENSE_USE_LABELS.software}</option><option value="image_production">{EXPENSE_USE_LABELS.image_production}</option></select></label>
         {type === 'vehicle' && <><label>Find vehicle <input type="search" value={search} onChange={e => setSearch(e.target.value)} placeholder="Year, model or VIN" /></label><p>{vehicleMessage}</p>
           {photoDays.some(row => vehicles.some(v => v.id === row.vehicle_id)) && <div className="accounting-similar"><p className="accounting-muted">Photographed around {shortDay(record.date!)} (from the day before to three days after)</p>
-            <div className="accounting-chips" role="group" aria-label="Vehicles photographed around this date">{photoDays.map(row => { const v = vehicles.find(x => x.id === row.vehicle_id); return v && <button type="button" key={row.vehicle_id} aria-pressed={row.vehicle_id === vehicleId} title={`${row.images} photos on ${dayList(row.photo_days)}`} onClick={() => choosePhotographed(row)}>{[v.year, v.make, v.model].filter(Boolean).join(' ')}{v.vin ? ` …${v.vin.slice(-6)}` : ''} · {row.photo_days.length === 1 ? '1 day' : `${row.photo_days.length} days`}</button>; })}</div></div>}<label>Recipient vehicle <select value={vehicleId} onChange={e => { setVehicleId(e.target.value); edit(); }}><option value="">Choose a vehicle</option>{snapshot.use?.vehicle_id && !choices.some(v => v.id === snapshot.use!.vehicle_id) && <option value={snapshot.use.vehicle_id}>{snapshot.use.destination_label}</option>}{choices.map(v => <option key={v.id} value={v.id}>{vehicleLabel(v)}</option>)}</select></label></>}
+            <div className="accounting-chips" role="group" aria-label="Vehicles photographed around this date">{photoDays.map(row => { const v = vehicles.find(x => x.id === row.vehicle_id); return v && <button type="button" key={row.vehicle_id} aria-pressed={row.vehicle_id === vehicleId} title={`${row.images} photos on ${dayList(row.photo_days)}`} onClick={() => choosePhotographed(row)}>{[v.year, v.make, v.model].filter(Boolean).join(' ')}{v.vin ? ` …${v.vin.slice(-6)}` : ''} · {row.photo_days.length === 1 ? '1 day' : `${row.photo_days.length} days`}</button>; })}</div>
+            <p className="accounting-muted">Photo dates are context only. They never place a part on a vehicle by themselves: write what shows this vehicle received it.</p></div>}<label>Recipient vehicle <select value={vehicleId} onChange={e => { setVehicleId(e.target.value); edit(); }}><option value="">Choose a vehicle</option>{snapshot.use?.vehicle_id && !choices.some(v => v.id === snapshot.use!.vehicle_id) && <option value={snapshot.use.vehicle_id}>{snapshot.use.destination_label}</option>}{choices.map(v => <option key={v.id} value={v.id}>{vehicleLabel(v)}</option>)}</select></label></>}
         {type !== 'unassigned' && <label>Amount assigned <input inputMode="decimal" value={amount} onChange={e => { setAmount(e.target.value); edit(); }} placeholder={snapshot.record.amount || ''} /></label>}
-        <label>Reason / source <textarea value={basis} maxLength={500} onChange={e => { setBasis(e.target.value); edit(); }} /></label>
+        <label>Reason / source <textarea value={basis} maxLength={500} required onChange={e => { setBasis(e.target.value); edit(); }} /></label>
       </fieldset>
-      <button type="button" disabled={!dirty || busy || conflict} onClick={() => { void save(); }}>{busy ? 'Saving…' : 'Save use assignment'}</button>{' '}
+      <button type="button" disabled={!dirty || busy || conflict || !basis.trim()} onClick={() => { void save(); }}>{busy ? 'Saving…' : 'Save use assignment'}</button>{' '}
       {conflict && <button type="button" disabled={busy} onClick={() => { void reload(); }}>Reload current values</button>}
       <p className="accounting-muted">Partial assignments leave the remainder unassigned. Earlier decisions remain in history.</p>
     </> : !canCorrect && <p>Review access. A reviewer with correction access can edit this assignment.</p>}
