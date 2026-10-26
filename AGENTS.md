@@ -152,6 +152,15 @@ into permanent identity types or mandatory arrival choices without a separate mo
   green (fixed in #2320, #2322; the live check is #2323).
 - **Never** hand-apply a migration or function deploy, and never change compute, plan or disk.
 
+## Books and tax work
+- Start with `books_year_state(owner, year)` (RPC; migration `20261101170000`): Schedule C lines per schedule, owner
+  rulings, return-level facts (filing status, residency and credits, CFC/GILTI, Form 5471), the newest return result
+  and open items with what closes each. Settled facts live there, not in local files; do not re-derive them.
+- Write results, rulings and facts only through `ingest_financial_evidence`: Schedule C rulings with
+  `scripts/books/schedule_c_rulings.py`, return-level facts and results with `scripts/books/return_facts.py`.
+- A return builder passes `db-books/drift_check.py` before its result is reported, and
+  `scripts/books/books_year_state_check.py` (line 31 from the API equals the drift-check totals, 2022-2025) after.
+
 ## PR titles and commit messages
 The repo is public, and a squash merge puts the PR title (or a single commit's subject) on `main` as the
 permanent record. Write both as `type(scope): summary`, at most 72 characters. The PR gate in

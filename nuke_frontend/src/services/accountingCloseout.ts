@@ -60,6 +60,26 @@ export async function readCloseout(ownerId: string): Promise<Closeout> {
   return data as Closeout;
 }
 
+/** One tax year's settled state (books_year_state, migration 20261101170000): Schedule C lines per schedule, owner
+ *  rulings, return-level facts, the newest return result and open items with what closes each. */
+export type YearFact = {
+  local_id: string; key: string; topic: string; status: 'settled' | 'open' | 'superseded'; date: string; decision: string;
+  amount?: number; closes_with?: string; supersedes?: string; source: string | null;
+};
+export type YearState = {
+  year: number; read_at: string;
+  result: { form: string; result: 'owe' | 'refund'; amount: number; built_at: string | null; from: 'tax_return_summary' | 'return_fact'; amount_source?: string } | null;
+  schedule_c: Record<string, Record<string, number>>;
+  rulings: { local_id: string; schedule: string; line: string; label: string; amount: number | null; decision: string | null; date: string | null }[];
+  facts: YearFact[]; open_items: YearFact[]; unmapped: string[];
+};
+
+export async function readYearState(ownerId: string, year: string): Promise<YearState> {
+  const { data, error } = await supabase.rpc('books_year_state', { p_owner_id: ownerId, p_year: Number(year) });
+  if (error || !data || typeof data.schedule_c !== 'object') throw fail('The year state');
+  return data as YearState;
+}
+
 export async function readCloseoutRecords(ownerId: string, year: string, item: CloseoutItemKey, limit: number, offset: number):
   Promise<{ assessed: boolean; total: number | null; amount: number | null; rows: SavedRecord[] }> {
   const { data, error } = await supabase.rpc('accounting_closeout_records', { p_owner_id: ownerId, p_year: year, p_item: item, p_limit: limit, p_offset: offset });
