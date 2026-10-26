@@ -1,0 +1,125 @@
+{
+ "note": "bad sample indices per rule class; samples are fresh seeded draws excluding dev-viewed ids; applied only classes >=95%",
+ "judgments": {
+  "D_suv": [
+   43,
+   144
+  ],
+  "D_pickup": [],
+  "T_pickupword": [
+   84,
+   97
+  ],
+  "M_suv": [
+   3,
+   67,
+   111,
+   113,
+   114
+  ],
+  "M_pickup": [
+   46,
+   83,
+   128
+  ],
+  "M_van": [
+   19,
+   32,
+   35,
+   45,
+   46,
+   56,
+   93,
+   99,
+   149
+  ],
+  "T_panel": [
+   35,
+   67,
+   142
+  ],
+  "D_suv_crossmodel": [],
+  "D_van": [
+   47,
+   87,
+   102
+  ],
+  "D_cargo_van": "FAIL: >30 conversion/passenger/RV vans labelled cargo_van",
+  "D_chassis_cab": [
+   2,
+   14,
+   21,
+   27,
+   82,
+   137,
+   140,
+   143,
+   50,
+   95,
+   108,
+   109,
+   111,
+   114,
+   138
+  ],
+  "C_campervan": [
+   74
+  ],
+  "C_motorhome": [
+   3,
+   6,
+   15,
+   59,
+   75,
+   81,
+   98,
+   123
+  ],
+  "T_trailer": [
+   37,
+   60
+  ],
+  "M_heavy": [
+   96,
+   120
+  ],
+  "D_minivan": [],
+  "D_medium_heavy_truck": [],
+  "D_crossover": [],
+  "D_trailer": [],
+  "M_minivan": "FAIL: Nissan Safari fire trucks, Airstream Safari, VW Safari bus",
+  "D_semi_tractor": [
+   6
+  ],
+  "D_step_van": [],
+  "T_chassis": [],
+  "D_motorhome": [
+   0
+  ],
+  "D_cargo_van_as_van": [],
+  "C_motorhome_v2": [
+   33,
+   145
+  ],
+  "C_classb": [
+   3,
+   5,
+   7,
+   10,
+   13,
+   16
+  ],
+  "D_chassis_cab2": [
+   23,
+   32,
+   36,
+   51,
+   63,
+   98,
+   101,
+   109,
+   110,
+   111
+  ]
+ }
+}
