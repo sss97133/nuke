@@ -5,7 +5,9 @@ import { AccountingBookContext, useAccountingBook } from '../../components/finan
 import { useAccountingRevision } from '../../components/finance/useAccountingRevision';
 import ExpenseUseEditor from '../../components/finance/ExpenseUseEditor';
 import RecordClassifier from '../../components/finance/RecordClassifier';
-import AccountingActivity from '../../components/finance/AccountingActivity';
+import AccountingActivity, { ActivityPasses } from '../../components/finance/AccountingActivity';
+import RecordEvidence from '../../components/finance/RecordEvidence';
+import FinishTaxes, { type Drill } from '../../components/finance/FinishTaxes';
 import { remember, remembered } from '../../components/finance/accountingMemory';
 /**
  * FinanceDashboard
@@ -224,6 +226,9 @@ function EvidenceDialog({ documentId, record: selectedRecord, onClose, trigger }
   const [sourceTrail, setSourceTrail] = useState<string[]>([]);
   const activeDocument = sourceTrail.at(-1) || documentId;
   const atEntry = sourceTrail.length === 0;
+  // The full cell history of the record's source is read only when asked for (median 240 KB per source, measured 2026-10-25).
+  const [showFields, setShowFields] = useState(false);
+  const openSource = (id: string) => { if (id === documentId) setSourceTrail([]); else if (id !== activeDocument) setSourceTrail(current => [...current, id]); };
   useEffect(() => { setRecord(selectedRecord); }, [documentId, selectedRecord]);
   const dialog = useRef<HTMLDialogElement>(null);
   useEffect(() => {
@@ -235,10 +240,13 @@ function EvidenceDialog({ documentId, record: selectedRecord, onClose, trigger }
   return <dialog className="accounting-evidence-dialog" ref={dialog} aria-label="Accounting evidence" onCancel={event => { event.preventDefault(); onClose(); }}>
     <div className="accounting-dialog-heading"><h2>Accounting evidence</h2><button type="button" autoFocus onClick={onClose}>Close evidence</button></div>
     {!atEntry && <button type="button" className="accounting-back" onClick={() => setSourceTrail(current => current.slice(0, -1))}>‹ Back to {sourceTrail.length === 1 ? 'entry' : 'previous source'}</button>}
-    {atEntry && record && <section className="accounting-selected-record" aria-label="Selected accounting record"><h3>{recordDescription(record.description) || 'Selected transaction'}</h3><p>{record.date || record.year} · {record.account || 'Account not recorded'}</p><p className="accounting-entry-amount">{displayMoney(record.amount, record.currency)}</p><p><strong>{record.section || 'Unclassified'}</strong>{record.category && ` · ${record.category}`}</p>{record.status && <p>{record.status}</p>}<p>{record.decision || 'No accounting decision has been recorded for this movement.'}</p><p className="accounting-muted">This is the selected record. Its retained source may be a bank export or bookkeeping batch; it is not necessarily a receipt.</p>{record.description && <details><summary>Original source description</summary><p>{record.description}</p></details>}</section>}
+    {atEntry && record?.source_key && <section className="accounting-selected-record" aria-label="Selected accounting record"><RecordEvidence documentId={documentId} sourceKey={record.source_key} onOpenDocument={openSource} fallbackTitle={recordDescription(record.description)} /></section>}
+    {atEntry && record && !record.source_key && <section className="accounting-selected-record" aria-label="Selected accounting record"><h3>{recordDescription(record.description) || 'Selected transaction'}</h3><p>{record.date || record.year} · {record.account || 'Account not recorded'}</p><p className="accounting-entry-amount">{displayMoney(record.amount, record.currency)}</p><p><strong>{record.section || 'Unclassified'}</strong>{record.category && ` · ${record.category}`}</p>{record.status && <p>{record.status}</p>}<p>{record.decision || 'No accounting decision has been recorded for this movement.'}</p><p className="accounting-muted">This is the selected record. Its retained source may be a bank export or bookkeeping batch; it is not necessarily a receipt.</p>{record.description && <details><summary>Original source description</summary><p>{record.description}</p></details>}</section>}
     {atEntry && record?.source_key && <details className="accounting-edit-section"><summary>Review or correct classification <span>Add what you know about this entry</span></summary><RecordClassifier targets={[{ documentId, record }]} onChanged={changed => { const current = changed.find(item => item.record.source_key === record.source_key); if (current) setRecord(current.record); }} /></details>}
     {atEntry && record?.record_kind === 'retained_ledger_decision' && record.section === 'Expense' && record.source_key && <details className="accounting-edit-section"><summary>Vehicle, shop or business use <span>Inspect or update the recipient and your reason</span></summary><ExpenseUseEditor documentId={documentId} record={record} onCurrentRecord={setRecord} onSaved={() => window.dispatchEvent(new Event('accounting-saved'))} /></details>}
-    <DocumentEvidence key={activeDocument} documentId={activeDocument} record={atEntry ? record : null} onOpenDocument={id => { if (id === documentId) setSourceTrail([]); else if (id !== activeDocument) setSourceTrail(current => [...current, id]); }} />
+    {atEntry && record?.source_key
+      ? <details className="accounting-disclosure" onToggle={event => setShowFields(event.currentTarget.open)}><summary>All retained fields <span>every cell kept on this record's source, with history</span></summary>{showFields && <DocumentEvidence key={activeDocument} documentId={activeDocument} record={record} onOpenDocument={openSource} />}</details>
+      : <DocumentEvidence key={activeDocument} documentId={activeDocument} record={atEntry ? record : null} onOpenDocument={openSource} />}
   </dialog>;
 }
 
@@ -382,6 +390,7 @@ export default function FinanceDashboard() {
   const [sourceView, setSourceView] = useState<'summary' | 'review' | 'documents' | 'deals'>('summary');
   const [officeView, setOfficeView] = useState<'books' | 'documents' | 'review' | 'activity' | 'tools' | 'deals'>('books');
   const [addingDocument, setAddingDocument] = useState(false);
+  const [focus, setFocus] = useState<Drill | null>(null);
   const [sourceTablePage, setSourceTablePage] = useState(0);
   const [sourceQuery, setSourceQuery] = useState('');
   const [selectedDocument, setSelectedDocument] = useState<string | null>(null);
@@ -396,7 +405,7 @@ export default function FinanceDashboard() {
     if (next === bookIdentity.current) return;
     // Invalidate in the selection/grant callback, before a late prior-book read settles.
     generation.current++; bookIdentity.current = next; setOwnerId(next);
-    setSourceView('summary'); setOfficeView('books'); setAddingDocument(false);
+    setSourceView('summary'); setOfficeView('books'); setAddingDocument(false); setFocus(null);
     setSelectedDocument(null); setSelectedRecord(null); setDocs([]); setConcerns([]); setDeals([]); setErrors([]);
     setCounts({ docs: null, deals: null, concerns: null }); setConcernsLoaded(false); setPage(0); setLoading(true);
   }, []);
@@ -514,9 +523,10 @@ export default function FinanceDashboard() {
         ['review', 'Review questions', 'Evidence that needs attention'], ['activity', 'Activity', 'Changes to your shared books'],
         ['tools', 'Office settings', 'Access and imports'],
       ] as const).filter(([tab]) => !shared || tab !== 'tools').map(([tab, label, hint]) => <button type="button" key={tab} aria-current={officeView === tab ? 'page' : undefined} title={hint} onClick={() => { setOfficeView(tab); setSourceView(tab === 'documents' || tab === 'review' ? tab : 'summary'); }}><span>{label}</span></button>)}</nav>
-      <div hidden={officeView !== 'activity'}><h2>Recent activity</h2><p>Open a change to inspect the source and its current interpretation.</p><AccountingActivity people={people} onOpen={documentId => openEvidence(documentId)} /></div>
+      <div hidden={officeView !== 'activity'}><h2>Recent activity</h2><p>Open a change to inspect the source and its current interpretation.</p><AccountingActivity people={people} onOpen={documentId => openEvidence(documentId)} /><ActivityPasses people={people} onOpen={documentId => openEvidence(documentId)} /></div>
       {shared && <p>Shared books. Your corrections retain your identity and appear in the same ledger for the owner and other reviewers.</p>}
-      <div hidden={officeView !== 'books'}>{ownerId && <FinancialWorkpapers key={`${actorId}:${ownerId}`} viewerId={actorId} revision={sessionRevision} onOpen={openEvidence} />}
+      <div hidden={officeView !== 'books'}>{ownerId && <FinishTaxes key={`close:${ownerId}`} onDrill={drill => { setFocus(drill); window.setTimeout(() => document.querySelector('.accounting-books')?.scrollIntoView({ block: 'start' }), 0); }} onQuestions={() => { setOfficeView('review'); setSourceView('review'); }} />}
+      {ownerId && <FinancialWorkpapers key={`${actorId}:${ownerId}`} viewerId={actorId} revision={sessionRevision} onOpen={openEvidence} focus={focus} onLeaveFocus={() => setFocus(null)} />}
       <p className="accounting-muted accounting-tax-note">Tax review is a separate step. Saved records are not a filing or a completed reconciliation.</p></div>
       <div hidden={shared || officeView !== 'tools'}><h2>Office settings</h2><AccountingAccess grants={grants} actorId={actorId} onChanged={() => setGrantRevision(n => n + 1)} /><details className="accounting-disclosure" open={addingDocument} onToggle={event => setAddingDocument(event.currentTarget.open)}><summary>Add documents <span>Receipts, invoices and supporting files</span></summary>
         <FinancialDocumentIntake onComplete={documentId => { openEvidence(documentId); setSessionRevision(n => n + 1); }} />
