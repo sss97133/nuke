@@ -205,10 +205,72 @@ def drift(owner, line_map, returns, whole):
     return 1 if bad else 0
 
 
+# ---------- correct: supersede the specific ledger rows a ruling replaces ----------
+
+def document_state(owner, doc_id):
+    """Original, current run, its complete field set, accounting records and staging lines, as the writer needs them back."""
+    out = psql(f"""select json_build_object(
+      'original', json_build_object('sha256', d.content_sha256, 'storage_path', d.storage_path, 'source_filename', d.source_filename,
+                                    'source_kind', d.source_kind, 'byte_size', d.byte_size::text),
+      'run_id', r.run_id,
+      'fields', (select json_agg(json_strip_nulls(json_build_object('field_key', e.field_key, 'value_raw', e.value_raw, 'value_type', e.value_type,
+                   'page_number', e.page_number, 'value_normalized', e.value_normalized->'value', 'evidence', e.value_normalized->'evidence')) order by e.field_key)
+                 from financial_document_extractions e where e.document_id = d.id and e.extraction_run_id = r.run_id::uuid),
+      'records', (select json_agg(l.attributes->'accounting_record' order by l.line_number) from financial_document_lines l
+                  where l.document_id = d.id and l.attributes->>'extraction_run_id' = r.run_id and l.attributes ? 'accounting_record'),
+      'lines', (select json_agg(l.attributes->'staging' order by l.line_number) from financial_document_lines l
+                  where l.document_id = d.id and l.attributes->>'extraction_run_id' = r.run_id and l.attributes ? 'staging'))
+      from financial_documents d,
+           lateral (select x->>'run_id' run_id from jsonb_array_elements(d.attributes->'runs') x
+                     where not exists (select 1 from jsonb_array_elements(d.attributes->'runs') s where s->>'supersedes_run_id' = x->>'run_id')
+                     limit 1) r
+     where d.owner_id = '{owner}' and d.id = '{uuid_ok(doc_id)}';""")
+    return json.loads(out.strip())
+
+
+def correct(path, dry):
+    """corrections file: {"owner_id", "ruling_register": "...", "rows": {"<local_id>": {"document_id", "section", "category", "amount"?, "note"}}}"""
+    spec = json.load(open(path))
+    owner = uuid_ok(spec['owner_id'])
+    by_doc = collections.defaultdict(dict)
+    for lid, c in spec['rows'].items():
+        by_doc[c['document_id']][lid] = c
+    for doc_id, rows in sorted(by_doc.items()):
+        st = document_state(owner, doc_id)
+        recs, seen = st['records'] or [], set()
+        for r in recs:
+            c = rows.get(r['local_id'])
+            if not c:
+                continue
+            seen.add(r['local_id'])
+            note = f"Superseded {VERSION} by {c['ruling_id']}: {c['note']}"
+            if c.get('amount') is not None and D(c['amount']) != D(r['amount']):
+                note += f" (paid amount {r['amount']}; book amount {c['amount']})"
+                r['amount'] = f"{D(c['amount']):.2f}"
+            r['section'], r['category'] = c['section'], clip(c['category'], 300)
+            r['decision'] = clip(f"{r.get('decision') or ''} | {note}".lstrip(' |'), 1990)
+        missing = set(rows) - seen
+        if missing:
+            raise SystemExit(f'{doc_id}: rows not in the current revision: {sorted(missing)}')
+        rev = dict(method=METHOD, version=VERSION, fields=st['fields'], accounting_records=recs, supersedes_run_id=st['run_id'])
+        if st['lines']:
+            rev['lines'] = st['lines']
+        rev['idempotency_key'] = 'sc-ruling-correct-' + hashlib.sha256(json.dumps(rev, sort_keys=True).encode()).hexdigest()[:24]
+        sql = ("begin;\nselect set_config('request.jwt.claims','{\"role\":\"service_role\"}',true);\n"
+               "select set_config('request.jwt.claim.role','service_role',true);\n"
+               f"select public.ingest_financial_evidence('{owner}'::uuid, {q(json.dumps(st['original']))}::jsonb, "
+               f"{q(json.dumps(rev, ensure_ascii=False))}::jsonb, '{{\"kind\":\"user\"}}'::jsonb)::text;\n"
+               f"{'rollback' if dry else 'commit'};\n")
+        out = [l for l in psql(sql).splitlines() if l.startswith('{') and 'extraction_run_id' in l]
+        rec = json.loads(out[-1])
+        print(json.dumps(dict(document_id=doc_id, dry=dry, rows=sorted(rows), supersedes=st['run_id'], run_id=rec.get('extraction_run_id'),
+                              duplicate=rec.get('duplicate'))))
+
+
 if __name__ == '__main__':
     ap = argparse.ArgumentParser()
-    ap.add_argument('cmd', choices=['land', 'lines', 'drift'])
-    ap.add_argument('--rulings'); ap.add_argument('--dry', action='store_true')
+    ap.add_argument('cmd', choices=['land', 'lines', 'drift', 'correct'])
+    ap.add_argument('--rulings'); ap.add_argument('--corrections'); ap.add_argument('--dry', action='store_true')
     ap.add_argument('--owner', default='0b9f107a-d124-49de-9ded-94698f63c1c4')
     ap.add_argument('--year'); ap.add_argument('--line-map')
     ap.add_argument('--return', dest='returns', action='append', default=[])
@@ -218,6 +280,8 @@ if __name__ == '__main__':
     lm = json.load(open(a.line_map)) if a.line_map else {}
     if a.cmd == 'land':
         land(a.rulings, a.dry)
+    elif a.cmd == 'correct':
+        correct(a.corrections, a.dry)
     elif a.cmd == 'lines':
         print(json.dumps({s: {k: str(v) for k, v in l.items()} for s, l in lines_by_schedule(owner, a.year, lm).items()}, indent=1))
     else:
