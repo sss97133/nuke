@@ -50,6 +50,7 @@ GRANT ALL ON public.financial_deals, public.financial_payments TO anon, authenti
 \ir ../migrations/20261028213000_related_party_ledger.sql
 -- Re-applying is a no-op.
 \ir ../migrations/20261028213000_related_party_ledger.sql
+\ir ../migrations/20261028223000_related_party_ledger_book_join.sql
 
 -- Fixture, committed so the recording clocks of later steps differ.
 CREATE TABLE fx(k text PRIMARY KEY, v text);
