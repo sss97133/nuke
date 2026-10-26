@@ -36,7 +36,7 @@ def psql(sql):
 
 
 def q(s):
-    tag = 'R' + hashlib.md5(s.encode()).hexdigest()[:8]
+    tag = 'R' + hashlib.sha256(s.encode()).hexdigest()[:8]
     assert f'${tag}$' not in s
     return f'${tag}${s}${tag}$'
 
