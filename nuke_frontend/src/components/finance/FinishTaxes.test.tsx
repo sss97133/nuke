@@ -135,3 +135,22 @@ it('names a pass by person or agent and says what it moved per year', () => {
   expect(passWho({ ...pass, run_family: null, method: 'authenticated-record-classification' }, { [owner]: 'You' })).toBe('You');
   expect(passWhat(pass)).toBe('12 records changed · 2025: 7 records · 2024: 5 records, $1,235 touched · 2 questions opened');
 });
+
+it('renders each year from books_year_state: newer result, line 31 net, open items with what closes them, settled facts', async () => {
+  const data: Closeout = { read_at: '2026-10-25T23:00:00Z', books_revised_at: null, questions: { pending_current: 0, by_resolver: {} }, years: [year({})] };
+  const state = { year: 2024, read_at: '2026-10-26T23:00:00Z', unmapped: [],
+    result: { form: '1040', result: 'refund', amount: 300, built_at: '2026-10-26T23:00:00Z', from: 'return_fact' },
+    schedule_c: { 'Schedule C 1': { '31': 100.5 }, 'Schedule C 2': { '31': 200 } },
+    rulings: [{ local_id: '2024-RULING-x', schedule: 'Schedule C', line: '20b', label: 'Schedule C line 20b: synthetic rent', amount: 50, decision: 'Synthetic ruling', date: '2024-12-31' }],
+    facts: [{ local_id: '2024-FACT-filing', key: 'filing', topic: 'filing_status', status: 'settled', date: '2026-10-25', decision: 'Synthetic filing status', source: 'synthetic file' }],
+    open_items: [{ local_id: '2024-FACT-form', key: 'form', topic: 'form_5471', status: 'open', date: '2026-10-26', decision: 'Synthetic open form', closes_with: 'a synthetic corrected form', source: 's' }] };
+  fixture.rpc.mockImplementation(async (name: string, args: any) => name === 'accounting_closeout' ? { data, error: null }
+    : name === 'books_year_state' && args.p_year === 2024 ? { data: state, error: null }
+    : name === 'accounting_closeout_records' ? { data: { assessed: true, total: 0, amount: 0, rows: [] }, error: null } : { data: null, error: { message: 'unexpected' } });
+  await act(async () => root.render(inBook(<FinishTaxes onDrill={vi.fn()} onQuestions={vi.fn()} />)));
+  expect(node.querySelector('.accounting-close-answer')?.textContent).toBe('You get back $300');
+  expect(node.textContent).toContain('Schedule C net $301');
+  expect(node.textContent).toContain('Closes with: a synthetic corrected form');
+  expect(node.textContent).toContain('Settled for 2024: 1 return facts, 1 Schedule C rulings');
+  expect(node.textContent).toContain('Synthetic filing status');
+});
