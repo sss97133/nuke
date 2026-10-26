@@ -4,6 +4,8 @@ import { supabase } from '../../lib/supabase';
 import { expenseUseKey, type ExpenseUse } from '../../services/financialExpenseUse';
 import { remember, remembered } from './accountingMemory';
 import RecordClassifier, { type ClassifyTarget } from './RecordClassifier';
+import type { Drill } from './FinishTaxes';
+import { dollars, readCloseoutRecords } from '../../services/accountingCloseout';
 
 export type SavedRecord = { id: string; document_id: string; record: {
   record_kind: string; local_id: string; year: string; date: string | null; account: string | null;
@@ -58,7 +60,9 @@ export function yearOverview(controls: Control[]) {
 const overviewAmount = (amount: bigint | null, currency: string | null) => amount === null ? 'Not available' : displayMoney(Number(amount) / 1000000, currency);
 
 
-export default function FinancialWorkpapers({ revision, onOpen, viewerId }: { revision: number; viewerId?: string; onOpen: (documentId: string, record: SavedRecord['record']) => void }) {
+export default function FinancialWorkpapers({ revision, onOpen, viewerId, focus = null, onLeaveFocus }: { revision: number; viewerId?: string; onOpen: (documentId: string, record: SavedRecord['record']) => void;
+  /** A close-out item to list instead of the filtered records: same table, rows chosen by accounting_closeout_records. */
+  focus?: Drill | null; onLeaveFocus?: () => void }) {
   const { ownerId, shared, liveRevision, canCorrect } = useAccountingBook();
   const [selecting, setSelecting] = useState(false);
   const [selected, setSelected] = useState<Map<string, ClassifyTarget>>(() => new Map());
@@ -79,6 +83,7 @@ export default function FinancialWorkpapers({ revision, onOpen, viewerId }: { re
   const [rows, setRows] = useState<SavedRecord[] | null>(null);
   const [hasMoreRows, setHasMoreRows] = useState(false);
   const [rowsError, setRowsError] = useState('');
+  const [focusTotal, setFocusTotal] = useState<{ total: number | null; amount: number | null } | null>(null);
   const [data, setData] = useState<Workpapers | null>(null);
   const [error, setError] = useState('');
   const [summaryLoading, setSummaryLoading] = useState(true);
@@ -137,7 +142,8 @@ export default function FinancialWorkpapers({ revision, onOpen, viewerId }: { re
     }).catch(() => { if (!cancelled && identityGeneration.current === identity) { setUses({}); setUseError(true); } });
     return () => { cancelled = true; };
   }, [rows, ownerId]);
-  useEffect(() => { setTablePage(0); }, [view, query, account, kind, section, currency, unclassified, sort, year]);
+  useEffect(() => { setTablePage(0); }, [view, query, account, kind, section, currency, unclassified, sort, year, focus]);
+  useEffect(() => { if (focus) setView('records'); }, [focus]);
   // A selection belongs to the filter it was made in; changing what is listed starts a new one.
   useEffect(() => { setSelected(new Map()); }, [view, query, account, kind, section, currency, unclassified, year, ownerId]);
   const controls = data?.controls.filter(row => row.record_kind === 'retained_ledger_decision') || [];
@@ -157,6 +163,15 @@ export default function FinancialWorkpapers({ revision, onOpen, viewerId }: { re
     const identity = identityGeneration.current;
     let cancelled = false;
     setRows(null); setHasMoreRows(false); setRowsError('');
+    if (focus) {
+      setFocusTotal(null);
+      readCloseoutRecords(bookId, focus.year, focus.item, rowsPerPage, tablePage * rowsPerPage).then(result => {
+        if (cancelled || identityGeneration.current !== identity) return;
+        setRowsError(''); setRows(result.rows); setFocusTotal({ total: result.total, amount: result.amount });
+        setHasMoreRows(result.total !== null && tablePage * rowsPerPage + result.rows.length < result.total);
+      }).catch(() => { if (!cancelled && identityGeneration.current === identity) { setRows(null); setHasMoreRows(false); setRowsError('Saved records could not load.'); } });
+      return () => { cancelled = true; };
+    }
     const run = () => {
       let request = supabase.from('v_financial_accounting_records').select('id, document_id, record').eq('owner_id', bookId);
       if (selectedYear) request = request.eq('year', selectedYear);
@@ -180,7 +195,7 @@ export default function FinancialWorkpapers({ revision, onOpen, viewerId }: { re
     const typing = searched.current !== query; searched.current = query;
     const handle = typing ? window.setTimeout(run, 250) : (run(), 0);
     return () => { cancelled = true; window.clearTimeout(handle); };
-  }, [view, ownerId, selectedYear, account, kind, section, currency, unclassified, query, sort, tablePage, rowsPerPage, revision, sessionRevision, liveRevision, rowsRetry]);
+  }, [view, ownerId, selectedYear, account, kind, section, currency, unclassified, query, sort, tablePage, rowsPerPage, revision, sessionRevision, liveRevision, rowsRetry, focus]);
   const sortBy = (column: SortColumn) => setSort(current => ({ column, descending: current.column === column ? !current.descending : column === 'record_date' || column === 'amount_value' }));
   const sortable = (column: SortColumn, label: string) => <th aria-sort={sort.column === column ? (sort.descending ? 'descending' : 'ascending') : undefined}><button type="button" className="accounting-sort" onClick={() => sortBy(column)}>{label}{sort.column === column ? (sort.descending ? ' ↓' : ' ↑') : ''}</button></th>;
   const chip = (label: string, pressed: boolean, onPress: () => void) => <button type="button" aria-pressed={pressed} onClick={onPress}>{label}</button>;
@@ -209,7 +224,7 @@ export default function FinancialWorkpapers({ revision, onOpen, viewerId }: { re
   const currencies = [...new Set([...controls.map(row => row.currency), currency !== '__unknown' ? currency : ''].filter((value): value is string => !!value))].sort();
   const offset = Math.min(tablePage, Math.max(0, Math.ceil(accountRows.length / rowsPerPage) - 1)) * rowsPerPage;
   const recordsOffset = tablePage * rowsPerPage;
-  const changeView = (next: typeof view) => { if (next === 'records' && !data && !year) setYear('__all'); setView(next); setQuery(''); setAccount(''); setKind(''); setSection(''); setCurrency(''); setUnclassified(false); setTablePage(0); };
+  const changeView = (next: typeof view) => { if (focus) onLeaveFocus?.(); if (next === 'records' && !data && !year) setYear('__all'); setView(next); setQuery(''); setAccount(''); setKind(''); setSection(''); setCurrency(''); setUnclassified(false); setTablePage(0); };
   const inspect = (nextSection: string | null, nextCurrency: string | null, nextAccount: string | null = '') => {
     changeView('records'); setKind('retained_ledger_decision'); setSection(nextSection ?? '__unknown'); setCurrency(nextCurrency ?? '__unknown'); setAccount(nextAccount ?? '__unknown');
   };
@@ -235,8 +250,13 @@ export default function FinancialWorkpapers({ revision, onOpen, viewerId }: { re
 
       </>}
       {data?.total_rows === 0 && !summaryLoading && view !== 'records' && <p>No bookkeeping records have been recovered into this account yet.</p>}
+      {view === 'records' && focus && <div className="accounting-focus" role="region" aria-label="Close-out records">
+        <h3>{focus.label} · {focus.year}</h3>
+        <p className="accounting-muted">{focusTotal ? `${(focusTotal.total ?? 0).toLocaleString('en-US')} records · ${dollars(focusTotal.amount)} · largest first` : 'Reading the records…'} Open one to see its evidence.</p>
+        <button type="button" onClick={() => onLeaveFocus?.()}>Back to all records</button>
+      </div>}
       {(view === 'records' || (view === 'accounts' && data && !summaryLoading)) && <>
-        <div className="accounting-filters"><label>{view === 'records' ? 'Search records' : 'Search account breakdown'}<input type="search" value={query} onChange={event => setQuery(event.target.value)} /></label>
+        {!focus && <div className="accounting-filters"><label>{view === 'records' ? 'Search records' : 'Search account breakdown'}<input type="search" value={query} onChange={event => setQuery(event.target.value)} /></label>
           {view === 'records' && <><label>Classification <select value={section} onChange={event => { setSection(event.target.value); setUnclassified(false); }}><option value="">All classifications</option><option value="__unknown">Unclassified</option>{sections.map(value => <option key={value}>{value}</option>)}</select></label><label>Currency <select value={currency} onChange={event => setCurrency(event.target.value)}><option value="">All currencies</option><option value="__unknown">Currency unknown</option>{currencies.map(value => <option key={value}>{value}</option>)}</select></label></>}
           <label>Account <select value={account} onChange={event => setAccount(event.target.value)}><option value="">All accounts</option><option value="__unknown">Account unknown</option>{accounts.map(value => <option key={value}>{value}</option>)}</select></label>
           <label>Rows per page <select value={rowsPerPage} onChange={event => { setRowsPerPage(Number(event.target.value)); setTablePage(0); }}>{pageSizes.map(size => <option key={size} value={size}>{size}</option>)}</select></label>
@@ -247,7 +267,7 @@ export default function FinancialWorkpapers({ revision, onOpen, viewerId }: { re
             {chip('Unclassified', unclassified, () => { setKind('retained_bank_movement'); setSection(''); setUnclassified(current => !current); })}
           </div>}
           {view === 'records' && canCorrect && <div className="accounting-chips">{chip(selecting ? 'Done' : 'Select', selecting, () => { setSelecting(current => !current); setSelected(new Map()); })}</div>}
-        </div>
+        </div>}
         {view === 'records' && selecting && <div className="accounting-selection-bar" role="region" aria-label="Selected records">
           <span>{selected.size ? `${selected.size} selected` : 'Tap records to select them'}</span>
           <button type="button" className="accounting-primary" disabled={!selected.size} onClick={() => setClassifying(true)}>Classify…</button>
@@ -255,7 +275,7 @@ export default function FinancialWorkpapers({ revision, onOpen, viewerId }: { re
         </div>}
         {classifying && <ClassifyDialog targets={[...selected.values()]} onChanged={classified} onClose={() => setClassifying(false)} />}
         {view === 'records' ? <>
-          <p className="accounting-muted">{selectedYear ? `Year ${selectedYear}.` : 'All years.'} Search and filters cover saved records in this scope. {!data && 'Summary totals and complete filter choices are unavailable. '} Sort by Date, Transaction / decision, Account, Classification or Amount; newest date first by default.</p>
+          {!focus && <p className="accounting-muted">{selectedYear ? `Year ${selectedYear}.` : 'All years.'} Search and filters cover saved records in this scope. {!data && 'Summary totals and complete filter choices are unavailable. '} Sort by Date, Transaction / decision, Account, Classification or Amount; newest date first by default.</p>}
           {rowsError && <p role="alert">{rowsError} <button type="button" onClick={() => setRowsRetry(value => value + 1)}>Retry records</button></p>}
           {!rows && !rowsError && <p role="status">Loading saved records…</p>}
           {rows && <div className="accounting-table-wrap"><table className={selecting ? 'accounting-records-table accounting-selecting' : 'accounting-records-table'}><thead><tr>{selecting && <th className="accounting-select"><input type="checkbox" aria-label="Select every record on this page" checked={pageSelected} disabled={!selectable.length} onChange={togglePage} /></th>}{sortable('record_date', 'Date')}{sortable('description', 'Transaction / decision')}{sortable('account', 'Account')}{sortable('section', 'Classification')}{sortable('amount_value', 'Amount')}<th className="accounting-cell-use">Vehicle / shop use</th><th className="accounting-cell-evidence">Evidence</th></tr></thead><tbody>{rows.map(row => <tr key={row.id} className="accounting-row" aria-selected={selecting ? selected.has(row.record.source_key || '') : undefined} onClick={() => selecting ? toggle(row) : onOpen(row.document_id, row.record)}>

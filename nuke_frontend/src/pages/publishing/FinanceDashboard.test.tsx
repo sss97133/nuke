@@ -226,6 +226,12 @@ it('opens readable evidence with source quote, closed technical detail, and rest
   expect(document.activeElement).toBe(trigger);
 });
 
+const openAllFields = async (dialog: Element, documentId: string) => {
+  // The record's whole source history is read only on request.
+  expect(fixture.calls.some(c => c.table === 'financial_document_extractions' && c.filters?.some(([key, value]: string[]) => key === 'document_id' && value === documentId))).toBe(false);
+  const all = Array.from(dialog.querySelectorAll('details')).find(d => d.querySelector('summary')?.textContent?.startsWith('All retained fields'))!;
+  await act(async () => { all.open = true; all.dispatchEvent(new Event('toggle')); });
+};
 it('keeps the chosen bookkeeping record distinct from its batch and defers payment context until requested', async () => {
   fixture.results.tax_read = { records: [{ id:'bank-row',document_id:'batch-doc',record:{record_kind:'retained_bank_movement',local_id:'bank-one',source_key:'selected-key',year:'2025',date:'2025-02-20',account:'Checking',section:'Owner',category:'Personal subscription',amount:'-13.99',currency:'USD',description:'Chosen synthetic subscription',decision:'Owner-confirmed personal purpose'} }], total_rows:1,next_after:null,controls_valid:true,controls:[] };
   fixture.results.financial_document_extractions = {data:[{id:'selected-field',field_key:'classification',value_normalized:{value:{source_key:'selected-key',classification:{category:'Personal subscription'}}},document:{source_filename:'batch.csv'}},{id:'other-field',field_key:'other_record',value_normalized:{value:{source_key:'other-key',description:'UNRELATED BATCH RECORD'}}}],count:2};
@@ -236,6 +242,7 @@ it('keeps the chosen bookkeeping record distinct from its batch and defers payme
   await act(async () => Array.from(container.querySelectorAll('button')).find(b=>b.textContent==='View evidence')!.click());
   const dialog = container.querySelector('dialog')!;
   expect(dialog.querySelector('[aria-label="Selected accounting record"]')?.textContent).toContain('Chosen synthetic subscription');
+  await openAllFields(dialog, 'batch-doc');
   expect(dialog.textContent).not.toContain('UNRELATED BATCH RECORD');
   const sourceNotes = dialog.querySelector<HTMLDetailsElement>('.accounting-source-notes')!;
   expect(sourceNotes.open).toBe(false);
@@ -321,6 +328,7 @@ it('opens linked receipt items and returns to the selected entry without showing
   await act(async () => Array.from(container.querySelectorAll('button')).find(button => button.textContent === 'Records')!.click());
   await act(async () => Array.from(container.querySelectorAll('button')).find(button => button.textContent === 'View evidence')!.click());
   let dialog = container.querySelector('dialog')!;
+  await openAllFields(dialog, 'batch-doc');
   expect(dialog.textContent).toContain('Synthetic filter');
   expect(dialog.textContent).not.toContain('UNRELATED PURCHASE');
   expect(dialog.querySelector(`a[href="/vehicle/${vehicleId}"]`)).not.toBeNull();
