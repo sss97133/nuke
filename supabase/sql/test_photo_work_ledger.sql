@@ -50,6 +50,7 @@ BEGIN IF ok IS NOT TRUE THEN RAISE EXCEPTION 'FAIL: %', what; END IF; RAISE NOTI
 
 \ir ../migrations/20261028203000_photo_work_ledger.sql
 \ir ../migrations/20261028233000_photo_work_ledger_sighting_hash.sql
+\ir ../migrations/20261029001500_photo_asset_fold_speed.sql
 
 -- Person A (…0a) owns photos at a recurring shop cell (36.000,-115.000) on 6 days; person B (…0b) owns one photo.
 INSERT INTO vehicle_images(id, vehicle_id, user_id, image_url, taken_at, latitude, longitude, vision_gate_status, is_sensitive)
