@@ -50,7 +50,9 @@ function YearCard({ y, revenue, onDrill }: { y: CloseoutYear; revenue: CloseoutI
   const [opening, setOpening] = useState('');
   const r = y.return;
   const per1000 = r?.tax_per_1000_expense ?? null;
-  const items = rankItems(y.items.map(i => i.key === 'revenue_no_payer' && revenue ? revenue : i).filter(i => i.assessed || i.key === 'revenue_no_payer'));
+  // Income with no named payer is read per year only where the year has income records; elsewhere it does not apply.
+  const hasRevenue = (y.books?.revenue_records ?? 0) > 0;
+  const items = rankItems(y.items.map(i => i.key === 'revenue_no_payer' && revenue ? revenue : i).filter(i => i.assessed || (i.key === 'revenue_no_payer' && hasRevenue)));
   const open = async () => {
     if (!r || !ownerId) return;
     setOpening('Opening the draft…');
@@ -124,7 +126,7 @@ export default function FinishTaxes({ onDrill, onQuestions, resolverLabel }: { o
       for (const y of data.years.filter(y => y.books && y.books.revenue_records > 0)) {
         readCloseoutRecords(ownerId, y.year, 'revenue_no_payer', 1, 0).then(result => {
           if (!cancelled) setRevenue(current => ({ ...current, [y.year]: { key: 'revenue_no_payer', assessed: result.assessed, n: result.total, of: y.books!.revenue_records, amount: result.amount } }));
-        }).catch(() => undefined);
+        }).catch(() => { if (!cancelled) setRevenue(current => ({ ...current, [y.year]: { key: 'revenue_no_payer', assessed: false, n: null, of: y.books!.revenue_records, amount: null } })); });
       }
     }).catch(() => { if (!cancelled) setState(previous => ({ owner: ownerId, data: previous?.owner === ownerId ? previous.data : null, error: true })); });
     return () => { cancelled = true; };

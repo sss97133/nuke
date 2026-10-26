@@ -64,6 +64,18 @@ it('leads each year with the plain answer, flags a stale draft, ranks what is le
   expect(questions).toHaveBeenCalled();
 });
 
+it('shows income-payer status only for years with income records, and a failed gate read as not assessed', async () => {
+  const noIncome = year({ year: '2023', books: { decisions: 2, revenue_records: 0, revenue: null, expense_records: 2, expense: 10, revised_at: null } });
+  const data: Closeout = { read_at: '2026-10-25T23:00:00Z', books_revised_at: null, questions: { pending_current: 0, by_resolver: {} }, years: [year({}), noIncome] };
+  fixture.rpc.mockImplementation(async (name: string) => name === 'accounting_closeout' ? { data, error: null } : { data: null, error: { code: '57014' } });
+  await act(async () => root.render(inBook(<FinishTaxes onDrill={vi.fn()} onQuestions={vi.fn()} />)));
+  const cards = node.querySelectorAll('.accounting-close-year');
+  expect(cards[0].textContent).toContain('Income with no named payer');
+  expect(cards[0].textContent).toContain('Not assessed');
+  expect(cards[1].textContent).not.toContain('Income with no named payer');
+  expect(node.textContent).not.toContain('Checking…');
+});
+
 it('a failed read says so and never shows zero', async () => {
   fixture.rpc.mockResolvedValue({ data: null, error: { code: '57014' } });
   await act(async () => root.render(inBook(<FinishTaxes onDrill={vi.fn()} onQuestions={vi.fn()} />)));
