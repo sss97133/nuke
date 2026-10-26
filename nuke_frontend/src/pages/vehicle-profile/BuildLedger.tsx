@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { CollapsibleWidget } from '../../components/ui/CollapsibleWidget';
 import { askAgent } from '../../components/agent/askAgent';
 import PrefetchLink from '../../components/PrefetchLink';
-import { useBuildLedger, type BookCostEntry, type BookCostTotal, type BuildLedgerEntry, type BuildLedgerGroup } from './hooks/useBuildLedger';
+import { useBuildLedger, type BookCostEntry, type BookCostTotal, type BuildLedgerEntry, type BuildLedgerGroup, type WorkingNoteTable } from './hooks/useBuildLedger';
 
 // ── Formatting ──
 
@@ -328,6 +328,75 @@ const BookSection: React.FC<{ entries: BookCostEntry[]; totals: BookCostTotal[];
   </div>
 );
 
+// ── Working notes from then: the owner's spreadsheets from the time that name this vehicle ──
+
+const fmtPeriod = (from: string | null, to: string | null) =>
+  !from && !to ? '—' : from === to || !to ? fmtDate(from) : `${fmtDate(from)} – ${fmtDate(to)}`;
+
+// Read-only context. Rows are shown as written; their amounts are never added to any total above.
+const WorkingNoteRowView: React.FC<{ note: WorkingNoteTable }> = ({ note }) => {
+  const [expanded, setExpanded] = useState(false);
+  const title = [note.workbook, note.sheet && note.sheet !== note.table ? note.sheet : null, note.table].filter(Boolean).join(' › ');
+  return (
+    <div style={{ marginBottom: '2px' }}>
+      <div
+        onClick={() => setExpanded(v => !v)}
+        style={{
+          display: 'grid', gridTemplateColumns: '1fr auto auto', gap: '2px 8px', alignItems: 'center',
+          padding: '4px 6px', cursor: 'pointer', userSelect: 'none', border: '2px solid var(--vp-ghost)',
+          background: expanded ? 'var(--vp-row-alt, #fafafa)' : 'transparent',
+        }}
+      >
+        <span style={{ minWidth: 0, overflow: 'hidden' }}>
+          <span style={{ fontSize: '8px', fontWeight: 700, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {expanded ? '▾' : '▸'} {title || 'Untitled sheet'}
+          </span>
+          <span style={{ ...monoNum, fontSize: '8px', color: 'var(--vp-pencil)', display: 'block' }}>
+            {fmtPeriod(note.periodFrom, note.periodTo)}{note.periodBasis === 'file_clock' ? ' (file dates)' : ''}
+          </span>
+        </span>
+        <span>{note.vehicleMatch === 'candidate' && <Chip text="POSSIBLE MATCH" color="var(--vp-pencil, #888)" title="The sheet names a vehicle like this one; it may be another" />}</span>
+        <span style={{ ...monoNum, fontSize: '8px', color: 'var(--vp-pencil)', textAlign: 'right' }}>
+          {note.rowsMatched === note.rowsTotal ? `${note.rowsTotal} rows` : `${note.rowsMatched} of ${note.rowsTotal} rows`}
+        </span>
+      </div>
+      {expanded && (
+        <div style={{ borderLeft: '2px solid var(--vp-ghost)', borderRight: '2px solid var(--vp-ghost)', borderBottom: '2px solid var(--vp-ghost)', padding: '6px 8px', background: 'var(--vp-row-alt, #fafafa)' }}>
+          {note.rows.map(r => (
+            <div key={r.r} style={{ display: 'grid', gridTemplateColumns: '28px 64px 1fr', gap: '6px', marginBottom: '2px', alignItems: 'baseline' }}>
+              <span style={{ ...monoNum, fontSize: '8px', color: 'var(--vp-pencil)' }}>R{r.r}</span>
+              <span style={{ ...monoNum, fontSize: '8px', color: 'var(--vp-pencil)' }}>{r.d ? fmtDate(r.d) : ''}</span>
+              <span style={{ ...monoNum, fontSize: '8px', wordBreak: 'break-word', color: 'var(--vp-ink)' }}>{r.t}</span>
+            </div>
+          ))}
+          {note.rowsMatched > note.rows.length && (
+            <div style={{ fontSize: '8px', color: 'var(--vp-pencil)' }}>{note.rowsMatched - note.rows.length} more rows in the sheet.</div>
+          )}
+          <div style={{ marginTop: '4px', fontSize: '8px' }}>
+            <PrefetchLink to={`/accounting?book=${note.bookOwnerId}`}>Open the source in accounting</PrefetchLink>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const WorkingNotesSection: React.FC<{ notes: WorkingNoteTable[] }> = ({ notes }) => (
+  <div style={{ marginBottom: '10px' }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', borderBottom: '2px solid var(--vp-ink)', padding: '3px 0 2px', marginBottom: '4px' }}>
+      <span style={{ fontSize: '9px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Working notes from then</span>
+      <span style={{ fontSize: '8px', color: 'var(--vp-pencil)', ...monoNum, letterSpacing: '0.04em' }}>
+        {notes.length} {notes.length === 1 ? 'SHEET' : 'SHEETS'}
+      </span>
+    </div>
+    <div style={{ fontSize: '8px', color: 'var(--vp-pencil)', lineHeight: 1.5, marginBottom: '6px' }}>
+      Your spreadsheets from the time that name this vehicle. Context, not books: amounts are what was written then and
+      are not added to any total.
+    </div>
+    {notes.map(n => <WorkingNoteRowView key={n.cellId} note={n} />)}
+  </div>
+);
+
 // ── Main ──
 
 interface BuildLedgerProps {
@@ -344,7 +413,7 @@ const BuildLedger: React.FC<BuildLedgerProps> = ({ vehicleId }) => {
       variant="profile"
       title="Build Ledger"
       defaultCollapsed={false}
-      badge={<span className="widget__count">{data.hasAudit ? `DRAFT · ${data.entryCount} ENTRIES` : ''}{data.hasAudit && data.book.length ? ' · ' : ''}{data.book.length ? `${data.book.length} BOOKED` : ''}</span>}
+      badge={<span className="widget__count">{[data.hasAudit ? `DRAFT · ${data.entryCount} ENTRIES` : '', data.book.length ? `${data.book.length} BOOKED` : '', data.notes.length ? `${data.notes.length} NOTES` : ''].filter(Boolean).join(' · ')}</span>}
     >
       <div style={{ fontFamily: 'var(--vp-font-sans)', fontSize: '9px', lineHeight: 1.6 }}>
         {data.hasAudit && <>
@@ -380,6 +449,8 @@ const BuildLedger: React.FC<BuildLedgerProps> = ({ vehicleId }) => {
         </>}
 
         {data.book.length > 0 && <BookSection entries={data.book} totals={data.bookTotals} alongsideAudit={data.hasAudit} />}
+
+        {data.notes.length > 0 && <WorkingNotesSection notes={data.notes} />}
 
         <div style={{ fontSize: '8px', color: 'var(--vp-pencil)', textTransform: 'uppercase', letterSpacing: '0.06em', marginTop: '2px' }}>
           Every entry expands to its verbatim source citation.

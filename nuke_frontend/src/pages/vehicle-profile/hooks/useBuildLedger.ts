@@ -71,6 +71,53 @@ export interface BookCostTotal {
   unsplit: number;
 }
 
+// The owner's spreadsheets from the time that name this vehicle, read through owner_working_notes: context beside the
+// books, never summed. A separate type again: no amount here enters any group, total or confirmation count.
+export interface WorkingNoteRow {
+  r: number;
+  d: string | null;
+  t: string;
+  a: string | null;
+}
+
+export interface WorkingNoteTable {
+  cellId: string;
+  documentId: string;
+  bookOwnerId: string;
+  workbook: string | null;
+  sheet: string | null;
+  table: string | null;
+  periodFrom: string | null;
+  periodTo: string | null;
+  periodBasis: string | null;
+  vehicleMatch: 'table' | 'rows' | 'candidate' | null;
+  rowsTotal: number;
+  rowsMatched: number;
+  rows: WorkingNoteRow[];
+}
+
+export function parseWorkingNotes(payload: unknown, bookOwnerId: string): WorkingNoteTable[] {
+  const tables = (payload as { tables?: unknown })?.tables;
+  if (!Array.isArray(tables)) return [];
+  return tables.map((t: Record<string, any>): WorkingNoteTable => ({
+    cellId: String(t.cell_id),
+    documentId: String(t.document_id),
+    bookOwnerId,
+    workbook: str(t.workbook),
+    sheet: str(t.sheet),
+    table: str(t.table),
+    periodFrom: str(t.period?.from),
+    periodTo: str(t.period?.to),
+    periodBasis: str(t.period?.basis),
+    vehicleMatch: ['table', 'rows', 'candidate'].includes(t.vehicle_match) ? t.vehicle_match : null,
+    rowsTotal: num(t.rows_total),
+    rowsMatched: num(t.rows_matched),
+    rows: Array.isArray(t.rows)
+      ? t.rows.map((r: Record<string, unknown>) => ({ r: num(r.r), d: str(r.d), t: str(r.t) ?? '', a: str(r.a) }))
+      : [],
+  }));
+}
+
 export interface BuildLedgerData {
   groups: BuildLedgerGroup[];
   documentedTotal: number;
@@ -81,6 +128,7 @@ export interface BuildLedgerData {
   hasAudit: boolean;
   book: BookCostEntry[];
   bookTotals: BookCostTotal[];
+  notes: WorkingNoteTable[];
   hasData: boolean;
 }
 
@@ -196,7 +244,26 @@ export function useBuildLedger(vehicleId: string | undefined) {
     staleTime: 10 * 60 * 1000,
   });
 
+  // The signed-in owner's working notes that name this vehicle (their own book only). Same silent degrade.
+  const { data: noteTables, isLoading: notesLoading } = useQuery({
+    queryKey: ['build-ledger', vehicleId, 'working-notes'],
+    queryFn: async (): Promise<WorkingNoteTable[]> => {
+      if (!vehicleId) return [];
+      const session = await supabase.auth?.getSession?.();
+      const uid = session?.data?.session?.user?.id;
+      if (!uid) return [];
+      const { data, error: rpcErr } = await supabase.rpc('owner_working_notes', {
+        p_owner_id: uid, p_vehicle_id: vehicleId, p_rows: 20, p_limit: 10,
+      });
+      if (rpcErr || !data) return [];
+      return parseWorkingNotes(data, uid);
+    },
+    enabled: !!vehicleId && vehicleId.length >= 20,
+    staleTime: 10 * 60 * 1000,
+  });
+
   const data = useMemo<BuildLedgerData>(() => {
+    const notes = noteTables ?? [];
     const rows = rawRows ?? [];
     const book = [...(bookRows ?? [])].sort((a, b) => (a.date ?? '').localeCompare(b.date ?? ''));
     // Per currency, summed in cents; an unsplit assignment is counted, never summed.
@@ -213,7 +280,7 @@ export function useBuildLedger(vehicleId: string | undefined) {
       return {
         groups: [], documentedTotal: 0, statedPendingTotal: 0,
         pendingCount: 0, entryCount: 0, auditRun: null, hasAudit: false,
-        book, bookTotals, hasData: book.length > 0,
+        book, bookTotals, notes, hasData: book.length > 0 || notes.length > 0,
       };
     }
 
@@ -240,9 +307,10 @@ export function useBuildLedger(vehicleId: string | undefined) {
       hasAudit: true,
       book,
       bookTotals,
+      notes,
       hasData: true,
     };
-  }, [rawRows, bookRows]);
+  }, [rawRows, bookRows, noteTables]);
 
-  return { data, loading: isLoading || bookLoading, error: error?.message ?? null };
+  return { data, loading: isLoading || bookLoading || notesLoading, error: error?.message ?? null };
 }

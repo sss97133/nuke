@@ -440,6 +440,7 @@ The conversational face of the same verbs the drill buttons use. Runs as the cal
 
 Ledger read set: `get_vehicle_build_ledger` returns `extraction_method IN ('audit_draft_v0','owner_confirmed_v1')`. A rejected entry's `owner_rejected_v1` successor is deliberately excluded — the ruling persists as testimony, the row leaves the ledger.
 Booked costs: `accounting_vehicle_costs(vehicle_id)` (SECURITY DEFINER) returns the current accounting-book expense uses assigned to the vehicle, for a caller who can read that book (owner or active accounting grant) AND has the vehicle access above. Its rows are keyed by the book cell id, never an observation id, so the confirmation tools cannot act on them; the Build ledger shows them as their own "In the accounts" group, never summed with the audit totals.
+Working notes: `owner_working_notes(owner_id, vehicle_id?, organization_id?, from?, to?, rows?, limit?)` (SECURITY INVOKER, jsonb) returns the owner's spreadsheets from the time (Numbers workbooks and their CSV/PDF companions, admitted as `working_notes_*` cells by `scripts/books/numbers_working_notes.py` through `ingest_financial_evidence`) that name a vehicle, an organization or related party, or overlap a period: compact keyed rows `{r, d, t, a}` with the trust tier `owner_working_notes_contextual`. They carry no lines or accounting records, so no books reader counts them; the Build ledger shows them as "Working notes from then", outside every total. Bounded to 100 tables and 50 rows per table; owner and accounting delegates only.
 
 ---
 
