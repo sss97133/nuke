@@ -1,4 +1,4 @@
--- Disposable PG17 only. Synthetic fixtures; exercises the actual migration 20261028200000_photo_work_ledger.sql.
+-- Disposable PG17 only. Synthetic fixtures; exercises the actual migration 20261028203000_photo_work_ledger.sql.
 \set ON_ERROR_STOP on
 DO $$ BEGIN
   IF current_database() NOT LIKE 'dm_%' OR to_regclass('public.vehicle_images') IS NOT NULL THEN
@@ -48,7 +48,7 @@ INSERT INTO tool_requirement_key_map VALUES ('tool_term','tig welder','welding.t
 CREATE FUNCTION t_assert(ok boolean, what text) RETURNS void LANGUAGE plpgsql AS $$
 BEGIN IF ok IS NOT TRUE THEN RAISE EXCEPTION 'FAIL: %', what; END IF; RAISE NOTICE 'ok: %', what; END $$;
 
-\ir ../migrations/20261028200000_photo_work_ledger.sql
+\ir ../migrations/20261028203000_photo_work_ledger.sql
 
 -- Person A (…0a) owns photos at a recurring shop cell (36.000,-115.000) on 6 days; person B (…0b) owns one photo.
 INSERT INTO vehicle_images(id, vehicle_id, user_id, image_url, taken_at, latitude, longitude, vision_gate_status, is_sensitive)

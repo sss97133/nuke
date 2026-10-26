@@ -17,7 +17,9 @@
 import Anthropic from '@anthropic-ai/sdk';
 import sharp from 'sharp';
 import { readFileSync, appendFileSync, existsSync, writeFileSync, mkdtempSync, rmSync } from 'node:fs';
-import { execFileSync } from 'node:child_process';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+const execFileAsync = promisify(execFile);
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -89,7 +91,7 @@ export async function fetchImage(url) {
     const dir = mkdtempSync(join(tmpdir(), 'pwl-'));
     try {
       writeFileSync(join(dir, 'in'), buf);
-      execFileSync('sips', ['-s', 'format', 'jpeg', '-s', 'formatOptions', '75', '-Z', '768', join(dir, 'in'), '--out', join(dir, 'out.jpg')], { stdio: 'ignore', timeout: 60000 });
+      await execFileAsync('sips', ['-s', 'format', 'jpeg', '-s', 'formatOptions', '75', '-Z', '768', join(dir, 'in'), '--out', join(dir, 'out.jpg')], { timeout: 60000 });
       out = readFileSync(join(dir, 'out.jpg'));
     } finally { rmSync(dir, { recursive: true, force: true }); }
   }
