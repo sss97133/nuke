@@ -160,6 +160,10 @@ into permanent identity types or mandatory arrival choices without a separate mo
   `scripts/books/schedule_c_rulings.py`, return-level facts and results with `scripts/books/return_facts.py`.
 - A return builder passes `db-books/drift_check.py` before its result is reported, and
   `scripts/books/books_year_state_check.py` (line 31 from the API equals the drift-check totals, 2022-2025) after.
+- A year is trusted only when `books_year_gate(owner, year)` passes every rule (R1-R9: one treatment per movement,
+  credits are revenue unless proven, no double count, cash method, evidence on expenses of $75+, depreciation from an
+  asset register, monthly mixed-use percentages, SE tax/credits/GILTI computed from stored inputs, no drift). Run
+  `scripts/books/books_year_gate_check.py` and list the failures; never fix them silently.
 
 ## PR titles and commit messages
 The repo is public, and a squash merge puts the PR title (or a single commit's subject) on `main` as the
