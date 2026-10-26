@@ -575,6 +575,14 @@ def pack_cells(doc):
                     rows_total=t['rows_total'], period=t['period'], keys=t['keys'], rows=[], continued_in=[])
         while nbytes(head) > CELL_MAX and head['header']:
             head['header'] = head['header'][:-1]
+        # Vehicle keys stay (rows point at them by index); slim them before anything else is cut.
+        for slim in (lambda x: [c.pop('label', None) for c in x.get('candidates', [])],
+                     lambda x: x.pop('text', None) if x.get('vehicle_id') else None,
+                     lambda x: x.update(candidates=x['candidates'][:2]) if x.get('candidates') else None):
+            if nbytes(head) <= CELL_MAX - 400:
+                break
+            for x in head['keys']['vehicles']:
+                slim(x)
         for k in ('people', 'deals', 'related_parties', 'organizations'):
             while nbytes(head) > CELL_MAX - 400 and head['keys'][k]:
                 head['keys'][k] = head['keys'][k][:-1]; head.setdefault('keys_truncated', []).append(k)
@@ -619,6 +627,9 @@ def pack_cells(doc):
     if len(cells) > FIELDS_MAX:
         cells = cells[:FIELDS_MAX]
         cells[0][1]['cells_truncated'] = True
+    for k, v, _ in cells:
+        if nbytes(v) > 3990:
+            raise ValueError(f"{doc['location']}: cell {k} is {nbytes(v)} bytes, over the writer limit")
     fields = [dict(field_key=k, value_raw=raw[:2000], value_type='text', value_normalized=v,
                    evidence=dict(stage='owner_working_notes', trust_tier=TRUST, original_sha256=doc['sha256'],
                                  location=doc['location'], method=METHOD, version=VERSION)) for k, v, raw in cells]
@@ -654,7 +665,7 @@ def sql_quote(s):
 
 def upload(blob, key, ext):
     url = os.environ['SUPABASE_URL'].rstrip('/') + f'/storage/v1/object/user-documents/{key}'
-    ctype = {'pdf': 'application/pdf', 'csv': 'text/csv'}.get(ext, 'application/octet-stream')
+    ctype = {'pdf': 'application/pdf', 'csv': 'text/csv', 'numbers': 'application/x-iwork-numbers-sffnumbers'}.get(ext, 'application/octet-stream')
     req = urllib.request.Request(url, data=open(blob, 'rb').read(), method='POST', headers={
         'Authorization': 'Bearer ' + os.environ['SUPABASE_SERVICE_ROLE_KEY'], 'apikey': os.environ['SUPABASE_SERVICE_ROLE_KEY'],
         'Content-Type': ctype, 'x-upsert': 'false'})
@@ -678,11 +689,11 @@ def psql(sql):
     return out.stdout
 
 
-def land(plan_path, dry, only, log_path):
+def land(plan_path, dry, only, log_path, exts=None):
     p = json.load(open(plan_path))
     owner = p['owner_id']
     for doc in p['documents']:
-        if only and not doc['sha256'].startswith(only):
+        if (only and not doc['sha256'].startswith(only)) or (exts and doc['ext'] not in exts):
             continue
         fields = pack_cells(doc)
         key = f"{owner}/financial/{doc['sha256']}.{doc['ext']}"
@@ -714,6 +725,7 @@ if __name__ == '__main__':
     ap.add_argument('cmd', choices=['plan', 'land'])
     ap.add_argument('--config'); ap.add_argument('--out'); ap.add_argument('--plan')
     ap.add_argument('--dry', action='store_true'); ap.add_argument('--only'); ap.add_argument('--log')
+    ap.add_argument('--ext', help='comma-separated original extensions to land, e.g. csv,pdf')
     a = ap.parse_args()
     if a.cmd == 'plan':
         inv, docs = plan(a.config, a.out)
@@ -721,4 +733,4 @@ if __name__ == '__main__':
                               not_local=sum(1 for i in inv if i.get('status') == 'not_local'), documents=len(docs),
                               tables=sum(len(d['tables']) for d in docs), rows=sum(t['rows_total'] for d in docs for t in d['tables']))))
     else:
-        land(a.plan, a.dry, a.only, a.log)
+        land(a.plan, a.dry, a.only, a.log, set(a.ext.split(',')) if a.ext else None)
