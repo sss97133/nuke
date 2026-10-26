@@ -3,7 +3,7 @@
 \ir test_accounting_delegation.sql
 \ir ../migrations/20261023220500_accounting_delegate_read_hoisted.sql
 -- test_accounting_delegation.sql leaves owner 1111, reviewer 2222 (confirmed), stranger 3333 and an inactive grant.
-\ir ../migrations/20261028200000_owner_working_notes_reader.sql
+\ir ../migrations/20261028220000_owner_working_notes_reader.sql
 BEGIN;
 -- The owner grants the reviewer read access to the book.
 SELECT set_config('request.jwt.claim.role','authenticated',true),set_config('request.jwt.claim.sub','11111111-1111-4111-8111-111111111111',true);

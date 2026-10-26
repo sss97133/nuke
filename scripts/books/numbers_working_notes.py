@@ -25,7 +25,7 @@ import argparse, csv, datetime as dt, hashlib, io, json, os, re, stat, subproces
 
 SF_DATALESS = 0x40000000
 TRUST = 'owner_working_notes_contextual'
-METHOD, VERSION = 'owner-working-notes', 'numbers-context-v1'
+METHOD, VERSION = 'owner-working-notes', 'numbers-context-v2'
 CELL_MAX = 3800          # writer limit is 4000 bytes per value
 FIELDS_MAX = 100         # writer limit per run
 BODY_MAX = 240_000       # writer limit 250,000 for original + revision
@@ -46,6 +46,7 @@ MODEL_ALIASES = {'burb': 'suburban', 'pick up': 'pickup', 'k5': 'blazer'}
 COLORS = ['red', 'blue', 'white', 'black', 'green', 'ochre', 'orange', 'maroon', 'bronze', 'tan', 'silver', 'grey', 'gray',
           'yellow', 'brown', 'gold', 'camel', 'saddle', 'burgundy', 'teal', 'turquoise']
 VIN17_RE = re.compile(r'\b[A-HJ-NPR-Z0-9]{17}\b')
+SHORT_VIN_RE = re.compile(r'\b(?=[A-Z0-9]*\d)(?=[A-Z0-9]*[A-Z])[A-Z0-9]{10,13}\b')  # pre-1981 serials
 IBAN_RE = re.compile(r'[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30}')
 SSN_RE = re.compile(r'\b\d{3}-\d{2}-\d{4}\b')
 LONG_DIGITS_RE = re.compile(r'\b\d{9,}\b')
@@ -228,10 +229,16 @@ class Keys:
         """Vehicle keys named in text: VINs, or a model year next to a make/model word.
         Ties break on a colour word in the text, then on a deal jacket active during the notes' window."""
         out, low = [], text.lower()
-        for m in VIN17_RE.finditer(text.upper()):
-            hit = [v for v in self.vehicles if v['vin'] and v['vin'] == m.group(0)]
-            if hit:
-                out.append(dict(vehicle_id=hit[0]['id'], label=hit[0]['label'], match='vin'))
+        for rx in (VIN17_RE, SHORT_VIN_RE):
+            for m in rx.finditer(text.upper()):
+                hit = [v for v in self.vehicles if v['vin'] and v['vin'] == m.group(0)]
+                if len(hit) == 1:
+                    out.append(dict(vehicle_id=hit[0]['id'], label=hit[0]['label'], match='vin'))
+                elif hit:
+                    out.append(dict(vehicle_id=None, match='vin_ambiguous', text='VIN…' + m.group(0)[-6:],
+                                    candidates=[dict(vehicle_id=v['id'], label=v['label']) for v in hit[:5]]))
+        if any(x['match'] == 'vin' for x in out):
+            return [x for x in out if x['match'] == 'vin']  # a serial outranks a year/model reading of the same text
         for m in re.finditer(r"(?<![\d$.,])'?(19[2-9]\d|20[0-2]\d|[2-9]\d)(?![\d,.%:])", low):
             year = year_of(m.group(1))
             after = low[m.end(1):m.end(1) + 40]
@@ -323,7 +330,8 @@ def build_table(name_parts, rows, keys, file_year, period_floor, period_ceiling,
         ctx_years = [int(c) for _, r in nonempty[:3] for c in (cell_str(v) for v in r) if re.fullmatch(r'20[12]\d', c)]
     ctx_year = ctx_years[0] if ctx_years else (t_from.year if t_from and t_from.year == t_to.year else None)
     title_vehicles = []
-    for x in keys.vehicles_in(title, window):
+    header_text = ' ; '.join(h for h in (header or []) if h)
+    for x in keys.vehicles_in(title, window) + keys.vehicles_in(header_text, window):
         if not any((x.get('vehicle_id') or x.get('candidates')) == (y.get('vehicle_id') or y.get('candidates')) for y in title_vehicles):
             title_vehicles.append(x)
     t_orgs, t_rel = keys.orgs_in(title)
@@ -338,6 +346,10 @@ def build_table(name_parts, rows, keys, file_year, period_floor, period_ceiling,
         return len(lst) - 1
 
     out_rows, dates = [], []
+    for h in header or []:  # a dated column heading ('Jan 25, 2024') dates the sheet
+        hd = parse_date_text(h, ctx_year) if h and len(h) <= 20 and re.search(r'\d{4}|\d/\d', h) else None
+        if hd and period_floor <= hd <= period_ceiling:
+            dates.append(hd)
     for i, r in nonempty:
         cells = [cell_str(v) for v in r]
         parts = []
@@ -689,6 +701,19 @@ def psql(sql):
     return out.stdout
 
 
+def current_run(owner, sha256):
+    """The document's current (unsuperseded) run and its field keys, or None for a new original."""
+    out = psql(f"""select json_build_object('run_id', r->>'run_id', 'key', r->>'key',
+        'field_keys', (select json_agg(field_key) from financial_document_extractions e
+                       where e.document_id = d.id and e.extraction_run_id = (r->>'run_id')::uuid))
+      from financial_documents d, jsonb_array_elements(d.attributes->'runs') r
+      where d.owner_id = '{owner}' and d.content_sha256 = '{sha256}' and d.logical_index = 1
+        and not exists (select 1 from jsonb_array_elements(d.attributes->'runs') s where s->>'supersedes_run_id' = r->>'run_id')
+      limit 1;""")
+    line = next((l for l in out.splitlines() if l.startswith('{')), None)
+    return json.loads(line) if line else None
+
+
 def land(plan_path, dry, only, log_path, exts=None):
     p = json.load(open(plan_path))
     owner = p['owner_id']
@@ -699,7 +724,22 @@ def land(plan_path, dry, only, log_path, exts=None):
         key = f"{owner}/financial/{doc['sha256']}.{doc['ext']}"
         original = dict(sha256=doc['sha256'], storage_path=key, source_filename=doc['filename'][:255], source_kind='upload',
                         byte_size=str(doc['byte_size']))
-        revision = dict(idempotency_key=f"working-notes-{doc['sha256'][:8]}", method=METHOD, version=VERSION, fields=fields)
+        digest = hashlib.sha256(json.dumps(fields, sort_keys=True).encode()).hexdigest()[:8]
+        revision = dict(idempotency_key=f"working-notes-{doc['sha256'][:8]}-{digest}", method=METHOD, version=VERSION, fields=fields)
+        current = current_run(owner, doc['sha256'])
+        if current and current['key'] == revision['idempotency_key']:
+            print(json.dumps(dict(sha256=doc['sha256'], location=doc['location'], unchanged=True)))
+            continue
+        if current:
+            # A re-read supersedes the current run; the writer requires every prior field key, so a cell the new read
+            # no longer produces is carried as an empty, retired cell.
+            revision['supersedes_run_id'] = current['run_id']
+            have = {f['field_key'] for f in fields}
+            for k in current['field_keys']:
+                if k not in have:
+                    fields.append(dict(field_key=k, value_raw='retired by a later read', value_type='text',
+                                       value_normalized=dict(trust_tier=TRUST, retired=True, rows=[]),
+                                       evidence=dict(stage='owner_working_notes', retired=True, method=METHOD, version=VERSION)))
         guard(revision)
         body = json.dumps(original) + json.dumps(revision)
         if len(body.encode()) > BODY_MAX:
