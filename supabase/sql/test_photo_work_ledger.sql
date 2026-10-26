@@ -31,7 +31,7 @@ CREATE TABLE public.assets(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), asset_
   attributes jsonb DEFAULT '{}'::jsonb, created_at timestamptz DEFAULT now(), updated_at timestamptz DEFAULT now(),
   CONSTRAINT assets_asset_type_check CHECK (asset_type = ANY (ARRAY['image','vehicle','garment','publication','issue','article','shoot'])));
 CREATE TABLE public.asset_observations(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), asset_id uuid REFERENCES public.assets(id) ON DELETE CASCADE,
-  source_id uuid, kind text, observed_at timestamptz, content_text text, structured_data jsonb DEFAULT '{}'::jsonb, content_hash text,
+  source_id uuid, kind text NOT NULL, observed_at timestamptz NOT NULL, content_text text, structured_data jsonb DEFAULT '{}'::jsonb, content_hash text NOT NULL,
   confidence numeric DEFAULT 0.5, source_url text, source_identifier text, extraction_method text, agent_model text, superseded_by uuid,
   supersedes uuid, created_at timestamptz DEFAULT now());
 ALTER TABLE public.assets ENABLE ROW LEVEL SECURITY;
@@ -49,6 +49,7 @@ CREATE FUNCTION t_assert(ok boolean, what text) RETURNS void LANGUAGE plpgsql AS
 BEGIN IF ok IS NOT TRUE THEN RAISE EXCEPTION 'FAIL: %', what; END IF; RAISE NOTICE 'ok: %', what; END $$;
 
 \ir ../migrations/20261028203000_photo_work_ledger.sql
+\ir ../migrations/20261028233000_photo_work_ledger_sighting_hash.sql
 
 -- Person A (…0a) owns photos at a recurring shop cell (36.000,-115.000) on 6 days; person B (…0b) owns one photo.
 INSERT INTO vehicle_images(id, vehicle_id, user_id, image_url, taken_at, latitude, longitude, vision_gate_status, is_sensitive)
@@ -61,7 +62,8 @@ INSERT INTO vehicle_images VALUES
  ('50000000-0000-0000-0000-000000000008',NULL,'10000000-0000-0000-0000-00000000000a','https://img.example/8','2024-10-06 19:00Z',NULL,NULL,'rejected_personal',false),
  ('50000000-0000-0000-0000-000000000009',NULL,'10000000-0000-0000-0000-00000000000b','https://img.example/9','2024-10-06 19:00Z',NULL,NULL,'approved',false),
  ('50000000-0000-0000-0000-000000000010',NULL,'10000000-0000-0000-0000-00000000000a','https://img.example/10','2024-11-01 19:00Z',36.0001,-115.0001,'approved',false),
- ('50000000-0000-0000-0000-000000000011',NULL,'10000000-0000-0000-0000-00000000000a','https://img.example/11','2024-11-02 19:00Z',NULL,NULL,'approved',false);
+ ('50000000-0000-0000-0000-000000000011',NULL,'10000000-0000-0000-0000-00000000000a','https://img.example/11','2024-11-02 19:00Z',NULL,NULL,'approved',false),
+ ('50000000-0000-0000-0000-000000000012',NULL,'10000000-0000-0000-0000-00000000000a','https://img.example/12',NULL,NULL,NULL,'approved',false);
 INSERT INTO user_tools(user_id, brand, description, category, first_purchase_date) VALUES
  ('10000000-0000-0000-0000-00000000000a','Snap-on','1/2 drive impact wrench brushless','power_tool','2023-01-10');
 INSERT INTO v_financial_accounting_records VALUES
@@ -121,6 +123,11 @@ SELECT record_photo_work_readings('10000000-0000-0000-0000-00000000000a', format
 SELECT t_assert((:'w3'::jsonb) @> '{"recorded":1}' AND (SELECT count(*) FROM image_analysis_records WHERE image_id = '50000000-0000-0000-0000-000000000003' AND superseded_by IS NULL) = 1
   AND (SELECT analysis_tier FROM image_analysis_records WHERE image_id = '50000000-0000-0000-0000-000000000003' AND superseded_by IS NULL) = 2, 'tier 2 supersedes tier 1');
 
+-- A photo with no clock keeps its reading but folds no sighting (observed_at is NOT NULL live).
+SELECT record_photo_work_readings('10000000-0000-0000-0000-00000000000a', format('[{"image_id":"50000000-0000-0000-0000-000000000012","model":"m-small","reading":{"objects":[%s],"work":%s,"commerce":%s,"scene":"s","place_kind":"shop"}}]', :'tig', :'nowork', :'nocom')::jsonb) AS w4 \gset
+SELECT t_assert((:'w4'::jsonb) @> '{"recorded":1,"sightings_recorded":0,"assets_created":0}', 'undated photo: reading kept, no sighting: ' || :'w4');
+SELECT t_assert((SELECT count(*) FROM asset_observations WHERE content_hash IS NULL OR length(content_hash) <> 32) = 0, 'every sighting carries a content hash');
+
 -- Readers: the person, then another signed-in person, then anon.
 SET ROLE authenticated;
 SELECT set_config('request.jwt.claims','{"sub":"10000000-0000-0000-0000-00000000000a","role":"authenticated"}',false);
@@ -130,7 +137,7 @@ SELECT photo_footprint_traces('10000000-0000-0000-0000-00000000000a', 2024) AS t
 SELECT photo_work_proof_read('10000000-0000-0000-0000-00000000000a') AS proof \gset
 RESET ROLE;
 
-SELECT t_assert((:'own'::jsonb)->>'assets_total' = '5' AND (:'own'::jsonb)->>'readings_total' = '8', 'own read totals: ' || ((:'own'::jsonb) - 'assets')::text);
+SELECT t_assert((:'own'::jsonb)->>'assets_total' = '5' AND (:'own'::jsonb)->>'readings_total' = '9', 'own read totals: ' || ((:'own'::jsonb) - 'assets')::text);
 SELECT t_assert((SELECT a FROM jsonb_array_elements((:'own'::jsonb)->'assets') a WHERE a->>'key' = 'welding.tig')
   @> '{"photos":4,"sighting_days":3,"holding":"held","citation":"uncited","brand":"Lincoln","models_read":["Square Wave 200"],"first_image_id":"50000000-0000-0000-0000-000000000001"}',
   'TIG: tier-1 photo 3 sighting withdrawn; 4 photos on 3 days over months at the recurring shop = held, no expense names it');
