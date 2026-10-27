@@ -50,3 +50,12 @@ anchors in view, so 018 replaced it. scott-bay 022 keeps the earlier five-point 
   (x 0.42). The real wall must step outboard near the cowl; the agreed x 0.42 was kept.
 - The leg's width and length, and the front pocket's size, are by eye from vendor photos without a scale.
 - The Raybuck camera fits are silhouette fits (mean IoU 0.80 LH / 0.79 RH), so small shape errors shift the camera too.
+
+## Third pass (rebuilt from the JEGS photos)
+The cage is now the four elements in b_jegs_1/3/5/7: an arch rim flange in the fender plane (x 0.858) with a rolled
+double bead and tails past the dome, a pillowed dome stepping inboard at a creased shoulder line, flat transverse end
+panels, and a ribbed bottom flange with holes every 150 mm. The rim arc and the dome top are traced from b_jegs_7
+(0.73 mm/px from the tail-to-tail span). Heights are hung from the dome top at z 1.080. With that scale, the photo's
+tail-to-dome-top height (0.46 m) equals the OER box height, so the rim apex lands at z 0.86, not the earlier assumed 0.98.
+b_jegs_7 is read as an outboard view (the dome's convex top shows above the rim), so its left, steep tail is the front.
+The b_jegs_1/3/5 cameras are still not solved: silhouette fitting flips them to other viewpoints.

@@ -3,157 +3,144 @@
 Run headless:  Blender -b -P inner_fender_sds.py -- <out.blend> [<out.glb>]
 Twin metres: +x driver, -y forward, +z up. LH is built, RH is its mirror. The GLB is Y-up, (X,Y,Z) = (x, z, -y).
 
-Shape (receipt docs/wiring/receipts/2026-10-26_k5-inner-fender-sds.md names the photo for each feature):
-one deep-drawn tub. A low-poly cage is placed by hand: a top grid (the dome, full and high nearly to both ends) and six
-rings hung off its boundary (shoulder, wall top, wall, bend, flange root, flange tip). The engine-side wall drops to a
-straight bottom flange on the frame rail; the outboard side drops to the wheel-arch rim and its lip under the fender;
-the front end is a full-width bowl whose flange runs forward flat; the rear end closes against the cowl.
-Catmull-Clark level 3 rounds it; stamped detail (front-flange ribs, the shelf's cross ribs and pan, clip holes) is
-pressed into the subdivided sheet, then it is solidified to 1 mm.
+Built as the four elements the JEGS product photos show (receipt docs/wiring/receipts/2026-10-26_k5-inner-fender-sds.md):
+1. ARCH RIM (b_jegs_7): a flange in the fender plane following the wheel arc, a rolled double bead along it, running
+   past the dome as a short tail at the front and a long flat bolt leg at the rear (the cowl leg).
+2. DOME (b_jegs_3, b_jegs_1): a pillowed quarter-dome stepping inboard off the rim at a shoulder line, peak forward of the
+   arc centre, its engine-side face running down nearly vertical to the bottom flange.
+3. END PANELS (b_jegs_1 rear; b_jegs_3, b_jegs_5 front): a flat transverse rear panel with a diagonal crease and one
+   hole; a lower front end with a stamped round cup and a hole beside it.
+4. BOTTOM FLANGE (b_jegs_3, b_jegs_5): flat along the engine-side bottom edge, a dozen transverse ribs, holes ~150 mm.
+The cage is placed by hand from the traced curves below; Catmull-Clark level 3 with creased loops rounds it; beads, ribs,
+the cup and the panel crease are pressed into the subdivided sheet; solidify 1 mm; holes by boolean.
 """
 import bpy, bmesh, math, sys
-from mathutils import Vector
 
 # ---- placement (agreed twin anchors) -------------------------------------------------------------------------------
-X_WALL = 0.420        # engine-side wall plane
-X_OUT = 0.832         # outboard wall plane; its lip runs out to the fender line
-X_LIP = 0.858         # lip edge, under the outer fender's top lip
-Z_RAIL = 0.620        # straight bottom flange on the frame rail
-Y_FRONT = -2.505      # front flange tip on the core support's rear face
-Y_REAR = -1.440       # rear flange at the cowl
-Y_FWALL = -2.440      # front bowl wall (flange 65 mm forward of it, Raybuck LH 1-5)
-Y_RWALL = -1.462      # rear end wall
-TOP = 1.085           # dome crown (bottom flange + ~18 in OER box height, less the rim drop)
-# outboard rim height along y: b_eckler_1 trace for the crown, ends pulled down by eye to the arch in Raybuck LH 9/13, RH 9/12
-RIM = [(-2.505, 0.700), (-2.42, 0.780), (-2.30, 0.880), (-2.18, 0.950), (-2.03, 0.978), (-1.87, 0.980),
-       (-1.75, 0.968), (-1.64, 0.930), (-1.56, 0.850), (-1.50, 0.740), (-1.44, 0.640)]
-FRONT_BOT = 0.740     # the front flange lies flat at this height (Raybuck LH 1-5, b_oer_1 left end)
-REAR_BOT = 0.640      # rear edge comes down the cowl to near the rail (b_jegs_1 holed leg)
+X_RIM = 0.858         # rim flange plane: the fender plane, under the outer fender's lip
+X_WALL = 0.420        # engine-side face of the dome
+Z_RAIL = 0.620        # bottom flange on the frame rail
+Y_FRONT = -2.505      # front tail and bottom flange end at the core support's rear face
+Y_REAR = -1.440       # rear leg end at the cowl
+
+# ---- traced curves ---------------------------------------------------------------------------------------------------
+# b_jegs_7 (1500 x 660 px, LH, from outboard and a little above: the dome's convex top shows above the rim, so image
+# left = front; the steep left tail drops to the core support, the long flat right tail is the cowl leg). Scale 0.73 mm/px from the tail-to-tail span (1460 px = Y_REAR - Y_FRONT). Heights from the same
+# scale, hung from the dome top at z 1.080: the photo's tail-tip-to-dome-top height (628 px = 0.46 m) is the OER T70124
+# box height (18 in) over the rail flange, so the tails end at the rail and the rim apex lands at z 0.86.
+# Rim = lower edge of the flange band, (px column, px row):
+RIM_PX = [(20, 650), (60, 580), (110, 470), (160, 400), (210, 340), (260, 320), (400, 330), (600, 345), (800, 365),
+          (1000, 400), (1150, 440), (1250, 480), (1320, 520), (1400, 560), (1480, 590)]
+MM_PX = (Y_REAR - Y_FRONT) / 1460
 
 
-def lerp_tab(tab, y):
+def px_y(c): return Y_FRONT + (c - 20) * MM_PX
+
+
+RIM = sorted((px_y(c), 1.080 - (r - 22) * MM_PX) for c, r in RIM_PX)
+# dome top silhouette in the same photo, (column, row)
+DOME_PX = [(240, 240), (300, 200), (400, 60), (550, 30), (700, 22), (900, 35), (1000, 70), (1150, 120), (1240, 250),
+           (1290, 330)]
+DOME = sorted((px_y(c), 1.080 - (r - 22) * MM_PX) for c, r in DOME_PX)
+Y_FEND = px_y(240)    # front end panel (dome silhouette's front end in _7), y -2.344
+Y_REND = px_y(1290)   # rear end panel plane (dome's rear end), y -1.578
+BAND = 0.035          # rim flange band height (b_jegs_7: ~45 px)
+
+
+def lerp(tab, y):
     if y <= tab[0][0]: return tab[0][1]
     if y >= tab[-1][0]: return tab[-1][1]
     for (y0, z0), (y1, z1) in zip(tab, tab[1:]):
         if y0 <= y <= y1: return z0 + (z1 - z0) * (y - y0) / (y1 - y0)
 
 
-# ---- cage -----------------------------------------------------------------------------------------------------------
-NU, NV = 6, 12                        # top grid quads across (inboard -> outboard) and along (front -> rear)
-XT0, XT1 = 0.505, 0.775               # top grid x extent (shoulders roll off outside it)
-YT0, YT1 = -2.385, -1.520             # top grid y extent: the dome stays high nearly to both ends
+def section(y):
+    """(x, z) LH from the rim's arch edge round the dome to the bottom flange tip, and per-point crease weights."""
+    zr = lerp(RIM, y); zt = max(lerp(DOME, y), zr + 0.07)
+    zf = min(0.80 + 0.06 * max(0.0, min(1.0, (zt - 0.90) / 0.18)), zt - 0.12)          # where the engine-side face goes vertical
+    pts = [
+        (X_RIM, zr), (X_RIM, zr + 0.5 * BAND), (X_RIM, zr + BAND),            # flange band in the fender plane
+        (X_RIM - 0.024, zr + BAND + 0.012),                                   # step: the shoulder line (b_jegs_7)
+        (X_RIM - 0.040, zr + 0.45 * (zt - zr) + 0.02),                        # outboard flank of the dome
+        (0.77, zt - 0.025), (0.66, zt), (0.54, zt - 0.025),                   # pillowed crown
+        (0.455, zt - 0.10),                                                   # roll onto the engine-side face
+        (X_WALL + 0.004, zf), (X_WALL, Z_RAIL + 0.05), (X_WALL, Z_RAIL + 0.008),   # near-vertical face, bend
+        (X_WALL - 0.015, Z_RAIL), (X_WALL - 0.040, Z_RAIL),                   # bottom flange
+    ]
+    crease = {2: 0.9, 3: 0.7, 11: 0.8}                                        # band top, shoulder, flange bend
+    return pts, crease
 
 
-def top_z(x, y):
-    u = (x - XT0) / (XT1 - XT0); v = (y - YT0) / (YT1 - YT0)
-    z = TOP + 0.012 * (1 - u)                       # crest sits a little inboard (b_jegs_1 highlight, Raybuck LH 9)
-    z -= 0.030 * (2 * u - 1) ** 4                   # flattening off toward the shoulders
-    z -= 0.022 * max(0.0, 1 - fold_d(x, y) / 0.06)   # the fold: a shallow valley along FOLD
-    z -= 0.050 * (2 * v - 1) ** 2 + 0.050 * (2 * v - 1) ** 4   # crowned along y, ends roll off (Raybuck LH 9, RH 9)
-    return z
-
-
-FOLD = ((0.525, -1.98), (0.760, -1.62))   # dome's diagonal fold, running rearward and outboard (Raybuck LH 9, RH 9/12)
-
-
-def fold_d(x, y):
-    (x0, y0), (x1, y1) = FOLD
-    t = max(0.0, min(1.0, ((x - x0) * (x1 - x0) + (y - y0) * (y1 - y0)) / ((x1 - x0) ** 2 + (y1 - y0) ** 2)))
-    return math.hypot(x - (x0 + t * (x1 - x0)), y - (y0 + t * (y1 - y0)))
-
-
-def boundary(nu, nv):
-    """grid indices (i, j) around the top grid's boundary, counter-clockwise seen from above (LH)."""
-    ring = [(i, 0) for i in range(nu)] + [(nu, j) for j in range(nv)]
-    ring += [(i, nv) for i in range(nu, 0, -1)] + [(0, j) for j in range(nv, 0, -1)]
-    return ring
-
-
-def side_of(i, j):
-    """outward direction (dx, dy) and which wall a boundary vertex hangs off."""
-    dx = 1 if i == NU else (-1 if i == 0 else 0)
-    dy = -1 if j == 0 else (1 if j == NV else 0)
-    return dx, dy
-
-
-def wall_point(x, y, dx, dy):
-    """where a boundary vertex lands on the wall planes, and the bottom height there."""
-    wx = X_OUT if dx > 0 else (X_WALL if dx < 0 else x)
-    wy = Y_FWALL if dy < 0 else (Y_RWALL if dy > 0 else y)
-    if dx < 0: zb = Z_RAIL                            # straight engine-side flange (Raybuck RH 1, RH 9)
-    elif dx > 0: zb = lerp_tab(RIM, wy)               # wheel-arch rim
-    elif dy < 0:                                      # front bowl: flat flange, meets the rail flange at the inboard corner
-        t = (x - XT0) / (XT1 - XT0); zb = FRONT_BOT + (lerp_tab(RIM, wy) - FRONT_BOT) * max(t - 0.6, 0) / 0.4
-        zb = Z_RAIL + (zb - Z_RAIL) * min(1, 0.35 + t * 1.6)
-    else:                                             # rear end: down the cowl
-        t = (x - XT0) / (XT1 - XT0); zb = REAR_BOT + (lerp_tab(RIM, wy) - REAR_BOT) * t ** 2
-    if dx < 0 and dy != 0: zb = Z_RAIL
-    if dx > 0 and dy != 0: zb = lerp_tab(RIM, wy)
-    return wx, wy, zb
+NS = 14
+STATIONS = [Y_FEND + (Y_REND - Y_FEND) * i / (NS - 1) for i in range(NS)]
 
 
 def build_cage():
     bm = bmesh.new()
-    xs = [XT0 + (XT1 - XT0) * i / NU for i in range(NU + 1)]
-    ys = [YT0 + (YT1 - YT0) * j / NV for j in range(NV + 1)]
-    G = [[bm.verts.new((xs[i], ys[j], top_z(xs[i], ys[j]))) for j in range(NV + 1)] for i in range(NU + 1)]
-    for i in range(NU):
-        for j in range(NV):
-            bm.faces.new((G[i][j], G[i + 1][j], G[i + 1][j + 1], G[i][j + 1]))
-    ring_ij = boundary(NU, NV)
-    rings = [[G[i][j] for i, j in ring_ij]]
-    layers = []
-    for i, j in ring_ij:
-        x, y = xs[i], ys[j]; zt = top_z(x, y); dx, dy = side_of(i, j)
-        wx, wy, zb = wall_point(x, y, dx, dy)
-        h = zt - zb
-        s = min(0.085, 0.55 * h)                      # shoulder drop: big rounded shoulder (Raybuck LH 5, RH 3)
-        k = 0.90 if (dx < 0 or dy > 0) else 0.72      # defined shoulder line on the wall side and the cowl end (Raybuck LH 9, RH 9, RH 1-3)
-        sx, sy = x + (wx - x) * k, y + (wy - y) * k
-        fl = 0.030 if dx > 0 else 0.032               # flange widths: lip to the fender line, rail flange (b_jegs_1)
-        if dy < 0 and dx == 0: fl = Y_FWALL - Y_FRONT  # front flange runs forward to the core support
-        if dy > 0 and dx == 0: fl = 0.022
-        fx = (X_LIP - X_OUT) if dx > 0 else (-fl if dx < 0 else 0)
-        fy = -(Y_FWALL - Y_FRONT) if dy < 0 else (0.022 if dy > 0 else 0)
-        cols = [
-            (sx, sy, zt - 0.32 * s),                  # shoulder
-            (wx, wy, zt - s),                         # wall top
-            (wx, wy, zb + 0.35 * (zt - s - zb) + 0.012),
-            (wx, wy, zb + 0.012),                     # bend support
-            (wx + fx * 0.25, wy + fy * 0.25, zb),     # flange root
-            (wx + fx, wy + fy, zb),                   # flange tip
-        ]
-        layers.append(cols)
-    for k in range(6):
-        rings.append([bm.verts.new(layers[n][k]) for n in range(len(ring_ij))])
-    N = len(ring_ij)
-    for a, b in zip(rings, rings[1:]):
-        for n in range(N):
-            m = (n + 1) % N
-            bm.faces.new((a[n], a[m], b[m], b[n]))
-    # creases live in the cage: the wall-to-dome shoulder line (ring 2) on the engine side and the cowl end, and the
-    # dome's long diagonal fold toward the rear (Raybuck LH 9, RH 9, RH 12)
-    cr = bm.edges.layers.float.get('crease_edge') or bm.edges.layers.float.new('crease_edge')
-    for n in range(N):
-        m = (n + 1) % N; dxn, dyn = side_of(*ring_ij[n]); dxm, dym = side_of(*ring_ij[m])
-        if (dxn < 0 and dxm < 0) or (dyn > 0 and dym > 0):
-            e = bm.edges.get((rings[2][n], rings[2][m]))
-            if e: e[cr] = 0.85
-    for e in bm.edges:
-        a, b = e.verts
-        if a.co.z > 0.95 and b.co.z > 0.95 and fold_d(*((a.co + b.co) / 2)[:2]) < 0.02: e[cr] = 0.6
-    # rear: the long holed leg down the cowl at the outboard corner, a channel with turned edges (b_jegs_1, Raybuck RH 1-3)
-    yl = Y_RWALL + 0.004
-    cols = [(0.600, yl + 0.018), (0.612, yl), (0.720, yl), (0.825, yl), (0.835, yl + 0.018)]
-    zs = [0.44, 0.52, 0.60, 0.68, 0.76]
-    L = [[bm.verts.new((x, y, z)) for (x, y) in cols] for z in zs]
-    for r in range(len(zs) - 1):
-        for c in range(len(cols) - 1):
-            bm.faces.new((L[r][c], L[r][c + 1], L[r + 1][c + 1], L[r + 1][c]))
+    cr = bm.edges.layers.float.new('crease_edge')
+    rows = []
+    for y in STATIONS:
+        pts, crease = section(y)
+        rows.append([bm.verts.new((x, y, z)) for x, z in pts])
+    npt = len(rows[0])
+    for a, b in zip(rows, rows[1:]):
+        for i in range(npt - 1):
+            bm.faces.new((a[i], a[i + 1], b[i + 1], b[i]))
+    _, crease = section(STATIONS[0])
+    for a, b in zip(rows, rows[1:]):
+        for i, w in crease.items():
+            e = bm.edges.get((a[i], b[i]))
+            if e: e[cr] = w
+
+    def panel(row, y, sign):
+        """flat transverse end panel: the section closed by its chord from the shoulder to the flange bend."""
+        sec = row[3:12]; p0, p1 = sec[0].co.copy(), sec[-1].co.copy()
+        n = len(sec); grid = [sec]
+        for k in (1, 2, 3):
+            t = k / 4
+            r = []
+            for j, v in enumerate(sec):
+                if j in (0, n - 1): r.append(v); continue
+                ch = p0.lerp(p1, j / (n - 1))
+                r.append(bm.verts.new(v.co.lerp(ch, t) if k < 3 else v.co.lerp(ch, 0.96)))
+            grid.append(r)
+        for ra, rb in zip(grid, grid[1:]):
+            for j in range(n - 1):
+                q = [ra[j], ra[j + 1], rb[j + 1], rb[j]]
+                u = []
+                for v in q:
+                    if v not in u: u.append(v)
+                if len(u) >= 3: bm.faces.new(u if sign > 0 else u[::-1])
+        for j in range(n - 1):      # crease the panel's boundary with the dome: the end shoulder
+            e = bm.edges.get((sec[j], sec[j + 1]))
+            if e: e[cr] = 0.55
+        # band below the shoulder closes down to the arch edge in the panel plane
+        bm.faces.new((row[0], row[1], row[2], row[3]) if sign > 0 else (row[3], row[2], row[1], row[0]))
+
+    panel(rows[-1], Y_REND, 1)
+    panel(rows[0], Y_FEND, -1)
+
+    def tail(row, y_to, n, extra_low=0.0):
+        """rim band (and, at the front, the bottom flange) carried past the dome to y_to along the arch."""
+        prev = [row[0], row[1], row[2]]
+        y0 = row[0].co.y
+        for k in range(1, n + 1):
+            y = y0 + (y_to - y0) * k / n; zr = lerp(RIM, y)
+            cur = [bm.verts.new((X_RIM, y, zr - extra_low)), bm.verts.new((X_RIM, y, zr + 0.5 * BAND)),
+                   bm.verts.new((X_RIM, y, zr + BAND))]
+            for i in range(2): bm.faces.new((prev[i], prev[i + 1], cur[i + 1], cur[i]))
+            prev = cur
+
+    tail(rows[-1], Y_REAR, 4, extra_low=0.025)     # the long flat bolt leg to the cowl (b_jegs_7 right, b_jegs_1)
+    tail(rows[0], Y_FRONT, 3)                      # the short front tail
+    prev = rows[0][10:]                            # bottom flange runs on to the core support (b_jegs_3, _5)
+    for k in (1, 2):
+        y = Y_FEND + (Y_FRONT - Y_FEND) * k / 2
+        cur = [bm.verts.new((v.co.x, y, v.co.z)) for v in prev]
+        for i in range(len(cur) - 1): bm.faces.new((prev[i], prev[i + 1], cur[i + 1], cur[i]))
+        prev = cur
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     me = bpy.data.meshes.new("cage"); bm.to_mesh(me); bm.free()
-    for p in me.polygons:
-        if p.normal.z < -0.2 and p.center.z > 1.0: p.flip()
     return me
 
 
@@ -166,49 +153,35 @@ def stamp(me):
     me.update()
     for v in me.vertices:
         x, y, z = v.co; n = v.normal; off = 0.0
-        # front flange: stamped stiffening ribs across it (Raybuck LH 1-5, b_oer_1 upper left)
-        if y < Y_FWALL - 0.008 and abs(n.z) > 0.7:
-            for k in range(7):
-                xc = 0.47 + k * 0.055
-                if abs(x - xc) < 0.012 and Y_FRONT + 0.012 < y < Y_FWALL - 0.012: off += 0.006 * bump(x - xc, 0.012)
-        # outboard flange, front third: short ribs across the lip (b_oer_1 top edge, Raybuck RH 5-8)
-        if x > X_OUT + 0.006 and y < -2.15:
-            for k in range(6):
-                yc = -2.40 + k * 0.045
-                if abs(y - yc) < 0.009: off += 0.004 * bump(y - yc, 0.009)
-        # shelf: the "+" stamped ribs and the shallow pan beside them (b_oer_1, mirrored to LH)
-        if n.z > 0.85:
-            cy, cx = -1.80, 0.640
-            if abs(y - cy) < 0.10 and abs(x - cx) < 0.010: off += 0.004 * bump(x - cx, 0.010)
-            if abs(x - cx) < 0.09 and abs(y - cy) < 0.010: off += 0.004 * bump(y - cy, 0.010)
-            r = math.hypot((x - 0.650) / 0.085, (y - (-1.93)) / 0.075)
-            if r < 1: off -= 0.008 * bump(r, 1.0)
-        # rail flange: a long stiffening bead just above the bend (Raybuck RH 9-12)
-        if abs(x - X_WALL) < 0.006 and abs(z - (Z_RAIL + 0.040)) < 0.010 and -2.40 < y < -1.50:
-            off += 0.004 * bump(z - (Z_RAIL + 0.040), 0.010) * -1
-        # engine-side wall: the long step bead at mid height that catches the highlight band (Raybuck LH 9, RH 9)
-        if abs(x - X_WALL) < 0.01 and abs(n.x) > 0.7 and -2.42 < y < -1.48:
-            zc = Z_RAIL + 0.20
-            if abs(z - zc) < 0.025: off -= 0.007 * bump(z - zc, 0.025)
-        # front bowl: the cup pocket pressed into the end face (Raybuck LH 1-5)
-        if n.y < -0.8 and y < Y_FWALL + 0.06:
-            r = math.hypot((x - 0.565) / 0.070, (z - 0.855) / 0.060)
-            if r < 1: off -= 0.030 * bump(r, 1.0)
-        # rear end panel: the diagonal crease across it (Raybuck RH 1-3, b_jegs_1)
-        if n.y > 0.6 and y > Y_RWALL - 0.03:
-            (x0, z0), (x1, z1) = (0.47, 0.70), (0.74, 0.99)
+        # rim: rolled double bead along the band (b_jegs_7, b_jegs_3)
+        if x > X_RIM - 0.004 and abs(n.x) > 0.7:
+            zr = lerp(RIM, y)
+            for zc in (zr + 0.010, zr + 0.024):
+                if abs(z - zc) < 0.006: off += 0.0035 * bump(z - zc, 0.006)
+        # bottom flange: a dozen short transverse stiffening ribs (b_jegs_3 lower right, b_jegs_5)
+        if x < X_WALL - 0.008 and z < Z_RAIL + 0.004 and abs(n.z) > 0.7:
+            for k in range(12):
+                yc = -2.47 + k * 0.074
+                if abs(y - yc) < 0.007: off += 0.004 * bump(y - yc, 0.007)
+        # front end: the stamped round cup, ~100 mm, near the bottom (b_jegs_3, b_jegs_5)
+        if n.y < -0.6 and y < Y_FEND + 0.05:
+            r = math.hypot((x - 0.50) / 0.050, (z - 0.74) / 0.050)
+            if r < 1: off -= 0.025 * bump(r, 1.0)
+        # rear panel: the diagonal crease from the top shoulder down toward the leg (b_jegs_1)
+        if n.y > 0.6 and y > Y_REND - 0.03:
+            (x0, z0), (x1, z1) = (0.52, 0.99), (0.80, 0.80)
             dd = abs((x1 - x0) * (z0 - z) - (x0 - x) * (z1 - z0)) / math.hypot(x1 - x0, z1 - z0)
-            if dd < 0.012 and x0 - 0.01 < x < x1 + 0.01: off -= 0.008 * bump(dd, 0.012)
+            if dd < 0.010 and x0 - 0.01 < x < x1 + 0.01: off -= 0.007 * bump(dd, 0.010)
         if off: v.co = v.co + n * off
 
 
-HOLES = (  # clip/bolt holes: (x, y, z, axis, radius); from b_jegs_1, b_oer_1, b_jegs_7
-    [(X_WALL - 0.020, -2.30 + k * 0.20, Z_RAIL, 'Z', 0.0045) for k in range(5)] +          # rail flange
-    [(X_OUT + 0.016, y, lerp_tab(RIM, y), 'Z', 0.004) for y in (-2.33, -2.12, -1.90, -1.68, -1.56)] +   # fender lip
-    [(0.48 + k * 0.11, Y_FRONT + 0.030, FRONT_BOT, 'Z', 0.005) for k in range(3)] +        # front flange
-    [(0.62, Y_RWALL, 0.82, 'Y', 0.011)] +                                                    # rear end face, big round
-    [(0.72, Y_RWALL + 0.004, 0.48 + k * 0.08, 'Y', 0.006) for k in range(3)] +             # holes down the leg
-    [(0.62, -2.25, top_z(0.62, -2.25), 'Z', 0.0035), (0.70, -1.62, top_z(0.70, -1.62), 'Z', 0.0035)]  # shelf
+HOLES = (  # (x, y, z, axis, radius)
+    [(X_WALL - 0.027, -2.46 + k * 0.15, Z_RAIL, 'Z', 0.0045) for k in range(6)] +          # bottom flange, ~150 mm
+    [(X_RIM, y, lerp(RIM, y) + 0.017, 'X', 0.004) for y in (-2.30, -2.05, -1.80)] +        # rim band (b_jegs_7, _5)
+    [(X_RIM, -1.50, lerp(RIM, -1.50) + 0.005, 'X', 0.0055)] +                             # the leg's hole (b_jegs_1)
+    [(0.64, Y_REND, 0.86, 'Y', 0.0065)] +                                                   # rear panel, mid height
+    [(0.575, Y_FEND, 0.72, 'Y', 0.005)] +                                                   # beside the cup
+    [(0.66, -1.95, lerp(DOME, -1.95), 'Z', 0.0035)]                                         # crown hole (b_jegs_7)
 )
 
 
@@ -221,9 +194,9 @@ def make_side(name, me_cage, sx, mat):
     sol = ob.modifiers.new("sol", "SOLIDIFY"); sol.thickness = 0.001; sol.offset = 0
     bpy.ops.object.modifier_apply(modifier="sol")
     cutters = []
+    rot = {'X': (0, math.pi / 2, 0), 'Y': (math.pi / 2, 0, 0), 'Z': (0, 0, 0)}
     for (x, y, z, ax, r) in HOLES:
-        bpy.ops.mesh.primitive_cylinder_add(vertices=12, radius=r, depth=0.04, location=(x, y, z),
-                                            rotation=(math.pi / 2, 0, 0) if ax == 'Y' else (0, 0, 0))
+        bpy.ops.mesh.primitive_cylinder_add(vertices=12, radius=r, depth=0.04, location=(x, y, z), rotation=rot[ax])
         cutters.append(bpy.context.object)
     for c in cutters: c.select_set(True)
     bpy.context.view_layer.objects.active = cutters[0]; bpy.ops.object.join(); cut = bpy.context.object
