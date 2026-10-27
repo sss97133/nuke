@@ -141,3 +141,28 @@ Least sure (assumed, not measured):
 - End walls: _03 reads as a ~40 mm flange that follows the dipped profile; the model's wall is a flat 76 mm strip.
 - Headlamp-panel outline and depth (30 mm) and the hood-latch plate, which no photo here shows clearly.
 - Photos are not committed (third-party and owner photos; public repo).
+
+## Third pass: sections thinned to the NOS part (2026-10-26)
+The owner saw the second pass in the live viewer and said it reads as blocks. Changes in `core_support_blender.py`:
+- Upper tie bar: an open channel, 62 mm deep and 70 mm tall, open toward the engine. It has a 22 mm return flange on
+  the face and a top wall that runs back past the face with a turned-down lip (_03 left end, about 90 px at
+  0.65 mm/px; _13).
+- Lower tie bar: a 40 mm deep, 60 mm tall trough with a 22 mm top return on the face and the 40 mm rear lip
+  (_03 right end, _17).
+- The face sheet now stops where the channels begin (z 0.691 to 1.188), so nothing is a closed box.
+- Radiator posts: 50 mm flanged hat channels, tapering from 45 mm deep at the bottom to 60 mm at the top
+  (_16, _17). The direction of the taper is assumed.
+- End flanges: 40 mm, turned rearward off the face edge and following its dip, with five 9 mm holes (_03).
+- Headlamp step wall widened to a 28 mm radiused S. Lamp collars are 5 mm and 9 mm.
+- Every bend is beveled 3.5 mm.
+- Material: satin dark grey, base 0.13 linear, metallic 0, roughness 0.35. The inner fender and firewall use the same
+  numbers.
+- 0.65 MB; `strip_and_scan` passes.
+
+Checked by side-by-sides on _03, _16 and _10, and by renders under viewer-like lighting (Blender studio HDRI at 0.5,
+two suns, AgX).
+
+Least sure:
+- Post depth and taper. In _16 the posts look deeper than 60 mm. `{unknown, needs: tape across a post at each end}`
+- Upper channel orientation (open toward the engine) and the top-wall overhang behind the face.
+- Lower trough depth (40 mm) and its height on the face.
