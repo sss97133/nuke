@@ -267,6 +267,7 @@ function EmailsTab({ alertsOnly = false }: { alertsOnly?: boolean }) {
   const [replyText, setReplyText] = useState('');
   const [sending, setSending] = useState(false);
   const [counts, setCounts] = useState<Record<string, { total: number; unread: number }>>({});
+  const [countsUnavailable, setCountsUnavailable] = useState(false);
   const [showMobileDetail, setShowMobileDetail] = useState(false);
 
   const fetchEmails = useCallback(async () => {
@@ -292,6 +293,7 @@ function EmailsTab({ alertsOnly = false }: { alertsOnly?: boolean }) {
 
   const fetchCounts = useCallback(async () => {
     const next = await readInboxCounts();
+    setCountsUnavailable(next === null);
     if (next) setCounts(next);
   }, []);
 
@@ -366,7 +368,7 @@ function EmailsTab({ alertsOnly = false }: { alertsOnly?: boolean }) {
 
   const mailboxesWithEmails = Object.keys(counts).filter(addr =>
     alertsOnly ? addr.includes('alerts') : !addr.includes('alerts')
-  );
+  ).sort();
 
   return (
     <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
@@ -414,6 +416,27 @@ function EmailsTab({ alertsOnly = false }: { alertsOnly?: boolean }) {
                 {f}
               </button>
             ))}
+          </div>
+        )}
+
+        {!alertsOnly && (mailboxesWithEmails.length > 0 || mailboxFilter !== 'all' || countsUnavailable) && (
+          <div className="inbox-mailboxes" role="group" aria-label="Mailbox totals">
+            <button type="button" aria-pressed={mailboxFilter === 'all'} onClick={() => setMailboxFilter('all')}>All mailboxes</button>
+            {mailboxesWithEmails.map(address => (
+              <button type="button" key={address} aria-pressed={mailboxFilter === address}
+                aria-label={`${address}: ${counts[address].unread} unread, ${counts[address].total} total`}
+                onClick={() => setMailboxFilter(address)}>
+                <MailboxDot address={address} />
+                <span>{address}</span>
+                <span className="inbox-mailbox-total">{counts[address].unread} unread · {counts[address].total} total</span>
+              </button>
+            ))}
+            {countsUnavailable && (
+              <div className="inbox-count-status" role="status">
+                <span>{mailboxesWithEmails.length ? 'Counts could not refresh; last loaded totals are shown.' : 'Mailbox counts are unavailable.'}</span>
+                <button type="button" onClick={fetchCounts}>Retry counts</button>
+              </div>
+            )}
           </div>
         )}
 
@@ -1408,6 +1431,11 @@ export default function TeamInbox() {
         }
         .inbox-mobile-tabbar { display: none; }
         .inbox-email-row:hover { background: var(--surface-hover) !important; }
+        .inbox-mailboxes { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 12px; border-bottom: 1px solid var(--border); }
+        .inbox-mailboxes button { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; min-height: 44px; max-width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--text); font-family: var(--font-family); font-size: var(--text-caption); overflow-wrap: anywhere; cursor: pointer; }
+        .inbox-mailboxes button[aria-pressed="true"] { border-color: var(--accent); background: var(--surface-hover); }
+        .inbox-mailbox-total { color: var(--text-muted); font-variant-numeric: tabular-nums; }
+        .inbox-count-status { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; font-size: var(--text-caption); color: var(--text-muted); }
         .email-body img { max-width: 100%; height: auto; border-radius: 0; margin: 8px 0; display: block; }
         .email-body a { color: var(--primary, var(--accent)); text-decoration: underline; }
         .email-body p { margin: 0 0 12px; }
