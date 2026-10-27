@@ -86,8 +86,8 @@ P = {
     "head_w": D(224.0, "head width across the deck (exhaust face to intake face); not dimensioned", "assumed", 15.0),
     "head_h": D(118.0, "deck to the rocker-cover rail; not dimensioned", "assumed", 15.0),
     "head_len": D(470.0, "4 bores (3 x 111.76 + 103.25 = 438.5) + head-bolt bosses at each end; not dimensioned", "assumed", 15.0),
-    "cover_w": D(176.0, PH30 + " / " + PH32 + ": Delmo DELVC01 'Chevrolet-Script SB Valve Covers, Black Paint' (receipt item ef6b4452) on the heads", "photo", 15.0),
-    "cover_h": D(78.0, PH30 + " / " + PH32 + ": cover height against the head", "photo", 15.0),
+    "cover_w": D(140.0, PH30 + " / " + PH32 + ": Delmo DELVC01 'Chevrolet-Script SB Valve Covers, Black Paint' (receipt item ef6b4452) on the heads", "photo", 15.0),
+    "cover_h": D(72.0, PH30 + " / " + PH32 + ": cover height against the head", "photo", 15.0),
     "front_cover_t": D(20.0, "Gen IV front (timing) cover depth ahead of the block face; not dimensioned", "assumed", 8.0),
     "pan_depth_z": D(-225.0, LS3M_SIDE + ": pan bottom 225 below the crank (the marine pan)", "scaled", 15.0,
                      "the truck's pan model is not on record: drawn at the LS3M marine pan depth with a rear sump (4WD front-axle clearance), ASSUMED"),
@@ -438,7 +438,7 @@ def text_mesh(body, size, depth):
     cu.body = body
     cu.size = size
     cu.extrude = depth / 2
-    cu.resolution_u = 2          # keeps the lettering to a few thousand triangles
+    cu.resolution_u = 8          # smooth script strokes (2 garbled the letters at 92 mm)
     cu.align_x, cu.align_y = "CENTER", "CENTER"
     for f in ("/System/Library/Fonts/Supplemental/Brush Script.ttf",):   # a script face like the covers'; Blender's own font otherwise
         if Path(f).exists():
@@ -617,14 +617,29 @@ def build():
         if not scan:
             join(f"head_{tag}", [bank_box(sig, 0, HH, -HW / 2, HW / 2, yc - HL / 2, yc + HL / 2)], "block", bevel=7)
         CW, CH = v("cover_w"), v("cover_h")
-        join(f"valve_cover_{tag}", [bank_box(sig, HH, HH + CH, -CW / 2, CW / 2, yc - HL / 2 + 8, yc + HL / 2 - 8)], "cover", bevel=22)
+        # small-block Chevy stamped cover (Delmo DELVC01 on its LS adapter): a base lip, sloped side walls, a flat top
+        # 30 mm narrower than the base; the side the script sits on leans out with the bank (IMG_6530 / IMG_6532)
+        y0c, y1c = yc - HL / 2 + 4, yc + HL / 2 - 4
+        prof = [(HH, -CW / 2 - 6), (HH, CW / 2 + 6), (HH + 7, CW / 2 + 6), (HH + 9, CW / 2), (HH + CH, CW / 2 - 15),
+                (HH + CH, -CW / 2 + 15), (HH + 9, -CW / 2), (HH + 7, -CW / 2 - 6)]
+        cb = bmesh.new()
+        a_ = [cb.verts.new(bank_pt(sig, s_, r_, y0c)) for s_, r_ in prof]
+        b_ = [cb.verts.new(bank_pt(sig, s_, r_, y1c)) for s_, r_ in prof]
+        for k_ in range(len(prof)):
+            cb.faces.new((a_[k_], a_[(k_ + 1) % len(prof)], b_[(k_ + 1) % len(prof)], b_[k_]))
+        cb.faces.new(list(reversed(a_)))
+        cb.faces.new(b_)
+        bmesh.ops.recalc_face_normals(cb, faces=cb.faces)
+        join(f"valve_cover_{tag}", [cb], "cover", bevel=9)
         # the covers' embossed "Chevrolet" script on the outer face (IMG_6530 / IMG_6532), redrawn, cosmetic
         n3 = Vector((sig * S45, 0, C45))
         t3 = Vector((sig * C45, 0, -S45))
         rot = Matrix((Vector((0, sig, 0)), n3, t3)).transposed().to_4x4()
-        txt = text_mesh("Chevrolet", 64.0, 2.5)
+        txt = text_mesh("Chevrolet", 92.0, 3.0)   # the pressed script runs most of the cover's length (IMG_6532)
         bmesh.ops.transform(txt, matrix=rot, verts=txt.verts)
-        bmesh.ops.translate(txt, vec=bank_pt(sig, HH + CH / 2, CW / 2 + 1.0, yc), verts=txt.verts)
+        wall = math.atan2(15.0, CH - 9)                 # the outer wall leans in by this much from the bank axis
+        bmesh.ops.rotate(txt, cent=(0, 0, 0), matrix=Matrix.Rotation(sig * wall, 4, Vector((0, 1, 0))), verts=txt.verts)
+        bmesh.ops.translate(txt, vec=bank_pt(sig, HH + 9 + (CH - 9) * 0.5, CW / 2 - 7.5 + 0.5, yc), verts=txt.verts)
         join(f"valve_cover_script_{tag}", [txt], "cover")
         # hold-down bolts along the cover's outer rail, as in IMG_6532 (count and spacing cosmetic)
         bolts = [hex_bolt(bank_pt(sig, HH + 10, CW / 2 - 6, yc + k * (HL - 60) / 3), n3) for k in (-1.5, -0.5, 0.5, 1.5)]
@@ -757,18 +772,54 @@ def build():
     for sig in (1, -1):   # legs back to the heads' front faces, where the pump bolts over the coolant outlets
         hf = HEAD_Y[sig] - v("head_len") / 2
         mm.append(cyl((sig * 125, (FACE + hf) / 2 + 2, 185), 56, abs(hf - FACE) + 4))
-    wp_mesh = opt("--wp-mesh")
-    if wp_mesh:   # Holley Mid-Mount LS cooling manifold (97-163 natural / 97-167 black, one casting) from the maker's
-        # photos (TRELLIS): its front face (mesh -z) forward, turned in its plane so bore and thermostat outlet land on the layout; 572 mm/unit from the bore to
-        # thermostat-outlet span (0.444 units) against the 254 mm of the H335 belt-render layout; bore on the pump axis
-        part_mesh(wp_mesh, "midmount_bracket", 572.0, (WX, MF, WZ), rot=((-0.9883, -0.1527, 0), (0, 0, 1), (-0.1527, 0.9883, 0)),
-                  anchor=(-0.051, 0.034, -0.16), material=material("manifold"))
+    wp_outline = opt("--wp-outline")
+    if wp_outline:
+        # Holley Mid-Mount LS cooling manifold traced off the maker's straight-on photo (billys_97-167_01, 2000 px;
+        # outline and bolt holes by threshold + contour): a 14 mm cast front plate in that outline with its holes, raised
+        # rings at the pump-bore flange and the thermostat outlet, and bolt bosses back to the cover. Scale 0.246 mm/px:
+        # bore centre to the thermostat end = 265 mm, the H335 belt-render layout's span. Bore centre on the pump axis.
+        ol = json.loads(Path(wp_outline).read_text())
+        K, BX, BZ = 0.246, 1143.0, 1055.0
+        to = lambda px, pz: (WX + (px - BX) * K, WZ - (pz - BZ) * K)
+        cu = bpy.data.curves.new("mm_outline", "CURVE")
+        cu.dimensions = "2D"
+        cu.fill_mode = "BOTH"
+        cu.extrude = 7.0
+        cu.bevel_depth = 1.5
+        for loop in [ol["outer"]] + ol["holes"]:
+            sp = cu.splines.new("POLY")
+            sp.points.add(len(loop) - 1)
+            for pt, (px, pz) in zip(sp.points, loop):
+                x_, z_ = to(px, pz)
+                pt.co = (x_, z_, 0.0, 1.0)
+            sp.use_cyclic_u = True
+        ob = bpy.data.objects.new("mm_outline", cu)
+        bpy.context.scene.collection.objects.link(ob)
+        bpy.context.view_layer.update()
+        me = bpy.data.meshes.new_from_object(ob.evaluated_get(bpy.context.evaluated_depsgraph_get()))
+        bpy.data.objects.remove(ob)
+        bpy.data.curves.remove(cu)
+        plate = bmesh.new()
+        plate.from_mesh(me)
+        bpy.data.meshes.remove(me)
+        # curve plane is x-y; stand it up: (x, y, z) -> (x, MF + 7 - z, y)
+        bmesh.ops.transform(plate, matrix=Matrix(((1, 0, 0, 0), (0, 0, -1, MF + 7), (0, 1, 0, 0), (0, 0, 0, 1))), verts=plate.verts)
+        parts = [plate,
+                 ring((WX, MF - 6, WZ), 2 * 177 * K, 2 * 225 * K, 12, axis="y", seg=72),      # bore flange (Hough r 177 / 225 px)
+                 ring((to(437, 1280)[0], MF - 8, to(437, 1280)[1]), 90 * K * 2 * 0.62, 150 * K * 2 * 0.62, 16, axis="y", seg=48)]
+        for hl in ol["holes"]:   # a boss behind every bolt hole, back to the cover face
+            xs = [q[0] for q in hl]; zs = [q[1] for q in hl]
+            r_px = (max(xs) - min(xs)) / 2
+            if r_px * K < 14:
+                hx, hz = to((max(xs) + min(xs)) / 2, (max(zs) + min(zs)) / 2)
+                parts.append(ring((hx, (MF + 14 + FACE) / 2, hz), 2 * r_px * K, 2 * r_px * K + 14, abs(FACE - MF - 14), axis="y", seg=20))
+        join("midmount_bracket", parts, "manifold", bevel=0)
     else:
         join("midmount_bracket", mm, "manifold", bevel=6)
-    if not wp_mesh:
+    if not wp_outline:
         join("midmount_fittings", [cyl((-95, MF - 20, 225), 19, 45), cyl((-240, MF - 18, 110), 38, 40)], "chrome")   # heater barb, inlet (IMG_6531)
 
-    join("water_pump", [cyl((WX, BY, WZ), v("wp_d"), 30), cyl((WX, (BY + MF) / 2, WZ), 70, abs(MF - BY) + 4),
+    join("water_pump", [cyl((WX, BY, WZ), v("wp_d"), 30), cyl((WX, (BY + MF) / 2, WZ), 56, abs(MF - BY) + 4),
                         cyl((WX, BY - 16, WZ), 44, 6)], "anod", bevel=0)
 
     AL, ACD, APD = v("alt_len"), v("alt_case_d"), v("alt_pulley_d")
