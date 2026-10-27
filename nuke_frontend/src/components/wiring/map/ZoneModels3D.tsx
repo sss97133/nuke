@@ -11,6 +11,7 @@ import React, { Suspense, forwardRef, useEffect, useImperativeHandle, useLayoutE
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Html, OrbitControls, useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import type { Colorway } from '../connector-inspector/colorways';
 import { frame, rule } from '../connector-inspector/colorways';
 import { SECTIONS } from './useWiringMap';
@@ -194,11 +195,12 @@ export default function ZoneModels3D({ cw, ix, site, sel, rel, onSelect, onClear
 
   return (
     <div style={{ position: 'relative', height: '100%', background: cw.surface, overflow: 'hidden' }}>
-      <Canvas camera={{ position: [2.4, 1.7, 2.6], fov: 32, near: 0.01, far: 200 }} dpr={[1, 2]} style={{ background: cw.surface }}>
-        <ambientLight intensity={0.9} />
-        <hemisphereLight args={['#ffffff', '#8a8f96', 0.7]} />
-        <directionalLight position={[3, 5, 4]} intensity={1.5} />
-        <directionalLight position={[-4, 3, -3]} intensity={0.6} />
+      <Canvas camera={{ position: [2.4, 1.7, 2.6], fov: 32, near: 0.01, far: 200 }} dpr={[1, 2]} style={{ background: cw.surface }}
+        gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.05 }}>
+        <Studio />
+        <ambientLight intensity={0.15} />
+        <directionalLight position={[3, 5, 4]} intensity={1.6} />
+        <directionalLight position={[-4, 3, -3]} intensity={0.5} />
         {ZONES.filter(z => zones.has(z.id)).map(z => (
           <Suspense key={z.id} fallback={null}><ZoneScene zone={z.id} url={z.url} ix={ix} reg={reg} hides={hides} /></Suspense>
         ))}
@@ -348,6 +350,20 @@ function useLayerFiles(): Record<string, boolean> {
     return () => { off = true; };
   }, []);
   return have;
+}
+
+// a studio room for reflections, built in the page (no HDR download): metals, paint and the clear-coated covers read as
+// their finishes instead of flat colour
+function Studio() {
+  const { gl, scene } = useThree();
+  useEffect(() => {
+    const pm = new THREE.PMREMGenerator(gl);
+    const env = pm.fromScene(new RoomEnvironment(), 0.04).texture;
+    scene.environment = env;
+    scene.environmentIntensity = 0.85;
+    return () => { scene.environment = null; env.dispose(); pm.dispose(); };
+  }, [gl, scene]);
+  return null;
 }
 
 // one zone GLB: its meshes keyed by the end or loom segment they draw; `hides` takes out what a layer or part replaces
