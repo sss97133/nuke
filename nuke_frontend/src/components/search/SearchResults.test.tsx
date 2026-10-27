@@ -85,3 +85,12 @@ it('exposes sort and view controls with their current selection', async () => {
   await act(async () => list.click());
   expect(grid.getAttribute('aria-pressed')).toBe('false'); expect(list.getAttribute('aria-pressed')).toBe('true');
 });
+
+it('keeps one count and no duplicate type/facet strip for a vehicle-only result set', async () => {
+  const vehicles = Array.from({ length: 3 }, (_, i) => ({ ...results[0], id: `vehicle-${i}`, metadata: { year: 1987, make: 'Chevrolet', model: 'K5 Blazer', series: 'K5 Blazer (Full-Size)', body_style: 'SUV' } }));
+  await act(async () => root.render(<SearchResults results={vehicles} searchSummary="Loaded 3 results." totalCount={3} />));
+  expect(container.querySelector('.search-result-count')?.textContent).toBe('3 vehicles');
+  expect(container.querySelector('.search-results-summary')).toBeNull();
+  expect(container.querySelector('[data-testid="header-search-facets"]')).toBeNull();
+  expect(container.querySelector('[role="group"][aria-label="Result view"]')).not.toBeNull();
+});

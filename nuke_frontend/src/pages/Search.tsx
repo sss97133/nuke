@@ -4,6 +4,7 @@ import Link from '../components/PrefetchLink';
 import { Button } from '../components/ui/button';
 import { useSearchPage } from '../hooks/useSearchPage';
 import { useSearchEmptyState } from '../hooks/useSearchEmptyState';
+import { usePageTitle } from '../hooks/usePageTitle';
 import SearchResults from '../components/search/SearchResults';
 import { SearchFilterPanel } from '../components/search/SearchFilterPanel';
 import { SearchStatsBar } from '../components/search/SearchStatsBar';
@@ -88,6 +89,8 @@ export default function Search() {
 
   const emptyState = useSearchEmptyState(!query);
   const resultsRef = useRef<HTMLDivElement | null>(null);
+  usePageTitle(query ? `Search · ${query}` : 'Search');
+  const activeFilters = [filters.make, filters.priceMin, filters.priceMax, filters.yearMin, filters.yearMax, filters.mileageMax, filters.transmission, filters.listingStatus].filter(Boolean).length;
 
   return (
     <main className="search-page">
@@ -106,55 +109,10 @@ export default function Search() {
       {/* Active search: filters + results */}
       {query && !urlExtraction && (
         <>
-          {vehicleCount > 0 && (
-            <p style={{ color: 'var(--text-secondary)' }}>
-              {displayVehicleCount} of {vehicleCount} loaded vehicle records shown.
-              {' '}Recorded prices may be past sales, estimates, or asks. Current purchase availability is unverified.
-              {(filters.priceMin || filters.priceMax) && ' Price bounds apply to these loaded records; unknown prices are excluded. This is not an exhaustive market shortlist.'}
-            </p>
-          )}
-          {/* Cohort terminal link — only when the query is a clean year-make-model */}
-          {cohortTarget && (
-            <Link className="search-page-link"
-              to={cohortTarget.path}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: '12px',
-                border: '1px solid var(--border)',
-                background: 'var(--surface)',
-                padding: '10px 14px',
-                marginBottom: '12px',
-                textDecoration: 'none',
-                transition: 'opacity 180ms cubic-bezier(0.16, 1, 0.3, 1)',
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.7'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; }}
-            >
-              <div>
-                <div style={{ fontWeight: 800, color: 'var(--text-muted)' }}>
-                  Cohort Terminal
-                </div>
-                <div style={{ fontWeight: 800, color: 'var(--text)' }}>
-                  {cohortTarget.label}
-                </div>
-              </div>
-              <div style={{ fontWeight: 800, color: 'var(--text)' }}>
-                View terminal &rarr;
-              </div>
-            </Link>
-          )}
-
-          {/* Filter panel — above results, collapsed by default */}
-          {vehicleCount > 0 && (
-            <SearchFilterPanel
-              filters={filters}
-              onChange={setFilters}
-              vehicleCount={vehicleCount}
-              displayVehicleCount={displayVehicleCount}
-            />
-          )}
+          <div className="search-context-row">
+            {cohortTarget && <Link to={cohortTarget.path} aria-label={`Open market briefing for ${cohortTarget.label}`}>Market briefing ↗</Link>}
+            {vehicleCount > 0 && <details className="search-record-basis"><summary>About these records</summary><p>{displayVehicleCount} of {vehicleCount} loaded vehicle records shown. Recorded prices may be past sales, estimates, or asks. Current purchase availability is unverified.{(filters.priceMin || filters.priceMax) && ' Price bounds apply to these loaded records; unknown prices are excluded. This is not an exhaustive market shortlist.'}</p></details>}
+          </div>
 
           {/* Results */}
           <div ref={resultsRef}>
@@ -167,12 +125,14 @@ export default function Search() {
               loading={loading}
               activeFilter={resultFilter}
               onFilterChange={setResultFilter}
-              totalCount={searchMeta?.total_count}
+              totalCount={activeFilters ? null : searchMeta?.total_count}
               hasMore={searchMeta?.has_more && !searchMeta.pagination_limited}
               paginationLimited={searchMeta?.pagination_limited}
               onLoadMore={handleLoadMore}
               loadingMore={loadingMore}
               loadMoreError={loadMoreError}
+              filterControls={vehicleCount > 0 ? <button type="button" className="search-result-control search-filters-toggle" aria-expanded={filters.showFilters} aria-controls="search-vehicle-filters" onClick={() => setFilters({ ...filters, showFilters: !filters.showFilters })}>Filters{activeFilters ? ` (${activeFilters})` : ''}</button> : undefined}
+              filterPanel={vehicleCount > 0 && filters.showFilters ? <div id="search-vehicle-filters"><SearchFilterPanel filters={filters} onChange={setFilters} vehicleCount={vehicleCount} displayVehicleCount={displayVehicleCount} hideToggle /></div> : undefined}
             />}
           </div>
 
