@@ -85,8 +85,12 @@ export default function ZoneModels3D({ cw, ix, site, sel, rel, onSelect, onClear
     () => Object.fromEntries(LAYERS.filter(l => l.off).map(l => [l.id, false])));
 
   // what the loaded layers and parts replace in the zone GLBs (only once they are drawn)
-  const hidePats: string[] = [...ZONE_HIDES], keepPats: string[] = [];
-  LAYERS.forEach(l => { if (layerOn[l.id] !== false && reg.has('layer:' + l.id)) { hidePats.push(...l.hides); keepPats.push(...(l.keeps ?? [])); } });
+  const hidePats: string[] = [...ZONE_HIDES], keepPats: string[] = [], layerPats: Record<string, string[]> = {};
+  LAYERS.forEach(l => {
+    if (layerOn[l.id] === false || !reg.has('layer:' + l.id)) return;
+    hidePats.push(...l.hides); keepPats.push(...(l.keeps ?? []));
+    Object.entries(l.hidesIn ?? {}).forEach(([id, names]) => { (layerPats[id] ??= []).push(...names); });
+  });
   TRUE_PARTS.forEach(p => { if (reg.has('part:' + p.code)) hidePats.push(...p.hides); });
   const hideKey = hidePats.join('|') + '#' + keepPats.join('|');
   const hides = useMemo(() => {
@@ -211,7 +215,7 @@ export default function ZoneModels3D({ cw, ix, site, sel, rel, onSelect, onClear
           </Suspense>
         ))}
         {LAYERS.filter(l => layerFiles[l.id] && layerOn[l.id] !== false).map(l => (
-          <Suspense key={l.id} fallback={null}><LayerScene id={l.id} url={l.url} ix={ix} reg={reg} /></Suspense>
+          <Suspense key={l.id} fallback={null}><LayerScene id={l.id} url={l.url} ix={ix} reg={reg} hidden={(layerPats[l.id] ?? []).join('|')} /></Suspense>
         ))}
         <Highlighter reg={reg} ver={ver} sel={sel} rel={rel} hover={hover?.key ?? null} focus={focus} accent={cw.accent} />
         <Picker reg={reg} onHover={setHover} onPick={key => { setFocus(null); onSelect(key); }} />
@@ -470,7 +474,8 @@ function PartScene({ part, spot, ix, reg, mountAt }: {
 }
 
 // another lane's layer (frame, engine): drawn as published, listed by its node names
-function LayerScene({ id, url, ix, reg }: { id: string; url: string; ix: WsIndex; reg: Registry }) {
+// `hidden`: '|'-joined node names another drawn layer replaces in this file (LayerDef.hidesIn)
+function LayerScene({ id, url, ix, reg, hidden }: { id: string; url: string; ix: WsIndex; reg: Registry; hidden: string }) {
   const { scene } = useGLTF(url);
   const root = useMemo(() => ownMaterials(scene), [scene]);
   useLayoutEffect(() => {
@@ -491,6 +496,12 @@ function LayerScene({ id, url, ix, reg }: { id: string; url: string; ix: WsIndex
     reg.add('layer:' + id, root, items);
     return () => reg.remove('layer:' + id);
   }, [root, id, ix, reg]);
+  useEffect(() => {
+    const h = nameMatcher(hidden ? hidden.split('|') : []);
+    let changed = false;
+    root.traverse(o => { if (o === root || !o.name) return; const v = !h(o.name); if (o.visible !== v) { o.visible = v; changed = true; } });
+    if (changed) reg.bump();
+  }, [root, hidden, reg]);
   return <primitive object={root} />;
 }
 
