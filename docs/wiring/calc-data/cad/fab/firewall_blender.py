@@ -197,6 +197,9 @@ def arch(x, t=0.0):
 TOP = cabs([(140, 112), (115, 92), (160, 72), (720, 66), (1290, 72), (1340, 95), (1330, 120), (1365, 175), (1385, 250),
             (1372, 330), (1320, 395), (1300, 410)])
 PS = cabs([(140, 410), (100, 380), (55, 330), (40, 260), (62, 175)])
+# lower ends: the panel runs down to the toe line at both ends (05, 03), no cut-away corner
+TOP[-2], TOP[-1] = (0.84, TOE_Z0 + 0.03), (0.80, TOE_Z0)
+PS[0], PS[1] = (-0.80, TOE_Z0), (-0.84, TOE_Z0 + 0.03)
 xb = np.linspace(TOP[-1][0], PS[0][0], 300)
 bottom = np.stack([xb, TOE_Z0 + (TUN_CROWN - TOE_Z0) * arch(xb)], 1)
 outline_raw = np.vstack([TOP[:-1], bottom, PS])
@@ -207,9 +210,16 @@ OUTER = Poly.__new__(Poly)
 OUTER.V = OUTLINE
 
 
+CORNER_R = 0.10 * 1.715
+CORNER_X0 = 1.715 / 2 - 0.12 * 1.715
+
+
 def ear_y(x):
     # ends flare forward into the cowl sides (03 rounded ends, 02 and 06 at 3/4; 30 mm assumed +/-15)
-    return 0.0 * np.abs(x)  # the corner radius now lives in the cowl-side skin
+    # the dash turns forward into the cowl side on a 0.1 W radius starting 0.12 W in from the panel end (05, 01: the
+    # blower ring sits on this curve)
+    d = np.clip(np.abs(x) - CORNER_X0, 0, CORNER_R * 0.999)
+    return -(CORNER_R - np.sqrt(CORNER_R ** 2 - d ** 2))
 
 
 # ---- stamped features (x, z twin metres) from the 03 crop; each names its photo
@@ -239,8 +249,8 @@ pch = np.array([0.055, 0.030])
 # Brow: 0.62 W wide above the shoulder, arched top with its crown 0.18 H under the seam, ends down to the shoulder;
 # below the shoulder it narrows between the heater frame and the plate and fades into the tunnel arch. Soft ~50 mm
 # fillet (wall 0.10 m), deepest just below the shoulder.
-# 0.62 W would run the brow over the heater frame and the plate; it is bounded by them instead (x -0.36 to +0.25)
-_bx0, _bx1 = -0.36, 0.21
+# the brow's ends abut the heater opening's inboard edge and the plate's inboard edge (05)
+_bx0, _bx1 = float(hc[0] + hh[0]) + 0.075, PLATE_X0 - 0.055  # wall ends on the heater frame and the plate rim
 _bc, _bw = (_bx0 + _bx1) / 2, (_bx1 - _bx0) / 2
 _arch = [(_bc + x, SHOULDER_Z + (SEAM_Z - 0.18 * H_ - SHOULDER_Z) * math.cos(math.pi / 2 * x / _bw) ** 0.6)
          for x in np.linspace(_bw, -_bw, 17)]
@@ -264,8 +274,10 @@ PLATEAUS = [
     # passenger end: a shallow pressed ring around the blower hole, 10 mm proud (01 bare, 05)
     (Circle(bl, 0.085), -0.010, 0.030),
     # heater frame: raised rectangle starting 0.05 W inboard of the ring, round and below the heater opening (01, 03)
-    (RRect(((bl[0] + 0.085 + 0.05 * W_ + hc[0] + hh[0] + 0.02) / 2, hc[1] - 0.01),
-           ((hc[0] + hh[0] + 0.02 - (bl[0] + 0.085 + 0.05 * W_)) / 2, hh[1] + 0.035), 0.015), -0.004, 0.008),
+    (RRect(((bl[0] + 0.085 + 0.05 * W_ + hc[0] + hh[0] + 0.018) / 2, hc[1] - 0.01),
+           ((hc[0] + hh[0] + 0.018 - (bl[0] + 0.085 + 0.05 * W_)) / 2, hh[1] + 0.035), 0.015), -0.004, 0.008),
+    # the flanged lower rectangle under the heater opening with its plate (05)
+    (RRect((hc[0], hc[1] - hh[1] - 0.045), (hh[0] + 0.008, 0.028), 0.008), -0.007, 0.006),
     # wiper-motor boss (03, 05)
     (Circle(wi, 0.045), -0.004, 0.008),
     # the single small dimple at the brow's centre (owner front photo, 03 crop 755, 192)
@@ -288,7 +300,7 @@ HOLES = [
 ]
 for c in (bl + (0.095, 0.025), bl + (0.095, -0.012)):            # two small holes just inboard of the blower (01, 05)
     HOLES.append((Circle(c, 0.013), 0.0, "small_hole"))
-for p, r in (((497, 192), 12), ((1115, 218), 9), ((1258, 338), 9), ((1215, 355), 9)):  # small holes (03)
+for p, r in (((1115, 218), 9), ((1258, 338), 9), ((1215, 355), 9)):  # small holes (03)
     HOLES.append((Circle(cab(*p), r * CAB_MPX), 0.0, "small_hole"))
 
 # bead along the tunnel arch on the dash (03 lip at crop y 345-385, 05)
@@ -444,8 +456,8 @@ TOE_Y1, TOE_Z1 = -1.220, 0.660
 
 
 def toe_mesh():
-    xs = np.unique(np.r_[np.arange(-0.78, 0.78, 0.018), np.arange(TUN_X - 0.34, TUN_X + 0.34, 0.008)])
-    xs = xs[np.abs(xs) <= 0.78]
+    xs = np.unique(np.r_[np.arange(-0.80, 0.80, 0.018), [0.80], np.arange(TUN_X - 0.34, TUN_X + 0.34, 0.008)])
+    xs = xs[np.abs(xs) <= 0.80]
     ts = np.linspace(0, 1, 36)
     Vt = []
     for t in ts:
@@ -459,7 +471,21 @@ def toe_mesh():
         Vt += [(x, y, zz) for x, zz in zip(xs, z)]
     n = len(xs)
     Ft = [(i * n + j, i * n + j + 1, (i + 1) * n + j + 1, (i + 1) * n + j) for i in range(len(ts) - 1) for j in range(n - 1)]
-    return np.array(Vt), Ft
+    # kick-panel returns: at both ends the toe board's edge drops as a wall to the cowl-side bottom (05, 03, owner)
+    Vt = np.array(Vt)
+    n0 = len(Vt)
+    for j in (0, n - 1):
+        col = Vt[:n0][j::n]
+        base = len(Vt)
+        rows = [np.c_[col[:, 0], col[:, 1], col[:, 2] + (0.58 - col[:, 2]) * k / 6] for k in range(1, 7)]
+        Vt = np.vstack([Vt] + rows)
+        m = len(col)
+        prev = [j + i * n for i in range(m)]
+        for k in range(6):
+            cur = [base + k * m + i for i in range(m)]
+            Ft += [(prev[i], prev[i + 1], cur[i + 1], cur[i]) for i in range(m - 1)]
+            prev = cur
+    return Vt, Ft
 
 
 toe = toe_mesh()
@@ -608,52 +634,53 @@ def quads(nr, nc):
 
 
 def cowl_side(sign):
-    """Cowl side, one continuous swept skin per side (02, 083B873C, 10; owner photos). In plan, at every height: the
-    dash face ends at x 0.80 and turns forward through a convex corner of radius ~0.1 W (150-180 mm at the top, less at
-    the bottom where the reach is shorter), then the side runs forward to the vertical fender flange with a gentle
-    outboard bow; behind the corner the same side line runs back to the hinge pillar. The lower 0.3 curls under toward
-    the rocker. A hood-hinge shelf with its stud at cowl-top level. Every station is one smooth polyline, so there is
-    no crease at the corner. Reach 150-280 mm ahead of the dash face, assumed +/-0.04 m."""
+    """Cowl side, one continuous skin per side (02, 06, 083B873C, 10; owner photos). The dash face itself starts its
+    corner 0.12 W in from the panel end (CORNER_X0) and curves forward on a 0.1 W radius; the blower ring is pressed
+    into that curve (05, 01). At the dash end (x 0.80, ~60 degrees round) this skin takes over: the rest of the arc to
+    90 degrees, then the side runs forward with an outboard bow to the vertical fender flange; behind the tangent point
+    the same side line runs back to the hinge pillar. The lower 0.3 curls under. The top edge follows the seam and
+    slopes down 60 mm toward the flange; a small hood-hinge shelf (120 x 80 mm) with its stud sits at the top-forward
+    corner. Reach 200-280 mm ahead of the dash face, assumed +/-0.04 m."""
     nv = 30
     vs = np.linspace(0, 1, nv)
+    R, X0 = CORNER_R, CORNER_X0
+    phi0 = math.asin(min(1.0, (DASH_END_X - X0) / R))
     rows_f, rows_r = [], []
     for v in vs:
         z = COWL_ZB + v * (COWL_ZT - COWL_ZB)
-        reach = 0.15 + 0.13 * v
-        R = 0.065  # 0.04 W: the blower ring sits 0.07 W from the side, which leaves no room for 0.1 W here
+        reach = 0.20 + 0.08 * v
         curl = 0.08 * max(0.0, 1 - v / 0.3) ** 2
-        xs0 = DASH_END_X + R
-        # front run: dash end -> corner arc -> forward along the side (bowing outboard) -> fender flange
-        pts = [(DASH_END_X - 0.002, FACE_Y)]
-        for t in np.linspace(0, 1, 14)[1:]:
-            a = math.pi / 2 * (1 - t)
-            pts.append((DASH_END_X + R * math.cos(a), FACE_Y - R + R * math.sin(a)))
+        pts = []
+        for p in np.linspace(phi0, math.pi / 2, 10):
+            pts.append((X0 + R * math.sin(p), FACE_Y - R + R * math.cos(p)))
+        xs0 = X0 + R
         y_end = FACE_Y - reach
         for t in np.linspace(0, 1, 9)[1:]:
-            y = FACE_Y - R + (y_end - (FACE_Y - R)) * t
-            pts.append((xs0 + 0.012 * math.sin(math.pi * t) - 0.01 * t, y))
+            pts.append((xs0 + 0.012 * math.sin(math.pi * t) - 0.01 * t, FACE_Y - R + (y_end - (FACE_Y - R)) * t))
         pts = np.array(pts)
         pts[1:, 0] -= curl * np.linspace(0, 1, len(pts) - 1)
-        rows_f.append(np.c_[sign * pts[:, 0], pts[:, 1], np.full(len(pts), z)])
-        # rear run: from the corner's tangent point back along the side line to the hinge pillar (outboard bow)
+        fwd = np.linspace(0, 1, len(pts))
+        zz = COWL_ZB + (z - COWL_ZB) * (1 - (0.06 / (COWL_ZT - COWL_ZB)) * fwd * v)  # top slopes down to the flange
+        rows_f.append(np.c_[sign * pts[:, 0], pts[:, 1], zz])
         ys = np.linspace(FACE_Y - R, COWL_Y1, 14)
         u = (ys - ys[0]) / (ys[-1] - ys[0])
-        xr = xs0 + (COWL_XR - xs0) * smootherstep(0, 1, u) + 0.02 * np.sin(math.pi * u) - curl
+        xr = xs0 + (COWL_XR - xs0) * smootherstep(0, 1, u) + 0.015 * np.sin(math.pi * u) - curl
         rows_r.append(np.c_[sign * xr, ys, np.full(len(ys), z)])
-    Fr = np.array(rows_f)            # (nv, nf, 3), column 0 at the dash end, last at the flange
-    Rr = np.array(rows_r)
-    # fender flange: vertical, turned outboard 25 mm at the front edge
+    Fr, Rr = np.array(rows_f), np.array(rows_r)
     edge = Fr[:, -1]
     fl = [edge + np.array([sign, 0, 0]) * a + np.array([0, -1, 0]) * b
           for a, b in ((0.0006, 0.0015), (0.0025, 0.0035), (0.005, 0.0045), (0.025, 0.005))]
     A = np.concatenate([Fr, np.stack(fl, 1)], 1)
-    top = A[-1]
-    shelf = [top + (np.c_[np.full(len(top), sign * DASH_END_X), top[:, 1], top[:, 2]] - top) * k / 4 for k in (1, 2, 3, 4)]
-    A = np.concatenate([A, np.stack(shelf, 0)], 0)
     front = (A.reshape(-1, 3), quads(*A.shape[:2]))
     rear = (Rr.reshape(-1, 3), quads(*Rr.shape[:2]))
-    stud = cylinder((sign * (DASH_END_X + 0.06), FACE_Y - 0.17, COWL_ZT), (0, 0, 1), 0.005, 0.028)
-    V, F = merge(front, rear, stud)
+    # small hood-hinge shelf at the top-forward corner, 120 mm deep x 80 mm wide, inboard of the skin
+    tf = Fr[-1, -1]
+    sx = np.linspace(0, 0.08, 5)
+    sy = np.linspace(0, 0.12, 7)
+    S = np.array([[(tf[0] - sign * a, tf[1] + b, tf[2]) for a in sx] for b in sy])
+    shelf = (S.reshape(-1, 3), quads(*S.shape[:2]))
+    stud = cylinder((tf[0] - sign * 0.04, tf[1] + 0.06, tf[2]), (0, 0, 1), 0.005, 0.028)
+    V, F = merge(front, rear, shelf, stud)
     if sign < 0:
         F = [f[::-1] for f in F]
     return V, F
