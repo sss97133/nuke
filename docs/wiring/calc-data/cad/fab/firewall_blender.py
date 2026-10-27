@@ -360,7 +360,7 @@ def flanged(V2, F):
     gin[on_outer] = g_out[on_outer]
     for sh, L, _ in HOLES:
         m = (np.abs(sh.sd(P)) < 0.002) & ~on_outer
-        length[m] = L
+        length[m] = max(L, 0.003)  # every opening gets at least a 3 mm rolled edge, so it catches a highlight
         gin[m] = -sd_grad(sh.sd, P[m]) if m.any() else gin[m]
     verts = [tuple(v) for v in Vf]
     faces = [tuple(f) for f in F]
@@ -474,7 +474,7 @@ bsdf = mat.node_tree.nodes["Principled BSDF"]
 bsdf.inputs["Base Color"].default_value = (0.11, 0.010, 0.014, 1)  # the cab's deep metallic maroon (owner-cab 08-14)
 bsdf.inputs["Metallic"].default_value = 0.55
 bsdf.inputs["Roughness"].default_value = 0.32
-bsdf.inputs["Coat Weight"].default_value = 1.0  # clear (exports as KHR_materials_clearcoat)
+bsdf.inputs["Coat Weight"].default_value = 0.3  # clear (exports as KHR_materials_clearcoat 0.3)
 bsdf.inputs["Coat Roughness"].default_value = 0.05
 
 for name, (Vp, Fp) in parts.items():
