@@ -38,13 +38,13 @@ export const LAYERS: LayerDef[] = [
     // off until the lead flips it. Once the per-layer hidesIn field lands it also hides the sheetmetal layer's
     // inner_fender_wall/top/wheelhouse_L/R nodes.
     id: 'inner-fender', label: 'INNER FENDER', url: '/models/k5-inner-fender.glb', lane: 'k5-inner-fender-sds',
-    hides: ['CTX-inner-fender-wall-driver', 'CTX-inner-fender-wall-passenger'], off: true,
+    hides: ['CTX-inner-fender-wall-driver', 'CTX-inner-fender-wall-passenger'],
   },
   {
     // stock 1973-80 non-AC dash panel, toe board and cowl sides, camera-matched to photos (receipt 2026-10-26_k5-firewall-3d);
-    // off with the sheet metal until the old panel underneath it is hidden (#2826) and the other two parts land
+    // on by default since the placeholder sheet metal is off; the old panel under it goes when #2826 lands
     id: 'firewall', label: 'FIREWALL', url: '/models/k5-firewall.glb', lane: 'k5-firewall-3d',
-    hides: ['CTX-firewall-face', 'CTX-toe-board'], off: true,
+    hides: ['CTX-firewall-face', 'CTX-toe-board'],
   },
   {
     // the 1975-80 radiator core support drawn from photos (receipt 2026-10-26_k5-core-support-3d); the sheetmetal
