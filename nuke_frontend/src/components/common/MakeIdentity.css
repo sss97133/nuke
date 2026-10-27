@@ -30,12 +30,20 @@
 .vehicle-identity__art--emblem { width:28px; }
 .vehicle-identity__variant { font-size:14px; font-weight:400; }
 .vehicle-identity__art--variant { width:112px; }
+.vehicle-identity--compact { gap:6px; font:inherit; }
+.vehicle-identity--compact .vehicle-identity__maker,
+.vehicle-identity--compact .vehicle-identity__model,
+.vehicle-identity--compact .vehicle-identity__variant,
+.vehicle-identity--compact .vehicle-identity__year { font:inherit; letter-spacing:normal; }
+.vehicle-identity--compact .vehicle-identity__art svg { max-height:36px; width:auto; }
+.vehicle-identity--compact .vehicle-identity__art { width:auto; }
 /* Keep period artwork at headline scale alongside the recorded identity. */
 .vehicle-identity[data-variant-artwork="true"] { flex-wrap:nowrap; }
 .vehicle-identity[data-variant-artwork="true"] .vehicle-identity__maker { align-items:flex-start; }
 .vehicle-identity[data-variant-artwork="true"] .vehicle-identity__art--make { width:84px; }
 .vehicle-identity[data-variant-artwork="true"] .vehicle-identity__art--emblem { order:-1; }
 .vehicle-identity[data-variant-artwork="true"] .vehicle-identity__model { font:inherit; }
+.vehicle-identity--compact[data-variant-artwork="true"] { flex-wrap:wrap; }
 /* A neutral nameplate surface retains the source chrome/enamel in both themes.
    Multiply removes the white photographic surround without recoloring the badge. */
 .vehicle-identity[data-period-artwork="true"] { background:#f1f1ee; color:#202020; padding:6px 8px; }

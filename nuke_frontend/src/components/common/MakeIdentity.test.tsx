@@ -75,3 +75,39 @@ it('uses catalogue label choices for Chevrolet and Dodge while retaining other w
     expect(host.querySelector('.sr-only')?.textContent).toBe('Ferrari');
   } finally { await act(async () => root.unmount()); }
 });
+
+it('renders a compact identity once with original sourced artwork or text when the year/model has no asset', async () => {
+  (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
+  const host = document.createElement('div'), root = createRoot(host);
+  try {
+    await act(async () => root.render(<VehicleIdentity compact year={1980} make="Chevrolet" model="K5 Blazer" />));
+    expect(host.querySelector('.sr-only')?.textContent).toBe('1980 Chevrolet K5 Blazer');
+    expect(host.querySelector('svg')).toBeNull();
+    const visible = host.cloneNode(true) as HTMLElement;
+    visible.querySelectorAll('.sr-only').forEach(node => node.remove());
+    expect(visible.textContent).toBe('1980ChevroletK5 Blazer');
+    await act(async () => root.render(<VehicleIdentity compact year={1963} make="Chevrolet" model="Corvette" />));
+    expect([...host.querySelectorAll('image')].map(node => node.getAttribute('href'))).toEqual([
+      '/stacks/makes/chevrolet-corvette-brochure-1963.jpg', '/stacks/makes/corvette-nose-1963-1964.png', '/stacks/makes/corvette-script-1963-1965.png',
+    ]);
+    expect(host.querySelector('svg text')).toBeNull();
+    await act(async () => root.render(<VehicleIdentity compact year={1987} make="Chevrolet" model="Corvette" />));
+    expect(host.querySelector('image')).toBeNull();
+  } finally { await act(async () => root.unmount()); }
+});
+
+it('uses the photographed K5 emblem only for the supplier documented full-size model and years', async () => {
+  for (const year of [1981, 1987, 1988]) expect(resolveVehicleArtwork({ year, make: 'Chevrolet', model: 'K5 Blazer' }).map(asset => asset.file)).toEqual(['chevrolet-k5-blazer-emblem-1981-1988.jpg']);
+  for (const year of [1980, 1989, 1991, null]) expect(resolveVehicleArtwork({ year, make: 'Chevrolet', model: 'K5 Blazer' })).toEqual([]);
+  for (const model of ['S10 Blazer', 'S-10 Blazer', 'Blazer', 'Suburban']) expect(resolveVehicleArtwork({ year: 1987, make: 'Chevrolet', model })).toEqual([]);
+  (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
+  const host = document.createElement('div'), root = createRoot(host);
+  try {
+    await act(async () => root.render(<VehicleIdentity compact year={1987} make="Chevrolet" model="K5 Blazer" />));
+    expect(host.querySelector('image')?.getAttribute('href')).toBe('/stacks/makes/chevrolet-k5-blazer-emblem-1981-1988.jpg');
+    expect(host.querySelector('.sr-only')?.textContent).toBe('1987 Chevrolet K5 Blazer');
+    expect(host.querySelector('svg text')).toBeNull();
+    await act(async () => host.querySelector('image')!.dispatchEvent(new Event('error')));
+    expect(host.querySelector('.vehicle-identity__model')?.textContent).toBe('K5 Blazer');
+  } finally { await act(async () => root.unmount()); }
+});

@@ -52,7 +52,7 @@ export function MakeIdentity({ make, inverse = false, compact = false }: { make:
   </span>;
 }
 
-type VehicleIdentityProps = { make: string; model: string; year?: number | string | null; variants?: VehicleIdentityToken[] };
+type VehicleIdentityProps = { make: string; model: string; year?: number | string | null; variants?: VehicleIdentityToken[]; compact?: boolean };
 type VehicleArtwork = (typeof vehicleArtwork)[number];
 
 /** Match structured identity only. Unknown years/models never inherit another era's badge. */
@@ -81,21 +81,22 @@ function VehicleArtworkImage({ asset, fallback }: { asset: VehicleArtwork; fallb
 }
 
 /** The vehicle's own nameplate, selected by year/make/model, with a readable fallback. */
-export function VehicleIdentity({ make, model, year, variants = [] }: VehicleIdentityProps) {
+export function VehicleIdentity({ make, model, year, variants = [], compact = false }: VehicleIdentityProps) {
   const assets = resolveVehicleArtwork({ make, model, year, variants });
   const maker = assets.find(asset => asset.role === 'make');
   const script = assets.find(asset => asset.role === 'model');
   const emblem = assets.find(asset => asset.role === 'emblem');
   const variantScript = assets.find(asset => asset.role === 'variant');
   const variantName = variants.filter(token => token.kind === 'series' || token.kind === 'trim').map(token => token.value).join(' ');
-  return <span className="vehicle-identity" data-period-artwork={assets.length > 0} data-variant-artwork={!!variantScript}>
+  return <span className={`vehicle-identity${compact ? ' vehicle-identity--compact' : ''}`} data-period-artwork={assets.length > 0} data-variant-artwork={!!variantScript}>
+    {compact && year && <span className="vehicle-identity__year" aria-hidden="true">{year}</span>}
     <span className="vehicle-identity__maker" aria-hidden="true">
       {maker ? <VehicleArtworkImage key={maker.file} asset={maker} fallback={make} /> : <span>{make}</span>}
-      <span className="vehicle-identity__year">{year}{variantScript && <>{year ? ' · ' : ''}<span className="vehicle-identity__model">{model}</span></>}</span>
+      {!compact && <span className="vehicle-identity__year">{year}{variantScript && <>{year ? ' · ' : ''}<span className="vehicle-identity__model">{model}</span></>}</span>}
     </span>
     {emblem && <VehicleArtworkImage key={emblem.file} asset={emblem} />}
     <span className="vehicle-identity__name">
-      {!variantScript && <span className="vehicle-identity__model" aria-hidden="true">
+      {(!variantScript || compact) && <span className="vehicle-identity__model" aria-hidden="true">
         {script ? <VehicleArtworkImage key={script.file} asset={script} fallback={model} /> : model}
       </span>}
       {variantScript && <span className="vehicle-identity__variant" aria-hidden="true"><VehicleArtworkImage key={variantScript.file} asset={variantScript} fallback={variantName} /></span>}

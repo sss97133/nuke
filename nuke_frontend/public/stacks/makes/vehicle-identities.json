@@ -148,5 +148,31 @@
     "evidence": "https://assets-v2.porsche.com/us/-/media/Project/PCOM/SharedSite/PorscheClassic/ORIGINALE/Editions---ENUS/ORIGINALE-08_EN-US_Teilekatalog",
     "notes": "Porsche Classic ORIGINALE 08, printed pages 84–85: reissued part 993559237034PU preserves the original 993 lettering, silver finish, 1995–1998 Turbo applicability. Unmodified product photograph. Exact complete series/trim match only; never apply to Turbo S or Carrera.",
     "sourceSha256Base64": "zR0ipNPS6V0vgy0lp5dKWKwpyFTVAsM5Gd7ivFP2LwA="
+  },
+  {
+    "make": "Chevrolet",
+    "models": [
+      "K5 Blazer"
+    ],
+    "years": [
+      1981,
+      1988
+    ],
+    "role": "model",
+    "file": "chevrolet-k5-blazer-emblem-1981-1988.jpg",
+    "viewport": "20 3 194 105",
+    "width": 116,
+    "height": 63,
+    "sourceWidth": 308,
+    "sourceHeight": 185,
+    "source": "https://promo2.classicindustries.com/hubfs/Classic_Industries/pdf-catalogs/Truck/T_SEC_F.pdf?hsLang=en#page=5",
+    "sourceAsset": "https://promo2.classicindustries.com/hubfs/Classic_Industries/pdf-catalogs/Truck/T_SEC_F.pdf?hsLang=en",
+    "evidence": "https://promo2.classicindustries.com/hubfs/Classic_Industries/pdf-catalogs/Truck/T_SEC_F.pdf?hsLang=en#page=5",
+    "notes": "Unmodified embedded product photograph from Classic Industries Truck catalog, printed page 162 (PDF page 5), image XObject 93. The photographed OER reproduction is SKU153621, documented by the supplier for 1981-88 K5 Blazer front fenders. The viewport isolates the first emblem; no tracing, substitute lettering or recoloring. This is reference photography of a reproduction part, not an original factory photograph or proof a badge is installed on this vehicle. Do not apply to S-10 Blazer or undocumented years.",
+    "retrievedAt": "2026-10-27",
+    "attribution": "Chevrolet and Blazer trademarks belong to General Motors. Photograph: Classic Industries/OER, reference identification; not evidence of physical installation.",
+    "sourceSha256Base64": "X0rL8nWy6ig9lTRR94TmFQ25hFPTr34McGdKXyNwcfs=",
+    "sourceDocumentSha256Base64": "cKDFALZsC4RVkd5kFFUbAcIU73AafWUpJkP2gKznFvo=",
+    "extraction": "pdfimages -f 5 -l 5 -j; source image object 93, unchanged JPEG stream"
   }
 ]

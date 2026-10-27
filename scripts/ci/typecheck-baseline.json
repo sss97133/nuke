@@ -5,7 +5,7 @@
     "tsconfig.app.json",
     "tsconfig.node.json"
   ],
-  "total": 439,
+  "total": 438,
   "files": {
     "nuke_frontend/src/branding/ModeSwitcher.tsx": 1,
     "nuke_frontend/src/components/AdminDashboard.tsx": 1,
@@ -46,7 +46,6 @@
     "nuke_frontend/src/components/profile/SocialConnections.tsx": 2,
     "nuke_frontend/src/components/search/AIDataIngestionSearch.tsx": 1,
     "nuke_frontend/src/components/search/AIModelSelector.tsx": 1,
-    "nuke_frontend/src/components/search/SearchResults.tsx": 1,
     "nuke_frontend/src/components/upload/TitleValidationModal.tsx": 3,
     "nuke_frontend/src/components/upload/UploadProgressNotifications.tsx": 8,
     "nuke_frontend/src/components/vehicle/EnhancedImageTagger.tsx": 1,

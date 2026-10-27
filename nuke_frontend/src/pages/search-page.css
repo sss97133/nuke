@@ -31,4 +31,22 @@
 .search-import-source { display: inline-flex; align-items: center; min-height: var(--control-height); color: var(--link); }
 .search-import-source:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
 
-.search-page .search-results-summary { border-radius: var(--radius-lg); }
+.search-context-row { display:flex; align-items:center; flex-wrap:wrap; gap:8px 20px; margin:8px 0; min-height:32px; font:var(--text-caption)/1.4 var(--font-family); }
+.search-context-row > a { color:var(--accent); text-decoration:none; min-height:44px; display:inline-flex; align-items:center; }
+.search-record-basis summary { cursor:pointer; color:var(--text-secondary); min-height:44px; display:flex; align-items:center; }
+.search-record-basis[open] { flex-basis:100%; }
+.search-record-basis p { max-width:80ch; margin:0 0 12px; color:var(--text-secondary); }
+.search-results-summary { margin:8px 0; }
+.search-results-controls { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:0 0 12px; padding:8px 0; border-top:1px solid var(--border); border-bottom:1px solid var(--border); }
+.search-result-count { margin-right:auto; font:var(--text-callout)/1.4 var(--font-family); white-space:nowrap; }
+.search-result-count strong { font-variant-numeric:tabular-nums; }
+.search-view-toggle { display:flex; align-items:center; padding:2px; border-radius:var(--radius-sm); background:var(--surface-hover); }
+.search-view-toggle .search-result-control { display:grid; place-items:center; padding:0; min-width:44px; min-height:44px; border:0; background:transparent; }
+.search-page .search-view-toggle .search-result-control[aria-pressed="true"] { color:var(--accent); background:var(--surface); }
+.search-page .search-filters-toggle { padding:0 12px; background:transparent; }
+.search-page select.search-result-control { max-width:140px; }
+@media(max-width:600px) {
+  .search-results-controls { gap:6px; }
+  .search-page select.search-result-control { max-width:116px; }
+  .search-page .search-filters-toggle { padding:0 8px; }
+}

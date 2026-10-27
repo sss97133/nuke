@@ -25,6 +25,8 @@ Arial/caps/zero-radius mandate. It does not change data, privacy or publication 
 
 ### Brand identity rendering (owner rule, 2026-10-08)
 
+- Owner correction, 2026-10-27: identity appears once on a card. Do not repeat its title as a badge, a series chip and another label. Use sourced original artwork with documented model/year/variant applicability; generated rectangles, substitute fonts and approximate scripts are not authentic badges, regardless of a legacy "vetted" name. If the exact artwork is unavailable, retain readable text. Keep count, filter and view controls in one compact hierarchy instead of repeating the same result count in separate cards.
+
 - A structured brand/make label uses available identity artwork programmatically. Vehicle makes use `components/common/MakeIdentity.tsx`; organization identity uses the existing `OrgLogo` renderer. This applies wherever brand identity is relevant, including discovery, filters, group headings and drill paths.
 - `MakeIdentity` resolves the brand against the sourced artwork catalogue: wordmark first, otherwise emblem with readable name, otherwise plain text. Catalogue additions must become available to every consumer without adding page-specific brand lists. Preserve accessible names and text on asset failure.
 - Treat lettering as identity artwork, not a replacement UI font. The shared system font tokens remain the interface fonts. Compact labels and prose retain readable text; an adjacent emblem uses `MakeLogo`. Do not guess brands from arbitrary text or rewrite vehicle titles into logos.

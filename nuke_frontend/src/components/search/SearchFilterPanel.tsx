@@ -11,6 +11,7 @@ interface Props {
   onChange: (filters: VehicleFilters) => void;
   vehicleCount: number;
   displayVehicleCount: number;
+  hideToggle?: boolean;
 }
 
 const inputStyle: React.CSSProperties = {
@@ -23,7 +24,7 @@ const labelStyle: React.CSSProperties = {
   marginBottom: '4px',
 };
 
-export const SearchFilterPanel: React.FC<Props> = ({ filters, onChange, vehicleCount, displayVehicleCount }) => {
+export const SearchFilterPanel: React.FC<Props> = ({ filters, onChange, vehicleCount, displayVehicleCount, hideToggle = false }) => {
   const fieldsId = useId();
   const set = (patch: Partial<VehicleFilters>) => onChange({ ...filters, ...patch });
   const activeCount = [
@@ -37,14 +38,14 @@ export const SearchFilterPanel: React.FC<Props> = ({ filters, onChange, vehicleC
       <div style={{ padding: '12px', background: 'var(--surface)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', alignItems: 'center', gap: '8px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <button type="button" aria-expanded={filters.showFilters} aria-controls={fieldsId} onClick={() => set({ showFilters: !filters.showFilters })} style={{
+            {!hideToggle && <button type="button" aria-expanded={filters.showFilters} aria-controls={fieldsId} onClick={() => set({ showFilters: !filters.showFilters })} style={{
               padding: '4px 10px', fontSize: 'var(--text-callout)', fontWeight: 700,
               border: '1px solid var(--border)', cursor: 'pointer',
               background: filters.showFilters ? 'var(--action)' : 'var(--surface)',
               color: filters.showFilters ? 'var(--on-action)' : 'var(--text)',
             }}>
               Filters{activeCount > 0 ? ` (${activeCount})` : ''}
-            </button>
+            </button>}
             {activeCount > 0 && (
               <button type="button" onClick={() => set({ ...DEFAULT_FILTERS, showFilters: filters.showFilters })} style={{
                 padding: '4px 8px', fontSize: 'var(--text-caption)', fontWeight: 600,
@@ -55,11 +56,11 @@ export const SearchFilterPanel: React.FC<Props> = ({ filters, onChange, vehicleC
               </button>
             )}
           </div>
-          <div style={{ fontSize: 'var(--text-callout)', color: 'var(--text-secondary)' }}>
+          {!hideToggle && <div style={{ fontSize: 'var(--text-callout)', color: 'var(--text-secondary)' }}>
             {activeCount > 0
               ? `${displayVehicleCount} of ${vehicleCount} loaded vehicles match`
               : `${vehicleCount} loaded vehicle${vehicleCount === 1 ? '' : 's'}`}
-          </div>
+          </div>}
         </div>
 
         {filters.showFilters && (
