@@ -252,7 +252,7 @@ pch = np.array([0.055, 0.030])
 # the brow's ends abut the heater opening's inboard edge and the plate's inboard edge (05)
 _bx0, _bx1 = float(hc[0] + hh[0]) + 0.075, PLATE_X0 - 0.055  # wall ends on the heater frame and the plate rim
 _bc, _bw = (_bx0 + _bx1) / 2, (_bx1 - _bx0) / 2
-_arch = [(_bc + x, SHOULDER_Z + (SEAM_Z - 0.18 * H_ - SHOULDER_Z) * math.cos(math.pi / 2 * x / _bw) ** 0.6)
+_arch = [(_bc + x, SHOULDER_Z + (SEAM_Z - 0.18 * H_ - SHOULDER_Z) * (1 - abs(x / _bw) ** 4) ** 0.5)  # wide dome: flat top third (05)
          for x in np.linspace(_bw, -_bw, 17)]
 BROW = Poly(np.array(_arch + [(_bx0 + 0.01, SHOULDER_Z - 0.06), (_bx0 + 0.04, TOE_Z0 + 0.03),
                               (_bx1 - 0.03, TOE_Z0 + 0.03), (_bx1 - 0.01, SHOULDER_Z - 0.06)]))
@@ -264,13 +264,15 @@ def brow_depth_scale(z):
     return up * smootherstep(TOE_Z0 + 0.01, TOE_Z0 + 0.16, z)
 
 
+BAND_Z = float(hc[1] + hh[1]) + 0.035 + 0.006  # band's lower edge just above the heater-frame top, so their walls do not cross
+
 # Plateaus: (shape, depth y [+ = rearward, into the cab], wall width)
 PLATEAUS = [
     (BROW, -0.110, 0.100),  # 50 mm fillet each side of the wall
     # upper shoulder band: the strip from the shoulder line to the seam, from the heater-frame top across to the plate
     # top (05, 03); the brow rises out of it, so no line crosses the brow; 6 mm forward, assumed +/-4
-    (Poly(np.array([(-DASH_END_X + 0.02, SHOULDER_Z), (DASH_END_X - 0.02, SHOULDER_Z), (DASH_END_X - 0.02, SEAM_Z - 0.01),
-                    (-DASH_END_X + 0.02, SEAM_Z - 0.01)])), -0.006, 0.010),
+    (Poly(np.array([(-DASH_END_X + 0.02, BAND_Z), (DASH_END_X - 0.02, BAND_Z), (DASH_END_X - 0.02, SEAM_Z + 0.05),
+                    (-DASH_END_X + 0.02, SEAM_Z + 0.05)])), -0.006, 0.010),  # top beyond the seam: no wall along the top edge
     # passenger end: a shallow pressed ring around the blower hole, 10 mm proud (01 bare, 05)
     (Circle(bl, 0.085), -0.010, 0.030),
     # heater frame: raised rectangle starting 0.05 W inboard of the ring, round and below the heater opening (01, 03)
@@ -369,6 +371,12 @@ def add_loop(L, closed=True, keep_tol=0.0008):
 
 
 add_loop(OUTLINE, keep_tol=1.0)
+# rings just inside the outline, so the edge strip is regular quads-in-triangles, not long slivers to the grid
+_t = np.roll(OUTLINE, -1, 0) - np.roll(OUTLINE, 1, 0)
+_n = np.stack([-_t[:, 1], _t[:, 0]], 1) / (np.linalg.norm(_t, axis=1)[:, None] + 1e-12)
+_n *= np.sign((OUTER.sd(OUTLINE + 0.003 * _n) < 0).mean() - 0.5)  # point inward
+for d in (0.005, 0.011, 0.019):
+    add_loop(OUTLINE + d * _n)
 for L in loops[1:]:
     add_loop(L)
 for L in arch_off:
@@ -418,7 +426,7 @@ def flanged(V2, F):
     g_out = sd_grad(OUTER.sd, P)
     bottom_edge = on_outer & (P[:, 1] < TUN_CROWN + 0.01) & (np.abs(P[:, 0]) < 0.74)
     length[on_outer & ~bottom_edge] = np.where(np.abs(P[on_outer & ~bottom_edge, 0]) > 0.795, 0.0, 0.025)  # ends join the cowl skin
-    length[on_outer & (P[:, 1] > 1.19) & (np.abs(P[:, 0]) < 0.79)] = 0.0  # top edge: pinch-weld flange (own part)
+    length[on_outer] = 0.0  # top edge carries the pinch-weld flange (own part), the ends join the cowl skin, the bottom the toe board
     gin[on_outer] = g_out[on_outer]
     for sh, L, nm in HOLES:
         m = (np.abs(sh.sd(P)) < 0.002) & ~on_outer
@@ -572,14 +580,22 @@ def booster_plate():
 def pinch_flange():
     """Dash-to-plenum pinch weld: two sheets pressed flat together standing up from the dash top edge, 18 mm, with
     spot-weld dimples at 45 mm pitch (owner, 03, 05, 006214DA). Solidified 2 mm (doubled sheet)."""
-    top = OUTLINE[(OUTLINE[:, 1] > 1.19) & (np.abs(OUTLINE[:, 0]) < 0.79)]
-    top = top[np.argsort(top[:, 0])]
-    top = resample(top, 0.004, closed=False)
+    # the longest run of outline points along the top, in outline order (sorting by x folded the rounded corner back
+    # on itself, which drew the zig-zag at the passenger end)
+    m = (OUTLINE[:, 1] > 1.19) & (np.abs(OUTLINE[:, 0]) < 0.79)
+    runs, cur = [], []
+    for i in range(len(OUTLINE) * 2):
+        if m[i % len(OUTLINE)]:
+            cur.append(i % len(OUTLINE))
+        elif cur:
+            runs.append(cur); cur = []
+    top = OUTLINE[max(runs, key=len)]
+    top = resample(chaikin(top, 2, closed=False), 0.0025, closed=False)
     yb = face_y(top)
     rows = []
     for dz in (0.0, 0.004, 0.009, 0.014, 0.018):
         pitch = np.mod(top[:, 0] - top[0, 0], 0.045)
-        dent = 0.0006 * np.exp(-((pitch - 0.0225) / 0.0035) ** 2) * math.exp(-((dz - 0.009) / 0.005) ** 2)
+        dent = 0.0004 * np.exp(-((pitch - 0.0225) / 0.006) ** 2) * math.exp(-((dz - 0.009) / 0.005) ** 2)
         rows.append(np.c_[top[:, 0], yb + dent, top[:, 1] + dz])
     A = np.array(rows)
     nr, nc = A.shape[:2]
@@ -606,7 +622,7 @@ def cowl_plenum():
     return np.c_[V2[:, 0], V2[:, 1], zt + H + rise], F
 
 
-COWL_Y1 = -1.08   # rear edge at the hinge pillar: 02 / A37DE48A, ~0.4 of the door opening; assumed +/-0.05
+COWL_Y1 = -1.31   # rear edge at the hinge pillar, measured on A37DE48A (solved camera, 14 px): y -1.29 to -1.34
 COWL_XR = 0.875   # outboard at the hinge pillar: in 006214DA nothing shows outboard of the panel ends; assumed +/-0.02
 COWL_XF = 0.905   # forward (fender) flange line; assumed +/-0.03
 COWL_ZB = 0.58    # bottom, where it curls under toward the rocker; assumed +/-0.05
@@ -626,7 +642,7 @@ def dash_end_x(z, sign):
     xe = np.interp(zs, zs[good], xe[good])
     xe[zs < TOE_Z0] = np.minimum(xe[zs < TOE_Z0], 0.80)
     xe = np.convolve(np.pad(xe, 3, mode="edge"), np.ones(7) / 7, "valid")
-    return max(0.80, float(np.interp(z, zs, xe)))
+    return float(np.interp(z, zs, xe))  # the skin starts exactly on the dash outline's end at every height
 
 
 def quads(nr, nc):
@@ -648,10 +664,12 @@ def cowl_side(sign):
     rows_f, rows_r = [], []
     for v in vs:
         z = COWL_ZB + v * (COWL_ZT - COWL_ZB)
-        reach = 0.20 + 0.08 * v
+        reach = R + 0.02 + 0.02 * v  # 0.19-0.21 m; top: hinge stud measured 0.11-0.21 m ahead on A37DE48A; bottom assumed
         curl = 0.08 * max(0.0, 1 - v / 0.3) ** 2
         pts = []
-        for p in np.linspace(phi0, math.pi / 2, 10):
+        # one swept profile: start exactly on the dash outline's end at this height, on the dash's own corner circle
+        ps = math.asin(float(np.clip((dash_end_x(z, sign) - X0) / R, 0, 1)))
+        for p in np.linspace(ps, math.pi / 2, 10):
             pts.append((X0 + R * math.sin(p), FACE_Y - R + R * math.cos(p)))
         xs0 = X0 + R
         y_end = FACE_Y - reach
