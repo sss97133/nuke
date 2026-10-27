@@ -19,8 +19,9 @@ export const zoneOfY = (y: number): ZoneId => (y < -1.46 ? 'bay' : y < 0.1 ? 'ca
 // ── Layer GLBs from other lanes. Each loads only if its file is published; while it is shown, the zone GLBs' nodes it
 // replaces are hidden by name ("Name*" = every name starting with "Name"), except the names in `keeps`. Each file is in
 // the zones' frame (twin metres, glTF Y-up), so it is drawn as published. Extend `hides` when a layer draws more.
+// `hidesIn` does the same inside another layer's file: { layer id: node names } for what this layer replaces there.
 // (The MAP tab does not load k5-blazer.glb, so its Under_Frame_Blazer needs no entry here.)
-export interface LayerDef { id: string; label: string; url: string; lane: string; hides: string[]; keeps?: string[]; credit?: { text: string; href: string } }
+export interface LayerDef { id: string; label: string; url: string; lane: string; hides: string[]; hidesIn?: Record<string, string[]>; keeps?: string[]; credit?: { text: string; href: string } }
 export const LAYERS: LayerDef[] = [
   {
     id: 'frame', label: 'FRAME', url: '/models/k5-frame.glb', lane: 'chassis-3d (#470)',
@@ -34,6 +35,7 @@ export const LAYERS: LayerDef[] = [
   {
     // stock 1973-80 non-AC dash panel, toe board and cowl sides, camera-matched to photos (receipt 2026-10-26_k5-firewall-3d)
     id: 'firewall', label: 'FIREWALL', url: '/models/k5-firewall.glb', lane: 'k5-firewall-3d',
+    hidesIn: { sheetmetal: ['firewall_dash_panel', 'firewall_toe_board'] },
     hides: ['CTX-firewall-face', 'CTX-toe-board'],
   },
   {
