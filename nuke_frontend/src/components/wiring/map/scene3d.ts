@@ -20,7 +20,8 @@ export const zoneOfY = (y: number): ZoneId => (y < -1.46 ? 'bay' : y < 0.1 ? 'ca
 // replaces are hidden by name ("Name*" = every name starting with "Name"), except the names in `keeps`. Each file is in
 // the zones' frame (twin metres, glTF Y-up), so it is drawn as published. Extend `hides` when a layer draws more.
 // (The MAP tab does not load k5-blazer.glb, so its Under_Frame_Blazer needs no entry here.)
-export interface LayerDef { id: string; label: string; url: string; lane: string; hides: string[]; keeps?: string[]; credit?: { text: string; href: string } }
+// `off`: drawn only when a viewer switches it on (MORE menu); for placeholder geometry that is not yet the real part.
+export interface LayerDef { id: string; label: string; url: string; lane: string; hides: string[]; keeps?: string[]; credit?: { text: string; href: string }; off?: boolean }
 export const LAYERS: LayerDef[] = [
   {
     id: 'frame', label: 'FRAME', url: '/models/k5-frame.glb', lane: 'chassis-3d (#470)',
@@ -28,13 +29,15 @@ export const LAYERS: LayerDef[] = [
     hides: ['CTX-frame-rail-web-driver', 'CTX-frame-rail-web-passenger'],
   },
   {
+    // placeholder boxes, not the stamped parts (owner, 2026-10-26): off until the photo-derived parts replace them
     id: 'sheetmetal', label: 'SHEET METAL', url: '/models/k5-front-sheetmetal.glb', lane: 'chassis-3d (#470)',
-    hides: ['CTX-inner-fender-wall-driver', 'CTX-inner-fender-wall-passenger'],
+    hides: ['CTX-inner-fender-wall-driver', 'CTX-inner-fender-wall-passenger'], off: true,
   },
   {
-    // stock 1973-80 non-AC dash panel, toe board and cowl sides, camera-matched to photos (receipt 2026-10-26_k5-firewall-3d)
+    // stock 1973-80 non-AC dash panel, toe board and cowl sides, camera-matched to photos (receipt 2026-10-26_k5-firewall-3d);
+    // off with the sheet metal until the old panel underneath it is hidden (#2826) and the other two parts land
     id: 'firewall', label: 'FIREWALL', url: '/models/k5-firewall.glb', lane: 'k5-firewall-3d',
-    hides: ['CTX-firewall-face', 'CTX-toe-board'],
+    hides: ['CTX-firewall-face', 'CTX-toe-board'], off: true,
   },
   {
     // the 1975-80 radiator core support drawn from photos (receipt 2026-10-26_k5-core-support-3d); the sheetmetal
