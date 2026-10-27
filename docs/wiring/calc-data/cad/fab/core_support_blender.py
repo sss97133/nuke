@@ -1,57 +1,116 @@
-"""1973-80 C/K + K5 radiator core support, drawn in Blender (headless) from reference photos.
+"""1973-80 C/K + K5 radiator core support, drawn in Blender (headless) as stamped 1 mm sections from reference photos.
 
-Run: Blender -b -P core_support_blender.py -- <out.glb> [<out.obj>]
+Run: Blender -b -P core_support_blender.py -- <out.glb> [<out.blend>]
 Twin metres: +x driver, -y forward, +z up (Blender's Z-up frame is the twin frame here); the glTF exporter turns it
 Y-up, (X, Y, Z) = (x, z, -y), the same turn as k5cad.write_glb. Every size below names its source; the receipt is
-docs/wiring/receipts/k5-core-support-3d.md. Photo ids: NOS GM support eBay 227561622754 frames _01/_05/_06/_07/_10,
-owner truck scott-bay 045/046. Inches from the tape in _05/_06 (25.4 mm).
+docs/wiring/receipts/2026-10-26_k5-core-support-3d.md. Photo ids: NOS GM support eBay 227561622754 frames _01/_03/_04/
+_05/_06/_10/_13/_16/_17/_21, owner truck scott-bay 045/046. Inches from the tape in _05/_06 (25.4 mm).
+
+Construction (the sections, read from the end and oblique views):
+- radiator_face: one sheet as a height field over (x, z): the headlamp panels pressed 30 mm forward in their stepped
+  outline (_03/_04 end profile dips forward between the tie bars; _10/_21 step line), the oval bosses domed 12 mm
+  toward the engine, a raised bead ring round each headlamp hole; holes cut through after the 1 mm solidify.
+- upper/lower tie bars: hat boxes standing forward of the face, open to it (_03 near end, _13 end of the upper bar,
+  _16/_17/_21 from the front), each with a return lip turned toward the engine (owner 045 lower band).
+- radiator posts: hat channels standing forward either side of the opening, tie bar to tie bar (_16, _17, _21).
+- end baffles: walls turned 90 degrees to the face along each end, five fender screw holes (_03, _04; GM 2C-9).
+Profiles are swept, bends beveled (4 mm, 3 segments), solidified 1 mm, shaded smooth by angle.
 """
+import math
 import sys
 import bpy
 import bmesh
-from mathutils import Matrix
+from mathutils import Vector
 
 IN = 0.0254
-YF = -2.527                       # front face on the frame's core-support pads (chassis_frame.py body_mount_1)
-T = 0.0015                        # sheet, assumed 16 ga
-D = 0.100                         # tie-bar section depth, ~4 in (_07 edge view, _03 end view), assumed +/-15 mm
+YF = -2.527                       # face plane on the frame's core-support pads (chassis_frame.py body_mount_1)
+T = 0.001                         # sheet, ~1 mm (lead's brief; none printed)
+D = 0.095                         # tie-bar box depth forward of the face, ~4 in (_03, _13 end views), assumed +/-15 mm
 HALF_W = 76.8 * IN / 2            # tie-bar ends 76.8 in apart (_05 tape -2.9 in, _06 tape 73.9 in)
-LAMP_Z = 1.052                    # twin headlamp centre (the vertical anchor; photo gives everything relative to it)
+LAMP_Z = 1.052                    # twin headlamp centre (the vertical anchor)
 H = 0.627                         # face height 24.7 in (_01 467 px over 18.4 px/in, _05 cross-check 24.9 in)
 ZB = LAMP_Z - 0.421               # lamp centre 0.671 H above the lower tie bar's bottom (_01)
 ZT = ZB + H
-LAMP_X, LAMP_D = 0.851, 5.3 * IN  # centres 1.702 m apart on the _05/_06 tape (perspective-corrected); hole 5.3 in (_05)
-PARK_X, PARK_Z, PARK_D = 0.820, 0.818, 3.2 * IN   # parking-lamp hole under each headlamp (_01 overlay, _05, _06, _10)
+LAMP_X, LAMP_D = 0.851, 5.3 * IN  # centres 1.702 m apart (_05/_06 tape, perspective-corrected); hole 5.3 in (_05)
+PARK_X, PARK_Z, PARK_D = 0.820, 0.818, 3.2 * IN   # parking-lamp hole under each headlamp (_01, _05, _06, _10)
 OPEN_CX, OPEN_W = 0.025, 30.1 * IN                # radiator opening 19.4-49.55 in on the tape: 1 in toward the driver
 OPEN_ZT, OPEN_ZB = ZT - 0.086, ZT - 0.086 - 0.493 # 3.4 in under the top edge (_01), 19.4 in tall (_05 tape)
-MOUNT_X = 0.367                   # frame-mount brackets 28.9 in apart (_01 bottom edge), over the rail tops (+/-0.368)
-DOME_X, DOME_Z = 0.541, 1.094     # stamped oval boss each side of the opening (_01, _05, _06; owner 045)
-RECESS = (0.650, HALF_W - 0.02, ZB + 0.03, ZT - 0.09)  # headlamp-panel step: inner edge 0.11 m outboard of the boss
-#                                                        (owner 045 at 1491 px/m), outline from _05 left, _06 right
-FLANGE_SCREWS_Z = [ZB + 0.09 + i * 0.105 for i in range(5)]  # five fender screws (GM 2C-9 step 10); spacing assumed
+OPEN_R = 0.045                    # opening corner radius (_01 corners), assumed +/-15 mm
+MOUNT_X = 0.367                   # frame-mount brackets 28.9 in apart (_01 bottom edge), over the rail tops
+DOME_X, DOME_Z, DOME_A, DOME_B = 0.541, 1.094, 0.107 / 2, 0.195 / 2  # oval boss (owner 045 size; _06 x; _01 z)
+TB_H = 0.085                      # tie-bar box height on the face (_03 end view: about a seventh of the face)
+POST_W = 0.070                    # radiator post width on the face (_21), assumed +/-15 mm
+RECESS = 0.030                    # headlamp panel pressed forward (_03/_04 end profile dip), assumed +/-10 mm
+FLANGE_SCREWS_Z = [ZB + 0.13 + i * 0.095 for i in range(5)]  # five fender screws (GM 2C-9 step 10; _03 end wall)
+GRID = 0.010                      # height-field pitch
 
 
-def box(name, x0, x1, y0, y1, z0, z1):
-    me = bpy.data.meshes.new(name)
-    bm = bmesh.new()
-    bmesh.ops.create_cube(bm, size=1.0)
-    bmesh.ops.transform(bm, verts=bm.verts, matrix=Matrix.Diagonal((x1 - x0, y1 - y0, z1 - z0, 1)))
-    bmesh.ops.translate(bm, verts=bm.verts, vec=((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2))
-    bm.to_mesh(me)
-    bm.free()
+def link(name, me):
     ob = bpy.data.objects.new(name, me)
     bpy.context.collection.objects.link(ob)
     return ob
 
 
-def cyl(name, x, y0, y1, z, d, seg=48):
-    bpy.ops.mesh.primitive_cylinder_add(vertices=seg, radius=d / 2, depth=abs(y1 - y0))
-    ob = bpy.context.active_object
-    ob.name = name
-    ob.rotation_euler = (1.5708, 0, 0)
-    ob.location = (x, (y0 + y1) / 2, z)
-    bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
+def finish(ob, bevel=True, thick=T):
+    """Bevel the bends, give the sheet its thickness, apply."""
+    if bevel:
+        b = ob.modifiers.new("bend", "BEVEL")
+        b.width, b.segments, b.limit_method, b.angle_limit = 0.004, 3, "ANGLE", math.radians(30)
+        b.harden_normals = False
+    s = ob.modifiers.new("sheet", "SOLIDIFY")
+    s.thickness, s.offset, s.use_even_offset = thick, 0.0, True
+    bpy.context.view_layer.objects.active = ob
+    for m in list(ob.modifiers):
+        bpy.ops.object.modifier_apply(modifier=m.name)
     return ob
+
+
+def sweep(name, prof, axis, a0, a1):
+    """Open profile [(u, v)] swept straight along `axis` from a0 to a1. axis 'x': (u, v) = (y, z); 'z': (x, y)."""
+    bm = bmesh.new()
+    rows = []
+    for a in (a0, a1):
+        row = []
+        for u, v in prof:
+            co = (a, u, v) if axis == "x" else (u, v, a)
+            row.append(bm.verts.new(co))
+        rows.append(row)
+    for i in range(len(prof) - 1):
+        bm.faces.new((rows[0][i], rows[0][i + 1], rows[1][i + 1], rows[1][i]))
+    me = bpy.data.meshes.new(name)
+    bm.to_mesh(me)
+    bm.free()
+    return link(name, me)
+
+
+def prism(name, loop, y0, y1):
+    """Closed (x, z) outline extruded along y: a cutter."""
+    bm = bmesh.new()
+    a = [bm.verts.new((x, y0, z)) for x, z in loop]
+    b = [bm.verts.new((x, y1, z)) for x, z in loop]
+    n = len(loop)
+    for i in range(n):
+        bm.faces.new((a[i], a[(i + 1) % n], b[(i + 1) % n], b[i]))
+    bm.faces.new(a[::-1])
+    bm.faces.new(b)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    me = bpy.data.meshes.new(name)
+    bm.to_mesh(me)
+    bm.free()
+    return link(name, me)
+
+
+def circle(cx, cz, r, n=48, sz=1.0):
+    return [(cx + r * math.cos(2 * math.pi * i / n), cz + sz * r * math.sin(2 * math.pi * i / n)) for i in range(n)]
+
+
+def rrect(x0, x1, z0, z1, r, n=8):
+    pts = []
+    for cx, cz, a0 in ((x1 - r, z1 - r, 0), (x0 + r, z1 - r, 90), (x0 + r, z0 + r, 180), (x1 - r, z0 + r, 270)):
+        for i in range(n + 1):
+            a = math.radians(a0 + 90 * i / n)
+            pts.append((cx + r * math.cos(a), cz + r * math.sin(a)))
+    return pts
 
 
 def cut(target, *tools):
@@ -70,74 +129,172 @@ def join(name, obs):
         o.select_set(True)
     bpy.context.view_layer.objects.active = obs[0]
     bpy.ops.object.join()
-    obs[0].name = name
-    obs[0].data.name = name
+    obs[0].name = obs[0].data.name = name
     return obs[0]
+
+
+def smooth(t):
+    t = min(max(t, 0.0), 1.0)
+    return t * t * (3 - 2 * t)
+
+
+def poly_sd(px, pz, poly):
+    """Signed distance to a closed polygon, negative inside."""
+    d, inside = 1e9, False
+    n = len(poly)
+    for i in range(n):
+        (ax, az), (bx, bz) = poly[i], poly[(i + 1) % n]
+        ex, ez = bx - ax, bz - az
+        t = max(0.0, min(1.0, ((px - ax) * ex + (pz - az) * ez) / (ex * ex + ez * ez)))
+        d = min(d, math.hypot(px - ax - t * ex, pz - az - t * ez))
+        if (az > pz) != (bz > pz) and px < ax + (pz - az) * ex / ez:
+            inside = not inside
+    return -d if inside else d
+
+
+# headlamp panel outline, driver side (mirrored): inner step at x 0.650 (owner 045, 0.109 m outboard of the boss),
+# bottom step over the lower tie bar, top step over the headlamp then a diagonal up to the upper tie bar near the
+# end (_10 step line, _21 same on the other end); runs out past the end so the end wall takes the dip (_03/_04)
+PANEL = [(0.650, ZB + TB_H + 0.012), (HALF_W + 0.05, ZB + TB_H + 0.012), (HALF_W + 0.05, ZT - TB_H - 0.012),
+         (0.905, ZT - TB_H - 0.012), (0.800, 1.150), (0.650, 1.150)]
+RAMP = 0.018                       # width of the pressed step's wall (the photo's step reads ~ 20 mm wide in _10)
+
+
+def face_y(x, z):
+    """Offset of the face sheet from YF: forward (-) in the headlamp panel, rearward (+) on bosses and lamp beads."""
+    s = 1 if x >= 0 else -1
+    ax = abs(x)
+    off = -RECESS * smooth(0.5 - poly_sd(ax, z, PANEL) / RAMP)
+    # oval boss, domed 12 mm toward the engine with a flat top (owner 045, _01, _10)
+    r = math.hypot((ax - DOME_X) / DOME_A, (z - DOME_Z) / DOME_B)
+    off += 0.012 * smooth((1.15 - r) / 0.35)
+    # headlamp bead: a ring raised 5 mm round the hole (_01 dark ring, _10 rim)
+    rl = math.hypot(ax - LAMP_X, z - LAMP_Z) - LAMP_D / 2
+    off += 0.005 * smooth(1 - abs(rl - 0.016) / 0.012)
+    return off
+
+
+def height_face():
+    bm = bmesh.new()
+    nx = int(2 * HALF_W / GRID) + 1
+    nz = int((ZT - ZB) / GRID) + 1
+    xs = [-HALF_W + 2 * HALF_W * i / (nx - 1) for i in range(nx)]
+    zs = [ZB + (ZT - ZB) * j / (nz - 1) for j in range(nz)]
+    vv = [[bm.verts.new((x, YF + face_y(x, z), z)) for z in zs] for x in xs]
+    for i in range(nx - 1):
+        for j in range(nz - 1):
+            bm.faces.new((vv[i][j], vv[i + 1][j], vv[i + 1][j + 1], vv[i][j + 1]))
+    me = bpy.data.meshes.new("radiator_face")
+    bm.to_mesh(me)
+    bm.free()
+    return link("radiator_face", me)
+
+
+bpy.ops.wm.read_factory_settings(use_empty=True)
+parts = {}
+
+# ---- the face sheet: height field, solidify, cut the openings
+face = finish(height_face(), bevel=False)
+open_loop = rrect(OPEN_CX - OPEN_W / 2, OPEN_CX + OPEN_W / 2, OPEN_ZB, OPEN_ZT, OPEN_R)
+tools = [prism("o", open_loop, YF - 0.1, YF + 0.1)]
+for s in (1, -1):
+    tools += [prism("l", circle(s * LAMP_X, LAMP_Z, LAMP_D / 2), YF - 0.1, YF + 0.1),
+              prism("p", circle(s * PARK_X, PARK_Z, PARK_D / 2, 32), YF - 0.1, YF + 0.1)]
+face = cut(face, *tools)
+parts["radiator_face"] = face
+
+# ---- radiator opening return flange, 15 mm toward the engine all round (_01 lit edge, _10 inner lip)
+bm = bmesh.new()
+a = [bm.verts.new((x, YF, z)) for x, z in open_loop]
+b = [bm.verts.new((x, YF + 0.015, z)) for x, z in open_loop]
+for i in range(len(a)):
+    bm.faces.new((a[i], a[(i + 1) % len(a)], b[(i + 1) % len(a)], b[i]))
+me = bpy.data.meshes.new("opening_flange")
+bm.to_mesh(me)
+bm.free()
+parts["opening_flange"] = finish(link("opening_flange", me), bevel=False)
+
+# ---- upper tie bar: hat box forward of the face, top skin flush with the top edge, a 15 mm lip turned rearward
+# over the face top (_13 end of the bar; _03 left end; owner 045 shows no wide flange at the top on the engine side)
+ut = [(0.0, ZT - TB_H), (-D, ZT - TB_H), (-D, ZT), (0.012, ZT), (0.012, ZT - 0.012)]
+parts["upper_tie_bar"] = finish(sweep("upper_tie_bar", [(YF + u, v) for u, v in ut], "x", -HALF_W, HALF_W))
+
+# hood-latch plate on the bar's front wall, centred (GM 2C-20 upper panel; _01 centre holes): a doubler with a slot
+latch = finish(sweep("hood_latch_plate", [(YF - D - 0.003, ZT - 0.075), (YF - D - 0.003, ZT - 0.008)], "x",
+                     OPEN_CX - 0.09, OPEN_CX + 0.09), bevel=False, thick=0.002)
+parts["hood_latch_plate"] = cut(latch, prism("slot", rrect(OPEN_CX - 0.03, OPEN_CX + 0.03, ZT - 0.05, ZT - 0.03,
+                                                          0.009), YF - D - 0.02, YF - D + 0.01))
+
+# ---- lower tie bar: hat box forward, bottom skin the face's bottom edge, a 45 mm rear lip toward the engine
+# (owner 045 wide band on the engine side; _03/_04 right end shows the lip standing up)
+lt = [(0.0, ZB + TB_H), (-D, ZB + TB_H), (-D, ZB), (0.045, ZB), (0.045, ZB + 0.040)]
+parts["lower_tie_bar"] = finish(sweep("lower_tie_bar", [(YF + u, v) for u, v in lt], "x", -HALF_W, HALF_W))
+
+# ---- radiator posts: hat channels standing forward either side of the opening, tie bar to tie bar, with a 20 mm
+# flange to the face each side (_21 from the front, _16/_17 standing up off the floor)
+for s, sfx, xe in ((1, "L", OPEN_CX + OPEN_W / 2), (-1, "R", OPEN_CX - OPEN_W / 2)):
+    x0, x1 = xe, xe + s * POST_W
+    prof = [(x0 - s * 0.020, YF - T), (x0, YF - T), (x0, YF - D + 0.002), (x1, YF - D + 0.002), (x1, YF - T), (x1 + s * 0.020, YF - T)]
+    if s < 0:
+        prof = prof[::-1]
+    parts[f"radiator_post_{sfx}"] = finish(sweep(f"radiator_post_{sfx}", prof, "z", ZB + TB_H, ZT - TB_H))
+
+# ---- radiator mounting panel across the opening top on the engine side: a strip with a 20 mm lower return
+# (GM Fig 2C-20; _01 strip with two stepped dips over the opening)
+rmp = [(YF + 0.002, OPEN_ZT + 0.050), (YF + 0.002, OPEN_ZT - 0.002), (YF + 0.022, OPEN_ZT - 0.002)]
+parts["radiator_mounting_panel"] = finish(sweep("radiator_mounting_panel", rmp, "x", OPEN_CX - OPEN_W / 2 - 0.03,
+                                                OPEN_CX + OPEN_W / 2 + 0.03))
+
+for s, sfx in ((1, "L"), (-1, "R")):
+    # headlamp and parking-lamp collars: the hole edge turned 8 mm forward, the parking collar 15 mm (_10, _21)
+    col = []
+    for cx, cz, d, dep in ((LAMP_X, LAMP_Z, LAMP_D, 0.008), (PARK_X, PARK_Z, PARK_D, 0.015)):
+        bm = bmesh.new()
+        y0 = YF + face_y(s * cx, cz + d / 2)
+        ring = circle(s * cx, cz, d / 2, 40)
+        a = [bm.verts.new((x, y0, z)) for x, z in ring]
+        b = [bm.verts.new((x, y0 - dep, z)) for x, z in ring]
+        for i in range(len(a)):
+            bm.faces.new((a[i], a[(i + 1) % len(a)], b[(i + 1) % len(a)], b[i]))
+        me = bpy.data.meshes.new("c")
+        bm.to_mesh(me)
+        bm.free()
+        col.append(finish(link("c", me), bevel=False))
+    parts[f"lamp_collars_{sfx}"] = join(f"lamp_collars_{sfx}", col)
+
+    # end baffle: a wall turned 90 degrees to the face along the end, front edge following the panel dip, five
+    # fender screw holes (_03, _04 end walls; GM 2C-9 step 10). Profile in (x, y), swept up z.
+    x = s * HALF_W
+    wall = [(x - s * 0.012, YF - RECESS - 0.001), (x, YF - RECESS - 0.001), (x, YF + 0.045)]
+    if s < 0:
+        wall = wall[::-1]
+    w = finish(sweep(f"fender_flange_{sfx}", wall, "z", ZB + TB_H, ZT - TB_H))
+    hs = []
+    for z in FLANGE_SCREWS_Z:
+        bpy.ops.mesh.primitive_cylinder_add(vertices=16, radius=0.0045, depth=0.03,
+                                            location=(x, YF + 0.022, z), rotation=(0, math.pi / 2, 0))
+        hs.append(bpy.context.active_object)
+    parts[f"fender_flange_{sfx}"] = cut(w, *hs)
+
+    # frame mount: a U bracket under the lower tie bar's box on each rail, 45 mm drop, 17 mm bolt hole (_01, _07)
+    prof = [(YF - D + 0.01, ZB), (YF - D + 0.01, ZB - 0.045), (YF - 0.005, ZB - 0.045), (YF - 0.005, ZB)]
+    br = finish(sweep(f"frame_mount_{sfx}", prof, "x", s * MOUNT_X - 0.035, s * MOUNT_X + 0.035))
+    bpy.ops.mesh.primitive_cylinder_add(vertices=24, radius=0.0085, depth=0.03,
+                                        location=(s * MOUNT_X, YF - D / 2, ZB - 0.045))
+    parts[f"frame_mount_{sfx}"] = cut(br, bpy.context.active_object)
 
 
 def mat(name, rgb, metal, rough):
     m = bpy.data.materials.new(name)
     m.use_nodes = True
-    b = m.node_tree.nodes["Principled BSDF"]
-    b.inputs["Base Color"].default_value = (*rgb, 1)
-    b.inputs["Metallic"].default_value = metal
-    b.inputs["Roughness"].default_value = rough
+    bsdf = m.node_tree.nodes["Principled BSDF"]
+    bsdf.inputs["Base Color"].default_value = (*rgb, 1)
+    bsdf.inputs["Metallic"].default_value = metal
+    bsdf.inputs["Roughness"].default_value = rough
     return m
 
 
-bpy.ops.wm.read_factory_settings(use_empty=True)
-ye = YF + T                        # engine face of the sheet
-
-# radiator mounting face: one sheet with the radiator opening, headlamp, parking-lamp and boss-centre holes
-face = box("face", -HALF_W, HALF_W, YF, ye, ZB, ZT)
-holes = [box("o", -OPEN_W / 2 + OPEN_CX, OPEN_W / 2 + OPEN_CX, YF - 0.01, ye + 0.01, OPEN_ZB, OPEN_ZT)]
-for s in (1, -1):
-    holes += [cyl("l", s * LAMP_X, YF - 0.01, ye + 0.01, LAMP_Z, LAMP_D),
-              cyl("p", s * PARK_X, YF - 0.01, ye + 0.01, PARK_Z, PARK_D)]
-face = cut(face, *holes)
-face.name = "radiator_face"
-
-parts = {"radiator_face": face}
-# stamped oval bosses beside the opening, standing 12 mm toward the engine: 107 x 195 mm (owner 045; _06 dome)
-for s, sfx in ((1, "L"), (-1, "R")):
-    o = cyl(f"boss_{sfx}", s * DOME_X, ye, ye + 0.012, DOME_Z, 0.107)
-    for v in o.data.vertices:          # oval, 1.8 times taller than wide
-        v.co.z = DOME_Z + (v.co.z - DOME_Z) * 1.8
-    parts[f"boss_{sfx}"] = o
-
-# upper tie bar: a channel along the top standing FORWARD of the face (owner 045 shows no flange on the engine side
-# at the top, while the lower one does), top flange the full section depth, front lip down 60 mm (_03, _07)
-parts["upper_tie_bar"] = join("upper_tie_bar", [
-    box("ut", -HALF_W + 0.01, HALF_W - 0.01, YF - D, YF, ZT - T, ZT),
-    box("ul", -HALF_W + 0.01, HALF_W - 0.01, YF - D, YF - D + T, ZT - 0.060, ZT)])
-# radiator mounting panel across the opening top, bolted to the upper tie bar (GM Fig 2C-20; _01 wavy strip)
-parts["radiator_mounting_panel"] = box("rmp", OPEN_CX - OPEN_W / 2 - 0.03, OPEN_CX + OPEN_W / 2 + 0.03,
-                                       ye, ye + 0.035, OPEN_ZT - 0.002, OPEN_ZT + 0.045)
-# lower tie bar: bottom flange the full depth toward the engine, rear lip up 60 mm (_01, _05/_06, owner 045 band)
-parts["lower_tie_bar"] = join("lower_tie_bar", [
-    box("lb", -HALF_W, HALF_W, YF, YF + D, ZB, ZB + T),
-    box("ll", -HALF_W, HALF_W, YF + D - T, YF + D, ZB, ZB + 0.060)])
-for s, sfx in ((1, "L"), (-1, "R")):
-    x0, x1, z0, z1 = RECESS
-    # headlamp panel: the stepped box around lamp and parking lamp, 30 mm deep toward the engine (_05, _06, _10)
-    parts[f"headlamp_panel_{sfx}"] = join(f"headlamp_panel_{sfx}", [
-        box("a", s * x0 - T / 2, s * x0 + T / 2, ye, ye + 0.03, z0, z1),
-        box("b", min(s * x0, s * x1), max(s * x0, s * x1), ye, ye + 0.03, z1 - T, z1),
-        box("c", min(s * x0, s * x1), max(s * x0, s * x1), ye, ye + 0.03, z0, z0 + T)])
-    # side baffle / fender flange: bent rearward 50 mm at each end, five screw holes (_13/_14 end detail; GM 2C-9)
-    fl = box(f"fender_flange_{sfx}", s * HALF_W - T / 2, s * HALF_W + T / 2, YF, YF + 0.05, ZB + 0.03, ZT - 0.03)
-    tools = []
-    for z in FLANGE_SCREWS_Z:
-        bpy.ops.mesh.primitive_cylinder_add(vertices=16, radius=0.004, depth=0.02,
-                                            location=(s * HALF_W, YF + 0.03, z), rotation=(0, 1.5708, 0))
-        tools.append(bpy.context.active_object)
-    parts[f"fender_flange_{sfx}"] = cut(fl, *tools)
-    # frame mount: box bracket under the lower tie bar on each rail, 17 mm bolt hole (_01, _07; GM 2C: one per rail)
-    br = box(f"frame_mount_{sfx}", s * MOUNT_X - 0.035, s * MOUNT_X + 0.035, YF + 0.005, YF + 0.095, ZB - 0.045, ZB)
-    bpy.ops.mesh.primitive_cylinder_add(vertices=24, radius=0.0085, depth=0.2, location=(s * MOUNT_X, YF + 0.05, ZB))
-    parts[f"frame_mount_{sfx}"] = cut(br, bpy.context.active_object)
-
-black = mat("satin_black_steel", (0.02, 0.02, 0.022), 0.6, 0.55)
+black = mat("satin_black_steel", (0.025, 0.025, 0.027), 0.3, 0.4)
 root = bpy.data.objects.new("core_support", None)
 bpy.context.collection.objects.link(root)
 for n, o in parts.items():
@@ -145,16 +302,15 @@ for n, o in parts.items():
     o.data.materials.clear()
     o.data.materials.append(black)
     o.parent = root
+    bpy.ops.object.select_all(action="DESELECT")
+    o.select_set(True)
+    bpy.context.view_layer.objects.active = o
+    bpy.ops.object.shade_smooth_by_angle(angle=math.radians(35))
 
-out = sys.argv[sys.argv.index("--") + 1]
+argv = sys.argv[sys.argv.index("--") + 1:]
 bpy.ops.object.select_all(action="SELECT")
-bpy.ops.export_scene.gltf(filepath=out, export_format="GLB", use_selection=True, export_yup=True,
+bpy.ops.export_scene.gltf(filepath=argv[0], export_format="GLB", use_selection=True, export_yup=True,
                           export_extras=False, export_apply=True, export_draco_mesh_compression_enable=False,
                           export_texcoords=False, export_normals=True)
-if len(sys.argv) > sys.argv.index("--") + 2:
-    import json
-    dump = {}
-    for n, o in parts.items():
-        o.data.calc_loop_triangles()
-        dump[n] = {"v": [list(v.co) for v in o.data.vertices], "f": [list(t.vertices) for t in o.data.loop_triangles]}
-    json.dump(dump, open(sys.argv[sys.argv.index("--") + 2], "w"))
+if len(argv) > 1:
+    bpy.ops.wm.save_as_mainfile(filepath=argv[1])
