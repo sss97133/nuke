@@ -611,7 +611,8 @@ def cowl_plenum():
     slots per side (two large, one small) and the wiper pivot holes (owner photos; positions and sizes assumed
     +/-0.03 m: no photo of the top has been camera-matched)."""
     zt = float(OUTLINE[:, 1].max()) + 0.018
-    outer = RRect((0.0, (FACE_Y + PLENUM_Y1) / 2), (0.78, (PLENUM_Y1 - FACE_Y) / 2), 0.02)  # between the cowl sides
+    half = min(dash_end_x(SEAM_Z - 0.01, 1), dash_end_x(SEAM_Z - 0.01, -1)) - 0.005  # ends on the cowl-side line
+    outer = RRect((0.0, (FACE_Y + PLENUM_Y1) / 2), (half, (PLENUM_Y1 - FACE_Y) / 2), 0.02)
     holes = []
     for sg in (-1, 1):
         for xc, hw in ((0.18, 0.095), (0.42, 0.095), (0.62, 0.045)):
@@ -691,13 +692,18 @@ def cowl_side(sign):
     A = np.concatenate([Fr, np.stack(fl, 1)], 1)
     front = (A.reshape(-1, 3), quads(*A.shape[:2]))
     rear = (Rr.reshape(-1, 3), quads(*Rr.shape[:2]))
-    # small hood-hinge shelf at the top-forward corner, 120 mm deep x 80 mm wide, inboard of the skin
-    tf = Fr[-1, -1]
-    sx = np.linspace(0, 0.08, 5)
-    sy = np.linspace(0, 0.12, 7)
-    S = np.array([[(tf[0] - sign * a, tf[1] + b, tf[2]) for a in sx] for b in sy])
+    # hood-hinge shelf: 80 mm wide inboard of the skin's top edge, following the skin's plan curve (corner arc and
+    # side) over its forward 120 mm, so the shelf and the corner are one bend, not a straight tab against a curve
+    top = Fr[-1]
+    keep = top[:, 1] < top[-1, 1] + 0.12 + 1e-6
+    T = top[keep]
+    tang = np.gradient(T[:, :2], axis=0)
+    nrm = np.stack([-tang[:, 1], tang[:, 0]], 1) / (np.linalg.norm(tang, axis=1)[:, None] + 1e-12)
+    nrm *= -np.sign(nrm[:, 0].mean() * sign)  # inboard
+    S = np.array([[(p[0] + n[0] * a, p[1] + n[1] * a, p[2]) for p, n in zip(T, nrm)] for a in np.linspace(0, 0.08, 5)])
     shelf = (S.reshape(-1, 3), quads(*S.shape[:2]))
-    stud = cylinder((tf[0] - sign * 0.04, tf[1] + 0.06, tf[2]), (0, 0, 1), 0.005, 0.028)
+    mid = S[2, len(T) // 2]
+    stud = cylinder((mid[0], mid[1], mid[2]), (0, 0, 1), 0.005, 0.028)
     V, F = merge(front, rear, shelf, stud)
     if sign < 0:
         F = [f[::-1] for f in F]
