@@ -1,21 +1,7 @@
-/**
- * GarageVehicleCard.tsx
- * Redesigned vehicle card following the NUKE design system.
- *
- * Design rules enforced:
- *   - 0px border-radius everywhere
- *   - No backdrop-filter, no box-shadow, no translateY
- *   - Hover = border-color change to --border-focus only
- *   - All labels ALL CAPS, 8px, letter-spacing 0.5px
- *   - Monospace (Courier New) for all numeric data
- *   - Health bar as 2px progress bar below content
- *   - Solid opaque backgrounds — no blur overlays
- *   - Every element interactive: hover shows tooltip, click triggers action
- *   - Mini timeline barcode under image (3% height)
- */
+/** Garage cards preserve recorded relationships, evidence and estimate coverage. */
 
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import Link from '../PrefetchLink';
 import { supabase } from '../../lib/supabase';
 import { optimizeImageUrl as sharedOptimizeImageUrl } from '../../lib/imageOptimizer';
 import type { GarageVehicle, RelationshipType, ViewMode } from '../../hooks/useVehiclesDashboard';
@@ -28,10 +14,6 @@ export interface GarageVehicleCardProps {
   vehicle: GarageVehicle;
   viewMode?: ViewMode;
   onRefresh?: () => void;
-  onDragStart?: () => void;
-  onDragEnd?: () => void;
-  isDragging?: boolean;
-  isTriageActive?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -93,6 +75,15 @@ function relationshipTooltip(vehicle: GarageVehicle): string {
     .filter(Boolean).join(' | ');
 }
 
+function relationshipSource(vehicle: GarageVehicle): string {
+  const labels: Record<GarageVehicle['relationship_source'], string> = {
+    verification: 'Ownership verification', ownership: 'Ownership record',
+    owner_statement: 'Account statement', discovered: 'Prior ownership record',
+    permission: 'Permission record', contributor: 'Contribution record', uploaded_by: 'Upload record',
+  };
+  return labels[vehicle.relationship_source] ?? 'Source unavailable';
+}
+
 function estimateTooltip(vehicle: GarageVehicle): string {
   return vehicle.estimated_value != null
     ? `BUILD-CLASS ESTIMATE | ${vehicle.estimate_calculated_at ?? 'DATE UNKNOWN'}`
@@ -121,19 +112,18 @@ function relationshipAccent(rel: RelationshipType): { bg: string; border: string
 // Style constants
 // ---------------------------------------------------------------------------
 
-const FONT_BODY = 'Arial, sans-serif';
-const FONT_MONO = "'Courier New', Courier, monospace";
+const FONT_BODY = 'var(--font-family)';
+const FONT_MONO = 'var(--font-mono)';
 
 const BASE: React.CSSProperties = {
   fontFamily: FONT_BODY,
-  fontSize: '9px',
+  fontSize: 'var(--text-callout)',
   color: 'var(--text, #2a2a2a)',
   backgroundColor: 'var(--surface, #ebebeb)',
-  border: '2px solid var(--border, #bdbdbd)', display: 'flex',
+  border: '1px solid var(--border)', display: 'flex',
   flexDirection: 'column',
   overflow: 'hidden',
   transition: 'border-color 180ms cubic-bezier(0.16, 1, 0.3, 1)',
-  cursor: 'pointer',
 };
 
 const BASE_HOVER: React.CSSProperties = {
@@ -146,9 +136,7 @@ const MONO: React.CSSProperties = {
 };
 
 const LABEL: React.CSSProperties = {
-  textTransform: 'uppercase',
-  letterSpacing: '0.5px',
-  fontSize: '8px',
+  fontSize: 'var(--text-caption)',
   fontWeight: 700,
   color: 'var(--text-secondary, #666666)',
 };
@@ -158,10 +146,8 @@ const TOOLTIP_STYLE: React.CSSProperties = {
   zIndex: 9999,
   padding: '3px 6px',
   fontFamily: FONT_MONO,
-  fontSize: '8px',
+  fontSize: 'var(--text-caption)',
   fontWeight: 700,
-  textTransform: 'uppercase',
-  letterSpacing: '0.5px',
   color: 'var(--bg, #f5f5f5)',
   backgroundColor: 'var(--text, #2a2a2a)',
   border: '2px solid var(--text, #2a2a2a)', whiteSpace: 'nowrap',
@@ -229,6 +215,11 @@ function HoverData({
     <>
       <span
         ref={elRef}
+        className={onClick ? 'garage-card-control' : undefined}
+        role={onClick ? 'button' : undefined}
+        tabIndex={onClick ? 0 : undefined}
+        aria-label={onClick ? tooltip : undefined}
+        onKeyDown={onClick ? event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); elRef.current?.click(); } } : undefined}
         onMouseEnter={handleEnter}
         onMouseLeave={handleLeave}
         onClick={handleClick}
@@ -365,7 +356,7 @@ function RelationshipBadge({ rel }: { rel: RelationshipType }) {
     <span
       style={{
         ...LABEL,
-        color: accent.color,
+        color: 'var(--text)',
         border: `2px solid ${accent.border}`,
         backgroundColor: accent.bg, padding: '1px 4px',
         display: 'inline-block',
@@ -382,8 +373,8 @@ function MissingTag({ label }: { label: string }) {
     <span
       style={{
         ...LABEL,
-        fontSize: '8px',
-        color: 'var(--warning, #b05a00)',
+        fontSize: 'var(--text-caption)',
+        color: 'var(--text)',
         border: '2px solid var(--warning, #b05a00)', padding: '1px 4px',
         display: 'inline-block',
       }}
@@ -436,127 +427,11 @@ function HealthBar({ score, vehicle }: { score: number | null; vehicle: GarageVe
             }}
           />
         </div>
-        <span style={{ ...MONO, fontSize: '8px', color: 'var(--text-secondary, #666666)', minWidth: 22 }}>
+        <span style={{ ...MONO, fontSize: 'var(--text-caption)', color: 'var(--text-secondary, #666666)', minWidth: 22 }}>
           {pct != null ? `${pct}` : '—'}
         </span>
       </div>
     </HoverData>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Quick-assign chips for CONTRIBUTOR vehicles (upgrade relationship)
-// ---------------------------------------------------------------------------
-
-const QUICK_ASSIGN_CHIPS = [
-  { label: 'OWN', table: 'vehicle_user_permissions', role: 'owner' },
-  { label: 'CO-OWN', table: 'vehicle_user_permissions', role: 'co_owner' },
-  { label: 'PREV OWNER', table: 'discovered_vehicles', type: 'previously_owned' },
-  { label: 'WORKED ON', table: 'vehicle_contributors', role: 'contributor' },
-] as const;
-
-function QuickAssignStrip({
-  vehicleId,
-  onRefresh,
-}: {
-  vehicleId: string;
-  onRefresh?: () => void;
-}) {
-  const [assigning, setAssigning] = useState<string | null>(null);
-
-  const handleAssign = useCallback(async (chip: typeof QUICK_ASSIGN_CHIPS[number]) => {
-    setAssigning(chip.label);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      if (chip.table === 'vehicle_user_permissions') {
-        await supabase.from('vehicle_user_permissions').upsert({
-          vehicle_id: vehicleId,
-          user_id: user.id,
-          role: chip.role,
-          is_active: true,
-          updated_at: new Date().toISOString(),
-        }, { onConflict: 'vehicle_id,user_id' });
-      } else if (chip.table === 'discovered_vehicles') {
-        const isDismiss = 'dismiss' in chip && (chip as any).dismiss;
-        await supabase.from('discovered_vehicles').upsert({
-          vehicle_id: vehicleId,
-          user_id: user.id,
-          relationship_type: (chip as any).type,
-          is_active: !isDismiss,
-          updated_at: new Date().toISOString(),
-        }, { onConflict: 'vehicle_id,user_id' });
-      } else if (chip.table === 'vehicle_contributors') {
-        await supabase.from('vehicle_contributors').upsert({
-          vehicle_id: vehicleId,
-          user_id: user.id,
-          role: chip.role,
-          status: 'active',
-          updated_at: new Date().toISOString(),
-        }, { onConflict: 'vehicle_id,user_id' });
-      }
-
-      onRefresh?.();
-    } catch (err) {
-      console.error('Quick assign error:', err);
-    } finally {
-      setAssigning(null);
-    }
-  }, [vehicleId, onRefresh]);
-
-  return (
-    <div
-      style={{
-        borderTop: '2px solid var(--border, #bdbdbd)',
-        padding: '6px 8px',
-        display: 'flex',
-        flexWrap: 'wrap',
-        gap: 4,
-        alignItems: 'center',
-      }}
-      onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
-    >
-      <span style={{ ...LABEL, width: '100%', marginBottom: 2 }}>ASSIGN RELATIONSHIP</span>
-      {QUICK_ASSIGN_CHIPS.map((chip) => {
-        const isDismiss = 'dismiss' in chip && (chip as any).dismiss;
-        return (
-          <button
-            key={chip.label}
-            disabled={assigning !== null}
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              handleAssign(chip);
-            }}
-            style={{
-              padding: '2px 6px',
-              fontSize: '8px',
-              fontWeight: 700,
-              fontFamily: FONT_BODY,
-              textTransform: 'uppercase',
-              letterSpacing: '0.5px',
-              border: `2px solid ${isDismiss ? 'var(--error, #d13438)' : 'var(--border, #bdbdbd)'}`, backgroundColor: assigning === chip.label
-                ? 'var(--text, #2a2a2a)'
-                : isDismiss
-                ? 'var(--error-dim, rgba(209, 52, 56, 0.1))'
-                : 'transparent',
-              color: assigning === chip.label
-                ? 'var(--bg, #f5f5f5)'
-                : isDismiss
-                ? 'var(--error, #d13438)'
-                : 'var(--text, #2a2a2a)',
-              cursor: assigning ? 'wait' : 'pointer',
-              opacity: assigning && assigning !== chip.label ? 0.5 : 1,
-              transition: 'background-color 180ms cubic-bezier(0.16, 1, 0.3, 1), color 180ms cubic-bezier(0.16, 1, 0.3, 1)',
-              marginLeft: isDismiss ? 'auto' : undefined,
-            }}
-          >
-            {assigning === chip.label ? '...' : chip.label}
-          </button>
-        );
-      })}
-    </div>
   );
 }
 
@@ -567,76 +442,54 @@ function QuickAssignStrip({
 function ActionStrip({
   vehicle,
   vertical = false,
-  onRelationshipClick,
 }: {
   vehicle: GarageVehicle;
   vertical?: boolean;
-  onRelationshipClick?: (e: React.MouseEvent) => void;
 }) {
-  const primaryAction =
-    (vehicle.image_count ?? 0) < 3
-      ? 'ADD PHOTOS'
-      : 'VIEW DETAILS';
+  const primaryAction = 'View vehicle';
 
   if (vertical) {
     return (
-      <div
+      <Link to={`/vehicle/${vehicle.id}`} className="garage-card-open"
         style={{
           padding: '8px 10px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          height: '100%',
           ...LABEL,
-          fontSize: '8px',
+          fontSize: 'var(--text-caption)',
           color: 'var(--text, #2a2a2a)',
           writingMode: 'vertical-rl',
           whiteSpace: 'nowrap',
         }}
       >
         {primaryAction}
-      </div>
+      </Link>
     );
   }
 
   return (
     <div
+      className="garage-card-actions"
       style={{
         borderTop: '2px solid var(--border, #bdbdbd)',
         display: 'flex',
         alignItems: 'stretch',
       }}
     >
-      <HoverData tooltip={primaryAction === 'VIEW DETAILS' ? 'OPEN VEHICLE PROFILE' : 'UPLOAD MORE PHOTOS'} style={{ flex: 1 }}>
-        <div
+      <HoverData tooltip="Open vehicle profile" style={{ flex: 1 }}>
+        <Link to={`/vehicle/${vehicle.id}`} className="garage-card-open"
           style={{
             flex: 1,
             padding: '6px 8px',
             ...LABEL,
-            fontSize: '9px',
+            fontSize: 'var(--text-callout)',
             color: 'var(--text, #2a2a2a)',
             textAlign: 'center',
-            borderRight: '2px solid var(--border, #bdbdbd)',
           }}
         >
           {primaryAction}
-        </div>
-      </HoverData>
-      <HoverData
-        tooltip="CHANGE RELATIONSHIP TO THIS VEHICLE"
-        onClick={onRelationshipClick}
-      >
-        <div
-          style={{
-            padding: '6px 8px',
-            ...LABEL,
-            fontSize: '9px',
-            color: 'var(--text-secondary, #666666)',
-            whiteSpace: 'nowrap',
-          }}
-        >
-          RELATIONSHIP
-        </div>
+        </Link>
       </HoverData>
     </div>
   );
@@ -646,15 +499,10 @@ function ActionStrip({
 // Grid card (full detail)
 // ---------------------------------------------------------------------------
 
-function GridCard({ vehicle, onRefresh, onDragStart, onDragEnd, isDragging, isTriageActive }: {
-  vehicle: GarageVehicle; onRefresh?: () => void;
-  onDragStart?: () => void; onDragEnd?: () => void; isDragging?: boolean; isTriageActive?: boolean;
-}) {
+function GridCard({ vehicle, onRefresh }: { vehicle: GarageVehicle; onRefresh?: () => void }) {
   const [hovered, setHovered] = useState(false);
   const [vinCopied, setVinCopied] = useState(false);
-  const [showAssign, setShowAssign] = useState(false);
   const title = formatVehicleTitle(vehicle);
-  const showQuickAssign = vehicle.relationship_type === 'CONTRIBUTOR';
 
   const copyVin = useCallback((e: React.MouseEvent) => {
     if (vehicle.vin) {
@@ -664,9 +512,7 @@ function GridCard({ vehicle, onRefresh, onDragStart, onDragEnd, isDragging, isTr
     }
   }, [vehicle.vin]);
 
-  const toggleAssign = useCallback((e: React.MouseEvent) => {
-    setShowAssign(prev => !prev);
-  }, []);
+
 
   const yearAge = vehicle.year ? `${new Date().getFullYear() - vehicle.year} YEARS OLD` : '';
   const valueTooltip = estimateTooltip(vehicle);
@@ -674,27 +520,16 @@ function GridCard({ vehicle, onRefresh, onDragStart, onDragEnd, isDragging, isTr
     ? `${formatCurrency(vehicle.purchase_price)} → ${formatCurrency(vehicle.estimated_value!)}`
     : '';
 
-  const dragStyle: React.CSSProperties = isDragging
-    ? { borderColor: 'var(--text, #2a2a2a)', transform: 'scale(1.02)', opacity: 0.8, zIndex: 10 }
-    : isTriageActive
-    ? { opacity: 0.4, transition: 'opacity 180ms cubic-bezier(0.16, 1, 0.3, 1)' }
-    : {};
+
 
   return (
-    <Link
-      to={`/vehicle/${vehicle.id}`}
-      draggable
-      onDragStart={(e) => {
-        e.dataTransfer.setData('text/plain', vehicle.id);
-        e.dataTransfer.effectAllowed = 'move';
-        onDragStart?.();
-      }}
-      onDragEnd={() => onDragEnd?.()}
-      style={{ textDecoration: 'none', display: 'block', color: 'inherit', ...dragStyle }}
+    <div
+      className="garage-vehicle-card"
+      style={{ textDecoration: 'none', display: 'block', color: 'inherit' }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      <article style={{ ...BASE, ...(hovered && !isTriageActive ? BASE_HOVER : {}) }}>
+      <article style={{ ...BASE, ...(hovered ? BASE_HOVER : {}) }}>
         {/* Image 16:9 + mini barcode */}
         <div
           style={{
@@ -706,6 +541,7 @@ function GridCard({ vehicle, onRefresh, onDragStart, onDragEnd, isDragging, isTr
             flexShrink: 0,
           }}
         >
+          <Link to={`/vehicle/${vehicle.id}`} className="garage-card-image-link" aria-hidden="true" tabIndex={-1} />
           {(vehicle.resolved_image_url || vehicle.primary_image_url) ? (
             <img
               src={optimizeImageUrl(vehicle.resolved_image_url || vehicle.primary_image_url!)}
@@ -765,15 +601,15 @@ function GridCard({ vehicle, onRefresh, onDragStart, onDragEnd, isDragging, isTr
           {/* Relationship badge — top-left, solid bg */}
           <HoverData
             tooltip={relationshipTooltip(vehicle)}
-            style={{ position: 'absolute', top: 6, left: 6 }}
+            style={{ position: 'absolute', top: 6, left: 6, zIndex: 2 }}
           >
             <div
               style={{
                 backgroundColor: 'var(--surface, #ebebeb)',
-                border: '2px solid var(--border, #bdbdbd)', padding: '1px 4px',
+                border: '1px solid var(--border)', padding: '1px 4px',
               }}
             >
-              <span style={{ ...LABEL, fontSize: '8px', color: 'var(--text-secondary, #666666)' }}>
+              <span style={{ ...LABEL, fontSize: 'var(--text-caption)', color: 'var(--text-secondary, #666666)' }}>
                 {vehicle.relationship_type}
               </span>
             </div>
@@ -783,7 +619,8 @@ function GridCard({ vehicle, onRefresh, onDragStart, onDragEnd, isDragging, isTr
           {vehicle.relationship_source === 'discovered' && (
             <button
               type="button"
-              title="NOT MINE — REMOVE FROM GARAGE"
+              title="Remove from garage"
+              aria-label="Remove discovery from garage"
               onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
               onClick={async (e) => {
                 e.preventDefault();
@@ -802,20 +639,21 @@ function GridCard({ vehicle, onRefresh, onDragStart, onDragEnd, isDragging, isTr
               }}
               style={{
                 position: 'absolute',
+                zIndex: 2,
                 top: 6,
                 right: 6,
-                width: 20,
-                height: 20,
+                width: 44,
+                height: 44,
                 padding: 0,
-                fontFamily: "'Courier New', Courier, monospace",
+                fontFamily: FONT_MONO,
                 fontSize: '12px',
                 fontWeight: 700,
                 lineHeight: 1,
                 cursor: 'pointer',
                 backgroundColor: 'var(--surface, #ebebeb)',
                 color: 'var(--text-secondary, #666666)',
-                border: '2px solid var(--border, #bdbdbd)',
-                borderRadius: 0,
+                border: '1px solid var(--border)',
+
               }}
             >×</button>
           )}
@@ -827,9 +665,9 @@ function GridCard({ vehicle, onRefresh, onDragStart, onDragEnd, isDragging, isTr
         {/* Body */}
         <div style={{ padding: '8px', display: 'flex', flexDirection: 'column', gap: 6, flex: 1, overflow: 'visible' }}>
           {/* Title — each part hoverable */}
-          <div
+          <Link to={`/vehicle/${vehicle.id}`} aria-label={`Open ${title || 'vehicle record'}`} className="garage-card-title"
             style={{
-              fontSize: '11px',
+              fontSize: 'var(--text-callout)',
               fontWeight: 700,
               textTransform: 'uppercase',
               letterSpacing: '0.5px',
@@ -855,11 +693,12 @@ function GridCard({ vehicle, onRefresh, onDragStart, onDragEnd, isDragging, isTr
               <HoverData tooltip={`TRIM: ${vehicle.trim.toUpperCase()}`}>{vehicle.trim.toUpperCase()}</HoverData>
             ) : null}
             {!title && <span>UNKNOWN VEHICLE</span>}
-          </div>
+          </Link>
 
           <span style={{ ...MONO, ...LABEL }} title={relationshipTooltip(vehicle)}>
             {ownershipPeriod(vehicle)}
           </span>
+          <span style={LABEL}>Source: {relationshipSource(vehicle)}</span>
 
           {/* VIN + missing tags */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
@@ -871,7 +710,7 @@ function GridCard({ vehicle, onRefresh, onDragStart, onDragEnd, isDragging, isTr
                 <span
                   style={{
                     ...MONO,
-                    fontSize: '8px',
+                    fontSize: 'var(--text-caption)',
                     color: vinCopied ? 'var(--success, #16825d)' : 'var(--text-secondary, #666666)',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
@@ -903,13 +742,13 @@ function GridCard({ vehicle, onRefresh, onDragStart, onDragEnd, isDragging, isTr
             {/* Value */}
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
               <HoverData tooltip={valueTooltip}>
-                <span style={LABEL}>VALUE</span>
+                <span style={LABEL}>Estimate</span>
                 {vehicle.estimated_value != null ? (
-                  <span style={{ ...MONO, fontSize: '10px', fontWeight: 700, color: 'var(--text, #2a2a2a)', marginLeft: 4 }}>
+                  <span style={{ ...MONO, fontSize: 'var(--text-callout)', fontWeight: 700, color: 'var(--text, #2a2a2a)', marginLeft: 4 }}>
                     {formatCurrency(vehicle.estimated_value)}
                   </span>
                 ) : (
-                  <span style={{ ...MONO, fontSize: '9px', color: 'var(--text-secondary, #666666)', marginLeft: 4 }}>—</span>
+                  <span style={{ ...MONO, fontSize: 'var(--text-callout)', color: 'var(--text-secondary, #666666)', marginLeft: 4 }}>—</span>
                 )}
               </HoverData>
               {vehicle.value_delta != null && vehicle.value_delta !== 0 && (
@@ -917,7 +756,7 @@ function GridCard({ vehicle, onRefresh, onDragStart, onDragEnd, isDragging, isTr
                   <span
                     style={{
                       ...MONO,
-                      fontSize: '8px',
+                      fontSize: 'var(--text-caption)',
                       color: vehicle.value_delta > 0 ? 'var(--success, #16825d)' : 'var(--error, #d13438)',
                     }}
                   >
@@ -929,9 +768,9 @@ function GridCard({ vehicle, onRefresh, onDragStart, onDragEnd, isDragging, isTr
 
             {/* Counts */}
             <div style={{ display: 'flex', gap: 12 }}>
-              <HoverData tooltip={`${vehicle.view_count ?? 0} TOTAL VIEWS`}>
+              <HoverData tooltip={vehicle.view_count == null ? 'View count unavailable' : `${vehicle.view_count} recorded views`}>
                 <span style={LABEL}>VIEWS</span>
-                <span style={{ ...MONO, fontSize: '9px', fontWeight: 700, marginLeft: 3 }}>{vehicle.view_count ?? '—'}</span>
+                <span style={{ ...MONO, fontSize: 'var(--text-callout)', fontWeight: 700, marginLeft: 3 }}>{vehicle.view_count ?? '—'}</span>
               </HoverData>
             </div>
 
@@ -940,14 +779,9 @@ function GridCard({ vehicle, onRefresh, onDragStart, onDragEnd, isDragging, isTr
           </div>
         </div>
 
-        {/* Action strip or quick-assign */}
-        {showQuickAssign || showAssign ? (
-          <QuickAssignStrip vehicleId={vehicle.id} onRefresh={onRefresh} />
-        ) : (
-          <ActionStrip vehicle={vehicle} onRelationshipClick={toggleAssign} />
-        )}
+        <ActionStrip vehicle={vehicle} />
       </article>
-    </Link>
+    </div>
   );
 }
 
@@ -955,14 +789,10 @@ function GridCard({ vehicle, onRefresh, onDragStart, onDragEnd, isDragging, isTr
 // List card (horizontal)
 // ---------------------------------------------------------------------------
 
-function ListCard({ vehicle, onRefresh, onDragStart, onDragEnd, isDragging, isTriageActive }: {
-  vehicle: GarageVehicle; onRefresh?: () => void;
-  onDragStart?: () => void; onDragEnd?: () => void; isDragging?: boolean; isTriageActive?: boolean;
-}) {
+function ListCard({ vehicle }: { vehicle: GarageVehicle }) {
   const [hovered, setHovered] = useState(false);
   const [vinCopied, setVinCopied] = useState(false);
   const title = formatVehicleTitle(vehicle);
-  const showQuickAssign = vehicle.relationship_type === 'CONTRIBUTOR';
 
   const copyVin = useCallback((e: React.MouseEvent) => {
     if (vehicle.vin) {
@@ -972,27 +802,16 @@ function ListCard({ vehicle, onRefresh, onDragStart, onDragEnd, isDragging, isTr
     }
   }, [vehicle.vin]);
 
-  const dragStyle: React.CSSProperties = isDragging
-    ? { borderColor: 'var(--text, #2a2a2a)', transform: 'scale(1.02)', opacity: 0.8, zIndex: 10 }
-    : isTriageActive
-    ? { opacity: 0.4, transition: 'opacity 180ms cubic-bezier(0.16, 1, 0.3, 1)' }
-    : {};
+
 
   return (
-    <Link
-      to={`/vehicle/${vehicle.id}`}
-      draggable
-      onDragStart={(e) => {
-        e.dataTransfer.setData('text/plain', vehicle.id);
-        e.dataTransfer.effectAllowed = 'move';
-        onDragStart?.();
-      }}
-      onDragEnd={() => onDragEnd?.()}
-      style={{ textDecoration: 'none', display: 'block', color: 'inherit', ...dragStyle }}
+    <div
+      className="garage-vehicle-card"
+      style={{ textDecoration: 'none', display: 'block', color: 'inherit' }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      <article style={{ ...BASE, flexDirection: 'row', alignItems: 'stretch', ...(hovered && !isTriageActive ? BASE_HOVER : {}) }}>
+      <article style={{ ...BASE, flexDirection: 'row', alignItems: 'stretch', ...(hovered ? BASE_HOVER : {}) }}>
         {/* Thumbnail with mini barcode */}
         <div
           style={{
@@ -1003,6 +822,7 @@ function ListCard({ vehicle, onRefresh, onDragStart, onDragEnd, isDragging, isTr
             overflow: 'hidden',
           }}
         >
+          <Link to={`/vehicle/${vehicle.id}`} className="garage-card-image-link" aria-hidden="true" tabIndex={-1} />
           {(vehicle.resolved_image_url || vehicle.primary_image_url) ? (
             <img
               src={optimizeImageUrl(vehicle.resolved_image_url || vehicle.primary_image_url!)}
@@ -1011,11 +831,11 @@ function ListCard({ vehicle, onRefresh, onDragStart, onDragEnd, isDragging, isTr
               height={90}
               loading="lazy"
               decoding="async"
-              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+              style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
             />
           ) : (
             <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <span style={{ ...LABEL, fontSize: '8px' }}>NO IMAGE</span>
+              <span style={{ ...LABEL, fontSize: 'var(--text-caption)' }}>NO IMAGE</span>
             </div>
           )}
           <MiniBarcode eventWeeks={vehicle.event_weeks} />
@@ -1023,10 +843,10 @@ function ListCard({ vehicle, onRefresh, onDragStart, onDragEnd, isDragging, isTr
 
         {/* Content */}
         <div style={{ flex: 1, padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <Link to={`/vehicle/${vehicle.id}`} aria-label={`Open ${title || 'vehicle record'}`} className="garage-card-title"
               style={{
-                fontSize: '11px',
+                fontSize: 'var(--text-callout)',
                 fontWeight: 700,
                 textTransform: 'uppercase',
                 letterSpacing: '0.5px',
@@ -1036,7 +856,7 @@ function ListCard({ vehicle, onRefresh, onDragStart, onDragEnd, isDragging, isTr
               }}
             >
               {title || 'UNKNOWN VEHICLE'}
-            </span>
+            </Link>
             <HoverData tooltip={relationshipTooltip(vehicle)}>
               <RelationshipBadge rel={vehicle.relationship_type} />
             </HoverData>
@@ -1052,6 +872,7 @@ function ListCard({ vehicle, onRefresh, onDragStart, onDragEnd, isDragging, isTr
             )}
           </div>
 
+          <span style={LABEL}>Source: {relationshipSource(vehicle)}</span>
           {vehicle.vin && (
             <HoverData
               tooltip={vinCopied ? 'COPIED!' : `${vehicle.vin} | CLICK TO COPY`}
@@ -1059,7 +880,7 @@ function ListCard({ vehicle, onRefresh, onDragStart, onDragEnd, isDragging, isTr
             >
               <span style={{
                 ...MONO,
-                fontSize: '8px',
+                fontSize: 'var(--text-caption)',
                 color: vinCopied ? 'var(--success, #16825d)' : 'var(--text-secondary, #666666)',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
@@ -1071,16 +892,16 @@ function ListCard({ vehicle, onRefresh, onDragStart, onDragEnd, isDragging, isTr
             </HoverData>
           )}
 
-          <div style={{ display: 'flex', gap: 12, alignItems: 'baseline' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 12px', alignItems: 'baseline' }}>
             <HoverData tooltip={estimateTooltip(vehicle)}>
-              <span style={LABEL}>VALUE</span>
-              <span style={{ ...MONO, fontSize: '9px', fontWeight: 700, marginLeft: 4 }}>
+              <span style={LABEL}>Estimate</span>
+              <span style={{ ...MONO, fontSize: 'var(--text-callout)', fontWeight: 700, marginLeft: 4 }}>
                 {vehicle.estimated_value != null ? formatCurrency(vehicle.estimated_value) : '—'}
               </span>
             </HoverData>
-            <HoverData tooltip={`${vehicle.view_count ?? 0} TOTAL VIEWS`}>
+            <HoverData tooltip={vehicle.view_count == null ? 'View count unavailable' : `${vehicle.view_count} recorded views`}>
               <span style={LABEL}>VWS</span>
-              <span style={{ ...MONO, fontSize: '9px', marginLeft: 3 }}>{vehicle.view_count ?? '—'}</span>
+              <span style={{ ...MONO, fontSize: 'var(--text-callout)', marginLeft: 3 }}>{vehicle.view_count ?? '—'}</span>
             </HoverData>
           </div>
 
@@ -1089,19 +910,11 @@ function ListCard({ vehicle, onRefresh, onDragStart, onDragEnd, isDragging, isTr
           </div>
         </div>
 
-        {/* Right strip */}
-        {showQuickAssign ? (
-          <div style={{ borderLeft: '2px solid var(--border, #bdbdbd)', padding: '8px', display: 'flex', alignItems: 'center' }}
-               onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
-            <span style={{ ...LABEL, fontSize: '8px', color: 'var(--warning, #b05a00)' }}>CATEGORIZE</span>
-          </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', borderLeft: '2px solid var(--border, #bdbdbd)' }}>
-            <ActionStrip vehicle={vehicle} vertical />
-          </div>
-        )}
+        <div style={{ display: 'flex', flexDirection: 'column', borderLeft: '2px solid var(--border, #bdbdbd)' }}>
+          <ActionStrip vehicle={vehicle} vertical />
+        </div>
       </article>
-    </Link>
+    </div>
   );
 }
 
@@ -1109,28 +922,19 @@ function ListCard({ vehicle, onRefresh, onDragStart, onDragEnd, isDragging, isTr
 // Compact card (one-liner)
 // ---------------------------------------------------------------------------
 
-function CompactCard({ vehicle, onDragStart, onDragEnd, isDragging, isTriageActive }: {
-  vehicle: GarageVehicle;
-  onDragStart?: () => void; onDragEnd?: () => void; isDragging?: boolean; isTriageActive?: boolean;
-}) {
+function CompactCard({ vehicle }: { vehicle: GarageVehicle }) {
   const [hovered, setHovered] = useState(false);
   const [vinCopied, setVinCopied] = useState(false);
   const title = formatVehicleTitle(vehicle);
 
   return (
     <Link
+      className="garage-vehicle-card"
+      aria-label={`Open ${title || 'vehicle record'}`}
       to={`/vehicle/${vehicle.id}`}
-      draggable
-      onDragStart={(e) => {
-        e.dataTransfer.setData('text/plain', vehicle.id);
-        e.dataTransfer.effectAllowed = 'move';
-        onDragStart?.();
-      }}
-      onDragEnd={() => onDragEnd?.()}
       style={{
         textDecoration: 'none', display: 'block', color: 'inherit',
-        ...(isDragging ? { borderColor: 'var(--text, #2a2a2a)', transform: 'scale(1.02)', opacity: 0.8, zIndex: 10 } :
-            isTriageActive ? { opacity: 0.4, transition: 'opacity 180ms cubic-bezier(0.16, 1, 0.3, 1)' } : {}),
+
       }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
@@ -1142,13 +946,13 @@ function CompactCard({ vehicle, onDragStart, onDragEnd, isDragging, isTriageActi
           alignItems: 'center',
           padding: '6px 8px',
           gap: 8,
-          ...(hovered && !isTriageActive ? BASE_HOVER : {}),
+          ...(hovered ? BASE_HOVER : {}),
         }}
       >
         <HoverData tooltip={vehicle.vin ? `VIN: ${vehicle.vin}` : 'NO VIN'}>
           <span
             style={{
-              fontSize: '9px',
+              fontSize: 'var(--text-callout)',
               fontWeight: 700,
               textTransform: 'uppercase',
               letterSpacing: '0.5px',
@@ -1170,11 +974,11 @@ function CompactCard({ vehicle, onDragStart, onDragEnd, isDragging, isTriageActi
           </HoverData>
         )}
         <HoverData tooltip={estimateTooltip(vehicle)}>
-          <span style={{ ...MONO, fontSize: '9px', fontWeight: 700, flexShrink: 0 }}>
+          <span style={{ ...MONO, fontSize: 'var(--text-callout)', fontWeight: 700, flexShrink: 0 }}>
             {vehicle.estimated_value != null ? formatCurrency(vehicle.estimated_value) : '—'}
           </span>
         </HoverData>
-        <span style={{ ...LABEL, fontSize: '8px', flexShrink: 0 }}>
+        <span style={{ ...LABEL, fontSize: 'var(--text-caption)', flexShrink: 0 }}>
           {formatRelativeTime(vehicle.updated_at)}
         </span>
       </div>
@@ -1190,15 +994,10 @@ export function GarageVehicleCard({
   vehicle,
   viewMode = 'GRID',
   onRefresh,
-  onDragStart,
-  onDragEnd,
-  isDragging,
-  isTriageActive,
 }: GarageVehicleCardProps) {
-  const dragProps = { onDragStart, onDragEnd, isDragging, isTriageActive };
-  if (viewMode === 'LIST') return <ListCard vehicle={vehicle} onRefresh={onRefresh} {...dragProps} />;
-  if (viewMode === 'COMPACT') return <CompactCard vehicle={vehicle} {...dragProps} />;
-  return <GridCard vehicle={vehicle} onRefresh={onRefresh} {...dragProps} />;
+  if (viewMode === 'LIST') return <ListCard vehicle={vehicle} />;
+  if (viewMode === 'COMPACT') return <CompactCard vehicle={vehicle} />;
+  return <GridCard vehicle={vehicle} onRefresh={onRefresh} />;
 }
 
 export default GarageVehicleCard;

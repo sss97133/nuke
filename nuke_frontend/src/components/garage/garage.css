@@ -1,0 +1,44 @@
+.garage-page { max-width: 1400px; margin: auto; padding: 20px 16px 40px; min-width: 0; color: var(--text); font: var(--text-body)/1.5 var(--font-family); }
+.garage-page h1 { margin: 0; font-size: var(--text-title); }
+.garage-page h2 { margin: 0 0 12px; font-size: 18px; }
+.garage-page h3 { margin: 0 0 8px; font-size: 16px; }
+.garage-heading, .garage-toolbar-heading { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
+.garage-heading { margin-bottom: 20px; }
+.garage-heading p { margin: 4px 0 0; color: var(--text-secondary); }
+.garage-toolbar, .garage-notice, .garage-empty, .garage-unresolved { padding: 16px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); margin-bottom: 20px; }
+.garage-toolbar-heading { margin-bottom: 16px; }
+.garage-toolbar-heading p { margin: 0; }
+.garage-toolbar-fields { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 16px; }
+.garage-toolbar-fields > * { display: flex; flex-direction: column; min-width: 0; gap: 6px; font-size: var(--text-callout); }
+.garage-toolbar-fields select { box-sizing: border-box; max-width: 100%; min-height: 44px; padding: 8px; color: var(--text); border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); font: inherit; }
+.garage-segments { display: flex; flex-wrap: wrap; gap: 4px; }
+.garage-segments button { min-height: 44px; padding: 8px 14px; color: var(--text); border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); font: 500 var(--text-callout)/1.4 var(--font-family); cursor: pointer; }
+.garage-segments button[aria-pressed=true] { background: var(--action); color: var(--on-action); border-color: var(--action); }
+.garage-page :is(button,select,summary,a):focus-visible { outline: 2px solid var(--border-focus); outline-offset: 3px; }
+.garage-unresolved article + article { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); }
+.garage-unresolved p { margin: 6px 0; }
+.garage-unresolved summary { min-height: 44px; box-sizing: border-box; padding: 10px 0; cursor: pointer; color: var(--link); }
+.garage-empty-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.garage-sections { display: flex; flex-direction: column; gap: 24px; }
+.garage-section-heading { text-transform: capitalize; display: flex; align-items: baseline; gap: 8px; }
+.garage-section-heading span, .garage-unresolved h2 span { color: var(--text-secondary); font-size: var(--text-callout); font-variant-numeric: tabular-nums; }
+.garage-vehicles { display: grid; gap: 12px; min-width: 0; }
+.garage-view-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); }
+.garage-vehicle-card { min-width: 0; border-radius: var(--radius-lg); overflow: hidden; }
+.garage-vehicle-card > :is(article,div) { border-radius: var(--radius-lg); }
+.garage-view-compact .garage-vehicle-card > div { min-height: 44px; box-sizing: border-box; }
+@media (max-width: 600px) {
+  .garage-page { padding: 16px 12px 32px; }
+  .garage-toolbar-fields { display: grid; grid-template-columns: minmax(0,1fr); }
+  .garage-toolbar-fields select { font-size: 16px; width: 100%; }
+}
+.garage-page .garage-vehicle-card button { min-height: 44px; min-width: 44px; }
+.garage-view-compact .garage-vehicle-card > div { flex-wrap: wrap; }
+.garage-card-control, .garage-card-actions > span { min-height: 44px; min-width: 44px; box-sizing: border-box; }
+.garage-card-actions > span > div { display: flex; align-items: center; justify-content: center; }
+.garage-card-control:focus-visible { outline: 2px solid var(--border-focus); outline-offset: -2px; }
+.garage-card-title, .garage-card-open { color: inherit; text-decoration: none; min-height: 44px; min-width: 44px; box-sizing: border-box; }
+.garage-card-title { display: inline-flex; align-items: center; }
+.garage-card-image-link { position: absolute; inset: 0; z-index: 1; }
+
+.garage-relationship-note { color: var(--text-secondary); font-size: var(--text-callout); margin: 0 0 20px; }
