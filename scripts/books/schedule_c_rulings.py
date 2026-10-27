@@ -260,9 +260,9 @@ def document_state(owner, doc_id):
 
 
 def correct(path, dry):
-    """corrections file: {"owner_id", "rows": {"<local_id>": {"document_id", "section"?, "category"?, "amount"?, "ruling_id"?, "proof_links"?: [{kind, ref}], "note"?, "add_bank_links"?: [ids]}}}
+    """corrections file: {"owner_id", "rows": {"<local_id>": {"document_id", "section"?, "category"?, "amount"?, "ruling_id"?, "proof_links"?: [{kind, ref}], "note"?, "add_bank_links"?: [ids], "set_bank_links"?: [ids]}}}
     ruling_id and proof_links are stored as structured keys on the record (R5 grade R needs both); proof_links merge, deduped.
-    section and category change only when given (a movement may take a new section). add_bank_links appends to the row's bank_links, deduped,
+    section and category change only when given (a movement may take a new section). set_bank_links replaces the row's bank_links; add_bank_links appends to the row's bank_links, deduped,
     and puts a dated note in its decision. Amounts change only when "amount" is given."""
     spec = json.load(open(path))
     owner = uuid_ok(spec['owner_id'])
@@ -291,6 +291,13 @@ def correct(path, dry):
                 r['ruling_id'] = str(c['ruling_id'])[:200]
             if c.get('proof_links'):
                 r['proof_links'] = proof_links((r.get('proof_links') or []) + list(c['proof_links']))
+            if c.get('set_bank_links') is not None:
+                # replace the row's links (a legacy pipe-joined id shared by two records cannot tell them apart)
+                new_links = list(dict.fromkeys(c['set_bank_links']))
+                if new_links != (r.get('bank_links') or []):
+                    parts.append(f"Links replaced {VERSION}: {', '.join(new_links) or 'none'} (was {', '.join(r.get('bank_links') or []) or 'none'})"
+                                 + (f" ({c['note']})" if c.get('note') and not (c.get('section') or c.get('category')) else ''))
+                    r['bank_links'] = new_links
             add = [x for x in c.get('add_bank_links', []) if x not in (r.get('bank_links') or [])]
             if add:
                 r['bank_links'] = list(dict.fromkeys((r.get('bank_links') or []) + add))
