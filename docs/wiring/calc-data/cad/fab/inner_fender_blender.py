@@ -8,7 +8,7 @@ W = os.environ.get("K5_FENDER_WORK", "/tmp/k5-inner-fender")   # .blend + model.
 os.makedirs(W, exist_ok=True)
 
 # The part is a wheelhouse tunnel: an arched rim on the outboard face (bolts to the fender's wheel-opening lip), a roof
-# running inboard, a fillet, and an engine-side wall whose lower edge follows the same arch (b_jegs_1, b_jegs_5,
+# running inboard, a fillet, and an engine-side wall with a straight lower flange; the rim follows the wheel arch (b_jegs_1, b_jegs_5,
 # b_eckler_1, raybuck frames). Rear end: the long holed leg (b_jegs_1, b_jegs_3); front end: the short tail to the
 # core support.
 # Rim: b_eckler_1.jpg (LH, inboard side, near-level; rear at left), lower edge of the dark silhouette per column (sil.py)
@@ -20,13 +20,12 @@ P = dict(
     y_rear=-1.440,       # rear leg at the cowl side (FR-88 cowl points y -1.43, firewall station -1.46) - assumed +/-0.02
     col_front=965, col_rear=25,   # b_eckler_1 columns of the two ends
     z_rim_apex=0.980,    # rim apex: tyre top 0.802 (wheel z 0.396 + r 0.406) plus ~0.18 travel and clearance - assumed +/-0.04
-    x_out=0.858,         # FR-88 cowl pair 1715/2: the fender line the rim bolts to - maker
-    x_in=0.400,          # engine-side wall: OER box width 18 in (0.457) back from the rim lip; lands on the frame rail's
-                         # outer flange (web x 0.360 + ~75) - scaled +/-0.03 (moved from the old 0.510/0.545 FR-88 read)
+    x_out=0.828,         # rim face; its 30 mm lip ends at x 0.858, the FR-88 fender line (cowl pair 1715/2) - maker
+    x_in=0.419,          # engine-side wall: derived, 0.858 less the OER box width 0.457, plus the 18 mm bottom flange - +/-0.025
     crown=0.150,         # roof rise from rim to the inboard crest - assumed +/-0.05 (b_eckler_1 dome over rim)
     fillet=0.100,        # crest-to-wall radius, b_jegs_1 / b_oer_1 highlight band - photo +/-0.03
-    wall=0.230,          # engine-side wall depth below the crest, b_jegs_1 wall band vs dome - photo +/-0.05
-    front_taper=0.25,    # b_eckler_1 cols 800-950: dome over rim 153 -> 28 px over the front quarter - photo
+    z_wall_bottom=0.620, # the wall's bottom flange is straight (Raybuck RH 1/9: it lies flat on the table) - fitted
+    front_taper=0.02,    # none: Raybuck LH 1 and 5 show the front end full height (mean frame IoU 0.71 vs 0.70 at 0.25) - photo
     arch_k=1.20,         # b_eckler_1 was shot from above: rim drops are divided by cos(elevation) - fitted
     lip=0.030,           # rim flange width, b_jegs_7 - photo +/-0.01
     bump=(0.25, 0.48, 0.09, 0.10, 0.025),   # b_oer_1 stamped "+" bulge on the roof: x frac in from rim, y frac from
@@ -52,7 +51,7 @@ def section(y, n_roof=12, n_fil=8, n_wall=8):
     f = 0.15 + 0.85 * min(1.0, u / P["front_taper"]) ** 0.7       # b_eckler_1: the dome falls onto the front tail
     zc = zr + P["crown"] * f
     xi = P["x_in"]          # full width to the front: b_oer_1 shows no narrowing (b_eckler_1 alone suggests some)
-    r = r * (0.4 + 0.6 * f); wall = P["wall"] * f
+    r = r * (0.4 + 0.6 * f); zwb = min(P["z_wall_bottom"], zc - r - 0.01)
     pts = [(xo + P["lip"], zr), (xo, zr)]
     for i in range(1, n_roof + 1):
         t = i / n_roof
@@ -65,8 +64,8 @@ def section(y, n_roof=12, n_fil=8, n_wall=8):
         a = math.radians(90 + 90 * i / n_fil)
         pts.append((xi + r + r * math.cos(a), zc - r + r * math.sin(a)))
     for i in range(1, n_wall + 1):
-        pts.append((xi, zc - r - (wall - r) * i / n_wall))
-    pts.append((xi - P["lip"] * 0.6, zc - wall))     # wall's bottom flange (b_jegs_1)
+        pts.append((xi, zc - r - (zc - r - zwb) * i / n_wall))
+    pts.append((xi - P["lip"] * 0.6, zwb))     # wall's bottom flange (b_jegs_1)
     return pts
 
 def build(name, sx):

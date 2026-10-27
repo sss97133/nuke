@@ -79,3 +79,14 @@ Pixel errors are converted at that view's mm/px.
 - The owner photo checks only occlusion and the outboard line, because the panel sits mostly behind the core support
   in 022. Owner photos 018-020 (bay from above) were not camera-matched. 057-059 show the cowl with the inner fenders
   off.
+
+## Rework, same day (in progress; the landmark table above is from the first pass)
+- Engine-side wall's bottom flange is straight, not arched: Raybuck RH 1 and 9 show it lying flat along the table.
+  It is fitted at z 0.62 for now. The rim alone follows the wheel arch.
+- Width is derived from the box and the FR-88 fender line. The rim lip ends at x 0.858 (x_out 0.828) and the wall
+  sits at x 0.419, with its flange at 0.401 (+/-0.025). The bounding box is now 0.457 x 1.065 x 0.51 m.
+- No front taper. Raybuck LH 1 and 5 show the front end as a full-height bowl, and b_eckler_1's narrow "tail" is that
+  bowl's flange seen edge-on. Per-frame camera fits on 8 Raybuck frames (RH 1/3/9/12, LH 1/5/9/13) give a mean IoU
+  of 0.71 without the taper and 0.70 with it (LH 5: 0.90 vs 0.81).
+- Open: the Raybuck frames carry no scale, and each frame's camera is fitted freely, so they constrain proportions
+  but not millimetres. The 25 mm landmarks still need metric anchors.
