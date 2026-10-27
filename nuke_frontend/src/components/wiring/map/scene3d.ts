@@ -50,7 +50,7 @@ export const LAYERS: LayerDef[] = [
     // the 1975-80 radiator core support drawn from photos (receipt 2026-10-26_k5-core-support-3d); the sheetmetal
     // file's own radiator_support box still draws until that file is retired
     id: 'core-support', label: 'CORE SUPPORT', url: '/models/k5-core-support.glb', lane: 'k5/core-support-3d',
-    hides: ['CTX-core-support-face'],
+    hides: ['CTX-core-support-face'], off: true,   // flat plate, not yet the pressing (owner, 2026-10-26); rebuild in progress
   },
   {
     id: 'engine', label: 'ENGINE', url: '/models/k5-engine-ls3.glb', lane: 'engine-3d (#468)',
