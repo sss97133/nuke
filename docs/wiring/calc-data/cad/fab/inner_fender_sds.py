@@ -24,8 +24,9 @@ Y_FRONT = -2.505      # front tail and bottom flange end at the core support's r
 Y_REAR = -1.440       # rear leg end at the cowl
 
 # ---- traced curves ---------------------------------------------------------------------------------------------------
-# b_jegs_7 (1500 x 660 px, LH, from outboard and a little above: the dome's convex top shows above the rim, so image
-# left = front; the steep left tail drops to the core support, the long flat right tail is the cowl leg). Scale 0.73 mm/px from the tail-to-tail span (1460 px = Y_REAR - Y_FRONT). Heights from the same
+# b_jegs_7 (1500 x 660 px, from outboard and a little above). The JEGS part is a RH skirt: the steep left tail is the
+# holed leg at the cowl (b_jegs_1 shows it under the flat rear panel), so image left = rear. Ends are set from the
+# installed photos (i_bat_27, i_bat_15: the flat panel carries the MSD box beside the firewall); the bare photos give shape. Scale 0.73 mm/px from the tail-to-tail span (1460 px = Y_REAR - Y_FRONT). Heights from the same
 # scale, hung from the dome top at z 1.080: the photo's tail-tip-to-dome-top height (628 px = 0.46 m) is the OER T70124
 # box height (18 in) over the rail flange, so the tails end at the rail and the rim apex lands at z 0.86.
 # Rim = lower edge of the flange band, (px column, px row):
@@ -34,16 +35,18 @@ RIM_PX = [(20, 650), (60, 580), (110, 470), (160, 400), (210, 340), (260, 320), 
 MM_PX = (Y_REAR - Y_FRONT) / 1460
 
 
-def px_y(c): return Y_FRONT + (c - 20) * MM_PX
+def px_y(c): return Y_REAR - (c - 20) * MM_PX
 
 
 RIM = sorted((px_y(c), 1.080 - (r - 22) * MM_PX) for c, r in RIM_PX)
 # dome top silhouette in the same photo, (column, row)
 DOME_PX = [(240, 240), (300, 200), (400, 60), (550, 30), (700, 22), (900, 35), (1000, 70), (1150, 120), (1240, 250),
            (1290, 330)]
-DOME = sorted((px_y(c), 1.080 - (r - 22) * MM_PX) for c, r in DOME_PX)
-Y_FEND = px_y(240)    # front end panel (dome silhouette's front end in _7), y -2.344
-Y_REND = px_y(1290)   # rear end panel plane (dome's rear end), y -1.578
+# the camera sits above the rim (the dome's top shows), so the dome's image height includes its inboard depth; the
+# point-matched camera for b_jegs_7 (RMS 8.5 px) puts the crown ~0.06 m below the level-camera reading
+DOME = sorted((px_y(c), 1.080 - 0.060 - (r - 22) * MM_PX) for c, r in DOME_PX)
+Y_REND = px_y(240)    # rear end panel plane (dome silhouette's rear end in _7), y -1.601
+Y_FEND = px_y(1290)   # front end: the bowl comes down to the ribbed front flange, y -2.367
 BAND = 0.035          # rim flange band height (b_jegs_7: ~45 px)
 
 
@@ -61,7 +64,7 @@ def section(y):
     pts = [
         (X_RIM, zr), (X_RIM, zr + 0.5 * BAND), (X_RIM, zr + BAND),            # flange band in the fender plane
         (X_RIM - 0.024, zr + BAND + 0.012),                                   # step: the shoulder line (b_jegs_7)
-        (X_RIM - 0.040, zr + 0.45 * (zt - zr) + 0.02),                        # outboard flank of the dome
+        (X_RIM - 0.085, zr + 0.55 * (zt - zr) + 0.01),                        # outboard flank, sloped (b_jegs_7 highlight)
         (0.77, zt - 0.025), (0.66, zt), (0.54, zt - 0.025),                   # pillowed crown
         (0.455, zt - 0.10),                                                   # roll onto the engine-side face
         (X_WALL + 0.004, zf), (X_WALL, Z_RAIL + 0.05), (X_WALL, Z_RAIL + 0.008),   # near-vertical face, bend
@@ -111,6 +114,13 @@ def build_cage():
                 for v in q:
                     if v not in u: u.append(v)
                 if len(u) >= 3: bm.faces.new(u if sign > 0 else u[::-1])
+        if sign < 0:                # front: the ribbed flange runs forward flat from the bowl's lower edge (b_jegs_3, _5)
+            prev = grid[-1]
+            for k in (1, 2):
+                yy = y + (Y_FRONT - y) * k / 2
+                cur = [bm.verts.new((v.co.x, yy, v.co.z)) for v in prev]
+                for j in range(n - 1): bm.faces.new((prev[j], prev[j + 1], cur[j + 1], cur[j]))
+                prev = cur
         for j in range(n - 1):      # crease the panel's boundary with the dome: the end shoulder
             e = bm.edges.get((sec[j], sec[j + 1]))
             if e: e[cr] = 0.55
@@ -131,14 +141,8 @@ def build_cage():
             for i in range(2): bm.faces.new((prev[i], prev[i + 1], cur[i + 1], cur[i]))
             prev = cur
 
-    tail(rows[-1], Y_REAR, 4, extra_low=0.025)     # the long flat bolt leg to the cowl (b_jegs_7 right, b_jegs_1)
+    tail(rows[-1], Y_REAR, 4, extra_low=0.045)     # the long holed leg down to the rail at the cowl (b_jegs_7 left, b_jegs_1)
     tail(rows[0], Y_FRONT, 3)                      # the short front tail
-    prev = rows[0][10:]                            # bottom flange runs on to the core support (b_jegs_3, _5)
-    for k in (1, 2):
-        y = Y_FEND + (Y_FRONT - Y_FEND) * k / 2
-        cur = [bm.verts.new((v.co.x, y, v.co.z)) for v in prev]
-        for i in range(len(cur) - 1): bm.faces.new((prev[i], prev[i + 1], cur[i + 1], cur[i]))
-        prev = cur
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     me = bpy.data.meshes.new("cage"); bm.to_mesh(me); bm.free()
     return me
@@ -163,9 +167,14 @@ def stamp(me):
             for k in range(12):
                 yc = -2.47 + k * 0.074
                 if abs(y - yc) < 0.007: off += 0.004 * bump(y - yc, 0.007)
-        # front end: the stamped round cup, ~100 mm, near the bottom (b_jegs_3, b_jegs_5)
-        if n.y < -0.6 and y < Y_FEND + 0.05:
-            r = math.hypot((x - 0.50) / 0.050, (z - 0.74) / 0.050)
+        # front flange: short ribs across it (b_jegs_3 lower right, b_jegs_5 right end)
+        if y < Y_FEND - 0.010 and abs(n.z) > 0.6:
+            for k in range(7):
+                xc = 0.47 + k * 0.058
+                if abs(x - xc) < 0.008: off += 0.005 * bump(x - xc, 0.008)
+        # front end: the stamped round cup, ~100 mm, just above the flange (b_jegs_3, b_jegs_5)
+        if n.y < -0.6 and Y_FEND - 0.03 < y < Y_FEND + 0.05:
+            r = math.hypot((x - 0.68) / 0.050, (z - 0.775) / 0.050)
             if r < 1: off -= 0.025 * bump(r, 1.0)
         # rear panel: the diagonal crease from the top shoulder down toward the leg (b_jegs_1)
         if n.y > 0.6 and y > Y_REND - 0.03:
@@ -176,12 +185,13 @@ def stamp(me):
 
 
 HOLES = (  # (x, y, z, axis, radius)
-    [(X_WALL - 0.027, -2.46 + k * 0.15, Z_RAIL, 'Z', 0.0045) for k in range(6)] +          # bottom flange, ~150 mm
+    [(X_WALL - 0.027, -2.31 + k * 0.15, Z_RAIL, 'Z', 0.0045) for k in range(5)] +          # bottom flange, ~150 mm
     [(X_RIM, y, lerp(RIM, y) + 0.017, 'X', 0.004) for y in (-2.30, -2.05, -1.80)] +        # rim band (b_jegs_7, _5)
-    [(X_RIM, -1.50, lerp(RIM, -1.50) + 0.005, 'X', 0.0055)] +                             # the leg's hole (b_jegs_1)
+    [(X_RIM, -1.50, lerp(RIM, -1.50) - 0.012, 'X', 0.009)] +                              # the leg's big hole (b_jegs_1)
     [(0.64, Y_REND, 0.86, 'Y', 0.0065)] +                                                   # rear panel, mid height
-    [(0.575, Y_FEND, 0.72, 'Y', 0.005)] +                                                   # beside the cup
-    [(0.66, -1.95, lerp(DOME, -1.95), 'Z', 0.0035)]                                         # crown hole (b_jegs_7)
+    [(0.60, Y_FEND, 0.76, 'Y', 0.005)] +                                                    # beside the cup
+    [(xx, Y_FRONT + 0.03, 0.0, 'F', 0.0045) for xx in (0.48, 0.64, 0.80)] +                 # front flange holes
+    [(0.66, -2.14, lerp(DOME, -2.14), 'Z', 0.0035)]                                         # crown hole (b_jegs_7 col 980)
 )
 
 
@@ -195,7 +205,9 @@ def make_side(name, me_cage, sx, mat):
     bpy.ops.object.modifier_apply(modifier="sol")
     cutters = []
     rot = {'X': (0, math.pi / 2, 0), 'Y': (math.pi / 2, 0, 0), 'Z': (0, 0, 0)}
+    sec, _ = section(Y_FEND); (xa, za), (xb, zb) = sec[3], sec[11]
     for (x, y, z, ax, r) in HOLES:
+        if ax == 'F': z = za + (zb - za) * (xa - x) / (xa - xb); ax = 'Z'    # on the front flange's slope
         bpy.ops.mesh.primitive_cylinder_add(vertices=12, radius=r, depth=0.04, location=(x, y, z), rotation=rot[ax])
         cutters.append(bpy.context.object)
     for c in cutters: c.select_set(True)

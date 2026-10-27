@@ -57,5 +57,12 @@ double bead and tails past the dome, a pillowed dome stepping inboard at a creas
 panels, and a ribbed bottom flange with holes every 150 mm. The rim arc and the dome top are traced from b_jegs_7
 (0.73 mm/px from the tail-to-tail span). Heights are hung from the dome top at z 1.080. With that scale, the photo's
 tail-to-dome-top height (0.46 m) equals the OER box height, so the rim apex lands at z 0.86, not the earlier assumed 0.98.
-b_jegs_7 is read as an outboard view (the dome's convex top shows above the rim), so its left, steep tail is the front.
-The b_jegs_1/3/5 cameras are still not solved: silhouette fitting flips them to other viewpoints.
+Ends are set from the installed photos (i_bat_27, i_bat_15): the flat panel with the diagonal crease and the holed leg
+is at the cowl, and the cup and ribbed flange are at the core support. The JEGS part is a RH skirt, so it is compared
+against `inner_fender_R`. Read that way, b_jegs_7's steep left tail is the cowl leg, and the traced rim's flat low
+stretch is centred about 0.09 m behind CF.FA_Y.
+Cameras solved from point matches with a free focal length: b_jegs_7 RMS 8.9 px (5 points: tail tips, crown hole,
+two rim points); b_jegs_3 RMS 23.7 px (6: three front-flange holes, cup, leg tip, crown hole); b_jegs_1 RMS 17.6 px
+(4: rear-panel hole, leg hole, leg tip, front tail tip). The b_jegs_5 point match did not converge (RMS 90 px). Its
+side-by-side uses a silhouette fit, which still shows the part from the wrong end.
+The dome is 0.06 m lower than a level-camera reading of b_jegs_7, because the solved camera sits above the rim.
