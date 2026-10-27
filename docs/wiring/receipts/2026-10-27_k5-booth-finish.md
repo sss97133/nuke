@@ -33,7 +33,8 @@ only; no geometry changed). Owner's ask, 2026-10-27: "make it look like the vide
 
 ## Check
 Local build of the MAP tab, logged out, ENGINE BAY view with INNER FENDER, FIREWALL and CORE SUPPORT switched on through
-MORE: `scratchpad/sm/out/booth/local4.png` (wide) and `local4z.png` (zoomed), 22 model files at 200, 0 console errors.
+MORE: `scratchpad/sm/out/booth/local5z.png` (zoomed; `local4.png` wide, before the base colour was darkened from
+(0.235, 0.048, 0.042), which read pink under the booth), 22 model files at 200, 0 console errors.
 Live check after deploy with `scratchpad/sm/live-map-shot.mjs`.
 
 ## Unknowns
