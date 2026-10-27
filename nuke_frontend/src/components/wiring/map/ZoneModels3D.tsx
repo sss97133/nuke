@@ -11,7 +11,6 @@ import React, { Suspense, forwardRef, useEffect, useImperativeHandle, useLayoutE
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Html, OrbitControls, useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
-import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import type { Colorway } from '../connector-inspector/colorways';
 import { frame, rule } from '../connector-inspector/colorways';
 import { SECTIONS } from './useWiringMap';
@@ -199,9 +198,9 @@ export default function ZoneModels3D({ cw, ix, site, sel, rel, onSelect, onClear
       <Canvas camera={{ position: [2.4, 1.7, 2.6], fov: 32, near: 0.01, far: 200 }} dpr={[1, 2]} style={{ background: cw.surface }}
         gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.05 }}>
         <Studio />
-        <ambientLight intensity={0.15} />
-        <directionalLight position={[3, 5, 4]} intensity={1.6} />
-        <directionalLight position={[-4, 3, -3]} intensity={0.5} />
+        <ambientLight intensity={0.05} />
+        <directionalLight position={[3, 5, 4]} intensity={0.7} />
+        <directionalLight position={[-4, 3, -3]} intensity={0.25} />
         {ZONES.filter(z => zones.has(z.id)).map(z => (
           <Suspense key={z.id} fallback={null}><ZoneScene zone={z.id} url={z.url} ix={ix} reg={reg} hides={hides} /></Suspense>
         ))}
@@ -357,15 +356,51 @@ function useLayerFiles(): Record<string, boolean> {
   return have;
 }
 
-// a studio room for reflections, built in the page (no HDR download): metals, paint and the clear-coated covers read as
-// their finishes instead of flat colour
+// the paint booth the cab was sprayed in, built in the page as the reflection environment (no HDR download): a light
+// grey room with rows of fluorescent panels in the ceiling and tall panels on the walls, a dark filter wall at the far
+// end. Fresh clear streaks with the panel rows the way it does in the owner's booth clips; metals and the
+// clear-coated covers read as their finishes instead of flat colour. Metres; the part sits at the origin, 1.2 m up.
+function boothScene(): THREE.Scene {
+  const s = new THREE.Scene();
+  const W = 7, L = 9, H = 3.6, EYE = 1.2;
+  const box = (w: number, h: number, d: number, x: number, y: number, z: number, lum: number, warm = 1) => {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshBasicMaterial({ color: new THREE.Color(lum, lum * (1 - (1 - warm) * 0.5), lum * warm) }));
+    m.position.set(x, y, z);
+    s.add(m);
+  };
+  const room = new THREE.Mesh(new THREE.BoxGeometry(W, H, L), new THREE.MeshBasicMaterial({ color: new THREE.Color(0.40, 0.40, 0.42), side: THREE.BackSide }));
+  room.position.set(0, H / 2 - EYE, 0);
+  s.add(room);
+  box(W - 0.02, 0.01, L - 0.02, 0, H - EYE - 0.02, 0, 0.7);          // white ceiling
+  box(W - 0.02, 0.01, L - 0.02, 0, -EYE + 0.01, 0, 0.34);             // grey concrete floor
+  for (let i = 0; i < 6; i++) for (const x of [-W / 2 + 0.03, W / 2 - 0.03])   // the low light row along both walls
+    box(0.02, 0.25, 1.2, x, -0.65, -4 + i * 1.6, 7.0, 0.96);             // (0.55 m off the floor: what a vertical panel
+  for (const x of [-2.4, -0.8, 0.8, 2.4]) for (const z of [-L / 2 + 0.03, L / 2 - 0.03])   // mirrors from above)
+    box(1.2, 0.25, 0.02, x, -0.65, z, 7.0, 0.96);
+  for (const x of [-1.6, 0, 1.6]) for (let i = 0; i < 6; i++)          // the ceiling rows mirrored in the sealed floor
+    box(0.6, 0.02, 1.2, x, -EYE + 0.03, -4 + i * 1.6, 2.2, 0.96);
+  box(W - 0.1, H - 0.1, 0.02, 0, H / 2 - EYE, -L / 2 + 0.02, 0.30);   // filter wall at the far end
+  for (const x of [-1.6, 0, 1.6]) for (let i = 0; i < 6; i++)          // ceiling panels: three rows of six
+    box(0.6, 0.02, 1.2, x, H - EYE - 0.04, -4 + i * 1.6, 8.0, 0.96);
+  for (const sx of [-1, 1]) for (let i = 0; i < 6; i++) {               // the slanted ceiling-to-wall rows
+    const m = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.02, 1.2), new THREE.MeshBasicMaterial({ color: new THREE.Color(8.0, 7.9, 7.7) }));
+    m.position.set(sx * (W / 2 - 0.45), H - EYE - 0.45, -4 + i * 1.6);
+    m.rotation.z = sx * Math.PI / 4;
+    s.add(m);
+  }
+  for (const x of [-W / 2 + 0.03, W / 2 - 0.03]) for (let i = 0; i < 5; i++)   // tall wall panels
+    box(0.02, 1.6, 0.3, x, 0.7, -3.6 + i * 1.8, 6.5, 0.96);
+  for (const x of [-2.2, 0, 2.2]) box(0.3, 1.6, 0.02, x, 0.7, L / 2 - 0.03, 6.5, 0.96);   // the wall behind the viewer
+  return s;
+}
+
 function Studio() {
   const { gl, scene } = useThree();
   useEffect(() => {
     const pm = new THREE.PMREMGenerator(gl);
-    const env = pm.fromScene(new RoomEnvironment(), 0.04).texture;
+    const env = pm.fromScene(boothScene(), 0.02).texture;
     scene.environment = env;
-    scene.environmentIntensity = 0.85;
+    scene.environmentIntensity = 1.0;
     return () => { scene.environment = null; env.dispose(); pm.dispose(); };
   }, [gl, scene]);
   return null;

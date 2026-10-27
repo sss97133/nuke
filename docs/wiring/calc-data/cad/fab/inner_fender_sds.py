@@ -253,11 +253,11 @@ def make(mat):
 
 
 def paint():
-    m = bpy.data.materials.new("satin_black"); m.use_nodes = True
+    m = bpy.data.materials.new("gloss_black"); m.use_nodes = True
     b = m.node_tree.nodes["Principled BSDF"]
-    b.inputs["Base Color"].default_value = (0.13, 0.13, 0.135, 1)   # satin dark grey, shared with core support and firewall
-    b.inputs["Metallic"].default_value = 0.0; b.inputs["Roughness"].default_value = 0.35
-    b.inputs["Coat Weight"].default_value = 0.25; b.inputs["Coat Roughness"].default_value = 0.15
+    b.inputs["Base Color"].default_value = (0.016, 0.016, 0.017, 1)   # gloss black, shared with the core support
+    b.inputs["Metallic"].default_value = 0.0; b.inputs["Roughness"].default_value = 0.32
+    b.inputs["Coat Weight"].default_value = 0.8; b.inputs["Coat Roughness"].default_value = 0.08
     return m
 
 
