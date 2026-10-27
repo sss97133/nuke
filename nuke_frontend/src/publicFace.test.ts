@@ -1,6 +1,7 @@
 // The readable public face: what a reader without JavaScript gets from /, /market, /journal and /llms.txt.
 // The Gemini audit of 2026-10-15 found these routes returned a 3 KB shell with no body text, so a reader invented the rest.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import staticAdvisorCard from '../public/.well-known/mcp.json';
 
 const SHELL = '<!doctype html><html><head><title>Nuke</title>' +
   '<meta name="description" content="x" />' +
@@ -77,7 +78,9 @@ describe('public face', () => {
     expect(out!.res.headers.get('content-type')).toContain('application/json');
     const card = JSON.parse(out!.body);
     expect(card.url).toBe('https://nuke.ag/mcp/advisor');
-    expect(card.tools).toContain('get_history');
+    expect(card.tools).toEqual(['find_asset', 'get_asset', 'get_comps', 'value_asset', 'evaluate_listing', 'budget_options']);
+    expect(staticAdvisorCard.tools).toEqual(card.tools);
+    expect(staticAdvisorCard.version).toEqual(card.version);
   });
 
   it('/docs and bare /api return real 404 JSON, not the SPA shell', async () => {
