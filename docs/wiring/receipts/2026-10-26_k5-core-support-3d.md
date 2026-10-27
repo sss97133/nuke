@@ -166,3 +166,30 @@ Least sure:
 - Post depth and taper. In _16 the posts look deeper than 60 mm. `{unknown, needs: tape across a post at each end}`
 - Upper channel orientation (open toward the engine) and the top-wall overhang behind the face.
 - Lower trough depth (40 mm) and its height on the face.
+
+## Owner's truck additions (2026-10-27)
+The owner compared the part with his own support, on and off the truck (photos not on disk), and named three missing
+groups. Where his support and the vendor read differ, his support governs.
+- Upper portion. The full-width top channel is now read as the top rail at the hood line, where the chrome strip
+  seats. The lamp panels already reach it.
+- New `upper_tie_bar_lower`: a 100 mm open channel standing forward. Its top is 100 mm under the panel tops, and it
+  runs x +/-0.650.
+- New `hood_latch_bracket`: a vertical 120 mm flanged plate standing on the tie bar at centre, up to the top rail,
+  with two latch bolt holes.
+- Mounts: the fender flanges stay as the third pass left them, with 5 holes.
+- New `body_mount_pad_L/R`: a 3 mm pad with a 17 mm hole under each frame bracket, with a 25 mm rubber
+  `body_mount_cushion_L/R` beneath it.
+- New `radiator_saddle_L/R`: two rubber saddles on the lower trough (048 shows two black cushions on the support).
+- New `frame_support_L/R`: two vertical gussets per side from the lower trough down to the pad.
+- Side-by-sides added against owner 022 (front, grille on; hand-set camera). There, the headlamp and parking-lamp
+  holes land on the truck's lamps and the top rail lands at the hood line. An 045 (from below) view is also rendered.
+- 0.69 MB; `strip_and_scan` passes.
+
+Conflicts and least sure:
+- The lowered tie bar crosses the radiator opening's top 114 mm. NOS _01 shows only face sheet over the opening, and
+  the opening height is tape-read. Its station is the owner's description, not a measurement.
+  `{unknown, needs: tape from the panel top to the tie bar on his support}`
+- The body-mount pad is at x +/-0.367, z 0.585. The frame's body_mount_1 is at x +/-0.313, z 0.721. The 135 mm
+  vertical conflict from the first receipt stands and belongs to the frame lane. The part was not moved, because the
+  lamps and top rail match 022 where they are.
+- Gusset, latch bracket and saddle sizes are assumed (+/-20 mm). 041-044 do not show the support.

@@ -227,6 +227,8 @@ parts["opening_flange"] = finish(link("opening_flange", me), bevel=False)
 # rear lip turned down. Was: a 15 mm lip turned rearward
 # over the face top (_13 end of the bar; _03 left end; owner 045 shows no wide flange at the top on the engine side)
 ut = [(T, ZT - TB_H - RET), (T, ZT - TB_H), (-D, ZT - TB_H), (-D, ZT), (RET, ZT), (RET, ZT - RET * 0.8)]
+# (owner, 2026-10-27, from his own support: this top channel is the top rail the chrome strip seats on; the lamp
+# panels run up to it at the hood line, and the real upper tie bar sits lower, see below)
 parts["upper_tie_bar"] = finish(sweep("upper_tie_bar", [(YF + u, v) for u, v in ut], "x", -HALF_W, HALF_W))
 
 # hood-latch plate on the bar's front wall, centred (GM 2C-20 upper panel; _01 centre holes): a doubler with a slot
@@ -312,13 +314,68 @@ def mat(name, rgb, metal, rough):
     return m
 
 
+# ---- upper tie bar, at its real station (owner 2026-10-27, his support on the truck and off it; 022 front view):
+# a ~100 mm open channel standing forward across the opening top, its top ~100 mm under the panel tops, running
+# post to post and on to the lamp panels. Assumed +/-20 mm: no tape on his photos.
+UT_TOP = ZT - 0.100
+UT_H = 0.100
+utb = [(-T, UT_TOP - UT_H - RET), (-T, UT_TOP - UT_H), (-0.055, UT_TOP - UT_H), (-0.055, UT_TOP), (-T, UT_TOP),
+       (-T, UT_TOP + RET)]
+parts["upper_tie_bar_lower"] = finish(sweep("upper_tie_bar_lower", [(YF + u, v) for u, v in utb], "x",
+                                            -0.650, 0.650))
+# hood-latch support bracket: a vertical flanged plate standing on the tie bar at centre up to the top rail, two
+# latch bolt holes (owner 2026-10-27; GM 2C-20 hood latch support). 120 mm wide, 20 mm side flanges, assumed.
+lx0, lx1, ly = OPEN_CX - 0.060, OPEN_CX + 0.060, YF - 0.055 - 0.004
+lb = [(lx0, ly + 0.020), (lx0, ly), (lx1, ly), (lx1, ly + 0.020)]
+lbr = finish(sweep("hood_latch_bracket", lb, "z", UT_TOP - 0.010, ZT - TB_H + 0.005))
+hs = []
+for xx in (OPEN_CX - 0.035, OPEN_CX + 0.035):
+    bpy.ops.mesh.primitive_cylinder_add(vertices=20, radius=0.0055, depth=0.03, location=(xx, ly, UT_TOP + 0.035),
+                                        rotation=(math.pi / 2, 0, 0))
+    hs.append(bpy.context.active_object)
+parts["hood_latch_bracket"] = cut(lbr, *hs)
+
+for s, sfx in ((1, "L"), (-1, "R")):
+    x = s * MOUNT_X
+    # lower frame support: two vertical gussets per side from the lower trough down to the mount pad (owner
+    # 2026-10-27; 048 shows the bracket under the support beside the rail), triangle 90 mm tall, assumed
+    gs = []
+    for dx in (-0.035, 0.035):
+        bm = bmesh.new()
+        vs = [bm.verts.new((x + dx, yy, zz)) for yy, zz in
+              ((YF - DL, ZB), (YF + 0.040, ZB), (YF + 0.040, ZB - 0.045), (YF - DL + 0.005, ZB - 0.045))]
+        bm.faces.new(vs)
+        me = bpy.data.meshes.new("g")
+        bm.to_mesh(me)
+        bm.free()
+        gs.append(finish(link("g", me), bevel=False, thick=0.0015))
+    parts[f"frame_support_{sfx}"] = join(f"frame_support_{sfx}", gs)
+    # body-mount pad and rubber cushion under it, on the frame's core-support pad (chassis_frame body_mount_1)
+    pad = finish(sweep(f"body_mount_pad_{sfx}", [(YF - 0.045, ZB - 0.046), (YF + 0.045, ZB - 0.046)], "x",
+                       x - 0.045, x + 0.045), bevel=False, thick=0.003)
+    bpy.ops.mesh.primitive_cylinder_add(vertices=24, radius=0.0085, depth=0.03, location=(x, YF, ZB - 0.046))
+    parts[f"body_mount_pad_{sfx}"] = cut(pad, bpy.context.active_object)
+    bpy.ops.mesh.primitive_cylinder_add(vertices=32, radius=0.030, depth=0.025, location=(x, YF, ZB - 0.060))
+    cu = bpy.context.active_object
+    bpy.ops.mesh.primitive_cylinder_add(vertices=24, radius=0.0085, depth=0.05, location=(x, YF, ZB - 0.060))
+    cut(cu, bpy.context.active_object)
+    parts[f"body_mount_cushion_{sfx}"] = cu
+    # radiator mounting boss: rubber saddle on the lower trough behind the radiator's bottom tank (048 two black
+    # cushions on the support), 60 x 30 x 25 mm, assumed
+    bpy.ops.mesh.primitive_cube_add(size=1, location=(OPEN_CX + s * 0.300, YF + 0.022, ZB + 0.0125))
+    sd = bpy.context.active_object
+    sd.scale = (0.060, 0.030, 0.025)
+    bpy.ops.object.transform_apply(scale=True)
+    parts[f"radiator_saddle_{sfx}"] = sd
+
 black = mat("satin_dark_grey_steel", (0.13, 0.13, 0.13), 0.0, 0.35)  # shared with inner fender + firewall (lead)
 root = bpy.data.objects.new("core_support", None)
 bpy.context.collection.objects.link(root)
+rubber = mat("rubber", (0.02, 0.02, 0.02), 0.0, 0.8)
 for n, o in parts.items():
     o.name = n
     o.data.materials.clear()
-    o.data.materials.append(black)
+    o.data.materials.append(rubber if "cushion" in n or "saddle" in n else black)
     o.parent = root
     bpy.ops.object.select_all(action="DESELECT")
     o.select_set(True)
