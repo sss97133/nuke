@@ -141,3 +141,62 @@ Least sure (assumed, not measured):
 - End walls: _03 reads as a ~40 mm flange that follows the dipped profile; the model's wall is a flat 76 mm strip.
 - Headlamp-panel outline and depth (30 mm) and the hood-latch plate, which no photo here shows clearly.
 - Photos are not committed (third-party and owner photos; public repo).
+
+## Third pass: sections thinned to the NOS part (2026-10-26)
+The owner saw the second pass in the live viewer and said it reads as blocks. Changes in `core_support_blender.py`:
+- Upper tie bar: an open channel, 62 mm deep and 70 mm tall, open toward the engine. It has a 22 mm return flange on
+  the face and a top wall that runs back past the face with a turned-down lip (_03 left end, about 90 px at
+  0.65 mm/px; _13).
+- Lower tie bar: a 40 mm deep, 60 mm tall trough with a 22 mm top return on the face and the 40 mm rear lip
+  (_03 right end, _17).
+- The face sheet now stops where the channels begin (z 0.691 to 1.188), so nothing is a closed box.
+- Radiator posts: 50 mm flanged hat channels, tapering from 45 mm deep at the bottom to 60 mm at the top
+  (_16, _17). The direction of the taper is assumed.
+- End flanges: 40 mm, turned rearward off the face edge and following its dip, with five 9 mm holes (_03).
+- Headlamp step wall widened to a 28 mm radiused S. Lamp collars are 5 mm and 9 mm.
+- Every bend is beveled 3.5 mm.
+- Material: satin dark grey, base 0.13 linear, metallic 0, roughness 0.35. The inner fender and firewall use the same
+  numbers.
+- 0.65 MB; `strip_and_scan` passes.
+
+Checked by side-by-sides on _03, _16 and _10, and by renders under viewer-like lighting (Blender studio HDRI at 0.5,
+two suns, AgX).
+
+Least sure:
+- Post depth and taper. In _16 the posts look deeper than 60 mm. `{unknown, needs: tape across a post at each end}`
+- Upper channel orientation (open toward the engine) and the top-wall overhang behind the face.
+- Lower trough depth (40 mm) and its height on the face.
+
+## Owner's truck additions (2026-10-27)
+The owner compared the part with his own support, on and off the truck (photos not on disk), and named three missing
+groups. Where his support and the vendor read differ, his support governs.
+- Upper portion. The full-width top channel is now read as the top rail at the hood line, where the chrome strip
+  seats. The lamp panels already reach it.
+- New `upper_tie_bar_lower`: a 100 mm open channel standing forward. Its top is 100 mm under the panel tops, and it
+  runs x +/-0.650.
+- New `hood_latch_bracket`: a vertical 120 mm flanged plate standing on the tie bar at centre, up to the top rail,
+  with two latch bolt holes.
+- Mounts: the fender flanges stay as the third pass left them, with 5 holes.
+- New `body_mount_pad_L/R`: a 3 mm pad with a 17 mm hole under each frame bracket, with a 25 mm rubber
+  `body_mount_cushion_L/R` beneath it.
+- New `radiator_saddle_L/R`: two rubber saddles on the lower trough (048 shows two black cushions on the support).
+- New `frame_support_L/R`: two vertical gussets per side from the lower trough down to the pad.
+- Side-by-sides added against owner 022 (front, grille on; hand-set camera). There, the headlamp and parking-lamp
+  holes land on the truck's lamps and the top rail lands at the hood line. An 045 (from below) view is also rendered.
+- 0.69 MB; `strip_and_scan` passes.
+
+Conflicts and least sure:
+- The lowered tie bar crosses the radiator opening's top 114 mm. NOS _01 shows only face sheet over the opening, and
+  the opening height is tape-read. Its station is the owner's description, not a measurement.
+  `{unknown, needs: tape from the panel top to the tie bar on his support}`
+- The body-mount pad is at x +/-0.367, z 0.585. The frame's body_mount_1 is at x +/-0.313, z 0.721. The 135 mm
+  vertical conflict from the first receipt stands and belongs to the frame lane. The part was not moved, because the
+  lamps and top rail match 022 where they are.
+- Gusset, latch bracket and saddle sizes are assumed (+/-20 mm). 041-044 do not show the support.
+
+## Correction (2026-10-27)
+`upper_tie_bar_lower` is removed. The lead withdrew it: no second bar exists. The upper tie bar is the top rail at the
+hood line. NOS _01 shows the radiator opening running up to it, and the owner's grille-off photo shows the top tank
+right under it. The hood-latch bracket now hangs from that tie bar at centre down to the top-tank line (the opening
+top, 16 mm under the bar). Everything else from the owner pass stays. The body-mount pad conflict (z 0.585 vs 0.721)
+stays open for the frame lane, and the part is not moved. 0.68 MB; `strip_and_scan` passes.
