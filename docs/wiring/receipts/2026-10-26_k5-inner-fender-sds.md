@@ -79,3 +79,12 @@ b_jegs_3 (RMS 41 px), b_jegs_1 (36 px) and b_jegs_5 (74 px) do not solve to a fe
 Material (shared with the core support and firewall): satin dark grey, base colour 0.13 linear, roughness 0.35,
 metallic 0, clearcoat 0.25. Edges at bends over 30 deg are bevelled 2.5 mm so they catch a highlight under the viewer's
 RoomEnvironment and directional lights; near-black read as a silhouette there.
+
+## Fifth pass (dome is a true ellipsoid octant)
+Semi-axes 0.42 along, 0.40 across, 0.34 up, centred at (0.835, CF.FA_Y - 0.05, 0.62). Kept inboard of the rim plane
+and above the rail. Cut only by the rear panel plane, so the front runs down into the front flange zone. The arch is
+the ellipsoid's section in the rim plane, so the rim apex equals the crown, z 0.96. The rail flange is a flat region
+from the ellipsoid's footprint out to a straight inboard edge at x 0.38 and, in front, to the core-support line.
+The cowl leg is widened into the rear panel.
+Point-matched cameras against this shape: b_jegs_7 53.7 px, b_jegs_3 34.6 px, b_jegs_1 38.7 px, b_jegs_5 52.6 px
+(RMS). All are above the 30 px stop line.
