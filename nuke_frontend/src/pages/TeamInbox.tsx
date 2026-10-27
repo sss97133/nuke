@@ -247,6 +247,17 @@ function MailboxDot({ address }: { address: string }) {
 
 // ─── Emails Tab ───────────────────────────────────────────────────────────────
 
+export async function readInboxCounts(): Promise<Record<string, { total: number; unread: number }> | null> {
+  try {
+    // Postgrest builders are thenable, but do not expose Promise.catch().
+    const { data, error } = await supabase.from('v_inbox_summary').select('*');
+    if (error || !data) return null;
+    return Object.fromEntries(data.map(row => [row.to_address, { total: row.total, unread: row.unread }]));
+  } catch {
+    return null;
+  }
+}
+
 function EmailsTab({ alertsOnly = false }: { alertsOnly?: boolean }) {
   const [emails, setEmails] = useState<InboxEmail[]>([]);
   const [selected, setSelected] = useState<InboxEmail | null>(null);
@@ -280,17 +291,8 @@ function EmailsTab({ alertsOnly = false }: { alertsOnly?: boolean }) {
   }, [statusFilter, mailboxFilter, alertsOnly]);
 
   const fetchCounts = useCallback(async () => {
-    const { data } = await supabase
-      .from('v_inbox_summary')
-      .select('*')
-      .catch(() => ({ data: null }));
-    if (data) {
-      const c: Record<string, { total: number; unread: number }> = {};
-      for (const row of (data as any[])) {
-        c[row.to_address] = { total: row.total, unread: row.unread };
-      }
-      setCounts(c);
-    }
+    const next = await readInboxCounts();
+    if (next) setCounts(next);
   }, []);
 
   useEffect(() => {
