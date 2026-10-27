@@ -733,11 +733,14 @@ bpy.ops.wm.read_factory_settings(use_empty=True)
 mat = bpy.data.materials.new("firewall_paint")
 mat.use_nodes = True
 bsdf = mat.node_tree.nodes["Principled BSDF"]
-bsdf.inputs["Base Color"].default_value = (0.20, 0.035, 0.04, 1)  # the cab's deep metallic maroon (owner-cab 08-14)
-bsdf.inputs["Metallic"].default_value = 0.0
-bsdf.inputs["Roughness"].default_value = 0.42
-bsdf.inputs["Coat Weight"].default_value = 0.3  # clear (exports as KHR_materials_clearcoat 0.3)
-bsdf.inputs["Coat Roughness"].default_value = 0.2
+# the cab as it left the booth (owner's clear-coat clips, 2025-02-08/09): a copper-tinged dark red metallic base under
+# wet clear; mid-tone off the firewall face reads linear (0.26, 0.078, 0.065) with the booth lights on it and the shaded tenth
+# (0.038, 0.007, 0.008); the base sits between so the lit faces reach the mid-tone and the panel streaks stay brighter; the clear is full weight and near mirror (the ceiling panels streak across it)
+bsdf.inputs["Base Color"].default_value = (0.17, 0.032, 0.03, 1)
+bsdf.inputs["Metallic"].default_value = 0.15  # flake: a little of the booth comes back tinted
+bsdf.inputs["Roughness"].default_value = 0.48
+bsdf.inputs["Coat Weight"].default_value = 1.0  # exports as KHR_materials_clearcoat 1.0
+bsdf.inputs["Coat Roughness"].default_value = 0.04
 
 for name, (Vp, Fp) in parts.items():
     me = bpy.data.meshes.new(name)

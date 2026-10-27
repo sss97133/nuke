@@ -379,13 +379,15 @@ for s, sfx in ((1, "L"), (-1, "R")):
     parts[f"frame_mount_{sfx}"] = cut(br, bpy.context.active_object)
 
 
-def mat(name, rgb, metal, rough):
+def mat(name, rgb, metal, rough, coat=0.0, coat_rough=0.1):
     m = bpy.data.materials.new(name)
     m.use_nodes = True
     bsdf = m.node_tree.nodes["Principled BSDF"]
     bsdf.inputs["Base Color"].default_value = (*rgb, 1)
     bsdf.inputs["Metallic"].default_value = metal
     bsdf.inputs["Roughness"].default_value = rough
+    bsdf.inputs["Coat Weight"].default_value = coat  # exports as KHR_materials_clearcoat
+    bsdf.inputs["Coat Roughness"].default_value = coat_rough
     return m
 
 
@@ -442,7 +444,9 @@ for s, sfx in ((1, "L"), (-1, "R")):
     bpy.ops.object.transform_apply(scale=True)
     parts[f"radiator_cushion_{sfx}"] = cu
 
-black = mat("satin_dark_grey_steel", (0.11, 0.11, 0.11), 0.0, 0.38)  # shared with inner fender + firewall (lead)
+# gloss black over the stamping, as the support is painted on the truck; the clear carries the booth-light reflections
+# so the sections stay legible next to the body-colour firewall (shared with the inner fender)
+black = mat("gloss_black", (0.016, 0.016, 0.017), 0.0, 0.32, coat=0.8, coat_rough=0.08)
 root = bpy.data.objects.new("core_support", None)
 bpy.context.collection.objects.link(root)
 rubber = mat("rubber", (0.02, 0.02, 0.02), 0.0, 0.8)
