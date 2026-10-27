@@ -418,7 +418,7 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
           <div className="search-result-count">
             <strong>{filteredAndSortedResults.length.toLocaleString()}</strong>
             {totalCount != null && totalCount > results.length && filterBy === 'all' ? ` of ${totalCount.toLocaleString()}` : ''}
-            {' '}{filterBy === 'vehicle' || (filterBy === 'all' && Object.keys(typeCounts).length === 1 && typeCounts.vehicle) ? 'vehicle' : 'result'}{filteredAndSortedResults.length === 1 ? '' : 's'}
+            {' '}{(filterBy === 'vehicle' || (filterBy === 'all' && Object.keys(typeCounts).length === 1 && typeCounts.vehicle) ? 'vehicle' : 'result') + (filteredAndSortedResults.length === 1 ? '' : 's')}
           </div>
           {filterControls}
           <div className="search-view-toggle" role="group" aria-label="Result view">
