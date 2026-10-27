@@ -522,7 +522,7 @@ def scan_longblock(path):
     return src
 
 
-def part_mesh(path, name, mm_per_unit, at, lift=0.0):
+def part_mesh(path, name, mm_per_unit, at, lift=0.0, rot=None, anchor=None, material=None):
     """an image-to-3D mesh (TRELLIS, from the maker's photos; unit-normalised, Z-up, pulley/shaft toward +Y) placed in
     engine-local mm: scaled by a printed dimension, turned so its front faces the truck's front (-y), and moved so its
     pulley-face centre sits at `at`. Returns the object (textured, kept as made)."""
@@ -541,22 +541,33 @@ def part_mesh(path, name, mm_per_unit, at, lift=0.0):
     me = bpy.data.meshes.new(name)
     bm.to_mesh(me)
     bm.free()
-    for m in mats:
+    for m in ([material] if material else mats):
         me.materials.append(m)
+    if material:
+        mats = []
     import numpy as np
+    # turn so the part's front (pulley / shaft end) faces the truck's front (-y), scale by the printed dimension, then
+    # move the centre of its front-most 12 mm to `at`
+    Rm = Matrix(rot or ((-1, 0, 0), (0, -1, 0), (0, 0, 1))).to_4x4()
+    me.transform(Matrix.Scale(mm_per_unit, 4) @ Rm)
     co = np.array([tuple(vv.co) for vv in me.vertices])
-    nose = co[co[:, 1] > co[:, 1].max() - 0.12]
-    cx, cz, cy = float(np.median(nose[:, 0])), float(np.median(nose[:, 2])), float(co[:, 1].max())
-    k = mm_per_unit
-    # x -> -x, y -> -y (a half turn about z), scale, nose centre to `at`
-    T = Matrix(((-k, 0, 0, at[0] + k * cx), (0, -k, 0, at[1] + k * cy), (0, 0, k, at[2] - k * cz), (0, 0, 0, 1)))
-    me.transform(T)
+    nose = co[co[:, 1] < co[:, 1].min() + 12.0]
+    if anchor is not None:   # a mesh-unit point (before turning) that goes to `at` in x and z; the front face to at.y
+        ap = Matrix.Scale(mm_per_unit, 4) @ Rm @ Vector(anchor)
+        d = Vector((at[0] - ap.x, at[1] - float(co[:, 1].min()), at[2] - ap.z))
+    else:
+        d = Vector(at) - Vector((float(np.median(nose[:, 0])), float(co[:, 1].min()), float(np.median(nose[:, 2]))))
+    me.transform(Matrix.Translation(d))
     me.transform(M_WORLD)
     ob = bpy.data.objects.new(name, me)
     bpy.context.scene.collection.objects.link(ob)
-    if len(me.polygons) > 60000:
+    if len(me.polygons) > 30000:
         dec = ob.modifiers.new("decimate", "DECIMATE")
-        dec.ratio = 60000 / len(me.polygons)
+        dec.ratio = 30000 / len(me.polygons)
+    for m in mats:   # 1K textures: these parts are a few hundred pixels on the map view
+        for n in (m.node_tree.nodes if m and m.use_nodes else []):
+            if n.type == "TEX_IMAGE" and n.image and n.image.size[0] > 1024:
+                n.image.scale(1024, 1024)
     if lift:   # the generator bakes the maker's studio shading in dark; lift it toward the photos' natural finish
         for m in mats:
             for n in (m.node_tree.nodes if m and m.use_nodes else []):
@@ -746,8 +757,16 @@ def build():
     for sig in (1, -1):   # legs back to the heads' front faces, where the pump bolts over the coolant outlets
         hf = HEAD_Y[sig] - v("head_len") / 2
         mm.append(cyl((sig * 125, (FACE + hf) / 2 + 2, 185), 56, abs(hf - FACE) + 4))
-    join("midmount_bracket", mm, "manifold", bevel=6)
-    join("midmount_fittings", [cyl((-95, MF - 20, 225), 19, 45), cyl((-240, MF - 18, 110), 38, 40)], "chrome")   # heater barb, inlet (IMG_6531)
+    wp_mesh = opt("--wp-mesh")
+    if wp_mesh:   # Holley Mid-Mount LS cooling manifold (97-163 natural / 97-167 black, one casting) from the maker's
+        # photos (TRELLIS): its front face (mesh -z) forward, turned in its plane so bore and thermostat outlet land on the layout; 572 mm/unit from the bore to
+        # thermostat-outlet span (0.444 units) against the 254 mm of the H335 belt-render layout; bore on the pump axis
+        part_mesh(wp_mesh, "midmount_bracket", 572.0, (WX, MF, WZ), rot=((-0.9883, -0.1527, 0), (0, 0, 1), (-0.1527, 0.9883, 0)),
+                  anchor=(-0.051, 0.034, -0.16), material=material("manifold"))
+    else:
+        join("midmount_bracket", mm, "manifold", bevel=6)
+    if not wp_mesh:
+        join("midmount_fittings", [cyl((-95, MF - 20, 225), 19, 45), cyl((-240, MF - 18, 110), 38, 40)], "chrome")   # heater barb, inlet (IMG_6531)
 
     join("water_pump", [cyl((WX, BY, WZ), v("wp_d"), 30), cyl((WX, (BY + MF) / 2, WZ), 70, abs(MF - BY) + 4),
                         cyl((WX, BY - 16, WZ), 44, 6)], "anod", bevel=0)
@@ -812,16 +831,23 @@ def build():
     # three mount ears on its front face, and the tall black reservoir box behind it, cap on top (IMG_6532), return
     # elbow at its foot. Body and box sizes are read off the maker photos against the Ø170 pulley; Holley prints none.
     PB = BY + 28
+    ps_mesh = opt("--ps-mesh")
+    if ps_mesh:   # Holley 198-101 from its maker photos (TRELLIS): shaft (mesh +z) forward, cap (mesh -y) up; 156 mm/unit
+        # from the cap (Ø ~50 against the Ø170 pulley in IMG_6532) at 0.32 of the mesh's width
+        part_mesh(ps_mesh, "ps_pump", 156.0, (PX, BY - 4, PZ), lift=2.2, rot=((-1, 0, 0), (0, 0, -1), (0, -1, 0)))
     body = [cyl((PX, PB + 14, PZ), 50, 28), cyl((PX, PB + 28 + 30, PZ), 74, 60)]
     for a in (math.radians(40), math.radians(140), math.radians(270)):
         body.append(box((PX + 40 * math.cos(a), PB + 33, PZ + 40 * math.sin(a)), (22, 12, 22)))
     body.append(box((PX - 44, PB + 50, PZ + 20), (20, 24, 18)))                    # pressure boss, -6 AN banjo side
-    join("ps_pump", body, "alt", bevel=1.5)
+    if not ps_mesh:
+        join("ps_pump", body, "alt", bevel=1.5)
     RX0 = PX + 6
     res = [box((RX0, PB + 88 + 55, PZ - 2), (70, 110, 150)),
            cyl((RX0, PB + 88 + 60, PZ + 73 + 13), 60, 26, axis="z")]
-    join("ps_reservoir", res, "plastic", bevel=6)
-    join("ps_return", [tube("ps_return", [Vector((RX0, PB + 120, PZ - 77)), Vector((RX0, PB + 122, PZ - 96)),
+    if not ps_mesh:
+        join("ps_reservoir", res, "plastic", bevel=6)
+    if not ps_mesh:
+      join("ps_return", [tube("ps_return", [Vector((RX0, PB + 120, PZ - 77)), Vector((RX0, PB + 122, PZ - 96)),
                                           Vector((RX0 - 8, PB + 112, PZ - 116))], 14, "plastic")], "plastic")
     join("tensioner", [ribbed((TX, BY, TZ), v("tens_d"), 26), box((TX + 8, BY + 30, TZ - 40), (40, 30, 90))], "anod", bevel=2)
     join("idler", [cyl((IX, BY, IZ), v("idler_d"), 26)], "anod")
