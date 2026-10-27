@@ -57,8 +57,24 @@ async function visit(route, mobile) {
     if (s === 400 || s === 401 || s === 403) bad.push(label); else if (s >= 500) soft.push(label);
   });
   page.on('console', m => { if (m.type() === 'error' && /permission denied|42501/i.test(m.text())) consoleErrors.push(m.text().slice(0, 160)); });
-  await page.goto(SITE + route, { waitUntil: 'networkidle', timeout: 90000 }).catch(e => bad.push('goto: ' + e.message.slice(0, 120)));
+  let navigationError;
+  await page.goto(SITE + route, { waitUntil: 'networkidle', timeout: 90000 }).catch(e => { navigationError = e; });
   await page.waitForTimeout(3000);
+  let anonPhotos = null;
+  const vehicle = route.match(/^\/vehicle\/([0-9a-f-]{36})$/);
+  if (vehicle && anonKey) {
+    const res = await fetch(`${supabaseOrigin}/rest/v1/vehicle_images_public?select=id&vehicle_id=eq.${vehicle[1]}&vehicle_image_gallery_eligible=eq.true&limit=1`,
+      { headers: { apikey: anonKey, Prefer: 'count=exact', Range: '0-0' } }).catch(() => null);
+    if (res && res.ok) anonPhotos = Number((res.headers.get('content-range') || '').split('/')[1]);
+    else if (res) failures.push({ page: route, what: `anonymous photo read answered ${res.status}`, detail: [] });
+  }
+  if (anonPhotos > 0) {
+    // The text-first response can become idle before React mounts. Wait for an admitted photo, then sample again.
+    await page.waitForFunction(() => {
+      const root = document.querySelector('.vehicle-profile-page') || document.body;
+      return [...root.querySelectorAll('img')].some(i => i.complete && i.naturalWidth > 50 && i.getBoundingClientRect().width > 40);
+    }, null, { timeout: 30000 }).catch(() => {});
+  }
   const seen = await page.evaluate(() => {
     const root = document.querySelector('.vehicle-profile-page') || document.body;
     const text = document.body.innerText || '';
@@ -66,10 +82,19 @@ async function visit(route, mobile) {
     return { text: text.slice(0, 20000), images: imgs.length };
   });
   const tag = `${route}${mobile ? ' (mobile)' : ''}`;
+  if (navigationError) {
+    const idleTimeout = navigationError.name === 'TimeoutError' && seen.text.trim().length > 0;
+    (idleTimeout ? warnings : failures).push({ page: tag,
+      what: idleTimeout ? 'navigation did not become idle within 90 seconds' : 'page navigation failed',
+      detail: [navigationError.message.slice(0, 160)] });
+  }
   if (bad.length) failures.push({ page: tag, what: 'data API refused or rejected requests', detail: [...new Set(bad)].slice(0, 6) });
   if (consoleErrors.length) failures.push({ page: tag, what: 'permission errors in the console', detail: [...new Set(consoleErrors)].slice(0, 3) });
   const errText = seen.text.match(ERROR_TEXT);
   if (errText) failures.push({ page: tag, what: `error text on the page: "${errText[0]}"`, detail: [] });
+  if (anonPhotos > 0 && seen.images === 0) {
+    failures.push({ page: tag, what: `the database admits ${anonPhotos} photos to anonymous readers; the page shows none`, detail: [] });
+  }
   if (soft.length) warnings.push({ page: tag, what: `${soft.length} 5xx responses`, detail: [...new Set(soft)].slice(0, 3) });
   const safe = route.replace(/[^a-z0-9]+/gi, '_');
   await page.screenshot({ path: path.join(OUT, `${safe}${mobile ? '_m' : ''}.png`), fullPage: false }).catch(() => {});
@@ -77,22 +102,7 @@ async function visit(route, mobile) {
   return seen;
 }
 
-for (const route of PAGES) {
-  const seen = await visit(route, false);
-  const m = route.match(/^\/vehicle\/([0-9a-f-]{36})$/);
-  if (!m) continue;
-  // The database's own answer: how many photos does an anonymous reader get for this vehicle?
-  let anonPhotos = null;
-  if (anonKey) {
-    const res = await fetch(`${supabaseOrigin}/rest/v1/vehicle_images_public?select=id&vehicle_id=eq.${m[1]}&vehicle_image_gallery_eligible=eq.true&limit=1`,
-      { headers: { apikey: anonKey, Prefer: 'count=exact', Range: '0-0' } }).catch(() => null);
-    if (res && res.ok) anonPhotos = Number((res.headers.get('content-range') || '').split('/')[1]);
-    else if (res) failures.push({ page: route, what: `anonymous photo read answered ${res.status}`, detail: [] });
-  }
-  if (anonPhotos > 0 && seen.images === 0) {
-    failures.push({ page: route, what: `the database admits ${anonPhotos} photos to anonymous readers; the page shows none`, detail: [] });
-  }
-}
+for (const route of PAGES) await visit(route, false);
 for (const q of ANON_READS) {
   if (!anonKey) break;
   const res = await fetch(`${supabaseOrigin}/rest/v1/${q}`, { headers: { apikey: anonKey } }).catch(() => null);
