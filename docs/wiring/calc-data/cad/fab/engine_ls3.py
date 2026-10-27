@@ -136,8 +136,8 @@ P = {
     "tens_xz": D((-168.0, 240.0), "x off " + PH31 + " (scaled against the alternator offset); z solved so the belt path closes at the 6PK1539 length", "derived", 15.0),
     # ---- shorty cast headers (owner testimony; PN unknown)
     "hdr_port_s": D(40.0, "exhaust port centre above the deck, on the head's exhaust face; not dimensioned", "assumed", 12.0),
-    "hdr_primary_d": D(54.0, PH30 + " / " + PH32 + ": cast primaries against the port pitch (111.76)", "photo", 8.0),
-    "hdr_log_d": D(66.0, PH30 + " / " + PH32 + ": the lower log the primaries merge into", "photo", 10.0),
+    "hdr_primary_d": D(50.0, "Holley 8501HKR spec 'Primary Tube Dia. 1-3/4 in' (44.5) plus the cast wall", "derived", 4.0),
+    "hdr_log_d": D(60.0, "Holley 8502HKR 2.50 in outlet (63.5) at the run's end; the run is drawn at that size", "derived", 6.0),
     "hdr_log_x": D(300.0, PH30 + " / " + PH32 + "; stays inside the frame rails' inside faces at +-353 (" + FR88 + ")", "photo", 20.0),
     "hdr_log_z": D(20.0, PH30 + " / " + PH32 + ": the log runs just above crank height, close under the ports (a compact cast shorty)", "photo", 35.0),
     "hdr_outlet_z": D(-50.0, PH30 + ": collector flange at the head's rear bottom, facing down", "photo", 30.0),
@@ -704,29 +704,74 @@ def build():
 
     AL, ACD, APD = v("alt_len"), v("alt_case_d"), v("alt_pulley_d")
     y_front = BY - 14
-    join("alternator_197-302", [cyl((AX, y_front + 28 + (AL - 28) / 2, AZ), ACD, AL - 28),
-                                cyl((AX, y_front + 28 + 12, AZ), ACD + 10, 18)], "alt", bevel=3)
+    # Holley 197-302 (ref-parts/alternator-197-302/REFERENCE.md, maker photos): a GM AD-style two-piece case. Front
+    # housing: 18 radial spokes over open windows around the pulley hub, a ring of rectangular windows round its rim,
+    # two mount ears low; a thin stator band; rear housing with side windows; a small end cap; B+ stud high on the
+    # right of the rear housing with the 3-pin plug below it. Window counts and depths are read off the photos.
+    R = ACD / 2
+    yF = y_front + 28                     # front face of the front housing (the pulley stands ahead of it)
+    LF, LS, LR, LC = 0.36 * (AL - 28), 0.10 * (AL - 28), 0.38 * (AL - 28), 0.16 * (AL - 28)
+    # each housing: solid lips at its ends, a window band between whose bars sit flush with the case (the windows read
+    # dark: the "alternator_vents" core shows through them)
+    bands = [(yF, LF, 0.30, 0.15), (yF + LF + LS, LR, 0.20, 0.25)]
+    case = [cyl((AX, yF + LF + LS + LR + LC / 2, AZ), ACD - 30, LC, seg=56),
+            ring((AX, yF + 4, AZ), 44, 2 * (R - 24), 8, axis="y", seg=72),          # rim of the front face
+            cyl((AX, yF + 3, AZ), 46, 10)]                                           # hub boss
+    for y0, ln, f0, f1 in bands:
+        case.append(cyl((AX, y0 + ln * f0 / 2, AZ), ACD, ln * f0, seg=72))
+        case.append(cyl((AX, y0 + ln - ln * f1 / 2, AZ), ACD - 2, ln * f1, seg=72))
+        wy, wl = y0 + ln * f0 + ln * (1 - f0 - f1) / 2, ln * (1 - f0 - f1) + 1
+        for k in range(26):
+            a = 2 * math.pi * k / 26
+            case.append(box((AX + (R - 4) * math.cos(a), wy, AZ + (R - 4) * math.sin(a)), (8, wl, 7), rot=Matrix.Rotation(-a, 4, "Y")))
+    for k in range(18):                   # front spokes across the window ring
+        a = 2 * math.pi * k / 18
+        rm = (22 + R - 24) / 2
+        case.append(box((AX + rm * math.cos(a), yF + 3, AZ + rm * math.sin(a)), (5, 10, R - 24 - 22), rot=Matrix.Rotation(-a + math.pi / 2, 4, "Y")))
+    for sx in (-1, 1):                    # mount ears, low on the front housing (ear spacing 138.7, Holley fitment PDF)
+        ex, ez = AX + sx * 69.0, AZ - 58.0
+        case.append(cyl((ex, yF + LF / 2, ez), 26, LF))
+        case.append(box(((AX + ex) / 2, yF + LF / 2, (AZ + ez) / 2), (abs(ex - AX), LF - 6, 30)))
+    join("alternator_197-302", case, "alt", bevel=1.5)
+    # what reads dark through the windows: the stator and rectifier inside, and the plug and stud insulator
+    join("alternator_vents", [cyl((AX, yF + LF / 2 + 4, AZ), ACD - 14, LF - 2, seg=72),
+                              cyl((AX, yF + LF + LS / 2, AZ), ACD + 2, LS, seg=72),
+                              cyl((AX, yF + LF + LS + LR / 2, AZ), ACD - 14, LR - 2, seg=72),
+                              cyl((AX, yF + 4.5, AZ), 2 * (R - 25), 4, seg=72),
+                              box((AX - R - 10, yF + LF + LS + LR * 0.5, AZ - 10), (22, 34, 28)),
+                              cyl((AX - R * 0.62, yF + LF + LS + LR * 0.35, AZ + R * 0.72), 18, 12, axis="z")], "plastic")
+    join("alternator_bplus", [cyl((AX - R * 0.62, yF + LF + LS + LR * 0.35, AZ + R * 0.72 + 14), 6, 22, axis="z"),
+                              cyl((AX - R * 0.62, yF + LF + LS + LR * 0.35, AZ + R * 0.72 + 9), 12, 6, axis="z", seg=6)], "bolt")
     join("alternator_pulley", [ribbed((AX, BY, AZ), APD, 28), cyl((AX, BY - 15, AZ), 30, 4)], "anod")
 
     PSD = v("ps_pulley_d")
-    join("ps_pulley", [ribbed((PX, BY, PZ), PSD, 26), cyl((PX, BY + 8, PZ), 50, 40)], "anod")
-    RES = v("res_d")
-    join("ps_pump", [cyl((PX, BY + 30 + 55, PZ), v("ps_body_d"), 110),
-                     cyl((PX + 55, BY + 95, PZ + 55), RES, 105, axis="z"),
-                     cyl((PX + 55, BY + 95, PZ + 55 + 58), 60, 12, axis="z")], "plastic", bevel=2)
+    # Holley 97-152 (GM 12568997): steel, 4 spokes, Ø170 over the ribs, 161 at the groove roots (Holley pulley table)
+    pr = [ring((PX, BY, PZ), PSD - 26, PSD, 22, axis="y", seg=96), cyl((PX, BY + 6, PZ), 58, 30)]
+    for k in range(4):
+        a = math.pi / 4 + k * math.pi / 2
+        pr.append(box((PX + 50 * math.cos(a), BY + 6, PZ + 50 * math.sin(a)), (24, 6, PSD / 2 - 30), rot=Matrix.Rotation(-a + math.pi / 2, 4, "Y")))
+    join("ps_pulley", pr, "anod")
+    # Holley 198-101 Type II pump (ref-parts/ps-pump-198-101/REFERENCE.md): an aluminium body with the bearing boss and
+    # three mount ears on its front face, and the tall black reservoir box behind it, cap on top (IMG_6532), return
+    # elbow at its foot. Body and box sizes are read off the maker photos against the Ø170 pulley; Holley prints none.
+    PB = BY + 28
+    body = [cyl((PX, PB + 14, PZ), 50, 28), cyl((PX, PB + 28 + 30, PZ), 74, 60)]
+    for a in (math.radians(40), math.radians(140), math.radians(270)):
+        body.append(box((PX + 40 * math.cos(a), PB + 33, PZ + 40 * math.sin(a)), (22, 12, 22)))
+    body.append(box((PX - 44, PB + 50, PZ + 20), (20, 24, 18)))                    # pressure boss, -6 AN banjo side
+    join("ps_pump", body, "alt", bevel=1.5)
+    RX0 = PX + 6
+    res = [box((RX0, PB + 88 + 55, PZ - 2), (70, 110, 150)),
+           cyl((RX0, PB + 88 + 60, PZ + 73 + 13), 60, 26, axis="z")]
+    join("ps_reservoir", res, "plastic", bevel=6)
+    join("ps_return", [tube("ps_return", [Vector((RX0, PB + 120, PZ - 77)), Vector((RX0, PB + 122, PZ - 96)),
+                                          Vector((RX0 - 8, PB + 112, PZ - 116))], 14, "plastic")], "plastic")
     join("tensioner", [ribbed((TX, BY, TZ), v("tens_d"), 26), box((TX + 8, BY + 30, TZ - 40), (40, 30, 90))], "anod", bevel=2)
     join("idler", [cyl((IX, BY, IZ), v("idler_d"), 26)], "anod")
     # centre bolts on every pulley face, and the alternator's slotted front frame (IMG_6531; slot count cosmetic)
     front = Vector((0, -1, 0))
     join("pulley_bolts", [hex_bolt((x, BY - 13 - 2, z), front, across=15, head=7, washer=26)
                           for x, z in ((0, 0), (WX, WZ), (AX, AZ), (PX, PZ), (IX, IZ), (TX, TZ))], "bolt")
-    fins = []
-    for k in range(14):
-        a = 2 * math.pi * k / 14
-        r = ACD / 2 - 14
-        fins.append(box((AX + r * math.cos(a), y_front + 30, AZ + r * math.sin(a)), (6, 8, 22),
-                        rot=Matrix.Rotation(-a, 4, "Y")))
-    join("alternator_vents", fins, "anod")
 
     # belt path (6PK1539): solve the tangents around the pulleys, loop CCW seen from the front
     order = [("crank", 0.0, 0.0, DD / 2, True), ("ps", PX, PZ, PSD / 2, True), ("alt", AX, AZ, APD / 2, True),
@@ -750,45 +795,61 @@ def build():
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     emit("belt", bm, "belt")
 
-    # ---- shorty cast headers + down-pipes
+    # ---- cast shorty manifolds + down-pipes: the Hooker BlackHeart LS-swap casting (8501/8502HKR shape; owner: "shorty
+    # cast headers, like hooker brand"; ref-parts/headers/REFERENCE.md). One casting a side: a flat head flange of four
+    # round port bosses with bolt ears between, four short round lobes straight out of it that turn down into one main run
+    # under the ports, the run sloping rearward and turning down into a 2-bolt outlet flange (Holley 8501HKR images).
     PD_, LD = v("hdr_primary_d"), v("hdr_log_d")
-    LX, LZ, OZ = v("hdr_log_x"), v("hdr_log_z"), v("hdr_outlet_z")
     ports = {}
     for sig, tag in ((1, "L"), (-1, "R")):
         cyls = sorted([c for c in STATION if BANK[c] == sig], key=lambda c: STATION[c])
         y_front, y_rear = STATION[cyls[0]], STATION[cyls[-1]]
-        y_out = y_rear + 42
-        parts = [bank_box(sig, v("hdr_port_s") - 34, v("hdr_port_s") + 34, HW / 2, HW / 2 + 12, y_front - 40, y_rear + 40)]
         out_dir = Vector((t_(sig)[0], 0, t_(sig)[1]))
-        for c in cyls:
+        down = Vector((0, 0, -1))
+        face = lambda y, off=0.0: bank_pt(sig, v("hdr_port_s"), HW / 2 + off, y)
+        rot = out_dir.to_track_quat("Z", "Y").to_matrix().to_4x4()
+        parts = []
+        for k, c in enumerate(cyls):     # port bosses (flange) and the ears between and outside them
+            b = cyl((0, 0, 0), PD_ + 14, 11, axis="z")
+            bmesh.ops.transform(b, matrix=rot, verts=b.verts)
+            bmesh.ops.translate(b, vec=face(STATION[c], 5.5), verts=b.verts)
+            parts.append(b)
+        for y in [y_front - 46] + [(STATION[a] + STATION[b_]) / 2 for a, b_ in zip(cyls, cyls[1:])] + [y_rear + 46]:
+            e = cyl((0, 0, 0), 22, 11, axis="z")
+            bmesh.ops.transform(e, matrix=rot, verts=e.verts)
+            bmesh.ops.translate(e, vec=face(y, 5.5) + Vector((0, 0, 14)), verts=e.verts)
+            parts.append(e)
+            parts.append(hex_bolt(face(y, 11) + Vector((0, 0, 14)), out_dir, across=12, head=6, washer=18))
+        # the main run: under the ports, about one lobe diameter out from the flange, sloping down toward the rear
+        run_out = 52.0
+        z_top = face(y_front).z - 95
+        run = [face(y_front + 18, run_out) + Vector((0, 0, -40)), face((y_front + y_rear) / 2, run_out) + Vector((0, 0, -48)),
+               face(y_rear + 20, run_out + 4) + Vector((0, 0, -58))]
+        # outlet centre from Holley's 8501HKR engine drawing: 6.63 / 7.71 in below the head-bolt pattern centre and
+        # 2.82 / 1.80 in ahead of the block's rear face (passenger / driver, our reading of its labels)
+        y_out = -(72.0 if sig < 0 else 46.0)
+        outlet = face(y_out, run_out + 14)
+        outlet.z = face(y_out).z - (168.0 if sig < 0 else 196.0)
+        run += [Vector(((run[-1].x + outlet.x) / 2, y_out - 6, run[-1].z - 40)), outlet]
+        parts.append(tube(f"run_{tag}", run, LD + 4, "header", res=18))
+        for c in cyls:                    # lobes: straight out of the flange, then down and back into the run
             y = STATION[c]
-            p0 = bank_pt(sig, v("hdr_port_s"), HW / 2 + 6, y)
-            p1 = p0 + out_dir * 34
-            p2 = Vector((sig * LX, y + 12, (p1.z + LZ) / 2 - 5))
-            p3 = Vector((sig * LX, y + 30, LZ + 10))
-            # oval cast primaries (wider along the head than they stand out from it), as in IMG_6530 / IMG_6532
-            parts.append(tube(f"primary_{c}", [p0, p1, p2, p3], PD_, "header"))
+            p0 = face(y, 4)
+            p1 = p0 + out_dir * 26
+            zr = run[1].z + (run[2].z - run[1].z) * max(0.0, (y - (y_front + y_rear) / 2) / ((y_rear - y_front) / 2 + 1e-6))
+            p3 = face(y + 18, run_out); p3.z = zr + 6
+            p2 = p1 + out_dir * 8 + down * 10 + Vector((0, 5, 0))
+            parts.append(tube(f"lobe_{c}", [p0, p1, p2, p3], PD_ + 6, "header", res=18))
             ports[c] = p0
-        # the casting's web: one wall joining the primaries' inboard sides from the port flange down to the log, so the
-        # four read as a single cast piece (IMG_6530: no daylight between the primaries)
-        bm = bmesh.new()   # a quad wall, 14 thick, from the flange's lower edge down to the log's top
-        ya, yb = y_front - 20, y_rear + 20
-        top = lambda y, r: bank_pt(sig, v("hdr_port_s") - 22, HW / 2 + r, y)
-        bot = lambda y, d: Vector((sig * (LX - 6 + d), y, LZ + 22))
-        q = [top(ya, 14), top(yb, 14), bot(yb, 0), bot(ya, 0), top(ya, 28), top(yb, 28), bot(yb, 14), bot(ya, 14)]
-        vs = [bm.verts.new(p_) for p_ in q]
-        for f in ((0, 1, 2, 3), (7, 6, 5, 4), (0, 4, 5, 1), (1, 5, 6, 2), (2, 6, 7, 3), (3, 7, 4, 0)):
-            bm.faces.new([vs[k_] for k_ in f])
-        bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
-        parts.append(bm)
-        parts.append(tube(f"log_{tag}", [Vector((sig * LX, y_front + 10, LZ + 8)), Vector((sig * LX, (y_front + y_rear) / 2, LZ)),
-                                         Vector((sig * LX, y_out - 20, LZ - 8)), Vector((sig * LX, y_out, OZ + 25)),
-                                         Vector((sig * LX, y_out + 4, OZ))], LD, "header"))
-        parts.append(cyl((sig * LX, y_out + 4, OZ - 4), LD + 30, 8, axis="z"))          # collector flange
+        # 2-bolt outlet flange, facing down (8502HKR_outlet_flange_face_closeup)
+        fl = bmesh.new()
+        for part in (cyl((0, 0, 0), LD + 22, 12, axis="z"), cyl((LD / 2 + 14, 0, 0), 26, 12, axis="z"), cyl((-LD / 2 - 14, 0, 0), 26, 12, axis="z")):
+            tmp = bpy.data.meshes.new("tmp"); part.to_mesh(tmp); part.free(); fl.from_mesh(tmp); bpy.data.meshes.remove(tmp)
+        bmesh.ops.translate(fl, vec=outlet + Vector((0, 0, -4)), verts=fl.verts)
+        parts.append(fl)
         join(f"header_{tag}", parts, "header", bevel=0)
         ye = v("downpipe_end_y")
-        dp = [Vector((sig * LX, y_out + 4, OZ - 8)), Vector((sig * (LX + 6), y_out + 40, OZ - 70)),
-              Vector((sig * (LX + 12), ye, OZ - 110))]
+        dp = [outlet + Vector((0, 0, -10)), outlet + Vector((sig * 4, 40, -70)), Vector((outlet.x + sig * 8, ye, outlet.z - 110))]
         join(f"downpipe_{tag}", [tube(f"downpipe_{tag}", dp, v("downpipe_d"), "pipe", res=16)], "pipe")
     return dict(length=length, arcs=arcs, inj=inj_pos, ports=ports, pad_z=PAD_Z, belt_y=BY)
 
