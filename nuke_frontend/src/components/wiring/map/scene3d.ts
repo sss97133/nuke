@@ -34,6 +34,13 @@ export const LAYERS: LayerDef[] = [
     hides: ['CTX-inner-fender-wall-driver', 'CTX-inner-fender-wall-passenger'], off: true,
   },
   {
+    // 1973-80 front inner fenders, a subdivision-surface sculpt matched to photos (receipt 2026-10-26_k5-inner-fender-sds);
+    // off until the lead flips it. Once the per-layer hidesIn field lands it also hides the sheetmetal layer's
+    // inner_fender_wall/top/wheelhouse_L/R nodes.
+    id: 'inner-fender', label: 'INNER FENDER', url: '/models/k5-inner-fender.glb', lane: 'k5-inner-fender-sds',
+    hides: ['CTX-inner-fender-wall-driver', 'CTX-inner-fender-wall-passenger'], off: true,
+  },
+  {
     // stock 1973-80 non-AC dash panel, toe board and cowl sides, camera-matched to photos (receipt 2026-10-26_k5-firewall-3d);
     // off with the sheet metal until the old panel underneath it is hidden (#2826) and the other two parts land
     id: 'firewall', label: 'FIREWALL', url: '/models/k5-firewall.glb', lane: 'k5-firewall-3d',
