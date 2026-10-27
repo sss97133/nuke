@@ -29,7 +29,12 @@ export const LAYERS: LayerDef[] = [
   },
   {
     id: 'sheetmetal', label: 'SHEET METAL', url: '/models/k5-front-sheetmetal.glb', lane: 'chassis-3d (#470)',
-    hides: ['CTX-core-support-face', 'CTX-firewall-face', 'CTX-toe-board', 'CTX-inner-fender-wall-driver', 'CTX-inner-fender-wall-passenger'],
+    hides: ['CTX-core-support-face', 'CTX-inner-fender-wall-driver', 'CTX-inner-fender-wall-passenger'],
+  },
+  {
+    // stock 1973-80 non-AC dash panel, toe board and cowl sides, camera-matched to photos (receipt 2026-10-26_k5-firewall-3d)
+    id: 'firewall', label: 'FIREWALL', url: '/models/k5-firewall.glb', lane: 'k5-firewall-3d',
+    hides: ['CTX-firewall-face', 'CTX-toe-board'],
   },
   {
     id: 'engine', label: 'ENGINE', url: '/models/k5-engine-ls3.glb', lane: 'engine-3d (#468)',

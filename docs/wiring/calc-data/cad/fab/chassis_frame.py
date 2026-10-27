@@ -459,7 +459,7 @@ def strip_and_scan(path):
     import re
     low = raw.lower()
     hits = [w for w in (b"api_key", b"token", b"secret", b"blendermcp", b"sketchfab") if w in low]
-    hits += [b"hex32"] if re.search(rb"[0-9a-fA-F]{32}", raw) else []
+    hits += [b"hex32"] if re.search(rb"[0-9a-fA-F]{32}", js) else []  # JSON chunk only: a dense float buffer can spell 32 hex bytes
     hits += [b"draco"] if b"KHR_draco" in raw else []
     if hits:
         raise SystemExit(f"refusing to ship {path}: found {hits}")
