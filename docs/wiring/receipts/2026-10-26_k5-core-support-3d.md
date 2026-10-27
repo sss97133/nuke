@@ -193,3 +193,10 @@ Conflicts and least sure:
   vertical conflict from the first receipt stands and belongs to the frame lane. The part was not moved, because the
   lamps and top rail match 022 where they are.
 - Gusset, latch bracket and saddle sizes are assumed (+/-20 mm). 041-044 do not show the support.
+
+## Correction (2026-10-27)
+`upper_tie_bar_lower` is removed. The lead withdrew it: no second bar exists. The upper tie bar is the top rail at the
+hood line. NOS _01 shows the radiator opening running up to it, and the owner's grille-off photo shows the top tank
+right under it. The hood-latch bracket now hangs from that tie bar at centre down to the top-tank line (the opening
+top, 16 mm under the bar). Everything else from the owner pass stays. The body-mount pad conflict (z 0.585 vs 0.721)
+stays open for the frame lane, and the part is not moved. 0.68 MB; `strip_and_scan` passes.

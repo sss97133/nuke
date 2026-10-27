@@ -227,8 +227,8 @@ parts["opening_flange"] = finish(link("opening_flange", me), bevel=False)
 # rear lip turned down. Was: a 15 mm lip turned rearward
 # over the face top (_13 end of the bar; _03 left end; owner 045 shows no wide flange at the top on the engine side)
 ut = [(T, ZT - TB_H - RET), (T, ZT - TB_H), (-D, ZT - TB_H), (-D, ZT), (RET, ZT), (RET, ZT - RET * 0.8)]
-# (owner, 2026-10-27, from his own support: this top channel is the top rail the chrome strip seats on; the lamp
-# panels run up to it at the hood line, and the real upper tie bar sits lower, see below)
+# (owner + lead, 2026-10-27: this channel IS the upper tie bar, the top rail at the hood line; the lamp panels run up
+# to it and the radiator's top tank sits right under it, _01 and his grille-off photo)
 parts["upper_tie_bar"] = finish(sweep("upper_tie_bar", [(YF + u, v) for u, v in ut], "x", -HALF_W, HALF_W))
 
 # hood-latch plate on the bar's front wall, centred (GM 2C-20 upper panel; _01 centre holes): a doubler with a slot
@@ -314,23 +314,15 @@ def mat(name, rgb, metal, rough):
     return m
 
 
-# ---- upper tie bar, at its real station (owner 2026-10-27, his support on the truck and off it; 022 front view):
-# a ~100 mm open channel standing forward across the opening top, its top ~100 mm under the panel tops, running
-# post to post and on to the lamp panels. Assumed +/-20 mm: no tape on his photos.
-UT_TOP = ZT - 0.100
-UT_H = 0.100
-utb = [(-T, UT_TOP - UT_H - RET), (-T, UT_TOP - UT_H), (-0.055, UT_TOP - UT_H), (-0.055, UT_TOP), (-T, UT_TOP),
-       (-T, UT_TOP + RET)]
-parts["upper_tie_bar_lower"] = finish(sweep("upper_tie_bar_lower", [(YF + u, v) for u, v in utb], "x",
-                                            -0.650, 0.650))
-# hood-latch support bracket: a vertical flanged plate standing on the tie bar at centre up to the top rail, two
-# latch bolt holes (owner 2026-10-27; GM 2C-20 hood latch support). 120 mm wide, 20 mm side flanges, assumed.
-lx0, lx1, ly = OPEN_CX - 0.060, OPEN_CX + 0.060, YF - 0.055 - 0.004
+# hood-latch support bracket: a vertical flanged plate hung from the upper tie bar at centre, dropping to the
+# radiator top-tank line (the opening top), two latch bolt holes (owner 2026-10-27; GM 2C-20 hood latch support).
+# 120 mm wide, 20 mm side flanges, assumed.
+lx0, lx1, ly = OPEN_CX - 0.060, OPEN_CX + 0.060, YF - 0.030
 lb = [(lx0, ly + 0.020), (lx0, ly), (lx1, ly), (lx1, ly + 0.020)]
-lbr = finish(sweep("hood_latch_bracket", lb, "z", UT_TOP - 0.010, ZT - TB_H + 0.005))
+lbr = finish(sweep("hood_latch_bracket", lb, "z", OPEN_ZT, ZT - TB_H + 0.002))
 hs = []
 for xx in (OPEN_CX - 0.035, OPEN_CX + 0.035):
-    bpy.ops.mesh.primitive_cylinder_add(vertices=20, radius=0.0055, depth=0.03, location=(xx, ly, UT_TOP + 0.035),
+    bpy.ops.mesh.primitive_cylinder_add(vertices=20, radius=0.0055, depth=0.03, location=(xx, ly, (OPEN_ZT + ZT - TB_H) / 2),
                                         rotation=(math.pi / 2, 0, 0))
     hs.append(bpy.context.active_object)
 parts["hood_latch_bracket"] = cut(lbr, *hs)
