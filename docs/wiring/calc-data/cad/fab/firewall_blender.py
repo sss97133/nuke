@@ -201,63 +201,94 @@ xb = np.linspace(TOP[-1][0], PS[0][0], 300)
 bottom = np.stack([xb, TOE_Z0 + (TUN_CROWN - TOE_Z0) * arch(xb)], 1)
 outline_raw = np.vstack([TOP[:-1], bottom, PS])
 OUTLINE = resample(chaikin(outline_raw, 3), 0.006)
+OUTLINE[:, 0] = np.clip(OUTLINE[:, 0], -0.80, 0.80)  # dash face ends where the cowl-side corner starts
+OUTLINE = resample(OUTLINE, 0.006)
 OUTER = Poly.__new__(Poly)
 OUTER.V = OUTLINE
 
 
 def ear_y(x):
     # ends flare forward into the cowl sides (03 rounded ends, 02 and 06 at 3/4; 30 mm assumed +/-15)
-    return -0.030 * smoothstep(0.70, 0.86, np.abs(x))
+    return 0.0 * np.abs(x)  # the corner radius now lives in the cowl-side skin
 
 
 # ---- stamped features (x, z twin metres) from the 03 crop; each names its photo
-bl, wi = cab(125, 260), cab(1180, 127)
-bo = cab(1015, 198)
+# Layout in the lead's photo units (2026-10-27 critique, read on 05 / 006214DA, +/-5%): W = cowl width 1.715 m,
+# H = dash-face height from the pinch seam to the tunnel-arch crown.
+W_ = 1.715
+SEAM_Z = float(OUTLINE[:, 1].max())
+H_ = SEAM_Z - TUN_CROWN
+SHOULDER_Z = SEAM_Z - 0.45 * H_          # horizontal shoulder, the brow's base
+DASH_END_X = 0.80                         # the dash face ends here and turns into the cowl side through the corner
+bl = np.array([-(W_ / 2 - 0.07 * W_), 0.965])   # blower: 0.07 W in from the cowl side, lower than the 03 read (05, 01)
+wi = cab(1180, 127)
 bh = cab(1200, 280)
 hc, hh = (cab(358, 202) + cab(463, 355)) / 2, np.abs(cab(463, 355) - cab(358, 202)) / 2
-pc = (cab(1020, 300) + cab(1120, 360)) / 2
+# driver reinforcement plate (dp photo): tall rounded rectangle, inboard edge beside the brow, top 0.12 H under the
+# seam; 0.13 m x 0.26 m (1:2)
+PLATE_X0, PLATE_X1 = 0.262, 0.392
+PLATE_Z1 = SEAM_Z - 0.12 * H_
+PLATE_Z0 = PLATE_Z1 - 0.26
+PLATE = RRect(((PLATE_X0 + PLATE_X1) / 2, (PLATE_Z0 + PLATE_Z1) / 2), ((PLATE_X1 - PLATE_X0) / 2, (PLATE_Z1 - PLATE_Z0) / 2), 0.030)
+bo = np.array([PLATE.c[0] - 0.012, PLATE_Z1 - 0.075])          # push-rod hole, upper half, inboard
+STUDS = [bo + (dx, dz) for dx in (-0.033, 0.033) for dz in (-0.033, 0.033)]
+COL_HOLE = np.array([PLATE.c[0], PLATE_Z0 + 0.065])            # big round column hole, plate's lower half
+pc = np.array([PLATE.c[0] + 0.005, PLATE_Z0 - 0.050])          # seal opening below the plate, inside the second rim
+pch = np.array([0.055, 0.030])
+
+# Brow: 0.62 W wide above the shoulder, arched top with its crown 0.18 H under the seam, ends down to the shoulder;
+# below the shoulder it narrows between the heater frame and the plate and fades into the tunnel arch. Soft ~50 mm
+# fillet (wall 0.10 m), deepest just below the shoulder.
+# 0.62 W would run the brow over the heater frame and the plate; it is bounded by them instead (x -0.36 to +0.25)
+_bx0, _bx1 = -0.36, 0.21
+_bc, _bw = (_bx0 + _bx1) / 2, (_bx1 - _bx0) / 2
+_arch = [(_bc + x, SHOULDER_Z + (SEAM_Z - 0.18 * H_ - SHOULDER_Z) * math.cos(math.pi / 2 * x / _bw) ** 0.6)
+         for x in np.linspace(_bw, -_bw, 17)]
+BROW = Poly(np.array(_arch + [(_bx0 + 0.01, SHOULDER_Z - 0.06), (_bx0 + 0.04, TOE_Z0 + 0.03),
+                              (_bx1 - 0.03, TOE_Z0 + 0.03), (_bx1 - 0.01, SHOULDER_Z - 0.06)]))
+
+
+def brow_depth_scale(z):
+    # deepest just below the shoulder; 60 % at the crown; fades into the tunnel below
+    up = 1 - 0.4 * smoothstep(SHOULDER_Z, SEAM_Z - 0.18 * H_, z)
+    return up * smootherstep(TOE_Z0 + 0.01, TOE_Z0 + 0.16, z)
+
 
 # Plateaus: (shape, depth y [+ = rearward, into the cab], wall width)
 PLATEAUS = [
-    # the big centre pressing: a domed protrusion TOWARD THE ENGINE over the intake (owner, 2026-10-27, with the
-    # 3/4 views 02 / A37DE48A, 083B873C, driver_plate_34 where it shows in profile); arched top traced on 03 (crop
-    # x 500-940, top y 85). ~110 mm proud at the centre, tapering over a 180 mm wall to the panel at its outline, and
-    # fading out toward the dash lower edge where it runs into the tunnel; depth assumed +/-30 mm
-    (Poly(cabs([(505, 398), (498, 260), (515, 165), (565, 100), (720, 84), (880, 98), (928, 165), (942, 280),
-                (936, 398), (860, 398), (800, 352), (720, 338), (640, 352), (585, 398)])), -0.110, 0.180),
-    # upper band: the strip from the crease (crop y 175-215) to the top, cut diagonally at both ends toward the cowl
-    # corners (03, 05); stands forward of the lower face, 6 mm assumed +/-4
-    (Poly(cabs([(112, 105), (232, 212), (330, 196), (500, 178), (950, 182), (1232, 212), (1335, 108), (1300, 78),
-                (720, 72), (150, 80)])), -0.006, 0.010),
-    # passenger end: raised bulb around the blower hole inside the diagonal crease (03 crop 40-235, 01 ring)
-    (Circle(bl, 0.088), -0.012, 0.016),
-    # driver pedal/booster support plate: raised plate with a diagonal outboard edge (03 crop, 05, 08; 01 detail)
-    (Poly(cabs([(952, 115), (1068, 110), (1078, 175), (1168, 335), (1162, 402), (985, 405), (962, 330), (950, 250)])), -0.005, 0.008),
-    # heater frame: raised rectangle around and below the heater opening (01 bare metal, 03)
-    (RRect((cab(330, 190) + cab(480, 375)) / 2, np.abs(cab(480, 375) - cab(330, 190)) / 2, 0.015), -0.004, 0.008),
+    (BROW, -0.110, 0.100),  # 50 mm fillet each side of the wall
+    # upper shoulder band: the strip from the shoulder line to the seam, from the heater-frame top across to the plate
+    # top (05, 03); the brow rises out of it, so no line crosses the brow; 6 mm forward, assumed +/-4
+    (Poly(np.array([(-DASH_END_X + 0.02, SHOULDER_Z), (DASH_END_X - 0.02, SHOULDER_Z), (DASH_END_X - 0.02, SEAM_Z - 0.01),
+                    (-DASH_END_X + 0.02, SEAM_Z - 0.01)])), -0.006, 0.010),
+    # passenger end: a shallow pressed ring around the blower hole, 10 mm proud (01 bare, 05)
+    (Circle(bl, 0.085), -0.010, 0.030),
+    # heater frame: raised rectangle starting 0.05 W inboard of the ring, round and below the heater opening (01, 03)
+    (RRect(((bl[0] + 0.085 + 0.05 * W_ + hc[0] + hh[0] + 0.02) / 2, hc[1] - 0.01),
+           ((hc[0] + hh[0] + 0.02 - (bl[0] + 0.085 + 0.05 * W_)) / 2, hh[1] + 0.035), 0.015), -0.004, 0.008),
     # wiper-motor boss (03, 05)
     (Circle(wi, 0.045), -0.004, 0.008),
-    # small domed boss at the top of the centre pocket (03 crop 755, 192; 05)
-    (Circle(cab(755, 192), 0.012), -0.005, 0.008),
+    # the single small dimple at the brow's centre (owner front photo, 03 crop 755, 192)
+    (Circle(np.array([0.0, SHOULDER_Z + 0.03]), 0.012), 0.005, 0.008),
 ]
-# column area: a second raised rim framing the column hole and seal opening (driver_plate_34, 05, 01): a raised band
-# (outer step up, inner step back down), 4 mm, 22 mm wide
-COL_RIM_O = RRect((cab(1000, 262) + cab(1145, 392)) / 2, np.abs(cab(1145, 392) - cab(1000, 262)) / 2, 0.024)
-COL_RIM_I = RRect(COL_RIM_O.c, COL_RIM_O.h - 0.022, 0.012)
+# column area: a second raised rim framing the seal opening below the plate (dp photo, 05, 01)
+COL_RIM_O = RRect(pc, pch + 0.024, 0.026)
+COL_RIM_I = RRect(pc, pch + 0.004, 0.022)
 PLATEAUS += [(COL_RIM_O, -0.004, 0.006), (COL_RIM_I, 0.004, 0.006)]
 
 # Openings: (shape, flange length rearward, name)
 HOLES = [
-    (Circle(bl, 43 * CAB_MPX), 0.006, "blower_hole"),              # 03 crop 86 px across; rolled lip (01)
+    (Circle(bl, 43 * CAB_MPX), 0.003, "blower_hole"),              # 03 crop 86 px across; shallow lip (01)
     (RRect(hc, hh, 0.006), 0.012, "heater_opening"),               # 03 crop 358-463 x 202-355
-    (Circle(bo, 16 * CAB_MPX), 0.0, "pushrod_hole"),       # 03 crop 1015, 198 (plate hole)
+    (Circle(bo, 16 * CAB_MPX), 0.0, "pushrod_hole"),               # dp photo, plate upper half
     (Circle(wi, 20 * CAB_MPX), 0.0, "wiper_motor_hole"),           # 03 crop 1180, 127
     (RRect(bh, np.abs(cab(1225, 302) - cab(1175, 258)) / 2, 0.004), 0.008, "bulkhead_hole"),  # 03 crop 1175-1225 x 258-302
-    (RRect(pc, np.abs(cab(1120, 360) - cab(1020, 300)) / 2, 0.020), 0.008, "column_seal_opening"),  # 03 crop, 01, 05
-    (Circle(cab(1040, 318), 0.030), 0.008, "steering_column_hole"),  # round end of the column opening (driver_plate_34)
+    (RRect(pc, pch, 0.020), 0.008, "column_seal_opening"),         # dp photo: below the plate, toothed flange
+    (Circle(COL_HOLE, 0.032), 0.008, "steering_column_hole"),      # dp photo: plate's lower half
 ]
-for p, r in (((258, 232), 10), ((238, 258), 10), ((497, 192), 12), ((943, 198), 9), ((1115, 218), 9), ((1258, 338), 9),
-             ((1215, 355), 9), ((965, 268), 7), ((1062, 262), 7)):  # small holes beside the blower and on the plate (03)
+for c in (bl + (0.095, 0.025), bl + (0.095, -0.012)):            # two small holes just inboard of the blower (01, 05)
+    HOLES.append((Circle(c, 0.013), 0.0, "small_hole"))
+for p, r in (((497, 192), 12), ((1115, 218), 9), ((1258, 338), 9), ((1215, 355), 9)):  # small holes (03)
     HOLES.append((Circle(cab(*p), r * CAB_MPX), 0.0, "small_hole"))
 
 # bead along the tunnel arch on the dash (03 lip at crop y 345-385, 05)
@@ -277,7 +308,7 @@ def dist_polyline(P, L):
 def face_y(P):
     y = FACE_Y + ear_y(P[:, 0])
     for k, (sh, depth, w) in enumerate(PLATEAUS):
-        fade = smootherstep(TOE_Z0 + 0.01, TOE_Z0 + 0.16, P[:, 1]) if k == 0 else 1.0  # pocket meets the tunnel
+        fade = brow_depth_scale(P[:, 1]) if k == 0 else 1.0  # brow: deepest under the shoulder, fades into the tunnel
         y += depth * fade * (1 - smootherstep(-w / 2, w / 2, sh.sd(P)))
     da = dist_polyline(P, ARCH_LINE)
     y += BEAD_H * np.exp(-((da - BEAD_OFF) / (BEAD_W / 2.5)) ** 2) * (P[:, 1] > ARCH_LINE[:, 1].min() - 0.01)
@@ -374,7 +405,7 @@ def flanged(V2, F):
     on_outer = np.abs(so) < 0.002
     g_out = sd_grad(OUTER.sd, P)
     bottom_edge = on_outer & (P[:, 1] < TUN_CROWN + 0.01) & (np.abs(P[:, 0]) < 0.74)
-    length[on_outer & ~bottom_edge] = np.where(np.abs(P[on_outer & ~bottom_edge, 0]) > 0.80, 0.030, 0.025)
+    length[on_outer & ~bottom_edge] = np.where(np.abs(P[on_outer & ~bottom_edge, 0]) > 0.795, 0.0, 0.025)  # ends join the cowl skin
     length[on_outer & (P[:, 1] > 1.19) & (np.abs(P[:, 0]) < 0.79)] = 0.0  # top edge: pinch-weld flange (own part)
     gin[on_outer] = g_out[on_outer]
     for sh, L, nm in HOLES:
@@ -495,19 +526,20 @@ def booster_plate():
     rectangle with a raised rim and spot-weld dimples round its edge, the push-rod hole and four studs through it
     (driver_plate_34, bay_fender_loose_full, 01, 05). Outline from 03 crop (955-1075 x 112-240); the two upper studs
     are on 03 and 05; the lower pair is assumed to mirror them about the push-rod hole."""
-    outer = RRect((cab(955, 112) + cab(1075, 240)) / 2, np.abs(cab(1075, 240) - cab(955, 112)) / 2, 0.014)
+    outer = PLATE
     hole = Circle(bo, 16 * CAB_MPX)
+    colh = Circle(COL_HOLE, 0.032)
     welds = [outer.contour(-0.010)[k] for k in range(0, len(outer.contour(-0.010)), 11)]
 
     def h(P):
-        rim = -0.0015 * np.exp(-((outer.sd(P) + 0.004) / 0.002) ** 2)
+        rim = -0.0015 * np.exp(-((outer.sd(P) + 0.0075) / 0.004) ** 2)  # ~15 mm rim
         dents = sum(0.0006 * np.exp(-(np.linalg.norm(P - w, axis=1) / 0.0025) ** 2) for w in welds)
         return rim + dents
-    V2, H, F = flat_part(outer, [hole], h, 0.006)
-    y0 = float(face_y(np.array([outer.c]))[0]) - 0.0015  # 3 mm plate centred 1.5 mm ahead of the face
+    V2, H, F = flat_part(outer, [hole, colh], h, 0.006)
+    y0 = float(face_y(outer.contour(-0.004)).min()) - 0.0015  # 3 mm plate, 1.5 mm ahead of the face's most forward point under it
     V = np.c_[V2[:, 0], y0 + H, V2[:, 1]]
     studs = [cylinder((p[0], y0 - 0.0015, p[1]), (0, -1, 0), 0.0048, 0.030) for p in
-             (cab(985, 130), cab(1050, 130), cab(985, 222), cab(1050, 222))]
+             STUDS]
     return merge((V, F), *studs)
 
 
@@ -537,18 +569,19 @@ def cowl_plenum():
     slots per side (two large, one small) and the wiper pivot holes (owner photos; positions and sizes assumed
     +/-0.03 m: no photo of the top has been camera-matched)."""
     zt = float(OUTLINE[:, 1].max()) + 0.018
-    outer = RRect((0.0, (FACE_Y + PLENUM_Y1) / 2), (0.80, (PLENUM_Y1 - FACE_Y) / 2), 0.02)
+    outer = RRect((0.0, (FACE_Y + PLENUM_Y1) / 2), (0.78, (PLENUM_Y1 - FACE_Y) / 2), 0.02)  # between the cowl sides
     holes = []
     for sg in (-1, 1):
         for xc, hw in ((0.18, 0.095), (0.42, 0.095), (0.62, 0.045)):
             holes.append(RRect((sg * xc, FACE_Y + 0.11), (hw, 0.022), 0.008))
         holes.append(Circle((sg * 0.50, FACE_Y + 0.20), 0.013))
     V2, H, F = flat_part(outer, holes, lambda P: np.zeros(len(P)), 0.02)
-    return np.c_[V2[:, 0], V2[:, 1], zt + H], F
+    rise = 0.05 * np.clip((V2[:, 1] - FACE_Y) / (PLENUM_Y1 - FACE_Y), 0, 1) ** 1.5  # rear edge up to the windshield base (assumed)
+    return np.c_[V2[:, 0], V2[:, 1], zt + H + rise], F
 
 
 COWL_Y1 = -1.08   # rear edge at the hinge pillar: 02 / A37DE48A, ~0.4 of the door opening; assumed +/-0.05
-COWL_XR = 0.975   # outboard at the hinge pillar (cab side line); assumed +/-0.03
+COWL_XR = 0.875   # outboard at the hinge pillar: in 006214DA nothing shows outboard of the panel ends; assumed +/-0.02
 COWL_XF = 0.905   # forward (fender) flange line; assumed +/-0.03
 COWL_ZB = 0.58    # bottom, where it curls under toward the rocker; assumed +/-0.05
 COWL_ZT = float(OUTLINE[:, 1].max()) + 0.018   # cowl-top / hood-hinge shelf level, at the pinch-flange top
@@ -575,45 +608,52 @@ def quads(nr, nc):
 
 
 def cowl_side(sign):
-    """Cowl side, one continuous skin per side (owner photos of this cab; 02 / A37DE48A, 10, 13611ED8, 083B873C):
-    from a vertical fender-bolt flange well ahead of the dash (reach 150 mm at the bottom to 280 mm at the top ahead of
-    the dash face, owner 250-300 at the top; assumed +/-0.04) it bulges outboard as a broad convex surface and runs back
-    to the hinge pillar, curling under toward the rocker at the bottom; a horizontal hood-hinge shelf at cowl-top level
-    with its stud; the dash end turns back along a diagonal crease strip into the skin, so dash, crease, cowl side and
-    flange are one skin with no gap. Quad grids."""
-    nu, nv = 26, 30
+    """Cowl side, one continuous swept skin per side (02, 083B873C, 10; owner photos). In plan, at every height: the
+    dash face ends at x 0.80 and turns forward through a convex corner of radius ~0.1 W (150-180 mm at the top, less at
+    the bottom where the reach is shorter), then the side runs forward to the vertical fender flange with a gentle
+    outboard bow; behind the corner the same side line runs back to the hinge pillar. The lower 0.3 curls under toward
+    the rocker. A hood-hinge shelf with its stud at cowl-top level. Every station is one smooth polyline, so there is
+    no crease at the corner. Reach 150-280 mm ahead of the dash face, assumed +/-0.04 m."""
+    nv = 30
     vs = np.linspace(0, 1, nv)
-    S = np.zeros((nv, nu, 3))
-    yd = FACE_Y + float(ear_y(np.array([0.86]))[0])
-    for j, v in enumerate(vs):
+    rows_f, rows_r = [], []
+    for v in vs:
         z = COWL_ZB + v * (COWL_ZT - COWL_ZB)
-        fy = FACE_Y - (0.15 + 0.13 * v)
-        curl = 0.06 * max(0.0, 1 - v / 0.15) ** 2
-        for i, u in enumerate(np.linspace(0, 1, nu)):
-            ax = COWL_XF + (COWL_XR - COWL_XF) * float(smootherstep(0, 1, u ** 0.7)) + 0.03 * math.sin(math.pi * u) - curl
-            S[j, i] = (sign * ax, fy + u * (COWL_Y1 - fy), z)
+        reach = 0.15 + 0.13 * v
+        R = 0.065  # 0.04 W: the blower ring sits 0.07 W from the side, which leaves no room for 0.1 W here
+        curl = 0.08 * max(0.0, 1 - v / 0.3) ** 2
+        xs0 = DASH_END_X + R
+        # front run: dash end -> corner arc -> forward along the side (bowing outboard) -> fender flange
+        pts = [(DASH_END_X - 0.002, FACE_Y)]
+        for t in np.linspace(0, 1, 14)[1:]:
+            a = math.pi / 2 * (1 - t)
+            pts.append((DASH_END_X + R * math.cos(a), FACE_Y - R + R * math.sin(a)))
+        y_end = FACE_Y - reach
+        for t in np.linspace(0, 1, 9)[1:]:
+            y = FACE_Y - R + (y_end - (FACE_Y - R)) * t
+            pts.append((xs0 + 0.012 * math.sin(math.pi * t) - 0.01 * t, y))
+        pts = np.array(pts)
+        pts[1:, 0] -= curl * np.linspace(0, 1, len(pts) - 1)
+        rows_f.append(np.c_[sign * pts[:, 0], pts[:, 1], np.full(len(pts), z)])
+        # rear run: from the corner's tangent point back along the side line to the hinge pillar (outboard bow)
+        ys = np.linspace(FACE_Y - R, COWL_Y1, 14)
+        u = (ys - ys[0]) / (ys[-1] - ys[0])
+        xr = xs0 + (COWL_XR - xs0) * smootherstep(0, 1, u) + 0.02 * np.sin(math.pi * u) - curl
+        rows_r.append(np.c_[sign * xr, ys, np.full(len(ys), z)])
+    Fr = np.array(rows_f)            # (nv, nf, 3), column 0 at the dash end, last at the flange
+    Rr = np.array(rows_r)
     # fender flange: vertical, turned outboard 25 mm at the front edge
-    fl = [S[:, 0] + np.array([sign, 0, 0]) * a + np.array([0, -1, 0]) * b
-          for a, b in ((0.0006, 0.0015), (0.0025, 0.0035), (0.005, 0.0045), (0.025, 0.005))][::-1]
-    A = np.concatenate([np.stack(fl, 1), S], 1)
-    # hood-hinge shelf: from the skin's top row, horizontal, inboard to x 0.80
+    edge = Fr[:, -1]
+    fl = [edge + np.array([sign, 0, 0]) * a + np.array([0, -1, 0]) * b
+          for a, b in ((0.0006, 0.0015), (0.0025, 0.0035), (0.005, 0.0045), (0.025, 0.005))]
+    A = np.concatenate([Fr, np.stack(fl, 1)], 1)
     top = A[-1]
-    shelf = [top + (np.c_[np.full(len(top), sign * 0.80), top[:, 1], top[:, 2]] - top) * k / 4 for k in (1, 2, 3, 4)]
+    shelf = [top + (np.c_[np.full(len(top), sign * DASH_END_X), top[:, 1], top[:, 2]] - top) * k / 4 for k in (1, 2, 3, 4)]
     A = np.concatenate([A, np.stack(shelf, 0)], 0)
-    nr, nc = A.shape[:2]
-    skin = (A.reshape(-1, 3), quads(nr, nc))
-    # crease strip: from the dash end back/outboard into the skin at the same height
-    C = []
-    for j, v in enumerate(vs):
-        z = COWL_ZB + v * (COWL_ZT - COWL_ZB)
-        d = np.array([sign * dash_end_x(z, sign), yd, z])
-        row = S[j]
-        k = int(np.argmin(np.abs(row[:, 1] - (yd + 0.03))))
-        C.append([d + (row[k] - d) * t for t in np.linspace(0, 1, 6)])
-    C = np.array(C)
-    crease = (C.reshape(-1, 3), quads(*C.shape[:2]))
-    stud = cylinder((sign * 0.875, FACE_Y - 0.17, COWL_ZT), (0, 0, 1), 0.005, 0.028)
-    V, F = merge(skin, crease, stud)
+    front = (A.reshape(-1, 3), quads(*A.shape[:2]))
+    rear = (Rr.reshape(-1, 3), quads(*Rr.shape[:2]))
+    stud = cylinder((sign * (DASH_END_X + 0.06), FACE_Y - 0.17, COWL_ZT), (0, 0, 1), 0.005, 0.028)
+    V, F = merge(front, rear, stud)
     if sign < 0:
         F = [f[::-1] for f in F]
     return V, F
@@ -642,11 +682,11 @@ bpy.ops.wm.read_factory_settings(use_empty=True)
 mat = bpy.data.materials.new("firewall_paint")
 mat.use_nodes = True
 bsdf = mat.node_tree.nodes["Principled BSDF"]
-bsdf.inputs["Base Color"].default_value = (0.11, 0.010, 0.014, 1)  # the cab's deep metallic maroon (owner-cab 08-14)
-bsdf.inputs["Metallic"].default_value = 0.55
-bsdf.inputs["Roughness"].default_value = 0.32
+bsdf.inputs["Base Color"].default_value = (0.20, 0.035, 0.04, 1)  # the cab's deep metallic maroon (owner-cab 08-14)
+bsdf.inputs["Metallic"].default_value = 0.0
+bsdf.inputs["Roughness"].default_value = 0.42
 bsdf.inputs["Coat Weight"].default_value = 0.3  # clear (exports as KHR_materials_clearcoat 0.3)
-bsdf.inputs["Coat Roughness"].default_value = 0.05
+bsdf.inputs["Coat Roughness"].default_value = 0.2
 
 for name, (Vp, Fp) in parts.items():
     me = bpy.data.meshes.new(name)
