@@ -766,8 +766,21 @@ def build():
             p1 = p0 + out_dir * 34
             p2 = Vector((sig * LX, y + 12, (p1.z + LZ) / 2 - 5))
             p3 = Vector((sig * LX, y + 30, LZ + 10))
+            # oval cast primaries (wider along the head than they stand out from it), as in IMG_6530 / IMG_6532
             parts.append(tube(f"primary_{c}", [p0, p1, p2, p3], PD_, "header"))
             ports[c] = p0
+        # the casting's web: one wall joining the primaries' inboard sides from the port flange down to the log, so the
+        # four read as a single cast piece (IMG_6530: no daylight between the primaries)
+        bm = bmesh.new()   # a quad wall, 14 thick, from the flange's lower edge down to the log's top
+        ya, yb = y_front - 20, y_rear + 20
+        top = lambda y, r: bank_pt(sig, v("hdr_port_s") - 22, HW / 2 + r, y)
+        bot = lambda y, d: Vector((sig * (LX - 6 + d), y, LZ + 22))
+        q = [top(ya, 14), top(yb, 14), bot(yb, 0), bot(ya, 0), top(ya, 28), top(yb, 28), bot(yb, 14), bot(ya, 14)]
+        vs = [bm.verts.new(p_) for p_ in q]
+        for f in ((0, 1, 2, 3), (7, 6, 5, 4), (0, 4, 5, 1), (1, 5, 6, 2), (2, 6, 7, 3), (3, 7, 4, 0)):
+            bm.faces.new([vs[k_] for k_ in f])
+        bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+        parts.append(bm)
         parts.append(tube(f"log_{tag}", [Vector((sig * LX, y_front + 10, LZ + 8)), Vector((sig * LX, (y_front + y_rear) / 2, LZ)),
                                          Vector((sig * LX, y_out - 20, LZ - 8)), Vector((sig * LX, y_out, OZ + 25)),
                                          Vector((sig * LX, y_out + 4, OZ))], LD, "header"))
