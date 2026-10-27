@@ -4,7 +4,7 @@ Run headless:  Blender -b -P inner_fender_sds.py -- <out.blend> [<out.glb>]
 Twin metres: +x driver, -y forward, +z up. LH is built, RH is its mirror. The GLB is Y-up, (X,Y,Z) = (x, z, -y).
 
 The part is four elements (receipt docs/wiring/receipts/2026-10-26_k5-inner-fender-sds.md names the photos):
-1. DOME: a true ellipsoid (semi-axes 0.56 along, 0.24 across, 0.34 up) centred inboard of the rim plane on the rail
+1. DOME: a true ellipsoid (semi-axes 0.56 along, crown z 1.07, 0.24 across, 0.34 up) centred inboard of the rim plane on the rail
    plane, kept inboard of the rim plane and above the rail, cut only by the rear panel plane. Its section in the rim plane is the wheel arch;
    the front is not cut and runs down into the front flange zone.
 2. ARCH RIM: a short fillet strip (the shoulder line) steps from the arch out to a flange band in the fender plane
@@ -28,12 +28,12 @@ MM_PX = (Y_REAR - Y_FRONT) / 1460          # b_jegs_7 scale from the tail-to-tai
 Y_REND = Y_REAR - 220 * MM_PX              # rear end panel (b_jegs_7 dome silhouette, col 240), y -1.601
 
 # ---- dome: a true ellipsoid -----------------------------------------------------------------------------------------
-# Centred inboard of the rim plane so the rim-plane cut sits at U across: the arch apex is z 0.86 (axle 0.396 + tyre
-# 0.406 + ~60 mm) and the crown z 0.96. Across, the engine-side face is vertical at x 0.42 on the rail. Along the
+# Centred inboard of the rim plane so the rim-plane cut sits at U across; crown z 1.07, arch apex z 0.94
+# (0.14 m over the tyre top at rest). Across, the engine-side face is vertical at x 0.42 on the rail. Along the
 # truck, SA puts the dome's footprint nose at the core support; the rim band carries on from the arch's front foot as
 # the front tail, so the rim runs tail to tail (b_jegs_7).
-SC = 0.34
-U = (1 - ((0.86 - 0.62) / SC) ** 2) ** 0.5
+SC = 1.070 - Z_RAIL    # crown at the LS3 valve-cover top (owner bay photos; z 1.077 in the twin), 18 in box
+U = 0.70              # rim-plane cut 0.7 across: arch apex z 0.62 + 0.71 SC = 0.94
 SB = (X_CUT - 0.420) / (1 + U)
 XE = 0.420 + SB
 YC = -1.896 - 0.05

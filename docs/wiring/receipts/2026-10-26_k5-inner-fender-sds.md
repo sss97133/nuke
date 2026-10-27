@@ -123,3 +123,19 @@ not placement.
   hold 0.86.
 - The engine-side face rises nearly vertical from the rail, and the dome stands well clear of the firewall's lower
   panel. Both agree with the elements here.
+
+## Crown pass (still a placeholder)
+Crown set to z 1.07, just under the LS3 valve-cover top (z 1.077) that the owner photos show the dome level with.
+Rail plane 0.62 and rim plane 0.858 are unchanged. The rim-plane cut is kept at 0.7 across, which puts the arch apex at
+z 0.94, 0.14 m over the tyre top at rest. Everything else is unchanged.
+
+| photo | points | RMS |
+|---|---|---|
+| b_jegs_7 | 5 | 37.6 px |
+| b_jegs_3 | 5 | 73.1 px |
+| b_jegs_1 | 4 | 70.7 px |
+| b_jegs_5 | 9 | 66.1 px |
+| owner bay_fender_loose (camera from the twin's LS3 fuel rail, valve cover and alternator) | 5 | 49.5 px at 1024 px |
+
+The owner-photo camera solves poorly. Its anchors are the twin's LS3 parts, and the engine's real position in the
+owner's truck is not verified against the twin. The frame rail edge in that photo was not usable as a point.
