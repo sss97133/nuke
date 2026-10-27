@@ -522,6 +522,56 @@ def scan_longblock(path):
     return src
 
 
+def part_mesh(path, name, mm_per_unit, at, lift=0.0):
+    """an image-to-3D mesh (TRELLIS, from the maker's photos; unit-normalised, Z-up, pulley/shaft toward +Y) placed in
+    engine-local mm: scaled by a printed dimension, turned so its front faces the truck's front (-y), and moved so its
+    pulley-face centre sits at `at`. Returns the object (textured, kept as made)."""
+    before = set(bpy.data.objects)
+    bpy.ops.import_scene.gltf(filepath=str(path))
+    new = [o for o in bpy.data.objects if o not in before]
+    meshes = [o for o in new if o.type == "MESH"]
+    bm = bmesh.new()
+    for o in meshes:
+        tmp = o.data.copy()
+        tmp.transform(o.matrix_world)
+        bm.from_mesh(tmp)
+        bpy.data.meshes.remove(tmp)
+    src = meshes[0]
+    mats = list(src.data.materials)
+    me = bpy.data.meshes.new(name)
+    bm.to_mesh(me)
+    bm.free()
+    for m in mats:
+        me.materials.append(m)
+    import numpy as np
+    co = np.array([tuple(vv.co) for vv in me.vertices])
+    nose = co[co[:, 1] > co[:, 1].max() - 0.12]
+    cx, cz, cy = float(np.median(nose[:, 0])), float(np.median(nose[:, 2])), float(co[:, 1].max())
+    k = mm_per_unit
+    # x -> -x, y -> -y (a half turn about z), scale, nose centre to `at`
+    T = Matrix(((-k, 0, 0, at[0] + k * cx), (0, -k, 0, at[1] + k * cy), (0, 0, k, at[2] - k * cz), (0, 0, 0, 1)))
+    me.transform(T)
+    me.transform(M_WORLD)
+    ob = bpy.data.objects.new(name, me)
+    bpy.context.scene.collection.objects.link(ob)
+    if len(me.polygons) > 60000:
+        dec = ob.modifiers.new("decimate", "DECIMATE")
+        dec.ratio = 60000 / len(me.polygons)
+    if lift:   # the generator bakes the maker's studio shading in dark; lift it toward the photos' natural finish
+        for m in mats:
+            for n in (m.node_tree.nodes if m and m.use_nodes else []):
+                if n.type == "TEX_IMAGE" and n.image and not n.image.get("lifted"):
+                    px = np.array(n.image.pixels[:]).reshape(-1, 4)
+                    px[:, :3] = np.clip(px[:, :3] * lift, 0, 1)
+                    n.image.pixels = px.ravel().tolist()
+                    n.image.pack()
+                    n.image["lifted"] = 1
+    for o in new:
+        bpy.data.objects.remove(o)
+    OBJS.append(ob)
+    return ob
+
+
 def v_(d):
     return float(d.value)
 
@@ -708,6 +758,9 @@ def build():
     # housing: 18 radial spokes over open windows around the pulley hub, a ring of rectangular windows round its rim,
     # two mount ears low; a thin stator band; rear housing with side windows; a small end cap; B+ stud high on the
     # right of the rear housing with the 3-pin plug below it. Window counts and depths are read off the photos.
+    alt_mesh = opt("--alt-mesh")
+    if alt_mesh:   # Holley 197-302 from its maker photos (TRELLIS); 154 mm/unit from the 138.7 ear spacing (ears span 1.00)
+        part_mesh(alt_mesh, "alternator_197-302", 154.0, (AX, y_front, AZ), lift=2.2)
     R = ACD / 2
     yF = y_front + 28                     # front face of the front housing (the pulley stands ahead of it)
     LF, LS, LR, LC = 0.36 * (AL - 28), 0.10 * (AL - 28), 0.38 * (AL - 28), 0.16 * (AL - 28)
@@ -732,17 +785,21 @@ def build():
         ex, ez = AX + sx * 69.0, AZ - 58.0
         case.append(cyl((ex, yF + LF / 2, ez), 26, LF))
         case.append(box(((AX + ex) / 2, yF + LF / 2, (AZ + ez) / 2), (abs(ex - AX), LF - 6, 30)))
-    join("alternator_197-302", case, "alt", bevel=1.5)
+    if not alt_mesh:
+        join("alternator_197-302", case, "alt", bevel=1.5)
     # what reads dark through the windows: the stator and rectifier inside, and the plug and stud insulator
-    join("alternator_vents", [cyl((AX, yF + LF / 2 + 4, AZ), ACD - 14, LF - 2, seg=72),
+    if not alt_mesh:
+      join("alternator_vents", [cyl((AX, yF + LF / 2 + 4, AZ), ACD - 14, LF - 2, seg=72),
                               cyl((AX, yF + LF + LS / 2, AZ), ACD + 2, LS, seg=72),
                               cyl((AX, yF + LF + LS + LR / 2, AZ), ACD - 14, LR - 2, seg=72),
                               cyl((AX, yF + 4.5, AZ), 2 * (R - 25), 4, seg=72),
                               box((AX - R - 10, yF + LF + LS + LR * 0.5, AZ - 10), (22, 34, 28)),
                               cyl((AX - R * 0.62, yF + LF + LS + LR * 0.35, AZ + R * 0.72), 18, 12, axis="z")], "plastic")
-    join("alternator_bplus", [cyl((AX - R * 0.62, yF + LF + LS + LR * 0.35, AZ + R * 0.72 + 14), 6, 22, axis="z"),
+    if not alt_mesh:
+      join("alternator_bplus", [cyl((AX - R * 0.62, yF + LF + LS + LR * 0.35, AZ + R * 0.72 + 14), 6, 22, axis="z"),
                               cyl((AX - R * 0.62, yF + LF + LS + LR * 0.35, AZ + R * 0.72 + 9), 12, 6, axis="z", seg=6)], "bolt")
-    join("alternator_pulley", [ribbed((AX, BY, AZ), APD, 28), cyl((AX, BY - 15, AZ), 30, 4)], "anod")
+    if not opt("--alt-mesh"):
+        join("alternator_pulley", [ribbed((AX, BY, AZ), APD, 28), cyl((AX, BY - 15, AZ), 30, 4)], "anod")
 
     PSD = v("ps_pulley_d")
     # Holley 97-152 (GM 12568997): steel, 4 spokes, Ø170 over the ribs, 161 at the groove roots (Holley pulley table)
