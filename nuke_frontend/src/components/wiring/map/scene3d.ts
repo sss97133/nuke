@@ -20,7 +20,7 @@ export const zoneOfY = (y: number): ZoneId => (y < -1.46 ? 'bay' : y < 0.1 ? 'ca
 // replaces are hidden by name ("Name*" = every name starting with "Name"), except the names in `keeps`. Each file is in
 // the zones' frame (twin metres, glTF Y-up), so it is drawn as published. Extend `hides` when a layer draws more.
 // (The MAP tab does not load k5-blazer.glb, so its Under_Frame_Blazer needs no entry here.)
-export interface LayerDef { id: string; label: string; url: string; lane: string; hides: string[]; keeps?: string[] }
+export interface LayerDef { id: string; label: string; url: string; lane: string; hides: string[]; keeps?: string[]; credit?: { text: string; href: string } }
 export const LAYERS: LayerDef[] = [
   {
     id: 'frame', label: 'FRAME', url: '/models/k5-frame.glb', lane: 'chassis-3d (#470)',
@@ -33,6 +33,8 @@ export const LAYERS: LayerDef[] = [
   },
   {
     id: 'engine', label: 'ENGINE', url: '/models/k5-engine-ls3.glb', lane: 'engine-3d (#468)',
+    // the long block is a scan (CC BY 4.0, credit required); intake, covers, Mid-Mount and headers are drawn from sources
+    credit: { text: 'LS long block: "GM LS small block engine" by inked1979, CC BY 4.0', href: 'https://sketchfab.com/3d-models/gm-ls-small-block-engine-4ec40400a93546d4aa6b7dd24393e9a5' },
     // 82 of the zones' 92 E3 nodes. Still drawn: E3_Starter_DFSR-8715, E3_Starter_Solenoid, E3_FuelPressReg_asbuilt and
     // E3_6L90_Bell / _Case / _Pan (the new model has no starter, regulator or transmission); the four TB nodes go with
     // the TB part swap. E3_AC_* goes because the old planned compressor sits driver-low, off the new belt plane.
