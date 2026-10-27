@@ -28,7 +28,7 @@ const MCP_SERVER_CARD = {
   description:
     'Read-only, citation-first MCP for physical assets (vehicles first). Every claim carries sources, event dates, and confidence.',
   url: 'https://nuke.ag/mcp/advisor',
-  version: '1.0.0',
+  version: '1.1.0',
   protocol: '2025-03-26',
   transport: 'streamable-http',
   authentication: {
@@ -36,8 +36,7 @@ const MCP_SERVER_CARD = {
     note: 'Anonymous reads allowed. Optional X-API-Key for rate-limit identity.',
   },
   tools: [
-    'find_asset', 'find_listings', 'evaluate_listing', 'get_asset', 'get_history', 'explain_field',
-    'value_asset', 'get_comps', 'get_coverage',
+    'find_asset', 'get_asset', 'get_comps', 'value_asset', 'evaluate_listing', 'budget_options',
   ],
   documentation: 'https://nuke.ag/llms.txt',
   full_connector: 'https://nuke.ag/mcp',
@@ -293,7 +292,7 @@ function llmsTxt(b: Board): string {
     '- [Sitemap](https://nuke.ag/sitemap.xml)',
     '', '## Nuke Asset Advisor',
     'Install in any MCP client as a Streamable HTTP server at `https://nuke.ag/mcp/advisor`.',
-    'Anonymous reads are allowed. Tools: find_asset, find_listings, evaluate_listing, get_asset, get_history, explain_field, value_asset, get_comps, get_coverage.',
+    'Anonymous reads are allowed. Tools: find_asset, get_asset, get_comps, value_asset, evaluate_listing, budget_options.',
     'Every answer is an evidence envelope: cite source_name, source_url, and event_time; never invent missing fields — say not recorded.',
     'event_time is the real-world sale/auction clock; ingested_at is when Nuke learned the row — do not conflate them.',
     '', '## Sources and their coverage',
