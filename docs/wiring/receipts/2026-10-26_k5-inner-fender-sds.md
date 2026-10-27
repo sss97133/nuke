@@ -110,3 +110,16 @@ part. The route to a tighter part is the physical part or a scan of it: a few ta
 the rail flange, dome crown, footprint length and width, cup and hole positions) or a phone photogrammetry pass on a
 bare skirt. Hand-picked points on vendor photos with no scale did not get below about 35 px with any primitive tried
 (hand cage, superellipsoid, ellipsoid).
+
+## Installed reference for the next modeler
+Two owner photos show a new repro skirt resting loose on the driver-side frame rail, with the LS3 and the firewall
+behind it. One is in the reference set as `ref/inner-fender/owner/bay_fender_loose_full.jpg` (5712 x 4284), shot from
+the driver-side front; the other is a front view and is not on disk. They are loose, so use them for size and height,
+not placement.
+- Dome height: the dome top is roughly level with the LS3 valve-cover top. In the twin that is z 1.077
+  (`k5-engine-ls3.glb`, node `valve_cover_L`). This placeholder's crown is z 0.96, about 0.12 m low. The OER box
+  height (18 in over the rail flange, crown about z 1.08) and the earlier level-camera reading of b_jegs_7 (1.02 to
+  1.08) agree with the photo. The next pass should set the crown near 1.07 and re-solve the arch apex rather than
+  hold 0.86.
+- The engine-side face rises nearly vertical from the rail, and the dome stands well clear of the firewall's lower
+  panel. Both agree with the elements here.
