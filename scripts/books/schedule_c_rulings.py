@@ -13,7 +13,7 @@ Amounts and evidence live in a local rulings file and in the database, never in 
   dotenvx run -- python3 scripts/books/schedule_c_rulings.py lines --year 2025 --line-map line-map.json
   dotenvx run -- python3 scripts/books/schedule_c_rulings.py drift --line-map line-map.json --return 2025=sc-2025.json ...
 
-rulings file: {"owner_id", "year", "title", "register"?, "records": [{"key", "line" | "section"+"category", "label", "amount", "ruling", "evidence", "account", "date",
+rulings file: {"owner_id", "year", "title", "register"?, "records": [{"key", "line" | "section"+"category", "label", "amount", "ruling", "evidence", "account", "date", "ruling_id"?, "proof_links"?: [{kind, ref}],
   "record_kind"?, "local_id"?, "bank_links"?, "description"?, "currency"?}]}. A record without a Schedule C line names its own section (Owner,
 Transfer, Financing, Reference); record_kind retained_bank_movement lands a missing counterpart movement. "register" (default
 schedule-c-rulings-register) names a separate register document, so counterpart movements never share a revision with the rulings.
@@ -25,6 +25,7 @@ import argparse, collections, hashlib, json, os, subprocess, sys, urllib.error, 
 from decimal import Decimal as D, ROUND_HALF_UP
 
 METHOD, VERSION = 'schedule_c_rulings_register', '2026-10-26'
+PROOF_KINDS = ('owner_ruling', 'register', 'artifact', 'photo', 'gmail', 'file')
 EXPENSE_LINES = ['8', '9', '10', '11', '12', '13', '14', '15', '16a', '16b', '17', '18', '19', '20a', '20b', '21', '22', '23', '24a', '25', '26', '27a']
 
 
@@ -85,6 +86,18 @@ def current_run(owner, sha):
     return json.loads(line) if line else None
 
 
+def proof_links(links):
+    """[{kind, ref}] with kind from the closed list; the DB writer rejects anything else."""
+    out = []
+    for l in links or []:
+        if not isinstance(l, dict) or set(l) - {'kind', 'ref'} or l.get('kind') not in PROOF_KINDS or not str(l.get('ref') or '').strip():
+            raise SystemExit(f'proof_links entries are {{kind: {"|".join(PROOF_KINDS)}, ref}}: {l!r}')
+        e = {'kind': l['kind'], 'ref': str(l['ref'])[:300]}
+        if e not in out:
+            out.append(e)
+    return out[:20]
+
+
 def clip(s, n=1900):
     return s if len(s) <= n else s[:n - 1] + '…'
 
@@ -122,6 +135,10 @@ def build_revision(spec, sha):
             bank_links=list(r.get('bank_links', [])), recognition_status='retained_decision' if kind == 'retained_ledger_decision' else 'not_applicable',
             payment_status='unresolved', vehicle_status='unresolved',
             reimbursement_status='unresolved', entity_status='retained_scope_unallocated')
+        if r.get('ruling_id'):
+            rec['ruling_id'] = str(r['ruling_id'])[:200]
+        if r.get('proof_links'):
+            rec['proof_links'] = proof_links(r['proof_links'])
         records.append(rec)
     digest = hashlib.sha256(json.dumps([fields, records], sort_keys=True).encode()).hexdigest()[:12]
     return dict(idempotency_key=f'{register}-{year}-{digest}'[:200], method=METHOD, version=VERSION, fields=fields, accounting_records=records)
@@ -243,7 +260,8 @@ def document_state(owner, doc_id):
 
 
 def correct(path, dry):
-    """corrections file: {"owner_id", "rows": {"<local_id>": {"document_id", "section"?, "category"?, "amount"?, "ruling_id"?, "note"?, "add_bank_links"?: [ids]}}}
+    """corrections file: {"owner_id", "rows": {"<local_id>": {"document_id", "section"?, "category"?, "amount"?, "ruling_id"?, "proof_links"?: [{kind, ref}], "note"?, "add_bank_links"?: [ids]}}}
+    ruling_id and proof_links are stored as structured keys on the record (R5 grade R needs both); proof_links merge, deduped.
     section and category change only when given (a movement may take a new section). add_bank_links appends to the row's bank_links, deduped,
     and puts a dated note in its decision. Amounts change only when "amount" is given."""
     spec = json.load(open(path))
@@ -269,6 +287,10 @@ def correct(path, dry):
                 r['section'] = c['section']
             if c.get('category'):
                 r['category'] = clip(c['category'], 300)
+            if c.get('ruling_id'):
+                r['ruling_id'] = str(c['ruling_id'])[:200]
+            if c.get('proof_links'):
+                r['proof_links'] = proof_links((r.get('proof_links') or []) + list(c['proof_links']))
             add = [x for x in c.get('add_bank_links', []) if x not in (r.get('bank_links') or [])]
             if add:
                 r['bank_links'] = list(dict.fromkeys((r.get('bank_links') or []) + add))
