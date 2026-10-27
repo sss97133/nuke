@@ -76,3 +76,6 @@ bevelled bars. The rear-panel crease is in the panel grid. Nothing is pressed in
 C = 0.34 (crown z 0.96). With a 1.02 crown, the point-matched b_jegs_7 camera dropped below the rim and looked into
 the wheel well, which the photo does not show. With 0.96 the camera sits at z 1.17 (RMS 7.8 px).
 b_jegs_3 (RMS 41 px), b_jegs_1 (36 px) and b_jegs_5 (74 px) do not solve to a few pixels against this shape.
+Material (shared with the core support and firewall): satin dark grey, base colour 0.13 linear, roughness 0.35,
+metallic 0, clearcoat 0.25. Edges at bends over 30 deg are bevelled 2.5 mm so they catch a highlight under the viewer's
+RoomEnvironment and directional lights; near-black read as a silhouette there.

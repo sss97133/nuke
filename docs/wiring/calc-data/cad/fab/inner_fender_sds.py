@@ -229,6 +229,9 @@ def make(mat):
     bpy.ops.object.select_all(action='DESELECT')
     for o in parts + [c, ob]: o.select_set(True)
     bpy.context.view_layer.objects.active = ob; bpy.ops.object.join()
+    bv = ob.modifiers.new("edges", "BEVEL"); bv.width = 0.0025; bv.segments = 2; bv.limit_method = 'ANGLE'
+    bv.angle_limit = math.radians(30); bv.use_clamp_overlap = True       # flange edges catch a highlight
+    bpy.ops.object.modifier_apply(modifier="edges")
     bpy.ops.object.shade_smooth_by_angle(angle=math.radians(35))
     ob.data.materials.append(mat)
     R = ob.copy(); R.data = ob.data.copy(); R.name = "inner_fender_R"; bpy.context.scene.collection.objects.link(R)
@@ -242,7 +245,7 @@ def make(mat):
 def paint():
     m = bpy.data.materials.new("satin_black"); m.use_nodes = True
     b = m.node_tree.nodes["Principled BSDF"]
-    b.inputs["Base Color"].default_value = (0.012, 0.012, 0.014, 1)
+    b.inputs["Base Color"].default_value = (0.13, 0.13, 0.135, 1)   # satin dark grey, shared with core support and firewall
     b.inputs["Metallic"].default_value = 0.0; b.inputs["Roughness"].default_value = 0.35
     b.inputs["Coat Weight"].default_value = 0.25; b.inputs["Coat Roughness"].default_value = 0.15
     return m
