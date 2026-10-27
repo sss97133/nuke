@@ -66,6 +66,12 @@ def smoothstep(a, b, t):
     return s * s * (3 - 2 * s)
 
 
+def smootherstep(a, b, t):
+    """C2 ramp for pressing walls: curvature, not just slope, is continuous, so reflections run smooth."""
+    s = np.clip((t - a) / (b - a), 0, 1)
+    return s * s * s * (s * (6 * s - 15) + 10)
+
+
 def chaikin(P, n=3, closed=True):
     for _ in range(n):
         Q = np.roll(P, -1, 0) if closed else P[1:]
@@ -146,7 +152,14 @@ class Poly:
         return sd_poly(P, s.V)
 
     def contour(s, d):
-        return resample(s.V + d * s.N, 0.004)
+        # offset along the normal, then pull each point onto the sd = d level set (normal offsets bunch and cross at
+        # concave corners, which is what rippled the pocket wall), then even the spacing
+        P = s.V + d * s.N
+        for _ in range(4):
+            h = 1e-4
+            g = np.stack([(s.sd(P + [h, 0]) - s.sd(P - [h, 0])) / (2 * h), (s.sd(P + [0, h]) - s.sd(P - [0, h])) / (2 * h)], 1)
+            P = P - (s.sd(P) - d)[:, None] * g / (np.linalg.norm(g, axis=1)[:, None] ** 2 + 1e-12)
+        return resample(chaikin(P, 1), 0.004)
 
 
 # ---- the owner's cab (scratchpad ref owner-cab, 2026-10-26), primer, straight on: photo 03 cropped to the panel
@@ -260,7 +273,7 @@ def dist_polyline(P, L):
 def face_y(P):
     y = FACE_Y + ear_y(P[:, 0])
     for sh, depth, w in PLATEAUS:
-        y += depth * (1 - smoothstep(-w / 2, w / 2, sh.sd(P)))
+        y += depth * (1 - smootherstep(-w / 2, w / 2, sh.sd(P)))
     da = dist_polyline(P, ARCH_LINE)
     y += BEAD_H * np.exp(-((da - BEAD_OFF) / (BEAD_W / 2.5)) ** 2) * (P[:, 1] > ARCH_LINE[:, 1].min() - 0.01)
     return y
@@ -277,7 +290,7 @@ def material_sd(P):
 # ---- face mesh: feature-following rings + a background grid, constrained Delaunay, filtered to the sheet
 loops = [OUTLINE]
 for sh, depth, w in PLATEAUS:
-    for f in (-0.75, -0.5, -0.25, 0, 0.25, 0.5, 0.75):
+    for f in np.linspace(-0.85, 0.85, max(7, int(w / 0.006) | 1)):  # a ring every ~6 mm across the wall
         loops.append(sh.contour(f * w))
 for sh, L, _ in HOLES:
     for d in (0.0, 0.003, 0.008):
@@ -412,42 +425,60 @@ def toe_mesh():
 toe = toe_mesh()
 
 
+COWL_Y1 = -1.08   # rear edge at the hinge pillar: 02 / A37DE48A, the panel runs ~0.4 of the door opening; assumed +/-0.05
+COWL_XR = 0.975   # outboard at the hinge pillar (cab side line); assumed +/-0.03
+COWL_ZB = 0.58    # bottom, where the kick-panel return turns in above the rocker; assumed +/-0.05
+COWL_ZT = 1.24    # top, under the A-pillar base / cowl (03 panel top 1.231)
+
+
+def dash_end_x(z, sign):
+    """|x| of the dash outline's end at height z (03 trace); below the dash, the toe board edge."""
+    side = OUTLINE[sign * OUTLINE[:, 0] > 0.4]
+    zs = np.linspace(COWL_ZB, COWL_ZT, 60)
+    xe = np.full(len(zs), np.nan)
+    for k, zz in enumerate(zs):
+        m = np.abs(side[:, 1] - zz) < 0.012
+        if m.any():
+            xe[k] = np.abs(side[m, 0]).max()
+    good = ~np.isnan(xe)
+    xe = np.interp(zs, zs[good], xe[good])
+    xe[zs < TOE_Z0] = np.minimum(xe[zs < TOE_Z0], 0.80)
+    xe = np.convolve(np.pad(xe, 3, mode="edge"), np.ones(7) / 7, "valid")
+    return max(0.80, float(np.interp(z, zs, xe)))  # no inboard tuck at the top corner, so the top flange does not twist
+
+
 def cowl_side(sign):
-    """Cowl side (kick panel) the fender bolts to: from the FR-88 cowl point x at its rear (y -1.25) it flares
-    outboard 50 mm and forward to the dash's flared end (y -1.47), as the owner's cab shows at 3/4 (owner-cab 02, 06,
-    10); top at the flange tip (solved z), bottom at the toe line; a 20 mm flange turned inboard at its front edge.
-    Flare and extents assumed +/-0.02 / +/-0.05 m."""
-    x = sign * 0.8575
-    z0, z1 = TOE_Z0 - 0.02, float(PT["ear_P"][2])
-    pr = RRect(((-1.47 - 1.25) / 2, (z0 + z1) / 2), (0.11, (z1 - z0) / 2), 0.03)
-    ys, zs = np.arange(-1.47, -1.25 + 1e-6, 0.008), np.arange(z0, z1 + 1e-6, 0.008)
-    Y, Z = np.meshgrid(ys, zs)
-    P = np.stack([Y.ravel(), Z.ravel()], 1)
-    keep = pr.sd(P) < 0
-    pts2 = [tuple(p) for p in pr.contour(0)] + [tuple(p) for p in P[keep & (pr.sd(P) < -0.004)]]
-    nb = len(pr.contour(0))
-    Vv, _, Fv, _, _, _ = geometry.delaunay_2d_cdt(pts2, [(i, (i + 1) % nb) for i in range(nb)], [], 0, 1e-6)
-    Vv = np.array([tuple(v) for v in Vv])
-    Fv = [f for f in Fv if pr.sd(np.array([Vv[list(f)].mean(0)]))[0] < 0]
-    def fx(y):
-        return sign * (0.8575 + 0.05 * np.clip((-1.25 - y) / 0.22, 0, 1) ** 2)
-    verts = [(fx(v[0]), v[0], v[1]) for v in Vv]
-    # front flange: boundary verts at the front (y < -1.42) turn inboard
-    faces = [tuple(f) for f in Fv]
-    front = [i for i, v in enumerate(Vv) if v[0] < -1.465 and abs(pr.sd(np.array([v]))[0]) < 1e-3]
-    front.sort(key=lambda i: Vv[i][1])
-    ring = {}
-    for i in front:
-        ids = []
-        for a, b in ((0.0006, 0.0015), (0.0025, 0.0035), (0.005, 0.0045), (0.020, 0.005)):
-            ids.append(len(verts))
-            verts.append((fx(Vv[i][0]) - sign * a, Vv[i][0] - b + 0.0, Vv[i][1]))
-        ring[i] = ids
-    for a, b in zip(front[:-1], front[1:]):
-        ca, cb = [a] + ring[a], [b] + ring[b]
-        for k in range(len(ca) - 1):
-            faces.append((ca[k], cb[k], cb[k + 1], ca[k + 1]))
-    return np.array(verts), faces
+    """Cowl side: the big panel each side from the dash end back to the hinge pillar (owner-cab 02 / A37DE48A, 10,
+    13611ED8, 083B873C). It leaves the dash end at the dash's own x and y (no gap), sweeps outboard to the cab side
+    line with a soft outboard crown, and turns flanges at its edges: inboard under the A-pillar base at the top, inboard
+    as the kick-panel return at the bottom, outboard as the door-seal flange at the rear. Quad grid, no triangles."""
+    y0 = FACE_Y + float(ear_y(np.array([0.86]))[0])
+    us, vs = np.linspace(0, 1, 26), np.linspace(0, 1, 36)
+    G = np.zeros((len(vs), len(us), 3))
+    for j, v in enumerate(vs):
+        z = COWL_ZB + v * (COWL_ZT - COWL_ZB)
+        x0 = dash_end_x(z, sign)
+        for i, u in enumerate(us):
+            sw = float(smootherstep(0, 1, u ** 0.8))
+            ax = x0 + (COWL_XR - x0) * sw + 0.022 * math.sin(math.pi * u) * math.sin(math.pi * v)
+            G[j, i] = (sign * ax, y0 + u * (COWL_Y1 - y0), z)
+
+    def flange(edge, d, L):
+        """rows bending from an edge row: d = (direction of the flange, normal it leaves along); ~5 mm bend radius"""
+        return [edge + np.asarray(d[0], float) * b + np.asarray(d[1], float) * a
+                for a, b in ((0.0015, 0.0006), (0.0035, 0.0025), (0.0045, 0.005), (0.005, L))]
+
+    top = flange(G[-1], ((-sign, 0, 0), (0, 0, 1)), 0.040)   # A-pillar base / cowl
+    bot = flange(G[0], ((-sign, 0, 0), (0, 0, -1)), 0.040)   # kick-panel return
+    A = np.array(bot[::-1] + list(G) + top)
+    rear = flange(A[:, -1], ((sign, 0, 0), (0, 1, 0)), 0.025)  # door-seal flange at the hinge pillar
+    A = np.concatenate([A] + [r[:, None] for r in rear], 1)
+    nr, nc = A.shape[:2]
+    V = A.reshape(-1, 3)
+    F = [(r * nc + c, r * nc + c + 1, (r + 1) * nc + c + 1, (r + 1) * nc + c) for r in range(nr - 1) for c in range(nc - 1)]
+    if sign < 0:
+        F = [f[::-1] for f in F]
+    return V, F
 
 
 parts = {"firewall_dash": dash, "firewall_toe_board": toe, "cowl_side_L": cowl_side(-1), "cowl_side_R": cowl_side(1)}
