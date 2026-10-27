@@ -3287,3 +3287,38 @@ and `revert_auction_transfer_relabels` puts it back, so later evidence (a bridge
 New seeds follow the same rule: `transfer-automator` seeds a lot as `recorded_unconfirmed` with the one hammer milestone and
 seeds nothing for a lot the fold flagged as relisted; `transfer-advance` creates the deal pipeline and moves the transfer to
 `in_progress` when a party engages. The listing-seeded path (a deal run through Nuke) keeps the full pipeline.
+
+## 16. The money machine: catch, fingerprint, match, cite, label, release, compute (owner, 2026-10-26)
+
+**Owner, 2026-10-26:** "this should be as simple as catch and release as giving a key to an agent. they go in find the docs,
+fingerprint everything no questions to the client until every rock has been turned over." Two priorities run together: finish
+the 2022-2025 taxes, and build the automation that handles all future taxes and financial events. The tax cleanup is the first
+full run of the machine; every item cleared by hand becomes an acceptance test the machine must pass alone.
+
+**The loop (daily, not per tax season):**
+1. **Catch.** Every financial event lands as a record: bank/card feeds, QuickBooks/Intuit, PayPal, Gmail (receipts, statements,
+   landlord/city/vendor mail), iMessage, Photos (assets with time and GPS), utility and landlord portals.
+2. **Fingerprint.** amount, date, counterparty, account, content hash for documents.
+3. **Match.** Join each event to its partners: payment to receipt, cash withdrawal to purchase/photo/seller message, transfer to
+   its counterpart, deposit to invoice/deal/lender/spouse.
+4. **Cite.** Two axes per decision: payment proof (bank/card line, cash withdrawal, recorded cash receipt, none) and purpose proof
+   (third-party document, message, photo, vehicle record, dated owner testimony, or an inverse citation: a recorded search that
+   proves absence, with sources, query, date and result).
+5. **Label.** Hard rules assign the tax treatment from a closed list (books_year_gate R1-R9, PRs #2813/#2814). No default stands
+   as a judgment: a defaulted row stays `searching` until cited; filing is blocked while any row is `searching`.
+6. **Release.** Only after the search is recorded does the owner get one batched question, with the gathered evidence.
+7. **Compute.** Returns compute from the labeled ledger at any moment (books_year_state); builders read the DB only and must
+   pass the drift check.
+
+**Acceptance cases from 2026-10-26** (each was found by the owner, not the machine; the machine must find them alone; the
+specific records live in the books by id, not here):
+- Cash withdrawal + same-day photos at a seller's yard (time and GPS) -> cash parts for a customer job.
+- Landlord statements arriving as image attachments -> rent actually paid by month; unpaid rent not deductible; credited
+  payments with no matching bank line flagged.
+- A utility portal's payment-history page -> electric paid per year; exposed a double count under another category.
+- A worker's hourly payment sheet (spreadsheet screenshots) -> cash labor by month; 1099 threshold check.
+- A customer's job sheet -> unlabeled bank-to-bank credits were customer payments.
+- Duplicates: vendor invoice rows vs account payments; bank copies vs ledger rows (R3).
+- A spouse-owned foreign company: calendar tax year (IRC 898); a provision reversal is not US-rules income; the company's
+  information return must match the inclusion on the joint return.
+- Residency: photo GPS + face presence by day -> credit residency tests per year.
