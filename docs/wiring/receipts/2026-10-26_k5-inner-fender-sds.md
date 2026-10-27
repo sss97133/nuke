@@ -88,3 +88,25 @@ from the ellipsoid's footprint out to a straight inboard edge at x 0.38 and, in 
 The cowl leg is widened into the rear panel.
 Point-matched cameras against this shape: b_jegs_7 53.7 px, b_jegs_3 34.6 px, b_jegs_1 38.7 px, b_jegs_5 52.6 px
 (RMS). All are above the 30 px stop line.
+
+## Final pass and status: VIEWER PLACEHOLDER
+The ellipsoid centre is moved inboard (x 0.663, across 0.243) so the rim-plane cut gives the arch apex z 0.86 with the
+crown z 0.96. Along the truck it runs 0.56 each way, so the footprint's nose reaches the core support; the rim band
+runs on from the arch's front foot as the front tail. Everything else is unchanged: straight rail flange at x 0.38,
+cup, ribs, rear panel with the crease, the leg widened into the panel, satin grey with bevelled edges.
+
+Point-matched cameras (RMS, free focal length):
+
+| photo | points | RMS |
+|---|---|---|
+| b_jegs_7 | 5 | 43.5 px |
+| b_jegs_3 | 5 | 73.9 px |
+| b_jegs_1 | 4 | 70.7 px |
+| b_jegs_5 | 9 | 68.0 px |
+
+The acceptance line was about 30 px on b_jegs_7, _3 and _1. This file therefore ships as a viewer placeholder: right
+placement, right elements (arch rim, dome, rear panel and leg, cup, ribbed flanges) and plausible size, not a matched
+part. The route to a tighter part is the physical part or a scan of it: a few tape measurements (rim apex height over
+the rail flange, dome crown, footprint length and width, cup and hole positions) or a phone photogrammetry pass on a
+bare skirt. Hand-picked points on vendor photos with no scale did not get below about 35 px with any primitive tried
+(hand cage, superellipsoid, ellipsoid).

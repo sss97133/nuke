@@ -4,8 +4,8 @@ Run headless:  Blender -b -P inner_fender_sds.py -- <out.blend> [<out.glb>]
 Twin metres: +x driver, -y forward, +z up. LH is built, RH is its mirror. The GLB is Y-up, (X,Y,Z) = (x, z, -y).
 
 The part is four elements (receipt docs/wiring/receipts/2026-10-26_k5-inner-fender-sds.md names the photos):
-1. DOME: a true ellipsoid octant (semi-axes 0.42 along, 0.40 across, 0.34 up) centred on the rim plane and the rail
-   plane, kept inboard and above, cut only by the rear panel plane. Its section in the rim plane is the wheel arch;
+1. DOME: a true ellipsoid (semi-axes 0.56 along, 0.24 across, 0.34 up) centred inboard of the rim plane on the rail
+   plane, kept inboard of the rim plane and above the rail, cut only by the rear panel plane. Its section in the rim plane is the wheel arch;
    the front is not cut and runs down into the front flange zone.
 2. ARCH RIM: a short fillet strip (the shoulder line) steps from the arch out to a flange band in the fender plane
    with a rolled double bead; the band runs on as the holed leg down the cowl, widened into the rear panel.
@@ -27,19 +27,23 @@ Y_REAR = -1.440       # rear leg end at the cowl
 MM_PX = (Y_REAR - Y_FRONT) / 1460          # b_jegs_7 scale from the tail-to-tail span, 0.73 mm/px
 Y_REND = Y_REAR - 220 * MM_PX              # rear end panel (b_jegs_7 dome silhouette, col 240), y -1.601
 
-# ---- dome: a true ellipsoid octant ----------------------------------------------------------------------------------
-# Semi-axes along the truck SA 0.42, across SB 0.40, up SC 0.34, centred on the rim plane at the solved arch apex
-# station (CF.FA_Y - 0.05) and on the rail plane. Kept: inboard of the rim plane, above the rail, forward of the rear
-# panel. The arch edge is its section in the rim plane (crown z 0.96 at the rim); the front is not cut, so it runs down
-# into the front flange zone (b_jegs_3); the rear panel cuts a slice at the cowl end (b_jegs_1).
-SA, SB, SC = 0.42, 0.40, 0.34
+# ---- dome: a true ellipsoid -----------------------------------------------------------------------------------------
+# Centred inboard of the rim plane so the rim-plane cut sits at U across: the arch apex is z 0.86 (axle 0.396 + tyre
+# 0.406 + ~60 mm) and the crown z 0.96. Across, the engine-side face is vertical at x 0.42 on the rail. Along the
+# truck, SA puts the dome's footprint nose at the core support; the rim band carries on from the arch's front foot as
+# the front tail, so the rim runs tail to tail (b_jegs_7).
+SC = 0.34
+U = (1 - ((0.86 - 0.62) / SC) ** 2) ** 0.5
+SB = (X_CUT - 0.420) / (1 + U)
+XE = 0.420 + SB
 YC = -1.896 - 0.05
+SA = YC - Y_FRONT
 
 
 def dome_mesh(bm):
     res = bmesh.ops.create_uvsphere(bm, u_segments=64, v_segments=32, radius=1.0)
     for v in res['verts']:
-        v.co = Vector((X_CUT + SB * v.co.x, YC + SA * v.co.y, Z_RAIL + SC * v.co.z))
+        v.co = Vector((XE + SB * v.co.x, YC + SA * v.co.y, Z_RAIL + SC * v.co.z))
     for co, no, inner in (((0, 0, Z_RAIL), (0, 0, 1), True), ((X_CUT, 0, 0), (1, 0, 0), False),
                           ((0, Y_REND, 0), (0, 1, 0), False)):
         bmesh.ops.bisect_plane(bm, geom=bm.verts[:] + bm.edges[:] + bm.faces[:], plane_co=co, plane_no=no,
@@ -47,7 +51,7 @@ def dome_mesh(bm):
 
 
 def dome_z(x, y):
-    q = 1 - ((x - X_CUT) / SB) ** 2 - ((y - YC) / SA) ** 2
+    q = 1 - ((x - XE) / SB) ** 2 - ((y - YC) / SA) ** 2
     return Z_RAIL + SC * math.sqrt(max(q, 0.0))
 
 
@@ -75,7 +79,7 @@ def build():
     eps = 1e-4
     arc = sorted(boundary(bm, lambda c: abs(c.x - X_CUT) < eps and c.z > Z_RAIL + eps), key=lambda v: v.co.y)
     foot = boundary(bm, lambda c: abs(c.z - Z_RAIL) < eps and c.y < Y_REND - eps)
-    foot.sort(key=lambda v: math.atan2(v.co.y - YC, -(v.co.x - X_CUT)))     # front tip -> inboard -> rear
+    foot.sort(key=lambda v: math.atan2(v.co.y - YC, -(v.co.x - XE)))     # front tip -> inboard -> rear
     sec = sorted(boundary(bm, lambda c: abs(c.y - Y_REND) < eps), key=lambda v: v.co.x)   # rear section, inboard first
     # rim: fillet strip out to the fender plane, then the beaded band; its bottom stays above the flanges
     def band_col(y, z_top, low_extra=0.0):
@@ -84,12 +88,17 @@ def build():
         return [Vector((X_RIM - 0.006, y, z_top - 0.006)), Vector((X_RIM, y, ztop))] + \
                [Vector((X_RIM + (0.0025 if k in (1, 3) else 0.0), y, ztop + (zb - ztop) * k / 5)) for k in range(1, 6)]
     cols = [[v] + [bm.verts.new(p) for p in band_col(v.co.y, max(v.co.z, Z_RAIL + 0.03))] for v in arc]
+    y0, z0 = arc[0].co.y, max(arc[0].co.z, Z_RAIL + 0.03)   # front tail: arch foot on to the core support
+    front = []
+    for k in range(1, 4):
+        y = y0 + (Y_FRONT - y0) * k / 3; zt = z0 + (lerp(TAIL, Y_FRONT) + BAND - z0) * k / 3
+        front.append([bm.verts.new(p) for p in [Vector((X_CUT, y, zt + 0.004))] + band_col(y, zt)])
     y1, z1 = arc[-1].co.y, arc[-1].co.z         # rear: the holed leg down the cowl, widening (b_jegs_7, b_jegs_1)
     rear = []
     for k in range(1, 6):
         y = y1 + (Y_REAR - y1) * k / 5; zt = z1 + (lerp(TAIL, Y_REAR) + BAND + 0.02 - z1) * k / 5
         rear.append([bm.verts.new(p) for p in [Vector((X_CUT, y, zt + 0.004))] + band_col(y, zt, 0.06 * k / 5)])
-    allc = cols + rear
+    allc = front[::-1] + cols + rear
     for a, b in zip(allc, allc[1:]):
         for i in range(len(a) - 1):
             bm.faces.new((a[i], b[i], b[i + 1], a[i + 1]))
@@ -119,11 +128,11 @@ def build():
     # flat flange on the rail: from the dome's foot out to a straight inboard edge and the core-support line in front
     out = []
     for v in foot:
-        dx, dy = v.co.x - X_CUT, v.co.y - YC
-        tx = (X_FLANGE - X_CUT) / dx if dx < -1e-9 else 1e9
+        dx, dy = v.co.x - XE, v.co.y - YC
+        tx = (X_FLANGE - XE) / dx if dx < -1e-9 else 1e9
         ty = (Y_FRONT - YC) / dy if dy < -1e-9 else 1e9
         t = min(tx, ty)
-        out.append(bm.verts.new((max(X_CUT + dx * t, X_FLANGE), min(max(YC + dy * t, Y_FRONT), Y_REND), Z_RAIL)))
+        out.append(bm.verts.new((max(XE + dx * t, X_FLANGE), min(max(YC + dy * t, Y_FRONT), Y_REND), Z_RAIL)))
     mid = [bm.verts.new(v.co.lerp(o.co, 0.5)) for v, o in zip(foot, out)]
     for a, b in ((foot, mid), (mid, out)):
         for j in range(len(a) - 1):
@@ -146,13 +155,13 @@ def beads(fz):
     obs = []
     for k in range(7):                       # front flange zone, b_jegs_3 lower right
         x = 0.47 + k * 0.058
-        yf = YC - SA * math.sqrt(max(1 - ((x - X_CUT) / SB) ** 2, 0.0))
+        yf = YC - SA * math.sqrt(max(1 - ((x - XE) / SB) ** 2, 0.0))
         yl = (Y_FRONT + 0.012 + yf - 0.012) / 2; ln = max(yf - 0.012 - Y_FRONT - 0.012, 0.02)
         bpy.ops.mesh.primitive_cube_add(size=1, location=(x, yl, Z_RAIL + 0.002))
         o = bpy.context.object; o.scale = (0.010, ln, 0.006); obs.append(o)
     for k in range(8):                       # rail flange, b_jegs_5 lower edge
         y = -2.10 + k * 0.065
-        xf = X_CUT - SB * math.sqrt(max(1 - ((y - YC) / SA) ** 2, 0.0))
+        xf = XE - SB * math.sqrt(max(1 - ((y - YC) / SA) ** 2, 0.0))
         bpy.ops.mesh.primitive_cube_add(size=1, location=((X_FLANGE + 0.008 + xf) / 2, y, Z_RAIL + 0.002))
         o = bpy.context.object; o.scale = (max(xf - X_FLANGE - 0.02, 0.02), 0.009, 0.006); obs.append(o)
     for o in obs:
@@ -163,13 +172,13 @@ def beads(fz):
     return obs
 
 
-CUP = (0.68, 0.70)    # cup centre (x, z) on the dome's lower front (b_jegs_3, b_jegs_5), ~100 mm across
+CUP = (0.68, 0.72)    # cup centre (x, z) on the dome's lower front (b_jegs_3, b_jegs_5), ~100 mm across
 
 
 def cup_frame():
     x, z = CUP
-    y = YC - SA * math.sqrt(max(1 - ((x - X_CUT) / SB) ** 2 - ((z - Z_RAIL) / SC) ** 2, 0.0))
-    n = Vector(((x - X_CUT) / SB ** 2, (y - YC) / SA ** 2, (z - Z_RAIL) / SC ** 2)).normalized()
+    y = YC - SA * math.sqrt(max(1 - ((x - XE) / SB) ** 2 - ((z - Z_RAIL) / SC) ** 2, 0.0))
+    n = Vector(((x - XE) / SB ** 2, (y - YC) / SA ** 2, (z - Z_RAIL) / SC ** 2)).normalized()
     return Vector((x, y, z)), n
 
 
@@ -193,8 +202,8 @@ def holes(fz):
     H += [(X_RIM, y, None, 'X', 0.004) for y in (-2.20, -1.95, -1.75)]                       # rim band
     H += [(0.78, Y_REND, Z_RAIL - 0.005, "Y", 0.009)]                                          # leg's big hole
     H += [(0.70, Y_REND, 0.72, 'Y', 0.0065)]                                                  # rear panel
-    H += [(x, -2.47, Z_RAIL, 'Z', 0.0045) for x in (0.50, 0.64, 0.79)]                        # front flange
-    p, n = cup_frame(); s = p + Vector((-0.07, 0, 0.0)); s = Vector((s.x, YC - SA * math.sqrt(max(1 - ((s.x - X_CUT) / SB) ** 2 - ((s.z - Z_RAIL) / SC) ** 2, 0)), s.z))
+    H += [(x, -2.49, Z_RAIL, "Z", 0.0045) for x in (0.45, 0.80)]                        # front flange
+    p, n = cup_frame(); s = p + Vector((-0.07, 0, 0.0)); s = Vector((s.x, YC - SA * math.sqrt(max(1 - ((s.x - XE) / SB) ** 2 - ((s.z - Z_RAIL) / SC) ** 2, 0)), s.z))
     H += [(s.x, s.y, s.z, 'Y', 0.005)]                                                       # beside the cup
     H += [(0.70, -2.14, dome_z(0.70, -2.14), 'Z', 0.0035)]                                   # crown hole (b_jegs_7)
     return H
