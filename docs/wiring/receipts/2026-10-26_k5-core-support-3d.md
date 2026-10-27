@@ -228,3 +228,18 @@ them.
   1. Pan outline: inboard rim positions and the trapezoid taper.
   2. The latch plate hanging 50 mm into the opening top.
   3. The end-wall step position (z ZB + 0.12) and its 30 mm inboard step.
+
+## Rail depth, face bead, end walls (2026-10-27)
+| # | Element | Before | After | Photo |
+|---|---|---|---|---|
+| 1 | Top rail depth | 62 mm | 62 mm, unchanged and unmeasured (+/-20 %) | _16 |
+| 2 | Face bead | none | 12 mm wide, 4 mm proud toward the front, from the post flange (x 0.49) to 14 mm short of the pan rim; 60 mm under the lamp centre, clear of the boss | _01, _16 |
+| 3 | End wall | 40 mm flange turned forward | 75 mm deep full-height wall (as deep as the posts); rear edge follows the pan dip; 25 mm flange turned outboard off its front edge carrying the five holes | _16 |
+| 4 | Pan floor | dished height field cut by booleans (ripple at grazing angles) | quad loft per side: rim on the face, wall inset 8 mm over 45 mm (~10 deg draft), flat floor with the lamp holes cut through the floor only; face cut away inside the rim | _03 render |
+
+On the top rail: back-projecting _16's near-end rail section with the solved camera gives 46 mm front to back
+(about 57 x 48 px at about 0.8 mm/px). That corner's back-projection also lands 60 mm above the top edge, so the
+camera is unreliable there, and the 46 mm reading is not used.
+`{unknown, needs: tape across the top rail section}`
+
+GLB 1.10 MB.

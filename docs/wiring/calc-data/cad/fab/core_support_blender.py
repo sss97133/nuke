@@ -47,6 +47,7 @@ TL_H = 0.060                      # lower trough height on the face (_03 right e
 POST_W = 0.050                    # radiator post channel width (_21), assumed +/-10 mm
 POST_D = (0.072, 0.080)           # post depth, bottom to top: tapers slightly (_16, _17), +/-20 %
 POST_FL = 0.025                   # post flanges on the face (_16)
+END_D = 0.075                     # end wall depth front to back, as deep as the posts (_16), +/-20 %
 RECESS = 0.045                    # lamp pan depth, rim to floor (_03, _16 tray rim ~45 mm), +/-20 %
 DRAFT = 0.022                     # pan wall run: ~10 deg draft plus bend radii (_03, _16), assumed
 FLANGE_SCREWS_Z = [ZB + 0.12 + i * 0.097 for i in range(5)]  # five fender screws (GM 2C-9 step 10; _03 end wall)
@@ -169,20 +170,34 @@ def poly_sd(px, pz, poly):
 PANEL = [(0.665, ZT - TB_H - 0.014), (HALF_W + 0.05, ZT - TB_H - 0.014), (HALF_W + 0.05, ZB + TL_H + 0.014),
          (0.735, ZB + TL_H + 0.014)]
 RAMP = DRAFT
+BEAD_Z = LAMP_Z - 0.060              # face bead height, assumed +/-20 mm
 
 
 def face_y(x, z):
     """Offset of the face sheet from YF: forward (-) in the headlamp panel, rearward (+) on bosses and lamp beads."""
     s = 1 if x >= 0 else -1
     ax = abs(x)
-    off = -RECESS * smooth(-poly_sd(ax, z, PANEL) / RAMP)
+    off = 0.0
     # oval boss, domed 12 mm toward the engine with a flat top (owner 045, _01, _10)
     r = math.hypot((ax - DOME_X) / DOME_A, (z - DOME_Z) / DOME_B)
     off += 0.012 * smooth((1.0 - r) / 0.45)
-    # headlamp bead: a ring raised 5 mm round the hole (_01 dark ring, _10 rim)
-    rl = math.hypot(ax - LAMP_X, z - LAMP_Z) - LAMP_D / 2
-    off += 0.005 * smooth(1 - abs(rl - 0.016) / 0.012)
+    # stiffening bead across the flat face between the post flange and the lamp-pan rim, 12 mm wide, 4 mm proud
+    # toward the front (_01, _16). Set 60 mm under the lamp centre so it clears the boss, which sits at lamp height.
+    xr = pan_rim_x(BEAD_Z) - 0.014
+    off -= 0.004 * smooth(1 - abs(z - BEAD_Z) / 0.007) * smooth((ax - 0.490) / 0.012) * smooth((xr - ax) / 0.012)
     return off
+
+
+def pan_y(z):
+    """The pan floor's offset under the rim along the end, for the end wall and the collars."""
+    zt, zb = PANEL[0][1], PANEL[3][1]
+    return -RECESS * smooth(min(zt - z, z - zb) / RAMP)
+
+
+def pan_rim_x(z):
+    """Inboard rim of the lamp pan at height z (the trapezoid's slanted side)."""
+    (x0, z0), (x1, z1) = PANEL[0], PANEL[3]
+    return x0 + (x1 - x0) * (z0 - z) / (z0 - z1)
 
 
 FACE_Z = (ZB + TL_H, ZT - TB_H)     # the sheet stops where the channels take over: they are open, not boxes
@@ -216,6 +231,62 @@ for s in (1, -1):
     tools += [prism("l", circle(s * LAMP_X, LAMP_Z, LAMP_D / 2), YF - 0.1, YF + 0.1),
               prism("p", circle(s * PARK_X, PARK_Z, PARK_D / 2, 32), YF - 0.1, YF + 0.1)]
 face = cut(face, *tools)
+
+
+def rounded(poly, r, n=8):
+    """Open polyline with each interior corner replaced by an arc of radius r."""
+    out = [poly[0]]
+    for i in range(1, len(poly) - 1):
+        p, a, b = Vector((*poly[i], 0)), Vector((*poly[i - 1], 0)), Vector((*poly[i + 1], 0))
+        u, v = (a - p).normalized(), (b - p).normalized()
+        ang = u.angle(v)
+        dd = r / math.tan(ang / 2)
+        p0, p1 = p + u * dd, p + v * dd
+        cen = p + (u + v).normalized() * (r / math.sin(ang / 2))
+        a0 = math.atan2(p0.y - cen.y, p0.x - cen.x)
+        a1 = math.atan2(p1.y - cen.y, p1.x - cen.x)
+        da = (a1 - a0 + math.pi) % (2 * math.pi) - math.pi
+        out += [(cen.x + r * math.cos(a0 + da * k / n), cen.y + r * math.sin(a0 + da * k / n)) for k in range(n + 1)]
+    return out + [poly[-1]]
+
+
+def inset(line, d, inside):
+    """Offset an open polyline by d toward the interior point."""
+    out = []
+    for i, (x, z) in enumerate(line):
+        a, b = line[max(i - 1, 0)], line[min(i + 1, len(line) - 1)]
+        tx, tz = b[0] - a[0], b[1] - a[1]
+        L = math.hypot(tx, tz)
+        nx, nz = -tz / L, tx / L
+        if (inside[0] - x) * nx + (inside[1] - z) * nz < 0:
+            nx, nz = -nx, -nz
+        out.append((x + d * nx, z + d * nz))
+    return out
+
+
+# ---- lamp pans: a clean loft per side, rim on the face, a drafted wall (~10 deg: 8 mm in over 45 mm), a flat floor
+# carrying the lamp holes (_03, _16); the face is cut away inside the rim (lead 2026-10-27: no boolean dish)
+for s, sfx in ((1, "L"), (-1, "R")):
+    (xt, zt), _, _, (xb, zb) = PANEL
+    rim = rounded([(HALF_W, zt), (xt, zt), (xb, zb), (HALF_W, zb)], 0.030)
+    flo = inset(rim, 0.008, (0.88, (zt + zb) / 2))
+    flo[0] = (HALF_W, flo[0][1])
+    flo[-1] = (HALF_W, flo[-1][1])
+    face = cut(face, prism("pc", [(s * x, z) for x, z in rim + [(HALF_W + 0.05, zb), (HALF_W + 0.05, zt)]],
+                           YF - 0.02, YF + 0.02))
+    bm = bmesh.new()
+    a = [bm.verts.new((s * x, YF, z)) for x, z in rim]
+    b = [bm.verts.new((s * x, YF - RECESS, z)) for x, z in flo]
+    for i in range(len(a) - 1):
+        bm.faces.new((a[i], a[i + 1], b[i + 1], b[i]))
+    bm.faces.new(b)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    me = bpy.data.meshes.new("pan")
+    bm.to_mesh(me)
+    bm.free()
+    pan = finish(link(f"lamp_pan_{sfx}", me))
+    parts[f"lamp_pan_{sfx}"] = cut(pan, prism("l", circle(s * LAMP_X, LAMP_Z, LAMP_D / 2), YF - 0.08, YF - 0.02),
+                                   prism("p", circle(s * PARK_X, PARK_Z, PARK_D / 2, 32), YF - 0.08, YF - 0.02))
 parts["radiator_face"] = face
 
 # ---- radiator opening return flange, 15 mm toward the engine all round (_01 lit edge, _10 inner lip)
@@ -263,7 +334,7 @@ for s, sfx in ((1, "L"), (-1, "R")):
     col = []
     for cx, cz, d, dep in ((LAMP_X, LAMP_Z, LAMP_D, 0.005), (PARK_X, PARK_Z, PARK_D, 0.009)):
         bm = bmesh.new()
-        y0 = YF + face_y(s * cx, cz + d / 2)
+        y0 = YF - RECESS
         ring = circle(s * cx, cz, d / 2, 40)
         a = [bm.verts.new((x, y0, z)) for x, z in ring]
         b = [bm.verts.new((x, y0 - dep, z)) for x, z in ring]
@@ -275,24 +346,28 @@ for s, sfx in ((1, "L"), (-1, "R")):
         col.append(finish(link("c", me), bevel=False))
     parts[f"lamp_collars_{sfx}"] = join(f"lamp_collars_{sfx}", col)
 
-    # end wall: a full-height plate along the end that steps inboard 30 mm near the bottom (the dip in _03), its
-    # fender flange turned 40 mm forward off the face edge along the whole height, five screw holes in it (_03, _04)
+    # end wall: a full-height plate along the end, as deep as the posts (75 mm front to back, _16 near end), its rear
+    # edge following the pan dip and stepping 30 mm inboard near the bottom (_03); the fender flange is turned
+    # outboard 25 mm off its front edge and carries the five screw holes (_16, GM 2C-9)
     x = s * HALF_W
     xz = lambda z: s * (HALF_W - 0.030 * smooth((ZB + 0.120 - z) / 0.030))
+    YW = YF - END_D
     bm = bmesh.new()
     zs = [ZB + (ZT - ZB) * j / 80 for j in range(81)]
-    a = [bm.verts.new((xz(z), YF + face_y(x, z), z)) for z in zs]
-    b = [bm.verts.new((xz(z), YF + face_y(x, z) - 0.040, z)) for z in zs]
+    a = [bm.verts.new((xz(z), YF + pan_y(z), z)) for z in zs]
+    b = [bm.verts.new((xz(z), YW, z)) for z in zs]
+    c = [bm.verts.new((xz(z) + s * 0.025, YW, z)) for z in zs]
     for j in range(80):
         bm.faces.new((a[j], a[j + 1], b[j + 1], b[j]))
+        bm.faces.new((b[j], b[j + 1], c[j + 1], c[j]))
     me = bpy.data.meshes.new("w")
     bm.to_mesh(me)
     bm.free()
-    w = finish(link(f"fender_flange_{sfx}", me), bevel=False)
+    w = finish(link(f"fender_flange_{sfx}", me))
     hs = []
     for z in FLANGE_SCREWS_Z:
         bpy.ops.mesh.primitive_cylinder_add(vertices=16, radius=0.0045, depth=0.03,
-                                            location=(xz(z), YF + face_y(x, z) - 0.022, z), rotation=(0, math.pi / 2, 0))
+                                            location=(xz(z) + s * 0.013, YW, z), rotation=(math.pi / 2, 0, 0))
         hs.append(bpy.context.active_object)
     parts[f"fender_flange_{sfx}"] = cut(w, *hs)
 
