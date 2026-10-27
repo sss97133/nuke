@@ -466,6 +466,66 @@ def empty(name, p_local, note=""):
 
 
 # ------------------------------------------------------------------------------------------ build
+# ------------------------------------------------------------------------------------------ scanned long block
+# --scan <model.glb>: "GM LS small block engine" by inked1979, Sketchfab 4ec40400a93546d4aa6b7dd24393e9a5, CC BY 4.0
+# (attribution required; a textured stock LS truck long block, one mesh, unit-normalised). It replaces the drawn block,
+# bell face, heads, front cover and pan; what the K5 carries instead of stock (Holley intake, Delmo covers, Mid-Mount,
+# shorty headers, DEL-Stributor ignition) stays drawn from the table, so the scan is cut above the heads' cover rail,
+# over the valley and ahead of the front cover. Fit, read off the scan itself (2026-10-26):
+SCAN = {
+    "k": D(362.9, "the scan's four driver-side exhaust ports space 0.308 units against the GM bore centre 111.76", "derived", 8.0),
+    "x_rear": D(-0.88, "the scan's block rear face: where its section widens past the flexplate (x slices, 0.02 units)", "scaled", 7.0),
+    "z_crank": D(-0.334, "the scan's flexplate centre (x = -0.98 slice, z -0.803..0.134)", "scaled", 4.0),
+}
+SCAN_CREDIT = "LS long block: 'GM LS small block engine' by inked1979 (sketchfab.com/3d-models/4ec40400a93546d4aa6b7dd24393e9a5), CC BY 4.0, cut and placed"
+
+
+def scan_longblock(path):
+    """import the scan into engine-local mm, cut what the K5 replaces, emit it with its own textured material"""
+    before = set(bpy.data.objects)
+    bpy.ops.import_scene.gltf(filepath=str(path))
+    new = [o for o in bpy.data.objects if o not in before]
+    src = next(o for o in new if o.type == "MESH")
+    k, xr, zc = v_(SCAN["k"]), v_(SCAN["x_rear"]), v_(SCAN["z_crank"])
+    # scan (x fwd, y driver, z up), unit-normalised -> engine-local mm (x driver, y rearward, z up)
+    to_local = Matrix(((0, k, 0, 0), (-k, 0, 0, k * xr), (0, 0, k, -k * zc), (0, 0, 0, 1)))
+    me = src.data
+    me.transform(src.matrix_world)
+    me.transform(to_local)
+    bm = bmesh.new()
+    bm.from_mesh(me)
+    L, FT, HH, VZ = v("block_len"), v("front_cover_t"), v("head_h"), v("valley_z")
+    inner_x = DECK * S45 - v("deck_half") * C45
+
+    def cut(c):
+        sig = 1 if c.x >= 0 else -1
+        s_ = c.x * n_(sig)[0] + c.z * n_(sig)[1] - DECK          # height above the deck along the bank axis
+        r_ = c.x * t_(sig)[0] + c.z * t_(sig)[1]                 # across the deck, + toward the exhaust side
+        valley = r_ < -v("head_w") / 2 + 4 and s_ > -10            # the stock intake, on the valley side of the ports
+        return (s_ > HH and c.z > 150) or valley or (abs(c.x) < inner_x - 10 and c.z > VZ + 10) or c.y < -L - FT
+    bmesh.ops.delete(bm, geom=[f for f in bm.faces if cut(f.calc_center_median())], context="FACES")
+    bm.to_mesh(me)
+    bm.free()
+    me.transform(M_WORLD)
+    src.matrix_world = Matrix.Identity(4)
+    src.parent = None
+    src.name = "longblock_scan"
+    for o in new:
+        if o is not src:
+            bpy.data.objects.remove(o)
+    dec = src.modifiers.new("decimate", "DECIMATE")
+    dec.ratio = 0.55
+    for img in bpy.data.images:          # 4K atlases to 2K: the map view never gets close enough to use more
+        if img.size[0] > 2048:
+            img.scale(2048, 2048)
+    OBJS.append(src)
+    return src
+
+
+def v_(d):
+    return float(d.value)
+
+
 def build():
     L = v("block_len")
     PR = v("pan_rail_z")
@@ -477,18 +537,24 @@ def build():
     half = [(0, PR), (SK, PR), (SK, 0), outer, inner, (inner[0] - 30, VZ), (0, VZ)]
     prof = half + [(-x, z) for x, z in reversed(half[1:-1])]
     prof = [(0, PR)] + prof[1:]
-    join("block", [prism_xz(prof[:1] + prof[1:], -L, -v("bell_t"))], "block", bevel=6)
+    scan = opt("--scan")
+    if scan:
+        scan_longblock(scan)
+    else:
+        join("block", [prism_xz(prof[:1] + prof[1:], -L, -v("bell_t"))], "block", bevel=6)
 
     BH = v("bell_half")
     deck_at = lambda x: DECK / C45 - x * S45 / C45      # deck line z at |x| (driver bank)
     bell = [(-BH, PR + 29), (BH, PR + 29), (BH, deck_at(BH)), inner, (-inner[0], inner[1]), (-BH, deck_at(BH))]
-    join("bell_face", [prism_xz(bell, -v("bell_t"), 0.0)], "block", bevel=2)
+    if not scan:
+        join("bell_face", [prism_xz(bell, -v("bell_t"), 0.0)], "block", bevel=2)
 
     # heads + valve covers
     HL, HW, HH = v("head_len"), v("head_w"), v("head_h")
     for sig, tag in ((1, "L"), (-1, "R")):
         yc = HEAD_Y[sig]
-        join(f"head_{tag}", [bank_box(sig, 0, HH, -HW / 2, HW / 2, yc - HL / 2, yc + HL / 2)], "block", bevel=7)
+        if not scan:
+            join(f"head_{tag}", [bank_box(sig, 0, HH, -HW / 2, HW / 2, yc - HL / 2, yc + HL / 2)], "block", bevel=7)
         CW, CH = v("cover_w"), v("cover_h")
         join(f"valve_cover_{tag}", [bank_box(sig, HH, HH + CH, -CW / 2, CW / 2, yc - HL / 2 + 8, yc + HL / 2 - 8)], "cover", bevel=22)
         # the covers' embossed "Chevrolet" script on the outer face (IMG_6530 / IMG_6532), redrawn, cosmetic
@@ -506,7 +572,8 @@ def build():
     # front cover (Gen IV timing cover) and the balancer
     FT = v("front_cover_t")
     fc = [(-SK + 10, PR + 5), (SK - 10, PR + 5), (SK + 5, 60), (120, 170), (-120, 170), (-SK - 5, 60)]
-    join("front_cover", [prism_xz(fc, -L - FT, -L)], "block", bevel=6)
+    if not scan:
+        join("front_cover", [prism_xz(fc, -L - FT, -L)], "block", bevel=6)
 
     BY = v("belt_y")
     DD = v("damper_d")
@@ -520,7 +587,8 @@ def build():
     PD, PF, SL = v("pan_depth_z"), v("pan_front_z"), v("sump_len")
     pan_front = prism_xz([(-SK + 8, PR), (SK - 8, PR), (SK - 20, PF), (-SK + 20, PF)], -L + 5, -SL)
     pan_sump = prism_xz([(-SK + 8, PR), (SK - 8, PR), (SK - 25, PD), (-SK + 25, PD)], -SL, -v("bell_t") - 2)
-    join("oil_pan", [pan_front, pan_sump], "pan", bevel=9)
+    if not scan:
+        join("oil_pan", [pan_front, pan_sump], "pan", bevel=9)
 
     # ---- intake
     PAD_Y, PL, PW = v("pad_y"), v("plenum_len"), v("plenum_w")
@@ -858,7 +926,8 @@ def export(path):
         o.select_set(o in OBJS)
     bpy.ops.export_scene.gltf(filepath=str(path), export_format="GLB", use_selection=True, export_apply=True,
                               export_yup=True, export_extras=False, export_cameras=False, export_lights=False,
-                              export_draco_mesh_compression_enable=False, export_normals=True, export_texcoords=False,
+                              export_draco_mesh_compression_enable=False, export_normals=True, export_texcoords=True,
+                              export_image_format="JPEG", export_jpeg_quality=82,
                               export_materials="EXPORT")
     scrub(path)
 
@@ -881,6 +950,8 @@ def scrub(path):
         met, rough = finish.get(m.get("name"), (pbr.get("metallicFactor", 1.0), pbr.get("roughnessFactor", 1.0)))
         pbr["metallicFactor"], pbr["roughnessFactor"] = float(met), float(rough)
     j["asset"] = {"version": "2.0", "generator": "docs/wiring/calc-data/cad/fab/engine_ls3.py (Blender glTF I/O)"}
+    if opt("--scan"):
+        j["asset"]["copyright"] = SCAN_CREDIT
     js = json.dumps(j, separators=(",", ":")).encode()
     js += b" " * ((4 - len(js) % 4) % 4)
     total = 12 + 8 + len(js) + len(rest)

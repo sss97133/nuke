@@ -252,6 +252,10 @@ export default function ZoneModels3D({ cw, ix, site, sel, rel, onSelect, onClear
                 <button key={l.id} style={btn(layerOn[l.id] !== false)} aria-pressed={layerOn[l.id] !== false}
                   onClick={() => setLayerOn(s => ({ ...s, [l.id]: s[l.id] === false }))}>{layerOn[l.id] !== false ? '☑' : '☐'} {l.label}</button>
               ))}
+              {LAYERS.filter(l => l.credit && layerFiles[l.id] && layerOn[l.id] !== false).map(l => (
+                <a key={l.id + ':credit'} href={l.credit!.href} target="_blank" rel="noreferrer"
+                  style={{ color: cw.ink, fontFamily: cw.fontBody, fontSize: 10, opacity: 0.7 }}>{l.credit!.text}</a>
+              ))}
             </MoreRow>
           )}
           <MoreRow cw={cw} label="TURN">
