@@ -112,3 +112,32 @@ The two conflicts below are about the twin, not this part.
 - `{unknown, needs: tape across the tie-bar section}` tie-bar depth and channel shape.
 - `{unknown, needs: tape on the owner's fender flange}` screw spacing.
 - `{unknown, needs: 1973-74 support photo}` the feature that tells 1973-74 from 1975-80, beyond the model year.
+
+## Rebuilt as stamped sections (2026-10-26, second pass)
+The first file had the right outline and holes but no section depth. `core_support_blender.py` now builds the part as
+1 mm sheet (Solidify), bends beveled 4 mm / 3 segments, shaded smooth by angle; 0.82 MB, same node `core_support`,
+same placement (face plane y -2.527, z 0.631-1.258, all hole positions unchanged). Sub-nodes:
+- `radiator_face`: one height-field sheet. Headlamp panels pressed 30 mm forward inside a stepped outline (inner step
+  x +/-0.650, diagonal up to the upper tie bar near each end): _03/_04 end profile dips forward between the tie bars,
+  _10 and _21 show the step line. Oval bosses domed 12 mm toward the engine (_01, _10, owner 045). A 5 mm bead ring
+  round each headlamp hole (_01, _10).
+- `upper_tie_bar`, `lower_tie_bar`: hat boxes 95 mm forward x 85 mm tall, open to the face, full width (_03 near end,
+  _13 open end of the upper bar, _16/_17/_21 from the front). Upper has a 12 mm lip turned rearward over the top; lower
+  a 45 mm lip toward the engine (owner 045 band, _03 right end).
+- `radiator_post_L/R`: 70 mm hat channels standing forward either side of the opening, tie bar to tie bar (_16, _17, _21).
+- `opening_flange`: 15 mm return toward the engine round the opening, 45 mm corner radius (_01, _10).
+- `fender_flange_L/R`: end walls turned 90 degrees, from the panel dip to 45 mm behind the face, five 9 mm holes (_03, _04).
+- `lamp_collars_L/R`: headlamp edge turned 8 mm forward, parking-lamp collar 15 mm (_10, _21).
+- `hood_latch_plate` (2 mm doubler with slot, centred on the upper bar's front wall), `radiator_mounting_panel`
+  (strip with a 20 mm return), `frame_mount_L/R` (U brackets, 45 mm drop, 17 mm hole).
+Material: satin black, metallic 0.3, roughness 0.4. `strip_and_scan` passes (824,316 bytes).
+
+Checked by side-by-sides (photo | Cycles | 50 % blend): _01 and _10 with the first pass's OpenCV cameras; _03 and _16
+with cameras set by hand (look-at, not solved), so those two compare sections, not positions.
+
+Least sure (assumed, not measured):
+- Tie-bar and post section sizes (95 x 85 mm boxes, 70 mm posts, constant depth). _16/_17 suggest the posts may taper
+  or deepen toward one tie bar; no tape crosses a section. `{unknown, needs: tape across a tie bar and a post}`
+- End walls: _03 reads as a ~40 mm flange that follows the dipped profile; the model's wall is a flat 76 mm strip.
+- Headlamp-panel outline and depth (30 mm) and the hood-latch plate, which no photo here shows clearly.
+- Photos are not committed (third-party and owner photos; public repo).
