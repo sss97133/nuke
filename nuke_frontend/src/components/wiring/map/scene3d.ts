@@ -29,7 +29,13 @@ export const LAYERS: LayerDef[] = [
   },
   {
     id: 'sheetmetal', label: 'SHEET METAL', url: '/models/k5-front-sheetmetal.glb', lane: 'chassis-3d (#470)',
-    hides: ['CTX-core-support-face', 'CTX-firewall-face', 'CTX-toe-board', 'CTX-inner-fender-wall-driver', 'CTX-inner-fender-wall-passenger'],
+    hides: ['CTX-core-support-face', 'CTX-firewall-face', 'CTX-toe-board'],
+  },
+  {
+    // drawn from reference photos (docs/wiring/receipts/2026-10-26_k5-inner-fender-3d.md); until the core-support and
+    // firewall files land, k5-front-sheetmetal.glb still carries its own inner_fender_* boxes
+    id: 'inner-fender', label: 'INNER FENDERS', url: '/models/k5-inner-fender.glb', lane: 'k5/inner-fender-3d',
+    hides: ['CTX-inner-fender-wall-driver', 'CTX-inner-fender-wall-passenger'],
   },
   {
     id: 'engine', label: 'ENGINE', url: '/models/k5-engine-ls3.glb', lane: 'engine-3d (#468)',
