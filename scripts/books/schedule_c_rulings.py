@@ -13,7 +13,10 @@ Amounts and evidence live in a local rulings file and in the database, never in 
   dotenvx run -- python3 scripts/books/schedule_c_rulings.py lines --year 2025 --line-map line-map.json
   dotenvx run -- python3 scripts/books/schedule_c_rulings.py drift --line-map line-map.json --return 2025=sc-2025.json ...
 
-rulings file: {"owner_id", "year", "title", "records": [{"key", "line", "label", "amount", "ruling", "evidence", "account", "date"}]}
+rulings file: {"owner_id", "year", "title", "register"?, "records": [{"key", "line" | "section"+"category", "label", "amount", "ruling", "evidence", "account", "date",
+  "record_kind"?, "local_id"?, "bank_links"?, "description"?, "currency"?}]}. A record without a Schedule C line names its own section (Owner,
+Transfer, Financing, Reference); record_kind retained_bank_movement lands a missing counterpart movement. "register" (default
+schedule-c-rulings-register) names a separate register document, so counterpart movements never share a revision with the rulings.
 line map: {"<section>|<category>": "<line>"} for legacy ledger categories (ruling categories carry their line).
 return file: {"<account>": {"<line>": amount, ...}} (whole-dollar or cent amounts; compared to the cent after rounding both sides
 the way the return does when --whole-dollars is given).
@@ -48,10 +51,10 @@ def uuid_ok(s):
 
 # ---------- land ----------
 
-def register_original(owner, year):
-    body = f'Schedule C rulings register, tax year {year}. Records are revisions of this original in financial_evidence_v1.\n'.encode()
+def register_original(owner, year, register='schedule-c-rulings-register'):
+    body = f'{register}, tax year {year}. Records are revisions of this original in financial_evidence_v1.\n'.encode()
     sha = hashlib.sha256(body).hexdigest()
-    return body, dict(sha256=sha, storage_path=f'{owner}/financial/{sha}.txt', source_filename=f'schedule-c-rulings-register-{year}.txt',
+    return body, dict(sha256=sha, storage_path=f'{owner}/financial/{sha}.txt', source_filename=f'{register}-{year}.txt',
                       source_kind='upload', byte_size=str(len(body)))
 
 
@@ -88,6 +91,7 @@ def clip(s, n=1900):
 
 def build_revision(spec, sha):
     year = spec['year']
+    register = spec.get('register', 'schedule-c-rulings-register')
     fields, records = [], []
     keys = [r['key'] for r in spec['records']]
     if len(keys) != len(set(keys)) or not 1 <= len(keys) <= 99:
@@ -96,27 +100,37 @@ def build_revision(spec, sha):
                        value_normalized=dict(year=year, records=len(keys)), evidence=dict(stage='owner_rulings', method=METHOD)))
     for i, r in enumerate(spec['records'], 1):
         amt = D(str(r['amount'])).quantize(D('0.01'))
-        line = str(r['line'])
+        line = str(r.get('line', ''))
+        kind = r.get('record_kind', 'retained_ledger_decision')
+        if kind not in ('retained_ledger_decision', 'retained_bank_movement'):
+            raise SystemExit(f"record {r['key']}: record_kind must be retained_ledger_decision or retained_bank_movement")
+        # A record with its own section (Owner, Transfer, Financing, Clearing, Reference) carries no Schedule C line; the rest need one.
+        section = r.get('section') or ('Revenue' if line == '1' else 'Expense')
+        if not r.get('section') and not line:
+            raise SystemExit(f"record {r['key']}: give a Schedule C line or a section")
+        category = r.get('category') or f"Schedule C line {line}: {r['label']}"
         fields.append(dict(field_key=f"ruling:{r['key']}", value_raw=f'{amt}', value_type='currency',
                            value_normalized=dict(line=line, account=r['account'], label=clip(r['label'], 300)),
                            evidence=dict(ruling=clip(r['ruling'], 600), reference=clip(r['evidence'], 1800))))
-        records.append(dict(
-            record_kind='retained_ledger_decision', source_key=hashlib.sha256(f"{sha}:{year}:{r['key']}".encode()).hexdigest(),
-            source_sha256=sha, source_row=str(i), local_id=f"{year}-RULING-{r['key']}"[:200], year=year, date=r['date'],
-            account=r['account'], currency='USD', currency_basis='Schedule C amount as ruled (USD)', amount=f'{amt}',
-            section='Revenue' if line == '1' else 'Expense', category=clip(f"Schedule C line {line}: {r['label']}", 300),
-            description=clip(r['label'], 500), decision=clip(f"{r['ruling']} | Evidence: {r['evidence']}"),
-            status='Included: owner ruling on the Schedule C basis', source_reference=f"schedule-c-rulings-register-{year} | {r['key']}",
-            bank_links=[], recognition_status='retained_decision', payment_status='unresolved', vehicle_status='unresolved',
-            reimbursement_status='unresolved', entity_status='retained_scope_unallocated'))
+        rec = dict(
+            record_kind=kind, source_key=hashlib.sha256(f"{sha}:{year}:{r['key']}".encode()).hexdigest(),
+            source_sha256=sha, source_row=str(i), local_id=r.get('local_id') or f"{year}-RULING-{r['key']}"[:200], year=year, date=r['date'],
+            account=r['account'], currency=r.get('currency', 'USD'), currency_basis=r.get('currency_basis', 'Schedule C amount as ruled (USD)'), amount=f'{amt}',
+            section=section, category=clip(category, 300),
+            description=clip(r.get('description') or r['label'], 500), decision=clip(f"{r['ruling']} | Evidence: {r['evidence']}"),
+            status=r.get('status', 'Included: owner ruling on the Schedule C basis'), source_reference=f"{register}-{year} | {r['key']}",
+            bank_links=list(r.get('bank_links', [])), recognition_status='retained_decision' if kind == 'retained_ledger_decision' else 'not_applicable',
+            payment_status='unresolved', vehicle_status='unresolved',
+            reimbursement_status='unresolved', entity_status='retained_scope_unallocated')
+        records.append(rec)
     digest = hashlib.sha256(json.dumps([fields, records], sort_keys=True).encode()).hexdigest()[:12]
-    return dict(idempotency_key=f'sc-rulings-{year}-{digest}', method=METHOD, version=VERSION, fields=fields, accounting_records=records)
+    return dict(idempotency_key=f'{register}-{year}-{digest}'[:200], method=METHOD, version=VERSION, fields=fields, accounting_records=records)
 
 
 def land(path, dry):
     spec = json.load(open(path))
     owner = uuid_ok(spec['owner_id'])
-    body, original = register_original(owner, spec['year'])
+    body, original = register_original(owner, spec['year'], spec.get('register', 'schedule-c-rulings-register'))
     rev = build_revision(spec, original['sha256'])
     cur = current_run(owner, original['sha256'])
     if cur and cur['key'] == rev['idempotency_key']:
@@ -134,7 +148,7 @@ def land(path, dry):
            "select set_config('request.jwt.claim.role','service_role',true);\n"
            f"select public.ingest_financial_evidence('{owner}'::uuid, {q(json.dumps(original))}::jsonb, "
            f"{q(json.dumps(rev, ensure_ascii=False))}::jsonb, '{{\"kind\":\"user\"}}'::jsonb)::text;\n"
-           f"select count(*) from v_financial_accounting_records where owner_id='{owner}' and year='{spec['year']}' and local_id like '{spec['year']}-RULING-%';\n"
+           f"select count(*) from v_financial_accounting_records where owner_id='{owner}' and year='{spec['year']}' and local_id in ({','.join(q(r.get('local_id') or f"{spec['year']}-RULING-{r['key']}"[:200]) for r in spec['records'])});\n"
            f"{'rollback' if dry else 'commit'};\n")
     out = [l for l in psql(sql).splitlines() if l.strip()]
     rec = json.loads(next(l for l in out if l.startswith('{') and 'extraction_run_id' in l))
@@ -229,7 +243,9 @@ def document_state(owner, doc_id):
 
 
 def correct(path, dry):
-    """corrections file: {"owner_id", "ruling_register": "...", "rows": {"<local_id>": {"document_id", "section", "category", "amount"?, "note"}}}"""
+    """corrections file: {"owner_id", "rows": {"<local_id>": {"document_id", "section"?, "category"?, "amount"?, "ruling_id"?, "note"?, "add_bank_links"?: [ids]}}}
+    section and category change only when given (a movement may take a new section). add_bank_links appends to the row's bank_links, deduped,
+    and puts a dated note in its decision. Amounts change only when "amount" is given."""
     spec = json.load(open(path))
     owner = uuid_ok(spec['owner_id'])
     by_doc = collections.defaultdict(dict)
@@ -243,12 +259,22 @@ def correct(path, dry):
             if not c:
                 continue
             seen.add(r['local_id'])
-            note = f"Superseded {VERSION} by {c['ruling_id']}: {c['note']}"
+            parts = []
+            if c.get('section') or c.get('category'):
+                parts.append(f"Superseded {VERSION}" + (f" by {c['ruling_id']}" if c.get('ruling_id') else '') + (f": {c['note']}" if c.get('note') else ''))
             if c.get('amount') is not None and D(c['amount']) != D(r['amount']):
-                note += f" (paid amount {r['amount']}; book amount {c['amount']})"
+                parts.append(f"(paid amount {r['amount']}; book amount {c['amount']})")
                 r['amount'] = f"{D(c['amount']):.2f}"
-            r['section'], r['category'] = c['section'], clip(c['category'], 300)
-            r['decision'] = clip(f"{r.get('decision') or ''} | {note}".lstrip(' |'), 1990)
+            if c.get('section'):
+                r['section'] = c['section']
+            if c.get('category'):
+                r['category'] = clip(c['category'], 300)
+            add = [x for x in c.get('add_bank_links', []) if x not in (r.get('bank_links') or [])]
+            if add:
+                r['bank_links'] = list(dict.fromkeys((r.get('bank_links') or []) + add))
+                parts.append(f"Links added {VERSION}: {', '.join(add)}" + (f" ({c['note']})" if c.get('note') and not (c.get('section') or c.get('category')) else ''))
+            if parts:
+                r['decision'] = clip(f"{r.get('decision') or ''} | {' '.join(parts)}".lstrip(' |'), 1990)
         missing = set(rows) - seen
         if missing:
             raise SystemExit(f'{doc_id}: rows not in the current revision: {sorted(missing)}')
