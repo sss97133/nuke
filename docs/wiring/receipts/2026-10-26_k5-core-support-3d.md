@@ -200,3 +200,31 @@ hood line. NOS _01 shows the radiator opening running up to it, and the owner's 
 right under it. The hood-latch bracket now hangs from that tie bar at centre down to the top-tank line (the opening
 top, 16 mm under the bar). Everything else from the owner pass stays. The body-mount pad conflict (z 0.585 vs 0.721)
 stays open for the frame lane, and the part is not moved. 0.68 MB; `strip_and_scan` passes.
+
+## Lamp pans and rails from the NOS photos (2026-10-27)
+Eight corrections from the lead's comparison against the NOS part. All sizes are +/-20 % unless a tape frame pins
+them.
+| # | Element | Before | After | Photo |
+|---|---|---|---|---|
+| 1 | Lamp panels | 30 mm stepped plate, 28 mm ramp | Pan 45 mm deep, rounded trapezoid (inboard rim x 0.665 at the top rail, 0.735 at the lower bar), 22 mm drafted wall, flat floor carrying both lamp holes | _03, _16 |
+| 2 | Oval boss | Vertical 107 x 195 at x 0.541, z 1.094 | Horizontal 110 x 60 at x 0.585, z 1.052 (lamp height), domed 12 mm toward the engine | _01, _10 |
+| 3 | Lower tie bar | 40 mm forward + 45 mm lip | 60 mm forward + 25 mm rear lip = 85 mm front to back, 60 mm tall | _16 |
+| 4 | Opening posts and return | Posts 45-60 mm deep, 18 mm flanges; opening return 15 mm | Posts 72-80 mm deep, 25 mm flanges; continuous opening return 20 mm toward the engine | _16 |
+| 5 | Hood-latch support | 120 mm plate, 16 mm tall | 150 mm plate on the rail's front wall, from the rail top to 50 mm under the opening top, 15 mm side flanges, 60 x 25 mm slot, two bolt holes | lead's read of _01 and the owner's photos |
+| 6 | Radiator saddles | Flat 60 x 30 x 25 rubber pads | 70 mm wide brackets standing 60 mm off the rear lip, a formed cup on top with a rubber cushion | 048 |
+| 7 | End walls | 40 mm flange rearward, between the bars | Full height ZB to ZT, 40 mm turned forward off the face edge, following the pan dip, stepping 30 mm inboard below ZB + 0.12, five holes | _03 |
+| 8 | Material | Base 0.13, roughness 0.35 | Base 0.11, roughness 0.38, metallic 0 | lead |
+
+- The height-field pitch is now 6 mm, so the pan walls do not stair-step. GLB 1.49 MB.
+- `strip_and_scan` passes.
+- Removed: the old 2 mm latch doubler on the rail and the hood-latch bracket.
+- Cameras for _03 and _16 are solved from six hand-picked points each: both headlamp and parking-lamp centres at
+  the near end, and the four end corners of the face. The fit is Gauss-Newton with a soft prior on focal length.
+  - _16: f 1812 px, residuals 4-15 px.
+  - _03: f 3439 px, residuals 14-25 px. Its corners sit nearly edge-on, so focal length and distance trade off;
+    this camera is the weaker of the two.
+  - The tape could not be used as a correspondence: none of its marks are pinned to a model point.
+- Least sure:
+  1. Pan outline: inboard rim positions and the trapezoid taper.
+  2. The latch plate hanging 50 mm into the opening top.
+  3. The end-wall step position (z ZB + 0.12) and its 30 mm inboard step.
