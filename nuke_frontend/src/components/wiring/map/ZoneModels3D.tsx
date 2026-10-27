@@ -82,7 +82,8 @@ export default function ZoneModels3D({ cw, ix, site, sel, rel, onSelect, onClear
   const pending = useRef<{ fitSel?: boolean } | null>(null);
   const homed = useRef(false);
   const layerFiles = useLayerFiles();
-  const [layerOn, setLayerOn] = useState<Record<string, boolean>>({});
+  const [layerOn, setLayerOn] = useState<Record<string, boolean>>(
+    () => Object.fromEntries(LAYERS.filter(l => l.off).map(l => [l.id, false])));
 
   // what the loaded layers and parts replace in the zone GLBs (only once they are drawn)
   const hidePats: string[] = [...ZONE_HIDES], keepPats: string[] = [];
