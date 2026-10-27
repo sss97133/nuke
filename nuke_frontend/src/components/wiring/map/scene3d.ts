@@ -178,6 +178,37 @@ export const VIEWS: { id: ViewId; label: string; dir: [number, number, number]; 
 ];
 export const HOME_DIR: [number, number, number] = [1, 0.75, 1.1];
 
+// ── The scene in the URL. A link names the camera, the layers drawn and the harness zones, so a client link lands on the
+// same picture the sender saw. `cam` is a named view ('side' is the driver-side view, 'fit' frames everything drawn);
+// `pose` is camera position then orbit target, scene metres (px,py,pz,tx,ty,tz) and wins over `cam`; `layers` lists
+// exactly the LAYERS ids drawn (absent = each layer's default); `harness` lists the zones (bay,cab,rear) or `off`;
+// `client=1` hides the engineering chrome; `tone=aces` selects the older tone mapping (the default is Neutral).
+export type CamId = ViewId | 'fit';
+const CAM_ALIAS: Record<string, CamId> = { side: 'driver' };
+export interface Scene3dParams {
+  cam: CamId | null; pose: number[] | null; layers: Set<string> | null; zones: Set<ZoneId> | null; client: boolean | null; tone: 'neutral' | 'aces';
+}
+const csv = (v: string | null): string[] | null => (v === null ? null : v.split(',').map(x => x.trim()).filter(Boolean));
+
+export function parseScene3d(p: URLSearchParams): Scene3dParams {
+  const rawCam = p.get('cam')?.trim().toLowerCase() ?? '', camId = CAM_ALIAS[rawCam] ?? rawCam;
+  const cam = camId === 'fit' || VIEWS.some(v => v.id === camId) ? (camId as CamId) : null;
+  const pv = csv(p.get('pose'))?.map(Number) ?? null;
+  const pose = pv && pv.length === 6 && pv.every(Number.isFinite) ? pv : null;
+  const ls = csv(p.get('layers')), layers = ls ? new Set(ls.filter(id => LAYERS.some(l => l.id === id))) : null;
+  const hs = csv(p.get('harness')), zones = hs ? new Set(hs.filter((id): id is ZoneId => ZONES.some(z => z.id === id))) : null;
+  const c = p.get('client');
+  return { cam, pose, layers, zones, client: c === '1' ? true : c === '0' ? false : null, tone: p.get('tone') === 'aces' ? 'aces' : 'neutral' };
+}
+
+/** The URL parameters that describe what is drawn: `layerOn[id] === false` is off, absent is on. */
+export function scene3dPatch(zones: Set<ZoneId>, layerOn: Record<string, boolean>): { layers: string; harness: string } {
+  return {
+    layers: LAYERS.filter(l => layerOn[l.id] !== false).map(l => l.id).join(','),
+    harness: zones.size ? ZONES.filter(z => zones.has(z.id)).map(z => z.id).join(',') : 'off',
+  };
+}
+
 /** Camera distance that fits `box` in view from `dir` (perspective camera), with a margin. */
 export function fitDistance(box: THREE.Box3, dir: THREE.Vector3, cam: THREE.PerspectiveCamera, margin = 1.12): number {
   const d = dir.clone().normalize(), up = new THREE.Vector3(0, 1, 0);
