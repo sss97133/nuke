@@ -149,86 +149,103 @@ class Poly:
         return resample(s.V + d * s.N, 0.004)
 
 
-# ---- outline: traced on WVUT f_0785, passenger end first, clockwise from ahead (pixels), bottom edge replaced by the
-# toe-board line with the tunnel arch so dash and toe board share one edge
-OUTLINE_PX = [(22, 178), (200, 125), (600, 112), (1000, 112), (1400, 118), (1700, 150), (1835, 222), (1845, 300),
-              (1840, 420), (1830, 500), (1750, 590)]
-OUTLINE_PX_P = [(195, 585), (60, 520), (15, 420), (10, 300)]
-TOE_Z0 = 0.827          # dash lower edge, median of the 0785 trace (first version)
-TUN_X, TUN_CROWN = float(PT["tun_top"][0]), float(PT["tun_top"][2])        # -0.020, 0.914 (solved)
-TUN_HALF = abs(float(PT["tun_footP"][0]) - TUN_X)                              # 0.2656: 531 mm at the foot (solved)
-TUN_FLAT = 0.09         # crown half width, 0785 (880-1150 px across the arch top); assumed +/-0.03
+# ---- the owner's cab (scratchpad ref owner-cab, 2026-10-26), primer, straight on: photo 03 cropped to the panel
+# (x 170-650, y 460-660 px) and scaled 3x. Scale from the cowl width: the panel ends sit at crop x 40 and 1380, so
+# 1340 crop px = 1.715 m (1.28 mm/px); height from the heater opening's solved top edge (z 1.062 at crop y 202). The
+# solved layout agrees within 35 mm: blower (-0.749, 0.988) vs -0.774, 1.002; booster (0.39, 1.067) vs 0.364, 1.053;
+# wiper (0.60, 1.158) vs 0.618, 1.157; bulkhead (0.627, 0.962) vs 0.633, 0.928. Where they differ, 03 wins.
+CAB_MPX, CAB_X0, CAB_Y0, CAB_Z0 = 1.715 / 1340, 710, 202, 1.062
+
+
+def cab(X, Y):
+    """03 crop pixel -> (x, z) twin metres on the face."""
+    return np.array([(X - CAB_X0) * CAB_MPX, CAB_Z0 - (Y - CAB_Y0) * CAB_MPX])
+
+
+def cabs(pts):
+    return np.array([cab(*p) for p in pts])
+
+
+TOE_Z0 = float(cab(0, 410)[1])  # dash lower edge, 03 crop y 410 (0.796)
+TUN_X = float(cab(720, 0)[0])   # arch centre, 03 crop x 720 (+0.013)
+TUN_CROWN = float(cab(0, 362)[1])  # arch crown at the dash, 03 crop y 362 (0.857)
+TUN_HALF = 130 * CAB_MPX + 0.02  # 03 arch 590-850 crop px wide at the dash edge (333 mm), plus the foot fillet
 
 
 def arch(x, t=0.0):
-    """Tunnel section height over the toe line at the dash (t=0) and down the toe board (t=1)."""
+    """Semicircular tunnel section (03, 05, 07): 1 at the crown, 0 at the foot, at the dash (t=0) and down the toe
+    board (t=1), where it widens."""
     half = TUN_HALF + 0.035 * t
-    s = 1 - smoothstep(TUN_FLAT, half, np.abs(np.asarray(x) - TUN_X))
-    return s
+    u = np.clip(np.abs(np.asarray(x) - TUN_X) / half, 0, 1)
+    return np.sqrt(np.clip(1 - u ** 2, 0, 1)) * (1 - smoothstep(0.80, 1.0, u)) + 0 * u
 
 
-top = np.array([onface(*p) for p in OUTLINE_PX])
-ps = np.array([onface(*p) for p in OUTLINE_PX_P])
-xb = np.linspace(0.72, -0.70, 285)
+# outline: 03, passenger end (image left) first, clockwise as seen from ahead; ends bulge outboard at mid height
+TOP = cabs([(140, 112), (115, 92), (160, 72), (720, 66), (1290, 72), (1340, 95), (1330, 120), (1365, 175), (1385, 250),
+            (1372, 330), (1320, 395), (1300, 410)])
+PS = cabs([(140, 410), (100, 380), (55, 330), (40, 260), (62, 175)])
+xb = np.linspace(TOP[-1][0], PS[0][0], 300)
 bottom = np.stack([xb, TOE_Z0 + (TUN_CROWN - TOE_Z0) * arch(xb)], 1)
-outline_raw = np.vstack([top[:-1], bottom, ps])
+outline_raw = np.vstack([TOP[:-1], bottom, PS])
 OUTLINE = resample(chaikin(outline_raw, 3), 0.006)
 OUTER = Poly.__new__(Poly)
 OUTER.V = OUTLINE
 
 
 def ear_y(x):
-    # outer ends wrap rearward toward the cowl sides (0009, 0161: the flange tips solve at y -1.43)
-    return 0.02 * smoothstep(0.74, 0.85, np.abs(x))
+    # ends flare forward into the cowl sides (03 rounded ends, 02 and 06 at 3/4; 30 mm assumed +/-15)
+    return -0.030 * smoothstep(0.70, 0.86, np.abs(x))
 
 
-# ---- stamped features (x, z twin metres); each traces to a named photo
-bl, bo, wi, bh = PT["blower"][[0, 2]], PT["booster"][[0, 2]], PT["wiper"][[0, 2]], PT["bulkhead"][[0, 2]]
-hc = (PT["heaterTL"][[0, 2]] + PT["heaterBR"][[0, 2]]) / 2
-hh = np.abs(PT["heaterTL"][[0, 2]] - PT["heaterBR"][[0, 2]]) / 2
-pc = onface(1410, 495)
+# ---- stamped features (x, z twin metres) from the 03 crop; each names its photo
+bl, wi = cab(125, 260), cab(1180, 127)
+bo = cab(1015, 198)
+bh = cab(1200, 280)
+hc, hh = (cab(358, 202) + cab(463, 355)) / 2, np.abs(cab(463, 355) - cab(358, 202)) / 2
+pc = (cab(1020, 300) + cab(1120, 360)) / 2
 
-# Plateaus: (shape, depth y [+ = rearward, into the cab], wall width). Wall width ~ depth gives 4-8 mm bend radii.
+# Plateaus: (shape, depth y [+ = rearward, into the cab], wall width)
 PLATEAUS = [
-    # upper rib band: two long pressings with rounded ends across the upper third (0785 px 180-740 x 200-290 and
-    # 750-1250 x 195-280; 0009, 0161, AMD repro); pressed rearward, depth assumed 10 +/-5 mm
-    (RRect((onface(180, 245) + onface(740, 245)) / 2, (abs(onface(740, 245)[0] - onface(180, 245)[0]) / 2, 0.036), 0.034), 0.010, 0.012),
-    (RRect((onface(752, 238) + onface(1250, 238)) / 2, (abs(onface(1250, 238)[0] - onface(752, 238)[0]) / 2, 0.034), 0.032), 0.010, 0.012),
-    # centre plateau between heater and booster, pressed forward (0785 diagonal steps px 700/1250 at the top to
-    # 670/1290 at the arch; AMD repro); depth assumed 8 +/-4 mm
-    (Poly([onface(*p) for p in ((705, 305), (1245, 305), (1285, 470), (1130, 460), (1000, 440), (880, 455), (690, 480))]), -0.008, 0.012),
-    # booster / master-cylinder pad: recessed plate (0785 dark plate px 1310-1500 x 205-410; 0009, 0161, 0289)
-    (RRect((onface(1310, 205) + onface(1500, 410)) / 2, np.abs(onface(1500, 410) - onface(1310, 205)) / 2, 0.012), 0.007, 0.010),
-    # blower ring: raised annulus around the blower hole (0785 ring ~230 px across; 0009, OxeW 0547, 058)
-    (Circle(bl, 0.090), -0.014, 0.016),
-    # wiper-motor pad: a low round boss (0785 px 1600-1665 hole in a flat ring ~110 px; 0009, 0161)
-    (Circle(wi, 0.050), -0.004, 0.008),
-    # bulkhead pad: a shallow recess around the connector opening (0009 px 1650-1770 x 630-720; 0161, owner 058)
-    (RRect(bh, (0.048, 0.068), 0.012), 0.004, 0.008),
+    # the big centre pressing: an arched-top pocket from the tunnel arch up to near the cowl (03 crop x 500-940,
+    # top y 85; 05 and 07 the same). Ceiling lights put its upper wall in shadow, so it is pressed REARWARD (into the
+    # cab), continuous with the tunnel; depth assumed 60 +/-20 mm (no side view of it)
+    (Poly(cabs([(505, 398), (498, 260), (515, 165), (565, 100), (720, 84), (880, 98), (928, 165), (942, 280),
+                (936, 398), (860, 398), (800, 352), (720, 338), (640, 352), (585, 398)])), 0.060, 0.070),
+    # upper band: the strip from the crease (crop y 175-215) to the top, cut diagonally at both ends toward the cowl
+    # corners (03, 05); stands forward of the lower face, 6 mm assumed +/-4
+    (Poly(cabs([(112, 105), (232, 212), (330, 196), (500, 178), (950, 182), (1232, 212), (1335, 108), (1300, 78),
+                (720, 72), (150, 80)])), -0.006, 0.010),
+    # passenger end: raised bulb around the blower hole inside the diagonal crease (03 crop 40-235, 01 ring)
+    (Circle(bl, 0.088), -0.012, 0.016),
+    # driver pedal/booster support plate: raised plate with a diagonal outboard edge (03 crop, 05, 08; 01 detail)
+    (Poly(cabs([(952, 115), (1068, 110), (1078, 175), (1168, 335), (1162, 402), (985, 405), (962, 330), (950, 250)])), -0.005, 0.008),
+    # heater frame: raised rectangle around and below the heater opening (01 bare metal, 03)
+    (RRect((cab(330, 190) + cab(480, 375)) / 2, np.abs(cab(480, 375) - cab(330, 190)) / 2, 0.015), -0.004, 0.008),
+    # wiper-motor boss (03, 05)
+    (Circle(wi, 0.045), -0.004, 0.008),
+    # small domed boss at the top of the centre pocket (03 crop 755, 192; 05)
+    (Circle(cab(755, 192), 0.012), -0.005, 0.008),
 ]
-# four booster stud bosses on the GM booster's 3.38 in (86 mm) square (pattern assumed; studs visible in 0009 and 0161)
-for dx in (-0.043, 0.043):
-    for dz in (-0.043, 0.043):
-        PLATEAUS.append((Circle(bo + (dx, dz), 0.011), -0.003, 0.005))
-# heater opening rim: a raised frame around the opening (0785, 0009, AMD repro)
-PLATEAUS.append((RRect(hc, hh + 0.016, 0.018), -0.004, 0.008))
+# plate studs: two at the top of the plate (03 crop 985/1050, 130; 05 the same pair)
+for p in ((985, 130), (1050, 130)):
+    PLATEAUS.append((Circle(cab(*p), 0.009), -0.006, 0.005))
 
-# Openings: (shape, flange length rearward, name). Turned-in flanges where the photos show a rolled edge.
+# Openings: (shape, flange length rearward, name)
 HOLES = [
-    (Circle(bl, 0.0567), 0.006, "blower_hole"),                  # 0785 hole 65-190 px; rolled lip (OxeW 0547)
-    (RRect(hc, hh, 0.008), 0.012, "heater_opening"),             # solved corners; flange (0009, AMD repro)
-    (Circle(bo, 0.0272), 0.0, "booster_hole"),                   # 0785 1358-1418 px
-    (Circle(wi, 0.0295), 0.0, "wiper_motor_hole"),               # 0785 1600-1665 px
-    (RRect(bh, (0.0275, 0.045), 0.005), 0.008, "bulkhead_hole"),  # owner 058 connector; flange (0161)
-    (RRect(pc, (0.0635, 0.050), 0.018), 0.008, "pedal_column_opening"),  # 0785 1340-1480 x 440-550 px
+    (Circle(bl, 43 * CAB_MPX), 0.006, "blower_hole"),              # 03 crop 86 px across; rolled lip (01)
+    (RRect(hc, hh, 0.006), 0.012, "heater_opening"),               # 03 crop 358-463 x 202-355
+    (Circle(bo, 16 * CAB_MPX), 0.0, "steering_column_hole"),       # 03 crop 1015, 198 (plate hole)
+    (Circle(wi, 20 * CAB_MPX), 0.0, "wiper_motor_hole"),           # 03 crop 1180, 127
+    (RRect(bh, np.abs(cab(1225, 302) - cab(1175, 258)) / 2, 0.004), 0.008, "bulkhead_hole"),  # 03 crop 1175-1225 x 258-302
+    (RRect(pc, np.abs(cab(1120, 360) - cab(1020, 300)) / 2, 0.020), 0.008, "column_seal_opening"),  # 03 crop, 01, 05
 ]
-for c in (onface(300, 345), onface(290, 378), onface(660, 300)):  # small harness/cable holes (0785)
-    HOLES.append((Circle(c, 0.009), 0.0, "small_hole"))
+for p, r in (((258, 232), 10), ((238, 258), 10), ((497, 192), 12), ((943, 198), 9), ((1115, 218), 9), ((1258, 338), 9),
+             ((1215, 355), 9), ((965, 268), 7), ((1062, 262), 7)):  # small holes beside the blower and on the plate (03)
+    HOLES.append((Circle(cab(*p), r * CAB_MPX), 0.0, "small_hole"))
 
-# Bead along the tunnel arch on the dash: 3 mm high, 9 mm wide, 28 mm off the edge (0785 bright line along the arch,
-# 0553 seam close-up, AMD repro lip)
+# bead along the tunnel arch on the dash (03 lip at crop y 345-385, 05)
 ARCH_LINE = bottom[(np.abs(bottom[:, 0] - TUN_X) < TUN_HALF + 0.05)]
-BEAD_OFF, BEAD_H, BEAD_W = 0.028, -0.003, 0.009
+BEAD_OFF, BEAD_H, BEAD_W = 0.022, -0.004, 0.010
 
 
 def dist_polyline(P, L):
@@ -381,7 +398,7 @@ def toe_mesh():
     for t in ts:
         y = FACE_Y + t * (TOE_Y1 - FACE_Y)
         zf = TOE_Z0 + t * (TOE_Z1 - TOE_Z0)
-        hgt = (TUN_CROWN - TOE_Z0) + 0.10 * t  # tunnel rises over the falling toe board (assumed +/-0.03)
+        hgt = (TUN_CROWN - TOE_Z0) + 0.12 * t  # crown holds level while the toe board falls (assumed +/-0.03)
         z = zf + hgt * arch(xs, t)
         # stiffening bead on each flank of the hump (0553)
         dx = np.abs(np.abs(xs - TUN_X) - (TUN_HALF + 0.035 * t + 0.03))
@@ -396,13 +413,14 @@ toe = toe_mesh()
 
 
 def cowl_side(sign):
-    """Kick panel the fender bolts to: a wall at the FR-88 cowl point x from the flange tip (solved z) down to the
-    toe line, y -1.43 to -1.25, rounded corners, a 20 mm flange turned inboard at its front edge to meet the dash's end
-    flange; extents assumed +/-0.05 m (repro kick-panel photos only, no real bare cab side in the set)."""
+    """Cowl side (kick panel) the fender bolts to: from the FR-88 cowl point x at its rear (y -1.25) it flares
+    outboard 50 mm and forward to the dash's flared end (y -1.47), as the owner's cab shows at 3/4 (owner-cab 02, 06,
+    10); top at the flange tip (solved z), bottom at the toe line; a 20 mm flange turned inboard at its front edge.
+    Flare and extents assumed +/-0.02 / +/-0.05 m."""
     x = sign * 0.8575
     z0, z1 = TOE_Z0 - 0.02, float(PT["ear_P"][2])
-    pr = RRect(((-1.43 - 1.25) / 2, (z0 + z1) / 2), (0.09, (z1 - z0) / 2), 0.03)
-    ys, zs = np.arange(-1.43, -1.25 + 1e-6, 0.008), np.arange(z0, z1 + 1e-6, 0.008)
+    pr = RRect(((-1.47 - 1.25) / 2, (z0 + z1) / 2), (0.11, (z1 - z0) / 2), 0.03)
+    ys, zs = np.arange(-1.47, -1.25 + 1e-6, 0.008), np.arange(z0, z1 + 1e-6, 0.008)
     Y, Z = np.meshgrid(ys, zs)
     P = np.stack([Y.ravel(), Z.ravel()], 1)
     keep = pr.sd(P) < 0
@@ -411,17 +429,19 @@ def cowl_side(sign):
     Vv, _, Fv, _, _, _ = geometry.delaunay_2d_cdt(pts2, [(i, (i + 1) % nb) for i in range(nb)], [], 0, 1e-6)
     Vv = np.array([tuple(v) for v in Vv])
     Fv = [f for f in Fv if pr.sd(np.array([Vv[list(f)].mean(0)]))[0] < 0]
-    verts = [(x, v[0], v[1]) for v in Vv]
+    def fx(y):
+        return sign * (0.8575 + 0.05 * np.clip((-1.25 - y) / 0.22, 0, 1) ** 2)
+    verts = [(fx(v[0]), v[0], v[1]) for v in Vv]
     # front flange: boundary verts at the front (y < -1.42) turn inboard
     faces = [tuple(f) for f in Fv]
-    front = [i for i, v in enumerate(Vv) if v[0] < -1.425 and abs(pr.sd(np.array([v]))[0]) < 1e-3]
+    front = [i for i, v in enumerate(Vv) if v[0] < -1.465 and abs(pr.sd(np.array([v]))[0]) < 1e-3]
     front.sort(key=lambda i: Vv[i][1])
     ring = {}
     for i in front:
         ids = []
         for a, b in ((0.0006, 0.0015), (0.0025, 0.0035), (0.005, 0.0045), (0.020, 0.005)):
             ids.append(len(verts))
-            verts.append((x - sign * a, Vv[i][0] - b + 0.0, Vv[i][1]))
+            verts.append((fx(Vv[i][0]) - sign * a, Vv[i][0] - b + 0.0, Vv[i][1]))
         ring[i] = ids
     for a, b in zip(front[:-1], front[1:]):
         ca, cb = [a] + ring[a], [b] + ring[b]
@@ -448,12 +468,14 @@ LANDMARKS = {
 print("LANDMARKS", json.dumps(LANDMARKS))
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
-mat = bpy.data.materials.new("firewall_primer")
+mat = bpy.data.materials.new("firewall_paint")
 mat.use_nodes = True
 bsdf = mat.node_tree.nodes["Principled BSDF"]
-bsdf.inputs["Base Color"].default_value = (0.055, 0.057, 0.06, 1)  # satin dark grey primer
-bsdf.inputs["Metallic"].default_value = 0.0
-bsdf.inputs["Roughness"].default_value = 0.5
+bsdf.inputs["Base Color"].default_value = (0.11, 0.010, 0.014, 1)  # the cab's deep metallic maroon (owner-cab 08-14)
+bsdf.inputs["Metallic"].default_value = 0.55
+bsdf.inputs["Roughness"].default_value = 0.32
+bsdf.inputs["Coat Weight"].default_value = 1.0  # clear (exports as KHR_materials_clearcoat)
+bsdf.inputs["Coat Roughness"].default_value = 0.05
 
 for name, (Vp, Fp) in parts.items():
     me = bpy.data.meshes.new(name)
