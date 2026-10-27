@@ -118,14 +118,16 @@ BEGIN
     END IF;
   END LOOP;
 
-  -- 3: typed facts (cells vehicle_fact_*) through the sanctioned vehicle writers
+  -- 3: typed facts (cells vehicle_fact_*, landed by scripts/books/vehicle_facts.py as their own revisioned original; each names the
+  -- source_key of the current books decision it rests on) through the sanctioned vehicle writers
   FOR f IN
-    SELECT e.owner_id, e.document_id, e.value_normalized->'value' AS val, e.value_normalized->'evidence' AS ev
+    SELECT e.owner_id, rec.document_id, e.value_normalized->'value' AS val, e.value_normalized->'evidence' AS ev
     FROM financial_document_extractions e
+    CROSS JOIN LATERAL (SELECT r.document_id FROM v_financial_accounting_records r
+                        WHERE r.owner_id = e.owner_id AND r.record_kind = 'retained_ledger_decision'
+                          AND r.record->>'source_key' = e.value_normalized->'value'->>'source_key' LIMIT 1) rec
     WHERE NOT e.is_superseded AND e.field_key LIKE 'vehicle\_fact\_%'
       AND (p_owner_id IS NULL OR e.owner_id = p_owner_id)
-      AND EXISTS (SELECT 1 FROM v_financial_accounting_records r WHERE r.owner_id = e.owner_id AND r.document_id = e.document_id
-                  AND r.record->>'source_key' = e.value_normalized->'value'->>'source_key' AND r.record_kind = 'retained_ledger_decision')
     LIMIT p_limit
   LOOP
     v_facts := v_facts + 1;
