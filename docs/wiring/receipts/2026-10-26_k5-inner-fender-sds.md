@@ -66,3 +66,13 @@ two rim points); b_jegs_3 RMS 23.7 px (6: three front-flange holes, cup, leg tip
 (4: rear-panel hole, leg hole, leg tip, front tail tip). The b_jegs_5 point match did not converge (RMS 90 px). Its
 side-by-side uses a silhouette fit, which still shows the part from the wrong end.
 The dome is 0.06 m lower than a level-camera reading of b_jegs_7, because the solved camera sits above the rim.
+
+## Fourth pass (dome from a cut superellipsoid)
+The dome is now a superellipsoid with |x/A|^2 + |y/B|^4 + |z/C|^2 = 1, sitting on the rail plane. It is cut by the
+rim plane (x 0.835), the rail plane and the two end planes, and the inboard-upper part is kept. Its cut edge on the rim
+plane is the wheel arch (apex z 0.86, 0.05 m behind CF.FA_Y). A fillet strip steps out to the beaded band at x 0.858.
+The front cup is a separate bevelled dish set into a cut opening. The front-flange and bottom-flange ribs are separate
+bevelled bars. The rear-panel crease is in the panel grid. Nothing is pressed into a smoothed mesh.
+C = 0.34 (crown z 0.96). With a 1.02 crown, the point-matched b_jegs_7 camera dropped below the rim and looked into
+the wheel well, which the photo does not show. With 0.96 the camera sits at z 1.17 (RMS 7.8 px).
+b_jegs_3 (RMS 41 px), b_jegs_1 (36 px) and b_jegs_5 (74 px) do not solve to a few pixels against this shape.
