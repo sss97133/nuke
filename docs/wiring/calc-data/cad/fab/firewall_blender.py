@@ -377,9 +377,12 @@ def flanged(V2, F):
     length[on_outer & ~bottom_edge] = np.where(np.abs(P[on_outer & ~bottom_edge, 0]) > 0.80, 0.030, 0.025)
     length[on_outer & (P[:, 1] > 1.19) & (np.abs(P[:, 0]) < 0.79)] = 0.0  # top edge: pinch-weld flange (own part)
     gin[on_outer] = g_out[on_outer]
-    for sh, L, _ in HOLES:
+    for sh, L, nm in HOLES:
         m = (np.abs(sh.sd(P)) < 0.002) & ~on_outer
-        length[m] = max(L, 0.003)  # every opening gets at least a 3 mm rolled edge, so it catches a highlight
+        length[m] = max(L, 0.003)
+        if nm == "column_seal_opening":  # toothed seal flange: 10 mm tabs on a ~14 mm pitch (driver_plate_34_full)
+            ang = np.arctan2(P[m, 1] - sh.c[1], P[m, 0] - sh.c[0])
+            length[m] = np.where(np.sin(ang * 24) > 0, 0.010, 0.003)  # every opening gets at least a 3 mm rolled edge, so it catches a highlight
         gin[m] = -sd_grad(sh.sd, P[m]) if m.any() else gin[m]
     verts = [tuple(v) for v in Vf]
     faces = [tuple(f) for f in F]
