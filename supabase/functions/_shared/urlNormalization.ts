@@ -15,6 +15,8 @@
  *   // result.normalized === "https://jamesedition.com/cars/.../for-sale-14855981"
  */
 
+import { vicariListingId, vicariUrl } from "./vicariParser.ts";
+
 export interface NormalizedUrl {
   /** Original URL as received */
   original: string;
@@ -64,6 +66,10 @@ export function normalizeListingUrl(url: string | null | undefined): NormalizedU
   if (!url || typeof url !== "string" || url.trim().length === 0) return null;
 
   const trimmed = url.trim();
+
+  // Vicari's query parameter is the identity; stripping it collapses every lot into one URL.
+  const vicariId = vicariListingId(trimmed);
+  if (vicariId) return { original: trimmed, normalized: vicariUrl(vicariId), canonicalListingId: `vicari:${vicariId}`, platform: "vicari" };
 
   // JamesEdition: extract numeric listing ID (7+ digits)
   // Clean: /for-sale-14855981
