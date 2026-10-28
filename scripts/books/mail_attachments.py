@@ -43,7 +43,7 @@ def fetch_with_mail_app(account, mailbox, header, outdir, prefix):
     return saved & "<<BODY>>" & (content of m)
   end tell
 end run'''
-    r = subprocess.run(['osascript', '-e', script, account, mailbox, header.strip('<>'), outdir + '/', prefix], capture_output=True, text=True, timeout=240)
+    r = subprocess.run(['osascript', '-e', script, account, mailbox, header.strip('<>'), outdir + '/', prefix], capture_output=True, text=True, timeout=90)
     if r.returncode:
         raise RuntimeError(r.stderr[-300:])
     names, _, body = r.stdout.partition('<<BODY>>')
@@ -65,10 +65,11 @@ def main():
     rows = db.execute("""select m.ROWID, mb.url, g.message_id_header, s.subject, m.date_sent, ad.address, group_concat(at.name, '|')
         from messages m join mailboxes mb on mb.ROWID = m.mailbox join subjects s on s.ROWID = m.subject
         left join addresses ad on ad.ROWID = m.sender join message_global_data g on g.ROWID = m.global_message_id join attachments at on at.message = m.ROWID
-        where m.ROWID > ? and m.deleted = 0 group by m.ROWID order by m.ROWID limit ?""", (start, a.limit * 20)).fetchall()
+        where m.ROWID > ? and m.deleted = 0 group by m.ROWID order by m.ROWID limit ?""", (start, 200000)).fetchall()
     emails_path = os.path.join(out, 'emails.json')
     emails = json.load(open(emails_path)) if os.path.exists(emails_path) else []
     have = {e['id'] for e in emails}
+    failed = cur.get('failed', {})
     scanned = opened = saved = 0
     last = start
     for row, url, header, subject, sent, sender, names in rows:
@@ -83,14 +84,16 @@ def main():
         mbpath = unquote(mbpath)
         if not header:
             continue
+        if failed.get(str(row), 0) >= 3:
+            continue
         opened += 1
         mid = f'mail:{row}'
         try:
             names_saved, body = fetch_with_mail_app(acct, mbpath.split('/')[-1], header, os.path.join(out, 'pdf'), f'mail-{row}-')
-        except Exception as e:   # leave the cursor behind this message so the next run retries it
-            print(json.dumps(dict(error=str(e)[:200], row=row)), file=sys.stderr)
-            last = row - 1
-            break
+        except Exception as e:   # Mail could not hand it over (timeout, offline): retry on later runs, give up after 3 tries
+            failed[str(row)] = failed.get(str(row), 0) + 1
+            print(json.dumps(dict(error=str(e)[:200], row=row, tries=failed[str(row)])), file=sys.stderr)
+            continue
         saved += len(names_saved)
         if mid not in have:
             emails.append({'id': mid, 'date': dt.datetime.fromtimestamp(sent, dt.timezone.utc).isoformat() if sent else None, 'from': sender,
@@ -98,7 +101,7 @@ def main():
     json.dump(emails, open(emails_path + '.tmp', 'w'))
     os.replace(emails_path + '.tmp', emails_path)
     exhausted = (not rows) or last == rows[-1][0]
-    cur = {'row': last, 'last_run': dt.datetime.now(dt.timezone.utc).isoformat(timespec='seconds')}
+    cur = {'row': last, 'failed': failed, 'last_run': dt.datetime.now(dt.timezone.utc).isoformat(timespec='seconds')}
     json.dump(cur, open(cpath + '.tmp', 'w'))
     os.replace(cpath + '.tmp', cpath)
     print(json.dumps(dict(from_row=start, to_row=last, scanned_with_attachments=scanned, opened=opened, pdfs_saved=saved, caught_up=exhausted)))
