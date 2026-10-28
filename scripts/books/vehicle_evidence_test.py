@@ -57,6 +57,29 @@ class T(unittest.TestCase):
         self.assertEqual(ve.parse_date('MAY 14 2022'), '2022-05-14')
         self.assertEqual(ve.money('(1,200.50)'), 1200.5)
 
+    def test_agreement_whose_counterparty_is_not_the_payer_is_void(self):
+        a = ve.cand(V, 'sale', 24000, '2030-03-01', 'Alpha Failed', 'pdf_form', 'pdf:a.pdf', 0.8, 'claim')
+        r1 = ve.cand(V, 'deposit', 20000, '2030-03-05', 'Bravo Paid', 'gl', 'gl:1', 0.9, 'proof', channel='bank')
+        r2 = ve.cand(V, 'deposit', 500, '2030-03-02', 'Bravo Paid', 'gl', 'gl:2', 0.9, 'proof', channel='bank')
+        r = ve.reconcile([a, r1, r2], set(), {})[0]
+        self.assertEqual((r['status'], r['value']), ('receipts_only', 20500.0))
+        self.assertEqual(a['role'], 'void')
+        self.assertFalse(any('disagree' in x or 'differs' in x for x in r['conflicts']))
+
+    def test_owner_statement_voids_a_matching_agreement(self):
+        a = ve.cand(V, 'sale', 24000, '2030-03-01', 'Alpha Failed', 'pdf_form', 'pdf:a.pdf', 0.8, 'claim')
+        r1 = ve.cand(V, 'deposit', 9000, '2030-03-05', None, 'gl', 'gl:1', 0.9, 'proof', channel='bank')
+        facts = [dict(vehicle_id=V, event='sale', counterparty_tokens=ve._name_tokens('Alpha Failed'), stated='test')]
+        r = ve.reconcile([a, r1], set(), {}, facts)[0]
+        self.assertEqual((r['status'], r['value']), ('receipts_only', 9000.0))
+
+    def test_agreement_paid_by_its_counterparty_stays(self):
+        a = ve.cand(V, 'sale', 9000, '2030-03-01', 'Bravo Paid', 'pdf_form', 'pdf:a.pdf', 0.8, 'claim')
+        r1 = ve.cand(V, 'deposit', 9000, '2030-03-05', 'Bravo Paid', 'gl', 'gl:1', 0.9, 'proof', channel='bank')
+        r = ve.reconcile([a, r1], set(), {})[0]
+        self.assertEqual(r['status'], 'reconciled')
+
+
 
 if __name__ == '__main__':
     unittest.main()
