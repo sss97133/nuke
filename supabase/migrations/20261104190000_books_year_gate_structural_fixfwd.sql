@@ -7,11 +7,13 @@
 -- previous gate stayed in place, so the R6 and R10 changes that migration describes did not apply.
 --
 -- Below is the same function text, byte for byte, with a 90 s lock_timeout so the replace waits for that transaction to finish
--- instead of failing. statement_timeout is not set here (the deploy job passes PGOPTIONS statement_timeout=120s).
+-- instead of failing. statement_timeout is set to 120 s, the bound the deploy job passes in PGOPTIONS: that option is not known
+-- to reach a pooled session, and the role default (10 s) would end the wait early.
 -- CREATE OR REPLACE keeps the function's owner, grants and comment; the original file has no GRANT or COMMENT after line 700,
 -- so none follows.
 
 SET lock_timeout = '90s';
+SET statement_timeout = '120s';
 
 CREATE OR REPLACE FUNCTION public.books_year_gate(p_owner_id uuid, p_year integer)
  RETURNS jsonb
