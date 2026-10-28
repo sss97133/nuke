@@ -18,11 +18,29 @@ export const vicariUrl = (id: string): string => `https://vicariauction.com/auct
 const clean = (s: string): string => htmlToText(s).replace(/[ \t]+/g, " ").trim();
 const known = (s?: string): string | null => s && !/^(?:n\/?a|unknown|none|-+)$/i.test(s.trim()) ? s.trim() : null;
 
+// Repeat removal so malformed nested markup cannot reassemble a comment/script around fake lot claims.
+function visibleMarkup(html: string): string {
+  let previous: string;
+  do {
+    previous = html;
+    html = html.replace(/<!--[\s\S]*?-->/g, "").replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1>/gi, "");
+  } while (html !== previous);
+  return html;
+}
+
+function meta(body: string, property: string): string | null {
+  for (const m of body.matchAll(/<meta\b[^>]*>/gi)) {
+    if (m[0].match(/\bproperty=["']([^"']+)["']/i)?.[1] !== property) continue;
+    return clean(m[0].match(/\bcontent="([^"]*)"/i)?.[1] ?? m[0].match(/\bcontent='([^']*)'/i)?.[1] ?? "");
+  }
+  return null;
+}
+
 export interface VicariListing {
   source_id: string;
   source_url: string;
   title: string;
-  lot_number: string;
+  lot_number: string | null;
   auction_name: string | null;
   raw_fields: Record<string, string>;
   year: number | null;
@@ -40,10 +58,9 @@ export interface VicariListing {
 export function parseVicariListing(html: string, url: string): VicariListing {
   const id = vicariListingId(url);
   if (!id) throw new Error("invalid_vicari_listing_url");
-  const body = html.replace(/<!--[\s\S]*?-->/g, "").replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1>/gi, "");
-  const title = [...body.matchAll(/<h3\b[^>]*>([\s\S]*?)<\/h3>/gi)].map(m => clean(m[1])).find(t => /^Lot\s+\S+\s*[–—-]/i.test(t));
-  const lot = title?.match(/^Lot\s+(\S+)\s*[–—-]/i)?.[1];
-  if (!title || !lot) throw new Error("vicari_lot_heading_missing");
+  const body = visibleMarkup(html);
+  const declaredUrl = meta(body, "og:url");
+  if (declaredUrl && vicariListingId(declaredUrl) !== id) throw new Error("vicari_page_listing_mismatch");
   const fields: Record<string, string> = {};
   for (const block of body.matchAll(/<ul\b[^>]*class=["'][^"']*\bdetail\b[^"']*["'][^>]*>([\s\S]*?)<\/ul>/gi)) {
     for (const item of block[1].matchAll(/<li\b[^>]*>([\s\S]*?)<\/li>/gi)) {
@@ -55,6 +72,14 @@ export function parseVicariListing(html: string, url: string): VicariListing {
     }
   }
   if (!["Year", "Make", "Model"].every(k => k in fields)) throw new Error("vicari_attribute_block_missing");
+  const headings = [...body.matchAll(/<h3\b[^>]*>([\s\S]*?)<\/h3>/gi)].map(m => clean(m[1]));
+  const identity = clean([fields.Year, fields.Make, fields.Model].join(" "));
+  // Older archives omit the lot prefix from their heading, but retain the same labeled identity fields.
+  const title = headings.find(t => /^Lot\s+\S+\s*[–—-]/i.test(t))
+    ?? headings.find(t => t.toLowerCase() === identity.toLowerCase());
+  if (!title) throw new Error("vicari_lot_heading_missing");
+  const lot = title.match(/^Lot\s+(\S+)\s*[–—-]/i)?.[1]
+    ?? meta(body, "og:description")?.match(/\bLot:\s*([^\s–—]+)\s*[–—-]/i)?.[1] ?? null;
   const images = new Set<string>();
   for (const tag of body.matchAll(/<img\b[^>]*>/gi)) {
     const src = tag[0].match(/\bsrc=["']([^"']+)["']/i)?.[1];
@@ -68,7 +93,7 @@ export function parseVicariListing(html: string, url: string): VicariListing {
       images.add(u.href);
     } catch (e) { if (e instanceof Error && e.message === "vicari_image_listing_mismatch") throw e; }
   }
-  const auction = body.match(/<h2\b[^>]*>\s*Lot\s+[^<]*<a\b[^>]*>([\s\S]*?)<\/a>/i);
+  const auction = body.match(/<h2\b[^>]*>\s*(?:Lot\s+[^<]*)?<a\b[^>]*>([\s\S]*?)<\/a>/i);
   const text = clean(body);
   const archive = /This is an ARCHIVE listing/i.test(text);
   const forSale = /This Car is Still\s*(?:For\s*Sale|FOR SALE)/i.test(text);
@@ -90,7 +115,13 @@ export function parseVicariListing(html: string, url: string): VicariListing {
 
 /** Follow only links actually advertised by the public catalog; never enumerate numeric ahid guesses. */
 export function vicariCatalogLinks(html: string, base: string): { lots: string[]; catalogs: string[] } {
+  html = visibleMarkup(html);
   const lots = new Set<string>(), catalogs = new Set<string>();
+  const current = new URL(base);
+  const lastLink = [...html.matchAll(/<a\b[^>]*>/gi)]
+    .find(m => /\bclass=["'][^"']*\b(?:OFF)?pagination_far_right\b/.test(m[0]))?.[0];
+  const lastHref = lastLink?.match(/\bhref=["']([^"']+)["']/i)?.[1];
+  const lastPage = lastHref ? Number(new URL(lastHref.replace(/&amp;/g, "&"), base).searchParams.get("page")) : null;
   for (const m of html.matchAll(/<a\b[^>]*\bhref=["']([^"']+)["']/gi)) {
     try {
       const u = new URL(m[1].replace(/&amp;/g, "&"), base);
@@ -98,6 +129,10 @@ export function vicariCatalogLinks(html: string, base: string): { lots: string[]
       const id = vicariListingId(u.href);
       if (id) { lots.add(vicariUrl(id)); continue; }
       if (!/^\/auction-house(?:\/\d+)?\/?$/.test(u.pathname) || !u.searchParams.has("ahcode") || u.searchParams.has("soldpa")) continue;
+      const page = Number(u.searchParams.get("page") || "1");
+      if (!Number.isInteger(page) || page < 1) continue;
+      // Vicari emits a next-page anchor even beyond its declared final page.
+      if (u.searchParams.get("ahcode") === current.searchParams.get("ahcode") && lastPage && page > lastPage) continue;
       const out = new URL("https://www.vicariauction.com/auction-house/");
       out.searchParams.set("ahcode", u.searchParams.get("ahcode")!);
       out.searchParams.set("page", u.searchParams.get("page") || "1");

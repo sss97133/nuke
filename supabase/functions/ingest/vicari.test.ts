@@ -43,6 +43,28 @@ Deno.test("catalog discovery keeps only observed lots and unfiltered auction pag
     <a href="https://evil.example/auction-house/?ahid=5">external</a>`, "https://www.vicariauction.com/auction-house/");
   eq(links.lots, [url]); eq(links.catalogs, ["https://www.vicariauction.com/auction-house/?ahcode=CTC+2026&page=2"]);
 });
+Deno.test("older archive headings keep literal identity and metadata lot number", () => {
+  const old = html.replace("Lot F1 &ndash; <a>", "<a>").replace("Lot F1 &ndash; 1967", "1967");
+  const metadata = `<meta property="og:url" content="${url}"><meta property="og:description" content="Upcoming Auction, is Lot:F1 &ndash; a 1967 FORD MUSTANG">`;
+  const lot = parseVicariListing(metadata + old, url);
+  eq([lot.title, lot.lot_number, lot.auction_name], ["1967 FORD MUSTANG", "F1", "Example, 2026 Auction"]);
+  eq(parseVicariListing(old, url).lot_number, null);
+  let failed = false;
+  try { parseVicariListing(metadata.replace("ahid=123", "ahid=124") + old, url); } catch { failed = true; }
+  eq(failed, true);
+});
+Deno.test("reassembled comments and scripts cannot introduce source claims", () => {
+  const fake = `<h3>Lot FAKE - 2000 FORD FAKE</h3><a href="?ahid=999">fake</a>`;
+  const hidden = `<!----><!--${fake}--><scr<script></script>ipt>${fake}</script><!<!--x-->--${fake}-->`;
+  eq(parseVicariListing(hidden + html, url).title, "Lot F1 - 1967 FORD MUSTANG");
+  eq(vicariCatalogLinks(hidden, url).lots, []);
+});
+Deno.test("catalog discovery stops at the advertised final page", () => {
+  const links = vicariCatalogLinks(`<a class="pagination_right" href="?ahcode=OLD&page=22">next</a>
+    <a class="OFFpagination_far_right" href="?ahcode=OLD&page=14">last</a>
+    <a class="ahname" href="?ahcode=OTHER&page=1">another auction</a>`, "https://www.vicariauction.com/auction-house/?ahcode=OLD&page=21");
+  eq(links.catalogs, ["https://www.vicariauction.com/auction-house/?ahcode=OLD&page=14", "https://www.vicariauction.com/auction-house/?ahcode=OTHER&page=1"]);
+});
 
 async function world(failure?: "archive" | "admission" | "readback" | "images" | "identity", unresolved = false) {
   const body = unresolved ? html.replace("Year: 1967", "Year: N/A") : html;
