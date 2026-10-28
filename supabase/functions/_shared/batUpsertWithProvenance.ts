@@ -80,13 +80,20 @@ function valuesMatch(existing: any, proposed: any, field: string): boolean {
   return normalizeForComparison(existing) === normalizeForComparison(proposed);
 }
 
+/**
+ * The values extraction_metadata_validation_status_check accepts
+ * (supabase/migrations/20251202_extraction_provenance_system.sql). A receipt with any other status is refused with
+ * 23514, and the insert below does not throw on that, so the receipt would be lost without a trace.
+ */
+type ReceiptStatus = "unvalidated" | "valid" | "invalid" | "conflicting" | "low_confidence";
+
 /** Write an extraction_metadata receipt row */
 async function writeReceipt(
   ctx: TetrisContext,
   field: string,
   value: any,
   metadata: ProvenanceMetadata,
-  validationStatus: string = "unvalidated",
+  validationStatus: ReceiptStatus = "unvalidated",
 ): Promise<void> {
   try {
     const v = String(value ?? "").trim();
@@ -179,8 +186,10 @@ export async function upsertFieldWithProvenance(
   }
 
   if (valuesMatch(existingValue, proposedValue, field)) {
-    // CONFIRMATION — don't overwrite, just add verification receipt
-    await writeReceipt(ctx, field, proposedValue, metadata, "confirmed");
+    // CONFIRMATION — don't overwrite, just add verification receipt.
+    // "valid" is the CHECK's word for a confirmed value ("Confirmed correct" in the creating migration). This sent
+    // "confirmed", which the CHECK refuses, so no confirmation receipt ever landed.
+    await writeReceipt(ctx, field, proposedValue, metadata, "valid");
     return { action: "confirmation", field, value: proposedValue, existing_value: existingValue };
   }
 
