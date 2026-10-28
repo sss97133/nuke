@@ -115,21 +115,12 @@ async function main() {
             described++;
           } catch (e) {
             // Generate description may not exist or may fail — that's ok
-            // Fall back to a simple description from what we know
-            const price = v.sale_price || v.asking_price;
-            const loc = [v.city, v.state].filter(Boolean).join(", ") || v.location || "";
-            const parts = [
-              `${v.year} ${v.make} ${v.model || ""}`.trim(),
-              v.trim ? `${v.trim} trim` : null,
-              price ? `listed at $${price.toLocaleString()}` : null,
-              loc ? `located in ${loc}` : null,
-              v.auction_source ? `sourced from ${v.auction_source.replace(/_/g, " ")}` : null,
-              `${v.image_count} photos on file`,
-            ].filter(Boolean);
-
-            const desc = parts.join(". ") + ".";
-
-            await sb.from("vehicles").update({ description: desc }).eq("id", v.id);
+            // Fall back to the database's own composer (compose_vehicle_description): identity, the sold price and date when
+            // reconciled, location, photo count. It never prints "listed at" for a sold car or an internal source token like
+            // "user-submission" (the old template did, so a reconciled sale still read as a $45,000 listing).
+            const { data: desc, error: composeErr } = await sb.rpc("compose_vehicle_description", { p_vehicle_id: v.id });
+            if (composeErr || !desc) throw composeErr || new Error("compose_vehicle_description returned nothing");
+            await sb.from("vehicles").update({ description: desc, description_source: "composed_from_record", description_generated_at: new Date().toISOString() }).eq("id", v.id);
             described++;
           }
         }

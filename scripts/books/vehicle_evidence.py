@@ -22,7 +22,7 @@ and land the result as cited facts the books linker carries onto the profile.
 Needs pypdf (pip install pypdf) for PDF form fields; pdftotext (poppler) for label positions. Private data is read from local
 files and the database and written only to the work dir and the database, never to this repo.
 """
-import argparse, collections, datetime as dt, glob, hashlib, itertools, json, os, re, stat, subprocess, sys
+import argparse, collections, datetime as dt, glob, hashlib, itertools, json, os, re, stat, subprocess, sys, time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from schedule_c_rulings import psql, q, uuid_ok, upload, current_run, clip  # noqa: E402
@@ -241,20 +241,26 @@ def dataless(path):
         return True
 
 
-def extract_pdfs(roots, idx, owner_name, skip=()):
-    cands, seen, n_pdf, n_form = [], 0, 0, 0
+def extract_pdfs(roots, idx, owner_name, skip=(), cache=None):
+    """cache: {path|mtime|size: parsed agreement or None}; a PDF already read is not parsed again (the incremental cursor)."""
+    cache = {} if cache is None else cache
+    cands, seen, n_pdf, n_form, n_new = [], 0, 0, 0, 0
     for root in roots:
         for p in glob.glob(os.path.join(os.path.expanduser(root), '**', '*.pdf'), recursive=True):
             if any(s in p for s in skip) or dataless(p) or os.path.getsize(p) > 6_000_000:
                 continue
             n_pdf += 1
-            try:
-                fields = pdf_fields(p)
-            except Exception:
-                continue
-            if len(fields) < 5:
-                continue
-            g = read_agreement(fields, owner_name)
+            ck = f'{p}|{int(os.path.getmtime(p))}|{os.path.getsize(p)}|{owner_name}'
+            if ck in cache:
+                g = cache[ck]
+            else:
+                n_new += 1
+                try:
+                    fields = pdf_fields(p)
+                    g = read_agreement(fields, owner_name) if len(fields) >= 5 else None
+                except Exception:
+                    g = None
+                cache[ck] = g
             if not g:
                 continue
             n_form += 1
@@ -276,7 +282,7 @@ def extract_pdfs(roots, idx, owner_name, skip=()):
                 if g.get('balance') not in (None, 0):
                     cands.append(cand(vid, 'balance', abs(g['balance']), g.get('balance_date'), cp, 'pdf_form', ref, 0.5, 'claim',
                                       'balance due the agreement states', how, ambiguous=amb))
-    return cands, dict(pdfs_read=n_pdf, agreement_forms=n_form)
+    return cands, dict(pdfs_seen=n_pdf, pdfs_parsed_new=n_new, agreement_forms=n_form)
 
 
 # ---------------------------------------------------------------- email, ledger, books records, receipts
@@ -364,6 +370,8 @@ def extract_books(owner, idx):
         if not vid:
             continue
         m = re.search(r'\b(sale|sold|purchase[d]?|bought|bill of sale)\b[^0-9$]{0,30}\$?\s?(\d{1,3}(?:,\d{3})+(?:\.\d\d)?|\d{4,6}(?:\.\d\d)?)', text, re.I)
+        if m and re.fullmatch(r'(19|20)\d\d', m[2]) and '$' not in m[0]:
+            m = None    # "sale 1991 Toyota": a model year, not a price
         if m:   # an amount a books decision states next to the word sale or purchase: a secondary claim, never proof
             ev = 'sale' if m[1].lower() in ('sale', 'sold', 'bill of sale') else 'purchase'
             cands.append(cand(vid, ev, money(m[2]), r['d'], None, 'books_record', f"books:{r['sk']}", 0.5, 'claim', clip(r['descr'], 160), how))
@@ -402,7 +410,33 @@ def days(a, b):
     return (dt.date.fromisoformat(a) - dt.date.fromisoformat(b)).days
 
 
-def reconcile(cands, ruled, current):
+def _name_tokens(name):
+    return {w for w in re.findall(r'[a-z]+', (name or '').lower()) if len(w) >= 3} - {'llc', 'inc', 'the', 'and', 'paypal', 'sales', 'zelle', 'venmo'}
+
+
+def find_voids(agreements, cs, facts):
+    """-> {candidate id: reason}. An agreement is VOID, not a conflicting price, when
+      - the owner states the deal failed (an owner_fact cell naming the counterparty), or
+      - the vehicle has receipts that name a payer, none of those payers is the agreement's counterparty, and the receipts
+        already reach half the agreement's price: the money came from somebody else, so the deal that closed is not this one.
+    A void agreement stays in the dossier as context and never enters the claims, the conflicts or the receipt inference."""
+    out = {}
+    for a in agreements:
+        cp = _name_tokens(a.get('counterparty'))
+        for f in facts:
+            if f.get('counterparty_tokens') and cp & f['counterparty_tokens']:
+                out[a['id']] = f"owner states this agreement did not go through ({f.get('stated', 'dated')})"
+    receipts = [c for c in cs if c['event'] == 'deposit' and c['role'] == 'proof']
+    payers = set().union(*[_name_tokens(c.get('counterparty')) for c in receipts]) if receipts else set()
+    got = sum(c['amount'] for c in receipts)
+    for a in agreements:
+        cp = _name_tokens(a.get('counterparty'))
+        if a['id'] not in out and cp and payers and not (cp & payers) and got >= 0.5 * a['amount']:
+            out[a['id']] = 'counterparty on the agreement is not a payer in the receipts; receipts name another payer'
+    return out
+
+
+def reconcile(cands, ruled, current, owner_facts=None):
     """-> list of results per (vehicle, kind). current: {vehicle_id: {sale_price, sale_date, purchase_price, purchase_date}}."""
     by = collections.defaultdict(list)
     for c in cands:
@@ -417,6 +451,13 @@ def reconcile(cands, ruled, current):
             claims = [c for c in cs if c['event'] == kind and c['amount']]
             if not claims:
                 continue
+            facts = [f for f in (owner_facts or []) if f['vehicle_id'] == vid and f['event'] == kind]
+            voids = find_voids([c for c in claims if c['source']['kind'] == 'pdf_form'], cs, facts)
+            for c in claims:
+                if c['id'] in voids:
+                    c['role'], c['note'] = 'void', 'void agreement: ' + voids[c['id']]
+            voided = [c for c in claims if c['id'] in voids]
+            claims = [c for c in claims if c['id'] not in voids]
             strong = [c for c in claims if c['source']['kind'] in ('pdf_form', 'email')]
             distinct = sorted({c['amount'] for c in strong}) if strong else []
             proof = [c for c in cs if c['event'] == 'deposit' and c['role'] == 'proof'] if kind == 'sale' else []
@@ -434,6 +475,19 @@ def reconcile(cands, ruled, current):
                 for c in claims:
                     if c['source']['kind'] == 'books_record' and abs(c['amount'] - claim) > 0.5 and 0.5 * claim <= c['amount'] <= 2 * claim:
                         res['conflicts'].append(f"a books record states {c['amount']:,.2f} for the {kind}")
+            if not strong and voided and kind == 'sale' and receipts:
+                got = sum(r['amount'] for r in receipts)
+                res['components'] = receipts
+                res.update(status='receipts_only', value=round(got, 2), confidence=0.7, n_sources=len(receipts) + len(voided),
+                           date=max(r['date'] for r in receipts if r['amount'] == max(x['amount'] for x in receipts)))
+                res['conflicts'] += [f"{len(voided)} agreement(s) void: {voids[voided[0]['id']]}",
+                                     'the sale rests on receipts that name the vehicle; no agreement for the buyer who paid is in the dossier']
+                res['voided'] = [c['id'] for c in voided]
+                res['profile_before'] = dict(price=cur.get('sale_price'), date=cur.get('sale_date'))
+                if cur.get('sale_price') is not None and abs(float(cur['sale_price']) - got) > 0.5:
+                    res['conflicts'].append(f"profile holds {float(cur['sale_price']):,.2f}; reconciled value differs")
+                results.append(res)
+                continue
             if not strong:
                 res.update(status='insufficient_evidence')
                 res['conflicts'].append('only a books-record mention states a price; no agreement or receipt in the dossier')
@@ -530,9 +584,11 @@ def build_cells(vid, cs, results):
     return fields
 
 
-def land(owner, per_vehicle, results, dry):
+def land(owner, per_vehicle, results, dry, sleep=0.0):
     out = []
     for vid, cs in per_vehicle.items():
+        if out and sleep:
+            time.sleep(sleep)
         fields = build_cells(vid, cs, [r for r in results if r['vehicle_id'] == vid])
         if not fields:
             continue
@@ -564,6 +620,32 @@ def land(owner, per_vehicle, results, dry):
     return out
 
 
+def land_heartbeat(owner, stats, dry):
+    """The job's DB-side pulse: one cell on a fixed original, each landing supersedes the last. check_vehicle_evidence_job() (cron
+    watch-vehicle-evidence) fails, and so v_job_health shows it, when this goes stale."""
+    body = b'Vehicle evidence job heartbeat. Each landing is a revision of this original in financial_evidence_v1.\n'
+    sha = hashlib.sha256(body).hexdigest()
+    original = dict(sha256=sha, storage_path=f'{owner}/financial/{sha}.txt', source_filename='vehicle-evidence-heartbeat.txt',
+                    source_kind='upload', byte_size=str(len(body)))
+    val = dict(job='vehicle-evidence', at=dt.datetime.now(dt.timezone.utc).isoformat(timespec='seconds'),
+               **{k: v for k, v in stats.items() if isinstance(v, (int, str)) and k != 'landed'})
+    val['reconciled'] = dict(stats.get('reconciled', {}))
+    fields = [dict(field_key='job_heartbeat', value_raw='vehicle-evidence heartbeat', value_type='text', value_normalized=val,
+                   evidence=dict(source='local launchd job ag.nuke.vehicle-evidence', method=METHOD))]
+    rev = dict(idempotency_key=f"vehicle-evidence-heartbeat-{val['at']}", method=METHOD, version=VERSION, fields=fields)
+    cur = current_run(owner, sha)
+    if cur:
+        rev['supersedes_run_id'] = cur['run_id']
+    if not dry:
+        upload(body, original['storage_path'])
+    sql = ("begin;\nselect set_config('request.jwt.claims','{\"role\":\"service_role\"}',true);\n"
+           "select set_config('request.jwt.claim.role','service_role',true);\n"
+           f"select public.ingest_financial_evidence('{owner}'::uuid, {q(json.dumps(original))}::jsonb, "
+           f"{q(json.dumps(rev, default=str))}::jsonb, '{{\"kind\":\"user\"}}'::jsonb)::text;\n{'rollback' if dry else 'commit'};\n")
+    psql(sql)
+    return val['at']
+
+
 # ---------------------------------------------------------------- main
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split('\n')[0])
@@ -576,15 +658,31 @@ def main():
     ap.add_argument('--gl', action='append', default=['~/nuke-logs/books-*/**/gl*_rows.json'])
     ap.add_argument('--emails')
     ap.add_argument('--dry', action='store_true')
+    ap.add_argument('--facts', default='~/nuke-logs/vehicle-evidence/owner_facts.json',
+                    help='owner statements (private, outside the repo): [{vehicle_id, event, counterparty_contains, stated}]')
+    ap.add_argument('--cursor', help='cursor file: PDFs already parsed and the digest of the last landed candidate set')
+    ap.add_argument('--max-land', type=int, default=60, help='load budget: dossiers written per run')
+    ap.add_argument('--land-sleep', type=float, default=1.0, help='load budget: seconds between dossier writes')
+    ap.add_argument('--force', action='store_true')
+    ap.add_argument('--heartbeat-hours', type=float, default=0, help='land a job heartbeat cell at most this often (0 = never)')
     a = ap.parse_args()
     owner = uuid_ok(a.owner)
     os.makedirs(a.work, exist_ok=True)
     idx = Index(owner)
+    cursor = json.load(open(os.path.expanduser(a.cursor))) if a.cursor and os.path.exists(os.path.expanduser(a.cursor)) else {}
+    pdf_cache = cursor.get('pdf_cache', {})
     cands, stats = [], dict(vehicles_in_index=len(idx.v))
-    for fn, args in ((extract_pdfs, (a.pdf_root, idx, a.owner_name, a.skip)), (extract_emails, (a.emails, idx, a.owner_name)), (extract_gl, (a.gl, idx))):
+    for fn, args in ((extract_pdfs, (a.pdf_root, idx, a.owner_name, a.skip, pdf_cache)), (extract_emails, (a.emails, idx, a.owner_name)), (extract_gl, (a.gl, idx))):
         c, s = fn(*args)
         cands += c
         stats.update(s)
+    owner_facts = []
+    fp = os.path.expanduser(a.facts)
+    for f in (json.load(open(fp)) if os.path.exists(fp) else []):
+        f['counterparty_tokens'] = _name_tokens(f.get('counterparty_contains'))
+        owner_facts.append(f)
+        cands.append(cand(f['vehicle_id'], 'owner_fact', None, f.get('stated'), None, 'owner_statement', f"owner:{cid(f['vehicle_id'], f['event'], f.get('counterparty_contains'))}",
+                          1.0, 'context', f"owner states the {f['event']} agreement with a named counterparty did not go through", 'id'))
     c, s, ruled = extract_books(owner, idx)
     cands += c
     stats.update(s)
@@ -606,7 +704,7 @@ def main():
     cur = json.loads(psql(f"""select coalesce(jsonb_object_agg(id, jsonb_build_object('sale_price', sale_price, 'sale_date', sale_date::text,
         'purchase_price', purchase_price, 'purchase_date', purchase_date::text)),'{{}}') from vehicles
         where owner_id='{owner}' or user_id='{owner}' or uploaded_by='{owner}';""").strip())
-    results = reconcile(cands, ruled, cur)
+    results = reconcile(cands, ruled, cur, owner_facts)
     byid = {c['id']: c for c in cands}
     for r in results:      # a deposit the reconciler attributed by window joins that vehicle's dossier, marked inferred
         for comp in r['components']:
@@ -622,7 +720,25 @@ def main():
         for c in cands:   # a dossier holds the transaction candidates; costs already live in receipts and the cost readers
             if c['vehicle_id'] in have and c['event'] != 'cost' and c['source']['kind'] != 'receipt':
                 per[c['vehicle_id']].append(c)
-        stats['landed'] = land(owner, per, results, a.dry)
+        digest = hashlib.sha256(json.dumps([sorted(c['id'] + str(c.get('role')) for c in cands), cur, [f['vehicle_id'] for f in owner_facts]], sort_keys=True, default=str).encode()).hexdigest()
+        if digest == cursor.get('digest') and not a.force and not a.dry:
+            stats['landed'] = 'skipped: no new records since the last landed run'
+        else:
+            todo = dict(list(per.items())[: a.max_land]) if a.max_land else per
+            stats['landed'] = land(owner, todo, results, a.dry, a.land_sleep)
+            stats['deferred_to_next_run'] = len(per) - len(todo)
+            if not a.dry and len(todo) == len(per):
+                cursor['digest'] = digest
+    if a.heartbeat_hours and not a.dry and a.cmd == 'run':
+        last = cursor.get('last_heartbeat')
+        if a.force or not last or dt.datetime.fromisoformat(last) < dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=a.heartbeat_hours) or stats.get('landed') not in (None, 'skipped: no new records since the last landed run'):
+            cursor['last_heartbeat'] = land_heartbeat(owner, stats, a.dry)
+            stats['heartbeat'] = cursor['last_heartbeat']
+    if a.cursor and not a.dry:
+        cursor.update(pdf_cache=pdf_cache, last_run=dt.datetime.now(dt.timezone.utc).isoformat(timespec='seconds'))
+        tmp = os.path.expanduser(a.cursor) + '.tmp'
+        json.dump(cursor, open(tmp, 'w'))
+        os.replace(tmp, os.path.expanduser(a.cursor))
     print(json.dumps(stats, indent=1, default=str))
 
 
