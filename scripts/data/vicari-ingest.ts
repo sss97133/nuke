@@ -53,7 +53,7 @@ if (has("--retain-local")) {
     const html = await Deno.readTextFile(`${root}/${r.file}`);
     const hash = [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(html)))].map(b => b.toString(16).padStart(2, "0")).join("");
     if (hash !== r.sha256) throw new Error("Local capture hash mismatch");
-    const retained = await retainFetchedCapture(db, { platform: "vicari", url: vicariUrl(id), html,
+    const retained = await retainFetchedCapture(db, { platform: "vicari", url: r.url, html,
       httpStatus: 200, fetchedAt: r.received_at, metadata: { caller: "vicari-ingest", capture_method: "public_http" } });
     await append({ action: "retain", id, ...retained, recorded_at: new Date().toISOString() });
     if ("reason" in retained) throw new Error(retained.reason);

@@ -19,7 +19,9 @@ export async function ingestVicari(url: string, deps: Dependencies) {
     .eq("slug", "vicari").maybeSingle();
   if (source.error || !source.data || source.data.species !== "block_house"
     || !source.data.supported_observations?.includes("listing")) throw new Error("vicari_source_not_registered");
-  const page = await deps.archiveFetch(canonical, {
+  // The source advertises www + trailing slash; the bare-host alias redirects across hosts.
+  // Keep the stable identity above, but request the observed origin without weakening the public-fetch guard.
+  const page = await deps.archiveFetch(`https://www.vicariauction.com/auction-house/?ahid=${id}`, {
     platform: "vicari", callerName: "ingest:vicari", useFirecrawl: false, firecrawlOnBlock: false,
     directFetchOptions: { publicOnly: true, timeout: 20_000 },
   });

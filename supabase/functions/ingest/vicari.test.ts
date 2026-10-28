@@ -69,7 +69,11 @@ async function world(failure?: "archive" | "admission" | "readback" | "images" |
   };
   const run = () => ingestVicari(url, {
     supabase: db,
-    archiveFetch: async () => ({ html: body, markdown: null, source: "cache", cached: true, snapshotId: failure === "archive" ? null : "snapshot", url, platform: "vicari", statusCode: 200, error: null, costCents: 0 }),
+    archiveFetch: async (fetchUrl, options) => {
+      eq(fetchUrl, "https://www.vicariauction.com/auction-house/?ahid=123");
+      eq(options.directFetchOptions?.publicOnly, true); eq(options.firecrawlOnBlock, false);
+      return { html: body, markdown: null, source: "cache", cached: true, snapshotId: failure === "archive" ? null : "snapshot", url, platform: "vicari", statusCode: 200, error: null, costCents: 0 };
+    },
     matchVehicle: async (data) => { matches++; eq(data.price, undefined); eq(data.vin, undefined); return { vehicleId: "vehicle", isNew: true }; },
   });
   return { run, counts: () => ({ matches, calls }), payload: () => payload };
