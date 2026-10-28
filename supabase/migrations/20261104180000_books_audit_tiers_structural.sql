@@ -1,26 +1,62 @@
 -- Structural rows get a cited rule instead of tier C (owner, 2026-10-28: a deduction is justified by its bank line plus a cited
 -- allocation basis; receipts per line only where section 274 requires them). Refines v_books_audit_tiers, v_books_audit_tier_years and
--- books_year_gate R10; adds v_books_asset_register. Reads only; every rule row carries its citation in structural_cites.
---   Depreciation and section 179 lines   tier B, basis "asset register" (books-register-inputs asset cell, MACRS computed vs booked),
---                                        only where the register reproduces the year (the gate's R6 test, v_books_asset_register.year_r6_pass)
---   Snap-on supplier-history items,      inherit the payment proof of the RA payment movements the year's Snap-on RA ruling links
---   contract interest                    (payment_cites lists their local_ids); tiered by the usual rule from that proof
---   Owner-ruling aggregate rows          tier B when the ruling record is its own aggregate (local_id = ruling_id) and cites its evidence
---   Rows with no payment of their own    leave the deduction denominator (is_deduction false, tier X, exclusion_reason): zero reclass
---                                        pairs, inventory-change shares, cash-pool allocations, sales tax collected, refunds and
---                                        credits, fees netted from a deposit
---   Statement and feed documents         a decision whose document is a bank or card statement or the Intuit feed extract is payment proof
---                                        (payment_cites = the document id); documents are typed by source_filename, doc_type is
---                                        'unclassified' for all of them. A "statement_missing" caveat stays as the note that the PDF is not on file.
+-- books_year_gate (R6 and R10); adds v_books_asset_register and v_books_structural_rules. Reads only. Every rule is a row of
+-- v_books_structural_rules (its basis, citation and what is verified) and every output row cites its rule in structural_cites.
+--   asset_register          Depreciation and section 179 lines: tier B with no bank line, only where the year passes the gate's R6 test
+--                           (v_books_asset_register, which books_year_gate R6 now reads: one implementation)
+--   snapon_ra_payments      Snap-on supplier-history items and contract interest inherit the payment proof of the RA payment movements
+--                           the year's Snap-on RA ruling links, only for movements dated in that year, only while the year's inheriting
+--                           rows (inferred rows never inherit) net to no more than those movements' outflow
+--   netted_fee_deposit      A fee netted from a deposit: billed less deposited equals the fee and a bank movement equals the deposit
+--   owner_ruling_aggregate  The ruling row is its own aggregate (local_id = ruling_id) and its text cites evidence; an estimate pending
+--                           evidence is not accepted. Tier B with no bank line, reported apart as b_nobank in the rollup and in R10
+--   inventory_share, cash_pool_allocation, credit_reduction, zero_reclass_pair
+--                           Rows with no payment of their own leave the deduction denominator (is_deduction false, tier X), each only
+--                           when its verifiable counterpart exists (parent order row, pool parent, negative amount, paired zero row)
+-- A statement-document rule was dropped: the filenames the rule matched include personal-account statements and no live decision needs it.
 -- Totals do not move: total_usd stays the sum of every row; the denominator of the A/B/C percentages is deduction_usd = total_usd - excluded_usd.
 
 SET lock_timeout = '5s';
 SET statement_timeout = '60s';
 
+CREATE OR REPLACE VIEW public.v_books_structural_rules WITH (security_invoker = true) AS
+SELECT * FROM (VALUES
+  ('asset_register', 'tier B, no bank line', 'asset register',
+   'books-register-inputs asset cell (cost, in-service date, class, MACRS table) reproduces the year''s line 13 decisions within 0.51 (the books_year_gate R6 test)',
+   'v_books_asset_register.year_r6_pass for the row''s year'),
+  ('snapon_ra_payments', 'payment proof', 'Snap-on RA payment movements',
+   'the year''s Snap-on RA owner ruling links the bank movements that paid Snap-on; the supplier-history and interest rows are what those payments bought',
+   'movements dated in the row''s year; inheriting rows (inferred rows excluded) net to no more than the movements'' outflow'),
+  ('netted_fee_deposit', 'payment proof', 'deposit movement',
+   'a fee netted from a deposit is paid by the shortfall of the deposit against the invoice',
+   'billed less deposited equals the fee, and a bank movement of the deposited amount exists in the same year'),
+  ('owner_ruling_aggregate', 'tier B, no bank line', 'owner ruling aggregate',
+   'the owner''s ruling is the allocation basis and cites its evidence in its text; no bank line is linked to the aggregate row itself',
+   'local_id = ruling_id and the text contains Evidence:; a ruling that calls its amount an estimate pending evidence or a floor is not accepted'),
+  ('inventory_share', 'excluded', 'inventory share of a counted order',
+   'a share of a parent order that is itself counted and tiered; the share has no payment of its own',
+   'the parent row (local_id without the -INVENTORY suffix) exists in the same year'),
+  ('cash_pool_allocation', 'excluded', 'cash pool allocation',
+   'allocates cash already counted on its parent row and cannot add to a deduction',
+   'the parent row (local_id without the -POOL suffix) exists in the same year and the amount is not positive'),
+  ('credit_reduction', 'excluded', 'credit or refund',
+   'a credit or refund only reduces deductions; the original purchase row is cited in its text and is tiered separately',
+   'local_id ends -CREDIT or -REFUND and the amount is negative'),
+  ('zero_reclass_pair', 'excluded', 'zero reclass pair',
+   'a zero-dollar reclassification that nets to 0.00 with its counterpart row',
+   'the paired -IN / -OUT row exists in the same year and is also 0.00')
+) AS r(rule, effect, basis, citation, verified_by);
+
+COMMENT ON VIEW public.v_books_structural_rules IS
+  'The structural rules of v_books_audit_tiers: rule, effect (tier B with no bank line, payment proof, or excluded from the deduction denominator), basis, citation and what the view verifies before applying it. Every structural_rule value in v_books_audit_tiers is a row here.';
+REVOKE ALL ON public.v_books_structural_rules FROM PUBLIC, anon;
+REVOKE INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public.v_books_structural_rules FROM authenticated, service_role;
+GRANT SELECT ON public.v_books_structural_rules TO authenticated, service_role;
+
 CREATE OR REPLACE VIEW public.v_books_asset_register WITH (security_invoker = true) AS
--- One row per decision claimed by an asset in the books register inputs, per year, with the register's MACRS computation for that
--- asset-year and whether the year as a whole reproduces (the same test as books_year_gate R6: every line 13 decision is claimed, every
--- asset-year computed equals what its decisions carry within 0.51).
+-- The books_year_gate R6 test, per year, as rows. kind 'claim': a line 13 decision claimed by a register asset (with that asset's MACRS
+-- computation); 'unclaimed': a line 13 decision no asset claims; 'asset_year_off': an asset-year whose MACRS computation differs from what
+-- its decisions carry by more than 0.51. year_r6_pass is true when a year has only claims. The gate selects the same rows.
 WITH lm AS (
   SELECT DISTINCT ON (e.owner_id) e.owner_id, e.value_normalized->'value' AS m
   FROM public.financial_document_extractions e
@@ -33,14 +69,11 @@ WITH lm AS (
               ELSE lm.m->>(v.section || '|' || v.category) END AS line
   FROM public.v_financial_accounting_records v
   LEFT JOIN lm ON lm.owner_id = v.owner_id
-  WHERE v.record_kind = 'retained_ledger_decision' AND v.section = 'Expense' AND v.amount_value IS NOT NULL AND v.amount_value <> 0
-    AND v.year ~ '^[0-9]{4}$'
-), l13 AS MATERIALIZED (
-  SELECT * FROM dec WHERE line = '13'
-), yrs AS (
-  SELECT DISTINCT v.owner_id, v.year::text AS year
-  FROM public.v_financial_accounting_records v
   WHERE v.record_kind = 'retained_ledger_decision' AND v.section = 'Expense' AND v.year ~ '^[0-9]{4}$'
+), yrs AS (
+  SELECT DISTINCT owner_id, year FROM dec
+), l13 AS MATERIALIZED (
+  SELECT * FROM dec WHERE line = '13' AND amount IS NOT NULL AND amount <> 0
 ), cells AS (
   SELECT e.owner_id, e.id AS extraction_id, e.value_normalized->'value' AS v
   FROM public.financial_document_extractions e
@@ -58,21 +91,28 @@ WITH lm AS (
   FROM ay
 ), ayo AS (
   SELECT ayb.*, NOT ((ayb.computed <> 0 OR cardinality(ayb.cids) > 0) AND abs(ayb.booked - ayb.computed) > 0.51) AS asset_ok FROM ayb
-), yr AS (
-  SELECT y.owner_id, y.year,
-    (NOT EXISTS (SELECT 1 FROM l13 l WHERE l.owner_id = y.owner_id AND l.year = y.year
-                   AND NOT EXISTS (SELECT 1 FROM ayo a WHERE a.owner_id = l.owner_id AND a.year = l.year AND l.local_id = ANY(a.cids)))
-     AND NOT EXISTS (SELECT 1 FROM ayo a WHERE a.owner_id = y.owner_id AND a.year = y.year AND NOT a.asset_ok)) AS r6_pass
-  FROM yrs y
+), fx AS (
+  SELECT a.owner_id, a.year, 'claim'::text AS kind, l.local_id, l.amount, a.v->>'id' AS asset_id, a.v->>'name' AS asset_name, a.v->>'cls' AS asset_class,
+         a.computed, a.booked, a.asset_ok, a.extraction_id, a.v->'cites' AS cites
+  FROM ayo a
+  CROSS JOIN LATERAL unnest(a.cids) AS cid(local_id)
+  JOIN l13 l ON l.owner_id = a.owner_id AND l.year = a.year AND l.local_id = cid.local_id
+  UNION ALL
+  SELECT l.owner_id, l.year, 'unclaimed', l.local_id, l.amount, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL
+  FROM l13 l
+  WHERE NOT EXISTS (SELECT 1 FROM ayo a WHERE a.owner_id = l.owner_id AND a.year = l.year AND l.local_id = ANY(a.cids))
+  UNION ALL
+  SELECT a.owner_id, a.year, 'asset_year_off', (a.v->>'id') || ': register computes ' || a.computed || ', decisions carry ' || a.booked, abs(a.booked - a.computed),
+         a.v->>'id', a.v->>'name', a.v->>'cls', a.computed, a.booked, a.asset_ok, a.extraction_id, a.v->'cites'
+  FROM ayo a WHERE NOT a.asset_ok
 )
-SELECT a.owner_id, a.year, cid.local_id, a.v->>'id' AS asset_id, a.v->>'name' AS asset_name, a.v->>'cls' AS asset_class,
-       a.computed, a.booked, a.asset_ok, yr.r6_pass AS year_r6_pass, a.extraction_id, a.v->'cites' AS cites
-FROM ayo a
-JOIN yr ON yr.owner_id = a.owner_id AND yr.year = a.year
-CROSS JOIN LATERAL unnest(a.cids) AS cid(local_id);
+SELECT fx.owner_id, fx.year, fx.kind, fx.local_id, fx.amount, fx.asset_id, fx.asset_name, fx.asset_class, fx.computed, fx.booked, fx.asset_ok,
+       bool_and(fx.kind = 'claim') OVER (PARTITION BY fx.owner_id, fx.year) AS year_r6_pass,
+       fx.extraction_id, fx.cites
+FROM fx;
 
 COMMENT ON VIEW public.v_books_asset_register IS
-  'Decisions claimed by an asset in the books register inputs, per year: the asset, its MACRS computation and booked amount for that year, and year_r6_pass (the books_year_gate R6 test for the year). Reads the register; derived, never typed.';
+  'The books_year_gate R6 test as rows, per year: claims (line 13 decisions claimed by a register asset, with its MACRS computation and booked amount), unclaimed line 13 decisions and asset-years whose computation differs from their decisions by more than 0.51. year_r6_pass is true for a year with only claims. books_year_gate R6 and v_books_audit_tiers both read it. Derived from the register; never typed.';
 REVOKE ALL ON public.v_books_asset_register FROM PUBLIC, anon;
 REVOKE INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public.v_books_asset_register FROM authenticated, service_role;
 GRANT SELECT ON public.v_books_asset_register TO authenticated, service_role;
@@ -84,27 +124,34 @@ WITH rc AS MATERIALIZED (
 ), reg AS MATERIALIZED (
   SELECT DISTINCT ON (r.owner_id, r.year, r.local_id) r.owner_id, r.year, r.local_id, r.asset_id, r.asset_name, r.computed, r.booked, r.year_r6_pass, r.extraction_id
   FROM public.v_books_asset_register r
+  WHERE r.kind = 'claim'
   ORDER BY r.owner_id, r.year, r.local_id, r.asset_id
 ), ra AS MATERIALIZED (
-  SELECT DISTINCT ON (v.owner_id, v.year) v.owner_id, v.year::text AS year, v.local_id AS ra_id, v.record->'bank_links' AS links
-  FROM public.v_financial_accounting_records v
-  WHERE v.record_kind = 'retained_ledger_decision' AND v.section = 'Expense' AND v.local_id ~ '-RULING-snapon-ra-payments$'
-    AND jsonb_typeof(v.record->'bank_links') = 'array' AND jsonb_array_length(v.record->'bank_links') > 0
-  ORDER BY v.owner_id, v.year, v.local_id
+  -- The year's Snap-on RA ruling and the bank movements it links that are dated in that year; out_usd is their outflow.
+  SELECT x.owner_id, x.year, x.ra_id, jsonb_agg(m.local_id ORDER BY m.local_id) AS links, sum(-m.amount_value) FILTER (WHERE m.amount_value < 0) AS out_usd
+  FROM (
+    SELECT DISTINCT ON (v.owner_id, v.year) v.owner_id, v.year::text AS year, v.local_id AS ra_id, v.record->'bank_links' AS links
+    FROM public.v_financial_accounting_records v
+    WHERE v.record_kind = 'retained_ledger_decision' AND v.section = 'Expense' AND v.local_id ~ '-RULING-snapon-ra-payments$'
+      AND jsonb_typeof(v.record->'bank_links') = 'array' AND jsonb_array_length(v.record->'bank_links') > 0
+    ORDER BY v.owner_id, v.year, v.local_id
+  ) x
+  CROSS JOIN LATERAL jsonb_array_elements_text(x.links) AS l(id)
+  JOIN public.v_financial_accounting_records m ON m.owner_id = x.owner_id AND m.local_id = l.id AND m.record_kind = 'retained_bank_movement' AND m.year::text = x.year
+  GROUP BY x.owner_id, x.year, x.ra_id
 ), d AS (
   SELECT v.id, v.owner_id, v.document_id, v.year, v.local_id, v.amount_value AS amount, v.category, v.description, v.status, v.record,
          lower(coalesce(v.category, '') || ' ' || coalesce(v.description, '')) AS t,
          lower(coalesce(v.category, '') || ' ' || coalesce(v.description, '') || ' ' || coalesce(v.status, '') || ' ' || coalesce(v.decision, '')) AS tt,
          CASE WHEN jsonb_typeof(v.record->'bank_links') = 'array' THEN v.record->'bank_links' ELSE '[]'::jsonb END AS bl,
          CASE WHEN jsonb_typeof(v.record->'proof_links') = 'array' THEN v.record->'proof_links' ELSE '[]'::jsonb END AS pl,
-         coalesce(v.record->>'account', '') AS acct, coalesce(v.decision, '') AS decision_text, fd.source_filename AS doc_filename
+         coalesce(v.record->>'account', '') AS acct, coalesce(v.decision, '') AS decision_text
   FROM public.v_financial_accounting_records v
-  LEFT JOIN public.financial_documents fd ON fd.id = v.document_id AND fd.owner_id = v.owner_id
   WHERE v.record_kind = 'retained_ledger_decision' AND v.section = 'Expense' AND v.amount_value IS NOT NULL
     AND coalesce(v.status, '') NOT LIKE 'Closed%' AND coalesce(v.status, '') NOT LIKE 'Open allocation%'
 ), f AS (
   SELECT d.*,
-    (jsonb_array_length(d.bl) > 0 OR d.local_id LIKE '%-BANK-%') AS pay_proof,
+    (jsonb_array_length(d.bl) > 0 OR d.local_id LIKE '%-BANK-%') AS pay_own,
     (SELECT coalesce(jsonb_agg(p), '[]') FROM jsonb_array_elements(d.pl) p
        WHERE p->>'kind' IN ('gmail', 'file', 'photo', 'artifact', 'receipt') OR coalesce(p->>'ref', '') ILIKE '%nuke vehicle%') AS doc_cites,
     (SELECT coalesce(jsonb_agg(p), '[]') FROM jsonb_array_elements(d.pl) p WHERE p->>'kind' = 'owner_ruling') AS ruling_cites,
@@ -126,86 +173,112 @@ WITH rc AS MATERIALIZED (
          (f.has_ruling_id OR jsonb_array_length(f.ruling_cites) > 0) AS has_owner_ruling
   FROM f
 ), h AS (
-  SELECT g.*, (g.has_owner_ruling OR g.vehicle_link OR g.doc_proof OR jsonb_array_length(g.rule_cites) > 0) AS purpose_proof FROM g
+  SELECT g.*, (g.has_owner_ruling OR g.vehicle_link OR g.doc_proof OR jsonb_array_length(g.rule_cites) > 0) AS purpose_proof,
+    -- Counterpart row a structural exclusion points at (a parent order row, a pool parent, the paired zero row).
+    CASE WHEN g.local_id ~ '-(INVENTORY|POOL)$' THEN regexp_replace(g.local_id, '-(INVENTORY|POOL)$', '')
+         WHEN g.amount = 0 AND g.local_id ~* 'reclass.*-IN$' THEN regexp_replace(g.local_id, '-IN$', '-OUT')
+         WHEN g.amount = 0 AND g.local_id ~* 'reclass.*-OUT$' THEN regexp_replace(g.local_id, '-OUT$', '-IN') END AS cp_id,
+    -- Fee netted from a deposit: "$billed billed, $deposited deposited" in the description.
+    CASE WHEN g.acct ~* '\(netted\)' THEN regexp_match(g.description, '\$([0-9,]+\.[0-9]{2}) billed, \$([0-9,]+\.[0-9]{2}) deposited') END AS nd_m
+  FROM g
 ), s AS (
-  -- Structural signals. A row with a payment of its own is tiered by the usual rule; these apply to rows that have none.
   SELECT h.*,
-    (h.doc_filename IS NOT NULL AND (h.doc_filename ~* 'statement.*\.pdf$' OR h.doc_filename ~* '^intuit-gl-')) AS stmt_doc,
     (h.acct ~* '^snap-on (supplier history|credit contract)' OR h.local_id ~ '^(SNAP-ITEM-|SNAP-CART-|SNAPON-INTEREST-)') AS is_snapon,
-    ra.ra_id, ra.links AS ra_links,
+    (h.local_id ~* 'inferred') AS is_inferred,
+    ra.ra_id, ra.links AS ra_links, ra.out_usd AS ra_out_usd,
     reg.asset_id, reg.asset_name, reg.computed AS reg_computed, reg.booked AS reg_booked, reg.extraction_id AS reg_extraction, coalesce(reg.year_r6_pass, false) AS reg_r6_pass,
     (reg.local_id IS NOT NULL) AS in_register,
-    (h.has_ruling_id AND h.local_id = h.record->>'ruling_id' AND (h.decision_text ~ 'Evidence:' OR jsonb_array_length(h.ruling_cites) > 0)) AS ruling_aggregate,
-    CASE WHEN h.pay_proof THEN NULL
-         WHEN h.amount = 0 AND h.local_id ~* 'reclass' THEN 'zero reclass pair: nets to 0.00 with its counterpart row'
-         WHEN h.local_id ~ '-POOL$' THEN 'cash-pool allocation: allocates cash already counted, not a new payment'
-         WHEN h.local_id ~ '-INVENTORY$' THEN 'inventory-change row: cost of goods held for sale, its payment proof is the parent order row'
-         WHEN h.t ~ 'sales tax collected|collected sales tax' THEN 'sales tax collected: held for the state, not a deduction'
-         WHEN h.local_id ~ '-(CREDIT|REFUND)$' THEN 'refund or credit: nets against the original purchase row'
-         WHEN h.acct ~* '\(netted\)' THEN 'fee netted from a deposit: justified by the invoice and deposit record, not a bank debit'
-    END AS exclusion_reason
+    (h.has_ruling_id AND h.local_id = h.record->>'ruling_id' AND h.decision_text ~ 'Evidence:' AND h.decision_text !~* 'estimate pending|\mfloor\M') AS ruling_aggregate,
+    (h.cp_id IS NOT NULL AND EXISTS (SELECT 1 FROM d p WHERE p.owner_id = h.owner_id AND p.year = h.year AND p.local_id = h.cp_id
+                                       AND (h.amount <> 0 OR p.amount = 0))) AS cp_found,
+    nd.mv_id AS nd_mv
   FROM h
   LEFT JOIN ra ON ra.owner_id = h.owner_id AND ra.year = h.year::text
   LEFT JOIN reg ON reg.owner_id = h.owner_id AND reg.year = h.year::text AND reg.local_id = h.local_id
+  LEFT JOIN LATERAL (
+    SELECT m.local_id AS mv_id
+    FROM public.v_financial_accounting_records m
+    WHERE h.nd_m IS NOT NULL AND NOT h.pay_own AND m.owner_id = h.owner_id AND m.record_kind = 'retained_bank_movement' AND m.year::text = h.year::text
+      AND abs((replace(h.nd_m[1], ',', '')::numeric - replace(h.nd_m[2], ',', '')::numeric) - h.amount) < 0.005
+      AND m.amount_value = replace(h.nd_m[2], ',', '')::numeric
+    ORDER BY m.local_id LIMIT 1
+  ) nd ON true
 ), r AS (
   SELECT s.*,
-    (s.exclusion_reason IS NULL) AS is_deduction,
-    (s.pay_proof OR (s.exclusion_reason IS NULL AND (s.stmt_doc OR (s.is_snapon AND s.ra_id IS NOT NULL)))) AS pay_final,
-    CASE WHEN s.pay_proof THEN NULL
-         WHEN s.exclusion_reason IS NOT NULL THEN 'excluded'
-         WHEN s.stmt_doc THEN 'bank_statement_document'
-         WHEN s.is_snapon AND s.ra_id IS NOT NULL THEN 'snapon_ra_payments'
+    CASE WHEN s.pay_own THEN NULL
+         WHEN s.local_id ~ '-INVENTORY$' AND s.cp_found THEN 'inventory_share'
+         WHEN s.local_id ~ '-POOL$' AND s.cp_found AND s.amount <= 0 THEN 'cash_pool_allocation'
+         WHEN s.local_id ~ '-(CREDIT|REFUND)$' AND s.amount < 0 THEN 'credit_reduction'
+         WHEN s.amount = 0 AND s.local_id ~* 'reclass' AND s.cp_found THEN 'zero_reclass_pair'
+         WHEN s.nd_mv IS NOT NULL THEN 'netted_fee_deposit'
+         WHEN s.is_snapon AND NOT s.is_inferred AND s.ra_id IS NOT NULL THEN 'snapon_ra_payments'
          WHEN s.in_register AND s.reg_r6_pass THEN 'asset_register'
          WHEN s.ruling_aggregate THEN 'owner_ruling_aggregate'
-    END AS structural_rule
+    END AS rule0
   FROM s
-), u AS (
+), r2 AS (
+  -- The year's Snap-on inheriting rows must net to no more than the movements' outflow; otherwise none of them inherits.
   SELECT r.*,
-    CASE WHEN NOT r.is_deduction THEN 'X'
-         WHEN r.pay_final AND r.purpose_proof THEN CASE WHEN r.doc_proof THEN 'A' ELSE 'B' END
-         WHEN r.structural_rule IN ('asset_register', 'owner_ruling_aggregate') THEN 'B'
-         ELSE 'C' END AS tier_final
+    coalesce(sum(r.amount) FILTER (WHERE r.rule0 = 'snapon_ra_payments') OVER (PARTITION BY r.owner_id, r.year), 0) AS sn_rows_usd
   FROM r
+), u AS (
+  SELECT r2.*,
+    CASE WHEN r2.rule0 = 'snapon_ra_payments' AND r2.sn_rows_usd > coalesce(r2.ra_out_usd, 0) + 0.005 THEN NULL ELSE r2.rule0 END AS structural_rule
+  FROM r2
+), w AS (
+  SELECT u.*,
+    (u.structural_rule IS NULL OR u.structural_rule NOT IN ('inventory_share', 'cash_pool_allocation', 'credit_reduction', 'zero_reclass_pair')) AS is_deduction,
+    (u.pay_own OR u.structural_rule IN ('snapon_ra_payments', 'netted_fee_deposit')) AS pay_final
+  FROM u
+), z AS (
+  SELECT w.*,
+    CASE WHEN NOT w.is_deduction THEN 'X'
+         WHEN w.pay_final AND w.purpose_proof THEN CASE WHEN w.doc_proof THEN 'A' ELSE 'B' END
+         WHEN w.structural_rule IN ('asset_register', 'owner_ruling_aggregate') THEN 'B'
+         ELSE 'C' END AS tier_final
+  FROM w
 )
 SELECT t.id, t.owner_id, t.document_id, t.year, t.local_id, t.amount, t.category, t.description,
   t.tier_final AS tier,
-  CASE WHEN NOT t.is_deduction THEN 'outside the deduction denominator: ' || t.exclusion_reason
+  CASE WHEN NOT t.is_deduction THEN 'outside the deduction denominator: ' || sr.citation || ' (counterpart row ' || coalesce(t.cp_id, 'none needed') || ')'
        WHEN t.is_summary_row THEN 'summary row with no line detail, no bank line'
-       WHEN t.tier_final = 'B' AND t.structural_rule = 'asset_register' THEN 'asset register: ' || t.asset_name || ' (MACRS ' || t.reg_computed || ' vs booked ' || t.reg_booked || ', gate R6 passes for ' || t.year || ')'
-       WHEN t.tier_final = 'B' AND t.structural_rule = 'owner_ruling_aggregate' THEN 'owner ruling aggregate that cites its evidence (' || t.local_id || ')'
+       WHEN t.tier_final = 'B' AND t.structural_rule = 'asset_register' THEN 'asset register: ' || t.asset_name || ' (MACRS ' || t.reg_computed || ' vs booked ' || t.reg_booked || ', gate R6 passes for ' || t.year || '); no bank line'
+       WHEN t.tier_final = 'B' AND t.structural_rule = 'owner_ruling_aggregate' THEN 'owner ruling aggregate that cites its evidence (' || t.local_id || '); no bank line is linked to the aggregate'
        WHEN NOT t.pay_final THEN 'no bank line'
        WHEN NOT t.purpose_proof THEN 'bank line but no cited allocation basis'
        WHEN t.structural_rule = 'snapon_ra_payments' THEN 'payment proof inherited from the ' || jsonb_array_length(t.ra_links) || ' Snap-on RA payment movements of ' || t.ra_id || '; ' ||
             CASE WHEN t.doc_proof THEN 'allocation basis and a document' ELSE 'cited allocation basis' END
-       WHEN t.structural_rule = 'bank_statement_document' THEN 'payment proof is the statement or feed document ' || t.document_id || '; ' ||
+       WHEN t.structural_rule = 'netted_fee_deposit' THEN 'payment proof is the deposit movement ' || t.nd_mv || ' (fee netted from the deposit); ' ||
             CASE WHEN t.doc_proof THEN 'allocation basis and a document' ELSE 'cited allocation basis' END
        WHEN t.doc_proof THEN 'bank line, allocation basis and a document'
        ELSE 'bank line and a cited allocation basis (' || CASE WHEN t.has_owner_ruling THEN 'owner ruling' WHEN t.vehicle_link THEN 'Nuke vehicle' ELSE 'category rule' END || ')' END AS tier_reason,
   t.pay_final AS pay_proof, t.doc_proof, t.purpose_proof, t.has_owner_ruling,
   t.is_cash, t.is_contractor, t.is_274, t.is_caveat, t.is_summary_row,
   (t.is_274 AND (t.is_lodging OR abs(t.amount) >= 75)) AS needs_receipt,
-  CASE WHEN t.pay_proof OR NOT t.pay_final THEN t.bl
-       WHEN t.structural_rule = 'bank_statement_document' THEN jsonb_build_array(t.document_id::text)
+  CASE WHEN t.pay_own OR NOT t.pay_final THEN t.bl
+       WHEN t.structural_rule = 'netted_fee_deposit' THEN jsonb_build_array(t.nd_mv)
        ELSE t.ra_links END AS payment_cites,
   t.doc_cites AS document_cites, t.rule_cites AS rule_cites,
   (coalesce(t.record->>'ruling_id', '')) AS ruling_id, t.ruling_cites AS ruling_cites,
-  t.is_deduction, t.exclusion_reason, t.structural_rule,
-  CASE t.structural_rule
-    WHEN 'asset_register' THEN jsonb_build_array(jsonb_build_object('basis', 'asset register',
-      'citation', 'books-register-inputs asset ' || t.asset_id || ' (extraction ' || t.reg_extraction || '): ' || t.year || ' MACRS computed ' || t.reg_computed || ', decisions carry ' || t.reg_booked || '; books_year_gate R6 passes for ' || t.year,
-      'asset_id', t.asset_id))
-    WHEN 'snapon_ra_payments' THEN jsonb_build_array(jsonb_build_object('basis', 'Snap-on RA payment movements',
-      'citation', 'payment proof inherited from the ' || jsonb_array_length(t.ra_links) || ' payment movements linked by ' || t.ra_id || ' (listed in payment_cites)'))
-    WHEN 'bank_statement_document' THEN jsonb_build_array(jsonb_build_object('basis', 'bank or card statement, or Intuit feed document',
-      'citation', 'decision extracted from document ' || t.document_id || ' (' || (CASE WHEN t.doc_filename ~* '^intuit-gl-' THEN 'Intuit feed extract' ELSE 'statement' END) || '); the feed is the bank''s record'))
-    WHEN 'owner_ruling_aggregate' THEN jsonb_build_array(jsonb_build_object('basis', 'owner ruling aggregate',
-      'citation', 'ruling ' || t.local_id || ' cites its evidence; the superseded rows it replaces carry their own proof'))
-    WHEN 'excluded' THEN jsonb_build_array(jsonb_build_object('basis', 'outside the deduction denominator', 'citation', t.exclusion_reason))
-  END AS structural_cites
-FROM u t;
+  t.is_deduction,
+  CASE WHEN NOT t.is_deduction THEN sr.citation || CASE WHEN t.cp_id IS NOT NULL THEN ' (counterpart row ' || t.cp_id || ')' ELSE '' END END AS exclusion_reason,
+  t.structural_rule,
+  CASE WHEN t.structural_rule IS NOT NULL THEN jsonb_build_array(jsonb_build_object('rule', sr.rule, 'basis', sr.basis, 'citation', sr.citation, 'verified_by', sr.verified_by,
+    'detail', CASE t.structural_rule
+      WHEN 'asset_register' THEN 'books-register-inputs asset ' || t.asset_id || ' (extraction ' || t.reg_extraction || '): ' || t.year || ' MACRS computed ' || t.reg_computed || ', decisions carry ' || t.reg_booked || '; books_year_gate R6 passes for ' || t.year
+      WHEN 'snapon_ra_payments' THEN jsonb_array_length(t.ra_links) || ' movements linked by ' || t.ra_id || ' dated ' || t.year || ' (listed in payment_cites), outflow ' || round(t.ra_out_usd, 2) || ' covers the year''s inheriting rows ' || round(t.sn_rows_usd, 2)
+      WHEN 'netted_fee_deposit' THEN 'fee ' || t.amount || ' = billed ' || replace(t.nd_m[1], ',', '') || ' less deposited ' || replace(t.nd_m[2], ',', '') || '; deposit movement ' || t.nd_mv
+      WHEN 'owner_ruling_aggregate' THEN 'ruling ' || t.local_id || ' cites its evidence in its text'
+      ELSE 'counterpart row ' || coalesce(t.cp_id, 'none needed') END)) END AS structural_cites,
+  CASE WHEN t.tier_final IN ('A', 'B') THEN
+    CASE WHEN t.pay_own THEN 'bank_line' WHEN t.structural_rule = 'snapon_ra_payments' THEN 'snapon_ra_movements' WHEN t.structural_rule = 'netted_fee_deposit' THEN 'deposit_movement'
+         WHEN t.structural_rule = 'asset_register' THEN 'asset_register' WHEN t.structural_rule = 'owner_ruling_aggregate' THEN 'owner_ruling' END
+  END AS proof_basis
+FROM z t
+LEFT JOIN public.v_books_structural_rules sr ON sr.rule = t.structural_rule;
 
 COMMENT ON VIEW public.v_books_audit_tiers IS
-  'Structural rows carry a cited rule (structural_rule, structural_cites) and rows with no payment of their own leave the deduction denominator (is_deduction false, tier X). One row per Expense decision of the current books with its audit tier (A bank line+allocation basis+document, B bank line+cited allocation basis, C no bank line or no basis), section 274 / cash / contractor / caveat flags, the reason and the cites used. Runs as the caller.';
+  'One row per Expense decision of the current books with its audit tier: A bank line + cited allocation basis + document; B bank line + cited allocation basis, or (proof_basis asset_register / owner_ruling, pay_proof false) a cited asset register or owner ruling with no bank line, which the rollup reports apart as b_nobank; C no bank line or no basis; X outside the deduction denominator (is_deduction false). Structural rows cite a rule of v_books_structural_rules (structural_rule, structural_cites). Section 274 / cash / contractor / caveat flags, the reason and the cites used. Runs as the caller.';
 
 CREATE OR REPLACE VIEW public.v_books_audit_tier_years WITH (security_invoker = true) AS
 SELECT t.owner_id, t.year,
@@ -228,12 +301,14 @@ SELECT t.owner_id, t.year,
   count(*) FILTER (WHERE t.is_deduction) AS deductions,
   round(coalesce(sum(t.amount) FILTER (WHERE t.is_deduction), 0), 2) AS deduction_usd,
   count(*) FILTER (WHERE NOT t.is_deduction) AS excluded_n,
-  round(coalesce(sum(t.amount) FILTER (WHERE NOT t.is_deduction), 0), 2) AS excluded_usd
+  round(coalesce(sum(t.amount) FILTER (WHERE NOT t.is_deduction), 0), 2) AS excluded_usd,
+  count(*) FILTER (WHERE t.tier = 'B' AND NOT t.pay_proof) AS b_nobank_n,
+  round(coalesce(sum(t.amount) FILTER (WHERE t.tier = 'B' AND NOT t.pay_proof), 0), 2) AS b_nobank_usd
 FROM public.v_books_audit_tiers t
 GROUP BY t.owner_id, t.year;
 
 COMMENT ON VIEW public.v_books_audit_tier_years IS
-  'Per owner and year rollup of v_books_audit_tiers. total_usd and decisions cover every row; excluded_usd and excluded_n are the rows outside the deduction denominator (is_deduction false, tier X); deduction_usd = total_usd - excluded_usd is the denominator of the A/B/C percentages. Section 274, cash and contractor dollars are over every row.';
+  'Per owner and year rollup of v_books_audit_tiers. total_usd and decisions cover every row; excluded_usd and excluded_n are the rows outside the deduction denominator (is_deduction false, tier X); deduction_usd = total_usd - excluded_usd is the denominator of the A/B/C percentages. b_nobank_n and b_nobank_usd are the part of tier B with no bank line (asset register, owner ruling): b_usd - b_nobank_usd is the bank-backed B. Section 274, cash and contractor dollars are over every row.';
 
 REVOKE ALL ON public.v_books_audit_tiers, public.v_books_audit_tier_years FROM PUBLIC, anon;
 REVOKE INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public.v_books_audit_tiers, public.v_books_audit_tier_years FROM authenticated, service_role;
@@ -387,32 +462,21 @@ BEGIN
     WHERE d.year = v_year AND d.section IN ('Revenue', 'Expense') AND m.year <> d.year
   ),
   r4n AS (SELECT count(DISTINCT d.id) AS n FROM dc d JOIN mv m ON m.links ? d.id WHERE d.year = v_year AND d.section IN ('Revenue', 'Expense')),
-  -- Register inputs: current cells of the books register inputs original (asset:<id>, use:<year>:<key>, credit:<year>).
+  -- Register inputs: current use cells of the books register inputs original (use:<year>:<key>) for R7.
   rcells AS MATERIALIZED (
     SELECT e.field_key, e.value_normalized->'value' AS v
     FROM public.financial_document_extractions e
     JOIN public.financial_documents d ON d.id = e.document_id AND d.owner_id = p_owner_id AND d.source_filename = 'books-register-inputs.txt'
-    WHERE e.owner_id = p_owner_id AND NOT e.is_superseded AND e.field_key ~ '^(asset|use|credit):'
+    WHERE e.owner_id = p_owner_id AND NOT e.is_superseded AND e.field_key ~ '^use:'
       AND jsonb_typeof(e.value_normalized->'value') = 'object' AND e.value_normalized->'value' ? 'cites'
   ),
   -- R6: each line 13 decision traces to register assets; each asset-year's MACRS computation equals what the decisions carry.
-  l13 AS (SELECT d.id, d.amount FROM dc d WHERE d.year = v_year AND d.section = 'Expense' AND d.line = '13' AND d.amount <> 0),
-  ra AS (
-    SELECT a.v->>'id' AS aid, (a.v->>'cost')::numeric AS cost, coalesce((a.v->>'business_pct')::numeric, 1) AS bp,
-           public.books_macrs_pct(a.v->>'cls', p_year - (a.v->>'placed_in_service')::int + 1) AS pct,
-           coalesce(ARRAY(SELECT jsonb_array_elements_text(a.v->'claims'->v_year)), '{}') AS cids
-    FROM rcells a WHERE a.field_key LIKE 'asset:%'
-  ),
-  rac AS (
-    SELECT ra.aid, ra.cids, round(ra.cost * ra.bp * ra.pct / 100, 2) AS computed,
-           (SELECT coalesce(sum(l.amount), 0) FROM l13 l WHERE l.id = ANY(ra.cids)) AS booked
-    FROM ra
+  -- One implementation: v_books_asset_register, which v_books_audit_tiers also reads.
+  r6src AS MATERIALIZED (
+    SELECT a.kind, a.local_id, a.amount FROM public.v_books_asset_register a WHERE a.owner_id = p_owner_id AND a.year = v_year
   ),
   r6 AS (
-    SELECT l.id, l.amount FROM l13 l WHERE NOT EXISTS (SELECT 1 FROM ra WHERE l.id = ANY(ra.cids))
-    UNION ALL
-    SELECT c.aid || ': register computes ' || c.computed || ', decisions carry ' || c.booked, abs(c.booked - c.computed)
-    FROM rac c WHERE (c.computed <> 0 OR cardinality(c.cids) > 0) AND abs(c.booked - c.computed) > 0.51
+    SELECT s6.local_id AS id, s6.amount FROM r6src s6 WHERE s6.kind <> 'claim'
   ),
   -- R7: each line 20b or line 30 (home use) decision belongs to a stored use group whose base times percentage equals it.
   l20 AS (SELECT d.id, d.amount FROM dc d WHERE d.year = v_year AND d.section = 'Expense' AND d.line IN ('20b', '30') AND d.amount <> 0),
@@ -462,8 +526,8 @@ BEGIN
        'detail', 'assessed only where a bank movement links to the decision; ' || ((SELECT sc FROM pop) - (SELECT n FROM r4n)) || ' Schedule C decisions have no linked payment and are not assessed',
        'idlist', (SELECT coalesce(jsonb_agg(q.id), '[]') FROM (SELECT id FROM r4 ORDER BY abs(amount) DESC LIMIT 100) q)) FROM r4),
     (SELECT jsonb_build_object('rule', 'R6', 'title', 'depreciation only from an asset register (cost, in-service date, class, MACRS table)',
-       'n', count(*), 'amount', round(coalesce(sum(abs(amount)), 0), 2), 'of', (SELECT count(*) FROM l13),
-       'detail', (SELECT count(*) FROM l13) || ' line 13 decisions, ' || (SELECT count(*) FROM ra) || ' register assets; each decision must trace to an asset whose MACRS computation equals what the decisions carry',
+       'n', count(*), 'amount', round(coalesce(sum(abs(amount)), 0), 2), 'of', (SELECT count(DISTINCT local_id) FROM r6src WHERE kind IN ('claim', 'unclaimed')),
+       'detail', (SELECT count(DISTINCT local_id) FROM r6src WHERE kind IN ('claim', 'unclaimed')) || ' line 13 decisions; each must trace to a register asset whose MACRS computation equals what the decisions carry (v_books_asset_register)',
        'idlist', (SELECT coalesce(jsonb_agg(q.id), '[]') FROM (SELECT id FROM r6 ORDER BY abs(amount) DESC LIMIT 100) q)) FROM r6),
     (SELECT jsonb_build_object('rule', 'R7', 'title', 'mixed use carries a stored business percentage with its source (decisions equal percentage x base)',
        'n', count(*), 'amount', round(coalesce(sum(abs(amount)), 0), 2), 'of', (SELECT count(*) FROM l20),
@@ -585,31 +649,45 @@ BEGIN
     v_rules := v_rules || jsonb_build_array(v_bad);
   END IF;
 
-  -- R10: audit-proof tiers of the year's deductions (v_books_audit_tiers). Fails on (a) a section 274 item that needs a receipt
+  -- R10: audit-proof tiers of the year's deductions (v_books_audit_tiers, read once). Fails on (a) a section 274 item that needs a receipt
   -- (lodging, or $75 or more) and has no document and is not recorded as a caveat, or (b) a deduction with no payment proof and
-  -- no owner ruling. The tier rollup is always reported. A year with no deduction decisions is not assessed.
+  -- no owner ruling. The tier rollup is always reported; tier B is split into B with a bank line and B with no bank line (asset
+  -- register, owner ruling), and the rows outside the deduction denominator are reported by rule. A year with no deduction decisions is not assessed.
   WITH ta AS MATERIALIZED (SELECT * FROM public.v_books_audit_tiers WHERE owner_id = p_owner_id AND year = v_year),
   t AS MATERIALIZED (SELECT * FROM ta WHERE is_deduction),
-  xc AS (SELECT count(*) AS n, round(coalesce(sum(amount), 0), 2) AS usd FROM ta WHERE NOT is_deduction),
   bad AS (
-    SELECT t.local_id, t.amount, t.tier,
-           (t.needs_receipt AND NOT t.doc_proof AND NOT t.is_caveat) AS no_receipt, (NOT t.pay_proof AND NOT t.has_owner_ruling AND t.structural_rule IS NULL) AS no_pay_no_ruling
+    SELECT t.local_id, t.amount, (t.needs_receipt AND NOT t.doc_proof AND NOT t.is_caveat) AS no_receipt,
+           (NOT t.pay_proof AND NOT t.has_owner_ruling AND t.structural_rule IS NULL) AS no_pay_no_ruling
     FROM t WHERE (t.needs_receipt AND NOT t.doc_proof AND NOT t.is_caveat) OR (NOT t.pay_proof AND NOT t.has_owner_ruling AND t.structural_rule IS NULL)
-  )
-  SELECT CASE WHEN (SELECT count(*) FROM t) = 0 THEN
-      jsonb_build_object('rule', 'R10', 'title', 'deductions are audit-proof: bank line plus allocation basis plus document (A), or bank line plus cited allocation basis (B)',
+  ),
+  agg AS (
+    SELECT count(*) AS n, round(coalesce(sum(amount), 0), 2) AS usd,
+           round(coalesce(sum(amount) FILTER (WHERE tier = 'A'), 0), 2) AS a_usd, round(coalesce(sum(amount) FILTER (WHERE tier = 'B'), 0), 2) AS b_usd,
+           round(coalesce(sum(amount) FILTER (WHERE tier = 'C'), 0), 2) AS c_usd,
+           count(*) FILTER (WHERE tier = 'B' AND NOT pay_proof) AS bn_n, round(coalesce(sum(amount) FILTER (WHERE tier = 'B' AND NOT pay_proof), 0), 2) AS bn_usd
+    FROM t
+  ),
+  xc AS (SELECT count(*) AS n, round(coalesce(sum(amount), 0), 2) AS usd FROM ta WHERE NOT is_deduction)
+  SELECT CASE WHEN (SELECT n FROM agg) = 0 THEN
+      jsonb_build_object('rule', 'R10', 'title', 'deductions are audit-proof: bank line plus allocation basis plus document (A), bank line plus cited allocation basis (B), or a cited asset register or owner ruling with no bank line (B, reported apart)',
         'status', 'not_assessed', 'n', 0, 'amount', NULL, 'detail', 'no Expense decisions for this year', 'ids', '[]'::jsonb)
-    ELSE jsonb_build_object('rule', 'R10', 'title', 'deductions are audit-proof: bank line plus allocation basis plus document (A), or bank line plus cited allocation basis (B)',
+    ELSE jsonb_build_object('rule', 'R10', 'title', 'deductions are audit-proof: bank line plus allocation basis plus document (A), bank line plus cited allocation basis (B), or a cited asset register or owner ruling with no bank line (B, reported apart)',
       'status', CASE WHEN (SELECT count(*) FROM bad) = 0 THEN 'pass' ELSE 'fail' END,
-      'n', (SELECT count(*) FROM bad), 'amount', (SELECT round(coalesce(sum(abs(amount)), 0), 2) FROM bad), 'of', (SELECT count(*) FROM t),
-      'detail', format('of %s deduction decisions totalling %s: A %s (%s%%), B %s (%s%%), C %s (%s%%); %s section 274 items need a receipt and have none and no caveat, %s deductions have no payment proof and no owner ruling; %s further rows (%s) are outside the deduction denominator',
-        (SELECT count(*) FROM t), (SELECT round(sum(amount), 2) FROM t),
-        (SELECT round(coalesce(sum(amount) FILTER (WHERE tier = 'A'), 0), 2) FROM t), (SELECT round(100 * coalesce(sum(amount) FILTER (WHERE tier = 'A'), 0) / nullif(sum(amount), 0), 1) FROM t),
-        (SELECT round(coalesce(sum(amount) FILTER (WHERE tier = 'B'), 0), 2) FROM t), (SELECT round(100 * coalesce(sum(amount) FILTER (WHERE tier = 'B'), 0) / nullif(sum(amount), 0), 1) FROM t),
-        (SELECT round(coalesce(sum(amount) FILTER (WHERE tier = 'C'), 0), 2) FROM t), (SELECT round(100 * coalesce(sum(amount) FILTER (WHERE tier = 'C'), 0) / nullif(sum(amount), 0), 1) FROM t),
+      'n', (SELECT count(*) FROM bad), 'amount', (SELECT round(coalesce(sum(abs(amount)), 0), 2) FROM bad), 'of', (SELECT n FROM agg),
+      'detail', format('of %s deduction decisions totalling %s: A %s (%s%%), B %s (%s%%; %s on %s rows have no bank line: asset register or owner ruling), C %s (%s%%); %s section 274 items need a receipt and have none and no caveat, %s deductions have no payment proof and no owner ruling; %s further rows (%s) are outside the deduction denominator',
+        (SELECT n FROM agg), (SELECT usd FROM agg),
+        (SELECT a_usd FROM agg), (SELECT round(100 * a_usd / nullif(usd, 0), 1) FROM agg),
+        (SELECT b_usd FROM agg), (SELECT round(100 * b_usd / nullif(usd, 0), 1) FROM agg), (SELECT bn_usd FROM agg), (SELECT bn_n FROM agg),
+        (SELECT c_usd FROM agg), (SELECT round(100 * c_usd / nullif(usd, 0), 1) FROM agg),
         (SELECT count(*) FROM bad WHERE no_receipt), (SELECT count(*) FROM bad WHERE no_pay_no_ruling), (SELECT n FROM xc), (SELECT usd FROM xc)),
       'tiers', (SELECT jsonb_object_agg(k.tier, jsonb_build_object('n', k.n, 'amount', k.a)) FROM
                   (SELECT tier, count(*) AS n, round(sum(amount), 2) AS a FROM t GROUP BY tier) k),
+      'b_no_bank', jsonb_build_object('n', (SELECT bn_n FROM agg), 'amount', (SELECT bn_usd FROM agg),
+                  'by_rule', (SELECT coalesce(jsonb_object_agg(q.r, jsonb_build_object('n', q.n, 'amount', q.a)), '{}') FROM
+                                (SELECT structural_rule AS r, count(*) AS n, round(sum(amount), 2) AS a FROM t WHERE tier = 'B' AND NOT pay_proof GROUP BY structural_rule) q)),
+      'excluded', jsonb_build_object('n', (SELECT n FROM xc), 'amount', (SELECT usd FROM xc),
+                  'by_rule', (SELECT coalesce(jsonb_object_agg(q.r, jsonb_build_object('n', q.n, 'amount', q.a)), '{}') FROM
+                                (SELECT structural_rule AS r, count(*) AS n, round(sum(amount), 2) AS a FROM ta WHERE NOT is_deduction GROUP BY structural_rule) q)),
       'ids', (SELECT coalesce(jsonb_agg(q.local_id), '[]') FROM (SELECT local_id FROM bad ORDER BY abs(amount) DESC LIMIT 100) q))
     END
   INTO v_r10;
