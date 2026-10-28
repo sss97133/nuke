@@ -3,12 +3,16 @@
 --   v_books_audit_tier_years the per-year rollup: dollars and % by tier, with the denominator.
 --   books_year_gate R10      reports the rollup; fails the year on (a) a section 274 item that needs a receipt and has none
 --                            and is not recorded as a caveat, or (b) a deduction with no payment proof and no owner ruling.
--- Tiers (first match wins):
---   C  cash, or no payment proof, or a summary row with no bank link and no proof link
---   A  payment proof AND a document (proof_links of kind gmail, file, photo, artifact or receipt, or a Nuke vehicle link)
---   B  payment proof AND a written purpose (ruling_id, an owner_ruling proof link, or a category note), no document
+-- Tiers (owner, 2026-10-28: "most bank lines don't need explanation, rather their allocation to an account is what needs justification"):
+--   C  no bank line (payment proof), or no cited allocation basis at all (a summary row has no bank line, so it is C)
+--   A  bank line AND an allocation basis AND a document (proof_links of kind gmail, file, photo, artifact or receipt, or a Nuke vehicle link)
+--   B  bank line AND a cited allocation basis (owner ruling, category rule, or Nuke vehicle link), no document
+-- Allocation basis: an owner ruling (ruling_id or an owner_ruling proof link), a category rule in v_books_category_rules (cited rows: the
+-- owner's Schedule C line map in the return-facts register and the categories his rulings already cover), a Nuke vehicle link, or a document.
+-- Per-line receipts are not required except under section 274. Cash is a flag, not a tier: a bank-paid line is a bank line.
 -- Payment proof: bank_links names a retained bank movement, or the decision is itself a bank line (local_id has -BANK-).
--- Section 274 flag: category or description names travel, lodging, meals, St Barth, gifts, phone or mileage/fuel, or the category is a vehicle/auto one. A receipt
+-- Section 274 flag: category or description names travel, lodging, meals, St Barth, gifts, phone or mileage/fuel, or the category is a vehicle/auto one
+-- other than vehicle acquisition, transport, brokerage or reconditioning for inventory (cost of goods, not 274 travel). A receipt
 -- is required for lodging and for any item of $75 or more. Cash and contractor flags are keyword flags on the same text.
 -- Caveat: the decision or status text says caveat or qualification (the books record unresolved points that way).
 -- Excluded: decisions closed as not claimed (status Closed...) and open allocations that add no deduction.
@@ -17,8 +21,40 @@
 SET lock_timeout = '5s';
 SET statement_timeout = '60s';
 
+CREATE OR REPLACE VIEW public.v_books_category_rules WITH (security_invoker = true) AS
+-- Cited category rules, derived from rows already in the books. Nothing is typed in here.
+--   return_facts_line_map  the owner's section|category -> Schedule C line map held in the return-facts register (his filed and amended returns)
+--   owner_ruling           a category that at least one of his rulings (ruling_id or owner_ruling link) already allocates; the citation lists the rulings
+WITH lm AS (
+  SELECT DISTINCT ON (e.owner_id) e.owner_id, e.id AS extraction_id, e.value_normalized->'value' AS m
+  FROM public.financial_document_extractions e
+  JOIN public.financial_documents d ON d.id = e.document_id AND d.owner_id = e.owner_id AND d.source_filename = 'return-facts-register.txt'
+  WHERE NOT e.is_superseded AND e.field_key = 'schedule_c_line_map' AND jsonb_typeof(e.value_normalized->'value') = 'object'
+  ORDER BY e.owner_id, e.created_at DESC
+)
+SELECT lm.owner_id, split_part(kv.key, '|', 1) AS section, substr(kv.key, strpos(kv.key, '|') + 1) AS category, 'return_facts_line_map'::text AS basis,
+       ('Schedule C line ' || kv.value || ' (return-facts register, extraction ' || lm.extraction_id || ')')::text AS citation
+FROM lm, jsonb_each_text(lm.m) kv
+UNION ALL
+SELECT v.owner_id, v.section, v.category, 'owner_ruling'::text,
+       ('rulings ' || (array_agg(DISTINCT coalesce(nullif(v.record->>'ruling_id', ''), v.local_id)))[1:5]::text || ' (' || count(*) || ' decisions)')::text
+FROM public.v_financial_accounting_records v
+WHERE v.record_kind = 'retained_ledger_decision' AND v.section = 'Expense' AND v.category IS NOT NULL
+  AND (coalesce(v.record->>'ruling_id', '') <> ''
+       OR EXISTS (SELECT 1 FROM jsonb_array_elements(CASE WHEN jsonb_typeof(v.record->'proof_links') = 'array' THEN v.record->'proof_links' ELSE '[]'::jsonb END) p WHERE p->>'kind' = 'owner_ruling'))
+GROUP BY v.owner_id, v.section, v.category;
+
+COMMENT ON VIEW public.v_books_category_rules IS
+  'Cited category allocation rules for the audit tiers: the owner''s Schedule C line map (return-facts register) and the categories his rulings already cover, each with its source citation. Derived, never typed.';
+REVOKE ALL ON public.v_books_category_rules FROM PUBLIC, anon;
+REVOKE INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public.v_books_category_rules FROM authenticated, service_role;
+GRANT SELECT ON public.v_books_category_rules TO authenticated, service_role;
+
 CREATE OR REPLACE VIEW public.v_books_audit_tiers WITH (security_invoker = true) AS
-WITH d AS (
+WITH rc AS MATERIALIZED (
+  SELECT r.owner_id, r.category, jsonb_agg(jsonb_build_object('basis', r.basis, 'citation', r.citation)) AS cites
+  FROM public.v_books_category_rules r WHERE r.section = 'Expense' GROUP BY r.owner_id, r.category
+), d AS (
   SELECT v.id, v.owner_id, v.document_id, v.year, v.local_id, v.amount_value AS amount, v.category, v.description, v.status, v.record,
          lower(coalesce(v.category, '') || ' ' || coalesce(v.description, '')) AS t,
          lower(coalesce(v.category, '') || ' ' || coalesce(v.description, '') || ' ' || coalesce(v.status, '') || ' ' || coalesce(v.decision, '')) AS tt,
@@ -34,12 +70,15 @@ WITH d AS (
        WHERE p->>'kind' IN ('gmail', 'file', 'photo', 'artifact', 'receipt') OR coalesce(p->>'ref', '') ILIKE '%nuke vehicle%') AS doc_cites,
     (SELECT coalesce(jsonb_agg(p), '[]') FROM jsonb_array_elements(d.pl) p WHERE p->>'kind' = 'owner_ruling') AS ruling_cites,
     (coalesce(d.record->>'ruling_id', '') <> '') AS has_ruling_id,
+    coalesce((SELECT rc.cites FROM rc WHERE rc.owner_id = d.owner_id AND rc.category = d.category), '[]'::jsonb) AS rule_cites,
+    EXISTS (SELECT 1 FROM jsonb_array_elements(d.pl) p WHERE coalesce(p->>'ref', '') ILIKE '%nuke vehicle%') AS vehicle_link,
     (d.tt ~ '\mcash\M') AS is_cash,
     (d.t ~ '\m(contractors?|contract labor|helper|painter|labor|1099|sandblast\w*)\M') AS is_contractor,
     (d.t ~ '\m(lodging|hotel|airbnb|motel)\M') AS is_lodging,
     (d.t ~ '\m(travel|trip|flights?|airfare|lodging|hotel|airbnb|motel|meals?|restaurants?|dining|barths?|gifts?|phones?|telephone|cellular|car and truck|mileage|fuel|gasoline)\M'
        OR d.t ~ '\mline (9|24a|24b)\M'
-       OR lower(coalesce(d.category, '')) ~ '^(vehicle|auto)') AS is_274,
+       OR (lower(coalesce(d.category, '')) ~ '^(vehicle|auto)'
+           AND lower(coalesce(d.category, '')) !~ '(acquisition|transport|brokerage|reconditioning|delivery|cost of goods|shipping cars)')) AS is_274,
     (d.tt ~ 'caveat|qualification') AS is_caveat,
     (d.local_id ~ 'RULING-(filed|Schedule C|car-basis)' AND jsonb_array_length(d.bl) = 0 AND jsonb_array_length(d.pl) = 0) AS is_summary_row
   FROM d
@@ -48,26 +87,25 @@ WITH d AS (
          (f.has_ruling_id OR jsonb_array_length(f.ruling_cites) > 0) AS has_owner_ruling
   FROM f
 ), h AS (
-  SELECT g.*, (g.has_owner_ruling OR coalesce(g.category, '') <> '') AS purpose_proof FROM g
+  SELECT g.*, (g.has_owner_ruling OR g.vehicle_link OR g.doc_proof OR jsonb_array_length(g.rule_cites) > 0) AS purpose_proof FROM g
 )
 SELECT h.id, h.owner_id, h.document_id, h.year, h.local_id, h.amount, h.category, h.description,
-  CASE WHEN h.is_cash OR NOT h.pay_proof OR h.is_summary_row THEN 'C'
-       WHEN h.doc_proof THEN 'A' WHEN h.purpose_proof THEN 'B' ELSE 'C' END AS tier,
-  CASE WHEN h.is_cash THEN 'cash payment'
-       WHEN h.is_summary_row THEN 'summary row with no line detail'
-       WHEN NOT h.pay_proof THEN 'no payment proof'
-       WHEN h.doc_proof THEN 'payment proof and a document'
-       WHEN h.purpose_proof THEN 'payment proof and a written purpose, no document'
-       ELSE 'payment proof only' END AS tier_reason,
+  CASE WHEN NOT h.pay_proof OR NOT h.purpose_proof THEN 'C'
+       WHEN h.doc_proof THEN 'A' ELSE 'B' END AS tier,
+  CASE WHEN h.is_summary_row THEN 'summary row with no line detail, no bank line'
+       WHEN NOT h.pay_proof THEN 'no bank line'
+       WHEN NOT h.purpose_proof THEN 'bank line but no cited allocation basis'
+       WHEN h.doc_proof THEN 'bank line, allocation basis and a document'
+       ELSE 'bank line and a cited allocation basis (' || CASE WHEN h.has_owner_ruling THEN 'owner ruling' WHEN h.vehicle_link THEN 'Nuke vehicle' ELSE 'category rule' END || ')' END AS tier_reason,
   h.pay_proof, h.doc_proof, h.purpose_proof, h.has_owner_ruling,
   h.is_cash, h.is_contractor, h.is_274, h.is_caveat, h.is_summary_row,
   (h.is_274 AND (h.is_lodging OR abs(h.amount) >= 75)) AS needs_receipt,
-  h.bl AS payment_cites, h.doc_cites AS document_cites,
+  h.bl AS payment_cites, h.doc_cites AS document_cites, h.rule_cites AS rule_cites,
   (coalesce(h.record->>'ruling_id', '')) AS ruling_id, h.ruling_cites AS ruling_cites
 FROM h;
 
 COMMENT ON VIEW public.v_books_audit_tiers IS
-  'One row per Expense decision of the current books with its audit tier (A payment+document, B payment+written purpose, C weak), section 274 / cash / contractor / caveat flags, the reason and the cites used. Runs as the caller.';
+  'One row per Expense decision of the current books with its audit tier (A bank line+allocation basis+document, B bank line+cited allocation basis, C no bank line or no basis), section 274 / cash / contractor / caveat flags, the reason and the cites used. Runs as the caller.';
 
 CREATE OR REPLACE VIEW public.v_books_audit_tier_years WITH (security_invoker = true) AS
 SELECT t.owner_id, t.year,
@@ -453,9 +491,9 @@ BEGIN
     FROM t WHERE (t.needs_receipt AND NOT t.doc_proof AND NOT t.is_caveat) OR (NOT t.pay_proof AND NOT t.has_owner_ruling)
   )
   SELECT CASE WHEN (SELECT count(*) FROM t) = 0 THEN
-      jsonb_build_object('rule', 'R10', 'title', 'deductions are audit-proof: payment proof plus document (A), or payment plus written purpose (B)',
+      jsonb_build_object('rule', 'R10', 'title', 'deductions are audit-proof: bank line plus allocation basis plus document (A), or bank line plus cited allocation basis (B)',
         'status', 'not_assessed', 'n', 0, 'amount', NULL, 'detail', 'no Expense decisions for this year', 'ids', '[]'::jsonb)
-    ELSE jsonb_build_object('rule', 'R10', 'title', 'deductions are audit-proof: payment proof plus document (A), or payment plus written purpose (B)',
+    ELSE jsonb_build_object('rule', 'R10', 'title', 'deductions are audit-proof: bank line plus allocation basis plus document (A), or bank line plus cited allocation basis (B)',
       'status', CASE WHEN (SELECT count(*) FROM bad) = 0 THEN 'pass' ELSE 'fail' END,
       'n', (SELECT count(*) FROM bad), 'amount', (SELECT round(coalesce(sum(abs(amount)), 0), 2) FROM bad), 'of', (SELECT count(*) FROM t),
       'detail', format('of %s deduction decisions totalling %s: A %s (%s%%), B %s (%s%%), C %s (%s%%); %s section 274 items need a receipt and have none and no caveat, %s deductions have no payment proof and no owner ruling',
