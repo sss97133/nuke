@@ -72,6 +72,9 @@ jobs:
       - name: Market fold refresh contracts
         run: python3 scripts/test-refresh-market-views.py
 
+      - name: CAD photo evidence coverage contracts
+        run: python3 -m unittest discover -s docs/wiring/calc-data/cad -p test_check_dimensions.py
+
       - name: Type check
         working-directory: ./nuke_frontend
         run: npm run type-check || npx tsc --noEmit --skipLibCheck
