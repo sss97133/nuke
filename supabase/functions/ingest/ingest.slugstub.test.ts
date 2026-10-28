@@ -139,6 +139,19 @@ function assert(condition: boolean, message: string) {
 const OPENAI_NO_CREDITS =
   '{"success":false,"error":"OpenAI API error: 429 - {\\n \\"error\\": {\\n \\"message\\": \\"You have no credits remaining. Add credits to continue using the API';
 
+Deno.test("Vicari preview preserves ahid and performs no extraction or writes", async () => {
+  const r = await ingest({ url: "https://www.vicariauction.com/auction-house/5/?ahid=123", preview: true });
+  equal([r.result.status, r.result.source, r.result.external_id], ["preview", "vicari", "123"]);
+  equal(extractorCalls(), []); equal(writes(), []);
+});
+
+Deno.test("Vicari refuses an unregistered source instead of falling back to AI or caller fields", async () => {
+  const r = await ingest({ url: "https://www.vicariauction.com/auction-house/?ahid=123",
+    year: 1967, make: "Ford", model: "Mustang", description: "caller text", enrich: false });
+  equal([r.result.status, r.result.error], ["error", "vicari_source_not_registered"]);
+  equal(extractorCalls(), []); equal(writes(), []);
+});
+
 const SLUG_VENUES: Array<{ platform: string; url: string; extractor: string }> = [
   { platform: "classiccars", url: "https://classiccars.com/listings/view/2089229/1993-chevrolet-corvette-for-sale-in-cleveland-ohio-44128", extractor: "extract-classiccars" },
   { platform: "mecum", url: "https://www.mecum.com/lots/1177355/2005-hummer-h2", extractor: "extract-mecum" },
