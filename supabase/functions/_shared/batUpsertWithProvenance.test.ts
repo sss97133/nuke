@@ -6,6 +6,9 @@
 // inserts in the 24 hours to 2026-10-28 22:59Z (Postgres logs), from every extractor that writes through
 // _shared/observationWriter.ts and from extract-bat-core. The allowed list is read from the migration that creates the
 // table, so the test follows the table and not a copy of it.
+//
+// The second contract is the confirmation throttle: a value re-read unchanged leaves one 'valid' receipt per 7 days for
+// each (vehicle, field, source). Gap fills, conflicts and any changed value file at once.
 import {
   batchUpsertWithProvenance,
   upsertFieldWithProvenance,
@@ -51,7 +54,10 @@ function fakeClient(allowed: string[]) {
         order: () => query,
         limit: () => query,
         maybeSingle: () => {
-          const hit = [...stored].reverse().find((r) => Object.entries(filters).every(([k, v]) => r[k] === v));
+          // The latest row for the key: the layer asks for extracted_at descending, limit 1.
+          const hit = stored
+            .filter((r) => Object.entries(filters).every(([k, v]) => r[k] === v))
+            .sort((x, y) => Date.parse(String(y.extracted_at)) - Date.parse(String(x.extracted_at)))[0];
           return Promise.resolve({ data: hit ?? null, error: null });
         },
         insert: (row: Row) => {
@@ -85,6 +91,11 @@ const meta: ProvenanceMetadata = {
 };
 const ctx = (supabase: unknown) => ({ supabase, vehicleId: VEHICLE, listingUrl: URL_, extractionVersion: meta.extraction_version });
 const summary = (rows: Row[]) => rows.map((r) => [r.field_name, r.field_value, r.validation_status]);
+
+const HOUR = 60 * 60 * 1000;
+const DAY = 24 * HOUR;
+/** Make a stored receipt look `ms` old, as it would after that long: the layer reads extracted_at back. */
+const age = (row: Row, ms: number) => { row.extracted_at = new Date(Date.now() - ms).toISOString(); };
 
 Deno.test("the CHECK in the creating migration is five statuses, and confirmed is not one of them", () => {
   equal(allowedStatuses().slice().sort(), ["conflicting", "invalid", "low_confidence", "unvalidated", "valid"]);
@@ -151,9 +162,63 @@ Deno.test("a batch of gap fills, confirmations and a conflict lands every receip
   equal(stored.map((r) => r.validation_status).sort(), ["conflicting", "unvalidated", "valid", "valid", "valid"]);
 });
 
-Deno.test("a repeat read of a confirmed value adds no second receipt", async () => {
-  const { client, stored } = fakeClient(allowedStatuses());
-  await upsertFieldWithProvenance(ctx(client), "model", "911", "911", meta);
+Deno.test("a second confirmation within 7 days files nothing", async () => {
+  const { client, stored, refused } = fakeClient(allowedStatuses());
   await upsertFieldWithProvenance(ctx(client), "model", "911", "911", meta);
   equal(summary(stored), [["model", "911", "valid"]]);
+  await upsertFieldWithProvenance(ctx(client), "model", "911", "911", meta); // at once
+  age(stored[0], 6 * DAY + 23 * HOUR); // one hour short of the window
+  await upsertFieldWithProvenance(ctx(client), "model", "911", "911", meta);
+  equal(summary(stored), [["model", "911", "valid"]]);
+  equal(refused.length, 0);
+});
+
+Deno.test("after 7 days a confirmation files once, then the window starts again", async () => {
+  const { client, stored, refused } = fakeClient(allowedStatuses());
+  await upsertFieldWithProvenance(ctx(client), "model", "911", "911", meta);
+  age(stored[0], 7 * DAY); // the window has run out
+  await upsertFieldWithProvenance(ctx(client), "model", "911", "911", meta);
+  equal(summary(stored), [["model", "911", "valid"], ["model", "911", "valid"]]);
+  await upsertFieldWithProvenance(ctx(client), "model", "911", "911", meta); // inside the new window
+  equal(stored.length, 2);
+  equal(refused.length, 0);
+});
+
+Deno.test("a confirmation after a gap fill waits for the gap fill's receipt to be 7 days old", async () => {
+  const { client, stored } = fakeClient(allowedStatuses());
+  await upsertFieldWithProvenance(ctx(client), "make", "Porsche", null, meta); // gap fill, unvalidated
+  await upsertFieldWithProvenance(ctx(client), "make", "Porsche", "Porsche", meta); // a minute later
+  equal(summary(stored), [["make", "Porsche", "unvalidated"]]);
+  age(stored[0], 8 * DAY);
+  await upsertFieldWithProvenance(ctx(client), "make", "Porsche", "Porsche", meta);
+  equal(summary(stored), [["make", "Porsche", "unvalidated"], ["make", "Porsche", "valid"]]);
+});
+
+Deno.test("a changed value files at once, inside the window", async () => {
+  const { client, stored } = fakeClient(allowedStatuses());
+  await upsertFieldWithProvenance(ctx(client), "model", "911", "911", meta);
+  await upsertFieldWithProvenance(ctx(client), "model", "912", "912", meta); // the stored value moved to 912
+  equal(summary(stored), [["model", "911", "valid"], ["model", "912", "valid"]]);
+});
+
+Deno.test("gap fills and conflicts are not throttled by a recent confirmation", async () => {
+  const { client, stored, quarantined } = fakeClient(allowedStatuses());
+  await upsertFieldWithProvenance(ctx(client), "model", "911", "911", meta); // confirmation, valid
+  await upsertFieldWithProvenance(ctx(client), "model", "912", "911", meta); // the source now says 912: conflict
+  await upsertFieldWithProvenance(ctx(client), "color", "Red", null, meta); // gap fill on another field
+  equal(summary(stored), [["model", "911", "valid"], ["model", "912", "conflicting"], ["color", "Red", "unvalidated"]]);
+  equal(quarantined.length, 1);
+  // a conflict that repeats the same value keeps the dedupe it always had: no second row, however old the receipt
+  age(stored[0], 31 * DAY);
+  age(stored[1], 30 * DAY); // the conflict is still the latest receipt for the key
+  await upsertFieldWithProvenance(ctx(client), "model", "912", "911", meta);
+  equal(stored.filter((r) => r.validation_status === "conflicting").length, 1);
+});
+
+Deno.test("the window is per source: another listing URL files its own confirmation", async () => {
+  const { client, stored } = fakeClient(allowedStatuses());
+  await upsertFieldWithProvenance(ctx(client), "model", "911", "911", meta);
+  const other = { supabase: client, vehicleId: VEHICLE, listingUrl: "https://example.com/listing/2", extractionVersion: meta.extraction_version };
+  await upsertFieldWithProvenance(other, "model", "911", "911", { ...meta, source_url: other.listingUrl });
+  equal(stored.map((r) => r.source_url), [URL_, other.listingUrl]);
 });
