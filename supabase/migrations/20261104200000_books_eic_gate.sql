@@ -23,6 +23,7 @@
 -- amount pays the full maximum; the line holding the phase-out start pays the full maximum. Checked against the printed Tables (Form 1040
 -- instructions) for every line and column (single and joint, 0 to 3 children): 2024 and 2025 match in every cell; 2023 is within $1
 -- (the 2023 Table uses unrounded maximums).
+-- Must apply after 20261104190000 (PR #2873); it carries the complete books_year_gate body from 20261104180000 plus the EIC change.
 
 SET lock_timeout = '5s';
 SET statement_timeout = '60s';
@@ -261,6 +262,8 @@ COMMENT ON FUNCTION public.books_eic_recompute(jsonb, integer, text) IS
 REVOKE ALL ON FUNCTION public.books_eic_amount(numeric, numeric, numeric, numeric, numeric, numeric), public.books_eic_recompute(jsonb, integer, text) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.books_eic_amount(numeric, numeric, numeric, numeric, numeric, numeric), public.books_eic_recompute(jsonb, integer, text) TO authenticated, service_role;
 
+SET lock_timeout = '90s';
+SET statement_timeout = '120s';
 CREATE OR REPLACE FUNCTION public.books_year_gate(p_owner_id uuid, p_year integer)
  RETURNS jsonb
  LANGUAGE plpgsql
