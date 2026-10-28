@@ -23,7 +23,7 @@ function visibleMarkup(html: string): string {
   let previous: string;
   do {
     previous = html;
-    html = html.replace(/<!--[\s\S]*?-->/g, "").replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1>/gi, "");
+    html = previous.replace(/<!--[\s\S]*?-->|<(script|style)\b[^>]*>[\s\S]*?<\/\1>/gi, "");
   } while (html !== previous);
   return html;
 }
