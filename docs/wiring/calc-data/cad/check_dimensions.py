@@ -21,10 +21,10 @@ Exit status 1 if any shape, unit or on-page check fails.
 import math
 import re
 import sys
+import csv
+import json
 from collections import Counter
 from pathlib import Path
-
-import yaml
 
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[3]
@@ -222,7 +222,131 @@ def cross(d):
     return out
 
 
+def photo_evidence(rows, camera_document, source_landmarks, requirements, tolerance_mm=25.0):
+    """Audit saved reprojections without re-rendering or promoting them to 3D accuracy.
+
+    Camera ``gate: true`` is explicit permission to score that reference. A solved
+    camera is not necessarily a validation camera. ``validation_role: holdout``
+    must mean the image was not used to fit geometry/cameras/scale; its provenance
+    is reviewed by a human. Six points/two views are a coverage floor, not a proof
+    of shape, independence, absolute accuracy, or a manufacturing tolerance.
+    """
+    if not math.isfinite(tolerance_mm) or tolerance_mm <= 0:
+        raise ValueError('tolerance_mm must be finite and positive')
+    required = requirements.get('required_landmarks', [])
+    if (not isinstance(required, list) or not required
+            or any(not isinstance(name, str) or not name.strip() for name in required)
+            or len(set(required)) != len(required)):
+        raise ValueError('requirements need a nonempty, unique required_landmarks list')
+    cameras = camera_document['cameras']
+    if len({c['id'] for c in cameras}) != len(cameras):
+        raise ValueError('duplicate camera id')
+    sources = {r['name']: r for r in source_landmarks}
+    if len(sources) != len(source_landmarks):
+        raise ValueError('duplicate source landmark')
+    reasons, per_image, observed = [], {}, {name: set() for name in required}
+    known_ids = {c['id'] for c in cameras}
+    unknown_ids = sorted({r['image_id'] for r in rows} - known_ids)
+    if unknown_ids:
+        reasons.append('rows reference unknown cameras: ' + ', '.join(unknown_ids))
+    qualifying, holdouts = set(), set()
+    for camera in cameras:
+        cid = camera['id']
+        selected = [r for r in rows if r['image_id'] == cid]
+        eligible = camera.get('gate') is True
+        info = {'eligible': eligible, 'rows': len(selected), 'unique_landmarks': 0,
+                'problems': []}
+        per_image[cid] = info
+        if not eligible:
+            info['exclusion'] = 'gate:false' if camera.get('gate') is False else 'eligibility undeclared'
+            continue
+        if camera.get('rvec') is None or camera.get('tvec') is None:
+            info['problems'].append('camera pose missing')
+        names = [r['name'] for r in selected]
+        info['unique_landmarks'] = len(set(names))
+        if len(names) != len(set(names)):
+            info['problems'].append('duplicate landmark rows')
+        if len(set(names)) < 6:
+            info['problems'].append('fewer than six distinct landmarks')
+        errors, uncertainty, valid_names = [], [], set()
+        for row in selected:
+            name = row['name']
+            try:
+                error, depth = float(row['d_mm']), float(row['depth_m'])
+                sigma = float(sources[name]['sigma_mm'])
+            except (ValueError, TypeError, KeyError):
+                info['problems'].append(name + ': missing residual/depth/source uncertainty')
+                continue
+            if not all(math.isfinite(v) for v in (error, depth, sigma)) or min(error, sigma) < 0 or depth <= 0:
+                info['problems'].append(name + ': invalid residual/depth/source uncertainty')
+                continue
+            errors.append(error)
+            uncertainty.append(sigma)
+            if error > tolerance_mm:
+                info['problems'].append(name + ': residual exceeds tolerance')
+            if sigma > tolerance_mm:
+                info['problems'].append(name + ': source uncertainty exceeds tolerance')
+            if error <= tolerance_mm and sigma <= tolerance_mm:
+                valid_names.add(name)
+        info['max_residual_mm'] = max(errors, default=None)
+        info['max_source_sigma_mm'] = max(uncertainty, default=None)
+        if not info['problems']:
+            qualifying.add(cid)
+            if camera.get('validation_role') == 'holdout':
+                holdouts.add(cid)
+            for name in valid_names & observed.keys():
+                observed[name].add(cid)
+        else:
+            reasons.append(cid + ': ' + '; '.join(info['problems']))
+    if len(qualifying) < 2:
+        reasons.append('fewer than two qualifying eligible views')
+    if not holdouts:
+        reasons.append('no qualifying held-out validation view declared')
+    coverage = {name: sorted(ids) for name, ids in observed.items()}
+    incomplete = [name for name, ids in observed.items() if len(ids) < 2]
+    if incomplete:
+        reasons.append('required features need two qualifying views: ' + ', '.join(incomplete))
+    without_holdout = [name for name, ids in observed.items() if not ids & holdouts]
+    if without_holdout:
+        reasons.append('required features lack a qualifying holdout: ' + ', '.join(without_holdout))
+    return {'status': 'BLOCKED' if reasons else 'COVERAGE_CHECK_PASSED',
+            'tolerance_mm': tolerance_mm, 'qualifying_views': sorted(qualifying),
+            'holdout_views': sorted(holdouts), 'per_image': per_image,
+            'required_feature_coverage': coverage, 'reasons': reasons,
+            'scope': 'Saved landmark reprojection coverage only; no independent camera calibration, '
+                     'dense surface, silhouette, assembly fit, materials, or physical accuracy certification.'}
+
+
+def photo_evidence_cli():
+    import argparse
+    parser = argparse.ArgumentParser(description='Audit photo evidence; never certify a whole render from point residuals')
+    parser.add_argument('--photo-gate', required=True, help='saved gate.csv from the overlay renderer')
+    parser.add_argument('--cameras', required=True)
+    parser.add_argument('--source-landmarks', required=True, help='landmarks_twin.csv with sigma_mm')
+    parser.add_argument('--requirements', required=True, help='JSON with required_landmarks, declared before fitting')
+    parser.add_argument('--tolerance-mm', type=float, default=25.0,
+                        help='existing coarse overlay limit; not a manufacturing tolerance')
+    parser.add_argument('--output', help='private JSON output path; defaults to stdout')
+    args = parser.parse_args()
+    def csv_rows(path):
+        with open(path, newline='') as handle:
+            return list(csv.DictReader(handle))
+    report = photo_evidence(csv_rows(args.photo_gate), json.loads(Path(args.cameras).read_text()),
+                            csv_rows(args.source_landmarks), json.loads(Path(args.requirements).read_text()),
+                            args.tolerance_mm)
+    content = json.dumps(report, indent=2, allow_nan=False) + '\n'
+    if args.output:
+        Path(args.output).write_text(content)
+        print(report['status'], args.output)
+    else:
+        print(content, end='')
+    return 1 if report['status'] == 'BLOCKED' else 0
+
+
 def main():
+    if '--photo-gate' in sys.argv:
+        sys.exit(photo_evidence_cli())
+    import yaml
     data = yaml.safe_load((HERE / "dimensions.yaml").read_text())
     sources = data["sources"]
     dims = data["dimensions"]
