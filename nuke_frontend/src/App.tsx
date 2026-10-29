@@ -27,6 +27,7 @@ const OneMap = React.lazy(() => import('./components/map/OneMap'));
 const VehicleShowcase = React.lazy(() => import('./pages/showcase/VehicleShowcase'));
 const DeckPage = React.lazy(() => import('./pages/DeckPage'));
 const ShareWiring = React.lazy(() => import('./pages/ShareWiring'));
+const ContributePage = React.lazy(() => import('./pages/contribute/ContributePage'));
 
 const LazyFallback = <div className="p-6"><LoadingSkeleton variant="card-list" count={6} ariaLabel="Loading page" /></div>;
 
@@ -89,6 +90,8 @@ function RoutedApp() {
           <Route path="/deck/:deckId" element={<Suspense fallback={LazyFallback}><DeckPage /></Suspense>} />
           {/* Builder share view — zero-chrome public print package (receipt 2026-06-11_builder-share-view.md) */}
           <Route path="/share/wiring/:vehicleId" element={<Suspense fallback={LazyFallback}><ShareWiring /></Suspense>} />
+          {/* Contributor link: a builder or previous owner answers from their phone, no account (contributor-intake) */}
+          <Route path="/contribute/:token" element={<Suspense fallback={LazyFallback}><ContributePage /></Suspense>} />
 
           {/* ── App shell routes (with AppLayout) ── */}
           <Route path="/*" element={

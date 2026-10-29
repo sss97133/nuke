@@ -10,6 +10,7 @@ const VehicleLedgerDocumentsCard = React.lazy(() => import('../../components/veh
 // WiringQueryContextBar removed — wiring canvas replaced with data view
 const PartsQuoteGenerator = React.lazy(() => import('../../components/PartsQuoteGenerator').then(m => ({ default: m.PartsQuoteGenerator })));
 const InvestmentLedger = React.lazy(() => import('./InvestmentLedger'));
+const ContributorIntakeCard = React.lazy(() => import('./ContributorIntakeCard'));
 const BuildLedger = React.lazy(() => import('./BuildLedger'));
 const AgentChat = React.lazy(() => import('../../components/agent/AgentChat'));
 const WorthEngineCard = React.lazy(() => import('./WorthEngineCard'));
@@ -385,6 +386,11 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
                 <PartsQuoteGenerator vehicleId={vehicle.id} vehicleInfo={{ year: vehicle.year, make: vehicle.make, model: vehicle.model }} />
               </CollapsibleWidget>
             </>
+          )}
+          {(isRowOwner || isVerifiedOwner) && (
+            <CollapsibleWidget variant="profile" title="Contributors" defaultCollapsed={true}>
+              <React.Suspense fallback={null}><ContributorIntakeCard vehicleId={vehicle.id} /></React.Suspense>
+            </CollapsibleWidget>
           )}
           {(isVerifiedOwner || hasContributorAccess) && (
             <CollapsibleWidget variant="profile" title="Ledger Documents" defaultCollapsed={true}>

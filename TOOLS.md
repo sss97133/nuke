@@ -157,6 +157,7 @@ Building a duplicate wastes compute, creates data forks, and breaks pipeline tra
 
 | Intent | Use This | Notes |
 |--------|----------|-------|
+| A contributor (builder, previous owner, shop, appraiser) answers questions and sends documents from a link | `contributor-intake` | Public, token-only (no account). GET open, POST /answer, POST /file (multipart, sha256, `vehicle-photos/contributors/<invite_id>/<sha256>/<file>`, EXIF). Writes only through `contributor_intake_open` / `_answer` / `_file`; device attestation with ip_sha256 (daily salt `CONTRIBUTOR_IP_SALT`); one 404 for unknown, expired and revoked tokens. Owner creates links with `create_contributor_invite` and reads `get_contributor_intake`; page `/contribute/:token` |
 | OCR a vehicle document | `document-ocr-worker` | Reads from `document_ocr_queue` |
 | Queue a document for OCR | Insert to `document_ocr_queue` | Worker picks up automatically |
 | Extract title/registration data | `extract-title-data` | Writes to `vehicle_title_documents` |
