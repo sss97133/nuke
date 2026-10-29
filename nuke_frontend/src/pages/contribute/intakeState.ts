@@ -48,7 +48,7 @@ export function statusWord(a: AnswerState | undefined): string {
 }
 
 export type UploadStatus = 'uploading' | 'received' | 'duplicate' | 'failed';
-export type Upload = { id: string; name: string; isImage: boolean; previewUrl: string | null; status: UploadStatus };
+export type Upload = { id: string; name: string; label: string; isImage: boolean; previewUrl: string | null; status: UploadStatus };
 export type UploadEvent =
   | { type: 'added'; upload: Omit<Upload, 'status'> }
   | { type: 'done'; id: string; duplicate: boolean }
@@ -65,6 +65,16 @@ export function uploadsReducer(state: Upload[], e: UploadEvent): Upload[] {
 export const uploadWord: Record<UploadStatus, string> = {
   uploading: 'sending…', received: 'received', duplicate: 'already received', failed: 'not sent, tap to try again',
 };
+
+/** What the contributor says a file is. It decides where it is kept: only build photos are public. */
+export const DOCUMENT_LABELS: Array<{ value: string; word: string; isPrivate: boolean }> = [
+  { value: 'receipt', word: 'Receipt or invoice', isPrivate: true },
+  { value: 'cam card / parts paperwork', word: 'Cam card or parts paperwork', isPrivate: true },
+  { value: 'dyno or timeslip', word: 'Dyno sheet or timeslip', isPrivate: true },
+  { value: 'purchase or title paper', word: 'Title or purchase paper', isPrivate: true },
+  { value: 'build photo', word: 'Build photo', isPrivate: false },
+  { value: 'other', word: 'Something else', isPrivate: true },
+];
 
 export type DeviceHints = { screen: { w: number | null; h: number | null; dpr: number | null }; timezone: string | null };
 

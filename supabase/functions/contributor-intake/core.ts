@@ -19,12 +19,42 @@ export type JsonObject = { [k: string]: Json };
 
 export const NOT_FOUND_BODY = { error: "not_found" } as const;
 export const TOKEN_RE = /^[A-Za-z0-9_-]{16,256}$/;
-export const MAX_FILE_BYTES = 20 * 1024 * 1024;
+export const MAX_FILE_BYTES = 52 * 1024 * 1024;
+
+export const LABELS = ["build photo", "purchase or title paper", "receipt", "cam card / parts paperwork", "dyno or timeslip", "other"] as const;
+export type Bucket = "vehicle-photos" | "ownership-documents" | "user-documents";
+const HEIC = /^image\/hei[cf]$/;
+const BUCKET_RULES: Record<Bucket, { max: number; mime: RegExp; sensitive: boolean }> = {
+  "vehicle-photos": { max: 20 * 1024 * 1024, mime: /^image\/(jpeg|png|webp|gif)$/, sensitive: false },
+  "ownership-documents": { max: 10 * 1024 * 1024, mime: /^(image\/(jpeg|png|webp)|application\/pdf)$/, sensitive: true },
+  "user-documents": { max: 52 * 1024 * 1024, mime: /^(image\/[a-z0-9.+-]+|application\/pdf)$/, sensitive: true },
+};
+
+/**
+ * Where a file goes, by the label the contributor picked. Only build photos are public; title and purchase papers
+ * (they carry a home address) go to ownership-documents; everything else to user-documents. HEIC is refused by
+ * vehicle-photos and ownership-documents, so a HEIC file goes to user-documents (private) whatever its label:
+ * we never send a phone's HEIC to a public bucket and never convert server-side.
+ */
+export function routeBucket(label: string | null, mime: string): { bucket: Bucket; sensitive: boolean; max: number } | null {
+  let bucket: Bucket = label === "build photo" ? "vehicle-photos" : label === "purchase or title paper" ? "ownership-documents" : "user-documents";
+  if (HEIC.test(mime)) bucket = "user-documents";
+  const rule = BUCKET_RULES[bucket];
+  if (!rule.mime.test(mime)) return null;
+  return { bucket, sensitive: rule.sensitive, max: rule.max };
+}
+
+/** https URL for the object: the public URL for vehicle-photos, the authenticated object URL for the private buckets. */
+export function objectUrl(supabaseUrl: string, bucket: Bucket, path: string): string {
+  const base = supabaseUrl.replace(/^http:\/\//, "https://").replace(/\/+$/, "");
+  const enc = path.split("/").map(encodeURIComponent).join("/");
+  return bucket === "vehicle-photos" ? `${base}/storage/v1/object/public/${bucket}/${enc}` : `${base}/storage/v1/object/authenticated/${bucket}/${enc}`;
+}
 export const MAX_ANSWER_CHARS = 20000;
 
 export interface Deps {
   rpc: (name: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: { code?: string; message?: string } | null }>;
-  upload: (path: string, bytes: Uint8Array, contentType: string) => Promise<{ error: { message?: string } | null }>;
+  upload: (bucket: Bucket, path: string, bytes: Uint8Array, contentType: string) => Promise<{ error: { message?: string } | null }>;
   exif: (bytes: Uint8Array, mime: string) => Promise<JsonObject | null>;
   resolveUser: (jwt: string) => Promise<string | null>;
   env: (name: string) => string | undefined;
@@ -96,12 +126,19 @@ export class RateLimiter {
 export function defaultLimiter(): RateLimiter { return new RateLimiter(60, 10 * 60 * 1000); }
 const ipLimiter = new RateLimiter(240, 10 * 60 * 1000);
 
-/** The database says a token does not resolve: null, ok:false, or a token error. All of them become the same 404. */
+/** The database says a token does not resolve: null, {ok:false, error:'not_found'}, or a token error. One 404 for all. */
 export function isTokenRefusal(data: unknown, error: { code?: string; message?: string } | null): boolean {
-  if (error) return error.code === "P0002" || /token|not.?found|expired|revoked|invalid/i.test(error.message ?? "");
+  if (error) return error.code === "P0002" || /token|not.?found|expired|revoked/i.test(error.message ?? "");
   if (data == null) return true;
-  return typeof data === "object" && (data as Record<string, unknown>).ok === false;
+  const o = typeof data === "object" ? data as Record<string, unknown> : null;
+  return o?.ok === false && o.error === "not_found";
 }
+
+/** {ok:false, error:<other>}: the writer refused the content (unknown_question, invalid_sha256, …). */
+const contentRefusal = (data: unknown): Out | null => {
+  const o = data && typeof data === "object" ? data as Record<string, unknown> : null;
+  return o?.ok === false ? { status: 400, body: { error: typeof o.error === "string" ? o.error : "refused" } } : null;
+};
 
 export const safeFileName = (name: string) =>
   (name.normalize("NFKD").replace(/[^A-Za-z0-9._-]+/g, "_").replace(/^[._]+/, "").slice(-120)) || "file";
@@ -171,38 +208,46 @@ export async function handle(req: Request, deps: Deps): Promise<Out> {
     });
     if (isTokenRefusal(data, error)) return notFound();
     if (error) return { status: 500, body: { error: "not_saved" } };
-    return { status: 200, body: data };
+    return contentRefusal(data) ?? { status: 200, body: data };
   }
 
   const file = form!.get("file");
   if (!(file instanceof File)) return { status: 400, body: { error: "file_required" } };
-  if (file.size === 0 || file.size > MAX_FILE_BYTES) return { status: 413, body: { error: "file_size", max_bytes: MAX_FILE_BYTES } };
-  const mime = file.type || (file.name.toLowerCase().endsWith(".pdf") ? "application/pdf" : "application/octet-stream");
-  if (!/^image\//.test(mime) && mime !== "application/pdf") return { status: 415, body: { error: "images_or_pdf_only" } };
+  const lower = (file.name || "").toLowerCase();
+  const given = file.type && file.type !== "application/octet-stream" ? file.type : "";
+  const mime = (given || (lower.endsWith(".pdf") ? "application/pdf" : /\.hei[cf]$/.test(lower) ? "image/heic" : "application/octet-stream")).toLowerCase();
+  const rawLabel = short(form!.get("label"), 64);
+  const label = rawLabel && (LABELS as readonly string[]).includes(rawLabel) ? rawLabel : "other";
+  const dest = routeBucket(label, mime);
+  if (!dest) return { status: 415, body: { error: "images_or_pdf_only" } };
+  if (file.size === 0 || file.size > dest.max) return { status: 413, body: { error: "file_size", max_bytes: dest.max } };
 
   // Validate the token (and record this upload's visit) before anything reaches storage.
   const opened = await deps.rpc("contributor_intake_open", { p_token: token, p_device: { ...device, purpose: "file" } });
   if (isTokenRefusal(opened.data, opened.error)) return notFound();
   if (opened.error) return { status: 500, body: { error: "open_failed" } };
-  const o = opened.data as JsonObject;
-  const inviteId = typeof o.invite_id === "string" ? o.invite_id
-    : (o.invite && typeof o.invite === "object" && typeof (o.invite as JsonObject).id === "string" ? (o.invite as JsonObject).id as string : null);
+  const inv = (opened.data as JsonObject).invite;
+  const inviteId = inv && typeof inv === "object" && !Array.isArray(inv) && typeof inv.id === "string" ? inv.id : null;
   if (!inviteId) return { status: 500, body: { error: "invite_unresolved" } };
 
   const bytes = new Uint8Array(await file.arrayBuffer());
   const sha = await sha256Hex(bytes);
   const name = safeFileName(file.name || "file");
   const path = `contributors/${inviteId}/${sha}/${name}`;
-  const up = await deps.upload(path, bytes, mime);
+  const up = await deps.upload(dest.bucket, path, bytes, mime);
   if (up.error && !/exists|duplicate/i.test(up.error.message ?? "")) return { status: 502, body: { error: "storage_failed" } };
   let exif: JsonObject | null = null;
   try { exif = /^image\//.test(mime) ? await deps.exif(bytes, mime) : null; } catch { exif = null; }
-  const label = short(form!.get("label"), 64);
   const { data, error } = await deps.rpc("contributor_intake_file", {
     p_token: token,
-    p_file: { storage_path: `vehicle-photos/${path}`, file_name: name, mime_type: mime, size_bytes: bytes.length, sha256: sha, exif, device, label, recorded_by: recorder },
+    p_file: {
+      bucket: dest.bucket, is_sensitive: dest.sensitive, storage_path: path,
+      image_url: objectUrl(deps.env("SUPABASE_URL") ?? "", dest.bucket, path),
+      file_name: name, mime_type: mime, size_bytes: bytes.length, sha256: sha, exif, device, label,
+      ...(recorder ? { recorded_by: recorder } : {}),
+    },
   });
   if (isTokenRefusal(data, error)) return notFound();
   if (error) return { status: 500, body: { error: "not_saved" } };
-  return { status: 200, body: data };
+  return contentRefusal(data) ?? { status: 200, body: data };
 }

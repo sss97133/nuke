@@ -10,7 +10,7 @@ import { Masthead, Row, Rows, Text } from '../../kit';
 import { usePageTitle } from '../../hooks/usePageTitle';
 import { arr, num, obj, str, type JsonObject } from '../jobs/jobRead';
 import { getSupabaseFunctionsUrl, SUPABASE_ANON_KEY, supabase } from '../../lib/supabase';
-import { answersReducer, drafts, makeClient, needsSave, statusWord, uploadsReducer, uploadWord, type IntakeClient } from './intakeState';
+import { answersReducer, DOCUMENT_LABELS, drafts, makeClient, needsSave, statusWord, uploadsReducer, uploadWord, type IntakeClient } from './intakeState';
 import '../jobs/job-page.css';
 import '../jobs/jobs.css';
 import './contribute.css';
@@ -56,7 +56,9 @@ export default function ContributePage({ intake }: { intake?: IntakeClient }) {
   const [answers, dispatch] = useReducer(answersReducer, {});
   const [uploads, upload] = useReducer(uploadsReducer, []);
   const files = useRef(new Map<string, File>());
+  const labels = useRef(new Map<string, string>());
   const picker = useRef<HTMLInputElement>(null);
+  const [label, setLabel] = useState('receipt');
 
   const vehicle = obj(card?.vehicle);
   const title = vehicle ? [num(vehicle.year), str(vehicle.make), str(vehicle.model)].filter(Boolean).join(' ') : 'This car';
@@ -87,7 +89,7 @@ export default function ContributePage({ intake }: { intake?: IntakeClient }) {
 
   const send = async (id: string) => {
     const f = files.current.get(id); if (!f) return;
-    const r = await api.file(token, f, 'document');
+    const r = await api.file(token, f, labels.current.get(id) ?? 'other');
     upload(r.ok ? { type: 'done', id, duplicate: r.duplicate } : { type: 'failed', id });
   };
   const add = (list: FileList | null) => {
@@ -96,8 +98,8 @@ export default function ContributePage({ intake }: { intake?: IntakeClient }) {
       const isImage = f.type.startsWith('image/');
       let previewUrl: string | null = null;
       try { previewUrl = isImage && typeof URL.createObjectURL === 'function' ? URL.createObjectURL(f) : null; } catch { previewUrl = null; }
-      files.current.set(id, f);
-      upload({ type: 'added', upload: { id, name: f.name, isImage, previewUrl } });
+      files.current.set(id, f); labels.current.set(id, label);
+      upload({ type: 'added', upload: { id, name: f.name, label, isImage, previewUrl } });
       void send(id);
     }
     if (picker.current) picker.current.value = '';
@@ -141,10 +143,16 @@ export default function ContributePage({ intake }: { intake?: IntakeClient }) {
       <Text role="entity" as="h2" id="ct-s1"><span className="ct-n">1</span> Send what you have</Text>
       <Text role="body" as="p">Receipts, invoices, parts paperwork, build photos, purchase papers. Phone photos are fine.</Text>
       <input ref={picker} className="ct-hidden" type="file" accept="image/*,application/pdf" multiple onChange={e => add(e.target.files)} aria-label="Choose photos or PDFs" />
+      <label className="jb-field"><Text role="label">What are you sending?</Text>
+        <select className="jb-input k-body" value={label} onChange={e => setLabel(e.target.value)}>
+          {DOCUMENT_LABELS.map(l => <option key={l.value} value={l.value}>{l.word}</option>)}</select></label>
+      <Text role="caption" as="p">{DOCUMENT_LABELS.find(l => l.value === label)?.isPrivate
+        ? 'Kept private: only the owner sees it.' : 'Build photos can appear on the car\'s public page.'}</Text>
       <div className="jb-actions"><button type="button" className="btn-base btn-md btn-primary" onClick={() => picker.current?.click()}><Text role="label">Add photos or PDFs</Text></button></div>
-      <Text role="caption" as="p">{onFile > 0 ? `${onFile} already on file. ` : ''}Up to 20 MB each.</Text>
+      <Text role="caption" as="p">{onFile > 0 ? `${onFile} already on file. ` : ''}Up to 20 MB each (title papers 10 MB).</Text>
       {uploads.length > 0 && <ul className="ct-tiles" aria-label="What you sent">{uploads.map(u => <li key={u.id} className="ct-tile">
         {u.previewUrl ? <img className="ct-tile__img" src={u.previewUrl} alt={u.name} width={140} height={140} /> : <span className="ct-tile__img ct-tile__doc"><Text role="label">PDF</Text></span>}
+        <Text role="caption">{DOCUMENT_LABELS.find(l => l.value === u.label)?.word ?? u.label}</Text>
         {u.status === 'failed'
           ? <button type="button" className="btn-base btn-xs btn-secondary" onClick={() => { upload({ type: 'retry', id: u.id }); void send(u.id); }}><Text role="caption" className="jb-warn">{uploadWord.failed}</Text></button>
           : <Text role="caption" className={u.status === 'uploading' ? '' : 'jb-done'}>{uploadWord[u.status]}</Text>}

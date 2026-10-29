@@ -35,7 +35,7 @@ describe('answer saves', () => {
 
 describe('uploads', () => {
   it('uploading → received or already received; failed → retry → uploading', () => {
-    let u = uploadsReducer([], { type: 'added', upload: { id: 'a', name: 'r.jpg', isImage: true, previewUrl: null } });
+    let u = uploadsReducer([], { type: 'added', upload: { id: 'a', name: 'r.jpg', label: 'receipt', isImage: true, previewUrl: null } });
     expect(u[0].status).toBe('uploading');
     expect(uploadsReducer(u, { type: 'done', id: 'a', duplicate: false })[0].status).toBe('received');
     expect(uploadsReducer(u, { type: 'done', id: 'a', duplicate: true })[0].status).toBe('duplicate');

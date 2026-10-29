@@ -46,8 +46,8 @@ Deno.serve(async (req) => {
         const { data, error } = await service.rpc(name, args);
         return { data, error: error ? { code: error.code, message: error.message } : null };
       },
-      upload: async (path, bytes, contentType) => {
-        const { error } = await service.storage.from("vehicle-photos").upload(path, bytes, { contentType, upsert: false });
+      upload: async (bucket, path, bytes, contentType) => {
+        const { error } = await service.storage.from(bucket).upload(path, bytes, { contentType, upsert: false });
         return { error: error ? { message: error.message } : null };
       },
       exif: async (bytes) => {

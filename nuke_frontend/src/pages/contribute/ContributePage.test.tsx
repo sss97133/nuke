@@ -78,6 +78,20 @@ describe('ContributePage', () => {
     expect(host.textContent).toContain('sending…');
     await act(async () => { finish({ ok: true, duplicate: false }); });
     expect(host.textContent).toContain('received');
+    expect(file).toHaveBeenCalledWith(TOKEN, f, 'receipt');
+  });
+
+  it('the picked label travels with the file', async () => {
+    const file = vi.fn(async () => ({ ok: true, duplicate: false }));
+    await render({ open: async () => ({ status: 200, body: CARD }), answer: vi.fn(), file });
+    const select = host.querySelector('select') as HTMLSelectElement;
+    await act(async () => { select.value = 'build photo'; select.dispatchEvent(new Event('change', { bubbles: true })); });
+    expect(host.textContent).toContain("public page");
+    const input = host.querySelector('input[type=file]') as HTMLInputElement;
+    const f = new File(['x'], 'shell.jpg', { type: 'image/jpeg' });
+    Object.defineProperty(input, 'files', { value: [f], configurable: true });
+    await act(async () => { input.dispatchEvent(new Event('change', { bubbles: true })); });
+    expect(file).toHaveBeenCalledWith(TOKEN, f, 'build photo');
   });
 });
 

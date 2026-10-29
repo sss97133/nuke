@@ -1,6 +1,6 @@
 // contributor-intake: token/404 handling, attestation and rate limits. Every dependency is a mock; nothing touches prod.
 import { assert, assertEquals } from "jsr:@std/assert@1";
-import { buildDevice, type Deps, handle, ipSha256, NOT_FOUND_BODY, RateLimiter, safeFileName, sanitizeHints, sha256Hex } from "./core.ts";
+import { buildDevice, type Deps, handle, ipSha256, NOT_FOUND_BODY, RateLimiter, routeBucket, safeFileName, sanitizeHints, sha256Hex } from "./core.ts";
 
 const GOOD = "a".repeat(43);
 const NOW = new Date("2026-10-29T18:00:00Z");
@@ -11,14 +11,14 @@ function deps(over: Partial<Deps> = {}, calls: Array<[string, Record<string, unk
     rpc: (name, args) => {
       calls.push([name, args]);
       if (args.p_token !== GOOD) return Promise.resolve({ data: null, error: { code: "P0002", message: "invite token not found" } });
-      if (name === "contributor_intake_open") return Promise.resolve({ data: { invite_id: INVITE, vehicle: { year: 1973 } }, error: null });
+      if (name === "contributor_intake_open") return Promise.resolve({ data: { invite: { id: INVITE, expires_at: "2026-11-28T00:00:00Z" }, vehicle: { year: 1973 } }, error: null });
       if (name === "contributor_intake_answer") return Promise.resolve({ data: { observation_id: "obs-1" }, error: null });
       return Promise.resolve({ data: { image_id: "img-1", duplicate: false }, error: null });
     },
     upload: () => Promise.resolve({ error: null }),
     exif: () => Promise.resolve({ Make: "Apple", Model: "iPhone" }),
     resolveUser: () => Promise.resolve(null),
-    env: (n) => (n === "CONTRIBUTOR_IP_SALT" ? "test-salt" : undefined),
+    env: (n) => (n === "CONTRIBUTOR_IP_SALT" ? "test-salt" : n === "SUPABASE_URL" ? "https://proj.supabase.co" : undefined),
     now: () => NOW,
     limiter: new RateLimiter(60, 600_000),
     ...over,
@@ -65,17 +65,21 @@ Deno.test("answer passes p_recorded_by only when a user JWT resolves", async () 
 Deno.test("file: validates the token before storage, hashes, and uses the contributors path", async () => {
   const uploads: string[] = [];
   const calls: Array<[string, Record<string, unknown>]> = [];
-  const form = (token: string) => { const f = new FormData(); f.set("token", token); f.set("label", "receipt"); f.set("file", new File([new Uint8Array([1, 2, 3])], "Cam card.jpg", { type: "image/jpeg" })); return f; };
-  const bad = await handle(new Request(`${base}/file`, { method: "POST", body: form("b".repeat(43)) }), deps({ upload: (p) => { uploads.push(p); return Promise.resolve({ error: null }); } }));
+  const form = (token: string) => { const f = new FormData(); f.set("token", token); f.set("label", "build photo"); f.set("file", new File([new Uint8Array([1, 2, 3])], "Cam card.jpg", { type: "image/jpeg" })); return f; };
+  const bad = await handle(new Request(`${base}/file`, { method: "POST", body: form("b".repeat(43)) }), deps({ upload: (b, p) => { uploads.push(`${b}:${p}`); return Promise.resolve({ error: null }); } }));
   assertEquals(bad.status, 404);
   assertEquals(uploads.length, 0);
-  const ok = await handle(new Request(`${base}/file`, { method: "POST", body: form(GOOD) }), deps({ upload: (p) => { uploads.push(p); return Promise.resolve({ error: null }); } }, calls));
+  const ok = await handle(new Request(`${base}/file`, { method: "POST", body: form(GOOD) }), deps({ upload: (b, p) => { uploads.push(`${b}:${p}`); return Promise.resolve({ error: null }); } }, calls));
   assertEquals(ok.status, 200);
   const sha = await sha256Hex(new Uint8Array([1, 2, 3]));
-  assertEquals(uploads[0], `contributors/${INVITE}/${sha}/Cam_card.jpg`);
+  assertEquals(uploads[0], `vehicle-photos:contributors/${INVITE}/${sha}/Cam_card.jpg`);
   const file = calls.find(([n]) => n === "contributor_intake_file")![1].p_file as Record<string, unknown>;
   assertEquals(file.sha256, sha);
-  assertEquals(file.storage_path, `vehicle-photos/contributors/${INVITE}/${sha}/Cam_card.jpg`);
+  assertEquals(file.storage_path, `contributors/${INVITE}/${sha}/Cam_card.jpg`);
+  assertEquals(file.bucket, "vehicle-photos");
+  assertEquals(file.is_sensitive, false);
+  assertEquals(file.image_url, `https://proj.supabase.co/storage/v1/object/public/vehicle-photos/contributors/${INVITE}/${sha}/Cam_card.jpg`);
+  assert(!("recorded_by" in file));
   assertEquals((file.exif as Record<string, unknown>).Make, "Apple");
 });
 
@@ -92,4 +96,35 @@ Deno.test("hints and names are sanitized", async () => {
   assertEquals(await ipSha256("1.2.3.4", undefined, NOW), null);
   const dev = await buildDevice(new Headers(), {}, "s", NOW);
   assertEquals(dev.opened_at, NOW.toISOString());
+});
+
+Deno.test("documents route to private buckets by label; HEIC never goes public", () => {
+  assertEquals(routeBucket("build photo", "image/jpeg")?.bucket, "vehicle-photos");
+  assertEquals(routeBucket("purchase or title paper", "image/jpeg"), { bucket: "ownership-documents", sensitive: true, max: 10 * 1024 * 1024 });
+  for (const l of ["receipt", "cam card / parts paperwork", "dyno or timeslip", "other"]) assertEquals(routeBucket(l, "application/pdf")?.bucket, "user-documents");
+  assertEquals(routeBucket("build photo", "image/heic")?.bucket, "user-documents");
+  assertEquals(routeBucket("purchase or title paper", "image/heic")?.sensitive, true);
+  assertEquals(routeBucket("build photo", "application/pdf"), null);
+});
+
+Deno.test("a title photo lands private with sensitive, image_url and recorded_by for a signed-in owner", async () => {
+  const uploads: string[] = [];
+  const calls: Array<[string, Record<string, unknown>]> = [];
+  const f = new FormData(); f.set("token", GOOD); f.set("label", "purchase or title paper");
+  f.set("file", new File([new Uint8Array([9])], "title.heic", { type: "" }));
+  const out = await handle(new Request(`${base}/file`, { method: "POST", headers: { authorization: "Bearer aaa.bbb.ccc" }, body: f }),
+    deps({ upload: (b, p) => { uploads.push(`${b}:${p}`); return Promise.resolve({ error: null }); }, resolveUser: () => Promise.resolve("owner-1") }, calls));
+  assertEquals(out.status, 200);
+  assert(uploads[0].startsWith("user-documents:contributors/"));
+  const file = calls.find(([n]) => n === "contributor_intake_file")![1].p_file as Record<string, unknown>;
+  assertEquals([file.bucket, file.is_sensitive, file.recorded_by, file.mime_type], ["user-documents", true, "owner-1", "image/heic"]);
+  assert(String(file.image_url).startsWith("https://proj.supabase.co/storage/v1/object/authenticated/user-documents/"));
+});
+
+Deno.test("a content refusal is a 400, not the token 404", async () => {
+  const d = deps({ rpc: () => Promise.resolve({ data: { ok: false, error: "unknown_question" }, error: null }) });
+  const out = await handle(new Request(`${base}/answer`, { method: "POST", body: JSON.stringify({ token: GOOD, question_key: "zz", answer: "x" }) }), d);
+  assertEquals(out, { status: 400, body: { error: "unknown_question" } });
+  const nf = deps({ rpc: () => Promise.resolve({ data: { ok: false, error: "not_found" }, error: null }) });
+  assertEquals((await handle(new Request(`${base}?token=${GOOD}`), nf)).status, 404);
 });
