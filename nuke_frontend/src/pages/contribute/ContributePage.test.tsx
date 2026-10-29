@@ -148,6 +148,19 @@ describe('ContributePage', () => {
     expect(host.querySelector('.ct-ladder__rung')?.textContent).toBe('Engine numbers shot');
   });
 
+  it('reads the derivation from a rung band block: n, lots, p25 to p75, and the rule as reasoning', async () => {
+    const band = { reader: 'evidence_rung_band_v1', as_of: '2026-10-29', n: 34, too_few_to_tell: false, low: 26125, high: 56875, median: 40000, interval: 'p25 to p75 of hammer prices',
+      lot_ids: ['ae-1', 'ae-2'], reasoning: { inputs: { table: 'auction_events', n: 34 }, rule: 'Sold 1970-73 Firebird lots, base class, since 2022.', result: 'p25 26,125, p75 56,875.' } };
+    const few = { ...band, n: 1, too_few_to_tell: true, low: null, high: null, lot_ids: ['ae-9'] };
+    const p = { rung: { key: 'r1', label: 'As photographed', band_low: 26125, band_high: 56875, band }, rungs: [{ key: 'r1', label: 'As photographed', band_low: 26125, band_high: 56875, band }, { key: 'r2', label: 'Clone', band_low: null, band_high: null, band: few }] };
+    await render({ open: async () => ({ status: 200, body: { ...CARD, progress: p } }), answer: vi.fn(), file: vi.fn() });
+    expect(host.querySelector('.ct-ladder__rung')?.textContent).toBe('As photographed: $26,125 to $56,875');
+    expect(host.querySelector('.ct-ladder__now .ct-derivation summary')?.textContent).toBe('34 sold lots, evidence_rung_band_v1, as of Oct 29, 2026, p25 to p75 of hammer prices');
+    expect(host.querySelector('.ct-reasoning')?.textContent).toBe('Sold 1970-73 Firebird lots, base class, since 2022. p25 26,125, p75 56,875.');
+    const rungs = Array.from(host.querySelectorAll('.ct-rung')).map(r => r.textContent);
+    expect(rungs[1]).toContain('too few to tell'); expect(rungs[1]).toContain('1 sold lot, evidence_rung_band_v1'); expect(rungs[1]).not.toContain('$');
+  });
+
   it('no colour on the row means no accent and no swatch; no frames means no hero; no progress means no ladder', async () => {
     await render({ open: async () => ({ status: 200, body: CARD }), answer: vi.fn(), file: vi.fn() });
     const article = host.querySelector('article.ct-page') as HTMLElement;
