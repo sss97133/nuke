@@ -51,6 +51,12 @@
 .ct-ladder__rung { margin: 0; }
 .ct-ladder__counts { margin: 0; }
 .ct-next { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+.ct-derivation { min-width: 0; }
+.ct-derivation summary { cursor: pointer; list-style: none; min-height: 24px; display: flex; align-items: center; gap: 4px; }
+.ct-derivation summary::before { content: "▸"; font-size: 10px; color: var(--accent); }
+.ct-derivation[open] summary::before { content: "▾"; }
+.ct-lots { list-style: none; margin: 4px 0 0; padding: 0 0 0 14px; display: grid; gap: 2px; font-family: 'Courier New', monospace; }
+.ct-reasoning { margin: 4px 0 0; padding: 8px 10px; border-left: 2px solid var(--border); }
 .ct-moved { margin: 0; padding: 8px 10px; background: var(--accent-dim, var(--surface-hover)); border-left: 4px solid var(--accent); animation: ct-moved-in 180ms cubic-bezier(0.16, 1, 0.3, 1); }
 @keyframes ct-moved-in { from { transform: translateY(4px); opacity: 0; } to { transform: none; opacity: 1; } }
 @media (max-width: 480px) {
@@ -58,4 +64,5 @@
   .ct-rungs { grid-auto-flow: row; gap: 8px; }
   .ct-rung { grid-template-columns: 40px 1fr auto; column-gap: 10px; align-items: center; }
   .ct-rung__bar { align-self: center; }
+  .ct-rung .ct-derivation { grid-column: 2 / -1; }
 }
