@@ -702,6 +702,8 @@ jobs:
         run: deno test supabase/functions/_shared/batChassis.test.ts
       - name: Verify the shared BaT "Private Party or Dealer" reader (private, dealer, absent and odd wording)
         run: deno test supabase/functions/_shared/batSellerType.test.ts
+      - name: Verify the Tetris write layer files every extraction_metadata receipt with a status the table's CHECK accepts (a confirmation lands as valid)
+        run: deno test --allow-read=supabase/migrations supabase/functions/_shared/batUpsertWithProvenance.test.ts
       - name: Verify batch-extract-snapshots never calls the model under no_ai, ends queue rows with no vehicle, and does not fail a row on a price or VIN the database refuses
         run: deno test --allow-read=supabase/functions/batch-extract-snapshots supabase/functions/batch-extract-snapshots/aiGate.test.ts supabase/functions/batch-extract-snapshots/writeRules.test.ts
       - name: Verify photo-pipeline-orchestrator files a photo only through attribute_testimony and writes no upload-clock suggestion
