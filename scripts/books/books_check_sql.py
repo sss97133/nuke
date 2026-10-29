@@ -74,16 +74,23 @@ def run(queries, migration=None, view_names=(), with_gate=False, timeout='100s')
 def with_substituted_views(view_select, sources):
     """The view's SELECT with the views/tables it reads replaced by CTEs over synthetic rows.
 
-    sources: {view_name: (column_definitions, rows)}, e.g. {'v_books_audit_tiers': ('id uuid, amount numeric', [{...}])}.
-    The view text must start with WITH (all the views here do); the synthetic CTEs are put in front of its own.
+    sources: {name: (column_definitions, rows)}, e.g. {'v_books_audit_tiers': ('id uuid, amount numeric', [{...}])}; or {name: sql} to put another
+    SELECT in its place (a view that reads a view). The view text must start with WITH (all the views here do); the synthetic CTEs are put in
+    front of its own.
     """
     body = view_select
     ctes = []
-    for name, (cols, rows) in sources.items():
+    for name, src in sources.items():
         body = re.sub(r'public\.%s\b' % re.escape(name), name, body)
-        ctes.append(f"{name} AS (SELECT * FROM jsonb_to_recordset({q(json.dumps(rows, default=str))}::jsonb) AS t({cols}))")
-    assert body.lstrip().startswith('WITH '), 'view text must start with WITH'
-    return 'WITH ' + ',\n'.join(ctes) + ',\n' + body.lstrip()[len('WITH '):]
+        if isinstance(src, str):
+            ctes.append(f"{name} AS ({src})")
+        else:
+            cols, rows = src
+            ctes.append(f"{name} AS (SELECT * FROM jsonb_to_recordset({q(json.dumps(rows, default=str))}::jsonb) AS t({cols}))")
+    assert body.lstrip().startswith('WITH ') or body.lstrip().upper().startswith('SELECT '), 'view text must start with WITH or SELECT'
+    if body.lstrip().startswith('WITH '):
+        return 'WITH ' + ',\n'.join(ctes) + ',\n' + body.lstrip()[len('WITH '):]
+    return 'WITH ' + ',\n'.join(ctes) + '\n' + body.lstrip()
 
 
 def money(x):
