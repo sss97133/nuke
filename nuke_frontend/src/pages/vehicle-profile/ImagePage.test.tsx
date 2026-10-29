@@ -45,6 +45,56 @@ beforeEach(() => {
 });
 afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.useRealTimers(); });
 async function mount() { await act(async () => root.render(<MemoryRouter><ImagePage /></MemoryRouter>)); }
+it('attributes a stored image interpretation without presenting its gate status as factual verification', async () => {
+  fixture.read.mockImplementation(c => c.table === 'vehicle_images'
+    ? { data: c.single ? image({ vision_gate_status: 'approved', vision_gate_agent_reasoning: 'Prior image interpretation', caption: 'Prior caption' }) : [], error: null }
+    : read(c));
+  await mount();
+  expect(host.textContent).toContain('Recorded review: approved');
+  expect(host.textContent).toContain('Stored review interpretation');
+  expect(host.textContent).toContain('This prior interpretation may differ from later claim corrections');
+  expect(host.querySelector('aside img')?.getAttribute('alt')).toBe('Recorded caption: Prior caption');
+});
+it.each([null, { id: 'viewer-a' }])('reads only vehicle identity and withholds over-returned private parent context for viewer %j', async user => {
+  fixture.auth.user = user;
+  fixture.read.mockImplementation(c => c.table === 'vehicles'
+    ? { data: { id: VEHICLE, year: 1965, make: 'Offline', model: 'Example', notes: 'private-accounting-canary', search_vector: 'private-search-canary', provenance_metadata: { private: 'private-metadata-canary' } }, error: null }
+    : read(c));
+  await mount();
+  const parentReads = fixture.calls.filter(c => c.table === 'vehicles');
+  expect(parentReads).toHaveLength(1);
+  expect(parentReads[0].selected).toBe('id, year, make, model, trim');
+  expect(host.textContent).toContain('vehicles · identity fields');
+  expect(host.textContent).not.toContain('private-accounting-canary');
+  expect(host.textContent).not.toContain('private-search-canary');
+  expect(host.textContent).not.toContain('private-metadata-canary');
+  expect(host.querySelector('aside img')?.getAttribute('src')).toBe(SOURCE);
+});
+it('keeps the cited original visible and links the separately read same-vehicle replacement', async () => {
+  fixture.read.mockImplementation(c => c.table === 'vehicle_images'
+    ? { data: c.single ? id(c) === 'replacement' ? { id: 'replacement', vehicle_id: VEHICLE } : image({ is_superseded: true, superseded_by: 'replacement', superseded_at: '2026-01-02T00:00:00Z' }) : [], error: null }
+    : read(c));
+  await mount();
+  expect(host.querySelector('aside img')?.getAttribute('src')).toBe(SOURCE);
+  expect(host.textContent).toContain('You are viewing the original cited record');
+  expect(host.querySelector('a[href="/vehicle/offline-vehicle/image/replacement"]')).not.toBeNull();
+  expect(fixture.calls.find(c => c.table === 'vehicle_images' && id(c) === 'replacement')?.filters).toContainEqual(['vehicle_id', VEHICLE]);
+});
+it.each([
+  { data: { id: 'replacement', vehicle_id: 'foreign-vehicle' }, error: null },
+  { data: { id: 'different-image', vehicle_id: VEHICLE }, error: null },
+  { data: null, error: null },
+  { data: null, error: { message: 'private replacement payload' } },
+])('withholds a foreign, hidden or failed replacement without discarding the original: %j', async result => {
+  fixture.read.mockImplementation(c => c.table === 'vehicle_images'
+    ? id(c) === 'replacement' ? result : { data: c.single ? image({ is_superseded: true, superseded_by: 'replacement' }) : [], error: null }
+    : read(c));
+  await mount();
+  expect(host.querySelector('aside img')?.getAttribute('src')).toBe(SOURCE);
+  expect(host.querySelector('a[href*="/image/replacement"]')).toBeNull();
+  expect(host.textContent).toContain('Replacement record unavailable for this vehicle');
+  expect(host.textContent).not.toContain('private replacement payload');
+});
 it('gates the parent and image before dependent reads, including scoped raw refetches', async () => {
   await mount();
   expect(fixture.calls.slice(0, 2).map(c => c.table)).toEqual(['vehicles', 'vehicle_images']);

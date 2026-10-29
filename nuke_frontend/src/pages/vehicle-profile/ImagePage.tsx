@@ -30,6 +30,9 @@ interface ImageRow {
   caption: string | null;
   file_name: string | null;
   is_primary: boolean | null;
+  is_superseded: boolean | null;
+  superseded_by: string | null;
+  superseded_at: string | null;
 }
 
 interface VehicleSummary {
@@ -86,6 +89,8 @@ const ImagePageContent: React.FC = () => {
   const [attribution, setAttribution] = useState<DeviceAttribution | null>(null);
   const [attributionStatus, setAttributionStatus] = useState<'pending' | 'ready' | 'unavailable'>('pending');
   const [witnessStatus, setWitnessStatus] = useState<'pending' | 'ready' | 'unavailable'>('pending');
+  const [replacementId, setReplacementId] = useState<string | null>(null);
+  const [replacementStatus, setReplacementStatus] = useState<'pending' | 'ready' | 'unavailable'>('pending');
   const [detailError, setDetailError] = useState(false);
   const [substrate, setSubstrate] = useState<SubstrateBundle | null>(null);
   const [loading, setLoading] = useState(true);
@@ -107,6 +112,8 @@ const ImagePageContent: React.FC = () => {
     setAttribution(null);
     setAttributionStatus('pending');
     setWitnessStatus('pending');
+    setReplacementId(null);
+    setReplacementStatus('pending');
     setDetailError(false);
     setSubstrate(null);
 
@@ -130,7 +137,7 @@ const ImagePageContent: React.FC = () => {
               id, vehicle_id, image_url, thumbnail_url, medium_url,
               created_at, taken_at, source,
               vision_gate_status, vision_gate_agent_reasoning,
-              caption, file_name, is_primary
+              caption, file_name, is_primary, is_superseded, superseded_by, superseded_at
             `)
           .eq('id', imageId)
           .eq('vehicle_id', vehicleId)
@@ -146,7 +153,7 @@ const ImagePageContent: React.FC = () => {
         setLoadedSubject(`${vehicleId}:${imageId}`);
 
         // Dependent reads only follow a visible, correctly bound image.
-        const [witnessRead, attributionRead] = await Promise.allSettled([
+        const [witnessRead, attributionRead, replacementRead] = await Promise.allSettled([
           supabase
             .from('observation_witnesses')
             .select(`
@@ -168,6 +175,13 @@ const ImagePageContent: React.FC = () => {
             .eq('image_id', imageId)
             .abortSignal(controller.signal)
             .maybeSingle(),
+          // Inspect one explicit edge. Do not replace the cited original silently,
+          // or link a private/reattributed image under this vehicle's identity.
+          imgRes.data.is_superseded && imgRes.data.superseded_by && imgRes.data.superseded_by !== imageId
+            ? supabase.from('vehicle_images').select('id,vehicle_id')
+              .eq('id', imgRes.data.superseded_by).eq('vehicle_id', vehicleId)
+              .abortSignal(controller.signal).maybeSingle()
+            : Promise.resolve({ data: null, error: null }),
         ]);
         if (cancelled) return;
         const witRes = witnessRead.status === 'fulfilled' ? witnessRead.value : { data: null, error: true };
@@ -175,6 +189,11 @@ const ImagePageContent: React.FC = () => {
         if (!attribRes.error && attribRes.data) setAttribution(attribRes.data as DeviceAttribution);
         setAttributionStatus(attribRes.error ? 'unavailable' : 'ready');
         setWitnessStatus(witRes.error ? 'unavailable' : 'ready');
+        const replacement = replacementRead.status === 'fulfilled' ? replacementRead.value : { data: null, error: true };
+        setReplacementStatus(replacement.error ? 'unavailable' : 'ready');
+        if (!replacement.error && replacement.data?.id === imgRes.data.superseded_by && replacement.data?.vehicle_id === vehicleId) {
+          setReplacementId(replacement.data.id);
+        }
 
         if (!witRes.error && witRes.data) {
           const rows: WitnessedObservation[] = [];
@@ -197,24 +216,21 @@ const ImagePageContent: React.FC = () => {
           setWitnessed(rows);
         }
 
-        // --- Substrate inspector: fetch every row in every relation that touches
-        // this image, return raw DB shape (no curation). The point is to expose
-        // the substrate as it actually exists, not as a rendered summary.
+        // Image/source substrate stays inspectable. The parent contributes only
+        // identity fields: free-text vehicle notes and derived metadata can carry
+        // private accounting context even when dedicated money fields are masked.
         const [
           imgFullRes,
-          vehFullRes,
           witFullRes,
         ] = await Promise.all([
           supabase.from('vehicle_images').select(await vehicleImageRowColumns()).eq('id', imageId).eq('vehicle_id', vehicleId).limit(1).abortSignal(controller.signal),
-          // The row as the caller may see it (the owner's purchase facts only for the owner).
-          supabase.rpc('vehicle_row_read', { p_vehicle_id: vehicleId }).abortSignal(controller.signal),
           supabase.from('observation_witnesses').select('*').eq('image_id', imageId).limit(200).abortSignal(controller.signal),
         ]);
 
         if (cancelled) return;
         const witnessRows = ((witFullRes.data || []) as Row[]).filter(row => row.image_id === imageId);
         const unavailableRelations = [
-          ['vehicle_images', imgFullRes], ['vehicles', vehFullRes], ['observation_witnesses', witFullRes],
+          ['vehicle_images', imgFullRes], ['observation_witnesses', witFullRes],
         ].filter(([, result]) => (result as { error?: unknown }).error).map(([name]) => name as string);
         const obsIds = Array.from(new Set(witnessRows.map((r) => r.observation_id).filter(Boolean))) as string[];
 
@@ -253,7 +269,7 @@ const ImagePageContent: React.FC = () => {
             vehicle_observations: obsRows,
             observation_discoveries: discoveryRows,
             observation_sources: sourceRows,
-            vehicles: vehFullRes.data ? [vehFullRes.data as Row] : [],
+            vehicles: [{ id: vehRes.data.id, year: vehRes.data.year, make: vehRes.data.make, model: vehRes.data.model, trim: vehRes.data.trim }],
 
           });
         }
@@ -320,7 +336,7 @@ const ImagePageContent: React.FC = () => {
         <span style={{ color: 'var(--text)' }}>Image</span>
         {image?.vision_gate_status && (
           <span style={{ border: '1px solid var(--border)', padding: '1px 5px' }}>
-            {image.vision_gate_status}
+            Recorded review: {image.vision_gate_status}
           </span>
         )}
         {image?.source && (
@@ -336,6 +352,15 @@ const ImagePageContent: React.FC = () => {
       </nav>
 
       <h1>Image evidence</h1>
+      {image?.is_superseded && <section aria-label="Image record history" className="evidence-metadata evidence-read-notice">
+        <strong>This image record was superseded.</strong>
+        <p>You are viewing the original cited record. Supersession changes the record's standing; it does not establish a physical change to the vehicle.</p>
+        {image.superseded_at && <p>Supersession recorded: {image.superseded_at}</p>}
+        {replacementId ? <Link to={`/vehicle/${vehicleId}/image/${replacementId}`}>Inspect replacement image record {replacementId.slice(0, 8)}</Link>
+          : !image.superseded_by ? <p>No replacement reference is recorded.</p>
+          : replacementStatus === 'pending' ? <p role="status">Reading replacement reference…</p>
+          : <p role="status">Replacement record unavailable for this vehicle.</p>}
+      </section>}
       {loading && !image && (
         <div role="status" style={{ color: 'var(--text-secondary)', padding: 12 }}>Loading image…</div>
       )}
@@ -373,7 +398,7 @@ const ImagePageContent: React.FC = () => {
               >
                 <img
                   src={renderSrc}
-                  alt={image.caption || image.file_name || 'Vehicle image'}
+                  alt={image.caption ? `Recorded caption: ${image.caption}` : image.file_name || 'Vehicle image'}
                   decoding="async"
                   width={1200}
                   height={900}
@@ -389,8 +414,10 @@ const ImagePageContent: React.FC = () => {
             )}
             {!renderSrc && <p role="status">Original image URL unavailable.</p>}
             {image.vision_gate_agent_reasoning && (
-              <div style={{ lineHeight: 1.4, color: 'var(--text)' }}>
-                {image.vision_gate_agent_reasoning}
+              <div className="evidence-metadata">
+                <strong>Stored review interpretation</strong>
+                <p>{image.vision_gate_agent_reasoning}</p>
+                <p>This prior interpretation may differ from later claim corrections. The review status does not verify the description or current vehicle state.</p>
               </div>
             )}
             <div className="evidence-metadata" style={{ lineHeight: 1.5, color: 'var(--text-secondary)' }}>
@@ -518,11 +545,11 @@ const ImagePageContent: React.FC = () => {
                   margin: '4px 0 12px',
                 }}
               >
-                Visible rows returned by bounded reads, in native shape. Read limits and permissions can restrict this view; it does not establish complete evidence coverage.
+                Visible image and source rows returned by bounded reads, in native shape. Vehicle context is limited to identity fields. Read limits and permissions can restrict this view; it does not establish complete evidence coverage.
               </div>
               {(['vehicle_images', 'observation_witnesses', 'vehicle_observations',
                 'observation_discoveries', 'observation_sources', 'vehicles'] as const).map(name => (
-                <SubstrateTable key={name} name={name} rows={substrate[name]} unavailable={substrate.unavailableRelations.includes(name)} />
+                <SubstrateTable key={name} name={name === 'vehicles' ? 'vehicles · identity fields' : name} rows={substrate[name]} unavailable={substrate.unavailableRelations.includes(name)} />
               ))}
             </section>
           )}

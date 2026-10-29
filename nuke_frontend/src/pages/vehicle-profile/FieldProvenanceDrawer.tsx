@@ -7,7 +7,9 @@
  * Typography follows the shared readable system tokens.
  */
 import React from 'react';
+import PrefetchLink from '../../components/PrefetchLink';
 import type { FieldEvidenceGroup, FieldEvidenceRow } from './hooks/useFieldEvidence';
+import './vehicle-evidence.css';
 
 /* ------------------------------------------------------------------ */
 /*  Props                                                              */
@@ -19,6 +21,8 @@ interface FieldProvenanceDrawerProps {
   group: FieldEvidenceGroup;
   isOpen: boolean;
   onToggle: () => void;
+  onNavigate?: () => void;
+  drawerId?: string;
 }
 
 /* ------------------------------------------------------------------ */
@@ -167,6 +171,17 @@ function ClaimClock({ label, value }: { label: string; value: string | null | un
     : 'unknown'}</span>;
 }
 
+function ClaimReference({ row, onNavigate }: { row: FieldEvidenceRow; onNavigate?: () => void }) {
+  return <div className="field-claim-reference field-claim-metadata">
+    <div>Recorded decision: {row.status || 'unknown'} · <ClaimClock label="Decision recorded" value={row.assigned_at} /></div>
+    {row.source_image_id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(row.source_image_id)
+      ? <PrefetchLink to={`/vehicle/${row.vehicle_id}/image/${row.source_image_id}`} onClick={onNavigate}>
+        Inspect cited image record {row.source_image_id.slice(0, 8)}
+      </PrefetchLink>
+      : <span>No image record is cited by this claim.</span>}
+  </div>;
+}
+
 /* ------------------------------------------------------------------ */
 /*  Component                                                          */
 /* ------------------------------------------------------------------ */
@@ -177,6 +192,8 @@ const FieldProvenanceDrawer: React.FC<FieldProvenanceDrawerProps> = ({
   group,
   isOpen,
   onToggle,
+  onNavigate,
+  drawerId,
 }) => {
   const { sources, agreementCount, totalSources, hasConflict, primary } = group;
 
@@ -186,7 +203,7 @@ const FieldProvenanceDrawer: React.FC<FieldProvenanceDrawerProps> = ({
         ...S.drawer,
         display: isOpen ? 'block' : 'none',
       }}
-      id={`provenance-drawer-${fieldName}`}
+      id={drawerId || `provenance-drawer-${fieldName}`}
       aria-label={`${fieldLabel} retained source claims`}
       data-testid={`provenance-drawer-${fieldName}`}
     >
@@ -219,6 +236,7 @@ const FieldProvenanceDrawer: React.FC<FieldProvenanceDrawerProps> = ({
         </div>
         <p style={{ ...S.timestamp, margin: '4px 0 6px' }}>
           Score calibration and source independence are unknown. Stored clocks do not establish original source event time.
+          {' '}Accepted is a recorded decision about the claim; it does not establish current installation or condition.
         </p>
 
         {/* Source rows */}
@@ -274,9 +292,23 @@ const FieldProvenanceDrawer: React.FC<FieldProvenanceDrawerProps> = ({
                 {row.extraction_context || ''}
               </span>
 
+              <ClaimReference row={row} onNavigate={onNavigate} />
+
             </div>
           );
         })}
+
+        {!!group.history?.length && <details className="field-claim-history">
+          <summary>Correction history · {group.history.length} withdrawn claim{group.history.length === 1 ? '' : 's'}</summary>
+          <p className="field-claim-metadata">These records are excluded from current claims. A withdrawn interpretation is not a physical change to the vehicle.</p>
+          {group.history.map(row => <article key={row.id} className="field-claim-history-row">
+            <strong className="field-claim-value">{row.field_value}</strong>
+            <div className="field-claim-metadata">{getSourceLabel(row.source_type)}</div>
+            {row.extraction_context && <p className="field-claim-context field-claim-metadata">{row.extraction_context}</p>}
+            <ClaimClock label="Claim row created" value={row.created_at} />
+            <ClaimReference row={row} onNavigate={onNavigate} />
+          </article>)}
+        </details>}
 
         {/* Notes from primary if present */}
         {primary.notes && (
