@@ -264,7 +264,8 @@ def correct(path, dry):
     ruling_id and proof_links are stored as structured keys on the record (R5 grade R needs both); proof_links merge, deduped.
     section and category change only when given (a movement may take a new section). set_bank_links replaces the row's bank_links; add_bank_links appends to the row's bank_links, deduped,
     and puts a dated note in its decision. Amounts change only when "amount" is given. "status" re-states a stale status (the old one is kept in the decision text);
-    "caveat" appends a dated caveat to the decision without changing the row. A decision that would pass 1990 characters stops the run instead of being cut."""
+    "caveat" appends a dated caveat to the decision without changing the row. "replace_decision" rewrites the row's decision text from scratch (the earlier text stays in the superseded revision);
+    use it when a row's decision has reached the cap and can no longer take a dated note. A decision that would pass 1990 characters stops the run instead of being cut."""
     spec = json.load(open(path))
     owner = uuid_ok(spec['owner_id'])
     by_doc = collections.defaultdict(dict)
@@ -310,7 +311,15 @@ def correct(path, dry):
             if add:
                 r['bank_links'] = list(dict.fromkeys((r.get('bank_links') or []) + add))
                 parts.append(f"Links added {VERSION}: {', '.join(add)}" + (f" ({c['note']})" if c.get('note') and not (c.get('section') or c.get('category')) else ''))
-            if parts:
+            if c.get('replace_decision'):
+                # 2026-10-29: a row whose decision text is at the cap cannot take another dated note; the text is rewritten and the
+                # earlier text stays readable in the superseded revision (the writer never deletes a revision)
+                base = f"{c['replace_decision']} | Rewritten {VERSION}: the earlier decision text is retained in the superseded revision"
+                full = f"{base} | {' '.join(parts)}" if parts else base
+                if len(full) > 1990:
+                    raise SystemExit(f"{r['local_id']}: replacement decision would be {len(full)} characters (limit 1990); shorten it")
+                r['decision'] = full
+            elif parts:
                 full = f"{r.get('decision') or ''} | {' '.join(parts)}".lstrip(' |')
                 if len(full) > 1990:
                     raise SystemExit(f"{r['local_id']}: decision would be {len(full)} characters (limit 1990); shorten the note")
