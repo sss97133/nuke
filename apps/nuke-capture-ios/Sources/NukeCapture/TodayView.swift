@@ -213,6 +213,10 @@ struct CaptureSections: View {
                 if let s = attribution.lastSummary {
                     Text(s)   // what the last Analyze Today run routed
                 }
+                // A cowl tag read without a VIN/serial read: no profile until the plate is photographed.
+                ForEach(attribution.pendingIdentifiers, id: \.context.imageIDs) { pending in
+                    Text(pending.line)
+                }
             }
             .font(.caption2)
             .foregroundStyle(.secondary)

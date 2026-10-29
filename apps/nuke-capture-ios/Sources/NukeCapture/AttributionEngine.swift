@@ -30,6 +30,10 @@ final class AttributionEngine: ObservableObject {
     @Published private(set) var progress: (done: Int, total: Int) = (0, 0)
     /// This run's suggestion per image id, so the confirm sheet can lead with it.
     @Published private(set) var suggestionByImage: [String: String] = [:]
+    /// Sessions with a cowl tag but no VIN/serial read: no profile until the plate is photographed.
+    @Published private(set) var pendingIdentifiers: [CaptureContextReader.PendingIdentifier] = []
+    /// Server candidate-profile path (another lane). Nil until that lane provides one.
+    var candidateProfiles: CandidateProfileRequesting? = nil
 
     // ─── DB shapes ───────────────────────────────────────────────────────────
     private struct VehicleRow: Decodable {
@@ -66,6 +70,15 @@ final class AttributionEngine: ObservableObject {
         /// The read matched one of the owner's own vehicles exactly (roster match), so a classic
         /// serial needs no album context to be worth uploading.
         var rosterMatch: Bool = false
+
+        /// The same frame with a session-derived namespace in the contextual slots (for the
+        /// serial-read upload confidence, which keys on a known make).
+        func withContext(_ c: CaptureContext) -> VINCaptureFrame {
+            VINCaptureFrame(imageID: imageID, vin: vin, exactVIN: exactVIN, takenAt: takenAt, latitude: latitude,
+                longitude: longitude, fileHash: fileHash, isVehicle: isVehicle, isDocument: isDocument,
+                isSensitive: isSensitive, contextualYear: c.year, contextualMake: c.make, contextualModel: c.model,
+                albumContextAmbiguous: albumContextAmbiguous, rosterMatch: rosterMatch)
+        }
     }
     struct VINCaptureGroup: Equatable, Sendable {
         let vin: String
@@ -75,6 +88,9 @@ final class AttributionEngine: ObservableObject {
         let anchorImageID: String
         let imageIDs: [String]
         let vehicleFrameCount: Int
+        /// The capture-session namespace (document / cowl tag / badge) that made a classic serial
+        /// eligible; nil when the year/make came from an album label or the VIN is a 17-digit one.
+        var context: CaptureContext? = nil
     }
     private struct IdentitySourceItem: Encodable {
         let image_id: String
@@ -115,6 +131,8 @@ final class AttributionEngine: ObservableObject {
         let isDocument: Bool
         let session: String
         var onDevice: [OnDeviceObservation] = []
+        /// The on-device OCR lines, read again here for capture context (no new read).
+        var textLines: [String] = []
     }
     private struct SuggestUpdate: Encodable {
         let auto_suggested_vehicle_id: String
@@ -285,7 +303,7 @@ final class AttributionEngine: ObservableObject {
                                   vinRead: match?.vin ?? unknown, unknownVIN: unknown,
                                   identityReadAt: identityReadAt, labels: labels,
                                   vinCandidates: sourceVINCandidates, isDocument: isDocument,
-                                  session: sessionKey(row), onDevice: onDevice))
+                                  session: sessionKey(row), onDevice: onDevice, textLines: lines))
         }
 
         let albumContext = Self.albumContextByAsset()
@@ -302,9 +320,23 @@ final class AttributionEngine: ObservableObject {
                 albumContextAmbiguous: assetID.map { albumContext.ambiguous.contains($0) } ?? false,
                 rosterMatch: s.vinVehicleId != nil && s.vinDist == 0)
         }
-        await uploadVINReads(captureFrames)
+        // Identity context from the session's own frames (document, cowl tag, badge); albums stay a weaker fallback.
+        let contextReads = signals.flatMap { s in
+            CaptureContextReader.reads(imageID: s.row.id, lines: s.textLines, isVehicle: s.isVehicle,
+                isDocument: s.isDocument, takenAt: s.row.taken_at, latitude: s.row.latitude, longitude: s.row.longitude)
+        }
+        let sessionContextFrames = captureFrames.map { f in
+            guard f.contextualMake == nil, f.exactVIN, let vin = f.vin, !VisionEngine.isValidVIN(vin),
+                  let ctx = Self.sessionContext(for: f, reads: contextReads) else { return f }
+            return f.withContext(ctx)
+        }
+        await uploadVINReads(sessionContextFrames)
         // anchors × frames × frontier: run off the main actor.
-        let identityGroups = await Task.detached(priority: .utility) { Self.vinAnchoredCaptureGroups(captureFrames) }.value
+        let identityGroups = await Task.detached(priority: .utility) {
+            Self.vinAnchoredCaptureGroups(captureFrames, contexts: contextReads)
+        }.value
+        pendingIdentifiers = Self.pendingIdentifiers(frames: captureFrames, reads: contextReads, groups: identityGroups)
+        if let candidates = candidateProfiles { for p in pendingIdentifiers { await candidates.requestCandidateProfile(p) } }
         // Persist contextual 2–3 source reading receipts before any VIN profile write.
         // They use image_observations' protected reading-only lane; no subject membership is asserted.
         if !identityGroups.isEmpty {
@@ -372,7 +404,7 @@ final class AttributionEngine: ObservableObject {
             let ids = group.imageIDs.filter { !albumMappedIDs.contains($0) }
             guard ids.count >= 2, ids.contains(group.anchorImageID) else { continue }
             guard let anchorSignal = signals.first(where: { $0.row.id == group.anchorImageID }) else { continue }
-            let evidence: [String: String] = [
+            var evidence: [String: String] = [
                 "context_method": "vin_capture_session_v1",
                 "identifier_read": group.vin,
                 "edit_distance": "0",
@@ -383,6 +415,8 @@ final class AttributionEngine: ObservableObject {
                 "anchor_source_sha256": captureFrames.first(where: { $0.imageID == group.anchorImageID })?.fileHash ?? "",
                 "read_at": ISO8601DateFormatter().string(from: anchorSignal.identityReadAt),
             ]
+            if let ctx = group.context { evidence.merge(ctx.evidence) { current, _ in current } }
+            else if group.make != nil { evidence["identity_context_method"] = CaptureContextMethod.album.rawValue }
             let modernVIN = group.vin.count == 17
             let result = await createProfile(DeviceProfileRequest(basis: "capture_session", vin: modernVIN ? group.vin : nil,
                     serial: modernVIN ? nil : group.vin,
@@ -836,7 +870,35 @@ final class AttributionEngine: ObservableObject {
     /// The widest a VIN-anchored shoot may reach from its anchor (chained 5 min / 25 m hops).
     nonisolated static let setWindowSeconds: TimeInterval = 45 * 60
 
-    nonisolated static func vinAnchoredCaptureGroups(_ frames: [VINCaptureFrame]) -> [VINCaptureGroup] {
+    /// The session-derived namespace for one identifier frame: context reads in the same run
+    /// (set window, ~100 m), resolved strongest-first. A 17-digit VIN needs none.
+    nonisolated static func sessionContext(for frame: VINCaptureFrame, reads: [CaptureContextRead]) -> CaptureContext? {
+        guard !reads.isEmpty else { return nil }
+        let near = reads.filter { CaptureContextReader.sameRun($0, anchorTakenAt: frame.takenAt,
+            anchorLat: frame.latitude, anchorLon: frame.longitude) }
+        return CaptureContextReader.resolve(near, serial: frame.vin)
+    }
+
+    /// Sessions with a cowl-tag read and no identifier group (and no exact identifier read):
+    /// no profile is created; Today shows "needs the VIN plate" with the frames waiting.
+    nonisolated static func pendingIdentifiers(frames: [VINCaptureFrame], reads: [CaptureContextRead],
+                                               groups: [VINCaptureGroup]) -> [CaptureContextReader.PendingIdentifier] {
+        let byID = Dictionary(frames.map { ($0.imageID, $0) }, uniquingKeysWith: { a, _ in a })
+        func key(_ f: VINCaptureFrame) -> String { sessionKey(takenAt: f.takenAt, latitude: f.latitude, longitude: f.longitude) }
+        var tagReads: [String: [CaptureContextRead]] = [:]
+        for r in reads where r.method == .cowlTag {
+            guard let f = byID[r.imageID] else { continue }
+            tagReads[key(f), default: []].append(r)
+        }
+        var sessionFrames: [String: Set<String>] = [:]
+        for f in frames where f.isVehicle && !f.isDocument && !f.isSensitive { sessionFrames[key(f), default: []].insert(f.imageID) }
+        var anchored = Set(frames.filter { $0.exactVIN && $0.vin != nil }.map(key))
+        for g in groups { if let a = byID[g.anchorImageID] { anchored.insert(key(a)) } }
+        return CaptureContextReader.pendingIdentifiers(tagReadsBySession: tagReads, sessionFrames: sessionFrames, anchored: anchored)
+    }
+
+    nonisolated static func vinAnchoredCaptureGroups(_ frames: [VINCaptureFrame],
+                                                     contexts: [CaptureContextRead] = []) -> [VINCaptureGroup] {
         func captureDate(_ value: String?) -> Date? {
             guard let value else { return nil }
             let fractional = ISO8601DateFormatter()
@@ -869,11 +931,13 @@ final class AttributionEngine: ObservableObject {
             guard let ta = captureDate(a.takenAt), let tb = captureDate(b.takenAt) else { return false }
             return abs(ta.timeIntervalSince(tb)) <= setWindowSeconds
         }
+        // A classic serial's namespace: the session's own context first, the album label second.
+        func context(_ frame: VINCaptureFrame) -> CaptureContext? { sessionContext(for: frame, reads: contexts) }
         let anchors = frames.filter { frame in
             frame.exactVIN && !frame.isDocument && !frame.isSensitive &&
             frame.fileHash?.range(of: "^[a-f0-9]{64}$", options: .regularExpression) != nil &&
             frame.vin.map { VisionEngine.isValidVIN($0) ||
-                ((8...16).contains($0.count) && $0.contains(where: \.isLetter) && $0.contains(where: \.isNumber) && frame.contextualMake != nil) } == true &&
+                ((8...16).contains($0.count) && $0.contains(where: \.isLetter) && $0.contains(where: \.isNumber) && (frame.contextualMake != nil || context(frame) != nil)) } == true &&
             captureDate(frame.takenAt) != nil && frame.latitude.map { abs($0) <= 90 } == true &&
             frame.longitude.map { abs($0) <= 180 } == true
         }.sorted { ($0.takenAt ?? "", $0.imageID) < ($1.takenAt ?? "", $1.imageID) }
@@ -905,9 +969,17 @@ final class AttributionEngine: ObservableObject {
             }
             let ids = Array(Set([anchor.imageID] + members.map(\.imageID))).sorted()
             guard (2...100).contains(ids.count) else { continue }
-            groups.append(VINCaptureGroup(vin: anchor.vin!, year: anchor.contextualYear, make: anchor.contextualMake,
-                model: anchor.contextualModel, anchorImageID: anchor.imageID,
-                imageIDs: ids, vehicleFrameCount: Set(members.map(\.imageID)).count))
+            let classic = !VisionEngine.isValidVIN(anchor.vin!)
+            if classic, let ctx = context(anchor) {
+                groups.append(VINCaptureGroup(vin: anchor.vin!, year: ctx.year ?? anchor.contextualYear, make: ctx.make,
+                    model: ctx.model ?? (anchor.contextualMake?.lowercased() == ctx.make.lowercased() ? anchor.contextualModel : nil),
+                    anchorImageID: anchor.imageID, imageIDs: ids,
+                    vehicleFrameCount: Set(members.map(\.imageID)).count, context: ctx))
+            } else {
+                groups.append(VINCaptureGroup(vin: anchor.vin!, year: anchor.contextualYear, make: anchor.contextualMake,
+                    model: anchor.contextualModel, anchorImageID: anchor.imageID,
+                    imageIDs: ids, vehicleFrameCount: Set(members.map(\.imageID)).count))
+            }
         }
         return groups
     }
