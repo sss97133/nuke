@@ -2,12 +2,20 @@
  * The ladder: where the car stands on its sourced bands and what moves it. One renderer for the contributor page and
  * the owner card. Every number here comes from the `progress` block the intake writers return (vehicle_evidence_rungs
  * and vehicle_evidence_items); nothing is computed or guessed on the page.
+ *
+ * A dollar band is shown only when the reply carries its derivation: the reader that computed it, how many sold lots
+ * (n), the interval, the as-of date and the auction_events lot ids. A rung without that is a label, never a number;
+ * a rung the reader marks too_few_to_tell says so in words.
  */
 import React from 'react';
-import { Text } from '../../kit';
+import { day, Text } from '../../kit';
 import { arr, num, obj, str } from '../jobs/jobRead';
 
-export type Rung = { key: string; label: string; low: number | null; high: number | null; basis: string | null; reached: boolean };
+export type Derivation = { reader: string; n: number; asOf: string; lotIds: string[]; interval: { low: number; high: number; level: string | null } | null };
+export type Rung = {
+  key: string; label: string; low: number | null; high: number | null; basis: string | null; reached: boolean;
+  derivation: Derivation | null; tooFew: boolean; reasoning: string | null;
+};
 export type Item = { key: string; label: string; kind: string | null; questionKey: string | null; status: string | null };
 export type Progress = {
   rung: Rung | null; rungs: Rung[];
@@ -15,11 +23,27 @@ export type Progress = {
   lastChange: { at: string | null; what: string | null; toStatus: string | null; movedFrom: string | null; movedTo: string | null } | null;
 };
 
+const readInterval = (v: unknown): Derivation['interval'] => {
+  const o = obj(v);
+  if (o) { const low = num(o.low) ?? num(o.lo); const high = num(o.high) ?? num(o.hi); return low !== null && high !== null ? { low, high, level: str(o.level) ?? str(o.coverage) } : null; }
+  const a = arr(v); const low = num(a[0]); const high = num(a[1]);
+  return low !== null && high !== null ? { low, high, level: null } : null;
+};
+/** The derivation only counts when every part is present: a band without its lots is not shown. */
+const readDerivation = (r: Record<string, unknown>): Derivation | null => {
+  const reader = str(r.reader); const n = num(r.n); const asOf = str(r.as_of);
+  const lotIds = arr(r.lot_ids).map(x => str(x) ?? (typeof x === 'number' ? String(x) : null)).filter((x): x is string => !!x);
+  if (!reader || n === null || n <= 0 || !asOf || lotIds.length === 0) return null;
+  return { reader, n, asOf, lotIds, interval: readInterval(r.interval) };
+};
 const readRung = (v: unknown, reached = false): Rung | null => {
   const r = obj(v); if (!r) return null;
   const key = str(r.key) ?? str(r.label); const label = str(r.label) ?? str(r.key);
   if (!key || !label) return null;
-  return { key, label, low: num(r.band_low) ?? num(r.low), high: num(r.band_high) ?? num(r.high), basis: str(r.basis), reached: r.reached === true || reached };
+  return {
+    key, label, low: num(r.band_low) ?? num(r.low), high: num(r.band_high) ?? num(r.high), basis: str(r.basis), reached: r.reached === true || reached,
+    derivation: readDerivation(r), tooFew: r.too_few_to_tell === true, reasoning: str(r.reasoning),
+  };
 };
 const readItem = (v: unknown, status: string | null): Item | null => {
   if (typeof v === 'string') return v ? { key: v, label: v, kind: null, questionKey: null, status } : null;
@@ -51,7 +75,16 @@ export function readProgress(v: unknown): Progress | null {
 }
 
 const usd = (n: number) => n.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
-export const bandText = (r: Rung): string | null => r.low !== null && r.high !== null ? `${usd(r.low)} to ${usd(r.high)}` : r.low !== null ? `from ${usd(r.low)}` : r.high !== null ? `up to ${usd(r.high)}` : null;
+/** Whether the band may be shown at all: both ends and a complete derivation. */
+export const isDerived = (r: Rung): boolean => !r.tooFew && r.low !== null && r.high !== null && r.derivation !== null;
+/** The band in words: "too few to tell" when the reader says so (whatever else the row carries); dollars only with a derivation; else nothing. */
+export const bandText = (r: Rung): string | null => r.tooFew ? 'too few to tell' : isDerived(r) ? `${usd(r.low!)} to ${usd(r.high!)}` : null;
+/** "14 sold lots, market line, as of Oct 29, 2026" (+ the interval when the reader gives one). */
+export const derivationText = (d: Derivation): string => {
+  const pretty = day(d.asOf); const when = pretty === 'unknown date' ? d.asOf : pretty;
+  const interval = d.interval ? `, ${d.interval.level ? `${d.interval.level} ` : ''}interval ${usd(d.interval.low)} to ${usd(d.interval.high)}` : '';
+  return `${d.n.toLocaleString('en-US')} sold ${d.n === 1 ? 'lot' : 'lots'}, ${d.reader}, as of ${when}${interval}`;
+};
 
 /** What the last input did, in one line, from the writer's own record of it: the item (by key or label) and any rung move. */
 export function movedText(p: Progress | null): string | null {
@@ -73,20 +106,31 @@ export function shotChoices(p: Progress | null): Item[] {
   return [...p.next, ...p.open].filter(i => (i.kind === 'photo' || i.kind === 'document') && !seen.has(i.key) && seen.add(i.key)).slice(0, 12);
 }
 
+function DerivationView({ d }: { d: Derivation }) {
+  return <details className="ct-derivation">
+    <summary><Text role="caption">{derivationText(d)}</Text></summary>
+    <ul className="ct-lots" aria-label="Sold lots behind this band">{d.lotIds.map(id => <li key={id}><Text role="caption">{id}</Text></li>)}</ul>
+  </details>;
+}
+
 export function IntakeLadder({ progress, moved, audience }: { progress: Progress; moved?: string | null; audience: 'contributor' | 'owner' }) {
   const { rung, rungs } = progress;
   const counts = [progress.proven.length ? `${progress.proven.length} proven` : null, progress.open.length ? `${progress.open.length} open` : null,
     progress.contradicted.length ? `${progress.contradicted.length} contradicted` : null].filter(Boolean).join(' · ');
+  const standing = rung ? (bandText(rung) ? `${rung.label}: ${bandText(rung)}` : rung.label) : null;
   return <section className="ct-ladder" aria-label="Where the car stands">
     {rungs.length > 0 && <ol className="ct-rungs" aria-label="Rungs">{rungs.map(r => <li key={r.key} className={`ct-rung${r.reached ? ' ct-rung--reached' : ''}${rung && r.key === rung.key ? ' ct-rung--here' : ''}`}>
       <span className="ct-rung__bar" aria-hidden="true" />
       <Text role="caption">{r.label}</Text>
       {bandText(r) && <Text role="caption" className="ct-rung__band">{bandText(r)}</Text>}
+      {r.derivation && <DerivationView d={r.derivation} />}
     </li>)}</ol>}
-    {rung && <div className="ct-ladder__now">
+    {rung && standing && <div className="ct-ladder__now">
       <Text role="label">{audience === 'contributor' ? 'Where it stands with what you have sent' : 'Where it stands'}</Text>
-      <Text role="entity" as="p" className="ct-ladder__rung">{rung.label}{bandText(rung) ? `: ${bandText(rung)}` : ''}</Text>
+      <Text role="entity" as="p" className="ct-ladder__rung">{standing}</Text>
+      {rung.derivation && <DerivationView d={rung.derivation} />}
       {rung.basis && <Text role="caption" as="p">{rung.basis}</Text>}
+      {rung.reasoning && <blockquote className="ct-reasoning"><Text role="body">{rung.reasoning}</Text></blockquote>}
     </div>}
     {counts && <Text role="caption" as="p" className="ct-ladder__counts">{counts}</Text>}
     {moved && <p className="ct-moved" role="status"><Text role="body">{moved}</Text></p>}

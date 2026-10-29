@@ -8,6 +8,8 @@ vi.mock('../../lib/supabase', () => ({ supabase: { auth: { getSession: async () 
 import ContributePage from './ContributePage';
 import { deviceSummary } from '../vehicle-profile/ContributorIntakeCard';
 import type { IntakeClient } from './intakeState';
+import { bandText, readProgress } from './IntakeLadder';
+const readProgressRung = (r: unknown) => readProgress({ rung: r, rungs: [r] })!.rung!;
 
 const TOKEN = 't'.repeat(43);
 const CARD = { invite_id: 'i1', vehicle: { year: 1973, make: 'Pontiac', model: 'Firebird', vin: 'TESTVIN0000000001' },
@@ -94,9 +96,10 @@ describe('ContributePage', () => {
     expect(file).toHaveBeenCalledWith(TOKEN, f, 'build photo', null);
   });
 
+  const DERIVED = { reader: 'market line', n: 14, as_of: '2026-10-29', lot_ids: ['lot-a', 'lot-b', 'lot-c'], interval: { low: 33000, high: 47000, level: '80%' } };
   const PROGRESS = {
-    rung: { key: 'r1', label: 'As photographed', band_low: 35000, band_high: 45000, basis: 'Six 1970-73 Firebird clones sold 2024-26' },
-    rungs: [{ key: 'r1', label: 'As photographed', band_low: 35000, band_high: 45000 }, { key: 'r2', label: 'Engine numbers shot', band_low: 55000, band_high: 65000 }, { key: 'r3', label: 'SD parts proven', band_low: 60000, band_high: 70000 }],
+    rung: { key: 'r1', label: 'As photographed', band_low: 35000, band_high: 45000, basis: 'Six 1970-73 Firebird clones sold 2024-26', ...DERIVED, reasoning: 'Clones of this era trade on condition, not provenance, until numbers are proven.' },
+    rungs: [{ key: 'r1', label: 'As photographed', band_low: 35000, band_high: 45000, ...DERIVED }, { key: 'r2', label: 'Engine numbers shot', band_low: 55000, band_high: 65000 }, { key: 'r3', label: 'SD parts proven', band_low: 60000, band_high: 70000, too_few_to_tell: true }],
     proven: [{ key: 'vin', label: 'VIN plate' }], open: [{ key: 'pad', label: 'Engine pad stamp' }, { key: 'q1', label: 'The block' }], contradicted: [],
     next: [{ key: 'q1', label: 'The block', kind: 'question', question_key: 'q1' }, { key: 'pad', label: 'Engine pad stamp', kind: 'photo' }],
     last_change: null,
@@ -119,6 +122,30 @@ describe('ContributePage', () => {
     expect(host.textContent).toContain('1 proven · 2 open');
     expect(host.querySelectorAll('.ct-rung--reached').length).toBe(1);
     expect(host.querySelectorAll('.ct-next li').length).toBe(2);
+  });
+
+  it('a band shows dollars only with its derivation; an underived rung is a label; too few to tell says so', async () => {
+    await render({ open: async () => ({ status: 200, body: { ...CARD, progress: PROGRESS } }), answer: vi.fn(), file: vi.fn() });
+    const rungs = Array.from(host.querySelectorAll('.ct-rung')).map(r => r.textContent);
+    expect(rungs[0]).toContain('$35,000 to $45,000');
+    expect(rungs[0]).toContain('14 sold lots, market line, as of Oct 29, 2026, 80% interval $33,000 to $47,000');
+    expect(rungs[1]).toBe('Engine numbers shot');
+    expect(rungs[2]).toBe('SD parts proventoo few to tell');
+    expect(bandText({ ...readProgressRung(PROGRESS.rungs[0]), tooFew: true })).toBe('too few to tell');
+    expect(host.textContent).not.toContain('$55,000'); expect(host.textContent).not.toContain('$60,000');
+    expect(Array.from(host.querySelectorAll('.ct-ladder__now .ct-lots li')).map(l => l.textContent)).toEqual(['lot-a', 'lot-b', 'lot-c']);
+    expect(host.querySelector('.ct-reasoning')?.textContent).toContain('Clones of this era trade on condition');
+  });
+
+  it('the standing rung without a derivation is a label with no dollars, even when the row carries a band', async () => {
+    const bare = { ...PROGRESS, rung: { key: 'r2', label: 'Engine numbers shot', band_low: 55000, band_high: 65000, basis: 'seeded' } };
+    await render({ open: async () => ({ status: 200, body: { ...CARD, progress: bare } }), answer: vi.fn(), file: vi.fn() });
+    expect(host.querySelector('.ct-ladder__rung')?.textContent).toBe('Engine numbers shot');
+    expect(host.querySelector('.ct-ladder__now')?.textContent).not.toContain('$');
+    const partial = { ...bare, rung: { ...bare.rung, reader: 'market line', n: 9, as_of: '2026-10-29', lot_ids: [] } };
+    await act(async () => root.unmount()); host.remove(); host = document.createElement('div'); document.body.appendChild(host); root = createRoot(host);
+    await render({ open: async () => ({ status: 200, body: { ...CARD, progress: partial } }), answer: vi.fn(), file: vi.fn() });
+    expect(host.querySelector('.ct-ladder__rung')?.textContent).toBe('Engine numbers shot');
   });
 
   it('no colour on the row means no accent and no swatch; no frames means no hero; no progress means no ladder', async () => {
@@ -145,7 +172,7 @@ describe('ContributePage', () => {
   });
 
   it('a saved answer carries the ladder after it and says what moved', async () => {
-    const after = { ...PROGRESS, rung: { ...PROGRESS.rung, key: 'r2', label: 'Engine numbers shot', band_low: 55000, band_high: 65000 },
+    const after = { ...PROGRESS, rung: { ...PROGRESS.rung, key: 'r2', label: 'Engine numbers shot', band_low: 55000, band_high: 65000, n: 11, lot_ids: ['lot-d'] },
       proven: [...PROGRESS.proven, { key: 'q1', label: 'The block' }], open: [{ key: 'pad', label: 'Engine pad stamp' }],
       last_change: { at: '2026-10-29T20:00:00Z', what: 'q1', from_status: 'open', to_status: 'proven', moved_from: 'r1', moved_to: 'r2' } };
     const answer = vi.fn().mockResolvedValue({ ok: true, body: { observation_id: 'o1', progress: after } });
