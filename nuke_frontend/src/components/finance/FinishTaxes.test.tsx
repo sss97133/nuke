@@ -5,11 +5,11 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 const fixture = vi.hoisted(() => ({ rpc: vi.fn(), invoke: vi.fn() }));
 vi.mock('../../lib/supabase', () => ({ supabase: { rpc: fixture.rpc, functions: { invoke: fixture.invoke } } }));
 vi.mock('../PrefetchLink', () => ({ default: ({ to, children, ...props }: any) => <a href={to} {...props}>{children}</a> }));
-import FinishTaxes, { netAcrossYears, rankItems, taxAtStake } from './FinishTaxes';
+import FinishTaxes, { headlineOf, netAcrossYears, rankItems, taxAtStake } from './FinishTaxes';
 import RecordEvidence from './RecordEvidence';
 import { passWhat, passWho } from './AccountingActivity';
 import { AccountingBookContext } from './AccountingBookContext';
-import { describeRecord, type Closeout, type CloseoutYear } from '../../services/accountingCloseout';
+import { clearYearStateReads, describeRecord, type Closeout, type CloseoutYear, type YearState } from '../../services/accountingCloseout';
 
 // Synthetic book: every value below is invented.
 const owner = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
@@ -26,8 +26,8 @@ const year = (extra: Partial<CloseoutYear>): CloseoutYear => ({
     { key: 'revenue_no_payer', n: null, of: null, amount: null, assessed: false, deferred: true },
   ], ...extra });
 let node: HTMLDivElement, root: Root;
-beforeEach(() => { (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true; fixture.rpc.mockReset(); fixture.invoke.mockReset(); node = document.createElement('div'); document.body.append(node); root = createRoot(node); });
-afterEach(async () => { await act(async () => root.unmount()); node.remove(); });
+beforeEach(() => { (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true; clearYearStateReads(); fixture.rpc.mockReset(); fixture.invoke.mockReset(); node = document.createElement('div'); document.body.append(node); root = createRoot(node); });
+afterEach(async () => { await act(async () => root.unmount()); node.remove(); vi.useRealTimers(); });
 const inBook = (child: React.ReactNode) => <AccountingBookContext.Provider value={{ ownerId: owner, shared: false, canCorrect: true, liveRevision: '1' }}>{child}</AccountingBookContext.Provider>;
 
 it('measures tax at stake from the draft rate and ranks items by money', () => {
@@ -36,10 +36,10 @@ it('measures tax at stake from the draft rate and ranks items by money', () => {
   const ranked = rankItems(year({}).items).map(i => i.key);
   expect(ranked.slice(0, 3)).toEqual(['expense_no_receipt', 'expense_no_proof', 'statement_gaps']);
   expect(ranked.at(-1)).toBe('revenue_no_payer');
-  expect(netAcrossYears([year({}), year({ year: '2023', return: { ...year({}).return!, result: 'refund', amount: 300 } })])).toEqual({ owe: 600, count: 2, first: '2023', last: '2024' });
+  expect(netAcrossYears([year({}), year({ year: '2023', return: { ...year({}).return!, result: 'refund', amount: 300 } })])).toEqual({ owe: 600, count: 2, first: '2023', last: '2024', counted: ['2023', '2024'], held: [] });
 });
 
-it('leads each year with the plain answer, flags a stale draft, ranks what is left and drills into it', async () => {
+it('leads each year with the plain answer, never warns from timestamps, ranks what is left and drills into it', async () => {
   const data: Closeout = { read_at: '2026-10-25T23:00:00Z', books_revised_at: null, questions: { pending_current: 7, by_resolver: { 'Synthetic Owner': 5, model_reconciliation: 2 } },
     years: [year({ draft_stale: true }), { year: '2021', return: null, books: null, draft_stale: null, items: [] }] };
   fixture.rpc.mockImplementation(async (name: string, args: any) => name === 'accounting_closeout' ? { data, error: null }
@@ -48,18 +48,28 @@ it('leads each year with the plain answer, flags a stale draft, ranks what is le
   await act(async () => root.render(inBook(<FinishTaxes onDrill={drill} onQuestions={questions} />)));
   expect(node.querySelector('.accounting-close-answer')?.textContent).toBe('You owe $900');
   expect(node.querySelectorAll('.accounting-close-year')).toHaveLength(1);
-  expect(node.querySelector('[role="alert"]')?.textContent).toContain('Regenerate it before signing');
+  // Whether the return still matches the books is the gate's answer (books docket, rule R9); a comparison of timestamps never warns here.
+  expect(node.querySelector('[role="alert"]')).toBeNull();
+  expect(node.textContent).not.toContain('Regenerate');
+  expect(node.textContent).not.toContain('books changed');
+  expect(node.querySelector('#close-2024')).not.toBeNull();
   const labels = Array.from(node.querySelectorAll('.accounting-close-item .k-body')).map(n => n.textContent);
-  expect(labels.slice(0, 2)).toEqual(['Expenses paid, but no receipt', 'Income with no named payer']);
-  expect(node.textContent).toContain('If these were disallowed, about $600 more tax. Each $1,000 proven keeps about $300.');
+  // The per-line receipt item is not listed (owner ruling 2026-10-28); the docket's tiers say how the deductions are supported.
+  expect(labels.slice(0, 2)).toEqual(['Income with no named payer', 'Expenses with no bank line and no receipt']);
+  expect(node.textContent).not.toContain('Expenses paid, but no receipt');
+  expect(node.textContent).not.toContain('The bank line proves payment, not what was bought');
+  expect(node.textContent).toContain('If these were disallowed, about $60 more tax. Each $1,000 proven keeps about $300.');
   expect(node.textContent).toContain('If these turned out to be transfers, loans or refunds, about $75 less tax. Each $1,000 shown not to be income saves about $300.');
+  expect(node.textContent).not.toContain('about $600 more tax');
   expect(node.textContent).not.toContain('rides on');
   expect(node.textContent).toContain('Sign and mail (your step)');
   expect(node.textContent).toContain('Open questions: Synthetic Owner 5');
   expect(node.textContent).toContain('plus 2 agent notes');
+  // Every count carries its source and its read time.
+  expect(node.querySelector('.accounting-close-questions')?.textContent).toContain('Pending questions on the current reading, from the review queue (financial_review_queue) · read Oct 25, 2026, 4:00 PM');
   expect(node.textContent).not.toContain('Car costs with no car named$');
-  await act(async () => (node.querySelector('.accounting-close-item button') as HTMLButtonElement).click());
-  expect(drill).toHaveBeenCalledWith({ year: '2024', item: 'expense_no_receipt', label: 'Expenses paid, but no receipt' });
+  await act(async () => (Array.from(node.querySelectorAll('.accounting-close-item button')).find(b => b.textContent!.includes('Expenses with no bank line')) as HTMLButtonElement).click());
+  expect(drill).toHaveBeenCalledWith({ year: '2024', item: 'expense_no_proof', label: 'Expenses with no bank line and no receipt' });
   await act(async () => (node.querySelector('.accounting-close-questions') as HTMLButtonElement).click());
   expect(questions).toHaveBeenCalled();
 });
@@ -76,11 +86,93 @@ it('shows income-payer status only for years with income records, and a failed g
   expect(node.textContent).not.toContain('Checking…');
 });
 
-it('a failed read says so and never shows zero', async () => {
+it('a failed read is tried once more, then says so and never shows zero', async () => {
+  vi.useFakeTimers();
   fixture.rpc.mockResolvedValue({ data: null, error: { code: '57014' } });
   await act(async () => root.render(inBook(<FinishTaxes onDrill={vi.fn()} onQuestions={vi.fn()} />)));
+  // The first failure shows no error yet: the read is tried again a moment later (the first load failed under load, 2026-10-29).
+  expect(node.querySelector('[role="alert"]')).toBeNull();
+  expect(node.textContent).toContain('Reading where each tax year stands');
+  await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
+  expect(fixture.rpc.mock.calls.filter(c => c[0] === 'accounting_closeout')).toHaveLength(2);
   expect(node.querySelector('[role="alert"]')?.textContent).toContain('could not load');
   expect(node.textContent).not.toContain('$0');
+});
+
+it('a read that fails once and succeeds on the second try shows the status without an error', async () => {
+  vi.useFakeTimers();
+  const data: Closeout = { read_at: '2026-10-25T23:00:00Z', books_revised_at: null, questions: { pending_current: 0, by_resolver: {} }, years: [year({})] };
+  let calls = 0;
+  fixture.rpc.mockImplementation(async (name: string) => name === 'accounting_closeout' ? (++calls === 1 ? { data: null, error: { code: '503' } } : { data, error: null }) : { data: null, error: { message: 'unexpected' } });
+  await act(async () => root.render(inBook(<FinishTaxes onDrill={vi.fn()} onQuestions={vi.fn()} />)));
+  await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
+  expect(node.querySelector('.accounting-close-answer')?.textContent).toBe('You owe $900');
+  expect(node.querySelector('[role="alert"]')).toBeNull();
+});
+
+// ── The headline total never sums a year that is on hold ────────────────────────────────────────────────────────────────
+const stateOf = (y: number, over: Partial<YearState> = {}): YearState => ({ year: y, read_at: '2026-10-29T17:40:00Z', result: null, schedule_c: {}, rulings: [], facts: [], open_items: [], unmapped: [], ...over });
+const hold = (y: number) => ({ local_id: `${y}-FACT-filing-hold`, key: 'filing-hold', topic: 'owner_ruling', status: 'settled', date: '2026-10-28', decision: 'Hold.', source: 's' }) as any;
+const refund = (y: string, amount: number) => year({ year: y, return: { ...year({}).return!, tax_year: y, result: 'refund', amount } });
+
+it('a year on hold is left out of the headline total, and the headline says which year and why', () => {
+  const years = [refund('2025', 2000), refund('2024', 1000), refund('2023', 5000)];
+  const states = { '2025': stateOf(2025), '2024': stateOf(2024), '2023': stateOf(2023, { facts: [hold(2023)] }) };
+  const net = netAcrossYears(years, states)!;
+  expect(net).toMatchObject({ owe: -3000, counted: ['2024', '2025'], held: ['2023'] });
+  const h = headlineOf(years, states, { '2025': 'ready', '2024': 'ready', '2023': 'ready' });
+  expect(h).toEqual({ kind: 'text', text: 'Across the 2024 and 2025 drafts, you get back $3,000 net, before penalties and interest. 2023 is on hold and not counted.' });
+});
+
+it('a structured filing fact marks a year on hold just as the older ruling does, and a mailed or prepared year still counts', () => {
+  const filing = (state: string) => ({ local_id: '2023-FACT-filing', key: 'filing', topic: 'filing', status: 'settled', date: '2026-10-29', decision: 'x', source: 's', filing: { state, as_of: '2026-10-29', form: '1040-X' } }) as any;
+  const years = [refund('2024', 1000), refund('2023', 5000)];
+  expect(netAcrossYears(years, { '2024': stateOf(2024), '2023': stateOf(2023, { facts: [filing('on_hold')] }) })).toMatchObject({ counted: ['2024'], held: ['2023'], owe: -1000 });
+  expect(netAcrossYears(years, { '2024': stateOf(2024), '2023': stateOf(2023, { facts: [filing('prepared')] }) })).toMatchObject({ counted: ['2023', '2024'], held: [], owe: -6000 });
+  // a newer settled filing fact wins over the older ruling
+  const released = { ...filing('prepared'), filing: { state: 'prepared', as_of: '2026-10-30', form: '1040-X' } };
+  expect(netAcrossYears(years, { '2024': stateOf(2024), '2023': stateOf(2023, { facts: [hold(2023), released] }) })).toMatchObject({ held: [] });
+});
+
+it('the headline waits for every year\'s filing state, says so while it reads, and names a year whose state could not load', () => {
+  const years = [refund('2024', 1000), refund('2023', 5000)];
+  expect(headlineOf(years, { '2024': stateOf(2024) }, { '2024': 'ready' })).toEqual({ kind: 'pending' });
+  const h = headlineOf(years, { '2024': stateOf(2024) }, { '2024': 'ready', '2023': 'error' });
+  expect(h).toEqual({ kind: 'text', text: 'The 2024 draft says you get back $1,000, before penalties and interest. 2023: the filing state could not load, so that year is not counted.' });
+  expect(headlineOf([refund('2023', 5000)], { '2023': stateOf(2023, { facts: [hold(2023)] }) }, { '2023': 'ready' }))
+    .toEqual({ kind: 'text', text: 'There is no total across the drafts. 2023 is on hold and not counted.' });
+  expect(headlineOf([], {}, {})).toBeNull();
+});
+
+it('the page shows no total until the filing states are read, then the total without the held year', async () => {
+  const data: Closeout = { read_at: '2026-10-25T23:00:00Z', books_revised_at: null, questions: { pending_current: 0, by_resolver: {} }, years: [refund('2024', 1000), refund('2023', 5000)] };
+  let release!: () => void; const gate = new Promise<void>(resolve => { release = resolve; });
+  fixture.rpc.mockImplementation(async (name: string, args: any) => {
+    if (name === 'accounting_closeout') return { data, error: null };
+    if (name === 'books_year_state') { if (args.p_year === 2023) await gate; return { data: stateOf(args.p_year, args.p_year === 2023 ? { facts: [hold(2023)] } : {}), error: null }; }
+    return { data: { assessed: true, total: 0, amount: 0, rows: [] }, error: null };
+  });
+  await act(async () => root.render(inBook(<FinishTaxes onDrill={vi.fn()} onQuestions={vi.fn()} />)));
+  expect(node.textContent).toContain("Reading each year's filing state");
+  expect(node.textContent).not.toContain('you get back');
+  await act(async () => { release(); });
+  expect(node.textContent).toContain('The 2024 draft says you get back $1,000, before penalties and interest. 2023 is on hold and not counted.');
+  expect(node.querySelector('#close-2023')?.textContent).toContain('On hold as of Oct 28, 2026: this answer is not counted in the total above.');
+});
+
+it('the docket and Finish your taxes share one read of a year\'s state', async () => {
+  const data: Closeout = { read_at: '2026-10-25T23:00:00Z', books_revised_at: null, questions: { pending_current: 0, by_resolver: {} }, years: [year({})] };
+  fixture.rpc.mockImplementation(async (name: string, args: any) => name === 'accounting_closeout' ? { data, error: null }
+    : name === 'books_year_state' ? { data: stateOf(args.p_year), error: null } : { data: { assessed: true, total: 0, amount: 0, rows: [] }, error: null });
+  const { readYearStateOnce } = await import('../../services/accountingCloseout');
+  await Promise.all([readYearStateOnce(owner, '2024', '1'), readYearStateOnce(owner, '2024', '1')]);
+  expect(fixture.rpc.mock.calls.filter(c => c[0] === 'books_year_state')).toHaveLength(1);
+  await readYearStateOnce(owner, '2024', '2'); // the book changed: read again
+  expect(fixture.rpc.mock.calls.filter(c => c[0] === 'books_year_state')).toHaveLength(2);
+  fixture.rpc.mockImplementation(async () => ({ data: null, error: { code: '503' } }));
+  await expect(readYearStateOnce(owner, '2023', '1')).rejects.toThrow();
+  fixture.rpc.mockImplementation(async (_n: string, args: any) => ({ data: stateOf(args.p_year), error: null }));
+  await expect(readYearStateOnce(owner, '2023', '1')).resolves.toMatchObject({ year: 2023 }); // a failure is not kept
 });
 
 it('shows evidence strongest first: one line, the car, the receipt, the statement line, the message, and notes last', async () => {

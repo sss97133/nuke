@@ -2,11 +2,13 @@ import { useEffect, useState } from 'react';
 import { Text } from '../../kit/Text';
 import { useAccountingBook } from './AccountingBookContext';
 import {
-  dollars, fetchAccountingOriginal, pacific, readCloseout, readCloseoutRecords, readYearState,
-  type Closeout, type YearState, type CloseoutItem, type CloseoutItemKey, type CloseoutYear,
+  dollars, fetchAccountingOriginal, pacific, readCloseout, readCloseoutRecords, readYearStateOnce, withOneRetry,
+  type Closeout, type YearState, type CloseoutItem, type CloseoutItemKey, type CloseoutYear, type DrillItem,
 } from '../../services/accountingCloseout';
+import { FILING_WORDS, filingOf, yearsPhrase } from './filingState';
 
-export type Drill = { year: string; item: CloseoutItemKey; label: string };
+/** What the office's row list is asked to show: a close-out item, or the decisions behind a number of the books docket. */
+export type Drill = { year: string; item: DrillItem; label: string };
 
 /** Plain words for each close-out item. The reader decides membership; this only names it. */
 export const ITEM_WORDS: Record<CloseoutItemKey, { label: string; why: string; drill: boolean }> = {
@@ -16,6 +18,11 @@ export const ITEM_WORDS: Record<CloseoutItemKey, { label: string; why: string; d
   car_cost_no_car: { label: 'Car costs with no car named', why: 'Decides which car, and which year, the cost lands in.', drill: true },
   statement_gaps: { label: 'Months with no statement lines', why: 'Either the statement is missing or the account had no activity that month.', drill: false },
 };
+
+/** Items the reader still returns that the list does not show. expense_no_receipt asked for a receipt on every paid line; the owner ruled on
+ *  2026-10-28 that bank lines need no explanation, their allocation does, and receipts are required per line only where section 274 says so.
+ *  The books docket shows how the deductions are supported by that definition (tiers A, B, C) in its place. */
+export const HIDDEN_ITEMS: ReadonlySet<CloseoutItemKey> = new Set<CloseoutItemKey>(['expense_no_receipt']);
 
 /** Tax that rides on an amount, from the draft's own measured rate per $1,000 of expenses. */
 export function taxAtStake(amount: number | null, per1000: number | null | undefined): number | null {
@@ -37,12 +44,19 @@ export function rankItems(items: CloseoutItem[]): CloseoutItem[] {
   return [...items].sort((a, b) => weight(b) - weight(a));
 }
 
-export function netAcrossYears(years: CloseoutYear[], states: Record<string, YearState> = {}): { owe: number; count: number; first: string; last: string } | null {
-  const results = years.map(y => ({ year: y.year, r: states[y.year]?.result ?? y.return })).filter(x => x.r && Number.isFinite(Number(x.r.amount)));
+/** The net of the years' drafts, without the years that are on hold: a held year's draft is not something to count on, so it never enters a
+ *  headline. `held` lists those years (the state is read from the facts register, see filingOf). */
+export const heldYears = (years: CloseoutYear[], states: Record<string, YearState>): string[] =>
+  years.filter(y => filingOf(states[y.year])?.state === 'on_hold').map(y => y.year).sort();
+
+export function netAcrossYears(years: CloseoutYear[], states: Record<string, YearState> = {}):
+  { owe: number; count: number; first: string; last: string; counted: string[]; held: string[] } | null {
+  const held = heldYears(years, states);
+  const results = years.filter(y => !held.includes(y.year)).map(y => ({ year: y.year, r: states[y.year]?.result ?? y.return })).filter(x => x.r && Number.isFinite(Number(x.r.amount)));
   if (!results.length) return null;
   const owe = results.reduce((sum, x) => sum + (x.r!.result === 'owe' ? 1 : -1) * Number(x.r!.amount), 0);
   const names = results.map(x => x.year).sort();
-  return { owe, count: results.length, first: names[0], last: names.at(-1)! };
+  return { owe, count: results.length, first: names[0], last: names.at(-1)!, counted: names, held };
 }
 
 /** The settled line-31 net across a year's Schedule C forms (books_year_state), or null before it loads. */
@@ -55,13 +69,14 @@ function YearCard({ y, revenue, state, onDrill }: { y: CloseoutYear; revenue: Cl
   const { ownerId } = useAccountingBook();
   const [opening, setOpening] = useState('');
   const r = y.return;
+  const filing = filingOf(state);
   // The newest result wins: a rebuilt draft whose PDF is not yet in the books still answers through its result fact.
   const res = state?.result ?? r;
   const net = scheduleCNet(state) ?? r?.schedule_c_net ?? null;
   const per1000 = r?.tax_per_1000_expense ?? null;
   // Income with no named payer is read per year only where the year has income records; elsewhere it does not apply.
   const hasRevenue = (y.books?.revenue_records ?? 0) > 0;
-  const items = rankItems(y.items.map(i => i.key === 'revenue_no_payer' && revenue ? revenue : i).filter(i => i.assessed || (i.key === 'revenue_no_payer' && hasRevenue)));
+  const items = rankItems(y.items.filter(i => !HIDDEN_ITEMS.has(i.key)).map(i => i.key === 'revenue_no_payer' && revenue ? revenue : i).filter(i => i.assessed || (i.key === 'revenue_no_payer' && hasRevenue)));
   const open = async () => {
     if (!r || !ownerId) return;
     setOpening('Opening the draft…');
@@ -71,17 +86,16 @@ function YearCard({ y, revenue, state, onDrill }: { y: CloseoutYear; revenue: Cl
       setOpening('');
     } catch { setOpening('The draft could not be opened.'); }
   };
-  return <article className="accounting-close-year" aria-label={`Tax year ${y.year}`}>
+  return <article className="accounting-close-year" id={`close-${y.year}`} aria-label={`Tax year ${y.year}`}>
     <header className="accounting-close-year__head">
       <Text role="label" as="h3">{y.year}{res ? ` · Form ${res.form} draft` : ''}</Text>
       {res ? <Text role="figure" as="p" className="accounting-close-answer">{res.result === 'owe' ? `You owe ${dollars(res.amount)}` : `You get back ${dollars(res.amount)}`}</Text>
         : <Text role="body" as="p">No return draft is in the books for {y.year}.</Text>}
       <Text role="caption" as="p">
-        {[net != null ? `Schedule C net ${dollars(net)}` : null,
-          res?.built_at ? `draft built ${pacific(res.built_at)}` : null,
-          y.books?.revised_at ? `books changed ${pacific(y.books.revised_at)}` : null].filter(Boolean).join(' · ')}
+        {[net != null ? `Schedule C net ${dollars(net)}` : null, res?.built_at ? `draft built ${pacific(res.built_at)}` : null].filter(Boolean).join(' · ')}
       </Text>
-      {y.draft_stale && <p role="alert" className="accounting-close-stale"><Text role="body">The books changed after this draft was built. Regenerate it before signing.</Text></p>}
+      {/* Whether the return still matches the books is the gate's answer (rule R9, in the books docket above), never a comparison of timestamps. */}
+      {filing?.state === 'on_hold' && <Text role="caption" as="p">{FILING_WORDS.on_hold} as of {pacific(filing.as_of, false)}: this answer is not counted in the total above.</Text>}
     </header>
     <ol className="accounting-close-list">
       {items.map(item => {
@@ -109,8 +123,6 @@ function YearCard({ y, revenue, state, onDrill }: { y: CloseoutYear; revenue: Cl
         <Text role="body">{f.decision}</Text>
         {f.closes_with && <Text role="caption">Closes with: {f.closes_with}</Text>}
       </span>{f.amount != null && <Text role="measure" className="accounting-close-item__amount">{dollars(f.amount)}</Text>}</div></li>)}
-      {y.draft_stale && <li className="accounting-close-item"><div className="accounting-close-item__button"><span className="accounting-close-item__main">
-        <Text role="body">Regenerate the {y.year} draft</Text><Text role="caption">Built from the books as of {pacific(r?.books_as_of)}. Ask the books agent to rebuild and republish it.</Text></span></div></li>}
       {r && <li className="accounting-close-item accounting-close-item--you"><div className="accounting-close-item__button"><span className="accounting-close-item__main">
         <Text role="body">Sign and mail (your step)</Text>
         <Text role="caption">{[r.filing?.signers ? `Signed by ${r.filing.signers}` : null, r.filing?.method, r.filing?.mail_to ? `to ${r.filing.mail_to}` : null,
@@ -135,22 +147,45 @@ function YearCard({ y, revenue, state, onDrill }: { y: CloseoutYear; revenue: Cl
   </article>;
 }
 
-/** "Finish your taxes": per year, what the draft says you owe or get back, whether it is current, and what is left. */
+/** The one-line total across the years' drafts, or why there is none. It waits until every year's filing state has been read, because a year
+ *  on hold must never be summed into it, and says which years it left out. */
+export function headlineOf(years: CloseoutYear[], states: Record<string, YearState>, read: Record<string, 'ready' | 'error'>):
+  { kind: 'pending' } | { kind: 'text'; text: string } | null {
+  if (!years.length) return null;
+  if (years.some(y => read[y.year] === undefined)) return { kind: 'pending' };
+  const unreadable = years.filter(y => read[y.year] === 'error').map(y => y.year);
+  const readable = years.filter(y => read[y.year] === 'ready');
+  const net = netAcrossYears(readable, states);
+  const held = heldYears(readable, states);
+  const notes = [held.length ? `${yearsPhrase(held)} ${held.length > 1 ? 'are' : 'is'} on hold and not counted.` : '',
+    unreadable.length ? `${yearsPhrase(unreadable)}: the filing state could not load, so ${unreadable.length > 1 ? 'those years are' : 'that year is'} not counted.` : ''].filter(Boolean).join(' ');
+  if (!net) return notes ? { kind: 'text', text: `There is no total across the drafts. ${notes}` } : null;
+  const said = net.counted.length === 1 ? `The ${net.counted[0]} draft says` : `Across the ${yearsPhrase(net.counted)} drafts,`;
+  const amount = net.owe > 0 ? `you owe ${dollars(net.owe)}` : `you get back ${dollars(-net.owe)}`;
+  return { kind: 'text', text: `${said} ${amount}${net.count > 1 ? ' net' : ''}, before penalties and interest.${notes ? ` ${notes}` : ''}` };
+}
+
+/** "Finish your taxes": per year, what the draft says you owe or get back and what is left. Whether the return still matches the books is the
+ *  stored gate's answer (books docket, rule R9); the paperwork state comes from the facts register. */
 export default function FinishTaxes({ onDrill, onQuestions, resolverLabel }: { onDrill: (drill: Drill) => void; onQuestions: () => void; resolverLabel?: (name: string) => string }) {
   const { ownerId, liveRevision } = useAccountingBook();
   const [state, setState] = useState<{ owner: string; data: Closeout | null; error: boolean } | null>(null);
   const [revenue, setRevenue] = useState<Record<string, CloseoutItem>>({});
   const [yearStates, setYearStates] = useState<Record<string, YearState>>({});
+  const [yearStateRead, setYearStateRead] = useState<Record<string, 'ready' | 'error'>>({});
   const [retry, setRetry] = useState(0);
   useEffect(() => {
     if (!ownerId) return;
     let cancelled = false;
     setState(previous => previous?.owner === ownerId ? previous : { owner: ownerId, data: null, error: false });
-    readCloseout(ownerId).then(data => {
+    // One automatic retry: under load the first read has failed with a 503 or the statement cap and succeeded a moment later.
+    withOneRetry(() => readCloseout(ownerId)).then(data => {
       if (cancelled) return;
       setState({ owner: ownerId, data, error: false });
       for (const y of data.years.filter(y => y.return || y.books)) {
-        readYearState(ownerId, y.year).then(s => { if (!cancelled) setYearStates(current => ({ ...current, [y.year]: s })); }).catch(() => undefined);
+        readYearStateOnce(ownerId, y.year, liveRevision).then(s => {
+          if (!cancelled) { setYearStates(current => ({ ...current, [y.year]: s })); setYearStateRead(current => ({ ...current, [y.year]: 'ready' })); }
+        }).catch(() => { if (!cancelled) setYearStateRead(current => ({ ...current, [y.year]: 'error' })); });
       }
       // The revenue gate costs a few seconds a year; read it per year, in parallel, after the page is up.
       for (const y of data.years.filter(y => y.books && y.books.revenue_records > 0)) {
@@ -165,15 +200,17 @@ export default function FinishTaxes({ onDrill, onQuestions, resolverLabel }: { o
   if (!state || state.owner !== ownerId || (!state.data && !state.error)) return <p role="status"><Text role="caption">Reading where each tax year stands…</Text></p>;
   if (!state.data) return <p role="alert"><Text role="body">Where each tax year stands could not load.</Text> <button type="button" onClick={() => setRetry(n => n + 1)}>Try again</button></p>;
   const years = state.data.years.filter(y => y.return || y.books);
-  const net = netAcrossYears(years, yearStates);
+  const headline = headlineOf(years, yearStates, yearStateRead);
   const questions = Object.entries(state.data.questions.by_resolver).filter(([name]) => name !== 'model_reconciliation').sort((a, b) => b[1] - a[1]);
   const notes = state.data.questions.by_resolver.model_reconciliation || 0;
   return <section className="accounting-close" aria-label="Finish your taxes">
     <div className="accounting-section-heading"><Text role="entity" as="h2">Finish your taxes</Text></div>
-    {net && <Text role="body" as="p">{net.count === 1 ? `The ${net.first} draft says` : `Across the ${net.first}–${net.last} drafts,`} {net.owe > 0 ? `you owe ${dollars(net.owe)}` : `you get back ${dollars(-net.owe)}`}{net.count > 1 ? ' net' : ''}, before penalties and interest.</Text>}
+    {headline?.kind === 'pending' && <p role="status"><Text role="caption">Reading each year&apos;s filing state…</Text></p>}
+    {headline?.kind === 'text' && <Text role="body" as="p">{headline.text}</Text>}
     {questions.length > 0 && <button type="button" className="accounting-close-questions" onClick={onQuestions}>
       <Text role="body">Open questions: {questions.map(([name, n]) => `${resolverLabel ? resolverLabel(name) : name} ${n.toLocaleString('en-US')}`).join(' · ')}</Text>
-      {notes > 0 && <Text role="caption">plus {notes.toLocaleString('en-US')} agent notes</Text>}<span aria-hidden="true">›</span></button>}
+      {notes > 0 && <Text role="caption">plus {notes.toLocaleString('en-US')} agent notes</Text>}<span aria-hidden="true">›</span>
+      <Text role="caption" className="accounting-close-questions__source">Pending questions on the current reading, from the review queue (financial_review_queue) · read {pacific(state.data.read_at)}</Text></button>}
     <div className="accounting-close-years">{years.map(y => <YearCard key={y.year} y={y} revenue={revenue[y.year]} state={yearStates[y.year]} onDrill={onDrill} />)}</div>
     {state.error && <Text role="caption" as="p">Showing the last loaded status; a refresh failed.</Text>}
     <Text role="caption" as="p">Read {pacific(state.data.read_at)}. Drafts are unsigned; amounts are whole dollars from each draft.</Text>

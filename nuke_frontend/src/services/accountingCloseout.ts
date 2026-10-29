@@ -5,6 +5,12 @@ import type { SavedRecord } from '../components/finance/FinancialWorkpapers';
  *  policies decide what comes back; nothing here writes. */
 
 export type CloseoutItemKey = 'expense_no_proof' | 'expense_no_receipt' | 'car_cost_no_car' | 'statement_gaps' | 'revenue_no_payer';
+/** The classes of books_tier_records (migration 20261106130000): one per number of the audit-tier rollup. */
+export type TierDrillKey = 'tier_a' | 'tier_b' | 'tier_c' | 'excluded' | 'b_no_bank' | 's274_needs_receipt' | 'no_pay_no_ruling';
+/** What the office's one row list can be asked to list: a close-out item, or the decisions behind a tier number. */
+export type DrillItem = CloseoutItemKey | TierDrillKey;
+const TIER_DRILL_KEYS: readonly string[] = ['tier_a', 'tier_b', 'tier_c', 'excluded', 'b_no_bank', 's274_needs_receipt', 'no_pay_no_ruling'];
+export const isTierDrill = (item: DrillItem): item is TierDrillKey => TIER_DRILL_KEYS.includes(item);
 export type CloseoutItem = {
   key: CloseoutItemKey; n: number | null; of: number | null; amount: number | null; assessed: boolean; deferred?: boolean;
   accounts?: { account: string | null; months_without_lines: string[]; months_in_span: number }[];
@@ -62,9 +68,15 @@ export async function readCloseout(ownerId: string): Promise<Closeout> {
 
 /** One tax year's settled state (books_year_state, migration 20261101170000): Schedule C lines per schedule, owner
  *  rulings, return-level facts, the newest return result and open items with what closes each. */
+/** The structured paperwork state of one year's return (a fact with topic filing, written by scripts/books/return_facts.py). */
+export type FilingState = 'draft' | 'prepared' | 'mail_ready' | 'on_hold' | 'mailed' | 'filed';
+export type FilingFact = { state: FilingState; as_of: string; form: string; packet_pages?: number; packet_document_id?: string; deadline?: string };
 export type YearFact = {
   local_id: string; key: string; topic: string; status: 'settled' | 'open' | 'superseded'; date: string; decision: string;
   amount?: number; closes_with?: string; supersedes?: string; source: string | null;
+  /** Who closes an open item: the owner, the CPA or the books agent. Absent means unassigned. */
+  actor?: 'owner' | 'cpa' | 'agent';
+  filing?: FilingFact;
 };
 export type YearState = {
   year: number; read_at: string;
@@ -85,6 +97,142 @@ export async function readCloseoutRecords(ownerId: string, year: string, item: C
   const { data, error } = await supabase.rpc('accounting_closeout_records', { p_owner_id: ownerId, p_year: year, p_item: item, p_limit: limit, p_offset: offset });
   if (error || !data || !Array.isArray(data.rows)) throw fail('These records');
   return { assessed: data.assessed !== false, total: data.total ?? null, amount: data.amount ?? null, rows: data.rows as SavedRecord[] };
+}
+
+/** One automatic retry for a transient failure: under load the data API answers 503 or a read hits its statement cap, and the same read a moment later succeeds. */
+export const RETRY_AFTER_MS = 1500;
+export async function withOneRetry<T>(read: () => Promise<T>, delayMs = RETRY_AFTER_MS): Promise<T> {
+  try { return await read(); } catch {
+    await new Promise(resolve => setTimeout(resolve, delayMs));
+    return read();
+  }
+}
+
+/** books_year_state is read by the docket and by Finish your taxes; one in-flight or settled read per book, year and revision serves both.
+ *  A failed read is not kept, so a retry reads again. */
+const yearStateReads = new Map<string, Promise<YearState>>();
+export function readYearStateOnce(ownerId: string, year: string, revision: string | undefined): Promise<YearState> {
+  const key = `${ownerId}:${year}:${revision ?? ''}`;
+  let read = yearStateReads.get(key);
+  if (!read) {
+    read = readYearState(ownerId, year);
+    yearStateReads.set(key, read);
+    read.catch(() => { if (yearStateReads.get(key) === read) yearStateReads.delete(key); });
+    while (yearStateReads.size > 24) yearStateReads.delete(yearStateReads.keys().next().value as string);
+  }
+  return read;
+}
+export function clearYearStateReads(): void { yearStateReads.clear(); }
+
+/** The proof a tier-drill row carries (books_tier_records): its tier, why, and the citations the audit-tier view used. */
+export type RowProof = {
+  tier: 'A' | 'B' | 'C' | 'X'; tier_reason: string; proof_basis: string | null;
+  pay_proof: boolean; doc_proof: boolean; purpose_proof: boolean; has_owner_ruling: boolean; is_274: boolean; needs_receipt: boolean; is_caveat: boolean;
+  structural_rule: string | null;
+  payment_cites: string[]; document_cites: { kind: string; ref: string }[]; ruling_cites: { kind: string; ref: string }[];
+  rule_cites: { basis: string; citation: string }[]; structural_cites: { rule: string; basis?: string; citation?: string; detail?: string }[] | null;
+};
+
+/** The decisions behind one tier number (books_tier_records, migration 20261106130000), in the envelope the close-out drill returns. */
+export async function readTierRecords(ownerId: string, year: string, cls: TierDrillKey, limit: number, offset: number):
+  Promise<{ assessed: boolean; total: number | null; amount: number | null; rows: SavedRecord[] }> {
+  const { data, error } = await supabase.rpc('books_tier_records', { p_owner_id: ownerId, p_year: year, p_class: cls, p_limit: limit, p_offset: offset });
+  if (error || !data || !Array.isArray(data.rows)) throw fail('These records');
+  return { assessed: data.assessed !== false, total: data.total ?? null, amount: data.amount ?? null, rows: data.rows as SavedRecord[] };
+}
+
+/** The one reader behind the office's row list: a close-out item or a tier number. */
+export function readDrillRecords(ownerId: string, year: string, item: DrillItem, limit: number, offset: number) {
+  return isTierDrill(item) ? readTierRecords(ownerId, year, item, limit, offset) : readCloseoutRecords(ownerId, year, item, limit, offset);
+}
+
+const finite = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
+const numberOrNull = (value: unknown): number | null => value === null || value === undefined || value === '' ? null : Number.isFinite(Number(value)) ? Number(value) : null;
+
+/** One rule of a stored books_year_gate run, as books_gate_status returns it: sorted by the database, never with ids or detail text. */
+export type GateRule = {
+  rule: string; title: string; status: string; n: number | null; of: number | null; amount: number | null;
+  grades?: Record<string, number>; ruling_only?: { n: number; amount: number | null };
+  b_no_bank?: { n: number; amount: number | null }; excluded?: { n: number; amount: number | null };
+};
+export type GateRun = {
+  id: string; started_at: string; finished_at: string; duration_ms: number; pass: boolean;
+  stale: boolean; stale_books: boolean; stale_gate: boolean; trusted: boolean;
+  rule_counts: { total: number; pass: number; fail: number; not_assessed: number; empty: number };
+  rules: GateRule[];
+};
+export type GateAttempt = { status: 'complete' | 'timed_out' | 'error'; started_at: string; finished_at: string; duration_ms: number };
+export type OpenItemCounts = { total: number; owner: number; cpa: number; agent: number; unassigned: number };
+export type GateYear = {
+  year: number; draft_document_id: string | null; drafts_on_file: number; attempt: GateAttempt | null; run: GateRun | null; open_items: OpenItemCounts;
+};
+export type GateStatus = {
+  owner_id: string; read_at: string; book_signature: string; gate_md5: string | null;
+  summary: { years: number; with_run: number; passed: number; trusted: number; failing: number; not_assessed: number; stale: number; open_items: number };
+  years: GateYear[];
+};
+
+const isRecord = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
+function isGateYear(y: unknown): y is GateYear {
+  if (!isRecord(y) || !Number.isInteger(y.year) || !Number.isInteger(y.drafts_on_file)) return false;
+  if (!isRecord(y.open_items) || !['total', 'owner', 'cpa', 'agent', 'unassigned'].every(k => finite((y.open_items as Record<string, unknown>)[k]))) return false;
+  if (y.attempt !== null && !(isRecord(y.attempt) && typeof y.attempt.status === 'string' && typeof y.attempt.finished_at === 'string')) return false;
+  if (y.run === null) return true;
+  const run = y.run;
+  return isRecord(run) && typeof run.finished_at === 'string' && typeof run.pass === 'boolean' && typeof run.stale === 'boolean' && typeof run.trusted === 'boolean'
+    && isRecord(run.rule_counts) && ['total', 'pass', 'fail', 'not_assessed', 'empty'].every(k => finite((run.rule_counts as Record<string, unknown>)[k]))
+    && Array.isArray(run.rules) && run.rules.every(r => isRecord(r) && typeof r.rule === 'string' && typeof r.title === 'string' && typeof r.status === 'string');
+}
+
+/** The stored gate runs of the owner's book, per tax year (books_gate_status, migration 20261106110000). Cheap; never runs the gate. */
+export async function readGateStatus(ownerId: string): Promise<GateStatus> {
+  const { data, error } = await supabase.rpc('books_gate_status', { p_owner_id: ownerId });
+  if (error || !isRecord(data) || !isRecord(data.summary) || !Array.isArray(data.years) || !data.years.every(isGateYear)
+    || !['years', 'with_run', 'passed', 'trusted', 'failing', 'not_assessed', 'stale', 'open_items'].every(k => finite((data.summary as Record<string, unknown>)[k]))) {
+    throw fail('The gate status');
+  }
+  return data as unknown as GateStatus;
+}
+
+/** One row of v_books_audit_tier_years, exactly as stored: the page prints these columns and computes nothing from them. */
+export type TierYear = {
+  year: string; decisions: number; deductions: number; total_usd: number; deduction_usd: number;
+  a_usd: number; b_usd: number; c_usd: number; a_pct: number | null; b_pct: number | null; c_pct: number | null; a_n: number; b_n: number; c_n: number;
+  excluded_n: number; excluded_usd: number; b_nobank_n: number; b_nobank_usd: number;
+  s274_needs_receipt_usd: number; s274_uncaveated_usd: number; no_pay_no_ruling_usd: number;
+};
+const TIER_YEAR_COLUMNS = 'year, decisions, deductions, total_usd, deduction_usd, a_usd, b_usd, c_usd, a_pct, b_pct, c_pct, a_n, b_n, c_n, excluded_n, excluded_usd, b_nobank_n, b_nobank_usd, s274_needs_receipt_usd, s274_uncaveated_usd, no_pay_no_ruling_usd';
+const TIER_YEAR_REQUIRED = ['decisions', 'deductions', 'total_usd', 'deduction_usd', 'a_usd', 'b_usd', 'c_usd', 'a_n', 'b_n', 'c_n', 'excluded_n', 'excluded_usd', 'b_nobank_n', 'b_nobank_usd',
+  's274_needs_receipt_usd', 's274_uncaveated_usd', 'no_pay_no_ruling_usd'] as const;
+
+export async function readTierYears(ownerId: string): Promise<TierYear[]> {
+  const { data, error } = await supabase.from('v_books_audit_tier_years').select(TIER_YEAR_COLUMNS).eq('owner_id', ownerId).order('year');
+  if (error || !Array.isArray(data)) throw fail('The deduction support');
+  return (data as unknown as Record<string, unknown>[]).map(row => {
+    if (typeof row.year !== 'string' || TIER_YEAR_REQUIRED.some(k => numberOrNull(row[k]) === null)) throw fail('The deduction support');
+    const out: Record<string, unknown> = { year: row.year };
+    for (const k of TIER_YEAR_REQUIRED) out[k] = Number(row[k]);
+    for (const k of ['a_pct', 'b_pct', 'c_pct'] as const) out[k] = numberOrNull(row[k]);
+    return out as unknown as TierYear;
+  });
+}
+
+/** One row of v_books_citation_links (migration 20261106120000): every Expense decision of the year in exactly one class. */
+export type TieYear = {
+  year: string; decisions: number; both_n: number; cites_only_n: number; cited_by_only_n: number; cites_missing_n: number; none_n: number;
+  links: number; links_resolved: number; tied_n: number; amount_equal_n: number;
+};
+const TIE_COLUMNS = ['decisions', 'both_n', 'cites_only_n', 'cited_by_only_n', 'cites_missing_n', 'none_n', 'links', 'links_resolved', 'tied_n', 'amount_equal_n'] as const;
+
+export async function readCitationLinks(ownerId: string): Promise<TieYear[]> {
+  const { data, error } = await supabase.from('v_books_citation_links').select(`year, ${TIE_COLUMNS.join(', ')}`).eq('owner_id', ownerId).order('year');
+  if (error || !Array.isArray(data)) throw fail('The statement ties');
+  return (data as unknown as Record<string, unknown>[]).map(row => {
+    if (typeof row.year !== 'string' || TIE_COLUMNS.some(k => numberOrNull(row[k]) === null)) throw fail('The statement ties');
+    const out: Record<string, unknown> = { year: row.year };
+    for (const k of TIE_COLUMNS) out[k] = Number(row[k]);
+    return out as unknown as TieYear;
+  });
 }
 
 /** Split a balanced trailing "( … )" off a phrase; repeated, it peels every trailing group. */

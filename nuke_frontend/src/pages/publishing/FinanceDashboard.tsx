@@ -8,20 +8,21 @@ import RecordClassifier from '../../components/finance/RecordClassifier';
 import AccountingActivity, { ActivityPasses } from '../../components/finance/AccountingActivity';
 import RecordEvidence from '../../components/finance/RecordEvidence';
 import FinishTaxes, { type Drill } from '../../components/finance/FinishTaxes';
+import BooksDocket from '../../components/finance/BooksDocket';
 import { remember, remembered } from '../../components/finance/accountingMemory';
 /**
- * FinanceDashboard
+ * FinanceDashboard: the private accounting office.
+ * Routes: /accounting and /publishing/finance, both behind ProtectedRoute (signed-in only).
  *
- * Operator finance view for the publishing arm.
- * Route: /publishing/finance
+ * The Books view opens on the Books docket (the stored reconciliation gate, how the deductions are supported, statement ties, paperwork and
+ * what is open, per tax year), then Finish your taxes, then the book's records. The docket is the owner's own book only.
  *
- * Data source (both owner-RLS'd — anon/unauthorized sessions get ZERO rows):
- *   - v_financial_deal_flow  (aggregated per-deal roll-up)
- *   - financial_documents    (individual invoices / credit notes)
+ * Data sources, all bound to the signed-in account's own book by row policy (a visitor gets nothing, a stranger gets zero rows):
+ *   - the accounting readers (accounting_closeout, books_year_state, books_gate_status, v_books_audit_tier_years, v_books_citation_links)
+ *   - v_financial_deal_flow and financial_documents (the source documents and invoices below)
  *
- * When both queries return empty, this is not an error state — it means the
- * session is not an operator. We render a single bordered access line and
- * nothing else (no empty tables, no dead boxes).
+ * When those queries return empty, this is not an error state: it means the session has no books here. We render a single bordered access
+ * line and nothing else (no empty tables, no dead boxes).
  */
 
 import '../../styles/accounting.css';
@@ -505,6 +506,8 @@ export default function FinanceDashboard() {
   const priorConcerns = concerns.filter(c => concernRevision(c) === 'superseded');
 
   useEffect(() => { setSourceTablePage(0); }, [sourceView, sourceQuery, page]);
+  // One row list serves every number that can be opened: a close-out item or the decisions behind a tier of the docket.
+  const openDrill = (drill: Drill) => { setFocus(drill); window.setTimeout(() => document.querySelector('.accounting-books')?.scrollIntoView({ block: 'start' }), 0); };
   const openEvidence = (id: string, record?: SavedRecord['record']) => { evidenceTrigger.current = document.activeElement as HTMLElement | null; setSelectedRecord(record || null); setSelectedDocument(id); };
   const visibleDocs = docs.filter(doc => [doc.source_filename, doc.issuer_name_raw, doc.document_number, doc.doc_type].join(' ').toLowerCase().includes(sourceQuery.toLowerCase()));
 
@@ -525,7 +528,8 @@ export default function FinanceDashboard() {
       ] as const).filter(([tab]) => !shared || tab !== 'tools').map(([tab, label, hint]) => <button type="button" key={tab} aria-current={officeView === tab ? 'page' : undefined} title={hint} onClick={() => { setOfficeView(tab); setSourceView(tab === 'documents' || tab === 'review' ? tab : 'summary'); }}><span>{label}</span></button>)}</nav>
       <div hidden={officeView !== 'activity'}><h2>Recent activity</h2><p>Open a change to inspect the source and its current interpretation.</p><AccountingActivity people={people} onOpen={documentId => openEvidence(documentId)} /><ActivityPasses people={people} onOpen={documentId => openEvidence(documentId)} /></div>
       {shared && <p>Shared books. Your corrections retain your identity and appear in the same ledger for the owner and other reviewers.</p>}
-      <div hidden={officeView !== 'books'}>{ownerId && <FinishTaxes key={`close:${ownerId}`} onDrill={drill => { setFocus(drill); window.setTimeout(() => document.querySelector('.accounting-books')?.scrollIntoView({ block: 'start' }), 0); }} onQuestions={() => { setOfficeView('review'); setSourceView('review'); }} />}
+      <div hidden={officeView !== 'books'}>{ownerId && !shared && <BooksDocket key={`docket:${ownerId}`} active={officeView === 'books'} onDrill={openDrill} />}
+      {ownerId && <FinishTaxes key={`close:${ownerId}`} onDrill={openDrill} onQuestions={() => { setOfficeView('review'); setSourceView('review'); }} />}
       {ownerId && <FinancialWorkpapers key={`${actorId}:${ownerId}`} viewerId={actorId} revision={sessionRevision} onOpen={openEvidence} focus={focus} onLeaveFocus={() => setFocus(null)} />}
       <p className="accounting-muted accounting-tax-note">Tax review is a separate step. Saved records are not a filing or a completed reconciliation.</p></div>
       <div hidden={shared || officeView !== 'tools'}><h2>Office settings</h2><AccountingAccess grants={grants} actorId={actorId} onChanged={() => setGrantRevision(n => n + 1)} /><details className="accounting-disclosure" open={addingDocument} onToggle={event => setAddingDocument(event.currentTarget.open)}><summary>Add documents <span>Receipts, invoices and supporting files</span></summary>

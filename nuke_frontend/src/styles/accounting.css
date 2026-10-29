@@ -264,3 +264,42 @@
 .accounting-activity-passes { list-style:none; padding:0; margin:0 0 12px; border-top:1px solid var(--border); }
 .accounting-activity-passes li { border-bottom:1px solid var(--border); }
 .accounting-page .accounting-activity-passes button { display:flex; flex-direction:column; align-items:flex-start; gap:2px; width:100%; text-align:left; border:0; background:transparent; padding:10px 0; font-weight:400; }
+.accounting-page .accounting-close-questions__source { flex-basis:100%; }
+/* Books docket: per year, the stored gate, how the deductions are supported, statement ties, paperwork and what is open. Status colors are the shared tokens. */
+.accounting-docket .accounting-close-years { margin-top:10px; }
+.accounting-docket-year { border-top:3px solid var(--border); }
+.accounting-docket-year[data-verdict="trusted"] { border-top-color:var(--success); }
+.accounting-docket-year[data-verdict="not_trusted"],.accounting-docket-year[data-verdict="did_not_finish"] { border-top-color:var(--error); }
+.accounting-docket-year[data-verdict="not_run"] { border-top-color:var(--warning); }
+.accounting-page .accounting-docket-verdict { margin:2px 0 0; }
+.accounting-docket-verdict[data-state="trusted"] { color:var(--success); }
+.accounting-docket-verdict[data-state="not_trusted"],.accounting-docket-verdict[data-state="did_not_finish"] { color:var(--error); }
+.accounting-docket-verdict[data-state="not_run"] { color:var(--warning); }
+/* The gate's rules: one chip per rule in the database's order, coloured by what it found; the chip's line opens beneath. */
+.accounting-docket-rules { margin:6px 0 0; }
+.accounting-docket-chips { display:flex; flex-wrap:wrap; gap:6px; margin:4px 0 6px; }
+.accounting-page .accounting-docket-chip { min-height:36px; padding:4px 10px; font-weight:600; color:var(--success); }
+.accounting-page .accounting-docket-chip[aria-pressed="true"] { background:var(--bg-secondary,var(--border)); border-color:var(--text); }
+.accounting-page .accounting-docket-chip[data-rule-state="fail"] { color:var(--error); border-color:var(--error); }
+.accounting-page .accounting-docket-chip[data-rule-state="not_assessed"],.accounting-page .accounting-docket-chip[data-rule-state="empty"] { color:var(--warning); border-color:var(--warning); }
+.accounting-docket-rule[data-rule-state="fail"] .k-body { color:var(--error); }
+.accounting-docket-rule[data-rule-state="empty"] .k-body,.accounting-docket-rule[data-rule-state="not_assessed"] .k-body { color:var(--warning); }
+.accounting-page .accounting-docket-rule p,.accounting-page .accounting-docket-rules>p { margin:2px 0 0; }
+.accounting-page .accounting-docket-apartbox,.accounting-page .accounting-docket-legend { margin:6px 0 0; padding:0; border:0; }
+.accounting-page .accounting-docket-apartbox>summary,.accounting-page .accounting-docket-legend>summary { font-weight:400; padding:4px 0; }
+.accounting-page .accounting-docket-apartbox[open]>summary,.accounting-page .accounting-docket-legend[open]>summary { margin-bottom:4px; }
+.accounting-docket-legend ul { margin:0 0 10px; padding-left:18px; max-width:85ch; }
+.accounting-docket-bar { display:block; width:100%; max-width:320px; height:4px; margin-top:4px; }
+.accounting-docket-bar__track { fill:var(--border); }
+.accounting-docket-bar__fill { fill:var(--text-secondary); }
+.accounting-docket .accounting-section-heading { flex-wrap:wrap; }
+.accounting-docket .accounting-close-item__button { flex-wrap:wrap; }
+.accounting-docket .accounting-close-item__main { min-width:min(100%,15rem); }
+.accounting-docket-ties,.accounting-docket-apart { list-style:none; margin:4px 0; padding:0; display:flex; flex-direction:column; gap:3px; }
+.accounting-docket-ties b { color:var(--text); font-variant-numeric:tabular-nums; }
+.accounting-docket .accounting-close-item[data-warn="true"] { border-left:3px solid var(--warning); padding-left:10px; }
+/* The proof under a row of a tier drill: why the decision sits in its tier, and what it cites. */
+.accounting-page .accounting-proof { margin:4px 0 0; padding:0; border:0; }
+.accounting-page .accounting-proof>summary { font-size:12px; font-weight:400; padding:2px 0; color:var(--text-secondary); }
+.accounting-page .accounting-proof[open]>summary { margin-bottom:4px; }
+.accounting-proof ul { margin:0; padding-left:16px; font-size:12px; color:var(--text-secondary); }

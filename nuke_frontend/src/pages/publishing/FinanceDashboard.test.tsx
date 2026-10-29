@@ -4,7 +4,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 const fixture = vi.hoisted(() => ({ results: {} as Record<string, any>, calls: [] as any[], downloads: [] as string[], userId: '11111111-1111-4111-8111-111111111111' as string | null, authChanged: null as null | ((event?: string, id?: string | null) => void), listeners: new Set<(event: string, session: {user:{id:string}} | null) => void>() }));
 vi.mock('../../components/PrefetchLink', () => ({ default: ({ to, children, ...props }: any) => <a href={to} {...props}>{children}</a> }));
-vi.mock('../../lib/supabase', () => ({ supabase: { rpc: async (name: string) => ({ data: name === 'accounting_recent_activity' ? fixture.results.activity || [] : name === 'accounting_similar_classifications' ? fixture.results.similar || [] : fixture.results.grants || [], error: null }), functions: { invoke: async (_name: string, { body }: any) => { fixture.calls.push({ action: body.action }); return { data: { data: fixture.results[body.action] || { lines: [] } }, error: null }; } }, channel() { return { on() { return this; }, subscribe() { return this; } }; }, removeChannel() {}, storage: { from(bucket: string) { return { async download(path: string) { fixture.downloads.push(`${bucket}/${path}`); return { data: null, error: new Error('not available') }; } }; } }, auth: { getUser: async () => ({ data: { user: fixture.userId ? { id: fixture.userId } : null }, error: null }), onAuthStateChange(callback: (event: string, session: {user:{id:string}} | null) => void) { fixture.listeners.add(callback); fixture.authChanged = (event = 'SIGNED_OUT', id = null) => { fixture.userId = id; for (const listener of [...fixture.listeners]) listener(event, id ? {user:{id}} : null); }; return { data: { subscription: { unsubscribe() { fixture.listeners.delete(callback); } } } }; } }, from(table: string) {
+vi.mock('../../lib/supabase', () => ({ supabase: { rpc: async (name: string) => { fixture.calls.push({ rpc: name }); return ({ data: name === 'accounting_recent_activity' ? fixture.results.activity || [] : name === 'accounting_similar_classifications' ? fixture.results.similar || [] : name === 'books_gate_status' ? fixture.results.gate || [] : fixture.results.grants || [], error: null }); }, functions: { invoke: async (_name: string, { body }: any) => { fixture.calls.push({ action: body.action }); return { data: { data: fixture.results[body.action] || { lines: [] } }, error: null }; } }, channel() { return { on() { return this; }, subscribe() { return this; } }; }, removeChannel() {}, storage: { from(bucket: string) { return { async download(path: string) { fixture.downloads.push(`${bucket}/${path}`); return { data: null, error: new Error('not available') }; } }; } }, auth: { getUser: async () => ({ data: { user: fixture.userId ? { id: fixture.userId } : null }, error: null }), onAuthStateChange(callback: (event: string, session: {user:{id:string}} | null) => void) { fixture.listeners.add(callback); fixture.authChanged = (event = 'SIGNED_OUT', id = null) => { fixture.userId = id; for (const listener of [...fixture.listeners]) listener(event, id ? {user:{id}} : null); }; return { data: { subscription: { unsubscribe() { fixture.listeners.delete(callback); } } } }; } }, from(table: string) {
   const call: any = { table }; fixture.calls.push(call);
   const q: any = {
     select(fields: string) { call.fields = fields; return q; },
@@ -378,4 +378,37 @@ it('invalidates pending owner records at shared-book selection before effect cle
   });
   expect(container.textContent).not.toContain('PRIVATE OTHER BOOK');
   expect(fixture.calls.filter(call => call.table === 'financial_documents').at(-1).filter).toEqual(['owner_id', '22222222-2222-4222-8222-222222222222']);
+});
+
+// ── The books docket in the Books view ──────────────────────────────────────────────────────────────────────────────────
+const gateFixture = (owner: string) => ({ owner_id: owner, read_at: '2026-10-29T17:40:00Z', book_signature: '1:x', gate_md5: 'm',
+  summary: { years: 1, with_run: 1, passed: 1, trusted: 1, failing: 0, not_assessed: 0, stale: 0, open_items: 0 },
+  years: [{ year: 2024, draft_document_id: null, drafts_on_file: 0, attempt: null, open_items: { total: 0, owner: 0, cpa: 0, agent: 0, unassigned: 0 },
+    run: { id: 'run-1', started_at: '2026-10-29T17:30:30Z', finished_at: '2026-10-29T17:31:00Z', duration_ms: 30000, pass: true, stale: false, stale_books: false, stale_gate: false, trusted: true,
+      rule_counts: { total: 1, pass: 1, fail: 0, not_assessed: 0, empty: 0 }, rules: [{ rule: 'R1', title: 'synthetic rule', status: 'pass', n: 0, of: 10, amount: 0 }] } }] });
+it('opens the Books view on the docket, ahead of Finish your taxes, reading the stored gate and never running it', async () => {
+  fixture.results.gate = gateFixture(fixture.userId!);
+  await act(async () => root.render(<FinanceDashboard />));
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 30)); });
+  const docket = container.querySelector('.accounting-docket');
+  expect(docket).not.toBeNull();
+  expect(docket?.querySelector('#docket-2024 .accounting-docket-verdict')?.textContent).toBe('Trusted');
+  // The first block of the Books view: nothing sits above it, and Finish your taxes and the records follow it.
+  expect(docket!.parentElement!.firstElementChild).toBe(docket);
+  expect(docket!.parentElement!.children.length).toBeGreaterThan(1);
+  expect(docket?.closest('[hidden]')).toBeNull();
+  const rpcNames = fixture.calls.filter(c => c.rpc).map(c => c.rpc);
+  expect(rpcNames).toContain('books_gate_status');
+  expect(rpcNames).not.toContain('books_year_gate');
+});
+it('shows no docket and reads no gate status in a shared book', async () => {
+  fixture.results.grants = [{ id: 'grant', owner_id: '22222222-2222-4222-8222-222222222222', member_id: '11111111-1111-4111-8111-111111111111', active: true, can_correct: true, owner_name: 'Shared owner' }];
+  fixture.results.gate = gateFixture(fixture.userId!);
+  await act(async () => root.render(<FinanceDashboard />));
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 30)); });
+  await act(async () => Array.from(container.querySelectorAll<HTMLButtonElement>('[aria-label="Active accounting book"] button')).find(b => b.textContent?.startsWith('Shared owner'))!.click());
+  const before = fixture.calls.filter(c => c.rpc === 'books_gate_status').length;
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 30)); });
+  expect(container.querySelector('.accounting-docket')).toBeNull();
+  expect(fixture.calls.filter(c => c.rpc === 'books_gate_status')).toHaveLength(before);
 });
