@@ -108,6 +108,12 @@ into permanent identity types or mandatory arrival choices without a separate mo
    - Private data (people's contact details, invoices, amounts) doesn't either. It lives in the database,
      and code and docs refer to it by id.
    - `VITE_*` values ship to browsers, so no secret gets that prefix. `npm run build` fails if one does.
+5. **Numbers are cited from the database or they are not stated.** A price, band, score or count in a reply,
+   a page or a row comes from a reader over the ledger's rows (the reader's name, its population, n, the
+   as-of date and the keys it used), never from a constant an agent typed into a seed, a doc or a markdown
+   table built for the reply. A status such as proven or contradicted exists only with a proof reference.
+   An agent's own judgment is labelled as judgment and never seeded into a table. (Skylar, 2026-10-29:
+   "you can only cite from the db".)
 
 ## Writes and deploys
 - **Schema, cron and SQL functions.** Write a migration file, make one commit, and push it yourself.
