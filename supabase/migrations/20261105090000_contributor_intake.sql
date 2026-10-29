@@ -324,7 +324,12 @@ RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE
   i public.vehicle_contributor_invites;
   v_sha text := lower(p_file ->> 'sha256');
-  v_path text := p_file ->> 'storage_path';
+  -- Bucket: vehicle-photos (public) for photos, ownership-documents / user-documents (private) for papers.
+  -- vehicle-photos paths stay bucket-relative, as every existing vehicle_images row records them; a private
+  -- bucket's path is stored as '<bucket>/<path>' so the gated read knows to sign it from that bucket.
+  v_bucket text := coalesce(nullif(p_file ->> 'bucket', ''), 'vehicle-photos');
+  v_sensitive boolean := coalesce((p_file ->> 'is_sensitive')::boolean, false);
+  v_path text := regexp_replace(coalesce(p_file ->> 'storage_path', ''), '^(vehicle-photos|ownership-documents|user-documents)/', '');
   v_url text := p_file ->> 'image_url';
   v_exif jsonb := CASE WHEN jsonb_typeof(p_file -> 'exif') = 'object' AND p_file -> 'exif' <> '{}'::jsonb THEN p_file -> 'exif' END;
   v_device jsonb := public.contributor_intake_device(coalesce(p_file -> 'device', '{}'::jsonb));
@@ -342,10 +347,20 @@ BEGIN
     v_recorded_by := (p_file ->> 'recorded_by')::uuid;
   END IF;
   IF v_sha IS NULL OR v_sha !~ '^[0-9a-f]{64}$' THEN RETURN jsonb_build_object('ok', false, 'error', 'invalid_sha256'); END IF;
-  IF v_path IS NULL OR v_path !~ ('^(vehicle-photos/)?contributors/' || i.id || '/' || v_sha || '/[^/]{1,200}$') THEN
+  IF v_bucket NOT IN ('vehicle-photos', 'ownership-documents', 'user-documents') THEN
+    RETURN jsonb_build_object('ok', false, 'error', 'invalid_bucket');
+  END IF;
+  -- A sensitive file lives only in a private bucket, and a private bucket holds only sensitive files.
+  IF v_sensitive <> (v_bucket <> 'vehicle-photos') THEN
+    RETURN jsonb_build_object('ok', false, 'error', 'bucket_sensitivity_mismatch');
+  END IF;
+  IF v_path !~ ('^contributors/' || i.id || '/' || v_sha || '/[^/]{1,200}$') THEN
     RETURN jsonb_build_object('ok', false, 'error', 'invalid_storage_path');
   END IF;
-  IF v_url IS NULL OR v_url !~ '^https://' THEN RETURN jsonb_build_object('ok', false, 'error', 'invalid_image_url'); END IF;
+  IF v_bucket <> 'vehicle-photos' THEN v_path := v_bucket || '/' || v_path; END IF;
+  -- A sensitive row never carries an object URL; the gated read signs storage_path.
+  IF v_sensitive THEN v_url := '';
+  ELSIF v_url IS NULL OR v_url !~ '^https://' THEN RETURN jsonb_build_object('ok', false, 'error', 'invalid_image_url'); END IF;
 
   SELECT id INTO v_id FROM public.vehicle_images
    WHERE vehicle_id = i.vehicle_id AND file_hash = v_sha AND coalesce(is_superseded, false) = false LIMIT 1;
@@ -355,10 +370,12 @@ BEGIN
   END IF;
 
   INSERT INTO public.vehicle_images (vehicle_id, image_url, storage_path, file_hash, file_name, filename, file_size,
-    mime_type, source, is_external, exif_data, caption, ingest_kind, image_medium, photographer_attribution, submitted_by)
+    mime_type, source, is_external, exif_data, caption, ingest_kind, image_medium, photographer_attribution, submitted_by,
+    is_sensitive, sensitive_type)
   VALUES (i.vehicle_id, v_url, v_path, v_sha, left(p_file ->> 'file_name', 255), left(p_file ->> 'file_name', 255),
     nullif(p_file ->> 'size_bytes', '')::bigint, left(p_file ->> 'mime_type', 128), 'contributor_link', true, v_exif,
-    left(p_file ->> 'label', 500), 'import', 'received', 'contributor:' || i.contributor_id, v_recorded_by)
+    left(p_file ->> 'label', 500), 'import', 'received', 'contributor:' || i.contributor_id, v_recorded_by,
+    v_sensitive, CASE WHEN v_sensitive THEN 'document' END)
   RETURNING id INTO v_id;
 
   -- trg_auto_attribute_image_to_device wrote the EXIF device row when the EXIF names a device; point it at the
@@ -447,6 +464,9 @@ BEGIN
     'uploads', coalesce((SELECT jsonb_agg(jsonb_build_object('image_id', vi.id, 'created_at', vi.created_at,
         'file_name', vi.file_name, 'mime_type', vi.mime_type, 'size_bytes', vi.file_size, 'sha256', vi.file_hash,
         'label', vi.caption, 'storage_path', vi.storage_path, 'is_document', vi.is_document,
+        'is_sensitive', vi.is_sensitive, 'sensitive_type', vi.sensitive_type,
+        'bucket', coalesce(substring(vi.storage_path from '^(ownership-documents|user-documents)/'), 'vehicle-photos'),
+        'image_url', CASE WHEN vi.is_sensitive THEN NULL ELSE nullif(vi.image_url, '') END,
         'contributor_id', da.contributor_id, 'device_fingerprint', da.device_fingerprint,
         'ghost_user_id', da.ghost_user_id, 'attribution_source', da.attribution_source) ORDER BY vi.created_at)
       FROM public.vehicle_images vi LEFT JOIN public.device_attributions da ON da.image_id = vi.id

@@ -75,7 +75,7 @@ CREATE TABLE public.vehicle_images (id uuid PRIMARY KEY DEFAULT gen_random_uuid(
   filename text, file_size bigint, mime_type text, source text, is_external boolean, exif_data jsonb, caption text,
   ingest_kind text CHECK (ingest_kind IN ('live', 'backfill', 'import')),
   image_medium text NOT NULL DEFAULT 'photograph' CHECK (image_medium IN ('photograph', 'render', 'drawing', 'screenshot', 'camera', 'received', 'web', 'other')),
-  photographer_attribution text, submitted_by uuid, ghost_user_id uuid REFERENCES public.ghost_users(id), is_document boolean,
+  photographer_attribution text, submitted_by uuid, is_sensitive boolean NOT NULL DEFAULT false, sensitive_type text, ghost_user_id uuid REFERENCES public.ghost_users(id), is_document boolean,
   is_superseded boolean, created_at timestamptz DEFAULT now());
 CREATE UNIQUE INDEX idx_unique_vehicle_file_hash ON public.vehicle_images (vehicle_id, file_hash)
   WHERE file_hash IS NOT NULL AND vehicle_id IS NOT NULL AND coalesce(is_superseded, false) = false;
@@ -275,6 +275,30 @@ SELECT pg_temp.ok('a non-owner recorder on a file is not_found', public.contribu
 SELECT pg_temp.ok('a path outside this invite is refused', public.contributor_intake_file(inv.r ->> 'token',
   jsonb_set(f.p, '{storage_path}', '"contributors/someone-else/x.jpg"')) ->> 'error' = 'invalid_storage_path') FROM inv, f;
 
+-- Documents: a title goes to the private bucket, sensitive, with no object URL; a photo stays public.
+CREATE TEMP TABLE title AS SELECT public.contributor_intake_file(inv.r ->> 'token', jsonb_build_object(
+  'bucket', 'ownership-documents', 'is_sensitive', true,
+  'storage_path', 'contributors/' || (inv.r ->> 'invite_id') || '/' || repeat('d', 64) || '/title.jpg',
+  'image_url', 'https://example.test/should-not-be-kept.jpg', 'file_name', 'title.jpg', 'mime_type', 'image/jpeg',
+  'size_bytes', 1000, 'sha256', repeat('d', 64), 'label', 'Title')) AS u FROM inv;
+SELECT pg_temp.ok('a title lands sensitive in ownership-documents with no object URL', t.u ->> 'duplicate' = 'false'
+  AND vi.is_sensitive AND vi.sensitive_type = 'document' AND vi.image_url = ''
+  AND vi.storage_path = 'ownership-documents/contributors/' || (inv.r ->> 'invite_id') || '/' || repeat('d', 64) || '/title.jpg')
+  FROM title t, inv, public.vehicle_images vi WHERE vi.id = (t.u ->> 'image_id')::uuid;
+SELECT pg_temp.ok('a build photo lands not sensitive in vehicle-photos', NOT vi.is_sensitive AND vi.sensitive_type IS NULL
+  AND vi.storage_path LIKE 'contributors/%' AND vi.image_url LIKE 'https://%')
+  FROM up, public.vehicle_images vi WHERE vi.id = (up.u ->> 'image_id')::uuid;
+SELECT pg_temp.ok('a sensitive file in the public bucket is refused', public.contributor_intake_file(inv.r ->> 'token',
+  f.p || '{"is_sensitive": true}') ->> 'error' = 'bucket_sensitivity_mismatch'
+  AND public.contributor_intake_file(inv.r ->> 'token', f.p || '{"bucket": "ownership-documents"}') ->> 'error'
+    = 'bucket_sensitivity_mismatch'
+  AND public.contributor_intake_file(inv.r ->> 'token', f.p || '{"bucket": "vehicles"}') ->> 'error' = 'invalid_bucket') FROM inv, f;
+CREATE TEMP TABLE rec AS SELECT public.contributor_intake_file(inv.r ->> 'token', jsonb_set(jsonb_set(f.p, '{sha256}',
+  to_jsonb(repeat('e', 64))), '{storage_path}', to_jsonb('contributors/' || (inv.r ->> 'invite_id') || '/' || repeat('e', 64)
+  || '/frame.jpg')) || '{"recorded_by": "00000000-0000-0000-0000-00000000000b"}') AS u FROM inv, f;
+SELECT pg_temp.ok('an editor recorded on a file lands as submitted_by', vi.submitted_by = '00000000-0000-0000-0000-00000000000b')
+  FROM rec, public.vehicle_images vi WHERE vi.id = (rec.u ->> 'image_id')::uuid;
+
 -- Read: everything round-trips to the owner.
 SET test.auth_uid = '00000000-0000-0000-0000-00000000000a';
 CREATE TEMP TABLE rd AS SELECT public.get_contributor_intake('10000000-0000-0000-0000-000000000001') AS g;
@@ -282,10 +306,15 @@ SELECT pg_temp.ok('the read has the invites with visits and no token hash', json
   AND g::text NOT LIKE '%token_hash%' AND jsonb_array_length(g #> '{invites,0,visits}') >= 4) FROM rd;
 SELECT pg_temp.ok('the read has both answers with attestation', jsonb_array_length(g -> 'answers') = 2
   AND g #>> '{answers,0,device_attestation,platform}' = 'iOS' AND jsonb_array_length(g -> 'visits') >= 4) FROM rd;
-SELECT pg_temp.ok('the read has the uploads with their contributor', jsonb_array_length(g -> 'uploads') = 2
+SELECT pg_temp.ok('the read never returns an object URL for a sensitive row', NOT EXISTS (
+    SELECT 1 FROM jsonb_array_elements(g -> 'uploads') x WHERE (x ->> 'is_sensitive')::boolean AND x ->> 'image_url' IS NOT NULL)
+  AND EXISTS (SELECT 1 FROM jsonb_array_elements(g -> 'uploads') x WHERE x ->> 'bucket' = 'ownership-documents'
+    AND x ->> 'storage_path' LIKE 'ownership-documents/%')
+  AND g::text NOT LIKE '%should-not-be-kept%') FROM rd;
+SELECT pg_temp.ok('the read has the uploads with their contributor', jsonb_array_length(g -> 'uploads') = 4
   AND g #>> '{uploads,0,contributor_id}' = inv.r ->> 'contributor_id') FROM rd, inv;
 RESET test.auth_uid;
 SELECT pg_temp.ok('the reopened card counts documents and shows the answer',
-  ((public.contributor_intake_open(inv.r ->> 'token', dev.d)) ->> 'documents_count')::int = 2
+  ((public.contributor_intake_open(inv.r ->> 'token', dev.d)) ->> 'documents_count')::int = 4
   AND (public.contributor_intake_open(inv.r ->> 'token', dev.d)) #>> '{questions,0,answer}' = 'Built it in 2018, not 2019.')
   FROM inv, dev;
