@@ -4,16 +4,21 @@ import { createRoot, type Root } from 'react-dom/client';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
-const fixture = vi.hoisted(() => ({ rows: {} as Record<string, any[]>, fail: '', calls: [] as any[], hold: null as Promise<void> | null }));
+const fixture = vi.hoisted(() => ({ rows: {} as Record<string, any[]>, fail: '', forbiddenVehicleColumns: [] as string[], calls: [] as any[], hold: null as Promise<void> | null }));
 vi.mock('../lib/supabase', () => ({ supabase: {
   auth: { getUser: async () => ({ data: { user: { id: 'user' } } }) },
   from: (table: string) => {
     let rows = fixture.rows[table] ?? [];
+    let denied = false;
     const q: any = { then: (fn: any) => Promise.resolve(fixture.hold).then(() => ({
-      data: table === fixture.fail ? null : rows,
-      error: table === fixture.fail ? { message: 'unavailable' } : null,
+      data: table === fixture.fail || denied ? null : rows,
+      error: table === fixture.fail || denied ? { message: 'permission denied' } : null,
     })).then(fn) };
-    q.select = (...args: any[]) => { fixture.calls.push([table, 'select', ...args]); return q; };
+    q.select = (...args: any[]) => {
+      fixture.calls.push([table, 'select', ...args]);
+      denied = table === 'vehicles' && args[0].split(',').some((column: string) => fixture.forbiddenVehicleColumns.includes(column.trim()));
+      return q;
+    };
     q.eq = (key: string, value: any) => { rows = rows.filter(r => r[key] === value); return q; };
     q.in = (key: string, values: any[]) => { rows = rows.filter(r => values.includes(r[key])); return q; };
     return q;
@@ -81,7 +86,7 @@ function Harness({ viewer = 'user' }: { viewer?: string | null }) {
 }
 beforeEach(() => {
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
-  fixture.rows = {}; fixture.fail = ''; fixture.calls = []; fixture.hold = null; snapshots.length = 0;
+  fixture.rows = {}; fixture.fail = ''; fixture.forbiddenVehicleColumns = []; fixture.calls = []; fixture.hold = null; snapshots.length = 0;
   container = document.createElement('div'); document.body.appendChild(container); root = createRoot(container);
 });
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); });
@@ -298,4 +303,13 @@ it('names real vehicle destinations and omits unsupported relationship and drag 
     if (viewMode !== 'COMPACT') expect(container.querySelector('.garage-card-open')?.textContent).toBe('View vehicle');
   }
   expect(fixture.calls.some(call => ['upsert','insert','update'].includes(call[1]))).toBe(false);
+});
+
+it('loads the garage when direct purchase-price reads are denied', async () => {
+  seedGarage(); fixture.forbiddenVehicleColumns = ['purchase_price'];
+  await act(async () => root.render(<Harness />));
+  expect(state.error).toBeNull();
+  expect(state.vehicles).toHaveLength(2);
+  expect(state.vehicles.every(vehicle => vehicle.purchase_price === null)).toBe(true);
+  expect(state.vehicles[0].estimated_value).toBe(12000);
 });
