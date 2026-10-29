@@ -51,6 +51,8 @@
 .ct-ladder__rung { margin: 0; }
 .ct-ladder__counts { margin: 0; }
 .ct-next { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+.ct-rung__name { display: grid; gap: 2px; min-width: 0; }
+.ct-rung__class, .ct-ladder__classes, .ct-derivation__asof { margin: 0; opacity: 0.8; }
 .ct-derivation { min-width: 0; }
 .ct-derivation summary { cursor: pointer; list-style: none; min-height: 24px; display: flex; align-items: center; gap: 4px; }
 .ct-derivation summary::before { content: "▸"; font-size: 10px; color: var(--accent); }
