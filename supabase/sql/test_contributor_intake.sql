@@ -90,12 +90,31 @@ CREATE TABLE public.device_attributions (id uuid PRIMARY KEY DEFAULT gen_random_
 \ir helpers/device_attribution_live_20261014.sql
 CREATE TRIGGER trg_auto_attribute_device AFTER INSERT ON public.vehicle_images
   FOR EACH ROW EXECUTE FUNCTION public.auto_attribute_image_to_device();
+CREATE TABLE public.user_notifications (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), user_id uuid NOT NULL,
+  type text NOT NULL, notification_type text, title text NOT NULL, message text, vehicle_id uuid, image_id uuid,
+  organization_id uuid, from_user_id uuid, action_url text, metadata jsonb DEFAULT '{}'::jsonb,
+  created_at timestamptz NOT NULL DEFAULT now());
+CREATE FUNCTION public.create_notification(p_user_id uuid, p_type text, p_title text, p_message text,
+  p_vehicle_id uuid DEFAULT NULL, p_related_user_id uuid DEFAULT NULL, p_metadata jsonb DEFAULT '{}'::jsonb,
+  p_priority integer DEFAULT 1) RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public' AS $$
+DECLARE v_id uuid;
+BEGIN
+  INSERT INTO public.user_notifications (user_id, type, notification_type, title, message, vehicle_id, action_url, metadata)
+  VALUES (p_user_id, p_type, p_type, p_title, p_message, p_vehicle_id, nullif(btrim(p_metadata ->> 'action_url'), ''),
+    p_metadata || jsonb_build_object('priority', p_priority)) RETURNING id INTO v_id;
+  RETURN v_id;
+END $$;
 GRANT USAGE ON SCHEMA public, auth TO anon, authenticated, service_role;
 
 \ir ../migrations/20261105090000_contributor_intake.sql
 \ir ../migrations/20261105090000_contributor_intake.sql
 \ir ../migrations/20261105110000_contributor_intake_actor.sql
 \ir ../migrations/20261105110000_contributor_intake_actor.sql
+INSERT INTO auth.users VALUES ('0b9f107a-d124-49de-9ded-94698f63c1c4');
+INSERT INTO public.vehicles (id, user_id, year, make, model, vin, color) VALUES
+  ('20d21fb0-4651-4469-a0ba-e751309a1e54', '0b9f107a-d124-49de-9ded-94698f63c1c4', 1973, 'Pontiac', 'Firebird', '2S87D3N143591', 'red');
+\ir ../migrations/20261105120000_contributor_intake_ladder.sql
+\ir ../migrations/20261105120000_contributor_intake_ladder.sql
 
 -- Fixtures: an owner, an editor, a stranger, one vehicle with one prior specification fact.
 INSERT INTO auth.users VALUES ('00000000-0000-0000-0000-00000000000a'), ('00000000-0000-0000-0000-00000000000b'),
@@ -358,3 +377,103 @@ SELECT pg_temp.ok('a signed-in stranger cannot borrow the owner through acting-a
   $q$SELECT public.get_contributor_intake('10000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-00000000000a')$q$));
 RESET test.auth_uid;
 RESET request.jwt.claims;
+
+-- The evidence ladder (20261105120000): rungs and items are data; every input marks its item, logs the move,
+-- queues a re-evaluation and tells the owner; the readers carry the block.
+RESET test.auth_uid;
+RESET request.jwt.claims;
+SELECT pg_temp.ok('ladder internals are closed to anon and authenticated', NOT has_function_privilege('anon', f, 'EXECUTE')
+    AND NOT has_function_privilege('authenticated', f, 'EXECUTE'))
+  FROM unnest(ARRAY['public.contributor_intake_progress_for(uuid)',
+    'public.contributor_intake_after_input(public.vehicle_contributor_invites,text,uuid,text,text)',
+    'public.claim_contributor_intake_reevaluation(integer)', 'public.finish_contributor_intake_reevaluation(uuid,boolean,jsonb)']) f;
+SELECT pg_temp.ok('the ladder tables are closed to anon and authenticated', NOT has_table_privilege('anon', t, 'SELECT')
+    AND NOT has_table_privilege('authenticated', t, 'SELECT'))
+  FROM unnest(ARRAY['public.vehicle_evidence_rungs', 'public.vehicle_evidence_items', 'public.vehicle_evidence_changes',
+    'public.contributor_intake_reevaluations']) t;
+SELECT pg_temp.ok('the owner read of progress is executable by authenticated and the service role',
+  has_function_privilege('authenticated', 'public.contributor_intake_progress(uuid,uuid)', 'EXECUTE')
+  AND has_function_privilege('service_role', 'public.contributor_intake_progress(uuid,uuid)', 'EXECUTE'));
+SELECT pg_temp.ok('the Firebird seed landed once: 3 rungs, 32 items, 3 contradicted',
+  (SELECT count(*) FROM public.vehicle_evidence_rungs WHERE vehicle_id = '20d21fb0-4651-4469-a0ba-e751309a1e54') = 3
+  AND (SELECT count(*) FROM public.vehicle_evidence_items WHERE vehicle_id = '20d21fb0-4651-4469-a0ba-e751309a1e54') = 32
+  AND (SELECT count(*) FROM public.vehicle_evidence_items WHERE vehicle_id = '20d21fb0-4651-4469-a0ba-e751309a1e54' AND status = 'contradicted') = 3);
+SELECT pg_temp.ok('every rung requirement names a seeded item', NOT EXISTS (
+  SELECT 1 FROM public.vehicle_evidence_rungs g, jsonb_array_elements_text(g.requirements) x
+   WHERE g.vehicle_id = '20d21fb0-4651-4469-a0ba-e751309a1e54'
+     AND NOT EXISTS (SELECT 1 FROM public.vehicle_evidence_items i WHERE i.vehicle_id = g.vehicle_id AND i.key = x)));
+SET test.auth_uid = '00000000-0000-0000-0000-00000000000c';
+SELECT pg_temp.ok('a stranger cannot read progress', pg_temp.raises(
+  $q$SELECT public.contributor_intake_progress('20d21fb0-4651-4469-a0ba-e751309a1e54')$q$));
+SET test.auth_uid = '0b9f107a-d124-49de-9ded-94698f63c1c4';
+CREATE TEMP TABLE prog0 AS SELECT public.contributor_intake_progress('20d21fb0-4651-4469-a0ba-e751309a1e54') AS g;
+GRANT ALL ON prog0 TO PUBLIC;
+SELECT pg_temp.ok('the car stands on the baseline rung with its band and basis', g #>> '{rung,key}' = 'as_photographed'
+  AND (g #>> '{rung,band_low}')::int = 35000 AND (g #>> '{rung,band_high}')::int = 45000
+  AND length(g #>> '{rung,basis}') > 40 AND jsonb_array_length(g -> 'rungs') = 3
+  AND (g #>> '{rungs,0,standing}')::boolean AND NOT (g #>> '{rungs,1,reached}')::boolean) FROM prog0;
+SELECT pg_temp.ok('next names three open items for the next rung, with the question key where it is a question',
+  jsonb_array_length(g -> 'next') = 3 AND g #>> '{next,0,for_rung}' = 'numbers_photographed'
+  AND EXISTS (SELECT 1 FROM jsonb_array_elements(g -> 'next') x WHERE x ->> 'kind' = 'question' AND x ->> 'question_key' IS NOT NULL)
+     = EXISTS (SELECT 1 FROM jsonb_array_elements(g -> 'next') x WHERE x ->> 'kind' = 'question')) FROM prog0;
+SELECT pg_temp.ok('no change yet', g -> 'last_change' = 'null'::jsonb AND (g #>> '{counts,open}')::int = 29) FROM prog0;
+CREATE TEMP TABLE finv AS SELECT public.create_contributor_invite('20d21fb0-4651-4469-a0ba-e751309a1e54', 'Sam', 'builder') AS r;
+GRANT ALL ON finv TO PUBLIC;
+SELECT public.set_contributor_intake_questions('20d21fb0-4651-4469-a0ba-e751309a1e54',
+  '[{"key":"q1","prompt":"The block"},{"key":"q6","prompt":"Who and when"}]');
+RESET test.auth_uid;
+CREATE TEMP TABLE fopen AS SELECT public.contributor_intake_open(r ->> 'token', dev.d) AS c FROM finv, dev;
+GRANT ALL ON fopen TO PUBLIC;
+SELECT pg_temp.ok('the opened card carries progress', c #>> '{progress,rung,key}' = 'as_photographed'
+  AND jsonb_array_length(c #> '{progress,rungs}') = 3) FROM fopen;
+CREATE TEMP TABLE fans AS SELECT public.contributor_intake_answer(finv.r ->> 'token', 'q1',
+  'Out of a 1970 Bonneville, bored .030, two-bolt.', dev.d) AS a FROM finv, dev;
+GRANT ALL ON fans TO PUBLIC;
+SELECT pg_temp.ok('the answer reply carries progress with q1 proven', (a ->> 'ok')::boolean
+  AND (a #>> '{progress,counts,proven}')::int = 1 AND a #>> '{progress,last_change,what}' = 'q1'
+  AND a #>> '{progress,last_change,moved_from}' = 'as_photographed' AND a #>> '{progress,last_change,moved_to}' = 'as_photographed') FROM fans;
+SELECT pg_temp.ok('the item points at the observation that proved it', (SELECT status = 'proven' AND proof_kind = 'observation'
+    AND proof_ref = (fans.a ->> 'observation_id')::uuid FROM public.vehicle_evidence_items
+   WHERE vehicle_id = '20d21fb0-4651-4469-a0ba-e751309a1e54' AND key = 'q1')) FROM fans;
+SELECT pg_temp.ok('the move is logged', (SELECT count(*) FROM public.vehicle_evidence_changes
+  WHERE vehicle_id = '20d21fb0-4651-4469-a0ba-e751309a1e54' AND item_key = 'q1' AND to_status = 'proven') = 1);
+SELECT pg_temp.ok('a re-evaluation is queued once for the observation', (SELECT count(*) FROM public.contributor_intake_reevaluations
+  WHERE observation_id = (fans.a ->> 'observation_id')::uuid AND status = 'queued') = 1) FROM fans;
+SELECT pg_temp.ok('the owner was told, with the invite and item in the metadata', (SELECT count(*) FROM public.user_notifications
+  WHERE user_id = '0b9f107a-d124-49de-9ded-94698f63c1c4' AND type = 'contributor_intake_progress'
+    AND metadata ->> 'item_key' = 'q1' AND metadata ->> 'invite_id' = finv.r ->> 'invite_id'
+    AND action_url = '/vehicle/20d21fb0-4651-4469-a0ba-e751309a1e54' AND title LIKE 'Sam answered%') = 1) FROM finv;
+CREATE TEMP TABLE fans2 AS SELECT public.contributor_intake_answer(finv.r ->> 'token', 'q1',
+  'Out of a 1970 Bonneville, bored .030, four-bolt actually.', dev.d) AS a FROM finv, dev;
+SELECT pg_temp.ok('a changed answer does not re-prove or re-queue the item', (SELECT count(*) FROM public.vehicle_evidence_changes
+  WHERE vehicle_id = '20d21fb0-4651-4469-a0ba-e751309a1e54' AND item_key = 'q1') = 1
+  AND (SELECT count(*) FROM public.contributor_intake_reevaluations WHERE vehicle_id = '20d21fb0-4651-4469-a0ba-e751309a1e54') = 2);
+CREATE TEMP TABLE ffile AS SELECT jsonb_build_object('storage_path', 'contributors/' || (finv.r ->> 'invite_id') || '/' || repeat('c', 64) || '/pad.jpg',
+  'file_name', 'pad.jpg', 'mime_type', 'image/jpeg', 'size_bytes', 1000, 'sha256', repeat('c', 64),
+  'image_url', 'https://example.test/pad.jpg', 'device', dev.d, 'label', 'Engine pad stamp') AS p FROM finv, dev;
+GRANT ALL ON ffile TO PUBLIC;
+CREATE TEMP TABLE fup AS SELECT public.contributor_intake_file(finv.r ->> 'token', ffile.p) AS u FROM finv, ffile;
+GRANT ALL ON fup TO PUBLIC;
+SELECT pg_temp.ok('an upload labelled with a shot proves that item and carries progress', (u ->> 'ok')::boolean
+  AND (u #>> '{progress,counts,proven}')::int = 2 AND u #>> '{progress,last_change,what}' = 'shot_pad_stamp'
+  AND (SELECT proof_kind = 'image' AND proof_ref = (fup.u ->> 'image_id')::uuid FROM public.vehicle_evidence_items
+       WHERE vehicle_id = '20d21fb0-4651-4469-a0ba-e751309a1e54' AND key = 'shot_pad_stamp')) FROM fup;
+SELECT pg_temp.ok('the upload is queued once for the image', (SELECT count(*) FROM public.contributor_intake_reevaluations
+  WHERE image_id = (fup.u ->> 'image_id')::uuid) = 1) FROM fup;
+SELECT pg_temp.ok('a duplicate upload queues nothing more', (public.contributor_intake_file(finv.r ->> 'token', ffile.p) -> 'duplicate')::boolean
+  AND (SELECT count(*) FROM public.contributor_intake_reevaluations WHERE vehicle_id = '20d21fb0-4651-4469-a0ba-e751309a1e54') = 3) FROM finv, ffile;
+SET request.jwt.claims = '{"role":"service_role"}';
+SELECT pg_temp.ok('the owner read carries the same progress', (public.get_contributor_intake('20d21fb0-4651-4469-a0ba-e751309a1e54',
+  '0b9f107a-d124-49de-9ded-94698f63c1c4') #>> '{progress,counts,proven}')::int = 2);
+RESET request.jwt.claims;
+CREATE TEMP TABLE claimed AS SELECT public.claim_contributor_intake_reevaluation(2) AS r;
+GRANT ALL ON claimed TO PUBLIC;
+SELECT pg_temp.ok('the agent claims the two oldest queued rows (earlier fixture inputs queued too)', jsonb_array_length(r) = 2
+  AND (SELECT count(*) FROM public.contributor_intake_reevaluations WHERE status = 'claimed') = 2
+  AND (SELECT count(*) FROM public.contributor_intake_reevaluations WHERE status = 'queued') > 0
+  AND (r #>> '{0,created_at}')::timestamptz <= (SELECT min(created_at) FROM public.contributor_intake_reevaluations WHERE status = 'queued')) FROM claimed;
+SELECT pg_temp.ok('finishing a claimed row closes it; an unclaimed one is left alone',
+  (public.finish_contributor_intake_reevaluation((r #>> '{0,id}')::uuid, true, '{"round_two": 1}') ->> 'status') = 'done'
+  AND (public.finish_contributor_intake_reevaluation((SELECT id FROM public.contributor_intake_reevaluations WHERE status = 'queued' LIMIT 1), true) ->> 'status') IS NULL) FROM claimed;
+SELECT pg_temp.ok('the plain-vehicle writers still work with no ladder rows', (SELECT (a ->> 'ok')::boolean AND a -> 'progress' -> 'rung' = 'null'::jsonb
+  AND jsonb_array_length(a #> '{progress,rungs}') = 0 FROM ans));
