@@ -1,0 +1,22 @@
+/* /contribute/:token — layout only; type comes from the kit, controls from jobs.css and job-page.css. */
+.ct-page { max-width: 720px; padding-bottom: 48px; }
+.ct-card { border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 12px 16px; margin-top: 12px; background: var(--surface); }
+.ct-facts { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 6px; }
+.ct-fact { display: grid; grid-template-columns: 18px 1fr; gap: 8px; align-items: baseline; }
+.ct-fact--proven .ct-fact__mark { color: var(--success, var(--text)); }
+.ct-fact--open .ct-fact__mark { color: var(--warning-dark, var(--text)); }
+.ct-step { display: grid; gap: 8px; margin-top: 28px; }
+.ct-step h2, .ct-step p { margin: 0; }
+.ct-n { color: var(--accent); font-variant-numeric: tabular-nums; margin-right: 6px; }
+.ct-hidden { display: none; }
+.ct-tiles { list-style: none; margin: 4px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; }
+.ct-tile { display: grid; gap: 4px; justify-items: start; min-width: 0; }
+.ct-tile__img { width: 100%; height: auto; aspect-ratio: 1; object-fit: cover; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-hover, var(--surface)); display: grid; place-items: center; }
+.ct-questions { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.ct-q { display: grid; gap: 6px; padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); }
+.ct-textarea { min-height: 112px; resize: vertical; border-radius: var(--radius); padding: 10px; }
+.ct-save { min-height: 20px; }
+.ct-details { border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 12px 14px; }
+.ct-details summary { min-height: 44px; display: flex; align-items: center; }
+.ct-footer { margin-top: 28px; padding-top: 12px; border-top: 1px solid var(--border); }
+.ct-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
