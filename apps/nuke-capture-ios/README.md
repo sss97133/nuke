@@ -71,6 +71,12 @@ Standing rules the code carries:
   camera reuses. A pass reads no original for an asset it already settled (`SyncEngine.processAsset`, by
   `localIdentifier`), gives each asset three attempts before it stops holding the watermark or the queue, and
   stops on a refused session (`SupabaseService.isAuthFailure`) instead of failing every remaining photo.
+- **A capture session is the identity context; an album is not.** Owner direction, 2026-10-28 (case ledger §17): the make
+  and year a classic serial needs come from the session itself, in order of strength: a title or registration document read in
+  the same session, a cowl or trim tag (`BODY BY FISHER` + `ST73 2FS87` decodes model year, make and series), a make badge
+  read on a vehicle-classified frame. A VIN-plate read plus any one of these makes the profile; a tag without a plate makes a
+  private candidate profile and the owner's next notification asks for the one missing frame. The day receipt treats a gap
+  of more than an hour between bursts as a question with one tap, whose answer is an owner-testimony work session.
 - **Photos file to the owner's vehicles; strong evidence makes a profile.** Owner direction, 2026-10-15: "the app
   after vision run is supposed to assign the vehicle to a profile under the image owners associated vehicle profiles,
   its supposed to create new profiles if theres enough data to support it." `AttributionEngine.run` files an uploaded

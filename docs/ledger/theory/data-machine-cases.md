@@ -3322,3 +3322,124 @@ specific records live in the books by id, not here):
 - A spouse-owned foreign company: calendar tax year (IRC 898); a provision reversal is not US-rules income; the company's
   information return must match the inclusion on the joint return.
 - Residency: photo GPS + face presence by day -> credit residency tests per year.
+
+## 17. A vehicle arrives at the shop: what the system builds on its own (owner, 2026-10-28)
+
+**Owner, 2026-10-28 (in substance):** "I plugged in my phone, it has a bunch of photos of the 1973 Pontiac Trans Am clone.
+I'm supposed to go to bringatrailer.com, sign in and submit the vehicle for auction. The app is supposed to make me a new
+profile as it builds and send me notifications like 'your new vehicle profile', depending on the type of relationship. It
+should be able to look at what I did today and make a work receipt. I didn't document the one step of cutting and polishing
+that I did for about 2-4 hours mid day. I want the app to understand what it's supposed to build, and an automation to
+Bring a Trailer. Do the Nuke profile first; the data plate, the VIN plate and the title are in the photos."
+
+### The case that produced this
+
+A red 1973 Firebird with a Trans Am hood, "SD-455" decals and shaker, on the lift at the Boulder City shop
+(GPS at the registered shop). 230 photos on 2026-10-28 in three bursts:
+
+| burst (PT) | frames | what the frames show (Photos labels) |
+|---|---|---|
+| 10:00-10:24 | 170 | engine bay, exhaust, tires and wheels, underside, cowl tag |
+| 10:54-11:23 | 11 | exterior with people |
+| 11:23-15:44 | 0 | the gap: the owner's undocumented cutting and polishing, 2-4 h |
+| 15:44-15:58 | 49 | interior, seats, dashboard, trunk, bumpers: the after-polish set |
+
+Read off the frames (local Vision OCR of the exported originals, filenames in the owner's library):
+- Cowl tag: `ST73 2FS87 N 189504 BDY · TR 232 A51 · 75 75 PNT · 07C`. 2FS87 = 1973 Firebird base coupe
+  (a Trans Am is 2FV87), Norwood, Fisher body 189504, trim 232 (black), paint 75 (Buccaneer Red), built 3rd week of July.
+  The clone claim is proven by the plate, not by the owner.
+- Decals: SD-455; PONTIAC badge; "TRANS AM".
+- Parts with legible labels: Uremco 14-4164 remanufactured (dated 9/9/24), AC A366C air filter, battery (Ozark), FR70-15
+  radials, jack stowage card.
+- Not found in the library (Aug 20 - Oct 28, every document-labelled frame OCR'd): the VIN plate and the title. The
+  owner says they were taken; they are not in iCloud Photos as of 17:30 PT. A 1973 VIN is 13 characters (2S87R3N1xxxxx).
+
+**What stopped the machine on this day.** At 15:49 PT Supabase restricted the organization (storage 763.69 GB of 110 GB,
+spend cap on). Every API request is dropped: the iOS relay (402), the web, the MCP. The last relayed photos landed at
+22:43 PT on 10-27. Nothing below can run until the owner lifts the cap; the database itself answers on the pooler.
+
+### The chain the system owns (nothing in it is typed by the owner)
+
+```
+phone camera ─▶ iOS relay (GPS at the registered shop) ─▶ vehicle_images (capture_relay_ios, user_id = owner)
+   ─▶ on-device identity read (OCR: VIN/serial, cowl tag, badges, documents) + server vision gate
+   ─▶ device_create_vehicle_profile  (basis capture_session: serial + make from capture evidence)
+   ─▶ attribute_testimony files every frame of the session on the profile
+   ─▶ derive_work_sessions (one per capture day) + gap testimony (owner statement, one tap)
+   ─▶ get_user_day_receipt (photos, sessions, parts, money)  ─▶ user_notifications
+   ─▶ generate-listing-package ─▶ dispatchChannel('bring_a_trailer') ─▶ listing_exports job browser_submit
+   ─▶ Chrome worker fills the BaT form under the owner's session, stops at the owner's two keys
+```
+
+### 1. Identity from capture evidence, not from an album
+`device_create_vehicle_profile(basis = 'capture_session')` already accepts an 8-17 character serial, but for a classic
+serial it needs `make` and takes it only from an album label (`AttributionEngine` line 301; line 876 refuses a classic
+serial group when `contextualMake` is nil). Albums are test labels, not product logic (owner, 10-20). The make and year
+must come from the capture session itself, in this order of strength:
+1. a title or registration document in the same session (OCR: year, make, VIN) — a document cannot file a photo by
+   itself, but it can supply the namespace for a plate read;
+2. a cowl/trim tag (`BODY BY FISHER` + `ST73 2FS87`: model year and body series decode the make and series);
+3. a make badge or wordmark read on a vehicle-classified frame (`PONTIAC` on the nose).
+A VIN-plate read plus any one of these creates the profile. A cowl tag without a VIN plate creates a **candidate**
+profile (private, status `needs_identifier`) so the day's work still files somewhere, and the owner's next notification
+asks for the one missing frame instead of a form.
+
+### 2. Relationship decides the words
+The profile writer records the owner as photographer; the relationship (owner, steward for a client, shop technician,
+consignor) comes from the GPS org tag and the owner's roster. The notification copy follows it:
+"Your new vehicle profile: 1973 Pontiac Firebird (Trans Am clone)" for the owner; "New vehicle at <shop>: ..." for a
+technician; "Client vehicle profile ..." for a steward. The row goes to `user_notifications` with `vehicle_id`,
+`image_id` (the anchor frame) and `action_url` = the profile. Today `user_notifications` has had 0 rows in 60 days: the
+21 insert sites in migrations are never reached by the capture chain.
+
+### 3. The day is the unit; the gap is testimony
+`derive_work_sessions` makes one session per capture day from the frames. A gap of more than an hour between bursts on
+a day the owner was at the shop is a question, not nothing: the day receipt shows the gap ("11:23-15:44, no photos") and
+offers one tap: "I was working on this car: ____ (what) ____ (hours)". The answer lands as a `work_sessions` row with
+`session_type = 'owner_testimony'`, `intent_source = 'owner'`, start/end = the gap, and the stated hours; it is on the
+proven rung (a Sign), the photo sessions on the attributed rung. The receipt (`get_user_day_receipt`,
+`TechnicianDayReceipt`) is then complete for 2026-10-28: 230 frames, 3 photo sessions, 1 testimony session.
+
+### 4. The listing package reads the profile; the worker reads the package
+`mapToBatSubmission` carries decode/observe/deliberate/sign tiers. The BaT form for a 1973 Pontiac Firebird (read from
+the live form on 10-28, 180 inputs, Pontiac-specific branch) wants, in order:
+
+| BaT question | tier | from |
+|---|---|---|
+| year, make, model (Firebird / Firebird Formula / Firebird Trans Am) | decode | profile; a clone is listed as the body series on the tag (Firebird), the clone named in the title |
+| country, city, postal code | decode | shop location of the session |
+| listed elsewhere? / listed on BaT before? / dealer? / consignment? | sign | owner |
+| VIN | decode | VIN plate read (missing today) |
+| race car or street? | observe | registration document |
+| engine (350ci V8 / 400ci V8 / Other) | observe | block casting / owner |
+| transmission | observe | frames (console shifter) / owner |
+| exterior color (Pontiac code list; 75 = Buccaneer Red) | decode | cowl tag PNT 75 |
+| interior color (code list; 232 = black) | decode | cowl tag TR 232 |
+| wheels (honeycomb / Rally II / other), tires brand, size | observe | frames (FR70-15 radials read) |
+| how titled / registered, name on title, state, title status | sign | title document |
+| year purchased, odometer, accurate?, miles added | sign | title + owner |
+| refurbished? year, details; paint/body history; accidents; rust | deliberate | work sessions + owner |
+| equipment checklist (Safe-T-Track, Ram Air hood, hood decal, console, tach, A/C, radio...) | observe | frames |
+| modifications (exhaust/intake, from stock) and the list | deliberate | frames + sessions (SD-455 decals, shaker, exhaust) |
+| history from new; services performed and when | deliberate | sessions + receipts (Uremco 9/9/24 part) |
+| documents (window sticker, PHS, manual, records, spares) | sign | owner |
+| issues / problems; anything else | deliberate | owner |
+| reserve? amount; document fee | sign | owner (final_approval key) |
+| two attestation checkboxes | sign | owner (ownership_attestation key) |
+| photos (up to 600) | decode | the session's frames, newest set first |
+
+The worker (`metadata.job.kind = 'browser_submit'`, `platform = 'bat'`) runs in the owner's Chrome session, fills every
+decode/observe/deliberate field, uploads the frames, and stops before "Finish" with the sign-tier fields shown as the
+owner's taps. BaT autosaves the draft under My Listings ("Resume submission"), so a stopped run is resumable. The
+submission is recorded back on `listing_exports` (`submitted_at`, `external_listing_id` from the photos URL BaT mails).
+
+### Acceptance (the 10-28 Trans Am is the test)
+1. Relay the 230 frames of 10-28 once the API is back: 230 rows, `source = capture_relay_ios`, GPS at the shop.
+2. With the VIN-plate frame added, one profile exists for the 13-character serial, make Pontiac, year 1973, with the
+   cowl tag decoded (series 2FS87, paint 75, trim 232) and all 230+ frames filed on it; without the VIN frame, a
+   candidate profile and a notification asking for that one frame.
+3. One `user_notifications` row "Your new vehicle profile" to the owner, linking the profile.
+4. `get_user_day_receipt(owner, 2026-10-28)` returns 3 derived sessions and, after one tap, the owner's cutting and
+   polishing session for the 11:23-15:44 gap.
+5. `generate-listing-package` + `dispatchChannel('bring_a_trailer')` produce a `listing_exports` row whose field map
+   covers every decode/observe row in the table above; the worker fills the live BaT form to the reserve step and stops.
