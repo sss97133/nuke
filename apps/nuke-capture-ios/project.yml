@@ -128,6 +128,7 @@ targets:
         BGTaskSchedulerPermittedIdentifiers:
           - ag.nuke.capture.refresh
           - ag.nuke.capture.backfill
+          - ag.nuke.capture.recent
         # App makes HTTPS-only calls (Supabase) → exempt from export
         # compliance docs; answering here skips the question on every upload.
         ITSAppUsesNonExemptEncryption: false
