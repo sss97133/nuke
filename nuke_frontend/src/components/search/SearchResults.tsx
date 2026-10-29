@@ -1,10 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import type { FeedItem } from '../feed/types';
 import ContentCard from '../feed/ContentCard';
 import VehicleCardDense from '../vehicles/VehicleCardDense';
 import {
-  HeaderSearchFacetPills,
   boostAndFilterVehicleSearchResults,
 } from '../HeaderSearch';
 import { highlightSearchTerm } from '../../utils/searchHighlight';
@@ -38,9 +37,11 @@ interface SearchResultsProps {
   onLoadMore?: () => void;
   loadingMore?: boolean;
   loadMoreError?: string | null;
+  filterControls?: ReactNode;
+  filterPanel?: ReactNode;
 }
 
-const SearchResults = ({ results, searchSummary, loading = false, activeFilter, onFilterChange, totalCount, hasMore, paginationLimited, onLoadMore, loadingMore, loadMoreError }: SearchResultsProps) => {
+const SearchResults = ({ results, searchSummary, loading = false, activeFilter, onFilterChange, totalCount, hasMore, paginationLimited, onLoadMore, loadingMore, loadMoreError, filterControls, filterPanel }: SearchResultsProps) => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { recordView } = useViewHistory();
@@ -258,32 +259,11 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
   return (
     <div className="search-results" style={{ padding: '0' }}>
       {/* Search Summary header — only show if we have results or a summary message */}
-      {(results.length > 0 || searchSummary) && (
-        <div style={{
-          background: 'var(--surface)',
-          border: '2px solid var(--text)', padding: '10px 14px',
-          marginBottom: '12px'
-        }}>
+      {((results.length === 0 && searchSummary) || Object.keys(typeCounts).length > 1 || (filterBy !== 'all' && !typeCounts[filterBy])) && (
+        <div className="search-results-summary">
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
             {/* Left: result count + summary */}
             <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', flexWrap: 'wrap' }}>
-              {results.length > 0 && (
-                <span style={{ fontSize: '13px', fontWeight: 800, color: 'var(--text)' }}>
-                  {filteredAndSortedResults.length}
-                </span>
-              )}
-              {results.length > 0 && totalCount && totalCount > results.length && filterBy === 'all' && (
-                <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>of {totalCount.toLocaleString()}</span>
-              )}
-              {results.length > 0 && filterBy !== 'all' && (
-                <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>of {results.length}</span>
-              )}
-              {results.length > 0 && (
-                <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 600 }}>
-                  {filterBy === 'all' ? 'results' : (typeLabels[filterBy] || filterBy).toLowerCase()}
-                  {searchQuery ? ` for "${searchQuery}"` : ''}
-                </span>
-              )}
               {results.length === 0 && searchSummary && (
                 <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{searchSummary}</span>
               )}
@@ -293,14 +273,10 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
             {results.length > 0 && (
               <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
                 {filterBy !== 'all' && (
-                  <button
+                  <button type="button" className="search-result-control"
                     style={{
                       padding: '3px 8px',
-                      fontSize: '7.5pt',
                       fontWeight: 700,
-                      border: '2px solid var(--text)',
-                      background: 'var(--text)',
-                      color: 'var(--bg)',
                       cursor: 'pointer',
                     }}
                     onClick={() => setFilterBy('all')}
@@ -313,33 +289,19 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
                   if (count === 0) return null;
                   const isActive = filterBy === type;
                   return (
-                    <button
+                    <button type="button" className="search-result-control"
                       key={type}
+                      aria-pressed={isActive}
                       style={{
                         display: 'flex',
                         alignItems: 'center',
                         gap: '4px',
-                        background: isActive ? 'var(--text)' : 'var(--surface)',
-                        border: `2px solid ${isActive ? 'var(--text)' : 'var(--border)'}`,
-                        padding: '3px 8px', fontSize: '7.5pt',
+                        padding: '3px 8px',
                         fontWeight: 700,
-                        color: isActive ? 'var(--bg)' : 'var(--text)',
                         cursor: 'pointer',
                         transition: 'all 180ms cubic-bezier(0.16, 1, 0.3, 1)',
                       }}
                       onClick={() => { setFilterBy(type); setViewMode('cards'); }}
-                      onMouseEnter={(e) => {
-                        if (!isActive) {
-                          e.currentTarget.style.borderColor = 'var(--text)';
-                          e.currentTarget.style.background = 'var(--bg)';
-                        }
-                      }}
-                      onMouseLeave={(e) => {
-                        if (!isActive) {
-                          e.currentTarget.style.borderColor = 'var(--border)';
-                          e.currentTarget.style.background = 'var(--surface)';
-                        }
-                      }}
                     >
                       <span>{typeLabels[type] || type}</span>
                       <span style={{ opacity: 0.7, fontWeight: 600 }}>{count}</span>
@@ -367,14 +329,11 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
                 Jump into the slice you care about.
               </div>
             </div>
-            <button
+            <button type="button" className="search-result-control"
               onClick={() => setShowBazaar(false)}
               style={{
                 padding: '4px 8px',
-                fontSize: '11px',
                 fontWeight: 700,
-                border: '2px solid var(--text)',
-                background: 'var(--surface)',
                 cursor: 'pointer'
               }}
             >
@@ -396,18 +355,16 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
                       if (count === 0) return null;
                       const isActive = filterBy === type;
                       return (
-                        <button
+                        <button type="button" className="search-result-control"
                           key={type}
+                      aria-pressed={isActive}
                           onClick={() => {
                             setFilterBy(type);
                             setViewMode('cards');
                           }}
                           style={{
                             padding: '3px 6px',
-                            fontSize: '9px',
                             fontWeight: 700,
-                            border: `2px solid ${isActive ? 'var(--accent)' : 'var(--text)'}`,
-                            background: isActive ? 'var(--bg)' : 'var(--surface)',
                             cursor: 'pointer'
                           }}
                         >
@@ -456,47 +413,40 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
       )}
 
       {/* Controls — only show when there are results */}
-      {filteredAndSortedResults.length > 0 && (
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: '16px',
-          flexWrap: 'wrap',
-          gap: '8px',
-        }}>
-          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+      {(filteredAndSortedResults.length > 0 || filterControls) && (
+        <div className="search-results-controls">
+          <div className="search-result-count">
+            <strong>{filteredAndSortedResults.length.toLocaleString()}</strong>
+            {totalCount != null && totalCount > results.length && filterBy === 'all' ? ` of ${totalCount.toLocaleString()}` : ''}
+            {' '}{(filterBy === 'vehicle' || (filterBy === 'all' && Object.keys(typeCounts).length === 1 && typeCounts.vehicle) ? 'vehicle' : 'result') + (filteredAndSortedResults.length === 1 ? '' : 's')}
+          </div>
+          {filterControls}
+          <div className="search-view-toggle" role="group" aria-label="Result view">
             {(['cards', 'list'] as const).map(mode => (
-              <button
+              <button type="button" className="search-result-control"
                 key={mode}
+                aria-pressed={viewMode === mode}
                 onClick={() => setViewMode(mode)}
                 style={{
                   padding: '4px 10px',
-                  fontSize: '7.5pt',
                   fontWeight: 700,
-                  textTransform: 'uppercase',
-                  border: '2px solid var(--text)', background: viewMode === mode ? 'var(--text)' : 'var(--surface)',
-                  color: viewMode === mode ? 'var(--surface)' : 'var(--text)',
                   cursor: 'pointer',
-                  letterSpacing: '0.3px',
                 }}
               >
-                {mode === 'cards' ? 'Grid' : 'List'}
+                <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6">
+                  {mode === 'cards' ? <><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /></> : <><path d="M3 5h18M3 12h18M3 19h18" /></>}
+                </svg><span className="sr-only">{mode === 'cards' ? 'Grid' : 'List'}</span>
               </button>
             ))}
           </div>
 
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
             <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-              <span style={{ fontSize: '7.5pt', fontWeight: 600, color: 'var(--text-secondary)' }}>Sort</span>
-              <select
+              <select className="search-result-control" aria-label="Sort search results"
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as any)}
                 style={{
-                  fontSize: '7.5pt',
                   padding: '3px 6px',
-                  border: '2px solid var(--text)', background: 'var(--surface)',
-                  color: 'var(--text)',
                   fontWeight: 600,
                   cursor: 'pointer',
                 }}
@@ -512,6 +462,7 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
           </div>
         </div>
       )}
+      {filterPanel}
 
       {/* Results */}
       {filteredAndSortedResults.length === 0 ? (
@@ -537,15 +488,11 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
               : 'Try different keywords, check spelling, or search by make and model.'}
           </p>
           {filterBy !== 'all' && (
-            <button
+            <button type="button" className="search-result-control"
               onClick={() => setFilterBy('all')}
               style={{
                 padding: '6px 14px',
-                fontSize: '11px',
                 fontWeight: 700,
-                border: '2px solid var(--text)',
-                background: 'var(--surface)',
-                color: 'var(--text)',
                 cursor: 'pointer',
                 marginBottom: '20px',
               }}
@@ -625,19 +572,9 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
                       showPriceChange={false}
                       showPriceOverlay={true}
                       showDetailOverlay={true}
+                      showGrade={false}
                       infoDense={true}
                       thumbnailFit="contain"
-                    />
-                    <HeaderSearchFacetPills
-                      year={result.metadata?.year}
-                      make={result.metadata?.make}
-                      model={result.metadata?.model}
-                      series={result.metadata?.series}
-                      trim={result.metadata?.trim}
-                      bodyStyle={result.metadata?.body_style}
-                      title={result.title}
-                      subtitle={result.subtitle}
-                      description={result.description}
                     />
                     {/* Deep match snippet — shows WHY this result matched */}
                     {result.metadata?.deep_snippet && (
@@ -904,18 +841,12 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
           justifyContent: 'center',
           padding: '24px 0 12px',
         }}>
-          <button
+          <button type="button" className="search-result-control"
             onClick={onLoadMore}
             disabled={loadingMore}
             style={{
               padding: '10px 32px',
-              fontSize: '11px',
               fontWeight: 700,
-              textTransform: 'uppercase',
-              letterSpacing: '0.5px',
-              border: '2px solid var(--text)',
-              background: loadingMore ? 'var(--surface)' : 'var(--bg)',
-              color: loadingMore ? 'var(--text-secondary)' : 'var(--text)',
               cursor: loadingMore ? 'not-allowed' : 'pointer',
               transition: 'all 180ms cubic-bezier(0.16, 1, 0.3, 1)',
             }}

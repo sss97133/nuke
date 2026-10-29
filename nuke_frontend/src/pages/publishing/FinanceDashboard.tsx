@@ -1,10 +1,13 @@
 import SharedAccountingOriginal from '../../components/finance/SharedAccountingOriginal';
+import PrefetchLink from '../../components/PrefetchLink';
 import AccountingAccess, { type BookGrant } from '../../components/finance/AccountingAccess';
 import { AccountingBookContext, useAccountingBook } from '../../components/finance/AccountingBookContext';
 import { useAccountingRevision } from '../../components/finance/useAccountingRevision';
 import ExpenseUseEditor from '../../components/finance/ExpenseUseEditor';
 import RecordClassifier from '../../components/finance/RecordClassifier';
-import AccountingActivity from '../../components/finance/AccountingActivity';
+import AccountingActivity, { ActivityPasses } from '../../components/finance/AccountingActivity';
+import RecordEvidence from '../../components/finance/RecordEvidence';
+import FinishTaxes, { type Drill } from '../../components/finance/FinishTaxes';
 import { remember, remembered } from '../../components/finance/accountingMemory';
 /**
  * FinanceDashboard
@@ -22,7 +25,7 @@ import { remember, remembered } from '../../components/finance/accountingMemory'
  */
 
 import '../../styles/accounting.css';
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import FinancialSourceReview from '../../components/financial/FinancialSourceReview';
 import FinancialDocumentLines from '../../components/finance/FinancialDocumentLines';
@@ -168,15 +171,64 @@ const humanLabel = (value: string | null | undefined) => {
   if (value?.startsWith('owner_personal_purpose_resolution_')) return 'Owner decision';
   return (value || 'Not recorded').replace(/_/g, ' ').replace(/\b[a-f0-9]{24,}\b/g, '').trim();
 };
-function EvidenceValue({ value, depth = 0 }: { value: unknown; depth?: number }) {
+function EvidenceValue({ value, depth = 0, onOpenDocument }: { value: unknown; depth?: number; onOpenDocument: (id: string) => void }) {
   if (value === null || value === undefined) return <span>Not recorded</span>;
   if (typeof value !== 'object') return <span>{String(value)}</span>;
-  if (Array.isArray(value)) return <span>{value.length} retained entries; open technical details to inspect the complete source structure.</span>;
-  const entries = Object.entries(value as Record<string, unknown>).filter(([key, item]) => item !== null && item !== '' && !/(?:sha256|source_key|local_id|storage_path|run_id|source_reference|auth_context)/.test(key));
-  return <dl className="accounting-evidence-values">{entries.slice(0, 10).map(([key, item]) => <div key={key}><dt>{humanLabel(key)}</dt><dd>{typeof item === 'object' && !Array.isArray(item) && /^(classification|decision|attribution)$/.test(key) && depth < 2 ? <EvidenceValue value={item} depth={depth + 1} /> : typeof item === 'object' ? Array.isArray(item) ? `${item.length} retained entries` : 'Structured source evidence; available in technical details' : String(item)}</dd></div>)}</dl>;
+  if (depth > 4) return <details><summary>More source detail</summary><pre>{JSON.stringify(value, null, 2)}</pre></details>;
+  if (Array.isArray(value)) return <div className="accounting-evidence-items"><ol>{value.slice(0, 20).map((item, index) => <li key={index}><EvidenceValue value={item} depth={depth + 1} onOpenDocument={onOpenDocument} /></li>)}</ol>{value.length > 20 && <details><summary>{value.length - 20} more retained entries</summary><pre>{JSON.stringify(value.slice(20), null, 2)}</pre></details>}</div>;
+  const object = value as Record<string, unknown>;
+  const validId = (id: unknown): id is string => typeof id === 'string' && /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(id);
+  const entries = Object.entries(object).filter(([key, item]) => item !== null && item !== '' && !/(?:sha256|source_key|local_id|storage_path|run_id|source_reference|auth_context)/.test(key) && !['document_id', 'vehicle_id', 'work_order_id'].includes(key));
+  return <div>
+    <div className="accounting-evidence-links">
+      {validId(object.document_id) && <button type="button" onClick={() => onOpenDocument(object.document_id as string)}>Open source{typeof object.source_filename === 'string' ? ` · ${object.source_filename}` : ''} <span aria-hidden="true">›</span></button>}
+      {validId(object.vehicle_id) && <PrefetchLink to={`/vehicle/${object.vehicle_id}`} target="_blank" rel="noopener noreferrer">View vehicle <span aria-hidden="true">↗</span></PrefetchLink>}
+      {validId(object.work_order_id) && <PrefetchLink to={`/jobs/${object.work_order_id}`} target="_blank" rel="noopener noreferrer">View job <span aria-hidden="true">↗</span></PrefetchLink>}
+    </div>
+    <dl className="accounting-evidence-values">{entries.slice(0, 16).map(([key, item]) => <div key={key}><dt>{humanLabel(key)}</dt><dd><EvidenceValue value={item} depth={depth + 1} onOpenDocument={onOpenDocument} /></dd></div>)}</dl>
+    {entries.length > 16 && <details><summary>More recorded fields ({entries.length - 16})</summary><pre>{JSON.stringify(Object.fromEntries(entries.slice(16)), null, 2)}</pre></details>}
+  </div>;
+}
+
+/** Render the admitted relationship, not a newly inferred payment or installation. */
+function ExpenseEvidence({ fieldKey, value, currency, hasUseEditor, onOpenDocument }: { fieldKey: string; value: unknown; currency?: string | null; hasUseEditor: boolean; onOpenDocument: (id: string) => void }) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return <EvidenceValue value={value} onOpenDocument={onOpenDocument} />;
+  const v = value as Record<string, unknown>;
+  const useCurrency = typeof v.currency === 'string' ? v.currency : currency || null;
+  if (fieldKey.startsWith('expense_use_') && typeof v.destination_label === 'string') return <div className="accounting-use-summary">
+    <strong>{v.destination_label}</strong>
+    <EvidenceValue value={{ vehicle_id: v.vehicle_id, work_order_id: v.work_order_id }} onOpenDocument={onOpenDocument} />
+    <dl className="accounting-evidence-values"><div><dt>Assigned</dt><dd>{displayMoney(typeof v.allocated_amount === 'string' ? v.allocated_amount : null, useCurrency)}</dd></div><div><dt>Still unassigned</dt><dd>{displayMoney(typeof v.unallocated_amount === 'string' ? v.unallocated_amount : null, useCurrency)}</dd></div></dl>
+    {typeof v.basis === 'string' && <p>{v.basis}</p>}
+    <p className="accounting-muted">Use attribution is separate from payment and tax treatment.{hasUseEditor && <> Open the use editor above to add or correct your knowledge.</>}</p>
+  </div>;
+  if (fieldKey.startsWith('expense_items_') && Array.isArray(v.items)) return <div>
+    <p>{v.items.length} linked source {v.items.length === 1 ? 'item' : 'items'}{typeof v.part === 'number' && typeof v.parts === 'number' && v.parts > 1 ? ` · part ${v.part} of ${v.parts}` : ''}. These are supporting observations, not additional expenses.</p>
+    <ol className="accounting-linked-items">{v.items.slice(0, 50).map((item: unknown, index) => {
+      if (!item || typeof item !== 'object') return <li key={index}><EvidenceValue value={item} onOpenDocument={onOpenDocument} /></li>;
+      const line = item as Record<string, unknown>;
+      return <li key={index}>
+        <div className="accounting-linked-item-heading"><strong>{typeof line.description === 'string' ? line.description : 'Description not recorded'}</strong><span>{displayMoney(typeof line.source_amount === 'string' ? line.source_amount : null, typeof line.source_currency === 'string' ? line.source_currency : null)}</span></div>
+        <p className="accounting-muted">Observed source amount{typeof line.line_number === 'number' ? ` · line ${line.line_number}` : ''}{typeof line.quantity === 'number' ? ` · quantity ${line.quantity}` : ''}</p>
+        <EvidenceValue value={{ document_id: line.document_id, vehicle_id: line.vehicle_id, work_order_id: line.work_order_id }} onOpenDocument={onOpenDocument} />
+        {typeof line.source_filename === 'string' && <p className="accounting-muted">{line.source_filename}</p>}
+        {Array.isArray(line.issues) && line.issues.length > 0 && <details><summary>Item reading limits</summary><ul>{line.issues.filter(issue => typeof issue === 'string').map((issue, i) => <li key={i}>{humanLabel(String(issue))}</li>)}</ul></details>}
+      </li>;
+    })}</ol>
+    {v.items.length > 50 && <p>{v.items.length - 50} more source items are retained in technical details.</p>}
+    {typeof v.association_basis === 'string' && <p>{v.association_basis}</p>}
+    {typeof v.limits === 'string' && <p className="accounting-muted">{v.limits}</p>}
+  </div>;
+  return <EvidenceValue value={value} onOpenDocument={onOpenDocument} />;
 }
 function EvidenceDialog({ documentId, record: selectedRecord, onClose, trigger }: { trigger: HTMLElement | null; documentId: string; record: SavedRecord['record'] | null; onClose: () => void }) {
   const [record, setRecord] = useState(selectedRecord);
+  const [sourceTrail, setSourceTrail] = useState<string[]>([]);
+  const activeDocument = sourceTrail.at(-1) || documentId;
+  const atEntry = sourceTrail.length === 0;
+  // The full cell history of the record's source is read only when asked for (median 240 KB per source, measured 2026-10-25).
+  const [showFields, setShowFields] = useState(false);
+  const openSource = (id: string) => { if (id === documentId) setSourceTrail([]); else if (id !== activeDocument) setSourceTrail(current => [...current, id]); };
   useEffect(() => { setRecord(selectedRecord); }, [documentId, selectedRecord]);
   const dialog = useRef<HTMLDialogElement>(null);
   useEffect(() => {
@@ -187,14 +239,18 @@ function EvidenceDialog({ documentId, record: selectedRecord, onClose, trigger }
   }, []);
   return <dialog className="accounting-evidence-dialog" ref={dialog} aria-label="Accounting evidence" onCancel={event => { event.preventDefault(); onClose(); }}>
     <div className="accounting-dialog-heading"><h2>Accounting evidence</h2><button type="button" autoFocus onClick={onClose}>Close evidence</button></div>
-    {record && <section className="accounting-selected-record" aria-label="Selected accounting record"><h3>{recordDescription(record.description) || 'Selected transaction'}</h3><p>{record.date || record.year} · {record.account || 'Account not recorded'} · {displayMoney(record.amount, record.currency)}</p><p><strong>{record.section || 'Unclassified'}</strong>{record.category && ` · ${record.category}`}</p>{record.status && <p>{record.status}</p>}<p>{record.decision || 'No accounting decision has been recorded for this movement.'}</p><p className="accounting-muted">This is the selected record. Its retained source may be a bank export or bookkeeping batch; it is not necessarily a receipt.</p>{record.description && <details><summary>Original source description</summary><p>{record.description}</p></details>}</section>}
-    {record?.source_key && <RecordClassifier targets={[{ documentId, record }]} onChanged={changed => { const current = changed.find(item => item.record.source_key === record.source_key); if (current) setRecord(current.record); }} />}
-    {record?.record_kind === 'retained_ledger_decision' && record.section === 'Expense' && record.source_key && <ExpenseUseEditor documentId={documentId} record={record} onCurrentRecord={setRecord} onSaved={() => window.dispatchEvent(new Event('accounting-saved'))} />}
-    <DocumentEvidence key={documentId} documentId={documentId} record={record} />
+    {!atEntry && <button type="button" className="accounting-back" onClick={() => setSourceTrail(current => current.slice(0, -1))}>‹ Back to {sourceTrail.length === 1 ? 'entry' : 'previous source'}</button>}
+    {atEntry && record?.source_key && <section className="accounting-selected-record" aria-label="Selected accounting record"><RecordEvidence documentId={documentId} sourceKey={record.source_key} onOpenDocument={openSource} fallbackTitle={recordDescription(record.description)} /></section>}
+    {atEntry && record && !record.source_key && <section className="accounting-selected-record" aria-label="Selected accounting record"><h3>{recordDescription(record.description) || 'Selected transaction'}</h3><p>{record.date || record.year} · {record.account || 'Account not recorded'}</p><p className="accounting-entry-amount">{displayMoney(record.amount, record.currency)}</p><p><strong>{record.section || 'Unclassified'}</strong>{record.category && ` · ${record.category}`}</p>{record.status && <p>{record.status}</p>}<p>{record.decision || 'No accounting decision has been recorded for this movement.'}</p><p className="accounting-muted">This is the selected record. Its retained source may be a bank export or bookkeeping batch; it is not necessarily a receipt.</p>{record.description && <details><summary>Original source description</summary><p>{record.description}</p></details>}</section>}
+    {atEntry && record?.source_key && <details className="accounting-edit-section"><summary>Review or correct classification <span>Add what you know about this entry</span></summary><RecordClassifier targets={[{ documentId, record }]} onChanged={changed => { const current = changed.find(item => item.record.source_key === record.source_key); if (current) setRecord(current.record); }} /></details>}
+    {atEntry && record?.record_kind === 'retained_ledger_decision' && record.section === 'Expense' && record.source_key && <details className="accounting-edit-section"><summary>Vehicle, shop or business use <span>Inspect or update the recipient and your reason</span></summary><ExpenseUseEditor documentId={documentId} record={record} onCurrentRecord={setRecord} onSaved={() => window.dispatchEvent(new Event('accounting-saved'))} /></details>}
+    {atEntry && record?.source_key
+      ? <details className="accounting-disclosure" onToggle={event => setShowFields(event.currentTarget.open)}><summary>All retained fields <span>every cell kept on this record's source, with history</span></summary>{showFields && <DocumentEvidence key={activeDocument} documentId={activeDocument} record={record} onOpenDocument={openSource} />}</details>
+      : <DocumentEvidence key={activeDocument} documentId={activeDocument} record={atEntry ? record : null} onOpenDocument={openSource} />}
   </dialog>;
 }
 
-function DocumentEvidence({ documentId, record }: { documentId: string; record: SavedRecord['record'] | null }) {
+function DocumentEvidence({ documentId, record, onOpenDocument }: { documentId: string; record: SavedRecord['record'] | null; onOpenDocument: (id: string) => void }) {
   const { ownerId, shared, liveRevision } = useAccountingBook();
   const [rows, setRows] = useState<ExtractionEvidence[]>([]);
   const [state, setState] = useState('Loading retained evidence…');
@@ -224,30 +280,44 @@ function DocumentEvidence({ documentId, record }: { documentId: string; record: 
   const sourceName = (Array.isArray(sourceDocument) ? sourceDocument[0] : sourceDocument)?.source_filename;
   const imageSource = !!sourceName && /\.(jpe?g|png|webp|heic)$/i.test(sourceName);
   const currentRows = rows.filter(row => !row.is_superseded).filter(row => {
-    const value = (row.value_normalized as { value?: { source_key?: string; scope_source_keys?: string[] } })?.value;
-    return !record?.source_key || (!value?.source_key && !value?.scope_source_keys) || value.source_key === record.source_key || value.scope_source_keys?.includes(record.source_key);
+    const value = (row.value_normalized as { value?: { source_key?: string; expense_source_key?: string; scope_source_keys?: string[] } })?.value;
+    const sourceKey = value?.source_key || value?.expense_source_key;
+    return !record?.source_key || (!sourceKey && !value?.scope_source_keys) || sourceKey === record.source_key || (Array.isArray(value?.scope_source_keys) && value.scope_source_keys.includes(record.source_key));
   });
   const readableRows = currentRows.filter(row => !/^(retained_relationships|retained_accounting_batch|canonical_|.*sha256)/.test(row.field_key));
-  return <section aria-label="Retained document evidence">
-    <h3>Supporting source</h3><p>{sourceName || 'Retained document'}{sourceName?.endsWith('.csv') ? ' · bank export or bookkeeping source' : ''}</p>
-    <p className="accounting-muted">{state} Newest first; source page {page + 1}.</p>
-    {readableRows.map(row => {
+  // Batch-level notes can describe other entries. Keep them available without
+  // presenting an unscoped note as evidence specifically linked to this entry.
+  const sourceWideRows = record?.source_key ? readableRows.filter(row => {
+    if (row.field_key === 'redacted_source') return false;
+    const value = (row.value_normalized as { value?: { source_key?: string; expense_source_key?: string; scope_source_keys?: string[] } })?.value;
+    return !value?.source_key && !value?.expense_source_key && !value?.scope_source_keys;
+  }) : [];
+  const sourceWideIds = new Set(sourceWideRows.map(row => row.id));
+  const entryRows = readableRows.filter(row => !sourceWideIds.has(row.id));
+  const renderField = (row: ExtractionEvidence) => {
+      const entryContext = sourceWideIds.has(row.id) ? null : record;
       const envelope = row.value_normalized as { value?: unknown; evidence?: { quote?: string; source_file?: string; source_sheet?: string; source_row?: string | number }; method?: string } | null;
       const quote = envelope?.evidence?.quote;
-      const firstQuote = quote && readableRows.find(candidate => (candidate.value_normalized as { evidence?: { quote?: string } })?.evidence?.quote === quote)?.id === row.id;
-      return <article key={row.id} className="accounting-evidence-field"><h4>{row.field_key.startsWith('retained_workpaper_classification_') ? 'Retained bookkeeping classification' : humanLabel(row.field_key)}</h4>
-        {row.field_key === 'redacted_source' ? <RedactedDocumentSource row={row} /> : <EvidenceValue value={envelope && typeof envelope === 'object' && 'value' in envelope ? envelope.value : row.value_normalized} />}
+      const quoteRows = sourceWideIds.has(row.id) ? sourceWideRows : entryRows;
+      const firstQuote = quote && quoteRows.find(candidate => (candidate.value_normalized as { evidence?: { quote?: string } })?.evidence?.quote === quote)?.id === row.id;
+      return <article key={row.id} className="accounting-evidence-field"><h4>{row.field_key.startsWith('retained_workpaper_classification_') ? 'Retained bookkeeping classification' : row.field_key.startsWith('expense_items_') ? 'Linked receipt items' : row.field_key.startsWith('expense_use_') ? 'Where this expense was used' : row.field_key.startsWith('expense_components_') ? 'Expense breakdown' : humanLabel(row.field_key)}</h4>
+        {row.field_key === 'redacted_source' ? <RedactedDocumentSource row={row} /> : <ExpenseEvidence fieldKey={row.field_key} value={envelope && typeof envelope === 'object' && 'value' in envelope ? envelope.value : row.value_normalized} currency={entryContext?.currency} hasUseEditor={entryContext?.record_kind === 'retained_ledger_decision' && entryContext.section === 'Expense' && !!entryContext.source_key} onOpenDocument={onOpenDocument} />}
         {firstQuote && <><blockquote>{quote.length > 500 ? `${quote.slice(0, 500)}…` : quote}</blockquote>{quote.length > 500 && <details><summary>Complete source quotation</summary><blockquote>{quote}</blockquote></details>}</>}
         {envelope?.evidence && (envelope.evidence.source_file || envelope.evidence.source_sheet || envelope.evidence.source_row) && <p className="accounting-muted">Source: {[envelope.evidence.source_file, envelope.evidence.source_sheet, envelope.evidence.source_row].filter(value => value !== undefined && value !== null).join(' · ')}</p>}
         <p className="accounting-muted">Recorded {row.created_at ? formatDate(row.created_at) : 'date unknown'} · {humanLabel(row.extractor)}{row.extractor_model ? ` · ${row.extractor_model}` : ''}</p>
         <details><summary>Provenance and technical details</summary><p>Retained interpretation; this alone does not establish expense recognition.</p><pre>{JSON.stringify(row.value_normalized, null, 2) ?? 'unknown'}</pre><p>Field reference: {row.field_key}</p><p>Evidence reference: {row.id}</p></details>
       </article>;
-    })}
+  };
+  return <section aria-label="Retained document evidence">
+    <h3>Supporting source</h3><p>{sourceName || 'Retained document'}{sourceName?.endsWith('.csv') ? ' · bank export or bookkeeping source' : ''}</p>
+    <p className="accounting-muted">{state} Newest first; source page {page + 1}.</p>
+    {entryRows.map(renderField)}
+    {sourceWideRows.length > 0 && <details className="accounting-source-notes"><summary>Source-wide notes ({sourceWideRows.length})</summary><p>These notes belong to the source document or batch. They are not explicitly linked to the selected entry and may describe other records.</p>{sourceWideRows.map(renderField)}</details>}
     {currentRows.some(row => /^(retained_relationships|retained_accounting_batch|canonical_|.*sha256)/.test(row.field_key)) && <details><summary>Technical source references</summary>{currentRows.filter(row => /^(retained_relationships|retained_accounting_batch|canonical_|.*sha256)/.test(row.field_key)).map(row => <article key={row.id}><h4>{humanLabel(row.field_key)}</h4><pre>{JSON.stringify(row.value_normalized, null, 2)}</pre></article>)}</details>}
     {rows.some(row => row.is_superseded) && <details><summary>Earlier interpretations on this page ({rows.filter(row => row.is_superseded).length})</summary>{rows.filter(row => row.is_superseded).map(row => <article key={row.id}><strong>{humanLabel(row.field_key)}</strong><p>Superseded interpretation · {row.created_at}</p><pre>{JSON.stringify(row.value_normalized, null, 2)}</pre></article>)}</details>}
     <div className="accounting-pagination"><button type="button" disabled={page === 0} onClick={() => setPage(p => p - 1)}>Newer evidence</button><button type="button" disabled={(page + 1) * PAGE_SIZE >= (count ?? 0)} onClick={() => setPage(p => p + 1)}>Older evidence</button></div>
     <details onToggle={event => setShowLines(event.currentTarget.open)}><summary>{sourceName?.toLowerCase().endsWith('.csv') ? 'Source items and payment comparison' : 'Receipt items and payment comparison'}</summary>{showLines && <FinancialDocumentLines key={`${documentId}:${reviewRevision}`} documentId={documentId} />}</details>
-    {shared && ownerId && <SharedAccountingOriginal ownerId={ownerId} documentId={documentId} />}
+    {ownerId && <SharedAccountingOriginal ownerId={ownerId} documentId={documentId} />}
     {!shared && <details><summary>Source processing tools</summary><button type="button" disabled={processing} onClick={async () => {
       setProcessing(true); setProcessingMessage('Processing retained source…');
       try {
@@ -301,6 +371,7 @@ function formatAmount(n: number | null): string {
 export default function FinanceDashboard() {
   // The active book and year are remembered per browser (accountingMemory); the server still decides access.
   const [actorId, setActorId] = useState('');
+  const actorIdentity = useRef<string | null>(null);
   const [ownerId, setOwnerId] = useState('');
   const [grants, setGrants] = useState<BookGrant[]>([]);
   const [grantRevision, setGrantRevision] = useState(0);
@@ -309,23 +380,6 @@ export default function FinanceDashboard() {
   const canCorrect = !!actorId && (ownerId === actorId || grants.some(g => g.owner_id === ownerId && g.member_id === actorId && g.active && g.can_correct));
   // Names for the change feed come from the grants this account already lists; nobody else's profile is read.
   const people: Record<string, string> = Object.fromEntries([...grants.flatMap(g => [[g.owner_id, g.owner_name], [g.member_id, g.member_name]]), ...(actorId ? [[actorId, 'You']] : [])]);
-  useEffect(() => {
-    let cancelled = false;
-    void supabase.auth.getUser().then(async ({ data }) => {
-      if (cancelled) return;
-      // A remembered book waits for the grants so the screen never loads a book this account cannot read.
-      const id = data.user?.id || ''; setActorId(id); setOwnerId(current => current || (remembered('book') ? '' : id));
-      const result = await supabase.rpc('list_accounting_access').then(result => result, () => ({ data: null, error: true }));
-      if (cancelled) return;
-      const rows: BookGrant[] = result.error || !Array.isArray(result.data) ? [] : result.data;
-      setGrants(rows); setOwnerId(current => { const wanted = current || remembered('book') || id; return wanted === id || rows.some(g => g.owner_id === wanted && g.member_id === id && g.active) ? wanted : id; });
-    }).catch(() => { if (!cancelled) { setActorId(''); setOwnerId(''); setGrants([]); } });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(event => {
-      if (event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED') return;
-      cancelled = true; setActorId(''); setOwnerId(''); setGrants([]); setGrantRevision(n => n + 1);
-    });
-    return () => { cancelled = true; subscription.unsubscribe(); };
-  }, [grantRevision]);
   const generation = useRef(0);
   const [deals, setDeals] = useState<DealFlowRow[]>([]);
   const [docs, setDocs] = useState<FinancialDocumentRow[]>([]);
@@ -334,28 +388,60 @@ export default function FinanceDashboard() {
   const evidenceTrigger = useRef<HTMLElement | null>(null);
   const [selectedRecord, setSelectedRecord] = useState<SavedRecord['record'] | null>(null);
   const [sourceView, setSourceView] = useState<'summary' | 'review' | 'documents' | 'deals'>('summary');
+  const [officeView, setOfficeView] = useState<'books' | 'documents' | 'review' | 'activity' | 'tools' | 'deals'>('books');
+  const [addingDocument, setAddingDocument] = useState(false);
+  const [focus, setFocus] = useState<Drill | null>(null);
   const [sourceTablePage, setSourceTablePage] = useState(0);
   const [sourceQuery, setSourceQuery] = useState('');
   const [selectedDocument, setSelectedDocument] = useState<string | null>(null);
   const [concerns, setConcerns] = useState<ReviewConcern[]>([]);
+  const [concernsLoaded, setConcernsLoaded] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
   const [page, setPage] = useState(0);
   const [counts, setCounts] = useState<{ docs: number | null; deals: number | null; concerns: number | null }>({ docs: null, deals: null, concerns: null });
 
+  const bookIdentity = useRef('');
+  const selectBook = useCallback((next: string) => {
+    if (next === bookIdentity.current) return;
+    // Invalidate in the selection/grant callback, before a late prior-book read settles.
+    generation.current++; bookIdentity.current = next; setOwnerId(next);
+    setSourceView('summary'); setOfficeView('books'); setAddingDocument(false); setFocus(null);
+    setSelectedDocument(null); setSelectedRecord(null); setDocs([]); setConcerns([]); setDeals([]); setErrors([]);
+    setCounts({ docs: null, deals: null, concerns: null }); setConcernsLoaded(false); setPage(0); setLoading(true);
+  }, []);
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
-      generation.current++;
+    let cancelled = false;
+    void supabase.auth.getUser().then(async ({ data }) => {
+      if (cancelled) return;
+      // A remembered book waits for the grants so the screen never loads a book this account cannot read.
+      const id = data.user?.id || ''; actorIdentity.current = id; setActorId(id); if (!bookIdentity.current && !remembered('book')) selectBook(id);
+      const result = await supabase.rpc('list_accounting_access').then(result => result, () => ({ data: null, error: true }));
+      if (cancelled) return;
+      const rows: BookGrant[] = result.error || !Array.isArray(result.data) ? [] : result.data;
+      setGrants(rows);
+      const wanted = bookIdentity.current || remembered('book') || id;
+      selectBook(wanted === id || rows.some(g => g.owner_id === wanted && g.member_id === id && g.active) ? wanted : id);
+    }).catch(() => { if (!cancelled) { setActorId(''); selectBook(''); setGrants([]); } });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      const nextActor = session?.user?.id || '';
+      if (actorIdentity.current === null && event === 'INITIAL_SESSION') { actorIdentity.current = nextActor; return; }
+      if (nextActor === actorIdentity.current && event !== 'SIGNED_OUT') return;
+      actorIdentity.current = nextActor;
+      cancelled = true; generation.current++;
+      setActorId(''); selectBook(''); setGrants([]); setGrantRevision(n => n + 1);
       setDocs([]); setDeals([]); setConcerns([]); setSelectedDocument(null); setSelectedRecord(null); setSourceQuery(''); setErrors([]);
       setCounts({ docs: null, deals: null, concerns: null });
       setPage(0); setLoading(true); setSessionRevision(n => n + 1);
+      setOfficeView('books'); setSourceView('summary'); setAddingDocument(false);
     });
-    return () => { generation.current++; subscription.unsubscribe(); };
-  }, []);
+    return () => { cancelled = true; subscription.unsubscribe(); };
+  }, [grantRevision, selectBook]);
 
   useEffect(() => {
     let cancelled = false;
     const request = ++generation.current;
     setLoading(true);
+    setConcernsLoaded(false);
     setErrors([]);
     setCounts({ docs: null, deals: null, concerns: null });
 
@@ -394,7 +480,8 @@ export default function FinanceDashboard() {
         ...(queueRes.error ? ['Review concerns could not load.'] : []),
       ]);
       setCounts({ docs: docRes.error ? null : docRes.count, deals: dealRes.error ? null : dealRes.count, concerns: queueRes.error ? null : queueRes.count });
-      setConcerns((queueRes.data as ReviewConcern[]) ?? []);
+      setConcernsLoaded(!queueRes.error && Array.isArray(queueRes.data));
+      setConcerns(!queueRes.error && Array.isArray(queueRes.data) ? queueRes.data as ReviewConcern[] : []);
       setDeals((dealRes.data as DealFlowRow[]) ?? []);
       setDocs((docRes.data as FinancialDocumentRow[]) ?? []);
       setLoading(false);
@@ -427,24 +514,30 @@ export default function FinanceDashboard() {
   // ── Render ────────────────────────────────────────────────────
   return (
     <AccountingBookContext.Provider value={{ ownerId, shared, canCorrect, liveRevision: live.revision }}><div className="accounting-page" style={s.container}>
-      <header className="accounting-header"><div><span className="accounting-eyebrow">PRIVATE ACCOUNT</span><h1>Accounting</h1><p>Your books, the documents behind them, and what still needs review.</p></div>
-        <button type="button" onClick={() => setSessionRevision(n => n + 1)}>Refresh records</button></header>
-      {actorId && <div className="accounting-book-picker"><span className="accounting-eyebrow" id="accounting-book-label">Active book</span><div className="accounting-chips" role="group" aria-label="Active accounting book" aria-labelledby="accounting-book-label">{[{ id: actorId, label: 'My books' }, ...grants.filter(g => g.member_id === actorId && g.active).map(g => ({ id: g.owner_id, label: `${g.owner_name} · shared books (${g.can_correct ? 'review and correct' : 'review'})` }))].map(bookOption => <button type="button" key={bookOption.id} aria-pressed={ownerId === bookOption.id} onClick={() => { if (ownerId === bookOption.id) return; remember('book', bookOption.id); setOwnerId(bookOption.id); setSourceView('summary'); setSelectedDocument(null); setSelectedRecord(null); setDocs([]); setConcerns([]); setDeals([]); setPage(0); }}>{bookOption.label}</button>)}</div></div>}
+      <header className="accounting-header"><div><span className="accounting-eyebrow">Your private office</span><h1>Accounting</h1><p>Follow the money. See the evidence. Add what you know.</p></div>
+        <div className="accounting-header-actions">{!shared && <button type="button" className="accounting-primary" onClick={() => { setOfficeView('tools'); setAddingDocument(true); }}>Add documents</button>}<button type="button" onClick={() => setSessionRevision(n => n + 1)}>Refresh records</button></div></header>
+      {actorId && <div className="accounting-book-picker"><span className="accounting-eyebrow" id="accounting-book-label">Active book</span><div className="accounting-chips" role="group" aria-label="Active accounting book" aria-labelledby="accounting-book-label">{[{ id: actorId, label: 'My books' }, ...grants.filter(g => g.member_id === actorId && g.active).map(g => ({ id: g.owner_id, label: `${g.owner_name} · shared books (${g.can_correct ? 'review and correct' : 'review'})` }))].map(bookOption => <button type="button" key={bookOption.id} aria-pressed={ownerId === bookOption.id} onClick={() => { if (ownerId === bookOption.id) return; remember('book', bookOption.id); selectBook(bookOption.id); }}>{bookOption.label}</button>)}</div></div>}
       <p className="accounting-muted" role="status">{live.message}</p>
-      <AccountingActivity people={people} onOpen={documentId => openEvidence(documentId)} />
+      <nav className="accounting-office-nav" aria-label="Accounting office">{([
+        ['books', 'Books', 'Income, expenses and transactions'], ['documents', 'Source documents', 'Receipts and supporting files'],
+        ['review', 'Review questions', 'Evidence that needs attention'], ['activity', 'Activity', 'Changes to your shared books'],
+        ['tools', 'Office settings', 'Access and imports'],
+      ] as const).filter(([tab]) => !shared || tab !== 'tools').map(([tab, label, hint]) => <button type="button" key={tab} aria-current={officeView === tab ? 'page' : undefined} title={hint} onClick={() => { setOfficeView(tab); setSourceView(tab === 'documents' || tab === 'review' ? tab : 'summary'); }}><span>{label}</span></button>)}</nav>
+      <div hidden={officeView !== 'activity'}><h2>Recent activity</h2><p>Open a change to inspect the source and its current interpretation.</p><AccountingActivity people={people} onOpen={documentId => openEvidence(documentId)} /><ActivityPasses people={people} onOpen={documentId => openEvidence(documentId)} /></div>
       {shared && <p>Shared books. Your corrections retain your identity and appear in the same ledger for the owner and other reviewers.</p>}
-      <FinancialWorkpapers key={ownerId} revision={sessionRevision} onOpen={openEvidence} />
-      <p className="accounting-muted accounting-tax-note">Tax review is a separate step. Saved records are not a filing or a completed reconciliation.</p>
-      <div hidden={shared}><AccountingAccess grants={grants} actorId={actorId} onChanged={() => setGrantRevision(n => n + 1)} /><details className="accounting-disclosure"><summary>Add documents <span>Receipts, invoices and supporting files</span></summary>
+      <div hidden={officeView !== 'books'}>{ownerId && <FinishTaxes key={`close:${ownerId}`} onDrill={drill => { setFocus(drill); window.setTimeout(() => document.querySelector('.accounting-books')?.scrollIntoView({ block: 'start' }), 0); }} onQuestions={() => { setOfficeView('review'); setSourceView('review'); }} />}
+      {ownerId && <FinancialWorkpapers key={`${actorId}:${ownerId}`} viewerId={actorId} revision={sessionRevision} onOpen={openEvidence} focus={focus} onLeaveFocus={() => setFocus(null)} />}
+      <p className="accounting-muted accounting-tax-note">Tax review is a separate step. Saved records are not a filing or a completed reconciliation.</p></div>
+      <div hidden={shared || officeView !== 'tools'}><h2>Office settings</h2><AccountingAccess grants={grants} actorId={actorId} onChanged={() => setGrantRevision(n => n + 1)} /><details className="accounting-disclosure" open={addingDocument} onToggle={event => setAddingDocument(event.currentTarget.open)}><summary>Add documents <span>Receipts, invoices and supporting files</span></summary>
         <FinancialDocumentIntake onComplete={documentId => { openEvidence(documentId); setSessionRevision(n => n + 1); }} />
       </details>
       <details className="accounting-disclosure accounting-advanced"><summary>Advanced: recover existing books <span>Import a prepared recovery bundle</span></summary>
         <FinancialEvidenceRestore onRestored={() => { setPage(0); setSessionRevision(n => n + 1); }} />
       </details>
+      <button type="button" onClick={() => { setOfficeView('deals'); setSourceView('deals'); }}>View deal flow</button>
       </div>
-      {selectedDocument && <EvidenceDialog trigger={evidenceTrigger.current} documentId={selectedDocument} record={selectedRecord} onClose={() => { setSelectedDocument(null); setSelectedRecord(null); }} />}
-      {shared && <p>Deal rollups are not included in this shared-book view. Saved bookkeeping records, controls and source evidence remain available above.</p>}
-      <nav className="accounting-tabs" aria-label="Source and review views">{(['summary', 'review', 'documents', 'deals'] as const).filter(tab => !shared || tab !== 'deals').map(tab => <button type="button" key={tab} aria-current={sourceView === tab ? 'page' : undefined} onClick={() => setSourceView(tab)}>{tab === 'summary' ? 'Review summary' : tab === 'review' ? 'Review questions' : tab === 'documents' ? 'Source documents' : 'Deals'}</button>)}</nav>
+      {selectedDocument && <EvidenceDialog key={`${ownerId}:${selectedDocument}`} trigger={evidenceTrigger.current} documentId={selectedDocument} record={selectedRecord} onClose={() => { setSelectedDocument(null); setSelectedRecord(null); }} />}
+      <section className="accounting-sources" hidden={officeView === 'activity' || officeView === 'tools'}>
       {loading ? <div style={s.loadingText}>LOADING</div> : noRecords ? <div style={s.accessLine}>
         No source documents are visible in this view yet. Use Add documents or the recovery tools above.
       </div> : <>
@@ -456,7 +549,8 @@ export default function FinanceDashboard() {
         <button type="button" disabled={(page + 1) * PAGE_SIZE >= Math.max(counts.docs ?? 0, counts.concerns ?? 0)} onClick={() => setPage(p => p + 1)}>Next page</button>
       </div>
       </>}
-      {sourceView === 'summary' && <section aria-label="Review summary"><h2>Review summary</h2><p>{currentConcerns.length} current or unversioned source questions on this loaded page. These are source questions, not automatically unresolved expenses.</p>{currentConcerns.slice(0, 3).map(c => <p key={c.id}><strong>{humanLabel(c.concern_type)}</strong> · {c.detail || 'Source needs review'} <button type="button" onClick={() => openEvidence(c.document_id)}>View evidence</button></p>)}<button type="button" onClick={() => setSourceView('review')}>Review source questions</button></section>}
+      {sourceView === 'summary' && <section className="accounting-review-summary" aria-label="Review summary"><h2>Needs a closer look</h2>{concernsLoaded ? <p>{currentConcerns.length} current or unversioned source questions on this loaded page. These are source questions, not automatically unresolved expenses.</p> : <p>Source question coverage is unknown because the review queue could not load.</p>}{currentConcerns.slice(0, 3).map(c => <p key={c.id}><strong>{humanLabel(c.concern_type)}</strong> · {c.detail || 'Source needs review'} <button type="button" onClick={() => openEvidence(c.document_id)}>View evidence</button></p>)}<button type="button" onClick={() => { setOfficeView('review'); setSourceView('review'); }}>Review source questions <span aria-hidden="true">›</span></button></section>}
+      {sourceView === 'review' && concernsLoaded && !concerns.length && <section className="accounting-review-summary"><h2>No source questions on this page</h2><p>This queue is clear for the loaded page. It does not establish that the books are reconciled or ready to file.</p><button type="button" onClick={() => { setOfficeView('documents'); setSourceView('documents'); }}>Inspect source documents</button></section>}
       {sourceView === 'review' && concerns.length > 0 && <section aria-label="Pending accounting concerns" style={s.section}>
         <h2 style={s.sectionLabel}>PENDING ACCOUNTING CONCERNS</h2>
         <p>{currentConcerns.length} current or unversioned concerns on this page; {priorConcerns.length} from superseded readings are retained below. Each concern is independent. A missing vehicle or unresolved party does not itself determine expense recognition.</p>
@@ -573,6 +667,7 @@ export default function FinanceDashboard() {
       )}
       {sourceView !== 'summary' && <div className="accounting-pagination"><span>{sourceRowCount ? sourceOffset + 1 : 0}–{Math.min(sourceOffset + 25, sourceRowCount)} of {sourceRowCount} loaded rows</span><button type="button" disabled={sourceOffset === 0} onClick={() => setSourceTablePage(value => value - 1)}>Previous 25 sources</button><button type="button" disabled={sourceOffset + 25 >= sourceRowCount} onClick={() => setSourceTablePage(value => value + 1)}>Next 25 sources</button></div>}
       </>}
+      </section>
     </div></AccountingBookContext.Provider>
   );
 }
@@ -584,12 +679,12 @@ const s: Record<string, React.CSSProperties> = {
     padding: '0 12px',
     maxWidth: '1200px',
     margin: '0 auto',
-    fontFamily: 'Arial, sans-serif',
+    fontFamily: 'var(--font-family)',
     color: 'var(--text)',
   },
   header: {
-    fontFamily: 'Arial, sans-serif',
-    fontSize: '11px',
+    fontFamily: 'var(--font-family)',
+    fontSize: '15px',
     fontWeight: 700,
     textTransform: 'uppercase',
     letterSpacing: '0.04em',
@@ -598,8 +693,8 @@ const s: Record<string, React.CSSProperties> = {
     padding: 'var(--space-3) 0',
   },
   loadingText: {
-    fontFamily: 'Arial, sans-serif',
-    fontSize: '9px',
+    fontFamily: 'var(--font-family)',
+    fontSize: '13px',
     fontWeight: 700,
     letterSpacing: '0.2em',
     textTransform: 'uppercase',
@@ -607,22 +702,21 @@ const s: Record<string, React.CSSProperties> = {
     padding: 'var(--space-6) 0',
   },
   accessLine: {
-    fontFamily: 'Arial, sans-serif',
-    fontSize: '9px',
+    fontFamily: 'var(--font-family)',
+    fontSize: '13px',
     fontWeight: 700,
     letterSpacing: '0.04em',
     textTransform: 'uppercase',
     color: 'var(--text-secondary)',
     border: '2px solid var(--border)',
-    borderRadius: 0,
     padding: 'var(--space-3)',
     lineHeight: 1.5,
   },
   statsBar: {
     display: 'flex',
     gap: 'var(--space-4)',
-    fontFamily: '"Courier New", Courier, monospace',
-    fontSize: '9px',
+    fontFamily: 'var(--font-mono)',
+    fontSize: '13px',
     color: 'var(--text-secondary)',
     marginBottom: 'var(--space-4)',
     borderBottom: '2px solid var(--border)',
@@ -633,8 +727,8 @@ const s: Record<string, React.CSSProperties> = {
     marginBottom: 'var(--space-5)',
   },
   sectionLabel: {
-    fontFamily: 'Arial, sans-serif',
-    fontSize: '8px',
+    fontFamily: 'var(--font-family)',
+    fontSize: '12px',
     fontWeight: 700,
     letterSpacing: '0.12em',
     textTransform: 'uppercase',
@@ -644,16 +738,15 @@ const s: Record<string, React.CSSProperties> = {
   tableWrap: {
     overflowX: 'auto',
     border: '2px solid var(--border)',
-    borderRadius: 0,
   },
   table: {
     width: '100%',
     borderCollapse: 'collapse',
-    fontFamily: 'Arial, sans-serif',
+    fontFamily: 'var(--font-family)',
   },
   th: {
-    fontFamily: 'Arial, sans-serif',
-    fontSize: '8px',
+    fontFamily: 'var(--font-family)',
+    fontSize: '12px',
     fontWeight: 700,
     letterSpacing: '0.1em',
     textTransform: 'uppercase',
@@ -664,8 +757,8 @@ const s: Record<string, React.CSSProperties> = {
     whiteSpace: 'nowrap',
   },
   thRight: {
-    fontFamily: 'Arial, sans-serif',
-    fontSize: '8px',
+    fontFamily: 'var(--font-family)',
+    fontSize: '12px',
     fontWeight: 700,
     letterSpacing: '0.1em',
     textTransform: 'uppercase',
@@ -679,16 +772,16 @@ const s: Record<string, React.CSSProperties> = {
     borderBottom: '1px solid var(--border)',
   },
   td: {
-    fontFamily: 'Arial, sans-serif',
-    fontSize: '11px',
+    fontFamily: 'var(--font-family)',
+    fontSize: '15px',
     color: 'var(--text)',
     padding: 'var(--space-2)',
     borderBottom: '1px solid var(--border)',
     verticalAlign: 'top',
   },
   tdMono: {
-    fontFamily: '"Courier New", Courier, monospace',
-    fontSize: '9px',
+    fontFamily: 'var(--font-mono)',
+    fontSize: '13px',
     fontWeight: 700,
     color: 'var(--text)',
     padding: 'var(--space-2)',
@@ -697,8 +790,8 @@ const s: Record<string, React.CSSProperties> = {
     verticalAlign: 'top',
   },
   tdRight: {
-    fontFamily: '"Courier New", Courier, monospace',
-    fontSize: '9px',
+    fontFamily: 'var(--font-mono)',
+    fontSize: '13px',
     fontWeight: 700,
     color: 'var(--text)',
     padding: 'var(--space-2)',

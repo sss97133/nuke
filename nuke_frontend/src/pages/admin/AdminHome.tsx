@@ -425,12 +425,6 @@ export default function AdminHome() {
           <Link className="button button-secondary" to="/admin/business-intelligence">
             Business intelligence
           </Link>
-          <Link className="button button-secondary" to="/admin/shipping-settings">
-            Shipping
-          </Link>
-          <Link className="button button-secondary" to="/admin/x402-settings">
-            x402
-          </Link>
         </div>
       </div>
     </div>

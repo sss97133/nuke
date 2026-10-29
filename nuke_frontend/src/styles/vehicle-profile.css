@@ -1,24 +1,20 @@
 /**
- * Vehicle Profile V3 — Bloomberg Terminal Design
- * Source: /Users/skylar/Downloads/nuke-session-files/nuke-vehicle-v3/index.html (canonical template)
- *
- * RULES: Arial only. Courier New for mono. Zero border-radius. Zero shadows. Zero gradients.
- * Widgets stack with border-bottom, NOT individual borders.
- * Transitions: 180ms cubic-bezier(0.16, 1, 0.3, 1) only.
+ * Vehicle profile surfaces. Shared system tokens own typography, color and shape;
+ * this file owns the measured sticky stack, evidence rows and media controls.
  */
 
 /* ─── Tokens ─── */
 .vehicle-profile-page {
-  --vp-bg: #f5f5f5;
-  --vp-surface: #ffffff;
-  --vp-ink: #1a1a1a;
-  --vp-pencil: #888888;
-  --vp-ghost: #dddddd;
-  --vp-text-faint: #bbbbbb;
-  --vp-row-alt: #f9f9f9;
+  --vp-bg: var(--bg);
+  --vp-surface: var(--surface);
+  --vp-ink: var(--text);
+  --vp-pencil: var(--text-secondary);
+  --vp-ghost: var(--border);
+  --vp-text-faint: var(--text-secondary);
+  --vp-row-alt: var(--surface-hover);
 
-  --vp-font-sans: Arial, Helvetica, sans-serif;
-  --vp-font-mono: 'Courier New', Courier, monospace;
+  --vp-font-sans: var(--font-family);
+  --vp-font-mono: var(--font-mono);
 
   --vp-ease: cubic-bezier(0.16, 1, 0.3, 1);
   --vp-speed: 180ms;
@@ -61,13 +57,6 @@
 
 /* Dark mode overrides for vehicle profile tokens */
 :root[data-theme="dark"] .vehicle-profile-page {
-  --vp-bg: #1e1e1e;
-  --vp-surface: #252526;
-  --vp-ink: #cccccc;
-  --vp-pencil: #858585;
-  --vp-ghost: #3e3e42;
-  --vp-text-faint: #555555;
-  --vp-row-alt: #2d2d30;
   --vp-brg: #004225;
   --vp-papaya: #FF8000;
   --vp-live-green: #4ade80;
@@ -76,18 +65,13 @@
   /* Heatmap contrast — dark mode */
   --heat-0: #3a3a3a;
   --heat-2: #4ade80;
-
-  /* Layout */
-  --h-hero: 550px;
-  --vp-col-left: 30%;
-  --vp-col-right: 70%;
 }
 
 /* Page-level */
 .vehicle-profile-page {
   font-family: var(--vp-font-sans);
-  font-size: 10px;
-  line-height: 1.4;
+  font-size: var(--text-body);
+  line-height: 1.45;
   color: var(--vp-ink);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -95,32 +79,6 @@
 
 /* Selection */
 .vehicle-profile-page ::selection { background: #1a1a1a; color: #fff; }
-
-/* Zero border-radius everywhere */
-.vehicle-profile-page *,
-.vehicle-profile-page *::before,
-.vehicle-profile-page *::after {
-  border-radius: 0 !important;
-}
-
-/* Paper grain texture */
-.vehicle-profile-page::after {
-  content: '';
-  position: fixed;
-  top: 0; left: 0; right: 0; bottom: 0;
-  pointer-events: none;
-  z-index: 999;
-  opacity: 0.03;
-  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
-}
-
-/* Only allowed transition */
-.vehicle-profile-page button,
-.vehicle-profile-page a,
-.vehicle-profile-page img {
-  transition-timing-function: var(--vp-ease) !important;
-  transition-duration: var(--vp-speed) !important;
-}
 
 /* ============ LAYER 2: VEHICLE SUB-HEADER ============ */
 
@@ -349,21 +307,13 @@
 
 /* Gallery filter chip — sticky above gallery toolbar inside right column */
 .gallery-filter-chip {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 12px;
-  font-size: 8px;
-  font-family: Arial, sans-serif;
-  font-weight: 700;
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
-  position: sticky;
-  top: 0;
-  z-index: 101;
+  display: flex; align-items: center; gap: 8px; padding: 4px 12px;
+  font: var(--text-callout)/1.4 var(--font-family);
+  background: var(--surface); border-bottom: 1px solid var(--border);
+  min-width: 0; width: 100%;
 }
+.gallery-filter-chip > span { overflow-wrap: anywhere; min-width: 0; }
+.gallery-filter-chip button { flex-shrink: 0; margin-left: auto; min-height: var(--control-height); padding: 6px 10px; border: 0; border-radius: var(--radius-sm); background: var(--accent-dim); color: var(--link); font: inherit; cursor: pointer; }
 
 /* Receipt popup */
 .receipt {
@@ -949,46 +899,26 @@
 /* ============ GALLERY ============ */
 
 .gallery-header {
-  position: sticky;
-  top: 0;
-  background: var(--vp-bg);
-  z-index: 100;
-  padding: 0;
-  border-bottom: 1px solid var(--vp-ghost);
+  position: sticky; top: 0; z-index: 100; flex-shrink: 0; flex-wrap: wrap;
+  background: var(--vp-bg); padding: 12px; border-bottom: 1px solid var(--vp-ghost); gap: 8px;
 }
-.gallery-filter-chip + .gallery-header {
-  top: 24px;
-}
-.gallery-toolbar { display: flex; flex-wrap: wrap; gap: 2px; }
+.gallery-header .widget__label { font: 650 var(--text-callout)/1.4 var(--font-family); letter-spacing: 0; text-transform: none; }
+.gallery-header .widget__count { font: var(--text-caption)/1.4 var(--font-family); }
+.gallery-header .widget__controls { flex: 1 1 100%; min-width: 0; flex-wrap: wrap; gap: 8px 16px; }
+.gallery-toolbar { display: flex; flex-wrap: wrap; gap: 4px; }
 .gallery-btn {
-  font-family: var(--vp-font-sans);
-  font-size: 8px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  padding: 2px 5px;
-  border: 1px solid var(--vp-ghost);
-  background: transparent;
-  color: var(--vp-pencil);
-  cursor: pointer;
-  transition: background var(--vp-speed) var(--vp-ease), color var(--vp-speed) var(--vp-ease), border-color var(--vp-speed) var(--vp-ease);
+  min-height: var(--control-height); min-width: var(--control-height); padding: 8px 12px;
+  border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface);
+  color: var(--text); font: 550 var(--text-callout)/1.3 var(--font-family); cursor: pointer;
+  transition: background var(--vp-speed) var(--vp-ease), color var(--vp-speed) var(--vp-ease);
 }
-.gallery-btn:hover { background: #eee; color: var(--vp-ink); }
-.gallery-btn--active { background: var(--vp-ink); color: #fff; border-color: var(--vp-ink); }
-
-.gallery-slider-row { display: flex; align-items: center; gap: 6px; }
-.gallery-slider-label { font-size: 8px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--vp-text-faint); }
-.gallery-slider {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 60px;
-  height: 2px;
-  background: var(--vp-ghost);
-  outline: none;
-}
-.gallery-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 8px; height: 8px; background: var(--vp-ink); cursor: pointer; }
-.gallery-slider::-moz-range-thumb { width: 8px; height: 8px; background: var(--vp-ink); border: none; cursor: pointer; }
-.gallery-slider-val { font-family: var(--vp-font-mono); font-size: 8px; color: var(--vp-pencil); min-width: 8px; text-align: center; }
+.gallery-btn:hover { background: var(--surface-hover); }
+.gallery-btn--active, .gallery-btn--active:hover { background: var(--action); color: var(--on-action); border-color: var(--action); }
+.gallery-btn:focus-visible, .gallery-slider:focus-visible, .gallery-filter-chip button:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 3px; }
+.gallery-slider-row { display: flex; align-items: center; gap: 12px; min-height: var(--control-height); }
+.gallery-slider-label, .gallery-slider-val { font: var(--text-callout)/1.4 var(--font-family); color: var(--text-secondary); }
+.gallery-slider { width: 112px; height: var(--control-height); margin: 0; accent-color: var(--action); cursor: pointer; }
+.gallery-slider-val { min-width: 16px; text-align: center; font-variant-numeric: tabular-nums; }
 
 .gallery-content { padding: 10px 12px; }
 .gallery-category { margin-bottom: 14px; }
@@ -1060,106 +990,26 @@
 
 /* ============ OVERRIDES FOR EXISTING COMPONENTS ============ */
 
-/* CollapsibleWidget profile variant — no section divider lines */
-.vehicle-profile-left-column .collapsible-widget--profile,
-.vehicle-profile-right-column .collapsible-widget--profile {
-  border: none !important;
-  border-bottom: none !important;
-  background: transparent !important;
-  box-shadow: none !important;
-  margin: 0 !important;
-}
-
-.vehicle-profile-left-column .collapsible-widget--profile__header,
-.vehicle-profile-right-column .collapsible-widget--profile__header {
-  min-height: 32px;
-  padding: 10px 16px;
-  border-bottom: none;
-  background: transparent;
-}
-
-.vehicle-profile-left-column .collapsible-widget--profile__title,
-.vehicle-profile-right-column .collapsible-widget--profile__title {
-  font-family: var(--vp-font-sans);
-  font-size: 8px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--vp-pencil);
-}
-
-.vehicle-profile-left-column .collapsible-widget--profile__content,
-.vehicle-profile-right-column .collapsible-widget--profile__content {
-  padding: 10px 16px 14px;
-}
-
-/* Cards in left column — adapt to widget stacking */
-.vehicle-profile-left-column .card,
-.vehicle-profile-left-column .vehicle-profile-section {
-  border: none !important;
-  border-bottom: 1px solid var(--vp-ghost) !important;
-  background: transparent !important;
-  box-shadow: none !important;
+/* Profile widgets keep their own grouped surface instead of styling arbitrary descendants. */
+.vehicle-profile-page .collapsible-widget--profile {
+  margin: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
   overflow: hidden;
-  margin: 0 !important;
 }
-
-.vehicle-profile-left-column .card .card-header,
-.vehicle-profile-left-column .vehicle-profile-section > button {
-  min-height: 32px;
-  padding: 10px 16px !important;
-  border-bottom: none !important;
-  background: transparent !important;
-  font-family: var(--vp-font-sans) !important;
-  font-size: 8px !important;
-  font-weight: 700 !important;
-  letter-spacing: 0.12em !important;
-  text-transform: uppercase !important;
-  color: var(--vp-pencil) !important;
+.vehicle-profile-page .collapsible-widget--profile__header {
+  min-height: 52px;
+  padding: 12px 16px;
+  background: var(--surface);
 }
-
-.vehicle-profile-left-column .card .card-body,
-.vehicle-profile-left-column .vehicle-profile-section > div[class*="border-t"] {
-  padding: 10px 16px 14px !important;
+.vehicle-profile-page .collapsible-widget--profile__title {
+  font: 600 var(--text-callout)/1.35 var(--font-family);
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--text);
 }
-
-.vehicle-profile-left-column .card .card-footer {
-  padding: 10px 16px !important;
-  border-top: none !important;
-  background: transparent !important;
-}
-
-/* All direct children in left column — widget stacking, no divider lines */
-.vehicle-profile-left-column > div {
-  border: none !important;
-  border-bottom: none !important;
-  background: transparent !important;
-  box-shadow: none !important;
-  overflow: hidden;
-  margin: 0 !important;
-}
-
-/* V3 header chrome on VehicleBasicInfo etc. */
-.vehicle-profile-left-column > div > div:first-child {
-  min-height: 32px !important;
-  padding: 10px 16px !important;
-  border-bottom: none !important;
-  background: transparent !important;
-  font-family: var(--vp-font-sans) !important;
-  font-size: 8px !important;
-  font-weight: 700 !important;
-  letter-spacing: 0.12em !important;
-  text-transform: uppercase !important;
-  color: var(--vp-pencil) !important;
-}
-.vehicle-profile-left-column > div > div:first-child span {
-  font-family: var(--vp-font-sans) !important;
-  font-size: 8px !important;
-  font-weight: 700 !important;
-  letter-spacing: 0.12em !important;
-  text-transform: uppercase !important;
-  color: var(--vp-pencil) !important;
-}
+.vehicle-profile-page .collapsible-widget--profile__content { padding: 0 12px 12px; }
 
 /* Collapsed cards */
 .vehicle-profile-left-column .card.is-collapsed .card-body,
@@ -1170,40 +1020,21 @@
   border-bottom: none !important;
 }
 
-/* Right column cards — no divider lines */
-.vehicle-profile-right-column .card {
-  border: none !important;
-  border-bottom: none !important;
-  background: transparent !important;
-  box-shadow: none !important;
+/* Legacy cards remain grouped without overriding the content's field typography. */
+.vehicle-profile-page .vehicle-profile-left-column .card,
+.vehicle-profile-page .vehicle-profile-right-column .card {
+  margin: 12px;
   overflow: hidden;
-  margin: 0 !important;
-}
-.vehicle-profile-right-column .card .card-header {
-  min-height: 32px;
-  padding: 10px 16px !important;
-  border-bottom: none !important;
-  background: transparent !important;
-  font-family: var(--vp-font-sans) !important;
-  font-size: 8px !important;
-  font-weight: 700 !important;
-  letter-spacing: 0.12em !important;
-  text-transform: uppercase !important;
-  color: var(--vp-pencil) !important;
-}
-.vehicle-profile-right-column .card .card-body {
-  padding: 10px 16px 14px !important;
 }
 
 /* ============ MOBILE ============ */
 
 @media (max-width: 768px) {
 
-  .vehicle-sub__badges { display: none; }
   .vehicle-sub__title { font-size: 10px; }
   .vp-columns { flex-direction: column; position: static; height: auto; }
   .vp-col-left, .vp-col-right { width: 100% !important; height: auto; max-height: none; overflow-y: visible; }
-  .vp-col-left { border-bottom: 2px solid var(--vp-ink); }
+  .vp-col-left { border-bottom: 1px solid var(--vp-ghost); }
   .vp-col-divider { display: none; }
   .badge__tooltip { display: none !important; }
   .mileage__tooltip { display: none !important; }
@@ -1223,15 +1054,8 @@
 
 /* ─── Vehicle Dossier: Mobile Responsive ─── */
 @media (max-width: 768px) {
-  .dossier-field-grid {
-    grid-template-columns: 80px 1fr auto 16px !important;
-    padding: 4px 6px !important;
-  }
   .dossier-identity-ymm {
     font-size: 13px !important;
-  }
-  .dossier-evidence-row {
-    grid-template-columns: 60px minmax(0, 1fr) !important;
   }
 }
 
@@ -1314,3 +1138,75 @@
 
 .vp-live-seller { position: relative; }
 .vp-live-seller > button { background: transparent; border: 0; padding: 4px; font: 11px Arial, sans-serif; color: var(--text); cursor: pointer; }
+
+/* Native profile chrome. Existing fact and evidence drills retain their owners. */
+.vehicle-profile-page .vp-header-sticky { background: var(--surface); border-bottom: 1px solid var(--border); }
+.vehicle-profile-page .vp-header-sticky .k-masthead { padding: 12px 16px; gap: 12px 24px; }
+.vehicle-profile-page .vp-header-sticky .k-entity { margin: 0; min-width: 0; }
+.vehicle-profile-page .vp-header-sticky .k-masthead__result { min-width: 0; }
+.vehicle-profile-page .vp-strip { background: var(--surface); border-bottom: 1px solid var(--border); }
+.vehicle-profile-page .vp-strip .k-strip { padding: 6px 12px; gap: 8px; }
+.vehicle-profile-page .vp-strip .k-facet { display: inline-flex; align-items: center; box-sizing: border-box; min-height: 44px; padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-hover); color: var(--text); font: 500 var(--text-callout)/1.3 var(--font-family); }
+.vehicle-profile-page .vp-strip .k-facet[aria-expanded="true"] { border-color: var(--link); color: var(--link); }
+.vehicle-profile-page .vp-badge-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 8px 12px; border-bottom: 1px solid var(--border); background: var(--surface); }
+.vehicle-profile-page .vp-identity-mark,
+.vehicle-profile-page .vp-facet-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; max-width: 100%; white-space: normal; overflow-wrap: anywhere; box-sizing: border-box; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); font: 600 var(--text-caption)/1.3 var(--font-family); letter-spacing: normal; text-transform: none; text-decoration: none; cursor: pointer; }
+.vehicle-profile-page .vp-identity-mark:hover,
+.vehicle-profile-page .vp-facet-chip:hover { border-color: var(--link); background: var(--surface-hover); }
+.vehicle-profile-page .vp-identity-mark__svg { display: inline-flex; align-items: center; height: 18px; width: 54px; }
+.vp-attention-banner { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--border); background: var(--surface); color: var(--text-secondary); font: 500 var(--text-caption)/1.4 var(--font-family); }
+.vp-attention-banner__icon { color: var(--warning); }
+.vp-attention-banner__actions { display: flex; flex-wrap: wrap; gap: 6px; margin-left: auto; }
+.vp-attention-banner__action,
+.vp-attention-banner__dismiss { min-height: 44px; min-width: 44px; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--link); font: 600 var(--text-caption)/1.3 var(--font-family); white-space: nowrap; cursor: pointer; }
+.vp-attention-banner__dismiss { border-color: transparent; font-size: 22px; color: var(--text-secondary); }
+.vp-attention-banner__action:disabled { cursor: wait; opacity: .6; }
+.vehicle-profile-page .vp-dossier-panel { margin-bottom: 12px; background: var(--surface-elevated); border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; }
+.vehicle-profile-page .vp-dossier-panel__title,
+.vehicle-profile-page .vp-dossier-panel__group { padding: 12px; border-bottom: 1px solid var(--border); background: var(--surface-hover); color: var(--text); font: 600 var(--text-callout)/1.35 var(--font-family); }
+.vehicle-profile-page .vp-dossier-panel__group { font-size: var(--text-caption); color: var(--text-secondary); }
+.vehicle-profile-page .dossier-field-grid { display: grid; grid-template-columns: minmax(64px, 88px) minmax(0, 1fr) 44px; align-items: center; column-gap: 8px; padding: 4px 8px 4px 12px; min-height: 52px; }
+.vehicle-profile-page .dossier-field-label { grid-column: 1; grid-row: 1 / span 2; overflow-wrap: anywhere; color: var(--text-secondary); font: 500 var(--text-caption)/1.4 var(--font-family); }
+.vehicle-profile-page .dossier-field-value { grid-column: 2; grid-row: 1; display: flex; align-items: center; min-width: 0; min-height: 44px; padding: 4px 0; overflow-wrap: anywhere; color: var(--text); font: 500 var(--text-callout)/1.4 var(--font-family); }
+.vehicle-profile-page .dossier-field-value[role="button"] { cursor: pointer; text-decoration: underline dotted var(--border); text-underline-offset: 4px; }
+.vehicle-profile-page .dossier-field-value[role="button"]:hover { color: var(--link); text-decoration-color: currentColor; }
+.vehicle-profile-page .dossier-field-value--vin { font-family: var(--font-mono); font-size: var(--text-caption); }
+.vehicle-profile-page .dossier-field-sources { grid-column: 2; grid-row: 2; display: flex; flex-wrap: wrap; gap: 4px; padding-bottom: 4px; }
+.vehicle-profile-page .dossier-field-sources:empty { display: none; }
+.vehicle-profile-page .dossier-source-count { color: var(--text-secondary); font: 500 var(--text-caption)/1.3 var(--font-family); }
+.vehicle-profile-page .vp-source-badge { display: inline-block; border-radius: 4px; padding: 2px 5px; font: 600 var(--text-caption)/1.3 var(--font-family); }
+.vehicle-profile-page .dossier-field-expand { grid-column: 3; grid-row: 1 / span 2; width: 44px; height: 44px; padding: 0; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--link); font-size: 12px; cursor: pointer; }
+.vehicle-profile-page .dossier-field-expand[aria-expanded="true"] { transform: rotate(90deg); }
+.vehicle-profile-page .dossier-field-expand:hover:not(:disabled) { background: var(--surface-hover); }
+.vehicle-profile-page .dossier-field-expand:disabled { cursor: default; }
+.vehicle-profile-page .vp-dossier-expand-fields { display: block; min-height: 44px; width: 100%; padding: 10px 12px; border: 0; border-bottom: 1px solid var(--border); background: transparent; color: var(--link); font: 500 var(--text-caption)/1.4 var(--font-family); text-align: left; cursor: pointer; }
+.vp-media-caption,
+.vp-media-arrow,
+.vp-photo-fit { position: absolute; z-index: 2; border: 1px solid rgba(255,255,255,.3); border-radius: var(--radius-sm); background: rgba(0,0,0,.72); color: #fff; font: 600 var(--text-caption)/1.4 var(--font-family); }
+.vp-media-caption { top: 10px; left: 10px; max-width: calc(100% - 20px); padding: 6px 10px; }
+.vp-media-arrow { top: 50%; transform: translateY(-50%); width: 44px; height: 44px; font-size: 20px; cursor: pointer; }
+.vp-media-arrow--prev { left: 10px; }
+.vp-media-arrow--next { right: 10px; }
+.vp-photo-fit { right: 10px; bottom: 10px; min-height: 44px; min-width: 44px; padding: 8px 12px; cursor: pointer; }
+.vp-media-indicators { position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); display: flex; z-index: 2; }
+.vp-media-indicator { display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 0; background: transparent; cursor: pointer; }
+.vp-media-indicator::after { content: ''; width: 8px; height: 8px; border: 1px solid #fff; border-radius: 50%; background: rgba(0,0,0,.72); }
+.vp-media-indicator[aria-pressed="true"]::after { width: 12px; height: 12px; background: #fff; }
+.vehicle-profile-page :is(.dossier-field-value, .dossier-field-expand, .vp-identity-mark, .vp-facet-chip, .vp-attention-banner__action, .vp-attention-banner__dismiss, .vp-photo-fit, .vp-media-arrow, .vp-media-indicator):focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+
+/* A 30% desktop sidebar becomes too narrow for useful evidence at tablet widths. */
+@media (max-width: 1024px) {
+  .vehicle-profile-page .vp-columns { flex-direction: column; position: static; height: auto; }
+  .vehicle-profile-page .vp-col-left,
+  .vehicle-profile-page .vp-col-right { width: 100% !important; height: auto; max-height: none; overflow-y: visible; }
+  .vehicle-profile-page .vp-col-divider { display: none; }
+}
+@media (max-width: 480px) {
+  .vehicle-profile-page .vp-header-sticky .k-masthead { padding: 10px 12px; }
+  .vehicle-profile-page .collapsible-widget--profile { margin: 10px 8px; }
+  .vehicle-profile-page .collapsible-widget--profile__content { padding: 0 8px 8px; }
+  .vehicle-profile-page .dossier-field-grid { grid-template-columns: 88px minmax(0, 1fr) 44px; column-gap: 6px; padding-left: 10px; }
+}
+
+.vehicle-profile-page .vp-source-coverage { padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text-secondary); font: 400 var(--text-caption)/1.5 var(--font-family); }
+.vehicle-profile-page .vp-source-coverage h4 { margin: 0 0 8px; color: var(--text); font: 600 var(--text-callout)/1.4 var(--font-family); }

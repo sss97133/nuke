@@ -1,21 +1,10 @@
 import React, { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { PrefetchLink as Link } from '../components/PrefetchLink';
+import { usePageTitle } from '../hooks/usePageTitle';
+import './MarketPages.css';
 import { useAuth } from '../hooks/useAuth';
 import { useMarketSegments, type SegmentIndexRow } from '../hooks/useMarketSegments';
 
-
-const formatUSD0 = (value: number) =>
-  new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 0
-  }).format(value);
-
-const formatPct = (value: number | null) => {
-  if (value === null || Number.isNaN(value)) return '—';
-  const sign = value >= 0 ? '+' : '';
-  return `${sign}${value.toFixed(2)}%`;
-};
 
 const getDefinitionSubcategory = (r: SegmentIndexRow) => {
   const hasYear = r.year_min !== null || r.year_max !== null;
@@ -30,9 +19,10 @@ const getDefinitionSubcategory = (r: SegmentIndexRow) => {
 };
 
 export default function MarketSegments() {
+  usePageTitle('Market segments');
   const { user } = useAuth();
   const hasSession = Boolean(user);
-  const { data: rows = [], isLoading: loading, error: queryError } = useMarketSegments();
+  const { data: rows = [], isLoading: loading, error: queryError, isFetching, refetch } = useMarketSegments();
   const error = queryError ? (queryError as Error).message : null;
   const [query, setQuery] = useState('');
   const [managerFilter, setManagerFilter] = useState<'all' | 'ai' | 'human'>('all');
@@ -68,172 +58,58 @@ export default function MarketSegments() {
     return ordered;
   }, [filtered]);
 
-  const tileBg = (pct: number | null) => {
-    if (pct === null) return 'rgba(0,0,0,0.03)';
-    if (pct > 0) return 'rgba(16, 185, 129, 0.14)';
-    if (pct < 0) return 'rgba(220, 38, 38, 0.14)';
-    return 'rgba(0,0,0,0.03)';
-  };
-
-  if (loading) {
-    return (
-      <div style={{ minHeight: '100vh', background: 'var(--bg)', padding: '24px' }}>
-        <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-          <div style={{ height: 28, background: 'var(--surface)', marginBottom: 24, width: 220 }} />
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>
-            {[1, 2, 3, 4, 5, 6].map((i) => (
-              <div key={i} style={{ border: '2px solid var(--border)', padding: 16, background: 'var(--surface)' }}>
-                <div style={{ height: 14, background: 'var(--border)', marginBottom: 10, width: '60%' }} />
-                <div style={{ height: 24, background: 'var(--border)', marginBottom: 8, width: '40%' }} />
-                <div style={{ height: 10, background: 'var(--border)', width: '75%' }} />
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg)', padding: '24px' }}>
-      <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'flex-start',
-            gap: '12px',
-            flexWrap: 'wrap',
-            lineHeight: '12px'
-          }}
-        >
-          <div>
-            <h1 style={{ margin: 0, fontSize: '19px' }}>Market Segments</h1>
-            <div style={{ marginTop: '6px', fontSize: '12px', color: 'var(--text-muted)', fontWeight: 200 }}>
-              Browse segments and index stats. Trading is intentionally not enabled here yet.
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <Link to="/" className="button button-secondary" style={{ textDecoration: 'none', color: 'inherit' }}>
-              Back
-            </Link>
-            <Link to="/market/portfolio" className="button button-secondary" style={{ textDecoration: 'none', color: 'inherit' }}>
-              Portfolio
-            </Link>
-          </div>
+    <div className="market-definitions-page">
+      <header className="market-definitions-header">
+        <div>
+          <h1>Market segments</h1>
+          <p>Browse retained definitions by year, make and model keywords.</p>
         </div>
-
-        {error && (
-          <div style={{ marginTop: '16px', padding: '12px', border: '2px solid var(--border)', background: 'var(--surface)' }}>
-            <div style={{ fontWeight: 800, marginBottom: '6px' }}>Error</div>
-            <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{error}</div>
-          </div>
-        )}
-
-        <div style={{ marginTop: '16px', display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search segments..."
-            style={{
-              border: '2px solid var(--border)', padding: '8px',
-              minWidth: '280px',
-              background: 'var(--white)',
-              color: 'var(--text)'
-            }}
-          />
-          <div style={{ display: 'flex', gap: '6px', alignItems: 'center', fontSize: '12px', color: 'var(--text-muted)' }}>
-            Manager
-            <select
-              value={managerFilter}
-              onChange={(e) => setManagerFilter(e.target.value as any)}
-              style={{
-                border: '2px solid var(--border)', padding: '6px',
-                background: 'var(--white)',
-                color: 'var(--text)'
-              }}
-            >
-              <option value="all">All</option>
-              <option value="ai">AI</option>
-              <option value="human">Human</option>
-            </select>
-          </div>
-        </div>
-
-        {!error && rows.length === 0 && (
-          <div style={{ marginTop: '18px', padding: '14px', border: '2px solid var(--border)', background: 'var(--surface)' }}>
-            <div style={{ fontWeight: 900, marginBottom: '6px' }}>No segments returned</div>
-            <div style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: '14px' }}>
-              This usually means there are no segments with status = active, or your database permissions/policies are preventing reads of the
-              market segments index view.
-            </div>
-            <div style={{ marginTop: '10px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              {!hasSession && (
-                <Link to="/login" className="button button-secondary" style={{ textDecoration: 'none', color: 'inherit' }}>
-                  Sign in
-                </Link>
-              )}
-              <Link to="/" className="button button-secondary" style={{ textDecoration: 'none', color: 'inherit' }}>
-                Home
-              </Link>
-            </div>
-          </div>
-        )}
-
-        <div style={{ marginTop: '18px', display: 'grid', gap: '18px' }}>
-          {Object.entries(grouped).map(([groupName, items]) => (
-            <div key={groupName}>
-              <div style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 900, marginBottom: '10px' }}>
-                {groupName} <span style={{ fontWeight: 400 }}>({items.length})</span>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '12px' }}>
-                {items.map((r) => (
-                  <Link
-                    key={r.segment_id}
-                    to={`/market/segments/${r.slug}`}
-                    style={{
-                      textDecoration: 'none', color: 'inherit',
-                      textAlign: 'left',
-                      padding: '14px',
-                      border: '2px solid var(--border)', background: tileBg(r.change_7d_pct),
-                      transition: 'transform 0.12s ease',
-                      display: 'block'
-                    }}
-                    onMouseEnter={(e) => (e.currentTarget.style.transform = 'translateY(-1px)')}
-                    onMouseLeave={(e) => (e.currentTarget.style.transform = 'translateY(0)')}
-                    title="Open segment"
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px' }}>
-                      <div style={{ fontWeight: 900 }}>{r.name}</div>
-                      <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{r.manager_type.toUpperCase()}</div>
-                    </div>
-
-                    <div style={{ marginTop: '6px', fontSize: '12px', color: 'var(--text-muted)' }}>
-                      {r.vehicle_count.toLocaleString()} vehicles • {formatUSD0(r.market_cap_usd)} in play
-                    </div>
-
-                    <div style={{ marginTop: '10px', display: 'flex', justifyContent: 'space-between', gap: '12px' }}>
-                      <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>7d</div>
-                      <div style={{ fontWeight: 900 }}>{formatPct(r.change_7d_pct)}</div>
-                    </div>
-                    <div style={{ marginTop: '6px', display: 'flex', justifyContent: 'space-between', gap: '12px' }}>
-                      <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>30d</div>
-                      <div style={{ fontWeight: 900 }}>{formatPct(r.change_30d_pct)}</div>
-                    </div>
-
-                    {r.description && (
-                      <div style={{ marginTop: '10px', fontSize: '12px', color: 'var(--text-muted)', lineHeight: '16px' }}>{r.description}</div>
-                    )}
-                  </Link>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
+        <nav aria-label="Market navigation">
+          <Link to="/market" className="button">Browse vehicles</Link>
+          <Link to="/?tab=garage" className="button">Your Garage</Link>
+        </nav>
+      </header>
+      {loading && <p role="status">Loading segment definitions…</p>}
+      {error && <div role="alert" className="market-reader-error">
+        <span>Segment definitions could not be refreshed: {error} {rows.length > 0 ? 'Showing the last successful definitions.' : ''}</span>
+        <button className="button" disabled={isFetching} onClick={() => void refetch()}>Retry segments</button>
+      </div>}
+      <p className="market-page-note">This index does not supply measured vehicle coverage or price changes. Open a definition to browse matching captured vehicles.</p>
+      <div className="market-definition-filters">
+        <label>Search definitions
+          <input type="search" value={query} onChange={e => setQuery(e.target.value)} placeholder="Name or description" />
+        </label>
+        <label>Manager
+          <select value={managerFilter} onChange={e => setManagerFilter(e.target.value as 'all' | 'ai' | 'human')}>
+            <option value="all">All</option><option value="ai">AI</option><option value="human">Human</option>
+          </select>
+        </label>
       </div>
+      {!loading && !error && rows.length === 0 && <section className="card market-definition-empty">
+        <h2>No segment definitions returned</h2>
+        <p>There are no definitions available from this read.</p>
+        {!hasSession && <Link to="/login" className="button">Sign in</Link>}
+      </section>}
+      {!loading && rows.length > 0 && filtered.length === 0 && <section className="card market-definition-empty">
+        <h2>No definitions match these filters</h2>
+        <button className="button" onClick={() => { setQuery(''); setManagerFilter('all'); }}>Clear filters</button>
+      </section>}
+      {Object.entries(grouped).map(([groupName, items]) => <section key={groupName} className="market-definition-group">
+        <h2>{groupName} <span>({items.length})</span></h2>
+        <div className="market-definition-grid">
+          {items.map(row => <Link key={row.segment_id} to={`/market/segments/${row.slug}`} className="card market-definition-card">
+            <div className="market-definition-title"><strong>{row.name}</strong><span>{row.manager_type === 'ai' ? 'AI managed' : row.manager_type === 'human' ? 'Human managed' : 'Manager not reported'}</span></div>
+            <dl>
+              <dt>Years</dt><dd>{row.year_min == null && row.year_max == null ? 'Any year' : `${row.year_min ?? 'Any'}–${row.year_max ?? 'Any'}`}</dd>
+              <dt>Makes</dt><dd>{row.makes?.length ? row.makes.join(', ') : 'Any make'}</dd>
+              <dt>Model keywords</dt><dd>{row.model_keywords?.length ? row.model_keywords.join(', ') : 'Any model'}</dd>
+            </dl>
+            {row.description && <p>{row.description}</p>}
+            <span className="market-definition-open">Browse matching vehicles →</span>
+          </Link>)}
+        </div>
+      </section>)}
     </div>
   );
 }
-
-

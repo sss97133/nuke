@@ -38,6 +38,8 @@ import { slugStubRejection } from "./slugStub.ts";
 import { parseVehicleTitle, type ParsedVehicle } from "./vehicleTitle.ts";
 import { extractFromHtml } from "../extract-craigslist/extract.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { vicariListingId } from "../_shared/vicariParser.ts";
+import { ingestVicari } from "./vicari.ts";
 
 const supabaseAdmin = createClient(
   Deno.env.get("SUPABASE_URL")!,
@@ -245,6 +247,8 @@ function extractTitleFromUrlSlug(url: string): string | null {
 }
 
 function detectSource(url: string): SourceMatch {
+  const vicariId = vicariListingId(url);
+  if (vicariId) return { platform: "vicari", externalId: vicariId };
   for (const { platform, pattern, extractId } of SOURCE_PATTERNS) {
     const match = url.match(pattern);
     if (match) {
@@ -636,6 +640,8 @@ async function matchOrCreateVehicle(
     source: platform && platform !== "unknown" ? platform : null,
     platform_source: platformSourceFor(platform), // C7: the platform key
   };
+  // An archived Vicari appearance has no established current sale state. Do not inherit the DB's "available" default.
+  if (platform === "vicari") vehicleData.sale_status = null;
   // A Craigslist post is a live classified when we read it. The column defaulted to false for every one of them
   // (1,053 of 1,053 created in two days, 2026-10-15) while sale_status said "available".
   if (platform === "craigslist") vehicleData.is_for_sale = true;
@@ -832,6 +838,7 @@ async function enrichVehicle(vehicleId: string, data: VehicleEnrichment, platfor
 // ── Auto-Enrichment via Existing Extractors ──────────────────────
 
 interface EnrichedData {
+  vicari_receipt?: Record<string, unknown>;
   vehicle_id?: string;
   year?: number | null;
   make?: string | null;
@@ -867,6 +874,14 @@ type EnrichResult =
 async function tryAutoEnrich(url: string, platform: string): Promise<EnrichResult> {
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const serviceKey = projectSecretKey()!;
+
+  if (platform === "vicari") {
+    try {
+      const data = await ingestVicari(url, { supabase: supabaseAdmin, archiveFetch,
+        matchVehicle: (fields) => matchOrCreateVehicle(fields, "vicari") });
+      return { ok: true, data: { ...data, vehicle_id: data.vehicle_id ?? undefined } };
+    } catch (e) { return { ok: false, error: e instanceof Error ? e.message : String(e) }; }
+  }
 
   // BaT delegates to extract-bat-core, a self-contained writer (it creates or
   // conservatively updates the vehicle row itself, resolving by
@@ -1112,6 +1127,7 @@ interface IngestInput {
 }
 
 interface IngestResult {
+  vicari_receipt?: Record<string, unknown>;
   status: "created" | "matched" | "duplicate" | "rejected" | "error" | "preview" | "unresolved";
   vehicle_id?: string | null;
   discovery_id?: string | null;
@@ -1290,12 +1306,17 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
     let extractorVehicleId: string | undefined;
     let enrichedPostedAt: string | null = null;
     let enrichedSellerType: string | null = null;
+    let vicariReceipt: Record<string, unknown> | undefined;
 
-    if (input.enrich !== false && listingUrl && !input.description) {
+    if (listingUrl && (platform === "vicari" || (input.enrich !== false && !input.description))) {
       const enrichResult = await tryAutoEnrich(listingUrl, platform);
       if (enrichResult.ok) {
         enrichmentSucceeded = true;
         const enriched = enrichResult.data;
+        vicariReceipt = enriched.vicari_receipt;
+        if (platform === "vicari" && vicariReceipt?.unresolved === true) {
+          return { status: "unresolved", vehicle_id: null, source: platform, external_id: externalId, vicari_receipt: vicariReceipt };
+        }
         if (platform === "craigslist" && CRAIGSLIST_SHARE_RE.test(listingUrl) && enriched.capture?.post_id !== externalId) {
           return { status: "rejected", reason: "enrichment_failed: Craigslist share detail post identity mismatch",
             enrichment_error: "Craigslist share detail post identity mismatch", source: platform, external_id: externalId };
@@ -1352,6 +1373,10 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
         enrichmentError = enrichResult.error;
         console.error(`Enrichment failed for ${listingUrl} (${platform}): ${enrichmentError}`);
       }
+    }
+
+    if (platform === "vicari" && enrichmentError) {
+      return { status: "error", error: enrichmentError, source: platform, external_id: externalId };
     }
 
     // Automated Craigslist intake must ledger a failed public detail request,
@@ -1846,6 +1871,7 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
       quality_score: qualityScore,
       issues: gateResult.issues.length > 0 ? gateResult.issues : undefined,
       needs_review: needsReview || undefined,
+      ...(vicariReceipt ? { vicari_receipt: vicariReceipt } : {}),
       ...(capture ? { listing_capture: ledgerFields(capture, landing) } : {}),
     };
   } catch (err: any) {

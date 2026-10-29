@@ -5,7 +5,7 @@
  * Same pattern as VehicleProfile.tsx.
  */
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { UserProfileProvider, useUserProfile } from './user-profile/UserProfileContext';
 import '../styles/user-profile.css';
 
@@ -17,6 +17,8 @@ const UserSettingsDrawer = React.lazy(() => import('./user-profile/UserSettingsD
 
 const UserProfileInner: React.FC = () => {
   const { loading, profile, isOwnProfile } = useUserProfile();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const settingsRequested = searchParams.get('settings') === 'connections';
 
   if (loading) {
     return <div style={{ height: '100vh', background: 'var(--bg)' }} />;
@@ -59,7 +61,10 @@ const UserProfileInner: React.FC = () => {
       {/* Settings Drawer — opens via up:open-settings event */}
       {isOwnProfile && (
         <React.Suspense fallback={null}>
-          <UserSettingsDrawer />
+          <UserSettingsDrawer open={settingsRequested ? true : undefined} onClose={() => {
+            if (!settingsRequested) return;
+            setSearchParams(current => { const next = new URLSearchParams(current); next.delete('settings'); return next; }, { replace: true });
+          }} />
         </React.Suspense>
       )}
     </div>

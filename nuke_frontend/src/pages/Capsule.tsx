@@ -1,10 +1,11 @@
 import { ProfileService } from '../services/profileService';
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { readCachedSession } from '../utils/cachedSession';
 import { PersonalPhotoLibrary } from './PersonalPhotoLibrary';
-import ShopFinancials from './ShopFinancials';
+import PrefetchLink from '../components/PrefetchLink';
+import './Capsule.css';
 import OrganizationAffiliations from '../components/profile/OrganizationAffiliations';
 import ProfessionalToolbox from '../components/profile/ProfessionalToolbox';
 import { ProfileVerification } from '../components/ProfileVerification';
@@ -29,28 +30,20 @@ type CapsuleTab =
   | 'professional'
   | 'photos';
 
+const capsuleTabs: CapsuleTab[] = ['dashboard', 'api-access', 'settings', 'appearance', 'financials', 'organizations', 'knowledge', 'streaming', 'professional', 'photos'];
+
 const Capsule: React.FC = () => {
   const [session, setSession] = useState<any>(() => readCachedSession());
   const [, setUserProfile] = useState<any>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get('tab') as CapsuleTab | null;
-  const [activeTab, setActiveTab] = useState<CapsuleTab>(tabParam || 'dashboard');
+  const activeTab: CapsuleTab = tabParam && capsuleTabs.includes(tabParam) ? tabParam : 'dashboard';
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
-  // Update active tab when URL param changes
-  useEffect(() => {
-    if (
-      tabParam &&
-      ['dashboard', 'api-access', 'settings', 'appearance', 'financials', 'organizations', 'knowledge', 'streaming', 'professional', 'photos'].includes(tabParam)
-    ) {
-      setActiveTab(tabParam);
-    }
-  }, [tabParam]);
-
   // Update URL when tab changes
   const handleTabChange = (tab: CapsuleTab) => {
-    setActiveTab(tab);
+    if (tab === 'financials') { navigate('/accounting'); return; }
     setSearchParams({ tab });
   };
 
@@ -78,18 +71,22 @@ const Capsule: React.FC = () => {
     }
   };
 
-  if (loading) return null;
+  if (loading) return <div className="capsule-workspace"><p role="status">Loading your workspace…</p></div>;
 
   if (!session) {
     return null; // Will redirect
   }
+
+  // Keep saved links to the old financials tab useful. Its event-summary reader
+  // is retired; the owner-scoped accounting office owns books and evidence.
+  if (activeTab === 'financials') return <Navigate to="/accounting" replace />;
 
   const tabs: Array<{ key: CapsuleTab; label: string }> = [
     { key: 'dashboard', label: 'Dashboard' },
     { key: 'api-access', label: 'API Access' },
     { key: 'settings', label: 'Settings' },
     { key: 'appearance', label: 'Appearance' },
-    { key: 'financials', label: 'Financials' },
+    { key: 'financials', label: 'Accounting' },
     { key: 'organizations', label: 'Organizations' },
     { key: 'knowledge', label: 'Knowledge Library' },
     { key: 'streaming', label: 'Streaming' },
@@ -98,29 +95,17 @@ const Capsule: React.FC = () => {
   ];
 
   return (
-      <div style={{ display: 'flex', gap: 'var(--space-4)', minHeight: '600px' }}>
+      <div className="capsule-workspace">
         {/* Sidebar Navigation - Hidden on Photos tab */}
         {activeTab !== 'photos' && (
-          <div style={{
-            width: '200px',
-            flexShrink: 0,
-            borderRight: '2px solid var(--border)',
-            paddingRight: 'var(--space-4)'
-          }}>
-            <nav style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <div className="capsule-sidebar">
+            <nav aria-label="Your workspace">
               {tabs.map(tab => (
                 <button
                   key={tab.key}
+                  type="button"
                   onClick={() => handleTabChange(tab.key)}
-                  style={{
-                    padding: 'var(--space-2) var(--space-3)',
-                    textAlign: 'left',
-                    background: activeTab === tab.key ? 'var(--surface-hover)' : 'transparent',
-                    border: activeTab === tab.key ? '2px solid var(--border)' : '1px solid transparent',
-                    cursor: 'pointer',
-                    fontSize: '12px',
-                    fontWeight: activeTab === tab.key ? 'bold' : 'normal'
-                  }}
+                  aria-current={activeTab === tab.key ? 'page' : undefined}
                 >
                   {tab.label}
                 </button>
@@ -130,17 +115,20 @@ const Capsule: React.FC = () => {
         )}
 
         {/* Main Content */}
-        <div style={{ flex: activeTab === 'photos' ? 1 : 1 }}>
+        <div className="capsule-content">
           {activeTab === 'dashboard' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
               <div className="card">
                 <div className="card-header">
-                  <h3 className="heading-3">Dashboard Overview</h3>
+                  <h1>Your workspace</h1>
                 </div>
                 <div className="card-body">
-                  <div>
-                    <div className="text text-small text-muted" style={{ marginBottom: '8px', fontWeight: 600 }}>Cash Balance</div>
-                    <div className="text text-muted">Trading removed</div>
+                  <p>Open your books, contribute evidence, or pick up the work that needs you.</p>
+                  <div className="capsule-destinations">
+                    <PrefetchLink to="/accounting"><strong>Accounting</strong><span>Books, receipts, review questions and shared access.</span><span aria-hidden="true">›</span></PrefetchLink>
+                    <PrefetchLink to="/work"><strong>Work</strong><span>Jobs, work days and confirmations awaiting your review.</span><span aria-hidden="true">›</span></PrefetchLink>
+                    <PrefetchLink to="/photo-library"><strong>Your photo library</strong><span>Organize your captures and the evidence they carry.</span><span aria-hidden="true">›</span></PrefetchLink>
+                    <PrefetchLink to="/settings"><strong>Settings</strong><span>Your account, connected agents and business preferences.</span><span aria-hidden="true">›</span></PrefetchLink>
                   </div>
                 </div>
               </div>
@@ -211,12 +199,6 @@ const Capsule: React.FC = () => {
           {activeTab === 'appearance' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
               <AppearanceSpecimen />
-            </div>
-          )}
-
-          {activeTab === 'financials' && (
-            <div>
-              <ShopFinancials />
             </div>
           )}
 

@@ -683,9 +683,12 @@ Deno.serve(async (req) => {
       const nowIso = new Date().toISOString()
       const { data: extListing } = await supabase
         .from('vehicle_events')
-        .select('id, final_price, current_price, event_status, ended_at, sold_at, source_listing_id, metadata')
+        .select('id, final_price, current_price, event_status, ended_at, sold_at, source_listing_id, metadata, source_suspect')
         .eq('vehicle_id', vehicleId)
         .eq('source_platform', 'bat')
+        // Only this listing's row: a relisted car has one event per listing, and the newest-updated row of a
+        // different listing must never take this page's price (wrong-listing / relist mismatches).
+        .in('source_url', urlCandidates)
         .order('updated_at', { ascending: false })
         .limit(1)
         .maybeSingle()
@@ -726,10 +729,27 @@ Deno.serve(async (req) => {
 
       // The page's own result banner wins over comments: a "Bid to" listing did not sell, whatever a comment says.
       const pageResult = parseBatPageResult(html)
+      // A stored price is never overwritten: when the page's sold amount differs, keep the stored value and
+      // record the conflict as a cited observation (final_price is flagged suspect), so it is resolved by evidence.
+      const storedFinal = plausibleBatSalePrice(extListing?.final_price)
+      const pagePriceConflict = pageResult?.kind === 'sold' && storedFinal != null && storedFinal !== pageResult.amount
       const inferredFinalPrice =
         pageResult?.kind === 'bid_to' ? null
+        : pagePriceConflict ? storedFinal
         : pageResult?.kind === 'sold' ? pageResult.amount
-        : (plausibleBatSalePrice(extListing?.final_price) ?? plausibleBatSalePrice(inferredSoldPriceFromComment))
+        : (storedFinal ?? plausibleBatSalePrice(inferredSoldPriceFromComment))
+      if (pagePriceConflict && extListing?.id) {
+        softWrite('price_basis_observation insert (page price conflict)', await supabase.from('price_basis_observation').upsert({
+          tbl: 'vehicle_events', event_id: extListing.id, kind: 'observed_page_status', stored_price: storedFinal,
+          observed_status: 'sold', observed_price: pageResult!.amount, observed_on: nowIso.slice(0, 10), source_url: String(auctionUrlNorm),
+          evidence: `bat page banner says Sold for $${pageResult!.amount}; stored final_price ${storedFinal} kept; final_price flagged suspect`,
+          rule: 'extractor_page_price_conflict_v1', run_id: 'extract-auction-comments',
+        }, { onConflict: 'tbl,event_id,rule', ignoreDuplicates: true }), writeErrors)
+        const suspect = Array.from(new Set([...((extListing as any)?.source_suspect || []), 'final_price']))
+        softWrite('vehicle_events flag final_price', await supabase.from('vehicle_events')
+          .update({ source_suspect: suspect, source_suspect_reason: 'page sold amount differs from stored final_price', source_suspect_run_id: 'extractor_page_price_conflict_v1', source_suspect_at: nowIso })
+          .eq('id', extListing.id), writeErrors)
+      }
 
       const inferredSaleDate = (() => {
         // Prefer an existing event date; else fall back to the SOLD system comment's
@@ -814,9 +834,10 @@ Deno.serve(async (req) => {
         event_status: inferredStatus || undefined,
         comment_count: commentsWithIdentities.length,
         bid_count: commentsWithIdentities.filter((c: any) => typeof c?.bid_amount === 'number' && Number.isFinite(c.bid_amount) && c.bid_amount > 0).length,
-        final_price: inferredFinalPrice,
-        current_price: inferredFinalPrice || (inferredHighBid > 0 ? Math.floor(inferredHighBid) : null),
-        sold_at: inferredFinalPrice ? inferredSaleDate : null,
+        // Never write null over a stored price or sale date; only a cited amount is written.
+        final_price: inferredFinalPrice ?? undefined,
+        current_price: inferredFinalPrice || (inferredHighBid > 0 ? Math.floor(inferredHighBid) : undefined),
+        sold_at: inferredFinalPrice ? inferredSaleDate : undefined,
         ended_at: inferredSaleDate || undefined,
         extracted_at: nowIso,
         updated_at: nowIso,
@@ -886,9 +907,9 @@ Deno.serve(async (req) => {
             .update({
               comment_count: batCommentRows.length,
               bid_count: bidRows.length,
-              current_price: inferredFinalPrice || (maxBid > 0 ? Math.floor(maxBid) : null),
-              final_price: inferredFinalPrice,
-              sold_at: inferredFinalPrice ? inferredSaleDate : null,
+              current_price: inferredFinalPrice || (maxBid > 0 ? Math.floor(maxBid) : undefined),
+              final_price: inferredFinalPrice ?? undefined,
+              sold_at: inferredFinalPrice ? inferredSaleDate : undefined,
               event_status: inferredStatus || undefined,
               extracted_at: nowIso,
               updated_at: nowIso,

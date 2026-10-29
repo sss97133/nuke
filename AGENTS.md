@@ -108,6 +108,12 @@ into permanent identity types or mandatory arrival choices without a separate mo
    - Private data (people's contact details, invoices, amounts) doesn't either. It lives in the database,
      and code and docs refer to it by id.
    - `VITE_*` values ship to browsers, so no secret gets that prefix. `npm run build` fails if one does.
+5. **Numbers are cited from the database or they are not stated.** A price, band, score or count in a reply,
+   a page or a row comes from a reader over the ledger's rows (the reader's name, its population, n, the
+   as-of date and the keys it used), never from a constant an agent typed into a seed, a doc or a markdown
+   table built for the reply. A status such as proven or contradicted exists only with a proof reference.
+   An agent's own judgment is labelled as judgment and never seeded into a table. (Skylar, 2026-10-29:
+   "you can only cite from the db".)
 
 ## Writes and deploys
 - **Schema, cron and SQL functions.** Write a migration file, make one commit, and push it yourself.
@@ -152,6 +158,19 @@ into permanent identity types or mandatory arrival choices without a separate mo
   green (fixed in #2320, #2322; the live check is #2323).
 - **Never** hand-apply a migration or function deploy, and never change compute, plan or disk.
 
+## Books and tax work
+- Start with `books_year_state(owner, year)` (RPC; migration `20261101170000`): Schedule C lines per schedule, owner
+  rulings, return-level facts (filing status, residency and credits, CFC/GILTI, Form 5471), the newest return result
+  and open items with what closes each. Settled facts live there, not in local files; do not re-derive them.
+- Write results, rulings and facts only through `ingest_financial_evidence`: Schedule C rulings with
+  `scripts/books/schedule_c_rulings.py`, return-level facts and results with `scripts/books/return_facts.py`.
+- A return builder passes `db-books/drift_check.py` before its result is reported, and
+  `scripts/books/books_year_state_check.py` (line 31 from the API equals the drift-check totals, 2022-2025) after.
+- A year is trusted only when `books_year_gate(owner, year)` passes every rule (R1-R9: one treatment per movement,
+  credits are revenue unless proven, no double count, cash method, evidence on expenses of $75+, depreciation from an
+  asset register, monthly mixed-use percentages, SE tax/credits/GILTI computed from stored inputs, no drift). Run
+  `scripts/books/books_year_gate_check.py` and list the failures; never fix them silently.
+
 ## PR titles and commit messages
 The repo is public, and a squash merge puts the PR title (or a single commit's subject) on `main` as the
 permanent record. Write both as `type(scope): summary`, at most 72 characters. The PR gate in
@@ -173,6 +192,15 @@ permanent record. Write both as `type(scope): summary`, at most 72 characters. T
   `feat(cad): engine assembly mesh at 1:1 scale`.
 
 ## Working alongside other agents
+
+- Preserve the owner's original outcome and later corrections in one current pickup;
+  a new detail does not replace the integrated task. Use existing tools for routine
+  checks, Luna for suitable small jobs, Sol for scoped engineering and Astra for gist,
+  difficult decisions and deep iteration. These are starting preferences, not automatic
+  routing or permission to spawn paid work. The [workspace workflow](docs/AGENT_WORKFLOW.md)
+  provides installed commands and a compact handoff; load it when routing or resuming
+  substantial work, not before every edit.
+
 - Work in your own worktree:
   `git worktree add ~/.worktrees/<task> -b <branch> origin/main`, then
   `ln -s ~/nuke/nuke_frontend/node_modules ~/.worktrees/<task>/nuke_frontend/node_modules` so the

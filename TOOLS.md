@@ -36,6 +36,7 @@ Building a duplicate wastes compute, creates data forks, and breaks pipeline tra
 | Measure raw-vs-model landing depth | `measure-landing-depth` | Nightly per source (pg_cron): samples recently landed lots, reads each retained capture with the independent probes in `_shared/landingDepthProbes.ts`, resolves the vehicle, and writes raw-present / model-present / profile-present counts per field to `landing_depth_measurements` (views `v_landing_depth_latest`, `v_landing_depth_drops`). Reads captures and the model; writes only its own table. `{source, sample, dry_run}`. |
 | Import Facebook Saved vehicles | MCP `import_facebook_saved` tool or `scripts/fb-saved-extractor.js` | Two-step: extract (returns browser JS) → submit (POSTs to ingest). Runs client-side in user's browser on facebook.com/saved. |
 | Extract Bonhams auction | `extract-bonhams` | |
+| Ingest Vicari auction lots | `ingest` with a Vicari `auction-house?ahid=` URL | Deterministic `vicari_html_v1`; retained source pages, attributed listing observations and full-size photo URLs. High bids and archived listings are not sale results. `scripts/data/vicari-ingest.ts` discovers advertised catalog pagination and runs a bounded/resumable one-off import; no new schedule or paid analysis. |
 | Extract RM Sotheby's | `extract-rmsothebys` | |
 | Extract Mecum | `extract-mecum` | Service-only `action: source_result_preview` with one explicit `snapshot_id` reads/hash-verifies that retained capture and returns private unqualified result/run-day claims and gaps. No source fetching, intake, metadata/profile/queue writes or inference; `dry_run: false` and extraction options refuse. Scheduled run day is not sale/settlement time. Parent custody, currency and fee basis remain unestablished. |
 | Extract Gooding & Co | `extract-gooding` | |
@@ -156,6 +157,7 @@ Building a duplicate wastes compute, creates data forks, and breaks pipeline tra
 
 | Intent | Use This | Notes |
 |--------|----------|-------|
+| A contributor (builder, previous owner, shop, appraiser) answers questions and sends documents from a link | `contributor-intake` | Public, token-only (no account). GET open, POST /answer, POST /file (multipart, sha256, `vehicle-photos/contributors/<invite_id>/<sha256>/<file>`, EXIF). Writes only through `contributor_intake_open` / `_answer` / `_file`; device attestation with ip_sha256 (daily salt `CONTRIBUTOR_IP_SALT`); one 404 for unknown, expired and revoked tokens. Owner creates links with `create_contributor_invite` and reads `get_contributor_intake`; page `/contribute/:token` |
 | OCR a vehicle document | `document-ocr-worker` | Reads from `document_ocr_queue` |
 | Queue a document for OCR | Insert to `document_ocr_queue` | Worker picks up automatically |
 | Extract title/registration data | `extract-title-data` | Writes to `vehicle_title_documents` |
@@ -164,7 +166,19 @@ Building a duplicate wastes compute, creates data forks, and breaks pipeline tra
 
 ---
 
-## Agent Hierarchy (Haiku/Sonnet/Opus)
+## Workspace agents
+
+For development-session routing, commands and handoffs use
+[Agent workspace](docs/AGENT_WORKFLOW.md) and the `nuke-work` skill. Its explicit
+profiles preserve the selected account and base permissions; they do not automatically
+dispatch jobs or establish model access. Use tools for routine checks, Sol for scoped
+engineering and Astra for ambiguous intent and hard decisions; Luna suits small jobs.
+
+## Application extraction agents (historical Haiku/Sonnet/Opus inventory)
+
+This inventory describes application endpoints, not the workspace's session router.
+Verify the affected endpoint's current implementation, live activity and authorization
+before invoking it. A listed operation is not permission to run a paid pipeline.
 
 | Intent | Use This | Notes |
 |--------|----------|-------|
@@ -173,7 +187,7 @@ Building a duplicate wastes compute, creates data forks, and breaks pipeline tra
 | Get agent system status | `agent-tier-router` with `{"action":"status"}` | Queue counts, tier health, cost estimates |
 | Get cost report | `agent-tier-router` with `{"action":"cost_report"}` | Cost breakdown by tier, savings vs Sonnet-only |
 | Run Opus strategy query | `agent-tier-router` with `{"action":"strategy","strategy_query":"..."}` | Source prioritization, market intel |
-| Extract listing with Haiku (cheap) | `haiku-extraction-worker` with `{"action":"extract_listing","url":"...","html":"..."}` | 3x cheaper than Sonnet |
+| Extract listing with Haiku | `haiku-extraction-worker` with `{"action":"extract_listing","url":"...","html":"..."}` | Verify the current model and cost before calling |
 | Parse title with Haiku | `haiku-extraction-worker` with `{"action":"parse_title","title":"..."}` | Fast YMM extraction |
 | Batch parse titles | `haiku-extraction-worker` with `{"action":"parse_titles","titles":["..."]}` | Single API call for many titles |
 | Process queue batch with Haiku | `haiku-extraction-worker` with `{"action":"batch_extract","batch_size":10}` | Pulls from import_queue |
@@ -182,10 +196,12 @@ Building a duplicate wastes compute, creates data forks, and breaks pipeline tra
 | Resolve edge case | `sonnet-supervisor` with `{"action":"resolve_edge_case","content":"..."}` | Complex vehicles (replicas, restomods) |
 | Quality report | `sonnet-supervisor` with `{"action":"quality_report"}` | Extraction quality metrics |
 
-### Tier Routing Rules
-- **Haiku** ($1/$5 per MTok): Routine extraction, title parsing, field extraction, simple classification
-- **Sonnet** ($3/$15 per MTok): Quality review, edge cases, multi-field validation, escalation decisions
-- **Opus** ($5/$25 per MTok): Source prioritization, market intelligence, pipeline optimization strategy
+### Historical extraction roles
+- **Haiku**: Routine extraction, title parsing, field extraction, simple classification
+- **Sonnet**: Quality review, edge cases, multi-field validation, escalation decisions
+- **Opus**: Source prioritization, market intelligence, pipeline optimization strategy
+
+Provider prices and subscription limits are not established by this dated inventory.
 
 ---
 
@@ -426,6 +442,7 @@ The conversational face of the same verbs the drill buttons use. Runs as the cal
 
 Ledger read set: `get_vehicle_build_ledger` returns `extraction_method IN ('audit_draft_v0','owner_confirmed_v1')`. A rejected entry's `owner_rejected_v1` successor is deliberately excluded — the ruling persists as testimony, the row leaves the ledger.
 Booked costs: `accounting_vehicle_costs(vehicle_id)` (SECURITY DEFINER) returns the current accounting-book expense uses assigned to the vehicle, for a caller who can read that book (owner or active accounting grant) AND has the vehicle access above. Its rows are keyed by the book cell id, never an observation id, so the confirmation tools cannot act on them; the Build ledger shows them as their own "In the accounts" group, never summed with the audit totals.
+Working notes: `owner_working_notes(owner_id, vehicle_id?, organization_id?, from?, to?, rows?, limit?)` (SECURITY INVOKER, jsonb) returns the owner's spreadsheets from the time (Numbers workbooks and their CSV/PDF companions, admitted as `working_notes_*` cells by `scripts/books/numbers_working_notes.py` through `ingest_financial_evidence`) that name a vehicle, an organization or related party, or overlap a period: compact keyed rows `{r, d, t, a}` with the trust tier `owner_working_notes_contextual`. They carry no lines or accounting records, so no books reader counts them; the Build ledger shows them as "Working notes from then", outside every total. Bounded to 100 tables and 50 rows per table; owner and accounting delegates only.
 
 ---
 

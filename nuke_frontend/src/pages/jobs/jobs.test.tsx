@@ -9,6 +9,7 @@ const fixture = vi.hoisted(() => ({
   rpc: vi.fn(),
   session: null as null | { user: { id: string } },
 }));
+vi.mock('../../hooks/useAuth', () => ({ useAuth: () => ({ user: null, loading: false }) }));
 vi.mock('../../lib/supabase', () => ({ supabase: { rpc: fixture.rpc } }));
 vi.mock('../../contexts/AuthContext', () => ({ useAuthContext: () => ({ session: fixture.session }) }));
 vi.mock('../../hooks/usePageTitle', () => ({ usePageTitle: () => {} }));
@@ -305,6 +306,7 @@ describe('WorkPage', () => {
   };
 
   it('lists signature items with the server words and job links, and payments only on the payee item', async () => {
+    fixture.session = { user: { id: CUSTOMER_UID } };
     fixture.rpc.mockImplementation(async (fn: string) => ({ data: fn === 'my_signature_queue' ? queue : jobs, error: null }));
     await render(<WorkPage />);
     const text = container.textContent ?? '';

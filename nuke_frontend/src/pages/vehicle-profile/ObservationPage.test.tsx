@@ -7,8 +7,9 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 // Synthetic offline contracts; no production testimony is created.
 const fixture = vi.hoisted(() => ({
   route: { vehicleId: 'offline-vehicle', obsId: 'offline-observation' },
-  read: vi.fn(), calls: [] as any[],
+  auth: { user: { id: 'viewer-a' } as { id: string } | null, loading: false }, read: vi.fn(), calls: [] as any[],
 }));
+vi.mock('../../hooks/useAuth', () => ({ useAuth: () => fixture.auth }));
 vi.mock('react-router-dom', async original => ({
   ...await original<typeof import('react-router-dom')>(), useParams: () => fixture.route,
 }));
@@ -42,6 +43,7 @@ function parent(call: any) { return { data: { id: id(call), year: 1965, make: 'O
 let root: Root, host: HTMLDivElement;
 beforeEach(() => {
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
+  fixture.auth = { user: { id: 'viewer-a' }, loading: false };
   fixture.route = { vehicleId: PARENT, obsId: OBS }; fixture.calls = []; fixture.read.mockReset();
   fixture.read.mockImplementation(call => call.table === 'vehicles' ? parent(call) : { data: observation(), error: null });
   host = document.createElement('div'); document.body.append(host); root = createRoot(host);
@@ -179,4 +181,53 @@ it.each(['vehicles', 'vehicle_observations'])('ends a stalled %s reader at a fin
   expect(host.querySelector('[role=alert]')).not.toBeNull();
   expect(host.querySelector('[role=status]')).toBeNull();
   expect(host.querySelector('h1')).toBeNull();
+});
+
+
+it('clears prior viewer data immediately on logout and while the next read is pending', async () => {
+  await mount();
+  expect(host.textContent).toContain('731');
+  let finish: (value: any) => void = () => {};
+  fixture.read.mockImplementation(() => new Promise(resolve => { finish = resolve; }));
+  fixture.auth = { user: null, loading: false };
+  await mount();
+  expect(host.textContent).not.toContain('731');
+  expect(host.querySelector('[role=status]')).not.toBeNull();
+  await act(async () => finish({ data: null, error: null }));
+  expect(host.querySelector('[role=alert]')).not.toBeNull();
+});
+it('waits for auth resolution and preserves the reader on a same-ID session refresh', async () => {
+  fixture.auth.loading = true; await mount();
+  expect(fixture.calls).toHaveLength(0);
+  fixture.auth.loading = false; await mount();
+  const calls = fixture.calls.length;
+  fixture.auth = { user: { id: 'viewer-a' }, loading: false };
+  await mount(); expect(fixture.calls).toHaveLength(calls);
+  expect(host.textContent).toContain('731');
+  fixture.auth.loading = true; await mount();
+  expect(host.textContent).not.toContain('731');
+});
+
+it('does not publish a late viewer-A observation after viewer B replaces the reader', async () => {
+  let release: (v: any) => void = () => {};
+  fixture.read.mockImplementation(call => call.table === 'vehicles' ? parent(call) : new Promise(resolve => { release = resolve; }));
+  await mount(); const oldSignal = fixture.calls.find(call => call.table === 'vehicle_observations').signal;
+  fixture.auth.user = { id: 'viewer-b' };
+  fixture.read.mockResolvedValue({ data: null, error: null });
+  await mount(); expect(oldSignal.aborted).toBe(true);
+  await act(async () => release({ data: observation(), error: null }));
+  expect(host.querySelector('h1')).toBeNull(); expect(host.textContent).not.toContain('731');
+});
+it('reports unavailable linked observations while retaining the visible observation and retries', async () => {
+  fixture.read.mockImplementation(call => call.table === 'vehicles' ? parent(call)
+    : id(call) === OBS ? { data: observation({ superseded_by: 'next-report' }), error: null }
+    : { data: null, error: { message: 'private linked query error' } });
+  await mount();
+  expect(host.textContent).toContain('731');
+  expect(host.textContent).toContain('Linked observations could not be read completely');
+  expect(host.textContent).not.toContain('private linked query error');
+  fixture.read.mockImplementation(call => call.table === 'vehicles' ? parent(call) : { data: observation(), error: null });
+  await act(async () => [...host.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent === 'Retry linked observations')!.click());
+  expect(host.textContent).not.toContain('Linked observations could not be read completely');
+  expect(host.textContent).toContain('731');
 });

@@ -1,0 +1,13 @@
+.vehicle-popup-body { --vehicle-popup-success: color-mix(in srgb, var(--success) 65%, var(--text)); --vehicle-popup-error: color-mix(in srgb, var(--error) 65%, var(--text)); --vehicle-popup-warning: color-mix(in srgb, var(--warning) 65%, var(--text)); display: flex; flex-direction: column; color: var(--text); background: var(--surface); font: var(--text-body)/1.5 var(--font-family); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.vehicle-popup-heading { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px; }
+.vehicle-popup-heading > span:first-child { flex: 1 1 210px; min-width: 0; }
+.vehicle-popup-text-action { display: inline-flex; align-items: center; min-height: var(--control-height); max-width: 100%; padding: 4px 6px; margin: 0; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--link); font: inherit; text-align: left; cursor: pointer; overflow-wrap: anywhere; }
+.vehicle-popup-text-action:hover { background: var(--surface-hover); }
+.vehicle-popup-comp { width: 100%; min-width: 0; min-height: var(--control-height); border: 0; background: transparent; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.vehicle-popup-comp:hover { background: var(--surface-hover); }
+.vehicle-popup-sighting { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 6px 0; }
+.vehicle-popup-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; padding: 12px; }
+.vehicle-popup-action { box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; min-height: var(--control-height); padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--link); text-decoration: none; font: 600 var(--text-callout)/1.4 var(--font-family); }
+.vehicle-popup-action-primary { background: var(--action); color: var(--on-action); border-color: var(--action); }
+.vehicle-popup-text-action:focus-visible, .vehicle-popup-comp:focus-visible, .vehicle-popup-action:focus-visible { outline: 2px solid var(--border-focus); outline-offset: -2px; }
+@media (max-width: 600px) { .vehicle-popup-action { flex: 1 1 auto; } }

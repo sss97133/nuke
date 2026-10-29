@@ -2,6 +2,8 @@
 /**
  * extract-bat-core
  *
+ * Version: 4.5.8 — vehicles.description stores the full post body (was a 480-char summary + "…"); a stored legacy
+ *   cut of the same body is replaced, never a longer/different text; sets description_truncated / description_length_source (2026-10-25)
  * Version: 4.5.2 — the lot's own "Private Party or Dealer" line lands in auction_events.seller_type (raw text in raw_data.party_type_raw) (2026-10-20)
  * Version: 4.5.1 — a withdrawn lot is closed: outcome 'cancelled', end = its "Withdrawn on" stamp (2026-10-15)
  * Version: 4.5.0 — an end event only once the auction is over; the lot's own end, never the widget's (2026-10-15)
@@ -36,6 +38,7 @@
  * Comments/bids are handled separately by extract-auction-comments and stored in auction_comments.
  */
 
+import { fullDescriptionText, shouldReplaceDescription } from "./descriptionText.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { normalizeListingUrlKey } from "../_shared/listingUrl.ts";
 import { decideLotAttribution, mergeEventMetadata, monitorForSeller, type BatEventRow } from "./sellerAttribution.ts";
@@ -61,7 +64,7 @@ import { landIdentifierClaims } from "../_shared/landIdentifierClaims.ts";
 declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void };
 
 // Extractor versioning - update on each significant change
-const EXTRACTOR_VERSION = 'extract-bat-core:4.5.7';
+const EXTRACTOR_VERSION = 'extract-bat-core:4.5.8';
 
 // Shared column list for the four vehicle-existence lookups below
 // (discovery_url / bat_auction_url / listing_url / update-existing-vehicle
@@ -909,13 +912,6 @@ function extractImages(html: string): string[] {
   return Array.from(new Set(urls));
 }
 
-function normalizeDescriptionSummary(raw: string | null): string | null {
-  const s = typeof raw === "string" ? raw.trim() : "";
-  if (!s) return null;
-  const cleaned = s.replace(/\s+/g, " ").trim();
-  if (cleaned.length <= 480) return cleaned;
-  return `${cleaned.slice(0, 480).trim()}…`;
-}
 
 async function trySaveExtractionMetadata(args: {
   supabase: any;
@@ -1417,7 +1413,7 @@ Deno.serve(async (req) => {
     const batCategory = essentials.listing_category ? String(essentials.listing_category).trim() : null;
     const listingKind = batCategory && batCategory.toLowerCase() === "parts" ? "non_vehicle_item" : "vehicle";
     const descriptionRaw = extractDescription(html);
-    const description = normalizeDescriptionSummary(descriptionRaw);
+    const description = fullDescriptionText(descriptionRaw);
     const images = extractImages(html);
     const inferredBodyStyle = inferBodyStyleFromTitle(identity.title);
     const bestBodyStyle =
@@ -1525,6 +1521,8 @@ Deno.serve(async (req) => {
         vin: isIdentityGradeVin(essentials.vin) ? essentials.vin : null,
         description: description || null,
         description_source: description ? "source_imported" : null,
+        description_truncated: description ? false : null,
+        description_length_source: description ? "full_post_body" : null,
         listing_title: identity.title || null,
         listing_url: listingUrlCanonical,
         listing_source: "bat",
@@ -1751,7 +1749,11 @@ Deno.serve(async (req) => {
       if (!existing?.bat_listing_title || isPolluted(existing?.bat_listing_title)) updatePayload.bat_listing_title = identity.title || null;
 
       if (!existing?.vin && essentials.vin) updatePayload.vin = essentials.vin;
-      if (!existing?.description && description) updatePayload.description = description;
+      if (shouldReplaceDescription(existing?.description, description)) {
+        updatePayload.description = description;
+        updatePayload.description_truncated = false;
+        updatePayload.description_length_source = "full_post_body";
+      }
       if (!existing?.description_source && description) updatePayload.description_source = "source_imported";
 
       // BaT fields / essentials (fill if missing)

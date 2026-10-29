@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { parseAction, type JobAction, type JsonObject } from './jobRead';
 import {
-  attestArgs, baseLines, evidenceArgs, findingsArgs, grantArgs, notAttachableText, changeOrderArgs, completionActions, confirmBookingArgs, cosignArgs, facilityAssets, invoiceArgs, invoiceLinesFromQuote,
+  attestArgs, baseLines, evidenceArgs, findingsArgs, grantArgs, notAttachableText, changeOrderArgs, completionActions, confirmBookingArgs, confirmWorkDayArgs, workDayConfirmationFailure, cosignArgs, facilityAssets, invoiceArgs, invoiceLinesFromQuote,
   payInvoiceTarget, paymentArgs, paymentSide, quoteArgs, quoteScope, refusal, releaseVocabulary, requestsLeft, reserveArgs, seedQuoteLines,
   stripeCheckoutUrl, vouchArgs,
 } from './signDrafts';
@@ -164,6 +164,21 @@ describe('co-sign, vouch and bookings', () => {
   it('flattens facility_read asset groups', () => {
     expect(facilityAssets({ assets_by_kind: [{ kind: 'lift', capacity_total: 2, assets: [{ asset_id: 'as1', label: 'Lift A', capacity: 1, busy: [{ from: '2026-10-20T08:00:00Z', until: '2026-10-20T10:00:00Z' }] }] }] }))
       .toEqual([{ assetId: 'as1', kind: 'lift', label: 'Lift A', capacity: 1, busy: [{ from: '2026-10-20T08:00:00Z', until: '2026-10-20T10:00:00Z' }] }]);
+  });
+
+  it('confirms a work day only from its exact affirmative queue action', () => {
+    const item = { kind: 'work_session', ref_id: 'session-1', sign: { rpc: 'confirm_work_session', args_hint: { p_session_id: 'session-1', p_confirm: true } } };
+    expect(confirmWorkDayArgs(item)).toEqual({ ok: true, args: { p_session_id: 'session-1', p_confirm: true } });
+    for (const changed of [
+      { ...item, kind: 'quote_to_accept' }, { ...item, ref_id: 'session-2' },
+      { ...item, sign: { ...item.sign, rpc: 'another_writer' } },
+      { ...item, sign: { ...item.sign, args_hint: { p_session_id: 'session-1', p_confirm: false } } },
+      { ...item, sign: { rpc: 'confirm_work_session' } },
+    ]) expect(confirmWorkDayArgs(changed).ok).toBe(false);
+    expect(workDayConfirmationFailure({ ok: true, confirmed: true, session_id: 'session-1' }, 'session-1')).toBeNull();
+    for (const result of [null, {}, { ok: false, error: 'not_authorized' }, { ok: true, confirmed: false, session_id: 'session-1' }, { ok: true, confirmed: true, session_id: 'other' }]) {
+      expect(workDayConfirmationFailure(result, 'session-1')).toBeTruthy();
+    }
   });
 
   it('confirms a booking only from its own queue sign hint', () => {

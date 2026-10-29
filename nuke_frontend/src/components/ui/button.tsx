@@ -4,22 +4,22 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "../../lib/utils"
 
 const buttonVariants = cva(
-  "button", // Use design system base class
+  "btn-base", // Canonical shared controls
   {
     variants: {
       variant: {
-        default: "button-primary",
-        destructive: "button", // Use base button for destructive
-        outline: "button-secondary",
-        secondary: "button-secondary",
-        ghost: "button",
-        link: "button",
+        default: "btn-primary",
+        destructive: "btn-danger",
+        outline: "btn-secondary",
+        secondary: "btn-secondary",
+        ghost: "btn-ghost",
+        link: "btn-link",
       },
       size: {
-        default: "",
-        sm: "button-small",
-        lg: "",
-        icon: "",
+        default: "btn-md",
+        sm: "btn-sm",
+        lg: "btn-lg",
+        icon: "btn-icon",
       },
     },
     defaultVariants: {
@@ -49,4 +49,4 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
 )
 Button.displayName = "Button"
 
-export { Button, buttonVariants } 
+export { Button, buttonVariants }

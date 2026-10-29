@@ -117,6 +117,8 @@ export interface DashboardSummary {
 export interface VehiclesDashboardState {
   /** False for a visitor who is not signed in: the garage then explains itself instead of offering an add. */
   signedIn: boolean;
+  viewerId: string | null;
+  warnings?: string[];
   unresolvedSources?: UnresolvedGarageSource[];
   sections: GarageSection[];
   vehicles: GarageVehicle[];
@@ -416,6 +418,8 @@ function rowToGarageVehicle(
 // ---------------------------------------------------------------------------
 
 export function useVehiclesDashboard(userId: string | undefined | null): VehiclesDashboardState {
+  const [readerViewer, setReaderViewer] = useState(userId ?? null);
+  const [warnings, setWarnings] = useState<string[]>([]);
   const [rawVehicles, setRawVehicles] = useState<GarageVehicle[]>([]);
   const [unresolvedSources, setUnresolvedSources] = useState<UnresolvedGarageSource[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -428,6 +432,8 @@ export function useVehiclesDashboard(userId: string | undefined | null): Vehicle
   const refresh = useCallback(() => setRefreshKey((k) => k + 1), []);
 
   useEffect(() => {
+    setReaderViewer(userId ?? null);
+    setWarnings([]);
     if (!userId) {
       setRawVehicles([]);
       setUnresolvedSources([]);
@@ -510,6 +516,7 @@ export function useVehiclesDashboard(userId: string | undefined | null): Vehicle
         const eventSummaries = new Map<string, EventSummary>();
         const eventWeeksMap = new Map<string, string[]>();
         const estimates = new Map<string, { estimated_value: number; calculated_at: string }>();
+        const readWarnings: string[] = [];
 
         if (vehicleIdArray.length > 0) {
           // IDs missing primary_image_url need fallback images
@@ -523,6 +530,9 @@ export function useVehiclesDashboard(userId: string | undefined | null): Vehicle
             if (row.image_count != null) imageCounts.set(vid, Number(row.image_count));
           }
 
+          const optionalRead = async (read: PromiseLike<{ data: any; error?: unknown }>) => {
+            try { return await read; } catch { return { data: null, error: true }; }
+          };
           const [fallbackRes, eventSummaryRes, eventWeeksRes, estimateRes] = await Promise.all([
             needsFallback.length > 0
               ? supabase.rpc('get_first_image_batch', { vehicle_ids: needsFallback })
@@ -540,21 +550,24 @@ export function useVehiclesDashboard(userId: string | undefined | null): Vehicle
               .eq('comp_method', 'class_stratified')
               .eq('is_stale', false)
               .eq('is_circular', false),
-          ]);
-          if (estimateRes.error) throw new Error('Garage estimates unavailable. Please retry.');
-          for (const e of estimateRes.data ?? []) {
+          ].map(optionalRead));
+          if (fallbackRes.error) readWarnings.push('Some fallback photos are unavailable.');
+          if (eventSummaryRes.error) readWarnings.push('Event summaries are unavailable. Activity counts remain unknown.');
+          if (eventWeeksRes.error) readWarnings.push('Activity timelines are unavailable.');
+          if (estimateRes.error) readWarnings.push('Recorded estimates are unavailable. Vehicle relationships remain visible.');
+          for (const e of estimateRes.error ? [] : estimateRes.data ?? []) {
             if (Number.isFinite(Number(e.estimated_value)) && Number(e.estimated_value) > 0 &&
                 e.calculated_at && Number.isFinite(Date.parse(e.calculated_at))) {
               estimates.set(e.vehicle_id, { estimated_value: Number(e.estimated_value), calculated_at: e.calculated_at });
             }
           }
 
-          if (fallbackRes.data) {
+          if (!fallbackRes.error && fallbackRes.data) {
             for (const f of fallbackRes.data as { vehicle_id: string; image_url: string }[]) {
               fallbackImages.set(f.vehicle_id, f.image_url);
             }
           }
-          if (eventSummaryRes.data) {
+          if (!eventSummaryRes.error && eventSummaryRes.data) {
             for (const s of eventSummaryRes.data as any[]) {
               eventSummaries.set(s.vehicle_id, {
                 total_events: Number(s.total_events) || 0,
@@ -565,7 +578,7 @@ export function useVehiclesDashboard(userId: string | undefined | null): Vehicle
               });
             }
           }
-          if (eventWeeksRes.data) {
+          if (!eventWeeksRes.error && eventWeeksRes.data) {
             for (const w of eventWeeksRes.data as { vehicle_id: string; event_week: string }[]) {
               if (!eventWeeksMap.has(w.vehicle_id)) eventWeeksMap.set(w.vehicle_id, []);
               eventWeeksMap.get(w.vehicle_id)!.push(w.event_week);
@@ -584,6 +597,7 @@ export function useVehiclesDashboard(userId: string | undefined | null): Vehicle
           garage.push(rowToGarageVehicle(row, rel, estimates.get(id), imageCounts.get(id), fallbackImages.get(id), eventWeeksMap.get(id), eventSummaries.get(id)));
         }
 
+        setWarnings(readWarnings);
         setRawVehicles(applyGarageOwnerCorrections(garage, corrections));
         setUnresolvedSources(unresolvedGarageSources(corrections));
       } catch (err: unknown) {
@@ -601,7 +615,9 @@ export function useVehiclesDashboard(userId: string | undefined | null): Vehicle
   }, [userId, refreshKey]);
 
   // Derived state
-  const vehicles = rawVehicles
+  const sameViewer = readerViewer === (userId ?? null);
+  const visibleLoading = !!userId && (!sameViewer || isLoading);
+  const vehicles = (sameViewer && userId ? rawVehicles : [])
     .filter((v) => matchesFilter(v, filterMode))
     .sort((a, b) => sortVehicles(a, b, sortMode));
 
@@ -612,16 +628,18 @@ export function useVehiclesDashboard(userId: string | undefined | null): Vehicle
     .filter((v) => ['VERIFIED OWNER', 'OWNER', 'CO-OWNER'].includes(v.relationship_type))
     .reduce((sum, v) => sum + (v.estimated_value ?? 0), 0);
 
-  const data = userId ? buildDashboardData(sections, vehicles) : null;
+  const data = sameViewer && userId ? buildDashboardData(sections, vehicles) : null;
 
   return {
     signedIn: !!userId,
+    viewerId: userId ?? null,
+    warnings: sameViewer && userId ? warnings : [],
     sections,
-    unresolvedSources,
+    unresolvedSources: sameViewer && userId ? unresolvedSources : [],
     vehicles,
     totalEstimatedValue,
-    isLoading,
-    error,
+    isLoading: visibleLoading,
+    error: sameViewer && userId ? error : null,
     viewMode,
     sortMode,
     filterMode,
@@ -630,6 +648,6 @@ export function useVehiclesDashboard(userId: string | undefined | null): Vehicle
     setFilterMode,
     refresh,
     data,
-    loading: isLoading,
+    loading: visibleLoading,
   };
 }

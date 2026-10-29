@@ -3,6 +3,29 @@
 \ir ../migrations/20261023200300_financial_accounting_records_view.sql
 \ir ../migrations/20261023201000_financial_accounting_records_view_grants.sql
 \ir ../migrations/20261023233000_financial_accounting_categories_view.sql
+CREATE TEMP TABLE records_view_properties AS
+SELECT relowner,relacl,reloptions FROM pg_class WHERE oid='public.v_financial_accounting_records'::regclass;
+-- Keep an independent copy of the original definition for bidirectional parity.
+DO $$ BEGIN
+ EXECUTE 'CREATE TEMP VIEW accounting_records_preimage WITH (security_invoker=true) AS '
+   || pg_get_viewdef('public.v_financial_accounting_records'::regclass,true);
+END $$;
+\ir ../migrations/20261025083500_accounting_records_bounded_reads.sql
+\ir ../migrations/20261025083500_accounting_records_bounded_reads.sql
+DO $$ BEGIN
+ IF EXISTS(SELECT * FROM records_view_properties EXCEPT SELECT relowner,relacl,reloptions
+   FROM pg_class WHERE oid='public.v_financial_accounting_records'::regclass)
+ THEN RAISE EXCEPTION 'view owner, grants or invoker options changed'; END IF;
+END $$;
+ALTER TABLE auth.users ADD COLUMN email_confirmed_at timestamptz DEFAULT now();
+CREATE TABLE accounting_access_grants(owner_id uuid, member_id uuid, active boolean NOT NULL DEFAULT true);
+ALTER TABLE financial_document_lines ENABLE ROW LEVEL SECURITY;
+CREATE POLICY financial_document_lines_owner_select ON financial_document_lines FOR SELECT USING (auth.uid()=owner_id);
+CREATE POLICY financial_documents_delegate_read ON financial_documents FOR SELECT TO authenticated USING (false);
+CREATE POLICY financial_lines_delegate_read ON financial_document_lines FOR SELECT TO authenticated USING (false);
+CREATE POLICY financial_extractions_delegate_read ON financial_document_extractions FOR SELECT TO authenticated USING (false);
+CREATE POLICY financial_concerns_delegate_read ON financial_review_queue FOR SELECT TO authenticated USING (false);
+\ir ../migrations/20261023220500_accounting_delegate_read_hoisted.sql
 BEGIN;
 INSERT INTO auth.users(id) VALUES ('11111111-1111-4111-8111-111111111111'),('22222222-2222-4222-8222-222222222222');
 SELECT set_config('request.jwt.claim.role','service_role',true);
@@ -53,4 +76,119 @@ BEGIN
  RAISE NOTICE 'PASS current accounting records view: current run only, record columns, book isolation, read-only, caller-scoped';
  RAISE NOTICE 'PASS accounting categories view: classified pairs counted from current records, isolated, select-only';
 END $$;
+-- Duplicate cells must not multiply records. Noncanonical UUID strings remain
+-- excluded, and a run with both superseded and current cells remains current.
+INSERT INTO financial_document_extractions(owner_id,document_id,extraction_run_id,field_key,value_raw)
+SELECT owner_id,document_id,extraction_run_id,'parity-extra','synthetic'
+FROM v_financial_accounting_records LIMIT 1;
+INSERT INTO financial_document_lines(owner_id,document_id,line_number,attributes)
+SELECT owner_id,document_id,9999,jsonb_build_object('intake_mode','financial_evidence_v1',
+  'extraction_run_id',upper(extraction_run_id::text),'accounting_record',record)
+FROM v_financial_accounting_records WHERE extraction_run_id::text ~ '[a-f]' LIMIT 1;
+INSERT INTO financial_document_lines(owner_id,document_id,line_number,attributes)
+SELECT owner_id,document_id,10000,jsonb_build_object('intake_mode','financial_evidence_v1',
+  'extraction_run_id','not-a-uuid','accounting_record',record)
+FROM v_financial_accounting_records LIMIT 1;
+INSERT INTO financial_document_extractions(owner_id,document_id,extraction_run_id,field_key,value_raw,is_superseded)
+SELECT owner_id,document_id,extraction_run_id,'parity-superseded-cell','synthetic',true
+FROM v_financial_accounting_records LIMIT 1;
+GRANT SELECT ON financial_documents,financial_document_extractions,financial_document_lines,accounting_records_preimage TO authenticated;
+SELECT set_config('request.jwt.claim.role','authenticated',true),set_config('request.jwt.claim.sub','11111111-1111-4111-8111-111111111111',true);
+SET LOCAL ROLE authenticated;
+DO $$ BEGIN
+ IF (SELECT count(*) FROM v_financial_accounting_records)<>2 THEN RAISE EXCEPTION 'owner lost current rows or duplicated cells'; END IF;
+ IF EXISTS ((SELECT * FROM v_financial_accounting_records EXCEPT ALL SELECT * FROM accounting_records_preimage)
+   UNION ALL (SELECT * FROM accounting_records_preimage EXCEPT ALL SELECT * FROM v_financial_accounting_records)) THEN
+   RAISE EXCEPTION 'ordinary owner payload changed'; END IF;
+END $$;
+RESET ROLE;
+SELECT set_config('request.jwt.claim.sub','22222222-2222-4222-8222-222222222222',true);
+SET LOCAL ROLE authenticated;
+DO $$ BEGIN IF EXISTS(SELECT 1 FROM v_financial_accounting_records) THEN RAISE EXCEPTION 'nonmember saw a book'; END IF; END $$;
+RESET ROLE;
+INSERT INTO accounting_access_grants VALUES('11111111-1111-4111-8111-111111111111','22222222-2222-4222-8222-222222222222',true);
+SET LOCAL ROLE authenticated;
+DO $$ BEGIN
+ IF (SELECT count(*) FROM v_financial_accounting_records)<>2 THEN RAISE EXCEPTION 'delegate lost current rows'; END IF;
+ IF EXISTS ((SELECT * FROM v_financial_accounting_records EXCEPT ALL SELECT * FROM accounting_records_preimage)
+   UNION ALL (SELECT * FROM accounting_records_preimage EXCEPT ALL SELECT * FROM v_financial_accounting_records)) THEN
+   RAISE EXCEPTION 'delegate payload changed'; END IF;
+END $$;
+RESET ROLE;
+UPDATE accounting_access_grants SET active=false;
+SET LOCAL ROLE authenticated;
+DO $$ BEGIN IF EXISTS(SELECT 1 FROM v_financial_accounting_records) THEN RAISE EXCEPTION 'revoked delegate saw a book'; END IF; END $$;
+RESET ROLE;
+SET LOCAL ROLE anon;
+DO $$ BEGIN
+ BEGIN PERFORM 1 FROM v_financial_accounting_records LIMIT 1; RAISE EXCEPTION 'anon read books';
+ EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+END $$;
+RESET ROLE;
+ROLLBACK;
+
+-- History plus a large retained batch: 70,000 lines and 67,000 extraction
+-- fields. The old per-line correlated lookup especially revisited batch fields.
+-- Synthetic fixtures exercise the same owner/delegate RLS as ordinary API reads.
+BEGIN;
+SELECT set_config('request.jwt.claim.role','service_role',true);
+INSERT INTO auth.users(id) VALUES ('33333333-3333-4333-8333-333333333333'),('44444444-4444-4444-8444-444444444444');
+CREATE TEMP TABLE records_scale_runs AS
+SELECT d,r,md5('records-document-'||d)::uuid AS document_id,
+       md5('records-run-'||d||'-'||r)::uuid AS run_id,
+       r=5 AS current_run,13 AS line_count,13 AS field_count
+FROM generate_series(1,1000) d CROSS JOIN generate_series(1,5) r
+UNION ALL
+SELECT 1001,r,md5('records-batch')::uuid,md5('records-batch-'||r)::uuid,r=2,2500,1000
+FROM generate_series(1,2) r;
+INSERT INTO financial_documents(id,owner_id,source_filename,attributes)
+SELECT document_id,'33333333-3333-4333-8333-333333333333','synthetic-'||d||'.csv',
+       '{"intake_mode":"financial_evidence_v1"}'::jsonb
+FROM records_scale_runs GROUP BY document_id,d;
+INSERT INTO financial_document_extractions(owner_id,document_id,extraction_run_id,field_key,value_raw,is_superseded)
+SELECT '33333333-3333-4333-8333-333333333333',document_id,run_id,'synthetic-'||n,'synthetic value',NOT current_run
+FROM records_scale_runs CROSS JOIN LATERAL generate_series(1,field_count) n;
+INSERT INTO financial_document_lines(owner_id,document_id,line_number,attributes)
+SELECT '33333333-3333-4333-8333-333333333333',document_id,(r-1)*line_count+n,
+       jsonb_build_object('intake_mode','financial_evidence_v1','extraction_run_id',run_id,'accounting_record',
+         jsonb_build_object('record_kind','retained_ledger_decision','local_id',d||'-'||r||'-'||n,
+           'year','2025','date','2025-01-01','currency','USD','section','Expense','amount','25.00'))
+FROM records_scale_runs CROSS JOIN LATERAL generate_series(1,line_count) n;
+-- Mirror production's existing access indexes; this migration adds none.
+CREATE INDEX ON financial_documents(owner_id);
+CREATE INDEX ON financial_document_extractions(owner_id);
+CREATE INDEX ON financial_document_extractions(document_id);
+CREATE INDEX ON financial_document_extractions(extraction_run_id);
+CREATE INDEX ON financial_document_lines(owner_id);
+CREATE INDEX ON financial_document_lines(document_id);
+ANALYZE financial_documents;
+ANALYZE financial_document_extractions;
+ANALYZE financial_document_lines;
+GRANT SELECT ON financial_documents,financial_document_extractions,financial_document_lines TO authenticated;
+SELECT set_config('request.jwt.claim.role','authenticated',true),set_config('request.jwt.claim.sub','33333333-3333-4333-8333-333333333333',true);
+SET LOCAL ROLE authenticated;
+SET LOCAL statement_timeout='15s';
+DO $$ BEGIN
+ IF (SELECT count(*) FROM v_financial_accounting_records
+     WHERE owner_id='33333333-3333-4333-8333-333333333333' AND year='2025'
+       AND record_kind='retained_ledger_decision' AND section='Expense' AND currency='USD')<>15500
+ THEN RAISE EXCEPTION 'scaled owner reader lost or multiplied current records'; END IF;
+ IF (SELECT count(*) FROM (SELECT id,document_id,record FROM v_financial_accounting_records
+     WHERE owner_id='33333333-3333-4333-8333-333333333333' AND year='2025'
+       AND record_kind='retained_ledger_decision' AND section='Expense' AND currency='USD'
+     ORDER BY record_date DESC NULLS LAST,id LIMIT 100 OFFSET 100) page)<>100
+ THEN RAISE EXCEPTION 'scaled filtered second page failed'; END IF;
+END $$;
+RESET ROLE;
+INSERT INTO accounting_access_grants VALUES('33333333-3333-4333-8333-333333333333','44444444-4444-4444-8444-444444444444',true);
+SELECT set_config('request.jwt.claim.sub','44444444-4444-4444-8444-444444444444',true);
+SET LOCAL ROLE authenticated;
+DO $$ BEGIN
+ IF (SELECT count(*) FROM v_financial_accounting_records WHERE owner_id='33333333-3333-4333-8333-333333333333')<>15500
+ THEN RAISE EXCEPTION 'scaled delegated reader lost current records'; END IF;
+ IF (SELECT sum(records) FROM v_financial_accounting_categories WHERE owner_id='33333333-3333-4333-8333-333333333333')<>15500
+ THEN RAISE EXCEPTION 'dependent categories lost current records'; END IF;
+ RAISE NOTICE 'PASS scaled current records: owner, delegate, filters, ordered second page and dependent categories';
+END $$;
+RESET ROLE;
 ROLLBACK;

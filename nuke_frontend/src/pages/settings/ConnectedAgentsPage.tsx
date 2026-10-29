@@ -16,34 +16,11 @@
  *   a `scopes: string[]` array in the create payload. No new endpoint needed.
  */
 
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { getSupabaseFunctionsUrl } from '../../lib/supabase';
+import { useState, useEffect, useRef } from 'react';
+import Link from '../../components/PrefetchLink';
+import { useApiKeyManagement, type CreatedKey, type ManagedKey } from './useApiKeyManagement';
+import './credential-settings.css';
 import { useAuth } from '../../hooks/useAuth';
-
-interface AgentKey {
-  id: string;
-  name: string;
-  key_prefix: string;
-  scopes: string[];
-  is_active: boolean;
-  rate_limit_per_hour: number;
-  rate_limit_remaining: number;
-  last_used_at: string | null;
-  expires_at: string | null;
-  created_at: string;
-  requests_24h: number;
-}
-
-interface NewAgentKey {
-  id: string;
-  name: string;
-  key: string;
-  key_prefix: string;
-  scopes: string[];
-  expires_at: string | null;
-  created_at: string;
-}
 
 type ScopeMode = 'one_vehicle' | 'any_vehicle';
 
@@ -83,8 +60,8 @@ function ScopeChip({ scope }: { scope: string }) {
 
   const palette: Record<typeof tone, { bg: string; fg: string }> = {
     narrow: { bg: 'rgba(76, 175, 80, 0.12)', fg: 'var(--success, #4caf50)' },
-    read: { bg: 'rgba(33, 150, 243, 0.12)', fg: '#2196f3' },
-    broad: { bg: 'rgba(255, 152, 0, 0.15)', fg: '#ff9800' },
+    read: { bg: 'rgba(33, 150, 243, 0.12)', fg: 'var(--link)' },
+    broad: { bg: 'rgba(255, 152, 0, 0.15)', fg: 'var(--warning)' },
     legacy: { bg: 'rgba(150, 150, 150, 0.15)', fg: 'var(--text-muted)' },
   };
   const { bg, fg } = palette[tone];
@@ -93,13 +70,13 @@ function ScopeChip({ scope }: { scope: string }) {
     <span
       style={{
         display: 'inline-block',
-        fontSize: '10px',
+        fontSize: '12px',
         padding: '2px 8px',
         marginRight: '4px',
         marginBottom: '2px',
         background: bg,
         color: fg,
-        fontFamily: "'Courier New', monospace",
+        fontFamily: 'var(--font-mono)',
       }}
       title={scope}
     >
@@ -108,57 +85,28 @@ function ScopeChip({ scope }: { scope: string }) {
   );
 }
 
-export default function ConnectedAgentsPage() {
-  const navigate = useNavigate();
-  const { session, loading: authLoading } = useAuth();
-  const [loading, setLoading] = useState(!session);
-  const [keys, setKeys] = useState<AgentKey[]>([]);
+function ConnectedAgentsContent({ userId }: { userId: string }) {
+  const { session } = useAuth();
+  const { keys, loading, readError, actionError, pending, loadKeys, createKey: issueKey, revokeKey: removeKey } = useApiKeyManagement(userId, session?.access_token);
+  const creating = pending === 'create';
+  const dialog = useRef<HTMLDialogElement>(null);
+  const opener = useRef<HTMLButtonElement | null>(null);
+  const alive = useRef(true);
+  useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newKeyName, setNewKeyName] = useState('');
   const [scopeMode, setScopeMode] = useState<ScopeMode>('one_vehicle');
   const [scopeVin, setScopeVin] = useState('');
   const [newKeyExpiry, setNewKeyExpiry] = useState<number>(90); // default 90 days for agent keys
-  const [creating, setCreating] = useState(false);
-  const [newlyCreatedKey, setNewlyCreatedKey] = useState<NewAgentKey | null>(null);
+  const [newlyCreatedKey, setNewlyCreatedKey] = useState<CreatedKey | null>(null);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState('');
-
   useEffect(() => {
-    if (authLoading) return;
-    if (!session) {
-      navigate('/login');
-      return;
-    }
-    loadKeys();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session, authLoading]);
-
-  const loadKeys = async () => {
-    setLoading(true);
-    try {
-      const token = session?.access_token;
-      if (!token) {
-        navigate('/login');
-        return;
-      }
-
-      const response = await fetch(`${getSupabaseFunctionsUrl()}/api-keys-manage`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      const result = await response.json();
-      if (result.data) {
-        setKeys(result.data as AgentKey[]);
-      }
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Failed to load keys';
-      setError(msg);
-    } finally {
-      setLoading(false);
-    }
-  };
+    if (!showCreateModal) return;
+    dialog.current?.showModal();
+    dialog.current?.querySelector<HTMLInputElement>('input[type="text"]')?.focus();
+    return () => { if (opener.current?.isConnected) opener.current.focus(); };
+  }, [showCreateModal]);
 
   const buildScopes = (): string[] | null => {
     if (scopeMode === 'any_vehicle') return ['events:write:all'];
@@ -170,83 +118,25 @@ export default function ConnectedAgentsPage() {
   const createKey = async () => {
     setError('');
     const scopes = buildScopes();
-    if (!scopes) {
-      setError('VIN is required when scoping to one vehicle');
-      return;
-    }
-    if (!newKeyName.trim()) {
-      setError('Name is required');
-      return;
-    }
-
-    setCreating(true);
-    try {
-      const token = session?.access_token;
-      if (!token) return;
-
-      const response = await fetch(`${getSupabaseFunctionsUrl()}/api-keys-manage`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: newKeyName,
-          scopes,
-          expires_in_days: newKeyExpiry,
-        }),
-      });
-
-      const result = await response.json();
-      if (result.data) {
-        setNewlyCreatedKey(result.data as NewAgentKey);
-        setShowCreateModal(false);
-        setNewKeyName('');
-        setScopeVin('');
-        setScopeMode('one_vehicle');
-        setNewKeyExpiry(90);
-        loadKeys();
-      } else {
-        setError(result.error || 'Failed to create key');
-      }
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Failed to create key';
-      setError(msg);
-    } finally {
-      setCreating(false);
+    if (!scopes) { setError('VIN is required when scoping to one vehicle'); return; }
+    if (!newKeyName.trim()) { setError('Name is required'); return; }
+    const result = await issueKey({ name: newKeyName, expires_in_days: newKeyExpiry, scopes });
+    if (result && alive.current) {
+      setNewlyCreatedKey(result); setCopied(false); setShowCreateModal(false); setNewKeyName(''); setScopeVin(''); setScopeMode('one_vehicle'); setNewKeyExpiry(90);
     }
   };
-
   const revokeKey = async (keyId: string) => {
-    if (!confirm('Revoke this agent key? Existing sessions using it will stop working immediately.')) {
-      return;
-    }
-    try {
-      const token = session?.access_token;
-      if (!token) return;
-
-      await fetch(`${getSupabaseFunctionsUrl()}/api-keys-manage/${keyId}`, {
-        method: 'DELETE',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      loadKeys();
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Failed to revoke key';
-      setError(msg);
-    }
+    if (pending || !confirm('Revoke this agent key? Existing sessions using it will stop working immediately.')) return;
+    setError('');
+    await removeKey(keyId);
   };
-
   const copyToClipboard = async (text: string) => {
-    await navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    try { await navigator.clipboard.writeText(text); if (alive.current) setCopied(true); }
+    catch { if (alive.current) setError('The key could not be copied. Select and copy it manually.'); }
   };
 
   const formatDate = (date: string | null) => {
-    if (!date) return 'Never';
+    if (!date) return 'No recorded use';
     return new Date(date).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
@@ -257,7 +147,7 @@ export default function ConnectedAgentsPage() {
   };
 
   const formatRelative = (date: string | null) => {
-    if (!date) return 'Never';
+    if (!date) return 'No recorded use';
     const d = new Date(date);
     const now = new Date();
     const diff = now.getTime() - d.getTime();
@@ -268,42 +158,36 @@ export default function ConnectedAgentsPage() {
     return formatDate(date);
   };
 
-  const isExpired = (k: AgentKey) =>
+  const isExpired = (k: ManagedKey) =>
     k.expires_at !== null && new Date(k.expires_at).getTime() < Date.now();
 
-  if (loading) {
-    return (
-      <div style={{ padding: '24px', maxWidth: '1000px', margin: '0 auto' }}>
-        <p style={{ color: 'var(--text-muted)' }}>Loading...</p>
-      </div>
-    );
-  }
 
   return (
-    <div style={{ padding: '24px', maxWidth: '1000px', margin: '0 auto' }}>
+    <div className="credential-settings">
+      <nav className="credential-settings-nav"><Link to="/settings">Settings</Link><Link to="/settings/usage">API usage</Link></nav>
       {/* Header */}
       <div
         style={{
           display: 'flex',
-          justifyContent: 'space-between',
+          justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px',
           alignItems: 'center',
           marginBottom: '24px',
         }}
       >
         <div>
-          <h1 style={{ fontSize: '18px', marginBottom: '4px' }}>Connected Agents</h1>
-          <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+          <h1 style={{ fontSize: '28px', marginBottom: '4px' }}>Connected Agents</h1>
+          <p style={{ fontSize: '14px', color: 'var(--text-muted)' }}>
             Issue scoped keys to LLM agents (Claude, ChatGPT, custom) so they can write events to your vehicles on your behalf.
           </p>
         </div>
         <button
-          onClick={() => setShowCreateModal(true)}
+          disabled={!!pending} onClick={(event) => { opener.current = event.currentTarget; setError(''); setShowCreateModal(true); }}
           style={{
-            background: 'var(--accent)',
-            color: 'var(--bg)',
+            background: 'var(--action)',
+            color: 'var(--on-action)',
             border: 'none',
             padding: '10px 16px',
-            fontSize: '12px',
+            fontSize: '14px',
             cursor: 'pointer',
           }}
         >
@@ -311,7 +195,7 @@ export default function ConnectedAgentsPage() {
         </button>
       </div>
 
-      {error && (
+      {(error || actionError) && (
         <div
           style={{
             background: 'rgba(244, 67, 54, 0.1)',
@@ -319,18 +203,22 @@ export default function ConnectedAgentsPage() {
             padding: '12px',
             marginBottom: '16px',
             color: 'var(--error, #f44336)',
-            fontSize: '12px',
+            fontSize: '14px',
           }}
         >
-          {error}
+          <span role="alert">{error || actionError}</span>
         </div>
       )}
 
+      <div className="credential-settings-refresh"><button type="button" disabled={loading} onClick={() => void loadKeys()}>{loading ? 'Reading keys…' : 'Refresh keys'}</button></div>
+      {readError && <div role="alert" className="credential-settings-notice">{readError}<button type="button" disabled={loading} onClick={() => void loadKeys()}>Retry key list</button></div>}
+      {loading && <p role="status">Reading access keys…</p>}
+      {creating && <p role="status">Creating the key… You can close the dialog while this request finishes.</p>}
       {/* Newly Created Key Warning */}
       {newlyCreatedKey && (
         <div
           style={{
-            background: 'rgba(0, 255, 0, 0.1)',
+            background: 'var(--surface)',
             border: '1px solid var(--accent)',
             padding: '16px',
             marginBottom: '24px',
@@ -348,15 +236,15 @@ export default function ConnectedAgentsPage() {
               <h3 style={{ fontSize: '14px', marginBottom: '4px', color: 'var(--accent)' }}>
                 Agent Key Created
               </h3>
-              <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+              <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
                 Copy this key now and paste it into your agent's config. You won't be able to see it again.
               </p>
-              <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+              <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
                 Header to use: <code>X-API-Key: nk_live_...</code>
               </p>
             </div>
             <button
-              onClick={() => setNewlyCreatedKey(null)}
+              aria-label="Dismiss created key" onClick={() => setNewlyCreatedKey(null)}
               style={{
                 background: 'none',
                 border: 'none',
@@ -375,7 +263,7 @@ export default function ConnectedAgentsPage() {
               gap: '8px',
               background: 'var(--bg)',
               padding: '12px',
-              fontFamily: "'Courier New', monospace",
+              fontFamily: 'var(--font-mono)',
               fontSize: '13px',
             }}
           >
@@ -383,11 +271,11 @@ export default function ConnectedAgentsPage() {
             <button
               onClick={() => copyToClipboard(newlyCreatedKey.key)}
               style={{
-                background: 'var(--accent)',
-                color: 'var(--bg)',
+                background: 'var(--action)',
+                color: 'var(--on-action)',
                 border: 'none',
                 padding: '6px 12px',
-                fontSize: '11px',
+                fontSize: '12px',
                 cursor: 'pointer',
                 whiteSpace: 'nowrap',
               }}
@@ -395,7 +283,7 @@ export default function ConnectedAgentsPage() {
               {copied ? 'Copied!' : 'Copy'}
             </button>
           </div>
-          <div style={{ marginTop: '8px', fontSize: '11px', color: 'var(--text-muted)' }}>
+          <div style={{ marginTop: '8px', fontSize: '12px', color: 'var(--text-muted)' }}>
             Scopes:{' '}
             {newlyCreatedKey.scopes.map((s) => (
               <ScopeChip key={s} scope={s} />
@@ -405,12 +293,12 @@ export default function ConnectedAgentsPage() {
       )}
 
       {/* Keys Table */}
-      {keys.length === 0 ? (
+      {keys.length === 0 && (loading || readError) ? null : keys.length === 0 ? (
         <div
           style={{
             textAlign: 'center',
             padding: '48px',
-            background: 'var(--bg-secondary)',
+            background: 'var(--surface)',
             border: '1px solid var(--border)',
           }}
         >
@@ -419,13 +307,13 @@ export default function ConnectedAgentsPage() {
             No agents connected yet
           </p>
           <button
-            onClick={() => setShowCreateModal(true)}
+            disabled={!!pending} onClick={(event) => { opener.current = event.currentTarget; setError(''); setShowCreateModal(true); }}
             style={{
-              background: 'var(--accent)',
-              color: 'var(--bg)',
+              background: 'var(--action)',
+              color: 'var(--on-action)',
               border: 'none',
               padding: '10px 20px',
-              fontSize: '12px',
+              fontSize: '14px',
               cursor: 'pointer',
             }}
           >
@@ -433,7 +321,7 @@ export default function ConnectedAgentsPage() {
           </button>
         </div>
       ) : (
-        <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)' }}>
+        <div className="credential-settings-table" role="region" aria-label="Access keys" tabIndex={0} style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid var(--border)' }}>
@@ -441,7 +329,7 @@ export default function ConnectedAgentsPage() {
                   style={{
                     padding: '12px',
                     textAlign: 'left',
-                    fontSize: '11px',
+                    fontSize: '12px',
                     color: 'var(--text-muted)',
                     fontWeight: 500,
                   }}
@@ -452,7 +340,7 @@ export default function ConnectedAgentsPage() {
                   style={{
                     padding: '12px',
                     textAlign: 'left',
-                    fontSize: '11px',
+                    fontSize: '12px',
                     color: 'var(--text-muted)',
                     fontWeight: 500,
                   }}
@@ -463,7 +351,7 @@ export default function ConnectedAgentsPage() {
                   style={{
                     padding: '12px',
                     textAlign: 'left',
-                    fontSize: '11px',
+                    fontSize: '12px',
                     color: 'var(--text-muted)',
                     fontWeight: 500,
                   }}
@@ -474,7 +362,7 @@ export default function ConnectedAgentsPage() {
                   style={{
                     padding: '12px',
                     textAlign: 'left',
-                    fontSize: '11px',
+                    fontSize: '12px',
                     color: 'var(--text-muted)',
                     fontWeight: 500,
                   }}
@@ -485,7 +373,7 @@ export default function ConnectedAgentsPage() {
                   style={{
                     padding: '12px',
                     textAlign: 'left',
-                    fontSize: '11px',
+                    fontSize: '12px',
                     color: 'var(--text-muted)',
                     fontWeight: 500,
                   }}
@@ -496,7 +384,7 @@ export default function ConnectedAgentsPage() {
                   style={{
                     padding: '12px',
                     textAlign: 'left',
-                    fontSize: '11px',
+                    fontSize: '12px',
                     color: 'var(--text-muted)',
                     fontWeight: 500,
                   }}
@@ -507,7 +395,7 @@ export default function ConnectedAgentsPage() {
                   style={{
                     padding: '12px',
                     textAlign: 'right',
-                    fontSize: '11px',
+                    fontSize: '12px',
                     color: 'var(--text-muted)',
                     fontWeight: 500,
                   }}
@@ -521,21 +409,21 @@ export default function ConnectedAgentsPage() {
                 const expired = isExpired(key);
                 return (
                   <tr key={key.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                    <td style={{ padding: '12px' }}>
-                      <div style={{ fontSize: '12px', fontWeight: 500 }}>{key.name}</div>
-                      <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
+                    <td data-label="Name" style={{ padding: '12px' }}>
+                      <div style={{ fontSize: '14px', fontWeight: 500 }}>{key.name}</div>
+                      <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
                         Created {formatRelative(key.created_at)}
                       </div>
                     </td>
-                    <td style={{ padding: '12px' }}>
-                      <code style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                    <td data-label="Key prefix" style={{ padding: '12px' }}>
+                      <code style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
                         nk_live_{key.key_prefix}...
                       </code>
                     </td>
-                    <td style={{ padding: '12px', maxWidth: '260px' }}>
+                    <td data-label="Granted scopes" style={{ padding: '12px', maxWidth: '260px' }}>
                       <div>
                         {(key.scopes || []).length === 0 ? (
-                          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                          <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
                             (no scopes)
                           </span>
                         ) : (
@@ -543,17 +431,17 @@ export default function ConnectedAgentsPage() {
                         )}
                       </div>
                     </td>
-                    <td style={{ padding: '12px', fontSize: '12px', color: 'var(--text-muted)' }}>
+                    <td data-label="Last used" style={{ padding: '12px', fontSize: '14px', color: 'var(--text-muted)' }}>
                       {formatRelative(key.last_used_at)}
                     </td>
-                    <td style={{ padding: '12px', fontSize: '12px', color: 'var(--text-muted)' }}>
+                    <td data-label="Expires" style={{ padding: '12px', fontSize: '14px', color: 'var(--text-muted)' }}>
                       {key.expires_at ? formatDate(key.expires_at) : 'No expiry'}
                     </td>
-                    <td style={{ padding: '12px' }}>
+                    <td data-label="Status" style={{ padding: '12px' }}>
                       {!key.is_active ? (
                         <span
                           style={{
-                            fontSize: '10px',
+                            fontSize: '12px',
                             padding: '2px 8px',
                             background: 'rgba(244, 67, 54, 0.2)',
                             color: 'var(--error, #f44336)',
@@ -564,7 +452,7 @@ export default function ConnectedAgentsPage() {
                       ) : expired ? (
                         <span
                           style={{
-                            fontSize: '10px',
+                            fontSize: '12px',
                             padding: '2px 8px',
                             background: 'rgba(255, 152, 0, 0.2)',
                             color: '#ff9800',
@@ -575,7 +463,7 @@ export default function ConnectedAgentsPage() {
                       ) : (
                         <span
                           style={{
-                            fontSize: '10px',
+                            fontSize: '12px',
                             padding: '2px 8px',
                             background: 'rgba(76, 175, 80, 0.2)',
                             color: 'var(--success, #4caf50)',
@@ -585,16 +473,16 @@ export default function ConnectedAgentsPage() {
                         </span>
                       )}
                     </td>
-                    <td style={{ padding: '12px', textAlign: 'right' }}>
+                    <td data-label="Actions" style={{ padding: '12px', textAlign: 'right' }}>
                       {key.is_active && (
                         <button
-                          onClick={() => revokeKey(key.id)}
+                          disabled={!!pending} onClick={() => void revokeKey(key.id)}
                           style={{
                             background: 'none',
                             border: '1px solid var(--border)',
                             color: 'var(--text-muted)',
                             padding: '4px 12px',
-                            fontSize: '11px',
+                            fontSize: '12px',
                             cursor: 'pointer',
                           }}
                         >
@@ -615,19 +503,19 @@ export default function ConnectedAgentsPage() {
         style={{
           marginTop: '24px',
           padding: '16px',
-          background: 'var(--bg-secondary)',
+          background: 'var(--surface)',
           border: '1px solid var(--border)',
         }}
       >
-        <h3 style={{ fontSize: '12px', marginBottom: '8px' }}>Quick Start</h3>
-        <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px' }}>
+        <h3 style={{ fontSize: '14px', marginBottom: '8px' }}>Quick Start</h3>
+        <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '8px' }}>
           Once you have a key, your agent can post events to NUKE in one call:
         </p>
         <pre
           style={{
             background: 'var(--bg)',
             padding: '12px',
-            fontSize: '11px',
+            fontSize: '12px',
             overflow: 'auto',
             margin: 0,
           }}
@@ -649,7 +537,7 @@ export default function ConnectedAgentsPage() {
   }'`}
         </pre>
         <div style={{ marginTop: '12px' }}>
-          <a href="/api/docs" style={{ fontSize: '12px', color: 'var(--accent)' }}>
+          <a href="/docs/api" style={{ fontSize: '14px', color: 'var(--accent)' }}>
             Full API documentation -&gt;
           </a>
         </div>
@@ -657,36 +545,16 @@ export default function ConnectedAgentsPage() {
 
       {/* Create Modal */}
       {showCreateModal && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(0, 0, 0, 0.8)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000,
-          }}
-        >
-          <div
-            style={{
-              background: 'var(--bg)',
-              border: '1px solid var(--border)',
-              padding: '24px',
-              width: '100%',
-              maxWidth: '480px',
-            }}
-          >
-            <h2 style={{ fontSize: '16px', marginBottom: '16px' }}>Connect a New Agent</h2>
+        <dialog ref={dialog} className="credential-settings-dialog" aria-label="Connect a new agent" onCancel={() => setShowCreateModal(false)}>
+          <div>
+            {(error || actionError) && <p role="alert">{error || actionError}</p>}
+            <h2 style={{ fontSize: '22px', marginBottom: '16px' }}>Connect a New Agent</h2>
 
             <div style={{ marginBottom: '16px' }}>
               <label
                 style={{
                   display: 'block',
-                  fontSize: '11px',
+                  fontSize: '12px',
                   color: 'var(--text-muted)',
                   marginBottom: '4px',
                 }}
@@ -695,14 +563,14 @@ export default function ConnectedAgentsPage() {
               </label>
               <input
                 type="text"
-                value={newKeyName}
+                aria-label="Agent name" value={newKeyName}
                 onChange={(e) => setNewKeyName(e.target.value)}
                 placeholder="e.g., Claude (Mustang sessions)"
                 style={{
                   width: '100%',
                   padding: '10px',
-                  fontSize: '12px',
-                  background: 'var(--bg-secondary)',
+                  fontSize: '14px',
+                  background: 'var(--surface)',
                   border: '1px solid var(--border)',
                   color: 'var(--text)',
                 }}
@@ -713,7 +581,7 @@ export default function ConnectedAgentsPage() {
               <label
                 style={{
                   display: 'block',
-                  fontSize: '11px',
+                  fontSize: '12px',
                   color: 'var(--text-muted)',
                   marginBottom: '8px',
                 }}
@@ -741,15 +609,15 @@ export default function ConnectedAgentsPage() {
                   style={{ marginTop: '2px' }}
                 />
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: '12px', fontWeight: 500 }}>
+                  <div style={{ fontSize: '14px', fontWeight: 500 }}>
                     Write to one specific vehicle
                   </div>
-                  <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '6px' }}>
+                  <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '6px' }}>
                     Recommended. The agent can only write events for this VIN.
                   </div>
                   <input
                     type="text"
-                    value={scopeVin}
+                    aria-label="Vehicle VIN" value={scopeVin}
                     onChange={(e) => setScopeVin(e.target.value)}
                     onFocus={() => setScopeMode('one_vehicle')}
                     placeholder="VIN (e.g., 6F07C219593)"
@@ -757,9 +625,9 @@ export default function ConnectedAgentsPage() {
                     style={{
                       width: '100%',
                       padding: '8px',
-                      fontSize: '12px',
-                      fontFamily: "'Courier New', monospace",
-                      background: 'var(--bg-secondary)',
+                      fontSize: '14px',
+                      fontFamily: 'var(--font-mono)',
+                      background: 'var(--surface)',
                       border: '1px solid var(--border)',
                       color: 'var(--text)',
                       opacity: scopeMode === 'one_vehicle' ? 1 : 0.4,
@@ -787,10 +655,10 @@ export default function ConnectedAgentsPage() {
                   style={{ marginTop: '2px' }}
                 />
                 <div>
-                  <div style={{ fontSize: '12px', fontWeight: 500 }}>
+                  <div style={{ fontSize: '14px', fontWeight: 500 }}>
                     Write to any vehicle I own
                   </div>
-                  <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
+                  <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
                     Power-user mode. The agent picks the VIN per submission.
                   </div>
                 </div>
@@ -801,7 +669,7 @@ export default function ConnectedAgentsPage() {
               <label
                 style={{
                   display: 'block',
-                  fontSize: '11px',
+                  fontSize: '12px',
                   color: 'var(--text-muted)',
                   marginBottom: '4px',
                 }}
@@ -809,13 +677,13 @@ export default function ConnectedAgentsPage() {
                 Expiration
               </label>
               <select
-                value={newKeyExpiry}
+                aria-label="Expiration" value={newKeyExpiry}
                 onChange={(e) => setNewKeyExpiry(parseInt(e.target.value, 10))}
                 style={{
                   width: '100%',
                   padding: '10px',
-                  fontSize: '12px',
-                  background: 'var(--bg-secondary)',
+                  fontSize: '14px',
+                  background: 'var(--surface)',
                   border: '1px solid var(--border)',
                   color: 'var(--text)',
                 }}
@@ -834,7 +702,7 @@ export default function ConnectedAgentsPage() {
                   border: '1px solid var(--border)',
                   color: 'var(--text)',
                   padding: '10px 16px',
-                  fontSize: '12px',
+                  fontSize: '14px',
                   cursor: 'pointer',
                 }}
               >
@@ -844,11 +712,11 @@ export default function ConnectedAgentsPage() {
                 onClick={createKey}
                 disabled={!newKeyName.trim() || creating || (scopeMode === 'one_vehicle' && !scopeVin.trim())}
                 style={{
-                  background: 'var(--accent)',
-                  color: 'var(--bg)',
+                  background: 'var(--action)',
+                  color: 'var(--on-action)',
                   border: 'none',
                   padding: '10px 16px',
-                  fontSize: '12px',
+                  fontSize: '14px',
                   cursor: 'pointer',
                   opacity:
                     !newKeyName.trim() || creating || (scopeMode === 'one_vehicle' && !scopeVin.trim())
@@ -860,8 +728,15 @@ export default function ConnectedAgentsPage() {
               </button>
             </div>
           </div>
-        </div>
+        </dialog>
       )}
     </div>
   );
+}
+
+export default function ConnectedAgentsPage() {
+  const { user, loading } = useAuth();
+  if (loading) return <main className="credential-settings"><p role="status">Checking access…</p></main>;
+  if (!user) return <main className="credential-settings"><Link to="/login">Sign in to manage access keys</Link></main>;
+  return <ConnectedAgentsContent key={user.id} userId={user.id} />;
 }

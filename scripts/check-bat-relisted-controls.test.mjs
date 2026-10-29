@@ -10,8 +10,11 @@ test('canonical native receipts retire relisted locator monitors without hiding 
     'this contract requires the disposable local PostgreSQL service');
   const root = fileURLToPath(new URL('../', import.meta.url));
   const database = 'nuke_soft_close_test';
+  // Each assay starts from a fresh database; an earlier assay in the same job leaves one behind.
+  const dropped = spawnSync('dropdb', ['--if-exists', database], { cwd: root, encoding: 'utf8' });
+  assert(dropped.status === 0, dropped.stderr);
   const created = spawnSync('createdb', [database], { cwd: root, encoding: 'utf8' });
-  assert(created.status === 0 || created.stderr.includes('already exists'), created.stderr);
+  assert(created.status === 0, created.stderr);
   const fixture = execFileSync('deno', ['run', '--cached-only', '--node-modules-dir=none',
     'supabase/sql/prepare_bat_public_live_fixture.ts', '--stdout'], { cwd: root, encoding: 'utf8' }).trim();
   const read = path => readFileSync(root + path, 'utf8');

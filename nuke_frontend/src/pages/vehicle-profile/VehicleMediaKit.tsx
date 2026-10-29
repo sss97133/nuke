@@ -269,23 +269,7 @@ const VehicleMediaKit: React.FC<VehicleMediaKitProps> = ({ vehicleId, onImageCli
       />
 
       {/* Scene label — top-left corner */}
-      <div
-        style={{
-          position: 'absolute',
-          top: '10px',
-          left: '10px',
-          background: 'rgba(0,0,0,0.55)',
-          color: 'var(--surface-elevated, #fff)',
-          padding: '4px 8px',
-          fontFamily: 'Arial, sans-serif',
-          fontSize: '9px',
-          fontWeight: 700,
-          letterSpacing: '0.12em',
-          textTransform: 'uppercase' as const,
-          border: '2px solid rgba(255,255,255,0.15)',
-          zIndex: 2,
-        }}
-      >
+      <div className="vp-media-caption">
         {current.label}
         {dateLabel ? (current.taken_at ? ` · ${dateLabel}` : ` · RECORD DATE ${dateLabel} · CAPTURE DATE UNKNOWN`) : ''}
       </div>
@@ -299,23 +283,7 @@ const VehicleMediaKit: React.FC<VehicleMediaKitProps> = ({ vehicleId, onImageCli
             e.stopPropagation();
             setIndex((i) => (i - 1 + curated.length) % curated.length);
           }}
-          style={{
-            position: 'absolute',
-            top: '50%',
-            left: '10px',
-            transform: 'translateY(-50%)',
-            width: '32px',
-            height: '32px',
-            background: 'rgba(0,0,0,0.55)',
-            color: 'var(--surface-elevated, #fff)',
-            border: '2px solid rgba(255,255,255,0.15)',
-            fontFamily: 'Arial, sans-serif',
-            fontSize: '12px',
-            fontWeight: 700,
-            cursor: 'pointer',
-            zIndex: 2,
-            transition: 'border-color 180ms cubic-bezier(0.16, 1, 0.3, 1)',
-          }}
+          className="vp-media-arrow vp-media-arrow--prev"
         >
           {'<'}
         </button>
@@ -330,23 +298,7 @@ const VehicleMediaKit: React.FC<VehicleMediaKitProps> = ({ vehicleId, onImageCli
             e.stopPropagation();
             setIndex((i) => (i + 1) % curated.length);
           }}
-          style={{
-            position: 'absolute',
-            top: '50%',
-            right: '10px',
-            transform: 'translateY(-50%)',
-            width: '32px',
-            height: '32px',
-            background: 'rgba(0,0,0,0.55)',
-            color: 'var(--surface-elevated, #fff)',
-            border: '2px solid rgba(255,255,255,0.15)',
-            fontFamily: 'Arial, sans-serif',
-            fontSize: '12px',
-            fontWeight: 700,
-            cursor: 'pointer',
-            zIndex: 2,
-            transition: 'border-color 180ms cubic-bezier(0.16, 1, 0.3, 1)',
-          }}
+          className="vp-media-arrow vp-media-arrow--next"
         >
           {'>'}
         </button>
@@ -354,17 +306,7 @@ const VehicleMediaKit: React.FC<VehicleMediaKitProps> = ({ vehicleId, onImageCli
 
       {/* Dot indicators */}
       {curated.length > 1 && (
-        <div
-          style={{
-            position: 'absolute',
-            bottom: '10px',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            display: 'flex',
-            gap: '6px',
-            zIndex: 2,
-          }}
-        >
+        <div className="vp-media-indicators">
           {curated.map((p, i) => (
             <button
               key={p.id}
@@ -374,15 +316,8 @@ const VehicleMediaKit: React.FC<VehicleMediaKitProps> = ({ vehicleId, onImageCli
                 e.stopPropagation();
                 setIndex(i);
               }}
-              style={{
-                width: i === index ? '12px' : '8px',
-                height: '8px',
-                background: i === index ? 'var(--surface-elevated, #fff)' : 'rgba(255,255,255,0.4)',
-                border: '2px solid rgba(0,0,0,0.4)',
-                padding: 0,
-                cursor: 'pointer',
-                transition: 'width 180ms cubic-bezier(0.16, 1, 0.3, 1)',
-              }}
+              className="vp-media-indicator"
+              aria-pressed={i === index}
             />
           ))}
         </div>

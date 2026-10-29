@@ -1,18 +1,20 @@
 /**
  * WorkPage — /work, the signed-in work console: what is waiting for your signature
  * (my_signature_queue) and the jobs you are on (my_work_orders). Each item links to its job page and
- * repeats the server's own words for what signing binds and does not bind; the Signs themselves run
- * on the job page. A payment amount appears only on the payee's own confirmation item.
+ * repeats the server's own words for what signing binds and does not bind. Work-day and booking
+ * confirmations have review sheets here; job Signs run on the job page. A payment amount appears only on the payee's own confirmation item.
  */
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Section, Text } from '../../kit';
 import { PrefetchLink } from '../../components/PrefetchLink';
 import { usePageTitle } from '../../hooks/usePageTitle';
+import { useAuthContext } from '../../contexts/AuthContext';
 import {
   JobReaders, STAGES, binds, day, gapWord, jobHref, paymentLine, quoteTotals, signKindTitle, slotWords, stageWord, stateWord, vehicleText,
   type MyWorkOrdersRead, type SignQueueItem, type SignQueueRead, type WorkOrderRow,
 } from './jobsReaders';
-import { ConfirmBookingSheet } from './PeopleSheets';
+import { ConfirmBookingSheet, ConfirmWorkDaySheet } from './PeopleSheets';
+import { confirmWorkDayArgs } from './signDrafts';
 import type { JsonObject } from './jobRead';
 import './jobs.css';
 
@@ -41,6 +43,7 @@ function QueueItem({ item, onSigned }: { item: SignQueueItem; onSigned: () => vo
   const who = counterpart(item);
   const b = binds(item);
   const nb = item.sign?.does_not_bind ?? [];
+  const workDay = item.kind === 'work_session' ? confirmWorkDayArgs(item as unknown as JsonObject) : null;
   return <li className="jb-row" aria-label={signKindTitle(item.kind)}>
     <div className="jb-row__head">
       <Text role="label">{signKindTitle(item.kind)}</Text>
@@ -54,10 +57,15 @@ function QueueItem({ item, onSigned }: { item: SignQueueItem; onSigned: () => vo
     {amount && <Text role="measure" dense>{amount}</Text>}
     {b.length > 0 && <div className="jb-says"><Text role="label">Signing says</Text><ul>{b.map(s => <li key={s}><Text role="body">{s}</Text></li>)}</ul></div>}
     {nb.length > 0 && <div className="jb-says"><Text role="label">It does not say</Text><ul>{nb.map(s => <li key={s}><Text role="body">{s}</Text></li>)}</ul></div>}
-    {item.kind === 'facility_reservation_to_confirm'
+    {workDay
+      ? <div className="jb-actions"><button type="button" className="btn-base btn-sm btn-primary" disabled={!workDay.ok} onClick={() => setConfirming(true)}><Text role="label">Review work day</Text></button>
+        {!workDay.ok && <Text role="caption">{workDay.error}</Text>}</div>
+      : item.kind === 'facility_reservation_to_confirm'
       ? <div className="jb-actions"><button type="button" className="btn-base btn-sm btn-primary" onClick={() => setConfirming(true)}><Text role="label">Confirm booking</Text></button></div>
       : item.work_order_id && <Text role="caption">Sign on the job page.</Text>}
-    {confirming && <ConfirmBookingSheet item={item as unknown as JsonObject} onClose={() => setConfirming(false)} onDone={onSigned} />}
+    {confirming && (workDay
+      ? <ConfirmWorkDaySheet item={item as unknown as JsonObject} onClose={() => setConfirming(false)} onDone={onSigned} />
+      : <ConfirmBookingSheet item={item as unknown as JsonObject} onClose={() => setConfirming(false)} onDone={onSigned} />)}
   </li>;
 }
 
@@ -77,25 +85,42 @@ function JobRow({ row }: { row: WorkOrderRow }) {
 
 const WorkPage: React.FC = () => {
   usePageTitle('Work');
+  const { session } = useAuthContext();
+  const viewerId = session?.user?.id ?? null;
+  // Queues, jobs and open confirmation drafts belong to this viewer. A new
+  // account must never inherit a prior account's Sign or private read state.
+  return viewerId ? <ViewerWorkPage key={viewerId} /> : null;
+};
+
+const ViewerWorkPage: React.FC = () => {
   const [queue, setQueue] = useState<SignQueueRead | null>(null);
   const [jobs, setJobs] = useState<MyWorkOrdersRead | null>(null);
   const [jobRows, setJobRows] = useState<WorkOrderRow[]>([]);
   const [refusal, setRefusal] = useState<string | null>(null);
+  const generation = useRef(0);
 
   const loadJobs = useCallback(async (after: string | null) => {
+    const scope = generation.current;
     const r = await JobReaders.myWorkOrders(after);
+    if (scope !== generation.current) return;
     if (r.refusal) { setRefusal(r.refusal.message); return; }
     setJobs(r.data);
     setJobRows(prev => (after ? [...prev, ...r.data.rows] : r.data.rows));
   }, []);
 
   const loadQueue = useCallback(() => {
-    void JobReaders.signatureQueue().then(r => { if (r.refusal) setRefusal(r.refusal.message); else setQueue(r.data); });
+    const scope = generation.current;
+    void JobReaders.signatureQueue().then(r => {
+      if (scope !== generation.current) return;
+      if (r.refusal) setRefusal(r.refusal.message); else setQueue(r.data);
+    });
   }, []);
 
   useEffect(() => {
+    generation.current++;
     loadQueue();
     void loadJobs(null);
+    return () => { generation.current++; };
   }, [loadJobs, loadQueue]);
 
   return <article className="jb-page jb-scope">

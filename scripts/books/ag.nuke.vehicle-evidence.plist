@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!-- Hourly, at :41: the vehicle-evidence pipeline (scripts/books/vehicle_evidence_job.sh). It reads local files (~/Documents PDFs and
+       Mail.app attachments), so it runs here rather than in Supabase cron. Incremental: only new mail, new or changed PDFs and
+       changed vehicles are processed. Runs main's copy of the scripts (fetched into a runner cache) without touching ~/nuke's checkout.
+       Visible in v_job_health as the cron job watch-vehicle-evidence (fails when the heartbeat cell is older than 14 hours); receipts
+       are ~/nuke-logs/vehicle-evidence/runs/run-<UTC>.json and the log is launchd.log beside them.
+       Installed copy: ~/Library/LaunchAgents/ag.nuke.vehicle-evidence.plist (launchctl bootout + bootstrap after an edit). -->
+  <key>Label</key><string>ag.nuke.vehicle-evidence</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>-c</string>
+    <string>cd /Users/skylar/nuke &amp;&amp; git fetch -q origin main &amp;&amp; mkdir -p $HOME/Library/Caches/nuke-vehicle-evidence-runner &amp;&amp; git show origin/main:scripts/books/vehicle_evidence_job.sh &gt; $HOME/Library/Caches/nuke-vehicle-evidence-runner/job.sh &amp;&amp; exec /bin/bash $HOME/Library/Caches/nuke-vehicle-evidence-runner/job.sh &lt;/dev/null</string>
+  </array>
+  <key>WorkingDirectory</key><string>/Users/skylar/nuke</string>
+  <key>EnvironmentVariables</key>
+  <dict><key>PATH</key><string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string><key>HOME</key><string>/Users/skylar</string></dict>
+  <key>StartCalendarInterval</key><dict><key>Minute</key><integer>41</integer></dict>
+  <key>RunAtLoad</key><false/>
+  <key>ProcessType</key><string>Background</string>
+  <key>Nice</key><integer>15</integer>
+  <key>StandardOutPath</key><string>/Users/skylar/nuke-logs/vehicle-evidence/launchd.log</string>
+  <key>StandardErrorPath</key><string>/Users/skylar/nuke-logs/vehicle-evidence/launchd.log</string>
+</dict>
+</plist>

@@ -2,9 +2,9 @@
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-const fixture = vi.hoisted(() => ({ invoke: vi.fn(), from: vi.fn(), classify: vi.fn(), listener: null as null | ((event: string) => void) }));
+const fixture = vi.hoisted(() => ({ invoke: vi.fn(), from: vi.fn(), classify: vi.fn(), listener: null as null | ((event: string, session?: {user: {id: string}} | null) => void) }));
 vi.mock('../../lib/supabase', () => ({ supabase: { functions: { invoke: fixture.invoke }, from: fixture.from, auth: {
-  onAuthStateChange(listener: (event: string) => void) { fixture.listener = listener; return { data: { subscription: { unsubscribe() {} } } }; },
+  onAuthStateChange(listener: (event: string, session?: {user: {id: string}} | null) => void) { fixture.listener = listener; return { data: { subscription: { unsubscribe() {} } } }; },
 } } }));
 vi.mock('../../services/financialRecordClassification', async importOriginal => ({ ...await importOriginal<object>(), classifyRecords: fixture.classify }));
 import FinancialWorkpapers, { yearOverview, recordDescription, searchPattern } from './FinancialWorkpapers';
@@ -79,11 +79,11 @@ it('invalid duplicate controls withhold subtotals', async () => {
   await act(async () => root.render(<FinancialWorkpapers revision={0} onOpen={() => {}} />));
   expect(container.textContent).toContain('subtotals are withheld'); expect(container.textContent).not.toContain('999.99');
 });
-it('reads records from the server view for the book and year, pages by 25 and opens the retained source document', async () => {
+it('reads records from the server view for the book and year, pages by 100 and opens the retained source document', async () => {
   const open = vi.fn();
   const control = { record_kind: 'retained_ledger_decision', year: '2024', account: 'Account', section: 'Expense', currency: 'USD', retained_amount: '12.50', rows: 1 };
-  fixture.invoke.mockResolvedValue(response({ ...empty(), total_rows: 51, controls: [control] }));
-  fixture.from.mockImplementationOnce(() => table({ data: [record('row1'), ...Array.from({ length: 25 }, (_, i) => record(`row${i + 2}`, `Record ${i + 2}`))] })).mockImplementationOnce(() => table({ data: [record('row2', 'Second page')] }));
+  fixture.invoke.mockResolvedValue(response({ ...empty(), total_rows: 151, controls: [control] }));
+  fixture.from.mockImplementationOnce(() => table({ data: [record('row1'), ...Array.from({ length: 100 }, (_, i) => record(`row${i + 2}`, `Record ${i + 2}`))] })).mockImplementationOnce(() => table({ data: [record('row2', 'Second page')] }));
   await act(async () => root.render(book(<FinancialWorkpapers revision={0} onOpen={open} />)));
   expect(fixture.invoke.mock.calls[0][1].body).toEqual({ mode: 'financial_evidence_v1', action: 'tax_read', limit: 1 });
   expect(fixture.from).not.toHaveBeenCalled();
@@ -91,14 +91,14 @@ it('reads records from the server view for the book and year, pages by 25 and op
   expect(fixture.from).toHaveBeenCalledWith('v_financial_accounting_records');
   expect(filters(queries()[0], 'eq')).toEqual([['owner_id', 'owner'], ['year', '2024']]);
   expect(filters(queries()[0], 'select')).toEqual([['id, document_id, record']]);
-  expect(filters(queries()[0], 'range')).toEqual([[0, 25]]);
+  expect(filters(queries()[0], 'range')).toEqual([[0, 100]]);
   expect(filters(queries()[0], 'order')[0]).toEqual(['record_date', { ascending: false, nullsFirst: false }]);
   expect(filters(queries()[0], 'or')).toEqual([]);
-  expect(container.textContent).toContain('Showing 1–25 records; more available');
+  expect(container.textContent).toContain('Showing 1–100 records; more available');
   await act(async () => Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'View evidence')!.click()); expect(open).toHaveBeenCalledWith('doc', record().record);
-  await act(async () => Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'Next 25')!.click());
-  expect(filters(queries()[1], 'range')).toEqual([[25, 50]]);
-  expect(container.textContent).toContain('Second page'); expect(container.textContent).toContain('Showing 26–26 records');
+  await act(async () => Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'Next 100')!.click());
+  expect(filters(queries()[1], 'range')).toEqual([[100, 200]]);
+  expect(container.textContent).toContain('Second page'); expect(container.textContent).toContain('Showing 101–101 records');
 });
 it('sends filters and the search term to the server instead of filtering a loaded page', async () => {
   const control = { record_kind: 'retained_bank_movement', year: '2025', account: 'AFCU 8288', section: null, currency: 'USD', retained_amount: '1', rows: 3 };
@@ -147,7 +147,7 @@ it('account switch synchronously invalidates late prior-account response before 
   fixture.invoke.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; })).mockResolvedValue(response(empty()));
   await act(async () => root.render(<FinancialWorkpapers revision={0} onOpen={() => {}} />));
   await act(async () => {
-    fixture.listener!('SIGNED_IN');
+    fixture.listener!('SIGNED_IN', { user: { id: 'next-owner' } });
     finish(response({ ...empty(), total_rows: 1, records: [record('old', 'PRIVATE OLD ACCOUNT')] }));
     await Promise.resolve();
   });
@@ -187,14 +187,14 @@ it('defaults to the latest book year and scopes records and bank attention to th
   expect(filters(queries()[1], 'eq')).toContainEqual(['year', '2024']);
   expect(container.textContent).toContain('No saved records match these filters for 2024');
 });
-it('shows one server page of 25 and withholds partial account sums', async () => {
+it('shows one server page of 100 and withholds partial account sums', async () => {
   fixture.invoke.mockResolvedValue(response({...empty(),total_rows:7767,controls:[{record_kind:'retained_ledger_decision',year:'2024',account:'Account',section:'Expense',currency:'USD',retained_amount:'98765.43',missing_amounts:1,rows:60}]}));
-  fixture.from.mockImplementation(() => table({ data: Array.from({length:26},(_,i)=>record(`r${i}`,`Record ${i}`)) }));
+  fixture.from.mockImplementation(() => table({ data: Array.from({length:101},(_,i)=>record(`r${i}`,`Record ${i}`)) }));
   await act(async () => root.render(book(<FinancialWorkpapers revision={0} onOpen={()=>{}}/>)));
   expect(container.querySelector('table')).toBeNull();
   await act(async () => Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'Records')!.click());
-  expect(container.querySelectorAll('tbody tr')).toHaveLength(25);
-  expect(container.textContent).toContain('Showing 1–25 records; more available');
+  expect(container.querySelectorAll('tbody tr')).toHaveLength(100);
+  expect(container.textContent).toContain('Showing 1–100 records; more available');
   await act(async () => Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'Accounts')!.click());
   expect(container.querySelector('tbody')?.textContent).toContain('Unknown');
   expect(container.textContent).not.toContain('98,765.43');
@@ -249,4 +249,121 @@ it('select mode: tap rows to select them, classify the selection in one sheet, a
   await act(async () => Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'Done')!.click());
   await act(async () => (container.querySelector('tbody tr') as HTMLElement).click());
   expect(open).toHaveBeenCalledTimes(1);
+});
+
+it('drills an expense subtotal into its exact year, currency and ledger classification', async () => {
+  fixture.invoke.mockResolvedValue(response({ ...empty(), total_rows: 3, controls: [
+    { record_kind: 'retained_ledger_decision', year: '2025', account: 'Checking', section: 'Expense', currency: 'USD', retained_amount: '40', rows: 1 },
+    { record_kind: 'retained_ledger_decision', year: '2025', account: 'Checking', section: 'Expense', currency: 'EUR', retained_amount: '12', rows: 1 },
+    { record_kind: 'retained_bank_movement', year: '2025', account: 'Checking', section: null, currency: 'USD', retained_amount: '-40', rows: 1 },
+  ] }));
+  await act(async () => root.render(book(<FinancialWorkpapers revision={0} onOpen={() => {}} />)));
+  await act(async () => (container.querySelector('[aria-label="Inspect recorded expenses for 2025 USD"]') as HTMLButtonElement).click());
+  const request = queries().find(query => filters(query, 'select').some(args => args[0] === 'id, document_id, record'))!;
+  expect(filters(request, 'eq')).toEqual(expect.arrayContaining([['owner_id', 'owner'], ['year', '2025'], ['record_kind', 'retained_ledger_decision'], ['section', 'Expense'], ['currency', 'USD']]));
+});
+
+it('keeps unknown currency and account controls scoped when opening their entries', async () => {
+  fixture.invoke.mockResolvedValue(response({ ...empty(), total_rows: 1, controls: [
+    { record_kind: 'retained_ledger_decision', year: '2025', account: null, section: 'Expense', currency: null, retained_amount: null, rows: 1 },
+  ] }));
+  await act(async () => root.render(book(<FinancialWorkpapers revision={0} onOpen={() => {}} />)));
+  await act(async () => Array.from(container.querySelectorAll('button')).find(button => button.textContent === 'Accounts')!.click());
+  await act(async () => (container.querySelector('tbody button') as HTMLButtonElement).click());
+  const request = queries().find(query => filters(query, 'select').some(args => args[0] === 'id, document_id, record'))!;
+  expect(filters(request, 'is')).toEqual(expect.arrayContaining([['currency', null], ['account', null]]));
+});
+
+it('shows unresolved accounts when the account filter requests unknown', async () => {
+  fixture.invoke.mockResolvedValue(response({ ...empty(), total_rows: 2, controls: [
+    { record_kind: 'retained_ledger_decision', year: '2025', account: null, section: 'Expense', currency: 'USD', retained_amount: '15', rows: 1 },
+    { record_kind: 'retained_ledger_decision', year: '2025', account: 'Checking', section: 'Expense', currency: 'USD', retained_amount: '20', rows: 1 },
+  ] }));
+  await act(async () => root.render(book(<FinancialWorkpapers revision={0} onOpen={() => {}} />)));
+  await act(async () => Array.from(container.querySelectorAll('button')).find(button => button.textContent === 'Accounts')!.click());
+  const account = Array.from(container.querySelectorAll('label')).find(label => label.textContent?.startsWith('Account '))!.querySelector('select')!;
+  await act(async () => { account.value = '__unknown'; account.dispatchEvent(new Event('change', { bubbles: true })); });
+  expect(container.querySelector('tbody')?.textContent).toContain('Unresolved');
+  expect(container.querySelectorAll('tbody tr')).toHaveLength(1);
+  expect(container.textContent).not.toContain('No account classifications match');
+});
+
+it('replaces the unclassified constraint when choosing a classification', async () => {
+  fixture.invoke.mockResolvedValue(response({ ...empty(), total_rows: 2, controls: [
+    { record_kind: 'retained_ledger_decision', year: '2025', account: 'Checking', section: 'Expense', currency: 'USD', retained_amount: '20', rows: 1 },
+    { record_kind: 'retained_bank_movement', year: '2025', account: 'Checking', section: null, currency: 'USD', retained_amount: '-20', rows: 1 },
+  ] }));
+  await act(async () => root.render(book(<FinancialWorkpapers revision={0} onOpen={() => {}} />)));
+  await act(async () => Array.from(container.querySelectorAll('button')).find(button => button.textContent === 'Inspect unclassified movements')!.click());
+  const classification = Array.from(container.querySelectorAll('label')).find(label => label.textContent?.startsWith('Classification '))!.querySelector('select')!;
+  await act(async () => { classification.value = 'Expense'; classification.dispatchEvent(new Event('change', { bubbles: true })); });
+  const request = queries().at(-1)!;
+  expect(filters(request, 'eq')).toContainEqual(['section', 'Expense']);
+  expect(filters(request, 'is')).not.toContainEqual(['section', null]);
+});
+
+const clickBookButton = async (label: string) => act(async () => Array.from(container.querySelectorAll('button')).find(button => button.textContent === label)!.click());
+it('keeps records available while the summary is pending, then fails, and retries only the summary', async () => {
+  let finish!: (value: unknown) => void;
+  fixture.invoke.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+  fixture.from.mockImplementation(() => table({ data: [record()] }));
+  await act(async () => root.render(book(<FinancialWorkpapers viewerId="owner" revision={0} onOpen={() => {}} />)));
+  await clickBookButton('Records');
+  expect(container.textContent).toContain('Retained part'); expect(container.textContent).toContain('All years.');
+  expect(filters(queries()[0], 'eq')).toContainEqual(['owner_id', 'owner']);
+  expect(filters(queries()[0], 'eq').some(args => args[0] === 'year')).toBe(false);
+  await act(async () => finish({ data: null, error: new Error('summary timeout') }));
+  expect(container.textContent).toContain('totals are unknown'); expect(container.textContent).toContain('Retained part');
+  expect(container.textContent).not.toContain('No bookkeeping records');
+  const recordReads = fixture.from.mock.calls.filter(([name]) => name === 'v_financial_accounting_records').length;
+  await clickBookButton('Retry summary');
+  expect(fixture.invoke).toHaveBeenCalledTimes(2);
+  expect(fixture.from.mock.calls.filter(([name]) => name === 'v_financial_accounting_records')).toHaveLength(recordReads);
+  expect(container.textContent).toContain('Retained part');
+  expect(container.querySelector('button[aria-current="page"]')?.textContent).toBe('Records');
+});
+it('retries failed records independently when the summary is unavailable', async () => {
+  fixture.invoke.mockResolvedValue({ data: null, error: new Error('summary timeout') });
+  fixture.from.mockImplementationOnce(() => table({ data: null, error: new Error('records timeout') })).mockImplementation(() => table({ data: [record()] }));
+  await act(async () => root.render(book(<FinancialWorkpapers viewerId="owner" revision={0} onOpen={() => {}} />)));
+  await clickBookButton('Records'); expect(container.textContent).toContain('Saved records could not load');
+  await clickBookButton('Retry records'); expect(container.textContent).toContain('Retained part');
+  expect(fixture.invoke).toHaveBeenCalledTimes(1); expect(container.textContent).toContain('totals are unknown');
+});
+it('preserves current records and does not reread on same-viewer sign-in, initial session or token refresh', async () => {
+  fixture.from.mockImplementation(() => table({ data: [record()] }));
+  await act(async () => root.render(book(<FinancialWorkpapers viewerId="owner" revision={0} onOpen={() => {}} />)));
+  await clickBookButton('Records'); const reads = fixture.from.mock.calls.length;
+  await act(async () => { for (const event of ['INITIAL_SESSION', 'SIGNED_IN', 'TOKEN_REFRESHED']) fixture.listener!(event, {user:{id:'owner'}}); });
+  expect(container.textContent).toContain('Retained part');
+  expect(container.querySelector('button[aria-current="page"]')?.textContent).toBe('Records');
+  expect(fixture.invoke).toHaveBeenCalledTimes(1); expect(fixture.from).toHaveBeenCalledTimes(reads);
+});
+it('invalidates a pending record result immediately on signout before effect cleanup', async () => {
+  let finish!: (value: unknown) => void;
+  const pending = new Promise(resolve => { finish = resolve; });
+  const builder = table({}); builder.then = resolve => pending.then(resolve);
+  fixture.from.mockReturnValue(builder);
+  await act(async () => root.render(book(<FinancialWorkpapers viewerId="owner" revision={0} onOpen={() => {}} />)));
+  await clickBookButton('Records');
+  await act(async () => { fixture.listener!('SIGNED_OUT', null); finish({ data: [record('late', 'PRIVATE LATE RECORD')], error: null }); await Promise.resolve(); });
+  expect(container.textContent).not.toContain('PRIVATE LATE RECORD'); expect(container.querySelector('tbody')).toBeNull();
+});
+
+it('keeps selected filter options visible and applied after summary controls fail', async () => {
+  fixture.invoke.mockResolvedValueOnce(response({ ...empty(), total_rows: 1, controls: [{ record_kind: 'retained_ledger_decision', year: '2024', account: 'Checking A', section: 'Expense', currency: 'USD', retained_amount: '12.50', rows: 1 }] })).mockResolvedValue({ data: null, error: new Error('summary timeout') });
+  fixture.from.mockImplementation(() => table({ data: [record()] }));
+  await act(async () => root.render(book(<FinancialWorkpapers viewerId="owner" revision={0} onOpen={() => {}} />)));
+  await clickBookButton('Records');
+  const select = (label: string) => Array.from(container.querySelectorAll('label')).find(node => node.textContent?.startsWith(label))!.querySelector('select')!;
+  for (const [label, value] of [['Classification ', 'Expense'], ['Currency ', 'USD'], ['Account ', 'Checking A']]) {
+    await act(async () => { select(label).value = value; select(label).dispatchEvent(new Event('change', {bubbles: true})); });
+  }
+  await act(async () => root.render(book(<FinancialWorkpapers viewerId="owner" revision={1} onOpen={() => {}} />)));
+  expect(container.textContent).toContain('totals are unknown');
+  for (const [label, value] of [['Classification ', 'Expense'], ['Currency ', 'USD'], ['Account ', 'Checking A']]) {
+    expect(select(label).value).toBe(value); expect(select(label).selectedOptions[0].textContent).toBe(value);
+  }
+  const request = queries().filter(query => filters(query, 'select').some(args => args[0] === 'id, document_id, record')).at(-1)!;
+  expect(filters(request, 'eq')).toEqual(expect.arrayContaining([['year','2024'], ['section','Expense'], ['currency','USD'], ['account','Checking A']]));
 });

@@ -18,6 +18,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { parseBatPageResult } from "../extract-auction-comments/batResult.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -129,38 +130,33 @@ async function fetchFinalPrices(supabase: ReturnType<typeof createClient>): Prom
       if (!resp.ok) return null;
       const html = await resp.text();
 
-      // Check for reserve not met FIRST — JSON-LD price on unsold listings is the high bid, not a hammer price
+      // The page's own result banner decides the outcome ("Sold for <strong>USD $X</strong>" / "Bid to <strong>USD $X</strong>").
+      // The old checks never matched that markup ("Bid to $X" / "Sold for $X"), then fell back to the JSON-LD price
+      // (the high bid on unsold lots) gated on /sold on/, which every BaT page contains ("textSoldOn":"Sold on").
+      // That wrote high bids as sales. High bids now go to high_bid with a typed, cited sale_outcome.
+      const result = parseBatPageResult(html);
       const reserveNotMet = /Reserve\s+Not\s+Met/i.test(html);
-      const bidToMatch = html.match(/Bid\s+to\s+\$([\d,]+)/i);
-      if (reserveNotMet || bidToMatch) {
+      const nowIso = new Date().toISOString();
+      if (result?.kind === "bid_to" || (!result && reserveNotMet)) {
         await supabase
           .from("vehicle_events")
-          .update({ event_status: "unsold", updated_at: new Date().toISOString() })
-          .eq("id", row.listing_id);
-        const highBid = bidToMatch?.[1] || html.match(/High\s+Bid[^$]*\$([\d,]+)/)?.[1] || "unknown";
-        console.log(`[score] ${row.listing_url}: reserve not met (high bid $${highBid})`);
+          .update({
+            event_status: "unsold",
+            sale_outcome: "bid_to",
+            sale_outcome_source_url: row.listing_url,
+            sale_outcome_evidence: result ? `BaT page banner: Bid to USD $${result.amount}` : "BaT page: Reserve Not Met",
+            sale_outcome_run_id: "score-live-auctions",
+            sale_outcome_observed_at: nowIso,
+            ...(result ? { high_bid: result.amount } : {}),
+            updated_at: nowIso,
+          })
+          .eq("id", row.listing_id)
+          .is("final_price", null);
+        console.log(`[score] ${row.listing_url}: no sale (high bid ${result?.amount ?? "unknown"})`);
         return null;
       }
 
-      // Extract hammer price using same patterns as extract-bat-core
-      let hammerPrice: number | null = null;
-
-      // Priority 1: "Sold for $X" in stats table (most reliable)
-      const soldMatch = html.match(/Sold\s+for\s+\$([\d,]+)/i);
-      if (soldMatch) hammerPrice = Number(soldMatch[1].replace(/,/g, ""));
-
-      // Priority 2: Title tag "sold for $X"
-      if (!hammerPrice) {
-        const titleMatch = html.match(/<title>[^<]*sold\s+for\s+\$([\d,]+)/i);
-        if (titleMatch) hammerPrice = Number(titleMatch[1].replace(/,/g, ""));
-      }
-
-      // Priority 3: JSON-LD "price" field (only if "Sold" appears on page — avoids high-bid-as-price bug)
-      if (!hammerPrice) {
-        const jsonLdMatch = html.match(/"price":\s*(\d+)/);
-        const pageIndicatesSold = /Sold\s+for/i.test(html) || /sold\s+on/i.test(html);
-        if (jsonLdMatch && pageIndicatesSold) hammerPrice = Number(jsonLdMatch[1]);
-      }
+      const hammerPrice: number | null = result?.kind === "sold" ? result.amount : null;
 
       if (!hammerPrice || hammerPrice <= 0) {
         console.log(`[score] ${row.listing_url}: no hammer price found`);
@@ -173,7 +169,12 @@ async function fetchFinalPrices(supabase: ReturnType<typeof createClient>): Prom
         .update({
           final_price: hammerPrice,
           event_status: "sold",
-          updated_at: new Date().toISOString(),
+          sale_outcome: "sold",
+          sale_outcome_source_url: row.listing_url,
+          sale_outcome_evidence: `BaT page banner: Sold for USD $${hammerPrice}`,
+          sale_outcome_run_id: "score-live-auctions",
+          sale_outcome_observed_at: nowIso,
+          updated_at: nowIso,
         })
         .eq("id", row.listing_id);
 

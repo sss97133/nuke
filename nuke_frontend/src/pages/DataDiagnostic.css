@@ -1,0 +1,15 @@
+.data-diagnostic { max-width: 1100px; margin: 0 auto; padding: 24px 16px; color: var(--text); font-size: var(--text-body); line-height: 1.5; }
+.data-diagnostic header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 20px; }
+.data-diagnostic h1 { margin: 0; font-size: var(--text-title); }
+.data-diagnostic h2 { margin: 0 0 8px; font-size: var(--text-body); font-weight: 600; }
+.data-diagnostic p { margin: 8px 0; color: var(--text-secondary); }
+.data-diagnostic .card { padding: 18px; margin: 16px 0; min-width: 0; }
+.data-diagnostic-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.data-diagnostic-columns .card { margin: 0; }
+.data-diagnostic a { display: inline-flex; align-items: center; min-height: var(--control-height); color: var(--accent); overflow-wrap: anywhere; }
+.data-diagnostic button { min-height: var(--control-height); font-size: var(--text-callout); }
+.data-diagnostic ul { padding-left: 20px; max-height: 420px; overflow-y: auto; }
+.data-diagnostic li { overflow-wrap: anywhere; padding: 6px 0; }
+.data-diagnostic [role=alert] { color: var(--error-dark); }
+.data-diagnostic summary { min-height: var(--control-height); cursor: pointer; font-weight: 600; }
+@media (max-width: 700px) { .data-diagnostic-columns { grid-template-columns: 1fr; } }

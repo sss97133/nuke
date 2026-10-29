@@ -90,10 +90,14 @@ if node --test "$GD/no-swallowed-write-errors.test.mjs" >"$CI_TMP_DIR/ci_swallow
 else red "  ✗ swallowed-write-error detector contract FAILED"; cat "$CI_TMP_DIR/ci_swallowed_tests.out"; fail=1; fi
 if node --test "$ROOT/scripts/check-image-observation-health.test.mjs" >"$CI_TMP_DIR/ci_image_health_tests.out" 2>&1; then grn "  ✓ image-health failure assays"
 else red "  ✗ image-health failure assays FAILED"; cat "$CI_TMP_DIR/ci_image_health_tests.out"; fail=1; fi
+if node --experimental-vm-modules --test "$ROOT/scripts/ci/logged-out-live.test.mjs" >"$CI_TMP_DIR/ci_logged_out_tests.out" 2>&1; then grn "  ✓ logged-out navigation and access failure assays"
+else red "  ✗ logged-out failure assays FAILED"; cat "$CI_TMP_DIR/ci_logged_out_tests.out"; fail=1; fi
 if node --test "$GD/no-raw-fetch.test.mjs" >"$CI_TMP_DIR/ci_rawfetch_tests.out" 2>&1; then grn "  ✓ raw-fetch regression tests"
 else red "  ✗ raw-fetch regression tests FAILED"; cat "$CI_TMP_DIR/ci_rawfetch_tests.out"; fail=1; fi
 if node --test "$ROOT/scripts/data/declared-source-reader.test.mjs" >"$CI_TMP_DIR/ci_declared_reader_tests.out" 2>&1; then grn "  ✓ declared-source reader mapping"
 else red "  ✗ declared-source reader mapping FAILED"; cat "$CI_TMP_DIR/ci_declared_reader_tests.out"; fail=1; fi
+if node --test "$ROOT/scripts/books/expense-footprints.test.mjs" >"$CI_TMP_DIR/ci_expense_footprints_tests.out" 2>&1; then grn "  ✓ expense-footprints collector contract"
+else red "  ✗ expense-footprints collector contract FAILED"; cat "$CI_TMP_DIR/ci_expense_footprints_tests.out"; fail=1; fi
 if node --test "$ROOT/scripts/ci/invalid-indexes.test.mjs" >"$CI_TMP_DIR/ci_invalid_indexes_tests.out" 2>&1; then grn "  ✓ invalid-index detector contract"
 else red "  ✗ invalid-index detector contract FAILED"; cat "$CI_TMP_DIR/ci_invalid_indexes_tests.out"; fail=1; fi
 if node --test "$ROOT/scripts/ci/owner-writable-views.test.mjs" >"$CI_TMP_DIR/ci_owner_writable_views_tests.out" 2>&1; then grn "  ✓ owner-writable view detector contract"

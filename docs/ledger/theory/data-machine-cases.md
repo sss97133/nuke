@@ -3287,3 +3287,253 @@ and `revert_auction_transfer_relabels` puts it back, so later evidence (a bridge
 New seeds follow the same rule: `transfer-automator` seeds a lot as `recorded_unconfirmed` with the one hammer milestone and
 seeds nothing for a lot the fold flagged as relisted; `transfer-advance` creates the deal pipeline and moves the transfer to
 `in_progress` when a party engages. The listing-seeded path (a deal run through Nuke) keeps the full pipeline.
+
+## 16. The money machine: catch, fingerprint, match, cite, label, release, compute (owner, 2026-10-26)
+
+**Owner, 2026-10-26:** "this should be as simple as catch and release as giving a key to an agent. they go in find the docs,
+fingerprint everything no questions to the client until every rock has been turned over." Two priorities run together: finish
+the 2022-2025 taxes, and build the automation that handles all future taxes and financial events. The tax cleanup is the first
+full run of the machine; every item cleared by hand becomes an acceptance test the machine must pass alone.
+
+**The loop (daily, not per tax season):**
+1. **Catch.** Every financial event lands as a record: bank/card feeds, QuickBooks/Intuit, PayPal, Gmail (receipts, statements,
+   landlord/city/vendor mail), iMessage, Photos (assets with time and GPS), utility and landlord portals.
+2. **Fingerprint.** amount, date, counterparty, account, content hash for documents.
+3. **Match.** Join each event to its partners: payment to receipt, cash withdrawal to purchase/photo/seller message, transfer to
+   its counterpart, deposit to invoice/deal/lender/spouse.
+4. **Cite.** Two axes per decision: payment proof (bank/card line, cash withdrawal, recorded cash receipt, none) and purpose proof
+   (third-party document, message, photo, vehicle record, dated owner testimony, or an inverse citation: a recorded search that
+   proves absence, with sources, query, date and result).
+5. **Label.** Hard rules assign the tax treatment from a closed list (books_year_gate R1-R9, PRs #2813/#2814). No default stands
+   as a judgment: a defaulted row stays `searching` until cited; filing is blocked while any row is `searching`.
+6. **Release.** Only after the search is recorded does the owner get one batched question, with the gathered evidence.
+7. **Compute.** Returns compute from the labeled ledger at any moment (books_year_state); builders read the DB only and must
+   pass the drift check.
+
+**Acceptance cases from 2026-10-26** (each was found by the owner, not the machine; the machine must find them alone; the
+specific records live in the books by id, not here):
+- Cash withdrawal + same-day photos at a seller's yard (time and GPS) -> cash parts for a customer job.
+- Landlord statements arriving as image attachments -> rent actually paid by month; unpaid rent not deductible; credited
+  payments with no matching bank line flagged.
+- A utility portal's payment-history page -> electric paid per year; exposed a double count under another category.
+- A worker's hourly payment sheet (spreadsheet screenshots) -> cash labor by month; 1099 threshold check.
+- A customer's job sheet -> unlabeled bank-to-bank credits were customer payments.
+- Duplicates: vendor invoice rows vs account payments; bank copies vs ledger rows (R3).
+- A spouse-owned foreign company: calendar tax year (IRC 898); a provision reversal is not US-rules income; the company's
+  information return must match the inclusion on the joint return.
+- Residency: photo GPS + face presence by day -> credit residency tests per year.
+
+## 17. A vehicle arrives at the shop: what the system builds on its own (owner, 2026-10-28)
+
+**Owner, 2026-10-28 (in substance):** "I plugged in my phone, it has a bunch of photos of the 1973 Pontiac Trans Am clone.
+I'm supposed to go to bringatrailer.com, sign in and submit the vehicle for auction. The app is supposed to make me a new
+profile as it builds and send me notifications like 'your new vehicle profile', depending on the type of relationship. It
+should be able to look at what I did today and make a work receipt. I didn't document the one step of cutting and polishing
+that I did for about 2-4 hours mid day. I want the app to understand what it's supposed to build, and an automation to
+Bring a Trailer. Do the Nuke profile first; the data plate, the VIN plate and the title are in the photos."
+
+### The case that produced this
+
+A red 1973 Firebird with a Trans Am hood, "SD-455" decals and shaker, on the lift at the Boulder City shop
+(GPS at the registered shop). 230 photos on 2026-10-28 in three bursts:
+
+| burst (PT) | frames | what the frames show (Photos labels) |
+|---|---|---|
+| 10:00-10:24 | 170 | engine bay, exhaust, tires and wheels, underside, cowl tag |
+| 10:54-11:23 | 11 | exterior with people |
+| 11:23-15:44 | 0 | the gap: the owner's undocumented cutting and polishing, 2-4 h |
+| 15:44-15:58 | 49 | interior, seats, dashboard, trunk, bumpers: the after-polish set |
+
+Read off the frames (local Vision OCR of the exported originals, filenames in the owner's library):
+- Cowl tag: `ST73 2FS87 N 189504 BDY · TR 232 A51 · 75 75 PNT · 07C`. 2FS87 = 1973 Firebird base coupe
+  (a Trans Am is 2FV87), Norwood, Fisher body 189504, trim 232 (black), paint 75 (Buccaneer Red), built 3rd week of July.
+  The clone claim is proven by the plate, not by the owner.
+- Decals: SD-455; PONTIAC badge; "TRANS AM".
+- Parts with legible labels: Uremco 14-4164 remanufactured (dated 9/9/24), AC A366C air filter, battery (Ozark), FR70-15
+  radials, jack stowage card.
+- Not found in the library (Aug 20 - Oct 28, every document-labelled frame OCR'd): the VIN plate and the title. The
+  owner says they were taken; they are not in iCloud Photos as of 17:30 PT. A 1973 VIN is 13 characters (2S87R3N1xxxxx).
+
+**What stopped the machine on this day.** At 15:49 PT Supabase restricted the organization (storage 763.69 GB of 110 GB,
+spend cap on). Every API request is dropped: the iOS relay (402), the web, the MCP. The last relayed photos landed at
+22:43 PT on 10-27. Nothing below can run until the owner lifts the cap; the database itself answers on the pooler.
+
+### The chain the system owns (nothing in it is typed by the owner)
+
+```
+phone camera ─▶ iOS relay (GPS at the registered shop) ─▶ vehicle_images (capture_relay_ios, user_id = owner)
+   ─▶ on-device identity read (OCR: VIN/serial, cowl tag, badges, documents) + server vision gate
+   ─▶ device_create_vehicle_profile  (basis capture_session: serial + make from capture evidence)
+   ─▶ attribute_testimony files every frame of the session on the profile
+   ─▶ derive_work_sessions (one per capture day) + gap testimony (owner statement, one tap)
+   ─▶ get_user_day_receipt (photos, sessions, parts, money)  ─▶ user_notifications
+   ─▶ generate-listing-package ─▶ dispatchChannel('bring_a_trailer') ─▶ listing_exports job browser_submit
+   ─▶ Chrome worker fills the BaT form under the owner's session, stops at the owner's two keys
+```
+
+### 1. Identity from capture evidence, not from an album
+`device_create_vehicle_profile(basis = 'capture_session')` already accepts an 8-17 character serial, but for a classic
+serial it needs `make` and takes it only from an album label (`AttributionEngine` line 301; line 876 refuses a classic
+serial group when `contextualMake` is nil). Albums are test labels, not product logic (owner, 10-20). The make and year
+must come from the capture session itself, in this order of strength:
+1. a title or registration document in the same session (OCR: year, make, VIN) — a document cannot file a photo by
+   itself, but it can supply the namespace for a plate read;
+2. a cowl/trim tag (`BODY BY FISHER` + `ST73 2FS87`: model year and body series decode the make and series);
+3. a make badge or wordmark read on a vehicle-classified frame (`PONTIAC` on the nose).
+A VIN-plate read plus any one of these creates the profile. A cowl tag without a VIN plate creates a **candidate**
+profile (private, status `needs_identifier`) so the day's work still files somewhere, and the owner's next notification
+asks for the one missing frame instead of a form.
+
+### 2. Relationship decides the words
+The profile writer records the owner as photographer; the relationship (owner, steward for a client, shop technician,
+consignor) comes from the GPS org tag and the owner's roster. The notification copy follows it:
+"Your new vehicle profile: 1973 Pontiac Firebird (Trans Am clone)" for the owner; "New vehicle at <shop>: ..." for a
+technician; "Client vehicle profile ..." for a steward. The row goes to `user_notifications` with `vehicle_id`,
+`image_id` (the anchor frame) and `action_url` = the profile. Today `user_notifications` has had 0 rows in 60 days: the
+21 insert sites in migrations are never reached by the capture chain.
+
+### 3. The day is the unit; the gap is testimony
+`derive_work_sessions` makes one session per capture day from the frames. A gap of more than an hour between bursts on
+a day the owner was at the shop is a question, not nothing: the day receipt shows the gap ("11:23-15:44, no photos") and
+offers one tap: "I was working on this car: ____ (what) ____ (hours)". The answer lands as a `work_sessions` row with
+`session_type = 'owner_testimony'`, `intent_source = 'owner'`, start/end = the gap, and the stated hours; it is on the
+proven rung (a Sign), the photo sessions on the attributed rung. The receipt (`get_user_day_receipt`,
+`TechnicianDayReceipt`) is then complete for 2026-10-28: 230 frames, 3 photo sessions, 1 testimony session.
+
+### 4. The listing package reads the profile; the worker reads the package
+`mapToBatSubmission` carries decode/observe/deliberate/sign tiers. The BaT form for a 1973 Pontiac Firebird (read from
+the live form on 10-28, 180 inputs, Pontiac-specific branch) wants, in order:
+
+| BaT question | tier | from |
+|---|---|---|
+| year, make, model (Firebird / Firebird Formula / Firebird Trans Am) | decode | profile; a clone is listed as the body series on the tag (Firebird), the clone named in the title |
+| country, city, postal code | decode | shop location of the session |
+| listed elsewhere? / listed on BaT before? / dealer? / consignment? | sign | owner |
+| VIN | decode | VIN plate read (missing today) |
+| race car or street? | observe | registration document |
+| engine (350ci V8 / 400ci V8 / Other) | observe | block casting / owner |
+| transmission | observe | frames (console shifter) / owner |
+| exterior color (Pontiac code list; 75 = Buccaneer Red) | decode | cowl tag PNT 75 |
+| interior color (code list; 232 = black) | decode | cowl tag TR 232 |
+| wheels (honeycomb / Rally II / other), tires brand, size | observe | frames (FR70-15 radials read) |
+| how titled / registered, name on title, state, title status | sign | title document |
+| year purchased, odometer, accurate?, miles added | sign | title + owner |
+| refurbished? year, details; paint/body history; accidents; rust | deliberate | work sessions + owner |
+| equipment checklist (Safe-T-Track, Ram Air hood, hood decal, console, tach, A/C, radio...) | observe | frames |
+| modifications (exhaust/intake, from stock) and the list | deliberate | frames + sessions (SD-455 decals, shaker, exhaust) |
+| history from new; services performed and when | deliberate | sessions + receipts (Uremco 9/9/24 part) |
+| documents (window sticker, PHS, manual, records, spares) | sign | owner |
+| issues / problems; anything else | deliberate | owner |
+| reserve? amount; document fee | sign | owner (final_approval key) |
+| two attestation checkboxes | sign | owner (ownership_attestation key) |
+| photos (up to 600) | decode | the session's frames, newest set first |
+
+The worker (`metadata.job.kind = 'browser_submit'`, `platform = 'bat'`) runs in the owner's Chrome session, fills every
+decode/observe/deliberate field, uploads the frames, and stops before "Finish" with the sign-tier fields shown as the
+owner's taps. BaT autosaves the draft under My Listings ("Resume submission"), so a stopped run is resumable. The
+submission is recorded back on `listing_exports` (`submitted_at`, `external_listing_id` from the photos URL BaT mails).
+
+### Acceptance (the 10-28 Trans Am is the test)
+1. Relay the 230 frames of 10-28 once the API is back: 230 rows, `source = capture_relay_ios`, GPS at the shop.
+2. With the VIN-plate frame added, one profile exists for the 13-character serial, make Pontiac, year 1973, with the
+   cowl tag decoded (series 2FS87, paint 75, trim 232) and all 230+ frames filed on it; without the VIN frame, a
+   candidate profile and a notification asking for that one frame.
+3. One `user_notifications` row "Your new vehicle profile" to the owner, linking the profile.
+4. `get_user_day_receipt(owner, 2026-10-28)` returns 3 derived sessions and, after one tap, the owner's cutting and
+   polishing session for the 11:23-15:44 gap.
+5. `generate-listing-package` + `dispatchChannel('bring_a_trailer')` produce a `listing_exports` row whose field map
+   covers every decode/observe row in the table above; the worker fills the live BaT form to the reserve step and stops.
+
+## 18. "What will it bring": a valuation is four readers, not a comp list (owner, 2026-10-29)
+
+**Owner, 2026-10-29 (in substance), after the 10-28 Firebird was priced off 1970-73 BaT lots:** "You're not covering
+enough years. You should be doing all. Also track the Firebird market line, and then pull up comparable nut-and-bolt
+restos as a whole. This is the value of our system at play. We can even distill user commentary: a car like this whose
+main points are 'iconic style muscle car', 'nut and bolt rotisserie', 'Firebird, Trans Am clone'. And you should have
+analysed all the images so I'm not missing any documentation on the key parts that make these claims valid."
+
+### The case
+The 10-28 Firebird (§17) went to Bring a Trailer on the owner's claims: every part new, all Trans Am hardware but the
+VIN tag, a 455 built from numbers-correct SD-455 parts. Four readers were then run by hand against the ledger and the
+owner's frames. What each found is the design.
+
+| reader | what it read | what it returned |
+|---|---|---|
+| market line | Firebird/Trans Am, model years 1967-2002, five houses, sales 2018-2026: 2,387 priced lots, 1,800 sold | the all-Firebird median flat at $32-34k since 2022; 1970-73 the dear generation ($62.7k, n=121); real non-SD 1970-73 Trans Am $70.2k (n=33, 2024-26); SD-455 too few to tell (n=5) |
+| class | nut-and-bolt / rotisserie / body-off across all 1965-74 American muscle; clone / tribute / -Style across all makes | resto premium 1.51x (median of the ten biggest groups), Firebirds 1.96x (n=29 vs 279); clone discount 0.37-0.44x where n allows (Shelby, COPO); 27 lots both clone and resto since 2022, none a 1970-73 Firebird: no direct comp exists |
+| commentary | 8,545 comments on 80 BaT 1970-73 Firebird lots 2023-26, plus cross-make samples | honest, year-correct, photo-documented clones earn praise and a clone price; bids die on a title the VIN contradicts, on silent sellers, on engine claims that look faked; SD-455 claims are audited in a fixed order (VIN, block code, pad stamp, block date, distributor, carb, axle, trans tag, PHS, dyno); 323 video requests on 68 of 80 lots |
+| evidence audit | 340 of the owner's frames read by eye, 222 of the car, against each claim | the VIN stamp decodes to a base coupe born with the six; the block casting is a 1970 455, not the SD casting; the carburetor is a 2024 remanufactured unit; scale rust underneath; 17 frames missing, named in walk order |
+
+The number moved from "$55-75k with a documented SD engine" (five BaT comps) to "$35-45k as the frames show it today,
+$55-65k once the underside and every engine number are photographed" because the fourth reader put the car in a different
+class than the owner's words did. The first three readers set the rows; the fourth decides which row the car is in.
+
+### The rule
+A price question about a vehicle in the ledger runs all four readers, in this order, and writes to the vehicle's case
+folder, not to chat:
+1. **Market line.** The model across every model year and every house, by sale year and generation, like-for-like
+   within class (§13 rule: never headline a raw median move; "too few to tell" under n = 8).
+2. **Class.** The car's build class across makes (nut-and-bolt, restomod, clone/tribute, survivor), premium or discount
+   against stock siblings of the same make, model and year band, n on both sides, and the intersection of its classes.
+3. **Commentary.** The comment record for the model and the class, distilled to what moves bids, what kills them, and the
+   verification order buyers run; each finding with its count and one short quote keyed to the lot.
+4. **Evidence audit.** Every frame the owner holds, read against every claim the listing will make, returning supported /
+   contradicted / missing per claim and the shot list. The listing copy is written from this reader, not from the owner.
+
+### What the system has and lacks
+- `compute-vehicle-valuation` selects comps on make, canonical model and year ±5 from `clean_vehicle_prices`, and derives
+  a build class (restomod / project / survivor) from `vehicle_condition_scores.descriptor_summary`. It has no market line
+  by sale year, no class premium from the ledger, no commentary reader, and no evidence audit; the owner's claims enter
+  as the vehicle's fields.
+- `auction_comments` holds the record (columns for sentiment, expertise, claims, question categories) and `auction_events`
+  holds every house; the readers above are SQL over them plus the frames. The listing package (§17) should carry the
+  four readers' outputs so the BaT description is written from evidence tiers, with every claim's frame id beside it.
+- Data notes from the run: Mecum canonical URLs end in '/', so a trailing-slash dedupe drops Mecum (dedupe on a
+  normalized URL); Mecum 2018-22 rows carry no prices; Barrett-Jackson holds sold lots only, and its 2007-2020 dockets
+  carry the scrape date as `auction_end_date` (#2881); two B-J 1973 Firebird dockets are labelled "Grand Prix".
+
+### Acceptance
+1. For the 10-28 Firebird, the four readers' outputs exist on the profile (market line, class, commentary, evidence
+   audit) and the listing package's description cites a frame id for every claim; claims without a frame are listed as
+   "needs a frame", never asserted.
+2. A new price question on any vehicle in the ledger returns the four sections with denominators and dates, or says which
+   reader had too little to tell.
+
+## 19. The builder is a contributor without an account (owner, 2026-10-29)
+
+**Owner, 2026-10-29 (in substance):** "I want a better presentation of this, tied to the vehicle profile. This is exactly
+the purpose of our system. It is a lot to answer, and if he has any documentation he had best upload first so we can
+re-evaluate and ask questions that are more relevant. Think desktop and mobile, because he will receive this by text."
+
+### The case
+The 10-28 Firebird's builder holds the facts the listing needs (what went into the 1970 455 block, who did the
+machine work, the title history) and the paper that proves them. He is not a Nuke user, will not make an account, and
+receives links by text. The first draft was a fifty-question sheet. The owner's correction: documents first, then only
+the questions the documents leave open; the page is the vehicle's own intake, not a form.
+
+### The rule
+A vehicle profile has a **contributor intake**: a share link the owner sends by text. It opens with no account, on a
+phone, and shows the car's identity card (what the frames already prove, what is still unknown), then three steps:
+1. **Send documents first.** Photos of receipts, invoices, cam cards, dyno sheets, build photos, purchase papers. Each
+   lands on the profile as a document frame attributed to the contributor (ingest kind contributor_upload), goes through
+   the document reader (§17), and the unknowns list shrinks.
+2. **A short first round**, at most eight questions, chosen by what changes the number for this car (§18 readers decide
+   the order). Answers land as testimony rows with the contributor as source and the owner as recorder when the owner
+   types them on a call.
+3. **A second round generated after the documents are read**, asking only what is still open.
+The relationship (builder, previous owner, shop, appraiser) is recorded on every row; the listing package (§17) cites
+the contributor by name on each fact they supplied. The owner can do all of this on the contributor's behalf from the
+same page while on the phone with them.
+
+### What exists and what does not
+- Document frames, the document reader, attribute_testimony and work_sessions testimony exist for the owner's own
+  captures. There is no contributor identity without an auth user, no share-link intake, and no "unknowns" reader that
+  turns the §18 evidence audit into a question list.
+- Stopgap used on 2026-10-29 while the API was restricted: a published page outside Nuke (owner writes, builder reads).
+  It is not the product; it is the spec's sketch.
+
+### Acceptance
+1. The owner sends one link by text; the builder opens it on a phone with no account and sees the car, the three steps and
+   the eight questions.
+2. A receipt photo he sends lands on the profile attributed to him, and the next open of the page shows one fewer unknown.
+3. The BaT package cites him by name on every fact he supplied, with the frame id of his document beside it.

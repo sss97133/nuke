@@ -1,4 +1,5 @@
-begin; set local statement_timeout='55s'; set local lock_timeout='5s';
+-- caller controls the transaction (wrap in BEGIN ... ROLLBACK for tests); no COMMIT here
+set local statement_timeout='55s'; set local lock_timeout='5s';
 -- Revert run agg_houselot_v9_20261024 without deleting anything:
 -- 1) cc events back to their from-vehicle with original suspect fields/metadata (from backup); 2) untrusted marks retired;
 -- 3) the inserted B-J house events are retracted in place (event_status 'cancelled', source_suspect vehicle_id, reason) - rows kept;
@@ -12,4 +13,4 @@ update public.vehicle_events e set event_status='cancelled', source_suspect=arra
   source_suspect_run_id='revert_agg_houselot_v9_20261024', source_suspect_at=now()
 from public.backup_agg_houselot_v9_20261024 b where e.id=b.house_event_id and e.extraction_run_id='agg_houselot_v9_20261024';
 update public.bj_results_stage_v1_20261024 set inserted_house_event_id=null, attached_cc_event_id=null, note='reverted agg_houselot_v9_20261024' where note='agg_houselot_v9_20261024 attached';
-commit;
+

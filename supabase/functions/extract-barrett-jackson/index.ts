@@ -929,11 +929,14 @@ async function saveVehicle(
   // Ensure deterministic facet extraction has run on the vehicle before identity check & write
   applyBarrettJacksonVehicleFacets(vehicle);
 
-  // Check if vehicle already exists by URL
+  // Check if vehicle already exists by URL: every spelling of the canonical listing URL (http/https, www, trailing slash),
+  // oldest record first, so a re-crawl with a different spelling finds the existing vehicle instead of making a twin.
+  const urlSpellings = listingUrlSpellings(vehicle.url);
   const { data: byUrl } = await supabase
     .from("vehicles")
     .select("id")
-    .eq("discovery_url", vehicle.url)
+    .in("discovery_url", urlSpellings)
+    .order("created_at", { ascending: true })
     .limit(1)
     .maybeSingle();
 
@@ -941,8 +944,9 @@ async function saveVehicle(
   const { data: queueEntry } = await supabase
     .from("import_queue")
     .select("vehicle_id")
-    .eq("listing_url", vehicle.url)
+    .in("listing_url", urlSpellings)
     .not("vehicle_id", "is", null)
+    .order("created_at", { ascending: true })
     .limit(1)
     .maybeSingle();
 
@@ -1141,7 +1145,9 @@ async function saveVehicle(
       .select("id, metadata, sold_at, ended_at")
       .eq("vehicle_id", vehicleId)
       .eq("source_platform", "barrettjackson")
-      .eq("source_url", vehicle.url)
+      // Any spelling of the same lot (www./non-www., http/https, trailing slash) is the same listing.
+      .in("source_url", listingUrlSpellings(vehicle.url))
+      .order("created_at", { ascending: true })
       .limit(1)
       .maybeSingle();
     const existingListing = liveRow as { id: string; metadata: Record<string, unknown> | null; sold_at: string | null; ended_at: string | null } | null;
@@ -1151,7 +1157,7 @@ async function saveVehicle(
       source_platform: "barrettjackson",
       source_listing_id: null,
       event_type: "auction",
-      source_url: vehicle.url,
+      source_url: canonicalListingUrl(vehicle.url),
       event_status: episodeStatus(vehicle.status),
       final_price: vehicle.sale_price || null,
       sold_at: episodeSoldAt(vehicle.status, vehicle.event_date),
@@ -1191,7 +1197,10 @@ async function saveVehicle(
       .select("id, auction_end_date")
       .eq("vehicle_id", vehicleId)
       .eq("source", "barrett-jackson")
-      .eq("source_url", vehicle.url)
+      // Match on the canonical URL: an exact source_url match missed www./non-www. spellings of the
+      // same lot and inserted ~10.4k twin rows (marked duplicate_of in 20261028120900, 2026-10-25).
+      .eq("canonical_listing_url", canonicalListingUrl(vehicle.url))
+      .is("duplicate_of", null)
       .limit(1)
       .maybeSingle();
 
@@ -1199,7 +1208,7 @@ async function saveVehicle(
       mustWrite('auction_events insert', await supabase.from("auction_events").insert({
         vehicle_id: vehicleId,
         source: "barrett-jackson",
-        source_url: vehicle.url,
+        source_url: canonicalListingUrl(vehicle.url),
         outcome: vehicle.status?.toLowerCase() === "sold" ? "sold" : "listed",
         winning_bid: vehicle.sale_price || null,
         lot_number: vehicle.lot_number || null,
@@ -1214,6 +1223,20 @@ async function saveVehicle(
   }
 
   return { vehicleId, isNew, fieldsUpdated, qualityScore: gate.score };
+}
+
+/** Same normalization as SQL public.canonical_listing_url(): lowercase, https, no www., no query/fragment, no trailing slash. */
+export function canonicalListingUrl(u: string): string {
+  return u.trim().toLowerCase().split("#")[0].split("?")[0]
+    .replace(/^https?:\/\/(www\.)?/, "https://").replace(/\/+$/, "");
+}
+
+/** The spellings of one listing URL that canonicalListingUrl() folds together, for exact-match lookups. */
+export function listingUrlSpellings(u: string): string[] {
+  const rest = canonicalListingUrl(u).replace(/^https:\/\//, "");
+  const out = new Set<string>([u]);
+  for (const scheme of ["https://", "http://"]) for (const www of ["", "www."]) for (const slash of ["", "/"]) out.add(scheme + www + rest + slash);
+  return [...out];
 }
 
 // ─── Main handler ───────────────────────────────────────────────────────────

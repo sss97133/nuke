@@ -23,7 +23,9 @@ export function SignSheet({ title, says, doesNotSay, confirmLabel, onConfirm, on
 }) {
   const dialog = useRef<HTMLDivElement>(null);
   const closeRef = useRef(onClose);
-  closeRef.current = onClose;
+  // Once submitted, dismissing the sheet cannot cancel the server operation.
+  // Keep its eventual answer visible instead of implying that Cancel undid a Sign.
+  closeRef.current = busy ? () => {} : onClose;
   const titleId = useId();
 
   // Focus moves into the sheet when it opens (its first field, else the sheet), stays inside while it is open (Tab and
@@ -51,11 +53,12 @@ export function SignSheet({ title, says, doesNotSay, confirmLabel, onConfirm, on
     };
   }, []);
 
-  return <div className="jb-sheet-backdrop" onClick={onClose}>
+  const close = () => { if (!busy) onClose(); };
+  return <div className="jb-sheet-backdrop" onClick={close}>
     <div ref={dialog} tabIndex={-1} className="jb-sheet" role="dialog" aria-modal="true" aria-labelledby={titleId} onClick={e => e.stopPropagation()}>
       <div className="jb-sheet__head">
         <Text role="entity" dense as="h2" id={titleId}>{title}</Text>
-        <button type="button" className="btn-base btn-xs btn-ghost" onClick={onClose}><Text role="label">{done ? 'Done' : 'Cancel'}</Text></button>
+        <button type="button" className="btn-base btn-xs btn-ghost" disabled={busy} onClick={close}><Text role="label">{done ? 'Done' : 'Cancel'}</Text></button>
       </div>
       <div className="jb-sheet__body">
         {children}

@@ -1,6 +1,7 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { FaviconIcon } from '../common/FaviconIcon';
+import { VehicleIdentity } from '../common/MakeIdentity';
 import { getVehicleIdentityTokens } from '../../utils/vehicleIdentity';
 import { UserInteractionService } from '../../services/userInteractionService';
 import { getEngineDefinition, getTransmissionDefinition, type PowertrainSpecDefinition } from '../../services/powertrainDefinitionService';
@@ -469,6 +470,8 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
   }, [vehicle]);
 
   const identity = React.useMemo(() => getVehicleIdentityTokens(vehicle as any), [vehicle]);
+  const identityMake = identity.primary.find(token => token.kind === 'make')?.value;
+  const identityModel = identity.primary.find(token => token.kind === 'model')?.value;
   const loggedKeysRef = React.useRef<Set<string>>(new Set());
 
   const vehicleTitle = React.useMemo(() => {
@@ -1005,7 +1008,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
       right: '6px',
       background: 'rgba(0, 0, 0, 0.75)',
       backdropFilter: 'blur(6px)',
-      color: thermalPriceColor || 'var(--surface-elevated)',
+      color: thermalPriceColor || 'var(--on-dark-overlay)',
       padding: isCompactCard ? '3px 6px' : '4px 8px',
       display: 'inline-flex',
       alignItems: 'center',
@@ -1618,7 +1621,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                 vehicle.primary_image_url,
                 vehicle.image_url,
               ]}
-              alt={`${vehicle.year || ''} ${vehicle.make || ''} ${vehicle.model || ''}`.trim() || 'Vehicle'}
+              alt={showDetailOverlay ? '' : vehicleTitle}
               fill={true}
               objectFit={thumbnailFit}
               placeholderSrc="/nuke.png"
@@ -1637,7 +1640,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                 color: 'var(--text-disabled)', textAlign: 'center',
                 letterSpacing: '1px', textTransform: 'uppercase',
               }}>
-                {vehicle.year} {vehicle.make}<br />{vehicle.model}
+                {showDetailOverlay ? 'Photo unavailable' : <>{vehicle.year} {vehicle.make}<br />{vehicle.model}</>}
               </span>
             </div>
           )}
@@ -1850,7 +1853,9 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                   marginBottom: '4px',
                 }}
               >
-                {vehicleTitle}
+                {identityMake && identityModel ? <VehicleIdentity compact
+                  year={identity.primary.find(token => token.kind === 'year')?.value}
+                  make={identityMake} model={identityModel} variants={identity.differentiators} /> : vehicleTitle}
               </div>
 
               {/* Metadata row - clean by default; infoDense adds extras */}

@@ -1,10 +1,10 @@
 import React, { Suspense } from 'react';
 import { BrowserRouter as Router, Route, Routes, useLocation, Navigate } from 'react-router-dom';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { BrandingProvider } from './branding/BrandingContext';
 import ModeAutoController from './branding/ModeAutoController';
 import { AuthProvider } from './contexts/AuthContext';
+import { ViewerWorkspace } from './components/auth/ViewerWorkspace';
 import { ToastProvider } from './components/ui/Toast';
 import { ToastProvider as OldToastProvider } from './hooks/useToast';
 import { UploadStatusProvider } from './contexts/UploadStatusContext';
@@ -14,6 +14,7 @@ import GlobalUploadStatus from './components/GlobalUploadStatus';
 import { SpeedInsights } from '@vercel/speed-insights/react';
 import { Toaster } from 'react-hot-toast';
 import AppLayout from './components/layout/AppLayout';
+import LoadingSkeleton from './components/common/LoadingSkeleton';
 import { DomainRoutes } from './routes/DomainRoutes';
 import ErrorBoundary from './components/ErrorBoundary';
 import { AuthErrorBoundary } from './components/auth/AuthErrorBoundary';
@@ -26,14 +27,9 @@ const OneMap = React.lazy(() => import('./components/map/OneMap'));
 const VehicleShowcase = React.lazy(() => import('./pages/showcase/VehicleShowcase'));
 const DeckPage = React.lazy(() => import('./pages/DeckPage'));
 const ShareWiring = React.lazy(() => import('./pages/ShareWiring'));
+const ContributePage = React.lazy(() => import('./pages/contribute/ContributePage'));
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: { staleTime: 5 * 60 * 1000, retry: 1 },
-  },
-});
-
-const LazyFallback = <div style={{ height: '100vh', background: 'var(--bg)' }} />;
+const LazyFallback = <div className="p-6"><LoadingSkeleton variant="card-list" count={6} ariaLabel="Loading page" /></div>;
 
 /**
  * Home route gate — HomePage (in AppLayout) for everyone. Its first tab is the
@@ -94,6 +90,8 @@ function RoutedApp() {
           <Route path="/deck/:deckId" element={<Suspense fallback={LazyFallback}><DeckPage /></Suspense>} />
           {/* Builder share view — zero-chrome public print package (receipt 2026-06-11_builder-share-view.md) */}
           <Route path="/share/wiring/:vehicleId" element={<Suspense fallback={LazyFallback}><ShareWiring /></Suspense>} />
+          {/* Contributor link: a builder or previous owner answers from their phone, no account (contributor-intake) */}
+          <Route path="/contribute/:token" element={<Suspense fallback={LazyFallback}><ContributePage /></Suspense>} />
 
           {/* ── App shell routes (with AppLayout) ── */}
           <Route path="/*" element={
@@ -113,9 +111,8 @@ function RoutedApp() {
 
 export default function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-    {/* AuthProvider is outermost so every hook and page reads from the same
-        single cached session — no per-component getSession() calls needed. */}
+    /* AuthProvider is outermost so every hook and page reads from the same
+        single cached session — no per-component getSession() calls needed. */
     <AuthProvider>
     <ThemeProvider>
       <BrandingProvider>
@@ -124,7 +121,9 @@ export default function App() {
         <OldToastProvider>
           <UploadStatusProvider>
             <Router>
-              <RoutedApp />
+              <ViewerWorkspace fallback={LazyFallback}>
+                <RoutedApp />
+              </ViewerWorkspace>
             </Router>
           </UploadStatusProvider>
 
@@ -135,7 +134,6 @@ export default function App() {
       </BrandingProvider>
     </ThemeProvider>
     </AuthProvider>
-    </QueryClientProvider>
   );
 }
 

@@ -2643,14 +2643,14 @@ function WebhooksSection() {
     <div>
       <h1 style={s.h1}>Webhooks</h1>
       <p style={s.p}>
-        Subscribe to events and get notified when things happen. Useful for monitoring specific vehicles,
-        price thresholds, new listings from a source, or new observations.
+        Webhook configuration is not currently available in the application. The event descriptions
+        below are reference material; they do not establish an active subscription or delivery.
       </p>
 
       <h2 style={s.h2}>Setup</h2>
       <p style={s.p}>
-        Configure webhooks from <Link to="/settings/webhooks" style={{ color: 'var(--text)', fontWeight: 'bold' }}>Settings &gt; Webhooks</Link>.
-        Provide an HTTPS endpoint URL and select which events to subscribe to.
+        Open <Link to="/settings" style={{ color: 'var(--text)', fontWeight: 'bold' }}>Settings</Link> for
+        the available agent and API connections. There is no webhook setup action to complete here.
       </p>
 
       <h2 style={s.h2}>Events</h2>

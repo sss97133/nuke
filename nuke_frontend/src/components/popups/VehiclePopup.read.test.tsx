@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import React, { act } from 'react';
+import { MemoryRouter } from 'react-router-dom';
 import { createRoot, type Root } from 'react-dom/client';
 import { createClient } from '@supabase/supabase-js';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -27,7 +28,7 @@ const context = { stack: [], push, pop: vi.fn(), popTop: vi.fn(), closeAll: vi.f
 const vehicle = Object.freeze({ id: '00000000-0000-4000-8000-00000000000a', year: 2000, make: 'Ford', model: 'Coupe',
   discovery_source: 'synthetic-source', discovery_url: 'https://example.test/lot' });
 const privateMessage = 'Synthetic private intelligence read refused';
-const baseText = '2000 Ford Coupe—synthetic-sourceVIEW LISTINGOPEN FULL PROFILE';
+const baseText = '2000 Ford Coupe—synthetic-sourceView listingOpen full profile';
 const scope = { method: 'same_year_exact_model', subject_id: null, label: '2000 Coupe',
   basis: 'Same recorded model year; canonical aliases only when the canonical model resolves uniquely.', fallback_reason: 'no_supported_registered_scope', supported_scope_count: 0,
   condition_matched: false, condition_note: 'Sold context only. Condition, restoration and build class have not been matched.', sale_rule: 'vehicle_price_facts / vehicle_sale_basis',
@@ -38,10 +39,10 @@ const empty = { comment_evidence: { source_limit: 20, atom_limit: 200, sources_r
 const legacyEmpty = { comment_intel: null, description_intel: null, scores: null, apparitions: null, recent_comps: null };
 const text = () => host.textContent;
 const links = () => [...host.querySelectorAll('a')].map(node => ({ text: node.textContent, href: node.getAttribute('href'), target: node.getAttribute('target'), rel: node.getAttribute('rel') }));
-const expectedLinks = [{ text: 'VIEW LISTING', href: vehicle.discovery_url, target: '_blank', rel: 'noopener noreferrer' },
-  { text: 'OPEN FULL PROFILE', href: `/vehicle/${vehicle.id}`, target: null, rel: null }];
+const expectedLinks = [{ text: 'View listing', href: vehicle.discovery_url, target: '_blank', rel: 'noopener noreferrer' },
+  { text: 'Open full profile', href: `/vehicle/${vehicle.id}`, target: null, rel: null }];
 async function draw(current: Record<string, unknown> = vehicle, searchQuery?: string) {
-  await act(async () => root.render(<PopupStackContext.Provider value={context}><VehiclePopup vehicle={current as any} searchQuery={searchQuery} /></PopupStackContext.Provider>));
+  await act(async () => root.render(<MemoryRouter><PopupStackContext.Provider value={context}><VehiclePopup vehicle={current as any} searchQuery={searchQuery} /></PopupStackContext.Provider></MemoryRouter>));
 }
 async function settle(data: unknown, status = 200, index = 0) {
   const raw = structuredClone(data);
@@ -95,19 +96,19 @@ it('preserves complete retained comment/description inline output', async () => 
     community_concerns: ['Synthetic concern'], price_sentiment: null, market_signals: null, seller_disclosures: null, authenticity: null, overall_sentiment: 'positive', sentiment_score: 0.5, comment_count: 3 },
     description_intel: { red_flags: [{ f: 'Synthetic condition flag', sev: 'low' }], mods: ['Synthetic modification'], work_history: null, condition: null,
       condition_note: 'Synthetic condition testimony', title_status: null, owner_count: 0, matching_numbers: false, documentation: [], option_codes: null, equipment: null, price_positive: null, price_negative: null } });
-  expect(text()).toBe('2000 Ford Coupe—COMMUNITY INTELLIGENCEpositive 50%3 commentsSynthetic source quoteEXPERT INSIGHTSSynthetic expert statementCONCERNS RAISEDSynthetic concernVEHICLE INTELLIGENCESynthetic condition testimonyNOT MATCHING0 OWNERSRED FLAGSlowSynthetic condition flagMODIFICATIONS (1)Synthetic modificationsynthetic-sourceVIEW LISTINGOPEN FULL PROFILE');
+  expect(text()).toBe('2000 Ford Coupe—Community summariespositive 50%3 commentsSynthetic source quoteReported expert insightsSynthetic expert statementConcerns raisedSynthetic concernListing summariesSynthetic condition testimonyNOT MATCHING0 OWNERSReported concernslowSynthetic condition flagModifications (1)Synthetic modificationsynthetic-sourceView listingOpen full profile');
   expect(links()).toEqual(expectedLinks); expect(reads).toHaveLength(1); rpc();
 });
 it('preserves complete retained score values and confidence', async () => {
   await draw(); await settle({ ...empty, scores: { nuke_estimate: 12000, nuke_confidence: 80, heat_score: 45, deal_score: 65 } });
-  expect(text()).toBe('2000 Ford Coupe—NUKE ESTIMATE$12,00080% confidenceHEAT45DEAL65synthetic-sourceVIEW LISTINGOPEN FULL PROFILE');
+  expect(text()).toBe('2000 Ford Coupe—Nuke estimate$12,00080% confidenceHeat45Deal65synthetic-sourceView listingOpen full profile');
   expect(reads).toHaveLength(1); rpc();
 });
 it('preserves supplied asking price/specs and captured make/model/source actions through actual usePopup', async () => {
   const current = Object.freeze({ ...vehicle, series: 'S1', is_for_sale: true, asking_price: 12500, mileage: 12345.9, transmission: 'Manual', drivetrain: 'RWD', engine_size: '2.0 L', body_style: 'Coupe', fuel_type: 'Gasoline', vin: 'SYNTHETIC12345678', location: 'Synthetic place' });
   const raw = structuredClone(current); await draw(current); await settle(empty);
-  expect(text()).toBe('2000 Ford Coupe S1$12,500FOR SALEMILEAGE12,345 miTRANSManualDRIVERWDENGINE2.0 LBODYCoupeFUELGasolineVIN...12345678LOCATIONSynthetic placesynthetic-sourceVIEW LISTINGOPEN FULL PROFILE');
-  const buttons = [...host.querySelectorAll('[role="button"]')]; await click(buttons[0]); await click(buttons[1]); await click(buttons[2]);
+  expect(text()).toBe('2000 Ford Coupe S1$12,500For saleMileage12,345 miTransmissionManualDrivetrainRWDEngine2.0 LBodyCoupeFuelGasolineVIN...12345678LocationSynthetic placesynthetic-sourceView listingOpen full profile');
+  const buttons = [...host.querySelectorAll('.vehicle-popup-text-action')]; await click(buttons[0]); await click(buttons[1]); await click(buttons[2]);
   const calls = push.mock.calls as unknown as [React.ReactElement<any>, string, number][];
   expect(calls.map(([element, title, width]) => ({ type: element.type, props: element.props, title, width }))).toEqual([
     { type: MakePopup, props: { make: 'Ford' }, title: 'Ford', width: 480 }, { type: ModelPopup, props: { make: 'Ford', model: 'Coupe' }, title: 'Coupe', width: 420 },
@@ -121,7 +122,7 @@ it('preserves qualified sold context, recorded dates/apparitions and the existin
     apparitions: [{ platform: 'synthetic-one', url: 'https://example.test/one', event_type: 'auction', event_date: date, price: 24000 },
       { platform: 'synthetic-two', url: null, event_type: 'listing', event_date: null, price: null }] });
   const formatted = new Date(date).toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
-  expect(text()).toBe(`2000 Ford Coupe—RECENT SOLD CONTEXT2000 Coupe · Condition not matched2000 Coupe12,000 mi$24,000${formatted}APPARITION HISTORYsynthetic-oneauction$24,000${formatted}synthetic-twolistingsynthetic-sourceVIEW LISTINGOPEN FULL PROFILE`);
+  expect(text()).toBe(`2000 Ford Coupe—Recent sold context2000 Coupe · Condition not matched2000 Coupe12,000 mi$24,000${formatted}Recorded sightingssynthetic-oneauction$24,000${formatted}synthetic-twolistingsynthetic-sourceView listingOpen full profile`);
   expect(host.querySelector('[title="' + scope.basis + '"]')).not.toBeNull();
   await click([...host.querySelectorAll('span')].find(node => node.textContent === '2000 Coupe')!); expect(reads).toHaveLength(2); rpc();
   expect(reads[1].method).toBe('GET'); expect(reads[1].url.pathname).toBe('/rest/v1/vehicles');

@@ -5,17 +5,31 @@ paths:
 
 # Frontend Design System Rules
 
-Canonical CSS: `src/styles/unified-design-system.css` (legacy `design-system.css` is frozen).
+Canonical CSS: `src/styles/unified-design-system.css`; semantic type/layout lives in `src/kit/kit.css`.
+Tailwind config maps to these roles. Legacy `design-system.css` remains frozen; its old root tokens
+must not override the canonical tokens when a lazy route loads. The app shell no longer opts every
+page into the legacy `compact win95` styles.
+
+## Native web direction — owner, 2026-10-24
+
+Inventory the existing route, reader and shared component before redesigning. The owner explicitly
+requests an iOS-influenced interface across the web app: clear hierarchy, grouped lists, obvious
+navigation and actions, readable detail, and traceable evidence. This supersedes the earlier tiny
+Arial/caps/zero-radius mandate. It does not change data, privacy or publication authority.
 
 ## Typography
-- Arial only. Courier New for data/monospace.
-- ALL CAPS labels at 8-9px
+- Use `--font-family` (platform system sans) and the `src/kit` text roles. Use tabular figures for amounts.
+- Prose 15px, callouts 14px, captions 12px; scale through the shared tokens. Avoid caps for sentence labels.
+- Legacy `--fs-8` through `--fs-12` preserve explicitly dense data/chart layouts until their owning page
+  is reviewed; they are not appropriate defaults for forms or prose.
 
 ### Brand identity rendering (owner rule, 2026-10-08)
 
+- Owner correction, 2026-10-27: identity appears once on a card. Do not repeat its title as a badge, a series chip and another label. Use sourced original artwork with documented model/year/variant applicability; generated rectangles, substitute fonts and approximate scripts are not authentic badges, regardless of a legacy "vetted" name. If the exact artwork is unavailable, retain readable text. Keep count, filter and view controls in one compact hierarchy instead of repeating the same result count in separate cards.
+
 - A structured brand/make label uses available identity artwork programmatically. Vehicle makes use `components/common/MakeIdentity.tsx`; organization identity uses the existing `OrgLogo` renderer. This applies wherever brand identity is relevant, including discovery, filters, group headings and drill paths.
 - `MakeIdentity` resolves the brand against the sourced artwork catalogue: wordmark first, otherwise emblem with readable name, otherwise plain text. Catalogue additions must become available to every consumer without adding page-specific brand lists. Preserve accessible names and text on asset failure.
-- Treat lettering as identity artwork, not a replacement UI font. Arial/Courier remain the interface fonts. Compact labels and prose retain readable text; an adjacent emblem uses `MakeLogo`. Do not guess brands from arbitrary text or rewrite vehicle titles into logos.
+- Treat lettering as identity artwork, not a replacement UI font. The shared system font tokens remain the interface fonts. Compact labels and prose retain readable text; an adjacent emblem uses `MakeLogo`. Do not guess brands from arbitrary text or rewrite vehicle titles into logos.
 - Reuse local attributed artwork and its theme variants. Reserve image dimensions and preserve contrast on selected surfaces. New surfaces consume the shared rule instead of inventing artwork or fetching logos independently.
 - Vehicle headlines use year/make/model-specific identity artwork (owner correction, 2026-10-10). Use `VehicleIdentity` in the shared `MakeIdentity.tsx` owner and `vehicle-identities.json`: sourced period maker lettering, model nameplate and model emblem, each with its own verified model/year applicability. Vehicle year selects a documented range; it does not establish a badge's history. Unknown matches retain text. Do not substitute a modern make wordmark or approximate script font. Preserve the source chrome/enamel rather than recoloring it for themes. This supersedes the 2026-10-08 blanket prohibition on year-based selection.
 - Pass recorded series/trim tokens into `VehicleIdentity` for variant nameplates. Match the complete designation and documented year range; a Turbo script must not stand in for Turbo S or Carrera. Keep the base model and complete accessible identity readable when a variant nameplate leads the headline.
@@ -23,8 +37,12 @@ Canonical CSS: `src/styles/unified-design-system.css` (legacy `design-system.css
 - The local artwork catalogue uses a light/dark pair for colored wordmarks, or one verified monochrome wordmark that can be inverted. Keep that convention when registering artwork; absent theme metadata is not permission to recolor arbitrary logos.
 
 ## Visual
-- Zero border-radius. Zero shadows. Zero gradients.
-- 2px solid borders.
+- Use grouped surfaces, 1px separators, `--radius` controls and `--radius-lg` cards/sheets.
+- Shadows communicate floating layers; avoid decorative gradients and shadows on every row.
+- Primary actions use `--action` with `--on-action`; links use `--accent`. Preserve semantic status colors.
+- Shared controls target 44px. Keep keyboard focus visible and respect reduced motion/transparency.
+- Never globally erase radii, shadows, focus rings or font choices with universal `!important` rules.
+- Do not mark a value clickable without an action; make the source and related entity reachable.
 - Racing accents (Gulf, Martini, JPS, BRG, Papaya) as easter eggs only.
 
 ## Animation

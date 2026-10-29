@@ -1,7 +1,7 @@
 import * as React from "react"
 
 // Nuke Design System — Label Component
-// Rules: ALL CAPS, letter-spacing 0.05em, --fs-8, --text-secondary, 0px border-radius, Arial
+// Readable form labels use the shared system face.
 
 export interface LabelProps extends React.LabelHTMLAttributes<HTMLLabelElement> {
   required?: boolean
@@ -9,12 +9,10 @@ export interface LabelProps extends React.LabelHTMLAttributes<HTMLLabelElement> 
 
 const labelStyle: React.CSSProperties = {
   display: "inline-block",
-  fontFamily: "Arial, sans-serif",
-  fontSize: "var(--fs-8, 8px)",
+  fontFamily: "var(--font-family)",
+  fontSize: "var(--text-callout)",
   fontWeight: 600,
   color: "var(--text-secondary, #666666)",
-  textTransform: "uppercase",
-  letterSpacing: "0.05em",
   lineHeight: 1.4,
   cursor: "default",
 }

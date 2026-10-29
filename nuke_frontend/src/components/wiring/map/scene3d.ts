@@ -19,8 +19,10 @@ export const zoneOfY = (y: number): ZoneId => (y < -1.46 ? 'bay' : y < 0.1 ? 'ca
 // ── Layer GLBs from other lanes. Each loads only if its file is published; while it is shown, the zone GLBs' nodes it
 // replaces are hidden by name ("Name*" = every name starting with "Name"), except the names in `keeps`. Each file is in
 // the zones' frame (twin metres, glTF Y-up), so it is drawn as published. Extend `hides` when a layer draws more.
+// `hidesIn` does the same inside another layer's file: { layer id: node names } for what this layer replaces there.
 // (The MAP tab does not load k5-blazer.glb, so its Under_Frame_Blazer needs no entry here.)
-export interface LayerDef { id: string; label: string; url: string; lane: string; hides: string[]; keeps?: string[] }
+// `off`: drawn only when a viewer switches it on (MORE menu); for placeholder geometry that is not yet the real part.
+export interface LayerDef { id: string; label: string; url: string; lane: string; hides: string[]; hidesIn?: Record<string, string[]>; keeps?: string[]; credit?: { text: string; href: string }; off?: boolean }
 export const LAYERS: LayerDef[] = [
   {
     id: 'frame', label: 'FRAME', url: '/models/k5-frame.glb', lane: 'chassis-3d (#470)',
@@ -28,11 +30,34 @@ export const LAYERS: LayerDef[] = [
     hides: ['CTX-frame-rail-web-driver', 'CTX-frame-rail-web-passenger'],
   },
   {
+    // placeholder boxes, not the stamped parts (owner, 2026-10-26): off until the photo-derived parts replace them
     id: 'sheetmetal', label: 'SHEET METAL', url: '/models/k5-front-sheetmetal.glb', lane: 'chassis-3d (#470)',
-    hides: ['CTX-core-support-face', 'CTX-firewall-face', 'CTX-toe-board', 'CTX-inner-fender-wall-driver', 'CTX-inner-fender-wall-passenger'],
+    hides: ['CTX-inner-fender-wall-driver', 'CTX-inner-fender-wall-passenger'], off: true,
+  },
+  {
+    // 1973-80 front inner fenders, a subdivision-surface sculpt matched to photos (receipt 2026-10-26_k5-inner-fender-sds);
+    // off until the lead flips it; when drawn, it replaces the sheetmetal layer's inner-fender boxes too.
+    id: 'inner-fender', label: 'INNER FENDER', url: '/models/k5-inner-fender.glb', lane: 'k5-inner-fender-sds',
+    hidesIn: { sheetmetal: ['inner_fender_wall_L', 'inner_fender_wall_R', 'inner_fender_top_L', 'inner_fender_top_R', 'inner_fender_wheelhouse_L', 'inner_fender_wheelhouse_R'] },
+    hides: ['CTX-inner-fender-wall-driver', 'CTX-inner-fender-wall-passenger'], off: true,
+  },
+  {
+    // stock 1973-80 non-AC dash panel, toe board and cowl sides, camera-matched to photos (receipt 2026-10-26_k5-firewall-3d);
+    // off until the owner chooses the layer defaults
+    id: 'firewall', label: 'FIREWALL', url: '/models/k5-firewall.glb', lane: 'k5-firewall-3d',
+    hidesIn: { sheetmetal: ['firewall_dash_panel', 'firewall_toe_board'] },
+    hides: ['CTX-firewall-face', 'CTX-toe-board'], off: true,
+  },
+  {
+    // the 1975-80 radiator core support drawn from photos (receipt 2026-10-26_k5-core-support-3d)
+    id: 'core-support', label: 'CORE SUPPORT', url: '/models/k5-core-support.glb', lane: 'k5/core-support-3d',
+    hidesIn: { sheetmetal: ['radiator_support'] },
+    hides: ['CTX-core-support-face'], off: true,   // flat plate, not yet the pressing (owner, 2026-10-26); rebuild in progress
   },
   {
     id: 'engine', label: 'ENGINE', url: '/models/k5-engine-ls3.glb', lane: 'engine-3d (#468)',
+    // the long block is a scan (CC BY 4.0, credit required); intake, covers, Mid-Mount and headers are drawn from sources
+    credit: { text: 'LS long block: "GM LS small block engine" by inked1979, CC BY 4.0', href: 'https://sketchfab.com/3d-models/gm-ls-small-block-engine-4ec40400a93546d4aa6b7dd24393e9a5' },
     // 82 of the zones' 92 E3 nodes. Still drawn: E3_Starter_DFSR-8715, E3_Starter_Solenoid, E3_FuelPressReg_asbuilt and
     // E3_6L90_Bell / _Case / _Pan (the new model has no starter, regulator or transmission); the four TB nodes go with
     // the TB part swap. E3_AC_* goes because the old planned compressor sits driver-low, off the new belt plane.

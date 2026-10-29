@@ -9,6 +9,7 @@ import type React from 'react';
 import { buildAuctionPulseFromExternalListings, buildAuctionPulseFromReadResult } from './buildAuctionPulse';
 import { isMismatchedVehicleImage, scoreMoneyShot } from './imageFilterUtils';
 import { vehicleImageColumnsForViewer } from '../../lib/vehicleImageColumns';
+import { createViewerScopedInflight, ViewerReadInvalidatedError } from '../../lib/viewerScopedInflight';
 
 // ----- Hero Image Auto-Selection -----
 
@@ -89,12 +90,13 @@ export function mergedTargetOf(vehicle: { id?: unknown; merged_into_vehicle_id?:
 
 // In-flight dedupe for the hero-candidate query. The identical vehicle_images
 // query was observed firing 2-4x per page load (StrictMode double-mount +
-// RPC-fallback path both selecting a hero). Key = vehicleId — the rest of the
+// RPC-fallback path both selecting a hero). Key = viewer + vehicleId — the rest of the
 // query shape is constant. Entries clear when the promise settles, so this is
 // pure concurrent-request coalescing, not a cache.
-const inflightHeroCandidates = new Map<string, Promise<any[] | null>>();
+const coalesceHeroCandidates = createViewerScopedInflight<any[]>();
+const coalesceProfileRpc = createViewerScopedInflight<any>();
 
-// In-flight dedupe for the main profile RPC (same coalescing pattern).
+// The public VIN address reader is independent of the viewer-sensitive profile RPC.
 const inflightProfileRpc = new Map<string, Promise<any>>();
 
 /**
@@ -119,7 +121,7 @@ export async function selectBestHeroImage(
   try {
     // Coalesce concurrent loads. Keep the recent window for owner-upload recency,
     // but read explicit primaries separately: recency alone can omit the primary.
-    const projection = await vehicleImageColumnsForViewer('id, image_url, medium_url, large_url, photo_quality_score, zone_confidence, vehicle_zone, exif_data, taken_at, position, angle, ai_detected_angle, source, is_primary, is_document, is_duplicate, is_superseded, is_sensitive, image_vehicle_match_status, ai_processing_status, vision_gate_status, created_at, category, image_type');
+    const projectionForViewer = () => vehicleImageColumnsForViewer('id, image_url, medium_url, large_url, photo_quality_score, zone_confidence, vehicle_zone, exif_data, taken_at, position, angle, ai_detected_angle, source, is_primary, is_document, is_duplicate, is_superseded, is_sensitive, image_vehicle_match_status, ai_processing_status, vision_gate_status, created_at, category, image_type');
     const readRows = async (query: any): Promise<any[]> => {
       const { data, error } = await query;
       if (error) console.warn('[selectBestHeroImage] query error:', error);
@@ -128,6 +130,7 @@ export async function selectBestHeroImage(
     let candidates: any[] | null = null;
 
     if (prefetchedImages && prefetchedImages.length > 0) {
+      const projection = await projectionForViewer();
       const primaryRows = prefetchedImages.some((img) => img?.is_primary === true)
         ? []
         : await readRows(supabase.from('vehicle_images').select(projection)
@@ -135,9 +138,10 @@ export async function selectBestHeroImage(
           .order('created_at', { ascending: false }).limit(10));
       candidates = [...prefetchedImages, ...primaryRows];
     } else {
-      let pending = inflightHeroCandidates.get(vehicleId);
-      if (!pending) {
-        const query = Promise.all([
+      candidates = await coalesceHeroCandidates(supabase, vehicleId, async assertCurrent => {
+        const projection = await projectionForViewer();
+        assertCurrent();
+        return Promise.all([
           readRows(supabase.from('vehicle_images').select(projection)
             .eq('vehicle_id', vehicleId)
             .order('taken_at', { ascending: false, nullsFirst: false })
@@ -149,10 +153,7 @@ export async function selectBestHeroImage(
             .eq('vehicle_id', vehicleId).eq('is_primary', true)
             .order('created_at', { ascending: false }).limit(10)),
         ]).then(([recent, primary]) => [...recent, ...primary]);
-        pending = query.finally(() => inflightHeroCandidates.delete(vehicleId));
-        inflightHeroCandidates.set(vehicleId, pending);
-      }
-      candidates = await pending;
+      });
     }
 
     if (!candidates || candidates.length === 0) return null;
@@ -449,12 +450,8 @@ export async function loadVehicleImpl({
       );
       // Coalesce concurrent identical RPC calls (StrictMode double-mount was
       // observed firing this 3.7s query twice in parallel).
-      let rpcPending = inflightProfileRpc.get(vehicleId);
-      if (!rpcPending) {
-        rpcPending = Promise.resolve(supabase.rpc('get_vehicle_profile_data', { p_vehicle_id: vehicleId }))
-          .finally(() => inflightProfileRpc.delete(vehicleId));
-        inflightProfileRpc.set(vehicleId, rpcPending);
-      }
+      const rpcPending = coalesceProfileRpc(supabase, vehicleId, () =>
+        supabase.rpc('get_vehicle_profile_data', { p_vehicle_id: vehicleId }));
       const rpcResult = await Promise.race([
         rpcPending,
         timeoutPromise,
@@ -875,6 +872,7 @@ export async function loadVehicleImpl({
     }
 
   } catch (error) {
+    if (error instanceof ViewerReadInvalidatedError) return rpcLoaded;
     console.error('Error loading vehicle:', error);
     navigate('/vehicles');
   } finally {

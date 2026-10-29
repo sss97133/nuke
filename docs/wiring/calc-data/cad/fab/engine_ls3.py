@@ -184,7 +184,7 @@ HEAD_Y = {sig: (sum(STATION[c] for c in STATION if BANK[c] == sig) / 4) for sig 
 MATS = {}
 
 
-def mat(name, hexc, metallic, rough):
+def mat(name, hexc, metallic, rough, coat=0.0):
     if name in MATS:
         return MATS[name]
     m = bpy.data.materials.new(name)
@@ -196,6 +196,9 @@ def mat(name, hexc, metallic, rough):
     b.inputs["Base Color"].default_value = (*lin, 1.0)
     b.inputs["Metallic"].default_value = metallic
     b.inputs["Roughness"].default_value = rough
+    if coat:   # paint over the part: exported as KHR_materials_clearcoat
+        b.inputs["Coat Weight"].default_value = coat
+        b.inputs["Coat Roughness"].default_value = 0.06
     m.diffuse_color = (*lin, 1.0)
     MATS[name] = m
     return m
@@ -204,26 +207,28 @@ def mat(name, hexc, metallic, rough):
 def M(key):
     return {
         # base colours are medians of 36 x 36 px patches of his photos (full resolution)
-        "block": ("cast aluminium (block, heads, front cover)", "#938b7e", 0.35, 0.6),   # f9a38895 (2024-08-24) head side
-        "intake": ("cast aluminium, as-cast Holley intake", "#9a9386", 0.35, 0.65),        # IMG_6531 runners
-        "manifold": ("cast aluminium, Holley manifold natural", "#b3ada0", 0.4, 0.55),     # IMG_6531 manifold, lit + shaded faces
-        "cover": ("gloss black paint (valve covers)", "#2b2825", 0.0, 0.22),             # IMG_6531 cover faces
-        "anod": ("black anodised aluminium (rails, pulleys)", "#222223", 0.5, 0.4),      # IMG_6531 water-pump pulley
+        # finishes (metallic, roughness, clear coat) are physically based for the material named, not measured
+        "block": ("cast aluminium (block, heads, front cover)", "#938b7e", 0.9, 0.52),   # f9a38895 (2024-08-24) head side
+        "intake": ("cast aluminium, as-cast Holley intake", "#9a9386", 0.9, 0.55),        # IMG_6531 runners
+        "manifold": ("cast aluminium, Holley manifold natural", "#b3ada0", 0.9, 0.48),     # IMG_6531 manifold, lit + shaded faces
+        "cover": ("gloss black paint (valve covers)", "#2b2825", 0.0, 0.3, 1.0),             # IMG_6531 cover faces
+        "anod": ("black anodised aluminium (rails, pulleys)", "#222223", 0.8, 0.38),     # IMG_6531 water-pump pulley
         "billet": ("polished billet aluminium (TB adapter)", "#d9d9d6", 1.0, 0.15),      # IMG_6531 / IMG_6532 (polished)
-        "alt": ("natural aluminium (alternator case)", "#c9c2b5", 0.6, 0.4),            # IMG_6531 case (#dfd8ca lit, less the highlight)
-        "header": ("coated cast header (glossy grey)", "#877f73", 0.8, 0.28),            # IMG_6532 + IMG_6530 header patches
+        "alt": ("natural aluminium (alternator case)", "#c9c2b5", 0.95, 0.38),            # IMG_6531 case (#dfd8ca lit, less the highlight)
+        "header": ("coated cast header (glossy grey)", "#877f73", 1.0, 0.24),            # IMG_6532 + IMG_6530 header patches
         "pipe": ("mild steel down-pipe", "#77736d", 1.0, 0.5),                           # assumed, not photographed
         "belt": ("rubber belt", "#151515", 0.0, 0.85),
         "plastic": ("black plastic (P/S reservoir)", "#121212", 0.0, 0.5),               # IMG_6532
         "damper": ("black damper/pulley", "#222223", 0.4, 0.5),                          # IMG_6531
         "chrome": ("zinc/chrome fittings", "#b8b8b4", 1.0, 0.2),                         # IMG_6531 barbs
-        "pan": ("cast aluminium oil pan (model not on record)", "#8a847a", 0.35, 0.6),
+        "bolt": ("zinc-plated steel fasteners", "#9c9a94", 1.0, 0.35),
+        "pan": ("cast aluminium oil pan (model not on record)", "#8a847a", 0.9, 0.55),
     }[key]
 
 
 def material(key):
-    name, hexc, met, rough = M(key)
-    return mat(name, hexc, met, rough)
+    name, hexc, met, rough, *coat = M(key)
+    return mat(name, hexc, met, rough, *coat)
 
 
 # ------------------------------------------------------------------------------------------ mesh helpers (engine-local mm)
@@ -242,10 +247,13 @@ def emit(name, bm, key, bevel=0.0):
     if bevel:
         mod = ob.modifiers.new("bevel", "BEVEL")
         mod.width = bevel * 0.001
-        mod.segments = 2
+        mod.segments = 3
         mod.limit_method = "ANGLE"
-    for p in ob.data.polygons:
-        p.use_smooth = False
+        mod.harden_normals = True
+    ob.data.shade_smooth()
+    ob.data.set_sharp_from_angle(angle=math.radians(35))
+    wn = ob.modifiers.new("weighted", "WEIGHTED_NORMAL")
+    wn.keep_sharp = True
     OBJS.append(ob)
     return ob
 
@@ -271,7 +279,7 @@ def box(c, size, rot=None):
     return bm
 
 
-def cyl(c, d, length, axis="y", seg=40, d2=None):
+def cyl(c, d, length, axis="y", seg=64, d2=None):
     bm = bmesh.new()
     bmesh.ops.create_cone(bm, cap_ends=True, cap_tris=False, segments=seg, radius1=d / 2, radius2=(d2 or d) / 2, depth=length)
     rot = {"z": Matrix.Identity(3), "y": Matrix.Rotation(math.radians(-90), 3, "X"), "x": Matrix.Rotation(math.radians(90), 3, "Y")}[axis]
@@ -280,7 +288,7 @@ def cyl(c, d, length, axis="y", seg=40, d2=None):
     return bm
 
 
-def ribbed(c, d, width, ribs=6, depth=2.4, seg=56):
+def ribbed(c, d, width, ribs=6, depth=2.4, seg=72):
     """a grooved (poly-V) pulley along y: a lathe profile with `ribs` grooves across the belt width, centred at c"""
     bm = bmesh.new()
     R, w = d / 2, width
@@ -297,6 +305,22 @@ def ribbed(c, d, width, ribs=6, depth=2.4, seg=56):
     bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=0.02)
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     bmesh.ops.translate(bm, vec=Vector(c), verts=bm.verts)
+    return bm
+
+
+def hex_bolt(at, axis, across=13.0, head=5.5, washer=20.0):
+    """a flanged hex bolt head seated at `at`, standing along `axis` (cosmetic detail: sizes are a common M8 flange bolt)"""
+    ax = Vector(axis).normalized()
+    rot = ax.to_track_quat("Z", "Y").to_matrix().to_4x4()
+    bm = cyl((0, 0, 1.0), washer, 2.0, axis="z", seg=24)
+    hx = cyl((0, 0, 2.0 + head / 2), across / math.cos(math.pi / 6), head, axis="z", seg=6)
+    tmp = bpy.data.meshes.new("tmp")
+    hx.to_mesh(tmp)
+    hx.free()
+    bm.from_mesh(tmp)
+    bpy.data.meshes.remove(tmp)
+    bmesh.ops.transform(bm, matrix=rot, verts=bm.verts)
+    bmesh.ops.translate(bm, vec=Vector(at), verts=bm.verts)
     return bm
 
 
@@ -355,7 +379,7 @@ def bank_box(sig, s0, s1, r0, r1, y0, y1):
     return bm
 
 
-def tube(name, pts, d, key, closed=False, res=10, rect=None):
+def tube(name, pts, d, key, closed=False, res=16, rect=None):
     """a tube along a smooth path through the given engine-local points (a Bezier with auto handles): round of
     diameter d, or with rect=(w, h) a rounded-rectangle section kept upright (w across, h vertical)"""
     cu = bpy.data.curves.new(name, "CURVE")
@@ -370,8 +394,8 @@ def tube(name, pts, d, key, closed=False, res=10, rect=None):
         r_ = min(w, h) * 0.3
         corners = []
         for cx, cy, a0 in ((w / 2 - r_, h / 2 - r_, 0), (-w / 2 + r_, h / 2 - r_, 90), (-w / 2 + r_, -h / 2 + r_, 180), (w / 2 - r_, -h / 2 + r_, 270)):
-            for k in range(4):
-                a_ = math.radians(a0 + 30 * k)
+            for k in range(7):
+                a_ = math.radians(a0 + 15 * k)
                 corners.append((cx + r_ * math.cos(a_), cy + r_ * math.sin(a_)))
         ps.points.add(len(corners) - 1)
         for pt, (x_, y_) in zip(ps.points, corners):
@@ -384,7 +408,7 @@ def tube(name, pts, d, key, closed=False, res=10, rect=None):
         cu.twist_mode = "Z_UP"
     else:
         cu.bevel_depth = d / 2
-        cu.bevel_resolution = 4
+        cu.bevel_resolution = 8
     sp = cu.splines.new("BEZIER")
     sp.bezier_points.add(len(pts) - 1)
     for bp, p in zip(sp.bezier_points, pts):
@@ -442,6 +466,66 @@ def empty(name, p_local, note=""):
 
 
 # ------------------------------------------------------------------------------------------ build
+# ------------------------------------------------------------------------------------------ scanned long block
+# --scan <model.glb>: "GM LS small block engine" by inked1979, Sketchfab 4ec40400a93546d4aa6b7dd24393e9a5, CC BY 4.0
+# (attribution required; a textured stock LS truck long block, one mesh, unit-normalised). It replaces the drawn block,
+# bell face, heads, front cover and pan; what the K5 carries instead of stock (Holley intake, Delmo covers, Mid-Mount,
+# shorty headers, DEL-Stributor ignition) stays drawn from the table, so the scan is cut above the heads' cover rail,
+# over the valley and ahead of the front cover. Fit, read off the scan itself (2026-10-26):
+SCAN = {
+    "k": D(362.9, "the scan's four driver-side exhaust ports space 0.308 units against the GM bore centre 111.76", "derived", 8.0),
+    "x_rear": D(-0.88, "the scan's block rear face: where its section widens past the flexplate (x slices, 0.02 units)", "scaled", 7.0),
+    "z_crank": D(-0.334, "the scan's flexplate centre (x = -0.98 slice, z -0.803..0.134)", "scaled", 4.0),
+}
+SCAN_CREDIT = "LS long block: 'GM LS small block engine' by inked1979 (sketchfab.com/3d-models/4ec40400a93546d4aa6b7dd24393e9a5), CC BY 4.0, cut and placed"
+
+
+def scan_longblock(path):
+    """import the scan into engine-local mm, cut what the K5 replaces, emit it with its own textured material"""
+    before = set(bpy.data.objects)
+    bpy.ops.import_scene.gltf(filepath=str(path))
+    new = [o for o in bpy.data.objects if o not in before]
+    src = next(o for o in new if o.type == "MESH")
+    k, xr, zc = v_(SCAN["k"]), v_(SCAN["x_rear"]), v_(SCAN["z_crank"])
+    # scan (x fwd, y driver, z up), unit-normalised -> engine-local mm (x driver, y rearward, z up)
+    to_local = Matrix(((0, k, 0, 0), (-k, 0, 0, k * xr), (0, 0, k, -k * zc), (0, 0, 0, 1)))
+    me = src.data
+    me.transform(src.matrix_world)
+    me.transform(to_local)
+    bm = bmesh.new()
+    bm.from_mesh(me)
+    L, FT, HH, VZ = v("block_len"), v("front_cover_t"), v("head_h"), v("valley_z")
+    inner_x = DECK * S45 - v("deck_half") * C45
+
+    def cut(c):
+        sig = 1 if c.x >= 0 else -1
+        s_ = c.x * n_(sig)[0] + c.z * n_(sig)[1] - DECK          # height above the deck along the bank axis
+        r_ = c.x * t_(sig)[0] + c.z * t_(sig)[1]                 # across the deck, + toward the exhaust side
+        valley = r_ < -v("head_w") / 2 + 4 and s_ > -10            # the stock intake, on the valley side of the ports
+        return (s_ > HH and c.z > 150) or valley or (abs(c.x) < inner_x - 10 and c.z > VZ + 10) or c.y < -L - FT
+    bmesh.ops.delete(bm, geom=[f for f in bm.faces if cut(f.calc_center_median())], context="FACES")
+    bm.to_mesh(me)
+    bm.free()
+    me.transform(M_WORLD)
+    src.matrix_world = Matrix.Identity(4)
+    src.parent = None
+    src.name = "longblock_scan"
+    for o in new:
+        if o is not src:
+            bpy.data.objects.remove(o)
+    dec = src.modifiers.new("decimate", "DECIMATE")
+    dec.ratio = 0.55
+    for img in bpy.data.images:          # 4K atlases to 2K: the map view never gets close enough to use more
+        if img.size[0] > 2048:
+            img.scale(2048, 2048)
+    OBJS.append(src)
+    return src
+
+
+def v_(d):
+    return float(d.value)
+
+
 def build():
     L = v("block_len")
     PR = v("pan_rail_z")
@@ -453,20 +537,26 @@ def build():
     half = [(0, PR), (SK, PR), (SK, 0), outer, inner, (inner[0] - 30, VZ), (0, VZ)]
     prof = half + [(-x, z) for x, z in reversed(half[1:-1])]
     prof = [(0, PR)] + prof[1:]
-    join("block", [prism_xz(prof[:1] + prof[1:], -L, -v("bell_t"))], "block", bevel=3)
+    scan = opt("--scan")
+    if scan:
+        scan_longblock(scan)
+    else:
+        join("block", [prism_xz(prof[:1] + prof[1:], -L, -v("bell_t"))], "block", bevel=6)
 
     BH = v("bell_half")
     deck_at = lambda x: DECK / C45 - x * S45 / C45      # deck line z at |x| (driver bank)
     bell = [(-BH, PR + 29), (BH, PR + 29), (BH, deck_at(BH)), inner, (-inner[0], inner[1]), (-BH, deck_at(BH))]
-    join("bell_face", [prism_xz(bell, -v("bell_t"), 0.0)], "block", bevel=2)
+    if not scan:
+        join("bell_face", [prism_xz(bell, -v("bell_t"), 0.0)], "block", bevel=2)
 
     # heads + valve covers
     HL, HW, HH = v("head_len"), v("head_w"), v("head_h")
     for sig, tag in ((1, "L"), (-1, "R")):
         yc = HEAD_Y[sig]
-        join(f"head_{tag}", [bank_box(sig, 0, HH, -HW / 2, HW / 2, yc - HL / 2, yc + HL / 2)], "block", bevel=4)
+        if not scan:
+            join(f"head_{tag}", [bank_box(sig, 0, HH, -HW / 2, HW / 2, yc - HL / 2, yc + HL / 2)], "block", bevel=7)
         CW, CH = v("cover_w"), v("cover_h")
-        join(f"valve_cover_{tag}", [bank_box(sig, HH, HH + CH, -CW / 2, CW / 2, yc - HL / 2 + 8, yc + HL / 2 - 8)], "cover", bevel=14)
+        join(f"valve_cover_{tag}", [bank_box(sig, HH, HH + CH, -CW / 2, CW / 2, yc - HL / 2 + 8, yc + HL / 2 - 8)], "cover", bevel=22)
         # the covers' embossed "Chevrolet" script on the outer face (IMG_6530 / IMG_6532), redrawn, cosmetic
         n3 = Vector((sig * S45, 0, C45))
         t3 = Vector((sig * C45, 0, -S45))
@@ -475,11 +565,15 @@ def build():
         bmesh.ops.transform(txt, matrix=rot, verts=txt.verts)
         bmesh.ops.translate(txt, vec=bank_pt(sig, HH + CH / 2, CW / 2 + 1.0, yc), verts=txt.verts)
         join(f"valve_cover_script_{tag}", [txt], "cover")
+        # hold-down bolts along the cover's outer rail, as in IMG_6532 (count and spacing cosmetic)
+        bolts = [hex_bolt(bank_pt(sig, HH + 10, CW / 2 - 6, yc + k * (HL - 60) / 3), n3) for k in (-1.5, -0.5, 0.5, 1.5)]
+        join(f"valve_cover_bolts_{tag}", bolts, "bolt")
 
     # front cover (Gen IV timing cover) and the balancer
     FT = v("front_cover_t")
     fc = [(-SK + 10, PR + 5), (SK - 10, PR + 5), (SK + 5, 60), (120, 170), (-120, 170), (-SK - 5, 60)]
-    join("front_cover", [prism_xz(fc, -L - FT, -L)], "block", bevel=3)
+    if not scan:
+        join("front_cover", [prism_xz(fc, -L - FT, -L)], "block", bevel=6)
 
     BY = v("belt_y")
     DD = v("damper_d")
@@ -493,7 +587,8 @@ def build():
     PD, PF, SL = v("pan_depth_z"), v("pan_front_z"), v("sump_len")
     pan_front = prism_xz([(-SK + 8, PR), (SK - 8, PR), (SK - 20, PF), (-SK + 20, PF)], -L + 5, -SL)
     pan_sump = prism_xz([(-SK + 8, PR), (SK - 8, PR), (SK - 25, PD), (-SK + 25, PD)], -SL, -v("bell_t") - 2)
-    join("oil_pan", [pan_front, pan_sump], "pan", bevel=6)
+    if not scan:
+        join("oil_pan", [pan_front, pan_sump], "pan", bevel=9)
 
     # ---- intake
     PAD_Y, PL, PW = v("pad_y"), v("plenum_len"), v("plenum_w")
@@ -535,6 +630,16 @@ def build():
         parts.append(bank_box(sig, v("port_s") - 42, v("port_s") + 42, -HW / 2 - 14, -HW / 2, y - 26, y + 26))
         runner_ends[cyl_n] = (p0, p1)
     join("intake_300-131", parts, "intake", bevel=0)
+    # the ten intake-to-head bolts (Gen IV: five a side, between and outside the ports), seated on the flange top
+    ib = []
+    for sig in (1, -1):
+        ys = sorted(y for c, y in STATION.items() if BANK[c] == sig)
+        stops = [ys[0] - 52] + [(a + b) / 2 for a, b in zip(ys, ys[1:])] + [ys[-1] + 52]
+        up = Vector((-t_(sig)[0], 0, -t_(sig)[1]))
+        for y in stops:
+            ib.append(bank_box(sig, v("port_s") + 30, v("port_s") + 52, -HW / 2 - 14, -HW / 2, y - 12, y + 12))
+            ib.append(hex_bolt(bank_pt(sig, v("port_s") + 41, -HW / 2 - 14, y), up))
+    join("intake_bolts", ib, "bolt")
 
     # TB adapter (Delmo 4150 -> 4-bolt truck TB) + the empties layout-ui mounts on
     AH = v("adapter_h")
@@ -549,7 +654,7 @@ def build():
     inj_pos = {}
     for sig, tag in ((1, "L"), (-1, "R")):
         ys = [STATION[c] for c in STATION if BANK[c] == sig]
-        join(f"fuel_rail_{tag}", [box((sig * RX, (min(ys) + max(ys)) / 2, RZ), (RS, max(ys) - min(ys) + 90, RS))], "anod", bevel=2)
+        join(f"fuel_rail_{tag}", [box((sig * RX, (min(ys) + max(ys)) / 2, RZ), (RS, max(ys) - min(ys) + 90, RS))], "anod", bevel=4)
         inj = []
         for c in STATION:
             if BANK[c] != sig:
@@ -591,7 +696,7 @@ def build():
     for sig in (1, -1):   # legs back to the heads' front faces, where the pump bolts over the coolant outlets
         hf = HEAD_Y[sig] - v("head_len") / 2
         mm.append(cyl((sig * 125, (FACE + hf) / 2 + 2, 185), 56, abs(hf - FACE) + 4))
-    join("midmount_bracket", mm, "manifold", bevel=4)
+    join("midmount_bracket", mm, "manifold", bevel=6)
     join("midmount_fittings", [cyl((-95, MF - 20, 225), 19, 45), cyl((-240, MF - 18, 110), 38, 40)], "chrome")   # heater barb, inlet (IMG_6531)
 
     join("water_pump", [cyl((WX, BY, WZ), v("wp_d"), 30), cyl((WX, (BY + MF) / 2, WZ), 70, abs(MF - BY) + 4),
@@ -611,6 +716,17 @@ def build():
                      cyl((PX + 55, BY + 95, PZ + 55 + 58), 60, 12, axis="z")], "plastic", bevel=2)
     join("tensioner", [ribbed((TX, BY, TZ), v("tens_d"), 26), box((TX + 8, BY + 30, TZ - 40), (40, 30, 90))], "anod", bevel=2)
     join("idler", [cyl((IX, BY, IZ), v("idler_d"), 26)], "anod")
+    # centre bolts on every pulley face, and the alternator's slotted front frame (IMG_6531; slot count cosmetic)
+    front = Vector((0, -1, 0))
+    join("pulley_bolts", [hex_bolt((x, BY - 13 - 2, z), front, across=15, head=7, washer=26)
+                          for x, z in ((0, 0), (WX, WZ), (AX, AZ), (PX, PZ), (IX, IZ), (TX, TZ))], "bolt")
+    fins = []
+    for k in range(14):
+        a = 2 * math.pi * k / 14
+        r = ACD / 2 - 14
+        fins.append(box((AX + r * math.cos(a), y_front + 30, AZ + r * math.sin(a)), (6, 8, 22),
+                        rot=Matrix.Rotation(-a, 4, "Y")))
+    join("alternator_vents", fins, "anod")
 
     # belt path (6PK1539): solve the tangents around the pulleys, loop CCW seen from the front
     order = [("crank", 0.0, 0.0, DD / 2, True), ("ps", PX, PZ, PSD / 2, True), ("alt", AX, AZ, APD / 2, True),
@@ -650,8 +766,21 @@ def build():
             p1 = p0 + out_dir * 34
             p2 = Vector((sig * LX, y + 12, (p1.z + LZ) / 2 - 5))
             p3 = Vector((sig * LX, y + 30, LZ + 10))
+            # oval cast primaries (wider along the head than they stand out from it), as in IMG_6530 / IMG_6532
             parts.append(tube(f"primary_{c}", [p0, p1, p2, p3], PD_, "header"))
             ports[c] = p0
+        # the casting's web: one wall joining the primaries' inboard sides from the port flange down to the log, so the
+        # four read as a single cast piece (IMG_6530: no daylight between the primaries)
+        bm = bmesh.new()   # a quad wall, 14 thick, from the flange's lower edge down to the log's top
+        ya, yb = y_front - 20, y_rear + 20
+        top = lambda y, r: bank_pt(sig, v("hdr_port_s") - 22, HW / 2 + r, y)
+        bot = lambda y, d: Vector((sig * (LX - 6 + d), y, LZ + 22))
+        q = [top(ya, 14), top(yb, 14), bot(yb, 0), bot(ya, 0), top(ya, 28), top(yb, 28), bot(yb, 14), bot(ya, 14)]
+        vs = [bm.verts.new(p_) for p_ in q]
+        for f in ((0, 1, 2, 3), (7, 6, 5, 4), (0, 4, 5, 1), (1, 5, 6, 2), (2, 6, 7, 3), (3, 7, 4, 0)):
+            bm.faces.new([vs[k_] for k_ in f])
+        bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+        parts.append(bm)
         parts.append(tube(f"log_{tag}", [Vector((sig * LX, y_front + 10, LZ + 8)), Vector((sig * LX, (y_front + y_rear) / 2, LZ)),
                                          Vector((sig * LX, y_out - 20, LZ - 8)), Vector((sig * LX, y_out, OZ + 25)),
                                          Vector((sig * LX, y_out + 4, OZ))], LD, "header"))
@@ -810,7 +939,8 @@ def export(path):
         o.select_set(o in OBJS)
     bpy.ops.export_scene.gltf(filepath=str(path), export_format="GLB", use_selection=True, export_apply=True,
                               export_yup=True, export_extras=False, export_cameras=False, export_lights=False,
-                              export_draco_mesh_compression_enable=False, export_normals=True, export_texcoords=False,
+                              export_draco_mesh_compression_enable=False, export_normals=True, export_texcoords=True,
+                              export_image_format="JPEG", export_jpeg_quality=82,
                               export_materials="EXPORT")
     scrub(path)
 
@@ -827,12 +957,14 @@ def scrub(path):
         for item in j.get(key, []):
             item.pop("extras", None)
     finish = {M(k)[0]: (M(k)[2], M(k)[3]) for k in ("block", "intake", "manifold", "cover", "anod", "billet", "alt", "header",
-                                                  "pipe", "belt", "plastic", "damper", "chrome", "pan")}
+                                                  "pipe", "belt", "plastic", "damper", "chrome", "bolt", "pan")}
     for m in j.get("materials", []):   # the exporter drops factors equal to the glTF default (1.0); write them all
         pbr = m.setdefault("pbrMetallicRoughness", {})
         met, rough = finish.get(m.get("name"), (pbr.get("metallicFactor", 1.0), pbr.get("roughnessFactor", 1.0)))
         pbr["metallicFactor"], pbr["roughnessFactor"] = float(met), float(rough)
     j["asset"] = {"version": "2.0", "generator": "docs/wiring/calc-data/cad/fab/engine_ls3.py (Blender glTF I/O)"}
+    if opt("--scan"):
+        j["asset"]["copyright"] = SCAN_CREDIT
     js = json.dumps(j, separators=(",", ":")).encode()
     js += b" " * ((4 - len(js) % 4) % 4)
     total = 12 + 8 + len(js) + len(rest)

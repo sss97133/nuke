@@ -10,8 +10,11 @@ test('actual daily reader reconciles native results and exposes missing known lo
     'this assay requires a disposable local PostgreSQL service');
   const root = fileURLToPath(new URL('../', import.meta.url));
   const database = 'nuke_soft_close_test';
+  // Each assay starts from a fresh database; an earlier assay in the same job leaves one behind.
+  const dropped = spawnSync('dropdb', ['--if-exists', database], { cwd: root, encoding: 'utf8' });
+  assert(dropped.status === 0, dropped.stderr);
   const created = spawnSync('createdb', [database], { cwd: root, encoding: 'utf8' });
-  assert(created.status === 0 || created.stderr.includes('already exists'), created.stderr);
+  assert(created.status === 0, created.stderr);
   const fixture = execFileSync('deno', ['run', 'supabase/sql/prepare_bat_public_live_fixture.ts', '--stdout'],
     { cwd: root, encoding: 'utf8' }).trim();
   const existing = readFileSync(`${root}supabase/sql/test_bat_public_live_events.sql`, 'utf8');

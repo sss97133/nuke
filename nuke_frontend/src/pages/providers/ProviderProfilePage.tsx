@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
@@ -18,6 +18,7 @@ import { VouchSheet } from '../jobs/PeopleSheets';
 import { setupIncomplete } from '../provider-setup/setupReaders';
 import ShareButton from '../jobs/ShareButton';
 import '../jobs/job-page.css';
+import './provider-profile.css';
 
 type Subject = { p_user_id: string } | { p_actor_id: string };
 
@@ -221,45 +222,63 @@ function JobsSection({ page, onMore, loadingMore }: { page: JsonObject; onMore: 
 
 export default function ProviderProfilePage() {
   const { handle, actorId } = useParams<{ handle?: string; actorId?: string }>();
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
+  if (loading) return <article className="job-page provider-page" aria-busy="true"><p role="status">Checking the viewer for this work record…</p></article>;
+  return <ViewerProviderProfile key={`${user?.id ?? 'anonymous'}:${actorId ? `actor:${actorId}` : `handle:${handle ?? ''}`}`} handle={handle} actorId={actorId} signedIn={!!user} />;
+}
+
+function ViewerProviderProfile({ handle, actorId, signedIn }: { handle?: string; actorId?: string; signedIn: boolean }) {
   const [subject, setSubject] = useState<Subject | null | 'missing'>(null);
   const [profile, setProfile] = useState<Load>({ status: 'loading' });
   const [jobs, setJobs] = useState<Load>({ status: 'loading' });
   const [productivity, setProductivity] = useState<Load>({ status: 'loading' });
   const [loadingMore, setLoadingMore] = useState(false);
   const [nonce, setNonce] = useState(0);
+  const [lookupAttempt, setLookupAttempt] = useState(0);
+  const [lookupFailure, setLookupFailure] = useState<string | null>(null);
+  const [moreFailure, setMoreFailure] = useState<string | null>(null);
+  const generation = useRef(0);
+  const morePending = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
-    setSubject(null);
+    setSubject(null); setLookupFailure(null);
     if (actorId) { setSubject({ p_actor_id: actorId }); return; }
     if (!handle) { setSubject('missing'); return; }
-    supabase.from('profiles').select('id').eq('username', handle).maybeSingle()
-      .then(({ data }: { data: { id?: string } | null }) => { if (!cancelled) setSubject(data?.id ? { p_user_id: data.id } : 'missing'); });
+    void Promise.resolve(supabase.from('profiles').select('id').eq('username', handle).maybeSingle())
+      .then(({ data, error }: { data: { id?: string } | null; error: unknown }) => {
+        if (cancelled) return;
+        if (error) { setLookupFailure('The profile lookup could not be completed. Try again.'); return; }
+        setSubject(data?.id ? { p_user_id: data.id } : 'missing');
+      }).catch(() => { if (!cancelled) setLookupFailure('The profile lookup could not be completed.'); });
     return () => { cancelled = true; };
-  }, [handle, actorId]);
+  }, [handle, actorId, lookupAttempt]);
 
   useEffect(() => {
     if (!subject || subject === 'missing') return;
-    let cancelled = false;
+    const request = ++generation.current;
+    morePending.current = false; setLoadingMore(false); setMoreFailure(null);
     setProfile({ status: 'loading' }); setJobs({ status: 'loading' }); setProductivity({ status: 'loading' });
     const ids = { p_user_id: null, p_actor_id: null, ...subject };
-    readJob('provider_profile_read', subject).then(l => { if (!cancelled) setProfile(l); });
-    readJob('provider_job_record_read', { ...ids, p_after: null, p_limit: 10 }).then(l => { if (!cancelled) setJobs(l); });
-    readJob('provider_productivity_read', subject).then(l => { if (!cancelled) setProductivity(l); });
-    return () => { cancelled = true; };
+    readJob('provider_profile_read', subject).then(l => { if (generation.current === request) setProfile(l); });
+    readJob('provider_job_record_read', { ...ids, p_after: null, p_limit: 10 }).then(l => { if (generation.current === request) setJobs(l); });
+    readJob('provider_productivity_read', subject).then(l => { if (generation.current === request) setProductivity(l); });
+    return () => { generation.current++; morePending.current = false; };
   }, [subject, nonce]);
 
   const loadMore = useCallback(async () => {
-    if (jobs.status !== 'loaded' || !subject || subject === 'missing') return;
+    if (morePending.current || jobs.status !== 'loaded' || !subject || subject === 'missing') return;
     const after = str(jobs.data.next_after);
     if (!after) return;
-    setLoadingMore(true);
+    morePending.current = true; const request = generation.current;
+    setLoadingMore(true); setMoreFailure(null);
     const next = await readJob('provider_job_record_read', { p_user_id: null, p_actor_id: null, ...subject, p_after: after, p_limit: 10 });
-    setLoadingMore(false);
+    if (generation.current !== request) return;
+    morePending.current = false; setLoadingMore(false);
     if (next.status === 'loaded') {
-      setJobs({ status: 'loaded', data: { ...next.data, rows: [...arr(jobs.data.rows), ...arr(next.data.rows)] } });
-    }
+      const combined = [...arr(jobs.data.rows), ...arr(next.data.rows)].map(obj).filter((row): row is JsonObject => !!row && !!str(row.work_order_id));
+      setJobs({ status: 'loaded', data: { ...next.data, rows: [...new Map(combined.map(row => [str(row.work_order_id), row])).values()] } });
+    } else setMoreFailure(next.status === 'failed' ? next.reason : 'More jobs could not be loaded.');
   }, [jobs, subject]);
 
   const p = profile.status === 'loaded' ? profile.data : null;
@@ -267,20 +286,25 @@ export default function ProviderProfilePage() {
   const name = p ? subjectName(s) : handle ? '@' + handle : 'Provider';
   usePageTitle(`${name} · work record`);
 
+  if (lookupFailure) return <article className="job-page provider-page" aria-label="Provider lookup unavailable">
+    <Masthead><Text role="entity" as="h1">{name}</Text></Masthead>
+    <section className="k-section job-block" role="alert"><Text role="body" as="p">Profile lookup unavailable: {lookupFailure}</Text>
+      <button type="button" className="job-button" onClick={() => setLookupAttempt(n => n + 1)}>Retry profile lookup</button></section>
+  </article>;
   if (subject === 'missing') {
-    return <article className="job-page" aria-label="Provider unavailable">
+    return <article className="job-page provider-page" aria-label="Provider unavailable">
       <Masthead><Text role="entity" as="h1">No public profile</Text></Masthead>
       <section className="k-section job-block"><Text role="body" as="p">No public profile has the handle {handle ? `@${handle}` : 'given'}. The link may be old, or mistyped.</Text></section>
     </article>;
   }
   if (profile.status === 'loading') {
-    return <article className="job-page" aria-busy="true" aria-label={name}>
+    return <article className="job-page provider-page" aria-busy="true" aria-label={name}>
       <Masthead><Text role="entity" as="h1">{name}</Text></Masthead>
       <section className="k-section job-block"><Text role="caption" as="p">Loading their work record. A long record can take a few seconds the first time.</Text></section>
     </article>;
   }
   if (profile.status === 'failed') {
-    return <article className="job-page" aria-label="Provider unavailable">
+    return <article className="job-page provider-page" aria-label="Provider unavailable">
       <Masthead><Text role="entity" as="h1">{name}</Text></Masthead>
       <section className="k-section job-block">
         <Text role="body" as="p">{profile.reason}</Text>
@@ -296,7 +320,7 @@ export default function ProviderProfilePage() {
   const evidencedHandle = s?.kind === 'actor' ? str(obj(s.display)?.handle) : null;
   const where = place(s);
 
-  return <article className="job-page" aria-label={`${name}, work record`}>
+  return <article className="job-page provider-page" aria-label={`${name}, work record`}>
     <Masthead result={<Text role="caption">{[where, day(str(s?.member_since)) ? `on Nuke since ${day(str(s?.member_since))}` : null].filter(Boolean).join(' · ')}</Text>}>
       <div className="job-masthead">
         <Text role="entity" as="h1">{name}</Text>
@@ -312,22 +336,27 @@ export default function ProviderProfilePage() {
     <RecordSection p={data} />
     <ToolsSection p={data} isSelf={isSelf} />
     <VouchSection p={data} name={name} onChanged={() => setNonce(n => n + 1)}
-      canVouch={!!user && !isSelf && (s?.kind === 'actor' ? !!str(s.actor_id) : !!str(s?.profile_id))} />
+      canVouch={signedIn && !isSelf && (s?.kind === 'actor' ? !!str(s.actor_id) : !!str(s?.profile_id))} />
     {isSelf && <MyVouchesSection onChanged={() => setNonce(n => n + 1)} />}
     {showsShops(viewerContext) && <ShopsSection p={data} />}
     <WorkRecordSection p={data} isSelf={isSelf} />
     {jobs.status === 'loaded' && <JobsSection page={jobs.data} onMore={loadMore} loadingMore={loadingMore} />}
+    {jobs.status === 'loading' && <p role="status">Reading jobs on record…</p>}
+    {moreFailure && <div role="alert"><Text role="body" as="p">More jobs could not be loaded: {moreFailure}</Text>
+      <button type="button" className="job-button" disabled={loadingMore} onClick={loadMore}>Retry more jobs</button></div>}
     {productivity.status === 'loaded' && <ProductivitySection d={productivity.data} />}
+    {productivity.status === 'loading' && <p role="status">Reading productivity…</p>}
 
     {(jobs.status === 'failed' || productivity.status === 'failed') && <section className="k-section job-block" aria-label="Not loaded">
       <Text role="label" as="h2">Not loaded</Text>
       {jobs.status === 'failed' && <Text role="body" as="p">Jobs on record: {jobs.reason}</Text>}
       {productivity.status === 'failed' && <Text role="body" as="p">Productivity: {productivity.reason}</Text>}
+      <button type="button" className="job-button" onClick={() => setNonce(n => n + 1)}>Retry work record</button>
     </section>}
 
     {!isSelf && <section className="k-section job-block" aria-label="Contact via Nuke">
       <Text role="label" as="h2">Contact</Text>
-      <ContactViaNuke contact={obj(data.contact)} signedIn={!!user} recipient={name} />
+      <ContactViaNuke contact={obj(data.contact)} signedIn={signedIn} recipient={name} />
     </section>}
   </article>;
 }

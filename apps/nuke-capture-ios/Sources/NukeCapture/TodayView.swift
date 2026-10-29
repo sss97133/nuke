@@ -51,6 +51,7 @@ struct TodayView: View {
 struct CaptureSections: View {
     @ObservedObject private var engine = SyncEngine.shared
     @ObservedObject private var attribution = AttributionEngine.shared
+    @ObservedObject private var uploader = BackgroundUploader.shared
 
     var body: some View {
         // ── Errors / permission banner ──
@@ -81,10 +82,32 @@ struct CaptureSections: View {
             NavigationLink("Photo filter decisions") { VisionDecisionCountsView() }
                 .font(.footnote)
         }
+        // ── Uploads · what left the phone and what is still landing ──
+        // Every number is the engine's own counter (queued = staged for the background session,
+        // landing = the transfer iOS is carrying, landed = rows inserted today).
+        if uploader.queuedCount > 0 || uploader.inFlightCount > 0 || uploader.landedToday > 0 || uploader.lastError != nil {
+            Section {
+                Text("\(uploader.landedToday) landed today · \(uploader.inFlightCount) landing · \(uploader.queuedCount) queued")
+                    .font(.footnote).foregroundStyle(.secondary)
+                if let error = uploader.lastError {
+                    Text("Last upload problem: \(error)").font(.caption2).foregroundStyle(.secondary)
+                }
+            } header: {
+                Text("Uploads")
+            } footer: {
+                Text("A queued photo keeps uploading after you leave the app; its record lands when the bytes do.")
+                    .font(.caption2).foregroundStyle(.secondary)
+            }
+        }
         if engine.gaveUpCount > 0 {
             Section {
-                Text("\(engine.gaveUpCount) photos failed three times and are no longer retried on open. The last error: \(engine.lastError ?? "not recorded").")
+                Text("\(engine.gaveUpCount) photos failed three times on their own and stopped retrying. The last error: \(engine.lastError ?? "not recorded").")
                     .font(.footnote).foregroundStyle(.secondary)
+                Button("Retry \(engine.gaveUpCount) photos") { Task { await engine.retryGaveUp() } }
+                    .disabled(engine.isSyncing || engine.isPaused || engine.authorizationDenied)
+            } footer: {
+                Text("Network, server and storage-quota failures no longer count against a photo; only its own failures do.")
+                    .font(.caption2).foregroundStyle(.secondary)
             }
         }
         if let error = engine.backfillError, engine.backfillRemaining > 0 {
@@ -212,6 +235,10 @@ struct CaptureSections: View {
                 Text("On-site photos only · \(engine.totalSkippedOffShop) held back")
                 if let s = attribution.lastSummary {
                     Text(s)   // what the last Analyze Today run routed
+                }
+                // A cowl tag read without a VIN/serial read: no profile until the plate is photographed.
+                ForEach(attribution.pendingIdentifiers, id: \.context.imageIDs) { pending in
+                    Text(pending.line)
                 }
             }
             .font(.caption2)

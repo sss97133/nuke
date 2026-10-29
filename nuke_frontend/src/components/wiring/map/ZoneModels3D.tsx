@@ -81,11 +81,16 @@ export default function ZoneModels3D({ cw, ix, site, sel, rel, onSelect, onClear
   const pending = useRef<{ fitSel?: boolean } | null>(null);
   const homed = useRef(false);
   const layerFiles = useLayerFiles();
-  const [layerOn, setLayerOn] = useState<Record<string, boolean>>({});
+  const [layerOn, setLayerOn] = useState<Record<string, boolean>>(
+    () => Object.fromEntries(LAYERS.filter(l => l.off).map(l => [l.id, false])));
 
   // what the loaded layers and parts replace in the zone GLBs (only once they are drawn)
-  const hidePats: string[] = [...ZONE_HIDES], keepPats: string[] = [];
-  LAYERS.forEach(l => { if (layerOn[l.id] !== false && reg.has('layer:' + l.id)) { hidePats.push(...l.hides); keepPats.push(...(l.keeps ?? [])); } });
+  const hidePats: string[] = [...ZONE_HIDES], keepPats: string[] = [], layerPats: Record<string, string[]> = {};
+  LAYERS.forEach(l => {
+    if (layerOn[l.id] === false || !reg.has('layer:' + l.id)) return;
+    hidePats.push(...l.hides); keepPats.push(...(l.keeps ?? []));
+    Object.entries(l.hidesIn ?? {}).forEach(([id, names]) => { (layerPats[id] ??= []).push(...names); });
+  });
   TRUE_PARTS.forEach(p => { if (reg.has('part:' + p.code)) hidePats.push(...p.hides); });
   const hideKey = hidePats.join('|') + '#' + keepPats.join('|');
   const hides = useMemo(() => {
@@ -194,11 +199,12 @@ export default function ZoneModels3D({ cw, ix, site, sel, rel, onSelect, onClear
 
   return (
     <div style={{ position: 'relative', height: '100%', background: cw.surface, overflow: 'hidden' }}>
-      <Canvas camera={{ position: [2.4, 1.7, 2.6], fov: 32, near: 0.01, far: 200 }} dpr={[1, 2]} style={{ background: cw.surface }}>
-        <ambientLight intensity={0.9} />
-        <hemisphereLight args={['#ffffff', '#8a8f96', 0.7]} />
-        <directionalLight position={[3, 5, 4]} intensity={1.5} />
-        <directionalLight position={[-4, 3, -3]} intensity={0.6} />
+      <Canvas camera={{ position: [2.4, 1.7, 2.6], fov: 32, near: 0.01, far: 200 }} dpr={[1, 2]} style={{ background: cw.surface }}
+        gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.05 }}>
+        <Studio />
+        <ambientLight intensity={0.05} />
+        <directionalLight position={[3, 5, 4]} intensity={0.7} />
+        <directionalLight position={[-4, 3, -3]} intensity={0.25} />
         {ZONES.filter(z => zones.has(z.id)).map(z => (
           <Suspense key={z.id} fallback={null}><ZoneScene zone={z.id} url={z.url} ix={ix} reg={reg} hides={hides} /></Suspense>
         ))}
@@ -209,7 +215,7 @@ export default function ZoneModels3D({ cw, ix, site, sel, rel, onSelect, onClear
           </Suspense>
         ))}
         {LAYERS.filter(l => layerFiles[l.id] && layerOn[l.id] !== false).map(l => (
-          <Suspense key={l.id} fallback={null}><LayerScene id={l.id} url={l.url} ix={ix} reg={reg} /></Suspense>
+          <Suspense key={l.id} fallback={null}><LayerScene id={l.id} url={l.url} ix={ix} reg={reg} hidden={(layerPats[l.id] ?? []).join('|')} /></Suspense>
         ))}
         <Highlighter reg={reg} ver={ver} sel={sel} rel={rel} hover={hover?.key ?? null} focus={focus} accent={cw.accent} />
         <Picker reg={reg} onHover={setHover} onPick={key => { setFocus(null); onSelect(key); }} />
@@ -249,6 +255,10 @@ export default function ZoneModels3D({ cw, ix, site, sel, rel, onSelect, onClear
               {LAYERS.filter(l => layerFiles[l.id]).map(l => (
                 <button key={l.id} style={btn(layerOn[l.id] !== false)} aria-pressed={layerOn[l.id] !== false}
                   onClick={() => setLayerOn(s => ({ ...s, [l.id]: s[l.id] === false }))}>{layerOn[l.id] !== false ? '☑' : '☐'} {l.label}</button>
+              ))}
+              {LAYERS.filter(l => l.credit && layerFiles[l.id] && layerOn[l.id] !== false).map(l => (
+                <a key={l.id + ':credit'} href={l.credit!.href} target="_blank" rel="noreferrer"
+                  style={{ color: cw.ink, fontFamily: cw.fontBody, fontSize: 10, opacity: 0.7 }}>{l.credit!.text}</a>
               ))}
             </MoreRow>
           )}
@@ -350,6 +360,56 @@ function useLayerFiles(): Record<string, boolean> {
   return have;
 }
 
+// the paint booth the cab was sprayed in, built in the page as the reflection environment (no HDR download): a light
+// grey room with rows of fluorescent panels in the ceiling and tall panels on the walls, a dark filter wall at the far
+// end. Fresh clear streaks with the panel rows the way it does in the owner's booth clips; metals and the
+// clear-coated covers read as their finishes instead of flat colour. Metres; the part sits at the origin, 1.2 m up.
+function boothScene(): THREE.Scene {
+  const s = new THREE.Scene();
+  const W = 7, L = 9, H = 3.6, EYE = 1.2;
+  const box = (w: number, h: number, d: number, x: number, y: number, z: number, lum: number, warm = 1) => {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshBasicMaterial({ color: new THREE.Color(lum, lum * (1 - (1 - warm) * 0.5), lum * warm) }));
+    m.position.set(x, y, z);
+    s.add(m);
+  };
+  const room = new THREE.Mesh(new THREE.BoxGeometry(W, H, L), new THREE.MeshBasicMaterial({ color: new THREE.Color(0.40, 0.40, 0.42), side: THREE.BackSide }));
+  room.position.set(0, H / 2 - EYE, 0);
+  s.add(room);
+  box(W - 0.02, 0.01, L - 0.02, 0, H - EYE - 0.02, 0, 0.7);          // white ceiling
+  box(W - 0.02, 0.01, L - 0.02, 0, -EYE + 0.01, 0, 0.34);             // grey concrete floor
+  for (let i = 0; i < 6; i++) for (const x of [-W / 2 + 0.03, W / 2 - 0.03])   // the low light row along both walls
+    box(0.02, 0.25, 1.2, x, -0.65, -4 + i * 1.6, 7.0, 0.96);             // (0.55 m off the floor: what a vertical panel
+  for (const x of [-2.4, -0.8, 0.8, 2.4]) for (const z of [-L / 2 + 0.03, L / 2 - 0.03])   // mirrors from above)
+    box(1.2, 0.25, 0.02, x, -0.65, z, 7.0, 0.96);
+  for (const x of [-1.6, 0, 1.6]) for (let i = 0; i < 6; i++)          // the ceiling rows mirrored in the sealed floor
+    box(0.6, 0.02, 1.2, x, -EYE + 0.03, -4 + i * 1.6, 2.2, 0.96);
+  box(W - 0.1, H - 0.1, 0.02, 0, H / 2 - EYE, -L / 2 + 0.02, 0.30);   // filter wall at the far end
+  for (const x of [-1.6, 0, 1.6]) for (let i = 0; i < 6; i++)          // ceiling panels: three rows of six
+    box(0.6, 0.02, 1.2, x, H - EYE - 0.04, -4 + i * 1.6, 8.0, 0.96);
+  for (const sx of [-1, 1]) for (let i = 0; i < 6; i++) {               // the slanted ceiling-to-wall rows
+    const m = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.02, 1.2), new THREE.MeshBasicMaterial({ color: new THREE.Color(8.0, 7.9, 7.7) }));
+    m.position.set(sx * (W / 2 - 0.45), H - EYE - 0.45, -4 + i * 1.6);
+    m.rotation.z = sx * Math.PI / 4;
+    s.add(m);
+  }
+  for (const x of [-W / 2 + 0.03, W / 2 - 0.03]) for (let i = 0; i < 5; i++)   // tall wall panels
+    box(0.02, 1.6, 0.3, x, 0.7, -3.6 + i * 1.8, 6.5, 0.96);
+  for (const x of [-2.2, 0, 2.2]) box(0.3, 1.6, 0.02, x, 0.7, L / 2 - 0.03, 6.5, 0.96);   // the wall behind the viewer
+  return s;
+}
+
+function Studio() {
+  const { gl, scene } = useThree();
+  useEffect(() => {
+    const pm = new THREE.PMREMGenerator(gl);
+    const env = pm.fromScene(boothScene(), 0.02).texture;
+    scene.environment = env;
+    scene.environmentIntensity = 1.0;
+    return () => { scene.environment = null; env.dispose(); pm.dispose(); };
+  }, [gl, scene]);
+  return null;
+}
+
 // one zone GLB: its meshes keyed by the end or loom segment they draw; `hides` takes out what a layer or part replaces
 function ZoneScene({ zone, url, ix, reg, hides }: { zone: ZoneId; url: string; ix: WsIndex; reg: Registry; hides: (name: string) => boolean }) {
   const { scene } = useGLTF(url);
@@ -414,7 +474,8 @@ function PartScene({ part, spot, ix, reg, mountAt }: {
 }
 
 // another lane's layer (frame, engine): drawn as published, listed by its node names
-function LayerScene({ id, url, ix, reg }: { id: string; url: string; ix: WsIndex; reg: Registry }) {
+// `hidden`: '|'-joined node names another drawn layer replaces in this file (LayerDef.hidesIn)
+function LayerScene({ id, url, ix, reg, hidden }: { id: string; url: string; ix: WsIndex; reg: Registry; hidden: string }) {
   const { scene } = useGLTF(url);
   const root = useMemo(() => ownMaterials(scene), [scene]);
   useLayoutEffect(() => {
@@ -435,6 +496,12 @@ function LayerScene({ id, url, ix, reg }: { id: string; url: string; ix: WsIndex
     reg.add('layer:' + id, root, items);
     return () => reg.remove('layer:' + id);
   }, [root, id, ix, reg]);
+  useEffect(() => {
+    const h = nameMatcher(hidden ? hidden.split('|') : []);
+    let changed = false;
+    root.traverse(o => { if (o === root || !o.name) return; const v = !h(o.name); if (o.visible !== v) { o.visible = v; changed = true; } });
+    if (changed) reg.bump();
+  }, [root, hidden, reg]);
   return <primitive object={root} />;
 }
 

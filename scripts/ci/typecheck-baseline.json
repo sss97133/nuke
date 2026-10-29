@@ -1,11 +1,11 @@
 {
-  "generated": "2026-10-20",
+  "generated": "2026-10-27",
   "note": "Ratchet floor for scripts/ci/typecheck-ratchet.mjs (npm run type-check). Per-file tsc error counts over the nuke_frontend projects; a file may not rise and a file not listed may not have errors. Lowered automatically by a clean local run; never raise it by hand.",
   "projects": [
     "tsconfig.app.json",
     "tsconfig.node.json"
   ],
-  "total": 441,
+  "total": 438,
   "files": {
     "nuke_frontend/src/branding/ModeSwitcher.tsx": 1,
     "nuke_frontend/src/components/AdminDashboard.tsx": 1,
@@ -46,7 +46,6 @@
     "nuke_frontend/src/components/profile/SocialConnections.tsx": 2,
     "nuke_frontend/src/components/search/AIDataIngestionSearch.tsx": 1,
     "nuke_frontend/src/components/search/AIModelSelector.tsx": 1,
-    "nuke_frontend/src/components/search/SearchResults.tsx": 1,
     "nuke_frontend/src/components/upload/TitleValidationModal.tsx": 3,
     "nuke_frontend/src/components/upload/UploadProgressNotifications.tsx": 8,
     "nuke_frontend/src/components/vehicle/EnhancedImageTagger.tsx": 1,
@@ -86,10 +85,8 @@
     "nuke_frontend/src/pages/Search.tsx": 1,
     "nuke_frontend/src/pages/SellDashboard.tsx": 1,
     "nuke_frontend/src/pages/ShareWiring.tsx": 1,
-    "nuke_frontend/src/pages/TeamInbox.tsx": 1,
     "nuke_frontend/src/pages/VehiclePortfolio.tsx": 1,
     "nuke_frontend/src/pages/Vehicles.tsx": 15,
-    "nuke_frontend/src/pages/VehiclesDashboard.tsx": 1,
     "nuke_frontend/src/pages/WiringPlan.tsx": 3,
     "nuke_frontend/src/pages/admin/InventoryAnalytics.tsx": 1,
     "nuke_frontend/src/pages/admin/MemeLibraryAdmin.tsx": 1,

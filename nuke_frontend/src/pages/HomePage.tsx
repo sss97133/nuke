@@ -16,6 +16,7 @@ import TruckFacetToolbar from './market/TruckFacetToolbar';
 import { filterTruckMembers, parseTruckMembers, partitionTruckMembers, readTruckNavigation, TRUCK_AXES, TRUCK_AXIS_LABELS, type TruckAxis, type TruckRead } from './market/truckFacets';
 import { Text } from '../kit';
 import { MakeIdentity } from '../components/common/MakeIdentity';
+import LoadingSkeleton from '../components/common/LoadingSkeleton';
 import FamilyMovers from './market/FamilyMovers';
 import BrandFamilyMap, { MapViewSwitch } from './market/BrandFamilyMap';
 import FamilySalesChart, { FamilyViewSwitch, matchesSaleSubModel, useFamilySales, type Sale } from './market/FamilySalesChart';
@@ -2241,7 +2242,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
         height: embedded ? 'auto' : '100vh',
         background: 'var(--bg)',
         color: 'var(--text)',
-        fontFamily: 'Arial, sans-serif',
+        fontFamily: 'var(--font-family)',
         overflow: embedded ? 'visible' : 'hidden',
       }}
     >
@@ -3184,20 +3185,25 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
       <style>{`
         .home-map-refine, .home-family-history, .home-family-comparisons { display: contents; }
         .home-map-refine > summary, .home-family-history > summary, .home-family-comparisons > summary { display: none; }
-        .home-phone-browse { display: grid; gap: 8px; padding: 12px; border-bottom: 2px solid var(--border); }
+        .home-phone-browse { display: grid; gap: 16px; padding: 16px; border-bottom: 1px solid var(--border); background: var(--surface); }
         .home-phone-browse-actions, .home-phone-display { display: flex; gap: 4px; align-items: center; justify-content: space-between; }
-        .home-phone-display { margin-left: auto; }
-        .home-phone-browse button, .home-phone-browse select, .home-phone-browse-list > button { min-height: 44px !important; border: 2px solid var(--border); background: var(--bg); color: var(--text); padding: 8px 12px; cursor: pointer; }
-        .home-phone-display button[aria-pressed="true"] { background: var(--text); color: var(--bg); }
+        .home-phone-display { margin-left: auto; padding: 3px; border-radius: var(--radius); background: var(--surface-hover); }
+        .home-phone-browse button, .home-phone-browse select, .home-phone-browse-list > button { min-height: var(--control-height); border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--text); padding: 10px 12px; font-family: var(--font-family); cursor: pointer; }
+        .home-phone-display button { border: 0; background: transparent; }
+        .home-phone-display button[aria-pressed="true"] { background: var(--surface); color: var(--accent); box-shadow: 0 1px 3px rgb(0 0 0 / 10%); }
         .home-phone-browse-picker { display: grid; gap: 6px; }
-        .home-phone-browse-picker select { min-width: 0; width: 100%; }
-        .home-phone-browse-list { display: grid; gap: 2px; padding: 8px 12px; }
-        .home-phone-browse-list > button { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; text-align: left; }
+        .home-phone-browse-picker select { min-width: 0; width: 100%; font-size: max(16px, var(--text-body)); }
+        .home-phone-browse-list { display: grid; gap: 0; margin: 16px; padding: 0; border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; background: var(--surface); }
+        .home-phone-browse-list > button { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; min-height: 60px; text-align: left; border: 0; border-bottom: 1px solid var(--border); border-radius: 0; padding: 14px 16px; }
+        .home-phone-browse-list > button:last-of-type { border-bottom: 0; }
+        .home-phone-browse-list > button:hover:not(:disabled) { background: var(--surface-hover); }
+        .home-phone-browse-list > p { padding: 12px 16px; margin: 0; border-top: 1px solid var(--border); }
+        .home-phone-browse-list .make-identity strong { font-size: var(--text-body); }
         .home-phone-browse-list > button:disabled { cursor: default; color: var(--text-disabled); }
         .home-phone-browse-count { display: inline-flex; align-items: center; gap: 12px; flex-shrink: 0; }
         .home-phone-browse button, .home-phone-browse-list > button, .home-map-refine > summary, .home-family-history > summary, .home-family-comparisons > summary { position: relative; }
         .home-phone-browse button:focus-visible::after, .home-phone-browse-list > button:focus-visible::after, .home-map-refine > summary:focus-visible::after, .home-family-history > summary:focus-visible::after, .home-family-comparisons > summary:focus-visible::after { content: ''; position: absolute; inset: 2px; border: 2px solid var(--text); pointer-events: none; }
-        .home-phone-display button[aria-pressed="true"]:focus-visible::after { border-color: var(--bg); }
+        .home-phone-display button[aria-pressed="true"]:focus-visible::after { border-color: var(--accent); }
         .home-phone-browse select:focus-visible { border-color: var(--text); }
         @media (max-width: 640px) {
           .home-map-refine, .home-family-history, .home-family-comparisons { display: block; border-bottom: 2px solid var(--border); }
@@ -3380,14 +3386,8 @@ const TABS: { id: TabId; label: string }[] = [
   { id: 'garage', label: 'Garage' },
 ];
 
-function TabSkeleton() {
-  return (
-    <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 12, fontFamily: 'Arial, sans-serif' }}>
-      {[1, 2, 3].map((i) => (
-        <div key={i} style={{ height: 80, background: 'var(--surface)', border: '2px solid var(--border)' }} />
-      ))}
-    </div>
-  );
+function TabSkeleton({ label = 'Loading view' }: { label?: string }) {
+  return <div className="p-6"><LoadingSkeleton variant="card-list" count={3} ariaLabel={label} /></div>;
 }
 
 export default function HomePage() {
@@ -3397,6 +3397,8 @@ export default function HomePage() {
   // browser back/forward. A saved tab must not replace the market on arrival.
   const requestedTab = searchParams.get('tab');
   const activeTab: TabId = TABS.find(tab => tab.id === requestedTab)?.id || 'market';
+  usePageTitle(searchParams.get('force_treemap') === '1' ? 'Nuke — Vehicle Intelligence'
+    : TABS.find(tab => tab.id === activeTab)!.label);
 
   const garage = useVehiclesDashboard(user?.id);
   // The refresh receipt, for the Sources board's sales-by-house hover (one read per page lifetime, shared with the map).
@@ -3450,13 +3452,13 @@ export default function HomePage() {
           <TreemapHomePage embedded onBrowse={() => (document.querySelector('.market-sources') ?? document.querySelector('.market-explorer'))
             ?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
           {/* Every source with the same row, ranked by the lots we hold (owner, 2026-10-15: "treat all sources the same") */}
-          <SourcesBoard scope={{
+          <Suspense fallback={<TabSkeleton label="Loading sources" />}><SourcesBoard scope={{
             make: searchParams.get('make'),
             family: searchParams.get('family'),
             familyName: searchParams.get('family_name'),
             model: searchParams.get('model') ?? searchParams.get('facet'),
-          }} houseMix={sourcesRefresh.populations?.by_house ? { rows: sourcesRefresh.populations.by_house, clock: ledgerViewsClock(sourcesRefresh.refreshedAt) } : null} />
-          <MarketPulse onUnavailable={user ? <FeedPage /> : <IntakePage variant="homepage" />} />
+          }} houseMix={sourcesRefresh.populations?.by_house ? { rows: sourcesRefresh.populations.by_house, clock: ledgerViewsClock(sourcesRefresh.refreshedAt) } : null} /></Suspense>
+          <Suspense fallback={<TabSkeleton label="Loading live auctions" />}><MarketPulse onUnavailable={user ? <FeedPage /> : <IntakePage variant="homepage" />} /></Suspense>
         </>}
         {activeTab === 'garage' && <GarageTab dashboard={garage} />}
         {activeTab === 'feed' && <FeedPage />}

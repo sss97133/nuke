@@ -18,8 +18,22 @@
 import SwiftUI
 import BackgroundTasks
 
+/// UIKit's door for the background upload session: when iOS relaunches the app because transfers
+/// finished with it closed, this hands the completion to the uploader, which inserts the rows first.
+final class CaptureAppDelegate: NSObject, UIApplicationDelegate {
+    func application(_ application: UIApplication, handleEventsForBackgroundURLSession identifier: String,
+                     completionHandler: @escaping () -> Void) {
+        guard identifier == Config.uploadSessionID else { completionHandler(); return }
+        Task { @MainActor in
+            BackgroundUploader.shared.attachRelaunchCompletion(completionHandler)
+            await BackgroundUploader.shared.resume()
+        }
+    }
+}
+
 @main
 struct NukeCaptureApp: App {
+    @UIApplicationDelegateAdaptor(CaptureAppDelegate.self) private var appDelegate
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var session = SessionStore()
     /// Ignition phase drives the denied-grant detour (below).
@@ -35,6 +49,7 @@ struct NukeCaptureApp: App {
         // returns is a runtime error. SwiftUI App.init() runs early enough.
         Self.registerBackgroundRefresh()
         Self.registerBackgroundBackfill()
+        Self.registerRecentUploads()
         // Existing installs ran the pre-ignition app: they keep the
         // hardcoded shop gate and skip ignition entirely.
         if SyncEngine.hasExistingWatermark,
@@ -164,6 +179,7 @@ struct NukeCaptureApp: App {
                 #endif
             }
             .environmentObject(session)
+            .onOpenURL(perform: handleOpenURL)
             #if DEBUG
             .overlay(alignment: .topLeading) { if FixtureBackend.isActive { FixtureWriteLogOverlay() } }
             #endif
@@ -228,10 +244,25 @@ struct NukeCaptureApp: App {
                 // 15 min out; in practice it learns usage patterns).
                 Self.scheduleBackgroundRefresh()
                 Self.scheduleBackgroundBackfill()
+                // Recent work left behind (a budget stop, transfers in flight) does not wait for a
+                // charger: the recent-window task needs only a network.
+                if SyncEngine.shared.foregroundBudgetReached || BackgroundUploader.shared.queuedCount > 0
+                    || BackgroundUploader.shared.inFlightCount > 0 {
+                    Self.scheduleRecentUploads()
+                }
             default:
                 break
             }
         }
+    }
+
+    /// The Shortcuts door (README, "Land as taken"): `ag.nuke.capture://sync` runs a pass now. A
+    /// personal automation "When Camera is closed → Open Nuke" opens this URL, so a frame uploads
+    /// the moment the shutter is put away, with no tap in the app.
+    private func handleOpenURL(_ url: URL) {
+        guard url.scheme == Config.oauthRedirectURL.scheme, url.host == Config.syncURLHost else { return }
+        guard session.isSignedIn, ignitionComplete else { return }
+        Task { await SyncEngine.shared.start() }
     }
 
     /// The normal root routing (extracted so the DEBUG deep-link can bypass it).
@@ -372,6 +403,44 @@ struct NukeCaptureApp: App {
             try BGTaskScheduler.shared.submit(request)
         } catch {
             NSLog("NukeCapture: BG backfill submit failed: %@", String(describing: error))
+        }
+    }
+
+    // ─── BGProcessingTask: the recent window, no charger ─────────────────────
+    // The backfill task waits for power and Wi-Fi, which is right for 32 K old photos and wrong for
+    // the frame shot an hour ago. This task asks only for a network: one sync pass (the last three
+    // days lead it, newest first) and the upload queue's resume. Booked whenever a pass leaves recent
+    // work behind (SyncEngine.sync) and on every background transition with transfers owed.
+
+    private static func registerRecentUploads() {
+        BGTaskScheduler.shared.register(forTaskWithIdentifier: Config.recentTaskID, using: nil) { task in
+            guard let processingTask = task as? BGProcessingTask else {
+                task.setTaskCompleted(success: false)
+                return
+            }
+            handleRecentUploads(processingTask)
+        }
+    }
+
+    private static func handleRecentUploads(_ task: BGProcessingTask) {
+        let work = Task { @MainActor in
+            let clean = await SyncEngine.shared.sync()
+            await BackgroundUploader.shared.resume()
+            if !clean || BackgroundUploader.shared.queuedCount > 0 { scheduleRecentUploads() }
+            task.setTaskCompleted(success: clean)
+        }
+        task.expirationHandler = { work.cancel() }
+    }
+
+    static func scheduleRecentUploads() {
+        let request = BGProcessingTaskRequest(identifier: Config.recentTaskID)
+        request.requiresExternalPower = false
+        request.requiresNetworkConnectivity = true
+        request.earliestBeginDate = Date(timeIntervalSinceNow: 60)
+        do {
+            try BGTaskScheduler.shared.submit(request)
+        } catch {
+            NSLog("NukeCapture: BG recent submit failed: %@", String(describing: error))
         }
     }
 }

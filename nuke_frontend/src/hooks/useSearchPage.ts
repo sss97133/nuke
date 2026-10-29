@@ -45,7 +45,7 @@ function detectPlatform(url: string): { label: string; short: string } | null {
 }
 
 export interface UrlExtraction {
-  status: 'detecting' | 'extracting' | 'success' | 'error';
+  status: 'ready' | 'detecting' | 'extracting' | 'success' | 'error';
   url: string;
   platform: { label: string; short: string } | null;
   vehicleId?: string;
@@ -189,6 +189,10 @@ export function useSearchPage() {
   const [searchMeta, setSearchMeta] = useState<SearchMeta | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const [searchAttempt, setSearchAttempt] = useState(0);
+  const requestVersion = useRef(0);
+  const retrySearch = useCallback(() => setSearchAttempt(attempt => attempt + 1), []);
   const [resultFilter, setResultFilter] = useState<SearchFilter>('all');
   const lastQueryRef = useRef('');
   const loadMoreRequestRef = useRef<string | null>(null);
@@ -206,18 +210,19 @@ export function useSearchPage() {
   // Direct /search links and subsequent queries must use the existing parser,
   // just as the intent router does. A prior query's budget must not linger.
   useEffect(() => {
-    setFilters(previous => ({ ...previous,
+    setFilters(previous => ({ ...DEFAULT_FILTERS, showFilters: previous.showFilters,
+      make: urlMake, yearMin: urlYearMin, yearMax: urlYearMax,
       priceMin: urlPriceMin || (parsedQuery.priceMin == null ? '' : String(parsedQuery.priceMin)),
       priceMax: urlPriceMax || (parsedQuery.priceMax == null ? '' : String(parsedQuery.priceMax)),
     }));
-  }, [urlPriceMin, urlPriceMax, parsedQuery.priceMin, parsedQuery.priceMax]);
+  }, [query, urlMake, urlYearMin, urlYearMax, urlPriceMin, urlPriceMax, parsedQuery.priceMin, parsedQuery.priceMax]);
 
   // Browse stats for context (fetched alongside results)
   const [browseStats, setBrowseStats] = useState<BrowseStats | null>(null);
 
   // URL extraction state
   const [urlExtraction, setUrlExtraction] = useState<UrlExtraction | null>(null);
-  const urlExtractionRef = useRef<string | null>(null);
+  const activeUrlImport = useRef<{ url: string; version: number } | null>(null);
 
   // Detect make from query or URL params for browse_stats
   const detectedMake = useMemo(() => {
@@ -237,6 +242,17 @@ export function useSearchPage() {
   // Execute search when query changes
   useEffect(() => {
     const q = query.trim();
+    const version = ++requestVersion.current;
+    let cancelled = false;
+    const isCurrent = () => !cancelled && requestVersion.current === version;
+    const cleanup = () => { cancelled = true; if (requestVersion.current === version) requestVersion.current++; };
+    const failSearch = () => {
+      if (!isCurrent()) return;
+      setSearchError('Search could not be completed. Try again.');
+      setSearchSummary('Search failed.');
+      setResults([]); setSearchMeta(null); setLoading(false);
+    };
+    setSearchError(null);
     if (!q) {
       lastQueryRef.current = '';
       setResults([]);
@@ -246,78 +262,37 @@ export function useSearchPage() {
       setBrowseStats(null);
       setLoading(false);
       setUrlExtraction(null);
-      urlExtractionRef.current = null;
-      return;
+      return cleanup;
     }
-
-    if (q === lastQueryRef.current) return;
     lastQueryRef.current = q;
     loadMoreRequestRef.current = null;
     setLoadingMore(false);
     setLoadMoreError(null);
     setSearchMeta(null);
+    setResults([]);
+    setSearchSummary('');
+    setBrowseStats(null);
 
-    // UUID detection — redirect to vehicle page
+    // UUID lookup is still a bounded visible-row read; absence is not a stall.
     if (UUID_RE.test(q)) {
-      supabase
-        .from('vehicles')
-        .select('id')
-        .eq('id', q)
-        .maybeSingle()
-        .then(({ data }) => {
-          if (data) navigate(`/vehicle/${data.id}`, { replace: true });
-        });
-      return;
+      setLoading(true); setUrlExtraction(null);
+      Promise.resolve(supabase.from('vehicles').select('id').eq('id', q).maybeSingle())
+        .then(({ data, error }) => {
+          if (!isCurrent()) return;
+          if (error) { failSearch(); return; }
+          setLoading(false);
+          if (data?.id?.toLowerCase() === q.toLowerCase()) navigate(`/vehicle/${data.id}`, { replace: true });
+          else setSearchSummary('No visible vehicle matches this ID.');
+        }, failSearch);
+      return cleanup;
     }
 
-    // URL detection — skip search, go straight to ingestion
+    // A URL is an import preview. Only the explicit action below may start ingestion.
     if (looksLikeUrl(q)) {
       const url = URL_RE.test(q) ? q : `https://${q}`;
-
-      // Prevent duplicate extraction for same URL
-      if (urlExtractionRef.current === url) return;
-      urlExtractionRef.current = url;
-
-      const platform = detectPlatform(url);
-      setResults([]);
-      setSearchSummary('');
-      setSearchMeta(null);
-      setBrowseStats(null);
       setLoading(false);
-      setUrlExtraction({ status: 'extracting', url, platform });
-
-      // Fire extraction immediately — no fake delays
-      (async () => {
-        try {
-          const result = await ingestVehicle({ url, enrich: true });
-
-          if (result.status === 'error' || result.status === 'rejected') {
-            const errorMsg = result.status === 'rejected'
-              ? `Quality too low (${result.issues?.join(', ') || 'insufficient data'})`
-              : (result.error || 'Extraction failed');
-            setUrlExtraction(prev => prev ? { ...prev, status: 'error', error: errorMsg } : null);
-            return;
-          }
-
-          // Got a vehicle — go straight to profile, no lingering
-          if (result.vehicle_id) {
-            track('url_ingest', { url, ok: true });
-            navigate(`/vehicle/${result.vehicle_id}`, { replace: true });
-            return;
-          }
-
-          // No vehicle_id returned — show error
-          setUrlExtraction(prev => prev ? {
-            ...prev,
-            status: 'error',
-            error: 'No vehicle data found at this URL',
-          } : null);
-        } catch (err: any) {
-          setUrlExtraction(prev => prev ? { ...prev, status: 'error', error: err.message || 'Extraction failed' } : null);
-        }
-      })();
-
-      return;
+      setUrlExtraction({ status: 'ready', url, platform: detectPlatform(url) });
+      return cleanup;
     }
 
     // A VIN: one indexed read through vehicle_by_vin_public (public rows only, the columns a card shows).
@@ -326,17 +301,14 @@ export function useSearchPage() {
     if (VIN_RE.test(q)) {
       const vin = q.toUpperCase();
       setUrlExtraction(null);
-      urlExtractionRef.current = null;
       setLoading(true);
       setResultFilter('all');
       setBrowseStats(null);
       setSearchMeta(null);
       Promise.resolve(supabase.rpc('vehicle_by_vin_public', { p_vin: vin })).then(({ data, error }: { data: unknown; error: unknown }) => {
-        if (lastQueryRef.current !== q) return;
+        if (!isCurrent()) return;
         if (error || !Array.isArray(data)) {
-          setSearchSummary('Search failed.');
-          setResults([]);
-          setLoading(false);
+          failSearch();
           return;
         }
         const mapped: SearchResult[] = (data as any[]).map((v) => mapRawResult({
@@ -358,17 +330,14 @@ export function useSearchPage() {
         track('search_results', { q, loaded_count: mapped.length, total: mapped.length });
         setLoading(false);
       }, () => {
-        if (lastQueryRef.current !== q) return;
-        setSearchSummary('Search failed.');
-        setResults([]);
-        setLoading(false);
+        if (!isCurrent()) return;
+        failSearch();
       });
-      return;
+      return cleanup;
     }
 
     // Not a URL or a VIN — clear extraction state and do normal search
     setUrlExtraction(null);
-    urlExtractionRef.current = null;
     setLoading(true);
     setResultFilter('all');
 
@@ -383,19 +352,17 @@ export function useSearchPage() {
     setBrowseStats(null);
     if (detectedMake) {
       supabase.rpc('browse_stats', { p_make: detectedMake })
-        .then(({ data }: { data: unknown }) => {
-          if (data) setBrowseStats(data as BrowseStats);
+        .then(({ data, error }: { data: unknown; error: unknown }) => {
+          if (isCurrent() && !error && data) setBrowseStats(data as BrowseStats);
         }, () => { /* stats are decoration — never surface their failures */ });
     }
 
     searchPromise.then(async (searchRes) => {
-      if (lastQueryRef.current !== q) return;
+      if (!isCurrent()) return;
       const { data, error } = searchRes;
 
       if (error || !data || data.success === false || !Array.isArray(data.results)) {
-        setSearchSummary('Search failed.');
-        setResults([]);
-        setLoading(false);
+        failSearch();
         return;
       }
 
@@ -417,7 +384,7 @@ export function useSearchPage() {
             .ilike('model', `%${canonicalModel}%`)
             .order('sale_price', { ascending: false, nullsFirst: false })
             .limit(60);
-          if (lastQueryRef.current !== q) return;
+          if (!isCurrent()) return;
           if (Array.isArray(canonicalVehicles) && canonicalVehicles.length > 0) {
             const expanded: SearchResult[] = canonicalVehicles.map((v: any) => mapRawResult({
               id: v.id,
@@ -453,6 +420,7 @@ export function useSearchPage() {
           // Keep base results if canonical expansion fails
         }
       }
+      if (!isCurrent()) return;
       // Prioritize results with images — users see photos, not placeholders
       mapped.sort((a, b) => (b.image_url ? 1 : 0) - (a.image_url ? 1 : 0));
       setResults(mapped);
@@ -464,16 +432,49 @@ export function useSearchPage() {
 
       setLoading(false);
     }).catch(() => {
-      if (lastQueryRef.current !== q) return;
-      setSearchSummary('Search failed.');
-      setResults([]); setSearchMeta(null); setLoading(false);
+      if (!isCurrent()) return;
+      failSearch();
     });
-  }, [query, navigate, detectedMake, parsedQuery.priceMin, parsedQuery.priceMax]);
+    return cleanup;
+  }, [query, navigate, detectedMake, parsedQuery.priceMin, parsedQuery.priceMax, searchAttempt]);
+
+  const startUrlImport = useCallback(async () => {
+    const q = query.trim();
+    if (!looksLikeUrl(q)) return;
+    const url = URL_RE.test(q) ? q : `https://${q}`;
+    const version = requestVersion.current;
+    if (activeUrlImport.current?.version === version) return;
+    const request = { url, version };
+    activeUrlImport.current = request;
+    const isCurrent = () => activeUrlImport.current === request && requestVersion.current === version;
+    setUrlExtraction({ status: 'extracting', url, platform: detectPlatform(url) });
+    try {
+      const result = await ingestVehicle({ url, enrich: true });
+      if (!isCurrent()) return;
+      if (result.status === 'error' || result.status === 'rejected') {
+        const message = result.status === 'rejected'
+          ? `Quality too low (${result.issues?.join(', ') || 'insufficient data'})`
+          : result.error || 'Import failed';
+        setUrlExtraction(previous => previous ? { ...previous, status: 'error', error: message } : null);
+      } else if (result.vehicle_id) {
+        track('url_ingest', { url, ok: true });
+        navigate(`/vehicle/${result.vehicle_id}`, { replace: true });
+      } else {
+        setUrlExtraction(previous => previous ? { ...previous, status: 'error', error: 'No vehicle data found at this URL' } : null);
+      }
+    } catch (failure: unknown) {
+      if (isCurrent()) setUrlExtraction(previous => previous ? { ...previous, status: 'error', error: failure instanceof Error ? failure.message : 'Import failed' } : null);
+    } finally {
+      if (activeUrlImport.current === request) activeUrlImport.current = null;
+    }
+  }, [query, navigate]);
 
   // Load more results
   const handleLoadMore = useCallback(async () => {
     if (!searchMeta || !searchMeta.has_more || loadingMore || loadMoreRequestRef.current) return;
     const q = query.trim(), nextOffset = searchMeta.next_offset;
+    const version = requestVersion.current;
+    const isCurrent = () => requestVersion.current === version && lastQueryRef.current === q;
     if (searchMeta.pagination_limited) {
       setSearchSummary(loadedSummary(results.length, q, true));
       return;
@@ -483,7 +484,7 @@ export function useSearchPage() {
       setSearchSummary(`${loadedSummary(results.length, q)} More results could not be loaded. Try again.`);
       return;
     }
-    const requestKey = `${q}/${nextOffset}`;
+    const requestKey = `${version}:${q}/${nextOffset}`;
     loadMoreRequestRef.current = requestKey;
     setLoadingMore(true);
     setLoadMoreError(null);
@@ -494,7 +495,7 @@ export function useSearchPage() {
           ...(parsedQuery.priceMin != null || parsedQuery.priceMax != null ? { includeAI: false } : {}) },
       });
 
-      if (lastQueryRef.current !== q) return;
+      if (!isCurrent()) return;
       if (error || data?.success === false || !Array.isArray(data?.results) || !data.meta || data.meta.offset !== nextOffset ||
         data.meta.vehicle_source !== searchMeta.vehicle_source || typeof data.meta.has_more !== 'boolean' ||
         (data.meta.pagination_limited === true
@@ -509,7 +510,7 @@ export function useSearchPage() {
       setSearchMeta(data.meta);
       setSearchSummary(loadedSummary(results.length + unique.length, q, data.meta.pagination_limited === true));
     } catch {
-      if (lastQueryRef.current === q) {
+      if (isCurrent()) {
         setLoadMoreError('More results could not be loaded. Try again.');
         setSearchSummary(`${loadedSummary(results.length, q)} More results could not be loaded. Try again.`);
       }
@@ -576,8 +577,11 @@ export function useSearchPage() {
     handleLoadMore,
     loadingMore,
     loadMoreError,
+    searchError,
+    retrySearch,
     browseStats,
     detectedMake,
     urlExtraction,
+    startUrlImport,
   };
 }

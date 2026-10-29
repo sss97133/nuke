@@ -41,7 +41,7 @@ const DealerDropboxImport: React.FC = () => {
     }
 
     const dropboxService = DropboxService.getInstance({ clientId: dropboxClientId });
-    const authUrl = dropboxService.generateAuthUrl();
+    const authUrl = dropboxService.generateAuthUrl(`/dealer/${orgId}/dropbox-import`);
     window.location.href = authUrl;
   };
 

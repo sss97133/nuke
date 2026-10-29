@@ -5,6 +5,8 @@
  *
  * /vehicle/:id        — dynamic vehicle data injection for AI readability,
  *                        OG tags, JSON-LD, and Accept: application/json support
+ * /api/v1/vehicle/:id — public vehicle JSON. 404 means the read worked and found no public vehicle; 503 with Retry-After
+ *                        means the data store could not be read (never a 404, so an outage cannot pass for a missing record).
  * /, /market, /journal, /llms.txt — readable text for crawlers and AI readers (the app is drawn by JavaScript, so
  *                        without this they see a title and nothing else). Numbers come from market_sources_read()
  *                        through the anon key, each with its own date; if the read fails the page says so and shows no number.
@@ -28,7 +30,7 @@ const MCP_SERVER_CARD = {
   description:
     'Read-only, citation-first MCP for physical assets (vehicles first). Every claim carries sources, event dates, and confidence.',
   url: 'https://nuke.ag/mcp/advisor',
-  version: '1.0.0',
+  version: '1.1.0',
   protocol: '2025-03-26',
   transport: 'streamable-http',
   authentication: {
@@ -36,8 +38,7 @@ const MCP_SERVER_CARD = {
     note: 'Anonymous reads allowed. Optional X-API-Key for rate-limit identity.',
   },
   tools: [
-    'find_asset', 'find_listings', 'evaluate_listing', 'get_asset', 'get_history', 'explain_field',
-    'value_asset', 'get_comps', 'get_coverage',
+    'find_asset', 'get_asset', 'get_comps', 'value_asset', 'evaluate_listing', 'budget_options',
   ],
   documentation: 'https://nuke.ag/llms.txt',
   full_connector: 'https://nuke.ag/mcp',
@@ -122,7 +123,28 @@ function buildJsonLd(v: Record<string, unknown>): string {
 
 // ── Fetch vehicle from PostgREST ─────────────────────────────────────────────
 
-async function fetchVehicle(vehicleId: string): Promise<Record<string, unknown> | null> {
+/**
+ * What an upstream (PostgREST) read came back with. An empty result is still `ok`: the read worked and found nothing.
+ * A failure carries the HTTP status that refused it, or null when no usable answer arrived (network error, timeout, a
+ * body PostgREST would not send). A failure must never be reported as "not found".
+ */
+type Read<T> = { ok: true; value: T } | { ok: false; status: number | null };
+
+/** The answer for a failed upstream read: 503 and never cached, so an outage cannot pass for a missing record. */
+function upstreamUnavailable(status: number | null): Response {
+  return new Response(JSON.stringify({ error: 'upstream unavailable', upstream_status: status }), {
+    status: 503,
+    headers: {
+      'Content-Type': 'application/json',
+      'Retry-After': '30',
+      'Cache-Control': 'no-store',
+      'Access-Control-Allow-Origin': '*',
+    },
+  });
+}
+
+/** The public vehicle row (value null when no public vehicle has that id), or why the read failed. */
+async function fetchVehicle(vehicleId: string): Promise<Read<Record<string, unknown> | null>> {
   const apiUrl = `${SUPABASE_URL}/rest/v1/vehicles?id=eq.${vehicleId}&is_public=eq.true&select=${VEHICLE_SELECT}`;
   try {
     const resp = await fetch(apiUrl, {
@@ -132,14 +154,13 @@ async function fetchVehicle(vehicleId: string): Promise<Record<string, unknown> 
         Accept: 'application/json',
       },
     });
-    if (resp.ok) {
-      const rows = await resp.json();
-      if (rows && rows.length > 0) return rows[0];
-    }
+    if (!resp.ok) return { ok: false, status: resp.status };
+    const rows = await resp.json();
+    if (!Array.isArray(rows)) return { ok: false, status: null };
+    return { ok: true, value: rows[0] ?? null };
   } catch {
-    // Return null on fetch error
+    return { ok: false, status: null };
   }
-  return null;
 }
 
 
@@ -293,7 +314,7 @@ function llmsTxt(b: Board): string {
     '- [Sitemap](https://nuke.ag/sitemap.xml)',
     '', '## Nuke Asset Advisor',
     'Install in any MCP client as a Streamable HTTP server at `https://nuke.ag/mcp/advisor`.',
-    'Anonymous reads are allowed. Tools: find_asset, find_listings, evaluate_listing, get_asset, get_history, explain_field, value_asset, get_comps, get_coverage.',
+    'Anonymous reads are allowed. Tools: find_asset, get_asset, get_comps, value_asset, evaluate_listing, budget_options.',
     'Every answer is an evidence envelope: cite source_name, source_url, and event_time; never invent missing fields — say not recorded.',
     'event_time is the real-world sale/auction clock; ingested_at is when Nuke learned the row — do not conflate them.',
     '', '## Sources and their coverage',
@@ -321,39 +342,53 @@ function anonHeaders(): Record<string, string> {
     ...(SUPABASE_ANON.startsWith('eyJ') ? { Authorization: `Bearer ${SUPABASE_ANON}` } : {}) };
 }
 
-/** An anon reader call; null when it refuses, fails or takes too long (the page then keeps the plain app shell). */
-async function anonRpc(fn: string, args: Record<string, unknown>, ms = 4000): Promise<Record<string, unknown> | null> {
-  if (!SUPABASE_URL || !SUPABASE_ANON) return null;
+/** One anon PostgREST call: the decoded JSON, or how it failed (the refusing status; null when nothing usable came back in time). */
+async function anonRead(path: string, init: RequestInit, ms: number): Promise<Read<unknown>> {
+  if (!SUPABASE_URL || !SUPABASE_ANON) return { ok: false, status: null };
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), ms);
   try {
-    const resp = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fn}`, { method: 'POST', headers: anonHeaders(), body: JSON.stringify(args), signal: ctl.signal });
-    if (!resp.ok) return null;
-    const v = await resp.json();
-    return v && typeof v === 'object' && !Array.isArray(v) ? v as Record<string, unknown> : null;
-  } catch { return null; } finally { clearTimeout(timer); }
+    const resp = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, { ...init, headers: anonHeaders(), signal: ctl.signal });
+    if (!resp.ok) return { ok: false, status: resp.status };
+    return { ok: true, value: await resp.json() };
+  } catch { return { ok: false, status: null }; } finally { clearTimeout(timer); }
+}
+
+/** An anon reader call that says why it failed. */
+async function anonRpcRead(fn: string, args: Record<string, unknown>, ms = 4000): Promise<Read<Record<string, unknown>>> {
+  const r = await anonRead(`rpc/${fn}`, { method: 'POST', body: JSON.stringify(args) }, ms);
+  if (!r.ok) return r;
+  const v = r.value;
+  return v && typeof v === 'object' && !Array.isArray(v) ? { ok: true, value: v as Record<string, unknown> } : { ok: false, status: null };
+}
+
+/** An anon PostgREST read of rows the row policies already open, saying why it failed. No rows is still ok. */
+async function anonRowsRead(path: string, ms = 4000): Promise<Read<Record<string, unknown>[]>> {
+  const r = await anonRead(path, {}, ms);
+  if (!r.ok) return r;
+  return Array.isArray(r.value) ? { ok: true, value: r.value as Record<string, unknown>[] } : { ok: false, status: null };
+}
+
+/** An anon reader call; null when it refuses, fails or takes too long (the page then keeps the plain app shell). */
+async function anonRpc(fn: string, args: Record<string, unknown>, ms = 4000): Promise<Record<string, unknown> | null> {
+  const r = await anonRpcRead(fn, args, ms);
+  return r.ok ? r.value : null;
 }
 
 /** An anon PostgREST read of rows the row policies already open; null on any failure. */
 async function anonRows(path: string, ms = 4000): Promise<Record<string, unknown>[] | null> {
-  if (!SUPABASE_URL || !SUPABASE_ANON) return null;
-  const ctl = new AbortController();
-  const timer = setTimeout(() => ctl.abort(), ms);
-  try {
-    const resp = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, { headers: anonHeaders(), signal: ctl.signal });
-    if (!resp.ok) return null;
-    const v = await resp.json();
-    return Array.isArray(v) ? v as Record<string, unknown>[] : null;
-  } catch { return null; } finally { clearTimeout(timer); }
+  const r = await anonRowsRead(path, ms);
+  return r.ok ? r.value : null;
 }
 
-async function openJobIds(): Promise<{ ids: string[]; asOf: string | null } | null> {
+async function openJobIds(): Promise<Read<{ ids: string[]; asOf: string | null }>> {
   const ids: string[] = [];
   let after: string | null = null;
   let asOf: string | null = null;
   for (let page = 0; page < 10; page++) {
-    const r = await anonRpc('open_requirements_read', { p_after: after, p_limit: 100, p_kind: null });
-    if (!r) return page === 0 ? null : { ids, asOf };
+    const got = await anonRpcRead('open_requirements_read', { p_after: after, p_limit: 100, p_kind: null });
+    if (!got.ok) return page === 0 ? got : { ok: true, value: { ids, asOf } };
+    const r = got.value;
     asOf = asOf ?? (typeof r.as_of === 'string' ? r.as_of : null);
     for (const row of Array.isArray(r.rows) ? r.rows : []) {
       const id = (row as Record<string, unknown>)?.work_order_id;
@@ -362,29 +397,33 @@ async function openJobIds(): Promise<{ ids: string[]; asOf: string | null } | nu
     after = typeof r.next_after === 'string' ? r.next_after : null;
     if (!after) break;
   }
-  return { ids, asOf };
+  return { ok: true, value: { ids, asOf } };
 }
 
-/** Public organizations in pages of 1,000 (PostgREST returns at most that many rows per request); null if the first page fails. */
-async function publicOrganizations(): Promise<Record<string, unknown>[] | null> {
+/** Public organizations in pages of 1,000 (PostgREST returns at most that many rows per request); a failure only if the first page fails. */
+async function publicOrganizations(): Promise<Read<Record<string, unknown>[]>> {
   const out: Record<string, unknown>[] = [];
   for (let offset = 0; offset < 20000; offset += 1000) {
-    const rows = await anonRows(`organizations?is_public=eq.true&select=id,updated_at&order=id.asc&limit=1000&offset=${offset}`, 6000);
-    if (!rows) return offset === 0 ? null : out;
-    out.push(...rows);
-    if (rows.length < 1000) break;
+    const got = await anonRowsRead(`organizations?is_public=eq.true&select=id,updated_at&order=id.asc&limit=1000&offset=${offset}`, 6000);
+    if (!got.ok) return offset === 0 ? got : { ok: true, value: out };
+    out.push(...got.value);
+    if (got.value.length < 1000) break;
   }
-  return out;
+  return { ok: true, value: out };
 }
 
 async function workSitemap(): Promise<Response> {
   const [jobs, providers, orgs] = await Promise.all([
     openJobIds(),
-    anonRpc('discovery_providers_read', { p_limit: 5000 }),
+    anonRpcRead('discovery_providers_read', { p_limit: 5000 }),
     publicOrganizations(),
   ]);
-  const status = `jobs=${jobs ? 'ok' : 'unread'};providers=${providers ? 'ok' : 'unread'};organizations=${orgs ? 'ok' : 'unread'}`;
-  const urls = workSitemapUrls(jobs?.ids ?? [], providers, (orgs ?? []).filter(o => typeof o.id === 'string' && UUID_RE.test(o.id as string)), jobs?.asOf ?? null);
+  // Nothing readable at all is an outage, not an empty site: a sitemap with no pages in it would be kept by the edge for hours.
+  // (When some readers answer, the sitemap is still served and x-nuke-sitemap says which did not.)
+  if (!jobs.ok && !providers.ok && !orgs.ok) return upstreamUnavailable(jobs.status ?? providers.status ?? orgs.status);
+  const status = `jobs=${jobs.ok ? 'ok' : 'unread'};providers=${providers.ok ? 'ok' : 'unread'};organizations=${orgs.ok ? 'ok' : 'unread'}`;
+  const urls = workSitemapUrls(jobs.ok ? jobs.value.ids : [], providers.ok ? providers.value : null,
+    (orgs.ok ? orgs.value : []).filter(o => typeof o.id === 'string' && UUID_RE.test(o.id as string)), jobs.ok ? jobs.value.asOf : null);
   return new Response(sitemapXml(urls), {
     headers: { 'Content-Type': 'application/xml; charset=utf-8', 'Cache-Control': SITEMAP_CACHE, 'x-nuke-sitemap': status },
   });
@@ -613,7 +652,9 @@ export default async function middleware(request: Request): Promise<Response | u
         status: 500, headers: { 'Content-Type': 'application/json' },
       });
     }
-    const vehicle = await fetchVehicle(apiVehicleId);
+    const read = await fetchVehicle(apiVehicleId);
+    if (!read.ok) return upstreamUnavailable(read.status);
+    const vehicle = read.value;
     if (!vehicle) {
       return new Response(
         JSON.stringify({ error: 'Vehicle not found', message: 'Vehicle does not exist or is not public.' }),
@@ -682,12 +723,16 @@ export default async function middleware(request: Request): Promise<Response | u
   // Check if we can fetch from Supabase
   if (!SUPABASE_URL || !SUPABASE_KEY) return undefined;
 
-  const vehicle = await fetchVehicle(vehicleId);
+  const read = await fetchVehicle(vehicleId);
+  const accept = request.headers.get('Accept') || '';
+  const wantsJson = accept.includes('application/json') && !accept.includes('text/html');
+  // A JSON client is told the data store is down; a page request falls through to the app shell, which reads for itself.
+  if (!read.ok) return wantsJson ? upstreamUnavailable(read.status) : undefined;
+  const vehicle = read.value;
   if (!vehicle) return undefined;
 
   // ── Accept: application/json → return raw JSON ──
-  const accept = request.headers.get('Accept') || '';
-  if (accept.includes('application/json') && !accept.includes('text/html')) {
+  if (wantsJson) {
     return new Response(
       JSON.stringify({
         data: vehicle,

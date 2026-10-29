@@ -288,23 +288,9 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ overlayNode }) => {
               {!mediaKitActive && (
               <button
                 onClick={e => { e.stopPropagation(); setFitMode(m => m === 'cover' ? 'contain' : 'cover'); }}
-                style={{
-                  position: 'absolute',
-                  bottom: '10px',
-                  right: '10px',
-                  background: 'rgba(0,0,0,0.55)',
-                  color: 'var(--surface-elevated)',
-                  border: 'none', padding: '2px 6px',
-                  fontFamily: 'Arial, sans-serif',
-                  fontSize: '8px',
-                  fontWeight: 600,
-                  letterSpacing: '0.08em',
-                  textTransform: 'uppercase' as const,
-                  cursor: 'pointer',
-                  zIndex: 2,
-                  backdropFilter: 'blur(6px)',
-                  transition: 'border-color 180ms cubic-bezier(0.16, 1, 0.3, 1)',
-                }}
+                type="button"
+                className="vp-photo-fit"
+                aria-label={fitMode === 'cover' ? 'Fit whole photo' : 'Fill photo area'}
               >
                 {fitMode === 'cover' ? 'FIT' : 'FILL'}
               </button>
