@@ -23,7 +23,7 @@ Timings of the reads are printed; --max-seconds fails a read that takes longer.
 Exit 1 on a failed unit test or invariant, or on a year with flagged head rows (--report: exit 0 on findings alone).
 
   dotenvx run -- python3 scripts/books/books_large_sums_check.py --owner <uuid> [--years 2022 2023 2024 2025]
-      [--migration supabase/migrations/20261105140000_books_big_sum_rules.sql] [--expect 2024:1:ok ...] [--with-gate] [--report]
+      [--migration supabase/migrations/20261105160000_books_large_sums_tuning.sql] [--expect 2024:1:ok ...] [--with-gate] [--before-after] [--report]
 """
 import argparse
 import re
@@ -32,7 +32,8 @@ from decimal import Decimal
 
 from books_check_sql import money, run, uuid_ok, view_sql, with_substituted_views
 
-DEFAULT_MIGRATION = 'supabase/migrations/20261105140000_books_big_sum_rules.sql'
+DEFAULT_MIGRATION = 'supabase/migrations/20261105160000_books_large_sums_tuning.sql'
+VIEWS = ('v_books_direction_links', 'v_books_direction_checks', 'v_books_large_sums')
 FLAGS = ('filed_return_only', 'no_payment_proof', 'no_basis', 'missing_doc')
 FILED_ID = re.compile(r'RULING-(filed|Schedule C|car-basis)')
 FILED_REF = re.compile(r'owner ruling on the filed [0-9]{4} schedule c', re.I)
@@ -80,6 +81,8 @@ NUKE_COLS = {
     'receipts': 'id uuid, total numeric, total_amount numeric',
     'secure_documents': 'id uuid, document_type text, upload_metadata jsonb',
 }
+EXTRACTION_COLS = 'owner_id uuid, document_id uuid, field_key text, value_normalized jsonb, is_superseded boolean'
+DOCUMENT_COLS = 'id uuid, owner_id uuid, source_filename text'
 _n = [0]
 
 
@@ -216,6 +219,17 @@ DOCROWS = [  # (row, expected required_doc_kind, rule, missing_doc, expected doc
     (t('V-AMT-YES', 100, year='2097', cat=CAT_PARTS), 'receipt_or_order', 'parts_supplies', False, ['vehicle_documents'], 1),   # a vehicle document of the same amount is
     (t('V-TITLE-NOT-INVOICE', 100, year='2097', cat=CAT_LABOR), 'invoice_or_agreement', 'contractor', True, [], 0),    # the vehicle's title is not a labor invoice
     (t('V-SECURE', 100, year='2097', cat=CAT_DEAL), 'purchase_agreement', 'vehicle_deal', False, ['secure_documents'], 1),   # the owner's title scan names the vehicle
+    # rent: a stored R7 use group that names the decision documents it
+    (t('R-USEGROUP', 100, year='2097', cat=CAT_RENT), 'lease_or_ruling', 'rent', False, ['use_group'], 1),
+    (t('R-USEGROUP-FILED', 100, year='2097', cat=CAT_RENT, **FILED20), 'lease_or_ruling', 'rent', False, ['use_group'], 1),   # the group, not the filed ruling, is the basis
+    (t('R-SUPERSEDED', 100, year='2097', cat=CAT_RENT), 'lease_or_ruling', 'rent', True, [], 0),        # a superseded group counts for nothing
+    (t('R-OTHER-OWNER', 100, year='2097', cat=CAT_RENT), 'lease_or_ruling', 'rent', True, [], 0),       # a group of another owner counts for nothing
+    (t('R-STRING-DECISIONS', 100, year='2097', cat=CAT_RENT), 'lease_or_ruling', 'rent', True, [], 0),  # a cell whose decisions are not a list is skipped, not an error
+    (t('R-NOT-USE', 100, year='2097', cat=CAT_RENT), 'lease_or_ruling', 'rent', True, [], 0),           # an asset cell naming it is not a use group
+    (t('R-NO-CITES', 100, year='2097', cat=CAT_RENT), 'lease_or_ruling', 'rent', True, [], 0),          # a use cell without cites is not one R7 reads
+    (t('R-OTHER-FILE', 100, year='2097', cat=CAT_RENT), 'lease_or_ruling', 'rent', True, [], 0),        # a cell of another document is not the register inputs
+    (t('K-USEGROUP', 100, year='2097', cat=CAT_LABOR), 'invoice_or_agreement', 'contractor', True, [], 0),   # contractor rows stay strict even inside a use group
+    (t('P-USEGROUP', 100, year='2097', cat=CAT_PARTS), 'receipt_or_order', 'parts_supplies', True, [], 0),   # so do parts rows
 ]
 SYN_TIERS += [r[0] for r in DOCROWS]
 LINKED = {'V-LINKED-OK': 1, 'V-LINKED-LOW': 2, 'V-LINKED-TITLE': 3, 'V-LINKED-RETIRED': 4, 'V-IMG': 5, 'V-MANY': 6, 'V-AMT-NO': 8, 'V-AMT-YES': 9, 'V-TITLE-NOT-INVOICE': 3, 'V-SECURE': 10}
@@ -224,7 +238,26 @@ for local, vn in LINKED.items():                                          # the 
     SYN_RECS.append(v(local, 100, section='Expense', year='2097', rid_=_by_local[local]['id'], source_key='sk-' + local))
 SYN_REGISTER = [dict(owner_id=A, year='2097', local_id='D-REG', asset_id='asset-1', kind='claim'), dict(owner_id=A, year='2097', local_id='D-REG-PAID', asset_id='asset-2', kind='claim'),
                 dict(owner_id=A, year='2097', local_id='D-NOREG', asset_id='asset-9', kind='unclaimed')]          # an unclaimed line 13 row is not a register asset
-RCPT_LOW, RCPT_99, RCPT_MANY = uid(), uid(), [uid() for _ in range(7)]
+RCPT_LOW, RCPT_99, RCPT_MANY, DOC_REG_B = uid(), uid(), [uid() for _ in range(7)], uid()
+DOC_REG, DOC_OTHER = uid(), uid()
+def cell(owner, key, decisions, doc=DOC_REG, superseded=False, cites=True):
+    value = {'key': key, 'year': '2097', 'pct': 1.0, 'base': 1, 'desc': 'd', 'decisions': decisions}
+    if cites:
+        value['cites'] = {'pct': 'owner standing ruling: the shop rent is 100% business', 'base': 'lease', 'decisions': 'books decisions named here'}
+    return dict(owner_id=owner, document_id=doc, field_key=f'use:2097:{key}', value_normalized={'value': value}, is_superseded=superseded)
+
+
+SYN_DOCUMENTS = [dict(id=DOC_REG, owner_id=A, source_filename='books-register-inputs.txt'), dict(id=DOC_OTHER, owner_id=A, source_filename='other.txt'),
+                 dict(id=DOC_REG_B, owner_id=B, source_filename='books-register-inputs.txt')]
+SYN_EXTRACTIONS = [
+    cell(A, 'rent-x', ['R-USEGROUP', 'R-USEGROUP-FILED', 'K-USEGROUP', 'P-USEGROUP']),
+    cell(A, 'rent-old', ['R-SUPERSEDED'], superseded=True),
+    cell(B, 'rent-b', ['R-OTHER-OWNER'], doc=DOC_REG_B),
+    cell(A, 'rent-str', 'books decisions named here'),
+    dict(owner_id=A, document_id=DOC_REG, field_key='asset:x', value_normalized={'value': {'key': 'x', 'cites': {'pct': 'p'}, 'decisions': ['R-NOT-USE']}}, is_superseded=False),
+    cell(A, 'rent-nocites', ['R-NO-CITES'], cites=False),
+    cell(A, 'rent-otherfile', ['R-OTHER-FILE'], doc=DOC_OTHER),
+]
 SYN_NUKE = {
     'vehicle_documents': [dict(id=uid(), vehicle_id=VEH[vn], document_type='books_decision', file_url=f'nuke-books://{A}/sk-{local}', amount=None) for local, vn in LINKED.items()]
                          + [dict(id=uid(), vehicle_id=VEH[2], document_type='provenance_citation', file_url='x', amount=None),
@@ -255,6 +288,7 @@ def unit_test(migration_text):
     sources = {'v_books_audit_tiers': (TIER_COLS, SYN_TIERS), 'v_financial_accounting_records': (REC_COLS, SYN_RECS), 'v_books_category_rules': (RULE_COLS, SYN_RULES),
                'v_books_asset_register': (REGISTER_COLS, SYN_REGISTER)}
     sources.update({name: (NUKE_COLS[name], SYN_NUKE[name]) for name in NUKE_COLS})
+    sources.update({'financial_document_extractions': (EXTRACTION_COLS, SYN_EXTRACTIONS), 'financial_documents': (DOCUMENT_COLS, SYN_DOCUMENTS)})
     select = with_substituted_views(view_sql(migration_text, 'v_books_large_sums'), sources)
     sql = ("select coalesce(jsonb_agg(jsonb_build_object('kind', x.kind, 'owner', x.owner_id, 'year', x.year, 'id', x.local_id, 'rank', x.dollar_rank, 'tier', x.tier, "
            "'pay', x.pay_proof, 'basis', x.basis_strength, 'flag', x.proof_flag, 'head', x.in_head, 'usd', x.year_usd, 'cum', x.cum_share, 'share', x.share, "
@@ -461,7 +495,7 @@ def check_expect(rows, expects):
 def gate_agreement(owner, migration, years, found):
     print('-- books_year_gate against the views')
     qs = [(f'g{y}', f"select public.books_year_gate{'_pending' if migration else ''}('{owner}'::uuid, {int(y)})::text") for y in years]
-    res = run(qs, migration=migration, view_names=('v_books_large_sums', 'v_books_direction_checks'), with_gate=bool(migration), timeout='115s')
+    res = run(qs, migration=migration, view_names=VIEWS, with_gate=bool(migration), timeout='115s')
     for y in years:
         g = res[f'g{y}'][0]
         rules = {r['rule']: r for r in g['rules']}
@@ -480,6 +514,50 @@ def gate_agreement(owner, migration, years, found):
         ok('R11' in rules, f"{y} gate carries R11 ({rules.get('R11', {}).get('status')}) and R12 after R10, existing rules before them: {[x['rule'] for x in g['rules']][-4:]}")
 
 
+def before_after(owner, migration, years, limit=15):
+    """What the rule says now against what it said: the deployed view against this migration's, per year and by dollar rank."""
+    print('-- before and after: the deployed v_books_large_sums against the migration\'s')
+    ylist = ','.join("'" + y + "'" for y in years)
+    cols = 'year, dollar_rank, local_id, amount, tier, proof_flag, missing_doc, required_doc_kind, required_doc_rule, doc_found, in_head, year_usd'
+    q = ("select coalesce(jsonb_agg(to_jsonb(r)), '[]'::jsonb) from (select " + cols + " from public.v_books_large_sums where owner_id = '" + owner +
+         f"'::uuid and kind = 'deduction' and year in ({ylist})) r")
+    old = run([('rows', q)])['rows'][0]
+    new = run([('rows', q)], migration=migration, view_names=VIEWS)['rows'][0]
+    key = lambda r: (r['year'], r['local_id'])  # noqa: E731
+    oldm, newm = {key(r): r for r in old}, {key(r): r for r in new}
+    flag = lambda r: r['proof_flag'] or ('missing_doc' if r['missing_doc'] else None)  # noqa: E731
+    print(f"{'year':<5}{'flagged head rows before':>26}{'after':>26}   by flag before -> after")
+    for y in years:
+        row = []
+        for m in (oldm, newm):
+            head = [r for k, r in m.items() if k[0] == y and r['in_head']]
+            fl = [r for r in head if flag(r)]
+            by = {}
+            for r in fl:
+                by.setdefault(flag(r), []).append(abs(r['amount']))
+            row.append((len(fl), sum(abs(r['amount']) for r in fl), {k: (len(v), sum(v)) for k, v in by.items()}, len(head)))
+        fmt = lambda t: ', '.join(f"{k} {n} {money(d)}" for k, (n, d) in sorted(t.items()))  # noqa: E731
+        print(f"{y:<5}{str(row[0][0]) + ' ' + money(row[0][1]):>26}{str(row[1][0]) + ' ' + money(row[1][1]):>26}   {fmt(row[0][2])}  ->  {fmt(row[1][2])}")
+        miss = [sum(1 for r in m.values() if r['year'] == y and r['in_head'] and r['missing_doc']) for m in (oldm, newm)]
+        kinds = [{} for _ in (0, 1)]
+        for i, m in enumerate((oldm, newm)):
+            for r in m.values():
+                if r['year'] == y and r['in_head'] and r['missing_doc']:
+                    kinds[i][r['required_doc_kind']] = kinds[i].get(r['required_doc_kind'], 0) + 1
+        print(f"     head rows missing their document: {miss[0]} {dict(sorted(kinds[0].items()))} -> {miss[1]} {dict(sorted(kinds[1].items()))}")
+        print(f"     by dollar rank (flagged before or after, largest first; * = changed):")
+        rows = sorted((k for k in set(oldm) | set(newm) if k[0] == y and (flag(oldm.get(k, {'proof_flag': None, 'missing_doc': False})) or flag(newm.get(k, {'proof_flag': None, 'missing_doc': False})))),
+                      key=lambda k: (newm.get(k) or oldm.get(k))['dollar_rank'])
+        for k in rows[:limit]:
+            o, n = oldm.get(k), newm.get(k)
+            r = n or o
+            before, after = flag(o) if o else '-', flag(n) if n else '-'
+            print(f"     {r['dollar_rank']:>4} {k[1]:<42} {money(abs(r['amount'])):>11}  {r['required_doc_kind'] or '-':<21} {before or 'ok':<18} -> {after or 'ok':<18}{'  *' if before != after else ''}"
+                  + (f"  [{', '.join(sorted({f.get('source') for f in n['doc_found']}))}]" if n and n['doc_found'] and before != after else ''))
+        changed = [k for k in set(oldm) | set(newm) if k[0] == y and (flag(oldm.get(k)) if oldm.get(k) else None) != (flag(newm.get(k)) if newm.get(k) else None)]
+        print(f"     rows whose flag changed: {len(changed)}, dollars {money(sum(abs((newm.get(k) or oldm.get(k))['amount']) for k in changed))}")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--owner', required=True)
@@ -487,6 +565,7 @@ def main():
     ap.add_argument('--migration', help='try this migration file inside the rolled-back transaction (its views; with --with-gate also its gate)')
     ap.add_argument('--expect', nargs='*', default=[], metavar='YEAR:RANK:FLAG')
     ap.add_argument('--with-gate', action='store_true')
+    ap.add_argument('--before-after', action='store_true', help='print what R12 says now against the deployed view (needs --migration)')
     ap.add_argument('--max-seconds', type=float)
     ap.add_argument('--report', action='store_true', help='exit 0 when only the books have findings')
     a = ap.parse_args()
@@ -508,7 +587,7 @@ def main():
         # the shape the office page reads: one year, deductions, the head only
         ('page', f"select count(*) from public.v_books_large_sums where owner_id = '{owner}'::uuid and year = '{years[-1]}' and kind = 'deduction' and in_head"),
     ]
-    res = run(qs, migration=a.migration, view_names=('v_books_large_sums', 'v_books_direction_checks'))
+    res = run(qs, migration=a.migration, view_names=VIEWS)
     rows = res['rows'][0]
     tot = lambda name: {r['year']: (r['n'], r['usd']) for r in res[name][0]}  # noqa: E731
     tiers, rollup, revenue = tot('tiers'), tot('rollup'), tot('revenue')
@@ -522,6 +601,10 @@ def main():
     invariants(rows, tiers, rollup, revenue, years)
     found = findings_for(rows, years)
     check_expect(rows, a.expect)
+    if a.before_after:
+        if not a.migration:
+            sys.exit('--before-after needs --migration')
+        before_after(owner, a.migration, years)
     if a.with_gate:
         gate_agreement(owner, a.migration, years, found)
     print('books_large_sums:', 'PASS' if not problems and not findings else
