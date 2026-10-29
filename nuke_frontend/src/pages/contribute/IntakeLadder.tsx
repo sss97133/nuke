@@ -11,7 +11,7 @@ import React from 'react';
 import { day, Text } from '../../kit';
 import { arr, num, obj, str } from '../jobs/jobRead';
 
-export type Derivation = { reader: string; n: number; asOf: string; lotIds: string[]; interval: { low: number; high: number; level: string | null } | null };
+export type Derivation = { reader: string; n: number; asOf: string; lotIds: string[]; interval: { low: number; high: number; level: string | null } | string | null };
 export type Rung = {
   key: string; label: string; low: number | null; high: number | null; basis: string | null; reached: boolean;
   derivation: Derivation | null; tooFew: boolean; reasoning: string | null;
@@ -24,6 +24,7 @@ export type Progress = {
 };
 
 const readInterval = (v: unknown): Derivation['interval'] => {
+  if (typeof v === 'string') return v.trim() || null;
   const o = obj(v);
   if (o) { const low = num(o.low) ?? num(o.lo); const high = num(o.high) ?? num(o.hi); return low !== null && high !== null ? { low, high, level: str(o.level) ?? str(o.coverage) } : null; }
   const a = arr(v); const low = num(a[0]); const high = num(a[1]);
@@ -36,13 +37,21 @@ const readDerivation = (r: Record<string, unknown>): Derivation | null => {
   if (!reader || n === null || n <= 0 || !asOf || lotIds.length === 0) return null;
   return { reader, n, asOf, lotIds, interval: readInterval(r.interval) };
 };
+/** Reasoning as the writer gives it: a sentence, or {rule, result} (its inputs are the lots already shown). */
+const readReasoning = (v: unknown): string | null => {
+  const s = str(v); if (s) return s;
+  const o = obj(v); if (!o) return null;
+  return [str(o.rule), str(o.result)].filter(Boolean).join(' ') || null;
+};
 const readRung = (v: unknown, reached = false): Rung | null => {
   const r = obj(v); if (!r) return null;
   const key = str(r.key) ?? str(r.label); const label = str(r.label) ?? str(r.key);
   if (!key || !label) return null;
+  // The derivation lives in the rung's `band` block (reader, n, as_of, lot_ids, low, high) or, for older replies, on the rung itself.
+  const b = obj(r.band) ?? r;
   return {
-    key, label, low: num(r.band_low) ?? num(r.low), high: num(r.band_high) ?? num(r.high), basis: str(r.basis), reached: r.reached === true || reached,
-    derivation: readDerivation(r), tooFew: r.too_few_to_tell === true, reasoning: str(r.reasoning),
+    key, label, low: num(b.low) ?? num(r.band_low) ?? num(r.low), high: num(b.high) ?? num(r.band_high) ?? num(r.high), basis: str(r.basis), reached: r.reached === true || reached,
+    derivation: readDerivation(b), tooFew: b.too_few_to_tell === true || r.too_few_to_tell === true, reasoning: readReasoning(b.reasoning) ?? readReasoning(r.reasoning),
   };
 };
 const readItem = (v: unknown, status: string | null): Item | null => {
@@ -82,7 +91,7 @@ export const bandText = (r: Rung): string | null => r.tooFew ? 'too few to tell'
 /** "14 sold lots, market line, as of Oct 29, 2026" (+ the interval when the reader gives one). */
 export const derivationText = (d: Derivation): string => {
   const pretty = day(d.asOf); const when = pretty === 'unknown date' ? d.asOf : pretty;
-  const interval = d.interval ? `, ${d.interval.level ? `${d.interval.level} ` : ''}interval ${usd(d.interval.low)} to ${usd(d.interval.high)}` : '';
+  const interval = typeof d.interval === 'string' ? `, ${d.interval}` : d.interval ? `, ${d.interval.level ? `${d.interval.level} ` : ''}interval ${usd(d.interval.low)} to ${usd(d.interval.high)}` : '';
   return `${d.n.toLocaleString('en-US')} sold ${d.n === 1 ? 'lot' : 'lots'}, ${d.reader}, as of ${when}${interval}`;
 };
 
