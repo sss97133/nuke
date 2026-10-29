@@ -3443,3 +3443,58 @@ submission is recorded back on `listing_exports` (`submitted_at`, `external_list
    polishing session for the 11:23-15:44 gap.
 5. `generate-listing-package` + `dispatchChannel('bring_a_trailer')` produce a `listing_exports` row whose field map
    covers every decode/observe row in the table above; the worker fills the live BaT form to the reserve step and stops.
+
+## 18. "What will it bring": a valuation is four readers, not a comp list (owner, 2026-10-29)
+
+**Owner, 2026-10-29 (in substance), after the 10-28 Firebird was priced off 1970-73 BaT lots:** "You're not covering
+enough years. You should be doing all. Also track the Firebird market line, and then pull up comparable nut-and-bolt
+restos as a whole. This is the value of our system at play. We can even distill user commentary: a car like this whose
+main points are 'iconic style muscle car', 'nut and bolt rotisserie', 'Firebird, Trans Am clone'. And you should have
+analysed all the images so I'm not missing any documentation on the key parts that make these claims valid."
+
+### The case
+The 10-28 Firebird (§17) went to Bring a Trailer on the owner's claims: every part new, all Trans Am hardware but the
+VIN tag, a 455 built from numbers-correct SD-455 parts. Four readers were then run by hand against the ledger and the
+owner's frames. What each found is the design.
+
+| reader | what it read | what it returned |
+|---|---|---|
+| market line | Firebird/Trans Am, model years 1967-2002, five houses, sales 2018-2026: 2,387 priced lots, 1,800 sold | the all-Firebird median flat at $32-34k since 2022; 1970-73 the dear generation ($62.7k, n=121); real non-SD 1970-73 Trans Am $70.2k (n=33, 2024-26); SD-455 too few to tell (n=5) |
+| class | nut-and-bolt / rotisserie / body-off across all 1965-74 American muscle; clone / tribute / -Style across all makes | resto premium 1.51x (median of the ten biggest groups), Firebirds 1.96x (n=29 vs 279); clone discount 0.37-0.44x where n allows (Shelby, COPO); 27 lots both clone and resto since 2022, none a 1970-73 Firebird: no direct comp exists |
+| commentary | 8,545 comments on 80 BaT 1970-73 Firebird lots 2023-26, plus cross-make samples | honest, year-correct, photo-documented clones earn praise and a clone price; bids die on a title the VIN contradicts, on silent sellers, on engine claims that look faked; SD-455 claims are audited in a fixed order (VIN, block code, pad stamp, block date, distributor, carb, axle, trans tag, PHS, dyno); 323 video requests on 68 of 80 lots |
+| evidence audit | 340 of the owner's frames read by eye, 222 of the car, against each claim | the VIN stamp decodes to a base coupe born with the six; the block casting is a 1970 455, not the SD casting; the carburetor is a 2024 remanufactured unit; scale rust underneath; 17 frames missing, named in walk order |
+
+The number moved from "$55-75k with a documented SD engine" (five BaT comps) to "$35-45k as the frames show it today,
+$55-65k once the underside and every engine number are photographed" because the fourth reader put the car in a different
+class than the owner's words did. The first three readers set the rows; the fourth decides which row the car is in.
+
+### The rule
+A price question about a vehicle in the ledger runs all four readers, in this order, and writes to the vehicle's case
+folder, not to chat:
+1. **Market line.** The model across every model year and every house, by sale year and generation, like-for-like
+   within class (§13 rule: never headline a raw median move; "too few to tell" under n = 8).
+2. **Class.** The car's build class across makes (nut-and-bolt, restomod, clone/tribute, survivor), premium or discount
+   against stock siblings of the same make, model and year band, n on both sides, and the intersection of its classes.
+3. **Commentary.** The comment record for the model and the class, distilled to what moves bids, what kills them, and the
+   verification order buyers run; each finding with its count and one short quote keyed to the lot.
+4. **Evidence audit.** Every frame the owner holds, read against every claim the listing will make, returning supported /
+   contradicted / missing per claim and the shot list. The listing copy is written from this reader, not from the owner.
+
+### What the system has and lacks
+- `compute-vehicle-valuation` selects comps on make, canonical model and year ±5 from `clean_vehicle_prices`, and derives
+  a build class (restomod / project / survivor) from `vehicle_condition_scores.descriptor_summary`. It has no market line
+  by sale year, no class premium from the ledger, no commentary reader, and no evidence audit; the owner's claims enter
+  as the vehicle's fields.
+- `auction_comments` holds the record (columns for sentiment, expertise, claims, question categories) and `auction_events`
+  holds every house; the readers above are SQL over them plus the frames. The listing package (§17) should carry the
+  four readers' outputs so the BaT description is written from evidence tiers, with every claim's frame id beside it.
+- Data notes from the run: Mecum canonical URLs end in '/', so a trailing-slash dedupe drops Mecum (dedupe on a
+  normalized URL); Mecum 2018-22 rows carry no prices; Barrett-Jackson holds sold lots only, and its 2007-2020 dockets
+  carry the scrape date as `auction_end_date` (#2881); two B-J 1973 Firebird dockets are labelled "Grand Prix".
+
+### Acceptance
+1. For the 10-28 Firebird, the four readers' outputs exist on the profile (market line, class, commentary, evidence
+   audit) and the listing package's description cites a frame id for every claim; claims without a frame are listed as
+   "needs a frame", never asserted.
+2. A new price question on any vehicle in the ledger returns the four sections with denominators and dates, or says which
+   reader had too little to tell.
