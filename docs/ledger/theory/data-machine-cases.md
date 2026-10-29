@@ -3498,3 +3498,42 @@ folder, not to chat:
    "needs a frame", never asserted.
 2. A new price question on any vehicle in the ledger returns the four sections with denominators and dates, or says which
    reader had too little to tell.
+
+## 19. The builder is a contributor without an account (owner, 2026-10-29)
+
+**Owner, 2026-10-29 (in substance):** "I want a better presentation of this, tied to the vehicle profile. This is exactly
+the purpose of our system. It is a lot to answer, and if he has any documentation he had best upload first so we can
+re-evaluate and ask questions that are more relevant. Think desktop and mobile, because he will receive this by text."
+
+### The case
+The 10-28 Firebird's builder holds the facts the listing needs (what went into the 1970 455 block, who did the
+machine work, the title history) and the paper that proves them. He is not a Nuke user, will not make an account, and
+receives links by text. The first draft was a fifty-question sheet. The owner's correction: documents first, then only
+the questions the documents leave open; the page is the vehicle's own intake, not a form.
+
+### The rule
+A vehicle profile has a **contributor intake**: a share link the owner sends by text. It opens with no account, on a
+phone, and shows the car's identity card (what the frames already prove, what is still unknown), then three steps:
+1. **Send documents first.** Photos of receipts, invoices, cam cards, dyno sheets, build photos, purchase papers. Each
+   lands on the profile as a document frame attributed to the contributor (ingest kind contributor_upload), goes through
+   the document reader (§17), and the unknowns list shrinks.
+2. **A short first round**, at most eight questions, chosen by what changes the number for this car (§18 readers decide
+   the order). Answers land as testimony rows with the contributor as source and the owner as recorder when the owner
+   types them on a call.
+3. **A second round generated after the documents are read**, asking only what is still open.
+The relationship (builder, previous owner, shop, appraiser) is recorded on every row; the listing package (§17) cites
+the contributor by name on each fact they supplied. The owner can do all of this on the contributor's behalf from the
+same page while on the phone with them.
+
+### What exists and what does not
+- Document frames, the document reader, attribute_testimony and work_sessions testimony exist for the owner's own
+  captures. There is no contributor identity without an auth user, no share-link intake, and no "unknowns" reader that
+  turns the §18 evidence audit into a question list.
+- Stopgap used on 2026-10-29 while the API was restricted: a published page outside Nuke (owner writes, builder reads).
+  It is not the product; it is the spec's sketch.
+
+### Acceptance
+1. The owner sends one link by text; the builder opens it on a phone with no account and sees the car, the three steps and
+   the eight questions.
+2. A receipt photo he sends lands on the profile attributed to him, and the next open of the page shows one fewer unknown.
+3. The BaT package cites him by name on every fact he supplied, with the frame id of his document beside it.
