@@ -344,7 +344,7 @@ function buildSections(vehicles: GarageVehicle[]): GarageSection[] {
 // Vehicle select columns (only columns that exist on the vehicles table)
 // ---------------------------------------------------------------------------
 
-const VEHICLE_SELECT = 'id, year, make, model, normalized_model, trim, vin, purchase_price, primary_image_url, image_count, confidence_score, heat_score, view_count, created_at, updated_at, status';
+const VEHICLE_SELECT = 'id, year, make, model, normalized_model, trim, vin, primary_image_url, image_count, confidence_score, heat_score, view_count, created_at, updated_at, status';
 
 const VISIBLE_STATUSES = new Set(['active', 'pending', 'discovered', 'pending_backfill']);
 
@@ -356,7 +356,6 @@ interface VehicleRow {
   normalized_model?: string | null;
   trim: string | null;
   vin: string | null;
-  purchase_price: number | null;
   primary_image_url: string | null;
   image_count: number | null;
   confidence_score: number | null;
@@ -388,7 +387,8 @@ function rowToGarageVehicle(
     primary_image_url: row.primary_image_url,
     resolved_image_url: row.primary_image_url || fallback_image_url || null,
     estimated_value,
-    purchase_price: row.purchase_price,
+    // Direct purchase-price access is private; use an attributed cost reader when available.
+    purchase_price: null,
     // Vehicle-level purchase price is not an attributed ownership-period cost.
     value_delta: null,
     // Data confidence does not describe the vehicle's mechanical condition.
