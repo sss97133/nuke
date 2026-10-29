@@ -260,10 +260,11 @@ def document_state(owner, doc_id):
 
 
 def correct(path, dry):
-    """corrections file: {"owner_id", "rows": {"<local_id>": {"document_id", "section"?, "category"?, "amount"?, "ruling_id"?, "proof_links"?: [{kind, ref}], "note"?, "add_bank_links"?: [ids], "set_bank_links"?: [ids]}}}
+    """corrections file: {"owner_id", "rows": {"<local_id>": {"document_id", "section"?, "category"?, "amount"?, "ruling_id"?, "proof_links"?: [{kind, ref}], "note"?, "status"?, "caveat"?, "add_bank_links"?: [ids], "set_bank_links"?: [ids]}}}
     ruling_id and proof_links are stored as structured keys on the record (R5 grade R needs both); proof_links merge, deduped.
     section and category change only when given (a movement may take a new section). set_bank_links replaces the row's bank_links; add_bank_links appends to the row's bank_links, deduped,
-    and puts a dated note in its decision. Amounts change only when "amount" is given."""
+    and puts a dated note in its decision. Amounts change only when "amount" is given. "status" re-states a stale status (the old one is kept in the decision text);
+    "caveat" appends a dated caveat to the decision without changing the row. A decision that would pass 1990 characters stops the run instead of being cut."""
     spec = json.load(open(path))
     owner = uuid_ok(spec['owner_id'])
     by_doc = collections.defaultdict(dict)
@@ -289,6 +290,13 @@ def correct(path, dry):
                 r['category'] = clip(c['category'], 300)
             if c.get('ruling_id'):
                 r['ruling_id'] = str(c['ruling_id'])[:200]
+            if c.get('status') is not None and c['status'] != r.get('status'):
+                # re-state a status that a later ruling made stale; the old status stays in the decision text
+                parts.append(f"Status re-stated {VERSION}" + (f" by {c['ruling_id']}" if c.get('ruling_id') else '')
+                             + f" (was: {r.get('status')})" + (f": {c['note']}" if c.get('note') and not (c.get('section') or c.get('category')) else ''))
+                r['status'] = clip(c['status'], 300)
+            if c.get('caveat'):
+                parts.append(f"Caveat {VERSION}: {c['caveat']}")
             if c.get('proof_links'):
                 r['proof_links'] = proof_links((r.get('proof_links') or []) + list(c['proof_links']))
             if c.get('set_bank_links') is not None:
@@ -303,7 +311,10 @@ def correct(path, dry):
                 r['bank_links'] = list(dict.fromkeys((r.get('bank_links') or []) + add))
                 parts.append(f"Links added {VERSION}: {', '.join(add)}" + (f" ({c['note']})" if c.get('note') and not (c.get('section') or c.get('category')) else ''))
             if parts:
-                r['decision'] = clip(f"{r.get('decision') or ''} | {' '.join(parts)}".lstrip(' |'), 1990)
+                full = f"{r.get('decision') or ''} | {' '.join(parts)}".lstrip(' |')
+                if len(full) > 1990:
+                    raise SystemExit(f"{r['local_id']}: decision would be {len(full)} characters (limit 1990); shorten the note")
+                r['decision'] = full
         missing = set(rows) - seen
         if missing:
             raise SystemExit(f'{doc_id}: rows not in the current revision: {sorted(missing)}')
