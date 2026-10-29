@@ -226,8 +226,10 @@ export async function handle(req: Request, deps: Deps): Promise<Out> {
   const opened = await deps.rpc("contributor_intake_open", { p_token: token, p_device: { ...device, purpose: "file" } });
   if (isTokenRefusal(opened.data, opened.error)) return notFound();
   if (opened.error) return { status: 500, body: { error: "open_failed" } };
-  const inv = (opened.data as JsonObject).invite;
-  const inviteId = inv && typeof inv === "object" && !Array.isArray(inv) && typeof inv.id === "string" ? inv.id : null;
+  const od = opened.data as JsonObject;
+  const inv = od.invite;
+  const inviteId = typeof od.invite_id === "string" ? od.invite_id
+    : inv && typeof inv === "object" && !Array.isArray(inv) && typeof inv.id === "string" ? inv.id : null;
   if (!inviteId) return { status: 500, body: { error: "invite_unresolved" } };
 
   const bytes = new Uint8Array(await file.arrayBuffer());
