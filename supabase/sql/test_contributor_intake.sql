@@ -94,6 +94,8 @@ GRANT USAGE ON SCHEMA public, auth TO anon, authenticated, service_role;
 
 \ir ../migrations/20261105090000_contributor_intake.sql
 \ir ../migrations/20261105090000_contributor_intake.sql
+\ir ../migrations/20261105110000_contributor_intake_actor.sql
+\ir ../migrations/20261105110000_contributor_intake_actor.sql
 
 -- Fixtures: an owner, an editor, a stranger, one vehicle with one prior specification fact.
 INSERT INTO auth.users VALUES ('00000000-0000-0000-0000-00000000000a'), ('00000000-0000-0000-0000-00000000000b'),
@@ -117,12 +119,13 @@ SELECT pg_temp.ok('anon cannot execute ' || f, NOT has_function_privilege('anon'
     'public.contributor_intake_file(text,jsonb)']) f;
 SELECT pg_temp.ok('anon cannot execute ' || f, NOT has_function_privilege('anon', f, 'EXECUTE')),
        pg_temp.ok('authenticated can execute ' || f, has_function_privilege('authenticated', f, 'EXECUTE'))
-  FROM unnest(ARRAY['public.create_contributor_invite(uuid,text,text,text,integer)',
-    'public.set_contributor_intake_questions(uuid,jsonb)', 'public.get_contributor_intake(uuid)',
-    'public.revoke_contributor_invite(uuid)']) f;
+  FROM unnest(ARRAY['public.create_contributor_invite(uuid,text,text,text,integer,uuid)',
+    'public.set_contributor_intake_questions(uuid,jsonb,uuid)', 'public.get_contributor_intake(uuid,uuid)',
+    'public.revoke_contributor_invite(uuid,uuid)']) f;
 SELECT pg_temp.ok('internal helper closed: ' || f, NOT has_function_privilege('anon', f, 'EXECUTE')
     AND NOT has_function_privilege('authenticated', f, 'EXECUTE'))
-  FROM unnest(ARRAY['public.contributor_intake_can_manage(uuid,uuid)', 'public.contributor_intake_invite_for_token(text)']) f;
+  FROM unnest(ARRAY['public.contributor_intake_can_manage(uuid,uuid)', 'public.contributor_intake_invite_for_token(text)',
+    'public.contributor_intake_actor(uuid)']) f;
 SELECT pg_temp.ok('every writer is SECURITY DEFINER with a pinned search_path',
   (SELECT bool_and(p.prosecdef AND p.proconfig::text LIKE '%search_path=public%') FROM pg_proc p
     WHERE p.proname IN ('create_contributor_invite', 'contributor_intake_open', 'contributor_intake_answer',
@@ -318,3 +321,40 @@ SELECT pg_temp.ok('the reopened card counts documents and shows the answer',
   ((public.contributor_intake_open(inv.r ->> 'token', dev.d)) ->> 'documents_count')::int = 4
   AND (public.contributor_intake_open(inv.r ->> 'token', dev.d)) #>> '{questions,0,answer}' = 'Built it in 2018, not 2019.')
   FROM inv, dev;
+
+-- An agent holding the service role acts for the owner; never for a stranger; never without the service role.
+RESET test.auth_uid;
+SELECT pg_temp.ok('the old single-actor signatures are gone', NOT EXISTS (SELECT 1 FROM pg_proc p
+  WHERE p.pronamespace = 'public'::regnamespace AND (p.proname, pg_get_function_identity_arguments(p.oid)) IN
+    (('create_contributor_invite', 'p_vehicle_id uuid, p_display_name text, p_relationship text, p_phone text, p_expires_days integer'),
+     ('set_contributor_intake_questions', 'p_vehicle_id uuid, p_questions jsonb'),
+     ('get_contributor_intake', 'p_vehicle_id uuid'), ('revoke_contributor_invite', 'p_invite_id uuid'))));
+SELECT pg_temp.ok('without a session or the service role, acting-as is refused', pg_temp.raises(
+  $q$SELECT public.create_contributor_invite('10000000-0000-0000-0000-000000000001', 'Agent Invite', 'shop', NULL, 30,
+    '00000000-0000-0000-0000-00000000000a')$q$));
+SET request.jwt.claims = '{"role":"service_role"}';
+SELECT pg_temp.ok('the service role cannot act for a stranger', pg_temp.raises(
+  $q$SELECT public.create_contributor_invite('10000000-0000-0000-0000-000000000001', 'Agent Invite', 'shop', NULL, 30,
+    '00000000-0000-0000-0000-00000000000c')$q$));
+SELECT pg_temp.ok('the service role with no acting-as is refused', pg_temp.raises(
+  $q$SELECT public.set_contributor_intake_questions('10000000-0000-0000-0000-000000000001', '[]')$q$));
+CREATE TEMP TABLE inv_agent AS SELECT public.create_contributor_invite('10000000-0000-0000-0000-000000000001', 'Agent Invite',
+  'shop', NULL, 30, '00000000-0000-0000-0000-00000000000a') AS r;
+GRANT ALL ON inv_agent TO PUBLIC;
+SELECT pg_temp.ok('the service role acting for the owner mints a link recorded as the owner', (r ->> 'token') ~ '^[0-9a-f]{64}$'
+  AND (SELECT created_by FROM public.vehicle_contributor_invites WHERE id = (r ->> 'invite_id')::uuid)
+      = '00000000-0000-0000-0000-00000000000a') FROM inv_agent;
+SELECT pg_temp.ok('the service role acting for the owner seeds questions',
+  (public.set_contributor_intake_questions('10000000-0000-0000-0000-000000000001',
+    '[{"key":"agent_q","prompt":"Seeded by an agent"}]', '00000000-0000-0000-0000-00000000000a') ->> 'upserted') = '1');
+SELECT pg_temp.ok('the seeded question records the owner, not the agent',
+  (SELECT created_by FROM public.contributor_intake_questions WHERE key = 'agent_q') = '00000000-0000-0000-0000-00000000000a');
+SELECT pg_temp.ok('the service role acting for the owner reads the intake',
+  jsonb_array_length(public.get_contributor_intake('10000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-00000000000a') -> 'invites') >= 2);
+SELECT pg_temp.ok('the service role acting for the owner revokes',
+  (public.revoke_contributor_invite((r ->> 'invite_id')::uuid, '00000000-0000-0000-0000-00000000000a') ->> 'revoked')::boolean) FROM inv_agent;
+SET test.auth_uid = '00000000-0000-0000-0000-00000000000c';
+SELECT pg_temp.ok('a signed-in stranger cannot borrow the owner through acting-as even with the service role claim', pg_temp.raises(
+  $q$SELECT public.get_contributor_intake('10000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-00000000000a')$q$));
+RESET test.auth_uid;
+RESET request.jwt.claims;
