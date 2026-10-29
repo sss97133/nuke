@@ -523,14 +523,11 @@ enum SupabaseService {
         // image_url column is NOT NULL in prod; "" passes the url_scheme check),
         // and ai_processing_status='skipped' so the INSERT trigger / orchestrator
         // queue (which require 'pending' AND a non-null image_url) skip it.
-        var imageURL = ""
-        var storagePath: String? = nil
         var fileHash: String? = nil
-        var status = "skipped"
 
         if uploadPixels {
             // SHA-256 of the bytes, lowercase hex: it names the object, so it comes first.
-            let hash = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+            let hash = sha256Hex(data)
             let path = Config.storagePath(userId: userId, sha256: hash, filename: meta.filename)
             do {
                 try await client.storage
@@ -542,30 +539,50 @@ enum SupabaseService {
                 let msg = String(describing: error).lowercased()
                 guard msg.contains("already exists") || msg.contains("duplicate") else { throw error }
             }
-
-            imageURL = try client.storage
-                .from(Config.storageBucket)
-                .getPublicURL(path: path).absoluteString
-            storagePath = path
             fileHash = hash
-            status = "pending"
         }
 
-        let row = VehicleImageRow(
+        let row = try buildImageRow(meta: meta, userId: userId, byteCount: data.count,
+                                    sha256: fileHash, appleMLLabels: appleMLLabels)
+        try await insertImageRow(row)
+        // Operational byte acknowledgement only. The subject reader still resolves an exact,
+        // current own image row and its privacy gate before requesting any visual analysis.
+        return fileHash
+    }
+
+    nonisolated static func sha256Hex(_ data: Data) -> String {
+        SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+    }
+
+    /// The vehicle_images row for one photo. With `sha256` the row names the object the bytes will
+    /// (or did) land on and enters the analysis pipeline ('pending'); without it the row is the
+    /// metadata-only alibi ('skipped', empty URL sentinel). One builder for the inline path and the
+    /// background queue, so both insert the same shape.
+    static func buildImageRow(meta: PhotoMeta, userId: String, byteCount: Int, sha256: String?,
+                              appleMLLabels: [String]) throws -> VehicleImageRow {
+        let mime = mimeType(forFilename: meta.filename)
+        var imageURL = ""
+        var storagePath: String? = nil
+        if let sha256 {
+            let path = Config.storagePath(userId: userId, sha256: sha256, filename: meta.filename)
+            imageURL = try client.storage.from(Config.storageBucket).getPublicURL(path: path).absoluteString
+            storagePath = path
+        }
+        return VehicleImageRow(
             image_url: imageURL,
             storage_path: storagePath,
             source: Config.sourceTag,
             mime_type: mime,
             file_name: meta.filename,
-            file_size: data.count,
+            file_size: byteCount,
             is_external: false,
-            ai_processing_status: status,
+            ai_processing_status: sha256 == nil ? "skipped" : "pending",
             user_id: userId,
             documented_by_user_id: userId,
             latitude: meta.latitude,
             longitude: meta.longitude,
             taken_at: (meta.exifCaptureDate ?? meta.creationDate).map { isoFormatter.string(from: $0) },
-            file_hash: fileHash,
+            file_hash: sha256,
             apple_ml_labels: appleMLLabels.isEmpty ? nil : appleMLLabels,
             exif_data: .init(
                 uuid: meta.assetIdentifier,
@@ -577,18 +594,52 @@ enum SupabaseService {
                 owner_verified: meta.cameraMake == "Apple"
             )
         )
+    }
 
+    /// Insert one row. A duplicate (unique constraint) counts as success — parity with the daemon.
+    static func insertImageRow(_ row: VehicleImageRow) async throws {
         do {
             try await client.from("vehicle_images").insert(row).execute()
         } catch {
-            // Duplicate row (unique constraint) counts as success — parity
-            // with the daemon's dup handling.
             let msg = String(describing: error).lowercased()
             guard msg.contains("duplicate") || msg.contains("unique") else { throw error }
         }
-        // Operational byte acknowledgement only. The subject reader still resolves an exact,
-        // current own image row and its privacy gate before requesting any visual analysis.
-        return fileHash
+    }
+
+    /// The same insert from a row staged as JSON by the upload queue (a relaunch inserts it without
+    /// rebuilding anything).
+    static func insertImageRow(encoded: Data) async throws {
+        let value = try JSONDecoder().decode(AnyJSON.self, from: encoded)
+        do {
+            try await client.from("vehicle_images").insert(value).execute()
+        } catch {
+            let msg = String(describing: error).lowercased()
+            guard msg.contains("duplicate") || msg.contains("unique") else { throw error }
+        }
+    }
+
+    /// The signed-in session's access token, refreshed by the SDK when expired; nil when signed out.
+    static func accessToken() async -> String? {
+        #if DEBUG
+        if FixtureBackend.isActive { return "fixture-token" }
+        #endif
+        return try? await client.auth.session.accessToken
+    }
+
+    /// The storage REST request a background URLSession can carry: the same object write the SDK
+    /// makes (`POST /storage/v1/object/<bucket>/<path>`, no upsert), under the user's JWT. Public by
+    /// design: bucket paths are per-user and RLS-scoped; the publishable key ships in every client.
+    nonisolated static func storageUploadRequest(path: String, mimeType: String, accessToken: String) -> URLRequest {
+        var url = Config.supabaseURL
+        url.append(path: "storage/v1/object/\(Config.storageBucket)/\(path)")
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        request.setValue(Config.supabaseAnonKey, forHTTPHeaderField: "apikey")
+        request.setValue(mimeType, forHTTPHeaderField: "Content-Type")
+        request.setValue("false", forHTTPHeaderField: "x-upsert")
+        request.setValue("3600", forHTTPHeaderField: "cache-control")
+        return request
     }
 }
 
