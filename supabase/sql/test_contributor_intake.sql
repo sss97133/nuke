@@ -38,7 +38,16 @@ CREATE TYPE public.observation_kind AS ENUM ('listing', 'sale_result', 'comment'
 CREATE TYPE public.source_category AS ENUM ('auction', 'owner', 'documentation', 'internal');
 CREATE TABLE public.profiles (id uuid PRIMARY KEY);
 CREATE TABLE public.vehicles (id uuid PRIMARY KEY, user_id uuid, year int, make text, model text, vin text, color text,
-  body_style text, transmission text, origin_metadata jsonb, is_public boolean DEFAULT true);
+  body_style text, transmission text, origin_metadata jsonb, is_public boolean DEFAULT true,
+  bat_listing_title text, listing_title text, trim text, description text, deleted_at timestamptz, merged_into_vehicle_id uuid);
+-- The sold-lot population the ladder's band reader draws on (20261105130000), shaped as the live columns it reads.
+CREATE TABLE public.auction_events (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid REFERENCES public.vehicles(id),
+  source text, source_url text, outcome text, auction_end_date timestamptz, hammer_price numeric, gross_price numeric,
+  net_to_owner numeric);
+CREATE TABLE public.vehicle_events (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid, source_url text, sale_outcome text);
+CREATE FUNCTION public.auction_event_typed_not_sold(p_vehicle_id uuid, p_url text) RETURNS boolean LANGUAGE sql STABLE AS $$
+  SELECT p_url IS NOT NULL AND EXISTS (SELECT 1 FROM public.vehicle_events ve WHERE ve.vehicle_id = p_vehicle_id
+    AND rtrim(ve.source_url, '/') = rtrim(p_url, '/') AND ve.sale_outcome IS NOT NULL AND ve.sale_outcome NOT IN ('sold', 'unknown')) $$;
 CREATE TABLE public.vehicle_contributors (id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   vehicle_id uuid NOT NULL REFERENCES public.vehicles(id), user_id uuid NOT NULL REFERENCES public.profiles(id),
   role text NOT NULL, end_date date, status text DEFAULT 'active', can_edit boolean DEFAULT true);
@@ -115,6 +124,53 @@ INSERT INTO public.vehicles (id, user_id, year, make, model, vin, color) VALUES
   ('20d21fb0-4651-4469-a0ba-e751309a1e54', '0b9f107a-d124-49de-9ded-94698f63c1c4', 1973, 'Pontiac', 'Firebird', '2S87D3N143591', 'red');
 \ir ../migrations/20261105120000_contributor_intake_ladder.sql
 \ir ../migrations/20261105120000_contributor_intake_ladder.sql
+\ir ../migrations/20261105130000_contributor_intake_ladder_derived.sql
+\ir ../migrations/20261105130000_contributor_intake_ladder_derived.sql
+-- Sold lots the band reader classes: six base, six Trans Am, two SD (under the floor), one clone, one typed not-sold,
+-- one before the period, one deleted vehicle, one gross-only price. Ids are fixed so the reply's lot_ids can be checked.
+INSERT INTO public.vehicles (id, year, make, model, bat_listing_title, description, deleted_at) VALUES
+  ('a0000000-0000-0000-0000-000000000001', 1972, 'Pontiac', 'Firebird', '455-Powered 1972 Pontiac Firebird', 'Esprit with a 455 swap', NULL),
+  ('a0000000-0000-0000-0000-000000000002', 1971, 'Pontiac', 'Firebird', '1971 Pontiac Firebird Formula 400', NULL, NULL),
+  ('a0000000-0000-0000-0000-000000000003', 1973, 'Pontiac', 'Firebird', '1973 Pontiac Firebird Esprit', NULL, NULL),
+  ('a0000000-0000-0000-0000-000000000004', 1970, 'Pontiac', 'Firebird', '1970 Pontiac Firebird', NULL, NULL),
+  ('a0000000-0000-0000-0000-000000000005', 1972, 'Pontiac', 'Firebird', '1972 Pontiac Firebird 350', NULL, NULL),
+  ('a0000000-0000-0000-0000-000000000006', 1973, 'Pontiac', 'Firebird', '1973 Pontiac Firebird Formula 455', NULL, NULL),
+  ('a0000000-0000-0000-0000-000000000011', 1973, 'Pontiac', 'Firebird Trans Am', '1973 Pontiac Firebird Trans Am 455', NULL, NULL),
+  ('a0000000-0000-0000-0000-000000000012', 1972, 'Pontiac', 'Firebird', '1972 Pontiac Trans Am 4-Speed', NULL, NULL),
+  ('a0000000-0000-0000-0000-000000000013', 1971, 'Pontiac', 'Firebird Trans Am', '1971 Pontiac Firebird Trans Am', NULL, NULL),
+  ('a0000000-0000-0000-0000-000000000014', 1970, 'Pontiac', 'Firebird', '1970 Pontiac Trans Am Ram Air III', NULL, NULL),
+  ('a0000000-0000-0000-0000-000000000015', 1973, 'Pontiac', 'Firebird', '1973 Pontiac Firebird', 'A real Trans Am with its PHS documents', NULL),
+  ('a0000000-0000-0000-0000-000000000016', 1973, 'Pontiac', 'Firebird Trans Am', '1973 Pontiac Firebird Trans Am', NULL, NULL),
+  ('a0000000-0000-0000-0000-000000000021', 1973, 'Pontiac', 'Firebird Trans Am', '1973 Pontiac Trans Am SD-455', NULL, NULL),
+  ('a0000000-0000-0000-0000-000000000022', 1973, 'Pontiac', 'Firebird', '1973 Pontiac Firebird Trans Am Super Duty', NULL, NULL),
+  ('a0000000-0000-0000-0000-000000000031', 1973, 'Pontiac', 'Firebird', '1973 Pontiac Firebird Trans Am Clone', NULL, NULL),
+  ('a0000000-0000-0000-0000-000000000041', 1972, 'Pontiac', 'Firebird', '1972 Pontiac Firebird', NULL, NULL),
+  ('a0000000-0000-0000-0000-000000000042', 1972, 'Pontiac', 'Firebird', '1972 Pontiac Firebird', NULL, NULL),
+  ('a0000000-0000-0000-0000-000000000043', 1972, 'Pontiac', 'Firebird', '1972 Pontiac Firebird', NULL, now()),
+  ('a0000000-0000-0000-0000-000000000044', 1972, 'Pontiac', 'Firebird', '1972 Pontiac Firebird', NULL, NULL);
+INSERT INTO public.auction_events (id, vehicle_id, source, source_url, outcome, auction_end_date, hammer_price, gross_price) VALUES
+  ('b0000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001', 'bat', 'https://x/1', 'sold', '2025-06-01', 30000, 33000),
+  ('b0000000-0000-0000-0000-000000000002', 'a0000000-0000-0000-0000-000000000002', 'bat', 'https://x/2', 'sold', '2025-05-01', 34000, 37400),
+  ('b0000000-0000-0000-0000-000000000003', 'a0000000-0000-0000-0000-000000000003', 'mecum', 'https://x/3/', 'sold', '2025-04-01', 38000, 41800),
+  ('b0000000-0000-0000-0000-000000000004', 'a0000000-0000-0000-0000-000000000004', 'bat', 'https://x/4', 'sold', '2024-06-01', 42000, 46200),
+  ('b0000000-0000-0000-0000-000000000005', 'a0000000-0000-0000-0000-000000000005', 'bat', 'https://x/5', 'sold', '2024-03-01', 26000, 28600),
+  ('b0000000-0000-0000-0000-000000000006', 'a0000000-0000-0000-0000-000000000006', 'barrett-jackson', 'https://x/6', 'sold', '2023-01-01', 50000, 55000),
+  ('b0000000-0000-0000-0000-000000000011', 'a0000000-0000-0000-0000-000000000011', 'bat', 'https://x/11', 'sold', '2025-07-01', 60000, 66000),
+  ('b0000000-0000-0000-0000-000000000012', 'a0000000-0000-0000-0000-000000000012', 'bat', 'https://x/12', 'sold', '2025-02-01', 70000, 77000),
+  ('b0000000-0000-0000-0000-000000000013', 'a0000000-0000-0000-0000-000000000013', 'mecum', 'https://x/13/', 'sold', '2024-09-01', 80000, 88000),
+  ('b0000000-0000-0000-0000-000000000014', 'a0000000-0000-0000-0000-000000000014', 'bat', 'https://x/14', 'sold', '2024-01-01', 90000, 99000),
+  ('b0000000-0000-0000-0000-000000000015', 'a0000000-0000-0000-0000-000000000015', 'bat', 'https://x/15', 'sold', '2023-06-01', 55000, 60500),
+  ('b0000000-0000-0000-0000-000000000016', 'a0000000-0000-0000-0000-000000000016', 'bat', 'https://x/16', 'sold', '2022-06-01', 65000, 71500),
+  ('b0000000-0000-0000-0000-000000000021', 'a0000000-0000-0000-0000-000000000021', 'mecum', 'https://x/21/', 'sold', '2025-05-15', 145000, 159500),
+  ('b0000000-0000-0000-0000-000000000022', 'a0000000-0000-0000-0000-000000000022', 'bat', 'https://x/22', 'sold', '2024-05-15', 120000, 132000),
+  ('b0000000-0000-0000-0000-000000000031', 'a0000000-0000-0000-0000-000000000031', 'bat', 'https://x/31', 'sold', '2025-03-01', 60000, 66000),
+  ('b0000000-0000-0000-0000-000000000041', 'a0000000-0000-0000-0000-000000000041', 'bat', 'https://x/41', 'sold', '2025-03-02', 99999, 109999),
+  ('b0000000-0000-0000-0000-000000000042', 'a0000000-0000-0000-0000-000000000042', 'bat', 'https://x/42', 'sold', '2019-03-02', 1000, 1100),
+  ('b0000000-0000-0000-0000-000000000043', 'a0000000-0000-0000-0000-000000000043', 'bat', 'https://x/43', 'sold', '2025-03-03', 1000, 1100),
+  ('b0000000-0000-0000-0000-000000000044', 'a0000000-0000-0000-0000-000000000044', 'bat', 'https://x/44', 'sold', '2025-03-04', NULL, 1100),
+  ('b0000000-0000-0000-0000-000000000045', 'a0000000-0000-0000-0000-000000000001', 'bat', 'https://x/45', 'bid_to', '2025-08-01', 90000, 99000);
+INSERT INTO public.vehicle_events (vehicle_id, source_url, sale_outcome) VALUES
+  ('a0000000-0000-0000-0000-000000000041', 'https://x/41/', 'bid_to');
 
 -- Fixtures: an owner, an editor, a stranger, one vehicle with one prior specification fact.
 INSERT INTO auth.users VALUES ('00000000-0000-0000-0000-00000000000a'), ('00000000-0000-0000-0000-00000000000b'),
@@ -394,10 +450,59 @@ SELECT pg_temp.ok('the ladder tables are closed to anon and authenticated', NOT 
 SELECT pg_temp.ok('the owner read of progress is executable by authenticated and the service role',
   has_function_privilege('authenticated', 'public.contributor_intake_progress(uuid,uuid)', 'EXECUTE')
   AND has_function_privilege('service_role', 'public.contributor_intake_progress(uuid,uuid)', 'EXECUTE'));
-SELECT pg_temp.ok('the Firebird seed landed once: 3 rungs, 32 items, 3 contradicted',
+SELECT pg_temp.ok('the Firebird seed landed once: 3 rungs, 32 items, and nothing stands contradicted without proof',
   (SELECT count(*) FROM public.vehicle_evidence_rungs WHERE vehicle_id = '20d21fb0-4651-4469-a0ba-e751309a1e54') = 3
   AND (SELECT count(*) FROM public.vehicle_evidence_items WHERE vehicle_id = '20d21fb0-4651-4469-a0ba-e751309a1e54') = 32
-  AND (SELECT count(*) FROM public.vehicle_evidence_items WHERE vehicle_id = '20d21fb0-4651-4469-a0ba-e751309a1e54' AND status = 'contradicted') = 3);
+  AND (SELECT count(*) FROM public.vehicle_evidence_items WHERE vehicle_id = '20d21fb0-4651-4469-a0ba-e751309a1e54' AND status <> 'open') = 0);
+-- 20261105130000: the three seeded contradictions were reset to open with their reason on the record; a status
+-- other than open now needs a proof_ref; the rungs carry specs, not numbers.
+SELECT pg_temp.ok('the seeded contradictions were reset with a reasoned change row each',
+  (SELECT count(*) FROM public.vehicle_evidence_changes c WHERE c.vehicle_id = '20d21fb0-4651-4469-a0ba-e751309a1e54'
+     AND c.from_status = 'contradicted' AND c.to_status = 'open' AND c.reasoning ->> 'rule' LIKE '%requires a proof_ref%') = 3
+  AND (SELECT count(*) FROM public.vehicle_evidence_changes c WHERE c.vehicle_id = '20d21fb0-4651-4469-a0ba-e751309a1e54') = 3);
+SELECT pg_temp.ok('a status other than open is refused without proof', pg_temp.raises(
+  $q$UPDATE public.vehicle_evidence_items SET status = 'contradicted' WHERE key = 'claim_sd_block'$q$));
+SELECT pg_temp.ok('the rungs hold no stored band', NOT EXISTS (SELECT 1 FROM information_schema.columns
+  WHERE table_schema = 'public' AND table_name = 'vehicle_evidence_rungs' AND column_name IN ('band_low', 'band_high', 'currency'))
+  AND (SELECT bool_and(comps_spec ->> 'make' = 'Pontiac' AND comps_spec ->> 'class' IS NOT NULL
+         AND jsonb_array_length(comps_spec -> 'class_rules') = 3)
+       FROM public.vehicle_evidence_rungs WHERE vehicle_id = '20d21fb0-4651-4469-a0ba-e751309a1e54'));
+SELECT pg_temp.ok('the band reader is internal', NOT has_function_privilege('anon', 'public.evidence_rung_band(uuid,jsonb,timestamptz)', 'EXECUTE')
+  AND NOT has_function_privilege('authenticated', 'public.evidence_rung_band(uuid,jsonb,timestamptz)', 'EXECUTE'));
+-- The band reader on the seeded lots: the base class has six sold lots since 2022 with a hammer price (the typed
+-- not-sold lot, the 2019 lot, the deleted vehicle's lot and the gross-only lot are out); p25 31,000, p75 41,000.
+CREATE TEMP TABLE bandb AS SELECT public.evidence_rung_band('20d21fb0-4651-4469-a0ba-e751309a1e54',
+  (SELECT comps_spec FROM public.vehicle_evidence_rungs WHERE vehicle_id = '20d21fb0-4651-4469-a0ba-e751309a1e54' AND key = 'as_photographed')) AS b;
+GRANT ALL ON bandb TO PUBLIC;
+SELECT pg_temp.ok('the base band comes from six keyed lots: n, p25, p75, median, as-of, reader and params',
+  (b ->> 'n')::int = 6 AND (b ->> 'low')::numeric = 31000 AND (b ->> 'high')::numeric = 41000 AND (b ->> 'median')::numeric = 36000
+  AND NOT (b ->> 'too_few_to_tell')::boolean AND b ->> 'reader' = 'evidence_rung_band_v1' AND (b ->> 'as_of') IS NOT NULL
+  AND b #>> '{params,basis}' = 'hammer' AND b #>> '{params,class}' = 'base' AND (b #>> '{params,floor}')::int = 5
+  AND jsonb_array_length(b -> 'lot_ids') = 6
+  AND b -> 'lot_ids' ? 'b0000000-0000-0000-0000-000000000001' AND b -> 'lot_ids' ? 'b0000000-0000-0000-0000-000000000006'
+  AND NOT b -> 'lot_ids' ? 'b0000000-0000-0000-0000-000000000041' AND NOT b -> 'lot_ids' ? 'b0000000-0000-0000-0000-000000000042'
+  AND NOT b -> 'lot_ids' ? 'b0000000-0000-0000-0000-000000000043' AND NOT b -> 'lot_ids' ? 'b0000000-0000-0000-0000-000000000044'
+  AND NOT b -> 'lot_ids' ? 'b0000000-0000-0000-0000-000000000045') FROM bandb;
+SELECT pg_temp.ok('the band carries its class counts and its reasoning with the lot keys',
+  (b #>> '{class_counts,base}')::int = 6 AND (b #>> '{class_counts,trans_am}')::int = 6 AND (b #>> '{class_counts,sd}')::int = 2
+  AND (b #>> '{class_counts,clone}')::int = 1
+  AND b #>> '{reasoning,inputs,table}' = 'auction_events join vehicles' AND jsonb_array_length(b #> '{reasoning,inputs,lot_ids}') = 6
+  AND b #>> '{reasoning,rule}' LIKE 'sold lots of Pontiac firebird 1970-1973 since 2022-01-01%'
+  AND (b #>> '{reasoning,result,low}')::numeric = 31000) FROM bandb;
+SELECT pg_temp.ok('under the floor the reader says too few to tell and gives no number',
+  (SELECT (b ->> 'n')::int = 2 AND (b ->> 'too_few_to_tell')::boolean AND b -> 'low' = 'null'::jsonb AND b -> 'high' = 'null'::jsonb
+     AND jsonb_array_length(b -> 'lot_ids') = 2 AND (b #>> '{reasoning,result,too_few_to_tell}')::boolean
+   FROM (SELECT public.evidence_rung_band('20d21fb0-4651-4469-a0ba-e751309a1e54',
+     (SELECT comps_spec FROM public.vehicle_evidence_rungs WHERE vehicle_id = '20d21fb0-4651-4469-a0ba-e751309a1e54' AND key = 'sd_parts_proven')) AS b) x));
+SELECT pg_temp.ok('a spec without a make or with a mixed basis is refused, not guessed',
+  (public.evidence_rung_band('20d21fb0-4651-4469-a0ba-e751309a1e54', '{"basis":"hammer"}') ->> 'error') IS NOT NULL
+  AND (public.evidence_rung_band('20d21fb0-4651-4469-a0ba-e751309a1e54', '{"make":"Pontiac","basis":"mixed"}') ->> 'error') IS NOT NULL
+  AND (public.evidence_rung_band('20d21fb0-4651-4469-a0ba-e751309a1e54', '{"make":"Pontiac","basis":"mixed"}') ->> 'too_few_to_tell')::boolean);
+SELECT pg_temp.ok('the subject vehicle never comps itself and the period is honoured',
+  (SELECT (b ->> 'n')::int FROM (SELECT public.evidence_rung_band('a0000000-0000-0000-0000-000000000001',
+     (SELECT comps_spec FROM public.vehicle_evidence_rungs WHERE vehicle_id = '20d21fb0-4651-4469-a0ba-e751309a1e54' AND key = 'as_photographed')) AS b) x) = 5
+  AND (SELECT (b ->> 'n')::int FROM (SELECT public.evidence_rung_band('20d21fb0-4651-4469-a0ba-e751309a1e54',
+     (SELECT comps_spec || '{"since":"2025-01-01"}'::jsonb FROM public.vehicle_evidence_rungs WHERE vehicle_id = '20d21fb0-4651-4469-a0ba-e751309a1e54' AND key = 'as_photographed')) AS b) x) = 3);
 SELECT pg_temp.ok('every rung requirement names a seeded item', NOT EXISTS (
   SELECT 1 FROM public.vehicle_evidence_rungs g, jsonb_array_elements_text(g.requirements) x
    WHERE g.vehicle_id = '20d21fb0-4651-4469-a0ba-e751309a1e54'
@@ -408,15 +513,27 @@ SELECT pg_temp.ok('a stranger cannot read progress', pg_temp.raises(
 SET test.auth_uid = '0b9f107a-d124-49de-9ded-94698f63c1c4';
 CREATE TEMP TABLE prog0 AS SELECT public.contributor_intake_progress('20d21fb0-4651-4469-a0ba-e751309a1e54') AS g;
 GRANT ALL ON prog0 TO PUBLIC;
-SELECT pg_temp.ok('the car stands on the baseline rung with its band and basis', g #>> '{rung,key}' = 'as_photographed'
-  AND (g #>> '{rung,band_low}')::int = 35000 AND (g #>> '{rung,band_high}')::int = 45000
+SELECT pg_temp.ok('the car stands on the baseline rung with a band derived from the lots, not a stored number', g #>> '{rung,key}' = 'as_photographed'
+  AND (g #>> '{rung,band_low}')::int = 31000 AND (g #>> '{rung,band_high}')::int = 41000
+  AND (g #>> '{rung,band,n}')::int = 6 AND jsonb_array_length(g #> '{rung,band,lot_ids}') = 6
+  AND g #>> '{rung,band,reader}' = 'evidence_rung_band_v1' AND (g #>> '{rung,band,reasoning,rule}') IS NOT NULL
+  AND (g ->> 'as_of') IS NOT NULL
   AND length(g #>> '{rung,basis}') > 40 AND jsonb_array_length(g -> 'rungs') = 3
   AND (g #>> '{rungs,0,standing}')::boolean AND NOT (g #>> '{rungs,1,reached}')::boolean) FROM prog0;
+SELECT pg_temp.ok('every rung in the list carries its own derived band: the Trans Am class from six lots, the SD class too few to tell',
+  (g #>> '{rungs,1,band,n}')::int = 6 AND (g #>> '{rungs,1,band_low}')::int = 61250 AND (g #>> '{rungs,1,band_high}')::int = 77500
+  AND (g #>> '{rungs,1,band,class_counts,clone}')::int = 1
+  AND (g #>> '{rungs,2,band,n}')::int = 2 AND (g #>> '{rungs,2,band,too_few_to_tell}')::boolean
+  AND g #> '{rungs,2,band_low}' = 'null'::jsonb AND g #> '{rungs,2,band_high}' = 'null'::jsonb
+  AND (g #> '{rungs,0,comps_spec}') IS NOT NULL) FROM prog0;
 SELECT pg_temp.ok('next names three open items for the next rung, with the question key where it is a question',
   jsonb_array_length(g -> 'next') = 3 AND g #>> '{next,0,for_rung}' = 'numbers_photographed'
   AND EXISTS (SELECT 1 FROM jsonb_array_elements(g -> 'next') x WHERE x ->> 'kind' = 'question' AND x ->> 'question_key' IS NOT NULL)
      = EXISTS (SELECT 1 FROM jsonb_array_elements(g -> 'next') x WHERE x ->> 'kind' = 'question')) FROM prog0;
-SELECT pg_temp.ok('no change yet', g -> 'last_change' = 'null'::jsonb AND (g #>> '{counts,open}')::int = 29) FROM prog0;
+SELECT pg_temp.ok('no input yet: the last change is the reasoned reset of a seeded contradiction, and all 32 items are open',
+  g #>> '{last_change,to_status}' = 'open' AND g #>> '{last_change,from_status}' = 'contradicted'
+  AND (g #>> '{last_change,reasoning,rule}') IS NOT NULL AND (g #>> '{counts,open}')::int = 32
+  AND (g #>> '{counts,contradicted}')::int = 0) FROM prog0;
 CREATE TEMP TABLE finv AS SELECT public.create_contributor_invite('20d21fb0-4651-4469-a0ba-e751309a1e54', 'Sam', 'builder') AS r;
 GRANT ALL ON finv TO PUBLIC;
 SELECT public.set_contributor_intake_questions('20d21fb0-4651-4469-a0ba-e751309a1e54',
@@ -437,6 +554,12 @@ SELECT pg_temp.ok('the item points at the observation that proved it', (SELECT s
    WHERE vehicle_id = '20d21fb0-4651-4469-a0ba-e751309a1e54' AND key = 'q1')) FROM fans;
 SELECT pg_temp.ok('the move is logged', (SELECT count(*) FROM public.vehicle_evidence_changes
   WHERE vehicle_id = '20d21fb0-4651-4469-a0ba-e751309a1e54' AND item_key = 'q1' AND to_status = 'proven') = 1);
+SELECT pg_temp.ok('the move carries its reasoning: inputs with keys, the rule, the result; the reply surfaces it',
+  (SELECT c.reasoning #>> '{inputs,matched_on}' = 'satisfied_by' AND c.reasoning #>> '{inputs,item_key}' = 'q1'
+     AND (c.reasoning #>> '{inputs,proof_ref}')::uuid = c.proof_ref AND c.reasoning ->> 'rule' LIKE 'an open item whose%'
+     AND c.reasoning #>> '{result,to}' = 'proven'
+   FROM public.vehicle_evidence_changes c WHERE c.vehicle_id = '20d21fb0-4651-4469-a0ba-e751309a1e54' AND c.item_key = 'q1')
+  AND (SELECT a #>> '{progress,last_change,reasoning,inputs,item_key}' = 'q1' FROM fans));
 SELECT pg_temp.ok('a re-evaluation is queued once for the observation', (SELECT count(*) FROM public.contributor_intake_reevaluations
   WHERE observation_id = (fans.a ->> 'observation_id')::uuid AND status = 'queued') = 1) FROM fans;
 SELECT pg_temp.ok('the owner was told, with the invite and item in the metadata', (SELECT count(*) FROM public.user_notifications
