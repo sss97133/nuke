@@ -13,6 +13,10 @@
  */
 
 import type { ChannelDef } from './channelRegistry';
+import {
+  BAT_FORM, COMPONENT_TO_OPTION, TIRE_BRANDS_RE, TIRE_SIZE_RE,
+  type BatQuestion, type FieldTier,
+} from './batSubmissionForm';
 
 export type DispatchStatus = 'active' | 'submitted' | 'prepared' | 'blocked';
 
@@ -108,57 +112,170 @@ export function mapToEbayAddItem(ctx: DispatchContext): Record<string, unknown> 
 
 /** The only things an agent cannot resolve — they need the owner's signature. */
 export type HumanKey = 'identity_grant' | 'ownership_attestation' | 'contract_signature' | 'final_approval';
-type FieldTier = 'decode' | 'observe' | 'deliberate' | 'sign';
-interface TieredField { value: unknown; tier: FieldTier; }
+export type { FieldTier };
+
+export interface TieredField {
+  value: unknown;
+  tier: FieldTier;
+  /** DOM-order position on the live form (BAT_FORM index). */
+  order: number;
+  step: BatQuestion['step'];
+  control: BatQuestion['control'];
+  nameHint: string | null;
+  /** Profile attribute the value came from. */
+  from: string;
+  /** vehicle_images ids that justify an observed value. */
+  sourceImageIds?: string[];
+  /** For sign rows: the human key that owns the tap. */
+  humanKey?: HumanKey;
+}
 
 export interface BatSubmission {
-  /** Keyed by BaT field_map semantic name. Worker resolves name → live DOM field. */
+  /** Keyed by the BaT question label. Every BAT_FORM row with a value (sign rows always present, value proposed or null). */
   fields: Record<string, TieredField>;
+  /** Labels the worker may fill (decode/observe/deliberate with a value), in DOM order. */
+  autoFill: string[];
+  /** Labels left to the owner (sign tier), in DOM order. */
+  ownerTaps: string[];
+  /** Non-sign rows the profile has no value for yet (ingest gaps, not owner questions). */
+  missing: string[];
   /** Owner signatures required before/at submit — surfaced as the only taps. */
   humanKeys: HumanKey[];
 }
 
+const SIGN_KEY: Record<string, HumanKey> = {
+  'Do you want a reserve?': 'final_approval',
+  'Reserve amount': 'final_approval',
+  'Document fee': 'final_approval',
+  'Known issues or problems': 'final_approval',
+};
+const signKeyFor = (q: BatQuestion): HumanKey =>
+  SIGN_KEY[q.label] ?? (q.step === 'contact' || q.label === 'Country of residence' ? 'identity_grant' : 'ownership_attestation');
+
+type Component = { label?: string; image_id?: string; confidence?: number };
+
+/** Map observed components to BaT checkbox options, keeping the images that show each one. */
+export function componentsToOptions(components: Component[], question: 'Equipment' | 'Wheels') {
+  const byOption = new Map<string, Set<string>>();
+  for (const c of components) {
+    if (!c?.label) continue;
+    for (const m of COMPONENT_TO_OPTION) {
+      if (m.question !== question || !m.re.test(c.label)) continue;
+      const s = byOption.get(m.option) ?? new Set<string>();
+      if (c.image_id) s.add(c.image_id);
+      byOption.set(m.option, s);
+    }
+  }
+  return [...byOption].map(([option, ids]) => ({ option, image_ids: [...ids] }));
+}
+
+function firstMatch(components: Component[], re: RegExp): { value: string; image_ids: string[] } | null {
+  for (const c of components) {
+    const m = c?.label?.match(re);
+    if (m) return { value: m[1] ?? m[0], image_ids: c.image_id ? [c.image_id] : [] };
+  }
+  return null;
+}
+
+const yesNo = (v: unknown) => (v == null || v === '' || (Array.isArray(v) && !v.length) ? null : 'Yes');
+const text = (v: unknown): string | null => {
+  if (v == null) return null;
+  if (Array.isArray(v)) return v.length ? v.map((x) => (typeof x === 'string' ? x : JSON.stringify(x))).join('\n') : null;
+  if (typeof v === 'object') return JSON.stringify(v);
+  const s = String(v).trim();
+  return s || null;
+};
+
 export function mapToBatSubmission(ctx: DispatchContext): BatSubmission {
   const id = (ctx.pkg?.identity ?? ctx.pkg?.vehicle ?? {}) as Record<string, any>;
   const content = (ctx.pkg?.listing_content ?? {}) as Record<string, any>;
-  const fields: Record<string, TieredField> = {};
-  const put = (name: string, value: unknown, tier: FieldTier) => {
-    if (value != null && value !== '') fields[name] = { value, tier };
+  const cowl = (id.cowl_tag ?? {}) as Record<string, any>;
+  const components = (ctx.pkg?.observed_components ?? []) as Component[];
+  const photos = (ctx.pkg?.photos?.ordered ?? []) as Array<{ id?: string; url: string }>;
+  const refurb = (content.refurbishment ?? {}) as Record<string, any>;
+
+  const equipment = componentsToOptions(components, 'Equipment');
+  const wheels = componentsToOptions(components, 'Wheels');
+  const tireSize = firstMatch(components, TIRE_SIZE_RE);
+  const tireBrand = firstMatch(components, TIRE_BRANDS_RE);
+  const ids = (xs: Array<{ image_ids: string[] }>) => [...new Set(xs.flatMap((x) => x.image_ids))];
+
+  // Value + source images per question label. Sign rows carry a proposed value
+  // (for the owner's review) but are never in autoFill.
+  const values: Record<string, { value: unknown; sourceImageIds?: string[] }> = {
+    Year: { value: id.year },
+    Make: { value: id.make },
+    // A clone is entered as its tag's body series; the clone name rides in the title.
+    Model: { value: id.bat_model ?? cowl.series_model ?? ([id.model, id.trim].filter(Boolean).join(' ') || null) },
+    'Country where the vehicle is located': { value: id.country },
+    City: { value: id.city },
+    'Postal code': { value: id.zip },
+    'YouTube links': { value: text(content.video_urls) },
+    Photos: {
+      value: photos.length ? photos.map((p) => ({ image_id: p.id ?? null })) : null,
+      sourceImageIds: photos.map((p) => p.id).filter(Boolean) as string[],
+    },
+    'Street address where the vehicle is located': { value: id.street_address },
+    VIN: { value: id.vin },
+    'Is this a race car?': { value: id.registration_use ? (id.registration_use === 'race' ? 'Yes' : 'No') : null },
+    Engine: { value: id.engine_option ?? id.engine ?? id.engine_type ?? id.displacement },
+    Transmission: { value: id.transmission ?? id.transmission_type },
+    // Cowl tag code first (the option list is keyed by factory code), observed color as fallback.
+    'Exterior color': { value: cowl.paint_code ?? id.exterior_color },
+    'Interior color': { value: cowl.trim_code ?? id.interior_color },
+    Wheels: { value: wheels.length ? wheels.map((w) => w.option) : null, sourceImageIds: ids(wheels) },
+    'Tire brand': { value: tireBrand?.value, sourceImageIds: tireBrand?.image_ids },
+    'Tire size': { value: tireSize?.value, sourceImageIds: tireSize?.image_ids },
+    'Title status': { value: id.title_status },
+    'What year did you purchase the vehicle?': { value: id.owned_time },
+    'Odometer reading': { value: id.mileage },
+    'Has the vehicle been refurbished?': { value: yesNo(refurb.details ?? refurb.year) },
+    'Refurbishment year': { value: refurb.year },
+    'Refurbishment details': { value: text(refurb.details) },
+    'Paint and body history': { value: text(content.paint_body_history) },
+    'Accident history': { value: text(content.accident_history) },
+    Rust: { value: text(content.rust) },
+    Equipment: { value: equipment.length ? equipment.map((e) => e.option) : null, sourceImageIds: ids(equipment) },
+    'Has the exhaust or intake been modified?': { value: content.exhaust_intake_modified == null ? null : content.exhaust_intake_modified ? 'Yes' : 'No' },
+    'Has the vehicle been modified from stock?': { value: yesNo(content.modifications) },
+    'List the modifications': { value: text(content.modifications) },
+    'History of the vehicle from new': { value: text(content.description) },
+    'Services performed and when': { value: text(content.recent_service_history) },
+    Records: { value: text(content.documents_on_hand) },
+    'Known issues or problems': { value: text(content.known_flaws) },
+    'Anything else we should know?': { value: text(content.highlights) },
+    'Reserve amount': { value: ctx.reserveCents != null ? ctx.reserveCents / 100 : null },
   };
 
-  // Decode — from the title / VIN (deterministic identity & provenance).
-  put('chassis', id.vin, 'decode');
-  put('make_model_year', id.year, 'decode');
-  put('make_name', id.make, 'decode');
-  put('model_name', id.model, 'decode');
-  put('location_input', id.location, 'decode');
-  put('location_zip', id.zip, 'decode'); // generate-listing-package: identity.zip (vehicles.zip_code)
-  put('title_status', id.title_status, 'decode'); // null here → rides on ownership_attestation
-  put('owned_time', id.owned_time, 'decode'); // identity.owned_time = purchase year
+  const fields: Record<string, TieredField> = {};
+  const autoFill: string[] = [];
+  const ownerTaps: string[] = [];
+  const missing: string[] = [];
+  BAT_FORM.forEach((q, order) => {
+    const v = values[q.label];
+    const value = v?.value ?? null;
+    const has = value != null && value !== '';
+    const isSign = q.tier === 'sign';
+    if (!has && !isSign) { missing.push(q.label); return; }
+    fields[q.label] = {
+      value: has ? value : null,
+      tier: q.tier,
+      order,
+      step: q.step,
+      control: q.control,
+      nameHint: q.nameHint,
+      from: q.from,
+      ...(v?.sourceImageIds?.length ? { sourceImageIds: v.sourceImageIds } : {}),
+      ...(isSign ? { humanKey: signKeyFor(q) } : {}),
+    };
+    (isSign ? ownerTaps : autoFill).push(q.label);
+  });
 
-  // Observe — from the image cascade.
-  put('mileage', id.mileage, 'observe');
-  put('transmission', id.transmission ?? id.transmission_type, 'observe');
-  put('body_style', id.body_style, 'observe');
-  put('engine', id.engine ?? id.engine_type, 'observe');
-  put('exterior_color', id.exterior_color, 'observe');
-  put('interior_color', id.interior_color, 'observe');
-
-  // Deliberate — ownership-era narrative.
-  put('description', content.description, 'deliberate');
-
-  // Reserve / price is always a final-approval decision; carry the proposed value.
-  if (ctx.reserveCents != null) put('reserve', ctx.reserveCents / 100, 'sign');
-
-  // Human keys: title photo + status (ownership_attestation) and the
-  // price/known-defects sign-off (final_approval) can never be auto-resolved.
-  // identity_grant is satisfied by a linked seller account; add it only if the
-  // package can't prove seller identity. contract_signature is concierge-only.
-  const humanKeys: HumanKey[] = ['ownership_attestation', 'final_approval'];
-  if (!id.title_status) {
-    // status unknown → it rides on the title doc the owner must attest anyway.
-  }
-  return { fields, humanKeys };
+  // ownership_attestation (title, history, attestations) and final_approval
+  // (reserve, fees, known defects) always; identity_grant for the seller's
+  // own contact and residence. contract_signature is concierge-only.
+  const humanKeys: HumanKey[] = ['ownership_attestation', 'final_approval', 'identity_grant'];
+  return { fields, autoFill, ownerTaps, missing, humanKeys };
 }
 
 // ---------------------------------------------------------------------------
@@ -209,7 +326,7 @@ export function dispatchChannel(channel: ChannelDef, ctx: DispatchContext): Adap
       return {
         status: 'prepared',
         note: bat
-          ? `Mapped ${Object.keys(bat.fields).length} fields for ${channel.label} auto-pilot; ${bat.humanKeys.length} owner sign-offs remain.`
+          ? `Mapped ${bat.autoFill.length} fields for ${channel.label} auto-pilot; ${bat.ownerTaps.length} owner taps, ${bat.missing.length} not on the profile yet.`
           : `Queued for AI auto-pilot to submit on ${channel.label}.`,
         payload: bat ? (bat.fields as Record<string, unknown>) : null,
         job: {
@@ -218,7 +335,15 @@ export function dispatchChannel(channel: ChannelDef, ctx: DispatchContext): Adap
           platform: channel.platform,
           vehicle_id: ctx.vehicleId,
           needs: 'session_link', // requires a logged-in session for the outlet
-          ...(bat ? { field_map: bat.fields, human_keys: bat.humanKeys } : {}),
+          ...(bat
+            ? {
+                field_map: bat.fields,
+                auto_fill: bat.autoFill,
+                owner_taps: bat.ownerTaps,
+                missing: bat.missing,
+                human_keys: bat.humanKeys,
+              }
+            : {}),
           // Freeze the derive-on-read provenance into the attested snapshot: what
           // was submitted, its consensus confidence, and the attribute behind it.
           ...(bat && ctx.pkg?.field_provenance ? { field_provenance: ctx.pkg.field_provenance } : {}),
