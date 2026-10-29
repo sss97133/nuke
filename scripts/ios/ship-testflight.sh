@@ -4,7 +4,7 @@
 # The CLI ship (the owner's preferred path). It needs ONE of:
 #   a) Xcode signed into the team's Apple ID (Xcode → Settings → Accounts), or
 #   b) the App Store Connect API key for the Nuke team, read from ~/.appstoreconnect/asc-nuke.env:
-#        NUKE_ASC_ISSUER_ID, NUKE_ASC_KEY_ID (77637BYL66), NUKE_ASC_KEY_PATH, NUKE_APPLE_TEAM_ID (K474YLCACB)
+#        NUKE_ASC_ISSUER_ID, NUKE_ASC_KEY_ID (77637BYL66), NUKE_ASC_KEY_PATH, NUKE_APPLE_TEAM_ID (JZ28MFU3VB; K474YLCACB was the June team, the app moved)
 # Nothing secret is printed. The build number is an epoch timestamp so uploads never collide;
 # note Xcode Cloud stamps its own small run counter, so after a CLI upload under one marketing
 # version, bump MARKETING_VERSION before the next Xcode Cloud ship of that version.
@@ -30,7 +30,7 @@ if [[ -f "$ENV_FILE" ]]; then
     echo "▸ signing and upload through the App Store Connect key (issuer and key id loaded, not printed)"
   fi
 fi
-TEAM="${NUKE_APPLE_TEAM_ID:-K474YLCACB}"
+TEAM="${NUKE_APPLE_TEAM_ID:-JZ28MFU3VB}"
 [[ ${#AUTH[@]} -eq 0 ]] && echo "▸ no App Store Connect key on disk; relying on the Apple ID signed into Xcode"
 
 cd "$APP"
