@@ -40,6 +40,7 @@ const UserWorkLedger = React.lazy(() => import('./UserWorkLedger'));
 const UserBatTrackRecord = React.lazy(() => import('./UserBatTrackRecord'));
 const UserMoneyFlow = React.lazy(() => import('./UserMoneyFlow'));
 const UserReconciliationPanel = React.lazy(() => import('./UserReconciliationPanel'));
+const UserBooksDoor = React.lazy(() => import('./UserBooksDoor'));
 
 // Right column
 const UserRecentPhotos = React.lazy(() => import('./UserRecentPhotos'));
@@ -88,6 +89,13 @@ const UserWorkspaceContent: React.FC = () => {
           <React.Suspense fallback={null}>
             <UserConnectionStateStrip />
           </React.Suspense>
+
+          {/* Books — the owner's door to the accounting office (visitors: null, no heading, no request) */}
+          {userId && isOwnProfile && (
+            <React.Suspense fallback={null}>
+              <UserBooksDoor userId={userId} isOwnProfile={isOwnProfile} />
+            </React.Suspense>
+          )}
 
           {/* Reconciliation — owner-only inside the component (visitors: null, no fetch) */}
           {userId && (
