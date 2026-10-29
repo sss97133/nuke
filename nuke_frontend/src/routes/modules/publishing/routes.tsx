@@ -15,7 +15,8 @@ const PublishingModuleRoutes = () => {
     <Suspense fallback={<div style={{ height: '100vh', background: 'var(--bg)' }} />}>
       <Routes>
         <Route path="/" element={<PublishingDashboard />} />
-        <Route path="/finance" element={<FinanceDashboard />} />
+        {/* The private office: signed-in only. The same page mounts at /accounting behind the same gate. */}
+        <Route path="/finance" element={<ProtectedRoute><FinanceDashboard /></ProtectedRoute>} />
         <Route path="/:slug" element={<PublicationProfile />} />
         <Route path="/:slug/issue/:issueNumber" element={<IssueProfile />} />
         <Route path="/people" element={<PeopleDirectory />} />
