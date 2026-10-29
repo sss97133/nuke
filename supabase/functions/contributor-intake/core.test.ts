@@ -1,6 +1,6 @@
 // contributor-intake: token/404 handling, attestation and rate limits. Every dependency is a mock; nothing touches prod.
 import { assert, assertEquals } from "jsr:@std/assert@1";
-import { buildDevice, type Deps, handle, ipSha256, NOT_FOUND_BODY, RateLimiter, routeBucket, safeFileName, sanitizeHints, sha256Hex } from "./core.ts";
+import { buildDevice, type Deps, type FrameRow, handle, ipSha256, NOT_FOUND_BODY, pickFrames, RateLimiter, routeBucket, safeFileName, sanitizeHints, sha256Hex } from "./core.ts";
 
 const GOOD = "a".repeat(43);
 const NOW = new Date("2026-10-29T18:00:00Z");
@@ -18,6 +18,7 @@ function deps(over: Partial<Deps> = {}, calls: Array<[string, Record<string, unk
     upload: () => Promise.resolve({ error: null }),
     exif: () => Promise.resolve({ Make: "Apple", Model: "iPhone" }),
     resolveUser: () => Promise.resolve(null),
+    frames: () => Promise.resolve([]),
     env: (n) => (n === "CONTRIBUTOR_IP_SALT" ? "test-salt" : n === "SUPABASE_URL" ? "https://proj.supabase.co" : undefined),
     now: () => NOW,
     limiter: new RateLimiter(60, 600_000),
@@ -127,4 +128,62 @@ Deno.test("a content refusal is a 400, not the token 404", async () => {
   assertEquals(out, { status: 400, body: { error: "unknown_question" } });
   const nf = deps({ rpc: () => Promise.resolve({ data: { ok: false, error: "not_found" }, error: null }) });
   assertEquals((await handle(new Request(`${base}?token=${GOOD}`), nf)).status, 404);
+});
+
+Deno.test("a named shot becomes the file's label for the ladder; the document label still picks the bucket; junk is dropped", async () => {
+  const calls: Array<[string, Record<string, unknown>]> = [];
+  const send = async (shot: string) => {
+    const form = new FormData();
+    form.set("token", GOOD); form.set("label", "build photo"); form.set("shot", shot); form.set("device", "{}");
+    form.set("file", new File([new Uint8Array([1, 2, 3])], "pad.jpg", { type: "image/jpeg" }));
+    calls.length = 0;
+    const out = await handle(new Request(`${base}/file`, { method: "POST", body: form }), deps({}, calls));
+    assertEquals(out.status, 200);
+    return calls.find(([n]) => n === "contributor_intake_file")![1].p_file as Record<string, unknown>;
+  };
+  const named = await send("Engine pad stamp");
+  assertEquals([named.label, named.document_label, named.bucket], ["Engine pad stamp", "build photo", "vehicle-photos"]);
+  const junk = await send("<script>alert(1)</script>");
+  assertEquals([junk.label, junk.document_label], ["build photo", "build photo"]);
+});
+
+Deno.test("frames: the public gate holds; hero, emblem, primary, then newest; a storage path never leaves", () => {
+  const row = (id: string, over: Partial<FrameRow> = {}): FrameRow => ({ id, image_url: `https://cdn.example/${id}.jpg`, created_at: `2026-10-${id.padStart(2, "0")}T00:00:00Z`, ...over });
+  const rows: FrameRow[] = [
+    row("1", { caption: "title paper", is_sensitive: true }),
+    row("2", { is_document: true }),
+    row("3", { vision_gate_status: "rejected_personal" }),
+    row("4", { image_vehicle_match_status: "mismatch" }),
+    row("5", { image_url: "vehicle-photos/users/x/IMG_1.jpg" }),
+    row("14", { image_url: "https://cdn.example/IMG_5094.HEIC" }),
+    row("15", { image_url: "https://cdn.example/IMG_5095.HEIC", medium_url: "https://cdn.example/IMG_5095-m.jpg", created_at: "2026-09-01T00:00:00Z" }),
+    row("6", { caption: "hood bird decal" }),
+    row("7", { caption: "front 3/4 at the shop" }),
+    row("8", { is_primary: true }),
+    row("9"), row("10"), row("11"), row("12"), row("13"),
+  ];
+  const picked = pickFrames(rows);
+  assertEquals(picked.length, 6);
+  assertEquals(picked[0], { image_id: "7", url: "https://cdn.example/7.jpg", role: "hero", caption: "front 3/4 at the shop" });
+  assertEquals([picked[1].image_id, picked[1].role], ["6", "emblem"]);
+  assertEquals(picked[2].image_id, "8");
+  assertEquals(picked.slice(3).map((f) => f.image_id), ["13", "12", "11"]);
+  assert(picked.every((f) => f.url.startsWith("https://")));
+  assertEquals(pickFrames([]), []);
+});
+
+Deno.test("open returns the car's frames from the gated read, and an empty list when that read fails", async () => {
+  const calls: string[] = [];
+  const d = deps({
+    rpc: () => Promise.resolve({ data: { invite_id: INVITE, vehicle: { id: "veh-1", year: 1973 } }, error: null }),
+    frames: (id) => { calls.push(id); return Promise.resolve([{ id: "f1", image_url: "https://cdn.example/f1.jpg" }]); },
+  });
+  const out = await handle(new Request(`${base}?token=${GOOD}`), d);
+  assertEquals(calls, ["veh-1"]);
+  assertEquals((out.body as { frames: unknown[] }).frames, [{ image_id: "f1", url: "https://cdn.example/f1.jpg", role: "hero", caption: null }]);
+  const broken = deps({
+    rpc: () => Promise.resolve({ data: { invite_id: INVITE, vehicle: { id: "veh-1" } }, error: null }),
+    frames: () => Promise.reject(new Error("db down")),
+  });
+  assertEquals(((await handle(new Request(`${base}?token=${GOOD}`), broken)).body as { frames: unknown[] }).frames, []);
 });

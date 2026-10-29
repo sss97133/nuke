@@ -103,8 +103,10 @@ export const drafts = {
 
 export type IntakeClient = {
   open(token: string): Promise<{ status: number; body: unknown }>;
-  answer(token: string, key: string, answer: string): Promise<boolean>;
-  file(token: string, file: File, label: string): Promise<{ ok: boolean; duplicate: boolean }>;
+  /** ok, plus the writer's reply (it carries `progress`, the ladder after this answer). */
+  answer(token: string, key: string, answer: string): Promise<{ ok: boolean; body: unknown }>;
+  /** label picks the bucket; shot (an evidence item's key from the ladder) names what the photo proves. */
+  file(token: string, file: File, label: string, shot?: string | null): Promise<{ ok: boolean; duplicate: boolean; body: unknown }>;
 };
 
 export function makeClient(functionsUrl: string, apikey: string, bearer: () => Promise<string | null>, fetcher: typeof fetch = fetch): IntakeClient {
@@ -125,18 +127,20 @@ export function makeClient(functionsUrl: string, apikey: string, bearer: () => P
     async answer(token, key, answer) {
       try {
         const r = await fetcher(`${base}/answer`, { method: 'POST', headers: await headers(true), body: JSON.stringify({ token, question_key: key, answer, device: buildDeviceHints() }) });
-        return r.ok;
-      } catch { return false; }
+        let body: unknown = null; try { body = await r.json(); } catch { body = null; }
+        return { ok: r.ok, body };
+      } catch { return { ok: false, body: null }; }
     },
-    async file(token, file, label) {
+    async file(token, file, label, shot = null) {
       try {
         const f = new FormData();
         f.set('token', token); f.set('label', label); f.set('device', JSON.stringify(buildDeviceHints())); f.set('file', file);
+        if (shot) f.set('shot', shot);
         const r = await fetcher(`${base}/file`, { method: 'POST', headers: await headers(false), body: f });
-        if (!r.ok) return { ok: false, duplicate: false };
+        if (!r.ok) return { ok: false, duplicate: false, body: null };
         const b = await r.json().catch(() => ({}));
-        return { ok: true, duplicate: Boolean((b as { duplicate?: boolean }).duplicate) };
-      } catch { return { ok: false, duplicate: false }; }
+        return { ok: true, duplicate: Boolean((b as { duplicate?: boolean }).duplicate), body: b };
+      } catch { return { ok: false, duplicate: false, body: null }; }
     },
   };
 }

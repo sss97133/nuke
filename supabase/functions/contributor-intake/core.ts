@@ -22,6 +22,8 @@ export const TOKEN_RE = /^[A-Za-z0-9_-]{16,256}$/;
 export const MAX_FILE_BYTES = 52 * 1024 * 1024;
 
 export const LABELS = ["build photo", "purchase or title paper", "receipt", "cam card / parts paperwork", "dyno or timeslip", "other"] as const;
+/** An evidence item key or label: letters, digits, spaces and light punctuation; nothing that could carry markup. */
+export const SHOT_RE = /^[A-Za-z0-9][A-Za-z0-9 _.,'()/-]{1,79}$/;
 export type Bucket = "vehicle-photos" | "ownership-documents" | "user-documents";
 const HEIC = /^image\/hei[cf]$/;
 const BUCKET_RULES: Record<Bucket, { max: number; mime: RegExp; sensitive: boolean }> = {
@@ -57,9 +59,46 @@ export interface Deps {
   upload: (bucket: Bucket, path: string, bytes: Uint8Array, contentType: string) => Promise<{ error: { message?: string } | null }>;
   exif: (bytes: Uint8Array, mime: string) => Promise<JsonObject | null>;
   resolveUser: (jwt: string) => Promise<string | null>;
+  /** The vehicle's own frames as the gated profile read returns them; pickFrames applies the public gate again. */
+  frames: (vehicleId: string) => Promise<FrameRow[]>;
   env: (name: string) => string | undefined;
   now: () => Date;
   limiter: RateLimiter;
+}
+
+/** A vehicle_images row as the gated profile read returns it. */
+export type FrameRow = {
+  id: string; image_url: string | null; medium_url?: string | null; large_url?: string | null; caption?: string | null;
+  category?: string | null; image_type?: string | null; vehicle_zone?: string | null; taken_at?: string | null; created_at?: string | null;
+  is_document?: boolean | null; is_duplicate?: boolean | null; is_superseded?: boolean | null; is_sensitive?: boolean | null;
+  is_primary?: boolean | null; vision_gate_status?: string | null; image_vehicle_match_status?: string | null;
+};
+export type Frame = { image_id: string; url: string; role: "hero" | "emblem" | "frame"; caption: string | null };
+export const FRAME_LIMIT = 6;
+const EMBLEM_WORDS = /\b(emblem|badge|decal|hood bird|script|nameplate|shaker|spoiler|wheel|rally|grille)\b/i;
+const HERO_WORDS = /\b(front 3\/4|three.quarter|front quarter|profile|side|hero|exterior|overall)\b/i;
+
+/**
+ * The car's own frames for the page: the same gate the public profile applies (loadVehicleData.ts): documents,
+ * duplicates, superseded, sensitive, mismatched and gate-rejected rows never leave the function. Order: hero words,
+ * then emblem words, then the primary, then newest. Never a storage path: only an https URL the row already carries.
+ */
+export function pickFrames(rows: FrameRow[], limit = FRAME_LIMIT): Frame[] {
+  const urlOf = (r: FrameRow) => r.large_url || r.medium_url || r.image_url || "";
+  // A phone's HEIC original with no JPEG derivative renders nowhere but Safari: leave it out rather than show a hole.
+  const usable = rows.filter((r) => r && typeof r.id === "string"
+    && !r.is_document && !r.is_duplicate && !r.is_superseded && !r.is_sensitive
+    && !(typeof r.vision_gate_status === "string" && r.vision_gate_status.startsWith("rejected"))
+    && r.image_vehicle_match_status !== "mismatch" && r.image_vehicle_match_status !== "unrelated"
+    && urlOf(r).startsWith("https://") && !/\.hei[cf](\?|#|$)/i.test(urlOf(r)));
+  const text = (r: FrameRow) => [r.caption, r.category, r.image_type, r.vehicle_zone].filter((x) => typeof x === "string").join(" ");
+  const rank = (r: FrameRow) => (HERO_WORDS.test(text(r)) ? 0 : EMBLEM_WORDS.test(text(r)) ? 1 : r.is_primary ? 2 : 3);
+  const when = (r: FrameRow) => Date.parse(r.taken_at ?? r.created_at ?? "") || 0;
+  usable.sort((a, b) => rank(a) - rank(b) || when(b) - when(a));
+  return usable.slice(0, limit).map((r, i) => ({
+    image_id: r.id, url: urlOf(r), caption: typeof r.caption === "string" && r.caption.trim() ? r.caption.trim().slice(0, 120) : null,
+    role: i === 0 ? "hero" : EMBLEM_WORDS.test(text(r)) ? "emblem" : "frame",
+  }));
 }
 
 export async function sha256Hex(input: string | Uint8Array): Promise<string> {
@@ -195,7 +234,12 @@ export async function handle(req: Request, deps: Deps): Promise<Out> {
     const { data, error } = await deps.rpc("contributor_intake_open", { p_token: token, p_device: device });
     if (isTokenRefusal(data, error)) return notFound();
     if (error) return { status: 500, body: { error: "open_failed" } };
-    return { status: 200, body: { ...(data as JsonObject), recorded_by_owner: recorder != null } };
+    const card = data as JsonObject;
+    const veh = card.vehicle;
+    const vehicleId = veh && typeof veh === "object" && !Array.isArray(veh) && typeof veh.id === "string" ? veh.id : null;
+    let frames: Frame[] = [];
+    if (vehicleId) { try { frames = pickFrames(await deps.frames(vehicleId)); } catch { frames = []; } }
+    return { status: 200, body: { ...card, frames: frames as unknown as Json, recorded_by_owner: recorder != null } };
   }
 
   if (kind === "answer") {
@@ -218,6 +262,10 @@ export async function handle(req: Request, deps: Deps): Promise<Out> {
   const mime = (given || (lower.endsWith(".pdf") ? "application/pdf" : /\.hei[cf]$/.test(lower) ? "image/heic" : "application/octet-stream")).toLowerCase();
   const rawLabel = short(form!.get("label"), 64);
   const label = rawLabel && (LABELS as readonly string[]).includes(rawLabel) ? rawLabel : "other";
+  // The shot the person says this is (an evidence item's key or label from the ladder). It names the file for the
+  // ladder's writer; the bucket still follows the document label above, so a shot never changes where bytes go.
+  const rawShot = short(form!.get("shot"), 80);
+  const shot = rawShot && SHOT_RE.test(rawShot) ? rawShot : null;
   const dest = routeBucket(label, mime);
   if (!dest) return { status: 415, body: { error: "images_or_pdf_only" } };
   if (file.size === 0 || file.size > dest.max) return { status: 413, body: { error: "file_size", max_bytes: dest.max } };
@@ -245,7 +293,8 @@ export async function handle(req: Request, deps: Deps): Promise<Out> {
     p_file: {
       bucket: dest.bucket, is_sensitive: dest.sensitive, storage_path: path,
       image_url: objectUrl(deps.env("SUPABASE_URL") ?? "", dest.bucket, path),
-      file_name: name, mime_type: mime, size_bytes: bytes.length, sha256: sha, exif, device, label,
+      file_name: name, mime_type: mime, size_bytes: bytes.length, sha256: sha, exif, device,
+      label: shot ?? label, document_label: label,
       ...(recorder ? { recorded_by: recorder } : {}),
     },
   });

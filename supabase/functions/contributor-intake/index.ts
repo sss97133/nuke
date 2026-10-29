@@ -13,7 +13,7 @@ import exifr from "npm:exifr@7.1.3";
 import { corsHeaders } from "../_shared/cors.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { projectPublishableKey, projectSecretKey } from "../_shared/supabaseKeys.ts";
-import { defaultLimiter, handle, NOT_FOUND_BODY, TOKEN_RE, type JsonObject } from "./core.ts";
+import { defaultLimiter, type FrameRow, handle, NOT_FOUND_BODY, TOKEN_RE, type JsonObject } from "./core.ts";
 
 const headers = { ...corsHeaders, "Access-Control-Allow-Methods": "GET, POST, OPTIONS" };
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -53,6 +53,14 @@ Deno.serve(async (req) => {
       exif: async (bytes) => {
         const parsed = await exifr.parse(bytes, { tiff: true, exif: true, gps: true, makerNote: false, userComment: false });
         return parsed ? JSON.parse(JSON.stringify(parsed)) as JsonObject : null;
+      },
+      frames: async (vehicleId) => {
+        // The columns the public profile reads; the picker in core.ts applies the gate again before anything leaves.
+        const { data } = await service.from("vehicle_images")
+          .select("id, image_url, medium_url, large_url, caption, category, image_type, vehicle_zone, taken_at, created_at, is_document, is_duplicate, is_superseded, is_sensitive, is_primary, vision_gate_status, image_vehicle_match_status")
+          .eq("vehicle_id", vehicleId).eq("is_sensitive", false).eq("is_document", false)
+          .order("created_at", { ascending: false }).limit(60);
+        return (data ?? []) as FrameRow[];
       },
       resolveUser: async (jwt) => {
         const anon = createClient(SUPABASE_URL, projectPublishableKey()!, { auth: { persistSession: false, autoRefreshToken: false } });

@@ -4,12 +4,14 @@
  * The link is shown once, to copy and text from the owner's own phone. Nuke sends nothing.
  */
 import React, { useCallback, useEffect, useState } from 'react';
-import { day, Row, Rows, Text } from '../../kit';
+import { day, Row, Rows, Text, themeVars, vehicleTheme, type ThemeSource } from '../../kit';
 import { supabase } from '../../lib/supabase';
 import { arr, num, obj, str, type JsonObject } from '../jobs/jobRead';
 import { useWriter } from '../jobs/useWriter';
+import { IntakeLadder, movedText, readProgress } from '../contribute/IntakeLadder';
 import '../jobs/jobs.css';
 import '../jobs/job-page.css';
+import '../contribute/contribute.css';
 
 const RELATIONSHIPS: Array<[string, string]> = [['builder', 'Builder'], ['previous_owner', 'Previous owner'], ['shop', 'Shop'], ['appraiser', 'Appraiser']];
 
@@ -24,8 +26,9 @@ export function deviceSummary(d: unknown): string {
   return [kind, str(o.platform), screen, str(o.timezone)].filter(Boolean).join(', ') || 'device not identified';
 }
 
-export default function ContributorIntakeCard({ vehicleId }: { vehicleId: string }) {
+export default function ContributorIntakeCard({ vehicleId, vehicle }: { vehicleId: string; vehicle?: ThemeSource | null }) {
   const w = useWriter();
+  const theme = vehicleTheme(vehicle);
   const [name, setName] = useState('');
   const [relationship, setRelationship] = useState('builder');
   const [phone, setPhone] = useState('');
@@ -52,8 +55,10 @@ export default function ContributorIntakeCard({ vehicleId }: { vehicleId: string
   const visits = arr(intake?.visits).map(obj).filter((x): x is JsonObject => !!x);
   const answers = arr(intake?.answers).map(obj).filter((x): x is JsonObject => !!x);
   const uploads = arr(intake?.uploads).map(obj).filter((x): x is JsonObject => !!x);
+  const progress = readProgress(intake?.progress);
 
-  return <div className="job-block" aria-label="Contributors">
+  return <div className="job-block ct-page" aria-label="Contributors" style={themeVars(theme)} data-theme-key={theme.key}>
+    {progress && <IntakeLadder progress={progress} moved={movedText(progress)} audience="owner" />}
     <div className="jb-field">
       <label className="jb-field"><Text role="label">Name</Text>
         <input className="jb-input k-body" value={name} onChange={e => setName(e.target.value)} autoComplete="off" /></label>
