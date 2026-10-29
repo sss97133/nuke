@@ -75,7 +75,7 @@ CREATE TABLE public.vehicle_images (id uuid PRIMARY KEY DEFAULT gen_random_uuid(
   filename text, file_size bigint, mime_type text, source text, is_external boolean, exif_data jsonb, caption text,
   ingest_kind text CHECK (ingest_kind IN ('live', 'backfill', 'import')),
   image_medium text NOT NULL DEFAULT 'photograph' CHECK (image_medium IN ('photograph', 'render', 'drawing', 'screenshot', 'camera', 'received', 'web', 'other')),
-  photographer_attribution text, ghost_user_id uuid REFERENCES public.ghost_users(id), is_document boolean,
+  photographer_attribution text, submitted_by uuid, ghost_user_id uuid REFERENCES public.ghost_users(id), is_document boolean,
   is_superseded boolean, created_at timestamptz DEFAULT now());
 CREATE UNIQUE INDEX idx_unique_vehicle_file_hash ON public.vehicle_images (vehicle_id, file_hash)
   WHERE file_hash IS NOT NULL AND vehicle_id IS NOT NULL AND coalesce(is_superseded, false) = false;
@@ -180,9 +180,9 @@ CREATE TEMP TABLE dev AS SELECT '{"user_agent":"Mozilla/5.0 (iPhone; CPU iPhone 
   "screen":{"w":393,"h":852,"dpr":3},"timezone":"America/Los_Angeles","language":"en-US",
   "ip_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","ip":"must-be-dropped"}'::jsonb AS d;
 CREATE TEMP TABLE card AS SELECT public.contributor_intake_open(inv.r ->> 'token', dev.d) AS c FROM inv, dev;
-SELECT pg_temp.ok('open returns the car card', c ->> 'ok' = 'true' AND c #>> '{vehicle,vin}' = 'TESTVIN0000000001'
+SELECT pg_temp.ok('open returns the car card', c ->> 'ok' = 'true' AND c ->> 'invite_id' = inv.r ->> 'invite_id' AND c #>> '{vehicle,vin}' = 'TESTVIN0000000001'
   AND c #>> '{vehicle,body,engine}' = '455' AND c #>> '{contributor,display_name}' = 'Sam'
-  AND c #>> '{contributor,relationship}' = 'builder') FROM card;
+  AND c #>> '{contributor,relationship}' = 'builder') FROM card, inv;
 SELECT pg_temp.ok('open lists known facts, round one and round two', jsonb_array_length(c -> 'known_facts') = 1
   AND jsonb_array_length(c -> 'questions') = 2 AND jsonb_array_length(c -> 'round_two') = 1
   AND (c ->> 'documents_count')::int = 0) FROM card;
@@ -238,7 +238,7 @@ SELECT pg_temp.ok('a changed answer supersedes and keeps the original',
     = '00000000-0000-0000-0000-00000000000a'
   AND (SELECT count(*) FROM public.vehicle_observations WHERE kind = 'contributor_answer') = 2) FROM ans, ans2;
 SELECT pg_temp.ok('a non-owner cannot be the recorder', public.contributor_intake_answer(inv.r ->> 'token', 'paint', 'x', '{}',
-  '00000000-0000-0000-0000-00000000000c') ->> 'error' = 'recorder_not_owner') FROM inv;
+  '00000000-0000-0000-0000-00000000000c') = '{"ok": false, "error": "not_found"}') FROM inv;
 SELECT pg_temp.ok('an unknown question is refused', public.contributor_intake_answer(inv.r ->> 'token', 'nope', 'x', '{}')
   ->> 'error' = 'unknown_question') FROM inv;
 
@@ -270,6 +270,8 @@ SELECT pg_temp.ok('a file without EXIF still gets its contributor attribution', 
   AND da.contributor_id = (inv.r ->> 'contributor_id')::uuid)
   FROM up2, inv, public.device_attributions da WHERE da.image_id = (up2.u ->> 'image_id')::uuid;
 SELECT pg_temp.ok('the duplicate call wrote no second row', (SELECT count(*) FROM public.vehicle_images) = 2);
+SELECT pg_temp.ok('a non-owner recorder on a file is not_found', public.contributor_intake_file(inv.r ->> 'token',
+  f.p || '{"recorded_by":"00000000-0000-0000-0000-00000000000c"}') = '{"ok": false, "error": "not_found"}') FROM inv, f;
 SELECT pg_temp.ok('a path outside this invite is refused', public.contributor_intake_file(inv.r ->> 'token',
   jsonb_set(f.p, '{storage_path}', '"contributors/someone-else/x.jpg"')) ->> 'error' = 'invalid_storage_path') FROM inv, f;
 
@@ -279,7 +281,7 @@ CREATE TEMP TABLE rd AS SELECT public.get_contributor_intake('10000000-0000-0000
 SELECT pg_temp.ok('the read has the invites with visits and no token hash', jsonb_array_length(g -> 'invites') = 3
   AND g::text NOT LIKE '%token_hash%' AND jsonb_array_length(g #> '{invites,0,visits}') >= 4) FROM rd;
 SELECT pg_temp.ok('the read has both answers with attestation', jsonb_array_length(g -> 'answers') = 2
-  AND g #>> '{answers,0,device_attestation,platform}' = 'iOS') FROM rd;
+  AND g #>> '{answers,0,device_attestation,platform}' = 'iOS' AND jsonb_array_length(g -> 'visits') >= 4) FROM rd;
 SELECT pg_temp.ok('the read has the uploads with their contributor', jsonb_array_length(g -> 'uploads') = 2
   AND g #>> '{uploads,0,contributor_id}' = inv.r ->> 'contributor_id') FROM rd, inv;
 RESET test.auth_uid;

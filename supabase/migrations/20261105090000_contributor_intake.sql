@@ -227,6 +227,7 @@ BEGIN
 
   SELECT jsonb_build_object(
     'ok', true,
+    'invite_id', i.id,
     'invite', jsonb_build_object('id', i.id, 'expires_at', i.expires_at),
     'vehicle', jsonb_build_object('id', v.id, 'year', v.year, 'make', v.make, 'model', v.model, 'vin', v.vin,
       'color', v.color, 'body_style', v.body_style, 'transmission', v.transmission,
@@ -276,7 +277,7 @@ BEGIN
     RETURN jsonb_build_object('ok', false, 'error', 'invalid_answer');
   END IF;
   IF p_recorded_by IS NOT NULL AND NOT public.contributor_intake_can_manage(i.vehicle_id, p_recorded_by) THEN
-    RETURN jsonb_build_object('ok', false, 'error', 'recorder_not_owner');
+    RETURN jsonb_build_object('ok', false, 'error', 'not_found');
   END IF;
   SELECT external_identity_id INTO v_identity FROM public.contributors WHERE id = i.contributor_id;
   SELECT id INTO v_source FROM public.observation_sources WHERE slug = 'contributor_link';
@@ -329,9 +330,17 @@ DECLARE
   v_device jsonb := public.contributor_intake_device(coalesce(p_file -> 'device', '{}'::jsonb));
   v_id uuid;
   v_fp text;
+  v_recorded_by uuid;
 BEGIN
   i := public.contributor_intake_invite_for_token(p_token);
   IF i.id IS NULL THEN RETURN jsonb_build_object('ok', false, 'error', 'not_found'); END IF;
+  IF nullif(p_file ->> 'recorded_by', '') IS NOT NULL THEN
+    IF p_file ->> 'recorded_by' !~ '^[0-9a-f-]{36}$'
+       OR NOT public.contributor_intake_can_manage(i.vehicle_id, (p_file ->> 'recorded_by')::uuid) THEN
+      RETURN jsonb_build_object('ok', false, 'error', 'not_found');
+    END IF;
+    v_recorded_by := (p_file ->> 'recorded_by')::uuid;
+  END IF;
   IF v_sha IS NULL OR v_sha !~ '^[0-9a-f]{64}$' THEN RETURN jsonb_build_object('ok', false, 'error', 'invalid_sha256'); END IF;
   IF v_path IS NULL OR v_path !~ ('^(vehicle-photos/)?contributors/' || i.id || '/' || v_sha || '/[^/]{1,200}$') THEN
     RETURN jsonb_build_object('ok', false, 'error', 'invalid_storage_path');
@@ -346,10 +355,10 @@ BEGIN
   END IF;
 
   INSERT INTO public.vehicle_images (vehicle_id, image_url, storage_path, file_hash, file_name, filename, file_size,
-    mime_type, source, is_external, exif_data, caption, ingest_kind, image_medium, photographer_attribution)
+    mime_type, source, is_external, exif_data, caption, ingest_kind, image_medium, photographer_attribution, submitted_by)
   VALUES (i.vehicle_id, v_url, v_path, v_sha, left(p_file ->> 'file_name', 255), left(p_file ->> 'file_name', 255),
     nullif(p_file ->> 'size_bytes', '')::bigint, left(p_file ->> 'mime_type', 128), 'contributor_link', true, v_exif,
-    left(p_file ->> 'label', 500), 'import', 'received', 'contributor:' || i.contributor_id)
+    left(p_file ->> 'label', 500), 'import', 'received', 'contributor:' || i.contributor_id, v_recorded_by)
   RETURNING id INTO v_id;
 
   -- trg_auto_attribute_image_to_device wrote the EXIF device row when the EXIF names a device; point it at the
@@ -420,6 +429,10 @@ BEGIN
       FROM public.vehicle_contributor_invites i JOIN public.contributors c ON c.id = i.contributor_id
       JOIN public.external_identities e ON e.id = c.external_identity_id
       WHERE i.vehicle_id = p_vehicle_id), '[]'::jsonb),
+    'visits', coalesce((SELECT jsonb_agg(jsonb_build_object('invite_id', x.invite_id, 'action', x.action,
+        'ref_id', x.ref_id, 'seen_at', x.seen_at, 'device', x.device) ORDER BY x.seen_at DESC)
+      FROM (SELECT w.* FROM public.vehicle_contributor_invite_visits w JOIN public.vehicle_contributor_invites i2
+              ON i2.id = w.invite_id WHERE i2.vehicle_id = p_vehicle_id ORDER BY w.seen_at DESC LIMIT 500) x), '[]'::jsonb),
     'questions', coalesce((SELECT jsonb_agg(jsonb_build_object('key', q.key, 'prompt', q.prompt, 'hint', q.hint,
         'round', q.round, 'position', q.position, 'status', q.status, 'invite_id', q.invite_id) ORDER BY q.round, q.position, q.key)
       FROM public.contributor_intake_questions q WHERE q.vehicle_id = p_vehicle_id), '[]'::jsonb),
