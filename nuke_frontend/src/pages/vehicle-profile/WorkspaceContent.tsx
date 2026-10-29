@@ -389,7 +389,7 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
           )}
           {(isRowOwner || isVerifiedOwner) && (
             <CollapsibleWidget variant="profile" title="Contributors" defaultCollapsed={true}>
-              <React.Suspense fallback={null}><ContributorIntakeCard vehicleId={vehicle.id} /></React.Suspense>
+              <React.Suspense fallback={null}><ContributorIntakeCard vehicleId={vehicle.id} vehicle={{ make: vehicle.make, year: vehicle.year, color: vehicle.color }} /></React.Suspense>
             </CollapsibleWidget>
           )}
           {(isVerifiedOwner || hasContributorAccess) && (
