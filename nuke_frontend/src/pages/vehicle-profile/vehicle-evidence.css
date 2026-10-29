@@ -152,3 +152,12 @@
 @media (max-width: 480px) {
   .field-evidence-related-images { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+/* Original claim citations and withdrawn interpretations share the existing drill. */
+.field-claim-reference { grid-column: 1 / -1; }
+.field-claim-metadata { font: var(--text-caption)/1.6 var(--font-family); color: var(--text-secondary); overflow-wrap: anywhere; }
+.field-claim-value { font: 650 var(--text-callout)/1.5 var(--font-family); color: var(--text); overflow-wrap: anywhere; }
+.field-claim-context { white-space: pre-wrap; }
+.field-claim-history { margin-top: 12px; }
+.field-claim-history summary { cursor: pointer; min-height: var(--control-height); padding-block: 8px; }
+.field-claim-history-row { padding-block: 8px; border-top: 1px solid var(--border); }

@@ -12,7 +12,8 @@ import { Button } from '../../components/ui/button';
 import { usePopup } from '../../components/popups/usePopup';
 import { useVehicleImageEvidence, relatedFieldImages, hasImageAnalysis, webSourceUrl } from './hooks/useVehicleImageEvidence';
 import { useFieldProvenance, citedFieldImages, evidenceRelationLabel, provenanceCoverageUnavailable, formatProvenanceValue, groupRepeatedReports, ENGINE_PROPERTY_IDS } from './hooks/useFieldProvenance';
-import type { FieldEvidenceGroup } from './hooks/useFieldEvidence';
+import { useFieldEvidence, type FieldEvidenceGroup } from './hooks/useFieldEvidence';
+import FieldProvenanceDrawer from './FieldProvenanceDrawer';
 import { optimizeImageUrl } from '../../lib/imageOptimizer';
 import './vehicle-evidence.css';
 
@@ -61,6 +62,8 @@ const FieldEvidencePopup: React.FC<FieldEvidencePopupProps> = ({
   const { closeTop } = usePopup();
   const inventory = useVehicleImageEvidence(vehicleId);
   const provenance = useFieldProvenance(vehicleId, field);
+  const claims = useFieldEvidence(vehicleId);
+  const claimGroup = evidence || claims.evidence[field];
   const rows = inventory.data?.images || [];
   const images = relatedFieldImages(rows, field);
   const citations = citedFieldImages(provenance.data, rows);
@@ -72,9 +75,10 @@ const FieldEvidencePopup: React.FC<FieldEvidencePopupProps> = ({
   const resolvedValue = isEngineProperty
     ? (provenance.data?.canonical?.status === 'resolved' ? provenance.data.canonical.value : null)
     : provenance.data?.value;
-  const hasRecordedImageReference = imageObservations.length > 0 || !!provenance.data?.source_image_url || (provenance.data?.evidence || []).some(source => source.image_id && (source.source !== 'field_evidence' || source.verified === true));
+  const hasClaimImageReference = !!claimGroup?.sources.some(source => source.source_image_id);
+  const hasRecordedImageReference = hasClaimImageReference || imageObservations.length > 0 || !!provenance.data?.source_image_url || (provenance.data?.evidence || []).some(source => source.image_id && (source.source !== 'field_evidence' || source.verified === true));
 
-  const sources = evidence?.sources || (provenance.data?.evidence || [])
+  const sources = claimGroup?.sources || (provenance.data?.evidence || [])
     .filter(source => source.source !== 'field_evidence' || source.verified === true)
     .map((source, index) => ({ id: `${source.source}-${index}`, source_type: source.source_type || source.source, field_value: source.value, created_at: source.at }));
   const sortedSources = [...sources].sort((a, b) => trustRank(a.source_type) - trustRank(b.source_type));
@@ -96,7 +100,7 @@ const FieldEvidencePopup: React.FC<FieldEvidencePopupProps> = ({
       </header>
 
       {provenance.data && <div style={{ marginBottom: 8 }}>
-        <span className="ev-label">{isEngineProperty ? 'RESOLVED SOURCE CLAIM' : 'CANONICAL VALUE'}</span>{' '}
+        <span className="ev-label">{isEngineProperty ? 'RESOLVED SOURCE CLAIM' : 'RECORDED VEHICLE VALUE'}</span>{' '}
         <strong>{resolvedValue ? formatProvenanceValue(field, resolvedValue) : 'Unknown'}</strong>
         {isEngineProperty && provenance.data.canonical?.status === 'unavailable'
           ? <p role="status">The resolved value could not be read. Source reports below remain attributed claims.</p>
@@ -107,7 +111,7 @@ const FieldEvidencePopup: React.FC<FieldEvidencePopupProps> = ({
           {(provenance.data as any).identifier_consensus.citation_summary}
           {(provenance.data as any).identifier_consensus.status === 'conflict' ? ' · sources disagree' : ''}
         </p>}
-        {evidence?.hasConflict && evidence.conflictType === 'genuine'
+        {claimGroup?.hasConflict && claimGroup.conflictType === 'genuine'
           ? <p role="status">Source claims differ. No resolution is established by this display.</p>
           : sortedSources.length > 1 && <p role="status">Multiple source claims are shown. This display does not establish whether differences have been resolved.</p>}
       </div>}
@@ -136,7 +140,10 @@ const FieldEvidencePopup: React.FC<FieldEvidencePopupProps> = ({
       )}
 
       {/* Evidence sources */}
-      {sortedSources.length > 0 && (
+      {claimGroup && claimGroup.sources.length > 0 ? <FieldProvenanceDrawer
+        fieldName={field} fieldLabel={label} group={claimGroup} isOpen onToggle={() => {}} onNavigate={closeTop}
+        drawerId={`popup-provenance-${field}`}
+      /> : sortedSources.length > 0 && (
         <div style={{ marginBottom: '8px' }}>
           <div className="field-evidence-section-title">
             {sortedSources.length} source claim{sortedSources.length !== 1 ? 's' : ''}
@@ -149,6 +156,8 @@ const FieldEvidencePopup: React.FC<FieldEvidencePopupProps> = ({
           ))}
         </div>
       )}
+      {claims.error && <p role="status">Claim details and correction history could not be read.</p>}
+      {claims.loading && <p role="status">Reading claim details and correction history…</p>}
 
       {/* Claim-specific references from the existing provenance reader. */}
       {!imagesLoading && citations.length > 0 && (
@@ -256,8 +265,8 @@ const FieldEvidencePopup: React.FC<FieldEvidencePopupProps> = ({
       </div>}
       {!imagesLoading && !imageReadFailed && citations.length === 0 && (
         <div className="field-evidence-gap">
-          <div className="ev-label">IMAGE CITATION MISSING</div>
-          <p>{hasRecordedImageReference ? 'An image reference exists but could not be validated in the visible inventory.' : `No image citation is recorded for ${label.toLowerCase()}.`}</p>
+          <div className="ev-label">{hasRecordedImageReference ? 'IMAGE CITATION OUTSIDE CURRENT GALLERY' : 'IMAGE CITATION MISSING'}</div>
+          <p>{hasClaimImageReference ? 'The claim records an image reference above. Inspect that record for its attribution and supersession history.' : hasRecordedImageReference ? 'An image reference exists but could not be validated in the visible inventory.' : `No image citation is recorded for ${label.toLowerCase()}.`}</p>
           {awaiting > 0 && <p><strong>{awaiting}</strong> of {rows.length} visible image records are not marked complete by the image-processing pipeline. They may contain relevant evidence.</p>}
           {images.length === 0 && awaiting === 0 && <p>No matching image area is indexed in the records read.</p>}
           {inventory.data && !inventory.data.complete && <p>Showing {rows.length} of {inventory.data.total ?? 'an unknown number of'} visible records. This is a partial inventory.</p>}

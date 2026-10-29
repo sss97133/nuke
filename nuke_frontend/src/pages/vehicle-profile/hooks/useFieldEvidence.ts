@@ -32,6 +32,9 @@ export interface FieldEvidenceRow {
   extracted_at: string | null;
   status: string | null;
   created_at: string;
+  /** Original cited record, not a resolved/current photo or evidence of installation. */
+  source_image_id?: string | null;
+  assigned_at?: string | null;
 }
 
 export type ConflictType = 'genuine' | 'refinement' | 'synonym' | 'variance';
@@ -49,6 +52,8 @@ export interface FieldEvidenceGroup {
   hasConflict: boolean;
   /** What kind of conflict (if any) */
   conflictType?: ConflictType;
+  /** Withdrawn claims remain inspectable but never take part in current ranking. */
+  history?: FieldEvidenceRow[];
 }
 
 export type FieldEvidenceMap = Record<string, FieldEvidenceGroup>;
@@ -245,7 +250,7 @@ async function fetchAgentConsensus(vehicleId: string): Promise<FieldEvidenceRow[
 async function fetchAndProcessEvidence(vehicleId: string): Promise<FieldEvidenceMap> {
   const { data, error: queryError } = await supabase
     .from('field_evidence')
-    .select('id, vehicle_id, field_name, proposed_value, source_type, source_confidence, extraction_context, extracted_at, status, created_at')
+    .select('id, vehicle_id, field_name, proposed_value, source_type, source_confidence, extraction_context, extracted_at, status, created_at, assigned_at, source_image_id:raw_extraction_data->>photo_id')
     .eq('vehicle_id', vehicleId)
     .order('source_confidence', { ascending: false });
 
@@ -259,7 +264,7 @@ async function fetchAndProcessEvidence(vehicleId: string): Promise<FieldEvidence
   // displaying a profile must not request a testimony backfill.
 
   // Map DB columns to UI interface
-  const mapped: FieldEvidenceRow[] = (rows as any[]).map((r) => ({
+  const mapped: FieldEvidenceRow[] = (rows as any[]).filter(r => r.vehicle_id === vehicleId).map((r) => ({
     id: r.id,
     vehicle_id: r.vehicle_id,
     field_name: r.field_name,
@@ -272,11 +277,14 @@ async function fetchAndProcessEvidence(vehicleId: string): Promise<FieldEvidence
     extracted_at: r.extracted_at ?? null,
     status: r.status ?? null,
     created_at: r.created_at,
+    assigned_at: r.assigned_at ?? null,
+    source_image_id: typeof r.source_image_id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(r.source_image_id) ? r.source_image_id : null,
   }));
 
-  // Filter out rejected and superseded evidence — neither is a current source, so neither enters the
-  // conflict analysis or the display (their history stays in field_evidence.contradicting_signals)
-  const active = mapped.filter(r => r.status !== 'rejected' && r.status !== 'superseded');
+  // Preserve the withdrawn account separately: it cannot win or manufacture disagreement today.
+  const withdrawn = (row: FieldEvidenceRow) => row.status === 'superseded' || !!row.status?.startsWith('rejected');
+  const active = mapped.filter(r => !withdrawn(r));
+  const history = mapped.filter(withdrawn);
 
   // Merge agent-write consensus (projection_event) as additional evidence sources — the
   // corrections engine converges into the SAME provenance UI, not a parallel display.
@@ -326,6 +334,8 @@ async function fetchAndProcessEvidence(vehicleId: string): Promise<FieldEvidence
       totalSources: fieldRows.length,
       hasConflict,
       conflictType,
+      history: history.filter(row => row.field_name === fieldName).sort((a, b) =>
+        new Date(b.assigned_at || b.created_at).getTime() - new Date(a.assigned_at || a.created_at).getTime()),
     };
   }
 
