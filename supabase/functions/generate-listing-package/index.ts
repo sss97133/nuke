@@ -101,6 +101,7 @@ interface ListingPackage {
     zones_covered: string[];
     zones_missing: string[];
     ordered: Array<{
+      id: string;
       url: string;
       zone: string | null;
       quality: number | null;
@@ -110,6 +111,43 @@ interface ListingPackage {
   valuation: Record<string, unknown> | null;
   market_context: Record<string, unknown>;
   submission_fields: Record<string, unknown> | null;
+  /** components_seen entries from the photos above, each with its image id (BaT equipment/wheels/tires). */
+  observed_components: Array<{ label: string; confidence: number | null; image_id: string }>;
+}
+
+// Cowl tag (body tag) decode, when the profile carries one. Read from
+// vehicles.origin_metadata.cowl_tag (series, paint_code, trim_code). Never inferred.
+function cowlTag(v: Record<string, unknown>): Record<string, unknown> | null {
+  const om = (v.origin_metadata ?? {}) as Record<string, unknown>;
+  const t = (om.cowl_tag ?? om.trim_tag ?? null) as Record<string, unknown> | null;
+  if (!t || typeof t !== "object") return null;
+  const pick = (...k: string[]) => {
+    for (const key of k) if (t[key] != null && t[key] !== "") return String(t[key]);
+    return null;
+  };
+  const out = {
+    series: pick("series", "body_series", "style"),
+    series_model: pick("series_model"),
+    paint_code: pick("paint_code", "paint", "pnt"),
+    trim_code: pick("trim_code", "trim", "tr"),
+  };
+  return Object.values(out).some((x) => x != null) ? out : null;
+}
+
+// components_seen has three shapes on vehicle_images; only the array of
+// {label, confidence} entries is a component list.
+function componentsOf(rows: Array<Record<string, unknown>>) {
+  const out: Array<{ label: string; confidence: number | null; image_id: string }> = [];
+  for (const r of rows) {
+    const cs = r.components_seen;
+    if (!Array.isArray(cs)) continue;
+    for (const c of cs as Array<Record<string, unknown>>) {
+      if (c && typeof c.label === "string") {
+        out.push({ label: c.label, confidence: (c.confidence as number) ?? null, image_id: r.id as string });
+      }
+    }
+  }
+  return out;
 }
 
 // BaT submission field mapping (skeleton — full mapping in Sprint 3)
@@ -227,13 +265,13 @@ Deno.serve(async (req: Request) => {
     const { data: photos } = await supabase
       .from("vehicle_images")
       .select(
-        "id, image_url, vehicle_zone, photo_quality_score, caption, display_order, taken_at",
+        "id, image_url, vehicle_zone, photo_quality_score, caption, display_order, taken_at, components_seen",
       )
       .eq("vehicle_id", vehicleId)
       .or("is_duplicate.is.null,is_duplicate.eq.false")
       .order("display_order", { ascending: true, nullsFirst: false })
       .order("photo_quality_score", { ascending: false, nullsFirst: true })
-      .limit(200);
+      .limit(600); // BaT accepts up to 600 photos
 
     // Sort photos: hero first, then by zone priority, then by quality
     const sortedPhotos = (photos || []).sort((a, b) => {
@@ -289,7 +327,12 @@ Deno.serve(async (req: Request) => {
         mileage: v.mileage,
         title_status: v.title_status,
         location: [v.city, v.state].filter(Boolean).join(", ") || v.location,
+        city: v.city ?? null,
+        state: v.state ?? null,
+        country: v.country ?? null,
         zip: v.zip_code ?? null,
+        cowl_tag: cowlTag(v),
+        bat_model: cowlTag(v)?.series_model ?? null,
         // owned_time = the purchase year (BaT asks "what year did you purchase"). Null-safe; never inferred.
         owned_time: v.purchase_date ? new Date(v.purchase_date).getFullYear() : null,
       },
@@ -303,6 +346,10 @@ Deno.serve(async (req: Request) => {
         recent_service_history: v.recent_service_history,
         documents_on_hand: v.documents_on_hand,
         seller_name: v.seller_name,
+        video_urls: v.video_urls ?? null,
+        paint_body_history: v.paint_body_history ?? null,
+        accident_history: v.accident_history ?? null,
+        rust: v.rust_notes ?? null,
       },
       photos: {
         count: sortedPhotos.length,
@@ -311,6 +358,7 @@ Deno.serve(async (req: Request) => {
         zones_missing: (ars?.photo_zones_missing as string[]) || [],
         ordered: sortedPhotos.map(
           (p: Record<string, unknown>) => ({
+            id: p.id as string,
             url: p.image_url as string,
             zone: p.vehicle_zone as string | null,
             quality: p.photo_quality_score as number | null,
@@ -335,6 +383,7 @@ Deno.serve(async (req: Request) => {
       },
       submission_fields:
         platform === "bat" ? mapToBatFields(v) : null,
+      observed_components: componentsOf(sortedPhotos as Array<Record<string, unknown>>),
     };
 
     // Derive-on-read pass: override flat-column values with synthesized consensus
@@ -360,7 +409,7 @@ Deno.serve(async (req: Request) => {
         attribute: d.attribute,
       };
     }
-    (pkg as Record<string, unknown>).field_provenance = fieldProvenance;
+    (pkg as unknown as Record<string, unknown>).field_provenance = fieldProvenance;
 
     return new Response(JSON.stringify(pkg, null, 2), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
