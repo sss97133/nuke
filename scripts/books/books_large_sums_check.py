@@ -6,14 +6,19 @@ Read-only: every statement runs as the service role in a transaction that is rol
                  ranking by dollars, the 80% head (including the exact-80% edge), each basis_strength and proof_flag, NULL payment proof,
                  credits, a second owner and a second year; and the document layer: which kind of paper each category requires, which cites
                  and which Nuke documents satisfy it (and which do not: retired, revoked, unapproved, too weak), vehicles tied through the
-                 books_decision documents. No books data is read.
+                 books_decision documents; and the message-thread rule (owner ruling 2026-10-29): which cites of a Messages / chat.db, iMessage, SMS,
+                 WhatsApp, Marketplace, Craigslist or Gmail thread count as the invoice or agreement and as the purchase agreement, which do not (a
+                 search that found nothing, no date or id, a bare Gmail message id, a receipt or order, a lease), and that a real document wins over a
+                 thread. No books data is read.
   2. invariants  on the live books (the deployed views, or the migration's with --migration): the view's rows tie out to their sources
                  (the audit tiers' deduction rows and the rollup the office page shows, the Revenue decisions), the ranking and the
                  cumulative share are arithmetic over those rows, the head is the smallest top set reaching 80%, the basis_strength of every row
                  follows from the ruling ids, ruling refs and document cites the row carries, and the required document kind follows from the
-                 category (an independent copy of the keyword rules).
+                 category (an independent copy of the keyword rules); a row reports doc_message_only exactly when a message thread is the only
+                 document, and an independent copy of the message-thread test agrees with the view.
   3. findings    per year the head, the dollars in it, and the head rows R12 flags, by flag, with the largest, and the head rows that miss the
-                 document their kind requires, by kind. A year with a flagged head row is a FAIL (the books, not the view). --expect
+                 document their kind requires, by kind; the head rows that rest on a message thread alone; the flagged head rows whose only cites
+                 are message threads that did not count (and why). A year with a flagged head row is a FAIL (the books, not the view). --expect
                  YEAR:RANK:FLAG states what the deduction at that dollar rank must be (FLAG = filed_return_only | no_payment_proof | no_basis |
                  missing_doc | ok).
   --with-gate    also runs books_year_gate (slow: about 12 to 45 s a year) and requires R12 to equal part 3 (n, dollars, head size, ids, missing
@@ -23,7 +28,7 @@ Timings of the reads are printed; --max-seconds fails a read that takes longer.
 Exit 1 on a failed unit test or invariant, or on a year with flagged head rows (--report: exit 0 on findings alone).
 
   dotenvx run -- python3 scripts/books/books_large_sums_check.py --owner <uuid> [--years 2022 2023 2024 2025]
-      [--migration supabase/migrations/20261105160000_books_large_sums_tuning.sql] [--expect 2024:1:ok ...] [--with-gate] [--before-after] [--report]
+      [--migration supabase/migrations/20261105190000_books_large_sums_message_threads.sql] [--expect 2024:1:ok ...] [--with-gate] [--before-after] [--report]
 """
 import argparse
 import re
@@ -32,8 +37,8 @@ from decimal import Decimal
 
 from books_check_sql import money, run, uuid_ok, view_sql, with_substituted_views
 
-DEFAULT_MIGRATION = 'supabase/migrations/20261105160000_books_large_sums_tuning.sql'
-VIEWS = ('v_books_direction_links', 'v_books_direction_checks', 'v_books_large_sums')
+DEFAULT_MIGRATION = 'supabase/migrations/20261105190000_books_large_sums_message_threads.sql'
+VIEWS = ('v_books_large_sums',)
 FLAGS = ('filed_return_only', 'no_payment_proof', 'no_basis', 'missing_doc')
 FILED_ID = re.compile(r'RULING-(filed|Schedule C|car-basis)')
 FILED_REF = re.compile(r'owner ruling on the filed [0-9]{4} schedule c', re.I)
@@ -51,6 +56,27 @@ RULES = [
     ('cost_of_goods', r'schedule c line 4\b|cost of goods', 'invoice_or_agreement'),
 ]
 LEVEL = {'purchase_agreement': 3, 'invoice_or_agreement': 2, 'receipt_or_order': 1}
+
+# An independent copy of the message-thread test (PostgreSQL \m and \M become \b). A cite counts when its ref names the medium, locates the exchange by a date or
+# an id, and does not record a search with no result. A Gmail cite needs the word thread: a bare Gmail message id is one message, not an exchange.
+MEDIUM = re.compile(r'chat\.db|library/messages|\bmessages? handle|\bi-?messages?\b|\bsms\b|\btext messages?\b|\btext (thread|exchange|conversation)\b|\btexts (with|from|to|between)\b'
+                    r'|\btexted\b|whatsapp|\b(facebook|fb) (messenger|messages?|chat)\b|\bmessenger\b'
+                    r'|\b(marketplace|craigslist)\b.{0,40}\b(thread|messages?|chat|conversation|repl(y|ies)|exchange)\b'
+                    r'|\b(thread|messages?|chat|conversation|exchange)\b.{0,40}\b(marketplace|craigslist)\b|\b(gmail|e-?mail) (thread|exchange|chain)\b')
+NO_RESULT = re.compile(r'searched,? no |earliest message|nothing found|none found|not found|found nothing'
+                       r'|\bno (relevant |matching |such |cash-use |other )?(messages?|chat|texts?|evidence|threads?|hits?|results?|matches)\b')
+LOCATOR = re.compile(r'[0-9]{4}-[0-9]{2}-[0-9]{2}|[0-9]{1,2}/[0-9]{1,2}/[0-9]{2,4}|\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]* [0-9]{1,2}\b'
+                     r'|\b[0-9]{1,2} (jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\b|[0-9]{5,}|\b[0-9a-f]{12,}\b')
+
+
+def names_medium(c):
+    ref = (c.get('ref') or '').lower()
+    return bool(MEDIUM.search(ref) or (c.get('kind') == 'gmail' and re.search(r'\bthread\b', ref)))
+
+
+def is_message_thread(c):
+    ref = (c.get('ref') or '').lower()
+    return names_medium(c) and not NO_RESULT.search(ref) and bool(LOCATOR.search(ref))
 
 problems, findings = [], []
 
@@ -202,7 +228,7 @@ DOCROWS = [  # (row, expected required_doc_kind, rule, missing_doc, expected doc
     (t('R-RULING', 100, year='2097', cat=CAT_RENT, rid='2099-RULING-674-rent', rcites=[ruling('2099-RULING-674-rent')]),
      'lease_or_ruling', 'rent', False, ['owner_ruling'], 1),
     (t('R-FILED', 100, year='2097', cat=CAT_RENT, **FILED20), 'lease_or_ruling', 'rent', True, [], 0),
-    (t('R-LEASE', 100, year='2097', cat=CAT_RENT, dcites=[cite('file', 'lease agreement 674 Wells Rd')]), 'lease_or_ruling', 'rent', False, ['proof_links'], 1),
+    (t('R-LEASE', 100, year='2097', cat=CAT_RENT, dcites=[cite('file', 'lease agreement for the shop space')]), 'lease_or_ruling', 'rent', False, ['proof_links'], 1),
     (t('D-REG', 100, year='2097', cat=CAT_DEP, pay=False, basis='asset_register'), 'register_asset', 'depreciation', False, ['asset_register'], 1),
     (t('D-REG-PAID', 100, year='2097', cat=CAT_DEP), 'register_asset', 'depreciation', False, ['asset_register'], 1),     # claimed by the register, proven by its bank line
     (t('D-NOREG', 100, year='2097', cat=CAT_DEP, tier='C', pay=False, basis=None), 'register_asset', 'depreciation', True, [], 0),
@@ -231,8 +257,61 @@ DOCROWS = [  # (row, expected required_doc_kind, rule, missing_doc, expected doc
     (t('K-USEGROUP', 100, year='2097', cat=CAT_LABOR), 'invoice_or_agreement', 'contractor', True, [], 0),   # contractor rows stay strict even inside a use group
     (t('P-USEGROUP', 100, year='2097', cat=CAT_PARTS), 'receipt_or_order', 'parts_supplies', True, [], 0),   # so do parts rows
 ]
+# ---- the message-thread rule, year 2097: (row, required kind, rule, missing, doc_found sources, doc_found_n, doc_found_kind, doc_message_only)
+CHAT = '~/Library/Messages/chat.db handle h-001, 2024-10-23, message ids 5521 5522: painter names the job and the price'
+MSGROWS = [
+    (t('M-K-CHATDB', 100, year='2097', cat=CAT_LABOR, dcites=[cite('file', CHAT)]), 'invoice_or_agreement', 'contractor', False, ['proof_links'], 1, 'message thread', True),
+    (t('M-K-IMESSAGE', 100, year='2097', cat=CAT_LABOR, dcites=[cite('file', 'iMessage with the painter 2025-03-03: job and price agreed')]),
+     'invoice_or_agreement', 'contractor', False, ['proof_links'], 1, 'message thread', True),
+    (t('M-K-SMS', 100, year='2097', cat=CAT_LABOR, dcites=[cite('artifact', 'SMS thread screenshot 03/04/2025')]), 'invoice_or_agreement', 'contractor', False, ['proof_links'], 1,
+     'message thread', True),
+    (t('M-K-TEXTS', 100, year='2097', cat=CAT_LABOR, dcites=[cite('photo', 'texts with the welder, 14 Feb 2025 (price in the second text)')]), 'invoice_or_agreement', 'contractor', False,
+     ['proof_links'], 1, 'message thread', True),
+    (t('M-K-WHATSAPP', 100, year='2097', cat=CAT_LABOR, dcites=[cite('artifact', 'WhatsApp chat export 2025-02-01')]), 'invoice_or_agreement', 'contractor', False,
+     ['proof_links'], 1, 'message thread', True),
+    (t('M-K-FB', 100, year='2097', cat=CAT_LABOR, dcites=[cite('artifact', 'Facebook Marketplace thread 2025-06-03, seller agreed the price')]), 'invoice_or_agreement',
+     'contractor', False, ['proof_links'], 1, 'message thread', True),
+    (t('M-K-CL', 100, year='2097', cat=CAT_LABOR, dcites=[cite('artifact', 'Craigslist reply thread, 3 Jun 2025')]), 'invoice_or_agreement', 'contractor', False,
+     ['proof_links'], 1, 'message thread', True),
+    (t('M-K-GMAILTHREAD', 100, year='2097', cat=CAT_LABOR, dcites=[cite('gmail', 'Gmail thread abcdef0123456789: quote and price for the paint')]), 'invoice_or_agreement',
+     'contractor', False, ['proof_links'], 1, 'message thread', True),
+    (t('M-T-GMAILTHREAD', 100, year='2097', cat='Freight and delivery', dcites=[cite('gmail', 'Gmail thread abcdef0123456789: carrier quote and price')]),
+     'invoice_or_agreement', 'transport', False, ['proof_links'], 1, 'message thread', True),
+    # cites that name a message but do not count
+    (t('M-K-GMAILMSG', 100, year='2097', cat=CAT_LABOR, dcites=[cite('gmail', 'Gmail message id 0123456789abcdef')]), 'invoice_or_agreement', 'contractor', True, [], 0, None, False),
+    (t('M-K-NOLOCATOR', 100, year='2097', cat=CAT_LABOR, dcites=[cite('file', 'iMessage with the painter')]), 'invoice_or_agreement', 'contractor', True, [], 0, None, False),
+    (t('M-K-SEARCHED', 100, year='2097', cat=CAT_LABOR, dcites=[cite('file', '~/Library/Messages/chat.db 2025-08-19..22 searched, no cash-use message')]),
+     'invoice_or_agreement', 'contractor', True, [], 0, None, False),
+    (t('M-K-EARLIEST', 100, year='2097', cat=CAT_LABOR, dcites=[cite('file', 'chat.db: earliest message 2024-07-17, so no 2022 chat evidence exists on this computer')]),
+     'invoice_or_agreement', 'contractor', True, [], 0, None, False),
+    (t('M-K-PLAINTEXT', 100, year='2097', cat=CAT_LABOR, dcites=[cite('file', 'plain text export 2025-03-03 of the price list')]), 'invoice_or_agreement', 'contractor', True, [], 0, None, False),
+    (t('M-K-LISTING', 100, year='2097', cat=CAT_LABOR, dcites=[cite('artifact', 'Facebook Marketplace listing 2025-06-03')]), 'invoice_or_agreement', 'contractor', True, [], 0, None, False),
+    (t('M-K-RULINGONLY', 100, year='2097', cat=CAT_LABOR, rid='2099-RULING-x', rcites=[dict(kind='owner_ruling', ref='2099-RULING-x: texts with the painter 2025-03-03')]),
+     'invoice_or_agreement', 'contractor', True, [], 0, None, False),                                   # a ruling that mentions texts is a ruling, not a document
+    # a real document wins over a thread, and the thread is then not listed
+    (t('M-K-BOTH', 100, year='2097', cat=CAT_LABOR, dcites=[cite('file', CHAT), cite('gmail', 'invoice from the painter')]), 'invoice_or_agreement', 'contractor', False,
+     ['proof_links'], 1, 'invoice or agreement', False),
+    (t('M-K-BOTH-ONECITE', 100, year='2097', cat=CAT_LABOR, dcites=[cite('file', 'iMessage 2025-03-03 painter sent the invoice for the job')]), 'invoice_or_agreement', 'contractor',
+     False, ['proof_links'], 1, 'message thread', True),                                                # one cite that is both is read as the thread it is
+    # strict kinds
+    (t('M-P-RECEIPT', 100, year='2097', cat=CAT_PARTS, dcites=[cite('file', CHAT)]), 'receipt_or_order', 'parts_supplies', True, [], 0, None, False),
+    (t('M-P-RECEIPT-ORDER', 100, year='2097', cat=CAT_PARTS, dcites=[cite('file', CHAT), cite('file', 'Amazon order 112-3456')]), 'receipt_or_order', 'parts_supplies', False,
+     ['proof_links'], 1, 'receipt or order', False),
+    (t('M-R-RENT', 100, year='2097', cat=CAT_RENT, dcites=[cite('file', CHAT)]), 'lease_or_ruling', 'rent', True, [], 0, None, False),
+    (t('M-D-DEP', 100, year='2097', cat=CAT_DEP, tier='C', pay=False, basis=None, dcites=[cite('file', CHAT)]), 'register_asset', 'depreciation', True, [], 0, None, False),
+    # vehicle and equipment purchases: the thread is the purchase agreement when no bill of sale or title is found
+    (t('M-V-THREAD', 100, year='2097', cat=CAT_DEAL, dcites=[cite('artifact', 'Facebook Marketplace thread 2025-06-03, seller agreed the price')]), 'purchase_agreement',
+     'vehicle_deal', False, ['proof_links'], 1, 'message thread', True),
+    (t('M-V-EQUIPMENT', 100, year='2097', cat='Equipment purchase', dcites=[cite('file', CHAT)]), 'purchase_agreement', 'vehicle_deal', False, ['proof_links'], 1, 'message thread', True),
+    (t('M-V-BOS', 100, year='2097', cat=CAT_DEAL, dcites=[cite('file', 'bill of sale 2025-06-03'), cite('artifact', 'Facebook Marketplace thread 2025-06-03')]), 'purchase_agreement',
+     'vehicle_deal', False, ['proof_links'], 1, 'purchase agreement, bill of sale or title', False),
+    (t('M-V-LINKED-TITLE', 100, year='2097', cat=CAT_DEAL, dcites=[cite('artifact', 'Facebook Marketplace thread 2025-06-03')]), 'purchase_agreement', 'vehicle_deal', False,
+     ['ownership_verifications'], 1, 'title', False),                                                   # the vehicle's approved title is found; the thread is not listed beside it
+    (t('M-V-NOTHING', 100, year='2097', cat=CAT_DEAL), 'purchase_agreement', 'vehicle_deal', True, [], 0, None, False),
+]
+DOCROWS += [m[:6] for m in MSGROWS]
 SYN_TIERS += [r[0] for r in DOCROWS]
-LINKED = {'V-LINKED-OK': 1, 'V-LINKED-LOW': 2, 'V-LINKED-TITLE': 3, 'V-LINKED-RETIRED': 4, 'V-IMG': 5, 'V-MANY': 6, 'V-AMT-NO': 8, 'V-AMT-YES': 9, 'V-TITLE-NOT-INVOICE': 3, 'V-SECURE': 10}
+LINKED = {'V-LINKED-OK': 1, 'V-LINKED-LOW': 2, 'V-LINKED-TITLE': 3, 'V-LINKED-RETIRED': 4, 'V-IMG': 5, 'V-MANY': 6, 'V-AMT-NO': 8, 'V-AMT-YES': 9, 'V-TITLE-NOT-INVOICE': 3, 'V-SECURE': 10, 'M-V-LINKED-TITLE': 11}
 _by_local = {r[0]['local_id']: r[0] for r in DOCROWS}
 for local, vn in LINKED.items():                                          # the decision record carries the source_key the link job wrote
     SYN_RECS.append(v(local, 100, section='Expense', year='2097', rid_=_by_local[local]['id'], source_key='sk-' + local))
@@ -270,7 +349,8 @@ SYN_NUKE = {
                               dict(receipt_id=RCPT_99, vehicle_id=VEH[8], status='linked', retired_at=None)]
                              + [dict(receipt_id=r, vehicle_id=VEH[6], status='linked', retired_at=None) for r in RCPT_MANY],
     'ownership_verifications': [dict(id=uid(), vehicle_id=VEH[3], status='approved', title_document_url='u'),
-                                dict(id=uid(), vehicle_id=VEH[4], status='pending', title_document_url='u')],
+                                dict(id=uid(), vehicle_id=VEH[4], status='pending', title_document_url='u'),
+                                dict(id=uid(), vehicle_id=VEH[11], status='approved', title_document_url='u')],
     'vehicle_images': [dict(id=uid(), vehicle_id=VEH[5], is_document=True, document_classification='title scan', document_category=None),
                        dict(id=uid(), vehicle_id=VEH[5], is_document=False, document_classification='bill of sale', document_category=None)],
     'vehicle_listing_documents': [dict(id=1, vehicle_id=VEH[4], doc_type='title', revoked_at='2026-10-01T00:00:00Z', amount=None)],
@@ -292,7 +372,7 @@ def unit_test(migration_text):
     select = with_substituted_views(view_sql(migration_text, 'v_books_large_sums'), sources)
     sql = ("select coalesce(jsonb_agg(jsonb_build_object('kind', x.kind, 'owner', x.owner_id, 'year', x.year, 'id', x.local_id, 'rank', x.dollar_rank, 'tier', x.tier, "
            "'pay', x.pay_proof, 'basis', x.basis_strength, 'flag', x.proof_flag, 'head', x.in_head, 'usd', x.year_usd, 'cum', x.cum_share, 'share', x.share, "
-           "'req', x.required_doc_kind, 'rule', x.required_doc_rule, 'missing', x.missing_doc, 'found', x.doc_found, 'found_n', x.doc_found_n, 'cited', x.doc_cited_n, 'veh', x.vehicle_ids) "
+           "'req', x.required_doc_kind, 'rule', x.required_doc_rule, 'missing', x.missing_doc, 'found', x.doc_found, 'found_n', x.doc_found_n, 'cited', x.doc_cited_n, 'veh', x.vehicle_ids, 'fkind', x.doc_found_kind, 'msg_only', x.doc_message_only) "
            f"order by x.owner_id, x.kind, x.year, x.dollar_rank), '[]'::jsonb) from ({select}) x")
     rows = run([('unit', sql)])['unit'][0]
     got = {(r['kind'], r['year'], r['id']): r for r in rows if r['owner'] == A}
@@ -325,6 +405,23 @@ def unit_test(migration_text):
         ok((r['req'], r['rule'], r['missing'], srcs, r['found_n'], vehicles) == (req, rule, missing, sorted(sources_), found_n, want_veh),
            f"documents {row['local_id']}: requires {r['req']} ({r['rule']}), missing {r['missing']}, found {srcs} of {r['found_n']}, vehicles {vehicles and len(vehicles)}"
            f" (expected {req} {rule} {missing} {sorted(sources_)} {found_n})")
+    for row, req, rule, missing, sources_, found_n, fkind, msg_only in MSGROWS:
+        r = got.get(('deduction', '2097', row['local_id']))
+        if r:
+            ok((r['fkind'], r['msg_only']) == (fkind, msg_only), f"message threads {row['local_id']}: doc_found_kind {r['fkind']!r}, doc_message_only {r['msg_only']} (expected {fkind!r} {msg_only})")
+            ok(all((f.get('type') == 'message thread') == r['msg_only'] for f in r['found']) or not r['found'],
+               f"message threads {row['local_id']}: a thread is listed only when it is all there is")
+            ok(all(f.get('level') == LEVEL[req] for f in r['found'] if f.get('type') == 'message thread'), f"message threads {row['local_id']}: a listed thread carries the required level")
+            if req in ('invoice_or_agreement', 'purchase_agreement'):
+                py = any(is_message_thread(c) for c in row['document_cites'])
+                if fkind == 'message thread':
+                    ok(py, f"message threads {row['local_id']}: the independent copy of the test sees the thread")
+                elif missing:
+                    ok(not py, f"message threads {row['local_id']}: the independent copy of the test sees no thread either")
+    ok(all(isinstance(r['msg_only'], bool) for r in rows), 'doc_message_only is a boolean on every row')
+    ok(all(r['fkind'] is None for r in rows if r['found_n'] == 0), 'doc_found_kind is null when nothing is found')
+    ok(not any(r['msg_only'] for r in rows if r['kind'] == 'revenue' or r['req'] not in ('invoice_or_agreement', 'purchase_agreement')),
+       'only an invoice-or-agreement or purchase-agreement row can rest on a message thread')
     cited = {row['local_id']: len(row['document_cites']) for row, *_ in DOCROWS}
     ok(all(got[('deduction', '2097', k)]['cited'] == n for k, n in cited.items() if ('deduction', '2097', k) in got), 'doc_cited_n counts the documents a row cites, whatever they are')
     ok(all(r['req'] is None and r['missing'] is False and r['found'] == [] for r in rows if r['kind'] == 'revenue'),
@@ -428,6 +525,17 @@ def invariants(rows, tiers, rollup, revenue, years):
                     bad.append((r['local_id'], 'a found document below the required level', ''))
                 if len(r['doc_found']) > 5 or len(r['doc_found']) > r['doc_found_n']:
                     bad.append((r['local_id'], 'doc_found size', len(r['doc_found'])))
+                threads = [f for f in r['doc_found'] if f.get('type') == 'message thread']
+                if r['doc_message_only'] != bool(threads) or (threads and len(threads) != len(r['doc_found'])):
+                    bad.append((r['local_id'], 'doc_message_only', r['doc_message_only']))
+                if threads and r['required_doc_kind'] not in ('invoice_or_agreement', 'purchase_agreement'):
+                    bad.append((r['local_id'], 'a message thread on a kind that stays strict', r['required_doc_kind']))
+                if r['required_doc_kind'] in ('invoice_or_agreement', 'purchase_agreement') and r['doc_found_n'] == 0 and any(is_message_thread(c) for c in r['document_cites'] or []):
+                    bad.append((r['local_id'], 'a message thread cited and no document found', ''))
+                if r['doc_message_only'] and not any(is_message_thread(c) for c in r['document_cites'] or []):
+                    bad.append((r['local_id'], 'rests on a message thread the independent test does not see', ''))
+                if (r['doc_found_kind'] is None) != (r['doc_found_n'] == 0):
+                    bad.append((r['local_id'], 'doc_found_kind', r['doc_found_kind']))
             ok(not bad, f'{label}: required document kind follows from the category rules; missing_doc = required and none found; a found document meets the level'
                + (f' (first: {bad[:3]})' if bad else ''))
 
@@ -474,6 +582,20 @@ def findings_for(rows, years):
             print(f"     missing documents: {len(missing)} head rows {money(md)} ({len(nodoc)} cite no document at all, {money(sum(abs(r['amount']) for r in nodoc))}): " + ', '.join(f"{len(v)} {k} {money(sum(abs(r['amount']) for r in v))}"
                                                                                              for k, v in sorted(kinds.items(), key=lambda kv: -sum(abs(r['amount']) for r in kv[1]))))
             print(f"     largest missing: {', '.join(r['local_id'] + ' ' + money(abs(r['amount'])) + ' (' + r['required_doc_kind'] + ')' for r in missing[:3])}")
+        # message threads (owner ruling 2026-10-29): what rests on texts, and what cites only texts that did not count
+        resting = [r for r in head if r['doc_message_only']]
+        print(f"     head rows that rest on a message thread alone: {len(resting)} {money(sum(abs(r['amount']) for r in resting))}")
+        texts_only = [r for r in flagged if r['document_cites'] and all(names_medium(c) for c in r['document_cites'])]
+        if texts_only:
+            why = {}
+            for r in texts_only:
+                reason = ('kind stays strict (' + r['required_doc_kind'] + ')' if r['required_doc_kind'] not in ('invoice_or_agreement', 'purchase_agreement')
+                          else 'no date or id' if not any(LOCATOR.search((c.get('ref') or '').lower()) for c in r['document_cites'])
+                          else 'records a search with no result' if all(NO_RESULT.search((c.get('ref') or '').lower()) for c in r['document_cites'])
+                          else 'other')
+                why[reason] = why.get(reason, 0) + 1
+            print(f"     flagged head rows whose only cites are message threads that did not count: {len(texts_only)} ({', '.join(f'{n} {k}' for k, n in sorted(why.items()))}): "
+                  + ', '.join(r['local_id'] for r in texts_only[:10]))
     return out
 
 
@@ -494,8 +616,9 @@ def check_expect(rows, expects):
 
 def gate_agreement(owner, migration, years, found):
     print('-- books_year_gate against the views')
-    qs = [(f'g{y}', f"select public.books_year_gate{'_pending' if migration else ''}('{owner}'::uuid, {int(y)})::text") for y in years]
-    res = run(qs, migration=migration, view_names=VIEWS, with_gate=bool(migration), timeout='115s')
+    has_gate = bool(migration) and 'CREATE OR REPLACE FUNCTION public.books_year_gate(' in open(migration).read()
+    qs = [(f'g{y}', f"select public.books_year_gate{'_pending' if has_gate else ''}('{owner}'::uuid, {int(y)})::text") for y in years]
+    res = run(qs, migration=migration, view_names=VIEWS, with_gate=has_gate, timeout='115s')
     for y in years:
         g = res[f'g{y}'][0]
         rules = {r['rule']: r for r in g['rules']}
@@ -519,10 +642,11 @@ def before_after(owner, migration, years, limit=15):
     print('-- before and after: the deployed v_books_large_sums against the migration\'s')
     ylist = ','.join("'" + y + "'" for y in years)
     cols = 'year, dollar_rank, local_id, amount, tier, proof_flag, missing_doc, required_doc_kind, required_doc_rule, doc_found, in_head, year_usd'
+    new_cols = cols + ', doc_found_kind, doc_message_only'
     q = ("select coalesce(jsonb_agg(to_jsonb(r)), '[]'::jsonb) from (select " + cols + " from public.v_books_large_sums where owner_id = '" + owner +
          f"'::uuid and kind = 'deduction' and year in ({ylist})) r")
     old = run([('rows', q)])['rows'][0]
-    new = run([('rows', q)], migration=migration, view_names=VIEWS)['rows'][0]
+    new = run([('rows', q.replace(cols, new_cols, 1))], migration=migration, view_names=VIEWS)['rows'][0]
     key = lambda r: (r['year'], r['local_id'])  # noqa: E731
     oldm, newm = {key(r): r for r in old}, {key(r): r for r in new}
     flag = lambda r: r['proof_flag'] or ('missing_doc' if r['missing_doc'] else None)  # noqa: E731
@@ -556,6 +680,9 @@ def before_after(owner, migration, years, limit=15):
                   + (f"  [{', '.join(sorted({f.get('source') for f in n['doc_found']}))}]" if n and n['doc_found'] and before != after else ''))
         changed = [k for k in set(oldm) | set(newm) if k[0] == y and (flag(oldm.get(k)) if oldm.get(k) else None) != (flag(newm.get(k)) if newm.get(k) else None)]
         print(f"     rows whose flag changed: {len(changed)}, dollars {money(sum(abs((newm.get(k) or oldm.get(k))['amount']) for k in changed))}")
+        differ = [k for k in oldm if k in newm and (oldm[k]['doc_found'], oldm[k]['missing_doc']) != (newm[k]['doc_found'], newm[k]['missing_doc'])]
+        resting = [r for r in newm.values() if r['year'] == y and r['in_head'] and r['doc_message_only']]
+        print(f"     rows whose doc_found changed: {len(differ)}; head rows that now rest on a message thread alone: {len(resting)}")
 
 
 def main():
@@ -575,7 +702,7 @@ def main():
     ylist = ','.join("'" + y + "'" for y in years)
     cols = ("kind, year, dollar_rank, local_id, amount, category, tier, pay_proof, doc_proof, purpose_proof, proof_basis, basis_strength, proof_flag, ruling_id, "
             "ruling_cites, payment_cites, document_cites, required_doc_kind, required_doc_rule, doc_found, doc_found_n, doc_cited_n, missing_doc, vehicle_ids, "
-            "year_usd, share, cum_usd, cum_share, in_head")
+            "year_usd, share, cum_usd, cum_share, in_head, doc_found_kind, doc_message_only")
     qs = [
         ('rows', f"select coalesce(jsonb_agg(to_jsonb(r)), '[]'::jsonb) from (select {cols} from public.v_books_large_sums where owner_id = '{owner}'::uuid and year in ({ylist})) r"),
         ('tiers', f"select coalesce(jsonb_agg(jsonb_build_object('year', year, 'n', n, 'usd', usd)), '[]'::jsonb) from (select year, count(*) n, sum(amount) usd from public.v_books_audit_tiers "
