@@ -28,6 +28,12 @@ RETURNS boolean LANGUAGE sql IMMUTABLE SET search_path=pg_catalog,public AS $$
   SELECT m[1] FROM strong CROSS JOIN LATERAL regexp_matches(upper(o->>'value'),'\m([A-Z0-9]{17})\M','g') m
    WHERE o->>'kind'='ocr_text'
   UNION
+  -- This function only compares against a persisted vehicle identifier. A
+  -- bare classic plate may match it exactly; it cannot create a new identity.
+  SELECT m[1] FROM strong CROSS JOIN LATERAL regexp_matches(upper(o->>'value'),'\m([A-Z0-9]{8,16})\M','g') m
+   WHERE o->>'kind'='ocr_text' AND length(p_identifier) BETWEEN 8 AND 16
+    AND m[1] ~ '[A-Z]' AND m[1] ~ '[0-9]'
+  UNION
   SELECT m[1] FROM strong CROSS JOIN LATERAL regexp_matches(upper(o->>'value'),
    '\m(?:CHASSIS|SERIAL|VIN)\s*(?:NO\.?|NUMBER|#)?\s*[:#.-]?\s*([A-Z0-9]{8,16})\M','g') m
    WHERE o->>'kind'='ocr_text'

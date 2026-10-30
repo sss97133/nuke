@@ -251,4 +251,23 @@ SELECT pg_temp.ok('existing qualification owner grants and ownership stay unchan
  WHERE p.proacl IS DISTINCT FROM a.proacl OR p.proowner<>a.proowner)
  AND NOT has_function_privilege('authenticated','public.contributor_native_identifier_matches(jsonb,text)','EXECUTE')
  AND NOT has_function_privilege('anon','public.contributor_native_identifier_matches(jsonb,text)','EXECUTE'));
+DO $test$ DECLARE original jsonb; original_identifier text; changed jsonb; item_id uuid; reading_id uuid;
+BEGIN
+ SELECT id INTO reading_id FROM qualified_reading;
+ SELECT confidence_basis INTO original FROM public.image_observations WHERE id=reading_id;
+ SELECT vin INTO original_identifier FROM public.vehicles WHERE id='a0000000-0000-4000-8000-000000000001';
+ SELECT id INTO item_id FROM public.vehicle_evidence_items WHERE vehicle_id='a0000000-0000-4000-8000-000000000001' AND key='shot_vin_plate';
+ UPDATE public.vehicles SET vin='2S87T3N123456' WHERE id='a0000000-0000-4000-8000-000000000001';
+ changed:=jsonb_set(jsonb_set(original,'{visual_subject_reading_v1,envelope,raw_model_reading,observations,0,vin_candidates}',
+   '["2S87T3N123456"]'),'{visual_subject_reading_v1,envelope,raw_model_reading,observations,0,on_device,0,value}','"2S87T3N123456"');
+ UPDATE public.image_observations SET confidence_basis=changed WHERE id=reading_id;
+ PERFORM pg_temp.ok('an unlabelled classic plate can match the persisted identifier exactly',
+  public.evaluate_contributor_evidence_item(item_id,reading_id)->'qualified'='true'::jsonb);
+ UPDATE public.image_observations SET confidence_basis=jsonb_set(changed,
+  '{visual_subject_reading_v1,envelope,raw_model_reading,observations,0,on_device,0,value}','"2S8703N123456"') WHERE id=reading_id;
+ PERFORM pg_temp.ok('native confidence one cannot repair a wrong classic glyph into proof',
+  public.evaluate_contributor_evidence_item(item_id,reading_id)->'qualified'='false'::jsonb);
+ UPDATE public.image_observations SET confidence_basis=original WHERE id=reading_id;
+ UPDATE public.vehicles SET vin=original_identifier WHERE id='a0000000-0000-4000-8000-000000000001';
+END $test$;
 \i supabase/migrations/20261030213042_qualify_retained_native_identifier_witness.sql
