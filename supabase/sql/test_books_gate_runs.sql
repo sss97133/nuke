@@ -1,11 +1,13 @@
 \set ON_ERROR_STOP on
--- Disposable synthetic contract for books_gate_runs and its writer and readers (migration 20261106110000). Every id, name and
+-- Disposable synthetic contract for books_gate_runs and its writer and readers (migration 20261106110000) and for the walk that
+-- books_gate_md5 makes from the gate (migration 20261106150000, which replaces the function the first migration made). Every id, name and
 -- amount below is invented; books_year_gate is a stand-in whose definition the contract changes.
 -- Covered: the store's keys, checks, append-only trigger, RLS and grants; the writer (service_role only, one receipt per run, a
 -- result must name its owner and year, a failed run needs a reason, a context belongs to a complete run); the reader: the years are the
 -- return drafts, the stored runs and the years that have Expense decisions (a closed decision and a revenue-only year add none), rules in R-order
 -- with an unknown id last and never dropped, no failing ids or detail text, stale when a document is touched, when the gate definition
--- changes and when a view the gate reads changes (named by the gate, or read through another view; an unrelated view changes nothing),
+-- changes and when anything the gate reads changes (a view or reader its source names, a helper a reader names, a view beneath a view, a function
+-- a view calls, a view first read by two named views; an unrelated view or function changes nothing),
 -- trusted only for a fresh pass with no rule that checked nothing, the latest attempt, drafts on file, open return items by actor
 -- equal to what books_year_state lists, the summary; a stranger, the accounting reviewer and anon are refused; a re-apply changes nothing.
 \ir test_financial_accounting.sql
@@ -41,6 +43,8 @@ CREATE TABLE public.write_receipts (
 CREATE FUNCTION public.books_year_gate(p_owner_id uuid, p_year integer) RETURNS jsonb LANGUAGE sql STABLE AS $$ SELECT '{"stand_in": 1}'::jsonb $$;
 \ir ../migrations/20261106110000_books_gate_runs.sql
 \ir ../migrations/20261106110000_books_gate_runs.sql
+\ir ../migrations/20261106150000_books_gate_md5_walk.sql
+\ir ../migrations/20261106150000_books_gate_md5_walk.sql
 
 CREATE FUNCTION pg_temp.ok(label text, condition boolean) RETURNS void LANGUAGE plpgsql AS $$ BEGIN
   IF condition IS NOT TRUE THEN RAISE EXCEPTION 'Contract failed: %', label; END IF;
@@ -287,12 +291,29 @@ SELECT pg_temp.ok('a changed gate definition marks the runs stale because the ga
   AND (SELECT j->>'gate_md5' <> (SELECT run_md5 FROM (SELECT gate_md5 AS run_md5 FROM public.books_gate_runs LIMIT 1) q) FROM s3));
 COMMIT;
 
--- Stale when a view the gate reads changes ------------------------------------------------------------------------------------------------
--- R10 and R12 are computed by views, so the hash covers the views the gate names and every view those read. v_books_base is not named by the gate;
--- v_books_audit_tiers is, and reads it. v_books_unrelated is read by nothing the gate touches.
+-- Stale when something the gate reads changes ----------------------------------------------------------------------------------------------
+-- The hash is found from the gate, not from a list. The gate's source names the books functions and v_books views it reads, a function's source
+-- names what it calls, and a view's stored rule depends on the views it reads and the public functions it calls. The stand-in below names four views and one
+-- reader (in a comment, which counts); the rest is found from there:
+--   v_books_audit_tiers        named by the gate, reads v_books_base (named by nothing)
+--   v_books_large_sums         named by the gate
+--   v_books_asset_register     named by the gate, calls books_macrs_pct (named by nothing)
+--   v_books_direction_checks   named by the gate, read by no view
+--   books_eic_recompute        named by the gate, names books_eic_amount
+--   v_books_unrelated, books_unrelated_fn: in the families, named by nothing the gate touches
+CREATE OR REPLACE FUNCTION public.books_year_gate(p_owner_id uuid, p_year integer) RETURNS jsonb LANGUAGE sql STABLE AS $$
+  SELECT '{"stand_in": 3}'::jsonb /* v_books_audit_tiers v_books_large_sums v_books_asset_register v_books_direction_checks books_eic_recompute */ $$;
 CREATE VIEW public.v_books_base AS SELECT 1 AS n;
 CREATE VIEW public.v_books_audit_tiers AS SELECT n FROM public.v_books_base;
+CREATE VIEW public.v_books_large_sums AS SELECT 1 AS n;
 CREATE VIEW public.v_books_unrelated AS SELECT 1 AS n;
+CREATE VIEW public.v_books_direction_checks AS SELECT 1 AS n;
+CREATE FUNCTION public.books_macrs_pct(p_class text, p_year integer) RETURNS numeric LANGUAGE sql IMMUTABLE AS $$ SELECT 1::numeric $$;
+CREATE VIEW public.v_books_asset_register AS SELECT public.books_macrs_pct('5', 2020) AS pct;
+CREATE FUNCTION public.books_eic_amount(p_amount numeric) RETURNS numeric LANGUAGE sql IMMUTABLE AS $$ SELECT p_amount $$;
+CREATE FUNCTION public.books_eic_recompute(p_in jsonb, p_year integer, p_note text) RETURNS jsonb LANGUAGE plpgsql STABLE AS $$
+BEGIN RETURN to_jsonb(public.books_eic_amount(1)); END $$;
+CREATE FUNCTION public.books_unrelated_fn() RETURNS integer LANGUAGE sql IMMUTABLE AS $$ SELECT 1 $$;
 SET ROLE service_role;
 SELECT public.record_books_gate_run('11111111-1111-4111-8111-111111111111', 2020, 'complete', now() - interval '5 seconds', now(), public.books_book_signature('11111111-1111-4111-8111-111111111111'),
   public.books_gate_md5(), pg_temp.gate_result(2020, true, jsonb_build_array(pg_temp.rule('R1', 'pass', 0, 10))), NULL, 'contract');
@@ -317,6 +338,32 @@ SET LOCAL ROLE authenticated;
 SELECT pg_temp.ok('a view the gate reads only through another view changes, and the run is stale because the gate changed, not the books',
   (pg_temp.run_2020()->>'stale')::boolean AND (pg_temp.run_2020()->>'stale_gate')::boolean AND NOT (pg_temp.run_2020()->>'stale_books')::boolean AND NOT (pg_temp.run_2020()->>'trusted')::boolean);
 COMMIT;
+-- The other kinds of change, compared on the hash itself around each statement.
+SELECT public.books_gate_md5() AS h \gset
+SELECT pg_temp.ok('the hash is stable when nothing changes', public.books_gate_md5() = :'h');
+CREATE OR REPLACE VIEW public.v_books_direction_checks AS SELECT 2 AS n;
+SELECT pg_temp.ok('a view the gate names and no other view reads changes the hash', public.books_gate_md5() <> :'h');
+SELECT public.books_gate_md5() AS h \gset
+CREATE OR REPLACE FUNCTION public.books_macrs_pct(p_class text, p_year integer) RETURNS numeric LANGUAGE sql IMMUTABLE AS $$ SELECT 2::numeric $$;
+SELECT pg_temp.ok('a function a view of the gate calls changes the hash', public.books_gate_md5() <> :'h');
+SELECT public.books_gate_md5() AS h \gset
+CREATE OR REPLACE FUNCTION public.books_eic_amount(p_amount numeric) RETURNS numeric LANGUAGE sql IMMUTABLE AS $$ SELECT p_amount + 1 $$;
+SELECT pg_temp.ok('a helper a reader of the gate names changes the hash', public.books_gate_md5() <> :'h');
+SELECT public.books_gate_md5() AS h \gset
+CREATE OR REPLACE FUNCTION public.books_unrelated_fn() RETURNS integer LANGUAGE sql IMMUTABLE AS $$ SELECT 2 $$;
+CREATE FUNCTION public.accounting_other_fn() RETURNS integer LANGUAGE sql IMMUTABLE AS $$ SELECT 1 $$;
+SELECT pg_temp.ok('an edited and a new function of the families that nothing the gate touches names change nothing', public.books_gate_md5() = :'h');
+-- The shape of a view that two named views start to read (v_books_vehicle_links, first read by v_books_audit_tiers and v_books_large_sums).
+CREATE VIEW public.v_books_vehicle_links AS SELECT 1 AS n;
+SELECT pg_temp.ok('a new view nothing reads yet changes nothing', public.books_gate_md5() = :'h');
+CREATE OR REPLACE VIEW public.v_books_audit_tiers AS SELECT b.n, l.n AS vehicle_n FROM public.v_books_base b CROSS JOIN public.v_books_vehicle_links l;
+SELECT pg_temp.ok('a named view that starts to read it (with a column appended) changes the hash', public.books_gate_md5() <> :'h');
+SELECT public.books_gate_md5() AS h \gset
+CREATE OR REPLACE VIEW public.v_books_large_sums AS SELECT l.n FROM public.v_books_vehicle_links l;
+SELECT pg_temp.ok('a second named view that starts to read it changes the hash again', public.books_gate_md5() <> :'h');
+SELECT public.books_gate_md5() AS h \gset
+CREATE OR REPLACE VIEW public.v_books_vehicle_links AS SELECT 2 AS n;
+SELECT pg_temp.ok('an edit to the new view, reached through both, changes the hash', public.books_gate_md5() <> :'h');
 BEGIN;
 DROP FUNCTION public.books_year_gate(uuid, integer);
 SELECT pg_temp.ok('a book with no gate has no hash (null), as before', public.books_gate_md5() IS NULL);
@@ -355,3 +402,9 @@ COMMIT;
 SELECT pg_temp.ok('the migration was applied twice without error and left one policy, one trigger and the same grants',
   (SELECT count(*) FROM pg_policy WHERE polrelid = 'public.books_gate_runs'::regclass) = 1
   AND (SELECT count(*) FROM pg_trigger WHERE tgrelid = 'public.books_gate_runs'::regclass AND NOT tgisinternal) = 1);
+SELECT pg_temp.ok('the walk migration replaced the hash function (one overload, owner-callable, closed to anon), applied twice',
+  (SELECT count(*) FROM pg_proc WHERE pronamespace = 'public'::regnamespace AND proname = 'books_gate_md5') = 1
+  AND has_function_privilege('authenticated', 'public.books_gate_md5()', 'EXECUTE')
+  AND has_function_privilege('service_role', 'public.books_gate_md5()', 'EXECUTE')
+  AND NOT has_function_privilege('anon', 'public.books_gate_md5()', 'EXECUTE')
+  AND obj_description('public.books_gate_md5()'::regprocedure, 'pg_proc') LIKE '%found from the gate itself%');
