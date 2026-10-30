@@ -90,6 +90,17 @@ function formatTimeRemaining(endDate: string | null, status: string | null): { t
   return { text: timeLeft(diff), urgency, ended: false };
 }
 
+/** Priority readings from the same live episode; complete controls open in place. */
+export function ExternalAuctionSummary({ currentBid, currencyCode, endDate, listingStatus, onClick }: Pick<ExternalAuctionLiveBannerProps, 'currentBid' | 'currencyCode' | 'endDate' | 'listingStatus'> & { onClick: () => void }) {
+  useSecondClock();
+  const clock = formatTimeRemaining(endDate, listingStatus);
+  return <button type="button" className="external-auction-summary" aria-haspopup="dialog" aria-label="Explore live auction" onClick={onClick}>
+    <span>Live auction</span>
+    <strong>{currentBid !== null && Number.isFinite(currentBid) && currentBid > 0 ? formatCurrencyAmount(currentBid, { currency: currencyCode }) : 'Awaiting bid'}</strong>
+    <span>{clock.text}</span>
+  </button>;
+}
+
 // Color mapping for urgency levels - NO YELLOW
 const urgencyColors: Record<UrgencyLevel, { color: string; glow?: string }> = {
   lastMinute: { color: 'var(--error)', glow: '0 0 12px rgba(220, 38, 38, 0.7)' },

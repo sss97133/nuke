@@ -31,6 +31,7 @@ function Probe() {
 }
 beforeEach(() => {
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
+  window.history.replaceState({}, '', '/');
   vi.useFakeTimers(); vi.setSystemTime(new Date('2026-10-18T12:00:00Z'));
   vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => setTimeout(() => cb(Date.now()), 0));
   vi.stubGlobal('cancelAnimationFrame', (id: number) => clearTimeout(id));
@@ -93,7 +94,8 @@ async function showDay() {
   </MemoryRouter></QueryClientProvider>));
   await act(async () => { await vi.advanceTimersByTimeAsync(5); });
   expect(current.session?.user?.id).toBe('00000000-0000-0000-0000-000000000099');
-  await act(async () => (host.querySelector('[aria-label="Vehicle timeline"]') as HTMLButtonElement).click());
+  const timeline = host.querySelector('[aria-label="Vehicle timeline"]') as HTMLButtonElement;
+  if (timeline.getAttribute('aria-expanded') === 'false') await act(async () => timeline.click());
   await act(async () => (host.querySelector(`[data-date="${day}"]`) as HTMLElement).click());
   await act(async () => { await vi.advanceTimersByTimeAsync(5); });
   const work = current.timelineEvents.find(event => event.id === row.id)!;

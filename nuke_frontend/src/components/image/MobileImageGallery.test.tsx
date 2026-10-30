@@ -9,7 +9,6 @@ vi.mock('../../lib/supabase', () => ({ get supabase() { return fixture.client; }
 vi.mock('../../pages/vehicle-profile/VehicleProfileContext', () => ({ useVehicleProfile: () => ({ vehicleId: fixture.vehicleId,
   leadImageUrl: fixture.lead, heroMeta: null, vehicle: { year: 1970, make: 'Synthetic', model: 'Specimen', transmission: 'Manual' } }) }));
 vi.mock('../../hooks/useIsMobile', () => ({ useIsMobile: () => true }));
-vi.mock('../../pages/vehicle-profile/VehicleMediaKit', () => ({ __esModule: true, default: () => null }));
 vi.mock('../../pages/vehicle-profile/VehiclePhotoLightbox', () => ({ openVehiclePhoto: vi.fn(), openVehiclePhotoByUrl: vi.fn() }));
 vi.mock('../badges/useBadgeDepth', () => ({ useBadgeDepth: () => ({ data: null, loading: false, load: () => {} }) }));
 vi.mock('../badges/BadgeClusterPanel', () => ({ BadgeClusterPanel: () => null }));

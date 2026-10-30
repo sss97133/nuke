@@ -9,7 +9,7 @@ vi.mock('../PrefetchLink', () => ({ PrefetchLink: ({ to, children }: any) => <a 
 vi.mock('../../hooks/useExternalAuctionSync', () => ({ useExternalAuctionSync: () => ({ syncResult: null }) }));
 vi.mock('../../lib/supabase', () => ({ supabase: { auth: { getSession: async () => ({ data: { session: null } }) } } }));
 vi.mock('../bidding/PlatformCredentialForm', () => ({ default: () => null }));
-import ExternalAuctionLiveBanner, { liveMetricRank } from './ExternalAuctionLiveBanner';
+import ExternalAuctionLiveBanner, { ExternalAuctionSummary, liveMetricRank } from './ExternalAuctionLiveBanner';
 
 let container: HTMLDivElement, root: Root;
 const props = { externalListingId: null, platform: 'bat', listingUrl: 'https://bringatrailer.com/listing/synthetic-soft-close', currentBid: 118888, bidCount: 10, watcherCount: 2000, commentCount: 79, endDate: '2026-10-04T17:36:00Z', listingStatus: 'active', lastUpdatedAt: '2026-10-04T16:45:00Z' };
@@ -22,6 +22,17 @@ beforeEach(() => {
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); vi.useRealTimers(); });
 
 describe('visible soft-close state', () => {
+  it('keeps the compact priority reading on the same soft-close clock and opens its context', async () => {
+    const open = vi.fn();
+    await act(async () => root.render(<ExternalAuctionSummary {...props} onClick={open} />));
+    expect(container.textContent).toContain('$118,888');
+    expect(container.textContent).toContain('RESULT PENDING');
+    expect(container.textContent).not.toContain('ENDED');
+    await act(async () => root.render(<ExternalAuctionSummary {...props} endDate="2026-10-04T17:40:00Z" onClick={open} />));
+    expect(container.textContent).toContain('2m 00s');
+    await act(async () => container.querySelector('button')!.click());
+    expect(open).toHaveBeenCalledOnce();
+  });
   it('does not announce an active lot ended at zero and follows a later extension', async () => {
     await act(async () => root.render(<ExternalAuctionLiveBanner {...props} />));
     expect(container.textContent).toContain('RESULT PENDING');

@@ -6,7 +6,9 @@
  *
  * See: docs/library/technical/design-book/09-click-through-chains.md
  */
-import React from 'react';
+import React, { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '../../lib/supabase';
 import PrefetchLink from '../../components/PrefetchLink';
 import { Button } from '../../components/ui/button';
 import { usePopup } from '../../components/popups/usePopup';
@@ -15,7 +17,23 @@ import { useFieldProvenance, citedFieldImages, evidenceRelationLabel, provenance
 import { useFieldEvidence, type FieldEvidenceGroup } from './hooks/useFieldEvidence';
 import FieldProvenanceDrawer from './FieldProvenanceDrawer';
 import { optimizeImageUrl } from '../../lib/imageOptimizer';
+import { openVehiclePhoto } from './VehiclePhotoLightbox';
+import SoldContext from './SoldContext';
+import type { CompSale, CompScope } from './hooks/useVehicleIntel';
+import type { FieldProvenance } from './hooks/useFieldProvenance';
+import type { EvidenceImage } from './hooks/useVehicleImageEvidence';
+import type { FeedVehicle } from '../../feed/types/feed';
+import type { Vehicle } from './types';
 import './vehicle-evidence.css';
+
+const VehiclePopup = React.lazy(() => import('../../components/popups/VehiclePopup').then(module => ({ default: module.VehiclePopup })));
+
+type ProfileFieldContext = {
+  subject: Pick<Vehicle, 'id' | 'make' | 'model' | 'year'> & Partial<Vehicle>;
+  matchField?: string;
+  sales?: CompSale[] | null;
+  salesScope?: CompScope | null;
+};
 
 interface FieldEvidencePopupProps {
   field: string;
@@ -25,6 +43,83 @@ interface FieldEvidencePopupProps {
   evidence?: FieldEvidenceGroup;
   /** Optional VIN decode data (passed for VIN field) */
   vinDecode?: Record<string, any> | null;
+  context?: ProfileFieldContext;
+}
+
+/** The selected attribute remains framed by this vehicle; peer matches never replace its evidence. */
+function FieldContext({ field, label, value, context, reports, images, details }: {
+  field: string; label: string; value: string; context: ProfileFieldContext;
+  reports: FieldProvenance['observations']; images: EvidenceImage[]; details: React.ReactNode;
+}) {
+  const { openPopup } = usePopup();
+  const subject = context.subject;
+  const canScope = !!subject.make && !!subject.model && !['make', 'model'].includes(field);
+  const [sameModel, setSameModel] = useState(true);
+  const [showPeers, setShowPeers] = useState(false);
+  const matchField = context.matchField || field;
+  const allowed = ['year', 'make', 'model', 'series', 'trim', 'body_style', 'drivetrain', 'transmission', 'transmission_model'];
+  const subjectValue = (key: string) => subject[key as keyof Vehicle];
+  const filters: [string, string | number][] = allowed.includes(matchField)
+    ? [[matchField, matchField === 'year' ? Number(value) : String(subjectValue(matchField) || value)]]
+    : field === 'location'
+      ? ['city', 'state'].flatMap(key => typeof subjectValue(key) === 'string' && subjectValue(key) ? [[key, subjectValue(key) as string] as [string, string]] : [])
+      : field === 'engine_type'
+        ? ['engine_type', 'engine_size'].flatMap(key => typeof subjectValue(key) === 'string' && subjectValue(key) ? [[key, subjectValue(key) as string] as [string, string]] : []) : [];
+  if (filters.length && canScope && sameModel) {
+    filters.push(['make', subject.make!], ['model', subject.model!]);
+    if (subject.year) filters.push(['year', subject.year]);
+  }
+  if (field === 'model' && subject.make) filters.push(['make', subject.make]);
+  const peers = useQuery({
+    queryKey: ['profile-field-matches', subject.id, filters],
+    enabled: showPeers && filters.length > 0,
+    staleTime: 60_000,
+    queryFn: async ({ signal }) => {
+      let query = supabase.from('vehicles').select('id,year,make,model,trim,thumbnail_url:primary_image_url,transmission,transmission_model,drivetrain,engine_size,body_style,created_at')
+        .eq('is_public', true).is('deleted_at', null).or('listing_kind.is.null,listing_kind.neq.non_vehicle_item').neq('id', subject.id);
+      for (const [column, filterValue] of filters) query = query.eq(column, filterValue);
+      const { data, error } = await query.order('updated_at', { ascending: false }).limit(8).abortSignal(signal);
+      if (error) throw error;
+      return (data || []) as Pick<FeedVehicle, 'id' | 'year' | 'make' | 'model' | 'trim' | 'thumbnail_url' | 'created_at' | 'transmission' | 'transmission_model' | 'drivetrain' | 'engine_size' | 'body_style'>[];
+    },
+  });
+  const specific = reports.filter((report, index) => reports.findIndex(other => other.id === report.id) === index).filter(report => report.value?.trim().toLowerCase() === value.trim().toLowerCase()
+    || (field === 'drivetrain' && /\bNP\d{3}\b|transfer case|t-case/i.test(report.content || '')));
+  return <div className="vp-field-context">
+    <p className="vp-field-context__scope">{label.replace(/^./, c => c.toUpperCase())} · this vehicle</p>
+    {specific.slice(0, 2).map(report => <article key={report.id} className="vp-field-context__report">
+      {report.content && <p>{report.content}</p>}
+      <small>{(report.source_slug || 'Retained report').replace(/_/g, ' ')}{report.observed_at && <> · {new Date(report.observed_at).toLocaleDateString('en-US', { timeZone: 'UTC' })}</>}</small>
+    </article>)}
+    {images.length > 0 && <section aria-label={`${value} related photographs`}>
+      <h3>Related photographs</h3>
+      <div className="vp-field-context__images">{images.slice(0, 6).map(image => <button key={image.id} type="button" onClick={() => openVehiclePhoto(image.id)} aria-label={`Inspect ${image.vehicle_zone?.replace(/_/g, ' ') || label}`}>
+        <img src={image.thumbnail_url || image.medium_url || image.image_url} alt="" width={160} height={110} loading="lazy" />
+      </button>)}</div>
+      <p className="vp-field-context__note">Related views help inspection; they do not establish the specific configuration.</p>
+    </section>}
+    {filters.length > 0 && <section aria-label={`${value} data segment`}>
+      <div className="vp-field-context__segment-head"><button type="button" aria-expanded={showPeers} onClick={() => setShowPeers(current => !current)}>Other profiles with this configuration</button>
+        {showPeers && canScope && <button type="button" onClick={() => setSameModel(current => !current)}>{sameModel ? 'All profiles' : `Within ${subject.year || ''} ${subject.model}`}</button>}
+      </div>
+      {showPeers && <>
+      <p className="vp-field-context__note">{canScope && sameModel ? `${subject.year || ''} ${subject.make} ${subject.model} · ` : ''}Exact recorded labels · up to 8 other public profiles</p>
+      {peers.isPending && <p role="status">Reading related profiles…</p>}
+      {peers.isError && <p role="status">Related profiles could not be read. <button type="button" onClick={() => void peers.refetch()}>Retry</button></p>}
+      {peers.data?.length === 0 && <p>No other profiles returned in this scope.</p>}
+      <div className="vp-field-context__peers">{peers.data?.map(peer => <button type="button" key={peer.id} onClick={() => openPopup(
+        <React.Suspense fallback={<p role="status">Reading profile…</p>}><VehiclePopup vehicle={peer} showRelatedSales={false} /></React.Suspense>,
+        [peer.year, peer.make, peer.model, peer.trim].filter(Boolean).join(' '), 560,
+        false,
+      )}>
+        {peer.thumbnail_url && <img src={optimizeImageUrl(peer.thumbnail_url, 'thumbnail') || peer.thumbnail_url} alt="" width={56} height={42} loading="lazy" />}
+        <span>{[peer.year, peer.make, peer.model, peer.trim].filter(Boolean).join(' ')}</span>
+      </button>)}</div>
+      </>}
+    </section>}
+    {context.sales && <SoldContext comps={context.sales} scope={context.salesScope} subject={subject} />}
+    <details className="vp-field-context__evidence"><summary>Sources & observations for this vehicle</summary>{details}</details>
+  </div>;
 }
 
 const SOURCE_LABELS: Record<string, string> = {
@@ -57,11 +152,12 @@ function sourceLabel(sourceType: string): string {
 }
 
 const FieldEvidencePopup: React.FC<FieldEvidencePopupProps> = ({
-  field, label, value, vehicleId, evidence, vinDecode,
+  field, label, value, vehicleId, evidence, vinDecode, context,
 }) => {
   const { closeTop } = usePopup();
-  const inventory = useVehicleImageEvidence(vehicleId);
+  const inventory = useVehicleImageEvidence(vehicleId, context ? field : undefined);
   const provenance = useFieldProvenance(vehicleId, field);
+  const drivetrainContext = useFieldProvenance(context && field === 'drivetrain' ? vehicleId : '', 'transmission');
   const claims = useFieldEvidence(vehicleId);
   const claimGroup = evidence || claims.evidence[field];
   const rows = inventory.data?.images || [];
@@ -83,16 +179,16 @@ const FieldEvidencePopup: React.FC<FieldEvidencePopupProps> = ({
     .map((source, index) => ({ id: `${source.source}-${index}`, source_type: source.source_type || source.source, field_value: source.value, created_at: source.at }));
   const sortedSources = [...sources].sort((a, b) => trustRank(a.source_type) - trustRank(b.source_type));
 
-  if (!provenance.isLoading && provenance.data === null && !provenance.error) {
+  if (!context && !provenance.isLoading && provenance.data === null && !provenance.error) {
     return <div className="field-evidence-popup"><p role="status">Field evidence is unavailable or this record is private.</p></div>;
   }
-  if (provenanceCoverageUnavailable(provenance.data)) {
+  if (!context && provenanceCoverageUnavailable(provenance.data)) {
     return <div className="field-evidence-popup"><p role="status">Source evidence could not be loaded completely for this field. Coverage is unknown.</p>
       <Button type="button" variant="secondary" disabled={provenance.isFetching} onClick={() => void provenance.refetch()}>Retry source evidence</Button>
     </div>;
   }
 
-  return (
+  const evidenceContent = (
     <div className="field-evidence-popup">
       <header className="field-evidence-heading">
         <div className="ev-label">{label}</div>
@@ -275,6 +371,17 @@ const FieldEvidencePopup: React.FC<FieldEvidencePopupProps> = ({
       {!imagesLoading && !imageReadFailed && sortedSources.length === 0 && citations.length === 0 && !provenance.data?.observations.length && <p>No source claim was returned for this field. The displayed value needs a source.</p>}
     </div>
   );
+  return context ? <FieldContext field={field} label={label} value={value} context={context}
+    reports={[
+      ...(provenanceCoverageUnavailable(provenance.data) ? [] : provenance.data?.observations || []),
+      ...(context && field === 'drivetrain' && !provenanceCoverageUnavailable(drivetrainContext.data)
+        ? (drivetrainContext.data?.observations || []).filter(report => /\bNP\d{3}\b|transfer case|t-case/i.test(report.content || '')) : []),
+    ]}
+    images={[...citations, ...images.filter(image => !citations.some(citation => citation.id === image.id))]}
+    details={provenanceCoverageUnavailable(provenance.data)
+      ? <p role="status">Source evidence could not be loaded completely for this field. <Button type="button" variant="secondary" disabled={provenance.isFetching} onClick={() => void provenance.refetch()}>Retry source evidence</Button></p>
+      : !provenance.isLoading && provenance.data === null && !provenance.error
+        ? <p role="status">Field evidence is unavailable or this record is private.</p> : evidenceContent} /> : evidenceContent;
 };
 
 export default FieldEvidencePopup;

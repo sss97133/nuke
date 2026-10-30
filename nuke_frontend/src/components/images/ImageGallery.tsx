@@ -11,9 +11,12 @@ import ImageZoneSection, { groupImagesByZone } from './ImageZoneSection';
 import { ImageSetService } from '../../services/imageSetService';
 import { OnboardingSlideshow } from '../onboarding/OnboardingSlideshow';
 import type { GalleryFilter } from '../../pages/vehicle-profile/VehicleProfileContext';
+import { isRelatedFieldImage } from '../../pages/vehicle-profile/hooks/useVehicleImageEvidence';
 
 /** Profile toolbar mode: maps to viewMode + groupBySource + chronologicalMode */
 export type GalleryViewMode = 'ZONES' | 'GRID' | 'FULL' | 'INFO' | 'SESSIONS' | 'CATEGORY' | 'CHRONO' | 'SOURCE';
+
+export type GalleryReadCount = { vehicleId: string; filterKey: string; shown: number; partial: boolean };
 
 interface ImageGalleryProps {
   vehicleId: string;
@@ -38,6 +41,7 @@ interface ImageGalleryProps {
   galleryView?: GalleryViewMode;
   /** Cross-column gallery filter from vehicle profile context. */
   galleryFilter?: GalleryFilter | null;
+  onReadCount?: (read: GalleryReadCount) => void;
   // NEW: Image Set features (optional - defaults maintain existing behavior)
   selectMode?: boolean;
   selectedImages?: Set<string>;
@@ -351,6 +355,7 @@ const ImageGallery = ({
   fallbackSourceUrl,
   galleryView,
   galleryFilter,
+  onReadCount,
   // NEW: Optional image set props
   selectMode = false,
   selectedImages,
@@ -478,6 +483,7 @@ const ImageGallery = ({
     if (allImages.length === 0) return;
     const filtered = galleryFilter
       ? allImages.filter((img: any) => {
+          if (galleryFilter.field && !isRelatedFieldImage(img, galleryFilter.field)) return false;
           if (galleryFilter.zone) {
             const zone = String(img.vehicle_zone || '').toLowerCase().trim();
             if (zone !== galleryFilter.zone.toLowerCase().trim()) return false;
@@ -1360,6 +1366,7 @@ const ImageGallery = ({
   const galleryFilteredImages = useMemo(() => {
     if (!galleryFilter) return allImages;
     return allImages.filter((img: any) => {
+      if (galleryFilter.field && !isRelatedFieldImage(img, galleryFilter.field)) return false;
       if (galleryFilter.zone) {
         const zone = String(img.vehicle_zone || '').toLowerCase().trim();
         if (zone !== galleryFilter.zone.toLowerCase().trim()) return false;
@@ -1389,6 +1396,18 @@ const ImageGallery = ({
       return true;
     });
   }, [allImages, galleryFilter]);
+
+  const filterKey = JSON.stringify(galleryFilter || null);
+  useEffect(() => {
+    if (!loading) onReadCount?.({ vehicleId, filterKey, shown: galleryFilteredImages.length, partial: partialLoad });
+  }, [onReadCount, vehicleId, filterKey, galleryFilteredImages.length, loading, partialLoad]);
+  const matchingImageIds = useMemo(() => new Set(galleryFilteredImages.map(image => image.id)), [galleryFilteredImages]);
+  const scopedSessions = galleryFilter ? sessions.map(session => ({ ...session,
+    image_ids: (session.image_ids || []).filter((id: string) => matchingImageIds.has(id)),
+  })).filter(session => session.image_ids.length > 0) : sessions;
+  const scopedBundles = galleryFilter ? sortedLegacyBundles.map(bundle => ({ ...bundle,
+    image_ids: (bundle.image_ids || []).filter((id: string) => matchingImageIds.has(id)),
+  })).filter(bundle => bundle.image_ids.length > 0) : sortedLegacyBundles;
 
   const getSortedImages = () => {
     let sorted = sortRows(galleryFilteredImages, sortBy);
@@ -4226,7 +4245,7 @@ const ImageGallery = ({
           )}
 
           {/* Auto-detected sessions (from get_vehicle_sessions), sorted chronologically */}
-          {[...sessions].sort((a, b) => {
+          {[...scopedSessions].sort((a, b) => {
             const ta = a.session_start ? new Date(a.session_start).getTime() : 0;
             const tb = b.session_start ? new Date(b.session_start).getTime() : 0;
             return tb - ta;
@@ -4273,7 +4292,7 @@ const ImageGallery = ({
                         {dateLabel}
                       </span>
                       <span style={{ fontSize: '10px', fontFamily: "'Courier New', monospace", color: 'var(--text-muted)' }}>
-                        {session.image_count} photos
+                        {galleryFilter ? `${session.image_ids.length} matching photos` : `${session.image_count} photos`}
                         {durationMin != null && durationMin > 0 ? ` · ${durationMin < 60 ? `${durationMin}m` : `${Math.round(durationMin / 60)}h`}` : ''}
                         {receiptCount > 0 ? ` · ${receiptCount} receipt${receiptCount === 1 ? '' : 's'}` : ''}
                       </span>
@@ -4304,7 +4323,7 @@ const ImageGallery = ({
           })}
 
           {/* Legacy bundles fallback (when no auto-sessions detected) */}
-          {sessions.length === 0 && sortedLegacyBundles.map(bundle => {
+          {sessions.length === 0 && scopedBundles.map(bundle => {
             const dateStr = String(bundle.bundle_date);
             const isCollapsed = bundleCollapsed[dateStr] ?? false;
             const previewImages = (bundle.image_ids || [])
@@ -4335,7 +4354,7 @@ const ImageGallery = ({
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <p style={{ margin: 0, fontSize: '13px', fontWeight: 500, color: 'var(--text-primary)' }}>{dateLabel}</p>
                     <p style={{ margin: '2px 0 0', fontSize: '11px', color: 'var(--text-muted)' }}>
-                      {bundle.image_count} photos
+                      {galleryFilter ? `${bundle.image_ids.length} matching photos` : `${bundle.image_count} photos`}
                       {showDuration ? ` · ${durationMin! < 60 ? `${durationMin}m` : `${Math.round(durationMin! / 60)}h`} session` : ''}
                       {receiptCount > 0 ? ` · ${receiptCount} receipt${receiptCount === 1 ? '' : 's'}` : ''}
                     </p>

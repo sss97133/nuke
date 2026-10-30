@@ -30,6 +30,9 @@ import type { HeroImageMeta } from './loadVehicleData';
 // ---------------------------------------------------------------------------
 
 export interface GalleryFilter {
+  /** A profile topic uses indexed image areas, never proof of the selected specification. */
+  field?: string;
+  label?: string;
   zone?: string;
   category?: string;
   tag?: string;
@@ -177,6 +180,7 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
   const [isPublic, setIsPublic] = useState(false);
   const [vehicleHeaderHeight, setVehicleHeaderHeight] = useState(88);
   const [galleryFilter, setGalleryFilter] = useState<GalleryFilter | null>(null);
+  useEffect(() => setGalleryFilter(null), [vehicleId]);
 
   // ── Refs ──
   const ranBatSyncRef = useRef<string | null>(null);

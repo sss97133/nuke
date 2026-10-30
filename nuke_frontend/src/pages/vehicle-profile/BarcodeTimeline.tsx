@@ -308,24 +308,51 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = ({ selectedAuctionUrl, o
   const heatmapRef = useRef<HTMLDivElement>(null);
   const stripRef = useRef<HTMLDivElement>(null);
   const anchorRef = useRef<HTMLDivElement>(null);
-  const hasTimeline = timelineEvents.length > 0 || auctions.length > 0;
+  const expandedRef = useRef(expanded);
+  expandedRef.current = expanded;
+  useEffect(() => { if (heatmapRef.current) heatmapRef.current.inert = !expanded; }, [expanded]);
+  const hasTimeline = timelineEvents.length > 0 || auctions.some(auction => auction.activityExtracted || auction.open || auction.close);
+  const setCalendarExpanded = useCallback((show: boolean) => {
+    if (expandedRef.current === show) return;
+    const target = show ? anchorRef.current : stripRef.current?.querySelector<HTMLElement>('.barcode-bar');
+    if (typeof target?.scrollIntoView === 'function') {
+      target.scrollIntoView({ block: 'start', behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' });
+    } else {
+      expandedRef.current = show;
+      setExpanded(show);
+    }
+  }, []);
 
-  // The calendar and barcode are two resolutions of one subheader. A static
-  // anchor keeps the collapse threshold independent of the sticky element.
+  // The calendar rolls away in normal document flow. Only the barcode sticks;
+  // no per-frame transforms, resizing or inherited style updates are needed.
   useEffect(() => {
+    let frame = 0;
     const update = () => {
+      frame = 0;
       const anchor = anchorRef.current;
-      const strip = stripRef.current;
-      if (!anchor || !strip) return;
-      const stickyTop = parseFloat(getComputedStyle(strip).top) || 0;
-      setExpanded(anchor.getBoundingClientRect().top >= stickyTop);
+      const calendar = heatmapRef.current;
+      const bar = stripRef.current?.querySelector<HTMLElement>('.barcode-bar');
+      if (!anchor || !calendar || !bar) return;
+      const stickyTop = parseFloat(getComputedStyle(bar).top) || 0;
+      const show = anchor.getBoundingClientRect().top + calendar.getBoundingClientRect().height > stickyTop;
+      if (expandedRef.current !== show) {
+        expandedRef.current = show;
+        setExpanded(show);
+      }
+    };
+    const schedule = () => {
+      if (!frame) frame = requestAnimationFrame(update);
     };
     update();
-    window.addEventListener('scroll', update, { passive: true });
-    window.addEventListener('resize', update);
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(schedule);
+    if (heatmapRef.current) observer?.observe(heatmapRef.current);
+    window.addEventListener('scroll', schedule, { passive: true });
+    window.addEventListener('resize', schedule);
     return () => {
-      window.removeEventListener('scroll', update);
-      window.removeEventListener('resize', update);
+      if (frame) cancelAnimationFrame(frame);
+      observer?.disconnect();
+      window.removeEventListener('scroll', schedule);
+      window.removeEventListener('resize', schedule);
     };
   }, [vehicleId, hasTimeline]);
 
@@ -576,11 +603,11 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = ({ selectedAuctionUrl, o
       else setHighlightGroup(null);
       // Emit gallery filter for this day's photos
       setGalleryFilter({ dateRange: [ds, ds] });
-      setExpanded(true);
+      setCalendarExpanded(true);
       setReceiptDate(ds);
       setDayParam(ds);
     },
-    [eventMap, setGalleryFilter]
+    [eventMap, setGalleryFilter, setCalendarExpanded]
   );
 
   const closeDay = useCallback(() => {
@@ -604,7 +631,7 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = ({ selectedAuctionUrl, o
   useEffect(() => {
     const param = new URLSearchParams(window.location.search).get('day');
     if (param && /^\d{4}-\d{2}-\d{2}$/.test(param)) {
-      setExpanded(true);
+      setCalendarExpanded(true);
       setReceiptDate(param);
     }
     const onOpenDay = (e: Event) => {
@@ -619,16 +646,14 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = ({ selectedAuctionUrl, o
 
   // Toggle expand
   const toggleExpand = useCallback(() => {
-    setExpanded((prev) => {
-      if (prev) {
-        setReceiptDate(null);
-        setDayParam(null);
-        setHighlightGroup(null);
-        setGalleryFilter(null);
-      }
-      return !prev;
-    });
-  }, [setGalleryFilter]);
+    if (expanded) {
+      setReceiptDate(null);
+      setDayParam(null);
+      setHighlightGroup(null);
+      setGalleryFilter(null);
+    }
+    setCalendarExpanded(!expanded);
+  }, [expanded, setGalleryFilter, setCalendarExpanded]);
 
   // Anchor the heatmap's initial window to the DATA, not the calendar:
   // land with the latest day that has activity at the right edge. Plain
@@ -716,14 +741,14 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = ({ selectedAuctionUrl, o
         return;
       }
       if (expanded) {
-        setExpanded(false);
+        setCalendarExpanded(false);
         setHighlightGroup(null);
         setGalleryFilter(null);
       }
     };
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
-  }, [expanded, receiptDate, closeDay, setGalleryFilter]);
+  }, [expanded, receiptDate, closeDay, setGalleryFilter, setCalendarExpanded]);
 
   // Barcode stripe hover
   const onStripeMouseMove = useCallback(
@@ -785,29 +810,8 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = ({ selectedAuctionUrl, o
         ref={stripRef}
         className={`barcode-strip ${expanded ? 'barcode-strip--expanded' : 'barcode-strip--collapsed'}`}
       >
-        {/* Collapsed bar */}
-        <button type="button" className="barcode-bar" onClick={toggleExpand} aria-expanded={expanded} aria-label="Vehicle timeline" hidden={expanded}>
-          <span className="barcode-bar__label-left">TIMELINE {expanded ? '▴' : '▾'}</span>
-          <div className="barcode-canvas">
-            {weeks.map((w, i) => (
-              <div
-                key={i}
-                className="barcode-stripe"
-                onMouseMove={(e) => onStripeMouseMove(e, w.events)}
-                onMouseLeave={onStripeMouseLeave}
-              >
-                <div
-                  className="barcode-stripe__fill"
-                  style={{ background: BARCODE_COLORS[w.level] || 'transparent' }}
-                />
-              </div>
-            ))}
-          </div>
-          <span className="barcode-bar__label-right">{yearRange}</span>
-        </button>
-
         {/* Expanded heatmap — full timeline from vehicle year to present */}
-        <div className="barcode-heatmap" ref={heatmapRef} hidden={!expanded} aria-label="Vehicle calendar">
+        <div className="barcode-heatmap" ref={heatmapRef} aria-hidden={!expanded} aria-label="Vehicle calendar">
           <div className="timeline-heatmap">
             <div className="hm-day-labels">
               {['', 'MON', '', 'WED', '', 'FRI', ''].map((name, i) => (
@@ -887,6 +891,27 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = ({ selectedAuctionUrl, o
           ))}
 
         </div>
+        {/* Collapsed bar */}
+        <button type="button" className="barcode-bar" onClick={toggleExpand} aria-expanded={expanded} aria-label="Vehicle timeline" aria-hidden={expanded} tabIndex={expanded ? -1 : 0}>
+          <span className="barcode-bar__label-left">TIMELINE {expanded ? '▴' : '▾'}</span>
+          <div className="barcode-canvas">
+            {weeks.map((w, i) => (
+              <div
+                key={i}
+                className="barcode-stripe"
+                onMouseMove={(e) => onStripeMouseMove(e, w.events)}
+                onMouseLeave={onStripeMouseLeave}
+              >
+                <div
+                  className="barcode-stripe__fill"
+                  style={{ background: BARCODE_COLORS[w.level] || 'transparent' }}
+                />
+              </div>
+            ))}
+          </div>
+          <span className="barcode-bar__label-right">{yearRange}</span>
+        </button>
+
       </div>
 
       {/* The selected day stays readable when its calendar compresses on scroll. */}

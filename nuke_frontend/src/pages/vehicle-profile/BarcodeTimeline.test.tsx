@@ -96,7 +96,7 @@ async function openCalendar() {
   if (button?.getAttribute('aria-expanded') === 'false') await act(async () => button.click());
   const details = host.querySelector<HTMLDetailsElement>('details.timeline-view-options');
   if (details && !details.open) await act(async () => details.querySelector('summary')!.click());
-  expect(host.querySelector('[aria-label="Vehicle calendar"]')?.hasAttribute('hidden')).toBe(false);
+  expect(host.querySelector('[aria-label="Vehicle calendar"]')?.getAttribute('aria-hidden')).toBe('false');
 }
 const visit = async (id: string) => { await act(async () => go(`/vehicle/${id}`)); await act(async () => { await vi.advanceTimersByTimeAsync(5); }); };
 const cell = (day: string) => host.querySelector<HTMLElement>(`.hm-c[data-date="${day}"]`);
@@ -275,24 +275,27 @@ it('retains actual work detail/story/amount/duration instead of showing a missin
 it('shows the calendar alone, collapses to the barcode on scroll, and restores the same days on return', async () => {
   let anchorTop = 200;
   vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
-    return { top: this.className === 'vp-timeline-anchor' ? anchorTop : 0, height: 0 } as DOMRect;
+    return { top: this.className === 'vp-timeline-anchor' ? anchorTop : 0, height: this.className === 'barcode-heatmap' ? 124 : 0 } as DOMRect;
   });
   await draw();
   const calendar = host.querySelector<HTMLElement>('[aria-label="Vehicle calendar"]')!;
   const barcode = host.querySelector<HTMLElement>('[aria-label="Vehicle timeline"]')!;
-  expect(calendar.hidden).toBe(false); expect(barcode.hidden).toBe(true);
+  expect((calendar.getAttribute('aria-hidden') === 'true')).toBe(false); expect((barcode.getAttribute('aria-hidden') === 'true')).toBe(true);
   expect(host.querySelector('.timeline-view-options')).toBeNull();
   const days = snapshot().cells;
   await import('./VehicleDayDrawer');
   await act(async () => cell(photoA)!.click());
-  anchorTop = -1;
-  await act(async () => window.dispatchEvent(new Event('scroll')));
-  expect(calendar.hidden).toBe(true); expect(barcode.hidden).toBe(false);
+  anchorTop = -50;
+  await act(async () => { window.dispatchEvent(new Event('scroll')); await vi.advanceTimersByTimeAsync(5); });
+  expect((calendar.getAttribute('aria-hidden') === 'true')).toBe(false); expect((barcode.getAttribute('aria-hidden') === 'true')).toBe(true);
+  anchorTop = -124;
+  await act(async () => { window.dispatchEvent(new Event('scroll')); await vi.advanceTimersByTimeAsync(5); });
+  expect((calendar.getAttribute('aria-hidden') === 'true')).toBe(true); expect((barcode.getAttribute('aria-hidden') === 'true')).toBe(false);
   expect(host.querySelector('[data-day-drawer]')).not.toBeNull();
   expect(host.querySelector('[data-day-drawer]')!.closest('[hidden]')).toBeNull();
   anchorTop = 200;
-  await act(async () => window.dispatchEvent(new Event('scroll')));
-  expect(calendar.hidden).toBe(false); expect(barcode.hidden).toBe(true);
+  await act(async () => { window.dispatchEvent(new Event('scroll')); await vi.advanceTimersByTimeAsync(5); });
+  expect((calendar.getAttribute('aria-hidden') === 'true')).toBe(false); expect((barcode.getAttribute('aria-hidden') === 'true')).toBe(true);
   expect(snapshot().cells).toEqual(days);
   expect(calls('get_vehicle_contribution_days', a)).toHaveLength(1);
 });

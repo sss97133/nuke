@@ -6,11 +6,18 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 const fixture = vi.hoisted(() => ({ vehicle: null as any, depth: [] as { dimension: string; value: unknown }[], depthLoads: 0,
   media: [] as string[], photoOpens: [] as unknown[], leadImageUrl: null as string | null,
+  galleryFilter: null as null | {field: string; label: string}, clear: vi.fn(),
   vehicleImages: [{ id: 'synthetic-unscreened', image_url: 'https://images.test/unscreened-gallery.jpg' }] }));
-vi.mock('./VehicleProfileContext', () => ({ useVehicleProfile: () => ({ vehicle: fixture.vehicle, vehicleId: 'synthetic-spec-card', leadImageUrl: fixture.leadImageUrl, heroMeta: null, vehicleImages: fixture.vehicleImages }) }));
+vi.mock('./VehicleProfileContext', () => ({ useVehicleProfile: () => ({ vehicle: fixture.vehicle, vehicleId: 'synthetic-spec-card', leadImageUrl: fixture.leadImageUrl, heroMeta: null, vehicleImages: fixture.vehicleImages, galleryFilter: fixture.galleryFilter, setGalleryFilter: fixture.clear }) }));
+vi.mock('./hooks/useVehicleImageEvidence', async original => ({
+  ...await original<typeof import('./hooks/useVehicleImageEvidence')>(),
+  useVehicleImageEvidence: () => ({ data: { complete: true, images: [
+    { id: 'drive-photo', image_url: 'https://images.test/drivetrain.jpg', vehicle_zone: 'mech_drivetrain', is_document: false },
+    { id: 'engine-photo', image_url: 'https://images.test/engine.jpg', vehicle_zone: 'mech_engine_bay', is_document: false },
+  ] } }),
+}));
 vi.mock('../../hooks/useIsMobile', () => ({ useIsMobile: () => false }));
 vi.mock('../../components/image/MobileImageGallery', () => ({ __esModule: true, default: () => { fixture.media.push('mobile'); return null; } }));
-vi.mock('./VehicleMediaKit', () => ({ __esModule: true, default: () => { fixture.media.push('media-kit'); return null; } }));
 vi.mock('./VehiclePhotoLightbox', () => ({ openVehiclePhoto: (id: unknown) => fixture.photoOpens.push(id), openVehiclePhotoByUrl: (url: unknown) => fixture.photoOpens.push(url) }));
 vi.mock('../../components/badges/useBadgeDepth', () => ({ useBadgeDepth: (dimension: string, value: unknown) => {
   fixture.depth.push({ dimension, value }); return { data: null, loading: false, load: () => { fixture.depthLoads++; } };
@@ -27,6 +34,7 @@ beforeEach(() => {
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true; root = null; host = null; fixture.leadImageUrl = null;
   fixture.vehicle = Object.freeze({ year: 1976, make: 'Synthetic', model: 'Specimen', body_style: 'Coupe', transmission: 'Manual' });
   fixture.depth = []; fixture.depthLoads = 0; fixture.media = []; fixture.photoOpens = [];
+  fixture.galleryFilter = null; fixture.clear.mockReset();
   vi.stubGlobal('fetch', vi.fn(() => { throw new Error('Real network forbidden'); }));
 });
 afterEach(async () => { if (root) await act(async () => root!.unmount()); host?.remove(); expect(globalThis.fetch).not.toHaveBeenCalled(); vi.unstubAllGlobals(); });
@@ -66,6 +74,20 @@ it.each([
 
 
 const chosen = 'https://images.test/chosen-screened.jpg', replacement = 'https://images.test/replacement-screened.jpg';
+it('selects related drivetrain views explicitly and keeps the image original and clear path actionable', async () => {
+  fixture.galleryFilter = { field: 'drivetrain', label: '4WD' };
+  await client(chosen);
+  const photo = host!.querySelector<HTMLImageElement>('.vp-context-hero__photo img')!;
+  expect(photo.src).toBe('https://images.test/drivetrain.jpg');
+  expect(host!.querySelectorAll('.vp-context-hero__thumbnails button')).toHaveLength(1);
+  await act(async () => host!.querySelector<HTMLButtonElement>('.vp-context-hero__photo')!.click());
+  expect(fixture.photoOpens).toEqual(['drive-photo']);
+  await act(async () => host!.querySelector<HTMLButtonElement>('.vp-context-hero__head button')!.click());
+  expect(fixture.clear).toHaveBeenCalledWith(null);
+  fixture.galleryFilter = null; await client(chosen);
+  expect(host!.querySelector('.vp-context-hero')).toBeNull();
+  expect(actualImage().src).toBe(chosen);
+});
 async function client(lead: string | null) {
   fixture.leadImageUrl = lead;
   if (!root) { host = document.createElement('div'); document.body.appendChild(host); root = createRoot(host); }

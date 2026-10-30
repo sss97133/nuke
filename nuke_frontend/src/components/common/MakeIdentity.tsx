@@ -52,7 +52,7 @@ export function MakeIdentity({ make, inverse = false, compact = false }: { make:
   </span>;
 }
 
-type VehicleIdentityProps = { make: string; model: string; year?: number | string | null; variants?: VehicleIdentityToken[]; compact?: boolean };
+type VehicleIdentityProps = { make: string; model: string; year?: number | string | null; variants?: VehicleIdentityToken[]; compact?: boolean; onExplore?: (field: string, value: string) => void };
 type VehicleArtwork = (typeof vehicleArtwork)[number];
 
 /** Match structured identity only. Unknown years/models never inherit another era's badge. */
@@ -81,27 +81,32 @@ function VehicleArtworkImage({ asset, fallback }: { asset: VehicleArtwork; fallb
 }
 
 /** The vehicle's own nameplate, selected by year/make/model, with a readable fallback. */
-export function VehicleIdentity({ make, model, year, variants = [], compact = false }: VehicleIdentityProps) {
+export function VehicleIdentity({ make, model, year, variants = [], compact = false, onExplore }: VehicleIdentityProps) {
   const assets = resolveVehicleArtwork({ make, model, year, variants });
   const maker = assets.find(asset => asset.role === 'make');
   const script = assets.find(asset => asset.role === 'model');
   const emblem = assets.find(asset => asset.role === 'emblem');
   const variantScript = assets.find(asset => asset.role === 'variant');
   const variantName = variants.filter(token => token.kind === 'series' || token.kind === 'trim').map(token => token.value).join(' ');
+  const part = (field: string, value: string, content: React.ReactNode) => onExplore
+    ? <button type="button" className="vehicle-identity__explore" aria-haspopup="dialog" aria-label={`Explore ${value} in this profile`} onClick={() => onExplore(field, value)}>{content}</button>
+    : content;
   return <span className={`vehicle-identity${compact ? ' vehicle-identity--compact' : ''}`} data-period-artwork={assets.length > 0} data-variant-artwork={!!variantScript}>
-    {compact && year && <span className="vehicle-identity__year" aria-hidden="true">{year}</span>}
-    <span className="vehicle-identity__maker" aria-hidden="true">
+    {compact && year && <span className="vehicle-identity__year" aria-hidden={onExplore ? undefined : true}>{part('year', String(year), year)}</span>}
+    <span className="vehicle-identity__maker" aria-hidden={onExplore ? undefined : true}>
+      {part('make', make, <>
       {maker ? <VehicleArtworkImage key={maker.file} asset={maker} fallback={make} /> : <span>{make}</span>}
       {!compact && <span className="vehicle-identity__year">{year}{variantScript && <>{year ? ' · ' : ''}<span className="vehicle-identity__model">{model}</span></>}</span>}
+      </>)}
     </span>
     {emblem && <VehicleArtworkImage key={emblem.file} asset={emblem} />}
     <span className="vehicle-identity__name">
-      {(!variantScript || compact) && <span className="vehicle-identity__model" aria-hidden="true">
+      {(!variantScript || compact) && <span className="vehicle-identity__model" aria-hidden={onExplore ? undefined : true}>{part('model', model, <>
         {script ? <VehicleArtworkImage key={script.file} asset={script} fallback={model} /> : model}
-      </span>}
-      {variantScript && <span className="vehicle-identity__variant" aria-hidden="true"><VehicleArtworkImage key={variantScript.file} asset={variantScript} fallback={variantName} /></span>}
+      </>)}</span>}
+      {variantScript && <span className="vehicle-identity__variant" aria-hidden={onExplore ? undefined : true}>{part('trim', variantName, <VehicleArtworkImage key={variantScript.file} asset={variantScript} fallback={variantName} />)}</span>}
       {variants.filter(token => !variantScript || (token.kind !== 'series' && token.kind !== 'trim')).map(token =>
-        <span key={token.kind} className="vehicle-identity__variant" aria-hidden="true">{token.value}</span>)}
+        <span key={token.kind} className="vehicle-identity__variant" aria-hidden={onExplore ? undefined : true}>{part(token.kind, token.value, token.value)}</span>)}
     </span>
     <span className="sr-only">{[year, make, model, ...variants.map(token => token.value)].filter(Boolean).join(' ')}</span>
   </span>;

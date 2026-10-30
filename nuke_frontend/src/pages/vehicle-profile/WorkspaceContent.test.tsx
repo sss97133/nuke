@@ -92,7 +92,8 @@ it('keeps every gallery view actionable and exposes the selected mode', async ()
     expect(host.querySelectorAll('[aria-label="Image view"] [aria-pressed="true"]')).toHaveLength(1);
     expect(fixture.gallery.mock.calls.at(-1)?.[0].galleryView).toBe(modes[index]);
   }
-  expect(fixture.context.setGalleryFilter).toHaveBeenCalledWith(null);
+  expect(fixture.context.setGalleryFilter).not.toHaveBeenCalled();
+  expect(fixture.gallery.mock.calls.at(-1)?.[0].galleryFilter).toEqual(fixture.context.galleryFilter);
   const clear = [...host.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent === 'Clear filter')!;
   expect(clear.closest('.gallery-header')).not.toBeNull();
   fixture.context.setGalleryFilter.mockClear();

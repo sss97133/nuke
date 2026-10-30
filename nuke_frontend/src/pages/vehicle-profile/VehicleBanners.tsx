@@ -11,10 +11,12 @@ const MergeProposalsPanel = React.lazy(() => import('../../components/vehicle/Me
 
 export interface VehicleBannersProps {
   onMergeComplete: () => void;
+  externalAuctionInHeader?: boolean;
 }
 
 const VehicleBanners: React.FC<VehicleBannersProps> = ({
   onMergeComplete,
+  externalAuctionInHeader = false,
 }) => {
   const { vehicle, session, permissions, auctionPulse, auctionCurrency, isVerifiedOwner } = useVehicleProfile();
   const activeExternal = isAuctionPresentation(auctionPulse) && !!auctionPulse?.listing_url && ['active', 'live'].includes(auctionPulse.listing_status);
@@ -63,7 +65,7 @@ const VehicleBanners: React.FC<VehicleBannersProps> = ({
       <React.Suspense fallback={null}><LiveAuctionBanner vehicleId={vehicle.id} /></React.Suspense>
 
       {/* External Auction Live Banner - Show if vehicle has active BaT/C&B/etc auction */}
-      {activeExternal && (
+      {activeExternal && !externalAuctionInHeader && (
         <div style={{ padding: '0 var(--space-4)', maxWidth: '1600px', margin: 'var(--space-2) auto 0' }}>
           <React.Suspense fallback={null}><ExternalAuctionLiveBanner
             sellerStack={<React.Suspense fallback={null}><SellerStackButton /></React.Suspense>}

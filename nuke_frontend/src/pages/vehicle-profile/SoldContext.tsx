@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from 'react';
+import React, { useContext, useMemo, useState } from 'react';
+import { PopupStackContext } from '../../components/popups/PopupStack';
 import { PrefetchLink as Link } from '../../components/PrefetchLink';
 import { sanitizeIdentityToken } from '../../utils/vehicleIdentity';
 import {
@@ -9,6 +10,8 @@ import {
   type VehicleCohortFilterKey,
 } from '../../lib/market/vehicleTaxonomy';
 import type { CompSale, CompScope } from './hooks/useVehicleIntel';
+
+const VehiclePopup = React.lazy(() => import('../../components/popups/VehiclePopup').then(module => ({ default: module.VehiclePopup })));
 
 const money = (value: number) => `$${Math.round(value).toLocaleString('en-US')}`;
 const labelKey = (value: string) => value.toLowerCase().replace(/\s+/g, ' ').trim();
@@ -52,6 +55,7 @@ export default function SoldContext({
   recordedSale?: number | null;
 }) {
   const [activeCohort, setActiveCohort] = useState<VehicleCohortFilterKey>('all');
+  const popup = useContext(PopupStackContext);
 
   const validComps = useMemo(
     () =>
@@ -107,7 +111,7 @@ export default function SoldContext({
   const difference = recordedSale && Number.isFinite(recordedSale) && median && matching.length >= 2 ? 100 * (recordedSale / median - 1) : null;
 
   return <details className="vp-sold-context">
-    <summary>Sold context <span>{difference !== null
+    <summary>Recorded model sales <span>{difference !== null
       ? `Latest sale ${difference >= 0 ? '+' : ''}${difference.toFixed(1)}% vs same-label median · ${matching.length} records`
       : allGroups.some(group => group.sameLabel) ? 'Same model first' : 'Other recorded models'}</span></summary>
     <div className="vp-sold-context__basis" title={scope?.basis ?? undefined}>{scope?.label} · current model labels · condition unmatched</div>
@@ -146,7 +150,12 @@ export default function SoldContext({
     {visibleGroups.map(group => <section key={group.label} className="vp-sold-context__group" aria-label={group.label}>
       <h3>{group.label}{group.sameLabel && <small>Same model label</small>}</h3>
       {group.sales.map(sale => <div className="vp-sold-context__sale" key={sale.id}>
-        <Link to={`/vehicle/${sale.id}`} className="vp-sold-context__record" aria-label={`Inspect ${group.label}, sold ${sale.sale_date}`}>
+        <Link to={`/vehicle/${sale.id}`} className="vp-sold-context__record" aria-label={`Inspect ${group.label}, sold ${sale.sale_date}`} onClick={event => {
+          if (!popup || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
+          event.preventDefault();
+          popup.push(<React.Suspense fallback={<p role="status">Reading profile…</p>}><VehiclePopup vehicle={{ id: sale.id, year: sale.year, make: subject.make, model: sale.model, thumbnail_url: sale.thumbnail,
+            sale_price: sale.sale_price, sale_date: sale.sale_date, mileage: sale.mileage }} /></React.Suspense>, group.label, 560);
+        }}>
           {sale.thumbnail && <img src={sale.thumbnail} width="40" height="30" alt="" loading="lazy" />}
           <span>{new Date(sale.sale_date!).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })}
             <small>{sale.mileage != null ? `${sale.mileage.toLocaleString()} mi recorded` : 'Mileage unrecorded'}</small></span>
