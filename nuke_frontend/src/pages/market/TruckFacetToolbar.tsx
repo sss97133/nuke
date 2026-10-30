@@ -16,6 +16,6 @@ export default function TruckFacetToolbar({ axis, filters, count, total, usd, pe
       {Object.keys(filters).length > 0 && <button type="button" onClick={onClear}>Clear filters</button>}
       <span>{pending ? 'Reading complete Truck membership…' : `${count.toLocaleString()} of ${total.toLocaleString()} priced sale records · $${usd.toLocaleString()}`}</span>
     </div>
-    <p>Click a tile to filter. Change grouping to divide that selection. Area = sale dollars, all years. Groups use current recorded configuration, which may differ from configuration at sale.</p>
+    <p>Click a tile to filter. Change grouping to divide that selection. Area = sale dollars, all years. Groups use recorded specifications and source claims. Current configuration and configuration at sale may remain unverified.</p>
   </section>;
 }
