@@ -23,6 +23,7 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 import { requireOwnerOrService, requireWriteAuth } from "../_shared/writeGuard.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { mustWrite } from '../_shared/writeResult.ts';
+import { AnalysisLeaseLost, enqueueAnalysis, runAnalysisQueue, type AnalysisClaim } from './queueWork.ts';
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -93,24 +94,6 @@ function determineSeverity(
   if (thresholds.warning !== undefined && score <= thresholds.warning)
     return "warning";
   return "ok";
-}
-
-function compareSeverity(
-  oldSeverity: string | null,
-  newSeverity: string
-): string {
-  const order: Record<string, number> = {
-    critical: 0,
-    warning: 1,
-    info: 2,
-    ok: 3,
-  };
-  if (!oldSeverity) return "new";
-  const oldN = order[oldSeverity] ?? 2;
-  const newN = order[newSeverity] ?? 2;
-  if (newN < oldN) return "degraded";
-  if (newN > oldN) return "improved";
-  return "unchanged";
 }
 
 // ─── Widget Computation ─────────────────────────────────────────────
@@ -534,81 +517,21 @@ async function computeWidget(
 // ─── Upsert Signal ──────────────────────────────────────────────────
 
 async function upsertSignal(
-  supabase: any,
-  vehicleId: string,
-  widget: WidgetConfig,
-  result: WidgetResult
+  supabase: any, claim: AnalysisClaim, workerId: string, widget: WidgetConfig, result: WidgetResult
 ): Promise<{ isNew: boolean; changed: boolean }> {
-  // Check existing signal
-  const { data: existing } = await supabase
-    .from("analysis_signals")
-    .select("id, score, severity, input_hash, changed_at")
-    .eq("vehicle_id", vehicleId)
-    .eq("widget_slug", widget.slug)
-    .maybeSingle();
-
-  const changeDirection = existing
-    ? compareSeverity(existing.severity, result.severity)
-    : "new";
-
-  const staleAt = new Date(
-    Date.now() + widget.stale_after_hours * 3600000
-  ).toISOString();
-
-  const signalData = {
-    vehicle_id: vehicleId,
-    widget_slug: widget.slug,
-    score: result.score,
-    label: result.label ?? null,
-    severity: result.severity,
-    value_json: result.value_json,
-    reasons: result.reasons,
-    evidence: result.evidence ?? null,
-    confidence: result.confidence ?? null,
-    recommendations: result.recommendations ?? [],
-    previous_score: existing?.score ?? null,
-    previous_severity: existing?.severity ?? null,
-    changed_at:
-      changeDirection !== "unchanged"
-        ? new Date().toISOString()
-        : existing?.changed_at ?? new Date().toISOString(),
-    change_direction: changeDirection,
-    computed_at: new Date().toISOString(),
-    stale_at: staleAt,
-    compute_time_ms: result.compute_time_ms,
-  };
-
-  const { data: upserted, error } = await supabase
-    .from("analysis_signals")
-    .upsert(signalData, {
-      onConflict: "vehicle_id,widget_slug",
-    })
-    .select("id")
-    .single();
-
-  if (error) {
-    console.error(`Failed to upsert signal ${widget.slug}:`, error.message);
-    return { isNew: false, changed: false };
-  }
-
-  // Write history if severity changed
-  if (changeDirection !== "unchanged" && upserted?.id) {
-    mustWrite('analysis_signal_history insert', await supabase.from("analysis_signal_history").insert({
-      signal_id: upserted.id,
-      vehicle_id: vehicleId,
-      widget_slug: widget.slug,
-      score: result.score,
-      severity: result.severity,
-      label: result.label ?? null,
-      reasons: result.reasons,
-      computed_at: new Date().toISOString(),
-    }));
-  }
-
-  return {
-    isNew: !existing,
-    changed: changeDirection === "degraded" || changeDirection === "improved",
-  };
+  const { data, error } = await supabase.rpc("record_analysis_queue_signal", {
+    p_id: claim.id, p_worker_id: workerId, p_revision: claim.claimed_revision, p_lease_token: claim.lease_token,
+    p_signal: { vehicle_id: claim.vehicle_id, widget_slug: widget.slug,
+      score: result.score, label: result.label ?? null, severity: result.severity,
+      value_json: result.value_json, reasons: result.reasons, evidence: result.evidence ?? null,
+      confidence: result.confidence ?? null, recommendations: result.recommendations ?? [],
+      stale_at: new Date(Date.now() + widget.stale_after_hours * 3600000).toISOString(),
+      compute_time_ms: result.compute_time_ms },
+  });
+  if (error) throw new Error(`Signal publication failed: ${error.message}`);
+  if (data?.status === "lease_lost") throw new AnalysisLeaseLost("Analysis lease lost");
+  if (data?.status !== "recorded") throw new Error("Signal publication receipt missing");
+  return { isNew: data.is_new === true, changed: data.changed === true };
 }
 
 // ─── Backfill: ARS-scored vehicles with no analysis signals ──────────
@@ -616,7 +539,7 @@ async function upsertSignal(
 async function handleBackfillAuctions(
   supabase: any,
   batchSize: number
-): Promise<unknown> {
+): Promise<Record<string, unknown>> {
   const limit = Math.min(batchSize, 100);
 
   // Find vehicles with auction_readiness scores but zero analysis_signals rows.
@@ -644,17 +567,7 @@ async function handleBackfillAuctions(
   let queued = 0;
   for (const vid of rows) {
     if (!vid) continue;
-    const { error } = await supabase.from("analysis_queue").upsert(
-      {
-        vehicle_id: vid,
-        trigger_source: "backfill_auctions",
-        trigger_reasons: ["ars_scored_no_signals"],
-        status: "pending",
-        priority: 30, // Lower than sweep (50) and observation (70)
-      },
-      { onConflict: "vehicle_id", ignoreDuplicates: true }
-    );
-    if (!error) queued++;
+    if (await enqueueAnalysis(supabase, vid, "backfill_auctions", ["ars_scored_no_signals"], null, 30)) queued++;
   }
 
   // Now process the queue
@@ -672,7 +585,7 @@ async function handleBackfillAuctions(
 async function handleSweep(
   supabase: any,
   batchSize: number
-): Promise<unknown> {
+): Promise<Record<string, unknown>> {
   const now = new Date().toISOString();
 
   // Find vehicles with stale signals
@@ -708,20 +621,7 @@ async function handleSweep(
   // Queue them
   let queued = 0;
   for (const vehicleId of vehicleIds) {
-    const { error } = await supabase.from("analysis_queue").upsert(
-      {
-        vehicle_id: vehicleId,
-        trigger_source: "cron_sweep",
-        trigger_reasons: ["stale_or_missing_signals"],
-        status: "pending",
-        priority: 50,
-      },
-      {
-        onConflict: "vehicle_id",
-        ignoreDuplicates: true,
-      }
-    );
-    if (!error) queued++;
+    if (await enqueueAnalysis(supabase, vehicleId, "cron_sweep", ["stale_or_missing_signals"], null, 50)) queued++;
   }
 
   // Now process the queue
@@ -737,133 +637,38 @@ async function handleSweep(
   };
 }
 
-async function processQueue(
-  supabase: any,
-  batchSize: number
-): Promise<unknown> {
-  // Claim batch
-  const { data: claimed, error: claimError } = await supabase.rpc(
-    "claim_analysis_queue_batch",
-    {
-      p_batch_size: batchSize,
-      p_worker_id: "coordinator-" + Date.now(),
-    }
-  );
-
-  if (claimError || !claimed?.length) {
-    return { claimed: 0, processed: 0, errors: claimError?.message ?? null };
-  }
-
-  // Load all enabled widgets
-  const { data: widgets } = await supabase
-    .from("analysis_widgets")
-    .select(
-      "slug, display_name, compute_mode, edge_function_name, compute_sql, severity_thresholds, stale_after_hours"
-    )
+async function processQueue(supabase: any, batchSize: number, vehicleId?: string) {
+  // Registry errors cannot strand already-claimed work.
+  const { data: widgets, error } = await supabase.from("analysis_widgets")
+    .select("slug, display_name, compute_mode, edge_function_name, compute_sql, severity_thresholds, stale_after_hours")
     .eq("is_enabled", true);
-
-  if (!widgets?.length) {
-    return { claimed: claimed.length, processed: 0, error: "no_widgets" };
-  }
-
-  const results: Array<{
-    vehicle_id: string;
-    widgets_computed: number;
-    widgets_failed: number;
-    duration_ms: number;
-  }> = [];
-
-  for (const queueItem of claimed) {
-    const startMs = Date.now();
-    let computed = 0;
-    let failed = 0;
-
-    // Determine which widgets to run
-    const targetWidgets = queueItem.widget_slugs?.length
-      ? widgets.filter((w: WidgetConfig) =>
-          queueItem.widget_slugs.includes(w.slug)
-        )
-      : widgets;
-
-    for (const widget of targetWidgets) {
-      // Skip widgets without compute logic
-      if (
-        widget.compute_mode === "edge_function" &&
-        !widget.edge_function_name
-      ) {
-        continue;
-      }
-      if (widget.compute_mode === "inline_sql" && !widget.compute_sql) {
-        continue;
-      }
-
-      try {
-        const widgetResult = await computeWidget(
-          supabase,
-          queueItem.vehicle_id,
-          widget
-        );
-
-        if (widgetResult.value_json?.status === "widget_not_configured") {
-          continue; // Skip unconfigured widgets silently
-        }
-
-        await upsertSignal(
-          supabase,
-          queueItem.vehicle_id,
-          widget,
-          widgetResult
-        );
-        computed++;
-      } catch (err: any) {
-        console.error(
-          `Widget ${widget.slug} failed for ${queueItem.vehicle_id}:`,
-          err.message
-        );
-        failed++;
-      }
-    }
-
-    // Mark queue item complete
-    mustWrite('analysis_queue update', await supabase
-      .from("analysis_queue")
-      .update({
-        status: failed > 0 && computed === 0 ? "failed" : "complete",
-        widgets_computed: computed,
-        widgets_failed: failed,
-        compute_time_ms: Date.now() - startMs,
-        completed_at: new Date().toISOString(),
-      })
-      .eq("id", queueItem.id));
-
-    results.push({
-      vehicle_id: queueItem.vehicle_id,
-      widgets_computed: computed,
-      widgets_failed: failed,
-      duration_ms: Date.now() - startMs,
-    });
-  }
-
-  return {
-    claimed: claimed.length,
-    processed: results.length,
-    total_computed: results.reduce((s, r) => s + r.widgets_computed, 0),
-    total_failed: results.reduce((s, r) => s + r.widgets_failed, 0),
-    results,
-  };
+  if (error) throw new Error(`Widget registry unavailable: ${error.message}`);
+  const bySlug = new Map<string, WidgetConfig>((widgets ?? []).map((w: WidgetConfig) => [w.slug, w]));
+  return await runAnalysisQueue(supabase, { batchSize, vehicleId,
+    compute: async (claim, slug, workerId) => {
+      const widget = bySlug.get(slug);
+      if (!widget) throw new Error("Requested widget is unavailable");
+      const result = await computeWidget(supabase, claim.vehicle_id, widget);
+      if (result.value_json?.status === "widget_not_configured") throw new Error("Requested widget is not configured");
+      if (result.value_json?.error) throw new Error(String(result.value_json.error));
+      const stored = await upsertSignal(supabase, claim, workerId, widget, result);
+      return { widget: slug, score: result.score, severity: result.severity, headline: result.reasons?.[0] ?? "",
+        is_new: stored.isNew, changed: stored.changed, compute_time_ms: result.compute_time_ms };
+    },
+  });
 }
 
 async function handleObservationTrigger(
   supabase: any,
   vehicleId: string,
   observationKind: string
-): Promise<unknown> {
+): Promise<Record<string, unknown>> {
   // Find widgets that care about this observation kind
-  const { data: widgets } = await supabase
-    .from("analysis_widgets")
-    .select("slug")
-    .eq("is_enabled", true)
-    .contains("trigger_on_observation_kinds", [observationKind]);
+  const { data: registered, error } = await supabase.from("analysis_widgets")
+    .select("slug,trigger_on_observation_kinds").eq("is_enabled", true);
+  if (error) throw new Error(`Widget registry unavailable: ${error.message}`);
+  const widgets = registered?.filter((w: { trigger_on_observation_kinds: string[] | null }) =>
+    w.trigger_on_observation_kinds?.some(k => k === observationKind || k === "*"));
 
   if (!widgets?.length) {
     return { queued: false, reason: "no_widgets_for_kind", kind: observationKind };
@@ -871,109 +676,24 @@ async function handleObservationTrigger(
 
   const widgetSlugs = widgets.map((w: { slug: string }) => w.slug);
 
-  // Queue (upsert with debounce)
-  const { error } = await supabase.from("analysis_queue").upsert(
-    {
-      vehicle_id: vehicleId,
-      trigger_source: "observation",
-      trigger_reasons: [`observation_kind:${observationKind}`],
-      widget_slugs: widgetSlugs,
-      status: "pending",
-      priority: 70, // Higher priority than cron sweep
-    },
-    {
-      onConflict: "vehicle_id",
-      ignoreDuplicates: false,
-    }
-  );
+  const id = await enqueueAnalysis(supabase, vehicleId, "observation",
+    [`observation_kind:${observationKind}`], widgetSlugs, 70);
+  return { queued: id !== null, vehicle_id: vehicleId,
+    observation_kind: observationKind, widgets_triggered: widgetSlugs };
 
-  return {
-    queued: !error,
-    vehicle_id: vehicleId,
-    observation_kind: observationKind,
-    widgets_triggered: widgetSlugs,
-    error: error?.message,
-  };
 }
 
-async function handleEvaluateVehicle(
-  supabase: any,
-  vehicleId: string,
-  widgetSlugs?: string[]
-): Promise<unknown> {
-  // Load widgets
-  let query = supabase
-    .from("analysis_widgets")
-    .select(
-      "slug, display_name, compute_mode, edge_function_name, compute_sql, severity_thresholds, stale_after_hours"
-    )
-    .eq("is_enabled", true);
-
-  if (widgetSlugs?.length) {
-    query = query.in("slug", widgetSlugs);
-  }
-
-  const { data: widgets } = await query;
-  if (!widgets?.length) {
-    return { error: "no_widgets_found" };
-  }
-
+async function handleEvaluateVehicle(supabase: any, vehicleId: string, widgetSlugs?: string[]) {
   const startMs = Date.now();
-  const signalResults: Array<{
-    widget: string;
-    score: number | null;
-    severity: string;
-    headline: string;
-    is_new: boolean;
-    changed: boolean;
-    compute_time_ms: number;
-  }> = [];
-
-  for (const widget of widgets) {
-    // Skip widgets without compute logic
-    if (
-      widget.compute_mode === "edge_function" &&
-      !widget.edge_function_name
-    ) {
-      continue;
-    }
-    if (widget.compute_mode === "inline_sql" && !widget.compute_sql) {
-      continue;
-    }
-
-    const result = await computeWidget(supabase, vehicleId, widget);
-
-    if (result.value_json?.status === "widget_not_configured") {
-      continue;
-    }
-
-    const { isNew, changed } = await upsertSignal(
-      supabase,
-      vehicleId,
-      widget,
-      result
-    );
-
-    signalResults.push({
-      widget: widget.slug,
-      score: result.score,
-      severity: result.severity,
-      headline: result.reasons?.[0] ?? "",
-      is_new: isNew,
-      changed,
-      compute_time_ms: result.compute_time_ms,
-    });
-  }
-
-  return {
-    vehicle_id: vehicleId,
-    widgets_evaluated: signalResults.length,
-    total_time_ms: Date.now() - startMs,
-    signals: signalResults,
-  };
+  const id = await enqueueAnalysis(supabase, vehicleId, "owner_evaluation", ["evaluate_vehicle"], widgetSlugs?.length ? widgetSlugs : null, 90);
+  if (!id) return { vehicle_id: vehicleId, error: "no_widgets_found" };
+  const work = await processQueue(supabase, 1, vehicleId);
+  return { vehicle_id: vehicleId, queued: true, queue_id: id,
+    widgets_evaluated: work.total_computed, total_time_ms: Date.now() - startMs,
+    signals: work.results.flatMap(r => r.signals), work };
 }
 
-async function handleStatus(supabase: any): Promise<unknown> {
+async function handleStatus(supabase: any): Promise<Record<string, unknown>> {
   // Widget registry stats
   const { data: allWidgets } = await supabase
     .from("analysis_widgets")
@@ -1041,7 +761,7 @@ async function handleStatus(supabase: any): Promise<unknown> {
 async function handleDashboard(
   supabase: any,
   filters?: { vehicle_id?: string; category?: string; severity?: string }
-): Promise<unknown> {
+): Promise<Record<string, unknown>> {
   let query = supabase
     .from("analysis_signals")
     .select(
@@ -1107,7 +827,7 @@ async function handleAcknowledge(
   supabase: any,
   signalId: string,
   userId?: string
-): Promise<unknown> {
+): Promise<Record<string, unknown>> {
   const { error } = await supabase
     .from("analysis_signals")
     .update({
@@ -1124,7 +844,7 @@ async function handleDismiss(
   signalId: string,
   dismissHours: number,
   userId?: string
-): Promise<unknown> {
+): Promise<Record<string, unknown>> {
   const dismissUntil = new Date(
     Date.now() + dismissHours * 3600000
   ).toISOString();
@@ -1173,7 +893,7 @@ Deno.serve(async (req: Request) => {
 
       case "compute": {
         const batchSize = Math.min(body.batch_size ?? 20, 100);
-        const result = await processQueue(supabase, batchSize);
+        const result = await processQueue(supabase, batchSize, body.vehicle_id);
         return json(200, { action: "compute", ...result });
       }
 

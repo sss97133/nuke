@@ -1203,16 +1203,8 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
     const protectedResponse = await protectedReply(observation,false);
     if (protectedResponse) return protectedResponse;
 
-    // Fire-and-forget: trigger analysis engine for this vehicle+observation kind
-    if (vehicleId && input.kind && input.defer_analysis !== true) {
-      const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-      const serviceKey = projectSecretKey() ?? "";
-      fetch(`${supabaseUrl}/functions/v1/analysis-engine-coordinator`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${serviceKey}` },
-        body: JSON.stringify({ action: "observation_trigger", vehicle_id: vehicleId, observation_kind: input.kind }),
-      }).catch(() => {}); // intentionally fire-and-forget
-    }
+    // The existing database observation hook records affected analysis work in
+    // this admission transaction. A worker wake must never be its only receipt.
 
     return new Response(JSON.stringify({
       success: true,
