@@ -73,6 +73,7 @@ final class DeviceAttributionTests: XCTestCase {
         }
         XCTAssertTrue(AttributionEngine.profileNeedsRetry(try response(#"{"status":"created","filing":{"results":[{"image_id":"a","status":"filed"},{"image_id":"b","status":"deferred"}]}}"#)))
         XCTAssertTrue(AttributionEngine.profileNeedsRetry(try response(#"{"unexpected":"response"}"#)))
+        XCTAssertTrue(AttributionEngine.profileNeedsRetry(try response(#"{"status":"created","filing":{}}"#)))
         XCTAssertFalse(AttributionEngine.profileNeedsRetry(try response(#"{"status":"ambiguous"}"#)), "ambiguity is not a transport retry or a filing")
         XCTAssertFalse(AttributionEngine.profileNeedsRetry(try response(#"{"status":"created","filing":{"results":[{"image_id":"a","status":"filed"}]}}"#)))
     }

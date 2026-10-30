@@ -692,8 +692,11 @@ final class AttributionEngine: ObservableObject {
     nonisolated static func profileNeedsRetry(_ res: AnyJSON) -> Bool {
         guard case .object(let o) = res, case .string(let status)? = o["status"] else { return true }
         if ["busy", "error", "rate_limited"].contains(status) { return true }
-        guard case .object(let filing)? = o["filing"] else { return false }
-        return statuses(from: .object(filing)).values.contains { ["busy", "deferred", "error"].contains($0) }
+        let expectsFiling = ["created", "exists_vin", "exists_associated"].contains(status)
+        guard case .object(let filing)? = o["filing"] else { return expectsFiling }
+        let filingStatuses = statuses(from: .object(filing))
+        if expectsFiling && filingStatuses.isEmpty { return true }
+        return filingStatuses.values.contains { ["busy", "deferred", "error"].contains($0) }
     }
 
     /// Append the cheap, fresh per-image source pass under one run key. Only
