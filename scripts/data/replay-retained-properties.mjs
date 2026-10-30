@@ -37,9 +37,9 @@ const inputSha256 = createHash('sha256').update(input).digest('hex');
 let state;
 try { state = JSON.parse(await readFile(statePath)); }
 catch (error) { if (error.code !== 'ENOENT') throw error; }
-state ??= { version: 'retained-property-replay-v1', input_sha256: inputSha256, apply: options.apply, total: ids.length,
+state ??= { version: 'retained-property-replay-v2', input_sha256: inputSha256, apply: options.apply, total: ids.length,
   started_at: new Date().toISOString(), results: {} };
-if (state.input_sha256 !== inputSha256 || state.apply !== options.apply || state.version !== 'retained-property-replay-v1') {
+if (state.input_sha256 !== inputSha256 || state.apply !== options.apply || state.version !== 'retained-property-replay-v2') {
   throw Error('State belongs to a different manifest or mode; use a separate receipt');
 }
 const base = process.env.SUPABASE_URL, key = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -61,27 +61,32 @@ if (options.apply && await request('/rest/v1/rpc/retained_native_listing_source'
 async function replay(id) {
   const [v] = await select('vehicles', { select: 'id,is_public,deleted_at,listing_kind,listing_url,discovery_url', id: `eq.${id}` });
   if (!v || v.is_public !== true || v.deleted_at || v.listing_kind === 'non_vehicle_item') return { status: 'blocked', reason: 'parent_not_public_real_vehicle' };
+  // Existing source testimony is usable independently of a new snapshot replay.
+  // Let the canonical enqueue owner qualify it, including when the current URL
+  // is absent/unsupported or a protected capture cannot be admitted.
+  const parents = await select('vehicle_observations', { select: 'id', vehicle_id: `eq.${id}`,
+    kind: 'in.(listing,sale_result)', extraction_method: 'in.(html_match,html_description_capture,html_parse,public_lot_index,next_data_json_parse,retained_native_fields_v1)',
+    is_superseded: 'eq.false', order: 'id', limit: '50' });
+  const keys = parents.map(p => p.id);
+  let seeded = options.apply && keys.length ? await request('/rest/v1/rpc/enqueue_retained_listing_properties', { p_sources: keys }) : 0;
+  const retained = () => ({ source_parents_submitted: options.apply ? keys.length : 0, source_parents_seen: keys.length,
+    source_scan_limited: parents.length === 50, work_seeded: seeded, model_calls: 0, source_to_reader_verified: false });
+  const blocked = (reason, extra = {}) => ({ status: 'blocked', reason, ...retained(), ...extra });
+  try {
   let url;
-  try { url = new URL(v.listing_url || v.discovery_url); } catch { return { status: 'blocked', reason: 'source_url_unknown' }; }
+  try { url = new URL(v.listing_url || v.discovery_url); } catch { return blocked('source_url_unknown'); }
   const host = url.hostname.replace(/^www\./, '');
   const platform = { 'bringatrailer.com': 'bat', 'mecum.com': 'mecum', 'barrett-jackson.com': 'barrett-jackson' }[host];
   if (!platform) {
-    return { status: 'blocked', reason: 'source_adapter_not_available', source_host: url.hostname };
+    return blocked('source_adapter_not_available', { source_host: url.hostname });
   }
   url.hash = ''; url.search = '';
   const canonical = 'https://' + host + url.pathname.replace(/\/+$/, '') + '/';
   const variants = [...new Set([url.href, canonical, canonical.slice(0, -1), canonical.replace('https://', 'https://www.'), canonical.slice(0, -1).replace('https://', 'https://www.')])];
-  const nativeParents = platform === 'mecum' ? await select('vehicle_observations', { select: 'id', vehicle_id: `eq.${id}`,
-    kind: 'in.(listing,sale_result)', extraction_method: 'eq.next_data_json_parse', is_superseded: 'eq.false', limit: '50' }) : [];
   const snapshots = await select('listing_page_snapshots', { select: 'id,html_sha256,metadata,fetched_at', platform: `eq.${platform}`,
     listing_url: 'in.(' + variants.join(',') + ')', success: 'eq.true', http_status: 'eq.200', order: 'fetched_at.desc', limit: '10' });
   const snapshot = snapshots.find(s => s.metadata?.vehicle_id === id && s.metadata.vehicle_matched === true && /^[0-9a-f]{64}$/i.test(s.html_sha256 || ''));
-  if (!snapshot && nativeParents.length) {
-    const seeded = options.apply ? await request('/rest/v1/rpc/enqueue_retained_listing_properties', { p_sources: nativeParents.map(p => p.id) }) : 0;
-    return { status: options.apply ? 'retained_queued' : 'preview', source_parents: nativeParents.map(p => p.id),
-      work_seeded: seeded, model_calls: 0, source_to_reader_verified: false };
-  }
-  if (!snapshot) return { status: 'blocked', reason: 'attributed_retained_capture_missing' };
+  if (!snapshot) return blocked('attributed_retained_capture_missing');
   const endpoint = platform === 'bat' ? '/functions/v1/extract-bat-core' : '/functions/v1/batch-extract-snapshots';
   const selectors = {
     mode: platform === 'bat' ? 'description_source' : 'retained_properties', vehicle_id: id,
@@ -93,26 +98,30 @@ async function replay(id) {
         : preview.native_property_profile !== 'retained_native_fields_v1')) throw Error('Expected deployed pinned source decoder');
   const receipt = options.apply ? await request(endpoint, { ...selectors, dry_run: false }) : preview;
   if (!receipt.success || receipt.model_calls !== 0 || receipt.vehicle_id !== id || receipt.snapshot_id !== snapshot.id) throw Error('Invalid native capture receipt');
-  let seeded = 0;
   if (options.apply) {
-    // Include old qualified captures so grammar improvements reach historical
-    // records too. Enqueue owns all eligibility and existing-work deduplication.
-    const parents = await select('vehicle_observations', { select: 'id', vehicle_id: `eq.${id}`, kind: 'eq.listing',
-      extraction_method: 'in.(html_match,html_description_capture,retained_native_fields_v1)', is_superseded: 'eq.false', order: 'observed_at.desc', limit: '50' });
-    const keys = [...new Set([...parents, ...nativeParents].map(p => p.id))];
-    if (keys.length) seeded = await request('/rest/v1/rpc/enqueue_retained_listing_properties', { p_sources: keys });
+    const sourceId = receipt.description_receipt?.observation_id ?? receipt.observation_id;
+    if (!uuid.test(sourceId ?? '')) throw Error('Missing admitted source receipt');
+    seeded += await request('/rest/v1/rpc/enqueue_retained_listing_properties', { p_sources: [sourceId] });
   }
   return { status: options.apply ? 'admitted' : 'preview', snapshot_id: snapshot.id,
     capture_sha256: snapshot.html_sha256, source_captured_at: receipt.source_captured_at,
     input_characters: receipt.input_characters, native_receipt: receipt.description_receipt ?? { observation_id: receipt.observation_id,
       duplicate: receipt.duplicate, field_keys: receipt.field_keys },
-    work_seeded: seeded, model_calls: 0, source_to_reader_verified: false };
+    ...retained() };
+  } catch (error) {
+    // A later archive refusal must not erase work already submitted above.
+    error.retained_replay = retained();
+    throw error;
+  }
 }
 let processed = 0;
 for (const id of ids) {
   if (state.results[id] && state.results[id].status !== 'retry') continue;
   try { state.results[id] = { ...await replay(id), attempted_at: new Date().toISOString() }; }
-  catch (error) { state.results[id] = { status: 'retry', reason: error.message, attempted_at: new Date().toISOString() }; }
+  catch (error) {
+    const refused = error.message.startsWith('HTTP 409:') || error.message.includes('Newer listing evidence cannot be reconstructed from the pinned older capture');
+    state.results[id] = { status: refused ? 'blocked' : 'retry', reason: error.message, ...error.retained_replay, attempted_at: new Date().toISOString() };
+  }
   state.updated_at = new Date().toISOString();
   const temporary = statePath + '.tmp';
   await writeFile(temporary, JSON.stringify(state, null, 2) + '\n', { mode: 0o600 }); await rename(temporary, statePath);
