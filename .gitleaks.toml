@@ -60,6 +60,15 @@ title = "Nuke Key Guardian"
   entropy = 3.5
   tags = ["key", "twilio"]
 
+  # Existing Mecum publisher search-only key moved from extract-mecum/index.ts.
+  # This is not a Twilio credential. Match only this public declaration/path;
+  # other keys and every other secret rule remain subject to scanning.
+  [[rules.allowlists]]
+    condition = "AND"
+    paths = ['''(^|/)supabase/functions/_shared/mecumSearch\.ts$''']
+    regexTarget = "line"
+    regexes = ['''^\n?\+?const ALGOLIA_SEARCH_KEY = "(0291c46cde807bcb)(428a021a96138fcb)";$''']
+
   # Immutable public questionnaire/model SHA-256 digests, not credentials.
   # Restrict exceptions to these exact declarations in these two assay files.
   # Gitleaks 8.30's finding.Line includes the preceding newline; admit only that prefix.

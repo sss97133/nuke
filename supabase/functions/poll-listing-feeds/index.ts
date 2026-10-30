@@ -16,6 +16,7 @@
  *
  * Fetch strategies:
  *   - Default: fetch feed_url directly and parse RSS/Atom XML.
+ *   - mecum_public_index: reuse the public JSON index for bounded upcoming-lot discovery.
  *   - search_criteria.fetch_strategy = "firecrawl_html": Craigslist killed RSS,
  *     so the search page is fetched as curated HTML, listing detail URLs are
  *     extracted from the HTML/markdown, and unknown ones are POSTed to the
@@ -29,7 +30,8 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { firecrawlScrape } from "../_shared/firecrawl.ts";
 import { firecrawlGate, ALLOWANCE_EXHAUSTED } from "../_shared/firecrawlGate.ts";
-import { archiveFetch } from "../_shared/archiveFetch.ts";
+import { archiveFetch, isAwsWafChallengeHtml, isGarbageHtml } from "../_shared/archiveFetch.ts";
+import { fetchMecumFeedUrls } from "../_shared/mecumSearch.ts";
 import { fetchCraigslistFeed } from "./feedFetch.ts";
 import { extractCraigslistCanonicalUrls } from "../_shared/urlNormalization.ts";
 import { isGarbageMake } from "../_shared/normalizeVehicle.ts";
@@ -582,7 +584,16 @@ async function pollFirecrawlHtmlFeed(
   let blockNote = "";
   let confirmedEmptySearch = false;
 
-  if (feed.search_criteria?.fetch_strategy === "rss_direct_ingest") {
+  if (feed.search_criteria?.fetch_strategy === "mecum_public_index") {
+    if (feed.source_slug !== "mecum") return await failFeed("config_error: mecum_public_index requires mecum");
+    try {
+      const discovery = await fetchMecumFeedUrls();
+      urls = discovery.urls;
+      confirmedEmptySearch = discovery.confirmedEmpty;
+    } catch (err: any) {
+      return await failFeed(`fetch_failed: ${err?.message || String(err)}`);
+    }
+  } else if (feed.search_criteria?.fetch_strategy === "rss_direct_ingest") {
     try {
       const items = await fetchAndParseRssFeed(feed.feed_url);
       urls = [
@@ -713,6 +724,11 @@ async function pollFirecrawlHtmlFeed(
       );
     }
 
+    // A challenge is a source refusal, never a parser failure or an empty feed.
+    if (blockNote || (html && isAwsWafChallengeHtml(html))) {
+      return await failFeed(`blocked: source challenge${blockNote}`);
+    }
+    if (html && isGarbageHtml(html, feed.source_slug)) return await failFeed("fetch_failed: invalid_source_body");
     htmlForCards = html;
     // Per-feed regex config generalizes this path beyond Craigslist; feeds
     // without a listing_url_regex keep the CL extractor (the original behavior).
@@ -1215,7 +1231,7 @@ Deno.serve(async (req) => {
       }
 
       if (
-        ["firecrawl_html", "rss_direct_ingest"].includes(
+        ["firecrawl_html", "rss_direct_ingest", "mecum_public_index"].includes(
           feed.search_criteria?.fetch_strategy
         )
       ) {
