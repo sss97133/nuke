@@ -736,12 +736,13 @@ async function replayNativeProperties(supabase: any, body: any): Promise<Respons
     const { v, s, fields, associationBasis } = capture;
     if (dryRun) return reply({ success: true, mode: body.mode, native_property_profile: "retained_native_fields_v1", dry_run: true, vehicle_id: v.id, snapshot_id: s.id,
       field_keys: Object.keys(fields), source_association_basis: associationBasis, writes: 0, model_calls: 0 });
-    const identityVersion = s.platform === "mecum" ? "native-identity-v2" : fields.publisher_style_label !== undefined ? "publisher-style-v2" : "v1";
+    const identityVersion = s.platform === "mecum" ? "native-identity-v2" : "publisher-style-v2";
     const input = { source_slug: s.platform, kind: "listing", vehicle_id: v.id, source_url: s.listing_url,
       source_identifier: `retained-native-fields:${s.id}:${associationBasis === "snapshot_vehicle_match" ? identityVersion : `record-url-${identityVersion}`}`, raw_source_ref: `listing_page_snapshots:${s.id}`,
       observed_at: s.fetched_at, extraction_method: "retained_native_fields_v1", defer_analysis: true, agent_cost_cents: 0,
       structured_data: { ...fields, source_capture_sha256: s.html_sha256, source_captured_at: s.fetched_at,
         ...(s.platform === "mecum" ? { identity_extractor_version: "mecum_native_graphql_identity_v1" } : {}),
+        ...(s.platform === "barrett-jackson" ? { native_field_semantics_version: "publisher_style_label_v2" } : {}),
         ...(fields.publisher_style_label !== undefined ? { publisher_style_source_field: "barrett-jackson.native.style" } : {}),
         ...(associationBasis === "exact_record_url_and_native_labels" ? { source_association_basis: associationBasis } : {}),
         source_archive_ingested_at: s.created_at, extractor: "batch-extract-snapshots", source_event_time_status: "unknown",
