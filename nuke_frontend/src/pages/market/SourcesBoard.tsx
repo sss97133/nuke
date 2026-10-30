@@ -1558,6 +1558,81 @@ function PulseLines({ title, series, labels, now, last }: {
   );
 }
 
+/** One source contribution, with a server quote and a processor-confirmed receipt. */
+export function SourceRefreshControl({ source }: { source: string }) {
+  const returned = new URLSearchParams(window.location.search);
+  const [requestId, setRequestId] = useState(() => returned.get('refresh_source') === source ? returned.get('refresh') : null);
+  const [open, setOpen] = useState(!!requestId);
+  const [status, setStatus] = useState<any>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
+  const pendingId = useRef<string | null>(requestId);
+  useEffect(() => {
+    if (!open) return;
+    let active = true;
+    const read = async () => {
+      try {
+        const { data, error: readError } = await supabase.functions.invoke('create-api-access-checkout', {
+          body: { action: 'source_refresh_status', source, request_id: requestId },
+        });
+        if (readError || !data) throw new Error('Source funding status could not be loaded. Try again.');
+        if (active) { setStatus(data); setError(null); }
+      } catch (e) { if (active) setError(e instanceof Error ? e.message : 'Source funding status unavailable.'); }
+    };
+    void read();
+    const timer = requestId ? window.setInterval(() => void read(), 10000) : null;
+    return () => { active = false; if (timer) window.clearInterval(timer); };
+  }, [open, source, requestId]);
+  const request = async () => {
+    setBusy(true); setError(null);
+    try {
+      const { data: auth } = await supabase.auth.getUser();
+      if (!auth.user) throw new Error('Sign in to request this refresh.');
+      pendingId.current ??= crypto.randomUUID();
+      const { data, error: checkoutError } = await supabase.functions.invoke('create-api-access-checkout', {
+        body: { action: status?.requires_payment === false ? 'source_refresh_request' : 'source_refresh_checkout', source, request_id: pendingId.current },
+      });
+      if (!checkoutError && data?.payment_required === false && data.request_id) { setRequestId(data.request_id); return; }
+      if (checkoutError || !data?.checkout_url) throw new Error(status?.requires_payment === false
+        ? 'Refresh could not be queued. Try again.' : 'Payment could not be opened. No refresh is funded yet.');
+      const url = new URL(data.checkout_url);
+      if (url.protocol !== 'https:' || url.hostname !== 'checkout.stripe.com') throw new Error('Payment link unavailable.');
+      setCheckoutUrl(url.toString());
+    } catch (e) { setError(e instanceof Error ? e.message : 'Payment unavailable.'); }
+    finally { setBusy(false); }
+  };
+  const receipt = status?.receipt;
+  const receiptText: Record<string, string> = {
+    awaiting_payment: 'Waiting for payment confirmation. A return from checkout is not a payment receipt.',
+    funded: 'Payment confirmed. The refresh is queued and will follow the source schedule and access limits.',
+    dispatching: 'Payment confirmed. The source refresh is running.',
+    completed: 'The feed refresh completed. Queued listings continue through extraction.',
+    needs_review: 'Payment confirmed. The refresh needs attention; another paid attempt has not been started.',
+  };
+  return <div className="market-sources__refresh">
+    <button type="button" className="market-sources__drill-btn" aria-expanded={open}
+      onClick={() => setOpen(v => !v)}>Refresh source</button>
+    {open && <section className="market-sources__funding" aria-label="Fund source refresh">
+      {error && <p role="alert">{error} {error.startsWith('Sign in') && <a href="/login">Sign in</a>}</p>}
+      {receipt ? <p role="status">{receipt.payment_required === false && ['funded', 'dispatching', 'needs_review'].includes(receipt.status)
+        ? (receipt.status === 'funded' ? 'Refresh queued using existing capacity.' : receipt.status === 'needs_review'
+          ? 'The refresh needs attention; another attempt has not been started.' : 'The source refresh is running using existing capacity.')
+        : receiptText[receipt.status] ?? 'Refresh status is unavailable.'}</p> : requestId ?
+        <p role="status">{status ? 'Sign in to view this refresh receipt. No payment is confirmed here.' : 'Checking refresh receipt…'}</p> :
+        status?.available ? <>
+          <p>{status.requires_payment === false ? 'Use existing capacity for' : 'Fund shared API costs and'} one feed refresh, up to {status.max_ingests} listing admissions. Existing source restrictions still apply.</p>
+          {status.requires_payment !== false && <p>Payments go to Nuke to cover shared API costs. Provider capacity must be available before extraction can run.</p>}
+          {checkoutUrl ? <a className="market-sources__drill-btn" href={checkoutUrl}>Continue to secure payment</a> :
+            <button type="button" className="market-sources__drill-btn" disabled={busy} onClick={() => void request()}>
+              {busy ? 'Preparing refresh…' : status.requires_payment === false ? 'Refresh now' : `Fund refresh · ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(status.amount_cents / 100)}`}
+            </button>}
+        </> : <p role="status">{status?.reason ?? (error ? 'No payment was taken.' : 'Checking source funding…')}</p>}
+      <button type="button" className="market-sources__drill-btn" onClick={() => setOpen(false)}>Close funding</button>
+    </section>}
+  </div>;
+}
+
 function SourceLandingInspector({
   row,
   boardLanding,
@@ -1729,12 +1804,13 @@ function SourceLandingInspector({
               Browse vehicles
             </a>
           ) : null}
+          {row && <SourceRefreshControl key={row.source} source={row.source} />}
           <button
             type="button"
             className="market-sources__drill-btn"
             onClick={() => setRefreshTick((t) => t + 1)}
           >
-            Refresh
+            Reload activity
           </button>
           <button
             type="button"
@@ -1975,6 +2051,7 @@ export function SourcesBoardView({
    *  once; he liked the bar, so it moved here instead of going). Shown on the all-makes board only. */
   houseMix?: HouseMix | null;
 }) {
+  initialSource ??= new URLSearchParams(window.location.search).get('refresh_source');
   const [all, setAll] = useState(() => !!resolveInitialSource(data.rows, initialSource));
   const [horizon, setHorizon] = useState<LandingHorizon>('14d');
   const [openSource, setOpenSource] = useState<string | null>(() => resolveInitialSource(data.rows, initialSource));

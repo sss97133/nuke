@@ -56,3 +56,14 @@ Deno.test("other purchase types are not credited", () => {
 Deno.test("a credit session without a user is ignored", () => {
   assertEquals(routeCheckoutSession(event, { id: "cs_6", metadata: {} }).kind, "ignore");
 });
+
+Deno.test("source funding routes only paid live one-time sessions, never wallet credit", () => {
+  const session = { id: "cs_live_fixture", mode: "payment", payment_status: "paid", amount_total: 300,
+    currency: "usd", client_reference_id: user, metadata: { purchase_type: "source_refresh", user_id: user, request_id: inv } };
+  assertEquals(routeCheckoutSession(event, session).kind, "source_refresh");
+  for (const extra of [{ payment_status: "unpaid" }, { mode: "subscription" }, { currency: "eur" },
+    { amount_total: 0 }, { client_reference_id: wo }]) {
+    assertEquals(routeCheckoutSession(event, { ...session, ...extra }).kind, "ignore");
+  }
+  assertEquals(routeCheckoutSession({ ...event, livemode: false }, session).kind, "ignore");
+});

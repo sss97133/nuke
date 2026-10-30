@@ -26,6 +26,8 @@
  *     (last_error / error_count) -- a silent 0 is a lie.
  */
 
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void };
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { firecrawlScrape } from "../_shared/firecrawl.ts";
 import { firecrawlGate, ALLOWANCE_EXHAUSTED } from "../_shared/firecrawlGate.ts";
@@ -33,7 +35,8 @@ import { archiveFetch } from "../_shared/archiveFetch.ts";
 import { fetchCraigslistFeed } from "./feedFetch.ts";
 import { extractCraigslistCanonicalUrls } from "../_shared/urlNormalization.ts";
 import { isGarbageMake } from "../_shared/normalizeVehicle.ts";
-import { requireWriteAuth } from "../_shared/writeGuard.ts";
+import { requireWriteAuth, isServiceCaller } from "../_shared/writeGuard.ts";
+import { dispatchFundedRefresh } from "./fundedRefresh.ts";
 import { captureLedgerFields } from "./captureLedger.ts";
 import { createIntakeRunReceipt } from "../_shared/extractionMetrics.ts";
 import {
@@ -1025,26 +1028,45 @@ Deno.serve(async (req) => {
     let feedId: string | null = null;
     let batchSize = 10;
     let force = false;
+    let fundingDispatch = false;
+    let intakeRunId: string | undefined;
+    let fundedMaxIngests: number | undefined;
 
-    try {
-      const body = await req.json();
-      source = body.source || null;
-      feedId = body.feed_id || null;
-      batchSize = body.batch_size ?? 10;
-      force = body.force || false;
-      excludeSource = typeof body.exclude_source === "string" ? body.exclude_source : null;
-    } catch (_) {
-      /* no body is fine */
+    let body: any = {};
+    try { body = await req.json(); } catch { /* no body is fine */ }
+    source = body.source || null;
+    feedId = body.feed_id || null;
+    batchSize = body.batch_size ?? 10;
+    force = body.force || false;
+    excludeSource = typeof body.exclude_source === "string" ? body.exclude_source : null;
+    if (body.funding_dispatch === true) {
+      if (!await isServiceCaller(req)) return new Response("Service caller required", { status: 403, headers: corsHeaders });
+      if (!/^[0-9a-f-]{36}$/i.test(body.intake_run_id ?? "") || !source || batchSize !== 1 || force ||
+          !Number.isInteger(body.max_ingests) || body.max_ingests < 1 || body.max_ingests > 5) {
+        throw new Error("Invalid funded refresh scope");
+      }
+      fundingDispatch = true;
+      intakeRunId = body.intake_run_id;
+      fundedMaxIngests = body.max_ingests;
+    }
+
+    if (!fundingDispatch && !source && !feedId && await isServiceCaller(req)) {
+      // Preserve ordinary source polling while the durable paid request runs in
+      // its own bounded invocation. CAS claiming prevents duplicate dispatch.
+      EdgeRuntime.waitUntil(dispatchFundedRefresh(supabase).catch(() => {
+        console.error("[poll-feeds] funded refresh remains queued or needs reconciliation");
+      }));
     }
 
     const { data: control, error: controlError } = await supabase.from("platform_config")
       .select("config_value").eq("config_key", "source_intake").maybeSingle();
     if (controlError) throw new Error("Intake throttle unavailable; no source work started");
     const throttle = intakeThrottle(control?.config_value ?? {});
+    if (fundedMaxIngests !== undefined) throttle.max_ingests = Math.min(throttle.max_ingests, fundedMaxIngests);
     if (!Number.isInteger(batchSize) || batchSize < 0 || batchSize > 100) throw new Error("batch_size must be an integer from 0 to 100");
     batchSize = Math.min(batchSize, throttle.max_feeds);
     const budget = createIntakeBudget(throttle, startTime);
-    runReceipt = await createIntakeRunReceipt(supabase, startTime);
+    runReceipt = await createIntakeRunReceipt(supabase, startTime, intakeRunId);
     if (!throttle.enabled || batchSize === 0 || throttle.max_ingests === 0) {
       await runReceipt.select([], true, throttle);
       await runReceipt.finish('throttled', 'controls_zero');

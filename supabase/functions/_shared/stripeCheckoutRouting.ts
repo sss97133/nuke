@@ -5,6 +5,7 @@
  * credit purchase (the vehicle facilitation fee, a work-order invoice) would also have landed in the payer's wallet.
  * Sessions now carry `metadata.purchase_type`:
  *   - `work_order_invoice` -> record_work_order_processor_payment (create-work-order-invoice-checkout opens these);
+ *   - `source_refresh` -> stored source quote/payment receipt, never a personal wallet credit;
  *   - `ai_wallet_topup` / `api_access_subscription`, or no purchase_type at all (create-checkout deposits) -> AI credit,
  *     exactly as before;
  *   - any other purchase_type -> ignored with a reason, never credited.
@@ -17,6 +18,7 @@ export interface CheckoutSessionLike {
   payment_status?: string | null;
   amount_total?: number | null;
   currency?: string | null;
+  mode?: string | null;
   client_reference_id?: string | null;
   payment_intent?: string | { id: string } | null;
   metadata?: Record<string, string> | null;
@@ -24,6 +26,7 @@ export interface CheckoutSessionLike {
 
 export type CheckoutRoute =
   | { kind: "work_order_invoice"; payload: Record<string, unknown> }
+  | { kind: "source_refresh"; payload: Record<string, unknown> }
   | { kind: "ai_credit"; userId: string }
   | { kind: "ignore"; reason: string };
 
@@ -35,6 +38,17 @@ export function routeCheckoutSession(
 ): CheckoutRoute {
   const meta = session.metadata ?? {};
   const purchaseType = meta.purchase_type ?? null;
+
+  if (purchaseType === "source_refresh") {
+    if (!UUID.test(meta.request_id ?? "") || !UUID.test(meta.user_id ?? "") ||
+        session.client_reference_id !== meta.user_id || session.payment_status !== "paid" || session.mode !== "payment" || !event.livemode ||
+        !Number.isSafeInteger(session.amount_total) || (session.amount_total ?? 0) <= 0 || session.currency !== "usd") {
+      return { kind: "ignore", reason: "source refresh session is unpaid or invalid" };
+    }
+    return { kind: "source_refresh", payload: { request_id: meta.request_id, user_id: meta.user_id,
+      session_id: session.id, event_id: event.id, paid_at: event.created, livemode: event.livemode,
+      amount_cents: session.amount_total, currency: session.currency, payment_status: session.payment_status } };
+  }
 
   if (purchaseType === "work_order_invoice") {
     for (const k of ["work_order_id", "invoice_id", "payer_user_id"]) {

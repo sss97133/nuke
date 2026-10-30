@@ -5,6 +5,10 @@
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
 import Stripe from 'npm:stripe@14.11.0'
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { sourceRefreshCheckout } from "./sourceRefresh.ts";
+import { requireWriteAuth } from "../_shared/writeGuard.ts";
+import { dispatchFundedRefresh } from "../poll-listing-feeds/fundedRefresh.ts";
+declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void };
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -17,10 +21,27 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { subscription_type, success_url, cancel_url } = await req.json()
+    const body = await req.json()
+    const { subscription_type, success_url, cancel_url } = body
+    if (['source_refresh_status', 'source_refresh_checkout', 'source_refresh_request'].includes(body.action)) {
+      if (body.action !== 'source_refresh_status') {
+        const denied = await requireWriteAuth(req);
+        if (denied) return denied;
+      }
+      const { createClient } = await import('jsr:@supabase/supabase-js@2')
+      const db = createClient(Deno.env.get('SUPABASE_URL')!, projectSecretKey()!,
+        { auth: { persistSession: false, autoRefreshToken: false } });
+      const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || 'sk_test_unconfigured', { apiVersion: '2023-10-16' });
+      const result = await sourceRefreshCheckout(req, body, db, stripe);
+      if (body.action === 'source_refresh_request') EdgeRuntime.waitUntil(dispatchFundedRefresh(db).catch(() => {
+        console.error('[source-refresh] request retained for scheduled recovery');
+      }));
+      return new Response(JSON.stringify(result),
+        { headers: { 'content-type': 'application/json', ...corsHeaders } });
+    }
 
     // Subscription plans
-    const plans = {
+    const plans: Record<string, { name: string; description: string; amount: number; recurring: boolean; credits?: number; wallet_cents?: number }> = {
       monthly: {
         name: 'Monthly API Access',
         description: '1,000 AI image analyses per month',
@@ -124,10 +145,10 @@ Deno.serve(async (req) => {
       client_reference_id: user.id,
       metadata: {
         user_id: user.id,
-        purchase_type: (plan as any).wallet_cents ? 'ai_wallet_topup' : 'api_access_subscription',
+        purchase_type: plan.wallet_cents ? 'ai_wallet_topup' : 'api_access_subscription',
         subscription_type: subscription_type,
         ...(plan.credits ? { credits: plan.credits.toString() } : {}),
-        ...((plan as any).wallet_cents ? { amount_cents: (plan as any).wallet_cents.toString() } : {})
+        ...(plan.wallet_cents ? { amount_cents: plan.wallet_cents.toString() } : {})
       },
     }
 
@@ -140,7 +161,7 @@ Deno.serve(async (req) => {
   } catch (error) {
     console.error('Checkout error:', error)
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: error instanceof Error ? error.message : 'Checkout unavailable' }),
       { status: 500, headers: { 'content-type': 'application/json', ...corsHeaders } }
     )
   }
