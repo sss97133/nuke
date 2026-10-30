@@ -1,7 +1,7 @@
 -- Empty disposable PG17 only, as a superuser (the live view_write_guard event trigger is installed), from the repo root:
 --   psql -X -v ON_ERROR_STOP=1 -d dm_refinement_receipt_views_privacy -f supabase/sql/test_receipt_views_privacy.sql
 -- scripts/ci/run-db-contracts.sh runs it that way in the db-contracts job.
--- Contract for 20261106150000_receipt_views_privacy.sql. Synthetic rows only; never production.
+-- Contract for 20261106160000_receipt_views_privacy.sql. Synthetic rows only; never production.
 -- With the 2026-10-29 definitions (owner-run views over receipts, which has row-level security), a signed-in stranger reads another
 -- user's spending summary, anon reads the receipt totals of every vehicle, public or not, and the public receipts view serves the
 -- receipts of public vehicles that are deleted. After the migration:
@@ -244,8 +244,8 @@ END $$;
 RESET ROLE;
 
 -- The migration, twice: it must be replay-safe, and the live guard must accept every statement of it.
-\ir ../migrations/20261106150000_receipt_views_privacy.sql
-\ir ../migrations/20261106150000_receipt_views_privacy.sql
+\ir ../migrations/20261106160000_receipt_views_privacy.sql
+\ir ../migrations/20261106160000_receipt_views_privacy.sql
 
 -- user_receipt_summary: anon is refused.
 SET ROLE anon;
@@ -538,7 +538,7 @@ CREATE OR REPLACE VIEW public.vehicle_receipts_rollup_v WITH (security_barrier =
         count(*) AS receipts_count
    FROM public.receipts WHERE scope_type = 'vehicle' GROUP BY scope_id;
 \set ON_ERROR_STOP off
-\ir ../migrations/20261106150000_receipt_views_privacy.sql
+\ir ../migrations/20261106160000_receipt_views_privacy.sql
 \set ON_ERROR_STOP on
 DO $$ BEGIN
   IF pg_get_viewdef('public.vehicle_receipts_rollup_v'::regclass) LIKE '%vehicle_user_has_access%' THEN
