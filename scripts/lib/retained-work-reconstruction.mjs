@@ -63,6 +63,8 @@ export function reconstructRetainedWork(input) {
   const scope = new Map();
   const paymentReports = [];
   const obligations = [];
+  const mappedSourceIds = new Set();
+  const sourceBacklog = [];
   const context = input.ownerContext ?? { sources: [], claims: [] };
   if (!Array.isArray(context.claims)) throw new Error('invalid_owner_context_claims');
   const contextSources = new Map(uniqueRecords(context.sources, 'owner_context_sources').map(source => [source.id, source]));
@@ -95,20 +97,24 @@ export function reconstructRetainedWork(input) {
           candidateWorkOrderIds: workOrders.map(order => order.id) },
       });
       scope.set(locator, entry);
+      mappedSourceIds.add(source.id);
     }
-    if (text(data.payment_status)) paymentReports.push({ value: data.payment_status,
+    if (text(data.payment_status)) { mappedSourceIds.add(source.id); paymentReports.push({ value: data.payment_status,
       source: observationRef(source, '/structured_data/payment_status'),
       assurance: data.trust === 'owner_stated' ? 'retained_owner_report' : 'retained_source_report',
       client: text(data.client) ? { value: data.client, source: observationRef(source, '/structured_data/client') } : null,
-      authenticatedPaymentWitness: false });
-    if (text(data.obligation)) obligations.push({ kind: data.obligation,
+      authenticatedPaymentWitness: false }); }
+    if (text(data.obligation)) { mappedSourceIds.add(source.id); obligations.push({ kind: data.obligation,
       source: observationRef(source, '/structured_data/obligation'),
       narrative: text(source.content_text) ? { value: source.content_text, source: observationRef(source, '/content_text') } : null,
       assurance: data.trust === 'owner_stated' ? 'retained_owner_report' : 'retained_source_report',
       client: text(data.client) ? { value: data.client, source: observationRef(source, '/structured_data/client') } : null,
       performerActorId: null, performerBinding: 'requires_sourced_party_relationship',
       fulfillment: 'not_inferred_from_payment_or_job_status',
-      candidateWorkOrderIds: workOrders.map(order => order.id) });
+      candidateWorkOrderIds: workOrders.map(order => order.id) }); }
+    if (!mappedSourceIds.has(source.id)) sourceBacklog.push({ observationId: source.id,
+      state: 'requires_extraction_or_binding', metadataKeys: Object.keys(data),
+      source: observationRef(source, ''), interpretation: 'Retained evidence, not absence of work.' });
   }
 
   const images = uniqueRecords(input.images, 'images');
@@ -171,13 +177,14 @@ export function reconstructRetainedWork(input) {
       source: { table: 'vehicle_ownerships', id: period.id, recordSha256: digest(period) } })),
     scopeEntries: [...scope.values()].map(entry => ({ ...entry,
       sourceState: entry.interpretations.length === 1 ? 'one_retained_interpretation' : 'multiple_retained_interpretations' })),
-    reportedRelationships, paymentReports, obligations, imageBacklog, appearances,
+    reportedRelationships, paymentReports, obligations, sourceBacklog, imageBacklog, appearances,
     imageContext: { workOrderId: imageContext?.work_order_id ?? null, jobAttribution: imageContext?.job_attribution ?? 'not_read',
       observations: frames.size, distinctImages: new Set([...frames.values()].map(frame => frame.image_id)).size,
       sightings: [...frames.values()].reduce((sum, frame) => sum + frame.sightings.length, 0),
       coverage: imageContext?.coverage ?? { state: 'not_read', reason: 'no_job_context_supplied' },
       interpretation: 'Repeated sightings are retained evidence, not unique parts, measured labor or completed operations.' },
-    coverage: { selection: input.selection, workRecords: { ...coverageFor(input, 'workRecords', sources.length), eligibleRecords: eligible.length },
+    coverage: { selection: input.selection, workRecords: { ...coverageFor(input, 'workRecords', sources.length),
+      eligibleRecords: eligible.length, mappedRecords: mappedSourceIds.size, unresolvedRecords: sourceBacklog.length },
       excludedWorkRecords: excluded, rawWorkRecords: sources.length,
       selectedImages: coverageFor(input, 'images', images.length),
       realWorldWorkPopulation: 'not_assessed' },

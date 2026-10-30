@@ -752,6 +752,10 @@ Work-source withdrawal and reattribution remove the affected current interpretat
 duplicate replay is idempotent. Same-ID revisions with changed contents are refused.
 Source paging and selected-image coverage remain explicit. Complete access to the
 declared source selection does not measure the population of real-world work.
+Eligible source formats not yet mapped by this extractor remain individually keyed
+in `sourceBacklog`; mapped and unresolved source counts account for the full eligible
+selection. An unsupported receipt or narrative is not silently discarded or counted
+as no work.
 
 This closes an extraction/read gap: useful existing build records remain recoverable
 when the operations table is empty or image processing fails. A historical source can

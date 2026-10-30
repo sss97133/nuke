@@ -119,6 +119,16 @@ test('historical work remains recoverable before any work-order header has been 
   assert.equal(result.imageContext.coverage.state, 'not_read');
   assert.equal(result.effects.canonicalJobsCreated, false);
 });
+test('unsupported retained source formats stay in an explicit extraction backlog', () => {
+  const input = fixture(); input.workRecords.push(source('unmapped', { receipt_id: 'receipt', line_items: [] }));
+  const result = reconstructRetainedWork(input);
+  assert.equal(result.sourceBacklog.length, 1);
+  assert.equal(result.sourceBacklog[0].observationId, 'unmapped');
+  assert.equal(result.sourceBacklog[0].state, 'requires_extraction_or_binding');
+  assert.equal(result.coverage.workRecords.mappedRecords + result.coverage.workRecords.unresolvedRecords,
+    result.coverage.workRecords.eligibleRecords);
+  assert.equal(result.sourceBacklog[0].source.pointer, '');
+});
 test('completed analysis, failed analysis and attribution review remain different backlog dimensions', () => {
   const input = fixture(); input.images = [
     image('review', { vision_gate_status: 'review_needed' }),
