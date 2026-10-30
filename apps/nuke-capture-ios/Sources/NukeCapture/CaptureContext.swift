@@ -207,8 +207,7 @@ enum CaptureContextReader {
         }
         if !isDocument, let t = decodeCowlTag(lines) {
             let qualifiedText = onDevice.filter { $0.kind == .ocrText && $0.confidence >= 0.9
-                && $0.source.framework == "Apple Vision" && $0.source.model == "VNRecognizeTextRequest"
-                && $0.source.revision > 0 && $0.source.method == OnDeviceAnalysis.methodVersion }
+                && OnDeviceAnalysis.isIdentityTextSource($0.source) }
             let retainedTag = decodeCowlTag(qualifiedText.map(\.value))
             let confidence = retainedTag?.bodyNumber != nil && retainedTag == t
                 ? qualifiedText.map(\.confidence).min() : nil

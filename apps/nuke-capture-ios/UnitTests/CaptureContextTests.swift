@@ -174,25 +174,32 @@ final class CaptureContextTests: XCTestCase {
     }
 
     func testClassicSerialPlusDocumentContextMakesAGroup() {
-        let frames = [frame("plate", vin: serial), frame("front", time: "2026-10-18T12:01:00Z"),
+        let frames = [frame("plate", vin: serial), frame("plate2", vin: serial, time: "2026-10-18T12:01:00Z"),
                       frame("title", time: "2026-10-18T12:02:00Z", vehicle: false, document: true)]
         let reads = [read("title", .document, make: "Pontiac", year: 1973, serial: serial)]
         let g = AttributionEngine.vinAnchoredCaptureGroups(frames, contexts: reads)
         XCTAssertEqual(g.count, 1)
         XCTAssertEqual(g.first?.make, "Pontiac")
         XCTAssertEqual(g.first?.year, 1973)
-        XCTAssertEqual(g.first?.imageIDs, ["front", "plate"])   // the document is context, never a member
+        XCTAssertEqual(g.first?.imageIDs, ["plate", "plate2"])   // the document is context, never a member
         XCTAssertEqual(g.first?.context?.method, .document)
     }
 
     func testClassicSerialPlusCowlTagMakesAGroup() {
-        let frames = [frame("plate", vin: serial), frame("tag", time: "2026-10-18T12:02:00Z"),
+        let frames = [frame("plate", vin: serial), frame("plate2", vin: serial, time: "2026-10-18T12:02:00Z"),
                       frame("rear", time: "2026-10-18T12:04:00Z")]
-        let reads = [read("tag", .cowlTag, make: "Pontiac", year: 1973, model: "Firebird")]
+        let reads = [read("plate", .cowlTag, make: "Pontiac", year: 1973, model: "Firebird")]
         let g = AttributionEngine.vinAnchoredCaptureGroups(frames, contexts: reads).first
         XCTAssertEqual(g?.make, "Pontiac")
         XCTAssertEqual(g?.model, "Firebird")
-        XCTAssertEqual(g?.context?.imageIDs, ["tag"])
+        XCTAssertEqual(g?.context?.imageIDs, ["plate"])
+        XCTAssertEqual(g?.imageIDs, ["plate", "plate2"])
+    }
+
+    func testNearbyTagCannotSupplyAnotherClassicSerialNamespace() {
+        let frames = [frame("plate", vin: serial), frame("plate2", vin: serial), frame("other-tag")]
+        let reads = [read("other-tag", .cowlTag, make: "Pontiac", year: 1973, model: "Firebird")]
+        XCTAssertTrue(AttributionEngine.vinAnchoredCaptureGroups(frames, contexts: reads).isEmpty)
     }
 
     func testContextFromAnotherRunDoesNotCount() {
