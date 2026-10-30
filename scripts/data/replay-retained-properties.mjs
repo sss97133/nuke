@@ -85,7 +85,10 @@ async function replay(id) {
   const variants = [...new Set([url.href, canonical, canonical.slice(0, -1), canonical.replace('https://', 'https://www.'), canonical.slice(0, -1).replace('https://', 'https://www.')])];
   const snapshots = await select('listing_page_snapshots', { select: 'id,html_sha256,metadata,fetched_at', platform: `eq.${platform}`,
     listing_url: 'in.(' + variants.join(',') + ')', success: 'eq.true', http_status: 'eq.200', order: 'fetched_at.desc', limit: '10' });
-  const snapshot = snapshots.find(s => s.metadata?.vehicle_id === id && s.metadata.vehicle_matched === true && /^[0-9a-f]{64}$/i.test(s.html_sha256 || ''));
+  const fingerprinted = snapshots.filter(s => /^[0-9a-f]{64}$/i.test(s.html_sha256 || ''));
+  const snapshot = fingerprinted.find(s => s.metadata?.vehicle_id === id && s.metadata.vehicle_matched === true) ??
+    (platform !== 'bat' ? fingerprinted.find(s => (s.metadata?.vehicle_id == null || s.metadata.vehicle_id === id) &&
+      s.metadata?.vehicle_matched == null) : undefined);
   if (!snapshot) return blocked('attributed_retained_capture_missing');
   const endpoint = platform === 'bat' ? '/functions/v1/extract-bat-core' : '/functions/v1/batch-extract-snapshots';
   const selectors = {
@@ -96,6 +99,9 @@ async function replay(id) {
   if (!preview.success || preview.vehicle_id !== id || preview.snapshot_id !== snapshot.id || preview.writes !== 0 ||
       preview.model_calls !== 0 || (platform === 'bat' ? preview.property_projection_profile !== 'retained_archived_description_v1'
         : preview.native_property_profile !== 'retained_native_fields_v1')) throw Error('Expected deployed pinned source decoder');
+  if (snapshot.metadata?.vehicle_matched !== true && preview.source_association_basis !== 'exact_record_url_and_native_labels') {
+    throw Error('Expected deployed literal native-label association');
+  }
   const receipt = options.apply ? await request(endpoint, { ...selectors, dry_run: false }) : preview;
   if (!receipt.success || receipt.model_calls !== 0 || receipt.vehicle_id !== id || receipt.snapshot_id !== snapshot.id) throw Error('Invalid native capture receipt');
   if (options.apply) {
@@ -105,6 +111,7 @@ async function replay(id) {
   }
   return { status: options.apply ? 'admitted' : 'preview', snapshot_id: snapshot.id,
     capture_sha256: snapshot.html_sha256, source_captured_at: receipt.source_captured_at,
+    source_association_basis: receipt.source_association_basis,
     input_characters: receipt.input_characters, native_receipt: receipt.description_receipt ?? { observation_id: receipt.observation_id,
       duplicate: receipt.duplicate, field_keys: receipt.field_keys },
     ...retained() };
