@@ -6,7 +6,7 @@ INSERT INTO canonical_makes(id,canonical_name,display_name,aliases)
 SELECT '13333333-1111-4111-8111-111111111111','Chevrolet','Chevrolet','{}'
 WHERE NOT EXISTS (SELECT FROM canonical_makes WHERE canonical_name='Chevrolet');
 INSERT INTO canonical_models(id,make,canonical_model,canonical_series,year_start,year_end,aliases) VALUES
-('022cef91-1b4b-406d-9f39-d08072175cbd','Chevrolet','C10','C/K',1947,NULL,ARRAY['c10','c10 custom','k10 custom']),
+('022cef91-1b4b-406d-9f39-d08072175cbd','CHEVROLET','C10','C/K',1947,NULL,ARRAY['c10','c10 custom','k10 custom']),
 ('5d4192f0-9d02-497f-b4a9-c890c42414fa','Chevrolet','C10','C/K Series',1947,NULL,ARRAY['c10','c10 custom','k10 custom','c10 custom pickup']),
 ('023c138f-2f9e-4023-a3c3-bbdc2e1c0b43','Chevrolet','K10','C/K',1960,1987,ARRAY['k10']),
 ('87fb1e59-3e43-4b01-83ff-d6f679192ccd','Chevrolet','K10','C/K Series',1960,1987,ARRAY['k10','k10 custom','k10 custom pickup']);
@@ -65,9 +65,9 @@ SELECT record_family_price_index(jsonb_build_object('brand','Chevrolet','family_
  'n_prior12',20,'verdict','up','method','hedonic_v1'))) FROM unnest(ARRAY[
  '022cef91-1b4b-406d-9f39-d08072175cbd','023c138f-2f9e-4023-a3c3-bbdc2e1c0b43']) k;
 
-\ir ../migrations/20261030003919_separate_chevrolet_k10_custom_alias.sql
+\ir ../migrations/20261030051409_reissue_chevrolet_k10_alias_case_guard.sql
 CREATE TEMP TABLE truck_catalog_after AS SELECT id,aliases,notes FROM canonical_models;
-\ir ../migrations/20261030003919_separate_chevrolet_k10_custom_alias.sql
+\ir ../migrations/20261030051409_reissue_chevrolet_k10_alias_case_guard.sql
 SELECT pg_temp.ok('idempotent catalog and retained superseded aliases',
  NOT EXISTS(SELECT id,aliases,notes FROM canonical_models EXCEPT SELECT * FROM truck_catalog_after)
  AND (SELECT count(*) FROM canonical_models WHERE canonical_model='C10' AND notes LIKE '%k10 custom%')=2);

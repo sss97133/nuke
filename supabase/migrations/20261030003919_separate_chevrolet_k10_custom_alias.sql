@@ -53,10 +53,10 @@ DO $guard$
 BEGIN
   IF (SELECT count(*) FROM public.canonical_models
       WHERE id IN ('022cef91-1b4b-406d-9f39-d08072175cbd', '5d4192f0-9d02-497f-b4a9-c890c42414fa')
-        AND make = 'Chevrolet' AND canonical_model = 'C10') <> 2
+        AND lower(make) = 'chevrolet' AND canonical_model = 'C10') <> 2
      OR NOT EXISTS (SELECT FROM public.canonical_models
        WHERE id = '87fb1e59-3e43-4b01-83ff-d6f679192ccd'
-         AND make = 'Chevrolet' AND canonical_model = 'K10'
+         AND lower(make) = 'chevrolet' AND canonical_model = 'K10'
          AND 'k10 custom' = ANY(aliases)) THEN
     RAISE EXCEPTION 'Chevrolet C10/K10 alias ownership changed; review before applying';
   END IF;
