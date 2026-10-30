@@ -129,7 +129,8 @@ for (const id of pendingIds) {
   if (state.results[id] && state.results[id].status !== 'retry') continue;
   try { state.results[id] = { ...await replay(id), attempted_at: new Date().toISOString() }; }
   catch (error) {
-    const refused = error.message.startsWith('HTTP 409:') || error.message.includes('Newer listing evidence cannot be reconstructed from the pinned older capture');
+    const refused = error.message.startsWith('HTTP 409:') || error.message.includes('Newer listing evidence cannot be reconstructed from the pinned older capture') ||
+      error.message.includes('Protected snapshot archive read failed: source_clock_conflict');
     state.results[id] = { status: refused ? 'blocked' : 'retry', reason: error.message, ...error.retained_replay, attempted_at: new Date().toISOString() };
   }
   state.updated_at = new Date().toISOString();
