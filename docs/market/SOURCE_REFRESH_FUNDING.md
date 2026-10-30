@@ -32,6 +32,14 @@ payer, source, amount and mode. One session creates one payment receipt and queu
 one refresh atomically, including when different webhook event IDs describe the
 same session. The browser's return URL never confirms payment.
 
+The checkout also binds its PaymentIntent metadata. Confirmed `refund.created`
+and `refund.updated` events append separate incoming payer testimony once per
+refund, including partial refunds, and stop queued work. Dispute-created/closed
+events preserve their source clocks and history and hold work for review. They do
+not invent a refund or automatically restart a paid attempt. Existing captures and
+the original payment remain intact. The existing Stripe event destination must
+subscribe to these four event types before activation.
+
 The existing schedule recovers queued funding receipts. A compare-and-set claim
 dispatches one enabled feed, without force, with a maximum of five listing
 admissions and the current lower intake limits. The existing intake receipt must
@@ -41,5 +49,5 @@ Feed completion is distinct from queued listings finishing extraction.
 
 Before activation, demonstrate the provider account/key association, actual
 replenishment, signed live payment receipt, source intake and consumer together,
-plus reversal/refund handling. Current source/privacy/collector holds still apply.
+plus the deployed reversal/refund event subscriptions. Current source/privacy/collector holds still apply.
 Account-side setup and this acceptance case remain open until separately evidenced.

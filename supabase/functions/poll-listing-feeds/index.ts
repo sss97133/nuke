@@ -26,7 +26,6 @@
  *     (last_error / error_count) -- a silent 0 is a lie.
  */
 
-import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void };
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { firecrawlScrape } from "../_shared/firecrawl.ts";
@@ -1040,7 +1039,8 @@ Deno.serve(async (req) => {
     force = body.force || false;
     excludeSource = typeof body.exclude_source === "string" ? body.exclude_source : null;
     if (body.funding_dispatch === true) {
-      if (!await isServiceCaller(req)) return new Response("Service caller required", { status: 403, headers: corsHeaders });
+      if (!await isServiceCaller(req)) return new Response(JSON.stringify({ success: false, error: "Forbidden funded dispatch" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       if (!/^[0-9a-f-]{36}$/i.test(body.intake_run_id ?? "") || !source || batchSize !== 1 || force ||
           !Number.isInteger(body.max_ingests) || body.max_ingests < 1 || body.max_ingests > 5) {
         throw new Error("Invalid funded refresh scope");

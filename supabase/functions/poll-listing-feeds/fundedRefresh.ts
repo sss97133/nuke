@@ -28,7 +28,7 @@ export function fundedOutcome(run: any, source: string): { status: string; resul
 export async function dispatchFundedRefresh(db: any, fetcher: typeof fetch = fetch): Promise<Record<string, unknown> | null> {
   const { data: rows, error } = await db.from("extraction_runs").select("id,status,started_at,metadata")
     .eq("source", FUNDING_SOURCE).in("status", ["funded", "dispatching"])
-    .order("metadata->>checked_at", { nullsFirst: true }).order("started_at").limit(10);
+    .order("metadata->>checked_at", { nullsFirst: true }).order("started_at").order("id").limit(10);
   if (error) throw new Error("Funded refresh queue unavailable");
   for (const row of rows ?? []) {
     const result = await dispatchRow(db, row, fetcher);

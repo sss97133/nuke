@@ -120,6 +120,7 @@ export async function sourceRefreshCheckout(req: Request, body: any, db: any, st
   back.searchParams.set("refresh", id);
   const session = await stripe.checkout.sessions.create({
     mode: "payment", payment_method_types: ["card"], client_reference_id: user,
+    payment_intent_data: { metadata: { purchase_type: "source_refresh", request_id: id, user_id: user } },
     line_items: [{ price_data: { currency: "usd", unit_amount: quote.amount_cents,
       product_data: { name: "Source refresh funding", description:
         `Fund shared ${quote.provider} API costs and one ${quote.source} feed refresh, up to ${quote.max_ingests} listing admissions. This is not a personal credit deposit.` } }, quantity: 1 }],

@@ -1569,7 +1569,6 @@ export function SourceRefreshControl({ source }: { source: string }) {
   const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
   const pendingId = useRef<string | null>(requestId);
   useEffect(() => {
-    if (!open) return;
     let active = true;
     const read = async () => {
       try {
@@ -1583,7 +1582,7 @@ export function SourceRefreshControl({ source }: { source: string }) {
     void read();
     const timer = requestId ? window.setInterval(() => void read(), 10000) : null;
     return () => { active = false; if (timer) window.clearInterval(timer); };
-  }, [open, source, requestId]);
+  }, [source, requestId]);
   const request = async () => {
     setBusy(true); setError(null);
     try {
@@ -1609,7 +1608,11 @@ export function SourceRefreshControl({ source }: { source: string }) {
     dispatching: 'Payment confirmed. The source refresh is running.',
     completed: 'The feed refresh completed. Queued listings continue through extraction.',
     needs_review: 'Payment confirmed. The refresh needs attention; another paid attempt has not been started.',
+    refunded: 'The payment was refunded. Queued work has been stopped; any evidence already captured is retained.',
+    partially_refunded: 'Part of the payment was refunded. Further refresh work is on hold.',
+    payment_disputed: 'The payment dispute needs review. Further refresh work is on hold.',
   };
+  if (!requestId && !status?.available) return null;
   return <div className="market-sources__refresh">
     <button type="button" className="market-sources__drill-btn" aria-expanded={open}
       onClick={() => setOpen(v => !v)}>Refresh source</button>
@@ -1621,7 +1624,7 @@ export function SourceRefreshControl({ source }: { source: string }) {
         : receiptText[receipt.status] ?? 'Refresh status is unavailable.'}</p> : requestId ?
         <p role="status">{status ? 'Sign in to view this refresh receipt. No payment is confirmed here.' : 'Checking refresh receipt…'}</p> :
         status?.available ? <>
-          <p>{status.requires_payment === false ? 'Use existing capacity for' : 'Fund shared API costs and'} one feed refresh, up to {status.max_ingests} listing admissions. Existing source restrictions still apply.</p>
+          <p>{status.requires_payment === false ? 'Use existing capacity for' : 'Fund shared API costs and'} one feed refresh, up to {status.max_ingests} listings. Existing source restrictions still apply.</p>
           {status.requires_payment !== false && <p>Payments go to Nuke to cover shared API costs. Provider capacity must be available before extraction can run.</p>}
           {checkoutUrl ? <a className="market-sources__drill-btn" href={checkoutUrl}>Continue to secure payment</a> :
             <button type="button" className="market-sources__drill-btn" disabled={busy} onClick={() => void request()}>

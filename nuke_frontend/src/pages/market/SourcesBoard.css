@@ -378,10 +378,11 @@
 .market-sources__pulse-path { fill: none; stroke: var(--text); stroke-width: 1.5; stroke-linejoin: round; }
 .market-sources__pulse-row.is-backfill .market-sources__pulse-path { stroke: var(--text-disabled); }
 .market-sources__pulse-path.is-now { stroke: var(--success); stroke-width: 2; stroke-dasharray: 3 2; } /* the current bucket is still filling */
-.market-sources__refresh { position: relative; }
+.market-sources__refresh { display: contents; }
+.market-sources__drill-actions { flex-wrap: wrap; max-width: 100%; }
 .market-sources__refresh > button { min-height: 44px; }
-.market-sources__funding { position: absolute; inset-inline-end: 0; top: 100%; z-index: 5;
-  width: min(360px, calc(100vw - 48px)); padding: 12px; border: 1px solid var(--border);
+.market-sources__funding { box-sizing: border-box; flex-basis: 100%;
+  width: min(360px, 100%); max-width: 100%; padding: 12px; border: 1px solid var(--border);
   border-radius: var(--radius-lg); background: var(--bg); color: var(--text);
   font-family: var(--font-family); font-size: 14px; line-height: 1.5; }
 .market-sources__funding p { margin: 0 0 12px; }

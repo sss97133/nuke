@@ -25,7 +25,7 @@ import Stripe from "npm:stripe@14.11.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
 import { creditCents } from "../_shared/aiCredits.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
-import { type CheckoutSessionLike, routeCheckoutSession } from "../_shared/stripeCheckoutRouting.ts";
+import { type CheckoutSessionLike, routeCheckoutSession, sourceRefreshRefund, sourceRefreshDispute } from "../_shared/stripeCheckoutRouting.ts";
 import { dispatchFundedRefresh } from "../poll-listing-feeds/fundedRefresh.ts";
 
 const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") ?? "", { apiVersion: "2023-10-16" });
@@ -71,6 +71,32 @@ Deno.serve(async (req) => {
   const supabase = svc();
 
   try {
+    if (event.type === "refund.created" || event.type === "refund.updated") {
+      if (!event.livemode) return ok();
+      const refund = event.data.object as Stripe.Refund;
+      const pi = refund.payment_intent;
+      if (!pi || refund.status !== "succeeded") return ok();
+      const intent = await stripe.paymentIntents.retrieve(typeof pi === "string" ? pi : pi.id);
+      const payload = sourceRefreshRefund(event, refund, intent);
+      if (payload) {
+        const { error } = await supabase.rpc("record_source_refresh_refund", { p: payload });
+        if (error) throw new Error(`source refresh refund: ${error.code}`);
+      }
+      return ok();
+    }
+    if (event.type === "charge.dispute.created" || event.type === "charge.dispute.closed") {
+      if (!event.livemode) return ok();
+      const dispute = event.data.object as Stripe.Dispute;
+      const pi = dispute.payment_intent;
+      if (!pi) return ok();
+      const intent = await stripe.paymentIntents.retrieve(typeof pi === "string" ? pi : pi.id);
+      const payload = sourceRefreshDispute(event, dispute, intent);
+      if (payload) {
+        const { error } = await supabase.rpc("record_source_refresh_dispute", { p: payload });
+        if (error) throw new Error(`source refresh dispute: ${error.code}`);
+      }
+      return ok();
+    }
     if (event.type === "checkout.session.completed" || event.type === "checkout.session.async_payment_succeeded") {
       const session = event.data.object as Stripe.Checkout.Session;
       const route = routeCheckoutSession(event, session as unknown as CheckoutSessionLike);

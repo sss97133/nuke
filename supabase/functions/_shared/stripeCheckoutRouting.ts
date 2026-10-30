@@ -32,6 +32,31 @@ export type CheckoutRoute =
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+/** Refunds are incoming payer cash testimony, not a fabricated provider refill.
+ * The webhook resolves the PaymentIntent using Stripe's server credential. */
+export function sourceRefreshRefund(
+  event: { id: string; created: number; livemode: boolean },
+  refund: { id: string; status?: string | null; currency: string; amount: number },
+  intent: { id: string; metadata: Record<string, string> | null },
+): Record<string, unknown> | null {
+  const meta = intent.metadata ?? {};
+  if (meta.purchase_type !== "source_refresh" || !event.livemode || refund.status !== "succeeded" ||
+      refund.currency !== "usd" || !Number.isSafeInteger(refund.amount) || refund.amount < 1 ||
+      !UUID.test(meta.request_id ?? "") || !UUID.test(meta.user_id ?? "")) return null;
+  return { request_id: meta.request_id, user_id: meta.user_id, payment_intent_id: intent.id,
+    refund_id: refund.id, event_id: event.id, paid_at: event.created, livemode: event.livemode,
+    amount_cents: refund.amount, currency: refund.currency, refund_status: refund.status };
+}
+
+export function sourceRefreshDispute(event: { id: string; created: number; livemode: boolean },
+  dispute: { id: string; status: string }, intent: { id: string; metadata: Record<string, string> | null },
+): Record<string, unknown> | null {
+  const meta = intent.metadata ?? {};
+  if (!event.livemode || meta.purchase_type !== "source_refresh" || !UUID.test(meta.request_id ?? "") || !UUID.test(meta.user_id ?? "")) return null;
+  return { request_id: meta.request_id, user_id: meta.user_id, payment_intent_id: intent.id,
+    dispute_id: dispute.id, dispute_status: dispute.status, event_id: event.id, event_created: event.created, livemode: true };
+}
+
 export function routeCheckoutSession(
   event: { id: string; created: number; livemode: boolean },
   session: CheckoutSessionLike,
@@ -40,13 +65,16 @@ export function routeCheckoutSession(
   const purchaseType = meta.purchase_type ?? null;
 
   if (purchaseType === "source_refresh") {
+    const pi = typeof session.payment_intent === "string" ? session.payment_intent : session.payment_intent?.id ?? "";
     if (!UUID.test(meta.request_id ?? "") || !UUID.test(meta.user_id ?? "") ||
         session.client_reference_id !== meta.user_id || session.payment_status !== "paid" || session.mode !== "payment" || !event.livemode ||
+        !/^pi_[A-Za-z0-9]+$/.test(pi) ||
         !Number.isSafeInteger(session.amount_total) || (session.amount_total ?? 0) <= 0 || session.currency !== "usd") {
       return { kind: "ignore", reason: "source refresh session is unpaid or invalid" };
     }
     return { kind: "source_refresh", payload: { request_id: meta.request_id, user_id: meta.user_id,
       session_id: session.id, event_id: event.id, paid_at: event.created, livemode: event.livemode,
+      payment_intent_id: pi,
       amount_cents: session.amount_total, currency: session.currency, payment_status: session.payment_status } };
   }
 

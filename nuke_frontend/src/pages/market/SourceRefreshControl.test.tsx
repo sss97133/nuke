@@ -20,10 +20,10 @@ const click = async (text: string) => {
 };
 const mount = async () => { await act(async () => root.render(<SourceRefreshControl source="fixture" />)); };
 
-it('makes refresh actionable and refuses payment while actual provider funding is unavailable', async () => {
+it('hides the refresh control when no verified source policy exists', async () => {
   fixture.invoke.mockResolvedValue({ data: { available: false, reason: 'Provider funding is not connected.' } });
-  await mount(); await click('Refresh source');
-  expect(host.textContent).toContain('Provider funding is not connected.');
+  await mount();
+  expect(host.querySelector('button')).toBeNull();
   expect(host.textContent).not.toContain('Fund refresh ·');
   expect(fixture.invoke).toHaveBeenCalledWith('create-api-access-checkout', {
     body: { action: 'source_refresh_status', source: 'fixture', request_id: null },
@@ -63,5 +63,12 @@ it('does not treat a checkout return as confirmed payment or start another check
   await mount();
   expect(host.textContent).toContain('Waiting for payment confirmation.');
   expect(host.textContent).not.toContain('Payment confirmed.');
+  expect(host.textContent).not.toContain('Fund refresh ·');
+});
+it('shows a refunded source payment without offering another checkout on the same receipt', async () => {
+  history.replaceState(null, '', '/?refresh_source=fixture&refresh=fixture-id');
+  fixture.invoke.mockResolvedValue({ data: { receipt: { status: 'refunded', payment_required: true } } });
+  await mount();
+  expect(host.textContent).toContain('The payment was refunded.');
   expect(host.textContent).not.toContain('Fund refresh ·');
 });

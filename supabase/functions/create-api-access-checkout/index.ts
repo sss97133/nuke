@@ -161,7 +161,7 @@ Deno.serve(async (req) => {
   } catch (error) {
     console.error('Checkout error:', error)
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : 'Checkout unavailable' }),
+      JSON.stringify({ error: 'Checkout or refresh unavailable. Please try again.' }),
       { status: 500, headers: { 'content-type': 'application/json', ...corsHeaders } }
     )
   }

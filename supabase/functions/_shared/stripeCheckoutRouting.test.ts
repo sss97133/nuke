@@ -1,5 +1,5 @@
 import { assertEquals } from "jsr:@std/assert@1";
-import { routeCheckoutSession } from "./stripeCheckoutRouting.ts";
+import { routeCheckoutSession, sourceRefreshRefund, sourceRefreshDispute } from "./stripeCheckoutRouting.ts";
 
 const event = { id: "evt_1", created: 1760000000, livemode: true };
 const wo = "e7400000-0000-0000-0000-000000000001";
@@ -59,11 +59,22 @@ Deno.test("a credit session without a user is ignored", () => {
 
 Deno.test("source funding routes only paid live one-time sessions, never wallet credit", () => {
   const session = { id: "cs_live_fixture", mode: "payment", payment_status: "paid", amount_total: 300,
-    currency: "usd", client_reference_id: user, metadata: { purchase_type: "source_refresh", user_id: user, request_id: inv } };
+    currency: "usd", payment_intent: "pi_fixture", client_reference_id: user, metadata: { purchase_type: "source_refresh", user_id: user, request_id: inv } };
   assertEquals(routeCheckoutSession(event, session).kind, "source_refresh");
   for (const extra of [{ payment_status: "unpaid" }, { mode: "subscription" }, { currency: "eur" },
     { amount_total: 0 }, { client_reference_id: wo }]) {
     assertEquals(routeCheckoutSession(event, { ...session, ...extra }).kind, "ignore");
   }
   assertEquals(routeCheckoutSession({ ...event, livemode: false }, session).kind, "ignore");
+});
+
+Deno.test("only confirmed live source refunds and disputes enter their source payment owner", () => {
+  const intent = { id: "pi_fixture", metadata: { purchase_type: "source_refresh", user_id: user, request_id: inv } };
+  const refund = { id: "re_fixture", amount: 100, currency: "usd", status: "succeeded" };
+  assertEquals(sourceRefreshRefund(event, refund, intent)?.amount_cents, 100);
+  assertEquals(sourceRefreshRefund(event, { ...refund, status: "pending" }, intent), null);
+  assertEquals(sourceRefreshRefund({ ...event, livemode: false }, refund, intent), null);
+  assertEquals(sourceRefreshRefund(event, refund, { ...intent, metadata: { purchase_type: "work_order_invoice" } }), null);
+  assertEquals(sourceRefreshDispute(event, { id: "dp_fixture", status: "needs_response" }, intent)?.dispute_id, "dp_fixture");
+  assertEquals(sourceRefreshDispute(event, { id: "dp_fixture", status: "won" }, { ...intent, metadata: {} }), null);
 });
