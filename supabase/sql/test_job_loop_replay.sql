@@ -423,6 +423,14 @@ CREATE TABLE IF NOT EXISTS public.city_geocode_lookup(city text, state text, lat
 \ir ../migrations/20261023200100_work_order_open_requirements_read.sql
 \echo REPLAY 20261030061000_work_order_retained_sources.sql
 \ir ../migrations/20261030061000_work_order_retained_sources.sql
+-- Workload fields on the existing list-row owner.
+ALTER TABLE public.work_orders ADD COLUMN IF NOT EXISTS updated_at timestamptz,
+ ADD COLUMN IF NOT EXISTS currency text, ADD COLUMN IF NOT EXISTS estimated_hours numeric,
+ ADD COLUMN IF NOT EXISTS actual_hours numeric;
+ALTER TABLE public.work_order_payments ADD COLUMN IF NOT EXISTS amount numeric,
+ ADD COLUMN IF NOT EXISTS payment_date timestamptz;
+\echo REPLAY 20261030192441_work_order_workload_read.sql
+\ir ../migrations/20261030192441_work_order_workload_read.sql
 -- Plan check and final state.
 \set replay_problems `scripts/ci/job-loop-replay-check.sh | tr '\n' ' '`
 SELECT t_assert(btrim(:'replay_problems') = '', 'replay plan covers the build in filename order: ' || COALESCE(NULLIF(btrim(:'replay_problems'), ''), 'ok'));

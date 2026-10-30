@@ -93,6 +93,22 @@ export type WorkOrderRow = {
   first_gap?: { stage: string; gap: string | null } | null;
   request_source_label?: string | null;
   retained_work?: RetainedWorkRead;
+  workload?: {
+    recorded_status: string | null;
+    disposition: 'current' | 'history';
+    completed_at: string | null;
+    updated_at: string | null;
+    schedule: { start: string | null; end: string | null };
+    client: string | null;
+    organization: { id: string; name: string | null } | null;
+    provider: { handle?: string; label?: string } | null;
+    money: { visibility: 'party' | 'withheld'; currency?: string | null; estimate?: number | null;
+      estimate_at?: string | null; received?: number | null; payment_records?: number;
+      last_payment_on?: string | null; balance?: number | null; payment_basis?: string; estimate_basis?: string };
+    time: { estimated_hours: number | null; recorded_hours: number | null; remaining_hours: number | null; basis: string };
+    parts: { records: number; states: Record<string, number>; basis: string };
+    source: { table: string; record_id: string; as_of: string | null };
+  };
 };
 
 export type RetainedWorkRead = {
