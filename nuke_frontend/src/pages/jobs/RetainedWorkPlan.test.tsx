@@ -12,7 +12,8 @@ let host: HTMLDivElement, root: Root;
 const reports = [{ binding_id: 'binding', provider_actor_id: 'actor', provider_label: 'Technician', client_label: 'Client', source_observation_id: 'basis', reported_at: '2026-07-01', payment_state: null, delivery_state: 'reported_owed' as const, assurance: 'report' }];
 const context = (): WorkContext => ({ vehicleId: 'vehicle-a', proofs: [], errors: [], partial: false,
   decisions: [{ id: 'mount', subject: 'Where the controller mounts', status: 'open', work_status: 'open', source: 'A retained build note', chosen: null, decided_on: null, trust: null },
-    { id: 'optional', subject: 'Optional remote start', status: 'candidate', work_status: 'needs_owner', source: null, chosen: null, decided_on: null, trust: null }],
+    { id: 'optional', subject: 'Optional remote start', status: 'candidate', work_status: 'needs_owner', source: null, chosen: null, decided_on: null, trust: null },
+    { id: 'agent', subject: 'Controller split', status: 'decided', work_status: 'decided', source: 'Agent plan', chosen: 'Working split', decided_on: null, trust: 'T3' }],
   handoffs: [{ id: 'old', source_id: 'source', observed_at: '2026-07-01', ingested_at: '2026-07-02', gate: 'Wiring before delivery to Client', next_action: 'Buy wire', blocked_on: ['An earlier question'] }] });
 beforeEach(() => {
   (globalThis as unknown as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
@@ -25,11 +26,12 @@ it('leads with actual open work, keeps historical handoff questions and optional
   await act(async () => root.render(<RetainedWorkPlan vehicleId="vehicle-a" reports={reports} />));
   expect(host.querySelector('[aria-label="Work to finish"]')?.textContent).toContain('Where the controller mounts');
   expect(host.querySelector('[aria-label="Work to finish"]')?.textContent).not.toContain('Optional remote start');
-  for (const text of ['Earlier handoffs', 'Optional scope']) {
+  for (const text of ['Earlier handoffs', 'Optional scope', 'Recorded choices']) {
     const summary = [...host.querySelectorAll('summary')].find(s => s.textContent === text)!;
     expect(summary.parentElement?.hasAttribute('open')).toBe(false);
   }
   expect(host.textContent).toContain('Questions in that handoff');
+  expect(host.textContent).toContain('Agent working choice');
   expect(host.querySelector('a')?.getAttribute('href')).toBe('/vehicle/vehicle-a/wiring');
   expect(host.textContent).not.toContain('Physical progress not established');
 });

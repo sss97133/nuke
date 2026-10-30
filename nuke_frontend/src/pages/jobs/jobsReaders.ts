@@ -260,7 +260,7 @@ async function readRetainedWorkContext(vehicleId: string, reports: NonNullable<R
   const result: WorkContext = { vehicleId, proofs: [], decisions: [], handoffs: [], errors: [], partial: false };
   if (!reports.length) return result;
   const [proofs, decisions, bases] = await Promise.all([
-    supabase.from('vehicle_observations').select('id,vehicle_id,kind,source_id,is_superseded,observed_at,ingested_at,component:structured_data->>plug,component_name:structured_data->>plug_name,description:structured_data->>value,level:structured_data->>proof_level,photo_url:structured_data->photo->>url,photo_at:structured_data->photo->>taken_at,event_date:structured_data->>event_date,replaces:structured_data->>supersedes_original_id')
+    supabase.from('vehicle_observations').select('id,vehicle_id,kind,source_id,is_superseded,observed_at,ingested_at,component:structured_data->>plug,component_name:structured_data->>plug_name,description:structured_data->>value,level:structured_data->>proof_level,photo_url:structured_data->photo->>url,photo_at:structured_data->photo->>taken_at,event_date:structured_data->>event_date,replaces:structured_data->>supersedes_original_id,method:structured_data->>method,owner_words:structured_data->>owner_confirmed')
       .eq('vehicle_id', vehicleId).eq('kind', 'specification').eq('is_superseded', false)
       .eq('structured_data->>domain', 'wiring').eq('structured_data->>property_key', 'device proof')
       .order('id').limit(101),

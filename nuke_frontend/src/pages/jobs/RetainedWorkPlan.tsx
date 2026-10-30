@@ -34,6 +34,8 @@ function ProofSource({ proof }: { proof: WorkProof }) {
       {(proof.event_date || proof.observed_at) ? ` · ${day(proof.event_date || proof.observed_at)}` : ''}</Text>
     {proof.description && <Text role="body" as="p">{workExcerpt(proof.description)}</Text>}
     <div className="work-source">
+      {proof.owner_words === 'true' && <Text role="caption" as="p">Relayed owner statement</Text>}
+      {proof.method && <Text role="caption" as="p">{workExcerpt(proof.method)}</Text>}
       {photo && <a href={photo} target="_blank" rel="noopener noreferrer">View source photo{proof.photo_at ? ` · ${day(proof.photo_at)}` : ''} ↗</a>}
       <Text role="caption" as="p">Recorded {day(proof.ingested_at)} · observation {proof.id}</Text>
     </div>
@@ -99,9 +101,10 @@ export function RetainedWorkPlan(props: Props) {
       <Text role="caption" as="p">Saved options for the vehicle. These are not purchase orders or missing-work commitments.</Text>
       <ComponentRows rows={plan.options} />
     </details>}
-    {plan.settled.length > 0 && <details className="work-group"><summary>Decisions already made</summary>
-      <ul className="work-items">{plan.settled.map(call => <li key={call.id}>
+    {plan.choices.length > 0 && <details className="work-group"><summary>Recorded choices</summary>
+      <ul className="work-items">{plan.choices.map(call => <li key={call.id}>
         <Text role="label" as="h3">{workExcerpt(call.subject)}</Text>
+        <Text role="caption" as="p">{call.authority === 'owner_reported' ? 'Owner-stated choice' : call.authority === 'agent_working' ? 'Agent working choice' : 'Recorded choice'}</Text>
         {call.chosen && <Text role="body" as="p">{workExcerpt(call.chosen)}</Text>}
         <Text role="caption" as="p">{call.decided_on ? `${day(call.decided_on)} · ` : ''}{workExcerpt(call.source)} · decision {call.id}</Text>
       </li>)}</ul>

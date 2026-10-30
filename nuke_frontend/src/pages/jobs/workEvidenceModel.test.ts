@@ -21,12 +21,13 @@ it('keeps optional candidates out of promised scope and decided choices out of o
   input.decisions = [
     { id: 'mount', subject: 'Where the controller mounts', status: 'open', work_status: 'open', chosen: null, source: 'Owner handoff', decided_on: null, trust: 'owner' },
     { id: 'extra', subject: 'Optional extra lamp', status: 'candidate', work_status: 'needs_owner', chosen: null, source: null, decided_on: null, trust: null },
-    { id: 'gauge', subject: 'Gauge feed', status: 'decided', work_status: 'decided', chosen: 'Direct sender', source: 'Receipt', decided_on: '2026-09-01', trust: 'owner' },
+    { id: 'gauge', subject: 'Gauge feed', status: 'decided', work_status: 'decided', chosen: 'Direct sender', source: 'Receipt', decided_on: '2026-09-01', trust: 'T1' },
+    { id: 'agent', subject: 'Controller split', status: 'decided', work_status: 'decided', chosen: 'Working split', source: 'Agent plan', decided_on: '2026-09-02', trust: 'T3' },
   ];
   const plan = retainedWorkPlan(input);
   expect(plan.open.map(d => d.id)).toEqual(['mount']);
   expect(plan.candidates.map(d => d.id)).toEqual(['extra']);
-  expect(plan.settled.map(d => d.id)).toEqual(['gauge']);
+  expect(plan.choices.map(d => [d.id, d.authority])).toEqual([['gauge', 'owner_reported'], ['agent', 'agent_working']]);
 });
 
 it('withdraws exactly the rejected interpretation while preserving earlier purchase and presence testimony', () => {

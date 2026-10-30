@@ -1032,7 +1032,10 @@ Vehicle history supports the job without allocating its costs or labor to it.
 
 Requested work, design decisions, purchases, presence, installation and delivery
 remain separate assertions. Candidate design options are not accepted work scope.
-Settled choices leave the open-decision list; they do not close physical work.
+Recorded choices leave the open-decision list; they do not close physical work.
+Their authority remains explicit: T1 owner-stated choices, T3 agent working
+choices and otherwise unqualified records. Agent choices neither become owner
+approval nor automatically reopen as another mandatory owner question.
 A purchased part with an uninstalled report remains an installation gap, rather
 than another purchase task. A mounted-part report saying exactly “Not wired.”
 supports a dated wiring gap; mounting or image appearance alone does not.

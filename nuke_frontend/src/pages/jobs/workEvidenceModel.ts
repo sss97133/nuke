@@ -6,6 +6,7 @@ export type WorkProof = {
   component: string | null; component_name: string | null; description: string | null;
   level: string | null; photo_url: string | null; photo_at: string | null;
   event_date: string | null; replaces: string | null;
+  method?: string | null; owner_words?: string | null;
 };
 export type WorkDecision = {
   id: string; subject: string; status: string | null; work_status: string | null;
@@ -64,7 +65,8 @@ export function retainedWorkPlan(context: WorkContext) {
     // Candidate add-ons are not accepted scope or delivery blockers. A locked choice is not physical completion.
     open: context.decisions.filter(d => d.status !== 'candidate' && d.status !== 'decided'
       && !['done', 'decided'].includes(d.work_status ?? '')),
-    settled: context.decisions.filter(d => d.status === 'decided' || d.work_status === 'decided'),
+    choices: context.decisions.filter(d => d.status === 'decided' || d.work_status === 'decided').map(d => ({ ...d,
+      authority: d.trust === 'T1' ? 'owner_reported' as const : d.trust === 'T3' ? 'agent_working' as const : 'unqualified' as const })),
     candidates: context.decisions.filter(d => d.status === 'candidate'),
   };
 }
