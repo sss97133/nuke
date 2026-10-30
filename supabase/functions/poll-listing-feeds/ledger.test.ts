@@ -287,6 +287,7 @@ Deno.test("no credits remaining is billing, whatever status the provider put on 
     'extract-vehicle-data-ai HTTP 500: {"success":false,"error":"OpenAI API error: 429 - {\\n "error": {\\n "message": "You have no credits remaining. Add credits to continue using the API';
   equal(failureCategoryFor(openai), "billing");
   equal(failureCategoryFor("OpenAI API error: 429 - insufficient_quota"), "billing");
+  equal(failureCategoryFor("OpenAI API error: 429 - billing_or_usage_limit"), "billing");
   equal(failureCategoryFor("OpenAI API error: 429 - Rate limit reached for requests"), "rate_limited");
 });
 
@@ -581,6 +582,7 @@ Deno.test("revisits take at most a quarter of an invocation's ingests, spent acr
 
 Deno.test("a Firecrawl allowance deferral is not a failure: no ledger row, no attempt, and the source stops for this run", () => {
   equal(failureCategoryFor("extract-ksl HTTP 500: allowance_deferred: firecrawl allowance exhausted for today"), "deferred");
+  equal(failureCategoryFor("Failed to scrape eBay listing: firecrawl_allowance_exhausted"), "deferred");
   // KSL's extractor failing falls through to ingest's identity check; the extractor's error rides on enrichment_error.
   const ingest: IngestOutcome = { status: "rejected", reason: "insufficient identity: year=? make=? model=? — need all three",
     enrichment_error: "extract-ksl HTTP 500: allowance_deferred: firecrawl allowance exhausted for today" };

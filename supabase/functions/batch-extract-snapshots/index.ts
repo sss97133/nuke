@@ -33,7 +33,6 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { callTier, parseJsonResponse } from "../_shared/agentTiers.ts";
-import { writeObservation } from "../_shared/observationWriter.ts";
 import { vinExcerpt } from "./vinCitation.ts";
 import { authenticateWriter, requireWriteAuth } from "../_shared/writeGuard.ts";
 import { drainBatSaleQueue } from "./batSaleQueue.ts";
@@ -41,7 +40,7 @@ import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { makeAiGate, noAiConflict, readNoAi, terminalQueueStatus } from "./aiGate.ts";
 import { applyLotSlugYear } from "./lotYear.ts";
 import { orphanVehicleIds } from "./queueRows.ts";
-import { isUniqueViolation, salePriceWritable } from "./writeRules.ts";
+import { admitSnapshotObservation, isUniqueViolation, salePriceWritable } from "./writeRules.ts";
 import { mustWrite, softWrite } from '../_shared/writeResult.ts';
 import { identityConflict } from '../_shared/identityMatch.ts';
 import { judge, pickBjLotPrice, urlVariants, type LotPage } from "./snapshotCompare.ts";
@@ -51,7 +50,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const VERSION = "batch-extract-snapshots:2.0.0";
+const VERSION = "batch-extract-snapshots:2.0.1";
 
 Deno.serve(async (req) => {
   // Writes are never anonymous: service key, signed-in user, or nothing (P0.2, 2026-09-27).
@@ -237,6 +236,8 @@ Deno.serve(async (req) => {
     let salePriceWithheld = 0; // parsed prices not written because the vehicle is not marked sold (writeRules.ts)
     let identityRefused = 0; // snapshots whose car is not the vehicle's (identity_match / different_car / relink): nothing written
     let vinConflicts = 0; // parsed VINs not written because another vehicle already holds them (writeRules.ts)
+    let observationsStored = 0;
+    let observationDuplicates = 0;
     const sampleResults: any[] = [];
 
     // Helper: read HTML from Supabase Storage when inline html is null
@@ -264,10 +265,11 @@ Deno.serve(async (req) => {
           if (snapUrl) {
             const { data: snaps } = await supabase
               .from("listing_page_snapshots")
-              .select("id, html, html_storage_path, markdown")
+              .select("id, listing_url, fetched_at, html, html_storage_path, markdown")
               .eq("listing_url", snapUrl)
               .eq("platform", platform)
               .eq("success", true)
+              .order("fetched_at", { ascending: false })
               .limit(1);
             snapshot = snaps?.[0] || null;
             if (snapshot?.html && snapshot.html.length > 500) {
@@ -322,7 +324,7 @@ Deno.serve(async (req) => {
           // First try inline HTML, then fall back to storage
           const { data: snaps } = await supabase
             .from("listing_page_snapshots")
-            .select("id, html, html_storage_path, markdown")
+            .select("id, listing_url, fetched_at, html, html_storage_path, markdown")
             .in("listing_url", [...normalizedUrls])
             .eq("platform", platform)
             .eq("success", true)
@@ -351,6 +353,7 @@ Deno.serve(async (req) => {
         }
 
         // Parse based on platform — try regex first, fall back to AI
+        const aiCallsBefore = gate.counters().ai_calls;
         let parsed: Record<string, any>;
         let regexEmpty = false;
         const useAI = mode === "ai";
@@ -481,6 +484,24 @@ Deno.serve(async (req) => {
           }
         }
 
+        // Preserve every available parsed field, including fields already on the
+        // vehicle. Admission precedes projection, so a retry can recover a reading
+        // even after an earlier attempt updated the vehicle.
+        if (!dryRun) {
+          const sourceFields = Object.fromEntries(Object.entries(parsed)
+            .filter(([_key, value]) => value != null && String(value).trim() !== ""));
+          if (Object.keys(sourceFields).length > 0) {
+            const admitted = await admitSnapshotObservation(supabase, {
+              vehicleId: vehicle.id, platform, snapshot, fields: sourceFields,
+              method: gate.counters().ai_calls > aiCallsBefore ? "snapshot_ai_parse" : "snapshot_regex_parse",
+              version: VERSION,
+              citationExcerpt: parsed.vin ? vinExcerpt(snapshotHtml, String(parsed.vin)) : null,
+            });
+            if (admitted.duplicate) observationDuplicates++;
+            else observationsStored++;
+          }
+        }
+
         if (fieldsUpdated.length === 0) {
           skipped++;
           if (!dryRun) {
@@ -551,28 +572,6 @@ Deno.serve(async (req) => {
         extracted++;
         fieldsTotal += fieldsUpdated.length;
 
-        // Write observation + field_evidence (fire-and-forget, don't block extraction)
-        if (!dryRun && fieldsUpdated.length > 0) {
-          const obsFields: Record<string, any> = {};
-          for (const f of fieldsUpdated) {
-            if (updatePayload[f] !== undefined) obsFields[f] = updatePayload[f];
-          }
-          // A VIN carries its receipt: the snapshot it was read from and the verbatim text around it.
-          const vinExcerptText = obsFields.vin ? vinExcerpt(snapshotHtml, String(obsFields.vin)) : null;
-          writeObservation(supabase, {
-            vehicleId: vehicle.id,
-            ...(snapshot?.id ? { sourceSnapshotId: snapshot.id } : {}),
-            ...(vinExcerptText ? { citationExcerpt: vinExcerptText } : {}),
-            source: {
-              platform,
-              url: vehicleUrl || vehicle.bat_auction_url || vehicle.listing_url || vehicle.discovery_url || "",
-            },
-            fields: obsFields,
-            observationKind: "specification",
-            extractionMethod: "snapshot_regex_parse",
-          }).catch((e: any) => console.warn(`[batch-extract] observationWriter error for ${vehicle.id}: ${e?.message}`));
-        }
-
         if (useQueue && !dryRun) {
           mustWrite('snapshot_extraction_queue update', await supabase.from("snapshot_extraction_queue")
             .update({ status: terminal, completed_at: new Date().toISOString(), fields_filled: fieldsUpdated.length })
@@ -622,6 +621,8 @@ Deno.serve(async (req) => {
       identity_refused: identityRefused,
       errors,
       fields_filled: fieldsTotal,
+      observations_stored: observationsStored,
+      observation_duplicates: observationDuplicates,
       sample_results: sampleResults,
       duration_ms: Date.now() - startTime,
       next_offset: offset + batchSize,

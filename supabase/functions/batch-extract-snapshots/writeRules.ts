@@ -1,3 +1,5 @@
+import { observationClockMicroseconds } from '../_shared/observationContentHash.ts';
+
 // What batch-extract-snapshots may write to a vehicle, as the database enforces it. Two BEFORE UPDATE triggers on vehicles
 // refuse a whole row when one field breaks them, and the function treated the refusal as a failed row:
 //
@@ -23,4 +25,59 @@ export function isUniqueViolation(err: { code?: string | null; message?: string 
   if (!err) return false;
   if (err.code === '23505') return true;
   return /unique constraint|already exists on vehicle/i.test(String(err.message ?? ''));
+}
+
+/** Keep the page reading before a vehicle update can make the row look finished.
+ * The canonical writer owns testimony. Its duplicate reply is checked against the
+ * stored reading too; an HTTP success alone is not evidence of admission.
+ */
+export async function admitSnapshotObservation(supabase: any, input: {
+  vehicleId: string;
+  platform: string;
+  snapshot: { id: string; listing_url: string; fetched_at: string };
+  fields: Record<string, unknown>;
+  method: string;
+  version: string;
+  citationExcerpt?: string | null;
+}): Promise<{ observationId: string; duplicate: boolean }> {
+  const { snapshot } = input;
+  const captureClock = observationClockMicroseconds(snapshot?.fetched_at);
+  if (!snapshot?.id || !snapshot.listing_url || captureClock === null) {
+    throw new Error('Snapshot observation requires its capture ID, URL and observed clock');
+  }
+  const source = input.platform === 'carsandbids' ? 'cars-and-bids' : input.platform;
+  const rawRef = `listing_page_snapshots:${snapshot.id}`;
+  const fields = JSON.parse(JSON.stringify(input.fields));
+  const body = {
+    vehicle_id: input.vehicleId, source_slug: source, kind: 'listing',
+    source_url: snapshot.listing_url, observed_at: snapshot.fetched_at,
+    source_identifier: `snapshot:${snapshot.id}:${input.version}`,
+    structured_data: fields, raw_source_ref: rawRef,
+    extraction_method: input.method,
+    agent_inferred: input.method === 'snapshot_ai_parse',
+    extraction_metadata: { parser_version: input.version, snapshot_id: snapshot.id },
+    ...(input.citationExcerpt ? { citation: { excerpt: input.citationExcerpt } } : {}),
+    // Existing source replay must not wake paid analysis.
+    defer_analysis: true,
+  };
+  const { data, error } = await supabase.functions.invoke('ingest-observation', { body });
+  if (error || data?.success !== true || !data.observation_id) {
+    throw new Error(`Snapshot observation admission failed: ${error?.message ?? data?.error ?? 'missing receipt'}`);
+  }
+  const saved = await supabase.from('vehicle_observations')
+    .select('id,vehicle_id,kind,source_url,observed_at,structured_data,raw_source_ref,extraction_method,analysis_deferred,is_superseded,source:observation_sources!source_id(slug)')
+    .eq('id', data.observation_id).maybeSingle();
+  const row = saved.data;
+  const canonical = (value: any): string => JSON.stringify(value, (_key, v) =>
+    v && typeof v === 'object' && !Array.isArray(v)
+      ? Object.fromEntries(Object.keys(v).sort().map(k => [k, v[k]])) : v);
+  if (saved.error || !row || row.vehicle_id !== input.vehicleId || row.kind !== 'listing'
+    || row.source?.slug !== source || row.source_url !== snapshot.listing_url
+    || observationClockMicroseconds(row.observed_at) !== captureClock
+    || row.raw_source_ref !== rawRef || row.extraction_method !== input.method
+    || row.analysis_deferred !== true || row.is_superseded === true
+    || canonical(row.structured_data) !== canonical(fields)) {
+    throw new Error('Snapshot observation readback did not match the admitted capture and fields');
+  }
+  return { observationId: row.id, duplicate: data.duplicate === true };
 }
