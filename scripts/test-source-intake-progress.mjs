@@ -115,7 +115,8 @@ export function fixture(options = {}) {
       if (name.endsWith('/yearFilter.ts')) return { splitByYear: (u) => ({ keep: u, rest: [] }) };
       if (name.endsWith('/firecrawlGate.ts')) return { firecrawlGate: () => ({ allow: async () => true, record: async () => {} }), ALLOWANCE_EXHAUSTED: 'allowance_deferred: test' };
       if (name.endsWith('/extractionMetrics.ts')) return metrics.exports;
-      if (name.endsWith('/writeGuard.ts')) return { requireWriteAuth: async () => null };
+      if (name.endsWith('/writeGuard.ts')) return { requireWriteAuth: async () => null, isServiceCaller: async () => false };
+      if (name.endsWith('/fundedRefresh.ts')) return { dispatchFundedRefresh: async () => { throw new Error('unexpected funded dispatch for user fixture'); } };
       if (name.endsWith('/supabaseKeys.ts')) return { projectSecretKey: () => 'synthetic-service-key' };
       if (name.endsWith('/normalizeVehicle.ts')) return { isGarbageMake: () => false };
       if (name.endsWith('/urlNormalization.ts')) return { extractCraigslistCanonicalUrls: () => [] };
@@ -131,6 +132,15 @@ export function fixture(options = {}) {
     })); return { status: response.status, body: await response.json() }; },
   };
 }
+
+test('a signed-in caller cannot inject the service-only funded dispatch scope', async () => {
+  const f = fixture();
+  const result = await f.request({ funding_dispatch: true, intake_run_id: '00000000-0000-4000-8000-000000000004',
+    source: 'bat', batch_size: 1, max_ingests: 1 });
+  assert.equal(result.status, 403);
+  assert.equal(result.body.error, 'Forbidden funded dispatch');
+  assert.equal(f.calls.length, 0);
+});
 
 test('failed database acknowledgement cannot report complete or landed', async () => {
   for (const options of [{ ledgerError: true }, { missingLedgerReceipt: true }, { wrongLedgerTarget: true }]) {
