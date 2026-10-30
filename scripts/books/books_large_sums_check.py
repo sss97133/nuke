@@ -228,7 +228,7 @@ DOCROWS = [  # (row, expected required_doc_kind, rule, missing_doc, expected doc
     (t('R-RULING', 100, year='2097', cat=CAT_RENT, rid='2099-RULING-674-rent', rcites=[ruling('2099-RULING-674-rent')]),
      'lease_or_ruling', 'rent', False, ['owner_ruling'], 1),
     (t('R-FILED', 100, year='2097', cat=CAT_RENT, **FILED20), 'lease_or_ruling', 'rent', True, [], 0),
-    (t('R-LEASE', 100, year='2097', cat=CAT_RENT, dcites=[cite('file', 'lease agreement 674 Wells Rd')]), 'lease_or_ruling', 'rent', False, ['proof_links'], 1),
+    (t('R-LEASE', 100, year='2097', cat=CAT_RENT, dcites=[cite('file', 'lease agreement for the shop space')]), 'lease_or_ruling', 'rent', False, ['proof_links'], 1),
     (t('D-REG', 100, year='2097', cat=CAT_DEP, pay=False, basis='asset_register'), 'register_asset', 'depreciation', False, ['asset_register'], 1),
     (t('D-REG-PAID', 100, year='2097', cat=CAT_DEP), 'register_asset', 'depreciation', False, ['asset_register'], 1),     # claimed by the register, proven by its bank line
     (t('D-NOREG', 100, year='2097', cat=CAT_DEP, tier='C', pay=False, basis=None), 'register_asset', 'depreciation', True, [], 0),
