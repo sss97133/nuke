@@ -305,6 +305,14 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
 
   try {
     let input: ObservationInput = await req.json();
+    if (input.extraction_method === "retained_native_fields_v1" ||
+        input.structured_data?.source_profile === "retained_native_fields_v1" ||
+        (input.source_slug === "mecum" && input.extraction_method === "next_data_json_parse")) {
+      const writer = await authenticateWriter(req);
+      if (!writer.ok || writer.caller.kind !== "service_role") return new Response(
+        JSON.stringify({ error: "Native extractor receipts require service role" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
     if (input.mode === FINANCIAL_EVIDENCE_MODE) {
       const action = (input as unknown as { action?: string }).action ?? "submit";
       if ('owner_user_id' in input || action === 'contexts' || action === 'correct' || action === 'original') {
