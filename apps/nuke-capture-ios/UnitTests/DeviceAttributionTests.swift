@@ -33,6 +33,27 @@ final class DeviceAttributionTests: XCTestCase {
         }
     }
 
+    func testAutomaticIdentityNeedsStrongUnmodifiedOCRWithItsMethod() {
+        let vin = "1GCEK14L9EJ147915"
+        let source = OnDeviceObservation.Source(framework: "Apple Vision", model: "VNRecognizeTextRequest", revision: 3,
+            os_version: "26", method: "v1")
+        let good = OnDeviceObservation(kind: .ocrText, value: "VIN \(vin)", confidence: 0.99, source: source)
+        XCTAssertTrue(AttributionEngine.qualifiedIdentityRead(vin, observations: [good]))
+        XCTAssertFalse(AttributionEngine.qualifiedIdentityRead(vin, observations: []))
+        XCTAssertFalse(AttributionEngine.qualifiedIdentityRead(vin, observations: [
+            .init(kind: .vin, value: vin, confidence: 0.4, source: source)]))
+        XCTAssertFalse(AttributionEngine.qualifiedIdentityRead(vin, observations: [
+            .init(kind: .vin, value: vin, confidence: 0.99, source: source, repaired: true)]))
+        XCTAssertFalse(AttributionEngine.qualifiedIdentityRead(vin, observations: [
+            .init(kind: .ocrText, value: "X\(vin)X", confidence: 0.99, source: source)]))
+        let other = OnDeviceObservation.Source(framework: "Apple Vision", model: "VNClassifyImageRequest", revision: 3,
+            os_version: "26", method: "v1")
+        XCTAssertFalse(AttributionEngine.qualifiedIdentityRead(vin, observations: [
+            .init(kind: .vin, value: vin, confidence: 0.99, source: other)]))
+        XCTAssertFalse(AttributionEngine.qualifiedIdentityRead(vin, observations: [good,
+            .init(kind: .vin, value: "1HGCM82633A004352", confidence: 0.99, source: source)]))
+    }
+
     func testManualReviewFilesOnlyTheExplicitSelection() {
         let session = ["mustang", "corvette", "porsche"]
         XCTAssertEqual(AttributionEngine.reviewedPhotoIDs(["mustang", "mustang", "outside-session"], sessionIDs: session), ["mustang"])
@@ -78,11 +99,12 @@ final class DeviceAttributionTests: XCTestCase {
         XCTAssertFalse(AttributionEngine.profileNeedsRetry(try response(#"{"status":"created","filing":{"results":[{"image_id":"a","status":"filed"}]}}"#)))
     }
 
-    func testFreshExactVINFoldsNearbyVehicleFramesFromTheSameReadRun() {
+    func testFreshExactVINRequiresEachMemberOwnIdentifier() {
         let vin = "1GCEK14L9EJ147915"
         let frames = [capture("plate", vin: vin, exact: true),
-                      capture("front", time: "2026-10-18T12:03:00Z", lat: 37.0001, vehicle: true),
-                      capture("rear", time: "2026-10-18T12:04:00Z", lat: 37.0002, vehicle: true)]
+                      capture("front", vin: vin, exact: true, time: "2026-10-18T12:03:00Z", lat: 37.0001, vehicle: true),
+                      capture("rear", vin: vin, exact: true, time: "2026-10-18T12:04:00Z", lat: 37.0002, vehicle: true),
+                      capture("unrelated-car", time: "2026-10-18T12:01:00Z", lat: 37.00001, vehicle: true)]
         XCTAssertEqual(AttributionEngine.vinAnchoredCaptureGroups(frames), [
             .init(vin: vin, year: nil, make: nil, model: nil, anchorImageID: "plate",
                   imageIDs: ["front", "plate", "rear"], vehicleFrameCount: 2)
@@ -98,7 +120,7 @@ final class DeviceAttributionTests: XCTestCase {
         ]).isEmpty, "a classic serial alone cannot establish its make")
         XCTAssertEqual(AttributionEngine.vinAnchoredCaptureGroups([
             capture("plate", vin: serial, exact: true, year: 1966, make: "Ford", model: "Mustang Cpe Blk"),
-            capture("front", vehicle: true)
+            capture("front", vin: serial, exact: true, vehicle: true)
         ]), [.init(vin: serial, year: 1966, make: "Ford", model: "Mustang Cpe Blk",
                    anchorImageID: "plate", imageIDs: ["front", "plate"], vehicleFrameCount: 1)])
         XCTAssertTrue(AttributionEngine.vinAnchoredCaptureGroups([
@@ -111,7 +133,7 @@ final class DeviceAttributionTests: XCTestCase {
         let vinA = "1GCEK14L9EJ147915", vinB = "JT6HJ88J4V0178097"
         XCTAssertTrue(AttributionEngine.vinAnchoredCaptureGroups([
             capture("plate", vin: vinA, exact: true),
-            capture("next-bay", time: "2026-10-18T12:01:00Z", lat: 37.0003, vehicle: true)
+            capture("next-bay", vin: vinA, exact: true, time: "2026-10-18T12:01:00Z", lat: 37.0003, vehicle: true)
         ]).isEmpty, "a neighboring bay must not inherit this VIN")
         XCTAssertTrue(AttributionEngine.vinAnchoredCaptureGroups([
             capture("plate-a", vin: vinA, exact: true),
@@ -148,10 +170,14 @@ final class DeviceAttributionTests: XCTestCase {
             capture("plate", vin: vinA, exact: true),
             capture("late", time: "2026-10-18T12:16:00Z", vehicle: true)
         ]).isEmpty)
-        XCTAssertEqual(AttributionEngine.vinAnchoredCaptureGroups([
+        XCTAssertTrue(AttributionEngine.vinAnchoredCaptureGroups([
             capture("plate", vin: vinA, exact: true),
             capture("front", vehicle: true)
-        ]).count, 1, "the run plus capture neighborhood is the relation; camera model metadata is not")
+        ]).isEmpty, "a nearby car-shaped frame has no same-car witness")
+        XCTAssertEqual(AttributionEngine.vinAnchoredCaptureGroups([
+            capture("plate", vin: vinA, exact: true),
+            capture("second-plate", vin: vinA, exact: true)
+        ]).count, 1)
         XCTAssertTrue(AttributionEngine.vinAnchoredCaptureGroups([
             capture("plate-a", vin: vinA, exact: true),
             capture("plate-b", vin: vinB, exact: true, time: "2026-10-18T12:01:00Z", lat: 37.0001),
@@ -164,7 +190,7 @@ final class DeviceAttributionTests: XCTestCase {
         // 4 min / ~11 m hops for 56 minutes; only the frames within 45 min of the anchor join.
         var frames = [capture("plate", vin: vin, exact: true)]
         for i in 1...14 {
-            frames.append(capture("walk\(i)", time: String(format: "2026-10-18T12:%02d:00Z", i * 4), lat: 37 + Double(i) * 0.0001, vehicle: true))
+            frames.append(capture("walk\(i)", vin: vin, exact: true, time: String(format: "2026-10-18T12:%02d:00Z", i * 4), lat: 37 + Double(i) * 0.0001, vehicle: true))
         }
         let groups = AttributionEngine.vinAnchoredCaptureGroups(frames)
         XCTAssertEqual(groups.count, 1)

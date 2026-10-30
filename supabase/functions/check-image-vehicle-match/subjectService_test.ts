@@ -1,4 +1,4 @@
-import { resolveSubjectBatch, retainDeviceSourceReading, sanitizeOnDeviceObservations, subjectOwnerId, supabaseSubjectStore, type CandidateScope, type SubjectEnvelope, type SubjectReading,
+import { resolveSubjectBatch, retainDeviceSourceReading, admitDeviceCaptureProfile, sanitizeOnDeviceObservations, subjectOwnerId, supabaseSubjectStore, type CandidateScope, type SubjectEnvelope, type SubjectReading,
   type SubjectSource, type SubjectStore, type SubjectDependencies, type CaptureProfileRequest } from "./subjectService.ts";
 import type { VisionInputCapture } from "./inputCustody.ts";
 import { projectSourceIdentities, sourceAliases, sourceIdentityRecords, attachSourceIdentityRecords } from "./sourceIdentity.ts";
@@ -9,6 +9,9 @@ import { planSubjectReinspection } from "./subjectReinspection.ts";
 const uid = "00000000-0000-4000-8000-000000000001", other = "00000000-0000-4000-8000-000000000002";
 const ids = ["10000000-0000-4000-8000-000000000001", "10000000-0000-4000-8000-000000000002", "10000000-0000-4000-8000-000000000003"];
 const cluster = "20000000-0000-4000-8000-000000000001";
+const nativeRun = '70000000-0000-4000-8000-000000000001', nativeMethod = 'vehicle-identity-context-fold-v3:fixture';
+const nativeOCR = (value: string, patch: Record<string, unknown> = {}) => ({ kind: 'ocr_text', value, confidence: 0.99,
+  source: { framework: 'Apple Vision', model: 'VNRecognizeTextRequest', revision: 3, os_version: '26', method: 'v1' }, ...patch });
 function equal(a: unknown, b: unknown) { if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error(`${JSON.stringify(a)} != ${JSON.stringify(b)}`); }
 const scope: CandidateScope = { kind: "account_associated_terminal_vehicles", vehicle_ids: [cluster], retrieved: 1,
   exhausted: true, truncated: false, reference_photos_assessed: 0, unavailable_references: [cluster], global_novelty_asserted: false };
@@ -67,6 +70,54 @@ function fixture() {
   const run = (body = request) => resolveSubjectBatch(store, body, "https://example.test", dependencies);
   return { sources, readings, writes, counts, store, dependencies, request, run };
 }
+async function nativeCaptureFixture(options: { single?: boolean; tag?: boolean; neighbor?: boolean; observation?: Record<string, unknown> } = {}) {
+  const f = fixture(), selected = ids.slice(0, options.single ? 1 : 2), requests: unknown[] = [];
+  f.sources.forEach((s, i) => Object.assign(s, { latitude: 35, longitude: -115, device_fingerprint: 'fixture-device',
+    taken_at: `2026-10-01T12:0${i}:00Z` }));
+  f.store.admitCapture = async request => { requests.push(request); return { status: 'created', vehicle_id: cluster }; };
+  const vin = '1HGCM82633A004352';
+  const observations = selected.map((id, i) => ({ image_id: id, read_at: '2026-10-02T00:00:00Z', is_document: false, is_vehicle: true,
+    labels: ['car'], vin_candidates: options.tag || options.neighbor && i === 1 ? [] : [vin],
+    on_device: options.neighbor && i === 1 ? [] : [nativeOCR(options.tag ? 'BODY BY FISHER ST73 2FS87 N189504 BDY TR232 PNT75' : vin, options.observation)] }));
+  await retainDeviceSourceReading(f.store, { user_id: uid, image_ids: selected, identity_run_id: nativeRun,
+    identity_method_version: nativeMethod, expected_source_hashes: Object.fromEntries(f.sources.filter(s => selected.includes(s.id)).map(s => [s.id, s.file_hash])),
+    observations }, new Date('2026-10-02T00:00:00Z'));
+  const request = { basis: options.tag ? 'tag_only' : options.single ? 'vin' : 'capture_session',
+    vin: options.tag ? undefined : vin, year: options.tag ? 1973 : undefined, make: options.tag ? 'Pontiac' : undefined, image_ids: selected,
+    evidence: { identity_run_id: nativeRun, identity_method_version: nativeMethod, anchor_image_id: selected[0],
+      anchor_source_sha256: f.sources[0].file_hash, ...(options.tag ? { tag: { body_number: 'N189504', style_code: '2FS87' } } : {}) } };
+  return { ...f, requests, profile: request, admit: () => admitDeviceCaptureProfile(f.store, uid, request, '2026-10-02T00:00:00Z') };
+}
+Deno.test('a qualified singleton VIN uses the existing writer without a made-up second car view or model call', async () => {
+  const f = await nativeCaptureFixture({ single: true }); equal((await f.admit()).status, 'created'); equal(f.requests.length, 1);
+  equal(f.counts, { captures: 0, models: 0, candidates: 0 }); equal(f.writes, []);
+});
+Deno.test('a nearby car-shaped frame without its own identifier cannot be filed by a native VIN request', async () => {
+  const f = await nativeCaptureFixture({ neighbor: true }); equal((await f.admit()).status, 'insufficient_evidence'); equal(f.requests, []);
+});
+Deno.test('every native VIN member needs its own strong unmodified retained OCR method', async () => {
+  const good = await nativeCaptureFixture(); equal((await good.admit()).status, 'created');
+  for (const observation of [{ confidence: 0.4 }, { repaired: true }, { source: { framework: 'other', model: 'guess', revision: 1, method: 'v1' } }]) {
+    const f = await nativeCaptureFixture({ observation }); equal((await f.admit()).status, 'insufficient_evidence'); equal(f.requests, []);
+  }
+});
+Deno.test('source changes and mismatched native run/method cannot reuse an older identity read', async () => {
+  const f = await nativeCaptureFixture(); f.sources[1].file_hash = 'e'.repeat(64);
+  equal((await f.admit()).status, 'insufficient_evidence'); equal(f.requests, []);
+  const other = await nativeCaptureFixture(); other.profile.evidence.identity_run_id = '70000000-0000-4000-8000-000000000002';
+  equal((await other.admit()).status, 'insufficient_evidence'); equal(other.requests, []);
+});
+Deno.test('another strong identifier on the same source prevents choosing the first candidate', async () => {
+  const f = await nativeCaptureFixture({ observation: { value: '1HGCM82633A004352 1GCEK14L9EJ147915' } });
+  equal((await f.admit()).status, 'insufficient_evidence'); equal(f.requests, []);
+});
+Deno.test('a tag candidate requires the same qualified body/year/style on each source, not a label or neighbor', async () => {
+  const f = await nativeCaptureFixture({ tag: true }); equal((await f.admit()).status, 'created');
+  const wrong = await nativeCaptureFixture({ tag: true }); wrong.profile.evidence.tag!.body_number = 'N000000';
+  equal((await wrong.admit()).status, 'insufficient_evidence'); equal(wrong.requests, []);
+  const neighbor = await nativeCaptureFixture({ tag: true, neighbor: true }); equal((await neighbor.admit()).status, 'insufficient_evidence');
+  equal(neighbor.requests, []);
+});
 function captureFixture() {
   const f = fixture(), requests: CaptureProfileRequest[] = [];
   f.sources.forEach((source, index) => Object.assign(source, { latitude: 35, longitude: -115,

@@ -97,7 +97,9 @@ Standing rules the code carries:
 - **A capture session is the identity context; an album is not.** Owner direction, 2026-10-28 (case ledger §17): the make
   and year a classic serial needs come from the session itself, in order of strength: a title or registration document read in
   the same session, a cowl or trim tag (`BODY BY FISHER` + `ST73 2FS87` decodes model year, make and series), a make badge
-  read on a vehicle-classified frame. A VIN-plate read plus any one of these makes the profile. Without a plate, at least two
+  read on a vehicle-classified frame. These remain retained context. Automatic classic-serial namespace uses the source itself,
+  an exact serial-bearing document, or an existing owner album declaration; nearby text alone is unresolved. Every image
+  automatically filed by its identifier must independently read that identifier. Without a plate, at least two
   source-bound frames reading the same labelled body number can request a private candidate. Its tag fields must also decode
   from retained native OCR at confidence0.9 or greater. A nearby car without that reading stays separate; time/GPS only bound
   the source set. The existing writer retains `needs_identifier` and asks for the missing plate. The day receipt treats a gap
@@ -107,7 +109,7 @@ Standing rules the code carries:
   its supposed to create new profiles if theres enough data to support it." `AttributionEngine.run` files an uploaded
   photo through the server (`device_file_images` → `attribute_testimony`, audited) on a fresh exact VIN or chassis
   serial matching one of the owner's vehicles, or on the owner's album mapped to a vehicle (`album_sync_map`) after a
-  fresh original-byte read classifies the image as a vehicle. Fuzzy reads and photos without a fresh source read stay out
+  fresh original-byte read classifies the image as a vehicle. Fuzzy, ambiguous, repaired and sub0.9 identifier reads stay out
   of automatic filing. A valid 17-character VIN (`VisionEngine.isValidVIN`) that matches nothing, or an unmapped album
   named "year make model" (`AlbumLabel`) with `Config.albumProfileMinPhotos` uploaded photos, goes to
   `device_create_vehicle_profile`, which resolves an existing vehicle first and creates a private profile, with the
@@ -118,10 +120,12 @@ Standing rules the code carries:
   check-digit-valid modern VINs and explicitly labelled 8–16 character classic chassis serials. It creates no subject or membership. This keeps pre-identity reads out of
   `image_analysis_records` (whose required `vehicle_id` would invent a relation) and avoids a parallel source-read
   table. Before profile admission, the server folds only reads from the same fresh run and exact source hashes, with
-  the identifier anchor and independently classified vehicle frames within five minutes and 25 m by capture metadata.
-  A classic serial additionally needs one unambiguous owner album label for its year, make and model; unlabeled OCR
-  strings and serials without that context remain unresolved. Invoice/document language in local OCR blocks both VIN
-  and serial anchors, and raw OCR text never leaves the phone.
+  each source's own matching unmodified identifier at native OCR confidence0.9 or greater. Five-minute/25m neighborhoods
+  bound the request and never make an unlabelled nearby car a member. A single modern VIN uses the existing one-source
+  VIN writer and a protected singleton reading with no subjects or memberships.
+  A classic serial additionally needs an unambiguous namespace from its own source, an exact serial-bearing context,
+  or the owner's existing album declaration. Unlabelled OCR strings and serials without that context remain unresolved. Invoice/document language in local OCR blocks both VIN
+  and serial anchors. The existing bounded native observations include OCR on non-document sources; document OCR stays local.
   Documents, sensitive or rejected photos, stale hashes, missing clocks/locations, and nearby conflicting VINs block
   the fold. The existing audited profile writer then resolves a globally held VIN or creates a private profile with
   the photographer relation. For a newly created 17-character VIN profile, the server invokes the existing

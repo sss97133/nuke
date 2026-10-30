@@ -37,7 +37,7 @@ export interface SubjectReading {
 
 /** Fresh device Vision/OCR hints enrich the one bounded contextual model read.
  * They never qualify cluster membership and cannot be replayed as a completed deep read. */
-export function onDeviceSourceHints(readings: SubjectReading[], sources: SubjectSource[], user: string, asOf: string) {
+export function onDeviceSourceHints(readings: SubjectReading[], sources: SubjectSource[], user: string, asOf: string, includeObservations = false) {
   const live = new Map(sources.map(source => [source.id, source])), hints = new Map<string, Record<string, unknown>>();
   for (const row of readings) {
     if (!row.is_active || row.observed_by && row.observed_by !== "visual_subject_reading_v1") continue;
@@ -50,7 +50,7 @@ export function onDeviceSourceHints(readings: SubjectReading[], sources: Subject
       typeof raw.identity_run_id !== "string" || !UUID.test(raw.identity_run_id) ||
       typeof raw.identity_method_version !== "string" ||
       !/^vehicle-identity-context-fold-v3:[A-Za-z0-9._:-]{1,80}$/.test(raw.identity_method_version) ||
-      !Array.isArray(sourceInputs) || sourceInputs.length < 2 || sourceInputs.length > 3 ||
+      !Array.isArray(sourceInputs) || sourceInputs.length < 1 || sourceInputs.length > 3 ||
       !Array.isArray(raw.observations) || raw.observations.length !== sourceInputs.length) continue;
     const qualified = sourceInputs.every((input: any) => {
       const source = live.get(input?.image_id);
@@ -67,7 +67,8 @@ export function onDeviceSourceHints(readings: SubjectReading[], sources: Subject
       const candidate = { image_id: observation.image_id, is_vehicle: observation.is_vehicle,
         is_document: observation.is_document, labels: observation.labels.filter((value: unknown) => typeof value === "string").slice(0, 8),
         vin_candidates: observation.vin_candidates.filter((value: unknown) => isDeviceVehicleIdentifier(value)).slice(0, 4),
-        method_version: raw.identity_method_version, identity_run_id: raw.identity_run_id };
+        method_version: raw.identity_method_version, identity_run_id: raw.identity_run_id,
+        ...(includeObservations ? { on_device: sanitizeOnDeviceObservations(observation.on_device) ?? [] } : {}) };
       if (!current || Date.parse(envelope.read_at) > Date.parse(String(current.read_at ?? "")))
         hints.set(observation.image_id, { ...candidate, read_at: envelope.read_at });
     }
@@ -107,6 +108,69 @@ export interface SubjectStore {
   retainPrivacy?(imageId: string, envelope: Record<string, unknown>): Promise<string>;
   admission(envelope: SubjectEnvelope): Promise<ReturnType<typeof assessSubjectAdmission>>;
   ingest(imageId: string, anchorId: string, envelope: SubjectEnvelope): Promise<{ id: string; cluster_id: string | null }>;
+}
+
+/** A native source reading is identity evidence only for that source. A nearby
+ * classified car cannot inherit it. Model-assisted graph admission has its own
+ * existing path; this direct device entrypoint never requests inference. */
+export async function admitDeviceCaptureProfile(store: SubjectStore, user: string, request: any, asOf = new Date().toISOString()) {
+  const refuse = (reason: string) => ({ status: 'insufficient_evidence', detail: reason });
+  if (!store.admitCapture) return refuse('capture_profile_writer_unavailable');
+  if (!request || !['vin', 'capture_session', 'tag_only', 'album', 'serial_album'].includes(request.basis)) return refuse('capture_profile_invalid');
+  // Explicit owner album declarations continue through their existing owner.
+  if (['album', 'serial_album'].includes(request.basis)) return await store.admitCapture(request);
+  const ids = request.image_ids, evidence = request.evidence;
+  const minimum = request.basis === 'vin' ? 1 : 2;
+  if (!Array.isArray(ids) || ids.length < minimum || ids.length > 100 || new Set(ids).size !== ids.length || ids.some(id => !UUID.test(id)) ||
+    !evidence || !UUID.test(evidence.identity_run_id) || typeof evidence.identity_method_version !== 'string' ||
+    !/^vehicle-identity-context-fold-v3:[A-Za-z0-9._:-]{1,80}$/.test(evidence.identity_method_version) ||
+    !ids.includes(evidence.anchor_image_id)) return refuse('source_bound_identity_scope_required');
+  const sources = await store.sources(user, ids);
+  if (sources.length !== ids.length || sources.some(s => !ids.includes(s.id) || s.user_id !== user) ||
+    sources.find(s => s.id === evidence.anchor_image_id)?.file_hash !== evidence.anchor_source_sha256) return refuse('identity_source_changed');
+  const hints = onDeviceSourceHints(await store.readings(ids), sources, user, asOf, true);
+  const text = (hint: Record<string, any>) => (sanitizeOnDeviceObservations(hint.on_device) ?? []).filter(o => {
+    const source = o.source as Record<string, unknown>;
+    return o.repaired !== true && Number(o.confidence) >= 0.9 && source.framework === 'Apple Vision' &&
+      source.model === 'VNRecognizeTextRequest' && Number(source.revision) > 0 && source.method === 'v1';
+  });
+  for (const id of ids) {
+    const hint = hints.find(h => h.image_id === id && h.identity_run_id === evidence.identity_run_id &&
+      h.method_version === evidence.identity_method_version);
+    if (!hint || hint.is_document) return refuse('each_source_needs_a_qualified_identity_read');
+    const observations = text(hint);
+    if (request.basis === 'tag_only') {
+      const lines = observations.filter(o => o.kind === 'ocr_text').map(o => String(o.value).toUpperCase()).join(' ');
+      const styles = [...lines.matchAll(/\bST\s*[-.]?\s*(\d{2})\s*[-.]?\s*([1-6])\s*([A-Z])([A-Z])\s*(\d{2})\b/g)];
+      const styleKeys = new Set(styles.map(m => m.slice(1).join('')));
+      const style = styles[0], tag = evidence.tag;
+      if (!style || styleKeys.size !== 1 || !(lines.includes('FISHER') || /\bBDY\b/.test(lines) && /\b(TR|PNT)\b/.test(lines)))
+        return refuse('each_source_needs_the_same_qualified_body_tag');
+      const suffix = lines.slice(style.index! + style[0].length);
+      const bodies = new Set([...suffix.matchAll(/\b(?:([A-Z])\s+)?([A-Z0-9]{3,12})\s+BDY\b/g)]
+        .map(m => (m[1] ?? '') + m[2]).filter(v => v.length <= 12 && /\d/.test(v)));
+      const make = ({ '1': 'Chevrolet', '2': 'Pontiac', '3': 'Oldsmobile', '4': 'Buick', '6': 'Cadillac' } as Record<string, string>)[style[2]];
+      const code = style.slice(2).join('');
+      if (bodies.size !== 1 || !tag || !bodies.has(tag.body_number) || (tag.style_code ?? tag.series_code) !== code ||
+        Number(style[1]) < 70 || Number(style[1]) > 89 || request.year !== 1900 + Number(style[1]) || request.make !== make)
+        return refuse('each_source_needs_the_same_qualified_body_tag');
+    } else {
+      const identifier = request.vin ?? request.serial;
+      const supported = new Set(observations.flatMap(o => {
+        if (o.kind === 'vin' || o.kind === 'classic_serial') return isDeviceVehicleIdentifier(o.value) ? [o.value] : [];
+        if (o.kind !== 'ocr_text') return [];
+        const value = String(o.value).toUpperCase();
+        return [...(value.match(/[A-Z0-9]+/g) ?? []).filter(v => v.length === 17 && isDeviceVehicleIdentifier(v)),
+          ...[...value.matchAll(/\b(?:CHASSIS|SERIAL|VIN)\s*(?:NO\.?|NUMBER|#)?\s*[:#.-]?\s*([A-Z0-9]{8,16})\b/g)]
+            .map(m => m[1]).filter(isDeviceVehicleIdentifier)];
+      }));
+      if (!isDeviceVehicleIdentifier(identifier) || request.basis === 'vin' && identifier.length !== 17 ||
+        !Array.isArray(hint.vin_candidates) || new Set(hint.vin_candidates).size !== 1 || !hint.vin_candidates.includes(identifier) ||
+        supported.size !== 1 || !supported.has(identifier))
+        return refuse('each_source_needs_its_own_matching_identifier');
+    }
+  }
+  return await store.admitCapture(request);
 }
 export interface SubjectDependencies {
   capture?: (sources: VisionInputSource[], projectURL: string) => Promise<VisionInputCapture>;
@@ -163,7 +227,7 @@ export async function retainDeviceSourceReading(store: SubjectStore, request: De
   const ids = request.image_ids, observations = request.observations;
   const privacy = request.device_privacy_receipts ?? {};
   const refused = (reason: string) => ({ method: SUBJECT_METHOD, status: "refused", refusal: reason, persisted_image_ids: [] as string[] });
-  if (!Array.isArray(ids) || ids.length < 2 || ids.length > 3 || new Set(ids).size !== ids.length ||
+  if (!Array.isArray(ids) || ids.length < 1 || ids.length > 3 || new Set(ids).size !== ids.length ||
     ids.some(id => !UUID.test(id)) || !Array.isArray(observations) || observations.length !== ids.length ||
     new Set(observations.map(item => item?.image_id)).size !== ids.length || observations.some(item =>
       !ids.includes(item.image_id) || typeof item.is_vehicle !== "boolean" || typeof item.is_document !== "boolean" ||
