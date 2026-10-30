@@ -117,7 +117,9 @@ Standing rules the code carries:
   Vision OCR/classification and does not accept previous cloud, album, or deep-analysis output as identity evidence.
   A fresh VIN-anchored capture read is retained in the existing protected, reading-only `image_observations` lane.
   It records the source hash, method revision, run, bounded peer inputs, local vehicle/document classifications and
-  check-digit-valid modern VINs and explicitly labelled 8–16 character classic chassis serials. It creates no subject or membership. This keeps pre-identity reads out of
+  check-digit-valid modern VINs and explicitly labelled 8–16 character classic chassis serials. A bare classic plate may
+  match an already-known identifier exactly under the same qualified native OCR rule; it cannot create a new identity.
+  It creates no subject or membership. This keeps pre-identity reads out of
   `image_analysis_records` (whose required `vehicle_id` would invent a relation) and avoids a parallel source-read
   table. Before profile admission, the server folds only reads from the same fresh run and exact source hashes, with
   each source's own matching unmodified identifier at native OCR confidence0.9 or greater. Five-minute/25m neighborhoods

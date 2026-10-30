@@ -60,6 +60,20 @@ final class DeviceAttributionTests: XCTestCase {
         XCTAssertTrue(AttributionEngine.reviewedPhotoIDs([], sessionIDs: session).isEmpty)
     }
 
+    func testBareClassicPlateCanOnlyMatchAnAlreadyKnownExactIdentifier() {
+        let serial = "2S87T3N123456"
+        let source = OnDeviceObservation.Source(framework: "Apple Vision", model: "VNRecognizeTextRequest", revision: 3,
+            os_version: "26", method: "v1")
+        func read(_ text: String) -> [OnDeviceObservation] {
+            [.init(kind: .ocrText, value: text, confidence: 0.99, source: source)]
+        }
+        XCTAssertTrue(AttributionEngine.qualifiedIdentityRead(serial, observations: read(serial), allowKnownClassicSerial: true))
+        XCTAssertFalse(AttributionEngine.qualifiedIdentityRead(serial, observations: read(serial)))
+        for text in ["X\(serial)X", "2S8703N123456", "\(serial) 2S87T3N654321"] {
+            XCTAssertFalse(AttributionEngine.qualifiedIdentityRead(serial, observations: read(text), allowKnownClassicSerial: true))
+        }
+    }
+
     func testMixedShopSessionFilesOnlyEachPhotosOwnSerialMatch() throws {
         let json = #"[{"id":"mustang","vehicle_id":null,"auto_suggested_vehicle_id":"vehicle-a","auto_suggestion_confidence":0.99,"auto_suggestion_reasons":["vin_ocr_match","edit_distance=0"]},{"id":"corvette","vehicle_id":null,"auto_suggested_vehicle_id":"vehicle-a","auto_suggestion_confidence":0.8,"auto_suggestion_reasons":["session_inheritance"]},{"id":"porsche","vehicle_id":null,"auto_suggested_vehicle_id":"vehicle-b","auto_suggestion_confidence":0.99,"auto_suggestion_reasons":["vin_ocr_match"]},{"id":"no-photo-evidence","vehicle_id":null,"auto_suggested_vehicle_id":null,"auto_suggestion_confidence":null,"auto_suggestion_reasons":null},{"id":"already-filed","vehicle_id":"vehicle-b","auto_suggested_vehicle_id":"vehicle-a","auto_suggestion_confidence":0.99,"auto_suggestion_reasons":["vin_ocr_match"]}]"#
         let rows = try JSONDecoder().decode([AttributionEngine.PhotoSuggestion].self, from: Data(json.utf8))

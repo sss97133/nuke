@@ -286,7 +286,7 @@ final class AttributionEngine: ObservableObject {
             let isVehicle: Bool
             let identityReadAt: Date
             let labels: [String]
-            let sourceVINCandidates: [String]
+            var sourceVINCandidates: [String]
             let isDocument: Bool
             let onDevice: [OnDeviceObservation]
             if let cached, cached.inputSHA256 == row.file_hash {
@@ -326,6 +326,12 @@ final class AttributionEngine: ObservableObject {
                 onDevice = OnDeviceAnalysis.uploadable(review.onDeviceObservations, isDocument: isDocument)
             }
             let match = isDocument || knownVINs.isEmpty ? nil : VisionEngine.matchSerial(in: lines, known: knownVINs)
+            // A physical pre-1981 plate often has no printed "VIN" label. It may
+            // match an already-known identifier exactly; it cannot mint a new one.
+            if let match, match.editDistance == 0, match.vin.count < 17,
+               Self.qualifiedIdentityRead(match.vin, observations: onDevice, allowKnownClassicSerial: true) {
+                sourceVINCandidates = Array(Set(sourceVINCandidates + [match.vin])).sorted()
+            }
             let classicIdentifiers = Set(VisionEngine.labelledClassicSerialCandidates(in: lines))
             let rawIdentifiers = VisionEngine.vinCandidates(in: lines) + Array(classicIdentifiers)
             let unknown = !isDocument && match == nil ? rawIdentifiers.first(where: {
@@ -402,7 +408,7 @@ final class AttributionEngine: ObservableObject {
             // Fuzzy OCR remains a review suggestion; only an exact source read in a
             // fresh vehicle frame can file this image directly.
             guard let vid = s.vinVehicleId, s.vinDist == 0, Set(s.vinCandidates).count == 1,
-                  Self.qualifiedIdentityRead(s.vinRead, observations: s.onDevice), !s.isDocument,
+                  Self.qualifiedIdentityRead(s.vinRead, observations: s.onDevice, allowKnownClassicSerial: true), !s.isDocument,
                   s.row.is_document != true, s.row.doc_flag != true, s.row.is_sensitive != true else { continue }
             if !retainedIdentityIDs.contains(s.row.id) {
                 guard extraIdentityReceipts < 2 else { identityRetentionPending = true; continue }
@@ -580,7 +586,7 @@ final class AttributionEngine: ObservableObject {
         for s in signals where !completedIDs.contains(s.row.id) {
             if s.isDocument { unresolved += 1; continue }
             if let vid = s.vinVehicleId {
-                let qualified = Set(s.vinCandidates).count == 1 && Self.qualifiedIdentityRead(s.vinRead, observations: s.onDevice)
+                let qualified = Set(s.vinCandidates).count == 1 && Self.qualifiedIdentityRead(s.vinRead, observations: s.onDevice, allowKnownClassicSerial: true)
                 let conf = qualified ? ([0: 0.99, 1: 0.97, 2: 0.93][s.vinDist ?? 0] ?? 0.93) : 0.79
                 await suggest(imageId: s.row.id, vehicleId: vid, conf: conf,
                               reasons: [qualified ? "vin_ocr_match" : "identifier_read_unqualified", "edit_distance=\(s.vinDist ?? 0)"])
@@ -1090,7 +1096,8 @@ final class AttributionEngine: ObservableObject {
         return CaptureContextReader.pendingIdentifiers(tagReadsBySession: tagReads, sessionFrames: sessionFrames, anchored: anchored)
     }
 
-    nonisolated static func qualifiedIdentityRead(_ identifier: String?, observations: [OnDeviceObservation]) -> Bool {
+    nonisolated static func qualifiedIdentityRead(_ identifier: String?, observations: [OnDeviceObservation],
+                                                 allowKnownClassicSerial: Bool = false) -> Bool {
         guard let identifier, !identifier.isEmpty else { return false }
         var identifiers = Set<String>()
         for o in observations where o.confidence >= 0.9 && o.repaired != true &&
@@ -1102,6 +1109,11 @@ final class AttributionEngine: ObservableObject {
                 identifiers.formUnion(o.value.uppercased().split(whereSeparator: { !$0.isLetter && !$0.isNumber })
                     .map(String.init).filter { VisionEngine.isValidVIN($0) })
                 identifiers.formUnion(VisionEngine.labelledClassicSerialCandidates(in: [o.value]))
+                if allowKnownClassicSerial, (8...16).contains(identifier.count) {
+                    identifiers.formUnion(o.value.uppercased().split(whereSeparator: { !$0.isLetter && !$0.isNumber })
+                        .map(String.init).filter { (8...16).contains($0.count) && $0.contains(where: \.isLetter) &&
+                            $0.contains(where: \.isNumber) && $0.utf8.allSatisfy { $0 < 128 } })
+                }
             }
         }
         return identifiers == [identifier]
