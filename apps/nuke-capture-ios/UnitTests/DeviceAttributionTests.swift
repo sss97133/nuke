@@ -66,6 +66,17 @@ final class DeviceAttributionTests: XCTestCase {
         XCTAssertTrue(AttributionEngine.profileFiledIDs(from: try response(#"{"status":"created","filing":{}}"#)).isEmpty)
     }
 
+    func testTransientProfileFailuresKeepTheAcknowledgedSourcePending() throws {
+        func response(_ json: String) throws -> AnyJSON { try JSONDecoder().decode(AnyJSON.self, from: Data(json.utf8)) }
+        for status in ["busy", "error", "rate_limited"] {
+            XCTAssertTrue(AttributionEngine.profileNeedsRetry(try response("{\"status\":\"\(status)\"}")))
+        }
+        XCTAssertTrue(AttributionEngine.profileNeedsRetry(try response(#"{"status":"created","filing":{"results":[{"image_id":"a","status":"filed"},{"image_id":"b","status":"deferred"}]}}"#)))
+        XCTAssertTrue(AttributionEngine.profileNeedsRetry(try response(#"{"unexpected":"response"}"#)))
+        XCTAssertFalse(AttributionEngine.profileNeedsRetry(try response(#"{"status":"ambiguous"}"#)), "ambiguity is not a transport retry or a filing")
+        XCTAssertFalse(AttributionEngine.profileNeedsRetry(try response(#"{"status":"created","filing":{"results":[{"image_id":"a","status":"filed"}]}}"#)))
+    }
+
     func testFreshExactVINFoldsNearbyVehicleFramesFromTheSameReadRun() {
         let vin = "1GCEK14L9EJ147915"
         let frames = [capture("plate", vin: vin, exact: true),
