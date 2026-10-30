@@ -19,7 +19,7 @@ RETURNS boolean LANGUAGE sql IMMUTABLE SET search_path=pg_catalog,public AS $$
    AND CASE WHEN pg_input_is_valid(o->>'confidence','numeric') THEN (o->>'confidence')::numeric BETWEEN 0.9 AND 1 ELSE false END
    AND (o->'repaired' IS NULL OR o->'repaired'='false'::jsonb)
    AND o#>>'{source,framework}'='Apple Vision' AND o#>>'{source,model}'='VNRecognizeTextRequest'
-   AND o#>>'{source,method}'='v1' AND jsonb_typeof(o#>'{source,revision}')='number'
+   AND o#>>'{source,method}' IN ('nuke-ondevice-v1','nuke-identity-perspective-v1') AND jsonb_typeof(o#>'{source,revision}')='number'
    AND CASE WHEN pg_input_is_valid(o#>>'{source,revision}','integer') THEN (o#>>'{source,revision}')::int>0 ELSE false END
  ), identifiers AS (
   SELECT o->>'value' identifier FROM strong WHERE o->>'kind' IN ('vin','classic_serial')

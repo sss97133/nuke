@@ -87,7 +87,7 @@ CREATE TEMP TABLE qualified_reading AS WITH inserted AS (
     'observations',jsonb_build_array(jsonb_build_object('image_id',id,'is_document',false,
       'vin_candidates',jsonb_build_array('1M8GDM9AXKP042788'),'on_device',jsonb_build_array(jsonb_build_object(
        'kind','ocr_text','value','1M8GDM9AXKP042788','confidence',0.99,'repaired',false,
-       'source',jsonb_build_object('framework','Apple Vision','model','VNRecognizeTextRequest','revision',3,'method','v1'))))))))) FROM original_frame RETURNING id)
+       'source',jsonb_build_object('framework','Apple Vision','model','VNRecognizeTextRequest','revision',3,'method','nuke-ondevice-v1'))))))))) FROM original_frame RETURNING id)
  SELECT id FROM inserted;
 CREATE TEMP TABLE native_owner_acl AS SELECT oid,proacl,proowner FROM pg_proc WHERE oid IN
  ('public.evaluate_contributor_evidence_item(uuid,uuid)'::regprocedure,'public.contributor_retained_reading_for(uuid)'::regprocedure);
@@ -211,8 +211,8 @@ BEGIN
  FOR patch IN SELECT x FROM jsonb_array_elements('[
   {"confidence":0.89},{"repaired":true},{"confidence":"0.99"},
   {"value":"1M8GDM9AXKP042788 1HGCM82633A004352"},
-  {"source":{"framework":"other","model":"VNRecognizeTextRequest","revision":3,"method":"v1"}},
-  {"source":{"framework":"Apple Vision","model":"VNRecognizeTextRequest","revision":0,"method":"v1"}}
+  {"source":{"framework":"other","model":"VNRecognizeTextRequest","revision":3,"method":"nuke-ondevice-v1"}},
+  {"source":{"framework":"Apple Vision","model":"VNRecognizeTextRequest","revision":0,"method":"nuke-ondevice-v1"}}
  ]'::jsonb) x LOOP
   changed:=jsonb_set(original,'{visual_subject_reading_v1,envelope,raw_model_reading,observations,0,on_device,0}',
     original#>'{visual_subject_reading_v1,envelope,raw_model_reading,observations,0,on_device,0}'||patch);
@@ -263,6 +263,15 @@ BEGIN
  UPDATE public.image_observations SET confidence_basis=changed WHERE id=reading_id;
  PERFORM pg_temp.ok('an unlabelled classic plate can match the persisted identifier exactly',
   public.evaluate_contributor_evidence_item(item_id,reading_id)->'qualified'='true'::jsonb);
+ changed:=jsonb_set(changed,'{visual_subject_reading_v1,envelope,raw_model_reading,observations,0,on_device,0,source,method}',
+  '"nuke-identity-perspective-v1"');
+ UPDATE public.image_observations SET confidence_basis=changed WHERE id=reading_id;
+ PERFORM pg_temp.ok('the actual perspective producer method can qualify its own retained exact reading',
+  public.evaluate_contributor_evidence_item(item_id,reading_id)->'qualified'='true'::jsonb);
+ UPDATE public.image_observations SET confidence_basis=jsonb_set(changed,
+  '{visual_subject_reading_v1,envelope,raw_model_reading,observations,0,on_device,0,source,method}','"nuke-identity-perspective-seed-v1"') WHERE id=reading_id;
+ PERFORM pg_temp.ok('an intermediate seed reading cannot be promoted to final claim proof',
+  public.evaluate_contributor_evidence_item(item_id,reading_id)->'qualified'='false'::jsonb);
  UPDATE public.image_observations SET confidence_basis=jsonb_set(changed,
   '{visual_subject_reading_v1,envelope,raw_model_reading,observations,0,on_device,0,value}','"2S8703N123456"') WHERE id=reading_id;
  PERFORM pg_temp.ok('native confidence one cannot repair a wrong classic glyph into proof',
