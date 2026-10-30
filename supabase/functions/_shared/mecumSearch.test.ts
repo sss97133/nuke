@@ -18,6 +18,9 @@ Deno.test("Mecum discovery reads current sales and canonical vehicle lots withou
       { permalink: "https://outside.invalid/lots/7/wrong" },
       { permalink: "/auctions/upcoming" },
       { permalink: "/lots/999/car?redirect=outside" },
+      { permalink: "http://[" },
+      null,
+      { permalink: "/lots/1000/unknown", taxonomies: { division_tax: {} } },
     ] };
   }, now);
   assertEquals(result, { urls: ["https://www.mecum.com/lots/123/1980-ford-f100"], confirmedEmpty: false });
@@ -29,10 +32,12 @@ Deno.test("Mecum discovery reads current sales and canonical vehicle lots withou
 Deno.test("only an explicit roster without current sales is a confirmed empty search", async () => {
   assertEquals(await fetchMecumFeedUrls(async () => ({ facets: { "taxonomies.auction_tax.name": { "Past|1|2": 1 } } })), { urls: [], confirmedEmpty: true });
   await assertRejects(() => fetchMecumFeedUrls(async () => ({})), Error, "missing sale facets");
-  let calls = 0;
-  await assertRejects(() => fetchMecumFeedUrls(async () => ++calls === 1
-    ? { facets: { "taxonomies.auction_tax.name": { "Future|1|9999999999": 1 } } }
-    : { hits: [] }), Error, "missing listed lots");
+  for (const [hits, message] of [[[], "missing listed lots"], [[null, { permalink: "http://[" }], "no vehicle lot URLs"]] as const) {
+    let calls = 0;
+    await assertRejects(() => fetchMecumFeedUrls(async () => ++calls === 1
+      ? { facets: { "taxonomies.auction_tax.name": { "Future|1|9999999999": 1 } } }
+      : { hits }), Error, message);
+  }
 });
 
 Deno.test("Mecum public API refuses HTTP errors and malformed results", async () => {

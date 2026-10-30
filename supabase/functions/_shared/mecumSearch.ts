@@ -40,9 +40,11 @@ export async function fetchMecumFeedUrls(
   if (!Array.isArray(result.hits) || !result.hits.length) throw new Error("mecum_index: missing listed lots");
   const urls = new Set<string>();
   for (const hit of result.hits.slice(0, 300)) {
-    if ((hit.taxonomies?.division_tax ?? []).some((division: any) => division.slug === "road-art" || division.name === "Road Art")) continue;
-    if (typeof hit.permalink !== "string") continue;
-    const url = new URL(hit.permalink, "https://www.mecum.com");
+    if (!hit || typeof hit.permalink !== "string") continue;
+    const divisions = hit.taxonomies?.division_tax ?? [];
+    if (!Array.isArray(divisions) || divisions.some((division: any) => division?.slug === "road-art" || division?.name === "Road Art")) continue;
+    let url: URL;
+    try { url = new URL(hit.permalink, "https://www.mecum.com"); } catch { continue; }
     if (url.origin !== "https://www.mecum.com" || url.username || url.password || url.search || url.hash ||
       !/^\/lots\/\d+\/[a-z0-9-]+\/?$/.test(url.pathname)) continue;
     urls.add(url.href.replace(/\/$/, ""));
