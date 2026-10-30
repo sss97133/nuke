@@ -4,6 +4,7 @@
 // listing_work_plan_read, request_inspection, vehicle_work_orders_read, post_work_request,
 // my_signature_queue, my_work_orders. Nothing here computes a number the server can state.
 import { supabase } from '../../lib/supabase';
+import type { WorkContext, WorkDecision, WorkHandoff, WorkProof } from './workEvidenceModel';
 
 export type VehicleLabel = { year?: number | null; make?: string | null; model?: string | null; trim?: string | null; text?: string | null } | null;
 
@@ -82,6 +83,7 @@ export type SignQueueRead = {
 
 export type WorkOrderRow = {
   work_order_id: string;
+  vehicle_id?: string | null;
   title?: string | null;
   display_title?: string | null;
   vehicle_label?: VehicleLabel;
@@ -249,7 +251,73 @@ export const JobReaders = {
   signatureQueue: () => call<SignQueueRead>('my_signature_queue', {}),
   myWorkOrders: (after: string | null, cohort: 'responsible' | 'accessible' = 'responsible') => call<MyWorkOrdersRead>('my_work_orders', { p_slot: cohort === 'responsible' ? 'responsible' : null, p_after: after, p_limit: 25 }),
   retainedWorkSources: (workOrderId: string, after: string | null = null) => call<RetainedWorkRead>('work_order_retained_sources_read', { p_work_order_id: workOrderId, p_after_source_id: after, p_limit: 25 }),
+  // Existing vehicle readers/RLS, invoked only after the job reader includes the retained duty.
+  // Vehicle evidence is supporting history, never silently allocated as performed work on this job.
+  workContext: readRetainedWorkContext,
 };
+
+async function readRetainedWorkContext(vehicleId: string, reports: NonNullable<RetainedWorkRead['responsibility_reports']>): Promise<WorkContext> {
+  const result: WorkContext = { vehicleId, proofs: [], decisions: [], handoffs: [], errors: [], partial: false };
+  if (!reports.length) return result;
+  const [proofs, decisions, bases] = await Promise.all([
+    supabase.from('vehicle_observations').select('id,vehicle_id,kind,source_id,is_superseded,observed_at,ingested_at,component:structured_data->>plug,component_name:structured_data->>plug_name,description:structured_data->>value,level:structured_data->>proof_level,photo_url:structured_data->photo->>url,photo_at:structured_data->photo->>taken_at,event_date:structured_data->>event_date,replaces:structured_data->>supersedes_original_id')
+      .eq('vehicle_id', vehicleId).eq('kind', 'specification').eq('is_superseded', false)
+      .eq('structured_data->>domain', 'wiring').eq('structured_data->>property_key', 'device proof')
+      .order('id').limit(101),
+    supabase.from('wiring_decisions').select('id,subject,status,work_status,chosen,source,decided_on,trust')
+      .eq('vehicle_id', vehicleId).eq('is_superseded', false).not('decision_kind', 'is', null).order('id').limit(101),
+    supabase.from('vehicle_observations').select('id,source_id').eq('vehicle_id', vehicleId)
+      .eq('kind', 'work_record').eq('is_superseded', false).in('id', reports.map(r => r.source_observation_id)),
+  ]);
+  if (proofs.error) result.errors.push('Parts evidence could not be read.');
+  else {
+    result.proofsComplete = (proofs.data?.length ?? 0) <= 100;
+    result.proofs = (proofs.data ?? []).slice(0, 100) as unknown as WorkProof[];
+    result.partial ||= !result.proofsComplete;
+  }
+  if (decisions.error) result.errors.push('Work decisions could not be read.');
+  else { result.decisions = (decisions.data ?? []).slice(0, 100) as unknown as WorkDecision[]; result.partial ||= (decisions.data?.length ?? 0) > 100; }
+  const codes = [...new Set(result.proofs.map(p => p.component).filter((s): s is string => !!s))];
+  if (codes.length) {
+    const names = await supabase.from('harness_endpoints').select('code,name,design:harness_designs!inner(vehicle_id)')
+      .eq('design.vehicle_id', vehicleId).eq('is_superseded', false).in('code', codes).limit(201);
+    if (names.error) result.errors.push('Some component names could not be read.');
+    else {
+      result.partial ||= (names.data?.length ?? 0) > 200;
+      for (const proof of result.proofs) {
+        const labels = [...new Set((names.data ?? []).filter(n => n.code === proof.component).map(n => n.name).filter(Boolean))];
+        // An ambiguous design match does not establish a component identity.
+        if (labels.length === 1) proof.component_name = labels[0];
+      }
+    }
+  }
+  if (bases.error) { result.errors.push('Handoff sources could not be read.'); return result; }
+  const sourceClients = new Map<string, string[]>();
+  for (const basis of bases.data ?? []) {
+    const report = reports.find(r => r.source_observation_id === basis.id);
+    if (basis.source_id && report) sourceClients.set(basis.source_id, [...(sourceClients.get(basis.source_id) ?? []), report.client_label]);
+  }
+  if (!sourceClients.size) return result;
+  const handoffs = await supabase.from('vehicle_observations')
+    .select('id,source_id,observed_at,ingested_at,gate:structured_data->>gate,next_action:structured_data->>next_action,blocked_on:structured_data->blocked_on')
+    .eq('vehicle_id', vehicleId).eq('kind', 'work_record').eq('is_superseded', false)
+    .eq('structured_data->>folder_role', 'current_state').in('source_id', [...sourceClients.keys()])
+    .order('observed_at', { ascending: false, nullsFirst: false }).order('id').limit(21);
+  if (handoffs.error) result.errors.push('Handoff history could not be read.');
+  else {
+    result.partial ||= (handoffs.data?.length ?? 0) > 20;
+    result.handoffs = (handoffs.data ?? []).slice(0, 20).filter(row => {
+      if (typeof row.gate !== 'string') return false;
+      // A same-vehicle match alone cannot attach another client's handoff to this job.
+      const words = row.gate.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean).join(' ');
+      return (sourceClients.get(row.source_id) ?? []).some(client => {
+        const name = client.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean).join(' ');
+        return name && ` ${words} `.includes(` ${name} `);
+      });
+    }).map(row => ({ ...row, blocked_on: Array.isArray(row.blocked_on) ? row.blocked_on.filter((v: unknown) => typeof v === 'string') : [] })) as WorkHandoff[];
+  }
+  return result;
+}
 
 export const JobSigns = {
   offer: (args: OfferArgs) => call<{ offer_id: string; duplicate: boolean }>('offer_on_requirement', args),

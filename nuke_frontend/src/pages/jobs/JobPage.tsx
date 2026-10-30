@@ -21,6 +21,10 @@ import { RetainedWorkSection } from './RetainedWorkSection';
 import type { RetainedWorkRead } from './jobsReaders';
 import { completionActions, completionState } from './signDrafts';
 import './job-page.css';
+
+function JobRecordDetails({ collapsed, children }: { collapsed: boolean; children: React.ReactNode }) {
+  return collapsed ? <details className="work-group job-administration"><summary>Job administration & records</summary>{children}</details> : <>{children}</>;
+}
 const BestMatches = React.lazy(() => import('./BestMatches'));
 const JobSuppliers = React.lazy(() => import('./JobSuppliers'));
 const PartsFinder = React.lazy(() => import('./PartsFinder'));
@@ -450,30 +454,35 @@ function JobPageForViewer({ viewerId }: { viewerId: string | null }) {
   const completionStage = stages.find(s => s.key === 'completion')?.raw ?? null;
   const pathActions = [...(viewer?.actions ?? []),
     ...completionActions(workOrderId, completionStage, parseViewer(r('invoices')?.viewer)?.actions ?? [], viewer?.slots ?? [])];
+  const retained = obj(data.retained_work)?.visibility === 'included' ? data.retained_work as RetainedWorkRead : null;
+  const hasRetainedWork = !!(retained?.responsibility_reports?.length || retained?.scope_entries?.length);
   const sheetData = { workOrderId, quotes: r('quotes'), operations: r('operations'), offers: r('offers'), invoices: r('invoices'), inspection: r('inspection'),
     completionSignedAt: completionState(completionStage).signedAt, reload };
 
   return <JobSheetContext.Provider value={sheetData}><article className="job-page" aria-label={title}>
-    <Masthead result={<Text role="caption">{str(data.request_source_label) ?? ''}</Text>}>
+    <Masthead result={hasRetainedWork ? undefined : <Text role="caption">{str(data.request_source_label) ?? ''}</Text>}>
       <div className="job-masthead">
-        <Text role="entity" as="h1">{title}</Text>
+        <Text role="entity" as="h1">{hasRetainedWork && vehicle ? vehicle : title}</Text>
         {vehicle && (vehicleId
-          ? <PrefetchLink className="job-link" to={`/vehicle/${vehicleId}`}><Text role="body">{vehicle}</Text></PrefetchLink>
+          ? <PrefetchLink className="job-link" to={`/vehicle/${vehicleId}`}><Text role="body">{hasRetainedWork ? 'Vehicle profile →' : vehicle}</Text></PrefetchLink>
           : <Text role="body">{vehicle}</Text>)}
         <ShareButton path={`/jobs/${workOrderId}`} title={title} label="Share this job" />
       </div>
     </Masthead>
 
+    {hasRetainedWork && <RetainedWorkSection key={`${workOrderId}:${str(data.as_of) ?? ''}`} workOrderId={workOrderId} vehicleId={viewerId ? vehicleId : null} initial={retained!} />}
+    {hasRetainedWork && pathActions.length > 0 && <SignActions actions={pathActions} onSigned={reload} />}
+
+    <JobRecordDetails collapsed={hasRetainedWork}>
+    {hasRetainedWork && <Text role="body" as="p">Source job: {title}</Text>}
     <Section title="Job path" coverage={cov(recorded, STAGES.length, 'stages recorded', data.as_of)}>
       <JobStageRail states={Object.fromEntries(stages.map(s => [s.key, s.state]))}
         conflicts={Object.fromEntries(stages.map(s => [s.key, s.inconsistencies.length > 0]))} />
       <Text role="caption" as="p">Viewing as {viewingAs(viewer)}. Stages show what's on record, not yet verified; "proven" is kept for signatures made through Nuke.</Text>
       <JobStageRailLegend />
       <JobPublication workOrderId={workOrderId} />
-      {pathActions.length > 0 && <SignActions actions={pathActions} onSigned={reload} />}
+      {!hasRetainedWork && pathActions.length > 0 && <SignActions actions={pathActions} onSigned={reload} />}
     </Section>
-
-    {obj(data.retained_work) && <RetainedWorkSection key={`${workOrderId}:${str(data.as_of) ?? ''}`} workOrderId={workOrderId} initial={data.retained_work as RetainedWorkRead} />}
 
     <Section title="Stages" coverage={cov(stages.filter(s => s.state !== null).length, STAGES.length, 'stages reported', data.as_of)}>
       <div className="job-stages">{stages.map(s => <StageBlock key={s.key} stage={s} />)}</div>
@@ -493,6 +502,7 @@ function JobPageForViewer({ viewerId }: { viewerId: string | null }) {
     {r('inspection') && <InspectionSection d={r('inspection')!} onSigned={reload} />}
     {r('evidence') && <EvidenceSection d={r('evidence')!} onSigned={reload} />}
     {r('invoices') && <InvoicesSection d={r('invoices')!} onSigned={reload} />}
+    </JobRecordDetails>
 
     {(failures.length > 0 || pending.length > 0) && <section className="k-section job-block" aria-label="Not loaded">
       <Text role="label" as="h2">Not loaded</Text>

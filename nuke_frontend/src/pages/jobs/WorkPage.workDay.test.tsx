@@ -55,7 +55,7 @@ it('links a paid delivery responsibility to its original build records', async (
       coverage: { total_for_viewer: 1 } }, error: null }));
   await render(); expect(host.textContent).toContain('Technician owes delivery to Client');
   expect(host.textContent).toContain('Owner report'); expect(host.textContent).toContain('Paid in full');
-  expect([...host.querySelectorAll('a')].find(a => a.textContent?.includes('121 build records'))?.getAttribute('href')).toBe(`/jobs/${ID}#retained-work`);
+  expect([...host.querySelectorAll('a')].find(a => a.textContent?.includes('Open build records'))?.getAttribute('href')).toBe(`/jobs/${ID}#retained-work`);
 });
 
 it('shows jobs before source reviews and mounts no confirmation cards on arrival', async () => {
