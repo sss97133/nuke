@@ -598,6 +598,8 @@ jobs:
         run: deno test --no-check --allow-read supabase/functions/_shared/transferSeed.test.ts
       - name: Verify the contributor link answers unknown, expired and revoked tokens with one 404, hashes the ip, and validates before storage
         run: deno test --no-check --node-modules-dir=none supabase/functions/contributor-intake/core.test.ts
+      - name: Verify listing packages preserve contributor sources, supersession and private evidence boundaries
+        run: deno test --node-modules-dir=none supabase/functions/generate-listing-package/listingEvidence_test.ts
       - name: Verify Stripe checkout routing (only credit purchases credit wallets; invoice sessions go to the recorder) and invoice checkout parameters
         run: deno test --no-check supabase/functions/_shared/stripeCheckoutRouting.test.ts supabase/functions/create-work-order-invoice-checkout/checkout.test.ts
       - name: Verify ingest writes no vehicle from a URL slug when the page extractor failed

@@ -347,6 +347,7 @@ export function dispatchChannel(channel: ChannelDef, ctx: DispatchContext): Adap
           // Freeze the derive-on-read provenance into the attested snapshot: what
           // was submitted, its consensus confidence, and the attribute behind it.
           ...(bat && ctx.pkg?.field_provenance ? { field_provenance: ctx.pkg.field_provenance } : {}),
+          ...(bat && ctx.pkg?.contributor_evidence ? { contributor_evidence: ctx.pkg.contributor_evidence } : {}),
         },
         // SEAM: worker reads listing_exports where metadata.job.kind='browser_submit'.
       };
