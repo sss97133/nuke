@@ -4,6 +4,11 @@ BEGIN;
 SET LOCAL statement_timeout = '10s';
 SET LOCAL lock_timeout = '5s';
 
+ALTER TABLE public.vehicle_observations
+  ADD COLUMN IF NOT EXISTS analysis_deferred boolean NOT NULL DEFAULT false;
+COMMENT ON COLUMN public.vehicle_observations.analysis_deferred IS
+  'Service-validated downstream scheduling hold; separate from immutable source/extraction testimony.';
+
 ALTER TABLE public.analysis_queue
   ADD COLUMN IF NOT EXISTS request_revision bigint NOT NULL DEFAULT 0,
   ADD COLUMN IF NOT EXISTS claimed_revision bigint,
@@ -149,7 +154,7 @@ BEGIN
       OR w.trigger_on_observation_kinds @> ARRAY['*']);
   IF cardinality(v_slugs)>0 THEN
     PERFORM public.enqueue_analysis_work(NEW.vehicle_id,'observation',ARRAY['observation_kind:'||NEW.kind::text],v_slugs,70,
-      coalesce(NEW.extraction_metadata->'analysis_deferred'='true'::jsonb,false));
+      NEW.analysis_deferred);
   END IF;
   RETURN NEW;
 END $$;

@@ -134,8 +134,8 @@ SELECT pg_temp.ok('failed work admission rolls back its observation',NOT EXISTS(
  SELECT FROM public.vehicle_observations WHERE source_identifier='must-rollback'));
 
 ALTER TABLE public.analysis_queue DROP CONSTRAINT fixture_fail_work;
-INSERT INTO public.vehicle_observations(vehicle_id,kind,source_identifier,extraction_metadata)
- VALUES('10000000-0000-4000-8000-000000000003','listing','deferred-input','{"analysis_deferred":true}');
+INSERT INTO public.vehicle_observations(vehicle_id,kind,source_identifier,analysis_deferred)
+ VALUES('10000000-0000-4000-8000-000000000003','listing','deferred-input',true);
 SELECT pg_temp.ok('service-deferred work is durable but cannot be claimed',
  (SELECT analysis_deferred AND request_revision=2 FROM public.analysis_queue WHERE vehicle_id='10000000-0000-4000-8000-000000000003')
  AND NOT EXISTS(SELECT FROM public.claim_analysis_queue_batch(1,'worker','10000000-0000-4000-8000-000000000003')));
@@ -149,8 +149,8 @@ SELECT pg_temp.ok('a cron cannot lift deferred compute',
 SELECT public.enqueue_analysis_work('10000000-0000-4000-8000-000000000003','owner_evaluation','{}',NULL,90);
 CREATE TEMP TABLE authorized AS SELECT * FROM public.claim_analysis_queue_batch(1,'authorized','10000000-0000-4000-8000-000000000003');
 SELECT pg_temp.ok('an explicit existing owner evaluation can resume deferred calculations',(SELECT count(*)=1 FROM authorized));
-INSERT INTO public.vehicle_observations(vehicle_id,kind,source_identifier,extraction_metadata)
- VALUES('10000000-0000-4000-8000-000000000003','listing','new-defer-during-calculation','{"analysis_deferred":true}');
+INSERT INTO public.vehicle_observations(vehicle_id,kind,source_identifier,analysis_deferred)
+ VALUES('10000000-0000-4000-8000-000000000003','listing','new-defer-during-calculation',true);
 SELECT pg_temp.ok('a new deferral fences the running calculation',
  (SELECT public.record_analysis_queue_signal(id,'authorized',claimed_revision,lease_token,
   jsonb_build_object('vehicle_id',vehicle_id,'widget_slug','a','severity','info','score',1))->>'status'='lease_lost' FROM authorized));

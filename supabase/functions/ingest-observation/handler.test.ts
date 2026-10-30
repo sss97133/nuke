@@ -70,7 +70,8 @@ Deno.test("property insert binds FK, caps inference, retains zero cost, defers i
   assert(insert?.body?.property_id === UUID);
   assert(insert?.body?.confidence_score === .6);
   assert(insert?.body?.agent_cost_cents === 0);
-  assert((insert?.body?.extraction_metadata as Record<string, unknown>)?.analysis_deferred === true);
+  assert(insert?.body?.analysis_deferred === true);
+  assert(insert?.body?.extraction_metadata === undefined);
   assert(insert?.writer === "ingest-observation", "the actual log HTTP request must declare its receipt writer");
   assert(!r.calls.some(call => call.path.endsWith("analysis-engine-coordinator")));
 });
@@ -78,7 +79,8 @@ Deno.test("normal intake no longer relies on a fire-and-forget coordinator reque
   const r = await run({ ...input, defer_analysis: false }, "success");
   assert(r.status === 200 && r.data.success === true);
   const insert = r.calls.find(call => call.method === "POST" && call.path.endsWith("vehicle_observations"));
-  assert((insert?.body?.extraction_metadata as Record<string, unknown>)?.analysis_deferred === false);
+  assert(insert?.body?.analysis_deferred === undefined);
+  assert(insert?.body?.extraction_metadata === undefined);
   assert(!r.calls.some(call => call.path.endsWith("analysis-engine-coordinator")));
 });
 Deno.test("failed transactional dependency admission cannot report a successful observation", async () => {

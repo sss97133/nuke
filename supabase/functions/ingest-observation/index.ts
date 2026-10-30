@@ -1159,7 +1159,10 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
         confidence_factors: confidenceFactors,
         observer_raw: input.observer_raw,
         extractor_id: input.extractor_id,
-        extraction_metadata: { ...input.extraction_metadata, analysis_deferred: input.defer_analysis === true },
+        extraction_metadata: input.extraction_metadata,
+        // Scheduling is operational state, not part of the source testimony.
+        // Preserve exact custody comparisons of extraction_metadata.
+        ...(input.defer_analysis === true ? { analysis_deferred: true } : {}),
         // LLM provenance fields
         agent_tier: input.agent_tier || null,
         agent_model: input.agent_model || null,
