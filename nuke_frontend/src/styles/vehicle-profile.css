@@ -1219,3 +1219,10 @@
 .vp-structured-claims dd { margin: 4px 0; font-size: var(--text-body); overflow-wrap: anywhere; }
 .vp-structured-claims__source { margin-top: 4px; font-size: var(--text-caption); }
 .vp-structured-claims__source a { display: inline-flex; align-items: center; min-height: 44px; }
+
+.vp-structured-record { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.vp-structured-record caption { text-align: left; color: var(--text-secondary); font-size: var(--text-caption); padding: 0 0 12px; }
+.vp-structured-record th, .vp-structured-record td { text-align: left; vertical-align: top; padding: 10px 8px; border-bottom: 1px solid var(--border); overflow-wrap: anywhere; }
+.vp-structured-record th { width: 35%; font-weight: 500; }
+.vp-structured-record__unknown, .vp-structured-record__note { color: var(--text-secondary); }
+.vp-structured-record__note { margin-top: 4px; font-size: var(--text-caption); }
