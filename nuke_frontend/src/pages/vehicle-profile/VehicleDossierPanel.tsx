@@ -52,7 +52,12 @@ const StructuredProfileClaims: React.FC<{ vehicleId: string }> = ({ vehicleId })
         if (!claims.every(c => c && /^[a-z][a-z0-9_]*$/.test(c.property_key)
           && UUID.test(c.property_id) && UUID.test(c.observation_id)
           && (c.unit === null || typeof c.unit === 'string')
-          && (!c.qualifiers || (typeof c.qualifiers === 'object' && Object.values(c.qualifiers).every(v => v == null || ['string', 'number', 'boolean'].includes(typeof v))))
+          && (c.observed_at === null || typeof c.observed_at === 'string')
+          && (c.ingested_at === null || typeof c.ingested_at === 'string')
+          && (!c.qualifiers || (typeof c.qualifiers === 'object' &&
+            ['claim_role', 'current_configuration_status', 'factory_configuration_status', 'observed_at_basis', 'limitation']
+              .every(key => c.qualifiers?.[key as keyof NonNullable<StructuredClaim['qualifiers']>] == null
+                || typeof c.qualifiers?.[key as keyof NonNullable<StructuredClaim['qualifiers']>] === 'string')))
           && (typeof c.value === 'string' || (typeof c.value === 'number' && Number.isFinite(c.value))))) throw Error('Invalid structured claims');
         if (active) setRead({ id: vehicleId, status: 'ready', claims });
       } catch {
