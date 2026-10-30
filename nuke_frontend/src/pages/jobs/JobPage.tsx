@@ -17,6 +17,8 @@ import ShareButton from './ShareButton';
 import { readJobHeader } from './jobHeader';
 import { JobSheetContext } from './jobSheetContext';
 import { JobPublication } from './Publication';
+import { RetainedWorkSection } from './RetainedWorkSection';
+import type { RetainedWorkRead } from './jobsReaders';
 import { completionActions, completionState } from './signDrafts';
 import './job-page.css';
 const BestMatches = React.lazy(() => import('./BestMatches'));
@@ -470,6 +472,8 @@ function JobPageForViewer({ viewerId }: { viewerId: string | null }) {
       <JobPublication workOrderId={workOrderId} />
       {pathActions.length > 0 && <SignActions actions={pathActions} onSigned={reload} />}
     </Section>
+
+    {obj(data.retained_work) && <RetainedWorkSection key={`${workOrderId}:${str(data.as_of) ?? ''}`} workOrderId={workOrderId} initial={data.retained_work as RetainedWorkRead} />}
 
     <Section title="Stages" coverage={cov(stages.filter(s => s.state !== null).length, STAGES.length, 'stages reported', data.as_of)}>
       <div className="job-stages">{stages.map(s => <StageBlock key={s.key} stage={s} />)}</div>

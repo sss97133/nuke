@@ -90,6 +90,22 @@ export type WorkOrderRow = {
   stage_states?: Record<string, string>;
   first_gap?: { stage: string; gap: string | null } | null;
   request_source_label?: string | null;
+  retained_work?: RetainedWorkRead;
+};
+
+export type RetainedWorkRead = {
+  visibility: 'included' | 'withheld';
+  as_of?: string;
+  responsibility_reports?: Array<{ binding_id: string; provider_actor_id: string; provider_label: string;
+    client_label: string; source_observation_id: string; reported_at: string; payment_state: string | null;
+    delivery_state: 'reported_owed'; assurance: string }>;
+  scope_entries?: Array<{ source_observation_id: string; source_id: string; source_pointer: string;
+    item: string; category: string | null; document_label: string; document_row: number;
+    billing_column: string | null; execution_state: string; observed_at: string | null; ingested_at: string | null }>;
+  next_after_source_id?: string | null;
+  coverage?: { returned: number; total_source_entries: number; population: string };
+  physical_completion?: string;
+  money_authorized?: boolean;
 };
 
 export type MyWorkOrdersRead = {
@@ -231,7 +247,8 @@ export const JobReaders = {
   matches: (workOrderId: string) => call<MatchesRead>('work_order_provider_matches_read', { p_work_order_id: workOrderId, p_limit: 25 }),
   vehicleWorkOrders: (vehicleId: string, after: string | null = null) => call<VehicleWorkOrdersRead>('vehicle_work_orders_read', { p_vehicle_id: vehicleId, p_after: after, p_limit: 25 }),
   signatureQueue: () => call<SignQueueRead>('my_signature_queue', {}),
-  myWorkOrders: (after: string | null) => call<MyWorkOrdersRead>('my_work_orders', { p_slot: null, p_after: after, p_limit: 25 }),
+  myWorkOrders: (after: string | null, cohort: 'responsible' | 'accessible' = 'responsible') => call<MyWorkOrdersRead>('my_work_orders', { p_slot: cohort === 'responsible' ? 'responsible' : null, p_after: after, p_limit: 25 }),
+  retainedWorkSources: (workOrderId: string, after: string | null = null) => call<RetainedWorkRead>('work_order_retained_sources_read', { p_work_order_id: workOrderId, p_after_source_id: after, p_limit: 25 }),
 };
 
 export const JobSigns = {

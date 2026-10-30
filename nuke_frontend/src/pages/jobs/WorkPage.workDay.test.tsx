@@ -35,6 +35,28 @@ beforeEach(() => {
 });
 afterEach(async () => { await act(async () => root.unmount()); host.remove(); });
 
+it('defaults to evidenced work responsibilities and keeps the accessible-job view available', async () => {
+  await render();
+  expect(fixture.rpc).toHaveBeenCalledWith('my_work_orders', { p_slot: 'responsible', p_after: null, p_limit: 25 });
+  await click(button('Your commitments'));
+  expect(host.textContent).toContain('No supported work responsibilities');
+  await click(button('All accessible work'));
+  expect(fixture.rpc).toHaveBeenCalledWith('my_work_orders', { p_slot: null, p_after: null, p_limit: 25 });
+  expect(host.textContent).toContain('No accessible work orders');
+});
+
+it('links a paid delivery responsibility to its original build records', async () => {
+  fixture.rpc.mockImplementation((name: string) => Promise.resolve({ data: name === 'my_signature_queue'
+    ? { items: [], coverage: { returned: 0, total: 0 } }
+    : { rows: [{ work_order_id: ID, title: 'Client build', slots: ['vehicle_access'], money_visible: false,
+      retained_work: { visibility: 'included', coverage: { total_source_entries: 121 }, responsibility_reports: [{
+        binding_id: 'report', provider_label: 'Technician', client_label: 'Client', payment_state: 'paid_in_full', reported_at: '2026-07-15' }] } }],
+      coverage: { total_for_viewer: 1 } }, error: null }));
+  await render(); expect(host.textContent).toContain('delivery of the completed vehicle reported owed');
+  expect(host.textContent).toContain('Payment reported settled');
+  expect([...host.querySelectorAll('a')].find(a => a.textContent?.includes('121 source-linked'))?.getAttribute('href')).toBe(`/jobs/${ID}#retained-work`);
+});
+
 it('opens a review with day, vehicle and qualified photo evidence; cancel does not sign', async () => {
   await render(); expect(fixture.writer).not.toHaveBeenCalled();
   await click(button('Review work day'));

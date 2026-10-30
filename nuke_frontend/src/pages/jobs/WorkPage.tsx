@@ -78,6 +78,15 @@ function JobRow({ row }: { row: WorkOrderRow }) {
       <Text role="caption">{(row.slots ?? []).map(slotWords).join(' · ')}</Text>
     </div>
     {vehicleText(row.vehicle_label) && <Text role="body">{vehicleText(row.vehicle_label)}</Text>}
+    {row.retained_work?.visibility === 'included' && <>
+      {(row.retained_work.responsibility_reports ?? []).map(report => <div key={report.binding_id}>
+        <Text role="body">{report.provider_label} → {report.client_label}: delivery of the completed vehicle reported owed</Text>
+        <Text role="caption">{report.payment_state === 'paid_in_full' ? 'Payment reported settled · ' : ''}Reported {new Date(report.reported_at).toLocaleDateString('en-US', { timeZone: 'UTC' })}. Physical completion is separate.</Text>
+      </div>)}
+      {!!row.retained_work.coverage?.total_source_entries && <PrefetchLink to={`${jobHref(row.work_order_id)}#retained-work`}>
+        <Text role="body">{row.retained_work.coverage.total_source_entries} source-linked build entries →</Text>
+      </PrefetchLink>}
+    </>}
     {stages && <Text role="caption">{stages}</Text>}
     {row.first_gap?.gap && <Text role="caption">Next: {stageWord(row.first_gap.stage)} — {gapWord(row.first_gap.gap)}</Text>}
   </li>;
@@ -97,16 +106,21 @@ const ViewerWorkPage: React.FC = () => {
   const [jobs, setJobs] = useState<MyWorkOrdersRead | null>(null);
   const [jobRows, setJobRows] = useState<WorkOrderRow[]>([]);
   const [refusal, setRefusal] = useState<string | null>(null);
+  const [cohort, setCohort] = useState<'responsible' | 'accessible'>('responsible');
   const generation = useRef(0);
+  const paging = useRef(false);
 
   const loadJobs = useCallback(async (after: string | null) => {
+    if (after && paging.current) return;
+    paging.current = true;
     const scope = generation.current;
-    const r = await JobReaders.myWorkOrders(after);
+    const r = await JobReaders.myWorkOrders(after, cohort);
     if (scope !== generation.current) return;
+    paging.current = false;
     if (r.refusal) { setRefusal(r.refusal.message); return; }
     setJobs(r.data);
     setJobRows(prev => (after ? [...prev, ...r.data.rows] : r.data.rows));
-  }, []);
+  }, [cohort]);
 
   const loadQueue = useCallback(() => {
     const scope = generation.current;
@@ -118,6 +132,8 @@ const ViewerWorkPage: React.FC = () => {
 
   useEffect(() => {
     generation.current++;
+    paging.current = false;
+    setRefusal(null);
     loadQueue();
     void loadJobs(null);
     return () => { generation.current++; };
@@ -126,7 +142,7 @@ const ViewerWorkPage: React.FC = () => {
   return <article className="jb-page jb-scope">
     <div className="jb-intro">
       <Text role="entity" as="h1">Work</Text>
-      <Text role="body">What is waiting for your signature, and the jobs you are on. <PrefetchLink to="/jobs">Jobs looking for someone</PrefetchLink> · <PrefetchLink to="/work/market">The job market</PrefetchLink></Text>
+      <Text role="body">Your work responsibilities and records waiting for your signature. <PrefetchLink to="/jobs">Jobs looking for someone</PrefetchLink> · <PrefetchLink to="/work/market">The job market</PrefetchLink></Text>
       <Text role="body"><PrefetchLink to="/work/setup">Set up your provider page</PrefetchLink> so jobs that fit can find you.</Text>
     </div>
     <div role="alert" className="jb-live">{refusal && <Text role="body" className="jb-warn">{refusal}</Text>}</div>
@@ -135,9 +151,13 @@ const ViewerWorkPage: React.FC = () => {
         ? <Text role="body">Nothing is waiting for your signature.</Text>
         : <ul className="jb-list">{queue.items.map(i => <QueueItem key={`${i.kind}:${i.ref_id}`} item={i} onSigned={loadQueue} />)}</ul>}
     </Section>}
-    {jobs && <Section title="Your jobs" coverage={{ n: jobRows.length, of: jobs.coverage.total_for_viewer, grain: 'jobs', as_of: jobs.as_of }}>
+    <div role="group" aria-label="Work scope">
+      <button type="button" className="btn-base btn-sm btn-secondary" aria-pressed={cohort === 'responsible'} onClick={() => { if (cohort !== 'responsible') { setJobs(null); setJobRows([]); setCohort('responsible'); } }}>Your commitments</button>
+      <button type="button" className="btn-base btn-sm btn-secondary" aria-pressed={cohort === 'accessible'} onClick={() => { if (cohort !== 'accessible') { setJobs(null); setJobRows([]); setCohort('accessible'); } }}>All accessible work</button>
+    </div>
+    {jobs && <Section title={cohort === 'responsible' ? 'Your commitments' : 'Accessible work'} coverage={{ n: jobRows.length, of: jobs.coverage.total_for_viewer, grain: 'jobs', as_of: jobs.as_of }}>
       {jobRows.length === 0
-        ? <Text role="body">You are not on any jobs yet.</Text>
+        ? <Text role="body">{cohort === 'responsible' ? 'No supported work responsibilities were returned. Unlinked source records may still contain work history.' : 'No accessible work orders were returned.'}</Text>
         : <ul className="jb-list">{jobRows.map(r => <JobRow key={r.work_order_id} row={r} />)}</ul>}
       {jobs.next_after && <div className="jb-more"><button type="button" className="btn-base btn-sm btn-secondary" onClick={() => void loadJobs(jobs.next_after)}>
         <Text role="label">More jobs</Text></button></div>}
