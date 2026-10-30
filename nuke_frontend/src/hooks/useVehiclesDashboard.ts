@@ -64,6 +64,7 @@ export interface GarageVehicle {
   relationship_source: 'verification' | 'ownership' | 'permission' | 'contributor' | 'discovered' | 'uploaded_by' | 'owner_statement';
   relationship_roles?: RelationshipType[];
   relationship_detail?: string;
+  inventory_status?: 'current' | 'previous' | 'unknown';
   relationship_id?: string;
   ownership_start_date?: string | null;
   ownership_end_date?: string | null;
@@ -344,7 +345,7 @@ function buildSections(vehicles: GarageVehicle[]): GarageSection[] {
 // Vehicle select columns (only columns that exist on the vehicles table)
 // ---------------------------------------------------------------------------
 
-const VEHICLE_SELECT = 'id, year, make, model, normalized_model, trim, vin, primary_image_url, image_count, confidence_score, heat_score, view_count, created_at, updated_at, status';
+const VEHICLE_SELECT = 'id, year, make, model, normalized_model, trim, vin, primary_image_url, image_count, confidence_score, heat_score, view_count, created_at, updated_at, status, merged_into_vehicle_id';
 
 const VISIBLE_STATUSES = new Set(['active', 'pending', 'discovered', 'pending_backfill']);
 
@@ -364,6 +365,7 @@ interface VehicleRow {
   created_at: string;
   updated_at: string;
   status: string | null;
+  merged_into_vehicle_id?: string | null;
 }
 
 function rowToGarageVehicle(
@@ -471,10 +473,10 @@ export function useVehiclesDashboard(userId: string | undefined | null): Vehicle
         for (const res of [verifiedRes, prevOwnedRes, ownershipRes, correctionRes]) {
           if (res.error) throw new Error('Garage relationships unavailable. Please retry.');
         }
-        const relMap = resolveGarageRelationships(
+        let relMap = resolveGarageRelationships(
           ownershipRes.data ?? [], verifiedRes.data ?? [], prevOwnedRes.data ?? [],
         );
-        const corrections = (correctionRes.data ?? []) as GarageOwnerCorrection[];
+        let corrections = (correctionRes.data ?? []) as GarageOwnerCorrection[];
         // Statements can concern a vehicle missing from the legacy ownership union.
         for (const c of corrections) {
           if (!c.vehicle_id) continue;
@@ -508,6 +510,42 @@ export function useVehiclesDashboard(userId: string | undefined | null): Vehicle
         }
 
         if (cancelled) return;
+
+        // Membership can survive a vehicle merge on its original row. Follow
+        // only recorded merge links, then resolve the original relationships
+        // against the terminal identity before reading its images and events.
+        for (let depth = 0; ; depth++) {
+          const missing = [...new Set([...allRows.values()].flatMap(row =>
+            row.merged_into_vehicle_id && !allRows.has(row.merged_into_vehicle_id) ? [row.merged_into_vehicle_id] : []))];
+          if (!missing.length) break;
+          if (depth >= 10) throw new Error('Garage vehicle identities unavailable. Please retry.');
+          for (let offset = 0; offset < missing.length; offset += 100) {
+            const { data, error } = await supabase.from('vehicles').select(VEHICLE_SELECT).in('id', missing.slice(offset, offset + 100));
+            if (error) throw new Error('Garage vehicle identities unavailable. Please retry.');
+            for (const row of (data ?? []) as VehicleRow[]) allRows.set(row.id, row);
+          }
+          if (missing.some(id => !allRows.has(id))) throw new Error('Garage vehicle identities unavailable. Please retry.');
+          if (cancelled) return;
+        }
+        const terminalId = (id: string): string => {
+          const seen = new Set<string>();
+          while (allRows.get(id)?.merged_into_vehicle_id) {
+            if (seen.has(id)) throw new Error('Garage vehicle identities unavailable. Please retry.');
+            seen.add(id); id = allRows.get(id)!.merged_into_vehicle_id!;
+          }
+          return id;
+        };
+        relMap = resolveGarageRelationships(
+          (ownershipRes.data ?? []).map(row => ({ ...row, vehicle_id: terminalId(row.vehicle_id) })),
+          (verifiedRes.data ?? []).map(row => ({ ...row, vehicle_id: terminalId(row.vehicle_id) })),
+          (prevOwnedRes.data ?? []).map(row => ({ ...row, vehicle_id: terminalId(row.vehicle_id) })),
+        );
+        corrections = corrections.map(row => ({ ...row, vehicle_id: row.vehicle_id ? terminalId(row.vehicle_id) : null }));
+        for (const row of corrections) {
+          if (row.vehicle_id && !relMap.has(row.vehicle_id)) relMap.set(row.vehicle_id,
+            { type: 'RELATIONSHIP REVIEW', source: 'owner_statement', id: row.id, start_date: null, end_date: null });
+        }
+        allRows = new Map([...allRows].filter(([id]) => relMap.has(id)));
 
         // Batch fetch image counts, fallback images, event summaries, event weeks in parallel
         const vehicleIdArray = Array.from(allRows.keys());

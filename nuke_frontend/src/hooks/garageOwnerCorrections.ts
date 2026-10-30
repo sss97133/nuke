@@ -11,6 +11,7 @@ export interface GarageOwnerCorrection {
       disputed: boolean;
       start_date: string | null;
       end_date: string | null;
+      inventory_status?: 'current' | 'previous' | 'unknown';
     };
     cover_image_id?: string;
     unresolved_vehicle?: { label: string; stated_roles: string[] };
@@ -67,12 +68,14 @@ export function applyGarageOwnerCorrections(
     }
     if (relationships.length > 1) {
       result.relationship_type = 'RELATIONSHIP REVIEW';
+      result.inventory_status = 'unknown';
       result.relationship_source = 'owner_statement';
       result.relationship_detail = 'CONFLICTING ACCOUNT STATEMENTS';
       result.ownership_start_date = null; result.ownership_end_date = null;
     } else if (relationships.length === 1) {
       const statement = relationships[0];
       const claim = statement.correction.relationship!;
+      result.inventory_status = claim.inventory_status;
       const roles = claim.roles.filter(role => GROUPS[role]);
       // A rejection without a supported role removes the automated association
       // from this projection. Its private source remains in the observation log.

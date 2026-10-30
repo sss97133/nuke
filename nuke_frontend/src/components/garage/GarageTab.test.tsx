@@ -47,3 +47,32 @@ it('offers sign-in without garage actions for a visitor',async()=>{
   state={...state,viewerId:null,signedIn:false,vehicles:[],sections:[]};await mount();
   expect(host.querySelector('a[href="/login"]')?.textContent).toBe('Sign in');expect(host.querySelector('a[href="/vehicle/add"]')).toBeNull();
 });
+it('groups current inventory together independently of title and retains past business roles',async()=>{
+  const rows = [
+    {id:'titled',relationship_type:'VERIFIED OWNER'},
+    {id:'owner',relationship_type:'OWNER'},
+    {id:'disputed',relationship_type:'CLAIMED INTEREST',inventory_status:'current'},
+    {id:'pending',relationship_type:'TRANSFER PENDING',inventory_status:'current'},
+    {id:'sold',relationship_type:'PREVIOUSLY OWNED'},
+    {id:'business',relationship_type:'BUSINESS HANDLING',inventory_status:'previous'},
+    {id:'represented',relationship_type:'SALES REPRESENTATIVE',inventory_status:'previous'},
+    {id:'unresolved-role',relationship_type:'CONSIGNED'},
+  ] as GarageVehicle[];
+  state={...state,vehicles:rows};await mount();
+  const current=host.querySelector('section[aria-label="Current vehicles"]')!;
+  const previous=host.querySelector('section[aria-label="Previous vehicles"]')!;
+  expect([...current.querySelectorAll('a')].map(a=>a.textContent)).toEqual(['titled','owner','disputed','pending']);
+  expect([...previous.querySelectorAll('a')].map(a=>a.textContent)).toEqual(['sold','business','represented']);
+  expect(host.querySelector('section[aria-label="Other vehicle relationships"]')?.textContent).toContain('unresolved-role');
+  expect([...host.querySelectorAll('.garage-section-heading')].map(h=>h.textContent)).toEqual([
+    'Current vehicles 4','Previous vehicles 3','Other vehicle relationships 1',
+  ]);
+  expect(rows[2].relationship_type).toBe('CLAIMED INTEREST');
+  expect(rows[5].relationship_type).toBe('BUSINESS HANDLING');
+});
+it('honors explicit inventory status without assuming missing dates mean current ownership',async()=>{
+  state={...state,vehicles:[{...vehicle,inventory_status:'previous'},{...vehicle,id:'unknown',inventory_status:'unknown'}]};
+  await mount();expect(host.querySelector('section[aria-label="Current vehicles"]')).toBeNull();
+  expect(host.querySelector('section[aria-label="Previous vehicles"]')?.textContent).toContain('synthetic-car');
+  expect(host.querySelector('section[aria-label="Other vehicle relationships"]')?.textContent).toContain('unknown');
+});

@@ -110,6 +110,30 @@ it('loads prior periods, excludes them from current asset totals, and does not r
   expect(state.data?.my_vehicles[0].acquisition_date).toBe('2020-01-01');
   expect(fixture.calls.find(c => c[0] === 'vehicles')?.[2]).not.toContain('current_value');
 });
+it('follows merged garage memberships to one surviving vehicle with its VIN and photos', async () => {
+  seedGarage();
+  fixture.rows.vehicles[1].merged_into_vehicle_id='middle';
+  fixture.rows.vehicles.push({...fixture.rows.vehicles[1],id:'middle',merged_into_vehicle_id:'terminal'},
+    {...fixture.rows.vehicles[1],id:'terminal',merged_into_vehicle_id:null,vin:'REAL-SERIAL',image_count:31,primary_image_url:'retained-whole-truck'});
+  fixture.rows.discovered_vehicles=[{id:'also-terminal',vehicle_id:'terminal',user_id:'user',relationship_type:'previously_owned',is_active:true}];
+  await act(async()=>root.render(<Harness/>));
+  const car=state.vehicles.find(v=>v.id==='terminal')!;
+  expect(car).toMatchObject({vin:'REAL-SERIAL',image_count:31,resolved_image_url:'retained-whole-truck',relationship_type:'PREVIOUSLY OWNED'});
+  expect(state.vehicles.map(v=>v.id).sort()).toEqual(['car','terminal']);
+});
+it('keeps a denial attached to the surviving merged identity',async()=>{
+  seedGarage();fixture.rows.vehicles[0].merged_into_vehicle_id='terminal';
+  fixture.rows.vehicles.push({...fixture.rows.vehicles[0],id:'terminal',merged_into_vehicle_id:null});
+  fixture.rows.garage_owner_corrections=[{id:'denial',vehicle_id:'car',observed_at:'2026-10-30',cover_image_url:null,
+    correction:{relationship:{roles:[],ownership_denied:true,title_status:'unknown',disputed:false,start_date:null,end_date:null}}}];
+  await act(async()=>root.render(<Harness/>));expect(state.vehicles.map(v=>v.id)).toEqual(['old']);
+});
+it('refuses broken and cyclic merge chains instead of displaying a misleading empty stub',async()=>{
+  seedGarage();fixture.rows.vehicles[0].merged_into_vehicle_id='missing';
+  await act(async()=>root.render(<Harness/>));expect(state.error).toContain('vehicle identities unavailable');
+  fixture.rows.vehicles[0].merged_into_vehicle_id='car';
+  await act(async()=>state.refresh());expect(state.error).toContain('vehicle identities unavailable');
+});
 
 it('withholds stale, circular, unqualified and invalid estimates without falling back to paid price', async () => {
   seedGarage();

@@ -8,9 +8,19 @@ import { GarageToolbar } from './GarageToolbar';
 import './garage.css';
 
 function GarageContent({ dashboard }: { dashboard: VehiclesDashboardState }) {
-  const { sections, vehicles, isLoading, error, warnings = [], viewMode, sortMode, filterMode,
+  const { vehicles, isLoading, error, warnings = [], viewMode, sortMode, filterMode,
     setViewMode, setSortMode, setFilterMode, refresh, unresolvedSources = [], signedIn } = dashboard;
   const filtered = filterMode !== 'ALL';
+  const groups = [
+    { key: 'current', label: 'Current vehicles' },
+    { key: 'previous', label: 'Previous vehicles' },
+    { key: 'unknown', label: 'Other vehicle relationships' },
+  ].map(group => ({ ...group, vehicles: vehicles.filter(vehicle => {
+    const status = vehicle.inventory_status ??
+      (['VERIFIED OWNER', 'OWNER', 'CO-OWNER'].includes(vehicle.relationship_type) ? 'current'
+        : vehicle.relationship_type === 'PREVIOUSLY OWNED' ? 'previous' : 'unknown');
+    return status === group.key;
+  }) })).filter(group => group.vehicles.length > 0);
 
   return <main className="garage-page">
     <div className="garage-heading"><div><h1>Garage</h1><p>Your vehicle relationships and the evidence recorded for them.</p></div>
@@ -36,8 +46,8 @@ function GarageContent({ dashboard }: { dashboard: VehiclesDashboardState }) {
         </section>}
         {vehicles.length > 0 && <p className="garage-relationship-note">Relationships reflect recorded ownership and account statements. Relationship changes are not available from this page.</p>}
         <div className="garage-sections">
-          {sections.map(section => <section key={section.relationship_type} aria-label={section.relationship_type}>
-            <h2 className="garage-section-heading">{section.relationship_type.toLowerCase()} <span>{section.vehicles.length}</span></h2>
+          {groups.map(section => <section key={section.key} aria-label={section.label}>
+            <h2 className="garage-section-heading">{section.label} <span>{section.vehicles.length}</span></h2>
             <div className={`garage-vehicles garage-view-${viewMode.toLowerCase()}`}>
               {section.vehicles.map(vehicle => <GarageVehicleCard key={vehicle.id} vehicle={vehicle} viewMode={viewMode} onRefresh={refresh} />)}
             </div>

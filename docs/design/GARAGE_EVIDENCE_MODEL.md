@@ -92,6 +92,16 @@ filter is insufficient. No new public grant is implied by this proposal.
 
 ## Garage projection
 
+Owner refinement, 2026-10-30: the primary web sections are **Current vehicles**
+and **Previous vehicles**, describing inventory tenure rather than title status.
+A current vehicle can have disputed ownership or a pending title transfer; a
+previous vehicle can have been handled by a business or represented for sale.
+Keep those roles and qualifications on the card instead of making each a section.
+The existing private correction writer accepts an optional `inventory_status`
+(`current`, `previous`, `unknown`) with its existing exact-source and supersession
+rules. Unknown dates stay unknown. Legacy personal ownership supplies a grouping
+fallback; other unclassified relationships remain visible separately.
+
 Use one common fold for web and native readers, based on qualified canonical
 evidence at an explicit as-of/known-at boundary. Return all roles with their source,
 periods, title qualification and conflicts. Grouping is a display choice, never an
