@@ -16,6 +16,8 @@ import { ConfirmBookingSheet, ConfirmWorkDaySheet } from './PeopleSheets';
 import { confirmWorkDayArgs } from './signDrafts';
 import type { JsonObject } from './jobRead';
 import './jobs.css';
+import './job-page.css';
+import { WorkPlanPreview } from './RetainedWorkPlan';
 
 function firstClock(item: SignQueueItem): string | null {
   const c = item.clock ?? {};
@@ -73,19 +75,21 @@ function QueueItem({ item, onSigned }: { item: SignQueueItem; onSigned: () => vo
 
 function JobRow({ row }: { row: WorkOrderRow }) {
   const title = row.display_title || row.title || 'Untitled job';
+  const heading = row.retained_work?.visibility === 'included' && row.retained_work.responsibility_reports?.length
+    ? vehicleText(row.vehicle_label) || title : title;
   return <li className="jb-row" aria-label={title}>
     <div className="jb-row__head">
-      <PrefetchLink to={jobHref(row.work_order_id)}><Text role="entity" dense>{title}</Text></PrefetchLink>
+      <PrefetchLink to={jobHref(row.work_order_id)}><Text role="entity" dense>{heading}</Text></PrefetchLink>
     </div>
-    {vehicleText(row.vehicle_label) && <Text role="body">{vehicleText(row.vehicle_label)}</Text>}
+    {vehicleText(row.vehicle_label) && vehicleText(row.vehicle_label) !== heading && <Text role="body">{vehicleText(row.vehicle_label)}</Text>}
     {row.retained_work?.visibility === 'included' && <>
       {(row.retained_work.responsibility_reports ?? []).map(report => <div className="jb-work-responsibility" key={report.binding_id}>
         <Text role="body">{report.provider_label} owes delivery to {report.client_label}.</Text>
         <Text role="caption">Owner report · {day(report.reported_at)}{report.payment_state === 'paid_in_full' ? ' · Paid in full' : ''}</Text>
       </div>)}
-      {!!row.retained_work.coverage?.total_source_entries && <PrefetchLink to={`${jobHref(row.work_order_id)}#retained-work`}>
-        <Text role="body">{row.retained_work.coverage.total_source_entries} build records →</Text>
-      </PrefetchLink>}
+      {row.vehicle_id && !!row.retained_work.responsibility_reports?.length
+        ? <WorkPlanPreview vehicleId={row.vehicle_id} reports={row.retained_work.responsibility_reports} href={`${jobHref(row.work_order_id)}#work-plan`} />
+        : !!row.retained_work.coverage?.total_source_entries && <PrefetchLink to={`${jobHref(row.work_order_id)}#retained-work`}>Open build records →</PrefetchLink>}
     </>}
   </li>;
 }

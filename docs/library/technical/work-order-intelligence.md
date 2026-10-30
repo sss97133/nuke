@@ -1021,3 +1021,38 @@ All scripts live in `mcp-servers/nuke-context/` and share `lib/env.mjs` for envi
 | `20260327100001_work_order_intelligence_seed.sql` | Seed | 64 labor operations |
 | `20260327100002_work_order_receipt_view.sql` | View | `work_order_receipt_unified` + `work_order_balance()` |
 | `20260327100003_resolve_work_order_status.sql` | RPC | The product function |
+
+## Retained build evidence in the work view
+
+`jobsReaders.workContext` and `workEvidenceModel.ts` connect the existing work-order
+consumer to RLS-protected `vehicle_observations`, `wiring_decisions` and endpoint
+names. This is a read model, with no new task ledger, source writes or grants.
+It runs only for a job whose existing reader includes retained responsibility.
+Vehicle history supports the job without allocating its costs or labor to it.
+
+Requested work, design decisions, purchases, presence, installation and delivery
+remain separate assertions. Candidate design options are not accepted work scope.
+Recorded choices leave the open-decision list; they do not close physical work.
+Their authority remains explicit: T1 owner-stated choices, T3 agent working
+choices and otherwise unqualified records. Agent choices neither become owner
+approval nor automatically reopen as another mandatory owner question.
+A purchased part with an uninstalled report remains an installation gap, rather
+than another purchase task. A mounted-part report saying exactly “Not wired.”
+supports a dated wiring gap; mounting or image appearance alone does not.
+
+Source corrections remove only their exact original interpretation. Other
+purchase and presence evidence survives. Unresolved installation disagreements
+remain visible. A truncated proof read withholds the derived remaining-work list
+because an omitted correction could change it. Failures and source limits remain
+visible; an empty read never certifies a finished build.
+
+Older handoffs require the same vehicle, the reporting source of an included duty
+report and an exact client-name token match. Their questions remain historical;
+they are not automatically today's blockers. Original source text, event/photo
+dates and recording clocks are available through evidence disclosure. The original
+build log and job administration stay reachable beneath the working view.
+
+Contracts: `workEvidenceModel.test.ts`, `retainedWorkPlan.reader.test.ts`,
+`RetainedWorkPlan.test.tsx`, and the existing retained-source, job-page and work-page
+tests. This does not reconstruct every operation from the wider retained media,
+grant a performer role, repair ownership, or establish accepted completion.

@@ -29,7 +29,8 @@ it('shows paid plus delivery owed, original scope and its source without inventi
   expect(host.textContent).toContain('Technician owes Client delivery');
   expect(host.textContent).toContain('payment reported settled');
   expect(host.textContent).toContain('Billing: Done');
-  expect(host.textContent).toContain('Physical progress not established');
+  expect(host.textContent).toContain('physical progress requires work evidence');
+  expect(host.querySelector('.work-group')?.hasAttribute('open')).toBe(false);
   expect(host.textContent).toContain('Original build log');
   expect(host.textContent).toContain('report-1');
   expect(host.querySelector('#retained-work')).not.toBeNull();
