@@ -76,7 +76,7 @@ console.log(JSON.stringify(["year","make","model"].map(k=>deriveRetainedInterior
     assert read(f"SELECT get_field_provenance('{vehicle_id}','model')")['observations']==[]
     sql(f"UPDATE vehicle_observations SET is_superseded=false WHERE id='{parent_id}';UPDATE vehicles SET is_public=false WHERE id='{vehicle_id}'")
     assert sql(f"SELECT count(*) FROM vehicle_canonical WHERE vehicle_id='{vehicle_id}'")=='0'
-    assert read(f"SELECT jsonb_agg(x) FROM get_vehicle_specs(ARRAY['{vehicle_id}'::uuid],true)x") is None
+    assert sql(f"SELECT count(*) FROM get_vehicle_specs(ARRAY['{vehicle_id}'::uuid],true)") == '0'
     sql(f"UPDATE vehicles SET is_public=true WHERE id='{vehicle_id}'")
     rejects(migration)  # Single guarded activation; a changed/already active contract is refused.
     passed('Mecum literal identity: real TS decoder -> queue -> guarded SQL -> canonical/bulk/provenance/anonymous readers; forged value, supersession and private parent refused')
