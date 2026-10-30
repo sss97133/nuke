@@ -86,6 +86,7 @@ Deno.test('snapshot reading reaches canonical listing intake with its original c
   equal([body.source_slug, body.kind, body.observed_at, body.raw_source_ref, body.defer_analysis],
     ['barrett-jackson', 'listing', captureInput.snapshot.fetched_at, 'listing_page_snapshots:capture-a', true]);
   equal(body.structured_data, captureInput.fields);
+  equal(body.agent_inferred, false);
 });
 
 Deno.test('C&B snapshot storage spelling resolves to its registered source on canonical intake', async () => {
@@ -93,6 +94,16 @@ Deno.test('C&B snapshot storage spelling resolves to its registered source on ca
   equal(await admitSnapshotObservation(db, { ...captureInput, platform: 'carsandbids' }),
     { observationId: 'observation-a', duplicate: true });
   equal(db.calls[0].body.source_slug, 'cars-and-bids');
+});
+
+Deno.test('AI readings retain inferred qualification and exact sub-millisecond capture clocks', async () => {
+  const db = admissionDb({ change: row => ({ ...row, observed_at: '2026-10-14T03:00:00.123455+00:00' }) });
+  let refused = false;
+  try { await admitSnapshotObservation(db, { ...captureInput, method: 'snapshot_ai_parse',
+    snapshot: { ...captureInput.snapshot, fetched_at: '2026-10-14T03:00:00.123456Z' } }); }
+  catch (error) { refused = String(error).includes('readback'); }
+  equal(refused, true);
+  equal(db.calls[0].body.agent_inferred, true);
 });
 
 Deno.test('an HTTP success or duplicate reply cannot hide missing, misattributed, changed or superseded testimony', async () => {

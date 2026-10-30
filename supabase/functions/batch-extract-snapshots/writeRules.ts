@@ -1,3 +1,5 @@
+import { observationClockMicroseconds } from '../_shared/observationContentHash.ts';
+
 // What batch-extract-snapshots may write to a vehicle, as the database enforces it. Two BEFORE UPDATE triggers on vehicles
 // refuse a whole row when one field breaks them, and the function treated the refusal as a failed row:
 //
@@ -39,7 +41,8 @@ export async function admitSnapshotObservation(supabase: any, input: {
   citationExcerpt?: string | null;
 }): Promise<{ observationId: string; duplicate: boolean }> {
   const { snapshot } = input;
-  if (!snapshot?.id || !snapshot.listing_url || !Number.isFinite(Date.parse(snapshot.fetched_at))) {
+  const captureClock = observationClockMicroseconds(snapshot?.fetched_at);
+  if (!snapshot?.id || !snapshot.listing_url || captureClock === null) {
     throw new Error('Snapshot observation requires its capture ID, URL and observed clock');
   }
   const source = input.platform === 'carsandbids' ? 'cars-and-bids' : input.platform;
@@ -51,6 +54,7 @@ export async function admitSnapshotObservation(supabase: any, input: {
     source_identifier: `snapshot:${snapshot.id}:${input.version}`,
     structured_data: fields, raw_source_ref: rawRef,
     extraction_method: input.method,
+    agent_inferred: input.method === 'snapshot_ai_parse',
     extraction_metadata: { parser_version: input.version, snapshot_id: snapshot.id },
     ...(input.citationExcerpt ? { citation: { excerpt: input.citationExcerpt } } : {}),
     // Existing source replay must not wake paid analysis.
@@ -69,7 +73,7 @@ export async function admitSnapshotObservation(supabase: any, input: {
       ? Object.fromEntries(Object.keys(v).sort().map(k => [k, v[k]])) : v);
   if (saved.error || !row || row.vehicle_id !== input.vehicleId || row.kind !== 'listing'
     || row.source?.slug !== source || row.source_url !== snapshot.listing_url
-    || Date.parse(row.observed_at) !== Date.parse(snapshot.fetched_at)
+    || observationClockMicroseconds(row.observed_at) !== captureClock
     || row.raw_source_ref !== rawRef || row.extraction_method !== input.method
     || row.analysis_deferred !== true || row.is_superseded === true
     || canonical(row.structured_data) !== canonical(fields)) {

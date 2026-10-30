@@ -269,6 +269,7 @@ Deno.serve(async (req) => {
               .eq("listing_url", snapUrl)
               .eq("platform", platform)
               .eq("success", true)
+              .order("fetched_at", { ascending: false })
               .limit(1);
             snapshot = snaps?.[0] || null;
             if (snapshot?.html && snapshot.html.length > 500) {
