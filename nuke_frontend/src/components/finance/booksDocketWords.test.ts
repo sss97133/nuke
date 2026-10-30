@@ -98,8 +98,8 @@ it('the filing state is the newest settled filing fact by its as_of date; supers
 });
 
 it('the legacy hold ruling reads as on hold only while no filing fact is recorded, and only by its key', () => {
-  const hold = fact({ local_id: '2023-FACT-filing-hold', key: 'filing-hold', topic: 'owner_ruling', date: '2026-10-28', decision: 'the packet is mail-ready' });
-  expect(filingOf(stateWith([hold]))).toMatchObject({ state: 'on_hold', as_of: '2026-10-28', from: 'legacy_hold' });
+  const hold = fact({ local_id: '2019-FACT-filing-hold', key: 'filing-hold', topic: 'owner_ruling', date: '2026-10-20', decision: 'the packet is mail-ready' });
+  expect(filingOf(stateWith([hold]))).toMatchObject({ state: 'on_hold', as_of: '2026-10-20', from: 'legacy_hold' });
   expect(filingOf(stateWith([hold, filing('prepared', '2026-10-30')]))).toMatchObject({ state: 'prepared', from: 'fact' });
   expect(filingOf(stateWith([fact({ key: 'something-else', decision: 'filing hold on hold' })]))).toBeNull();
 });

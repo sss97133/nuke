@@ -3,11 +3,12 @@
 -- WHY. Two readers count a "bank line" in opposite directions and disagree on the page the owner already uses. The close-out
 -- (accounting_decision_proof.has_statement) counts only a bank movement that LISTS the decision in its bank_links; the audit tiers
 -- (v_books_audit_tiers.pay_proof) count only a decision that lists a bank link of its own, and never check the linked id exists.
--- Measured read-only on prod, 2026-10-29 (counts drift as the books change): 2022 and 2023 link almost only decision-to-movement
--- (the close-out says 762 of 774 and 624 of 640 expenses have no statement line), 2024 and 2025 link almost only movement-to-decision
--- (the tiers count 68 and 95 decisions as bank-backed whose cited ids exist in no movement). This view places every decision in exactly
--- one class so neither number is hidden, and carries the line-level truth (links written, links that resolve) and whether the linked
--- movements add up to the decision's amount to the cent. It decides nothing about which definition is right; that is the owner's ruling.
+-- Measured read-only on prod, 2026-10-29: the early years (2022, 2023) link almost only decision-to-movement, so the close-out finds almost no
+-- expense with a statement line; the later years (2024, 2025) link almost only movement-to-decision, so the tiers count decisions as bank-backed
+-- whose cited ids exist in no movement. The counts are in the view and move as the books change; they are not copied into this public file.
+-- This view places every decision in exactly one class so neither number is hidden, and carries the line-level truth (links written, links
+-- that resolve) and whether the linked movements add up to the decision's amount to the cent. It decides nothing about which definition is
+-- right; that is the owner's ruling.
 --
 -- THE FIVE CLASSES (exclusive; they sum to decisions):
 --   both            cites at least one movement that is in the books, and a movement lists the decision
@@ -22,9 +23,8 @@
 -- than any one of them and does not count).
 --
 -- Reads the same RLS-bound base (v_financial_accounting_records) as the tier views, so a stranger sees nothing and the view is
--- security_invoker. Measured read-only on prod, 2026-10-29, as the owner role: 0.7 s, 4 rows; 2022 of 774: 2/765/1/0/6,
--- 2023 of 640: 8/611/2/0/19, 2024 of 889: 39/66/616/68/100, 2025 of 1,169: 77/45/841/95/111 (both/cites_only/cited_by_only/
--- cites_missing/none). Every stage is MATERIALIZED on purpose: left inlined, the planner joined the stages with nested loops (14.9 s).
+-- security_invoker. Measured read-only on prod, 2026-10-29, as the owner role: 0.7 s, 4 rows (one per year; the class counts are in the view).
+-- Every stage is MATERIALIZED on purpose: left inlined, the planner joined the stages with nested loops (14.9 s).
 -- CONTRACT. supabase/sql/test_books_citation_links.sql.
 SET lock_timeout = '5s';
 SET statement_timeout = '60s';

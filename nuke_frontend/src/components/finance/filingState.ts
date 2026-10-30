@@ -13,7 +13,7 @@ export type YearFiling = {
   from: 'fact' | 'legacy_hold';
 };
 
-/** The key of the owner-ruling fact that holds a year back today (2023-FACT-filing-hold). It is read as "on hold" only while the year has no
+/** The key of the older owner-ruling fact that holds a year back (its local_id is "<year>-FACT-filing-hold"). It is read as "on hold" only while the year has no
  *  filing fact; once the state is recorded structurally this bridge never applies. It is matched on the fact's key, never on its text. */
 export const LEGACY_HOLD_KEY = 'filing-hold';
 

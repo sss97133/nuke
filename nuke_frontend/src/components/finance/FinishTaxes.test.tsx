@@ -127,17 +127,18 @@ it('a read that fails once and succeeds on the second try shows the status witho
 
 // ── No total across the years, and a year on hold says so ─────────────────────────────────────────────────────────────────
 const refund = (y: string, amount: number) => year({ year: y, return: { ...year({}).return!, tax_year: y, result: 'refund', amount } });
-const hold = (y: number) => ({ local_id: `${y}-FACT-filing-hold`, key: 'filing-hold', topic: 'owner_ruling', status: 'settled', date: '2026-10-28', decision: 'Hold.', source: 's' }) as any;
+const HOLD_YEAR = 2019; // an invented year, so no test says which real year is on hold
+const hold = (y: number) => ({ local_id: `${y}-FACT-filing-hold`, key: 'filing-hold', topic: 'owner_ruling', status: 'settled', date: '2026-10-20', decision: 'Hold.', source: 's' }) as any;
 
 it('each year says its own answer and the page adds nothing across them: no total, no "net"; a year on hold says so on its own card', async () => {
-  const data: Closeout = { read_at: '2026-10-25T23:00:00Z', books_revised_at: null, questions: { pending_current: 0, by_resolver: {} }, years: [refund('2024', 1000), refund('2023', 5000)] };
+  const data: Closeout = { read_at: '2026-10-25T23:00:00Z', books_revised_at: null, questions: { pending_current: 0, by_resolver: {} }, years: [refund('2024', 1000), refund(String(HOLD_YEAR), 5000)] };
   serve((name, args) => name === 'accounting_closeout' ? { data, error: null }
-    : name === 'books_year_state' ? { data: stateOf({ year: args.p_year, facts: args.p_year === 2023 ? [hold(2023)] : [] }), error: null } : { data: noIncome, error: null });
+    : name === 'books_year_state' ? { data: stateOf({ year: args.p_year, facts: args.p_year === HOLD_YEAR ? [hold(HOLD_YEAR)] : [] }), error: null } : { data: noIncome, error: null });
   await act(async () => root.render(inBook(<FinishTaxes onDrill={vi.fn()} onQuestions={vi.fn()} />)));
   await settle();
   expect(Array.from(node.querySelectorAll('.accounting-close-answer')).map(n => n.textContent)).toEqual(['You get back $1,000', 'You get back $5,000']);
   for (const summed of ['Across the', ' net, before', 'before penalties and interest', 'you get back $6,000', 'not counted in the total']) expect(node.textContent).not.toContain(summed);
-  expect(node.querySelector('#close-2023')?.textContent).toContain('On hold as of Oct 28, 2026.');
+  expect(node.querySelector(`#close-${HOLD_YEAR}`)?.textContent).toContain('On hold as of Oct 20, 2026.');
   expect(node.querySelector('#close-2024')?.textContent).not.toContain('On hold');
 });
 

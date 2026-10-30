@@ -25,8 +25,8 @@ export const ITEM_WORDS: Record<CloseoutItemKey, { label: string; why: string; d
  *  and receipts are required per line only where section 274 says so. The books docket shows how the deductions are supported by that definition (tiers A,
  *  B, C), and the deductions with no bank line, ruling or rule, in their place:
  *   - expense_no_receipt asked for a receipt on every paid line;
- *   - expense_no_proof counted the statement-side direction only (an expense that no statement line lists and no receipt is tied to), which says 2022 and
- *     2023 are almost wholly unproven while the docket's deductions-with-no-bank-line count (rule R10 part b) is zero for them: two answers to one question
+ *   - expense_no_proof counted the statement-side direction only (an expense that no statement line lists and no receipt is tied to), which says the early
+ *     years are almost wholly unproven while the docket's deductions-with-no-bank-line count (rule R10 part b) is zero for them: two answers to one question
  *     on one tab. Which direction defines a bank line is the owner's ruling (docs/books-docket.md, known gaps); until then the docket's answer stands alone. */
 export const HIDDEN_ITEMS: ReadonlySet<CloseoutItemKey> = new Set<CloseoutItemKey>(['expense_no_receipt', 'expense_no_proof']);
 

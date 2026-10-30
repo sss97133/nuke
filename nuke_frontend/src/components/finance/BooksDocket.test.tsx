@@ -264,11 +264,11 @@ it('a filing state recorded for a draft that is not the newest never reads as th
 });
 
 it('until a filing fact is recorded, the older filing-hold ruling reads as on hold, by its key and never by its text', async () => {
-  const hold = { local_id: '2023-FACT-filing-hold', key: 'filing-hold', topic: 'owner_ruling', status: 'settled', date: '2026-10-28', decision: 'Anything at all.', source: 's' };
-  serve(status([gateYear(2023)]), { states: { '2023': yearState({ year: 2023, facts: [hold as any] }) } });
+  const hold = { local_id: '2019-FACT-filing-hold', key: 'filing-hold', topic: 'owner_ruling', status: 'settled', date: '2026-10-20', decision: 'Anything at all.', source: 's' };
+  serve(status([gateYear(2019)]), { states: { '2019': yearState({ year: 2019, facts: [hold as any] }) } });
   await mount(inBook(<BooksDocket onOpen={vi.fn()} onDrill={vi.fn()} />));
-  expect(text(card('2023'))).toContain('On hold as of Oct 28, 2026');
-  expect(text(card('2023'))).toContain('read from the filing-hold ruling');
+  expect(text(card('2019'))).toContain('On hold as of Oct 20, 2026');
+  expect(text(card('2019'))).toContain('read from the filing-hold ruling');
 });
 
 it('what is open: counts by who closes them from the reader, the first "Closes with", and a button that brings the year into view', async () => {
