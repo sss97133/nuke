@@ -147,8 +147,11 @@ export const STATES = [
   { name: '/providers/:handle visitor', path: '/providers/e2etech', tables: { profiles: [{ id: TECH.id }] }, readers: providerReaders('visitor'), ready: 'What the record shows' },
   { name: '/providers/:handle signed-in + vouch sheet', path: '/providers/e2etech', who: CUSTOMER, tables: { profiles: [{ id: TECH.id }] }, readers: providerReaders('visitor'), ready: 'Vouch for this person', act: open('Vouch for this person') },
   { name: '/providers/:handle self', path: '/providers/e2etech', who: TECH, tables: { profiles: [{ id: TECH.id }] }, readers: providerReaders('self'), ready: 'Your shops' },
-  { name: '/work', path: '/work', who: SHOP, readers: { my_signature_queue: queue, my_work_orders: myWork }, ready: 'Waiting for your signature' },
-  { name: '/work confirm booking sheet', path: '/work', who: SHOP, readers: { my_signature_queue: queue, my_work_orders: myWork }, ready: 'Confirm booking', act: open('Confirm booking') },
+  { name: '/work', path: '/work', who: SHOP, readers: { my_signature_queue: queue, my_work_orders: myWork }, ready: 'Jobs' },
+  { name: '/work records', path: '/work', who: SHOP, readers: { my_signature_queue: queue, my_work_orders: myWork }, ready: 'Review records',
+    act: async (page) => { await page.getByRole('button', { name: 'Review records', exact: true }).click(); } },
+  { name: '/work confirm booking sheet', path: '/work', who: SHOP, readers: { my_signature_queue: queue, my_work_orders: myWork }, ready: 'Review records',
+    act: async (page) => { await page.getByRole('button', { name: 'Review records', exact: true }).click(); await open('Confirm booking')(page); } },
   ...[0, 1, 2, 3, 4].map(i => ({ name: `/work/setup step ${i + 1}`, path: '/work/setup', who: TECH, tables: { profiles: [{ username: 'e2etech', is_public: true, profession: 'mechanic', expertise_areas: [] }] },
     readers: { my_suggested_provider_links: { items: [], coverage: { returned: 0 } }, provider_profile_read: profile('self') }, ready: 'Records that may be yours',
     act: async (page) => { await page.getByRole('navigation', { name: 'Setup steps' }).getByRole('button').nth(i).click(); } })),
@@ -166,7 +169,7 @@ export const STATES = [
   { name: 'statement page', path: `/work-orders/statement?work_order_id=${WO}`, readers: { work_order_statement_read: statement }, ready: 'Install exhaust' },
   // Header activity indicator (signed in), panel open: the header is outside the default scope, so audit the button and panel.
   { name: 'header activity panel', path: '/work', who: CUSTOMER, readers: activityReaders(), tables: { user_notifications: activityNotes },
-    ready: 'Waiting for your signature',
+    ready: 'Jobs',
     act: async (page) => { await page.getByRole('button', { name: /^Activity / }).click(); await page.getByRole('region', { name: 'Activity' }).waitFor(); },
     scope: '.activity' },
 ];
