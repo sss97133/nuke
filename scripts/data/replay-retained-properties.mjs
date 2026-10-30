@@ -6,7 +6,7 @@
  * Every native capture and property is admitted by the existing service writers.
  * Unsupported sources and missing/ambiguous captures remain explicit backlog.
  */
-import { readFile, writeFile, rename, realpath } from 'node:fs/promises';
+import { readFile, writeFile, appendFile, truncate, rename, realpath } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
@@ -37,10 +37,32 @@ const inputSha256 = createHash('sha256').update(input).digest('hex');
 let state;
 try { state = JSON.parse(await readFile(statePath)); }
 catch (error) { if (error.code !== 'ENOENT') throw error; }
-state ??= { version: 'retained-property-replay-v2', input_sha256: inputSha256, apply: options.apply, total: ids.length,
+const hadSnapshot = !!state;
+state ??= { version: 'retained-property-replay-v3', input_sha256: inputSha256, apply: options.apply, total: ids.length,
   started_at: new Date().toISOString(), results: {} };
-if (state.input_sha256 !== inputSha256 || state.apply !== options.apply || state.version !== 'retained-property-replay-v2') {
+if (state.input_sha256 !== inputSha256 || state.apply !== options.apply || state.version !== 'retained-property-replay-v3') {
   throw Error('State belongs to a different manifest or mode; use a separate receipt');
+}
+// One writer per state. Append each completed record; compact once per bounded
+// invocation. Rewriting a large snapshot per record made fleet replay quadratic.
+const journalPath = statePath + '.journal.jsonl', idSet = new Set(ids);
+let journal;
+try { journal = await readFile(journalPath, 'utf8'); }
+catch (error) { if (error.code !== 'ENOENT') throw error; }
+if (journal) {
+  const complete = journal.slice(0, journal.lastIndexOf('\n') + 1);
+  const entries = complete.split('\n').filter(Boolean).map(line => JSON.parse(line));
+  for (const entry of entries) {
+    if (entry.version !== state.version || entry.input_sha256 !== inputSha256 || entry.apply !== options.apply ||
+        !idSet.has(entry.id) || !entry.result || !['admitted', 'preview', 'blocked', 'retry'].includes(entry.result.status) ||
+        typeof entry.started_at !== 'string') throw Error('Journal belongs to a different manifest/mode or is invalid');
+  }
+  if (!hadSnapshot && entries.length) state.started_at = entries[0].started_at;
+  if (entries.some(entry => entry.started_at !== state.started_at)) throw Error('Journal belongs to a different replay');
+  for (const entry of entries) { state.results[entry.id] = entry.result; state.updated_at = entry.result.attempted_at; }
+  // An interrupted append may leave a partial final line. Remove only that
+  // unacknowledged tail before appending another independently replayable row.
+  if (complete.length !== journal.length) await truncate(journalPath, Buffer.byteLength(complete));
 }
 const base = process.env.SUPABASE_URL, key = process.env.SUPABASE_SERVICE_ROLE_KEY;
 if (!base || !key || new URL(base).hostname !== 'qkgaybvrernstplzjaam.supabase.co') throw Error('Expected Nuke service environment');
@@ -134,10 +156,13 @@ for (const id of pendingIds) {
     state.results[id] = { status: refused ? 'blocked' : 'retry', reason: error.message, ...error.retained_replay, attempted_at: new Date().toISOString() };
   }
   state.updated_at = new Date().toISOString();
-  const temporary = statePath + '.tmp';
-  await writeFile(temporary, JSON.stringify(state, null, 2) + '\n', { mode: 0o600 }); await rename(temporary, statePath);
+  await appendFile(journalPath, JSON.stringify({ version: state.version, input_sha256: inputSha256, apply: options.apply,
+    started_at: state.started_at, id, result: state.results[id] }) + '\n', { mode: 0o600 });
   if (++processed >= options.limit) break;
 }
+const temporary = statePath + '.tmp';
+await writeFile(temporary, JSON.stringify(state, null, 2) + '\n', { mode: 0o600 }); await rename(temporary, statePath);
+await writeFile(journalPath, '', { mode: 0o600 });
 const counts = Object.values(state.results).reduce((a, r) => (a[r.status] = (a[r.status] || 0) + 1, a), {});
 console.log(JSON.stringify({ total: ids.length, attempted: Object.keys(state.results).length, processed, counts,
   remaining: ids.length - Object.keys(state.results).length, model_calls: 0, state: statePath,
