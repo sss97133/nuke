@@ -26,9 +26,9 @@ export type DocumentLinkTarget = {
   /** The kind of paper the row's rule requires (v_books_large_sums.required_doc_kind), or null. */
   required_doc_kind: string | null;
 };
-/** A file name that looks like a Social Security number (nine digits in the 3-2-4 pattern, with or without separators). The name is written into the
- *  citation of the row, so such a file is refused before anything is sent; never a document with one. */
-export const looksLikeSsn = (filename: string): boolean => /(^|[^0-9])\d{3}[- ]?\d{2}[- ]?\d{4}([^0-9]|$)/.test(filename);
+/** A file name that looks like a Social Security number (nine digits in the 3-2-4 pattern, with or without a separator of space, hyphen, dot, underscore or
+ *  dash). The name is written into the citation of the row, so such a file is refused before anything is sent; never a document with one. */
+export const looksLikeSsn = (filename: string): boolean => /(^|[^0-9])\d{3}[-._ –—]?\d{2}[-._ –—]?\d{4}([^0-9]|$)/.test(filename);
 export const linkFieldKey = (sourceKey: string) => `supports_record_${sourceKey.slice(0, 24)}`;
 /** The citation text for the decision: what the owner says the file is, its name and the start of its hash, so a later reader can find the stored original. */
 export function linkRef(docKind: string, filename: string, sha256: string): string {

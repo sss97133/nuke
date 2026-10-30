@@ -153,11 +153,11 @@ it('a file of the wrong type or size, and a signed-out session, are refused befo
 
 
 it('a file name that looks like a Social Security number is refused before anything is sent, so it never becomes a citation; ordinary names and numbers pass', async () => {
-  for (const name of ['123-45-6789.pdf', 'ssn 123 45 6789 invoice.pdf', '123456789.pdf', 'tax-123-45-6789-w2.jpg']) {
+  for (const name of ['123-45-6789.pdf', 'ssn 123 45 6789 invoice.pdf', '123456789.pdf', 'tax-123-45-6789-w2.jpg', 'ssn_123_45_6789.pdf', 'w2.123.45.6789.pdf', '123–45–6789.pdf']) {
     expect(looksLikeSsn(name), name).toBe(true);
     await expect(processFinancialDocument(pdf(name), () => {}, target)).rejects.toThrow('Social Security number');
   }
-  for (const name of ['Invoice 1.pdf', 'invoice-2024-12-1234.pdf', 'IMG_20241203_101530.jpg', 'order 1118-2233-4455.pdf', 'po 12345.pdf', 'scan 2024.pdf']) expect(looksLikeSsn(name), name).toBe(false);
+  for (const name of ['Invoice 1.pdf', 'invoice-2024-12-1234.pdf', 'IMG_20241203_101530.jpg', 'order 1118-2233-4455.pdf', 'po 12345.pdf', 'scan 2024.pdf', 'receipt_2024_03_0042.pdf', 'inv_2024_12_1234.pdf', '20241203_101530.jpg']) expect(looksLikeSsn(name), name).toBe(false);
   expect(fixture.calls).toEqual([]);
   // the plain Add documents flow is unchanged: the guard belongs to the citation a row carries
   await processFinancialDocument(pdf('123456789.pdf'), () => {});
