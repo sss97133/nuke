@@ -13,8 +13,9 @@
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { isServiceCaller, requireWriteAuth } from "../_shared/writeGuard.ts";
+import { authenticateWriter, isServiceCaller, requireWriteAuth } from "../_shared/writeGuard.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { readVehicleAssessment } from "../_shared/vehicleAssessment.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -169,7 +170,9 @@ function classAwareAnchor(rows: any[], buildClass: string, subjectYear: number |
   }
 }
 
-async function getBasePrice(supabase: any, vehicle: any): Promise<{
+async function getBasePrice(supabase: any, vehicle: any, qualification: {
+  configuration_specific: { eligible: boolean }; body_specific: { eligible: boolean };
+}): Promise<{
   basePrice: number;
   compCount: number;
   method: string;
@@ -183,9 +186,9 @@ async function getBasePrice(supabase: any, vehicle: any): Promise<{
   }
 
   // Subject build class → which percentile of the comp pool anchors the estimate.
-  const buildClass = await getBuildClass(supabase, vehicle.id);
+  const buildClass = qualification.configuration_specific.eligible ? await getBuildClass(supabase, vehicle.id) : 'unknown';
   // Subject body class → hard mismatch filter on the comp pool (Stage-2-lite).
-  const bodyClass = subjectBodyClass(vehicle);
+  const bodyClass = qualification.body_specific.eligible ? subjectBodyClass(vehicle) : null;
   const anchor = (rows: any[]) => classAwareAnchor(rows, buildClass, year);
   const label = (tier: string, stratified = false) => {
     const base = buildClass !== "unknown" ? "class_stratified" : tier;
@@ -853,7 +856,13 @@ async function computeValuation(supabase: any, vehicleId: string): Promise<any> 
   }
 
   // Step 1: Base price from comparables
-  let { basePrice, compCount, method: compMethod } = await getBasePrice(supabase, vehicle);
+  // v1 has no cited mechanical acceptance contract. Its retained estimate is
+  // never authority for a specialized comparison class. The explicit read-only
+  // assessment below supplies the qualified evidence; do not add fleet-wide
+  // source rereads to this existing legacy computation loop.
+  let { basePrice, compCount, method: compMethod } = await getBasePrice(supabase, vehicle, {
+    configuration_specific: { eligible: false }, body_specific: { eligible: false },
+  });
   if (basePrice <= 0) {
     // No independent comps found. If vehicle already sold, skip — using its own
     // sale_price as the "estimate" is circular and meaningless.
@@ -973,7 +982,7 @@ async function computeValuation(supabase: any, vehicleId: string): Promise<any> 
     deal_score_label: dealScoreLabel,
     heat_score: heatScore,
     heat_score_label: heatScoreLabel,
-    model_version: "v1",
+    model_version: "v1.1",
     input_count: inputCount,
     calculated_at: new Date().toISOString(),
     is_stale: false,
@@ -1016,7 +1025,7 @@ async function computeValuation(supabase: any, vehicleId: string): Promise<any> 
         projected_value: estimatedValue,
         projected_at: result.calculated_at,
         projection_horizon: "spot",
-        model_version: "v1",
+        model_version: result.model_version,
         model_metadata: { price_tier: priceTier, input_count: inputCount, comp_count: compCount },
       });
     } catch {
@@ -1024,7 +1033,8 @@ async function computeValuation(supabase: any, vehicleId: string): Promise<any> 
     }
   }
 
-  return result;
+  return { ...result, qualification: 'legacy_estimate_not_an_evidence_qualified_vehicle_appraisal',
+    assessment_reader: { action: 'assessment', vehicle_id: vehicleId } };
 }
 
 // ============================================================================
@@ -1039,23 +1049,41 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Require the service role, judged as writeGuard judges it (2026-10-14)
-    const authHeader = req.headers.get("Authorization");
     const serviceRoleKey = projectSecretKey() ?? "";
-    const token = authHeader?.replace("Bearer ", "") ?? "";
-    if (!(await isServiceCaller(req))) {
-      return new Response(
-        JSON.stringify({ error: "Authentication required" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       serviceRoleKey
     );
 
     const body = req.method === "POST" ? await req.json().catch(() => ({})) : {};
+    if (body.action === 'assessment') {
+      if (typeof body.vehicle_id !== 'string' || !/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(body.vehicle_id)) {
+        return new Response(JSON.stringify({ error: 'valid vehicle_id required' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      const caller = await authenticateWriter(req);
+      if (!caller.ok || !['user', 'service_role'].includes(caller.caller.kind)) return new Response(JSON.stringify({ error: 'authorized reader required' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      const scope = await supabase.from('vehicles').select('id,is_public,deleted_at,listing_kind').eq('id', body.vehicle_id).maybeSingle();
+      if (scope.error || !scope.data || scope.data.deleted_at || scope.data.listing_kind === 'non_vehicle_item') return new Response(JSON.stringify({ error: 'vehicle unavailable' }),
+        { status: scope.error ? 503 : 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      if (!scope.data.is_public && caller.caller.kind === 'user') {
+        const access = await supabase.rpc('user_can_edit_vehicle', { p_vehicle_id: body.vehicle_id, p_user_id: caller.caller.userId });
+        if (access.error || access.data !== true) return new Response(JSON.stringify({ error: 'vehicle access required' }),
+          { status: access.error ? 503 : 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      const subject = await supabase.from('vehicles').select('id,year,make,model').eq('id', body.vehicle_id).maybeSingle();
+      if (subject.error || !subject.data) return new Response(JSON.stringify({ error: 'vehicle reader unavailable' }),
+        { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      const assessment = await readVehicleAssessment(supabase, subject.data, { claimAfter: body.claim_after,
+        commentAfter: body.comment_after, photoAfter: body.photo_after });
+      return new Response(JSON.stringify({ action: 'assessment', read_only: true, assessment }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+    // Every legacy computation/write remains service-only. The new assessment
+    // branch above only reads sources already visible to this viewer.
+    if (!(await isServiceCaller(req))) return new Response(JSON.stringify({ error: 'Authentication required' }),
+      { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    if (body.action != null && body.action !== 'compute') return new Response(JSON.stringify({ error: 'unsupported action' }),
+      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     const force = body.force || false;
 
     // Determine vehicle IDs
@@ -1107,7 +1135,8 @@ Deno.serve(async (req) => {
         .eq("is_stale", false);
 
       if (existing?.length) {
-        cachedResults = existing;
+        cachedResults = existing.map((row: any) => ({ ...row, qualification: 'legacy_cached_estimate_not_evidence_qualified',
+          assessment_reader: { action: 'assessment', vehicle_id: row.vehicle_id } }));
         const existingIds = new Set(existing.map((e: any) => e.vehicle_id));
         vehicleIds = vehicleIds.filter((id) => !existingIds.has(id));
 

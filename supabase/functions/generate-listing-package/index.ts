@@ -3,431 +3,104 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 import { authenticateWriter, requireWriteAuth } from "../_shared/writeGuard.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { readVehicleAssessment } from "../_shared/vehicleAssessment.ts";
 import { readListingEvidence } from "./listingEvidence.ts";
 
-// =============================================================================
-// generate-listing-package — Produces auction submission bundles from digital twin
-// =============================================================================
-// Takes a vehicle_id + platform, checks ARS tier, assembles identity, photos,
-// structured fields, and valuation into a submission-ready package.
-//
-// Sprint 1-2 skeleton: data assembly only. AI description generation and
-// platform-specific field mapping come in Sprint 3.
-// =============================================================================
-
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const SERVICE_ROLE_KEY = projectSecretKey()!;
-
-function getSupabase() {
-  return createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-}
-
-// Derive-on-read (vehicle-profile-computation-surface.md doctrine): for attributes
-// that have a registry definition + recorded atoms, the canonical value is the
-// SYNTHESIZED consensus, not the flat vehicles column (a Phase-1 cache being
-// strangled per observation-model.md Phase 3). We reuse mcp-connector's
-// synthesize_attribute (the one consensus engine) via an internal call rather than
-// duplicate it. Returns null when no atoms exist → caller keeps the flat-column value.
-async function deriveAttr(
-  vehicleId: string,
-  attribute: string,
-): Promise<{ value: unknown; confidence: number | null } | null> {
-  try {
-    const resp = await fetch(`${SUPABASE_URL}/functions/v1/mcp-connector`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        jsonrpc: "2.0",
-        id: 1,
-        method: "tools/call",
-        params: { name: "synthesize_attribute", arguments: { subject_id: vehicleId, attribute } },
-      }),
-    });
-    if (!resp.ok) return null;
-    const j = await resp.json();
-    const text = j?.result?.content?.[0]?.text;
-    if (!text) return null;
-    const syn = JSON.parse(text);
-    const c = syn?.consensus;
-    const support = c?.observation_count ?? c?.support ?? 0;
-    if (!c || c.label == null || support < 1) return null;
-    return { value: c.label, confidence: c.weighted_confidence ?? null };
-  } catch {
-    return null; // synthesis unavailable → flat-column fallback, never block the package
-  }
-}
-
-// Identity field → registry attribute. Only these prefer consensus; everything
-// else stays on the flat column until its attribute is registered.
-// Map each identity field to its registry attribute. A `format` coerces a
-// structured consensus label to the SCALAR the consumers expect (BaT fill /
-// eBay mapper want a string for color, never an object) — without it, a
-// structured attribute would corrupt the consumer. `format` returning null
-// skips the override (keeps the flat-column value).
-const titleCase = (s: string) =>
-  s.replace(/\b\w/g, (c) => c.toUpperCase()).replace(/_/g, " ").trim();
-function colorToString(v: unknown): string | null {
-  if (typeof v === "string") return v ? titleCase(v) : null;
-  if (v && typeof v === "object") {
-    const o = v as Record<string, unknown>;
-    const color = o.color ?? o.name ?? o.value;
-    if (!color) return null;
-    const finish = o.finish ? `${o.finish} ` : "";
-    return titleCase(`${finish}${String(color)}`);
-  }
-  return null;
-}
-const DERIVE_MAP: ReadonlyArray<{ key: string; attribute: string; format?: (v: unknown) => unknown }> = [
-  { key: "title_status", attribute: "vehicle.title_status" },
-  { key: "zip", attribute: "vehicle.zip" },
-  { key: "owned_time", attribute: "vehicle.owned_time" },
-  { key: "exterior_color", attribute: "vehicle.current_color", format: colorToString },
-];
-
-interface ListingPackage {
-  platform: string;
-  ars_score: number | null;
-  tier: string | null;
-  tier_warning: string | null;
-  identity: Record<string, unknown>;
-  listing_content: Record<string, unknown>;
-  photos: {
-    count: number;
-    hero_image: string | null;
-    zones_covered: string[];
-    zones_missing: string[];
-    ordered: Array<{
-      id: string;
-      url: string;
-      zone: string | null;
-      quality: number | null;
-      caption: string | null;
-    }>;
-  };
-  valuation: Record<string, unknown> | null;
-  market_context: Record<string, unknown>;
-  submission_fields: Record<string, unknown> | null;
-  /** components_seen entries from the photos above, each with its image id (BaT equipment/wheels/tires). */
-  observed_components: Array<{ label: string; confidence: number | null; image_id: string }>;
-  contributor_evidence: Awaited<ReturnType<typeof readListingEvidence>>;
-}
-
-// Cowl tag (body tag) decode, when the profile carries one. Read from
-// vehicles.origin_metadata.cowl_tag (series, paint_code, trim_code). Never inferred.
-function cowlTag(v: Record<string, unknown>): Record<string, unknown> | null {
-  const om = (v.origin_metadata ?? {}) as Record<string, unknown>;
-  const t = (om.cowl_tag ?? om.trim_tag ?? null) as Record<string, unknown> | null;
-  if (!t || typeof t !== "object") return null;
-  const pick = (...k: string[]) => {
-    for (const key of k) if (t[key] != null && t[key] !== "") return String(t[key]);
-    return null;
-  };
-  const out = {
-    series: pick("series", "body_series", "style"),
-    series_model: pick("series_model"),
-    paint_code: pick("paint_code", "paint", "pnt"),
-    trim_code: pick("trim_code", "trim", "tr"),
-  };
-  return Object.values(out).some((x) => x != null) ? out : null;
-}
-
-// components_seen has three shapes on vehicle_images; only the array of
-// {label, confidence} entries is a component list.
-function componentsOf(rows: Array<Record<string, unknown>>) {
-  const out: Array<{ label: string; confidence: number | null; image_id: string }> = [];
-  for (const r of rows) {
-    const cs = r.components_seen;
-    if (!Array.isArray(cs)) continue;
-    for (const c of cs as Array<Record<string, unknown>>) {
-      if (c && typeof c.label === "string") {
-        out.push({ label: c.label, confidence: (c.confidence as number) ?? null, image_id: r.id as string });
-      }
-    }
-  }
-  return out;
-}
-
-// BaT submission field mapping (skeleton — full mapping in Sprint 3)
-function mapToBatFields(
-  v: Record<string, unknown>,
-): Record<string, unknown> {
-  return {
-    title: `${v.year} ${v.make} ${v.model}${v.trim ? " " + v.trim : ""}`,
-    make: v.make,
-    model: v.model,
-    year: v.year,
-    vin: v.vin,
-    mileage: v.mileage,
-    transmission: v.transmission,
-    drivetrain: v.drivetrain,
-    engine: v.engine_type,
-    body_style: v.body_style,
-    exterior_color: v.color || v.color_primary,
-    interior_color: v.interior_color,
-    title_status: v.title_status,
-    location: [v.city, v.state].filter(Boolean).join(", ") || v.location,
-    reserve: null, // User must set
-    _note:
-      "Field mapping is a skeleton. Full BaT form automation comes in Sprint 4.",
-  };
-}
+const UUID = /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
+const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
+  status, headers: { ...corsHeaders, "Content-Type": "application/json" },
+});
+const storedDraft = (v: Record<string, unknown>) => ({
+  qualification: "unassayed_stored_record_not_listing_assertions",
+  description: v.description ?? null, highlights: v.highlights ?? null,
+  equipment: v.equipment ?? null, modifications: v.modifications ?? null,
+  known_flaws: v.known_flaws ?? null, recent_service_history: v.recent_service_history ?? null,
+  documents_on_hand: v.documents_on_hand ?? null, paint_body_history: v.paint_body_history ?? null,
+  accident_history: v.accident_history ?? null, rust_notes: v.rust_notes ?? null,
+});
 
 Deno.serve(async (req: Request) => {
-  // Writes are never anonymous: service key, signed-in user, or nothing (P0.2, 2026-09-27).
   const denied = await requireWriteAuth(req);
   if (denied) return denied;
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
-
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (req.method !== "POST") return json({ error: "POST required" }, 405);
   try {
     const body = await req.json();
     const vehicleId = body.vehicle_id;
     const platform = body.platform || "bat";
-
-    if (!vehicleId) {
-      return new Response(
-        JSON.stringify({ error: "vehicle_id required" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+    if (typeof vehicleId !== "string" || !UUID.test(vehicleId) || typeof platform !== "string" || platform.length > 40) {
+      return json({ error: "valid vehicle_id and platform required" }, 400);
     }
-
-    const supabase = getSupabase();
-
-    // 1. Check/compute ARS
-    let ars: Record<string, unknown> | null = null;
-    {
-      const { data } = await supabase
-        .from("auction_readiness")
-        .select("*")
-        .eq("vehicle_id", vehicleId)
-        .single();
-
-      if (data) {
-        ars = data;
-      } else {
-        // Compute fresh
-        const { error } = await supabase.rpc("persist_auction_readiness", {
-          p_vehicle_id: vehicleId,
-        });
-        if (!error) {
-          const res = await supabase
-            .from("auction_readiness")
-            .select("*")
-            .eq("vehicle_id", vehicleId)
-            .single();
-          ars = res.data;
-        }
-      }
-    }
-
-    // Tier vocabulary is single-sourced from compute_auction_readiness() (SQL) and
-    // AuctionReadinessPanel TIER_LABELS: TIER_1_EXCEPTIONAL, TIER_2_COMPETITIVE,
-    // TIER_3_VIABLE, TIER_4_INCOMPLETE, DISCOVERY_ONLY. (EARLY_STAGE / NEEDS_WORK are
-    // legacy rows from an older scorer — they fall through to not-ready.)
-    const tier = (ars?.tier as string) || null;
-    const tierWarning =
-      tier === "TIER_1_EXCEPTIONAL" || tier === "TIER_2_COMPETITIVE"
-        ? null
-        : tier === "TIER_3_VIABLE"
-          ? "Vehicle is TIER_3_VIABLE — listing-ready with minor gaps. Use get_coaching_plan to strengthen."
-          : `Vehicle is ${tier || "UNSCORED"} — not ready for submission. Use get_coaching_plan to close gaps.`;
-
-    // 2. Pull full vehicle data
-    const { data: v, error: vErr } = await supabase
-      .from("vehicles")
-      .select("*")
-      .eq("id", vehicleId)
-      .single();
-
-    if (vErr || !v) {
-      return new Response(
-        JSON.stringify({ error: vErr?.message || "Vehicle not found" }),
-        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
-    }
-
-    // 3. Pull photos ordered by zone priority then quality
-    const { data: zoneOrder } = await supabase
-      .from("photo_coverage_requirements")
-      .select("zone, sort_position")
-      .eq("platform", "universal")
-      .order("sort_position");
-
-    const zonePriority: Record<string, number> = {};
-    for (const z of zoneOrder || []) {
-      zonePriority[z.zone] = z.sort_position;
-    }
-
-    const { data: photos } = await supabase
-      .from("vehicle_images")
-      .select(
-        "id, image_url, vehicle_zone, photo_quality_score, caption, display_order, taken_at, components_seen",
-      )
-      .eq("vehicle_id", vehicleId)
-      .or("is_duplicate.is.null,is_duplicate.eq.false")
-      .order("display_order", { ascending: true, nullsFirst: false })
-      .order("photo_quality_score", { ascending: false, nullsFirst: true })
-      .limit(600); // BaT accepts up to 600 photos
-
-    // Sort photos: hero first, then by zone priority, then by quality
-    const sortedPhotos = (photos || []).sort((a, b) => {
-      // Primary image first
-      if (a.image_url === v.primary_image_url) return -1;
-      if (b.image_url === v.primary_image_url) return 1;
-      // Then by zone priority
-      const za = a.vehicle_zone ? (zonePriority[a.vehicle_zone] ?? 99) : 99;
-      const zb = b.vehicle_zone ? (zonePriority[b.vehicle_zone] ?? 99) : 99;
-      if (za !== zb) return za - zb;
-      // Then by quality
-      return (b.photo_quality_score || 0) - (a.photo_quality_score || 0);
-    });
-
-    // 4. Pull valuation
-    const { data: valuation } = await supabase
-      .from("nuke_estimates")
-      .select(
-        "estimated_value, value_low, value_high, confidence_score, deal_score, heat_score, price_tier",
-      )
-      .eq("vehicle_id", vehicleId)
-      .order("calculated_at", { ascending: false })
-      .limit(1)
-      .single();
-
-    // 5. Pull comparable sales count
-    const { count: compCount } = await supabase
-      .from("nuke_estimates")
-      .select("id", { count: "exact", head: true })
-      .eq("vehicle_id", vehicleId);
-
-    // Keep the existing intake's ownership check, even though assembly uses the service client.
     const auth = await authenticateWriter(req);
-    const actorId = auth.ok && auth.caller.kind === "user" ? auth.caller.userId
-      : auth.ok && auth.caller.kind === "service_role" ? v.user_id : null;
-    const contributorEvidence = await readListingEvidence(supabase, vehicleId, actorId);
-
-    // 6. Assemble package
-    const pkg: ListingPackage = {
-      platform,
-      ars_score: (ars?.composite_score as number) ?? null,
-      tier: (ars?.tier as string) ?? null,
-      tier_warning: tierWarning,
-      identity: {
-        year: v.year,
-        make: v.make,
-        model: v.model,
-        trim: v.trim,
-        vin: v.vin,
-        engine_type: v.engine_type,
-        engine_code: v.engine_code,
-        displacement: v.displacement || v.engine_displacement,
-        transmission: v.transmission,
-        transmission_type: v.transmission_type,
-        drivetrain: v.drivetrain,
-        body_style: v.body_style,
-        exterior_color: v.color || v.color_primary,
-        interior_color: v.interior_color,
-        mileage: v.mileage,
-        title_status: v.title_status,
-        location: [v.city, v.state].filter(Boolean).join(", ") || v.location,
-        city: v.city ?? null,
-        state: v.state ?? null,
-        country: v.country ?? null,
-        zip: v.zip_code ?? null,
-        cowl_tag: cowlTag(v),
-        bat_model: cowlTag(v)?.series_model ?? null,
-        // owned_time = the purchase year (BaT asks "what year did you purchase"). Null-safe; never inferred.
-        owned_time: v.purchase_date ? new Date(v.purchase_date).getFullYear() : null,
-      },
-      listing_content: {
-        title: `${v.year} ${v.make} ${v.model}${v.trim ? " " + v.trim : ""}`,
-        description: v.description,
-        highlights: v.highlights,
-        equipment: v.equipment,
-        modifications: v.modifications,
-        known_flaws: v.known_flaws,
-        recent_service_history: v.recent_service_history,
-        documents_on_hand: v.documents_on_hand,
-        seller_name: v.seller_name,
-        video_urls: v.video_urls ?? null,
-        paint_body_history: v.paint_body_history ?? null,
-        accident_history: v.accident_history ?? null,
-        rust: v.rust_notes ?? null,
-      },
-      photos: {
-        count: sortedPhotos.length,
-        hero_image: v.primary_image_url,
-        zones_covered: (ars?.photo_zones_present as string[]) || [],
-        zones_missing: (ars?.photo_zones_missing as string[]) || [],
-        ordered: sortedPhotos.map(
-          (p: Record<string, unknown>) => ({
-            id: p.id as string,
-            url: p.image_url as string,
-            zone: p.vehicle_zone as string | null,
-            quality: p.photo_quality_score as number | null,
-            caption: p.caption as string | null,
-          }),
-        ),
-      },
-      valuation: valuation
-        ? {
-            nuke_estimate: valuation.estimated_value,
-            range_low: valuation.value_low,
-            range_high: valuation.value_high,
-            confidence: valuation.confidence_score,
-            deal_score: valuation.deal_score,
-            heat_score: valuation.heat_score,
-            price_tier: valuation.price_tier,
-          }
-        : null,
-      market_context: {
-        has_valuation: !!valuation,
-        comparable_sales_available: (compCount || 0) > 0,
-      },
-      submission_fields:
-        platform === "bat" ? mapToBatFields(v) : null,
-      observed_components: componentsOf(sortedPhotos as Array<Record<string, unknown>>),
-      contributor_evidence: contributorEvidence,
-    };
-
-    // Derive-on-read pass: override flat-column values with synthesized consensus
-    // where atoms exist, and record per-field provenance (powers the frozen,
-    // attested listing_exports snapshot — what was submitted and why).
-    const fieldProvenance: Record<string, unknown> = {};
-    const derived = await Promise.all(
-      DERIVE_MAP.map(async ({ key, attribute, format }) => {
-        const d = await deriveAttr(vehicleId, attribute);
-        if (!d) return null;
-        const value = format ? format(d.value) : d.value;
-        if (value == null) return null; // formatter rejected the shape → keep flat column
-        return { key, attribute, value, confidence: d.confidence } as const;
-      }),
-    );
-    for (const d of derived) {
-      if (!d) continue;
-      (pkg.identity as Record<string, unknown>)[d.key] = d.value;
-      fieldProvenance[d.key] = {
-        value: d.value,
-        confidence: d.confidence,
-        source: "synthesis",
-        attribute: d.attribute,
-      };
-    }
-    (pkg as unknown as Record<string, unknown>).field_provenance = fieldProvenance;
-
-    return new Response(JSON.stringify(pkg, null, 2), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    if (!auth.ok || !["user", "service_role"].includes(auth.caller.kind)) return json({ error: "authorized actor required" }, 403);
+    const db = createClient(Deno.env.get("SUPABASE_URL")!, projectSecretKey()!, {
+      auth: { persistSession: false, autoRefreshToken: false },
     });
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return new Response(
-      JSON.stringify({ error: msg }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-    );
+    // Check the real caller before fetching a private draft or preparing its
+    // evidence. Service reads never retry a refused user as the vehicle owner.
+    if (auth.caller.kind === "user") {
+      const access = await db.rpc("user_can_edit_vehicle", { p_vehicle_id: vehicleId, p_user_id: auth.caller.userId });
+      if (access.error) return json({ error: "vehicle access reader unavailable" }, 503);
+      if (access.data !== true) return json({ error: "vehicle editing access required" }, 403);
+    }
+    const { data: v, error: vehicleError } = await db.from("vehicles").select("*").eq("id", vehicleId).maybeSingle();
+    if (vehicleError) return json({ error: "vehicle reader unavailable" }, 503);
+    if (!v || v.deleted_at) return json({ error: "vehicle not found" }, 404);
+    const actorId = auth.caller.kind === "user" ? auth.caller.userId : v.user_id ?? v.owner_id ?? v.uploaded_by ?? null;
+    const [intake, photoRead, readiness, estimate] = await Promise.all([
+      readListingEvidence(db, vehicleId, actorId),
+      db.from("vehicle_images").select("id,image_url,vehicle_zone,photo_quality_score,display_order,taken_at")
+        .eq("vehicle_id", vehicleId).eq("vehicle_image_gallery_eligible", true)
+        .not("is_sensitive", "is", true).not("is_document", "is", true).not("doc_flag", "is", true)
+        .order("display_order", { ascending: true, nullsFirst: false }).order("id").limit(601),
+      db.from("auction_readiness").select("composite_score,tier").eq("vehicle_id", vehicleId).maybeSingle(),
+      db.from("nuke_estimates").select("estimated_value,value_low,value_high,confidence_score,calculated_at,model_version")
+        .eq("vehicle_id", vehicleId).maybeSingle(),
+    ]);
+    if (photoRead.error) return json({ error: "qualified photo reader unavailable" }, 503);
+    const availablePhotos = photoRead.data ?? [];
+    const photos = availablePhotos.slice(0, 600);
+    const assessment = await readVehicleAssessment(db, v, {
+      photos, photoHasMore: availablePhotos.length > 600, contributorEvidence: intake,
+      claimAfter: body.claim_after, commentAfter: body.comment_after,
+    });
+    const identity = {
+      year: assessment.listing.supported.year ?? null, make: assessment.listing.supported.make ?? null,
+      model: assessment.listing.supported.model ?? null, vin: null, trim: null, engine_type: null, engine_code: null,
+      displacement: null, transmission: null, transmission_type: null, drivetrain: null, body_style: null,
+      exterior_color: null, interior_color: null, mileage: null, title_status: null, location: null,
+      cowl_tag: null, owned_time: null,
+    };
+    const titleParts = [identity.year, identity.make, identity.model].filter(x => x !== null);
+    const title = titleParts.length === 3 ? titleParts.join(" ") : "Vehicle — identity pending";
+    const description = assessment.listing.assertions.map(a => a.statement).join("\n") || null;
+    const fieldProvenance = Object.fromEntries(assessment.listing.assertions.map(a => [a.field, a]));
+    return json({
+      platform, submission_ready: false, ars_score: null, tier: null,
+      tier_warning: "Evidence qualification and owner review remain required.",
+      identity, listing_content: { title, description, highlights: null, equipment: null, modifications: null,
+        known_flaws: null, recent_service_history: null, documents_on_hand: null, video_urls: null },
+      listing_assertions: assessment.listing.assertions, field_provenance: fieldProvenance,
+      unresolved_fields: assessment.unresolved_fields, assessment,
+      // Keep the received draft and attestations, separately qualified, so they
+      // cannot silently re-enter asserted copy or platform specifications.
+      retained_draft: storedDraft(v), contributor_evidence: intake,
+      retained_readiness: readiness.error ? { status: "unavailable" }
+        : { status: "unqualified_stored_heuristic", record: readiness.data },
+      retained_valuation: estimate.error ? { status: "unavailable" }
+        : { status: "unqualified_stored_estimate", record: estimate.data },
+      valuation: null, market_context: assessment.market,
+      photos: { count: photos.length, has_more: availablePhotos.length > 600, platform_limit: 600,
+        hero_image: photos.find(p => p.image_url === v.primary_image_url)?.image_url ?? photos[0]?.image_url ?? null,
+        zones_covered: [], zones_missing: [], coverage_status: "unknown",
+        ordered: photos.map(p => ({ id: p.id, url: p.image_url, zone: null, quality: null, caption: null })) },
+      observed_components: [],
+      submission_fields: platform === "bat" ? { title, year: identity.year, make: identity.make, model: identity.model,
+        vin: null, mileage: null, transmission: null, drivetrain: null, engine: null, body_style: null,
+        exterior_color: null, interior_color: null, title_status: null, location: null, reserve: null,
+        _qualification: "Source-reported identity only; unresolved specifications require cited evidence and owner review." } : null,
+    });
+  } catch {
+    return json({ error: "listing package could not be prepared" }, 500);
   }
 });
