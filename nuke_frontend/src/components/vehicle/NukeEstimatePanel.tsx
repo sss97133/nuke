@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrencyAmount } from '../../utils/currency';
 import { DEAL_SCORE_CONFIG, type DealScoreLabel } from '../../constants/dealScore';
-import { useNukeEstimate, type NukeEstimate } from '../../hooks/useNukeEstimate';
+import { useNukeEstimate } from '../../hooks/useNukeEstimate';
+import { assertVehicleAssessment, type ListingAssessment } from '../../services/listingPackageEvidence';
+import VehicleEvidenceAssessment from './VehicleEvidenceAssessment';
 
 interface NukeEstimatePanelProps {
   vehicleId: string;
@@ -41,26 +43,37 @@ const SIGNAL_LABELS: Record<string, string> = {
 
 const NukeEstimatePanel: React.FC<NukeEstimatePanelProps> = ({ vehicleId, vehicle, canCompute = true }) => {
   const { data, isLoading: loading } = useNukeEstimate(vehicleId, vehicle);
-  const [estimateOverride, setEstimateOverride] = useState<NukeEstimate | null>(null);
-  const [computing, setComputing] = useState(false);
+  const [review, setReview] = useState<{ id: string; loading: boolean; error?: string; assessment?: ListingAssessment }>({ id: vehicleId, loading: false });
+  const requestGeneration = useRef(0);
+  const currentVehicle = useRef(vehicleId);
+  currentVehicle.current = vehicleId;
+  useEffect(() => () => { requestGeneration.current++; }, [vehicleId]);
+  const computing = review.id === vehicleId && review.loading;
+  const assessment = review.id === vehicleId ? review.assessment : undefined;
+  const reviewError = review.id === vehicleId ? review.error : undefined;
 
-  const estimate = estimateOverride ?? data?.estimate ?? null;
+  const estimate = data?.estimate ?? null;
   const record = data?.record ?? null;
   const survival = data?.survival ?? null;
 
   const handleCompute = async () => {
-    setComputing(true);
+    const generation = ++requestGeneration.current;
+    const subject = vehicleId;
+    setReview(previous => ({ id: subject, loading: true, assessment: previous.id === subject ? previous.assessment : undefined }));
     try {
       const { data: result, error } = await supabase.functions.invoke('compute-vehicle-valuation', {
-        body: { vehicle_id: vehicleId, force: true },
+        body: { action: 'assessment', vehicle_id: subject },
       });
-      if (!error && result?.results?.[0]) {
-        setEstimateOverride(result.results[0] as NukeEstimate);
+      if (error || result?.action !== 'assessment' || result?.read_only !== true) throw new Error('Vehicle evidence could not be read.');
+      assertVehicleAssessment(result.assessment, subject);
+      if (requestGeneration.current === generation && currentVehicle.current === subject) {
+        setReview({ id: subject, loading: false, assessment: result.assessment });
       }
-    } catch {
-      // ignore
+    } catch (error) {
+      if (requestGeneration.current === generation && currentVehicle.current === subject) setReview(previous => ({
+        ...previous, id: subject, loading: false, error: error instanceof Error ? error.message : 'Vehicle evidence could not be read.',
+      }));
     }
-    setComputing(false);
   };
 
   // No Empty Shells: if done loading/computing and no estimate, hide for non-owners
@@ -86,53 +99,35 @@ const NukeEstimatePanel: React.FC<NukeEstimatePanelProps> = ({ vehicleId, vehicl
             color: 'var(--text)',
           }}
         >
-          {computing ? 'Computing...' : estimate ? 'Recompute' : 'Compute'}
+          {computing ? 'Reading evidence...' : 'Review evidence'}
         </button>
       </div>
       <div className="card-body" style={{ padding: '12px' }}>
+        {reviewError && <p role="alert">{reviewError}</p>}
+        {assessment && <VehicleEvidenceAssessment assessment={assessment} assertions={assessment.listing.assertions}
+          unresolvedFields={assessment.unresolved_fields} vehicleId={vehicleId} />}
         {!estimate ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {computing ? (
-              <>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <div style={{
-                    width: '8px', height: '8px', background: 'var(--success)',
-                  }} />
-                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                    Computing estimate...
-                  </span>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  {['Comparable Sales', 'Market Trend', 'Rarity', 'Condition'].map((s, i) => (
-                    <div key={s} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span style={{ width: '100px', fontSize: '8px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>{s}</span>
-                      <div style={{
-                        flex: 1, height: '3px', background: 'var(--grey-100)', overflow: 'hidden',
-                      }}>
-                        <div style={{
-                          width: `${30 + i * 15}%`, height: '100%',
-                          background: 'var(--border)',
-                        }} />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </>
+              <p role="status">Reading retained evidence...</p>
             ) : (
               <div style={{ color: 'var(--text-muted)', fontSize: '11px' }}>
-                No estimate available. Click "Compute" to generate.
+                No stored estimate. Review the retained evidence to inspect its qualified market context and unresolved claims.
               </div>
             )}
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <details>
+            <summary>Stored heuristic estimate (unqualified)</summary>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <p>Vehicle-specific source qualification remains unestablished.</p>
             {/* Main estimate */}
             <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
               <span style={{ fontSize: '21px', fontWeight: 800, color: 'var(--text)' }}>
                 ${estimate.estimated_value.toLocaleString(undefined, { maximumFractionDigits: 0 })}
               </span>
               <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                {estimate.confidence_score}% confidence
+                Stored heuristic score: {estimate.confidence_score}/100
               </span>
               <span style={{
                 fontSize: '9px',
@@ -273,7 +268,8 @@ const NukeEstimatePanel: React.FC<NukeEstimatePanelProps> = ({ vehicleId, vehicl
               Model {estimate.model_version} | {estimate.input_count} signals |{' '}
               Computed {new Date(estimate.calculated_at).toLocaleDateString()}
             </div>
-          </div>
+            </div>
+          </details>
         )}
       </div>
     </div>
