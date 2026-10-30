@@ -38,7 +38,11 @@ export function retainedDescriptionCaptureQualified(source: Record<string, any>)
   const observed = observationClockMicroseconds(source.observed_at);
   const recorded = observationClockMicroseconds(source.ingested_at);
   if (source.extraction_method !== "html_description_capture" ||
-      d?.extractor !== "extract-bat-core" || d.source_text_field !== "extract-bat-core.extractDescription" ||
+      d?.extractor !== "extract-bat-core" ||
+      !(d.source_text_field === "extract-bat-core.extractDescription" ||
+        (d.source_capture_basis === "protected_snapshot" &&
+         d.source_text_field === "listing_page_snapshots.html:batParser.extractDescription" &&
+         /^listing_page_snapshots:[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(source.raw_source_ref ?? ""))) ||
       d.description_capture !== true || d.extractor_input_truncated !== false ||
       !["direct_fetch", "protected_snapshot"].includes(d.source_capture_basis) ||
       !/^[0-9a-f]{64}$/.test(d.source_capture_sha256 ?? "") ||
