@@ -20,10 +20,11 @@
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
-import { requireOwnerOrService, requireWriteAuth } from "../_shared/writeGuard.ts";
+import { isServiceCaller, requireOwnerOrService, requireWriteAuth } from "../_shared/writeGuard.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { mustWrite } from '../_shared/writeResult.ts';
 import { AnalysisLeaseLost, enqueueAnalysis, runAnalysisQueue, type AnalysisClaim } from './queueWork.ts';
+import { computeRetainedWidget, retainedMethodAllowed } from './retainedWork.ts';
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -106,6 +107,7 @@ interface WidgetConfig {
   compute_sql: string | null;
   severity_thresholds: { warning?: number; critical?: number } | null;
   stale_after_hours: number;
+  retained_dispatch_method: string | null;
 }
 
 interface WidgetResult {
@@ -414,6 +416,11 @@ async function computeWidget(
 ): Promise<WidgetResult> {
   const startMs = Date.now();
 
+  if (widget.retained_dispatch_method !== null) {
+    if (widget.compute_mode !== 'inline_sql') throw new Error('Invalid retained widget route');
+    return await computeRetainedWidget(supabase, vehicleId, widget.slug, widget.retained_dispatch_method);
+  }
+
   if (widget.compute_mode === "edge_function" && widget.edge_function_name) {
     // Call the widget edge function
     try {
@@ -637,17 +644,21 @@ async function handleSweep(
   };
 }
 
-async function processQueue(supabase: any, batchSize: number, vehicleId?: string) {
+async function processQueue(supabase: any, batchSize: number, vehicleId?: string, retainedOnly = false) {
   // Registry errors cannot strand already-claimed work.
   const { data: widgets, error } = await supabase.from("analysis_widgets")
-    .select("slug, display_name, compute_mode, edge_function_name, compute_sql, severity_thresholds, stale_after_hours")
+    .select("slug, display_name, compute_mode, edge_function_name, compute_sql, severity_thresholds, stale_after_hours, retained_dispatch_method")
     .eq("is_enabled", true);
   if (error) throw new Error(`Widget registry unavailable: ${error.message}`);
   const bySlug = new Map<string, WidgetConfig>((widgets ?? []).map((w: WidgetConfig) => [w.slug, w]));
   return await runAnalysisQueue(supabase, { batchSize, vehicleId,
+    retainedOnly, ...(retainedOnly ? { budgetMs: 15000, reserveMs: 9000 } : {}),
     compute: async (claim, slug, workerId) => {
       const widget = bySlug.get(slug);
       if (!widget) throw new Error("Requested widget is unavailable");
+      if (retainedOnly && (widget.compute_mode !== 'inline_sql' || !retainedMethodAllowed(widget.retained_dispatch_method))) {
+        throw new Error('Requested widget requires separate compute authority');
+      }
       const result = await computeWidget(supabase, claim.vehicle_id, widget);
       if (result.value_json?.status === "widget_not_configured") throw new Error("Requested widget is not configured");
       if (result.value_json?.error) throw new Error(String(result.value_json.error));
@@ -885,6 +896,19 @@ Deno.serve(async (req: Request) => {
     const supabase = getSupabase();
 
     switch (action) {
+      case 'compute_retained': {
+        if (!(await isServiceCaller(req))) return json(403, { error: 'service_role required' });
+        const requested = body.batch_size == null ? 2 : Number(body.batch_size);
+        const batchSize = Number.isFinite(requested) ? Math.max(0, Math.min(2, Math.floor(requested))) : 0;
+        const result = await processQueue(supabase, batchSize, body.vehicle_id, true);
+        return json(200, { action, method: 'retained_analysis_dispatch_v1', ...result });
+      }
+      case 'retained_status': {
+        if (!(await isServiceCaller(req))) return json(403, { error: 'service_role required' });
+        const { data, error } = await supabase.rpc('analysis_queue_health', { p_vehicle_id: body.vehicle_id ?? null, p_limit: 1000 });
+        if (error) throw new Error(`Retained work health unavailable: ${error.message}`);
+        return json(200, { action, work: data });
+      }
       case "sweep": {
         const batchSize = Math.min(body.batch_size ?? 20, 100);
         const result = await handleSweep(supabase, batchSize);

@@ -602,6 +602,7 @@ jobs:
         run: |
           deno check --node-modules-dir=none supabase/functions/analysis-engine-coordinator/index.ts
           deno test --node-modules-dir=none supabase/functions/analysis-engine-coordinator/queueWork.test.ts
+          deno test --node-modules-dir=none supabase/functions/analysis-engine-coordinator/retainedWork.test.ts
       - name: Verify registered contributor review uses retained sources and fenced leases
         run: |
           deno check --node-modules-dir=none supabase/functions/contributor-intake/index.ts supabase/functions/derive-dispatch/index.ts

@@ -27,6 +27,7 @@ import { isServiceCaller, requireWriteAuth } from "../_shared/writeGuard.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { mustWrite } from '../_shared/writeResult.ts';
 import { dispatchContributorReview } from './contributorReview.ts';
+import { dispatchRetainedAnalysis } from './retainedAnalysis.ts';
 
 const WORKER = `derive-dispatch-${crypto.randomUUID().slice(0, 8)}`;
 
@@ -68,8 +69,15 @@ Deno.serve(async (req) => {
     const platformCredential = body.platform_credential === true;
     // Service-only registry dispatch. Only new revisioned contributor work is
     // eligible; the handler retains its own owner authority and fenced leases.
-    const contributorReview = await dispatchContributorReview(admin, Deno.env.get('SUPABASE_URL')!,
-      projectSecretKey()!, body.user_id ?? null, batchSize);
+    // Auxiliary retained owners run in parallel. Their failure must be visible,
+    // but cannot prevent independently admitted derivation work from proceeding.
+    const auxiliary = await Promise.allSettled([
+      dispatchContributorReview(admin, Deno.env.get('SUPABASE_URL')!, projectSecretKey()!, body.user_id ?? null, batchSize),
+      dispatchRetainedAnalysis(Deno.env.get('SUPABASE_URL')!, projectSecretKey()!, body.user_id ?? null, batchSize),
+    ]);
+    const auxiliaryFailed = auxiliary.some(r => r.status === 'rejected');
+    const [contributorReview, retainedAnalysis] = auxiliary.map(r => r.status === 'fulfilled' ? r.value
+      : { status: 'failed', error: String(r.reason instanceof Error ? r.reason.message : r.reason) });
 
     // Claim a batch. Claiming before working is what lets two workers run without
     // reading the same evidence twice.
@@ -79,7 +87,8 @@ Deno.serve(async (req) => {
       p_user_id: body.user_id ?? null,
     });
     if (claimErr) throw claimErr;
-    if (!claimed?.length) return json({ claimed: 0, done: 0, failed: 0, results: [], contributor_review: contributorReview });
+    if (!claimed?.length) return json({ claimed: 0, done: 0, failed: 0, results: [], contributor_review: contributorReview,
+      retained_analysis: retainedAnalysis }, auxiliaryFailed ? 502 : 200);
 
     const results: unknown[] = [];
     let done = 0, failed = 0;
@@ -213,7 +222,8 @@ Deno.serve(async (req) => {
         .eq("slug", s));
     }
 
-    return json({ claimed: claimed.length, done, failed, results, contributor_review: contributorReview });
+    return json({ claimed: claimed.length, done, failed, results, contributor_review: contributorReview,
+      retained_analysis: retainedAnalysis }, auxiliaryFailed ? 502 : 200);
   } catch (e) {
     console.error("[derive-dispatch]", e);
     return json({ error: String(e instanceof Error ? e.message : e) }, 500);

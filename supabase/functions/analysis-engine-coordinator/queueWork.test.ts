@@ -88,3 +88,17 @@ Deno.test("zero batch capacity claims nothing", async () => {
   assertEquals(calls, 0);
   assertEquals(result.claimed, 0);
 });
+
+Deno.test('short retained budget claims one reachable lease and leaves later widgets durable', async () => {
+  let clock = 0;
+  const db = { rpc(name: string, args: Record<string, unknown>) {
+    if (name === 'claim_analysis_queue_batch') {
+      assertEquals(args.p_retained_only, true); return Promise.resolve({ data: [claim], error: null });
+    }
+    assertEquals(args.p_succeeded_widgets, ['a']);
+    return Promise.resolve({ data: { status: 'pending' }, error: null });
+  } };
+  const result = await runAnalysisQueue(db, { batchSize: 2, retainedOnly: true, budgetMs: 15000, reserveMs: 9000,
+    now: () => clock, compute: async () => { clock += 8000; return {}; } });
+  assertEquals(result.claimed, 1); assertEquals(result.total_computed, 1);
+});
