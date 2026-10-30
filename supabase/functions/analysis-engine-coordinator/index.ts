@@ -24,7 +24,7 @@ import { isServiceCaller, requireOwnerOrService, requireWriteAuth } from "../_sh
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { mustWrite } from '../_shared/writeResult.ts';
 import { AnalysisLeaseLost, enqueueAnalysis, runAnalysisQueue, type AnalysisClaim } from './queueWork.ts';
-import { computeRetainedWidget, retainedMethodAllowed } from './retainedWork.ts';
+import { computeRetainedWidget, retainedMethodAllowed, retainedWorkLimits } from './retainedWork.ts';
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -644,7 +644,7 @@ async function handleSweep(
   };
 }
 
-async function processQueue(supabase: any, batchSize: number, vehicleId?: string, retainedOnly = false) {
+async function processQueue(supabase: any, batchSize: number, vehicleId?: string, retainedOnly = false, retainedBudgetMs = 15000) {
   // Registry errors cannot strand already-claimed work.
   const { data: widgets, error } = await supabase.from("analysis_widgets")
     .select("slug, display_name, compute_mode, edge_function_name, compute_sql, severity_thresholds, stale_after_hours, retained_dispatch_method")
@@ -652,7 +652,7 @@ async function processQueue(supabase: any, batchSize: number, vehicleId?: string
   if (error) throw new Error(`Widget registry unavailable: ${error.message}`);
   const bySlug = new Map<string, WidgetConfig>((widgets ?? []).map((w: WidgetConfig) => [w.slug, w]));
   return await runAnalysisQueue(supabase, { batchSize, vehicleId,
-    retainedOnly, ...(retainedOnly ? { budgetMs: 15000, reserveMs: 9000 } : {}),
+    retainedOnly, ...(retainedOnly ? { budgetMs: retainedBudgetMs, reserveMs: 9000 } : {}),
     compute: async (claim, slug, workerId) => {
       const widget = bySlug.get(slug);
       if (!widget) throw new Error("Requested widget is unavailable");
@@ -898,10 +898,9 @@ Deno.serve(async (req: Request) => {
     switch (action) {
       case 'compute_retained': {
         if (!(await isServiceCaller(req))) return json(403, { error: 'service_role required' });
-        const requested = body.batch_size == null ? 2 : Number(body.batch_size);
-        const batchSize = Number.isFinite(requested) ? Math.max(0, Math.min(2, Math.floor(requested))) : 0;
-        const result = await processQueue(supabase, batchSize, body.vehicle_id, true);
-        return json(200, { action, method: 'retained_analysis_dispatch_v1', ...result });
+        const { batchSize, budgetMs } = retainedWorkLimits(body);
+        const result = await processQueue(supabase, batchSize, body.vehicle_id, true, budgetMs);
+        return json(200, { action, method: 'retained_analysis_dispatch_v1', limit: batchSize, time_budget_ms: budgetMs, ...result });
       }
       case 'retained_status': {
         if (!(await isServiceCaller(req))) return json(403, { error: 'service_role required' });

@@ -102,3 +102,16 @@ Deno.test('short retained budget claims one reachable lease and leaves later wid
     now: () => clock, compute: async () => { clock += 8000; return {}; } });
   assertEquals(result.claimed, 1); assertEquals(result.total_computed, 1);
 });
+
+Deno.test('retained throughput stays bounded by time and never preclaims unreachable work', async () => {
+  let clock = 0; let claims = 0;
+  const db = { rpc(name: string, args: Record<string, unknown>) {
+    if (name === 'claim_analysis_queue_batch') { claims++; assertEquals(args.p_batch_size, 1);
+      assertEquals(args.p_retained_only, true); return Promise.resolve({ data: [claim], error: null }); }
+    return Promise.resolve({ data: { status: 'pending' }, error: null });
+  } };
+  const r = await runAnalysisQueue(db, { batchSize: 20, retainedOnly: true, budgetMs: 45000, reserveMs: 9000,
+    now: () => clock, compute: async () => { clock += 8000; return {}; } });
+  assertEquals(r.claimed, 3); assertEquals(claims, 3); assertEquals(r.total_computed, 5);
+  assertEquals(clock, 40000);
+});
