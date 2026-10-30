@@ -117,6 +117,16 @@ export type MyWorkOrdersRead = {
   coverage: { returned: number; total_for_viewer: number };
 };
 
+export type VehicleReceiptLine = {
+  id: string; receipt_id: string; line_number: number | null; description: string | null;
+  part_number: string | null; quantity: number | null; category: string | null;
+  receipt: { id: string; vehicle_id: string; scope_type: string; scope_id: string;
+    vendor_name: string | null; receipt_date: string | null; transaction_date: string | null;
+    purchase_date: string | null; file_url: string | null; is_active: boolean;
+    is_superseded: boolean; duplicate_of: string | null };
+};
+export type VehicleReceiptLinesRead = { rows: VehicleReceiptLine[]; next_after: string | null };
+
 export type VehicleAccess = {
   role: string;
   can_post_work_request: boolean;
@@ -254,7 +264,22 @@ export const JobReaders = {
   // Existing vehicle readers/RLS, invoked only after the job reader includes the retained duty.
   // Vehicle evidence is supporting history, never silently allocated as performed work on this job.
   workContext: readRetainedWorkContext,
+  vehicleReceiptLines: readVehicleReceiptLines,
 };
+
+/** Existing parent receipt RLS, not job-party or vehicle-access substitution.
+ * These are vehicle-filed source lines, never job allocation or on-hand inventory. */
+async function readVehicleReceiptLines(vehicleId: string, after: string | null = null): Promise<RpcResult<VehicleReceiptLinesRead>> {
+  let query = supabase.from('receipt_items').select('id,receipt_id,line_number,description,part_number,quantity,category,receipt:receipts!inner(id,vehicle_id,scope_type,scope_id,vendor_name,receipt_date,transaction_date,purchase_date,file_url,is_active,is_superseded,duplicate_of)')
+    .eq('receipt.vehicle_id',vehicleId).eq('receipt.scope_type','vehicle').eq('receipt.scope_id',vehicleId)
+    .eq('receipt.is_active',true).eq('receipt.is_superseded',false).is('receipt.duplicate_of',null)
+    .order('id').limit(101);
+  if (after) query=query.gt('id',after);
+  const { data,error }=await query;
+  if (error) return {data:null,refusal:{message:refusalText(error),code:error.code}};
+  const rows=(data ?? []) as unknown as VehicleReceiptLine[];
+  return {data:{rows:rows.slice(0,100),next_after:rows.length>100 ? rows[99].id : null},refusal:null};
+}
 
 async function readRetainedWorkContext(vehicleId: string, reports: NonNullable<RetainedWorkRead['responsibility_reports']>): Promise<WorkContext> {
   const result: WorkContext = { vehicleId, proofs: [], decisions: [], handoffs: [], errors: [], partial: false };

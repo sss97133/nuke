@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { PrefetchLink } from '../../components/PrefetchLink';
 import { Text } from '../../kit';
-import { day, JobReaders, type RetainedWorkRead } from './jobsReaders';
+import { useAuthContext } from '../../contexts/AuthContext';
+import { day, JobReaders, type RetainedWorkRead, type VehicleReceiptLine } from './jobsReaders';
 import { retainedWorkPlan, workExcerpt, type WorkComponent, type WorkContext, type WorkProof } from './workEvidenceModel';
 
 type Props = { vehicleId: string; reports: NonNullable<RetainedWorkRead['responsibility_reports']> };
@@ -57,6 +58,65 @@ function ComponentRows({ rows }: { rows: WorkComponent[] }) {
   })}</ul>;
 }
 
+function ReceiptRecords({ vehicleId }: { vehicleId: string }) {
+  const { session }=useAuthContext();
+  const viewerId=session?.user.id;
+  return viewerId ? <ViewerReceiptRecords key={`${viewerId}:${vehicleId}`} vehicleId={vehicleId} /> : null;
+}
+function ViewerReceiptRecords({ vehicleId }: { vehicleId: string }) {
+  const [rows,setRows]=useState<VehicleReceiptLine[]>([]);
+  const [complete,setComplete]=useState(false);
+  const [error,setError]=useState<string | null>(null);
+  const [query,setQuery]=useState('');
+  const [limit,setLimit]=useState(20);
+  useEffect(()=>{
+    let active=true;
+    setRows([]);setComplete(false);setError(null);setQuery('');setLimit(20);
+    void (async()=>{
+      const found=new Map<string,VehicleReceiptLine>(),cursors=new Set<string>();
+      let after:string | null=null;
+      try {
+        do {
+          const read=await JobReaders.vehicleReceiptLines(vehicleId,after);
+          if (!active) return;
+          if (read.refusal) throw new Error(read.refusal.message);
+          for (const line of read.data.rows) found.set(line.id,line);
+          setRows([...found.values()]);
+          after=read.data.next_after;
+          if (after && cursors.has(after)) throw new Error('Receipt records could not be fully loaded.');
+          if (after) cursors.add(after);
+        } while (after);
+        if (active) setComplete(true);
+      } catch (cause) { if (active) setError(cause instanceof Error ? cause.message : 'Receipt records could not be read.'); }
+    })();
+    return ()=>{active=false;};
+  },[vehicleId]);
+  // A zero visible set does not establish an absence of purchases. Other
+  // accounts' private receipts are not a promise of inventory to this viewer.
+  if (!rows.length) return error ? <Text role="caption" as="p">{error}</Text> : null;
+  const words=query.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
+  const matching=rows.filter(line=>{
+    const text=[line.description,line.part_number,line.category,line.receipt.vendor_name].filter(Boolean).join(' ').toLocaleLowerCase();
+    return words.every(word=>text.includes(word));
+  });
+  return <details className="work-group"><summary>Receipt records</summary>
+    <Text role="caption" as="p">Filed under this vehicle. A receipt line does not establish present stock, installation or a charge to this job.</Text>
+    <label className="jb-field">Find a part or supplier<input className="jb-input" type="search" value={query} disabled={!complete} onChange={event=>{setQuery(event.target.value);setLimit(20);}} /></label>
+    <Text role="caption" as="p" aria-live="polite">{Math.min(limit,matching.length)} of {matching.length} {query ? 'matching ' : ''}receipt lines{!complete ? ' · source read incomplete' : ''}</Text>
+    <ul className="work-items">{matching.slice(0,limit).map(line=>{
+      const receipt=line.receipt;
+      const date=receipt.receipt_date || receipt.transaction_date || receipt.purchase_date;
+      return <li key={line.id} data-receipt-line={line.id}>
+        <Text role="label" as="h3">{workExcerpt(line.description) || line.part_number || 'Receipt line'}</Text>
+        <Text role="caption" as="p">{[line.part_number, line.quantity==null ? null : `Qty ${line.quantity}`, workExcerpt(receipt.vendor_name), day(date)].filter(Boolean).join(' · ')}</Text>
+        {receipt.file_url && /^https:\/\//.test(receipt.file_url) && <a href={receipt.file_url} target="_blank" rel="noopener noreferrer">View receipt ↗</a>}
+      </li>;
+    })}</ul>
+    {limit<matching.length && <button className="btn-base btn-sm btn-secondary" type="button" onClick={()=>setLimit(n=>n+20)}>More receipt lines</button>}
+    {error && <Text role="caption" as="p">{error}</Text>}
+  </details>;
+}
+
 export function WorkPlanPreview({ vehicleId, reports, href }: Props & { href: string }) {
   const context = useWorkContext({ vehicleId, reports });
   const plan = context && retainedWorkPlan(context);
@@ -97,6 +157,7 @@ export function RetainedWorkPlan(props: Props) {
       <Text role="caption" as="p">Purchase, presence and installation are separate. Each entry keeps what its source actually says.</Text>
       <ComponentRows rows={plan.available} />
     </details>}
+    <ReceiptRecords vehicleId={props.vehicleId} />
     {plan.options.length > 0 && <details className="work-group"><summary>Vendor options</summary>
       <Text role="caption" as="p">Saved options for the vehicle. These are not purchase orders or missing-work commitments.</Text>
       <ComponentRows rows={plan.options} />
