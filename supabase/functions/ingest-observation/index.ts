@@ -899,6 +899,10 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
       return new Response(JSON.stringify({ error: "BaT activity requires its retained report selector", writes: 0, model_calls: 0 }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
+    if (source.id === "755185e3-3d21-4373-b806-ddcbf0d5e39c" && input.kind === "specification" && !retainedSourceId) {
+      return new Response(JSON.stringify({ error: "Native specifications require the retained source selector" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
 
     // A claim keyed to the condition dimension must name a live descriptor.
     let descriptorId: string | null = null;
