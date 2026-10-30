@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase';
-import { carriedRevision, readAccountingSnapshot, type AccountingSnapshot } from './financialExpenseUse';
+import { carriedRevision, correctionRequest, readAccountingSnapshot, type AccountingSnapshot } from './financialExpenseUse';
 
 // Revision JSON is shaped and checked by the writer; typed loosely here as in financialExpenseUse.ts.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -51,11 +51,7 @@ export function classificationCorrection(snapshot: AccountingSnapshot, sourceKey
   fields.push({ field_key: CLASSIFICATION_FIELD, value_type: 'text', value_normalized: value,
     value_raw: `${keys.size} record${keys.size === 1 ? '' : 's'} classified as ${classificationLabel(section, category)}${note ? `; ${note}` : ''}`.slice(0, 2000),
     evidence: { stage: 'record_classification_review', source_kind: 'authenticated_reviewer_decision', prior_run_id: snapshot.runId, ...(note ? { basis: note } : {}) } });
-  if (fields.length > 100) throw new Error('This source has reached its field limit. No evidence has been changed.');
-  const doc = snapshot.document;
-  return { written, payload: { mode: 'financial_evidence_v1', action: 'correct', owner_user_id: doc.owner_id,
-    original: { sha256: doc.content_sha256, storage_path: doc.storage_path, source_filename: doc.source_filename, source_kind: doc.source_kind },
-    revision: { idempotency_key: `record-classification:${requestId}`, method: 'authenticated-record-classification', version: '1', supersedes_run_id: snapshot.runId, fields, accounting_records: records, lines, concerns } } };
+  return { written, payload: correctionRequest(snapshot, { idempotencyKey: `record-classification:${requestId}`, method: 'authenticated-record-classification', fields, records, lines, concerns }) };
 }
 
 /** Classifies records of one source through the attributed writer. When another reviewer saved a newer revision of the

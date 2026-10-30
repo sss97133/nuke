@@ -9,7 +9,8 @@ const script = fileURLToPath(new URL('./logged-out-live.mjs', import.meta.url));
 const source = fs.readFileSync(script, 'utf8');
 
 // Run the unchanged CLI module against browser/HTTP fixtures. No network, credentials, screenshots or delays.
-async function probe({ timeout = false, navigationFailure = false, refused = false, text = 'Nuke vehicle evidence', images = 1, photoCount = 1, delayedImages = false } = {}) {
+async function probe({ timeout = false, navigationFailure = false, refused = false, text = 'Nuke vehicle evidence', images = 1, photoCount = 1, delayedImages = false,
+  privateOpen = false, booksCall = false } = {}) {
   const written = new Map();
   let exitCode;
   const chromium = { launch: async () => ({
@@ -17,9 +18,16 @@ async function probe({ timeout = false, navigationFailure = false, refused = fal
       newPage: async () => {
         const handlers = new Map();
         let renderedImages = images;
+        let current = '';
         return {
           on: (event, handler) => handlers.set(event, handler),
-          goto: async () => {
+          url: () => current,
+          goto: async (target) => {
+            // A visitor on a private page is sent to /login, unless the fixture says the page opened for them.
+            current = String(target);
+            const privateRoute = /^https:\/\/fixture\.invalid\/(accounting|publishing\/finance|profile)$/.test(current);
+            if (privateRoute && !privateOpen) current = 'https://fixture.invalid/login?returnUrl=%2Fprivate';
+            if (privateRoute && booksCall) handlers.get('request')?.({ url: () => 'https://fixture.supabase.co/rest/v1/rpc/books_gate_status', method: () => 'POST' });
             handlers.get('response')?.({
               url: () => 'https://fixture.supabase.co/rest/v1/vehicle_images_public?select=id',
               request: () => ({ headers: () => ({ apikey: 'anon' }) }),
@@ -115,4 +123,33 @@ test('a rendered page without admitted photos still fails', async () => {
   const result = await probe({ timeout: true, images: 0, photoCount: 3 });
   assert.equal(result.exitCode, 1);
   assert.ok(result.failures.some(f => f.what.includes('database admits 3 photos')));
+});
+
+test('a visitor sent to /login from every private page, calling no books reader, passes', async () => {
+  const result = await probe();
+  assert.equal(result.exitCode, 0);
+  assert.equal(result.failures.length, 0);
+});
+
+test('a private page that opens for a visitor fails, for each of the three', async () => {
+  const result = await probe({ privateOpen: true });
+  assert.equal(result.exitCode, 1);
+  const opened = result.failures.filter(f => f.what.startsWith('a private page opened for a visitor'));
+  assert.deepEqual(opened.map(f => f.page).sort(), ['/accounting', '/profile', '/publishing/finance']);
+});
+
+test('a books reader called while a visitor loads a private page fails and names the call', async () => {
+  const result = await probe({ booksCall: true });
+  assert.equal(result.exitCode, 1);
+  const called = result.failures.filter(f => f.what === 'a visitor page load called a books reader');
+  assert.equal(called.length, 3);
+  assert.ok(called[0].detail.some(d => d.includes('/rest/v1/rpc/books_gate_status')));
+});
+
+test('a private heading on a visitor page fails', async () => {
+  const result = await probe({ text: 'Books docket' });
+  assert.equal(result.exitCode, 1);
+  assert.ok(result.failures.some(f => f.what.startsWith('a private heading is on a visitor page') && f.page === '/accounting'));
+  // the public pages are not held to the private-heading rule
+  assert.ok(!result.failures.some(f => f.what.startsWith('a private heading') && f.page === '/'));
 });

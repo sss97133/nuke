@@ -6,6 +6,14 @@ const LIVE = 'Live ledger · updates arrive as they happen';
 const POLLING = 'Live ledger · checks for changes every 5 seconds';
 const OFFLINE = 'Live updates unavailable. Refresh before editing.';
 
+/** The book's revision in the one spelling the database uses for the revision it stores with each gate run (books_book_signature, migration
+ *  20261106110000): "<documents>:<latest change as YYYY-MM-DDTHH:MI:SS.USZ, UTC>". PostgREST hands the timestamp back as 2026-10-29T17:40:00.5+00:00
+ *  (trailing zeros trimmed, an offset); a reading that is not UTC is left as it came, never guessed. A test pins this to the migration's format. */
+export function bookSignature(count: number, latest: string | null | undefined): string {
+  const m = /^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2}:\d{2})(?:\.(\d{1,6}))?(?:Z|\+00(?::?00)?)$/.exec(latest ?? '');
+  return `${count}:${m ? `${m[1]}T${m[2]}.${(m[3] ?? '').padEnd(6, '0')}Z` : latest ?? ''}`;
+}
+
 /** A book's revision is how many source documents it holds and when one last changed: every admitted run touches
  *  financial_documents.updated_at (trg_fdoc_touch) and originals are never deleted, so count + latest change is a
  *  complete signature that costs two index reads whatever the book's size. Realtime delivers changes as they land;
@@ -26,7 +34,7 @@ export function useAccountingRevision(ownerId: string) {
         ]);
         if (cancelled) return;
         if (latest.error || total.error || !Array.isArray(latest.data) || !Number.isSafeInteger(total.count)) throw new Error('sync');
-        const revision = `${total.count}:${latest.data[0]?.updated_at ?? ''}`;
+        const revision = bookSignature(total.count as number, latest.data[0]?.updated_at); // a safe integer: checked above
         const message = live ? LIVE : POLLING;
         if (revision !== previous) { previous = revision; setState({ revision, message }); }
         else setState(current => ({ ...current, message }));

@@ -1,74 +1,92 @@
 // @vitest-environment jsdom
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
+import type { QueryClient } from '@tanstack/react-query';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-const fixture = vi.hoisted(() => ({ rpc: vi.fn(), invoke: vi.fn() }));
-vi.mock('../../lib/supabase', () => ({ supabase: { rpc: fixture.rpc, functions: { invoke: fixture.invoke } } }));
+const fixture = vi.hoisted(() => ({ rpc: vi.fn(), from: vi.fn(), invoke: vi.fn() }));
+vi.mock('../../lib/supabase', () => ({ supabase: { rpc: fixture.rpc, from: fixture.from, functions: { invoke: fixture.invoke }, auth: { onAuthStateChange: () => ({ data: { subscription: { unsubscribe() {} } } }) } } }));
 vi.mock('../PrefetchLink', () => ({ default: ({ to, children, ...props }: any) => <a href={to} {...props}>{children}</a> }));
-import FinishTaxes, { netAcrossYears, rankItems, taxAtStake } from './FinishTaxes';
+import FinishTaxes, { HIDDEN_ITEMS, ITEM_WORDS, rankItems, stakeWords } from './FinishTaxes';
+import BooksDocket from './BooksDocket';
 import RecordEvidence from './RecordEvidence';
 import { passWhat, passWho } from './AccountingActivity';
 import { AccountingBookContext } from './AccountingBookContext';
-import { describeRecord, type Closeout, type CloseoutYear } from '../../services/accountingCloseout';
+import { describeRecord, type Closeout } from '../../services/accountingCloseout';
+import { answer, closeoutYear as year, freshClient, gateYear, inQuery, owner, run, cleanRules, status, tableRead, yearState as stateOf } from './__fixtures__/books';
 
-// Synthetic book: every value below is invented.
-const owner = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
-const year = (extra: Partial<CloseoutYear>): CloseoutYear => ({
-  year: '2024', draft_stale: false, books: { decisions: 10, revenue_records: 4, revenue: 1000, expense_records: 6, expense: 600, revised_at: '2026-10-25T22:00:00Z' },
-  return: { tax_year: '2024', form: '1040', result: 'owe', amount: 900, schedule_c_net: 400, total_tax: 1200, agi: 500, built_at: '2026-10-25T21:00:00Z',
-    books_as_of: '2026-10-25T20:00:00Z', tax_per_1000_expense: -300, document_id: 'draft-doc', recorded_at: '2026-10-25T21:00:00Z',
-    filing: { signers: 'both spouses', method: 'paper, certified mail', mail_to: 'a synthetic address', deadline: null } },
-  items: [
-    { key: 'expense_no_proof', n: 2, of: 6, amount: 200, assessed: true },
-    { key: 'expense_no_receipt', n: 3, of: 6, amount: 2000, assessed: true },
-    { key: 'car_cost_no_car', n: 0, of: 2, amount: 0, assessed: true },
-    { key: 'statement_gaps', n: 1, of: 12, assessed: true, amount: null, accounts: [{ account: 'Synthetic checking', months_without_lines: ['2024-03'], months_in_span: 12 }] },
-    { key: 'revenue_no_payer', n: null, of: null, amount: null, assessed: false, deferred: true },
-  ], ...extra });
-let node: HTMLDivElement, root: Root;
-beforeEach(() => { (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true; fixture.rpc.mockReset(); fixture.invoke.mockReset(); node = document.createElement('div'); document.body.append(node); root = createRoot(node); });
-afterEach(async () => { await act(async () => root.unmount()); node.remove(); });
-const inBook = (child: React.ReactNode) => <AccountingBookContext.Provider value={{ ownerId: owner, shared: false, canCorrect: true, liveRevision: '1' }}>{child}</AccountingBookContext.Provider>;
+// Synthetic book: every value below is invented (see __fixtures__/books.ts).
+let node: HTMLDivElement, root: Root, client: QueryClient;
+beforeEach(() => {
+  (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true; client = freshClient(); fixture.rpc.mockReset(); fixture.from.mockReset(); fixture.invoke.mockReset();
+  fixture.from.mockImplementation(() => tableRead(() => ({ data: [], error: null })));
+  node = document.createElement('div'); document.body.append(node); root = createRoot(node);
+});
+afterEach(async () => { await act(async () => root.unmount()); node.remove(); vi.useRealTimers(); client.clear(); });
+const inBook = (child: React.ReactNode) => inQuery(client, <AccountingBookContext.Provider value={{ ownerId: owner, shared: false, canCorrect: true, liveRevision: '1' }}>{child}</AccountingBookContext.Provider>);
+/** The data API answers each call from the handler, as a promise that takes the abort signal the reads pass. */
+const serve = (handler: (name: string, args: any) => unknown) => fixture.rpc.mockImplementation((name: string, args: any) => answer(handler(name, args)));
+const later = async (ms: number) => { for (let left = ms; left > 0; left -= 100) await act(async () => { await vi.advanceTimersByTimeAsync(Math.min(100, left)); }); };
+// react-query notifies on a timer and a read that depends on another starts a render later: let a few turns pass
+const settle = async () => { for (let i = 0; i < 6; i++) await act(async () => { await new Promise(resolve => setTimeout(resolve, 10)); }); };
+const reads = (name: string) => fixture.rpc.mock.calls.filter(c => c[0] === name).length;
+const noIncome = { assessed: true, total: 0, amount: 0, rows: [] };
 
-it('measures tax at stake from the draft rate and ranks items by money', () => {
-  expect(taxAtStake(2000, -300)).toBe(600);
-  expect(taxAtStake(2000, null)).toBeNull();
+it('ranks items by the money the database states and hides the two items the docket answers in their place', () => {
   const ranked = rankItems(year({}).items).map(i => i.key);
   expect(ranked.slice(0, 3)).toEqual(['expense_no_receipt', 'expense_no_proof', 'statement_gaps']);
   expect(ranked.at(-1)).toBe('revenue_no_payer');
-  expect(netAcrossYears([year({}), year({ year: '2023', return: { ...year({}).return!, result: 'refund', amount: 300 } })])).toEqual({ owe: 600, count: 2, first: '2023', last: '2024' });
+  expect([...HIDDEN_ITEMS].sort()).toEqual(['expense_no_proof', 'expense_no_receipt']);
+  expect(Object.keys(ITEM_WORDS).sort()).toEqual(['car_cost_no_car', 'expense_no_proof', 'expense_no_receipt', 'revenue_no_payer', 'statement_gaps']);
 });
 
-it('leads each year with the plain answer, flags a stale draft, ranks what is left and drills into it', async () => {
+it('no tax is computed on this page: the stake is the draft\'s own rate, said for income only, and nothing is multiplied by it', () => {
+  expect(stakeWords('revenue_no_payer', -300)).toBe('Each $1,000 shown not to be income (a transfer, loan or refund) saves about $300 of tax, at the draft\'s own rate.');
+  expect(stakeWords('expense_no_proof', -300)).toBeNull();
+  expect(stakeWords('car_cost_no_car', -300)).toBeNull();
+});
+
+it('leads each year with the plain answer, never warns from timestamps, ranks what is left and drills into it', async () => {
   const data: Closeout = { read_at: '2026-10-25T23:00:00Z', books_revised_at: null, questions: { pending_current: 7, by_resolver: { 'Synthetic Owner': 5, model_reconciliation: 2 } },
     years: [year({ draft_stale: true }), { year: '2021', return: null, books: null, draft_stale: null, items: [] }] };
-  fixture.rpc.mockImplementation(async (name: string, args: any) => name === 'accounting_closeout' ? { data, error: null }
-    : name === 'accounting_closeout_records' && args.p_item === 'revenue_no_payer' ? { data: { assessed: true, total: 1, amount: 250, rows: [] }, error: null } : { data: null, error: { message: 'unexpected' } });
+  serve((name, args) => name === 'accounting_closeout' ? { data, error: null }
+    : name === 'accounting_closeout_records' && args.p_item === 'revenue_no_payer' ? { data: { assessed: true, total: 1, amount: 250, rows: [] }, error: null }
+    : name === 'books_year_state' ? { data: stateOf({ year: args.p_year }), error: null } : { data: null, error: { message: 'unexpected' } });
   const drill = vi.fn(), questions = vi.fn();
   await act(async () => root.render(inBook(<FinishTaxes onDrill={drill} onQuestions={questions} />)));
+  await settle();
   expect(node.querySelector('.accounting-close-answer')?.textContent).toBe('You owe $900');
   expect(node.querySelectorAll('.accounting-close-year')).toHaveLength(1);
-  expect(node.querySelector('[role="alert"]')?.textContent).toContain('Regenerate it before signing');
+  // Whether the return still matches the books is the gate's answer (books docket, rule R9); a comparison of timestamps never warns here.
+  expect(node.querySelector('[role="alert"]')).toBeNull();
+  expect(node.textContent).not.toContain('Regenerate');
+  expect(node.textContent).not.toContain('books changed');
+  expect(node.querySelector('#close-2024')).not.toBeNull();
   const labels = Array.from(node.querySelectorAll('.accounting-close-item .k-body')).map(n => n.textContent);
-  expect(labels.slice(0, 2)).toEqual(['Expenses paid, but no receipt', 'Income with no named payer']);
-  expect(node.textContent).toContain('If these were disallowed, about $600 more tax. Each $1,000 proven keeps about $300.');
-  expect(node.textContent).toContain('If these turned out to be transfers, loans or refunds, about $75 less tax. Each $1,000 shown not to be income saves about $300.');
-  expect(node.textContent).not.toContain('rides on');
+  // Two items are not listed (owner ruling 2026-10-28; the docket answers both): the per-line receipt, and the statement-side count of expenses with no bank line and no receipt.
+  expect(labels.slice(0, 2)).toEqual(['Income with no named payer', 'Months with no statement lines']);
+  for (const gone of ['Expenses paid, but no receipt', 'The bank line proves payment, not what was bought', 'Expenses with no bank line and no receipt', 'Nothing on file shows these were paid.', 'more tax']) expect(node.textContent).not.toContain(gone);
+  expect(node.textContent).toContain('Each $1,000 shown not to be income (a transfer, loan or refund) saves about $300 of tax, at the draft\'s own rate.');
+  expect(node.textContent).not.toContain('about $75');
+  expect(node.textContent).not.toContain('about $60');
   expect(node.textContent).toContain('Sign and mail (your step)');
   expect(node.textContent).toContain('Open questions: Synthetic Owner 5');
   expect(node.textContent).toContain('plus 2 agent notes');
-  expect(node.textContent).not.toContain('Car costs with no car named$');
-  await act(async () => (node.querySelector('.accounting-close-item button') as HTMLButtonElement).click());
-  expect(drill).toHaveBeenCalledWith({ year: '2024', item: 'expense_no_receipt', label: 'Expenses paid, but no receipt' });
+  // Every count carries its source and its read time.
+  expect(node.querySelector('.accounting-close-questions')?.textContent).toContain('Pending questions on the current reading, from the review queue (financial_review_queue) · read Oct 25, 2026, 4:00 PM');
+  expect(node.textContent).toContain('Counts read Oct 25, 2026, 4:00 PM from the close-out (accounting_closeout); filing state and facts from the facts register (books_year_state).');
+  await act(async () => (Array.from(node.querySelectorAll('.accounting-close-item button')).find(b => b.textContent!.includes('Income with no named payer')) as HTMLButtonElement).click());
+  expect(drill).toHaveBeenCalledWith({ year: '2024', item: 'revenue_no_payer', label: 'Income with no named payer' });
   await act(async () => (node.querySelector('.accounting-close-questions') as HTMLButtonElement).click());
   expect(questions).toHaveBeenCalled();
 });
 
 it('shows income-payer status only for years with income records, and a failed gate read as not assessed', async () => {
-  const noIncome = year({ year: '2023', books: { decisions: 2, revenue_records: 0, revenue: null, expense_records: 2, expense: 10, revised_at: null } });
-  const data: Closeout = { read_at: '2026-10-25T23:00:00Z', books_revised_at: null, questions: { pending_current: 0, by_resolver: {} }, years: [year({}), noIncome] };
-  fixture.rpc.mockImplementation(async (name: string) => name === 'accounting_closeout' ? { data, error: null } : { data: null, error: { code: '57014' } });
+  const noIncomeYear = year({ year: '2023', books: { decisions: 2, revenue_records: 0, revenue: null, expense_records: 2, expense: 10, revised_at: null } });
+  const data: Closeout = { read_at: '2026-10-25T23:00:00Z', books_revised_at: null, questions: { pending_current: 0, by_resolver: {} }, years: [year({}), noIncomeYear] };
+  vi.useFakeTimers();
+  serve(name => name === 'accounting_closeout' ? { data, error: null } : name === 'books_year_state' ? { data: stateOf(), error: null } : { data: null, error: { code: '57014' } });
   await act(async () => root.render(inBook(<FinishTaxes onDrill={vi.fn()} onQuestions={vi.fn()} />)));
+  await later(3000);
   const cards = node.querySelectorAll('.accounting-close-year');
   expect(cards[0].textContent).toContain('Income with no named payer');
   expect(cards[0].textContent).toContain('Not assessed');
@@ -76,11 +94,67 @@ it('shows income-payer status only for years with income records, and a failed g
   expect(node.textContent).not.toContain('Checking…');
 });
 
-it('a failed read says so and never shows zero', async () => {
-  fixture.rpc.mockResolvedValue({ data: null, error: { code: '57014' } });
+it('a failed read is tried once more, then says so and never shows zero', async () => {
+  vi.useFakeTimers();
+  serve(() => ({ data: null, error: { code: '57014' } }));
   await act(async () => root.render(inBook(<FinishTaxes onDrill={vi.fn()} onQuestions={vi.fn()} />)));
-  expect(node.querySelector('[role="alert"]')?.textContent).toContain('could not load');
+  // The first failure shows no error yet: the read is tried again a moment later (the first load failed under load, 2026-10-29).
+  await later(100);
+  expect(node.querySelector('[role="alert"]')).toBeNull();
+  expect(node.textContent).toContain('Reading where each tax year stands');
+  await later(2000);
+  expect(reads('accounting_closeout')).toBe(2);
+  expect(node.querySelector('[role="alert"]')?.textContent).toContain('Where each tax year stands could not load.');
   expect(node.textContent).not.toContain('$0');
+  // and the retry button reads again
+  const data: Closeout = { read_at: '2026-10-25T23:00:00Z', books_revised_at: null, questions: { pending_current: 0, by_resolver: {} }, years: [year({})] };
+  serve(name => name === 'accounting_closeout' ? { data, error: null } : name === 'books_year_state' ? { data: stateOf(), error: null } : { data: noIncome, error: null });
+  await act(async () => (node.querySelector('[role="alert"] button') as HTMLButtonElement).click());
+  await later(500);
+  expect(node.querySelector('.accounting-close-answer')?.textContent).toBe('You owe $900');
+});
+
+it('a read that fails once and succeeds on the second try shows the status without an error', async () => {
+  vi.useFakeTimers();
+  const data: Closeout = { read_at: '2026-10-25T23:00:00Z', books_revised_at: null, questions: { pending_current: 0, by_resolver: {} }, years: [year({})] };
+  let tries = 0;
+  serve(name => name === 'accounting_closeout' ? (++tries === 1 ? { data: null, error: { code: '503' } } : { data, error: null }) : name === 'books_year_state' ? { data: stateOf(), error: null } : { data: noIncome, error: null });
+  await act(async () => root.render(inBook(<FinishTaxes onDrill={vi.fn()} onQuestions={vi.fn()} />)));
+  await later(2500);
+  expect(node.querySelector('.accounting-close-answer')?.textContent).toBe('You owe $900');
+  expect(node.querySelector('[role="alert"]')).toBeNull();
+});
+
+// ── No total across the years, and a year on hold says so ─────────────────────────────────────────────────────────────────
+const refund = (y: string, amount: number) => year({ year: y, return: { ...year({}).return!, tax_year: y, result: 'refund', amount } });
+const HOLD_YEAR = 2019; // an invented year, so no test says which real year is on hold
+const hold = (y: number) => ({ local_id: `${y}-FACT-filing-hold`, key: 'filing-hold', topic: 'owner_ruling', status: 'settled', date: '2026-10-20', decision: 'Hold.', source: 's' }) as any;
+
+it('each year says its own answer and the page adds nothing across them: no total, no "net"; a year on hold says so on its own card', async () => {
+  const data: Closeout = { read_at: '2026-10-25T23:00:00Z', books_revised_at: null, questions: { pending_current: 0, by_resolver: {} }, years: [refund('2024', 1000), refund(String(HOLD_YEAR), 5000)] };
+  serve((name, args) => name === 'accounting_closeout' ? { data, error: null }
+    : name === 'books_year_state' ? { data: stateOf({ year: args.p_year, facts: args.p_year === HOLD_YEAR ? [hold(HOLD_YEAR)] : [] }), error: null } : { data: noIncome, error: null });
+  await act(async () => root.render(inBook(<FinishTaxes onDrill={vi.fn()} onQuestions={vi.fn()} />)));
+  await settle();
+  expect(Array.from(node.querySelectorAll('.accounting-close-answer')).map(n => n.textContent)).toEqual(['You get back $1,000', 'You get back $5,000']);
+  for (const summed of ['Across the', ' net, before', 'before penalties and interest', 'you get back $6,000', 'not counted in the total']) expect(node.textContent).not.toContain(summed);
+  expect(node.querySelector(`#close-${HOLD_YEAR}`)?.textContent).toContain('On hold as of Oct 20, 2026.');
+  expect(node.querySelector('#close-2024')?.textContent).not.toContain('On hold');
+});
+
+it('the docket and Finish your taxes read a year\'s state and the close-out once between them, in one office', async () => {
+  const data: Closeout = { read_at: '2026-10-25T23:00:00Z', books_revised_at: null, questions: { pending_current: 0, by_resolver: {} }, years: [year({})] };
+  serve((name, args) => name === 'accounting_closeout' ? { data, error: null }
+    : name === 'books_gate_status' ? { data: status([gateYear(2024, { run: run(cleanRules) })]), error: null }
+    : name === 'books_year_state' ? { data: stateOf({ year: args.p_year }), error: null } : { data: noIncome, error: null });
+  vi.useFakeTimers();
+  await act(async () => root.render(inBook(<><BooksDocket onDrill={vi.fn()} onOpen={vi.fn()} /><FinishTaxes onDrill={vi.fn()} onQuestions={vi.fn()} /></>)));
+  await later(7000);
+  expect(node.querySelector('#close-2024')).not.toBeNull();
+  expect(node.querySelector('#docket-2024')).not.toBeNull();
+  expect(reads('books_year_state')).toBe(1);
+  expect(reads('accounting_closeout')).toBe(1);
+  expect(reads('books_gate_status')).toBe(1);
 });
 
 it('shows evidence strongest first: one line, the car, the receipt, the statement line, the message, and notes last', async () => {
@@ -144,10 +218,11 @@ it('renders each year from books_year_state: newer result, line 31 net, open ite
     rulings: [{ local_id: '2024-RULING-x', schedule: 'Schedule C', line: '20b', label: 'Schedule C line 20b: synthetic rent', amount: 50, decision: 'Synthetic ruling', date: '2024-12-31' }],
     facts: [{ local_id: '2024-FACT-filing', key: 'filing', topic: 'filing_status', status: 'settled', date: '2026-10-25', decision: 'Synthetic filing status', source: 'synthetic file' }],
     open_items: [{ local_id: '2024-FACT-form', key: 'form', topic: 'form_5471', status: 'open', date: '2026-10-26', decision: 'Synthetic open form', closes_with: 'a synthetic corrected form', source: 's' }] };
-  fixture.rpc.mockImplementation(async (name: string, args: any) => name === 'accounting_closeout' ? { data, error: null }
+  serve((name, args) => name === 'accounting_closeout' ? { data, error: null }
     : name === 'books_year_state' && args.p_year === 2024 ? { data: state, error: null }
     : name === 'accounting_closeout_records' ? { data: { assessed: true, total: 0, amount: 0, rows: [] }, error: null } : { data: null, error: { message: 'unexpected' } });
   await act(async () => root.render(inBook(<FinishTaxes onDrill={vi.fn()} onQuestions={vi.fn()} />)));
+  await settle();
   expect(node.querySelector('.accounting-close-answer')?.textContent).toBe('You get back $300');
   expect(node.textContent).toContain('Schedule C net $301');
   expect(node.textContent).toContain('Closes with: a synthetic corrected form');

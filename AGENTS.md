@@ -169,7 +169,12 @@ into permanent identity types or mandatory arrival choices without a separate mo
 - A year is trusted only when `books_year_gate(owner, year)` passes every rule (R1-R9: one treatment per movement,
   credits are revenue unless proven, no double count, cash method, evidence on expenses of $75+, depreciation from an
   asset register, monthly mixed-use percentages, SE tax/credits/GILTI computed from stored inputs, no drift). Run
-  `scripts/books/books_year_gate_check.py` and list the failures; never fix them silently.
+  `scripts/books/books_year_gate_check.py` and list the failures; never fix them silently. After the last landing, record
+  the gate (`books_year_gate_check.py --record`, bounded at 120 s a year) so the books docket at `/accounting` can show it:
+  a page never calls the gate, and any landing marks every stored run stale. Land filing state first, record the gate last.
+  The docket's first screen lists the large sums rule R12 flags (`books_large_sum_rows`); a paper the owner adds for a row waits as a
+  `supports_record_*` cell until `scripts/books/pending_attachments.py` and `schedule_c_rulings.py correct` cite it in the decision's `proof_links`.
+  The docket's spec and its owner-only rules are in `docs/books-docket.md`.
 
 ## PR titles and commit messages
 The repo is public, and a squash merge puts the PR title (or a single commit's subject) on `main` as the

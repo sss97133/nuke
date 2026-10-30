@@ -2,8 +2,8 @@
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-const fixture = vi.hoisted(() => ({ invoke: vi.fn(), from: vi.fn(), classify: vi.fn(), listener: null as null | ((event: string, session?: {user: {id: string}} | null) => void) }));
-vi.mock('../../lib/supabase', () => ({ supabase: { functions: { invoke: fixture.invoke }, from: fixture.from, auth: {
+const fixture = vi.hoisted(() => ({ invoke: vi.fn(), from: vi.fn(), rpc: vi.fn(), classify: vi.fn(), listener: null as null | ((event: string, session?: {user: {id: string}} | null) => void) }));
+vi.mock('../../lib/supabase', () => ({ supabase: { functions: { invoke: fixture.invoke }, from: fixture.from, rpc: fixture.rpc, auth: {
   onAuthStateChange(listener: (event: string, session?: {user: {id: string}} | null) => void) { fixture.listener = listener; return { data: { subscription: { unsubscribe() {} } } }; },
 } } }));
 vi.mock('../../services/financialRecordClassification', async importOriginal => ({ ...await importOriginal<object>(), classifyRecords: fixture.classify }));
@@ -29,7 +29,7 @@ const queries = () => fixture.from.mock.results.map(r => r.value as Query);
 const filters = (query: Query, method: string) => query.calls.filter(([m]: [string, unknown[]]) => m === method).map(([, args]: [string, unknown[]]) => args);
 const book = (ui: React.ReactNode) => <AccountingBookContext.Provider value={{ ownerId: 'owner', shared: false, canCorrect: true, liveRevision: '0' }}>{ui}</AccountingBookContext.Provider>;
 beforeEach(() => {
-  (globalThis as unknown as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true; fixture.invoke.mockReset(); fixture.from.mockReset(); fixture.classify.mockReset(); forgetAccountingCategories();
+  (globalThis as unknown as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true; fixture.invoke.mockReset(); fixture.from.mockReset(); fixture.rpc.mockReset(); fixture.classify.mockReset(); forgetAccountingCategories();
   fixture.invoke.mockResolvedValue(response(empty()));
   fixture.from.mockImplementation(() => table({}));
   // Node's own experimental localStorage global shadows jsdom's and is undefined here; give the page a plain one.
@@ -366,4 +366,46 @@ it('keeps selected filter options visible and applied after summary controls fai
   }
   const request = queries().filter(query => filters(query, 'select').some(args => args[0] === 'id, document_id, record')).at(-1)!;
   expect(filters(request, 'eq')).toEqual(expect.arrayContaining([['year','2024'], ['section','Expense'], ['currency','USD'], ['account','Checking A']]));
+});
+
+// ── The decisions behind a number of the books docket ─────────────────────────────────────────────────────────────────────
+const tierRow = (id: string, over: object = {}) => ({ ...record(id, `Synthetic purchase ${id}`), proof: { tier: 'C', tier_reason: 'no bank line', proof_basis: null, pay_proof: false, doc_proof: false, purpose_proof: true,
+  has_owner_ruling: true, is_274: false, needs_receipt: false, is_caveat: false, structural_rule: null, payment_cites: [], document_cites: [{ kind: 'file', ref: 'receipt.pdf' }],
+  ruling_cites: [{ kind: 'owner_ruling', ref: 'ruling-1' }], rule_cites: [{ basis: 'category rule', citation: 'rule-7' }], structural_cites: null }, ...over });
+
+it('lists the decisions behind a tier of the docket from books_tier_records, each with the proof the view used, and opens its evidence', async () => {
+  fixture.rpc.mockResolvedValue({ data: { assessed: true, total: 2, amount: 330, rows: [tierRow('t1'), tierRow('t2')] }, error: null });
+  const onOpen = vi.fn();
+  await act(async () => root.render(book(<FinancialWorkpapers revision={0} onOpen={onOpen} focus={{ year: '2024', item: 'tier_c', label: 'Tier C deductions' }} />)));
+  expect(fixture.rpc).toHaveBeenCalledWith('books_tier_records', { p_owner_id: 'owner', p_year: '2024', p_class: 'tier_c', p_limit: 100, p_offset: 0 });
+  expect(fixture.rpc).not.toHaveBeenCalledWith('accounting_closeout_records', expect.anything());
+  expect(container.querySelector('.accounting-focus h3')?.textContent).toBe('Tier C deductions · 2024');
+  expect(container.querySelector('.accounting-focus')?.textContent).toContain('2 records · $330 · largest first. Open one to see its evidence.');
+  const rows = Array.from(container.querySelectorAll('.accounting-row'));
+  expect(rows).toHaveLength(2);
+  expect(rows[0].querySelector('.accounting-proof summary')?.textContent).toBe('Tier C · no bank line');
+  const lines = Array.from(rows[0].querySelectorAll('.accounting-proof li')).map(li => li.textContent);
+  expect(lines).toEqual(['No bank line cited', 'Document cited: receipt.pdf (file)', 'Owner ruling cited: ruling-1 (owner_ruling)', 'Category rule: rule-7']);
+  // opening a proof does not open the evidence; the evidence button does
+  await act(async () => (rows[0].querySelector('.accounting-proof summary') as HTMLElement).click());
+  expect(onOpen).not.toHaveBeenCalled();
+  await act(async () => (rows[0].querySelector('.accounting-cell-evidence button') as HTMLButtonElement).click());
+  expect(onOpen).toHaveBeenCalledWith('doc', expect.objectContaining({ local_id: 't1' }));
+});
+
+it('a close-out item still reads accounting_closeout_records, and its rows carry no proof line', async () => {
+  fixture.rpc.mockResolvedValue({ data: { assessed: true, total: 1, amount: 12.5, rows: [record('c1')] }, error: null });
+  await act(async () => root.render(book(<FinancialWorkpapers revision={0} onOpen={() => {}} focus={{ year: '2024', item: 'expense_no_proof', label: 'Expenses with no bank line and no receipt' }} />)));
+  expect(fixture.rpc).toHaveBeenCalledWith('accounting_closeout_records', { p_owner_id: 'owner', p_year: '2024', p_item: 'expense_no_proof', p_limit: 100, p_offset: 0 });
+  expect(fixture.rpc).not.toHaveBeenCalledWith('books_tier_records', expect.anything());
+  expect(container.querySelectorAll('.accounting-row')).toHaveLength(1);
+  expect(container.querySelector('.accounting-proof')).toBeNull();
+});
+
+it('a tier drill that cannot load says so and offers a retry, never an empty list', async () => {
+  fixture.rpc.mockResolvedValue({ data: null, error: { code: '57014' } });
+  await act(async () => root.render(book(<FinancialWorkpapers revision={0} onOpen={() => {}} focus={{ year: '2024', item: 'tier_c', label: 'Tier C deductions' }} />)));
+  expect(container.textContent).toContain('Saved records could not load.');
+  expect(container.querySelector('.accounting-row')).toBeNull();
+  expect(container.textContent).not.toContain('No saved records match');
 });

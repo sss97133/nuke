@@ -5,13 +5,13 @@ import { expenseUseKey, type ExpenseUse } from '../../services/financialExpenseU
 import { remember, remembered } from './accountingMemory';
 import RecordClassifier, { type ClassifyTarget } from './RecordClassifier';
 import type { Drill } from './FinishTaxes';
-import { dollars, readCloseoutRecords } from '../../services/accountingCloseout';
+import { dollars, readDrillRecords, type RowProof } from '../../services/accountingCloseout';
 
 export type SavedRecord = { id: string; document_id: string; record: {
   record_kind: string; local_id: string; year: string; date: string | null; account: string | null;
   section: string | null; category: string | null; amount: string | null; currency: string | null;
   description?: string; decision?: string; status?: string; source_key?: string; source_reference?: string;
-} };
+}; /** Present on the rows of a tier drill (books_tier_records): why the decision sits in its tier. */ proof?: RowProof };
 type Control = { record_kind: string; year: string; account: string | null; currency: string | null; section: string | null; rows: number; missing_amounts?: number; retained_amount: string | number | null };
 type Workpapers = { records: SavedRecord[]; total_rows: number; next_after: string | null; controls_valid: boolean; controls: Control[] };
 const defaultPageSize = 100;
@@ -165,7 +165,7 @@ export default function FinancialWorkpapers({ revision, onOpen, viewerId, focus 
     setRows(null); setHasMoreRows(false); setRowsError('');
     if (focus) {
       setFocusTotal(null);
-      readCloseoutRecords(bookId, focus.year, focus.item, rowsPerPage, tablePage * rowsPerPage).then(result => {
+      readDrillRecords(bookId, focus.year, focus.item, rowsPerPage, tablePage * rowsPerPage).then(result => {
         if (cancelled || identityGeneration.current !== identity) return;
         setRowsError(''); setRows(result.rows); setFocusTotal({ total: result.total, amount: result.amount });
         setHasMoreRows(result.total !== null && tablePage * rowsPerPage + result.rows.length < result.total);
@@ -252,7 +252,7 @@ export default function FinancialWorkpapers({ revision, onOpen, viewerId, focus 
       {data?.total_rows === 0 && !summaryLoading && view !== 'records' && <p>No bookkeeping records have been recovered into this account yet.</p>}
       {view === 'records' && focus && <div className="accounting-focus" role="region" aria-label="Close-out records">
         <h3>{focus.label} · {focus.year}</h3>
-        <p className="accounting-muted">{focusTotal ? `${(focusTotal.total ?? 0).toLocaleString('en-US')} records · ${dollars(focusTotal.amount)} · largest first` : 'Reading the records…'} Open one to see its evidence.</p>
+        <p className="accounting-muted">{focusTotal ? `${(focusTotal.total ?? 0).toLocaleString('en-US')} records · ${dollars(focusTotal.amount)} · largest first.` : 'Reading the records…'} Open one to see its evidence.</p>
         <button type="button" onClick={() => onLeaveFocus?.()}>Back to all records</button>
       </div>}
       {(view === 'records' || (view === 'accounts' && data && !summaryLoading)) && <>
@@ -280,7 +280,7 @@ export default function FinancialWorkpapers({ revision, onOpen, viewerId, focus 
           {!rows && !rowsError && <p role="status">Loading saved records…</p>}
           {rows && <div className="accounting-table-wrap"><table className={selecting ? 'accounting-records-table accounting-selecting' : 'accounting-records-table'}><thead><tr>{selecting && <th className="accounting-select"><input type="checkbox" aria-label="Select every record on this page" checked={pageSelected} disabled={!selectable.length} onChange={togglePage} /></th>}{sortable('record_date', 'Date')}{sortable('description', 'Transaction / decision')}{sortable('account', 'Account')}{sortable('section', 'Classification')}{sortable('amount_value', 'Amount')}<th className="accounting-cell-use">Vehicle / shop use</th><th className="accounting-cell-evidence">Evidence</th></tr></thead><tbody>{rows.map(row => <tr key={row.id} className="accounting-row" aria-selected={selecting ? selected.has(row.record.source_key || '') : undefined} onClick={() => selecting ? toggle(row) : onOpen(row.document_id, row.record)}>
             {selecting && <td className="accounting-select"><input type="checkbox" aria-label={`Select ${recordDescription(row.record.description) || 'record'}`} checked={selected.has(row.record.source_key || '')} disabled={!row.record.source_key} onClick={event => event.stopPropagation()} onChange={() => toggle(row)} /></td>}
-            <td className="accounting-cell-date">{row.record.date || row.record.year}</td><td className="accounting-cell-desc"><button type="button" className="accounting-record-open" onClick={event => { event.stopPropagation(); if (selecting) toggle(row); else onOpen(row.document_id, row.record); }}><span className="accounting-record-description">{recordDescription(row.record.description) || 'Saved record'}</span></button><small>{row.record.record_kind === 'retained_bank_movement' ? 'Bank movement' : 'Bookkeeping decision'}</small></td><td className="accounting-cell-account">{row.record.account || 'Not recorded'}</td><td className="accounting-cell-class">{row.record.section || 'Unclassified'}<small>{row.record.category}</small></td><td className="accounting-number accounting-cell-amount">{displayMoney(row.record.amount, row.record.currency)}</td><td className="accounting-cell-use">{row.record.section === 'Expense' && row.record.record_kind === 'retained_ledger_decision' ? useError ? 'Use unavailable' : row.record.source_key && uses[row.record.source_key]?.destination_label || 'Unassigned' : '—'}</td><td className="accounting-cell-evidence"><button type="button" onClick={event => { event.stopPropagation(); onOpen(row.document_id, row.record); }}>View evidence</button></td>
+            <td className="accounting-cell-date">{row.record.date || row.record.year}</td><td className="accounting-cell-desc"><button type="button" className="accounting-record-open" onClick={event => { event.stopPropagation(); if (selecting) toggle(row); else onOpen(row.document_id, row.record); }}><span className="accounting-record-description">{recordDescription(row.record.description) || 'Saved record'}</span></button><small>{row.record.record_kind === 'retained_bank_movement' ? 'Bank movement' : 'Bookkeeping decision'}</small>{row.proof && <ProofLine proof={row.proof} />}</td><td className="accounting-cell-account">{row.record.account || 'Not recorded'}</td><td className="accounting-cell-class">{row.record.section || 'Unclassified'}<small>{row.record.category}</small></td><td className="accounting-number accounting-cell-amount">{displayMoney(row.record.amount, row.record.currency)}</td><td className="accounting-cell-use">{row.record.section === 'Expense' && row.record.record_kind === 'retained_ledger_decision' ? useError ? 'Use unavailable' : row.record.source_key && uses[row.record.source_key]?.destination_label || 'Unassigned' : '—'}</td><td className="accounting-cell-evidence"><button type="button" onClick={event => { event.stopPropagation(); onOpen(row.document_id, row.record); }}>View evidence</button></td>
           </tr>)}</tbody></table></div>}
           {rows && !rows.length && <p>No saved records match these filters {selectedYear ? `for ${selectedYear}` : 'across all years'}.</p>}
         </> : <>
@@ -293,6 +293,28 @@ export default function FinancialWorkpapers({ revision, onOpen, viewerId, focus 
       </>}
     </>
   </section>;
+}
+
+/** Why a decision sits in its tier: the view's own reason, then the proof basis and each citation it used, as written. */
+export function proofLines(proof: RowProof): string[] {
+  const named = (items: { kind?: string; ref?: string }[] | null | undefined) => (items || []).map(c => [c.ref, c.kind ? `(${c.kind})` : ''].filter(Boolean).join(' ')).filter(Boolean);
+  return [
+    `Tier ${proof.tier}: ${proof.tier_reason}`,
+    proof.proof_basis ? `Proof basis: ${proof.proof_basis.replace(/_/g, ' ')}` : '',
+    proof.payment_cites.length ? `Bank lines cited: ${proof.payment_cites.join(', ')}` : 'No bank line cited',
+    ...named(proof.document_cites).map(c => `Document cited: ${c}`),
+    ...named(proof.ruling_cites).map(c => `Owner ruling cited: ${c}`),
+    ...(proof.rule_cites || []).map(c => `Category rule: ${c.citation || c.basis}`),
+    ...(proof.structural_cites || []).map(c => `Structural rule ${c.rule}: ${c.detail || c.basis || c.citation || ''}`.trim()),
+    proof.needs_receipt ? `Section 274: needs a receipt${proof.doc_proof ? ' (a document is cited)' : ', none cited'}${proof.is_caveat ? '; caveated' : ''}` : '',
+  ].filter(Boolean);
+}
+function ProofLine({ proof }: { proof: RowProof }) {
+  const lines = proofLines(proof);
+  return <details className="accounting-proof accounting-compact-details" onClick={event => event.stopPropagation()}>
+    <summary>{`Tier ${proof.tier} · ${proof.tier_reason}`}</summary>
+    <ul>{lines.slice(1).map((line, i) => <li key={i}>{line}</li>)}</ul>
+  </details>;
 }
 
 /** The selection, frozen for the dialog's life so its outcome stays readable while the list behind it refreshes. */

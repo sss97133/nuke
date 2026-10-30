@@ -22,3 +22,8 @@ export function rankLabel(rank: Measure['rank'], floor: number = RANK_FLOOR): st
   if (!rank || !Number.isFinite(rank.p) || rank.n < floor) return null;
   return `P${Math.round(Math.min(100, Math.max(0, rank.p)))}`;
 }
+
+/** A count with its noun: "1 row", "2 rows", "1,204 rows". A noun whose plural is not "s" gives it: plural(2, 'row needs', 'rows need'). */
+export function plural(n: number, one: string, many: string = `${one}s`): string {
+  return `${n.toLocaleString('en-US')} ${n === 1 ? one : many}`;
+}
