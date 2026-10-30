@@ -648,6 +648,7 @@ Deno.serve(async (req) => {
  * tuple and DB ingestion clock; this producer never writes snapshot metadata.
  */
 async function replayNativeProperties(supabase: any, body: any): Promise<Response> {
+  let writes: number | null = 0;
   const reply = (data: any, status = 200) => new Response(JSON.stringify(data),
     { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   const uuid = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
@@ -725,19 +726,32 @@ async function replayNativeProperties(supabase: any, body: any): Promise<Respons
         source_profile: "retained_native_fields_v1", claim_role: "extractor_claim",
         factory_configuration_status: "unknown", current_configuration_status: "unknown" },
       content_text: "Deterministic retained native-field extraction. Source labels and extractor claims only; physical identity, factory/current configuration and source event time remain unverified." };
+    // Once intake starts, a lost response cannot establish zero writes. A
+    // canonical acknowledgement can establish its own append/duplicate count.
+    writes = null;
     const intake = await supabase.functions.invoke("ingest-observation", { body: input });
+    if (intake.data?.success === true && typeof intake.data.duplicate === "boolean") writes = intake.data.duplicate ? 0 : 1;
     if (intake.error || intake.data?.success !== true || !uuid.test(intake.data.observation_id ?? "")) throw Error("Native field intake failed");
-    const admitted = await supabase.from("vehicle_observations").select("id,vehicle_id,source_url,raw_source_ref,kind,is_superseded,structured_data,extraction_method")
+    const admitted = await supabase.from("vehicle_observations").select("id,vehicle_id,source_id,source_identifier,source_observation_id,property_id,subject_type,subject_id,observed_at,ingested_at,confidence_score,source_url,raw_source_ref,kind,is_superseded,structured_data,extraction_method")
       .eq("id", intake.data.observation_id).maybeSingle();
     const o = admitted.data;
+    const { observationClockMicroseconds } = await import("../_shared/observationContentHash.ts");
+    const ingested = observationClockMicroseconds(o?.ingested_at), archived = observationClockMicroseconds(s.created_at);
+    const sourceId = s.platform === "mecum" ? "fee71d50-c59c-4340-b819-cd9a7d074d7f" : "755185e3-3d21-4373-b806-ddcbf0d5e39c";
     if (admitted.error || !o || o.vehicle_id !== v.id || o.source_url !== s.listing_url || o.raw_source_ref !== input.raw_source_ref ||
+        o.source_id !== sourceId || o.source_identifier !== input.source_identifier || o.source_observation_id !== null ||
+        o.property_id !== null || o.subject_type !== "vehicle" || o.subject_id !== null ||
+        observationClockMicroseconds(o.observed_at) !== observationClockMicroseconds(s.fetched_at) ||
+        ingested === null || archived === null || ingested < archived || ingested > BigInt(Date.now()) * 1000n ||
+        !Number.isFinite(o.confidence_score) || o.confidence_score < .6 || o.confidence_score > 1 ||
         o.kind !== "listing" || o.is_superseded !== false || o.extraction_method !== input.extraction_method ||
         Object.keys(o.structured_data || {}).sort().join() !== Object.keys(input.structured_data).sort().join() ||
         Object.entries(input.structured_data).some(([k, value]) => o.structured_data[k] !== value)) throw Error("Native receipt withdrawn, relinked or changed");
     return reply({ success: true, mode: body.mode, native_property_profile: "retained_native_fields_v1", dry_run: false, vehicle_id: v.id, snapshot_id: s.id,
       observation_id: o.id, duplicate: intake.data.duplicate, field_keys: Object.keys(fields), model_calls: 0,
       writes: intake.data.duplicate ? 0 : 1, source_to_reader_verified: false });
-  } catch (error) { return reply({ success: false, error: error instanceof Error ? error.message : "Native replay refused", writes: 0, model_calls: 0 }, 409); }
+  } catch (error) { return reply({ success: false, error: error instanceof Error ? error.message : "Native replay refused", writes,
+    receipt_verified: false, model_calls: 0 }, 409); }
 }
 
 async function qualifySourceSales(supabase: any, body: any): Promise<Response> {
