@@ -23,7 +23,8 @@ export type Item = { key: string; label: string; kind: string | null; questionKe
 export type Progress = {
   rung: Rung | null; rungs: Rung[];
   proven: Item[]; open: Item[]; contradicted: Item[]; next: Item[];
-  lastChange: { at: string | null; what: string | null; toStatus: string | null; movedFrom: string | null; movedTo: string | null } | null;
+  received: Array<{ key: string; label: string; sourceRead: string; assessment: string }>;
+  lastChange: { at: string | null; what: string | null; toStatus: string | null; movedFrom: string | null; movedTo: string | null; eventKind: string | null } | null;
 };
 
 const CLASS_WORDS: Record<string, string> = { base: 'base', trans_am: 'Trans Am', sd: 'SD', clone: 'clone' };
@@ -82,7 +83,11 @@ export function readProgress(v: unknown): Progress | null {
   const lc = obj(p.last_change);
   const out: Progress = {
     rung, rungs, proven: items(p.proven, 'proven'), open: items(p.open, 'open'), contradicted: items(p.contradicted, 'contradicted'), next: items(p.next, 'open').slice(0, 3),
-    lastChange: lc ? { at: str(lc.at), what: str(lc.what), toStatus: str(lc.to_status), movedFrom: str(lc.moved_from), movedTo: str(lc.moved_to) } : null,
+    received: arr(p.received).flatMap(v => {
+      const r = obj(v); const key = str(r?.key); const label = str(r?.label);
+      return key && label ? [{ key, label, sourceRead: str(r?.source_read_status) ?? 'pending', assessment: str(r?.assessment_status) ?? 'unresolved' }] : [];
+    }),
+    lastChange: lc ? { at: str(lc.at), what: str(lc.what), toStatus: str(lc.to_status), movedFrom: str(lc.moved_from), movedTo: str(lc.moved_to), eventKind: str(lc.event_kind) } : null,
   };
   return out.rung || out.rungs.length || out.proven.length || out.open.length || out.next.length ? out : null;
 }
@@ -118,6 +123,7 @@ export function movedText(p: Progress | null): string | null {
   const all = [...p.proven, ...p.open, ...p.contradicted];
   const item = lc.what ? all.find(i => i.key === lc.what || i.label === lc.what) : null;
   const label = item?.label ?? lc.what;
+  if (lc.eventKind === 'input_received') return `${label ?? 'Input'} received. Evidence checks are pending.`;
   const verb = lc.toStatus === 'proven' ? 'is now proven' : lc.toStatus === 'contradicted' ? 'is now contradicted' : lc.toStatus ? `is now ${lc.toStatus}` : 'changed';
   const rungName = (k: string) => p.rungs.find(r => r.key === k)?.label ?? k;
   const move = lc.movedTo && lc.movedFrom && lc.movedTo !== lc.movedFrom ? ` The car moved from ${rungName(lc.movedFrom)} to ${rungName(lc.movedTo)}.` : '';
@@ -163,6 +169,9 @@ export function IntakeLadder({ progress, moved, audience, subject }: { progress:
       {rung.band?.reasoning && <blockquote className="ct-reasoning"><Text role="body">{rung.band.reasoning}</Text></blockquote>}
     </div>}
     {counts && <Text role="caption" as="p" className="ct-ladder__counts">{counts}</Text>}
+    {progress.received.length > 0 && <ul aria-label="Received evidence">{progress.received.map(r => <li key={r.key}>
+      <Text role="caption">{r.label}: received · {r.sourceRead === 'read' ? 'source read' : r.sourceRead === 'failed' ? 'reading failed' : 'reading pending'} · {r.assessment === 'supported' ? 'claim supported' : r.assessment === 'contradicted' ? 'claim contradicted' : 'claim unresolved'}</Text>
+    </li>)}</ul>}
     {moved && <p className="ct-moved" role="status"><Text role="body">{moved}</Text></p>}
     {progress.next.length > 0 && <div className="ct-ladder__next">
       <Text role="label">{audience === 'contributor' ? 'What moves it next' : 'Next'}</Text>

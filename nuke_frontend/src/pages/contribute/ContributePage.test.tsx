@@ -179,19 +179,19 @@ describe('ContributePage', () => {
     expect(file).toHaveBeenCalledWith(TOKEN, f, 'receipt', 'pad');
   });
 
-  it('a saved answer carries the ladder after it and says what moved', async () => {
-    const after = { ...PROGRESS, rung: { key: 'r2', label: 'Engine numbers shot', band: BAND('trans_am', 38, 49575, 95125, ['ae-4']) },
-      proven: [...PROGRESS.proven, { key: 'q1', label: 'The block' }], open: [{ key: 'pad', label: 'Engine pad stamp' }],
-      last_change: { at: '2026-10-29T20:00:00Z', what: 'q1', from_status: 'open', to_status: 'proven', moved_from: 'r1', moved_to: 'r2' } };
+  it('a saved answer confirms receipt while evidence checks and the value rung stay separate', async () => {
+    const after = { ...PROGRESS,
+      received: [{ key: 'q1', label: 'The block', source_read_status: 'pending', assessment_status: 'unresolved' }],
+      last_change: { at: '2026-10-29T20:00:00Z', what: 'q1', event_kind: 'input_received', from_status: 'not_received', to_status: 'received' } };
     const answer = vi.fn().mockResolvedValue({ ok: true, body: { observation_id: 'o1', progress: after } });
     await render({ open: async () => ({ status: 200, body: { ...CARD, progress: PROGRESS } }), answer, file: vi.fn() });
     const ta = host.querySelector('textarea')!;
     await act(async () => { setText(ta, 'A 1970 455'); });
     await act(async () => { ta.dispatchEvent(new FocusEvent('focusout', { bubbles: true })); });
-    expect(host.textContent).toContain('Engine numbers shot: $49,575 to $95,125');
-    expect(host.textContent).toContain('what Trans Am lots sold for');
-    expect(host.querySelector('.ct-moved')?.textContent).toBe('The block is now proven. The car moved from As the frames show it today to Engine numbers shot.');
-    expect(host.querySelectorAll('.ct-rung--reached').length).toBe(2);
+    expect(host.querySelector('.ct-moved')?.textContent).toBe('The block received. Evidence checks are pending.');
+    expect(host.querySelector('[aria-label="Received evidence"]')?.textContent).toContain('received · reading pending · claim unresolved');
+    expect(host.querySelectorAll('.ct-rung--reached').length).toBe(1);
+    expect(host.querySelector('.ct-moved')?.textContent).not.toContain('proven');
   });
 });
 

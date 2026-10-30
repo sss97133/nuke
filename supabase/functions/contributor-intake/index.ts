@@ -11,9 +11,10 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import exifr from "npm:exifr@7.1.3";
 import { corsHeaders } from "../_shared/cors.ts";
-import { requireWriteAuth } from "../_shared/writeGuard.ts";
+import { isServiceCaller, requireWriteAuth } from "../_shared/writeGuard.ts";
 import { projectPublishableKey, projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { defaultLimiter, type FrameRow, handle, NOT_FOUND_BODY, TOKEN_RE, type JsonObject } from "./core.ts";
+import { reviewRetainedInputs } from "./reviewWork.ts";
 
 const headers = { ...corsHeaders, "Access-Control-Allow-Methods": "GET, POST, OPTIONS" };
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -41,6 +42,18 @@ Deno.serve(async (req) => {
   const denied = await requireWriteAuth(req, { allowAnonymous: carriesToken, headers });
   if (denied) return json(NOT_FOUND_BODY, 404);
   try {
+    if (new URL(req.url).pathname.endsWith('/review')) {
+      if (req.method !== 'POST' || !(await isServiceCaller(req))) return json(NOT_FOUND_BODY, 404);
+      const body = await req.json();
+      if (body?.action !== 'retained_review' || body?.platform_credential === true ||
+          (body?.user_id != null && (typeof body.user_id !== 'string' || !/^[a-f0-9-]{36}$/i.test(body.user_id)))) {
+        return json({ error: 'invalid_retained_review_request' }, 400);
+      }
+      return json(await reviewRetainedInputs(service, {
+        limit: typeof body.batch_size === 'number' && Number.isFinite(body.batch_size) ? body.batch_size : 2,
+        userId: body.user_id ?? null,
+      }), 200);
+    }
     const out = await handle(req, {
       rpc: async (name, args) => {
         const { data, error } = await service.rpc(name, args);
