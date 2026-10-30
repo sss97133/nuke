@@ -220,6 +220,11 @@ export async function retainFetchedCapture(supabase: any, input: {
  * Examples: Cloudflare challenge pages, bare React/Next.js shells, bot walls.
  * These should be archived as success=false so cache lookups don't return garbage.
  */
+export function isAwsWafChallengeHtml(html: string): boolean {
+  const lower = html.toLowerCase();
+  return html.length < 20_000 && lower.includes("awswafintegration") && /token\.awswaf\.com[^\"\'<>]*\/challenge\.js/.test(lower);
+}
+
 export function isGarbageHtml(html: string, platform: string): boolean {
   if (!html || html.length === 0) return true;
 
@@ -232,7 +237,7 @@ export function isGarbageHtml(html: string, platform: string): boolean {
   if (lower.includes("cf_chl_opt")) return true;
 
   // AWS WAF can return HTTP 202 with a challenge script and no source content.
-  if (html.length < 20_000 && lower.includes("awswafintegration") && /token\.awswaf\.com[^\"\'<>]*\/challenge\.js/.test(lower)) return true;
+  if (isAwsWafChallengeHtml(html)) return true;
 
   // Generic access denied / blocked
   if (lower.includes("access denied") && html.length < 5000) return true;

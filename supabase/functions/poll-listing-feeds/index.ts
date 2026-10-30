@@ -30,7 +30,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { firecrawlScrape } from "../_shared/firecrawl.ts";
 import { firecrawlGate, ALLOWANCE_EXHAUSTED } from "../_shared/firecrawlGate.ts";
-import { archiveFetch, isGarbageHtml } from "../_shared/archiveFetch.ts";
+import { archiveFetch, isAwsWafChallengeHtml, isGarbageHtml } from "../_shared/archiveFetch.ts";
 import { fetchMecumFeedUrls } from "../_shared/mecumSearch.ts";
 import { fetchCraigslistFeed } from "./feedFetch.ts";
 import { extractCraigslistCanonicalUrls } from "../_shared/urlNormalization.ts";
@@ -725,9 +725,10 @@ async function pollFirecrawlHtmlFeed(
     }
 
     // A challenge is a source refusal, never a parser failure or an empty feed.
-    if (blockNote || (html && isGarbageHtml(html, feed.source_slug))) {
+    if (blockNote || (html && isAwsWafChallengeHtml(html))) {
       return await failFeed(`blocked: source challenge${blockNote}`);
     }
+    if (html && isGarbageHtml(html, feed.source_slug)) return await failFeed("fetch_failed: invalid_source_body");
     htmlForCards = html;
     // Per-feed regex config generalizes this path beyond Craigslist; feeds
     // without a listing_url_regex keep the CL extractor (the original behavior).

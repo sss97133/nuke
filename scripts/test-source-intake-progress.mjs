@@ -121,7 +121,7 @@ export function fixture(options = {}) {
       if (name.endsWith('/normalizeVehicle.ts')) return { isGarbageMake: () => false };
       if (name.endsWith('/urlNormalization.ts')) return { extractCraigslistCanonicalUrls: () => [] };
       if (name.endsWith('/archiveFetch.ts')) return { archiveFetch: options.archive ?? (() => { throw new Error('unexpected acquisition'); }),
-        isGarbageHtml: options.isGarbageHtml ?? (() => false) };
+        isGarbageHtml: options.isGarbageHtml ?? (() => false), isAwsWafChallengeHtml: options.isAwsWafChallengeHtml ?? (() => false) };
       if (name.endsWith('/firecrawl.ts')) return { firecrawlScrape: () => { throw new Error('unexpected paid provider'); } };
       throw new Error(`Unexpected feed import ${name}`);
     },
@@ -497,8 +497,16 @@ test('a Mecum search refusal fails without a paid fallback or ingestion', async 
 test('a challenge body fails as blocked before regex matching or ingestion', async () => {
   const f = fixture({ feed: { source_slug: 'gateway', search_criteria: { fetch_strategy: 'firecrawl_html', prefer_direct_fetch: true,
     listing_url_regex: 'https://www.gatewayclassiccars.com/vehicle/[^" ]+' } },
-    archive: async () => ({ html: '<html>challenge</html>', statusCode: 202, error: null }), isGarbageHtml: () => true });
+    archive: async () => ({ html: '<html>challenge</html>', statusCode: 202, error: null }), isAwsWafChallengeHtml: () => true });
   const result = await f.request();
   assert.equal(result.body.results[0].error, 'blocked: source challenge');
+  assert(!f.calls.some(c => c.path === '/functions/v1/ingest'));
+});
+
+test('an invalid source shell is not mislabeled as a confirmed challenge', async () => {
+  const f = fixture({ feed: { source_slug: 'bonhams', search_criteria: { fetch_strategy: 'firecrawl_html', prefer_direct_fetch: true } },
+    archive: async () => ({ html: '<html>empty shell</html>', statusCode: 200, error: null }), isGarbageHtml: () => true });
+  const result = await f.request();
+  assert.equal(result.body.results[0].error, 'fetch_failed: invalid_source_body');
   assert(!f.calls.some(c => c.path === '/functions/v1/ingest'));
 });
