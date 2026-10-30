@@ -12,10 +12,11 @@ import BooksDocket from '../../components/finance/BooksDocket';
 import { remember, remembered } from '../../components/finance/accountingMemory';
 /**
  * FinanceDashboard: the private accounting office.
- * Routes: /accounting and /publishing/finance, both behind ProtectedRoute (signed-in only).
+ * Route: /accounting, behind ProtectedRoute (signed-in only). The older /publishing/finance path redirects there.
  *
- * The Books view opens on the Books docket (the stored reconciliation gate, how the deductions are supported, statement ties, paperwork and
- * what is open, per tax year), then Finish your taxes, then the book's records. The docket is the owner's own book only.
+ * The Books view opens on the Books docket (per tax year: the large sums that need paper, with a way to add the paper; the stored reconciliation
+ * gate; how the deductions are supported; statement ties; paperwork; what is open), then Finish your taxes, then the book's records. The docket
+ * is the owner's own book only.
  *
  * Data sources, all bound to the signed-in account's own book by row policy (a visitor gets nothing, a stranger gets zero rows):
  *   - the accounting readers (accounting_closeout, books_year_state, books_gate_status, v_books_audit_tier_years, v_books_citation_links)

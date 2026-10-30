@@ -2,25 +2,20 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { expect, it } from 'vitest';
 import {
-  ATTACH_ANY, ATTACH_KINDS, FLAG_ASKS, THREAD_KINDS, PAPER_BY_KIND, PAPER_BY_RULE, attachChoices, attachLabel, attachedLine, byKindLine, canAttach, citedLine, gateRowCaption, gateRowLine, gateVerdict, liveCaption, liveHeading,
-  listVsRun, missingDocTotal, needsOf, openLine, outsideBankTotal, paperWord, paperwork, pct, returnMatchesLine, rowTitle, ruleLine, ruleState, shortCauses, tierExcludedLine,
+  ATTACH_ANY, DOC_KIND, FLAG_ASKS, LEGEND, THREAD_KINDS, PAPER_BY_RULE, RULE_STATE_WORDS, RULE_TONE, VERDICT_TONE, attachChoices, attachLabel, attachedLine, byKindLine, canAttach, citedLine, doorLine, driftLines,
+  gateRowCaption, gateRowLine, gateVerdict, liveCaption, liveHeading, missingDocTotal, needsOf, openLine, outsideBankTotal, paperWord, paperwork, pct, returnMatchesLine, rowTitle, ruleLine, ruleState,
+  shortCauses, tier274Line, tierExcludedLine, tierHeadline, tieClasses, tieCitationLine,
 } from './booksDocketWords';
 import { filingOf, forEarlierDraft, yearsPhrase } from './filingState';
 import { linkRef } from '../../services/financialEvidenceIntake';
-import type { GateRule, GateYear, LargeSumRow, LargeSumYear, RunContext, TierYear, YearState } from '../../services/accountingCloseout';
+import type { GateYear, LargeSumYear, RunContext, TierYear, YearState } from '../../services/accountingCloseout';
+import { attempt, gateYear, largeRow, largeYear, record as rec, rule, run, tie, tier } from './__fixtures__/books';
 
-// Synthetic values only.
-const rule = (id: string, status: string, n: number, of: number | null, extra: object = {}): GateRule => ({ rule: id, title: `t ${id}`, status, n, of, amount: null, ...extra });
-const counts = (rules: GateRule[]) => ({ total: rules.length, pass: rules.filter(r => r.status === 'pass').length, fail: rules.filter(r => r.status === 'fail').length,
-  not_assessed: rules.filter(r => r.status !== 'pass' && r.status !== 'fail').length, empty: rules.filter(r => r.status === 'pass' && r.of === 0).length });
-const withRun = (rules: GateRule[], over: object = {}): GateYear => {
-  const c = counts(rules); const pass = c.fail === 0 && c.not_assessed === 0;
-  return { year: 2024, draft_document_id: 'd1', drafts_on_file: 1, attempt: null, open_items: { total: 0, owner: 0, cpa: 0, agent: 0, unassigned: 0 },
-    run: { id: 'r', started_at: '2026-10-29T17:30:30Z', finished_at: '2026-10-29T17:31:00Z', duration_ms: 30000, pass, stale: false, stale_books: false, stale_gate: false,
-      trusted: pass && c.empty === 0, rule_counts: c, context: null, rules, ...over } };
-};
-const attempt = (status: 'timed_out' | 'error' | 'complete', finished_at = '2026-10-29T17:32:00Z') => ({ status, started_at: '2026-10-29T17:30:00Z', finished_at, duration_ms: 120000 });
+// Synthetic values only (see __fixtures__/books.ts).
 const clean = [rule('R1', 'pass', 0, 10), rule('R9', 'pass', 0, 5)];
+/** The one row most tests need: a contractor invoice missing on a bank-backed tier B decision, with the payee the title tests read. */
+const sumRow = (over: Partial<ReturnType<typeof largeRow>> = {}) => largeRow(1, { record: rec('L1') as any, ...over });
+const withRun = (rules: ReturnType<typeof rule>[], over: Parameters<typeof run>[1] = {}): GateYear => gateYear(2024, { run: run(rules, over) });
 
 it('the verdict is Trusted only for a fresh pass over populations, and every other state says why', () => {
   expect(gateVerdict(withRun(clean))).toMatchObject({ state: 'trusted', word: 'Trusted', reason: 'Passed 2 of 2 rules on Oct 29, 2026, 10:31 AM' });
@@ -58,12 +53,12 @@ it('the caption says when it ran, how long it took, and what changed or failed s
 });
 
 it('rule lines state their population; a rule with no population concept says passed; the rule ids are never reordered or dropped', () => {
-  expect(ruleLine(rule('R5', 'fail', 3, 170, { amount: 120 }))).toBe('R5 · t R5 · 3 failing of 170 checked · $120');
-  expect(ruleLine(rule('R5', 'pass', 0, 170))).toBe('R5 · t R5 · 0 failing of 170 checked');
-  expect(ruleLine(rule('R2i', 'pass', 0, 0))).toBe('R2i · t R2i · nothing checked');
-  expect(ruleLine(rule('R8a', 'pass', 0, null))).toBe('R8a · t R8a · passed');
-  expect(ruleLine(rule('R8b', 'not_assessed', 0, 4))).toBe('R8b · t R8b · not assessed (4 in the population)');
-  expect(ruleLine(rule('R11', 'something_new', 0, null))).toBe('R11 · t R11 · not assessed');
+  expect(ruleLine(rule('R5', 'fail', 3, 170, { amount: 120 }))).toBe('R5 · title of R5 · 3 failing of 170 checked · $120');
+  expect(ruleLine(rule('R5', 'pass', 0, 170))).toBe('R5 · title of R5 · 0 failing of 170 checked');
+  expect(ruleLine(rule('R2i', 'pass', 0, 0))).toBe('R2i · title of R2i · nothing checked');
+  expect(ruleLine(rule('R8a', 'pass', 0, null))).toBe('R8a · title of R8a · passed');
+  expect(ruleLine(rule('R8b', 'not_assessed', 0, 4))).toBe('R8b · title of R8b · not assessed (4 in the population)');
+  expect(ruleLine(rule('R11', 'something_new', 0, null))).toBe('R11 · title of R11 · not assessed');
   expect(['pass', 'fail', 'not_assessed', 'empty']).toEqual([ruleState(rule('a', 'pass', 0, 3)), ruleState(rule('a', 'fail', 1, 3)), ruleState(rule('a', 'not_assessed', 0, 3)), ruleState(rule('a', 'pass', 0, 0))]);
 });
 
@@ -139,17 +134,12 @@ it('short causes name what keeps a year from being trusted in a few words, and a
 
 // ── Large sums that need paper ────────────────────────────────────────────────────────────────────────────────────────
 
-const rec = (over: object = {}) => ({ record_kind: 'retained_ledger_decision', local_id: 'L1', year: '2024', date: '2024-01-05', account: 'Synthetic', section: 'Expense', category: 'Synthetic category',
-  amount: '4800.00', currency: 'USD', description: 'Painter Co — paint and bodywork', status: 'Synthetic', source_key: 'a'.repeat(64), ...over });
-const sumRow = (over: Partial<LargeSumRow> = {}): LargeSumRow => ({ year: '2024', id: 'id-1', document_id: 'doc-1', local_id: 'L1', dollar_rank: 1, amount: 4800, share: 0.05, cum_share: 0.05,
-  category: 'Synthetic category', tier: 'B', pay_proof: true, doc_proof: false, basis_strength: 'bank_and_rule', proof_flag: null, required_doc_kind: 'invoice_or_agreement',
-  required_doc_rule: 'contractor', missing_doc: true, doc_found_n: 0, doc_cited_n: 0, cites: [], record: rec(), attached: [], ...over });
-const sumYear = (over: Partial<LargeSumYear> = {}): LargeSumYear => ({ year: '2024', year_usd: 10000, deductions_n: 50, head_n: 12, head_usd: 8000, flagged_n: 3, flagged_usd: 6000,
-  missing_doc_n: 2, missing_doc_usd: 5000, no_payment_n: 1, no_payment_usd: 1000, filed_return_only_n: 0, filed_return_only_usd: 0, beyond_head_missing_doc_n: 0, beyond_head_missing_doc_usd: 0,
-  rows_shown: 0, rows: [], ...over });
 const ctx = (over: Partial<RunContext> = {}): RunContext => ({ deductions: { n: 200, usd: 150000 }, no_bank: { n: 30, usd: 20000 }, no_pay_no_ruling: { n: 12, usd: 9000 },
   head: { n: 40, usd: 120000, year_usd: 150000 }, ...over });
 const r12 = (over: object = {}) => rule('R12', 'fail', 15, 40, { missing_doc: { n: 11, amount: 36000, cite_no_document: 4, by_kind: { receipt_or_order: { n: 6, amount: 6000 }, invoice_or_agreement: { n: 4, amount: 27000 }, purchase_agreement: { n: 1, amount: 3000 } } }, ...over });
+const sumYear = (over: Partial<LargeSumYear> = {}): LargeSumYear => largeYear([], {
+  year_usd: 10000, deductions_n: 50, head_n: 12, head_usd: 8000, flagged_n: 3, flagged_usd: 6000, missing_doc_n: 2, missing_doc_usd: 5000, missing_doc_cite_no_document: 1, missing_doc_by_kind: { invoice_or_agreement: { n: 2, amount: 5000 } },
+  no_payment_n: 1, no_payment_usd: 1000, rows_shown: 0, ...over });
 
 it('a row says what it still needs in plain words, the document first; a rule or flag the table does not know yet is shown humanized, never dropped', () => {
   expect(needsOf(sumRow())).toEqual(['Contractor invoice']);
@@ -174,14 +164,14 @@ it('a file can answer a row that misses a document (except the asset register, w
   expect(attachLabel(sumRow({ required_doc_kind: 'purchase_agreement' }))).toBe('Add the purchase agreement');
   expect(attachLabel(sumRow({ missing_doc: false, proof_flag: 'filed_return_only', required_doc_kind: null }))).toBe('Add a document');
   expect(attachLabel(sumRow({ attached: [{ document_id: 'd', filename: 'a.pdf', doc_kind: 'Invoice', ref: 'r', attached_at: '2026-10-29T19:12:00Z' }] }))).toBe('Add another');
-  expect(attachChoices(sumRow())).toEqual(ATTACH_KINDS.invoice_or_agreement);
+  expect(attachChoices(sumRow())).toEqual(DOC_KIND.invoice_or_agreement.offers);
   expect(attachChoices(sumRow({ required_doc_kind: 'purchase_agreement' }))).toEqual(['Purchase agreement', 'Bill of sale', 'Title', 'Text message thread', 'Email thread']);
   expect(attachChoices(sumRow({ missing_doc: false, proof_flag: 'filed_return_only', required_doc_kind: null }))).toEqual(ATTACH_ANY);
 });
 
 it('the row\'s title is its payee and what was bought; an attached file is named with what the owner said it is and when', () => {
   expect(rowTitle(sumRow())).toBe('Painter Co — paint and bodywork');
-  expect(rowTitle(sumRow({ record: rec({ description: '' }) as any }))).toBe('Synthetic category');
+  expect(rowTitle(sumRow({ record: rec('L1', { description: '' }) as any }))).toBe('Synthetic category');
   expect(attachedLine({ document_id: 'd', filename: 'inv.pdf', doc_kind: 'Invoice', ref: 'x', attached_at: '2026-10-29T19:12:00Z' })).toBe('Invoice · inv.pdf · attached Oct 29, 2026, 12:12 PM');
   expect(attachedLine({ document_id: 'd', filename: null, doc_kind: null, ref: null, attached_at: '2026-10-29T19:12:00Z' })).toBe('Document · file · attached Oct 29, 2026, 12:12 PM');
 });
@@ -201,7 +191,7 @@ it('every document rule and kind the view can produce has its words (the contrac
   expect(rules.length).toBeGreaterThanOrEqual(7);
   for (const [rule, kind] of rules) {
     expect(PAPER_BY_RULE[rule], `rule ${rule}`).toBeTruthy();
-    expect(PAPER_BY_KIND[kind], `kind ${kind}`).toBeTruthy();
+    expect(DOC_KIND[kind]?.words, `kind ${kind}`).toBeTruthy();
   }
   const flags = [...viewSql.matchAll(/THEN '(no_payment_proof|no_basis|filed_return_only)'/g)].map(m => m[1]);
   expect(new Set(flags)).toEqual(new Set(['filed_return_only', 'no_payment_proof', 'no_basis']));
@@ -216,11 +206,11 @@ it('each kind of paper offered satisfies the level the view requires, by the key
   const required: Record<string, number> = { purchase_agreement: 3, invoice_or_agreement: 2, receipt_or_order: 1 };
   for (const [kind, level] of Object.entries(required)) {
     // a thread satisfies the row through the view's message-thread patterns, not its levels (next test)
-    for (const word of ATTACH_KINDS[kind].filter(w => !THREAD_KINDS.includes(w))) expect(levelOf(`${word}: scan.pdf (sha256 abcdef012345)`), `${word} for ${kind}`).toBeGreaterThanOrEqual(level);
+    for (const word of DOC_KIND[kind].offers!.filter((w: string) => !THREAD_KINDS.includes(w))) expect(levelOf(`${word}: scan.pdf (sha256 abcdef012345)`), `${word} for ${kind}`).toBeGreaterThanOrEqual(level);
   }
   // a lease is read by its own pattern, not by the levels
   expect(viewSql).toMatch(/lease\|rental agreement\|tenan/);
-  for (const word of ATTACH_KINDS.lease_or_ruling) expect(`${word}: lease.pdf`.toLowerCase()).toMatch(/lease|rental agreement|tenan/);
+  for (const word of DOC_KIND.lease_or_ruling.offers!) expect(`${word}: lease.pdf`.toLowerCase()).toMatch(/lease|rental agreement|tenan/);
 });
 
 it('a screenshot said to be a text or email thread satisfies the agreement a row requires by the view\'s own message-thread patterns, and is never offered for a receipt, lease, title or bill of sale', () => {
@@ -237,47 +227,61 @@ it('a screenshot said to be a text or email thread satisfies the agreement a row
     expect(refused.test(ref), `${word}: is not a record of a search with no result`).toBe(false);
   }
   expect(refused.test('text messages: searched, no message found')).toBe(true);
-  for (const kind of ['invoice_or_agreement', 'purchase_agreement']) for (const word of THREAD_KINDS) expect(ATTACH_KINDS[kind]).toContain(word);
-  for (const kind of ['receipt_or_order', 'lease_or_ruling']) for (const word of THREAD_KINDS) expect(ATTACH_KINDS[kind]).not.toContain(word);
+  for (const kind of ['invoice_or_agreement', 'purchase_agreement']) for (const word of THREAD_KINDS) expect(DOC_KIND[kind].offers).toContain(word);
+  for (const kind of ['receipt_or_order', 'lease_or_ruling']) for (const word of THREAD_KINDS) expect(DOC_KIND[kind].offers).not.toContain(word);
   expect(viewSql).toMatch(/rq\.required_doc_kind IN \('invoice_or_agreement', 'purchase_agreement'\)/);
   expect(ATTACH_ANY.some(word => THREAD_KINDS.includes(word))).toBe(false);
 });
 
-it('the live heading and caption state the reader\'s counts; the 80% line and the smaller rows beyond it are named, a cap is said', () => {
+it('the live heading and caption state the reader\'s counts: how many of the head are flagged, which answers they need, that a row can need more than one, the 80% line, the smaller rows beyond it, a cap and unread rows', () => {
   const y = sumYear({ missing_doc_n: 11, no_payment_n: 7, filed_return_only_n: 1, head_n: 40, head_usd: 120000, year_usd: 150000, beyond_head_missing_doc_n: 22, beyond_head_missing_doc_usd: 5000, flagged_n: 25, rows_shown: 20 });
-  expect(liveHeading(y)).toBe('11 rows need a document · 7 rows need a bank line · 1 row rests on the filed return only');
-  expect(liveCaption(y)).toBe('Rule R12 tests the 40 largest deductions, the 80% line. 22 smaller deductions below that line ($5,000) also miss a document; no rule tests them. Showing the largest 20 of 25.');
-  expect(liveCaption(sumYear({ beyond_head_missing_doc_n: 1, beyond_head_missing_doc_usd: 40, flagged_n: 0, rows_shown: 0, head_n: 1 }))).toBe('Rule R12 tests the 1 largest deduction, the 80% line. 1 smaller deduction below that line ($40) also misses a document; no rule tests them.');
+  expect(liveHeading(y)).toBe('25 of the 40 largest deductions flagged · 11 rows need a document · 7 rows need a bank line · 1 row rests on the filed return only');
+  expect(liveCaption(y)).toBe('Rule R12 tests the 40 largest deductions, the 80% line. A row can need more than one thing. 22 smaller deductions below that line ($5,000) also miss a document; no rule tests them. Showing the largest 20 of 25.');
+  expect(liveCaption(sumYear({ beyond_head_missing_doc_n: 1, beyond_head_missing_doc_usd: 40, flagged_n: 0, rows_shown: 0, head_n: 1 })))
+    .toBe('Rule R12 tests the 1 largest deduction, the 80% line. A row can need more than one thing. 1 smaller deduction below that line ($40) also misses a document; no rule tests them.');
+  expect(liveCaption(sumYear({ flagged_n: 3, rows_shown: 3, unreadable_rows: 2, head_n: 1 }))).toContain('2 rows of the answer could not be read and are not listed; the totals count them.');
+  expect(liveCaption(sumYear({ flagged_n: 3, rows_shown: 3, unreadable_rows: 1, head_n: 1 }))).toContain('1 row of the answer could not be read and is not listed; the totals count it.');
 });
 
-it('the totals come from the stored run with their denominators: paid outside a linked bank line (R10 part b) and missing a document (R12)', () => {
-  const y = withRun([rule('R10', 'fail', 12, 200), r12()], { context: ctx() });
-  expect(outsideBankTotal(y)).toMatchObject({ label: 'Paid outside a linked bank line', rule: 'R10 part b', headline: '$9,000 of $150,000 in deductions', state: 'bad' });
-  expect(outsideBankTotal(y).details).toEqual([
-    '12 of 200 deductions have no bank line, no owner ruling and no structural rule (rule R10 part b; R10 is failing).',
-    'In all, 30 deductions ($20,000) have no linked bank line; the ones not counted above rest on an owner ruling, the asset register or another structural rule.']);
-  expect(missingDocTotal(y)).toMatchObject({ label: 'Missing a document', rule: 'R12', headline: '$36,000 of $120,000 in the 40 largest deductions', state: 'bad' });
-  expect(missingDocTotal(y).details).toEqual([
-    '11 of the 40 largest deductions lack the document their kind requires; 4 of those cite no document at all.',
+// ── the two totals are the live readers' own figures ─────────────────────────────────────────────────────────────────────────
+
+it('rows with no bank line, ruling or rule (R10 part b): the audit tiers\' own dollars of the year\'s deductions, net of credits, read live; the label says what is counted and no more', () => {
+  const t = tier('2024', { no_pay_no_ruling_usd: 9000.4, deduction_usd: 150000.4 });
+  expect(outsideBankTotal({ phase: 'ready', data: t })).toMatchObject({ label: 'No bank line, no owner ruling, no rule', rule: 'R10 part b', from: 'v_books_audit_tier_years',
+    headline: '$9,000 of $150,000 in deductions, net of credits', tone: 'bad' });
+  expect(outsideBankTotal({ phase: 'ready', data: t }).details).toEqual(['Deductions with no linked bank line, no owner ruling and no structural rule (rule R10 part b). A deduction resting on an owner ruling or the asset register is counted apart.']);
+  expect(outsideBankTotal({ phase: 'ready', data: { ...t, no_pay_no_ruling_usd: 0 } })).toMatchObject({ headline: '$0 of $150,000 in deductions, net of credits', tone: 'good' });
+  // a credit can make the net negative; it is still money, still not "none"
+  expect(outsideBankTotal({ phase: 'ready', data: { ...t, no_pay_no_ruling_usd: -200 } }).tone).toBe('bad');
+});
+
+it('large deductions missing their document (R12): the live reader\'s own dollars of the head, with how many cite nothing and by kind; it says it counts paper, not unreconciled money', () => {
+  const live = sumYear({ head_n: 40, head_usd: 120000.4, year_usd: 150000, missing_doc_n: 11, missing_doc_usd: 36000.4, missing_doc_cite_no_document: 4,
+    missing_doc_by_kind: { receipt_or_order: { n: 6, amount: 6000 }, invoice_or_agreement: { n: 4, amount: 27000 }, purchase_agreement: { n: 1, amount: 3000 } } });
+  expect(missingDocTotal({ phase: 'ready', data: live })).toMatchObject({ label: 'Large deductions missing their document', rule: 'R12', from: 'v_books_large_sums',
+    headline: '$36,000 of $120,000 in the 40 largest deductions', tone: 'bad' });
+  expect(missingDocTotal({ phase: 'ready', data: live }).details).toEqual([
+    '11 of those 40 lack the document their kind requires; 4 of those cite no document at all.',
     'Purchase agreement or bill of sale 1 ($3,000) · Invoice or agreement 4 ($27,000) · Receipt or order confirmation 6 ($6,000)',
-    "The 40 largest deductions are the smallest set of the year's largest deductions that reaches 80% of its $150,000 (rule R12 tests them)."]);
-  // one row that cites no document reads in the singular; a run without its denominators states the count it has
-  expect(missingDocTotal(withRun([r12({ missing_doc: { n: 1, amount: 900, cite_no_document: 1, by_kind: {} } })], { context: ctx() })).details[0]).toBe('1 of the 40 largest deductions lack the document their kind requires; 1 of those cites no document at all.');
-  expect(missingDocTotal(withRun([r12()])).headline).toBe('$36,000 across 11 of the 40 largest deductions');
+    'This counts missing paper. Whether a row has a bank line is a separate flag, shown on the row and counted in the line above.',
+    "The 40 largest deductions are the smallest set of the year's largest deductions that reaches 80% of its $150,000 (absolute amounts, credits counted as positive; rule R12 tests them)."]);
+  expect(missingDocTotal({ phase: 'ready', data: { ...live, missing_doc_n: 1, missing_doc_cite_no_document: 1 } }).details[0]).toBe('1 of those 40 lack the document their kind requires; 1 of those cites no document at all.');
   // nothing missing is a pass with its denominator, not a blank
-  const clean = withRun([rule('R10', 'pass', 0, 200), r12({ status: 'pass', n: 0, missing_doc: { n: 0, amount: 0, cite_no_document: 0, by_kind: {} } })], { context: ctx({ no_pay_no_ruling: { n: 0, usd: 0 } }) });
-  expect(outsideBankTotal(clean)).toMatchObject({ headline: '$0 of $150,000 in deductions', state: 'ok' });
-  expect(missingDocTotal(clean)).toMatchObject({ headline: 'None: every one of the 40 largest deductions has the document its kind requires', state: 'ok' });
+  expect(missingDocTotal({ phase: 'ready', data: { ...live, missing_doc_n: 0, missing_doc_usd: 0, missing_doc_by_kind: {} } }))
+    .toMatchObject({ headline: 'None: every one of the 40 largest deductions has the document its kind requires', tone: 'good' });
 });
 
-it('with no stored run, a run without its denominators, or a run before rule R12, the totals say so and state no number', () => {
-  const none = { ...withRun([rule('R10', 'pass', 0, 5)]), run: null };
-  for (const total of [outsideBankTotal(none), missingDocTotal(none)]) expect(total).toMatchObject({ headline: 'Not run', state: 'unknown', details: ['There is no stored gate result for 2024.'] });
-  expect(outsideBankTotal(withRun([rule('R10', 'pass', 0, 5)]))).toMatchObject({ headline: 'Not recorded', state: 'unknown' });
-  expect(missingDocTotal(withRun([rule('R10', 'pass', 0, 5)]))).toMatchObject({ headline: 'Not in this run', state: 'unknown' });
-  expect(missingDocTotal(withRun([rule('R12', 'not_assessed', 0, null)]))).toMatchObject({ headline: 'Not assessed', state: 'unknown' });
-  // a stale run still states its numbers; the page says it is stale beside them
-  expect(missingDocTotal(withRun([r12()], { stale: true, stale_books: true, trusted: false, context: ctx() })).headline).toBe('$36,000 of $120,000 in the 40 largest deductions');
+it('a total is the live read and nothing else: in flight it says Reading, failed it says so and states no number, and a year with no deductions says that', () => {
+  for (const total of [outsideBankTotal({ phase: 'loading', data: undefined }), missingDocTotal({ phase: 'loading', data: undefined }), outsideBankTotal(), missingDocTotal()]) {
+    expect(total).toMatchObject({ headline: 'Reading…', details: [] });
+    expect(total.tone).toBeUndefined();
+  }
+  for (const total of [outsideBankTotal({ phase: 'error', data: undefined }), missingDocTotal({ phase: 'error', data: undefined })]) {
+    expect(total).toMatchObject({ headline: 'Could not load', tone: 'warn' });
+    expect(total.details[0]).toMatch(/could not be read; the retry is further down this card/);
+    expect(JSON.stringify(total)).not.toMatch(/\$\d/);
+  }
+  for (const total of [outsideBankTotal({ phase: 'ready', data: undefined }), missingDocTotal({ phase: 'ready', data: undefined })]) expect(total).toMatchObject({ headline: 'No deductions are in the books for this year' });
 });
 
 it('by-kind totals come in the order of the kinds, an unknown kind last and named', () => {
@@ -285,43 +289,79 @@ it('by-kind totals come in the order of the kinds, an unknown kind last and name
     .toBe('Purchase agreement or bill of sale 3 ($300) · Receipt or order confirmation 2 ($20) · Zeta kind 1 ($5)');
 });
 
-it('when the live list and the stored run disagree about the rows missing a document, the page says so; when they agree it says nothing', () => {
-  const y = withRun([r12()], { context: ctx() });
-  expect(listVsRun(y, sumYear({ missing_doc_n: 8 }))).toBe('The gate run of Oct 29, 2026, 10:31 AM counted 11 rows missing a document; the list now has 8.');
-  expect(listVsRun(y, sumYear({ missing_doc_n: 11 }))).toBeNull();
-  expect(listVsRun({ ...y, run: null }, sumYear({ missing_doc_n: 8 }))).toBeNull();
-  expect(listVsRun(y, undefined)).toBeNull();
+it('where the stored run and the live readers disagree the page says so with both numbers; where they agree, or nothing is stored, or a read is not in, it says nothing', () => {
+  const y = withRun([rule('R10', 'fail', 12, 200), r12()], { context: ctx() });
+  const live = sumYear({ missing_doc_n: 8, missing_doc_usd: 30000 });
+  expect(driftLines(y, live, undefined)).toEqual(['The gate run of Oct 29, 2026, 10:31 AM counted 11 rows missing a document ($36,000); the list now has 8 ($30,000).']);
+  // same count, different dollars is still a difference
+  expect(driftLines(y, sumYear({ missing_doc_n: 11, missing_doc_usd: 35000 }), undefined)).toHaveLength(1);
+  expect(driftLines(y, sumYear({ missing_doc_n: 11, missing_doc_usd: 36000 }), undefined)).toEqual([]);
+  const part = tier('2024', { no_pay_no_ruling_usd: 6556 });
+  expect(driftLines(y, undefined, part)).toEqual(['The gate run of Oct 29, 2026, 10:31 AM counted $9,000 (12 deductions) with no bank line, no owner ruling and no rule; the deductions now stand at $6,556.']);
+  expect(driftLines(y, undefined, tier('2024', { no_pay_no_ruling_usd: 9000 }))).toEqual([]);
+  expect(driftLines(y, live, part)).toHaveLength(2);
+  expect(driftLines({ ...y, run: null }, live, part)).toEqual([]);
+  expect(driftLines(y, undefined, undefined)).toEqual([]);
+  // a run without its denominators, or from before rule R12, has nothing to compare
+  expect(driftLines(withRun([rule('R10', 'pass', 0, 5)]), live, part)).toEqual([]);
 });
 
-
-it('with no stored run the totals fall back to the live readers\' own figures for the same conditions, and say they are live; a read in flight or failed states no number', () => {
-  const none = { ...withRun([rule('R10', 'pass', 0, 5)]), run: null };
-  const tierRow = { year: '2024', deduction_usd: 150000.4, no_pay_no_ruling_usd: 9000.4 } as TierYear;
-  expect(outsideBankTotal(none, { phase: 'ready', data: tierRow })).toMatchObject({ headline: '$9,000 of $150,000 in deductions', state: 'bad', source: 'live' });
-  expect(outsideBankTotal(none, { phase: 'ready', data: tierRow }).details[0]).toContain('No gate run is stored for 2024.');
-  expect(outsideBankTotal(none, { phase: 'ready', data: { ...tierRow, no_pay_no_ruling_usd: 0 } as TierYear })).toMatchObject({ headline: '$0 of $150,000 in deductions', state: 'ok', source: 'live' });
-  const live = sumYear({ head_n: 40, head_usd: 120000.4, missing_doc_n: 11, missing_doc_usd: 36000.4 });
-  expect(missingDocTotal(none, { phase: 'ready', data: live })).toMatchObject({ headline: '$36,000 of $120,000 in the 40 largest deductions', state: 'bad', source: 'live' });
-  expect(missingDocTotal(none, { phase: 'ready', data: live }).details).toEqual(['No gate run is stored for 2024. 11 of those 40 lack the document their kind requires, read live.']);
-  for (const total of [outsideBankTotal(none, { phase: 'loading', data: undefined }), missingDocTotal(none, { phase: 'loading', data: undefined })]) expect(total).toMatchObject({ headline: 'Reading…', source: 'live' });
-  for (const total of [outsideBankTotal(none, { phase: 'error', data: undefined }), missingDocTotal(none, { phase: 'ready', data: undefined })]) expect(total).toMatchObject({ headline: 'Not run', source: 'none' });
-  // a stored run is never replaced by the live figure: the live reader only stands in where nothing is stored
-  const stored = withRun([rule('R10', 'fail', 12, 200), r12()], { context: ctx() });
-  expect(outsideBankTotal(stored, { phase: 'ready', data: tierRow }).source).toBe('stored');
-  expect(missingDocTotal(stored, { phase: 'ready', data: live }).source).toBe('stored');
+it('colour is a tone: the verdicts, the rules and the totals each map their states to good, bad or warn, and nothing else', () => {
+  expect(VERDICT_TONE).toEqual({ trusted: 'good', not_trusted: 'bad', did_not_finish: 'bad', not_run: 'warn' });
+  expect(RULE_TONE).toEqual({ pass: 'good', fail: 'bad', not_assessed: 'warn', empty: 'warn' });
+  expect(Object.keys(RULE_STATE_WORDS).sort()).toEqual(Object.keys(RULE_TONE).sort());
+  expect(RULE_STATE_WORDS).toEqual({ pass: 'passed', fail: 'failing', not_assessed: 'not assessed', empty: 'nothing checked' });
 });
 
-it('the legend says what the first screen is, once', async () => {
-  const { LEGEND } = await import('./booksDocketWords');
+it('the legend says what the first screen is, once, and which dollars are net and which absolute', () => {
   expect(LEGEND.paper).toContain('Large sums that need paper');
   expect(LEGEND.paper).toContain('the row leaves the list when the books agent cites it');
+  expect(LEGEND.dollars).toContain('net of credits');
+  expect(LEGEND.dollars).toContain('absolute amounts');
 });
 
-
-it('a row that already cites a paper says what it cites, as written, so a cited paper of the wrong kind is visible', () => {
+it('a row that already cites a paper says what it cites, as written, so a cited paper of the wrong kind is visible; with more cites than shown it says how many in all', () => {
   expect(citedLine(sumRow())).toBeNull();
   expect(citedLine(sumRow({ doc_cited_n: 1, cites: [{ kind: 'file', ref: 'photo of the shelf' }] }))).toBe('Already cites: photo of the shelf (file)');
   expect(citedLine(sumRow({ doc_cited_n: 5, cites: [{ kind: 'file', ref: 'a' }, { kind: 'gmail', ref: 'b' }, { kind: 'photo', ref: 'c' }, { kind: 'file', ref: 'd' }] })))
-    .toBe('Already cites: a (file); b (gmail); c (photo), and 2 more');
+    .toBe('Already cites 5 documents, among them: a (file); b (gmail); c (photo)');
+  expect(citedLine(sumRow({ doc_cited_n: 3, cites: [{ kind: 'file', ref: 'a' }, { kind: 'gmail', ref: 'b' }, { kind: 'photo', ref: 'c' }] }))).toBe('Already cites: a (file); b (gmail); c (photo)');
   expect(citedLine(sumRow({ doc_cited_n: 1, cites: [{ kind: 'file', ref: 'x'.repeat(200) }] }))).toBe(`Already cites: ${'x'.repeat(78)}… (file)`);
+});
+
+// ── lines that state a count carry the population they are counted in ────────────────────────────────────────────────────────
+
+it('the tier lines carry their denominators: the headline and the part-b line say net of credits and of how many dollars; the section 274 line says of how many section 274 dollars', () => {
+  const t = tier('2024', { c_n: 2, deductions: 10, c_usd: 200, c_pct: 20, deduction_usd: 1000, s274_usd: 400, s274_needs_receipt_usd: 40, s274_uncaveated_usd: 25, no_pay_no_ruling_usd: 60 });
+  expect(tierHeadline(t)).toBe('Tier C: 2 of 10 deductions, $200, 20.0% of $1,000 net of credits');
+  expect(tier274Line(t)).toBe('Section 274 lines that need a receipt and have none: $40 of $400 in section 274 lines; not caveated: $25.');
+  expect(tier274Line({ ...t, s274_needs_receipt_usd: 0 })).toBeNull();
+  expect(tierExcludedLine({ ...t, excluded_n: 0 })).toBeNull();
+});
+
+it('the ties list the five classes of decisions and nothing else; the citation tally is its own line, not inside the class it is not the denominator of', () => {
+  const t = tie('2024', { decisions: 879, links: 879, links_resolved: 193, cites_missing_n: 67 });
+  const classes = tieClasses(t);
+  expect(classes.map(c => c.key)).toEqual(['both', 'cites_only', 'cited_by_only', 'cites_missing', 'none']);
+  expect(classes.every(c => c.of === 879)).toBe(true);
+  expect(classes.find(c => c.key === 'cites_missing')!.text).toBe('cite lines that are not in the books');
+  expect(tieCitationLine(t)).toBe('193 of 879 citations written point at a statement line we hold');
+});
+
+it('the profile door names what ran and when, and the large rows missing a document out of the rows the rule checked; a run that found none says nothing of it', () => {
+  const missing = (n: number, of: number | null = 40) => rule('R12', n ? 'fail' : 'pass', n, of, { missing_doc: { n, amount: 100, cite_no_document: 0, by_kind: {} } });
+  const open = { total: 2, owner: 1, cpa: 0, agent: 0, unassigned: 1 };
+  // a run whose counts are those of R1 alone: it passed, and its R12 rule states what it found
+  const door = (n: number, of: number | null = 40) => gateYear(2024, { run: run([rule('R1', 'pass', 0, 10)], { rules: [rule('R1', 'pass', 0, 10), missing(n, of)] }), open_items: open });
+  expect(doorLine(door(11))).toBe('Trusted · Oct 29, 2026, 10:31 AM · 11 of 40 large rows need a document · 2 open');
+  expect(doorLine(door(1))).toContain('1 of 40 large rows need a document');
+  expect(doorLine(door(0))).toBe('Trusted · Oct 29, 2026, 10:31 AM · 2 open');
+  // without a stated population the count stands alone, in the right number
+  expect(doorLine(door(1, null))).toContain('1 large row needs a document');
+  // not trusted: the causes, when it ran, then the paper
+  const failing = gateYear(2024, { run: run([rule('R1', 'fail', 2, 10)], { rules: [rule('R1', 'fail', 2, 10), missing(11)], stale: true, stale_books: true, trusted: false }) });
+  expect(doorLine(failing)).toBe('Not trusted · 1 rule failing · books changed since · ran Oct 29, 2026, 10:31 AM · 11 of 40 large rows need a document');
+  expect(doorLine({ ...gateYear(2024), run: null })).toBe('Gate not run');
+  expect(doorLine({ ...gateYear(2024), run: null, attempt: attempt('timed_out') })).toBe('Gate did not finish (stopped at 120 s)');
+  expect(doorLine({ ...gateYear(2024), run: null, attempt: attempt('error') })).toBe('Gate run failed');
 });

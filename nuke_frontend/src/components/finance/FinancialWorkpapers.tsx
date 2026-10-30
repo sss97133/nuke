@@ -311,7 +311,7 @@ export function proofLines(proof: RowProof): string[] {
 }
 function ProofLine({ proof }: { proof: RowProof }) {
   const lines = proofLines(proof);
-  return <details className="accounting-proof" onClick={event => event.stopPropagation()}>
+  return <details className="accounting-proof accounting-compact-details" onClick={event => event.stopPropagation()}>
     <summary>{`Tier ${proof.tier} · ${proof.tier_reason}`}</summary>
     <ul>{lines.slice(1).map((line, i) => <li key={i}>{line}</li>)}</ul>
   </details>;

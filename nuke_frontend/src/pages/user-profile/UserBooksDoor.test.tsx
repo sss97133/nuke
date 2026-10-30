@@ -3,50 +3,42 @@ import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { MemoryRouter } from 'react-router-dom';
+import { QueryClientProvider, type QueryClient } from '@tanstack/react-query';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 const fixture = vi.hoisted(() => ({ rpc: vi.fn() }));
 vi.mock('../../lib/supabase', () => ({ supabase: { rpc: fixture.rpc } }));
 vi.mock('../../components/PrefetchLink', () => ({ default: ({ to, children, ...props }: any) => <a href={to} {...props}>{children}</a> }));
 import UserBooksDoor from './UserBooksDoor';
-import { doorLine } from '../../components/finance/booksDocketWords';
-import type { GateStatus, GateYear } from '../../services/accountingCloseout';
+import { answer, freshClient, gateYear, owner, rule, run, status } from '../../components/finance/__fixtures__/books';
 
-// Synthetic: every id, year and time below is invented.
-const owner = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
-const open0 = { total: 0, owner: 0, cpa: 0, agent: 0, unassigned: 0 };
-const rules = (...r: [string, string, number][]) => r.map(([rule, status, of]) => ({ rule, title: `title of ${rule}`, status, n: status === 'fail' ? 2 : 0, of, amount: 0 }));
-const run = (rs: ReturnType<typeof rules>, over: object = {}) => {
-  const c = { total: rs.length, pass: rs.filter(r => r.status === 'pass').length, fail: rs.filter(r => r.status === 'fail').length, not_assessed: 0, empty: rs.filter(r => r.status === 'pass' && r.of === 0).length };
-  return { id: 'run', started_at: '2026-10-29T17:30:30Z', finished_at: '2026-10-29T17:31:00Z', duration_ms: 30000, pass: c.fail === 0, stale: false, stale_books: false, stale_gate: false,
-    trusted: c.fail === 0 && c.empty === 0, rule_counts: c, rules: rs, ...over };
+// Synthetic: every id, year and time below is invented (see components/finance/__fixtures__/books.tsx).
+let node: HTMLDivElement, root: Root, client: QueryClient;
+beforeEach(() => { (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true; vi.useFakeTimers(); client = freshClient(); fixture.rpc.mockReset(); node = document.createElement('div'); document.body.append(node); root = createRoot(node); });
+afterEach(async () => { await act(async () => root.unmount()); node.remove(); vi.useRealTimers(); client.clear(); });
+const reply = (data: unknown, error: unknown = null) => fixture.rpc.mockImplementation(() => answer({ data, error }));
+const render = async (ui: React.ReactNode) => {
+  await act(async () => root.render(<QueryClientProvider client={client}><MemoryRouter>{ui}</MemoryRouter></QueryClientProvider>));
+  for (let i = 0; i < 3; i++) await act(async () => { await vi.advanceTimersByTimeAsync(50); });
 };
-const year = (y: number, over: Partial<GateYear> = {}): GateYear => ({ year: y, draft_document_id: null, drafts_on_file: 0, attempt: null, run: null, open_items: open0, ...over });
-const gate = (years: GateYear[]): GateStatus => ({ owner_id: owner, read_at: '2026-10-29T17:40:00Z', book_signature: 's', gate_md5: 'm',
-  summary: { years: years.length, with_run: years.filter(y => y.run).length, passed: 0, trusted: 0, failing: 0, not_assessed: 0, stale: 0, open_items: 0 }, years });
-
-let node: HTMLDivElement, root: Root;
-beforeEach(() => { (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true; vi.useFakeTimers(); fixture.rpc.mockReset(); node = document.createElement('div'); document.body.append(node); root = createRoot(node); });
-afterEach(async () => { await act(async () => root.unmount()); node.remove(); vi.useRealTimers(); });
-const render = async (ui: React.ReactNode) => { await act(async () => root.render(<MemoryRouter>{ui}</MemoryRouter>)); await act(async () => { await vi.advanceTimersByTimeAsync(50); }); };
 
 it('a visitor gets no heading, no row, no link and no request', async () => {
-  expect(renderToStaticMarkup(<MemoryRouter><UserBooksDoor userId={owner} isOwnProfile={false} /></MemoryRouter>)).toBe('');
+  expect(renderToStaticMarkup(<QueryClientProvider client={client}><MemoryRouter><UserBooksDoor userId={owner} isOwnProfile={false} /></MemoryRouter></QueryClientProvider>)).toBe('');
   await render(<UserBooksDoor userId={owner} isOwnProfile={false} />);
   expect(node.textContent).toBe('');
   expect(fixture.rpc).not.toHaveBeenCalled();
 });
 
-it('the owner sees one row per tax year with the stored gate verdict, and one link to the books docket', async () => {
-  fixture.rpc.mockResolvedValue({ data: gate([
-    year(2025, { run: run(rules(['R1', 'fail', 10], ['R9', 'pass', 5]), { stale: true, stale_books: true, trusted: false }) as any, open_items: { total: 2, owner: 1, cpa: 0, agent: 0, unassigned: 1 } }),
-    year(2024, { run: run(rules(['R1', 'pass', 10], ['R9', 'pass', 5])) as any }),
-    year(2023),
-  ]), error: null });
+it('the owner sees one row per tax year with the stored gate verdict, when it ran, and one link to the books docket', async () => {
+  reply(status([
+    gateYear(2025, { run: run([rule('R1', 'fail', 2, 10), rule('R9', 'pass', 0, 5)], { stale: true, stale_books: true, trusted: false }), open_items: { total: 2, owner: 1, cpa: 0, agent: 0, unassigned: 1 } }),
+    gateYear(2024, { run: run([rule('R1', 'pass', 0, 10), rule('R9', 'pass', 0, 5)]) }),
+    gateYear(2023),
+  ]));
   await render(<UserBooksDoor userId={owner} isOwnProfile />);
   expect(fixture.rpc).toHaveBeenCalledWith('books_gate_status', { p_owner_id: owner });
   const rows = Array.from(node.querySelectorAll('.k-row')).map(r => r.textContent);
   expect(rows).toEqual([
-    '2025Not trusted · 1 rule failing · books changed since · 2 open',
+    '2025Not trusted · 1 rule failing · books changed since · ran Oct 29, 2026, 10:31 AM · 2 open',
     '2024Trusted · Oct 29, 2026, 10:31 AM',
     '2023Gate not run',
   ]);
@@ -54,35 +46,26 @@ it('the owner sees one row per tax year with the stored gate verdict, and one li
   expect(links).toHaveLength(1);
   expect(links[0].getAttribute('href')).toBe('/accounting');
   expect(links[0].textContent).toBe('Open the books docket ›');
-  expect(node.querySelector('.k-coverage')?.textContent).toBe('2 of 3 tax years with a stored gate run');
+  // the count of years with a stored run is dated by the database's own clock
+  expect(node.querySelector('.k-coverage')?.textContent).toBe('2 of 3 tax years with a stored gate run · Oct 29, 2026');
 });
 
 it('nothing is drawn while the status is being read', async () => {
-  fixture.rpc.mockImplementation(() => new Promise(() => undefined));
+  fixture.rpc.mockImplementation(() => Object.assign(new Promise(() => undefined), { abortSignal() { return this; } }));
   await render(<UserBooksDoor userId={owner} isOwnProfile />);
   expect(node.textContent).toBe('');
 });
 
-it('a failed read says so, offers a retry, and still lets the owner through to the docket', async () => {
-  fixture.rpc.mockResolvedValue({ data: null, error: { code: '57014' } });
+it('a failed read says so, offers a retry that reads again, and still lets the owner through to the docket', async () => {
+  reply(null, { code: '57014' });
   await render(<UserBooksDoor userId={owner} isOwnProfile />);
   await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
   expect(node.textContent).toContain('The books status could not load.');
   expect(node.textContent).not.toMatch(/\b0 of 0 tax years\b.*(Trusted|Passed)/);
   expect(node.querySelector('a')?.getAttribute('href')).toBe('/accounting');
   expect(node.querySelector('button')?.textContent).toBe('Try again');
-});
-
-it('words a gate that did not finish or failed outright', () => {
-  const attempt = (status: 'timed_out' | 'error') => ({ status, started_at: '2026-10-29T17:30:00Z', finished_at: '2026-10-29T17:32:00Z', duration_ms: 120000 } as const);
-  expect(doorLine(year(2024, { attempt: attempt('timed_out') }))).toBe('Gate did not finish (stopped at 120 s)');
-  expect(doorLine(year(2024, { attempt: attempt('error') }))).toBe('Gate run failed');
-});
-
-it('names the large rows the stored run found missing a document, beside the verdict and the open items; a run that found none says nothing of it', () => {
-  const missing = (n: number) => ({ rule: 'R12', title: 't', status: n ? 'fail' : 'pass', n, of: 40, amount: 0, missing_doc: { n, amount: 100, cite_no_document: 0, by_kind: {} } });
-  const withMissing = (n: number) => year(2024, { run: { ...run(rules(['R1', 'pass', 10])), rules: [...rules(['R1', 'pass', 10]), missing(n)] } as any, open_items: { total: 2, owner: 1, cpa: 0, agent: 0, unassigned: 1 } });
-  expect(doorLine(withMissing(11))).toBe('Trusted · Oct 29, 2026, 10:31 AM · 11 large rows need a document · 2 open');
-  expect(doorLine(withMissing(1))).toContain('1 large row needs a document');
-  expect(doorLine(withMissing(0))).toBe('Trusted · Oct 29, 2026, 10:31 AM · 2 open');
+  reply(status([gateYear(2024, { run: run([rule('R1', 'pass', 0, 10)]) })]));
+  await act(async () => (node.querySelector('button') as HTMLButtonElement).click());
+  await act(async () => { await vi.advanceTimersByTimeAsync(50); });
+  expect(Array.from(node.querySelectorAll('.k-row')).map(r => r.textContent)).toEqual(['2024Trusted · Oct 29, 2026, 10:31 AM']);
 });

@@ -51,21 +51,26 @@ it('the citation text names the kind first (the view reads its keywords), strips
   expect(long.startsWith('Invoice: ')).toBe(true);
 });
 
-it('a new file for a row is checked, uploaded privately and admitted in one revision that carries its capture and its link cell; nothing is invoked as the plain process path', async () => {
+it('a new file for a row is checked, uploaded privately, retained like any other and then linked by one correction of its document: the one path that links', async () => {
+  fixture.snapshot = { fields: [captured(runA)], lines: [], concerns: [] };
   const file = pdf(), hash = await sha(file), stages: string[] = [];
   const result = await processFinancialDocument(file, stage => stages.push(stage), target);
   expect(fixture.uploaded).toEqual([`${owner}/financial/${hash}.pdf`]);
-  expect(stages).toEqual(['checking', 'uploading', 'processing', 'verifying']);
-  const submit = fixture.calls.find(c => c.action === 'submit')!;
-  expect(fixture.calls.some(c => c.action === 'process')).toBe(false);
-  expect(submit.mode).toBe('financial_evidence_v1');
-  expect(submit.original).toEqual({ sha256: hash, storage_path: `${owner}/financial/${hash}.pdf`, source_filename: 'Invoice 1.pdf', source_kind: 'scan' });
-  expect(submit.revision.idempotency_key).toBe(`attach:v1:${hash}:${'a'.repeat(24)}`);
-  expect(submit.revision.method).toBe('authenticated_document_attachment');
-  expect(submit.revision.fields.map((f: Json) => f.field_key)).toEqual(['capture_status', `supports_record_${'a'.repeat(24)}`]);
-  expect(submit.revision.fields[0].value_normalized).toEqual({ processing_status: 'blocked', reason: 'ocr_entitlement_unavailable' });
-  expect(result.linked).toEqual({ field_key: `supports_record_${'a'.repeat(24)}`, already: false });
-  expect(result.documentId).toBe(doc);
+  expect(stages).toEqual(['checking', 'uploading', 'processing', 'verifying', 'linking']);
+  expect(fixture.calls.some(c => c.action === 'submit')).toBe(false);
+  const processed = fixture.calls.find(c => c.action === 'process')!;
+  expect(processed.original).toEqual({ sha256: hash, storage_path: `${owner}/financial/${hash}.pdf`, source_filename: 'Invoice 1.pdf', source_kind: 'scan' });
+  expect(fixture.calls.map(c => c.action)).toEqual(['read', 'process', 'read', 'read', 'correct', 'read']);
+  const correction = fixture.calls.find(c => c.action === 'correct')!;
+  expect(correction.mode).toBe('financial_evidence_v1');
+  expect(correction.owner_user_id).toBe(owner);
+  expect(correction.revision.supersedes_run_id).toBe(runA);
+  expect(correction.revision.idempotency_key).toMatch(/^document-link:/);
+  expect(correction.revision.method).toBe('authenticated_document_attachment');
+  // the capture the document was admitted with is carried unchanged; the capture cell is written in one place, by the server's process action
+  expect(correction.revision.fields.map((f: Json) => f.field_key)).toEqual(['capture_status', `supports_record_${'a'.repeat(24)}`]);
+  expect(correction.revision.fields[0]).toMatchObject({ value_normalized: { processing_status: 'blocked', reason: 'ocr_entitlement_unavailable' }, evidence: { stage: 'original_capture_only' } });
+  expect(result).toMatchObject({ documentId: doc, reused: false, linked: { field_key: `supports_record_${'a'.repeat(24)}`, already: false } });
 });
 
 it('a file added with no link target takes the plain process path, unchanged', async () => {
@@ -116,8 +121,27 @@ it('the same file for a second record keeps the first link and adds the second',
 it('a failed upload or a refused admission is an error in words and links nothing', async () => {
   fixture.uploadError = { statusCode: '500' };
   await expect(processFinancialDocument(pdf(), () => {}, target)).rejects.toThrow('The private upload failed. Retry this file to continue.');
-  fixture.uploadError = null; fixture.refuse = 'submit';
+  fixture.uploadError = null; fixture.refuse = 'process';
   await expect(processFinancialDocument(pdf(), () => {}, target)).rejects.toThrow('refused');
+  expect(fixture.calls.some(c => c.action === 'correct')).toBe(false);
+});
+
+it('a refused correction is an error in words; the file stays retained and the next try finds it held', async () => {
+  fixture.snapshot = { fields: [captured(runA)], lines: [], concerns: [] };
+  fixture.refuse = 'correct';
+  await expect(processFinancialDocument(pdf(), () => {}, target)).rejects.toThrow('refused');
+  expect(fixture.priorDocument).toBe(doc); // the document is retained: a retry reads it and links it without uploading again
+  fixture.refuse = null; fixture.uploaded = [];
+  const result = await processFinancialDocument(pdf(), () => {}, target);
+  expect(fixture.uploaded).toEqual([]);
+  expect(result).toMatchObject({ reused: true, linked: { already: false } });
+});
+
+it('a document that already holds 100 fields takes no more: the correction is refused before it is sent, in words', async () => {
+  fixture.priorDocument = doc;
+  fixture.snapshot = { fields: Array.from({ length: 100 }, (_, i) => ({ ...captured(runA), field_key: `f${i}` })), lines: [], concerns: [] };
+  await expect(processFinancialDocument(pdf(), () => {}, target)).rejects.toThrow('This source has reached its field limit. No evidence has been changed.');
+  expect(fixture.calls.some(c => c.action === 'correct')).toBe(false);
 });
 
 it('a file of the wrong type or size, and a signed-out session, are refused before anything is sent', async () => {

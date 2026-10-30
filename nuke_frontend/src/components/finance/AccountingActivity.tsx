@@ -2,10 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAccountingBook } from './AccountingBookContext';
 import { dollars, pacific, readActivityPasses, type ActivityPass } from '../../services/accountingCloseout';
+import { plural } from '../../kit';
 
 export type Activity = { document_id: string; source_filename: string | null; run_id: string; actor_user_id: string | null; method: string | null; recorded_at: string; records_changed: number; first_reading: boolean };
 
-const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 /** What a revision did, in words: the writer's method names the flow, records_changed says how much moved. */
 export function activityWhat(row: Activity): string {
   if (row.first_reading) return row.records_changed ? `added ${plural(row.records_changed, 'record')}` : 'added a source';
@@ -104,7 +104,7 @@ export default function AccountingActivity({ people, onOpen }: { people: Record<
       <button type="button" disabled={loading} onClick={() => setRetry(value => value + 1)}>{loading ? 'Retrying…' : 'Try again'}</button>
     </p>}
     {latest && <><p className="accounting-activity-latest"><span className="accounting-eyebrow">{failed ? 'Last loaded' : 'Latest'}</span> <strong>{who(latest)}</strong> {activityWhat(latest)} <span className="accounting-muted">· {latest.source_filename || 'source'} · {ago(latest.recorded_at, now)}</span></p>
-    <details><summary>Recent changes {news > 0 && <span className="accounting-new">{news} new</span>}</summary>
+    <details className="accounting-compact-details"><summary>Recent changes {news > 0 && <span className="accounting-new">{news} new</span>}</summary>
       <ol className="accounting-activity-list">{rows?.map(row => <li key={row.run_id}>
         <button type="button" onClick={() => onOpen(row.document_id)}><strong>{who(row)}</strong> {activityWhat(row)}<span className="accounting-muted">{row.source_filename || 'source'} · {ago(row.recorded_at, now)}</span>{fresh(row) && <span className="accounting-new">New</span>}</button>
       </li>)}</ol>

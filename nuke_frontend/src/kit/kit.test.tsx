@@ -4,7 +4,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { beforeEach, afterEach, describe, it, expect, vi } from 'vitest';
 vi.mock('../hooks/useIsMobile', () => ({ useIsMobile: () => false }));
 import { MIN_DISTRIBUTION } from '../pages/stacks/bidMeasurements';
-import { RANK_FLOOR, rankLabel, formatMeasure, day, MeasureView, ClaimView, Text, Measures, Strip, Facet } from './index';
+import { RANK_FLOOR, rankLabel, formatMeasure, day, plural, ShareBar, MeasureView, ClaimView, Text, Measures, Strip, Facet } from './index';
 
 let root: Root, host: HTMLDivElement;
 beforeEach(() => { host = document.createElement('div'); document.body.appendChild(host); root = createRoot(host); });
@@ -130,5 +130,27 @@ describe('containers', () => {
     act(() => (host.querySelector('button.k-facet') as HTMLButtonElement).click());
     expect(opened).toBe(true);
     expect(host.textContent?.endsWith('2 of 5 facets attributed')).toBe(true);
+  });
+});
+
+
+describe('plural and ShareBar', () => {
+  it('counts with the noun in the right number, with separators', () => {
+    expect(plural(1, 'row')).toBe('1 row');
+    expect(plural(0, 'row')).toBe('0 rows');
+    expect(plural(1204, 'row')).toBe('1,204 rows');
+    expect(plural(1, 'row needs', 'rows need')).toBe('1 row needs');
+    expect(plural(2, 'row needs', 'rows need')).toBe('2 rows need');
+  });
+  it('draws the stored percentage as the width, clamped to the track, and draws nothing for an unknown share', () => {
+    render(<ShareBar share={77.7} />);
+    expect(host.querySelector('.k-share-bar__fill')?.getAttribute('width')).toBe('77.7');
+    expect(host.querySelector('svg')?.getAttribute('aria-hidden')).toBe('true');
+    render(<ShareBar share={140} />);
+    expect(host.querySelector('.k-share-bar__fill')?.getAttribute('width')).toBe('100');
+    render(<ShareBar share={-5} />);
+    expect(host.querySelector('.k-share-bar__fill')?.getAttribute('width')).toBe('0');
+    render(<ShareBar share={null} />);
+    expect(host.querySelector('svg')).toBeNull();
   });
 });

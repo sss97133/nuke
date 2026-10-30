@@ -1,7 +1,11 @@
 import { supabase } from '../lib/supabase';
-import { carriedRevision, readAccountingSnapshot } from './financialExpenseUse';
+import { carriedRevision, correctionRequest, readAccountingSnapshot } from './financialExpenseUse';
 
 export type FinancialIntakeStage = 'checking' | 'uploading' | 'processing' | 'verifying' | 'linking';
+/** What each stage says, in plain words, for every surface that adds a document. */
+export const STAGE_WORDS: Record<FinancialIntakeStage, string> = {
+  checking: 'Checking the file…', uploading: 'Uploading it privately…', processing: 'Adding it to the books…', verifying: 'Checking it landed…', linking: 'Linking it to the row…',
+};
 export interface FinancialIntakeResult {
   documentId: string;
   status: 'needs_review' | 'complete' | 'blocked';
@@ -75,7 +79,7 @@ export async function processFinancialDocument(file: File, onStage: (stage: Fina
   await owner(userId);
   // A prior document is reused as evidence; its presence alone never means accounting is complete.
   if (prior?.data?.document?.id) {
-    return link ? linkExistingFinancialDocument(prior.data.document.id, userId, link, file.name, sha256, onStage) : processExistingFinancialDocument(prior.data.document.id, userId);
+    return link ? linkExistingFinancialDocument(prior.data.document.id, userId, link, file.name, sha256, true, onStage) : processExistingFinancialDocument(prior.data.document.id, userId);
   }
   const storagePath = `${userId}/financial/${sha256}.${extension}`;
   onStage('uploading');
@@ -85,36 +89,26 @@ export async function processFinancialDocument(file: File, onStage: (stage: Fina
   await owner(userId);
   onStage('processing');
   const original = { sha256, storage_path: storagePath, source_filename: file.name, source_kind: 'scan' };
-  // A file added for a row is admitted with its link cell in the same revision as its capture; any other file takes the plain process path.
-  const processed = link
-    ? await invoke({ mode: 'financial_evidence_v1', action: 'submit', original, revision: {
-        idempotency_key: `attach:v1:${sha256}:${link.source_key.slice(0, 24)}`, method: 'authenticated_document_attachment', version: '1',
-        fields: [CAPTURE_CELL(sha256), linkCell(link, file.name, sha256)] } })
-    : await invoke({ mode: 'financial_evidence_v1', action: 'process', original });
+  const processed = await invoke({ mode: 'financial_evidence_v1', action: 'process', original });
   await owner(userId);
   onStage('verifying');
   const verified = await invoke({ mode: 'financial_evidence_v1', action: 'read', original_sha256: sha256 });
   await owner(userId);
   if (!verified?.data?.document?.id) throw new Error('The upload is retained, but processing could not be verified. Retry this file.');
+  // A file added for a row is retained like any other, then linked: one correction of the document, the path a file the books already hold takes.
+  if (link) return linkExistingFinancialDocument(verified.data.document.id, userId, link, file.name, sha256, false, onStage);
   const output = result(verified.data, false);
   // Completion must be asserted by the server's accounting consumer, never inferred from upload.
   if (processed?.processing_status === 'complete') output.status = 'complete';
   else if (processed?.processing_status === 'blocked') output.status = 'blocked';
   if (typeof processed?.message === "string") output.message = processed.message;
-  if (link) output.linked = { field_key: linkFieldKey(link.source_key), already: false };
   return output;
 }
 
-/** The capture cell the plain process path writes, so a file added for a row starts as the same kind of document. */
-const CAPTURE_CELL = (sha256: string): Json => ({
-  field_key: 'capture_status', value_raw: 'Private original captured; extraction pending', value_type: 'event',
-  value_normalized: { processing_status: 'blocked', reason: 'ocr_entitlement_unavailable' },
-  evidence: { stage: 'original_capture_only', source_sha256: sha256, method: 'authenticated_original_capture', extraction_performed: false },
-});
-
-/** A file the books already hold, added again as the paper for a row: one correction that carries every field the document has and adds the link cell.
- *  A document already linked to that record is left as it is. */
-async function linkExistingFinancialDocument(documentId: string, userId: string, link: DocumentLinkTarget, filename: string, sha256: string,
+/** A document of the books, linked as the paper for a row: one correction that carries every field the document has and adds the link cell. This is the
+ *  only path that links, for a file the books already held (reused) and for one that was just retained. A document already linked to that record is
+ *  left as it is. */
+async function linkExistingFinancialDocument(documentId: string, userId: string, link: DocumentLinkTarget, filename: string, sha256: string, reused: boolean,
   onStage: (stage: FinancialIntakeStage) => void): Promise<FinancialIntakeResult> {
   onStage('linking');
   const snapshot = await readAccountingSnapshot(userId, documentId);
@@ -125,18 +119,13 @@ async function linkExistingFinancialDocument(documentId: string, userId: string,
   if (!linked) {
     const { fields, records, lines, concerns } = carriedRevision(snapshot);
     const next = [...fields.filter((f: Json) => f.field_key !== key), linkCell(link, filename, sha256)];
-    if (next.length > 100) throw new Error('This document has reached its field limit. Nothing was changed.');
-    const doc = snapshot.document;
-    await invoke({ mode: 'financial_evidence_v1', action: 'correct', owner_user_id: userId,
-      original: { sha256: doc.content_sha256, storage_path: doc.storage_path, source_filename: doc.source_filename, source_kind: doc.source_kind },
-      revision: { idempotency_key: `document-link:${crypto.randomUUID()}`, method: 'authenticated_document_attachment', version: '1',
-        supersedes_run_id: snapshot.runId, fields: next, accounting_records: records, lines, concerns } });
+    await invoke(correctionRequest(snapshot, { idempotencyKey: `document-link:${crypto.randomUUID()}`, method: 'authenticated_document_attachment', fields: next, records, lines, concerns }));
     await owner(userId);
   }
   const verified = await invoke({ mode: 'financial_evidence_v1', action: 'read', document_id: documentId });
   await owner(userId);
   if (verified?.data?.document?.id !== documentId) throw new Error('The document is retained, but the link could not be verified. Retry this file.');
-  const output = result(verified.data, true);
+  const output = result(verified.data, reused);
   output.linked = { field_key: key, already: linked };
   return output;
 }
