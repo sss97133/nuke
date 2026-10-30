@@ -1,6 +1,7 @@
 -- Synthetic canonical replay: current workload, party masking and distinct money/time states.
 \ir test_work_order_retained_sources.sql
 BEGIN;
+SELECT set_config('test.auth_uid','11000000-0000-0000-0000-000000000002',true);
 UPDATE public.work_orders SET estimated_hours=11.5,actual_hours=9,currency='USD',estimated_total=1200,
  updated_at='2026-10-29',customer_name='Private Client' WHERE id='31000000-0000-0000-0000-000000000001';
 INSERT INTO public.work_order_payments(id,work_order_id,status,amount,payment_date) VALUES
@@ -31,4 +32,7 @@ SELECT t_assert(EXISTS(SELECT 1 FROM jsonb_array_elements(public.my_work_orders(
 SELECT t_assert(NOT has_function_privilege('authenticated','public.work_order_list_row(uuid,text[])','EXECUTE')
  AND NOT has_function_privilege('anon','public.work_order_list_row(uuid,text[])','EXECUTE'),
  'caller cannot forge the slot array of this internal helper');
+SELECT set_config('test.auth_uid','',true);
+SELECT t_assert(public.work_order_list_row('31000000-0000-0000-0000-000000000001','{}')#>>'{workload}' IS NULL,
+ 'public vehicle job lists do not acquire private operational context');
 ROLLBACK;

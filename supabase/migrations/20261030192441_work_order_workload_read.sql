@@ -27,7 +27,9 @@ SET search_path = pg_catalog, public SET TimeZone = 'UTC' AS $function$
       WHERE jsonb_array_length(y.p#>ARRAY['stages', o.stage, 'gaps']) > 0 ORDER BY o.n LIMIT 1),
     'inconsistencies', (SELECT count(*) FROM jsonb_each(y.p->'stages') st, jsonb_array_elements(st.value->'inconsistencies')),
     'retained_work', y.retained,
-    'workload', jsonb_build_object(
+    -- Other callers include the public vehicle job list. Operational context is
+    -- for an authenticated viewer with an existing slot, not a new public read.
+    'workload', CASE WHEN auth.uid() IS NOT NULL AND coalesce(cardinality(p_slots),0)>0 THEN jsonb_build_object(
       'recorded_status', w.status,
       -- A paid/billed date is not physical completion. An outstanding current
       -- delivery report also remains visible when a legacy status disagrees.
@@ -56,7 +58,7 @@ SET search_path = pg_catalog, public SET TimeZone = 'UTC' AS $function$
       'parts',jsonb_build_object('records',(SELECT coalesce(sum(records),0) FROM part_states),
         'states',(SELECT coalesce(jsonb_object_agg(status,records),'{}'::jsonb) FROM part_states),
         'basis','work_order_parts recorded status; quoted does not establish availability or readiness'),
-      'source',jsonb_build_object('table','work_orders','record_id',w.id,'as_of',w.updated_at)),
+      'source',jsonb_build_object('table','work_orders','record_id',w.id,'as_of',w.updated_at)) END,
     'as_of', y.p->'as_of')
   FROM y CROSS JOIN w CROSS JOIN payments
 $function$;

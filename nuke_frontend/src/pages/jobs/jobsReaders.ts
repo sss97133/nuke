@@ -108,7 +108,7 @@ export type WorkOrderRow = {
     time: { estimated_hours: number | null; recorded_hours: number | null; remaining_hours: number | null; basis: string };
     parts: { records: number; states: Record<string, number>; basis: string };
     source: { table: string; record_id: string; as_of: string | null };
-  };
+  } | null;
 };
 
 export type RetainedWorkRead = {
