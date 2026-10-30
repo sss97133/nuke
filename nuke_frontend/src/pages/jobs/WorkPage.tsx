@@ -227,12 +227,13 @@ const ViewerWorkPage: React.FC = () => {
   }, [loadJobs, loadQueue]);
 
   const complete = !!jobs && !loadingJobs && jobRows.length === jobs.coverage.total_for_viewer;
+  const statusAvailable = jobRows.every(row => !!row.workload);
   const parties = useMemo(() => [...new Set(jobRows.flatMap(row => [clientFor(row), providerFor(row), row.workload?.organization?.name].filter((v): v is string => !!v)))].sort(), [jobRows]);
   const visibleRows = useMemo(() => {
     const words = query.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
     return jobRows.filter(row => {
-      if (view === 'history' ? !inHistory(row) : view !== 'all' && inHistory(row)) return false;
-      if (view === 'waiting' && !waiting(row)) return false;
+      if (statusAvailable && (view === 'history' ? !inHistory(row) : view !== 'all' && inHistory(row))) return false;
+      if (statusAvailable && view === 'waiting' && !waiting(row)) return false;
       const people = [clientFor(row), providerFor(row), row.workload?.organization?.name];
       if (partyFilter && !people.includes(partyFilter)) return false;
       const haystack = [row.display_title, row.title, vehicleText(row.vehicle_label), row.vehicle_id, row.work_order_id, ...people].filter(Boolean).join(' ').toLocaleLowerCase();
@@ -250,7 +251,7 @@ const ViewerWorkPage: React.FC = () => {
         return (a.workload?.money.currency || '\uffff').localeCompare(b.workload?.money.currency || '\uffff');
       return (sort === 'scheduled' ? av-bv : bv-av) || a.work_order_id.localeCompare(b.work_order_id);
     });
-  }, [jobRows, view, query, partyFilter, sort]);
+  }, [jobRows, view, query, partyFilter, sort, statusAvailable]);
 
   return <article className="jb-page jb-scope jb-work-page">
     <div className="jb-intro">
@@ -268,10 +269,14 @@ const ViewerWorkPage: React.FC = () => {
         <option value="updated">Recently updated</option><option value="scheduled">Scheduled first</option><option value="estimate">Estimate by currency</option><option value="hours">Largest time commitment</option>
       </select></label>
     </div>
-    <div className="jb-actions jb-work-views" role="group" aria-label="Work state">{(['current','waiting','history','all'] as const).map(state => <button key={state} type="button" className={`btn-base btn-sm ${view === state ? 'btn-primary' : 'btn-secondary'}`} disabled={!complete} aria-pressed={view === state} onClick={() => setView(state)}>{state === 'all' ? 'All records' : state[0].toUpperCase()+state.slice(1)}</button>)}</div>
+    <div className="jb-actions jb-work-views" role="group" aria-label="Work state">{(['current','waiting','history','all'] as const).map(state => {
+      const selected = statusAvailable ? view===state : state==='all';
+      return <button key={state} type="button" className={`btn-base btn-sm ${selected ? 'btn-primary' : 'btn-secondary'}`} disabled={!complete || (!statusAvailable && state!=='all')} aria-pressed={selected} onClick={() => setView(state)}>{state === 'all' ? 'All records' : state[0].toUpperCase()+state.slice(1)}</button>;
+    })}</div>
     {jobs && <section className="jb-work-results" aria-label="Jobs">
       {!complete && <Text role="caption" as="p" aria-live="polite">{loadingJobs ? 'Loading the full work list…' : 'The work list is incomplete. Search and filters are unavailable.'}</Text>}
-      {complete && <Text role="caption" as="p" aria-live="polite">{visibleRows.length} shown · {jobs.coverage.total_for_viewer} total · {view === 'history' ? 'History' : view === 'all' ? 'All records' : view === 'waiting' ? 'Recorded waiting' : 'Current work'}</Text>}
+      {complete && !statusAvailable && <Text role="body" as="p">Work status is unavailable. Showing all job records.</Text>}
+      {complete && <Text role="caption" as="p" aria-live="polite">{visibleRows.length} shown · {jobs.coverage.total_for_viewer} total · {!statusAvailable || view === 'all' ? 'All records' : view === 'history' ? 'History' : view === 'waiting' ? 'Recorded waiting' : 'Current work'}</Text>}
       {jobRows.length === 0
         ? <Text role="body">{cohort === 'responsible' ? 'No jobs linked to your commitments yet.' : 'No jobs available in this view.'}</Text>
         : <ul className="jb-list jb-work-list">{visibleRows.map(r => <JobRow key={r.work_order_id} row={r} image={r.vehicle_id ? images[r.vehicle_id] : undefined} />)}</ul>}

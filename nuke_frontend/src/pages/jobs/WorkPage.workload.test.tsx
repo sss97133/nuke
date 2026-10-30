@@ -53,6 +53,13 @@ it('keeps a paid delivery job current and never converts its unknown received am
   expect(host.textContent).toContain('Truck paid');expect(host.textContent).toContain('Paid in full');expect(host.textContent).not.toContain('$0');
   expect(host.textContent).toContain('owes delivery');
 });
+it('does not label legacy responses with missing status as current workload',async()=>{
+  const legacy=job('legacy');delete legacy.workload;fixture.rows=[legacy];await render();
+  expect(host.textContent).toContain('Work status is unavailable');
+  expect(button('Current').disabled).toBe(true);expect(button('History').disabled).toBe(true);
+  expect(button('All records').getAttribute('aria-pressed')).toBe('true');
+  expect(host.textContent).toContain('Truck legacy');expect(host.textContent).not.toContain('Current work');
+});
 it('waits for the full cohort and searches a job beyond the first page',async()=>{
   let finish!:(value:unknown)=>void;fixture.pageTwo=new Promise(resolve=>{finish=resolve;});
   await render();const search=host.querySelector<HTMLInputElement>('input[type="search"]')!;
