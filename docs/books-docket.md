@@ -70,9 +70,13 @@ part-b dollars are net of credits like the audit tiers, and the head is in absol
 `timed_out` or `error` in a second transaction, so the page says "Did not finish". There is no cron and no page button that runs it: the refresh path is
 the script, under an explicit bound, after the last landing.
 
-A stored run is **stale** when the books changed since it (the signature differs) or what the gate is made of changed since (the hash differs). The hash covers the source of
-`books_year_gate`, of the readers it calls, and the rule trees of the views it reads and every view those read (R10 and R12 are computed by views, so a migration that changes
-only a view marks every run stale). Any landing changes the signature, so land the filing state (`scripts/books/return_facts.py`) first and record the gate last.
+A stored run is **stale** when the books changed since it (the signature differs) or what the gate is made of changed since (the hash differs). The hash is found from the gate
+itself, not from a list: the source of `books_year_gate`; of every `books_*` / `accounting_*` function a function's source names (the readers and the helpers they call); the rule
+tree of every `v_books_*` / `v_accounting_*` / `v_financial_*` view a function's source names; and, through the dependency catalog, every view those views read and every public
+function they call (R10 and R12 are computed by views, so a migration that changes only a view or a helper marks every run stale). A name in a comment counts too, which errs toward
+stale. The walk reaches 17 definitions and takes about 50 ms (read-only on production as the signed-in role, 2026-10-29); a new view or helper the gate starts to read is covered the
+day it does, with no list to update. An object outside the two name families would not be found by name: keep the books gate's helpers inside them. Any landing changes the
+signature, so land the filing state (`scripts/books/return_facts.py`) first and record the gate last.
 A stale pass reads "Last run passed", never "Passed", and is never trusted. The browser spells the book's revision the way the database does (`<documents>:<latest change as
 YYYY-MM-DDTHH:MI:SS.USZ>`), pinned by a test against the migration.
 
