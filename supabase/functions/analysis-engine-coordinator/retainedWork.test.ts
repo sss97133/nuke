@@ -1,8 +1,14 @@
 import { assertEquals, assertRejects } from 'jsr:@std/assert@1';
-import { computeRetainedWidget } from './retainedWork.ts';
+import { computeRetainedWidget, retainedWorkLimits } from './retainedWork.ts';
 import { dispatchRetainedAnalysis } from '../derive-dispatch/retainedAnalysis.ts';
 const receipt = { method_revision: 'registered_source_state_v1', assessment_status: 'not_assessed', score: null,
   severity: 'info', details: { claims_in_page: 1 }, evidence: { record_ids: [{ observation_id: 'source' }] }, reasons: ['retained state'] };
+Deno.test('service retained limits preserve the small auxiliary wake and bound dedicated capacity', () => {
+  assertEquals(retainedWorkLimits({}), { batchSize: 2, budgetMs: 15000 });
+  assertEquals(retainedWorkLimits({ batch_size: 20000, time_budget_ms: 3600000 }), { batchSize: 20, budgetMs: 45000 });
+  assertEquals(retainedWorkLimits({ batch_size: -1, time_budget_ms: -1 }), { batchSize: 0, budgetMs: 10000 });
+  assertEquals(retainedWorkLimits({ batch_size: 'invalid', time_budget_ms: 'invalid' }), { batchSize: 0, budgetMs: 15000 });
+});
 Deno.test('registered retained calculation uses only its bounded RPC and preserves unscored evidence', async () => {
   let calls = 0;
   const db = { rpc(name: string, args: unknown) { calls++; assertEquals(name, 'compute_retained_analysis_widget');

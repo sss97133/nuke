@@ -1,4 +1,10 @@
 const methods = new Set(['registered_source_state_v1', 'filed_photo_state_v1']);
+export function retainedWorkLimits(body: { batch_size?: unknown; time_budget_ms?: unknown }) {
+  const requested = body.batch_size == null ? 2 : Number(body.batch_size);
+  const requestedBudget = body.time_budget_ms == null ? 15000 : Number(body.time_budget_ms);
+  return { batchSize: Number.isFinite(requested) ? Math.max(0, Math.min(20, Math.floor(requested))) : 0,
+    budgetMs: Number.isFinite(requestedBudget) ? Math.max(10000, Math.min(45000, Math.floor(requestedBudget))) : 15000 };
+}
 export function retainedMethodAllowed(method: unknown): method is string {
   return typeof method === 'string' && methods.has(method);
 }
