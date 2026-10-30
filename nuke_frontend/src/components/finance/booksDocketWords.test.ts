@@ -179,15 +179,22 @@ it('the row\'s title is its payee and what was bought; an attached file is named
 // The words must stay true to the rules in SQL. The newest migration that defines v_books_large_sums is the contract: every document rule and flag it can
 // produce has a word here, and every kind of paper a file may be called satisfies the level the rule requires by the keyword patterns the view reads.
 const migrations = fileURLToPath(new URL('../../../../supabase/migrations/', import.meta.url));
-const largeSumsSql = (() => {
+const docLayerSql = (() => {
+  // The document layer (rules, kinds, levels, message-thread patterns) lives in whichever books view defines it last: it moved from
+  // v_books_large_sums into v_books_audit_tiers on 2026-10-29 (migration 20261105200000), so the contract is the newest migration that carries it.
   const files = readdirSync(migrations).filter(f => f.endsWith('.sql')).sort();
-  const newest = [...files].reverse().find(f => /CREATE OR REPLACE VIEW public\.v_books_large_sums/.test(readFileSync(migrations + f, 'utf8')));
+  const hasLayer = (t: string) => /AND \(m\.r ~ '/.test(t) && (/\(\d+, '[a-z_]+',\s+'[^']*',\s+'[a-z_]+'/.test(t) || /\(ARRAY\['[a-z_]+'(?:, '[a-z_]+')*\]\)\[o\.ord\] AS required_doc_rule/.test(t));
+  const newest = [...files].reverse().find(f => hasLayer(readFileSync(migrations + f, 'utf8')));
   return readFileSync(migrations + newest!, 'utf8');
 })();
-const viewSql = largeSumsSql.slice(largeSumsSql.indexOf('CREATE OR REPLACE VIEW public.v_books_large_sums'), largeSumsSql.indexOf('COMMENT ON VIEW public.v_books_large_sums'));
+const viewSql = docLayerSql;
+const namesOf = (col: string) => { const m = viewSql.match(new RegExp(`\\(ARRAY\\[([^\\]]+)\\]\\)\\[o\\.ord\\] AS ${col}`)); return m ? [...m[1].matchAll(/'([a-z_]+)'/g)].map(x => x[1]) : []; };
 
 it('every document rule and kind the view can produce has its words (the contract is the view in SQL)', () => {
-  const rules = [...viewSql.matchAll(/\(\d+, '([a-z_]+)',\s+'[^']*',\s+'([a-z_]+)',\s+(?:\d+|NULL(?:::int)?)\)/g)].map(m => [m[1], m[2]]);
+  const tupleRules = [...viewSql.matchAll(/\(\d+, '([a-z_]+)',\s+'[^']*',\s+'([a-z_]+)',\s+(?:\d+|NULL(?:::int)?)\)/g)].map(m => [m[1], m[2]]);
+  const kinds = namesOf('required_doc_kind');
+  const arrayRules = namesOf('required_doc_rule').map((r, i) => [r, kinds[i]]);
+  const rules = tupleRules.length ? tupleRules : arrayRules;
   expect(rules.length).toBeGreaterThanOrEqual(7);
   for (const [rule, kind] of rules) {
     expect(PAPER_BY_RULE[rule], `rule ${rule}`).toBeTruthy();
