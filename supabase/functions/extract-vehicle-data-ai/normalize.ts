@@ -6,6 +6,17 @@
 
 import { captureFields } from '../_shared/craigslistAttributes.ts'
 
+/** A source's explicit spending hold must survive the dedicated-extractor proxy.
+ * Turning it into a generic AI attempt loses the deferral and needlessly tries
+ * paid providers against the same unavailable page.
+ */
+export function dedicatedExtractorDeferral(data: unknown): { success: false; deferred: true; error: string } | null {
+  const message = data && typeof data === 'object' ? (data as { error?: unknown }).error : null;
+  return typeof message === 'string' && /allowance[_ ]deferred|firecrawl_allowance_exhausted/i.test(message)
+    ? { success: false, deferred: true, error: 'allowance_deferred: source Firecrawl allowance unavailable' }
+    : null;
+}
+
 export function normalizeExtractedData(data: any, url: string): any {
   return {
     vin: data.vin || null,
