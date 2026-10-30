@@ -902,6 +902,9 @@ jobs:
       - name: Verify full-population analytical pagination and source inspection (offline)
         run: node --test nuke_frontend/scripts/test-stacks-study-query.mjs
 
+      - name: Verify retained work reconstruction and private offline receipts
+        run: node --test scripts/reconstruct-retained-work.test.mjs
+
       - name: Run Vitest
         working-directory: ./nuke_frontend
         run: npm run test
