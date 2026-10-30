@@ -41,6 +41,7 @@ type Scenario = {
   requeueError?: boolean;
   inactive?: boolean;
   contributorReview?: boolean;
+  retainedAnalysisFails?: boolean;
   body?: Record<string, unknown>;
   token?: string;
 };
@@ -68,6 +69,8 @@ async function run(scenario: Scenario = {}) {
         extractor_type: 'llm', is_active: !scenario.inactive }]);
     }
     if (url.pathname.startsWith('/functions/v1/')) {
+      if (url.pathname.endsWith('/analysis-engine-coordinator')) return respond(scenario.retainedAnalysisFails ? { error: 'interrupted' }
+        : { method: 'retained_analysis_dispatch_v1', processed: 0, total_failed: 0, results: [] }, scenario.retainedAnalysisFails ? 500 : 200);
       if (url.pathname.endsWith('/contributor-intake/review')) return respond({ method: 'contributor_evidence_review_v1', claimed: 1, results: [{ status: 'done' }] });
       if (scenario.readerThrows) throw new Error('synthetic reader interruption');
       return respond(scenario.output === undefined ? receipt() : scenario.output, scenario.readerStatus ?? 200);
@@ -93,7 +96,7 @@ async function run(scenario: Scenario = {}) {
     return { status: response.status, data: await response.json(), calls };
   } finally { globalThis.fetch = originalFetch; }
 }
-const readerCalls = (r: Awaited<ReturnType<typeof run>>) => r.calls.filter(c => c.path.startsWith('/functions/v1/'));
+const readerCalls = (r: Awaited<ReturnType<typeof run>>) => r.calls.filter(c => c.path.startsWith('/functions/v1/') && !c.path.endsWith('/analysis-engine-coordinator'));
 const queueWrites = (r: Awaited<ReturnType<typeof run>>, status?: string) => r.calls.filter(c =>
   c.path === '/rest/v1/derivation_queue' && (!status || c.body.status === status));
 
@@ -256,7 +259,8 @@ Deno.test('missing credentials are refused before database or reader access', as
 
 Deno.test('an empty claimed batch makes no reader calls and no completion writes', async () => {
   const r = await run({ items: [] });
-  equal(r.data, { claimed: 0, done: 0, failed: 0, results: [], contributor_review: null });
+  equal(r.data, { claimed: 0, done: 0, failed: 0, results: [], contributor_review: null,
+    retained_analysis: { method: 'retained_analysis_dispatch_v1', processed: 0, total_failed: 0, results: [] } });
   equal(readerCalls(r).length, 0); equal(queueWrites(r).length, 0);
 });
 
@@ -274,7 +278,14 @@ Deno.test('registered contributor review runs even without a new extraction and 
 Deno.test('zero dispatcher capacity does not invoke a registered review handler', async () => {
   const r = await run({ items: [], contributorReview: true, body: { batch_size: 0 } });
   equal(readerCalls(r).length, 0);
+  equal(r.calls.filter(c => c.path.endsWith('/analysis-engine-coordinator')).length, 0);
   equal(r.calls.find(c => c.path.endsWith('/claim_derivation_work'))?.body.p_batch_size, 0);
+});
+
+Deno.test('retained wake failure is visible without losing independent admitted extraction', async () => {
+  const r = await run({ retainedAnalysisFails: true });
+  equal(r.status, 502); equal(r.data.done, 1); equal(queueWrites(r, 'done').length, 1);
+  equal(r.data.retained_analysis.status, 'failed');
 });
 
 addEventListener('unload', () => envNames.forEach((name, index) => {

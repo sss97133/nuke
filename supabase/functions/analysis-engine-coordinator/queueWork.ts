@@ -23,19 +23,26 @@ export async function runAnalysisQueue(db: Database, options: {
   compute: (claim: AnalysisClaim, widget: string, workerId: string) => Promise<Record<string, unknown>>;
   now?: () => number;
   workerId?: string;
+  retainedOnly?: boolean;
+  budgetMs?: number;
+  reserveMs?: number;
 }) {
   const now = options.now ?? Date.now;
   if (!Number.isFinite(options.batchSize)) throw new Error("Invalid analysis batch size");
-  const deadline = now() + 90_000;
+  const budget = options.budgetMs ?? 90_000;
+  const reserve = options.reserveMs ?? 35_000;
+  if (!Number.isFinite(budget) || !Number.isFinite(reserve) || budget <= reserve || reserve < 0) throw new Error("Invalid analysis time budget");
+  const deadline = now() + budget;
   const worker = options.workerId ?? `coordinator-${crypto.randomUUID()}`;
   const limit = Math.max(0, Math.min(Math.floor(options.batchSize), 20));
   const results: Array<Record<string, any>> = [];
   let claimedCount = 0;
   // Claim one at a time: a short-lived function must not lease a batch it will
   // die before reaching. Completed widget receipts survive a later crash.
-  for (let n = 0; n < limit && now() < deadline - 35_000; n++) {
+  for (let n = 0; n < limit && now() < deadline - reserve; n++) {
     const response = await db.rpc("claim_analysis_queue_batch", { p_batch_size: 1,
-      p_worker_id: worker, p_vehicle_id: options.vehicleId ?? null });
+      p_worker_id: worker, p_vehicle_id: options.vehicleId ?? null,
+      ...(options.retainedOnly ? { p_retained_only: true } : {}) });
     if (response.error) throw new Error(`Analysis claim failed: ${response.error.message}`);
     const claim: AnalysisClaim | undefined = response.data?.[0];
     if (!claim) break;
@@ -47,7 +54,7 @@ export async function runAnalysisQueue(db: Database, options: {
     let lost = false;
     if (!Array.isArray(claim.claimed_widget_slugs)) throw new Error("Missing claimed widget snapshot");
     for (const slug of claim.claimed_widget_slugs) {
-      if (now() >= deadline - 35_000) break;
+      if (now() >= deadline - reserve) break;
       try {
         signals.push(await options.compute(claim, slug, worker));
         succeeded.push(slug);
