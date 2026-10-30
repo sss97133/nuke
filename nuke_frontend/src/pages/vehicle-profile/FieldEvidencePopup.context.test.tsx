@@ -46,9 +46,9 @@ beforeEach(() => {
   host = document.createElement('div'); document.body.appendChild(host); root = createRoot(host);
 });
 afterEach(async () => { await act(async () => root.unmount()); cache.clear(); host.remove(); expect(globalThis.fetch).not.toHaveBeenCalled(); vi.unstubAllGlobals(); });
-async function render() {
-  await act(async () => root.render(<QueryClientProvider client={cache}><FieldEvidencePopup vehicleId="subject" field="transmission" label="Transmission" value="6L90"
-    context={{ subject: { id: 'subject', year: 1977, make: 'Synthetic', model: 'Specimen', transmission: 'Automatic' }, matchField: 'transmission_model' }} /></QueryClientProvider>));
+async function render(field = 'transmission', value = '6L90', matchField = 'transmission_model') {
+  await act(async () => root.render(<QueryClientProvider client={cache}><FieldEvidencePopup vehicleId="subject" field={field} label={field} value={value}
+    context={{ subject: { id: 'subject', year: 1977, make: 'Synthetic', model: 'Specimen', transmission: 'Automatic' }, matchField }} /></QueryClientProvider>));
   await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); });
 }
 
@@ -64,7 +64,7 @@ it('opens the specific component through this vehicle and widens the same label 
   expect(host.querySelector('.vp-field-context__images')?.querySelectorAll('button')).toHaveLength(1);
   await act(async () => (host.querySelector('.vp-field-context__images button') as HTMLButtonElement).click());
   expect(fixture.photo).toHaveBeenCalledWith('transmission-photo');
-  await act(async () => ([...host.querySelectorAll('button')].find(button => button.textContent === 'All profiles') as HTMLButtonElement).click());
+  await act(async () => ([...host.querySelectorAll('button')].find(button => button.textContent === 'Wider scope') as HTMLButtonElement).click());
   await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); });
   const wider = requests[1].searchParams;
   expect(wider.get('transmission_model')).toBe('eq.6L90');
@@ -86,4 +86,11 @@ it('withholds refused source collections in the contextual presentation as well 
   fixture.refused = true; await render();
   expect(host.textContent).toContain('Source evidence could not be loaded completely');
   expect(host.textContent).not.toContain('Specific transmission retained');
+});
+it('keeps the model doorway within the observed year and model instead of mixing generations', async () => {
+  await render('model', 'Specimen', 'model');
+  await act(async () => (host.querySelector('.vp-field-context__segment-head button') as HTMLButtonElement).click());
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); });
+  expect(Object.fromEntries(requests[0].searchParams)).toMatchObject({ model: 'eq.Specimen', make: 'eq.Synthetic', year: 'eq.1977' });
+  expect(host.querySelector('.vp-sold-context')).toBeNull();
 });

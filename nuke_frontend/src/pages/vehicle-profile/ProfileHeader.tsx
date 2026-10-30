@@ -114,13 +114,12 @@ export function extractInlineLotProvenance(vehicle: Record<string, any> | null |
 }
 
 /**
- * The vehicle header through the kit: identity and the one headline price stay in view;
- * the strip of recorded facts scrolls with the page. Every fact is a claim with a source,
- * and the strip states how many of them are attributed. The document comes from one
- * viewer-scoped read (vehicle_profile_read); the viewer is whoever the database says it is.
+ * One compact identity and the available priority data, from the viewer-scoped profile read.
+ * Configuration opens this vehicle's reports and related photographs in place; it does not
+ * borrow an unrelated auction study or replace the vehicle route with a market page.
  */
 export default function ProfileHeader({ priceLotId }: { priceLotId?: string }) {
-  const { vehicle, auctionPulse, auctionCurrency, setGalleryFilter, vehicleIntel } = useVehicleProfile();
+  const { vehicle, auctionPulse, auctionCurrency, setGalleryFilter } = useVehicleProfile();
   const priceOwnedByLiveStack = isAuctionPresentation(auctionPulse) && !!auctionPulse?.listing_url && ['active', 'live'].includes(auctionPulse.listing_status);
   const doc = useProfileDocument(vehicle?.id, priceOwnedByLiveStack);
   const hasMasthead = doc?.sections.some(section => section.kind === 'masthead') ?? false;
@@ -341,9 +340,7 @@ export default function ProfileHeader({ priceLotId }: { priceLotId?: string }) {
       {activeFacet && <HeaderPopover open onClose={() => setActiveFacet(null)} title={activeFacet.value} width={560} dismissBoundaryRef={sticky}>
         <React.Suspense fallback={<p role="status">Reading vehicle context…</p>}>
           <FieldEvidencePopup key={`${vehicle.id}:${activeFacet.field}`} field={activeFacet.field} label={activeFacet.field.replace(/_/g, ' ')}
-            value={activeFacet.value} vehicleId={vehicle.id} context={{ subject: vehicle, matchField: activeFacet.matchField,
-              sales: activeFacet.field === 'model' ? vehicleIntel?.recent_comps : undefined,
-              salesScope: vehicleIntel?.recent_comps_scope }} />
+            value={activeFacet.value} vehicleId={vehicle.id} context={{ subject: vehicle, matchField: activeFacet.matchField }} />
         </React.Suspense>
       </HeaderPopover>}
     </div>

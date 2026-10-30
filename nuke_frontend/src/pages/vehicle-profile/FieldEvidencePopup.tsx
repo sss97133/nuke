@@ -18,8 +18,6 @@ import { useFieldEvidence, type FieldEvidenceGroup } from './hooks/useFieldEvide
 import FieldProvenanceDrawer from './FieldProvenanceDrawer';
 import { optimizeImageUrl } from '../../lib/imageOptimizer';
 import { openVehiclePhoto } from './VehiclePhotoLightbox';
-import SoldContext from './SoldContext';
-import type { CompSale, CompScope } from './hooks/useVehicleIntel';
 import type { FieldProvenance } from './hooks/useFieldProvenance';
 import type { EvidenceImage } from './hooks/useVehicleImageEvidence';
 import type { FeedVehicle } from '../../feed/types/feed';
@@ -31,8 +29,6 @@ const VehiclePopup = React.lazy(() => import('../../components/popups/VehiclePop
 type ProfileFieldContext = {
   subject: Pick<Vehicle, 'id' | 'make' | 'model' | 'year'> & Partial<Vehicle>;
   matchField?: string;
-  sales?: CompSale[] | null;
-  salesScope?: CompScope | null;
 };
 
 interface FieldEvidencePopupProps {
@@ -53,7 +49,7 @@ function FieldContext({ field, label, value, context, reports, images, details }
 }) {
   const { openPopup } = usePopup();
   const subject = context.subject;
-  const canScope = !!subject.make && !!subject.model && !['make', 'model'].includes(field);
+  const canScope = !!subject.make && !!subject.model && field !== 'make';
   const [sameModel, setSameModel] = useState(true);
   const [showPeers, setShowPeers] = useState(false);
   const matchField = context.matchField || field;
@@ -100,7 +96,7 @@ function FieldContext({ field, label, value, context, reports, images, details }
     </section>}
     {filters.length > 0 && <section aria-label={`${value} data segment`}>
       <div className="vp-field-context__segment-head"><button type="button" aria-expanded={showPeers} onClick={() => setShowPeers(current => !current)}>Other profiles with this configuration</button>
-        {showPeers && canScope && <button type="button" onClick={() => setSameModel(current => !current)}>{sameModel ? 'All profiles' : `Within ${subject.year || ''} ${subject.model}`}</button>}
+        {showPeers && canScope && <button type="button" onClick={() => setSameModel(current => !current)}>{sameModel ? 'Wider scope' : `Within ${subject.year || ''} ${subject.model}`}</button>}
       </div>
       {showPeers && <>
       <p className="vp-field-context__note">{canScope && sameModel ? `${subject.year || ''} ${subject.make} ${subject.model} · ` : ''}Exact recorded labels · up to 8 other public profiles</p>
@@ -117,7 +113,6 @@ function FieldContext({ field, label, value, context, reports, images, details }
       </button>)}</div>
       </>}
     </section>}
-    {context.sales && <SoldContext comps={context.sales} scope={context.salesScope} subject={subject} />}
     <details className="vp-field-context__evidence"><summary>Sources & observations for this vehicle</summary>{details}</details>
   </div>;
 }

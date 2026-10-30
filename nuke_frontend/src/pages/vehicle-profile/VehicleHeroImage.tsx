@@ -194,7 +194,7 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ overlayNode }) => {
     <>
       <div>
         <div style={{ overflow: 'hidden' }}>
-          {/* hero-media-slot: static image now, carousel/livestream later */}
+          {/* The screened lead remains stable until the viewer chooses a photo topic. */}
           <div className="hero-media-slot">
             <div
               style={{

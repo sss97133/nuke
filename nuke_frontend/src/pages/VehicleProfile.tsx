@@ -201,7 +201,7 @@ const VehicleProfileInner: React.FC = () => {
             This is the current vehicle record. <Link to={returnTo}>Return to the selected auction and replay →</Link>
           </div>
         )}
-        {/* The header through the kit: identity and price stay in view; recorded facts scroll with the page. */}
+        {/* Compact identity and priority data; field exploration stays within this profile. */}
         <ProfileHeader key={vehicleId} priceLotId={selectedEpisode.data?.lots.find(lot =>
           priceFacts?.source_url && lot.source_url.replace(/\/+$/, '') === priceFacts.source_url.replace(/\/+$/, '')
         )?.id} />
