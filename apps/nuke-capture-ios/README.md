@@ -97,8 +97,10 @@ Standing rules the code carries:
 - **A capture session is the identity context; an album is not.** Owner direction, 2026-10-28 (case ledger §17): the make
   and year a classic serial needs come from the session itself, in order of strength: a title or registration document read in
   the same session, a cowl or trim tag (`BODY BY FISHER` + `ST73 2FS87` decodes model year, make and series), a make badge
-  read on a vehicle-classified frame. A VIN-plate read plus any one of these makes the profile; a tag without a plate makes a
-  private candidate profile and the owner's next notification asks for the one missing frame. The day receipt treats a gap
+  read on a vehicle-classified frame. A VIN-plate read plus any one of these makes the profile. Without a plate, at least two
+  source-bound frames reading the same labelled body number can request a private candidate. Its tag fields must also decode
+  from retained native OCR at confidence0.9 or greater. A nearby car without that reading stays separate; time/GPS only bound
+  the source set. The existing writer retains `needs_identifier` and asks for the missing plate. The day receipt treats a gap
   of more than an hour between bursts as a question with one tap, whose answer is an owner-testimony work session.
 - **Photos file to the owner's vehicles; strong evidence makes a profile.** Owner direction, 2026-10-15: "the app
   after vision run is supposed to assign the vehicle to a profile under the image owners associated vehicle profiles,

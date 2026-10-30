@@ -33,6 +33,7 @@ final class CaptureContextTests: XCTestCase {
         XCTAssertEqual(t?.model, "Firebird")
         XCTAssertEqual(t?.code, "2FS87")
         XCTAssertEqual(t?.bodyLetter, "F")
+        XCTAssertEqual(t?.bodyNumber, "N189504")
     }
 
     func testTagWithoutFisherWordsStillReadsFromItsOwnFields() {
@@ -52,6 +53,62 @@ final class CaptureContextTests: XCTestCase {
         XCTAssertNil(CaptureContextReader.decodeCowlTag(["ST73 2FS87"]))            // no tag marker
         XCTAssertNil(CaptureContextReader.decodeCowlTag(["BODY BY FISHER", "ST73 5FS87"])) // no division 5
         XCTAssertNil(CaptureContextReader.decodeCowlTag(["BODY BY FISHER", "nothing here"]))
+    }
+
+    func testBodyNumberNeedsItsOwnLabelAndAmbiguousTagsCannotSeedCandidates() {
+        XCTAssertNil(CaptureContextReader.decodeCowlTag(["BODY BY FISHER", "ST73 2FS87 BDY", "TR 232", "75 75 PNT"])?.bodyNumber)
+        XCTAssertNil(CaptureContextReader.decodeCowlTag(["BODY BY FISHER", "ST73 2FS87 N 123456 BDY", "N 999999 BDY"])?.bodyNumber)
+        XCTAssertNil(CaptureContextReader.decodeCowlTag(["BODY BY FISHER", "ST73 2FS87 N123456 BDY", "ST74 1FQ87 N999999 BDY"]))
+    }
+
+    func testQualifiedTagRequestEncodesNestedSourceBoundEvidenceAndNoIdentifier() throws {
+        let tagID = "10000000-0000-4000-8000-000000000001"
+        let carID = "10000000-0000-4000-8000-000000000002"
+        let frames = [frame(tagID, vehicle: false), frame(carID)]
+        let lines = ["BODY BY FISHER", "ST73 2FS87 N 189504 BDY", "TR 232", "75 75 PNT"]
+        let observed = lines.map { OnDeviceObservation(kind: .ocrText, value: $0, confidence: 0.95, source: OnDeviceAnalysis.textSource()) }
+        let reads = [tagID, carID].flatMap { id in CaptureContextReader.reads(imageID: id, lines: lines,
+            isVehicle: false, isDocument: false, takenAt: "2026-10-18T12:00:00Z", latitude: 37, longitude: -122, onDevice: observed) }
+        let requests = AttributionEngine.tagCandidateRequests(frames: frames, reads: reads, excludedIDs: [],
+            runID: "20000000-0000-4000-8000-000000000001", method: LibraryIngest.identityMethodVersion)
+        XCTAssertEqual(requests.count, 1)
+        let encoded = try JSONSerialization.jsonObject(with: JSONEncoder().encode(XCTUnwrap(requests.first))) as? [String: Any]
+        XCTAssertEqual(encoded?["basis"] as? String, "tag_only")
+        XCTAssertNil(encoded?["vin"]); XCTAssertNil(encoded?["serial"])
+        let evidence = encoded?["evidence"] as? [String: Any]
+        XCTAssertEqual((evidence?["tag"] as? [String: String])?["body_number"], "N189504")
+        XCTAssertEqual(evidence?["anchor_source_sha256"] as? String, sourceHash)
+        XCTAssertEqual(evidence?["context_method"] as? String, "cowl_tag_session_v1")
+        XCTAssertEqual(encoded?["image_ids"] as? [String], [tagID, carID])
+    }
+
+    func testTagCandidateRefusesOtherIdentifiersTagsMappedFramesAndNonlocalSources() {
+        let tagID = "10000000-0000-4000-8000-000000000001"
+        let carID = "10000000-0000-4000-8000-000000000002"
+        let otherID = "10000000-0000-4000-8000-000000000003"
+        let tag = CaptureContextRead(imageID: tagID, method: .cowlTag, year: 1973, make: "Pontiac", model: "Firebird",
+            code: "2FS87", bodyNumber: "N189504", bodyReadConfidence: 0.95, takenAt: "2026-10-18T12:00:00Z", latitude: 37, longitude: -122)
+        let matching = CaptureContextRead(imageID: carID, method: .cowlTag, year: 1973, make: "Pontiac", model: "Firebird",
+            code: "2FS87", bodyNumber: "N189504", bodyReadConfidence: 0.95, takenAt: tag.takenAt, latitude: 37, longitude: -122)
+        func requests(_ frames: [AttributionEngine.VINCaptureFrame], _ reads: [CaptureContextRead] = [], _ excluded: Set<String> = []) -> [AttributionEngine.DeviceProfileRequest] {
+            AttributionEngine.tagCandidateRequests(frames: frames, reads: [tag]+reads, excludedIDs: excluded,
+                runID: "20000000-0000-4000-8000-000000000001", method: LibraryIngest.identityMethodVersion)
+        }
+        let base = [frame(tagID, vehicle: false), frame(carID)]
+        XCTAssertTrue(requests(base).isEmpty, "One tag and a nearby car do not establish common identity")
+        XCTAssertEqual(requests(base, [matching]).count, 1)
+        XCTAssertEqual(requests(base+[frame(carID)], [matching, matching]).count, 1, "Repeated arrivals coalesce by exact source")
+        var weak = matching; weak.bodyReadConfidence = 0.5
+        XCTAssertTrue(requests(base, [weak]).isEmpty)
+        XCTAssertEqual(requests(base+[frame(otherID)], [matching]).first?.image_ids, [tagID, carID], "Unrelated unlabelled car remains separate")
+        XCTAssertTrue(requests(base, [matching], [carID]).isEmpty)
+        XCTAssertTrue(requests([frame(tagID, document: true), frame(carID)], [matching]).isEmpty)
+        XCTAssertTrue(requests([frame(tagID), frame(carID, lat: 38)], [matching]).isEmpty)
+        XCTAssertTrue(requests([frame(tagID), frame(carID, time: "2026-10-18T12:16:00Z")], [matching]).isEmpty)
+        XCTAssertTrue(requests(base+[frame(otherID, vin: "2S87R3N100001")], [matching]).isEmpty)
+        let competing = CaptureContextRead(imageID: otherID, method: .cowlTag, year: 1973,
+            make: "Pontiac", model: "Firebird", code: "2FS87", bodyNumber: "N999999", takenAt: tag.takenAt, latitude: 37, longitude: -122)
+        XCTAssertTrue(requests(base+[frame(otherID)], [matching, competing]).isEmpty)
     }
 
     // ─── Badge + document reads ──────────────────────────────────────────────
