@@ -1,6 +1,7 @@
--- user_receipt_summary answers only its own user; vehicle_receipts_rollup_v answers for public vehicles and for the caller's own.
+-- Three receipt views answer the right caller: user_receipt_summary only its own user, and vehicle_receipts_rollup_v and receipts_public_summary
+-- only for public, undeleted vehicles (the rollup also for a vehicle's own people).
 --
--- Both views run as their owner (postgres, which bypasses row-level security) over receipts, whose policies answer the paying user and the
+-- All three run as their owner (postgres, which bypasses row-level security) over receipts, whose policies answer the paying user and the
 -- uploader of the vehicle. A view that runs as its owner without a filter of its own is a door past those policies. Measured read-only on prod,
 -- 2026-10-29, with the API roles simulated inside a transaction that was rolled back (counts only):
 --   user_receipt_summary       SELECT for authenticated. anon has no SELECT but still has INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES and TRIGGER,
@@ -11,10 +12,15 @@
 --                              8 on public vehicles, 0 on non-public ones, 0 on a vehicle with no row. Nothing private shows today. The first receipt
 --                              scoped to a non-public vehicle, or a vehicle made non-public, would have shown its lifetime, 90-day and 365-day totals
 --                              to every visitor.
--- Callers: none. Neither name is in a repository file outside its own migrations and the generated dictionary, in a function body, view, materialized
--- view, rule, policy or pg_cron job on prod, in the API edge log (24 hours is the most the log query reaches; the same window holds 168,852 requests
--- for the receipts and vehicles paths, so the filter does see REST traffic), or in a PostgREST statement in pg_stat_statements since its reset on
--- 2026-10-17. The vehicle profile reads receipts as the owner (row-level security) and receipts_public_summary otherwise; neither changes.
+--   receipts_public_summary    SELECT for anon and authenticated, owner-run with a security barrier, and a vehicle test of is_public alone. It serves
+--                              327 rows, one per receipt and vehicle it matches (counted with two indexed joins, because the view's own OR join times
+--                              out when counted whole), and 2 of them sit on public vehicles that have deleted_at set. The visibility rule for a
+--                              public reader, in .claude/rules/db-safety.md, is is_public = true AND deleted_at IS NULL.
+-- Callers: none for the first two. Neither name is in a repository file outside its own migrations and the generated dictionary, in a function body, view,
+-- materialized view, rule, policy or pg_cron job on prod, in the API edge log (24 hours is the most the log query reaches; the same window holds 168,852
+-- requests for the receipts and vehicles paths, so the filter does see REST traffic), or in a PostgREST statement in pg_stat_statements since its reset on
+-- 2026-10-17. The vehicle profile reads receipts as the owner (row-level security) and receipts_public_summary otherwise, in VehicleLedgerDocumentsCard
+-- and useInvestmentLedger. Those two select columns this migration does not touch, and nothing else in the database names the view.
 --
 -- Now:
 --   user_receipt_summary       WITH (security_invoker = true), so receipts and line_items answer as the caller and their policies apply, and the view
@@ -29,8 +35,10 @@
 --                              uploaded_by, or vehicle_user_has_access). The totals are unchanged. A vehicle with no row in vehicles has no rollup.
 --                              WITH (security_barrier = true), like receipts_public_summary, so a filter the caller writes cannot run before the
 --                              gate unless it is leakproof. anon and authenticated keep SELECT and lose the rest.
--- receipts_public_summary is not touched. A later CREATE OR REPLACE of either view must keep these filters; the contract is
--- supabase/sql/test_receipt_views_privacy.sql. Replay-safe: CREATE OR REPLACE, REVOKE and GRANT, and one transaction.
+--   receipts_public_summary    the same columns, join, security barrier and grants, with deleted_at IS NULL added to the vehicle test: 325 rows, and the
+--                              2 on deleted vehicles are no longer served. The OR join itself is not changed here.
+-- A later CREATE OR REPLACE of any of the three must keep these filters; the contract is supabase/sql/test_receipt_views_privacy.sql. Replay-safe:
+-- CREATE OR REPLACE, REVOKE and GRANT, and one transaction.
 SET lock_timeout = '90s';
 SET statement_timeout = '120s';
 
@@ -47,6 +55,10 @@ BEGIN
   d := pg_get_viewdef('public.vehicle_receipts_rollup_v'::regclass);
   IF d NOT LIKE '%receipt_doc_kind_excluded%' OR d NOT LIKE '%amount_check%' OR d NOT LIKE '%duplicate_of%' THEN
     RAISE EXCEPTION 'vehicle_receipts_rollup_v differs from the definition this migration was written from';
+  END IF;
+  d := pg_get_viewdef('public.receipts_public_summary'::regclass);
+  IF d NOT LIKE '%is_public%' OR d NOT LIKE '%source_document_table%' OR d NOT LIKE '%scope_id%' THEN
+    RAISE EXCEPTION 'receipts_public_summary differs from the definition this migration was written from';
   END IF;
 END
 $guard$;
@@ -138,6 +150,35 @@ GRANT SELECT ON public.vehicle_receipts_rollup_v TO anon, authenticated;
 COMMENT ON VIEW public.vehicle_receipts_rollup_v IS
   'Receipt totals per vehicle. A public, undeleted vehicle for everyone; any other vehicle only for its owner, uploader or a contributor with access (vehicle_user_has_access). Owner-run with a security barrier: the row filter is the gate (2026-10-29).';
 
+-- 3. The column-limited public view of receipts: vehicles that are public and not deleted. Columns, join and barrier as they were.
+CREATE OR REPLACE VIEW public.receipts_public_summary WITH (security_barrier = true) AS
+ SELECT r.id,
+    r.vehicle_id,
+    r.scope_type,
+    r.scope_id,
+    r.source_document_id,
+    r.source_document_table,
+    r.vendor_name,
+    r.total,
+    r.total_amount,
+    r.currency,
+    r.receipt_date,
+    r.transaction_date,
+    r.purchase_date,
+    r.invoice_number,
+    r.transaction_number,
+    r.processing_status,
+    r.status,
+    r.created_at
+   FROM public.receipts r
+     JOIN public.vehicles v ON v.id = r.vehicle_id OR (r.scope_type = 'vehicle'::text AND (v.id)::text = r.scope_id)
+  WHERE v.is_public = true AND v.deleted_at IS NULL;
+
+REVOKE ALL ON public.receipts_public_summary FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON public.receipts_public_summary TO anon, authenticated;
+COMMENT ON VIEW public.receipts_public_summary IS
+  'Safe, column-limited public view of receipts for vehicles that are public and not deleted (is_public = true AND deleted_at IS NULL). Backs the vehicle-profile Investment Ledger + Ledger Documents cards for anon/non-owner visitors. Never exposes card_last4/card_holder/vendor_address/raw_extraction/file_url — those stay behind the owner-only base-table policies.';
+
 -- This migration's own result, last, in the same transaction: a wrong end state rolls everything back.
 DO $check$
 DECLARE r regclass;
@@ -159,6 +200,17 @@ BEGIN
      OR has_any_column_privilege('authenticated', r, 'INSERT,UPDATE,REFERENCES')
      OR NOT coalesce((SELECT 'security_barrier=true' = ANY (reloptions) FROM pg_class WHERE oid = r), false) THEN
     RAISE EXCEPTION 'vehicle_receipts_rollup_v: grants or options are not the intended ones';
+  END IF;
+  r := 'public.receipts_public_summary'::regclass;
+  IF NOT has_table_privilege('anon', r, 'SELECT')
+     OR NOT has_table_privilege('authenticated', r, 'SELECT')
+     OR has_table_privilege('anon', r, 'INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+     OR has_table_privilege('authenticated', r, 'INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+     OR has_any_column_privilege('anon', r, 'INSERT,UPDATE,REFERENCES')
+     OR has_any_column_privilege('authenticated', r, 'INSERT,UPDATE,REFERENCES')
+     OR NOT coalesce((SELECT 'security_barrier=true' = ANY (reloptions) FROM pg_class WHERE oid = r), false)
+     OR pg_get_viewdef(r) NOT LIKE '%deleted_at%' THEN
+    RAISE EXCEPTION 'receipts_public_summary: grants, options or the deleted_at test are not the intended ones';
   END IF;
 END
 $check$;

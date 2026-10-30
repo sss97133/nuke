@@ -3,15 +3,18 @@
 -- scripts/ci/run-db-contracts.sh runs it that way in the db-contracts job.
 -- Contract for 20261106150000_receipt_views_privacy.sql. Synthetic rows only; never production.
 -- With the 2026-10-29 definitions (owner-run views over receipts, which has row-level security), a signed-in stranger reads another
--- user's spending summary, and anon reads the receipt totals of every vehicle, public or not. After the migration:
+-- user's spending summary, anon reads the receipt totals of every vehicle, public or not, and the public receipts view serves the
+-- receipts of public vehicles that are deleted. After the migration:
 --   * user_receipt_summary: anon is refused. A signed-in user reads exactly their own row, with the numbers the old view gave them.
 --     A stranger, an uploader who can read another user's receipt on their vehicle, a contributor and a request with no user read nothing.
 --   * vehicle_receipts_rollup_v: anon and a stranger read the rollups of public, undeleted vehicles, with unchanged totals, and nothing
 --     else. An owner (by each of owner_id, user_id, created_by_user_id, uploaded_by) and a contributor read their own vehicle too; a payer
 --     with no tie to a vehicle does not. A filter the caller writes cannot see a hidden row. A vehicle made private or deleted leaves
 --     anon's answer at once.
---   * grants and options: anon has nothing on the summary and SELECT only on the rollup; authenticated has SELECT only on both;
---     security_invoker and security_barrier are set; neither view is updatable.
+--   * receipts_public_summary: a public vehicle that is deleted yields no row to anon, to a stranger or to its owner, through either
+--     arm of the view's join (vehicle_id, or scope_id on a vehicle scope); the other public vehicles' rows are unchanged.
+--   * grants and options: anon has nothing on the summary and SELECT only on the two public views; authenticated has SELECT only on
+--     all three; security_invoker and security_barrier are set; no view is updatable.
 --   * the live view_write_guard accepts the migration, it is replay-safe, and it stops without changing anything when a live
 --     definition has lost a filter it was written from.
 \set ON_ERROR_STOP on
@@ -69,7 +72,9 @@ CREATE POLICY vehicles_private_select ON public.vehicles FOR SELECT USING ((is_p
 
 CREATE TABLE public.receipts (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), user_id uuid, vendor_name text, total_amount numeric(10,2),
   processing_status text DEFAULT 'pending', transaction_date date, scope_type text DEFAULT 'user', scope_id text, duplicate_of uuid,
-  amount_check public.receipt_amount_check DEFAULT 'unchecked', document_kind public.receipt_doc_kind);
+  amount_check public.receipt_amount_check DEFAULT 'unchecked', document_kind public.receipt_doc_kind,
+  vehicle_id uuid, source_document_id uuid, source_document_table text, total numeric, currency text, receipt_date date, purchase_date date,
+  invoice_number text, transaction_number text, status text DEFAULT 'processed', created_at timestamptz DEFAULT now());
 CREATE TABLE public.line_items (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), receipt_id uuid, user_id uuid, category text,
   total_price numeric(10,2));
 -- The receipts and line_items policies as they are live: the paying user, and the uploader of the vehicle a receipt is scoped to.
@@ -121,6 +126,18 @@ CREATE VIEW public.vehicle_receipts_rollup_v AS
   WHERE ((scope_type = 'vehicle'::text) AND (NOT receipt_doc_kind_excluded(document_kind)) AND ((duplicate_of IS NULL) AND (amount_check = ANY (ARRAY['verified'::receipt_amount_check, 'plausible'::receipt_amount_check]))))
   GROUP BY scope_id;
 
+-- The public view of receipts as production has it: column-limited, a security barrier, anon and authenticated SELECT only, and a vehicle
+-- test of is_public alone.
+CREATE VIEW public.receipts_public_summary WITH (security_barrier = true) AS
+ SELECT r.id, r.vehicle_id, r.scope_type, r.scope_id, r.source_document_id, r.source_document_table, r.vendor_name, r.total, r.total_amount,
+    r.currency, r.receipt_date, r.transaction_date, r.purchase_date, r.invoice_number, r.transaction_number, r.processing_status, r.status,
+    r.created_at
+   FROM receipts r
+     JOIN vehicles v ON v.id = r.vehicle_id OR r.scope_type = 'vehicle'::text AND v.id::text = r.scope_id
+  WHERE v.is_public = true;
+REVOKE ALL ON public.receipts_public_summary FROM anon, authenticated;
+GRANT SELECT ON public.receipts_public_summary TO anon, authenticated;
+
 -- The cast of characters. Users: A pays every receipt and owns some vehicles; B, C, D, M, U each tie to one private vehicle; S is a stranger.
 --   A ...a1, B ...b1, C ...c1 (created_by_user_id), D ...e1 (user_id), M ...f1 (contributor), U ...d1 (uploaded_by), S ...51
 -- Vehicles (the last three characters label them below):
@@ -168,6 +185,12 @@ INSERT INTO public.receipts (id, user_id, vendor_name, total_amount, processing_
  ('a0000000-0000-0000-0000-000000000006', '00000000-0000-0000-0000-0000000000a1', 'Acme',  10.00, 'pending',   '2026-01-12', 'user', NULL, 'verified', NULL),
  ('a0000000-0000-0000-0000-000000000007', '00000000-0000-0000-0000-0000000000a1', 'Acme',  75.00, 'completed', '2026-05-01', 'vehicle', '72000000-0000-0000-0000-000000000b04', 'verified', NULL),
  ('b0000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-0000000000b1', 'Gamma', 500.00, 'completed', '2026-04-01', 'user', NULL, 'verified', NULL);
+-- Receipts that reach a vehicle through vehicle_id, the other arm of the public view's join: on a01 (public), a03 (public, deleted) and b01
+-- (private). Pending and user-scoped, so neither summary nor rollup counts them.
+INSERT INTO public.receipts (id, user_id, vendor_name, total_amount, processing_status, scope_type, vehicle_id, amount_check) VALUES
+ ('c0000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-0000000000a1', 'Acme', 10.00, 'pending', 'user', '71000000-0000-0000-0000-000000000a01', 'verified'),
+ ('c0000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-0000000000a1', 'Acme', 10.00, 'pending', 'user', '71000000-0000-0000-0000-000000000a03', 'verified'),
+ ('c0000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-0000000000a1', 'Acme', 10.00, 'pending', 'user', '72000000-0000-0000-0000-000000000b01', 'verified');
 INSERT INTO public.line_items (receipt_id, user_id, category, total_price) VALUES
  ('a0000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-0000000000a1', 'parts', 60.00),
  ('a0000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-0000000000a1', 'labor', 40.00),
@@ -178,6 +201,10 @@ INSERT INTO public.line_items (receipt_id, user_id, category, total_price) VALUE
 -- Helpers: what the rollup returns to the current role (an invoker function, so it runs as the caller), and a filter that records what it saw.
 CREATE FUNCTION public.t_rollup_ids() RETURNS text LANGUAGE sql STABLE AS
 $$ SELECT coalesce(string_agg(right(vehicle_id::text, 3), ',' ORDER BY vehicle_id), '') FROM public.vehicle_receipts_rollup_v $$;
+-- What the public receipts view returns to the current role, counted per vehicle (a receipt is labelled by the vehicle it reaches).
+CREATE FUNCTION public.t_public_by_vehicle() RETURNS text LANGUAGE sql STABLE AS
+$$ SELECT coalesce(string_agg(lbl || ':' || n, ',' ORDER BY lbl), '') FROM (
+     SELECT right(coalesce(vehicle_id::text, scope_id), 3) AS lbl, count(*) AS n FROM public.receipts_public_summary GROUP BY 1) t $$;
 CREATE FUNCTION public.t_leak(p uuid) RETURNS boolean LANGUAGE plpgsql STABLE COST 0.0001 AS $$
 BEGIN
   PERFORM set_config('test.leaked', coalesce(current_setting('test.leaked', true), '') || right(p::text, 3) || ',', false);
@@ -186,6 +213,7 @@ END $$;
 -- What the old views answered, kept to compare the new answers with.
 CREATE TABLE public.t_before_user_summary AS SELECT * FROM public.user_receipt_summary;
 CREATE TABLE public.t_before_rollup AS SELECT * FROM public.vehicle_receipts_rollup_v;
+CREATE TABLE public.t_before_public AS SELECT * FROM public.receipts_public_summary;
 
 -- Before: the leaks this migration closes.
 SET ROLE authenticated;
@@ -208,6 +236,10 @@ BEGIN
   END IF;
   BEGIN PERFORM 1 FROM public.user_receipt_summary; RAISE EXCEPTION 'fixture: anon should have no SELECT on the summary';
   EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  ids := public.t_public_by_vehicle();
+  IF ids <> 'a01:7,a02:6,a03:7' THEN
+    RAISE EXCEPTION 'fixture: anon should read the receipts of the deleted public vehicle a03 before the migration, got %', ids;
+  END IF;
 END $$;
 RESET ROLE;
 
@@ -374,6 +406,59 @@ DO $$ BEGIN
 END $$;
 RESET ROLE;
 
+-- receipts_public_summary: the deleted public vehicle a03 yields nothing to anon, to a stranger or to its own owner, through either arm of the
+-- join (the six scope_id receipts and the one vehicle_id receipt); the live public vehicles keep every row; the private vehicle stays hidden.
+SET ROLE anon;
+SELECT set_config('test.auth_uid', '', false);
+DO $$
+DECLARE ids text; r record;
+BEGIN
+  ids := public.t_public_by_vehicle();
+  IF ids <> 'a01:7,a02:6' THEN RAISE EXCEPTION 'anon: expected a01:7,a02:6 from the public receipts view, got %', ids; END IF;
+  IF EXISTS (SELECT 1 FROM public.receipts_public_summary WHERE id = 'c0000000-0000-0000-0000-000000000002') THEN
+    RAISE EXCEPTION 'anon: read the receipt reached through vehicle_id on the deleted vehicle';
+  END IF;
+  IF EXISTS (SELECT 1 FROM public.receipts_public_summary WHERE scope_id = '71000000-0000-0000-0000-000000000a03') THEN
+    RAISE EXCEPTION 'anon: read a receipt scoped to the deleted vehicle';
+  END IF;
+  IF EXISTS (SELECT 1 FROM public.receipts_public_summary WHERE vehicle_id = '72000000-0000-0000-0000-000000000b01'
+             OR scope_id = '72000000-0000-0000-0000-000000000b01') THEN
+    RAISE EXCEPTION 'anon: read a receipt of a private vehicle';
+  END IF;
+  SELECT * INTO r FROM public.receipts_public_summary WHERE id = 'c0000000-0000-0000-0000-000000000001';
+  IF r.vendor_name IS DISTINCT FROM 'Acme' OR r.total_amount <> 10.00 OR r.vehicle_id <> '71000000-0000-0000-0000-000000000a01' THEN
+    RAISE EXCEPTION 'anon: wrong row for the receipt on the live public vehicle, got %', r;
+  END IF;
+  -- columns the view never exposes
+  BEGIN PERFORM file_url FROM public.receipts_public_summary; RAISE EXCEPTION 'the public view exposes file_url';
+  EXCEPTION WHEN undefined_column THEN NULL; END;
+END $$;
+RESET ROLE;
+SET ROLE authenticated;
+DO $$
+DECLARE who text; ids text;
+BEGIN
+  FOREACH who IN ARRAY ARRAY['00000000-0000-0000-0000-000000000051', '00000000-0000-0000-0000-0000000000a1'] LOOP  -- S, a stranger; A, a03's owner
+    PERFORM set_config('test.auth_uid', who, false);
+    ids := public.t_public_by_vehicle();
+    IF ids <> 'a01:7,a02:6' THEN RAISE EXCEPTION 'user %: expected a01:7,a02:6 from the public receipts view, got %', right(who, 2), ids; END IF;
+  END LOOP;
+END $$;
+RESET ROLE;
+-- Nothing else changed: every row the old view returned for a vehicle that is not deleted is the same row now.
+DO $$
+DECLARE n int;
+BEGIN
+  SELECT count(*) INTO n FROM (SELECT * FROM public.receipts_public_summary EXCEPT SELECT * FROM public.t_before_public) x;
+  IF n <> 0 THEN RAISE EXCEPTION 'the public view gained rows (new minus old: %)', n; END IF;
+  SELECT count(*) INTO n FROM (SELECT * FROM public.t_before_public EXCEPT SELECT * FROM public.receipts_public_summary) x;
+  IF n <> 7 THEN RAISE EXCEPTION 'the public view should have dropped exactly the 7 rows of the deleted vehicle, dropped %', n; END IF;
+  IF EXISTS (SELECT * FROM public.t_before_public EXCEPT SELECT * FROM public.receipts_public_summary
+             EXCEPT SELECT * FROM public.t_before_public WHERE right(coalesce(vehicle_id::text, scope_id), 3) = 'a03') THEN
+    RAISE EXCEPTION 'the public view dropped a row that is not on the deleted vehicle';
+  END IF;
+END $$;
+
 -- The gate reads the vehicle as it is now: made private or deleted, a vehicle leaves anon's answer at once; made public, a vehicle joins it.
 UPDATE public.vehicles SET is_public = false WHERE id = '71000000-0000-0000-0000-000000000a02';
 UPDATE public.vehicles SET deleted_at = now() WHERE id = '71000000-0000-0000-0000-000000000a01';
@@ -382,11 +467,31 @@ SET ROLE anon;
 SELECT set_config('test.auth_uid', '', false);
 DO $$ BEGIN
   IF public.t_rollup_ids() <> 'b02' THEN RAISE EXCEPTION 'anon after the flips: expected b02, got %', public.t_rollup_ids(); END IF;
+  IF public.t_public_by_vehicle() <> 'b02:6' THEN
+    RAISE EXCEPTION 'anon after the flips: expected b02:6 from the public receipts view, got %', public.t_public_by_vehicle();
+  END IF;
 END $$;
 RESET ROLE;
 UPDATE public.vehicles SET is_public = true WHERE id = '71000000-0000-0000-0000-000000000a02';
 UPDATE public.vehicles SET deleted_at = NULL WHERE id = '71000000-0000-0000-0000-000000000a01';
 UPDATE public.vehicles SET is_public = false WHERE id = '72000000-0000-0000-0000-000000000b02';
+-- Undelete the deleted public vehicle and its receipts come back; delete it again and they go.
+UPDATE public.vehicles SET deleted_at = NULL WHERE id = '71000000-0000-0000-0000-000000000a03';
+SET ROLE anon;
+DO $$ BEGIN
+  IF public.t_public_by_vehicle() <> 'a01:7,a02:6,a03:7' THEN
+    RAISE EXCEPTION 'anon after the undelete: expected a01:7,a02:6,a03:7, got %', public.t_public_by_vehicle();
+  END IF;
+END $$;
+RESET ROLE;
+UPDATE public.vehicles SET deleted_at = '2026-10-01' WHERE id = '71000000-0000-0000-0000-000000000a03';
+SET ROLE anon;
+DO $$ BEGIN
+  IF public.t_public_by_vehicle() <> 'a01:7,a02:6' THEN
+    RAISE EXCEPTION 'anon after the delete: expected a01:7,a02:6, got %', public.t_public_by_vehicle();
+  END IF;
+END $$;
+RESET ROLE;
 
 -- Grants and options: only what the contract above needs, and nothing that writes.
 DO $$
@@ -410,8 +515,19 @@ BEGIN
     RAISE EXCEPTION 'vehicle_receipts_rollup_v: no security barrier';
   END IF;
   IF pg_relation_is_updatable(r, false) <> 0 THEN RAISE EXCEPTION 'vehicle_receipts_rollup_v: updatable'; END IF;
+  r := 'public.receipts_public_summary'::regclass;
+  SELECT coalesce(string_agg(coalesce(ro.rolname, 'PUBLIC') || ':' || a.privilege_type, ',' ORDER BY coalesce(ro.rolname, 'PUBLIC'), a.privilege_type), '')
+    INTO acl FROM pg_class c CROSS JOIN LATERAL aclexplode(c.relacl) a LEFT JOIN pg_roles ro ON ro.oid = a.grantee
+   WHERE c.oid = r AND coalesce(ro.rolname, 'PUBLIC') IN ('PUBLIC', 'anon', 'authenticated');
+  IF acl <> 'anon:SELECT,authenticated:SELECT' THEN RAISE EXCEPTION 'receipts_public_summary: grants to PUBLIC, anon and authenticated are %', acl; END IF;
+  IF NOT coalesce((SELECT 'security_barrier=true' = ANY (reloptions) FROM pg_class WHERE oid = r), false) THEN
+    RAISE EXCEPTION 'receipts_public_summary: no security barrier';
+  END IF;
+  IF pg_relation_is_updatable(r, false) <> 0 THEN RAISE EXCEPTION 'receipts_public_summary: updatable'; END IF;
+  IF pg_get_viewdef(r) NOT LIKE '%deleted_at%' THEN RAISE EXCEPTION 'receipts_public_summary: no deleted_at test'; END IF;
   IF obj_description('public.user_receipt_summary'::regclass, 'pg_class') IS NULL
-     OR obj_description('public.vehicle_receipts_rollup_v'::regclass, 'pg_class') IS NULL THEN
+     OR obj_description('public.vehicle_receipts_rollup_v'::regclass, 'pg_class') IS NULL
+     OR obj_description('public.receipts_public_summary'::regclass, 'pg_class') IS NULL THEN
     RAISE EXCEPTION 'a view lost its comment';
   END IF;
 END $$;
