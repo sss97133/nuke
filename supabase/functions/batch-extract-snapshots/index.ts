@@ -697,9 +697,13 @@ async function replayNativeProperties(supabase: any, body: any): Promise<Respons
     // A historically mislinked lot must not donate its specifications to this
     // record. Keep identity disagreement as backlog; no matching or merging here.
     const label = (x: any) => String(x ?? "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "");
-    if (!parsed.year || parsed.year !== v.year || !label(parsed.make) || label(parsed.make) !== label(v.make) ||
-        !label(parsed.model) || ![parsed.model, [parsed.model, parsed.trim].filter(Boolean).join(" ")]
-          .some(model => label(model) === label(v.model))) throw Error("Native lot and retained vehicle labels disagree");
+    const matched = s.metadata?.vehicle_id === v.id && s.metadata?.vehicle_matched === true;
+    // A protected explicit match may supply an absent legacy field. Known
+    // disagreements still refuse; unstamped captures require all three labels.
+    if (!parsed.year || (v.year == null ? !matched : parsed.year !== v.year) ||
+        !label(parsed.make) || (label(v.make) ? label(parsed.make) !== label(v.make) : !matched) ||
+        !label(parsed.model) || (label(v.model) ? ![parsed.model, [parsed.model, parsed.trim].filter(Boolean).join(" ")]
+          .some(model => label(model) === label(v.model)) : !matched)) throw Error("Native lot and retained vehicle labels disagree");
     const fields: Record<string, unknown> = {};
     for (const field of ["year", "make", "model", "trim", "body_style", "vin", "color", "interior_color", "transmission"]) {
       if (parsed[field] != null && parsed[field] !== "") fields[field] = parsed[field];
@@ -711,7 +715,7 @@ async function replayNativeProperties(supabase: any, body: any): Promise<Respons
     // wrote a vehicle-match stamp. The exact stored record URL plus the native
     // year/make/model checks above associate the source labels to this record;
     // they do not resolve physical identity or override an explicit mismatch.
-    const associationBasis = s.metadata?.vehicle_id === v.id && s.metadata?.vehicle_matched === true
+    const associationBasis = matched
       ? "snapshot_vehicle_match" : "exact_record_url_and_native_labels";
     return { v, s, fields, associationBasis };
   };
