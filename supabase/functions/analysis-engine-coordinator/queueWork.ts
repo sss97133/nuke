@@ -10,9 +10,9 @@ export class AnalysisLeaseLost extends Error {}
 type Database = { rpc(name: string, args: Record<string, unknown>): PromiseLike<{ data: any; error: any }> };
 
 export async function enqueueAnalysis(db: Database, vehicle: string, source: string,
-  reasons: string[], widgets: string[] | null, priority: number) {
+  reasons: string[], widgets: string[] | null, priority: number, deferAnalysis = false) {
   const result = await db.rpc("enqueue_analysis_work", { p_vehicle_id: vehicle, p_source: source,
-    p_reasons: reasons, p_widget_slugs: widgets, p_priority: priority });
+    p_reasons: reasons, p_widget_slugs: widgets, p_priority: priority, p_defer_analysis: deferAnalysis });
   if (result.error) throw new Error(`Analysis enqueue failed: ${result.error.message}`);
   return result.data as string | null;
 }

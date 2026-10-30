@@ -45,6 +45,7 @@ async function run(body: unknown, scenario: string, token = "test-key") {
         if (scenario === "race") return response({ code: "23505", message: "duplicate" }, 409);
         if (scenario === "witness_failed") return response({ code: "23514", message: "image mismatch" }, 400);
         if (scenario === "comment_source_failed") return response({ code: "23503", message: "source comment missing" }, 400);
+        if (scenario === "work_admission_failed") return response({ code: "P0001", message: "dependency work admission failed" }, 500);
         return response([{ id: UUID }], 201);
       }
       observationReads++;
@@ -69,13 +70,23 @@ Deno.test("property insert binds FK, caps inference, retains zero cost, defers i
   assert(insert?.body?.property_id === UUID);
   assert(insert?.body?.confidence_score === .6);
   assert(insert?.body?.agent_cost_cents === 0);
+  assert((insert?.body?.extraction_metadata as Record<string, unknown>)?.analysis_deferred === true);
   assert(insert?.writer === "ingest-observation", "the actual log HTTP request must declare its receipt writer");
   assert(!r.calls.some(call => call.path.endsWith("analysis-engine-coordinator")));
 });
-Deno.test("normal intake retains downstream coordinator behavior", async () => {
+Deno.test("normal intake no longer relies on a fire-and-forget coordinator request", async () => {
   const r = await run({ ...input, defer_analysis: false }, "success");
-  assert(r.status === 200);
-  assert(r.calls.some(call => call.path.endsWith("analysis-engine-coordinator")));
+  assert(r.status === 200 && r.data.success === true);
+  const insert = r.calls.find(call => call.method === "POST" && call.path.endsWith("vehicle_observations"));
+  assert((insert?.body?.extraction_metadata as Record<string, unknown>)?.analysis_deferred === false);
+  assert(!r.calls.some(call => call.path.endsWith("analysis-engine-coordinator")));
+});
+Deno.test("failed transactional dependency admission cannot report a successful observation", async () => {
+  // The actual trigger's persistence/rollback is exercised on PostgreSQL by
+  // test_observation_analysis_work.sql. This checks the real HTTP handler boundary.
+  const r = await run({ ...input, defer_analysis: false }, "work_admission_failed");
+  assert(r.status === 500 && r.data.success !== true && !r.data.observation_id);
+  assert(!r.calls.some(call => call.path.endsWith("analysis-engine-coordinator")));
 });
 Deno.test("unknown property and unavailable registry never insert", async () => {
   for (const [scenario, status] of [["unknown_property", 400], ["registry_error", 503]] as const) {

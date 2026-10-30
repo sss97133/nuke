@@ -29,7 +29,7 @@ CREATE TABLE public.analysis_signal_history(id uuid DEFAULT gen_random_uuid(),si
   vehicle_id uuid,widget_slug text,score numeric,severity text,label text,reasons text[],computed_at timestamptz);
 CREATE TABLE public.ars_recompute_queue(vehicle_id uuid PRIMARY KEY,dimension text);
 CREATE TABLE public.vehicle_observations(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),vehicle_id uuid,
-  kind text,source_identifier text UNIQUE);
+  kind text,source_identifier text UNIQUE,extraction_metadata jsonb DEFAULT '{}'::jsonb);
 CREATE FUNCTION public.trigger_ars_on_observation() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RETURN NEW; END $$;
 CREATE TRIGGER trg_ars_on_observation_insert AFTER INSERT ON public.vehicle_observations
   FOR EACH ROW WHEN(NEW.vehicle_id IS NOT NULL) EXECUTE FUNCTION public.trigger_ars_on_observation();
@@ -132,3 +132,25 @@ DO $$ BEGIN
 END $$;
 SELECT pg_temp.ok('failed work admission rolls back its observation',NOT EXISTS(
  SELECT FROM public.vehicle_observations WHERE source_identifier='must-rollback'));
+
+ALTER TABLE public.analysis_queue DROP CONSTRAINT fixture_fail_work;
+INSERT INTO public.vehicle_observations(vehicle_id,kind,source_identifier,extraction_metadata)
+ VALUES('10000000-0000-4000-8000-000000000003','listing','deferred-input','{"analysis_deferred":true}');
+SELECT pg_temp.ok('service-deferred work is durable but cannot be claimed',
+ (SELECT analysis_deferred AND request_revision=2 FROM public.analysis_queue WHERE vehicle_id='10000000-0000-4000-8000-000000000003')
+ AND NOT EXISTS(SELECT FROM public.claim_analysis_queue_batch(1,'worker','10000000-0000-4000-8000-000000000003')));
+INSERT INTO public.vehicle_observations(vehicle_id,kind,source_identifier)
+ VALUES('10000000-0000-4000-8000-000000000003','work_record','ordinary-arrival');
+SELECT pg_temp.ok('an ordinary arrival cannot lift deferred compute',
+ (SELECT analysis_deferred AND request_revision=3 FROM public.analysis_queue WHERE vehicle_id='10000000-0000-4000-8000-000000000003'));
+SELECT public.enqueue_analysis_work('10000000-0000-4000-8000-000000000003','cron_sweep','{}',NULL,50);
+SELECT pg_temp.ok('a cron cannot lift deferred compute',
+ (SELECT analysis_deferred FROM public.analysis_queue WHERE vehicle_id='10000000-0000-4000-8000-000000000003'));
+SELECT public.enqueue_analysis_work('10000000-0000-4000-8000-000000000003','owner_evaluation','{}',NULL,90);
+CREATE TEMP TABLE authorized AS SELECT * FROM public.claim_analysis_queue_batch(1,'authorized','10000000-0000-4000-8000-000000000003');
+SELECT pg_temp.ok('an explicit existing owner evaluation can resume deferred calculations',(SELECT count(*)=1 FROM authorized));
+INSERT INTO public.vehicle_observations(vehicle_id,kind,source_identifier,extraction_metadata)
+ VALUES('10000000-0000-4000-8000-000000000003','listing','new-defer-during-calculation','{"analysis_deferred":true}');
+SELECT pg_temp.ok('a new deferral fences the running calculation',
+ (SELECT public.record_analysis_queue_signal(id,'authorized',claimed_revision,lease_token,
+  jsonb_build_object('vehicle_id',vehicle_id,'widget_slug','a','severity','info','score',1))->>'status'='lease_lost' FROM authorized));

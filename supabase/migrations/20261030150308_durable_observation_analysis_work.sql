@@ -13,7 +13,8 @@ ALTER TABLE public.analysis_queue
   ADD COLUMN IF NOT EXISTS lease_token uuid,
   ADD COLUMN IF NOT EXISTS next_attempt_at timestamptz,
   ADD COLUMN IF NOT EXISTS attempts integer NOT NULL DEFAULT 0,
-  ADD COLUMN IF NOT EXISTS last_error text;
+  ADD COLUMN IF NOT EXISTS last_error text,
+  ADD COLUMN IF NOT EXISTS analysis_deferred boolean NOT NULL DEFAULT false;
 
 CREATE INDEX IF NOT EXISTS analysis_queue_revision_pending_idx
   ON public.analysis_queue (priority DESC, created_at, id)
@@ -23,8 +24,8 @@ CREATE INDEX IF NOT EXISTS analysis_queue_revision_lease_idx
   WHERE status = 'processing' AND request_revision > 0;
 
 CREATE OR REPLACE FUNCTION public.enqueue_analysis_work(
-  p_vehicle_id uuid, p_source text, p_reasons text[] DEFAULT '{}',
-  p_widget_slugs text[] DEFAULT NULL, p_priority integer DEFAULT 50
+  p_vehicle_id uuid, p_source text, p_reasons text[],
+  p_widget_slugs text[], p_priority integer, p_defer_analysis boolean
 ) RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 DECLARE v_slugs text[]; v_id uuid;
 BEGIN
@@ -37,8 +38,8 @@ BEGIN
       AND (p_widget_slugs IS NULL OR w.slug = ANY(p_widget_slugs));
   IF coalesce(cardinality(v_slugs),0) = 0 THEN RETURN NULL; END IF;
   INSERT INTO public.analysis_queue AS q
-    (vehicle_id,trigger_source,trigger_reasons,widget_slugs,status,priority,request_revision)
-  VALUES (p_vehicle_id,p_source,p_reasons,v_slugs,'pending',greatest(0,least(coalesce(p_priority,50),100)),1)
+    (vehicle_id,trigger_source,trigger_reasons,widget_slugs,status,priority,request_revision,analysis_deferred)
+  VALUES (p_vehicle_id,p_source,p_reasons,v_slugs,'pending',greatest(0,least(coalesce(p_priority,50),100)),1,coalesce(p_defer_analysis,false))
   ON CONFLICT (vehicle_id) DO UPDATE SET
     widget_slugs = CASE WHEN q.request_revision > q.completed_revision THEN
       ARRAY(SELECT DISTINCT x FROM unnest(coalesce(q.widget_slugs,'{}') || excluded.widget_slugs) x ORDER BY x)
@@ -47,13 +48,29 @@ BEGIN
     trigger_source = excluded.trigger_source,
     priority = greatest(q.priority,excluded.priority),
     request_revision = q.request_revision + 1,
-    status = CASE WHEN q.status='processing' AND q.request_revision>0 THEN 'processing' ELSE 'pending' END,
+    status = CASE WHEN NOT excluded.analysis_deferred AND q.status='processing' AND q.request_revision>0 THEN 'processing' ELSE 'pending' END,
+    analysis_deferred = CASE WHEN excluded.trigger_source='owner_evaluation' AND NOT excluded.analysis_deferred THEN false
+      ELSE (q.request_revision>q.completed_revision AND q.analysis_deferred) OR excluded.analysis_deferred END,
+    worker_id = CASE WHEN excluded.analysis_deferred THEN NULL ELSE q.worker_id END,
+    claimed_at = CASE WHEN excluded.analysis_deferred THEN NULL ELSE q.claimed_at END,
+    claimed_revision = CASE WHEN excluded.analysis_deferred THEN NULL ELSE q.claimed_revision END,
+    claimed_widget_slugs = CASE WHEN excluded.analysis_deferred THEN NULL ELSE q.claimed_widget_slugs END,
+    lease_token = CASE WHEN excluded.analysis_deferred THEN NULL ELSE q.lease_token END,
+    lease_expires_at = CASE WHEN excluded.analysis_deferred THEN NULL ELSE q.lease_expires_at END,
     next_attempt_at = NULL,
     attempts = CASE WHEN q.status='processing' AND q.request_revision>0 THEN q.attempts ELSE 0 END,
     completed_at = NULL
   RETURNING id INTO v_id;
   RETURN v_id;
 END $$;
+
+-- Existing internal callers retain their signature; the service-only admission
+-- flag is supplied explicitly by the observation hook below.
+CREATE OR REPLACE FUNCTION public.enqueue_analysis_work(
+  p_vehicle_id uuid,p_source text,p_reasons text[] DEFAULT '{}',p_widget_slugs text[] DEFAULT NULL,p_priority integer DEFAULT 50
+) RETURNS uuid LANGUAGE sql SECURITY DEFINER SET search_path=pg_catalog,public AS $$
+  SELECT public.enqueue_analysis_work(p_vehicle_id,p_source,p_reasons,p_widget_slugs,p_priority,false);
+$$;
 
 -- The third argument supports a targeted wake without draining unrelated work.
 CREATE OR REPLACE FUNCTION public.claim_analysis_queue_batch(
@@ -66,7 +83,7 @@ BEGIN
   END IF;
   RETURN QUERY WITH candidates AS (
     SELECT q.id FROM public.analysis_queue q
-     WHERE q.request_revision>q.completed_revision
+     WHERE q.request_revision>q.completed_revision AND NOT q.analysis_deferred
        AND (p_vehicle_id IS NULL OR q.vehicle_id=p_vehicle_id)
        AND ((q.status='pending' AND coalesce(q.next_attempt_at,'-infinity')<=clock_timestamp())
          OR (q.status='processing' AND q.lease_expires_at<=clock_timestamp()))
@@ -92,7 +109,7 @@ CREATE OR REPLACE FUNCTION public.finish_analysis_queue_work(
 DECLARE q public.analysis_queue; v_remaining text[]; v_status text;
 BEGIN
   SELECT * INTO q FROM public.analysis_queue WHERE id=p_id FOR UPDATE;
-  IF q.id IS NULL OR q.status<>'processing' OR q.worker_id IS DISTINCT FROM p_worker_id
+  IF q.id IS NULL OR q.status<>'processing' OR q.analysis_deferred OR q.worker_id IS DISTINCT FROM p_worker_id
      OR q.claimed_revision IS DISTINCT FROM p_revision OR q.lease_token IS NULL OR q.lease_token IS DISTINCT FROM p_lease_token OR q.lease_expires_at IS NULL OR q.lease_expires_at<=clock_timestamp() THEN
     RETURN jsonb_build_object('status','lease_lost');
   END IF;
@@ -131,7 +148,8 @@ BEGIN
     WHERE w.is_enabled AND (w.trigger_on_observation_kinds @> ARRAY[NEW.kind::text]
       OR w.trigger_on_observation_kinds @> ARRAY['*']);
   IF cardinality(v_slugs)>0 THEN
-    PERFORM public.enqueue_analysis_work(NEW.vehicle_id,'observation',ARRAY['observation_kind:'||NEW.kind::text],v_slugs,70);
+    PERFORM public.enqueue_analysis_work(NEW.vehicle_id,'observation',ARRAY['observation_kind:'||NEW.kind::text],v_slugs,70,
+      coalesce(NEW.extraction_metadata->'analysis_deferred'='true'::jsonb,false));
   END IF;
   RETURN NEW;
 END $$;
@@ -153,7 +171,7 @@ DECLARE q public.analysis_queue; s public.analysis_signals; v_existing public.an
   v_id uuid; v_direction text; v_order text[] := ARRAY['critical','warning','info','ok'];
 BEGIN
   SELECT * INTO q FROM public.analysis_queue WHERE id=p_id FOR UPDATE;
-  IF q.id IS NULL OR q.status<>'processing' OR q.worker_id IS DISTINCT FROM p_worker_id
+  IF q.id IS NULL OR q.status<>'processing' OR q.analysis_deferred OR q.worker_id IS DISTINCT FROM p_worker_id
      OR q.claimed_revision IS DISTINCT FROM p_revision OR q.lease_token IS NULL OR q.lease_token IS DISTINCT FROM p_lease_token OR q.lease_expires_at IS NULL OR q.lease_expires_at<=clock_timestamp() THEN
     RETURN jsonb_build_object('status','lease_lost');
   END IF;
@@ -195,11 +213,13 @@ BEGIN
 END $$;
 
 REVOKE ALL ON FUNCTION public.enqueue_analysis_work(uuid,text,text[],text[],integer),
+ public.enqueue_analysis_work(uuid,text,text[],text[],integer,boolean),
  public.claim_analysis_queue_batch(integer,text,uuid),public.claim_analysis_queue_batch(integer,text),
  public.finish_analysis_queue_work(uuid,text,bigint,uuid,text[],integer,integer,text),
  public.record_analysis_queue_signal(uuid,text,bigint,uuid,jsonb),
  public.trigger_ars_on_observation(),public.trigger_ars_on_extraction() FROM PUBLIC,anon,authenticated;
 GRANT EXECUTE ON FUNCTION public.enqueue_analysis_work(uuid,text,text[],text[],integer),
+ public.enqueue_analysis_work(uuid,text,text[],text[],integer,boolean),
  public.claim_analysis_queue_batch(integer,text,uuid),public.claim_analysis_queue_batch(integer,text),
  public.finish_analysis_queue_work(uuid,text,bigint,uuid,text[],integer,integer,text),
  public.record_analysis_queue_signal(uuid,text,bigint,uuid,jsonb) TO service_role;
