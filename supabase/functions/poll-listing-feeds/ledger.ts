@@ -163,10 +163,10 @@ function statusCodes(message: string): number[] {
 export function failureCategoryFor(message: string): string {
   const m = message.toLowerCase();
   // A paid fetch the source's Firecrawl allowance does not cover today (_shared/firecrawlGate.ts) is a deferral, not a failure.
-  if (/allowance[_ ]deferred/.test(m)) return "deferred";
+  if (/allowance[_ ]deferred|firecrawl_allowance_exhausted/.test(m)) return "deferred";
   const codes = statusCodes(message);
   if (
-    /no credits remaining|insufficient[_ ]credits?|insufficient[_ ]quota|exceeded your current quota|payment required/.test(m) ||
+    /billing_or_usage_limit|no credits remaining|insufficient[_ ]credits?|insufficient[_ ]quota|exceeded your current quota|payment required/.test(m) ||
     codes.includes(402)
   ) return "billing";
   if (/timed out|timeout|aborterror|deadline exceeded/.test(m) || codes.some((c) => c === 504 || c === 408)) return "timeout";
