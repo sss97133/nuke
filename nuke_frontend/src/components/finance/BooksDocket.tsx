@@ -5,7 +5,7 @@ import { useAccountingBook } from './AccountingBookContext';
 import { HEAVY_GAP_MS, FRESH_MS, useRevisionRead, useYearStates, type RevisionRead } from './useRevisionRead';
 import type { Drill } from './FinishTaxes';
 import {
-  dollars, pacific, readCitationLinks, readGateStatus, readLargeSums, readTierYears,
+  dollars, pacific, pacificDay, readCitationLinks, readGateStatus, readLargeSums, readTierYears,
   type GateRule, type GateYear, type LargeSumYear, type TieYear, type TierYear, type TierDrillKey, type YearState,
 } from '../../services/accountingCloseout';
 import * as W from './booksDocketWords';
@@ -111,7 +111,7 @@ function TieRows({ y, tie, phase, retry }: { y: GateYear; tie: TieYear | undefin
   if (phase !== 'ready') return <Waiting what="Ties to a statement line" failed={phase === 'error'} onRetry={retry} />;
   if (!tie) return <CloseItem><Text role="label">Ties to a statement line</Text><Text role="body">No Expense decisions are in the books for {y.year}.</Text></CloseItem>;
   return <CloseItem><details className="accounting-compact-details">
-    <summary><Text role="label" as="span">Ties to a statement line</Text> <Text role="caption" as="small">{W.tieHeadline(tie)}</Text></summary>
+    <summary><Text role="caption" as="small">Ties to a statement line · {W.tieHeadline(tie)}</Text></summary>
     <ul className="accounting-docket-ties">
       {W.tieClasses(tie).map(c => <li key={c.key} data-tie={c.key}><Text role="caption"><b>{c.n.toLocaleString('en-US')}</b> of {c.of.toLocaleString('en-US')} {c.text}</Text></li>)}
     </ul>
@@ -195,7 +195,7 @@ function Docket({ ownerId, active, onDrill, onOpen }: { ownerId: string; active:
   return <section className="accounting-close accounting-docket" aria-label="Books docket">
     <div className="accounting-section-heading">
       <Text role="entity" as="h2">Books docket</Text>
-      <CoverageView c={{ n: status.summary.with_run, of: status.summary.years, grain: 'tax years with a stored gate run', as_of: status.read_at }} />
+      <CoverageView c={{ n: status.summary.with_run, of: status.summary.years, grain: 'tax years with a stored gate run', as_of: pacificDay(status.read_at) }} />
       {/* Reads the stored gate runs and the live rows again. It never runs the gate: that is the recorder's job, off the page. */}
       <button type="button" onClick={() => { gate.retry(); sums.retry(); tiers.retry(); ties.retry(); }}>Read again</button>
     </div>

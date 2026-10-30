@@ -12,7 +12,7 @@ import PrefetchLink from '../../components/PrefetchLink';
 import { ReadState } from '../../components/finance/CloseItem';
 import { useRevisionRead } from '../../components/finance/useRevisionRead';
 import { doorLine } from '../../components/finance/booksDocketWords';
-import { readGateStatus } from '../../services/accountingCloseout';
+import { pacificDay, readGateStatus } from '../../services/accountingCloseout';
 
 function Door({ userId }: { userId: string }) {
   const gate = useRevisionRead('gate', signal => readGateStatus(userId, signal), { scope: userId, enabled: true });
@@ -25,7 +25,7 @@ function Door({ userId }: { userId: string }) {
     </Section>;
   }
   const { summary, years } = gate.data;
-  return <Section title="Books" coverage={{ n: summary.with_run, of: summary.years, grain: 'tax years with a stored gate run', as_of: gate.data.read_at }}>
+  return <Section title="Books" coverage={{ n: summary.with_run, of: summary.years, grain: 'tax years with a stored gate run', as_of: pacificDay(gate.data.read_at) }}>
     <Rows title="Tax years">
       {years.map(y => <Row key={y.year} label={String(y.year)}>{doorLine(y)}</Row>)}
     </Rows>

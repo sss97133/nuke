@@ -3,7 +3,7 @@ const fixture = vi.hoisted(() => ({ rpc: vi.fn(), from: vi.fn() }));
 // A builder that is a promise of the answer and takes the abort signal the way postgrest-js's does (the signal it was given is recorded).
 const answer = (value: unknown, seen: AbortSignal[] = []) => Object.assign(Promise.resolve(value), { abortSignal(signal: AbortSignal) { seen.push(signal); return this; } });
 vi.mock('../lib/supabase', () => ({ supabase: { rpc: fixture.rpc, from: fixture.from } }));
-import { READ_BOUND_MS, bounded, readCitationLinks, readDrillRecords, readGateStatus, readLargeSums, readTierYears, readYearState } from './accountingCloseout';
+import { READ_BOUND_MS, bounded, pacificDay, readCitationLinks, readDrillRecords, readGateStatus, readLargeSums, readTierYears, readYearState } from './accountingCloseout';
 
 // Synthetic values only. These readers take what the database returns and refuse a shape they do not understand; a malformed answer is an error, never an empty list.
 const owner = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
@@ -147,4 +147,12 @@ it('one drill reader serves the close-out items and the tier numbers: the key de
   await expect(readDrillRecords(owner, '2024', 'tier_a', 1, 0)).rejects.toThrow('These records could not load.');
   reply({ rows: 'many' });
   await expect(readDrillRecords(owner, '2024', 'excluded', 1, 0)).rejects.toThrow('These records could not load.');
+});
+
+it('a coverage line is dated by the owner\'s Pacific day, so an evening read does not say tomorrow', () => {
+  expect(pacificDay('2026-10-29T17:40:00Z')).toBe('2026-10-29');
+  expect(pacificDay('2026-10-30T02:30:00Z')).toBe('2026-10-29'); // 7:30 PM Pacific on the 29th is already the 30th in UTC
+  expect(pacificDay('2026-10-29T06:59:00Z')).toBe('2026-10-28');
+  expect(pacificDay(null)).toBeNull();
+  expect(pacificDay('not a time')).toBeNull();
 });

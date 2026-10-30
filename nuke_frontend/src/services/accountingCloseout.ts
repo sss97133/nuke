@@ -437,6 +437,13 @@ export function pacific(iso: string | null | undefined, withTime = true): string
     ...(withTime ? { hour: 'numeric', minute: '2-digit' } : {}) });
 }
 
+/** The owner's calendar day (Pacific) of a moment, as YYYY-MM-DD. A coverage line dates by day and the kit reads a date string as that same date, never shifted
+ *  into UTC, so a read at 8 PM on the 29th says the 29th and not the 30th. */
+export function pacificDay(iso: string | null | undefined): string | null {
+  const t = Date.parse(iso ?? '');
+  return Number.isFinite(t) ? new Date(t).toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' }) : null;
+}
+
 /** Whole dollars, the way the return prints them. */
 export function dollars(value: number | string | null | undefined): string {
   const n = Number(value);

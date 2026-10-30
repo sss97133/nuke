@@ -206,7 +206,7 @@ it('ties to a statement line are folded away: closed to begin with, the five cla
   await mount(inBook(<BooksDocket onOpen={vi.fn()} onDrill={vi.fn()} />));
   const fold = card('2024').querySelector('.accounting-docket-ties')!.closest('details') as HTMLDetailsElement;
   expect(fold.open).toBe(false);
-  expect(text(fold.querySelector('summary'))).toBe('Ties to a statement line 9 of 12 expenses tie to a statement line we hold');
+  expect(text(fold.querySelector('summary'))).toBe('Ties to a statement line · 9 of 12 expenses tie to a statement line we hold');
   const counts = Array.from(card('2024').querySelectorAll('[data-tie] b')).map(b => Number(b.textContent));
   expect(counts).toEqual([2, 5, 2, 2, 1]);
   expect(counts.reduce((a, b) => a + b, 0)).toBe(12);
@@ -339,6 +339,12 @@ it('every time is printed on the owner\'s Pacific clock and the read is dated', 
   await mount(inBook(<BooksDocket onOpen={vi.fn()} onDrill={vi.fn()} />));
   expect(text(card('2024'))).toContain('Ran Oct 28, 2026, 6:05 PM');
   expect(text(node.querySelector('.accounting-docket'))).toContain('Read Oct 29, 2026, 10:40 AM: gate runs (books_gate_runs)');
+  // the coverage line is dated by the same Pacific day: a read at 7:30 PM on the 29th is not the 30th
+  const evening = { ...status([gateYear(2024)]), read_at: '2026-10-30T02:30:00Z' };
+  serve(evening);
+  await act(async () => (Array.from(node.querySelectorAll('.accounting-docket .accounting-section-heading button')).find(b => b.textContent === 'Read again') as HTMLButtonElement).click());
+  await later(500);
+  expect(text(node.querySelector('.k-coverage'))).toContain('· Oct 29, 2026');
 });
 
 it('another book never shows the first book\'s answer', async () => {
