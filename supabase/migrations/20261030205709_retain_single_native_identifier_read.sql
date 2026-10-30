@@ -1,7 +1,7 @@
 -- One source can retain its qualified native identifier reading without
 -- inventing a second same-car witness. No subjects, memberships or model read.
 SET lock_timeout='3s';
-SET statement_timeout='30s';
+SET statement_timeout='10s';
 DO $guard$ DECLARE definition text; hash text; BEGIN
  definition:=pg_get_functiondef('ingest_image_observation(uuid,uuid,text,numeric,text,text,jsonb,boolean,jsonb)'::regprocedure);
  hash:=encode(sha256(convert_to(definition,'UTF8')),'base64');
