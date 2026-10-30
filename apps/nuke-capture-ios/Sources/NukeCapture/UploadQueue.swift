@@ -42,9 +42,25 @@ struct UploadItem: Codable, Equatable, Sendable {
     var lastError: String? = nil
 }
 
+/// Follow-up work, not a vehicle claim. The server's unfiled image remains the source of truth.
+struct IdentityFollowupSource: Codable, Equatable, Sendable {
+    let assetID: String
+    let sha256: String
+    let userID: String
+    var methodVersion: String
+    var privacyReceipt: DevicePrivacyReceipt? = nil
+    var lastAttemptAt: Date? = nil
+    var key: String { [userID, assetID, sha256, methodVersion].joined(separator: "|") }
+    func matches(assetID: String?, sha256: String?, userID: String, methodVersion: String) -> Bool {
+        self.userID == userID && self.assetID == assetID && self.sha256 == sha256 && self.methodVersion == methodVersion
+    }
+}
+
 /// The queue's value: what is owed, what is in flight, what landed. Pure, so a test can drive it.
 struct UploadQueueState: Codable, Equatable, Sendable {
     var items: [UploadItem] = []
+    // Optional for queues written before identity follow-up existed.
+    var identityFollowups: [IdentityFollowupSource]? = nil
     /// Rows inserted today (the Today screen's "landed" count), keyed by local day.
     var landedDay: String = ""
     var landedToday: Int = 0
@@ -70,10 +86,43 @@ struct UploadQueueState: Codable, Equatable, Sendable {
     }
 
     /// The transfer finished and the row is in: the item leaves the queue.
-    mutating func complete(assetID: String, dayKey: String) {
+    mutating func complete(assetID: String, dayKey: String, identityMethodVersion: String? = nil) {
+        if let item = item(for: assetID), let method = identityMethodVersion {
+            let source = IdentityFollowupSource(assetID: item.assetID, sha256: item.sha256, userID: item.userID, methodVersion: method,
+                                               privacyReceipt: item.privacyReceipt)
+            enqueueIdentity(source)
+        }
         items.removeAll { $0.assetID == assetID }
         if landedDay != dayKey { landedDay = dayKey; landedToday = 0 }
         landedToday += 1
+    }
+
+    mutating func enqueueIdentity(_ source: IdentityFollowupSource, recovering: Bool = false) {
+        var pending = identityFollowups ?? []
+        // A recovery query can finish after a newer original was acknowledged.
+        if recovering, pending.contains(where: { $0.userID == source.userID && $0.assetID == source.assetID }) { return }
+        // A changed original/method supersedes owed work, never the retained source or testimony.
+        pending.removeAll { $0.userID == source.userID && $0.assetID == source.assetID && $0.key != source.key }
+        if let i = pending.firstIndex(where: { $0.key == source.key }) {
+            if pending[i].privacyReceipt == nil { pending[i].privacyReceipt = source.privacyReceipt }
+        } else { pending.append(source) }
+        identityFollowups = pending
+    }
+
+    mutating func identityBatch(userID: String, methodVersion: String, limit: Int, now: Date) -> [IdentityFollowupSource] {
+        var pending = identityFollowups ?? []
+        for i in pending.indices where pending[i].userID == userID { pending[i].methodVersion = methodVersion }
+        let batch = pending.filter { $0.userID == userID }.sorted {
+            ($0.lastAttemptAt ?? .distantPast) < ($1.lastAttemptAt ?? .distantPast)
+        }.prefix(max(0, limit))
+        let keys = Set(batch.map(\.key))
+        for i in pending.indices where keys.contains(pending[i].key) { pending[i].lastAttemptAt = now }
+        identityFollowups = pending
+        return Array(batch)
+    }
+
+    mutating func finishIdentity(_ completedKeys: Set<String>) {
+        identityFollowups?.removeAll { completedKeys.contains($0.key) }
     }
 
     /// The transfer or the insert failed. A retryable failure returns the item to the queue; a final one
@@ -141,6 +190,12 @@ final class BackgroundUploader: NSObject, ObservableObject {
     /// completion (transfer + insert) of that wake has been handled.
     private var relaunchCompletion: (() -> Void)?
     private var insertsInFlight = 0
+    private var identityTask: Task<Void, Never>?
+    private var identityRunning = false
+    private var identityProgressed = false
+    private var lastIdentityAttempt: Date?
+    private var recoveredIdentityUsers = Set<String>()
+    private var identityRecoveryTask: Task<Void, Never>?
 
     private override init() {
         let support = (try? fm.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true))
@@ -188,7 +243,25 @@ final class BackgroundUploader: NSObject, ObservableObject {
 
     /// Start every queued item that has no live task. Safe to call on every pass, wake and foreground.
     func resume() async {
-        guard SupabaseService.currentUserId != nil else { return }
+        guard let userID = SupabaseService.currentUserId else { return }
+        if !recoveredIdentityUsers.contains(userID), identityRecoveryTask == nil {
+            // Never put a metadata query ahead of starting an original's transfer.
+            identityRecoveryTask = Task { [weak self] in
+                guard let self else { return }
+                defer { self.identityRecoveryTask = nil }
+                do {
+                    // Recent landed captures only; no historical paid/discovery enrollment.
+                    let sources = try await AttributionEngine.shared.recentAcknowledgedSources(userID: userID)
+                    guard SupabaseService.currentUserId == userID else { return }
+                    for source in sources { self.state.enqueueIdentity(source, recovering: true) }
+                    if self.persist() { self.recoveredIdentityUsers.insert(userID) }
+                    self.requestIdentityFollowup()
+                } catch {
+                    self.lastError = "Recent photo filing could not resume: \(ReadFailure.text(error))"
+                }
+            }
+        }
+        requestIdentityFollowup()
         let live = await liveTasks()
         state.requeueOrphans(liveAssetIDs: Set(live.compactMap(\.taskDescription)))
         let queued = state.queued
@@ -252,8 +325,11 @@ final class BackgroundUploader: NSObject, ObservableObject {
                 persist()
                 return
             }
+            let before = state
+            state.complete(assetID: assetID, dayKey: Self.dayKey(Date()), identityMethodVersion: LibraryIngest.identityMethodVersion)
+            // Persist the follow-up before dropping the transfer. A crash replays either stage safely.
+            guard persist() else { state = before; return }
             try? fm.removeItem(at: directory.appendingPathComponent(item.fileName))
-            state.complete(assetID: assetID, dayKey: Self.dayKey(Date()))
             lastError = nil
             SyncEngine.shared.uploadLanded(assetID: assetID, seenKey: item.seenKey, sha256: item.sha256,
                                            userID: item.userID, privacyReceipt: item.privacyReceipt)
@@ -279,9 +355,56 @@ final class BackgroundUploader: NSObject, ObservableObject {
         await withCheckedContinuation { c in session.getAllTasks { c.resume(returning: $0) } }
     }
 
-    private func persist() {
-        if let data = try? JSONEncoder().encode(state) { try? data.write(to: stateURL, options: .atomic) }
+    @discardableResult
+    private func persist() -> Bool {
+        do {
+            try JSONEncoder().encode(state).write(to: stateURL, options: .atomic)
+        } catch {
+            lastError = "Upload follow-up could not be saved: \(error.localizedDescription)"
+            publish()
+            return false
+        }
         publish()
+        return true
+    }
+
+    /// Coalesce arrivals. Fresh identity OCR is tiny and local while the app is active and cool;
+    /// the existing charging job carries the larger budget. A held source stays persisted.
+    func requestIdentityFollowup(after minimumDelay: TimeInterval = 2) {
+        guard identityTask == nil, let userID = SupabaseService.currentUserId,
+              (state.identityFollowups ?? []).contains(where: { $0.userID == userID }),
+              UIApplication.shared.applicationState == .active else { return }
+        let elapsed = lastIdentityAttempt.map { Date().timeIntervalSince($0) } ?? 15
+        let delay = elapsed >= 0 ? max(minimumDelay, 15 - elapsed) : minimumDelay
+        identityTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(delay))
+            guard let self, !Task.isCancelled else { return }
+            self.identityTask = nil
+            let ran = await self.drainIdentityFollowups(ocrBudget: 2)
+            // Only pending metadata is polled while held; no original is read until the gates pass.
+            self.requestIdentityFollowup(after: ran && self.identityProgressed ? 2 : 60)
+        }
+    }
+
+    @discardableResult
+    func drainIdentityFollowups(ocrBudget: Int, background: Bool = false) async -> Bool {
+        guard !identityRunning, !Task.isCancelled, let userID = SupabaseService.currentUserId,
+              (background ? !SyncEngine.deviceTooHot : ProcessInfo.processInfo.thermalState == .nominal), !SyncEngine.lowPowerHolds,
+              background || UIApplication.shared.applicationState == .active else { return false }
+        let now = Date()
+        if !background, let last = lastIdentityAttempt, now.timeIntervalSince(last) >= 0,
+           now.timeIntervalSince(last) < 15 { return false }
+        let sources = state.identityBatch(userID: userID, methodVersion: LibraryIngest.identityMethodVersion, limit: background ? 200 : 16, now: now)
+        guard !sources.isEmpty, persist() else { return false }
+        identityRunning = true
+        identityProgressed = false
+        lastIdentityAttempt = now
+        defer { identityRunning = false }
+        let completed = await AttributionEngine.shared.runAcknowledged(sources: sources, ocrBudget: ocrBudget)
+        identityProgressed = !completed.isEmpty
+        state.finishIdentity(completed)
+        persist()
+        return true
     }
 
     private func publish() {

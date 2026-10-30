@@ -79,6 +79,15 @@ Standing rules the code carries:
   The Shortcuts door: opening `ag.nuke.capture://sync` runs a pass. Owner recipe, set up once on the phone:
   Shortcuts → Automation → New → App → Camera → "Is Closed" → Run Immediately → New Blank Automation → Open URL
   `ag.nuke.capture://sync`. The Today screen shows landed / landing / queued and a Retry for photos that gave up.
+- **Landed photos owe an identity pass.** `UploadQueueState.complete` saves follow-up work with the account,
+  PhotoKit asset, original SHA-256, identity method revision and upload privacy receipt before deleting staged
+  bytes. Restart resumes that checkpoint; a bounded three-day lookup also recovers recent unfiled captures
+  uploaded by earlier builds. `AttributionEngine.runAcknowledged` looks up those exact sources ahead of its
+  normal page and uses the existing original-byte reader and audited filing/profile writers. Foreground work
+  coalesces arrivals, reads at most two originals per pass while active and cool, and spaces attempts by at
+  least 15 seconds; the existing charging task gets 200. Missing originals, changed hashes and transient
+  writer failures retain their work. Completing a source read is not a filing receipt: ambiguous sources
+  remain unfiled, documents supply context only, and prior album/cloud reads never qualify as identity reads.
 - **Uploads are keyed by their bytes.** The storage path is `users/<uid>/capture-relay/<sha256>/<filename>`
   (`Config.storagePath`). The filename alone wraps at IMG_9999: by 2026-10-15, 586 old paths each held rows of
   different photos (1,266 rows, at least 598 showing another photo's bytes). Never key an object by a name the

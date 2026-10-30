@@ -377,7 +377,10 @@ struct NukeCaptureApp: App {
             // charging-window slot — upload, then send photos to their vehicle.
             // Prioritize this upload backlog. Fresh reads use LibraryIngest's original-byte
             // reader and are retained for later zero-OCR foreground passes.
-            await AttributionEngine.shared.run(limit: 500, ocrBudget: 200)
+            if !SyncEngine.deviceTooHotOrLow, !Task.isCancelled,
+               !(await BackgroundUploader.shared.drainIdentityFollowups(ocrBudget: 200, background: true)) {
+                await AttributionEngine.shared.run(limit: 500, ocrBudget: 200)
+            }
             // Reschedule when work remains — the upload queue still has assets, the
             // drain bailed early (metered link / paused / cancelled), or the
             // local-store backlog isn't fully indexed yet.
