@@ -96,7 +96,7 @@ async function openCalendar() {
   if (button?.getAttribute('aria-expanded') === 'false') await act(async () => button.click());
   const details = host.querySelector<HTMLDetailsElement>('details.timeline-view-options');
   if (details && !details.open) await act(async () => details.querySelector('summary')!.click());
-  expect(details?.open).toBe(true);
+  expect(host.querySelector('[aria-label="Vehicle calendar"]')?.hasAttribute('hidden')).toBe(false);
 }
 const visit = async (id: string) => { await act(async () => go(`/vehicle/${id}`)); await act(async () => { await vi.advanceTimersByTimeAsync(5); }); };
 const cell = (day: string) => host.querySelector<HTMLElement>(`.hm-c[data-date="${day}"]`);
@@ -106,14 +106,14 @@ const auxiliary = (request: Request, id: string) => request.body?.p_vehicle_id =
 
 it('keeps current contribution titles/counts and current depth useful with one read each', async () => {
   await draw(); await openCalendar(); expect(cell(photoA)?.title).toContain('17 photos'); expect(cell(common)?.className).toContain('l4');
-  expect(snapshot().counts).toContain('PHOTOS (1)'); expect(snapshot().counts).toContain('WORK (1)');
+  expect(cell(workA)?.title).toContain('Work'); expect(snapshot().counts).toEqual([]);
   expect(calls('get_vehicle_day_depth', a)).toHaveLength(1); expect(calls('get_vehicle_contribution_days', a)).toHaveLength(1);
 });
 it('withholds A contribution days/counts while B has its own raw event and pending auxiliary reads', async () => {
   await draw(); await openCalendar(); const pending = deferred(); reply = r => auxiliary(r, b) ? pending.promise : undefined;
   await visit(b); await openCalendar(); expect(current.vehicle?.id).toBe(b);
   expect({ aPhoto: cell(photoA)?.title ?? null, aWork: cell(workA)?.title ?? null, counts: snapshot().counts }).toEqual({ aPhoto: null, aWork: null,
-    counts: ['ALL (1)', 'WORK (0)', 'PHOTOS (0)', 'SALES (0)', 'DISCOVERY (0)'] });
+    counts: [] });
 });
 it('withholds A analysis depth while B has a raw event on the same day', async () => {
   await draw(); await openCalendar(); const pending = deferred(); reply = r => auxiliary(r, b) ? pending.promise : undefined;
@@ -193,10 +193,9 @@ it.each(['get_vehicle_contribution_days', 'get_vehicle_day_depth'])('keeps uncha
   else expect(firstReturned.cells.find(c => c.day === common)?.heat).toBe('hm-c l1 ');
   expect(calls(name, a)).toHaveLength(2);
 });
-it('keeps current B filtering, day click and journal navigation useful', async () => {
+it('keeps current B days, day click and journal navigation useful', async () => {
   await draw(); await visit(b); await openCalendar();
-  const photoFilter = [...host.querySelectorAll<HTMLButtonElement>('.timeline-filter-pill')].find(button => button.textContent?.startsWith('PHOTOS'))!;
-  await act(async () => photoFilter.click()); expect(cell(common)).toBeNull(); expect(cell(photoB)?.title).toContain('5 photos');
+  expect(host.querySelector('.timeline-filter-pill')).toBeNull(); expect(cell(common)).not.toBeNull(); expect(cell(photoB)?.title).toContain('5 photos');
   await import('./VehicleDayDrawer'); await act(async () => cell(photoB)!.click());
   expect(host.querySelector('[data-day-drawer]')).not.toBeNull();
   expect(host.querySelector(`a[href="/journal/${photoB}"]`)).not.toBeNull();
@@ -270,4 +269,30 @@ it('retains actual work detail/story/amount/duration instead of showing a missin
   await draw(); await openCalendar(); await openReceipt(workA);
   expect(drawerText()).toContain('Retained work story'); expect(drawerText()).toContain('125 (currency unknown)');
   expect(drawerText()).toContain('WORK 1'); expect(drawerText()).toContain('1h 0m'); expect(drawerText()).not.toContain(missingWork);
+});
+
+
+it('shows the calendar alone, collapses to the barcode on scroll, and restores the same days on return', async () => {
+  let anchorTop = 200;
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+    return { top: this.className === 'vp-timeline-anchor' ? anchorTop : 0, height: 0 } as DOMRect;
+  });
+  await draw();
+  const calendar = host.querySelector<HTMLElement>('[aria-label="Vehicle calendar"]')!;
+  const barcode = host.querySelector<HTMLElement>('[aria-label="Vehicle timeline"]')!;
+  expect(calendar.hidden).toBe(false); expect(barcode.hidden).toBe(true);
+  expect(host.querySelector('.timeline-view-options')).toBeNull();
+  const days = snapshot().cells;
+  await import('./VehicleDayDrawer');
+  await act(async () => cell(photoA)!.click());
+  anchorTop = -1;
+  await act(async () => window.dispatchEvent(new Event('scroll')));
+  expect(calendar.hidden).toBe(true); expect(barcode.hidden).toBe(false);
+  expect(host.querySelector('[data-day-drawer]')).not.toBeNull();
+  expect(host.querySelector('[data-day-drawer]')!.closest('[hidden]')).toBeNull();
+  anchorTop = 200;
+  await act(async () => window.dispatchEvent(new Event('scroll')));
+  expect(calendar.hidden).toBe(false); expect(barcode.hidden).toBe(true);
+  expect(snapshot().cells).toEqual(days);
+  expect(calls('get_vehicle_contribution_days', a)).toHaveLength(1);
 });

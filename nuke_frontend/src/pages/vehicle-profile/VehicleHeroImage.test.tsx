@@ -78,7 +78,7 @@ const photoView = () => ({ text: host!.textContent, images: [...host!.querySelec
   controls: [...host!.querySelectorAll('button')].map(button => button.textContent) });
 const fallbackView = (caption: string) => ({ text: `1976 Synthetic Specimen1976SYNTHETICSPECIMENCOUPEMANUAL${caption} · EXPLORE BY BADGE`, images: [],
   badges: ['1976', 'SYNTHETIC', 'SPECIMEN', 'COUPE', 'MANUAL'].map(text => ({ text, title: text })), controls: [] });
-const chosenView = (url: string) => ({ text: 'FILL', images: [{ src: url, srcset: null }], badges: [], controls: ['FILL'] });
+const chosenView = (url: string) => ({ text: 'FIT', images: [{ src: url, srcset: null }], badges: [], controls: ['FIT'] });
 function expectBadgeFacts() {
   expect(fixture.depth.slice(-5)).toEqual([{ dimension: 'year', value: 1976 }, { dimension: 'make', value: 'Synthetic' },
     { dimension: 'model', value: 'Specimen' }, { dimension: 'body_style', value: 'Coupe' }, { dimension: 'transmission', value: 'Manual' }]);
@@ -98,7 +98,7 @@ it('photo-read-status preserves loaded chosen rendering, current desktop open ca
   await client(chosen); await imageEvent('load'); expect(photoView()).toEqual(chosenView(chosen)); expect(fixture.depth).toEqual([]);
   await act(async () => actualImage().dispatchEvent(new MouseEvent('click', { bubbles: true }))); expect(fixture.photoOpens).toEqual([chosen]);
   await act(async () => host!.querySelector<HTMLButtonElement>('button')!.click());
-  expect(host!.textContent).toBe('FIT'); expect(fixture.photoOpens).toEqual([chosen]);
+  expect(host!.textContent).toBe('FILL'); expect(fixture.photoOpens).toEqual([chosen]);
 });
 it('photo-read-status preserves a valid replacement after failure', async () => {
   await client(chosen); await imageEvent('error'); await client(replacement); await imageEvent('load');
@@ -119,6 +119,6 @@ it('photo-read-status preserves existing render srcset, full-image load and orig
   await client(url); expect(host!.querySelectorAll('img')).toHaveLength(2);
   expect(actualImage().getAttribute('src')).toBe(`${render}?width=840&quality=90&resize=contain`);
   expect(actualImage().getAttribute('srcset')).toBe([420, 840, 1260].map(width => `${render}?width=${width}&quality=90&resize=contain ${width}w`).join(', '));
-  await imageEvent('load'); expect(host!.querySelectorAll('img')).toHaveLength(1); expect(host!.textContent).toBe('FILL');
+  await imageEvent('load'); expect(host!.querySelectorAll('img')).toHaveLength(1); expect(host!.textContent).toBe('FIT');
   await act(async () => actualImage().dispatchEvent(new MouseEvent('click', { bubbles: true }))); expect(fixture.photoOpens).toEqual([url]);
 });

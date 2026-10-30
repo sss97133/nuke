@@ -35,7 +35,7 @@ const lead = (vehicle: string) => `https://images.test/${vehicle}-screened-lead.
 const region = () => host.querySelector<HTMLElement>('[role="region"][aria-label="Vehicle media kit slideshow"]');
 function view() { return { vehicle: fixture.vehicleId, text: host.textContent,
   images: [...host.querySelectorAll('img')].map(img => img.getAttribute('src')), region: !!region() }; }
-const expectedStatic = (vehicle: string) => ({ vehicle, text: 'FILL', images: [lead(vehicle)], region: false });
+const expectedStatic = (vehicle: string) => ({ vehicle, text: 'FIT', images: [lead(vehicle)], region: false });
 async function render(vehicle = fixture.vehicleId, leadUrl = lead(vehicle)) {
   fixture.vehicleId = vehicle; fixture.lead = leadUrl;
   await act(async () => root.render(<React.Profiler id="media-subject" onRender={() => frames.push(view())}><VehicleHeroImage /></React.Profiler>));
@@ -81,7 +81,7 @@ it('preserves scene picks, recorded date, source render/srcset, navigation and e
   rows[4].large_url = 'https://storage.test/storage/v1/object/public/photos/exterior.jpg';
   raw[4].large_url = rows[4].large_url;
   await render(); await settle(0, rows); expect(requests).toHaveLength(1);
-  expect(region()!.textContent).toBe('EXTERIOR · 2026-09-12<>');
+  expect(region()!.textContent).toBe('EXTERIOR · 2026-09-12');
   const exterior = region()!.querySelector<HTMLImageElement>('img[alt="EXTERIOR"]')!;
   expect(exterior.getAttribute('src')).toBe('https://storage.test/storage/v1/render/image/public/photos/exterior.jpg?width=840&quality=85&resize=contain');
   expect(exterior.getAttribute('srcset')).toContain('width=420&quality=85&resize=contain 420w');
@@ -89,8 +89,8 @@ it('preserves scene picks, recorded date, source render/srcset, navigation and e
   for (const [n, name, label] of [[2, 'engine', 'ENGINE BAY'], [3, 'under', 'UNDERBODY'], [4, 'interior', 'INTERIOR'], [5, 'recent', 'CURRENT STATE']] as const) {
     await click(`Show image ${n} of 5`); expect(region()!.querySelector(`img[alt="${label}"]`)!.getAttribute('src')).toBe(`https://images.test/synthetic-a-${name}.jpg`);
   }
-  await click('Next image'); expect(region()!.textContent).toContain('EXTERIOR');
-  await click('Previous image'); expect(region()!.textContent).toContain('CURRENT STATE');
+  await click('Show image 1 of 5'); expect(region()!.textContent).toContain('EXTERIOR');
+  await click('Show image 5 of 5'); expect(region()!.textContent).toContain('CURRENT STATE');
   expect(rows).toEqual(raw); expect(fixture.urlOpens).toEqual([]); expect(requests).toHaveLength(1);
 });
 it.each(['empty', 'two-scenes'])('preserves static fallback for a successful $name result', async kind => {
@@ -183,7 +183,7 @@ it.each([
 ])('record-clock: $name', async ({ taken, created, suffix }) => {
   const rows = deck('synthetic-a'); Object.assign(rows[4], { taken_at: taken, created_at: created });
   const raw = structuredClone(rows); await render(); await settle(0, rows);
-  expect(view()).toEqual({ vehicle: 'synthetic-a', text: `EXTERIOR${suffix}<>`,
+  expect(view()).toEqual({ vehicle: 'synthetic-a', text: `EXTERIOR${suffix}`,
     images: ['https://images.test/synthetic-a-exterior.jpg'], region: true });
   expect(rows).toEqual(raw); expect(requests).toHaveLength(1);
   await act(async () => region()!.click()); expect(fixture.opens).toEqual(['synthetic-a-exterior']); expect(fixture.urlOpens).toEqual([]);

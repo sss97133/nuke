@@ -131,7 +131,8 @@ export default function ProfileHeader({ priceLotId }: { priceLotId?: string }) {
     const el = sticky.current;
     const page = el?.closest<HTMLElement>('.vehicle-profile-page');
     if (!el || !page) return;
-    const update = () => page.style.setProperty('--vp-h-masthead', `${el.offsetHeight}px`);
+    // offsetHeight rounds away the fractional pixels exposed by browser zoom.
+    const update = () => page.style.setProperty('--vp-h-masthead', `${el.getBoundingClientRect().height}px`);
     update();
     const observer = new ResizeObserver(update);
     observer.observe(el);
@@ -304,7 +305,7 @@ export default function ProfileHeader({ priceLotId }: { priceLotId?: string }) {
       />}>
         <Text role="entity" as="h1" aria-label={title}>
           {asArtwork
-            ? <VehicleIdentity year={vehicle.year} make={vehicle.make ?? ''} model={masthead.model!} variants={masthead.identity.differentiators} />
+            ? <VehicleIdentity compact year={vehicle.year} make={vehicle.make ?? ''} model={masthead.model!} variants={masthead.identity.differentiators} />
             : title}
         </Text>
       </Masthead>

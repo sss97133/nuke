@@ -214,7 +214,7 @@ const VehicleMediaKit: React.FC<VehicleMediaKitProps> = ({ vehicleId, onImageCli
         aspectRatio: 'auto',
         position: 'relative',
         overflow: 'hidden',
-        backgroundColor: 'var(--text)',
+        backgroundColor: 'var(--bg)',
         cursor: onImageClick ? 'pointer' : 'default',
       }}
       onMouseEnter={() => setPaused(true)}
@@ -240,7 +240,7 @@ const VehicleMediaKit: React.FC<VehicleMediaKitProps> = ({ vehicleId, onImageCli
             inset: 0,
             width: '100%',
             height: '100%',
-            objectFit: 'contain',
+            objectFit: 'cover',
             objectPosition: 'center',
             filter: 'blur(6px)',
           }}
@@ -263,7 +263,7 @@ const VehicleMediaKit: React.FC<VehicleMediaKitProps> = ({ vehicleId, onImageCli
           inset: 0,
           width: '100%',
           height: '100%',
-          objectFit: 'contain',
+          objectFit: 'cover',
           objectPosition: 'center',
         }}
       />
@@ -273,36 +273,6 @@ const VehicleMediaKit: React.FC<VehicleMediaKitProps> = ({ vehicleId, onImageCli
         {current.label}
         {dateLabel ? (current.taken_at ? ` · ${dateLabel}` : ` · RECORD DATE ${dateLabel} · CAPTURE DATE UNKNOWN`) : ''}
       </div>
-
-      {/* Prev chevron */}
-      {curated.length > 1 && (
-        <button
-          type="button"
-          aria-label="Previous image"
-          onClick={(e) => {
-            e.stopPropagation();
-            setIndex((i) => (i - 1 + curated.length) % curated.length);
-          }}
-          className="vp-media-arrow vp-media-arrow--prev"
-        >
-          {'<'}
-        </button>
-      )}
-
-      {/* Next chevron */}
-      {curated.length > 1 && (
-        <button
-          type="button"
-          aria-label="Next image"
-          onClick={(e) => {
-            e.stopPropagation();
-            setIndex((i) => (i + 1) % curated.length);
-          }}
-          className="vp-media-arrow vp-media-arrow--next"
-        >
-          {'>'}
-        </button>
-      )}
 
       {/* Dot indicators */}
       {curated.length > 1 && (

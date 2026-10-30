@@ -1095,6 +1095,8 @@
 .vp-performance__evidence-table td, .vp-performance__evidence-table th { text-align: left; padding: 3px; border-bottom: 1px solid var(--border); }
 .vehicle-profile-page .barcode-bar { border: 0; background: var(--vp-surface); text-align: left; }
 .vehicle-profile-page .barcode-bar__label-left { color: var(--vp-ink); }
+.vehicle-profile-page .barcode-bar[hidden],
+.vehicle-profile-page .barcode-heatmap[hidden] { display: none; }
 .timeline-auction-select { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 8px 0; font-size: 11px; }
 .timeline-auction-select select { max-width: 100%; font: inherit; background: var(--vp-surface); color: var(--vp-ink); border: 2px solid var(--vp-ghost); padding: 4px; }
 .vp-stored-interpretations, .vp-sold-context { padding: 6px 12px; border-bottom: 2px solid var(--border); font: 10px/1.4 Arial, sans-serif; }
@@ -1141,8 +1143,14 @@
 
 /* Native profile chrome. Existing fact and evidence drills retain their owners. */
 .vehicle-profile-page .vp-header-sticky { background: var(--surface); border-bottom: 1px solid var(--border); }
-.vehicle-profile-page .vp-header-sticky .k-masthead { padding: 12px 16px; gap: 12px 24px; }
+.vehicle-profile-page .vp-header-sticky .k-masthead { padding: 10px 12px; gap: 8px 20px; }
 .vehicle-profile-page .vp-header-sticky .k-entity { margin: 0; min-width: 0; }
+.vehicle-profile-page .vp-header-sticky .vehicle-identity { font-family: var(--font-family); font-size: 20px; line-height: 1.3; gap: 6px; }
+.vehicle-profile-page .vp-header-sticky .vehicle-identity__year,
+.vehicle-profile-page .vp-header-sticky .vehicle-identity__maker,
+.vehicle-profile-page .vp-header-sticky .vehicle-identity__variant { font-size: 16px; font-weight: 400; }
+.vehicle-profile-page .vp-header-sticky .vehicle-identity__year { color: var(--text-secondary); }
+.vehicle-profile-page .vp-header-sticky .vehicle-identity__name { flex-wrap: wrap; }
 .vehicle-profile-page .vp-header-sticky .k-masthead__result { min-width: 0; }
 .vehicle-profile-page .vp-strip { background: var(--surface); border-bottom: 1px solid var(--border); }
 .vehicle-profile-page .vp-strip .k-strip { padding: 6px 12px; gap: 8px; }
@@ -1181,18 +1189,14 @@
 .vehicle-profile-page .dossier-field-expand:disabled { cursor: default; }
 .vehicle-profile-page .vp-dossier-expand-fields { display: block; min-height: 44px; width: 100%; padding: 10px 12px; border: 0; border-bottom: 1px solid var(--border); background: transparent; color: var(--link); font: 500 var(--text-caption)/1.4 var(--font-family); text-align: left; cursor: pointer; }
 .vp-media-caption,
-.vp-media-arrow,
 .vp-photo-fit { position: absolute; z-index: 2; border: 1px solid rgba(255,255,255,.3); border-radius: var(--radius-sm); background: rgba(0,0,0,.72); color: #fff; font: 600 var(--text-caption)/1.4 var(--font-family); }
 .vp-media-caption { top: 10px; left: 10px; max-width: calc(100% - 20px); padding: 6px 10px; }
-.vp-media-arrow { top: 50%; transform: translateY(-50%); width: 44px; height: 44px; font-size: 20px; cursor: pointer; }
-.vp-media-arrow--prev { left: 10px; }
-.vp-media-arrow--next { right: 10px; }
 .vp-photo-fit { right: 10px; bottom: 10px; min-height: 44px; min-width: 44px; padding: 8px 12px; cursor: pointer; }
 .vp-media-indicators { position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); display: flex; z-index: 2; }
 .vp-media-indicator { display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 0; background: transparent; cursor: pointer; }
 .vp-media-indicator::after { content: ''; width: 8px; height: 8px; border: 1px solid #fff; border-radius: 50%; background: rgba(0,0,0,.72); }
 .vp-media-indicator[aria-pressed="true"]::after { width: 12px; height: 12px; background: #fff; }
-.vehicle-profile-page :is(.dossier-field-value, .dossier-field-expand, .vp-identity-mark, .vp-facet-chip, .vp-attention-banner__action, .vp-attention-banner__dismiss, .vp-photo-fit, .vp-media-arrow, .vp-media-indicator):focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+.vehicle-profile-page :is(.dossier-field-value, .dossier-field-expand, .vp-identity-mark, .vp-facet-chip, .vp-attention-banner__action, .vp-attention-banner__dismiss, .vp-photo-fit, .vp-media-indicator):focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
 
 /* A 30% desktop sidebar becomes too narrow for useful evidence at tablet widths. */
 @media (max-width: 1024px) {

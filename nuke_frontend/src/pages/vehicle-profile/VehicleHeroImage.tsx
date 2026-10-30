@@ -12,9 +12,8 @@ interface VehicleHeroImageProps {
 
 const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ overlayNode }) => {
   const { leadImageUrl, heroMeta, vehicleId } = useVehicleProfile();
-  // Default to contain: show the full vehicle, letterbox if needed.
-  // "The user came to see the vehicle, not a cropped fragment." — 2026-03-21 audit
-  const [fitMode, setFitMode] = useState<'contain' | 'cover'>('contain');
+  // Fill the profile frame; Fit and the photo viewer retain the complete image.
+  const [fitMode, setFitMode] = useState<'contain' | 'cover'>('cover');
   const [showGallery, setShowGallery] = useState(false);
   // Media-kit slideshow: rendered when curation finds >=3 distinct BYOK scene_types.
   // Initialized to FALSE so the static <img> paints instantly from primary_image_url.
@@ -201,7 +200,7 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ overlayNode }) => {
                 height: 'var(--h-hero, 420px)',
                 position: 'relative',
                 overflow: 'hidden',
-                backgroundColor: 'var(--text)',
+                backgroundColor: 'var(--bg)',
                 cursor: 'pointer',
               }}
               onClick={() => {
@@ -217,7 +216,7 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ overlayNode }) => {
                   style={{
                     position: 'absolute',
                     inset: 0,
-                    background: 'var(--text)',
+                    background: 'var(--bg)',
                   }}
                 />
               )}

@@ -382,7 +382,7 @@ it('enriches price claim popover with source-bound inline Mecum lot provenance w
 });
 
 it('measures the masthead when its async document arrives and keeps the sticky stack current', async () => {
-  const height = vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(112);
+  const height = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ height: 112.625 } as DOMRect);
   const originalObserver = globalThis.ResizeObserver;
   let resize: (() => void) | undefined;
   const disconnect = vi.fn();
@@ -398,10 +398,10 @@ it('measures the masthead when its async document arrives and keeps the sticky s
     expect(host.style.getPropertyValue('--vp-h-masthead')).toBe('');
     fixture.read = mustangRead();
     await render();
-    expect(host.style.getPropertyValue('--vp-h-masthead')).toBe('112px');
-    height.mockReturnValue(176);
+    expect(host.style.getPropertyValue('--vp-h-masthead')).toBe('112.625px');
+    height.mockReturnValue({ height: 176.25 } as DOMRect);
     act(() => resize?.());
-    expect(host.style.getPropertyValue('--vp-h-masthead')).toBe('176px');
+    expect(host.style.getPropertyValue('--vp-h-masthead')).toBe('176.25px');
     fixture.read = null;
     await render();
     expect(disconnect).toHaveBeenCalledOnce();
