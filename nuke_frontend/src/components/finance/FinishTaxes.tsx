@@ -213,6 +213,6 @@ export default function FinishTaxes({ onDrill, onQuestions, resolverLabel }: { o
       <Text role="caption" className="accounting-close-questions__source">Pending questions on the current reading, from the review queue (financial_review_queue) · read {pacific(state.data.read_at)}</Text></button>}
     <div className="accounting-close-years">{years.map(y => <YearCard key={y.year} y={y} revenue={revenue[y.year]} state={yearStates[y.year]} onDrill={onDrill} />)}</div>
     {state.error && <Text role="caption" as="p">Showing the last loaded status; a refresh failed.</Text>}
-    <Text role="caption" as="p">Read {pacific(state.data.read_at)}. Drafts are unsigned; amounts are whole dollars from each draft.</Text>
+    <Text role="caption" as="p">Counts read {pacific(state.data.read_at)} from the close-out (accounting_closeout); filing state and facts from the facts register (books_year_state). Drafts are unsigned; amounts are whole dollars from each draft.</Text>
   </section>;
 }

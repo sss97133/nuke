@@ -1,4 +1,4 @@
-import { dollars, pacific, type GateRule, type GateYear, type OpenItemCounts, type TieYear, type TierYear, type YearState } from '../../services/accountingCloseout';
+import { describeRecord, dollars, pacific, type AttachedDocument, type CountDollars, type GateRule, type GateYear, type LargeSumRow, type LargeSumYear, type OpenItemCounts, type TieYear, type TierYear, type YearState } from '../../services/accountingCloseout';
 import { formatMeasure } from '../../kit';
 import { FILING_WORDS, filingOf, forEarlierDraft } from './filingState';
 
@@ -127,6 +127,7 @@ export const TIE_DEFINITION = 'Here a bank line counts either way: the expense c
 
 /** The definitions the docket rests on, printed once for the whole page rather than on every year's card. */
 export const LEGEND = {
+  paper: 'Large sums that need paper: the rows that make up 80% of a year\'s deduction dollars, each flagged when it has no bank line, no cited basis, or lacks the document its kind requires (an invoice, a purchase agreement or bill of sale, a receipt, a lease). Adding a file points it at the row; the row leaves the list when the books agent cites it.',
   trusted: 'Trusted: the stored gate run passed every rule, neither the books nor the gate rules have changed since it ran, and no rule passed over zero records. Anything else is Not trusted, with the reason.',
   tiers: 'Tiers, by your rule that a bank line needs no explanation and its allocation does, and that a receipt on every line is needed only where section 274 requires one: A has a bank line, a cited allocation basis and a document; B has a bank line and a cited allocation basis; C is the rest.',
   ties: TIE_DEFINITION,
@@ -182,12 +183,173 @@ export function openLine(open: OpenItemCounts): string {
 
 // ── The profile door ─────────────────────────────────────────────────────────────────────────────────────────────────────
 
-/** "Trusted · Oct 29, 10:31 AM", "Gate not run", "1 rule failing · books changed since", with the open return items beside it. The reasons in full are in the docket. */
+/** "Trusted · Oct 29, 10:31 AM", "Gate not run", "1 rule failing · books changed since", with the large rows still missing a document (rule R12, as the stored run found) and the open return items beside it. The reasons in full are in the docket. */
 export function doorLine(y: GateYear): string {
   const v = gateVerdict(y);
   const head = v.state === 'trusted' ? `Trusted · ${pacific(y.run?.finished_at)}`
     : v.state === 'not_run' ? 'Gate not run'
     : v.state === 'did_not_finish' ? (y.attempt?.status === 'timed_out' ? `Gate did not finish (stopped at ${secondsOf(y.attempt.duration_ms)})` : 'Gate run failed')
     : ['Not trusted', ...shortCauses(y)].join(' · ');
-  return y.open_items.total > 0 ? `${head} · ${y.open_items.total.toLocaleString('en-US')} open` : head;
+  // The paper the stored run found missing (rule R12), when it found any; the live rows and their dollars are in the docket.
+  const m = y.run?.rules.find(r => r.rule === 'R12')?.missing_doc;
+  const paper = m && m.n > 0 ? `${plural(m.n, 'large row needs', 'large rows need')} a document` : '';
+  return [head, paper, y.open_items.total > 0 ? `${y.open_items.total.toLocaleString('en-US')} open` : ''].filter(Boolean).join(' · ');
+}
+
+
+// ── Large sums that need paper ────────────────────────────────────────────────────────────────────────────────────────
+
+const humanize = (key: string) => key.replace(/_/g, ' ').replace(/^./, c => c.toUpperCase());
+
+/** What a row of the large sums is missing, by the rule that matched its category (v_books_large_sums.required_doc_rule). The view decides which
+ *  rule matched; these only name it. A key the view starts to use that is not here is shown humanized, never dropped. */
+export const PAPER_BY_RULE: Record<string, string> = {
+  contractor: 'Contractor invoice', cost_of_goods: 'Supplier invoice', transport: 'Transport invoice', vehicle_deal: 'Purchase agreement or bill of sale',
+  parts_supplies: 'Receipt or order confirmation', rent: 'Lease', depreciation: 'Asset register entry',
+};
+/** The same, by the kind of paper the rule requires (v_books_large_sums.required_doc_kind), for a rule this table does not know yet. */
+export const PAPER_BY_KIND: Record<string, string> = {
+  purchase_agreement: 'Purchase agreement or bill of sale', invoice_or_agreement: 'Invoice or agreement', receipt_or_order: 'Receipt or order confirmation',
+  lease_or_ruling: 'Lease or owner ruling', register_asset: 'Asset register entry',
+};
+/** What the other flags of the view ask for (v_books_large_sums.proof_flag). */
+export const FLAG_ASKS: Record<string, string> = {
+  no_payment_proof: 'A bank line: no statement line is linked to this row',
+  no_basis: 'A cited basis for how this row is allocated',
+  filed_return_only: 'A document or ruling: only the filed return and its category support this row',
+};
+
+/** The kinds of paper a file can be said to be, per the kind the row requires, in the words the view reads (its keyword levels:
+ *  3 purchase agreement, bill of sale, title; 2 invoice, agreement, contract, work order; 1 receipt, order, confirmation, packing slip).
+ *  A paper of a higher level also satisfies a lower requirement, so "Purchase agreement" would clear any of them; the list offers what the rule asks for.
+ *  A screenshot of the text or email thread that states the work and the price is the agreement for an invoice or purchase-agreement row (owner ruling,
+ *  2026-10-29; the view names the media it accepts). It is never a receipt, a lease, a title or a bill of sale, so those lists do not offer it. */
+export const THREAD_KINDS = ['Text message thread', 'Email thread'];
+export const ATTACH_KINDS: Record<string, string[]> = {
+  purchase_agreement: ['Purchase agreement', 'Bill of sale', 'Title', ...THREAD_KINDS],
+  invoice_or_agreement: ['Invoice', 'Agreement', 'Contract', 'Work order', ...THREAD_KINDS],
+  receipt_or_order: ['Receipt', 'Order confirmation', 'Packing slip'],
+  lease_or_ruling: ['Lease', 'Rental agreement'],
+};
+/** For a row the rules flag without naming a kind of paper (resting on the filed return, or no cited basis): any supporting paper cites the row. */
+export const ATTACH_ANY = ['Invoice', 'Receipt', 'Purchase agreement', 'Bill of sale', 'Agreement', 'Supporting document'];
+
+/** The paper the row's rule requires, in words; null when the row misses no document. */
+export function paperWord(row: LargeSumRow): string | null {
+  if (!row.missing_doc) return null;
+  return (row.required_doc_rule && PAPER_BY_RULE[row.required_doc_rule]) || (row.required_doc_kind && PAPER_BY_KIND[row.required_doc_kind])
+    || (row.required_doc_rule ? humanize(row.required_doc_rule) : row.required_doc_kind ? humanize(row.required_doc_kind) : 'A document');
+}
+/** Everything the row still needs, document first. */
+export function needsOf(row: LargeSumRow): string[] {
+  const out: string[] = [];
+  const paper = paperWord(row);
+  if (paper) out.push(paper);
+  if (row.proof_flag) out.push(FLAG_ASKS[row.proof_flag] ?? humanize(row.proof_flag));
+  return out.length ? out : ['Flagged by the rules'];
+}
+/** The row can be answered with a file: it misses a document (the asset register is the books agent's), or rests only on the filed return, or has no cited basis. */
+export const canAttach = (row: LargeSumRow): boolean =>
+  (row.missing_doc && row.required_doc_kind !== 'register_asset') || row.proof_flag === 'filed_return_only' || row.proof_flag === 'no_basis';
+/** The button on a row that a file can answer: it names the paper the rule asks for. A row already holding a file offers another. */
+const ATTACH_LABEL: Record<string, string> = {
+  purchase_agreement: 'Add the purchase agreement', invoice_or_agreement: 'Add the invoice', receipt_or_order: 'Add the receipt', lease_or_ruling: 'Add the lease',
+};
+export const attachLabel = (row: LargeSumRow): string =>
+  row.attached.length > 0 ? 'Add another' : (row.missing_doc && row.required_doc_kind && ATTACH_LABEL[row.required_doc_kind]) || 'Add a document';
+export const attachChoices = (row: LargeSumRow): string[] => (row.missing_doc && row.required_doc_kind && ATTACH_KINDS[row.required_doc_kind]) || ATTACH_ANY;
+/** The row's payee and what was bought, from its booked description. */
+export const rowTitle = (row: LargeSumRow): string => describeRecord(row.record.description).title || row.category || row.local_id;
+/** What the row already cites as a document, as written (the view's own document cites): a row can cite a paper and still miss the kind its rule requires. */
+export function citedLine(row: LargeSumRow): string | null {
+  if (!row.cites.length) return null;
+  const shown = row.cites.slice(0, 3).map(c => `${c.ref.length > 80 ? `${c.ref.slice(0, 78)}…` : c.ref} (${c.kind})`);
+  const more = row.doc_cited_n > shown.length ? `, and ${row.doc_cited_n - shown.length} more` : '';
+  return `Already cites: ${shown.join('; ')}${more}`;
+}
+/** One attached document, in words. The row stays flagged until the books writer cites it: this says received, never done. */
+export function attachedLine(a: AttachedDocument): string {
+  return `${a.doc_kind || 'Document'} · ${a.filename || 'file'} · attached ${pacific(a.attached_at)}`;
+}
+export const ATTACHED_WAITING = 'Document received, link pending: it is linked to this row when the books agent cites it, and the row stays on the list until then.';
+
+/** The live heading of a year's list: how many of the flagged head rows need which answer. Counts as the reader states them. */
+export function liveHeading(y: LargeSumYear): string {
+  const parts = [`${plural(y.missing_doc_n, 'row needs', 'rows need')} a document`, `${plural(y.no_payment_n, 'row needs', 'rows need')} a bank line`,
+    `${plural(y.filed_return_only_n, 'row rests', 'rows rest')} on the filed return only`];
+  return parts.join(' · ');
+}
+export function liveCaption(y: LargeSumYear): string {
+  const head = `Rule R12 tests the ${plural(y.head_n, 'largest deduction', 'largest deductions')}, the 80% line.`;
+  const beyond = y.beyond_head_missing_doc_n > 0 ? ` ${plural(y.beyond_head_missing_doc_n, 'smaller deduction', 'smaller deductions')} below that line (${dollars(y.beyond_head_missing_doc_usd)}) also ${y.beyond_head_missing_doc_n === 1 ? 'misses' : 'miss'} a document; no rule tests them.` : '';
+  const cap = y.rows_shown < y.flagged_n ? ` Showing the largest ${y.rows_shown.toLocaleString('en-US')} of ${y.flagged_n.toLocaleString('en-US')}.` : '';
+  return head + beyond + cap;
+}
+
+// ── The two totals, from the stored gate run ─────────────────────────────────────────────────────────────────────────
+
+/** source: stored (the gate run's own numbers), live (the live reader, because no gate run is stored), none (no number). */
+export type PaperTotal = { label: string; headline: string; details: string[]; state: 'ok' | 'bad' | 'unknown'; rule: string; source: 'stored' | 'live' | 'none' };
+/** A live read the totals may fall back on while no gate run is stored. */
+export type LiveRead<T> = { data: T | undefined; phase: 'loading' | 'ready' | 'error' };
+const RULE_STATUS_WORD: Record<string, string> = { pass: 'passed', fail: 'failing', not_assessed: 'not assessed' };
+const ruleStatus = (rule: GateRule | undefined) => rule ? (RULE_STATUS_WORD[rule.status] ?? rule.status) : 'not in this run';
+const KIND_ORDER = ['purchase_agreement', 'invoice_or_agreement', 'receipt_or_order', 'lease_or_ruling', 'register_asset'];
+/** "Invoice or agreement 18 ($4,100) · Receipt or order confirmation 43 ($1,900)": the stored by-kind totals, in the order of the kinds above, an unknown kind last. */
+export function byKindLine(byKind: Record<string, CountDollars>): string {
+  const keys = Object.keys(byKind).sort((a, b) => (KIND_ORDER.indexOf(a) + 1 || 99) - (KIND_ORDER.indexOf(b) + 1 || 99) || a.localeCompare(b));
+  return keys.map(k => `${PAPER_BY_KIND[k] ?? humanize(k)} ${byKind[k].n.toLocaleString('en-US')} (${dollars(byKind[k].amount)})`).join(' · ');
+}
+
+/** Dollars paid outside a linked bank line: rule R10 part b (no payment proof, no owner ruling, no structural rule), with its denominator, as the stored run recorded it.
+ *  With no stored run it is the audit tiers' own live figure for the same condition (v_books_audit_tier_years), said to be live. */
+export function outsideBankTotal(y: GateYear, live?: LiveRead<TierYear>): PaperTotal {
+  const base = { label: 'Paid outside a linked bank line', rule: 'R10 part b' };
+  const run = y.run;
+  if (!run) {
+    if (live?.phase === 'loading') return { ...base, headline: 'Reading…', details: [], state: 'unknown', source: 'live' };
+    const t = live?.phase === 'ready' ? live.data : undefined;
+    if (t) return { ...base, headline: `${dollars(t.no_pay_no_ruling_usd)} of ${dollars(t.deduction_usd)} in deductions`,
+      details: [`No gate run is stored for ${y.year}. This is the audit tiers' own figure for deductions with no payment proof, no owner ruling and no structural rule.`],
+      state: t.no_pay_no_ruling_usd > 0 ? 'bad' : 'ok', source: 'live' };
+    return { ...base, headline: 'Not run', details: [`There is no stored gate result for ${y.year}.`], state: 'unknown', source: 'none' };
+  }
+  const c = run.context;
+  if (!c) return { ...base, headline: 'Not recorded', details: ['This stored run did not keep its denominators. Record the gate again.'], state: 'unknown', source: 'none' };
+  const b = c.no_pay_no_ruling, d = c.deductions;
+  const details = [`${b.n.toLocaleString('en-US')} of ${plural(d.n, 'deduction', 'deductions')} have no bank line, no owner ruling and no structural rule (rule R10 part b; R10 is ${ruleStatus(run.rules.find(r => r.rule === 'R10'))}).`];
+  if (c.no_bank.n > 0) details.push(`In all, ${plural(c.no_bank.n, 'deduction', 'deductions')} (${dollars(c.no_bank.usd)}) have no linked bank line; the ones not counted above rest on an owner ruling, the asset register or another structural rule.`);
+  return { ...base, headline: `${dollars(b.usd)} of ${dollars(d.usd)} in deductions`, details, state: b.n === 0 ? 'ok' : 'bad', source: 'stored' };
+}
+
+/** Dollars missing a document: rule R12 over the head of the year's largest deductions, with its denominators, as the stored run recorded it.
+ *  With no stored run it is the live reader's own figure over the same rows, said to be live. */
+export function missingDocTotal(y: GateYear, live?: LiveRead<LargeSumYear>): PaperTotal {
+  const base = { label: 'Missing a document', rule: 'R12' };
+  const run = y.run;
+  if (!run) {
+    if (live?.phase === 'loading') return { ...base, headline: 'Reading…', details: [], state: 'unknown', source: 'live' };
+    const l = live?.phase === 'ready' ? live.data : undefined;
+    if (l) return { ...base, headline: `${dollars(l.missing_doc_usd)} of ${dollars(l.head_usd)} in the ${l.head_n.toLocaleString('en-US')} largest deductions`,
+      details: [`No gate run is stored for ${y.year}. ${l.missing_doc_n.toLocaleString('en-US')} of those ${l.head_n.toLocaleString('en-US')} lack the document their kind requires, read live.`], state: l.missing_doc_n > 0 ? 'bad' : 'ok', source: 'live' };
+    return { ...base, headline: 'Not run', details: [`There is no stored gate result for ${y.year}.`], state: 'unknown', source: 'none' };
+  }
+  const r12 = run.rules.find(r => r.rule === 'R12');
+  if (!r12) return { ...base, headline: 'Not in this run', details: ['This stored run predates rule R12. Record the gate again.'], state: 'unknown', source: 'none' };
+  const m = r12.missing_doc;
+  if (r12.status === 'not_assessed' || !m) return { ...base, headline: 'Not assessed', details: [`Rule R12 was ${ruleStatus(r12)} in the stored run.`], state: 'unknown', source: 'none' };
+  const c = run.context;
+  const heads = r12.of === null || r12.of === undefined ? 'the largest deductions' : `the ${r12.of.toLocaleString('en-US')} largest deductions`;
+  const headLine = c ? `${heads.replace(/^the /, 'The ')} are the smallest set of the year's largest deductions that reaches 80% of its ${c.head.year_usd === null ? 'unknown total' : dollars(c.head.year_usd)} (rule R12 tests them).` : null;
+  if (m.n === 0) return { ...base, headline: `None: every one of ${heads} has the document its kind requires`, details: headLine ? [headLine] : [], state: 'ok', source: 'stored' };
+  const details = [`${m.n.toLocaleString('en-US')} of ${heads} lack the document their kind requires; ${m.cite_no_document.toLocaleString('en-US')} of those ${m.cite_no_document === 1 ? 'cites' : 'cite'} no document at all.`,
+    byKindLine(m.by_kind), ...(headLine ? [headLine] : [])];
+  return { ...base, headline: c ? `${dollars(m.amount)} of ${dollars(c.head.usd)} in ${heads}` : `${dollars(m.amount)} across ${m.n.toLocaleString('en-US')} of ${heads}`, details, state: 'bad', source: 'stored' };
+}
+
+/** When the live list and the stored run disagree about how many head rows miss a document, say so; otherwise nothing. Both numbers are the database's. */
+export function listVsRun(y: GateYear, live: LargeSumYear | undefined): string | null {
+  const stored = y.run?.rules.find(r => r.rule === 'R12')?.missing_doc;
+  if (!y.run || !stored || !live || stored.n === live.missing_doc_n) return null;
+  return `The gate run of ${pacific(y.run.finished_at)} counted ${stored.n.toLocaleString('en-US')} rows missing a document; the list now has ${live.missing_doc_n.toLocaleString('en-US')}.`;
 }

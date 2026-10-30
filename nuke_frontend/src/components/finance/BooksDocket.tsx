@@ -1,40 +1,33 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useState } from 'react';
 import { Text } from '../../kit/Text';
 import { CoverageView } from '../../kit/Measure';
 import { useAccountingBook } from './AccountingBookContext';
 import { useRevisionRead, type RevisionRead } from './useRevisionRead';
 import type { Drill } from './FinishTaxes';
 import {
-  dollars, pacific, readCitationLinks, readGateStatus, readTierYears, readYearStateOnce,
-  type GateRule, type GateYear, type TieYear, type TierYear, type TierDrillKey, type YearState,
+  dollars, pacific, readCitationLinks, readGateStatus, readLargeSums, readTierYears, readYearStateOnce,
+  type GateRule, type GateYear, type LargeSumYear, type TieYear, type TierYear, type TierDrillKey, type YearState,
 } from '../../services/accountingCloseout';
 import * as W from './booksDocketWords';
+import { Item, Waiting } from './DocketItem';
+import { LargeSumsList, PaperTotals } from './LargeSums';
+import type { SavedRecord } from './FinancialWorkpapers';
 
-/** Books docket: per tax year, whether the books can be trusted and what stands behind that. Every statement here is a stored answer of the database:
- *  the reconciliation gate's last run (books_gate_status), how the deductions are supported (v_books_audit_tier_years), how they tie to statement lines
- *  (v_books_citation_links), the paperwork state and the open return items (the facts register through books_year_state). The page never runs the gate and
- *  computes nothing: counts, classes, order and staleness arrive decided, and each number can be opened down to the records behind it.
+/** Books docket: per tax year, the paper the books still need and whether the books can be trusted. It opens on the large sums: the two totals the owner reads
+ *  (paid outside a linked bank line, missing a document) from the stored gate run, then the rows rule R12 flags, read live from v_books_large_sums, each with
+ *  what it still needs and a way to add the file that answers it. Then what stands behind the verdict: the stored gate run (books_gate_status), how the
+ *  deductions are supported (v_books_audit_tier_years), how they tie to statement lines (v_books_citation_links), the paperwork state and the open return
+ *  items (the facts register through books_year_state). The page never runs the gate and computes nothing: counts, classes, order and staleness arrive
+ *  decided, and each number can be opened down to the records behind it.
  *  Only the owner's own book: in a shared book nothing renders and nothing is read. */
 
-const TIER_READ_AFTER_MS = 1500;
-const TIE_READ_AFTER_MS = 3000;
+// The large sums are the first screen, so they start with the gate status; the two slower, secondary views follow one after the other, behind the
+// close-out read that Finish your taxes starts at the same moment: the first load of this page failed under load on 2026-10-29, so a loaded database
+// sees a trickle, not a burst.
+const TIER_READ_AFTER_MS = 2500;
+const TIE_READ_AFTER_MS = 5000;
 type Phase = 'loading' | 'ready' | 'error';
 const phaseOf = (r: RevisionRead<unknown>): Phase => r.phase === 'ready' ? 'ready' : r.phase === 'error' ? 'error' : 'loading';
-
-function Item({ children, amount, onClick, warn }: { children: ReactNode; amount?: ReactNode; onClick?: () => void; warn?: boolean }) {
-  const body = <><span className="accounting-close-item__main">{children}</span>
-    {amount !== undefined && <Text role="measure" className="accounting-close-item__amount">{amount}</Text>}
-    {onClick && <span aria-hidden="true">›</span>}</>;
-  return <li className="accounting-close-item" data-warn={warn ? 'true' : undefined}>
-    {onClick ? <button type="button" className="accounting-close-item__button" onClick={onClick}>{body}</button> : <div className="accounting-close-item__button">{body}</div>}
-  </li>;
-}
-
-function Waiting({ what, failed, onRetry }: { what: string; failed: boolean; onRetry: () => void }) {
-  return failed
-    ? <li className="accounting-close-item"><div className="accounting-close-item__button" role="alert"><span className="accounting-close-item__main"><Text role="body">{what} could not load.</Text></span><button type="button" onClick={onRetry}>Try again</button></div></li>
-    : <li className="accounting-close-item"><div className="accounting-close-item__button" role="status"><span className="accounting-close-item__main"><Text role="caption">Reading {what.charAt(0).toLowerCase()}{what.slice(1)}…</Text></span></div></li>;
-}
 
 const RULE_MARK: Record<ReturnType<typeof W.ruleState>, string> = { pass: '✓', fail: '✕', not_assessed: '?', empty: '0' };
 const RULE_STATE_WORDS: Record<ReturnType<typeof W.ruleState>, string> = { pass: 'passed', fail: 'failing', not_assessed: 'not assessed', empty: 'nothing checked' };
@@ -153,11 +146,13 @@ function OpenRow({ y, state, onShow }: { y: GateYear; state: YearState | undefin
   </Item>;
 }
 
-function YearDocket({ y, tier, tierPhase, retryTier, tie, tiePhase, retryTie, state, stateRead, onDrill, onShow }: {
-  y: GateYear; tier: TierYear | undefined; tierPhase: Phase; retryTier: () => void; tie: TieYear | undefined; tiePhase: Phase; retryTie: () => void;
-  state: YearState | undefined; stateRead: W.PaperworkRead; onDrill: (d: Drill) => void; onShow: (year: number) => void;
+function YearDocket({ y, sums, sumsPhase, sumsReadAt, retrySums, tier, tierPhase, retryTier, tie, tiePhase, retryTie, state, stateRead, onDrill, onOpen, onShow }: {
+  y: GateYear; sums: LargeSumYear | undefined; sumsPhase: Phase; sumsReadAt: number | null; retrySums: () => void;
+  tier: TierYear | undefined; tierPhase: Phase; retryTier: () => void; tie: TieYear | undefined; tiePhase: Phase; retryTie: () => void;
+  state: YearState | undefined; stateRead: W.PaperworkRead; onDrill: (d: Drill) => void; onOpen: (documentId: string, record: SavedRecord['record']) => void; onShow: (year: number) => void;
 }) {
   const verdict = W.gateVerdict(y);
+  const drift = sumsPhase === 'ready' ? W.listVsRun(y, sums) : null;
   return <article className="accounting-close-year accounting-docket-year" id={`docket-${y.year}`} data-verdict={verdict.state} aria-label={`Books docket ${y.year}`}>
     <header className="accounting-close-year__head">
       <Text role="label" as="h3">{y.year}</Text>
@@ -165,6 +160,11 @@ function YearDocket({ y, tier, tierPhase, retryTier, tie, tiePhase, retryTie, st
       <Text role="caption" as="p">{verdict.reason}</Text>
     </header>
     <ol className="accounting-close-list">
+      <PaperTotals y={y} sums={{ data: sums, phase: sumsPhase }} tier={{ data: tier, phase: tierPhase }} onDrill={onDrill} />
+      {drift && <Item warn><Text role="caption">{drift}</Text></Item>}
+      {sumsPhase !== 'ready' ? <Waiting what="The large sums" failed={sumsPhase === 'error'} onRetry={retrySums} />
+        : sums ? <LargeSumsList y={sums} readAt={sumsReadAt} onOpen={onOpen} onAttached={retrySums} />
+        : <Item><Text role="label">Large sums that need paper</Text><Text role="body">No deduction decisions are in the books for {y.year}.</Text></Item>}
       <GateRow y={y} />
       <DeductionRows y={y} tier={tier} phase={tierPhase} retry={retryTier} onDrill={onDrill} />
       <TieRows y={y} tie={tie} phase={tiePhase} retry={retryTie} />
@@ -180,16 +180,22 @@ function showYearInFinishTaxes(year: number): void {
   if (card && typeof card.scrollIntoView === 'function') card.scrollIntoView({ block: 'start', behavior: 'smooth' });
 }
 
-function Docket({ ownerId, active, onDrill }: { ownerId: string; active: boolean; onDrill: (drill: Drill) => void }) {
+/** A year with deductions in the books but no return draft and no stored run still gets its card: the paper it needs does not wait for a draft. */
+function withSumsOnlyYears(years: GateYear[], sums: LargeSumYear[] | undefined): GateYear[] {
+  const have = new Set(years.map(y => String(y.year)));
+  const extra = (sums ?? []).filter(s => /^\d{4}$/.test(s.year) && !have.has(s.year)).map((s): GateYear => ({
+    year: Number(s.year), draft_document_id: null, drafts_on_file: 0, attempt: null, run: null, open_items: { total: 0, owner: 0, cpa: 0, agent: 0, unassigned: 0 } }));
+  return [...years, ...extra].sort((a, b) => b.year - a.year);
+}
+
+function Docket({ ownerId, active, onDrill, onOpen }: { ownerId: string; active: boolean; onDrill: (drill: Drill) => void; onOpen: (documentId: string, record: SavedRecord['record']) => void }) {
   const { liveRevision } = useAccountingBook();
-  // The cheap read first. The two slower views (3 to 6 s each on prod) start once it is on screen, one after the other and behind the close-out
-  // read that Finish your taxes starts at the same moment: the first load of this page failed under load on 2026-10-29, so a loaded database
-  // sees a trickle, not a burst.
   const gate = useRevisionRead(() => readGateStatus(ownerId), { scope: ownerId, enabled: active, revision: liveRevision });
   const ready = gate.phase === 'ready';
+  const sums = useRevisionRead(() => readLargeSums(ownerId), { scope: ownerId, enabled: active && ready, revision: liveRevision });
   const tiers = useRevisionRead(() => readTierYears(ownerId), { scope: ownerId, enabled: active && ready, revision: liveRevision, startAfterMs: TIER_READ_AFTER_MS });
   const ties = useRevisionRead(() => readCitationLinks(ownerId), { scope: ownerId, enabled: active && ready, revision: liveRevision, startAfterMs: TIE_READ_AFTER_MS });
-  const years = gate.data?.years ?? [];
+  const years = gate.data ? withSumsOnlyYears(gate.data.years, sums.data?.years) : [];
   const yearsKey = years.map(y => y.year).join(',');
   const [states, setStates] = useState<Record<string, YearState | 'error'>>({});
   useEffect(() => { setStates({}); }, [ownerId]);
@@ -212,6 +218,7 @@ function Docket({ ownerId, active, onDrill }: { ownerId: string; active: boolean
       <p role="alert"><Text role="body">The books docket could not load.</Text> <button type="button" onClick={gate.retry}>Try again</button></p></section>;
   }
   const status = gate.data;
+  const sumsByYear = new Map((sums.data?.years ?? []).map(t => [t.year, t]));
   const tierByYear = new Map((tiers.data ?? []).map(t => [t.year, t]));
   const tieByYear = new Map((ties.data ?? []).map(t => [t.year, t]));
   const read = (readAt: number | null) => readAt ? pacific(new Date(readAt).toISOString()) : 'not yet';
@@ -219,35 +226,39 @@ function Docket({ ownerId, active, onDrill }: { ownerId: string; active: boolean
     <div className="accounting-section-heading">
       <Text role="entity" as="h2">Books docket</Text>
       <CoverageView c={{ n: status.summary.with_run, of: status.summary.years, grain: 'tax years with a stored gate run', as_of: null }} />
+      {/* Reads the stored gate runs and the live rows again. It never runs the gate: that is the recorder's job, off the page. */}
+      <button type="button" onClick={() => { gate.retry(); sums.retry(); tiers.retry(); ties.retry(); }}>Read again</button>
     </div>
-    <Text role="caption" as="p">The reconciliation gate takes 15 seconds or more a year to run, so this page shows its last stored run and says when the books or the gate have changed since. Nothing here is computed in the browser.</Text>
+    <Text role="caption" as="p">The reconciliation gate takes 8 to 30 seconds a year to run, so this page shows its last stored run and says when the books or the gate have changed since. The rows that need paper are read live. Nothing here is computed in the browser.</Text>
     <details className="accounting-docket-legend">
       <summary><Text role="caption" as="small">How to read the docket</Text></summary>
       <ul>
+        <li><Text role="caption">{W.LEGEND.paper}</Text></li>
         <li><Text role="caption">{W.LEGEND.trusted}</Text></li>
         <li><Text role="caption">{W.LEGEND.tiers}</Text></li>
         <li><Text role="caption">{W.LEGEND.ties}</Text></li>
       </ul>
     </details>
     {gate.refreshFailed && <Text role="caption" as="p">Showing the last loaded docket; a refresh failed.</Text>}
-    {status.years.length === 0
-      ? <p><Text role="body">There are no tax years with a return draft or a stored gate run yet.</Text></p>
-      : <div className="accounting-close-years">{status.years.map(y => <YearDocket key={y.year} y={y}
+    {years.length === 0
+      ? <p><Text role="body">There are no tax years with a return draft, a stored gate run or deductions yet.</Text></p>
+      : <div className="accounting-close-years">{years.map(y => <YearDocket key={y.year} y={y}
+          sums={sumsByYear.get(String(y.year))} sumsPhase={phaseOf(sums)} sumsReadAt={sums.readAt} retrySums={sums.retry}
           tier={tierByYear.get(String(y.year))} tierPhase={phaseOf(tiers)} retryTier={tiers.retry}
           tie={tieByYear.get(String(y.year))} tiePhase={phaseOf(ties)} retryTie={ties.retry}
           state={typeof states[String(y.year)] === 'object' ? states[String(y.year)] as YearState : undefined}
           stateRead={states[String(y.year)] === undefined ? 'loading' : states[String(y.year)] === 'error' ? 'error' : 'ready'}
-          onDrill={onDrill} onShow={showYearInFinishTaxes} />)}</div>}
+          onDrill={onDrill} onOpen={onOpen} onShow={showYearInFinishTaxes} />)}</div>}
     <Text role="caption" as="p">
-      Read {pacific(status.read_at)}: gate runs (books_gate_runs). Deductions (v_books_audit_tier_years) read {read(tiers.readAt)}. Ties (v_books_citation_links) read {read(ties.readAt)}.
+      Read {pacific(status.read_at)}: gate runs (books_gate_runs). Large sums (v_books_large_sums) read {read(sums.readAt)}. Deductions (v_books_audit_tier_years) read {read(tiers.readAt)}. Ties (v_books_citation_links) read {read(ties.readAt)}.
       Filing state and open return items come from the facts register (books_year_state).
     </Text>
   </section>;
 }
 
-export default function BooksDocket({ onDrill, active = true }: { onDrill: (drill: Drill) => void; active?: boolean }) {
+export default function BooksDocket({ onDrill, onOpen, active = true }: { onDrill: (drill: Drill) => void; onOpen: (documentId: string, record: SavedRecord['record']) => void; active?: boolean }) {
   const { ownerId, shared } = useAccountingBook();
   // A shared book is someone else's: nothing renders and nothing is read.
   if (!ownerId || shared) return null;
-  return <Docket ownerId={ownerId} active={active} onDrill={onDrill} />;
+  return <Docket ownerId={ownerId} active={active} onDrill={onDrill} onOpen={onOpen} />;
 }

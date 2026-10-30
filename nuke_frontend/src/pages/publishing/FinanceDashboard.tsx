@@ -528,7 +528,7 @@ export default function FinanceDashboard() {
       ] as const).filter(([tab]) => !shared || tab !== 'tools').map(([tab, label, hint]) => <button type="button" key={tab} aria-current={officeView === tab ? 'page' : undefined} title={hint} onClick={() => { setOfficeView(tab); setSourceView(tab === 'documents' || tab === 'review' ? tab : 'summary'); }}><span>{label}</span></button>)}</nav>
       <div hidden={officeView !== 'activity'}><h2>Recent activity</h2><p>Open a change to inspect the source and its current interpretation.</p><AccountingActivity people={people} onOpen={documentId => openEvidence(documentId)} /><ActivityPasses people={people} onOpen={documentId => openEvidence(documentId)} /></div>
       {shared && <p>Shared books. Your corrections retain your identity and appear in the same ledger for the owner and other reviewers.</p>}
-      <div hidden={officeView !== 'books'}>{ownerId && !shared && <BooksDocket key={`docket:${ownerId}`} active={officeView === 'books'} onDrill={openDrill} />}
+      <div hidden={officeView !== 'books'}>{ownerId && !shared && <BooksDocket key={`docket:${ownerId}`} active={officeView === 'books'} onDrill={openDrill} onOpen={openEvidence} />}
       {ownerId && <FinishTaxes key={`close:${ownerId}`} onDrill={openDrill} onQuestions={() => { setOfficeView('review'); setSourceView('review'); }} />}
       {ownerId && <FinancialWorkpapers key={`${actorId}:${ownerId}`} viewerId={actorId} revision={sessionRevision} onOpen={openEvidence} focus={focus} onLeaveFocus={() => setFocus(null)} />}
       <p className="accounting-muted accounting-tax-note">Tax review is a separate step. Saved records are not a filing or a completed reconciliation.</p></div>

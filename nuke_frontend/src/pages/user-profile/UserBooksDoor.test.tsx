@@ -78,3 +78,11 @@ it('words a gate that did not finish or failed outright', () => {
   expect(doorLine(year(2024, { attempt: attempt('timed_out') }))).toBe('Gate did not finish (stopped at 120 s)');
   expect(doorLine(year(2024, { attempt: attempt('error') }))).toBe('Gate run failed');
 });
+
+it('names the large rows the stored run found missing a document, beside the verdict and the open items; a run that found none says nothing of it', () => {
+  const missing = (n: number) => ({ rule: 'R12', title: 't', status: n ? 'fail' : 'pass', n, of: 40, amount: 0, missing_doc: { n, amount: 100, cite_no_document: 0, by_kind: {} } });
+  const withMissing = (n: number) => year(2024, { run: { ...run(rules(['R1', 'pass', 10])), rules: [...rules(['R1', 'pass', 10]), missing(n)] } as any, open_items: { total: 2, owner: 1, cpa: 0, agent: 0, unassigned: 1 } });
+  expect(doorLine(withMissing(11))).toBe('Trusted · Oct 29, 2026, 10:31 AM · 11 large rows need a document · 2 open');
+  expect(doorLine(withMissing(1))).toContain('1 large row needs a document');
+  expect(doorLine(withMissing(0))).toBe('Trusted · Oct 29, 2026, 10:31 AM · 2 open');
+});

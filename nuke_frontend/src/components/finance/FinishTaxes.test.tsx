@@ -67,6 +67,7 @@ it('leads each year with the plain answer, never warns from timestamps, ranks wh
   expect(node.textContent).toContain('plus 2 agent notes');
   // Every count carries its source and its read time.
   expect(node.querySelector('.accounting-close-questions')?.textContent).toContain('Pending questions on the current reading, from the review queue (financial_review_queue) · read Oct 25, 2026, 4:00 PM');
+  expect(node.textContent).toContain('Counts read Oct 25, 2026, 4:00 PM from the close-out (accounting_closeout); filing state and facts from the facts register (books_year_state).');
   expect(node.textContent).not.toContain('Car costs with no car named$');
   await act(async () => (Array.from(node.querySelectorAll('.accounting-close-item button')).find(b => b.textContent!.includes('Expenses with no bank line')) as HTMLButtonElement).click());
   expect(drill).toHaveBeenCalledWith({ year: '2024', item: 'expense_no_proof', label: 'Expenses with no bank line and no receipt' });

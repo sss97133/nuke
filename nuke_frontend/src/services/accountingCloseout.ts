@@ -150,15 +150,30 @@ const finite = (value: unknown): value is number => typeof value === 'number' &&
 const numberOrNull = (value: unknown): number | null => value === null || value === undefined || value === '' ? null : Number.isFinite(Number(value)) ? Number(value) : null;
 
 /** One rule of a stored books_year_gate run, as books_gate_status returns it: sorted by the database, never with ids or detail text. */
+export type CountDollars = { n: number; amount: number | null };
 export type GateRule = {
   rule: string; title: string; status: string; n: number | null; of: number | null; amount: number | null;
-  grades?: Record<string, number>; ruling_only?: { n: number; amount: number | null };
-  b_no_bank?: { n: number; amount: number | null }; excluded?: { n: number; amount: number | null };
+  grades?: Record<string, number>; ruling_only?: CountDollars;
+  b_no_bank?: CountDollars; excluded?: CountDollars;
+  /** Rule R12: the head rows that miss the document their kind requires, by kind, and the rows flagged by reason. */
+  missing_doc?: { n: number; amount: number | null; cite_no_document: number; by_kind: Record<string, CountDollars> };
+  by_flag?: Record<string, CountDollars>;
+};
+/** The denominators a stored run keeps (books_gate_context, read in the same transaction as the gate). */
+export type RunContext = {
+  deductions: { n: number; usd: number };
+  /** Deductions with no linked bank line, whatever else supports them. */
+  no_bank: { n: number; usd: number };
+  /** Rule R10 part b: no payment proof, no owner ruling, no structural rule. */
+  no_pay_no_ruling: { n: number; usd: number };
+  /** The head rule R12 tests: the largest deductions that reach 80% of the year's deduction dollars. */
+  head: { n: number; usd: number; year_usd: number | null };
 };
 export type GateRun = {
   id: string; started_at: string; finished_at: string; duration_ms: number; pass: boolean;
   stale: boolean; stale_books: boolean; stale_gate: boolean; trusted: boolean;
   rule_counts: { total: number; pass: number; fail: number; not_assessed: number; empty: number };
+  context: RunContext | null;
   rules: GateRule[];
 };
 export type GateAttempt = { status: 'complete' | 'timed_out' | 'error'; started_at: string; finished_at: string; duration_ms: number };
@@ -173,13 +188,20 @@ export type GateStatus = {
 };
 
 const isRecord = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
+const hasNumbers = (v: unknown, keys: string[]) => isRecord(v) && keys.every(k => finite(v[k]));
+/** A run recorded without a context is null; one that carries a context carries all of it. */
+function isRunContext(v: unknown): boolean {
+  if (v === null || v === undefined) return true;
+  return isRecord(v) && hasNumbers(v.deductions, ['n', 'usd']) && hasNumbers(v.no_bank, ['n', 'usd']) && hasNumbers(v.no_pay_no_ruling, ['n', 'usd'])
+    && hasNumbers(v.head, ['n', 'usd']) && isRecord(v.head) && (v.head.year_usd === null || finite(v.head.year_usd));
+}
 function isGateYear(y: unknown): y is GateYear {
   if (!isRecord(y) || !Number.isInteger(y.year) || !Number.isInteger(y.drafts_on_file)) return false;
   if (!isRecord(y.open_items) || !['total', 'owner', 'cpa', 'agent', 'unassigned'].every(k => finite((y.open_items as Record<string, unknown>)[k]))) return false;
   if (y.attempt !== null && !(isRecord(y.attempt) && typeof y.attempt.status === 'string' && typeof y.attempt.finished_at === 'string')) return false;
   if (y.run === null) return true;
   const run = y.run;
-  return isRecord(run) && typeof run.finished_at === 'string' && typeof run.pass === 'boolean' && typeof run.stale === 'boolean' && typeof run.trusted === 'boolean'
+  return isRecord(run) && isRunContext(run.context) && typeof run.finished_at === 'string' && typeof run.pass === 'boolean' && typeof run.stale === 'boolean' && typeof run.trusted === 'boolean'
     && isRecord(run.rule_counts) && ['total', 'pass', 'fail', 'not_assessed', 'empty'].every(k => finite((run.rule_counts as Record<string, unknown>)[k]))
     && Array.isArray(run.rules) && run.rules.every(r => isRecord(r) && typeof r.rule === 'string' && typeof r.title === 'string' && typeof r.status === 'string');
 }
@@ -233,6 +255,49 @@ export async function readCitationLinks(ownerId: string): Promise<TieYear[]> {
     for (const k of TIE_COLUMNS) out[k] = Number(row[k]);
     return out as unknown as TieYear;
   });
+}
+
+/** A document the owner attached to a row through the Add documents flow (a supports_record cell on the document). The row stays flagged until the books
+ *  writer cites it in the decision's proof_links: this says "received", never "done". */
+export type AttachedDocument = { document_id: string; filename: string | null; doc_kind: string | null; ref: string | null; attached_at: string };
+export type LargeSumFlag = 'no_payment_proof' | 'no_basis' | 'filed_return_only';
+/** One deduction decision that rule R12 flags (books_large_sum_rows over v_books_large_sums), exactly as the view states it. */
+export type LargeSumRow = {
+  year: string; id: string; document_id: string; local_id: string; dollar_rank: number; amount: number; share: number; cum_share: number;
+  category: string | null; tier: 'A' | 'B' | 'C'; pay_proof: boolean; doc_proof: boolean; basis_strength: string; proof_flag: LargeSumFlag | null;
+  required_doc_kind: string | null; required_doc_rule: string | null; missing_doc: boolean; doc_found_n: number; doc_cited_n: number;
+  cites: { kind: string; ref: string }[];
+  record: SavedRecord['record'];
+  attached: AttachedDocument[];
+};
+/** One tax year of the large sums: the totals rule R12 reports over the same rows, then the flagged head rows, largest dollars first. */
+export type LargeSumYear = {
+  year: string; year_usd: number | null; deductions_n: number; head_n: number; head_usd: number; flagged_n: number; flagged_usd: number;
+  missing_doc_n: number; missing_doc_usd: number; no_payment_n: number; no_payment_usd: number; filed_return_only_n: number; filed_return_only_usd: number;
+  beyond_head_missing_doc_n: number; beyond_head_missing_doc_usd: number; rows_shown: number; rows: LargeSumRow[];
+};
+export type LargeSums = { read_at: string; years: LargeSumYear[] };
+
+const LARGE_YEAR_NUMBERS = ['deductions_n', 'head_n', 'head_usd', 'flagged_n', 'flagged_usd', 'missing_doc_n', 'missing_doc_usd', 'no_payment_n', 'no_payment_usd',
+  'filed_return_only_n', 'filed_return_only_usd', 'beyond_head_missing_doc_n', 'beyond_head_missing_doc_usd', 'rows_shown'];
+const str = (v: unknown): v is string => typeof v === 'string' && v.length > 0;
+function isLargeSumRow(r: unknown): r is LargeSumRow {
+  return isRecord(r) && str(r.year) && str(r.id) && str(r.document_id) && str(r.local_id) && finite(r.dollar_rank) && finite(r.amount)
+    && typeof r.missing_doc === 'boolean' && typeof r.pay_proof === 'boolean' && (r.proof_flag === null || str(r.proof_flag))
+    && (r.required_doc_kind === null || str(r.required_doc_kind)) && (r.required_doc_rule === null || str(r.required_doc_rule))
+    && Array.isArray(r.cites) && Array.isArray(r.attached) && r.attached.every(a => isRecord(a) && str(a.document_id) && str(a.attached_at))
+    && isRecord(r.record) && str(r.record.source_key) && str(r.record.local_id) && str(r.record.year);
+}
+function isLargeSumYear(y: unknown): y is LargeSumYear {
+  return isRecord(y) && str(y.year) && LARGE_YEAR_NUMBERS.every(k => finite(y[k])) && (y.year_usd === null || finite(y.year_usd))
+    && Array.isArray(y.rows) && y.rows.every(isLargeSumRow) && y.rows.length === y.rows_shown;
+}
+
+/** The deduction decisions rule R12 flags, per tax year, read live (about 4 s on prod: one call, never one per year). Owner only. */
+export async function readLargeSums(ownerId: string): Promise<LargeSums> {
+  const { data, error } = await supabase.rpc('books_large_sum_rows', { p_owner_id: ownerId });
+  if (error || !isRecord(data) || typeof data.read_at !== 'string' || !Array.isArray(data.years) || !data.years.every(isLargeSumYear)) throw fail('The large sums');
+  return data as unknown as LargeSums;
 }
 
 /** Split a balanced trailing "( … )" off a phrase; repeated, it peels every trailing group. */

@@ -303,3 +303,13 @@
 .accounting-page .accounting-proof>summary { font-size:12px; font-weight:400; padding:2px 0; color:var(--text-secondary); }
 .accounting-page .accounting-proof[open]>summary { margin-bottom:4px; }
 .accounting-proof ul { margin:0; padding-left:16px; font-size:12px; color:var(--text-secondary); }
+/* Large sums that need paper: the two stored totals above the rows, a row that asks for a file, and the panel that takes it. Status colors are the shared tokens. */
+.accounting-paper-total[data-state="bad"] { color:var(--error); }
+.accounting-paper-total[data-state="ok"] { color:var(--success); }
+.accounting-paper-total[data-state="unknown"] { color:var(--warning); }
+.accounting-docket .accounting-paper-row .accounting-close-item__button { align-items:flex-start; }
+.accounting-paper-attach { margin:0 0 12px; padding:10px 12px; border:1px solid var(--border); border-radius:var(--radius,8px); background:var(--bg-secondary,var(--bg)); }
+.accounting-page .accounting-paper-attach p { margin:4px 0 0; }
+.accounting-paper-attach__fields { display:grid; grid-template-columns:auto minmax(0,1fr); gap:8px 12px; align-items:center; margin:8px 0; }
+.accounting-paper-attach__fields label { margin:0; }
+.accounting-paper-attach__fields button { grid-column:1 / -1; justify-self:start; }
