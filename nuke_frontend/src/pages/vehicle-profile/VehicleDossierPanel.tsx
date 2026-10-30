@@ -9,7 +9,7 @@
  * ALL CAPS labels, 9-10px body, zero radius/shadows/gradients.
  */
 import React, { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useVehicleProfile } from './VehicleProfileContext';
 import { usePopup } from '../../components/popups/usePopup';
 import { supabase } from '../../lib/supabase';
@@ -19,6 +19,81 @@ import { useFieldProvenance, formatProvenanceValue, provenanceCoverageUnavailabl
 import FieldProvenanceDrawer, { SourceBadge } from './FieldProvenanceDrawer';
 
 const FieldEvidencePopup = React.lazy(() => import('./FieldEvidencePopup'));
+
+type StructuredClaim = {
+  property_key: string; property_id: string; observation_id: string;
+  value: string | number; unit: string | null; source_url: string | null;
+  observed_at: string | null; ingested_at: string | null;
+  qualifiers?: { claim_role?: string; current_configuration_status?: string; factory_configuration_status?: string;
+    observed_at_basis?: string; limitation?: string };
+};
+const UUID = /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
+
+/** Read admitted claims from the existing canonical owner, without promoting
+ * a source assertion into a verified factory/current specification. */
+const StructuredProfileClaims: React.FC<{ vehicleId: string }> = ({ vehicleId }) => {
+  const [read, setRead] = useState<{ id: string; status: 'loading' | 'ready' | 'failed'; claims: StructuredClaim[] }>(
+    { id: vehicleId, status: 'loading', claims: [] });
+  React.useEffect(() => {
+    if (!UUID.test(vehicleId)) return;
+    const controller = new AbortController();
+    let active = true;
+    const timeout = setTimeout(() => controller.abort(), 10000);
+    setRead({ id: vehicleId, status: 'loading', claims: [] });
+    void (async () => {
+      try {
+        const { data, error } = await supabase.rpc('get_vehicle_specs', {
+          p_vehicle_ids: [vehicleId], p_include_typed_claims: true,
+        }).abortSignal(controller.signal);
+        const model = Array.isArray(data) && data.length === 1 ? data[0] : null;
+        if (error || model?.vehicle_id !== vehicleId || model.schema_version !== 'vehicle_data_model_v1'
+          || model.typed_claims_status !== 'current_core_scope_read' || !Array.isArray(model.typed_claims)) throw Error('Unavailable structured claims');
+        const claims: StructuredClaim[] = model.typed_claims;
+        if (!claims.every(c => c && /^[a-z][a-z0-9_]*$/.test(c.property_key)
+          && UUID.test(c.property_id) && UUID.test(c.observation_id)
+          && (c.unit === null || typeof c.unit === 'string')
+          && (c.observed_at === null || typeof c.observed_at === 'string')
+          && (c.ingested_at === null || typeof c.ingested_at === 'string')
+          && (!c.qualifiers || (typeof c.qualifiers === 'object' &&
+            ['claim_role', 'current_configuration_status', 'factory_configuration_status', 'observed_at_basis', 'limitation']
+              .every(key => c.qualifiers?.[key as keyof NonNullable<StructuredClaim['qualifiers']>] == null
+                || typeof c.qualifiers?.[key as keyof NonNullable<StructuredClaim['qualifiers']>] === 'string')))
+          && (typeof c.value === 'string' || (typeof c.value === 'number' && Number.isFinite(c.value))))) throw Error('Invalid structured claims');
+        if (active) setRead({ id: vehicleId, status: 'ready', claims });
+      } catch {
+        if (active) setRead({ id: vehicleId, status: 'failed', claims: [] });
+      } finally { clearTimeout(timeout); }
+    })();
+    return () => { active = false; clearTimeout(timeout); controller.abort(); };
+  }, [vehicleId]);
+  if (!UUID.test(vehicleId)) return null;
+  const current = read.id === vehicleId ? read : { status: 'loading', claims: [] };
+  return <section aria-label="Structured source claims" className="vp-structured-claims">
+    <h3>Structured source claims</h3>
+    {current.status === 'loading' ? <p role="status">Reading structured evidence…</p>
+      : current.status === 'failed' ? <p role="status">Structured evidence could not be read. Missing information has not been established.</p>
+      : current.claims.length === 0 ? <p>No admitted core claims returned. Retained descriptions and records may still contain unprocessed evidence.</p>
+      : <dl>{current.claims.map(claim => {
+        let external: string | null = null;
+        try { const url = new URL(claim.source_url || ''); if (url.protocol === 'https:' || url.protocol === 'http:') external = url.href; } catch { /* Retain the internal evidence link. */ }
+        return <div key={`${claim.property_id}:${claim.observation_id}`} className="vp-structured-claims__row">
+          <dt>{claim.property_key.replaceAll('_', ' ')}</dt>
+          <dd>
+            {String(claim.value)}{claim.unit ? ` ${claim.unit}` : ''}
+            <div className="vp-structured-claims__source">
+              <Link to={`/vehicle/${vehicleId}/observation/${claim.observation_id}`}>Evidence</Link>
+              {external && <> · <a href={external} target="_blank" rel="noopener noreferrer">Original source</a></>}
+              {' · '}{claim.qualifiers?.claim_role?.replaceAll('_', ' ') || 'Attributed claim'}
+              <div>Recorded: {claim.ingested_at || 'Unknown'} · Observation clock: {claim.observed_at || 'Unknown'}</div>
+              <div>Clock basis: {claim.qualifiers?.observed_at_basis?.replaceAll('_', ' ') || 'Unknown'}</div>
+              <div>Factory configuration: {claim.qualifiers?.factory_configuration_status || 'unknown'} · Current configuration: {claim.qualifiers?.current_configuration_status || 'unknown'}</div>
+              {claim.qualifiers?.limitation && <div>{claim.qualifiers.limitation}</div>}
+            </div>
+          </dd>
+        </div>;
+      })}</dl>}
+  </section>;
+};
 
 /* ------------------------------------------------------------------ */
 /*  Constants                                                          */
@@ -570,6 +645,8 @@ const VehicleDossierPanel: React.FC = () => {
       {/* Info Panel */}
       <div className="vp-dossier-panel">
         <div className="vp-dossier-panel__title">Vehicle information</div>
+
+        <StructuredProfileClaims vehicleId={vehicle?.id || ''} />
 
         {FIELD_GROUPS.map((fg, gi) => {
           // Collect visible fields for this group
