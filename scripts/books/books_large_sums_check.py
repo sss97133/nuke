@@ -9,13 +9,16 @@ Read-only: every statement runs as the service role in a transaction that is rol
                  books_decision documents; and the message-thread rule (owner ruling 2026-10-29): which cites of a Messages / chat.db, iMessage, SMS,
                  WhatsApp, Marketplace, Craigslist or Gmail thread count as the invoice or agreement and as the purchase agreement, which do not (a
                  search that found nothing, no date or id, a bare Gmail message id, a receipt or order, a lease), and that a real document wins over a
-                 thread. No books data is read.
+                 thread. No books data is read. The audit tiers' own SQL is tried the same way over synthetic decision records (the document layer, which the tier view now
+                 holds, and the A test: tier A needs the document the row's kind requires), and the two views run one after the other: tier A and R12 agree.
   2. invariants  on the live books (the deployed views, or the migration's with --migration): the view's rows tie out to their sources
                  (the audit tiers' deduction rows and the rollup the office page shows, the Revenue decisions), the ranking and the
                  cumulative share are arithmetic over those rows, the head is the smallest top set reaching 80%, the basis_strength of every row
                  follows from the ruling ids, ruling refs and document cites the row carries, and the required document kind follows from the
                  category (an independent copy of the keyword rules); a row reports doc_message_only exactly when a message thread is the only
-                 document, and an independent copy of the message-thread test agrees with the view.
+                 document, and an independent copy of the message-thread test agrees with the view; in the audit tiers, tier A needs a cited document
+                 and none missing (doc_proof), a row whose cited document does not meet its kind is B with the reason, and the large sums view reads the
+                 same tier, doc_proof and document columns (no row is tier A and missing its document).
   3. findings    per year the head, the dollars in it, and the head rows R12 flags, by flag, with the largest, and the head rows that miss the
                  document their kind requires, by kind; the head rows that rest on a message thread alone; the flagged head rows whose only cites
                  are message threads that did not count (and why). A year with a flagged head row is a FAIL (the books, not the view). --expect
@@ -28,7 +31,7 @@ Timings of the reads are printed; --max-seconds fails a read that takes longer.
 Exit 1 on a failed unit test or invariant, or on a year with flagged head rows (--report: exit 0 on findings alone).
 
   dotenvx run -- python3 scripts/books/books_large_sums_check.py --owner <uuid> [--years 2022 2023 2024 2025]
-      [--migration supabase/migrations/20261105190000_books_large_sums_message_threads.sql] [--expect 2024:1:ok ...] [--with-gate] [--before-after] [--report]
+      [--migration supabase/migrations/20261105200000_books_tier_a_kind_document.sql] [--expect 2024:1:ok ...] [--with-gate] [--before-after] [--report]
 """
 import argparse
 import re
@@ -37,8 +40,8 @@ from decimal import Decimal
 
 from books_check_sql import money, run, uuid_ok, view_sql, with_substituted_views
 
-DEFAULT_MIGRATION = 'supabase/migrations/20261105190000_books_large_sums_message_threads.sql'
-VIEWS = ('v_books_large_sums',)
+DEFAULT_MIGRATION = 'supabase/migrations/20261105200000_books_tier_a_kind_document.sql'
+VIEWS = ('v_books_vehicle_links', 'v_books_audit_tiers', 'v_books_large_sums')
 FLAGS = ('filed_return_only', 'no_payment_proof', 'no_basis', 'missing_doc')
 FILED_ID = re.compile(r'RULING-(filed|Schedule C|car-basis)')
 FILED_REF = re.compile(r'owner ruling on the filed [0-9]{4} schedule c', re.I)
@@ -92,7 +95,14 @@ def ok(cond, msg):
 A, B = '11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222'
 TIER_COLS = ('id uuid, owner_id uuid, document_id uuid, year text, local_id text, amount numeric, category text, description text, tier text, '
              'pay_proof boolean, doc_proof boolean, purpose_proof boolean, proof_basis text, has_owner_ruling boolean, ruling_id text, '
-             'payment_cites jsonb, document_cites jsonb, ruling_cites jsonb, is_summary_row boolean, is_deduction boolean')
+             'payment_cites jsonb, document_cites jsonb, ruling_cites jsonb, is_summary_row boolean, is_deduction boolean, '
+             'required_doc_kind text, required_doc_rule text, doc_found jsonb, doc_found_n bigint, doc_found_kind text, doc_message_only boolean, missing_doc boolean, vehicle_ids uuid[]')
+VLINK_COLS = 'owner_id uuid, source_key text, vehicle_ids uuid[]'
+TIER_REC_COLS = ('id uuid, owner_id uuid, document_id uuid, year text, local_id text, record_kind text, section text, category text, description text, '
+                 'status text, decision text, amount_value numeric, source_key text, record jsonb')
+REGISTER_FULL_COLS = ('owner_id uuid, year text, local_id text, asset_id text, asset_name text, computed numeric, booked numeric, year_r6_pass boolean, '
+                      'extraction_id uuid, kind text')
+STRUCT_COLS = 'rule text, basis text, citation text, verified_by text'
 REC_COLS = ('id uuid, owner_id uuid, document_id uuid, year text, local_id text, record_kind text, section text, category text, description text, '
             'status text, amount_value numeric, source_key text, record jsonb')
 RULE_COLS = 'owner_id uuid, section text, category text, basis text, citation text'
@@ -134,7 +144,8 @@ def t(local_id, amount, year='2099', owner=A, tier='B', pay=True, doc=False, pur
     dc = list(dcites) if dcites is not None else ([DOC] if doc else [])
     return dict(id=uid(), owner_id=owner, document_id=uid(), year=year, local_id=local_id, amount=amount, category=cat, description='d', tier=tier,
                 pay_proof=pay, doc_proof=doc or bool(dc), purpose_proof=purpose, proof_basis=basis, has_owner_ruling=bool(rid or rcites), ruling_id=rid,
-                payment_cites=['bank:x'] if pay else [], document_cites=dc, ruling_cites=list(rcites), is_summary_row=summary, is_deduction=ded)
+                payment_cites=['bank:x'] if pay else [], document_cites=dc, ruling_cites=list(rcites), is_summary_row=summary, is_deduction=ded,
+                required_doc_kind=None, required_doc_rule=None, doc_found=[], doc_found_n=0, doc_found_kind=None, doc_message_only=False, missing_doc=False, vehicle_ids=None)
 
 
 def v(local_id, amount, bank=(), proof=(), cat='Cat A', rid='', status='Included', owner=A, year='2099', section='Revenue', rid_=None, source_key=None):
@@ -310,13 +321,44 @@ MSGROWS = [
     (t('M-V-NOTHING', 100, year='2097', cat=CAT_DEAL), 'purchase_agreement', 'vehicle_deal', True, [], 0, None, False),
 ]
 DOCROWS += [m[:6] for m in MSGROWS]
-SYN_TIERS += [r[0] for r in DOCROWS]
+
+
+def td(local_id, amount, **kw):
+    """A deduction row of the audit tiers that already carries its document layer (the tier view works it out; the large sums view only reads it)."""
+    row = t(local_id, amount, year='2097', cat='Car restoration — labor (contractors)', dcites=kw.pop('dcites', []))
+    row['doc_proof'] = kw.pop('doc_proof', False)
+    row.update(kw)
+    return row
+
+
+PASS_ROWS = [
+    td('PX-MISS', 100, dcites=[cite('file', 'x.pdf')], required_doc_kind='invoice_or_agreement', required_doc_rule='contractor', missing_doc=True),
+    td('PX-THREAD', 100, dcites=[cite('file', CHAT)], required_doc_kind='invoice_or_agreement', required_doc_rule='contractor', doc_found_n=1, doc_found_kind='message thread',
+       doc_message_only=True, doc_found=[{'source': 'proof_links', 'kind': 'file', 'ref': CHAT[:160], 'type': 'message thread', 'level': 2}]),
+    td('PX-OK', 100, dcites=[cite('gmail', 'invoice 1')], doc_proof=True, tier='A', required_doc_kind='invoice_or_agreement', required_doc_rule='contractor', doc_found_n=1,
+       doc_found_kind='invoice or agreement', doc_found=[{'source': 'proof_links', 'kind': 'gmail', 'ref': 'invoice 1', 'level': 2}]),
+    td('PX-VEH', 100, required_doc_kind='purchase_agreement', required_doc_rule='vehicle_deal', doc_found_n=1, doc_found_kind='title', vehicle_ids=['99999901-0000-0000-0000-000000000000'],
+       doc_found=[{'source': 'ownership_verifications', 'id': 'x', 'type': 'title', 'vehicle_id': '99999901-0000-0000-0000-000000000000', 'level': 3}]),
+]
+SYN_TIERS += PASS_ROWS
+SYN_RECS += [v('V-VEH-REV', 100, bank=['m10'], year='2096', source_key='sk-rev'), v('V-NOVEH-REV', 100, bank=['m11'], year='2096', source_key='sk-none')]
+SYN_VLINKS = [dict(owner_id=A, source_key='sk-rev', vehicle_ids=['99999902-0000-0000-0000-000000000000'])]
 LINKED = {'V-LINKED-OK': 1, 'V-LINKED-LOW': 2, 'V-LINKED-TITLE': 3, 'V-LINKED-RETIRED': 4, 'V-IMG': 5, 'V-MANY': 6, 'V-AMT-NO': 8, 'V-AMT-YES': 9, 'V-TITLE-NOT-INVOICE': 3, 'V-SECURE': 10, 'M-V-LINKED-TITLE': 11}
-_by_local = {r[0]['local_id']: r[0] for r in DOCROWS}
-for local, vn in LINKED.items():                                          # the decision record carries the source_key the link job wrote
-    SYN_RECS.append(v(local, 100, section='Expense', year='2097', rid_=_by_local[local]['id'], source_key='sk-' + local))
-SYN_REGISTER = [dict(owner_id=A, year='2097', local_id='D-REG', asset_id='asset-1', kind='claim'), dict(owner_id=A, year='2097', local_id='D-REG-PAID', asset_id='asset-2', kind='claim'),
-                dict(owner_id=A, year='2097', local_id='D-NOREG', asset_id='asset-9', kind='unclaimed')]          # an unclaimed line 13 row is not a register asset
+
+
+def rec_of(row, source_key=None):
+    """The decision record the audit tiers read for a fixture row (the bank link, the proof links, the ruling id), with the source_key the link job writes for a linked vehicle."""
+    return dict(id=row['id'], owner_id=row['owner_id'], document_id=row['document_id'], year=row['year'], local_id=row['local_id'], record_kind='retained_ledger_decision',
+                section='Expense', category=row['category'], description='d', status='Included', decision='', amount_value=row['amount'], source_key=source_key,
+                record={'bank_links': ['bank:x'] if row['pay_proof'] else [], 'proof_links': list(row['document_cites']) + [dict(c) for c in row['ruling_cites']],
+                        'ruling_id': row['ruling_id'], 'account': ''})
+
+
+TIER_RECS = [rec_of(r[0], ('sk-' + r[0]['local_id']) if r[0]['local_id'] in LINKED else None) for r in DOCROWS]
+SYN_REGISTER_FULL = [dict(owner_id=A, year='2097', local_id='D-REG', asset_id='asset-1', asset_name='n', computed=None, booked=None, year_r6_pass=None, extraction_id=None, kind='claim'),
+                     dict(owner_id=A, year='2097', local_id='D-REG-PAID', asset_id='asset-2', asset_name='n', computed=None, booked=None, year_r6_pass=None, extraction_id=None, kind='claim'),
+                     dict(owner_id=A, year='2097', local_id='D-NOREG', asset_id='asset-9', asset_name='n', computed=None, booked=None, year_r6_pass=None, extraction_id=None,
+                          kind='unclaimed')]          # an unclaimed line 13 row is not a register asset
 RCPT_LOW, RCPT_99, RCPT_MANY, DOC_REG_B = uid(), uid(), [uid() for _ in range(7)], uid()
 DOC_REG, DOC_OTHER = uid(), uid()
 def cell(owner, key, decisions, doc=DOC_REG, superseded=False, cites=True):
@@ -363,20 +405,22 @@ SYN_NUKE = {
 }
 
 
+def ls_json_sql(select):
+    return ("select coalesce(jsonb_agg(jsonb_build_object('kind', x.kind, 'owner', x.owner_id, 'year', x.year, 'id', x.local_id, 'rank', x.dollar_rank, 'tier', x.tier, "
+            "'pay', x.pay_proof, 'doc', x.doc_proof, 'basis', x.basis_strength, 'flag', x.proof_flag, 'head', x.in_head, 'usd', x.year_usd, 'cum', x.cum_share, 'share', x.share, "
+            "'req', x.required_doc_kind, 'rule', x.required_doc_rule, 'missing', x.missing_doc, 'found', x.doc_found, 'found_n', x.doc_found_n, 'cited', x.doc_cited_n, 'veh', x.vehicle_ids, "
+            "'fkind', x.doc_found_kind, 'msg_only', x.doc_message_only) "
+            f"order by x.owner_id, x.kind, x.year, x.dollar_rank), '[]'::jsonb) from ({select}) x")
+
+
 def unit_test(migration_text):
-    print('-- 1. unit test: the view over synthetic rows')
+    print('-- 1. unit test: the large sums view over synthetic rows (the audit tiers rows come with their document layer)')
     sources = {'v_books_audit_tiers': (TIER_COLS, SYN_TIERS), 'v_financial_accounting_records': (REC_COLS, SYN_RECS), 'v_books_category_rules': (RULE_COLS, SYN_RULES),
-               'v_books_asset_register': (REGISTER_COLS, SYN_REGISTER)}
-    sources.update({name: (NUKE_COLS[name], SYN_NUKE[name]) for name in NUKE_COLS})
-    sources.update({'financial_document_extractions': (EXTRACTION_COLS, SYN_EXTRACTIONS), 'financial_documents': (DOCUMENT_COLS, SYN_DOCUMENTS)})
+               'v_books_vehicle_links': (VLINK_COLS, SYN_VLINKS)}
     select = with_substituted_views(view_sql(migration_text, 'v_books_large_sums'), sources)
-    sql = ("select coalesce(jsonb_agg(jsonb_build_object('kind', x.kind, 'owner', x.owner_id, 'year', x.year, 'id', x.local_id, 'rank', x.dollar_rank, 'tier', x.tier, "
-           "'pay', x.pay_proof, 'basis', x.basis_strength, 'flag', x.proof_flag, 'head', x.in_head, 'usd', x.year_usd, 'cum', x.cum_share, 'share', x.share, "
-           "'req', x.required_doc_kind, 'rule', x.required_doc_rule, 'missing', x.missing_doc, 'found', x.doc_found, 'found_n', x.doc_found_n, 'cited', x.doc_cited_n, 'veh', x.vehicle_ids, 'fkind', x.doc_found_kind, 'msg_only', x.doc_message_only) "
-           f"order by x.owner_id, x.kind, x.year, x.dollar_rank), '[]'::jsonb) from ({select}) x")
-    rows = run([('unit', sql)])['unit'][0]
+    rows = run([('unit', ls_json_sql(select))])['unit'][0]
     got = {(r['kind'], r['year'], r['id']): r for r in rows if r['owner'] == A}
-    expected_keys = set(EXPECT) | {('deduction', '2097', r[0]['local_id']) for r in DOCROWS}
+    expected_keys = set(EXPECT) | {('deduction', '2097', r['local_id']) for r in PASS_ROWS} | {('revenue', '2096', 'V-VEH-REV'), ('revenue', '2096', 'V-NOVEH-REV')}
     ok(set(got) == expected_keys, f'the view returns exactly the synthetic decisions of owner A (extra: {sorted(set(got) - expected_keys)}, missing: {sorted(expected_keys - set(got))})')
     for key, (rank, tier, basis, flag, head) in EXPECT.items():
         r = got.get(key)
@@ -394,19 +438,81 @@ def unit_test(migration_text):
     ok(abs(next(r for r in d99 if r['id'] == 'D-RULED')['cum'] - Decimal('0.865385')) < Decimal('0.000001'), 'cum_share of the third row is 900 / 1040')
     d98 = [r for r in rows if r['owner'] == A and r['year'] == '2098']
     ok(sum(r['head'] for r in d98) == 2, 'two rows reach exactly 80% and are the head; the next row (800 ranked above it) is not')
-    # documents
-    for row, req, rule, missing, sources_, found_n in DOCROWS:
+    # the document layer is read from the audit tiers as it comes
+    for row in PASS_ROWS:
         r = got.get(('deduction', '2097', row['local_id']))
         if not r:
             continue
+        want = (row['required_doc_kind'], row['required_doc_rule'], row['missing_doc'], row['doc_found'], row['doc_found_n'], row['doc_found_kind'], row['doc_message_only'],
+                row['vehicle_ids'], len(row['document_cites']), row['doc_proof'], row['tier'])
+        have = (r['req'], r['rule'], r['missing'], r['found'], r['found_n'], r['fkind'], r['msg_only'], r['veh'], r['cited'], r['doc'], r['tier'])
+        ok(have == want, f"document layer {row['local_id']} read as the audit tiers give it: {have} (expected {want})")
+        want_basis = 'documented' if row['doc_proof'] else 'bank_and_rule'
+        ok(r['basis'] == want_basis, f"document layer {row['local_id']}: basis_strength {r['basis']} follows doc_proof ({want_basis})")
+    ok(got[('revenue', '2096', 'V-VEH-REV')]['veh'] == [VEH[2]] and got[('revenue', '2096', 'V-NOVEH-REV')]['veh'] is None,
+       'a Revenue decision carries the vehicles v_books_vehicle_links ties to its source key; one with no link carries none')
+    ok(all(isinstance(r['msg_only'], bool) for r in rows), 'doc_message_only is a boolean on every row')
+    ok(all(r['req'] is None and r['missing'] is False and r['found'] == [] for r in rows if r['kind'] == 'revenue'),
+       'revenue rows carry no document requirement (the policy is about claimed expenses)')
+    ok(all(r['req'] is None and not r['missing'] for r in rows if r['kind'] == 'deduction' and r['year'] in ('2098', '2099') and r['id'] != 'D-REGISTER'),
+       'a category no rule names requires nothing: no document is missing')
+
+
+def tier_sources(migration_text, records):
+    vehicle_links = with_substituted_views(view_sql(migration_text, 'v_books_vehicle_links'), {'vehicle_documents': (NUKE_COLS['vehicle_documents'], SYN_NUKE['vehicle_documents'])})
+    sources = {'v_financial_accounting_records': (TIER_REC_COLS, records), 'v_books_category_rules': (RULE_COLS, SYN_RULES), 'v_books_asset_register': (REGISTER_FULL_COLS, SYN_REGISTER_FULL),
+               'v_books_structural_rules': (STRUCT_COLS, []), 'v_books_vehicle_links': vehicle_links}
+    sources.update({name: (NUKE_COLS[name], SYN_NUKE[name]) for name in NUKE_COLS})
+    sources.update({'financial_document_extractions': (EXTRACTION_COLS, SYN_EXTRACTIONS), 'financial_documents': (DOCUMENT_COLS, SYN_DOCUMENTS)})
+    return with_substituted_views(view_sql(migration_text, 'v_books_audit_tiers'), sources), vehicle_links
+
+
+def ref_tier(row, missing):
+    """The tier the policy gives a fixture row, worked out from the facts alone (an independent copy; no structural rule applies to these rows)."""
+    cited = bool(row['document_cites'])
+    pay = bool(row['pay_proof'])
+    purpose = bool(row['ruling_id'] or row['ruling_cites']) or cited
+    proof = cited and not missing
+    return ('A' if proof else 'B') if (pay and purpose) else 'C', proof
+
+
+def unit_test_tiers(migration_text):
+    print('-- 1b. unit test: the audit tiers over synthetic records (the document layer, tier A means the kind-appropriate document)')
+    tier_select, vehicle_links = tier_sources(migration_text, TIER_RECS)
+    sql = ("select coalesce(jsonb_agg(jsonb_build_object('id', x.local_id, 'year', x.year, 'tier', x.tier, 'doc', x.doc_proof, 'cited', x.doc_cited, 'purpose', x.purpose_proof, "
+           "'pay', x.pay_proof, 'missing', x.missing_doc, 'req', x.required_doc_kind, 'rule', x.required_doc_rule, 'found', x.doc_found, 'found_n', x.doc_found_n, "
+           "'fkind', x.doc_found_kind, 'msg_only', x.doc_message_only, 'veh', x.vehicle_ids, 'reason', x.tier_reason, 'ded', x.is_deduction, 'amount', x.amount) "
+           f"order by x.local_id), '[]'::jsonb) from ({tier_select}) x")
+    # the same rows through the large sums view: tier A and R12's flags must agree
+    ls_select = with_substituted_views(view_sql(migration_text, 'v_books_large_sums'), {
+        'v_books_audit_tiers': tier_select, 'v_financial_accounting_records': (REC_COLS, []), 'v_books_category_rules': (RULE_COLS, SYN_RULES), 'v_books_vehicle_links': vehicle_links})
+    res = run([('tiers', sql), ('ls', ls_json_sql(ls_select))])
+    got = {r['id']: r for r in res['tiers'][0]}
+    lgot = {r['id']: r for r in res['ls'][0] if r['kind'] == 'deduction'}
+    ok(set(got) == {r['local_id'] for r, *_ in DOCROWS}, f'the tier view returns exactly the synthetic decisions (extra: {sorted(set(got) - {r["local_id"] for r, *_ in DOCROWS})})')
+    for row, req, rule, missing, sources_, found_n in DOCROWS:
+        r = got.get(row['local_id'])
+        if not r:
+            continue
         srcs = sorted(f['source'] for f in r['found'])
-        vehicles = r['veh']
         want_veh = [VEH[LINKED[row['local_id']]]] if row['local_id'] in LINKED else None
-        ok((r['req'], r['rule'], r['missing'], srcs, r['found_n'], vehicles) == (req, rule, missing, sorted(sources_), found_n, want_veh),
-           f"documents {row['local_id']}: requires {r['req']} ({r['rule']}), missing {r['missing']}, found {srcs} of {r['found_n']}, vehicles {vehicles and len(vehicles)}"
+        ok((r['req'], r['rule'], r['missing'], srcs, r['found_n'], r['veh']) == (req, rule, missing, sorted(sources_), found_n, want_veh),
+           f"documents {row['local_id']}: requires {r['req']} ({r['rule']}), missing {r['missing']}, found {srcs} of {r['found_n']}, vehicles {r['veh'] and len(r['veh'])}"
            f" (expected {req} {rule} {missing} {sorted(sources_)} {found_n})")
+        tier, proof = ref_tier(row, missing)
+        ok((r['tier'], r['doc'], r['cited']) == (tier, proof, bool(row['document_cites'])),
+           f"tier {row['local_id']}: tier {r['tier']}, doc_proof {r['doc']}, doc_cited {r['cited']} (expected {tier}, {proof}, {bool(row['document_cites'])})")
+        if tier == 'B' and row['document_cites'] and missing:
+            ok(r['purpose'] and f'does not meet the {req} requirement' in (r['reason'] or ''),
+               f"tier {row['local_id']}: a row that cites a document that does not meet its kind keeps its purpose basis (B, not C) and its reason says why: {r['reason']!r}")
+        ok(r['tier'] != 'A' or not r['missing'], f"tier {row['local_id']}: tier A is never missing its document")
+        lr = lgot.get(row['local_id'])
+        ok(lr is not None and (lr['tier'], lr['doc'], lr['missing'], lr['found_n'], lr['req']) == (r['tier'], r['doc'], r['missing'], r['found_n'], r['req']),
+           f"{row['local_id']}: the large sums view reads the same tier, doc_proof and document columns the audit tiers give")
+        ok(lr is not None and (lr['basis'] == 'documented') == r['doc'] and not (lr['tier'] == 'A' and lr['missing']),
+           f"{row['local_id']}: basis_strength documented only with doc_proof, and never tier A and missing_doc at once")
     for row, req, rule, missing, sources_, found_n, fkind, msg_only in MSGROWS:
-        r = got.get(('deduction', '2097', row['local_id']))
+        r = got.get(row['local_id'])
         if r:
             ok((r['fkind'], r['msg_only']) == (fkind, msg_only), f"message threads {row['local_id']}: doc_found_kind {r['fkind']!r}, doc_message_only {r['msg_only']} (expected {fkind!r} {msg_only})")
             ok(all((f.get('type') == 'message thread') == r['msg_only'] for f in r['found']) or not r['found'],
@@ -418,16 +524,21 @@ def unit_test(migration_text):
                     ok(py, f"message threads {row['local_id']}: the independent copy of the test sees the thread")
                 elif missing:
                     ok(not py, f"message threads {row['local_id']}: the independent copy of the test sees no thread either")
-    ok(all(isinstance(r['msg_only'], bool) for r in rows), 'doc_message_only is a boolean on every row')
-    ok(all(r['fkind'] is None for r in rows if r['found_n'] == 0), 'doc_found_kind is null when nothing is found')
-    ok(not any(r['msg_only'] for r in rows if r['kind'] == 'revenue' or r['req'] not in ('invoice_or_agreement', 'purchase_agreement')),
+    ok(all(isinstance(r['msg_only'], bool) for r in got.values()), 'doc_message_only is a boolean on every row')
+    ok(all(r['fkind'] is None for r in got.values() if r['found_n'] == 0), 'doc_found_kind is null when nothing is found')
+    ok(not any(r['msg_only'] for r in got.values() if r['req'] not in ('invoice_or_agreement', 'purchase_agreement')),
        'only an invoice-or-agreement or purchase-agreement row can rest on a message thread')
-    cited = {row['local_id']: len(row['document_cites']) for row, *_ in DOCROWS}
-    ok(all(got[('deduction', '2097', k)]['cited'] == n for k, n in cited.items() if ('deduction', '2097', k) in got), 'doc_cited_n counts the documents a row cites, whatever they are')
-    ok(all(r['req'] is None and r['missing'] is False and r['found'] == [] for r in rows if r['kind'] == 'revenue'),
-       'revenue rows carry no document requirement (the policy is about claimed expenses)')
-    ok(all(r['req'] is None and not r['missing'] for r in rows if r['kind'] == 'deduction' and r['year'] in ('2098', '2099') and r['id'] != 'D-REGISTER'),
-       'a category no rule names requires nothing: no document is missing')
+    ok(not any(r['tier'] == 'A' and r['missing'] for r in got.values()), 'no row reads tier A and missing its document')
+    want_a = {row['local_id'] for row, req, rule, missing, *_ in DOCROWS if ref_tier(row, missing)[0] == 'A'}
+    have_a = {i for i, r in got.items() if r['tier'] == 'A'}
+    ok(have_a == want_a and want_a, f'tier A is exactly the {len(want_a)} rows that cite a document with none missing (extra: {sorted(have_a - want_a)}, missing: {sorted(want_a - have_a)})')
+    demoted = {row['local_id'] for row, req, rule, missing, *_ in DOCROWS if row['document_cites'] and missing and ref_tier(row, missing)[0] == 'B'}
+    ok(len(demoted) >= 5 and all(got[i]['tier'] == 'B' and not got[i]['doc'] and got[i]['cited'] for i in demoted),
+       f'{len(demoted)} rows cite a document that does not meet their kind and are B (they were A before the kind test)')
+    unhelped = {i for i, r in got.items() if not r['cited'] and r['req'] and not r['missing']}
+    ok(unhelped and all(got[i]['tier'] != 'A' and not got[i]['doc'] for i in unhelped),
+       f'{len(unhelped)} rows have the document R12 asks for from Nuke, a ruling, a use group or the register but cite nothing: not promoted to A')
+    ok(all(r['req'] is None and not r['missing'] and r['found'] == [] for r in got.values() if r['amount'] <= 0), 'a credit (amount not above zero) requires no document')
 
 
 # ---------------------------------------------------------------- 2. invariants on the live books
@@ -538,6 +649,63 @@ def invariants(rows, tiers, rollup, revenue, years):
                     bad.append((r['local_id'], 'doc_found_kind', r['doc_found_kind']))
             ok(not bad, f'{label}: required document kind follows from the category rules; missing_doc = required and none found; a found document meets the level'
                + (f' (first: {bad[:3]})' if bad else ''))
+
+
+def tier_invariants(trows, rows):
+    print('-- 2b. invariants: the audit tiers and the large sums view agree on the document')
+    ded = [r for r in trows if r['is_deduction']]
+    bad = []
+    for r in ded:
+        k = (r['year'], r['local_id'])
+        if r['tier'] == 'A' and (not r['doc_proof'] or r['missing_doc'] or not r['doc_cited']):
+            bad.append((k, 'tier A without a cited document that meets the kind'))
+        if r['doc_proof'] != (r['doc_cited'] and not r['missing_doc']):
+            bad.append((k, 'doc_proof is not doc_cited and not missing_doc'))
+        if r['missing_doc'] != (r['required_doc_kind'] is not None and r['doc_found_n'] == 0):
+            bad.append((k, 'missing_doc is not required and none found'))
+        rule, req = expected_requirement({'kind': 'deduction', 'amount': r['amount'], 'category': r['category']})
+        if req != r['required_doc_kind']:
+            bad.append((k, 'required_doc_kind', r['required_doc_kind'], req))
+        if r['doc_cited'] and r['missing_doc'] and r['pay_proof'] and r['purpose_proof'] and (r['tier'] != 'B' or 'does not meet' not in (r['tier_reason'] or '')):
+            bad.append((k, 'a row whose cited document does not meet its kind is B, with the reason'))
+    ok(not bad, f'{len(ded)} deduction rows: tier A needs a cited document and none missing; doc_proof, missing_doc and the required kind follow from the cites, the documents found and '
+                f'the category; a row whose cited document does not meet its kind is B with the reason' + (f' (first: {bad[:3]})' if bad else ''))
+    by = {(x['year'], x['local_id']): x for x in rows if x['kind'] == 'deduction'}
+    dmap = {(r['year'], r['local_id']): (r['tier'], r['doc_proof'], r['missing_doc'], r['doc_found_n'], r['required_doc_kind']) for r in ded}
+    off = [k for k, want in dmap.items() if k not in by or (by[k]['tier'], by[k]['doc_proof'], by[k]['missing_doc'], by[k]['doc_found_n'], by[k]['required_doc_kind']) != want]
+    ok(not off and len(by) == len(ded), f'the large sums view reads the same tier, doc_proof and document columns as the audit tiers on all {len(ded)} deduction rows'
+       + (f' (first: {off[:3]})' if off else ''))
+    a_flagged = [k for k, x in by.items() if x['tier'] == 'A' and x['missing_doc']]
+    ok(not a_flagged, f'no deduction reads tier A and missing its document at once ({len(a_flagged)} do)')
+
+
+def tier_effect(owner, migration, years):
+    """Tier A rows that fall to B (their cited document does not meet their kind), and the effect on the rollup, per year: the deployed views against this migration's."""
+    print("-- the kind test: tier A rows that fall to B, and v_books_audit_tier_years before and after")
+    ylist = ','.join("'" + y + "'" for y in years)
+    qs = [('rows', f"select coalesce(jsonb_agg(to_jsonb(r)), '[]'::jsonb) from (select year, local_id, amount, tier, doc_proof, is_deduction from public.v_books_audit_tiers "
+                   f"where owner_id = '{owner}'::uuid and year in ({ylist})) r"),
+          ('years', f"select coalesce(jsonb_agg(to_jsonb(r) order by r.year), '[]'::jsonb) from (select year, decisions, deductions, deduction_usd, a_n, b_n, c_n, a_usd, b_usd, c_usd, a_pct, b_pct, c_pct, "
+                    f"s274_needs_receipt_usd, s274_uncaveated_usd, b_nobank_n from public.v_books_audit_tier_years where owner_id = '{owner}'::uuid and year in ({ylist})) r")]
+    old = run(qs)
+    new = run(qs, migration=migration, view_names=VIEWS)
+    om, nm = ({(r['year'], r['local_id']): r for r in res['rows'][0]} for res in (old, new))
+    ok(set(om) == set(nm), 'the same rows before and after')
+    changed = [k for k in om if k in nm and om[k]['tier'] != nm[k]['tier']]
+    ok(all(om[k]['tier'] == 'A' and nm[k]['tier'] == 'B' for k in changed), f'every row whose tier changes goes from A to B ({len(changed)} rows); no row is promoted and none falls to C')
+    flipped = [k for k in om if k in nm and om[k]['doc_proof'] != nm[k]['doc_proof']]
+    ok(all(om[k]['doc_proof'] and not nm[k]['doc_proof'] for k in flipped), f'every row whose doc_proof changes loses it ({len(flipped)} rows)')
+    oy, ny = ({r['year']: r for r in res['years'][0]} for res in (old, new))
+    for y in years:
+        ch = [k for k in changed if k[0] == y]
+        usd = sum(abs(om[k]['amount']) for k in ch)
+        o, n = oy.get(y), ny.get(y)
+        if not o:
+            continue
+        print(f"{y}: tier A to B {len(ch)} rows {money(usd)}; A {o['a_n']} -> {n['a_n']} rows, {money(o['a_usd'])} -> {money(n['a_usd'])} ({o['a_pct']}% -> {n['a_pct']}%); "
+              f"B {o['b_n']} -> {n['b_n']} rows, {money(o['b_usd'])} -> {money(n['b_usd'])} ({o['b_pct']}% -> {n['b_pct']}%); C {o['c_pct']}% -> {n['c_pct']}%; "
+              f"doc_proof lost on {len([k for k in flipped if k[0] == y])} rows; s274 needs receipt {money(o['s274_needs_receipt_usd'])} -> {money(n['s274_needs_receipt_usd'])}, "
+              f"uncaveated {money(o['s274_uncaveated_usd'])} -> {money(n['s274_uncaveated_usd'])}")
 
 
 # ---------------------------------------------------------------- 3. findings
@@ -699,6 +867,7 @@ def main():
     owner, years = uuid_ok(a.owner), [str(int(y)) for y in a.years]
     path = a.migration or DEFAULT_MIGRATION
     unit_test(open(path).read())
+    unit_test_tiers(open(path).read())
     ylist = ','.join("'" + y + "'" for y in years)
     cols = ("kind, year, dollar_rank, local_id, amount, category, tier, pay_proof, doc_proof, purpose_proof, proof_basis, basis_strength, proof_flag, ruling_id, "
             "ruling_cites, payment_cites, document_cites, required_doc_kind, required_doc_rule, doc_found, doc_found_n, doc_cited_n, missing_doc, vehicle_ids, "
@@ -711,6 +880,8 @@ def main():
         ('revenue', f"select coalesce(jsonb_agg(jsonb_build_object('year', year, 'n', n, 'usd', usd)), '[]'::jsonb) from (select year, count(*) n, sum(amount_value) usd from public.v_financial_accounting_records "
                     f"where owner_id = '{owner}'::uuid and record_kind = 'retained_ledger_decision' and section = 'Revenue' and amount_value is not null and coalesce(status, '') not like 'Closed%' "
                     f"and coalesce(status, '') not like 'Open allocation%' and year in ({ylist}) group by year) q"),
+        ('tierrows', f"select coalesce(jsonb_agg(to_jsonb(r)), '[]'::jsonb) from (select year, local_id, amount, category, tier, tier_reason, pay_proof, doc_proof, doc_cited, purpose_proof, is_deduction, "
+                     f"required_doc_kind, doc_found_n, missing_doc from public.v_books_audit_tiers where owner_id = '{owner}'::uuid and year in ({ylist})) r"),
         # the shape the office page reads: one year, deductions, the head only
         ('page', f"select count(*) from public.v_books_large_sums where owner_id = '{owner}'::uuid and year = '{years[-1]}' and kind = 'deduction' and in_head"),
     ]
@@ -726,12 +897,14 @@ def main():
     if a.max_seconds:
         ok(res['page'][1] / 1000 <= a.max_seconds and res['rows'][1] / 1000 <= a.max_seconds, f'reads within {a.max_seconds} s')
     invariants(rows, tiers, rollup, revenue, years)
+    tier_invariants(res['tierrows'][0], rows)
     found = findings_for(rows, years)
     check_expect(rows, a.expect)
     if a.before_after:
         if not a.migration:
             sys.exit('--before-after needs --migration')
         before_after(owner, a.migration, years)
+        tier_effect(owner, a.migration, years)
     if a.with_gate:
         gate_agreement(owner, a.migration, years, found)
     print('books_large_sums:', 'PASS' if not problems and not findings else
