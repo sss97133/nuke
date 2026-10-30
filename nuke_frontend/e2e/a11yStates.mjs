@@ -169,7 +169,7 @@ export const STATES = [
   { name: 'statement page', path: `/work-orders/statement?work_order_id=${WO}`, readers: { work_order_statement_read: statement }, ready: 'Install exhaust' },
   // Header activity indicator (signed in), panel open: the header is outside the default scope, so audit the button and panel.
   { name: 'header activity panel', path: '/work', who: CUSTOMER, readers: activityReaders(), tables: { user_notifications: activityNotes },
-    ready: 'Waiting for your signature',
+    ready: 'Jobs',
     act: async (page) => { await page.getByRole('button', { name: /^Activity / }).click(); await page.getByRole('region', { name: 'Activity' }).waitFor(); },
     scope: '.activity' },
 ];
