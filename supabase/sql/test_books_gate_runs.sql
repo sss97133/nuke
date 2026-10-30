@@ -2,10 +2,12 @@
 -- Disposable synthetic contract for books_gate_runs and its writer and readers (migration 20261106110000). Every id, name and
 -- amount below is invented; books_year_gate is a stand-in whose definition the contract changes.
 -- Covered: the store's keys, checks, append-only trigger, RLS and grants; the writer (service_role only, one receipt per run, a
--- result must name its owner and year, a failed run needs a reason, a context belongs to a complete run); the reader: rules in R-order with an unknown id last and
--- never dropped, no failing ids or detail text, stale when a document is touched or the gate definition changes, trusted only
--- for a fresh pass with no rule that checked nothing, the latest attempt, drafts on file, open return items by actor equal to
--- books_year_state's open_items, the summary; a stranger, the accounting reviewer and anon are refused; a re-apply changes nothing.
+-- result must name its owner and year, a failed run needs a reason, a context belongs to a complete run); the reader: the years are the
+-- return drafts, the stored runs and the years that have Expense decisions (a closed decision and a revenue-only year add none), rules in R-order
+-- with an unknown id last and never dropped, no failing ids or detail text, stale when a document is touched, when the gate definition
+-- changes and when a view the gate reads changes (named by the gate, or read through another view; an unrelated view changes nothing),
+-- trusted only for a fresh pass with no rule that checked nothing, the latest attempt, drafts on file, open return items by actor
+-- equal to what books_year_state lists, the summary; a stranger, the accounting reviewer and anon are refused; a re-apply changes nothing.
 \ir test_financial_accounting.sql
 ALTER TABLE auth.users ADD COLUMN email_confirmed_at timestamptz DEFAULT now();
 CREATE TABLE accounting_access_grants(owner_id uuid, member_id uuid, active boolean NOT NULL DEFAULT true);
@@ -21,6 +23,9 @@ CREATE TABLE public.work_orders(id uuid PRIMARY KEY, title text);
 GRANT SELECT ON public.vehicles, public.work_orders TO authenticated;
 \ir ../migrations/20261028174500_accounting_closeout_readers.sql
 \ir ../migrations/20261101170000_books_year_state.sql
+\ir ../migrations/20261023200300_financial_accounting_records_view.sql
+\ir ../migrations/20261023201000_financial_accounting_records_view_grants.sql
+\ir ../migrations/20261025083500_accounting_records_bounded_reads.sql
 
 -- Supabase's default privileges and its service role, which bypasses RLS.
 ALTER ROLE service_role BYPASSRLS;
@@ -88,7 +93,21 @@ DO $$ DECLARE
  draft3 jsonb := jsonb_build_object('sha256', repeat('e', 64), 'storage_path', u || '/draft-c.pdf', 'byte_size', 100, 'source_filename', 'draft-c.pdf');
  reg jsonb := jsonb_build_object('sha256', repeat('f', 64), 'storage_path', u || '/register.txt', 'byte_size', 100, 'source_filename', 'return-facts-register.txt');
  fact jsonb := jsonb_build_object('year', 2024, 'topic', 'other', 'date', '2026-10-29', 'decision', 'Synthetic.');
+ ledger jsonb := jsonb_build_object('sha256', repeat('b', 64), 'storage_path', u || '/ledger.csv', 'byte_size', 100, 'source_filename', 'ledger.csv');
+ dec jsonb := jsonb_build_object('record_kind', 'retained_ledger_decision', 'source_sha256', repeat('a', 64), 'source_row', 1, 'year', '2020', 'date', '2020-03-01',
+   'account', 'Synthetic ledger', 'currency', 'USD', 'currency_basis', 'synthetic USD ledger', 'bank_links', '[]'::jsonb, 'recognition_status', 'retained_decision',
+   'payment_status', 'unresolved', 'vehicle_status', 'unresolved', 'reimbursement_status', 'unresolved', 'entity_status', 'retained_scope_unallocated',
+   'section', 'Expense', 'category', 'Synthetic category', 'decision', 'Synthetic.');
 BEGIN
+ -- Decisions: 2020 has an Expense decision and no draft or run (it gets a card); a closed 2018 Expense decision and a 2019 Revenue decision add no year;
+ -- 2024 has a decision too (it is already a year, so it is listed once).
+ PERFORM ingest_financial_evidence(u, ledger, jsonb_build_object('idempotency_key', 'ledger-1', 'method', 'synthetic-ledger', 'version', '1',
+   'fields', jsonb_build_array(jsonb_build_object('field_key', 'batch', 'value_raw', 'synthetic batch', 'evidence', jsonb_build_object('stage', 'retained'))),
+   'accounting_records', jsonb_build_array(
+     dec || jsonb_build_object('local_id', 'E20', 'source_key', repeat('1', 64), 'amount', '100.00'),
+     dec || jsonb_build_object('local_id', 'E18', 'source_key', repeat('2', 64), 'amount', '50.00', 'year', '2018', 'date', '2018-03-01', 'status', 'Closed with its pair'),
+     dec || jsonb_build_object('local_id', 'R19', 'source_key', repeat('3', 64), 'amount', '900.00', 'year', '2019', 'date', '2019-03-01', 'section', 'Revenue'),
+     dec || jsonb_build_object('local_id', 'E24', 'source_key', repeat('4', 64), 'amount', '70.00', 'year', '2024', 'date', '2024-03-01'))));
  PERFORM ingest_financial_evidence(u, draft1, jsonb_build_object('idempotency_key', 'draft-2024-a', 'method', 'tax-return-draft', 'version', '1',
    'fields', jsonb_build_array(jsonb_build_object('field_key', 'tax_return_summary', 'value_raw', '2024 draft a', 'evidence', jsonb_build_object('stage', 'generated_return_draft'),
      'value_normalized', jsonb_build_object('tax_year', '2024', 'result', 'owe', 'amount', 100, 'built_at', '2026-10-20T10:00:00Z')))));
@@ -178,8 +197,11 @@ SELECT set_config('request.jwt.claim.role', 'authenticated', true), set_config('
 SET LOCAL ROLE authenticated;
 CREATE TEMP TABLE s1 AS SELECT public.books_gate_status('11111111-1111-4111-8111-111111111111') AS j;
 GRANT SELECT ON s1 TO PUBLIC;
-SELECT pg_temp.ok('years are the return drafts union the stored runs, newest first: 2025, 2024, 2023, 2022, 2021',
-  (SELECT array_agg((y->>'year')::int) FROM s1, jsonb_array_elements(j->'years') y) = ARRAY[2025, 2024, 2023, 2022, 2021]);
+SELECT pg_temp.ok('years are the return drafts, the stored runs and the years with Expense decisions, newest first, each once: 2025, 2024, 2023, 2022, 2021, 2020 (a closed 2018 decision and a revenue-only 2019 add no year)',
+  (SELECT array_agg((y->>'year')::int) FROM s1, jsonb_array_elements(j->'years') y) = ARRAY[2025, 2024, 2023, 2022, 2021, 2020]);
+SELECT pg_temp.ok('a year that has only deduction decisions is a card with no run, no attempt, no draft and counted open items of its own (none), not an invented zero',
+  (SELECT jsonb_typeof(y->'run') = 'null' AND jsonb_typeof(y->'attempt') = 'null' AND y->>'draft_document_id' IS NULL AND (y->>'drafts_on_file')::int = 0 AND (y->'open_items'->>'total')::int = 0
+   FROM s1, jsonb_array_elements(j->'years') y WHERE y->>'year' = '2020'));
 SELECT pg_temp.ok('2024 rules come back in R-order: R2, R2i, R5, R8a, R8b, R10, then the unknown R11 and the unnumbered X1; none dropped',
   (SELECT array_agg(r->>'rule') FROM s1, jsonb_array_elements(j->'years') y, jsonb_array_elements(y->'run'->'rules') r WHERE y->>'year' = '2024')
     = ARRAY['R2', 'R2i', 'R5', 'R8a', 'R8b', 'R10', 'R11', 'X1']);
@@ -220,11 +242,17 @@ SELECT pg_temp.ok('open return items by who closes them: 2024 owner 1, cpa 1, un
   (SELECT (y->'open_items'->>'total')::int = 3 AND (y->'open_items'->>'owner')::int = 1 AND (y->'open_items'->>'cpa')::int = 1 AND (y->'open_items'->>'agent')::int = 0 AND (y->'open_items'->>'unassigned')::int = 1
    FROM s1, jsonb_array_elements(j->'years') y WHERE y->>'year' = '2024')
   AND (SELECT (y->'open_items'->>'total')::int = 1 AND (y->'open_items'->>'agent')::int = 1 FROM s1, jsonb_array_elements(j->'years') y WHERE y->>'year' = '2025'));
-SELECT pg_temp.ok('the open count is the one books_year_state lists: one definition of open',
-  jsonb_array_length(public.books_year_state('11111111-1111-4111-8111-111111111111', 2024)->'open_items') = 3
+SELECT pg_temp.ok('the open counts, by who closes them, equal what books_year_state lists as open for each year: one definition of open',
+  (SELECT bool_and((y->'open_items'->>'total')::int = jsonb_array_length(st->'open_items')
+          AND (y->'open_items'->>'owner')::int = (SELECT count(*) FROM jsonb_array_elements(st->'open_items') i WHERE i->>'actor' = 'owner')
+          AND (y->'open_items'->>'cpa')::int = (SELECT count(*) FROM jsonb_array_elements(st->'open_items') i WHERE i->>'actor' = 'cpa')
+          AND (y->'open_items'->>'agent')::int = (SELECT count(*) FROM jsonb_array_elements(st->'open_items') i WHERE i->>'actor' = 'agent')
+          AND (y->'open_items'->>'unassigned')::int = (SELECT count(*) FROM jsonb_array_elements(st->'open_items') i WHERE coalesce(i->>'actor', '') NOT IN ('owner', 'cpa', 'agent')))
+   FROM s1, jsonb_array_elements(j->'years') y, LATERAL (SELECT public.books_year_state('11111111-1111-4111-8111-111111111111', (y->>'year')::int) AS st) q)
+  AND jsonb_array_length(public.books_year_state('11111111-1111-4111-8111-111111111111', 2024)->'open_items') = 3
   AND jsonb_array_length(public.books_year_state('11111111-1111-4111-8111-111111111111', 2025)->'open_items') = 1);
-SELECT pg_temp.ok('the summary: 5 years, 4 with a complete run, 3 passed fresh, 2 trusted (2021 and 2023), 1 failing, 0 only not-assessed, 0 stale, 4 open items',
-  (SELECT (j->'summary'->>'years')::int = 5 AND (j->'summary'->>'with_run')::int = 4 AND (j->'summary'->>'passed')::int = 3 AND (j->'summary'->>'trusted')::int = 2
+SELECT pg_temp.ok('the summary: 6 years, 4 with a complete run, 3 passed fresh, 2 trusted (2021 and 2023), 1 failing, 0 only not-assessed, 0 stale, 4 open items',
+  (SELECT (j->'summary'->>'years')::int = 6 AND (j->'summary'->>'with_run')::int = 4 AND (j->'summary'->>'passed')::int = 3 AND (j->'summary'->>'trusted')::int = 2
           AND (j->'summary'->>'failing')::int = 1 AND (j->'summary'->>'not_assessed')::int = 0 AND (j->'summary'->>'stale')::int = 0 AND (j->'summary'->>'open_items')::int = 4 FROM s1));
 COMMIT;
 
@@ -258,6 +286,41 @@ SELECT pg_temp.ok('a changed gate definition marks the runs stale because the ga
   (SELECT bool_and((y->'run'->>'stale_gate')::boolean) FROM s3, jsonb_array_elements(j->'years') y WHERE jsonb_typeof(y->'run') = 'object')
   AND (SELECT j->>'gate_md5' <> (SELECT run_md5 FROM (SELECT gate_md5 AS run_md5 FROM public.books_gate_runs LIMIT 1) q) FROM s3));
 COMMIT;
+
+-- Stale when a view the gate reads changes ------------------------------------------------------------------------------------------------
+-- R10 and R12 are computed by views, so the hash covers the views the gate names and every view those read. v_books_base is not named by the gate;
+-- v_books_audit_tiers is, and reads it. v_books_unrelated is read by nothing the gate touches.
+CREATE VIEW public.v_books_base AS SELECT 1 AS n;
+CREATE VIEW public.v_books_audit_tiers AS SELECT n FROM public.v_books_base;
+CREATE VIEW public.v_books_unrelated AS SELECT 1 AS n;
+SET ROLE service_role;
+SELECT public.record_books_gate_run('11111111-1111-4111-8111-111111111111', 2020, 'complete', now() - interval '5 seconds', now(), public.books_book_signature('11111111-1111-4111-8111-111111111111'),
+  public.books_gate_md5(), pg_temp.gate_result(2020, true, jsonb_build_array(pg_temp.rule('R1', 'pass', 0, 10))), NULL, 'contract');
+RESET ROLE;
+CREATE FUNCTION pg_temp.run_2020() RETURNS jsonb LANGUAGE sql AS $$
+  SELECT y->'run' FROM jsonb_array_elements(public.books_gate_status('11111111-1111-4111-8111-111111111111')->'years') y WHERE y->>'year' = '2020' $$;
+BEGIN;
+SELECT set_config('request.jwt.claim.role', 'authenticated', true), set_config('request.jwt.claim.sub', '11111111-1111-4111-8111-111111111111', true);
+SET LOCAL ROLE authenticated;
+SELECT pg_temp.ok('a run recorded now is fresh', NOT (pg_temp.run_2020()->>'stale')::boolean AND (pg_temp.run_2020()->>'trusted')::boolean);
+COMMIT;
+CREATE OR REPLACE VIEW public.v_books_unrelated AS SELECT 2 AS n;
+BEGIN;
+SELECT set_config('request.jwt.claim.role', 'authenticated', true), set_config('request.jwt.claim.sub', '11111111-1111-4111-8111-111111111111', true);
+SET LOCAL ROLE authenticated;
+SELECT pg_temp.ok('a view the gate does not read can change and the run stays fresh', NOT (pg_temp.run_2020()->>'stale')::boolean);
+COMMIT;
+CREATE OR REPLACE VIEW public.v_books_base AS SELECT 2 AS n;
+BEGIN;
+SELECT set_config('request.jwt.claim.role', 'authenticated', true), set_config('request.jwt.claim.sub', '11111111-1111-4111-8111-111111111111', true);
+SET LOCAL ROLE authenticated;
+SELECT pg_temp.ok('a view the gate reads only through another view changes, and the run is stale because the gate changed, not the books',
+  (pg_temp.run_2020()->>'stale')::boolean AND (pg_temp.run_2020()->>'stale_gate')::boolean AND NOT (pg_temp.run_2020()->>'stale_books')::boolean AND NOT (pg_temp.run_2020()->>'trusted')::boolean);
+COMMIT;
+BEGIN;
+DROP FUNCTION public.books_year_gate(uuid, integer);
+SELECT pg_temp.ok('a book with no gate has no hash (null), as before', public.books_gate_md5() IS NULL);
+ROLLBACK;
 
 -- Who may read ------------------------------------------------------------------------------------------------------------------------
 BEGIN;

@@ -17,16 +17,21 @@ def row(local_id, ref, doc=DOC_A, links=None, year='2024', at='2026-10-29T19:00:
 
 
 class T(unittest.TestCase):
-    def test_the_read_is_read_only_and_keyed_by_the_owner_and_the_record_each_cell_names(self):
+    def test_the_read_is_read_only_and_keyed_by_the_owner_and_the_record_each_paper_names(self):
         sql = p.pending_sql(OWNER, 2024)
         self.assertTrue(sql.startswith('begin read only;'))
         self.assertTrue(sql.rstrip().endswith('rollback;'))
-        self.assertIn(f"e.owner_id = '{OWNER}'::uuid", sql)
-        # a cell counts only under the key of the record it names
-        self.assertIn("e.field_key = 'supports_record_' || left(e.value_normalized->'value'->>'source_key', 24)", sql)
-        self.assertIn("r.source_key = e.value_normalized->'value'->>'source_key'", sql)
+        self.assertIn(f"a.owner_id = '{OWNER}'::uuid", sql)
+        self.assertIn("r.source_key = a.source_key", sql)
         self.assertIn("r.year = '2024'", sql)
         self.assertNotRegex(sql, r'(?i)\b(insert|update|delete|truncate|alter|drop)\b')
+
+    def test_the_test_that_a_paper_counts_lives_in_the_view_once_and_not_in_this_script(self):
+        sql = p.pending_sql(OWNER)
+        self.assertIn('from public.v_books_record_attachments a', sql)
+        # the cell's key, its supersession and the check that it names the record it sits under are the view's, not repeated here
+        for repeated in ('supports_record', 'is_superseded', 'field_key', 'financial_document_extractions'):
+            self.assertNotIn(repeated, sql)
 
     def test_an_owner_that_is_not_a_uuid_and_a_year_that_is_not_a_number_never_reach_the_sql(self):
         with self.assertRaises(ValueError):

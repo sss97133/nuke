@@ -15,6 +15,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from schedule_c_rulings import psql, q, uuid_ok  # noqa: E402,F401
 
 SERVICE = "select set_config('request.jwt.claims','{\"role\":\"service_role\"}',true);\n"
+# The recorder's functions (record_books_gate_run and the readers it calls) read the role from the older claim as well.
+SERVICE_WRITER = SERVICE + "select set_config('request.jwt.claim.role','service_role',true);\n"
 
 
 def view_sql(migration_text, name):

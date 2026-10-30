@@ -1,8 +1,9 @@
 \set ON_ERROR_STOP on
 -- Disposable synthetic contract for books_tier_records (migration 20261106130000). Every id, name and amount below is invented.
 -- v_books_audit_tiers is a stand-in over the real v_financial_accounting_records (the tier logic is not this reader's job; the real view
--- needs its whole chain), and v_books_audit_tier_years is the real rollup definition of migration 20261104180000, copied, so the contract
--- can hold every class total equal to the rollup's own count and dollars.
+-- needs its whole chain), and v_books_audit_tier_years is the real rollup: the DDL of the newest migration that defines it, read from the file
+-- and run over the stand-in, so the contract holds every class total equal to the rollup's own count and dollars and cannot go on passing
+-- against a copy after the real view changes.
 -- Covered: each class returns exactly its rows, largest amount first, paged, with the record the records table renders and the row's
 -- proof; total and amount cover the whole class and equal the rollup; a bad year, class, limit or offset is refused; a signed-in
 -- stranger gets total 0; anon cannot execute; a re-apply changes nothing.
@@ -46,16 +47,9 @@ SELECT v.id, v.owner_id, v.document_id, v.year, v.local_id, v.amount_value AS am
   CASE WHEN f.structural_rule IS NOT NULL THEN jsonb_build_array(jsonb_build_object('rule', f.structural_rule)) END AS structural_cites, f.proof_basis
 FROM public.v_financial_accounting_records v JOIN public.tier_fixture f ON f.local_id = v.local_id
 WHERE v.record_kind = 'retained_ledger_decision' AND v.section = 'Expense';
--- The rollup, as migration 20261104180000 defines it (the columns this contract compares).
-CREATE VIEW public.v_books_audit_tier_years WITH (security_invoker = true) AS
-SELECT t.owner_id, t.year, count(*) AS decisions,
-  round(coalesce(sum(t.amount) FILTER (WHERE t.tier = 'A'), 0), 2) AS a_usd, round(coalesce(sum(t.amount) FILTER (WHERE t.tier = 'B'), 0), 2) AS b_usd, round(coalesce(sum(t.amount) FILTER (WHERE t.tier = 'C'), 0), 2) AS c_usd,
-  count(*) FILTER (WHERE t.tier = 'A') AS a_n, count(*) FILTER (WHERE t.tier = 'B') AS b_n, count(*) FILTER (WHERE t.tier = 'C') AS c_n,
-  round(coalesce(sum(t.amount) FILTER (WHERE t.needs_receipt AND NOT t.doc_proof), 0), 2) AS s274_needs_receipt_usd,
-  round(coalesce(sum(t.amount) FILTER (WHERE t.is_deduction AND NOT t.pay_proof AND NOT t.has_owner_ruling AND t.structural_rule IS NULL), 0), 2) AS no_pay_no_ruling_usd,
-  count(*) FILTER (WHERE NOT t.is_deduction) AS excluded_n, round(coalesce(sum(t.amount) FILTER (WHERE NOT t.is_deduction), 0), 2) AS excluded_usd,
-  count(*) FILTER (WHERE t.tier = 'B' AND NOT t.pay_proof) AS b_nobank_n, round(coalesce(sum(t.amount) FILTER (WHERE t.tier = 'B' AND NOT t.pay_proof), 0), 2) AS b_nobank_usd
-FROM public.v_books_audit_tiers t GROUP BY t.owner_id, t.year;
+-- The rollup: the CREATE OR REPLACE VIEW statement of the newest migration that defines it (run from the repository root, as the runner does).
+\set rollup `f=$(grep -l 'CREATE OR REPLACE VIEW public.v_books_audit_tier_years' supabase/migrations/*.sql | sort | tail -1); sed -n '/^CREATE OR REPLACE VIEW public.v_books_audit_tier_years/,/^GROUP BY t.owner_id, t.year;/p' "$f"`
+:rollup
 GRANT SELECT ON public.v_books_audit_tiers, public.v_books_audit_tier_years TO authenticated, service_role;
 
 \ir ../migrations/20261106130000_books_tier_records.sql

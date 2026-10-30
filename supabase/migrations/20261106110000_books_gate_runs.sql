@@ -11,26 +11,34 @@
 --      the gate does not state as structure (the year's deduction dollars, how many deductions have no bank line, the rows and dollars of
 --      the head that rule R12 tests), read by books_gate_context in the same repeatable-read transaction as the gate; timed_out and
 --      error carry the reason.
---      book_signature is the book's revision when the run started and gate_md5 the md5 of the live gate definition, so the reader
+--      book_signature is the book's revision when the run started and gate_md5 the md5 of what the gate was made of (item 3), so the reader
 --      decides stale in the database, never in the browser.
 --      RLS: an owner-only SELECT policy (auth.uid() = owner_id). No anon grant, no write grant to authenticated. The accounting
 --      reviewer grant (accounting_access_grants) reads every older accounting reader by design; it does NOT read this store.
 --   2. public.books_book_signature(owner): count and latest updated_at of the owner's financial_documents, the same two reads the
---      page's live-revision hook makes. The store is separate from financial_documents on purpose: a result written as a register
---      cell would bump the very signature that decides staleness.
---   3. public.books_gate_md5(): md5 of the live books_year_gate definition (NULL when the gate does not exist).
+--      page's live-revision hook makes, in the same spelling (count:YYYY-MM-DDTHH:MI:SS.USZ; the browser formats its read the same way
+--      and a test pins both to this format). The store is separate from financial_documents on purpose: a result written as a
+--      register cell would bump the very signature that decides staleness.
+--   3. public.books_gate_md5(): md5 of what the gate is made of: the definition of books_year_gate, of the readers it calls
+--      (books_year_state, books_eic_recompute, accounting_decision_proof, accounting_current_records) and of the views it reads
+--      (v_books_large_sums, v_books_audit_tiers, v_books_asset_register, v_books_direction_links) with every view those read, however
+--      deep. R10 and R12 are computed by views, so a migration that changes only a view marks every stored run stale. NULL when the
+--      gate does not exist.
 --   4. public.record_books_gate_run(...): the only writer. SECURITY INVOKER, EXECUTE for service_role only (the script calls it as
 --      the service role after reading the signature and running the gate in one repeatable-read transaction), one write_receipts row.
 --   5. public.books_gate_status(owner): SECURITY INVOKER, authenticated and service_role. Raises 42501 for anyone but the owner (a
---      stranger who calls books_year_gate directly gets a successful EMPTY pass; this reader refuses instead). Per tax year (return
---      drafts union stored runs): the latest complete run with its rules sorted by the database (R1, R2, R2i, R3 ... R10; an unknown
+--      stranger who calls books_year_gate directly gets a successful EMPTY pass; this reader refuses instead). Per tax year (the
+--      return drafts, the stored runs and the years that have Expense decisions): the latest complete run with its rules sorted by the database (R1, R2, R2i, R3 ... R10; an unknown
 --      id sorts last and is never dropped), each with status, n failing, of checked, amount, plus R5 grades and R10 extras; stale
---      because the books changed or because the gate definition changed since the run; trusted (passed, fresh, and no rule that
+--      because the books changed or because the gate or a view it reads changed since the run; trusted (passed, fresh, and no rule that
 --      checked nothing); the latest attempt (complete, timed_out, error); the newest draft's document id and how many drafts are on
 --      file; and the open return items counted by who closes them (owner, cpa, agent, unassigned). Failing ids and detail text are
---      never returned. About 0.2 s: a table read, the drafts reader and one register read.
+--      never returned. The Expense decisions are the population the audit tiers count, so the database owns the list of cards and the page
+--      invents none. About 1 s, summed from its parts and not yet timed whole: a table read, the drafts reader and one register read (0.2 s),
+--      the definition hash (15 ms) and one grouped read of the records view (0.7 s as the owner role).
 --
--- EVIDENCE (read-only prod, 2026-10-29): vein_append_only() and write_receipts exist; auth.uid() and auth.role() read
+-- EVIDENCE (read-only prod, 2026-10-29): the hash of 12 definitions (1.1 MB of rule trees) takes 15 ms; the grouped year read of the records
+-- view takes 0.64 to 0.71 s as the owner role. vein_append_only() and write_receipts exist; auth.uid() and auth.role() read
 -- request.jwt.claim.sub / role and request.jwt.claims; financial_documents has no foreign key on owner_id and an index on
 -- (owner_id); the roles' statement_timeout: anon 15 s, authenticated 15 s, postgres 10 s, service_role none.
 -- CONTRACT. supabase/sql/test_books_gate_runs.sql (synthetic data; anon, stranger and reviewer negative controls).
@@ -76,7 +84,7 @@ DROP POLICY IF EXISTS books_gate_runs_owner_select ON public.books_gate_runs;
 CREATE POLICY books_gate_runs_owner_select ON public.books_gate_runs FOR SELECT TO authenticated USING (auth.uid() = owner_id);
 
 COMMENT ON TABLE public.books_gate_runs IS
-  'One attempt to run books_year_gate(owner, year), append-only. complete rows hold the gate''s full output in result (failing ids and detail text: owner-only, never returned by books_gate_status); timed_out and error rows hold the reason. book_signature is the book''s revision (books_book_signature) when the run started; gate_md5 is the md5 of the live gate definition (books_gate_md5): a later difference in either marks the run stale. Written only by record_books_gate_run (service_role). RLS: owner-only SELECT; the accounting reviewer grant does not read it. Migration 20261106110000.';
+  'One attempt to run books_year_gate(owner, year), append-only. complete rows hold the gate''s full output in result (failing ids and detail text: owner-only, never returned by books_gate_status); timed_out and error rows hold the reason. book_signature is the book''s revision (books_book_signature) when the run started; gate_md5 is the md5 of the live gate definitions, views included (books_gate_md5): a later difference in either marks the run stale. Written only by record_books_gate_run (service_role). RLS: owner-only SELECT; the accounting reviewer grant does not read it. Migration 20261106110000.';
 COMMENT ON COLUMN public.books_gate_runs.owner_id IS 'The book the gate ran on. Unit: none (key). Source: the caller of record_books_gate_run. Grain: one run. Clock: n/a.';
 COMMENT ON COLUMN public.books_gate_runs.tax_year IS 'The tax year the gate ran for (2000-2100). Unit: year. Source: the caller. Grain: one run. Clock: n/a.';
 COMMENT ON COLUMN public.books_gate_runs.status IS 'complete (the gate returned), timed_out (stopped at its statement bound) or error. Unit: none. Source: scripts/books/books_year_gate_check.py --record. Grain: one run. Clock: n/a.';
@@ -84,7 +92,7 @@ COMMENT ON COLUMN public.books_gate_runs.started_at IS 'When the run began. Unit
 COMMENT ON COLUMN public.books_gate_runs.finished_at IS 'When the run ended, successfully or not. Unit: timestamptz. Source: the script clock. Grain: one run. Clock: run time.';
 COMMENT ON COLUMN public.books_gate_runs.duration_ms IS 'Wall time of the run in milliseconds (a timed_out row carries the bound it hit). Unit: ms. Source: the script. Grain: one run. Clock: run time.';
 COMMENT ON COLUMN public.books_gate_runs.book_signature IS 'books_book_signature(owner) read in the same repeatable-read transaction as the gate: the book the gate saw. Unit: none (text count:latest-change). Source: books_book_signature. Grain: one run. Clock: as of the run start.';
-COMMENT ON COLUMN public.books_gate_runs.gate_md5 IS 'md5 of the books_year_gate definition the run used (books_gate_md5()). Unit: none (hex). Source: pg_get_functiondef. Grain: one run. Clock: as of the run start.';
+COMMENT ON COLUMN public.books_gate_runs.gate_md5 IS 'md5 of what the gate was made of when the run started (books_gate_md5()): books_year_gate, the readers it calls and the views it reads, however deep. Unit: none (hex). Source: pg_proc and pg_rewrite. Grain: one run. Clock: as of the run start.';
 COMMENT ON COLUMN public.books_gate_runs.pass IS 'The gate''s own top-level pass: true only when every rule passes (a rule not assessed makes it false). NULL unless status is complete; equals result->pass (CHECK). Unit: boolean. Source: books_year_gate. Grain: one run. Clock: as of the run.';
 COMMENT ON COLUMN public.books_gate_runs.result IS 'The full books_year_gate output (rules with n, of, amount, ids, detail). Owner-only: ids and detail embed amounts and local ids. NULL unless status is complete. Unit: none (jsonb). Source: books_year_gate. Grain: one run. Clock: as of the run.';
 COMMENT ON COLUMN public.books_gate_runs.context IS 'The denominators of the run, read by books_gate_context in the same repeatable-read transaction as the gate: the year''s deduction dollars and count, the deductions with no bank line and those with no payment proof and no owner ruling (rule R10 part b), and the head rule R12 tests (rows, dollars, the year''s dollars). NULL when the caller gave none or the run did not complete. Unit: none (jsonb of counts and dollars). Source: books_gate_context. Grain: one run. Clock: as of the run.';
@@ -99,14 +107,40 @@ RETURNS text LANGUAGE sql STABLE SECURITY INVOKER SET search_path = public, pg_t
 $$;
 CREATE OR REPLACE FUNCTION public.books_gate_md5()
 RETURNS text LANGUAGE sql STABLE SECURITY INVOKER SET search_path = public, pg_temp AS $$
-  SELECT md5(pg_get_functiondef(to_regprocedure('public.books_year_gate(uuid,integer)')))
+  -- What the gate is made of: its own source and that of the readers it calls (every overload), and the stored rule tree of each view it reads
+  -- by name plus every view those read (found through pg_depend). A rule tree is hashed rather than deparsed: it is 15 ms, a deparse of the
+  -- same views 270 ms. A view that is only re-formatted counts as changed; that errs toward stale, never toward trusted.
+  WITH RECURSIVE fn AS MATERIALIZED (
+    SELECT p.proname || '(' || pg_get_function_identity_arguments(p.oid) || ')' AS name, p.prosrc || coalesce(p.proconfig::text, '') AS body
+    FROM pg_proc p
+    WHERE p.pronamespace = 'public'::regnamespace
+      AND p.proname IN ('books_year_gate', 'books_year_state', 'books_eic_recompute', 'accounting_decision_proof', 'accounting_current_records')
+  ), vw(oid) AS (
+    SELECT c.oid FROM pg_class c
+    WHERE c.relnamespace = 'public'::regnamespace AND c.relkind IN ('v', 'm')
+      AND c.relname IN ('v_books_large_sums', 'v_books_audit_tiers', 'v_books_asset_register', 'v_books_direction_links')
+    UNION
+    SELECT d.refobjid FROM vw
+      JOIN pg_rewrite rw ON rw.ev_class = vw.oid
+      JOIN pg_depend d ON d.classid = 'pg_rewrite'::regclass AND d.objid = rw.oid AND d.refclassid = 'pg_class'::regclass AND d.refobjid <> vw.oid
+      JOIN pg_class rc ON rc.oid = d.refobjid AND rc.relkind IN ('v', 'm')
+  )
+  SELECT CASE WHEN to_regprocedure('public.books_year_gate(uuid,integer)') IS NULL THEN NULL ELSE (
+    SELECT md5(string_agg(x.name || ':' || x.body, E'\n' ORDER BY x.name))
+    FROM (
+      SELECT 'f:' || fn.name AS name, fn.body FROM fn
+      UNION ALL
+      SELECT 'v:' || c.relname, rw.ev_action::text
+      FROM pg_class c JOIN pg_rewrite rw ON rw.ev_class = c.oid AND rw.rulename = '_RETURN'
+      WHERE c.oid IN (SELECT oid FROM vw)
+    ) x) END
 $$;
 REVOKE ALL ON FUNCTION public.books_book_signature(uuid), public.books_gate_md5() FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.books_book_signature(uuid), public.books_gate_md5() TO authenticated, service_role;
 COMMENT ON FUNCTION public.books_book_signature(uuid) IS
-  'The book''s revision: how many source documents the owner holds and when one last changed (count:latest updated_at, UTC). Every admitted run touches financial_documents.updated_at, so a landing changes it. SECURITY INVOKER (the book''s row policies apply).';
+  'The book''s revision: how many source documents the owner holds and when one last changed (count:latest updated_at as YYYY-MM-DDTHH:MI:SS.USZ, UTC). Every admitted run touches financial_documents.updated_at, so a landing changes it. The browser''s live revision is spelled the same way. SECURITY INVOKER (the book''s row policies apply).';
 COMMENT ON FUNCTION public.books_gate_md5() IS
-  'md5 of the live books_year_gate(uuid, integer) definition, NULL when the gate does not exist. A stored run whose gate_md5 differs ran an older gate. SECURITY INVOKER.';
+  'md5 of what books_year_gate is made of: its source, the readers it calls (books_year_state, books_eic_recompute, accounting_decision_proof, accounting_current_records) and the rule trees of the views it reads (v_books_large_sums, v_books_audit_tiers, v_books_asset_register, v_books_direction_links) and every view those read. NULL when the gate does not exist. A stored run whose gate_md5 differs ran an older gate or older views. SECURITY INVOKER.';
 
 -- 3. The writer --------------------------------------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.record_books_gate_run(
@@ -193,8 +227,14 @@ BEGIN
         AND NOT coalesce((e.value_normalized->'value'->>'retired')::boolean, false)
         AND e.value_normalized->'value'->>'status' = 'open'
     ) f GROUP BY f.tax_year
+  ), dy AS MATERIALIZED (
+    -- Years that have deduction decisions: the Expense decisions with an amount that the audit tiers count (the filter v_books_citation_links uses).
+    SELECT DISTINCT v.year::integer AS tax_year
+    FROM public.v_financial_accounting_records v
+    WHERE v.owner_id = p_owner_id AND v.record_kind = 'retained_ledger_decision' AND v.section = 'Expense' AND v.amount_value IS NOT NULL
+      AND coalesce(v.status, '') NOT LIKE 'Closed%' AND coalesce(v.status, '') NOT LIKE 'Open allocation%' AND v.year ~ '^[0-9]{4}$'
   ), yrs AS (
-    SELECT tax_year FROM dr UNION SELECT tax_year FROM la
+    SELECT tax_year FROM dr UNION SELECT tax_year FROM la UNION SELECT tax_year FROM dy
   )
   SELECT coalesce(jsonb_agg(jsonb_build_object(
       'year', y.tax_year,
@@ -259,4 +299,4 @@ $$;
 REVOKE ALL ON FUNCTION public.books_gate_status(uuid) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.books_gate_status(uuid) TO authenticated, service_role;
 COMMENT ON FUNCTION public.books_gate_status(uuid) IS
-  'The stored books_year_gate runs, per tax year (return drafts union stored runs), for the owner only (42501 for anyone else, the accounting reviewer included): the latest complete run with its rules sorted R1..R10 (status, n failing, of checked, amount, R5 grades, R10 and R12 extras, the run''s context of denominators; never failing ids or detail text), stale (books changed since, or the gate definition changed since), trusted (passed, fresh, no rule that checked nothing), the latest attempt (complete, timed_out, error), the newest draft''s document id with the drafts on file, and open return items by who closes them. Never runs the gate. SECURITY INVOKER; about 0.2 s.';
+  'The stored books_year_gate runs, per tax year (return drafts, stored runs and years that have Expense decisions), for the owner only (42501 for anyone else, the accounting reviewer included): the latest complete run with its rules sorted R1..R10 (status, n failing, of checked, amount, R5 grades, R10 and R12 extras, the run''s context of denominators; never failing ids or detail text), stale (books changed since, or the gate or a view it reads changed since), trusted (passed, fresh, no rule that checked nothing), the latest attempt (complete, timed_out, error), the newest draft''s document id with the drafts on file, and open return items by who closes them. Never runs the gate. SECURITY INVOKER; about 1 s, summed from its parts (read-only prod, 2026-10-29, as the owner role).';

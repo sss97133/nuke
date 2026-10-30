@@ -2,10 +2,13 @@
 -- Disposable synthetic contract for books_large_sum_rows and books_gate_context (migration 20261106140000). Every id, name and amount is invented.
 -- v_books_large_sums and v_books_audit_tiers are stand-ins over the real v_financial_accounting_records: the flags come from a fixture table, but the
 -- head (dollar_rank, year_usd, cum_share, in_head) is the real view's own window logic, copied, so the contract holds the reader to the 80% rule.
+-- v_books_audit_tier_years is the real rollup (the DDL of the newest migration that defines it, read from the file) over the stand-in tiers, so the
+-- context's deduction and part-b dollars are held equal to the rollup's own columns and cannot go on passing against a copy.
 -- Covered: the flagged head rows and nothing else, largest dollars first, with the record the evidence dialog opens; the year's totals equal the rows
--- (the same counts rule R12 reports); a cap per year trims rows and never totals; a document the owner attached shows beside its row, and a cell that names
--- another record does not; books_gate_context states the denominators; a signed-in stranger, the accounting reviewer and anon are refused; a re-apply
--- changes nothing.
+-- (the same counts rule R12 reports), including the missing documents by kind and those that cite none; a cap per year trims rows and never totals; a
+-- document the owner attached shows beside its row (through v_books_record_attachments, the one test that a cell counts), and a cell that names another
+-- record does not; books_gate_context states the denominators, in dollars net of credits like the audit-tier rollup (a year with a credit among the
+-- unsupported rows proves it); a signed-in stranger, the accounting reviewer and anon are refused; a re-apply changes nothing.
 \ir test_financial_accounting.sql
 \ir ../migrations/20261023200300_financial_accounting_records_view.sql
 \ir ../migrations/20261023201000_financial_accounting_records_view_grants.sql
@@ -39,11 +42,19 @@ INSERT INTO public.ls_fixture VALUES
   -- 2024 revenue: never listed
   ('V1', 'A', true,  false, NULL, false, false, NULL,               NULL,                   NULL,            0, 0, '[]'),
   -- 2025: one flagged row, so the years stay apart
-  ('M1', 'B', true,  false, NULL, true, false, NULL,                'purchase_agreement',   'vehicle_deal',  0, 0, '[]');
+  ('M1', 'B', true,  false, NULL, true, false, NULL,                'purchase_agreement',   'vehicle_deal',  0, 0, '[]'),
+  -- 2023: two unsupported rows, one of them a credit (-200), so the context's dollars must be net: 500 - 200 = 300, not 700
+  ('P1', 'C', false, false, NULL, true, false, 'no_payment_proof',  NULL,                   NULL,            0, 0, '[]'),
+  ('P2', 'C', false, false, NULL, true, false, 'no_payment_proof',  NULL,                   NULL,            0, 0, '[]'),
+  ('P3', 'B', true,  false, NULL, true, false, NULL,                NULL,                   NULL,            0, 0, '[]');
 CREATE VIEW public.v_books_audit_tiers WITH (security_invoker = true) AS
-SELECT v.id, v.owner_id, v.document_id, v.year, v.local_id, v.amount_value AS amount, f.pay_proof, f.has_owner_ruling, f.structural_rule, f.is_deduction
+SELECT v.id, v.owner_id, v.document_id, v.year, v.local_id, v.amount_value AS amount, f.pay_proof, f.has_owner_ruling, f.structural_rule, f.is_deduction,
+       f.tier, f.doc_proof, false AS is_274, false AS needs_receipt, false AS is_caveat, false AS is_cash, false AS is_contractor, false AS is_summary_row
 FROM public.v_financial_accounting_records v JOIN public.ls_fixture f ON f.local_id = v.local_id
 WHERE v.record_kind = 'retained_ledger_decision' AND v.section = 'Expense';
+-- The rollup: the CREATE OR REPLACE VIEW statement of the newest migration that defines it (run from the repository root, as the runner does).
+\set rollup `f=$(grep -l 'CREATE OR REPLACE VIEW public.v_books_audit_tier_years' supabase/migrations/*.sql | sort | tail -1); sed -n '/^CREATE OR REPLACE VIEW public.v_books_audit_tier_years/,/^GROUP BY t.owner_id, t.year;/p' "$f"`
+:rollup
 CREATE VIEW public.v_books_large_sums WITH (security_invoker = true) AS
 SELECT c.kind, c.owner_id, c.year, row_number() OVER w AS dollar_rank, c.local_id, c.id, c.document_id, c.amount, c.category, c.description, ''::text AS ruling_id,
        c.tier, c.pay_proof, c.doc_proof, c.pay_proof AS purpose_proof, NULL::text AS proof_basis,
@@ -67,7 +78,7 @@ FROM (
 ) c
 WINDOW p AS (PARTITION BY c.owner_id, c.year, c.kind),
        w AS (p ORDER BY abs(c.amount) DESC, c.local_id, c.id ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW);
-GRANT SELECT ON public.v_books_audit_tiers, public.v_books_large_sums TO authenticated, service_role;
+GRANT SELECT ON public.v_books_audit_tiers, public.v_books_audit_tier_years, public.v_books_large_sums TO authenticated, service_role;
 
 \ir ../migrations/20261106140000_books_large_sum_rows.sql
 \ir ../migrations/20261106140000_books_large_sum_rows.sql
@@ -109,7 +120,10 @@ DO $$ DECLARE
    dec || jsonb_build_object('local_id', 'L7', 'source_key', repeat('7', 64), 'amount', '60.00',   'date', '2024-07-01', 'description', 'Machine — depreciation'),
    dec || jsonb_build_object('local_id', 'L8', 'source_key', repeat('8', 64), 'amount', '40.00',   'date', '2024-08-01', 'description', 'Misc — small'),
    dec || jsonb_build_object('local_id', 'V1', 'source_key', repeat('9', 64), 'amount', '900.00',  'date', '2024-09-01', 'description', 'Customer — sale', 'section', 'Revenue'),
-   dec || jsonb_build_object('local_id', 'M1', 'source_key', repeat('b', 64), 'amount', '700.00',  'date', '2025-01-02', 'year', '2025', 'description', 'Seller — vehicle purchase'));
+   dec || jsonb_build_object('local_id', 'M1', 'source_key', repeat('b', 64), 'amount', '700.00',  'date', '2025-01-02', 'year', '2025', 'description', 'Seller — vehicle purchase'),
+   dec || jsonb_build_object('local_id', 'P1', 'source_key', repeat('d', 64), 'amount', '500.00',  'date', '2023-02-01', 'year', '2023', 'description', 'Cash — shop labour'),
+   dec || jsonb_build_object('local_id', 'P2', 'source_key', repeat('e', 64), 'amount', '-200.00', 'date', '2023-03-01', 'year', '2023', 'description', 'Refund — shop labour'),
+   dec || jsonb_build_object('local_id', 'P3', 'source_key', repeat('f', 64), 'amount', '100.00',  'date', '2023-04-01', 'year', '2023', 'description', 'Card — shop supplies'));
 BEGIN
  PERFORM ingest_financial_evidence(u, o, jsonb_build_object('idempotency_key', 'synthetic-large-1', 'method', 'synthetic-large', 'version', '1',
    'fields', jsonb_build_array(jsonb_build_object('field_key', 'batch', 'value_raw', 'synthetic batch', 'evidence', jsonb_build_object('stage', 'retained'))),
@@ -135,7 +149,7 @@ SET LOCAL ROLE authenticated;
 CREATE TEMP TABLE r1 AS SELECT public.books_large_sum_rows('11111111-1111-4111-8111-111111111111') AS j;
 GRANT SELECT ON r1 TO PUBLIC;
 SELECT pg_temp.ok('years are the years that have deductions, newest first; revenue is not listed',
-  (SELECT array_agg(y->>'year' ORDER BY y->>'year' DESC) FROM r1, jsonb_array_elements(j->'years') y) = ARRAY['2025', '2024']
+  (SELECT array_agg(y->>'year' ORDER BY y->>'year' DESC) FROM r1, jsonb_array_elements(j->'years') y) = ARRAY['2025', '2024', '2023']
   AND (SELECT j->>'reader' = 'books_large_sum_rows' AND j->>'owner_id' = '11111111-1111-4111-8111-111111111111' FROM r1));
 SELECT pg_temp.ok('2024 lists the flagged head rows and nothing else, largest dollars first: L1 (missing invoice), L2 (no payment proof), L3 (filed return only), L4 (missing receipt)',
   (SELECT array_agg(r->>'local_id' ORDER BY ord) FROM r1, jsonb_array_elements(j->'years') y, jsonb_array_elements(y->'rows') WITH ORDINALITY q(r, ord) WHERE y->>'year' = '2024')
@@ -161,6 +175,14 @@ SELECT pg_temp.ok('the year''s totals are the counts rule R12 reports over the s
           AND (y->>'no_payment_n')::int = 1 AND (y->>'no_payment_usd')::numeric = 800 AND (y->>'filed_return_only_n')::int = 1 AND (y->>'filed_return_only_usd')::numeric = 500
           AND (y->>'rows_shown')::int = 4
    FROM r1, jsonb_array_elements(j->'years') y WHERE y->>'year' = '2024'));
+SELECT pg_temp.ok('the missing documents are stated by kind of document and by how many cite none, in the shape rule R12 stores: L1 an invoice (1000, cites nothing), L4 a receipt (300, cites one other document)',
+  (SELECT y->'missing_doc_by_kind' = '{"invoice_or_agreement": {"n": 1, "amount": 1000.00}, "receipt_or_order": {"n": 1, "amount": 300.00}}'::jsonb
+          AND (y->>'missing_doc_cite_no_document')::int = 1
+          AND (SELECT sum((v->>'n')::int) FROM jsonb_each(y->'missing_doc_by_kind') k(key, v)) = (y->>'missing_doc_n')::int
+          AND (SELECT sum((v->>'amount')::numeric) FROM jsonb_each(y->'missing_doc_by_kind') k(key, v)) = (y->>'missing_doc_usd')::numeric
+   FROM r1, jsonb_array_elements(j->'years') y WHERE y->>'year' = '2024'));
+SELECT pg_temp.ok('a year with no missing document states an empty kind list, not a missing key',
+  (SELECT y->'missing_doc_by_kind' = '{}'::jsonb AND (y->>'missing_doc_cite_no_document')::int = 0 FROM r1, jsonb_array_elements(j->'years') y WHERE y->>'year' = '2023'));
 SELECT pg_temp.ok('the totals equal the sums of the rows listed (nothing was capped)',
   (SELECT (y->>'flagged_usd')::numeric = (SELECT sum(abs((r->>'amount')::numeric)) FROM jsonb_array_elements(y->'rows') r)
           AND (y->>'missing_doc_n')::int = (SELECT count(*) FROM jsonb_array_elements(y->'rows') r WHERE (r->>'missing_doc')::boolean)
@@ -173,6 +195,8 @@ SELECT pg_temp.ok('a document the owner attached shows beside its row, with what
           AND r->'attached'->0->>'ref' = 'Invoice: invoice-1.pdf (sha256 cccccccccccc)' AND r->'attached'->0->>'document_id' IS NOT NULL AND r->'attached'->0->>'attached_at' IS NOT NULL
    FROM r1, jsonb_array_elements(j->'years') y, jsonb_array_elements(y->'rows') r WHERE y->>'year' = '2024' AND r->>'local_id' = 'L1')
   AND (SELECT bool_and(jsonb_array_length(r->'attached') = 0) FROM r1, jsonb_array_elements(j->'years') y, jsonb_array_elements(y->'rows') r WHERE y->>'year' = '2024' AND r->>'local_id' IN ('L2', 'L3', 'L4')));
+SELECT pg_temp.ok('v_books_record_attachments is the one test: it holds the cell that names the record it sits under and not the mislabelled one',
+  (SELECT count(*) = 1 AND min(source_key) = repeat('1', 64) AND min(filename) = 'invoice-1.pdf' FROM public.v_books_record_attachments WHERE owner_id = '11111111-1111-4111-8111-111111111111'));
 SELECT pg_temp.ok('the row stays flagged after the document is attached: the view decides, not the cell',
   (SELECT (r->>'missing_doc')::boolean FROM r1, jsonb_array_elements(j->'years') y, jsonb_array_elements(y->'rows') r WHERE y->>'year' = '2024' AND r->>'local_id' = 'L1'));
 SELECT pg_temp.ok('a cap per year trims the rows and never the totals',
@@ -186,13 +210,26 @@ COMMIT;
 -- books_gate_context, as the service role (the recorder) -------------------------------------------------------------------------------
 BEGIN;
 SET LOCAL ROLE service_role;
-CREATE TEMP TABLE c1 AS SELECT public.books_gate_context('11111111-1111-4111-8111-111111111111', 2024) AS j, public.books_gate_context('11111111-1111-4111-8111-111111111111', 2022) AS empty;
+CREATE TEMP TABLE c1 AS SELECT public.books_gate_context('11111111-1111-4111-8111-111111111111', 2024) AS j, public.books_gate_context('11111111-1111-4111-8111-111111111111', 2022) AS empty,
+  public.books_gate_context('11111111-1111-4111-8111-111111111111', 2023) AS credit;
 GRANT SELECT ON c1 TO PUBLIC;
 SELECT pg_temp.ok('the context states the deduction denominator, the deductions with no bank line, rule R10 part b and the head of rule R12',
   (SELECT (j->'deductions'->>'n')::int = 8 AND (j->'deductions'->>'usd')::numeric = 3000
           AND (j->'no_bank'->>'n')::int = 2 AND (j->'no_bank'->>'usd')::numeric = 860
           AND (j->'no_pay_no_ruling'->>'n')::int = 1 AND (j->'no_pay_no_ruling'->>'usd')::numeric = 800
           AND (j->'head'->>'n')::int = 4 AND (j->'head'->>'usd')::numeric = 2600 AND (j->'head'->>'year_usd')::numeric = 3000 FROM c1));
+SELECT pg_temp.ok('the deduction, no-bank and part-b dollars are net of credits, the basis of v_books_audit_tier_years (500 - 200 = 300, not 700); the head stays in absolute dollars, the basis rule R12 reads',
+  (SELECT (credit->'deductions'->>'n')::int = 3 AND (credit->'deductions'->>'usd')::numeric = 400
+          AND (credit->'no_bank'->>'n')::int = 2 AND (credit->'no_bank'->>'usd')::numeric = 300
+          AND (credit->'no_pay_no_ruling'->>'n')::int = 2 AND (credit->'no_pay_no_ruling'->>'usd')::numeric = 300
+          AND (credit->'head'->>'n')::int = 2 AND (credit->'head'->>'usd')::numeric = 700 AND (credit->'head'->>'year_usd')::numeric = 800 FROM c1));
+SELECT pg_temp.ok('the context''s deduction and part-b dollars equal the audit-tier rollup''s own columns (deduction_usd, no_pay_no_ruling_usd) for every year the rollup has, so a stored figure can sit beside the live one',
+  (SELECT bool_and((public.books_gate_context('11111111-1111-4111-8111-111111111111', r.year::int)->'deductions'->>'usd')::numeric = r.deduction_usd
+                   AND (public.books_gate_context('11111111-1111-4111-8111-111111111111', r.year::int)->'no_pay_no_ruling'->>'usd')::numeric = r.no_pay_no_ruling_usd)
+   FROM public.v_books_audit_tier_years r WHERE r.owner_id = '11111111-1111-4111-8111-111111111111') AND (SELECT count(*) FROM public.v_books_audit_tier_years) = 3);
+SELECT pg_temp.ok('the part-b dollars equal the signed sum of the part-b rows of the tier view, whatever their sign',
+  (SELECT (credit->'no_pay_no_ruling'->>'usd')::numeric = (SELECT sum(t.amount) FROM public.v_books_audit_tiers t
+            WHERE t.owner_id = '11111111-1111-4111-8111-111111111111' AND t.year = '2023' AND t.is_deduction AND NOT t.pay_proof AND NOT t.has_owner_ruling AND t.structural_rule IS NULL) FROM c1));
 SELECT pg_temp.ok('the context agrees with the reader over the same rows (head rows and dollars, the year''s dollars)',
   (SELECT (c.j->'head'->>'n')::int = (y->>'head_n')::int AND (c.j->'head'->>'usd')::numeric = (y->>'head_usd')::numeric AND (c.j->'head'->>'year_usd')::numeric = (y->>'year_usd')::numeric
    FROM c1 c, (SELECT public.books_large_sum_rows('11111111-1111-4111-8111-111111111111') AS j) r, jsonb_array_elements(r.j->'years') y WHERE y->>'year' = '2024'));
@@ -208,6 +245,7 @@ SELECT pg_temp.fails('a signed-in stranger is refused the owner''s large sums (4
 SELECT pg_temp.ok('a signed-in stranger asking for their own book reads an empty list',
   (SELECT jsonb_array_length(public.books_large_sum_rows('22222222-2222-4222-8222-222222222222')->'years') = 0));
 SELECT pg_temp.fails('authenticated cannot call the recorder''s context (42501)', $q$SELECT public.books_gate_context('22222222-2222-4222-8222-222222222222', 2024)$q$, '42501');
+SELECT pg_temp.ok('a signed-in stranger reads no attachment of the owner''s book', (SELECT count(*) FROM public.v_books_record_attachments) = 0);
 COMMIT;
 BEGIN;
 SELECT set_config('request.jwt.claim.role', 'authenticated', true), set_config('request.jwt.claim.sub', '33333333-3333-4333-8333-333333333333', true);
@@ -218,6 +256,7 @@ BEGIN;
 SET LOCAL ROLE anon;
 SELECT pg_temp.fails('anon cannot execute the reader (42501)', $q$SELECT public.books_large_sum_rows('11111111-1111-4111-8111-111111111111')$q$, '42501');
 SELECT pg_temp.fails('anon cannot execute the context (42501)', $q$SELECT public.books_gate_context('11111111-1111-4111-8111-111111111111', 2024)$q$, '42501');
+SELECT pg_temp.fails('anon cannot read the attachments view (42501)', $q$SELECT count(*) FROM public.v_books_record_attachments$q$, '42501');
 COMMIT;
 SELECT pg_temp.ok('the reader is granted to authenticated and service_role, the context to service_role only; neither is a definer',
   has_function_privilege('authenticated', 'public.books_large_sum_rows(uuid,integer)', 'EXECUTE') AND has_function_privilege('service_role', 'public.books_large_sum_rows(uuid,integer)', 'EXECUTE')
@@ -225,5 +264,8 @@ SELECT pg_temp.ok('the reader is granted to authenticated and service_role, the 
   AND has_function_privilege('service_role', 'public.books_gate_context(uuid,integer)', 'EXECUTE')
   AND NOT has_function_privilege('authenticated', 'public.books_gate_context(uuid,integer)', 'EXECUTE') AND NOT has_function_privilege('anon', 'public.books_gate_context(uuid,integer)', 'EXECUTE')
   AND NOT EXISTS (SELECT 1 FROM pg_proc WHERE oid IN ('public.books_large_sum_rows(uuid,integer)'::regprocedure, 'public.books_gate_context(uuid,integer)'::regprocedure) AND prosecdef));
-SELECT pg_temp.ok('the migration was applied twice without error and left one function of each name',
-  (SELECT count(*) FROM pg_proc WHERE pronamespace = 'public'::regnamespace AND proname IN ('books_large_sum_rows', 'books_gate_context')) = 2);
+SELECT pg_temp.ok('the migration was applied twice without error and left one function of each name and one view',
+  (SELECT count(*) FROM pg_proc WHERE pronamespace = 'public'::regnamespace AND proname IN ('books_large_sum_rows', 'books_gate_context')) = 2
+  AND (SELECT count(*) FROM pg_class WHERE relnamespace = 'public'::regnamespace AND relname = 'v_books_record_attachments' AND relkind = 'v') = 1
+  AND has_table_privilege('authenticated', 'public.v_books_record_attachments', 'SELECT') AND NOT has_table_privilege('anon', 'public.v_books_record_attachments', 'SELECT')
+  AND NOT EXISTS (SELECT 1 FROM unnest(ARRAY['INSERT', 'UPDATE', 'DELETE', 'TRUNCATE']) p WHERE has_table_privilege('authenticated', 'public.v_books_record_attachments', p)));

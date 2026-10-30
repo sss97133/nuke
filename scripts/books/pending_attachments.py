@@ -4,7 +4,8 @@
 The docket's Add the paper action stores a file as an ordinary financial document with one cell, supports_record_<first 24 characters of the
 record's source key>, that names the record (year, local_id, source_key, the document that holds it), what the owner said the file is (doc_kind)
 and the exact citation text that would clear the flag (ref). The row stays on the list until the decision itself cites the file in its proof_links,
-because the decision's source document is too large for the browser's writer. This script finds those cells, leaves out the ones the decision
+because the decision's source document is too large for the browser's writer. This script reads those papers from v_books_record_attachments (the
+one place that says when such a cell counts; migration 20261106140000), joins each to the current record it names, leaves out the ones the decision
 already cites, and prints the corrections file the sanctioned writer takes. It reads; it writes nothing.
 
   dotenvx run -- python3 scripts/books/pending_attachments.py --owner <uuid> [--year 2024] [--out corrections.json]
@@ -22,18 +23,16 @@ PROOF_KIND = 'file'
 
 
 def pending_sql(owner, year=None):
-    """The attachment cells of the owner's book joined to the current record each names, with that record's proof_links. Read-only."""
+    """The papers the owner added (v_books_record_attachments) joined to the current record each names, with that record's proof_links. Read-only."""
     owner = uuid_ok(owner)
     where_year = f"and r.year = '{int(year)}'" if year else ''
     return ("begin read only;\n"
             "select coalesce(jsonb_agg(x order by x.year, x.local_id, x.attached_at), '[]'::jsonb)::text from (\n"
-            "  select r.year, r.local_id, r.document_id as decision_document_id, e.document_id as attached_document_id, e.created_at as attached_at,\n"
-            "         e.value_normalized->'value'->>'ref' as ref, e.value_normalized->'value'->>'doc_kind' as doc_kind,\n"
-            "         coalesce(r.record->'proof_links', '[]'::jsonb) as proof_links\n"
-            "  from public.financial_document_extractions e\n"
-            "  join public.v_financial_accounting_records r on r.owner_id = e.owner_id and r.source_key = e.value_normalized->'value'->>'source_key'\n"
-            f"  where e.owner_id = '{owner}'::uuid and not e.is_superseded and e.field_key like 'supports\\_record\\_%'\n"
-            "    and e.field_key = 'supports_record_' || left(e.value_normalized->'value'->>'source_key', 24)\n"
+            "  select r.year, r.local_id, r.document_id as decision_document_id, a.document_id as attached_document_id, a.attached_at,\n"
+            "         a.ref, a.doc_kind, coalesce(r.record->'proof_links', '[]'::jsonb) as proof_links\n"
+            "  from public.v_books_record_attachments a\n"
+            "  join public.v_financial_accounting_records r on r.owner_id = a.owner_id and r.source_key = a.source_key\n"
+            f"  where a.owner_id = '{owner}'::uuid\n"
             f"    and r.record_kind = 'retained_ledger_decision' {where_year}\n"
             ") x;\n"
             "rollback;\n")

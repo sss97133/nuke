@@ -21,19 +21,16 @@ import argparse, datetime, json, os, re, sys, time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from schedule_c_rulings import psql, q, uuid_ok  # noqa: E402
+from books_check_sql import SERVICE, SERVICE_WRITER  # noqa: E402
 
 WRITER = 'books_year_gate_check.py'
 MAX_BOUND_S = 300
 
 
 def gate(owner, year):
-    out = psql("begin;\nselect set_config('request.jwt.claims','{\"role\":\"service_role\"}',true);\n"
-               f"select public.books_year_gate('{owner}'::uuid, {int(year)})::text;\nrollback;\n")
+    out = psql("begin;\n" + SERVICE + f"select public.books_year_gate('{owner}'::uuid, {int(year)})::text;\nrollback;\n")
     return json.loads(next(l for l in out.splitlines() if l.startswith('{"') and '"rules"' in l))
 
-
-CLAIMS = ("select set_config('request.jwt.claims','{\"role\":\"service_role\"}',true);\n"
-          "select set_config('request.jwt.claim.role','service_role',true);\n")
 
 
 def bound_seconds(value):
@@ -48,7 +45,7 @@ def record_sql(owner, year, bound_s):
     """One year in one repeatable-read transaction: signature, definition hash, the gate, the run's denominators (books_gate_context), then the row.
     The run's clock stops when the gate returns, so the stored duration is the gate's, not the gate's plus the context's. Prints the gate's JSON, then RUN <id>."""
     return ('begin isolation level repeatable read;\n'
-            f"set local statement_timeout = '{bound_seconds(bound_s)}s';\nset local lock_timeout = '5s';\n" + CLAIMS +
+            f"set local statement_timeout = '{bound_seconds(bound_s)}s';\nset local lock_timeout = '5s';\n" + SERVICE_WRITER +
             f"select public.books_book_signature('{owner}'::uuid) as sig \\gset\n"
             "select public.books_gate_md5() as md5 \\gset\n"
             "select clock_timestamp() as t0 \\gset\n"
@@ -63,7 +60,7 @@ def record_sql(owner, year, bound_s):
 
 def failure_sql(owner, year, status, started, finished, error):
     """The second transaction after a run that did not finish: the reason, with the signature and hash as they are now."""
-    return ('begin;\n' + CLAIMS +
+    return ('begin;\n' + SERVICE_WRITER +
             f"select 'RUN ' || public.record_books_gate_run('{owner}'::uuid, {int(year)}, '{status}', {q(started)}::timestamptz, {q(finished)}::timestamptz, "
             f"public.books_book_signature('{owner}'::uuid), public.books_gate_md5(), NULL, {q(error)}, '{WRITER}');\n"
             'commit;\n')
