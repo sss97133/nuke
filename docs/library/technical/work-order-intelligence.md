@@ -717,6 +717,55 @@ job path counts sourced and pending operations, treats labor-task rows as operat
 `operation_excerpt_missing_from_scope` without deleting rows.
 Contract: `supabase/sql/test_work_order_scope_operations.sql`.
 
+### Retained document scope and reported delivery responsibility
+
+`work_order_retained_source_bindings` extends the canonical work-order owner with an
+immutable source relation. An admitted `internal-inference` `work_record` names the
+existing job, existing provider actor, original build-log observation and original
+owner-stated delivery report. The projector requires the provider's existing name
+and the reported client label in an exact responsibility excerpt. This is reported
+responsibility, never an authenticated assignment, ownership transfer or Sign.
+
+Intake uses the existing `ingest-observation` path followed by
+`project_work_order_resource_observation`; the event envelope is:
+
+```json
+{"work_order_resource":{"version":1,"event_type":"retained_source_binding",
+  "work_order_id":"<existing job UUID>","provider_actor_id":"<existing actor UUID>",
+  "scope_basis_observation_id":"<original build-log row UUID>",
+  "responsibility_basis_observation_id":"<original owner-report UUID>",
+  "reported_client_label":"<exact short label in both sources>",
+  "responsibility_excerpt":"<exact original excerpt naming the provider and client>"}}
+```
+
+One binding selects current `client_billing_line` observations by the same vehicle,
+source registry ID, document label and original document client. It does not mint
+one work task per billing line. Each returned entry retains its observation UUID,
+document row, field pointer and original clocks. `Done` stays a billing column;
+execution remains unestablished. Scope and duty have separate validity checks:
+withdrawing a duty report does not erase the retained document for existing job
+parties. Withdrawing or reattributing its original basis withholds that relationship;
+changed interpretation/report fingerprints cannot silently replace its meaning.
+The same whole document cannot bind simultaneously to a different job; splitting
+it requires a future explicit allocation model.
+
+`my_work_orders('responsible')` selects already-readable jobs with existing performer
+membership or a current retained duty report for the viewer's **evidenced** actor.
+It does not add a viewer slot. The default SQL `NULL` filter still means all accessible
+jobs. `/work` uses the responsible cohort and offers the existing accessible population
+separately; both link into `/jobs/:id`. The job-path reader includes a first page of
+`retained_work`; `work_order_retained_sources_read` provides the remaining pages.
+Private scope is returned only to existing job parties or the evidenced reported
+provider, within jobs the account could already read. Admin access and self-claimed
+actor identity alone are insufficient. Raw contacts, source invoice amounts and
+billing amounts are omitted. Payment/Sign authority is unchanged.
+
+Contracts: `supabase/sql/test_work_order_retained_sources.sql` replays the real job
+build and tests projector, currentness, cohorts, source paging and privacy;
+`RetainedWorkSection.test.tsx` and `WorkPage.workDay.test.tsx` test the consumer.
+Actual retained-source tests stay private. A local replay is not production admission
+or evidence of physical completion; image-to-operation attribution remains separate.
+
 ### Offline reconstruction from retained build sources
 
 `scripts/reconstruct-retained-work.mjs` reads a private captured selection of existing
