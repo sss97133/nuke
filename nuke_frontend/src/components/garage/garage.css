@@ -20,7 +20,7 @@
 .garage-unresolved summary { min-height: 44px; box-sizing: border-box; padding: 10px 0; cursor: pointer; color: var(--link); }
 .garage-empty-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .garage-sections { display: flex; flex-direction: column; gap: 24px; }
-.garage-section-heading { text-transform: capitalize; display: flex; align-items: baseline; gap: 8px; }
+.garage-section-heading { display: flex; align-items: baseline; gap: 8px; }
 .garage-section-heading span, .garage-unresolved h2 span { color: var(--text-secondary); font-size: var(--text-callout); font-variant-numeric: tabular-nums; }
 .garage-vehicles { display: grid; gap: 12px; min-width: 0; }
 .garage-view-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); }

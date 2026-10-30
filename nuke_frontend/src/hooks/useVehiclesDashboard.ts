@@ -64,6 +64,7 @@ export interface GarageVehicle {
   relationship_source: 'verification' | 'ownership' | 'permission' | 'contributor' | 'discovered' | 'uploaded_by' | 'owner_statement';
   relationship_roles?: RelationshipType[];
   relationship_detail?: string;
+  inventory_status?: 'current' | 'previous' | 'unknown';
   relationship_id?: string;
   ownership_start_date?: string | null;
   ownership_end_date?: string | null;
