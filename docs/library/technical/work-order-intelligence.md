@@ -717,6 +717,54 @@ job path counts sourced and pending operations, treats labor-task rows as operat
 `operation_excerpt_missing_from_scope` without deleting rows.
 Contract: `supabase/sql/test_work_order_scope_operations.sql`.
 
+### Offline reconstruction from retained build sources
+
+`scripts/reconstruct-retained-work.mjs` reads a private captured selection of existing
+work orders, `work_record` observations, ownership periods, selected images and
+`read_work_order_image_objects` results. Its model is
+`scripts/lib/retained-work-reconstruction.mjs`. It performs no network requests,
+source intake, image inference, database writes or payment actions.
+
+```sh
+node scripts/reconstruct-retained-work.mjs \
+  --input /private/retained-source-capture.json \
+  --out /private/work-reconstruction.json
+node --test scripts/reconstruct-retained-work.test.mjs
+```
+
+The `technician_evidence_capture_v1` input uses the existing rows as its evidence;
+real captures and reconstructed output stay outside every Git checkout. Output is
+created exclusively with mode 0600 and is never overwritten. The receipt hashes
+both input bytes and the model implementation. CI uses synthetic source records;
+private actual-source replays are separate evidence, not public fixtures.
+
+The reconstructed grains remain distinct:
+
+| Grain | Extracted result | Boundary |
+|---|---|---|
+| Retained build-log row | `client_billing_line` item, category, supplier, billing column/status/split and recorded minutes; exact observation and JSON pointer for each field | A billing label such as `Done` cannot establish physical execution, installation, measured labor or an assignment. Two interpretations of the same document row remain visible. |
+| Retained payment / obligation report | Original `payment_status` and `obligation` claims with source clocks and client label | A report is not an authenticated Sign; payment and delivery owed can coexist. No bill, balance or fulfillment state is changed. |
+| Owner answer about a relationship | Reviewed claim plus an exact excerpt of its retained answer | Earlier ownership, later ownership and continuing work responsibility coexist. No transfer date, canonical identity, permission or approved relationship is minted. |
+| Selected image | Separate processing, analysis-schema and attribution states; original component occurrences and JSON pointers | A processed image under review is distinct from failed analysis. An appearance is not performed work. Missing capture time stays separate from added time. |
+| Existing job-context image page | Source occurrence, distinct-image and sighting diagnostics | Vehicle context does not establish a particular operation or job allocation. Repeated appearances do not accrue physical parts, minutes or value. |
+
+Work-source withdrawal and reattribution remove the affected current interpretation;
+duplicate replay is idempotent. Same-ID revisions with changed contents are refused.
+Source paging and selected-image coverage remain explicit. Complete access to the
+declared source selection does not measure the population of real-world work.
+Eligible source formats not yet mapped by this extractor remain individually keyed
+in `sourceBacklog`; mapped and unresolved source counts account for the full eligible
+selection. An unsupported receipt or narrative is not silently discarded or counted
+as no work.
+
+This closes an extraction/read gap: useful existing build records remain recoverable
+when the operations table is empty or image processing fails. A historical source can
+also yield unbound scope before any work-order header exists; job-context image pages
+are optional and their absence is not evidence of no work. Linking candidate scope
+to the specific work order and performer, admitting supported temporal ownership and
+obligations through sanctioned writers, and integrating the result into the technician
+backlog remain separate work. This operator is not that production integration.
+
 ### Retained lifecycle testimony
 
 The job loop's acceptance, start, completion, invoice and payment owners record authenticated Signs.
