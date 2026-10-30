@@ -1216,6 +1216,8 @@ Deno.serve(async (req) => {
         }
         input = current;
       }
+      // The native archive path keeps its distinct parser label. Downstream
+      // deterministic admission accepts it only with protected snapshot custody.
       const receipt = await recordListingDescription(supabase, {
         vehicleId: body.vehicle_id, sourceUrl: input.sourceUrl, text: input.text,
         capturedAt: input.capturedAt || null, extractorVersion: EXTRACTOR_VERSION,
@@ -1228,6 +1230,7 @@ Deno.serve(async (req) => {
         throw new Error(`Protected description ${receipt.status}: ${receipt.reason || "No receipt"}`);
       }
       return new Response(JSON.stringify({ success: true, mode: body.mode, dry_run: dryRun,
+        property_projection_profile: "retained_archived_description_v1",
         vehicle_id: body.vehicle_id, snapshot_id: pin.id, ...descriptionPreview(input),
         input_sha256: textFingerprint, description_receipt: receipt, model_calls: 0,
         writes: dryRun || receipt.duplicate ? 0 : 1,

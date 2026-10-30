@@ -82,7 +82,7 @@ export async function loadDescriptionInput(
       throw new Error("Snapshot locator invalid; source custody unknown, mining refused");
     }
     const { data: snapshot, error } = await supabase.from("listing_page_snapshots")
-      .select("id,platform,listing_url,fetched_at,created_at,success,http_status,html,html_sha256,metadata")
+      .select("id,platform,listing_url,fetched_at,created_at,success,http_status,html,html_storage_path,html_sha256,metadata")
       .eq("id", snapshotId).maybeSingle();
     const capture = Date.parse(snapshot?.fetched_at);
     const ingestion = Date.parse(snapshot?.created_at);
@@ -106,7 +106,25 @@ export async function loadDescriptionInput(
     // A retry can see its own already-retained native receipt. It must still
     // revalidate the protected body, not accept a mutable locator as custody.
     const data = source?.structured_data || {};
-    const sourceIngestMicros = observationClockMicroseconds(source?.ingested_at);
+    // These producers migrate events or record an interpretation, not a new
+    // publisher read. Their later ingestion cannot date a missing description.
+    // Look past them on the existing vehicle/time index; do not let five recent
+    // metadata rows hide a newer actual capture. Unknown producers stay fenced.
+    const metadataOnly = ["vehicle_events_migration", "llm_extraction", "backfill-sale-results", "date_recovery_v1"];
+    let clockSource = source;
+    if (snapshotPin && source && metadataOnly.includes(source.extraction_method) &&
+        !source.content_text && !source.structured_data?.description) {
+      const captures = await supabase.from("vehicle_observations")
+        .select("id,ingested_at").eq("vehicle_id", vehicle.id).eq("kind", "listing")
+        .eq("subject_type", "vehicle").eq("source_url", source.source_url)
+        .or("is_superseded.eq.false,is_superseded.is.null")
+        .or(`extraction_method.is.null,extraction_method.not.in.(${metadataOnly.join(",")})`)
+        .lte("observed_at", asOf).lte("ingested_at", asOf)
+        .order("observed_at", { ascending: false }).order("ingested_at", { ascending: false }).limit(1);
+      if (captures.error) throw new Error("Publisher capture clock lookup failed; replay refused");
+      clockSource = captures.data?.[0];
+    }
+    const sourceIngestMicros = observationClockMicroseconds(clockSource?.ingested_at);
     const sameRetainedCapture = snapshotPin && source?.raw_source_ref === `listing_page_snapshots:${snapshot.id}` &&
       source.extraction_method === "html_description_capture" && data.description_capture === true &&
       data.source_capture_basis === "protected_snapshot" && data.source_event_time_status === "unknown" &&
@@ -114,22 +132,34 @@ export async function loadDescriptionInput(
       data.source_capture_sha256.toLowerCase() === snapshot.html_sha256?.toLowerCase() &&
       observationClockMicroseconds(data.source_captured_at) === captureMicros &&
       observationClockMicroseconds(source.observed_at) === captureMicros;
-    const pinnedTimeEligible = !source || (captureMicros !== null && sourceIngestMicros !== null &&
+    const pinnedTimeEligible = !clockSource || (captureMicros !== null && sourceIngestMicros !== null &&
       captureMicros >= sourceIngestMicros) || sameRetainedCapture;
     if (snapshotPin && !pinnedTimeEligible) {
       throw new Error("Newer listing evidence cannot be reconstructed from the pinned older capture; intake refused");
     }
-    // Never use an older capture to reconstruct a newer missing read. Receipt-only
-    // snapshots and storage paths are explicit refusals; this reader adds no raw access.
+    // Storage migration changes the body locator, not its evidence. Reuse the
+    // archive owner's hash/attribution/clock checks; never fetch the publisher.
     if (!source || capture >= Date.parse(source.ingested_at) || (snapshotPin && pinnedTimeEligible)) {
-      if (typeof snapshot.html !== "string" || !snapshot.html || snapshot.html.length > 5_000_000) {
+      let html = snapshot.html;
+      if (!html && snapshot.html_storage_path) {
+        try {
+          const { readPinnedArchivedPage } = await import("../_shared/archiveFetch.ts");
+          const stored = await readPinnedArchivedPage({ snapshotId: snapshot.id, vehicleId: vehicle.id,
+            sourceUrl: snapshot.listing_url, evidenceAsOf: asOf }, { supabase });
+          if (!stored.ok) throw new Error(stored.reason);
+          html = stored.html;
+        } catch (error) {
+          throw new Error(`Protected snapshot archive read failed: ${error instanceof Error ? error.message : "unavailable"}`);
+        }
+      }
+      if (typeof html !== "string" || !html || html.length > 5_000_000) {
         throw new Error("Protected snapshot text unavailable or oversized; mining refused");
       }
       if (typeof snapshot.html_sha256 !== "string" || !/^[0-9a-f]{64}$/i.test(snapshot.html_sha256) ||
-          snapshot.html_sha256.toLowerCase() !== await descriptionInputFingerprint({ text: snapshot.html } as DescriptionInput)) {
+          snapshot.html_sha256.toLowerCase() !== await descriptionInputFingerprint({ text: html } as DescriptionInput)) {
         throw new Error("Protected snapshot capture hash missing or mismatched; mining refused");
       }
-      const text = extractDescription(snapshot.html);
+      const text = extractDescription(html);
       if (!text || text.length < 100) throw new Error("Protected snapshot prose unavailable; mining refused");
       if (sameRetainedCapture && source.content_text !== text) {
         throw new Error("Retained source text differs from its protected capture; intake refused");

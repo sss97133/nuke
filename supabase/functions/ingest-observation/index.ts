@@ -305,6 +305,14 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
 
   try {
     let input: ObservationInput = await req.json();
+    if (input.extraction_method === "retained_native_fields_v1" ||
+        input.structured_data?.source_profile === "retained_native_fields_v1" ||
+        (input.source_slug === "mecum" && input.extraction_method === "next_data_json_parse")) {
+      const writer = await authenticateWriter(req);
+      if (!writer.ok || writer.caller.kind !== "service_role") return new Response(
+        JSON.stringify({ error: "Native extractor receipts require service role" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
     if (input.mode === FINANCIAL_EVIDENCE_MODE) {
       const action = (input as unknown as { action?: string }).action ?? "submit";
       if ('owner_user_id' in input || action === 'contexts' || action === 'correct' || action === 'original') {
@@ -608,7 +616,7 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
       };
       try {
       const parent = await read(`parent:${sourceId}`, () => supabase.from("vehicle_observations")
-        .select("id,vehicle_id,kind,is_superseded,property_id,subject_type,subject_id,source_id,source_url,source_identifier,observed_at,ingested_at,extraction_method,confidence_score,structured_data,extraction_metadata,content_text")
+        .select("id,vehicle_id,kind,is_superseded,property_id,subject_type,subject_id,source_id,source_url,source_identifier,raw_source_ref,observed_at,ingested_at,extraction_method,confidence_score,structured_data,extraction_metadata,content_text")
         .eq("id", sourceId).maybeSingle());
       if (parent.error) throw new Error("Retained source unavailable");
       const row = parent.data;
