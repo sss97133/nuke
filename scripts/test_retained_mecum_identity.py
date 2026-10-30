@@ -26,7 +26,7 @@ def run_mecum_identity_checks(sql, read, rejects, claim, passed):
     sql(f"""INSERT INTO vehicle_observations(id,vehicle_id,source_id,kind,extraction_method,
       confidence_score,source_url,observed_at,ingested_at,structured_data)
       VALUES('{parent_id}','{vehicle_id}','{source_id}','sale_result','public_lot_index',.7,
-      {literal(source['source_url'])},'2026-10-01','2026-10-01T00:00:01Z',
+      {literal(source['source_url'])},'2026-10-01T00:00:00Z','2026-10-01T00:00:01Z',
       {literal(json.dumps(source['structured_data']))}::jsonb);""")
     assert sql(f"SELECT count(*) FROM retained_listing_property_work WHERE source_observation_id='{parent_id}'") == '0'
     migration = Path('supabase/migrations/20261030053855_admit_retained_mecum_identity_labels.sql').read_text()
@@ -58,7 +58,11 @@ console.log(JSON.stringify(["year","make","model"].map(k=>deriveRetainedInterior
         if key=='model':
             forged={**d['structured_data'],'model':'C10'}
             rejects(insert(forged,'fa000003-0000-4000-8000-000000000001'))
-        sql(insert(d['structured_data'],child))
+        try:
+            sql(insert(d['structured_data'],child))
+        except subprocess.CalledProcessError as error:
+            print(error.stderr, flush=True)
+            raise
         assert sql(f"SELECT retained_listing_property_result_matches('{parent_id}','{prop}','{child}')")=='t'
         assert sql(f"SELECT finish_retained_listing_property('{parent_id}','{prop}','mecum-identity-fixture','done','{child}')")=='t'
     model=read(f"SELECT jsonb_agg(x) FROM get_vehicle_specs(ARRAY['{vehicle_id}'::uuid],true)x")[0]

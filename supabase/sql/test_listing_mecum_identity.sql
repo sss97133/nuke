@@ -8,5 +8,5 @@ END $$;
 \setenv PGDATABASE :DBNAME
 \! NUKE_TEST_PSQL="$DB_CONTRACT_PSQL" python3 scripts/test-retained-listing-intake.py "$PGDATABASE" --two-front --bulk120 --powertrain --description --odometer --identity --vin-label --craigslist-odometer --craigslist-year --native-year --native-identity --mecum-identity
 \if :SHELL_ERROR
- \quit 1
+ DO $$ BEGIN RAISE EXCEPTION 'Mecum identity source-to-reader verification failed'; END $$;
 \endif
