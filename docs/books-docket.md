@@ -89,7 +89,8 @@ YYYY-MM-DDTHH:MI:SS.USZ>`), pinned by a test against the migration.
   `scripts/ci/logged-out-live.mjs` fails when a visitor is not sent to `/login` from `/accounting`, `/publishing/finance` or `/profile`, when a books reader is called from
   the page load, or when a private heading is in the text.
 - The profile door (`UserBooksDoor`) renders for the owner's own profile only, with no heading and no request for anyone else. The profile
-  itself stays public. Migration `20261106100000` revokes three legacy owner views that gave every signed-in account SELECT.
+  itself stays public. Migration `20261106100000` revokes eighteen owner-rights views of the journal (the three legacy owner views and fifteen siblings, named in the
+  migration) that gave every signed-in account SELECT; the journal tables themselves answer nobody but their owner role.
 
 ## States
 
