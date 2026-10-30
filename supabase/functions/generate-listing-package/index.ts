@@ -1,8 +1,9 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
-import { requireWriteAuth } from "../_shared/writeGuard.ts";
+import { authenticateWriter, requireWriteAuth } from "../_shared/writeGuard.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { readListingEvidence } from "./listingEvidence.ts";
 
 // =============================================================================
 // generate-listing-package — Produces auction submission bundles from digital twin
@@ -113,6 +114,7 @@ interface ListingPackage {
   submission_fields: Record<string, unknown> | null;
   /** components_seen entries from the photos above, each with its image id (BaT equipment/wheels/tires). */
   observed_components: Array<{ label: string; confidence: number | null; image_id: string }>;
+  contributor_evidence: Awaited<ReturnType<typeof readListingEvidence>>;
 }
 
 // Cowl tag (body tag) decode, when the profile carries one. Read from
@@ -303,6 +305,12 @@ Deno.serve(async (req: Request) => {
       .select("id", { count: "exact", head: true })
       .eq("vehicle_id", vehicleId);
 
+    // Keep the existing intake's ownership check, even though assembly uses the service client.
+    const auth = await authenticateWriter(req);
+    const actorId = auth.ok && auth.caller.kind === "user" ? auth.caller.userId
+      : auth.ok && auth.caller.kind === "service_role" ? v.user_id : null;
+    const contributorEvidence = await readListingEvidence(supabase, vehicleId, actorId);
+
     // 6. Assemble package
     const pkg: ListingPackage = {
       platform,
@@ -384,6 +392,7 @@ Deno.serve(async (req: Request) => {
       submission_fields:
         platform === "bat" ? mapToBatFields(v) : null,
       observed_components: componentsOf(sortedPhotos as Array<Record<string, unknown>>),
+      contributor_evidence: contributorEvidence,
     };
 
     // Derive-on-read pass: override flat-column values with synthesized consensus
