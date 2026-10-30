@@ -119,6 +119,9 @@ Standing rules the code carries:
   It records the source hash, method revision, run, bounded peer inputs, local vehicle/document classifications and
   check-digit-valid modern VINs and explicitly labelled 8–16 character classic chassis serials. A bare classic plate may
   match an already-known identifier exactly under the same qualified native OCR rule; it cannot create a new identity.
+  The current identity method bounds input to 4096 pixels and rectifies at most two bare identifier regions before
+  native OCR. It retains changed intermediate readings separately. Conflicting strong identifier reads veto filing;
+  an intermediate reading alone cannot qualify a claim. Album review retains its existing method and image bound.
   It creates no subject or membership. This keeps pre-identity reads out of
   `image_analysis_records` (whose required `vehicle_id` would invent a relation) and avoids a parallel source-read
   table. Before profile admission, the server folds only reads from the same fresh run and exact source hashes, with

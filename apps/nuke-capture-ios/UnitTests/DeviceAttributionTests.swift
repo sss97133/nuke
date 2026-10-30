@@ -36,7 +36,7 @@ final class DeviceAttributionTests: XCTestCase {
     func testAutomaticIdentityNeedsStrongUnmodifiedOCRWithItsMethod() {
         let vin = "1GCEK14L9EJ147915"
         let source = OnDeviceObservation.Source(framework: "Apple Vision", model: "VNRecognizeTextRequest", revision: 3,
-            os_version: "26", method: "v1")
+            os_version: "26", method: OnDeviceAnalysis.methodVersion)
         let good = OnDeviceObservation(kind: .ocrText, value: "VIN \(vin)", confidence: 0.99, source: source)
         XCTAssertTrue(AttributionEngine.qualifiedIdentityRead(vin, observations: [good]))
         XCTAssertFalse(AttributionEngine.qualifiedIdentityRead(vin, observations: []))
@@ -47,7 +47,7 @@ final class DeviceAttributionTests: XCTestCase {
         XCTAssertFalse(AttributionEngine.qualifiedIdentityRead(vin, observations: [
             .init(kind: .ocrText, value: "X\(vin)X", confidence: 0.99, source: source)]))
         let other = OnDeviceObservation.Source(framework: "Apple Vision", model: "VNClassifyImageRequest", revision: 3,
-            os_version: "26", method: "v1")
+            os_version: "26", method: OnDeviceAnalysis.methodVersion)
         XCTAssertFalse(AttributionEngine.qualifiedIdentityRead(vin, observations: [
             .init(kind: .vin, value: vin, confidence: 0.99, source: other)]))
         XCTAssertFalse(AttributionEngine.qualifiedIdentityRead(vin, observations: [good,
@@ -63,7 +63,7 @@ final class DeviceAttributionTests: XCTestCase {
     func testBareClassicPlateCanOnlyMatchAnAlreadyKnownExactIdentifier() {
         let serial = "2S87T3N123456"
         let source = OnDeviceObservation.Source(framework: "Apple Vision", model: "VNRecognizeTextRequest", revision: 3,
-            os_version: "26", method: "v1")
+            os_version: "26", method: OnDeviceAnalysis.methodVersion)
         func read(_ text: String) -> [OnDeviceObservation] {
             [.init(kind: .ocrText, value: text, confidence: 0.99, source: source)]
         }
@@ -72,6 +72,24 @@ final class DeviceAttributionTests: XCTestCase {
         for text in ["X\(serial)X", "2S8703N123456", "\(serial) 2S87T3N654321"] {
             XCTAssertFalse(AttributionEngine.qualifiedIdentityRead(serial, observations: read(text), allowKnownClassicSerial: true))
         }
+    }
+
+    func testActualNativeObservationAssemblerAndRetainedSeedUseDifferentMethods() {
+        let serial = "2S87D3N123456"
+        let reading = NativeIdentityOCR.Result(readings: [.init(candidates: [(serial, Float(1))])],
+            seeds: [.init(candidates: [("2S8703N123456", Float(1))])], revision: 3)
+        let observations = OnDeviceAnalysis.identityObservations(reading, labels: [])
+        XCTAssertFalse(AttributionEngine.qualifiedIdentityRead(serial, observations: observations, allowKnownClassicSerial: true))
+        XCTAssertTrue(AttributionEngine.qualifiedIdentityRead(serial, observations: observations.filter {
+            $0.source.method != NativeIdentityOCR.seedMethodVersion }, allowKnownClassicSerial: true))
+        XCTAssertTrue(observations.contains { $0.value == "2S8703N123456" && $0.source.method == NativeIdentityOCR.seedMethodVersion })
+        XCTAssertFalse(AttributionEngine.qualifiedIdentityRead("2S8703N123456", observations: observations, allowKnownClassicSerial: true))
+        let ordinary = OnDeviceAnalysis.observations(textBoxes: [.init(candidates: [("VIN \(serial)", Float(1))])], labels: [])
+        XCTAssertTrue(AttributionEngine.qualifiedIdentityRead(serial, observations: ordinary))
+        XCTAssertTrue(LibraryIngest.identityMethodVersion.hasSuffix(NativeIdentityOCR.methodVersion))
+        XCTAssertTrue(NativeIdentityOCR.identifierLike(serial))
+        XCTAssertFalse(NativeIdentityOCR.identifierLike("1234567890"))
+        XCTAssertFalse(NativeIdentityOCR.identifierLike("WINDSHIELD"))
     }
 
     func testMixedShopSessionFilesOnlyEachPhotosOwnSerialMatch() throws {

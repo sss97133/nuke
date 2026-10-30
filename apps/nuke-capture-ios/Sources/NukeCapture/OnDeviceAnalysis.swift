@@ -86,6 +86,30 @@ enum OnDeviceAnalysis {
         .init(framework: "Apple Vision", model: "VNClassifyImageRequest", revision: revision, os_version: osVersion, method: methodVersion)
     }
 
+    static func isIdentityTextSource(_ source: OnDeviceObservation.Source) -> Bool {
+        source.framework == "Apple Vision" && source.model == "VNRecognizeTextRequest" && source.revision > 0 &&
+            [methodVersion, NativeIdentityOCR.methodVersion].contains(source.method)
+    }
+
+    static func identityObservations(_ reading: NativeIdentityOCR.Result, labels: [(String, Float)]) -> [OnDeviceObservation] {
+        let source = OnDeviceObservation.Source(framework: "Apple Vision", model: "VNRecognizeTextRequest",
+            revision: reading.revision, os_version: osVersion, method: NativeIdentityOCR.methodVersion)
+        let selected = observations(textBoxes: reading.readings.map { TextBox(candidates: $0.candidates) },
+            labels: labels, textSource: source)
+        let seedSource = OnDeviceObservation.Source(framework: source.framework, model: source.model,
+            revision: source.revision, os_version: source.os_version, method: NativeIdentityOCR.seedMethodVersion)
+        let seeds = reading.seeds.compactMap { $0.candidates.first }.map {
+            OnDeviceObservation(kind: .ocrText, value: $0.0, confidence: Double($0.1), source: seedSource)
+        }
+        return Array(selected.prefix(maxObservations - seeds.count)) + seeds
+    }
+
+    static func analyzeIdentity(_ cg: CGImage, classification: VisionEngine.Classification) -> (observations: [OnDeviceObservation], textLines: [String])? {
+        guard let reading = NativeIdentityOCR.read(cg, shouldHold: { processHold }) else { return nil }
+        return (identityObservations(reading, labels: classification.labels),
+            reading.readings.compactMap { $0.candidates.first?.0 })
+    }
+
     // MARK: - VIN check digit (ISO 3779 position 9, North American rule)
 
     private static let transliteration: [Character: Int] = [

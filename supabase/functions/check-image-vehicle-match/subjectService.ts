@@ -129,11 +129,22 @@ export async function admitDeviceCaptureProfile(store: SubjectStore, user: strin
   if (sources.length !== ids.length || sources.some(s => !ids.includes(s.id) || s.user_id !== user) ||
     sources.find(s => s.id === evidence.anchor_image_id)?.file_hash !== evidence.anchor_source_sha256) return refuse('identity_source_changed');
   const hints = onDeviceSourceHints(await store.readings(ids), sources, user, asOf, true);
-  const text = (hint: Record<string, any>) => (sanitizeOnDeviceObservations(hint.on_device) ?? []).filter(o => {
+  const text = (hint: Record<string, any>, methods = ['nuke-ondevice-v1', 'nuke-identity-perspective-v1']) => (sanitizeOnDeviceObservations(hint.on_device) ?? []).filter(o => {
     const source = o.source as Record<string, unknown>;
     return o.repaired !== true && Number(o.confidence) >= 0.9 && source.framework === 'Apple Vision' &&
-      source.model === 'VNRecognizeTextRequest' && Number(source.revision) > 0 && source.method === 'v1';
+      source.model === 'VNRecognizeTextRequest' && Number(source.revision) > 0 &&
+      methods.includes(String(source.method));
   });
+  const identifiersOf = (items: Array<Record<string, unknown>>, allowBare = false) => new Set(items.flatMap(o => {
+        if (o.kind === 'vin' || o.kind === 'classic_serial') return isDeviceVehicleIdentifier(o.value) ? [o.value] : [];
+        if (o.kind !== 'ocr_text') return [];
+        const value = String(o.value).toUpperCase();
+        return [...(allowBare ? (value.match(/[A-Z0-9]+/g) ?? []).filter(v => v.length < 17 && isDeviceVehicleIdentifier(v)) : []),
+          ...(value.match(/[A-Z0-9]+/g) ?? []).filter(v => v.length === 17 && isDeviceVehicleIdentifier(v)),
+          ...[...value.matchAll(/\b(?:CHASSIS|SERIAL|VIN)\s*(?:NO\.?|NUMBER|#)?\s*[:#.-]?\s*([A-Z0-9]{8,16})\b/g)]
+            .map(m => m[1]).filter(isDeviceVehicleIdentifier)];
+  }));
+
   for (const id of ids) {
     const hint = hints.find(h => h.image_id === id && h.identity_run_id === evidence.identity_run_id &&
       h.method_version === evidence.identity_method_version);
@@ -156,17 +167,11 @@ export async function admitDeviceCaptureProfile(store: SubjectStore, user: strin
         return refuse('each_source_needs_the_same_qualified_body_tag');
     } else {
       const identifier = request.vin ?? request.serial;
-      const supported = new Set(observations.flatMap(o => {
-        if (o.kind === 'vin' || o.kind === 'classic_serial') return isDeviceVehicleIdentifier(o.value) ? [o.value] : [];
-        if (o.kind !== 'ocr_text') return [];
-        const value = String(o.value).toUpperCase();
-        return [...(value.match(/[A-Z0-9]+/g) ?? []).filter(v => v.length === 17 && isDeviceVehicleIdentifier(v)),
-          ...[...value.matchAll(/\b(?:CHASSIS|SERIAL|VIN)\s*(?:NO\.?|NUMBER|#)?\s*[:#.-]?\s*([A-Z0-9]{8,16})\b/g)]
-            .map(m => m[1]).filter(isDeviceVehicleIdentifier)];
-      }));
+      const supported = identifiersOf(observations);
+      const competingSeeds = identifiersOf(text(hint, ['nuke-identity-perspective-seed-v1']), true);
       if (!isDeviceVehicleIdentifier(identifier) || request.basis === 'vin' && identifier.length !== 17 ||
         !Array.isArray(hint.vin_candidates) || new Set(hint.vin_candidates).size !== 1 || !hint.vin_candidates.includes(identifier) ||
-        supported.size !== 1 || !supported.has(identifier))
+        supported.size !== 1 || !supported.has(identifier) || [...competingSeeds].some(value => value !== identifier))
         return refuse('each_source_needs_its_own_matching_identifier');
     }
   }

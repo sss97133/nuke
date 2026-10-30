@@ -1099,24 +1099,27 @@ final class AttributionEngine: ObservableObject {
     nonisolated static func qualifiedIdentityRead(_ identifier: String?, observations: [OnDeviceObservation],
                                                  allowKnownClassicSerial: Bool = false) -> Bool {
         guard let identifier, !identifier.isEmpty else { return false }
-        var identifiers = Set<String>()
-        for o in observations where o.confidence >= 0.9 && o.repaired != true &&
-            o.source.framework == "Apple Vision" && o.source.model == "VNRecognizeTextRequest" &&
-            o.source.revision > 0 && o.source.method == "v1" {
-            if o.kind == .vin, VisionEngine.isValidVIN(o.value) { identifiers.insert(o.value) }
-            if o.kind == .classicSerial { identifiers.insert(o.value) }
+        var identifiers = Set<String>(), seedIdentifiers = Set<String>()
+        for o in observations where o.confidence >= 0.9 && o.repaired != true {
+            let seed = o.source.method == NativeIdentityOCR.seedMethodVersion && o.source.framework == "Apple Vision" &&
+                o.source.model == "VNRecognizeTextRequest" && o.source.revision > 0
+            guard OnDeviceAnalysis.isIdentityTextSource(o.source) || seed else { continue }
+            var found = Set<String>()
+            if o.kind == .vin, VisionEngine.isValidVIN(o.value) { found.insert(o.value) }
+            if o.kind == .classicSerial { found.insert(o.value) }
             if o.kind == .ocrText {
-                identifiers.formUnion(o.value.uppercased().split(whereSeparator: { !$0.isLetter && !$0.isNumber })
+                found.formUnion(o.value.uppercased().split(whereSeparator: { !$0.isLetter && !$0.isNumber })
                     .map(String.init).filter { VisionEngine.isValidVIN($0) })
-                identifiers.formUnion(VisionEngine.labelledClassicSerialCandidates(in: [o.value]))
+                found.formUnion(VisionEngine.labelledClassicSerialCandidates(in: [o.value]))
                 if allowKnownClassicSerial, (8...16).contains(identifier.count) {
-                    identifiers.formUnion(o.value.uppercased().split(whereSeparator: { !$0.isLetter && !$0.isNumber })
+                    found.formUnion(o.value.uppercased().split(whereSeparator: { !$0.isLetter && !$0.isNumber })
                         .map(String.init).filter { (8...16).contains($0.count) && $0.contains(where: \.isLetter) &&
                             $0.contains(where: \.isNumber) && $0.utf8.allSatisfy { $0 < 128 } })
                 }
             }
+            if seed { seedIdentifiers.formUnion(found) } else { identifiers.formUnion(found) }
         }
-        return identifiers == [identifier]
+        return identifiers == [identifier] && seedIdentifiers.allSatisfy { $0 == identifier }
     }
 
     nonisolated static func vinAnchoredCaptureGroups(_ frames: [VINCaptureFrame],

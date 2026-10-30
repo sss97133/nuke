@@ -11,7 +11,7 @@ const ids = ["10000000-0000-4000-8000-000000000001", "10000000-0000-4000-8000-00
 const cluster = "20000000-0000-4000-8000-000000000001";
 const nativeRun = '70000000-0000-4000-8000-000000000001', nativeMethod = 'vehicle-identity-context-fold-v3:fixture';
 const nativeOCR = (value: string, patch: Record<string, unknown> = {}) => ({ kind: 'ocr_text', value, confidence: 0.99,
-  source: { framework: 'Apple Vision', model: 'VNRecognizeTextRequest', revision: 3, os_version: '26', method: 'v1' }, ...patch });
+  source: { framework: 'Apple Vision', model: 'VNRecognizeTextRequest', revision: 3, os_version: '26', method: 'nuke-ondevice-v1' }, ...patch });
 function equal(a: unknown, b: unknown) { if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error(`${JSON.stringify(a)} != ${JSON.stringify(b)}`); }
 const scope: CandidateScope = { kind: "account_associated_terminal_vehicles", vehicle_ids: [cluster], retrieved: 1,
   exhausted: true, truncated: false, reference_photos_assessed: 0, unavailable_references: [cluster], global_novelty_asserted: false };
@@ -97,9 +97,24 @@ Deno.test('a nearby car-shaped frame without its own identifier cannot be filed 
 });
 Deno.test('every native VIN member needs its own strong unmodified retained OCR method', async () => {
   const good = await nativeCaptureFixture(); equal((await good.admit()).status, 'created');
-  for (const observation of [{ confidence: 0.4 }, { repaired: true }, { source: { framework: 'other', model: 'guess', revision: 1, method: 'v1' } }]) {
+  for (const observation of [{ confidence: 0.4 }, { repaired: true }, { source: { framework: 'other', model: 'guess', revision: 1, method: 'nuke-ondevice-v1' } }]) {
     const f = await nativeCaptureFixture({ observation }); equal((await f.admit()).status, 'insufficient_evidence'); equal(f.requests, []);
   }
+});
+Deno.test('qualification uses actual native method names and never promotes retained seed reads', async () => {
+  for (const method of ['nuke-ondevice-v1', 'nuke-identity-perspective-v1', 'v1', 'nuke-identity-perspective-seed-v1']) {
+    const f = await nativeCaptureFixture({ single: true, observation: { source: {
+      framework: 'Apple Vision', model: 'VNRecognizeTextRequest', revision: 3, os_version: '26', method } } });
+    equal((await f.admit()).status, method === 'v1' || method.includes('-seed-') ? 'insufficient_evidence' : 'created');
+    equal(f.counts.models, 0);
+  }
+});
+Deno.test('a contradictory strong seed remains a veto even when the final native read matches a profile', async () => {
+  const f = await nativeCaptureFixture({ single: true });
+  const envelope = f.readings[0].confidence_basis!.visual_subject_reading_v1!.envelope as any;
+  envelope.raw_model_reading.observations[0].on_device.push(nativeOCR('1GCEK14L9EJ147915', { source: {
+    framework: 'Apple Vision', model: 'VNRecognizeTextRequest', revision: 3, os_version: '26', method: 'nuke-identity-perspective-seed-v1' } }));
+  equal((await f.admit()).status, 'insufficient_evidence'); equal(f.requests, []);
 });
 Deno.test('source changes and mismatched native run/method cannot reuse an older identity read', async () => {
   const f = await nativeCaptureFixture(); f.sources[1].file_hash = 'e'.repeat(64);
