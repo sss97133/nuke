@@ -693,7 +693,7 @@ async function replayNativeProperties(supabase: any, body: any): Promise<Respons
     if (typeof html !== "string" || !html || new TextEncoder().encode(html).length > 2_097_152) throw Error("Retained body unavailable or oversized");
     const hash = [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(html)))].map(x => x.toString(16).padStart(2, "0")).join("");
     if (hash !== s.html_sha256.toLowerCase()) throw Error("Retained capture hash mismatch");
-    const parsed = s.platform === "mecum" ? parseMecumHtml(html, true) : parseBarrettJacksonHtml(html);
+    const parsed = s.platform === "mecum" ? parseMecumHtml(html, true) : parseBarrettJacksonHtml(html, true);
     // A historically mislinked lot must not donate its specifications to this
     // record. Keep identity disagreement as backlog; no matching or merging here.
     const label = (x: any) => String(x ?? "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "");
@@ -705,8 +705,14 @@ async function replayNativeProperties(supabase: any, body: any): Promise<Respons
         !label(parsed.model) || (label(v.model) ? ![parsed.model, [parsed.model, parsed.trim].filter(Boolean).join(" ")]
           .some(model => label(model) === label(v.model)) : !matched)) throw Error("Native lot and retained vehicle labels disagree");
     const fields: Record<string, unknown> = {};
-    for (const field of ["year", "make", "model", "trim", "body_style", "vin", "color", "interior_color", "transmission"]) {
+    for (const field of ["year", "make", "model", "body_style", "vin", "color", "interior_color", "transmission"]) {
       if (parsed[field] != null && parsed[field] !== "") fields[field] = parsed[field];
+    }
+    // Barrett-Jackson's named style field describes the publisher's lot label
+    // (for example CUSTOM PICKUP). It does not establish a trim package.
+    if (typeof parsed.publisher_style_label === "string" && parsed.publisher_style_label.trim() &&
+        parsed.publisher_style_label.length <= 500 && !/[\x00-\x1f\x7f]/.test(parsed.publisher_style_label)) {
+      fields.publisher_style_label = parsed.publisher_style_label;
     }
     if (typeof parsed.engine_type === "string" && parsed.engine_type.trim()) fields.engine_size = parsed.engine_type;
     // Existing legacy parsers may infer drive from a title/whole-page match.
@@ -730,12 +736,13 @@ async function replayNativeProperties(supabase: any, body: any): Promise<Respons
     const { v, s, fields, associationBasis } = capture;
     if (dryRun) return reply({ success: true, mode: body.mode, native_property_profile: "retained_native_fields_v1", dry_run: true, vehicle_id: v.id, snapshot_id: s.id,
       field_keys: Object.keys(fields), source_association_basis: associationBasis, writes: 0, model_calls: 0 });
-    const identityVersion = s.platform === "mecum" ? "native-identity-v2" : "v1";
+    const identityVersion = s.platform === "mecum" ? "native-identity-v2" : fields.publisher_style_label !== undefined ? "publisher-style-v2" : "v1";
     const input = { source_slug: s.platform, kind: "listing", vehicle_id: v.id, source_url: s.listing_url,
       source_identifier: `retained-native-fields:${s.id}:${associationBasis === "snapshot_vehicle_match" ? identityVersion : `record-url-${identityVersion}`}`, raw_source_ref: `listing_page_snapshots:${s.id}`,
       observed_at: s.fetched_at, extraction_method: "retained_native_fields_v1", defer_analysis: true, agent_cost_cents: 0,
       structured_data: { ...fields, source_capture_sha256: s.html_sha256, source_captured_at: s.fetched_at,
         ...(s.platform === "mecum" ? { identity_extractor_version: "mecum_native_graphql_identity_v1" } : {}),
+        ...(fields.publisher_style_label !== undefined ? { publisher_style_source_field: "barrett-jackson.native.style" } : {}),
         ...(associationBasis === "exact_record_url_and_native_labels" ? { source_association_basis: associationBasis } : {}),
         source_archive_ingested_at: s.created_at, extractor: "batch-extract-snapshots", source_event_time_status: "unknown",
         source_profile: "retained_native_fields_v1", claim_role: "extractor_claim",
@@ -1019,7 +1026,7 @@ async function parseWithAI(content: string, url: string, platform: string): Prom
 // 1. BARRETT-JACKSON PARSER — Next.js RSC data extraction
 // ============================================================
 
-function parseBarrettJacksonHtml(rawHtml: string): Record<string, any> {
+function parseBarrettJacksonHtml(rawHtml: string, nativeLabels = false): Record<string, any> {
   const result: Record<string, any> = {};
 
   // BJ uses Next.js RSC with double-escaped JSON in self.__next_f.push() calls.
@@ -1035,6 +1042,7 @@ function parseBarrettJacksonHtml(rawHtml: string): Record<string, any> {
     result.model = titleCase(vinChunkMatch[3]);
     const style = vinChunkMatch[4];
     if (style) {
+      if (nativeLabels) result.publisher_style_label = style;
       result.trim = titleCase(style);
       const bs = normalizeBodyStyle(style);
       if (bs) result.body_style = bs;
