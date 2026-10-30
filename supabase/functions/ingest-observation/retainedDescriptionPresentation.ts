@@ -4,7 +4,7 @@ const QUALIFIED=/\b(?:unknown|unspecified|not|no|without|or|would|could|might|ma
 // Deliberately narrow sentence forms; free-text labels remain exact source text.
 const FINISH=/^(?:Finished|The (?:car|truck|vehicle|motorcycle|bike) is (?:finished|refinished)|It is (?:finished|refinished)) in ([A-Za-z][A-Za-z0-9 /()'-]{0,79}?) over ([A-Za-z][A-Za-z0-9 /()'-]{0,79}?) (leather|vinyl|cloth)(?=[ ,.;]|$)/i;
 const INTERIOR=/^The (?:cabin|interior|seats) (?:is|are) (?:trimmed|upholstered|finished) in ([A-Za-z][A-Za-z0-9 /()'-]{0,79}?) (leather|vinyl|cloth)(?=[ ,.;]|$)/i;
-const ROUTE=/^(?:Power is (?:sent|delivered|routed)|The [A-Za-z0-9., -]{1,100} (?:routes|sends|delivers) power) to (?:the )?/i;
+const ROUTE=/^(?:Power is (?:sent|delivered|routed)|The \d+(?:\.\d+)?(?:-lit(?:er|re)|ci) (?:V\d{1,2}|inline[- ](?:four|six|\d)|flat[- ](?:four|six|\d)) (?:routes|sends|delivers) power) to (?:the )?/i;
 const DRIVE=/^(rear or all four|rear|front) wheels?\b/i;
 export function descriptionPresentationWitness(key:string,text:unknown):{source_value:string;value:string}|null {
  if(!["interior_color","exterior_color","drivetrain_layout"].includes(key)||typeof text!=="string"||bytes(text)<100||bytes(text)>32000)return null;
