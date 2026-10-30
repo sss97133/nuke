@@ -693,7 +693,7 @@ async function replayNativeProperties(supabase: any, body: any): Promise<Respons
     if (typeof html !== "string" || !html || new TextEncoder().encode(html).length > 2_097_152) throw Error("Retained body unavailable or oversized");
     const hash = [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(html)))].map(x => x.toString(16).padStart(2, "0")).join("");
     if (hash !== s.html_sha256.toLowerCase()) throw Error("Retained capture hash mismatch");
-    const parsed = s.platform === "mecum" ? parseMecumHtml(html, true) : parseBarrettJacksonHtml(html, true);
+    const parsed = s.platform === "mecum" ? parseMecumHtml(html, true) : parseBarrettJacksonHtml(html);
     // A historically mislinked lot must not donate its specifications to this
     // record. Keep identity disagreement as backlog; no matching or merging here.
     const label = (x: any) => String(x ?? "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "");
@@ -702,7 +702,7 @@ async function replayNativeProperties(supabase: any, body: any): Promise<Respons
     // disagreements still refuse; unstamped captures require all three labels.
     if (!parsed.year || (v.year == null ? !matched : parsed.year !== v.year) ||
         !label(parsed.make) || (label(v.make) ? label(parsed.make) !== label(v.make) : !matched) ||
-        !label(parsed.model) || (label(v.model) ? ![parsed.model, [parsed.model, parsed.trim].filter(Boolean).join(" ")]
+        !label(parsed.model) || (label(v.model) ? ![parsed.model, [parsed.model, parsed.publisher_style_label].filter(Boolean).join(" ")]
           .some(model => label(model) === label(v.model)) : !matched)) throw Error("Native lot and retained vehicle labels disagree");
     const fields: Record<string, unknown> = {};
     for (const field of ["year", "make", "model", "body_style", "vin", "color", "interior_color", "transmission"]) {
@@ -1026,7 +1026,7 @@ async function parseWithAI(content: string, url: string, platform: string): Prom
 // 1. BARRETT-JACKSON PARSER — Next.js RSC data extraction
 // ============================================================
 
-function parseBarrettJacksonHtml(rawHtml: string, nativeLabels = false): Record<string, any> {
+function parseBarrettJacksonHtml(rawHtml: string): Record<string, any> {
   const result: Record<string, any> = {};
 
   // BJ uses Next.js RSC with double-escaped JSON in self.__next_f.push() calls.
@@ -1042,8 +1042,7 @@ function parseBarrettJacksonHtml(rawHtml: string, nativeLabels = false): Record<
     result.model = titleCase(vinChunkMatch[3]);
     const style = vinChunkMatch[4];
     if (style) {
-      if (nativeLabels) result.publisher_style_label = style;
-      result.trim = titleCase(style);
+      result.publisher_style_label = style;
       const bs = normalizeBodyStyle(style);
       if (bs) result.body_style = bs;
     }
