@@ -105,8 +105,9 @@ function JobRow({ row, image }: { row: WorkOrderRow; image?: VehicleCardImage })
   const src = image?.medium_url || image?.thumbnail_url || image?.image_url;
   const paidReport = reportsFor(row).find(r => r.payment_state === 'paid_in_full');
   return <li className="jb-work-card" aria-label={title}>
-    <PrefetchLink className="jb-work-card__photo" to={row.vehicle_id ? `/vehicle/${row.vehicle_id}` : jobHref(row.work_order_id)} aria-label={`Open ${heading}`}>
-      {src && src !== failedSrc ? <img src={src} alt={heading} width={320} height={220} loading="lazy" onError={() => setFailedSrc(src)} />
+    <PrefetchLink className="jb-work-card__photo" to={row.vehicle_id ? `/vehicle/${row.vehicle_id}` : jobHref(row.work_order_id)}>
+      <span className="sr-only">Open {heading} · </span>
+      {src && src !== failedSrc ? <img src={src} alt="" width={320} height={220} loading="lazy" onError={() => setFailedSrc(src)} />
         : <span>Vehicle photo unavailable</span>}
       <span className="jb-work-card__id">{row.vehicle_id ? `Vehicle ${row.vehicle_id.slice(0, 8)}` : 'Vehicle not linked'}</span>
     </PrefetchLink>
