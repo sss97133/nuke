@@ -602,6 +602,10 @@ jobs:
         run: |
           deno check --node-modules-dir=none supabase/functions/analysis-engine-coordinator/index.ts
           deno test --node-modules-dir=none supabase/functions/analysis-engine-coordinator/queueWork.test.ts
+      - name: Verify registered contributor review uses retained sources and fenced leases
+        run: |
+          deno check --node-modules-dir=none supabase/functions/contributor-intake/index.ts supabase/functions/derive-dispatch/index.ts
+          deno test --node-modules-dir=none --allow-env supabase/functions/contributor-intake/reviewWork.test.ts supabase/functions/derive-dispatch/handler.test.ts
       - name: Verify listing packages preserve contributor sources, supersession and private evidence boundaries
         run: deno test --node-modules-dir=none supabase/functions/generate-listing-package/listingEvidence_test.ts
       - name: Verify Stripe checkout routing (only credit purchases credit wallets; invoice sessions go to the recorder) and invoice checkout parameters

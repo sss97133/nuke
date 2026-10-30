@@ -10,7 +10,7 @@
 //   cron / agent    -> derive-dispatch claims a batch
 //   dispatch        -> invokes observation_extractors.edge_function_name
 //   the reader      -> emits cited observations via ingest-observation
-//   ingest          -> fires analysis-engine-coordinator; projections recompute
+//   ingest          -> transactionally retains affected calculation work
 //
 // Compute belongs to the owner. The reader resolves credentials through runWithChain,
 // so a user's own subscription pays first. `platform_credential` is an operator flag
@@ -26,6 +26,7 @@ import { corsHeaders } from "../_shared/cors.ts";
 import { isServiceCaller, requireWriteAuth } from "../_shared/writeGuard.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { mustWrite } from '../_shared/writeResult.ts';
+import { dispatchContributorReview } from './contributorReview.ts';
 
 const WORKER = `derive-dispatch-${crypto.randomUUID().slice(0, 8)}`;
 
@@ -62,8 +63,13 @@ Deno.serve(async (req) => {
     );
 
     const body = await req.json().catch(() => ({}));
-    const batchSize = Math.min(Math.max(Number(body.batch_size) || 5, 1), 25);
+    const requested = body.batch_size == null ? 5 : Number(body.batch_size);
+    const batchSize = Number.isFinite(requested) ? Math.min(Math.max(Math.floor(requested), 0), 25) : 0;
     const platformCredential = body.platform_credential === true;
+    // Service-only registry dispatch. Only new revisioned contributor work is
+    // eligible; the handler retains its own owner authority and fenced leases.
+    const contributorReview = await dispatchContributorReview(admin, Deno.env.get('SUPABASE_URL')!,
+      projectSecretKey()!, body.user_id ?? null, batchSize);
 
     // Claim a batch. Claiming before working is what lets two workers run without
     // reading the same evidence twice.
@@ -73,7 +79,7 @@ Deno.serve(async (req) => {
       p_user_id: body.user_id ?? null,
     });
     if (claimErr) throw claimErr;
-    if (!claimed?.length) return json({ claimed: 0, done: 0, failed: 0, results: [] });
+    if (!claimed?.length) return json({ claimed: 0, done: 0, failed: 0, results: [], contributor_review: contributorReview });
 
     const results: unknown[] = [];
     let done = 0, failed = 0;
@@ -207,7 +213,7 @@ Deno.serve(async (req) => {
         .eq("slug", s));
     }
 
-    return json({ claimed: claimed.length, done, failed, results });
+    return json({ claimed: claimed.length, done, failed, results, contributor_review: contributorReview });
   } catch (e) {
     console.error("[derive-dispatch]", e);
     return json({ error: String(e instanceof Error ? e.message : e) }, 500);
