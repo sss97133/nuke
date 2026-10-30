@@ -38,6 +38,9 @@ struct CaptureContextRead: Equatable, Sendable {
     let model: String?
     /// Raw decoded code (e.g. the Fisher body code `2FS87`), kept for evidence.
     var code: String? = nil
+    /// Only a labelled body-number field from this same cowl-tag source.
+    var bodyNumber: String? = nil
+    var bodyReadConfidence: Double? = nil
     /// The VIN/serial a document printed, when it printed one; a document naming a different
     /// serial than the plate is not context for that plate.
     var documentSerial: String? = nil
@@ -82,6 +85,7 @@ enum CaptureContextReader {
         let seriesCode: String   // e.g. "FS"
         let bodyStyle: String    // e.g. "87"
         let model: String?       // decoded series when the table knows it
+        var bodyNumber: String? = nil
         var code: String { "\(division)\(seriesCode)\(bodyStyle)" }
     }
 
@@ -114,8 +118,27 @@ enum CaptureContextReader {
         guard let yy = Int(g(1)), (70...89).contains(yy), let div = Int(g(2)), let make = gmDivisions[div],
               let body = g(3).first else { return nil }
         let series = g(3) + g(4)
+        // Never mistake the style code, trim or paint number for a body number.
+        // The number must precede its own BDY label after the decoded style.
+        let suffix = (text as NSString).substring(from: m.range.location + m.range.length)
+        let bodyPattern = #"\b(?:([A-Z])\s+)?([A-Z0-9]{3,12})\s+BDY\b"#
+        var numbers = Set<String>()
+        if let bodyRE = try? NSRegularExpression(pattern: bodyPattern) {
+            for hit in bodyRE.matches(in: suffix, range: NSRange(suffix.startIndex..., in: suffix)) {
+                let plant = Range(hit.range(at: 1), in: suffix).map { String(suffix[$0]) } ?? ""
+                let number = Range(hit.range(at: 2), in: suffix).map { String(suffix[$0]) } ?? ""
+                let value = plant + number
+                if value.count <= 12 && value.rangeOfCharacter(from: .decimalDigits) != nil { numbers.insert(value) }
+            }
+        }
+        let styleReads = re.matches(in: text, range: NSRange(text.startIndex..., in: text))
+        let styles = Set(styleReads.map { hit in (1...5).map { i in
+            Range(hit.range(at: i), in: text).map { String(text[$0]) } ?? ""
+        }.joined() })
+        guard styles.count == 1 else { return nil }
         return CowlTag(modelYear: 1900 + yy, division: div, make: make, bodyLetter: body,
-                       seriesCode: series, bodyStyle: g(5), model: gmSeries["\(div)\(series)"])
+                       seriesCode: series, bodyStyle: g(5), model: gmSeries["\(div)\(series)"],
+                       bodyNumber: numbers.count == 1 ? numbers.first : nil)
     }
 
     // ─── Make wordmarks ────────────────────────────────────────────────────────
@@ -176,15 +199,22 @@ enum CaptureContextReader {
     /// Every context read one frame supplies (at most one per method).
     static func reads(imageID: String, lines: [String], isVehicle: Bool, isDocument: Bool,
                       takenAt: String?, latitude: Double?, longitude: Double?,
-                      makes: [String] = bundledMakes) -> [CaptureContextRead] {
+                      makes: [String] = bundledMakes, onDevice: [OnDeviceObservation] = []) -> [CaptureContextRead] {
         var out: [CaptureContextRead] = []
         if isDocument, let d = decodeDocument(lines, makes: makes) {
             out.append(.init(imageID: imageID, method: .document, year: d.year, make: d.make, model: nil,
                              documentSerial: d.serial, takenAt: takenAt, latitude: latitude, longitude: longitude))
         }
         if !isDocument, let t = decodeCowlTag(lines) {
+            let qualifiedText = onDevice.filter { $0.kind == .ocrText && $0.confidence >= 0.9
+                && $0.source.framework == "Apple Vision" && $0.source.model == "VNRecognizeTextRequest"
+                && $0.source.revision > 0 && $0.source.method == OnDeviceAnalysis.methodVersion }
+            let retainedTag = decodeCowlTag(qualifiedText.map(\.value))
+            let confidence = retainedTag?.bodyNumber != nil && retainedTag == t
+                ? qualifiedText.map(\.confidence).min() : nil
             out.append(.init(imageID: imageID, method: .cowlTag, year: t.modelYear, make: t.make, model: t.model,
-                             code: t.code, takenAt: takenAt, latitude: latitude, longitude: longitude))
+                             code: t.code, bodyNumber: t.bodyNumber, bodyReadConfidence: confidence,
+                             takenAt: takenAt, latitude: latitude, longitude: longitude))
         }
         if isVehicle, !isDocument, let make = badgeMake(lines, makes: makes) {
             out.append(.init(imageID: imageID, method: .badge, year: nil, make: make, model: nil,
@@ -234,7 +264,7 @@ enum CaptureContextReader {
     }
 
     // ─── Needs-the-VIN-plate state ────────────────────────────────────────────
-    /// A session that read a cowl tag but no identifier: no profile; the Today screen asks for the plate.
+    /// A session awaiting an identifier; a qualified repeated tag can already have a private candidate.
     struct PendingIdentifier: Equatable, Sendable {
         let context: CaptureContext
         /// Vehicle frames of the session waiting for the identifier.
@@ -260,8 +290,17 @@ enum CaptureContextReader {
     }
 }
 
-/// The seam for the server candidate-profile path (another lane: a private profile with
-/// status `needs_identifier`). Until that lane lands, the phone only shows the pending line.
+typealias CandidateProfileResult = (summary: String, filed: Set<String>, retry: Bool)
+
+/// Requests remain in the authenticated device writer; no caller may file by GPS alone.
 protocol CandidateProfileRequesting: Sendable {
-    func requestCandidateProfile(_ pending: CaptureContextReader.PendingIdentifier) async
+    @MainActor func requestCandidateProfile(_ request: AttributionEngine.DeviceProfileRequest,
+                                            userId: String) async -> CandidateProfileResult
+}
+
+struct DeviceCandidateProfileRequester: CandidateProfileRequesting {
+    @MainActor func requestCandidateProfile(_ request: AttributionEngine.DeviceProfileRequest,
+                                            userId: String) async -> CandidateProfileResult {
+        await AttributionEngine.createProfile(request, userId: userId)
+    }
 }
