@@ -1,8 +1,7 @@
 /**
- * WorkPage — /work, the signed-in work console: what is waiting for your signature
- * (my_signature_queue) and the jobs you are on (my_work_orders). Each item links to its job page and
- * repeats the server's own words for what signing binds and does not bind. Work-day and booking
- * confirmations have review sheets here; job Signs run on the job page. A payment amount appears only on the payee's own confirmation item.
+ * WorkPage — /work starts with the viewer's jobs. Source-record reviews are secondary,
+ * opened deliberately and rendered in batches. Work-day and booking confirmations retain
+ * their review sheets; job Signs run on the job page. Payment amounts stay payee-only.
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Section, Text } from '../../kit';
@@ -10,7 +9,7 @@ import { PrefetchLink } from '../../components/PrefetchLink';
 import { usePageTitle } from '../../hooks/usePageTitle';
 import { useAuthContext } from '../../contexts/AuthContext';
 import {
-  JobReaders, STAGES, binds, day, gapWord, jobHref, paymentLine, quoteTotals, signKindTitle, slotWords, stageWord, stateWord, vehicleText,
+  JobReaders, binds, day, jobHref, paymentLine, quoteTotals, signKindTitle, vehicleText,
   type MyWorkOrdersRead, type SignQueueItem, type SignQueueRead, type WorkOrderRow,
 } from './jobsReaders';
 import { ConfirmBookingSheet, ConfirmWorkDaySheet } from './PeopleSheets';
@@ -55,8 +54,11 @@ function QueueItem({ item, onSigned }: { item: SignQueueItem; onSigned: () => vo
     {who && <Text role="body">{who}</Text>}
     {totals && <Text role="measure" dense>{totals}</Text>}
     {amount && <Text role="measure" dense>{amount}</Text>}
-    {b.length > 0 && <div className="jb-says"><Text role="label">Signing says</Text><ul>{b.map(s => <li key={s}><Text role="body">{s}</Text></li>)}</ul></div>}
-    {nb.length > 0 && <div className="jb-says"><Text role="label">It does not say</Text><ul>{nb.map(s => <li key={s}><Text role="body">{s}</Text></li>)}</ul></div>}
+    {!workDay && (b.length > 0 || nb.length > 0) && <details>
+      <summary>About this confirmation</summary>
+      {b.length > 0 && <div className="jb-says"><Text role="label">Signing says</Text><ul>{b.map(s => <li key={s}><Text role="body">{s}</Text></li>)}</ul></div>}
+      {nb.length > 0 && <div className="jb-says"><Text role="label">It does not say</Text><ul>{nb.map(s => <li key={s}><Text role="body">{s}</Text></li>)}</ul></div>}
+    </details>}
     {workDay
       ? <div className="jb-actions"><button type="button" className="btn-base btn-sm btn-primary" disabled={!workDay.ok} onClick={() => setConfirming(true)}><Text role="label">Review work day</Text></button>
         {!workDay.ok && <Text role="caption">{workDay.error}</Text>}</div>
@@ -71,24 +73,20 @@ function QueueItem({ item, onSigned }: { item: SignQueueItem; onSigned: () => vo
 
 function JobRow({ row }: { row: WorkOrderRow }) {
   const title = row.display_title || row.title || 'Untitled job';
-  const stages = STAGES.filter(s => row.stage_states?.[s]).map(s => `${stageWord(s)}: ${stateWord(row.stage_states?.[s])}`).join(' · ');
   return <li className="jb-row" aria-label={title}>
     <div className="jb-row__head">
       <PrefetchLink to={jobHref(row.work_order_id)}><Text role="entity" dense>{title}</Text></PrefetchLink>
-      <Text role="caption">{(row.slots ?? []).map(slotWords).join(' · ')}</Text>
     </div>
     {vehicleText(row.vehicle_label) && <Text role="body">{vehicleText(row.vehicle_label)}</Text>}
     {row.retained_work?.visibility === 'included' && <>
-      {(row.retained_work.responsibility_reports ?? []).map(report => <div key={report.binding_id}>
-        <Text role="body">{report.provider_label} → {report.client_label}: delivery of the completed vehicle reported owed</Text>
-        <Text role="caption">{report.payment_state === 'paid_in_full' ? 'Payment reported settled · ' : ''}Reported {new Date(report.reported_at).toLocaleDateString('en-US', { timeZone: 'UTC' })}. Physical completion is separate.</Text>
+      {(row.retained_work.responsibility_reports ?? []).map(report => <div className="jb-work-responsibility" key={report.binding_id}>
+        <Text role="body">{report.provider_label} owes delivery to {report.client_label}.</Text>
+        <Text role="caption">Owner report · {day(report.reported_at)}{report.payment_state === 'paid_in_full' ? ' · Paid in full' : ''}</Text>
       </div>)}
       {!!row.retained_work.coverage?.total_source_entries && <PrefetchLink to={`${jobHref(row.work_order_id)}#retained-work`}>
-        <Text role="body">{row.retained_work.coverage.total_source_entries} source-linked build entries →</Text>
+        <Text role="body">{row.retained_work.coverage.total_source_entries} build records →</Text>
       </PrefetchLink>}
     </>}
-    {stages && <Text role="caption">{stages}</Text>}
-    {row.first_gap?.gap && <Text role="caption">Next: {stageWord(row.first_gap.stage)} — {gapWord(row.first_gap.gap)}</Text>}
   </li>;
 }
 
@@ -107,6 +105,8 @@ const ViewerWorkPage: React.FC = () => {
   const [jobRows, setJobRows] = useState<WorkOrderRow[]>([]);
   const [refusal, setRefusal] = useState<string | null>(null);
   const [cohort, setCohort] = useState<'responsible' | 'accessible'>('responsible');
+  const [reviewsOpen, setReviewsOpen] = useState(false);
+  const [reviewLimit, setReviewLimit] = useState(10);
   const generation = useRef(0);
   const paging = useRef(false);
 
@@ -142,26 +142,36 @@ const ViewerWorkPage: React.FC = () => {
   return <article className="jb-page jb-scope">
     <div className="jb-intro">
       <Text role="entity" as="h1">Work</Text>
-      <Text role="body">Your work responsibilities and records waiting for your signature. <PrefetchLink to="/jobs">Jobs looking for someone</PrefetchLink> · <PrefetchLink to="/work/market">The job market</PrefetchLink></Text>
-      <Text role="body"><PrefetchLink to="/work/setup">Set up your provider page</PrefetchLink> so jobs that fit can find you.</Text>
     </div>
     <div role="alert" className="jb-live">{refusal && <Text role="body" className="jb-warn">{refusal}</Text>}</div>
-    {queue && <Section title="Waiting for your signature" coverage={{ n: queue.coverage.returned, of: queue.coverage.total, grain: 'items', as_of: queue.as_of }}>
-      {queue.items.length === 0
-        ? <Text role="body">Nothing is waiting for your signature.</Text>
-        : <ul className="jb-list">{queue.items.map(i => <QueueItem key={`${i.kind}:${i.ref_id}`} item={i} onSigned={loadQueue} />)}</ul>}
-    </Section>}
-    <div role="group" aria-label="Work scope">
-      <button type="button" className="btn-base btn-sm btn-secondary" aria-pressed={cohort === 'responsible'} onClick={() => { if (cohort !== 'responsible') { setJobs(null); setJobRows([]); setCohort('responsible'); } }}>Your commitments</button>
-      <button type="button" className="btn-base btn-sm btn-secondary" aria-pressed={cohort === 'accessible'} onClick={() => { if (cohort !== 'accessible') { setJobs(null); setJobRows([]); setCohort('accessible'); } }}>All accessible work</button>
+    <div className="jb-actions" role="group" aria-label="Work scope">
+      <button type="button" className={`btn-base btn-sm ${cohort === 'responsible' ? 'btn-primary' : 'btn-secondary'}`} aria-pressed={cohort === 'responsible'} onClick={() => { if (cohort !== 'responsible') { setJobs(null); setJobRows([]); setCohort('responsible'); } }}>Your commitments</button>
+      <button type="button" className={`btn-base btn-sm ${cohort === 'accessible' ? 'btn-primary' : 'btn-secondary'}`} aria-pressed={cohort === 'accessible'} onClick={() => { if (cohort !== 'accessible') { setJobs(null); setJobRows([]); setCohort('accessible'); } }}>All accessible work</button>
     </div>
-    {jobs && <Section title={cohort === 'responsible' ? 'Your commitments' : 'Accessible work'} coverage={{ n: jobRows.length, of: jobs.coverage.total_for_viewer, grain: 'jobs', as_of: jobs.as_of }}>
+    {jobs && <Section title="Jobs" coverage={{ n: jobRows.length, of: jobs.coverage.total_for_viewer, grain: 'jobs', as_of: jobs.as_of }}>
       {jobRows.length === 0
-        ? <Text role="body">{cohort === 'responsible' ? 'No supported work responsibilities were returned. Unlinked source records may still contain work history.' : 'No accessible work orders were returned.'}</Text>
+        ? <Text role="body">{cohort === 'responsible' ? 'No jobs linked to your commitments yet.' : 'No jobs available in this view.'}</Text>
         : <ul className="jb-list">{jobRows.map(r => <JobRow key={r.work_order_id} row={r} />)}</ul>}
       {jobs.next_after && <div className="jb-more"><button type="button" className="btn-base btn-sm btn-secondary" onClick={() => void loadJobs(jobs.next_after)}>
         <Text role="label">More jobs</Text></button></div>}
     </Section>}
+    {!jobs && !refusal && <Text role="caption" as="p" aria-live="polite">Loading jobs…</Text>}
+    {queue && <section className="jb-work-reviews" aria-label="Record reviews">
+      <button type="button" className="btn-base btn-sm btn-secondary" aria-expanded={reviewsOpen} aria-controls="work-record-reviews" onClick={() => setReviewsOpen(open => !open)}>
+        Review records
+      </button>
+      {queue.coverage.total === 0 && <Text role="caption" as="p">Nothing waiting for review.</Text>}
+      <div id="work-record-reviews" hidden={!reviewsOpen}>{reviewsOpen && <Section title="Records to review" coverage={{ n: Math.min(reviewLimit, queue.items.length), of: queue.coverage.total, grain: 'records', as_of: queue.as_of }}>
+        <ul className="jb-list">{queue.items.slice(0, reviewLimit).map(i => <QueueItem key={`${i.kind}:${i.ref_id}`} item={i} onSigned={loadQueue} />)}</ul>
+        {reviewLimit < queue.items.length && <button type="button" className="btn-base btn-sm btn-secondary" onClick={() => setReviewLimit(limit => limit + 10)}>More records</button>}
+        {queue.coverage.total > queue.items.length && <Text role="caption" as="p">{queue.items.length} of {queue.coverage.total} records loaded.</Text>}
+      </Section>}</div>
+    </section>}
+    <details className="jb-work-tools"><summary>Work tools</summary><nav aria-label="Work tools">
+      <PrefetchLink to="/jobs">Find jobs</PrefetchLink>
+      <PrefetchLink to="/work/market">Job market</PrefetchLink>
+      <PrefetchLink to="/work/setup">Provider page</PrefetchLink>
+    </nav></details>
   </article>;
 };
 
