@@ -1210,3 +1210,12 @@
 
 .vehicle-profile-page .vp-source-coverage { padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text-secondary); font: 400 var(--text-caption)/1.5 var(--font-family); }
 .vehicle-profile-page .vp-source-coverage h4 { margin: 0 0 8px; color: var(--text); font: 600 var(--text-callout)/1.4 var(--font-family); }
+
+.vp-structured-claims { padding: 12px 0; border-bottom: 1px solid var(--border); font: 400 var(--text-callout)/1.5 var(--font-family); }
+.vp-structured-claims h3 { margin: 0 0 8px; font-size: var(--text-prose); }
+.vp-structured-claims dl { margin: 0; }
+.vp-structured-claims__row { padding: 8px 0; }
+.vp-structured-claims dt { font-size: var(--text-caption); color: var(--text-secondary); }
+.vp-structured-claims dd { margin: 4px 0; font-size: var(--text-prose); overflow-wrap: anywhere; }
+.vp-structured-claims__source { margin-top: 4px; font-size: var(--text-caption); }
+.vp-structured-claims__source a { display: inline-flex; align-items: center; min-height: 44px; }
