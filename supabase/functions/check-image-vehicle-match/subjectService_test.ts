@@ -92,6 +92,17 @@ Deno.test('a qualified singleton VIN uses the existing writer without a made-up 
   const f = await nativeCaptureFixture({ single: true }); equal((await f.admit()).status, 'created'); equal(f.requests.length, 1);
   equal(f.counts, { captures: 0, models: 0, candidates: 0 }); equal(f.writes, []);
 });
+Deno.test('an unresolved native read acknowledges source IDs separately from its reading IDs without filing', async () => {
+  const f = fixture();
+  const selected = ids.slice(0, 2);
+  const r = await retainDeviceSourceReading(f.store, { user_id: uid, image_ids: selected, identity_run_id: nativeRun,
+    identity_method_version: nativeMethod, expected_source_hashes: Object.fromEntries(f.sources.slice(0, 2).map(s => [s.id, s.file_hash])),
+    observations: selected.map(image_id => ({ image_id, read_at: '2026-10-02T00:00:00Z', is_vehicle: false,
+      is_document: false, labels: [], vin_candidates: [], on_device: [] })) }, new Date('2026-10-02T00:00:00Z'));
+  equal(r.status, 'reading_retained'); equal(r.persisted_image_ids, selected);
+  equal((r as any).reading_refs, selected.map(image_id => ({ image_id, reading_id: ids[0] })));
+  equal(f.writes, []); equal(f.counts.models, 0);
+});
 Deno.test('a nearby car-shaped frame without its own identifier cannot be filed by a native VIN request', async () => {
   const f = await nativeCaptureFixture({ neighbor: true }); equal((await f.admit()).status, 'insufficient_evidence'); equal(f.requests, []);
 });

@@ -282,9 +282,14 @@ export async function retainDeviceSourceReading(store: SubjectStore, request: De
     raw_model_reading: { kind: "on_device_identity_read_v1", identity_run_id: request.identity_run_id,
       identity_method_version: request.identity_method_version, observations: retained } };
   const persisted: string[] = [];
-  for (const id of ids) persisted.push(await store.retainReading(id, envelope));
+  const readingReferences: Array<{ image_id: string; reading_id: string }> = [];
+  for (const id of ids) {
+    const readingID = await store.retainReading(id, envelope);
+    if (!UUID.test(readingID)) throw new Error('native_reading_receipt_missing');
+    persisted.push(id); readingReferences.push({ image_id: id, reading_id: readingID });
+  }
   return { method: SUBJECT_METHOD, status: "reading_retained", persisted_image_ids: persisted,
-    identity_run_id: request.identity_run_id, inference_started: false };
+    reading_refs: readingReferences, identity_run_id: request.identity_run_id, inference_started: false };
 }
 
 /** Authentication alone is insufficient when a privileged client supplies user_id. */

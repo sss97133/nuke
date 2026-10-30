@@ -92,6 +92,18 @@ final class DeviceAttributionTests: XCTestCase {
         XCTAssertFalse(NativeIdentityOCR.identifierLike("WINDSHIELD"))
     }
 
+    func testIdentityFollowupNeedsExactRemoteSourceAcknowledgments() throws {
+        func response(_ json: String) throws -> AnyJSON { try JSONDecoder().decode(AnyJSON.self, from: Data(json.utf8)) }
+        XCTAssertTrue(AttributionEngine.identityReadingAcknowledged(try response(
+            #"{"status":"reading_retained","persisted_image_ids":["a","b"]}"#), imageIDs: ["b", "a"]))
+        for json in [#"{"status":"reading_retained"}"#,
+                     #"{"status":"reading_retained","persisted_image_ids":["a"]}"#,
+                     #"{"status":"reading_retained","persisted_image_ids":["reading-id","another-reading-id"]}"#,
+                     #"{"status":"refused","persisted_image_ids":["a","b"]}"#] {
+            XCTAssertFalse(AttributionEngine.identityReadingAcknowledged(try response(json), imageIDs: ["a", "b"]))
+        }
+    }
+
     func testMixedShopSessionFilesOnlyEachPhotosOwnSerialMatch() throws {
         let json = #"[{"id":"mustang","vehicle_id":null,"auto_suggested_vehicle_id":"vehicle-a","auto_suggestion_confidence":0.99,"auto_suggestion_reasons":["vin_ocr_match","edit_distance=0"]},{"id":"corvette","vehicle_id":null,"auto_suggested_vehicle_id":"vehicle-a","auto_suggestion_confidence":0.8,"auto_suggestion_reasons":["session_inheritance"]},{"id":"porsche","vehicle_id":null,"auto_suggested_vehicle_id":"vehicle-b","auto_suggestion_confidence":0.99,"auto_suggestion_reasons":["vin_ocr_match"]},{"id":"no-photo-evidence","vehicle_id":null,"auto_suggested_vehicle_id":null,"auto_suggestion_confidence":null,"auto_suggestion_reasons":null},{"id":"already-filed","vehicle_id":"vehicle-b","auto_suggested_vehicle_id":"vehicle-a","auto_suggestion_confidence":0.99,"auto_suggestion_reasons":["vin_ocr_match"]}]"#
         let rows = try JSONDecoder().decode([AttributionEngine.PhotoSuggestion].self, from: Data(json.utf8))

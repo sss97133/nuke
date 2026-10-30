@@ -394,7 +394,7 @@ final class BackgroundUploader: NSObject, ObservableObject {
         let now = Date()
         if !background, let last = lastIdentityAttempt, now.timeIntervalSince(last) >= 0,
            now.timeIntervalSince(last) < 15 { return false }
-        let sources = state.identityBatch(userID: userID, methodVersion: LibraryIngest.identityMethodVersion, limit: background ? 200 : 16, now: now)
+        let sources = state.identityBatch(userID: userID, methodVersion: LibraryIngest.identityMethodVersion, limit: background ? 200 : 2, now: now)
         guard !sources.isEmpty, persist() else { return false }
         identityRunning = true
         identityProgressed = false

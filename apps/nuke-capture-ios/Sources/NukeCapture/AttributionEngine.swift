@@ -223,7 +223,7 @@ final class AttributionEngine: ObservableObject {
 
         // Known vehicles + VINs (the small set we fuzzy-match against).
         let knownVehicles: [VehicleRow]
-        let orphans: [OrphanRow]
+        var orphans: [OrphanRow]
         let albumMap: [String: Set<String>]
         do {
             knownVehicles = try await fetchKnownVehicles(userId: userId)
@@ -346,9 +346,39 @@ final class AttributionEngine: ObservableObject {
                                   identityReadAt: identityReadAt, labels: labels,
                                   vinCandidates: sourceVINCandidates, isDocument: isDocument,
                                   session: sessionKey(row), onDevice: onDevice, textLines: lines))
-            for source in acknowledgedSources where source.matches(assetID: assetID, sha256: row.file_hash,
-                userID: userId, methodVersion: method) { qualifiedFollowupKeys.insert(source.key) }
         }
+
+
+        let receipts = Dictionary(acknowledgedSources.compactMap { source -> (String, DevicePrivacyReceipt)? in
+                guard let receipt = source.privacyReceipt, receipt.source_sha256 == source.sha256,
+                      receipt.owner_user_id == userId.lowercased() else { return nil }
+                return (source.sha256, receipt)
+            }, uniquingKeysWith: { first, _ in first })
+        // An unresolved native read is still retained evidence. A local cache
+        // entry cannot acknowledge this remote follow-up. Documents stay local.
+        let acknowledgedReads = signals.filter { signal in acknowledgedSources.contains {
+            $0.matches(assetID: signal.row.exif_data?.uuid, sha256: signal.row.file_hash,
+                userID: userId, methodVersion: method) } }
+        let remoteReads = acknowledgedReads.filter { !$0.isDocument }
+        let receiptGroups = stride(from: 0, to: remoteReads.count, by: 3).map { start in
+            let ids = Array(remoteReads[start..<min(start + 3, remoteReads.count)]).map { $0.row.id }
+            return (anchor: ids[0], ids: ids)
+        }
+        guard await recordIdentitySourcePass(receiptGroups, signals: signals, runID: identityRunID,
+            method: method, userId: userId, uploadReceipts: receipts) else {
+            lastSummary = "Native source reading remains pending; upload follow-up was retained."
+            return false
+        }
+        for signal in acknowledgedReads {
+            for source in acknowledgedSources where source.matches(assetID: signal.row.exif_data?.uuid,
+                sha256: signal.row.file_hash, userID: userId, methodVersion: method) {
+                qualifiedFollowupKeys.insert(source.key)
+            }
+        }
+        let acknowledgedReadIDs = Set(remoteReads.map { $0.row.id })
+        // A filed source still owes its reading receipt, never a reassignment.
+        signals.removeAll { $0.row.vehicle_id != nil }
+        orphans.removeAll { $0.vehicle_id != nil }
 
         let albumContext = Self.albumContextByAsset()
         let captureFrames = signals.map { s in
@@ -384,12 +414,7 @@ final class AttributionEngine: ObservableObject {
         pendingIdentifiers = Self.pendingIdentifiers(frames: captureFrames, reads: contextReads, groups: identityGroups)
         // Persist bounded 1–3 source reading receipts before any VIN profile write.
         // They use image_observations' protected reading-only lane; no subject membership is asserted.
-        let receipts = Dictionary(acknowledgedSources.compactMap { source -> (String, DevicePrivacyReceipt)? in
-                guard let receipt = source.privacyReceipt, receipt.source_sha256 == source.sha256,
-                      receipt.owner_user_id == userId.lowercased() else { return nil }
-                return (source.sha256, receipt)
-            }, uniquingKeysWith: { first, _ in first })
-        var retainedIdentityIDs = Set<String>()
+        var retainedIdentityIDs = acknowledgedReadIDs
         if !identityGroups.isEmpty {
             guard await recordIdentitySourcePass(identityGroups.map { (anchor: $0.anchorImageID, ids: $0.imageIDs) }, signals: signals, runID: identityRunID,
                     method: method, userId: userId, uploadReceipts: receipts) else {
@@ -790,7 +815,9 @@ final class AttributionEngine: ObservableObject {
         let byID = Dictionary(uniqueKeysWithValues: signals.map { ($0.row.id, $0) })
         for group in groups {
             let remaining = group.ids.filter { byID[$0] != nil && $0 != group.anchor }
-            let batches = remaining.isEmpty ? [[group.anchor]] : remaining.map { [group.anchor, $0] }
+            let batches = remaining.isEmpty ? [[group.anchor]] : stride(from: 0, to: remaining.count, by: 2).map {
+                [group.anchor] + Array(remaining[$0..<min($0 + 2, remaining.count)])
+            }
             for ids in batches {
                 guard ids.count >= 1, ids.count <= 3 else { continue }
                 let selected = ids.compactMap { byID[$0] }
@@ -816,7 +843,7 @@ final class AttributionEngine: ObservableObject {
                             expected_source_hashes: hashes, identity_run_id: runID,
                             identity_method_version: method, observations: items,
                             device_privacy_receipts: privacyByImage)))
-                    guard case .object(let object) = response, case .string("reading_retained")? = object["status"] else {
+                    guard Self.identityReadingAcknowledged(response, imageIDs: ids) else {
                         NSLog("NukeCapture on-device reading refused: %@", String(describing: response)); return false
                     }
                 } catch {
@@ -825,6 +852,14 @@ final class AttributionEngine: ObservableObject {
             }
         }
         return true
+    }
+
+    nonisolated static func identityReadingAcknowledged(_ response: AnyJSON, imageIDs: [String]) -> Bool {
+        guard !imageIDs.isEmpty, case .object(let object) = response,
+              case .string("reading_retained")? = object["status"],
+              case .array(let ids)? = object["persisted_image_ids"] else { return false }
+        let retained = ids.compactMap { item -> String? in if case .string(let id) = item { return id }; return nil }
+        return retained.count == ids.count && Set(retained) == Set(imageIDs)
     }
 
     nonisolated static func profileFiledIDs(from res: AnyJSON) -> Set<String> {
@@ -1265,9 +1300,9 @@ final class AttributionEngine: ObservableObject {
                 let matches = acknowledgedSources.filter { $0.matches(assetID: row.exif_data?.uuid, sha256: row.file_hash,
                     userID: userId, methodVersion: LibraryIngest.identityMethodVersion) }
                 guard !matches.isEmpty else { continue }
-                if row.vehicle_id != nil { qualifiedFollowupKeys.formUnion(matches.map(\.key)) }
-                else if seen.insert(row.id).inserted { out.append(row) }
+                if seen.insert(row.id).inserted { out.append(row) }
             }
+            return out
         }
         for range in Self.orphanPageRanges(limit: limit) {
             var query = SupabaseService.client.from("vehicle_images")
