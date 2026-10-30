@@ -269,6 +269,14 @@ BEGIN
  PERFORM pg_temp.ok('the actual perspective producer method can qualify its own retained exact reading',
   public.evaluate_contributor_evidence_item(item_id,reading_id)->'qualified'='true'::jsonb);
  UPDATE public.image_observations SET confidence_basis=jsonb_set(changed,
+  '{visual_subject_reading_v1,envelope,raw_model_reading,observations,0,on_device}',
+  (changed#>'{visual_subject_reading_v1,envelope,raw_model_reading,observations,0,on_device}') || jsonb_build_array(
+   jsonb_build_object('kind','ocr_text','value','2S8703N123456','confidence',1,'source',
+    jsonb_build_object('framework','Apple Vision','model','VNRecognizeTextRequest','revision',3,
+      'method','nuke-identity-perspective-seed-v1')))) WHERE id=reading_id;
+ PERFORM pg_temp.ok('a contradictory confidence-one seed prevents proof even if the final read matches',
+  public.evaluate_contributor_evidence_item(item_id,reading_id)->'qualified'='false'::jsonb);
+ UPDATE public.image_observations SET confidence_basis=jsonb_set(changed,
   '{visual_subject_reading_v1,envelope,raw_model_reading,observations,0,on_device,0,source,method}','"nuke-identity-perspective-seed-v1"') WHERE id=reading_id;
  PERFORM pg_temp.ok('an intermediate seed reading cannot be promoted to final claim proof',
   public.evaluate_contributor_evidence_item(item_id,reading_id)->'qualified'='false'::jsonb);

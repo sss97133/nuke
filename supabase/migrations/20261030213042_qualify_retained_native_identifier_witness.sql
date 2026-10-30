@@ -13,28 +13,28 @@ END $guard$;
 CREATE OR REPLACE FUNCTION public.contributor_native_identifier_matches(p_observation jsonb,p_identifier text)
 RETURNS boolean LANGUAGE sql IMMUTABLE SET search_path=pg_catalog,public AS $$
  WITH strong AS (
-  SELECT o FROM jsonb_array_elements(CASE WHEN jsonb_typeof(p_observation->'on_device')='array'
+  SELECT o,o#>>'{source,method}'='nuke-identity-perspective-seed-v1' AS is_seed FROM jsonb_array_elements(CASE WHEN jsonb_typeof(p_observation->'on_device')='array'
     THEN p_observation->'on_device' ELSE '[]'::jsonb END) o
   WHERE jsonb_typeof(o->'confidence')='number'
    AND CASE WHEN pg_input_is_valid(o->>'confidence','numeric') THEN (o->>'confidence')::numeric BETWEEN 0.9 AND 1 ELSE false END
    AND (o->'repaired' IS NULL OR o->'repaired'='false'::jsonb)
    AND o#>>'{source,framework}'='Apple Vision' AND o#>>'{source,model}'='VNRecognizeTextRequest'
-   AND o#>>'{source,method}' IN ('nuke-ondevice-v1','nuke-identity-perspective-v1') AND jsonb_typeof(o#>'{source,revision}')='number'
+   AND o#>>'{source,method}' IN ('nuke-ondevice-v1','nuke-identity-perspective-v1','nuke-identity-perspective-seed-v1') AND jsonb_typeof(o#>'{source,revision}')='number'
    AND CASE WHEN pg_input_is_valid(o#>>'{source,revision}','integer') THEN (o#>>'{source,revision}')::int>0 ELSE false END
  ), identifiers AS (
-  SELECT o->>'value' identifier FROM strong WHERE o->>'kind' IN ('vin','classic_serial')
+  SELECT o->>'value' identifier,is_seed FROM strong WHERE o->>'kind' IN ('vin','classic_serial')
    AND o->>'value' ~ '^[A-Z0-9]{8,17}$'
   UNION
-  SELECT m[1] FROM strong CROSS JOIN LATERAL regexp_matches(upper(o->>'value'),'\m([A-Z0-9]{17})\M','g') m
+  SELECT m[1],is_seed FROM strong CROSS JOIN LATERAL regexp_matches(upper(o->>'value'),'\m([A-Z0-9]{17})\M','g') m
    WHERE o->>'kind'='ocr_text'
   UNION
   -- This function only compares against a persisted vehicle identifier. A
   -- bare classic plate may match it exactly; it cannot create a new identity.
-  SELECT m[1] FROM strong CROSS JOIN LATERAL regexp_matches(upper(o->>'value'),'\m([A-Z0-9]{8,16})\M','g') m
+  SELECT m[1],is_seed FROM strong CROSS JOIN LATERAL regexp_matches(upper(o->>'value'),'\m([A-Z0-9]{8,16})\M','g') m
    WHERE o->>'kind'='ocr_text' AND length(p_identifier) BETWEEN 8 AND 16
     AND m[1] ~ '[A-Z]' AND m[1] ~ '[0-9]'
   UNION
-  SELECT m[1] FROM strong CROSS JOIN LATERAL regexp_matches(upper(o->>'value'),
+  SELECT m[1],is_seed FROM strong CROSS JOIN LATERAL regexp_matches(upper(o->>'value'),
    '\m(?:CHASSIS|SERIAL|VIN)\s*(?:NO\.?|NUMBER|#)?\s*[:#.-]?\s*([A-Z0-9]{8,16})\M','g') m
    WHERE o->>'kind'='ocr_text'
  ), candidates AS (
@@ -44,7 +44,8 @@ RETURNS boolean LANGUAGE sql IMMUTABLE SET search_path=pg_catalog,public AS $$
  SELECT coalesce(p_identifier ~ '^[A-Z0-9]{8,17}$' AND p_identifier ~ '[A-Z]' AND p_identifier ~ '[0-9]'
   AND p_observation->'is_document'='false'::jsonb
   AND (SELECT count(*)=1 AND bool_and(x=p_identifier) FROM candidates)
-  AND (SELECT count(*)=1 AND bool_and(identifier=p_identifier) FROM identifiers),false)
+  AND (SELECT count(*)=1 AND bool_and(identifier=p_identifier) FROM identifiers WHERE NOT is_seed)
+  AND NOT EXISTS(SELECT FROM identifiers WHERE is_seed AND identifier<>p_identifier),false)
 $$;
 REVOKE ALL ON FUNCTION public.contributor_native_identifier_matches(jsonb,text) FROM PUBLIC,anon,authenticated;
 GRANT EXECUTE ON FUNCTION public.contributor_native_identifier_matches(jsonb,text) TO service_role;
