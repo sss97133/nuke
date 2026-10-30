@@ -122,7 +122,10 @@ async function replay(id) {
   }
 }
 let processed = 0;
-for (const id of ids) {
+// Visit the whole manifest before spending later invocations on retries. A
+// persistent set of500 retryable records must not hide every remaining truck.
+const pendingIds = [...ids.filter(id => !state.results[id]), ...ids.filter(id => state.results[id]?.status === 'retry')];
+for (const id of pendingIds) {
   if (state.results[id] && state.results[id].status !== 'retry') continue;
   try { state.results[id] = { ...await replay(id), attempted_at: new Date().toISOString() }; }
   catch (error) {
