@@ -27,12 +27,24 @@ type StructuredClaim = {
   qualifiers?: { claim_role?: string; current_configuration_status?: string; factory_configuration_status?: string;
     observed_at_basis?: string; limitation?: string };
 };
+const RECORD_FIELDS = ['year', 'make', 'model', 'vin', 'trim', 'body_style', 'engine_type', 'engine_size',
+  'transmission', 'drivetrain', 'color', 'interior_color', 'mileage'] as const;
+type RecordField = typeof RECORD_FIELDS[number];
+type RecordAttribute = { value: string | number | null; data_type: string; unit: string | null;
+  value_status: 'unrecorded' | 'retained_record_value'; origin_column: string };
+type RecordBinding = { property_key: string; origin_column: string; value: string | number; unit: string | null;
+  record_columns_disagree: boolean };
+type StructuredRead = { id: string; status: 'loading' | 'ready' | 'failed'; claims: StructuredClaim[];
+  claimStatus?: 'loading' | 'ready' | 'failed'; attributes?: Record<RecordField, RecordAttribute>; bindings?: RecordBinding[] };
+const STRUCTURED_RECORD_LABELS: Record<RecordField, string> = { year: 'Year', make: 'Make', model: 'Model', vin: 'VIN', trim: 'Trim',
+  body_style: 'Body style', engine_type: 'Engine type', engine_size: 'Engine size', transmission: 'Transmission',
+  drivetrain: 'Drivetrain', color: 'Exterior color', interior_color: 'Interior color', mileage: 'Odometer' };
 const UUID = /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 
-/** Read admitted claims from the existing canonical owner, without promoting
- * a source assertion into a verified factory/current specification. */
-const StructuredProfileClaims: React.FC<{ vehicleId: string }> = ({ vehicleId }) => {
-  const [read, setRead] = useState<{ id: string; status: 'loading' | 'ready' | 'failed'; claims: StructuredClaim[] }>(
+/** Read every stored field first, then admitted claims from the same owner.
+ * A slow or failed source read must not hide the structured stored record. */
+const StructuredProfileData: React.FC<{ vehicleId: string }> = ({ vehicleId }) => {
+  const [read, setRead] = useState<StructuredRead>(
     { id: vehicleId, status: 'loading', claims: [] });
   React.useEffect(() => {
     if (!UUID.test(vehicleId)) return;
@@ -42,13 +54,36 @@ const StructuredProfileClaims: React.FC<{ vehicleId: string }> = ({ vehicleId })
     setRead({ id: vehicleId, status: 'loading', claims: [] });
     void (async () => {
       try {
+        const { data: records, error: recordError } = await supabase.rpc('get_vehicle_specs', {
+          p_vehicle_ids: [vehicleId], p_include_typed_claims: false,
+        }).abortSignal(controller.signal);
+        const model = Array.isArray(records) && records.length === 1 ? records[0] : null;
+        if (recordError || model?.vehicle_id !== vehicleId || model.schema_version !== 'vehicle_data_model_v1'
+          || model.typed_claims_status !== 'not_requested') throw Error('Unavailable structured record');
+        const record = model.retained_record;
+        const attributes = record?.attributes;
+        if (record?.origin_relation !== 'vehicles' || record.source_attribution_status !== 'unassayed'
+          || !attributes || !RECORD_FIELDS.every(key => {
+            const a = attributes[key];
+            return a && a.origin_column === key && (a.unit === null || typeof a.unit === 'string')
+              && ((a.value_status === 'unrecorded' && a.value === null)
+                || (a.value_status === 'retained_record_value'
+                  && ((a.data_type === 'string' && typeof a.value === 'string')
+                    || (a.data_type === 'integer' && Number.isSafeInteger(a.value)))));
+          }) || !Array.isArray(record.property_bindings)) throw Error('Unavailable structured record');
+        const bindings: RecordBinding[] = record.property_bindings;
+        if (!bindings.every(b => b && RECORD_FIELDS.includes(b.origin_column as RecordField)
+          && /^[a-z][a-z0-9_]*$/.test(b.property_key) && (b.unit === null || typeof b.unit === 'string')
+          && typeof b.record_columns_disagree === 'boolean'
+          && (typeof b.value === 'string' || (typeof b.value === 'number' && Number.isFinite(b.value))))) throw Error('Invalid record bindings');
+        if (active) setRead({ id: vehicleId, status: 'ready', claimStatus: 'loading', claims: [], attributes, bindings });
         const { data, error } = await supabase.rpc('get_vehicle_specs', {
           p_vehicle_ids: [vehicleId], p_include_typed_claims: true,
         }).abortSignal(controller.signal);
-        const model = Array.isArray(data) && data.length === 1 ? data[0] : null;
-        if (error || model?.vehicle_id !== vehicleId || model.schema_version !== 'vehicle_data_model_v1'
-          || model.typed_claims_status !== 'current_core_scope_read' || !Array.isArray(model.typed_claims)) throw Error('Unavailable structured claims');
-        const claims: StructuredClaim[] = model.typed_claims;
+        const claimModel = Array.isArray(data) && data.length === 1 ? data[0] : null;
+        if (error || claimModel?.vehicle_id !== vehicleId || claimModel.schema_version !== 'vehicle_data_model_v1'
+          || claimModel.typed_claims_status !== 'current_core_scope_read' || !Array.isArray(claimModel.typed_claims)) throw Error('Unavailable structured claims');
+        const claims: StructuredClaim[] = claimModel.typed_claims;
         if (!claims.every(c => c && /^[a-z][a-z0-9_]*$/.test(c.property_key)
           && UUID.test(c.property_id) && UUID.test(c.observation_id)
           && (c.unit === null || typeof c.unit === 'string')
@@ -59,19 +94,46 @@ const StructuredProfileClaims: React.FC<{ vehicleId: string }> = ({ vehicleId })
               .every(key => c.qualifiers?.[key as keyof NonNullable<StructuredClaim['qualifiers']>] == null
                 || typeof c.qualifiers?.[key as keyof NonNullable<StructuredClaim['qualifiers']>] === 'string')))
           && (typeof c.value === 'string' || (typeof c.value === 'number' && Number.isFinite(c.value))))) throw Error('Invalid structured claims');
-        if (active) setRead({ id: vehicleId, status: 'ready', claims });
+        if (active) setRead({ id: vehicleId, status: 'ready', claimStatus: 'ready', claims, attributes, bindings });
       } catch {
-        if (active) setRead({ id: vehicleId, status: 'failed', claims: [] });
+        if (active) setRead(previous => previous.id === vehicleId && previous.attributes
+          ? { ...previous, claimStatus: 'failed', claims: [] }
+          : { id: vehicleId, status: 'failed', claimStatus: 'failed', claims: [] });
       } finally { clearTimeout(timeout); }
     })();
     return () => { active = false; clearTimeout(timeout); controller.abort(); };
   }, [vehicleId]);
   if (!UUID.test(vehicleId)) return null;
-  const current = read.id === vehicleId ? read : { status: 'loading', claims: [] };
-  return <section aria-label="Structured source claims" className="vp-structured-claims">
+  const current: StructuredRead = read.id === vehicleId ? read : { id: vehicleId, status: 'loading', claims: [] };
+  return <>
+    <section aria-label="Structured vehicle data" className="vp-structured-claims">
+      <h3>Structured vehicle data</h3>
+      {current.status === 'loading' ? <p role="status">Reading vehicle data…</p>
+        : current.status === 'failed' ? <p role="status">Vehicle data could not be read. Missing information has not been established.</p>
+        : <table className="vp-structured-record">
+          <caption>Stored values; source attribution has not been established. Original and current configuration remain unknown. Source-backed claims appear below.</caption>
+          <thead><tr><th scope="col">Field</th><th scope="col">Recorded value</th></tr></thead>
+          <tbody>{RECORD_FIELDS.map(key => {
+            const a = current.attributes![key];
+            const derived = current.bindings?.filter(b => b.origin_column === key && (b.value !== a.value || b.unit !== a.unit || b.record_columns_disagree));
+            return <tr key={key} data-record-field={key}>
+              <th scope="row">{STRUCTURED_RECORD_LABELS[key]}</th>
+              <td>{a.value_status === 'unrecorded' ? <span className="vp-structured-record__unknown">Not recorded</span> : typeof a.value === 'string' && !a.value.trim() ? 'Empty recorded value' : String(a.value)}
+                {a.value !== null && a.unit && ` ${a.unit}`}
+                {key === 'mileage' && a.value !== null && !a.unit && <div className="vp-structured-record__note">Unit not established</div>}
+                {derived?.map(b => <div key={b.property_key} className="vp-structured-record__note">
+                  {b.property_key.replaceAll('_', ' ')}: {String(b.value)}{b.unit ? ` ${b.unit}` : ''}
+                  {b.record_columns_disagree && ' · Conflicting record values'}
+                </div>)}
+              </td>
+            </tr>;
+          })}</tbody>
+        </table>}
+    </section>
+    <section aria-label="Structured source claims" className="vp-structured-claims">
     <h3>Structured source claims</h3>
-    {current.status === 'loading' ? <p role="status">Reading structured evidence…</p>
-      : current.status === 'failed' ? <p role="status">Structured evidence could not be read. Missing information has not been established.</p>
+    {(current.claimStatus ?? current.status) === 'loading' ? <p role="status">Reading structured evidence…</p>
+      : (current.claimStatus ?? current.status) === 'failed' ? <p role="status">Structured evidence could not be read. Missing information has not been established.</p>
       : current.claims.length === 0 ? <p>No admitted core claims returned. Retained descriptions and records may still contain unprocessed evidence.</p>
       : <dl>{current.claims.map(claim => {
         let external: string | null = null;
@@ -92,7 +154,7 @@ const StructuredProfileClaims: React.FC<{ vehicleId: string }> = ({ vehicleId })
           </dd>
         </div>;
       })}</dl>}
-  </section>;
+  </section></>;
 };
 
 /* ------------------------------------------------------------------ */
@@ -646,7 +708,7 @@ const VehicleDossierPanel: React.FC = () => {
       <div className="vp-dossier-panel">
         <div className="vp-dossier-panel__title">Vehicle information</div>
 
-        <StructuredProfileClaims vehicleId={vehicle?.id || ''} />
+        <StructuredProfileData vehicleId={vehicle?.id || ''} />
 
         {FIELD_GROUPS.map((fg, gi) => {
           // Collect visible fields for this group
