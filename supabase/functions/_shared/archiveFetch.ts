@@ -231,6 +231,9 @@ export function isGarbageHtml(html: string, platform: string): boolean {
   if (lower.includes("cf-browser-verification")) return true;
   if (lower.includes("cf_chl_opt")) return true;
 
+  // AWS WAF can return HTTP 202 with a challenge script and no source content.
+  if (html.length < 20_000 && lower.includes("awswafintegration") && /token\.awswaf\.com[^\"\'<>]*\/challenge\.js/.test(lower)) return true;
+
   // Generic access denied / blocked
   if (lower.includes("access denied") && html.length < 5000) return true;
   if (lower.includes("403 forbidden") && html.length < 5000) return true;
@@ -333,7 +336,7 @@ export async function archiveFetch(
           } catch (_) { /* non-fatal */ }
         }
 
-        if (cachedHtml) {
+        if (cachedHtml && !isGarbageHtml(cachedHtml, platform)) {
           console.log(`[archiveFetch] Cache HIT for ${url} (snapshot ${cached.id}, fetched ${cached.fetched_at}, from ${cached.html_storage_path ? "storage" : "inline"})`);
           result.html = cachedHtml;
           result.markdown = cachedMarkdown;
@@ -449,7 +452,7 @@ export async function archiveFetch(
       fetch_method: result.source,
       http_status: result.statusCode,
       success: html !== null && html.length > 0 && !isGarbageHtml(html, platform),
-      error_message: result.error,
+      error_message: result.error || (html && isGarbageHtml(html, platform) ? "blocked_or_invalid_source_body" : null),
       html: html,
       markdown: markdownStored,
       html_sha256: htmlHash,

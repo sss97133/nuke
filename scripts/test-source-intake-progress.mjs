@@ -109,6 +109,7 @@ export function fixture(options = {}) {
         createIntakeBudget: (throttle, start) => ledger.createIntakeBudget(throttle, start, runtimeDate.now) };
       if (name.endsWith('/captureLedger.ts')) return { captureLedgerFields };
       if (name.endsWith('/feedFetch.ts')) return { fetchCraigslistFeed };
+      if (name.endsWith('/mecumSearch.ts')) return { fetchMecumFeedUrls: options.nativeDiscovery ?? (() => { throw new Error('unexpected native search'); }) };
       if (name.endsWith('/schedule.ts')) return { nextYield: () => ({ rate: 0, interval_minutes: 60 }) };
       if (name.endsWith('/removal.ts')) return { sweepCraigslistRemovals: async () => null, noticeFrom: () => null };
       if (name.endsWith('/kslCards.ts')) return { parseKslSearchCards: () => [] };
@@ -119,7 +120,8 @@ export function fixture(options = {}) {
       if (name.endsWith('/supabaseKeys.ts')) return { projectSecretKey: () => 'synthetic-service-key' };
       if (name.endsWith('/normalizeVehicle.ts')) return { isGarbageMake: () => false };
       if (name.endsWith('/urlNormalization.ts')) return { extractCraigslistCanonicalUrls: () => [] };
-      if (name.endsWith('/archiveFetch.ts')) return { archiveFetch: options.archive ?? (() => { throw new Error('unexpected acquisition'); }) };
+      if (name.endsWith('/archiveFetch.ts')) return { archiveFetch: options.archive ?? (() => { throw new Error('unexpected acquisition'); }),
+        isGarbageHtml: options.isGarbageHtml ?? (() => false) };
       if (name.endsWith('/firecrawl.ts')) return { firecrawlScrape: () => { throw new Error('unexpected paid provider'); } };
       throw new Error(`Unexpected feed import ${name}`);
     },
@@ -471,3 +473,32 @@ for (const failure of ['http-500-json', 'http-500-non-json', 'transport-error'])
     assert.equal(resumed.counts.landed_ledger_acknowledged, 1);
   });
 }
+
+test('Mecum native discovery reaches the existing ingestion and ledger path', async () => {
+  let calls = 0;
+  const url = 'https://www.mecum.com/lots/123/1980-ford-f100';
+  const f = fixture({ feed: { source_slug: 'mecum', search_criteria: { fetch_strategy: 'mecum_public_index' } },
+    nativeDiscovery: async () => { calls++; return { urls: [url], confirmedEmpty: false }; } });
+  const result = await f.request();
+  assert.equal(calls, 1);
+  assert.equal(result.body.results[0].items_found, 1);
+  assert(f.calls.some(c => c.path === '/functions/v1/ingest' && c.body.url === url));
+  assert(f.calls.some(c => c.path === '/rest/v1/import_queue' && c.body?.listing_url === url));
+});
+
+test('a Mecum search refusal fails without a paid fallback or ingestion', async () => {
+  const f = fixture({ feed: { source_slug: 'mecum', search_criteria: { fetch_strategy: 'mecum_public_index' } },
+    nativeDiscovery: async () => { throw new Error('mecum_index: HTTP 403'); } });
+  const result = await f.request();
+  assert.equal(result.body.results[0].error, 'fetch_failed: mecum_index: HTTP 403');
+  assert(!f.calls.some(c => c.path === '/functions/v1/ingest'));
+});
+
+test('a challenge body fails as blocked before regex matching or ingestion', async () => {
+  const f = fixture({ feed: { source_slug: 'gateway', search_criteria: { fetch_strategy: 'firecrawl_html', prefer_direct_fetch: true,
+    listing_url_regex: 'https://www.gatewayclassiccars.com/vehicle/[^" ]+' } },
+    archive: async () => ({ html: '<html>challenge</html>', statusCode: 202, error: null }), isGarbageHtml: () => true });
+  const result = await f.request();
+  assert.equal(result.body.results[0].error, 'blocked: source challenge');
+  assert(!f.calls.some(c => c.path === '/functions/v1/ingest'));
+});
