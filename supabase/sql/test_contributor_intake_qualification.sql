@@ -79,11 +79,19 @@ CREATE TEMP TABLE qualified_reading AS WITH inserted AS (
  SELECT id,'visual_subject_reading_v1',jsonb_build_object('visual_subject_reading_v1',jsonb_build_object('envelope',
   jsonb_build_object('user_id','00000000-0000-0000-0000-00000000000a','inputs',jsonb_build_array(
    jsonb_build_object('image_id',id,'source_sha256',repeat('9',64),'input_sha256',repeat('9',64),'source_qualified',true)),
-   'raw_model_reading',jsonb_build_object('kind','on_device_identity_context_v1',
+   'provider','Apple Vision (on-device)','model','vehicle-identity-context-fold-v3:fixture',
+   'run_key','70000000-0000-4000-8000-000000000001',
+   'raw_model_reading',jsonb_build_object('kind','on_device_identity_read_v1',
+    'identity_run_id','70000000-0000-4000-8000-000000000001',
     'identity_method_version','vehicle-identity-context-fold-v3:fixture',
     'observations',jsonb_build_array(jsonb_build_object('image_id',id,'is_document',false,
-      'vin_candidates',jsonb_build_array('1M8GDM9AXKP042788'))))))) FROM original_frame RETURNING id)
+      'vin_candidates',jsonb_build_array('1M8GDM9AXKP042788'),'on_device',jsonb_build_array(jsonb_build_object(
+       'kind','ocr_text','value','1M8GDM9AXKP042788','confidence',0.99,'repaired',false,
+       'source',jsonb_build_object('framework','Apple Vision','model','VNRecognizeTextRequest','revision',3,'method','nuke-ondevice-v1'))))))))) FROM original_frame RETURNING id)
  SELECT id FROM inserted;
+CREATE TEMP TABLE native_owner_acl AS SELECT oid,proacl,proowner FROM pg_proc WHERE oid IN
+ ('public.evaluate_contributor_evidence_item(uuid,uuid)'::regprocedure,'public.contributor_retained_reading_for(uuid)'::regprocedure);
+\i supabase/migrations/20261030213042_qualify_retained_native_identifier_witness.sql
 SELECT pg_temp.ok('only the explicit source-bound identifier rule can qualify the VIN claim',
  (SELECT public.evaluate_contributor_evidence_item(i.id,r.id)->>'qualified'='true'
   FROM public.vehicle_evidence_items i,qualified_reading r
@@ -190,3 +198,93 @@ SELECT pg_temp.ok('a fenced interruption retains work with a bounded retry delay
 SELECT pg_temp.ok('unfenced legacy completion and unprivileged review calls are refused',
  NOT has_function_privilege('anon','public.finish_contributor_intake_reevaluation(uuid,text,bigint,uuid)','EXECUTE')
  AND NOT has_function_privilege('authenticated','public.claim_contributor_intake_reevaluation(text,integer,uuid,uuid)','EXECUTE'));
+
+-- Exercise the actual reader with malformed/unqualified native payloads, not
+-- only the boolean helper. Original receipt and testimony stay unchanged.
+UPDATE public.image_observations SET is_active=true WHERE id=(SELECT id FROM qualified_reading);
+DO $test$ DECLARE original jsonb; changed jsonb; patch jsonb; item_id uuid; reading_id uuid;
+BEGIN
+ SELECT id INTO reading_id FROM qualified_reading;
+ SELECT confidence_basis INTO original FROM public.image_observations WHERE id=reading_id;
+ SELECT id INTO item_id FROM public.vehicle_evidence_items
+  WHERE vehicle_id='a0000000-0000-4000-8000-000000000001' AND key='shot_vin_plate';
+ FOR patch IN SELECT x FROM jsonb_array_elements('[
+  {"confidence":0.89},{"repaired":true},{"confidence":"0.99"},
+  {"value":"1M8GDM9AXKP042788 1HGCM82633A004352"},
+  {"source":{"framework":"other","model":"VNRecognizeTextRequest","revision":3,"method":"nuke-ondevice-v1"}},
+  {"source":{"framework":"Apple Vision","model":"VNRecognizeTextRequest","revision":0,"method":"nuke-ondevice-v1"}}
+ ]'::jsonb) x LOOP
+  changed:=jsonb_set(original,'{visual_subject_reading_v1,envelope,raw_model_reading,observations,0,on_device,0}',
+    original#>'{visual_subject_reading_v1,envelope,raw_model_reading,observations,0,on_device,0}'||patch);
+  UPDATE public.image_observations SET confidence_basis=changed WHERE id=reading_id;
+  PERFORM pg_temp.ok('unqualified OCR cannot prove the actual claim or advance its rung',
+   public.evaluate_contributor_evidence_item(item_id,reading_id)->'qualified'='false'::jsonb
+   AND public.contributor_intake_progress_for('a0000000-0000-4000-8000-000000000001')#>>'{rung,key}'='base');
+ END LOOP;
+ FOR changed IN SELECT x FROM (VALUES
+  (jsonb_set(original,'{visual_subject_reading_v1,envelope,raw_model_reading,observations,0,vin_candidates}',
+   '["1M8GDM9AXKP042788","1HGCM82633A004352"]')),
+  (jsonb_set(original,'{visual_subject_reading_v1,envelope,user_id}',to_jsonb(gen_random_uuid()::text))),
+  (jsonb_set(original,'{visual_subject_reading_v1,envelope,raw_model_reading,identity_run_id}',to_jsonb(gen_random_uuid()::text))),
+  (original#-'{visual_subject_reading_v1,envelope,raw_model_reading,observations,0,on_device}'),
+  (original#-'{visual_subject_reading_v1,envelope,raw_model_reading,identity_run_id}')
+ ) invalid(x) LOOP
+  UPDATE public.image_observations SET confidence_basis=changed WHERE id=reading_id;
+  PERFORM pg_temp.ok('ambiguous candidates, absent readings and substituted owner/run cannot prove a claim',
+   public.evaluate_contributor_evidence_item(item_id,reading_id)->'qualified'='false'::jsonb);
+ END LOOP;
+ UPDATE public.image_observations SET confidence_basis=original WHERE id=reading_id;
+ PERFORM pg_temp.ok('actual native reading qualifies with pinned stronger revision',
+  public.evaluate_contributor_evidence_item(item_id,reading_id)->>'qualification_revision'='native_vehicle_identifier_v2');
+ -- A later model context with candidate strings cannot displace the reusable
+ -- original qualified native witness or force completed extraction again.
+ INSERT INTO public.image_observations(image_id,observed_by,observed_at,confidence_basis)
+ SELECT image_id,observed_by,clock_timestamp()+interval '1 second',
+  jsonb_set(original#-'{visual_subject_reading_v1,envelope,raw_model_reading,observations,0,on_device}',
+    '{visual_subject_reading_v1,envelope,raw_model_reading,kind}','"on_device_identity_context_v1"')
+ FROM public.image_observations WHERE id=reading_id;
+ PERFORM pg_temp.ok('later candidate-only context does not hide a retained qualified native witness',
+  public.contributor_retained_reading_for((SELECT id FROM original_frame))=reading_id);
+END $test$;
+SELECT pg_temp.ok('existing qualification owner grants and ownership stay unchanged',
+ NOT EXISTS(SELECT FROM native_owner_acl a JOIN pg_proc p ON p.oid=a.oid
+ WHERE p.proacl IS DISTINCT FROM a.proacl OR p.proowner<>a.proowner)
+ AND NOT has_function_privilege('authenticated','public.contributor_native_identifier_matches(jsonb,text)','EXECUTE')
+ AND NOT has_function_privilege('anon','public.contributor_native_identifier_matches(jsonb,text)','EXECUTE'));
+DO $test$ DECLARE original jsonb; original_identifier text; changed jsonb; item_id uuid; reading_id uuid;
+BEGIN
+ SELECT id INTO reading_id FROM qualified_reading;
+ SELECT confidence_basis INTO original FROM public.image_observations WHERE id=reading_id;
+ SELECT vin INTO original_identifier FROM public.vehicles WHERE id='a0000000-0000-4000-8000-000000000001';
+ SELECT id INTO item_id FROM public.vehicle_evidence_items WHERE vehicle_id='a0000000-0000-4000-8000-000000000001' AND key='shot_vin_plate';
+ UPDATE public.vehicles SET vin='2S87T3N123456' WHERE id='a0000000-0000-4000-8000-000000000001';
+ changed:=jsonb_set(jsonb_set(original,'{visual_subject_reading_v1,envelope,raw_model_reading,observations,0,vin_candidates}',
+   '["2S87T3N123456"]'),'{visual_subject_reading_v1,envelope,raw_model_reading,observations,0,on_device,0,value}','"2S87T3N123456"');
+ UPDATE public.image_observations SET confidence_basis=changed WHERE id=reading_id;
+ PERFORM pg_temp.ok('an unlabelled classic plate can match the persisted identifier exactly',
+  public.evaluate_contributor_evidence_item(item_id,reading_id)->'qualified'='true'::jsonb);
+ changed:=jsonb_set(changed,'{visual_subject_reading_v1,envelope,raw_model_reading,observations,0,on_device,0,source,method}',
+  '"nuke-identity-perspective-v1"');
+ UPDATE public.image_observations SET confidence_basis=changed WHERE id=reading_id;
+ PERFORM pg_temp.ok('the actual perspective producer method can qualify its own retained exact reading',
+  public.evaluate_contributor_evidence_item(item_id,reading_id)->'qualified'='true'::jsonb);
+ UPDATE public.image_observations SET confidence_basis=jsonb_set(changed,
+  '{visual_subject_reading_v1,envelope,raw_model_reading,observations,0,on_device}',
+  (changed#>'{visual_subject_reading_v1,envelope,raw_model_reading,observations,0,on_device}') || jsonb_build_array(
+   jsonb_build_object('kind','ocr_text','value','2S8703N123456','confidence',1,'source',
+    jsonb_build_object('framework','Apple Vision','model','VNRecognizeTextRequest','revision',3,
+      'method','nuke-identity-perspective-seed-v1')))) WHERE id=reading_id;
+ PERFORM pg_temp.ok('a contradictory confidence-one seed prevents proof even if the final read matches',
+  public.evaluate_contributor_evidence_item(item_id,reading_id)->'qualified'='false'::jsonb);
+ UPDATE public.image_observations SET confidence_basis=jsonb_set(changed,
+  '{visual_subject_reading_v1,envelope,raw_model_reading,observations,0,on_device,0,source,method}','"nuke-identity-perspective-seed-v1"') WHERE id=reading_id;
+ PERFORM pg_temp.ok('an intermediate seed reading cannot be promoted to final claim proof',
+  public.evaluate_contributor_evidence_item(item_id,reading_id)->'qualified'='false'::jsonb);
+ UPDATE public.image_observations SET confidence_basis=jsonb_set(changed,
+  '{visual_subject_reading_v1,envelope,raw_model_reading,observations,0,on_device,0,value}','"2S8703N123456"') WHERE id=reading_id;
+ PERFORM pg_temp.ok('native confidence one cannot repair a wrong classic glyph into proof',
+  public.evaluate_contributor_evidence_item(item_id,reading_id)->'qualified'='false'::jsonb);
+ UPDATE public.image_observations SET confidence_basis=original WHERE id=reading_id;
+ UPDATE public.vehicles SET vin=original_identifier WHERE id='a0000000-0000-4000-8000-000000000001';
+END $test$;
+\i supabase/migrations/20261030213042_qualify_retained_native_identifier_witness.sql
