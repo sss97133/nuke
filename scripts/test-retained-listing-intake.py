@@ -10,7 +10,7 @@ import sys
 
 host = os.environ.get('PGHOST', '/private/tmp')
 port = os.environ.get('PGPORT', '5432' if host == 'localhost' else '55438')
-assert len(sys.argv)<=14 and set(sys.argv[2:]) <= {'--two-front','--bulk120','--powertrain','--description','--odometer','--identity','--vin-label','--craigslist-odometer','--craigslist-year','--native-year','--native-identity','--public-identity-evidence'}
+assert len(sys.argv)<=15 and set(sys.argv[2:]) <= {'--two-front','--bulk120','--powertrain','--description','--odometer','--identity','--vin-label','--craigslist-odometer','--craigslist-year','--native-year','--native-identity','--public-identity-evidence','--mecum-identity'}
 database = sys.argv[1] if len(sys.argv)>=2 else 'dm_refinement_listing_intake_ci'
 two_front = '--two-front' in sys.argv[2:]
 bulk120 = '--bulk120' in sys.argv[2:]
@@ -33,8 +33,10 @@ native_identity='--native-identity' in sys.argv[2:]
 assert not native_identity or native_year
 public_identity_evidence='--public-identity-evidence' in sys.argv[2:]
 assert not public_identity_evidence or native_identity
+mecum_identity='--mecum-identity' in sys.argv[2:]
+assert not mecum_identity or native_identity
 assert not powertrain or (two_front and bulk120)
-assert host in ('localhost', '/private/tmp') and database.startswith('dm_refinement_listing_')
+assert (host in ('localhost', '/private/tmp') or re.fullmatch(r'/(?:private/)?tmp/db-contracts\.[A-Za-z0-9]+',host)) and database.startswith('dm_refinement_listing_')
 psql = os.environ.get('NUKE_TEST_PSQL', 'psql')
 def sql(text):
     return subprocess.check_output([psql, '-X', '-h', host, '-p', port, '-d', database,
@@ -360,6 +362,9 @@ if powertrain:
     if public_identity_evidence:
         from test_public_identity_evidence import run_public_identity_evidence_checks
         run_public_identity_evidence_checks(sql,read,rejects,passed)
+    if mecum_identity:
+        from test_retained_mecum_identity import run_mecum_identity_checks
+        run_mecum_identity_checks(sql,read,rejects,claim,passed)
     sys.exit(0)
 if two_front:
     assert sql("SELECT reverse_cursor_recorded_at='2026-01-01'::timestamptz AND cursor_recorded_at='2026-01-01'::timestamptz FROM retained_listing_property_replay")=='t'
