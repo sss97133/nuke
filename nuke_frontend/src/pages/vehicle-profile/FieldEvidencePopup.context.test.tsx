@@ -5,14 +5,14 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
-const fixture = vi.hoisted(() => ({ client: null as unknown as SupabaseClient, open: vi.fn(), photo: vi.fn(), refused: false }));
+const fixture = vi.hoisted(() => ({ client: null as unknown as SupabaseClient, open: vi.fn(), photo: vi.fn(), refused: false, citedReference: false }));
 vi.mock('../../lib/supabase', () => ({ supabase: { from: (...args: any[]) => (fixture.client.from as any)(...args) } }));
 vi.mock('../../components/popups/usePopup', () => ({ usePopup: () => ({ closeTop: vi.fn(), openPopup: fixture.open }) }));
 vi.mock('./VehiclePhotoLightbox', () => ({ openVehiclePhoto: fixture.photo }));
 vi.mock('./hooks/useFieldEvidence', () => ({ useFieldEvidence: () => ({ evidence: {}, loading: false, error: null }) }));
 vi.mock('./hooks/useFieldProvenance', async original => ({
   ...await original<typeof import('./hooks/useFieldProvenance')>(),
-  useFieldProvenance: () => ({ data: { value: 'Automatic', evidence: [], coverage: fixture.refused ? { status: 'refused_input_limit' } : undefined, observations: [
+  useFieldProvenance: () => ({ data: { value: 'Automatic', evidence: fixture.citedReference ? [{ source: 'field_evidence', value: 'Automatic', source_type: 'owner', verified: true, image_id: 'reference-engine', at: null }] : [], coverage: fixture.refused ? { status: 'refused_input_limit' } : undefined, observations: [
     { id: 'specific-report', value: '6L90', content: 'Specific transmission retained in the vehicle report.', source_slug: 'synthetic_source', observed_at: '2026-01-02T00:00:00Z' },
   ] }, isLoading: false }),
 }));
@@ -32,7 +32,7 @@ let root: Root, host: HTMLDivElement, cache: QueryClient;
 let requests: URL[], fail: boolean;
 beforeEach(() => {
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
-  requests = []; fail = false; fixture.refused = false; fixture.open.mockReset(); fixture.photo.mockReset();
+  requests = []; fail = false; fixture.refused = false; fixture.citedReference = false; fixture.open.mockReset(); fixture.photo.mockReset();
   vi.stubGlobal('fetch', vi.fn(() => { throw new Error('Real network forbidden'); }));
   fixture.client = createClient('https://context.test', 'synthetic-anon', {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
@@ -82,6 +82,32 @@ it('reports a failed segment read without turning it into an empty population', 
   await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); });
   expect(host.textContent).toContain('Related profiles could not be read');
   expect(host.textContent).not.toContain('No other profiles returned');
+});
+
+it('keeps references in a separate inspectable group and excludes paper from both groups', async () => {
+  await render();
+  const physical = host.querySelector('.vp-field-context__images[data-image-context="physical"]');
+  const references = host.querySelector('.vp-field-context__images[data-image-context="reference"]');
+  expect(physical?.querySelectorAll('img')).toHaveLength(1);
+  expect(references?.querySelectorAll('img')).toHaveLength(1);
+  expect(references?.querySelector('img')?.src).toBe('https://images.test/reference.jpg');
+  expect(host.querySelector('img[src="https://images.test/receipt.jpg"]')).toBeNull();
+  await act(async () => (references?.querySelector('button') as HTMLButtonElement).click());
+  expect(fixture.photo).toHaveBeenCalledWith('reference-engine');
+  expect(requests).toHaveLength(0);
+});
+
+it('retains an accepted reference citation once in the contextual reference group', async () => {
+  fixture.citedReference = true; await render();
+  expect(host.querySelector('.vp-field-context__images[data-image-context="reference"]')?.querySelectorAll('button')).toHaveLength(1);
+  expect(host.querySelector('.vp-field-context__images[data-image-context="physical"] img[src="https://images.test/reference.jpg"]')).toBeNull();
+});
+
+it('preserves reference originals in the plain field evidence drawer', async () => {
+  await act(async () => root.render(<QueryClientProvider client={cache}><FieldEvidencePopup vehicleId="subject" field="transmission" label="Transmission" value="Automatic" /></QueryClientProvider>));
+  expect(host.querySelector('.field-evidence-related-images[data-image-context="physical"]')?.querySelectorAll('a')).toHaveLength(1);
+  expect(host.querySelector('.field-evidence-related-images[data-image-context="reference"] a')?.getAttribute('href')).toBe('https://images.test/reference.jpg');
+  expect(host.querySelector('img[src="https://images.test/receipt.jpg"]')).toBeNull();
 });
 
 it('withholds refused source collections in the contextual presentation as well as the evidence drawer', async () => {

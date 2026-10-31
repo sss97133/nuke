@@ -361,7 +361,8 @@ receipt matching and field relevance. Reference components keep their receipt ca
 paper documents keep their paper citation. Neither becomes a photographed part of the attributed build.
 The existing profile field reader now retains the scene classification and excludes document/reference
 context from uncited physical-area recommendations, including a false legacy `is_document` flag.
-Gallery records and explicit source citations remain available. Retained-source comparisons exercise
+Relevant renders and diagrams stay inspectable in a separate reference-material group; gallery records
+and explicit source citations remain available. Retained-source comparisons exercise
 the actual old/new producer rules and field mapper: reference confirmations are withheld and admitted
 renders/catalog references stop appearing as physical-area photographs. The separate physical-image
 controls retain their results. A receipt regression remains covered, but an inspected invoice was already

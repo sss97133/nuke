@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 vi.mock('../../../lib/supabase', () => ({ supabase: {} }));
-import { hasImageAnalysis, hasImageZone, isRelatedFieldImage, relatedFieldImages, webSourceUrl, type EvidenceImage } from './useVehicleImageEvidence';
+import { hasImageAnalysis, hasImageZone, isRelatedFieldImage, relatedFieldImages, referenceFieldImages, webSourceUrl, type EvidenceImage } from './useVehicleImageEvidence';
 import { citedFieldImages, evidenceOrder, type FieldProvenance } from './useFieldProvenance';
 const image = (id: string, changes: Partial<EvidenceImage> = {}): EvidenceImage => ({ id, image_url: `https://example.com/${id}.jpg`, thumbnail_url: null, medium_url: null, vehicle_zone: null, angle: null, ai_detected_angle: null, ai_processing_status: 'pending', vision_analyzed_at: null, vision_model_version: null, created_at: null, taken_at: null, source: 'external_import', is_primary: false, is_document: false, category: 'general', ...changes });
 const provenance = (changes: Partial<FieldProvenance> = {}): FieldProvenance => ({ field: 'color', value: 'Silver Pearl', inline_source: 'listing', source_image_url: null, evidence: [], observations: [], ...changes });
@@ -50,6 +50,19 @@ describe('field image evidence boundaries', () => {
   it.each(['cross_reference', 'product_screenshot', 'spreadsheet', 'hand_drawn_diagram'])('keeps %s context out of related physical-area photographs', scene => {
     const reference = image('reference', { vehicle_zone: 'mech_drivetrain', ai_byok_scene: scene, ai_byok_narrative: 'Transmission design reference.' });
     expect(relatedFieldImages([reference], 'transmission')).toEqual([]);
+    expect(referenceFieldImages([reference], 'transmission')).toEqual([reference]);
+  });
+  it('keeps relevant references inspectable in component order without including physical photos, paper or unrelated material', () => {
+    const area = image('area-reference', { vehicle_zone: 'mech_drivetrain', ai_byok_scene: 'cross_reference' });
+    const component = image('component-reference', { ai_byok_scene: 'product_screenshot', ai_byok_components: [{ label: 'Transmission assembly' }] });
+    const unrelated = image('unrelated', { vehicle_zone: 'mech_engine_bay', ai_byok_scene: 'cross_reference' });
+    const receipt = image('receipt', { vehicle_zone: 'mech_drivetrain', ai_byok_scene: 'receipt_document' });
+    const document = image('document', { ...area, id: 'document', is_document: true });
+    const physical = image('physical', { vehicle_zone: 'mech_drivetrain' });
+    const inventory = [area, physical, receipt, unrelated, document, component];
+    expect(referenceFieldImages(inventory, 'transmission')).toEqual([component, area]);
+    expect(relatedFieldImages(inventory, 'transmission')).toEqual([physical]);
+    expect(inventory[0]).toBe(area);
   });
   it('accepts nested source context and withholds explicit attribution doubt', () => {
     const physical = image('physical', { vehicle_zone: 'mech_drivetrain' });
