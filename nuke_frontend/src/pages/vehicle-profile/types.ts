@@ -614,6 +614,8 @@ export interface LiveSession {
 }
 
 export interface AuctionPulse {
+  /** Source-feed receipt clock; never the generic database updated_at. */
+  source_observed_at?: string | null;
   platform: string;
   /** Legacy external_listings id when the pulse came from that writer; canonical event pulses carry null. */
   external_listing_id?: string | null;

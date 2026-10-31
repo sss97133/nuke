@@ -19,6 +19,8 @@ vi.mock('./profileDocument', async (original) => {
     vehicleId && fixture.read ? real.profileDocumentFrom(fixture.read, priceOwnedByLiveStack) : null };
 });
 vi.mock('./FieldEvidencePopup', () => ({ default: ({ field, value, context }: any) => <div data-testid="field-context" data-field={field} data-match-field={context.matchField}>{value} vehicle context</div> }));
+// This suite owns price provenance; the financial department has its own reader/interaction tests.
+vi.mock('./ProfileFinancials', () => ({ default: ({ market }: any) => <>{market}<button>$$$</button></> }));
 vi.mock('../../components/auction/ExternalAuctionLiveBanner', () => ({ default: () => null,
   ExternalAuctionSummary: ({ currentBid }: any) => <button data-live-bid={currentBid}>Live episode</button> }));
 vi.mock('../../hooks/useIsMobile', () => ({ useIsMobile: () => false }));

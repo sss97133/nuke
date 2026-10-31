@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import { supabase } from '../../../lib/supabase';
+import { useAuthContext } from '../../../contexts/AuthContext';
 
 // Shape mirrors vehicle_observations rows with kind='work_record' AND
 // extraction_method='audit_draft_v0'. Read owner-scoped via the
@@ -15,7 +16,7 @@ export interface BuildLedgerEntry {
   id: string;
   observedAt: string | null;
   description: string;
-  amountUsd: number;
+  amountUsd: number | null;
   direction: BuildDirection | string;
   eventType: BuildEventType | string;
   counterparty: string | null;
@@ -33,11 +34,11 @@ export interface BuildLedgerEntry {
 }
 
 export interface BuildLedgerGroup {
-  eventType: BuildEventType;
+  eventType: BuildEventType | string;
   label: string;
   entries: BuildLedgerEntry[];
-  documentedTotal: number;
-  statedPendingTotal: number;
+  documentedTotal: number | null;
+  statedPendingTotal: number | null;
 }
 
 // A cost the accounting book assigns to this vehicle (expense-use cell on a booked Expense), read through the
@@ -120,8 +121,8 @@ export function parseWorkingNotes(payload: unknown, bookOwnerId: string): Workin
 
 export interface BuildLedgerData {
   groups: BuildLedgerGroup[];
-  documentedTotal: number;
-  statedPendingTotal: number;
+  documentedTotal: number | null;
+  statedPendingTotal: number | null;
   pendingCount: number;
   entryCount: number;
   auditRun: string | null;
@@ -158,12 +159,22 @@ function isStatedPending(e: BuildLedgerEntry): boolean {
   return e.attributionTier === 'stated' || e.direction === 'liability';
 }
 
+function auditSubtotal(rows: BuildLedgerEntry[], eligible: (entry: BuildLedgerEntry) => boolean): number | null {
+  const known = rows.filter(entry => eligible(entry) && entry.amountUsd != null);
+  return known.length ? known.reduce((sum, entry) => sum + Math.round(entry.amountUsd! * 100), 0) / 100 : null;
+}
+
 function num(v: unknown): number {
   return v != null && !Number.isNaN(Number(v)) ? Number(v) : 0;
 }
 
 function str(v: unknown): string | null {
   return v == null ? null : String(v);
+}
+
+function nullableMoney(value: unknown): number | null {
+  if (typeof value !== 'number' && (typeof value !== 'string' || !/^-?\d+(\.\d+)?$/.test(value))) return null;
+  return Number.isFinite(Number(value)) ? Number(value) : null;
 }
 
 interface RawLedgerRow {
@@ -173,24 +184,64 @@ interface RawLedgerRow {
   structured_data: Record<string, unknown> | null;
 }
 
+/** Parse the existing accounting reader without inventing currency or an unsplit amount. */
+export function parseVehicleBookCosts(data: Record<string, unknown>[]): BookCostEntry[] {
+  return (data as Record<string, unknown>[]).map((r): BookCostEntry => ({
+    id: String(r.use_id),
+    bookOwnerId: String(r.book_owner_id),
+    documentId: String(r.document_id),
+    ledgerId: str(r.ledger_id),
+    year: str(r.record_year),
+    date: str(r.record_date),
+    description: str(r.description) ?? '',
+    account: str(r.account),
+    category: str(r.category),
+    kind: bookCostKind(str(r.category)),
+    allocated: nullableMoney(r.allocated_amount),
+    bookAmount: nullableMoney(r.book_amount),
+    currency: typeof r.currency === 'string' && /^[A-Z]{3}$/.test(r.currency) ? r.currency : '',
+    basis: str(r.basis),
+    assignedBy: str(r.assigned_by),
+    assignedMethod: str(r.assigned_method),
+    assignedAt: str(r.assigned_at),
+  }));
+}
+
+/** Shared by the header and build ledger. A caller's books never reuse another caller's cache. */
+export function useVehicleBookCosts(vehicleId: string | undefined) {
+  const { user, loading } = useAuthContext();
+  const read = useQuery({
+    queryKey: ['build-ledger', vehicleId, 'book', user?.id ?? 'anon', 'coverage-v1'],
+    queryFn: async () => {
+      const { data, error, count } = await supabase.rpc('accounting_vehicle_costs', { p_vehicle_id: vehicleId! }, { count: 'exact' });
+      if (error || !Array.isArray(data)) throw new Error('Vehicle costs could not load.');
+      return { entries: parseVehicleBookCosts(data), total: count ?? null };
+    },
+    enabled: !!vehicleId && !loading && !!user,
+    staleTime: 60 * 1000,
+    gcTime: 0,
+    retry: false,
+  });
+  return { ...read, data: read.data?.entries, total: read.data?.total ?? null };
+}
+
 export function useBuildLedger(vehicleId: string | undefined) {
-  const { data: rawRows, isLoading, error } = useQuery({
-    queryKey: ['build-ledger', vehicleId],
+  const { user, loading: authLoading } = useAuthContext();
+  const auditRead = useQuery({
+    queryKey: ['build-ledger', vehicleId, 'audit', user?.id ?? 'anon'],
     queryFn: async (): Promise<BuildLedgerEntry[]> => {
       if (!vehicleId) return [];
       const { data, error: rpcErr } = await supabase.rpc('get_vehicle_build_ledger', {
         p_vehicle_id: vehicleId,
       });
-      // Degrade silently: a non-owner (or not-yet-applied migration) yields no
-      // rows and the section renders null. Never surface financial errors in UI.
-      if (rpcErr || !Array.isArray(data)) return [];
+      if (rpcErr || !Array.isArray(data)) throw new Error('Build records could not load.');
       return (data as RawLedgerRow[]).map((r): BuildLedgerEntry => {
         const sd = (r.structured_data ?? {}) as Record<string, unknown>;
         return {
           id: r.observation_id,
           observedAt: r.observed_at ?? null,
           description: r.content_text ?? '',
-          amountUsd: num(sd.amount_usd),
+          amountUsd: nullableMoney(sd.amount_usd),
           direction: str(sd.direction) ?? 'out',
           eventType: str(sd.event_type) ?? 'parts_purchase',
           counterparty: str(sd.counterparty),
@@ -208,60 +259,36 @@ export function useBuildLedger(vehicleId: string | undefined) {
         };
       });
     },
-    enabled: !!vehicleId && vehicleId.length >= 20,
-    staleTime: 10 * 60 * 1000,
+    enabled: !!vehicleId && vehicleId.length >= 20 && !authLoading && !!user,
+    staleTime: 60 * 1000,
+    gcTime: 0,
+    retry: false,
   });
 
-  // Costs assigned to this vehicle in the accounting book. Same silent degrade as above: no book access, no vehicle
-  // access or a not-yet-applied migration yields no rows.
-  const { data: bookRows, isLoading: bookLoading } = useQuery({
-    queryKey: ['build-ledger', vehicleId, 'book'],
-    queryFn: async (): Promise<BookCostEntry[]> => {
-      if (!vehicleId) return [];
-      const { data, error: rpcErr } = await supabase.rpc('accounting_vehicle_costs', { p_vehicle_id: vehicleId });
-      if (rpcErr || !Array.isArray(data)) return [];
-      return (data as Record<string, unknown>[]).map((r): BookCostEntry => ({
-        id: String(r.use_id),
-        bookOwnerId: String(r.book_owner_id),
-        documentId: String(r.document_id),
-        ledgerId: str(r.ledger_id),
-        year: str(r.record_year),
-        date: str(r.record_date),
-        description: str(r.description) ?? '',
-        account: str(r.account),
-        category: str(r.category),
-        kind: bookCostKind(str(r.category)),
-        allocated: r.allocated_amount != null && !Number.isNaN(Number(r.allocated_amount)) ? Number(r.allocated_amount) : null,
-        bookAmount: r.book_amount != null && !Number.isNaN(Number(r.book_amount)) ? Number(r.book_amount) : null,
-        currency: str(r.currency) ?? 'USD',
-        basis: str(r.basis),
-        assignedBy: str(r.assigned_by),
-        assignedMethod: str(r.assigned_method),
-        assignedAt: str(r.assigned_at),
-      }));
-    },
-    enabled: !!vehicleId && vehicleId.length >= 20,
-    staleTime: 10 * 60 * 1000,
-  });
+  const bookRead = useVehicleBookCosts(vehicleId);
+  const { data: bookRows, isLoading: bookLoading } = bookRead;
 
-  // The signed-in owner's working notes that name this vehicle (their own book only). Same silent degrade.
-  const { data: noteTables, isLoading: notesLoading } = useQuery({
-    queryKey: ['build-ledger', vehicleId, 'working-notes'],
+  // Working notes stay in the signed-in viewer's own book; read failures remain distinct from empty.
+  const noteRead = useQuery({
+    queryKey: ['build-ledger', vehicleId, 'working-notes', user?.id ?? 'anon'],
     queryFn: async (): Promise<WorkingNoteTable[]> => {
       if (!vehicleId) return [];
-      const session = await supabase.auth?.getSession?.();
-      const uid = session?.data?.session?.user?.id;
+      const uid = user?.id;
       if (!uid) return [];
       const { data, error: rpcErr } = await supabase.rpc('owner_working_notes', {
         p_owner_id: uid, p_vehicle_id: vehicleId, p_rows: 20, p_limit: 10,
       });
-      if (rpcErr || !data) return [];
+      if (rpcErr || !data) throw new Error('Working notes could not load.');
       return parseWorkingNotes(data, uid);
     },
-    enabled: !!vehicleId && vehicleId.length >= 20,
-    staleTime: 10 * 60 * 1000,
+    enabled: !!vehicleId && vehicleId.length >= 20 && !authLoading && !!user,
+    staleTime: 60 * 1000,
+    gcTime: 0,
+    retry: false,
   });
 
+  const { data: rawRows, isLoading, error } = auditRead;
+  const { data: noteTables, isLoading: notesLoading } = noteRead;
   const data = useMemo<BuildLedgerData>(() => {
     const notes = noteTables ?? [];
     const rows = rawRows ?? [];
@@ -278,13 +305,16 @@ export function useBuildLedger(vehicleId: string | undefined) {
       .map(([currency, t]) => ({ currency, total: t.cents / 100, entries: t.entries, unsplit: t.unsplit }));
     if (rows.length === 0) {
       return {
-        groups: [], documentedTotal: 0, statedPendingTotal: 0,
+        groups: [], documentedTotal: null, statedPendingTotal: null,
         pendingCount: 0, entryCount: 0, auditRun: null, hasAudit: false,
         book, bookTotals, notes, hasData: book.length > 0 || notes.length > 0,
       };
     }
 
-    const groups: BuildLedgerGroup[] = GROUP_ORDER.map(({ type, label }) => {
+    const knownTypes = new Set<string>(GROUP_ORDER.map(group => group.type));
+    const otherTypes = [...new Set(rows.map(row => row.eventType).filter(type => !knownTypes.has(type)))].sort();
+    const groupOrder = [...GROUP_ORDER, ...otherTypes.map(type => ({ type, label: 'Other build records' }))];
+    const groups: BuildLedgerGroup[] = groupOrder.map(({ type, label }) => {
       const entries = rows
         .filter(e => e.eventType === type)
         .sort((a, b) => (a.observedAt ?? '').localeCompare(b.observedAt ?? ''));
@@ -292,15 +322,15 @@ export function useBuildLedger(vehicleId: string | undefined) {
         eventType: type,
         label,
         entries,
-        documentedTotal: entries.filter(isDocumented).reduce((s, e) => s + e.amountUsd, 0),
-        statedPendingTotal: entries.filter(isStatedPending).reduce((s, e) => s + e.amountUsd, 0),
+        documentedTotal: auditSubtotal(entries, isDocumented),
+        statedPendingTotal: auditSubtotal(entries, isStatedPending),
       };
     }).filter(g => g.entries.length > 0);
 
     return {
       groups,
-      documentedTotal: rows.filter(isDocumented).reduce((s, e) => s + e.amountUsd, 0),
-      statedPendingTotal: rows.filter(isStatedPending).reduce((s, e) => s + e.amountUsd, 0),
+      documentedTotal: auditSubtotal(rows, isDocumented),
+      statedPendingTotal: auditSubtotal(rows, isStatedPending),
       pendingCount: rows.filter(e => e.needsOwnerConfirmation).length,
       entryCount: rows.length,
       auditRun: rows.find(e => e.auditRun)?.auditRun ?? null,
@@ -312,5 +342,9 @@ export function useBuildLedger(vehicleId: string | undefined) {
     };
   }, [rawRows, bookRows, noteTables]);
 
-  return { data, loading: isLoading || bookLoading || notesLoading, error: error?.message ?? null };
+  return { data, loading: !!user && (isLoading || bookLoading || notesLoading),
+    error: error?.message ?? bookRead.error?.message ?? noteRead.error?.message ?? null,
+    failures: { audit: !!error, book: bookRead.isError, notes: noteRead.isError },
+    bookCoverage: { shown: bookRows?.length ?? 0, total: bookRead.total },
+    retry: () => Promise.all([auditRead.refetch(), bookRead.refetch(), noteRead.refetch()]) };
 }

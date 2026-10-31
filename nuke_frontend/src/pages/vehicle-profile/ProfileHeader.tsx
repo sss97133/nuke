@@ -9,6 +9,8 @@ import { supabase } from '../../lib/supabase';
 import { useVehicleProfile } from './VehicleProfileContext';
 import { isAuctionPresentation } from './buildAuctionPulse';
 import { useProfileDocument } from './profileDocument';
+import ProfileFinancials from './ProfileFinancials';
+import ProfileActivity from './ProfileActivity';
 
 const FieldEvidencePopup = React.lazy(() => import('./FieldEvidencePopup'));
 const ExternalAuctionSummary = React.lazy(() => import('../../components/auction/ExternalAuctionLiveBanner').then(module => ({ default: module.ExternalAuctionSummary })));
@@ -119,13 +121,15 @@ export function extractInlineLotProvenance(vehicle: Record<string, any> | null |
  * borrow an unrelated auction study or replace the vehicle route with a market page.
  */
 export default function ProfileHeader({ priceLotId }: { priceLotId?: string }) {
-  const { vehicle, auctionPulse, auctionCurrency, setGalleryFilter } = useVehicleProfile();
+  const { vehicle, auctionPulse, auctionCurrency, setGalleryFilter, timelineEvents, timelineReadState } = useVehicleProfile();
   const priceOwnedByLiveStack = isAuctionPresentation(auctionPulse) && !!auctionPulse?.listing_url && ['active', 'live'].includes(auctionPulse.listing_status);
   const doc = useProfileDocument(vehicle?.id, priceOwnedByLiveStack);
   const hasMasthead = doc?.sections.some(section => section.kind === 'masthead') ?? false;
   const sticky = useRef<HTMLDivElement>(null);
   const [activeFacet, setActiveFacet] = useState<{ field: string; value: string; matchField?: string } | null>(null);
   const [liveOpen, setLiveOpen] = useState(false);
+  const [financialOpen, setFinancialOpen] = useState(false);
+  const [activityOpen, setActivityOpen] = useState(false);
   const [lotRead, setLotRead] = useState<LotProvenanceRead | null>(null);
 
   // The sticky stack below reads the masthead's measured height (vehicle-profile.css --vp-h-masthead).
@@ -140,7 +144,7 @@ export default function ProfileHeader({ priceLotId }: { priceLotId?: string }) {
     observer.observe(el);
     return () => { observer.disconnect(); page.style.removeProperty('--vp-h-masthead'); };
   }, [vehicle?.id, hasMasthead]);
-  useEffect(() => setActiveFacet(null), [vehicle?.id]);
+  useEffect(() => { setActiveFacet(null); setFinancialOpen(false); setActivityOpen(false); }, [vehicle?.id]);
   useEffect(() => setLiveOpen(false), [vehicle?.id, auctionPulse?.listing_url, priceOwnedByLiveStack]);
 
   const masthead = doc?.sections.find(s => s.kind === 'masthead');
@@ -293,7 +297,7 @@ export default function ProfileHeader({ priceLotId }: { priceLotId?: string }) {
   if (!vehicle || !doc || !masthead) return null;
   const asArtwork = !!masthead.model && vehicle.listing_kind !== 'non_vehicle_item';
   const explore = (field: string, value: string, matchField?: string) => {
-    setLiveOpen(false);
+    setLiveOpen(false); setFinancialOpen(false); setActivityOpen(false);
     const evidenceField = field === 'engine' ? 'engine_type' : field;
     setActiveFacet(current => current?.field === evidenceField ? null : { field: evidenceField, value, matchField });
     setGalleryFilter?.(['transmission', 'drivetrain', 'engine_type', 'body_style', 'mileage'].includes(evidenceField)
@@ -309,11 +313,11 @@ export default function ProfileHeader({ priceLotId }: { priceLotId?: string }) {
     })}
   </div>;
 
-  return <>
-    <div ref={sticky} className="vp-header-sticky">
-      <Masthead result={priceOwnedByLiveStack && auctionPulse ? <React.Suspense fallback={null}><ExternalAuctionSummary
+  const market = (reduced = false) => priceOwnedByLiveStack && auctionPulse ? <React.Suspense fallback={null}><ExternalAuctionSummary
         currentBid={auctionPulse.current_bid} currencyCode={auctionCurrency} endDate={auctionPulse.end_date} listingStatus={auctionPulse.listing_status}
-        onClick={() => { setActiveFacet(null); setLiveOpen(current => !current); }} /></React.Suspense> : enrichedPriceClaim && <ClaimView
+        sourceObservedAt={auctionPulse.source_observed_at}
+        hideAmount={reduced}
+        onClick={() => { setActiveFacet(null); setFinancialOpen(false); setActivityOpen(false); setLiveOpen(current => !current); }} /></React.Suspense> : !reduced && enrichedPriceClaim && <ClaimView
         label={masthead.priceLabel ?? 'Recorded price'}
         role="measure"
         claim={enrichedPriceClaim}
@@ -322,7 +326,18 @@ export default function ProfileHeader({ priceLotId }: { priceLotId?: string }) {
           {provenanceNote && <Text role="caption">{provenanceNote}</Text>}
           {priceLotId && <PrefetchLink className="k-body" to={`/stacks/order-book/${vehicle.id}?lot=${priceLotId}`}>Open auction stack →</PrefetchLink>}
         </>}
-      />}>
+      />;
+
+  return <>
+    <div ref={sticky} className="vp-header-sticky">
+      <Masthead result={<div className="vp-header-departments">
+        <ProfileActivity vehicleId={vehicle.id} events={timelineEvents ?? []} pulse={auctionPulse} readState={timelineReadState}
+          open={activityOpen} onToggle={() => { setFinancialOpen(false); setLiveOpen(false); setActiveFacet(null); setActivityOpen(current => !current); }}
+          onClose={() => setActivityOpen(false)} boundaryRef={sticky} />
+        <ProfileFinancials vehicleId={vehicle.id} market={market()} reducedMarket={market(true)} marketPriority={priceOwnedByLiveStack || enrichedPriceClaim?.source.method === 'ask'} open={financialOpen}
+          onToggle={() => { setActivityOpen(false); setLiveOpen(false); setActiveFacet(null); setFinancialOpen(current => !current); }}
+          onClose={() => setFinancialOpen(false)} boundaryRef={sticky} />
+      </div>}>
         <Text role="entity" as="h1" aria-label={title}>
           {asArtwork
             ? <VehicleIdentity compact year={vehicle.year} make={vehicle.make ?? ''} model={masthead.model!} variants={masthead.identity.differentiators} onExplore={explore} />
@@ -335,7 +350,7 @@ export default function ProfileHeader({ priceLotId }: { priceLotId?: string }) {
           sellerStack={<React.Suspense fallback={null}><SellerStackButton /></React.Suspense>}
           externalListingId={auctionPulse.external_listing_id || null} platform={auctionPulse.platform} listingUrl={auctionPulse.listing_url}
           currentBid={auctionPulse.current_bid} bidCount={auctionPulse.bid_count} watcherCount={auctionPulse.watcher_count} commentCount={auctionPulse.comment_count}
-          endDate={auctionPulse.end_date} listingStatus={auctionPulse.listing_status} lastUpdatedAt={auctionPulse.updated_at} currencyCode={auctionCurrency} /></React.Suspense>
+          endDate={auctionPulse.end_date} listingStatus={auctionPulse.listing_status} lastUpdatedAt={auctionPulse.source_observed_at ?? null} currencyCode={auctionCurrency} /></React.Suspense>
       </HeaderPopover>}
       {activeFacet && <HeaderPopover open onClose={() => setActiveFacet(null)} title={activeFacet.value} width={560} dismissBoundaryRef={sticky}>
         <React.Suspense fallback={<p role="status">Reading vehicle context…</p>}>

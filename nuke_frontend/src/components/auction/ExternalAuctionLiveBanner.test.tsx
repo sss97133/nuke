@@ -22,6 +22,12 @@ beforeEach(() => {
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); vi.useRealTimers(); });
 
 describe('visible soft-close state', () => {
+  it('keeps the auction clock visible when the header money display is reduced', async () => {
+    await act(async () => root.render(<ExternalAuctionSummary {...props} hideAmount endDate="2026-10-04T17:40:00Z" sourceObservedAt="2026-10-04T17:37:00Z" onClick={() => {}} />));
+    expect(container.textContent).toContain('2m 00s');
+    expect(container.textContent).not.toContain('$118,888');
+    expect(container.querySelector('button')?.getAttribute('aria-label')).toBe('Explore live auction');
+  });
   it('keeps the compact priority reading on the same soft-close clock and opens its context', async () => {
     const open = vi.fn();
     await act(async () => root.render(<ExternalAuctionSummary {...props} onClick={open} />));
