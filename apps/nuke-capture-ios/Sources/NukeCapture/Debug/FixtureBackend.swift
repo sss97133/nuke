@@ -233,6 +233,8 @@ enum FixtureBackend {
             [{"id":"\(navigationVehicleId)","year":1973,"make":"Fixture","model":"Coupe","vin":"TEST1234567",
               "trim":null,"primary_image_url":null,"image_count":0}]
             """)
+        case "vehicle_images" where scenario == "navigation-garage": return ok("[]")
+        case "vehicle_images_public" where scenario == "navigation-garage": return ok("[]")
         case "vehicle_images": return ok(persona == .client ? PostJobFixtures.photos : "[]")
         case "profiles": return ok(ParityFixtures.ownRow)
         case "tool_requirement_key_map": return ok(ParityFixtures.toolKeys)

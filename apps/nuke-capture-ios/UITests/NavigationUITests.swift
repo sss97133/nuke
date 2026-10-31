@@ -23,6 +23,8 @@ final class NavigationUITests: XCTestCase {
         let profile = app.descendants(matching: .any).matching(identifier: "garage.vehicle.profile.00000000-0000-4000-8000-00000000c001").firstMatch
         XCTAssertTrue(profile.waitForExistence(timeout: 10), "the primary row must open the actual vehicle profile")
         XCTAssertTrue(app.staticTexts["1973 FIXTURE COUPE"].firstMatch.waitForExistence(timeout: 10), "the profile must load the vehicle identity, not only mount its destination")
+        XCTAssertTrue(app.staticTexts["No photos available on this profile"].waitForExistence(timeout: 5), "a successful empty gallery must explain why uploaded photos may not appear here yet")
+        XCTAssertFalse(app.staticTexts["Couldn't load photos"].exists, "an empty gallery is a successful read, not a load failure")
         XCTAssertFalse(app.buttons["Open the vehicle profile"].exists, "the Garage must not insert a jobs screen before the profile")
         let back = app.navigationBars.buttons["Garage"].firstMatch
         XCTAssertTrue(back.waitForExistence(timeout: 5))
