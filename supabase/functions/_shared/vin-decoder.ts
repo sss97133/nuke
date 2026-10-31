@@ -329,12 +329,13 @@ function decodeModernVin(vin: string): VINDecodeResult {
     ['1GN', 'Chevrolet', 'Chevrolet'],
     ['1G1', 'Chevrolet', 'Chevrolet'],
     ['1G2', 'Pontiac', 'Pontiac'],
+    ['2G2', 'General Motors Canada', 'Pontiac'], // NHTSA vPIC: Canadian Pontiac WMI
     ['1G3', 'Oldsmobile', 'Oldsmobile'],
     ['1G4', 'Buick', 'Buick'],
     ['1G6', 'Cadillac', 'Cadillac'],
-    ['1G', 'General Motors', 'Chevrolet'], // fallback for unknown GM
-    ['2G', 'General Motors Canada', 'Chevrolet'],
-    ['3G', 'General Motors Mexico', 'Chevrolet'],
+    ['1G', 'General Motors', null], // OEM prefix alone does not establish the make
+    ['2G', 'General Motors Canada', null],
+    ['3G', 'General Motors Mexico', null],
     ['1FT', 'Ford Truck', 'Ford'],
     ['1FA', 'Ford', 'Ford'],
     ['1FB', 'Ford', 'Ford'],

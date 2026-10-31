@@ -894,13 +894,13 @@ async function pollFirecrawlHtmlFeed(
     for (const url of urls) {
       const raw = nativeLedger.get(url), receipt = raw?.dealer_receipt, o = admitted.get(receipt?.observation_id);
       const clock = Date.parse(o?.observed_at ?? "");
-      const valid = o && o.is_superseded === false && o.vehicle_id === ledgerRows.get(url)?.vehicle_id && o.source_id === nativeSourceId && o.source_url === url && o.extraction_method === "dealer_microdata_v1"
+      const valid = o && o.is_superseded === false && o.vehicle_id === ledgerRows.get(url)?.vehicle_id && o.source_id === nativeSourceId && o.source_url === url && o.extraction_method === "dealer_microdata_v2"
         && o.raw_source_ref === `listing_page_snapshots:${receipt.snapshot_id}` && Number.isFinite(clock) && clock <= Date.now();
       const fresh = valid && Date.now() - clock < feed.poll_interval_minutes * 60_000;
       if (valid) proved.set(url, clock);
       if (fresh) onVehicles.add(url);
       const prior = ledgerRows.get(url);
-      if (!fresh && (prior?.status === "complete" || (prior?.status === "skipped" && raw?.dealer_native_version !== "dealer_microdata_v1"))) ledgerRows.delete(url);
+      if (!fresh && (prior?.status === "complete" || (prior?.status === "skipped" && raw?.dealer_native_version !== "dealer_microdata_v2"))) ledgerRows.delete(url);
     }
     // Missing canonical evidence first, then oldest source reads. Existing failed
     // backoff and terminal native rejections remain with the ordinary planner.
@@ -962,7 +962,7 @@ async function pollFirecrawlHtmlFeed(
       const captureFields = captureLedgerFields(w.ingest);
       if (nativeDealer) {
         write.row.raw_data = { ...((write.row.raw_data as Record<string, unknown> | undefined) ?? {}),
-          dealer_native_version: "dealer_microdata_v1", ...(w.ingest.dealer_receipt ? { dealer_receipt: w.ingest.dealer_receipt } : {}) };
+          dealer_native_version: "dealer_microdata_v2", ...(w.ingest.dealer_receipt ? { dealer_receipt: w.ingest.dealer_receipt } : {}) };
       }
       if (Object.keys(captureFields).length > 0) {
         write.row.raw_data = { ...((write.row.raw_data as Record<string, unknown> | undefined) ?? {}), ...captureFields };

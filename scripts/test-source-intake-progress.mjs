@@ -571,15 +571,15 @@ test('native dealers require canonical receipt even when the URL and a complete 
   f.queued.set(f.first, { listing_url: f.first, status: 'complete', vehicle_id: 'vehicle', raw_data: {} });
   const r = await f.request(); assert.equal(r.body.results[0].ingest_outcomes.length, 2);
   assert.equal(f.queued.get(f.first).raw_data.dealer_receipt.observation_id, 'observation');
-  assert.equal(f.queued.get(f.first).raw_data.dealer_native_version, 'dealer_microdata_v1');
+  assert.equal(f.queued.get(f.first).raw_data.dealer_native_version, 'dealer_microdata_v2');
 });
 
 test('native canonical progress skips fresh admitted evidence, revisits stale evidence and prioritizes missing evidence', async () => {
-  const f = nativeProgressFixture({ nativeObservations: [{ id: 'observation', vehicle_id: 'vehicle', is_superseded: false, source_id: 'dealer-source', source_url: 'https://www.streetsideclassics.com/vehicles/42-det/1995-ford-f150', raw_source_ref: 'listing_page_snapshots:snapshot', extraction_method: 'dealer_microdata_v1', observed_at: new Date().toISOString() }] });
-  f.queued.set(f.first, { listing_url: f.first, status: 'complete', vehicle_id: 'vehicle', raw_data: { dealer_native_version: 'dealer_microdata_v1', dealer_receipt: f.receipt } });
+  const f = nativeProgressFixture({ nativeObservations: [{ id: 'observation', vehicle_id: 'vehicle', is_superseded: false, source_id: 'dealer-source', source_url: 'https://www.streetsideclassics.com/vehicles/42-det/1995-ford-f150', raw_source_ref: 'listing_page_snapshots:snapshot', extraction_method: 'dealer_microdata_v2', observed_at: new Date().toISOString() }] });
+  f.queued.set(f.first, { listing_url: f.first, status: 'complete', vehicle_id: 'vehicle', raw_data: { dealer_native_version: 'dealer_microdata_v2', dealer_receipt: f.receipt } });
   const r = await f.request(); assert.deepEqual(r.body.results[0].ingest_outcomes.map(o => o.url), [f.second]);
-  const stale = nativeProgressFixture({ nativeObservations: [{ id: 'observation', vehicle_id: 'vehicle', is_superseded: false, source_id: 'dealer-source', source_url: f.first, raw_source_ref: 'listing_page_snapshots:snapshot', extraction_method: 'dealer_microdata_v1', observed_at: new Date(Date.now()-86400_000).toISOString() }] });
-  stale.queued.set(stale.first, { listing_url: stale.first, status: 'complete', vehicle_id: 'vehicle', raw_data: { dealer_native_version: 'dealer_microdata_v1', dealer_receipt: stale.receipt } });
+  const stale = nativeProgressFixture({ nativeObservations: [{ id: 'observation', vehicle_id: 'vehicle', is_superseded: false, source_id: 'dealer-source', source_url: f.first, raw_source_ref: 'listing_page_snapshots:snapshot', extraction_method: 'dealer_microdata_v2', observed_at: new Date(Date.now()-86400_000).toISOString() }] });
+  stale.queued.set(stale.first, { listing_url: stale.first, status: 'complete', vehicle_id: 'vehicle', raw_data: { dealer_native_version: 'dealer_microdata_v2', dealer_receipt: stale.receipt } });
   const rr = await stale.request(); assert.deepEqual(rr.body.results[0].ingest_outcomes.map(o => o.url), [stale.second, stale.first]);
 });
 
@@ -592,8 +592,8 @@ test('native intake without a canonical acknowledgement is failed, never complet
 test('superseded or reattributed dealer evidence cannot keep a source URL marked complete', async () => {
  for (const change of [{ is_superseded: true }, { vehicle_id: 'different-vehicle' }]) {
   const url = 'https://www.streetsideclassics.com/vehicles/42-det/1995-ford-f150';
-  const f = nativeProgressFixture({ nativeObservations: [{ id: 'observation', source_id: 'dealer-source', vehicle_id: 'vehicle', source_url: url, raw_source_ref: 'listing_page_snapshots:snapshot', extraction_method: 'dealer_microdata_v1', observed_at: new Date().toISOString(), is_superseded: false, ...change }] });
-  f.queued.set(f.first, { listing_url: f.first, status: 'complete', vehicle_id: 'vehicle', raw_data: { dealer_native_version: 'dealer_microdata_v1', dealer_receipt: f.receipt } });
+  const f = nativeProgressFixture({ nativeObservations: [{ id: 'observation', source_id: 'dealer-source', vehicle_id: 'vehicle', source_url: url, raw_source_ref: 'listing_page_snapshots:snapshot', extraction_method: 'dealer_microdata_v2', observed_at: new Date().toISOString(), is_superseded: false, ...change }] });
+  f.queued.set(f.first, { listing_url: f.first, status: 'complete', vehicle_id: 'vehicle', raw_data: { dealer_native_version: 'dealer_microdata_v2', dealer_receipt: f.receipt } });
   const r = await f.request(); assert(r.body.results[0].ingest_outcomes.some(o=>o.url===f.first));
  }
 });
