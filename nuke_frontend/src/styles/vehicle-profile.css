@@ -1201,6 +1201,8 @@
 .vp-financial-preference { text-align: right; }
 .vp-financial-action { min-height: 44px; border: 0; padding: 6px 0; color: var(--link); background: transparent; font: inherit; cursor: pointer; }
 .vp-financial-original button { min-height: 44px; border: 0; padding: 6px 0; color: var(--link); background: transparent; font: inherit; cursor: pointer; }
+.vp-financial-sources { border-top: 1px solid var(--border); margin-top: 16px; padding-top: 8px; }
+.vp-financial-sources > summary { min-height: 44px; align-content: center; cursor: pointer; font-weight: 600; }
 .vp-financial-trigger:focus-visible,
 .vp-profile-activity:focus-visible,
 .vp-financial-action:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }

@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { signPrivateStorageUrl, privateStoragePath } from '../../lib/privateStorage';
-import { openVehiclePhotoByUrl } from './VehiclePhotoLightbox';
+import { bounded } from '../../services/accountingCloseout';
 import { useVehicleWorkOrderFinancials, type VehicleReceiptRecord, type useVehicleReceiptRecords } from './hooks/useBuildLedger';
+const OriginalDocumentPreview = React.lazy(() => import('../../components/finance/SharedAccountingOriginal').then(module => ({ default: module.OriginalDocumentPreview })));
 
 function amountText(amount: number | null, currency: string | null): string {
   if (amount == null) return 'Amount not recorded';
@@ -12,13 +13,15 @@ function amountText(amount: number | null, currency: string | null): string {
 
 function ReceiptSource({ receipt, vehicleId }: { receipt: VehicleReceiptRecord; vehicleId: string }) {
   const [state, setState] = useState('');
-  const [url, setUrl] = useState<string | null>(null);
+  const [original, setOriginal] = useState<{ blob: Blob; filename: string } | null>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
   const alive = useRef(true);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
   if (!receipt.sourceId || !['vehicle_documents', 'vehicle_images'].includes(receipt.sourceTable ?? '')) return <p>Original source access is not available in this view.</p>;
   return <div className="vp-financial-original">
-    <button type="button" disabled={state === 'Reading source…'} onClick={async () => {
+    <button ref={trigger} type="button" disabled={state === 'Reading source…'} onClick={async () => {
       setState('Reading source…');
+      setOriginal(null);
       try {
         const image = receipt.sourceTable === 'vehicle_images';
         const { data, error } = await supabase.from(image ? 'vehicle_images_public' : 'vehicle_documents')
@@ -27,12 +30,20 @@ function ReceiptSource({ receipt, vehicleId }: { receipt: VehicleReceiptRecord; 
         if (error || !raw || !/^https?:\/\//.test(raw)) throw new Error('Unavailable');
         const signed = await signPrivateStorageUrl(raw);
         if (privateStoragePath(raw) && signed === raw) throw new Error('Unavailable');
+        const blob = await bounded(async signal => {
+          const response = await fetch(signed, { signal });
+          if (!response.ok) throw new Error('Unavailable');
+          return response.blob();
+        });
         if (!alive.current) return;
-        if (image) openVehiclePhotoByUrl(signed); else setUrl(signed);
+        setOriginal({ blob, filename: new URL(raw).pathname.split('/').pop() || 'Original receipt' });
         setState('');
       } catch { if (alive.current) setState('Source unavailable or not visible to this viewer.'); }
     }}>{state === 'Reading source…' ? state : 'Read original source'}</button>
-    {url && <a href={url} target="_blank" rel="noopener noreferrer">Open original document ↗</a>}
+    {original && <React.Suspense fallback={<p role="status">Loading original viewer…</p>}>
+      <OriginalDocumentPreview blob={original.blob} filename={original.filename}
+        onClose={() => { setOriginal(null); trigger.current?.focus(); }} />
+    </React.Suspense>}
     {state && state !== 'Reading source…' && <p role="status">{state}</p>}
   </div>;
 }
@@ -49,7 +60,7 @@ export function ReceiptRecords({ vehicleId, read }: { vehicleId: string; read: R
       {receipt.dateConflict && <p>Recorded dates: {receipt.dates.join(' · ')}</p>}
       {receipt.amount === 0 && <p>Zero is retained as an extraction reading. Check the original before treating it as a zero-cost purchase.</p>}
       <p>Receipt reading · {receipt.processingStatus || receipt.status || 'Extraction state unknown'}. Extraction status does not establish payment or vehicle allocation.</p>
-      <ReceiptSource receipt={receipt} vehicleId={vehicleId} />
+      <ReceiptSource key={`${vehicleId}:${receipt.sourceTable}:${receipt.sourceId}`} receipt={receipt} vehicleId={vehicleId} />
     </details>)}
     {read.hasNextPage && <button type="button" className="vp-financial-action" disabled={read.isFetchingNextPage} onClick={() => void read.fetchNextPage()}>{read.isFetchingNextPage ? 'Reading more receipts…' : 'Load more receipts'}</button>}
     {!read.isLoading && !read.isError && !read.rows.length && <p>No receipt summaries are visible for this vehicle.</p>}

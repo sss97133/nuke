@@ -1,7 +1,7 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { HeaderPopover } from '../../components/vehicle/HeaderPopover';
 import { useAuthContext } from '../../contexts/AuthContext';
-import { useBuildLedger, useVehicleBookCosts, useVehicleReceiptRecords, type BookCostEntry } from './hooks/useBuildLedger';
+import { useBuildLedger, useVehicleReceiptRecords, type BookCostEntry } from './hooks/useBuildLedger';
 import { ReceiptRecords, WorkOrderFinancialRecords } from './FinancialReceiptRecords';
 const SharedAccountingOriginal = React.lazy(() => import('../../components/finance/SharedAccountingOriginal'));
 
@@ -96,17 +96,16 @@ function CostHistory({ scope }: { scope: BookSummary }) {
   </>;
 }
 
-function FinancialDetails({ vehicleId, market, receipts }: { vehicleId: string; market: React.ReactNode; receipts: ReturnType<typeof useVehicleReceiptRecords> }) {
+function FinancialDetails({ vehicleId, market }: { vehicleId: string; market: React.ReactNode }) {
   const { user } = useAuthContext();
   const ledger = useBuildLedger(vehicleId);
+  const receipts = useVehicleReceiptRecords(vehicleId);
   const scopes = useMemo(() => summarizeVehicleCosts(ledger.data.book), [ledger.data.book]);
   const [selected, setSelected] = useState<string | null>(null);
   const scope = scopes.find(item => item.key === selected) ?? scopes[0];
   return <div className="vp-financial-panel">
     {market && <section><h3>Market</h3>{market}</section>}
-    <ReceiptRecords vehicleId={vehicleId} read={receipts} />
-    {!user ? <p>Sign in to read work-order payments and private books available to you. Public receipt summaries remain visible here.</p> : <>
-      <WorkOrderFinancialRecords vehicleId={vehicleId} />
+    {!user ? <p>Sign in to read the financial records available to you.</p> : <>
       {ledger.loading && <p role="status">Reading vehicle financial records…</p>}
       {ledger.error && <div role="status"><p>Some financial records could not load. Available records remain shown; missing reads do not establish a zero balance.</p><button className="vp-financial-action" type="button" onClick={() => void ledger.retry()}>Retry financial records</button></div>}
       {scope && <section><h3>Booked vehicle costs</h3>
@@ -119,6 +118,7 @@ function FinancialDetails({ vehicleId, market, receipts }: { vehicleId: string; 
         <p className="vp-financial-coverage">Across the available books: {ledger.bookCoverage.shown} of {ledger.bookCoverage.total ?? 'an unknown number of'} visible cost entries loaded.</p>
         <CostHistory key={scope.key} scope={scope} />
       </section>}
+      <WorkOrderFinancialRecords vehicleId={vehicleId} />
       {ledger.data.hasAudit && <section><h3>Build records and reported obligations</h3>
         <p>Recorded evidence and attribution remain attached to each entry. These records are kept separate from booked costs.</p>
         {ledger.data.groups.flatMap(group => group.entries).map(entry => <details key={entry.id} className="vp-financial-entry">
@@ -141,20 +141,20 @@ function FinancialDetails({ vehicleId, market, receipts }: { vehicleId: string; 
       </section>}
       {!ledger.loading && !ledger.error && !ledger.data.hasData && <p>No entries are visible in the accounting-book or audit readers for this vehicle. Linked receipts and work orders are shown separately.</p>}
     </>}
+    {(receipts.isLoading || receipts.isError || receipts.rows.length > 0) && <details className="vp-financial-sources">
+      <summary>Receipt sources</summary>
+      <ReceiptRecords vehicleId={vehicleId} read={receipts} />
+    </details>}
   </div>;
 }
 
-export default function ProfileFinancials({ vehicleId, market, reducedMarket, marketPriority = false, open, onToggle, onClose, boundaryRef }: {
+export default function ProfileFinancials({ vehicleId, market, reducedMarket, open, onToggle, onClose, boundaryRef }: {
   vehicleId: string; market: React.ReactNode; open: boolean; onToggle: () => void; onClose: () => void;
-  marketPriority?: boolean;
   reducedMarket?: React.ReactNode;
   boundaryRef: React.RefObject<HTMLDivElement | null>;
 }) {
   const { user } = useAuthContext();
   const trigger = useRef<HTMLButtonElement>(null);
-  const read = useVehicleBookCosts(vehicleId);
-  const receipts = useVehicleReceiptRecords(vehicleId);
-  const scopes = useMemo(() => summarizeVehicleCosts(read.isError ? [] : read.data ?? []), [read.data, read.isError]);
   const preference = `vp:financial-display:v1:${user?.id ?? 'anon'}:${vehicleId}`;
   const [reduction, setReduction] = useState<{ key: string; reduced: boolean }>(() => {
     try { return { key: preference, reduced: localStorage.getItem(preference) === 'reduced' }; }
@@ -165,18 +165,18 @@ export default function ProfileFinancials({ vehicleId, market, reducedMarket, ma
   if (reduction.key !== preference) {
     try { reduced = localStorage.getItem(preference) === 'reduced'; } catch { reduced = false; }
   }
-  const amount = scopes.length === 1 && scopes[0].total != null ? <span className="vp-financial-headline"><small>Booked subtotal</small>{financialAmount(scopes[0].total, scopes[0].currency)}</span> : null;
   return <>
     <div className="vp-header-money">
-      {reduced ? reducedMarket : marketPriority ? market || amount : amount || market || (receipts.rows.length > 0 ? <span className="vp-financial-headline"><small>Receipts{receipts.total == null ? ' loaded' : ''}</small>{receipts.total ?? receipts.rows.length}</span> : null)}
+      {/* Only the canonical price owner supplies header money. Costs and receipt counts are not prices. */}
+      {reduced ? reducedMarket : market}
       <button ref={trigger} type="button" className="vp-financial-trigger" aria-label="Explore vehicle financials" aria-haspopup="dialog" aria-expanded={open} onClick={onToggle}>$$$</button>
     </div>
     {open && <HeaderPopover open title="Financials" width={640} align="right" onClose={() => { onClose(); trigger.current?.focus(); }} dismissBoundaryRef={boundaryRef}>
-      <div className="vp-financial-preference"><button type="button" className="vp-financial-action" onClick={() => {
+      {market && <div className="vp-financial-preference"><button type="button" className="vp-financial-action" onClick={() => {
         const next = !reduced; setReduction({ key: preference, reduced: next });
         try { localStorage.setItem(preference, next ? 'reduced' : 'expanded'); } catch { /* A display preference can remain session-only. */ }
-      }}>{reduced ? 'Show header amount' : 'Reduce header amount'}</button></div>
-      <FinancialDetails key={`${user?.id ?? 'anon'}:${vehicleId}`} vehicleId={vehicleId} market={market} receipts={receipts} />
+      }}>{reduced ? 'Show header amount' : 'Reduce header amount'}</button></div>}
+      <FinancialDetails key={`${user?.id ?? 'anon'}:${vehicleId}`} vehicleId={vehicleId} market={market} />
     </HeaderPopover>}
   </>;
 }
