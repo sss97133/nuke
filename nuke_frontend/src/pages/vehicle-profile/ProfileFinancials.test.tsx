@@ -96,6 +96,15 @@ it('reduces the visible amount deliberately, keeps the door, and remembers the d
   expect(host.textContent).toContain('Show header amount');
 });
 
+it('treats an exhausted decimal bank remainder as zero while retaining a different book amount', async () => {
+  fixture.rpc.mockImplementation((name: string) => Promise.resolve({ data: name === 'accounting_vehicle_financials' ? [rawCost({ phase: 'customer_receipt', allocated_amount: '60.00', book_amount: '60.04', bank_amount: '60.00', bank_remainder: '0.00', bank_date: '2024-07-01' })] : name === 'owner_working_notes' ? { tables: [] } : [], error: null }));
+  open = true; await render();
+  await act(async () => { const item = host.querySelector<HTMLDetailsElement>('.vp-financial-entry')!; item.open = true; item.dispatchEvent(new Event('toggle')); });
+  expect(host.textContent).toContain('Book source amount');
+  expect(host.textContent).toContain('$60.04');
+  expect(host.textContent).not.toContain('of the movement remains');
+});
+
 it('drops another viewer’s financial records immediately on account change and logout', async () => {
   open = true; await render(); expect(host.textContent).toContain('$40.00');
   let resolve!: (value: unknown) => void;

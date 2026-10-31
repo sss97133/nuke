@@ -5,7 +5,7 @@ import { supabase } from '../../lib/supabase';
 import { readRecordEvidence } from '../../services/accountingCloseout';
 import { readAccountingSnapshot } from '../../services/financialExpenseUse';
 import { JobReaders } from '../jobs/jobsReaders';
-import { FINANCIAL_PHASES, financialDate, moneyLabel, totalMoney, useVehicleFinancials, type FinancialPhase, type VehicleFinancialUse } from './hooks/useVehicleFinancials';
+import { FINANCIAL_PHASES, financialDate, moneyLabel, moneyMicros, totalMoney, useVehicleFinancials, type FinancialPhase, type VehicleFinancialUse } from './hooks/useVehicleFinancials';
 const SharedAccountingOriginal = React.lazy(() => import('../../components/finance/SharedAccountingOriginal'));
 const LABELS: Record<FinancialPhase, string> = { customer_receipt: 'Customer payments', book_expense: 'Booked vehicle costs', customer_refund: 'Customer refunds' };
 const dateLabel = (date: string | null) => date && /^\d{4}-\d{2}-\d{2}$/.test(date)
@@ -60,14 +60,17 @@ function AllocationEvidence({ row, vehicleId }: { row: VehicleFinancialUse; vehi
   if (row.bankDocumentId) documents.set(row.bankDocumentId, 'Bank source original');
   documents.set(row.documentId, 'Book source original');
   const lines = items.data?.rows.filter(item => item.receipt_id === row.receiptId) ?? [];
+  const bank = row.bankAmount == null ? null : moneyMicros(row.bankAmount);
+  const bookDiffers = bank != null && row.bookAmount != null && moneyMicros(row.bookAmount) !== (bank < 0n ? -bank : bank);
+  const hasRemainder = row.bankRemainder != null && moneyMicros(row.bankRemainder) !== 0n;
   return <div className="vp-financial-evidence">
     <dl><dt>Vehicle allocation</dt><dd>{row.basis || 'Basis not recorded'}</dd>
       {row.invoiceReference && <><dt>Invoice</dt><dd>{row.invoiceReference}</dd></>}
       {row.account && <><dt>Account</dt><dd>{row.account}</dd></>}
       {row.category && <><dt>Book category</dt><dd>{row.category}</dd></>}
       {row.bankAmount != null && <><dt>Bank movement</dt><dd>{moneyLabel(row.bankAmount, row.currency)} · posted {dateLabel(row.bankDate)}</dd>
-        <dt>Assigned here</dt><dd>{moneyLabel(row.amount, row.currency)}{row.bankRemainder !== '0' && row.bankRemainder != null ? ` · ${moneyLabel(row.bankRemainder, row.currency)} of the movement remains outside current vehicle allocations` : ''}</dd></>}
-      {row.bookAmount != null && row.bankAmount != null && Number(row.bookAmount) !== Math.abs(Number(row.bankAmount)) && <><dt>Book source amount</dt><dd>{moneyLabel(row.bookAmount, row.currency)} · retained separately from the bank amount</dd></>}
+        <dt>Assigned here</dt><dd>{moneyLabel(row.amount, row.currency)}{hasRemainder ? ` · ${moneyLabel(row.bankRemainder, row.currency)} of the movement remains outside current vehicle allocations` : ''}</dd></>}
+      {bookDiffers && <><dt>Book source amount</dt><dd>{moneyLabel(row.bookAmount, row.currency)} · retained separately from the bank amount</dd></>}
     </dl>
     {lines.length > 0 && <div><h4>Receipt items</h4><ul>{lines.map(item => <li key={item.id}>{item.quantity ?? 'Quantity unknown'} × {item.description || item.part_number || 'Unnamed source item'}{item.part_number ? ` · ${item.part_number}` : ''}</li>)}</ul></div>}
     {items.data?.next_after && <p>More filed receipt lines are available in the vehicle work records; this source-line read is partial.</p>}
