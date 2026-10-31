@@ -1269,6 +1269,7 @@
 .hero-media-slot:hover .vp-photo-fit,
 .vp-photo-fit:focus-visible { opacity: 1; pointer-events: auto; }
 @media (prefers-reduced-motion: reduce) { .vp-photo-fit { transition: none; } }
+@media (hover: none) and (pointer: coarse) { .vp-photo-fit { opacity: 1; pointer-events: auto; } }
 .vp-media-indicators { position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); display: flex; z-index: 2; }
 .vp-media-indicator { display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 0; background: transparent; cursor: pointer; }
 .vp-media-indicator::after { content: ''; width: 8px; height: 8px; border: 1px solid #fff; border-radius: 50%; background: rgba(0,0,0,.72); }

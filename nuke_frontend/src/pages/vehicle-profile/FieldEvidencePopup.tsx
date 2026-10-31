@@ -21,6 +21,7 @@ import { openVehiclePhoto } from './VehiclePhotoLightbox';
 import type { FieldProvenance } from './hooks/useFieldProvenance';
 import type { EvidenceImage } from './hooks/useVehicleImageEvidence';
 import type { FeedVehicle } from '../../feed/types/feed';
+import { VEHICLE_POPUP_COLUMNS } from '../../components/popups/vehiclePopupColumns';
 import type { Vehicle } from './types';
 import './vehicle-evidence.css';
 
@@ -71,12 +72,12 @@ function FieldContext({ field, label, value, context, reports, images, details }
     enabled: showPeers && filters.length > 0,
     staleTime: 60_000,
     queryFn: async ({ signal }) => {
-      let query = supabase.from('vehicles').select('id,year,make,model,trim,thumbnail_url:primary_image_url,transmission,transmission_model,drivetrain,engine_size,body_style,created_at')
+      let query = supabase.from('vehicles').select(`${VEHICLE_POPUP_COLUMNS},thumbnail_url:primary_image_url`)
         .eq('is_public', true).is('deleted_at', null).or('listing_kind.is.null,listing_kind.neq.non_vehicle_item').neq('id', subject.id);
       for (const [column, filterValue] of filters) query = query.eq(column, filterValue);
       const { data, error } = await query.order('updated_at', { ascending: false }).limit(8).abortSignal(signal);
       if (error) throw error;
-      return (data || []) as Pick<FeedVehicle, 'id' | 'year' | 'make' | 'model' | 'trim' | 'thumbnail_url' | 'created_at' | 'transmission' | 'transmission_model' | 'drivetrain' | 'engine_size' | 'body_style'>[];
+      return (data || []) as (Pick<FeedVehicle, 'id' | 'year' | 'make' | 'model' | 'trim' | 'thumbnail_url' | 'created_at'> & Partial<FeedVehicle>)[];
     },
   });
   const specific = reports.filter((report, index) => reports.findIndex(other => other.id === report.id) === index).filter(report => report.value?.trim().toLowerCase() === value.trim().toLowerCase()

@@ -67,7 +67,7 @@ export interface BookCostEntry {
 
 export interface BookCostTotal {
   currency: string;
-  total: number;
+  total: number | null;
   entries: number;
   unsplit: number;
 }
@@ -377,7 +377,7 @@ export function useBuildLedger(vehicleId: string | undefined) {
       byCurrency.set(e.currency, t);
     }
     const bookTotals: BookCostTotal[] = [...byCurrency.entries()].sort(([a], [b]) => a.localeCompare(b))
-      .map(([currency, t]) => ({ currency, total: t.cents / 100, entries: t.entries, unsplit: t.unsplit }));
+      .map(([currency, t]) => ({ currency, total: t.entries > t.unsplit ? t.cents / 100 : null, entries: t.entries, unsplit: t.unsplit }));
     if (rows.length === 0) {
       return {
         groups: [], documentedTotal: null, statedPendingTotal: null,

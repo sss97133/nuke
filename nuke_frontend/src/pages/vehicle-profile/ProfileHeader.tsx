@@ -11,11 +11,22 @@ import { isAuctionPresentation } from './buildAuctionPulse';
 import { useProfileDocument } from './profileDocument';
 import ProfileFinancials from './ProfileFinancials';
 import ProfileActivity from './ProfileActivity';
+import { useAuctionCommentStats } from '../../hooks/useAuctionComments';
+import type { AuctionPulse } from './types';
 
 const FieldEvidencePopup = React.lazy(() => import('./FieldEvidencePopup'));
 const ExternalAuctionSummary = React.lazy(() => import('../../components/auction/ExternalAuctionLiveBanner').then(module => ({ default: module.ExternalAuctionSummary })));
 const ExternalAuctionLiveBanner = React.lazy(() => import('../../components/auction/ExternalAuctionLiveBanner'));
 const SellerStackButton = React.lazy(() => import('./SellerStackButton'));
+
+function HeaderLiveAuction({ vehicleId, pulse, currency }: { vehicleId: string; pulse: AuctionPulse; currency: string | null }) {
+  const { data: comments } = useAuctionCommentStats(vehicleId, pulse.listing_url);
+  return <React.Suspense fallback={<p role="status">Reading live auction…</p>}><ExternalAuctionLiveBanner vehicleId={vehicleId}
+    sellerStack={<React.Suspense fallback={null}><SellerStackButton /></React.Suspense>}
+    externalListingId={pulse.external_listing_id || null} platform={pulse.platform} listingUrl={pulse.listing_url}
+    currentBid={pulse.current_bid} bidCount={pulse.bid_count} watcherCount={pulse.watcher_count} commentCount={comments?.commentCount ?? null}
+    endDate={pulse.end_date} listingStatus={pulse.listing_status} lastUpdatedAt={pulse.source_observed_at ?? null} currencyCode={currency} /></React.Suspense>;
+}
 
 type SaleLotProvenance = {
   lotNumber?: string | null;
@@ -346,11 +357,7 @@ export default function ProfileHeader({ priceLotId }: { priceLotId?: string }) {
         {priceOwnedByLiveStack ? <details className="vp-header-configuration"><summary>Configuration</summary>{configuration}</details> : configuration}
       </Masthead>
       {liveOpen && priceOwnedByLiveStack && auctionPulse && <HeaderPopover open title="Live auction" width={680} onClose={() => setLiveOpen(false)} dismissBoundaryRef={sticky}>
-        <React.Suspense fallback={<p role="status">Reading live auction…</p>}><ExternalAuctionLiveBanner vehicleId={vehicle.id}
-          sellerStack={<React.Suspense fallback={null}><SellerStackButton /></React.Suspense>}
-          externalListingId={auctionPulse.external_listing_id || null} platform={auctionPulse.platform} listingUrl={auctionPulse.listing_url}
-          currentBid={auctionPulse.current_bid} bidCount={auctionPulse.bid_count} watcherCount={auctionPulse.watcher_count} commentCount={auctionPulse.comment_count}
-          endDate={auctionPulse.end_date} listingStatus={auctionPulse.listing_status} lastUpdatedAt={auctionPulse.source_observed_at ?? null} currencyCode={auctionCurrency} /></React.Suspense>
+        <HeaderLiveAuction vehicleId={vehicle.id} pulse={auctionPulse} currency={auctionCurrency} />
       </HeaderPopover>}
       {activeFacet && <HeaderPopover open onClose={() => setActiveFacet(null)} title={activeFacet.value} width={560} dismissBoundaryRef={sticky}>
         <React.Suspense fallback={<p role="status">Reading vehicle context…</p>}>

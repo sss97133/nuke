@@ -275,7 +275,7 @@ it('retains actual work detail/story/amount/duration instead of showing a missin
 it('shows the calendar alone, collapses to the barcode on scroll, and restores the same days on return', async () => {
   let anchorTop = 200;
   vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
-    return { top: this.className === 'vp-timeline-anchor' ? anchorTop : 0, height: this.className === 'barcode-heatmap' ? 124 : 0 } as DOMRect;
+    return { top: this.className === 'vp-timeline-anchor' ? anchorTop : 0, height: this.className === 'barcode-heatmap' ? 124 : this.classList.contains('barcode-bar') ? 28 : 0 } as DOMRect;
   });
   await draw();
   const calendar = host.querySelector<HTMLElement>('[aria-label="Vehicle calendar"]')!;
@@ -288,7 +288,7 @@ it('shows the calendar alone, collapses to the barcode on scroll, and restores t
   anchorTop = -50;
   await act(async () => { window.dispatchEvent(new Event('scroll')); await vi.advanceTimersByTimeAsync(5); });
   expect((calendar.getAttribute('aria-hidden') === 'true')).toBe(false); expect((barcode.getAttribute('aria-hidden') === 'true')).toBe(true);
-  anchorTop = -124;
+  anchorTop = -96; // Calendar bottom includes the overlapping 28px barcode at its sticky target.
   await act(async () => { window.dispatchEvent(new Event('scroll')); await vi.advanceTimersByTimeAsync(5); });
   expect((calendar.getAttribute('aria-hidden') === 'true')).toBe(true); expect((barcode.getAttribute('aria-hidden') === 'true')).toBe(false);
   expect(host.querySelector('[data-day-drawer]')).not.toBeNull();

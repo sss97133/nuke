@@ -334,7 +334,7 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = ({ selectedAuctionUrl, o
       const bar = stripRef.current?.querySelector<HTMLElement>('.barcode-bar');
       if (!anchor || !calendar || !bar) return;
       const stickyTop = parseFloat(getComputedStyle(bar).top) || 0;
-      const show = anchor.getBoundingClientRect().top + calendar.getBoundingClientRect().height > stickyTop;
+      const show = anchor.getBoundingClientRect().top + calendar.getBoundingClientRect().height - bar.getBoundingClientRect().height > stickyTop + 1;
       if (expandedRef.current !== show) {
         expandedRef.current = show;
         setExpanded(show);

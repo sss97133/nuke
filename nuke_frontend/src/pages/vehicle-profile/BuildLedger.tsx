@@ -245,8 +245,8 @@ const SummaryCard: React.FC<{ label: string; amount: number | null; sub: string;
 
 // ── In the accounts: costs the accounting book assigns to this vehicle ──
 
-const fmtMoney = (n: number, currency: string) =>
-  currency === 'USD' ? fmt(n) : `${currency} ${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const fmtMoney = (n: number | null, currency: string) =>
+  n == null ? 'Amount unknown' : currency === 'USD' ? fmt(n) : `${currency || 'Currency unknown'} ${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 const KIND_LABEL: Record<string, string> = { parts_purchase: 'PARTS', labor_payment: 'LABOR' };
 

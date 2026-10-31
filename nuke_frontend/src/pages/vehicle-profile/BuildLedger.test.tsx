@@ -77,6 +77,13 @@ it('keeps a booked row read-only: it shows the recorded reason and links to the 
   expect(fixture.askAgent).not.toHaveBeenCalled();
 });
 
+it('retains unknown booked totals when every vehicle allocation is unpriced', async () => {
+  respond({ data: [], error: null }, { data: book.map(row => ({ ...row, allocated_amount: null })), error: null });
+  await render();
+  expect(node.textContent).toContain('Assigned in the accountsAmount unknown');
+  expect(node.textContent).not.toContain('$0.00');
+});
+
 it('renders a vehicle that has only booked costs, without the audit draft', async () => {
   respond({ data: [], error: null }, { data: [book[0]], error: null });
   await render();
