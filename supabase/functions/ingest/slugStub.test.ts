@@ -14,16 +14,16 @@ const FAILED = {
   enrichmentError: "extract-vehicle-data-ai HTTP 500: OpenAI API error: 429 - You have no credits remaining",
 };
 
-const TEN = [
-  "classiccars", "mecum", "barrett_jackson", "hagerty", "cars_and_bids",
+const VENUES = [
+  "gateway_classics", "classiccars", "mecum", "barrett_jackson", "hagerty", "cars_and_bids",
   "pcarmarket", "vanguard_motors", "allcollectorcars", "autohunter", "carandclassic",
 ];
 
-Deno.test("the set is exactly the ten venues registered for slug trust", () => {
-  equal([...SLUG_STUB_BLOCKED].sort(), [...TEN].sort());
+Deno.test("the configured venues reject a failed slug-only source extraction", () => {
+  equal([...SLUG_STUB_BLOCKED].sort(), [...VENUES].sort());
 });
 
-for (const platform of TEN) {
+for (const platform of VENUES) {
   Deno.test(`${platform}: a failed extractor on a slug-only identity is a rejection that carries the error`, () => {
     const r = slugStubRejection({ platform, ...FAILED });
     equal(r, { reason: `enrichment_failed: ${FAILED.enrichmentError}`, enrichment_error: FAILED.enrichmentError });

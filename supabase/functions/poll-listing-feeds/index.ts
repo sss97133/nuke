@@ -31,6 +31,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { firecrawlScrape } from "../_shared/firecrawl.ts";
 import { firecrawlGate, ALLOWANCE_EXHAUSTED } from "../_shared/firecrawlGate.ts";
 import { archiveFetch, isAwsWafChallengeHtml, isGarbageHtml } from "../_shared/archiveFetch.ts";
+import { gatewayInventoryUrls } from "../_shared/gatewayParser.ts";
+import { readGatewayBrowserCapture } from "../_shared/gatewayCapture.ts";
 import { fetchMecumFeedUrls } from "../_shared/mecumSearch.ts";
 import { fetchCraigslistFeed } from "./feedFetch.ts";
 import { extractCraigslistCanonicalUrls } from "../_shared/urlNormalization.ts";
@@ -584,7 +586,14 @@ async function pollFirecrawlHtmlFeed(
   let blockNote = "";
   let confirmedEmptySearch = false;
 
-  if (feed.search_criteria?.fetch_strategy === "mecum_public_index") {
+  if (feed.source_slug === "gateway_classics") {
+    try {
+      const capture = await readGatewayBrowserCapture(supabase, feed.feed_url, true, feed.poll_interval_minutes * 60);
+      const ready = new Set(capture.captured_urls);
+      urls = gatewayInventoryUrls(capture.html).filter(url => ready.has(url));
+      if (!urls.length) throw Error("gateway_browser_details_required");
+    } catch (error) { return await failFeed(`blocked: ${error instanceof Error ? error.message : String(error)}`); }
+  } else if (feed.search_criteria?.fetch_strategy === "mecum_public_index") {
     if (feed.source_slug !== "mecum") return await failFeed("config_error: mecum_public_index requires mecum");
     try {
       const discovery = await fetchMecumFeedUrls();
