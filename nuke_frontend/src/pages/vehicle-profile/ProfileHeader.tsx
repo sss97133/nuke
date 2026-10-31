@@ -345,7 +345,7 @@ export default function ProfileHeader({ priceLotId }: { priceLotId?: string }) {
         <ProfileActivity vehicleId={vehicle.id} events={timelineEvents ?? []} pulse={auctionPulse} readState={timelineReadState}
           open={activityOpen} onToggle={() => { setFinancialOpen(false); setLiveOpen(false); setActiveFacet(null); setActivityOpen(current => !current); }}
           onClose={() => setActivityOpen(false)} boundaryRef={sticky} />
-        <ProfileFinancials vehicleId={vehicle.id} market={market()} reducedMarket={market(true)} marketPriority={priceOwnedByLiveStack || enrichedPriceClaim?.source.method === 'ask'} open={financialOpen}
+        <ProfileFinancials vehicleId={vehicle.id} market={market()} reducedMarket={market(true)} open={financialOpen}
           onToggle={() => { setActivityOpen(false); setLiveOpen(false); setActiveFacet(null); setFinancialOpen(current => !current); }}
           onClose={() => setFinancialOpen(false)} boundaryRef={sticky} />
       </div>}>

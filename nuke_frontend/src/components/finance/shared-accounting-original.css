@@ -1,0 +1,7 @@
+.accounting-original-preview { min-width: 0; margin-block: 12px; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
+.accounting-original-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 8px; overflow-wrap: anywhere; }
+.accounting-original-preview button, .accounting-original-preview a { min-height: 44px; font: inherit; }
+.accounting-original-preview img, .accounting-original-preview canvas { display: block; width: 100%; height: auto; }
+.accounting-original-preview a { display: inline-flex; align-items: center; }
+.accounting-original-pdf { min-width: 0; }
+.accounting-original-pdf nav { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-block: 8px; }

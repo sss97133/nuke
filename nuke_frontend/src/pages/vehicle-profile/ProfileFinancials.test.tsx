@@ -4,6 +4,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 const fixture = vi.hoisted(() => ({ rpc: vi.fn(), from: vi.fn(), tables: {} as Record<string, Record<string, unknown>[]>, user: null as { id: string } | null }));
+vi.mock('pdfjs-dist/build/pdf.worker.min.mjs?url', () => ({ default: '/synthetic-pdf-worker.mjs' }));
 vi.mock('../../lib/supabase', () => ({ supabase: { rpc: fixture.rpc, from: fixture.from } }));
 vi.mock('../../contexts/AuthContext', () => ({ useAuthContext: () => ({ user: fixture.user, loading: false }) }));
 vi.mock('../../hooks/useIsMobile', () => ({ useIsMobile: () => false }));
@@ -39,11 +40,11 @@ beforeEach(() => {
 });
 afterEach(async () => { await act(async () => root.unmount()); client.clear(); host.remove(); vi.unstubAllGlobals(); });
 
-it('keeps a permanent financial door without a market price and shows allocated costs by default', async () => {
+it('never substitutes costs for a missing price and reads the books only when opened', async () => {
   await render();
   expect(host.querySelector('[aria-label="Explore vehicle financials"]')?.textContent).toBe('$$$');
-  expect(host.textContent).toContain('Booked subtotal$40.00');
-  expect(fixture.rpc.mock.calls.map(([name]) => name)).toEqual(['accounting_vehicle_costs']);
+  expect(host.querySelector('.vp-header-money')?.textContent).toBe('$$$');
+  expect(fixture.rpc).not.toHaveBeenCalled();
   open = true; await render();
   expect(host.textContent).toContain('Booked vehicle costs');
   expect(host.textContent).toContain('1 allocated of 1 visible entries');
@@ -78,10 +79,11 @@ it('reduces the visible amount deliberately, keeps the door, and remembers the d
   expect(host.textContent).toContain('Show header amount');
 });
 
-it('drops another viewer’s amount immediately on account change and logout', async () => {
-  await render(); expect(host.textContent).toContain('$40.00');
+it('drops another viewer’s financial records immediately on account change and logout', async () => {
+  open = true; await render(); expect(host.textContent).toContain('$40.00');
   let resolve!: (value: unknown) => void;
-  fixture.rpc.mockReturnValue(new Promise(done => { resolve = done; }));
+  fixture.rpc.mockImplementation((name: string) => name === 'accounting_vehicle_costs' ? new Promise(done => { resolve = done; })
+    : Promise.resolve({ data: name === 'owner_working_notes' ? { tables: [] } : [], error: null }));
   fixture.user = { id: 'owner-b' }; await render();
   expect(host.textContent).not.toContain('$40.00');
   await act(async () => resolve({ data: [rawCost({ book_owner_id: 'owner-b', allocated_amount: 70 })], error: null }));
@@ -115,7 +117,7 @@ it('shows a truncated accounting read as a visible subtotal with its returned de
   fixture.rpc.mockImplementation((name: string) => Promise.resolve({ data: name === 'accounting_vehicle_costs' ? [rawCost()] : name === 'owner_working_notes' ? { tables: [] } : [], count: 20, error: null }));
   open = true; await render();
   expect(host.textContent).toContain('1 of 20 visible cost entries loaded');
-  expect(host.querySelector('.vp-financial-headline')?.textContent).toBe('Booked subtotal$40.00');
+  expect(host.querySelector('.vp-header-money')?.textContent).toBe('$$$');
 });
 
 it('shows public receipt evidence while signed out, retaining the alternate amount field and pagination', async () => {
@@ -123,7 +125,8 @@ it('shows public receipt evidence while signed out, retaining the alternate amou
   fixture.tables.receipts_public_summary = Array.from({ length: 101 }, (_, index) => ({ id: `receipt-${index}`, vendor_name: `Synthetic receipt ${index}`,
     total: null, total_amount: 12.34, currency: null, transaction_date: '2024-06-01', status: 'processed' }));
   open = true; await render();
-  expect(host.querySelector('.vp-header-money')?.textContent).toContain('Receipts loaded100');
+  expect(host.querySelector('.vp-header-money')?.textContent).toBe('$$$');
+  expect(host.querySelector<HTMLDetailsElement>('.vp-financial-sources')?.open).toBe(false);
   expect(host.textContent).toContain('100 linked receipt records loaded. Total not yet read.');
   expect(host.textContent).toContain('12.34 · currency unrecorded');
   expect(host.textContent).not.toContain('No recorded market price');
@@ -158,4 +161,13 @@ it('shows authorized work-order charges and recorded payments separately from bo
   expect(host.textContent).toContain('Parts and labor charges$100.00');
   expect(host.textContent).toContain('Completed payments$40.00');
   expect(host.querySelector('.vp-financial-total')?.textContent).toBe('$40.00');
+});
+
+it('keeps an actual price ahead of expenses and makes source readings a secondary drill', async () => {
+  fixture.tables.receipts = [{ id: 'receipt', vendor_name: 'Synthetic vendor', total: 8 }];
+  open = true; await render(<span>Asking $900</span>);
+  expect(host.querySelector('.vp-header-money')?.textContent).toBe('Asking $900$$$');
+  const panel = host.querySelector('.vp-financial-panel')!;
+  expect(panel.textContent!.indexOf('Booked vehicle costs')).toBeLessThan(panel.textContent!.indexOf('Receipt sources'));
+  expect(panel.querySelector<HTMLDetailsElement>('.vp-financial-sources')?.open).toBe(false);
 });
