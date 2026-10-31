@@ -41,7 +41,7 @@ export function ReceiptRecords({ vehicleId, read }: { vehicleId: string; read: R
   return <section aria-label="Linked receipts"><h3>Build receipts</h3>
     {read.isLoading && <p role="status">Reading linked receipts…</p>}
     {read.isError && <div role="status"><p>Receipt summaries could not load.</p><button type="button" className="vp-financial-action" onClick={() => void read.refetch()}>Retry receipts</button></div>}
-    {(read.rows.length > 0 || read.total != null) && <p>{read.rows.length} of {read.total ?? 'an unknown number of'} linked receipt records loaded. Receipt readings and work-order charges can describe the same purchase; they are kept separate.</p>}
+    {(read.rows.length > 0 || read.total != null) && <p>{read.total == null ? `${read.rows.length} linked receipt records loaded. Total not yet read.` : `${read.rows.length} of ${read.total} linked receipt records loaded.`} Receipt readings and work-order charges can describe the same purchase; they are kept separate.</p>}
     {read.rows.map(receipt => <details key={receipt.id} className="vp-financial-entry">
       <summary><span><strong>{receipt.vendor || 'Linked receipt'}</strong><small>{receipt.dateConflict ? 'Date readings differ' : receipt.date || 'Date not recorded'}</small></span>
         <strong>{receipt.amountConflict ? 'Total readings differ' : amountText(receipt.amount, receipt.currency)}</strong></summary>

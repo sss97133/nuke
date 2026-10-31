@@ -30,7 +30,7 @@ beforeEach(() => {
     const rows = fixture.tables[table] ?? [];
     const query: any = { select: () => query, eq: () => query, or: () => query, order: () => query,
       limit: (size: number) => Promise.resolve({ data: rows.slice(0, size), count: rows.length, error: null }),
-      range: (start: number, end: number) => Promise.resolve({ data: rows.slice(start, end + 1), count: rows.length, error: null }) };
+      range: (start: number, end: number) => Promise.resolve({ data: rows.slice(start, end + 1), count: null, error: null }) };
     return query;
   });
   fixture.rpc.mockReset().mockImplementation((name: string) => Promise.resolve({ data: name === 'accounting_vehicle_costs' ? [rawCost()] : name === 'owner_working_notes' ? { tables: [] } : [], error: null }));
@@ -123,8 +123,8 @@ it('shows public receipt evidence while signed out, retaining the alternate amou
   fixture.tables.receipts_public_summary = Array.from({ length: 101 }, (_, index) => ({ id: `receipt-${index}`, vendor_name: `Synthetic receipt ${index}`,
     total: null, total_amount: 12.34, currency: null, transaction_date: '2024-06-01', status: 'processed' }));
   open = true; await render();
-  expect(host.querySelector('.vp-header-money')?.textContent).toContain('Receipts101');
-  expect(host.textContent).toContain('100 of 101 linked receipt records loaded');
+  expect(host.querySelector('.vp-header-money')?.textContent).toContain('Receipts loaded100');
+  expect(host.textContent).toContain('100 linked receipt records loaded. Total not yet read.');
   expect(host.textContent).toContain('12.34 · currency unrecorded');
   expect(host.textContent).not.toContain('No recorded market price');
   expect(fixture.from.mock.calls.every(([table]) => table === 'receipts_public_summary')).toBe(true);
@@ -141,7 +141,7 @@ it('keeps conflicting receipt amount/date readings unresolved and never invents 
 it('keeps a signed-in public-summary fallback on the same source when loading more receipts', async () => {
   fixture.tables.receipts_public_summary = Array.from({ length: 101 }, (_, index) => ({ id: `public-${index}`, total_amount: 5 }));
   open = true; await render();
-  expect(host.textContent).toContain('100 of 101 linked receipt records loaded');
+  expect(host.textContent).toContain('100 linked receipt records loaded. Total not yet read.');
   const baseReads = fixture.from.mock.calls.filter(([table]) => table === 'receipts').length;
   await act(async () => [...host.querySelectorAll('button')].find(button => button.textContent === 'Load more receipts')!.click());
   await render();

@@ -168,7 +168,7 @@ export default function ProfileFinancials({ vehicleId, market, reducedMarket, ma
   const amount = scopes.length === 1 && scopes[0].total != null ? <span className="vp-financial-headline"><small>Booked subtotal</small>{financialAmount(scopes[0].total, scopes[0].currency)}</span> : null;
   return <>
     <div className="vp-header-money">
-      {reduced ? reducedMarket : marketPriority ? market || amount : amount || market || (receipts.total != null && receipts.total > 0 ? <span className="vp-financial-headline"><small>Receipts</small>{receipts.total}</span> : null)}
+      {reduced ? reducedMarket : marketPriority ? market || amount : amount || market || (receipts.rows.length > 0 ? <span className="vp-financial-headline"><small>Receipts{receipts.total == null ? ' loaded' : ''}</small>{receipts.total ?? receipts.rows.length}</span> : null)}
       <button ref={trigger} type="button" className="vp-financial-trigger" aria-label="Explore vehicle financials" aria-haspopup="dialog" aria-expanded={open} onClick={onToggle}>$$$</button>
     </div>
     {open && <HeaderPopover open title="Financials" width={640} align="right" onClose={() => { onClose(); trigger.current?.focus(); }} dismissBoundaryRef={boundaryRef}>

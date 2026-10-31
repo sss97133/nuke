@@ -204,7 +204,7 @@ export function useVehicleReceiptRecords(vehicleId: string) {
     initialPageParam: { offset: 0, source: user ? 'receipts' : 'receipts_public_summary' },
     queryFn: async ({ pageParam }) => {
       const readPage = (source: string) => supabase.from(source)
-        .select('id,vendor_name,total,total_amount,currency,purchase_date,transaction_date,receipt_date,status,processing_status,source_document_table,source_document_id', { count: 'exact' })
+        .select('id,vendor_name,total,total_amount,currency,purchase_date,transaction_date,receipt_date,status,processing_status,source_document_table,source_document_id')
         .or(`vehicle_id.eq.${vehicleId},and(scope_type.eq.vehicle,scope_id.eq.${vehicleId})`)
         .order('created_at', { ascending: false }).order('id').range(pageParam.offset, pageParam.offset + 99);
       let source = pageParam.source;
@@ -220,13 +220,15 @@ export function useVehicleReceiptRecords(vehicleId: string) {
     },
     getNextPageParam: (last, pages) => {
       const loaded = pages.reduce((count, page) => count + page.rows.length, 0);
-      return last.rows.length === 0 || (last.total != null && loaded >= last.total) ? undefined : { offset: loaded, source: last.source };
+      return last.rows.length < 100 || (last.total != null && loaded >= last.total) ? undefined : { offset: loaded, source: last.source };
     },
     enabled: !!vehicleId && !loading,
     staleTime: 60_000, gcTime: 0, retry: false,
   });
   const rows = useMemo(() => [...new Map((read.data?.pages.flatMap(page => page.rows) ?? []).map(row => [row.id, row])).values()], [read.data]);
-  return { ...read, rows, total: read.data?.pages[0]?.total ?? null };
+  // Avoid an expensive full projection count before showing the first page.
+  // A total is established only after a short final page exhausts the read.
+  return { ...read, rows, total: read.data?.pages[0]?.total ?? (read.data && !read.hasNextPage ? rows.length : null) };
 }
 
 export function useVehicleWorkOrderFinancials(vehicleId: string) {
