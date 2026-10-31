@@ -28,6 +28,7 @@ beforeEach(() => {
   fixture.writer.mockResolvedValue({ data: { ok: true, confirmed: true, session_id: ID }, error: null });
   fixture.rpc.mockImplementation((name: string, args: unknown) => {
     if (name === 'confirm_work_session') return fixture.writer(args);
+    if (name === 'vehicle_card_images') return Promise.resolve({data: [], error: null});
     return Promise.resolve({ data: name === 'my_signature_queue'
       ? { as_of: '2026-10-25T07:00:00Z', items: fixture.items, coverage: { returned: fixture.items.length, total: fixture.queueTotal ?? fixture.items.length } }
       : { rows: fixture.jobs, coverage: { total_for_viewer: fixture.jobs.length }, next_after: null }, error: null });
