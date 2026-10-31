@@ -145,6 +145,14 @@ Deno.test("Vicari preview preserves ahid and performs no extraction or writes", 
   equal(extractorCalls(), []); equal(writes(), []);
 });
 
+Deno.test("Gateway requires verified native source capture even with caller fields and enrich false", async () => {
+  const r = await ingest({ url: "https://www.gatewayclassiccars.com/vehicles/det/42/1995-ford-f150",
+    year: 1995, make: "Ford", model: "F150", description: "caller text", enrich: false });
+  equal([r.result.status, r.result.source], ["rejected", "gateway_classics"]);
+  assert(r.result.reason.includes("gateway_source_not_registered"), "native source refusal must survive");
+  equal(extractorCalls(), []); equal(writes(), []);
+});
+
 Deno.test("Vicari refuses an unregistered source instead of falling back to AI or caller fields", async () => {
   const r = await ingest({ url: "https://www.vicariauction.com/auction-house/?ahid=123",
     year: 1967, make: "Ford", model: "Mustang", description: "caller text", enrich: false });

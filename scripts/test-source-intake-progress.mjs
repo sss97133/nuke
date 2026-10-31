@@ -109,6 +109,8 @@ export function fixture(options = {}) {
         createIntakeBudget: (throttle, start) => ledger.createIntakeBudget(throttle, start, runtimeDate.now) };
       if (name.endsWith('/captureLedger.ts')) return { captureLedgerFields };
       if (name.endsWith('/feedFetch.ts')) return { fetchCraigslistFeed };
+      if (name.endsWith('/gatewayParser.ts')) return { gatewayInventoryUrls: options.browserUrls ?? (() => { throw new Error('unexpected browser inventory'); }) };
+      if (name.endsWith('/gatewayCapture.ts')) return { readGatewayBrowserCapture: options.browserCapture ?? (() => { throw new Error('unexpected browser capture'); }) };
       if (name.endsWith('/mecumSearch.ts')) return { fetchMecumFeedUrls: options.nativeDiscovery ?? (() => { throw new Error('unexpected native search'); }) };
       if (name.endsWith('/schedule.ts')) return { nextYield: () => ({ rate: 0, interval_minutes: 60 }) };
       if (name.endsWith('/removal.ts')) return { sweepCraigslistRemovals: async () => null, noticeFrom: () => null };
@@ -491,6 +493,26 @@ test('a Mecum search refusal fails without a paid fallback or ingestion', async 
     nativeDiscovery: async () => { throw new Error('mecum_index: HTTP 403'); } });
   const result = await f.request();
   assert.equal(result.body.results[0].error, 'fetch_failed: mecum_index: HTTP 403');
+  assert(!f.calls.some(c => c.path === '/functions/v1/ingest'));
+});
+
+test('Gateway polls only retained inventory entries with captured detail pages', async () => {
+  const ready = 'https://www.gatewayclassiccars.com/vehicles/det/42/synthetic';
+  const uncaptured = 'https://www.gatewayclassiccars.com/vehicles/det/43/synthetic';
+  const f = fixture({ feed: { source_slug: 'gateway_classics', search_criteria: { fetch_strategy: 'firecrawl_html' } },
+    browserCapture: async () => ({ html: 'retained inventory', captured_urls: [ready] }),
+    browserUrls: () => [ready, uncaptured] });
+  const result = await f.request();
+  assert.equal(result.body.results[0].items_found, 1);
+  assert(f.calls.some(c => c.path === '/functions/v1/ingest' && c.body.url === ready));
+  assert(!f.calls.some(c => c.path === '/functions/v1/ingest' && c.body.url === uncaptured));
+});
+
+test('Gateway missing or stale browser progress refuses without source fetch or paid fallback', async () => {
+  const f = fixture({ feed: { source_slug: 'gateway_classics', search_criteria: { fetch_strategy: 'firecrawl_html' } },
+    browserCapture: async () => { throw new Error('gateway_browser_capture_required'); } });
+  const result = await f.request();
+  assert.match(result.body.results[0].error, /^blocked: (?:Error: )?gateway_browser_capture_required$/);
   assert(!f.calls.some(c => c.path === '/functions/v1/ingest'));
 });
 
