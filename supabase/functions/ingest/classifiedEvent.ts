@@ -12,9 +12,10 @@
  */
 import { vehicleEventWriterFor, type VehicleEventWriteResult } from "../_shared/vehicleEventWrite.ts";
 const writeVehicleEventByKey = vehicleEventWriterFor("ingest:classified");
+import { DEALERS } from "../_shared/dealerParser.ts";
 import { recordSellerTypes, sellerTypeRow, type SellerType } from "../_shared/sellerType.ts";
 
-export type ClassifiedPlatform = "gateway_classics" | "classiccars" | "ksl" | "facebook_marketplace";
+export type ClassifiedPlatform = "gr_auto_gallery" | "streetside_classics" | "gateway_classics" | "classiccars" | "ksl" | "facebook_marketplace";
 
 export function classifiedPlatform(url: string | null | undefined): ClassifiedPlatform | null {
   try {
@@ -56,7 +57,7 @@ export async function landClassifiedListing(
 ): Promise<ClassifiedLanding> {
   const event = await writeVehicleEventByKey(supabase, {
     vehicle_id: a.vehicleId,
-    source_platform: a.platform === "gateway_classics" ? "www.gatewayclassiccars.com" : a.platform,
+    source_platform: a.platform === "gateway_classics" ? "www.gatewayclassiccars.com" : a.platform === "gr_auto_gallery" || a.platform === "streetside_classics" ? DEALERS[a.platform].event : a.platform,
     source_listing_id: a.listingId,
     source_url: a.listingUrl,
     event_type: "listing",
