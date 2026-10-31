@@ -21,6 +21,8 @@ vi.mock('./hooks/useVehicleImageEvidence', async original => ({
   useVehicleImageEvidence: () => ({ isLoading: false, data: { complete: true, images: [
     { id: 'transmission-photo', image_url: 'https://images.test/transmission.jpg', vehicle_zone: 'mech_drivetrain', is_document: false },
     { id: 'unrelated-engine', image_url: 'https://images.test/engine.jpg', vehicle_zone: 'mech_engine_bay', is_document: false },
+    { id: 'receipt-tool', image_url: 'https://images.test/receipt.jpg', vehicle_zone: 'mech_drivetrain', is_document: false, ai_byok_scene: 'receipt_document', ai_byok_narrative: 'Transmission service tool invoice' },
+    { id: 'reference-engine', image_url: 'https://images.test/reference.jpg', vehicle_zone: 'mech_drivetrain', is_document: false, ai_byok_scene: 'cross_reference' },
   ] } }),
 }));
 vi.mock('../../components/PrefetchLink', () => ({ default: ({ to, children }: any) => <a href={to}>{children}</a> }));

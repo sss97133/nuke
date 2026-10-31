@@ -23,10 +23,11 @@ export interface EvidenceImage {
   caption?: string | null;
   ai_byok_narrative?: string | null;
   ai_byok_components?: unknown;
+  ai_byok_scene?: string | null;
 }
 
 const CAP = 500;
-const SELECT = 'id,image_url,thumbnail_url,medium_url,vehicle_zone,angle,ai_detected_angle,ai_processing_status,vision_analyzed_at,vision_model_version,created_at,taken_at,source,is_primary,is_document,category,caption,ai_byok_narrative:ai_scan_metadata->byok_deep_analysis->>narrative_one_line,ai_byok_components:ai_scan_metadata->byok_deep_analysis->components_seen';
+const SELECT = 'id,image_url,thumbnail_url,medium_url,vehicle_zone,angle,ai_detected_angle,ai_processing_status,vision_analyzed_at,vision_model_version,created_at,taken_at,source,is_primary,is_document,category,caption,ai_byok_narrative:ai_scan_metadata->byok_deep_analysis->>narrative_one_line,ai_byok_components:ai_scan_metadata->byok_deep_analysis->components_seen,ai_byok_scene:ai_scan_metadata->byok_deep_analysis->>scene_type';
 
 export function webSourceUrl(value: string | null | undefined): string | null {
   if (!value) return null;
@@ -59,8 +60,8 @@ const FIELD_TERMS: Record<string, string[]> = {
   transmission: ['transmission', 'gearbox'],
   drivetrain: ['transfer case', 'driveshaft', 'drive shaft', 'axle', 'differential', '4wd', '4x4'],
 };
-type AreaImage = Pick<EvidenceImage, 'vehicle_zone' | 'is_document'> & Partial<Pick<EvidenceImage, 'caption' | 'ai_byok_narrative' | 'ai_byok_components'>> & {
-  ai_scan_metadata?: { byok_deep_analysis?: { narrative_one_line?: string | null; components_seen?: unknown } | null } | null;
+type AreaImage = Pick<EvidenceImage, 'vehicle_zone' | 'is_document'> & Partial<Pick<EvidenceImage, 'caption' | 'ai_byok_narrative' | 'ai_byok_components' | 'ai_byok_scene'>> & {
+  ai_scan_metadata?: { byok_deep_analysis?: { narrative_one_line?: string | null; components_seen?: unknown; scene_type?: string | null; attribution_doubt?: unknown } | null } | null;
 };
 
 function topicRank(image: AreaImage, field: string): number {
@@ -75,6 +76,12 @@ function topicRank(image: AreaImage, field: string): number {
 }
 
 export function isRelatedFieldImage(image: AreaImage, field: string): boolean {
+  const byok = image.ai_scan_metadata?.byok_deep_analysis;
+  const scene = image.ai_byok_scene || byok?.scene_type;
+  // A receipt/tool description can mention an axle; a reference can show an engine.
+  // Those remain gallery/source records, not photographs of this vehicle's area.
+  if (['cross_reference', 'product_screenshot', 'spreadsheet', 'hand_drawn_diagram', 'receipt_document'].includes(scene || '')
+    || (typeof byok?.attribution_doubt === 'string' && byok.attribution_doubt.trim())) return false;
   const prefixes = FIELD_AREAS[field] || [];
   return image.is_document !== true && (topicRank(image, field) < 2
     || (!!image.vehicle_zone && prefixes.some(prefix => image.vehicle_zone!.startsWith(prefix))));

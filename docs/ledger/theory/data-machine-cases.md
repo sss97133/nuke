@@ -354,6 +354,24 @@ gain in model accuracy or an automatic learning/deployment loop. Independently s
 evidence, correction cost and real source-to-consumer acceptance remain required. No corpus re-drive,
 new model call, source write, processing activation or fleet coverage gain is established by these tests.
 
+**C17 source context survives interpretation — prepared 2026-10-31 UTC.** A retained reading can
+correctly identify a reference image or receipt while its consumer still treats the contents as a
+confirmed vehicle component or physical-area photograph. Preserve that source qualification through
+receipt matching and field relevance. Reference components keep their receipt candidates as inference;
+paper documents keep their paper citation. Neither becomes a photographed part of the attributed build.
+The existing profile field reader now retains the scene classification and excludes document/reference
+context from uncited physical-area recommendations, including a false legacy `is_document` flag.
+Gallery records and explicit source citations remain available. Retained-source comparisons exercise
+the actual old/new producer rules and field mapper: reference confirmations are withheld and admitted
+renders/catalog references stop appearing as physical-area photographs. The separate physical-image
+controls retain their results. A receipt regression remains covered, but an inspected invoice was already
+excluded by gallery admission, so it is not counted as a new consumer gain. Check the whole retrieval
+path before treating a changed local result as an operating improvement.
+This is a bounded source-to-consumer correction, not a population accuracy estimate, new model reading,
+historical component-row rewrite or evidence of current installation/completion. The next quality case
+must preserve this comparison and test a separately selected failure; repeated source-free assertions
+or an inactive reader alone cannot establish an improved operating workload.
+
 ## 4. Measurements worth keeping (2026-09-30, read-only, reproducible)
 
 - **The soft close, 400 settled BaT lots (closed 12 h to 10 days before):** 322 extended (80%); 5,471 of 14,026
