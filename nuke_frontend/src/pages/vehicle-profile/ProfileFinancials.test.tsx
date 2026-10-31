@@ -95,10 +95,12 @@ it('distinguishes a failed read from no visible entries and never manufactures a
 it('retains an unpriced audit record as unknown rather than zero and never adds it to books', async () => {
   fixture.rpc.mockImplementation((name: string) => Promise.resolve({ data: name === 'accounting_vehicle_costs' ? [rawCost()] : name === 'owner_working_notes' ? { tables: [] } : [
     { observation_id: 'audit-a', observed_at: '2024-06-01', content_text: 'Unpriced work', structured_data: { event_type: 'labor_payment', direction: 'out' } },
+    { observation_id: 'audit-b', observed_at: '2024-06-01', content_text: 'Unscoped financial record', structured_data: { amount_usd: 15 } },
   ], error: null }));
   open = true; await render();
   expect(host.textContent).toContain('Unpriced work'); expect(host.textContent).toContain('Amount unknown');
   expect(host.querySelector('.vp-financial-total')?.textContent).toBe('$40.00');
+  expect([...host.querySelectorAll('summary')].find(item => item.textContent?.includes('Unscoped financial record'))?.textContent).toContain('Financial record');
 });
 
 it('shows a truncated accounting read as a visible subtotal with its returned denominator', async () => {
