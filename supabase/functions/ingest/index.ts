@@ -41,7 +41,7 @@ import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { vicariListingId } from "../_shared/vicariParser.ts";
 import { prepareGatewayCapture, landGatewayCapture, type GatewayCapture } from "./gateway.ts";
 import { gatewayListing } from "../_shared/gatewayParser.ts";
-import { dealerListing } from "../_shared/dealerParser.ts";
+import { dealerListing, dealerHost } from "../_shared/dealerParser.ts";
 import { prepareDealerCapture, landDealerCapture, dealerIdentityConflict, type DealerCapture } from "./dealer.ts";
 import { ingestVicari } from "./vicari.ts";
 
@@ -1228,6 +1228,10 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
       const source = detectSource(input.url);
       platform = source.platform;
       externalId = source.externalId;
+      const nativeDealerHost = dealerHost(input.url);
+      if (nativeDealerHost && !dealerListing(input.url)) {
+        return { status: "rejected", reason: "dealer_listing_url_invalid", source: nativeDealerHost };
+      }
 
       // Resolve a Craigslist share link once. Failure returns to the intake
       // ledger/backoff before detail enrichment; it must not retry the same

@@ -16,12 +16,12 @@ async function fixture(options: Record<string, any> = {}) {
   const observed = new Date(Date.now() - 1000).toISOString(), original = observed;
   const hash = [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(html)))].map(v => v.toString(16).padStart(2, "0")).join("");
   const calls: { path: string; method: string; body: any; query: string }[] = [];
-  let observation: any = null, event: any = null;
+  let observation: any = null, event: any = null, captureFetches = 0;
   const db = createClient("https://fixture.invalid", "synthetic-service-key", {
     auth: { persistSession: false, autoRefreshToken: false }, global: { fetch: async (input, init = {}) => {
       const u = new URL(String(input)), method = init.method ?? "GET", body = init.body ? JSON.parse(String(init.body)) : null;
       calls.push({ path: u.pathname, method, body, query: u.search });
-      if (u.pathname === "/rest/v1/listing_feeds") return Response.json({ enabled: !options.held, poll_interval_minutes: 180 });
+      if (u.pathname === "/rest/v1/listing_feeds") return options.missingControl ? Response.json({ code: "PGRST116", message: "zero feed rows" }, { status: 406 }) : Response.json({ enabled: !options.held, poll_interval_minutes: 180 });
       if (u.pathname === "/rest/v1/platform_config") return Response.json(null);
       if (u.pathname === "/rest/v1/observation_sources") return Response.json(options.missing ? null : { id: "source", species: "dealer", supported_observations: ["listing"] });
       if (u.pathname === "/rest/v1/listing_page_snapshots") return Response.json({ id: "snapshot", platform: "streetside_classics", listing_url: options.wrongUrl ? url + "-other" : url,
@@ -47,10 +47,10 @@ async function fixture(options: Record<string, any> = {}) {
     } },
   });
   const read = (client: any, sourceUrl: string) => prepareDealerCapture(client, sourceUrl, async (_url, opts) => {
-    assertEquals(opts?.useFirecrawl, false); assertEquals(opts?.firecrawlOnBlock, false); assertEquals(opts?.directFetchOptions?.publicOnly, true);
+    captureFetches++; assertEquals(opts?.useFirecrawl, false); assertEquals(opts?.firecrawlOnBlock, false); assertEquals(opts?.directFetchOptions?.publicOnly, true);
     return { html, markdown: null, snapshotId: "snapshot", cached: true, source: "cache", url, platform: "streetside_classics", statusCode: null, error: null, costCents: 0 };
   });
-  return { db, read, observed, original, calls };
+  return { db, read, observed, original, calls, captureFetches: () => captureFetches };
 }
 
 Deno.test("native dealer capture, canonical readback and exact replay preserve qualified source clocks", async () => {
@@ -65,10 +65,11 @@ Deno.test("native dealer capture, canonical readback and exact replay preserve q
   const listing = f.calls.find(c => c.path === "/rest/v1/vehicle_events" && c.method === "POST")!.body;
   assertEquals([listing.source_platform, listing.source_listing_id, listing.event_type, listing.current_price], ["Streetside Classics", "42-det", "listing", 12345]);
 });
-for (const option of ["missing", "badHash", "wrongUrl", "future", "held"]) {
+for (const option of ["missing", "badHash", "wrongUrl", "future", "held", "missingControl"]) {
   Deno.test(`Dealer ${option} refuses before parent, canonical admission or paid fallback`, async () => {
     const f = await fixture({ [option]: true });
     await assertRejects(() => f.read(f.db, url));
     assertEquals(f.calls.some(c => c.method !== "GET"), false);
+    if (["missing", "held", "missingControl"].includes(option)) assertEquals(f.captureFetches(), 0);
   });
 }

@@ -6,11 +6,17 @@ export const DEALERS = {
   streetside_classics: { host: "www.streetsideclassics.com", slug: "streetside-classics", event: "Streetside Classics", stock: /^\d+-[a-z]{2,4}$/ },
 } as const;
 export type DealerPlatform = keyof typeof DEALERS;
+export function dealerHost(url: string): DealerPlatform | null {
+  try {
+    const host = new URL(url).hostname.replace(/^www\./, "");
+    return (Object.keys(DEALERS) as DealerPlatform[]).find(k => host === DEALERS[k].host.replace(/^www\./, "")) ?? null;
+  } catch { return null; }
+}
 export function dealerListing(url: string) {
   try {
     const u = new URL(url);
     if (u.protocol !== "https:" || u.username || u.password || u.port || u.search || u.hash) return null;
-    const platform = (Object.keys(DEALERS) as DealerPlatform[]).find(k => u.hostname.replace(/^www\./, "") === DEALERS[k].host.replace(/^www\./, ""));
+    const platform = dealerHost(url);
     const m = u.pathname.match(/^\/vehicles\/([^/]+)\/([a-z0-9-]+)\/?$/);
     if (!platform || !m || !DEALERS[platform].stock.test(m[1])) return null;
     return { platform, stock_id: m[1], url: `https://${DEALERS[platform].host}/vehicles/${m[1]}/${m[2]}` };

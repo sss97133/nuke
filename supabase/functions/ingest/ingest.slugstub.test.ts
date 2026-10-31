@@ -145,6 +145,13 @@ Deno.test("Vicari preview preserves ahid and performs no extraction or writes", 
   equal(extractorCalls(), []); equal(writes(), []);
 });
 
+for (const url of ["https://www.grautogallery.com/vehicles/b1234-j/1995-ford-f150?utm_source=x", "https://www.streetsideclassics.com/about-us", "http://www.streetsideclassics.com/vehicles/42-det/1995-ford-f150"]) {
+  Deno.test("invalid native dealer URL cannot reach generic extraction: " + url, async () => {
+    const r = await ingest({ url }); equal(r.result.status, "rejected"); equal(r.result.reason, "dealer_listing_url_invalid");
+    equal(extractorCalls(), []); equal(writes(), []);
+  });
+}
+
 for (const url of ["https://www.grautogallery.com/vehicles/b1234-j/1995-ford-f150", "https://www.streetsideclassics.com/vehicles/42-det/1995-ford-f150"]) {
   Deno.test("native dealer refuses unregistered source even with caller fields and enrich false: " + url, async () => {
     const r = await ingest({ url, year: 1995, make: "Ford", model: "F150", description: "caller text", enrich: false });

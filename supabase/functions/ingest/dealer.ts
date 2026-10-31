@@ -24,7 +24,9 @@ export async function prepareDealerCapture(db: any, url: string, fetchPage = arc
     db.from("platform_config").select("config_value").eq("config_key", "source_intake").maybeSingle(),
   ]);
   if (source.error || source.data?.species !== "dealer" || !source.data.supported_observations?.includes("listing")) throw Error("dealer_source_not_registered");
-  if (feed.error || config.error) throw Error("dealer_controls_unavailable");
+  // Missing/ambiguous feed controls are a hold, including fresh installations.
+  // This repair never creates or enables a collection target implicitly.
+  if (feed.error || !feed.data || config.error) throw Error("dealer_controls_unavailable");
   const throttle = intakeThrottle(config.data?.config_value ?? {}), control = throttle.sources[listing.platform];
   if (!feed.data.enabled || !throttle.enabled || throttle.max_feeds === 0 || throttle.max_ingests === 0 || control?.enabled === false || control?.max_ingests === 0) throw Error("dealer_intake_held");
   const capture = await fetchPage(listing.url, { platform: listing.platform, maxAgeSec: feed.data.poll_interval_minutes * 60,
