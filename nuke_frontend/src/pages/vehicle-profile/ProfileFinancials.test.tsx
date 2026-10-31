@@ -3,12 +3,12 @@ import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-const fixture = vi.hoisted(() => ({ rpc: vi.fn(), user: null as { id: string } | null }));
-vi.mock('../../lib/supabase', () => ({ supabase: { rpc: fixture.rpc } }));
+const fixture = vi.hoisted(() => ({ rpc: vi.fn(), from: vi.fn(), tables: {} as Record<string, Record<string, unknown>[]>, user: null as { id: string } | null }));
+vi.mock('../../lib/supabase', () => ({ supabase: { rpc: fixture.rpc, from: fixture.from } }));
 vi.mock('../../contexts/AuthContext', () => ({ useAuthContext: () => ({ user: fixture.user, loading: false }) }));
 vi.mock('../../hooks/useIsMobile', () => ({ useIsMobile: () => false }));
 import ProfileFinancials, { summarizeVehicleCosts } from './ProfileFinancials';
-import { parseVehicleBookCosts } from './hooks/useBuildLedger';
+import { parseVehicleBookCosts, parseVehicleReceiptRecord } from './hooks/useBuildLedger';
 
 let root: Root, host: HTMLDivElement, client: QueryClient;
 let open = false;
@@ -25,6 +25,14 @@ beforeEach(() => {
   const storage = new Map<string, string>();
   vi.stubGlobal('localStorage', { getItem: (key: string) => storage.get(key) ?? null, setItem: (key: string, value: string) => storage.set(key, value) });
   open = false; fixture.user = { id: 'owner-a' };
+  fixture.tables = {};
+  fixture.from.mockReset().mockImplementation((table: string) => {
+    const rows = fixture.tables[table] ?? [];
+    const query: any = { select: () => query, eq: () => query, or: () => query, order: () => query,
+      limit: (size: number) => Promise.resolve({ data: rows.slice(0, size), count: rows.length, error: null }),
+      range: (start: number, end: number) => Promise.resolve({ data: rows.slice(start, end + 1), count: rows.length, error: null }) };
+    return query;
+  });
   fixture.rpc.mockReset().mockImplementation((name: string) => Promise.resolve({ data: name === 'accounting_vehicle_costs' ? [rawCost()] : name === 'owner_working_notes' ? { tables: [] } : [], error: null }));
   client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   host = document.createElement('div'); document.body.appendChild(host); root = createRoot(host);
@@ -108,4 +116,46 @@ it('shows a truncated accounting read as a visible subtotal with its returned de
   open = true; await render();
   expect(host.textContent).toContain('1 of 20 visible cost entries loaded');
   expect(host.querySelector('.vp-financial-headline')?.textContent).toBe('Booked subtotal$40.00');
+});
+
+it('shows public receipt evidence while signed out, retaining the alternate amount field and pagination', async () => {
+  fixture.user = null;
+  fixture.tables.receipts_public_summary = Array.from({ length: 101 }, (_, index) => ({ id: `receipt-${index}`, vendor_name: `Synthetic receipt ${index}`,
+    total: null, total_amount: 12.34, currency: null, transaction_date: '2024-06-01', status: 'processed' }));
+  open = true; await render();
+  expect(host.querySelector('.vp-header-money')?.textContent).toContain('Receipts101');
+  expect(host.textContent).toContain('100 of 101 linked receipt records loaded');
+  expect(host.textContent).toContain('12.34 · currency unrecorded');
+  expect(host.textContent).not.toContain('No recorded market price');
+  expect(fixture.from.mock.calls.every(([table]) => table === 'receipts_public_summary')).toBe(true);
+  expect(fixture.rpc).not.toHaveBeenCalled();
+  await act(async () => [...host.querySelectorAll('button')].find(button => button.textContent === 'Load more receipts')!.click());
+  await render(); expect(host.textContent).toContain('101 of 101 linked receipt records loaded');
+});
+
+it('keeps conflicting receipt amount/date readings unresolved and never invents a currency', () => {
+  expect(parseVehicleReceiptRecord({ id: 'receipt', total: '10', total_amount: '12', currency: null,
+    receipt_date: '2024-06-01', transaction_date: '2024-06-02' })).toMatchObject({ amount: null, amountConflict: true, currency: null, date: null, dateConflict: true });
+});
+
+it('keeps a signed-in public-summary fallback on the same source when loading more receipts', async () => {
+  fixture.tables.receipts_public_summary = Array.from({ length: 101 }, (_, index) => ({ id: `public-${index}`, total_amount: 5 }));
+  open = true; await render();
+  expect(host.textContent).toContain('100 of 101 linked receipt records loaded');
+  const baseReads = fixture.from.mock.calls.filter(([table]) => table === 'receipts').length;
+  await act(async () => [...host.querySelectorAll('button')].find(button => button.textContent === 'Load more receipts')!.click());
+  await render();
+  expect(host.textContent).toContain('101 of 101 linked receipt records loaded');
+  expect(fixture.from.mock.calls.filter(([table]) => table === 'receipts')).toHaveLength(baseReads);
+});
+
+it('shows authorized work-order charges and recorded payments separately from books and receipts', async () => {
+  fixture.tables.work_order_receipt_unified = [{ work_order_id: 'wo', work_order_title: 'Synthetic job', work_order_status: 'in_progress',
+    parts_count: 1, labor_count: 0, payment_count: 1, invoice_total: 100, payments_total: 40, balance_due: 60 }];
+  fixture.tables.work_orders = [{ id: 'wo', currency: 'USD' }];
+  open = true; await render();
+  expect(host.textContent).toContain('Synthetic job');
+  expect(host.textContent).toContain('Parts and labor charges$100.00');
+  expect(host.textContent).toContain('Completed payments$40.00');
+  expect(host.querySelector('.vp-financial-total')?.textContent).toBe('$40.00');
 });

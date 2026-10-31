@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { useAuthContext } from '../../../contexts/AuthContext';
@@ -175,6 +175,81 @@ function str(v: unknown): string | null {
 function nullableMoney(value: unknown): number | null {
   if (typeof value !== 'number' && (typeof value !== 'string' || !/^-?\d+(\.\d+)?$/.test(value))) return null;
   return Number.isFinite(Number(value)) ? Number(value) : null;
+}
+
+export interface VehicleReceiptRecord {
+  id: string; vendor: string | null; currency: string | null;
+  amount: number | null; total: number | null; totalAmount: number | null; amountConflict: boolean;
+  date: string | null; dates: string[]; dateConflict: boolean;
+  status: string | null; processingStatus: string | null;
+  sourceTable: string | null; sourceId: string | null;
+}
+
+export function parseVehicleReceiptRecord(row: Record<string, unknown>): VehicleReceiptRecord {
+  const total = nullableMoney(row.total), totalAmount = nullableMoney(row.total_amount);
+  const amountConflict = total != null && totalAmount != null && total !== totalAmount;
+  const dates = [...new Set([row.purchase_date, row.transaction_date, row.receipt_date]
+    .filter((value): value is string => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)))];
+  return { id: String(row.id), vendor: str(row.vendor_name), currency: typeof row.currency === 'string' && /^[A-Z]{3}$/.test(row.currency) ? row.currency : null,
+    amount: amountConflict ? null : total ?? totalAmount, total, totalAmount, amountConflict,
+    date: dates.length === 1 ? dates[0] : null, dates, dateConflict: dates.length > 1,
+    status: str(row.status), processingStatus: str(row.processing_status), sourceTable: str(row.source_document_table), sourceId: str(row.source_document_id) };
+}
+
+/** Existing column-limited public receipt projection; originals and private books retain their own access checks. */
+export function useVehicleReceiptRecords(vehicleId: string) {
+  const { user, loading } = useAuthContext();
+  const read = useInfiniteQuery({
+    queryKey: ['vehicle-financial-receipts', vehicleId, user?.id ?? 'anon'],
+    initialPageParam: { offset: 0, source: user ? 'receipts' : 'receipts_public_summary' },
+    queryFn: async ({ pageParam }) => {
+      const readPage = (source: string) => supabase.from(source)
+        .select('id,vendor_name,total,total_amount,currency,purchase_date,transaction_date,receipt_date,status,processing_status,source_document_table,source_document_id', { count: 'exact' })
+        .or(`vehicle_id.eq.${vehicleId},and(scope_type.eq.vehicle,scope_id.eq.${vehicleId})`)
+        .order('created_at', { ascending: false }).order('id').range(pageParam.offset, pageParam.offset + 99);
+      let source = pageParam.source;
+      let result = await readPage(source);
+      // RLS may withhold the base rows from a signed-in non-owner. Reuse only the
+      // existing public summary, and keep that source for subsequent pages.
+      if (source === 'receipts' && pageParam.offset === 0 && (result.error || result.data?.length === 0)) {
+        source = 'receipts_public_summary'; result = await readPage(source);
+      }
+      const { data, error, count } = result;
+      if (error || !Array.isArray(data)) throw new Error('Receipt summaries could not load.');
+      return { rows: data.map(parseVehicleReceiptRecord), total: count ?? null, source };
+    },
+    getNextPageParam: (last, pages) => {
+      const loaded = pages.reduce((count, page) => count + page.rows.length, 0);
+      return last.rows.length === 0 || (last.total != null && loaded >= last.total) ? undefined : { offset: loaded, source: last.source };
+    },
+    enabled: !!vehicleId && !loading,
+    staleTime: 60_000, gcTime: 0, retry: false,
+  });
+  const rows = useMemo(() => [...new Map((read.data?.pages.flatMap(page => page.rows) ?? []).map(row => [row.id, row])).values()], [read.data]);
+  return { ...read, rows, total: read.data?.pages[0]?.total ?? null };
+}
+
+export function useVehicleWorkOrderFinancials(vehicleId: string) {
+  const { user, loading } = useAuthContext();
+  return useQuery({
+    queryKey: ['vehicle-financial-work-orders', vehicleId, user?.id ?? 'anon'],
+    queryFn: async () => {
+      const [orders, units] = await Promise.all([
+        supabase.from('work_order_receipt_unified')
+          .select('work_order_id,work_order_title,work_order_status,work_order_created,parts_count,labor_count,payment_count,invoice_total,payments_total,balance_due', { count: 'exact' })
+          .eq('vehicle_id', vehicleId).order('work_order_created', { ascending: false }).limit(200),
+        supabase.from('work_orders').select('id,currency').eq('vehicle_id', vehicleId).limit(200),
+      ]);
+      if (orders.error || !Array.isArray(orders.data)) throw new Error('Work-order financial records could not load.');
+      const currencies = new Map((units.error ? [] : units.data ?? []).map(row => [row.id, typeof row.currency === 'string' && /^[A-Z]{3}$/.test(row.currency) ? row.currency : null]));
+      return { rows: orders.data.map(row => ({ id: String(row.work_order_id), title: str(row.work_order_title), status: str(row.work_order_status),
+        currency: currencies.get(row.work_order_id) ?? null, createdAt: str(row.work_order_created),
+        pricedEntries: num(row.parts_count) + num(row.labor_count), paymentCount: num(row.payment_count),
+        charges: nullableMoney(row.invoice_total), paid: nullableMoney(row.payments_total), remainder: nullableMoney(row.balance_due) })), total: orders.count ?? null };
+    },
+    enabled: !!vehicleId && !loading && !!user,
+    staleTime: 60_000, gcTime: 0, retry: false,
+  });
 }
 
 interface RawLedgerRow {
