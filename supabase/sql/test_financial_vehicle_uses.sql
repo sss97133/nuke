@@ -224,5 +224,20 @@ DO $$ BEGIN
  IF (SELECT sum(allocated_amount) FROM accounting_vehicle_costs('aaaaaaaa-0000-4000-8000-00000000000a'))<>10 THEN
    RAISE EXCEPTION 'expense and refund phases were combined'; END IF;
 END $$;
+-- Vehicle filing alone does not authorize another book's private receipt item.
+SELECT set_config('request.jwt.claim.role','service_role',true);
+INSERT INTO public.receipts(id,user_id,vehicle_id,scope_type,scope_id,is_active,is_superseded)
+ VALUES('cccccccc-0000-4000-8000-000000000004','22222222-2222-4222-8222-222222222222','aaaaaaaa-0000-4000-8000-00000000000a','vehicle','aaaaaaaa-0000-4000-8000-00000000000a',true,false);
+DO $$ BEGIN
+ BEGIN
+  PERFORM ingest_financial_evidence('11111111-1111-4111-8111-111111111111',pg_temp.original(910),
+   pg_temp.revision('foreign-receipt',jsonb_build_array(pg_temp.field('financial_use_'||left(repeat('7',64),24),jsonb_build_object(
+    'source_key',repeat('7',64),'phase','book_expense','book_amount','4','currency','USD','allocations',jsonb_build_array(
+    jsonb_build_object('vehicle_id','aaaaaaaa-0000-4000-8000-00000000000a','receipt_id','cccccccc-0000-4000-8000-000000000004','allocated_amount','4','basis','Synthetic foreign receipt reference'))))),
+    jsonb_build_array(pg_temp.record(repeat('7',64),'4','retained_ledger_decision','Expense','foreign-receipt'))));
+  RAISE EXCEPTION 'another book receipt was admitted';
+ EXCEPTION WHEN raise_exception THEN IF SQLERRM NOT LIKE '%references must belong%' THEN RAISE; END IF; END;
+ IF EXISTS(SELECT 1 FROM financial_documents WHERE content_sha256=md5('910')||md5('910')) THEN RAISE EXCEPTION 'invalid reference left partial source state'; END IF;
+END $$;
 DO $$ BEGIN RAISE NOTICE 'PASS financial vehicle uses: exact cash vs book amounts, mixed-vehicle conservation, source keys, stale witnesses, compatible costs and privacy'; END $$;
 ROLLBACK;

@@ -185,7 +185,7 @@ BEGIN
         OR (NOT legacy AND coalesce(length(a->>'basis'),0) NOT BETWEEN 1 AND 2000)
         OR (job IS NOT NULL AND NOT EXISTS(SELECT 1 FROM public.work_orders WHERE id=job AND vehicle_id=vehicle))
         OR (invoice IS NOT NULL AND NOT EXISTS(SELECT 1 FROM public.financial_documents WHERE id=invoice AND owner_id=d.owner_id))
-        OR (receipt IS NOT NULL AND NOT EXISTS(SELECT 1 FROM public.receipts WHERE id=receipt AND vehicle_id=vehicle
+        OR (receipt IS NOT NULL AND NOT EXISTS(SELECT 1 FROM public.receipts WHERE id=receipt AND user_id=d.owner_id AND vehicle_id=vehicle
           AND scope_type='vehicle' AND scope_id::text=vehicle::text AND is_active AND NOT is_superseded AND duplicate_of IS NULL))
         OR (item IS NOT NULL AND NOT EXISTS(SELECT 1 FROM public.receipt_items WHERE id=item AND receipt_id=receipt))
         OR (session_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM public.work_sessions WHERE id=session_id AND vehicle_id=vehicle))
