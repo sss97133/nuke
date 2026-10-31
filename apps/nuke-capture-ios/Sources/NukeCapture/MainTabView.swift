@@ -1,15 +1,17 @@
-// MainTabView.swift — the app spine: LIBRARY · EXPLORE · PROFILE · WORK.
+// MainTabView.swift — LIBRARY · GARAGE · EXPLORE · PROFILE · WORK.
 //
 // LIBRARY is the FOUNDATION for a signed-in owner with full access — their whole
 // photo library at Photos speed (the source); everything else rides on top as
-// glasses. Tabs, left to right (Library shown only when signed in + full access):
+// glasses. Garage is the direct route to the account's vehicle profiles, with
+// no Photos grant required. Library is shown only with full Photos access.
 //
-//   EXPLORE  the front door (LEFTMOST). The populated world of vehicles + the
+//   GARAGE   the signed-in account's vehicle records, searchable by vehicle or
+//            VIN. A row opens the full profile, including zero-photo records.
+//   EXPLORE  the signed-out front door. The populated world of vehicles + the
 //            cohort market terminal — reachable signed-out, no wall. An anon
 //            visitor lands here; "not signing in" is never a dead end (Sign In
-//            lives in the Profile toolbar). Explore being the leftmost tab makes
-//            the front-door ruling STRUCTURAL, not a selection trick — the cure
-//            for "dumped in my back office / there's no actual exploring."
+//            lives in the Profile toolbar). It remains the leftmost destination
+//            for a visitor; the owner's Library and Garage precede it.
 //   PROFILE  the owner's record (own when signed in, the sample in explore
 //            mode); other profiles via handle search. Receipt-first: a
 //            signed-in owner's FIRST landing is still their own record.
@@ -35,7 +37,11 @@ struct MainTabView: View {
     @State private var tab: Tab = .explore
     @ObservedObject private var inboxBadge = InboxBadgeStore.shared
 
-    enum Tab: Hashable { case library, profile, explore, today }
+    enum Tab: Hashable { case library, garage, profile, explore, today }
+
+    private var accountScope: String {
+        session.isSignedIn ? (SupabaseService.currentUserId ?? "signed-in") : "visitor"
+    }
 
     var body: some View {
         TabView(selection: $tab) {
@@ -46,6 +52,14 @@ struct MainTabView: View {
                 LibraryView()
                     .tag(Tab.library)
                     .tabItem { Label("Library", systemImage: "photo.on.rectangle.angled") }
+            }
+
+            // Vehicle records are a primary destination, independent of Photos
+            // access, ownership status and whether any photos have been filed.
+            if session.isSignedIn, let userId = SupabaseService.currentUserId {
+                NavigationStack { GarageView(userId: userId) }
+                    .tag(Tab.garage)
+                    .tabItem { Label("Garage", systemImage: "car.2") }
             }
 
             // EXPLORE — the FRONT DOOR for anon visitors: the populated world +
@@ -69,9 +83,14 @@ struct MainTabView: View {
                     .badge(inboxBadge.badge)
             }
         }
-        .onAppear { tab = landingTab() }
-        .onChange(of: session.isSignedIn) { _, _ in tab = landingTab() }
-        .task(id: session.isSignedIn) { await inboxBadge.refresh() }
+        // Discard another account's navigation and private screen state. Merely
+        // returning from a sheet or another tab must preserve the user's place.
+        .id(accountScope)
+        .onChange(of: accountScope, initial: true) { _, _ in tab = landingTab() }
+        .onChange(of: fullAccess) { _, _ in
+            tab = Self.availableTab(tab, signedIn: session.isSignedIn, fullAccess: fullAccess)
+        }
+        .task(id: accountScope) { await inboxBadge.refresh() }
         .onChange(of: scenePhase) { _, phase in
             // Settings round-trips can change the grant — re-read it.
             if phase == .active {
@@ -96,6 +115,13 @@ struct MainTabView: View {
     private func landingTab() -> Tab {
         if session.isSignedIn { return fullAccess ? .library : .profile }
         return .explore
+    }
+
+    static func availableTab(_ selected: Tab, signedIn: Bool, fullAccess: Bool) -> Tab {
+        if selected == .library && !(signedIn && fullAccess) { return signedIn ? .profile : .explore }
+        if selected == .today && !signedIn { return .explore }
+        if selected == .garage && !signedIn { return .explore }
+        return selected
     }
 
     /// Photo grant exists = .authorized or .limited (matches SyncEngine).

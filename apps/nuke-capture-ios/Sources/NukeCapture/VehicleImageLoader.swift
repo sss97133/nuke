@@ -50,8 +50,16 @@ final class CoalescingCache<Value> {
 
 @MainActor
 enum VehicleImageLoader {
-    /// The one column list every profile read of vehicle_images selects.
-    static let columns = "id,image_url,thumbnail_url,is_primary,taken_at,labels,ai_processing_status,is_document,image_category,created_at,vision_gate_agent_reasoning,source,photo_imported_at:exif_data->>imported_at,photo_listing_url:exif_data->>source_url"
+    private static let publicColumns = "id,image_url,thumbnail_url,is_primary,taken_at,labels,ai_processing_status,is_document,image_category,created_at,vision_gate_agent_reasoning,source"
+
+    // Mirror vehicleImageColumns.ts: anon cannot form the table's whole-row
+    // gallery predicate or select private EXIF, so it reads the existing view.
+    static func source(signedIn: Bool) -> String { signedIn ? "vehicle_images" : "vehicle_images_public" }
+    static func columns(signedIn: Bool) -> String {
+        publicColumns + (signedIn ? ",photo_imported_at:exif_data->>imported_at,photo_listing_url:exif_data->>source_url" : "")
+    }
+    static var source: String { source(signedIn: SupabaseService.currentUserId != nil) }
+    static var columns: String { columns(signedIn: SupabaseService.currentUserId != nil) }
 
     static let cache = CoalescingCache<[VehicleGalleryImage]>(ttl: 60)
 
@@ -59,11 +67,20 @@ enum VehicleImageLoader {
 
     private static func rows(_ key: String,
                              _ build: @escaping () -> PostgrestTransformBuilder) async throws -> [VehicleGalleryImage] {
-        try await cache.value(key) { try await build().execute().value }
+        let viewer = SupabaseService.currentUserId
+        let scopedKey = key + "|viewer:" + (viewer ?? "visitor")
+        let rows = try await cache.value(scopedKey) {
+            guard SupabaseService.currentUserId == viewer else { throw CancellationError() }
+            let rows: [VehicleGalleryImage] = try await build().execute().value
+            guard SupabaseService.currentUserId == viewer else { throw CancellationError() }
+            return rows
+        }
+        guard SupabaseService.currentUserId == viewer else { throw CancellationError() }
+        return rows
     }
 
     private static func gated() -> PostgrestFilterBuilder {
-        VehicleGalleryImage.eligible(SupabaseService.client.from("vehicle_images").select(columns))
+        VehicleGalleryImage.eligible(SupabaseService.client.from(source).select(columns))
     }
 
     /// The exterior_body lead-image candidates, newest first (up to 200).

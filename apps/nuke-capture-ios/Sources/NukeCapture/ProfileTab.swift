@@ -153,6 +153,8 @@ struct ProfileTab: View {
     @State private var results: [ProfileRow] = []
     @State private var searchError = false   // a failed handle search ≠ "no such user"
     @State private var searchFailureText: String?
+    @State private var searching = false
+    @State private var searchRequests = ReadRequestGuard()
     @State private var showAccount = false
 
     private var rootUserId: String {
@@ -164,6 +166,8 @@ struct ProfileTab: View {
             Group {
                 if query.trimmingCharacters(in: .whitespaces).isEmpty {
                     ProfileView(userId: rootUserId, isOwn: ownUserId != nil, onSignIn: onSignIn)
+                } else if searching {
+                    ProgressView("Searching profiles…")
                 } else if searchError && results.isEmpty {
                     // The search request failed — never read as "no such handle".
                     ContentUnavailableView {
@@ -176,6 +180,9 @@ struct ProfileTab: View {
                         }
                         .buttonStyle(.borderedProminent)
                     }
+                } else if results.isEmpty {
+                    ContentUnavailableView("No profiles found", systemImage: "person.crop.circle.badge.questionmark",
+                                           description: Text("Try another handle."))
                 } else {
                     List(results) { row in
                         NavigationLink {
@@ -219,25 +226,40 @@ struct ProfileTab: View {
             .searchable(text: $query, prompt: "Handle")
             .task(id: query) {
                 let term = query.trimmingCharacters(in: .whitespaces)
-                guard !term.isEmpty else { results = []; return }
+                let request = beginSearch(term)
+                guard !term.isEmpty else { return }
                 try? await Task.sleep(nanoseconds: 300_000_000)   // debounce
-                guard !Task.isCancelled else { return }
-                await search(term)
+                guard !Task.isCancelled, searchRequests.isCurrent(request) else { return }
+                await search(term, request: request)
             }
         }
     }
 
-    private func search(_ term: String) async {
+    private func beginSearch(_ term: String) -> UUID {
+        let request = searchRequests.begin()
+        results = []
         searchError = false
+        searchFailureText = nil
+        searching = !term.isEmpty
+        return request
+    }
+
+    private func search(_ term: String, request: UUID? = nil) async {
+        guard !term.isEmpty, query.trimmingCharacters(in: .whitespaces) == term else { return }
+        let request = request ?? beginSearch(term)
+        defer { if searchRequests.isCurrent(request) { searching = false } }
         do {
-            results = try await SupabaseService.client
+            let rows: [ProfileRow] = try await SupabaseService.client
                 .from("profiles")
                 .select("id,username,full_name")
                 .ilike("username", pattern: "%\(term)%")
                 .limit(25)
                 .execute()
                 .value
+            guard !Task.isCancelled, searchRequests.isCurrent(request), query.trimmingCharacters(in: .whitespaces) == term else { return }
+            results = rows
         } catch {
+            guard !Task.isCancelled, searchRequests.isCurrent(request), query.trimmingCharacters(in: .whitespaces) == term else { return }
             searchError = true
             searchFailureText = ReadFailure.text(error)
             NSLog("NukeCapture profile search failed: %@", String(describing: error))

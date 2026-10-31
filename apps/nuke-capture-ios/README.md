@@ -24,6 +24,12 @@ in place. It is the phone end of the data machine: the one surface that can **ca
 EXIF, location, on-device Vision and OCR, the GPS shop gate), and it **mirrors** the web for everything
 else. The user profile starts at image intake, so it lives here (owner, 2026-10-05).
 
+**Garage is a primary destination.** A signed-in account reaches its vehicle records directly from
+the bottom bar, independent of Photos access or photo-filing progress. Search uses the existing
+garage reader's titles and stored VINs; a primary row opens the actual vehicle profile. Garage
+relationship and work controls remain available under the row's Garage details action. A record
+with no filed photos must stay findable; adding a record does not establish ownership or prove its specifications.
+
 Two rules outrank taste:
 
 1. **The web is the source of truth; the phone mirrors it.** Same RPCs, same numbers, same masks, same
