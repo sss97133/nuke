@@ -104,8 +104,12 @@ function FinancialScope({ rows, vehicleId, complete }: { rows: VehicleFinancialU
   const current = available.includes(phase) ? phase : available[0];
   const entries = rows.filter(row => row.phase === current);
   const known = entries.filter(row => row.qualification === 'ready' && row.amount != null);
-  const months = [...new Set(known.map(financialDate).filter((d): d is string => !!d && /^\d{4}-\d{2}-\d{2}$/.test(d)).map(d => d.slice(0, 7)))].sort();
-  const history = months.map(date => ({ date, value: totalMoney(known.filter(row => financialDate(row)!.slice(0, 7) <= date)) }));
+  const dated = known.flatMap(row => {
+    const date = financialDate(row);
+    return date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? [{ row, month: date.slice(0, 7) }] : [];
+  });
+  const months = [...new Set(dated.map(entry => entry.month))].sort();
+  const history = months.map(date => ({ date, value: totalMoney(dated.filter(entry => entry.month <= date).map(entry => entry.row)) }));
   const values = history.map(h => Number(h.value ?? 0));
   const low = Math.min(0, ...values), high = Math.max(0, ...values);
   const y = (value: string | null) => 128 - (Number(value ?? 0) - low) / Math.max(1, high - low) * 112;
@@ -119,7 +123,7 @@ function FinancialScope({ rows, vehicleId, complete }: { rows: VehicleFinancialU
       </button>)}
     </div>
     {history.length > 0 && <figure className="vp-financial-curve">
-      <figcaption>{LABELS[current]} over time · cumulative {complete ? 'visible records' : 'loaded records'}</figcaption>
+      <figcaption>{LABELS[current]} over time · cumulative dated {complete ? 'visible records' : 'loaded records'}</figcaption>
       <svg viewBox="0 0 600 140" role="img" aria-label={`Cumulative ${LABELS[current].toLowerCase()}`}>
         <polyline points={history.map((h, i) => `${12 + i / Math.max(1, history.length - 1) * 576},${y(h.value)}`).join(' ')} fill="none" stroke="currentColor" strokeWidth="2" />
         {history.map((h, i) => <circle key={h.date} cx={12 + i / Math.max(1, history.length - 1) * 576} cy={y(h.value)} r="3" fill="currentColor"><title>{h.date}: {moneyLabel(h.value, currency)}</title></circle>)}
@@ -127,6 +131,7 @@ function FinancialScope({ rows, vehicleId, complete }: { rows: VehicleFinancialU
     </figure>}
     <div className="vp-financial-filter"><h3>{LABELS[current]}</h3>{months.length > 1 && <label>Period <select value={month} onChange={event => setMonth(event.target.value)}><option value="">All dates</option>{months.map(date => <option key={date}>{date}</option>)}</select></label>}</div>
     <p>{moneyLabel(totalMoney(visible), currency)}{month ? ` · ${month}` : ''} · {visible.filter(row => row.qualification === 'ready').length} allocated of {visible.length} visible entries</p>
+    {known.length > dated.length && <p>Allocated entries without a usable date: {known.length - dated.length}. These remain in the all-dates total and are excluded from the chart and period filters.</p>}
     {entries.some(row => row.qualification !== 'ready') && <p>Entries awaiting allocation or revised source evidence are excluded from the amounts.</p>}
     {visible.sort((a, b) => (financialDate(b) ?? '').localeCompare(financialDate(a) ?? '')).map(row => <AllocationRow key={`${row.id}:${row.index}`} row={row} vehicleId={vehicleId} />)}
   </>;
