@@ -622,6 +622,8 @@ jobs:
         run: |
           deno test --no-check --node-modules-dir=none --allow-env --allow-read supabase/functions/ingest-observation/retainedEcr.test.ts supabase/functions/ingest-observation/retainedEcrHandler.test.ts
           node --test scripts/ecr-retained-replay.test.mjs
+      - name: Verify native dealer microdata, source qualification and canonical replay
+        run: deno test --node-modules-dir=none --allow-env supabase/functions/_shared/dealerParser.test.ts supabase/functions/ingest/dealer.test.ts
       - name: Verify native Gateway browser evidence, admission and replay
         run: deno test --node-modules-dir=none --allow-env --allow-read supabase/functions/_shared/gatewayParser.test.ts supabase/functions/ingest/gateway.test.ts
       - name: Verify the live-lot forecast route resolves a lot, sends the reader typed arguments, refuses anonymous callers and returns the reader's answer untouched

@@ -13,6 +13,7 @@ import { emptySearchHtml } from '../supabase/functions/poll-listing-feeds/fixtur
 const require = createRequire(new URL('../nuke_frontend/package.json', import.meta.url));
 const ts = require('typescript');
 const { createClient } = require('@supabase/supabase-js');
+const { parse } = require('parse5');
 const compile = text => ts.transpileModule(text, { compilerOptions: {
   module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022,
 } }).outputText;
@@ -104,6 +105,7 @@ export function fixture(options = {}) {
     setTimeout: (callback, ms) => { if (callback.toString().includes('abort')) return 0; advance(ms); callback(); return 0; }, clearTimeout() {},
     Deno: { env: { get: key => key === 'SUPABASE_URL' ? 'https://database.invalid' : 'synthetic-service-key' }, serve: fn => { serve = fn; } },
     require(name) {
+      if (name === 'https://esm.sh/parse5@7.3.0') return { parse };
       if (name.includes('supabase-js')) return { createClient: () => db };
       if (name.endsWith('/ledger.ts')) return { ...ledger,
         createIntakeBudget: (throttle, start) => ledger.createIntakeBudget(throttle, start, runtimeDate.now) };
@@ -532,3 +534,21 @@ test('an invalid source shell is not mislabeled as a confirmed challenge', async
   assert.equal(result.body.results[0].error, 'fetch_failed: invalid_source_body');
   assert(!f.calls.some(c => c.path === '/functions/v1/ingest'));
 });
+
+for (const [source, host, stock] of [['gr_auto_gallery', 'www.grautogallery.com', 'b1234-j'], ['streetside_classics', 'www.streetsideclassics.com', '42-det']]) {
+  test(`${source}: current absolute URL criteria read relative stock hrefs through existing intake`, async () => {
+    const path = `/vehicles/${stock}/1995-ford-f150`, target = `https://${host}${path}`;
+    const f = fixture({ feed: { source_slug: source, search_criteria: { fetch_strategy: 'firecrawl_html',
+      listing_url_regex: `https://` + host.replaceAll('.', '\\.') + `/vehicles/${stock}/[a-z0-9-]+`, listing_url_prefix: `https://${host}` } },
+      archive: async (_url, opts) => { assert.equal(opts.useFirecrawl, false); assert.equal(opts.firecrawlOnBlock, false);
+        return { html: `<a href="${path}">stock</a><a href="${path}">duplicate</a><a href="/vehicles/current">nav</a><a href="https://outside.invalid${path}">other</a><template><a href="/vehicles/${stock}/inert">template</a></template>`, statusCode: 200, snapshotId: 'snapshot', error: null }; } });
+    const result = await f.request(); assert.equal(result.body.results[0].items_found, 1);
+    assert.deepEqual(f.calls.filter(c => c.path === '/functions/v1/ingest').map(c => c.body.url), [target]);
+  });
+  test(`${source}: refused direct inventory has no paid fallback or ingestion`, async () => {
+    const f = fixture({ feed: { source_slug: source, search_criteria: { fetch_strategy: 'firecrawl_html' } },
+      archive: async () => ({ html: null, statusCode: 403, error: 'blocked' }) });
+    const result = await f.request(); assert.match(result.body.results[0].error, /^blocked:/);
+    assert(!f.calls.some(c => c.path === '/functions/v1/ingest'));
+  });
+}

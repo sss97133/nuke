@@ -145,6 +145,14 @@ Deno.test("Vicari preview preserves ahid and performs no extraction or writes", 
   equal(extractorCalls(), []); equal(writes(), []);
 });
 
+for (const url of ["https://www.grautogallery.com/vehicles/b1234-j/1995-ford-f150", "https://www.streetsideclassics.com/vehicles/42-det/1995-ford-f150"]) {
+  Deno.test("native dealer refuses unregistered source even with caller fields and enrich false: " + url, async () => {
+    const r = await ingest({ url, year: 1995, make: "Ford", model: "F150", description: "caller text", enrich: false });
+    equal(r.result.status, "rejected"); assert(r.result.reason.includes("dealer_source_not_registered"), "registered source required");
+    equal(extractorCalls(), []); equal(writes(), []);
+  });
+}
+
 Deno.test("Gateway requires verified native source capture even with caller fields and enrich false", async () => {
   const r = await ingest({ url: "https://www.gatewayclassiccars.com/vehicles/det/42/1995-ford-f150",
     year: 1995, make: "Ford", model: "F150", description: "caller text", enrich: false });

@@ -28,6 +28,7 @@
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { parse } from "https://esm.sh/parse5@7.3.0";
 import { firecrawlScrape } from "../_shared/firecrawl.ts";
 import { firecrawlGate, ALLOWANCE_EXHAUSTED } from "../_shared/firecrawlGate.ts";
 import { archiveFetch, isAwsWafChallengeHtml, isGarbageHtml } from "../_shared/archiveFetch.ts";
@@ -324,7 +325,30 @@ function extractListingUrlsByRegex(
   prefix: string | null,
   sourceSlug: string
 ): string[] {
-  const haystack = `${html || ""}\n${markdown || ""}`;
+  // Publisher hrefs may be relative even when the configured expression names
+  // absolute stock URLs. Resolve active, same-origin anchors before applying the
+  // existing expression; navigation still has to satisfy that expression.
+  const resolved: string[] = [];
+  if (html && prefix) {
+    try {
+      const base = new URL(prefix);
+      if (base.protocol === "https:" || base.protocol === "http:") {
+        const walk = (node: any) => {
+          if (["template", "script", "svg", "noscript"].includes(node.tagName)) return;
+          if (node.tagName === "a") {
+            const href = node.attrs?.find((a: any) => a.name === "href")?.value;
+            if (href) try {
+              const u = new URL(href, base);
+              if (u.origin === base.origin && !u.username && !u.password) resolved.push(u.href);
+            } catch { /* invalid publisher href */ }
+          }
+          for (const child of node.childNodes ?? []) walk(child);
+        };
+        walk(parse(html));
+      }
+    } catch { /* invalid prefix cannot establish relative links */ }
+  }
+  const haystack = `${html || ""}\n${markdown || ""}\n${resolved.join("\n")}`;
   let re: RegExp;
   try {
     re = new RegExp(regexSource, "gi");
@@ -586,7 +610,15 @@ async function pollFirecrawlHtmlFeed(
   let blockNote = "";
   let confirmedEmptySearch = false;
 
-  if (feed.source_slug === "gateway_classics") {
+  if (feed.source_slug === "gr_auto_gallery" || feed.source_slug === "streetside_classics") {
+    const page = await archiveFetch(feed.feed_url, { platform: feed.source_slug, useFirecrawl: false,
+      firecrawlOnBlock: false, skipCache: true, includeMarkdown: false,
+      directFetchOptions: { publicOnly: true }, callerName: "poll-listing-feeds:dealer-native" });
+    if (!page.html || page.error || page.archiveError || page.statusCode !== 200 || !page.snapshotId
+      || isAwsWafChallengeHtml(page.html) || isGarbageHtml(page.html, feed.source_slug)) return await failFeed("blocked: dealer public inventory unavailable");
+    urls = extractListingUrlsByRegex(page.html, null, feed.search_criteria?.listing_url_regex ?? "(?!)",
+      feed.search_criteria?.listing_url_prefix ?? null, feed.source_slug);
+  } else if (feed.source_slug === "gateway_classics") {
     try {
       const capture = await readGatewayBrowserCapture(supabase, feed.feed_url, true, feed.poll_interval_minutes * 60);
       const ready = new Set(capture.captured_urls);
