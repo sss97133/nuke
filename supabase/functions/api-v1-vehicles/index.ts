@@ -51,8 +51,20 @@ Deno.serve(async (req) => {
     const supabaseKey = projectSecretKey()!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Authenticate user (JWT or API key) — uses atomic rate limiting
-    const auth = await authenticateRequest(req, supabase, { endpoint: 'vehicles' });
+    const url = new URL(req.url);
+    // This source view reuses the canonical service-key verifier, including rotated
+    // keys on apikey. Other API paths keep their existing authentication unchanged.
+    let sourceService: Awaited<ReturnType<typeof authenticateRequest>> | undefined;
+    if (url.searchParams.has("source_url") && [req.headers.get("apikey"), req.headers.get("Authorization")?.replace(/^Bearer /, "")]
+      .some(value => value?.startsWith("sb_secret_"))) {
+      const { authenticateWriter } = await import("../_shared/writeGuard.ts");
+      const checked = await authenticateWriter(req);
+      if (checked.ok && checked.caller.kind === "service_role") sourceService = { userId: "service-role", isServiceRole: true };
+      else if (!checked.ok) return new Response(JSON.stringify({ error: "Invalid or missing authentication" }),
+        { status: checked.status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    // User JWTs and API keys retain the existing atomic rate-limiting path.
+    const auth = sourceService ?? await authenticateRequest(req, supabase, { endpoint: 'vehicles' });
     if (auth.error || !auth.userId) {
       return new Response(
         JSON.stringify({ error: auth.error || "Authentication required" }),
@@ -62,7 +74,25 @@ Deno.serve(async (req) => {
     const userId = auth.userId;
     const isServiceRole = auth.isServiceRole;
 
-    const url = new URL(req.url);
+    if (url.searchParams.has("source_url")) {
+      if (req.method !== "GET") return new Response(JSON.stringify({ error: "Source profiles are read-only" }),
+        { status: 405, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      if (url.searchParams.getAll("source_url").length !== 1 || !/\/(?:api-v1-vehicles|vehicles)\/?$/.test(url.pathname)) return new Response(
+        JSON.stringify({ error: "Select one source URL without a physical vehicle ID" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      const { readSourceProfile } = await import("./sourceProfile.ts");
+      const deadline = AbortSignal.any([req.signal, AbortSignal.timeout(10000)]);
+      const sourceDb = createClient(supabaseUrl, supabaseKey, { global: { fetch: (supabaseUrlOrRequest, init) => {
+        const target = new URL(supabaseUrlOrRequest instanceof Request ? supabaseUrlOrRequest.url : String(supabaseUrlOrRequest));
+        if (target.origin !== new URL(supabaseUrl).origin || !/^\/(rest|storage)\/v1\//.test(target.pathname))
+          throw Error("Unexpected source profile SDK target");
+        return fetch(supabaseUrlOrRequest, { ...init, signal: deadline });
+      } } });
+      const answer = await readSourceProfile(sourceDb, url.searchParams.get("source_url") ?? "");
+      return new Response(JSON.stringify(answer.body), {
+        status: answer.status, headers: { ...corsHeaders, ...auth.headers, "Content-Type": "application/json", "Cache-Control": "no-store" },
+      });
+    }
     const pathParts = url.pathname.split('/').filter(Boolean);
     const lastPart = pathParts[pathParts.length - 1];
     const secondToLast = pathParts[pathParts.length - 2];

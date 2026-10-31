@@ -62,6 +62,7 @@ Updated: 2026-03-27
 - **Queue flow**: `pending -> haiku -> complete/pending_review -> sonnet -> complete/pending_strategy`
 
 ### Entity Resolution / Matching
+- **Progressive ECR source profile**: `supabase/functions/api-v1-vehicles/sourceProfile.ts` (`GET ?source_url=...`) and the existing `VehicleProfile` source view, `pages/vehicle-profile/VehicleSourceProfile.tsx`. Search links ECR URLs to `/vehicle/source?source_url=...`. Authenticated, hash/receipt/clock checked, source assertions only; no physical merge, restoration or independent corroboration. See engineering-manual Chapter 4 and design-book `vehicle-profile-computation-surface.md`.
 - **Current**: Per-extractor matching (in each extract-* function)
 - **Target**: Universal matcher (ENCYCLOPEDIA Section 18)
 - **Dedup function**: `supabase/functions/dedup-vehicles/index.ts`
