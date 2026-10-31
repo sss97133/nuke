@@ -1,129 +1,33 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { HeaderPopover } from '../../components/vehicle/HeaderPopover';
 import { useAuthContext } from '../../contexts/AuthContext';
-import { useBuildLedger, useVehicleReceiptRecords, type BookCostEntry } from './hooks/useBuildLedger';
+import { useBuildLedger, useVehicleReceiptRecords } from './hooks/useBuildLedger';
 import { ReceiptRecords, WorkOrderFinancialRecords } from './FinancialReceiptRecords';
-const SharedAccountingOriginal = React.lazy(() => import('../../components/finance/SharedAccountingOriginal'));
-
-export type BookSummary = {
-  key: string; owner: string; currency: string; entries: BookCostEntry[];
-  total: number | null; allocated: number; unallocated: number;
-};
-
-/** Currency and book are separate scopes. Audit testimony never enters this subtotal. */
-export function summarizeVehicleCosts(rows: BookCostEntry[]): BookSummary[] {
-  const groups = new Map<string, BookCostEntry[]>();
-  const seen = new Set<string>();
-  for (const row of rows) {
-    if (seen.has(row.id)) continue;
-    seen.add(row.id);
-    const key = `${row.bookOwnerId}:${row.currency}`;
-    const group = groups.get(key);
-    if (group) group.push(row); else groups.set(key, [row]);
-  }
-  return [...groups.entries()].map(([key, entries]) => {
-    const { bookOwnerId: owner, currency } = entries[0];
-    const validCurrency = /^[A-Z]{3}$/.test(currency);
-    const digits = validCurrency ? new Intl.NumberFormat('en', { style: 'currency', currency }).resolvedOptions().maximumFractionDigits ?? 2 : 2;
-    const scale = 10 ** digits;
-    let minor = 0n;
-    let allocated = 0;
-    for (const entry of entries) {
-      if (entry.allocated == null || !Number.isFinite(entry.allocated)) continue;
-      // Add decimal minor units, rather than accumulating floating-point money.
-      const text = String(entry.allocated);
-      if (!/^-?\d+(\.\d+)?$/.test(text)) continue;
-      const [whole, fraction = ''] = text.replace('-', '').split('.');
-      const padded = fraction.padEnd(digits + 1, '0');
-      const value = BigInt(whole) * BigInt(scale) + BigInt(padded.slice(0, digits) || '0') + (Number(padded[digits]) >= 5 ? 1n : 0n);
-      minor += text.startsWith('-') ? -value : value;
-      allocated++;
-    }
-    return { key, owner, currency, entries, allocated, unallocated: entries.length - allocated,
-      total: validCurrency && allocated > 0 && Number.isSafeInteger(Number(minor)) ? Number(minor) / scale : null };
-  });
-}
-
-export function financialAmount(amount: number, currency: string): string {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency, currencyDisplay: currency === 'USD' ? 'symbol' : 'code' }).format(amount);
-}
+import FinancialLedger from './FinancialLedger';
+import { moneyLabel } from './hooks/useVehicleFinancials';
 
 function recordedDate(value: string | null) {
   if (!value || !Number.isFinite(Date.parse(value))) return 'Date not recorded';
   return new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
 }
 
-function CostRow({ entry }: { entry: BookCostEntry }) {
-  return <details className="vp-financial-entry">
-    <summary><span><strong>{entry.description || 'Recorded expense'}</strong><small>{recordedDate(entry.date)}</small></span>
-      <strong>{entry.allocated == null ? 'Amount not allocated' : entry.currency ? financialAmount(entry.allocated, entry.currency) : `${entry.allocated} · currency unknown`}</strong></summary>
-    <dl>
-      <dt>Vehicle allocation</dt><dd>{entry.basis || 'Basis not recorded'}</dd>
-      {entry.category && <><dt>Category</dt><dd>{entry.category}</dd></>}
-      {entry.account && <><dt>Account</dt><dd>{entry.account}</dd></>}
-      <dt>Source record</dt><dd>{entry.ledgerId || 'Record id not available'}</dd>
-      <dt>Assigned</dt><dd>{recordedDate(entry.assignedAt)}{entry.assignedMethod ? ` · ${entry.assignedMethod}` : ''}</dd>
-    </dl>
-    <div className="vp-financial-original"><React.Suspense fallback={<p role="status">Loading source control…</p>}>
-      <SharedAccountingOriginal ownerId={entry.bookOwnerId} documentId={entry.documentId} />
-    </React.Suspense></div>
-  </details>;
-}
-
-function CostHistory({ scope }: { scope: BookSummary }) {
-  const [month, setMonth] = useState<string | null>(null);
-  const months = useMemo(() => {
-    const grouped = new Map<string, BookCostEntry[]>();
-    for (const entry of scope.entries) {
-      if (entry.allocated == null || !entry.date || !/^\d{4}-\d{2}-\d{2}$/.test(entry.date)) continue;
-      const key = entry.date.slice(0, 7);
-      grouped.set(key, [...(grouped.get(key) ?? []), entry]);
-    }
-    return [...grouped].sort(([a], [b]) => a.localeCompare(b)).map(([key, entries]) => ({ key, amount: summarizeVehicleCosts(entries)[0]?.total ?? null }));
-  }, [scope]);
-  const maximum = Math.max(1, ...months.map(item => Math.abs(item.amount ?? 0)));
-  const visible = month ? scope.entries.filter(entry => entry.date?.startsWith(month)) : scope.entries;
-  return <>
-    {months.length > 0 && <div className="vp-financial-history" role="group" aria-label="Booked vehicle costs by month">
-      {months.map(item => <button key={item.key} type="button" aria-pressed={month === item.key}
-        onClick={() => setMonth(current => current === item.key ? null : item.key)}>
-        <span>{item.key}</span><progress aria-label={`Booked costs ${item.key}`} value={Math.abs(item.amount ?? 0)} max={maximum} />
-        <span>{item.amount == null ? 'Amount unavailable' : financialAmount(item.amount, scope.currency)}</span>
-      </button>)}
-    </div>}
-    {month && <button type="button" className="vp-financial-action" onClick={() => setMonth(null)}>Show all dates</button>}
-    {visible.map(entry => <CostRow key={entry.id} entry={entry} />)}
-  </>;
-}
-
 function FinancialDetails({ vehicleId, market }: { vehicleId: string; market: React.ReactNode }) {
   const { user } = useAuthContext();
-  const ledger = useBuildLedger(vehicleId);
+  const ledger = useBuildLedger(vehicleId, false);
   const receipts = useVehicleReceiptRecords(vehicleId);
-  const scopes = useMemo(() => summarizeVehicleCosts(ledger.data.book), [ledger.data.book]);
-  const [selected, setSelected] = useState<string | null>(null);
-  const scope = scopes.find(item => item.key === selected) ?? scopes[0];
   return <div className="vp-financial-panel">
     {market && <section><h3>Market</h3>{market}</section>}
     {!user ? <p>Sign in to read the financial records available to you.</p> : <>
       {ledger.loading && <p role="status">Reading vehicle financial records…</p>}
       {ledger.error && <div role="status"><p>Some financial records could not load. Available records remain shown; missing reads do not establish a zero balance.</p><button className="vp-financial-action" type="button" onClick={() => void ledger.retry()}>Retry financial records</button></div>}
-      {scope && <section><h3>Booked vehicle costs</h3>
-        {scopes.length === 1 && <p>{scope.owner === user.id ? 'Your book' : 'Shared book'} · {scope.currency || 'Currency unknown'}</p>}
-        {scopes.length > 1 && <label>Book and currency <select value={scope.key} onChange={event => setSelected(event.target.value)}>
-          {scopes.map((item, index) => <option key={item.key} value={item.key}>{item.owner === user.id ? 'Your book' : `Shared book ${index + 1}`} · {item.currency || 'Currency unknown'}</option>)}
-        </select></label>}
-        <p className="vp-financial-total">{scope.total == null ? 'Allocated subtotal unavailable' : financialAmount(scope.total, scope.currency)}</p>
-        <p>{scope.allocated} allocated of {scope.entries.length} visible entries{scope.unallocated ? ` · ${scope.unallocated} awaiting an amount` : ''}. This is the subtotal assigned in this book, rather than a lifetime investment or amount paid.</p>
-        <p className="vp-financial-coverage">Across the available books: {ledger.bookCoverage.shown} of {ledger.bookCoverage.total ?? 'an unknown number of'} visible cost entries loaded.</p>
-        <CostHistory key={scope.key} scope={scope} />
-      </section>}
+      <FinancialLedger vehicleId={vehicleId} />
+      <details className="vp-financial-sources"><summary>Work orders and historical build records</summary>
       <WorkOrderFinancialRecords vehicleId={vehicleId} />
       {ledger.data.hasAudit && <section><h3>Build records and reported obligations</h3>
         <p>Recorded evidence and attribution remain attached to each entry. These records are kept separate from booked costs.</p>
         {ledger.data.groups.flatMap(group => group.entries).map(entry => <details key={entry.id} className="vp-financial-entry">
           <summary><span><strong>{entry.description || 'Build record'}</strong><small>{recordedDate(entry.observedAt)} · {entry.direction === 'liability' ? 'Reported obligation' : entry.direction === 'out' ? 'Recorded cost' : 'Financial record'}</small></span>
-            <strong>{entry.amountUsd == null ? 'Amount unknown' : financialAmount(entry.amountUsd, 'USD')}</strong></summary>
+            <strong>{entry.amountUsd == null ? 'Amount unknown' : moneyLabel(String(entry.amountUsd), 'USD')}</strong></summary>
           <dl><dt>Attribution</dt><dd>{entry.attributionTier || 'Unknown'}{entry.needsOwnerConfirmation ? ' · needs confirmation' : ''}</dd>
             {entry.counterparty && <><dt>Counterparty</dt><dd>{entry.counterparty}</dd></>}
             {entry.entityPaid && <><dt>Reported payer</dt><dd>{entry.entityPaid.replace(/_/g, ' ')}</dd></>}
@@ -139,7 +43,7 @@ function FinancialDetails({ vehicleId, market }: { vehicleId: string; market: Re
           {note.rowsMatched > note.rows.length && <p>Showing {note.rows.length} of {note.rowsMatched} matching rows.</p>}
         </details>)}
       </section>}
-      {!ledger.loading && !ledger.error && !ledger.data.hasData && <p>No entries are visible in the accounting-book or audit readers for this vehicle. Linked receipts and work orders are shown separately.</p>}
+      </details>
     </>}
     {(receipts.isLoading || receipts.isError || receipts.rows.length > 0) && <details className="vp-financial-sources">
       <summary>Receipt sources</summary>

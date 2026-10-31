@@ -935,6 +935,9 @@ jobs:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://placeholder.supabase.co' }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || 'placeholder-key' }}
 
+      - name: Verify financial-use source preservation and decimal allocations (offline)
+        run: python3 scripts/books/financial_uses_test.py
+
   listing-state-contract:
     runs-on: ubuntu-latest
     services:
