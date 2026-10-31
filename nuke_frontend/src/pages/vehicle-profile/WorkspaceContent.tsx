@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { CollapsibleWidget } from '../../components/ui/CollapsibleWidget';
 import { useVehicleProfile } from './VehicleProfileContext';
+import type { GalleryReadCount } from '../../components/images/ImageGallery';
 
 // Lazy-load heavy components
 const WorkMemorySection = React.lazy(() => import('./WorkMemorySection'));
@@ -54,7 +55,8 @@ const ProfileGallery: React.FC<{
   onImagesUpdated: () => void;
   galleryView?: GalleryViewMode;
   galleryFilter?: import('./VehicleProfileContext').GalleryFilter | null;
-}> = ({ vehicleId, vehicleImages, fallbackListingImageUrls, leadImageUrl, vehicle, onImagesUpdated, galleryView = 'GRID', galleryFilter }) => {
+  onReadCount?: (read: GalleryReadCount) => void;
+}> = ({ vehicleId, vehicleImages, fallbackListingImageUrls, leadImageUrl, vehicle, onImagesUpdated, galleryView = 'GRID', galleryFilter, onReadCount }) => {
   // Build fallback chain: context images → listing images → hero URL → primary_image_url
   let fallback = vehicleImages.length > 0 ? vehicleImages : fallbackListingImageUrls;
   if (fallback.length === 0 && leadImageUrl) {
@@ -66,6 +68,7 @@ const ProfileGallery: React.FC<{
   return (
   <React.Suspense fallback={null}>
     <ImageGallery
+      key={vehicleId}
       vehicleId={vehicleId}
       showUpload={false}
       fallbackImageUrls={fallback}
@@ -74,6 +77,7 @@ const ProfileGallery: React.FC<{
       onImagesUpdated={onImagesUpdated}
       galleryView={galleryView}
       galleryFilter={galleryFilter}
+      onReadCount={onReadCount}
     />
   </React.Suspense>
   );
@@ -129,6 +133,7 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
   const [galleryCols, setGalleryCols] = useState(3);
   const [leftPct, setLeftPct] = useState(DEFAULT_LEFT_PCT);
   const [galleryView, setGalleryView] = useState<GalleryViewMode>('GRID');
+  const [galleryRead, setGalleryRead] = useState<GalleryReadCount | null>(null);
   const handleResize = useCallback((pct: number) => setLeftPct(pct), []);
   const handleReset = useCallback(() => setLeftPct(DEFAULT_LEFT_PCT), []);
 
@@ -468,13 +473,14 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
             {galleryFilter && (
               <div className="gallery-filter-chip">
                 <span style={{ color: 'var(--text-secondary)' }}>Filter:</span>
-                <span>{galleryFilter.zone || galleryFilter.category || galleryFilter.tag || 'Custom'}</span>
+                <span>{galleryFilter.label || galleryFilter.field || galleryFilter.zone || galleryFilter.category || galleryFilter.tag || 'Custom'}</span>
                 <button type="button" onClick={() => setGalleryFilter(null)}>Clear filter</button>
               </div>
             )}
             <div className="widget__header-left">
               <span className="widget__label">Images</span>
-              <span className="widget__count">{vehicleImages.length || '—'}</span>
+              <span className="widget__count">{galleryRead?.vehicleId === vehicle.id && galleryRead.filterKey === JSON.stringify(galleryFilter || null)
+                ? `${galleryRead.shown}${galleryRead.partial ? ' loaded matches' : ''}` : 'Reading…'}</span>
             </div>
             <div className="widget__controls">
               <div className="gallery-toolbar" role="group" aria-label="Image view">
@@ -486,7 +492,6 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
                     aria-pressed={view === galleryView}
                     onClick={() => {
                       setGalleryView(view);
-                      if (galleryFilter) setGalleryFilter(null);
                     }}
                   >
                     {{ ZONES: 'Zones', GRID: 'Grid', FULL: 'Full size', INFO: 'Details', SESSIONS: 'Sessions', CATEGORY: 'Category', CHRONO: 'Timeline', SOURCE: 'Source' }[view]}
@@ -519,6 +524,7 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
             onImagesUpdated={() => { reloadVehicle(); reloadTimeline(); reloadImages(); }}
             galleryView={galleryView}
             galleryFilter={galleryFilter}
+            onReadCount={setGalleryRead}
           />
 
           {/* Vehicle Scores */}

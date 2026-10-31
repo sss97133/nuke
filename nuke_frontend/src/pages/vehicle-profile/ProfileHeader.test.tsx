@@ -4,21 +4,25 @@ import { createRoot, type Root } from 'react-dom/client';
 import { beforeEach, afterEach, it, expect, vi } from 'vitest';
 import type { ProfileRead } from './profileDocument';
 const fixture = vi.hoisted(() => ({ vehicle: {} as Record<string, unknown>, pulse: null as Record<string, unknown> | null, read: null as ProfileRead | null,
-  auctionRows: [] as any[], eventRows: [] as any[], request: vi.fn() }));
+  auctionRows: [] as any[], eventRows: [] as any[], request: vi.fn(), gallery: vi.fn() }));
 vi.mock('../../lib/supabase', () => ({ supabase: { from: (table: string) => {
   let vehicleId: string;
   const query: any = { select: () => query, eq: (_key: string, id: string) => { vehicleId = id; return query; },
     order: () => query, limit: () => fixture.request(table, vehicleId) };
   return query;
 } } }));
-vi.mock('./VehicleProfileContext', () => ({ useVehicleProfile: () => ({ vehicle: fixture.vehicle, auctionPulse: fixture.pulse }) }));
+vi.mock('./VehicleProfileContext', () => ({ useVehicleProfile: () => ({ vehicle: fixture.vehicle, auctionPulse: fixture.pulse, setGalleryFilter: fixture.gallery }) }));
 vi.mock('./profileDocument', async (original) => {
   const real = await original<typeof import('./profileDocument')>();
   // The real document mapping over the fixture read, without a QueryClient: the fetch is the only thing mocked.
   return { ...real, useProfileDocument: (vehicleId: string | undefined, priceOwnedByLiveStack: boolean) =>
     vehicleId && fixture.read ? real.profileDocumentFrom(fixture.read, priceOwnedByLiveStack) : null };
 });
-vi.mock('../stacks/VehicleCohort', () => ({ VehiclePerformance: ({ facet }: any) => <div>performance stack for {facet.label}</div> }));
+vi.mock('./FieldEvidencePopup', () => ({ default: ({ field, value, context }: any) => <div data-testid="field-context" data-field={field} data-match-field={context.matchField}>{value} vehicle context</div> }));
+// This suite owns price provenance; the financial department has its own reader/interaction tests.
+vi.mock('./ProfileFinancials', () => ({ default: ({ market }: any) => <>{market}<button>$$$</button></> }));
+vi.mock('../../components/auction/ExternalAuctionLiveBanner', () => ({ default: () => null,
+  ExternalAuctionSummary: ({ currentBid }: any) => <button data-live-bid={currentBid}>Live episode</button> }));
 vi.mock('../../hooks/useIsMobile', () => ({ useIsMobile: () => false }));
 vi.mock('../../components/PrefetchLink', () => ({ PrefetchLink: ({ to, children }: any) => <a href={to}>{children}</a> }));
 import ProfileHeader, { comparableLotKey, extractInlineLotProvenance } from './ProfileHeader';
@@ -58,6 +62,7 @@ beforeEach(() => {
   root = createRoot(host);
   fixture.vehicle = { id: 'v-1', year: 1966, make: 'Ford', model: 'Mustang', listing_kind: 'vehicle' };
   fixture.pulse = null;
+  fixture.gallery.mockReset();
   fixture.read = mustangRead();
   fixture.auctionRows = []; fixture.eventRows = [];
   fixture.request.mockReset().mockImplementation((table: string) => Promise.resolve({ data: table === 'auction_events' ? fixture.auctionRows : fixture.eventRows, error: null }));
@@ -283,7 +288,7 @@ it.each([
   expect(document.body.textContent).not.toContain('FOREIGN-IDENTITY');
 });
 
-it('renders identity, the typed price and the strip with its coverage, with no inline style', async () => {
+it('keeps one identity, price and contextual controls in the masthead without a coverage strip', async () => {
   await render();
   expect(host.querySelector('h1.k-entity')?.textContent).toContain('Mustang');
   const price = host.querySelector('.k-masthead__result button.k-claim__value') as HTMLButtonElement;
@@ -291,7 +296,9 @@ it('renders identity, the typed price and the strip with its coverage, with no i
   expect(host.textContent).toContain('Last recorded sale');
   expect(host.textContent).toContain('10,000 mi');
   expect(host.querySelectorAll('button.k-facet').length).toBe(5);
-  expect(host.textContent).toContain('1 of 6 facts attributed');
+  expect(host.textContent).not.toContain('facts attributed');
+  expect(host.querySelector('.vp-strip')).toBeNull();
+  expect(host.querySelectorAll('.vehicle-identity')).toHaveLength(1);
   expect(host.querySelector('[style]')).toBeNull();
   expect(host.style.getPropertyValue('--vp-h-masthead')).toMatch(/px$/);
 });
@@ -304,17 +311,36 @@ it('opens the price source with its platform, clock and the stack link', async (
   expect(document.body.querySelector('a[href="/stacks/order-book/v-1?lot=lot-1"]')).not.toBeNull();
 });
 
-it('a facet opens its source and the performance stack', async () => {
+it('a facet opens vehicle context and coordinates the photo topic without navigation', async () => {
   await render();
-  act(() => (host.querySelectorAll('button.k-facet')[0] as HTMLButtonElement).click());
-  expect(document.body.textContent).toContain('performance stack for Coupe');
-  expect(document.body.textContent).toContain('vehicle record');
+  await act(async () => (host.querySelectorAll('button.k-facet')[0] as HTMLButtonElement).click());
+  expect(document.body.textContent).toContain('Coupe vehicle context');
+  expect(fixture.gallery).toHaveBeenLastCalledWith({ field: 'body_style', label: 'Coupe' });
+  expect(host.querySelector('[data-testid="field-context"]')?.getAttribute('data-field')).toBe('body_style');
+  expect(host.textContent).not.toContain('Auction performance unavailable');
 });
 
-it('leaves the price to the live banner when an auction is live', async () => {
-  fixture.pulse = { platform: 'bat', listing_url: 'https://bringatrailer.com/listing/x', listing_status: 'active', event_type: 'auction' };
+it('retains the specific transmission model and uses its existing transmission evidence context', async () => {
+  const masthead = fixture.read!.sections[0];
+  if (masthead.kind === 'masthead') masthead.identity_source.transmission_model = '6L90';
   await render();
-  expect(host.querySelector('.k-masthead__result')).toBeNull();
+  const control = host.querySelector('[aria-label="Explore 6L90 in this profile"]') as HTMLButtonElement;
+  expect(control).not.toBeNull();
+  expect(host.querySelector('[aria-label="Explore Automatic in this profile"]')).toBeNull();
+  await act(async () => control.click());
+  const panel = host.querySelector('[data-testid="field-context"]');
+  expect(panel?.getAttribute('data-field')).toBe('transmission');
+  expect(panel?.getAttribute('data-match-field')).toBe('transmission_model');
+  expect(fixture.gallery).toHaveBeenLastCalledWith({ field: 'transmission', label: '6L90' });
+});
+
+it('gives the live episode priority over the historical price and puts configuration behind its disclosure', async () => {
+  fixture.pulse = { platform: 'bat', listing_url: 'https://bringatrailer.com/listing/x', listing_status: 'active', event_type: 'auction', current_bid: 12345, end_date: '2099-01-01T00:00:00Z' };
+  await render();
+  expect(host.querySelector('[data-live-bid]')?.getAttribute('data-live-bid')).toBe('12345');
+  expect(host.querySelector('.k-masthead__result')?.textContent).not.toContain('$24,000');
+  expect(host.querySelector('.vp-header-configuration')?.tagName).toBe('DETAILS');
+  expect((host.querySelector('.vp-header-configuration') as HTMLDetailsElement).open).toBe(false);
   expect(host.querySelector('h1.k-entity')?.textContent).toContain('Mustang');
 });
 
@@ -325,7 +351,7 @@ it('shows no odometer when the read carries none', async () => {
   fixture.read = read;
   await render();
   expect(host.textContent).not.toContain(' mi');
-  expect(host.textContent).toContain('0 of 5 facts attributed');
+  expect(host.textContent).not.toContain('facts attributed');
 });
 
 it('renders nothing until the read answers', async () => {
@@ -382,7 +408,7 @@ it('enriches price claim popover with source-bound inline Mecum lot provenance w
 });
 
 it('measures the masthead when its async document arrives and keeps the sticky stack current', async () => {
-  const height = vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(112);
+  const height = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ height: 112.625 } as DOMRect);
   const originalObserver = globalThis.ResizeObserver;
   let resize: (() => void) | undefined;
   const disconnect = vi.fn();
@@ -398,10 +424,10 @@ it('measures the masthead when its async document arrives and keeps the sticky s
     expect(host.style.getPropertyValue('--vp-h-masthead')).toBe('');
     fixture.read = mustangRead();
     await render();
-    expect(host.style.getPropertyValue('--vp-h-masthead')).toBe('112px');
-    height.mockReturnValue(176);
+    expect(host.style.getPropertyValue('--vp-h-masthead')).toBe('112.625px');
+    height.mockReturnValue({ height: 176.25 } as DOMRect);
     act(() => resize?.());
-    expect(host.style.getPropertyValue('--vp-h-masthead')).toBe('176px');
+    expect(host.style.getPropertyValue('--vp-h-masthead')).toBe('176.25px');
     fixture.read = null;
     await render();
     expect(disconnect).toHaveBeenCalledOnce();

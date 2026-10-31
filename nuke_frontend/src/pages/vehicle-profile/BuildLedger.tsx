@@ -177,7 +177,7 @@ const BuildRow: React.FC<{ entry: BuildLedgerEntry }> = ({ entry }) => {
 
         {/* Amount */}
         <span style={{ ...monoNum, fontSize: '9px', fontWeight: 700, textAlign: 'right', minWidth: '64px', color: isLiability ? 'var(--vp-martini-red, #C8102E)' : 'var(--vp-ink)' }}>
-          {isLiability ? `(${fmt(entry.amountUsd)})` : fmt(entry.amountUsd)}
+          {entry.amountUsd == null ? 'AMOUNT UNKNOWN' : isLiability ? `(${fmt(entry.amountUsd)})` : fmt(entry.amountUsd)}
         </span>
       </div>
 
@@ -235,18 +235,18 @@ const GroupSection: React.FC<{ group: BuildLedgerGroup }> = ({ group }) => (
 
 // ── Summary card ──
 
-const SummaryCard: React.FC<{ label: string; amount: number; sub: string; color: string }> = ({ label, amount, sub, color }) => (
+const SummaryCard: React.FC<{ label: string; amount: number | null; sub: string; color: string }> = ({ label, amount, sub, color }) => (
   <div style={{ border: '2px solid var(--vp-ghost)', borderTop: `3px solid ${color}`, padding: '6px 8px' }}>
     <div style={{ fontSize: '8px', color: 'var(--vp-pencil)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>{label}</div>
-    <div style={{ ...monoNum, fontSize: '13px', fontWeight: 700, color }}>{fmt(amount)}</div>
+    <div style={{ ...monoNum, fontSize: '13px', fontWeight: 700, color }}>{amount == null ? 'Amount unknown' : fmt(amount)}</div>
     <div style={{ fontSize: '8px', color: 'var(--vp-pencil)', textTransform: 'uppercase', letterSpacing: '0.04em', marginTop: '1px' }}>{sub}</div>
   </div>
 );
 
 // ── In the accounts: costs the accounting book assigns to this vehicle ──
 
-const fmtMoney = (n: number, currency: string) =>
-  currency === 'USD' ? fmt(n) : `${currency} ${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const fmtMoney = (n: number | null, currency: string) =>
+  n == null ? 'Amount unknown' : currency === 'USD' ? fmt(n) : `${currency || 'Currency unknown'} ${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 const KIND_LABEL: Record<string, string> = { parts_purchase: 'PARTS', labor_payment: 'LABOR' };
 
@@ -421,7 +421,7 @@ const BuildLedger: React.FC<BuildLedgerProps> = ({ vehicleId }) => {
         <div style={{ fontSize: '8px', color: 'var(--vp-pencil)', lineHeight: 1.5, marginBottom: '6px' }}>
           Evidence-tiered reconstruction from receipts, bank, and messages
           {data.auditRun ? ` (${data.auditRun})` : ''}. Pending owner confirmation.
-          Documented and stated amounts are shown separately, never blended.
+          Documented and stated amounts are shown separately, never blended. Unpriced entries are excluded from both subtotals.
           {data.pendingCount > 0 && (
             <span style={{ color: 'var(--vp-gulf-orange, #EE7623)', fontWeight: 700 }}>
               {' '}{data.pendingCount} {data.pendingCount === 1 ? 'entry needs' : 'entries need'} confirmation.

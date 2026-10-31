@@ -15,7 +15,6 @@
 import React, { useState, useEffect } from 'react';
 import { useVehicleProfile } from './VehicleProfileContext';
 import { supabase } from '../../lib/supabase';
-import SoldContext from './SoldContext';
 import type { VehicleIntel } from './hooks/useVehicleIntel';
 import { useVehiclePriceFacts, priceKindLabel, type PriceFacts } from './hooks/useVehiclePriceFacts';
 
@@ -318,7 +317,6 @@ const VehicleBriefing: React.FC<{ collapsed?: boolean }> = ({ collapsed = false 
     </div>
   );
   return <>
-    {comps && <SoldContext comps={comps} scope={vehicleIntel?.recent_comps_scope} subject={vehicle} recordedSale={priceFacts?.price_kind === 'sold' ? priceFacts.price_amount : null} />}
     {(headline || pills.length > 0) && (collapsed ? <details className="vp-stored-interpretations"><summary>Stored model interpretations</summary>{content}</details> : content)}
   </>;
 };

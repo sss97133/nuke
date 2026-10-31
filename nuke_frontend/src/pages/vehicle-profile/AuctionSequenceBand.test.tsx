@@ -149,20 +149,28 @@ it('connects the visible source band to the existing vehicle bid drill', async (
   expect(push.mock.calls[0][1]).toBe('Recorded vehicle bid amounts');
 });
 
-it('opens one selected auction, keeps the calendar optional, and does not reopen on scroll',async()=>{
-  fixture.auction=sequence('2025-01-10T20:30:00Z');
-  fixture.otherAuction={...sequence('2024-01-10T20:30:00Z'),key:'older',lotUrl:'https://bringatrailer.com/listing/synthetic-older/',lotNumber:'2'};
-  await act(async()=>root.render(<BarcodeTimeline selectedAuctionUrl={fixture.otherAuction.lotUrl}/>));
-  const toggle=container.querySelector<HTMLButtonElement>('button[aria-label="Vehicle timeline"]')!;
-  expect(toggle.getAttribute('aria-expanded')).toBe('false');
-  await act(async()=>toggle.click());
-  expect(toggle.getAttribute('aria-expanded')).toBe('true');
+it('preserves the selected auction while the calendar compresses on scroll and restores on return', async () => {
+  let anchorTop = 100;
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+    return { top: this.className === 'vp-timeline-anchor' ? anchorTop : 0, height: this.className === 'barcode-heatmap' ? 124 : 0 } as DOMRect;
+  });
+  fixture.auction = sequence('2025-01-10T20:30:00Z');
+  fixture.otherAuction = { ...sequence('2024-01-10T20:30:00Z'), key: 'older', lotUrl: 'https://bringatrailer.com/listing/synthetic-older/', lotNumber: '2' };
+  await act(async () => root.render(<BarcodeTimeline selectedAuctionUrl={fixture.otherAuction.lotUrl} />));
+  const barcode = container.querySelector<HTMLButtonElement>('[aria-label="Vehicle timeline"]')!;
+  const calendar = container.querySelector<HTMLElement>('[aria-label="Vehicle calendar"]')!;
+  expect((barcode.getAttribute('aria-hidden') === 'true')).toBe(true); expect((calendar.getAttribute('aria-hidden') === 'true')).toBe(false);
+  expect(container.querySelector('.timeline-view-options')).toBeNull();
   expect(container.querySelectorAll('.auction-band')).toHaveLength(1);
   expect(container.querySelector('.auction-band__lot')!.getAttribute('href')).toBe(fixture.otherAuction.lotUrl);
-  expect(container.querySelector<HTMLDetailsElement>('.timeline-view-options')!.open).toBe(false);
-  await act(async()=>toggle.click());
-  await act(async()=>window.dispatchEvent(new Event('scroll')));
-  expect(toggle.getAttribute('aria-expanded')).toBe('false');
+  anchorTop = -124;
+  await act(async () => { window.dispatchEvent(new Event('scroll')); await new Promise(requestAnimationFrame); });
+  expect((barcode.getAttribute('aria-hidden') === 'true')).toBe(false); expect((calendar.getAttribute('aria-hidden') === 'true')).toBe(true);
+  anchorTop = 100;
+  await act(async () => { window.dispatchEvent(new Event('scroll')); await new Promise(requestAnimationFrame); });
+  expect((barcode.getAttribute('aria-hidden') === 'true')).toBe(true); expect((calendar.getAttribute('aria-hidden') === 'true')).toBe(false);
+  expect(container.querySelectorAll('.auction-band')).toHaveLength(1);
+  expect(container.querySelector('.auction-band__lot')!.getAttribute('href')).toBe(fixture.otherAuction.lotUrl);
 });
 
 it('uses the parent auction selector and leaves the sale result with its primary owner', async () => {

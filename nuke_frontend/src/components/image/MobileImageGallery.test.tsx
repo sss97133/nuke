@@ -9,7 +9,6 @@ vi.mock('../../lib/supabase', () => ({ get supabase() { return fixture.client; }
 vi.mock('../../pages/vehicle-profile/VehicleProfileContext', () => ({ useVehicleProfile: () => ({ vehicleId: fixture.vehicleId,
   leadImageUrl: fixture.lead, heroMeta: null, vehicle: { year: 1970, make: 'Synthetic', model: 'Specimen', transmission: 'Manual' } }) }));
 vi.mock('../../hooks/useIsMobile', () => ({ useIsMobile: () => true }));
-vi.mock('../../pages/vehicle-profile/VehicleMediaKit', () => ({ __esModule: true, default: () => null }));
 vi.mock('../../pages/vehicle-profile/VehiclePhotoLightbox', () => ({ openVehiclePhoto: vi.fn(), openVehiclePhotoByUrl: vi.fn() }));
 vi.mock('../badges/useBadgeDepth', () => ({ useBadgeDepth: () => ({ data: null, loading: false, load: () => {} }) }));
 vi.mock('../badges/BadgeClusterPanel', () => ({ BadgeClusterPanel: () => null }));
@@ -190,7 +189,7 @@ it.each([
 });
 it('zero-swipe: closes downward from a zero origin without changing the known read', async () => {
   await render(); await open(); await settle(0); expect(galleryView()).toEqual(loaded('synthetic-a'));
-  await swipe([0, 0], [0, 100]); expect(gallery()).toBeNull(); expect(host.textContent).toBe('FILL'); expect(reads).toHaveLength(1);
+  await swipe([0, 0], [0, 100]); expect(gallery()).toBeNull(); expect(host.textContent).toBe('FIT'); expect(reads).toHaveLength(1);
 });
 async function touch(type: string, coordinates: [number, number]) {
   await act(async () => { const event = new Event(type, { bubbles: true });

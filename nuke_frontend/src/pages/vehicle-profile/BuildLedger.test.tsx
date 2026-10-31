@@ -3,9 +3,10 @@ import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-const fixture = vi.hoisted(() => ({ rpc: vi.fn(), askAgent: vi.fn(), getSession: vi.fn() }));
+const fixture = vi.hoisted(() => ({ rpc: vi.fn(), askAgent: vi.fn(), getSession: vi.fn(), uid: '22222222-2222-4222-8222-222222222222' as string | null }));
 vi.mock('../../lib/supabase', () => ({ supabase: { rpc: fixture.rpc, auth: { getSession: fixture.getSession } } }));
 vi.mock('../../components/agent/askAgent', () => ({ askAgent: fixture.askAgent }));
+vi.mock('../../contexts/AuthContext', () => ({ useAuthContext: () => ({ user: fixture.uid ? { id: fixture.uid } : null, loading: false }) }));
 vi.mock('../../components/PrefetchLink', () => ({ default: ({ to, children }: any) => <a href={to}>{children}</a> }));
 import BuildLedger from './BuildLedger';
 import { bookCostKind } from './hooks/useBuildLedger';
@@ -37,6 +38,7 @@ const buttons = (text: string) => [...node.querySelectorAll('button')].filter(b 
 beforeEach(() => {
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
   fixture.rpc.mockReset(); fixture.askAgent.mockReset();
+  fixture.uid = owner;
   fixture.getSession.mockReset(); fixture.getSession.mockResolvedValue({ data: { session: { user: { id: owner } } } });
   client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   node = document.createElement('div'); document.body.appendChild(node); root = createRoot(node);
@@ -46,7 +48,7 @@ afterEach(async () => { await act(async () => root.unmount()); node.remove(); })
 it('shows booked costs in their own section without changing the audit totals or confirmations', async () => {
   respond({ data: audit, error: null }, { data: book, error: null });
   await render();
-  expect(fixture.rpc).toHaveBeenCalledWith('accounting_vehicle_costs', { p_vehicle_id: vehicle });
+  expect(fixture.rpc).toHaveBeenCalledWith('accounting_vehicle_costs', { p_vehicle_id: vehicle }, { count: 'exact' });
   const text = node.textContent!;
   expect(text).toContain('DRAFT · 2 ENTRIES · 2 BOOKED');
   expect(text).toContain('Documented$100.00'); // audit only: the booked 40.00 is not added
@@ -75,6 +77,13 @@ it('keeps a booked row read-only: it shows the recorded reason and links to the 
   expect(fixture.askAgent).not.toHaveBeenCalled();
 });
 
+it('retains unknown booked totals when every vehicle allocation is unpriced', async () => {
+  respond({ data: [], error: null }, { data: book.map(row => ({ ...row, allocated_amount: null })), error: null });
+  await render();
+  expect(node.textContent).toContain('Assigned in the accountsAmount unknown');
+  expect(node.textContent).not.toContain('$0.00');
+});
+
 it('renders a vehicle that has only booked costs, without the audit draft', async () => {
   respond({ data: [], error: null }, { data: [book[0]], error: null });
   await render();
@@ -94,6 +103,14 @@ it('shows today\'s ledger unchanged when the book read fails', async () => {
   expect(text).not.toContain('BOOKED');
   expect(text).not.toContain('In the accounts');
   expect(text).toContain('Documented$100.00');
+});
+
+it('keeps unpriced audit work unknown in both its row and subtotal', async () => {
+  respond({ data: [{ ...audit[0], structured_data: { ...audit[0].structured_data, amount_usd: null } }], error: null }, { data: [], error: null });
+  await render();
+  expect(node.textContent).toContain('AMOUNT UNKNOWN');
+  expect(node.textContent).toContain('DocumentedAmount unknown');
+  expect(node.textContent).not.toContain('$0.00');
 });
 
 it('shows the owner\'s working notes from then as context, outside every total', async () => {
@@ -123,7 +140,7 @@ it('renders a vehicle that only has working notes, and skips the read when nobod
   expect(node.textContent).not.toContain('In the accounts');
   await act(async () => root.unmount());
   root = createRoot(node); client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  fixture.rpc.mockClear(); fixture.getSession.mockResolvedValue({ data: { session: null } });
+  fixture.rpc.mockClear(); fixture.uid = null;
   await render();
   expect(fixture.rpc).not.toHaveBeenCalledWith('owner_working_notes', expect.anything());
   expect(node.textContent).toBe('');

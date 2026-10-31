@@ -8,6 +8,7 @@ import { useLiveLotTemperature, type CohortCount } from '../../pages/market/useL
 import { PrefetchLink as Link } from '../PrefetchLink';
 import './ExternalAuctionLiveBanner.css';
 import { timeLeft, useSecondClock } from '../../hooks/useSecondClock';
+import { hasFreshAuctionFeed } from '../../pages/vehicle-profile/buildAuctionPulse';
 
 interface ExternalAuctionLiveBannerProps {
   vehicleId?: string;
@@ -88,6 +89,18 @@ function formatTimeRemaining(endDate: string | null, status: string | null): { t
 
   if (days === 0 && hours === 0 && minutes === 0) return { text: `${seconds}s`, urgency, ended: false };
   return { text: timeLeft(diff), urgency, ended: false };
+}
+
+/** Priority readings from the same live episode; complete controls open in place. */
+export function ExternalAuctionSummary({ currentBid, currencyCode, endDate, listingStatus, sourceObservedAt, hideAmount = false, onClick }: Pick<ExternalAuctionLiveBannerProps, 'currentBid' | 'currencyCode' | 'endDate' | 'listingStatus'> & { sourceObservedAt?: string | null; hideAmount?: boolean; onClick: () => void }) {
+  useSecondClock();
+  const clock = formatTimeRemaining(endDate, listingStatus);
+  const fresh = hasFreshAuctionFeed(listingStatus, endDate, sourceObservedAt);
+  return <button type="button" className="external-auction-summary" aria-haspopup="dialog" aria-label={fresh ? 'Explore live auction' : 'Explore auction'} onClick={onClick}>
+    <span>{fresh ? 'Live auction' : 'Auction'}</span>
+    {!hideAmount && <strong>{currentBid !== null && Number.isFinite(currentBid) && currentBid > 0 ? formatCurrencyAmount(currentBid, { currency: currencyCode }) : 'Awaiting bid'}</strong>}
+    <span>{clock.text}</span>
+  </button>;
 }
 
 // Color mapping for urgency levels - NO YELLOW

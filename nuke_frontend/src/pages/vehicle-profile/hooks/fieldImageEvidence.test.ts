@@ -23,6 +23,20 @@ describe('field image evidence boundaries', () => {
   it('does not use the engine bay as evidence of transmission speeds', () => {
     expect(relatedFieldImages([image('engine', { vehicle_zone: 'mech_engine_bay' })], 'transmission')).toEqual([]);
   });
+  it('prioritizes indexed drivetrain views over generic controls without treating either as citations', () => {
+    const dashboard = image('controls', { vehicle_zone: 'int_dashboard' });
+    const drivetrain = image('drivetrain', { vehicle_zone: 'mech_drivetrain' });
+    const underbody = image('underbody', { vehicle_zone: 'ext_undercarriage' });
+    expect(relatedFieldImages([dashboard, underbody, drivetrain], 'transmission')).toEqual([drivetrain, underbody, dashboard]);
+    expect(relatedFieldImages([dashboard, drivetrain], 'drivetrain')).toEqual([drivetrain]);
+    expect(citedFieldImages(provenance(), [drivetrain, underbody])).toEqual([]);
+  });
+  it('recovers a component mention outside the coarse zone and ranks it ahead of generic drivetrain views', () => {
+    const axle = image('axle', { vehicle_zone: 'mech_drivetrain' });
+    const transmission = image('transmission', { vehicle_zone: 'mech_suspension', ai_byok_narrative: 'Automatic transmission staged on the frame.' });
+    expect(relatedFieldImages([axle, transmission], 'transmission')).toEqual([transmission, axle]);
+    expect(citedFieldImages(provenance(), [transmission])).toEqual([]);
+  });
   it('does not return document flags as related vehicle areas', () => {
     expect(relatedFieldImages([image('doc', { vehicle_zone: 'ext_front', is_document: true })], 'color')).toEqual([]);
   });
