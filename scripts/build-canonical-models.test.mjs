@@ -1,8 +1,9 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
+import {createRequire} from 'node:module';
 import vm from 'node:vm';
-import ts from 'typescript';
+const ts=createRequire(new URL('../nuke_frontend/package.json',import.meta.url))('typescript');
 
 const filename=new URL('./build-canonical-models.ts',import.meta.url);
 const source=ts.transpileModule(readFileSync(filename,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
