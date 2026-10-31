@@ -5,6 +5,9 @@ import type { ViewMode, SortMode, FilterMode } from '../../hooks/useVehiclesDash
 
 interface GarageToolbarProps {
   vehicleCount: number;
+  loadedVehicleCount: number;
+  searchQuery: string;
+  onSearchChange: (value: string) => void;
   viewMode: ViewMode;
   sortMode: SortMode;
   filterMode: FilterMode;
@@ -13,10 +16,11 @@ interface GarageToolbarProps {
   onFilterChange: (v: FilterMode) => void;
 }
 
-export function GarageToolbar({ vehicleCount, viewMode, sortMode, filterMode, onViewChange, onSortChange, onFilterChange }: GarageToolbarProps) {
+export function GarageToolbar({ vehicleCount, loadedVehicleCount, searchQuery, onSearchChange, viewMode, sortMode, filterMode, onViewChange, onSortChange, onFilterChange }: GarageToolbarProps) {
   return <section className="garage-toolbar" aria-label="Garage controls">
-    <div className="garage-toolbar-heading"><p>{vehicleCount} loaded {vehicleCount === 1 ? 'vehicle record' : 'vehicle records'} shown</p><Link className="btn-base btn-primary" to="/vehicle/add">Add vehicle</Link></div>
+    <div className="garage-toolbar-heading"><p>{vehicleCount === loadedVehicleCount ? vehicleCount : `${vehicleCount} of ${loadedVehicleCount}`} loaded {loadedVehicleCount === 1 ? 'vehicle record' : 'vehicle records'} shown</p><Link className="btn-base btn-primary" to="/vehicle/add">Add vehicle</Link></div>
     <div className="garage-toolbar-fields">
+      <label className="garage-search">Find vehicle or VIN<input type="search" value={searchQuery} onChange={event => onSearchChange(event.target.value)} placeholder="Vehicle name or VIN" /></label>
       <div><span id="garage-view-label">View</span><div className="garage-segments" role="group" aria-labelledby="garage-view-label">
         {(['GRID', 'LIST', 'COMPACT'] as const).map(mode => <button key={mode} type="button" aria-pressed={viewMode === mode} onClick={() => onViewChange(mode)}>{mode === 'GRID' ? 'Grid' : mode === 'LIST' ? 'List' : 'Compact'}</button>)}
       </div></div>
