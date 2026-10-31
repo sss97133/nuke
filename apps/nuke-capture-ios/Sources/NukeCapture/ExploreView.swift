@@ -79,6 +79,7 @@ struct ExploreView: View {
     @State private var feedFailureText: String?
     @State private var searchFailureText: String?
     @State private var searched = false
+    @State private var searchRequests = ReadRequestGuard()
     @State private var feedRetried = false   // cold-launch first call self-heals once
     // The Worklight: report the stage, never a blank spinner; a stall reads as an
     // honest failure with retry, never "nothing here".
@@ -235,10 +236,11 @@ struct ExploreView: View {
             .task(id: landingMode) { if landingMode == .metros { await loadMetros() } }
             .task(id: query) {
                 let term = query.trimmingCharacters(in: .whitespaces)
-                guard isSearching else { results = []; searchMeta = nil; actorHits = []; searched = false; return }
+                let request = beginSearch()
+                guard isSearching else { return }
                 try? await Task.sleep(nanoseconds: 300_000_000)   // debounce
-                guard !Task.isCancelled else { return }
-                await search(term)
+                guard !Task.isCancelled, searchRequests.isCurrent(request) else { return }
+                await search(term, request: request)
             }
         }
     }
@@ -353,7 +355,7 @@ struct ExploreView: View {
                     .foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-        } else if results.isEmpty && cohort == nil {
+        } else if results.isEmpty && actorHits.isEmpty && cohort == nil {
             ContentUnavailableView(
                 "No matches",
                 systemImage: "magnifyingglass",
@@ -535,11 +537,26 @@ struct ExploreView: View {
     // asks it the same question the site does: 100 hits a page, hits without a photo kept
     // and sorted last (useSearchPage.ts), later pages on the door's next_offset with the
     // reader it chose on page one. The door counts no total for a text query, so none is shown.
-    private func search(_ term: String) async {
+    private func beginSearch() -> UUID {
+        let request = searchRequests.begin()
+        results = []
+        actorHits = []
+        searchMeta = nil
+        searched = false
         searchError = false
+        searchFailureText = nil
+        loadMoreError = nil
+        loadingMore = false
+        return request
+    }
+
+    private func search(_ term: String, request: UUID? = nil) async {
+        guard isSearching, query.trimmingCharacters(in: .whitespaces) == term else { return }
+        let request = request ?? beginSearch()
         do {
             let res = try await UniversalSearch.vehicles(query: term, types: UniversalSearch.firstPageTypes)
             guard res.success else { throw URLError(.badServerResponse) }
+            guard !Task.isCancelled, searchRequests.isCurrent(request), query.trimmingCharacters(in: .whitespaces) == term else { return }
             // Actors the door matched by name lead the results: an organization opens its measures,
             // a person their profile. Vehicles follow in the grid.
             actorHits = res.results.filter { $0.type == "organization" || $0.type == "external_identity" || ($0.type == "user" && UUID(uuidString: $0.id) != nil) }
@@ -557,6 +574,7 @@ struct ExploreView: View {
             }
             #endif
         } catch {
+            guard !Task.isCancelled, searchRequests.isCurrent(request), query.trimmingCharacters(in: .whitespaces) == term else { return }
             searchError = true
             searchFailureText = ReadFailure.text(error)
             searched = true
@@ -571,22 +589,25 @@ struct ExploreView: View {
     /// button stays as the retry; a page that lands after the query moved on is dropped.
     private func loadMoreResults() async {
         guard let meta = searchMeta, let offset = meta.nextOffset, !loadingMore else { return }
+        guard let request = searchRequests.current, query.trimmingCharacters(in: .whitespaces) == meta.query else { return }
         guard let reader = meta.reader else { loadMoreError = Self.pageFailure; return }
         loadingMore = true
         loadMoreError = nil
-        defer { loadingMore = false }
+        defer { if searchRequests.isCurrent(request) { loadingMore = false } }
         do {
             let res = try await UniversalSearch.vehicles(query: meta.query, offset: offset, source: reader)
             guard res.success, let m = res.meta, m.offset == offset, m.vehicle_source == reader, let more = m.has_more,
                   m.pagination_limited == true ? (more && m.next_offset == nil) : (more ? (m.next_offset ?? 0) > offset : m.next_offset == nil)
             else { throw URLError(.badServerResponse) }
-            guard meta.query == searchMeta?.query else { return }
+            guard !Task.isCancelled, searchRequests.isCurrent(request), meta.query == searchMeta?.query,
+                  query.trimmingCharacters(in: .whitespaces) == meta.query else { return }
             // The web sorts photos first within each page and appends later pages in the door's order
             // (useSearchPage.ts); re-sorting the whole walk had moved page one's photo-less hits to the end.
             let page = Self.photosFirst(res.results.compactMap(\.headerRow).filter { hit in !results.contains { $0.id == hit.id } })
             results = results + page
             searchMeta = SearchCoverage(query: meta.query, rows: results, meta: m, milliseconds: res.search_time_ms)
         } catch {
+            guard !Task.isCancelled, searchRequests.isCurrent(request), query.trimmingCharacters(in: .whitespaces) == meta.query else { return }
             NSLog("NukeCapture explore search page failed: %@", String(describing: error))
             loadMoreError = Self.pageFailure
         }
