@@ -5,17 +5,21 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 const fixture = vi.hoisted(() => ({ rpc: vi.fn(), from: vi.fn(), tables: {} as Record<string, Record<string, unknown>[]>, user: null as { id: string } | null }));
 vi.mock('pdfjs-dist/build/pdf.worker.min.mjs?url', () => ({ default: '/synthetic-pdf-worker.mjs' }));
-vi.mock('../../lib/supabase', () => ({ supabase: { rpc: fixture.rpc, from: fixture.from } }));
+vi.mock('../../lib/supabase', () => ({ supabase: { rpc: (...args: unknown[]) => {
+  const pending = fixture.rpc(...args);
+  return Object.assign(pending, { range: (start: number, end: number) => ({ abortSignal: () => Promise.resolve(pending).then(result => ({ ...result, data: Array.isArray(result.data) ? result.data.slice(start, end + 1) : result.data })) }) });
+}, from: fixture.from } }));
 vi.mock('../../contexts/AuthContext', () => ({ useAuthContext: () => ({ user: fixture.user, loading: false }) }));
 vi.mock('../../hooks/useIsMobile', () => ({ useIsMobile: () => false }));
-import ProfileFinancials, { summarizeVehicleCosts } from './ProfileFinancials';
-import { parseVehicleBookCosts, parseVehicleReceiptRecord } from './hooks/useBuildLedger';
+import ProfileFinancials from './ProfileFinancials';
+import { parseVehicleReceiptRecord } from './hooks/useBuildLedger';
+import { parseFinancialUse, totalMoney, moneyLabel } from './hooks/useVehicleFinancials';
 
 let root: Root, host: HTMLDivElement, client: QueryClient;
 let open = false;
 const vehicleId = '11111111-1111-4111-8111-111111111111';
 const rawCost = (extra = {}) => ({ use_id: 'use-a', book_owner_id: 'owner-a', document_id: 'source-a',
-  allocated_amount: 40, book_amount: 40, currency: 'USD', record_date: '2024-06-01', description: 'Synthetic recorded part', basis: 'Source identifies this vehicle', ...extra });
+  allocation_index: 1, record_source_key: 'synthetic-key', phase: 'book_expense', qualification: 'ready', allocated_amount: '40', book_amount: '40', currency: 'USD', record_date: '2024-06-01', description: 'Synthetic recorded part', basis: 'Source identifies this vehicle', ...extra });
 const render = async (market: React.ReactNode = null) => {
   await act(async () => root.render(<QueryClientProvider client={client}><ProfileFinancials vehicleId={vehicleId} market={market} open={open}
     onToggle={() => { open = !open; void render(market); }} onClose={() => { open = false; void render(market); }} boundaryRef={{ current: host }} /></QueryClientProvider>));
@@ -34,7 +38,7 @@ beforeEach(() => {
       range: (start: number, end: number) => Promise.resolve({ data: rows.slice(start, end + 1), count: null, error: null }) };
     return query;
   });
-  fixture.rpc.mockReset().mockImplementation((name: string) => Promise.resolve({ data: name === 'accounting_vehicle_costs' ? [rawCost()] : name === 'owner_working_notes' ? { tables: [] } : [], error: null }));
+  fixture.rpc.mockReset().mockImplementation((name: string) => Promise.resolve({ data: name === 'accounting_vehicle_financials' ? [rawCost()] : name === 'owner_working_notes' ? { tables: [] } : [], error: null }));
   client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   host = document.createElement('div'); document.body.appendChild(host); root = createRoot(host);
 });
@@ -48,27 +52,40 @@ it('never substitutes costs for a missing price and reads the books only when op
   open = true; await render();
   expect(host.textContent).toContain('Booked vehicle costs');
   expect(host.textContent).toContain('1 allocated of 1 visible entries');
-  expect(host.querySelector('progress')?.getAttribute('value')).toBe('40');
-  await act(async () => host.querySelector<HTMLDetailsElement>('.vp-financial-entry')!.open = true);
+  expect(host.querySelector('svg[aria-label="Cumulative booked vehicle costs"]')).not.toBeNull();
+  await act(async () => { const item = host.querySelector<HTMLDetailsElement>('.vp-financial-entry')!; item.open = true; item.dispatchEvent(new Event('toggle')); });
   expect(host.textContent).toContain('Source identifies this vehicle');
 });
 
-it('separates books, currencies, unallocated amounts and repeated row ids', () => {
-  const costs = parseVehicleBookCosts([rawCost(), rawCost(), rawCost({ use_id: 'unsplit', allocated_amount: null }),
-    rawCost({ use_id: 'other-book', book_owner_id: 'owner-b' }), rawCost({ use_id: 'other-currency', currency: 'EUR' })]);
-  const totals = summarizeVehicleCosts(costs);
-  expect(totals).toHaveLength(3);
-  expect(totals[0]).toMatchObject({ total: 40, allocated: 1, unallocated: 1 });
-  expect(totals.map(total => total.total)).toEqual([40, 40, 40]);
-  expect(summarizeVehicleCosts(parseVehicleBookCosts([rawCost({ allocated_amount: null })]))[0].total).toBeNull();
-  expect(summarizeVehicleCosts(parseVehicleBookCosts([rawCost({ currency: null })]))[0].total).toBeNull();
-  expect(summarizeVehicleCosts(parseVehicleBookCosts([rawCost({ allocated_amount: '' })]))[0].total).toBeNull();
+it('sums exact allocations once, retaining phase/book/currency scope and excluding revised sources', () => {
+  const rows = (values: Record<string, unknown>[]) => values.map(value => parseFinancialUse(rawCost(value))!);
+  expect(totalMoney(rows([{ allocated_amount: '0.005' }, { use_id: 'b', allocated_amount: '0.005' }]))).toBe('0.010000');
+  expect(moneyLabel(totalMoney(rows([{ allocated_amount: '0.005' }, { use_id: 'b', allocated_amount: '0.005' }])), 'USD')).toBe('$0.01');
+  expect(totalMoney(rows([{}, {}, { use_id: 'unallocated', allocated_amount: null }, { use_id: 'stale', allocated_amount: '100', qualification: 'source_revised' }]))).toBe('40.000000');
+  expect(totalMoney(rows([{ allocated_amount: null }]))).toBeNull();
+  expect(totalMoney(rows([{}, { use_id: 'other', book_owner_id: 'other' }]))).toBeNull();
+  expect(totalMoney(rows([{}, { use_id: 'other', currency: 'EUR' }]))).toBeNull();
+  expect(totalMoney(rows([{}, { use_id: 'other', phase: 'customer_receipt' }]))).toBeNull();
+  expect(moneyLabel(totalMoney(rows([{ allocated_amount: '0' }])), 'USD')).toBe('$0.00');
+  expect(moneyLabel('-1.5', 'JPY')).toMatch(/^-JPY\s2$/);
 });
 
-it('adds decimal money with the currency minor units and preserves real zero and refunds', () => {
-  expect(summarizeVehicleCosts(parseVehicleBookCosts([rawCost({ allocated_amount: 0.1 }), rawCost({ use_id: 'b', allocated_amount: 0.2 })]))[0].total).toBe(0.3);
-  expect(summarizeVehicleCosts(parseVehicleBookCosts([rawCost({ allocated_amount: 0 })]))[0].total).toBe(0);
-  expect(summarizeVehicleCosts(parseVehicleBookCosts([rawCost({ allocated_amount: -1.5, currency: 'JPY' })]))[0].total).toBe(-2);
+it('keeps customer cash, mixed transfer allocation, book costs and revised rows distinct', async () => {
+  fixture.rpc.mockImplementation((name: string) => Promise.resolve({ data: name === 'accounting_vehicle_financials' ? [rawCost(),
+    rawCost({ use_id: 'cash', phase: 'customer_receipt', allocated_amount: '60', bank_amount: '100', bank_remainder: '40', bank_date: '2024-07-01', invoice_reference: 'SYNTHETIC-1', bank_document_id: 'bank-source' }),
+    rawCost({ use_id: 'stale', phase: 'customer_receipt', allocated_amount: '200', qualification: 'bank_source_revised' }),
+  ] : name === 'owner_working_notes' ? { tables: [] } : [], error: null }));
+  open = true; await render();
+  expect([...host.querySelectorAll('.vp-financial-measures strong')].map(node => node.textContent)).toEqual(['$60.00', '$40.00']);
+  expect(host.textContent).toContain('Source needs review');
+  const item = [...host.querySelectorAll<HTMLDetailsElement>('.vp-financial-entry')].find(entry => entry.textContent?.includes('SYNTHETIC-1'))!;
+  await act(async () => { item.open = true; item.dispatchEvent(new Event('toggle')); });
+  expect(item.textContent).toContain('$40.00 of the movement remains outside');
+  expect(item.textContent).toContain('Bank source original');
+  expect(host.querySelector('a[target="_blank"]')).toBeNull();
+  await act(async () => [...host.querySelectorAll<HTMLButtonElement>('.vp-financial-measures button')].find(button => button.textContent?.includes('Booked vehicle costs'))!.click());
+  expect(host.querySelector('.vp-financial-filter')?.textContent).toContain('Booked vehicle costs');
+  expect(host.textContent).not.toContain('SYNTHETIC-1');
 });
 
 it('reduces the visible amount deliberately, keeps the door, and remembers the display preference', async () => {
@@ -79,14 +96,23 @@ it('reduces the visible amount deliberately, keeps the door, and remembers the d
   expect(host.textContent).toContain('Show header amount');
 });
 
+it('treats an exhausted decimal bank remainder as zero while retaining a different book amount', async () => {
+  fixture.rpc.mockImplementation((name: string) => Promise.resolve({ data: name === 'accounting_vehicle_financials' ? [rawCost({ phase: 'customer_receipt', allocated_amount: '60.00', book_amount: '60.04', bank_amount: '60.00', bank_remainder: '0.00', bank_date: '2024-07-01' })] : name === 'owner_working_notes' ? { tables: [] } : [], error: null }));
+  open = true; await render();
+  await act(async () => { const item = host.querySelector<HTMLDetailsElement>('.vp-financial-entry')!; item.open = true; item.dispatchEvent(new Event('toggle')); });
+  expect(host.textContent).toContain('Book source amount');
+  expect(host.textContent).toContain('$60.04');
+  expect(host.textContent).not.toContain('of the movement remains');
+});
+
 it('drops another viewer’s financial records immediately on account change and logout', async () => {
   open = true; await render(); expect(host.textContent).toContain('$40.00');
   let resolve!: (value: unknown) => void;
-  fixture.rpc.mockImplementation((name: string) => name === 'accounting_vehicle_costs' ? new Promise(done => { resolve = done; })
+  fixture.rpc.mockImplementation((name: string) => name === 'accounting_vehicle_financials' ? new Promise(done => { resolve = done; })
     : Promise.resolve({ data: name === 'owner_working_notes' ? { tables: [] } : [], error: null }));
   fixture.user = { id: 'owner-b' }; await render();
   expect(host.textContent).not.toContain('$40.00');
-  await act(async () => resolve({ data: [rawCost({ book_owner_id: 'owner-b', allocated_amount: 70 })], error: null }));
+  await act(async () => resolve({ data: [rawCost({ book_owner_id: 'owner-b', allocated_amount: '70' })], error: null }));
   await render(); expect(host.textContent).toContain('$70.00');
   fixture.user = null; open = true; await render();
   expect(host.textContent).not.toContain('$70.00');
@@ -103,20 +129,20 @@ it('distinguishes a failed read from no visible entries and never manufactures a
 });
 
 it('retains an unpriced audit record as unknown rather than zero and never adds it to books', async () => {
-  fixture.rpc.mockImplementation((name: string) => Promise.resolve({ data: name === 'accounting_vehicle_costs' ? [rawCost()] : name === 'owner_working_notes' ? { tables: [] } : [
+  fixture.rpc.mockImplementation((name: string) => Promise.resolve({ data: name === 'accounting_vehicle_financials' ? [rawCost()] : name === 'owner_working_notes' ? { tables: [] } : [
     { observation_id: 'audit-a', observed_at: '2024-06-01', content_text: 'Unpriced work', structured_data: { event_type: 'labor_payment', direction: 'out' } },
     { observation_id: 'audit-b', observed_at: '2024-06-01', content_text: 'Unscoped financial record', structured_data: { amount_usd: 15 } },
   ], error: null }));
   open = true; await render();
   expect(host.textContent).toContain('Unpriced work'); expect(host.textContent).toContain('Amount unknown');
-  expect(host.querySelector('.vp-financial-total')?.textContent).toBe('$40.00');
+  expect(host.querySelector('.vp-financial-measures strong')?.textContent).toBe('$40.00');
   expect([...host.querySelectorAll('summary')].find(item => item.textContent?.includes('Unscoped financial record'))?.textContent).toContain('Financial record');
 });
 
-it('shows a truncated accounting read as a visible subtotal with its returned denominator', async () => {
-  fixture.rpc.mockImplementation((name: string) => Promise.resolve({ data: name === 'accounting_vehicle_costs' ? [rawCost()] : name === 'owner_working_notes' ? { tables: [] } : [], count: 20, error: null }));
+it('shows an unfinished allocation read as partial rather than a full balance', async () => {
+  fixture.rpc.mockImplementation((name: string) => Promise.resolve({ data: name === 'accounting_vehicle_financials' ? Array.from({ length: 200 }, (_, index) => rawCost({ use_id: `cost-${index}` })) : name === 'owner_working_notes' ? { tables: [] } : [], count: 20, error: null }));
   open = true; await render();
-  expect(host.textContent).toContain('1 of 20 visible cost entries loaded');
+  expect(host.textContent).toContain('200 allocation entries loaded · more available');
   expect(host.querySelector('.vp-header-money')?.textContent).toBe('$$$');
 });
 
@@ -160,7 +186,7 @@ it('shows authorized work-order charges and recorded payments separately from bo
   expect(host.textContent).toContain('Synthetic job');
   expect(host.textContent).toContain('Parts and labor charges$100.00');
   expect(host.textContent).toContain('Completed payments$40.00');
-  expect(host.querySelector('.vp-financial-total')?.textContent).toBe('$40.00');
+  expect(host.querySelector('.vp-financial-measures strong')?.textContent).toBe('$40.00');
 });
 
 it('keeps an actual price ahead of expenses and makes source readings a secondary drill', async () => {

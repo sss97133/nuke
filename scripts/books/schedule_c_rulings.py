@@ -21,7 +21,7 @@ line map: {"<section>|<category>": "<line>"} for legacy ledger categories (rulin
 return file: {"<account>": {"<line>": amount, ...}} (whole-dollar or cent amounts; compared to the cent after rounding both sides
 the way the return does when --whole-dollars is given).
 """
-import argparse, collections, hashlib, json, os, subprocess, sys, urllib.error, urllib.request
+import argparse, collections, copy, hashlib, json, os, re, subprocess, sys, urllib.error, urllib.request
 from decimal import Decimal as D, ROUND_HALF_UP
 
 METHOD, VERSION = 'schedule_c_rulings_register', '2026-10-26'
@@ -29,8 +29,11 @@ PROOF_KINDS = ('owner_ruling', 'register', 'artifact', 'photo', 'gmail', 'file')
 EXPENSE_LINES = ['8', '9', '10', '11', '12', '13', '14', '15', '16a', '16b', '17', '18', '19', '20a', '20b', '21', '22', '23', '24a', '25', '26', '27a']
 
 
-def psql(sql):
-    cmd = ['bash', '-c', 'PGPASSWORD="$SUPABASE_DB_PASSWORD" PGOPTIONS="-c statement_timeout=30000 -c lock_timeout=5000" psql '
+def psql(sql, timeout_ms=30000):
+    if timeout_ms not in (10000, 30000):
+        raise ValueError('unsupported query bound')
+    lock_ms = 2000 if timeout_ms == 10000 else 5000
+    cmd = ['bash', '-c', f'PGPASSWORD="$SUPABASE_DB_PASSWORD" PGOPTIONS="-c statement_timeout={timeout_ms} -c lock_timeout={lock_ms}" psql '
            '"host=aws-0-us-west-1.pooler.supabase.com port=5432 dbname=postgres user=postgres.qkgaybvrernstplzjaam sslmode=require" '
            '-X -v ON_ERROR_STOP=1 -At -f -']
     out = subprocess.run(cmd, input=sql, capture_output=True, text=True)
@@ -74,14 +77,14 @@ def upload(body, key):
         raise RuntimeError(f'upload failed {e.code}: {msg}')
 
 
-def current_run(owner, sha):
-    out = psql(f"""select json_build_object('run_id', r->>'run_id', 'key', r->>'key',
+def current_run(owner, sha, timeout_ms=30000):
+    out = psql(f"""select json_build_object('document_id',d.id,'run_id', r->>'run_id', 'key', r->>'key',
         'field_keys', (select json_agg(field_key) from financial_document_extractions e
                        where e.document_id = d.id and e.extraction_run_id = (r->>'run_id')::uuid))
       from financial_documents d, jsonb_array_elements(d.attributes->'runs') r
       where d.owner_id = '{owner}' and d.content_sha256 = '{sha}' and d.logical_index = 1
         and not exists (select 1 from jsonb_array_elements(d.attributes->'runs') s where s->>'supersedes_run_id' = r->>'run_id')
-      limit 1;""")
+      limit 1;""", timeout_ms)
     line = next((l for l in out.splitlines() if l.startswith('{')), None)
     return json.loads(line) if line else None
 
@@ -238,7 +241,7 @@ def drift(owner, line_map, returns, whole):
 
 # ---------- correct: supersede the specific ledger rows a ruling replaces ----------
 
-def document_state(owner, doc_id):
+def document_state(owner, doc_id, timeout_ms=30000):
     """Original, current run, its complete field set, accounting records and staging lines, as the writer needs them back."""
     out = psql(f"""select json_build_object(
       'original', json_build_object('sha256', d.content_sha256, 'storage_path', d.storage_path, 'source_filename', d.source_filename,
@@ -249,13 +252,15 @@ def document_state(owner, doc_id):
                  from financial_document_extractions e where e.document_id = d.id and e.extraction_run_id = r.run_id::uuid),
       'records', (select json_agg(l.attributes->'accounting_record' order by l.line_number) from financial_document_lines l
                   where l.document_id = d.id and l.attributes->>'extraction_run_id' = r.run_id and l.attributes ? 'accounting_record'),
+      'record_lines', (select json_object_agg(l.attributes->'accounting_record'->>'source_key',l.id) from financial_document_lines l
+                  where l.document_id=d.id and l.attributes->>'extraction_run_id'=r.run_id and l.attributes ? 'accounting_record'),
       'lines', (select json_agg(l.attributes->'staging' order by l.line_number) from financial_document_lines l
                   where l.document_id = d.id and l.attributes->>'extraction_run_id' = r.run_id and l.attributes ? 'staging'))
       from financial_documents d,
            lateral (select x->>'run_id' run_id from jsonb_array_elements(d.attributes->'runs') x
                      where not exists (select 1 from jsonb_array_elements(d.attributes->'runs') s where s->>'supersedes_run_id' = x->>'run_id')
                      limit 1) r
-     where d.owner_id = '{owner}' and d.id = '{uuid_ok(doc_id)}';""")
+     where d.owner_id = '{owner}' and d.id = '{uuid_ok(doc_id)}';""", timeout_ms)
     return json.loads(out.strip())
 
 
@@ -342,10 +347,150 @@ def correct(path, dry):
                               duplicate=rec.get('duplicate'))))
 
 
+def financial_use_fields(state, uses):
+    """Reference source records from separate attributed relationship observations.
+
+    The source owns amounts/currency. Inputs identify immutable bank witnesses and
+    explicit allocation evidence; the database enforces referenced subjects and conservation.
+    This does not change recognition, payment status, tax treatment or vehicle price.
+    """
+    fields = {}
+    records = {r['source_key']: r for r in state['records']}
+    seen = set()
+    for use in uses:
+        sk = use['source_key']
+        if not re.fullmatch(r'[a-f0-9]{64}', sk) or sk in seen or sk not in records:
+            raise ValueError('each use must address one distinct current record source key')
+        seen.add(sk)
+        rec = records[sk]
+        phase = use['phase']
+        if phase not in ('book_expense', 'customer_receipt', 'customer_refund'):
+            raise ValueError('unknown financial phase')
+        if rec.get('record_kind') != 'retained_ledger_decision' or (phase == 'book_expense' and rec.get('section') != 'Expense') or (phase == 'customer_receipt' and rec.get('section') != 'Revenue'):
+            raise ValueError('phase does not match the current source record')
+        currency = rec.get('currency')
+        if not currency or not re.fullmatch('[A-Z]{3}', currency) or rec.get('amount') is None:
+            raise ValueError('a financial use needs a known source amount and currency')
+        value = dict(source_key=sk, phase=phase, book_amount=rec['amount'], currency=currency,
+                     record_document_id=uuid_ok(use['document_id']), record_line_id=uuid_ok(state['record_lines'][sk]))
+        if phase != 'book_expense' or use.get('bank_line_id'):
+            for key in ('bank_line_id', 'bank_document_id'):
+                value[key] = uuid_ok(use[key])
+            if not re.fullmatch(r'[a-f0-9]{64}', use['bank_source_key']):
+                raise ValueError('a cash phase needs an addressed bank source')
+            value['bank_source_key'] = use['bank_source_key']
+        allocations = use['allocations']
+        if not isinstance(allocations, list) or len(allocations) > 50:
+            raise ValueError('bounded allocations required')
+        normalized = []
+        total = D(0)
+        for allocation in allocations:
+            item = copy.deepcopy(allocation)
+            for key in ('vehicle_id', 'work_order_id', 'invoice_document_id', 'receipt_id', 'receipt_item_id', 'work_session_id'):
+                if item.get(key) is not None:
+                    item[key] = uuid_ok(item[key])
+            if not item.get('vehicle_id') or not isinstance(item.get('basis'), str) or not 1 <= len(item['basis']) <= 2000:
+                raise ValueError('each allocation needs a vehicle and attributed basis')
+            amount = item.get('allocated_amount')
+            if amount is not None:
+                if not isinstance(amount, str) or not re.fullmatch(r'-?\d{1,12}(\.\d{1,6})?', amount):
+                    raise ValueError('allocation amounts are exact decimal strings')
+                number = D(amount)
+                if (phase != 'book_expense' and number < 0) or (phase == 'book_expense' and number * D(rec['amount']) < 0):
+                    raise ValueError('allocation direction differs from phase')
+                total += abs(number)
+            witnesses = item.get('witnesses', [])
+            if not isinstance(witnesses, list) or len(witnesses) > 20:
+                raise ValueError('bounded source citations required')
+            for witness in witnesses:
+                targets = [k for k in ('document_id', 'receipt_id', 'observation_id', 'image_id') if witness.get(k)]
+                if len(targets) != 1 or not isinstance(witness.get('label'), str) or not 1 <= len(witness['label']) <= 300:
+                    raise ValueError('a citation needs one source and a retained label')
+                witness[targets[0]] = uuid_ok(witness[targets[0]])
+            normalized.append(item)
+        if total > abs(D(rec['amount'])):
+            raise ValueError('allocations exceed the book source amount')
+        value['allocations'] = normalized
+        evidence = use['evidence']
+        if not isinstance(evidence, dict) or not evidence:
+            raise ValueError('attributed evidence required')
+        if len(json.dumps(value).encode()) > 3800 or len(json.dumps(evidence).encode()) > 3800:
+            raise ValueError('financial use must retain bounded source citations')
+        field = dict(field_key='financial_use_' + sk[:24], value_raw='Attributed financial use',
+                     value_type='text', value_normalized=value, evidence=evidence)
+        if field['field_key'] in fields:
+            raise ValueError('financial use source-prefix collision')
+        fields[field['field_key']] = field
+    return list(fields.values())
+
+
+def financial_use_original(owner, source_document_id, source_key, phase='book_expense'):
+    body = (f'Derived financial-use attribution register. Book {owner}. Source document {source_document_id}. '
+            f'Record {source_key}. Phase {phase}. Attributed field revisions reference the original monetary witnesses.\n').encode()
+    sha = hashlib.sha256(body).hexdigest()
+    return body, dict(sha256=sha, storage_path=f'{owner}/financial/{sha}.txt', source_filename=f'financial-use-{source_key}.txt',
+                      source_kind='upload', byte_size=str(len(body)))
+
+
+def _without_object_nulls(value):
+    """Match document_state's json_strip_nulls without changing retained testimony."""
+    if isinstance(value, dict):
+        return {k: _without_object_nulls(v) for k, v in value.items() if v is not None}
+    if isinstance(value, list):
+        return [_without_object_nulls(v) for v in value]
+    return value
+
+
+def assign_uses(path, dry):
+    spec = json.load(open(path))
+    owner = uuid_ok(spec['owner_id'])
+    seen = set()
+    for use in spec['uses']:
+        doc_id=uuid_ok(use['document_id'])
+        key=(doc_id,use['source_key'],use['phase'])
+        if key in seen:
+            raise ValueError('one complete allocation vector per source record')
+        seen.add(key)
+        state = document_state(owner, doc_id, 10000)
+        if not state:
+            raise ValueError('source document is not in the selected book')
+        fields = financial_use_fields(state, [use])
+        body,original=financial_use_original(owner,doc_id,use['source_key'],use['phase'])
+        cur=current_run(owner,original['sha256'],10000)
+        revision=dict(method='retained_financial_use_linker',version='1',fields=fields)
+        if cur:
+            prior=document_state(owner,cur['document_id'],10000)
+            if prior.get('records'):
+                raise ValueError('a use register cannot replace monetary records')
+            previous={f['field_key']:f for f in prior['fields']}
+            if all(previous.get(f['field_key'])==_without_object_nulls(f) for f in fields):
+                print(json.dumps(dict(source_document_id=doc_id,unchanged=True)))
+                continue
+            previous.update({f['field_key']:f for f in fields})
+            revision['fields']=list(previous.values())
+            revision['supersedes_run_id']=cur['run_id']
+        revision['idempotency_key']='financial-uses-'+hashlib.sha256(json.dumps(revision,sort_keys=True).encode()).hexdigest()[:24]
+        if not dry:
+            upload(body,original['storage_path'])
+        sql = ("begin;\nselect set_config('request.jwt.claims','{\"role\":\"service_role\"}',true);\n"
+               "select set_config('request.jwt.claim.role','service_role',true);\n"
+               f"select public.ingest_financial_evidence('{owner}'::uuid, {q(json.dumps(original))}::jsonb, "
+               f"{q(json.dumps(revision, ensure_ascii=False))}::jsonb, '{{\"kind\":\"api_key\"}}'::jsonb)::text;\n"
+               f"{'rollback' if dry else 'commit'};\n")
+        out = [line for line in psql(sql,10000).splitlines() if line.startswith('{') and 'extraction_run_id' in line]
+        receipt = json.loads(out[-1])
+        lock_waiters = 0 if dry else int(psql("select count(*) from pg_stat_activity where wait_event_type='Lock';",10000).strip())
+        print(json.dumps(dict(source_document_id=doc_id,claim_document_id=receipt.get('document_id'),dry=dry,uses=1,supersedes=cur['run_id'] if cur else None,
+                              run_id=receipt.get('extraction_run_id'), duplicate=receipt.get('duplicate'),lock_waiters=lock_waiters)))
+        if lock_waiters:
+            raise RuntimeError('Use admitted; stop and inspect database lock waiters before continuing')
+
+
 if __name__ == '__main__':
     ap = argparse.ArgumentParser()
-    ap.add_argument('cmd', choices=['land', 'lines', 'drift', 'correct'])
+    ap.add_argument('cmd', choices=['land', 'lines', 'drift', 'correct', 'assign-use'])
     ap.add_argument('--rulings'); ap.add_argument('--corrections'); ap.add_argument('--dry', action='store_true')
+    ap.add_argument('--uses')
     ap.add_argument('--owner', default='0b9f107a-d124-49de-9ded-94698f63c1c4')
     ap.add_argument('--year'); ap.add_argument('--line-map')
     ap.add_argument('--return', dest='returns', action='append', default=[])
@@ -357,6 +502,8 @@ if __name__ == '__main__':
         land(a.rulings, a.dry)
     elif a.cmd == 'correct':
         correct(a.corrections, a.dry)
+    elif a.cmd == 'assign-use':
+        assign_uses(a.uses, a.dry)
     elif a.cmd == 'lines':
         print(json.dumps({s: {k: str(v) for k, v in l.items()} for s, l in lines_by_schedule(owner, a.year, lm).items()}, indent=1))
     else:

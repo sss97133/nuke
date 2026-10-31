@@ -1203,6 +1203,20 @@
 .vp-financial-original button { min-height: 44px; border: 0; padding: 6px 0; color: var(--link); background: transparent; font: inherit; cursor: pointer; }
 .vp-financial-sources { border-top: 1px solid var(--border); margin-top: 16px; padding-top: 8px; }
 .vp-financial-sources > summary { min-height: 44px; align-content: center; cursor: pointer; font-weight: 600; }
+.vp-financial-measures { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 160px), 1fr)); gap: 8px; margin: 12px 0; }
+.vp-financial-measures button { display: grid; gap: 4px; padding: 12px; min-height: 96px; min-width: 0; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); text-align: left; font: inherit; cursor: pointer; }
+.vp-financial-measures button[aria-pressed="true"] { border-color: var(--link); }
+.vp-financial-measures strong { font-size: var(--text-title); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.vp-financial-measures small, .vp-financial-curve figcaption, .vp-financial-coverage, .vp-financial-photos figcaption { color: var(--text-secondary); font-size: var(--text-caption); }
+.vp-financial-curve { margin: 16px 0; }
+.vp-financial-curve svg { display: block; width: 100%; height: auto; color: var(--link); }
+.vp-financial-curve > div, .vp-financial-filter { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.vp-financial-source-choices { display: flex; flex-wrap: wrap; gap: 4px 16px; }
+.vp-financial-photos { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)); gap: 8px; }
+.vp-financial-photos figure { margin: 0; min-width: 0; }
+.vp-financial-photos img { display: block; width: 100%; height: auto; border-radius: var(--radius-sm); }
+.vp-financial-evidence h4 { margin: 12px 0 4px; }
+.vp-financial-measures button:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
 .vp-financial-trigger:focus-visible,
 .vp-profile-activity:focus-visible,
 .vp-financial-action:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }

@@ -285,7 +285,7 @@ export function parseVehicleBookCosts(data: Record<string, unknown>[]): BookCost
 }
 
 /** Shared by the header and build ledger. A caller's books never reuse another caller's cache. */
-export function useVehicleBookCosts(vehicleId: string | undefined) {
+export function useVehicleBookCosts(vehicleId: string | undefined, enabled = true) {
   const { user, loading } = useAuthContext();
   const read = useQuery({
     queryKey: ['build-ledger', vehicleId, 'book', user?.id ?? 'anon', 'coverage-v1'],
@@ -294,7 +294,7 @@ export function useVehicleBookCosts(vehicleId: string | undefined) {
       if (error || !Array.isArray(data)) throw new Error('Vehicle costs could not load.');
       return { entries: parseVehicleBookCosts(data), total: count ?? null };
     },
-    enabled: !!vehicleId && !loading && !!user,
+    enabled: enabled && !!vehicleId && !loading && !!user,
     staleTime: 60 * 1000,
     gcTime: 0,
     retry: false,
@@ -302,7 +302,7 @@ export function useVehicleBookCosts(vehicleId: string | undefined) {
   return { ...read, data: read.data?.entries, total: read.data?.total ?? null };
 }
 
-export function useBuildLedger(vehicleId: string | undefined) {
+export function useBuildLedger(vehicleId: string | undefined, includeBook = true) {
   const { user, loading: authLoading } = useAuthContext();
   const auditRead = useQuery({
     queryKey: ['build-ledger', vehicleId, 'audit', user?.id ?? 'anon'],
@@ -342,7 +342,7 @@ export function useBuildLedger(vehicleId: string | undefined) {
     retry: false,
   });
 
-  const bookRead = useVehicleBookCosts(vehicleId);
+  const bookRead = useVehicleBookCosts(vehicleId, includeBook);
   const { data: bookRows, isLoading: bookLoading } = bookRead;
 
   // Working notes stay in the signed-in viewer's own book; read failures remain distinct from empty.
