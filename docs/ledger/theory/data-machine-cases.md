@@ -341,6 +341,19 @@ claims, witnesses and reader output are not measured here, even for completed st
 No new alert rule, schedule, inference, re-drive or paid processing authorization is implied.
 Use the arrival/cached assays above for testimony and reader evidence. C17 remains open.
 
+**C17 refinement must recognize corrections — owner clarification 2026-10-30.** Stagnating image
+analysis is work for the repair loop. Compare a candidate method against the prior on the same
+retained evidence, trace changed claims into the existing consumer, and keep an unchanged control.
+Rewritten captions, output counts and confidence alone cannot establish improved understanding.
+The BYOK dry-pass comparison now checks structured fact values, not only collection sizes: a changed
+part number, text reading or condition can count as progress with the same number of detections.
+Equivalent collection ordering still converges, capped evidence still stops, and a new schema does
+not inherit the previous schema's dry-pass count. Offline regression cases also exercise the existing
+condition projection and reproduce its earlier result. This is a refinement-rule repair, not a measured
+gain in model accuracy or an automatic learning/deployment loop. Independently selected held-out
+evidence, correction cost and real source-to-consumer acceptance remain required. No corpus re-drive,
+new model call, source write, processing activation or fleet coverage gain is established by these tests.
+
 ## 4. Measurements worth keeping (2026-09-30, read-only, reproducible)
 
 - **The soft close, 400 settled BaT lots (closed 12 h to 10 days before):** 322 extended (80%); 5,471 of 14,026

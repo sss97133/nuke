@@ -45,7 +45,6 @@
  * observation_witness linking the image.
  */
 
-import { createClient } from '@supabase/supabase-js';
 import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'fs';
 import { dirname } from 'path';
 import { createHash } from 'crypto';
@@ -54,11 +53,13 @@ import { projectImageProperties, applyImagePropertyClaims } from './lib/image-pr
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-if (!SUPABASE_URL || !SERVICE_KEY) {
+const isMain = process.argv[1] && process.argv[1] === fileURLToPath(import.meta.url);
+if (isMain && (!SUPABASE_URL || !SERVICE_KEY)) {
   console.error('Missing VITE_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
   process.exit(1);
 }
-const sb = createClient(SUPABASE_URL, SERVICE_KEY);
+// Importing the pure refinement rules must not require credentials or initialize a client.
+const sb = isMain ? (await import('@supabase/supabase-js')).createClient(SUPABASE_URL, SERVICE_KEY) : null;
 
 // ─── Schema-as-DNA: a verdict that doesn't meet the contract CANNOT be ingested.
 // Dependency-free validator (mirrors scripts/schemas/byok-image-verdict.schema.json).
@@ -145,12 +146,29 @@ function classifyOpenQuestions(qs) {
 }
 
 // A fingerprint of the material facts in a verdict — used to detect a DRY pass (a re-analysis
-// that produced nothing new). Scene/phase + the counts of the accumulating arrays + the open-set.
+// that produced nothing new). Counts alone miss corrected identities, OCR and condition.
+// Compare structured facts; captions, confidence-only changes and run metadata are not new facts.
 function factFingerprint(d) {
   if (!d) return '';
-  const n = (x) => (Array.isArray(x) ? x.length : 0);
-  const oq = Array.isArray(d.open_questions) ? d.open_questions.slice().sort().join('|') : '';
-  return [d.scene_type, d.build_phase_guess, n(d.components_seen), n(d.text_regions), n(d.damage_localized), oq].join('~');
+  const collections = new Set(['components_seen', 'text_regions', 'damage_localized', 'open_questions']);
+  const unordered = new Set([...collections, 'tools_visible', 'damage_callouts']);
+  const objects = new Set(['camera_pose', 'state_observations', 'workshop_signals', 'presence']);
+  const canonical = (value, key) => {
+    if (Array.isArray(value)) {
+      const items = value.map(item => canonical(item));
+      // Evidence lists are sets for this comparison; coordinates remain ordered.
+      return unordered.has(key) ? [...new Map(items.map(item => [JSON.stringify(item), item])).values()].sort((a, b) => {
+        const x = JSON.stringify(a), y = JSON.stringify(b);
+        return x < y ? -1 : x > y ? 1 : 0;
+      }) : items;
+    }
+    if (value && typeof value === 'object') return Object.fromEntries(Object.keys(value)
+      .filter(k => k !== 'confidence' && k !== 'confidence_score').sort().map(k => [k, canonical(value[k], k)]));
+    return value;
+  };
+  const keys = [...SCHEMA_VERSIONS.at(-1).facts.filter(key => key !== 'narrative_one_line'), 'open_questions'];
+  return JSON.stringify(canonical(Object.fromEntries(keys.map(key => [key,
+    d[key] ?? (collections.has(key) ? [] : objects.has(key) ? {} : null)]))));
 }
 const DRY_PASS_LIMIT = 2; // after this many fruitless re-runs, saturate even a nominally-open frame
 
@@ -173,8 +191,9 @@ function computeSaturation(v, prior, nowIso) {
   // arrived, re-running gains nothing — count it dry and, at DRY_PASS_LIMIT, saturate anyway. Further
   // gain then requires an EVENT (new receipt / adjacent frame) to explicitly re-open, not a blind re-run.
   // This is what makes the OPEN bucket converge — the "gradual passes reduce token" guarantee.
-  let dry = priorSat.dry_passes || 0;
-  if (prior && stillOpen) dry = (factFingerprint(v) === factFingerprint(prior)) ? dry + 1 : 0;
+  const sameVersion = !priorSat.version || priorSat.version === CURRENT_SCHEMA_VERSION;
+  let dry = sameVersion ? priorSat.dry_passes || 0 : 0;
+  if (prior && stillOpen && sameVersion) dry = (factFingerprint(v) === factFingerprint(prior)) ? dry + 1 : 0;
   const saturated = !stillOpen || dry >= DRY_PASS_LIMIT;
   return {
     version: CURRENT_SCHEMA_VERSION,
@@ -1440,7 +1459,6 @@ async function projectCached() {
 // Pure ledger functions exported for unit tests (importing does not run the pipeline — see isMain).
 export { computeSaturation, classifyOpenQuestions, factFingerprint, isSaturatedRow, CURRENT_SCHEMA_VERSION, DRY_PASS_LIMIT };
 
-const isMain = process.argv[1] && process.argv[1] === fileURLToPath(import.meta.url);
 if (isMain) {
   if (!['prepare', 'ingest', 'context', 'queue', 'resolve', 'entities', 'project-cached'].includes(mode)) {
     console.error('mode must be "prepare", "ingest", "context", "queue", "resolve", "entities", or "project-cached"');
