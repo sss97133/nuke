@@ -1981,6 +1981,18 @@ a contaminated reference cover, a generic part close-up and a later discriminati
 Measure subject grouping, existing-record retrieval, admitted attribution and actual consumer delivery
 separately; an honest unresolved result passes refusal but does not count as resolved. Versioned
 comparison receipts and parser tests are a bounded repair, not proof of autonomous filing accuracy.
+
+**Garage reader and cover acceptance, owner correction 2026-10-30.** Account-related records must remain
+findable without filed photographs or a claim of ownership. The web Garage retains the existing
+`get_user_garage` contribution and profile-creation memberships alongside its ownership-period fold;
+membership pagination, merge-terminal traversal and explicit account corrections must preserve those
+distinctions. Inactive or sold history is not a deleted record. Loaded-record coverage remains visible
+when vehicle/VIN search or a relationship filter narrows the result.
+Cover choice is a display calculation over the existing viewer-eligible gallery: prefer an identifiable
+exterior view, retain a stable tie-break and preserve a cited explicit cover choice. A legacy primary
+flag or upload order alone does not establish a representative exterior. Failed cover enrichment
+must leave the roster usable and must not resurrect an excluded frame. This does not qualify a
+physical-vehicle match, resolve split records, authorize a merge or establish complete source intake.
 Live atlas inspection on 2026-10-18 found the existing cluster store idle (1,597 estimated rows,
 last inspected samples dated May); its existence is not an operating subject-resolution pipeline.
 

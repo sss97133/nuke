@@ -10,11 +10,12 @@
 .garage-toolbar-heading p { margin: 0; }
 .garage-toolbar-fields { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 16px; }
 .garage-toolbar-fields > * { display: flex; flex-direction: column; min-width: 0; gap: 6px; font-size: var(--text-callout); }
-.garage-toolbar-fields select { box-sizing: border-box; max-width: 100%; min-height: 44px; padding: 8px; color: var(--text); border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); font: inherit; }
+.garage-toolbar-fields :is(select,input) { box-sizing: border-box; max-width: 100%; min-height: 44px; padding: 8px; color: var(--text); border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); font: inherit; }
+.garage-search { flex: 1 1 220px; }
 .garage-segments { display: flex; flex-wrap: wrap; gap: 4px; }
 .garage-segments button { min-height: 44px; padding: 8px 14px; color: var(--text); border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); font: 500 var(--text-callout)/1.4 var(--font-family); cursor: pointer; }
 .garage-segments button[aria-pressed=true] { background: var(--action); color: var(--on-action); border-color: var(--action); }
-.garage-page :is(button,select,summary,a):focus-visible { outline: 2px solid var(--border-focus); outline-offset: 3px; }
+.garage-page :is(button,input,select,summary,a):focus-visible { outline: 2px solid var(--border-focus); outline-offset: 3px; }
 .garage-unresolved article + article { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); }
 .garage-unresolved p { margin: 6px 0; }
 .garage-unresolved summary { min-height: 44px; box-sizing: border-box; padding: 10px 0; cursor: pointer; color: var(--link); }
@@ -30,7 +31,7 @@
 @media (max-width: 600px) {
   .garage-page { padding: 16px 12px 32px; }
   .garage-toolbar-fields { display: grid; grid-template-columns: minmax(0,1fr); }
-  .garage-toolbar-fields select { font-size: 16px; width: 100%; }
+  .garage-toolbar-fields :is(select,input) { font-size: 16px; width: 100%; }
 }
 .garage-page .garage-vehicle-card button { min-height: 44px; min-width: 44px; }
 .garage-view-compact .garage-vehicle-card > div { flex-wrap: wrap; }

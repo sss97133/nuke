@@ -4,7 +4,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
-const fixture = vi.hoisted(() => ({ rows: {} as Record<string, any[]>, fail: '', forbiddenVehicleColumns: [] as string[], calls: [] as any[], hold: null as Promise<void> | null }));
+const fixture = vi.hoisted(() => ({ rows: {} as Record<string, any[]>, fail: '', forbiddenVehicleColumns: [] as string[], calls: [] as any[], hold: null as Promise<void> | null, rpcHolds: {} as Record<string, Promise<void>> }));
 vi.mock('../lib/supabase', () => ({ supabase: {
   auth: { getUser: async () => ({ data: { user: { id: 'user' } } }) },
   from: (table: string) => {
@@ -23,11 +23,27 @@ vi.mock('../lib/supabase', () => ({ supabase: {
     q.in = (key: string, values: any[]) => { rows = rows.filter(r => values.includes(r[key])); return q; };
     return q;
   },
-  rpc: async (name: string, params: unknown) => {
+  rpc: (name: string, params: unknown) => {
     fixture.calls.push(['rpc', name, params]);
-    await fixture.hold;
-    return { data: name === 'get_my_garage_owner_corrections'
-      ? fixture.rows.garage_owner_corrections ?? [] : [], error: null };
+    if (name === 'get_user_garage') {
+      let rows = [...(fixture.rows.garage_records ?? [])];
+      let limit = Infinity;
+      const q: any = {
+        order: (key: string) => { rows.sort((a, b) => a[key].localeCompare(b[key])); return q; },
+        limit: (value: number) => { limit = value; return q; },
+        gt: (key: string, value: string) => { rows = rows.filter(row => row[key] > value); return q; },
+        then: (fn: any) => Promise.resolve(fixture.hold).then(() => ({
+          data: fixture.fail === name ? null : rows.slice(0, limit),
+          error: fixture.fail === name ? { message: 'read failed' } : null,
+        })).then(fn),
+      };
+      return q;
+    }
+    return Promise.resolve(fixture.rpcHolds[name] ?? fixture.hold).then(() => ({
+      data: fixture.fail === name ? null : name === 'get_my_garage_owner_corrections' ? fixture.rows.garage_owner_corrections ?? []
+        : name === 'get_first_image_batch' ? (fixture.rows.garage_covers ?? []).filter(row => (params as any).vehicle_ids.includes(row.vehicle_id)) : [],
+      error: fixture.fail === name ? { message: 'read failed' } : null,
+    }));
   },
 } }));
 
@@ -86,7 +102,7 @@ function Harness({ viewer = 'user' }: { viewer?: string | null }) {
 }
 beforeEach(() => {
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
-  fixture.rows = {}; fixture.fail = ''; fixture.forbiddenVehicleColumns = []; fixture.calls = []; fixture.hold = null; snapshots.length = 0;
+  fixture.rows = {}; fixture.fail = ''; fixture.forbiddenVehicleColumns = []; fixture.calls = []; fixture.hold = null; fixture.rpcHolds = {}; snapshots.length = 0;
   container = document.createElement('div'); document.body.appendChild(container); root = createRoot(container);
 });
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); });
@@ -99,7 +115,57 @@ function seedGarage() {
     created_at: '2025-01-01', updated_at: '2026-01-01' }));
   fixture.rows.nuke_estimates = ['car', 'old'].map(vehicle_id => ({ vehicle_id, estimated_value: 12000,
     calculated_at: '2026-10-06T00:00:00Z', comp_method: 'class_stratified', is_stale: false, is_circular: false }));
+  fixture.rows.garage_covers = ['car', 'old'].map(vehicle_id => ({ vehicle_id, image_url: 'photo' }));
 }
+
+it('finds created zero-photo profiles and contributed records without promoting either to ownership', async () => {
+  seedGarage();
+  fixture.rows.garage_records = [
+    { vehicle_id: 'created-record', relationship: 'profile_record' },
+    { vehicle_id: 'contributed-record', relationship: 'contributor' },
+    { vehicle_id: 'car', relationship: 'profile_record' },
+  ];
+  fixture.rows.vehicles.push(...['created-record', 'contributed-record'].map(id => ({
+    ...fixture.rows.vehicles[0], id, year: 1973, make: 'Fixture', model: 'Coupe',
+    primary_image_url: null, image_count: 0,
+  })));
+  await act(async () => root.render(<Harness />));
+  expect(state.vehicles).toHaveLength(4);
+  expect(state.vehicles.find(v => v.id === 'created-record')).toMatchObject({
+    relationship_type: 'PROFILE RECORD', relationship_source: 'profile_record', image_count: 0,
+    ownership_start_date: null, ownership_end_date: null,
+  });
+  expect(state.vehicles.find(v => v.id === 'contributed-record')?.relationship_type).toBe('CONTRIBUTOR');
+  expect(state.vehicles.find(v => v.id === 'car')?.relationship_type).toBe('OWNER');
+  expect(state.totalEstimatedValue).toBe(12000);
+  expect(state.data?.my_vehicles.map(v => v.vehicle_id).sort()).toEqual(['car', 'old']);
+  await act(async () => root.render(<MemoryRouter><GarageTab dashboard={state} /></MemoryRouter>));
+  expect(container.querySelector('a[href="/vehicle/created-record"]')).not.toBeNull();
+  expect(container.textContent).toContain('Profile you added');
+  expect(container.textContent).toContain('OWNERSHIP NOT RECORDED');
+});
+
+it('walks the account reader beyond the REST row cap without losing vehicle records', async () => {
+  fixture.rows.garage_records = Array.from({ length: 1003 }, (_, i) => ({
+    vehicle_id: `record-${String(i).padStart(4, '0')}`, relationship: 'profile_record',
+  }));
+  fixture.rows.vehicles = fixture.rows.garage_records.map(row => ({
+    id: row.vehicle_id, year: 1973, make: 'Fixture', model: 'Coupe', status: 'active',
+    image_count: 0, primary_image_url: null, created_at: '2025-01-01', updated_at: '2026-01-01',
+  }));
+  await act(async () => root.render(<Harness />));
+  expect(state.vehicles).toHaveLength(1003);
+  expect(state.sections.find(s => s.relationship_type === 'PROFILE RECORD')?.vehicles).toHaveLength(1003);
+  expect(state.data?.my_vehicles).toEqual([]);
+  expect(fixture.calls.filter(c => c[0] === 'rpc' && c[1] === 'get_user_garage')).toHaveLength(3);
+});
+
+it('reports an incomplete account read instead of presenting only the ownership subset as the whole garage', async () => {
+  seedGarage(); fixture.fail = 'get_user_garage';
+  await act(async () => root.render(<Harness />));
+  expect(state.error).toContain('Garage account records unavailable');
+  expect(state.vehicles).toEqual([]);
+});
 
 it('loads prior periods, excludes them from current asset totals, and does not report an unattributed gain', async () => {
   seedGarage(); await act(async () => root.render(<Harness />));
@@ -116,10 +182,74 @@ it('follows merged garage memberships to one surviving vehicle with its VIN and 
   fixture.rows.vehicles.push({...fixture.rows.vehicles[1],id:'middle',merged_into_vehicle_id:'terminal'},
     {...fixture.rows.vehicles[1],id:'terminal',merged_into_vehicle_id:null,vin:'REAL-SERIAL',image_count:31,primary_image_url:'retained-whole-truck'});
   fixture.rows.discovered_vehicles=[{id:'also-terminal',vehicle_id:'terminal',user_id:'user',relationship_type:'previously_owned',is_active:true}];
+  fixture.rows.garage_covers.push({vehicle_id:'terminal',image_url:'retained-whole-truck'});
   await act(async()=>root.render(<Harness/>));
   const car=state.vehicles.find(v=>v.id==='terminal')!;
   expect(car).toMatchObject({vin:'REAL-SERIAL',image_count:31,resolved_image_url:'retained-whole-truck',relationship_type:'PREVIOUSLY OWNED'});
   expect(state.vehicles.map(v=>v.id).sort()).toEqual(['car','terminal']);
+});
+
+it('uses the qualified cover reader for every record instead of letting a legacy interior primary win', async () => {
+  seedGarage();
+  fixture.rows.vehicles[0].primary_image_url = 'https://example.invalid/legacy-interior.jpg';
+  fixture.rows.garage_covers[0].image_url = 'https://example.invalid/retained-exterior.jpg';
+  await act(async () => root.render(<Harness />));
+  const vehicle = state.vehicles.find(v => v.id === 'car')!;
+  expect(vehicle.resolved_image_url).toBe('https://example.invalid/retained-exterior.jpg');
+  expect(state.data?.my_vehicles.find(v => v.vehicle_id === 'car')?.primary_image_url).toBe(vehicle.resolved_image_url);
+  await act(async () => root.render(<MemoryRouter><GarageVehicleCard vehicle={vehicle} /></MemoryRouter>));
+  expect(container.querySelector('img')?.getAttribute('src')).toContain('retained-exterior');
+  expect(container.innerHTML).not.toContain('legacy-interior');
+});
+
+it('keeps relationships visible and withholds an unqualified legacy primary when the cover read fails', async () => {
+  seedGarage(); fixture.fail = 'get_first_image_batch';
+  await act(async () => root.render(<Harness />));
+  expect(state.error).toBeNull(); expect(state.vehicles).toHaveLength(2);
+  expect(state.warnings).toContain('Some vehicle cover photos are unavailable.');
+  expect(state.vehicles.every(v => v.resolved_image_url === null)).toBe(true);
+  expect(state.data?.my_vehicles.every(v => v.primary_image_url === null)).toBe(true);
+  const vehicle = state.vehicles.find(v => v.id === 'car')!;
+  await act(async () => root.render(<MemoryRouter><GarageVehicleCard vehicle={vehicle} /></MemoryRouter>));
+  expect(container.querySelector('img')?.getAttribute('src')).not.toContain('photo');
+});
+
+it('recovers a failed image when a newly selected cover arrives', async () => {
+  seedGarage(); await act(async () => root.render(<Harness />));
+  const vehicle = {...state.vehicles.find(v => v.id === 'car')!, resolved_image_url:'https://example.invalid/failed.jpg'};
+  await act(async () => root.render(<MemoryRouter><GarageVehicleCard vehicle={vehicle} /></MemoryRouter>));
+  const image = container.querySelector('img')!;
+  await act(async () => image.dispatchEvent(new Event('error')));
+  expect(image.style.display).toBe('none');
+  await act(async () => root.render(<MemoryRouter><GarageVehicleCard vehicle={{...vehicle,resolved_image_url:'https://example.invalid/ready.jpg'}} /></MemoryRouter>));
+  const ready = container.querySelector('img')!;
+  expect(ready.getAttribute('src')).toContain('ready.jpg');
+  expect(ready.style.display).toBe('block');
+});
+
+it('publishes the roster and ready covers while an unrelated activity reader is still waiting', async () => {
+  seedGarage(); let release!: () => void;
+  fixture.rpcHolds.get_vehicle_event_weeks_batch = new Promise<void>(resolve => { release = resolve; });
+  await act(async () => root.render(<Harness />));
+  try {
+    expect(state.isLoading).toBe(false);
+    expect(state.vehicles.find(v => v.id === 'car')?.resolved_image_url).toBe('photo');
+    expect(state.vehicles).toHaveLength(2);
+  } finally { await act(async () => release()); }
+});
+
+it('retains inactive and sold history while excluding removed and non-vehicle records', async () => {
+  seedGarage();
+  fixture.rows.vehicles[0].status = 'inactive'; fixture.rows.vehicles[1].status = 'sold';
+  fixture.rows.garage_records = ['removed', 'item', 'rejected'].map(vehicle_id => ({vehicle_id, relationship:'profile_record'}));
+  fixture.rows.vehicles.push(
+    {...fixture.rows.vehicles[0],id:'removed',deleted_at:'2026-10-30'},
+    {...fixture.rows.vehicles[0],id:'item',listing_kind:'non_vehicle_item'},
+    {...fixture.rows.vehicles[0],id:'rejected',status:'rejected'},
+  );
+  await act(async () => root.render(<Harness />));
+  expect(state.vehicles.map(v => v.id).sort()).toEqual(['car','old']);
+  expect(state.vehicles.find(v => v.id === 'old')?.relationship_type).toBe('PREVIOUSLY OWNED');
 });
 it('keeps a denial attached to the surviving merged identity',async()=>{
   seedGarage();fixture.rows.vehicles[0].merged_into_vehicle_id='terminal';
