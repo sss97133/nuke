@@ -1,4 +1,3 @@
-import { load } from "npm:cheerio@1.2.0";
 import { observationClockMicroseconds } from "../_shared/observationContentHash.ts";
 
 export const ECR_MODE = "retained_ecr_capture_v1";
@@ -10,7 +9,7 @@ const refuse = (reason: string) => ({ ok: false as const, reason });
 export function ecrSelector(body: Record<string, unknown>) {
   return body.mode === ECR_MODE && typeof body.snapshot_id === "string" && UUID.test(body.snapshot_id)
     && typeof body.dry_run === "boolean" && Object.keys(body).every(k => ["mode", "snapshot_id", "dry_run"].includes(k))
-    ? body.snapshot_id : null;
+    ? body.snapshot_id.toLowerCase() : null;
 }
 export function ecrUrl(value: unknown) {
   if (typeof value !== "string") return null;
@@ -22,9 +21,12 @@ export function ecrUrl(value: unknown) {
     return `https://exclusivecarregistry.com${path}`;
   } catch { return null; }
 }
-export function parseEcr(html: string, sourceUrl: string) {
+export async function parseEcr(html: string, sourceUrl: string) {
   const url = ecrUrl(sourceUrl);
   if (!url) return refuse("unsupported_ecr_page");
+  // The shared intake serves many unrelated paths. Load this existing parser
+  // dependency only when an ECR snapshot is actually qualified.
+  const { load } = await import("npm:cheerio@1.2.0");
   const $ = load(html);
   const main = $("main");
   const headings = main.find("h1");
@@ -93,7 +95,7 @@ export async function qualifyEcrCapture(snapshot: any, html: string, now = Date.
   if (!bytes.length || bytes.length > 2_097_152) return refuse("source_body_unavailable_or_oversize");
   const hash = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)), n => n.toString(16).padStart(2, "0")).join("");
   if (hash !== snapshot.html_sha256) return refuse("source_hash_mismatch");
-  const parsed = parseEcr(html, snapshot.listing_url);
+  const parsed = await parseEcr(html, snapshot.listing_url);
   if (!parsed.ok) return parsed;
   const receipt = { profile: ECR_MODE, snapshot_id: snapshot.id, source_url: snapshot.listing_url,
     source_sha256: hash, captured_at: snapshot.fetched_at, capture_recorded_at: snapshot.created_at,
@@ -103,6 +105,7 @@ export async function qualifyEcrCapture(snapshot: any, html: string, now = Date.
     source_identifier: `${ECR_MODE}:${snapshot.id}`,
     content_text: `ECR registry presentation: ${parsed.page.label}. Captured source claims only; ownership, physical identity and staging permission are not established.`,
     structured_data: { ecr_capture_receipt: receipt }, extraction_method: ECR_METHOD,
+    subject: { type: parsed.page.kind === "collection" ? "organization" : "vehicle" },
     raw_source_ref: `listing_page_snapshots:${snapshot.id}`, defer_analysis: true,
   } };
 }

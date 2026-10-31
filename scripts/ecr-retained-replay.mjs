@@ -17,7 +17,7 @@ export function parseArgs(args) {
   if(ids.length<1||ids.length>50||ids.some(id=>typeof id!=='string'||! /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(id)))
     throw Error('Select 1–50 explicit retained snapshot UUIDs; default is dry-run');
   if(new Set(ids.map(id=>id.toLowerCase())).size!==ids.length) throw Error('Duplicate snapshot selectors');
-  return {ids,apply};
+  return {ids:ids.map(id=>id.toLowerCase()),apply};
 }
 export async function replay({ids,apply}, {base,key,send=fetch,report=console.log}) {
   if(!base||!key) throw Error('Configured server-side Supabase credentials required');
@@ -37,11 +37,11 @@ export async function replay({ids,apply}, {base,key,send=fetch,report=console.lo
       const r={snapshot_id:id,status:'qualified',kind:result.receipt.kind,cards:result.receipt.cards.length,writes:0};receipts.push(r);report(JSON.stringify(r));continue;
     }
     if(typeof result.observation_id!=='string'||result.snapshot_id!==id||result.resolution_status!=='source_presentation_only'||result.model_calls!==0) throw Error('Unconfirmed admission response; inspect source before retrying');
-    const params=new URLSearchParams({select:'id,source_snapshot_id,source_identifier,vehicle_id,is_superseded,analysis_deferred,structured_data',id:`eq.${result.observation_id}`});
+    const params=new URLSearchParams({select:'id,source_snapshot_id,source_identifier,vehicle_id,subject_type,subject_id,is_superseded,analysis_deferred,structured_data',id:`eq.${result.observation_id}`});
     const read=await send(new URL('/rest/v1/vehicle_observations?'+params,origin),{headers,signal:AbortSignal.timeout(10000)});
     if(!read.ok)throw Error('Admission returned an ID but source receipt readback failed');
     const rows=await read.json(),row=Array.isArray(rows)&&rows.length===1?rows[0]:null;
-    if(!row||row.id!==result.observation_id||row.source_snapshot_id!==id||row.source_identifier!==`retained_ecr_capture_v1:${id}`||row.vehicle_id!==null||row.is_superseded!==false||row.analysis_deferred!==true||row.structured_data?.ecr_capture_receipt?.snapshot_id!==id)
+    if(!row||row.id!==result.observation_id||row.source_snapshot_id!==id||row.source_identifier!==`retained_ecr_capture_v1:${id}`||row.vehicle_id!==null||row.subject_id!==null||row.subject_type!==(row.structured_data?.ecr_capture_receipt?.kind==='collection'?'organization':'vehicle')||row.is_superseded!==false||row.analysis_deferred!==true||row.structured_data?.ecr_capture_receipt?.snapshot_id!==id)
       throw Error('Persisted source receipt differs from admission response');
     const r={snapshot_id:id,status:result.duplicate?'existing':'admitted',observation_id:row.id,kind:row.structured_data.ecr_capture_receipt.kind,cards:row.structured_data.ecr_capture_receipt.cards.length,writes:result.writes};
     receipts.push(r);report(JSON.stringify(r));

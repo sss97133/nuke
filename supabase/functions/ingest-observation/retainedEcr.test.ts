@@ -21,25 +21,25 @@ Deno.test("only exact source origins and entity paths are admitted", () => {
   for(const bad of [url.replace("https:","http:"),url.replace(".com/",".com.evil/"),url+"?owner=1",url+"#x",url.replace("https://","https://u:p@"),"https://exclusivecarregistry.com/make/pagani"])
     assert(ecrUrl(bad)===null,bad);
 });
-Deno.test("current and previous evidence remain separate; counts and unloaded tails stay qualified", () => {
-  const result=parseEcr(page(card(),card(car,"Pagani Zonda F")),url);
+Deno.test("current and previous evidence remain separate; counts and unloaded tails stay qualified", async () => {
+  const result=await parseEcr(page(card(),card(car,"Pagani Zonda F")),url);
   assert(result.ok);
   if(!result.ok)return;
   assert(result.page.cards.length===2 && result.page.current_total===17);
   assert(result.page.cards[0].relationship==="source_current" && result.page.cards[1].relationship==="source_previous");
   assert(result.page.enumeration==="captured_cards_only");
 });
-Deno.test("recommendations, filter options, scripts and page furniture do not become collection members", () => {
-  const result=parseEcr(page()+`<aside>${card(car.replace("123","456"))}</aside><select><option>Bugatti Chiron</option></select>`,url);
+Deno.test("recommendations, filter options, scripts and page furniture do not become collection members", async () => {
+  const result=await parseEcr(page()+`<aside>${card(car.replace("123","456"))}</aside><select><option>Bugatti Chiron</option></select>`,url);
   assert(result.ok && result.page.cards.length===1);
 });
-Deno.test("locked, conflicting, structurally empty and malformed source pages are refused", () => {
+Deno.test("locked, conflicting, structurally empty and malformed source pages are refused", async () => {
   for(const html of ["<main><h1>Example</h1>This content is locked</main>","<main><h1>Empty</h1></main>",
     page(card()+card(car,"Different title")),page(card("https://evil.test/details/pagani/zonda/123")),page(card(),"",0),
-    `<link rel="canonical" href="https://exclusivecarregistry.com/collection/other">${page()}`]) assert(!parseEcr(html,url).ok);
+    `<link rel="canonical" href="https://exclusivecarregistry.com/collection/other">${page()}`]) assert(!(await parseEcr(html,url)).ok);
 });
-Deno.test("detail page retains heading only; hidden specs and similar cars are not extracted", () => {
-  const result=parseEcr(`<main><div class="page_title"><h1>Pagani Zonda F</h1></div><h2>Car Timeline</h2><p>VIN Log in</p><h2>Similar Cars</h2>${card()}</main>`,car);
+Deno.test("detail page retains heading only; hidden specs and similar cars are not extracted", async () => {
+  const result=await parseEcr(`<main><div class="page_title"><h1>Pagani Zonda F</h1></div><h2>Car Timeline</h2><p>VIN Log in</p><h2>Similar Cars</h2>${card()}</main>`,car);
   assert(result.ok && result.page.cards.length===0 && result.page.hidden_fields===true);
 });
 Deno.test("qualified capture keeps source clocks, hash, unknown permission and unresolved physical identity",async()=>{
@@ -49,6 +49,7 @@ Deno.test("qualified capture keeps source clocks, hash, unknown permission and u
   assert(result.input.observed_at===s.fetched_at && result.receipt.capture_recorded_at===s.created_at);
   assert(result.receipt.source_sha256===s.html_sha256 && result.receipt.ownership_status==="unverified");
   assert(!("vehicle_id" in result.input) && result.input.defer_analysis && result.receipt.staging_permission_status==="unknown");
+  assert(result.input.subject.type==="organization" && !("id" in result.input.subject));
   for(const patch of [{success:false},{http_status:403},{platform:"bat"},{html_sha256:"0".repeat(64)},
     {fetched_at:"2999-01-01T00:00:00Z"},{created_at:null},{created_at:"2026-02-15T00:00:00Z"},{listing_url:"https://evil.test/collection/example"}])
     assert(!(await qualifyEcrCapture({...s,...patch},html)).ok);

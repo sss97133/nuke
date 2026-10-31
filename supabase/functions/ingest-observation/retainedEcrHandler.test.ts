@@ -24,7 +24,8 @@ Deno.test("real intake: hash qualification, dry run, admission, duplicate, corru
         const body=JSON.parse(String(init.body));writes++;
         assert(body.source_snapshot_id===sid&&body.source_id===sourceId&&body.confidence_score===.6);
         assert(body.extraction_method===ECR_METHOD&&body.analysis_deferred===true&&!body.vehicle_id);
-        saved={...body,id:oid,vehicle_id:null,is_superseded:false,ingested_at:"2026-10-31T03:30:00Z"};return response(saved,201);
+        assert(body.subject_type==="organization"&&!body.subject_id);
+        saved={...body,id:oid,vehicle_id:null,subject_id:null,is_superseded:false,ingested_at:"2026-10-31T03:30:00Z"};return response(saved,201);
       }
       return response(saved?[saved]:[]);
     }

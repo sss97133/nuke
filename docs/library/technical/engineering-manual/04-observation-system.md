@@ -497,7 +497,8 @@ Load-more tails are not enumerated. Locked pages are refused; hidden specificati
 stay unknown. A source current-membership claim never establishes present ownership
 or staging permission. Detail headings are retained without inventing a year/VIN.
 
-Admission writes an unresolved `listing` observation through the existing writer,
+Admission writes an unresolved `listing` observation through the existing writer
+(organization subject for collections, vehicle subject for individual detail pages),
 with `source_snapshot_id`, capture-time basis, unknown source event time and the full
 qualified source-card receipt. Physical vehicle/organization resolution remains a
 separate evidenced relationship repair; this replay creates no vehicles, makes,

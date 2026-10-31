@@ -21,7 +21,7 @@ test('apply checks durable observation; transport success without source binding
     let n=0;
     const run=()=>replay({ids:[id],apply:true},{base:'https://fixture.supabase.co',key:'key',report:()=>{},send:async()=>{
       if(++n===1)return reply({success:true,observation_id:obs,snapshot_id:id,resolution_status:'source_presentation_only',model_calls:0,writes:1});
-      return reply([{id:obs,source_snapshot_id:bad?obs:id,source_identifier:`retained_ecr_capture_v1:${id}`,vehicle_id:null,is_superseded:false,analysis_deferred:true,structured_data:{ecr_capture_receipt:{snapshot_id:id,kind:'collection',cards:[]}}}]);
+      return reply([{id:obs,source_snapshot_id:bad?obs:id,source_identifier:`retained_ecr_capture_v1:${id}`,vehicle_id:null,subject_type:'organization',subject_id:null,is_superseded:false,analysis_deferred:true,structured_data:{ecr_capture_receipt:{snapshot_id:id,kind:'collection',cards:[]}}}]);
     }});
     if(bad)await assert.rejects(run,/differs/);else assert.equal((await run())[0].status,'admitted');
   }

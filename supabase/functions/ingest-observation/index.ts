@@ -782,6 +782,7 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
           ? Object.fromEntries(Object.keys(v).sort().map(k => [k, ordered(v[k])])) : v;
         if (row?.source_snapshot_id !== expected.snapshot_id || row?.source_id !== source.id || row.kind !== "listing"
           || row.is_superseded !== false || row.vehicle_id !== null || row.extraction_method !== ECR_METHOD
+          || row.subject_type !== input.subject?.type || row.subject_id !== null
           || row.source_identifier !== input.source_identifier || row.source_url !== input.source_url
           || row.raw_source_ref !== input.raw_source_ref || row.observed_at_basis !== "source_capture_time"
           || row.source_event_time_precision !== "unknown" || row.source_event_at !== null
@@ -1005,7 +1006,7 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
     const contentHash = await observationContentHash(input);
 
     // Check for duplicate
-    const protectedColumns = "id,vehicle_id,ingested_at,structured_data,source_snapshot_id,kind,is_superseded,source_id,extraction_method,extractor_id,raw_source_ref,source_identifier,source_url,observed_at,observed_at_basis,source_event_time_precision,source_event_at";
+    const protectedColumns = "id,vehicle_id,ingested_at,structured_data,source_snapshot_id,kind,is_superseded,source_id,extraction_method,extractor_id,raw_source_ref,source_identifier,source_url,observed_at,observed_at_basis,source_event_time_precision,source_event_at,subject_type,subject_id";
     const replayQuery = () => {
       let query = supabase.from("vehicle_observations").select(ecr ? protectedColumns : retainedVin?.ok
         ? protectedColumns + ",source_vin,source_vin_taxonomy_revision_id,content_hash" : archivedSale?.ok
