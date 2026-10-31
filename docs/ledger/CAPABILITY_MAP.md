@@ -102,7 +102,7 @@ Generated 2026-07-12 from the Canonical Ledger (`CANONICAL_LEDGER.md`, `ledger.j
 | Org inventory extraction | import_queue extraction lane | organization_inventory_sync_queue (fills, never drains), index-classic-com-dealer ⚠, process-classic-seller-queue, extract-all-orgs-inventory |
 | Org dedup / merge | `auto-merge-duplicate-orgs` — DEPLOY IT FIRST (currently undeployed, live callers 404) | re-implementing merge fresh |
 | Org due diligence | `generate-org-due-diligence` † (verify deployed) | — |
-| ECR collections | CAPABILITY DELETED | all ecr_* fns/tables |
+| ECR retained registry evidence | `ingest-observation` mode `retained_ecr_capture_v1` (explicit snapshot UUID + dry_run; hash/clock/page qualification, listing observation + typed snapshot FK, source claims only); bounded operator `scripts/ecr-retained-replay.mjs`. Implementation is not live until its PR deploys; inspect live receipts. `ecr_makes`/`ecr_models` retain historical source labels, not verified canonical completeness. | Retired collection extractor functions; treating queue `complete`, source counts or URL discovery as canonical entity/relationship admission; locked fields as facts; source collection membership as ownership/permission; automatically restoring deleted records |
 | **DOCUMENTS** | | |
 | Receipt extraction | `receipt-extract` (DEPLOY FIRST — on disk, undeployed) | process-receipt (orphan deploy), smart-receipt-linker ⚠, receipt-photo-ocr / receipt-llm-validate (deleted) |
 | Receipt storage | `receipts` + `receipt_items` | vehicle_receipts (0 rows) |
