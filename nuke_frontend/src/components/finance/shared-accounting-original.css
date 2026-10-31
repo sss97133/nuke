@@ -4,4 +4,6 @@
 .accounting-original-preview img, .accounting-original-preview canvas { display: block; width: 100%; height: auto; }
 .accounting-original-preview a { display: inline-flex; align-items: center; }
 .accounting-original-pdf { min-width: 0; }
+.accounting-original-text { min-width: 0; }
+.accounting-original-text pre { max-height: 380px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--font-mono); }
 .accounting-original-pdf nav { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-block: 8px; }

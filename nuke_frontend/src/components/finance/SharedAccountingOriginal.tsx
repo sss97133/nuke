@@ -4,6 +4,25 @@ import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import { bounded, fetchAccountingOriginal } from '../../services/accountingCloseout';
 import './shared-accounting-original.css';
 
+function TextOriginal({ blob }: { blob: Blob }) {
+  const [source, setSource] = useState<{ blob: Blob; text: string; error?: boolean } | null>(null);
+  const [extent, setExtent] = useState({ blob, chars: 64_000 });
+  const chars = extent.blob === blob ? extent.chars : 64_000;
+  useEffect(() => {
+    let cancelled = false;
+    void blob.text().then(text => { if (!cancelled) setSource({ blob, text }); })
+      .catch(() => { if (!cancelled) setSource({ blob, text: '', error: true }); });
+    return () => { cancelled = true; };
+  }, [blob]);
+  if (source?.blob !== blob) return <p role="status">Reading original text…</p>;
+  if (source.error) return <p role="status">This text original could not be displayed.</p>;
+  return <div className="accounting-original-text">
+    <pre>{source.text.slice(0, chars)}</pre>
+    {source.text.length > chars && <><p>Showing {chars.toLocaleString()} of {source.text.length.toLocaleString()} characters.</p>
+      <button type="button" onClick={() => setExtent({ blob, chars: chars + 64_000 })}>Show more original text</button></>}
+  </div>;
+}
+
 function PdfOriginal({ blob }: { blob: Blob }) {
   const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null);
   const [page, setPage] = useState(1), [width, setWidth] = useState(0), [error, setError] = useState('');
@@ -66,11 +85,12 @@ export function OriginalDocumentPreview({ blob, filename, onClose }: { blob: Blo
   }, [blob]);
   const url = source?.blob === blob ? source.url : null;
   const image = /^image\/(jpeg|png|webp|gif|avif)$/.test(blob.type);
+  const text = /^(text\/(plain|csv|tab-separated-values)|application\/json)(;|$)/.test(blob.type) || /\.(csv|txt|tsv|json)$/i.test(filename);
   return <section className="accounting-original-preview" aria-label="Original document">
     <div className="accounting-original-toolbar"><button type="button" onClick={onClose}>Close original</button><span>{filename}</span></div>
     {blob.type === 'application/pdf' ? <PdfOriginal blob={blob} /> : image && url
       ? <img src={url} width={1000} height={1400} alt={`Original: ${filename}`} />
-      : <p>This file does not support an inline preview.</p>}
+      : text ? <TextOriginal blob={blob} /> : <p>This file does not support an inline preview.</p>}
     {url && <a href={url} download={filename}>Download original</a>}
   </section>;
 }

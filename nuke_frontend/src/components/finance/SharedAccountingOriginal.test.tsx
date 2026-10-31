@@ -65,3 +65,13 @@ it('never executes an HTML original inside the profile', async () => {
   expect(host.textContent).toContain('does not support an inline preview');
   expect(host.querySelector('iframe, object, script')).toBeNull();
 });
+
+it('shows bank CSV source text inline and escapes markup within its cells', async () => {
+  const source = '<script>bad()</script>,12.50\nSynthetic vendor,40.00';
+  const csv = Object.assign(new Blob([source], { type: 'text/csv' }), { text: () => Promise.resolve(source) });
+  fixture.fetch.mockResolvedValue({ blob: csv, filename: 'statement.csv' });
+  await render(); await click('Read private original');
+  expect(host.querySelector('pre')?.textContent).toBe(source);
+  expect(host.querySelector('iframe, object, script, a[target]')).toBeNull();
+  expect(host.textContent).not.toContain('does not support an inline preview');
+});
