@@ -14,6 +14,7 @@ enum GarageRelation {
         case "owner": return "Owned"
         case "previously_owned": return "Previously owned"
         case "contributor": return "Your photos or records — not recorded as yours"
+        case "profile_record": return "Profile you added"
         default: return v.relationshipLabel
         }
     }
@@ -46,6 +47,17 @@ struct GarageSections {
                               by: \.relationship)
         other = rest.keys.sorted().map { key in
             Interest(relationship: key, label: rest[key]?.first?.relationshipLabel ?? key, vehicles: rest[key] ?? [])
+        }
+    }
+
+    /// Search the records already read for this account, including zero-photo
+    /// profiles. Titles and stored identifiers are search keys, not proof.
+    static func matching(_ vehicles: [GarageVehicle], query: String) -> [GarageVehicle] {
+        let words = query.split(whereSeparator: \.isWhitespace).map(String.init)
+        guard !words.isEmpty else { return vehicles }
+        return vehicles.filter { vehicle in
+            let text = [vehicle.title, vehicle.vin ?? "", vehicle.relationshipLabel].joined(separator: " ")
+            return words.allSatisfy { text.localizedStandardContains($0) }
         }
     }
 

@@ -21,6 +21,7 @@ enum FixtureBackend {
 
     static let clientId = "00000000-0000-4000-8000-0000000000d1"
     static let providerId = "00000000-0000-4000-8000-0000000000d2"
+    static let navigationVehicleId = "00000000-0000-4000-8000-00000000c001"
     static var userId: String? {
         switch persona {
         case .visitor: return nil
@@ -66,6 +67,12 @@ enum FixtureBackend {
     static func respond(_ request: URLRequest) -> (Int, Data) {
         guard let url = request.url, url.host == baseURL.host else { return (404, Data()) }
         let path = url.path
+        if scenario == "navigation-actors", path == "/functions/v1/universal-search" {
+            return ok("""
+            {"success":true,"results":[{"id":"\(clientId)","type":"user","title":"Fixture Person"}],
+             "meta":{"total_count":0,"returned_count":0,"offset":0,"has_more":false,"vehicle_source":"search_vehicles_fts"}}
+            """)
+        }
         if path.hasPrefix("/rest/v1/rpc/") {
             let name = String(path.dropFirst("/rest/v1/rpc/".count))
             let args = (FixtureURLProtocol.body(of: request)).flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] } ?? [:]
@@ -98,6 +105,13 @@ enum FixtureBackend {
     private static func reader(_ name: String, _ args: [String: Any]) -> (Int, Data) {
         let signedIn = persona != .visitor
         switch name {
+        case "get_user_garage" where scenario == "navigation-garage":
+            return ok("""
+            [{"vehicle_id":"\(navigationVehicleId)","year":1973,"make":"Fixture","model":"Coupe",
+              "trim_name":null,"image_url":null,"current_value":null,"image_count":0,"relationship":"profile_record"}]
+            """)
+        case "get_my_garage_owner_corrections" where scenario == "navigation-garage": return ok("[]")
+        case "my_unorganized_photo_count" where scenario == "navigation-garage": return ok("0")
         case "listing_work_plan_read": return ok(PlanFixtures.plan)
         case "my_suggested_provider_links": return ok(ParityFixtures.suggestions)
         case "work_order_publication_read":
@@ -214,6 +228,13 @@ enum FixtureBackend {
 
     private static func table(_ name: String) -> (Int, Data) {
         switch name {
+        case "vehicles" where scenario == "navigation-garage":
+            return ok("""
+            [{"id":"\(navigationVehicleId)","year":1973,"make":"Fixture","model":"Coupe","vin":"TEST1234567",
+              "trim":null,"primary_image_url":null,"image_count":0}]
+            """)
+        case "vehicle_images" where scenario == "navigation-garage": return ok("[]")
+        case "vehicle_images_public" where scenario == "navigation-garage": return ok("[]")
         case "vehicle_images": return ok(persona == .client ? PostJobFixtures.photos : "[]")
         case "profiles": return ok(ParityFixtures.ownRow)
         case "tool_requirement_key_map": return ok(ParityFixtures.toolKeys)

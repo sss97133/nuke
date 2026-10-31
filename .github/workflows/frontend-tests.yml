@@ -490,7 +490,7 @@ jobs:
         with:
           node-version: '22'
       - name: Verify cached image projection receipts (offline)
-        run: node --test scripts/lib/image-property-projection.test.mjs scripts/lib/cached-image-worker.test.mjs scripts/daily-receipt/byok-drain.test.mjs
+        run: node --test scripts/deep-image-analysis-byok.test.mjs scripts/lib/image-property-projection.test.mjs scripts/lib/cached-image-worker.test.mjs scripts/daily-receipt/byok-drain.test.mjs
       - name: Create disposable cached-image ancestry database
         run: createdb dm_refinement_image_ancestry
       - name: Verify actual cached-image migration, intake and public reader ancestry
@@ -622,6 +622,8 @@ jobs:
         run: |
           deno test --no-check --node-modules-dir=none --allow-env --allow-read supabase/functions/ingest-observation/retainedEcr.test.ts supabase/functions/ingest-observation/retainedEcrHandler.test.ts
           node --test scripts/ecr-retained-replay.test.mjs
+      - name: Verify native Gateway browser evidence, admission and replay
+        run: deno test --node-modules-dir=none --allow-env --allow-read supabase/functions/_shared/gatewayParser.test.ts supabase/functions/ingest/gateway.test.ts
       - name: Verify the live-lot forecast route resolves a lot, sends the reader typed arguments, refuses anonymous callers and returns the reader's answer untouched
         run: deno test --no-check --allow-env supabase/functions/api-v1-vehicle-auction/
       - name: Verify RM Sotheby's writes only vehicles, reads each lot once, finds a vehicle before writing it again, and calls an unheld lot upcoming
