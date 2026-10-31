@@ -88,6 +88,32 @@ it('keeps customer cash, mixed transfer allocation, book costs and revised rows 
   expect(host.textContent).not.toContain('SYNTHETIC-1');
 });
 
+it('keeps undated allocations in totals without inventing a date or breaking dated history', async () => {
+  fixture.rpc.mockImplementation((name: string) => Promise.resolve({ data: name === 'accounting_vehicle_financials' ? [rawCost(),
+    rawCost({ use_id: 'undated', allocated_amount: '15', record_date: null }),
+    rawCost({ use_id: 'later', allocated_amount: '20', record_date: '2024-07-01' }),
+  ] : name === 'owner_working_notes' ? { tables: [] } : [], error: null }));
+  open = true; await render();
+  expect(host.querySelector('.vp-financial-measures strong')?.textContent).toBe('$75.00');
+  expect(host.textContent).toContain('Allocated entries without a usable date: 1');
+  expect(host.textContent).toContain('Date not recorded');
+  const chart = host.querySelector('svg[aria-label="Cumulative booked vehicle costs"]')!;
+  expect([...chart.querySelectorAll('title')].map(node => node.textContent)).toEqual(['2024-06: $40.00', '2024-07: $60.00']);
+  const period = host.querySelector<HTMLSelectElement>('.vp-financial-filter select')!;
+  await act(async () => { period.value = '2024-07'; period.dispatchEvent(new Event('change', { bubbles: true })); });
+  expect(host.textContent).toContain('$20.00 · 2024-07');
+  expect(host.textContent).not.toContain('Date not recorded');
+});
+
+it('shows only the total and rows when every allocated entry is undated', async () => {
+  fixture.rpc.mockImplementation((name: string) => Promise.resolve({ data: name === 'accounting_vehicle_financials' ? [rawCost({ record_date: null })]
+    : name === 'owner_working_notes' ? { tables: [] } : [], error: null }));
+  open = true; await render();
+  expect(host.querySelector('.vp-financial-measures strong')?.textContent).toBe('$40.00');
+  expect(host.querySelector('.vp-financial-curve')).toBeNull();
+  expect(host.textContent).toContain('Date not recorded');
+});
+
 it('reduces the visible amount deliberately, keeps the door, and remembers the display preference', async () => {
   open = true; await render(<span>Recorded sale</span>);
   await act(async () => [...host.querySelectorAll('button')].find(button => button.textContent === 'Reduce header amount')!.click());
