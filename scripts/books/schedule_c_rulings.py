@@ -432,6 +432,15 @@ def financial_use_original(owner, source_document_id, source_key, phase='book_ex
                       source_kind='upload', byte_size=str(len(body)))
 
 
+def _without_object_nulls(value):
+    """Match document_state's json_strip_nulls without changing retained testimony."""
+    if isinstance(value, dict):
+        return {k: _without_object_nulls(v) for k, v in value.items() if v is not None}
+    if isinstance(value, list):
+        return [_without_object_nulls(v) for v in value]
+    return value
+
+
 def assign_uses(path, dry):
     spec = json.load(open(path))
     owner = uuid_ok(spec['owner_id'])
@@ -454,7 +463,7 @@ def assign_uses(path, dry):
             if prior.get('records'):
                 raise ValueError('a use register cannot replace monetary records')
             previous={f['field_key']:f for f in prior['fields']}
-            if all(previous.get(f['field_key'])==f for f in fields):
+            if all(previous.get(f['field_key'])==_without_object_nulls(f) for f in fields):
                 print(json.dumps(dict(source_document_id=doc_id,unchanged=True)))
                 continue
             previous.update({f['field_key']:f for f in fields})
@@ -470,8 +479,11 @@ def assign_uses(path, dry):
                f"{'rollback' if dry else 'commit'};\n")
         out = [line for line in psql(sql,10000).splitlines() if line.startswith('{') and 'extraction_run_id' in line]
         receipt = json.loads(out[-1])
+        lock_waiters = 0 if dry else int(psql("select count(*) from pg_stat_activity where wait_event_type='Lock';",10000).strip())
         print(json.dumps(dict(source_document_id=doc_id,claim_document_id=receipt.get('document_id'),dry=dry,uses=1,supersedes=cur['run_id'] if cur else None,
-                              run_id=receipt.get('extraction_run_id'), duplicate=receipt.get('duplicate'))))
+                              run_id=receipt.get('extraction_run_id'), duplicate=receipt.get('duplicate'),lock_waiters=lock_waiters)))
+        if lock_waiters:
+            raise RuntimeError('Use admitted; stop and inspect database lock waiters before continuing')
 
 
 if __name__ == '__main__':

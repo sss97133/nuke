@@ -1,7 +1,7 @@
 """Offline financial-use admission tests. All identities and amounts are synthetic."""
 import copy
 import unittest
-from schedule_c_rulings import financial_use_fields, financial_use_original
+from schedule_c_rulings import financial_use_fields, financial_use_original, _without_object_nulls
 
 OWNER='11111111-1111-4111-8111-111111111111'
 DOC='22222222-2222-4222-8222-222222222222'
@@ -67,6 +67,16 @@ class FinancialUseTest(unittest.TestCase):
         self.assertEqual(claim,before)
         claim['allocations'][0]['witnesses'][0]['receipt_id']=DOC
         with self.assertRaisesRegex(ValueError,'one source'): financial_use_fields(source(),[claim])
+
+    def test_replay_matches_the_current_reader_when_optional_fields_are_null(self):
+        claim=use();claim['allocations'][0]['allocated_amount']=None
+        claim['evidence']['optional_reference']=None
+        field=financial_use_fields(source(),[claim])[0];before=copy.deepcopy(field)
+        current=_without_object_nulls(field)
+        self.assertNotIn('optional_reference',current['evidence'])
+        self.assertNotIn('allocated_amount',current['value_normalized']['allocations'][0])
+        self.assertEqual(field,before)
+        self.assertNotEqual(current,_without_object_nulls(financial_use_fields(source(),[use([])])[0]))
 
 
 if __name__=='__main__': unittest.main()
