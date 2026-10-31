@@ -17,6 +17,7 @@ test('retained originals and actual vector paths match the registered bytes and 
       const bytes = fs.readFileSync(path.join(directory, asset[kind]));
       const sha256 = crypto.createHash('sha256').update(bytes).digest('base64');
       assert.equal(sha256, asset[`${kind}Sha256Base64`]);
+      assert.ok(asset[kind].includes(Buffer.from(sha256, 'base64').toString('hex').slice(0, 12)), 'Published paths must change when bytes change');
       const row = registrations.find(row => row.id === asset[`${kind}AssetId`]);
       assert.equal(row?.sha256_base64, sha256);
       assert.equal(row.asset_path, `/stacks/makes/emblems/${asset[kind]}`);

@@ -8,7 +8,7 @@ verified artwork returns an empty `marks` array. Private/deleted records are not
 returned by this public reader. The catalogue can also be reused by authorized
 private consumers through the existing identity-mark resolver.
 
-Originals live byte-for-byte under `nuke_frontend/public/stacks/makes/emblems/`.
+Originals live byte-for-byte in content-addressed filenames under `nuke_frontend/public/stacks/makes/emblems/`.
 The database records their stable public asset paths, SHA-256 hashes, dimensions,
 source context and known source URL/capture clock. Unknown publishers, dates and
 year applicability remain unknown. Local desktop paths are not database URLs.
