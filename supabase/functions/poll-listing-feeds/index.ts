@@ -269,6 +269,7 @@ interface FeedResult {
     ledger?: string; // firecrawl_html path: the import_queue status written for this URL
     ledger_write_status?: 'acknowledged' | 'unavailable';
     ingest_attempted?: boolean;
+    dealer_receipt?: { observation_id: string; snapshot_id: string; listing_event_id: string; observed_at: string };
   }>;
   error: string | null;
   deferred_reason?: string | null;
@@ -609,8 +610,17 @@ async function pollFirecrawlHtmlFeed(
   let htmlForCards: string | null = null;
   let blockNote = "";
   let confirmedEmptySearch = false;
+  const nativeDealer = ["gr_auto_gallery", "streetside_classics"].includes(feed.source_slug);
+  let nativeSourceId: string | null = null;
 
   if (feed.source_slug === "gr_auto_gallery" || feed.source_slug === "streetside_classics") {
+    const [source, capability] = await Promise.all([
+      supabase.from("observation_sources").select("id,species,supported_observations").eq("slug", feed.source_slug.replaceAll("_", "-")).maybeSingle(),
+      supabase.functions.invoke("ingest", { method: "GET" }),
+    ]);
+    if (source.error || source.data?.species !== "dealer" || !source.data.supported_observations?.includes("listing")) return await failFeed("blocked: dealer source not registered");
+    if (capability.error || capability.data?.capabilities?.dealer_microdata_native !== true) return await failFeed("blocked: native dealer intake not deployed");
+    nativeSourceId = source.data.id;
     const page = await archiveFetch(feed.feed_url, { platform: feed.source_slug, useFirecrawl: false,
       firecrawlOnBlock: false, skipCache: true, includeMarkdown: false,
       directFetchOptions: { publicOnly: true }, callerName: "poll-listing-feeds:dealer-native" });
@@ -845,6 +855,7 @@ async function pollFirecrawlHtmlFeed(
   // (HTTP/2 stream error), so query in batches of 40.
   const onVehicles = new Set<string>();
   const ledgerRows = new Map<string, LedgerKnown>();
+  const nativeLedger = new Map<string, any>();
   // A Craigslist search page lists ~350 posts: nine chunks of two lookups each, one after another, cost several seconds of a
   // 110 s run per feed (measured 2026-10-15: 9 feeds finished per run). The chunks are independent, so they go in waves of four.
   const chunks: string[][] = [];
@@ -856,7 +867,7 @@ async function pollFirecrawlHtmlFeed(
         supabase.from("vehicles").select("listing_url").in("listing_url", chunk),
         supabase
           .from("import_queue")
-          .select("listing_url, status, vehicle_id, attempts, max_attempts, next_attempt_at, failure_category, processed_at")
+          .select(nativeDealer ? "listing_url, status, vehicle_id, attempts, max_attempts, next_attempt_at, failure_category, processed_at, raw_data" : "listing_url, status, vehicle_id, attempts, max_attempts, next_attempt_at, failure_category, processed_at")
           .in("listing_url", chunk)
           .in("status", ["complete", "skipped", "failed"]),
       ]);
@@ -866,8 +877,34 @@ async function pollFirecrawlHtmlFeed(
       if (known.error) return await failFeed(`fetch_failed: known-url lookup: ${known.error.message}`);
       if (ledgered.error) return await failFeed(`fetch_failed: ledger lookup: ${ledgered.error.message}`);
       for (const v of known.data || []) onVehicles.add(v.listing_url);
-      for (const q of ledgered.data || []) ledgerRows.set(q.listing_url, q);
+      for (const q of ledgered.data || []) { ledgerRows.set(q.listing_url, q); if (nativeDealer) nativeLedger.set(q.listing_url, q.raw_data ?? {}); }
     }
+  }
+  if (nativeDealer) {
+    const receipts = [...nativeLedger.entries()].filter(([_url, raw]) => raw.dealer_receipt?.observation_id);
+    const admitted = new Map<string, any>();
+    for (let i = 0; i < receipts.length; i += 40) {
+      const read = await supabase.from("vehicle_observations").select("id,vehicle_id,source_id,source_url,raw_source_ref,observed_at,extraction_method,is_superseded")
+        .eq("source_id", nativeSourceId).in("id", receipts.slice(i, i + 40).map(([_u, r]) => r.dealer_receipt.observation_id));
+      if (read.error) return await failFeed("readback_error: dealer canonical progress unavailable");
+      for (const o of read.data ?? []) admitted.set(o.id, o);
+    }
+    const proved = new Map<string, number>();
+    onVehicles.clear();
+    for (const url of urls) {
+      const raw = nativeLedger.get(url), receipt = raw?.dealer_receipt, o = admitted.get(receipt?.observation_id);
+      const clock = Date.parse(o?.observed_at ?? "");
+      const valid = o && o.is_superseded === false && o.vehicle_id === ledgerRows.get(url)?.vehicle_id && o.source_id === nativeSourceId && o.source_url === url && o.extraction_method === "dealer_microdata_v1"
+        && o.raw_source_ref === `listing_page_snapshots:${receipt.snapshot_id}` && Number.isFinite(clock) && clock <= Date.now();
+      const fresh = valid && Date.now() - clock < feed.poll_interval_minutes * 60_000;
+      if (valid) proved.set(url, clock);
+      if (fresh) onVehicles.add(url);
+      const prior = ledgerRows.get(url);
+      if (!fresh && (prior?.status === "complete" || (prior?.status === "skipped" && raw?.dealer_native_version !== "dealer_microdata_v1"))) ledgerRows.delete(url);
+    }
+    // Missing canonical evidence first, then oldest source reads. Existing failed
+    // backoff and terminal native rejections remain with the ordinary planner.
+    urls.sort((a, b) => Number(proved.has(a)) - Number(proved.has(b)) || (proved.get(a) ?? 0) - (proved.get(b) ?? 0));
   }
   // New URLs first, then failed ones whose retry is due; the cap applies to both.
   const plan = planIngests(urls, onVehicles, ledgerRows, new Date(), Math.min(MAX_NEW_INGESTS_PER_POLL, allocation),
@@ -900,7 +937,7 @@ async function pollFirecrawlHtmlFeed(
   // read-back failed, is `failed` with the reason (ledger.ts).
   const waiting: Array<{
     url: string;
-    ingest: IngestOutcome;
+    ingest: IngestOutcome & { dealer_receipt?: NonNullable<FeedResult["ingest_outcomes"]>[number]["dealer_receipt"] };
     entry: NonNullable<FeedResult["ingest_outcomes"]>[number];
   }> = [];
   let lastFlushAt = Date.now();
@@ -923,6 +960,10 @@ async function pollFirecrawlHtmlFeed(
       // Craigslist: post_id, posted_at, updated_at, attributes and capture_landing travel on the ledger row
       // (captureLedger.ts); empty for every other source.
       const captureFields = captureLedgerFields(w.ingest);
+      if (nativeDealer) {
+        write.row.raw_data = { ...((write.row.raw_data as Record<string, unknown> | undefined) ?? {}),
+          dealer_native_version: "dealer_microdata_v1", ...(w.ingest.dealer_receipt ? { dealer_receipt: w.ingest.dealer_receipt } : {}) };
+      }
       if (Object.keys(captureFields).length > 0) {
         write.row.raw_data = { ...((write.row.raw_data as Record<string, unknown> | undefined) ?? {}), ...captureFields };
       }
@@ -966,7 +1007,7 @@ async function pollFirecrawlHtmlFeed(
           Authorization: `Bearer ${serviceKey}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ url }),
+        body: JSON.stringify({ url, ...(nativeDealer ? { enrich: false } : {}) }),
         signal: controller.signal,
       });
 
@@ -975,7 +1016,11 @@ async function pollFirecrawlHtmlFeed(
       const ingest = (await resp.json().catch(() => ({
         status: "error",
         error: `ingest HTTP ${resp.status} (non-JSON body)`,
-      }))) as IngestOutcome;
+      }))) as IngestOutcome & { dealer_receipt?: NonNullable<FeedResult["ingest_outcomes"]>[number]["dealer_receipt"] };
+      if (nativeDealer && ["created", "matched", "duplicate"].includes(ingest.status ?? "") &&
+        (!ingest.vehicle_id || !ingest.dealer_receipt?.observation_id || !ingest.dealer_receipt.snapshot_id || !ingest.dealer_receipt.listing_event_id || !ingest.dealer_receipt.observed_at)) {
+        ingest.status = "error"; ingest.error = "dealer canonical admission unacknowledged";
+      }
       const status = ingest.status || "error";
       ingest.status = status;
 
@@ -983,6 +1028,7 @@ async function pollFirecrawlHtmlFeed(
         url,
         status,
         ingest_attempted: true,
+        ...(nativeDealer && ingest.dealer_receipt ? { dealer_receipt: ingest.dealer_receipt } : {}),
         vehicle_id: ingest.vehicle_id ?? null,
         ...(ingest.error ? { error: String(ingest.error).slice(0, 200) } : {}),
         ...(ingest.reason ? { reason: String(ingest.reason).slice(0, 200) } : {}),
@@ -1033,6 +1079,10 @@ async function pollFirecrawlHtmlFeed(
     return await failFeed(
       `ingest_failed: ${ingestErrors}/${attempted} ingest calls errored`
     );
+  }
+
+  if (nativeDealer && attempted > 0 && !result.ingest_outcomes!.some(o => o.dealer_receipt?.observation_id)) {
+    return await failFeed("canonical_admission_failed: no dealer observation acknowledged");
   }
 
   // Success path bookkeeping.

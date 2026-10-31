@@ -55,7 +55,7 @@ export async function landDealerCapture(db: any, capture: DealerCapture, vehicle
   const admitted = await db.functions.invoke("ingest-observation", { body: payload });
   if (admitted.error || admitted.data?.success !== true || !admitted.data.observation_id) throw Error("dealer_observation_admission_failed");
   const read = await db.from("vehicle_observations").select("id,vehicle_id,source_id,source_url,raw_source_ref")
-    .eq("id", admitted.data.observation_id).eq("observed_at", capture.observed_at).maybeSingle();
+    .eq("id", admitted.data.observation_id).eq("observed_at", capture.observed_at).eq("is_superseded", false).maybeSingle();
   const o = read.data;
   if (read.error || !o || o.vehicle_id !== vehicleId || o.source_id !== capture.source_id || o.source_url !== f.url || o.raw_source_ref !== payload.raw_source_ref) throw Error("dealer_observation_readback_failed");
   const listing = await landClassifiedListing(db, { vehicleId, platform: f.platform, listingUrl: f.url, listingId: f.stock_id,
