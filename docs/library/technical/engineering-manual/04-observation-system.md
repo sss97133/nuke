@@ -483,6 +483,40 @@ The analysis engine coordinator receives observation triggers and queues relevan
 
 ## Target Architecture
 
+### Retained ECR registry replay
+
+The owner requires valid ECR evidence to be admitted correctly rather than discarded
+because the earlier importer was incomplete. `ingest-observation` accepts service-only
+selectors `{mode: "retained_ecr_capture_v1", snapshot_id, dry_run}`. The server reads
+the selected original capture, verifies its hash and clocks, and parses the retained
+page. No caller-supplied claims, source re-fetch, browser session or model call is used.
+
+The source is an aggregator/registry presentation, not a sale. Collection Current and
+Previous card regions remain separate; Similar Cars and filter options are not members.
+Load-more tails are not enumerated. Locked pages are refused; hidden specifications
+stay unknown. A source current-membership claim never establishes present ownership
+or staging permission. Detail headings are retained without inventing a year/VIN.
+
+Admission writes an unresolved `listing` observation through the existing writer,
+with `source_snapshot_id`, capture-time basis, unknown source event time and the full
+qualified source-card receipt. Physical vehicle/organization resolution remains a
+separate evidenced relationship repair; this replay creates no vehicles, makes,
+models, ownership links or permissions and restores no deleted rows. Its source
+assertion confidence is capped and downstream analysis is deferred. A retry qualifies
+the original bytes again and checks the persisted source receipt before acknowledging
+a duplicate. Source loss, tampering or supersession cannot silently return success.
+
+Run `scripts/ecr-retained-replay.mjs --snapshot <uuid>` under the configured server
+environment for dry-run; pass `--apply` for explicitly authorized admission. `--manifest`
+accepts an array of 1–50 UUIDs. The operator verifies the persisted observation on apply;
+it does not mark the old import queue complete. Source labels and aggregate counts in
+historical `ecr_*` rows are not a canonical catalogue or physical-fleet denominator.
+
+Verification: `retainedEcr.test.ts`, `retainedEcrHandler.test.ts` and
+`scripts/ecr-retained-replay.test.mjs` exercise source qualification, unknowns, denied
+callers, dry-run, canonical admission/readback, corrupt replay and duplicate behavior.
+Live source-to-reader acceptance and historical identity repair are separate stages.
+
 The observation system is the foundation for the Digital Twin architecture described in the encyclopedia. The target state:
 
 1. **Every data point is an observation.** No more direct writes to `vehicles` from extractors. All data flows through `ingest-observation`, which becomes the sole write path.
