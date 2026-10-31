@@ -25,3 +25,14 @@ Deno.test("GR price text without a declared currency stays a qualified source st
   const p = parseDealerListing(h, u); assertEquals(p.price, null); assertEquals(p.source_price_text, "$12,345"); assertEquals(p.availability, "unknown");
   assertThrows(() => parseDealerListing(h.replace("$12,345", "SOLD"), u));
 });
+
+Deno.test("Streetside dot-grouped metadata requires the same offer's explicit USD cash display", () => {
+  const metadata = document().replace('content="12345"', 'content="16.995"');
+  const offer = '<span itemprop="offers" itemscope itemtype="http://schema.org/Offer"><div class="price">$16,995</div><div class="monthly">$146.10/month</div></span>';
+  const h = metadata.replace('</dl></div>', '</dl>' + offer + '</div>');
+  assertEquals(parseDealerListing(h, url).price, 16995);
+  assertEquals(parseDealerListing(metadata, url).price, null);
+  assertEquals(parseDealerListing(h.replace('$16,995', '$17,995'), url).price, null);
+  assertEquals(parseDealerListing(h.replace('content="USD"', 'content="CAD"'), url).price, null);
+  assertEquals(parseDealerListing(metadata.replace('</dl></div>', '</dl><div class="price">$16,995</div></div>'), url).price, null);
+});

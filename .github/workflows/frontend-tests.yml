@@ -624,7 +624,7 @@ jobs:
           deno test --no-check --node-modules-dir=none --allow-env --allow-read supabase/functions/api-v1-vehicles/sourceProfile.test.ts
           node --test scripts/ecr-retained-replay.test.mjs
       - name: Verify native dealer microdata, source qualification and canonical replay
-        run: deno test --node-modules-dir=none --allow-env supabase/functions/_shared/dealerParser.test.ts supabase/functions/ingest/dealer.test.ts
+        run: deno test --node-modules-dir=none --allow-env supabase/functions/_shared/dealerParser.test.ts supabase/functions/_shared/vin-decoder-native.test.ts supabase/functions/ingest/dealer.test.ts
       - name: Verify native Gateway browser evidence, admission and replay
         run: deno test --node-modules-dir=none --allow-env --allow-read supabase/functions/_shared/gatewayParser.test.ts supabase/functions/ingest/gateway.test.ts
       - name: Verify the live-lot forecast route resolves a lot, sends the reader typed arguments, refuses anonymous callers and returns the reader's answer untouched
@@ -687,6 +687,10 @@ jobs:
         run: createdb dm_refinement_bat_profile
       - name: Verify the actual profile migration and replay contract
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_bat_profile -f supabase/sql/test_bat_profile_comment_fold.sql
+      - name: Verify native listing clocks, source claims and price priority
+        run: |
+          createdb dm_refinement_native_listing_ci
+          psql -X -v ON_ERROR_STOP=1 -d dm_refinement_native_listing_ci -f supabase/sql/test_native_listing_profile_evidence.sql
       - name: Create disposable profile privacy database
         run: createdb dm_refinement_profile_privacy_ci
       - name: Verify private column protection and owner-only profile RPC
