@@ -549,4 +549,64 @@ DO $$ BEGIN
   END IF;
 END $$;
 
+-- Indexed public-summary join: exact bag equivalence, including canonical UUID
+-- text semantics and receipts related to two different public vehicles.
+INSERT INTO public.receipts (vendor_name,vehicle_id,scope_type,scope_id) VALUES
+ ('synthetic both same','71000000-0000-0000-0000-000000000a01','vehicle','71000000-0000-0000-0000-000000000a01'),
+ ('synthetic both different','71000000-0000-0000-0000-000000000a01','vehicle','71000000-0000-0000-0000-000000000a02'),
+ ('synthetic direct public scoped private','71000000-0000-0000-0000-000000000a01','vehicle','72000000-0000-0000-0000-000000000b01'),
+ ('synthetic direct private scoped public','72000000-0000-0000-0000-000000000b01','vehicle','71000000-0000-0000-0000-000000000a01'),
+ ('synthetic uppercase',NULL,'vehicle','71000000-0000-0000-0000-000000000A01'),
+ ('synthetic compact',NULL,'vehicle','71000000000000000000000000000a01'),
+ ('synthetic braces',NULL,'vehicle','{71000000-0000-0000-0000-000000000a01}'),
+ ('synthetic whitespace',NULL,'vehicle',' 71000000-0000-0000-0000-000000000a01 '),
+ ('synthetic invalid scope',NULL,'vehicle','not a uuid'),
+ ('synthetic other scope',NULL,'organization','71000000-0000-0000-0000-000000000a01'),
+ ('synthetic deleted scope',NULL,'vehicle','71000000-0000-0000-0000-000000000a03'),
+ ('synthetic null scope',NULL,'vehicle',NULL);
+CREATE TEMP TABLE receipt_summary_before_index AS SELECT * FROM public.receipts_public_summary;
+CREATE TEMP TABLE receipt_summary_options_before AS
+ SELECT relowner,relacl,reloptions FROM pg_class WHERE oid='public.receipts_public_summary'::regclass;
+\ir ../migrations/20261031042352_receipts_public_summary_indexed_vehicle_join.sql
+-- An exact replay preserves the same definition and grants.
+\ir ../migrations/20261031042352_receipts_public_summary_indexed_vehicle_join.sql
+DO $$ BEGIN
+ IF EXISTS (SELECT * FROM public.receipts_public_summary EXCEPT ALL SELECT * FROM receipt_summary_before_index)
+   OR EXISTS (SELECT * FROM receipt_summary_before_index EXCEPT ALL SELECT * FROM public.receipts_public_summary) THEN
+   RAISE EXCEPTION 'Indexed public summary changed the receipt row multiset';
+ END IF;
+ IF (SELECT count(*) FROM public.receipts_public_summary WHERE vendor_name='synthetic both different') <> 2 THEN
+   RAISE EXCEPTION 'Two public associations lost their existing multiplicity';
+ END IF;
+ IF EXISTS (SELECT relowner,relacl,reloptions FROM pg_class WHERE oid='public.receipts_public_summary'::regclass
+   EXCEPT SELECT * FROM receipt_summary_options_before) THEN RAISE EXCEPTION 'Indexed summary changed security options'; END IF;
+END $$;
+SET ROLE anon;
+DO $$ BEGIN
+ IF EXISTS (SELECT 1 FROM public.receipts_public_summary WHERE vendor_name IN
+   ('synthetic uppercase','synthetic compact','synthetic braces','synthetic whitespace','synthetic invalid scope',
+    'synthetic other scope','synthetic deleted scope','synthetic null scope')) THEN
+   RAISE EXCEPTION 'Indexed public summary widened scope matching or visibility';
+ END IF;
+ IF NOT EXISTS (SELECT 1 FROM public.receipts_public_summary WHERE vendor_name='synthetic direct private scoped public') THEN
+   RAISE EXCEPTION 'Existing public scope association was lost';
+ END IF;
+END $$;
+RESET ROLE;
+-- Drift refusal: a later extra filter must not silently be removed by this repair.
+CREATE OR REPLACE VIEW public.receipts_public_summary WITH (security_barrier=true) AS
+ SELECT r.id,r.vehicle_id,r.scope_type,r.scope_id,r.source_document_id,r.source_document_table,
+   r.vendor_name,r.total,r.total_amount,r.currency,r.receipt_date,r.transaction_date,r.purchase_date,
+   r.invoice_number,r.transaction_number,r.processing_status,r.status,r.created_at
+ FROM public.receipts r JOIN public.vehicles v ON v.id=r.vehicle_id
+ WHERE v.is_public=true AND v.deleted_at IS NULL AND r.status='later_filter';
+\set ON_ERROR_STOP off
+\ir ../migrations/20261031042352_receipts_public_summary_indexed_vehicle_join.sql
+\set ON_ERROR_STOP on
+DO $$ BEGIN
+ IF pg_get_viewdef('public.receipts_public_summary'::regclass) NOT LIKE '%later_filter%' THEN
+   RAISE EXCEPTION 'Indexed repair replaced a later changed definition';
+ END IF;
+END $$;
+
 SELECT 'test_receipt_views_privacy: PASS' AS result;
