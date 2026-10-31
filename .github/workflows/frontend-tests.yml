@@ -886,6 +886,9 @@ jobs:
       - name: Verify public search continuation and authenticated ownership (offline)
         run: node --test supabase/functions/universal-search/pagination.test.mjs
 
+      - name: Verify ECR catalogue pagination under API caps
+        run: node --test scripts/build-canonical-models.test.mjs
+
       - name: Verify preserved description input and sanctioned intake
         run: node --test scripts/test-description-source-input.mjs scripts/test-listing-description-intake.mjs scripts/test-field-evidence-reader.mjs scripts/test-vin-batch-existing-fields.mjs
         env:
