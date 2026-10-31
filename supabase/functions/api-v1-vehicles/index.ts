@@ -77,7 +77,8 @@ Deno.serve(async (req) => {
     if (url.searchParams.has("source_url")) {
       if (req.method !== "GET") return new Response(JSON.stringify({ error: "Source profiles are read-only" }),
         { status: 405, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      if (url.searchParams.getAll("source_url").length !== 1 || !/\/(?:api-v1-vehicles|vehicles)\/?$/.test(url.pathname)) return new Response(
+      if (url.searchParams.getAll("source_url").length !== 1 || url.searchParams.getAll("capture_id").length > 1
+        || !/\/(?:api-v1-vehicles|vehicles)\/?$/.test(url.pathname)) return new Response(
         JSON.stringify({ error: "Select one source URL without a physical vehicle ID" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       const { readSourceProfile } = await import("./sourceProfile.ts");
@@ -88,7 +89,7 @@ Deno.serve(async (req) => {
           throw Error("Unexpected source profile SDK target");
         return fetch(supabaseUrlOrRequest, { ...init, signal: deadline });
       } } });
-      const answer = await readSourceProfile(sourceDb, url.searchParams.get("source_url") ?? "");
+      const answer = await readSourceProfile(sourceDb, url.searchParams.get("source_url") ?? "", url.searchParams.get("capture_id"));
       return new Response(JSON.stringify(answer.body), {
         status: answer.status, headers: { ...corsHeaders, ...auth.headers, "Content-Type": "application/json", "Cache-Control": "no-store" },
       });

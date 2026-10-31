@@ -44,3 +44,14 @@ it('never displays another source response or a late prior subject, and retains 
   expect(host.querySelector('h1')).toBeNull();expect(host.textContent).toContain('response could not be verified');
   expect(host.querySelector('button')?.textContent).toBe('Retry');
 });
+
+it('keeps the exact capture through a drill and refuses a response for a different capture of the same URL',async()=>{
+  const capture='11111111-1111-4111-8111-111111111111';
+  fixture.invoke.mockResolvedValue({data:{data:profile},error:null});await mount();
+  await act(async()=>navigate(address()+'&capture_id='+capture));
+  expect(fixture.invoke.mock.calls.at(-1)?.[0]).toContain('&capture_id='+capture);
+  expect(host.querySelector('h1')).toBeNull();expect(host.textContent).toContain('response could not be verified');
+  fixture.invoke.mockResolvedValue({data:{data:{...profile,history:{complete:true,selected_snapshot_id:capture}}},error:null});
+  await act(async()=>host.querySelector('button')!.click());
+  expect(host.querySelector('h1')?.textContent).toBe(profile.label);
+});

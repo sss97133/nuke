@@ -8,17 +8,24 @@ const ordered = (v: any): any => Array.isArray(v) ? v.map(ordered) : v && typeof
   ? Object.fromEntries(Object.keys(v).sort().map(k => [k, ordered(v[k])])) : v;
 const equal = (a: unknown, b: unknown) => JSON.stringify(ordered(a)) === JSON.stringify(ordered(b));
 const result = (status: number, body: Record<string, unknown>) => ({ status, body });
-export const sourceProfilePath = (url: string) => `/vehicle/source?source_url=${encodeURIComponent(url)}`;
+export const sourceProfilePath = (url: string, snapshot?: string | null) => `/vehicle/source?source_url=${encodeURIComponent(url)}`
+  + (snapshot ? `&capture_id=${encodeURIComponent(snapshot)}` : "");
 
 /** Existing authenticated vehicles API only. No new table visibility, external fetch or write. */
-export async function readSourceProfile(db: any, selector: string) {
+export async function readSourceProfile(db: any, selector: string, captureSelector?: string | null) {
   const url = ecrUrl(selector);
   if (!url) return result(400, { error: "Unsupported source profile URL" });
+  if (captureSelector != null && !/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(captureSelector))
+    return result(400, { error: "Invalid retained capture selector" });
+  const captureId = captureSelector?.toLowerCase() ?? null;
   const source = await db.from("observation_sources").select("id,species")
     .eq("slug", "exclusive-car-registry").maybeSingle();
   if (source.error || source.data?.species !== "aggregator") return result(503, { error: "Source qualification unavailable" });
-  const query = () => db.from("vehicle_observations").select(columns)
-    .eq("source_id", source.data.id).eq("extraction_method", ECR_METHOD).eq("is_superseded", false);
+  const query = () => {
+    const q = db.from("vehicle_observations").select(columns)
+      .eq("source_id", source.data.id).eq("extraction_method", ECR_METHOD).eq("is_superseded", false);
+    return captureId ? q.eq("source_snapshot_id", captureId) : q;
+  };
   const finish = (q: any) => q.order("observed_at", { ascending: false }).order("id", { ascending: false }).limit(LIMIT + 1);
   const isCollection = url.includes("/collection/");
   // Keep the source URL's own detail evidence and the collection's testimony distinct.
@@ -37,6 +44,7 @@ export async function readSourceProfile(db: any, selector: string) {
   const evidence: any[] = [];
   const checkedCaptures = new Map<string, Awaited<ReturnType<typeof readEcrCapture>>>();
   for (const row of rows.slice(0, LIMIT)) {
+    if (captureId && row.source_snapshot_id !== captureId) return result(503, { error: "Source evidence belongs to another retained capture" });
     // Re-derive against the retained original. An arbitrary JSON envelope is not an admission credential.
     const checked = checkedCaptures.get(row.source_snapshot_id) ?? await readEcrCapture(db, row.source_snapshot_id);
     checkedCaptures.set(row.source_snapshot_id, checked);
@@ -50,6 +58,7 @@ export async function readSourceProfile(db: any, selector: string) {
       || observationClockMicroseconds(row.observed_at) !== observationClockMicroseconds(r.captured_at)
       || !equal(row.structured_data?.ecr_capture_receipt, r)) return result(503, { error: "Admitted source custody differs from retained evidence" });
     const cards = isCollection ? r.cards : r.cards.filter(c => c.url === url);
+    if (isCollection && ecrUrl(r.source_url) !== url) return result(503, { error: "Source evidence belongs to another collection presentation" });
     if (!isCollection && ecrUrl(r.source_url) !== url && !cards.length) return result(503, { error: "Source evidence belongs to another vehicle presentation" });
     const existing = evidence.find(e => e.snapshot_id === r.snapshot_id);
     if (existing) { existing.observation_ids.push(row.id); continue; }
@@ -58,14 +67,14 @@ export async function readSourceProfile(db: any, selector: string) {
       admitted_at: row.ingested_at, label: r.label, kind: r.kind, cards,
       current_total: r.current_total, previous_total: r.previous_total, enumeration: r.enumeration });
   }
-  const history = { complete, scope: "admitted_exact_source_url", capture_limit: LIMIT };
+  const history = { complete, scope: "admitted_exact_source_url", selected_snapshot_id: captureId, observation_limit: LIMIT };
   if (isCollection) {
     const latest = evidence[0];
     return result(200, { data: { kind: "source_collection", source: "exclusive-car-registry", source_url: url,
       label: latest.label, captured_at: latest.captured_at, history,
       // The actual captured members are traversable even when Load more was never captured.
       members: latest.cards.map((c: any) => ({ source_url: c.url, label: c.label, image_url: c.image_url,
-        relationship: c.relationship, profile_path: sourceProfilePath(c.url) })),
+        relationship: c.relationship, profile_path: sourceProfilePath(c.url, latest.snapshot_id) })),
       enumeration: latest.enumeration, current_total: latest.current_total, previous_total: latest.previous_total,
       model_use_policy: "ecr_source_presentation_v1", model_use: { attributed_registry_presentation: true,
         dated_collection_presentation: latest.cards.length > 0, current_ownership: false,
@@ -78,12 +87,12 @@ export async function readSourceProfile(db: any, selector: string) {
       source_hash: e.source_hash, captured_at: e.captured_at, admitted_at: e.admitted_at,
       label: card?.label ?? e.label, image_url: card?.image_url ?? null,
       relationship: card?.relationship ?? null, collection_label: card ? e.label : null,
-      collection_profile_path: card ? sourceProfilePath(e.source_url) : null }));
+      collection_profile_path: card ? sourceProfilePath(e.source_url, e.snapshot_id) : null }));
   });
   const labels = [...new Set(claims.map(c => c.label))];
   const image = claims.find(c => c.image_url);
   return result(200, { data: { kind: "source_vehicle", source_profile_id: `ecr:${url.split("/").at(-1)}`,
-    vehicle_id: null, source: "exclusive-car-registry", source_url: url, profile_path: sourceProfilePath(url),
+    vehicle_id: null, source: "exclusive-car-registry", source_url: url, profile_path: sourceProfilePath(url, captureId),
     label: claims[0].label, label_status: labels.length > 1 ? "source_labels_differ" : "source_assertion",
     image_url: image?.image_url ?? null, image_source_url: image?.source_url ?? null,
     image_page_captured_at: image?.captured_at ?? null, image_observation_id: image?.observation_id ?? null,

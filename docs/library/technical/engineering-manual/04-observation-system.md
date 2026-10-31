@@ -527,7 +527,10 @@ re-derives the bounded selected captures and checks the original receipt, hash,
 subject and clocks before returning data. The existing vehicle-profile owner renders
 it at `/vehicle/source?source_url=...`; Search offers that drill for ECR URLs.
 The collection's captured members and a car's attributed collection presentations
-link to each other. This uses the existing observations, without a parallel entity
+link to each other. Those links carry an optional UUID `capture_id` through the
+profile and API, so an earlier claim cannot silently drill into the newest member
+set. Source URL and selected capture must both agree with the verified response.
+This uses the existing observations, without a parallel entity
 table or inferred vehicle restoration. Deployment and reader verification are separate
 from this implementation contract.
 

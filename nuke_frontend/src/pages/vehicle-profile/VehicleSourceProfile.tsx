@@ -31,7 +31,7 @@ interface SourceProfile {
   image_observation_id?: string | null;
   image_relationship?: string | null;
   captured_at?: string;
-  history: { complete: boolean };
+  history: { complete: boolean; selected_snapshot_id?: string | null };
   claims?: Claim[];
   members?: Member[];
 }
@@ -43,8 +43,9 @@ const relationship = (value: string | null) => value === 'source_current' ? 'Lis
 export default function VehicleSourceProfile() {
   const location = useLocation();
   const sourceUrl = new URLSearchParams(location.search).get('source_url') ?? '';
+  const captureId = new URLSearchParams(location.search).get('capture_id');
   const { user, loading: authLoading } = useAuth();
-  const subject = `${user?.id ?? ''}:${sourceUrl}`;
+  const subject = `${user?.id ?? ''}:${sourceUrl}:${captureId ?? ''}`;
   const [answer, setAnswer] = useState<{ subject: string; data: SourceProfile } | null>(null);
   const [failure, setFailure] = useState<{ subject: string; message: string } | null>(null);
   const [attempt, setAttempt] = useState(0);
@@ -70,7 +71,7 @@ export default function VehicleSourceProfile() {
     void (async () => {
       try {
         const canonical = new URL(sourceUrl).href.replace(/\/$/, '');
-        const reply = await supabase.functions.invoke(`api-v1-vehicles?source_url=${encodeURIComponent(sourceUrl)}`, { method: 'GET', signal: controller.signal });
+        const reply = await supabase.functions.invoke(`api-v1-vehicles?source_url=${encodeURIComponent(sourceUrl)}${captureId == null ? '' : `&capture_id=${encodeURIComponent(captureId)}`}`, { method: 'GET', signal: controller.signal });
         if (cancelled) return;
         if (reply.error) {
           const body = reply.error.context instanceof Response ? await reply.error.context.json().catch(() => null) : null;
@@ -78,7 +79,8 @@ export default function VehicleSourceProfile() {
         }
         const data = reply.data?.data as SourceProfile | undefined;
         if (!data || data.source_url !== canonical || typeof data.label !== 'string'
-          || !data.history || (data.kind !== 'source_vehicle' && data.kind !== 'source_collection')
+          || !data.history || (captureId != null && data.history.selected_snapshot_id !== captureId.toLowerCase())
+          || (data.kind !== 'source_vehicle' && data.kind !== 'source_collection')
           || (data.kind === 'source_vehicle' && !Array.isArray(data.claims))
           || (data.kind === 'source_collection' && !Array.isArray(data.members))) throw Error('Source profile response could not be verified.');
         if (!cancelled) setAnswer({ subject, data });
@@ -87,7 +89,7 @@ export default function VehicleSourceProfile() {
       } finally { window.clearTimeout(deadline); }
     })();
     return () => { cancelled = true; controller.abort(); window.clearTimeout(deadline); };
-  }, [sourceUrl, user?.id, subject, attempt]);
+  }, [sourceUrl, captureId, user?.id, subject, attempt]);
   const returnUrl = encodeURIComponent(location.pathname + location.search);
   return <main ref={page} className="vehicle-profile-page evidence-detail source-profile">
     <nav aria-label="Source profile navigation"><Link to="/search">Vehicle search</Link></nav>
@@ -125,7 +127,7 @@ export default function VehicleSourceProfile() {
             <p className="evidence-metadata">{relationship(member.relationship)}</p>
           </li>)}</ul>}
         </>}
-        {!profile.history.complete && <p role="status">This view reached its capture limit. Earlier source history has not been fully read.</p>}
+        {!profile.history.complete && <p role="status">This view reached its evidence limit. Source history has not been fully read.</p>}
       </>}
   </main>;
 }

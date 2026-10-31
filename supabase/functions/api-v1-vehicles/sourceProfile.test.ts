@@ -16,9 +16,9 @@ async function fixture(previous=false){
     structured_data:qualified.input.structured_data};
   let species="aggregator",failRead=false,copies=1;const requests:string[]=[];
   const db={from:(table:string)=>{
-    requests.push(table);let urls:string[]=[],contains=false,active=true;
-    const q:any={select:()=>q,eq:(k:string,v:unknown)=>{if(k==="is_superseded")active=v===false;return q;},in:(k:string,v:string[])=>{if(k==="source_url")urls=v;return q;},order:()=>q,
-      contains:()=>{contains=true;return q;},limit:async()=>({data:!active||row.is_superseded?[]:contains||urls.includes(row.source_url)?Array.from({length:copies},(_,i)=>({...row,id:row.id.slice(0,-3)+String(i).padStart(3,"0")})):[],error:failRead?{}:null}),
+    requests.push(table);let urls:string[]=[],contains=false,active=true,captureId:string|null=null;
+    const q:any={select:()=>q,eq:(k:string,v:unknown)=>{if(k==="is_superseded")active=v===false;if(k==="source_snapshot_id")captureId=String(v);return q;},in:(k:string,v:string[])=>{if(k==="source_url")urls=v;return q;},order:()=>q,
+      contains:()=>{contains=true;return q;},limit:async()=>({data:!active||row.is_superseded||(captureId&&captureId!==row.source_snapshot_id)?[]:contains||urls.includes(row.source_url)?Array.from({length:copies},(_,i)=>({...row,id:row.id.slice(0,-3)+String(i).padStart(3,"0")})):[],error:failRead?{}:null}),
       maybeSingle:async()=>table==="observation_sources"?{data:{id:"source",species},error:null}:{data:snapshot,error:failRead?{}:null}};
     return q;}};
   return {db,row,snapshot,requests,setSpecies:(v:string)=>{species=v;},fail:()=>{failRead=true;},repeat:(n:number)=>{copies=n;}};
@@ -46,6 +46,11 @@ Deno.test("source profile retains both current and previous testimony and traver
   assert(data.claims.length===2&&data.claims[1].relationship==="source_previous");
   const own=await readSourceProfile(f.db,collection);const c=own.body.data as any;
   assert(c.members.length===2&&c.enumeration==="captured_cards_only"&&c.members[0].profile_path.includes("source_url="));
+  assert(c.members[0].profile_path.includes("capture_id="+f.snapshot.id)&&data.claims[0].collection_profile_path.includes("capture_id="+f.snapshot.id));
+  const selected=await readSourceProfile(f.db,collection,f.snapshot.id.toUpperCase());
+  assert(selected.status===200&&(selected.body.data as any).history.selected_snapshot_id===f.snapshot.id);
+  assert((await readSourceProfile(f.db,collection,"33333333-3333-4333-8333-333333333333")).status===404);
+  assert((await readSourceProfile(f.db,collection,"not-a-capture")).status===400);
 });
 Deno.test("withdrawal, failed reads, source/hash/custody disagreement and hostile URLs refuse a usable profile",async()=>{
   for(const change of [(f:any)=>{f.snapshot.html+="tampered";},(f:any)=>{f.row.structured_data={ecr_capture_receipt:{label:"forged"}};},
@@ -86,6 +91,10 @@ Deno.test("actual vehicles API authenticates, reads retained evidence, and refus
     r=await request();const body=await r.json();assert(r.status===200&&body.data.source_profile_id==="ecr:123",JSON.stringify(body));
     assert(r.headers.get("Cache-Control")==="no-store"&&body.data.claims[0].snapshot_id===f.snapshot.id);
     const address=base+"/functions/v1/api-v1-vehicles?source_url="+encodeURIComponent(car);
+    r=await handler(new Request(address+"&capture_id="+f.snapshot.id.toUpperCase(),{headers:{Authorization:`Bearer ${key}`}}));
+    assert(r.status===200&&(await r.json()).data.history.selected_snapshot_id===f.snapshot.id);
+    r=await handler(new Request(address+"&capture_id=33333333-3333-4333-8333-333333333333",{headers:{Authorization:`Bearer ${key}`}}));
+    assert(r.status===503,"a mismatched DB response cannot change the selected capture");
     const forgedFixture="sb_secret_forged",rotatedFixture="sb_secret_rotated_fixture";
     r=await handler(new Request(address,{headers:{apikey:forgedFixture}}));assert(r.status===401);
     r=await handler(new Request(address,{headers:{apikey:rotatedFixture}}));assert(r.status===200);
