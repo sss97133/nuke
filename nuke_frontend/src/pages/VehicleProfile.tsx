@@ -28,6 +28,7 @@ const VehicleBriefing = React.lazy(() => import('./vehicle-profile/VehicleBriefi
 const VehiclePerformance = React.lazy(() => import('./stacks/VehicleCohort').then(module => ({ default: module.VehiclePerformance })));
 const VehiclePhotoLightbox = React.lazy(() => import('./vehicle-profile/VehiclePhotoLightbox'));
 const VehicleEvidenceView = React.lazy(() => import('./vehicle-profile/VehicleEvidenceView'));
+const VehicleSourceProfile = React.lazy(() => import('./vehicle-profile/VehicleSourceProfile'));
 
 
 const VehicleProfileInner: React.FC = () => {
@@ -405,6 +406,7 @@ const VehicleVinAddress: React.FC<{ vin: string }> = ({ vin }) => {
 /** Resolve VIN addresses before mounting any UUID-dependent profile readers. */
 const VehicleProfile: React.FC = () => {
   const { vehicleId } = useParams<{ vehicleId: string }>();
+  if (vehicleId === 'source') return <VehicleSourceProfile />;
   if (isVehicleVinAddress(vehicleId)) return <VehicleVinAddress key={vehicleId} vin={vehicleId} />;
   return <VehicleProfileProvider><VehicleProfileInner /></VehicleProfileProvider>;
 };

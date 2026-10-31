@@ -10,6 +10,7 @@ import { SearchFilterPanel } from '../components/search/SearchFilterPanel';
 import { SearchStatsBar } from '../components/search/SearchStatsBar';
 import { SearchEmptyState } from '../components/search/SearchEmptyState';
 import type { UrlExtraction } from '../hooks/useSearchPage';
+import { sourceVehicleProfilePath } from '../lib/sourceProfileAddress';
 import '../styles/unified-design-system.css';
 import './search-page.css';
 
@@ -19,6 +20,12 @@ function UrlExtractionCard({ extraction, onImport }: { extraction: UrlExtraction
 
   let domain = '';
   try { domain = new URL(url).hostname.replace(/^www\./, ''); } catch { domain = url; }
+  const sourceProfile = sourceVehicleProfilePath(url);
+  if (sourceProfile) return <section className="search-import-card" aria-label="Source profile">
+    <h2>Inspect source evidence</h2>
+    <p>Open this ECR presentation and its recorded collection context.</p>
+    <Link to={sourceProfile}>Open source profile</Link>
+  </section>;
 
   return (
     <section className="search-import-card" aria-label="Listing import">

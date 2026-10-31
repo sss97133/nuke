@@ -621,6 +621,7 @@ jobs:
       - name: Verify ECR replay qualifies retained source claims without inventing ownership or physical vehicles
         run: |
           deno test --no-check --node-modules-dir=none --allow-env --allow-read supabase/functions/ingest-observation/retainedEcr.test.ts supabase/functions/ingest-observation/retainedEcrHandler.test.ts
+          deno test --no-check --node-modules-dir=none --allow-env --allow-read supabase/functions/api-v1-vehicles/sourceProfile.test.ts
           node --test scripts/ecr-retained-replay.test.mjs
       - name: Verify native Gateway browser evidence, admission and replay
         run: deno test --node-modules-dir=none --allow-env --allow-read supabase/functions/_shared/gatewayParser.test.ts supabase/functions/ingest/gateway.test.ts
