@@ -1,5 +1,4 @@
 import { delegatedFinancialEvidence } from "./financialDelegation.ts";
-import { ECR_MODE, ECR_METHOD, ecrSelector, readEcrCapture } from "./retainedEcr.ts";
 /**
  * INGEST OBSERVATION
  *
@@ -142,6 +141,8 @@ const ARCHIVED_SALE_METHOD = "protected_archived_sale_observation_v1";
 const ARCHIVED_EPISODE_PREVIEW_METHOD = "protected_archived_sale_episode_preview_v2";
 const CAB_LISTING_CAPTURE_MODE = "cab_listing_capture_v1";
 const CAB_LISTING_CAPTURE_METHOD = "protected_cab_listing_capture_v1";
+const ECR_MODE = "retained_ecr_capture_v1";
+const ECR_METHOD = "protected_retained_ecr_capture_v1";
 
 /** Derive protected sale testimony here, never from caller-supplied values.
  * This is the canonical intake; database ingested_at is deliberately omitted.
@@ -306,7 +307,7 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
 
   try {
     let input: ObservationInput = await req.json();
-    let ecr: Extract<Awaited<ReturnType<typeof readEcrCapture>>, { ok: true }> | undefined;
+    let ecr: Extract<Awaited<ReturnType<typeof import("./retainedEcr.ts").readEcrCapture>>, { ok: true }> | undefined;
     if (input.mode === ECR_MODE) {
       const denied = await requireWriteAuth(req);
       if (denied) return denied;
@@ -314,6 +315,8 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
       if (!writer.ok || writer.caller.kind !== "service_role") return new Response(
         JSON.stringify({ error: "Retained ECR replay requires service role", writes: 0, model_calls: 0 }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      // Keep this optional source's entire dependency graph off unrelated intake paths.
+      const { ecrSelector, readEcrCapture } = await import("./retainedEcr.ts");
       const id = ecrSelector(input as unknown as Record<string, unknown>);
       if (!id) return new Response(JSON.stringify({ error: "Expected a snapshot selector and explicit dry_run", writes: 0, model_calls: 0 }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
