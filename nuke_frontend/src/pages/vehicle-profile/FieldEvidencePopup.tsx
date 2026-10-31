@@ -12,7 +12,7 @@ import { supabase } from '../../lib/supabase';
 import PrefetchLink from '../../components/PrefetchLink';
 import { Button } from '../../components/ui/button';
 import { usePopup } from '../../components/popups/usePopup';
-import { useVehicleImageEvidence, relatedFieldImages, hasImageAnalysis, webSourceUrl } from './hooks/useVehicleImageEvidence';
+import { useVehicleImageEvidence, relatedFieldImages, referenceFieldImages, isReferenceImage, hasImageAnalysis, webSourceUrl } from './hooks/useVehicleImageEvidence';
 import { useFieldProvenance, citedFieldImages, evidenceRelationLabel, provenanceCoverageUnavailable, formatProvenanceValue, groupRepeatedReports, ENGINE_PROPERTY_IDS } from './hooks/useFieldProvenance';
 import { useFieldEvidence, type FieldEvidenceGroup } from './hooks/useFieldEvidence';
 import FieldProvenanceDrawer from './FieldProvenanceDrawer';
@@ -44,9 +44,9 @@ interface FieldEvidencePopupProps {
 }
 
 /** The selected attribute remains framed by this vehicle; peer matches never replace its evidence. */
-function FieldContext({ field, label, value, context, reports, images, details }: {
+function FieldContext({ field, label, value, context, reports, images, references, details }: {
   field: string; label: string; value: string; context: ProfileFieldContext;
-  reports: FieldProvenance['observations']; images: EvidenceImage[]; details: React.ReactNode;
+  reports: FieldProvenance['observations']; images: EvidenceImage[]; references: EvidenceImage[]; details: React.ReactNode;
 }) {
   const { openPopup } = usePopup();
   const subject = context.subject;
@@ -90,10 +90,16 @@ function FieldContext({ field, label, value, context, reports, images, details }
     </article>)}
     {images.length > 0 && <section aria-label={`${value} related photographs`}>
       <h3>Related photographs</h3>
-      <div className="vp-field-context__images">{images.slice(0, 6).map(image => <button key={image.id} type="button" onClick={() => openVehiclePhoto(image.id)} aria-label={`Inspect ${image.vehicle_zone?.replace(/_/g, ' ') || label}`}>
+      <div className="vp-field-context__images" data-image-context="physical">{images.slice(0, 6).map(image => <button key={image.id} type="button" onClick={() => openVehiclePhoto(image.id)} aria-label={`Inspect ${image.vehicle_zone?.replace(/_/g, ' ') || label}`}>
         <img src={image.thumbnail_url || image.medium_url || image.image_url} alt="" width={160} height={110} loading="lazy" />
       </button>)}</div>
       <p className="vp-field-context__note">Related views help inspection; they do not establish the specific configuration.</p>
+    </section>}
+    {references.length > 0 && <section aria-label={`${value} reference material`}>
+      <h3>Reference material</h3>
+      <div className="vp-field-context__images" data-image-context="reference">{references.slice(0, 6).map(image => <button key={image.id} type="button" onClick={() => openVehiclePhoto(image.id)} aria-label={`Inspect reference: ${image.vehicle_zone?.replace(/_/g, ' ') || label}`}>
+        <img src={image.thumbnail_url || image.medium_url || image.image_url} alt="" width={160} height={110} loading="lazy" />
+      </button>)}</div>
     </section>}
     {filters.length > 0 && <section aria-label={`${value} data segment`}>
       <div className="vp-field-context__segment-head"><button type="button" aria-expanded={showPeers} onClick={() => setShowPeers(current => !current)}>Other profiles with this configuration</button>
@@ -158,7 +164,9 @@ const FieldEvidencePopup: React.FC<FieldEvidencePopupProps> = ({
   const claimGroup = evidence || claims.evidence[field];
   const rows = inventory.data?.images || [];
   const images = relatedFieldImages(rows, field);
+  const references = referenceFieldImages(rows, field);
   const citations = citedFieldImages(provenance.data, rows);
+  const citedIds = new Set(citations.map(image => image.id));
   const imagesLoading = inventory.isLoading || provenance.isLoading;
   const awaiting = rows.filter(image => !hasImageAnalysis(image)).length;
   const imageReadFailed = !!inventory.error || !!provenance.error || (!provenance.isLoading && provenance.data === null);
@@ -325,7 +333,7 @@ const FieldEvidencePopup: React.FC<FieldEvidencePopupProps> = ({
             Related images · Area match ({images.length})
           </div>
           <p>Area matches help inspection; they do not confirm {value}.</p>
-          <div className="field-evidence-related-images">
+          <div className="field-evidence-related-images" data-image-context="physical">
             {images.map(img => (
               <a href={img.image_url} target="_blank" rel="noopener noreferrer" key={img.id} aria-label={`Inspect related image: ${(img.vehicle_zone || field).replace(/_/g, ' ')}`}>
                 <img
@@ -344,6 +352,15 @@ const FieldEvidencePopup: React.FC<FieldEvidencePopupProps> = ({
           </div>
         </div>
       )}
+
+      {!imagesLoading && references.length > 0 && <div>
+        <div className="field-evidence-section-title">Reference material ({references.length})</div>
+        <div className="field-evidence-related-images" data-image-context="reference">
+          {references.map(img => <a href={img.image_url} target="_blank" rel="noopener noreferrer" key={img.id} aria-label={`Inspect reference: ${(img.vehicle_zone || field).replace(/_/g, ' ')}`}>
+            <img src={img.thumbnail_url || optimizeImageUrl(img.image_url, 'thumbnail') || img.image_url} alt={img.vehicle_zone || field} width={150} height={150} loading="lazy" />
+          </a>)}
+        </div>
+      </div>}
 
       {provenance.isLoading && <p role="status">Reading source evidence…</p>}
       {inventory.isLoading && <p role="status">Reading image evidence…</p>}
@@ -373,7 +390,8 @@ const FieldEvidencePopup: React.FC<FieldEvidencePopupProps> = ({
       ...(context && field === 'drivetrain' && !provenanceCoverageUnavailable(drivetrainContext.data)
         ? (drivetrainContext.data?.observations || []).filter(report => /\bNP\d{3}\b|transfer case|t-case/i.test(report.content || '')) : []),
     ]}
-    images={[...citations, ...images.filter(image => !citations.some(citation => citation.id === image.id))]}
+    images={[...citations.filter(image => !isReferenceImage(image)), ...images.filter(image => !citedIds.has(image.id))]}
+    references={[...citations.filter(isReferenceImage), ...references.filter(image => !citedIds.has(image.id))]}
     details={provenanceCoverageUnavailable(provenance.data)
       ? <p role="status">Source evidence could not be loaded completely for this field. <Button type="button" variant="secondary" disabled={provenance.isFetching} onClick={() => void provenance.refetch()}>Retry source evidence</Button></p>
       : !provenance.isLoading && provenance.data === null && !provenance.error

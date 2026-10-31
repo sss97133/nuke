@@ -23,10 +23,11 @@ export interface EvidenceImage {
   caption?: string | null;
   ai_byok_narrative?: string | null;
   ai_byok_components?: unknown;
+  ai_byok_scene?: string | null;
 }
 
 const CAP = 500;
-const SELECT = 'id,image_url,thumbnail_url,medium_url,vehicle_zone,angle,ai_detected_angle,ai_processing_status,vision_analyzed_at,vision_model_version,created_at,taken_at,source,is_primary,is_document,category,caption,ai_byok_narrative:ai_scan_metadata->byok_deep_analysis->>narrative_one_line,ai_byok_components:ai_scan_metadata->byok_deep_analysis->components_seen';
+const SELECT = 'id,image_url,thumbnail_url,medium_url,vehicle_zone,angle,ai_detected_angle,ai_processing_status,vision_analyzed_at,vision_model_version,created_at,taken_at,source,is_primary,is_document,category,caption,ai_byok_narrative:ai_scan_metadata->byok_deep_analysis->>narrative_one_line,ai_byok_components:ai_scan_metadata->byok_deep_analysis->components_seen,ai_byok_scene:ai_scan_metadata->byok_deep_analysis->>scene_type';
 
 export function webSourceUrl(value: string | null | undefined): string | null {
   if (!value) return null;
@@ -59,8 +60,8 @@ const FIELD_TERMS: Record<string, string[]> = {
   transmission: ['transmission', 'gearbox'],
   drivetrain: ['transfer case', 'driveshaft', 'drive shaft', 'axle', 'differential', '4wd', '4x4'],
 };
-type AreaImage = Pick<EvidenceImage, 'vehicle_zone' | 'is_document'> & Partial<Pick<EvidenceImage, 'caption' | 'ai_byok_narrative' | 'ai_byok_components'>> & {
-  ai_scan_metadata?: { byok_deep_analysis?: { narrative_one_line?: string | null; components_seen?: unknown } | null } | null;
+type AreaImage = Pick<EvidenceImage, 'vehicle_zone' | 'is_document'> & Partial<Pick<EvidenceImage, 'caption' | 'ai_byok_narrative' | 'ai_byok_components' | 'ai_byok_scene'>> & {
+  ai_scan_metadata?: { byok_deep_analysis?: { narrative_one_line?: string | null; components_seen?: unknown; scene_type?: string | null; attribution_doubt?: unknown } | null } | null;
 };
 
 function topicRank(image: AreaImage, field: string): number {
@@ -74,19 +75,39 @@ function topicRank(image: AreaImage, field: string): number {
   return terms.some(term => text.includes(term)) ? 1 : 2;
 }
 
-export function isRelatedFieldImage(image: AreaImage, field: string): boolean {
+export function isReferenceImage(image: AreaImage): boolean {
+  const byok = image.ai_scan_metadata?.byok_deep_analysis;
+  const scene = image.ai_byok_scene || byok?.scene_type;
+  return ['cross_reference', 'product_screenshot', 'spreadsheet', 'hand_drawn_diagram'].includes(scene || '')
+    || (typeof byok?.attribution_doubt === 'string' && !!byok.attribution_doubt.trim());
+}
+
+function matchesFieldArea(image: AreaImage, field: string): boolean {
+  const scene = image.ai_byok_scene || image.ai_scan_metadata?.byok_deep_analysis?.scene_type;
   const prefixes = FIELD_AREAS[field] || [];
-  return image.is_document !== true && (topicRank(image, field) < 2
+  return image.is_document !== true && scene !== 'receipt_document' && (topicRank(image, field) < 2
     || (!!image.vehicle_zone && prefixes.some(prefix => image.vehicle_zone!.startsWith(prefix))));
 }
 
-export function relatedFieldImages(images: EvidenceImage[], field: string): EvidenceImage[] {
+export function isRelatedFieldImage(image: AreaImage, field: string): boolean {
+  return !isReferenceImage(image) && matchesFieldArea(image, field);
+}
+
+function rankFieldImages(images: EvidenceImage[], field: string): EvidenceImage[] {
   const areas = FIELD_AREAS[field] || [];
   const rank = (image: EvidenceImage) => {
     const mention = topicRank(image, field);
     return mention < 2 ? mention : 2 + areas.findIndex(area => image.vehicle_zone?.startsWith(area));
   };
-  return images.filter(image => isRelatedFieldImage(image, field)).sort((a, b) => rank(a) - rank(b));
+  return images.sort((a, b) => rank(a) - rank(b));
+}
+
+export function relatedFieldImages(images: EvidenceImage[], field: string): EvidenceImage[] {
+  return rankFieldImages(images.filter(image => isRelatedFieldImage(image, field)), field);
+}
+
+export function referenceFieldImages(images: EvidenceImage[], field: string): EvidenceImage[] {
+  return rankFieldImages(images.filter(image => isReferenceImage(image) && matchesFieldArea(image, field)), field);
 }
 
 export function useVehicleImageEvidence(vehicleId: string | undefined, field?: string) {

@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { spawnSync } from 'node:child_process';
-import { computeSaturation, factFingerprint, CURRENT_SCHEMA_VERSION, DRY_PASS_LIMIT } from './deep-image-analysis-byok.mjs';
+import { computeSaturation, factFingerprint, CURRENT_SCHEMA_VERSION, DRY_PASS_LIMIT,
+  attributionDoubt, landEntityPage } from './deep-image-analysis-byok.mjs';
 import { projectImageProperties } from './lib/image-property-projection.mjs';
 
 const now = '2026-10-30T20:00:00Z';
@@ -131,4 +132,73 @@ test('offline refinement import needs neither Supabase credentials nor network a
     `let calls = 0; globalThis.fetch = () => { calls++; throw Error('offline only'); }; await import(${JSON.stringify(moduleUrl)}); if (calls) process.exit(1);`],
   { env, encoding: 'utf8', timeout: 10_000 });
   assert.equal(result.status, 0, result.stderr);
+});
+
+function entityClient() {
+  const saved = { records: [], components: [], updates: [] };
+  const client = { from(table) {
+    const q = { select() { return q; }, in() { return q; }, is() { return q; }, ilike() { return q; },
+      order() { return Promise.resolve({ data: [], error: null }); },
+      insert(rows) {
+        if (table === 'image_analysis_records') {
+          saved.records.push(...structuredClone(rows));
+          return { select: () => Promise.resolve({ data: rows.map((r, i) => ({ id: `record-${i}`, image_id: r.image_id })), error: null }) };
+        }
+        assert.equal(table, 'component_identifications'); saved.components.push(...structuredClone(rows));
+        return Promise.resolve({ error: null });
+      },
+    }; return q;
+  } };
+  return { client, saved };
+}
+function entityFrame(scene, intent = 'parts_sourcing') {
+  return { image_id: 'synthetic-image', vehicle_id: 'synthetic-vehicle', taken_at: '2026-01-01T12:00:00Z',
+    verdict: { ...prior(), scene_type: scene, intent, analyzed_at: now,
+      components_seen: [{ label: 'valve cover', part_number_guess: 'PART-1234', confidence: 0.7, bbox: [10, 20, 100, 200] }],
+      text_regions: [],
+    } };
+}
+const roster = [{ id: 'synthetic-receipt-line', pn: 'PART-1234', pnNorm: 'PART1234', description: 'Valve cover' }];
+
+for (const scene of ['cross_reference', 'product_screenshot', 'spreadsheet', 'hand_drawn_diagram']) {
+  test(`${scene} retains its receipt candidate without becoming a confirmed build component`, async () => {
+    const { client, saved } = entityClient(), frame = entityFrame(scene);
+    const snapshot = structuredClone(frame);
+    const result = await landEntityPage([frame], roster, { client });
+    assert.equal(result.confirmed, 0);
+    assert.equal(saved.records[0].confirmed_findings.length, 0);
+    assert.equal(saved.records[0].inferred_findings[0].receipt_candidate.receipt_item_id, roster[0].id);
+    assert.equal(saved.components[0].status, 'inferred');
+    assert.equal(saved.components[0].confidence, 0.7, 'a reference match must not boost visual confidence');
+    assert.equal(saved.components[0].source_references.evidence_role, 'reference');
+    assert.equal(saved.records[0].reference_coverage_snapshot.component_qualification_rule, 'reference_context_v1');
+    assert.equal(saved.components[0].source_references.receipt_item_id, roster[0].id);
+    assert.deepEqual(frame, snapshot);
+  });
+}
+
+test('the separate physical-image control retains its existing receipt confirmation', async () => {
+  const { client, saved } = entityClient();
+  const result = await landEntityPage([entityFrame('undercarriage', 'documentation')], roster, { client });
+  assert.equal(result.confirmed, 1);
+  assert.equal(saved.components[0].status, 'confirmed');
+  assert.equal(saved.records[0].confirmed_findings.length, 1);
+  assert.equal(saved.components[0].source_references.evidence_role, undefined);
+});
+
+test('a receipt document retains the paper citation without being relabeled as a reference photograph', async () => {
+  const { client, saved } = entityClient(), frame = entityFrame('receipt_document', 'documentation');
+  frame.verdict.text_regions = [{ text: 'PART-1234', bbox: [20, 30, 50, 80] }];
+  await landEntityPage([frame], roster, { client });
+  assert.equal(saved.components[0].status, 'confirmed');
+  assert.equal(saved.components[0].source_references.scene_type, 'receipt_document');
+  assert.equal(saved.components[0].source_references.match_basis, 'ocr_text');
+});
+
+test('explicit attribution doubt remains binding even when the scene resembles a build photograph', async () => {
+  const { client, saved } = entityClient(), frame = entityFrame('engine_bay');
+  frame.verdict.attribution_doubt = 'The source reading explicitly withholds this vehicle association';
+  assert.equal(attributionDoubt(frame.verdict), frame.verdict.attribution_doubt);
+  await landEntityPage([frame], roster, { client });
+  assert.equal(saved.components[0].status, 'inferred');
 });
