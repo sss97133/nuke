@@ -1,0 +1,12 @@
+.vp-work-context { margin-block: 12px; font: 15px/1.5 var(--font-family); }
+.vp-work-context summary { cursor: pointer; min-height: 44px; display: list-item; align-content: center; }
+.vp-work-context section { border-top: 1px solid var(--border); padding-block: 12px; }
+.vp-work-context h4 { font-size: 16px; margin: 0 0 8px; }
+.vp-work-context p { margin-block: 8px; }
+.vp-work-context dl { margin-block: 8px; }
+.vp-work-context dt { font-weight: 600; }
+.vp-work-context dd { margin: 0 0 8px; }
+.vp-work-context button { min-height: 44px; cursor: pointer; }
+.vp-work-context-photos { display: flex; gap: 8px; overflow-x: auto; }
+.vp-work-context-photos button { padding: 0; flex: 0 0 120px; border: 1px solid var(--border); background: var(--surface); }
+.vp-work-context-photos img { display: block; object-fit: contain; }
