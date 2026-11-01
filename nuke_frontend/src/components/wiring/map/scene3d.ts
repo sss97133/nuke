@@ -194,7 +194,12 @@ export function parseScene3d(p: URLSearchParams): Scene3dParams {
   const rawCam = p.get('cam')?.trim().toLowerCase() ?? '', camId = CAM_ALIAS[rawCam] ?? rawCam;
   const cam = camId === 'fit' || VIEWS.some(v => v.id === camId) ? (camId as CamId) : null;
   const pv = csv(p.get('pose'))?.map(Number) ?? null;
-  const pose = pv && pv.length === 6 && pv.every(Number.isFinite) ? pv : null;
+  // Orbit/zoom is capped at 40 metres. Allow a full orbit radius of pan around
+  // the truck, but reject remote/degenerate URL cameras before THREE sees them.
+  // Saved poses have millimetre precision; a smaller separation rounds to zero.
+  const distance = pv?.length === 6 ? Math.hypot(pv[0] - pv[3], pv[1] - pv[4], pv[2] - pv[5]) : 0;
+  const pose = pv && pv.length === 6 && pv.every(v => Number.isFinite(v) && Math.abs(v) <= 80)
+    && distance >= 0.001 && distance <= 40.002 ? pv : null;
   const ls = csv(p.get('layers')), layers = ls ? new Set(ls.filter(id => LAYERS.some(l => l.id === id))) : null;
   const hs = csv(p.get('harness')), zones = hs ? new Set(hs.filter((id): id is ZoneId => ZONES.some(z => z.id === id))) : null;
   const c = p.get('client');

@@ -17,6 +17,15 @@ describe('parseScene3d', () => {
     expect(P('pose=1,2,3').pose).toBeNull();
     expect(P('pose=1,2,3,4,5,x').pose).toBeNull();
   });
+  it('rejects remote and degenerate poses while retaining normal saved cameras', () => {
+    for (const pose of ['1e200,0,0,0,0,0', '81,0,0,80,0,0', '0,0,0,0,0,0', '0,0,0,0.0001,0,0', '41,0,0,0,0,0']) {
+      expect(P(`cam=fit&pose=${pose}`).pose).toBeNull();
+      expect(P(`cam=fit&pose=${pose}`).cam).toBe('fit');
+    }
+    expect(P('pose=5.321,3.214,4.111,0,1,-1').pose).toEqual([5.321, 3.214, 4.111, 0, 1, -1]);
+    // Rounding the six saved coordinates can slightly exceed the 40 m orbit limit.
+    expect(P('pose=40.001,0,0,0,0,0').pose).not.toBeNull();
+  });
   it('lists layers and zones, drops unknown ids, and harness=off is no zones', () => {
     const r = P('layers=frame,engine,bogus&harness=off');
     expect([...r.layers!]).toEqual(['frame', 'engine']);
