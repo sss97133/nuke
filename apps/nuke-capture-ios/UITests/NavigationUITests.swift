@@ -4,6 +4,29 @@ import XCTest
 final class NavigationUITests: XCTestCase {
     override func setUp() { continueAfterFailure = false }
 
+    func testSessionReviewInspectsSourceWithoutSelectingOrFiling() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-NukeFixtureBackend", "1", "-NukeFixturePersona", "client", "-ignitionComplete", "YES"]
+        app.launchEnvironment["NUKE_FIXTURE_SCENARIO"] = "source-inspection"
+        app.launch()
+        let garage = app.tabBars.buttons["Garage"].firstMatch
+        XCTAssertTrue(garage.waitForExistence(timeout: 12)); garage.tap()
+        let organize = app.buttons["Organize photos"].firstMatch
+        XCTAssertTrue(organize.waitForExistence(timeout: 10)); organize.tap()
+        let day = app.staticTexts["2026-10-31"].firstMatch
+        XCTAssertTrue(day.waitForExistence(timeout: 10)); day.tap()
+        let inspect = app.buttons["session.source.inspect.00000000-0000-4000-8000-00000000e001"]
+        XCTAssertTrue(inspect.waitForExistence(timeout: 10)); inspect.tap()
+        XCTAssertTrue(app.staticTexts["This reading remains unresolved."].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Retained interpretations · this read does not establish identity"].exists)
+        let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = "session-source-inspection"; shot.lifetime = .keepAlways; add(shot)
+        app.navigationBars.buttons["Which vehicle?"].firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["0 selected · 1 shown of 1 session photos"].waitForExistence(timeout: 5))
+        let log = app.descendants(matching: .any)["fixture.writes"]
+        XCTAssertTrue(log.waitForExistence(timeout: 5))
+        XCTAssertEqual(log.label, "no writes", "Inspecting a source must not assert identity or file a photo")
+    }
+
     func testGarageTabFindsAZeroPhotoRecordAndOpensTheActualProfile() {
         let app = XCUIApplication()
         app.launchArguments = ["-NukeFixtureBackend", "1", "-NukeFixturePersona", "client", "-ignitionComplete", "YES"]

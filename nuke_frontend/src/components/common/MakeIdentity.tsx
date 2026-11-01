@@ -52,7 +52,8 @@ export function MakeIdentity({ make, inverse = false, compact = false }: { make:
   </span>;
 }
 
-type VehicleIdentityProps = { make: string; model: string; year?: number | string | null; variants?: VehicleIdentityToken[]; compact?: boolean; onExplore?: (field: string, value: string) => void };
+export type ModelIdentityArtwork = { path: string; width: number; height: number; description: string };
+type VehicleIdentityProps = { make: string; model: string; year?: number | string | null; variants?: VehicleIdentityToken[]; compact?: boolean; onExplore?: (field: string, value: string) => void; modelArtwork?: ModelIdentityArtwork | null };
 type VehicleArtwork = (typeof vehicleArtwork)[number];
 
 /** Match structured identity only. Unknown years/models never inherit another era's badge. */
@@ -81,7 +82,9 @@ function VehicleArtworkImage({ asset, fallback }: { asset: VehicleArtwork; fallb
 }
 
 /** The vehicle's own nameplate, selected by year/make/model, with a readable fallback. */
-export function VehicleIdentity({ make, model, year, variants = [], compact = false, onExplore }: VehicleIdentityProps) {
+export function VehicleIdentity({ make, model, year, variants = [], compact = false, onExplore, modelArtwork }: VehicleIdentityProps) {
+  const [failedArtwork, setFailedArtwork] = useState<string | null>(null);
+  const sourcedModel = modelArtwork && failedArtwork !== modelArtwork.path ? modelArtwork : null;
   const assets = resolveVehicleArtwork({ make, model, year, variants });
   const maker = assets.find(asset => asset.role === 'make');
   const script = assets.find(asset => asset.role === 'model');
@@ -91,7 +94,7 @@ export function VehicleIdentity({ make, model, year, variants = [], compact = fa
   const part = (field: string, value: string, content: React.ReactNode) => onExplore
     ? <button type="button" className="vehicle-identity__explore" aria-haspopup="dialog" aria-label={`Explore ${value} in this profile`} onClick={() => onExplore(field, value)}>{content}</button>
     : content;
-  return <span className={`vehicle-identity${compact ? ' vehicle-identity--compact' : ''}`} data-period-artwork={assets.length > 0} data-variant-artwork={!!variantScript}>
+  return <span className={`vehicle-identity${compact ? ' vehicle-identity--compact' : ''}`} data-period-artwork={assets.length > 0 || !!sourcedModel} data-variant-artwork={!!variantScript}>
     {compact && year && <span className="vehicle-identity__year" aria-hidden={onExplore ? undefined : true}>{part('year', String(year), year)}</span>}
     <span className="vehicle-identity__maker" aria-hidden={onExplore ? undefined : true}>
       {part('make', make, <>
@@ -102,7 +105,10 @@ export function VehicleIdentity({ make, model, year, variants = [], compact = fa
     {emblem && <VehicleArtworkImage key={emblem.file} asset={emblem} />}
     <span className="vehicle-identity__name">
       {(!variantScript || compact) && <span className="vehicle-identity__model" aria-hidden={onExplore ? undefined : true}>{part('model', model, <>
-        {script ? <VehicleArtworkImage key={script.file} asset={script} fallback={model} /> : model}
+        {sourcedModel ? <span className="vehicle-identity__art vehicle-identity__art--model"><img src={sourcedModel.path}
+          width={sourcedModel.width} height={sourcedModel.height} alt="" title={sourcedModel.description}
+          onError={() => setFailedArtwork(sourcedModel.path)} /></span>
+          : script ? <VehicleArtworkImage key={script.file} asset={script} fallback={model} /> : model}
       </>)}</span>}
       {variantScript && <span className="vehicle-identity__variant" aria-hidden={onExplore ? undefined : true}>{part('trim', variantName, <VehicleArtworkImage key={variantScript.file} asset={variantScript} fallback={variantName} />)}</span>}
       {variants.filter(token => !variantScript || (token.kind !== 'series' && token.kind !== 'trim')).map(token =>
