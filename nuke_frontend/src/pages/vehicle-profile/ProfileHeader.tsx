@@ -1,6 +1,6 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { PrefetchLink } from '../../components/PrefetchLink';
-import { VehicleIdentity } from '../../components/common/MakeIdentity';
+import ProfileIdentity from './ProfileIdentity';
 import { HeaderPopover } from '../../components/vehicle/HeaderPopover';
 import { getVehicleTitle } from '../../hooks/usePageTitle';
 import { Masthead, Facet, ClaimView, Text, formatMeasure } from '../../kit';
@@ -351,7 +351,7 @@ export default function ProfileHeader({ priceLotId }: { priceLotId?: string }) {
       </div>}>
         <Text role="entity" as="h1" aria-label={title}>
           {asArtwork
-            ? <VehicleIdentity compact year={vehicle.year} make={vehicle.make ?? ''} model={masthead.model!} variants={masthead.identity.differentiators} onExplore={explore} />
+            ? <ProfileIdentity vehicleId={vehicle.id} compact year={vehicle.year} make={vehicle.make ?? ''} model={masthead.model!} variants={masthead.identity.differentiators} onExplore={explore} />
             : title}
         </Text>
         {priceOwnedByLiveStack ? <details className="vp-header-configuration"><summary>Configuration</summary>{configuration}</details> : configuration}
