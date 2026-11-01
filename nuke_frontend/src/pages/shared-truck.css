@@ -1,0 +1,3 @@
+.shared-truck { position: fixed; inset: 0; background: var(--surface); }
+.shared-truck-status { padding: 24px; font: 15px/1.5 var(--font-family); color: var(--text); }
+.shared-truck-status button { min-height: 44px; padding-inline: 16px; cursor: pointer; }

@@ -43,7 +43,7 @@ import { PartLibrary } from './PartLibrary';
 import { MissingList, missingOf } from './MissingList';
 import { WireSearch } from './WireSearch';
 import { needsOwner } from './ownerLayer';
-import { parseScene3d } from './scene3d';
+import { useScene3dURL } from './useScene3dURL';
 
 const WORK_WORD: Record<WorkStatus, string> = {
   open: 'OPEN', in_progress: 'IN PROGRESS', needs_owner: 'NEEDS YOU', done: 'DONE', blocked: 'BLOCKED',
@@ -168,7 +168,8 @@ export function WiringMap({ vehicleId }: { vehicleId?: string }) {
   const view: View = doorViews.find(x => x[0] === rawView)?.[0] ?? doorViews[0][0];
   const [tablesOpen, setTablesOpen] = useState(false);
   const in3d = view === '3d';
-  const scene3d = useMemo(() => parseScene3d(params), [in3d]);   // eslint-disable-line react-hooks/exhaustive-deps -- the link's scene, read when the 3D view opens (the view keeps the URL current after that)
+  const sceneURL = useScene3dURL(params, set);
+  const scene3d = sceneURL.init;
   // one URL write per click (two in the same tick would each start from the same URL and the second would win)
   const go = (d: Door | null, id?: string | null) => {
     set({ door: d, view: null, ...(id !== undefined ? { sel: id, node: null, call: null } : {}) });
@@ -221,7 +222,7 @@ export function WiringMap({ vehicleId }: { vehicleId?: string }) {
         {view === '3d' && (
           <Suspense fallback={<div style={{ padding: 16, fontSize: 12, color: cw.inkMuted }}>LOADING THE 3D HARNESS…</div>}>
             <ZoneModels3D cw={cw} ix={ix} site={site} sel={sel} rel={rel} onSelect={pick} onClear={clearSel}
-              init={scene3d} client={scene3d.client === true} onScene={set} linkBase={vehicleId ? `/share/truck/${vehicleId}` : undefined} />
+              key={`${vehicleId}:${sceneURL.revision}`} init={scene3d} client={scene3d.client === true} onScene={sceneURL.onScene} linkBase={vehicleId ? `/share/truck/${vehicleId}` : undefined} />
           </Suspense>
         )}
         {view === 'face' && <ConnectorFace cw={cw} ix={ix} site={site} code={faceCode} sel={sel} rel={rel} onSelect={pick} />}
