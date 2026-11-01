@@ -112,6 +112,13 @@ export async function qualifyEcrCapture(snapshot: any, html: string, now = Date.
 
 // Consumer-only projection of the verified original, outside the immutable v1
 // admission receipt. Similar Cars and placeholder images are not this subject.
+// Fresh unauthenticated visual review on 2026-10-31 found these exact references
+// serve ECR's LOG IN artwork. Exclude only observed URLs, never dimensions; do
+// not try another gallery URL as an access fallback. The source link remains.
+const unavailableDetailImages = new Set([
+  "https://exclusivecarregistry.com/images/gallery/car/full/795824",
+  "https://exclusivecarregistry.com/images/gallery/car/full/357917",
+]);
 async function detailImage(html: string): Promise<string | null> {
   const { load } = await import("npm:cheerio@1.2.0");
   const $ = load(html);
@@ -123,7 +130,8 @@ async function detailImage(html: string): Promise<string | null> {
     try {
       const u = new URL(src, "https://exclusivecarregistry.com");
       if (u.origin === "https://exclusivecarregistry.com" && !u.username && !u.password && !u.search && !u.hash
-        && /^\/images\/gallery\/car\/(full|thumb)\/[1-9][0-9]*$/.test(u.pathname)) return u.href;
+        && /^\/images\/gallery\/car\/(full|thumb)\/[1-9][0-9]*$/.test(u.pathname))
+        return unavailableDetailImages.has(u.href) ? null : u.href;
     } catch { /* A missing or invalid presentation image does not invent one. */ }
   }
   return null;

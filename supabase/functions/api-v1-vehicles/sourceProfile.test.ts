@@ -116,7 +116,8 @@ Deno.test("retained detail hero reaches the profile with its original capture; h
   assert(data.image_observation_id===data.claims[0].observation_id&&data.claims[0].snapshot_id===f.snapshot.id);
   assert(data.vehicle_id===null&&data.staging_permission_status==='unknown'&&!data.model_use.verified_factory_specification);
   assert(JSON.stringify(f.row.structured_data)===before,'v1 receipt must stay unchanged');
-  for(const bad of ['',img('/images/common/standard-blank-image.jpg'),img('https://evil.test/images/gallery/car/full/123'),img('/images/gallery/car/full/123?other=1')]){
+  for(const bad of ['',img('/images/common/standard-blank-image.jpg'),img('https://evil.test/images/gallery/car/full/123'),img('/images/gallery/car/full/123?other=1'),
+    img('/images/gallery/car/full/795824')+img('/images/gallery/car/thumb/795825'),img('/images/gallery/car/full/357917')]){
     const missing=await fixture(false,detail(bad));const r=await readSourceProfile(missing.db,car);
     assert(r.status===200&&(r.body.data as any).image_url===null,'no placeholder, related car, or unqualified URL');
   }
