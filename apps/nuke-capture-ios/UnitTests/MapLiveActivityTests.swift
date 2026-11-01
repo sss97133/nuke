@@ -19,7 +19,9 @@ final class MapLiveActivityTests: XCTestCase {
         XCTAssertEqual(window.start, utc(2026, 10, 26))
         XCTAssertEqual(window.end, utc(2026, 11, 2))   // exclusive: all of Nov 1 is inside
         XCTAssertTrue(window.isServerEligible)
-        XCTAssertEqual(window.displayLabel, MapObservationWindow.lastDays(7) == window ? "Last 7 days" : window.label)
+        XCTAssertEqual(MapObservationWindow.lastDays(7).displayLabel, "Last 7 days")
+        XCTAssertEqual(MapObservationWindow.lastDays(30).displayLabel, "Last 30 days")
+        XCTAssertEqual(MapObservationWindow.all.displayLabel, "All time")
     }
 
     func testWindowEligibilityAndKeys() {
@@ -90,7 +92,7 @@ final class MapLiveActivityTests: XCTestCase {
 
     func testSmallPanKeepsKeyButRealMoveAndZoomChangeIt() {
         let base = rect(1_000_000, 2_000_000, 400_000, 700_000)
-        let tiny = rect(1_000_000 + 4_000, 2_000_000 + 4_000, 400_000, 700_000)
+        let tiny = rect(1_000_000 + 1_000, 2_000_000 + 1_000, 400_000, 700_000)
         XCTAssertEqual(ViewportSnap(base), ViewportSnap(tiny))
         let far = rect(1_000_000 + 900_000, 2_000_000, 400_000, 700_000)
         XCTAssertNotEqual(ViewportSnap(base), ViewportSnap(far))
