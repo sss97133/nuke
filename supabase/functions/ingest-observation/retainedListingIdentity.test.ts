@@ -43,6 +43,25 @@ Deno.test("identity text bounds count Unicode characters consistently with SQL",
  assert(retainedListingIdentityValue("model","🚙".repeat(121))===null);
  assert(retainedListingIdentityValue("model","a\u007fb")===null);
 });
+Deno.test("BaT sale-result labels retain source clocks and never become verified identity",()=>{
+ const closed={...source,kind:"sale_result"};
+ for(const key of ["year","make","model"]){
+  const mode=`retained_listing_${key}_v1`;
+  const d=deriveRetainedInterior(closed,vehicle,registrySource,mode)!;
+  assert(d && d.structured_data[key]===closed.structured_data[key as keyof typeof closed.structured_data]);
+  assert(d.observed_at===closed.ingested_at && d.raw_source_ref===`vehicle_observations:${closed.id}`);
+  assert(d.structured_data.identity_resolution_status==="unverified" && d.structured_data.source_event_time_status==="unknown");
+  assert(d.structured_data.source_observed_at===closed.observed_at && !("source_captured_at" in d.structured_data));
+  for(const patch of [{kind:"bid"},{extraction_method:"backfill-sale-results"},{extraction_method:"html_description_capture"},
+   {is_superseded:true},{source_url:"https://bringatrailer.com.evil.invalid/listing/test"},{source_url:"https://bringatrailer.com/listing/test?private=1"}])
+   assert(!deriveRetainedInterior({...closed,...patch},vehicle,registrySource,mode));
+  for(const patch of [{is_public:false},{deleted_at:"2026-10-01"},{listing_kind:"non_vehicle_item"}])
+   assert(!deriveRetainedInterior(closed,{...vehicle,...patch},registrySource,mode));
+  assert(!deriveRetainedInterior(closed,vehicle,{...registrySource,slug:"mecum"},mode));
+ }
+ for(const key of ["mileage_miles","engine_family_label"])
+  assert(!deriveRetainedInterior(closed,vehicle,registrySource,`retained_listing_${key}_v1`));
+});
 Deno.test("Mecum index identity keeps the exact source and admits no other source shape or property",()=>{
  const index={...source,kind:"sale_result",extraction_method:"public_lot_index",
   source_url:"https://www.mecum.com/lots/1/1971-chevrolet-k10-custom-pickup/",
