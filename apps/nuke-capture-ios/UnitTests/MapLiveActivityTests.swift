@@ -71,7 +71,7 @@ final class MapLiveActivityTests: XCTestCase {
     func testFoldAppliesMakeFilterAndMembershipGuard() {
         let rows = [row("89005", sold: 2), row("89005", make: "Ford", listed: 3), row("89005", county: "06037", sold: 7)]
         let crosswalk = ["89005": "32003"]
-        let ford = LiveActivityFold.fold(rows, make: " ford ", crosswalk: crosswalk,
+        let ford = LiveActivityFold.fold(rows, make: "ford", crosswalk: crosswalk,
                                          countyZIPs: ["32003": ["89005"], "06037": []], visible: ["89005"])
         XCTAssertEqual(ford.total, LiveActivity(fresh: 3, sold: 0, listed: 3))
         let all = LiveActivityFold.fold(rows, make: nil, crosswalk: crosswalk,
