@@ -57,7 +57,7 @@ enum FixtureBackend {
         "work_order_facility_reservations_read", "work_order_operations_read", "vehicle_work_orders_read",
         "listing_work_plan_read", "open_requirements_read", "provider_profile_read", "provider_job_record_read",
         "my_contact_requests", "contact_thread_read", "my_signature_queue", "my_work_orders", "my_identity_read",
-        "work_order_statement_read", "facility_read", "my_vouches_read",
+        "work_order_statement_read", "facility_read", "my_vouches_read", "user_org_relations",
     ]
 
     static func isReader(_ name: String) -> Bool {
@@ -71,6 +71,22 @@ enum FixtureBackend {
             return ok("""
             {"success":true,"results":[{"id":"\(clientId)","type":"user","title":"Fixture Person"}],
              "meta":{"total_count":0,"returned_count":0,"offset":0,"has_more":false,"vehicle_source":"search_vehicles_fts"}}
+            """)
+        }
+        if scenario == "source-inspection", path == "/functions/v1/check-image-vehicle-match" {
+            return ok("""
+            {"photos":[{"id":"00000000-0000-4000-8000-00000000e001","grain":"source_photo","identity":null,"grouping_asserted":false,
+              "source_state":"ready","source_reason":null,"image_url":"https://fixture.nuke.invalid/photo.png","source_sha256":"\(String(repeating: "a", count: 64))",
+              "created_at":"2026-10-31T12:00:00Z","taken_at":"2026-10-31T11:00:00Z","attached_vehicle_id_context":null,
+              "subject_analysis_state":"current_readings","membership_state":"unfiled",
+              "reading_context_coverage":{"grain":"terminal_reading_heads","assessed":1,"qualified":1,"withdrawn":0,"unqualified_or_conflicting":0,"complete":true},
+              "readings":[{"id":"00000000-0000-4000-8000-00000000e002","input_key":"fixture","provider":"fixture","model":"source-test",
+                "read_at":"2026-10-31T12:00:00Z","observed_at":"2026-10-31T11:00:00Z",
+                "input":{"source_sha256":"\(String(repeating: "a", count: 64))","input_sha256":"\(String(repeating: "a", count: 64))","representation":"source"},
+                "frame":{"medium":"photograph","primary_subject":"vehicle","view":"detail","bbox":null},
+                "unresolved_reasons":["Vehicle identity remains unresolved."]}]}],
+             "coverage":{"grain":"owner_source_page","assessed":1,"returned":1,"displayable":1,"without_displayable_pixels":0,"ambiguous_source_rows":0,
+               "as_of":"2026-10-31T12:00:00Z","truncated":false,"account_total":null,"accessible_device_library_total":null,"inference_started":false},"next_cursor":null}
             """)
         }
         if path.hasPrefix("/rest/v1/rpc/") {
@@ -105,7 +121,11 @@ enum FixtureBackend {
     private static func reader(_ name: String, _ args: [String: Any]) -> (Int, Data) {
         let signedIn = persona != .visitor
         switch name {
-        case "vehicle_profile_read" where scenario == "navigation-garage":
+        case "get_orphan_sessions" where scenario == "source-inspection":
+            return ok("""
+            [{"session_day":"2026-10-31","gps_cell":"fixture","photo_count":1,"image_ids":["00000000-0000-4000-8000-00000000e001"],"sample_url":null,"suggested_vehicle_id":null,"suggested_vehicle_label":null}]
+            """)
+        case "vehicle_profile_read" where ["navigation-garage", "source-inspection"].contains(scenario):
             return ok("""
             {"vehicle_id":"\(navigationVehicleId)","viewer":"anon","read_at":"2026-10-31T12:00:00Z",
              "sections":[{"kind":"strip","coverage":{"n":1,"of":1,"grain":"source claims","as_of":"2026-10-31T12:00:00Z"},
@@ -113,13 +133,13 @@ enum FixtureBackend {
                  "source":{"kind":"listing","label":"Dealer seller listing","method":"dealer_microdata_v2","url":"https://example.com/vehicle"},
                  "trust":0.6,"qualification":{"role":"seller_claim","factory_configuration_status":"unknown","current_configuration_status":"unknown"}}}]}]}
             """)
-        case "get_user_garage" where scenario == "navigation-garage":
+        case "get_user_garage" where ["navigation-garage", "source-inspection"].contains(scenario):
             return ok("""
             [{"vehicle_id":"\(navigationVehicleId)","year":1973,"make":"Fixture","model":"Coupe",
               "trim_name":null,"image_url":null,"current_value":null,"image_count":0,"relationship":"profile_record"}]
             """)
-        case "get_my_garage_owner_corrections" where scenario == "navigation-garage": return ok("[]")
-        case "my_unorganized_photo_count" where scenario == "navigation-garage": return ok("0")
+        case "get_my_garage_owner_corrections" where ["navigation-garage", "source-inspection"].contains(scenario): return ok("[]")
+        case "my_unorganized_photo_count" where ["navigation-garage", "source-inspection"].contains(scenario): return ok("0")
         case "listing_work_plan_read": return ok(PlanFixtures.plan)
         case "my_suggested_provider_links": return ok(ParityFixtures.suggestions)
         case "work_order_publication_read":
@@ -236,13 +256,15 @@ enum FixtureBackend {
 
     private static func table(_ name: String) -> (Int, Data) {
         switch name {
-        case "vehicles" where scenario == "navigation-garage":
+        case "vehicles" where ["navigation-garage", "source-inspection"].contains(scenario):
             return ok("""
             [{"id":"\(navigationVehicleId)","year":1973,"make":"Fixture","model":"Coupe","vin":"TEST1234567",
               "trim":null,"primary_image_url":null,"image_count":0}]
             """)
+        case "vehicle_images" where scenario == "source-inspection":
+            return ok(#"[{"id":"00000000-0000-4000-8000-00000000e001","image_url":"https://fixture.nuke.invalid/photo.png","auto_suggested_vehicle_id":null,"auto_suggestion_reasons":null}]"#)
         case "vehicle_images" where scenario == "navigation-garage": return ok("[]")
-        case "vehicle_images_public" where scenario == "navigation-garage": return ok("[]")
+        case "vehicle_images_public" where ["navigation-garage", "source-inspection"].contains(scenario): return ok("[]")
         case "vehicle_images": return ok(persona == .client ? PostJobFixtures.photos : "[]")
         case "profiles": return ok(ParityFixtures.ownRow)
         case "tool_requirement_key_map": return ok(ParityFixtures.toolKeys)
