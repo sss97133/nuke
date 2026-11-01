@@ -33,6 +33,29 @@ final class NavigationUITests: XCTestCase {
         XCTAssertTrue((search.value as? String)?.contains("1234567") == true, "returning must retain the Garage search")
     }
 
+    func testSellerSourceSheetShowsConfigurationLimits() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-NukeFixtureBackend", "1", "-NukeFixturePersona", "visitor"]
+        app.launchEnvironment["NUKE_FIXTURE_SCENARIO"] = "navigation-garage"
+        app.launchEnvironment["NUKE_DEBUG_VEHICLE_ID"] = "00000000-0000-4000-8000-00000000c001"
+        app.launch()
+        let engine = app.staticTexts["350 V8 Crate"].firstMatch
+        XCTAssertTrue(engine.waitForExistence(timeout: 15))
+        engine.tap()
+        XCTAssertTrue(app.staticTexts["What this establishes"].firstMatch.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Source, Dealer seller listing · dealer_microdata_v2"].exists)
+        app.swipeUp()
+        for (label, expected) in [("Claim basis", "Seller Claim"), ("Factory configuration", "Unknown"), ("Current configuration", "Unknown")] {
+            let row = app.descendants(matching: .any).matching(identifier: "claim.qualification.\(label)").firstMatch
+            XCTAssertTrue(row.exists)
+            let accessibleText = row.label + " " + (row.value as? String ?? "")
+            XCTAssertTrue(accessibleText.contains(expected), "\(label) must retain \(expected): \(accessibleText)")
+        }
+        let screenshot = XCTAttachment(screenshot: app.screenshot())
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
+    }
+
     func testExploreShowsPeopleWithoutRequiringVehicleResults() {
         let app = XCUIApplication()
         app.launchArguments = ["-NukeFixtureBackend", "1", "-NukeFixturePersona", "visitor"]

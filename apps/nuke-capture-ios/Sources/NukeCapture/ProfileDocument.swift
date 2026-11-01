@@ -260,6 +260,27 @@ enum ClaimValue: Decodable {
     }
 }
 
+/// Limits returned by the same reader as the value. A seller's specification is
+/// not proof of either factory equipment or the vehicle's present configuration.
+struct ClaimQualification: Decodable, Equatable {
+    let role: String?
+    let factory_configuration_status: String?
+    let current_configuration_status: String?
+    let limitation: String?
+
+    var hasContent: Bool {
+        !rows.isEmpty || !(limitation?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
+    }
+
+    var rows: [(label: String, value: String)] {
+        [("Claim basis", role), ("Factory configuration", factory_configuration_status),
+         ("Current configuration", current_configuration_status)].compactMap { label, value in
+            guard let value, !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+            return (label, value.replacingOccurrences(of: "_", with: " ").capitalized)
+        }
+    }
+}
+
 /// One attributed fact: a value, who said it, when it was observed, how far to trust it (0 to 1).
 struct Claim: Decodable {
     let value: ClaimValue
@@ -267,6 +288,7 @@ struct Claim: Decodable {
     var source: ClaimSource
     var observed_at: String?
     let trust: Double
+    var qualification: ClaimQualification? = nil
 
     /// Trust as the web shows it: a whole percentage, clamped.
     var trustPercent: Int { Int((min(1, max(0, trust)) * 100).rounded()) }

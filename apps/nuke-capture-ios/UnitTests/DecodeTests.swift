@@ -57,6 +57,31 @@ final class DecodeTests: XCTestCase {
         XCTAssertEqual(whole.value.text, "24000")
     }
 
+    func testNativeSellerClaimPreservesConfigurationLimits() throws {
+        // The shape returned by the deployed native-listing profile reader.
+        let claim = try decode(Claim.self, #"{"value":"350 V8 Crate","source":{"kind":"listing","label":"Dealer seller listing","method":"dealer_microdata_v2","url":"https://example.com/vehicle"},"observed_at":"2026-10-31T12:00:00Z","trust":0.6,"qualification":{"role":"seller_claim","factory_configuration_status":"unknown","current_configuration_status":"unknown"}}"#)
+        let qualification = try XCTUnwrap(claim.qualification)
+        XCTAssertEqual(qualification.role, "seller_claim")
+        XCTAssertEqual(qualification.rows.map(\.label), ["Claim basis", "Factory configuration", "Current configuration"])
+        XCTAssertEqual(qualification.rows.map(\.value), ["Seller Claim", "Unknown", "Unknown"])
+        XCTAssertEqual(claim.rootStatus, .attributed)
+        XCTAssertEqual(claim.trust, 0.6)
+        XCTAssertEqual(claim.source.openableURL?.absoluteString, "https://example.com/vehicle")
+    }
+
+    func testQualificationDoesNotInventMissingOrFutureConfigurationEvidence() throws {
+        let legacy = try decode(Claim.self, #"{"value":"V8","source":{"kind":"legacy"},"trust":0.3}"#)
+        XCTAssertNil(legacy.qualification)
+        XCTAssertFalse(try decode(ClaimQualification.self, "{}").hasContent)
+        XCTAssertFalse(try decode(ClaimQualification.self, #"{"role":" ","limitation":" "}"#).hasContent)
+        XCTAssertTrue(try decode(ClaimQualification.self, #"{"limitation":"Source limit"}"#).hasContent)
+        let partial = try decode(Claim.self, #"{"value":"V8","source":{"kind":"listing"},"trust":0.6,"qualification":{"role":"publisher_report","current_configuration_status":"not_assessed","limitation":"The source does not establish installation."}}"#)
+        XCTAssertNil(partial.qualification?.factory_configuration_status)
+        XCTAssertEqual(partial.qualification?.rows.map(\.value), ["Publisher Report", "Not Assessed"])
+        XCTAssertEqual(partial.qualification?.limitation, "The source does not establish installation.")
+        XCTAssertEqual(partial.rootStatus, .attributed)
+    }
+
     func testLiveBoardSkipsBrokenRowsAndReadsDriftedValuesAsMissing() throws {
         let json = """
         {"synced_at":"2026-10-13T16:40:00.496962+00:00","source":"test","auctions":[
