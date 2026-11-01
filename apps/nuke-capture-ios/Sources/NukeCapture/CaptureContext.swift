@@ -190,10 +190,34 @@ enum CaptureContextReader {
         if let re = try? NSRegularExpression(pattern: #"\b(?:YEAR|YR|MODEL YEAR)\b\D{0,12}((?:19|20)\d{2})\b"#),
            let m = re.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
            let r = Range(m.range(at: 1), in: text) { year = Int(text[r]) }
-        let serial = VisionEngine.vinCandidates(in: lines).first(where: VisionEngine.isValidVIN)
-            ?? VisionEngine.labelledClassicSerialCandidates(in: lines).first
+        guard let serials = documentSerials(lines), serials.count <= 1 else { return nil }
+        let serial = serials.first
         guard year != nil || serial != nil else { return nil }
         return DocumentRead(year: year, make: make, serial: serial)
+    }
+
+    /// Document fields may put a label and its value on consecutive OCR lines.
+    /// Bind only that immediate field, never search later lines for a plausible ID.
+    /// A present but unreadable/competing identifier must not become unbound context.
+    private static func documentSerials(_ lines: [String]) -> Set<String>? {
+        guard let label = try? NSRegularExpression(pattern: #"^\s*(?:VIN|SERIAL(?:\s+(?:NO\.?|NUMBER))?|CHASSIS(?:\s+(?:NO\.?|NUMBER))?|VEHICLE\s+IDENTIFICATION(?:\s+NUMBER)?)\b[\s:#.-]*"#, options: [.caseInsensitive]) else { return nil }
+        var values = Set(VisionEngine.vinCandidates(in: lines).filter(VisionEngine.isValidVIN))
+        for (index, line) in lines.enumerated() {
+            let ns = line as NSString
+            guard let match = label.firstMatch(in: line, range: NSRange(location: 0, length: ns.length)) else { continue }
+            let tail = ns.substring(from: NSMaxRange(match.range)).trimmingCharacters(in: .whitespacesAndNewlines)
+            let value: String
+            if tail.isEmpty {
+                guard index + 1 < lines.count else { return nil }
+                value = lines[index + 1].trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+            } else { value = tail.uppercased() }
+            // One complete printed value, no glyph correction, concatenation, or known-ID lookup.
+            guard (8...17).contains(value.count), value.utf8.allSatisfy({ (48...57).contains($0) || (65...90).contains($0) }),
+                  value.contains(where: \.isLetter), value.contains(where: \.isNumber),
+                  value.count != 17 || VisionEngine.isValidVIN(value) else { return nil }
+            values.insert(value)
+        }
+        return values
     }
 
     /// Every context read one frame supplies (at most one per method).
