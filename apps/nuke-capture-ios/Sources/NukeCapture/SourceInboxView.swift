@@ -247,6 +247,7 @@ struct SourcePhotoDetail: View {
     @State private var savedAt: Date?
     @State private var failure: String?
     @State private var generation = UUID()
+    @State private var nativeReview: CachedNativeSourceReview?
     private var allowed: Bool { session.isSignedIn && ObservedCarRead.ownAccount(userId, activeUserId: SupabaseService.currentUserId) != nil }
     var body: some View {
       ScrollViewReader { source in
@@ -320,6 +321,31 @@ struct SourcePhotoDetail: View {
                             .font(.caption).foregroundStyle(.secondary)
                     }
                     if let coverage = read?.coverage { SourceInboxCoverageView(coverage: coverage) }
+                    if let nativeReview {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Local native reading").font(.headline)
+                            Text(nativeReview.explanation).font(.caption).foregroundStyle(.secondary)
+                            if let clock = nativeReview.readAt {
+                                Text("Read " + clock.formatted(date: .abbreviated, time: .shortened))
+                                    .font(.caption2).foregroundStyle(.secondary)
+                            }
+                            if nativeReview.hasMultipleIdentifierReadings {
+                                Text("Multiple identifier-shaped readings remain; none is selected.").font(.caption)
+                            }
+                            ForEach(Array(nativeReview.lines.enumerated()), id: \.offset) { _, line in
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(line.isSeed ? "Earlier native reading" : "Native reading pass").font(.caption2).foregroundStyle(.secondary)
+                                    Text(line.text).font(.system(.caption, design: .monospaced)).textSelection(.enabled)
+                                    Text("OCR confidence " + line.confidence.formatted(.percent.precision(.fractionLength(0))))
+                                        .font(.caption2).foregroundStyle(.secondary)
+                                }
+                            }
+                            if !nativeReview.lines.isEmpty {
+                                Text("These are retained local text observations, not a vehicle identity or filing decision.")
+                                    .font(.caption).foregroundStyle(.secondary)
+                            }
+                        }.frame(maxWidth: .infinity, alignment: .leading)
+                    }
                 } else if read != nil { Text("This photo isn't available right now.").foregroundStyle(.secondary) }
                 else if failure == nil { ProgressView() }
                 if let failure { Text(failure).font(.caption).foregroundStyle(.secondary) }
@@ -338,15 +364,24 @@ struct SourcePhotoDetail: View {
     }
 
     @MainActor private func load() async {
-        guard allowed else { read = nil; return }
+        guard allowed else { read = nil; nativeReview = nil; return }
         let request = UUID(); generation = request
-        failure = nil; read = nil; savedAt = nil
+        failure = nil; read = nil; savedAt = nil; nativeReview = nil
         do {
             let result = try await SourceInboxReader.read(userId: userId, imageId: imageId)
             guard generation == request, allowed else { return }
             read = result
             do { try LocalStore.shared.cacheSourceInbox(userId: userId, activeUserId: SupabaseService.currentUserId, imageId: imageId, read: result) }
             catch { failure = "Live source read loaded; couldn't save it for offline use." }
+            do {
+                guard let photo = result.photos.first(where: { $0.id == imageId }) else { return }
+                let local = try await CachedNativeSourceReader.read(userId: userId, photo: photo)
+                guard generation == request, allowed else { return }
+                nativeReview = local
+            } catch {
+                guard generation == request, allowed else { return }
+                nativeReview = .init(state: .unavailable, explanation: "Current local-source custody could not be checked. " + ReadFailure.text(error))
+            }
         } catch {
             guard generation == request, allowed else { return }
             failure = ReadFailure.text(error)
