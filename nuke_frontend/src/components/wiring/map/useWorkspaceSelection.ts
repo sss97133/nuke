@@ -31,7 +31,7 @@ export interface PartModelIndex {
   parts: Record<string, PartModel>;
 }
 // routesOn: the date the loom routes were drawn on the twin (the routes file's own `generated`), the basis a length cites
-export interface SiteFiles { loaded: boolean; ends: Record<string, SiteEnd>; segs: SiteSeg[]; models: PartModelIndex | null; routesOn: string | null }
+export interface SiteFiles { loaded: boolean; error?: string | null; sourceVehicleId?: string | null; ends: Record<string, SiteEnd>; segs: SiteSeg[]; models: PartModelIndex | null; routesOn: string | null }
 
 const EMPTY_SITE: SiteFiles = { loaded: false, ends: {}, segs: [], models: null, routesOn: null };
 const getJson = (u: string) => fetch(u).then(r => (r.ok ? r.json() : null)).catch(() => null);
@@ -51,6 +51,8 @@ export function useSiteFiles(vehicleId: string | undefined): SiteFiles {
         Object.values(ends).forEach(e => { e.dev_name = publicName(e.dev_name) || e.dev; });
         setSite({
           loaded: true,
+          error: !pos || !rts || !pm ? 'The design files could not be read.' : null,
+          sourceVehicleId: mine(pos) && mine(rts) ? vehicleId : null,
           ends,
           segs: mine(rts) ? (rts.segments ?? []) : [],
           models: mine(pos) && pm ? pm : null,

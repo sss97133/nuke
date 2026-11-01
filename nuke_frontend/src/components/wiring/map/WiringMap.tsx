@@ -43,6 +43,7 @@ import { PartLibrary } from './PartLibrary';
 import { MissingList, missingOf } from './MissingList';
 import { WireSearch } from './WireSearch';
 import { needsOwner } from './ownerLayer';
+import { useScene3dURL } from './useScene3dURL';
 
 const WORK_WORD: Record<WorkStatus, string> = {
   open: 'OPEN', in_progress: 'IN PROGRESS', needs_owner: 'NEEDS YOU', done: 'DONE', blocked: 'BLOCKED',
@@ -166,6 +167,9 @@ export function WiringMap({ vehicleId }: { vehicleId?: string }) {
   const doorViews = door === 'manual' ? MANUAL_VIEWS : TRUCK_VIEWS;
   const view: View = doorViews.find(x => x[0] === rawView)?.[0] ?? doorViews[0][0];
   const [tablesOpen, setTablesOpen] = useState(false);
+  const in3d = view === '3d';
+  const sceneURL = useScene3dURL(params, set);
+  const scene3d = sceneURL.init;
   // one URL write per click (two in the same tick would each start from the same URL and the second would win)
   const go = (d: Door | null, id?: string | null) => {
     set({ door: d, view: null, ...(id !== undefined ? { sel: id, node: null, call: null } : {}) });
@@ -217,7 +221,8 @@ export function WiringMap({ vehicleId }: { vehicleId?: string }) {
         {view === 'plan' && <PlanView cw={cw} ix={ix} site={site} sel={sel} rel={rel} onSelect={pick} />}
         {view === '3d' && (
           <Suspense fallback={<div style={{ padding: 16, fontSize: 12, color: cw.inkMuted }}>LOADING THE 3D HARNESS…</div>}>
-            <ZoneModels3D cw={cw} ix={ix} site={site} sel={sel} rel={rel} onSelect={pick} onClear={clearSel} />
+            <ZoneModels3D cw={cw} ix={ix} site={site} sel={sel} rel={rel} onSelect={pick} onClear={clearSel}
+              key={`${vehicleId}:${sceneURL.revision}`} init={scene3d} client={scene3d.client === true} onScene={sceneURL.onScene} linkBase={vehicleId ? `/share/truck/${vehicleId}` : undefined} />
           </Suspense>
         )}
         {view === 'face' && <ConnectorFace cw={cw} ix={ix} site={site} code={faceCode} sel={sel} rel={rel} onSelect={pick} />}
@@ -327,7 +332,7 @@ export function WiringMap({ vehicleId }: { vehicleId?: string }) {
               <>
                 {door === 'wire' ? <div style={{ flexShrink: 0 }}>{search}</div> : (
                   <>
-                    <div style={{ height: '62vh', minHeight: 320, flexShrink: 0, borderBottom: frame(cw) }}>{centre}</div>
+                    <div style={{ height: view === '3d' ? 'calc(100dvh - 56px - 42px)' : '62vh', minHeight: 320, flexShrink: 0, borderBottom: frame(cw) }}>{centre}</div>
                     <div style={{ background: cw.surface, borderBottom: frame(cw), flexShrink: 0 }}>{props}</div>
                   </>
                 )}
