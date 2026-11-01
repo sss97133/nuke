@@ -22,7 +22,7 @@ struct CachedNativeSourceReview: Equatable, Sendable {
     }
 
     static func qualify(review: LocalAlbumImageReview?, localIdentifier: String,
-                        currentSourceVersion: String?, method: String, uploadedHash: String?) -> Self {
+                        currentSourceVersion: String?, method: String, uploadedHash: String?, sourceReady: Bool = false) -> Self {
         guard let version = currentSourceVersion else {
             return .init(state: .unavailable, explanation: "The current Photos source version is unavailable.")
         }
@@ -38,13 +38,16 @@ struct CachedNativeSourceReview: Equatable, Sendable {
         guard hash(review.inputSHA256) else {
             return .init(state: .unavailable, explanation: "The retained reading has no qualified original-byte receipt.")
         }
-        // Document text and personal frames remain private; this first consumer
-        // exposes only vehicle-frame native OCR, including contradictory seeds.
-        guard review.isVehicle, !review.hasPerson,
+        // Document/person refusals are independent of vehicle classification.
+        // An unclassified close-up additionally needs ready source + exact bytes.
+        guard !review.hasPerson,
               !VisionEngine.isIdentityDocument(labels: review.labels, isScreenshot: false, ocrLines: review.textLines),
               review.textLines.joined(separator: " ").range(of: #"\b(TITLE|CERTIFICATE|REGISTRATION|INVOICE|RECEIPT)\b"#,
                   options: [.regularExpression, .caseInsensitive]) == nil else {
             return .init(state: .unavailable, explanation: "This frame's local text is not available in vehicle-photo review.")
+        }
+        if !review.isVehicle && !(sourceReady && uploadedHash == review.inputSHA256) {
+            return .init(state: .unavailable, explanation: "Classification-unresolved text needs a ready source with matching original-byte receipts.")
         }
         let lines = review.onDeviceObservations.filter {
             $0.kind == .ocrText && $0.source.framework == "Apple Vision" &&
@@ -65,7 +68,9 @@ struct CachedNativeSourceReview: Equatable, Sendable {
                          explanation: "The current local reading and uploaded source have different byte receipts. These readings describe the local source only.",
                          lines: lines, readAt: review.analyzedAt)
         }
-        return .init(state: .bound, explanation: "Current Photos source, reading method and uploaded original-byte receipt match.",
+        let explanation = review.isVehicle ? "Current Photos source, reading method and uploaded original-byte receipt match." :
+            "Classification unresolved · text only. Current Photos source, reading method and uploaded original-byte receipt match. This is not a vehicle identity or filing decision."
+        return .init(state: .bound, explanation: explanation,
                      lines: lines, readAt: review.analyzedAt)
     }
 
@@ -101,7 +106,7 @@ enum CachedNativeSourceReader {
             return .init(state: .unavailable, explanation: "The current source qualification does not permit local evidence display.")
         }
         #if DEBUG
-        if FixtureBackend.isActive, ProcessInfo.processInfo.environment["NUKE_FIXTURE_NATIVE_REVIEW"] == "conflict" {
+        if FixtureBackend.isActive, let fixture = ProcessInfo.processInfo.environment["NUKE_FIXTURE_NATIVE_REVIEW"], ["conflict", "nonvehicle"].contains(fixture) {
             let observations = [("2S87R3N100001", false), ("2S87R3N100009", true)].map { text, seed in
                 OnDeviceObservation(kind: .ocrText, value: text, confidence: 1,
                     source: .init(framework: "Apple Vision", model: "VNRecognizeTextRequest", revision: 3,
@@ -109,9 +114,10 @@ enum CachedNativeSourceReader {
             }
             let review = LocalAlbumImageReview(id: "fixture", localIdentifier: "fixture", sourceVersion: "current",
                 inputSHA256: String(repeating: "a", count: 64), methodVersion: "fixture", analyzedAt: Date(timeIntervalSince1970: 1_793_404_800),
-                isVehicle: true, hasPerson: false, labelsJSON: "[]", vinCandidatesJSON: "[]", textLinesJSON: "[]",
+                isVehicle: fixture != "nonvehicle", hasPerson: false, labelsJSON: "[]", vinCandidatesJSON: "[]", textLinesJSON: "[]",
                 onDeviceJSON: OnDeviceAnalysis.encode(observations))
-            return .qualify(review: review, localIdentifier: "fixture", currentSourceVersion: "current", method: "fixture", uploadedHash: nil)
+            return .qualify(review: review, localIdentifier: "fixture", currentSourceVersion: "current", method: "fixture", uploadedHash: fixture == "nonvehicle" ? String(repeating: "a", count: 64) : nil,
+                sourceReady: fixture == "nonvehicle")
         }
         #endif
         let imageId = photo.id
@@ -141,11 +147,12 @@ enum CachedNativeSourceReader {
             return .init(state: .unavailable, explanation: "The exact Photos source is unavailable on this device.")
         }
         let version = asset.modificationDate.map { String($0.timeIntervalSince1970) }
-        let photo = LocalAlbumPhoto(localIdentifier: identifier, sourceVersion: version)
+        let localPhoto = LocalAlbumPhoto(localIdentifier: identifier, sourceVersion: version)
         let method = LibraryIngest.identityMethodVersion
-        let exact = try LocalStore.shared.albumImageReview(for: photo, methodVersion: method)
+        let exact = try LocalStore.shared.albumImageReview(for: localPhoto, methodVersion: method)
         let latest = try exact ?? LocalStore.shared.latestAlbumImageReview(localIdentifier: identifier)
         return CachedNativeSourceReview.qualify(review: latest, localIdentifier: identifier,
-            currentSourceVersion: version, method: method, uploadedHash: row.file_hash)
+            currentSourceVersion: version, method: method, uploadedHash: row.file_hash,
+            sourceReady: photo.source_state == "ready" && photo.source_sha256 == row.file_hash)
     }
 }

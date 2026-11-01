@@ -21,9 +21,25 @@ final class CachedNativeSourceReviewTests: XCTestCase {
     }
 
     private func qualify(_ review: LocalAlbumImageReview?, hash: String? = String(repeating: "a", count: 64),
-                         version: String? = "12345.0") -> CachedNativeSourceReview {
+                         version: String? = "12345.0", ready: Bool = false) -> CachedNativeSourceReview {
         .qualify(review: review, localIdentifier: identifier, currentSourceVersion: version,
-                 method: method, uploadedHash: hash)
+                 method: method, uploadedHash: hash, sourceReady: ready)
+    }
+
+
+    func testUnclassifiedCloseupNeedsReadySourceAndExactBytes() {
+        let reading = review(vehicle: false)
+        let ready = qualify(reading, ready: true)
+        XCTAssertEqual(ready.state, .bound)
+        XCTAssertEqual(ready.lines.count, 1)
+        XCTAssertTrue(ready.explanation.contains("Classification unresolved · text only"))
+        for result in [qualify(reading), qualify(reading, hash: nil, ready: true),
+                       qualify(reading, hash: String(repeating: "b", count: 64), ready: true),
+                       qualify(review(vehicle: false, person: true), ready: true),
+                       qualify(review(vehicle: false, text: ["CERTIFICATE OF TITLE"]), ready: true),
+                       qualify(review(version: "older", vehicle: false), ready: true)] {
+            XCTAssertTrue(result.lines.isEmpty)
+        }
     }
 
     func testExactCurrentRelationshipAndBytesRetainReading() {
