@@ -80,3 +80,9 @@ it('hides previous evidence when a refreshed permission check fails', async () =
   await act(async () => { await client.invalidateQueries(); await new Promise(r => setTimeout(r, 30)); });
   expect(host.textContent).not.toContain('Scored rotor'); expect(host.textContent).toContain('Work evidence could not load');
 });
+
+it('preserves cited before/progress/after order when the photo query returns another order', async () => {
+  photos.unshift({ ...photos[0], id: missing, image_url: 'https://images.test/after.jpg' });
+  await render(); await expand(); await act(async () => { await new Promise(r => setTimeout(r, 30)); });
+  expect(Array.from(host.querySelectorAll('img')).map(img => img.src)).toEqual(['https://images.test/brake.jpg', 'https://images.test/after.jpg']);
+});

@@ -19,7 +19,10 @@ function WorkContextRead({ vehicleId, sessionId, date }: Props) {
         <p>Retained image analysis{read.data.model ? ` · ${read.data.model}` : ''}. Descriptions may need correction; they do not confirm installed quantities or labor value.</p>
         {read.data.analyzedAt && Number.isFinite(Date.parse(read.data.analyzedAt)) && <p>Analysis recorded <time dateTime={read.data.analyzedAt}>{new Date(read.data.analyzedAt).toLocaleString()}</time></p>}
         {read.data.operations.map((operation, index) => {
-          const photos = read.data!.photos.filter(photo => operation.imageIds.includes(photo.id));
+          const photos = operation.imageIds.flatMap(id => {
+            const photo = read.data!.photos.find(photo => photo.id === id);
+            return photo ? [photo] : [];
+          });
           const unavailable = operation.imageIds.length - photos.length;
           return <section key={index} aria-label={operation.task}>
             <p>Image-analysis claim{operation.valueStatus ? ` · value ${operation.valueStatus}` : ' · value not established'}</p>
