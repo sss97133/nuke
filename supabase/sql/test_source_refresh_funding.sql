@@ -129,11 +129,13 @@ BEGIN;
 INSERT INTO public.extraction_runs(id,source,status,metadata) VALUES
  ('e7000000-0000-0000-0000-0000000000d1','source-refresh-funding','funded','{"contract":"source_refresh_funding_v1","feed_source":"shared-feed"}'),
  ('e7000000-0000-0000-0000-0000000000d2','source-refresh-funding','funded','{"contract":"source_refresh_funding_v1","feed_source":"shared-feed"}'),
- ('e7000000-0000-0000-0000-0000000000d3','source-refresh-funding','funded','{"contract":"source_refresh_funding_v1","feed_source":"other-feed"}');
+ ('e7000000-0000-0000-0000-0000000000d3','source-refresh-funding','funded','{"contract":"source_refresh_funding_v1","feed_source":"other-feed"}'),
+ ('e7000000-0000-0000-0000-0000000000d4','source-refresh-funding',NULL,'{"contract":"source_refresh_funding_v1","feed_source":"malformed-feed"}');
 DO $$ BEGIN
  ASSERT NOT has_function_privilege('anon','claim_source_refresh_dispatch(uuid,uuid)','execute');
  ASSERT NOT has_function_privilege('authenticated','claim_source_refresh_dispatch(uuid,uuid)','execute');
  ASSERT has_function_privilege('service_role','claim_source_refresh_dispatch(uuid,uuid)','execute');
+ ASSERT public.claim_source_refresh_dispatch('e7000000-0000-0000-0000-0000000000d4',gen_random_uuid()) IS NULL;
  ASSERT public.claim_source_refresh_dispatch('e7000000-0000-0000-0000-0000000000d1',gen_random_uuid())->'dispatch_lease_held'='true'::jsonb;
  ASSERT public.claim_source_refresh_dispatch('e7000000-0000-0000-0000-0000000000d2',gen_random_uuid()) IS NULL;
  ASSERT public.claim_source_refresh_dispatch('e7000000-0000-0000-0000-0000000000d3',gen_random_uuid()) IS NOT NULL;

@@ -40,7 +40,7 @@ BEGIN
  IF feed IS NULL OR feed !~ '^[a-z0-9_-]{1,64}$' THEN RETURN NULL; END IF;
  PERFORM pg_advisory_xact_lock(hashtextextended('source-refresh-feed:'||feed,0));
  SELECT * INTO r FROM public.extraction_runs WHERE id=p_request AND source='source-refresh-funding' FOR UPDATE;
- IF NOT FOUND OR r.status<>'funded' OR r.metadata->>'feed_source' IS DISTINCT FROM feed
+ IF NOT FOUND OR r.status IS DISTINCT FROM 'funded' OR r.metadata->>'feed_source' IS DISTINCT FROM feed
    OR r.metadata->>'contract' IS DISTINCT FROM 'source_refresh_funding_v1' THEN RETURN NULL; END IF;
  IF EXISTS(SELECT FROM public.extraction_runs q WHERE q.source='source-refresh-funding'
    AND q.metadata->>'feed_source'=feed AND q.metadata->'dispatch_lease_held'='true'::jsonb) THEN RETURN NULL; END IF;
