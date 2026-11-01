@@ -388,7 +388,7 @@ final class BackgroundUploader: NSObject, ObservableObject {
 
     @discardableResult
     func drainIdentityFollowups(ocrBudget: Int, background: Bool = false) async -> Bool {
-        guard !identityRunning, !Task.isCancelled, let userID = SupabaseService.currentUserId,
+        guard !identityRunning, !Task.isCancelled, !SyncEngine.shared.isPaused, let userID = SupabaseService.currentUserId,
               (background ? !SyncEngine.deviceTooHot : ProcessInfo.processInfo.thermalState == .nominal), !SyncEngine.lowPowerHolds,
               background || UIApplication.shared.applicationState == .active else { return false }
         let now = Date()
@@ -400,7 +400,36 @@ final class BackgroundUploader: NSObject, ObservableObject {
         identityProgressed = false
         lastIdentityAttempt = now
         defer { identityRunning = false }
-        let completed = await AttributionEngine.shared.runAcknowledged(sources: sources, ocrBudget: ocrBudget)
+        let mayContinue = {
+            SupabaseService.currentUserId == userID && !SyncEngine.shared.isPaused &&
+            !Task.isCancelled && !SyncEngine.lowPowerHolds &&
+            (background ? !SyncEngine.deviceTooHot : ProcessInfo.processInfo.thermalState == .nominal && UIApplication.shared.applicationState == .active)
+        }
+        var qualified: [IdentityFollowupSource] = []
+        for source in sources {
+            // Historical recovery can have an exact uploaded hash but no privacy witness.
+            // Only this existing foreground lease may repair it; no background activation.
+            if source.privacyReceipt == nil && background { continue }
+            do {
+                let enriched = try await IdentityFollowupPrivacy.recover(source, userID: userID,
+                    mayContinue: mayContinue, persist: { enriched in
+                        guard self.state.identityFollowups?.contains(where: { $0.key == enriched.key }) == true else {
+                            throw SubjectReinspectionFailure.scope
+                        }
+                        let previous = self.state
+                        self.state.enqueueIdentity(enriched)
+                        guard self.persist() else {
+                            self.state = previous
+                            throw SubjectReinspectionFailure.unavailable
+                        }
+                    })
+                qualified.append(enriched)
+            } catch {
+                lastError = "Photo source review waits for its exact local original and completed privacy read."
+            }
+        }
+        guard mayContinue() else { return false }
+        let completed = await AttributionEngine.shared.runAcknowledged(sources: qualified, ocrBudget: ocrBudget)
         identityProgressed = !completed.isEmpty
         state.finishIdentity(completed)
         persist()
