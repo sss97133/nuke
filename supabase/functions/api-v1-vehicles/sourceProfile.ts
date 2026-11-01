@@ -46,7 +46,7 @@ export async function readSourceProfile(db: any, selector: string, captureSelect
   for (const row of rows.slice(0, LIMIT)) {
     if (captureId && row.source_snapshot_id !== captureId) return result(503, { error: "Source evidence belongs to another retained capture" });
     // Re-derive against the retained original. An arbitrary JSON envelope is not an admission credential.
-    const checked = checkedCaptures.get(row.source_snapshot_id) ?? await readEcrCapture(db, row.source_snapshot_id);
+    const checked = checkedCaptures.get(row.source_snapshot_id) ?? await readEcrCapture(db, row.source_snapshot_id, true);
     checkedCaptures.set(row.source_snapshot_id, checked);
     if (!checked.ok) return result(503, { error: "Retained source evidence cannot be verified", reason: checked.reason });
     const r = checked.receipt;
@@ -64,7 +64,7 @@ export async function readSourceProfile(db: any, selector: string, captureSelect
     if (existing) { existing.observation_ids.push(row.id); continue; }
     evidence.push({ observation_id: row.id, observation_ids: [row.id], snapshot_id: r.snapshot_id, source_url: r.source_url,
       source_hash: r.source_sha256, captured_at: r.captured_at, recorded_at: r.capture_recorded_at,
-      admitted_at: row.ingested_at, label: r.label, kind: r.kind, cards,
+      admitted_at: row.ingested_at, label: r.label, kind: r.kind, cards, presentation_image_url: checked.presentation_image_url,
       current_total: r.current_total, previous_total: r.previous_total, enumeration: r.enumeration });
   }
   const history = { complete, scope: "admitted_exact_source_url", selected_snapshot_id: captureId, observation_limit: LIMIT };
@@ -85,7 +85,7 @@ export async function readSourceProfile(db: any, selector: string, captureSelect
     const cards = e.cards.filter((c: any) => c.url === url);
     return (cards.length ? cards : [null]).map((card: any) => ({ observation_id: e.observation_id, supporting_observation_ids: e.observation_ids, snapshot_id: e.snapshot_id, source_url: e.source_url,
       source_hash: e.source_hash, captured_at: e.captured_at, admitted_at: e.admitted_at,
-      label: card?.label ?? e.label, image_url: card?.image_url ?? null,
+      label: card?.label ?? e.label, image_url: card?.image_url ?? e.presentation_image_url ?? null,
       relationship: card?.relationship ?? null, collection_label: card ? e.label : null,
       collection_profile_path: card ? sourceProfilePath(e.source_url, e.snapshot_id) : null }));
   });
