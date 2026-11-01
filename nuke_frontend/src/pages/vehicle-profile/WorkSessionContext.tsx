@@ -15,8 +15,9 @@ function WorkContextRead({ vehicleId, sessionId, date }: Props) {
   return <>
       {read.isFetching && <p role="status">Reading work evidence…</p>}
       {read.isError && <div role="status"><p>Work evidence could not load.</p><button type="button" onClick={() => void read.refetch()}>Retry work evidence</button></div>}
-      {read.data && !read.isError && <>
+      {read.data && !read.isError && !read.isFetching && <>
         <p>Retained image analysis{read.data.model ? ` · ${read.data.model}` : ''}. Descriptions may need correction; they do not confirm installed quantities or labor value.</p>
+        {read.data.analyzedAt && Number.isFinite(Date.parse(read.data.analyzedAt)) && <p>Analysis recorded <time dateTime={read.data.analyzedAt}>{new Date(read.data.analyzedAt).toLocaleString()}</time></p>}
         {read.data.operations.map((operation, index) => {
           const photos = read.data!.photos.filter(photo => operation.imageIds.includes(photo.id));
           const unavailable = operation.imageIds.length - photos.length;
