@@ -105,6 +105,14 @@ enum FixtureBackend {
     private static func reader(_ name: String, _ args: [String: Any]) -> (Int, Data) {
         let signedIn = persona != .visitor
         switch name {
+        case "vehicle_profile_read" where scenario == "navigation-garage":
+            return ok("""
+            {"vehicle_id":"\(navigationVehicleId)","viewer":"anon","read_at":"2026-10-31T12:00:00Z",
+             "sections":[{"kind":"strip","coverage":{"n":1,"of":1,"grain":"source claims","as_of":"2026-10-31T12:00:00Z"},
+               "facets":[{"dimension":"engine","label":"350 V8 Crate","member":{"value":"350 V8 Crate",
+                 "source":{"kind":"listing","label":"Dealer seller listing","method":"dealer_microdata_v2","url":"https://example.com/vehicle"},
+                 "trust":0.6,"qualification":{"role":"seller_claim","factory_configuration_status":"unknown","current_configuration_status":"unknown"}}}]}]}
+            """)
         case "get_user_garage" where scenario == "navigation-garage":
             return ok("""
             [{"vehicle_id":"\(navigationVehicleId)","year":1973,"make":"Fixture","model":"Coupe",
