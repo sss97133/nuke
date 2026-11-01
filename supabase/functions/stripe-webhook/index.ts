@@ -20,11 +20,13 @@
  */
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void };
 import Stripe from "npm:stripe@14.11.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
 import { creditCents } from "../_shared/aiCredits.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
-import { type CheckoutSessionLike, routeCheckoutSession } from "../_shared/stripeCheckoutRouting.ts";
+import { type CheckoutSessionLike, routeCheckoutSession, sourceRefreshRefund, sourceRefreshDispute } from "../_shared/stripeCheckoutRouting.ts";
+import { dispatchFundedRefresh } from "../poll-listing-feeds/fundedRefresh.ts";
 
 const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") ?? "", { apiVersion: "2023-10-16" });
 
@@ -69,9 +71,45 @@ Deno.serve(async (req) => {
   const supabase = svc();
 
   try {
+    if (event.type === "refund.created" || event.type === "refund.updated") {
+      if (!event.livemode) return ok();
+      const refund = event.data.object as Stripe.Refund;
+      const pi = refund.payment_intent;
+      if (!pi || refund.status !== "succeeded") return ok();
+      const intent = await stripe.paymentIntents.retrieve(typeof pi === "string" ? pi : pi.id);
+      const payload = sourceRefreshRefund(event, refund, intent);
+      if (payload) {
+        const { error } = await supabase.rpc("record_source_refresh_refund", { p: payload });
+        if (error) throw new Error(`source refresh refund: ${error.code}`);
+      }
+      return ok();
+    }
+    if (event.type === "charge.dispute.created" || event.type === "charge.dispute.closed") {
+      if (!event.livemode) return ok();
+      const dispute = event.data.object as Stripe.Dispute;
+      const pi = dispute.payment_intent;
+      if (!pi) return ok();
+      const intent = await stripe.paymentIntents.retrieve(typeof pi === "string" ? pi : pi.id);
+      const payload = sourceRefreshDispute(event, dispute, intent);
+      if (payload) {
+        const { error } = await supabase.rpc("record_source_refresh_dispute", { p: payload });
+        if (error) throw new Error(`source refresh dispute: ${error.code}`);
+      }
+      return ok();
+    }
     if (event.type === "checkout.session.completed" || event.type === "checkout.session.async_payment_succeeded") {
       const session = event.data.object as Stripe.Checkout.Session;
       const route = routeCheckoutSession(event, session as unknown as CheckoutSessionLike);
+      if (route.kind === "source_refresh") {
+        const { error } = await supabase.rpc("record_source_refresh_payment", { p: route.payload });
+        if (error) throw new Error(`source refresh payment: ${error.code}`);
+        EdgeRuntime.waitUntil(dispatchFundedRefresh(supabase).catch(() => {
+          console.error("[stripe-webhook] funded refresh retained for scheduled recovery");
+        }));
+        // The existing scheduled feed worker drains the durable funded request.
+        // Receipt creation and funding are atomic; webhook replay never dispatches twice.
+        return ok();
+      }
       if (route.kind === "work_order_invoice") {
         const { data, error } = await supabase.rpc("record_work_order_processor_payment", { p: route.payload });
         if (error) {
