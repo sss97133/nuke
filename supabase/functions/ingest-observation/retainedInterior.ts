@@ -42,6 +42,11 @@ export function deriveRetainedInterior(source: Record<string, any>, vehicle: Rec
   // those extractor claims as such; do not mine the synthesized index summary.
   const mecumNative = registeredSource?.slug === "mecum" && source?.extraction_method === "next_data_json_parse";
   const mecumRetained = mecumIndex || mecumNative;
+  // extract-bat-core stores the same retained specification fields on closed
+  // auctions as sale_result. Their source assertions remain usable without
+  // reconstructing a missing body or turning the auction into a fresh listing.
+  const batSaleResult = registeredSource?.slug === "bat" && source?.kind === "sale_result" &&
+    source?.extraction_method === "html_match";
   const nativeFields = ["mecum", "barrett-jackson"].includes(registeredSource?.slug) &&
     source?.extraction_method === "retained_native_fields_v1" &&
     source.structured_data?.source_profile === "retained_native_fields_v1" &&
@@ -70,7 +75,7 @@ export function deriveRetainedInterior(source: Record<string, any>, vehicle: Rec
     ? ["mecum.com", "www.mecum.com"].includes(url.hostname) && /^\/lots\/[0-9]+\/[^/]+\/?$/.test(url.pathname)
     : url.hostname === "bringatrailer.com" && /^\/listing\/[^/]+\/?$/.test(url.pathname);
   if (!UUID.test(source?.id ?? "") || !UUID.test(source?.vehicle_id ?? "") ||
-      (source.kind !== "listing" && !(mecumRetained && source.kind === "sale_result")) || source.is_superseded !== false ||
+      (source.kind !== "listing" && !batSaleResult && !(mecumRetained && source.kind === "sale_result")) || source.is_superseded !== false ||
       (!description && !mecumRetained && !nativeFields && source.extraction_method !== "html_match") || source.property_id != null ||
       source.subject_type !== "vehicle" || source.subject_id != null ||
       !vehicle || vehicle.id !== source.vehicle_id || vehicle.is_public !== true ||

@@ -691,6 +691,11 @@ jobs:
         run: |
           createdb dm_refinement_native_listing_ci
           psql -X -v ON_ERROR_STOP=1 -d dm_refinement_native_listing_ci -f supabase/sql/test_native_listing_profile_evidence.sql
+          python3 scripts/test-retained-bat-profile.py
+      - name: Verify retained BaT sale source eligibility and custody
+        run: |
+          createdb dm_refinement_bat_sale
+          python3 scripts/test-retained-bat-sale-properties.py
       - name: Create disposable profile privacy database
         run: createdb dm_refinement_profile_privacy_ci
       - name: Verify private column protection and owner-only profile RPC

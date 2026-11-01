@@ -50,7 +50,7 @@ async function run(scenario = "new", token = "test-key") {
       }
       const id = url.searchParams.get("id")?.slice(3);
       if (id) return respond([{id,vehicle_id:VID,source_id:SID,source_url:"https://bringatrailer.com/listing/retained-fixture",
-        kind:"listing",is_superseded:false,property_id:null,subject_type:"vehicle",subject_id:null,
+        kind:scenario === "sale_result" ? "sale_result" : "listing",is_superseded:false,property_id:null,subject_type:"vehicle",subject_id:null,
         confidence_score:.7,extraction_method:"html_match",observed_at:null,ingested_at:"2026-09-01T00:00:00.123456Z",
         structured_data:{interior_color:"Exact Black Vinyl",color:scenario === "unknown" ? "unknown" : "Exact Signal Red"}}]);
       const hash = url.searchParams.get("content_hash")?.slice(3);
@@ -63,7 +63,7 @@ async function run(scenario = "new", token = "test-key") {
       headers:{Authorization:`Bearer ${token}`,"Content-Type":"application/json"},
       body:JSON.stringify({mode:RETAINED_LISTING_DRAIN_MODE,batch_size:60})});
     const response = await handler(request()),body = await response.json();
-    const replay = scenario === "new" ? await (await handler(request())).json() : null;
+    const replay = ["new","sale_result"].includes(scenario) ? await (await handler(request())).json() : null;
     return {status:response.status,body,replay,writes,calls,persisted};
   } finally {
     globalThis.fetch = original;
@@ -96,6 +96,16 @@ Deno.test("scheduled sixty-property drain uses real canonical selector/SDK/hash 
 Deno.test("real scheduled drain refuses private parents and explicit unknown values", async () => {
   const privateRow = await run("private");assert(privateRow.writes === 0 && privateRow.body.refused === 60);
   const unknown = await run("unknown");assert(unknown.writes === 30 && unknown.body.refused === 30);
+});
+Deno.test("closed BaT source fields traverse the actual selector and replay without new source claims",async()=>{
+ const r=await run("sale_result");
+ assert(r.status===200 && r.body.stored===60 && r.body.writes===60);
+ assert(r.replay.stored===60 && r.replay.duplicates===60 && r.replay.writes===0 && r.writes===60);
+ for(const o of r.persisted.values()){
+  assert(o.structured_data.source_extraction_method==="html_match");
+  assert(o.structured_data.source_observed_at===null && o.structured_data.current_configuration_status==="unknown");
+  assert(o.structured_data.source_recorded_at==="2026-09-01T00:00:00.123456Z");
+ }
 });
 Deno.test("signed-in caller cannot claim scheduled work", async () => {
   // A user session as Auth signs it since 2026-10-14: ES256, verified against the project JWKS.

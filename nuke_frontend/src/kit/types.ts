@@ -43,6 +43,12 @@ export type Claim<T = string | number> = {
   source: Source;
   observed_at: string | null;
   trust: number;
+  qualification?: {
+    role?: string | null;
+    factory_configuration_status?: string | null;
+    current_configuration_status?: string | null;
+    limitation?: string | null;
+  } | null;
 };
 
 /** The denominator every number carries: n of `of` members of `grain`, as of a clock. */

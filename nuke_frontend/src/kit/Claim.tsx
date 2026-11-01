@@ -102,6 +102,11 @@ export function SourceView({ claim }: { claim: Claim }) {
   const lotNumber = claim.source.lotNumber ?? claim.source.video?.lotNumber ?? null;
   const auctionName = claim.source.auctionName ?? claim.source.video?.auctionName ?? null;
   const lotLine = [lotNumber ? `Lot ${lotNumber}` : null, auctionName].filter(Boolean).join(' · ');
+  const qualificationRows = [
+    ['Claim basis', claim.qualification?.role],
+    ['Factory configuration', claim.qualification?.factory_configuration_status],
+    ['Current configuration', claim.qualification?.current_configuration_status],
+  ].filter((row): row is [string, string] => typeof row[1] === 'string' && row[1].trim().length > 0);
 
   const isAuctionSaleClaim =
     !!claim.source.video ||
@@ -155,6 +160,18 @@ export function SourceView({ claim }: { claim: Claim }) {
         <Text role="label">Trust</Text>
         <Text role="body">{Math.round(Math.min(1, Math.max(0, claim.trust)) * 100)}%</Text>
       </p>
+      {(qualificationRows.length > 0 || claim.qualification?.limitation) && (
+        <section aria-label="What this establishes">
+          <Text role="label">What this establishes</Text>
+          {qualificationRows.map(([label, value]) => (
+            <p key={label}>
+              <Text role="label">{label}</Text>
+              <Text role="body">{value.replace(/_/g, ' ').replace(/^./, letter => letter.toUpperCase())}</Text>
+            </p>
+          ))}
+          {claim.qualification?.limitation && <Text role="body">{claim.qualification.limitation}</Text>}
+        </section>
+      )}
       {(url || isAuctionSaleClaim) && (
         <div className="k-claim__actions">
           {isAuctionSaleClaim && (
