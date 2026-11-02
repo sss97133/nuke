@@ -4,7 +4,9 @@
 # The CLI ship (the owner's preferred path). It needs ONE of:
 #   a) Xcode signed into the team's Apple ID (Xcode → Settings → Accounts), or
 #   b) the App Store Connect API key for the Nuke team, read from ~/.appstoreconnect/asc-nuke.env:
-#        NUKE_ASC_ISSUER_ID, NUKE_ASC_KEY_ID (77637BYL66), NUKE_ASC_KEY_PATH, NUKE_APPLE_TEAM_ID (K474YLCACB)
+#        NUKE_ASC_ISSUER_ID, NUKE_ASC_KEY_ID (77637BYL66), NUKE_ASC_KEY_PATH, NUKE_APPLE_TEAM_ID (JZ28MFU3VB; K474YLCACB was the June team, the app moved)
+#      Falls back to ~/.appstoreconnect/asc.env (ASC_ISSUER_ID, ASC_KEY_ID, ASC_KEY_PATH),
+#      shared with scripts/asc_*.rb. The Nuke-specific file and variables take precedence.
 # Nothing secret is printed. The build number is an epoch timestamp so uploads never collide;
 # note Xcode Cloud stamps its own small run counter, so after a CLI upload under one marketing
 # version, bump MARKETING_VERSION before the next Xcode Cloud ship of that version.
@@ -22,15 +24,19 @@ KEEP=0; [[ "${1:-}" == "--keep" ]] && KEEP=1
 
 ENV_FILE="$HOME/.appstoreconnect/asc-nuke.env"
 AUTH=()
+[[ -f "$ENV_FILE" ]] || ENV_FILE="$HOME/.appstoreconnect/asc.env"
 if [[ -f "$ENV_FILE" ]]; then
   # shellcheck disable=SC1090
   source "$ENV_FILE"
-  if [[ -n "${NUKE_ASC_ISSUER_ID:-}" && -n "${NUKE_ASC_KEY_ID:-}" && -f "${NUKE_ASC_KEY_PATH:-}" ]]; then
-    AUTH=(-authenticationKeyPath "$NUKE_ASC_KEY_PATH" -authenticationKeyID "$NUKE_ASC_KEY_ID" -authenticationKeyIssuerID "$NUKE_ASC_ISSUER_ID")
+  ASC_SHIP_ISSUER="${NUKE_ASC_ISSUER_ID:-${ASC_ISSUER_ID:-}}"
+  ASC_SHIP_KEY_ID="${NUKE_ASC_KEY_ID:-${ASC_KEY_ID:-}}"
+  ASC_SHIP_KEY_PATH="${NUKE_ASC_KEY_PATH:-${ASC_KEY_PATH:-}}"
+  if [[ -n "$ASC_SHIP_ISSUER" && -n "$ASC_SHIP_KEY_ID" && -f "$ASC_SHIP_KEY_PATH" ]]; then
+    AUTH=(-authenticationKeyPath "$ASC_SHIP_KEY_PATH" -authenticationKeyID "$ASC_SHIP_KEY_ID" -authenticationKeyIssuerID "$ASC_SHIP_ISSUER")
     echo "▸ signing and upload through the App Store Connect key (issuer and key id loaded, not printed)"
   fi
 fi
-TEAM="${NUKE_APPLE_TEAM_ID:-K474YLCACB}"
+TEAM="${NUKE_APPLE_TEAM_ID:-JZ28MFU3VB}"
 [[ ${#AUTH[@]} -eq 0 ]] && echo "▸ no App Store Connect key on disk; relying on the Apple ID signed into Xcode"
 
 cd "$APP"

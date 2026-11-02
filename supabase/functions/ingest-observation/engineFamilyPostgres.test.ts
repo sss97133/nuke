@@ -47,7 +47,7 @@ const columns = {
   vehicle_observations: [
     "id", "vehicle_id", "kind", "is_superseded", "property_id", "subject_type", "subject_id", "source_id",
     "source_url", "source_identifier", "observed_at", "ingested_at", "extraction_method", "confidence_score",
-    "structured_data", "extraction_metadata", "content_text", "content_hash", "source_observation_id",
+    "structured_data", "extraction_metadata", "analysis_deferred", "content_text", "content_hash", "source_observation_id",
     "vehicle_match_confidence", "vehicle_match_signals", "confidence", "confidence_factors", "observer_raw",
     "extractor_id", "agent_tier", "agent_model", "agent_cost_cents", "agent_duration_ms", "raw_source_ref",
     "citation_document_id", "citation_secure_document_id", "citation_page_number", "citation_excerpt",

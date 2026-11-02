@@ -5,7 +5,8 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FieldEvidenceGroup } from './hooks/useFieldEvidence';
 
-const fixture = vi.hoisted(() => ({ provenance: {} as any, inventory: {} as any }));
+const fixture = vi.hoisted(() => ({ provenance: {} as any, inventory: {} as any, claims: {} as any }));
+vi.mock('./hooks/useFieldEvidence', () => ({ useFieldEvidence: () => fixture.claims }));
 vi.mock('./hooks/useFieldProvenance', async importOriginal => ({
   ...await importOriginal<typeof import('./hooks/useFieldProvenance')>(), useFieldProvenance: () => fixture.provenance,
 }));
@@ -19,12 +20,31 @@ import FieldEvidencePopup from './FieldEvidencePopup';
 const render = (evidence?: FieldEvidenceGroup) => renderToStaticMarkup(<FieldEvidencePopup vehicleId="local-vehicle" field="vin" label="VIN" value="Unknown" evidence={evidence} />);
 
 beforeEach(() => {
+  fixture.claims = { evidence: {}, loading: false, error: null };
   fixture.inventory = { data: { images: [], complete: true }, isLoading: false, refetch: vi.fn() };
   fixture.provenance = { isLoading: false, error: null, data: { value: null, evidence: [], observations: [
     { id: 'local-observation', value: 'SOURCE-VIN', confidence: 0.6, source_url: 'https://example.com/listing', source_slug: 'listing-source', observed_at: '2026-10-03T12:00:00Z' },
   ] } };
 });
 describe('canonical value -> attributed observation', () => {
+  it('makes a retained claim and its correction history reachable even without a parent-supplied group', () => {
+    const row = { id: 'local-claim', vehicle_id: 'local-vehicle', field_name: 'vin', field_value: 'SOURCE-VIN',
+      source_type: 'manual_review', source_confidence: 80, confidence: .8, status: 'accepted',
+      extraction_context: 'Exact retained account', created_at: '2026-01-01T00:00:00Z',
+      source_image_id: '00000000-0000-4000-8000-000000000002' };
+    fixture.claims.evidence.vin = { primary: row, sources: [row], totalSources: 1, agreementCount: 1, hasConflict: false,
+      history: [{ ...row, id: 'withdrawn-claim', status: 'superseded', field_value: 'WITHDRAWN-VIN', extraction_context: 'Wrong source interpretation' }] };
+    const html = render();
+    expect(html).toContain('Exact retained account');
+    expect(html).toContain('Recorded decision: accepted');
+    expect(html).toContain('Correction history');
+    expect(html).toContain('WITHDRAWN-VIN');
+    expect(html).toContain('Wrong source interpretation');
+    expect(html).toContain('/vehicle/local-vehicle/image/00000000-0000-4000-8000-000000000002');
+    expect(html).toContain('IMAGE CITATION OUTSIDE CURRENT GALLERY');
+    expect(html).not.toContain('No image citation is recorded');
+    expect(html).toContain('RECORDED VEHICLE VALUE');
+  });
   it('shows the qualified engine winner with its unit and identifies its report', () => {
     fixture.provenance.data.canonical = { status: 'resolved', value: '2.5', observation_id: 'local-observation' };
     fixture.provenance.data.observations[0].value = '2.5';

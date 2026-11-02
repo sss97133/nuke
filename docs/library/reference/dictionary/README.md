@@ -234,6 +234,11 @@ unknown coverage. Existing `image_sets` retains the source state and
 
 **Observation** — The fundamental unit of data in Nuke. Every piece of information is an observation from a source with a trust weight, confidence score, and timestamp. Comments, listings, images, metadata, user inputs — all observations.
 
+**Garage inventory status** — An account-stated `current`, `previous` or `unknown`
+inventory relationship, independent of personal ownership and title qualification.
+The optional `inventory_status` key in a private garage relationship correction
+groups cards without asserting title, a transfer date or organization ownership.
+
 **Unresolved garage source** — An exact private account statement whose physical
 vehicle is not yet identified. Its bounded label and stated roles describe the
 source; `vehicle_id` and `property_id` remain NULL. It appears as identity pending,

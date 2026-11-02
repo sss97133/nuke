@@ -59,6 +59,16 @@ describe('dispatch — routes each mechanism correctly', () => {
     expect(r.status).toBe('prepared');
     expect((r.job as any)?.kind).toBe('browser_submit');
   });
+  it('BaT job retains contributor citations and open audit without turning statements into description fields', () => {
+    const evidence = { status: 'available', testimony: [{ observation_id: 'observation', statement: 'Builder statement',
+      source: { contributor_id: 'contributor', name: 'Example Builder', relationship: 'builder' }, evidence_kind: 'contributor_statement' }],
+      documents: [{ image_id: 'receipt' }], audit: { open: [{ key: 'engine_stamp' }] } };
+    const r = dispatchChannel(CHANNELS_BY_ID['bring_a_trailer'], { vehicleId: 'v1', pkg: { contributor_evidence: evidence } });
+    const snapshot = JSON.parse(JSON.stringify(r.job));
+    expect(snapshot.contributor_evidence).toEqual(evidence);
+    expect(JSON.stringify(snapshot.field_map)).not.toContain('Builder statement');
+    expect(snapshot.human_keys).toContain('ownership_attestation');
+  });
   it('BaT agent pilot carries a projected field_map + human keys', () => {
     const r = dispatchChannel(CHANNELS_BY_ID['bring_a_trailer'], {
       vehicleId: 'v1',

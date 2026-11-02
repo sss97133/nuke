@@ -105,7 +105,7 @@ export type IntakeClient = {
   open(token: string): Promise<{ status: number; body: unknown }>;
   /** ok, plus the writer's reply (it carries `progress`, the ladder after this answer). */
   answer(token: string, key: string, answer: string): Promise<{ ok: boolean; body: unknown }>;
-  /** label picks the bucket; shot (an evidence item's key from the ladder) names what the photo proves. */
+  /** label picks the bucket; shot names the claim the contributor offers the photo to support. */
   file(token: string, file: File, label: string, shot?: string | null): Promise<{ ok: boolean; duplicate: boolean; body: unknown }>;
 };
 

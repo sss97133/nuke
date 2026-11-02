@@ -24,6 +24,11 @@
 
 @media (max-width: 480px) { .k-figure { font-size: 28px; } }
 
+/* A proportion bar: a track and a fill, the same tokens the market boards draw theirs with. */
+.k-share-bar { display: block; width: 100%; max-width: 320px; height: 4px; margin-top: 4px; }
+.k-share-bar__track { fill: var(--border); }
+.k-share-bar__fill { fill: var(--text-secondary); }
+
 /* Grouped content, with a thin separator between sections and rows. */
 .k-section { border-bottom: 1px solid var(--border); padding: 16px; background: var(--surface); }
 .k-section__head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 12px; }

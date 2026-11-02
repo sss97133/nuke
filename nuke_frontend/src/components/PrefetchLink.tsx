@@ -45,6 +45,8 @@ const CHUNK_MAP: { test: (href: string) => boolean; load: () => Promise<unknown>
     load: () => import('../pages/jobs/WorkPage') },
   { test: (h) => h === '/work/setup',
     load: () => import('../pages/provider-setup/ProviderSetupPage') },
+  { test: (h) => h === '/accounting' || h.startsWith('/accounting?'),
+    load: () => import('../pages/publishing/FinanceDashboard') },
 ];
 
 function resolveChunk(href: string): (() => Promise<unknown>) | null {

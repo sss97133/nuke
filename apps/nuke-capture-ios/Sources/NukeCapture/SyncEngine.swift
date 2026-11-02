@@ -1168,6 +1168,7 @@ final class SyncEngine: ObservableObject {
         persistSeenAssets()
         SubjectResolutionEngine.shared.acknowledge(localIdentifier: assetID, sourceHash: sha256, userId: userID,
                                                    privacyReceipt: privacyReceipt)
+        BackgroundUploader.shared.requestIdentityFollowup()
         let t0id = assetID
         Task { [weak self] in
             guard let self, let atom = await SyncEngine.analyzeT0(assetID: t0id) else { return }

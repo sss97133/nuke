@@ -39,6 +39,10 @@ import { parseVehicleTitle, type ParsedVehicle } from "./vehicleTitle.ts";
 import { extractFromHtml } from "../extract-craigslist/extract.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { vicariListingId } from "../_shared/vicariParser.ts";
+import { prepareGatewayCapture, landGatewayCapture, type GatewayCapture } from "./gateway.ts";
+import { gatewayListing } from "../_shared/gatewayParser.ts";
+import { dealerListing, dealerHost } from "../_shared/dealerParser.ts";
+import { prepareDealerCapture, landDealerCapture, dealerIdentityConflict, type DealerCapture } from "./dealer.ts";
 import { ingestVicari } from "./vicari.ts";
 
 const supabaseAdmin = createClient(
@@ -247,6 +251,10 @@ function extractTitleFromUrlSlug(url: string): string | null {
 }
 
 function detectSource(url: string): SourceMatch {
+  const dealer = dealerListing(url);
+  if (dealer) return { platform: dealer.platform, externalId: dealer.stock_id };
+  const gateway = gatewayListing(url);
+  if (gateway) return { platform: "gateway_classics", externalId: gateway.id };
   const vicariId = vicariListingId(url);
   if (vicariId) return { platform: "vicari", externalId: vicariId };
   for (const { platform, pattern, extractId } of SOURCE_PATTERNS) {
@@ -838,6 +846,8 @@ async function enrichVehicle(vehicleId: string, data: VehicleEnrichment, platfor
 // ── Auto-Enrichment via Existing Extractors ──────────────────────
 
 interface EnrichedData {
+  dealer_capture?: DealerCapture;
+  gateway_capture?: GatewayCapture;
   vicari_receipt?: Record<string, unknown>;
   vehicle_id?: string;
   year?: number | null;
@@ -874,6 +884,20 @@ type EnrichResult =
 async function tryAutoEnrich(url: string, platform: string): Promise<EnrichResult> {
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const serviceKey = projectSecretKey()!;
+
+  if (platform === "gr_auto_gallery" || platform === "streetside_classics") {
+    try {
+      const capture = await prepareDealerCapture(supabaseAdmin, url);
+      return { ok: true, data: { ...capture.fields, listing_url: capture.fields.url, dealer_capture: capture } };
+    } catch (e) { return { ok: false, error: e instanceof Error ? e.message : String(e) }; }
+  }
+
+  if (platform === "gateway_classics") {
+    try {
+      const capture = await prepareGatewayCapture(supabaseAdmin, url);
+      return { ok: true, data: { ...capture.fields, listing_url: capture.fields.url, gateway_capture: capture } };
+    } catch (e) { return { ok: false, error: e instanceof Error ? e.message : String(e) }; }
+  }
 
   if (platform === "vicari") {
     try {
@@ -1127,6 +1151,8 @@ interface IngestInput {
 }
 
 interface IngestResult {
+  dealer_receipt?: Record<string, unknown>;
+  gateway_receipt?: Record<string, unknown>;
   vicari_receipt?: Record<string, unknown>;
   status: "created" | "matched" | "duplicate" | "rejected" | "error" | "preview" | "unresolved";
   vehicle_id?: string | null;
@@ -1202,6 +1228,10 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
       const source = detectSource(input.url);
       platform = source.platform;
       externalId = source.externalId;
+      const nativeDealerHost = dealerHost(input.url);
+      if (nativeDealerHost && !dealerListing(input.url)) {
+        return { status: "rejected", reason: "dealer_listing_url_invalid", source: nativeDealerHost };
+      }
 
       // Resolve a Craigslist share link once. Failure returns to the intake
       // ledger/backoff before detail enrichment; it must not retry the same
@@ -1307,13 +1337,30 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
     let enrichedPostedAt: string | null = null;
     let enrichedSellerType: string | null = null;
     let vicariReceipt: Record<string, unknown> | undefined;
+    let dealerCapture: DealerCapture | undefined;
+    let dealerReceipt: Record<string, unknown> | undefined;
+    let gatewayCapture: GatewayCapture | undefined;
+    let gatewayReceipt: Record<string, unknown> | undefined;
 
-    if (listingUrl && (platform === "vicari" || (input.enrich !== false && !input.description))) {
+    if (listingUrl && (platform === "vicari" || (platform === "gr_auto_gallery" || platform === "streetside_classics") || platform === "gateway_classics" || (input.enrich !== false && !input.description))) {
       const enrichResult = await tryAutoEnrich(listingUrl, platform);
+      if (["gr_auto_gallery", "streetside_classics", "gateway_classics"].includes(platform) && !enrichResult.ok) return { status: "rejected", reason: `enrichment_failed: ${enrichResult.error}`, source: platform };
       if (enrichResult.ok) {
         enrichmentSucceeded = true;
         const enriched = enrichResult.data;
         vicariReceipt = enriched.vicari_receipt;
+        gatewayCapture = enriched.gateway_capture;
+        dealerCapture = enriched.dealer_capture;
+        if (dealerCapture) {
+          if (dealerIdentityConflict({ year: input.year, make: input.make, model: input.model }, dealerCapture.fields)) {
+            return { status: "unresolved", vehicle_id: null, source: platform, reason: "dealer_identity_claim_conflict",
+              dealer_receipt: { unresolved: true, snapshot_id: dealerCapture.snapshot_id } };
+          }
+          // Native principal identity supersedes a URL slug guess; caller
+          // disagreements stay unresolved rather than attaching the wrong asset.
+          parsed = { year: dealerCapture.fields.year, make: dealerCapture.fields.make, model: dealerCapture.fields.model };
+          identityIsSlugGuess = false;
+        }
         if (platform === "vicari" && vicariReceipt?.unresolved === true) {
           return { status: "unresolved", vehicle_id: null, source: platform, external_id: externalId, vicari_receipt: vicariReceipt };
         }
@@ -1612,6 +1659,9 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
       sellerName: input.seller_name,
     }, platform, { identityUncertain, extractorVehicleId });
 
+    if (dealerCapture) dealerReceipt = await landDealerCapture(supabaseAdmin, dealerCapture, match.vehicleId);
+    if (gatewayCapture) gatewayReceipt = await landGatewayCapture(supabaseAdmin, gatewayCapture, match.vehicleId);
+
     // Condition is free text with no home on the vehicles table — record it
     // as an observation so it's not silently discarded (see
     // recordConditionObservation for why).
@@ -1872,6 +1922,8 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
       issues: gateResult.issues.length > 0 ? gateResult.issues : undefined,
       needs_review: needsReview || undefined,
       ...(vicariReceipt ? { vicari_receipt: vicariReceipt } : {}),
+      ...(gatewayReceipt ? { gateway_receipt: gatewayReceipt } : {}),
+      ...(dealerReceipt ? { dealer_receipt: dealerReceipt } : {}),
       ...(capture ? { listing_capture: ledgerFields(capture, landing) } : {}),
     };
   } catch (err: any) {
@@ -1896,6 +1948,7 @@ Deno.serve(async (req: Request) => {
   if (req.method === "GET") {
     return new Response(JSON.stringify({
       name: "nuke.ingest",
+      capabilities: { gateway_browser_native: true, dealer_microdata_native: true },
       description: "Universal vehicle ingestion endpoint. Accepts structured data, URLs, or free text.",
       methods: { POST: "Ingest vehicle(s)", GET: "This schema documentation" },
       fields: {

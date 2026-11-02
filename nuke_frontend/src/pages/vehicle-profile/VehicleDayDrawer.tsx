@@ -18,6 +18,7 @@ import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useVehicleProfile } from './VehicleProfileContext';
 import { openVehiclePhoto } from './VehiclePhotoLightbox';
+import WorkSessionContext from './WorkSessionContext';
 import { auctionMomentDayTitle, auctionOpenDayTitle, fmtClock, fmtMoment, fmtUsd, isBatHosted, listingForPhoto, localDate, momentDay, type AuctionSequence } from './auctionSequence';
 
 interface DayPhoto {
@@ -274,6 +275,7 @@ const VehicleDayDrawer: React.FC<VehicleDayDrawerProps> = ({ date, auctions = []
                 {String(meta.work_description)}
               </div>
             )}
+            {vehicleId && ev.id && <WorkSessionContext key={`${vehicleId}:${ev.id}:${date}`} vehicleId={vehicleId} sessionId={ev.id} date={date} />}
           </div>
         );
       })}

@@ -717,6 +717,103 @@ job path counts sourced and pending operations, treats labor-task rows as operat
 `operation_excerpt_missing_from_scope` without deleting rows.
 Contract: `supabase/sql/test_work_order_scope_operations.sql`.
 
+### Retained document scope and reported delivery responsibility
+
+`work_order_retained_source_bindings` extends the canonical work-order owner with an
+immutable source relation. An admitted `internal-inference` `work_record` names the
+existing job, existing provider actor, original build-log observation and original
+owner-stated delivery report. The projector requires the provider's existing name
+and the reported client label in an exact responsibility excerpt. This is reported
+responsibility, never an authenticated assignment, ownership transfer or Sign.
+
+Intake uses the existing `ingest-observation` path followed by
+`project_work_order_resource_observation`; the event envelope is:
+
+```json
+{"work_order_resource":{"version":1,"event_type":"retained_source_binding",
+  "work_order_id":"<existing job UUID>","provider_actor_id":"<existing actor UUID>",
+  "scope_basis_observation_id":"<original build-log row UUID>",
+  "responsibility_basis_observation_id":"<original owner-report UUID>",
+  "reported_client_label":"<exact short label in both sources>",
+  "responsibility_excerpt":"<exact original excerpt naming the provider and client>"}}
+```
+
+One binding selects current `client_billing_line` observations by the same vehicle,
+source registry ID, document label and original document client. It does not mint
+one work task per billing line. Each returned entry retains its observation UUID,
+document row, field pointer and original clocks. `Done` stays a billing column;
+execution remains unestablished. Scope and duty have separate validity checks:
+withdrawing a duty report does not erase the retained document for existing job
+parties. Withdrawing or reattributing its original basis withholds that relationship;
+changed interpretation/report fingerprints cannot silently replace its meaning.
+The same whole document cannot bind simultaneously to a different job; splitting
+it requires a future explicit allocation model.
+
+`my_work_orders('responsible')` selects already-readable jobs with existing performer
+membership or a current retained duty report for the viewer's **evidenced** actor.
+It does not add a viewer slot. The default SQL `NULL` filter still means all accessible
+jobs. `/work` uses the responsible cohort and offers the existing accessible population
+separately; both link into `/jobs/:id`. The job-path reader includes a first page of
+`retained_work`; `work_order_retained_sources_read` provides the remaining pages.
+Private scope is returned only to existing job parties or the evidenced reported
+provider, within jobs the account could already read. Admin access and self-claimed
+actor identity alone are insufficient. Raw contacts, source invoice amounts and
+billing amounts are omitted. Payment/Sign authority is unchanged.
+
+Contracts: `supabase/sql/test_work_order_retained_sources.sql` replays the real job
+build and tests projector, currentness, cohorts, source paging and privacy;
+`RetainedWorkSection.test.tsx` and `WorkPage.workDay.test.tsx` test the consumer.
+Actual retained-source tests stay private. A local replay is not production admission
+or evidence of physical completion; image-to-operation attribution remains separate.
+
+### Offline reconstruction from retained build sources
+
+`scripts/reconstruct-retained-work.mjs` reads a private captured selection of existing
+work orders, `work_record` observations, ownership periods, selected images and
+`read_work_order_image_objects` results. Its model is
+`scripts/lib/retained-work-reconstruction.mjs`. It performs no network requests,
+source intake, image inference, database writes or payment actions.
+
+```sh
+node scripts/reconstruct-retained-work.mjs \
+  --input /private/retained-source-capture.json \
+  --out /private/work-reconstruction.json
+node --test scripts/reconstruct-retained-work.test.mjs
+```
+
+The `technician_evidence_capture_v1` input uses the existing rows as its evidence;
+real captures and reconstructed output stay outside every Git checkout. Output is
+created exclusively with mode 0600 and is never overwritten. The receipt hashes
+both input bytes and the model implementation. CI uses synthetic source records;
+private actual-source replays are separate evidence, not public fixtures.
+
+The reconstructed grains remain distinct:
+
+| Grain | Extracted result | Boundary |
+|---|---|---|
+| Retained build-log row | `client_billing_line` item, category, supplier, billing column/status/split and recorded minutes; exact observation and JSON pointer for each field | A billing label such as `Done` cannot establish physical execution, installation, measured labor or an assignment. Two interpretations of the same document row remain visible. |
+| Retained payment / obligation report | Original `payment_status` and `obligation` claims with source clocks and client label | A report is not an authenticated Sign; payment and delivery owed can coexist. No bill, balance or fulfillment state is changed. |
+| Owner answer about a relationship | Reviewed claim plus an exact excerpt of its retained answer | Earlier ownership, later ownership and continuing work responsibility coexist. No transfer date, canonical identity, permission or approved relationship is minted. |
+| Selected image | Separate processing, analysis-schema and attribution states; original component occurrences and JSON pointers | A processed image under review is distinct from failed analysis. An appearance is not performed work. Missing capture time stays separate from added time. |
+| Existing job-context image page | Source occurrence, distinct-image and sighting diagnostics | Vehicle context does not establish a particular operation or job allocation. Repeated appearances do not accrue physical parts, minutes or value. |
+
+Work-source withdrawal and reattribution remove the affected current interpretation;
+duplicate replay is idempotent. Same-ID revisions with changed contents are refused.
+Source paging and selected-image coverage remain explicit. Complete access to the
+declared source selection does not measure the population of real-world work.
+Eligible source formats not yet mapped by this extractor remain individually keyed
+in `sourceBacklog`; mapped and unresolved source counts account for the full eligible
+selection. An unsupported receipt or narrative is not silently discarded or counted
+as no work.
+
+This closes an extraction/read gap: useful existing build records remain recoverable
+when the operations table is empty or image processing fails. A historical source can
+also yield unbound scope before any work-order header exists; job-context image pages
+are optional and their absence is not evidence of no work. Linking candidate scope
+to the specific work order and performer, admitting supported temporal ownership and
+obligations through sanctioned writers, and integrating the result into the technician
+backlog remain separate work. This operator is not that production integration.
+
 ### Retained lifecycle testimony
 
 The job loop's acceptance, start, completion, invoice and payment owners record authenticated Signs.
@@ -924,3 +1021,38 @@ All scripts live in `mcp-servers/nuke-context/` and share `lib/env.mjs` for envi
 | `20260327100001_work_order_intelligence_seed.sql` | Seed | 64 labor operations |
 | `20260327100002_work_order_receipt_view.sql` | View | `work_order_receipt_unified` + `work_order_balance()` |
 | `20260327100003_resolve_work_order_status.sql` | RPC | The product function |
+
+## Retained build evidence in the work view
+
+`jobsReaders.workContext` and `workEvidenceModel.ts` connect the existing work-order
+consumer to RLS-protected `vehicle_observations`, `wiring_decisions` and endpoint
+names. This is a read model, with no new task ledger, source writes or grants.
+It runs only for a job whose existing reader includes retained responsibility.
+Vehicle history supports the job without allocating its costs or labor to it.
+
+Requested work, design decisions, purchases, presence, installation and delivery
+remain separate assertions. Candidate design options are not accepted work scope.
+Recorded choices leave the open-decision list; they do not close physical work.
+Their authority remains explicit: T1 owner-stated choices, T3 agent working
+choices and otherwise unqualified records. Agent choices neither become owner
+approval nor automatically reopen as another mandatory owner question.
+A purchased part with an uninstalled report remains an installation gap, rather
+than another purchase task. A mounted-part report saying exactly “Not wired.”
+supports a dated wiring gap; mounting or image appearance alone does not.
+
+Source corrections remove only their exact original interpretation. Other
+purchase and presence evidence survives. Unresolved installation disagreements
+remain visible. A truncated proof read withholds the derived remaining-work list
+because an omitted correction could change it. Failures and source limits remain
+visible; an empty read never certifies a finished build.
+
+Older handoffs require the same vehicle, the reporting source of an included duty
+report and an exact client-name token match. Their questions remain historical;
+they are not automatically today's blockers. Original source text, event/photo
+dates and recording clocks are available through evidence disclosure. The original
+build log and job administration stay reachable beneath the working view.
+
+Contracts: `workEvidenceModel.test.ts`, `retainedWorkPlan.reader.test.ts`,
+`RetainedWorkPlan.test.tsx`, and the existing retained-source, job-page and work-page
+tests. This does not reconstruct every operation from the wider retained media,
+grant a performer role, repair ownership, or establish accepted completion.

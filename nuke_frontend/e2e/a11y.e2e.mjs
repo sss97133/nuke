@@ -40,7 +40,10 @@ async function audit(state) {
   const page = await ctx.newPage();
   page.setDefaultTimeout(30_000);
   await page.goto(`${server.base}${state.path}`);
-  await page.getByText(state.ready, { exact: false }).first().waitFor();
+  const ready = state.readyRole
+    ? page.getByRole(state.readyRole, { name: state.ready, exact: true })
+    : page.getByText(state.ready, { exact: false }).first();
+  await ready.waitFor();
   if (state.act) await state.act(page);
   await page.waitForTimeout(150);
   await page.addScriptTag({ path: AXE });

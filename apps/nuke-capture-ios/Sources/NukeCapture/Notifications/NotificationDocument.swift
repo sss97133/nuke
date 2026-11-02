@@ -267,6 +267,8 @@ final class InboxBadgeStore: ObservableObject {
 
     @Published var unreadNotifications: Int?
     @Published var toSign: Int?
+    private var requests = ReadRequestGuard()
+    private var accountScope: String?
 
     var badge: Int { Self.badge(unread: unreadNotifications, toSign: toSign) }
 
@@ -280,14 +282,21 @@ final class InboxBadgeStore: ObservableObject {
     }
 
     func refresh() async {
-        guard SupabaseService.currentUserId != nil else { clear(); return }
+        let owner = SupabaseService.currentUserId
+        if accountScope != owner { clear(); accountScope = owner }
+        let request = requests.begin()
+        guard let owner else { clear(); return }
         async let unread = NotificationReaders.unreadCount()
         async let queue = JobReaders.signatures()
-        unreadNotifications = await unread
-        toSign = Self.toSign(await queue)
+        let result = await (unread, queue)
+        guard !Task.isCancelled, requests.isCurrent(request), SupabaseService.currentUserId == owner else { return }
+        unreadNotifications = result.0
+        toSign = Self.toSign(result.1)
     }
 
     func clear() {
+        _ = requests.begin()
+        accountScope = nil
         unreadNotifications = nil
         toSign = nil
     }

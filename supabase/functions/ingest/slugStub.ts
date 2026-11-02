@@ -20,6 +20,7 @@
 
 /** Platform keys as `detectSource` in index.ts names them. */
 export const SLUG_STUB_BLOCKED: ReadonlySet<string> = new Set([
+  "gateway_classics",
   "classiccars",
   "mecum",
   "barrett_jackson",

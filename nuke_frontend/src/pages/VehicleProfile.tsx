@@ -14,6 +14,7 @@ const AddOrganizationRelationship = React.lazy(() => import('../components/vehic
 import { usePageTitle, getVehicleTitle } from '../hooks/usePageTitle';
 import { useVehiclePriceFacts } from './vehicle-profile/hooks/useVehiclePriceFacts';
 import ProfileHeader from './vehicle-profile/ProfileHeader';
+import { useProfileRead } from './vehicle-profile/profileDocument';
 import { useOrderBook } from './stacks/orderBookReader';
 const ValidationPopupV2 = React.lazy(() => import('../components/vehicle/ValidationPopupV2'));
 import VehicleMemeOverlay from '../components/vehicle/VehicleMemeOverlay';
@@ -22,12 +23,12 @@ import { VehicleProfileProvider, useVehicleProfile } from './vehicle-profile/Veh
 import { isVehicleVinAddress, resolveVehicleVinAddress, type VinAddressResolution } from './vehicle-profile/loadVehicleData';
 const WorkspaceContent = React.lazy(() => import('./vehicle-profile/WorkspaceContent'));
 const VehicleBanners = React.lazy(() => import('./vehicle-profile/VehicleBanners'));
-const VehicleBadgeBar = React.lazy(() => import('./vehicle-profile/VehicleBadgeBar'));
 const BarcodeTimeline = React.lazy(() => import('./vehicle-profile/BarcodeTimeline'));
 const VehicleBriefing = React.lazy(() => import('./vehicle-profile/VehicleBriefing'));
 const VehiclePerformance = React.lazy(() => import('./stacks/VehicleCohort').then(module => ({ default: module.VehiclePerformance })));
 const VehiclePhotoLightbox = React.lazy(() => import('./vehicle-profile/VehiclePhotoLightbox'));
 const VehicleEvidenceView = React.lazy(() => import('./vehicle-profile/VehicleEvidenceView'));
+const VehicleSourceProfile = React.lazy(() => import('./vehicle-profile/VehicleSourceProfile'));
 
 
 const VehicleProfileInner: React.FC = () => {
@@ -40,6 +41,7 @@ const VehicleProfileInner: React.FC = () => {
   const { vehicleId, vehicle, session, isRowOwner, isVerifiedOwner, hasContributorAccess, userOwnershipClaim, permissions, isPublic } = ctx;
   const { priceFacts } = useVehiclePriceFacts(vehicleId ?? undefined);
   const selectedEpisode = useOrderBook(vehicleId ?? '', new URLSearchParams(location.search).get('performanceLot') ?? 'latest');
+  const headerRead = useProfileRead(vehicle?.id);
 
   // Local-only state (not in context)
   const [referenceLibraryRefreshKey, setReferenceLibraryRefreshKey] = useState(0);
@@ -200,20 +202,15 @@ const VehicleProfileInner: React.FC = () => {
             This is the current vehicle record. <Link to={returnTo}>Return to the selected auction and replay →</Link>
           </div>
         )}
-        {/* The header through the kit: identity and price stay in view; recorded facts scroll with the page. */}
+        {/* Compact identity and priority data; field exploration stays within this profile. */}
         <ProfileHeader key={vehicleId} priceLotId={selectedEpisode.data?.lots.find(lot =>
           priceFacts?.source_url && lot.source_url.replace(/\/+$/, '') === priceFacts.source_url.replace(/\/+$/, '')
         )?.id} />
 
-        <React.Suspense fallback={null}>
-          <VehicleBadgeBar />
-          <VehiclePerformance key={vehicleId} vehicleId={vehicleId!} />
-          <VehicleBriefing collapsed />
-        </React.Suspense>
-
         {/* Banners: BaT data flag, live auction, external auction, orphaned vehicle, merge proposals */}
         <React.Suspense fallback={null}>
           <VehicleBanners
+            externalAuctionInHeader={!!headerRead.data && headerRead.data.vehicle_id === vehicleId && headerRead.data.sections.some(section => section.kind === 'masthead')}
             onMergeComplete={() => ctx.reloadVehicle()}
           />
         </React.Suspense>
@@ -236,6 +233,11 @@ const VehicleProfileInner: React.FC = () => {
             />
           </React.Suspense>
         </div>
+
+        <React.Suspense fallback={null}>
+          <VehiclePerformance key={vehicleId} vehicleId={vehicleId!} />
+          <VehicleBriefing collapsed />
+        </React.Suspense>
 
         {/* Add Organization Relationship Modal */}
         {showAddOrgRelationship && vehicle && session?.user?.id && (
@@ -404,6 +406,7 @@ const VehicleVinAddress: React.FC<{ vin: string }> = ({ vin }) => {
 /** Resolve VIN addresses before mounting any UUID-dependent profile readers. */
 const VehicleProfile: React.FC = () => {
   const { vehicleId } = useParams<{ vehicleId: string }>();
+  if (vehicleId === 'source') return <VehicleSourceProfile />;
   if (isVehicleVinAddress(vehicleId)) return <VehicleVinAddress key={vehicleId} vin={vehicleId} />;
   return <VehicleProfileProvider><VehicleProfileInner /></VehicleProfileProvider>;
 };

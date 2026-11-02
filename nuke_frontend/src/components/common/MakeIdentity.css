@@ -25,6 +25,7 @@
 .vehicle-identity__model { font-size:20px; line-height:1; overflow-wrap:anywhere; }
 .vehicle-identity__art { display:block; flex-shrink:0; max-width:100%; }
 .vehicle-identity__art svg { display:block; max-width:100%; height:auto; overflow:hidden; }
+.vehicle-identity__art img { display:block; max-width:100%; height:auto; }
 .vehicle-identity__art--make { width:52px; }
 .vehicle-identity__art--model { width:140px; }
 .vehicle-identity__art--emblem { width:28px; }
@@ -36,6 +37,7 @@
 .vehicle-identity--compact .vehicle-identity__variant,
 .vehicle-identity--compact .vehicle-identity__year { font:inherit; letter-spacing:normal; }
 .vehicle-identity--compact .vehicle-identity__art svg { max-height:36px; width:auto; }
+.vehicle-identity--compact .vehicle-identity__art img { height:36px; width:auto; max-width:140px; object-fit:contain; }
 .vehicle-identity--compact .vehicle-identity__art { width:auto; }
 /* Keep period artwork at headline scale alongside the recorded identity. */
 .vehicle-identity[data-variant-artwork="true"] { flex-wrap:nowrap; }

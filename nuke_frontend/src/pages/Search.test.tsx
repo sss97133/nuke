@@ -40,3 +40,12 @@ it('offers an explicit listing import and announces the pending state', async ()
   expect(host.querySelector('[role="status"]')?.textContent).toContain('Importing');
   expect(Array.from(host.querySelectorAll('button')).some(b=>b.textContent==='Import listing')).toBe(false);
 });
+
+it('opens an ECR source URL as a profile without starting extraction or minting a physical vehicle', async () => {
+  const url='https://exclusivecarregistry.com/details/pagani/zonda/123';
+  fixture.extraction={status:'ready',url,platform:null};await render();
+  const link=[...host.querySelectorAll('a')].find(a=>a.textContent==='Open source profile');
+  expect(link?.getAttribute('href')).toBe('/vehicle/source?source_url='+encodeURIComponent(url));
+  expect(fixture.importListing).not.toHaveBeenCalled();
+  expect([...host.querySelectorAll('button')].some(b=>b.textContent==='Import listing')).toBe(false);
+});

@@ -158,7 +158,7 @@ final class LibraryIngest: ObservableObject {
     /// image analysis may have been wrong anywhere upstream, so it cannot qualify
     /// as the VIN/classification read that anchors a capture-session fold.
     static var identityMethodVersion: String {
-        "vehicle-identity-context-fold-v3:\(VNClassifyImageRequest.defaultRevision):\(VNRecognizeTextRequest.defaultRevision):\(OnDeviceAnalysis.methodVersion)"
+        "vehicle-identity-context-fold-v3:\(VNClassifyImageRequest.defaultRevision):\(VNRecognizeTextRequest.defaultRevision):\(NativeIdentityOCR.methodVersion)"
     }
 
     /// Read every selected source image, including already-bound photos. Album
@@ -262,9 +262,18 @@ final class LibraryIngest: ObservableObject {
         // album/session vehicle. Several readings remain several possible subjects.
         // Preserve all source text, including pre-1981 serials that the existing
         // modern 17-character VIN detector cannot recognize. Never force a match.
-        // One OCR pass yields both the lines and the scored observations (source + confidence).
-        let analysis = OnDeviceAnalysis.analyze(cg, classification: classification,
-                                                readText: !asset.mediaSubtypes.contains(.photoScreenshot))
+        let analysis: (observations: [OnDeviceObservation], textLines: [String])
+        if method.hasPrefix("vehicle-identity-context-fold-v3:"), method.hasSuffix(":\(NativeIdentityOCR.methodVersion)"),
+           !asset.mediaSubtypes.contains(.photoScreenshot) {
+            guard let identityCG = SyncEngine.downsampledCGImage(from: data, maxPixel: CGFloat(NativeIdentityOCR.maxPixel)),
+                  let read = OnDeviceAnalysis.analyzeIdentity(identityCG, classification: classification) else {
+                return .pending("identity reading held or unavailable")
+            }
+            analysis = read
+        } else {
+            analysis = OnDeviceAnalysis.analyze(cg, classification: classification,
+                readText: !asset.mediaSubtypes.contains(.photoScreenshot))
+        }
         let textLines = analysis.textLines
         let vins = Array(Set(VisionEngine.vinCandidates(in: textLines) + VisionEngine.checkedVINs(in: textLines) +
             VisionEngine.labelledClassicSerialCandidates(in: textLines))).sorted()

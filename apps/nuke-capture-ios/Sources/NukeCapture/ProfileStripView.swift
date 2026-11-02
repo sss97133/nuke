@@ -784,6 +784,21 @@ struct ClaimSourceSheet: View {
                          ? "A legacy value comes from the vehicle record itself, with no observation beneath it."
                          : "Trust is the reader's calibration for this evidence class, or the row's own confidence when it carries one.")
                 }
+                if let qualification = drill.claim.qualification, qualification.hasContent {
+                    Section {
+                        ForEach(qualification.rows, id: \.label) { row in
+                            LabeledContent(row.label, value: row.value)
+                                .accessibilityIdentifier("claim.qualification.\(row.label)")
+                        }
+                        if let limitation = qualification.limitation,
+                           !limitation.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                            Text(limitation)
+                                .font(.footnote)
+                        }
+                    } header: {
+                        Text("What this establishes")
+                    }
+                }
                 if drill.claim.source.openableURL != nil || drill.claim.isAuctionSaleClaim {
                     Section {
                         if let videoUrl = drill.claim.source.video?.watchableURL {

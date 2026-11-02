@@ -239,7 +239,7 @@ private struct SourcePhotoRow: View {
     }
 }
 
-private struct SourcePhotoDetail: View {
+struct SourcePhotoDetail: View {
     let userId: String
     let imageId: UUID
     @EnvironmentObject private var session: SessionStore

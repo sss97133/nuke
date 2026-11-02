@@ -36,6 +36,25 @@ beforeEach(() => {
 });
 
 describe('evidence reads preserve sparse source state', () => {
+  it('retains withdrawn source references separately without promoting their higher scores or creating conflicts', async () => {
+    const row = { vehicle_id: 'offline-history', field_name: 'engine_type', source_type: 'review',
+      extracted_at: null, created_at: '2026-01-01T00:00:00Z' };
+    fixture.rows = [
+      { ...row, id: 'current', proposed_value: 'Reported engine', source_confidence: 75, status: 'accepted' },
+      { ...row, id: 'withdrawn', proposed_value: 'Wrong engine', source_confidence: 99, status: 'superseded',
+        extraction_context: 'The cited photo was an intake, not an identity plate', assigned_at: '2026-02-01T00:00:00Z',
+        source_image_id: '00000000-0000-4000-8000-000000000001' },
+      { ...row, id: 'rejected', proposed_value: 'Another wrong engine', source_confidence: 98, status: 'rejected_misattributed', source_image_id: '../invalid' },
+      { ...row, id: 'foreign', vehicle_id: 'offline-other', proposed_value: 'Foreign engine', source_confidence: 100, status: 'accepted' },
+    ];
+    useFieldEvidence('offline-history'); const data = await fixture.queryFn!();
+    expect(data.engine_type.primary.id).toBe('current');
+    expect(data.engine_type.sources).toHaveLength(1);
+    expect(data.engine_type.hasConflict).toBe(false);
+    expect(data.engine_type.history?.map(r => r.id)).toEqual(['withdrawn', 'rejected']);
+    expect(data.engine_type.history?.[0]).toMatchObject({ source_image_id: '00000000-0000-4000-8000-000000000001', assigned_at: '2026-02-01T00:00:00Z' });
+    expect(data.engine_type.history?.[1].source_image_id).toBeNull();
+  });
   it.each([75, 0, null])('preserves raw native confidence %s for display without changing rank or either clock', async score => {
     fixture.rows = [{ id: 'offline-score', vehicle_id: 'offline-subject', field_name: 'color', proposed_value: 'Blue',
       source_type: 'source-report', source_confidence: score, status: 'pending',

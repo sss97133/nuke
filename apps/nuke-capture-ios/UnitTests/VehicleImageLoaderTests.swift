@@ -66,4 +66,14 @@ final class VehicleImageLoaderTests: XCTestCase {
         XCTAssertEqual(VehicleImageLoader.key("v1", "day", "2026-01-02"), "v1|day|2026-01-02")
         XCTAssertTrue(VehicleImageLoader.columns.hasPrefix("id,image_url,thumbnail_url"))
     }
+
+    func testVisitorGalleryUsesExistingPublicViewWithoutPrivateEXIF() {
+        XCTAssertEqual(VehicleImageLoader.source(signedIn: false), "vehicle_images_public")
+        XCTAssertEqual(VehicleImageLoader.source(signedIn: true), "vehicle_images")
+        let publicRead = VehicleImageLoader.columns(signedIn: false)
+        for privateColumn in ["exif_data", "latitude", "longitude", "device_fingerprint"] {
+            XCTAssertFalse(publicRead.contains(privateColumn))
+        }
+        XCTAssertTrue(VehicleImageLoader.columns(signedIn: true).contains("photo_imported_at:exif_data"))
+    }
 }

@@ -3,7 +3,7 @@ import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const fixture = vi.hoisted(() => ({ rows: [] as any[], fetch: vi.fn(), queueStats: vi.fn(), requests: [] as any[] }));
+const fixture = vi.hoisted(() => ({ rows: [] as any[], sessions: [] as any[], fetch: vi.fn(), queueStats: vi.fn(), requests: [] as any[] }));
 vi.mock('../../lib/fetchVehicleImages', () => ({ fetchVehicleImages: (...args: any[]) => fixture.fetch(...args) }));
 vi.mock('../../lib/supabase', () => {
   const meta = { id: 'vehicle-fixture', year: 2006, make: 'Pontiac', model: 'Solstice',
@@ -16,7 +16,7 @@ vi.mock('../../lib/supabase', () => {
     }
     return chain;
   };
-  return { supabase: { from: query, rpc: () => query('rpc'), auth: {
+  return { supabase: { from: query, rpc: (name: string) => name === 'get_vehicle_sessions' ? Promise.resolve({ data: fixture.sessions, error: null }) : query('rpc'), auth: {
     getSession: async () => ({ data: { session: null } }),
     onAuthStateChange: () => ({ data: { subscription: { unsubscribe() {} } } }),
   } } };
@@ -49,6 +49,7 @@ const galleryPhotos = () => [...container.querySelectorAll('img[src*="bringatrai
 beforeEach(() => {
   vi.useFakeTimers();
   fixture.rows = photos();
+  fixture.sessions = [];
   fixture.fetch.mockReset().mockImplementation(async () => fixture.rows);
   fixture.queueStats.mockReset().mockResolvedValue({ pending: 0, failed: 0 });
   fixture.requests = [];
@@ -81,6 +82,23 @@ async function mount(props: Record<string, any> = {}) {
 
 // Each case renders 399 rows through 20 timer steps (about 0.6 s locally, near 5 s on loaded CI runners; one timed out on 2026-10-13).
 describe('ImageGallery canonical database rows', { timeout: 20_000 }, () => {
+  it('retains the selected part topic and its count across full-size and session views', async () => {
+    fixture.rows = photos(4);
+    fixture.rows[0].vehicle_zone = 'mech_drivetrain';
+    fixture.rows[1].vehicle_zone = 'mech_engine_bay';
+    fixture.rows[2].ai_byok_narrative = 'Transmission staged above the frame.';
+    fixture.rows[3].vehicle_zone = 'ext_front';
+    fixture.sessions = [{ session_id: 'session', session_start: '2026-09-30T12:00:00Z', image_ids: fixture.rows.map(row => row.id), image_count: 4 }];
+    const galleryFilter = { field: 'transmission', label: '6L90' }, onReadCount = vi.fn();
+    await mount({ galleryFilter, onReadCount });
+    expect(galleryPhotos()).toHaveLength(2);
+    expect(onReadCount).toHaveBeenLastCalledWith({ vehicleId: 'vehicle-fixture', filterKey: JSON.stringify(galleryFilter), shown: 2, partial: false });
+    await act(async () => root.render(<ImageGallery vehicleId="vehicle-fixture" showUpload={false} galleryView="SESSIONS" galleryFilter={galleryFilter} onReadCount={onReadCount} />));
+    await act(async () => { await vi.advanceTimersByTimeAsync(500); });
+    expect(galleryPhotos()).toHaveLength(2);
+    expect(container.textContent).toContain('2 matching photos');
+    expect(onReadCount.mock.calls.at(-1)?.[0].shown).toBe(2);
+  });
   it.each([false, true])('navigates the full filtered collection before thumbnail paging (filtered=%s)', async (filtered) => {
     vi.stubGlobal('IntersectionObserver', class { observe() {} disconnect() {} unobserve() {} });
     fixture.rows.forEach((row, index) => { row.category = index % 2 === 0 ? 'detail' : 'general'; });

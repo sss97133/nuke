@@ -341,6 +341,38 @@ claims, witnesses and reader output are not measured here, even for completed st
 No new alert rule, schedule, inference, re-drive or paid processing authorization is implied.
 Use the arrival/cached assays above for testimony and reader evidence. C17 remains open.
 
+**C17 refinement must recognize corrections — owner clarification 2026-10-30.** Stagnating image
+analysis is work for the repair loop. Compare a candidate method against the prior on the same
+retained evidence, trace changed claims into the existing consumer, and keep an unchanged control.
+Rewritten captions, output counts and confidence alone cannot establish improved understanding.
+The BYOK dry-pass comparison now checks structured fact values, not only collection sizes: a changed
+part number, text reading or condition can count as progress with the same number of detections.
+Equivalent collection ordering still converges, capped evidence still stops, and a new schema does
+not inherit the previous schema's dry-pass count. Offline regression cases also exercise the existing
+condition projection and reproduce its earlier result. This is a refinement-rule repair, not a measured
+gain in model accuracy or an automatic learning/deployment loop. Independently selected held-out
+evidence, correction cost and real source-to-consumer acceptance remain required. No corpus re-drive,
+new model call, source write, processing activation or fleet coverage gain is established by these tests.
+
+**C17 source context survives interpretation — prepared 2026-10-31 UTC.** A retained reading can
+correctly identify a reference image or receipt while its consumer still treats the contents as a
+confirmed vehicle component or physical-area photograph. Preserve that source qualification through
+receipt matching and field relevance. Reference components keep their receipt candidates as inference;
+paper documents keep their paper citation. Neither becomes a photographed part of the attributed build.
+The existing profile field reader now retains the scene classification and excludes document/reference
+context from uncited physical-area recommendations, including a false legacy `is_document` flag.
+Relevant renders and diagrams stay inspectable in a separate reference-material group; gallery records
+and explicit source citations remain available. Retained-source comparisons exercise
+the actual old/new producer rules and field mapper: reference confirmations are withheld and admitted
+renders/catalog references stop appearing as physical-area photographs. The separate physical-image
+controls retain their results. A receipt regression remains covered, but an inspected invoice was already
+excluded by gallery admission, so it is not counted as a new consumer gain. Check the whole retrieval
+path before treating a changed local result as an operating improvement.
+This is a bounded source-to-consumer correction, not a population accuracy estimate, new model reading,
+historical component-row rewrite or evidence of current installation/completion. The next quality case
+must preserve this comparison and test a separately selected failure; repeated source-free assertions
+or an inactive reader alone cannot establish an improved operating workload.
+
 ## 4. Measurements worth keeping (2026-09-30, read-only, reproducible)
 
 - **The soft close, 400 settled BaT lots (closed 12 h to 10 days before):** 322 extended (80%); 5,471 of 14,026
@@ -1949,6 +1981,18 @@ a contaminated reference cover, a generic part close-up and a later discriminati
 Measure subject grouping, existing-record retrieval, admitted attribution and actual consumer delivery
 separately; an honest unresolved result passes refusal but does not count as resolved. Versioned
 comparison receipts and parser tests are a bounded repair, not proof of autonomous filing accuracy.
+
+**Garage reader and cover acceptance, owner correction 2026-10-30.** Account-related records must remain
+findable without filed photographs or a claim of ownership. The web Garage retains the existing
+`get_user_garage` contribution and profile-creation memberships alongside its ownership-period fold;
+membership pagination, merge-terminal traversal and explicit account corrections must preserve those
+distinctions. Inactive or sold history is not a deleted record. Loaded-record coverage remains visible
+when vehicle/VIN search or a relationship filter narrows the result.
+Cover choice is a display calculation over the existing viewer-eligible gallery: prefer an identifiable
+exterior view, retain a stable tie-break and preserve a cited explicit cover choice. A legacy primary
+flag or upload order alone does not establish a representative exterior. Failed cover enrichment
+must leave the roster usable and must not resurrect an excluded frame. This does not qualify a
+physical-vehicle match, resolve split records, authorize a merge or establish complete source intake.
 Live atlas inspection on 2026-10-18 found the existing cluster store idle (1,597 estimated rows,
 last inspected samples dated May); its existence is not an operating subject-resolution pipeline.
 

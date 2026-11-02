@@ -9,7 +9,7 @@
  * ALL CAPS labels, 9-10px body, zero radius/shadows/gradients.
  */
 import React, { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useVehicleProfile } from './VehicleProfileContext';
 import { usePopup } from '../../components/popups/usePopup';
 import { supabase } from '../../lib/supabase';
@@ -17,8 +17,170 @@ import { useFieldEvidence, type FieldEvidenceMap, type FieldEvidenceGroup } from
 import { useVehiclePriceFacts, priceKindLabel } from './hooks/useVehiclePriceFacts';
 import { useFieldProvenance, formatProvenanceValue, provenanceCoverageUnavailable } from './hooks/useFieldProvenance';
 import FieldProvenanceDrawer, { SourceBadge } from './FieldProvenanceDrawer';
+import { PrefetchLink } from '../../components/PrefetchLink';
+import { readProfileSourcePage, sourceValueText, type StructuredClaim } from './profileSourceClaims';
 
 const FieldEvidencePopup = React.lazy(() => import('./FieldEvidencePopup'));
+
+const RECORD_FIELDS = ['year', 'make', 'model', 'vin', 'trim', 'body_style', 'engine_type', 'engine_size',
+  'transmission', 'drivetrain', 'color', 'interior_color', 'mileage'] as const;
+type RecordField = typeof RECORD_FIELDS[number];
+type RecordAttribute = { value: string | number | null; data_type: string; unit: string | null;
+  value_status: 'unrecorded' | 'retained_record_value'; origin_column: string };
+type RecordBinding = { property_key: string; origin_column: string; value: string | number; unit: string | null;
+  record_columns_disagree: boolean };
+type StructuredRead = { id: string; status: 'loading' | 'ready' | 'failed'; claims: StructuredClaim[];
+  claimStatus?: 'loading' | 'ready' | 'failed'; attributes?: Record<RecordField, RecordAttribute>; bindings?: RecordBinding[];
+  nextAfter?: string | null; pageStatus?: 'loading' | 'failed'; unresolved?: Array<{ property_key: string; reason: string }> };
+const STRUCTURED_RECORD_LABELS: Record<RecordField, string> = { year: 'Year', make: 'Make', model: 'Model', vin: 'VIN', trim: 'Trim',
+  body_style: 'Body style', engine_type: 'Engine type', engine_size: 'Engine size', transmission: 'Transmission',
+  drivetrain: 'Drivetrain', color: 'Exterior color', interior_color: 'Interior color', mileage: 'Odometer' };
+const UUID = /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
+
+/** Read every stored field first, then admitted claims from the same owner.
+ * A slow or failed source read must not hide the structured stored record. */
+export const StructuredProfileData: React.FC<{ vehicleId: string }> = ({ vehicleId }) => {
+  const [read, setRead] = useState<StructuredRead>(
+    { id: vehicleId, status: 'loading', claims: [] });
+  const generation = React.useRef(0);
+  const pagingAbort = React.useRef<AbortController | null>(null);
+  React.useEffect(() => {
+    if (!UUID.test(vehicleId)) return;
+    const controller = new AbortController();
+    let active = true;
+    generation.current++;
+    const timeout = setTimeout(() => controller.abort(), 10000);
+    setRead({ id: vehicleId, status: 'loading', claims: [] });
+    void (async () => {
+      try {
+        const { data: records, error: recordError } = await supabase.rpc('get_vehicle_specs', {
+          p_vehicle_ids: [vehicleId], p_include_typed_claims: false,
+        }).abortSignal(controller.signal);
+        const model = Array.isArray(records) && records.length === 1 ? records[0] : null;
+        if (recordError || model?.vehicle_id !== vehicleId || model.schema_version !== 'vehicle_data_model_v1'
+          || model.typed_claims_status !== 'not_requested') throw Error('Unavailable structured record');
+        const record = model.retained_record;
+        const attributes = record?.attributes;
+        if (record?.origin_relation !== 'vehicles' || record.source_attribution_status !== 'unassayed'
+          || !attributes || !RECORD_FIELDS.every(key => {
+            const a = attributes[key];
+            return a && a.origin_column === key && (a.unit === null || typeof a.unit === 'string')
+              && ((a.value_status === 'unrecorded' && a.value === null)
+                || (a.value_status === 'retained_record_value'
+                  && ((a.data_type === 'string' && typeof a.value === 'string')
+                    || (a.data_type === 'integer' && Number.isSafeInteger(a.value)))));
+          }) || !Array.isArray(record.property_bindings)) throw Error('Unavailable structured record');
+        const bindings: RecordBinding[] = record.property_bindings;
+        if (!bindings.every(b => b && RECORD_FIELDS.includes(b.origin_column as RecordField)
+          && /^[a-z][a-z0-9_]*$/.test(b.property_key) && (b.unit === null || typeof b.unit === 'string')
+          && typeof b.record_columns_disagree === 'boolean'
+          && (typeof b.value === 'string' || (typeof b.value === 'number' && Number.isFinite(b.value))))) throw Error('Invalid record bindings');
+        if (active) setRead({ id: vehicleId, status: 'ready', claimStatus: 'loading', claims: [], attributes, bindings });
+        const { data, error } = await supabase.rpc('get_vehicle_specs', {
+          p_vehicle_ids: [vehicleId], p_include_typed_claims: true, p_claim_cursor: {},
+        }).abortSignal(controller.signal);
+        const claimModel = Array.isArray(data) && data.length === 1 ? data[0] : null;
+        if (error) throw Error('Unavailable structured claims');
+        const page = readProfileSourcePage(claimModel, vehicleId);
+        if (active) setRead({ id: vehicleId, status: 'ready', claimStatus: 'ready', claims: page.claims, attributes, bindings,
+          nextAfter: page.nextAfter, unresolved: page.unresolved });
+      } catch {
+        if (active) setRead(previous => previous.id === vehicleId && previous.attributes
+          ? { ...previous, claimStatus: 'failed', claims: [] }
+          : { id: vehicleId, status: 'failed', claimStatus: 'failed', claims: [] });
+      } finally { clearTimeout(timeout); }
+    })();
+    return () => { active = false; generation.current++; clearTimeout(timeout); controller.abort(); pagingAbort.current?.abort(); };
+  }, [vehicleId]);
+  const loadSourcePage = async (after: string | null) => {
+    if (read.id !== vehicleId || !read.attributes || read.pageStatus === 'loading') return;
+    const currentGeneration = generation.current;
+    const controller = new AbortController();
+    pagingAbort.current?.abort(); pagingAbort.current = controller;
+    const timeout = setTimeout(() => controller.abort(), 10000);
+    setRead(previous => ({ ...previous, pageStatus: 'loading' }));
+    try {
+      const { data, error } = await supabase.rpc('get_vehicle_specs', {
+        p_vehicle_ids: [vehicleId], p_include_typed_claims: true, p_claim_cursor: after ? { after } : {},
+      }).abortSignal(controller.signal);
+      if (error || !Array.isArray(data) || data.length !== 1) throw Error('Unavailable source page');
+      const page = readProfileSourcePage(data[0], vehicleId);
+      if (after !== null && (page.nextAfter === after || page.claims.some(c => c.observation_id <= after))) throw Error('Repeated source cursor');
+      if (generation.current === currentGeneration && pagingAbort.current === controller) setRead(previous => ({ ...previous, claimStatus: 'ready',
+        claims: after ? [...new Map([...previous.claims, ...page.claims].map(c => [c.observation_id, c])).values()] : page.claims,
+        nextAfter: page.nextAfter, unresolved: page.unresolved, pageStatus: undefined }));
+    } catch {
+      if (generation.current === currentGeneration && pagingAbort.current === controller) setRead(previous => ({ ...previous, pageStatus: 'failed' }));
+    } finally { clearTimeout(timeout); }
+  };
+  if (!UUID.test(vehicleId)) return null;
+  const current: StructuredRead = read.id === vehicleId ? read : { id: vehicleId, status: 'loading', claims: [] };
+  return <>
+    <section aria-label="Structured vehicle data" className="vp-structured-claims">
+      <h3>Structured vehicle data</h3>
+      {current.status === 'loading' ? <p role="status">Reading vehicle data…</p>
+        : current.status === 'failed' ? <p role="status">Vehicle data could not be read. Missing information has not been established.</p>
+        : <table className="vp-structured-record">
+          <caption>Stored values; source attribution has not been established. Original and current configuration remain unknown. Source-backed claims appear below.</caption>
+          <thead><tr><th scope="col">Field</th><th scope="col">Recorded value</th></tr></thead>
+          <tbody>{RECORD_FIELDS.map(key => {
+            const a = current.attributes![key];
+            const derived = current.bindings?.filter(b => b.origin_column === key && (b.value !== a.value || b.unit !== a.unit || b.record_columns_disagree));
+            return <tr key={key} data-record-field={key}>
+              <th scope="row">{STRUCTURED_RECORD_LABELS[key]}</th>
+              <td>{a.value_status === 'unrecorded' ? <span className="vp-structured-record__unknown">Not recorded</span> : typeof a.value === 'string' && !a.value.trim() ? 'Empty recorded value' : String(a.value)}
+                {a.value !== null && a.unit && ` ${a.unit}`}
+                {key === 'mileage' && a.value !== null && !a.unit && <div className="vp-structured-record__note">Unit not established</div>}
+                {derived?.map(b => <div key={b.property_key} className="vp-structured-record__note">
+                  {b.property_key.replaceAll('_', ' ')}: {String(b.value)}{b.unit ? ` ${b.unit}` : ''}
+                  {b.record_columns_disagree && ' · Conflicting record values'}
+                </div>)}
+              </td>
+            </tr>;
+          })}</tbody>
+        </table>}
+    </section>
+    <section aria-label="Structured source claims" className="vp-structured-claims">
+    <h3>Structured source claims</h3>
+    {(current.claimStatus ?? current.status) === 'loading' ? <p role="status">Reading structured evidence…</p>
+      : (current.claimStatus ?? current.status) === 'failed' ? <p role="status">Structured evidence could not be read. Missing information has not been established.</p>
+      : current.claims.length === 0 ? <p>No admitted core claims returned. Retained descriptions and records may still contain unprocessed evidence.</p>
+      : <dl>{current.claims.map(claim => {
+        let external: string | null = null;
+        let imageSource: string | null = null;
+        try { const url = new URL(claim.source_url || ''); if (url.protocol === 'https:' || url.protocol === 'http:') external = url.href; } catch { /* Retain the internal evidence link. */ }
+        try { const url = new URL(claim.image_url || ''); if (url.protocol === 'https:' || url.protocol === 'http:') imageSource = url.href; } catch { /* Keep the observation citation. */ }
+        return <div key={`${claim.property_id}:${claim.observation_id}`} className="vp-structured-claims__row">
+          <dt>{claim.label || claim.property_key.replaceAll('_', ' ')}</dt>
+          <dd>
+            {sourceValueText(claim.value)}{claim.unit ? ` ${claim.unit}` : ''}
+            <div className="vp-structured-claims__source">
+              <PrefetchLink to={`/vehicle/${vehicleId}/observation/${claim.observation_id}`}>Evidence</PrefetchLink>
+              {external && <> · <a href={external} target="_blank" rel="noopener noreferrer">Original source</a></>}
+              {imageSource && imageSource !== external && <> · <a href={imageSource} target="_blank" rel="noopener noreferrer">Image witness</a></>}
+              {' · '}{claim.evidence_state === 'reported' ? 'Reported source claim' : claim.evidence_state === 'disputed' ? 'Disputed image reading' : 'Interpreted image reading'}
+              <div>Recorded: {claim.ingested_at || 'Unknown'} · Observation clock: {claim.observed_at || 'Unknown'}</div>
+              <div>Clock basis: {claim.qualifiers?.observed_at_basis?.replaceAll('_', ' ') || 'Unknown'}</div>
+              <div>Factory configuration: {claim.qualifiers?.factory_configuration_status || 'unknown'} · Current configuration: {claim.qualifiers?.current_configuration_status || 'unknown'}</div>
+              {claim.qualifiers?.limitation && <div>{claim.qualifiers.limitation}</div>}
+              {claim.evidence_state === 'disputed' && claim.alternative_readings?.length ? <details>
+                <summary>Other readings of this image</summary>
+                <ul>{claim.alternative_readings.map(a => <li key={a.observation_id}>
+                  {sourceValueText(a.value)} · <PrefetchLink to={`/vehicle/${vehicleId}/observation/${a.observation_id}`}>Evidence</PrefetchLink>
+                </li>)}</ul>
+              </details> : null}
+            </div>
+          </dd>
+        </div>;
+      })}</dl>}
+    {current.unresolved?.some(p => p.reason === 'source_reader_refused_input_limit') && <p role="status">Some image evidence exceeds the current reader limit and remains unresolved.</p>}
+    {current.pageStatus === 'failed' && <p role="status">More evidence could not be read. The sources already shown are retained.</p>}
+    {(current.nextAfter || current.claimStatus === 'failed') && <button type="button" disabled={current.pageStatus === 'loading'}
+      onClick={() => { void loadSourcePage(current.nextAfter ?? null); }}>
+      {current.pageStatus === 'loading' ? 'Reading evidence…' : current.pageStatus === 'failed' || current.claimStatus === 'failed' ? 'Retry evidence' : 'Read more evidence'}
+    </button>}
+  </section></>;
+};
 
 /* ------------------------------------------------------------------ */
 /*  Constants                                                          */
@@ -570,6 +732,8 @@ const VehicleDossierPanel: React.FC = () => {
       {/* Info Panel */}
       <div className="vp-dossier-panel">
         <div className="vp-dossier-panel__title">Vehicle information</div>
+
+        <StructuredProfileData vehicleId={vehicle?.id || ''} />
 
         {FIELD_GROUPS.map((fg, gi) => {
           // Collect visible fields for this group

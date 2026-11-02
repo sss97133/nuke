@@ -24,6 +24,7 @@
  *      — Service-only, hash-verified retained-source preview; never writes
  */
 
+import { ALGOLIA_APP, ALGOLIA_INDEX, mecumSearch as algolia } from "../_shared/mecumSearch.ts";
 import { mileageFromMecumMarkdown } from "./markdownMileage.ts";
 import { mecumAuctionEndDate } from "./auctionEndDate.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -50,25 +51,6 @@ const REFOLD_TAG = "mecum-refold:1";
 const INDEX_METHOD = "mecum-index-v1";
 const INDEX_OBSERVATION_METHOD = "public_lot_index";
 const INDEX_TRUST = 0.7;
-const ALGOLIA_APP = "U6CFCQ7V52";
-const ALGOLIA_INDEX = "wp_posts_lot";
-// The search-only key Mecum's own site ships (also in scripts/mecum-algolia-discovery.mjs); it can read, not write.
-const ALGOLIA_SEARCH_KEY = "0291c46cde807bcb428a021a96138fcb";
-
-/** One query against Mecum's public search index; throws on a refusal so a permission check is never read as "no lots". */
-async function algolia(params: string): Promise<any> {
-  const resp = await fetch(`https://${ALGOLIA_APP}-dsn.algolia.net/1/indexes/*/queries`, { // guardrail-allow: raw-fetch (JSON search API, not a page)
-    method: "POST",
-    headers: { "x-algolia-application-id": ALGOLIA_APP, "x-algolia-api-key": ALGOLIA_SEARCH_KEY, "Content-Type": "application/json" },
-    body: JSON.stringify({ requests: [{ indexName: ALGOLIA_INDEX, params }] }),
-  });
-  if (!resp.ok) throw new Error(`algolia ${resp.status}: ${(await resp.text()).slice(0, 200)}`);
-  const body = await resp.json();
-  const result = body?.results?.[0];
-  if (!result) throw new Error("algolia: no result");
-  if (result.message) throw new Error(`algolia: ${result.message}`);
-  return result;
-}
 export const MECUM_SOURCE_RESULT_PARSER_VERSION = "extract-mecum:2.0.0:source_result_candidate_v2";
 
 type MecumTaxonomyClaim = { index: number; name: string | null; slug: string | null; incomplete: boolean };

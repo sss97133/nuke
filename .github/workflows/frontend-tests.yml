@@ -490,7 +490,7 @@ jobs:
         with:
           node-version: '22'
       - name: Verify cached image projection receipts (offline)
-        run: node --test scripts/lib/image-property-projection.test.mjs scripts/lib/cached-image-worker.test.mjs scripts/daily-receipt/byok-drain.test.mjs
+        run: node --test scripts/deep-image-analysis-byok.test.mjs scripts/lib/image-property-projection.test.mjs scripts/lib/cached-image-worker.test.mjs scripts/daily-receipt/byok-drain.test.mjs
       - name: Create disposable cached-image ancestry database
         run: createdb dm_refinement_image_ancestry
       - name: Verify actual cached-image migration, intake and public reader ancestry
@@ -598,6 +598,19 @@ jobs:
         run: deno test --no-check --allow-read supabase/functions/_shared/transferSeed.test.ts
       - name: Verify the contributor link answers unknown, expired and revoked tokens with one 404, hashes the ip, and validates before storage
         run: deno test --no-check --node-modules-dir=none supabase/functions/contributor-intake/core.test.ts
+      - name: Verify analysis queue lease, failure, deadline and revision handoffs
+        run: |
+          deno check --node-modules-dir=none supabase/functions/analysis-engine-coordinator/index.ts
+          deno test --node-modules-dir=none supabase/functions/analysis-engine-coordinator/queueWork.test.ts
+          deno test --node-modules-dir=none supabase/functions/analysis-engine-coordinator/retainedWork.test.ts
+      - name: Verify registered contributor review uses retained sources and fenced leases
+        run: |
+          deno check --node-modules-dir=none supabase/functions/contributor-intake/index.ts supabase/functions/derive-dispatch/index.ts
+          deno test --node-modules-dir=none --allow-env supabase/functions/contributor-intake/reviewWork.test.ts supabase/functions/derive-dispatch/handler.test.ts
+      - name: Verify listing packages preserve contributor sources, supersession and private evidence boundaries
+        run: |
+          deno check --node-modules-dir=none supabase/functions/generate-listing-package/index.ts supabase/functions/compute-vehicle-valuation/index.ts
+          deno test --node-modules-dir=none --allow-env supabase/functions/generate-listing-package/listingEvidence_test.ts supabase/functions/generate-listing-package/handler.test.ts supabase/functions/_shared/vehicleAssessment.test.ts supabase/functions/compute-vehicle-valuation/assessment.test.ts
       - name: Verify Stripe checkout routing (only credit purchases credit wallets; invoice sessions go to the recorder) and invoice checkout parameters
         run: deno test --no-check supabase/functions/_shared/stripeCheckoutRouting.test.ts supabase/functions/create-work-order-invoice-checkout/checkout.test.ts
       - name: Verify ingest writes no vehicle from a URL slug when the page extractor failed
@@ -605,6 +618,15 @@ jobs:
           deno test supabase/functions/ingest/slugStub.test.ts
           deno test --no-check --allow-env supabase/functions/ingest/ingest.slugstub.test.ts
           deno test --no-check --allow-env supabase/functions/ingest/vicari.test.ts
+      - name: Verify ECR replay qualifies retained source claims without inventing ownership or physical vehicles
+        run: |
+          deno test --no-check --node-modules-dir=none --allow-env --allow-read supabase/functions/ingest-observation/retainedEcr.test.ts supabase/functions/ingest-observation/retainedEcrHandler.test.ts
+          deno test --no-check --node-modules-dir=none --allow-env --allow-read supabase/functions/api-v1-vehicles/sourceProfile.test.ts
+          node --test scripts/ecr-retained-replay.test.mjs
+      - name: Verify native dealer microdata, source qualification and canonical replay
+        run: deno test --node-modules-dir=none --allow-env supabase/functions/_shared/dealerParser.test.ts supabase/functions/_shared/vin-decoder-native.test.ts supabase/functions/ingest/dealer.test.ts
+      - name: Verify native Gateway browser evidence, admission and replay
+        run: deno test --node-modules-dir=none --allow-env --allow-read supabase/functions/_shared/gatewayParser.test.ts supabase/functions/ingest/gateway.test.ts
       - name: Verify the live-lot forecast route resolves a lot, sends the reader typed arguments, refuses anonymous callers and returns the reader's answer untouched
         run: deno test --no-check --allow-env supabase/functions/api-v1-vehicle-auction/
       - name: Verify RM Sotheby's writes only vehicles, reads each lot once, finds a vehicle before writing it again, and calls an unheld lot upcoming
@@ -665,6 +687,15 @@ jobs:
         run: createdb dm_refinement_bat_profile
       - name: Verify the actual profile migration and replay contract
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_bat_profile -f supabase/sql/test_bat_profile_comment_fold.sql
+      - name: Verify native listing clocks, source claims and price priority
+        run: |
+          createdb dm_refinement_native_listing_ci
+          psql -X -v ON_ERROR_STOP=1 -d dm_refinement_native_listing_ci -f supabase/sql/test_native_listing_profile_evidence.sql
+          python3 scripts/test-retained-bat-profile.py
+      - name: Verify retained BaT sale source eligibility and custody
+        run: |
+          createdb dm_refinement_bat_sale
+          python3 scripts/test-retained-bat-sale-properties.py
       - name: Create disposable profile privacy database
         run: createdb dm_refinement_profile_privacy_ci
       - name: Verify private column protection and owner-only profile RPC
@@ -867,6 +898,9 @@ jobs:
       - name: Verify public search continuation and authenticated ownership (offline)
         run: node --test supabase/functions/universal-search/pagination.test.mjs
 
+      - name: Verify ECR catalogue pagination under API caps
+        run: node --test scripts/build-canonical-models.test.mjs
+
       - name: Verify preserved description input and sanctioned intake
         run: node --test scripts/test-description-source-input.mjs scripts/test-listing-description-intake.mjs scripts/test-field-evidence-reader.mjs scripts/test-vin-batch-existing-fields.mjs
         env:
@@ -900,12 +934,18 @@ jobs:
       - name: Verify full-population analytical pagination and source inspection (offline)
         run: node --test nuke_frontend/scripts/test-stacks-study-query.mjs
 
+      - name: Verify retained work reconstruction and private offline receipts
+        run: node --test scripts/reconstruct-retained-work.test.mjs
+
       - name: Run Vitest
         working-directory: ./nuke_frontend
         run: npm run test
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://placeholder.supabase.co' }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || 'placeholder-key' }}
+
+      - name: Verify financial-use source preservation and decimal allocations (offline)
+        run: python3 scripts/books/financial_uses_test.py
 
   listing-state-contract:
     runs-on: ubuntu-latest

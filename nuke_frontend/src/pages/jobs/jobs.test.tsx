@@ -305,10 +305,12 @@ describe('WorkPage', () => {
       customer_id: CUSTOMER_UID, payments: [{ amount: 555 }], balance_due: 444 }],
   };
 
-  it('lists signature items with the server words and job links, and payments only on the payee item', async () => {
+  it('opens record reviews with the server words and job links, and payments only on the payee item', async () => {
     fixture.session = { user: { id: CUSTOMER_UID } };
     fixture.rpc.mockImplementation(async (fn: string) => ({ data: fn === 'my_signature_queue' ? queue : jobs, error: null }));
     await render(<WorkPage />);
+    expect(container.textContent).not.toContain('$390.00');
+    await act(async () => [...container.querySelectorAll('button')].find(b => b.textContent === 'Review records')!.click());
     const text = container.textContent ?? '';
     expect(rpcNames().sort()).toEqual(['my_signature_queue', 'my_work_orders']);
     expect(text).toContain('Quote to accept');
@@ -318,8 +320,8 @@ describe('WorkPage', () => {
     expect(text).toContain('payment or deposit collection');
     expect(container.querySelector('a[href="/providers/tig_welder"]')).not.toBeNull();
     expect(text).not.toContain('777');
-    expect(text).toContain('You asked for this');
-    expect(text).toContain('Next: Estimate — no operations listed yet');
+    expect(text).not.toContain('You asked for this');
+    expect(text).not.toContain('Next: Estimate — no operations listed yet');
     expect(text).not.toContain('555');
     expect(text).not.toContain('444');
     expect(text).not.toContain(CUSTOMER_UID);

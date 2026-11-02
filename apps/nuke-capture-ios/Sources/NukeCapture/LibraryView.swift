@@ -23,7 +23,7 @@ struct LibraryView: View {
     @Namespace private var zoomNS
     @ObservedObject private var overlay = LibraryOverlayStore.shared
     @State private var selectMode = false
-    @State private var selected: Set<Int> = []
+    @State private var selected: Set<String> = []
     @State private var showDays = false
     @State private var showAlbums = false
 
@@ -63,11 +63,16 @@ struct LibraryView: View {
                     spacing: spacing
                 ) {
                     ForEach(0..<store.count, id: \.self) { idx in
-                        LibraryCell(index: idx, selecting: selectMode, isSelected: selected.contains(idx))
+                        let localIdentifier = store.asset(at: idx)?.localIdentifier
+                        LibraryCell(index: idx, selecting: selectMode,
+                                    isSelected: localIdentifier.map { selected.contains($0) } ?? false)
+                            .id(localIdentifier)
                             .matchedTransitionSource(id: idx, in: zoomNS)
                             .onTapGesture {
                                 if selectMode {
-                                    if selected.contains(idx) { selected.remove(idx) } else { selected.insert(idx) }
+                                    guard let localIdentifier else { return }
+                                    if selected.contains(localIdentifier) { selected.remove(localIdentifier) }
+                                    else { selected.insert(localIdentifier) }
                                 } else {
                                     detailIndex = idx
                                 }
@@ -119,7 +124,7 @@ struct LibraryView: View {
                 if selectMode {
                     // setVerdict writes LocalStore only; no server writer backs it yet.
                     VStack(spacing: 6) {
-                        JobAttachBar(localIdentifiers: selected.compactMap { LibraryStore.shared.asset(at: $0)?.localIdentifier })
+                        JobAttachBar(localIdentifiers: selected.sorted())
                         HStack(spacing: 12) {
                             Button(role: .destructive) { applyVerdict(approved: false) } label: {
                                 Label("Reject", systemImage: "eye.slash").frame(maxWidth: .infinity)
@@ -152,8 +157,7 @@ struct LibraryView: View {
     }
 
     private func applyVerdict(approved: Bool) {
-        let lids = selected.compactMap { LibraryStore.shared.asset(at: $0)?.localIdentifier }
-        overlay.setVerdict(lids, approved: approved)
+        overlay.setVerdict(selected.sorted(), approved: approved)
         withAnimation { selected.removeAll() }
     }
 }

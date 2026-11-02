@@ -235,7 +235,18 @@ final class JobFlowUITests: XCTestCase {
         let app = launch("client", scenario: "contact-send", ["NUKE_DEBUG_PROVIDER": contactProfileId])
         reveal(app.buttons["Contact via Nuke"].firstMatch, in: app).tap()
         type(app, into: "", "Could you look at my exhaust hangers?")
-        app.buttons["contact.send"].firstMatch.tap()
+        // Keyboard expansion changes the sheet detent. Scroll the form's margin,
+        // rather than the nested TextEditor or the provider page behind it.
+        let send = app.buttons["contact.send"].firstMatch
+        XCTAssertTrue(send.waitForExistence(timeout: 10), "contact composer did not finish keyboard layout")
+        XCTAssertGreaterThan(app.collectionViews.count, 0)
+        let form = app.collectionViews.element(boundBy: app.collectionViews.count - 1)
+        for _ in 0..<3 where !send.isHittable {
+            form.coordinate(withNormalizedOffset: CGVector(dx: 0.03, dy: 0.5))
+                .press(forDuration: 0.1, thenDragTo: form.coordinate(withNormalizedOffset: CGVector(dx: 0.03, dy: 0.2)))
+        }
+        XCTAssertTrue(send.isHittable, "contact Send row stayed behind the keyboard")
+        send.tap()
         XCTAssertTrue(app.staticTexts["Sent"].waitForExistence(timeout: 8))
         dismissSheet(app)
         let args = call(app, "request_contact")

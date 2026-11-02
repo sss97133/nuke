@@ -5,16 +5,21 @@
  * Calls generate-listing-package edge function, then displays editable form.
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { ListingExportService } from '../../services/listingExportService';
 import PlatformPreview from './PlatformPreview';
+import VehicleEvidenceAssessment from '../vehicle/VehicleEvidenceAssessment';
+import { assertListingPackageEvidence, listingEvidenceSnapshot, type ListingAssessment, type ListingAssertion } from '../../services/listingPackageEvidence';
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
 interface ListingPackage {
+  assessment: ListingAssessment;
+  listing_assertions: ListingAssertion[];
+  unresolved_fields: Array<{ field: string; reason: string }>;
   platform: string;
   ars_score: number | null;
   tier: string | null;
@@ -232,9 +237,9 @@ function ArsBadge({ score, tier }: { score: number | null; tier: string | null }
 // Main Modal
 // ---------------------------------------------------------------------------
 
+
 export default function ListingComposerModal({
   vehicleId,
-  vehicleName,
   isOpen,
   onClose,
   selectedPlatforms,
@@ -257,41 +262,47 @@ export default function ListingComposerModal({
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
   const [tab, setTab] = useState<ComposerTab>('edit');
+  const currentScope = useRef({ vehicleId, isOpen });
+  currentScope.current = { vehicleId, isOpen };
 
   // Fetch listing package on open
   useEffect(() => {
     if (!isOpen) return;
+    let active = true;
     setLoading(true);
     setError(null);
+    setPkg(null);
 
     (async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
         const resp = await supabase.functions.invoke('generate-listing-package', {
           body: { vehicle_id: vehicleId, platform: selectedPlatforms[0] || 'bat' },
         });
 
         if (resp.error) throw new Error(resp.error.message);
+        assertListingPackageEvidence(resp.data, vehicleId);
+        if (!active) return;
         const data = resp.data as ListingPackage;
         setPkg(data);
 
         // Populate editable fields
-        setTitle((data.listing_content.title as string) || vehicleName);
+        setTitle(data.listing_content.title as string);
         setDescription((data.listing_content.description as string) || '');
         setHighlights((data.listing_content.highlights as string) || '');
         setEquipment((data.listing_content.equipment as string) || '');
         setModifications((data.listing_content.modifications as string) || '');
         setKnownFlaws((data.listing_content.known_flaws as string) || '');
-        setPrice(askingPrice || (data.valuation as any)?.nuke_estimate || '');
+        setPrice(askingPrice || '');
         setPlatforms(selectedPlatforms.length > 0 ? selectedPlatforms : ['bat']);
         setExcludedPhotos(new Set());
         setTab('edit');
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to generate listing package');
+        if (active) setError(err instanceof Error ? err.message : 'Failed to generate listing package');
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     })();
+    return () => { active = false; };
   }, [isOpen, vehicleId]);
 
   const togglePhoto = useCallback((url: string) => {
@@ -327,11 +338,14 @@ export default function ListingComposerModal({
 
   // Save as draft
   const handleSaveDraft = useCallback(async () => {
+    if (saving || loading || !pkg || pkg.assessment.vehicle_id !== vehicleId) return;
+    setError(null);
     setSaving(true);
     try {
       const photos = getIncludedPhotos();
       for (const platform of platforms) {
-        await ListingExportService.createExport({
+        if (!currentScope.current.isOpen || currentScope.current.vehicleId !== vehicleId) return;
+        const saved = await ListingExportService.createExport({
           vehicle_id: vehicleId,
           platform,
           export_format: 'json',
@@ -346,19 +360,23 @@ export default function ListingComposerModal({
             known_flaws: knownFlaws,
             ars_score: pkg?.ars_score,
             tier: pkg?.tier,
+            ...listingEvidenceSnapshot(pkg),
+            owner_draft_changes: { status: 'draft_edits_not_mechanical_verification', title, description, highlights, equipment, modifications, known_flaws: knownFlaws },
           },
         });
+        if (!saved.success) throw new Error(saved.error || 'The draft was not saved.');
       }
-      onClose();
+      if (currentScope.current.isOpen && currentScope.current.vehicleId === vehicleId) onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save draft');
+      if (currentScope.current.isOpen && currentScope.current.vehicleId === vehicleId) setError(err instanceof Error ? err.message : 'Failed to save draft');
     } finally {
       setSaving(false);
     }
-  }, [vehicleId, title, description, price, highlights, equipment, modifications, knownFlaws, platforms, pkg, getIncludedPhotos, onClose]);
+  }, [vehicleId, title, description, price, highlights, equipment, modifications, knownFlaws, platforms, pkg, loading, saving, getIncludedPhotos, onClose]);
 
   // Copy to clipboard (platform-formatted)
   const handleCopy = useCallback(async (platform: string) => {
+    if (!pkg || pkg.assessment.vehicle_id !== vehicleId) return;
     const photos = getIncludedPhotos();
     let text = '';
 
@@ -390,7 +408,7 @@ export default function ListingComposerModal({
     await navigator.clipboard.writeText(text);
     setCopied(platform);
     setTimeout(() => setCopied(null), 2000);
-  }, [title, description, highlights, equipment, modifications, knownFlaws, price, getIncludedPhotos, pkg]);
+  }, [title, description, highlights, equipment, modifications, knownFlaws, price, getIncludedPhotos, pkg, vehicleId]);
 
   if (!isOpen) return null;
 
@@ -474,12 +492,15 @@ export default function ListingComposerModal({
             <div style={{ textAlign: 'center', padding: 40, ...LABEL, fontSize: '10px' }}>
               GENERATING LISTING PACKAGE...
             </div>
-          ) : error ? (
-            <div style={{ textAlign: 'center', padding: 40, color: 'var(--error, #d13438)', ...LABEL }}>
+          ) : error && !pkg ? (
+            <div role="alert" style={{ textAlign: 'center', padding: 40, color: 'var(--error, #d13438)', ...LABEL }}>
               {error}
             </div>
           ) : tab === 'edit' ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {error && <p role="alert">{error}</p>}
+              {pkg && <VehicleEvidenceAssessment assessment={pkg.assessment} assertions={pkg.listing_assertions}
+                unresolvedFields={pkg.unresolved_fields} vehicleId={vehicleId} />}
               {/* Title */}
               <div>
                 <label style={LABEL}>TITLE</label>
@@ -632,6 +653,7 @@ export default function ListingComposerModal({
           {platforms.map(p => (
             <button
               key={p}
+              disabled={loading || !pkg || pkg.assessment.vehicle_id !== vehicleId}
               onClick={() => handleCopy(p)}
               style={{
                 ...BUTTON,
@@ -643,7 +665,7 @@ export default function ListingComposerModal({
               {copied === p ? 'COPIED!' : `COPY FOR ${p.toUpperCase()}`}
             </button>
           ))}
-          <button onClick={handleSaveDraft} disabled={saving} style={BUTTON_PRIMARY}>
+          <button onClick={handleSaveDraft} disabled={saving || loading || !pkg || !platforms.length || pkg.assessment.vehicle_id !== vehicleId} style={BUTTON_PRIMARY}>
             {saving ? 'SAVING...' : 'SAVE AS DRAFT'}
           </button>
         </div>

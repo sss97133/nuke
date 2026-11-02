@@ -216,6 +216,7 @@ private struct VehiclePickerSheet: View {
                         .font(.caption.monospacedDigit())
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 3), count: 3), spacing: 3) {
                         ForEach(reviewPhotos) { photo in
+                          VStack(spacing: 4) {
                             Button {
                                 if !selectedIDs.insert(photo.id).inserted { selectedIDs.remove(photo.id) }
                             } label: {
@@ -231,6 +232,17 @@ private struct VehiclePickerSheet: View {
                             .buttonStyle(.plain)
                             .accessibilityLabel("Photo \(photo.id.prefix(8))")
                             .accessibilityValue(selectedIDs.contains(photo.id) ? "Selected" : "Not selected")
+                            if let userId = SupabaseService.currentUserId, let imageId = UUID(uuidString: photo.id) {
+                                NavigationLink {
+                                    SourcePhotoDetail(userId: userId, imageId: imageId)
+                                } label: {
+                                    Label("Inspect source", systemImage: "doc.text.magnifyingglass")
+                                        .font(.caption).frame(minHeight: 44)
+                                }
+                                .accessibilityIdentifier("session.source.inspect.\(photo.id)")
+                                .disabled(isRouting)
+                            }
+                          }
                         }
                     }
                     if !reviewPhotos.isEmpty {
@@ -249,7 +261,7 @@ private struct VehiclePickerSheet: View {
                         Button("Load more photos") { Task { await loadReviewPhotos() } }
                     }
                 } header: { Text("Select photos of one vehicle") }
-                footer: { Text("Choose a vehicle below after reviewing your selection. Other photos stay in this session.") }
+                footer: { Text("Inspect the source and its reading before selecting photos. Choose a vehicle below after reviewing your selection. Other photos stay in this session.") }
                 if let error = routingError {
                     Section {
                         Text(error).font(.footnote).foregroundStyle(.red)

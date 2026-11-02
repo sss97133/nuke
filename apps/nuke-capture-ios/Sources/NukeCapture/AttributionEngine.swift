@@ -7,7 +7,7 @@
 //     • load the LOCAL asset (PhotoKit, no download)
 //     • fresh classify + OCR against this method's source-hash cache namespace
 //   PASS B (context before identity):
-//     • exact valid VIN + same-run time/GPS neighborhood + classified car views
+//     • qualified exact identifier on each automatic source; time/GPS only bounds the request
 //       → source-pass receipt → existing audited VIN/profile writer
 //
 // Old cloud analysis and older local method versions never qualify as the new read.
@@ -32,8 +32,9 @@ final class AttributionEngine: ObservableObject {
     @Published private(set) var suggestionByImage: [String: String] = [:]
     /// Sessions with a cowl tag but no VIN/serial read: no profile until the plate is photographed.
     @Published private(set) var pendingIdentifiers: [CaptureContextReader.PendingIdentifier] = []
-    /// Server candidate-profile path (another lane). Nil until that lane provides one.
-    var candidateProfiles: CandidateProfileRequesting? = nil
+    /// Uses the existing authenticated candidate writer and its private needs-identifier state.
+    var candidateProfiles: CandidateProfileRequesting = DeviceCandidateProfileRequester()
+    private var qualifiedFollowupKeys = Set<String>()
 
     // ─── DB shapes ───────────────────────────────────────────────────────────
     private struct VehicleRow: Decodable {
@@ -43,6 +44,7 @@ final class AttributionEngine: ObservableObject {
     private struct Exif: Decodable { let uuid: String? }
     private struct OrphanRow: Decodable {
         let id: String
+        let vehicle_id: String?
         let latitude: Double?
         let longitude: Double?
         let taken_at: String?
@@ -142,6 +144,30 @@ final class AttributionEngine: ObservableObject {
 
     // ─── Run ───────────────────────────────────────────────────────────────────
 
+    func recentAcknowledgedSources(userID: String) async throws -> [IdentityFollowupSource] {
+        guard SupabaseService.currentUserId == userID else { return [] }
+        let rows = try await fetchOrphans(userId: userID, limit: 500, uploadedSince: Date().addingTimeInterval(-3 * 86400))
+        guard SupabaseService.currentUserId == userID else { return [] }
+        let receipts = SubjectResolutionEngine.shared.privacyReceipts(for: Set(rows.compactMap(\.file_hash)), userId: userID)
+        return rows.compactMap { row in
+            guard let assetID = row.exif_data?.uuid, let hash = row.file_hash,
+                  row.is_sensitive != true,
+                  hash.range(of: "^[a-f0-9]{64}$", options: .regularExpression) != nil else { return nil }
+            return IdentityFollowupSource(assetID: assetID, sha256: hash, userID: userID,
+                methodVersion: LibraryIngest.identityMethodVersion, privacyReceipt: receipts[assetID])
+        }
+    }
+
+    /// The durable upload queue supplies exact sources. Old album reads never qualify as identity reads.
+    func runAcknowledged(sources: [IdentityFollowupSource], ocrBudget: Int) async -> Set<String> {
+        guard let userID = SupabaseService.currentUserId else { return [] }
+        let own = Array(sources.filter { $0.userID == userID && $0.methodVersion == LibraryIngest.identityMethodVersion }.prefix(200))
+        guard !own.isEmpty, !isRunning,
+              await run(limit: 500, ocrBudget: ocrBudget, acknowledgedSources: own),
+              SupabaseService.currentUserId == userID else { return [] }
+        return qualifiedFollowupKeys
+    }
+
     // ─── Automatic-run gate (foreground + post-sync) ─────────────────────────
     // Foreground, every sync with uploads and every library change used to re-run the whole pass,
     // keeping the phone hot. Automatic runs now skip when the device is seriously hot or in Low
@@ -188,19 +214,20 @@ final class AttributionEngine: ObservableObject {
     /// vehicle, thresholds, audit through attribute_testimony). If it refuses or is not deployed,
     /// an inexact identifier read falls back to a suggestion.
     @discardableResult
-    func run(limit: Int = 2000, ocrBudget: Int = 200) async -> Bool {
+    func run(limit: Int = 2000, ocrBudget: Int = 200, acknowledgedSources: [IdentityFollowupSource] = []) async -> Bool {
         guard !isRunning else { return false }
         guard let userId = SupabaseService.currentUserId else { lastSummary = "Not signed in"; return false }
         isRunning = true
+        qualifiedFollowupKeys = []
         defer { isRunning = false }
 
         // Known vehicles + VINs (the small set we fuzzy-match against).
         let knownVehicles: [VehicleRow]
-        let orphans: [OrphanRow]
+        var orphans: [OrphanRow]
         let albumMap: [String: Set<String>]
         do {
             knownVehicles = try await fetchKnownVehicles(userId: userId)
-            orphans = try await fetchOrphans(userId: userId, limit: limit)
+            orphans = try await fetchOrphans(userId: userId, limit: limit, acknowledgedSources: acknowledgedSources)
             albumMap = try await fetchAlbumMap(userId: userId)
         } catch {
             lastSummary = "Photo filing couldn't load its evidence. \(ReadFailure.text(error))"
@@ -231,27 +258,35 @@ final class AttributionEngine: ObservableObject {
         }.value
         let identityRunID = UUID().uuidString.lowercased()
 
-        guard !orphans.isEmpty else { lastSummary = "No orphan photos to attribute"; return true }
+        guard !orphans.isEmpty else {
+            let missing = acknowledgedSources.contains { !qualifiedFollowupKeys.contains($0.key) }
+            lastSummary = missing ? "Uploaded sources could not be matched; identity follow-up remains pending." : "No orphan photos to attribute"
+            return !missing
+        }
         progress = (0, orphans.count)
 
         // PASS A — per-orphan on-device reading, within the OCR budget.
         var signals: [Signal] = []
-        var vinHits = 0, skippedNonLocal = 0, read = 0
+        var vinHits = 0, skippedNonLocal = 0, changedSources = 0, read = 0
         suggestionByImage = [:]
 
         for row in orphans {
             defer { progress.done += 1 }
             guard !Task.isCancelled else { return false }
-            if row.is_document == true || row.doc_flag == true || row.is_sensitive == true { continue }
+            // Non-sensitive documents can supply namespace context, never a filing anchor.
+            if row.is_sensitive == true { continue }
             guard let assetID = row.exif_data?.uuid else { skippedNonLocal += 1; continue }
             // Foreground sync has a zero *new* OCR budget. It must still consume original-byte
             // reads already retained by LibraryIngest, qualified by source and method version.
             let cached = cachedReviews[assetID]
+            // This method already read the current local original. A different uploaded hash
+            // awaits a source repair; rereading the same bytes cannot make that witness match.
+            if let cached, cached.inputSHA256 != row.file_hash { changedSources += 1; continue }
             let lines: [String]
             let isVehicle: Bool
             let identityReadAt: Date
             let labels: [String]
-            let sourceVINCandidates: [String]
+            var sourceVINCandidates: [String]
             let isDocument: Bool
             let onDevice: [OnDeviceObservation]
             if let cached, cached.inputSHA256 == row.file_hash {
@@ -259,13 +294,14 @@ final class AttributionEngine: ObservableObject {
                 isVehicle = cached.isVehicle
                 identityReadAt = cached.analyzedAt
                 labels = cached.labels
-                isDocument = VisionEngine.isIdentityDocument(labels: cached.labels,
+                isDocument = row.is_document == true || row.doc_flag == true || VisionEngine.isIdentityDocument(labels: cached.labels,
                     isScreenshot: VisionEngine.isScreenshot(localIdentifier: assetID), ocrLines: cached.textLines)
                 let classic = Set(VisionEngine.labelledClassicSerialCandidates(in: cached.textLines))
                 sourceVINCandidates = isDocument ? [] : cached.vinCandidates.filter { VisionEngine.isValidVIN($0) || classic.contains($0) }
                 onDevice = OnDeviceAnalysis.uploadable(cached.onDeviceObservations, isDocument: isDocument)
             } else {
                 guard read < ocrBudget else { continue }
+                guard !SyncEngine.deviceTooHotOrLow else { continue }
                 guard let photo = localPhotos[assetID] else { skippedNonLocal += 1; continue }
                 read += 1
                 let result = await Task.detached(priority: .utility) {
@@ -283,13 +319,19 @@ final class AttributionEngine: ObservableObject {
                 isVehicle = review.isVehicle
                 identityReadAt = review.analyzedAt
                 labels = review.labels
-                isDocument = VisionEngine.isIdentityDocument(labels: review.labels,
+                isDocument = row.is_document == true || row.doc_flag == true || VisionEngine.isIdentityDocument(labels: review.labels,
                     isScreenshot: VisionEngine.isScreenshot(localIdentifier: assetID), ocrLines: review.textLines)
                 let classic = Set(VisionEngine.labelledClassicSerialCandidates(in: review.textLines))
                 sourceVINCandidates = isDocument ? [] : review.vinCandidates.filter { VisionEngine.isValidVIN($0) || classic.contains($0) }
                 onDevice = OnDeviceAnalysis.uploadable(review.onDeviceObservations, isDocument: isDocument)
             }
             let match = isDocument || knownVINs.isEmpty ? nil : VisionEngine.matchSerial(in: lines, known: knownVINs)
+            // A physical pre-1981 plate often has no printed "VIN" label. It may
+            // match an already-known identifier exactly; it cannot mint a new one.
+            if let match, match.editDistance == 0, match.vin.count < 17,
+               Self.qualifiedIdentityRead(match.vin, observations: onDevice, allowKnownClassicSerial: true) {
+                sourceVINCandidates = Array(Set(sourceVINCandidates + [match.vin])).sorted()
+            }
             let classicIdentifiers = Set(VisionEngine.labelledClassicSerialCandidates(in: lines))
             let rawIdentifiers = VisionEngine.vinCandidates(in: lines) + Array(classicIdentifiers)
             let unknown = !isDocument && match == nil ? rawIdentifiers.first(where: {
@@ -306,12 +348,45 @@ final class AttributionEngine: ObservableObject {
                                   session: sessionKey(row), onDevice: onDevice, textLines: lines))
         }
 
+
+        let receipts = Dictionary(acknowledgedSources.compactMap { source -> (String, DevicePrivacyReceipt)? in
+                guard let receipt = source.privacyReceipt, receipt.source_sha256 == source.sha256,
+                      receipt.owner_user_id == userId.lowercased() else { return nil }
+                return (source.sha256, receipt)
+            }, uniquingKeysWith: { first, _ in first })
+        // An unresolved native read is still retained evidence. A local cache
+        // entry cannot acknowledge this remote follow-up. Documents stay local.
+        let acknowledgedReads = signals.filter { signal in acknowledgedSources.contains {
+            $0.matches(assetID: signal.row.exif_data?.uuid, sha256: signal.row.file_hash,
+                userID: userId, methodVersion: method) } }
+        let remoteReads = acknowledgedReads.filter { !$0.isDocument }
+        let receiptGroups = stride(from: 0, to: remoteReads.count, by: 3).map { start in
+            let ids = Array(remoteReads[start..<min(start + 3, remoteReads.count)]).map { $0.row.id }
+            return (anchor: ids[0], ids: ids)
+        }
+        guard await recordIdentitySourcePass(receiptGroups, signals: signals, runID: identityRunID,
+            method: method, userId: userId, uploadReceipts: receipts) else {
+            lastSummary = "Native source reading remains pending; upload follow-up was retained."
+            return false
+        }
+        for signal in acknowledgedReads {
+            for source in acknowledgedSources where source.matches(assetID: signal.row.exif_data?.uuid,
+                sha256: signal.row.file_hash, userID: userId, methodVersion: method) {
+                qualifiedFollowupKeys.insert(source.key)
+            }
+        }
+        let acknowledgedReadIDs = Set(remoteReads.map { $0.row.id })
+        // A filed source still owes its reading receipt, never a reassignment.
+        signals.removeAll { $0.row.vehicle_id != nil }
+        orphans.removeAll { $0.vehicle_id != nil }
+
         let albumContext = Self.albumContextByAsset()
         let captureFrames = signals.map { s in
             let assetID = s.row.exif_data?.uuid
             let albumLabel = assetID.flatMap { albumContext.labels[$0] }
             return VINCaptureFrame(imageID: s.row.id, vin: s.unknownVIN ?? (s.vinDist == 0 ? s.vinRead : nil),
-                exactVIN: s.unknownVIN != nil || s.vinDist == 0,
+                exactVIN: (s.unknownVIN != nil || s.vinDist == 0) && Set(s.vinCandidates).count == 1 &&
+                    Self.qualifiedIdentityRead(s.unknownVIN ?? s.vinRead, observations: s.onDevice),
                 takenAt: s.row.taken_at, latitude: s.row.latitude, longitude: s.row.longitude,
                 fileHash: s.row.file_hash, isVehicle: s.isVehicle,
                 isDocument: s.isDocument || s.row.is_document == true || s.row.doc_flag == true,
@@ -323,7 +398,8 @@ final class AttributionEngine: ObservableObject {
         // Identity context from the session's own frames (document, cowl tag, badge); albums stay a weaker fallback.
         let contextReads = signals.flatMap { s in
             CaptureContextReader.reads(imageID: s.row.id, lines: s.textLines, isVehicle: s.isVehicle,
-                isDocument: s.isDocument, takenAt: s.row.taken_at, latitude: s.row.latitude, longitude: s.row.longitude)
+                isDocument: s.isDocument, takenAt: s.row.taken_at, latitude: s.row.latitude, longitude: s.row.longitude,
+                onDevice: s.onDevice)
         }
         let sessionContextFrames = captureFrames.map { f in
             guard f.contextualMake == nil, f.exactVIN, let vin = f.vin, !VisionEngine.isValidVIN(vin),
@@ -336,25 +412,38 @@ final class AttributionEngine: ObservableObject {
             Self.vinAnchoredCaptureGroups(captureFrames, contexts: contextReads)
         }.value
         pendingIdentifiers = Self.pendingIdentifiers(frames: captureFrames, reads: contextReads, groups: identityGroups)
-        if let candidates = candidateProfiles { for p in pendingIdentifiers { await candidates.requestCandidateProfile(p) } }
-        // Persist contextual 2–3 source reading receipts before any VIN profile write.
+        // Persist bounded 1–3 source reading receipts before any VIN profile write.
         // They use image_observations' protected reading-only lane; no subject membership is asserted.
+        var retainedIdentityIDs = acknowledgedReadIDs
         if !identityGroups.isEmpty {
-            guard await recordIdentitySourcePass(identityGroups, signals: signals, runID: identityRunID,
-                    method: method, userId: userId) else {
+            guard await recordIdentitySourcePass(identityGroups.map { (anchor: $0.anchorImageID, ids: $0.imageIDs) }, signals: signals, runID: identityRunID,
+                    method: method, userId: userId, uploadReceipts: receipts) else {
                 lastSummary = "Fresh photo readings couldn't be recorded; nothing was filed."
                 return false
             }
+            retainedIdentityIDs.formUnion(identityGroups.flatMap(\.imageIDs))
         }
 
         // PASS B — file what the evidence supports.
         var fileItems: [DeviceFileItem] = []
         var filedIDs = Set<String>()
+        var extraIdentityReceipts = 0
+        var identityRetentionPending = false
         for s in signals {
             // Fuzzy OCR remains a review suggestion; only an exact source read in a
             // fresh vehicle frame can file this image directly.
-            guard let vid = s.vinVehicleId, s.vinDist == 0, s.isVehicle, !s.isDocument,
+            guard let vid = s.vinVehicleId, s.vinDist == 0, Set(s.vinCandidates).count == 1,
+                  Self.qualifiedIdentityRead(s.vinRead, observations: s.onDevice, allowKnownClassicSerial: true), !s.isDocument,
                   s.row.is_document != true, s.row.doc_flag != true, s.row.is_sensitive != true else { continue }
+            if !retainedIdentityIDs.contains(s.row.id) {
+                guard extraIdentityReceipts < 2 else { identityRetentionPending = true; continue }
+                guard await recordIdentitySourcePass([(anchor: s.row.id, ids: [s.row.id])], signals: signals,
+                    runID: identityRunID, method: method, userId: userId, uploadReceipts: receipts) else {
+                    lastSummary = "Identifier source reading remains pending; nothing was filed."
+                    return false
+                }
+                retainedIdentityIDs.insert(s.row.id); extraIdentityReceipts += 1
+            }
             let full = (knownVehicles.first { $0.id == vid }?.vin?.count ?? 0) == 17
             let conf = full ? ([0: 0.99, 1: 0.97, 2: 0.93][s.vinDist ?? 0] ?? 0.93)
                             : ([0: 0.97, 1: 0.92][s.vinDist ?? 0] ?? 0.92)
@@ -396,6 +485,7 @@ final class AttributionEngine: ObservableObject {
         // The server validates current source hash, ownership, document/sensitivity
         // gates, capture clock, GPS and conflicts again before filing.
         var profileResults: [String] = []
+        var profileRetry = identityRetentionPending
         let albumMappedIDs = Set(fileItems.filter { $0.method == "album_map" }.map(\.image_id))
         for group in identityGroups {
             // An explicit album mapping is a separate claim. Never include that
@@ -418,14 +508,53 @@ final class AttributionEngine: ObservableObject {
             if let ctx = group.context { evidence.merge(ctx.evidence) { current, _ in current } }
             else if group.make != nil { evidence["identity_context_method"] = CaptureContextMethod.album.rawValue }
             let modernVIN = group.vin.count == 17
-            let result = await createProfile(DeviceProfileRequest(basis: "capture_session", vin: modernVIN ? group.vin : nil,
+            let result = await Self.createProfile(DeviceProfileRequest(basis: "capture_session", vin: modernVIN ? group.vin : nil,
                     serial: modernVIN ? nil : group.vin,
                     year: modernVIN ? nil : group.year, make: modernVIN ? nil : group.make, model: modernVIN ? nil : group.model,
                     album_name: nil, album_native_id: nil,
                     image_ids: ids, evidence: evidence), userId: userId)
             profileResults.append(result.summary)
+            profileRetry = profileRetry || result.retry
             completedIDs.formUnion(result.filed)
             filedIDs.formUnion(result.filed)
+        }
+
+        // The existing VIN writer can retain a single qualified modern plate.
+        // Extra nearby views remain suggestions until they have their own link.
+        let singleVINs = signals.filter { s in
+            guard let vin = s.unknownVIN else { return false }
+            return !completedIDs.contains(s.row.id) && !s.isDocument && Set(s.vinCandidates).count == 1 && VisionEngine.isValidVIN(vin) &&
+                Self.qualifiedIdentityRead(vin, observations: s.onDevice)
+        }
+        profileRetry = profileRetry || singleVINs.count > 2
+        for s in singleVINs.prefix(2) {
+            guard let vin = s.unknownVIN else { continue }
+            guard await recordIdentitySourcePass([(anchor: s.row.id, ids: [s.row.id])], signals: signals,
+                runID: identityRunID, method: method, userId: userId, uploadReceipts: receipts) else {
+                profileRetry = true; continue
+            }
+            let result = await Self.createProfile(DeviceProfileRequest(basis: "vin", vin: vin, serial: nil,
+                year: nil, make: nil, model: nil, album_name: nil, album_native_id: nil, image_ids: [s.row.id],
+                evidence: ["identity_run_id": identityRunID, "identity_method_version": method,
+                    "anchor_image_id": s.row.id, "anchor_source_sha256": s.row.file_hash ?? ""]), userId: userId)
+            profileResults.append(result.summary); profileRetry = profileRetry || result.retry
+            completedIDs.formUnion(result.filed); filedIDs.formUnion(result.filed)
+        }
+
+        // A cowl tag supplies a private candidate, never a VIN or a verified
+        // engine/class. Retain this exact source pass before asking its writer.
+        let tagRequests = Self.tagCandidateRequests(frames: captureFrames, reads: contextReads,
+                excludedIDs: filedIDs.union(albumMappedIDs), runID: identityRunID, method: method)
+        profileRetry = profileRetry || tagRequests.count > 2
+        for request in tagRequests.prefix(2) {
+            guard let anchor = request.evidence["anchor_image_id"] else { continue }
+            guard await recordIdentitySourcePass([(anchor: anchor, ids: request.image_ids)], signals: signals,
+                    runID: identityRunID, method: method, userId: userId, uploadReceipts: receipts) else {
+                profileRetry = true; profileResults.append("Cowl-tag source readings remain pending"); continue
+            }
+            let result = await candidateProfiles.requestCandidateProfile(request, userId: userId)
+            profileResults.append(result.summary); profileRetry = profileRetry || result.retry
+            completedIDs.formUnion(result.filed); filedIDs.formUnion(result.filed)
         }
 
         // Album profiles remain available, but are processed only after VIN capture
@@ -435,10 +564,11 @@ final class AttributionEngine: ObservableObject {
             guard let label = AlbumLabel.parse(group.name), label.model != nil else { continue }
             let ids = group.ids.filter { !filedIDs.contains($0) }
             guard ids.count >= Config.albumProfileMinPhotos else { continue }
-            let result = await createProfile(DeviceProfileRequest(basis: "album", vin: nil, serial: nil, year: label.year,
+            let result = await Self.createProfile(DeviceProfileRequest(basis: "album", vin: nil, serial: nil, year: label.year,
                     make: label.make, model: label.model, album_name: group.name, album_native_id: albumId,
                     image_ids: ids, evidence: ["album": group.name]), userId: userId)
             profileResults.append(result.summary)
+            profileRetry = profileRetry || result.retry
             completedIDs.formUnion(result.filed)
             filedIDs.formUnion(result.filed)
         }
@@ -481,9 +611,10 @@ final class AttributionEngine: ObservableObject {
         for s in signals where !completedIDs.contains(s.row.id) {
             if s.isDocument { unresolved += 1; continue }
             if let vid = s.vinVehicleId {
-                let conf = [0: 0.99, 1: 0.97, 2: 0.93][s.vinDist ?? 0] ?? 0.93
+                let qualified = Set(s.vinCandidates).count == 1 && Self.qualifiedIdentityRead(s.vinRead, observations: s.onDevice, allowKnownClassicSerial: true)
+                let conf = qualified ? ([0: 0.99, 1: 0.97, 2: 0.93][s.vinDist ?? 0] ?? 0.93) : 0.79
                 await suggest(imageId: s.row.id, vehicleId: vid, conf: conf,
-                              reasons: ["vin_ocr_match", "edit_distance=\(s.vinDist ?? 0)"])
+                              reasons: [qualified ? "vin_ocr_match" : "identifier_read_unqualified", "edit_distance=\(s.vinDist ?? 0)"])
                 suggestionByImage[s.row.id] = vid
                 suggested += 1
             } else if let r = routed[s.row.id], let lead = r.decision.lead {
@@ -522,6 +653,11 @@ final class AttributionEngine: ObservableObject {
         }
         if albumLeads > 0 { suggested += albumLeads }
 
+        pendingIdentifiers = pendingIdentifiers.compactMap { pending in
+            let waiting = pending.imageIDs.filter { !completedIDs.contains($0) }
+            return waiting.isEmpty ? nil : .init(context: pending.context, imageIDs: waiting)
+        }
+
         let readIDs = Set(signals.map { $0.row.id })
         let awaitingRead = orphans.filter { !completedIDs.contains($0.id) && !readIDs.contains($0.id) }.count
         lastSummary = (["\(completedIDs.count) filed (\(filing.byMethod.map { "\($0.key) \($0.value)" }.sorted().joined(separator: ", ")))",
@@ -529,6 +665,7 @@ final class AttributionEngine: ObservableObject {
                         "\(suggested) suggested", "\(unresolved) unresolved",
                         awaitingRead > 0 ? "\(awaitingRead) awaiting a read" : nil,
                         skippedNonLocal > 0 ? "\(skippedNonLocal) not on this phone" : nil,
+                        changedSources > 0 ? "\(changedSources) source hashes changed; not filed" : nil,
                         filing.refused > 0 ? "\(filing.refused) refused by the server" : nil,
                         "\(vinHits) serial reads"].compactMap { $0 }).joined(separator: " · ")
         NSLog("NukeCapture attribution: %@", lastSummary ?? "")
@@ -545,7 +682,7 @@ final class AttributionEngine: ObservableObject {
         struct Row: Encodable { let event: String; let props: [String: AnyJSON]; let user_id: String?; let path: String }
         let row = Row(event: "ios_attribution_pass", props: props, user_id: userId, path: "ios/attribution")
         Task.detached { try? await SupabaseService.client.from("app_events").insert(row).execute() }
-        return true
+        return filing.refused == 0 && !profileRetry
     }
 
     // ─── Device filing and profile requests (server-gated) ────────────────────
@@ -568,6 +705,20 @@ final class AttributionEngine: ObservableObject {
         let album_native_id: String?
         let image_ids: [String]
         let evidence: [String: String]
+        var tag: [String: String]? = nil
+
+        enum CodingKeys: String, CodingKey { case basis, vin, serial, year, make, model, album_name, album_native_id, image_ids, evidence }
+        func encode(to encoder: Encoder) throws {
+            var c = encoder.container(keyedBy: CodingKeys.self)
+            try c.encode(basis, forKey: .basis); try c.encodeIfPresent(vin, forKey: .vin)
+            try c.encodeIfPresent(serial, forKey: .serial); try c.encodeIfPresent(year, forKey: .year)
+            try c.encodeIfPresent(make, forKey: .make); try c.encodeIfPresent(model, forKey: .model)
+            try c.encodeIfPresent(album_name, forKey: .album_name); try c.encodeIfPresent(album_native_id, forKey: .album_native_id)
+            try c.encode(image_ids, forKey: .image_ids)
+            var values = evidence.mapValues { AnyJSON.string($0) }
+            if let tag { values["tag"] = .object(tag.mapValues { .string($0) }) }
+            try c.encode(values, forKey: .evidence)
+        }
     }
 
     /// Files through `device_file_images` in chunks of 40; returns the ids the server filed.
@@ -621,37 +772,54 @@ final class AttributionEngine: ObservableObject {
     }
 
     /// Asks the server to resolve or create a profile; returns a one-line outcome for the summary.
-    private func createProfile(_ req: DeviceProfileRequest, userId: String) async -> (summary: String, filed: Set<String>) {
+    static func createProfile(_ req: DeviceProfileRequest, userId: String) async -> CandidateProfileResult {
+        guard SupabaseService.currentUserId == userId else { return ("Account changed; photo filing remains pending", [], true) }
         let label = req.vin ?? [req.year.map(String.init), req.make, req.model].compactMap { $0 }.joined(separator: " ")
         do {
             let res: AnyJSON = try await SupabaseService.client.functions.invoke("check-image-vehicle-match",
                 options: FunctionInvokeOptions(body: CaptureProfileRequestBody(user_id: userId, profile: req)))
+            guard SupabaseService.currentUserId == userId else { return ("Account changed; photo filing remains pending", [], true) }
             guard case .object(let o) = res, case .string(let status)? = o["status"] else {
-                return ("\(label): unreadable profile response", [])
+                return ("\(label): unreadable profile response", [], true)
             }
             let seedStatus: String? = {
                 guard case .object(let seed)? = o["identity_seed"], case .string(let value)? = seed["status"] else { return nil }
                 return value
             }()
             let seedSummary = seedStatus.map { " · VIN data \($0)" } ?? ""
-            return ("\(label): \(status)\(seedSummary)", Self.profileFiledIDs(from: res).intersection(req.image_ids))
+            let pending = o["identity_status"] == .string("needs_identifier") ? " · needs the VIN plate" : ""
+            return ("\(label): \(status)\(pending)\(seedSummary)", Self.profileFiledIDs(from: res).intersection(req.image_ids), Self.profileNeedsRetry(res))
         } catch {
             NSLog("NukeCapture device_create_vehicle_profile failed: %@", String(describing: error))
-            return ("\(label): \(ReadFailure.text(error))", [])
+            return ("\(label): \(ReadFailure.text(error))", [], true)
         }
     }
 
+    /// A refused identity is still unresolved; a transient writer failure remains owed work.
+    nonisolated static func profileNeedsRetry(_ res: AnyJSON) -> Bool {
+        guard case .object(let o) = res, case .string(let status)? = o["status"] else { return true }
+        if ["busy", "error", "rate_limited"].contains(status) { return true }
+        let expectsFiling = ["created", "exists_vin", "exists_associated"].contains(status)
+        guard case .object(let filing)? = o["filing"] else { return expectsFiling }
+        let filingStatuses = statuses(from: .object(filing))
+        if expectsFiling && filingStatuses.isEmpty { return true }
+        return filingStatuses.values.contains { ["busy", "deferred", "error"].contains($0) }
+    }
+
     /// Append the cheap, fresh per-image source pass under one run key. Only
-    /// check-digit-valid VIN or explicitly labelled classic-serial candidates, local classification, labels, source hash
-    /// and reading clock leave the phone; free-form OCR text and pixels stay local.
-    private func recordIdentitySourcePass(_ groups: [VINCaptureGroup], signals: [Signal], runID: String,
-                                         method: String, userId: String) async -> Bool {
+    /// check-digit-valid VIN or explicitly labelled classic-serial candidates, local classification,
+    /// labels, qualified non-document native OCR, source hash and reading clock leave the phone.
+    /// Document OCR and pixels stay local in this path.
+    private func recordIdentitySourcePass(_ groups: [(anchor: String, ids: [String])], signals: [Signal], runID: String,
+                                         method: String, userId: String, uploadReceipts: [String: DevicePrivacyReceipt] = [:]) async -> Bool {
         let byID = Dictionary(uniqueKeysWithValues: signals.map { ($0.row.id, $0) })
         for group in groups {
-            let remaining = group.imageIDs.filter { byID[$0] != nil && $0 != group.anchorImageID }
-            for start in remaining.indices {
-                let ids = [group.anchorImageID, remaining[start]]
-                guard ids.count >= 2, ids.count <= 3 else { continue }
+            let remaining = group.ids.filter { byID[$0] != nil && $0 != group.anchor }
+            let batches = remaining.isEmpty ? [[group.anchor]] : stride(from: 0, to: remaining.count, by: 2).map {
+                [group.anchor] + Array(remaining[$0..<min($0 + 2, remaining.count)])
+            }
+            for ids in batches {
+                guard ids.count >= 1, ids.count <= 3 else { continue }
                 let selected = ids.compactMap { byID[$0] }
                 guard selected.count == ids.count else { return false }
                 let items = selected.map { signal in IdentitySourceItem(image_id: signal.row.id,
@@ -665,7 +833,8 @@ final class AttributionEngine: ObservableObject {
                 guard hashes.count == ids.count else { return false }
                 let retainedPrivacy = SubjectResolutionEngine.shared.privacyReceipts(for: Set(hashes.values), userId: userId)
                 let privacyByImage = Dictionary(uniqueKeysWithValues: selected.compactMap { signal -> (String, DevicePrivacyReceipt)? in
-                    guard let localID = signal.row.exif_data?.uuid, let receipt = retainedPrivacy[localID] else { return nil }
+                    guard let localID = signal.row.exif_data?.uuid,
+                          let receipt = uploadReceipts[signal.row.file_hash ?? ""] ?? retainedPrivacy[localID] else { return nil }
                     return (signal.row.id, receipt)
                 })
                 do {
@@ -674,7 +843,7 @@ final class AttributionEngine: ObservableObject {
                             expected_source_hashes: hashes, identity_run_id: runID,
                             identity_method_version: method, observations: items,
                             device_privacy_receipts: privacyByImage)))
-                    guard case .object(let object) = response, case .string("reading_retained")? = object["status"] else {
+                    guard Self.identityReadingAcknowledged(response, imageIDs: ids) else {
                         NSLog("NukeCapture on-device reading refused: %@", String(describing: response)); return false
                     }
                 } catch {
@@ -683,6 +852,14 @@ final class AttributionEngine: ObservableObject {
             }
         }
         return true
+    }
+
+    nonisolated static func identityReadingAcknowledged(_ response: AnyJSON, imageIDs: [String]) -> Bool {
+        guard !imageIDs.isEmpty, case .object(let object) = response,
+              case .string("reading_retained")? = object["status"],
+              case .array(let ids)? = object["persisted_image_ids"] else { return false }
+        let retained = ids.compactMap { item -> String? in if case .string(let id) = item { return id }; return nil }
+        return retained.count == ids.count && Set(retained) == Set(imageIDs)
     }
 
     nonisolated static func profileFiledIDs(from res: AnyJSON) -> Set<String> {
@@ -863,9 +1040,9 @@ final class AttributionEngine: ObservableObject {
         return "\(day)|\(lat),\(lon)"
     }
 
-    /// Build identity groups from fresh source reads. Every member is within five minutes and
-    /// 25 m of the anchor or of another member (chained), and within 45 min of one exact VIN anchor. The run key is
-    /// the relation; camera make/model/lens metadata is not a device identity.
+    /// Build identity groups from fresh source reads. Every member reads the same qualified
+    /// identifier itself. Five-minute / 25 m hops and a 45-minute anchor window bound the run;
+    /// time and location cannot establish membership.
     /// A competing VIN anchor in that neighborhood makes the whole fold ambiguous.
     /// The widest a VIN-anchored shoot may reach from its anchor (chained 5 min / 25 m hops).
     nonisolated static let setWindowSeconds: TimeInterval = 45 * 60
@@ -877,6 +1054,63 @@ final class AttributionEngine: ObservableObject {
         let near = reads.filter { CaptureContextReader.sameRun($0, anchorTakenAt: frame.takenAt,
             anchorLat: frame.latitude, anchorLon: frame.longitude) }
         return CaptureContextReader.resolve(near, serial: frame.vin)
+    }
+
+    /// A tag candidate is a source-bound shoot awaiting an identifier. A nearby
+    /// car, another body tag or any exact serial boundary vetoes this request.
+    nonisolated static func tagCandidateRequests(frames: [VINCaptureFrame], reads: [CaptureContextRead],
+            excludedIDs: Set<String>, runID: String, method: String) -> [DeviceProfileRequest] {
+        // The caller already read/cache-qualified the exact current method on
+        // its actor. Keep that revision in the request without crossing actors.
+        guard UUID(uuidString: runID) != nil, method.hasPrefix("vehicle-identity-context-fold-v3:") else { return [] }
+        let byID = Dictionary(frames.map { ($0.imageID, $0) }, uniquingKeysWith: { a, _ in a })
+        let tags = reads.filter { $0.method == .cowlTag }
+        var emitted = Set<String>()
+        var requests: [DeviceProfileRequest] = []
+        for tag in tags.sorted(by: { $0.imageID < $1.imageID }) {
+            guard let readConfidence = tag.bodyReadConfidence, readConfidence >= 0.9,
+                  let body = tag.bodyNumber, body.range(of: "^[A-Z0-9]{3,12}$", options: .regularExpression) != nil,
+                  body.rangeOfCharacter(from: .decimalDigits) != nil,
+                  let year = tag.year, let code = tag.code, !code.isEmpty,
+                  let anchor = byID[tag.imageID], !excludedIDs.contains(anchor.imageID),
+                  !anchor.isDocument, !anchor.isSensitive,
+                  let anchorHash = anchor.fileHash,
+                  anchorHash.range(of: "^[a-f0-9]{64}$", options: .regularExpression) != nil else { continue }
+            let nearby = byID.values.filter { f in
+                CaptureContextReader.sameRun(tag, anchorTakenAt: f.takenAt, anchorLat: f.latitude, anchorLon: f.longitude, window: 900)
+            }
+            guard !nearby.contains(where: { $0.exactVIN && $0.vin != nil }),
+                  !tags.contains(where: { other in
+                    other.imageID != tag.imageID && CaptureContextReader.sameRun(other, anchorTakenAt: anchor.takenAt,
+                      anchorLat: anchor.latitude, anchorLon: anchor.longitude, window: 900)
+                      && (other.bodyNumber != body || other.year != year || other.make != tag.make || other.code != code)
+                  }) else { continue }
+            let members = nearby.filter { f in
+                // A time/GPS neighbor is not a body-number witness. Until a
+                // VIN anchors the wider shoot, only frames reading this same
+                // tag may join its private candidate.
+                tags.contains(where: { $0.imageID == f.imageID && $0.bodyNumber == body
+                    && $0.year == year && $0.make == tag.make && $0.code == code && ($0.bodyReadConfidence ?? 0) >= 0.9 })
+                  && !f.isDocument && !f.isSensitive
+                  && !excludedIDs.contains(f.imageID) && UUID(uuidString: f.imageID) != nil
+                  && f.fileHash?.range(of: "^[a-f0-9]{64}$", options: .regularExpression) != nil
+            }.sorted { $0.imageID < $1.imageID }
+            let clocks = members.compactMap { EventTime.clock(takenAt: $0.takenAt) }
+            guard (2...100).contains(members.count), members.contains(where: { $0.imageID == anchor.imageID }),
+                  clocks.count == members.count, let first = clocks.min(), let last = clocks.max(),
+                  last.timeIntervalSince(first) <= 900 else { continue }
+            let ids = members.map(\.imageID)
+            let key = "\(year)|\(tag.make)|\(body)|\(ids.joined(separator: ","))"
+            guard emitted.insert(key).inserted else { continue }
+            requests.append(DeviceProfileRequest(basis: "tag_only", vin: nil, serial: nil,
+                year: year, make: tag.make, model: tag.model, album_name: nil, album_native_id: nil,
+                image_ids: ids, evidence: ["context_method": "cowl_tag_session_v1", "tag_legibility": "clear",
+                  "tag_read_confidence": String(format: "%.3f", readConfidence),
+                  "anchor_image_id": anchor.imageID, "anchor_source_sha256": anchorHash,
+                  "identity_run_id": runID, "identity_method_version": method],
+                tag: ["body_number": body, "style_code": code]))
+        }
+        return requests
     }
 
     /// Sessions with a cowl-tag read and no identifier group (and no exact identifier read):
@@ -895,6 +1129,32 @@ final class AttributionEngine: ObservableObject {
         var anchored = Set(frames.filter { $0.exactVIN && $0.vin != nil }.map(key))
         for g in groups { if let a = byID[g.anchorImageID] { anchored.insert(key(a)) } }
         return CaptureContextReader.pendingIdentifiers(tagReadsBySession: tagReads, sessionFrames: sessionFrames, anchored: anchored)
+    }
+
+    nonisolated static func qualifiedIdentityRead(_ identifier: String?, observations: [OnDeviceObservation],
+                                                 allowKnownClassicSerial: Bool = false) -> Bool {
+        guard let identifier, !identifier.isEmpty else { return false }
+        var identifiers = Set<String>(), seedIdentifiers = Set<String>()
+        for o in observations where o.confidence >= 0.9 && o.repaired != true {
+            let seed = o.source.method == NativeIdentityOCR.seedMethodVersion && o.source.framework == "Apple Vision" &&
+                o.source.model == "VNRecognizeTextRequest" && o.source.revision > 0
+            guard OnDeviceAnalysis.isIdentityTextSource(o.source) || seed else { continue }
+            var found = Set<String>()
+            if o.kind == .vin, VisionEngine.isValidVIN(o.value) { found.insert(o.value) }
+            if o.kind == .classicSerial { found.insert(o.value) }
+            if o.kind == .ocrText {
+                found.formUnion(o.value.uppercased().split(whereSeparator: { !$0.isLetter && !$0.isNumber })
+                    .map(String.init).filter { VisionEngine.isValidVIN($0) })
+                found.formUnion(VisionEngine.labelledClassicSerialCandidates(in: [o.value]))
+                if allowKnownClassicSerial, (8...16).contains(identifier.count) {
+                    found.formUnion(o.value.uppercased().split(whereSeparator: { !$0.isLetter && !$0.isNumber })
+                        .map(String.init).filter { (8...16).contains($0.count) && $0.contains(where: \.isLetter) &&
+                            $0.contains(where: \.isNumber) && $0.utf8.allSatisfy { $0 < 128 } })
+                }
+            }
+            if seed { seedIdentifiers.formUnion(found) } else { identifiers.formUnion(found) }
+        }
+        return identifiers == [identifier] && seedIdentifiers.allSatisfy { $0 == identifier }
     }
 
     nonisolated static func vinAnchoredCaptureGroups(_ frames: [VINCaptureFrame],
@@ -932,7 +1192,12 @@ final class AttributionEngine: ObservableObject {
             return abs(ta.timeIntervalSince(tb)) <= setWindowSeconds
         }
         // A classic serial's namespace: the session's own context first, the album label second.
-        func context(_ frame: VINCaptureFrame) -> CaptureContext? { sessionContext(for: frame, reads: contexts) }
+        func context(_ frame: VINCaptureFrame) -> CaptureContext? {
+            // Nearby make/year text cannot establish a classic serial's namespace.
+            // Keep context on this source, an exact serial-bearing document, or
+            // the owner's existing album declaration.
+            sessionContext(for: frame, reads: contexts.filter { $0.imageID == frame.imageID || $0.documentSerial == frame.vin })
+        }
         let anchors = frames.filter { frame in
             frame.exactVIN && !frame.isDocument && !frame.isSensitive &&
             frame.fileHash?.range(of: "^[a-f0-9]{64}$", options: .regularExpression) != nil &&
@@ -946,10 +1211,10 @@ final class AttributionEngine: ObservableObject {
         var groups: [VINCaptureGroup] = []
         for anchor in anchors where emitted.insert(anchor.vin!).inserted {
             guard !anchors.contains(where: { $0.vin != anchor.vin && near(anchor, $0) }) else { continue }
-            // A shoot runs 20–40 minutes: grow the set through frames that are each within 5 min / 25 m
-            // of an admitted frame, up to the set window from the anchor. A frame near a competing anchor is
-            // never admitted (so the walk stops there); a competing anchor near this one makes it ambiguous.
-            let eligible = frames.filter { $0.isVehicle && !$0.isDocument && !$0.isSensitive && albumContextAgrees(anchor, $0) &&
+            // Time/GPS bounds a request; it never proves which car a frame depicts.
+            // Automatic members must each carry their own exact identifier read.
+            let eligible = frames.filter { $0.exactVIN && $0.vin == anchor.vin && !$0.isDocument && !$0.isSensitive &&
+                $0.fileHash?.range(of: "^[a-f0-9]{64}$", options: .regularExpression) != nil && albumContextAgrees(anchor, $0) &&
                 withinSetWindow(anchor, $0) }
             var members: [VINCaptureFrame] = []
             var admitted = Set<String>(), frontier = [anchor], ambiguous = false
@@ -1016,12 +1281,32 @@ final class AttributionEngine: ObservableObject {
         return stride(from: 0, to: total, by: orphanPageSize).map { $0...(min($0 + orphanPageSize, total) - 1) }
     }
 
-    private func fetchOrphans(userId: String, limit: Int) async throws -> [OrphanRow] {
+    private func fetchOrphans(userId: String, limit: Int, acknowledgedSources: [IdentityFollowupSource] = [], uploadedSince: Date? = nil) async throws -> [OrphanRow] {
         var out: [OrphanRow] = []
         var seen = Set<String>()
+        // Exact hash lookup prevents an older acknowledged source falling outside the ordinary page.
+        if !acknowledgedSources.isEmpty {
+            let focused: [OrphanRow] = try await SupabaseService.client.from("vehicle_images")
+                .select("id, vehicle_id, latitude, longitude, taken_at, is_document, doc_flag, is_sensitive, exif_data, file_hash")
+                .eq("user_id", value: userId).eq("source", value: Config.sourceTag)
+                .in("file_hash", values: Array(Set(acknowledgedSources.map(\.sha256))))
+                .in("exif_data->>uuid", values: Array(Set(acknowledgedSources.map(\.assetID))))
+                .neq("image_url", value: "")
+                .not("is_superseded", operator: .is, value: true)
+                .not("is_duplicate", operator: .is, value: true)
+                .or("vision_gate_status.is.null,vision_gate_status.not.in.(rejected_personal,rejected_misattributed)")
+                .limit(400).execute().value
+            for row in focused {
+                let matches = acknowledgedSources.filter { $0.matches(assetID: row.exif_data?.uuid, sha256: row.file_hash,
+                    userID: userId, methodVersion: LibraryIngest.identityMethodVersion) }
+                guard !matches.isEmpty else { continue }
+                if seen.insert(row.id).inserted { out.append(row) }
+            }
+            return out
+        }
         for range in Self.orphanPageRanges(limit: limit) {
-            let page: [OrphanRow] = try await SupabaseService.client.from("vehicle_images")
-                .select("id, latitude, longitude, taken_at, is_document, doc_flag, is_sensitive, exif_data, file_hash")
+            var query = SupabaseService.client.from("vehicle_images")
+                .select("id, vehicle_id, latitude, longitude, taken_at, is_document, doc_flag, is_sensitive, exif_data, file_hash")
                 .eq("user_id", value: userId)
                 .is("vehicle_id", value: nil)
                 .eq("source", value: Config.sourceTag)
@@ -1029,6 +1314,8 @@ final class AttributionEngine: ObservableObject {
                 .not("is_superseded", operator: .is, value: true)
                 .not("is_duplicate", operator: .is, value: true)
                 .or("vision_gate_status.is.null,vision_gate_status.not.in.(rejected_personal,rejected_misattributed)")
+            if let uploadedSince { query = query.gte("created_at", value: ISO8601DateFormatter().string(from: uploadedSince)) }
+            let page: [OrphanRow] = try await query
                 // A newly uploaded historic or undated photo still deserves its first filing pass.
                 .order("created_at", ascending: false)
                 .order("id", ascending: false)
@@ -1039,7 +1326,13 @@ final class AttributionEngine: ObservableObject {
         }
         // Fetched by upload so new arrivals get their first pass; filed by when they were taken,
         // newest first, undated last (upload time is not event time).
-        return out.sorted { EventTime.newestFirst(EventTime.clock(takenAt: $0.taken_at), EventTime.clock(takenAt: $1.taken_at), tie: ($0.id, $1.id)) }
+        let preferred = Set(acknowledgedSources.map(\.assetID))
+        return out.sorted {
+            let a = $0.exif_data?.uuid.map { preferred.contains($0) } ?? false
+            let b = $1.exif_data?.uuid.map { preferred.contains($0) } ?? false
+            if a != b { return a }
+            return EventTime.newestFirst(EventTime.clock(takenAt: $0.taken_at), EventTime.clock(takenAt: $1.taken_at), tie: ($0.id, $1.id))
+        }
     }
 
     /// The phone's exact identifier read, uploaded so the server can link without re-running OCR.

@@ -169,7 +169,7 @@ export default function ContributePage({ intake }: { intake?: IntakeClient }) {
         <li key={f.id}><img className="ct-strip__img" src={f.url} alt={f.caption ?? ''} width={140} height={140} loading="lazy" /></li>)}</ul>}
     </figure>}
 
-    {progress && <IntakeLadder progress={progress} moved={moved} audience="contributor" />}
+    {progress && <IntakeLadder progress={progress} moved={moved} audience="contributor" subject={str(vehicle?.model)} />}
 
     <section className="ct-card" aria-label="The car">
       <Rows title="The car">

@@ -13,6 +13,7 @@ import { emptySearchHtml } from '../supabase/functions/poll-listing-feeds/fixtur
 const require = createRequire(new URL('../nuke_frontend/package.json', import.meta.url));
 const ts = require('typescript');
 const { createClient } = require('@supabase/supabase-js');
+const { parse } = require('parse5');
 const compile = text => ts.transpileModule(text, { compilerOptions: {
   module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022,
 } }).outputText;
@@ -46,10 +47,13 @@ export function fixture(options = {}) {
         `<item><title>1980 Ford fixture</title><link>https://bringatrailer.com/listing/${url.pathname.slice(1)}-${i}/</link></item>`).join('') + '</channel></rss>');
     }
     if (url.pathname === '/functions/v1/ingest') {
+      if (method === "GET") return Response.json({ capabilities: { dealer_microdata_native: options.nativeNotDeployed !== true } });
       advance(options.timing?.ingestMs ?? 0);
       const outcome = options.ingestResult?.(body.url) ?? { status: 'created', vehicle_id: vehicleId };
       return outcome instanceof Response ? outcome : Response.json(outcome);
     }
+    if (url.pathname === '/rest/v1/observation_sources') return Response.json({ id: 'dealer-source', species: 'dealer', supported_observations: ['listing'] });
+    if (url.pathname === '/rest/v1/vehicle_observations') return Response.json(options.nativeObservations ?? []);
     if (url.pathname === '/rest/v1/platform_config') return Response.json(options.controls ? { config_value: options.controls } : null);
     if (url.pathname === '/rest/v1/listing_feeds') {
       if (method === 'GET') {
@@ -73,7 +77,7 @@ export function fixture(options = {}) {
       return new Response(null, { status: 204 });
     }
     if (url.pathname === '/rest/v1/vehicles') return Response.json(url.searchParams.has('id')
-      ? [{ id: vehicleId, description: 'Retained fixture description' }] : []);
+      ? [{ id: vehicleId, description: 'Retained fixture description' }] : (options.knownUrls ?? []).map(listing_url => ({ listing_url })));
     if (url.pathname === '/rest/v1/import_queue') {
       if (method === 'GET') return Response.json(options.retainLedger ? [...queued.values()] : []);
       if (options.ledgerError) return Response.json({ code: 'FIXTURE', message: 'PRIVATE_PROVIDER_ERROR' }, { status: 500 });
@@ -104,11 +108,15 @@ export function fixture(options = {}) {
     setTimeout: (callback, ms) => { if (callback.toString().includes('abort')) return 0; advance(ms); callback(); return 0; }, clearTimeout() {},
     Deno: { env: { get: key => key === 'SUPABASE_URL' ? 'https://database.invalid' : 'synthetic-service-key' }, serve: fn => { serve = fn; } },
     require(name) {
+      if (name === 'https://esm.sh/parse5@7.3.0') return { parse };
       if (name.includes('supabase-js')) return { createClient: () => db };
       if (name.endsWith('/ledger.ts')) return { ...ledger,
         createIntakeBudget: (throttle, start) => ledger.createIntakeBudget(throttle, start, runtimeDate.now) };
       if (name.endsWith('/captureLedger.ts')) return { captureLedgerFields };
       if (name.endsWith('/feedFetch.ts')) return { fetchCraigslistFeed };
+      if (name.endsWith('/gatewayParser.ts')) return { gatewayInventoryUrls: options.browserUrls ?? (() => { throw new Error('unexpected browser inventory'); }) };
+      if (name.endsWith('/gatewayCapture.ts')) return { readGatewayBrowserCapture: options.browserCapture ?? (() => { throw new Error('unexpected browser capture'); }) };
+      if (name.endsWith('/mecumSearch.ts')) return { fetchMecumFeedUrls: options.nativeDiscovery ?? (() => { throw new Error('unexpected native search'); }) };
       if (name.endsWith('/schedule.ts')) return { nextYield: () => ({ rate: 0, interval_minutes: 60 }) };
       if (name.endsWith('/removal.ts')) return { sweepCraigslistRemovals: async () => null, noticeFrom: () => null };
       if (name.endsWith('/kslCards.ts')) return { parseKslSearchCards: () => [] };
@@ -119,7 +127,8 @@ export function fixture(options = {}) {
       if (name.endsWith('/supabaseKeys.ts')) return { projectSecretKey: () => 'synthetic-service-key' };
       if (name.endsWith('/normalizeVehicle.ts')) return { isGarbageMake: () => false };
       if (name.endsWith('/urlNormalization.ts')) return { extractCraigslistCanonicalUrls: () => [] };
-      if (name.endsWith('/archiveFetch.ts')) return { archiveFetch: options.archive ?? (() => { throw new Error('unexpected acquisition'); }) };
+      if (name.endsWith('/archiveFetch.ts')) return { archiveFetch: options.archive ?? (() => { throw new Error('unexpected acquisition'); }),
+        isGarbageHtml: options.isGarbageHtml ?? (() => false), isAwsWafChallengeHtml: options.isAwsWafChallengeHtml ?? (() => false) };
       if (name.endsWith('/firecrawl.ts')) return { firecrawlScrape: () => { throw new Error('unexpected paid provider'); } };
       throw new Error(`Unexpected feed import ${name}`);
     },
@@ -471,3 +480,129 @@ for (const failure of ['http-500-json', 'http-500-non-json', 'transport-error'])
     assert.equal(resumed.counts.landed_ledger_acknowledged, 1);
   });
 }
+
+test('Mecum native discovery reaches the existing ingestion and ledger path', async () => {
+  let calls = 0;
+  const url = 'https://www.mecum.com/lots/123/1980-ford-f100';
+  const f = fixture({ feed: { source_slug: 'mecum', search_criteria: { fetch_strategy: 'mecum_public_index' } },
+    nativeDiscovery: async () => { calls++; return { urls: [url], confirmedEmpty: false }; } });
+  const result = await f.request();
+  assert.equal(calls, 1);
+  assert.equal(result.body.results[0].items_found, 1);
+  assert(f.calls.some(c => c.path === '/functions/v1/ingest' && c.body.url === url));
+  assert(f.calls.some(c => c.path === '/rest/v1/import_queue' && c.body?.listing_url === url));
+});
+
+test('a Mecum search refusal fails without a paid fallback or ingestion', async () => {
+  const f = fixture({ feed: { source_slug: 'mecum', search_criteria: { fetch_strategy: 'mecum_public_index' } },
+    nativeDiscovery: async () => { throw new Error('mecum_index: HTTP 403'); } });
+  const result = await f.request();
+  assert.equal(result.body.results[0].error, 'fetch_failed: mecum_index: HTTP 403');
+  assert(!f.calls.some(c => c.path === '/functions/v1/ingest'));
+});
+
+test('Gateway polls only retained inventory entries with captured detail pages', async () => {
+  const ready = 'https://www.gatewayclassiccars.com/vehicles/det/42/synthetic';
+  const uncaptured = 'https://www.gatewayclassiccars.com/vehicles/det/43/synthetic';
+  const f = fixture({ feed: { source_slug: 'gateway_classics', search_criteria: { fetch_strategy: 'firecrawl_html' } },
+    browserCapture: async () => ({ html: 'retained inventory', captured_urls: [ready] }),
+    browserUrls: () => [ready, uncaptured] });
+  const result = await f.request();
+  assert.equal(result.body.results[0].items_found, 1);
+  assert(f.calls.some(c => c.path === '/functions/v1/ingest' && c.body.url === ready));
+  assert(!f.calls.some(c => c.path === '/functions/v1/ingest' && c.body.url === uncaptured));
+});
+
+test('Gateway missing or stale browser progress refuses without source fetch or paid fallback', async () => {
+  const f = fixture({ feed: { source_slug: 'gateway_classics', search_criteria: { fetch_strategy: 'firecrawl_html' } },
+    browserCapture: async () => { throw new Error('gateway_browser_capture_required'); } });
+  const result = await f.request();
+  assert.match(result.body.results[0].error, /^blocked: (?:Error: )?gateway_browser_capture_required$/);
+  assert(!f.calls.some(c => c.path === '/functions/v1/ingest'));
+});
+
+test('a challenge body fails as blocked before regex matching or ingestion', async () => {
+  const f = fixture({ feed: { source_slug: 'gateway', search_criteria: { fetch_strategy: 'firecrawl_html', prefer_direct_fetch: true,
+    listing_url_regex: 'https://www.gatewayclassiccars.com/vehicle/[^" ]+' } },
+    archive: async () => ({ html: '<html>challenge</html>', statusCode: 202, error: null }), isAwsWafChallengeHtml: () => true });
+  const result = await f.request();
+  assert.equal(result.body.results[0].error, 'blocked: source challenge');
+  assert(!f.calls.some(c => c.path === '/functions/v1/ingest'));
+});
+
+test('an invalid source shell is not mislabeled as a confirmed challenge', async () => {
+  const f = fixture({ feed: { source_slug: 'bonhams', search_criteria: { fetch_strategy: 'firecrawl_html', prefer_direct_fetch: true } },
+    archive: async () => ({ html: '<html>empty shell</html>', statusCode: 200, error: null }), isGarbageHtml: () => true });
+  const result = await f.request();
+  assert.equal(result.body.results[0].error, 'fetch_failed: invalid_source_body');
+  assert(!f.calls.some(c => c.path === '/functions/v1/ingest'));
+});
+
+for (const [source, host, stock] of [['gr_auto_gallery', 'www.grautogallery.com', 'b1234-j'], ['streetside_classics', 'www.streetsideclassics.com', '42-det']]) {
+  test(`${source}: current absolute URL criteria read relative stock hrefs through existing intake`, async () => {
+    const path = `/vehicles/${stock}/1995-ford-f150`, target = `https://${host}${path}`;
+    const f = fixture({ ingestResult: () => ({ status: 'created', vehicle_id: 'vehicle', dealer_receipt: { observation_id: 'observation', snapshot_id: 'snapshot', listing_event_id: 'event', observed_at: new Date().toISOString() } }), feed: { source_slug: source, search_criteria: { fetch_strategy: 'firecrawl_html',
+      listing_url_regex: `https://` + host.replaceAll('.', '\\.') + `/vehicles/${stock}/[a-z0-9-]+`, listing_url_prefix: `https://${host}` } },
+      archive: async (_url, opts) => { assert.equal(opts.useFirecrawl, false); assert.equal(opts.firecrawlOnBlock, false);
+        return { html: `<a href="${path}">stock</a><a href="${path}">duplicate</a><a href="/vehicles/current">nav</a><a href="https://outside.invalid${path}">other</a><template><a href="/vehicles/${stock}/inert">template</a></template>`, statusCode: 200, snapshotId: 'snapshot', error: null }; } });
+    const result = await f.request(); assert.equal(result.body.results[0].items_found, 1);
+    assert.deepEqual(f.calls.filter(c => c.path === '/functions/v1/ingest' && c.method === 'POST').map(c => c.body.url), [target]);
+  });
+  test(`${source}: refused direct inventory has no paid fallback or ingestion`, async () => {
+    const f = fixture({ feed: { source_slug: source, search_criteria: { fetch_strategy: 'firecrawl_html' } },
+      archive: async () => ({ html: null, statusCode: 403, error: 'blocked' }) });
+    const result = await f.request(); assert.match(result.body.results[0].error, /^blocked:/);
+    assert(!f.calls.some(c => c.path === '/functions/v1/ingest' && c.method === 'POST'));
+  });
+}
+
+function nativeProgressFixture(extra = {}) {
+  const host = 'www.streetsideclassics.com', first = `https://${host}/vehicles/42-det/1995-ford-f150`, second = `https://${host}/vehicles/43-det/1996-ford-f150`;
+  const receipt = { observation_id: 'observation', snapshot_id: 'snapshot', listing_event_id: 'event', observed_at: new Date().toISOString() };
+  const f = fixture({ retainLedger: true, knownUrls: [first, second],
+    feed: { source_slug: 'streetside_classics', search_criteria: { fetch_strategy: 'firecrawl_html', listing_url_prefix: `https://${host}`, listing_url_regex: 'https://www\\.streetsideclassics\\.com/vehicles/\\d+-det/[a-z0-9-]+' } },
+    archive: async () => ({ html: '<a href="/vehicles/42-det/1995-ford-f150">first</a><a href="/vehicles/43-det/1996-ford-f150">second</a>', statusCode: 200, snapshotId: 'inventory', error: null }),
+    ingestResult: () => ({ status: 'matched', vehicle_id: 'vehicle', dealer_receipt: receipt }), ...extra });
+  return { ...f, first, second, receipt };
+}
+
+test('native dealers require canonical receipt even when the URL and a complete legacy ledger exist', async () => {
+  const f = nativeProgressFixture();
+  f.queued.set(f.first, { listing_url: f.first, status: 'complete', vehicle_id: 'vehicle', raw_data: {} });
+  const r = await f.request(); assert.equal(r.body.results[0].ingest_outcomes.length, 2);
+  assert.equal(f.queued.get(f.first).raw_data.dealer_receipt.observation_id, 'observation');
+  assert.equal(f.queued.get(f.first).raw_data.dealer_native_version, 'dealer_microdata_v2');
+});
+
+test('native canonical progress skips fresh admitted evidence, revisits stale evidence and prioritizes missing evidence', async () => {
+  const f = nativeProgressFixture({ nativeObservations: [{ id: 'observation', vehicle_id: 'vehicle', is_superseded: false, source_id: 'dealer-source', source_url: 'https://www.streetsideclassics.com/vehicles/42-det/1995-ford-f150', raw_source_ref: 'listing_page_snapshots:snapshot', extraction_method: 'dealer_microdata_v2', observed_at: new Date().toISOString() }] });
+  f.queued.set(f.first, { listing_url: f.first, status: 'complete', vehicle_id: 'vehicle', raw_data: { dealer_native_version: 'dealer_microdata_v2', dealer_receipt: f.receipt } });
+  const r = await f.request(); assert.deepEqual(r.body.results[0].ingest_outcomes.map(o => o.url), [f.second]);
+  const stale = nativeProgressFixture({ nativeObservations: [{ id: 'observation', vehicle_id: 'vehicle', is_superseded: false, source_id: 'dealer-source', source_url: f.first, raw_source_ref: 'listing_page_snapshots:snapshot', extraction_method: 'dealer_microdata_v2', observed_at: new Date(Date.now()-86400_000).toISOString() }] });
+  stale.queued.set(stale.first, { listing_url: stale.first, status: 'complete', vehicle_id: 'vehicle', raw_data: { dealer_native_version: 'dealer_microdata_v2', dealer_receipt: stale.receipt } });
+  const rr = await stale.request(); assert.deepEqual(rr.body.results[0].ingest_outcomes.map(o => o.url), [stale.second, stale.first]);
+});
+
+test('native intake without a canonical acknowledgement is failed, never complete', async () => {
+  const f = nativeProgressFixture({ ingestResult: () => ({ status: 'matched', vehicle_id: 'vehicle' }) });
+  const r = await f.request(); assert(r.body.results[0].error);
+  assert.equal(f.queued.get(f.first).status, 'failed'); assert.equal(r.body.results[0].matched_existing, 0);
+});
+
+test('superseded or reattributed dealer evidence cannot keep a source URL marked complete', async () => {
+ for (const change of [{ is_superseded: true }, { vehicle_id: 'different-vehicle' }]) {
+  const url = 'https://www.streetsideclassics.com/vehicles/42-det/1995-ford-f150';
+  const f = nativeProgressFixture({ nativeObservations: [{ id: 'observation', source_id: 'dealer-source', vehicle_id: 'vehicle', source_url: url, raw_source_ref: 'listing_page_snapshots:snapshot', extraction_method: 'dealer_microdata_v2', observed_at: new Date().toISOString(), is_superseded: false, ...change }] });
+  f.queued.set(f.first, { listing_url: f.first, status: 'complete', vehicle_id: 'vehicle', raw_data: { dealer_native_version: 'dealer_microdata_v2', dealer_receipt: f.receipt } });
+  const r = await f.request(); assert(r.body.results[0].ingest_outcomes.some(o=>o.url===f.first));
+ }
+});
+
+test('native collection preserves failed-source backoff and fails closed before an old deployment', async () => {
+ const f = nativeProgressFixture();
+ f.queued.set(f.first, { listing_url: f.first, status: 'failed', attempts: 1, next_attempt_at: new Date(Date.now()+3600_000).toISOString() });
+ const r = await f.request(); assert.deepEqual(r.body.results[0].ingest_outcomes.map(o=>o.url), [f.second]);
+ let fetched = 0;
+ const old = nativeProgressFixture({ nativeNotDeployed: true, archive: async () => { fetched++; throw Error('unexpected source fetch'); } });
+ const rr = await old.request(); assert.equal(fetched, 0); assert.match(rr.body.results[0].error, /not deployed/);
+});

@@ -46,6 +46,18 @@ it('keeps disputed interest and pending transfers distinct from registered owner
   expect(pending.relationship_type).toBe('TRANSFER PENDING');
   expect(pending.ownership_start_date).toBeNull();
 });
+it('projects current and previous inventory independently of relationship roles and unknown dates', () => {
+  for (const [role,status] of [['claimed_interest','current'],['transfer_pending','current'],
+    ['business_handling','previous'],['sales_representative','previous']]) {
+    const [car] = applyGarageOwnerCorrections([old], [statement([role], {inventory_status:status})]);
+    expect(car.inventory_status).toBe(status);
+    expect(car.relationship_type).not.toBe('OWNER');
+    expect(car.ownership_start_date).toBeNull();expect(car.ownership_end_date).toBeNull();
+  }
+  const fork=[statement(['claimed_interest'],{inventory_status:'current'}),
+    {...statement(['claimed_interest'],{inventory_status:'previous'}),id:'other'}];
+  expect(applyGarageOwnerCorrections([old],fork)[0].inventory_status).toBe('unknown');
+});
 it('excludes a rejected association without a supported role, even with a retained cover', () => {
   const denial = statement([], { ownership_denied: true });
   const cover: GarageOwnerCorrection = { id: 'cover', vehicle_id: 'car', correction: { cover_image_id: 'image' },

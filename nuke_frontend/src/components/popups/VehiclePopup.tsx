@@ -30,8 +30,10 @@ import PrefetchLink from '../PrefetchLink';
 import type { CompScope } from '../../pages/vehicle-profile/hooks/useVehicleIntel';
 
 interface Props {
-  vehicle: FeedVehicle;
+  vehicle: Pick<FeedVehicle, 'id'> & Partial<FeedVehicle>;
   searchQuery?: string;
+  /** Attribute exploration keeps unrelated model sale lists out of the selected context. */
+  showRelatedSales?: boolean;
 }
 
 interface VehicleIntel {
@@ -106,7 +108,7 @@ function formatPrice(n: number | null): string {
 const MONO = 'var(--font-family)';
 const SANS = 'var(--font-family)';
 
-export function VehiclePopup({ vehicle }: Props) {
+export function VehiclePopup({ vehicle, showRelatedSales = true }: Props) {
   const { openPopup, closeAll } = usePopup();
   const { recordView, endView } = useViewHistory();
   const { recordInterest } = useInterests();
@@ -169,7 +171,7 @@ export function VehiclePopup({ vehicle }: Props) {
   const ci = intel?.comment_intel;
   const di = intel?.description_intel;
   const apparitions = intel?.apparitions;
-  const comps = intel?.recent_comps;
+  const comps = showRelatedSales ? intel?.recent_comps : null;
 
   return (
     <div className="vehicle-popup-body">
@@ -574,10 +576,10 @@ interface SpecItem {
   onClick?: () => void;
 }
 
-function buildSpecs(v: FeedVehicle): SpecItem[] {
+function buildSpecs(v: Props['vehicle']): SpecItem[] {
   const specs: SpecItem[] = [];
   if (v.mileage) specs.push({ label: 'Mileage', value: `${Math.floor(v.mileage).toLocaleString()} mi` });
-  if (v.transmission) specs.push({ label: 'Transmission', value: v.transmission });
+  if (v.transmission_model || v.transmission) specs.push({ label: 'Transmission', value: v.transmission_model || v.transmission! });
   if (v.drivetrain) specs.push({ label: 'Drivetrain', value: v.drivetrain });
   if (v.engine_size) specs.push({ label: 'Engine', value: v.engine_size });
   if (v.canonical_body_style || v.body_style) specs.push({ label: 'Body', value: v.canonical_body_style || v.body_style || '' });

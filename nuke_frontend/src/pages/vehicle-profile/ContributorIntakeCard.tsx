@@ -26,7 +26,7 @@ export function deviceSummary(d: unknown): string {
   return [kind, str(o.platform), screen, str(o.timezone)].filter(Boolean).join(', ') || 'device not identified';
 }
 
-export default function ContributorIntakeCard({ vehicleId, vehicle }: { vehicleId: string; vehicle?: ThemeSource | null }) {
+export default function ContributorIntakeCard({ vehicleId, vehicle }: { vehicleId: string; vehicle?: (ThemeSource & { model?: unknown }) | null }) {
   const w = useWriter();
   const theme = vehicleTheme(vehicle);
   const [name, setName] = useState('');
@@ -58,7 +58,7 @@ export default function ContributorIntakeCard({ vehicleId, vehicle }: { vehicleI
   const progress = readProgress(intake?.progress);
 
   return <div className="job-block ct-page" aria-label="Contributors" style={themeVars(theme)} data-theme-key={theme.key}>
-    {progress && <IntakeLadder progress={progress} moved={movedText(progress)} audience="owner" />}
+    {progress && <IntakeLadder progress={progress} moved={movedText(progress)} audience="owner" subject={str(vehicle?.model)} />}
     <div className="jb-field">
       <label className="jb-field"><Text role="label">Name</Text>
         <input className="jb-input k-body" value={name} onChange={e => setName(e.target.value)} autoComplete="off" /></label>

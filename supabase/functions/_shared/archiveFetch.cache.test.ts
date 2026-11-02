@@ -24,3 +24,11 @@ Deno.test("a small login wall is still garbage", () => {
   const bodyOnly = `<html><body>Sign in to continue. Forgot your password? Create an account.<input type="password"></body></html>`;
   assertEquals(isGarbageHtml(bodyOnly, "x"), true);
 });
+
+Deno.test("an AWS WAF HTTP-202 challenge is not a reusable source capture", () => {
+  const wall = `<html><script src="https://example.token.awswaf.com/id/challenge.js"></script>
+    <script>window.AwsWafIntegration.getToken();</script></html>`;
+  assertEquals(isGarbageHtml(wall, "gateway"), true);
+  assertEquals(isGarbageHtml(wall + "<p>vehicle inventory</p>".repeat(1000), "gateway"), false);
+  assertEquals(isGarbageHtml(`<html><p>Documentation mentions AwsWafIntegration.</p></html>`, "gateway"), false);
+});

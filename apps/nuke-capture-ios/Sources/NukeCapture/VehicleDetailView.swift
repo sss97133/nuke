@@ -1519,6 +1519,14 @@ struct VehicleDetailView: View {
             .padding(.bottom, 16)
         } else if galleryError {
             sectionError("photos") { Task { await loadGalleryPage(reset: true) } }
+        } else if reachedEnd {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("No photos available on this profile").font(.subheadline)
+                Text("Uploaded photos appear here after they are matched to this vehicle and can be shown to you.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 16).padding(.vertical, 12)
         }
     }
 
@@ -1845,7 +1853,7 @@ struct VehicleDetailView: View {
         let to = from + Self.galleryPageSize - 1
         do {
             let request = VehicleGalleryImage.eligible(SupabaseService.client
-                .from("vehicle_images")
+                .from(VehicleImageLoader.source)
                 .select(VehicleImageLoader.columns, count: reset ? .exact : nil)
                 .eq("vehicle_id", value: vehicleId))
             // created_at is only an indexed paging order for a source listing's gallery, never a label.

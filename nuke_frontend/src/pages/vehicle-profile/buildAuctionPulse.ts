@@ -14,6 +14,12 @@ export function auctionReaderRevision(row: any): string {
 }
 
 const platformKey = (value: unknown) => String(value ?? '').toLowerCase().replace(/[_\-\s]+/g, '');
+export const AUCTION_FEED_FRESH_MS = 15 * 60 * 1000;
+export function hasFreshAuctionFeed(status: string | null, endDate: string | null, sourceAt: string | null | undefined, now = Date.now()): boolean {
+  const observed = sourceAt ? Date.parse(sourceAt) : NaN;
+  return ['active', 'live'].includes(status ?? '') && Date.parse(endDate ?? '') > now
+    && observed <= now && now - observed <= AUCTION_FEED_FRESH_MS;
+}
 const CLASSIFIED_PLATFORMS = new Set(['craigslist', 'facebookmarketplace', 'ksl', 'kslclassifieds', 'classiccars', 'autotrader', 'carscom', 'dealersite']);
 const AUCTION_PLATFORMS = new Set(['bat', 'bringatrailer', 'carsandbids', 'mecum', 'barrettjackson', 'rmsothebys', 'gooding', 'bonhams', 'pcarmarket', 'collectingcars', 'broadarrow', 'sbx', 'autohunter']);
 
@@ -246,6 +252,7 @@ export function buildAuctionPulseFromExternalListings(rows: any[], vehicleIdForR
       sold_at: soldAt,
       last_bid_at: best?.metadata?.live_stream?.last_bid_at || null,
       last_comment_at: best?.metadata?.live_stream?.last_comment_at || null,
+      source_observed_at: best?.metadata?.live_stream?.last_frame_received_at || null,
       updated_at: updatedAt,
       metadata: (best?.metadata && typeof best.metadata === 'object') ? best.metadata : null,
       _vehicle_id: vehicleIdForRows,

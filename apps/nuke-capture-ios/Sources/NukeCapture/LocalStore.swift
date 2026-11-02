@@ -196,6 +196,7 @@ struct GarageVehicle: Codable, Identifiable, Hashable, Sendable {
         switch relationship {
         case "owner": return "Owned"
         case "previously_owned": return "Previously owned"
+        case "profile_record": return "Profiles you added"
         case "consignment": return "Consignment"
         case "business_handling": return "Business handling"
         case "sales_representative": return "Sales representative"

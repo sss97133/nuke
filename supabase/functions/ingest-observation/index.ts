@@ -141,6 +141,8 @@ const ARCHIVED_SALE_METHOD = "protected_archived_sale_observation_v1";
 const ARCHIVED_EPISODE_PREVIEW_METHOD = "protected_archived_sale_episode_preview_v2";
 const CAB_LISTING_CAPTURE_MODE = "cab_listing_capture_v1";
 const CAB_LISTING_CAPTURE_METHOD = "protected_cab_listing_capture_v1";
+const ECR_MODE = "retained_ecr_capture_v1";
+const ECR_METHOD = "protected_retained_ecr_capture_v1";
 
 /** Derive protected sale testimony here, never from caller-supplied values.
  * This is the canonical intake; database ingested_at is deliberately omitted.
@@ -305,6 +307,45 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
 
   try {
     let input: ObservationInput = await req.json();
+    let ecr: Extract<Awaited<ReturnType<typeof import("./retainedEcr.ts").readEcrCapture>>, { ok: true }> | undefined;
+    if (input.mode === ECR_MODE) {
+      const denied = await requireWriteAuth(req);
+      if (denied) return denied;
+      const writer = await authenticateWriter(req);
+      if (!writer.ok || writer.caller.kind !== "service_role") return new Response(
+        JSON.stringify({ error: "Retained ECR replay requires service role", writes: 0, model_calls: 0 }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      // Keep this optional source's entire dependency graph off unrelated intake paths.
+      const { ecrSelector, readEcrCapture } = await import("./retainedEcr.ts");
+      const id = ecrSelector(input as unknown as Record<string, unknown>);
+      if (!id) return new Response(JSON.stringify({ error: "Expected a snapshot selector and explicit dry_run", writes: 0, model_calls: 0 }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      // Existing retained-source network boundary permits only this project's SDK reads/writes.
+      retainedSaleBudget = true;
+      const sourceRead = await supabase.from("observation_sources").select("species")
+        .eq("slug", "exclusive-car-registry").maybeSingle();
+      if (sourceRead.error || sourceRead.data?.species !== "aggregator") return new Response(
+        JSON.stringify({ error: "ECR source species qualification unavailable", writes: 0, model_calls: 0 }),
+        { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      const qualified = await readEcrCapture(supabase, id);
+      if (!qualified.ok) return new Response(JSON.stringify({ success: false, reason: qualified.reason, writes: 0, model_calls: 0 }),
+        { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      ecr = qualified;
+      if (input.dry_run) return new Response(JSON.stringify({ success: true, dry_run: true, receipt: ecr.receipt, writes: 0, model_calls: 0 }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      input = ecr.input;
+    } else if (input.extraction_method === ECR_METHOD || input.structured_data?.ecr_capture_receipt !== undefined) {
+      return new Response(JSON.stringify({ error: "ECR receipts require the retained snapshot selector", writes: 0, model_calls: 0 }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    if (input.extraction_method === "retained_native_fields_v1" ||
+        input.structured_data?.source_profile === "retained_native_fields_v1" ||
+        (input.source_slug === "mecum" && input.extraction_method === "next_data_json_parse")) {
+      const writer = await authenticateWriter(req);
+      if (!writer.ok || writer.caller.kind !== "service_role") return new Response(
+        JSON.stringify({ error: "Native extractor receipts require service role" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
     if (input.mode === FINANCIAL_EVIDENCE_MODE) {
       const action = (input as unknown as { action?: string }).action ?? "submit";
       if ('owner_user_id' in input || action === 'contexts' || action === 'correct' || action === 'original') {
@@ -608,7 +649,7 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
       };
       try {
       const parent = await read(`parent:${sourceId}`, () => supabase.from("vehicle_observations")
-        .select("id,vehicle_id,kind,is_superseded,property_id,subject_type,subject_id,source_id,source_url,source_identifier,observed_at,ingested_at,extraction_method,confidence_score,structured_data,extraction_metadata,content_text")
+        .select("id,vehicle_id,kind,is_superseded,property_id,subject_type,subject_id,source_id,source_url,source_identifier,raw_source_ref,observed_at,ingested_at,extraction_method,confidence_score,structured_data,extraction_metadata,content_text")
         .eq("id", sourceId).maybeSingle());
       if (parent.error) throw new Error("Retained source unavailable");
       const row = parent.data;
@@ -738,6 +779,25 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
     const protectedReply = async (row: any, duplicate: boolean) => {
+      if (ecr) {
+        const expected = ecr.receipt;
+        const ordered = (v: any): any => Array.isArray(v) ? v.map(ordered) : v && typeof v === "object"
+          ? Object.fromEntries(Object.keys(v).sort().map(k => [k, ordered(v[k])])) : v;
+        if (row?.source_snapshot_id !== expected.snapshot_id || row?.source_id !== source.id || row.kind !== "listing"
+          || row.is_superseded !== false || row.vehicle_id !== null || row.extraction_method !== ECR_METHOD
+          || row.subject_type !== input.subject?.type || row.subject_id !== null
+          || row.source_identifier !== input.source_identifier || row.source_url !== input.source_url
+          || row.raw_source_ref !== input.raw_source_ref || row.observed_at_basis !== "source_capture_time"
+          || row.source_event_time_precision !== "unknown" || row.source_event_at !== null
+          || observationClockMicroseconds(row.observed_at) !== observationClockMicroseconds(input.observed_at)
+          || JSON.stringify(ordered(row.structured_data?.ecr_capture_receipt)) !== JSON.stringify(ordered(expected))) {
+          return new Response(JSON.stringify({ error: "Persisted ECR receipt does not match retained source", writes: duplicate ? 0 : 1, model_calls: 0 }),
+            { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+        return new Response(JSON.stringify({ success: true, duplicate, observation_id: row.id, snapshot_id: expected.snapshot_id,
+          resolution_status: "source_presentation_only", writes: duplicate ? 0 : 1, model_calls: 0 }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
       if (retainedReportedWork) {
         const writes = duplicate ? 0 : 1;
         const unavailable = () => new Response(JSON.stringify({ success: false,
@@ -891,6 +951,10 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
       return new Response(JSON.stringify({ error: "BaT activity requires its retained report selector", writes: 0, model_calls: 0 }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
+    if (source.id === "755185e3-3d21-4373-b806-ddcbf0d5e39c" && input.kind === "specification" && !retainedSourceId) {
+      return new Response(JSON.stringify({ error: "Native specifications require the retained source selector" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
 
     // A claim keyed to the condition dimension must name a live descriptor.
     let descriptorId: string | null = null;
@@ -945,16 +1009,16 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
     const contentHash = await observationContentHash(input);
 
     // Check for duplicate
-    const protectedColumns = "id,vehicle_id,ingested_at,structured_data,source_snapshot_id,kind,is_superseded,source_id,extraction_method,extractor_id,raw_source_ref,source_identifier,source_url,observed_at";
+    const protectedColumns = "id,vehicle_id,ingested_at,structured_data,source_snapshot_id,kind,is_superseded,source_id,extraction_method,extractor_id,raw_source_ref,source_identifier,source_url,observed_at,observed_at_basis,source_event_time_precision,source_event_at,subject_type,subject_id";
     const replayQuery = () => {
-      let query = supabase.from("vehicle_observations").select(retainedVin?.ok
+      let query = supabase.from("vehicle_observations").select(ecr ? protectedColumns : retainedVin?.ok
         ? protectedColumns + ",source_vin,source_vin_taxonomy_revision_id,content_hash" : archivedSale?.ok
         ? protectedColumns + (input.source_vehicle_event_id ? ",source_vehicle_event_id,extraction_metadata,content_hash" : "") : "id").eq("content_hash",contentHash);
-      if (archivedSale?.ok || retainedVin?.ok) query = query.eq("source_id",source.id).eq("source_identifier",input.source_identifier!).eq("kind",input.kind);
+      if (ecr || archivedSale?.ok || retainedVin?.ok) query = query.eq("source_id",source.id).eq("source_identifier",input.source_identifier!).eq("kind",input.kind);
       return query.maybeSingle().returns<Record<string, unknown> | null>();
     };
     const { data: existing, error: replayError } = await replayQuery();
-    if ((input.source_vehicle_event_id && archivedSale?.ok || retainedVin?.ok || retainedReportedWork) && replayError) {
+    if ((ecr || input.source_vehicle_event_id && archivedSale?.ok || retainedVin?.ok || retainedReportedWork) && replayError) {
       return new Response(JSON.stringify({ error: "Typed sale replay unavailable" }),
         { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
@@ -1104,6 +1168,10 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
       (source.base_trust_score || 0.5) +
       Object.values(confidenceFactors).reduce((a, b) => a + b, 0)
     );
+    if (ecr && confidenceScore > 0.6) {
+      confidenceFactors.ecr_source_assertion_cap = 0.6 - confidenceScore;
+      confidenceScore = 0.6;
+    }
     // An LLM reading seller text is testimony about testimony: it never outranks a person.
     if (input.agent_inferred === true && confidenceScore > 0.6) {
       confidenceFactors.agent_inferred_cap = 0.6 - confidenceScore;
@@ -1135,6 +1203,8 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
         // Only freshly verified protected admission sets the typed source key.
         // Generic input, including caller-provided source_snapshot_id, is ignored.
         ...(archivedSale?.ok ? { source_snapshot_id: archivedSale.receipt.snapshot_id } : {}),
+        ...(ecr ? { source_snapshot_id: ecr.receipt.snapshot_id } : {}),
+        ...(ecr ? { observed_at_basis: "source_capture_time", source_event_time_precision: "unknown", source_event_at: null } : {}),
         ...(retainedVin?.ok ? { source_vin: input.source_vin,
           source_vin_taxonomy_revision_id: input.source_vin_taxonomy_revision_id } : {}),
         ...(archivedSale?.ok && input.source_vehicle_event_id ? { source_vehicle_event_id: input.source_vehicle_event_id } : {}),
@@ -1160,6 +1230,9 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
         observer_raw: input.observer_raw,
         extractor_id: input.extractor_id,
         extraction_metadata: input.extraction_metadata,
+        // Scheduling is operational state, not part of the source testimony.
+        // Preserve exact custody comparisons of extraction_metadata.
+        ...(input.defer_analysis === true ? { analysis_deferred: true } : {}),
         // LLM provenance fields
         agent_tier: input.agent_tier || null,
         agent_model: input.agent_model || null,
@@ -1203,16 +1276,8 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
     const protectedResponse = await protectedReply(observation,false);
     if (protectedResponse) return protectedResponse;
 
-    // Fire-and-forget: trigger analysis engine for this vehicle+observation kind
-    if (vehicleId && input.kind && input.defer_analysis !== true) {
-      const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-      const serviceKey = projectSecretKey() ?? "";
-      fetch(`${supabaseUrl}/functions/v1/analysis-engine-coordinator`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${serviceKey}` },
-        body: JSON.stringify({ action: "observation_trigger", vehicle_id: vehicleId, observation_kind: input.kind }),
-      }).catch(() => {}); // intentionally fire-and-forget
-    }
+    // The existing database observation hook records affected analysis work in
+    // this admission transaction. A worker wake must never be its only receipt.
 
     return new Response(JSON.stringify({
       success: true,

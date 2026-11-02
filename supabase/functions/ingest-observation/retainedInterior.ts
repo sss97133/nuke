@@ -34,6 +34,27 @@ export function deriveRetainedInterior(source: Record<string, any>, vehicle: Rec
   if(odometer && registeredSource?.slug==="craigslist")return deriveRetainedCraigslistOdometer(source,vehicle,registeredSource);
   if(propertyKey==="year" && registeredSource?.slug==="craigslist")return deriveRetainedCraigslistYear(source,vehicle,registeredSource);
   const identity = RETAINED_IDENTITY_KEYS.includes(propertyKey);
+  // Mecum's retained public index supplies literal identity labels, not a VIN
+  // witness, page-description capture or specification inference.
+  const mecumIndex = ["year", "make", "model"].includes(propertyKey) &&
+    registeredSource?.slug === "mecum" && source?.extraction_method === "public_lot_index";
+  // Native Mecum JSON already retains named specification fields. Project
+  // those extractor claims as such; do not mine the synthesized index summary.
+  const mecumNative = registeredSource?.slug === "mecum" && source?.extraction_method === "next_data_json_parse";
+  const mecumRetained = mecumIndex || mecumNative;
+  // extract-bat-core stores the same retained specification fields on closed
+  // auctions as sale_result. Their source assertions remain usable without
+  // reconstructing a missing body or turning the auction into a fresh listing.
+  const batSaleResult = registeredSource?.slug === "bat" && source?.kind === "sale_result" &&
+    source?.extraction_method === "html_match";
+  const nativeFields = ["mecum", "barrett-jackson"].includes(registeredSource?.slug) &&
+    source?.extraction_method === "retained_native_fields_v1" &&
+    source.structured_data?.source_profile === "retained_native_fields_v1" &&
+    source.structured_data?.extractor === "batch-extract-snapshots" &&
+    /^[0-9a-f]{64}$/.test(source.structured_data?.source_capture_sha256 ?? "") &&
+    /^listing_page_snapshots:[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(source.raw_source_ref ?? "") &&
+    observationClockMicroseconds(source.structured_data?.source_captured_at) !== null &&
+    observationClockMicroseconds(source.structured_data?.source_captured_at) === observationClockMicroseconds(source.observed_at);
   const presentation = ["interior_color","exterior_color","drivetrain_layout"].includes(propertyKey);
   const description = source?.extraction_method === "html_description_capture";
   if (engineFamily && !description) return null;
@@ -48,21 +69,25 @@ export function deriveRetainedInterior(source: Record<string, any>, vehicle: Rec
   const value = description ? witness?.value : identity ? retainedListingIdentityValue(propertyKey, rawValue) : powertrain ? retainedPowertrainValue(propertyKey, rawValue) : rawValue;
   let url: URL;
   try { url = new URL(source?.source_url); } catch { return null; }
+  const sourceUrlMatches = registeredSource?.slug === "barrett-jackson" && nativeFields
+    ? ["barrett-jackson.com", "www.barrett-jackson.com"].includes(url.hostname) && /^\/[^/]+\/docket\/vehicle\/[^/]+\/?$/.test(url.pathname)
+    : mecumRetained || nativeFields
+    ? ["mecum.com", "www.mecum.com"].includes(url.hostname) && /^\/lots\/[0-9]+\/[^/]+\/?$/.test(url.pathname)
+    : url.hostname === "bringatrailer.com" && /^\/listing\/[^/]+\/?$/.test(url.pathname);
   if (!UUID.test(source?.id ?? "") || !UUID.test(source?.vehicle_id ?? "") ||
-      source.kind !== "listing" || source.is_superseded !== false ||
-      (!description && source.extraction_method !== "html_match") || source.property_id != null ||
+      (source.kind !== "listing" && !batSaleResult && !(mecumRetained && source.kind === "sale_result")) || source.is_superseded !== false ||
+      (!description && !mecumRetained && !nativeFields && source.extraction_method !== "html_match") || source.property_id != null ||
       source.subject_type !== "vehicle" || source.subject_id != null ||
       !vehicle || vehicle.id !== source.vehicle_id || vehicle.is_public !== true ||
       vehicle.deleted_at != null || vehicle.listing_kind === "non_vehicle_item" ||
-      !registeredSource || registeredSource.id !== source.source_id || registeredSource.slug !== "bat" ||
-      url.protocol !== "https:" || url.hostname !== "bringatrailer.com" ||
-      !/^\/listing\/[^/]+\/?$/.test(url.pathname) || url.search || url.hash || url.username || url.password ||
+      !registeredSource || registeredSource.id !== source.source_id || (registeredSource.slug !== "bat" && !mecumRetained && !nativeFields) ||
+      url.protocol !== "https:" || !sourceUrlMatches || url.search || url.hash || url.username || url.password ||
       observationClockMicroseconds(source.ingested_at) === null ||
       (source.observed_at !== null && observationClockMicroseconds(source.observed_at) === null) ||
       (!identity && (typeof rawValue !== "string" || !rawValue.trim() || rawValue.length > 500 || /^(unknown|n\/a|unspecified)$/i.test(rawValue.trim()))) || value == null ||
       !Number.isFinite(source.confidence_score) || source.confidence_score < 0.6 || source.confidence_score > 1) return null;
   return {
-    source_slug: "bat", kind: odometer ? "condition" : "specification", vehicle_id: source.vehicle_id,
+    source_slug: nativeFields ? registeredSource.slug : mecumRetained ? "mecum" : "bat", kind: odometer ? "condition" : "specification", vehicle_id: source.vehicle_id,
     property_key: propertyKey, source_url: source.source_url,
     source_identifier: `${mode}:${source.id}`,
     observed_at: source.ingested_at, extraction_method: RETAINED_INTERIOR_METHOD,

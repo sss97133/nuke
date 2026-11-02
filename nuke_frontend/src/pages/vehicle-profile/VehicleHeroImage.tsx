@@ -3,37 +3,38 @@ import { useVehicleProfile } from './VehicleProfileContext';
 import MobileImageGallery from '../../components/image/MobileImageGallery';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { BadgePortal } from '../../components/badges/BadgePortal';
-import VehicleMediaKit from './VehicleMediaKit';
 import { openVehiclePhoto, openVehiclePhotoByUrl } from './VehiclePhotoLightbox';
+import { useVehicleImageEvidence, relatedFieldImages } from './hooks/useVehicleImageEvidence';
 
 interface VehicleHeroImageProps {
   overlayNode?: React.ReactNode;
 }
 
-const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ overlayNode }) => {
-  const { leadImageUrl, heroMeta, vehicleId } = useVehicleProfile();
-  // Default to contain: show the full vehicle, letterbox if needed.
-  // "The user came to see the vehicle, not a cropped fragment." — 2026-03-21 audit
-  const [fitMode, setFitMode] = useState<'contain' | 'cover'>('contain');
-  const [showGallery, setShowGallery] = useState(false);
-  // Media-kit slideshow: rendered when curation finds >=3 distinct BYOK scene_types.
-  // Initialized to FALSE so the static <img> paints instantly from primary_image_url.
-  // (The old true-default left the hero an empty void for ~40s on cold loads: the
-  // static img was suppressed until the BYOK curation query resolved at the tail of
-  // the request flood. Measured 2026-06-10: heroImgs=0 at t+30s, first paint t+40s.)
-  // VehicleMediaKit stays mounted regardless and upgrades the slot via
-  // onCurationResolved when curation lands.
-  const [mediaKitState, setMediaKitState] = useState({ vehicleId, active: false });
-  // A new vehicle entry starts with its static lead, including A → B → A.
-  if (mediaKitState.vehicleId !== vehicleId) {
-    setMediaKitState({ vehicleId, active: false });
-  }
-  const mediaKitActive = mediaKitState.vehicleId === vehicleId && mediaKitState.active;
-  const isMobile = useIsMobile();
+function ContextualHero({ vehicleId, field, label, onClear }: { vehicleId: string; field: string; label: string; onClear: () => void }) {
+  const inventory = useVehicleImageEvidence(vehicleId, field);
+  const [index, setIndex] = useState(0);
+  const images = relatedFieldImages(inventory.data?.images || [], field);
+  const image = images[index % (images.length || 1)];
+  return <section className="vp-context-hero" aria-label={`${label} photographs of this vehicle`}>
+    <div className="vp-context-hero__head"><span>{label} · related areas</span><button type="button" onClick={onClear}>All photos</button></div>
+    {image ? <>
+      <button type="button" className="vp-context-hero__photo" onClick={() => openVehiclePhoto(image.id)} aria-label={`Open ${label} photograph ${index + 1}`}>
+        <img src={image.medium_url || image.image_url} alt={`${label} · ${(image.vehicle_zone || '').replace(/_/g, ' ')}`} width={1260} height={840} />
+      </button>
+      <div className="vp-context-hero__thumbnails">{images.map((item, position) => <button key={item.id} type="button" aria-label={`Show ${label} photograph ${position + 1}`} aria-pressed={position === index} onClick={() => setIndex(position)}>
+        <img src={item.thumbnail_url || item.medium_url || item.image_url} alt="" width={64} height={48} loading="lazy" />
+      </button>)}</div>
+    </> : <p role="status">{inventory.isPending ? 'Reading related photographs…' : inventory.isError ? 'Related photographs could not be read.' : 'No related image areas are indexed in the records read.'}</p>}
+    {inventory.data && !inventory.data.complete && <p className="vp-context-hero__note">Showing {inventory.data.images.length} of {inventory.data.total ?? 'unknown'} available photographs.</p>}
+  </section>;
+}
 
-  const handleCurationResolved = useCallback((count: number) => {
-    setMediaKitState(current => current.vehicleId === vehicleId ? { ...current, active: count >= 3 } : current);
-  }, [vehicleId]);
+const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ overlayNode }) => {
+  const { leadImageUrl, heroMeta, vehicleId, galleryFilter, setGalleryFilter } = useVehicleProfile();
+  // Fill the profile frame; Fit and the photo viewer retain the complete image.
+  const [fitMode, setFitMode] = useState<'contain' | 'cover'>('cover');
+  const [showGallery, setShowGallery] = useState(false);
+  const isMobile = useIsMobile();
 
   const getSupabaseRenderUrl = (publicObjectUrl: string, width: number, quality = 90): string | null => {
     try {
@@ -100,12 +101,9 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ overlayNode }) => {
   // frame decodes.
   const heroThumbSrc = getSupabaseRenderUrl(imgUrl, 64, 40);
 
-  // <link rel=preload> for the hero — tells the browser to start the fetch
-  // before React paints the <img>. Only meaningful when media-kit is NOT
-  // active (the slideshow's first frame self-preloads via fetchpriority).
-  // Declared before the no-photo early-return so hooks-order is stable.
+  // Preload the static lead until the viewer selects a photo topic.
   useEffect(() => {
-    if (mediaKitActive) return;
+    if (galleryFilter?.field) return;
     if (!heroSrc || typeof document === 'undefined') return;
     const link = document.createElement('link');
     link.rel = 'preload';
@@ -118,7 +116,10 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ overlayNode }) => {
     return () => {
       try { document.head.removeChild(link); } catch { /* noop */ }
     };
-  }, [heroSrc, srcSetAttr, mediaKitActive]);
+  }, [heroSrc, srcSetAttr, galleryFilter?.field]);
+
+  if (vehicleId && galleryFilter?.field) return <ContextualHero key={`${vehicleId}:${galleryFilter.field}:${galleryFilter.label}`}
+    vehicleId={vehicleId} field={galleryFilter.field} label={galleryFilter.label || galleryFilter.field.replace(/_/g, ' ')} onClear={() => setGalleryFilter(null)} />;
 
   if (!src || src === 'undefined' || src === 'null') {
     // No photo: show spec card with clickable badges (zero dead ends)
@@ -193,7 +194,7 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ overlayNode }) => {
     <>
       <div>
         <div style={{ overflow: 'hidden' }}>
-          {/* hero-media-slot: static image now, carousel/livestream later */}
+          {/* The screened lead remains stable until the viewer chooses a photo topic. */}
           <div className="hero-media-slot">
             <div
               style={{
@@ -201,12 +202,12 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ overlayNode }) => {
                 height: 'var(--h-hero, 420px)',
                 position: 'relative',
                 overflow: 'hidden',
-                backgroundColor: 'var(--text)',
+                backgroundColor: 'var(--bg)',
                 cursor: 'pointer',
               }}
               onClick={() => {
                 if (isMobile) setShowGallery(true);
-                else if (!mediaKitActive && src) openVehiclePhotoByUrl(src);
+                else if (src) openVehiclePhotoByUrl(src);
               }}
             >
               {/* Dark backdrop in contain mode — solid color, not blurred image.
@@ -217,29 +218,15 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ overlayNode }) => {
                   style={{
                     position: 'absolute',
                     inset: 0,
-                    background: 'var(--text)',
+                    background: 'var(--bg)',
                   }}
-                />
-              )}
-
-              {/* Media-kit slideshow when curation finds >=3 distinct BYOK
-                  scene_types; falls back to single hero <img> otherwise.
-                  Mounted whenever we have a vehicleId (it renders null until
-                  curation passes its gate) so handleCurationResolved can still
-                  upgrade the static hero to the slideshow when ready. */}
-              {vehicleId && (
-                <VehicleMediaKit
-                  key={vehicleId}
-                  vehicleId={vehicleId}
-                  onCurationResolved={handleCurationResolved}
-                  onImageClick={isMobile ? () => setShowGallery(true) : (imageId) => openVehiclePhoto(imageId)}
                 />
               )}
 
               {/* Image — fixed frame, toggle between contain and cover.
                   Speed: eager+async+fetchpriority=high on LCP candidate.
                   srcset/sizes lets mobile pull a 420w variant. */}
-              {!mediaKitActive && heroThumbSrc && !fullLoaded && (
+              {heroThumbSrc && !fullLoaded && (
                 <img
                   src={heroThumbSrc}
                   alt=""
@@ -257,7 +244,6 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ overlayNode }) => {
                   }}
                 />
               )}
-              {!mediaKitActive && (
                 <img
                   src={heroSrc}
                   srcSet={srcSetAttr}
@@ -277,15 +263,13 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ overlayNode }) => {
                     objectPosition: 'center',
                   }}
                 />
-              )}
 
               {/* Overlay (auction banners etc) */}
               {overlayNode && (
                 <div style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 1 }}>{overlayNode}</div>
               )}
 
-              {/* Fit / Fill toggle — hidden when slideshow is active (slideshow uses contain only). */}
-              {!mediaKitActive && (
+              {/* Retain access to the complete original composition. */}
               <button
                 onClick={e => { e.stopPropagation(); setFitMode(m => m === 'cover' ? 'contain' : 'cover'); }}
                 type="button"
@@ -294,7 +278,6 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ overlayNode }) => {
               >
                 {fitMode === 'cover' ? 'FIT' : 'FILL'}
               </button>
-              )}
             </div>
           </div>
 

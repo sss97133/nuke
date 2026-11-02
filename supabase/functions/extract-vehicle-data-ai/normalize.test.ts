@@ -1,7 +1,7 @@
 // Run: deno test --allow-read=supabase/functions/extract-craigslist/fixtures supabase/functions/extract-vehicle-data-ai/normalize.test.ts
 // normalizeExtractedData is the funnel every dedicated extractor's answer passes through on its way to ingest.
 // A Craigslist capture must come out the other side; every other source must come out exactly as before.
-import { normalizeExtractedData } from "./normalize.ts";
+import { dedicatedExtractorDeferral, normalizeExtractedData } from "./normalize.ts";
 import { extractFromHtml } from "../extract-craigslist/extract.ts";
 
 function equal(actual: unknown, expected: unknown, note = "") {
@@ -22,6 +22,17 @@ const LEGACY_KEYS = [
 
 // what ingest receives is the extractor's JSON, so the test sends it through JSON too
 const viaHttp = (x: unknown) => JSON.parse(JSON.stringify(x));
+
+Deno.test('source allowance refusals survive the proxy as deferrals instead of generic AI fallbacks', () => {
+  for (const error of ['allowance_deferred: firecrawl allowance exhausted for today',
+    'Failed to scrape eBay listing: firecrawl_allowance_exhausted']) {
+    equal(dedicatedExtractorDeferral(viaHttp({ success: false, error })),
+      { success: false, deferred: true, error: 'allowance_deferred: source Firecrawl allowance unavailable' });
+  }
+  for (const data of [null, {}, { error: 'Could not parse listing' }, { data: { year: 1970 } }]) {
+    equal(dedicatedExtractorDeferral(data), null);
+  }
+});
 
 Deno.test("a Craigslist listing keeps its VIN and mileage through the funnel", () => {
   const out = normalizeExtractedData(viaHttp(extractFromHtml(page("classic-vin-manual-truck.html"), URL1)), URL1);
