@@ -36,6 +36,8 @@ struct MainTabView: View {
     @State private var fullAccess = (PHPhotoLibrary.authorizationStatus(for: .readWrite) == .authorized)
     @State private var tab: Tab = .explore
     @ObservedObject private var inboxBadge = InboxBadgeStore.shared
+    /// Live per-photo progress for this shooting session (the slim bar at the top).
+    @StateObject private var ingest = CaptureIngestStore()
 
     enum Tab: Hashable { case library, garage, profile, explore, today }
 
@@ -83,6 +85,17 @@ struct MainTabView: View {
                     .badge(inboxBadge.badge)
             }
         }
+        // The live ingest status bar: pinned above every tab, hidden when the session has nothing.
+        .safeAreaInset(edge: .top, spacing: 0) {
+            if session.isSignedIn { CaptureIngestBar(store: ingest) }
+        }
+        .task(id: accountScope) {
+            guard session.isSignedIn, let uid = SupabaseService.currentUserId else { return }
+            #if DEBUG
+            if FixtureBackend.isActive { return }   // UI tests run on a fake host; no Realtime there
+            #endif
+            await ingest.run(userId: uid)
+        }
         // Discard another account's navigation and private screen state. Merely
         // returning from a sheet or another tab must preserve the user's place.
         .id(accountScope)
@@ -97,6 +110,7 @@ struct MainTabView: View {
                 photoGrant = Self.currentPhotoGrant()
                 fullAccess = (PHPhotoLibrary.authorizationStatus(for: .readWrite) == .authorized)
                 Task { await inboxBadge.refresh() }
+                Task { await ingest.refresh() }
             }
         }
     }
