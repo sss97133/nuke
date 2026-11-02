@@ -20,7 +20,7 @@ export const zoneOfY = (y: number): ZoneId => (y < -1.46 ? 'bay' : y < 0.1 ? 'ca
 // replaces are hidden by name ("Name*" = every name starting with "Name"), except the names in `keeps`. Each file is in
 // the zones' frame (twin metres, glTF Y-up), so it is drawn as published. Extend `hides` when a layer draws more.
 // `hidesIn` does the same inside another layer's file: { layer id: node names } for what this layer replaces there.
-// (The MAP tab does not load k5-blazer.glb, so its Under_Frame_Blazer needs no entry here.)
+// (The MAP tab does not load k5-blazer.glb itself: the body layer draws k5-body-context.glb, which leaves out its Under_* parts.)
 // `off`: drawn only when a viewer switches it on (MORE menu); for placeholder geometry that is not yet the real part.
 export interface LayerDef { id: string; label: string; url: string; lane: string; hides: string[]; hidesIn?: Record<string, string[]>; keeps?: string[]; credit?: { text: string; href: string }; off?: boolean }
 export const LAYERS: LayerDef[] = [
@@ -45,7 +45,7 @@ export const LAYERS: LayerDef[] = [
     // stock 1973-80 non-AC dash panel, toe board and cowl sides, camera-matched to photos (receipt 2026-10-26_k5-firewall-3d);
     // off until the owner chooses the layer defaults
     id: 'firewall', label: 'FIREWALL', url: '/models/k5-firewall.glb', lane: 'k5-firewall-3d',
-    hidesIn: { sheetmetal: ['firewall_dash_panel', 'firewall_toe_board'] },
+    hidesIn: { sheetmetal: ['firewall_dash_panel', 'firewall_toe_board'], body: ['body_cowl_top'] },   // the body's cowl strip sits 65-73 mm over this layer's seam
     hides: ['CTX-firewall-face', 'CTX-toe-board'], off: true,
   },
   {
@@ -67,6 +67,21 @@ export const LAYERS: LayerDef[] = [
       'E3_Alternator_*', 'E3_PS_*', 'E3_Tensioner_*', 'E3_Idler_Lower', 'E3_AC_*', 'E3_Belt', 'E3_Header_*', 'E3_ExhFlange_*',
       'E3_Collector_*', 'E3_Exhaust_Tail_*', 'E3_O2_Bung_*',
     ],
+  },
+  {
+    // the truck around the photo-built parts: the TurboSquid 1978 Blazer split into named nodes at stance (receipt
+    // 2026-10-27_k5-body-context, generator body_context_blender.py): cab, doors, glass, fenders, tub, wheels, axles,
+    // grille, bumpers, trim, interior; no TurboSquid underbody, no top, no hood. off until the owner signs off.
+    id: 'body', label: 'TRUCK BODY', url: '/models/k5-body-context.glb', lane: 'k5-body-context',
+    credit: { text: 'Body: "1978 Chevrolet Blazer" by APEC_True, TurboSquid 1764639, modified', href: 'https://www.turbosquid.com/3d-models/1978chevroletblazer-3d-model-1764639' },
+    hidesIn: { sheetmetal: ['radiator_support', 'firewall_dash_panel', 'firewall_toe_board', 'inner_fender_wall_L', 'inner_fender_wall_R', 'inner_fender_top_L', 'inner_fender_top_R', 'inner_fender_wheelhouse_L', 'inner_fender_wheelhouse_R'] },
+    // CTX-FUEL-TANK and CTX-frame-rail-web-* stay
+    hides: ['CTX-cab-floor', 'CTX-cargo-floor', 'CTX-inner-fender-wall-driver', 'CTX-inner-fender-wall-passenger', 'CTX-core-support-face', 'CTX-firewall-face', 'CTX-toe-board'], off: true,
+  },
+  {
+    // the hood, its own file with its origin on the rear edge (the hinge line, assumed) so it can be shown raised; off
+    // always so the bay stays visible
+    id: 'hood', label: 'HOOD', url: '/models/k5-body-hood.glb', lane: 'k5-body-context', hides: [], off: true,
   },
 ];
 
