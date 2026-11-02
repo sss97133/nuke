@@ -18,7 +18,7 @@ BEGIN
                     'be853856-e450-4d0e-b2a1-613391956ad6','ac070808-4cbd-4d03-9c39-2ec5b0f0708c')
          AND is_public IS TRUE AND deleted_at IS NULL
       UNION
-      (SELECT id FROM public.vehicles WHERE is_public IS TRUE AND deleted_at IS NULL ORDER BY updated_at DESC NULLS LAST LIMIT 4)
+      (SELECT id FROM public.vehicles WHERE is_public IS TRUE AND deleted_at IS NULL LIMIT 4)
     ) s LOOP
     IF public.vehicle_profile_read(r.id) IS NULL THEN
       RAISE EXCEPTION 'anon vehicle_profile_read returned NULL for %', r.id;
