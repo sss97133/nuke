@@ -393,6 +393,23 @@ private enum ZIPLocationReader {
         try await SupabaseService.client.rpc("map_zip_counts", params: ["p_fips": [fips]]).execute().value
     }
 
+    private struct ActivityParams: Encodable, Sendable {
+        let p_fips: [String]
+        let p_start: String?
+        let p_end: String?
+    }
+
+    /// public.map_zip_activity: vehicles with an auction close in `window` per ZIP, plus last-24h sold / new listings.
+    /// A nil bound sends no window (only the 24h columns are meaningful).
+    static func fetchActivity(fips: String, window: MapObservationWindow) async throws -> [ZIPActivityRow] {
+        let formatter = ISO8601DateFormatter()
+        let bounded = window.isServerEligible
+        let params = ActivityParams(p_fips: [fips],
+                                    p_start: bounded ? window.start.map { formatter.string(from: $0) } : nil,
+                                    p_end: bounded ? window.end.map { formatter.string(from: $0) } : nil)
+        return try await SupabaseService.client.rpc("map_zip_activity", params: params).execute().value
+    }
+
     // Nonisolated network/decode work; only page publication returns to the UI.
     static func fetch(fips: String, after: String?, size: Int) async throws -> [CountyLocationRow] {
         var request = SupabaseService.client.from("vehicle_location_observations")
@@ -482,12 +499,26 @@ struct CountyZIPGeometry {
         Config.supabaseURL.appendingPathComponent("storage/v1/object/public/map-data/geo/v1/county/\(fips).geojson")
     }
 
+    /// ZIP shapes for one county. The GeoJSON is immutable, so a copy on this device is used before any network read;
+    /// a copy that no longer parses is discarded and fetched again.
     func areas(fips: String) async throws -> (overlays: [MKOverlay], labels: [ZIPAreaLabel]) {
-        var overlays: [MKOverlay] = []; var labels: [ZIPAreaLabel] = []; var seen = Set<String>()
+        try Task.checkCancellation()
+        let disk = ZIPPolygonDiskCache.shared
+        if let stored = disk.read(fips) {
+            if let parsed = try? await Self.parseAreas(stored) { return parsed }
+            disk.remove(fips)
+        }
         try Task.checkCancellation()
         let request = URLRequest(url: Self.areasURL(fips), cachePolicy: .returnCacheDataElseLoad, timeoutInterval: 20)
         let (data, response) = try await URLSession.shared.data(for: request)
         guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw URLError(.badServerResponse) }
+        let parsed = try await Self.parseAreas(data)
+        disk.write(data, fips: fips)   // only after it parsed
+        return parsed
+    }
+
+    private static func parseAreas(_ data: Data) async throws -> (overlays: [MKOverlay], labels: [ZIPAreaLabel]) {
+        var overlays: [MKOverlay] = []; var labels: [ZIPAreaLabel] = []; var seen = Set<String>()
         let decoded = try await Task.detached(priority: .userInitiated) { try MKGeoJSONDecoder().decode(data) }.value
         for case let feature as MKGeoJSONFeature in decoded {
             guard let properties = feature.properties,
@@ -517,6 +548,25 @@ actor ZIPMapReadCache {
     static let shared = ZIPMapReadCache()
     private var rows: [String: (Date, [CountyLocationRow])] = [:]
     private var geometry: [String: (CountyZIPGeometry, [MKOverlay], [ZIPAreaLabel])] = [:]
+    private var counts: [String: (Date, [ZIPCountRow])] = [:]
+    private var activity: [String: (Date, [ZIPActivityRow])] = [:]
+    func getCounts(_ fips: String) -> [ZIPCountRow]? {
+        guard let entry = counts[fips], Date().timeIntervalSince(entry.0) < 600 else { return nil }
+        return entry.1
+    }
+    func putCounts(_ fips: String, _ value: [ZIPCountRow]) {
+        if counts.count >= 24, let oldest = counts.min(by: { $0.value.0 < $1.value.0 })?.key { counts.removeValue(forKey: oldest) }
+        counts[fips] = (Date(), value)
+    }
+    /// Activity includes the last 24 hours, so it is only reused for five minutes.
+    func getActivity(_ fips: String, key: String) -> [ZIPActivityRow]? {
+        guard let entry = activity["\(fips)|\(key)"], Date().timeIntervalSince(entry.0) < 300 else { return nil }
+        return entry.1
+    }
+    func putActivity(_ fips: String, key: String, _ value: [ZIPActivityRow]) {
+        if activity.count >= 24, let oldest = activity.min(by: { $0.value.0 < $1.value.0 })?.key { activity.removeValue(forKey: oldest) }
+        activity["\(fips)|\(key)"] = (Date(), value)
+    }
     func getGeometry(_ fips: String) -> (CountyZIPGeometry, [MKOverlay], [ZIPAreaLabel])? { geometry[fips] }
     func putGeometry(_ fips: String, _ boundary: CountyZIPGeometry, _ areas: [MKOverlay], _ labels: [ZIPAreaLabel]) {
         if geometry.count >= 8, let key = geometry.keys.sorted().first { geometry.removeValue(forKey: key) }
@@ -546,6 +596,9 @@ struct ZIPMapViewport {
         var rows: [CountyLocationRow] = []
         var countRows: [ZIPCountRow]?
         var countsLoading = false
+        /// map_zip_activity rows; `windowed` is valid for `activityKey`, the 24h columns always.
+        var activityRows: [ZIPActivityRow]?
+        var activityKey: String?
         var cursor: String?
         var complete = false
         var loading = false
@@ -561,6 +614,9 @@ struct ZIPMapViewport {
     @Published private(set) var revision = 0
     /// nil until known; false once map_zip_counts answered "missing" (pre-migration fallback).
     @Published private(set) var countsAvailable: Bool?
+    /// Same for map_zip_activity; windows fall back to raw reads when it is not deployed.
+    @Published private(set) var activityAvailable: Bool?
+    private var window = MapObservationWindow.all
     private var activeRead: Task<Void, Never>?
     private var generation = 0
     private var throttle = ReprojectThrottle(interval: 1)
@@ -586,8 +642,9 @@ struct ZIPMapViewport {
     }
 
     /// `rows`: counties that need raw observations (ZIP drill-down, date windows, or no RPC).
-    func read(_ counties: [String], rows: Set<String> = []) async {
+    func read(_ counties: [String], rows: Set<String> = [], window: MapObservationWindow = .all) async {
         rowCounties = rows
+        self.window = window
         generation += 1
         let current = generation
         activeRead?.cancel()
@@ -628,11 +685,45 @@ struct ZIPMapViewport {
     }
 
     private func readEvidence(_ fips: String) async {
-        if countsAvailable != false {
+        let windowed = window != .all && window.isServerEligible && activityAvailable != false
+        // Activity rides along even for All time: it carries the last-24h signal. It never blocks coloring there.
+        async let activity: Void = readActivity(fips)
+        if !windowed && countsAvailable != false {
             await readCounts(fips)
         }
-        if countsAvailable == false || rowCounties.contains(fips) || (partitions[fips]?.countRows == nil && partitions[fips]?.countsLoading != true) {
-            await readRecords(fips)
+        _ = await activity
+        let needsRecords: Bool
+        if rowCounties.contains(fips) { needsRecords = true }
+        else if window != .all {
+            // A window is answered by map_zip_activity; raw reads only when it could not answer.
+            needsRecords = !windowed || partitions[fips]?.activityKey != window.cacheKey || partitions[fips]?.activityRows == nil
+        } else {
+            needsRecords = countsAvailable == false || (partitions[fips]?.countRows == nil && partitions[fips]?.countsLoading != true)
+        }
+        if needsRecords { await readRecords(fips) }
+    }
+
+    private func readActivity(_ fips: String) async {
+        guard activityAvailable != false else { return }
+        let key = window.cacheKey; let current = window
+        if partitions[fips]?.activityRows != nil, partitions[fips]?.activityKey == key { return }
+        if let cached = await ZIPMapReadCache.shared.getActivity(fips, key: key) {
+            change(fips, reproject: true) { $0.activityRows = cached; $0.activityKey = key }
+            return
+        }
+        let start = Date()
+        do {
+            let rows = try await ZIPLocationReader.fetchActivity(fips: fips, window: current)
+            try Task.checkCancellation()
+            activityAvailable = true
+            await ZIPMapReadCache.shared.putActivity(fips, key: key, rows)
+            change(fips, reproject: true) { $0.activityRows = rows; $0.activityKey = key }
+            NSLog("NukeCapture county %@: %d activity rows, %.3f seconds", fips, rows.count, Date().timeIntervalSince(start))
+        } catch {
+            if !Task.isCancelled, ZIPCountFold.isMissingFunction(error) {
+                activityAvailable = false
+                NSLog("NukeCapture map_zip_activity unavailable; windows use raw observation reads")
+            }
         }
     }
 
@@ -641,10 +732,16 @@ struct ZIPMapViewport {
         change(fips) { $0.countsLoading = true }
         defer { change(fips) { $0.countsLoading = false } }
         let start = Date()
+        if let cached = await ZIPMapReadCache.shared.getCounts(fips) {
+            guard !Task.isCancelled else { return }
+            change(fips, reproject: true) { $0.countRows = cached }
+            return
+        }
         do {
             let rows = try await ZIPLocationReader.fetchCounts(fips: fips)
             try Task.checkCancellation()
             countsAvailable = true
+            await ZIPMapReadCache.shared.putCounts(fips, rows)
             change(fips, reproject: true) { $0.countRows = rows }
             NSLog("NukeCapture county %@: %d ZIP count rows, %.3f seconds", fips, rows.count, Date().timeIntervalSince(start))
         } catch {
@@ -735,7 +832,9 @@ struct CountyZIPDrill: View {
     @State private var showReport = false
     @State private var showMakePicker = false
     @State private var make: String?
-    @State private var period = MapObservationWindow.all
+    @State private var period = MapObservationWindow.lastDays(7)
+    @State private var live: LiveActivity?
+    @State private var pulses: [ZIPPulseAnnotation] = []
     @State private var scale = GeographicScale.state
     @State private var summary = CountyEvidenceSummary(rows: [], fips: "", make: nil, crosswalk: [:])
     @State private var counts: [String: Int] = [:]
@@ -758,8 +857,9 @@ struct CountyZIPDrill: View {
     }
     /// Counties whose raw observations (and auction clocks) are needed: only the selected ZIP's,
     /// unless a date window is applied or the counts RPC is not deployed.
+    private var windowFast: Bool { period != .all && period.isServerEligible && reader.activityAvailable != false }
     private var rowCounties: Set<String> {
-        if period != .all || reader.countsAvailable == false { return Set(readCounties) }
+        if (period == .all && reader.countsAvailable == false) || (period != .all && !windowFast) { return Set(readCounties) }
         guard let zip = selectedZIP else { return [] }
         return Set(readCounties.filter { fips in
             CountyEvidenceSummary.zipCounties[zip] == fips
@@ -770,7 +870,9 @@ struct CountyZIPDrill: View {
     private func colorReady(_ fips: String) -> Bool {
         guard let partition = reader.partitions[fips] else { return false }
         if partition.complete || partition.failed { return true }
-        return partition.countRows != nil && period == .all && !rowCounties.contains(fips)
+        if rowCounties.contains(fips) { return false }
+        if period == .all { return partition.countRows != nil }
+        return windowFast && partition.activityRows != nil && partition.activityKey == period.cacheKey
     }
     private var loading: Bool { readCounties.contains { !colorReady($0) } }
     private var clockLoading: Bool { readCounties.contains { reader.partitions[$0]?.clockLoading == true } }
@@ -815,6 +917,7 @@ struct CountyZIPDrill: View {
             CountyChoropleth(counts: scale.needsPreciseEvidence ? [:] : counts,
                              geometry: areas, focus: focus, highlighted: selectedZIP,
                              areaLabels: scale.needsPreciseEvidence ? [] : areaLabels,
+                             pulses: scale.needsPreciseEvidence ? [] : pulses,
                              drawsAreas: !scale.needsPreciseEvidence,
                              onScaleChange: { if scale != $0 { scale = $0 } },
                              onViewportChange: { viewport = $0 },
@@ -826,7 +929,7 @@ struct CountyZIPDrill: View {
                         Label(make ?? "All makes", systemImage: "line.3.horizontal.decrease")
                     }
                     Button { showDates = true } label: {
-                        Label(period == .all ? "All time" : "Date range", systemImage: "calendar")
+                        Label(period == .all ? "All time" : period.displayLabel, systemImage: "calendar")
                     }.disabled(loading || failed)
                     Button { showInfo = true } label: { Image(systemName: "info.circle") }
                         .accessibilityLabel("Map sources and coverage")
@@ -854,10 +957,22 @@ struct CountyZIPDrill: View {
                             .font(.caption).foregroundStyle(.secondary)
                     }
                 } else {
-                    Text("\(visibleVehicles.formatted()) vehicles in visible ZIPs · captured history")
+                    Text("\(visibleVehicles.formatted()) vehicles in visible ZIPs · \(period == .all ? "captured history" : period.displayLabel.lowercased())")
                         .font(.caption).foregroundStyle(.secondary)
                 }
-                if period != .all { Text("\(period.label) · auction close dates, UTC").font(.caption2).foregroundStyle(.secondary) }
+                if let live, !readCounties.isEmpty, !loading {
+                    HStack(spacing: 6) {
+                        Circle().fill(live.fresh > 0 ? Color.orange : Color.secondary.opacity(0.4)).frame(width: 8, height: 8)
+                        Text(live.fresh > 0 ? "\(live.fresh.formatted()) new today" : "Nothing new in the last 24h")
+                            .font(.caption.weight(.semibold))
+                        if live.fresh > 0 {
+                            Text("· \(live.sold.formatted()) sold · \(live.listed.formatted()) newly listed")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                    .accessibilityElement(children: .combine)
+                }
+                if period != .all { Text("\(period.displayLabel) · auction close dates, UTC").font(.caption2).foregroundStyle(.secondary) }
                 if !scale.needsPreciseEvidence && !counts.isEmpty {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Vehicles per ZIP").font(.caption2).foregroundStyle(.secondary)
@@ -941,6 +1056,7 @@ struct CountyZIPDrill: View {
                 Text("\(viewport?.counties.count ?? 0) counties intersect this screen. Captured ZIP history is read across their borders. This is not a census of every vehicle or every auction.")
                 Text("Completed region reads are reused for up to 10 minutes during this map session. Auction event dates and location intake dates are separate. This is a current read of recorded evidence, not an immutable historical snapshot.")
                     Text("ZIP areas are Census 2020 ZIP Code Tabulation Areas. Some postal ZIPs have no area, and ZIPs can cross county boundaries. County conflicts and missing source ZIPs remain available under Coverage.")
+                    Text("Pulsing dots mark ZIPs with an auction that closed as sold in the last 24 hours, or a live auction Nuke first captured in the last 24 hours (that is when we saw it, not necessarily when the seller posted it). The dot sits at the ZIP's center, not at a car. \"New today\" adds those up for the ZIPs on screen.")
                     Text("We only know the ZIP code where a car was listed, not its exact spot, and not whether it is still there.")
                     Link("Census ZIP area definitions", destination: URL(string: "https://www.census.gov/programs-surveys/geography/guidance/geo-areas/zctas.html")!)
                 }
@@ -973,9 +1089,9 @@ struct CountyZIPDrill: View {
             }
             #endif
         }
-        .task(id: "\(readKey):\(retryRevision)") {
+        .task(id: "\(readKey):\(retryRevision):\(period.cacheKey)") {
             do { try await Task.sleep(for: .milliseconds(300)) } catch { return }
-            await reader.read(readCounties, rows: rowCounties)
+            await reader.read(readCounties, rows: rowCounties, window: period)
             #if DEBUG
             if !Task.isCancelled, ProcessInfo.processInfo.environment["NUKE_DEBUG_MAP_REPORT"] == "1" {
                 await project()
@@ -984,8 +1100,7 @@ struct CountyZIPDrill: View {
             #endif
         }
         .task(id: ProjectionKey(partitions: readKey, revision: reader.revision, make: make, window: period,
-                                x: viewport?.bounds.origin.x, y: viewport?.bounds.origin.y,
-                                width: viewport?.bounds.width, height: viewport?.bounds.height)) {
+                                viewport: ViewportSnap(viewport?.bounds))) {
             do { try await Task.sleep(for: .milliseconds(100)) } catch { return }
             await project()
         }
@@ -993,7 +1108,8 @@ struct CountyZIPDrill: View {
 
     private struct ProjectionKey: Hashable {
         let partitions: String; let revision: Int; let make: String?; let window: MapObservationWindow
-        let x: Double?; let y: Double?; let width: Double?; let height: Double?
+        /// Coarse on purpose: a small pan keeps the same key and does not re-run the fold.
+        let viewport: ViewportSnap?
     }
 
     // Geometry and labels have immutable coordinates/titles before publication;
@@ -1007,6 +1123,8 @@ struct CountyZIPDrill: View {
         let areas: [MKOverlay]
         let labels: [ZIPAreaLabel]
         let visible: Set<String>
+        let live: LiveActivity?
+        let pulses: [ZIPPulseAnnotation]
     }
 
     private func selectCounty(_ fips: String) {
@@ -1029,6 +1147,7 @@ struct CountyZIPDrill: View {
     private func project() async {
         let keys = readCounties; let partitions = reader.partitions; let bounds = viewport?.bounds
         let selectedMake = make; let window = period; let needsRows = rowCounties
+        let windowKey = window.cacheKey
         projectionBusy = true
         let task = Task.detached(priority: .userInitiated) {
             let start = Date()
@@ -1036,6 +1155,7 @@ struct CountyZIPDrill: View {
             var rows: [CountyLocationRow] = []; var shapes: [MKOverlay] = []; var labels: [ZIPAreaLabel] = []
             var membership: [String: Set<String>] = [:]; var visible = Set<String>()
             var countRows: [ZIPCountRow] = []; var summaryRows: [CountyLocationRow] = []
+            var activityRows: [ZIPActivityRow] = []; var activityKnown = !keys.isEmpty
             for key in keys.sorted() {
                 guard let partition = partitions[key] else { continue }
                 let fresh = partition.rows.filter { seenRows.insert($0.id).inserted }
@@ -1044,7 +1164,12 @@ struct CountyZIPDrill: View {
                 // (or a date window needs them); raw rows still back the drill-down summary.
                 if let counts = partition.countRows, window == .all, !partition.complete, !needsRows.contains(key) {
                     countRows.append(contentsOf: counts)
+                } else if window != .all, window.isServerEligible, !partition.complete, !needsRows.contains(key),
+                          partition.activityKey == windowKey, let activity = partition.activityRows {
+                    // The window is answered by map_zip_activity (auction close dates, UTC days).
+                    countRows.append(contentsOf: activity.filter { $0.windowed > 0 }.map(\.countRow))
                 } else { summaryRows.append(contentsOf: fresh) }
+                if let activity = partition.activityRows { activityRows.append(contentsOf: activity) } else { activityKnown = false }
                 let zips = Set(partition.areas.compactMap { ($0 as? MKShape)?.title })
                 if partition.geometryComplete { membership[key] = zips }
                 let newZIPs = zips.subtracting(seenZIPs)
@@ -1073,14 +1198,28 @@ struct CountyZIPDrill: View {
                 }
                 makes = merged.values.sorted { $0.count == $1.count ? $0.id < $1.id : $0.count > $1.count }
             }
+            // Last-24h signal for the ZIPs on screen. Unknown (nil) until every county in view has answered.
+            var liveResult: LiveActivity?; var pulseDots: [ZIPPulseAnnotation] = []
+            if activityKnown {
+                let fold = LiveActivityFold.fold(activityRows, make: selectedMake, crosswalk: CountyEvidenceSummary.zipCounties,
+                                                 countyZIPs: membership, visible: visible)
+                liveResult = fold.total
+                var centers: [String: CLLocationCoordinate2D] = [:]
+                for label in labels where centers[label.zip] == nil { centers[label.zip] = label.coordinate }
+                pulseDots = fold.byZIP.sorted { $0.value.fresh == $1.value.fresh ? $0.key < $1.key : $0.value.fresh > $1.value.fresh }
+                    .prefix(40).compactMap { zip, activity in
+                        centers[zip].map { ZIPPulseAnnotation(zip: zip, coordinate: $0, fresh: activity.fresh, sold: activity.sold, listed: activity.listed) }
+                    }
+            }
             NSLog("NukeCapture viewport fold: %d counties, %d records, %d count rows, %.3f seconds", keys.count, rows.count, countRows.count, Date().timeIntervalSince(start))
             return Projection(summary: result, counts: counts, visibleVehicles: rowVehicles + rpcVehicles, makes: makes, rows: rows,
-                              areas: shapes, labels: labels, visible: visible)
+                              areas: shapes, labels: labels, visible: visible, live: liveResult, pulses: pulseDots)
         }
         let result = await withTaskCancellationHandler(operation: { await task.value }, onCancel: { task.cancel() })
         guard !Task.isCancelled else { return }
         summary = result.summary; availableMakes = result.makes; observations = result.rows
         areas = result.areas; areaLabels = result.labels; visibleZIPs = result.visible
+        live = result.live; pulses = result.pulses
         counts = result.counts; visibleVehicles = result.visibleVehicles
         earliest = observations.compactMap { $0.auctionClock.date }.min()
         latest = observations.compactMap { $0.auctionClock.date }.max()
@@ -1107,6 +1246,8 @@ struct MapDateWindowPicker: View {
         NavigationStack {
             Form {
                 Section {
+                    Button("Last 7 days") { window = .lastDays(7); dismiss() }
+                    Button("Last 30 days") { window = .lastDays(30); dismiss() }
                     Button("All time") { window = .all; dismiss() }
                     DatePicker("From", selection: $start, displayedComponents: .date)
                     DatePicker("Through", selection: $end, in: start..., displayedComponents: .date)
@@ -1972,6 +2113,7 @@ struct CountyChoropleth: UIViewRepresentable {
     var focus: MKMapRect? = nil
     var highlighted: String? = nil
     var areaLabels: [ZIPAreaLabel] = []
+    var pulses: [ZIPPulseAnnotation] = []
     var drawsAreas = true
     var onScaleChange: ((GeographicScale) -> Void)? = nil
     var onViewportChange: ((ZIPMapViewport) -> Void)? = nil
@@ -2004,6 +2146,7 @@ struct CountyChoropleth: UIViewRepresentable {
         context.coordinator.parent = self
         context.coordinator.applyGeometry(map)
         context.coordinator.applyCountsIfReady(map)
+        context.coordinator.applyPulses(map)
     }
 
     final class Coordinator: NSObject, MKMapViewDelegate {
@@ -2012,6 +2155,7 @@ struct CountyChoropleth: UIViewRepresentable {
         private var appliedHighlight: String?
         private var suppliedIDs: [ObjectIdentifier] = []
         private var labelIDs: [String] = []
+        private var pulseIDs: [String] = []
         private var renderedBands: [Int: MKMultiPolygon] = [:]
         private var bandMembers: [Int: [ObjectIdentifier]] = [:]
         private var selectionOverlay: MKMultiPolygon?
@@ -2080,9 +2224,18 @@ struct CountyChoropleth: UIViewRepresentable {
             }
             let keys = labels.map { "\($0.zip):\(parent.counts[$0.zip, default: 0]):\($0.zip == parent.highlighted)" }
             if keys != labelIDs {
-                map.removeAnnotations(map.annotations); labelIDs = keys
+                map.removeAnnotations(map.annotations.filter { $0 is ZIPAreaLabel }); labelIDs = keys
                 map.addAnnotations(labels)
             }
+        }
+
+        /// Pulsing dots for ZIPs with real last-24h activity; replaced only when the set actually changes.
+        func applyPulses(_ map: MKMapView) {
+            let keys = parent.pulses.map(\.key)
+            guard keys != pulseIDs else { return }
+            pulseIDs = keys
+            map.removeAnnotations(map.annotations.filter { $0 is ZIPPulseAnnotation })
+            map.addAnnotations(parent.pulses)
         }
 
         private func polygons(_ overlay: MKOverlay) -> [MKPolygon] {
@@ -2153,6 +2306,13 @@ struct CountyChoropleth: UIViewRepresentable {
         }
 
         func mapView(_ mapView: MKMapView, viewFor annotation: MKAnnotation) -> MKAnnotationView? {
+            if let pulse = annotation as? ZIPPulseAnnotation {
+                let view = (mapView.dequeueReusableAnnotationView(withIdentifier: "zip-pulse") as? ZIPPulseView)
+                    ?? ZIPPulseView(annotation: pulse, reuseIdentifier: "zip-pulse")
+                view.annotation = pulse
+                view.configure(pulse)
+                return view
+            }
             guard let area = annotation as? ZIPAreaLabel else { return nil }
             let view = mapView.dequeueReusableAnnotationView(withIdentifier: "zip-name") ?? MKAnnotationView(annotation: area, reuseIdentifier: "zip-name")
             view.annotation = area
@@ -2172,6 +2332,10 @@ struct CountyChoropleth: UIViewRepresentable {
 
         func mapView(_ mapView: MKMapView, didSelect annotation: MKAnnotation) {
             if let area = annotation as? ZIPAreaLabel { parent.onTap(area.zip) }
+            if let pulse = annotation as? ZIPPulseAnnotation {
+                mapView.deselectAnnotation(pulse, animated: false)
+                parent.onTap(pulse.zip)
+            }
         }
 
         func mapView(_ mapView: MKMapView, regionDidChangeAnimated animated: Bool) {
