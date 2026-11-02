@@ -369,6 +369,11 @@ final class AttributionEngine: ObservableObject {
             lastSummary = "Native source reading remains pending; upload follow-up was retained."
             return false
         }
+        guard SupabaseService.currentUserId == userId, !Task.isCancelled else { return false }
+        // A retained unresolved source/privacy read changes the inspection surface even
+        // when no identity is qualified and no photo is filed. Failed/document-only
+        // passes never publish this event.
+        if !remoteReads.isEmpty { NotificationCenter.default.post(name: SubjectResolutionEngine.didChange, object: nil) }
         for signal in acknowledgedReads {
             for source in acknowledgedSources where source.matches(assetID: signal.row.exif_data?.uuid,
                 sha256: signal.row.file_hash, userID: userId, methodVersion: method) {
