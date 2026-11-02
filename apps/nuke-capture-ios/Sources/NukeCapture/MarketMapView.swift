@@ -1498,7 +1498,7 @@ struct ZIPActivityView: View {
                                 NavigationLink {
                                     MarketSellerView(handle: seller.name, area: group.id, areaListings: seller.listings.count)
                                 } label: {
-                                    LabeledContent(seller.name, value: seller.listings.count.formatted())
+                                    LabeledContent(seller.name, value: "\(seller.listings.count.formatted()) in ZIP")
                                 }
                             }
                         }
@@ -1820,10 +1820,11 @@ struct MarketSellerView: View {
                 Text(handle).font(.title.bold())
                 Text("Bring a Trailer account").foregroundStyle(.secondary)
                 if let area, let areaListings {
-                    Text("\(areaListings) captured listings connect this account to ZIP \(area). The account's full captured history is shown below.")
+                    Text("\(areaListings) captured listings connect this account to ZIP \(area). Its full captured history is shown below, not just this ZIP.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
             }
+            SellerMarketProfileSections(handle: handle, areaListings: areaListings, area: area)
             if loading { ProgressView("Reading captured seller history") }
             if failed { Button("Seller history couldn't load · Retry") { Task { await load() } } }
             if !loading && !failed {
