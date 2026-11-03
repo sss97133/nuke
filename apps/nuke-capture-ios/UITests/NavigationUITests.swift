@@ -95,4 +95,45 @@ final class NavigationUITests: XCTestCase {
         back.tap()
         XCTAssertTrue(person.waitForExistence(timeout: 5), "returning must preserve the search results")
     }
+
+    /// The first-launch welcome (rooted directly; fixture launches skip it in the real root so
+    /// every other test still opens on what it expects). Four pages, then the way in.
+    func testWelcomeShowsFourPagesThenTheWayIn() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-NukeFixtureBackend", "1", "-NukeFixturePersona", "visitor"]
+        app.launchEnvironment["NUKE_FIXTURE_SCENARIO"] = "navigation-garage"
+        app.launchEnvironment["NUKE_DEBUG_SCREEN"] = "welcome"
+        app.launch()
+        XCTAssertTrue(app.staticTexts["Find work near you."].waitForExistence(timeout: 12))
+        XCTAssertTrue(app.staticTexts["LinkedIn plus Uber for car guys."].exists)
+        XCTAssertFalse(app.buttons["welcome.lookAround"].exists, "the way in comes on the last page")
+        let next = app.buttons["welcome.next"]
+        XCTAssertTrue(next.waitForExistence(timeout: 5))
+        for (n, headline) in ["Show off your work.", "Hire a tech.", "See what cars really sell for."].enumerated() {
+            // The dots say which page is showing; the headline must be on screen too.
+            let dots = app.descendants(matching: .any)["Page \(n + 2) of 4"]
+            let target = app.staticTexts[headline]
+            next.tap()
+            if !(dots.waitForExistence(timeout: 5) && target.waitForExistence(timeout: 5)) {
+                // Next did not turn the page. Find out whether a second tap or a swipe does,
+                // and put the accessibility tree on ONE line (CI only keeps "error:" lines).
+                let tree = app.debugDescription.replacingOccurrences(of: "\n", with: " | ")
+                next.tap()
+                let retried = target.waitForExistence(timeout: 5)
+                var swiped = false
+                if !retried {
+                    app.swipeLeft()
+                    swiped = target.waitForExistence(timeout: 5)
+                }
+                XCTFail("Next did not advance to \(headline) (second tap \(retried ? "worked" : "failed"), swipe \(swiped ? "worked" : "not needed/failed")). TREE: \(String(tree.prefix(5000)))")
+                return
+            }
+        }
+        XCTAssertTrue(app.buttons["welcome.lookAround"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Get started"].exists, "one clear primary: Get started, via Sign in with Apple")
+        XCTAssertTrue(app.buttons["Look around first"].exists)
+        XCTAssertTrue(app.buttons["welcome.email"].exists)
+        XCTAssertTrue(app.buttons["welcome.apple"].exists || app.buttons["Sign in with Apple"].exists)
+        let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = "welcome-last-page"; shot.lifetime = .keepAlways; add(shot)
+    }
 }
