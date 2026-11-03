@@ -18,6 +18,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
 import { archiveFetch } from '../_shared/archiveFetch.ts';
 import { normalizeListingUrlKey } from '../_shared/listingUrl.ts';
+import { findHagertyVehicleId, hagertyListingKey } from '../_shared/listingKey.ts';
 import { normalizeVehicleFields } from '../_shared/normalizeVehicle.ts';
 import { writeVehicleEventByKey } from '../_shared/vehicleEventWrite.ts';
 import { writeObservation } from '../_shared/observationWriter.ts';
@@ -914,32 +915,55 @@ Deno.serve(async (req) => {
 
       let targetVehicleId = vehicle_id;
 
-      if (vehicle_id) {
+      // Identity of the listing is Hagerty's own id, not the URL (vehicles.discovery_url is lowercased by
+      // vehicles_canonicalize_discovery_url and the slug varies). Look the vehicle up by that key before inserting, so
+      // one listing is one vehicle (2026-11-02: six listings had been imported twice).
+      const listingKey = hagertyListingKey(extracted.url);
+      let matchedBy: 'vehicle_id' | 'listing_key' | 'legacy_url' | null = vehicle_id ? 'vehicle_id' : null;
+      let existingId: string | undefined = vehicle_id;
+      let keyToWrite: string | null = listingKey;
+      if (!existingId && listingKey) {
+        const found = await findHagertyVehicleId(supabase, listingKey);
+        if (found) { existingId = found.id; matchedBy = found.matchedBy; }
+      } else if (existingId && listingKey) {
+        // Caller named the vehicle. Write the key only when no other live vehicle already holds it.
+        const holder = await findHagertyVehicleId(supabase, listingKey, { keyOnly: true });
+        if (holder && holder.id !== existingId) {
+          console.warn(`[hagerty] key ${listingKey} is held by ${holder.id}; not writing it to ${existingId}`);
+          keyToWrite = null;
+        }
+      }
+
+      const updateFields = {
+        year: extracted.year,
+        make: extracted.make,
+        model: extracted.model,
+        vin: extracted.vin || undefined,
+        mileage: extracted.mileage,
+        color: extracted.exterior_color,
+        interior_color: extracted.interior_color,
+        transmission: extracted.transmission,
+        engine_type: extracted.engine,
+        drivetrain: extracted.drivetrain,
+        body_style: extracted.body_style,
+        description: extracted.description,
+        sale_price: extracted.sale_price,
+        high_bid: extracted.current_bid,
+        sale_status: extracted.status === 'sold' ? 'sold' : (extracted.status === 'active' ? 'available' : 'ended'),
+        ...(keyToWrite ? { source_listing_key: keyToWrite } : {}),
+      };
+
+      if (existingId) {
         // Update existing vehicle
         const { error: updateError } = await supabase
           .from('vehicles')
-          .update({
-            year: extracted.year,
-            make: extracted.make,
-            model: extracted.model,
-            vin: extracted.vin || undefined,
-            mileage: extracted.mileage,
-            color: extracted.exterior_color,
-            interior_color: extracted.interior_color,
-            transmission: extracted.transmission,
-            engine_type: extracted.engine,
-            drivetrain: extracted.drivetrain,
-            body_style: extracted.body_style,
-            description: extracted.description,
-            sale_price: extracted.sale_price,
-            high_bid: extracted.current_bid,
-            sale_status: extracted.status === 'sold' ? 'sold' : (extracted.status === 'active' ? 'available' : 'ended'),
-          })
-          .eq('id', vehicle_id);
+          .update(updateFields)
+          .eq('id', existingId);
 
         if (updateError) throw new Error(`Failed to update vehicle: ${updateError.message}`);
-        console.log(`[hagerty] Updated vehicle: ${vehicle_id}`);
-        extracted.vehicle_id = vehicle_id;
+        console.log(`[hagerty] Updated vehicle: ${existingId} (matched by ${matchedBy})`);
+        extracted.vehicle_id = existingId;
+        targetVehicleId = existingId;
       } else {
         // Insert new vehicle
         const { data, error } = await supabase
@@ -963,17 +987,32 @@ Deno.serve(async (req) => {
             profile_origin: 'hagerty_import',
             discovery_url: extracted.url,
             discovery_source: 'hagerty',
+            source_listing_key: listingKey,
             is_public: true,
             sale_status: extracted.status === 'sold' ? 'sold' : (extracted.status === 'active' ? 'available' : 'ended'),
           })
           .select()
           .maybeSingle();
 
-        if (error) throw new Error(`Failed to insert vehicle: ${error?.message || error}`);
-        console.log(`[hagerty] Created vehicle: ${data.id}`);
-        extracted.vehicle_id = data.id;
-        targetVehicleId = data.id;
+        if (error && (error as { code?: string }).code === '23505' && listingKey) {
+          // Lost a race with a concurrent import of the same listing: the unique index on source_listing_key says the
+          // vehicle exists now. Update it instead of failing.
+          const raced = await findHagertyVehicleId(supabase, listingKey, { keyOnly: true });
+          if (!raced) throw new Error(`Failed to insert vehicle: ${error.message}`);
+          const { error: raceUpdateError } = await supabase.from('vehicles').update(updateFields).eq('id', raced.id);
+          if (raceUpdateError) throw new Error(`Failed to update vehicle: ${raceUpdateError.message}`);
+          console.log(`[hagerty] Updated vehicle after insert race: ${raced.id}`);
+          matchedBy = 'listing_key';
+          extracted.vehicle_id = raced.id;
+          targetVehicleId = raced.id;
+        } else {
+          if (error) throw new Error(`Failed to insert vehicle: ${error?.message || error}`);
+          console.log(`[hagerty] Created vehicle: ${data.id}`);
+          extracted.vehicle_id = data.id;
+          targetVehicleId = data.id;
+        }
       }
+      (extracted as { matched_by?: string | null }).matched_by = matchedBy;
 
       // Fire-and-forget observation write
       if (targetVehicleId) {
@@ -1321,6 +1360,7 @@ Deno.serve(async (req) => {
       _fetch: { source: fetchSource },
       _db: (save_to_db || vehicle_id) ? {
         vehicle_saved: !!extracted.vehicle_id,
+        matched_by: (extracted as { matched_by?: string | null }).matched_by ?? null,
         images_saved: imagesSaved,
         vehicle_event_saved: externalListingSaved,
         identities_saved: identitiesSaved || [],
