@@ -121,6 +121,7 @@ final class NavigationUITests: XCTestCase {
             }
         }
         XCTAssertTrue(app.buttons["welcome.lookAround"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Get started"].exists, "one clear primary: Get started, via Sign in with Apple")
         XCTAssertTrue(app.buttons["Look around first"].exists)
         XCTAssertTrue(app.buttons["welcome.email"].exists)
         XCTAssertTrue(app.buttons["welcome.apple"].exists || app.buttons["Sign in with Apple"].exists)

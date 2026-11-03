@@ -52,7 +52,7 @@ struct WelcomeView: View {
 
     private let pages = WelcomePage.all
     /// Room the page text leaves for the controls pinned at the bottom.
-    private let controlsReserve: CGFloat = 290
+    private let controlsReserve: CGFloat = 310
 
     private var isLast: Bool { page == pages.count - 1 }
 
@@ -184,11 +184,23 @@ struct WelcomeView: View {
 
             if isLast {
                 if let errorMessage {
+                    // Stays on this page, in plain words, until the next attempt.
                     Text(errorMessage)
-                        .font(.callout)
-                        .foregroundStyle(.red)
+                        .font(.callout.weight(.semibold))
+                        .foregroundStyle(.white)
                         .multilineTextAlignment(.center)
+                        .padding(12)
+                        .frame(maxWidth: .infinity)
+                        .background(Color.red.opacity(0.55), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .accessibilityIdentifier("welcome.error")
                 }
+
+                // The one primary action. Apple's own button (its label is fixed by Apple's
+                // guidelines): Face ID or a passkey, no browser hop, no password to type.
+                Text("Get started")
+                    .font(.title2.weight(.bold))
+                    .foregroundStyle(.white)
+                    .accessibilityAddTraits(.isHeader)
 
                 SignInWithAppleButton(.signIn) { request in
                     appleNonce = AppleSignIn.prepare(request)
@@ -214,9 +226,7 @@ struct WelcomeView: View {
                     Text("Look around first")
                         .font(.headline)
                         .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity, minHeight: 54)
-                        .background(.white.opacity(0.22), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(.white.opacity(0.6), lineWidth: 1))
+                        .frame(maxWidth: .infinity, minHeight: 48)
                 }
                 .disabled(isWorking)
                 .accessibilityIdentifier("welcome.lookAround")

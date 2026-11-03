@@ -16,14 +16,31 @@ enum AppleSignIn {
         return nonce
     }
 
+    static let offlineFailure = "You seem to be offline. Check your connection and try again."
+    static let genericFailure = "We couldn't sign you in just now. Please try again, or use email instead."
+
+    /// What to tell the person when sign-in fails: plain words, never a raw error string.
+    /// nil when they simply dismissed Apple's sheet (not a failure worth a message).
+    static func friendlyMessage(for error: Error) -> String? {
+        if let authError = error as? ASAuthorizationError, authError.code == .canceled { return nil }
+        if let urlError = error as? URLError {
+            switch urlError.code {
+            case .notConnectedToInternet, .networkConnectionLost, .timedOut, .cannotFindHost, .cannotConnectToHost, .dataNotAllowed:
+                return offlineFailure
+            default:
+                break
+            }
+        }
+        return genericFailure
+    }
+
     /// Finish a sign-in. Returns the message to show, or nil on success or when the person
     /// simply dismissed Apple's sheet. SessionStore flips the root view on the auth change.
     @MainActor
     static func complete(_ result: Result<ASAuthorization, Error>, nonce: String?) async -> String? {
         switch result {
         case .failure(let error):
-            if let authError = error as? ASAuthorizationError, authError.code == .canceled { return nil }
-            return error.localizedDescription
+            return friendlyMessage(for: error)
 
         case .success(let authorization):
             guard
@@ -32,7 +49,7 @@ enum AppleSignIn {
                 let idToken = String(data: tokenData, encoding: .utf8),
                 let nonce
             else {
-                return "Apple returned no identity token — try again."
+                return genericFailure
             }
             // Apple gives the name once. Hold it before the network call so a failed exchange
             // does not lose it.
@@ -46,7 +63,8 @@ enum AppleSignIn {
                 }
                 return nil
             } catch {
-                return error.localizedDescription
+                NSLog("NukeCapture: Apple sign-in exchange failed: %@", String(describing: error))
+                return friendlyMessage(for: error)
             }
         }
     }

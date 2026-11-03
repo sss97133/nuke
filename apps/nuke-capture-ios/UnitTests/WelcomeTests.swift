@@ -1,6 +1,7 @@
 // WelcomeTests.swift — the first-launch flag logic, the welcome copy, the photo pick, and the
 // handling of the full name Apple provides once.
 
+import AuthenticationServices
 import XCTest
 @testable import NukeCapture
 
@@ -169,5 +170,25 @@ final class ProfileDisplayNameTests: XCTestCase {
         store.stashPending(name: "Ada Lovelace", appleUser: "apple-1")
         store.commit(appleUser: "apple-2", newName: nil, userId: "u2")
         XCTAssertNil(store.saved(for: "u2"))
+    }
+}
+
+final class AppleSignInMessageTests: XCTestCase {
+    func testDismissingAppleSheetIsNotAFailure() {
+        XCTAssertNil(AppleSignIn.friendlyMessage(for: ASAuthorizationError(.canceled)))
+    }
+
+    func testOfflineErrorsSayTheyAreOffline() {
+        for code in [URLError.Code.notConnectedToInternet, .networkConnectionLost, .timedOut] {
+            XCTAssertEqual(AppleSignIn.friendlyMessage(for: URLError(code)), AppleSignIn.offlineFailure)
+        }
+    }
+
+    func testAnyOtherFailureGetsAPlainMessageNotTheRawError() {
+        let raw = NSError(domain: "AuthError", code: 7, userInfo: [NSLocalizedDescriptionKey: "jwt malformed: kid mismatch"])
+        let message = AppleSignIn.friendlyMessage(for: raw)
+        XCTAssertEqual(message, AppleSignIn.genericFailure)
+        XCTAssertFalse(message?.contains("jwt") ?? true)
+        XCTAssertEqual(AppleSignIn.friendlyMessage(for: ASAuthorizationError(.failed)), AppleSignIn.genericFailure)
     }
 }
