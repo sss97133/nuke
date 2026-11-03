@@ -918,7 +918,7 @@ Deno.serve(async (req) => {
       // Identity of the listing is Hagerty's own id, not the URL (vehicles.discovery_url is lowercased by
       // vehicles_canonicalize_discovery_url and the slug varies). Look the vehicle up by that key before inserting, so
       // one listing is one vehicle (2026-11-02: six listings had been imported twice).
-      // (Deployed only after idx_vehicles_source_listing_key_unique is valid: the key lookup needs that index.)
+      // (The key lookup needs idx_vehicles_source_listing_key_unique, valid since 2026-11-02 16:3x PST; first deployed after the CLI 3 config fix.)
       const listingKey = hagertyListingKey(extracted.url);
       let matchedBy: 'vehicle_id' | 'listing_key' | 'legacy_url' | null = vehicle_id ? 'vehicle_id' : null;
       let existingId: string | undefined = vehicle_id;
