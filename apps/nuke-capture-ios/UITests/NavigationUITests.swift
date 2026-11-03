@@ -110,8 +110,15 @@ final class NavigationUITests: XCTestCase {
         let next = app.buttons["welcome.next"]
         XCTAssertTrue(next.waitForExistence(timeout: 5))
         for headline in ["Show off your work.", "Hire a tech.", "See what cars really sell for."] {
+            let target = app.staticTexts[headline]
             next.tap()
-            XCTAssertTrue(app.staticTexts[headline].waitForExistence(timeout: 5), headline)
+            if !target.waitForExistence(timeout: 5) {
+                // Next did not turn the page; a swipe must (the pages are swipeable).
+                app.swipeLeft()
+                let swiped = target.waitForExistence(timeout: 5)
+                XCTFail("Next did not advance to \(headline) (swipe \(swiped ? "worked" : "failed too")). \(String(app.debugDescription.prefix(2500)))")
+                if !swiped { return }
+            }
         }
         XCTAssertTrue(app.buttons["welcome.lookAround"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["Look around first"].exists)

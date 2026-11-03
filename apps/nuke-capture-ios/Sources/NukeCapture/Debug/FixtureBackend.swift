@@ -60,6 +60,14 @@ enum FixtureBackend {
         "work_order_statement_read", "facility_read", "my_vouches_read", "user_org_relations",
     ]
 
+    /// Explore's anonymous market reads. Explore is the default tab, so they run in every launch that
+    /// reaches the tab bar; they must never show up as writes.
+    static func isMarketRead(_ name: String) -> Bool {
+        name.hasPrefix("market_") || name.hasPrefix("treemap_") || name.hasPrefix("map_zip_")
+            || ["classified_ask_board", "live_finish_estimates", "price_histogram", "vehicles_by_filters",
+                "bat_listing_cohort", "bat_market_baseline", "bat_seller_profile"].contains(name)
+    }
+
     static func isReader(_ name: String) -> Bool {
         readers.contains(name) || name.hasSuffix("_read") || name.hasPrefix("get_") || name.hasPrefix("my_")
     }
@@ -93,7 +101,9 @@ enum FixtureBackend {
             let name = String(path.dropFirst("/rest/v1/rpc/".count))
             let args = (FixtureURLProtocol.body(of: request)).flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] } ?? [:]
             if !isReader(name) {
-                log.record(rpc: name, args: args)
+                // Public market reads (Explore's feed, map and terminal) are not writes: answer as
+                // before but keep them out of the write log the UI tests assert on.
+                if !isMarketRead(name) { log.record(rpc: name, args: args) }
                 return writer(name, args)
             }
             return reader(name, args)
