@@ -109,10 +109,12 @@ final class NavigationUITests: XCTestCase {
         XCTAssertFalse(app.buttons["welcome.lookAround"].exists, "the way in comes on the last page")
         let next = app.buttons["welcome.next"]
         XCTAssertTrue(next.waitForExistence(timeout: 5))
-        for headline in ["Show off your work.", "Hire a tech.", "See what cars really sell for."] {
+        for (n, headline) in ["Show off your work.", "Hire a tech.", "See what cars really sell for."].enumerated() {
+            // The dots say which page is showing; the headline must be on screen too.
+            let dots = app.descendants(matching: .any)["Page \(n + 2) of 4"]
             let target = app.staticTexts[headline]
             next.tap()
-            if !target.waitForExistence(timeout: 5) {
+            if !(dots.waitForExistence(timeout: 5) && target.waitForExistence(timeout: 5)) {
                 // Next did not turn the page. Find out whether a second tap or a swipe does,
                 // and put the accessibility tree on ONE line (CI only keeps "error:" lines).
                 let tree = app.debugDescription.replacingOccurrences(of: "\n", with: " | ")

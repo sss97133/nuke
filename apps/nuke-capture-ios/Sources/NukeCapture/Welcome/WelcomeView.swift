@@ -44,7 +44,10 @@ struct WelcomeView: View {
     @AppStorage("exploreMode") private var exploreMode = false
     @AppStorage(WelcomeGate.seenKey) private var welcomeSeen = false
     @StateObject private var photos = WelcomePhotoModel(pages: WelcomePage.all.count)
-    @State private var page = 0
+    /// Which page is showing. Driven by a scroll position (not a page-style TabView, whose
+    /// selection did not follow programmatic changes: the dots moved but the photo did not).
+    @State private var position: Int? = 0
+    private var page: Int { position ?? 0 }
     @State private var isWorking = false
     @State private var errorMessage: String?
     /// Raw nonce for the in-flight Apple request (its hash rides in the request).
@@ -59,12 +62,19 @@ struct WelcomeView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                TabView(selection: $page) {
-                    ForEach(pages.indices, id: \.self) { index in
-                        pageView(index).tag(index)
+                ScrollView(.horizontal) {
+                    LazyHStack(spacing: 0) {
+                        ForEach(pages.indices, id: \.self) { index in
+                            pageView(index)
+                                .containerRelativeFrame(.horizontal)
+                                .id(index)
+                        }
                     }
+                    .scrollTargetLayout()
                 }
-                .tabViewStyle(.page(indexDisplayMode: .never))
+                .scrollTargetBehavior(.paging)
+                .scrollPosition(id: $position)
+                .scrollIndicators(.hidden)
                 .ignoresSafeArea()
 
                 VStack(spacing: 0) {
@@ -149,7 +159,7 @@ struct WelcomeView: View {
             Spacer()
             if !isLast {
                 Button {
-                    withAnimation { page = pages.count - 1 }
+                    withAnimation { position = pages.count - 1 }
                 } label: {
                     Text("Skip")
                         .font(.headline)
@@ -244,7 +254,7 @@ struct WelcomeView: View {
                 .accessibilityIdentifier("welcome.email")
             } else {
                 Button {
-                    withAnimation { page += 1 }
+                    withAnimation { position = min(page + 1, pages.count - 1) }
                 } label: {
                     Text("Next")
                         .font(.headline)
