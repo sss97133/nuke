@@ -9,9 +9,10 @@
 //      so foreground + periodic background refresh is the heartbeat. The
 //      common path is the honest one: the owner takes photos at the shop,
 //      opens the app (or iOS wakes it within hours), photos upload.
-//   4. Route: signed out → SignInView (the constellation; its Explore path
-//      flips exploreMode), exploring → MainTabView (read-only Map + sample
-//      profile), signed in + ignition pending → IgnitionView (first-run
+//   4. Route: signed out on a fresh install → WelcomeView (once; its "Look around
+//      first" flips exploreMode), signed out otherwise → SignInView (the
+//      constellation; its "Look around first" path flips exploreMode),
+//      exploring → MainTabView (read-only Map + sample profile), signed in + ignition pending → IgnitionView (first-run
 //      full-library scan), signed in + ignition complete → MainTabView
 //      (MAP · PROFILE · TODAY).
 
@@ -43,6 +44,8 @@ struct NukeCaptureApp: App {
     /// The constellation's Explore path — the app without auth (read-only
     /// Map + sample profile). Cleared by the Profile tab's Sign In door.
     @AppStorage("exploreMode") private var exploreMode = false
+    /// The first-launch welcome has been seen (or the user signed in). See WelcomeGate.
+    @AppStorage(WelcomeGate.seenKey) private var welcomeSeen = false
 
     init() {
         // Must happen during launch: registering after didFinishLaunching
@@ -71,6 +74,9 @@ struct NukeCaptureApp: App {
                     // NUKE_DEBUG_COHORT="year|make|model" roots on the cohort terminal
                     // so the screenshot loop lands on it without tab/tap navigation.
                     DebugCohortDeepLink(spec: dbgCohort)
+                } else if ProcessInfo.processInfo.environment["NUKE_DEBUG_SCREEN"] == "welcome" {
+                    // The first-launch welcome alone (UI test + screenshot loop). DEBUG only.
+                    WelcomeView()
                 } else if ProcessInfo.processInfo.environment["NUKE_DEBUG_SCREEN"] == "explore" {
                     // Explore is anon/self-contained (its own NavigationStack) — root
                     // straight on it for the market-pulse screenshot. DEBUG only.
@@ -285,10 +291,27 @@ struct NukeCaptureApp: App {
                     // Explore: the populated world, read-only. No Today tab
                     // (no grant), Sign In one tap away in Profile.
                     MainTabView()
+                } else if WelcomeGate.shouldShow(seen: welcomeSeen, signedIn: false, exploring: false, skip: Self.skipsWelcome) {
+                    // Fresh install: say what the app is before asking for anything.
+                    WelcomeView()
                 } else {
                     SignInView()
                 }
         }
+        // Signed in by any route (Apple, email, a restored session) means the welcome is done;
+        // signing out later lands on SignInView, not the tour.
+        .onChange(of: session.isSignedIn, initial: true) { _, signedIn in
+            if signedIn { welcomeSeen = true }
+        }
+    }
+
+    /// UI-test / fixture launches never see the welcome.
+    private static var skipsWelcome: Bool {
+        #if DEBUG
+        return WelcomeGate.launchSkips(arguments: ProcessInfo.processInfo.arguments, fixtureActive: FixtureBackend.isActive)
+        #else
+        return false
+        #endif
     }
 
     // ─── BGTaskScheduler plumbing ────────────────────────────────────────────

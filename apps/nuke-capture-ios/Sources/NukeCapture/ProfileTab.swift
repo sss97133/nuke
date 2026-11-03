@@ -658,6 +658,15 @@ struct ProfileView: View {
         }
     }
 
+    /// The profile's name, or — for your own profile when the server's name is blank or an
+    /// auto-generated stand-in — the full name Apple gave at first sign-in, kept on this phone.
+    private var displayName: String? {
+        ProfileDisplayName.resolve(
+            profileName: profile?.full_name,
+            email: isOwn ? SupabaseService.currentUserEmail : nil,
+            savedName: isOwn ? ProfileDisplayName().saved(for: userId) : nil)
+    }
+
     // ─── Identity header — the builder, front and center ─────────────────────
     @ViewBuilder private var identityHeader: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -675,7 +684,7 @@ struct ProfileView: View {
                 .clipShape(Circle())
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(profile?.full_name ?? (profileSettled ? "Unnamed builder" : "…"))
+                    Text(displayName ?? (profileSettled ? "Unnamed builder" : "…"))
                         .font(.title2.weight(.bold))
                         .foregroundStyle(Color.primary)
                         .lineLimit(1)
