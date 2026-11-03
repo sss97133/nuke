@@ -95,4 +95,28 @@ final class NavigationUITests: XCTestCase {
         back.tap()
         XCTAssertTrue(person.waitForExistence(timeout: 5), "returning must preserve the search results")
     }
+
+    /// The first-launch welcome (rooted directly; fixture launches skip it in the real root so
+    /// every other test still opens on what it expects). Four pages, then the way in.
+    func testWelcomeShowsFourPagesThenTheWayIn() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-NukeFixtureBackend", "1", "-NukeFixturePersona", "visitor"]
+        app.launchEnvironment["NUKE_FIXTURE_SCENARIO"] = "navigation-garage"
+        app.launchEnvironment["NUKE_DEBUG_SCREEN"] = "welcome"
+        app.launch()
+        XCTAssertTrue(app.staticTexts["Find work near you."].waitForExistence(timeout: 12))
+        XCTAssertTrue(app.staticTexts["LinkedIn plus Uber for car guys."].exists)
+        XCTAssertFalse(app.buttons["welcome.lookAround"].exists, "the way in comes on the last page")
+        let next = app.buttons["welcome.next"]
+        XCTAssertTrue(next.waitForExistence(timeout: 5))
+        for headline in ["Show off your work.", "Hire a tech.", "See what cars really sell for."] {
+            next.tap()
+            XCTAssertTrue(app.staticTexts[headline].waitForExistence(timeout: 5), headline)
+        }
+        XCTAssertTrue(app.buttons["welcome.lookAround"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Look around first"].exists)
+        XCTAssertTrue(app.buttons["welcome.email"].exists)
+        XCTAssertTrue(app.buttons["welcome.apple"].exists || app.buttons["Sign in with Apple"].exists)
+        let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = "welcome-last-page"; shot.lifetime = .keepAlways; add(shot)
+    }
 }

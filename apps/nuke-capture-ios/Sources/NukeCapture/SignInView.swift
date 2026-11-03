@@ -8,7 +8,7 @@
 //                            configured; disabled placeholders risk a 2.1
 //                            App Review rejection)
 //   Continue with email     (same account as nuke.ag)
-//   Explore                 (no auth — read-only Map + sample profile;
+//   Look around first       (no auth — read-only Map + sample profile;
 //                            not-signing-in is not a dead end)
 //
 // SIWA nonce dance: a fresh random nonce is SHA-256-hashed into the Apple
@@ -45,10 +45,7 @@ struct SignInView: View {
                 Spacer()
 
                 SignInWithAppleButton(.signIn) { request in
-                    let nonce = AppleNonce.random()
-                    appleNonce = nonce
-                    request.requestedScopes = [.fullName, .email]
-                    request.nonce = AppleNonce.sha256(nonce)
+                    appleNonce = AppleSignIn.prepare(request)
                 } onCompletion: { result in
                     handleAppleSignIn(result)
                 }
@@ -98,9 +95,10 @@ struct SignInView: View {
                         .multilineTextAlignment(.center)
                 }
 
-                Button("Explore") {
+                Button("Look around first") {
                     exploreMode = true
                 }
+                .font(.body)
                 .padding(.top, 12)
                 .disabled(isWorking)
             }
@@ -129,36 +127,15 @@ struct SignInView: View {
     }
 
     private func handleAppleSignIn(_ result: Result<ASAuthorization, Error>) {
-        switch result {
-        case .failure(let error):
-            // User dismissing the Apple sheet is not an error worth showing.
-            if let authError = error as? ASAuthorizationError, authError.code == .canceled {
-                return
-            }
-            errorMessage = error.localizedDescription
-
-        case .success(let authorization):
-            guard
-                let credential = authorization.credential as? ASAuthorizationAppleIDCredential,
-                let tokenData = credential.identityToken,
-                let idToken = String(data: tokenData, encoding: .utf8),
-                let nonce = appleNonce
-            else {
-                errorMessage = "Apple returned no identity token — try again."
-                return
-            }
-            appleNonce = nil
-            isWorking = true
-            errorMessage = nil
-            Task {
-                do {
-                    try await SupabaseService.signInWithApple(idToken: idToken, nonce: nonce)
-                    // SessionStore flips the root view on auth change.
-                } catch {
-                    errorMessage = error.localizedDescription
-                }
-                isWorking = false
-            }
+        let nonce = appleNonce
+        appleNonce = nil
+        isWorking = true
+        errorMessage = nil
+        Task {
+            // Shared with the welcome flow: nonce check, Supabase exchange, and keeping the
+            // full name Apple only gives once. SessionStore flips the root view on auth change.
+            errorMessage = await AppleSignIn.complete(result, nonce: nonce)
+            isWorking = false
         }
     }
 }
@@ -451,7 +428,11 @@ struct AccountView: View {
                 // less alarming than the modal sheet but still requires an
                 // explicit tap on the red button to proceed.
                 Button("Delete Account", role: .destructive) {
-                    run { try await SupabaseService.requestAccountDeletion() }
+                    run {
+                        let userId = SupabaseService.currentUserId
+                        try await SupabaseService.requestAccountDeletion()
+                        if let userId { ProfileDisplayName().forget(userId: userId) }
+                    }
                 }
                 Button("Cancel", role: .cancel) {}
             } message: {

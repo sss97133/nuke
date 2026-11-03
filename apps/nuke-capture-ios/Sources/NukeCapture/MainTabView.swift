@@ -11,10 +11,10 @@
 //            cohort market terminal — reachable signed-out, no wall. An anon
 //            visitor lands here; "not signing in" is never a dead end (Sign In
 //            lives in the Profile toolbar). It remains the leftmost destination
-//            for a visitor; the owner's Library and Garage precede it.
+//            for a visitor; the owner's Library and Garage precede it. Explore
+//            is also the first tab selected after sign-in.
 //   PROFILE  the owner's record (own when signed in, the sample in explore
-//            mode); other profiles via handle search. Receipt-first: a
-//            signed-in owner's FIRST landing is still their own record.
+//            mode); other profiles via handle search.
 //   WORK     every signed-in account: signature queue, jobs in motion (each
 //            opens JobView), open requirements. Its Capture section (the
 //            capture gauge + pause toggle, the consent surface, and the
@@ -99,7 +99,7 @@ struct MainTabView: View {
         // Discard another account's navigation and private screen state. Merely
         // returning from a sheet or another tab must preserve the user's place.
         .id(accountScope)
-        .onChange(of: accountScope, initial: true) { _, _ in tab = landingTab() }
+        .onChange(of: accountScope, initial: true) { _, _ in tab = Self.defaultTab }
         .onChange(of: fullAccess) { _, _ in
             tab = Self.availableTab(tab, signedIn: session.isSignedIn, fullAccess: fullAccess)
         }
@@ -124,12 +124,11 @@ struct MainTabView: View {
         )
     }
 
-    /// Signed-in owners land on their LIBRARY (the foundation) when full access
-    /// exists; otherwise their record; anon visitors land on Explore.
-    private func landingTab() -> Tab {
-        if session.isSignedIn { return fullAccess ? .library : .profile }
-        return .explore
-    }
+    /// Everyone lands on Explore: the populated world is the front door for a visitor, and for a
+    /// signed-in owner it is the answer to "what is this app". Library, Garage, Profile and Work
+    /// are one tap away. The first-run photo scan (IgnitionView) runs BEFORE this view exists,
+    /// so a new account still gets its intro and scan first and lands here when it finishes.
+    static let defaultTab: Tab = .explore
 
     static func availableTab(_ selected: Tab, signedIn: Bool, fullAccess: Bool) -> Tab {
         if selected == .library && !(signedIn && fullAccess) { return signedIn ? .profile : .explore }
