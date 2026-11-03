@@ -113,11 +113,18 @@ final class NavigationUITests: XCTestCase {
             let target = app.staticTexts[headline]
             next.tap()
             if !target.waitForExistence(timeout: 5) {
-                // Next did not turn the page; a swipe must (the pages are swipeable).
-                app.swipeLeft()
-                let swiped = target.waitForExistence(timeout: 5)
-                XCTFail("Next did not advance to \(headline) (swipe \(swiped ? "worked" : "failed too")). \(String(app.debugDescription.prefix(2500)))")
-                if !swiped { return }
+                // Next did not turn the page. Find out whether a second tap or a swipe does,
+                // and put the accessibility tree on ONE line (CI only keeps "error:" lines).
+                let tree = app.debugDescription.replacingOccurrences(of: "\n", with: " | ")
+                next.tap()
+                let retried = target.waitForExistence(timeout: 5)
+                var swiped = false
+                if !retried {
+                    app.swipeLeft()
+                    swiped = target.waitForExistence(timeout: 5)
+                }
+                XCTFail("Next did not advance to \(headline) (second tap \(retried ? "worked" : "failed"), swipe \(swiped ? "worked" : "not needed/failed")). TREE: \(String(tree.prefix(5000)))")
+                return
             }
         }
         XCTAssertTrue(app.buttons["welcome.lookAround"].waitForExistence(timeout: 5))
