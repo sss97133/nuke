@@ -59,7 +59,7 @@ DO $$ BEGIN
   EXCEPTION WHEN check_violation THEN RAISE NOTICE 'PASS malformed key refused'; END;
 END $$;
 
-\i supabase/migrations/20261108130100_vehicles_source_listing_key_backfill_hagerty.sql
+\i supabase/migrations/20261108130300_vehicles_source_listing_key_backfill_hagerty_batched.sql
 
 SELECT pg_temp.ok('earliest duplicate keyed, case from origin_metadata',
   (SELECT source_listing_key FROM public.vehicles WHERE id = '00000000-0000-0000-0000-00000000000a') = 'hagerty:2qNtqutlbqCk0DwL0ePQNb');
@@ -76,11 +76,11 @@ SELECT pg_temp.ok('uuid row keyed, no-id row logged skipped_no_id, non-hagerty r
 SELECT pg_temp.ok('nothing but source_listing_key changed',
   NOT EXISTS (SELECT FROM _before b JOIN public.vehicles v USING (id) WHERE (to_jsonb(v) - 'source_listing_key') IS DISTINCT FROM b.j));
 SELECT pg_temp.ok('log has one row per hagerty vehicle', (SELECT count(*) FROM public.source_listing_key_backfill_log WHERE run_id = 'hagerty_listing_key_v1_20261102') = 5);
-\i supabase/migrations/20261108130100_vehicles_source_listing_key_backfill_hagerty.sql
+\i supabase/migrations/20261108130300_vehicles_source_listing_key_backfill_hagerty_batched.sql
 SELECT pg_temp.ok('re-run is a no-op', (SELECT count(*) FROM public.source_listing_key_backfill_log WHERE run_id = 'hagerty_listing_key_v1_20261102') = 5
   AND (SELECT count(*) FROM public.vehicles WHERE source_listing_key IS NOT NULL) = 2);
 
-\i supabase/migrations/20261108130200_vehicles_source_listing_key_unique_index.sql
+\i supabase/migrations/20261108130400_vehicles_source_listing_key_unique_index.sql
 
 SELECT pg_temp.ok('unique index valid', EXISTS (SELECT FROM pg_index WHERE indexrelid = 'public.idx_vehicles_source_listing_key_unique'::regclass AND indisvalid));
 DO $$ BEGIN
@@ -92,7 +92,7 @@ END $$;
 UPDATE public.vehicles SET deleted_at = now() WHERE id = '00000000-0000-0000-0000-00000000000a';
 UPDATE public.vehicles SET source_listing_key = 'hagerty:2qNtqutlbqCk0DwL0ePQNb' WHERE id = '00000000-0000-0000-0000-00000000000b';
 SELECT pg_temp.ok('soft-deleted holder frees the key', (SELECT count(*) FROM public.vehicles WHERE source_listing_key = 'hagerty:2qNtqutlbqCk0DwL0ePQNb' AND deleted_at IS NULL) = 1);
-\i supabase/migrations/20261108130200_vehicles_source_listing_key_unique_index.sql
+\i supabase/migrations/20261108130400_vehicles_source_listing_key_unique_index.sql
 SELECT pg_temp.ok('index migration re-applies', true);
 
 UPDATE public.vehicles SET deleted_at = NULL, source_listing_key = NULL WHERE id = '00000000-0000-0000-0000-00000000000b';

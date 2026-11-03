@@ -1,4 +1,4 @@
--- Revert run hagerty_listing_key_v1_20261102 (20261108130100_vehicles_source_listing_key_backfill_hagerty.sql).
+-- Revert run hagerty_listing_key_v1_20261102 (20261108130300_vehicles_source_listing_key_backfill_hagerty_batched.sql).
 -- Nulls source_listing_key on exactly the vehicles the run set (and only while the key is still the one the run wrote),
 -- and stamps reverted_at on their log rows. Touches no other column. The column, function, log table and index stay;
 -- the schema down script is supabase/rollbacks/20261108130000_vehicles_source_listing_key_down.sql.
