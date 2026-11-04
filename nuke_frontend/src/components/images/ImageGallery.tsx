@@ -4396,7 +4396,10 @@ const ImageGallery = ({
       {/* Image Lightbox - Using proper ImageLightbox component with tags */}
       {lightboxOpen && currentImage && (
         <ImageLightbox
-          imageUrl={getOptimalImageUrl(currentImage, 'full')}
+          imageUrl={/\.(heic|heif)(\?|$)/i.test(String(currentImage?.image_url || currentImage?.storage_path || ''))
+            // HEIC originals don't render in Chrome/Firefox; display a derivative (downloads keep the original).
+            ? (currentImage.large_url || currentImage.medium_url || currentImage.thumbnail_url || getOptimalImageUrl(currentImage, 'full'))
+            : getOptimalImageUrl(currentImage, 'full')}
           imageId={lightboxImageId}
           vehicleId={vehicleId}
           isOpen={lightboxOpen}

@@ -61,6 +61,8 @@ export interface GarageVehicle {
   last_event_at: string | null;
   created_at: string;
   updated_at: string;
+  /** Evidence-driven recency from vehicle_activity (via get_user_garage). */
+  last_activity_at?: string | null;
   relationship_type: RelationshipType;
   relationship_source: 'verification' | 'ownership' | 'permission' | 'contributor' | 'discovered' | 'uploaded_by' | 'owner_statement' | 'profile_record' | 'account_record';
   relationship_roles?: RelationshipType[];
@@ -194,7 +196,7 @@ interface GarageRelationship {
   end_date: string | null;
 }
 
-interface GarageRecord { vehicle_id: string; relationship: string }
+interface GarageRecord { vehicle_id: string; relationship: string; last_activity_at?: string | null }
 
 /** Account membership is broader than ownership. Keep the period/verification
  * fold authoritative while making contributed and created profiles findable. */
@@ -320,7 +322,7 @@ function sortVehicles(a: GarageVehicle, b: GarageVehicle, sort: SortMode): numbe
     }
     case 'RECENT':
     default:
-      return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
+      return new Date(b.last_activity_at ?? b.updated_at).getTime() - new Date(a.last_activity_at ?? a.updated_at).getTime();
   }
 }
 
@@ -331,7 +333,7 @@ function garageToMyVehicle(v: GarageVehicle): MyVehicle {
     make: v.make,
     model: v.model,
     acquisition_date: v.ownership_start_date ?? null,
-    last_activity_date: v.last_event_at ?? v.updated_at ?? null,
+    last_activity_date: v.last_activity_at ?? v.last_event_at ?? v.updated_at ?? null,
     event_count: v.event_count,
     image_count: v.image_count,
     confidence_score: v.confidence_score ?? 0,
@@ -361,7 +363,7 @@ function buildDashboardData(
   const now = Date.now();
   const thirtyDaysAgo = now - 30 * 24 * 60 * 60 * 1000;
   const recentActivity30d = vehicles.filter((v) => {
-    const t = v.last_event_at ?? v.updated_at;
+    const t = v.last_activity_at ?? v.last_event_at ?? v.updated_at;
     return t ? new Date(t).getTime() >= thirtyDaysAgo : false;
   }).length;
   return {
@@ -594,6 +596,12 @@ export function useVehiclesDashboard(userId: string | undefined | null): Vehicle
           (prevOwnedRes.data ?? []).map(row => ({ ...row, vehicle_id: terminalId(row.vehicle_id) })),
         );
         includeGarageRecords(relMap, accountRecords, terminalId);
+        const activityAt = new Map<string, string>();
+        for (const rec of accountRecords) {
+          const id = terminalId(rec.vehicle_id);
+          const t = rec.last_activity_at;
+          if (t && (!activityAt.has(id) || t > activityAt.get(id)!)) activityAt.set(id, t);
+        }
         corrections = corrections.map(row => ({ ...row, vehicle_id: row.vehicle_id ? terminalId(row.vehicle_id) : null }));
         for (const row of corrections) {
           if (row.vehicle_id && !relMap.has(row.vehicle_id)) relMap.set(row.vehicle_id,
@@ -618,7 +626,7 @@ export function useVehiclesDashboard(userId: string | undefined | null): Vehicle
             const rel = relMap.get(id);
             if (!rel || row.deleted_at || row.listing_kind === 'non_vehicle_item' ||
                 (row.status && EXCLUDED_STATUSES.has(row.status))) continue;
-            garage.push(rowToGarageVehicle(row, rel, estimates.get(id), imageCounts.get(id), fallbackImages.get(id), eventWeeksMap.get(id), eventSummaries.get(id)));
+            garage.push({ ...rowToGarageVehicle(row, rel, estimates.get(id), imageCounts.get(id), fallbackImages.get(id), eventWeeksMap.get(id), eventSummaries.get(id)), last_activity_at: activityAt.get(id) ?? null });
           }
           setWarnings([...readWarnings]);
           setRawVehicles(applyGarageOwnerCorrections(garage, corrections));

@@ -231,7 +231,7 @@ const PublicImageGallery: React.FC<PublicImageGalleryProps> = ({ userId, isOwnPr
                 key={image.id}
                 style={{
                   aspectRatio: '1 / 1',
-                  backgroundImage: `url(${image.image_url})`,
+                  backgroundImage: `url(${image.medium_url || image.thumbnail_url || image.image_url})`,
                   backgroundSize: 'cover',
                   backgroundPosition: 'center', border: '1px solid var(--border)',
                   cursor: 'pointer'
