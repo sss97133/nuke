@@ -2069,10 +2069,12 @@ enum LedgerMap {
             .execute().value
     }
 
-    static func familySales(brand: String, familyKey: String) async -> FamilySalesData? {
-        guard let res = try? await SupabaseService.client
+    /// Throws on a failed read so the years and vehicles levels can show "We couldn't load this"
+    /// with Try again; nil still means the server answered with nothing usable.
+    static func familySales(brand: String, familyKey: String) async throws -> FamilySalesData? {
+        let res = try await SupabaseService.client
             .rpc("treemap_family_sales", params: FamilyParams(p_brand: brand, p_family_key: familyKey))
-            .execute() else { return nil }
+            .execute()
         return FamilySalesData.parse(res.data)
     }
 
@@ -2099,10 +2101,10 @@ enum LedgerMap {
         await VehicleIdentityMark.resolve(brand: brand, family: family, year: year, eraId: eraId)
     }
 
-    static func shareMovers(horizon: MoverHorizon) async -> ShareMoversRead? {
-        guard let res = try? await SupabaseService.client
+    static func shareMovers(horizon: MoverHorizon) async throws -> ShareMoversRead? {
+        let res = try await SupabaseService.client
             .rpc("treemap_family_share_movers", params: ShareMoverParams(p_limit: 5, p_min_sales: horizon.gateMinSales, p_horizon: horizon.rawValue))
-            .execute() else { return nil }
+            .execute()
         return ShareMoversRead.parse(res.data)
     }
 }
@@ -2220,6 +2222,8 @@ struct LedgerMapView: View {
     @State private var movers: ShareMoversRead?
     @State private var baselineMovers: ShareMoversRead?
     @State private var moversLoading = false
+    @State private var moversFailed = false
+    @State private var moverRetry = 0
     @State private var showRelativityInfo = false
 
     @State private var loading = true
@@ -2244,7 +2248,7 @@ struct LedgerMapView: View {
     }
 
     private var moverTaskKey: String {
-        "\(comparisonEnabled)|\(moverHorizon.rawValue)|\(baselineHorizon.rawValue)"
+        "\(comparisonEnabled)|\(moverHorizon.rawValue)|\(baselineHorizon.rawValue)|\(moverRetry)"
     }
 
     private var activeMovers: ShareMoversRead? {
@@ -2412,18 +2416,25 @@ struct LedgerMapView: View {
             let requestedTask = moverTaskKey
             guard comparisonEnabled else { moversLoading = false; return }
             moversLoading = true
+            moversFailed = false
             movers = nil
             baselineMovers = nil
             defer { if requestedTask == moverTaskKey && !Task.isCancelled { moversLoading = false } }
-            async let targetTask = LedgerMap.shareMovers(horizon: moverHorizon)
+            let horizon = moverHorizon
             let baseH = baselineHorizon.moverHorizon
-            async let baseTask: ShareMoversRead? = (baseH != nil && baseH != moverHorizon)
-                ? LedgerMap.shareMovers(horizon: baseH!)
-                : nil
-            let (tRes, bRes) = await (targetTask, baseTask)
-            guard requestedTask == moverTaskKey, !Task.isCancelled else { return }
-            movers = tRes
-            baselineMovers = bRes
+            do {
+                async let targetTask = LedgerMap.shareMovers(horizon: horizon)
+                async let baseTask: ShareMoversRead? = (baseH != nil && baseH != horizon)
+                    ? LedgerMap.shareMovers(horizon: baseH!)
+                    : nil
+                let (tRes, bRes) = try await (targetTask, baseTask)
+                guard requestedTask == moverTaskKey, !Task.isCancelled else { return }
+                movers = tRes
+                baselineMovers = bRes
+            } catch {
+                guard requestedTask == moverTaskKey, !Task.isCancelled else { return }
+                moversFailed = true
+            }
         }
         .sheet(item: $inspectedNode) { node in
             nodeSheet(node)
@@ -3110,14 +3121,8 @@ struct LedgerMapView: View {
             ProgressView()
                 .frame(maxWidth: .infinity, minHeight: 280)
         } else if failed {
-            VStack(spacing: 10) {
-                Text("The map could not be read.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                Button("Retry") { Task { await load() } }
-                    .font(.system(.footnote, design: .monospaced))
-            }
-            .frame(maxWidth: .infinity, minHeight: 280)
+            NukeLoadFailed { Task { await load() } }
+                .frame(maxWidth: .infinity, minHeight: 280)
         } else if level == .vehicles {
             vehicleList
         } else if level == .brands && brandViewMode == .families && !brandFamilyRows.isEmpty {
@@ -3580,6 +3585,9 @@ struct LedgerMapView: View {
             if moversLoading && displayMovers == nil {
                 ProgressView()
                     .frame(maxWidth: .infinity, minHeight: 80)
+            } else if moversFailed && displayMovers == nil {
+                NukeLoadFailed { moverRetry += 1 }
+                    .frame(maxWidth: .infinity, minHeight: 160)
             } else if let m = displayMovers {
                 if m.gaining.isEmpty && m.losing.isEmpty {
                     Text("No family moved clearly beyond random variation in this window.")
@@ -3848,7 +3856,7 @@ struct LedgerMapView: View {
             case .models:
                 guard let make = selectedMake, let fk = selectedFamilyKey else { return }
                 async let modelsTask = LedgerMap.familyModels(brand: make, familyKey: fk)
-                async let salesTask = LedgerMap.familySales(brand: make, familyKey: fk)
+                async let salesTask: FamilySalesData? = try? await LedgerMap.familySales(brand: make, familyKey: fk) // chart extra; the years level re-reads it and surfaces a failure there
                 async let indexTask = LedgerMap.familyPriceIndex(brand: make, familyKey: fk)
                 async let upcomingTask = LedgerMap.familyUpcomingSupply(brand: make, familyKey: fk)
                 let subModels = try await modelsTask
@@ -3871,7 +3879,7 @@ struct LedgerMapView: View {
                     nodes = yrs
                 } else if let fk = selectedFamilyKey {
                     if familySalesData == nil {
-                        let sales = await LedgerMap.familySales(brand: make, familyKey: fk)
+                        let sales = try await LedgerMap.familySales(brand: make, familyKey: fk)
                         guard requestedPath == pathKey, !Task.isCancelled else { return }
                         familySalesData = sales
                     }
@@ -3894,7 +3902,7 @@ struct LedgerMapView: View {
                     vehicles = sales
                 } else if let fk = selectedFamilyKey {
                     if familySalesData == nil {
-                        let sales = await LedgerMap.familySales(brand: make, familyKey: fk)
+                        let sales = try await LedgerMap.familySales(brand: make, familyKey: fk)
                         guard requestedPath == pathKey, !Task.isCancelled else { return }
                         familySalesData = sales
                     }

@@ -32,6 +32,7 @@ struct InvestmentTimeline: Decodable {
 struct ValueTrajectoryView: View {
     let vehicleId: String
     @State private var t: InvestmentTimeline?
+    @State private var loadFailed = false
 
     private func money(_ v: Double) -> String { v.formatted(.currency(code: "USD").precision(.fractionLength(0))) }
     private func moneyK(_ v: Double) -> String {
@@ -90,6 +91,11 @@ struct ValueTrajectoryView: View {
                 }
             }
             .padding(.bottom, 16)
+        } else if loadFailed && t == nil {
+            NukeLoadFailed(message: "The investment timeline didn't come through.") {
+                Task { await fetch() }
+            }
+            .frame(minHeight: 200)
         }
         }
         .task(id: vehicleId) { await fetch() }
@@ -97,8 +103,15 @@ struct ValueTrajectoryView: View {
 
     private func fetch() async {
         struct P: Encodable { let p_vehicle: String }
-        t = try? await SupabaseService.client
-            .rpc("get_vehicle_investment_timeline", params: P(p_vehicle: vehicleId))
-            .execute().value
+        loadFailed = false
+        do {
+            t = try await SupabaseService.client
+                .rpc("get_vehicle_investment_timeline", params: P(p_vehicle: vehicleId))
+                .execute().value
+        } catch {
+            guard !Task.isCancelled else { return }
+            loadFailed = true
+            NSLog("NukeCapture investment timeline load failed: %@", String(describing: error))
+        }
     }
 }
