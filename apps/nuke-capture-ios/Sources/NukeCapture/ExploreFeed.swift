@@ -45,6 +45,17 @@ struct ExploreFeedItem: Identifiable, Equatable {
         return out
     }
 
+    /// The plain line under the title: where it is and what we know, only parts the record carries.
+    var subtitle: String? {
+        NukeDisplay.joined([location, facts, seen])
+    }
+
+    /// "Ends in 3d 4h" for a live lot, nil when there is no end time on record.
+    func timeLeft(now: Date) -> String? {
+        guard let endsAt else { return nil }
+        return LiveBoardView.remaining(endsAt, now: now)
+    }
+
     static func from(_ lot: LiveAuction) -> ExploreFeedItem {
         ExploreFeedItem(id: "live:" + lot.id, kind: .live, title: lot.headline, image: lot.imageUrl,
                         amount: lot.currentBid, amountLabel: "Current bid", endsAt: lot.endsAtDate,
@@ -77,32 +88,33 @@ struct ExploreFeedView: View {
     var body: some View {
         Group {
             if !loaded {
-                VStack(spacing: 10) {
-                    ProgressView()
-                    Text("Reading live auctions and new listings…")
-                        .font(.system(.footnote, design: .monospaced)).foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                // Shimmering cards in the shape of the real ones: the page looks alive while it loads.
+                NukeFeedSkeleton(message: "Finding cars for you…")
             } else if items.isEmpty {
-                ContentUnavailableView {
-                    Label(liveFailed && askFailed ? "Couldn't load the feed" : "Nothing to show yet",
-                          systemImage: liveFailed && askFailed ? "exclamationmark.triangle" : "photo.on.rectangle")
-                } description: {
-                    Text(liveFailed && askFailed ? "Both reads failed." : "No open auctions or new listings with photos right now.")
-                } actions: {
-                    Button("Retry") { Task { await load() } }.buttonStyle(.borderedProminent)
+                if liveFailed && askFailed {
+                    NukeEmptyState(icon: "wifi.exclamationmark", title: "We couldn't load cars",
+                                   message: "Check your connection, then try again.",
+                                   actionTitle: "Try again") { Task { await load() } }
+                } else {
+                    NukeEmptyState(icon: "photo.on.rectangle.angled", title: "No cars to show yet",
+                                   message: "New cars with photos appear here as they're listed. Check back soon.",
+                                   actionTitle: "Refresh") { Task { await load() } }
                 }
             } else {
                 ScrollView {
-                    LazyVStack(spacing: 18) {
+                    LazyVStack(spacing: NukeSpace.xl) {
                         ForEach(Array(items.enumerated()), id: \.element.id) { idx, item in
                             card(item)
                                 .onAppear { prefetch(after: idx) }
                         }
-                        Text(footer)
-                            .font(.caption2).foregroundStyle(.secondary)
-                            .padding(.horizontal, 16).padding(.bottom, 24)
+                        if !footer.isEmpty {
+                            Text(footer)
+                                .font(.caption).foregroundStyle(.tertiary)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal, NukeSpace.xl).padding(.bottom, NukeSpace.xl)
+                        }
                     }
+                    .padding(.top, NukeSpace.sm)
                 }
                 .refreshable { await load() }
             }
@@ -164,59 +176,34 @@ struct ExploreFeedView: View {
     }
 }
 
-/// Edge-to-edge 4:3 photo with the record's facts over a gradient. No scores.
+/// A large rounded photo with the price on it and the car's name beneath. No scores.
 struct ExploreHeroCard: View {
     let item: ExploreFeedItem
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Color(.secondarySystemFill)
-                .aspectRatio(4.0 / 3.0, contentMode: .fit)
-                .overlay {
-                    CachedAsyncImage(url: NukeImage.thumb(item.image, width: 1080), maxPixel: 1280) { i in
-                        i.resizable().scaledToFill()
-                    } placeholder: {
-                        Image(systemName: "car.side").font(.largeTitle).foregroundStyle(.secondary)
+        NukeHeroCard(imageURL: NukeImage.thumb(item.image, width: 1080), title: item.title,
+                     subtitle: item.subtitle, pills: [item.source]) {
+            HStack(alignment: .bottom) {
+                if let amt = item.amount {
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text(item.amountLabel)
+                            .font(.system(.caption, design: .rounded).weight(.semibold))
+                            .foregroundStyle(.white.opacity(0.85))
+                        Text(LiveBoardView.bidNumber(amt))
+                            .font(.nukeBigNumber)
+                            .foregroundStyle(.white)
                     }
                 }
-                .clipped()
-                .overlay(alignment: .bottomLeading) {
-                    LinearGradient(colors: [.clear, .black.opacity(0.65)], startPoint: .center, endPoint: .bottom)
-                        .allowsHitTesting(false)
-                }
-                .overlay(alignment: .bottomLeading) {
-                    HStack(alignment: .lastTextBaseline) {
-                        if let amt = item.amount {
-                            VStack(alignment: .leading, spacing: 0) {
-                                Text(item.amountLabel.uppercased())
-                                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                                Text(LiveBoardView.bidNumber(amt))
-                                    .font(.system(size: 26, weight: .bold, design: .rounded)).monospacedDigit()
-                            }
-                        }
-                        Spacer(minLength: 8)
-                        if let ends = item.endsAt {
-                            TimelineView(.periodic(from: .now, by: 60)) { ctx in
-                                Text(LiveBoardView.remaining(ends, now: ctx.date))
-                                    .font(.caption.weight(.semibold).monospacedDigit())
-                                    .padding(.horizontal, 8).padding(.vertical, 4)
-                                    .background(.ultraThinMaterial, in: Capsule())
-                            }
+                Spacer(minLength: NukeSpace.sm)
+                if item.endsAt != nil {
+                    TimelineView(.periodic(from: .now, by: 60)) { ctx in
+                        if let left = item.timeLeft(now: ctx.date) {
+                            NukePill(text: left, icon: "clock", onPhoto: true)
                         }
                     }
-                    .foregroundStyle(.white)
-                    .padding(12)
                 }
-            VStack(alignment: .leading, spacing: 3) {
-                Text(item.title).font(.headline).lineLimit(2)
-                Text(meta).font(.caption).foregroundStyle(.secondary).lineLimit(2)
             }
-            .padding(.horizontal, 14)
         }
         .accessibilityElement(children: .combine)
-    }
-
-    private var meta: String {
-        [item.source.uppercased(), item.location, item.facts, item.seen].compactMap { $0 }.joined(separator: " · ")
     }
 }

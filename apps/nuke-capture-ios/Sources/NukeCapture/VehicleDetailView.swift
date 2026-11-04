@@ -209,11 +209,10 @@ extension View {
     func nukeCard() -> some View {
         self
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(16)
-            .background(Color(.secondarySystemGroupedBackground),
-                        in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .padding(.horizontal, 16)
-            .padding(.bottom, 12)
+            .padding(NukeSpace.lg)
+            .nukeSurface()
+            .padding(.horizontal, NukeSpace.lg)
+            .padding(.bottom, NukeSpace.md)
     }
 }
 
@@ -629,10 +628,10 @@ struct VehicleDetailView: View {
                         if let raw = heroImage?.image_url, !raw.isEmpty {
                             CachedAsyncImage(url: NukeImage.thumb(raw, width: 600)) { image in
                                 image.resizable().scaledToFill()
-                            } placeholder: { Color(uiColor: .secondarySystemFill) }
+                            } placeholder: { Color(uiColor: .tertiarySystemFill).nukeShimmer() }
                             .frame(height: 190).clipped()
-                            .clipShape(RoundedRectangle(cornerRadius: 16))
-                            .padding(.horizontal, 16)
+                            .clipShape(RoundedRectangle(cornerRadius: NukeRadius.hero, style: .continuous))
+                            .padding(.horizontal, NukeSpace.lg)
                         }
                         mapContextSection
                         mapSourceSection
@@ -821,22 +820,31 @@ struct VehicleDetailView: View {
         if vehicle == nil {
             Group {
                 if let loadError {
-                    // The page spine failed — one Retry recovers header+gallery+ASSET.
-                    VStack(alignment: .leading, spacing: 10) {
-                        Label(loadError, systemImage: "exclamationmark.triangle")
-                            .font(.footnote).foregroundStyle(.secondary)
-                        Button("Retry") { Task { await load() } }
-                            .font(.footnote)
+                    // The page spine failed — one Try again recovers header+gallery+ASSET.
+                    VStack(spacing: NukeSpace.md) {
+                        Image(systemName: "wifi.exclamationmark")
+                            .font(.largeTitle).foregroundStyle(.secondary)
+                        Text(loadError == "Vehicle not found" ? "We couldn't find this car" : "We couldn't load this car")
+                            .font(.nukeHeadline)
+                        Text("Check your connection, then try again.")
+                            .font(.nukeDetail).foregroundStyle(.secondary)
+                        Button("Try again") { Task { await load() } }
+                            .buttonStyle(NukePrimaryButtonStyle())
                     }
+                    .frame(maxWidth: .infinity)
+                    .padding(NukeSpace.xl)
                 } else {
-                    HStack(spacing: 8) {
-                        ProgressView()
-                        Text("Loading…").font(.footnote).foregroundStyle(.secondary)
+                    // The photo area above already shimmers; these bars stand in for the title and facts.
+                    VStack(alignment: .leading, spacing: NukeSpace.md) {
+                        NukeSkeletonBlock(height: 22).frame(maxWidth: 260)
+                        NukeSkeletonBlock(height: 14).frame(maxWidth: 180)
+                        NukeSkeletonBlock(height: 90, radius: NukeRadius.card)
                     }
+                    .padding(NukeSpace.lg)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel("Loading this car")
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 16)
         }
     }
 
@@ -851,10 +859,9 @@ struct VehicleDetailView: View {
     @ViewBuilder private var assetWindow: some View {
         if let rel = relationship {
             VStack(alignment: .leading, spacing: 0) {
-                Text("ASSET")
-                    .font(.system(.caption2, design: .monospaced))
-                    .foregroundStyle(.secondary)
-                    .padding(.bottom, 4)
+                Text("Your link to this car")
+                    .font(.nukeCardTitle)
+                    .padding(.bottom, NukeSpace.xs)
 
                 // Role — his relationship to the asset (owner / co-owner / …).
                 LabeledContent {
@@ -928,6 +935,14 @@ struct VehicleDetailView: View {
 
     private var stripOwnsLocation: Bool { profile != nil }
 
+    /// Spec rows that actually carry a value. A spec the record has no value for is hidden, not
+    /// shown as "Unknown"; it still appears below as something to help fill in.
+    private var filledSpecs: [VehicleSpec] {
+        specsOutsideStrip.filter {
+            NukeDisplay.text($0.value) != nil || NukeDisplay.text($0.reported_value) != nil || $0.reported_conflict == true
+        }
+    }
+
     private var specsOutsideStrip: [VehicleSpec] {
         specs.filter { !stripOwnedFields.contains($0.field) }
     }
@@ -955,17 +970,17 @@ struct VehicleDetailView: View {
     // dimmed and "unverified" and never pretend to be fact. The root-system
     // contract, on the surface. Long-press any value to copy it.
     @ViewBuilder private var specTable: some View {
-        if !specsOutsideStrip.isEmpty || (locationRow != nil && !stripOwnsLocation) {
+        if !filledSpecs.isEmpty || (locationRow != nil && !stripOwnsLocation)
+            || (SupabaseService.currentUserId != nil && !needsToFill.isEmpty && !specsOutsideStrip.isEmpty) {
             VStack(alignment: .leading, spacing: 0) {
-                Text("SPECIFICATIONS")
-                    .font(.system(.caption2, design: .monospaced))
-                    .foregroundStyle(.secondary)
-                    .padding(.bottom, 4)
+                Text("The details")
+                    .font(.nukeCardTitle)
+                    .padding(.bottom, NukeSpace.xs)
 
                 VStack(spacing: 0) {
                     // Rows the strip already states (body, engine, transmission, drivetrain,
                     // odometer, location) are its to show; the table carries the rest.
-                    ForEach(specsOutsideStrip) { specRow($0) }
+                    ForEach(filledSpecs) { specRow($0) }
                     if let loc = locationRow, !stripOwnsLocation { plainRow("Location", loc) }
                 }
 
@@ -974,9 +989,8 @@ struct VehicleDetailView: View {
                 // the spec RPC decides fact-vs-facade, not a hardcoded "what matters".
                 if SupabaseService.currentUserId != nil, !needsToFill.isEmpty {
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("HELP COMPLETE THIS RECORD")
-                            .font(.system(.caption2, design: .monospaced))
-                            .foregroundStyle(.secondary)
+                        Text("Know something about this car? Tap to add it.")
+                            .font(.subheadline.weight(.semibold))
                         FlowChips(items: needsToFill.map(\.label))
                             { idx in contributeField = needsToFill[idx]; contributeText = "" }
                     }
@@ -1050,16 +1064,16 @@ struct VehicleDetailView: View {
     /// ContentUnavailableView would be too heavy. Never let a failed section read
     /// as a silently-absent one (Worklight).
     @ViewBuilder private func sectionError(_ what: String, retry: @escaping () -> Void) -> some View {
-        HStack(spacing: 8) {
-            Label("Couldn't load \(what)", systemImage: "exclamationmark.triangle")
-                .font(.system(.caption2, design: .monospaced))
+        HStack(spacing: NukeSpace.sm) {
+            Label("Couldn't load \(what)", systemImage: "wifi.exclamationmark")
+                .font(.subheadline)
                 .foregroundStyle(.secondary)
             Spacer()
-            Button("Retry", action: retry)
-                .font(.caption2)
+            Button("Try again", action: retry)
+                .font(.subheadline.weight(.semibold))
+                .frame(minHeight: NukeSize.minTap)
         }
-        .padding(.horizontal, 16)
-        .padding(.bottom, 16)
+        .padding(.horizontal, NukeSpace.lg)
     }
 
     // ─── Market estimate — the comp-based model value with its BASIS on the
@@ -1113,10 +1127,10 @@ struct VehicleDetailView: View {
 
     @ViewBuilder private func plainRow(_ label: String, _ value: String) -> some View {
         LabeledContent {
-            Text(value).font(.system(.footnote, design: .monospaced))
+            Text(value).font(.subheadline)
                 .foregroundStyle(.primary).multilineTextAlignment(.trailing)
         } label: {
-            Text(label).font(.footnote).foregroundStyle(.secondary)
+            Text(label).font(.subheadline).foregroundStyle(.secondary)
         }
         .padding(.vertical, 5)
     }
@@ -1483,14 +1497,14 @@ struct VehicleDetailView: View {
         if !images.isEmpty {
             LazyVStack(alignment: .leading, spacing: 8, pinnedViews: .sectionHeaders) {
                 HStack {
-                    Text("PHOTOS")
-                        .font(.system(.caption2, design: .monospaced)).foregroundStyle(.secondary)
+                    Text("Photos")
+                        .font(.nukeCardTitle)
                     Spacer()
                     // Loaded against the record (web #1051: "n of N", never what loaded as the whole).
                     // The record's count includes frames the gate or analysis has not admitted, so the
                     // two numbers are named, not reconciled.
                     Text(photosCountLine)
-                        .font(.system(.caption2, design: .monospaced)).foregroundStyle(.secondary)
+                        .font(.footnote).foregroundStyle(.secondary)
                 }
                 .padding(.horizontal, 16)
 
@@ -1504,7 +1518,7 @@ struct VehicleDetailView: View {
                             Text(group.day == "Listing photos" ? group.day : prettyDay(group.day)).font(.subheadline.weight(.semibold))
                             Spacer()
                             Text("\(group.photos.count)")
-                                .font(.system(.caption2, design: .monospaced)).foregroundStyle(.secondary)
+                                .font(.footnote).monospacedDigit().foregroundStyle(.secondary)
                         }
                         .padding(.horizontal, 16).padding(.vertical, 6)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -1520,13 +1534,14 @@ struct VehicleDetailView: View {
         } else if galleryError {
             sectionError("photos") { Task { await loadGalleryPage(reset: true) } }
         } else if reachedEnd {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("No photos available on this profile").font(.subheadline)
-                Text("Uploaded photos appear here after they are matched to this vehicle and can be shown to you.")
-                    .font(.caption).foregroundStyle(.secondary)
+            VStack(spacing: NukeSpace.sm) {
+                Image(systemName: "photo.on.rectangle.angled").font(.title).foregroundStyle(.tertiary)
+                Text("No photos available on this profile").font(.nukeCardTitle)
+                Text("Photos show up here once they're matched to this car.")
+                    .font(.nukeDetail).foregroundStyle(.secondary).multilineTextAlignment(.center)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 16).padding(.vertical, 12)
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, NukeSpace.lg).padding(.vertical, NukeSpace.xl)
         }
     }
 
@@ -1598,30 +1613,30 @@ struct VehicleDetailView: View {
     // comment bubble whose live count IS the door to the thread. No "ENGAGE" verb,
     // no section title, no composer standing open in the page spine.
     @ViewBuilder private var heroActionRow: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 18) {
+        VStack(alignment: .leading, spacing: NukeSpace.sm) {
+            HStack(spacing: NukeSpace.md) {
                 if let e = engagement {
                     Button { Task { await toggleFollow() } } label: {
                         Label(e.is_following ? "Following" : "Follow",
                               systemImage: e.is_following ? "checkmark" : "plus")
-                            .font(.footnote.weight(.medium))
                     }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(NukePrimaryButtonStyle())
                     .disabled(followBusy)
 
                     Button { showComments = true } label: {
-                        Label(e.comment_count > 0 ? "\(e.comment_count)" : "Comment",
+                        Label(e.comment_count > 0 ? "\(e.comment_count) comments" : "Comment",
                               systemImage: "bubble.left")
-                            .font(.footnote.weight(.medium))
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(NukeSecondaryButtonStyle())
 
                     Spacer(minLength: 0)
                 } else if engagementError {
-                    Button("Retry") { Task { await loadEngagement() } }.font(.footnote)
+                    Button("Try again") { Task { await loadEngagement() } }
+                        .buttonStyle(NukeSecondaryButtonStyle())
                     Spacer()
                 } else {
-                    ProgressView().scaleEffect(0.7)
+                    NukeSkeletonBlock(height: NukeSize.minTap + 4, radius: 26).frame(width: 120)
+                    NukeSkeletonBlock(height: NukeSize.minTap + 4, radius: 26).frame(width: 130)
                     Spacer()
                 }
             }
@@ -1629,26 +1644,26 @@ struct VehicleDetailView: View {
             if let e = engagement {
                 let caption = engagementCounts(e)
                 if !caption.isEmpty {
-                    Text(caption).font(.caption2).foregroundStyle(.secondary)
+                    Text(caption).font(.footnote).foregroundStyle(.secondary)
                 }
             }
             if let ts = testimonySummary, ts.total > 0 {
                 Text(ts.sentence)
-                    .font(.system(size: 10, design: .monospaced))
+                    .font(.caption)
                     .foregroundStyle(.tertiary)
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.top, 10)
-        .padding(.bottom, 6)
+        .padding(.horizontal, NukeSpace.lg)
+        .padding(.top, NukeSpace.md)
+        .padding(.bottom, NukeSpace.md)
     }
 
     private func engagementCounts(_ e: VehicleEngagement) -> String {
         var parts: [String] = []
         if e.following_count > 0 { parts.append("\(e.following_count) following") }
-        if e.comment_count > 0 { parts.append("\(e.comment_count) weighed in") }
-        if e.contribution_count > 0 { parts.append("\(e.contribution_count) contributions") }
-        return parts.isEmpty ? "Be the first to weigh in" : parts.joined(separator: " · ")
+        if e.comment_count > 0 { parts.append(NukeDisplay.count(e.comment_count, "comment")) }
+        if e.contribution_count > 0 { parts.append(NukeDisplay.count(e.contribution_count, "contribution")) }
+        return parts.isEmpty ? "Be the first to comment" : parts.joined(separator: " · ")
     }
 
     private func loadEngagement() async {
@@ -1711,15 +1726,12 @@ struct VehicleDetailView: View {
     @ViewBuilder private var webCTA: some View {
         if let url = URL(string: "https://nuke.ag/vehicle/\(vehicleId)") {
             Link(destination: url) {
-                HStack {
-                    Text("Open on nuke.ag")
-                    Spacer()
-                    Image(systemName: "arrow.up.right.square")
-                }
+                Label("See the full page on the web", systemImage: "arrow.up.right.square")
+                    .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.bordered)
-            .padding(.horizontal, 16)
-            .padding(.bottom, 24)
+            .buttonStyle(NukeSecondaryButtonStyle())
+            .padding(.horizontal, NukeSpace.lg)
+            .padding(.bottom, NukeSpace.xl)
         }
     }
 
