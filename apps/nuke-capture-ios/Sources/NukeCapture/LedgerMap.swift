@@ -2069,10 +2069,12 @@ enum LedgerMap {
             .execute().value
     }
 
-    static func familySales(brand: String, familyKey: String) async -> FamilySalesData? {
-        guard let res = try? await SupabaseService.client
+    /// Throws on a failed read so the years and vehicles levels can show "We couldn't load this"
+    /// with Try again; nil still means the server answered with nothing usable.
+    static func familySales(brand: String, familyKey: String) async throws -> FamilySalesData? {
+        let res = try await SupabaseService.client
             .rpc("treemap_family_sales", params: FamilyParams(p_brand: brand, p_family_key: familyKey))
-            .execute() else { return nil }
+            .execute()
         return FamilySalesData.parse(res.data)
     }
 
@@ -2099,10 +2101,10 @@ enum LedgerMap {
         await VehicleIdentityMark.resolve(brand: brand, family: family, year: year, eraId: eraId)
     }
 
-    static func shareMovers(horizon: MoverHorizon) async -> ShareMoversRead? {
-        guard let res = try? await SupabaseService.client
+    static func shareMovers(horizon: MoverHorizon) async throws -> ShareMoversRead? {
+        let res = try await SupabaseService.client
             .rpc("treemap_family_share_movers", params: ShareMoverParams(p_limit: 5, p_min_sales: horizon.gateMinSales, p_horizon: horizon.rawValue))
-            .execute() else { return nil }
+            .execute()
         return ShareMoversRead.parse(res.data)
     }
 }
@@ -2220,6 +2222,8 @@ struct LedgerMapView: View {
     @State private var movers: ShareMoversRead?
     @State private var baselineMovers: ShareMoversRead?
     @State private var moversLoading = false
+    @State private var moversFailed = false
+    @State private var moverRetry = 0
     @State private var showRelativityInfo = false
 
     @State private var loading = true
@@ -2244,7 +2248,7 @@ struct LedgerMapView: View {
     }
 
     private var moverTaskKey: String {
-        "\(comparisonEnabled)|\(moverHorizon.rawValue)|\(baselineHorizon.rawValue)"
+        "\(comparisonEnabled)|\(moverHorizon.rawValue)|\(baselineHorizon.rawValue)|\(moverRetry)"
     }
 
     private var activeMovers: ShareMoversRead? {
@@ -2412,18 +2416,25 @@ struct LedgerMapView: View {
             let requestedTask = moverTaskKey
             guard comparisonEnabled else { moversLoading = false; return }
             moversLoading = true
+            moversFailed = false
             movers = nil
             baselineMovers = nil
             defer { if requestedTask == moverTaskKey && !Task.isCancelled { moversLoading = false } }
-            async let targetTask = LedgerMap.shareMovers(horizon: moverHorizon)
+            let horizon = moverHorizon
             let baseH = baselineHorizon.moverHorizon
-            async let baseTask: ShareMoversRead? = (baseH != nil && baseH != moverHorizon)
-                ? LedgerMap.shareMovers(horizon: baseH!)
-                : nil
-            let (tRes, bRes) = await (targetTask, baseTask)
-            guard requestedTask == moverTaskKey, !Task.isCancelled else { return }
-            movers = tRes
-            baselineMovers = bRes
+            do {
+                async let targetTask = LedgerMap.shareMovers(horizon: horizon)
+                async let baseTask: ShareMoversRead? = (baseH != nil && baseH != horizon)
+                    ? LedgerMap.shareMovers(horizon: baseH!)
+                    : nil
+                let (tRes, bRes) = try await (targetTask, baseTask)
+                guard requestedTask == moverTaskKey, !Task.isCancelled else { return }
+                movers = tRes
+                baselineMovers = bRes
+            } catch {
+                guard requestedTask == moverTaskKey, !Task.isCancelled else { return }
+                moversFailed = true
+            }
         }
         .sheet(item: $inspectedNode) { node in
             nodeSheet(node)
@@ -2694,7 +2705,7 @@ struct LedgerMapView: View {
                                     selectedFacetLabel = nil
                                 } label: {
                                     Text(axis.label)
-                                        .font(.system(size: 9, weight: .bold, design: .monospaced))
+                                        .font(.system(.caption2, design: .monospaced, weight: .bold))
                                         .foregroundStyle(activeAxis ? Color(.systemBackground) : .secondary)
                                         .padding(.horizontal, 6)
                                         .padding(.vertical, 3)
@@ -2802,7 +2813,7 @@ struct LedgerMapView: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 6) {
                 Text(title)
-                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                    .font(.system(.caption2, design: .monospaced, weight: .semibold))
                     .foregroundStyle(.secondary)
                     .padding(.trailing, 2)
                 content()
@@ -2836,7 +2847,7 @@ struct LedgerMapView: View {
                         } label: {
                             HStack(spacing: 6) {
                                 Text(c.kind.label.uppercased())
-                                    .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                                    .font(.system(.caption2, design: .monospaced, weight: .semibold))
                                     .foregroundStyle(.secondary)
                                 Text(c.name)
                                     .font(.system(.caption2, design: .monospaced).weight(.semibold))
@@ -2844,7 +2855,7 @@ struct LedgerMapView: View {
                                     .font(.system(.caption2, design: .monospaced).weight(.bold))
                                     .foregroundStyle(c.rel >= 0 ? .green : .red)
                                 Text("\(c.prior.formatted())→\(c.sold.formatted())")
-                                    .font(.system(size: 10, design: .monospaced))
+                                    .font(.system(.caption2, design: .monospaced))
                                     .foregroundStyle(.secondary)
                             }
                             .padding(.horizontal, 10)
@@ -2868,7 +2879,7 @@ struct LedgerMapView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         HStack(spacing: 6) {
                             Text("SAME CAR, SAME MILES")
-                                .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                                .font(.system(.caption2, design: .monospaced, weight: .semibold))
                                 .foregroundStyle(.secondary)
                             Spacer()
                             Text(ix.answerText)
@@ -2876,7 +2887,7 @@ struct LedgerMapView: View {
                                 .foregroundStyle(ix.verdict == "up" ? .green : ix.verdict == "down" ? .red : .primary)
                         }
                         Text(ix.evidenceText)
-                            .font(.system(size: 11, design: .monospaced))
+                            .font(.system(.caption2, design: .monospaced))
                             .foregroundStyle(.secondary)
                         let readableSegs = ix.segments.filter { $0.verdict != "too few to tell" && $0.change != nil }
                         if readableSegs.count >= 2 {
@@ -2887,7 +2898,7 @@ struct LedgerMapView: View {
                                             ? "too few"
                                             : (seg.verdict == "flat" ? "flat" : LedgerMapScale.pct(seg.change ?? 0))
                                         Text("\(seg.label) \(val)")
-                                            .font(.system(size: 10, design: .monospaced))
+                                            .font(.system(.caption2, design: .monospaced))
                                             .padding(.horizontal, 7)
                                             .padding(.vertical, 3)
                                             .background(Color(.tertiarySystemFill), in: Capsule())
@@ -2916,7 +2927,7 @@ struct LedgerMapView: View {
 
                 HStack {
                     Text("\(scopedSales.count.formatted()) LOADED SALES (5Y, $500+)")
-                        .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                        .font(.system(.caption2, design: .monospaced, weight: .semibold))
                         .foregroundStyle(.secondary)
                     Spacer()
                     HStack(spacing: 8) {
@@ -2951,24 +2962,24 @@ struct LedgerMapView: View {
                     VStack(alignment: .leading, spacing: 6) {
                         HStack(spacing: 6) {
                             Text("UPCOMING \(up.counts.total.formatted())")
-                                .font(.system(size: 9, weight: .bold, design: .monospaced))
+                                .font(.system(.caption2, design: .monospaced, weight: .bold))
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 2)
                                 .background(Color.primary.opacity(0.1), in: RoundedRectangle(cornerRadius: 4))
                             if up.counts.batLive > 0 {
                                 let mTag = (up.finishFresh && up.finishModel != nil) ? " · M\(up.finishModel!)" : ""
                                 Text("\(up.counts.batLive) BaT live\(mTag)")
-                                    .font(.system(size: 10, design: .monospaced))
+                                    .font(.system(.caption2, design: .monospaced))
                                     .foregroundStyle(.secondary)
                             }
                             if up.counts.auctionCalendar > 0 {
                                 Text("\(up.counts.auctionCalendar) calendar")
-                                    .font(.system(size: 10, design: .monospaced))
+                                    .font(.system(.caption2, design: .monospaced))
                                     .foregroundStyle(.secondary)
                             }
                             if up.counts.facebookMarketplace > 0 {
                                 Text("\(up.counts.facebookMarketplace) FB")
-                                    .font(.system(size: 10, design: .monospaced))
+                                    .font(.system(.caption2, design: .monospaced))
                                     .foregroundStyle(.secondary)
                             }
                             Spacer()
@@ -3027,14 +3038,14 @@ struct LedgerMapView: View {
         let content = VStack(alignment: .leading, spacing: 2) {
             HStack(spacing: 4) {
                 Text(badge)
-                    .font(.system(size: 8, weight: .bold, design: .monospaced))
+                    .font(.system(.caption2, design: .monospaced, weight: .bold))
                     .foregroundStyle(badgeColor)
                 Text(title)
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(.system(.caption2, weight: .semibold))
                     .lineLimit(1)
             }
             Text(sub)
-                .font(.system(size: 9, design: .monospaced))
+                .font(.system(.caption2, design: .monospaced))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
         }
@@ -3060,7 +3071,7 @@ struct LedgerMapView: View {
     private func venueLegendDot(_ label: String, color: Color) -> some View {
         HStack(spacing: 3) {
             Circle().fill(color).frame(width: 6, height: 6)
-            Text(label).font(.system(size: 9, design: .monospaced)).foregroundStyle(.secondary)
+            Text(label).font(.system(.caption2, design: .monospaced)).foregroundStyle(.secondary)
         }
     }
 
@@ -3110,14 +3121,8 @@ struct LedgerMapView: View {
             ProgressView()
                 .frame(maxWidth: .infinity, minHeight: 280)
         } else if failed {
-            VStack(spacing: 10) {
-                Text("The map could not be read.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                Button("Retry") { Task { await load() } }
-                    .font(.system(.footnote, design: .monospaced))
-            }
-            .frame(maxWidth: .infinity, minHeight: 280)
+            NukeLoadFailed { Task { await load() } }
+                .frame(maxWidth: .infinity, minHeight: 280)
         } else if level == .vehicles {
             vehicleList
         } else if level == .brands && brandViewMode == .families && !brandFamilyRows.isEmpty {
@@ -3380,9 +3385,10 @@ struct LedgerMapView: View {
     private func vehicleRowContent(_ v: LedgerVehicle) -> some View {
         HStack(spacing: 12) {
             if let url = v.primary_image_url.flatMap(URL.init(string:)) {
-                AsyncImage(url: url) { phase in
-                    if case .success(let img) = phase { img.resizable().scaledToFill() }
-                    else { Color(.secondarySystemBackground) }
+                CachedAsyncImage(url: url, maxPixel: 256) { img in
+                    img.resizable().scaledToFill()
+                } placeholder: {
+                    Color(.secondarySystemBackground)
                 }
                 .frame(width: 64, height: 48)
                 .clipShape(RoundedRectangle(cornerRadius: 4))
@@ -3434,7 +3440,7 @@ struct LedgerMapView: View {
             if mapComparisonEnabled { HStack(spacing: 4) {
                 ForEach(["−50%", "−33%", "−17%", "0", "+17%", "+33%", "+50%"], id: \.self) { lbl in
                     Text(lbl)
-                        .font(.system(size: 9, design: .monospaced))
+                        .font(.system(.caption2, design: .monospaced))
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity)
                 }
@@ -3484,7 +3490,7 @@ struct LedgerMapView: View {
                             HStack(spacing: 4) {
                                 Circle().fill(venueColor(r.house)).frame(width: 6, height: 6)
                                 Text("\(r.house ?? "other") \(pct)% (\(r.sales.formatted()))")
-                                    .font(.system(size: 10, design: .monospaced))
+                                    .font(.system(.caption2, design: .monospaced))
                                     .foregroundStyle(.secondary)
                             }
                         }
@@ -3508,9 +3514,9 @@ struct LedgerMapView: View {
                             HStack(spacing: 3) {
                                 Text("RELATIVITY")
                                 Image(systemName: "info.circle")
-                                    .font(.system(size: 9))
+                                    .font(.system(.caption2))
                             }
-                            .font(.system(size: 10, weight: .bold, design: .monospaced))
+                            .font(.system(.caption2, design: .monospaced, weight: .bold))
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
                             .background(Color.primary.opacity(0.1), in: RoundedRectangle(cornerRadius: 4))
@@ -3523,7 +3529,7 @@ struct LedgerMapView: View {
                         let mPct = LedgerMapScale.pct(m.marketMove)
                         let vsLabel = baselineHorizon == .prior ? moverHorizon.windowText : "\(moverHorizon.label) vs \(baselineHorizon.label)"
                         Text("\(vsLabel) · \(m.marketPrior.formatted()) → \(m.marketSold.formatted()) (\(mPct))")
-                            .font(.system(size: 10, design: .monospaced))
+                            .font(.system(.caption2, design: .monospaced))
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -3539,7 +3545,7 @@ struct LedgerMapView: View {
                             moverHorizon = h
                         } label: {
                             Text(h.label)
-                                .font(.system(size: 10, weight: active ? .bold : .regular, design: .monospaced))
+                                .font(.system(.caption2, design: .monospaced, weight: active ? .bold : .regular))
                                 .foregroundStyle(active ? Color(.systemBackground) : .primary)
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 4)
@@ -3553,7 +3559,7 @@ struct LedgerMapView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 4) {
                     Text("VS")
-                        .font(.system(size: 9, weight: .bold, design: .monospaced))
+                        .font(.system(.caption2, design: .monospaced, weight: .bold))
                         .foregroundStyle(.secondary)
                         .padding(.trailing, 2)
                     ForEach(BaselineHorizon.allCases) { bh in
@@ -3564,7 +3570,7 @@ struct LedgerMapView: View {
                             baselineHorizon = bh
                         } label: {
                             Text(bh.label)
-                                .font(.system(size: 9, weight: active ? .bold : .regular, design: .monospaced))
+                                .font(.system(.caption2, design: .monospaced, weight: active ? .bold : .regular))
                                 .foregroundStyle(disabled ? Color.secondary.opacity(0.45) : (active ? Color(.systemBackground) : Color.secondary))
                                 .padding(.horizontal, 7)
                                 .padding(.vertical, 3)
@@ -3579,6 +3585,9 @@ struct LedgerMapView: View {
             if moversLoading && displayMovers == nil {
                 ProgressView()
                     .frame(maxWidth: .infinity, minHeight: 80)
+            } else if moversFailed && displayMovers == nil {
+                NukeLoadFailed { moverRetry += 1 }
+                    .frame(maxWidth: .infinity, minHeight: 160)
             } else if let m = displayMovers {
                 if m.gaining.isEmpty && m.losing.isEmpty {
                     Text("No family moved clearly beyond random variation in this window.")
@@ -3645,11 +3654,11 @@ struct LedgerMapView: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Text(title)
-                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                    .font(.system(.caption2, design: .monospaced, weight: .semibold))
                     .foregroundStyle(.secondary)
                 Spacer()
                 Text("0.5× · 1× PAR · 2×")
-                    .font(.system(size: 9, design: .monospaced))
+                    .font(.system(.caption2, design: .monospaced))
                     .foregroundStyle(.tertiary)
             }
             ForEach(rows) { r in
@@ -3667,11 +3676,11 @@ struct LedgerMapView: View {
                                 .lineLimit(1)
                             HStack(spacing: 6) {
                                 Text("\(r.prior.formatted()) → \(r.sold.formatted())")
-                                    .font(.system(size: 10, design: .monospaced))
+                                    .font(.system(.caption2, design: .monospaced))
                                     .foregroundStyle(.secondary)
                                 if let pm = r.avgPriceMove, abs(pm) >= 0.01 {
                                     Text("avg \(LedgerMapScale.pct(pm))")
-                                        .font(.system(size: 9, design: .monospaced))
+                                        .font(.system(.caption2, design: .monospaced))
                                         .foregroundStyle(.secondary)
                                 }
                             }
@@ -3847,7 +3856,7 @@ struct LedgerMapView: View {
             case .models:
                 guard let make = selectedMake, let fk = selectedFamilyKey else { return }
                 async let modelsTask = LedgerMap.familyModels(brand: make, familyKey: fk)
-                async let salesTask = LedgerMap.familySales(brand: make, familyKey: fk)
+                async let salesTask: FamilySalesData? = try? await LedgerMap.familySales(brand: make, familyKey: fk) // chart extra; the years level re-reads it and surfaces a failure there
                 async let indexTask = LedgerMap.familyPriceIndex(brand: make, familyKey: fk)
                 async let upcomingTask = LedgerMap.familyUpcomingSupply(brand: make, familyKey: fk)
                 let subModels = try await modelsTask
@@ -3870,7 +3879,7 @@ struct LedgerMapView: View {
                     nodes = yrs
                 } else if let fk = selectedFamilyKey {
                     if familySalesData == nil {
-                        let sales = await LedgerMap.familySales(brand: make, familyKey: fk)
+                        let sales = try await LedgerMap.familySales(brand: make, familyKey: fk)
                         guard requestedPath == pathKey, !Task.isCancelled else { return }
                         familySalesData = sales
                     }
@@ -3893,7 +3902,7 @@ struct LedgerMapView: View {
                     vehicles = sales
                 } else if let fk = selectedFamilyKey {
                     if familySalesData == nil {
-                        let sales = await LedgerMap.familySales(brand: make, familyKey: fk)
+                        let sales = try await LedgerMap.familySales(brand: make, familyKey: fk)
                         guard requestedPath == pathKey, !Task.isCancelled else { return }
                         familySalesData = sales
                     }

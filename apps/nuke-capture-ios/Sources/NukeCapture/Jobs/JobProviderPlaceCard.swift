@@ -233,12 +233,12 @@ struct JobProgressTracker: View {
                             connector(visible: i < steps.count - 1, filled: i + 1 < steps.count && Self.filled(steps[i + 1]))
                         }
                         Text(step.label)
-                            .font(.system(size: 10, weight: step.key == current ? .bold : .regular))
+                            .font(.system(.caption2, weight: step.key == current ? .bold : .regular))
                             .foregroundStyle(step.key == (selected ?? current) ? .primary : .secondary)
                             .lineLimit(1).minimumScaleFactor(0.7)
                         if step.reports > 0 {
                             Label("\(step.reports)", systemImage: "text.bubble")
-                                .font(.system(size: 9)).foregroundStyle(.secondary).labelStyle(.titleAndIcon)
+                                .font(.system(.caption2)).foregroundStyle(.secondary).labelStyle(.titleAndIcon)
                         }
                     }
                     .frame(maxWidth: .infinity)

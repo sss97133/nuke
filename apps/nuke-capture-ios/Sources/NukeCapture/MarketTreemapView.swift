@@ -366,7 +366,7 @@ struct MarketTreemapView: View {
         VStack(spacing: 3) {
             Rectangle().fill(Color.secondary.opacity(0.35)).frame(height: 0.5)
             Text("equal size below — the number is the true count")
-                .font(.system(size: 9, design: .monospaced)).foregroundStyle(.secondary)
+                .font(.system(.caption2, design: .monospaced)).foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, alignment: .leading).padding(.leading, 8)
         }
         .frame(width: width)
@@ -755,18 +755,18 @@ struct MarketTreemapView: View {
                     .font(.system(.caption)).foregroundStyle(.secondary)
                 Spacer(minLength: 6)
                 // The live color key — endpoints + the current ramp.
-                Text(lens.lo).font(.system(size: 9, weight: .semibold, design: .monospaced))
+                Text(lens.lo).font(.system(.caption2, design: .monospaced, weight: .semibold))
                     .foregroundStyle(.secondary)
                 LinearGradient(colors: [lensRamp(0), lensRamp(0.5), lensRamp(1)],
                                startPoint: .leading, endPoint: .trailing)
                     .frame(width: 42, height: 6).clipShape(Capsule())
-                Text(lens.hi).font(.system(size: 9, weight: .semibold, design: .monospaced))
+                Text(lens.hi).font(.system(.caption2, design: .monospaced, weight: .semibold))
                     .foregroundStyle(.secondary)
             }
             Text(lens == .era ? "Area: records · color: average year" :
                  lens == .price ? "Area: records · color: recorded median price" :
                  "Area: records · color: venue median difference")
-                .font(.system(size: 10, design: .monospaced))
+                .font(.system(.caption2, design: .monospaced))
                 .foregroundStyle(.secondary)
             if lens != .era {
                 Text(lens == .gap ? "Different cars and price bases; not an expected return." :
@@ -779,11 +779,11 @@ struct MarketTreemapView: View {
             // nightly at 03:40Z and the RPCs do not return that clock, so the schedule is stated.
             if unresolved > 0 {
                 Text("+\(unresolved.formatted()) records not yet matched to a \(groupBy.label.lowercased()) (not drawn)")
-                    .font(.system(size: 10, design: .monospaced))
+                    .font(.system(.caption2, design: .monospaced))
                     .foregroundStyle(.secondary)
             }
             Text("public vehicle records, deleted included, by \(groupBy.label.lowercased()) · market views refreshed nightly 03:40Z")
-                .font(.system(size: 9, design: .monospaced))
+                .font(.system(.caption2, design: .monospaced))
                 .foregroundStyle(.tertiary)
                 .lineLimit(2)
         }
@@ -802,7 +802,7 @@ struct MarketTreemapView: View {
                 Circle().fill(lensRamp(0.8)).frame(width: 10, height: 10)
                     .overlay(Circle().stroke(.white.opacity(0.5), lineWidth: 0.5))
                 Text(lens.label).font(.system(.subheadline).weight(.medium))
-                Image(systemName: "chevron.down").font(.system(size: 9, weight: .semibold))
+                Image(systemName: "chevron.down").font(.system(.caption2, weight: .semibold))
             }
             .foregroundStyle(.primary)
             .padding(.horizontal, 12).padding(.vertical, 7)
@@ -1184,7 +1184,7 @@ struct CohortDistributionCard: View {
                 HStack(spacing: 8) {
                     ProgressView().controlSize(.small)
                     Text("reading priced sales…")
-                        .font(.system(size: 10, design: .monospaced)).foregroundStyle(.tertiary)
+                        .font(.system(.caption2, design: .monospaced)).foregroundStyle(.tertiary)
                 }
                 .frame(maxWidth: .infinity, minHeight: 132)
             case .sparse:
@@ -1194,7 +1194,7 @@ struct CohortDistributionCard: View {
                         .font(.system(size: 13, weight: .semibold))
                     Text("not enough priced sales to draw a distribution"
                          + (primaryN > 0 ? " (\(primaryN) priced)" : ""))
-                        .font(.system(size: 11, design: .monospaced)).foregroundStyle(.secondary)
+                        .font(.system(.caption2, design: .monospaced)).foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.vertical, 6)
@@ -1223,7 +1223,7 @@ struct CohortDistributionCard: View {
                 .lineLimit(1).minimumScaleFactor(0.7)
             Spacer(minLength: 8)
             Text((listed.map { "\($0.formatted()) listed · " } ?? "") + "\(primaryN) priced")
-                .font(.system(size: 10, design: .monospaced))
+                .font(.system(.caption2, design: .monospaced))
                 .foregroundStyle(.secondary)
         }
     }
@@ -1238,7 +1238,7 @@ struct CohortDistributionCard: View {
                     .overlay(RoundedRectangle(cornerRadius: 2).strokeBorder(Color.accentColor, lineWidth: 1))
                     .frame(width: 9, height: 9)
                 Text("\(primaryLabel) (n=\(primaryN))")
-                    .font(.system(size: 11, weight: .semibold).smallCaps().monospacedDigit())
+                    .font(.system(.caption2, weight: .semibold).smallCaps().monospacedDigit())
             }
             if showOverlay {
                 HStack(spacing: 5) {
@@ -1247,7 +1247,7 @@ struct CohortDistributionCard: View {
                     Capsule().fill(Color.secondary.opacity(0.7))
                         .frame(width: 12, height: 2)
                     Text("\(parentLabel) (n=\(parentN))")
-                        .font(.system(size: 11).smallCaps().monospacedDigit())
+                        .font(.system(.caption2).smallCaps().monospacedDigit())
                         .foregroundStyle(.secondary)
                 }
             }
@@ -1258,7 +1258,7 @@ struct CohortDistributionCard: View {
                     withAnimation(.easeInOut(duration: 0.2)) { overlayOn.toggle() }
                 } label: {
                     Text("vs")
-                        .font(.system(size: 11, weight: .semibold).smallCaps())
+                        .font(.system(.caption2, weight: .semibold).smallCaps())
                         .padding(.horizontal, 9).padding(.vertical, 3)
                         .background(Capsule().fill(overlayOn ? Color.accentColor.opacity(0.16) : Color(uiColor: .tertiarySystemFill)))
                         .overlay(Capsule().strokeBorder(overlayOn ? Color.accentColor.opacity(0.5) : .clear, lineWidth: 0.5))
@@ -1317,7 +1317,7 @@ struct CohortDistributionCard: View {
             Spacer()
             Text(Self.money(pow(10, domain.upperBound)))
         }
-        .font(.system(size: 10, design: .monospaced))
+        .font(.system(.caption2, design: .monospaced))
         .foregroundStyle(.secondary)
     }
 

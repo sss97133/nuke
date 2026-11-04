@@ -230,6 +230,19 @@ struct NukeEmptyState: View {
     }
 }
 
+/// The standard "a read failed" state: one friendly sentence and a Try again button. Use this
+/// wherever a load throws, instead of an empty screen or a silent `try?`.
+struct NukeLoadFailed: View {
+    var title = "We couldn't load this"
+    var message: String? = "Check your connection and try again."
+    let retry: () -> Void
+
+    var body: some View {
+        NukeEmptyState(icon: "wifi.exclamationmark", title: title, message: message,
+                       actionTitle: "Try again", action: retry)
+    }
+}
+
 /// The one main button style: full-height tap target, rounded, accent fill.
 struct NukePrimaryButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {

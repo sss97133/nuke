@@ -755,7 +755,7 @@ struct CapturedListingsView: View {
                         }
                     } header: {
                         Text(askCoverageSentence(board))
-                            .font(.system(size: 9, design: .monospaced))
+                            .font(.system(.caption2, design: .monospaced))
                             .textCase(nil)
                     } footer: {
                         if let pp = board.price_population {
@@ -787,7 +787,7 @@ struct CapturedListingsView: View {
                             .listRowSeparator(.hidden)
                         }
                     } header: {
-                        Text(fallbackCoverageSentence).font(.system(size: 9, design: .monospaced)).textCase(nil)
+                        Text(fallbackCoverageSentence).font(.system(.caption2, design: .monospaced)).textCase(nil)
                     } footer: {
                         Text("A recorded amount is the seller's assertion as retained, in a currency the reader does not record; a listing's presence is one sighting, not a sale or a current availability.")
                     }
@@ -900,7 +900,7 @@ struct CapturedListingsView: View {
                         .foregroundStyle(active ? Color(.systemBackground).opacity(0.8) : .secondary)
                 }
             }
-            .font(.system(size: 10, weight: active ? .semibold : .regular, design: .monospaced))
+            .font(.system(.caption2, design: .monospaced, weight: active ? .semibold : .regular))
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
             .background(active ? Color.primary : Color(.secondarySystemFill), in: Capsule())
@@ -921,7 +921,7 @@ struct CapturedListingsView: View {
                     .lineLimit(2)
                 HStack(spacing: 6) {
                     Text(CapturedListings.sourceName(row.source).uppercased())
-                        .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                        .font(.system(.caption2, design: .monospaced, weight: .semibold))
                         .foregroundStyle(.secondary)
                     if let loc = row.location, !loc.isEmpty {
                         Text("· \(loc)")
@@ -931,7 +931,7 @@ struct CapturedListingsView: View {
                     }
                     Spacer(minLength: 0)
                     Text(ProfileClock.day(row.seen_at).map { "seen \($0)" } ?? "clock missing")
-                        .font(.system(size: 10, design: .monospaced))
+                        .font(.system(.caption2, design: .monospaced))
                         .foregroundStyle(.tertiary)
                 }
                 if !facts.isEmpty {
@@ -946,16 +946,16 @@ struct CapturedListingsView: View {
                             .foregroundStyle(place.tone == .below ? Color.green : (place.tone == .above ? Color.orange : Color.primary))
                         AskPriceStripView(place: place)
                         Text(place.spreadLine)
-                            .font(.system(size: 10, design: .monospaced))
+                            .font(.system(.caption2, design: .monospaced))
                             .foregroundStyle(.secondary)
                         if let mLine = place.milesLine {
                             Text(mLine)
-                                .font(.system(size: 10, design: .monospaced))
+                                .font(.system(.caption2, design: .monospaced))
                                 .foregroundStyle(.secondary)
                         }
                         if let vLine = place.venuesLine {
                             Text(vLine)
-                                .font(.system(size: 10))
+                                .font(.system(.caption2))
                                 .foregroundStyle(.secondary)
                         }
                     }
@@ -994,12 +994,12 @@ struct CapturedListingsView: View {
                 Text(row.headline).font(.headline).lineLimit(2)
                 HStack(spacing: 8) {
                     Text(CapturedListings.sourceName(row.source_platform).uppercased())
-                        .font(.system(size: 10, weight: .semibold, design: .monospaced)).foregroundStyle(.secondary)
+                        .font(.system(.caption2, design: .monospaced, weight: .semibold)).foregroundStyle(.secondary)
                     Text(row.current_price == nil ? "amount unrecorded" : "currency unrecorded")
                         .font(.caption).foregroundStyle(.secondary)
                     Spacer(minLength: 0)
                     Text(ProfileClock.day(row.clock).map { (row.source_observed_at != nil ? "seen " : "captured ") + $0 } ?? "clock missing")
-                        .font(.system(size: 10, design: .monospaced)).foregroundStyle(.tertiary)
+                        .font(.system(.caption2, design: .monospaced)).foregroundStyle(.tertiary)
                 }
             }
             .padding(.horizontal, 14)
@@ -1031,7 +1031,7 @@ struct ListingHeroPhoto: View {
                     ZStack(alignment: .bottomLeading) {
                         LinearGradient(colors: [.clear, .black.opacity(0.6)], startPoint: .center, endPoint: .bottom)
                         VStack(alignment: .leading, spacing: 0) {
-                            Text(amountLabel).font(.system(size: 10, weight: .semibold, design: .monospaced))
+                            Text(amountLabel).font(.system(.caption2, design: .monospaced, weight: .semibold))
                             Text(amount).font(.system(size: 24, weight: .bold, design: .rounded)).monospacedDigit()
                         }
                         .foregroundStyle(.white)

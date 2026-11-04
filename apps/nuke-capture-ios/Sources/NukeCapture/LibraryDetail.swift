@@ -45,12 +45,14 @@ struct LibraryDetailView: View {
                         .font(.headline).foregroundStyle(.white)
                         .padding(10).background(.black.opacity(0.4), in: Circle())
                 }
+                .accessibilityLabel("Close")
                 Spacer()
                 Button { showInfo = true } label: {
                     Image(systemName: "info.circle")
                         .font(.title3).foregroundStyle(.white)
                         .padding(10).background(.black.opacity(0.4), in: Circle())
                 }
+                .accessibilityLabel("Photo info")
             }
             .padding()
         }

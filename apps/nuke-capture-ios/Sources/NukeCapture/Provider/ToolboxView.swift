@@ -195,7 +195,7 @@ struct ToolboxCard: View {
                 .font(.footnote.weight(.medium))
                 .lineLimit(2, reservesSpace: true)
             if let line = ToolboxCopy.partLine(item) {
-                Text(line).font(.system(size: 10, design: .monospaced)).foregroundStyle(.secondary).lineLimit(1)
+                Text(line).font(.system(.caption2, design: .monospaced)).foregroundStyle(.secondary).lineLimit(1)
             }
             Text(ToolboxCopy.cardValue(item))
                 .font(.system(.footnote, design: .monospaced))

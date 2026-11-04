@@ -2144,7 +2144,7 @@ struct SourceLandingSheet: View {
     private func metricCell(label: String, value: String) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(label.uppercased())
-                .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                .font(.system(.caption2, design: .monospaced, weight: .semibold))
                 .foregroundStyle(.secondary)
             Text(value)
                 .font(.system(.subheadline, design: .monospaced).weight(.semibold))

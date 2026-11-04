@@ -395,8 +395,9 @@ enum JobCopy {
     /// "12 photos in this session · 41 photos of this vehicle that day".
     static func evidenceLine(_ counts: [String: JobJSON]) -> String? {
         guard !counts.isEmpty else { return nil }
-        return counts.keys.sorted().map { key in
-            let n = counts[key]!.text
+        return counts.sorted { $0.key < $1.key }.map { entry in
+            let key = entry.key
+            let n = entry.value.text
             if let words = evidence[key] { return "\(n) photos \(words)" }
             return "\(n) \(sentence(key).lowercased())"
         }.joined(separator: " · ")

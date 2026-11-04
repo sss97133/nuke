@@ -267,7 +267,7 @@ struct ProviderFaceContent: View {
                     if let s = v.scope { Text(s).font(.caption).foregroundStyle(.secondary) }
                     Text([JobCopy.day(v.vouched_at).map { "vouched \($0)" }, JobCopy.day(v.expires_at).map { "until \($0)" }]
                         .compactMap { $0 }.joined(separator: " · "))
-                        .font(.system(size: 9, design: .monospaced)).foregroundStyle(.tertiary)
+                        .font(.system(.caption2, design: .monospaced)).foregroundStyle(.tertiary)
                     if v.withdrawAction != nil {
                         Button("Withdraw your vouch", role: .destructive) { withdrawing = v }
                             .font(.caption).buttonStyle(.borderless)

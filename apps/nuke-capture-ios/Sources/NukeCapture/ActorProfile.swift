@@ -101,7 +101,7 @@ struct MeasuresCard: View {
                     if m.label != section.items.last?.label { Divider() }
                 }
                 Text(section.coverage.sentence)
-                    .font(.system(size: 10, design: .monospaced)).foregroundStyle(.tertiary)
+                    .font(.system(.caption2, design: .monospaced)).foregroundStyle(.tertiary)
             }
         }
         .padding(14)
@@ -175,7 +175,7 @@ struct ActorProfileView: View {
                         }
                     }
                     Text("One public projection for every viewer · read \(ProfileClock.day(read.read_at) ?? "now") · counts and ranks only, never an amount")
-                        .font(.system(size: 9, design: .monospaced)).foregroundStyle(.tertiary)
+                        .font(.system(.caption2, design: .monospaced)).foregroundStyle(.tertiary)
                 } else if failed {
                     ContentUnavailableView {
                         Label("Couldn't read this profile", systemImage: "wifi.exclamationmark")
@@ -264,7 +264,7 @@ struct RoleTableCard: View {
                     }
                 }
             }
-            Text(table.coverage.sentence).font(.system(size: 10, design: .monospaced)).foregroundStyle(.tertiary)
+            Text(table.coverage.sentence).font(.system(.caption2, design: .monospaced)).foregroundStyle(.tertiary)
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -311,7 +311,7 @@ struct ActorVehiclesView: View {
                 }
             }
             Text(!loaded ? "Reading…" : failed ? "" : Self.header(shown: rows.count, total: total, linked: linked))
-                .font(.system(size: 9, design: .monospaced)).foregroundStyle(.tertiary)
+                .font(.system(.caption2, design: .monospaced)).foregroundStyle(.tertiary)
                 .frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 16).padding(.vertical, 6)
             LazyVGrid(columns: columns, spacing: 2) {
                 ForEach(rows) { v in
