@@ -30,6 +30,12 @@ struct VideoLedger: Codable, Equatable, Sendable {
     /// assetKey → PhotoKit local identifier, for every clip whose preview landed (local only; phase 2 needs it).
     var previewed: [String: String] = [:]
     var fullUploaded: Set<String> = []
+    /// Screenshots whose pixels were read for on-device text recognition and did not name a vehicle.
+    /// Only the hash is kept (never the text), so a screenshot is not read twice.
+    var ocrChecked: Set<String> = []
+
+    func isOCRChecked(_ assetKey: String) -> Bool { ocrChecked.contains(assetKey) }
+    mutating func markOCRChecked(_ assetKey: String) { ocrChecked.insert(assetKey) }
 
     func isKnown(_ assetKey: String) -> Bool {
         previewed[assetKey] != nil || pending.contains { $0.assetKey == assetKey }

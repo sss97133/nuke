@@ -11,7 +11,10 @@
 //                   `acquisitionDaysAfter` (2) days after it. A screen recording has no GPS, so time
 //                   inside the window is the only evidence. Windows of two vehicles overlapping the
 //                   recording = ambiguous = no match.
-//   Both          → a clip longer than `maxClipSeconds` (10 min) or with no duration never matches.
+//   Screenshot    → a filed photo within 30 min (and within 150 m when the screenshot carries GPS; most do
+//                   not, then time alone), or the screen-recording acquisition window. Otherwise, and only
+//                   then, on-device OCR (ScreenshotVehicleTerms) may match it with no vehicle suggested.
+//   Videos        → a clip longer than `maxClipSeconds` (10 min) or with no duration never matches.
 //
 // A match only makes the clip eligible for a low-resolution, silent, private PREVIEW plus metadata.
 // The full file stays on the phone until a vehicle is attributed (server state), and a screen
@@ -24,6 +27,8 @@ import Foundation
 enum VideoKind: String, Codable, Sendable {
     case cameraVideo = "camera_video"
     case screenRecording = "screen_recording"
+    case screenshot = "screenshot"
+    var isVideo: Bool { self != .screenshot }
 }
 
 /// What PhotoKit says about one video, reduced to what the rule needs.
@@ -53,6 +58,8 @@ struct AcquisitionAnchor: Equatable, Sendable {
 
 enum VideoMatchRule: String, Codable, Sendable {
     case filedPhotoTimeAndPlace = "filed_photo_time_place_v1"
+    case filedPhotoTime = "filed_photo_time_v1"          // a screenshot with no GPS: time only
+    case onDeviceText = "ocr_vehicle_terms_v1"           // a screenshot whose on-device text names a vehicle
     case acquisitionWindow = "acquisition_window_v1"
 }
 
@@ -65,9 +72,11 @@ enum VideoUnmatchedReason: String, Equatable, Sendable {
 }
 
 enum VideoMatch: Equatable, Sendable {
-    case matched(vehicleID: String, rule: VideoMatchRule, anchors: Int)
+    /// `vehicleID` is nil only for an OCR match: the phone found vehicle terms but cannot name the vehicle.
+    case matched(vehicleID: String?, rule: VideoMatchRule, anchors: Int)
     case unmatched(VideoUnmatchedReason)
     var vehicleID: String? { if case .matched(let v, _, _) = self { return v } else { return nil } }
+    var isMatch: Bool { if case .matched = self { return true } else { return false } }
 }
 
 enum VideoCaptureMatcher {
@@ -75,12 +84,15 @@ enum VideoCaptureMatcher {
                          photos: [FiledPhotoAnchor],
                          acquisitions: [AcquisitionAnchor],
                          calendar: Calendar = .current) -> VideoMatch {
-        guard video.duration > 0, video.duration <= VideoSyncConfig.maxClipSeconds else {
-            return .unmatched(.badDuration)
+        if video.kind.isVideo {
+            guard video.duration > 0, video.duration <= VideoSyncConfig.maxClipSeconds else {
+                return .unmatched(.badDuration)
+            }
         }
         switch video.kind {
         case .cameraVideo: return matchCamera(video, photos: photos)
         case .screenRecording: return matchScreenRecording(video, acquisitions: acquisitions, calendar: calendar)
+        case .screenshot: return matchScreenshot(video, photos: photos, acquisitions: acquisitions, calendar: calendar)
         }
     }
 
@@ -96,6 +108,30 @@ enum VideoCaptureMatcher {
         if vehicles.isEmpty { return .unmatched(.noFiledPhotoNearby) }
         if vehicles.count > 1 { return .unmatched(.ambiguousVehicles) }
         return .matched(vehicleID: vehicles.first!, rule: .filedPhotoTimeAndPlace, anchors: near.count)
+    }
+
+    /// A screenshot: a filed photo within 30 min (and 150 m when the screenshot has GPS), else the acquisition
+    /// window. Never OCR: the caller reads the text only when this returns unmatched.
+    static func matchScreenshot(_ shot: VideoCandidate, photos: [FiledPhotoAnchor], acquisitions: [AcquisitionAnchor],
+                                calendar: Calendar) -> VideoMatch {
+        let from = shot.startedAt.addingTimeInterval(-VideoSyncConfig.photoTimeWindow)
+        let to = shot.startedAt.addingTimeInterval(VideoSyncConfig.photoTimeWindow)
+        let near = photos.filter { p in
+            guard p.takenAt >= from && p.takenAt <= to else { return false }
+            if let lat = shot.latitude, let lon = shot.longitude {
+                return distanceMeters(lat, lon, p.latitude, p.longitude) <= VideoSyncConfig.photoRadiusMeters
+            }
+            return true
+        }
+        let vehicles = Set(near.map(\.vehicleID))
+        if vehicles.count > 1 { return .unmatched(.ambiguousVehicles) }
+        if let only = vehicles.first {
+            return .matched(vehicleID: only, rule: shot.latitude == nil ? .filedPhotoTime : .filedPhotoTimeAndPlace,
+                            anchors: near.count)
+        }
+        let byWindow = matchScreenRecording(shot, acquisitions: acquisitions, calendar: calendar)
+        if byWindow.isMatch || byWindow == .unmatched(.ambiguousVehicles) { return byWindow }
+        return .unmatched(.noFiledPhotoNearby)
     }
 
     /// The acquisition window of a purchase day: [day − 7 days, end of day + 2 days).

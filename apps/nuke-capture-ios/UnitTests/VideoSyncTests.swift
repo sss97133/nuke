@@ -35,11 +35,17 @@ final class VideoSyncTests: XCTestCase {
 
     // ─── Storage targets are private and keyed by the asset ───────────────────
 
-    func testVideosNeverGoToThePublicPhotoBucket() {
+    func testMediaNeverGoesToThePublicBuckets() {
         XCTAssertNotEqual(VideoSyncConfig.bucket, Config.storageBucket)
-        XCTAssertEqual(VideoSyncConfig.bucket, "capture-video")
+        XCTAssertNotEqual(VideoSyncConfig.bucket, "vehicle-images", "vehicle-images is public and image-only")
+        XCTAssertEqual(VideoSyncConfig.bucket, "capture-media")
+        XCTAssertEqual(VideoSyncConfig.table, "vehicle_images", "the existing video columns are the record")
+        XCTAssertEqual(VideoSyncConfig.rowSource, "capture_relay_ios_media")
+        XCTAssertNotEqual(VideoSyncConfig.rowSource, Config.sourceTag, "the photo triggers key on capture_relay_ios")
         XCTAssertEqual(VideoSyncConfig.previewPath(userID: "u", assetKey: "abc"), "users/u/previews/abc.mp4")
-        XCTAssertEqual(VideoSyncConfig.fullPath(userID: "u", assetKey: "abc", fileExtension: "MOV"), "users/u/full/abc.mov")
+        XCTAssertEqual(VideoSyncConfig.previewPath(userID: "u", assetKey: "abc", fileExtension: "JPG"), "users/u/previews/abc.jpg")
+        XCTAssertEqual(VideoSyncConfig.fullPath(userID: "u", rowID: "ABC-1", fileExtension: "MOV"), "users/u/full/abc-1.mov",
+                       "keyed by the row id, so the storage policy finds the row by primary key")
     }
 
     func testAssetKeyHidesThePhotoKitIdentifier() {
@@ -159,18 +165,54 @@ final class VideoSyncTests: XCTestCase {
 
     // ─── What the server is told ──────────────────────────────────────────────
 
-    func testThePreviewRowNamesNoVehicleAndNoPhotoKitID() throws {
-        let row = VideoAssetRow(
-            user_id: "u", asset_key: String(repeating: "a", count: 64), kind: "screen_recording",
-            taken_at: "2026-11-04T12:00:00Z", duration_seconds: 30, latitude: nil, longitude: nil,
-            device_model: "iPhone17,1", device_os: "26.0", width: 1170, height: 2532,
-            preview_path: "users/u/previews/x.mp4", preview_size_bytes: 1000, match_rule: "acquisition_window_v1",
-            suggested_vehicle_id: "V1",
-            match_basis: .init(rule: "acquisition_window_v1", anchors: 1, window_seconds: nil, radius_m: nil, days_before: 7, days_after: 2))
-        let json = try XCTUnwrap(String(data: JSONEncoder().encode(row), encoding: .utf8))
-        XCTAssertFalse(json.contains("\"vehicle_id\""), "the phone suggests; only the server attributes")
-        XCTAssertFalse(json.contains("\"state\""))
+    func testOCRCheckedScreenshotsAreRemembered() {
+        var l = VideoLedger()
+        XCTAssertFalse(l.isOCRChecked("a"))
+        l.markOCRChecked("a")
+        XCTAssertTrue(l.isOCRChecked("a"))
+        XCTAssertFalse(l.isKnown("a"), "OCR-checked is not 'previewed': a later filed photo may still match it by time")
+    }
+
+    // ─── What the server is told ──────────────────────────────────────────────
+
+    private func row(kind: String = "screen_recording", sensitive: Bool = true, vehicle: String? = "V1") -> MediaImageRow {
+        MediaImageRow(
+            id: "r1", user_id: "u", image_url: "", storage_path: "users/u/previews/x.mp4", file_name: "x-preview.mp4",
+            mime_type: "video/mp4", file_size: 1000, is_video: true, duration_seconds: 30, video_codec: "hvc1",
+            video_resolution: "1170x2532", taken_at: "2026-11-04T12:00:00Z", latitude: nil, longitude: nil,
+            source: VideoSyncConfig.rowSource, image_medium: "other", ai_processing_status: "skipped",
+            is_sensitive: sensitive, ingest_kind: "live", auto_suggested_vehicle_id: vehicle,
+            auto_suggestion_reasons: ["acquisition_window_v1"],
+            exif_data: MediaExif(synced_by: "capture-relay-ios", asset_key: String(repeating: "a", count: 64), media: .init(
+                kind: kind, bucket: "capture-media", preview_path: "users/u/previews/x.mp4", preview_bytes: 1000,
+                full_state: "held_on_phone", device_model: "iPhone17,1", device_os: "26.0", width: 1170, height: 2532,
+                match: .init(rule: "acquisition_window_v1", anchors: 1, window_seconds: nil, radius_m: nil,
+                             days_before: 7, days_after: 2, terms: nil))))
+    }
+
+    func testThePreviewRowFillsTheExistingVideoColumnsAndFilesNoVehicle() throws {
+        let json = try XCTUnwrap(String(data: JSONEncoder().encode(row()), encoding: .utf8))
+        for column in ["\"is_video\":true", "\"duration_seconds\":30", "\"video_codec\":\"hvc1\"",
+                       "\"video_resolution\":\"1170x2532\"", "\"mime_type\":\"video\\/mp4\""] {
+            XCTAssertTrue(json.contains(column), column)
+        }
+        XCTAssertFalse(json.contains("\"vehicle_id\""), "the phone suggests; a person files")
+        XCTAssertFalse(json.contains("user_confirmed_vehicle"))
+        XCTAssertTrue(json.contains("\"image_url\":\"\""), "private bucket: no public URL")
+        XCTAssertTrue(json.contains("auto_suggested_vehicle_id"))
         XCTAssertFalse(json.contains("full_path"))
-        XCTAssertTrue(json.contains("suggested_vehicle_id"))
+        XCTAssertTrue(json.contains("held_on_phone"))
+    }
+
+    func testNoVehicleSuggestionIsOmittedNotNull() throws {
+        let json = try XCTUnwrap(String(data: JSONEncoder().encode(row(vehicle: nil)), encoding: .utf8))
+        XCTAssertFalse(json.contains("auto_suggested_vehicle_id"))
+    }
+
+    func testTheRowCarriesNoPixelsAndNoOCRText() throws {
+        let data = try JSONEncoder().encode(row())
+        XCTAssertLessThan(data.count, 4_000, "metadata only")
+        let json = try XCTUnwrap(String(data: data, encoding: .utf8))
+        XCTAssertFalse(json.contains("\"text\""))
     }
 }

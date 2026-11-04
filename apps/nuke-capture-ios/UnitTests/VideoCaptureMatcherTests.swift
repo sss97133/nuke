@@ -117,4 +117,53 @@ final class VideoCaptureMatcherTests: XCTestCase {
         XCTAssertEqual(VideoCaptureMatcher.distanceMeters(0, 0, 0, 0), 0, accuracy: 0.001)
         XCTAssertEqual(VideoCaptureMatcher.distanceMeters(35.0, -114.0, 35.001, -114.0), 111.2, accuracy: 1.0)
     }
+
+    // ─── Screenshots ─────────────────────────────────────────────────────────
+
+    private func shot(_ start: Date? = nil, lat: Double? = nil, lon: Double? = nil) -> VideoCandidate {
+        VideoCandidate(assetKey: "ss", kind: .screenshot, startedAt: start ?? t0, duration: 0, latitude: lat, longitude: lon)
+    }
+
+    func testAScreenshotWithoutGPSMatchesAFiledPhotoByTimeAlone() {
+        let m = VideoCaptureMatcher.evaluate(shot(), photos: [photo(offset: -1500)], acquisitions: [], calendar: utc)
+        XCTAssertEqual(m, .matched(vehicleID: "V1", rule: .filedPhotoTime, anchors: 1))
+    }
+
+    func testAScreenshotIsNotSubjectToTheClipDurationBounds() {
+        XCTAssertNotEqual(VideoCaptureMatcher.evaluate(shot(), photos: [photo()], acquisitions: [], calendar: utc),
+                          .unmatched(.badDuration))
+    }
+
+    func testAScreenshotWithGPSMustBeWithinOneHundredFiftyMeters() {
+        XCTAssertEqual(VideoCaptureMatcher.evaluate(shot(lat: lat, lon: lon), photos: [photo(dLat: 0.001)], acquisitions: [], calendar: utc),
+                       .matched(vehicleID: "V1", rule: .filedPhotoTimeAndPlace, anchors: 1))
+        XCTAssertEqual(VideoCaptureMatcher.evaluate(shot(lat: lat, lon: lon), photos: [photo(dLat: 0.002)], acquisitions: [], calendar: utc),
+                       .unmatched(.noFiledPhotoNearby))
+    }
+
+    func testAScreenshotOutsideThirtyMinutesOfAFiledPhotoStaysOnThePhone() {
+        XCTAssertEqual(VideoCaptureMatcher.evaluate(shot(), photos: [photo(offset: -1801)], acquisitions: [], calendar: utc),
+                       .unmatched(.noFiledPhotoNearby))
+        XCTAssertEqual(VideoCaptureMatcher.evaluate(shot(), photos: [photo(offset: 1801)], acquisitions: [], calendar: utc),
+                       .unmatched(.noFiledPhotoNearby))
+        XCTAssertNotNil(VideoCaptureMatcher.evaluate(shot(), photos: [photo(offset: 1800)], acquisitions: [], calendar: utc).vehicleID)
+    }
+
+    func testAScreenshotMatchesTheAcquisitionWindowToo() {
+        let a = AcquisitionAnchor(vehicleID: "V9", purchaseDay: t0)
+        XCTAssertEqual(VideoCaptureMatcher.evaluate(shot(t0.addingTimeInterval(-2 * 86_400)), photos: [], acquisitions: [a], calendar: utc),
+                       .matched(vehicleID: "V9", rule: .acquisitionWindow, anchors: 1))
+        XCTAssertEqual(VideoCaptureMatcher.evaluate(shot(t0.addingTimeInterval(-9 * 86_400)), photos: [], acquisitions: [a], calendar: utc),
+                       .unmatched(.noFiledPhotoNearby))
+    }
+
+    func testAScreenshotNearTwoVehiclesIsAmbiguous() {
+        XCTAssertEqual(VideoCaptureMatcher.evaluate(shot(), photos: [photo("V1"), photo("V2")], acquisitions: [], calendar: utc),
+                       .unmatched(.ambiguousVehicles))
+    }
+
+    func testAnUnrelatedScreenshotMatchesNothing() {
+        XCTAssertEqual(VideoCaptureMatcher.evaluate(shot(), photos: [], acquisitions: [], calendar: utc),
+                       .unmatched(.noFiledPhotoNearby))
+    }
 }
