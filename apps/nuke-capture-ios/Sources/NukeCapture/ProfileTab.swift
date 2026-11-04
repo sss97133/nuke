@@ -350,6 +350,14 @@ struct ProfileView: View {
                 .listRowBackground(Color.clear)
                 .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
 
+            // "What brings you here?": the one door to change the onboarding answer. Own profile, or
+            // the sample while exploring signed out (the visitor's answer).
+            if isOwn {
+                PersonaProfileSection(scope: PersonaStorage.scope(userId: userId, signedIn: true))
+            } else if onSignIn != nil, userId == Config.sampleProfileUserId {
+                PersonaProfileSection(scope: PersonaStorage.visitorScope)
+            }
+
             if isOwn { photoEvidenceSection }
 
             // BARCODE — the proof-of-work graph, directly under the identity (the
