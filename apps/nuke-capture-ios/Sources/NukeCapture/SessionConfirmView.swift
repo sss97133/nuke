@@ -117,7 +117,7 @@ struct SessionConfirmView: View {
         HStack(spacing: 12) {
             Button { picking = s } label: {
                 HStack(spacing: 12) {
-                    AsyncImage(url: Self.thumb(s.sample_url)) { img in
+                    CachedAsyncImage(url: Self.thumb(s.sample_url), maxPixel: 300) { img in
                         img.resizable().scaledToFill()
                     } placeholder: { Rectangle().fill(Color(.secondarySystemFill)) }
                     .frame(width: 56, height: 56).clipped()
@@ -220,7 +220,7 @@ private struct VehiclePickerSheet: View {
                             Button {
                                 if !selectedIDs.insert(photo.id).inserted { selectedIDs.remove(photo.id) }
                             } label: {
-                                AsyncImage(url: NukeImage.thumb(photo.image_url, width: 240)) { image in
+                                CachedAsyncImage(url: NukeImage.thumb(photo.image_url, width: 240), maxPixel: 480) { image in
                                     image.resizable().scaledToFill()
                                 } placeholder: { Rectangle().fill(Color(.secondarySystemFill)) }
                                 .frame(height: 90).frame(maxWidth: .infinity).clipped()
@@ -373,7 +373,7 @@ private struct VehiclePickerSheet: View {
             }
         } label: {
             HStack(spacing: 12) {
-                AsyncImage(url: SessionConfirmView.thumb(v.primary_image_url)) { img in
+                CachedAsyncImage(url: SessionConfirmView.thumb(v.primary_image_url), maxPixel: 300) { img in
                     img.resizable().scaledToFill()
                 } placeholder: { Rectangle().fill(Color(.secondarySystemFill)) }
                 .frame(width: 48, height: 48).clipped()

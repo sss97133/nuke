@@ -2300,7 +2300,11 @@ struct CountyChoropleth: UIViewRepresentable {
                 recolor(r, overlay)
                 return r
             }
-            let r = MKPolygonRenderer(polygon: overlay as! MKPolygon)
+            guard let polygon = overlay as? MKPolygon else {
+                // An overlay type we never add: draw nothing rather than crash.
+                return MKOverlayRenderer(overlay: overlay)
+            }
+            let r = MKPolygonRenderer(polygon: polygon)
             recolor(r, overlay)
             return r
         }
