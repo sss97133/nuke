@@ -9,6 +9,9 @@ struct PaperworkScanView: View {
     @ObservedObject private var queue = PaperworkQueue.shared
     @Environment(\.dismiss) private var dismiss
     @State private var scanning = false
+    /// The "why the camera" screen, shown before iOS asks, only while iOS has never asked.
+    @State private var explainingCamera = false
+    @State private var cameraExplained = false
     @State private var nextIsLabel = false
 
     var body: some View {
@@ -49,7 +52,7 @@ struct PaperworkScanView: View {
             }
             .safeAreaInset(edge: .bottom) {
                 Button {
-                    scanning = true
+                    if PermissionPrimer.needsExplanation(.camera) { explainingCamera = true } else { scanning = true }
                 } label: {
                     Label(nextIsLabel ? "Scan label card" : "Scan document", systemImage: "doc.viewfinder")
                         .font(.title3.bold()).frame(maxWidth: .infinity).padding(.vertical, 14)
@@ -62,6 +65,17 @@ struct PaperworkScanView: View {
             .navigationTitle("Paperwork")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .topBarLeading) { Button("Done") { dismiss() } } }
+            .sheet(isPresented: $explainingCamera, onDismiss: {
+                // Open the camera only after the explanation sheet is fully gone.
+                if cameraExplained { cameraExplained = false; scanning = true }
+            }) {
+                PermissionPrimerView(kind: .camera) {
+                    cameraExplained = true
+                    explainingCamera = false
+                } onNotNow: {
+                    explainingCamera = false
+                }
+            }
             .fullScreenCover(isPresented: $scanning) {
                 DocumentCamera { images in
                     scanning = false

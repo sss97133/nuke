@@ -14,7 +14,8 @@
 //      constellation; its "Look around first" path flips exploreMode),
 //      exploring → MainTabView (read-only Map + sample profile), signed in + ignition pending → IgnitionView (first-run
 //      full-library scan), signed in + ignition complete → MainTabView
-//      (MAP · PROFILE · TODAY).
+//      (MAP · PROFILE · TODAY). Right after a first sign-in, or after "Look around first",
+//      PersonaOnboardingView asks "What brings you here?" once (see PersonaGate), before the scan.
 
 import SwiftUI
 import BackgroundTasks
@@ -46,6 +47,9 @@ struct NukeCaptureApp: App {
     @AppStorage("exploreMode") private var exploreMode = false
     /// The first-launch welcome has been seen (or the user signed in). See WelcomeGate.
     @AppStorage(WelcomeGate.seenKey) private var welcomeSeen = false
+    /// The saved "What brings you here?" answers (keyed to the user). Observed so the question
+    /// disappears the moment it is answered.
+    @ObservedObject private var personas = PersonaStore.shared
 
     init() {
         // Must happen during launch: registering after didFinishLaunching
@@ -275,7 +279,10 @@ struct NukeCaptureApp: App {
     @ViewBuilder private var rootView: some View {
         Group {
             if session.isSignedIn {
-                    if ignitionComplete {
+                    if needsPersona {
+                        // Right after a first sign-in: one question, before the first-run scan.
+                        PersonaOnboardingView(scope: personaScope)
+                    } else if ignitionComplete {
                         MainTabView()
                     } else if ignition.phase == .denied {
                         // Photos denied is NOT a dead end: capture is one
@@ -288,9 +295,14 @@ struct NukeCaptureApp: App {
                         IgnitionView()
                     }
                 } else if exploreMode {
-                    // Explore: the populated world, read-only. No Today tab
-                    // (no grant), Sign In one tap away in Profile.
-                    MainTabView()
+                    if needsPersona {
+                        // "Look around first": the same one question, then the world.
+                        PersonaOnboardingView(scope: personaScope)
+                    } else {
+                        // Explore: the populated world, read-only. No Today tab
+                        // (no grant), Sign In one tap away in Profile.
+                        MainTabView()
+                    }
                 } else if WelcomeGate.shouldShow(seen: welcomeSeen, signedIn: false, exploring: false, skip: Self.skipsWelcome) {
                     // Fresh install: say what the app is before asking for anything.
                     WelcomeView()
@@ -303,6 +315,16 @@ struct NukeCaptureApp: App {
         .onChange(of: session.isSignedIn, initial: true) { _, signedIn in
             if signedIn { welcomeSeen = true }
         }
+    }
+
+    /// Who the saved answer belongs to: the signed-in user, or "visitor" while looking around.
+    private var personaScope: String {
+        PersonaStorage.scope(userId: SupabaseService.currentUserId, signedIn: session.isSignedIn)
+    }
+
+    /// True until this person has answered "What brings you here?". Fixture launches skip it.
+    private var needsPersona: Bool {
+        PersonaGate.shouldShow(hasChoice: personas.choice(for: personaScope) != nil, skip: Self.skipsWelcome)
     }
 
     /// UI-test / fixture launches never see the welcome.
