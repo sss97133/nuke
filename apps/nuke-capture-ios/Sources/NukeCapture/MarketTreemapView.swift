@@ -981,7 +981,7 @@ struct FilteredVehicleGrid: View {
     @State private var rows: [VehicleHeaderRow] = []
     @State private var loading = true
     @State private var failed = false
-    private let columns = Array(repeating: GridItem(.flexible(), spacing: 2), count: 3)
+    private let columns = [GridItem(.flexible(), spacing: NukeSpace.md), GridItem(.flexible(), spacing: NukeSpace.md)]
 
     private var title: String {
         PulseDim.allCases.compactMap { filters[$0.rawValue] }.joined(separator: " · ")
@@ -990,35 +990,30 @@ struct FilteredVehicleGrid: View {
     var body: some View {
         Group {
             if loading && rows.isEmpty {
-                VStack(spacing: 10) {
-                    ProgressView()
-                    Text("Loading cars…")
-                        .font(.system(.footnote, design: .monospaced)).foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                NukeTileGridSkeleton(message: "Finding cars…")
             } else if failed && rows.isEmpty {
-                ContentUnavailableView {
-                    Label("Couldn't load", systemImage: "exclamationmark.triangle")
-                } actions: {
-                    Button("Retry") { Task { await load() } }.buttonStyle(.borderedProminent)
-                }
+                NukeEmptyState(icon: "wifi.exclamationmark", title: "We couldn't load these cars",
+                               message: "Check your connection, then try again.",
+                               actionTitle: "Try again") { Task { await load() } }
             } else if rows.isEmpty {
-                ContentUnavailableView("No photographed cars", systemImage: "car.side")
+                NukeEmptyState(icon: "car.side", title: "No cars with photos here yet",
+                               message: "Try a broader group of cars.")
             } else {
                 ScrollView {
                     // Analyst Toolbox move 1: the cohort's price distribution rides
                     // above its holdings — the shape IS the price (no printed median).
                     CohortDistributionCard(filters: filters)
                         .padding(.horizontal, 10).padding(.top, 8).padding(.bottom, 6)
-                    Text("\(rows.count) photographed records shown · up to 60 · source-label matches · auction sources first, then recorded price · availability unverified")
-                        .font(.caption).foregroundStyle(.secondary)
+                    Text(NukeDisplay.count(rows.count, "car") + " with photos · availability isn't confirmed")
+                        .font(.footnote).foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 12).padding(.bottom, 8)
-                    LazyVGrid(columns: columns, spacing: 2) {
+                        .padding(.horizontal, NukeSpace.lg).padding(.bottom, NukeSpace.sm)
+                    LazyVGrid(columns: columns, spacing: NukeSpace.lg) {
                         ForEach(rows) { v in
                             NavigationLink(value: v) { cell(v) }.buttonStyle(.plain)
                         }
                     }
+                    .padding(.horizontal, NukeSpace.lg).padding(.bottom, NukeSpace.xl)
                 }
             }
         }
@@ -1028,26 +1023,9 @@ struct FilteredVehicleGrid: View {
     }
 
     @ViewBuilder private func cell(_ v: VehicleHeaderRow) -> some View {
-        Color(.secondarySystemFill)
-            .aspectRatio(1, contentMode: .fit)
-            .overlay {
-                CachedAsyncImage(url: NukeImage.thumb(v.primary_image_url, width: 200)) { img in
-                    img.resizable().scaledToFill()
-                } placeholder: {
-                    Image(systemName: "car.side").font(.title2).foregroundStyle(.secondary)
-                }
-            }
-            .clipped()
-            .overlay(alignment: .bottomLeading) {
-                Text([v.year.map(String.init), v.make, v.model].compactMap { $0 }.joined(separator: " "))
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(.white)
-                    .lineLimit(2)
-                    .padding(6)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(.black.opacity(0.7))
-            }
-            .contentShape(Rectangle())
+        NukeVehicleTile(imageURL: NukeImage.thumb(v.primary_image_url, width: 600),
+                        name: NukeDisplay.vehicleName(year: v.year, make: v.make, model: v.model),
+                        detail: NukeDisplay.joined([v.city, v.state], separator: ", "))
     }
 
     private func load() async {
