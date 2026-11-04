@@ -1594,6 +1594,7 @@ private struct PhotoFullScreenView: View {
                     .foregroundStyle(.white.opacity(0.7), .black.opacity(0.4))
                     .padding(12)
             }
+            .accessibilityLabel("Close")
         }
     }
 

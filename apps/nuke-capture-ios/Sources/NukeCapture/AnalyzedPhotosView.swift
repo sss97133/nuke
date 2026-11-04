@@ -263,6 +263,7 @@ struct AnalyzedEvidenceView: View {
                     // Ask the agent about THIS photo — the conversational face of the
                     // same correction verbs, grounded in this photo + its vehicle.
                     Button { showChat = true } label: { Image(systemName: "bubble.left.and.text.bubble.right") }
+                        .accessibilityLabel("Ask the agent about this photo")
                 }
             }
             // No opaque toolbar override — let the system float a Liquid Glass bar

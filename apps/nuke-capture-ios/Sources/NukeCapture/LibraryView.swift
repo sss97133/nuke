@@ -100,6 +100,7 @@ struct LibraryView: View {
                     }
                     ToolbarItem(placement: .topBarTrailing) {
                         Button { showDays = true } label: { Image(systemName: "calendar") }
+                            .accessibilityLabel("Days")
                     }
                     ToolbarItem(placement: .topBarTrailing) {
                         Menu {

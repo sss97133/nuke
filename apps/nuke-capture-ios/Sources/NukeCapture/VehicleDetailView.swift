@@ -1144,6 +1144,7 @@ struct VehicleDetailView: View {
             if renderingShare { ProgressView() }
             else { Image(systemName: "square.and.arrow.up") }
         }
+        .accessibilityLabel("Share")
         .disabled(renderingShare)
     }
 
@@ -1355,6 +1356,7 @@ struct VehicleDetailView: View {
                                 .foregroundStyle(.secondary)
                         }
                         .buttonStyle(.plain)
+                        .accessibilityLabel("Collapse timeline")
                     }
                     .padding(.horizontal, 16)
                     BarcodeTimeline(days: days) { day in
@@ -1386,6 +1388,10 @@ struct VehicleDetailView: View {
                     }
                     .contentShape(Rectangle())
                     .onTapGesture { withAnimation(.snappy(duration: 0.22)) { timelineExpanded = true } }
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel("Build timeline")
+                    .accessibilityHint("Expands the timeline")
+                    .accessibilityAddTraits(.isButton)
                     .transition(.opacity)
                 }
             }
@@ -2786,6 +2792,7 @@ private struct CommentsSheet: View {
                     if posting { ProgressView().scaleEffect(0.7) }
                     else { Image(systemName: "arrow.up.circle.fill").font(.title2) }
                 }
+                .accessibilityLabel("Post comment")
                 .disabled(posting || commentDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
             .padding(12)
