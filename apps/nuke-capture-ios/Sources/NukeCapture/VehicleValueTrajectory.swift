@@ -105,9 +105,10 @@ struct ValueTrajectoryView: View {
         struct P: Encodable { let p_vehicle: String }
         loadFailed = false
         do {
-            t = try await SupabaseService.client
+            let timeline: InvestmentTimeline = try await SupabaseService.client
                 .rpc("get_vehicle_investment_timeline", params: P(p_vehicle: vehicleId))
                 .execute().value
+            t = timeline
         } catch {
             guard !Task.isCancelled else { return }
             loadFailed = true

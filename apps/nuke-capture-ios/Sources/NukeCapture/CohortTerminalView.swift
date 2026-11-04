@@ -1013,9 +1013,10 @@ private struct SaleCard: View {
         defer { loaded = true }
         guard let vid = sale.vehicleId else { return }
         do {
-            v = try await SupabaseService.client
+            let snap: VehicleSnapshot = try await SupabaseService.client
                 .from("vehicles").select("year,make,model,trim,primary_image_url")
                 .eq("id", value: vid).single().execute().value
+            v = snap
         } catch {
             loadFailed = true
             NSLog("NukeCapture sale snapshot load failed: %@", String(describing: error))
