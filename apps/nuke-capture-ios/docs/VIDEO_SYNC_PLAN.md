@@ -1,9 +1,10 @@
 # Vehicle video sync, attributed by content — findings, plan, rules
 
-Status: **plan + code behind a flag that is OFF by default**. The migration
-(`supabase/migrations/20261109100000_capture_media_bucket.sql`: one private bucket + storage policies, no table
-change) is written and **not applied**; merging this PR to `main` applies it automatically
-(`supabase-deploy.yml`), so the owner approves it first.
+Status: **plan + code behind a flag that is OFF by default**. Two migrations are written and **not applied**:
+`supabase/migrations/20261109100000_capture_media_bucket.sql` (one private bucket + storage policies) and
+`20261109100100_capture_media_acquisition_document.sql` (the RPC `device_file_media_document` for screen captures).
+Neither changes a table or column. Merging this PR to `main` applies both automatically (`supabase-deploy.yml`), so the
+owner approves them first. The RPC has been syntax-checked only (pglast); it has never been executed.
 
 Measured read-only on 2026-11-04 (project `qkgaybvrernstplzjaam`). Counts are for the owner's account
 (`0b9f107a…`, the only user in `capture_upload_status`); other users were not measured.
@@ -18,8 +19,37 @@ is never prompted. A full-file upload is allowed once the item is auto-attribute
 Preview and full file stay private. Everything is behind a switch that is OFF by default, no bulk sync, no history
 (14 days), storage reuses the existing `vehicle_images` video columns.
 
+**Update (2026-11-04, acceptance test): screen recordings and screenshots must be supported.** They are *documents*,
+not photos, so they do not go through the photo gate. They have their own evidence rule, `screen_text_v1`
+(section 2c), still decided on the phone, still behind the same switch.
+
 (Earlier scope this replaces: context-only matching with a "suggested" vehicle and a human confirm before the full
 file; acquisition windows; screenshot OCR terms. All removed.)
+
+## Acceptance test: the '64 Corvette (vehicle `2e5ec4a1`)
+
+**This is THE acceptance test for this PR.** Everything else is in service of it. It has two days and four steps.
+
+Starting state, read from the database (read-only, 2026-11-04): vehicle `2e5ec4a1-c5fc-456d-8cff-82c6e582fd58`,
+1964 Chevrolet Corvette, owned by the account `0b9f107a…`, **`vin` null, `purchase_date` null**, 27 photos filed to it,
+the earliest taken **2023-09-17 05:27:58 UTC**. Nothing exists for 2023-09-16.
+
+| # | Step | Expected | PASS when | FAIL when |
+|---|---|---|---|---|
+| 1 | **Sep 16, 2023** Facebook Marketplace screen recording of the purchase negotiation is on the phone. Switch on. A photo sync pass finishes. | The phone finds it (it is a `videoScreenRecording` made inside the Corvette's acquisition window), reads 12 frames of its first 60 s with Vision OCR **on the device**, and sees the Corvette, the price and the seller. | The pass log shows the item read and attributed (`screen captures: 1 attached as documents`), and no upload happened before the next step's server call succeeded. | It is never listed (window or anchor wrong), is read but refused (OCR missed the year/make/model line or the price/seller), or anything leaves the phone before the server attaches it. |
+| 2 | The server attaches it. | A metadata-only `vehicle_images` row (`source capture_relay_ios_media`, no pixels, no `vehicle_id`) is inserted; `device_file_media_document` revalidates and **creates one `vehicle_documents` row**: `document_type acquisition_document`, `privacy_level private`, `vehicle_id = 2e5ec4a1`, `amount` = the price, `vendor_name` = the seller, and a description that cites **price, seller and date to frame index + timestamp**. The image row gets `vehicle_id = 2e5ec4a1` and `is_document = true`. | Exactly one document for this recording; every cited field has a frame (1 to 12) and a timestamp (0 to 60 s); `vehicle_id` equals the Corvette; nothing else on the Corvette changed (`purchase_price`, `purchase_date`, image counts, primary image). Re-running the pass makes no second document. | No document, a second document, a wrong vehicle, a cited field with no frame, any OCR text beyond the cited values in the database, or a change to the vehicle row. |
+| 3 | A **private preview** uploads. | One object in the private `capture-media` bucket at `users/<uid>/previews/<row id>.mp4` (first 60 s, video only). No `full/` object exists. | The object exists, is readable only by the owner, `vehicle_images.storage_path` points at it, and the original recording is **not** in the bucket. | A public object, a `full/` object, audio, or an object for a refused capture. |
+| 4 | **Sep 17, 2023**, 27 photos at Ann Rd (36.2618, -115.3024) should auto-land on `2e5ec4a1`, using the previous day's purchase as context. | With the attached acquisition document as context, photos of the next day near that place land on the Corvette without a person. | All 27 photos are filed to `2e5ec4a1` **by the photo filing path using the document as context** (not by hand, not by a script). | Any photo stays unfiled, or lands on another vehicle. |
+
+Honest status of each step (details in "What the read-only check found" below):
+
+* Steps 1 to 3 are built in this PR. Their **rules are unit-tested** with simulated Corvette OCR text
+  (`ScreenCaptureEvidenceTests`). What can only be proven **on a real device**: that Vision reads a real Marketplace
+  recording's text well enough (small fonts, scrolling, dark mode), that the recording is a `videoScreenRecording`,
+  that PhotoKit hands over the local file, and that the 1080p preview export fits. The RPC has not run anywhere.
+* Step 4 **is not delivered by this PR** and, in the live database, **has already happened by another route**: the
+  Sep 17 photos are filed to `2e5ec4a1` (via `ssd_blast`, not the phone). Re-proving it from the phone would need a
+  fresh, unfiled copy of those photos. What the context change needs is described in "Context for the photos".
 
 ## 1. How photo sync works today
 
@@ -156,18 +186,103 @@ Not run for these rows at all: the cloud vision gate (`vision_gate_status`), whi
 uploaded image; media rows are `skipped` with no image, so the privacy decision for these pixels is the on-device
 `VisionDecision` on all 12 frames. No server change is required for this PR beyond the bucket and policy.
 
-### 2c. Screenshots and screen recordings
+### 2c. Screenshots and screen recordings: `screen_text_v1`
 
-Under the stated rule ("same classifier, plate and VIN readers and filing gate as photos") they can **never** clear:
-the photo gate treats a screenshot as a document (`VisionEngine.isUnnecessary(isScreenshot:)` → `isIdentityDocument`
-→ no identifier is accepted from a document, and `VisionDecision` holds the pixels), and a VIN printed on a document
-cannot file a photo. So this PR does **not** read, upload or attribute screenshots or screen recordings: the
-screenshot and acquisition-window code, OCR-term matching and image preview path were removed. Whether a separate
-screen-capture evidence rule should exist is decision 1 below.
+A screen capture is a record *about* a vehicle (a listing, a bill of sale, a text thread), not a photo *of* it. The
+photo gate holds a document's pixels and never accepts an identifier from one, so screen captures take a separate
+rule. `ScreenCaptureEvidence.swift` is the whole rule as pure code; `ScreenCaptureSync.swift` is the PhotoKit/Vision
+plumbing. Four stages:
+
+1. **Narrow by acquisition context** (metadata only; nothing is read yet). A vehicle is a candidate for a capture made
+   inside its window: **21 days before to 2 days after its anchor** (3 days after when the anchor is a
+   `purchase_date`, because that is a whole day). The anchor is, in order: **`vehicles.purchase_date`** (UTC
+   midnight); else **the vehicle's first filed photo** (`taken_at` of the earliest real photo: not a clip this feature
+   filed, not sensitive, superseded or duplicate). **`created_at` is never used**: for imported or merged profiles it is the
+   import date (the Corvette's is 2026-01-13, three years after the purchase). A vehicle with neither is not a
+   candidate. Only captures inside some window are listed: no bulk history. Windows are merged, at most 200 per pass.
+2. **Read on the phone.** Vision OCR (`VNRecognizeTextRequest`, accurate, no language correction) over the screenshot,
+   or over 12 frames evenly spaced across the first 60 s of the recording (the same span the preview carries, so every
+   cited timestamp is findable in the uploaded preview). Recognised text lives in memory for one evaluation: never
+   stored, logged or sent. Local files only (no iCloud download). Recordings over 15 min are not read.
+3. **Decide.** Attribute only when the text gives **strong vehicle evidence that matches exactly one of the owner's
+   vehicles AND a price or seller line**:
+   * vehicle evidence: the vehicle's **own checksum-valid VIN** (confidence 0.97), or **year + make + model** (year
+     and model on one line, the make anywhere in the same frame; `'64` and short makes like "Chevy" accepted;
+     confidence 0.92). Both clear the 0.9 photo floor.
+   * commercial evidence: a price line ($500 to $5,000,000) or a seller line ("Seller: Name", "Listed by", "Seller
+     information" then a name, or a "Message seller" control).
+   * **refused** (stays on the phone, no prompt, never read again): no vehicle evidence; two vehicles evidenced; a
+     different valid VIN on screen; evidence for a vehicle outside its own window; no price or seller; a prominent
+     face in any frame; private text in any frame (card number that passes Luhn, SSN pattern, "password",
+     "verification code", "CVV", routing/account number).
+4. **File.** A metadata-only `vehicle_images` row is inserted (no `vehicle_id`, no location), then the RPC
+   **`device_file_media_document`** (migration `20261109100100`) is called with the method, confidence and the
+   **cited fields only**: `{name, value, frame, seconds}` for `vehicle`, `vin`, `price` (+ up to two `price_seen`),
+   `seller` (or `seller_line`), `date` (only a full date with a year). **Never the OCR dump.** The RPC revalidates
+   ownership, association, the window (recomputed from the database), the text-to-vehicle agreement (a `vehicle`
+   field must equal the vehicle's year make model; a `vin` field its VIN; a same-year/make/model second vehicle makes
+   it ambiguous), the price bounds and the preview path, then in one transaction inserts a private
+   **`acquisition_document`** (`amount` = price, `vendor_name` = seller, description = the cited fields with their
+   frames) and sets the row's `vehicle_id` and `is_document = true`. On any failure **nothing is written**:
+   `vehicle_id` stays null, there is no document, and the storage policy refuses the preview. (The row is a
+   metadata-only residue, as for camera clips.)
+
+Upload is **preview only**: a screenshot as a 1600 px JPEG (<= 2 MB), a recording as its first 60 s, video only,
+1080p (falls back to 640x480). The **original never uploads**: the storage policy opens `full/` only for rows whose
+`exif_data.media.kind` is `camera_video`. `vehicle_documents.file_url` is set by the RPC to
+`capture-media/<preview path>`; `vehicle_images.storage_path` is patched by the app once the object lands.
+
+The rule does **not** write `vehicles.purchase_price` or `purchase_date` (decision 14).
+
+Why this reading of "prior-day purchase as context" stops at narrowing for the capture itself: the recording is
+attributed by its own text. The window only decides which vehicles are worth reading it against.
+
+### 2c-bis. What the read-only check found (2026-11-04, project `qkgaybvrernstplzjaam`)
+
+* `2e5ec4a1-c5fc-456d-8cff-82c6e582fd58` exists: **1964 Chevrolet Corvette**, `vin` **null**, `purchase_date` **null**,
+  `created_at` 2026-01-13 (a profile-split import), 27 `vehicle_images` (all the owner's), the first taken
+  2023-09-17 05:27:58 UTC.
+* Photos on **2023-09-17**: **26**, not 27 (the 27th is a 2025 photo from a dropbox sync). All 26 are **already filed**
+  to `2e5ec4a1`, all via **`ssd_blast`**. None came from the phone's sync, so none went through the photo gate or
+  `capture_sets_score`. Those near Ann Rd (36.2618, -115.3024) are among them.
+* Why the *phone* path could not file them: the photo gate's methods are `vin_ocr` (needs the vehicle's 17-character
+  VIN: the Corvette has **none**) and `serial_ocr` (needs a serial in `vehicles`: none). A 1964 Corvette photo with no
+  readable VIN plate has no content evidence, so the gate does not file it. Only the server's context scorer could.
+* Nothing exists for 2023-09-16 (no document, no image).
+* Verified for the new RPC (read-only): `vehicle_documents` has `vehicle_id` (NOT NULL), `uploaded_by`,
+  `document_type` (free text), `title`, `description`, `file_url`, `file_type`, `amount`, `vendor_name`, `currency`,
+  `privacy_level` (default `private`), no metadata column (so the cited fields live in the description and in
+  `vehicle_images.exif_data.media.screen_fields`). `vehicle_images` gallery eligibility
+  (`vehicle_image_gallery_eligible`) already excludes `is_document = true` and empty `image_url`, and the primary-image
+  function requires a non-empty `image_url`: a filed screen capture does not enter galleries, counts or the cover.
+  The BEFORE UPDATE gate trigger (`enforce_vision_gate_filing`) fires only for `rejected_*` gate states, so setting
+  `vehicle_id` on a fresh row is not blocked. Side effects that **do** still fire on `vehicle_id` set: `has_photos`,
+  the activity bump (a `photo` activity at the capture's `taken_at`), completion/summary queues and
+  `compute_vehicle_value`: all pre-existing for camera clips too.
+
+### Context for the photos (acceptance step 4): what is needed
+
+How the server decides today: `capture_sets_score` v3 scores `capture_relay_ios` photos with a non-empty `image_url`.
+Its history prior uses **any filed `vehicle_images` row of the user**: weight `exp(-gap_days/2)` x (1.0 same GPS cell,
+else 0.35), plus `work_sessions` (0.6). It **does not read `purchase_date` or documents**. An attached screen-capture
+row is a filed row of the user, so it already counts, but with no GPS it is the "else 0.35" case and one day apart
+gives `exp(-0.5) x 0.35 ~= 0.21`: too weak to land 27 photos by itself.
+
+Two things are needed, both **server-side** and neither a small app change:
+
+1. **An acquisition prior in `capture_sets_score`**: when a vehicle has an `acquisition_document` (or a `purchase_date`)
+   within about 3 days before a capture set, add a dedicated prior for that vehicle (a stronger weight than the
+   generic 0.35, window-limited, and still never the sole basis: the set's own visual/GPS evidence must not
+   contradict). A purchase day is exactly when a new vehicle's first photos arrive, which is the Ann Rd case.
+2. **The photo has to reach that scorer**: it does only if the phone's photo sync filed it as `capture_relay_ios`
+   with an image. The app side needs no change for that.
+
+Not implemented in this PR: it changes server scoring that moves photos between vehicles for every user, and it
+cannot be tested without a database. Proposed as a follow-up migration with its own approval.
 
 ### 2d. Upload
 
-Preview = first 60 s, video track only (no audio), 640x480 or smaller, MP4, 25 MB cap. Full file = the original
+Preview = first 60 s, video track only (no audio), 640x480 or smaller (screen recordings: 1080p first), MP4, 25 MB cap (screenshots: 1600 px JPEG, 2 MB). Full file = the original
 resource copied from the phone (needs ≥ 2 GB free; never from iCloud). Both go to the **private** `capture-media`
 bucket by a **resumable TUS upload** (6 MiB chunks, resume from the server's offset). **Wi-Fi only by default**
 (`NetworkMonitor.isUnmetered`, URLSession with cellular/expensive/constrained off); stops on Low Power Mode or a hot
@@ -186,7 +301,7 @@ phone. Runs at the end of each photo sync pass (no new background task identifie
 | `source` | `capture_relay_ios_media` (the capture_relay_ios triggers and status table do not run) |
 | `image_medium`, `ai_processing_status`, `is_sensitive`, `ingest_kind` | `other`, `skipped`, `false`, `live` |
 | `taken_at`, `latitude`, `longitude` | capture time and the clip's GPS fix |
-| `exif_data` | `synced_by`, `asset_key` (sha256 of user id + PhotoKit id), `media{kind, bucket, preview_path, full_state, device model/OS, width, height, match{rule:"media_gate_v1", method, confidence, frames_sampled, frames_exact, candidates, anchors, window_seconds, radius_m}}` |
+| `exif_data` (camera clips and screen captures) | `synced_by`, `asset_key` (sha256 of user id + PhotoKit id), `media{kind, bucket, preview_path, full_state, device model/OS, width, height, match{rule:"media_gate_v1", method, confidence, frames_sampled, frames_exact, candidates, anchors, window_seconds, radius_m, anchor_source (screen captures)}}`; for screen captures `kind` is `screen_recording` or `screenshot`, `full_state` is `never_uploaded`, there is no location, and the server adds `document_id` and `screen_fields` |
 
 Not sent: the PhotoKit id, audio, OCR text, frames, the identifier read, the original file name.
 
@@ -198,24 +313,27 @@ attributed rows now carry a real `vehicle_id` with no human step, so this matter
 
 ## 3. What is built (this PR)
 
-`Sources/NukeCapture/VideoSync/`: `VideoSyncConfig` (switch + numbers), `VideoCaptureMatcher` (narrowing only),
-`MediaAttributionGate` (gate + per-frame evidence from the photo readers' outputs), `TusUpload`, `VideoSyncLedger`
-(cleared → rowInserted → filed → transfers; refused/filed words), `VideoSyncEngine`; one line in `SyncEngine.sync()`.
-Removed: `ScreenshotVehicleTerms`, the acquisition-window and screenshot paths, the confirm-gated full-file step.
-The switch is the UserDefaults key `videoSync.enabled` (absent = OFF); no screen turns it on (another agent owns the iOS
-screens). Tests: `VideoCaptureMatcherTests` (narrowing), `MediaAttributionGateTests` (gate rules and per-frame
-evidence), `VideoSyncTests` (switch, paths, TUS requests, ledger, row shape).
+`Sources/NukeCapture/VideoSync/`: `VideoSyncConfig` (switch + numbers), `VideoCaptureMatcher` (narrowing only, camera
+clips), `MediaAttributionGate` (camera-clip gate), **`ScreenCaptureEvidence`** (the screen-capture rule, pure),
+**`ScreenCaptureSync`** (acquisition-window enumeration, Vision OCR, the document filing path, the preview export),
+`TusUpload`, `VideoSyncLedger` (cleared -> rowInserted -> filed -> transfers; now also the screen payload and the anchor
+cache), `VideoSyncEngine`; one line in `SyncEngine.sync()`. The switch is the UserDefaults key `videoSync.enabled`
+(absent = OFF); no screen turns it on (another agent owns the iOS screens). Tests: `VideoCaptureMatcherTests`,
+`MediaAttributionGateTests`, `VideoSyncTests`, **`ScreenCaptureEvidenceTests`** (the Corvette recording as simulated OCR,
+anchor and window boundaries, evidence, refusals, privacy, citations, no OCR text in the payload or row, ledger).
 
-Not built: a Settings toggle; the reader filters above; any change to photo sync, to existing rows, or the re-triage of
-the 276 held photos. The frame-reading path (AVAssetImageGenerator + Vision on real video) is compile-checked by CI
-only; it has not run on a device.
+Migrations (not applied): the bucket (now also `image/jpeg` for screenshot previews, `full/` only for camera clips) and
+`device_file_media_document`.
+
+Not built: a Settings toggle; the reader filters; the acquisition prior for photos (server, above); promoting the
+document's price/date to the vehicle; any change to photo sync, existing rows, or the 276 held photos. The OCR/frame path
+(AVAssetImageGenerator, Vision, PhotoKit, preview export) is compile-checked by CI only and has not run on a device; the
+RPC has never executed.
 
 ## 4. Decisions needed from the owner
 
-1. **Screenshots and screen recordings never clear** under the photo gate (they are documents there), so they are
-   not synced at all now. Accept that, or approve a separate screen-capture evidence rule (e.g. a valid VIN read from
-   the screenshot's OCR, filed at a stated confidence, with its own privacy rule since a screenshot can show a
-   private conversation).
+1. ~~Screen captures~~ **Resolved by the owner: supported**, as documents under `screen_text_v1`. Still open inside
+   it: decisions 13 to 22 below.
 2. **Clips with no nearby filed photo are not read** (no candidates). Accept, or let a clip's frames match against the
    whole roster (more reads; time/GPS then narrow nothing).
 3. **Gate strictness:** all 12 frames must be `work` (a person in any frame holds the whole clip), one exact frame is
@@ -232,3 +350,25 @@ only; it has not run on a device.
 11. Numbers: 30 min / 150 m narrowing; 10 min clip cap; 14-day lookback; frames per clip.
 12. A Settings toggle (not built); the 276 held photo rows: leave held, or re-triage under today's rule (needs UPDATEs;
     not done).
+13. **Context numbers for screen captures:** window 21 days before to 2 days after (3 for a `purchase_date`), 12
+    frames from the first 60 s, 4 captures read per pass, recordings up to 15 min. Change?
+14. **Promote the document to the vehicle?** The RPC does *not* set `vehicles.purchase_price` / `purchase_date`. The
+    Corvette has neither; doing it from OCR needs your approval (and would make `purchase_date` the next anchor).
+15. **Confidence 0.92 for year + make + model alone** (0.97 for a VIN). Both clear the 0.9 floor; a YMM-only match
+    is weaker than a VIN and is protected by the price/seller requirement, the single-vehicle rule and the window.
+16. **Anchor choice when `purchase_date` is missing:** the first filed photo (not `created_at`). The Corvette's
+    anchor is therefore 2023-09-17 05:27:58 UTC; a capture 2 or more days after it, or 21+ days before, is out of
+    window. If its photos were back-filled later than the purchase, the first photo is not the purchase.
+17. **`document_type` name** `acquisition_document` (free text today; nothing reads it yet) and `file_url` holding
+    `capture-media/<path>` (a private path, not a URL: readers need a signed-URL step).
+18. **Seller name is PII** stored in `vendor_name` and the description, private to the owner. Accept, or store only
+    "seller seen".
+19. **Screenshots included** (a JPEG preview needs `image/jpeg` in the bucket and a 1600 px preview). A screenshot can
+    show more than the OCR-checked lines (the preview is the whole screen): the face and private-text refusals are
+    the only protection. Accept, or recordings only.
+20. **Evidence window is the first 60 s only.** A recording whose vehicle appears later is refused and never re-read.
+21. **Missing `vehicle_id` on failure:** a failed match leaves a metadata-only row and no document (it does not file an
+    unattributed document). If you want an unattributed document kept in the owner's record instead, that is a
+    different design (nullable `vehicle_id` does not exist on `vehicle_documents`).
+22. **Photo context (acceptance step 4):** approve a follow-up that adds an acquisition-document / `purchase_date`
+    prior to `capture_sets_score` (above). Until then, step 4 relies on whatever already filed the photos.

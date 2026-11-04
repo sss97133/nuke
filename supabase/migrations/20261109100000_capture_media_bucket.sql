@@ -4,6 +4,9 @@
 -- must not merge until the owner approves it. It creates one bucket and two storage policies. It changes no
 -- table, no column and no existing policy or bucket, and writes no row.
 --
+-- Screen recordings and screenshots (owner, 2026-11-04) are supported as DOCUMENTS by the second migration
+-- (20261109100100): their private preview only, never a full file.
+--
 -- Owner rule (2026-11-04): NO confirm tap. A video is attributed to a vehicle only when its frames, read on the
 -- phone by the same classifier, VIN/plate readers and filing gate as photos, clear the photo confidence threshold.
 -- Time and GPS only narrow the candidate vehicles. Anything below the threshold stays on the phone and nothing
@@ -37,17 +40,18 @@ SET lock_timeout = '5s';
 SET statement_timeout = '60s';
 
 -- ─── Private bucket ──────────────────────────────────────────────────────────
--- Video only: screenshots and screen recordings never auto-attribute under the photo gate, so no image types.
+-- Video types for camera clips and screen-recording previews, plus image/jpeg for screenshot PREVIEWS (a screenshot
+-- is a document; only its private preview is ever uploaded, never the original: see the full/ rule below).
 -- file_size_limit is this bucket's; the project-wide Storage limit (Dashboard > Storage > Settings) also applies
 -- and cannot be read from SQL.
 INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 VALUES ('capture-media', 'capture-media', false, 524288000,
-        ARRAY['video/mp4', 'video/quicktime', 'video/x-m4v'])
+        ARRAY['video/mp4', 'video/quicktime', 'video/x-m4v', 'image/jpeg'])
 ON CONFLICT (id) DO NOTHING;
 
 -- ─── Storage policies ────────────────────────────────────────────────────────
 -- Object names (both keyed by the vehicle_images row id):
---   users/<uid>/previews/<vehicle_images.id>.mp4      users/<uid>/full/<vehicle_images.id>.<ext>
+--   users/<uid>/previews/<vehicle_images.id>.mp4|.jpg   users/<uid>/full/<vehicle_images.id>.<ext>   (camera clips only)
 
 -- The owner reads their own objects (a private bucket is only reachable by signed URL or this policy).
 DROP POLICY IF EXISTS "capture-media: owner read" ON storage.objects;
@@ -57,7 +61,7 @@ CREATE POLICY "capture-media: owner read" ON storage.objects
          AND (storage.foldername(name))[1] = 'users'
          AND (storage.foldername(name))[2] = (SELECT auth.uid())::text);
 
--- Preview and full file: into the owner's own previews/ or full/ folder, and only when the vehicle_images row named
+-- Preview and full file (full: camera clips only): into the owner's own previews/ or full/ folder, and only when the vehicle_images row named
 -- in the object name belongs to the caller, was written by this feature, and already has a vehicle_id (set by the
 -- server's filing gate, device_file_images). Without that row state, storage itself refuses the object, so nothing
 -- about an unattributed clip can land in the bucket. The lookup is by primary key.
@@ -78,6 +82,10 @@ CREATE POLICY "capture-media: owner insert after attribution" ON storage.objects
          AND vi.user_id = (SELECT auth.uid())
          AND vi.source = 'capture_relay_ios_media'
          AND vi.vehicle_id IS NOT NULL
+         -- A screen recording or screenshot is a document: its private preview only. The original never uploads,
+         -- so the full/ folder is open only for rows the app wrote as camera clips.
+         AND ((storage.foldername(name))[3] = 'previews'
+              OR vi.exif_data #>> '{media,kind}' = 'camera_video')
     )
   );
 

@@ -40,6 +40,26 @@ struct VideoFiling: Codable, Equatable, Sendable {
     var attempts: Int = 0
     var previewDone = false
     var fullDone = false
+    /// Set for a screen recording or screenshot attached as an acquisition document (fullDone starts true: only the
+    /// private preview ever uploads).
+    var screen: ScreenFilingPayload? = nil
+}
+
+/// What the server needs to attach a screen capture as a document: the method, the confidence and the CITED fields.
+/// Never the OCR text.
+struct ScreenFilingPayload: Codable, Equatable, Sendable {
+    let kind: String                // screen_recording | screenshot
+    let method: String              // screen_vin | screen_ymm
+    let confidence: Double
+    let fields: [CitedField]
+    let previewExtension: String    // mp4 | jpg
+    let contentType: String         // video/mp4 | image/jpeg
+}
+
+/// A vehicle's first filed photo, remembered so the anchor does not cost a query every pass.
+struct ScreenAnchorEntry: Codable, Equatable, Sendable {
+    let firstPhoto: Double?         // seconds since 1970; nil = no filed photo yet
+    let fetchedAt: Double
 }
 
 struct VideoLedger: Codable, Equatable, Sendable {
@@ -49,6 +69,19 @@ struct VideoLedger: Codable, Equatable, Sendable {
     var filings: [String: VideoFiling] = [:]
     /// assetKey → outcome for every clip read once: a refusal word ("refused:privacy") or "filed". Never content.
     var checked: [String: String] = [:]
+    /// vehicleID → first filed photo (screen-capture anchor cache). Optional so an older ledger still decodes.
+    var anchorCache: [String: ScreenAnchorEntry]? = nil
+
+    func anchorEntry(_ vehicleID: String, now: Date, maxAge: TimeInterval) -> ScreenAnchorEntry? {
+        guard let e = anchorCache?[vehicleID], now.timeIntervalSince1970 - e.fetchedAt < maxAge else { return nil }
+        return e
+    }
+
+    mutating func setAnchor(_ vehicleID: String, firstPhoto: Date?, now: Date) {
+        var c = anchorCache ?? [:]
+        c[vehicleID] = ScreenAnchorEntry(firstPhoto: firstPhoto?.timeIntervalSince1970, fetchedAt: now.timeIntervalSince1970)
+        anchorCache = c
+    }
 
     func isKnown(_ assetKey: String) -> Bool { checked[assetKey] != nil || filings[assetKey] != nil }
 

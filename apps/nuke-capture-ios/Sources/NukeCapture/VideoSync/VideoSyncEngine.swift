@@ -50,6 +50,7 @@ struct MediaMatchBasis: Codable, Equatable, Sendable {
     let anchors: Int                 // filed photos that narrowed them
     let window_seconds: Int
     let radius_m: Double
+    var anchor_source: String? = nil   // screen captures: purchase_date | first_filed_photo
 }
 
 struct MediaExif: Codable, Equatable, Sendable {
@@ -103,10 +104,10 @@ final class VideoSyncEngine: ObservableObject {
     static let shared = VideoSyncEngine()
 
     @Published private(set) var lastSummary: String?
-    private(set) var ledger = VideoLedger()
+    var ledger = VideoLedger()                 // internal: ScreenCaptureSync (same type, another file) writes it
     private var running = false
-    private let fm = FileManager.default
-    private let directory: URL
+    let fm = FileManager.default
+    let directory: URL
     private let ledgerURL: URL
 
     private init() {
@@ -166,12 +167,15 @@ final class VideoSyncEngine: ObservableObject {
                 tally.failed += 1
             }
         }
+        // Screen recordings and screenshots: documents, read by their own text rule (ScreenCaptureSync).
+        let screen = await runScreenCaptures(userId: userId)
         await advanceFilings(userId: userId)
         await resumePending(token: token, userId: userId)
         await advanceFilings(userId: userId)        // stages the full file once its preview has landed
         await resumePending(token: token, userId: userId)
         lastSummary = "media: \(tally.cleared) attributed by content, \(tally.stayed) stayed on the phone"
             + (tally.failed > 0 ? ", \(tally.failed) failed" : "")
+            + "; screen captures: \(screen.attributed) attached as documents, \(screen.stayed) stayed on the phone"
         NSLog("NukeCapture media: %d attributed, %d left on phone, %d unreadable, %d failed",
               tally.cleared, tally.stayed, tally.unreadable, tally.failed)
     }
@@ -179,13 +183,13 @@ final class VideoSyncEngine: ObservableObject {
     private struct Tally { var read = 0, cleared = 0, stayed = 0, unreadable = 0, failed = 0 }
 
     /// Wi-Fi only (default), not hot, not Low Power Mode.
-    private func gatesAllow() -> Bool {
+    func gatesAllow() -> Bool {
         if VideoSyncConfig.wifiOnly() && !NetworkMonitor.shared.isUnmetered { return false }
         return readingAllowed()
     }
 
     /// Frame reading is local, but heavy: not on a hot phone or in Low Power Mode.
-    private func readingAllowed() -> Bool {
+    func readingAllowed() -> Bool {
         !(SyncEngine.deviceTooHot || SyncEngine.lowPowerHolds)
     }
 
@@ -243,7 +247,7 @@ final class VideoSyncEngine: ObservableObject {
         let is_video: Bool?
     }
 
-    private static func parseInstant(_ s: String) -> Date? {
+    static func parseInstant(_ s: String) -> Date? {
         let f = ISO8601DateFormatter()
         f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         if let d = f.date(from: s) { return d }
@@ -393,7 +397,7 @@ final class VideoSyncEngine: ObservableObject {
         return ClipFacts(codec: codec, width: Int(size.width), height: Int(size.height))
     }
 
-    private static func deviceModel() -> String {
+    static func deviceModel() -> String {
         var info = utsname()
         uname(&info)
         return withUnsafeBytes(of: &info.machine) { (raw: UnsafeRawBufferPointer) -> String in
@@ -441,7 +445,7 @@ final class VideoSyncEngine: ObservableObject {
         }
     }
 
-    private func advance(assetKey: String, userId: String) async {
+    func advance(assetKey: String, userId: String) async {
         guard var filing = ledger.filings[assetKey] else { return }
         if filing.state == .cleared {
             do {
@@ -492,11 +496,12 @@ final class VideoSyncEngine: ObservableObject {
         if filing.state == .filed { await stageUploads(filing, userId: userId) }
     }
 
-    private enum FilingResult { case filed, retry, refused(String) }
+    enum FilingResult { case filed, retry, refused(String) }
 
     /// device_file_images: the photo filing gate's server half (ownership, association, supersession,
     /// vision-gate state, confidence floor, VIN length, audit row, vehicle_id).
     private func fileOnServer(_ filing: VideoFiling) async -> FilingResult {
+        if let screen = filing.screen { return await fileScreenDocument(filing, screen) }
         struct P: Encodable { let p_items: [AttributionEngine.DeviceFileItem] }
         let item = AttributionEngine.DeviceFileItem(
             image_id: filing.rowID, vehicle_id: filing.vehicleID, method: filing.method, confidence: filing.confidence,
@@ -520,21 +525,24 @@ final class VideoSyncEngine: ObservableObject {
         guard let asset = PHAsset.fetchAssets(withLocalIdentifiers: [filing.localID], options: nil).firstObject else { return }
         let pendingKeys = Set(ledger.pending.map(\.key))
         if !filing.previewDone, !pendingKeys.contains("\(filing.assetKey)|preview") {
-            let fileName = "\(filing.assetKey)-preview.mp4"
+            let ext = filing.screen?.previewExtension ?? "mp4"
+            let fileName = "\(filing.assetKey)-preview.\(ext)"
             let file = directory.appendingPathComponent(fileName)
             do {
-                _ = try await exportVideoPreview(asset, to: file)
+                if let screen = filing.screen { _ = try await exportScreenPreview(asset, screen, to: file) }
+                else { _ = try await exportVideoPreview(asset, to: file) }
                 let record = VideoUploadRecord(
                     assetKey: filing.assetKey, rowID: filing.rowID, stage: .preview,
-                    objectName: VideoSyncConfig.previewPath(userID: userId, rowID: filing.rowID),
-                    fileName: fileName, contentType: "video/mp4")
+                    objectName: VideoSyncConfig.previewPath(userID: userId, rowID: filing.rowID, fileExtension: ext),
+                    fileName: fileName, contentType: filing.screen?.contentType ?? "video/mp4")
                 if ledger.enqueue(record) { persist() } else { try? fm.removeItem(at: file) }
             } catch {
                 NSLog("NukeCapture media: preview not staged (%@)", String(describing: error))
             }
             return
         }
-        guard filing.previewDone, !filing.fullDone, !pendingKeys.contains("\(filing.assetKey)|full") else { return }
+        // A screen capture is a document: its private preview only. fullDone is preset, and this is belt and braces.
+        guard filing.screen == nil, filing.previewDone, !filing.fullDone, !pendingKeys.contains("\(filing.assetKey)|full") else { return }
         let resources = PHAssetResource.assetResources(for: asset)
         guard let resource = resources.first(where: { $0.type == .fullSizeVideo })
                 ?? resources.first(where: { $0.type == .video }) else { return }
@@ -561,7 +569,7 @@ final class VideoSyncEngine: ObservableObject {
 
     // ─── Previews (low-res) ───────────────────────────────────────────────────
 
-    private func loadAVAsset(_ asset: PHAsset) async throws -> AVAsset {
+    func loadAVAsset(_ asset: PHAsset) async throws -> AVAsset {
         try await withCheckedThrowingContinuation { cont in
             let o = PHVideoRequestOptions()
             o.isNetworkAccessAllowed = false          // never pull an iCloud original for this
@@ -574,7 +582,7 @@ final class VideoSyncEngine: ObservableObject {
     }
 
     /// First 60 s, video track only (the audio never leaves the phone), 640x480 or smaller, MP4.
-    private func exportVideoPreview(_ asset: PHAsset, to out: URL) async throws -> Int {
+    func exportVideoPreview(_ asset: PHAsset, to out: URL, preset: String = AVAssetExportPreset640x480) async throws -> Int {
         let avAsset = try await loadAVAsset(asset)
         let composition = AVMutableComposition()
         guard let source = try await avAsset.loadTracks(withMediaType: .video).first,
@@ -585,7 +593,7 @@ final class VideoSyncEngine: ObservableObject {
         try target.insertTimeRange(CMTimeRange(start: .zero, duration: cut), of: source, at: .zero)
         target.preferredTransform = try await source.load(.preferredTransform)
         try? fm.removeItem(at: out)
-        guard let session = AVAssetExportSession(asset: composition, presetName: AVAssetExportPreset640x480) else {
+        guard let session = AVAssetExportSession(asset: composition, presetName: preset) else {
             throw VideoSyncError.exportFailed
         }
         session.outputURL = out
@@ -678,7 +686,7 @@ final class VideoSyncEngine: ObservableObject {
     // ─── Persistence ──────────────────────────────────────────────────────────
 
     @discardableResult
-    private func persist() -> Bool {
+    func persist() -> Bool {
         do {
             try JSONEncoder().encode(ledger).write(to: ledgerURL, options: .atomic)
             return true

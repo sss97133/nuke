@@ -7,6 +7,7 @@
 // attribute. Anything below the gate stays on the phone, nothing about it is sent, and the user is never prompted.
 // Plan: docs/VIDEO_SYNC_PLAN.md.
 
+import AVFoundation
 import CoreGraphics
 import Foundation
 
@@ -47,6 +48,26 @@ enum VideoSyncConfig {
     static let gateVersion = "media_gate_v1"
     /// A filed clip's attribution is retried this many passes when the server defers or is unreachable.
     static let maxFilingAttempts = 8
+
+    // ─── Screen recordings and screenshots (ScreenCaptureEvidence, rule screen_text_v1) ─
+    /// Documents, not photos: read by Vision OCR on the phone, attributed only by their own text. The windows
+    /// (AcquisitionAnchor) are in ScreenCaptureEvidence. These are the pass limits.
+    static let screenFramesPerRecording = 12
+    /// Screen captures read per pass (OCR of 12 frames is the expensive step).
+    static let maxScreenReadsPerPass = 4
+    /// PhotoKit screen-capture assets listed per type per pass (metadata only).
+    static let maxScreenAssetsPerPass = 120
+    /// Acquisition windows enumerated per pass (one per vehicle with an anchor, merged when they overlap).
+    static let maxScreenWindows = 200
+    /// First-filed-photo lookups per pass; each is cached on the phone this long.
+    static let maxAnchorLookupsPerPass = 25
+    static let anchorCacheSeconds: TimeInterval = 7 * 24 * 3600
+    /// Longer recordings are not read: a negotiation walk-through, not a feed capture.
+    static let maxScreenRecordingSeconds: TimeInterval = 15 * 60
+    /// Recording previews keep the text legible (the cited frames point into them).
+    static let screenRecordingPreviewPreset = AVAssetExportPreset1920x1080
+    static let screenshotPreviewMaxEdge: CGFloat = 1600
+    static let screenshotPreviewMaxBytes = 2 * 1024 * 1024
 
     // ─── Preview ────────────────────────────────────────────────────────────
     /// The preview is the first seconds of the clip, video track only (no audio), 640x480 or less.
