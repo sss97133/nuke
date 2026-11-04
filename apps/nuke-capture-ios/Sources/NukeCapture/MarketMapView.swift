@@ -931,7 +931,7 @@ struct CountyZIPDrill: View {
                     Button { showDates = true } label: {
                         Label(period == .all ? "All time" : period.displayLabel, systemImage: "calendar")
                     }.disabled(loading || failed)
-                    Button { showInfo = true } label: { Image(systemName: "info.circle") }
+                    Button { showInfo = true } label: { Image(systemName: "info.circle").frame(minWidth: NukeSize.minTap, minHeight: NukeSize.minTap) }
                         .accessibilityLabel("Map sources and coverage")
                 }
                 .font(.subheadline.weight(.medium))
@@ -939,12 +939,12 @@ struct CountyZIPDrill: View {
                     // At country zoom no county is read (reportRegion reads only under 4° of
                     // longitude), so the full-screen map was blank and inert. Offer one-tap jumps
                     // into the busiest recorded metros instead of a dead canvas.
-                    Text("Pinch into an area, search a ZIP, or jump to:").font(.caption).foregroundStyle(.secondary)
+                    Text("Zoom in, search a ZIP, or jump to a city:").font(.footnote).foregroundStyle(.secondary)
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 6) {
                             ForEach(Self.quickMetros, id: \.name) { m in
                                 Button(m.name) { focus = Self.rect(lat: m.lat, lon: m.lon) }
-                                    .buttonStyle(.bordered).controlSize(.small)
+                                    .buttonStyle(.bordered).controlSize(.regular)
                             }
                         }
                     }
@@ -957,8 +957,8 @@ struct CountyZIPDrill: View {
                             .font(.caption).foregroundStyle(.secondary)
                     }
                 } else {
-                    Text("\(visibleVehicles.formatted()) vehicles in visible ZIPs · \(period == .all ? "captured history" : period.displayLabel.lowercased())")
-                        .font(.caption).foregroundStyle(.secondary)
+                    Text("\(NukeDisplay.count(visibleVehicles, "car")) recorded in this area · \(period == .all ? "all dates" : period.displayLabel.lowercased())")
+                        .font(.footnote).foregroundStyle(.secondary)
                 }
                 if let live, !readCounties.isEmpty, !loading {
                     HStack(spacing: 6) {
@@ -991,8 +991,8 @@ struct CountyZIPDrill: View {
                 }
                 if let searchIssue { Text(searchIssue).font(.caption).foregroundStyle(.secondary) }
             }
-            .padding(10).background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
-            .padding(.horizontal, 12).padding(.top, 52)
+            .padding(NukeSpace.md).background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: NukeRadius.card, style: .continuous))
+            .padding(.horizontal, NukeSpace.md).padding(.top, 52)
         }
         .safeAreaInset(edge: .bottom) {
             VStack(alignment: .leading, spacing: 8) {
@@ -1012,14 +1012,14 @@ struct CountyZIPDrill: View {
                             Button("Area activity") { showReport = true }
                                 .buttonStyle(.bordered).accessibilityLabel("Explore ZIP \(zip) activity")
                         }
-                        Button { selectedZIP = nil } label: { Image(systemName: "xmark.circle.fill") }
+                        Button { selectedZIP = nil } label: { Image(systemName: "xmark.circle.fill").font(.title3).frame(minWidth: NukeSize.minTap, minHeight: NukeSize.minTap) }
                             .tint(.secondary).accessibilityLabel("Clear ZIP selection")
                     }
                 } else if !readCounties.isEmpty {
                     HStack {
-                        Text("Tap a ZIP to explore its activity").font(.subheadline)
+                        Text("Tap an area to see what's there").font(.subheadline)
                         Spacer()
-                        Button("Coverage") { showGaps = true }.font(.caption)
+                        Button("Coverage") { showGaps = true }.font(.footnote).frame(minHeight: NukeSize.minTap)
                     }
                 }
                 if failed || geometryFailed {
