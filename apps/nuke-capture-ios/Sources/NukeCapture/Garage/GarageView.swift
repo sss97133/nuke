@@ -3,6 +3,9 @@
 //
 // Reads: get_user_garage + get_my_garage_owner_corrections (GarageReaders.ownGarage, shared with
 // ProfileView) and my_unorganized_photo_count. Each vehicle opens VehicleDetailView.
+//
+// The top of the list is "Today in your garage" (GarageActivityViews), and vehicles are ordered by
+// their most recent activity (GarageActivity.swift). Both reuse reads the app already makes.
 
 import SwiftUI
 
@@ -18,13 +21,19 @@ struct GarageView: View {
     @State private var query = ""
     @State private var manageVehicle: GarageVehicle?
     @State private var requests = ReadRequestGuard()
+    @State private var openVehicleId: String?
+    @StateObject private var activity = GarageActivityStore()
+    @Environment(\.scenePhase) private var scenePhase
 
     private var isSearching: Bool { !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
 
     var body: some View {
         List {
+            if !isSearching {
+                GarageActivitySections(store: activity, retry: { refreshActivity() }, open: { openVehicleId = $0 })
+            }
             if let garage {
-                let matches = GarageSections.matching(garage.vehicles, query: query)
+                let matches = GarageSections.matching(activity.sorted(garage.vehicles), query: query)
                 if isSearching && matches.isEmpty {
                     ContentUnavailableView.search(text: query)
                 } else {
@@ -61,6 +70,13 @@ struct GarageView: View {
         .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "Vehicle or VIN")
         .refreshable { await load() }
         .task(id: userId) { await load() }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { refreshActivity() }
+        }
+        .navigationDestination(item: $openVehicleId) { id in
+            VehicleDetailView(vehicleId: id, embedInNavigationStack: false)
+                .accessibilityIdentifier("garage.activity.profile.\(id)")
+        }
         .sheet(item: $manageVehicle) { vehicle in
             NavigationStack {
                 GarageVehicleView(vehicle: vehicle)
@@ -126,7 +142,7 @@ struct GarageView: View {
         NavigationLink {
             VehicleDetailView(vehicleId: v.vehicle_id, embedInNavigationStack: false)
                 .accessibilityIdentifier("garage.vehicle.profile.\(v.vehicle_id)")
-        } label: { GarageRowLabel(vehicle: v) }
+        } label: { GarageRowLabel(vehicle: v, lastActivity: activity.latestByVehicle[v.vehicle_id.lowercased()]) }
         .accessibilityIdentifier("garage.vehicle.\(v.vehicle_id)")
         .swipeActions(edge: .trailing) {
             Button("Garage details") { manageVehicle = v }
@@ -138,7 +154,13 @@ struct GarageView: View {
     private func load() async {
         async let counted = GarageReaders.unorganizedPhotos()
         await loadGarage()
+        if let vehicles = garage?.vehicles { await activity.refresh(vehicles: vehicles) }
         photos = await counted
+    }
+
+    private func refreshActivity() {
+        guard let vehicles = garage?.vehicles else { return }
+        Task { await activity.refresh(vehicles: vehicles) }
     }
 
     private func loadGarage() async {
@@ -169,6 +191,8 @@ struct GarageView: View {
 /// One garage row: the server's cover thumbnail, the vehicle and what the record says it is to you.
 struct GarageRowLabel: View {
     let vehicle: GarageVehicle
+    /// Newest real activity on this vehicle; nil hides the line.
+    var lastActivity: Date? = nil
 
     var body: some View {
         HStack(spacing: 12) {
@@ -182,6 +206,9 @@ struct GarageRowLabel: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(vehicle.title.isEmpty ? "Unnamed vehicle" : vehicle.title).foregroundStyle(Color.primary)
                 Text(GarageRelation.line(vehicle)).font(.caption2).foregroundStyle(.secondary)
+                if let line = GarageActivityFeed.lastActivity(lastActivity, now: Date()) {
+                    Text(line).font(.caption2.weight(.medium)).foregroundStyle(Color.accentColor)
+                }
                 if let detail = vehicle.relationshipDetail {
                     Text(detail).font(.caption2).foregroundStyle(.secondary)
                 }
