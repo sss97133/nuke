@@ -193,7 +193,7 @@ jobs:
           # guardrail step above.
           # No --jobs: the CLI accepts it only with --use-api (server-side bundling), and every deploy so far
           # bundled locally — keep the bundler that is known to work (run 36331008968 died on the flag).
-          npx -y supabase@latest functions deploy $FNS --project-ref qkgaybvrernstplzjaam --no-verify-jwt
+          npx -y supabase@latest functions deploy $FNS --project-ref qkgaybvrernstplzjaam --no-verify-jwt --yes
           echo "✅ functions deployed"
 
       - name: Activate installed retained VIN intake
