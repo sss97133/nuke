@@ -13,6 +13,9 @@
 //              vehicle evidence = a checksum-valid VIN equal to the vehicle's VIN, or year + make + model
 //                                 (year and model on one line, the make anywhere in that frame);
 //              commercial evidence = a price line ($500 to $5,000,000) or a seller line.
+//            Every price on screen becomes one typed observation (asking | offer | agreed | unknown), classified from
+//            the text around it and cited to its frame; unclear text is 'unknown', never a guess. A price is an
+//            observation, never the vehicle's purchase price.
 //            Two vehicles evidenced, a conflicting VIN, a face, or private text (card, SSN, password…) = refused.
 //   SEND     Only cited fields (name, value, frame index, timestamp), never the OCR text. A private preview goes up
 //            after the server attaches it; the full file never does.
@@ -74,8 +77,21 @@ enum ScreenRefusal: String, Codable, Sendable {
     case conflictingVehicles, conflictingVIN, noPriceOrSellerLine
 }
 
+/// What a price on screen was, read from the text around it. `unknown` whenever that text is not clear.
+enum PriceKind: String, Codable, Sendable {
+    case asking, offer, agreed, unknown
+}
+
+/// One price seen on screen, typed and cited to the frame (index and seconds into the preview) that shows it.
+struct PriceObservation: Codable, Equatable, Sendable {
+    let amount: Int
+    let kind: PriceKind
+    let frame: Int
+    let seconds: Double
+}
+
 struct CitedField: Codable, Equatable, Sendable {
-    let name: String            // vehicle | vin | price | price_seen | seller | date
+    let name: String            // vehicle | vin | seller | seller_line | date
     let value: String
     let frame: Int
     let seconds: Double
@@ -86,6 +102,7 @@ struct ScreenAttribution: Equatable, Sendable {
     let method: String          // screen_vin | screen_ymm
     let confidence: Double
     let fields: [CitedField]
+    let prices: [PriceObservation]
     let anchorSource: AcquisitionAnchorSource
     let framesWithVehicleEvidence: Int
 }
@@ -104,6 +121,7 @@ enum ScreenCaptureEvidence {
     static let minPrice = 500
     static let maxPrice = 5_000_000
     static let maxFields = 12
+    static let maxPrices = 8
 
     // ─── Narrow ───────────────────────────────────────────────────────────────
 
@@ -138,7 +156,7 @@ enum ScreenCaptureEvidence {
             return .refused(.conflictingVIN)       // the text shows a different VIN than this vehicle's
         }
 
-        let price = prices(in: frames, preferringFrame: found.firstFrame)
+        let price = prices(in: frames)
         let seller = sellerLine(in: frames)
         guard !price.isEmpty || seller != nil else { return .refused(.noPriceOrSellerLine) }
 
@@ -153,9 +171,6 @@ enum ScreenCaptureEvidence {
         if let f = found.vinFrame, let vin = normalizedVIN(vehicle.vin) {
             fields.append(CitedField(name: "vin", value: vin, frame: f.index, seconds: f.seconds))
         }
-        for (i, p) in price.prefix(3).enumerated() {
-            fields.append(CitedField(name: i == 0 ? "price" : "price_seen", value: p.value, frame: p.frame.index, seconds: p.frame.seconds))
-        }
         if let s = seller {
             // A named seller is cited by name; a bare seller line ("Message seller") is cited as present, no name.
             fields.append(CitedField(name: s.name.isEmpty ? "seller_line" : "seller", value: s.name.isEmpty ? "seen" : s.name,
@@ -163,7 +178,7 @@ enum ScreenCaptureEvidence {
         }
         if let d = onScreenDate(in: frames) { fields.append(CitedField(name: "date", value: d.value, frame: d.frame.index, seconds: d.frame.seconds)) }
         return .attribute(ScreenAttribution(vehicleID: vehicleID, method: method, confidence: confidence,
-                                            fields: Array(fields.prefix(maxFields)), anchorSource: anchor.source,
+                                            fields: Array(fields.prefix(maxFields)), prices: price, anchorSource: anchor.source,
                                             framesWithVehicleEvidence: found.frameCount))
     }
 
@@ -252,32 +267,90 @@ enum ScreenCaptureEvidence {
 
     private static let priceRegex = try? NSRegularExpression(pattern: #"\$\s?(\d{1,3}(?:,\d{3})+|\d{3,7})(?:\.\d{2})?"#)
 
-    /// Price lines in frame order; the one on the vehicle's own frame (the listing header) first.
-    static func prices(in frames: [ScreenFrameText], preferringFrame: Int?) -> [FoundValue] {
-        var out: [FoundValue] = []
+    // How a price is typed. The words AROUND the price decide; nothing else does (not its size, not who sent it).
+    // A cue that points two ways, a negated cue ("no deal"), or no cue at all is `unknown`.
+    private static func cue(_ pattern: String) -> NSRegularExpression? { try? NSRegularExpression(pattern: pattern) }
+    private static let askingCue = cue(#"\b(asking|listed for|list price|listing price|priced at|or best offer|obo)\b"#)
+    private static let offerCue = cue(#"\b(would you (take|accept|do)|will you (take|accept)|can you do|could you do|how about|i can do|i'?ll do|i can offer|my offer|offer(ed|ing)?|i'?ll give you|i can give you|best i can do|i'?d pay)\b"#)
+    private static let agreedCue = cue(#"\b(deal|sold to you|agreed|i'?ll take it)\b"#)
+    private static let negatedCue = cue(#"\b(no deal|not agreed|never agreed|didn'?t agree|not a deal)\b"#)
+
+    private static func has(_ re: NSRegularExpression?, _ text: String) -> Bool {
+        re?.firstMatch(in: text, range: NSRange(location: 0, length: (text as NSString).length)) != nil
+    }
+
+    /// The kinds the words point to. Empty = no cue. More than one = unclear. A negated cue is unclear too.
+    static func cueKinds(_ raw: String) -> Set<PriceKind> {
+        let text = raw.lowercased().replacingOccurrences(of: "\u{2019}", with: "'")
+        if has(negatedCue, text) { return [.asking, .offer, .agreed] }
+        // "or best offer" qualifies an asking price; it is not an offer.
+        let offerText = text.replacingOccurrences(of: "or best offer", with: " ")
+        var kinds = Set<PriceKind>()
+        if has(askingCue, text) { kinds.insert(.asking) }
+        if has(offerCue, offerText) { kinds.insert(.offer) }
+        if has(agreedCue, text) { kinds.insert(.agreed) }
+        return kinds
+    }
+
+    /// `before` and `after` are the text around one price on its line, up to the neighbouring price. Cue words come
+    /// before the price they qualify ("asking $", "would you take $"), or after it ("$17,000, sold to you"). With no
+    /// cue on the line, the line above counts when it holds no price. A marketplace listing header (the price alone on
+    /// its line, the vehicle's title line next, in a frame that is a listing page) is the asking price.
+    static func classifyPrice(before: String, after: String, previousLine: String?, listingHeader: Bool) -> PriceKind {
+        for text in [before, after] {
+            let kinds = cueKinds(text)
+            if kinds.count == 1, let k = kinds.first { return k }
+            if kinds.count > 1 { return .unknown }
+        }
+        if let prev = previousLine, !prev.contains("$") {
+            let kinds = cueKinds(prev)
+            if kinds.count == 1, let k = kinds.first { return k }
+            if kinds.count > 1 { return .unknown }
+        }
+        return listingHeader ? .asking : .unknown
+    }
+
+    private static let yearRegex = cue(#"\b(19|20)\d{2}\b|'\d{2}\b"#)
+    private static let listingCues = ["listed ", "message seller", "send seller a message", "seller information", "seller details", "is this still available"]
+
+    private static func isListingFrame(_ lines: [String]) -> Bool {
+        let text = lines.joined(separator: "\n").lowercased()
+        return listingCues.contains { text.contains($0) }
+    }
+
+    /// Every price on screen, typed and cited to the first frame that shows it, in frame order. One observation per
+    /// (amount, kind); an `unknown` is dropped when the same amount was typed elsewhere. At most `maxPrices`, typed
+    /// ones first.
+    static func prices(in frames: [ScreenFrameText]) -> [PriceObservation] {
+        var seen: [PriceObservation] = []
         for f in frames {
-            for line in f.lines {
+            let listing = isListingFrame(f.lines)
+            for (li, line) in f.lines.enumerated() {
                 let ns = line as NSString
-                priceRegex?.enumerateMatches(in: line, range: NSRange(location: 0, length: ns.length)) { m, _, _ in
-                    guard let m, m.numberOfRanges > 1 else { return }
+                let ms = priceRegex?.matches(in: line, range: NSRange(location: 0, length: ns.length)) ?? []
+                for (mi, m) in ms.enumerated() where m.numberOfRanges > 1 {
                     let digits = ns.substring(with: m.range(at: 1)).replacingOccurrences(of: ",", with: "")
-                    guard let n = Int(digits), n >= minPrice, n <= maxPrice else { return }
-                    let shown = "$" + formatted(n)
-                    if !out.contains(where: { $0.value == shown }) { out.append(FoundValue(value: shown, frame: f)) }
+                    guard let n = Int(digits), n >= minPrice, n <= maxPrice else { continue }
+                    let beforeStart = mi == 0 ? 0 : ms[mi - 1].range.location + ms[mi - 1].range.length
+                    let before = ns.substring(with: NSRange(location: beforeStart, length: max(0, m.range.location - beforeStart)))
+                    let afterStart = m.range.location + m.range.length
+                    let afterEnd = mi + 1 < ms.count ? ms[mi + 1].range.location : ns.length
+                    let after = ns.substring(with: NSRange(location: afterStart, length: max(0, afterEnd - afterStart)))
+                    let alone = ms.count == 1 && (before + after).rangeOfCharacter(from: .letters) == nil
+                    let nextLine = li + 1 < f.lines.count ? f.lines[li + 1] : nil
+                    let titleNext = nextLine.map { has(yearRegex, $0) } ?? false
+                    let kind = classifyPrice(before: before, after: after, previousLine: li > 0 ? f.lines[li - 1] : nil,
+                                             listingHeader: alone && listing && titleNext)
+                    let obs = PriceObservation(amount: n, kind: kind, frame: f.index, seconds: f.seconds)
+                    if !seen.contains(where: { $0.amount == n && $0.kind == kind }) { seen.append(obs) }
                 }
             }
         }
-        if let pf = preferringFrame, let i = out.firstIndex(where: { $0.frame.index == pf }), i > 0 {
-            let first = out.remove(at: i)
-            out.insert(first, at: 0)
-        }
-        return out
-    }
-
-    private static func formatted(_ n: Int) -> String {
-        var s = String(n), out = ""
-        while s.count > 3 { out = "," + String(s.suffix(3)) + out; s = String(s.dropLast(3)) }
-        return s + out
+        let typed = Set(seen.filter { $0.kind != .unknown }.map(\.amount))
+        let live = seen.filter { $0.kind != .unknown || !typed.contains($0.amount) }
+        let ranked = live.filter { $0.kind != .unknown } + live.filter { $0.kind == .unknown }
+        let kept = Array(ranked.prefix(maxPrices))
+        return live.filter { o in kept.contains(o) }
     }
 
     struct SellerHit { let name: String; let frame: ScreenFrameText }

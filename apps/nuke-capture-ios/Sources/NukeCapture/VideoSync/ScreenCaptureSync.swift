@@ -343,7 +343,7 @@ extension VideoSyncEngine {
         let ext = isRecording ? "mp4" : "jpg"
         let mime = isRecording ? "video/mp4" : "image/jpeg"
         let payload = ScreenFilingPayload(kind: item.kind.rawValue, method: a.method, confidence: a.confidence,
-                                          fields: a.fields, previewExtension: ext, contentType: mime)
+                                          fields: a.fields, prices: a.prices, previewExtension: ext, contentType: mime)
         let basis = MediaMatchBasis(
             rule: ScreenCaptureEvidence.rule, method: a.method, confidence: a.confidence,
             frames_sampled: isRecording ? VideoSyncConfig.screenFramesPerRecording : 1,
@@ -369,7 +369,8 @@ extension VideoSyncEngine {
     }
 
     /// device_file_media_document: revalidates ownership, association, the acquisition window and the text-to-vehicle
-    /// consistency of the cited fields, then attaches the capture as an acquisition document and sets vehicle_id.
+    /// consistency of the cited fields, then attaches the capture as an acquisition document, records the typed price
+    /// observations and sets vehicle_id. Prices are observations only: nothing is written to the vehicle's price.
     /// A refusal leaves the row metadata-only (no vehicle_id), so storage refuses the preview.
     func fileScreenDocument(_ filing: VideoFiling, _ screen: ScreenFilingPayload) async -> FilingResult {
         struct P: Encodable {
@@ -378,9 +379,10 @@ extension VideoSyncEngine {
             let p_method: String
             let p_confidence: Double
             let p_fields: [CitedField]
+            let p_prices: [PriceObservation]
         }
         let params = P(p_row_id: filing.rowID, p_vehicle_id: filing.vehicleID, p_method: screen.method,
-                       p_confidence: screen.confidence, p_fields: screen.fields)
+                       p_confidence: screen.confidence, p_fields: screen.fields, p_prices: screen.prices)
         do {
             let res: AnyJSON = try await SupabaseService.client.rpc("device_file_media_document", params: params).execute().value
             switch AttributionEngine.statuses(from: res)[filing.rowID] {

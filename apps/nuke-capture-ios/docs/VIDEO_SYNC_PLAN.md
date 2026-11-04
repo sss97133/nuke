@@ -1,10 +1,12 @@
 # Vehicle video sync, attributed by content — findings, plan, rules
 
-Status: **plan + code behind a flag that is OFF by default**. Two migrations are written and **not applied**:
-`supabase/migrations/20261109100000_capture_media_bucket.sql` (one private bucket + storage policies) and
+Status: **plan + code behind a flag that is OFF by default**. Three migrations are in the PR:
+`supabase/migrations/20261109100000_capture_media_bucket.sql` (one private bucket + storage policies),
+`20261109100050_vehicle_price_observations.sql` (one new owner-only table for typed price observations) and
 `20261109100100_capture_media_acquisition_document.sql` (the RPC `device_file_media_document` for screen captures).
-Neither changes a table or column. Merging this PR to `main` applies both automatically (`supabase-deploy.yml`), so the
-owner approves them first. The RPC has been syntax-checked only (pglast); it has never been executed.
+None changes an existing table or column. Merging this PR to `main` applies all three automatically (`supabase-deploy.yml`); the
+owner approved the merge on 2026-11-04. The RPC has been syntax-checked only (pglast) and has not executed against a
+database; the OCR path has not run on a device.
 
 Measured read-only on 2026-11-04 (project `qkgaybvrernstplzjaam`). Counts are for the owner's account
 (`0b9f107a…`, the only user in `capture_upload_status`); other users were not measured.
@@ -36,8 +38,8 @@ the earliest taken **2023-09-17 05:27:58 UTC**. Nothing exists for 2023-09-16.
 
 | # | Step | Expected | PASS when | FAIL when |
 |---|---|---|---|---|
-| 1 | **Sep 16, 2023** Facebook Marketplace screen recording of the purchase negotiation is on the phone. Switch on. A photo sync pass finishes. | The phone finds it (it is a `videoScreenRecording` made inside the Corvette's acquisition window), reads 12 frames of its first 60 s with Vision OCR **on the device**, and sees the Corvette, the price and the seller. | The pass log shows the item read and attributed (`screen captures: 1 attached as documents`), and no upload happened before the next step's server call succeeded. | It is never listed (window or anchor wrong), is read but refused (OCR missed the year/make/model line or the price/seller), or anything leaves the phone before the server attaches it. |
-| 2 | The server attaches it. | A metadata-only `vehicle_images` row (`source capture_relay_ios_media`, no pixels, no `vehicle_id`) is inserted; `device_file_media_document` revalidates and **creates one `vehicle_documents` row**: `document_type acquisition_document`, `privacy_level private`, `vehicle_id = 2e5ec4a1`, `amount` = the price, `vendor_name` = the seller, and a description that cites **price, seller and date to frame index + timestamp**. The image row gets `vehicle_id = 2e5ec4a1` and `is_document = true`. | Exactly one document for this recording; every cited field has a frame (1 to 12) and a timestamp (0 to 60 s); `vehicle_id` equals the Corvette; nothing else on the Corvette changed (`purchase_price`, `purchase_date`, image counts, primary image). Re-running the pass makes no second document. | No document, a second document, a wrong vehicle, a cited field with no frame, any OCR text beyond the cited values in the database, or a change to the vehicle row. |
+| 1 | **Sep 16, 2023** Facebook Marketplace screen recording of the purchase negotiation is on the phone. Switch on. A photo sync pass finishes. | The phone finds it (it is a `videoScreenRecording` made inside the Corvette's acquisition window), reads 12 frames of its first 60 s with Vision OCR **on the device**, and sees the Corvette, its prices (typed asking, offer, agreed) and the seller. | The pass log shows the item read and attributed (`screen captures: 1 attached as documents`), and no upload happened before the next step's server call succeeded. | It is never listed (window or anchor wrong), is read but refused (OCR missed the year/make/model line or the price/seller), or anything leaves the phone before the server attaches it. |
+| 2 | The server attaches it. | A metadata-only `vehicle_images` row (`source capture_relay_ios_media`, no pixels, no `vehicle_id`) is inserted; `device_file_media_document` revalidates and **creates one `vehicle_documents` row**: `document_type acquisition_document`, `privacy_level private`, `vehicle_id = 2e5ec4a1`, `vendor_name` = the seller, `amount` = the agreed price only when exactly one agreed amount was seen, and a description that cites **seller, date and every price to frame index + timestamp**. **One `vehicle_price_observations` row per price** (type `asking`, `offer`, `agreed` or `unknown`, frame index and seconds): for the Corvette recording, asking $18,500 (frame 4, 17.5 s), offer $16,500 (frame 8, 37.5 s) and agreed $17,000 (frame 9, 42.5 s) in the unit-test fixture. The image row gets `vehicle_id = 2e5ec4a1` and `is_document = true`. | Exactly one document for this recording; every cited field and every price observation has a frame (1 to 12) and a timestamp (0 to 60 s); each price's type matches the words around it on screen (`unknown` when they were unclear); `vehicle_id` equals the Corvette; nothing else on the Corvette changed (**`purchase_price` and `purchase_date` untouched**, image counts, primary image). Re-running the pass makes no second document. | No document, a second document, a wrong vehicle, a cited field with no frame, any OCR text beyond the cited values in the database, or a change to the vehicle row. |
 | 3 | A **private preview** uploads. | One object in the private `capture-media` bucket at `users/<uid>/previews/<row id>.mp4` (first 60 s, video only). No `full/` object exists. | The object exists, is readable only by the owner, `vehicle_images.storage_path` points at it, and the original recording is **not** in the bucket. | A public object, a `full/` object, audio, or an object for a refused capture. |
 | 4 | **Sep 17, 2023**, 27 photos at Ann Rd (36.2618, -115.3024) should auto-land on `2e5ec4a1`, using the previous day's purchase as context. | With the attached acquisition document as context, photos of the next day near that place land on the Corvette without a person. | All 27 photos are filed to `2e5ec4a1` **by the photo filing path using the document as context** (not by hand, not by a script). | Any photo stays unfiled, or lands on another vehicle. |
 
@@ -210,20 +212,23 @@ plumbing. Four stages:
      and model on one line, the make anywhere in the same frame; `'64` and short makes like "Chevy" accepted;
      confidence 0.92). Both clear the 0.9 photo floor.
    * commercial evidence: a price line ($500 to $5,000,000) or a seller line ("Seller: Name", "Listed by", "Seller
-     information" then a name, or a "Message seller" control).
+     information" then a name, or a "Message seller" control). **Every price is typed from the words around it**
+     (below); an `unknown` price still counts as commercial evidence.
    * **refused** (stays on the phone, no prompt, never read again): no vehicle evidence; two vehicles evidenced; a
      different valid VIN on screen; evidence for a vehicle outside its own window; no price or seller; a prominent
      face in any frame; private text in any frame (card number that passes Luhn, SSN pattern, "password",
      "verification code", "CVV", routing/account number).
 4. **File.** A metadata-only `vehicle_images` row is inserted (no `vehicle_id`, no location), then the RPC
    **`device_file_media_document`** (migration `20261109100100`) is called with the method, confidence and the
-   **cited fields only**: `{name, value, frame, seconds}` for `vehicle`, `vin`, `price` (+ up to two `price_seen`),
-   `seller` (or `seller_line`), `date` (only a full date with a year). **Never the OCR dump.** The RPC revalidates
+   **cited fields only**: `{name, value, frame, seconds}` for `vehicle`, `vin`, `seller` (or `seller_line`), `date`
+   (only a full date with a year), plus up to 8 **price observations** `{amount, kind, frame, seconds}`. **Never the
+   OCR dump.** The RPC revalidates
    ownership, association, the window (recomputed from the database), the text-to-vehicle agreement (a `vehicle`
    field must equal the vehicle's year make model; a `vin` field its VIN; a same-year/make/model second vehicle makes
-   it ambiguous), the price bounds and the preview path, then in one transaction inserts a private
-   **`acquisition_document`** (`amount` = price, `vendor_name` = seller, description = the cited fields with their
-   frames) and sets the row's `vehicle_id` and `is_document = true`. On any failure **nothing is written**:
+   it ambiguous), the price bounds, the price kinds and the preview path, then in one transaction inserts a private
+   **`acquisition_document`** (`vendor_name` = seller, `amount` = the agreed price only if exactly one agreed
+   amount was seen, description = the cited fields and prices with their frames), one
+   **`vehicle_price_observations`** row per price, and sets the row's `vehicle_id` and `is_document = true`. On any failure **nothing is written**:
    `vehicle_id` stays null, there is no document, and the storage policy refuses the preview. (The row is a
    metadata-only residue, as for camera clips.)
 
@@ -232,7 +237,31 @@ Upload is **preview only**: a screenshot as a 1600 px JPEG (<= 2 MB), a recordin
 `exif_data.media.kind` is `camera_video`. `vehicle_documents.file_url` is set by the RPC to
 `capture-media/<preview path>`; `vehicle_images.storage_path` is patched by the app once the object lands.
 
-The rule does **not** write `vehicles.purchase_price` or `purchase_date` (decision 14).
+The rule does **not** write `vehicles.purchase_price` or `purchase_date`. Prices are observations (decision 14).
+
+**Typed price observations** (owner decision, 2026-11-04). One observation per price on screen: `amount`, `kind` =
+`asking | offer | agreed | unknown`, and the `frame` index and `seconds` into the preview that show it. The kind comes
+from the words **around the price** on the phone, and nowhere else (not the amount, not who sent it):
+
+| kind | cue words (whole words, case-insensitive) |
+|---|---|
+| `asking` | "asking", "listed for", "list price", "priced at", "or best offer", "obo"; or a **marketplace listing header**: the price alone on its line, the vehicle's title line directly below, in a frame that is a listing page ("Listed …", "Message seller", "Seller information", "Is this still available") |
+| `offer` | "would you take/accept/do", "will you take/accept", "can/could you do", "how about", "I can do", "I'll do", "I can offer", "my offer", "offer", "I'll give you", "best I can do", "I'd pay" |
+| `agreed` | "deal", "sold to you", "agreed", "I'll take it" |
+| `unknown` | everything else: no cue, cues of two kinds on one price, a negated cue ("no deal"), "dealership" (not "deal") |
+
+Cues are read before the price on its own line first (so "Asking $18,500, would you take $17,000" types both), then
+after it ("$17,000, sold to you"), then the line above when that line holds no price. The same amount seen again with
+the same type is cited to its first frame; an `unknown` is dropped when the same amount was typed elsewhere; at most 8
+per capture, typed ones kept first. **Never guessed**: unclear text is `unknown`.
+
+`vehicle_price_observations` is stored in its own owner-only table (migration `20261109100050`): RLS on, `SELECT` for
+`user_id = auth.uid()` only, no client write grants; rows are written only by `device_file_media_document`. Checked
+read-only against the live schema before choosing it: `vehicle_price_history` (CHECK `msrp|purchase|current|asking|sale`:
+no offer/agreed/unknown, no citation, its purchase/sale rows read as prices of record), `vehicle_observations` (the
+shared 14M-row claims ledger with a fixed property vocabulary: `asking_price_usd`, `sale_price_usd`), `price_observations`
+(villa and service rates) and `price_basis_observation` (auction-event audit): none fits. Nothing reads the new table
+yet; no price is promoted to `vehicles.purchase_price`.
 
 Why this reading of "prior-day purchase as context" stops at narrowing for the capture itself: the recording is
 attributed by its own text. The window only decides which vehicles are worth reading it against.
@@ -352,8 +381,11 @@ RPC has never executed.
     not done).
 13. **Context numbers for screen captures:** window 21 days before to 2 days after (3 for a `purchase_date`), 12
     frames from the first 60 s, 4 captures read per pass, recordings up to 15 min. Change?
-14. **Promote the document to the vehicle?** The RPC does *not* set `vehicles.purchase_price` / `purchase_date`. The
-    Corvette has neither; doing it from OCR needs your approval (and would make `purchase_date` the next anchor).
+14. **Resolved by the owner: typed observations, never `purchase_price`.** Prices are stored one per price as
+    `asking | offer | agreed | unknown` with frame citations in `vehicle_price_observations`; `vehicles.purchase_price` and
+    `purchase_date` are never written from OCR. Still open: whether a later, separate step may suggest the `agreed`
+    price to the owner as a purchase price (nothing does today), and whether `purchase_date` should ever come from a
+    cited date.
 15. **Confidence 0.92 for year + make + model alone** (0.97 for a VIN). Both clear the 0.9 floor; a YMM-only match
     is weaker than a VIN and is protected by the price/seller requirement, the single-vehicle rule and the window.
 16. **Anchor choice when `purchase_date` is missing:** the first filed photo (not `created_at`). The Corvette's

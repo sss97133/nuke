@@ -37,15 +37,16 @@ final class ScreenCaptureEvidenceTests: XCTestCase {
         ScreenFrameText(index: i, seconds: Double(i - 1) * 5 + 2.5, lines: lines, hasProminentFace: face)
     }
 
-    /// 12 frames of the Marketplace negotiation. Frame 4 is the listing header, frame 7 the seller card, frame 9 the
-    /// chat that carries the date.
+    /// 12 frames of the Marketplace negotiation. Frame 4 is the listing header (the asking price), frame 7 the seller
+    /// card, frame 8 the buyer's offer, frame 9 the chat that carries the date and the agreed price.
     private func corvetteRecording() -> [ScreenFrameText] {
         (1...12).map { i in
             switch i {
             case 4: return frame(i, ["Marketplace", "$18,500", "1964 Chevrolet Corvette", "Listed 2 weeks ago in Las Vegas, NV",
                                      "Message", "Is this still available?"])
             case 7: return frame(i, ["Seller information", "Mike Dawson", "Joined Facebook in 2012", "View profile"])
-            case 9: return frame(i, ["Mike Dawson", "Sep 16, 2023", "I can do $17,000 cash today", "Ok, see you at 4"])
+            case 8: return frame(i, ["Mike Dawson", "Would you take $16,500 cash today?"])
+            case 9: return frame(i, ["Mike Dawson", "Sep 16, 2023", "Ok deal, $17,000 cash today", "Ok, see you at 4"])
             default: return frame(i, ["Facebook", "Marketplace", "Search Marketplace"])
             }
         }
@@ -74,21 +75,37 @@ final class ScreenCaptureEvidenceTests: XCTestCase {
         let byName = Dictionary(a.fields.map { ($0.name, $0) }, uniquingKeysWith: { x, _ in x })
         XCTAssertEqual(byName["vehicle"]?.value, "1964 Chevrolet Corvette")
         XCTAssertEqual(byName["vehicle"]?.frame, 4)
-        XCTAssertEqual(byName["price"]?.value, "$18,500")
-        XCTAssertEqual(byName["price"]?.frame, 4, "the listing header's price is the one cited first")
         XCTAssertEqual(byName["seller"]?.value, "Mike Dawson")
         XCTAssertEqual(byName["seller"]?.frame, 7)
         XCTAssertEqual(byName["date"]?.value, "2023-09-16")
         XCTAssertEqual(byName["date"]?.frame, 9)
-        XCTAssertEqual(byName["price_seen"]?.value, "$17,000", "the offer in the chat is cited too, as seen")
-        XCTAssertEqual(byName["price_seen"]?.frame, 9)
-        XCTAssertEqual(try XCTUnwrap(byName["price"]).seconds, 17.5, accuracy: 0.001)
         XCTAssertNil(byName["vin"], "the Corvette has no VIN in the database and none is invented")
+        XCTAssertNil(byName["price"], "prices are typed observations, not cited fields")
+    }
+
+    func testTheCorvetteRecordingYieldsTheAskingOfferAndAgreedPriceObservationsEachCitedToItsFrame() throws {
+        let a = try XCTUnwrap(attribution(verdict(corvetteRecording())))
+        XCTAssertEqual(a.prices, [
+            PriceObservation(amount: 18_500, kind: .asking, frame: 4, seconds: 17.5),
+            PriceObservation(amount: 16_500, kind: .offer, frame: 8, seconds: 37.5),
+            PriceObservation(amount: 17_000, kind: .agreed, frame: 9, seconds: 42.5),
+        ])
+        XCTAssertEqual(Set(a.prices.map(\.kind)), [.asking, .offer, .agreed])
+        XCTAssertTrue(a.prices.allSatisfy { (1...12).contains($0.frame) && $0.seconds >= 0 && $0.seconds <= 60 })
+    }
+
+    func testThePriceObservationsEncodeAsTheServerExpectsThem() throws {
+        let a = try XCTUnwrap(attribution(verdict(corvetteRecording())))
+        let json = try XCTUnwrap(String(data: JSONEncoder().encode(a.prices.first), encoding: .utf8))
+        XCTAssertTrue(json.contains(#""kind":"asking""#))
+        XCTAssertTrue(json.contains(#""amount":18500"#))
+        XCTAssertTrue(json.contains(#""frame":4"#))
+        XCTAssertTrue(json.contains(#""seconds":17.5"#))
     }
 
     func testTheCitedFieldsNeverCarryTheOCRDump() throws {
         let a = try XCTUnwrap(attribution(verdict(corvetteRecording())))
-        let allowed: Set<String> = ["vehicle", "vin", "price", "price_seen", "seller", "seller_line", "date"]
+        let allowed: Set<String> = ["vehicle", "vin", "seller", "seller_line", "date"]
         XCTAssertTrue(a.fields.allSatisfy { allowed.contains($0.name) })
         XCTAssertTrue(a.fields.allSatisfy { $0.value.count <= 40 })
         let blob = a.fields.map(\.value).joined(separator: "|")
@@ -189,9 +206,9 @@ final class ScreenCaptureEvidenceTests: XCTestCase {
     }
 
     func testAPriceOnItsOwnLineIsReadButSillyAmountsAreNot() {
-        XCTAssertEqual(ScreenCaptureEvidence.prices(in: [frame(1, ["$50", "$12,000,000", "$499"])], preferringFrame: nil).count, 0)
-        XCTAssertEqual(ScreenCaptureEvidence.prices(in: [frame(1, ["Asking $18500 obo"])], preferringFrame: nil).first?.value, "$18,500")
-        XCTAssertEqual(ScreenCaptureEvidence.prices(in: [frame(1, ["$ 18,500.00"])], preferringFrame: nil).first?.value, "$18,500")
+        XCTAssertEqual(ScreenCaptureEvidence.prices(in: [frame(1, ["$50", "$12,000,000", "$499"])]).count, 0)
+        XCTAssertEqual(ScreenCaptureEvidence.prices(in: [frame(1, ["Asking $18500 obo"])]).first?.amount, 18_500)
+        XCTAssertEqual(ScreenCaptureEvidence.prices(in: [frame(1, ["$ 18,500.00"])]).first?.amount, 18_500)
         let frames = [frame(1, ["1964 Chevrolet Corvette", "$50", "$12,000,000"])]
         XCTAssertEqual(verdict(frames), .refused(.noPriceOrSellerLine))
     }
@@ -200,7 +217,7 @@ final class ScreenCaptureEvidenceTests: XCTestCase {
         let frames = [frame(1, ["1964 Chevrolet Corvette", "Seller: Mike Dawson"])]
         let a = try XCTUnwrap(attribution(verdict(frames)))
         XCTAssertEqual(a.fields.first { $0.name == "seller" }?.value, "Mike Dawson")
-        XCTAssertNil(a.fields.first { $0.name == "price" })
+        XCTAssertTrue(a.prices.isEmpty)
         let bare = [frame(1, ["1964 Chevrolet Corvette", "Message seller"])]
         XCTAssertEqual(try XCTUnwrap(attribution(verdict(bare))).fields.first { $0.name == "seller_line" }?.value, "seen")
     }
@@ -213,6 +230,88 @@ final class ScreenCaptureEvidenceTests: XCTestCase {
         XCTAssertNil(ScreenCaptureEvidence.personName("mike dawson"))
         XCTAssertNil(ScreenCaptureEvidence.personName("Joined Facebook"))
         XCTAssertNil(ScreenCaptureEvidence.personName("Mike 123"))
+    }
+
+    // ─── Typed price observations ─────────────────────────────────────────────
+
+    private func kinds(_ lines: [String], listing: Bool = false) -> [PriceKind] {
+        ScreenCaptureEvidence.prices(in: [frame(1, listing ? lines + ["Listed 2 weeks ago"] : lines)]).map(\.kind)
+    }
+
+    func testPriceKindsComeFromTheWordsAroundThePrice() {
+        XCTAssertEqual(kinds(["Asking $18,500"]), [.asking])
+        XCTAssertEqual(kinds(["$18,500 or best offer"]), [.asking], "or best offer qualifies an asking price")
+        XCTAssertEqual(kinds(["Would you take $16,500?"]), [.offer])
+        XCTAssertEqual(kinds(["I can do $17,000 cash"]), [.offer])
+        XCTAssertEqual(kinds(["My offer is $16,000"]), [.offer])
+        XCTAssertEqual(kinds(["Deal, $17,000"]), [.agreed])
+        XCTAssertEqual(kinds(["$17,000 sold to you"]), [.agreed], "a cue may follow the price")
+        XCTAssertEqual(kinds(["Ok we agreed on $17,000"]), [.agreed])
+    }
+
+    func testAPriceWithNoClearWordsIsUnknownNeverAGuess() {
+        XCTAssertEqual(kinds(["$17,000"]), [.unknown])
+        XCTAssertEqual(kinds(["Cash $17,000 today"]), [.unknown])
+        XCTAssertEqual(kinds(["Asking and offer $17,000"]), [.unknown], "two kinds of cue on one price is unclear")
+        XCTAssertEqual(kinds(["No deal, $17,000"]), [.unknown], "a negated cue is unclear")
+        XCTAssertEqual(kinds(["The dealership wants $17,000"]), [.unknown], "dealership is not 'deal'")
+    }
+
+    func testTheListingHeaderIsAskingOnlyOnAListingPageNextToATitle() {
+        let page = [frame(1, ["$18,500", "1964 Chevrolet Corvette", "Listed 2 weeks ago in Las Vegas, NV"])]
+        XCTAssertEqual(ScreenCaptureEvidence.prices(in: page).map(\.kind), [.asking])
+        let notAListing = [frame(1, ["$18,500", "1964 Chevrolet Corvette"])]
+        XCTAssertEqual(ScreenCaptureEvidence.prices(in: notAListing).map(\.kind), [.unknown], "no listing-page cue: unclear")
+        let noTitle = [frame(1, ["$18,500", "Message seller"])]
+        XCTAssertEqual(ScreenCaptureEvidence.prices(in: noTitle).map(\.kind), [.unknown], "no title line below: unclear")
+    }
+
+    func testTwoPricesOnOneLineAreTypedSeparately() {
+        let p = ScreenCaptureEvidence.prices(in: [frame(1, ["Asking $18,500, would you take $17,000?"])])
+        XCTAssertEqual(p.map(\.amount), [18_500, 17_000])
+        XCTAssertEqual(p.map(\.kind), [.asking, .offer])
+    }
+
+    func testTheLineAboveTypesAPriceThatHasNoCueOfItsOwn() {
+        let p = ScreenCaptureEvidence.prices(in: [frame(1, ["Would you take", "$16,500"])])
+        XCTAssertEqual(p.map(\.kind), [.offer])
+        let priced = ScreenCaptureEvidence.prices(in: [frame(1, ["Asking $18,500", "$16,500"])])
+        XCTAssertEqual(priced.map(\.kind), [.asking, .unknown], "a line above that holds a price does not type the next one")
+    }
+
+    func testEachPriceIsCitedToTheFirstFrameThatShowsIt() {
+        let frames = [frame(1, ["Asking $18,500"]), frame(2, ["Asking $18,500"]), frame(3, ["Would you take $18,500"])]
+        let p = ScreenCaptureEvidence.prices(in: frames)
+        XCTAssertEqual(p, [PriceObservation(amount: 18_500, kind: .asking, frame: 1, seconds: 2.5),
+                           PriceObservation(amount: 18_500, kind: .offer, frame: 3, seconds: 12.5)])
+    }
+
+    func testAnUnknownIsDroppedWhenTheSameAmountWasTypedElsewhere() {
+        let frames = [frame(1, ["$17,000"]), frame(2, ["Deal, $17,000"])]
+        XCTAssertEqual(ScreenCaptureEvidence.prices(in: frames).map(\.kind), [.agreed])
+    }
+
+    func testAtMostEightPricesAndTheTypedOnesKeepTheirPlace() {
+        var lines = (1...9).map { "$\(1000 + $0)" }                 // nine unknown prices
+        lines.append("Deal, $2,500")
+        let p = ScreenCaptureEvidence.prices(in: [frame(1, lines)])
+        XCTAssertEqual(p.count, ScreenCaptureEvidence.maxPrices)
+        XCTAssertTrue(p.contains { $0.kind == .agreed && $0.amount == 2_500 })
+    }
+
+    func testAnUnknownPriceStillCountsAsCommercialEvidenceButIsStoredAsUnknown() throws {
+        let frames = [frame(1, ["1964 Chevrolet Corvette", "$17,000"])]
+        let a = try XCTUnwrap(attribution(verdict(frames)))
+        XCTAssertEqual(a.prices.map(\.kind), [.unknown])
+    }
+
+    func testNoPriceObservationIsEverTheVehiclesPurchasePrice() throws {
+        // The filing payload carries observations and cited fields only: there is no purchase_price anywhere in it.
+        let a = try XCTUnwrap(attribution(verdict(corvetteRecording())))
+        let payload = ScreenFilingPayload(kind: "screen_recording", method: a.method, confidence: a.confidence, fields: a.fields,
+                                          prices: a.prices, previewExtension: "mp4", contentType: "video/mp4")
+        let json = try XCTUnwrap(String(data: JSONEncoder().encode(payload), encoding: .utf8))
+        XCTAssertFalse(json.contains("purchase"))
     }
 
     // ─── A VIN is stronger than a name ────────────────────────────────────────
@@ -301,7 +400,8 @@ final class ScreenCaptureEvidenceTests: XCTestCase {
 
     private func screenFiling() -> VideoFiling {
         let payload = ScreenFilingPayload(kind: "screen_recording", method: "screen_ymm", confidence: 0.92,
-                                          fields: [CitedField(name: "price", value: "$18,500", frame: 4, seconds: 17.5)],
+                                          fields: [CitedField(name: "vehicle", value: "1964 Chevrolet Corvette", frame: 4, seconds: 17.5)],
+                                          prices: [PriceObservation(amount: 18_500, kind: .asking, frame: 4, seconds: 17.5)],
                                           previewExtension: "mp4", contentType: "video/mp4")
         return VideoFiling(assetKey: "s", localID: "L", rowID: "row-s", vehicleID: corvetteID, method: "screen_ymm",
                            confidence: 0.92, rowJSON: Data("{}".utf8), fullDone: true, screen: payload)

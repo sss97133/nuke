@@ -45,13 +45,14 @@ struct VideoFiling: Codable, Equatable, Sendable {
     var screen: ScreenFilingPayload? = nil
 }
 
-/// What the server needs to attach a screen capture as a document: the method, the confidence and the CITED fields.
-/// Never the OCR text.
+/// What the server needs to attach a screen capture as a document: the method, the confidence, the CITED fields and
+/// the typed PRICE OBSERVATIONS (each with its frame). Never the OCR text.
 struct ScreenFilingPayload: Codable, Equatable, Sendable {
     let kind: String                // screen_recording | screenshot
     let method: String              // screen_vin | screen_ymm
     let confidence: Double
     let fields: [CitedField]
+    let prices: [PriceObservation]
     let previewExtension: String    // mp4 | jpg
     let contentType: String         // video/mp4 | image/jpeg
 }
