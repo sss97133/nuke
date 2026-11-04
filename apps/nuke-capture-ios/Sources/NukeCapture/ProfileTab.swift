@@ -367,20 +367,19 @@ struct ProfileView: View {
             // garage, calendar and latest-work sections it would have filled.
             if signInNeeded {
                 Section {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Label(isOwn ? "Sign in to see your garage, calendar and latest work" : "Sign in to see the calendar and latest work", systemImage: "person.crop.circle.badge.questionmark")
-                            .font(.subheadline)
+                    VStack(alignment: .leading, spacing: NukeSpace.md) {
+                        Label(isOwn ? "Sign in to see your garage and recent work" : "Sign in to see recent work", systemImage: "person.crop.circle.badge.questionmark")
+                            .font(.nukeCardTitle)
                             .foregroundStyle(Color.primary)
-                        Text("Those readers answer only a signed-in viewer. The public vehicles below are what any visitor sees, as on nuke.ag.")
-                            .font(.caption)
+                        Text("Cars that are public are still shown below.")
+                            .font(.nukeDetail)
                             .foregroundStyle(.secondary)
                         if let onSignIn {
                             Button("Sign in") { onSignIn() }
-                                .buttonStyle(.bordered)
-                                .controlSize(.small)
+                                .buttonStyle(NukePrimaryButtonStyle())
                         }
                     }
-                    .padding(.vertical, 4)
+                    .padding(.vertical, NukeSpace.sm)
                 }
             }
 
@@ -680,14 +679,23 @@ struct ProfileView: View {
                         .resizable().scaledToFit()
                         .foregroundStyle(.tertiary)
                 }
-                .frame(width: 68, height: 68)
+                .frame(width: 84, height: 84)
                 .clipShape(Circle())
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(displayName ?? (profileSettled ? "Unnamed builder" : "…"))
-                        .font(.title2.weight(.bold))
-                        .foregroundStyle(Color.primary)
-                        .lineLimit(1)
+                    if let name = displayName {
+                        Text(name)
+                            .font(.system(.title, design: .rounded).weight(.bold))
+                            .foregroundStyle(Color.primary)
+                            .lineLimit(1)
+                    } else if profileSettled {
+                        Text(isOwn ? "Your profile" : "Nuke member")
+                            .font(.system(.title, design: .rounded).weight(.bold))
+                            .foregroundStyle(Color.primary)
+                            .lineLimit(1)
+                    } else {
+                        NukeSkeletonBlock(height: 24).frame(maxWidth: 180)
+                    }
                     if let h = profile?.username, !h.isEmpty {
                         Text("@\(h)").font(.subheadline).foregroundStyle(.secondary)
                     }
@@ -707,8 +715,7 @@ struct ProfileView: View {
 
             // profiles.role is a self-claim, never a decided context: dim, at the record rung.
             if let role = profile?.role, !role.isEmpty {
-                RootedValueView(label: "Role", value: role.replacingOccurrences(of: "_", with: " "),
-                                status: .recorded, decay: "self-described")
+                NukePill(text: role.replacingOccurrences(of: "_", with: " ").capitalized)
             }
 
             // LIVE STATE — is this node producing NOW? The first "worth-connecting-to"
@@ -753,9 +760,12 @@ struct ProfileView: View {
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(Color.primary)
                         .fixedSize(horizontal: false, vertical: true)
-                    Text(fleetWorthLine)
-                        .font(.caption).monospacedDigit()
-                        .foregroundStyle(.secondary)
+                    // Shown only when a price is on record; an unpriced fleet says nothing, never a guess.
+                    if fleetPricedCount > 0 {
+                        Text(fleetWorthLine)
+                            .font(.footnote).monospacedDigit()
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
         }
@@ -767,7 +777,7 @@ struct ProfileView: View {
         if p.worked_today == true { return "Worked today" }
         if p.active_today == true {
             let n = p.images_today ?? 0
-            return n > 0 ? "Active today · \(n) photos" : "Active today"
+            return n > 0 ? "Active today · \(NukeDisplay.count(n, "photo"))" : "Active today"
         }
         if let last = p.last_worked {
             return "Last worked \(last)"
@@ -777,8 +787,8 @@ struct ProfileView: View {
 
     @ViewBuilder private func stat(_ value: String, _ label: String) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text(value).font(.headline).monospacedDigit().foregroundStyle(Color.primary)
-            Text(label).font(.caption2).foregroundStyle(.secondary)
+            Text(value).font(.system(.title3, design: .rounded).weight(.bold)).monospacedDigit().foregroundStyle(Color.primary)
+            Text(label).font(.caption).foregroundStyle(.secondary)
         }
     }
 
@@ -918,30 +928,28 @@ struct ProfileView: View {
 
     @ViewBuilder private func garageRow(_ v: GarageVehicle) -> some View {
         Button { openVehicle = v } label: {
-            HStack(spacing: 12) {
-                CachedAsyncImage(url: NukeImage.thumb(v.image_url, width: 170)) { img in
-                    img.resizable().scaledToFill()
-                } placeholder: {
-                    Image(systemName: "car.side").foregroundStyle(.secondary)
-                }
-                .frame(width: 56, height: 42)
-                .clipped()
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(v.title).foregroundStyle(Color.primary)
-                    HStack(spacing: 8) {
-                        Text("\(v.image_count) photos")
-                            .font(.caption2).monospacedDigit()
-                            .foregroundStyle(.secondary)
-                        if v.relationship != "owner" {
-                            Text(v.relationshipLabel)
-                                .font(.caption2).foregroundStyle(.secondary)
-                        }
+            HStack(spacing: NukeSpace.md) {
+                // The car leads: a big photo, not a postage stamp.
+                NukePhoto(url: NukeImage.thumb(v.image_url, width: 300), maxPixel: 480)
+                    .frame(width: 104, height: 78)
+                    .clipShape(RoundedRectangle(cornerRadius: NukeRadius.small, style: .continuous))
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(v.title)
+                        .font(.nukeCardTitle)
+                        .foregroundStyle(Color.primary)
+                        .lineLimit(2)
+                    Text(v.image_count > 0 ? NukeDisplay.count(v.image_count, "photo") : "No photos yet")
+                        .font(.footnote).monospacedDigit()
+                        .foregroundStyle(.secondary)
+                    if v.relationship != "owner" {
+                        Text(v.relationshipLabel)
+                            .font(.footnote).foregroundStyle(.secondary)
                     }
                     if let detail = v.relationshipDetail {
-                        Text(detail).font(.caption2).foregroundStyle(.secondary)
+                        Text(detail).font(.caption).foregroundStyle(.secondary)
                     }
                     if let period = v.relationshipPeriod {
-                        Text(period).font(.caption2).foregroundStyle(.secondary)
+                        Text(period).font(.caption).foregroundStyle(.secondary)
                     }
                 }
                 Spacer()
@@ -949,8 +957,10 @@ struct ProfileView: View {
                 // model estimate that the vehicle page hides unless the market defends it (#1065, the
                 // web's marketDefends), and the garage reader carries no such verdict. It returns when
                 // the reader does (review round two, 2026-10-13).
-                Image(systemName: "chevron.right").font(.caption2).foregroundStyle(.tertiary)
+                Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
             }
+            .frame(minHeight: NukeSize.minTap)
+            .contentShape(Rectangle())
         }
     }
 
@@ -1048,18 +1058,16 @@ struct ProfileView: View {
     // ─── Garage failed to load — distinct from "no vehicles yet". ─────────────
     private var garageErrorSection: some View {
         Section {
-            VStack(alignment: .leading, spacing: 8) {
-                Label("Couldn't load the garage", systemImage: "exclamationmark.triangle")
-                    .font(.subheadline)
-                    .foregroundStyle(Color.primary)
-                Text("Your vehicles are on the record — the connection dropped.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Button("Retry") { Task { await loadGarage() } }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
+            VStack(spacing: NukeSpace.md) {
+                Image(systemName: "wifi.exclamationmark").font(.title).foregroundStyle(.secondary)
+                Text("We couldn't load your garage").font(.nukeCardTitle)
+                Text("Your cars are safe. Check your connection and try again.")
+                    .font(.nukeDetail).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                Button("Try again") { Task { await loadGarage() } }
+                    .buttonStyle(NukePrimaryButtonStyle())
             }
-            .padding(.vertical, 2)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, NukeSpace.md)
         } header: {
             Text("Garage")
         }
@@ -1070,14 +1078,18 @@ struct ProfileView: View {
     // plainly how cars arrive: photos at a confirmed site develop into them.
     private var emptyGarageSection: some View {
         Section {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("No vehicles yet")
+            VStack(spacing: NukeSpace.sm) {
+                Image(systemName: "car.side").font(.system(size: 36)).foregroundStyle(.tertiary)
+                Text("Your garage is empty")
+                    .font(.nukeCardTitle)
                     .foregroundStyle(Color.primary)
-                Text("Photos you take at a confirmed site develop into your vehicles — they'll appear here as they're recognized.")
-                    .font(.caption)
+                Text("Take photos of a car at a work site and it shows up here.")
+                    .font(.nukeDetail)
                     .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
             }
-            .padding(.vertical, 2)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, NukeSpace.lg)
         } header: {
             Text("Garage")
         }
