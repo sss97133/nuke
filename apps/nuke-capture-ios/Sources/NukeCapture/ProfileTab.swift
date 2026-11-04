@@ -1446,7 +1446,7 @@ struct DayReceiptView: View {
     }
 }
 
-/// Square remote-thumbnail grid (AsyncImage). Tap any cell to open a
+/// Square remote-thumbnail grid (CachedAsyncImage). Tap any cell to open a
 /// full-screen viewer with a caption bar showing taken_at.
 private struct RemoteThumbGrid: View {
     let photos: [DayReceipt.Photo]

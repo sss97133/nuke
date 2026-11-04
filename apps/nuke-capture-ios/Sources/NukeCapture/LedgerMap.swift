@@ -3380,9 +3380,10 @@ struct LedgerMapView: View {
     private func vehicleRowContent(_ v: LedgerVehicle) -> some View {
         HStack(spacing: 12) {
             if let url = v.primary_image_url.flatMap(URL.init(string:)) {
-                AsyncImage(url: url) { phase in
-                    if case .success(let img) = phase { img.resizable().scaledToFill() }
-                    else { Color(.secondarySystemBackground) }
+                CachedAsyncImage(url: url, maxPixel: 256) { img in
+                    img.resizable().scaledToFill()
+                } placeholder: {
+                    Color(.secondarySystemBackground)
                 }
                 .frame(width: 64, height: 48)
                 .clipShape(RoundedRectangle(cornerRadius: 4))
