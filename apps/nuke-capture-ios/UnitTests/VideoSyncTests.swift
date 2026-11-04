@@ -219,8 +219,9 @@ final class VideoSyncTests: XCTestCase {
 
     func testTheInsertFillsTheExistingVideoColumnsAndIsMetadataOnly() throws {
         let json = try XCTUnwrap(String(data: JSONEncoder().encode(row()), encoding: .utf8))
+            .replacingOccurrences(of: "\\/", with: "/")
         for column in ["\"is_video\":true", "\"duration_seconds\":30", "\"video_codec\":\"hvc1\"",
-                       "\"video_resolution\":\"1920x1080\"", "\"mime_type\":\"video\/mp4\""] {
+                       "\"video_resolution\":\"1920x1080\"", "\"mime_type\":\"video/mp4\""] {
             XCTAssertTrue(json.contains(column), column)
         }
         XCTAssertTrue(json.contains("\"image_url\":\"\""), "private bucket: no public URL")
