@@ -650,6 +650,8 @@ final class SyncEngine: ObservableObject {
         // earlier pass. Visual analysis availability never changes upload or filing success.
         await SubjectResolutionEngine.shared.runAfterSync(userId: userId)
         await SubjectResolutionEngine.shared.runHistoricalAfterSync(userId: userId)
+        // Videos that belong to a vehicle (OFF by default; a no-op until the flag is on).
+        await VideoSyncEngine.shared.runAfterPhotoPass(userId: userId)
         return failed == 0
     }
 
