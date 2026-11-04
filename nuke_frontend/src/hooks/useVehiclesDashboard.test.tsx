@@ -21,6 +21,9 @@ vi.mock('../lib/supabase', () => ({ supabase: {
     };
     q.eq = (key: string, value: any) => { rows = rows.filter(r => r[key] === value); return q; };
     q.in = (key: string, values: any[]) => { rows = rows.filter(r => values.includes(r[key])); return q; };
+    q.gte = (key: string, value: any) => { rows = rows.filter(r => r[key] >= value); return q; };
+    q.order = () => q;
+    q.limit = () => q;
     return q;
   },
   rpc: (name: string, params: unknown) => {
