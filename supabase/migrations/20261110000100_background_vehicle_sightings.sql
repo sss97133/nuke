@@ -81,9 +81,9 @@ begin
       refused := refused || jsonb_build_object('image_id', v_img, 'vehicle_id', v_veh, 'why', 'already linked'); continue;
     end if;
     insert into image_observations (image_id, vehicle_id, role, confidence, confidence_basis, bbox,
-                                    layer_version, observed_by, agent_version, is_high_confidence_subject)
+                                    layer_version, observed_by, agent_version)
     values (v_img, v_veh, v_role, v_conf, coalesce(it->'evidence', '{}'::jsonb), it->'bbox',
-            jsonb_build_object('run_id', p_run_id, 'actor', p_actor), 'background_link_v1', 'background_link_v1', false)
+            jsonb_build_object('run_id', p_run_id, 'actor', p_actor), 'background_link_v1', 'background_link_v1')
     returning id into v_id;
     insert into profile_fix_log (run_id, rule, vehicle_id, target_table, target_pk, column_name, op, before, after, evidence)
     values (p_run_id, 'background_vehicle_link', v_veh, 'image_observations', v_id, 'is_active', 'insert', null,
