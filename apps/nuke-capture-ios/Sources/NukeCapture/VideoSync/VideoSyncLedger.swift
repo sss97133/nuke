@@ -1,15 +1,15 @@
 // VideoSyncLedger.swift — what the video sync owes and what it has done, as a pure value.
 //
-// Held locally only (Application Support/VideoSync/ledger.json). It never stores a video's bytes and
-// nothing in it leaves the phone: the server sees the asset key (a hash), not the PhotoKit id.
+// Held locally only (Application Support/VideoSync/ledger.json). It never stores a video's bytes, a frame or any
+// text read from one, and nothing in it leaves the phone: the server sees the asset key (a hash), not the PhotoKit id.
+// What it keeps about a refused clip is the asset key and a fixed refusal word, so the clip is not read twice.
 
 import Foundation
 
 struct VideoUploadRecord: Codable, Equatable, Sendable {
     enum Stage: String, Codable, Sendable { case preview, full }
     let assetKey: String
-    let localID: String
-    let kind: VideoKind
+    let rowID: String               // the vehicle_images row this object belongs to
     let stage: Stage
     let objectName: String
     let fileName: String            // staged bytes inside the VideoSync directory
@@ -17,28 +17,68 @@ struct VideoUploadRecord: Codable, Equatable, Sendable {
     var tus: TusProgress = TusProgress()
     var attempts: Int = 0
     var lastError: String? = nil
-    /// The insert that tells the server about a landed preview (stage .preview only).
-    var rowJSON: Data? = nil
-    /// The server row to mark after a landed full file (stage .full only).
-    var rowID: String? = nil
     var key: String { "\(assetKey)|\(stage.rawValue)" }
+}
+
+/// A clip whose frames cleared the gate. It lives here from the moment it clears until its row is filed to the
+/// vehicle and both objects have landed, so each step can resume after a relaunch without re-reading the frames.
+struct VideoFiling: Codable, Equatable, Sendable {
+    enum State: String, Codable, Sendable {
+        case cleared        // gate passed on the phone; NOTHING has been sent yet
+        case rowInserted    // metadata-only row exists (no pixels, no objects, vehicle_id still null)
+        case filed          // device_file_images set vehicle_id: pixels may now go up
+    }
+    let assetKey: String
+    let localID: String
+    let rowID: String
+    let vehicleID: String
+    let method: String
+    let confidence: Double
+    /// The insert body, built at clearance (metadata only).
+    let rowJSON: Data
+    var state: State = .cleared
+    var attempts: Int = 0
+    var previewDone = false
+    var fullDone = false
 }
 
 struct VideoLedger: Codable, Equatable, Sendable {
     /// Transfers in flight or waiting, at most one per (asset, stage).
     var pending: [VideoUploadRecord] = []
-    /// assetKey → PhotoKit local identifier, for every clip whose preview landed (local only; phase 2 needs it).
-    var previewed: [String: String] = [:]
-    var fullUploaded: Set<String> = []
-    /// Screenshots whose pixels were read for on-device text recognition and did not name a vehicle.
-    /// Only the hash is kept (never the text), so a screenshot is not read twice.
-    var ocrChecked: Set<String> = []
+    /// Cleared clips awaiting row insert, filing or transfers, by asset key.
+    var filings: [String: VideoFiling] = [:]
+    /// assetKey → outcome for every clip read once: a refusal word ("refused:privacy") or "filed". Never content.
+    var checked: [String: String] = [:]
 
-    func isOCRChecked(_ assetKey: String) -> Bool { ocrChecked.contains(assetKey) }
-    mutating func markOCRChecked(_ assetKey: String) { ocrChecked.insert(assetKey) }
+    func isKnown(_ assetKey: String) -> Bool { checked[assetKey] != nil || filings[assetKey] != nil }
 
-    func isKnown(_ assetKey: String) -> Bool {
-        previewed[assetKey] != nil || pending.contains { $0.assetKey == assetKey }
+    mutating func markChecked(_ assetKey: String, outcome: String) { checked[assetKey] = outcome }
+
+    mutating func recordCleared(_ filing: VideoFiling) {
+        guard filings[filing.assetKey] == nil else { return }
+        filings[filing.assetKey] = filing
+    }
+
+    mutating func setState(_ assetKey: String, _ state: VideoFiling.State) {
+        guard filings[assetKey] != nil else { return }
+        filings[assetKey]?.state = state
+        if state == .filed { checked[assetKey] = "filed" }
+    }
+
+    /// The server did not file it (refused, or kept deferring): the row stays metadata-only and nothing is uploaded.
+    mutating func noteFilingAttempt(_ assetKey: String, maxAttempts: Int) {
+        guard filings[assetKey] != nil else { return }
+        filings[assetKey]?.attempts += 1
+        if (filings[assetKey]?.attempts ?? 0) >= maxAttempts {
+            filings[assetKey] = nil
+            checked[assetKey] = "refused:server"
+        }
+    }
+
+    /// The server refused outright (not associated, conflict, gate rejected, …): done, nothing uploads.
+    mutating func serverRefused(_ assetKey: String, status: String) {
+        filings[assetKey] = nil
+        checked[assetKey] = "refused:server_\(status)"
     }
 
     @discardableResult
@@ -60,16 +100,14 @@ struct VideoLedger: Codable, Equatable, Sendable {
         if pending[i].attempts >= maxAttempts { pending.remove(at: i) }
     }
 
-    /// A preview landed and its row is in: the clip is known, the transfer leaves the queue.
-    mutating func completePreview(key: String) {
-        guard let rec = pending.first(where: { $0.key == key }) else { return }
-        previewed[rec.assetKey] = rec.localID
-        pending.removeAll { $0.key == key }
-    }
+    mutating func completePreview(key: String) { complete(key: key) { $0.previewDone = true } }
+    mutating func completeFull(key: String) { complete(key: key) { $0.fullDone = true } }
 
-    mutating func completeFull(key: String) {
+    private mutating func complete(key: String, _ mark: (inout VideoFiling) -> Void) {
         guard let rec = pending.first(where: { $0.key == key }) else { return }
-        fullUploaded.insert(rec.assetKey)
         pending.removeAll { $0.key == key }
+        guard filings[rec.assetKey] != nil else { return }
+        mark(&filings[rec.assetKey]!)
+        if filings[rec.assetKey]!.previewDone && filings[rec.assetKey]!.fullDone { filings[rec.assetKey] = nil }
     }
 }

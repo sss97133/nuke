@@ -27,13 +27,15 @@ final class VideoSyncTests: XCTestCase {
     func testTheNumbersMatchTheOwnerScope() {
         XCTAssertEqual(VideoSyncConfig.photoTimeWindow, 30 * 60)
         XCTAssertEqual(VideoSyncConfig.photoRadiusMeters, 150)
-        XCTAssertEqual(VideoSyncConfig.acquisitionDaysBefore, 7)
-        XCTAssertEqual(VideoSyncConfig.acquisitionDaysAfter, 2)
+        XCTAssertEqual(VideoSyncConfig.framesPerClip, 12)
+        XCTAssertEqual(MediaAttributionGate.confidenceFloor, 0.9, "the server's floor for vin_ocr / serial_ocr")
+        XCTAssertEqual(MediaAttributionGate.fullVINConfidence, 0.99)
+        XCTAssertEqual(MediaAttributionGate.classicSerialConfidence, 0.97)
         XCTAssertEqual(VideoSyncConfig.lookback, 14 * 24 * 3600, "no history: two weeks, not the library")
         XCTAssertEqual(VideoSyncConfig.tusChunkBytes, 6 * 1024 * 1024, "Supabase's resumable endpoint requires 6 MiB chunks")
     }
 
-    // ─── Storage targets are private and keyed by the asset ───────────────────
+    // ─── Storage targets are private and keyed by the row ───────────────────
 
     func testMediaNeverGoesToThePublicBuckets() {
         XCTAssertNotEqual(VideoSyncConfig.bucket, Config.storageBucket)
@@ -42,10 +44,9 @@ final class VideoSyncTests: XCTestCase {
         XCTAssertEqual(VideoSyncConfig.table, "vehicle_images", "the existing video columns are the record")
         XCTAssertEqual(VideoSyncConfig.rowSource, "capture_relay_ios_media")
         XCTAssertNotEqual(VideoSyncConfig.rowSource, Config.sourceTag, "the photo triggers key on capture_relay_ios")
-        XCTAssertEqual(VideoSyncConfig.previewPath(userID: "u", assetKey: "abc"), "users/u/previews/abc.mp4")
-        XCTAssertEqual(VideoSyncConfig.previewPath(userID: "u", assetKey: "abc", fileExtension: "JPG"), "users/u/previews/abc.jpg")
+        XCTAssertEqual(VideoSyncConfig.previewPath(userID: "u", rowID: "ABC-1"), "users/u/previews/abc-1.mp4")
         XCTAssertEqual(VideoSyncConfig.fullPath(userID: "u", rowID: "ABC-1", fileExtension: "MOV"), "users/u/full/abc-1.mov",
-                       "keyed by the row id, so the storage policy finds the row by primary key")
+                       "both objects are keyed by the row id, so the storage policy finds the row by primary key")
     }
 
     func testAssetKeyHidesThePhotoKitIdentifier() {
@@ -109,23 +110,69 @@ final class VideoSyncTests: XCTestCase {
 
     // ─── The ledger ───────────────────────────────────────────────────────────
 
-    private func record(_ key: String, stage: VideoUploadRecord.Stage = .preview) -> VideoUploadRecord {
-        VideoUploadRecord(assetKey: key, localID: "L-\(key)", kind: .cameraVideo, stage: stage,
-                          objectName: "users/u/previews/\(key).mp4", fileName: "\(key).mp4", contentType: "video/mp4")
+    private func filing(_ key: String) -> VideoFiling {
+        VideoFiling(assetKey: key, localID: "L-\(key)", rowID: "row-\(key)", vehicleID: "V1", method: "vin_ocr",
+                    confidence: 0.99, rowJSON: Data("{}".utf8))
+    }
+    private func record(_ key: String, stage: VideoUploadRecord.Stage) -> VideoUploadRecord {
+        VideoUploadRecord(assetKey: key, rowID: "row-\(key)", stage: stage,
+                          objectName: "users/u/\(stage.rawValue)/row-\(key).mp4", fileName: "\(key).mp4", contentType: "video/mp4")
     }
 
-    func testLedgerQueuesOncePerAssetAndStage() {
+    func testARefusedClipIsRememberedAsAWordNotContent() {
         var l = VideoLedger()
-        XCTAssertTrue(l.enqueue(record("a")))
-        XCTAssertFalse(l.enqueue(record("a")))
-        XCTAssertTrue(l.enqueue(record("a", stage: .full)))
+        XCTAssertFalse(l.isKnown("a"))
+        l.markChecked("a", outcome: "refused:no_identifier_read")
+        XCTAssertTrue(l.isKnown("a"), "a clip that was read once is not read again")
+        XCTAssertTrue(l.filings.isEmpty)
+        XCTAssertTrue(l.pending.isEmpty, "nothing is queued for a clip that stays on the phone")
+    }
+
+    func testAClearedClipMovesThroughRowFilingThenTransfers() {
+        var l = VideoLedger()
+        l.recordCleared(filing("a"))
+        XCTAssertEqual(l.filings["a"]?.state, .cleared)
         XCTAssertTrue(l.isKnown("a"))
-        XCTAssertFalse(l.isKnown("b"))
+        l.setState("a", .rowInserted)
+        XCTAssertNil(l.checked["a"], "not filed yet")
+        l.setState("a", .filed)
+        XCTAssertEqual(l.checked["a"], "filed")
+        XCTAssertTrue(l.enqueue(record("a", stage: .preview)))
+        XCTAssertFalse(l.enqueue(record("a", stage: .preview)))
+        l.completePreview(key: "a|preview")
+        XCTAssertEqual(l.filings["a"]?.previewDone, true)
+        XCTAssertNotNil(l.filings["a"], "the full file is still owed")
+        XCTAssertTrue(l.enqueue(record("a", stage: .full)))
+        l.completeFull(key: "a|full")
+        XCTAssertNil(l.filings["a"], "both objects landed")
+        XCTAssertTrue(l.isKnown("a"))
+    }
+
+    func testAServerRefusalLeavesNothingToUpload() {
+        var l = VideoLedger()
+        l.recordCleared(filing("a"))
+        l.setState("a", .rowInserted)
+        l.serverRefused("a", status: "not_associated")
+        XCTAssertNil(l.filings["a"])
+        XCTAssertEqual(l.checked["a"], "refused:server_not_associated")
+        XCTAssertTrue(l.pending.isEmpty)
+    }
+
+    func testDeferredFilingGivesUpAfterTooManyAttemptsWithoutUploading() {
+        var l = VideoLedger()
+        l.recordCleared(filing("a"))
+        l.setState("a", .rowInserted)
+        l.noteFilingAttempt("a", maxAttempts: 2)
+        XCTAssertNotNil(l.filings["a"])
+        l.noteFilingAttempt("a", maxAttempts: 2)
+        XCTAssertNil(l.filings["a"])
+        XCTAssertEqual(l.checked["a"], "refused:server")
     }
 
     func testLedgerKeepsTheResumeOffsetAndForgetsAfterTooManyFailures() {
         var l = VideoLedger()
-        l.enqueue(record("a"))
+        l.recordCleared(filing("a"))
+        l.enqueue(record("a", stage: .preview))
         l.updateTus(key: "a|preview", TusProgress(uploadURL: "https://x.test/u/1", offset: 6_291_456))
         XCTAssertEqual(l.pending.first?.tus.offset, 6_291_456)
         l.noteFailure(key: "a|preview", error: "e", maxAttempts: 2)
@@ -134,22 +181,12 @@ final class VideoSyncTests: XCTestCase {
         XCTAssertTrue(l.pending.isEmpty)
     }
 
-    func testCompletedPreviewRemembersTheLocalIDForTheFullFileStep() {
-        var l = VideoLedger()
-        l.enqueue(record("a"))
-        l.completePreview(key: "a|preview")
-        XCTAssertEqual(l.previewed["a"], "L-a")
-        XCTAssertTrue(l.pending.isEmpty)
-        XCTAssertTrue(l.isKnown("a"), "a clip whose preview landed is never previewed twice")
-        l.enqueue(record("a", stage: .full))
-        l.completeFull(key: "a|full")
-        XCTAssertTrue(l.fullUploaded.contains("a"))
-    }
-
     func testLedgerSurvivesARelaunch() throws {
         var l = VideoLedger()
-        l.enqueue(record("a"))
-        l.completePreview(key: "a|preview")
+        l.recordCleared(filing("a"))
+        l.setState("a", .filed)
+        l.enqueue(record("a", stage: .preview))
+        l.markChecked("b", outcome: "refused:privacy")
         let again = try JSONDecoder().decode(VideoLedger.self, from: JSONEncoder().encode(l))
         XCTAssertEqual(again, l)
     }
@@ -165,43 +202,48 @@ final class VideoSyncTests: XCTestCase {
 
     // ─── What the server is told ──────────────────────────────────────────────
 
-    func testOCRCheckedScreenshotsAreRemembered() {
-        var l = VideoLedger()
-        XCTAssertFalse(l.isOCRChecked("a"))
-        l.markOCRChecked("a")
-        XCTAssertTrue(l.isOCRChecked("a"))
-        XCTAssertFalse(l.isKnown("a"), "OCR-checked is not 'previewed': a later filed photo may still match it by time")
-    }
-
-    // ─── What the server is told ──────────────────────────────────────────────
-
-    private func row(kind: String = "screen_recording", sensitive: Bool = true, vehicle: String? = "V1") -> MediaImageRow {
+    private func row(vehicle: String? = "V1") -> MediaImageRow {
         MediaImageRow(
-            id: "r1", user_id: "u", image_url: "", storage_path: "users/u/previews/x.mp4", file_name: "x-preview.mp4",
-            mime_type: "video/mp4", file_size: 1000, is_video: true, duration_seconds: 30, video_codec: "hvc1",
-            video_resolution: "1170x2532", taken_at: "2026-11-04T12:00:00Z", latitude: nil, longitude: nil,
+            id: "r1", user_id: "u", image_url: "", file_name: "x-preview.mp4", mime_type: "video/mp4",
+            is_video: true, duration_seconds: 30, video_codec: "hvc1", video_resolution: "1920x1080",
+            taken_at: "2026-11-04T12:00:00Z", latitude: 35.9, longitude: -114.8,
             source: VideoSyncConfig.rowSource, image_medium: "other", ai_processing_status: "skipped",
-            is_sensitive: sensitive, ingest_kind: "live", auto_suggested_vehicle_id: vehicle,
-            auto_suggestion_reasons: ["acquisition_window_v1"],
+            is_sensitive: false, ingest_kind: "live", auto_suggested_vehicle_id: vehicle,
+            auto_suggestion_reasons: [VideoSyncConfig.gateVersion],
             exif_data: MediaExif(synced_by: "capture-relay-ios", asset_key: String(repeating: "a", count: 64), media: .init(
-                kind: kind, bucket: "capture-media", preview_path: "users/u/previews/x.mp4", preview_bytes: 1000,
-                full_state: "held_on_phone", device_model: "iPhone17,1", device_os: "26.0", width: 1170, height: 2532,
-                match: .init(rule: "acquisition_window_v1", anchors: 1, window_seconds: nil, radius_m: nil,
-                             days_before: 7, days_after: 2, terms: nil))))
+                kind: "camera_video", bucket: "capture-media", preview_path: "users/u/previews/r1.mp4",
+                full_state: "held_on_phone", device_model: "iPhone17,1", device_os: "26.0", width: 1920, height: 1080,
+                match: .init(rule: "media_gate_v1", method: "vin_ocr", confidence: 0.99, frames_sampled: 12, frames_exact: 2,
+                             candidates: 2, anchors: 3, window_seconds: 1800, radius_m: 150))))
     }
 
-    func testThePreviewRowFillsTheExistingVideoColumnsAndFilesNoVehicle() throws {
+    func testTheInsertFillsTheExistingVideoColumnsAndIsMetadataOnly() throws {
         let json = try XCTUnwrap(String(data: JSONEncoder().encode(row()), encoding: .utf8))
         for column in ["\"is_video\":true", "\"duration_seconds\":30", "\"video_codec\":\"hvc1\"",
-                       "\"video_resolution\":\"1170x2532\"", "\"mime_type\":\"video\\/mp4\""] {
+                       "\"video_resolution\":\"1920x1080\"", "\"mime_type\":\"video\/mp4\""] {
             XCTAssertTrue(json.contains(column), column)
         }
-        XCTAssertFalse(json.contains("\"vehicle_id\""), "the phone suggests; a person files")
-        XCTAssertFalse(json.contains("user_confirmed_vehicle"))
         XCTAssertTrue(json.contains("\"image_url\":\"\""), "private bucket: no public URL")
-        XCTAssertTrue(json.contains("auto_suggested_vehicle_id"))
-        XCTAssertFalse(json.contains("full_path"))
+        XCTAssertFalse(json.contains("\"storage_path\""), "no object yet: nothing has been uploaded")
+        XCTAssertFalse(json.contains("\"file_size\""))
         XCTAssertTrue(json.contains("held_on_phone"))
+    }
+
+    func testTheInsertNeverSetsTheVehicleTheServersGateDoes() throws {
+        let json = try XCTUnwrap(String(data: JSONEncoder().encode(row()), encoding: .utf8))
+        XCTAssertFalse(json.contains("\"vehicle_id\""), "device_file_images sets vehicle_id after its own checks")
+        XCTAssertFalse(json.contains("user_confirmed_vehicle"), "there is no confirm tap")
+        XCTAssertTrue(json.contains("\"ai_processing_status\":\"skipped\""))
+        XCTAssertTrue(json.contains("\"auto_suggested_vehicle_id\":\"V1\""))
+    }
+
+    func testTheMatchBasisIsNumbersAndFixedWordsOnly() throws {
+        let json = try XCTUnwrap(String(data: JSONEncoder().encode(row()), encoding: .utf8))
+        for k in ["media_gate_v1", "vin_ocr", "frames_sampled", "frames_exact", "candidates", "anchors", "radius_m"] {
+            XCTAssertTrue(json.contains(k), k)
+        }
+        XCTAssertFalse(json.contains("\"text\""), "OCR text is never stored")
+        XCTAssertFalse(json.contains("\"vin\""), "the identifier read is not stored")
     }
 
     func testNoVehicleSuggestionIsOmittedNotNull() throws {
@@ -212,7 +254,9 @@ final class VideoSyncTests: XCTestCase {
     func testTheRowCarriesNoPixelsAndNoOCRText() throws {
         let data = try JSONEncoder().encode(row())
         XCTAssertLessThan(data.count, 4_000, "metadata only")
-        let json = try XCTUnwrap(String(data: data, encoding: .utf8))
-        XCTAssertFalse(json.contains("\"text\""))
+    }
+
+    func testStorageAvailabilityCheckFailsClosed() {
+        XCTAssertFalse(VideoSyncEngine.hasRoom(for: URL(fileURLWithPath: "/definitely/not/here"), minimumBytes: Int64.max))
     }
 }
