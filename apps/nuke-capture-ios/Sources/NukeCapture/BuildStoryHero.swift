@@ -54,12 +54,21 @@ struct BuildStoryHero: View {
                 .frame(maxWidth: .infinity)
                 .frame(height: 160)
                 .overlay {
-                    VStack(spacing: 8) {
+                    VStack(spacing: NukeSpace.sm) {
                         Image(systemName: "car.side").font(.largeTitle).foregroundStyle(.secondary)
                         IdentityChips(year: year, make: make, model: model, trim: trim, tokens: identityTokens,
                                       onScrim: false, onDrill: onDrillCohort)
+                        Text("No photo yet")
+                            .font(.footnote).foregroundStyle(.secondary)
                     }
                 }
+        } else {
+            // Still loading: a shimmering photo-shaped block, never a blank gap.
+            Color(.tertiarySystemFill)
+                .frame(maxWidth: .infinity)
+                .frame(height: 300)
+                .nukeShimmer()
+                .accessibilityHidden(true)
         }
     }
 
@@ -79,7 +88,7 @@ struct BuildStoryHero: View {
             .overlay {
                 CachedAsyncImage(url: NukeImage.thumb(urlStr, width: 1000)) { image in
                     image.resizable().scaledToFill()
-                } placeholder: { ProgressView() }
+                } placeholder: { Color(.tertiarySystemFill).nukeShimmer() }
             }
             .clipped()
             .contentShape(Rectangle())
@@ -98,11 +107,11 @@ struct BuildStoryHero: View {
     @ViewBuilder private var decayBadge: some View {
         if let at = takenAt, !at.isEmpty {
             Text(String(at.prefix(10)))
-                .font(.system(.caption2, design: .monospaced))
+                .font(.nukePill)
                 .foregroundStyle(.white)
-                .padding(.horizontal, 6).padding(.vertical, 3)
+                .padding(.horizontal, NukeSpace.sm).padding(.vertical, 4)
                 .background(.black.opacity(0.4), in: Capsule())
-                .padding(8)
+                .padding(NukeSpace.sm)
         }
     }
 
