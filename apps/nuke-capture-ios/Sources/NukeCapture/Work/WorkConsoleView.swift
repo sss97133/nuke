@@ -240,7 +240,9 @@ struct WorkConsoleContent: View {
                 }
             case .loaded(let q):
                 if q.items.isEmpty {
-                    Text("Nothing to sign right now.").font(.footnote).foregroundStyle(.secondary)
+                    Label("You're all caught up", systemImage: "checkmark.circle")
+                        .font(.subheadline).foregroundStyle(.secondary)
+                        .frame(minHeight: NukeSize.minTap, alignment: .leading)
                 }
                 ForEach(q.items.prefix(Self.signaturePreview)) { item in
                     signatureRow(item)
@@ -258,9 +260,9 @@ struct WorkConsoleContent: View {
             }
         } header: {
             if case .loaded(let q) = signatures {
-                Text("Awaiting your signature · \(q.coverage?.total ?? q.items.count)")
+                Text("Needs your OK · \(q.coverage?.total ?? q.items.count)")
             } else {
-                Text("Awaiting your signature")
+                Text("Needs your OK")
             }
         } footer: {
             switch signatures {
@@ -307,7 +309,14 @@ struct WorkConsoleContent: View {
                 // works were surfacing as live work).
                 let inMotion = page.rows.filter { $0.stageStates[.completion] != .recorded }
                 if inMotion.isEmpty {
-                    Text("No jobs in motion.").font(.footnote).foregroundStyle(.secondary)
+                    VStack(spacing: NukeSpace.sm) {
+                        Image(systemName: "wrench.and.screwdriver").font(.title).foregroundStyle(.tertiary)
+                        Text("No jobs in progress").font(.nukeCardTitle)
+                        Text("Jobs you're working on will show up here.")
+                            .font(.nukeDetail).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, NukeSpace.lg)
                 }
                 ForEach(inMotion) { row in
                     NavigationLink {
@@ -323,6 +332,7 @@ struct WorkConsoleContent: View {
                     } label: {
                         if loadingMore { ProgressView() } else { Text("Show more jobs") }
                     }
+                    .frame(minHeight: NukeSize.minTap)
                     .disabled(loadingMore)
                 }
                 if page.unreadableRows > 0 {
@@ -330,10 +340,12 @@ struct WorkConsoleContent: View {
                 }
             }
         } header: {
-            Text("Jobs in motion")
+            Text("Jobs in progress")
         } footer: {
-            if case .loaded(let page) = jobs {
-                Text(page.coverage?.sentence ?? "Total not available")
+            // Only a count the server actually sent; no "total not available" filler.
+            if case .loaded(let page) = jobs, let coverage = page.coverage,
+               (coverage.totalForViewer ?? coverage.totalForVehicle) != nil {
+                Text(coverage.sentence)
             }
         }
         if case .loaded(let page) = jobs {
@@ -356,9 +368,9 @@ struct WorkConsoleContent: View {
     }
 
     private var loadingRow: some View {
-        HStack(spacing: 8) {
-            ProgressView()
-            Text("Loading…").font(.footnote).foregroundStyle(.secondary)
+        VStack(spacing: NukeSpace.sm) {
+            NukeRowSkeleton()
+            NukeRowSkeleton()
         }
     }
 }
@@ -393,20 +405,21 @@ struct JobRowView: View {
                 }
                 Spacer(minLength: 0)
             }
-            .font(.caption2)
+            .font(.caption)
             .foregroundStyle(.secondary)
             .lineLimit(1)
             if row.inconsistencyCount > 0 {
                 Label("Records disagree (\(row.inconsistencyCount))", systemImage: "exclamationmark.circle.fill")
-                    .font(.caption2)
+                    .font(.caption)
                     .foregroundStyle(.orange)
             }
             if let updated = JobCopy.updated(row.asOf) {
                 Text(updated)
-                    .font(.system(size: 9, design: .monospaced))
+                    .font(.caption2)
                     .foregroundStyle(.tertiary)
             }
         }
-        .padding(.vertical, 3)
+        .padding(.vertical, NukeSpace.xs)
+        .frame(minHeight: NukeSize.minTap)
     }
 }
