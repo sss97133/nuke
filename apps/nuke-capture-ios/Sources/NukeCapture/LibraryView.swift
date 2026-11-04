@@ -486,7 +486,7 @@ struct LibraryCell: View {
                 // means "not read yet". Toggle in the toolbar menu.
                 if showVisionTags && !selecting {
                     Text(visionTag ?? "·")
-                        .font(.system(size: 8, weight: .semibold))
+                        .font(.system(.caption2, weight: .semibold))
                         .lineLimit(1)
                         .padding(.horizontal, 3).padding(.vertical, 1)
                         .background(.black.opacity(0.55), in: Capsule())

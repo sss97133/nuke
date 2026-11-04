@@ -286,7 +286,7 @@ private struct StageFlags: View {
             HStack(spacing: 6) {
                 ForEach(flags, id: \.self) { f in
                     Text(f)
-                        .font(.system(size: 9, design: .monospaced))
+                        .font(.system(.caption2, design: .monospaced))
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, 4)
                         .padding(.vertical, 1)

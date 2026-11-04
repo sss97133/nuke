@@ -56,7 +56,7 @@ struct ValueTrajectoryView: View {
                 .padding(.horizontal, 16)
                 if let b = t.baseline?.delta {
                     Text("incl. \(money(b)) acquisition · the value you build, not wait to sell")
-                        .font(.system(size: 10, design: .monospaced)).foregroundStyle(.tertiary)
+                        .font(.system(.caption2, design: .monospaced)).foregroundStyle(.tertiary)
                         .padding(.horizontal, 16)
                 }
 
@@ -72,7 +72,7 @@ struct ValueTrajectoryView: View {
                         PointMark(x: .value("Date", d), y: .value("Invested", first.cumulative!))
                             .foregroundStyle(Color.accentColor).symbolSize(40)
                             .annotation(position: .topLeading) {
-                                Text("bought").font(.system(size: 9, design: .monospaced)).foregroundStyle(.secondary)
+                                Text("bought").font(.system(.caption2, design: .monospaced)).foregroundStyle(.secondary)
                             }
                     }
                 }
@@ -86,7 +86,7 @@ struct ValueTrajectoryView: View {
 
                 if let u = t.undated, let ut = u.total, ut > 0 {
                     Text("+ \(money(ut)) from \(u.n ?? 0) undated receipts — real spend, no date to place it on the curve")
-                        .font(.system(size: 10, design: .monospaced)).foregroundStyle(.tertiary)
+                        .font(.system(.caption2, design: .monospaced)).foregroundStyle(.tertiary)
                         .padding(.horizontal, 16)
                 }
             }

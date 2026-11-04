@@ -335,13 +335,13 @@ struct ProviderMatchInputRow: View {
             VStack(alignment: .leading, spacing: 1) {
                 Text("\(OfferCopy.input(input.input)) — \(ProviderMatchCopy.reason(input))").font(.caption)
                 if ProviderMatchCopy.isSelfClaim(input) {
-                    Text("self-claimed").font(.system(size: 9, design: .monospaced)).foregroundStyle(.tertiary)
+                    Text("self-claimed").font(.system(.caption2, design: .monospaced)).foregroundStyle(.tertiary)
                 }
                 if let next = OfferCopy.next(input.next), input.next == "plan_b_supplier_needed" {
                     Text(next).font(.caption2).foregroundStyle(.secondary)
                 }
                 if JobDebug.showCodes, let r = input.reason {
-                    Text(r).font(.system(size: 9, design: .monospaced)).foregroundStyle(.tertiary)
+                    Text(r).font(.system(.caption2, design: .monospaced)).foregroundStyle(.tertiary)
                 }
             }
         }

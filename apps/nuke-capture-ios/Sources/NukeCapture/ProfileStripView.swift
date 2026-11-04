@@ -516,16 +516,16 @@ struct ProfileHeaderBlock: View {
                             } label: {
                                 HStack(spacing: 5) {
                                     Text(chip.label)
-                                        .font(.system(size: 10, weight: .bold, design: .monospaced))
+                                        .font(.system(.caption2, design: .monospaced, weight: .bold))
                                         .foregroundStyle(.primary)
                                     if let sub = chip.subLabel, !sub.isEmpty {
                                         Text(sub)
-                                            .font(.system(size: 9, design: .monospaced))
+                                            .font(.system(.caption2, design: .monospaced))
                                             .foregroundStyle(.secondary)
                                     }
                                     if let rpo = chip.rpoCode, !rpo.isEmpty {
                                         Text(rpo)
-                                            .font(.system(size: 8, weight: .semibold, design: .monospaced))
+                                            .font(.system(.caption2, design: .monospaced, weight: .semibold))
                                             .foregroundStyle(.tertiary)
                                     }
                                 }
@@ -543,11 +543,11 @@ struct ProfileHeaderBlock: View {
                             HStack(spacing: 4) {
                                 if let prefix = chip.prefix, !prefix.isEmpty {
                                     Text("\(prefix) ·")
-                                        .font(.system(size: 9, weight: .bold, design: .monospaced))
+                                        .font(.system(.caption2, design: .monospaced, weight: .bold))
                                         .foregroundStyle(.secondary)
                                 }
                                 Text(chip.label)
-                                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                                    .font(.system(.caption2, design: .monospaced, weight: .bold))
                                     .foregroundStyle(.primary)
                             }
                             .padding(.horizontal, 8)
@@ -579,7 +579,7 @@ struct ProfileHeaderBlock: View {
                 Spacer(minLength: 4)
                 if let url = desc.source.openableURL {
                     Link("Source ↗", destination: url)
-                        .font(.system(size: 10, design: .monospaced))
+                        .font(.system(.caption2, design: .monospaced))
                 }
             }
             Text(trimmed)
@@ -598,7 +598,7 @@ struct ProfileHeaderBlock: View {
                 ProfileClock.day(desc.observed_at).map { "observed \($0)" }
             ].compactMap { $0 }.filter { !$0.isEmpty }
             Text(attrParts.joined(separator: " · "))
-                .font(.system(size: 9, design: .monospaced))
+                .font(.system(.caption2, design: .monospaced))
                 .foregroundStyle(.tertiary)
         }
         .nukeCard()
@@ -639,7 +639,7 @@ struct ProfileHeaderBlock: View {
             }
             // The denominator, always last and always present: a strip without coverage does not exist.
             Text(strip.coverage.sentence)
-                .font(.system(size: 9, design: .monospaced))
+                .font(.system(.caption2, design: .monospaced))
                 .foregroundStyle(.tertiary)
                 .padding(.top, 8)
         }
@@ -728,12 +728,12 @@ struct ProfileTimelineCard: View {
                 }
                 if timeline.days.count > shownDays {
                     Text("\(timeline.days.count - shownDays) earlier days")
-                        .font(.system(size: 9, design: .monospaced))
+                        .font(.system(.caption2, design: .monospaced))
                         .foregroundStyle(.tertiary)
                         .padding(.top, 6)
                 }
                 Text(timeline.coverage.sentence)
-                    .font(.system(size: 9, design: .monospaced))
+                    .font(.system(.caption2, design: .monospaced))
                     .foregroundStyle(.tertiary)
                     .padding(.top, 8)
             }

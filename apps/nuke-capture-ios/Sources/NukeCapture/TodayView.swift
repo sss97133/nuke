@@ -647,7 +647,7 @@ private struct MetricCell: View {
                 HStack(spacing: 3) {
                     Text(caption)
                     Image(systemName: "chevron.right")
-                        .font(.system(size: 8, weight: .semibold))
+                        .font(.system(.caption2, weight: .semibold))
                 }
                 .font(.caption2)
                 .foregroundStyle(.secondary)
@@ -692,7 +692,7 @@ private struct LiveT0Strip: View {
                         Text(atom.label.replacingOccurrences(of: "_", with: " "))
                             .font(.caption2).lineLimit(1)
                         Text("\(Int(atom.confidence * 100))%")
-                            .font(.system(size: 9, design: .monospaced))
+                            .font(.system(.caption2, design: .monospaced))
                             .foregroundStyle(.secondary)
                     }
                     .frame(width: 72)

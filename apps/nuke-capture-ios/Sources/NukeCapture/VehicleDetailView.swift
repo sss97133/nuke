@@ -257,7 +257,7 @@ struct PulseStrip: View {
         HStack(spacing: 11) {
             ForEach(signals) { sig in
                 HStack(spacing: 3) {
-                    Image(systemName: sig.glyph).font(.system(size: 10, weight: .semibold))
+                    Image(systemName: sig.glyph).font(.system(.caption2, weight: .semibold))
                     Text(sig.text).font(.caption2.weight(.semibold)).monospacedDigit()
                         .lineLimit(1)
                 }
@@ -1256,7 +1256,7 @@ struct VehicleDetailView: View {
         if !sales.isEmpty {
             VStack(alignment: .leading, spacing: 0) {
                 Text(sales.count == 1 ? "SALE HISTORY" : "SALE HISTORY · \(sales.count)")
-                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                    .font(.system(.caption2, design: .monospaced, weight: .semibold))
                     .foregroundStyle(.secondary).padding(.horizontal, 16).padding(.bottom, 6)
                 VStack(spacing: 0) { ForEach(sales) { s in saleRow(s) } }
                     .background(Color(.secondarySystemGroupedBackground),
@@ -1277,22 +1277,22 @@ struct VehicleDetailView: View {
                 HStack(spacing: 6) {
                     if let p = s.platform {
                         Text(prettySaleSource(p).uppercased())
-                            .font(.system(size: 10, design: .monospaced)).foregroundStyle(.secondary)
+                            .font(.system(.caption2, design: .monospaced)).foregroundStyle(.secondary)
                     }
                     if let d = s.date {
                         Text(String(d.prefix(10)))
-                            .font(.system(size: 10, design: .monospaced)).foregroundStyle(.tertiary)
+                            .font(.system(.caption2, design: .monospaced)).foregroundStyle(.tertiary)
                     }
                     if let b = s.bids, b > 0 {
                         Text("· \(b) bids")
-                            .font(.system(size: 10, design: .monospaced)).foregroundStyle(.tertiary)
+                            .font(.system(.caption2, design: .monospaced)).foregroundStyle(.tertiary)
                     }
                 }
             }
             Spacer(minLength: 0)
             if s.url != nil {
                 Image(systemName: "arrow.up.right")
-                    .font(.system(size: 11, weight: .semibold)).foregroundStyle(.tertiary)
+                    .font(.system(.caption2, weight: .semibold)).foregroundStyle(.tertiary)
             }
         }
         .padding(.horizontal, 14).padding(.vertical, 11).contentShape(Rectangle())
@@ -1352,7 +1352,7 @@ struct VehicleDetailView: View {
                         Spacer()
                         Button { withAnimation(.snappy(duration: 0.22)) { timelineExpanded = false } } label: {
                             Image(systemName: "chevron.up")
-                                .font(.system(size: 10, weight: .semibold))
+                                .font(.system(.caption2, weight: .semibold))
                                 .foregroundStyle(.secondary)
                         }
                         .buttonStyle(.plain)
@@ -1370,7 +1370,7 @@ struct VehicleDetailView: View {
                     // Headline the strip so a sparse band reads as a true fact, not a
                     // glitch (lead with meaning, per the Fitness pattern).
                     Text(buildSpanLabel)
-                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                        .font(.system(.caption2, design: .monospaced, weight: .semibold))
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, 16)
                     // The spine: edge-to-edge, full-bleed, on the SHARED surface.
@@ -1382,7 +1382,7 @@ struct VehicleDetailView: View {
                             .padding(.vertical, 8)
                             .padding(.horizontal, 16)
                         Image(systemName: "chevron.down")
-                            .font(.system(size: 10, weight: .semibold))
+                            .font(.system(.caption2, weight: .semibold))
                             .foregroundStyle(.secondary)
                             .padding(.trailing, 12)
                     }
@@ -2235,7 +2235,7 @@ private struct DayDrillSheet: View {
     }
     private func stat(_ l: String, _ v: String) -> some View {
         VStack(alignment: .leading, spacing: 3) {
-            Text(l).font(.system(size: 10, design: .monospaced)).foregroundStyle(.tertiary)
+            Text(l).font(.system(.caption2, design: .monospaced)).foregroundStyle(.tertiary)
             Text(v).font(.system(.title3, design: .monospaced).weight(.medium))
         }
     }
@@ -2816,7 +2816,7 @@ private struct FlowChips: View {
                 ForEach(Array(items.enumerated()), id: \.offset) { idx, label in
                     Button { onTap(idx) } label: {
                         HStack(spacing: 4) {
-                            Image(systemName: "plus").font(.system(size: 9, weight: .bold))
+                            Image(systemName: "plus").font(.system(.caption2, weight: .bold))
                             Text(label).font(.caption2.weight(.medium))
                         }
                         .padding(.horizontal, 10).padding(.vertical, 5)
@@ -3264,7 +3264,7 @@ struct FieldProvenanceSheet: View {
                         Spacer(minLength: 0)
                         if g.repeatCount > 1 {
                             Text("Repeated \(g.repeatCount)×")
-                                .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                                .font(.system(.caption2, design: .monospaced, weight: .semibold))
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 2)
                                 .background(Capsule().fill(Color(.tertiarySystemFill)))
@@ -3318,7 +3318,7 @@ struct FieldProvenanceSheet: View {
                     HStack(spacing: 6) {
                         Text(e.source_type ?? "source").font(.footnote.weight(.medium))
                         if idx == 0 {   // the current reading
-                            Text("LATEST").font(.system(size: 9, design: .monospaced).weight(.bold))
+                            Text("LATEST").font(.system(.caption2, design: .monospaced).weight(.bold))
                                 .padding(.horizontal, 5).padding(.vertical, 1)
                                 .background(Capsule().fill(Color.accentColor.opacity(0.15)))
                                 .foregroundStyle(Color.accentColor)

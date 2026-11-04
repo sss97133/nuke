@@ -2705,7 +2705,7 @@ struct LedgerMapView: View {
                                     selectedFacetLabel = nil
                                 } label: {
                                     Text(axis.label)
-                                        .font(.system(size: 9, weight: .bold, design: .monospaced))
+                                        .font(.system(.caption2, design: .monospaced, weight: .bold))
                                         .foregroundStyle(activeAxis ? Color(.systemBackground) : .secondary)
                                         .padding(.horizontal, 6)
                                         .padding(.vertical, 3)
@@ -2813,7 +2813,7 @@ struct LedgerMapView: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 6) {
                 Text(title)
-                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                    .font(.system(.caption2, design: .monospaced, weight: .semibold))
                     .foregroundStyle(.secondary)
                     .padding(.trailing, 2)
                 content()
@@ -2847,7 +2847,7 @@ struct LedgerMapView: View {
                         } label: {
                             HStack(spacing: 6) {
                                 Text(c.kind.label.uppercased())
-                                    .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                                    .font(.system(.caption2, design: .monospaced, weight: .semibold))
                                     .foregroundStyle(.secondary)
                                 Text(c.name)
                                     .font(.system(.caption2, design: .monospaced).weight(.semibold))
@@ -2855,7 +2855,7 @@ struct LedgerMapView: View {
                                     .font(.system(.caption2, design: .monospaced).weight(.bold))
                                     .foregroundStyle(c.rel >= 0 ? .green : .red)
                                 Text("\(c.prior.formatted())→\(c.sold.formatted())")
-                                    .font(.system(size: 10, design: .monospaced))
+                                    .font(.system(.caption2, design: .monospaced))
                                     .foregroundStyle(.secondary)
                             }
                             .padding(.horizontal, 10)
@@ -2879,7 +2879,7 @@ struct LedgerMapView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         HStack(spacing: 6) {
                             Text("SAME CAR, SAME MILES")
-                                .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                                .font(.system(.caption2, design: .monospaced, weight: .semibold))
                                 .foregroundStyle(.secondary)
                             Spacer()
                             Text(ix.answerText)
@@ -2887,7 +2887,7 @@ struct LedgerMapView: View {
                                 .foregroundStyle(ix.verdict == "up" ? .green : ix.verdict == "down" ? .red : .primary)
                         }
                         Text(ix.evidenceText)
-                            .font(.system(size: 11, design: .monospaced))
+                            .font(.system(.caption2, design: .monospaced))
                             .foregroundStyle(.secondary)
                         let readableSegs = ix.segments.filter { $0.verdict != "too few to tell" && $0.change != nil }
                         if readableSegs.count >= 2 {
@@ -2898,7 +2898,7 @@ struct LedgerMapView: View {
                                             ? "too few"
                                             : (seg.verdict == "flat" ? "flat" : LedgerMapScale.pct(seg.change ?? 0))
                                         Text("\(seg.label) \(val)")
-                                            .font(.system(size: 10, design: .monospaced))
+                                            .font(.system(.caption2, design: .monospaced))
                                             .padding(.horizontal, 7)
                                             .padding(.vertical, 3)
                                             .background(Color(.tertiarySystemFill), in: Capsule())
@@ -2927,7 +2927,7 @@ struct LedgerMapView: View {
 
                 HStack {
                     Text("\(scopedSales.count.formatted()) LOADED SALES (5Y, $500+)")
-                        .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                        .font(.system(.caption2, design: .monospaced, weight: .semibold))
                         .foregroundStyle(.secondary)
                     Spacer()
                     HStack(spacing: 8) {
@@ -2962,24 +2962,24 @@ struct LedgerMapView: View {
                     VStack(alignment: .leading, spacing: 6) {
                         HStack(spacing: 6) {
                             Text("UPCOMING \(up.counts.total.formatted())")
-                                .font(.system(size: 9, weight: .bold, design: .monospaced))
+                                .font(.system(.caption2, design: .monospaced, weight: .bold))
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 2)
                                 .background(Color.primary.opacity(0.1), in: RoundedRectangle(cornerRadius: 4))
                             if up.counts.batLive > 0 {
                                 let mTag = (up.finishFresh && up.finishModel != nil) ? " · M\(up.finishModel!)" : ""
                                 Text("\(up.counts.batLive) BaT live\(mTag)")
-                                    .font(.system(size: 10, design: .monospaced))
+                                    .font(.system(.caption2, design: .monospaced))
                                     .foregroundStyle(.secondary)
                             }
                             if up.counts.auctionCalendar > 0 {
                                 Text("\(up.counts.auctionCalendar) calendar")
-                                    .font(.system(size: 10, design: .monospaced))
+                                    .font(.system(.caption2, design: .monospaced))
                                     .foregroundStyle(.secondary)
                             }
                             if up.counts.facebookMarketplace > 0 {
                                 Text("\(up.counts.facebookMarketplace) FB")
-                                    .font(.system(size: 10, design: .monospaced))
+                                    .font(.system(.caption2, design: .monospaced))
                                     .foregroundStyle(.secondary)
                             }
                             Spacer()
@@ -3038,14 +3038,14 @@ struct LedgerMapView: View {
         let content = VStack(alignment: .leading, spacing: 2) {
             HStack(spacing: 4) {
                 Text(badge)
-                    .font(.system(size: 8, weight: .bold, design: .monospaced))
+                    .font(.system(.caption2, design: .monospaced, weight: .bold))
                     .foregroundStyle(badgeColor)
                 Text(title)
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(.system(.caption2, weight: .semibold))
                     .lineLimit(1)
             }
             Text(sub)
-                .font(.system(size: 9, design: .monospaced))
+                .font(.system(.caption2, design: .monospaced))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
         }
@@ -3071,7 +3071,7 @@ struct LedgerMapView: View {
     private func venueLegendDot(_ label: String, color: Color) -> some View {
         HStack(spacing: 3) {
             Circle().fill(color).frame(width: 6, height: 6)
-            Text(label).font(.system(size: 9, design: .monospaced)).foregroundStyle(.secondary)
+            Text(label).font(.system(.caption2, design: .monospaced)).foregroundStyle(.secondary)
         }
     }
 
@@ -3440,7 +3440,7 @@ struct LedgerMapView: View {
             if mapComparisonEnabled { HStack(spacing: 4) {
                 ForEach(["−50%", "−33%", "−17%", "0", "+17%", "+33%", "+50%"], id: \.self) { lbl in
                     Text(lbl)
-                        .font(.system(size: 9, design: .monospaced))
+                        .font(.system(.caption2, design: .monospaced))
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity)
                 }
@@ -3490,7 +3490,7 @@ struct LedgerMapView: View {
                             HStack(spacing: 4) {
                                 Circle().fill(venueColor(r.house)).frame(width: 6, height: 6)
                                 Text("\(r.house ?? "other") \(pct)% (\(r.sales.formatted()))")
-                                    .font(.system(size: 10, design: .monospaced))
+                                    .font(.system(.caption2, design: .monospaced))
                                     .foregroundStyle(.secondary)
                             }
                         }
@@ -3514,9 +3514,9 @@ struct LedgerMapView: View {
                             HStack(spacing: 3) {
                                 Text("RELATIVITY")
                                 Image(systemName: "info.circle")
-                                    .font(.system(size: 9))
+                                    .font(.system(.caption2))
                             }
-                            .font(.system(size: 10, weight: .bold, design: .monospaced))
+                            .font(.system(.caption2, design: .monospaced, weight: .bold))
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
                             .background(Color.primary.opacity(0.1), in: RoundedRectangle(cornerRadius: 4))
@@ -3529,7 +3529,7 @@ struct LedgerMapView: View {
                         let mPct = LedgerMapScale.pct(m.marketMove)
                         let vsLabel = baselineHorizon == .prior ? moverHorizon.windowText : "\(moverHorizon.label) vs \(baselineHorizon.label)"
                         Text("\(vsLabel) · \(m.marketPrior.formatted()) → \(m.marketSold.formatted()) (\(mPct))")
-                            .font(.system(size: 10, design: .monospaced))
+                            .font(.system(.caption2, design: .monospaced))
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -3545,7 +3545,7 @@ struct LedgerMapView: View {
                             moverHorizon = h
                         } label: {
                             Text(h.label)
-                                .font(.system(size: 10, weight: active ? .bold : .regular, design: .monospaced))
+                                .font(.system(.caption2, design: .monospaced, weight: active ? .bold : .regular))
                                 .foregroundStyle(active ? Color(.systemBackground) : .primary)
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 4)
@@ -3559,7 +3559,7 @@ struct LedgerMapView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 4) {
                     Text("VS")
-                        .font(.system(size: 9, weight: .bold, design: .monospaced))
+                        .font(.system(.caption2, design: .monospaced, weight: .bold))
                         .foregroundStyle(.secondary)
                         .padding(.trailing, 2)
                     ForEach(BaselineHorizon.allCases) { bh in
@@ -3570,7 +3570,7 @@ struct LedgerMapView: View {
                             baselineHorizon = bh
                         } label: {
                             Text(bh.label)
-                                .font(.system(size: 9, weight: active ? .bold : .regular, design: .monospaced))
+                                .font(.system(.caption2, design: .monospaced, weight: active ? .bold : .regular))
                                 .foregroundStyle(disabled ? Color.secondary.opacity(0.45) : (active ? Color(.systemBackground) : Color.secondary))
                                 .padding(.horizontal, 7)
                                 .padding(.vertical, 3)
@@ -3654,11 +3654,11 @@ struct LedgerMapView: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Text(title)
-                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                    .font(.system(.caption2, design: .monospaced, weight: .semibold))
                     .foregroundStyle(.secondary)
                 Spacer()
                 Text("0.5× · 1× PAR · 2×")
-                    .font(.system(size: 9, design: .monospaced))
+                    .font(.system(.caption2, design: .monospaced))
                     .foregroundStyle(.tertiary)
             }
             ForEach(rows) { r in
@@ -3676,11 +3676,11 @@ struct LedgerMapView: View {
                                 .lineLimit(1)
                             HStack(spacing: 6) {
                                 Text("\(r.prior.formatted()) → \(r.sold.formatted())")
-                                    .font(.system(size: 10, design: .monospaced))
+                                    .font(.system(.caption2, design: .monospaced))
                                     .foregroundStyle(.secondary)
                                 if let pm = r.avgPriceMove, abs(pm) >= 0.01 {
                                     Text("avg \(LedgerMapScale.pct(pm))")
-                                        .font(.system(size: 9, design: .monospaced))
+                                        .font(.system(.caption2, design: .monospaced))
                                         .foregroundStyle(.secondary)
                                 }
                             }

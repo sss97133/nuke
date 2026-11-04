@@ -56,7 +56,7 @@ struct ContactThreadView: View {
                                 .background(m.fromYou ? Color.accentColor.opacity(0.15) : Color(.secondarySystemFill),
                                             in: RoundedRectangle(cornerRadius: 10))
                             if let when = JobClock.text(m.createdAt) {
-                                Text(when).font(.system(size: 9, design: .monospaced)).foregroundStyle(.tertiary)
+                                Text(when).font(.system(.caption2, design: .monospaced)).foregroundStyle(.tertiary)
                             }
                         }
                         .frame(maxWidth: .infinity, alignment: m.fromYou ? .trailing : .leading)
