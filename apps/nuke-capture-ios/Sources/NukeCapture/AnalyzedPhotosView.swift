@@ -143,8 +143,11 @@ struct AnalyzedPhotosView: View {
             } else {
                 LazyVGrid(columns: columns, spacing: 2) {
                     ForEach(photos) { photo in
-                        AnalyzedGridCell(url: NukeImage.thumb(photo.thumb ?? photo.url, width: 200))
-                            .onTapGesture { selected = photo }
+                        Button { selected = photo } label: {
+                            AnalyzedGridCell(url: NukeImage.thumb(photo.thumb ?? photo.url, width: 200))
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Open analyzed photo")
                     }
                 }
                 .padding(.horizontal, 2)

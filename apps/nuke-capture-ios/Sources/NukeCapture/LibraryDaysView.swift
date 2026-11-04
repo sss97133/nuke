@@ -176,6 +176,9 @@ private struct DayPhotosView: View {
                     LibraryCell(index: gi)
                         .matchedTransitionSource(id: gi, in: zoomNS)
                         .onTapGesture { detailIndex = gi }
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel("Photo")
+                        .accessibilityAddTraits(.isButton)
                 }
             }
             if loaded && indices.isEmpty {

@@ -1460,20 +1460,24 @@ private struct RemoteThumbGrid: View {
             spacing: 2
         ) {
             ForEach(photos.prefix(20)) { photo in
-                Color(.secondarySystemFill)
-                    .aspectRatio(1, contentMode: .fit)
-                    .overlay {
-                        // Never a raw full-res original into a small grid cell —
-                        // route the thumb (or the url fallback) through the render
-                        // endpoint at a cell-sized width.
-                        CachedAsyncImage(url: NukeImage.thumb(photo.thumb ?? photo.url, width: 200)) { image in
-                            image.resizable().scaledToFill()
-                        } placeholder: {
-                            Color(.secondarySystemFill)
+                Button { selected = photo } label: {
+                    Color(.secondarySystemFill)
+                        .aspectRatio(1, contentMode: .fit)
+                        .overlay {
+                            // Never a raw full-res original into a small grid cell —
+                            // route the thumb (or the url fallback) through the render
+                            // endpoint at a cell-sized width.
+                            CachedAsyncImage(url: NukeImage.thumb(photo.thumb ?? photo.url, width: 200)) { image in
+                                image.resizable().scaledToFill()
+                            } placeholder: {
+                                Color(.secondarySystemFill)
+                            }
                         }
-                    }
-                    .clipped()
-                    .onTapGesture { selected = photo }
+                        .clipped()
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Open photo")
             }
         }
         .fullScreenCover(item: $selected) { photo in

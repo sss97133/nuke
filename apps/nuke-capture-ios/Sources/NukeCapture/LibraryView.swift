@@ -77,6 +77,9 @@ struct LibraryView: View {
                                     detailIndex = idx
                                 }
                             }
+                            .accessibilityElement(children: .ignore)
+                            .accessibilityLabel("Photo")
+                            .accessibilityAddTraits(selectMode && (localIdentifier.map { selected.contains($0) } ?? false) ? [.isButton, .isSelected] : .isButton)
                     }
                 }
             }
@@ -342,6 +345,9 @@ private struct LibraryAlbumPhotosView: View {
                         if let index = indices[photo.localIdentifier] {
                             LibraryCell(index: index, selecting: false, isSelected: false, localOnly: true)
                                 .onTapGesture { detailIndex = index }
+                                .accessibilityElement(children: .ignore)
+                                .accessibilityLabel("Photo")
+                                .accessibilityAddTraits(.isButton)
                         }
                     }
                 }
