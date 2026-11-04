@@ -301,6 +301,8 @@ struct ProfileView: View {
     @State private var garageIsCached = false
     @State private var garageCachedAt: Date?
     @State private var openVehicle: GarageVehicle?
+    /// Today's garage activity (own profile only) and the recency order it gives the fleet.
+    @StateObject private var garageActivity = GarageActivityStore()
     @State private var showPast = false           // "Past & contributions" stays collapsed
     @State private var photoEvidence: LocalProfileEvidence?
     @State private var photoEvidenceError: String?
@@ -312,7 +314,7 @@ struct ProfileView: View {
     // Only previous ownership belongs in collapsed history.
     // Intake placeholders (e.g. "UNRESOLVED / Intake Quarantine") are holding areas, not vehicles:
     // kept out of the fleet lists and shown apart (PhotoPresentation.isPlaceholderVehicle).
-    private var realGarage: [GarageVehicle] { garage.filter { !$0.isPlaceholder } }
+    private var realGarage: [GarageVehicle] { garageActivity.sorted(garage.filter { !$0.isPlaceholder }) }
     private var heldGarage: [GarageVehicle] { garage.filter(\.isPlaceholder) }
     private var currentGarage: [GarageVehicle] { realGarage.filter { $0.relationship == "owner" } }
     private var contributedGarage: [GarageVehicle] { realGarage.filter { $0.relationship == "contributor" } }
@@ -837,6 +839,12 @@ struct ProfileView: View {
     // ─── Garage ──────────────────────────────────────────────────────────────
     @ViewBuilder private var garageSection: some View {
       Group {
+        if isOwn {
+            GarageActivitySections(
+                store: garageActivity,
+                retry: { Task { await garageActivity.refresh(vehicles: realGarage) } },
+                open: { id in openVehicle = garage.first { $0.vehicle_id.lowercased() == id.lowercased() } })
+        }
         if !currentGarage.isEmpty {
             Section {
                 // Offline mirror notice — never let cached rows silently pass as
@@ -959,6 +967,9 @@ struct ProfileView: View {
                     if let period = v.relationshipPeriod {
                         Text(period).font(.caption).foregroundStyle(.secondary)
                     }
+                    if let line = GarageActivityFeed.lastActivity(garageActivity.latestByVehicle[v.vehicle_id.lowercased()], now: Date()) {
+                        Text(line).font(.caption.weight(.medium)).foregroundStyle(Color.accentColor)
+                    }
                 }
                 Spacer()
                 // No estimate on a garage row: get_user_garage's current_value is the class-stratified
@@ -1024,6 +1035,8 @@ struct ProfileView: View {
             if isOwn && SupabaseService.currentUserId == userId.lowercased() {
                 try LocalStore.shared.cacheUnresolvedGarageSources(userId: userId, sources: unresolved)
             }
+            // The activity feed reads on its own clock; it never holds up the garage rows.
+            Task { await garageActivity.refresh(vehicles: rows.filter { !$0.isPlaceholder }) }
             if isOwn { await loadPhotoEvidence() }
         } catch {
             if Self.isPermissionDenied(error) { signInNeeded = true; garageError = false; return }
