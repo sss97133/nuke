@@ -220,7 +220,7 @@ export function useVehicleReceiptRecords(vehicleId: string) {
       }
       const { data, error, count } = result;
       if (error || !Array.isArray(data)) throw new Error('Receipt summaries could not load.');
-      return { rows: (data as Record<string, unknown>[]).map(parseVehicleReceiptRecord), total: count ?? null, source };
+      return { rows: (data as unknown as Record<string, unknown>[]).map(parseVehicleReceiptRecord), total: count ?? null, source };
     },
     getNextPageParam: (last, pages) => {
       const loaded = pages.reduce((count, page) => count + page.rows.length, 0);
