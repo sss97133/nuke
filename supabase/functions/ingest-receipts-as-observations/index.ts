@@ -83,6 +83,7 @@ interface BridgeResponse {
   error_samples: Array<{ receipt_id: string; reason: string }>;
 }
 
+// Deployed with migration 20261109121000 (the 20261109120000 run failed before the functions step).
 // ─── Kind classification: classify.ts (word-boundary matches over the receipt's text fields; see classify.test.ts) ───
 import { classifyKind } from "./classify.ts";
 
