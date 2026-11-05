@@ -6,6 +6,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
+import { readGarageActivity, type CustodyOrg, type GarageActivityContext } from './garageCustody';
 import { applyGarageOwnerCorrections, unresolvedGarageSources, type GarageOwnerCorrection, type UnresolvedGarageSource } from './garageOwnerCorrections';
 
 // ---------------------------------------------------------------------------
@@ -73,6 +74,10 @@ export interface GarageVehicle {
   permission_role?: string;
   event_weeks: string[] | null;
   event_summary: EventSummary | null;
+  /** Organization that holds the car, from organization_vehicles (not a hard-coded list). */
+  custody_org?: CustodyOrg | null;
+  /** Latest EXIF photo or work session by the viewer inside the recency window. */
+  recent_work_at?: string | null;
 }
 
 export interface GarageSection {
@@ -481,6 +486,7 @@ export function useVehiclesDashboard(userId: string | undefined | null): Vehicle
   const [sortMode, setSortMode] = useState<SortMode>('RECENT');
   const [filterMode, setFilterMode] = useState<FilterMode>('ALL');
   const [refreshKey, setRefreshKey] = useState(0);
+  const [activity, setActivity] = useState<GarageActivityContext | null>(null);
 
   const refresh = useCallback(() => setRefreshKey((k) => k + 1), []);
 
@@ -497,6 +503,7 @@ export function useVehiclesDashboard(userId: string | undefined | null): Vehicle
 
     let cancelled = false;
     setRawVehicles([]);
+    setActivity(null);
     setUnresolvedSources([]);
     setIsLoading(true);
     setError(null);
@@ -658,6 +665,7 @@ export function useVehiclesDashboard(userId: string | undefined | null): Vehicle
           const optionalRead = async (read: PromiseLike<{ data: any; error?: unknown }>) => {
             try { return await read; } catch { return { data: null, error: true }; }
           };
+          const activityRead = readGarageActivity(userId!, vehicleIdArray, () => cancelled);
           const [fallbackRes, eventSummaryRes, eventWeeksRes, estimateRes] = await Promise.all([
             readCovers(),
             supabase
@@ -674,6 +682,10 @@ export function useVehiclesDashboard(userId: string | undefined | null): Vehicle
               .eq('is_stale', false)
               .eq('is_circular', false),
           ].map(optionalRead));
+          const garageActivity = await activityRead;
+          if (cancelled) return;
+          readWarnings.push(...garageActivity.warnings);
+          setActivity(garageActivity);
           if (fallbackRes.error) readWarnings.push('Some vehicle cover photos are unavailable.');
           if (eventSummaryRes.error) readWarnings.push('Event summaries are unavailable. Activity counts remain unknown.');
           if (eventWeeksRes.error) readWarnings.push('Activity timelines are unavailable.');
@@ -730,6 +742,7 @@ export function useVehiclesDashboard(userId: string | undefined | null): Vehicle
   const sameViewer = readerViewer === (userId ?? null);
   const visibleLoading = !!userId && (!sameViewer || isLoading);
   const vehicles = (sameViewer && userId ? rawVehicles : [])
+    .map((v) => activity ? { ...v, custody_org: activity.custody.get(v.id) ?? null, recent_work_at: activity.recentWork.get(v.id) ?? null } : v)
     .filter((v) => matchesFilter(v, filterMode))
     .sort((a, b) => sortVehicles(a, b, sortMode));
 
