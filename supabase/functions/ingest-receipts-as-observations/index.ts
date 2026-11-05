@@ -65,6 +65,11 @@ interface BridgeRequest {
   dry_run?: boolean;
   vehicle_id?: string;
   receipt_id?: string;
+  /** Re-bridge receipts whose observation carries a wrong kind: a new observation is written and the old one is
+   *  superseded through supersede_observation_relay (the owner who ordered it and the channel are named). */
+  rebridge_receipt_ids?: string[];
+  actor_user_id?: string;
+  via?: string;
 }
 
 interface BridgeResponse {
@@ -78,62 +83,8 @@ interface BridgeResponse {
   error_samples: Array<{ receipt_id: string; reason: string }>;
 }
 
-// ─── Kind classification ────────────────────────────────────────
-
-const PARTS_KEYWORDS = [
-  "part", "parts", "filter", "oil", "brake", "tire", "battery",
-  "spark plug", "hose", "belt", "gasket", "bearing", "seal",
-  "wheel", "axle", "transmission", "engine", "alternator",
-  "starter", "fuel", "exhaust", "muffler", "catalytic", "radiator",
-  "coolant", "shock", "strut", "pad", "rotor", "caliper", "bushing",
-  "ball joint", "tie rod", "wire", "harness", "connector", "fitting",
-  "bolt", "nut", "screw", "washer", "clip", "pump", "valve", "sensor",
-];
-
-const LABOR_KEYWORDS = [
-  "labor", "service", "install", "repair", "diagnose", "diagnostic",
-  "tune up", "tune-up", "alignment", "rotate", "balance", "mount",
-  "inspection", "smog", "emissions", "hours", "shop fee",
-];
-
-const DOC_KEYWORDS = [
-  "insurance", "policy", "premium", "coverage", "registration",
-  "title", "dmv", "license plate", "smog cert", "tag",
-];
-
-const VENDOR_PARTS_HINTS = [
-  "autozone", "napa", "o'reilly", "advance auto", "summit racing",
-  "rock auto", "rockauto", "pep boys", "carquest", "jegs",
-];
-
-const VENDOR_DOC_HINTS = [
-  "bristol west", "geico", "progressive", "state farm", "allstate",
-  "farmers insurance", "dmv", "department of motor",
-];
-
-function classifyKind(r: ReceiptRow): "work_record" | "specification" | "comment" {
-  const haystack = [
-    r.vendor_name ?? "",
-    JSON.stringify(r.raw_extraction ?? r.raw_json ?? {}),
-  ].join(" ").toLowerCase();
-
-  // Doc-type first (insurance/registration even if vendor sells parts)
-  if (DOC_KEYWORDS.some(k => haystack.includes(k))) return "specification";
-  if (VENDOR_DOC_HINTS.some(v => (r.vendor_name ?? "").toLowerCase().includes(v))) {
-    return "specification";
-  }
-
-  // Parts/labor receipts
-  if (VENDOR_PARTS_HINTS.some(v => (r.vendor_name ?? "").toLowerCase().includes(v))) {
-    return "work_record";
-  }
-  if (PARTS_KEYWORDS.some(k => haystack.includes(k))) return "work_record";
-  if (LABOR_KEYWORDS.some(k => haystack.includes(k))) return "work_record";
-
-  // Default: still a vehicle-attributed receipt — surface as comment so it
-  // shows on the timeline rather than being silently dropped.
-  return "comment";
-}
+// ─── Kind classification: classify.ts (word-boundary matches over the receipt's text fields; see classify.test.ts) ───
+import { classifyKind } from "./classify.ts";
 
 // ─── Payload assembly ──────────────────────────────────────────
 
@@ -232,9 +183,20 @@ Deno.serve(async (req) => {
         "raw_extraction", "raw_json", "submitted_observation_id",
       ].join(",")
     )
-    .is("submitted_observation_id", null)
     .not("vehicle_id", "is", null)
     .limit(batchSize);
+
+  const rebridge = Array.isArray(body.rebridge_receipt_ids) ? body.rebridge_receipt_ids.filter(id => typeof id === "string").slice(0, 200) : [];
+  if (rebridge.length) {
+    if (!body.actor_user_id || !body.via || body.via.trim().length < 3) {
+      return new Response(JSON.stringify({ error: "rebridge needs actor_user_id and via" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    query = query.in("id", rebridge);
+  } else {
+    query = query.is("submitted_observation_id", null);
+  }
 
   if (body.receipt_id) query = query.eq("id", body.receipt_id);
   if (body.vehicle_id) query = query.eq("vehicle_id", body.vehicle_id);
@@ -291,7 +253,7 @@ Deno.serve(async (req) => {
           raw_source_ref: `receipts.${r.id}`,
           extraction_metadata: {
             bridge: "ingest-receipts-as-observations",
-            bridge_version: "1.0.0",
+            bridge_version: "1.1.0",
           },
         }),
       });
@@ -309,6 +271,19 @@ Deno.serve(async (req) => {
       }
 
       const observationId = ingestJson.observation_id as string;
+
+      // A re-bridge supersedes the receipt's earlier observation; the original stays, pointed at its successor.
+      if (rebridge.length && r.submitted_observation_id && r.submitted_observation_id !== observationId) {
+        const { error: supErr } = await supabase.rpc("supersede_observation_relay", {
+          p_original_id: r.submitted_observation_id, p_successor_id: observationId,
+          p_actor_id: body.actor_user_id, p_via: body.via,
+        });
+        if (supErr) {
+          result.errors++;
+          if (result.error_samples.length < 5) result.error_samples.push({ receipt_id: r.id, reason: `supersede_failed: ${supErr.message}` });
+          continue;
+        }
+      }
 
       // Mark the receipt as submitted (idempotent re-runs are safe).
       // Event time: the transaction date, not the upload. Received = when the receipt was uploaded.

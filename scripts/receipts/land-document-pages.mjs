@@ -5,7 +5,11 @@
 //   dotenvx run -- node scripts/receipts/land-document-pages.mjs \
 //     --extract <dir of <FRAME>.json transcriptions> --manifest <frame\tsha256\tbucket/path tsv> \
 //     --originals <dir of <FRAME>.HEIC, for byte sizes> --owner <uuid> --vehicle <uuid> --run <text> \
-//     [--context "<why these pages belong to this vehicle>"] [--dry] [--out <receipt json path>]
+//     [--context "<why these pages belong to this vehicle>"] [--dry] [--out <receipt json path>] [--payload-out <file>]
+//
+// --payload-out writes the exact RPC body, for a caller that must reach the writer outside PostgREST (the API role runs
+// pg-safeupdate, which refuses an UPDATE without WHERE inside the fold; the pooler as postgres with the service-role claim
+// set for the transaction does not).
 //
 // Transcription schema: ~/nuke-logs/firebird-binder-20261102/extract_schema.md (one JSON per frame; continuation pages
 // name their parent in continues_from; a web confirmation that repeats an invoice names it in duplicate_of). Pages that
@@ -97,6 +101,7 @@ for (const [parent, frames] of docs) {
 }
 const envelope = { storage_base: process.env.SUPABASE_URL, method: 'binder_document_transcription_v1', model: 'claude-opus-5-5', documents };
 console.error(`${documents.length} documents from ${Object.keys(extracts).length} frames; skipped ${skipped.length} non-paper frames: ${skipped.map(s => s.join('=')).join(', ')}`);
+if (args['payload-out'] && args['payload-out'] !== true) writeFileSync(args['payload-out'], JSON.stringify({ p_owner: args.owner, p_vehicle: args.vehicle, p_run: args.run, p_docs: envelope }));
 if (DRY) { console.log(JSON.stringify({ dry: true, documents: documents.map(d => ({ source_key: d.source_key, doc_type: d.doc_type, vendor: d.vendor.name, date: d.doc_date, pages: d.pages.length, lines: d.lines.length, total: d.total })) }, null, 1)); process.exit(0); }
 if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) { console.error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY required (run under dotenvx)'); process.exit(2); }
 const res = await fetch(`${process.env.SUPABASE_URL}/rest/v1/rpc/land_document_pages`, {
