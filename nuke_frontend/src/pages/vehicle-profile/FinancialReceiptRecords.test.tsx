@@ -55,3 +55,22 @@ it('does not fetch a private object when signing fails', async () => {
   expect(host.textContent).toContain('Source unavailable or not visible');
   expect(host.querySelector('img')).toBeNull();
 });
+
+it('names who may see a masked amount instead of calling it unrecorded', async () => {
+  const masked = parseVehicleReceiptRecord({ id: 'receipt-b', vendor_name: 'Atomic Motors', total: null, total_amount: null, amounts_visible: false,
+    receipt_date: '2025-01-13', source_document_table: 'vehicle_documents', source_document_id: 'source-b' });
+  const unrecorded = parseVehicleReceiptRecord({ id: 'receipt-c', vendor_name: 'Classic Industries', total: null, total_amount: null, amounts_visible: true,
+    source_document_table: 'vehicle_documents', source_document_id: 'source-c' });
+  expect(masked.amountsHidden).toBe(true);
+  expect(unrecorded.amountsHidden).toBe(false);
+  expect(parseVehicleReceiptRecord({ id: 'receipt-d', total: 5 }).amountsHidden).toBe(false);
+  await act(async () => {
+    const read = { rows: [masked, unrecorded], isLoading: false, isError: false, total: 2, hasNextPage: false } as any;
+    root.render(<ReceiptRecords vehicleId="vehicle-a" read={read} />);
+  });
+  const summaries = [...host.querySelectorAll('summary')].map(s => s.textContent);
+  expect(summaries[0]).toContain("Amount visible to the vehicle's people");
+  expect(summaries[0]).not.toContain('Amount not recorded');
+  expect(summaries[1]).toContain('Amount not recorded');
+  expect(host.textContent).toContain('shown to the vehicle\'s owner and contributors');
+});

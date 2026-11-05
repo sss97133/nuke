@@ -180,6 +180,8 @@ function nullableMoney(value: unknown): number | null {
 export interface VehicleReceiptRecord {
   id: string; vendor: string | null; currency: string | null;
   amount: number | null; total: number | null; totalAmount: number | null; amountConflict: boolean;
+  /** The public projection withheld the money from this viewer (receipts_public_summary.amounts_visible = false). */
+  amountsHidden: boolean;
   date: string | null; dates: string[]; dateConflict: boolean;
   status: string | null; processingStatus: string | null;
   sourceTable: string | null; sourceId: string | null;
@@ -191,7 +193,7 @@ export function parseVehicleReceiptRecord(row: Record<string, unknown>): Vehicle
   const dates = [...new Set([row.purchase_date, row.transaction_date, row.receipt_date]
     .filter((value): value is string => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)))];
   return { id: String(row.id), vendor: str(row.vendor_name), currency: typeof row.currency === 'string' && /^[A-Z]{3}$/.test(row.currency) ? row.currency : null,
-    amount: amountConflict ? null : total ?? totalAmount, total, totalAmount, amountConflict,
+    amount: amountConflict ? null : total ?? totalAmount, total, totalAmount, amountConflict, amountsHidden: row.amounts_visible === false,
     date: dates.length === 1 ? dates[0] : null, dates, dateConflict: dates.length > 1,
     status: str(row.status), processingStatus: str(row.processing_status), sourceTable: str(row.source_document_table), sourceId: str(row.source_document_id) };
 }
@@ -203,8 +205,9 @@ export function useVehicleReceiptRecords(vehicleId: string) {
     queryKey: ['vehicle-financial-receipts', vehicleId, user?.id ?? 'anon'],
     initialPageParam: { offset: 0, source: user ? 'receipts' : 'receipts_public_summary' },
     queryFn: async ({ pageParam }) => {
+      // The public projection masks total and total_amount for a viewer not tied to the vehicle and says so in amounts_visible.
       const readPage = (source: string) => supabase.from(source)
-        .select('id,vendor_name,total,total_amount,currency,purchase_date,transaction_date,receipt_date,status,processing_status,source_document_table,source_document_id')
+        .select(`id,vendor_name,total,total_amount,currency,purchase_date,transaction_date,receipt_date,status,processing_status,source_document_table,source_document_id${source === 'receipts_public_summary' ? ',amounts_visible' : ''}`)
         .or(`vehicle_id.eq.${vehicleId},and(scope_type.eq.vehicle,scope_id.eq.${vehicleId})`)
         .order('created_at', { ascending: false }).order('id').range(pageParam.offset, pageParam.offset + 99);
       let source = pageParam.source;

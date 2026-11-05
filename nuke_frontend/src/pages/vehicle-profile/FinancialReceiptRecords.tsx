@@ -55,9 +55,10 @@ export function ReceiptRecords({ vehicleId, read }: { vehicleId: string; read: R
     {(read.rows.length > 0 || read.total != null) && <p>{read.total == null ? `${read.rows.length} linked receipt records loaded. Total not yet read.` : `${read.rows.length} of ${read.total} linked receipt records loaded.`} Receipt readings and work-order charges can describe the same purchase; they are kept separate.</p>}
     {read.rows.map(receipt => <details key={receipt.id} className="vp-financial-entry">
       <summary><span><strong>{receipt.vendor || 'Linked receipt'}</strong><small>{receipt.dateConflict ? 'Date readings differ' : receipt.date || 'Date not recorded'}</small></span>
-        <strong>{receipt.amountConflict ? 'Total readings differ' : amountText(receipt.amount, receipt.currency)}</strong></summary>
+        <strong>{receipt.amountsHidden ? "Amount visible to the vehicle's people" : receipt.amountConflict ? 'Total readings differ' : amountText(receipt.amount, receipt.currency)}</strong></summary>
       {receipt.amountConflict && <p>Recorded totals disagree: {amountText(receipt.total, receipt.currency)} and {amountText(receipt.totalAmount, receipt.currency)}. No single amount is selected.</p>}
       {receipt.dateConflict && <p>Recorded dates: {receipt.dates.join(' · ')}</p>}
+      {receipt.amountsHidden && <p>Receipt totals are shown to the vehicle's owner and contributors. The vendor, date and line items stay public.</p>}
       {receipt.amount === 0 && <p>Zero is retained as an extraction reading. Check the original before treating it as a zero-cost purchase.</p>}
       <p>Receipt reading · {receipt.processingStatus || receipt.status || 'Extraction state unknown'}. Extraction status does not establish payment or vehicle allocation.</p>
       <ReceiptSource key={`${vehicleId}:${receipt.sourceTable}:${receipt.sourceId}`} receipt={receipt} vehicleId={vehicleId} />
