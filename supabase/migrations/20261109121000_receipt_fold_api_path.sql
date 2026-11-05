@@ -14,6 +14,8 @@
 --    decide links (the fold re-reads amount_check on its next pass through receipt_link_one). Service role only.
 SET lock_timeout = '5s';
 SET statement_timeout = '60s';
+-- Replaces 20261109120000 (never applied: the first function statement lacked its terminator, so the deploy run of
+-- 2026-11-05 17:49Z failed at parse time and applied nothing).
 
 CREATE OR REPLACE FUNCTION public.receipt_queue_resolve(p_run text, p_receipt uuid DEFAULT NULL::uuid)
  RETURNS jsonb
@@ -119,7 +121,7 @@ begin
   select jsonb_build_object('queue',(select count(*) from _q),'no_evidence',(select count(*) from _qd where ks is null),
     'result',(select jsonb_object_agg(k,c) from (select status||':'||coalesce(basis,hold_reason) k, count(*) c from receipt_vehicle_links where run_id=p_run and retired_at is null group by 1) z)) into res;
   return res;
-end $function$
+end $function$;
 
 CREATE OR REPLACE FUNCTION public.receipts_amount_recheck(p_receipt uuid)
 RETURNS jsonb
