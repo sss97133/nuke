@@ -31,4 +31,4 @@ AS $function$
     'truck', (select t ~ '\m(lmc truck|truck|pickup|offroad|off-road|4x4|4wd|suburban|blazer|k5|k10|k20|k1500|k2500|c10|c20|squarebody|bronco|wrangler|cheyenne|scottsdale|transfer case|leaf spring)\M' from txt),
     'car', (select t ~ '\m(mustang|corvette|porsche|911|corvair|maxima|camaro|firebird|trans am|f-body|gto|lemans|tempest)\M' from txt),
     'models', (select coalesce(jsonb_agg(distinct m),'[]') from txt, unnest(array['mustang','corvette','bronco','suburban','blazer','corvair','wrangler','maxima','firebird','camaro']) m where t ~ ('\m'||m||'\M'))
-  ) $function$
+  ) $function$;
