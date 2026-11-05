@@ -125,7 +125,7 @@ it('puts a document day on the calendar and opens it with one paper read, money 
   expect(text).not.toContain('billed to');
   expect(text).not.toContain('USD');
   expect(text).not.toContain('2,190');
-  expect(host.querySelector(`[data-date="${paperDay}"]`)?.title).toContain('Paper (1 receipt)');
+  expect(host.querySelector<HTMLElement>(`[data-date="${paperDay}"]`)?.title).toContain('Paper (1 receipt)');
 });
 it('prints the money and the payer when the reader returns them to a tied viewer', async () => {
   tied = true; const text = await showDay(paperDay);
