@@ -28,18 +28,21 @@ const render = async () => act(async () => {
     isLoading: false, isError: false, total: 1, hasNextPage: false } as any;
   root.render(<ReceiptRecords vehicleId="vehicle-a" read={read} />);
 });
-const click = async (label: string) => {
+// The original preview is a lazy module (pdfjs behind it); three ticks were enough on a warm worker and not on a cold
+// one (main, 2026-11-05 18:08Z: "expected undefined to be 'blob:receipt'"). Wait until the click's effect is visible,
+// bounded, instead of a fixed number of ticks.
+const click = async (label: string, until: () => boolean = () => true) => {
   await act(async () => [...host.querySelectorAll('button')].find(button => button.textContent === label)!.click());
-  for (let i = 0; i < 3; i++) await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); });
+  for (let i = 0; i < 200 && !(i >= 3 && until()); i++) await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); });
 };
 
 it('binds the original to the same vehicle and source and returns to the selected receipt in place', async () => {
-  await render(); await click('Read original source');
+  await render(); await click('Read original source', () => !!host.querySelector('img') || host.textContent!.includes('unavailable'));
   expect(fixture.from).toHaveBeenCalledWith('vehicle_documents');
   expect(fixture.eq.mock.calls).toEqual([['id', 'source-a'], ['vehicle_id', 'vehicle-a']]);
   expect(host.querySelector('img')?.src).toBe('blob:receipt');
   expect(host.querySelector('a[target]')).toBeNull();
-  await click('Close original');
+  await click('Close original', () => !host.querySelector('img'));
   expect(host.textContent).toContain('Synthetic part');
   expect(host.textContent).toContain('$15.00');
   expect(document.activeElement?.textContent).toBe('Read original source');
@@ -47,7 +50,7 @@ it('binds the original to the same vehicle and source and returns to the selecte
 
 it('does not fetch a private object when signing fails', async () => {
   fixture.privatePath.mockReturnValue({ bucket: 'private', path: 'receipt.png' });
-  await render(); await click('Read original source');
+  await render(); await click('Read original source', () => host.textContent!.includes('Source unavailable'));
   expect(fetch).not.toHaveBeenCalled();
   expect(host.textContent).toContain('Source unavailable or not visible');
   expect(host.querySelector('img')).toBeNull();
