@@ -206,8 +206,9 @@ export function useVehicleReceiptRecords(vehicleId: string) {
     initialPageParam: { offset: 0, source: user ? 'receipts' : 'receipts_public_summary' },
     queryFn: async ({ pageParam }) => {
       // The public projection masks total and total_amount for a viewer not tied to the vehicle and says so in amounts_visible.
+      const columns: string = 'id,vendor_name,total,total_amount,currency,purchase_date,transaction_date,receipt_date,status,processing_status,source_document_table,source_document_id';
       const readPage = (source: string) => supabase.from(source)
-        .select(`id,vendor_name,total,total_amount,currency,purchase_date,transaction_date,receipt_date,status,processing_status,source_document_table,source_document_id${source === 'receipts_public_summary' ? ',amounts_visible' : ''}`)
+        .select(source === 'receipts_public_summary' ? `${columns},amounts_visible` : columns)
         .or(`vehicle_id.eq.${vehicleId},and(scope_type.eq.vehicle,scope_id.eq.${vehicleId})`)
         .order('created_at', { ascending: false }).order('id').range(pageParam.offset, pageParam.offset + 99);
       let source = pageParam.source;
@@ -219,7 +220,7 @@ export function useVehicleReceiptRecords(vehicleId: string) {
       }
       const { data, error, count } = result;
       if (error || !Array.isArray(data)) throw new Error('Receipt summaries could not load.');
-      return { rows: data.map(parseVehicleReceiptRecord), total: count ?? null, source };
+      return { rows: (data as Record<string, unknown>[]).map(parseVehicleReceiptRecord), total: count ?? null, source };
     },
     getNextPageParam: (last, pages) => {
       const loaded = pages.reduce((count, page) => count + page.rows.length, 0);
