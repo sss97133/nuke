@@ -45,11 +45,17 @@ interface DayEvent {
   } | null;
 }
 
+/** One receipt of the day as get_vehicle_day_documents returns it: money and payer are null unless the viewer is tied. */
+interface DayDocumentLine { line_number: number | null; description: string | null; part_number: string | null; quantity: number | null; unit_price: number | null; amount: number | null; line_date: string | null; hours: number | null; performer: string | null }
+interface DayDocument { receipt_id: string; vendor: string | null; document_type: string | null; document_number: string | null; pages: number | null; payer_as_named: string | null; subtotal: number | null; tax: number | null; total: number | null; currency: string | null; date_basis: string | null; lines: DayDocumentLine[] }
+
 interface VehicleDayDrawerProps {
   date: string; // YYYY-MM-DD
   /** the BaT auction sequences, one per listing, when this vehicle was a lot — bids and comments land on their days */
   auctions?: AuctionSequence[];
   hasWorkSummary?: boolean;
+  /** receipts linked to this vehicle on this page date (get_vehicle_contribution_days kind 'document'); 0 = no read */
+  documentCount?: number;
   onClose: () => void;
   onPrev?: () => void;
   onNext?: () => void;
@@ -100,9 +106,10 @@ const mono: React.CSSProperties = { fontFamily: "var(--vp-font-mono, 'Courier Ne
 // Session-scoped photo cache so re-opening a day never refetches.
 const dayPhotoCache = new Map<string, DayPhoto[]>();
 
-const VehicleDayDrawer: React.FC<VehicleDayDrawerProps> = ({ date, auctions = [], hasWorkSummary = false, onClose, onPrev, onNext }) => {
+const VehicleDayDrawer: React.FC<VehicleDayDrawerProps> = ({ date, auctions = [], hasWorkSummary = false, documentCount = 0, onClose, onPrev, onNext }) => {
   const { vehicleId, timelineEvents, timelineReadState } = useVehicleProfile();
   const [photoRead, setPhotoRead] = useState<{ key: string; rows: DayPhoto[]; failed: boolean } | null>(null);
+  const [documentRead, setDocumentRead] = useState<{ key: string; rows: DayDocument[]; failed: boolean } | null>(null);
   const drawerRef = useRef<HTMLDivElement>(null);
 
   // The bids and comments that landed on this day, across the car's listings, in time order.
@@ -177,6 +184,24 @@ const VehicleDayDrawer: React.FC<VehicleDayDrawerProps> = ({ date, auctions = []
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [photoContextKey]);
 
+  // ── The day's paper: one read, only on a day the timeline leg counted a linked receipt ──
+  const documentKey = `${vehicleId}:${date}`;
+  const documents = documentRead?.key === documentKey ? documentRead.rows : null;
+  const documentsUnavailable = documentRead?.key === documentKey ? documentRead.failed : false;
+  useEffect(() => {
+    if (!vehicleId || !date || documentCount <= 0) return;
+    let cancelled = false;
+    setDocumentRead(null);
+    Promise.resolve(supabase.rpc('get_vehicle_day_documents', { p_vehicle_id: vehicleId, p_date: date }))
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        const rows = !error && data && Array.isArray((data as { documents?: unknown }).documents) ? (data as { documents: DayDocument[] }).documents : null;
+        setDocumentRead({ key: documentKey, rows: rows ?? [], failed: rows === null });
+      })
+      .catch(() => { if (!cancelled) setDocumentRead({ key: documentKey, rows: [], failed: true }); });
+    return () => { cancelled = true; };
+  }, [vehicleId, date, documentCount, documentKey]);
+
   // ── Day events from the already-loaded timeline ──
   const dayEvents = useMemo(
     () => ((timelineEvents || []) as DayEvent[]).filter((ev) => String(ev.event_date || '').slice(0, 10) === date),
@@ -187,7 +212,7 @@ const VehicleDayDrawer: React.FC<VehicleDayDrawerProps> = ({ date, auctions = []
     [dayEvents],
   );
   const otherEvents = useMemo(
-    () => dayEvents.filter((ev) => !['work_session', 'photo_session'].includes(String(ev.event_type || ''))),
+    () => dayEvents.filter((ev) => !['work_session', 'photo_session', 'document'].includes(String(ev.event_type || ''))),
     [dayEvents],
   );
 
@@ -203,7 +228,8 @@ const VehicleDayDrawer: React.FC<VehicleDayDrawerProps> = ({ date, auctions = []
   const timelineUnavailable = timelineReadState?.timeline === 'unavailable' || timelineReadState?.work === 'unavailable';
 
   const loading = photos === null;
-  const isEmpty = !loading && !photosUnavailable && photos.length === 0 && workEvents.length === 0 && otherEvents.length === 0 && auctionItems.length === 0 && auctionMoments.length === 0;
+  const paperPending = documentCount > 0 && documents === null && !documentsUnavailable;
+  const isEmpty = !loading && !photosUnavailable && photos.length === 0 && workEvents.length === 0 && otherEvents.length === 0 && auctionItems.length === 0 && auctionMoments.length === 0 && documentCount <= 0;
 
   return (
     <div
@@ -255,8 +281,32 @@ const VehicleDayDrawer: React.FC<VehicleDayDrawerProps> = ({ date, auctions = []
           {dayBids > 0 && <span style={{ ...mono, fontSize: 8, border: '1px solid var(--vp-ghost, #ddd)', padding: '1px 5px' }}>BIDS {dayBids}</span>}
           {dayComments > 0 && <span style={{ ...mono, fontSize: 8, border: '1px solid var(--vp-ghost, #ddd)', padding: '1px 5px' }}>COMMENTS {dayComments}</span>}
           {workEvents.length > 0 && <span style={{ ...mono, fontSize: 8, border: '1px solid var(--vp-ghost, #ddd)', padding: '1px 5px' }}>WORK {workEvents.length}</span>}
+          {documentCount > 0 && <span style={{ ...mono, fontSize: 8, border: '1px solid var(--vp-ghost, #ddd)', padding: '1px 5px' }}>PAPER {documentCount}</span>}
         </div>
       )}
+
+      {/* The day's paper: each receipt with its lines; amounts only when the read returned them (owner-tied viewers) */}
+      {paperPending && <div role="status" style={{ ...mono, fontSize: 9, color: 'var(--vp-pencil, #888)' }}>Reading the day's paper…</div>}
+      {documentsUnavailable && <div role="status" style={{ ...mono, fontSize: 9, color: 'var(--vp-pencil, #888)' }}>Paper unavailable in this read.</div>}
+      {documents?.map((doc) => (
+        <div key={doc.receipt_id} className="day-drawer__document" style={{ marginBottom: 6 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 9 }}>
+            <span style={{ fontWeight: 700 }}>{[doc.vendor || 'Receipt', doc.document_type ? doc.document_type.replace(/_/g, ' ') : null, doc.document_number ? `#${doc.document_number}` : null].filter(Boolean).join(' · ')}</span>
+            <span style={mono}>{[doc.pages && doc.pages > 1 ? `${doc.pages} pages` : null, doc.total != null ? fmtMoney(doc.total, doc.currency) : null].filter(Boolean).join(' · ') || `${doc.lines.length} line${doc.lines.length === 1 ? '' : 's'}`}</span>
+          </div>
+          {doc.payer_as_named && <div style={{ fontSize: 8, color: 'var(--vp-pencil, #888)' }}>billed to {doc.payer_as_named}</div>}
+          {doc.lines.length > 0 && (
+            <div style={{ fontSize: 9, color: 'var(--vp-pencil, #888)', marginTop: 2, lineHeight: 1.5 }}>
+              {doc.lines.map((line, i) => (
+                <div key={`${doc.receipt_id}:${line.line_number ?? i}`} style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                  <span>{[line.line_date && line.line_date !== date ? line.line_date : null, line.performer, line.part_number, line.description].filter(Boolean).join(' · ')}</span>
+                  <span style={mono}>{[line.hours != null ? `${line.hours} h` : null, line.quantity != null && line.quantity !== 1 ? `×${line.quantity}` : null, line.amount != null ? fmtMoney(line.amount, doc.currency) : null].filter(Boolean).join(' · ')}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
 
       {/* Work story */}
       {workEvents.map((ev) => {

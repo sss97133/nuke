@@ -159,6 +159,12 @@ function formatEventLabel(ev: any): string {
   // System-ingested / extracted data: prefix with "Discovered on"
   const isSystemIngested = sourceType === 'system' || dataSource.startsWith('extract');
 
+  // Paper: receipts, invoices and work orders dated by the page
+  if (eventType === 'document') {
+    const count = Number(ev.metadata?.document_count) || 0;
+    return count > 0 ? `Paper (${count} receipt${count === 1 ? '' : 's'})` : 'Paper';
+  }
+
   // Work session: show work type from metadata
   if (eventType === 'work_session') {
     const workType = ev.metadata?.work_type || ev.category || 'work';
@@ -422,6 +428,9 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = ({ selectedAuctionUrl, o
         synthetic.push({ event_date: r.day, event_type: 'photo_session', title: `${r.n} photos`, metadata: { image_count: r.n, synthetic_day: true } });
       } else if (r.kind === 'work' && !coveredWorkDays.has(r.day)) {
         synthetic.push({ event_date: r.day, event_type: 'work_session', title: 'work session', metadata: { synthetic_day: true } });
+      } else if (r.kind === 'document' && Number.isFinite(r.n) && r.n > 0) {
+        // Paper linked to the car on the date printed on it (receipt_vehicle_links.page_date); the drawer reads the lines.
+        synthetic.push({ event_date: r.day, event_type: 'document', title: `${r.n} receipt${r.n === 1 ? '' : 's'}`, metadata: { synthetic_day: true, document_count: r.n } });
       }
     }
     return synthetic.length ? [...timelineEvents, ...synthetic] : timelineEvents;
@@ -921,6 +930,7 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = ({ selectedAuctionUrl, o
             date={receiptDate}
             auctions={auctions}
             hasWorkSummary={dayRows.some(row => row.day === receiptDate && row.kind === 'work' && Number.isFinite(row.n) && row.n > 0)}
+            documentCount={dayRows.filter(row => row.day === receiptDate && row.kind === 'document' && Number.isFinite(row.n)).reduce((sum, row) => sum + row.n, 0)}
             onClose={closeDay}
             onPrev={() => navigateReceipt(-1)}
             onNext={() => navigateReceipt(1)}
