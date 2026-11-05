@@ -246,7 +246,9 @@ Deno.serve(async (req) => {
           kind,
           observed_at: observedAt,
           vehicle_id: r.vehicle_id, // already attributed
-          source_identifier: `receipt:${r.id}`,
+          // ingest-observation deduplicates on source_identifier: a re-bridge must present a new one, or it is handed
+          // the old observation back and nothing is superseded (measured 2026-11-05, 26 of 26 unchanged).
+          source_identifier: rebridge.length && r.submitted_observation_id ? `receipt:${r.id}:rebridge:${r.submitted_observation_id}` : `receipt:${r.id}`,
           source_url: r.file_url ?? undefined,
           content_text: summary,
           structured_data: structured,
@@ -254,7 +256,7 @@ Deno.serve(async (req) => {
           raw_source_ref: `receipts.${r.id}`,
           extraction_metadata: {
             bridge: "ingest-receipts-as-observations",
-            bridge_version: "1.1.0",
+            bridge_version: "1.1.1",
           },
         }),
       });
