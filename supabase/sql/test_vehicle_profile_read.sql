@@ -84,6 +84,12 @@ ALTER TABLE public.vehicle_contributors ENABLE ROW LEVEL SECURITY;
 CREATE POLICY own_rows ON public.vehicle_contributors FOR SELECT USING (user_id = (SELECT auth.uid()));
 GRANT USAGE ON SCHEMA public, auth TO anon, authenticated, service_role;
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
+-- Production grants vehicles column by column (338 columns on 2026-11-06). The reader may read only granted columns:
+-- the fixture grants what the live grant held before 20261110093000, which adds is_replica.
+REVOKE SELECT ON public.vehicles FROM anon, authenticated;
+GRANT SELECT (id, user_id, owner_id, uploaded_by, is_public, deleted_at, year, make, model, normalized_model, series, trim,
+  transmission, transmission_model, mileage, mileage_source, canonical_body_style, body_style, engine_size, engine_type,
+  drivetrain, city, state, location, listing_location, bat_location, discovery_url, listing_title) ON public.vehicles TO anon, authenticated;
 
 \ir ../migrations/20261013143000_vehicle_profile_read.sql
 \ir ../migrations/20261013144500_vehicle_profile_read_acronyms.sql
@@ -100,6 +106,7 @@ GRANT SELECT ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role
 \ir ../migrations/20261018230000_identity_marks_series_label_fallback.sql
 \ir ../migrations/20261110090000_tribute_badges_and_engine_correction.sql
 \ir ../migrations/20261110090000_tribute_badges_and_engine_correction.sql
+\ir ../migrations/20261110093000_vehicles_is_replica_column_grant.sql
 
 -- Seeds. v1: the documented case; v2: nothing recorded; v3: a sourceless odometer; v4: private;
 -- v5: a classified asking price; v6: competing evidence; v7: a live auction bid.
