@@ -29,6 +29,7 @@ CREATE TABLE public.vehicles (
   year integer, make text, model text, normalized_model text, series text, trim text,
   transmission text, transmission_model text, mileage integer, mileage_source text,
   canonical_body_style text, body_style text, engine_size text, engine_type text, drivetrain text,
+  is_replica boolean,
   city text, state text, location text, listing_location text, bat_location text, discovery_url text, listing_title text);
 CREATE TABLE public.field_evidence (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid, field_name text, proposed_value text,
@@ -97,6 +98,8 @@ GRANT SELECT ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role
 \ir ../migrations/20261018200000_identity_marks_require_recorded_trim.sql
 \ir ../migrations/20261018220000_profile_read_title_claims.sql
 \ir ../migrations/20261018230000_identity_marks_series_label_fallback.sql
+\ir ../migrations/20261110090000_tribute_badges_and_engine_correction.sql
+\ir ../migrations/20261110090000_tribute_badges_and_engine_correction.sql
 
 -- Seeds. v1: the documented case; v2: nothing recorded; v3: a sourceless odometer; v4: private;
 -- v5: a classified asking price; v6: competing evidence; v7: a live auction bid.
@@ -376,6 +379,41 @@ BEGIN
   d := public.vehicle_profile_read('10000000-0000-0000-0000-000000000016');
   PERFORM public.t_assert(NOT EXISTS (SELECT 1 FROM jsonb_array_elements(d->'sections'->0->'identity_marks') m WHERE m->>'series_code' IS NOT NULL),
     format('a Pickup whose record names no series code gets no series plate; got %s', d->'sections'->0->'identity_marks'));
+END $$;
+RESET ROLE;
+
+-- 2d. Tribute and uncoded badges. The catalog's uncoded Pontiac plate (no family, series code or trim package) resolved
+-- for every 1964-2002 Pontiac with any recorded series or trim; a tribute (vehicles.is_replica) earns no factory series
+-- or trim badge, and the masthead's identity_source says so.
+INSERT INTO public.vehicle_identity_marks (brand, family, series_code, trim_package, body_style, year_start, year_end, mark_kind, display_label, sub_label, rpo_code, fender_placement, svg_markup, provenance_note) VALUES
+ ('Pontiac', NULL, NULL, NULL, NULL, 1964, 2002, 'series_badge', 'GTO · TRANS AM · JUDGE', 'PMD Arrowhead', 'W62 / WS6 / WT1', 'Hood Scoop', '<svg/>', 'Fixture: the live uncoded Pontiac plate.'),
+ ('Pontiac', 'Firebird', 'Trans Am', 'Trans Am WS6', NULL, 1970, 1981, 'trim_badge', 'TRANS AM · WS6', 'Screaming Chicken', 'WS4 / WS6 / W72', 'Hood Decal', '<svg/>', 'Fixture: the live WS6 plate.');
+INSERT INTO public.vehicles (id, year, make, model, normalized_model, series, trim, body_style, is_replica) VALUES
+ ('10000000-0000-0000-0000-000000000017', 1979, 'Pontiac', 'Firebird', 'Firebird', 'Trans Am', 'Trans Am WS6', 'Coupe', true),
+ ('10000000-0000-0000-0000-000000000018', 1979, 'Pontiac', 'Firebird', 'Firebird', 'Trans Am', 'Trans Am WS6', 'Coupe', false),
+ ('10000000-0000-0000-0000-000000000019', 1973, 'Pontiac', 'Firebird', 'Firebird', NULL, 'TRANS AM', 'Coupe', NULL);
+SET ROLE anon;
+SET test.auth_role = 'anon';
+DO $$
+DECLARE d jsonb;
+BEGIN
+  d := public.vehicle_profile_read('10000000-0000-0000-0000-000000000018');
+  PERFORM public.t_assert(EXISTS (SELECT 1 FROM jsonb_array_elements(d->'sections'->0->'identity_marks') m WHERE m->>'display_label' = 'TRANS AM · WS6'),
+    format('v18 (1979 Trans Am WS6, factory) earns the WS6 plate; got %s', d->'sections'->0->'identity_marks'));
+  PERFORM public.t_assert(NOT EXISTS (SELECT 1 FROM jsonb_array_elements(d->'sections'->0->'identity_marks') m WHERE m->>'display_label' = 'GTO · TRANS AM · JUDGE'),
+    format('the uncoded Pontiac plate never resolves; got %s', d->'sections'->0->'identity_marks'));
+  PERFORM public.t_assert((d->'sections'->0->'identity_source'->>'is_replica')::boolean = false, 'v18 identity_source: not a tribute');
+
+  d := public.vehicle_profile_read('10000000-0000-0000-0000-000000000017');
+  PERFORM public.t_assert(NOT EXISTS (SELECT 1 FROM jsonb_array_elements(d->'sections'->0->'identity_marks') m WHERE m->>'mark_kind' IN ('trim_badge', 'series_badge')),
+    format('v17 (the same car recorded as a tribute) earns no series or trim badge; got %s', d->'sections'->0->'identity_marks'));
+  PERFORM public.t_assert((d->'sections'->0->'identity_source'->>'is_replica')::boolean = true, 'v17 identity_source carries is_replica');
+  PERFORM public.t_assert(d->'sections'->0->'identity_marks' = d->'identity_marks', 'v17 masthead marks equal the document marks');
+
+  d := public.vehicle_profile_read('10000000-0000-0000-0000-000000000019');
+  PERFORM public.t_assert(NOT EXISTS (SELECT 1 FROM jsonb_array_elements(d->'sections'->0->'identity_marks') m WHERE m->>'mark_kind' IN ('trim_badge', 'series_badge')),
+    format('v19 (1973 Firebird recorded as TRANS AM, no series) gets no plate from the uncoded mark; got %s', d->'sections'->0->'identity_marks'));
+  PERFORM public.t_assert((d->'sections'->0->'identity_source'->>'is_replica')::boolean = false, 'v19 identity_source: null is_replica reads false');
 END $$;
 RESET ROLE;
 
