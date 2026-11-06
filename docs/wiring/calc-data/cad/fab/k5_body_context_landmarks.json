@@ -1,0 +1,432 @@
+{
+ "axle_parts": 84,
+ "bay_intrusion": {
+  "box_x": [
+   -0.55,
+   0.55
+  ],
+  "box_y": [
+   -2.45,
+   -1.45
+  ],
+  "box_z": [
+   0.55,
+   1.3
+  ],
+  "nodes_with_vertices_inside": {}
+ },
+ "body_parts": {
+  "cab_lower": 8,
+  "cab_upper": 6,
+  "fender": 20,
+  "hood": 2,
+  "tub": 32,
+  "valance": 4
+ },
+ "context_tris": 234590,
+ "cowl_top_tris": 182,
+ "files": {
+  "k5-body-context.glb": 6845428,
+  "k5-body-hood.glb": 167100
+ },
+ "hood_hinge": [
+  0.0,
+  -1.2409,
+  1.3593
+ ],
+ "hood_tris": 6046,
+ "interior_trim_y": -1.43,
+ "nodes": {
+  "body_axles": {
+   "materials": [
+    "primer",
+    "rubber"
+   ],
+   "max": [
+    0.783,
+    0.921,
+    0.588
+   ],
+   "min": [
+    -0.783,
+    -2.08,
+    0.193
+   ],
+   "tris": 11672
+  },
+  "body_bumper_F": {
+   "materials": [
+    "chrome"
+   ],
+   "max": [
+    0.987,
+    -2.513,
+    0.812
+   ],
+   "min": [
+    -0.987,
+    -2.717,
+    0.587
+   ],
+   "tris": 1388
+  },
+  "body_cab": {
+   "materials": [
+    "firewall_paint",
+    "roof_white",
+    "rubber"
+   ],
+   "max": [
+    0.997,
+    0.012,
+    1.924
+   ],
+   "min": [
+    -0.997,
+    -1.341,
+    0.493
+   ],
+   "tris": 3890
+  },
+  "body_cowl_top": {
+   "materials": [
+    "firewall_paint"
+   ],
+   "max": [
+    0.872,
+    -1.323,
+    1.379
+   ],
+   "min": [
+    -0.873,
+    -1.552,
+    1.305
+   ],
+   "tris": 182
+  },
+  "body_doors_L": {
+   "materials": [
+    "black_trim",
+    "chrome",
+    "firewall_paint",
+    "interior_buckskin",
+    "rubber"
+   ],
+   "max": [
+    1.18,
+    -0.115,
+    1.851
+   ],
+   "min": [
+    0.699,
+    -1.168,
+    0.591
+   ],
+   "tris": 10650
+  },
+  "body_doors_R": {
+   "materials": [
+    "black_trim",
+    "chrome",
+    "firewall_paint",
+    "interior_buckskin",
+    "rubber"
+   ],
+   "max": [
+    -0.699,
+    -0.115,
+    1.851
+   ],
+   "min": [
+    -1.18,
+    -1.168,
+    0.591
+   ],
+   "tris": 10650
+  },
+  "body_fender_L": {
+   "materials": [
+    "black_trim",
+    "firewall_paint"
+   ],
+   "max": [
+    1.006,
+    -1.117,
+    1.367
+   ],
+   "min": [
+    0.806,
+    -2.581,
+    0.491
+   ],
+   "tris": 1902
+  },
+  "body_fender_R": {
+   "materials": [
+    "black_trim",
+    "firewall_paint"
+   ],
+   "max": [
+    -0.807,
+    -1.117,
+    1.367
+   ],
+   "min": [
+    -1.006,
+    -2.581,
+    0.491
+   ],
+   "tris": 1902
+  },
+  "body_glass": {
+   "materials": [
+    "glass"
+   ],
+   "max": [
+    0.911,
+    -0.18,
+    1.865
+   ],
+   "min": [
+    -0.911,
+    -1.314,
+    1.355
+   ],
+   "tris": 1980
+  },
+  "body_grille": {
+   "materials": [
+    "black_trim",
+    "chrome",
+    "chrome_yellow"
+   ],
+   "max": [
+    0.933,
+    -2.528,
+    1.199
+   ],
+   "min": [
+    -0.933,
+    -2.67,
+    0.839
+   ],
+   "tris": 13999
+  },
+  "body_interior": {
+   "materials": [
+    "black_trim",
+    "chrome",
+    "chrome_yellow",
+    "firewall_paint",
+    "gauge_face",
+    "gauge_pointer",
+    "interior_buckskin",
+    "interior_plaid",
+    "rubber"
+   ],
+   "max": [
+    1.005,
+    1.76,
+    1.9
+   ],
+   "min": [
+    -0.847,
+    -1.43,
+    0.588
+   ],
+   "tris": 48473
+  },
+  "body_lamps": {
+   "materials": [
+    "black_trim",
+    "chrome",
+    "lamp_glass"
+   ],
+   "max": [
+    0.882,
+    -2.465,
+    1.144
+   ],
+   "min": [
+    -0.882,
+    -2.567,
+    0.959
+   ],
+   "tris": 1520
+  },
+  "body_trim_chrome": {
+   "materials": [
+    "chrome",
+    "rubber"
+   ],
+   "max": [
+    1.019,
+    1.858,
+    1.876
+   ],
+   "min": [
+    -1.019,
+    -2.465,
+    0.511
+   ],
+   "tris": 12091
+  },
+  "body_tub": {
+   "materials": [
+    "black_trim",
+    "chrome",
+    "firewall_paint",
+    "primer",
+    "rubber",
+    "tail_lens"
+   ],
+   "max": [
+    1.017,
+    1.979,
+    1.356
+   ],
+   "min": [
+    -1.017,
+    -0.115,
+    0.493
+   ],
+   "tris": 38903
+  },
+  "body_valance": {
+   "materials": [
+    "firewall_paint"
+   ],
+   "max": [
+    0.869,
+    -2.552,
+    0.914
+   ],
+   "min": [
+    -0.869,
+    -2.651,
+    0.766
+   ],
+   "tris": 2844
+  },
+  "body_wheel_FL": {
+   "materials": [
+    "black_trim",
+    "chrome",
+    "chrome_yellow",
+    "rubber"
+   ],
+   "max": [
+    1.029,
+    -1.481,
+    0.802
+   ],
+   "min": [
+    0.691,
+    -2.31,
+    -0.011
+   ],
+   "tris": 18136
+  },
+  "body_wheel_FR": {
+   "materials": [
+    "black_trim",
+    "chrome",
+    "chrome_yellow",
+    "rubber"
+   ],
+   "max": [
+    -0.691,
+    -1.481,
+    0.802
+   ],
+   "min": [
+    -1.029,
+    -2.31,
+    -0.011
+   ],
+   "tris": 18136
+  },
+  "body_wheel_RL": {
+   "materials": [
+    "black_trim",
+    "chrome",
+    "chrome_yellow",
+    "rubber"
+   ],
+   "max": [
+    1.029,
+    1.221,
+    0.802
+   ],
+   "min": [
+    0.691,
+    0.392,
+    -0.011
+   ],
+   "tris": 18136
+  },
+  "body_wheel_RR": {
+   "materials": [
+    "black_trim",
+    "chrome",
+    "chrome_yellow",
+    "rubber"
+   ],
+   "max": [
+    -0.691,
+    1.221,
+    0.802
+   ],
+   "min": [
+    -1.029,
+    0.392,
+    -0.011
+   ],
+   "tris": 18136
+  }
+ },
+ "stance": {
+  "front_axle_y_params": -1.896,
+  "front_delta_mm": 0.5,
+  "ground_delta_mm": 0.0,
+  "ground_z_brief": -0.0105,
+  "radius_delta_mm": 0.2,
+  "rear_axle_y_params": 0.809,
+  "rear_delta_mm": -2.1,
+  "tyre_r_brief": 0.406
+ },
+ "wheels": {
+  "FL": {
+   "bottom": -0.0105,
+   "cx": 0.86,
+   "cy": -1.8955,
+   "cz": 0.3957,
+   "r_z": 0.4062,
+   "top": 0.802
+  },
+  "FR": {
+   "bottom": -0.0105,
+   "cx": -0.86,
+   "cy": -1.8955,
+   "cz": 0.3957,
+   "r_z": 0.4062,
+   "top": 0.802
+  },
+  "RL": {
+   "bottom": -0.0105,
+   "cx": 0.86,
+   "cy": 0.8069,
+   "cz": 0.3957,
+   "r_z": 0.4062,
+   "top": 0.802
+  },
+  "RR": {
+   "bottom": -0.0105,
+   "cx": -0.86,
+   "cy": 0.8069,
+   "cz": 0.3957,
+   "r_z": 0.4062,
+   "top": 0.802
+  }
+ }
+}
