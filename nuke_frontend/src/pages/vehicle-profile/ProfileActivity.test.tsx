@@ -19,6 +19,16 @@ it('uses occurrence dates, excludes other vehicles, superseded records, plans an
   ], null, now);
   expect(result.latest?.id).toBe('old'); expect(result.live).toBe(false);
 });
+it('counts the timeline bar\'s contribution days as activity: photos filed, work and paper, never plain events', () => {
+  const days = [
+    { day: '2025-10-06', kind: 'photo', n: 4 }, { day: '2026-10-28', kind: 'photo', n: 391 }, { day: '2026-10-30', kind: 'event', n: 1 },
+    { day: '2026-10-29', kind: 'document', n: 2 }, { day: '2026-10-27', kind: 'work', n: 0 }, { day: '2027-01-01', kind: 'photo', n: 1 }];
+  const result = selectProfileActivity('v', [{ id: 'old', vehicle_id: 'v', event_type: 'work_session', event_date: '2025-10-07' }], null, now, days);
+  expect(result.latest?.event_date).toBe('2026-10-29');
+  expect(result.latest?.title).toBe('2 receipts on file');
+  expect(selectProfileActivity('v', [], null, now, [{ day: '2026-10-28', kind: 'photo', n: 391 }]).latest?.title).toBe('391 photos filed');
+  expect(selectProfileActivity('v', [], null, now, [{ day: '2026-10-30', kind: 'event', n: 3 }]).latest).toBeUndefined();
+});
 it('shows live only for an active auction with a fresh source-feed clock and future close', () => {
   expect(selectProfileActivity('v', [], pulse(), now).live).toBe(true);
   for (const invalid of [pulse({ end_date: '2026-10-30T19:00:00Z' }), pulse({ listing_status: 'sold' }),

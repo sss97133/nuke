@@ -11,6 +11,7 @@ import { isAuctionPresentation } from './buildAuctionPulse';
 import { useProfileDocument } from './profileDocument';
 import ProfileFinancials from './ProfileFinancials';
 import ProfileActivity from './ProfileActivity';
+import { useContributionDays } from './useContributionDays';
 import { useAuctionCommentStats } from '../../hooks/useAuctionComments';
 import type { AuctionPulse } from './types';
 
@@ -154,6 +155,7 @@ export function extractInlineLotProvenance(vehicle: Record<string, any> | null |
  */
 export default function ProfileHeader({ priceLotId }: { priceLotId?: string }) {
   const { vehicle, auctionPulse, auctionCurrency, setGalleryFilter, timelineEvents, timelineReadState } = useVehicleProfile();
+  const contributionDays = useContributionDays(vehicle?.id);
   const priceOwnedByLiveStack = isAuctionPresentation(auctionPulse) && !!auctionPulse?.listing_url && ['active', 'live'].includes(auctionPulse.listing_status);
   const doc = useProfileDocument(vehicle?.id, priceOwnedByLiveStack);
   const hasMasthead = doc?.sections.some(section => section.kind === 'masthead') ?? false;
@@ -363,7 +365,7 @@ export default function ProfileHeader({ priceLotId }: { priceLotId?: string }) {
   return <>
     <div ref={sticky} className="vp-header-sticky">
       <Masthead result={<div className="vp-header-departments">
-        <ProfileActivity vehicleId={vehicle.id} events={timelineEvents ?? []} pulse={auctionPulse} readState={timelineReadState}
+        <ProfileActivity vehicleId={vehicle.id} events={timelineEvents ?? []} pulse={auctionPulse} days={contributionDays} readState={timelineReadState}
           open={activityOpen} onToggle={() => { setFinancialOpen(false); setLiveOpen(false); setActiveFacet(null); setActivityOpen(current => !current); }}
           onClose={() => setActivityOpen(false)} boundaryRef={sticky} />
         <ProfileFinancials vehicleId={vehicle.id} market={market()} reducedMarket={market(true)} open={financialOpen}
