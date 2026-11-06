@@ -96,7 +96,9 @@ async function openRecording() {
     'structured_data->>property': 'eq.broadcast_lot_presentation', is_superseded: 'eq.false', limit: '20' });
   expect(requests.find(r => r.path.endsWith('/rpc/vehicle_profile_read'))?.body).toEqual({ p_vehicle_id: vehicleId });
   expect(requests.find(r => r.path.endsWith('/rpc/vehicle_identity_artwork'))?.body).toEqual({ p_vehicle_id: vehicleId });
-  expect(requests).toHaveLength(5);
+  // The activity clock's own read of the contribution days (photos, work, paper), once per mount.
+  expect(requests.find(r => r.path.endsWith('/rpc/get_vehicle_contribution_days'))?.body).toEqual({ p_vehicle_id: vehicleId });
+  expect(requests).toHaveLength(6);
   return document.querySelector('iframe')?.getAttribute('src') ?? null;
 }
 const embed = (video: string, start: number) => `https://www.youtube.com/embed/${video}?autoplay=1&rel=0&start=${start}&end=${start + 50}`;
