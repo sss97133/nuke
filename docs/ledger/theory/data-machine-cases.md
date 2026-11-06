@@ -3581,3 +3581,67 @@ same page while on the phone with them.
    the eight questions.
 2. A receipt photo he sends lands on the profile attributed to him, and the next open of the page shows one fewer unknown.
 3. The BaT package cites him by name on every fact he supplied, with the frame id of his document beside it.
+
+## 20. An agent writes with a user's lent key (owner, 2026-11-06)
+
+Owner, 2026-11-06 evening, while three agents (Grok Bot, Codex, Claude) were writing the Firebird's record: "what im
+curious is how our system is supposed to handle and accept how 'external' agents input data to the db even though its not
+exactly external... basically a user needs to be able to lend out their sub writing keys. theres a lot to think about on
+permissions." Captured as thinking, not a spec. What follows is the position the data machine takes from it.
+
+### What the agents use today, measured 2026-11-06
+- **The project's secret key.** Every agent lane (Grok's photo landing v3, the receipt landing of 2026-11-05, the
+  corrections and listing state of 2026-11-06) writes as `service_role`: every table, every row, every writer. The only
+  trace of *who* is a free-text `asserted_by` on the audit rows (`superseded_rows`, `profile_fix_log`, `metadata.history`)
+  and the `app.writer` setting the writer stamps. Nothing binds the write to a person who allowed it.
+- **`api_keys`** (172 rows, 13 active): `nk_live_…` keys per `user_id` with `scopes` (`read`, `write`, `stage_write`, the
+  scope grammar in `_shared/scopeGrammar.ts`), `expires_at`, `is_active`, rate limits, `agent_registration_id`. The edge
+  `writeGuard` accepts them (`X-API-Key`) and `apiKeyAuth` resolves the user. They stop at the edge: a function that
+  then calls the database does so as `service_role`, so the writers' tied gates (`auth.uid()` in owner/creator/
+  uploader/contributor, `vehicle_user_has_access`) never see the user, and the row policies never run as them.
+- **The acting-as path.** `contributor_intake_actor(p_acting_as)`: a service-role caller may name the user it acts for.
+  The builder's invite token (§19) is the one lent key that exists: a contributor without an account writes answers
+  and uploads through it, scoped to one vehicle, minted by the owner.
+- **The owner-delegated register.** `owner_delegated_signs`: append-only, one row per Sign an agent executed for the
+  owner, with `authorization_quote` (the owner's words), `authorized_at`, `agent_session`, `rolled_back`. Written in
+  the Sign's own transaction by `owner_delegated_sign_register`. This is the shape of an agent write done right:
+  the authorization is a quote with a clock, and the write and its register row commit together.
+
+### The position
+A write is accepted from an agent exactly when it is accepted from the person the agent writes for, within what that
+person lent, and the record says both names. Four pieces, all of them extensions of what exists:
+
+1. **A lent key is a row the principal mints**, not a copy of theirs: `agent_grants` (principal `user_id`, agent name,
+   `key_hash`, `scope`, `expires_at`, `revoked_at`, `last_used_at`). `scope` is the existing scope grammar plus two
+   axes it lacks today: **subjects** (vehicles the principal is tied to, or an explicit list; organizations likewise)
+   and **writers** (which sanctioned writers the key may call: `ingest-observation`, `land_document_pages`,
+   `record_listing_submission`, `correct_vehicle_*`, …). Tiers, in the owner's own table of who decides:
+   *read* · *propose* (candidates and observations, never a filing) · *write as me* (filings and corrections, within
+   scope) · never *sign* (money, messages to people, deletion, credentials: those stay with the person).
+2. **The key becomes the user at the database**, not at the edge. The gate (an edge function, or the MCP connector)
+   exchanges a valid lent key for a short-lived JWT for the principal (`sub` = principal, `role` = `authenticated`,
+   claims `agent_grant` = grant id, `agent` = name, `scope` = the grant's scope). PostgREST, the row policies and
+   every writer's tied gate then run *as the principal*; nothing new to teach them. `service_role` stays what it is:
+   the system's own jobs, never a person's agent.
+3. **Writers check the grant and name the agent.** One helper, `agent_grant_check(p_writer, p_subject)`: reads
+   `auth.jwt()`, and when `agent_grant` is present, refuses unless the grant is active (not revoked, not expired) and
+   its scope covers this writer and this subject. Every sanctioned writer calls it first and stamps
+   `asserted_by = principal/agent` and the grant id on its audit row (`superseded_rows.source`, `metadata.history`,
+   `profile_fix_log`, the observation's `extraction_metadata`). Revocation is immediate: the JWT may still verify,
+   the grant row says no.
+4. **The principal sees the ledger.** One reader, `my_agent_writes(p_grant)`: what each lent key wrote, when, to which
+   record, with the rollback handle the writer already keeps (`superseded_rows`, `revert_*`). Lending a key without
+   being able to read what it did is not lending; it is losing.
+
+### What this retires
+Agents writing as `service_role` with a text `asserted_by`. The lanes of 2026-11-05/06 would have run as
+`skylar/claude-skylar-74` under a grant scoped to the Firebird (subjects: vehicles the principal owns; writers:
+receipts, corrections, listing state), and the record would carry that.
+
+### First slice, no UI
+`agent_grants` + `agent_grant_check` + the JWT exchange in the MCP connector's auth + the check in three writers
+(`record_listing_submission`, `correct_vehicle_text_field`, `land_document_pages`) + `my_agent_writes`. The owner mints
+the first grant for his own agents with a SQL call; the UI comes when a second person needs one.
+
+Open for the owner (his column): whether a grant may be re-lent (an agent minting for a sub-agent: proposed no, the
+chain is one hop), and the default expiry (proposed 7 days, renewable).
