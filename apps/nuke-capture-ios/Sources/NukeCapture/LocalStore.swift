@@ -919,6 +919,17 @@ final class LocalStore {
         try dbQueue.write { db in try review.insert(db, onConflict: .ignore) }
     }
 
+    /// Diagnostic fallback only. Consumers must qualify source version, method
+    /// and byte custody before displaying any retained observation as current.
+    func latestAlbumImageReview(localIdentifier: String) throws -> LocalAlbumImageReview? {
+        try dbQueue.read { db in
+            try LocalAlbumImageReview.fetchOne(db, sql: """
+                SELECT * FROM photo_album_image_review WHERE localIdentifier = ?
+                ORDER BY rowid DESC LIMIT 1
+                """, arguments: [localIdentifier])
+        }
+    }
+
     /// Unknown source versions must be reread; a previous result cannot establish
     /// that the current bytes are unchanged. A method change also invalidates reuse.
     func albumImageReview(for photo: LocalAlbumPhoto, methodVersion: String) throws -> LocalAlbumImageReview? {
