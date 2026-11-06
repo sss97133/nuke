@@ -3,8 +3,8 @@ import { PrefetchLink } from '../../components/PrefetchLink';
 import ProfileIdentity from './ProfileIdentity';
 import { HeaderPopover } from '../../components/vehicle/HeaderPopover';
 import { getVehicleTitle } from '../../hooks/usePageTitle';
-import { Masthead, Facet, ClaimView, Text, formatMeasure } from '../../kit';
-import type { Claim } from '../../kit';
+import { Masthead, Facet, ClaimView, Text, formatMeasure, day } from '../../kit';
+import type { Claim, ListingState } from '../../kit';
 import { supabase } from '../../lib/supabase';
 import { useVehicleProfile } from './VehicleProfileContext';
 import { isAuctionPresentation } from './buildAuctionPulse';
@@ -13,6 +13,27 @@ import ProfileFinancials from './ProfileFinancials';
 import ProfileActivity from './ProfileActivity';
 import { useAuctionCommentStats } from '../../hooks/useAuctionComments';
 import type { AuctionPulse } from './types';
+
+const LISTING_VENUES: Record<string, string> = { bat: 'Bring a Trailer', ebay: 'eBay', carsandbids: 'Cars & Bids', hemmings: 'Hemmings', hagerty: 'Hagerty', carscom: 'Cars.com', autotrader: 'Autotrader', craigslist: 'Craigslist', facebook: 'Facebook Marketplace', nzero: 'Nuke' };
+
+/** One line for the masthead: where the car is listed and what the listing waits on, as the read serves it. */
+export function describeListing(listing: ListingState): string {
+  const venue = LISTING_VENUES[listing.platform] ?? listing.platform;
+  switch (listing.status) {
+    case 'active': return `Live on ${venue}${listing.activated_at ? ` since ${day(listing.activated_at)}` : ''}`;
+    case 'sold': return `Sold on ${venue}`;
+    case 'expired': return `${venue}: auction ended without a sale`;
+    case 'prepared': return `${venue}: listing prepared, not submitted`;
+    case 'submitted':
+      switch (listing.stage) {
+        case 'draft_pending_approval': return `${venue}: draft pending the seller's approval since ${day(listing.stage_since)}`;
+        case 'accepted': return `${venue}: accepted ${day(listing.stage_since)}, listing in preparation`;
+        case 'scheduled': return `${venue}: approved, awaiting a start date`;
+        default: return `${venue}: submitted ${day(listing.submitted_at)}`;
+      }
+    default: return `${venue}: ${listing.status}`;
+  }
+}
 
 const FieldEvidencePopup = React.lazy(() => import('./FieldEvidencePopup'));
 const ExternalAuctionSummary = React.lazy(() => import('../../components/auction/ExternalAuctionLiveBanner').then(module => ({ default: module.ExternalAuctionSummary })));
@@ -354,6 +375,10 @@ export default function ProfileHeader({ priceLotId }: { priceLotId?: string }) {
             ? <ProfileIdentity vehicleId={vehicle.id} compact year={vehicle.year} make={vehicle.make ?? ''} model={masthead.model!} variants={masthead.identity.differentiators} onExplore={explore} />
             : title}
         </Text>
+        {masthead.listing && <Text role="label" as="p" className="vp-header-listing" aria-label="Listing">
+          {describeListing(masthead.listing)}
+          {masthead.listing.url && <> · <a href={masthead.listing.url} target="_blank" rel="noreferrer">open</a></>}
+        </Text>}
         {priceOwnedByLiveStack ? <details className="vp-header-configuration"><summary>Configuration</summary>{configuration}</details> : configuration}
       </Masthead>
       {liveOpen && priceOwnedByLiveStack && auctionPulse && <HeaderPopover open title="Live auction" width={680} onClose={() => setLiveOpen(false)} dismissBoundaryRef={sticky}>
