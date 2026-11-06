@@ -24,7 +24,7 @@ END $$;
 
 -- The tables the read touches, with the live SELECT policies that matter to it.
 CREATE TABLE public.vehicles (
-  id uuid PRIMARY KEY, user_id uuid, owner_id uuid, uploaded_by uuid,
+  id uuid PRIMARY KEY, user_id uuid, owner_id uuid, uploaded_by uuid, created_by_user_id uuid,
   is_public boolean NOT NULL DEFAULT true, deleted_at timestamptz,
   year integer, make text, model text, normalized_model text, series text, trim text,
   transmission text, transmission_model text, mileage integer, mileage_source text,
@@ -43,6 +43,14 @@ CREATE TABLE public.vehicle_observations (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid, kind text, content_text text, source_url text,
   extraction_method text, observed_at timestamptz, is_superseded boolean, structured_data jsonb,
   confidence_score numeric, ingested_at timestamptz DEFAULT now());
+-- listing_exports as the listing-state reader uses it (own-user row policies; the reader is its own gate).
+CREATE TABLE public.listing_exports (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid NOT NULL, user_id uuid NOT NULL, platform text NOT NULL,
+  export_format text NOT NULL, title text NOT NULL, description text, status text DEFAULT 'prepared',
+  external_listing_url text, external_listing_id text, submitted_at timestamptz, activated_at timestamptz, metadata jsonb DEFAULT '{}'::jsonb,
+  created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now());
+ALTER TABLE public.listing_exports ENABLE ROW LEVEL SECURITY;
+CREATE POLICY view_own_exports ON public.listing_exports FOR SELECT USING (user_id = (SELECT auth.uid()));
 CREATE TABLE public.test_price_facts (
   vehicle_id uuid PRIMARY KEY, price_kind text, price_amount numeric, price_as_of timestamptz,
   price_live boolean, platform text, source_url text);
@@ -97,6 +105,7 @@ GRANT SELECT ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role
 \ir ../migrations/20261018200000_identity_marks_require_recorded_trim.sql
 \ir ../migrations/20261018220000_profile_read_title_claims.sql
 \ir ../migrations/20261018230000_identity_marks_series_label_fallback.sql
+\ir ../migrations/20261110100000_listing_submission_state.sql
 
 -- Seeds. v1: the documented case; v2: nothing recorded; v3: a sourceless odometer; v4: private;
 -- v5: a classified asking price; v6: competing evidence; v7: a live auction bid.
@@ -157,6 +166,15 @@ CREATE FUNCTION public.t_assert(p_ok boolean, p_what text) RETURNS void LANGUAGE
 BEGIN IF NOT coalesce(p_ok, false) THEN RAISE EXCEPTION 'FAIL: %', p_what; END IF; END $$;
 GRANT EXECUTE ON FUNCTION public.t_assert(boolean, text) TO anon, authenticated;
 
+-- v1 is submitted to a venue and its draft is pending: the masthead says so only to the vehicle's people.
+SET test.auth_role = 'service_role';
+SET statement_timeout = '5s';
+SELECT public.record_listing_submission('10000000-0000-0000-0000-000000000001', 'bat', 'submitted', 'draft_pending_approval', '2026-11-03T21:44:33Z',
+  '126086136', 'https://bringatrailer.com/listing/x/', '{"type":"gmail","ref":"1a1a35f039b8d7b3","title":"Required - Approve or suggest changes","asserted_by":"contract"}',
+  'The venue sent the seller a draft to approve.');
+RESET statement_timeout;
+SET test.auth_role = '';
+
 -- 1. Anonymous reader.
 SET ROLE anon;
 SET test.auth_role = 'anon';
@@ -170,6 +188,7 @@ BEGIN
   PERFORM public.t_assert((SELECT string_agg(x->>'kind', ',' ORDER BY o) FROM jsonb_array_elements(d->'sections') WITH ORDINALITY AS t(x, o)) = 'masthead,strip,timeline', 'masthead, strip and timeline');
   m := d->'sections'->0;
   PERFORM public.t_assert(m->>'kind' = 'masthead' AND m->>'model' = 'Mustang' AND (m->>'year')::int = 1966, 'masthead identity');
+  PERFORM public.t_assert(m->'listing' = 'null'::jsonb, format('anon reads no listing state while the draft is pending; got %s', m->'listing'));
   PERFORM public.t_assert(m->'identity_source'->>'normalized_model' = 'Mustang', 'identity_source for the client tokens');
   PERFORM public.t_assert((m->'price'->>'value')::numeric = 24000 AND m->'price'->>'unit' = 'USD', 'typed price value and unit');
   PERFORM public.t_assert(m->>'priceLabel' = 'Last recorded sale', 'a sale is the last recorded sale');
@@ -287,12 +306,16 @@ DECLARE d jsonb;
 BEGIN
   d := public.vehicle_profile_read('10000000-0000-0000-0000-000000000001');
   PERFORM public.t_assert(d->>'viewer' = 'owner', 'owner_id is the owner');
+  PERFORM public.t_assert(d->'sections'->0->'listing'->>'stage' = 'draft_pending_approval' AND d->'sections'->0->'listing'->>'visibility' = 'tied',
+    format('the owner reads the masthead listing state; got %s', d->'sections'->0->'listing'));
   PERFORM public.t_assert(d->'sections'->1->'facets'->2->'member'->'source'->>'kind' = 'document'
     AND (d->'sections'->1->'facets'->2->'member'->>'trust')::numeric = 0.95, 'an authenticated reader sees the invoice attribution');
   PERFORM public.t_assert((d->'sections'->1->'coverage'->>'n')::int = 4, 'coverage counts the invoice attribution for this viewer');
 END $$;
 SET test.auth_uid = '20000000-0000-0000-0000-000000000002';
 SELECT public.t_assert(public.vehicle_profile_read('10000000-0000-0000-0000-000000000001')->>'viewer' = 'contributor', 'the uploader is a contributor');
+SELECT public.t_assert(public.vehicle_profile_read('10000000-0000-0000-0000-000000000001')->'sections'->0->'listing'->>'stage' = 'draft_pending_approval',
+  'the uploader reads the masthead listing state');
 SET test.auth_uid = '20000000-0000-0000-0000-000000000003';
 SELECT public.t_assert(public.vehicle_profile_read('10000000-0000-0000-0000-000000000001')->>'viewer' = 'owner', 'an approved verification with both documents is the owner');
 SET test.auth_uid = '20000000-0000-0000-0000-000000000005';

@@ -82,6 +82,24 @@ const auction = (source_url = 'https://bringatrailer.com/listing/x', extra = {})
   lot_number: 'EXACT-LOT', auction_end_date: '2025-02-03T04:05:06Z', broadcast_video_url: 'https://www.youtube.com/watch?v=exact_video',
   broadcast_timestamp_start: 125, broadcast_timestamp_end: 180, ...extra });
 
+it('says where the car is listed and what the listing waits on, only when the read carries it', async () => {
+  await renderLoaded();
+  expect(host.querySelector('.vp-header-listing')).toBeNull();
+  const read = mustangRead();
+  const masthead = read.sections[0];
+  if (masthead.kind === 'masthead') masthead.listing = { platform: 'bat', status: 'submitted', stage: 'draft_pending_approval', stage_since: '2026-11-03T21:44:33+00:00',
+    submitted_at: '2026-10-29T15:00:03+00:00', url: 'https://bringatrailer.com/listing/1973-pontiac-firebird-26/', visibility: 'tied' };
+  fixture.read = read;
+  await renderLoaded();
+  const line = host.querySelector('.vp-header-listing');
+  expect(line?.textContent).toContain("Bring a Trailer: draft pending the seller's approval since Nov 3, 2026");
+  expect(line?.querySelector('a')?.getAttribute('href')).toBe('https://bringatrailer.com/listing/1973-pontiac-firebird-26/');
+  if (masthead.kind === 'masthead') masthead.listing = { platform: 'bat', status: 'active', activated_at: '2026-11-10T16:00:00+00:00', url: 'https://bringatrailer.com/listing/x', visibility: 'public' };
+  fixture.read = { ...read };
+  await renderLoaded();
+  expect(host.querySelector('.vp-header-listing')?.textContent).toContain('Live on Bring a Trailer since Nov 10, 2026');
+});
+
 it('retains exact lot enrichment without changing the price owner or its source observation clock', async () => {
   fixture.auctionRows = [auction()];
   await renderLoaded(); openPrice();

@@ -74,10 +74,18 @@ export const RANK_FLOOR = 5;
 
 export type IdentityTokens = { primary: VehicleIdentityToken[]; differentiators: VehicleIdentityToken[] };
 
+/** The vehicle's newest listing submission, as vehicle_listing_state serves it: a tied viewer gets the stage and clocks,
+ *  anyone else only a live or sold listing. Never a price. */
+export type ListingState = {
+  platform: string; status: string; stage?: string | null; stage_since?: string | null; submitted_at?: string | null;
+  activated_at?: string | null; url?: string | null; external_listing_id?: string | null; as_of?: string | null;
+  visibility?: 'tied' | 'public';
+};
+
 export type GalleryImage = { id: string; url: string; taken_at?: string | null; gate: 'approved' };
 
 export type Section =
-  | { kind: 'masthead'; identity: IdentityTokens; year: number | null; make: string | null; model: string | null; transmissionModel?: string | null; price?: Claim<number> | null; priceLabel?: string | null; identity_marks?: Record<string, unknown>[] }
+  | { kind: 'masthead'; identity: IdentityTokens; year: number | null; make: string | null; model: string | null; transmissionModel?: string | null; price?: Claim<number> | null; priceLabel?: string | null; identity_marks?: Record<string, unknown>[]; listing?: ListingState | null }
   | { kind: 'strip'; coverage: Coverage; facets: Array<{ dimension: string; label: string; member: Claim<string> }>; odometer?: Claim<number> | null }
   | { kind: 'measures'; stack: string; title: string; coverage: Coverage; items: Measure[] }
   | { kind: 'timeline'; coverage: Coverage; days: Array<{ day: string; kinds: Record<string, number> }> }
