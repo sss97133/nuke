@@ -1,6 +1,8 @@
 /**
  * OnboardingSlideshow - 3-slide "How It Works" modal for first-time visitors.
- * Triggered from homepage "Take a Tour" CTA.
+ * Triggered from homepage "Take a Tour" CTA, and once per browser for a
+ * freshly signed-in account. A signed-in viewer is sent to add their first
+ * vehicle, never back to signup.
  */
 
 import React, { useState } from 'react';
@@ -9,6 +11,8 @@ import { useNavigate } from 'react-router-dom';
 interface OnboardingSlideshowProps {
   isOpen: boolean;
   onClose: () => void;
+  /** The viewer already has an account: the calls to action lead into the product. */
+  signedIn?: boolean;
 }
 
 const slides = [
@@ -74,7 +78,7 @@ const slides = [
   },
 ];
 
-export const OnboardingSlideshow: React.FC<OnboardingSlideshowProps> = ({ isOpen, onClose }) => {
+export const OnboardingSlideshow: React.FC<OnboardingSlideshowProps> = ({ isOpen, onClose, signedIn = false }) => {
   const [currentSlide, setCurrentSlide] = useState(0);
   const navigate = useNavigate();
 
@@ -92,13 +96,28 @@ export const OnboardingSlideshow: React.FC<OnboardingSlideshowProps> = ({ isOpen
     }
   };
 
-  const handleSignUp = () => {
+  // Signed in: the primary action is the first vehicle, the secondary is the
+  // market the modal is covering. Signed out: create an account or sign in.
+  const handlePrimary = () => {
+    if (signedIn) {
+      onClose();
+      navigate('/vehicle/add');
+      return;
+    }
     navigate('/signup');
   };
 
-  const handleSignIn = () => {
+  const handleSecondary = () => {
+    if (signedIn) {
+      onClose();
+      return;
+    }
     navigate('/login');
   };
+
+  const primaryLabel = signedIn ? 'ADD YOUR FIRST VEHICLE' : 'CREATE ACCOUNT';
+  const secondaryLabel = signedIn ? 'BROWSE THE MARKET' : 'SIGN IN';
+  const skipLabel = signedIn ? 'SKIP TO ADD VEHICLE' : 'SKIP TO SIGN UP';
 
   const slide = slides[currentSlide];
 
@@ -301,7 +320,7 @@ export const OnboardingSlideshow: React.FC<OnboardingSlideshowProps> = ({ isOpen
           {currentSlide === slides.length - 1 ? (
             <div style={{ display: 'flex', gap: 'var(--space-2)', flex: 1, justifyContent: 'center' }}>
               <button
-                onClick={handleSignUp}
+                onClick={handlePrimary}
                 className="button button-primary"
                 style={{
                   fontSize: '13px',
@@ -309,30 +328,30 @@ export const OnboardingSlideshow: React.FC<OnboardingSlideshowProps> = ({ isOpen
                   fontWeight: 700
                 }}
               >
-                CREATE ACCOUNT
+                {primaryLabel}
               </button>
               <button
-                onClick={handleSignIn}
+                onClick={handleSecondary}
                 className="button"
                 style={{
                   fontSize: '12px',
                   padding: 'var(--space-2) var(--space-3)'
                 }}
               >
-                SIGN IN
+                {secondaryLabel}
               </button>
             </div>
           ) : (
             <div style={{ flex: 1, textAlign: 'center' }}>
               <button
-                onClick={handleSignUp}
+                onClick={handlePrimary}
                 className="button button-primary"
                 style={{
                   fontSize: '12px',
                   padding: 'var(--space-2) var(--space-3)'
                 }}
               >
-                SKIP TO SIGN UP
+                {skipLabel}
               </button>
             </div>
           )}
