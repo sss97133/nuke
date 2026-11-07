@@ -103,7 +103,7 @@ export function moneyIn(n: number | null | undefined, currency: string, compact 
   const opts: Intl.NumberFormatOptions = compact && Math.abs(n) >= 10_000
     ? { notation: 'compact', maximumFractionDigits: Math.abs(n) >= 1_000_000 ? 1 : 0 } : { maximumFractionDigits: 0 };
   try {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency, currencyDisplay: currency === 'USD' ? 'symbol' : 'code', ...opts }).format(n);
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency, currencyDisplay: 'symbol', ...opts }).format(n);
   } catch {
     return `${currency} ${Math.round(n).toLocaleString('en-US')}`;
   }
@@ -114,13 +114,13 @@ export const NO_MAKE = 'NO MAKE';
 
 // Disjoint ranges of the current bid in US dollars; missing is not zero.
 export const BID_BUCKETS = [
-  { id: 'under10k', label: 'Under $10,000' },
-  { id: '10k25k', label: '$10,000–24,999' },
-  { id: '25k50k', label: '$25,000–49,999' },
-  { id: '50k100k', label: '$50,000–99,999' },
-  { id: '100kplus', label: '$100,000+' },
-  { id: 'unknown', label: 'Unrecorded' },
-  { id: 'otherCurrency', label: 'Bid in another currency' },
+  { id: 'under10k', label: 'Under $10K' },
+  { id: '10k25k', label: '$10K–25K' },
+  { id: '25k50k', label: '$25K–50K' },
+  { id: '50k100k', label: '$50K–100K' },
+  { id: '100kplus', label: '$100K+' },
+  { id: 'unknown', label: 'No bid recorded' },
+  { id: 'otherCurrency', label: 'Other currency' },
 ] as const;
 export type BidBucket = typeof BID_BUCKETS[number]['id'];
 

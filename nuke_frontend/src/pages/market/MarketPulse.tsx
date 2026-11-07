@@ -10,7 +10,7 @@ import { BAT_HOUSE, BID_BUCKETS, bidBucket, currentBidDistribution, houseName, l
 import { HouseMark, HouseMarket, houseWeekChange, useHouseShare } from './HouseShare';
 import RecordedSalesComparison, { MarketScopeControls, type MarketSalesLens } from './RecordedSalesComparison';
 import { MakeLogo } from '../../components/common/MakeIdentity';
-import { selectRowFacts, useMarketRowDetails, useMarketRowSpecs, vehicleIdentity, type LotInspection, type MarketRowDetails } from './useMarketRowDetails';
+import { displayMake, selectRowFacts, useMarketRowDetails, useMarketRowSpecs, vehicleIdentity, type LotInspection, type MarketRowDetails } from './useMarketRowDetails';
 import { useFinishEstimates, type FinishEstimate } from './useFinishEstimates';
 import { ringBids, startBidChime } from './bidChime';
 import { matchesEraRange } from '../../lib/market/familyEras';
@@ -339,15 +339,10 @@ function BoardRow({ a, risen, stale, detail, expanded, finish, showHouse, onInsp
   // estimate use. The listing event's recorded price and the bid rows can trail it by hours (2026-10-15: a GT2 RS read
   // $582,000 on the board at 03:15Z while its event said $467,000 from 23:02Z).
   const bidReading = a;
-  // A row says what the photo cannot: the time left, the bid and its pace, and no reserve. The venue is the page's.
+  // A row says what the photo cannot: the car, the bid and its pace, then one line with the house, the time left and
+  // no reserve.
   return (
     <div ref={rowRef} className="market-lot-row" data-vehicle-id={a.id} data-expanded={expanded}>
-      <div className="market-lot-close">
-        <Text role="label">Closes in</Text>
-        <Countdown endsAt={a.endsAt} />
-        {a.noReserve && <Text role="label" className="market-no-reserve">No reserve</Text>}
-        {showHouse && <Text role="label" className="market-lot-house">{houseName(a.house, true)}</Text>}
-      </div>
       <button type="button" className="market-lot-image" onClick={() => onInspect(a, 'auction')}
         aria-label={`Inspect ${title(a)}`} aria-expanded={expanded} aria-controls={expanded ? `lot-inspection-${a.id}` : undefined}>
         <Thumb src={a.imageUrl} />
@@ -357,6 +352,11 @@ function BoardRow({ a, risen, stale, detail, expanded, finish, showHouse, onInsp
           aria-expanded={expanded} aria-controls={expanded ? `lot-inspection-${a.id}` : undefined}><Text role="entity">{title(a)}</Text></button>
         <div className="market-lot-facts">
           {facts.map(f => <Text role="body" key={f.field} title={`${f.label}: ${f.value}${f.conflict ? ' · reports differ' : ''}`}>{f.value}</Text>)}
+        </div>
+        <div className="market-lot-close">
+          {showHouse && <Text role="label" className="market-lot-house">{houseName(a.house, true)}</Text>}
+          <span className="market-lot-ends"><Countdown endsAt={a.endsAt} /> <Text role="label">left</Text></span>
+          {a.noReserve && <Text role="label" className="market-no-reserve">No reserve</Text>}
         </div>
       </div>
       <button type="button" className="market-lot-metrics" onClick={() => onInspect(a, 'auction')}
@@ -429,7 +429,6 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
   const boardRef = useRef<HTMLDivElement>(null);
-  const focusBoardPage = useRef(false);
 
   const makeParam = params.get('make')?.toUpperCase();
   const view = params.get('view') === 'sales' ? 'sales' : 'inventory';
@@ -633,23 +632,28 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
     return rows;
   }, [scoped, selectedBid, sort, model, inventoryLens.group, inventoryLens.inside, inventoryLens.focus, inventoryLens.child, taxonomy, pinnedAuction, activityId]);
 
-  // One page of the board. A link to a lot opens its page; a filter change returns to the first page.
+  // The board scrolls on: PAGE more lots load as the viewer nears the end. board=n in the URL says how many pages are
+  // loaded, so a shared link reopens as deep; a link to a lot loads through the lot. A filter change starts at the top.
   const pages = Math.max(1, Math.ceil(board.length / PAGE));
   const boardParam = Number(params.get('board'));
   const selectedIndex = activityId ? board.findIndex(a => a.id === activityId) : -1;
-  const page = Number.isInteger(boardParam) && boardParam >= 1 ? Math.min(boardParam, pages)
-    : selectedIndex >= 0 ? Math.floor(selectedIndex / PAGE) + 1 : 1;
-  const pageRows = useMemo(() => board.slice((page - 1) * PAGE, page * PAGE), [board, page]);
-  useLayoutEffect(() => {
-    if (!focusBoardPage.current || isLoading || mapFilterPending) return;
-    focusBoardPage.current = false;
-    boardRef.current?.scrollIntoView({ block: 'start' });
-    (boardRef.current?.querySelector<HTMLButtonElement>('.market-lot-name') ?? boardRef.current)?.focus();
-  }, [page, pageRows, isLoading, mapFilterPending]);
-  const goToPage = (n: number) => {
-    focusBoardPage.current = true;
-    setParam('board', String(n));
+  const page = Math.max(Number.isInteger(boardParam) && boardParam >= 1 ? Math.min(boardParam, pages) : 1,
+    selectedIndex >= 0 ? Math.floor(selectedIndex / PAGE) + 1 : 1);
+  const pageRows = useMemo(() => board.slice(0, page * PAGE), [board, page]);
+  const loadMore = () => {
+    if (page >= pages) return;
+    const next = new URLSearchParams(params); next.set('board', String(page + 1));
+    setParams(next, { replace: true, preventScrollReset: true });
   };
+  const moreRef = useRef<HTMLDivElement>(null);
+  const loadMoreRef = useRef(loadMore); loadMoreRef.current = loadMore;
+  useEffect(() => {
+    const node = moreRef.current;
+    if (!node || typeof IntersectionObserver === 'undefined') return;
+    const io = new IntersectionObserver((entries) => { if (entries.some(e => e.isIntersecting)) loadMoreRef.current(); }, { rootMargin: '600px 0px' });
+    io.observe(node);
+    return () => io.disconnect();
+  }, [page, pages, isLoading, mapFilterPending]);
 
 
   // The page as a document. The venue is the entity. Its live total is the page's one figure, stated once against the
@@ -700,7 +704,7 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
     </button> : undefined}>
       {view === 'inventory' ? <span className="market-venue">
         {house && <img className="market-venue__mark" src={house === BAT_HOUSE ? '/vendor/bat/favicon.ico' : `/source-logos/${house}.png`} alt="" width={32} height={32} />}
-        <Text role="entity" as="h1">{house ? houseName(house) : 'Live auctions'}{make ? ` · ${make}${familyName && !model ? ` · ${familyName}` : ''}${era ? ` · ${era.replace('-', '–')}` : ''}` : ''}</Text>
+        <Text role="entity" as="h1">{house ? houseName(house) : 'Live auctions'}{make ? ` · ${displayMake(make)}${familyName && !model ? ` · ${familyName}` : ''}${era ? ` · ${era.replace('-', '–')}` : ''}` : ''}</Text>
         {house ? <Text role="label">Live auctions</Text> : <span className="market-venue__marks" aria-label={boardHouses.map(h => houseName(h, true)).join(', ')}>{boardHouses.map(h => <HouseMark key={h} house={h} height={16} />)}</span>}
       </span> : <Text role="entity" as="h1">Recorded sales</Text>}
     </Masthead>
@@ -769,7 +773,7 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
       {make && <nav aria-label="Inventory drill path" className="market-drill">
         <button type="button" className="market-control" onClick={() => setParam('make', null)}><Text role="label">All makes</Text></button>
         <span aria-hidden="true">→</span>
-        <button type="button" className="market-control market-control--make" onClick={() => setParam('model', null)}><MakeLogo make={make} /><Text role="label">{make}</Text></button>
+        <button type="button" className="market-control market-control--make" onClick={() => setParam('model', null)}><MakeLogo make={make} /><Text role="label">{displayMake(make)}</Text></button>
         {model && <><span aria-hidden="true">→</span><Text role="body">{model}</Text></>}
       </nav>}
 
@@ -802,23 +806,20 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
                 <Text role="label">{s.label}</Text>
               </button>
             ))}
-            <button type="button" className="market-control" aria-pressed={sound}
+            <button type="button" className="market-control market-control--sound" aria-pressed={sound}
               title="A short bell for each Bring a Trailer bid as it lands, about a minute after BaT records it; the other houses ring no bell"
               onClick={() => setSound(sound ? false : startBidChime())}>
               <Text role="label">{sound ? 'Bid sounds on' : 'Bid sounds off'}</Text>
             </button>
           </div>
         </div>
-        {!isLoading && <details open={selectedBid != null} className="market-distribution">
-          <summary><Text role="label">Filter by bid</Text></summary>
-          <BidDistribution distribution={distribution} lots={scoped.length} scope={`${make ?? 'All makes'} · ${WINDOWS.find(w => w.id === win)?.label}`} selected={selectedBid} onSelect={b => setParam('bidRange', selectedBid === b ? null : b)} fetchedAt={dataUpdatedAt} />
-        </details>}
-        {filtered && !mapFilterPending && <Text role="caption" as="div" className="market-board__scope">
-          {`${board.filter(a => a.endsAt > now).length.toLocaleString('en-US')} of ${live.length.toLocaleString('en-US')} lots`}
-          {house ? ` · ${houseName(house, true)}` : ''}{make ? ` · ${make}` : ''}{model ? ` · ${model}` : ''}
-          {win !== 'all' ? ` · ${WINDOWS.find((w) => w.id === win)?.label}` : ''}
-          {selectedBid ? ` · ${BID_BUCKETS.find(b => b.id === selectedBid)?.label}` : ''}
-        </Text>}
+        {!isLoading && <BidDistribution distribution={distribution} lots={scoped.length} selected={selectedBid} onSelect={b => setParam('bidRange', selectedBid === b ? null : b)} />}
+        {filtered && !mapFilterPending && <div className="market-board__scope">
+          <Text role="body">Showing <strong>{board.filter(a => a.endsAt > now).length.toLocaleString('en-US')}</strong> of {live.length.toLocaleString('en-US')} live lots</Text>
+          <Text role="caption">{[house ? houseName(house, true) : null, make ? displayMake(make) : null, model,
+            win !== 'all' ? WINDOWS.find((w) => w.id === win)?.label : null,
+            selectedBid ? BID_BUCKETS.find(b => b.id === selectedBid)?.label : null].filter(Boolean).join(' · ')}</Text>
+        </div>}
         {mapFilterPending && <Text role="caption" as="div" className="market-board__scope">Reading classifications…</Text>}
         {!isLoading && !mapFilterPending && board.length === 0 && <div role="status" className="market-board__empty">No open lots match these filters. <button type="button" className="market-control" onClick={() => {
           const next = new URLSearchParams(params);
@@ -830,12 +831,13 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
         {isLoading || mapFilterPending ? null : <Board rows={pageRows} risenIds={risenIds} stale={syncBehind} showHouse={boardHouses.length > 1}
           activityId={activityId} finishes={finish.data?.byId} inspection={inspection} onInspect={openActivity} onInspectionChange={setInspection} onClose={closeActivity} />}
         {!isLoading && !mapFilterPending && board.length > 0 && (
-          <nav className="market-board-pager" aria-label="Board pages">
-            <Text role="caption">{`${((page - 1) * PAGE + 1).toLocaleString('en-US')}–${Math.min(page * PAGE, board.length).toLocaleString('en-US')} of ${board.length.toLocaleString('en-US')} lots`}</Text>
-            {page > 1 && <button type="button" className="market-board-page" aria-label={`Previous ${PAGE} lots`} onClick={() => goToPage(page - 1)}><Text role="label">← Previous {PAGE}</Text></button>}
-            {page < pages && <button type="button" className="market-board-page" aria-label={`Next ${PAGE} lots`} onClick={() => goToPage(page + 1)}><Text role="label">Next {PAGE} →</Text></button>}
-          </nav>
+          <div ref={moreRef} className="market-board-more">
+            {page < pages
+              ? <button type="button" className="market-board-page" onClick={loadMore}><Text role="label">Loading more · {pageRows.length.toLocaleString('en-US')} of {board.length.toLocaleString('en-US')}</Text></button>
+              : <Text role="caption">All {board.length.toLocaleString('en-US')} {board.length === 1 ? 'lot' : 'lots'} shown</Text>}
+          </div>
         )}
+        {!isLoading && <BoardNotes fetchedAt={dataUpdatedAt} />}
       </section>
       </div>
       </>}
@@ -843,41 +845,42 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
   );
 }
 
-function BidDistribution({ distribution, lots, scope, selected, onSelect, fetchedAt }: {
-  distribution: ReturnType<typeof currentBidDistribution>; lots: number; scope: string;
-  selected: BidBucket | null; onSelect: (b: BidBucket) => void; fetchedAt: number;
+// The current bids as filter chips, one per range with its lot count and a bar for its share; a range with no lots is
+// not offered. Dollar ranges add only bids recorded in US dollars; a bid in another currency has its own chip.
+function BidDistribution({ distribution, lots, selected, onSelect }: {
+  distribution: ReturnType<typeof currentBidDistribution>; lots: number;
+  selected: BidBucket | null; onSelect: (b: BidBucket) => void;
 }) {
+  const most = Math.max(1, ...BID_BUCKETS.map(b => distribution.counts[b.id]));
   return (
-    <section aria-label="Current bid distribution" className="market-distribution__body">
-      <div className="market-distribution__head">
-        <Text role="label">{scope}</Text>
-        <Text role="body">{distribution.recorded.toLocaleString('en-US')} of {lots.toLocaleString('en-US')} lots have a recorded bid number</Text>
-      </div>
-      {lots === 0 && <div role="status" className="k-body">No open lots in this scope.</div>}
-      <div className="market-distribution__bars">
-        {BID_BUCKETS.map(b => {
+    <section aria-label="Current bid distribution" className="market-distribution"
+      title={`${distribution.recorded.toLocaleString('en-US')} of ${lots.toLocaleString('en-US')} lots have a bid recorded in US dollars`}>
+      <Text role="label" className="market-distribution__label">Current bid</Text>
+      {lots === 0 && <Text role="caption">No open lots in this scope.</Text>}
+      <div role="group" aria-label="Filter by current bid" className="market-chips">
+        {BID_BUCKETS.filter(b => distribution.counts[b.id] > 0 || selected === b.id).map(b => {
           const n = distribution.counts[b.id];
-          const pct = lots > 0 ? n / lots * 100 : 0;
           return (
-            <button key={b.id} type="button" className="market-bucket" disabled={n === 0 && selected !== b.id} aria-pressed={selected === b.id}
-              aria-label={`${b.label}: ${n} of ${lots} lots. Show supporting lots`}
-              onClick={() => onSelect(b.id)}>
-              <Text role="body" className="market-bucket__label">{b.label}</Text>
-              <svg aria-hidden="true" className="market-bucket__track" viewBox="0 0 100 1" preserveAspectRatio="none"><rect x="0" y="0" width={pct} height="1" /></svg>
-              <Text role="measure" className="market-bucket__count">{n} · {pct.toFixed(1)}%</Text>
+            <button key={b.id} type="button" className={`market-chip market-bucket${b.id === 'unknown' || b.id === 'otherCurrency' ? ' market-bucket--apart' : ''}`}
+              aria-pressed={selected === b.id} aria-label={`${b.label}: ${n} of ${lots} lots`} onClick={() => onSelect(b.id)}>
+              <Text role="label">{b.label}</Text> <Text role="measure" dense>{n.toLocaleString('en-US')}</Text>
+              <span aria-hidden="true" className="market-bucket__bar" style={{ width: `${(n / most) * 100}%` }} />
             </button>
           );
         })}
       </div>
-      <Text role="caption" as="div" className="market-distribution__note">
-        Current bids in US dollars as recorded; a bid in another currency is counted apart, never converted. Choose a range to see its lots.
-      </Text>
-      <details className="market-notes">
-        <summary><Text role="label">Scope, source and timing</Text></summary>
-        <p className="k-body">One public, undeleted vehicle record marked live at Bring a Trailer, Collecting Cars or PCarMarket with a recorded end in the future (Cars & Bids joins while its reader runs; Bonhams lots carry no live bid and sit on the auction calendar). Make, house and auction-window filters define this distribution; selecting a bid range narrows the supporting list. Each bar counts lots, including unrecorded bids in the denominator. A recorded zero stays zero.</p>
-        <p className="k-body">These are current bids, not sold prices or a valuation. Condition, restoration and build class are not matched. Open a lot's Nuke record for evidence or its listing link for the attributed source.</p>
-        <p className="k-body">Board fetched {clock(fetchedAt)}. Latest record write is a vehicle-row update by any writer. Source read time and bid event time are unavailable in the full board reader; the bounded Ending next panel exposes captured source clocks separately. The houses' boards are scheduled reads (BaT every minute, the others every five); a schedule does not prove freshness.</p>
-      </details>
     </section>
+  );
+}
+
+// How the board is counted, in three plain lines, closed until asked.
+function BoardNotes({ fetchedAt }: { fetchedAt: number }) {
+  return (
+    <details className="market-notes">
+      <summary><Text role="label">How this board is counted</Text></summary>
+      <Text role="body" as="p">Every lot open now at Bring a Trailer, Collecting Cars and PCarMarket with its closing time still ahead.</Text>
+      <Text role="body" as="p">Bids are current bids, not sale prices or values. A bid in euros or pounds is shown in its own currency and never converted or added to dollar totals.</Text>
+      <Text role="body" as="p">Board read {clock(fetchedAt)}. The houses are read on a schedule (BaT every minute, the others every five), so a bid can trail the house by a few minutes.</Text>
+    </details>
   );
 }
