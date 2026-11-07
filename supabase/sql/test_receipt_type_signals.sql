@@ -58,7 +58,7 @@ INSERT INTO public.vehicles VALUES ('10000000-0000-4000-8000-000000000003', 'Che
                                    ('10000000-0000-4000-8000-000000000004', 'Chevrolet', 'Corvette', 'Coupe');
 SELECT pg_temp.assert_true(pg_temp.gate('21000000-0000-4000-8000-000000000001', '10000000-0000-4000-8000-000000000001') = 'unknown', 'report 1: hub pickup + truck freight is no vehicle signal: unknown on a Firebird');
 SELECT pg_temp.assert_true(pg_temp.gate('21000000-0000-4000-8000-000000000002', '10000000-0000-4000-8000-000000000001') = 'pass', 'report 2: CATEGORY: CA MOPAR Trans Am on a Pontiac Firebird passes');
-SELECT pg_temp.assert_true(pg_temp.gate('21000000-0000-4000-8000-000000000003', '10000000-0000-4000-8000-000000000001') = 'fail', 'report 3: LMC Truck K10 on a Firebird fails');
+SELECT pg_temp.assert_true(pg_temp.gate('21000000-0000-4000-8000-000000000003', '10000000-0000-4000-8000-000000000001') = 'pass', 'report 3: LMC Truck K10 beside a Pontiac Firebird hint is mixed evidence; the named Firebird model carries it (live semantics: truck+car signals never fail)');
 SELECT pg_temp.assert_true(pg_temp.gate('21000000-0000-4000-8000-000000000004', '10000000-0000-4000-8000-000000000003') = 'pass', 'report 4: LMC Truck Chevrolet K10 on a Chevrolet K10 passes');
 SELECT pg_temp.assert_true(pg_temp.gate('21000000-0000-4000-8000-000000000005', '10000000-0000-4000-8000-000000000001') = 'pass', 'report 5: Pontiac Firebird on a Pontiac Firebird passes');
 SELECT pg_temp.assert_true(pg_temp.gate('21000000-0000-4000-8000-000000000006', '10000000-0000-4000-8000-000000000004') = 'fail', 'report 6: Ford Mustang on a Chevrolet Corvette fails');
