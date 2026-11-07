@@ -162,7 +162,7 @@ CREATE FUNCTION fx_step(n int, step int) RETURNS jsonb LANGUAGE sql AS $$
    jsonb_array_elements(d.evidence->'chain') c WHERE (c->>'step')::int = step $$;
 CREATE FUNCTION fx_role(n int) RETURNS text LANGUAGE sql AS $$
  SELECT derived_role FROM derive_vehicle_relationships('00000000-0000-4000-8000-000000000001', fx(n)) $$;
-INSERT INTO vehicles(id,is_public,year,make,model) SELECT fx(g), true, 1984, 'Chevrolet', 'Suburban' FROM generate_series(1,12) g;
+INSERT INTO vehicles(id,is_public,year,make,model) SELECT fx(g), true, 1984, 'Fixturemake'||g, 'Suburban' FROM generate_series(1,12) g;  -- distinct makes: fixtures are not duplicates of each other
 
 -- step 2: a matched listing whose seller is an organization makes the vehicle that organization's inventory
 SELECT fx_photo(1); SELECT fx_obs(1, fixture_claim('{owner_current}',false,false,'2010-01-01'), 'owned since 2010');
@@ -208,8 +208,9 @@ SELECT fixture_assert((fx_step(8,3)->'evidence'->>'decides')::boolean AND (fx_st
 SELECT fixture_assert(fx_role(8)='contributor','shoot without a listing: contributor at the organization');
 SELECT fixture_assert((SELECT evidence->>'organization_inventory' FROM derive_vehicle_relationships(:'u',fx(8))) IS NULL,'GPS alone never makes org inventory');
 -- 11: same burst, vehicle not linked to either organization -> ambiguous, confidence halved
-SELECT fx_burst(11, 6, now() - interval '5 months', 36.17010, -115.14000);
+SELECT fx_burst(11, 6, now() - interval '7 months', 36.17010, -115.14000);  -- own time window: no other vehicle shot nearby
 SELECT fixture_assert((fx_step(11,3)->'evidence'->>'ambiguous')::boolean AND (fx_step(11,3)->>'confidence')::numeric=0.25,'unlinked vehicle between two orgs is ambiguous, halved');
+SELECT fixture_assert(fx_role(11)='contributor' AND jsonb_array_length(fx_step(11,3)->'evidence'->'organizations')=2 AND NOT (fx_step(11,3)->'evidence'->>'tie_break_decided')::boolean,'ambiguous shoot: contributor, both organizations cited');
 -- 12: same burst and Viva lists the vehicle -> business_handling
 INSERT INTO bat_listings(vehicle_id,organization_id,bat_listing_url) VALUES (fx(12),:'viva','https://bringatrailer.com/listing/y/');
 SELECT fx_burst(12, 6, now() - interval '5 months', 36.17010, -115.14000);
@@ -221,7 +222,7 @@ SELECT fixture_assert(fx_step(9,3)->'evidence'->>'pattern'='long_term_personal' 
 SELECT fixture_assert(fx_role(9)='documenting','long-term personal pattern stays documenting');
 -- too few photos, or more than two sessions, are not a shoot
 CREATE FUNCTION fx_vehicles(a int, b int) RETURNS void LANGUAGE sql AS $$
- INSERT INTO vehicles(id,is_public,year,make,model) SELECT fx(g), true, 2001, 'Fixturemake', 'Fixture' FROM generate_series(a,b) g $$;
+ INSERT INTO vehicles(id,is_public,year,make,model) SELECT fx(g), true, 2001, 'Fixturemake'||g, 'Fixture' FROM generate_series(a,b) g $$;
 SELECT fx_vehicles(13,60);
 SELECT fx_burst(13, 3, now() - interval '5 months', 36.17010, -115.14000);
 SELECT fixture_assert(fx_role(13)='documenting' AND fx_step(13,3)->'evidence'->>'pattern'='at_organization','three photos at an org is not a shoot');
@@ -352,6 +353,42 @@ SELECT fixture_assert((SELECT confidence FROM derive_vehicle_relationships(:'u',
 SELECT fx_photo(58);
 SELECT fx_stmt(58,'{owner_current}','authorized_agent',now(),'I have owned it since 2010',:'u','2010-01-01');
 SELECT fixture_assert((SELECT confidence FROM derive_vehicle_relationships(:'u',fx(58)))=0.85 AND (fx_step(58,5)->'evidence'->>'first_person')::boolean,'quoted first-person statement attributed to the account counts as first-person');
+
+-- ===== a contributor / permission row is not evidence by itself =====
+SELECT fx_vehicles(61,70);
+INSERT INTO vehicle_contributors(vehicle_id,user_id) VALUES (fx(61),:'u');                                -- no photo at all
+INSERT INTO vehicle_images(vehicle_id,user_id,image_url,exif_data) VALUES (fx(62),:'u','p',NULL),(fx(63),:'u','p',NULL);
+INSERT INTO vehicle_user_permissions(vehicle_id,user_id,role,granted_by) VALUES (fx(62),:'u','contributor',NULL),(fx(63),:'u','photographer',:'u');
+INSERT INTO vehicle_contributors(vehicle_id,user_id) VALUES (fx(63),:'u');
+SELECT fixture_assert(fx_role(61)='imported_by_user' AND fx_role(62)='imported_by_user' AND fx_role(63)='imported_by_user','contributor / permission rows (any role, self-granted or granted_by null) with no own-device photo, org link, title or statement: imported_by_user');
+SELECT fx_photo(64);
+INSERT INTO vehicle_contributors(vehicle_id,user_id) VALUES (fx(64),:'u');
+SELECT fixture_assert(fx_role(64)='documenting','own-device photos decide; the contributor row adds nothing');
+
+-- ===== shoot at one of two organizations: tie-breaks =====
+-- 65: unlinked, shot in the same sessions as vehicles linked to Viva (8, 12) -> Viva by session co-occurrence
+SELECT fx_burst(65, 6, now() - interval '5 months', 36.17010, -115.14000);
+SELECT fixture_assert(fx_step(65,3)->'evidence'->>'organization_id'=:'viva' AND NOT (fx_step(65,3)->'evidence'->>'ambiguous')::boolean
+  AND (fx_step(65,3)->'evidence'->>'tie_break_decided')::boolean AND (fx_step(65,3)->'evidence'->>'session_cooccurrence_links')::int>=1
+  AND fx_role(65)='contributor' AND (fx_step(65,3)->>'confidence')::numeric=0.5,'co-occurrence with the other vehicles of the same sessions picks the organization');
+-- 66: appears in a listing (organization unknown), no co-occurrence: dealer beats restoration_shop
+ALTER TABLE organizations ADD COLUMN business_type text;
+UPDATE organizations SET business_type='restoration_shop' WHERE id=:'viva';
+UPDATE organizations SET business_type='dealer' WHERE id=:'ernies';
+INSERT INTO bat_listings(vehicle_id,seller_username,bat_listing_url) VALUES (fx(66),'unknownseller123','https://bringatrailer.com/listing/unlinked66/');
+SELECT fx_burst(66, 6, now() - interval '9 months', 36.17010, -115.14000);
+SELECT fixture_assert(fx_step(66,3)->'evidence'->>'organization_id'=:'ernies' AND NOT (fx_step(66,3)->'evidence'->>'ambiguous')::boolean
+  AND fx_role(66)='contributor','listed vehicle: dealer / auction outranks restoration_shop');
+UPDATE organizations SET business_type=NULL WHERE id IN (:'viva',:'ernies');
+
+-- ===== a statement on a high-score duplicate applies to the whole cluster =====
+UPDATE vehicles SET year=1990, make='Dupmake', model='Dupmodel' WHERE id IN (fx(67),fx(68));
+UPDATE vehicles SET year=1993, make='Dupmake', model='Dupmodel' WHERE id=fx(69);   -- year 3 off: not a candidate
+SELECT fx_obs(67, fixture_claim('{owner_current}'), 'I own it');                    -- photo-less duplicate
+SELECT fx_photo(68); SELECT fx_photo(69);
+SELECT fixture_assert(fx_role(68)='owner_reported' AND (fx_step(68,5)->'evidence'->>'statement_vehicle_id')=fx(67)::text
+  AND (fx_step(68,5)->'evidence'->>'statement_from_duplicate')::boolean,'statement on a photo-less duplicate reaches the photo-rich record');
+SELECT fixture_assert(fx_role(69)='documenting','a vehicle that is not a duplicate does not inherit the statement');
 
 -- every row carries the five-step chain with an eliminated list
 SELECT fixture_assert(NOT EXISTS (SELECT 1 FROM derive_vehicle_relationships(:'u') d
