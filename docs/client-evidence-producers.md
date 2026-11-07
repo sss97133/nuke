@@ -1,7 +1,7 @@
 # Client evidence producers (mail intake, timeline, labor)
 
 Code: `scripts/client_evidence/` (Python stdlib only). Tests: `python3 scripts/client_evidence/test_client_evidence.py`
-(synthetic fixtures only; runs in `frontend-tests`). All entry points are **dry-run**; none executed against production.
+(synthetic fixtures only; not yet wired into CI, which needs a token with `workflow` scope). All entry points are **dry-run**; none executed against production.
 
 ## What exists and what it extends
 - **Writer reused, nothing minted.** Mail attachments land through the existing private `financial_evidence_v1` path
