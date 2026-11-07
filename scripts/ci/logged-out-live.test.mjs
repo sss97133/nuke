@@ -25,7 +25,7 @@ async function probe({ timeout = false, navigationFailure = false, refused = fal
           goto: async (target) => {
             // A visitor on a private page is sent to /login, unless the fixture says the page opened for them.
             current = String(target);
-            const privateRoute = /^https:\/\/fixture\.invalid\/(accounting|publishing\/finance|profile)$/.test(current);
+            const privateRoute = /^https:\/\/fixture\.invalid\/(accounting|publishing\/finance|profile|capture\/ledger)$/.test(current);
             if (privateRoute && !privateOpen) current = 'https://fixture.invalid/login?returnUrl=%2Fprivate';
             if (privateRoute && booksCall) handlers.get('request')?.({ url: () => 'https://fixture.supabase.co/rest/v1/rpc/books_gate_status', method: () => 'POST' });
             handlers.get('response')?.({
