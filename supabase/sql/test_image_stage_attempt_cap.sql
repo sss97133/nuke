@@ -21,7 +21,8 @@ CREATE FUNCTION cron.schedule(job text, sched text, cmd text) RETURNS bigint LAN
 -- Live shapes (the columns the queue reads).
 CREATE TABLE public.vehicle_images(id uuid PRIMARY KEY, user_id uuid, vehicle_id uuid, image_url text, created_at timestamptz NOT NULL DEFAULT now(),
   is_duplicate boolean DEFAULT false, is_sensitive boolean, is_external boolean, is_superseded boolean, vision_gate_status text,
-  ai_processing_status text, ai_scan_metadata jsonb, exif_data jsonb);
+  ai_processing_status text, ai_scan_metadata jsonb, exif_data jsonb,
+  updated_at timestamptz NOT NULL DEFAULT now(), ai_retry_count int NOT NULL DEFAULT 0);
 CREATE TABLE public.platform_config(config_key text PRIMARY KEY, config_value jsonb, description text);
 CREATE TABLE public.photo_pipeline_provider_state(provider text PRIMARY KEY, blocked_until timestamptz, consecutive_failures int NOT NULL DEFAULT 0,
   last_http_status int, last_error_class text, note text, updated_at timestamptz NOT NULL DEFAULT now(), max_concurrency int NOT NULL DEFAULT 8);
@@ -39,6 +40,7 @@ SELECT ('00000000-0000-0000-0000-0000000000' || lpad(n::text, 2, '0'))::uuid, ge
        now() - interval '1 day' - n * interval '1 minute', 'completed'
 FROM generate_series(1, 12) n;
 
+\ir ../migrations/20261109000500_photo_pipeline_backoff.sql   -- real order: the janitor's prior definition predates the stage queue
 \ir ../migrations/20261112090000_image_stage_receipts_reconciler.sql
 \ir ../migrations/20261112110000_image_stage_attempt_cap.sql
 
@@ -335,6 +337,36 @@ BEGIN
     VALUES (f, 'filing', 'photo-pipeline-orchestrator', 1, 'succeeded', 99, now());
     PERFORM t_assert(false, 'retry_after on succeeded is refused');
   EXCEPTION WHEN check_violation THEN PERFORM t_assert(true, 'retry_after on succeeded is refused'); END;
+END $$;
+
+-- ===== 9. the hourly janitor does not re-pay for a saved classification (migration 20261112140000)
+\ir ../migrations/20261112140000_reset_stuck_skip_classified.sql
+INSERT INTO public.vehicle_images(id, user_id, image_url, created_at, ai_processing_status, updated_at, ai_scan_metadata)
+SELECT ('00000000-0000-0000-0000-0000000000' || lpad(n::text, 2, '0'))::uuid, gen_random_uuid(), 'https://example.test/' || n || '.jpg',
+       now() - interval '1 day', 'failed', now() - interval '1 hour',
+       CASE WHEN n = 33 THEN '{"classification":{"classifier_ok":true}}'::jsonb END
+FROM generate_series(31, 34) n;
+DO $$
+DECLARE
+  plain uuid := '00000000-0000-0000-0000-000000000031'; rcpt uuid := '00000000-0000-0000-0000-000000000032';
+  legacy uuid := '00000000-0000-0000-0000-000000000033'; failcl uuid := '00000000-0000-0000-0000-000000000034';
+  res record;
+BEGIN
+  PERFORM public.record_image_stage_receipt(rcpt, 'classifier', 1, 'succeeded');
+  PERFORM public.record_image_stage_receipt(failcl, 'classifier', 1, 'failed', 'classifier_failed');
+  UPDATE public.vehicle_images SET ai_processing_status = 'completed' WHERE id NOT IN (plain, rcpt, legacy, failcl) AND ai_processing_status = 'failed';
+  SELECT * INTO res FROM public.reset_stuck_photo_pipeline_images();
+  PERFORM t_assert(res.requeued_failed = 2, 'only the 2 failed images with no saved classification are re-armed');
+  PERFORM t_assert((SELECT ai_processing_status FROM public.vehicle_images WHERE id = plain) = 'pending', 'failed, never classified: back to pending (unchanged behaviour)');
+  PERFORM t_assert((SELECT ai_processing_status FROM public.vehicle_images WHERE id = failcl) = 'pending', 'failed classifier receipt: still re-armed (unchanged behaviour)');
+  PERFORM t_assert((SELECT ai_processing_status FROM public.vehicle_images WHERE id = rcpt) = 'failed'
+                   AND (SELECT ai_retry_count FROM public.vehicle_images WHERE id = rcpt) = 0, 'succeeded classifier receipt: left failed for the filing/evidence runners, no retry burnt');
+  PERFORM t_assert((SELECT ai_processing_status FROM public.vehicle_images WHERE id = legacy) = 'failed', 'legacy saved classification (classifier_ok): left failed, no paid reclassify');
+  -- other guards keep working: terminal retry state still blocks
+  UPDATE public.vehicle_images SET ai_processing_status = 'failed', updated_at = now() - interval '1 hour' WHERE id = plain;
+  INSERT INTO public.photo_pipeline_retry_state(image_id, terminal) VALUES (plain, true);
+  SELECT * INTO res FROM public.reset_stuck_photo_pipeline_images();
+  PERFORM t_assert((SELECT ai_processing_status FROM public.vehicle_images WHERE id = plain) = 'failed', 'terminal retry state still blocks the reset');
 END $$;
 
 DO $$ BEGIN RAISE NOTICE 'ALL image_stage_attempt_cap CHECKS PASSED'; END $$;
