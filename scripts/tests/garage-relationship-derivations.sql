@@ -15,7 +15,7 @@ CREATE TABLE public.vehicles(id uuid PRIMARY KEY, user_id uuid, merged_into_vehi
  vin text, bat_seller text, origin_metadata jsonb, bat_auction_url text, listing_url text);
 CREATE TABLE public.vehicle_images(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid, user_id uuid, documented_by_user_id uuid,
  image_url text, created_at timestamptz DEFAULT now(), taken_at timestamptz, latitude numeric, longitude numeric,
- device_fingerprint text, source text,
+ device_fingerprint text, source text, storage_path text, automation_script text,
  exif_data jsonb DEFAULT '{"camera_make":"Apple","camera_model":"iPhone 15 Pro","source_type":"user_library"}',
  ai_detected_vehicle jsonb, vehicle_year integer, image_vehicle_match_status text, merged_from_vehicle_id uuid);
 CREATE TABLE public.platform_config(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), config_key text UNIQUE NOT NULL,
@@ -34,9 +34,14 @@ CREATE TABLE public.vehicle_ownerships(vehicle_id uuid, owner_profile_id uuid, i
 CREATE TABLE public.discovered_vehicles(vehicle_id uuid, user_id uuid, is_active boolean, relationship_type text);
 CREATE TABLE public.vehicle_contributors(vehicle_id uuid, user_id uuid);
 CREATE TABLE public.nuke_estimates(vehicle_id uuid, estimated_value numeric, comp_method text, calculated_at timestamptz);
+CREATE TYPE public.observation_kind AS ENUM ('provenance','media');
 CREATE TABLE public.vehicle_observations(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid, submitted_by_user_id uuid,
  content_text text, structured_data jsonb, is_superseded boolean DEFAULT false, observed_at timestamptz DEFAULT now(),
- ingested_at timestamptz DEFAULT now());
+ ingested_at timestamptz DEFAULT now(),
+ subject_type text, subject_id uuid, property_id uuid, source_id uuid, source_identifier text, content_hash text, observer_raw jsonb,
+ extraction_method text, kind public.observation_kind, confidence text, confidence_score numeric);
+CREATE TABLE public.observation_sources(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), slug text UNIQUE);
+INSERT INTO public.observation_sources(slug) VALUES ('owner-input');
 CREATE FUNCTION public.vehicle_image_gallery_eligible(vehicle_images) RETURNS boolean LANGUAGE sql AS $$ SELECT true $$;
 -- Stand-in for the reviewed live reader (the migration's hash guard is stripped below).
 CREATE FUNCTION public.get_user_garage(p_user_id uuid)
@@ -210,6 +215,9 @@ SELECT fixture_assert((SELECT evidence->>'organization_inventory' FROM derive_ve
 -- 11: same burst, vehicle not linked to either organization -> ambiguous, confidence halved
 SELECT fx_burst(11, 6, now() - interval '7 months', 36.17010, -115.14000);  -- own time window: no other vehicle shot nearby
 SELECT fixture_assert((fx_step(11,3)->'evidence'->>'ambiguous')::boolean AND (fx_step(11,3)->>'confidence')::numeric=0.25,'unlinked vehicle between two orgs is ambiguous, halved');
+SELECT fixture_assert(fx_role(11)='contributor' AND (SELECT confidence FROM derive_vehicle_relationships(:'u',fx(11)))<=0.2
+  AND (SELECT evidence->'flags' FROM derive_vehicle_relationships(:'u',fx(11))) ? 'org_ambiguous'
+  AND jsonb_array_length(fx_step(11,3)->'evidence'->'organizations')=2,'two organizations nothing separates: contributor <= 0.2, org_ambiguous flag, both organizations cited');
 SELECT fixture_assert(fx_role(11)='contributor' AND jsonb_array_length(fx_step(11,3)->'evidence'->'organizations')=2 AND NOT (fx_step(11,3)->'evidence'->>'tie_break_decided')::boolean,'ambiguous shoot: contributor, both organizations cited');
 -- 12: same burst and Viva lists the vehicle -> business_handling
 INSERT INTO bat_listings(vehicle_id,organization_id,bat_listing_url) VALUES (fx(12),:'viva','https://bringatrailer.com/listing/y/');
@@ -389,6 +397,98 @@ SELECT fx_photo(68); SELECT fx_photo(69);
 SELECT fixture_assert(fx_role(68)='owner_reported' AND (fx_step(68,5)->'evidence'->>'statement_vehicle_id')=fx(67)::text
   AND (fx_step(68,5)->'evidence'->>'statement_from_duplicate')::boolean,'statement on a photo-less duplicate reaches the photo-rich record');
 SELECT fixture_assert(fx_role(69)='documenting','a vehicle that is not a duplicate does not inherit the statement');
+
+-- ===== own-origin photos count as own-device without EXIF; scraped sources do not =====
+SELECT fixture_assert(own_origin_source('iphoto',NULL,NULL,:'u') AND own_origin_source('iphoto_60d',NULL,NULL,:'u')
+  AND own_origin_source('user_upload',NULL,NULL,:'u') AND own_origin_source('capture_relay_ios',NULL,NULL,:'u')
+  AND own_origin_source('photo_auto_sync',NULL,NULL,:'u') AND own_origin_source('photo_sync',NULL,NULL,:'u')
+  AND own_origin_source('drop-folder',NULL,NULL,:'u') AND own_origin_source('library_recovery',NULL,NULL,:'u')
+  AND own_origin_source('hd_archive',NULL,NULL,:'u') AND own_origin_source('daily_receipt',NULL,NULL,:'u')
+  AND own_origin_source('dropbox_import',NULL,NULL,:'u'),'own library / upload sources are own-origin');
+SELECT fixture_assert(NOT own_origin_source('bat',NULL,NULL,:'u') AND NOT own_origin_source('mecum',NULL,NULL,:'u')
+  AND NOT own_origin_source('classic-com',NULL,NULL,:'u') AND NOT own_origin_source('craigslist',NULL,NULL,:'u')
+  AND NOT own_origin_source('url_scraper',NULL,NULL,:'u') AND NOT own_origin_source('ssd_blast',NULL,NULL,:'u')
+  AND NOT own_origin_source('dropbox_import#automated',NULL,NULL,:'u') AND NOT own_origin_source(NULL,NULL,NULL,:'u')
+  AND NOT own_origin_source('iphoto',NULL,NULL,NULL),'scraped / external sources are not own-origin');
+SELECT fixture_assert(own_origin_source('image_intake',NULL,:'u',:'u') AND NOT own_origin_source('image_intake',NULL,'00000000-0000-4000-8000-000000000002',:'u')
+  AND own_origin_source(NULL,'users/'||:'u'||'/capture-relay/a.jpg',NULL,:'u') AND own_origin_source(NULL,'users/'||:'u'||'/photo-sync/a.jpg',NULL,:'u')
+  AND NOT own_origin_source(NULL,'users/00000000-0000-4000-8000-000000000002/photo-sync/a.jpg',NULL,:'u')
+  AND own_origin_source(NULL,'00000000-0000-4000-8000-000000000299/iphoto/a.jpg',NULL,:'u')
+  AND NOT own_origin_source(NULL,'vehicles/x/bat/a.jpg',NULL,:'u'),'image_intake needs the account as uploader; storage paths under the account or <vehicle>/iphoto');
+SELECT fx_vehicles(71,76);
+INSERT INTO vehicle_images(vehicle_id,user_id,image_url,exif_data,source) VALUES (fx(71),:'u','p',NULL,'iphoto'),(fx(72),:'u','p',NULL,'bat');
+INSERT INTO vehicle_images(vehicle_id,user_id,image_url,exif_data,source,automation_script) VALUES (fx(73),:'u','p',NULL,'dropbox_import','bulk.py');
+INSERT INTO vehicle_images(vehicle_id,user_id,image_url,exif_data,source) VALUES (fx(74),:'u','p',NULL,'image_intake');
+INSERT INTO vehicle_images(vehicle_id,user_id,image_url,exif_data,storage_path) VALUES (fx(75),:'u','p',NULL,'users/'||:'u'||'/photo-sync/1.jpg');
+SELECT fixture_assert(fx_role(71)='documenting' AND fx_role(74)='documenting' AND fx_role(75)='documenting','own-origin photos without EXIF are own-device');
+SELECT fixture_assert(fx_role(72)='imported_by_user' AND fx_role(73)='imported_by_user','bat source, or dropbox_import with automation_script, stays an import');
+SELECT fixture_assert((fx_step(71,1)->'evidence'->>'own_origin_photo_count')::int=1 AND (fx_step(72,1)->'evidence'->>'own_origin_photo_count')::int=0,'step 1 reports own-origin photos');
+
+-- ===== owner statements: parser =====
+SELECT fixture_assert((parse_owner_statement('I''ve owned these for 10 years but none of them are titled to me')->>'ownership_claim')::boolean
+  AND (parse_owner_statement('I''ve owned these for 10 years but none of them are titled to me')->>'tenure_years')::numeric=10
+  AND (parse_owner_statement('I''ve owned these for 10 years but none of them are titled to me')->>'title_denied')::boolean
+  AND parse_owner_statement('I''ve owned these for 10 years but none of them are titled to me')->>'title_denial_scope'='all_listed','ownership + tenure + title denial across a listed set');
+SELECT fixture_assert(parse_owner_statement('That one is not titled to me')->>'title_denial_scope'='single'
+  AND NOT (parse_owner_statement('That one is not titled to me')->>'ownership_claim')::boolean
+  AND (parse_owner_statement('I own it, owned twelve years')->>'tenure_years')::numeric=12
+  AND NOT (parse_owner_statement('I don''t own it')->>'ownership_claim')::boolean
+  AND NOT (parse_owner_statement('It is titled to me, I own it')->>'title_denied')::boolean,'single denial, word numbers, negated ownership, no false denial');
+
+-- ===== owner statements: record_owner_statement (dry run first, idempotent, ambiguity kept) =====
+SELECT fx_vehicles(77,82);
+UPDATE vehicles SET year=1978, make='Testmake', model='Zed' WHERE id IN (fx(76),fx(77));
+UPDATE vehicles SET year=1990, make='Testmake', model='Zed' WHERE id=fx(78);
+UPDATE vehicles SET year=1985, make='Ambmake', model='Amb', vin='AAAAAAAAAAAAAAAA1' WHERE id=fx(79);
+UPDATE vehicles SET year=1985, make='Ambmake', model='Amb', vin='AAAAAAAAAAAAAAAA2' WHERE id=fx(80);
+UPDATE vehicles SET year=1970, make='Solomake', model='Solo' WHERE id=fx(81);
+SELECT fx_photo(76); SELECT fx_photo(76); SELECT fx_photo(77); SELECT fx_photo(78); SELECT fx_photo(79); SELECT fx_photo(80); SELECT fx_photo(81);
+SELECT count(*) AS stmts_before FROM vehicle_observations WHERE extraction_method='owner_statement_v1' \gset
+SELECT fixture_assert((SELECT resolution='resolved' AND vehicle_id=fx(76) AND jsonb_array_length(candidates)=2 AND observation_id IS NULL
+  FROM record_owner_statement(:'u','I''ve owned it for 10 years but it is not titled to me','chat_message:m1',now(),'{"year":1978,"make":"Testmake","model":"Zed"}')),
+  'dry run resolves the hint to the duplicate family (photo-rich member) and stores nothing');
+SELECT fixture_assert((SELECT count(*) FROM vehicle_observations WHERE extraction_method='owner_statement_v1')=:stmts_before,'dry run wrote nothing');
+SELECT fixture_assert((SELECT resolution='ambiguous' AND vehicle_id IS NULL AND jsonb_array_length(candidates)=2
+  FROM record_owner_statement(:'u','I own the Amb','chat_message:m2',now(),'{"year":1985,"make":"Ambmake","model":"Amb"}')),'incompatible VINs: ambiguous, every candidate listed');
+SELECT fixture_assert((SELECT resolution='unresolved' FROM record_owner_statement(:'u','I own it','chat_message:m3',now(),'{"year":2001,"make":"Nomake","model":"Nomodel"}')),'no match is unresolved, not guessed');
+SELECT count(*) FROM record_owner_statement(:'u','I''ve owned it for 10 years but it is not titled to me','chat_message:m1',now(),'{"year":1978,"make":"Testmake","model":"Zed"}',false);
+SELECT count(*) FROM record_owner_statement(:'u','I''ve owned it for 10 years but it is not titled to me','chat_message:m1',now(),'{"year":1978,"make":"Testmake","model":"Zed"}',false);
+SELECT count(*) FROM record_owner_statement(:'u','I own the Amb','chat_message:m2',now(),'{"year":1985,"make":"Ambmake","model":"Amb"}',false);
+SELECT fixture_assert((SELECT count(*) FROM vehicle_observations WHERE extraction_method='owner_statement_v1')=:stmts_before+2,'apply is idempotent per source_ref');
+SELECT fixture_assert((SELECT o.structured_data->>'intake_actor'='owner_first_person' AND o.content_text LIKE 'I''ve owned it%' AND o.vehicle_id=fx(76)
+  AND o.structured_data->>'source_ref'='chat_message:m1' AND o.submitted_by_user_id=:'u'
+  FROM vehicle_observations o WHERE o.structured_data->>'source_ref'='chat_message:m1'),'row carries actor, quoted text, source_ref and vehicle');
+SELECT fixture_assert((SELECT o.vehicle_id IS NULL AND jsonb_array_length(o.structured_data->'candidates')=2
+  FROM vehicle_observations o WHERE o.structured_data->>'source_ref'='chat_message:m2'),'ambiguous statement stored with vehicle NULL and both candidates');
+SET ROLE authenticated; SELECT fixture_fails($q$SELECT * FROM record_owner_statement('00000000-0000-4000-8000-000000000001','x','y')$q$); RESET ROLE;
+-- the chain reads it: ownership + tenure + own photos, title denied: owner_reported, capped below 0.85, shared with the duplicate
+SELECT fixture_assert(fx_role(76)='owner_reported' AND fx_role(77)='owner_reported'
+  AND (SELECT confidence FROM derive_vehicle_relationships(:'u',fx(77)))=0.7
+  AND (SELECT evidence->>'title_denied' FROM derive_vehicle_relationships(:'u',fx(77)))='true'
+  AND (fx_step(77,5)->'evidence'->>'statement_from_duplicate')::boolean,'title denial caps below owner and keeps the role; the duplicate shares it');
+SELECT fixture_assert(fx_role(78)='documenting','a vehicle outside the duplicate family does not inherit it');
+-- title denial alone does not remove the garage role
+INSERT INTO vehicle_observations(vehicle_id,submitted_by_user_id,content_text,structured_data,extraction_method)
+ VALUES (fx(78),:'u','none of them are titled to me',jsonb_build_object('claim_contract','owner_statement_v1','facts',parse_owner_statement('none of them are titled to me')),'owner_statement_v1');
+SELECT fixture_assert(fx_role(78)='documenting' AND (SELECT evidence->>'title_denied' FROM derive_vehicle_relationships(:'u',fx(78)))='true','title denial alone: role stays, flagged');
+-- inline (unstored) statements through the preview placeholder; the function has none
+\set inl_sql `sed -e "s/:'user_id'/'00000000-0000-4000-8000-000000000001'/" -e "s/:'vehicle_id'/''/" -e '$ s/;[[:space:]]*$//' -e "s/^   WHERE false\$/   WHERE false UNION ALL SELECT gen_random_uuid(), '00000000-0000-4000-8000-000000000281'::uuid, now(), 'I have owned it for 12 years', jsonb_build_object('claim_contract','owner_statement_v1','facts',parse_owner_statement('I have owned it for 12 years'))/" supabase/sql/derive_vehicle_relationships_preview.sql`
+SELECT count(*) AS obs_before FROM vehicle_observations \gset
+SELECT fixture_assert((SELECT derived_role||confidence::text FROM (:inl_sql) q WHERE vehicle_id=fx(81))='owner_reported0.85'
+  AND fx_role(81)='documenting' AND (SELECT count(*) FROM vehicle_observations)=:obs_before,'inline statement is previewed read-only: owner_reported 0.85; unstored, the function says documenting');
+
+-- ===== detail-page enrichment: VIN match, lowercase seller, append-only =====
+UPDATE vehicles SET year=1978, make='Gmcx', model='K1500', vin='TKL148F714125' WHERE id=fx(82);
+SELECT fx_photo(82);
+INSERT INTO bat_listings(id,bat_listing_url,bat_listing_title) VALUES ('00000000-0000-4000-8000-0000000003e1','https://bringatrailer.com/listing/1978-gmc-k1500-8/','1978 GMC K1500');
+SELECT fixture_assert((SELECT count(*) FROM match_bat_listings_to_vehicles(100,:'u') WHERE vehicle_id=fx(82))=0,'no VIN on the listing yet: no match');
+INSERT INTO listing_detail_enrichments(listing_id,listing_url,lot_number,chassis,seller_username,title,run_id,producer_version)
+ VALUES ('00000000-0000-4000-8000-0000000003e1','https://bringatrailer.com/listing/1978-gmc-k1500-8/','255909','TKL148F714125','vivalasvegasautos','1978 GMC K1500',gen_random_uuid(),'t');
+SELECT fixture_assert((SELECT score=0.95 AND signals ? 'vin' FROM match_bat_listings_to_vehicles(100,:'u') WHERE vehicle_id=fx(82)),'the matcher matches by the enriched chassis / VIN');
+SELECT fixture_assert((SELECT fx_step(82,2)->'evidence'->>'organization_id')=:'viva' AND fx_step(82,2)->'evidence'->'inline_matches'->0->'signals' ? 'vin','the chain matches by the enriched VIN and resolves the (lowercased) seller handle to the organization');
+SELECT fixture_fails($q$INSERT INTO listing_detail_enrichments(listing_url,seller_username,run_id,producer_version) VALUES ('u2','VivaLasVegasAutos',gen_random_uuid(),'t')$q$);
+SELECT fixture_fails($q$UPDATE listing_detail_enrichments SET chassis='X1234567'$q$);
+SELECT fixture_fails($q$DELETE FROM listing_detail_enrichments$q$);
 
 -- every row carries the five-step chain with an eliminated list
 SELECT fixture_assert(NOT EXISTS (SELECT 1 FROM derive_vehicle_relationships(:'u') d

@@ -13,6 +13,9 @@
 --                                   for the ordered chain). New role 'imported_by_user' (zero own-device photos, no org link, no
 --                                   title, no statement); get_user_garage hides it. The chain computes matches and aliases inline
 --                                   from base tables, so the preview and the function never depend on the three tables above.
+--  6 own_origin_source              the one list of photo sources / paths that are the account's own library or upload (scrapers are not)
+--  7 parse_owner_statement, record_owner_statement   first-person chat statements stored as owner_statement_v1 testimony
+--  8 listing_detail_enrichments     lot / chassis / seller / title read from public listing pages (append-only); the matcher uses it
 --  5 garage_shop_shoot_rules        platform_config row with the shoot / personal-pattern thresholds; change the row, not the code.
 -- Rollback: re-apply 20261111180000's function body and 20261111170000's reader, restore the old role CHECK, then
 --   DROP FUNCTION match_bat_listings_to_vehicles, derive_listing_sellers, propose_organization_aliases;
@@ -97,10 +100,35 @@ CREATE UNIQUE INDEX organization_aliases_active ON public.organization_aliases(a
 COMMENT ON TABLE public.organization_aliases IS
   'Organizations that are probably the same business (normalized name, website host, GPS within 100 m). score >= 0.6 means name or website agrees; 0.3 is GPS alone (a candidate, not an alias). organizations rows are never edited. Written by propose_organization_aliases.';
 
+-- Detail-page enrichment of public listings (scripts/garage/enrich-bat-listing.mjs). Append-only; bat_listings is never
+-- written. The matcher reads the newest active row: chassis / VIN, lot, seller handle (lowercased), title.
+CREATE TABLE public.listing_detail_enrichments (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  listing_id uuid,
+  listing_url text NOT NULL,
+  lot_number text,
+  chassis text CHECK (chassis IS NULL OR chassis = upper(btrim(chassis))),
+  seller_username text CHECK (seller_username IS NULL OR seller_username = lower(btrim(seller_username))),
+  title text,
+  http_status integer,
+  content_sha256 text,
+  fetched_at timestamptz NOT NULL DEFAULT now(),
+  run_id uuid NOT NULL,
+  producer_version text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  superseded_at timestamptz,
+  superseded_by uuid,
+  superseded_reason text
+);
+CREATE UNIQUE INDEX listing_detail_enrichments_active ON public.listing_detail_enrichments(listing_url) WHERE superseded_at IS NULL;
+CREATE INDEX listing_detail_enrichments_listing ON public.listing_detail_enrichments(listing_id) WHERE superseded_at IS NULL;
+COMMENT ON TABLE public.listing_detail_enrichments IS
+  'Lot, chassis/VIN, seller handle and title read from a public listing detail page. Append-only (supersede, never edit); bat_listings is not overwritten. Written by scripts/garage/enrich-bat-listing.mjs.';
+
 DO $t$
 DECLARE t text;
 BEGIN
-  FOREACH t IN ARRAY ARRAY['listing_vehicle_matches', 'listing_seller_derivations', 'organization_aliases'] LOOP
+  FOREACH t IN ARRAY ARRAY['listing_vehicle_matches', 'listing_seller_derivations', 'organization_aliases', 'listing_detail_enrichments'] LOOP
     EXECUTE format('CREATE TRIGGER %I BEFORE UPDATE OR DELETE ON public.%I FOR EACH ROW EXECUTE FUNCTION public.derived_rows_append_only()', t || '_append_only', t);
     EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', t);
     EXECUTE format('CREATE POLICY %I ON public.%I FOR ALL TO service_role USING (true) WITH CHECK (true)', t || '_service', t);
@@ -129,12 +157,15 @@ BEGIN
       SELECT bl.id AS lid,
              regexp_replace(regexp_replace(lower(btrim(coalesce(bl.bat_listing_url, ''))), '[?#].*$', ''), '/+$', '') AS u,
              upper(regexp_replace(coalesce(bl.raw_data->>'vin', bl.raw_data->>'VIN', ''), '[^A-Za-z0-9]', '', 'g')) AS vin,
-             upper(regexp_replace(coalesce(bl.raw_data->>'chassis', bl.raw_data->>'chassis_number', ''), '[^A-Za-z0-9]', '', 'g')) AS chassis,
-             nullif(btrim(bl.bat_lot_number::text), '') AS lot,
-             (regexp_match(coalesce(bl.bat_listing_title, ''), '\m(19[0-9]{2}|20[0-4][0-9])\M'))[1]::int AS ty,
-             btrim(regexp_replace(lower(coalesce(bl.bat_listing_title, '')), '[^a-z0-9]+', ' ', 'g')) AS tl,
-             lower(btrim(coalesce(nullif(btrim(bl.seller_username), ''), bl.raw_data->>'seller_username', bl.raw_data->>'seller'))) AS seller
+             upper(regexp_replace(coalesce(bl.raw_data->>'chassis', bl.raw_data->>'chassis_number', en.chassis, ''), '[^A-Za-z0-9]', '', 'g')) AS chassis,
+             nullif(btrim(coalesce(bl.bat_lot_number::text, en.lot_number)), '') AS lot,
+             (regexp_match(coalesce(bl.bat_listing_title, en.title, ''), '\m(19[0-9]{2}|20[0-4][0-9])\M'))[1]::int AS ty,
+             btrim(regexp_replace(lower(coalesce(bl.bat_listing_title, en.title, '')), '[^a-z0-9]+', ' ', 'g')) AS tl,
+             lower(btrim(coalesce(nullif(btrim(bl.seller_username), ''), bl.raw_data->>'seller_username', bl.raw_data->>'seller',
+                                  en.seller_username))) AS seller
         FROM bat_listings bl
+        LEFT JOIN LATERAL (SELECT e.chassis, e.lot_number, e.title, e.seller_username FROM listing_detail_enrichments e
+                            WHERE e.superseded_at IS NULL AND e.listing_id = bl.id ORDER BY e.created_at DESC LIMIT 1) en ON true
        WHERE bl.vehicle_id IS NULL
        ORDER BY bl.scraped_at DESC NULLS LAST, bl.id
        LIMIT p_limit
@@ -226,6 +257,9 @@ BEGIN
         CROSS JOIN LATERAL (
           SELECT lower(btrim(coalesce(bl.raw_data->>'seller_username', bl.raw_data->>'seller'))) AS seller,
                  0.90 AS conf, 'bat_listings.raw_data' AS src, NULL::uuid AS vid
+          UNION ALL
+          SELECT e.seller_username, 0.92, 'listing_detail_enrichments', NULL::uuid
+            FROM listing_detail_enrichments e WHERE e.listing_id = bl.id AND e.superseded_at IS NULL
           UNION ALL
           SELECT lower(btrim(coalesce(nullif(btrim(v.bat_seller), ''), v.origin_metadata->'bat_snapshot_parsed'->>'seller_username'))),
                  0.70, 'linked vehicle seller', v.id
@@ -334,6 +368,165 @@ BEGIN
 END
 $fn$;
 
+-- Own-origin test, one source list for the preview and the function: is this photo's provenance chain the account's own
+-- library / upload? Scraped and external sources are not. A bulk-scraper row (automation_script set) arrives as
+-- '<source>#automated' and is never own. An image_intake row is own only when the uploader is the account.
+CREATE FUNCTION public.own_origin_source(p_source text, p_storage_path text, p_uploader uuid, p_user uuid)
+RETURNS boolean LANGUAGE sql IMMUTABLE PARALLEL SAFE
+AS $fn$
+  SELECT CASE
+    WHEN p_user IS NULL THEN false
+    WHEN s.v LIKE '%#automated' THEN false
+    WHEN s.v IN ('bat', 'mecum', 'classic_com', 'classiccom', 'craigslist', 'url_scraper', 'ssd_blast') THEN false
+    WHEN s.v IN ('iphoto', 'iphoto_60d', 'user_upload', 'capture_relay_ios', 'photo_auto_sync', 'photo_sync',
+                 'drop_folder', 'library_recovery', 'hd_archive', 'daily_receipt', 'dropbox_import') THEN true
+    WHEN s.v = 'image_intake' THEN p_uploader IS NOT NULL AND p_uploader = p_user
+    WHEN lower(coalesce(p_storage_path, '')) ~ ('^users/' || lower(p_user::text) || '/(capture-relay|photo-sync)(/|$)') THEN true
+    WHEN lower(coalesce(p_storage_path, '')) ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/iphoto(/|$)' THEN true
+    ELSE false END
+  FROM (SELECT regexp_replace(lower(btrim(coalesce(p_source, ''))), '[-\s]+', '_', 'g') AS v) s
+$fn$;
+COMMENT ON FUNCTION public.own_origin_source(text, text, uuid, uuid) IS
+  'True when a photo''s source / storage path / uploader show the account''s own library or upload (iphoto, user_upload, capture relay, photo sync, drop folder, recovery, archive, receipts; image_intake by the account; users/<uid>/capture-relay|photo-sync; <vehicle>/iphoto). Scrapers (bat, mecum, classic-com, craigslist, url_scraper, ssd_blast) and ''#automated'' rows are false. Used by derive_vehicle_relationships and its preview.';
+
+-- First-person statement facts, parsed generically: ownership claim, tenure ("owned N years"), title denial
+-- ("not titled to me", "none of them are titled to me"). Nothing is inferred beyond the words.
+CREATE FUNCTION public.parse_owner_statement(p_text text) RETURNS jsonb
+LANGUAGE plpgsql IMMUTABLE PARALLEL SAFE
+AS $fn$
+DECLARE
+  t text := lower(coalesce(p_text, ''));
+  m text[]; w text; ten numeric; own boolean; denied boolean; fp boolean; scope text;
+BEGIN
+  fp := t ~ '(^|[^a-z])(i|we|my|me|i''ve|i''m|i''d)([^a-z]|$)';
+  own := t ~ '\m(i|we)(''ve|''d| have| had| still| currently| also)*\s+(own|owned|bought|purchased)\M'
+         AND t !~ '\m(do not|don''t|never|no longer|did not|didn''t)\s+(own|bought|purchased)\M';
+  IF own THEN
+    m := regexp_match(t, '\m(\d{1,2}(?:\.\d)?|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifteen|twenty|thirty)\+?\s*(?:years?|yrs?)\M');
+    IF m IS NOT NULL THEN
+      w := m[1];
+      ten := CASE WHEN w ~ '^[0-9]' THEN w::numeric
+        ELSE CASE w WHEN 'one' THEN 1 WHEN 'two' THEN 2 WHEN 'three' THEN 3 WHEN 'four' THEN 4 WHEN 'five' THEN 5
+          WHEN 'six' THEN 6 WHEN 'seven' THEN 7 WHEN 'eight' THEN 8 WHEN 'nine' THEN 9 WHEN 'ten' THEN 10
+          WHEN 'eleven' THEN 11 WHEN 'twelve' THEN 12 WHEN 'fifteen' THEN 15 WHEN 'twenty' THEN 20 WHEN 'thirty' THEN 30 END END;
+    END IF;
+  END IF;
+  denied := t ~ '(\mnot|n''t|\mnever)\s+(currently\s+|yet\s+|even\s+)?(titled|registered)\s+(to|in)\s+(me|my name|our name)'
+         OR t ~ '\mnone of (them|these|those|it)\s+(are|is|were|was)\s+(\w+\s+)?(titled|registered)\s+(to|in)\s+(me|my name)';
+  scope := CASE WHEN NOT denied THEN NULL
+                WHEN t ~ '\m(none|all|any|neither|both|every)\s+of\s+(them|these|those)\M' THEN 'all_listed' ELSE 'single' END;
+  RETURN jsonb_build_object('ownership_claim', own AND fp, 'tenure_years', ten, 'title_denied', denied,
+                            'title_denial_scope', scope, 'first_person', fp, 'parser', 'parse_owner_statement/1');
+END
+$fn$;
+
+-- Stores a first-person chat statement as testimony: vehicle_observations, extraction_method 'owner_statement_v1',
+-- intake_actor 'owner_first_person', the quoted text in content_text, source_ref citing the chat message id. The vehicle
+-- comes from the hint (year / make / model / vin; an array of hints is a listed set) among the account's related vehicles,
+-- widened to the duplicate family (same make, model family, year within 1, VINs compatible). One family -> the member with
+-- the account's most photos; several families or none -> the row is stored with vehicle_id NULL and every candidate listed.
+-- Dry run by default. Idempotent per (account, source_ref, vehicle).
+CREATE FUNCTION public.record_owner_statement(
+  p_user uuid, p_text text, p_source_ref text, p_observed_at timestamptz DEFAULT now(),
+  p_vehicle_hint jsonb DEFAULT '{}'::jsonb, p_dry_run boolean DEFAULT true)
+RETURNS TABLE(observation_id uuid, vehicle_id uuid, resolution text, candidates jsonb, facts jsonb)
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
+AS $fn$
+#variable_conflict use_column
+DECLARE
+  v_facts jsonb; v_hint jsonb; v_hints jsonb; v_idx int := 0; v_n int;
+  v_cands uuid[]; v_family uuid[]; v_pick uuid; v_res text; v_hash text; v_src uuid; v_oid uuid;
+  v_year int; v_make text; v_fam text; v_vin text; v_payload jsonb; v_cl jsonb;
+BEGIN
+  IF coalesce(auth.role(), '') <> 'service_role' THEN RAISE EXCEPTION 'service role required' USING ERRCODE = '42501'; END IF;
+  IF p_user IS NULL OR nullif(btrim(p_text), '') IS NULL OR length(p_text) > 4000 OR nullif(btrim(p_source_ref), '') IS NULL THEN
+    RAISE EXCEPTION 'account, bounded quoted text and a source_ref (chat message id) required' USING ERRCODE = '23514';
+  END IF;
+  v_facts := parse_owner_statement(p_text);
+  v_hints := CASE WHEN jsonb_typeof(p_vehicle_hint) = 'array' THEN p_vehicle_hint ELSE jsonb_build_array(coalesce(p_vehicle_hint, '{}'::jsonb)) END;
+  v_n := jsonb_array_length(v_hints);
+  FOR v_idx IN 0 .. v_n - 1 LOOP
+    v_hint := v_hints->v_idx;
+    v_year := CASE WHEN v_hint->>'year' ~ '^[0-9]{4}$' THEN (v_hint->>'year')::int END;
+    v_make := nullif(lower(btrim(v_hint->>'make')), '');
+    v_fam := normalize_vehicle_model_family(v_hint->>'model');
+    v_vin := nullif(upper(regexp_replace(coalesce(v_hint->>'vin', ''), '[^A-Za-z0-9]', '', 'g')), '');
+    -- the account's related vehicles
+    WITH rel AS (
+      SELECT DISTINCT r.vid FROM (
+        SELECT vi.vehicle_id AS vid FROM vehicle_images vi WHERE vi.user_id = p_user
+        UNION SELECT vup.vehicle_id FROM vehicle_user_permissions vup WHERE vup.user_id = p_user
+        UNION SELECT vo.vehicle_id FROM vehicle_ownerships vo WHERE vo.owner_profile_id = p_user
+        UNION SELECT dv.vehicle_id FROM discovered_vehicles dv WHERE dv.user_id = p_user
+        UNION SELECT vc.vehicle_id FROM vehicle_contributors vc WHERE vc.user_id = p_user
+        UNION SELECT v.id FROM vehicles v WHERE v.user_id = p_user) r WHERE r.vid IS NOT NULL),
+    rv AS (
+      SELECT v.id, v.year, lower(btrim(v.make)) AS mk, normalize_vehicle_model_family(v.model) AS fam,
+             nullif(upper(regexp_replace(coalesce(v.vin, ''), '[^A-Za-z0-9]', '', 'g')), '') AS vin
+        FROM rel JOIN vehicles v ON v.id = rel.vid WHERE v.deleted_at IS NULL AND v.merged_into_vehicle_id IS NULL),
+    direct AS (
+      SELECT rv.id FROM rv
+       WHERE (v_vin IS NOT NULL AND rv.vin = v_vin)
+          OR (v_vin IS NULL AND v_year IS NOT NULL AND v_make IS NOT NULL AND v_fam IS NOT NULL
+              AND rv.year = v_year AND rv.mk = v_make AND rv.fam = v_fam)),
+    fam AS (
+      SELECT rv.id, rv.year, rv.mk, rv.fam, rv.vin FROM rv
+       WHERE rv.id IN (SELECT id FROM direct)
+          OR EXISTS (SELECT 1 FROM rv d JOIN direct dd ON dd.id = d.id
+                      WHERE d.id <> rv.id AND d.mk = rv.mk AND d.fam = rv.fam AND abs(d.year - rv.year) <= 1
+                        AND (d.vin IS NULL OR rv.vin IS NULL OR d.vin = rv.vin)))
+    SELECT coalesce(array_agg(DISTINCT d.id), '{}'),
+           CASE WHEN (SELECT count(*) FROM fam) = 0 THEN '{}'::uuid[]
+                WHEN (SELECT count(DISTINCT (mk, fam)) FROM fam) = 1 AND (SELECT max(year) - min(year) FROM fam) <= 1
+                     AND (SELECT count(DISTINCT vin) FROM fam WHERE vin IS NOT NULL) <= 1
+                THEN ARRAY(SELECT f.id FROM fam f ORDER BY f.id) ELSE '{}'::uuid[] END
+      INTO v_cands, v_family
+      FROM direct d;
+    IF cardinality(v_cands) = 0 THEN
+      v_res := 'unresolved'; v_pick := NULL;
+    ELSIF cardinality(v_family) > 0 THEN
+      v_res := 'resolved';
+      SELECT f.id INTO v_pick FROM unnest(v_family) f(id)
+       ORDER BY (SELECT count(*) FROM vehicle_images vi WHERE vi.vehicle_id = f.id AND vi.user_id = p_user) DESC, f.id::text LIMIT 1;
+    ELSE
+      v_res := 'ambiguous'; v_pick := NULL;
+    END IF;
+    v_cl := to_jsonb(CASE WHEN cardinality(v_family) > 0 THEN v_family ELSE v_cands END);
+    v_hash := md5('owner-statement:' || p_user::text || ':' || p_source_ref || ':' || coalesce(v_pick::text, v_idx::text));
+    v_oid := NULL;
+    IF NOT p_dry_run THEN
+      SELECT s.id INTO v_src FROM observation_sources s WHERE s.slug = 'owner-input';
+      IF v_src IS NULL THEN RAISE EXCEPTION 'owner input source unavailable'; END IF;
+      SELECT o.id INTO v_oid FROM vehicle_observations o WHERE o.content_hash = v_hash AND o.source_id = v_src LIMIT 1;
+      IF v_oid IS NULL THEN
+        v_payload := jsonb_build_object('claim_contract', 'owner_statement_v1', 'speaker_user_id', p_user,
+          'intake_actor', 'owner_first_person', 'is_public', false, 'source_ref', p_source_ref,
+          'observed_at_basis', 'chat_message', 'facts', v_facts, 'resolution', v_res,
+          'candidates', v_cl, 'cluster_vehicle_ids', to_jsonb(v_family), 'hint', v_hint);
+        INSERT INTO vehicle_observations (vehicle_id, subject_type, subject_id, source_id, source_identifier, observed_at,
+          content_text, content_hash, structured_data, submitted_by_user_id, observer_raw, extraction_method, kind,
+          confidence, confidence_score)
+        VALUES (v_pick, 'user', p_user, v_src, p_source_ref, coalesce(p_observed_at, now()), p_text, v_hash, v_payload, p_user,
+                jsonb_build_object('user_id', p_user, 'intake_actor', 'owner_first_person'),
+                'owner_statement_v1', 'provenance'::public.observation_kind, 'high', 0.95)
+        RETURNING id INTO v_oid;
+      END IF;
+    END IF;
+    observation_id := v_oid; vehicle_id := v_pick; resolution := v_res; candidates := v_cl; facts := v_facts;
+    RETURN NEXT;
+  END LOOP;
+END
+$fn$;
+REVOKE ALL ON FUNCTION public.record_owner_statement(uuid, text, text, timestamptz, jsonb, boolean) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.record_owner_statement(uuid, text, text, timestamptz, jsonb, boolean) TO service_role;
+REVOKE ALL ON FUNCTION public.parse_owner_statement(text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.parse_owner_statement(text), public.own_origin_source(text, text, uuid, uuid) TO authenticated, service_role;
+
+-- A stored first-person statement is private to its speaker, like a garage owner correction.
+CREATE POLICY owner_statement_private_read ON public.vehicle_observations AS RESTRICTIVE
+FOR SELECT TO anon, authenticated USING (
+  extraction_method IS DISTINCT FROM 'owner_statement_v1' OR submitted_by_user_id = auth.uid());
+
 REVOKE ALL ON FUNCTION public.match_bat_listings_to_vehicles(integer, uuid, uuid, boolean) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.derive_listing_sellers(integer, uuid, boolean) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.propose_organization_aliases(integer, uuid, boolean) FROM PUBLIC, anon, authenticated;
@@ -381,6 +574,14 @@ WITH cfg AS (
           coalesce((pc.config_value->>'dup_min_score')::float8, 0.7) AS r_dup
         FROM (SELECT 1) one LEFT JOIN platform_config pc ON pc.config_key = 'garage_shop_shoot_rules') rr
 ),
+-- INLINE STATEMENTS PLACEHOLDER (empty by default; keep this CTE when generating the function). To preview statements that
+-- are not stored yet, replace the WHERE false with real rows: (id, vehicle_id, observed_at, content_text, structured_data),
+-- where structured_data is {"claim_contract":"owner_statement_v1","facts":parse_owner_statement(content_text)}.
+inline_stmts AS (
+  SELECT t.id, t.vehicle_id, t.observed_at, t.content_text, t.structured_data
+    FROM (VALUES (NULL::uuid, NULL::uuid, NULL::timestamptz, NULL::text, NULL::jsonb)) t(id, vehicle_id, observed_at, content_text, structured_data)
+   WHERE false
+),
 cand_all AS (
   SELECT DISTINCT c.vid FROM cfg CROSS JOIN LATERAL (
       SELECT ov.vehicle_id AS vid FROM ownership_verifications ov WHERE ov.user_id = cfg.u
@@ -391,7 +592,9 @@ cand_all AS (
       UNION SELECT v.id FROM vehicles v WHERE v.user_id = cfg.u AND v.deleted_at IS NULL AND v.merged_into_vehicle_id IS NULL
       UNION SELECT vi.vehicle_id FROM vehicle_images vi WHERE vi.user_id = cfg.u
       UNION SELECT o.vehicle_id FROM vehicle_observations o
-        WHERE o.submitted_by_user_id = cfg.u AND o.structured_data->>'claim_contract' = 'garage_owner_correction_v1'
+        WHERE o.submitted_by_user_id = cfg.u
+          AND o.structured_data->>'claim_contract' IN ('garage_owner_correction_v1', 'owner_statement_v1')
+      UNION SELECT i.vehicle_id FROM inline_stmts i
     ) c
   WHERE c.vid IS NOT NULL
 ),
@@ -430,13 +633,18 @@ pp AS MATERIALIZED (
   SELECT vi.id, vi.vehicle_id AS vid, coalesce(vi.taken_at, vi.created_at) AS t,
          vi.latitude::float8 AS lat, vi.longitude::float8 AS lon,
          x.j->>'device_fingerprint' AS dev,
-         coalesce(nullif(btrim(x.j->'exif_data'->>'camera_make'), '') IS NOT NULL
+         o2.origin,
+         o2.origin OR coalesce(nullif(btrim(x.j->'exif_data'->>'camera_make'), '') IS NOT NULL
           AND nullif(btrim(x.j->'exif_data'->>'camera_model'), '') IS NOT NULL
           AND (x.j->'exif_data'->>'source_type' = 'user_library'
                OR x.j->'exif_data'->>'synced_by' ~* '^(capture[-_ ]?relay|photo[-_ ]?(auto[-_ ]?)?sync)'
                OR x.j->>'device_fingerprint' IN (SELECT fp.dev FROM fp)), false) AS own
     FROM cand_all ca JOIN vehicle_images vi ON vi.vehicle_id = ca.vid CROSS JOIN cfg
          CROSS JOIN LATERAL (SELECT to_jsonb(vi) AS j) x
+         CROSS JOIN LATERAL (SELECT coalesce(own_origin_source(
+             CASE WHEN nullif(btrim(x.j->>'automation_script'), '') IS NOT NULL THEN coalesce(x.j->>'source', '') || '#automated'
+                  ELSE x.j->>'source' END,
+             x.j->>'storage_path', vi.user_id, cfg.u), false) AS origin) o2
    WHERE vi.user_id = cfg.u
 ),
 -- Step 3: capture sessions of own-device photos (a new session after a gap of r_gap_h hours).
@@ -482,13 +690,18 @@ ul AS MATERIALIZED (
   SELECT bl.id AS listing_id, bl.organization_id,
          regexp_replace(regexp_replace(lower(btrim(coalesce(bl.bat_listing_url, ''))), '[?#].*$', ''), '/+$', '') AS u,
          upper(regexp_replace(coalesce(bl.raw_data->>'vin', bl.raw_data->>'VIN', ''), '[^A-Za-z0-9]', '', 'g')) AS vin,
-         upper(regexp_replace(coalesce(bl.raw_data->>'chassis', bl.raw_data->>'chassis_number', ''), '[^A-Za-z0-9]', '', 'g')) AS chassis,
-         nullif(btrim(bl.bat_lot_number::text), '') AS lot,
-         (regexp_match(coalesce(bl.bat_listing_title, ''), '\m(19[0-9]{2}|20[0-4][0-9])\M'))[1]::int AS ty,
-         btrim(regexp_replace(lower(coalesce(bl.bat_listing_title, '')), '[^a-z0-9]+', ' ', 'g')) AS tl,
-         lower(btrim(coalesce(nullif(btrim(bl.seller_username), ''), bl.raw_data->>'seller_username', bl.raw_data->>'seller'))) AS seller,
+         upper(regexp_replace(coalesce(bl.raw_data->>'chassis', bl.raw_data->>'chassis_number', en.chassis, ''), '[^A-Za-z0-9]', '', 'g')) AS chassis,
+         nullif(btrim(coalesce(bl.bat_lot_number::text, en.lot_number)), '') AS lot,
+         (regexp_match(coalesce(bl.bat_listing_title, en.title, ''), '\m(19[0-9]{2}|20[0-4][0-9])\M'))[1]::int AS ty,
+         btrim(regexp_replace(lower(coalesce(bl.bat_listing_title, en.title, '')), '[^a-z0-9]+', ' ', 'g')) AS tl,
+         lower(btrim(coalesce(nullif(btrim(bl.seller_username), ''), bl.raw_data->>'seller_username', bl.raw_data->>'seller',
+                              en.seller_username))) AS seller,
          bl.bat_listing_url AS ref
     FROM bat_listings bl
+    -- detail-page enrichment (append-only table; the newest active row for this listing)
+    LEFT JOIN LATERAL (SELECT e.chassis, e.lot_number, e.title, e.seller_username FROM listing_detail_enrichments e
+                        WHERE e.superseded_at IS NULL AND e.listing_id = bl.id
+                        ORDER BY e.created_at DESC LIMIT 1) en ON true
    WHERE bl.vehicle_id IS NULL AND EXISTS (SELECT 1 FROM cv)
 ),
 -- One row per matching signal. Strong signals are global; a title match counts only when the listing matches exactly
@@ -661,7 +874,7 @@ f AS (
          ver.id AS ver_id,
          perm.co_by_other, perm.self_granted, perm.owner_perm, perm.any_perm,
          obs.id AS obs_id, obs.stmt_vid, obs.content_text, obs.structured_data, obs.first_person,
-         ph.n AS photos, ph.n_own, ph.first_t, ph.last_t, ph.gps_n, ph.recent_gps_n, ph.devices,
+         ph.n AS photos, ph.n_own, ph.n_origin, ph.first_t, ph.last_t, ph.gps_n, ph.recent_gps_n, ph.devices,
          ol.t AS obs_last,
          EXISTS (SELECT 1 FROM vehicle_contributors vc WHERE vc.vehicle_id = cand.vid AND vc.user_id = cfg.u) AS contrib,
          EXISTS (SELECT 1 FROM vehicle_ownerships vo WHERE vo.vehicle_id = cand.vid AND vo.owner_profile_id = cfg.u
@@ -690,18 +903,38 @@ f AS (
   -- Step 5 evidence: the live account statement, on this vehicle or on a high-score duplicate of it. A first-person statement outranks an agent paraphrase; newest first.
   -- (A superseded statement is already excluded: is_superseded is set by the sanctioned writer from 'supersedes'.)
   LEFT JOIN LATERAL (
-    SELECT o.id, o.content_text, o.structured_data, fpx.v AS first_person, o.vehicle_id AS stmt_vid FROM vehicle_observations o
-     CROSS JOIN LATERAL (SELECT (coalesce(o.structured_data->>'intake_actor', '') <> 'authorized_agent'
-                                 OR (o.structured_data->>'speaker_user_id' = cfg.u::text
+    SELECT o.id, o.content_text, o.sd AS structured_data, fpx.v AS first_person, o.vehicle_id AS stmt_vid FROM (
+        -- stored statements and the inline (unstored) set; an owner_statement_v1 row is read as a relationship claim
+        -- built from its parsed facts (ownership claim + tenure -> owner_current + start_date; title denial -> flag).
+        SELECT s0.id, s0.vehicle_id, s0.observed_at, s0.ingested_at, s0.content_text, s0.structured_data,
+               CASE WHEN s0.structured_data->>'claim_contract' = 'owner_statement_v1' THEN jsonb_build_object(
+                      'claim_contract', 'owner_statement_v1', 'intake_actor', 'owner_first_person',
+                      'speaker_user_id', cfg.u::text,
+                      'title_denied', coalesce((s0.structured_data->'facts'->>'title_denied')::boolean, false),
+                      'correction', jsonb_build_object('relationship', jsonb_build_object(
+                        'roles', CASE WHEN coalesce((s0.structured_data->'facts'->>'ownership_claim')::boolean, false)
+                                      THEN '["owner_current"]'::jsonb ELSE '[]'::jsonb END,
+                        'ownership_denied', false, 'disputed', false,
+                        'start_date', CASE WHEN (s0.structured_data->'facts'->>'tenure_years') ~ '^[0-9]+(\.[0-9]+)?$'
+                                           THEN to_char((s0.observed_at AT TIME ZONE 'UTC')::date
+                                                  - round((s0.structured_data->'facts'->>'tenure_years')::numeric * 365)::int, 'YYYY-MM-DD') END)))
+                    ELSE s0.structured_data END AS sd
+          FROM (SELECT o1.id, o1.vehicle_id, o1.observed_at, o1.ingested_at, o1.content_text, o1.structured_data
+                  FROM vehicle_observations o1
+                 WHERE o1.submitted_by_user_id = cfg.u AND o1.is_superseded IS NOT TRUE
+                   AND o1.structured_data->>'claim_contract' IN ('garage_owner_correction_v1', 'owner_statement_v1')
+                UNION ALL
+                SELECT i.id, i.vehicle_id, i.observed_at, i.observed_at, i.content_text, i.structured_data FROM inline_stmts i) s0
+      ) o
+     CROSS JOIN LATERAL (SELECT (coalesce(o.sd->>'intake_actor', '') <> 'authorized_agent'
+                                 OR (o.sd->>'speaker_user_id' = cfg.u::text
                                      AND coalesce(o.content_text, '') ~* '^[\s"“'']*(i|we|my|me|i''m|i''ve|i''d)\M')) AS v) fpx
      WHERE (o.vehicle_id = cand.vid OR o.vehicle_id IN (SELECT d.b FROM dup d WHERE d.a = cand.vid))
-       AND o.submitted_by_user_id = cfg.u AND o.is_superseded IS NOT TRUE
-       AND o.structured_data->>'claim_contract' = 'garage_owner_correction_v1'
-       AND o.structured_data->'correction' ? 'relationship'
+       AND (o.sd->'correction' ? 'relationship' OR o.sd->>'claim_contract' = 'owner_statement_v1')
      ORDER BY fpx.v DESC, (o.vehicle_id = cand.vid) DESC, o.observed_at DESC NULLS LAST, o.ingested_at DESC LIMIT 1) obs ON true
   -- Step 1 evidence: the account's photos; capture facts count only for own-device photos.
   LEFT JOIN LATERAL (
-    SELECT count(*) AS n, count(*) FILTER (WHERE p.own) AS n_own,
+    SELECT count(*) AS n, count(*) FILTER (WHERE p.own) AS n_own, count(*) FILTER (WHERE p.origin) AS n_origin,
            min(p.t) FILTER (WHERE p.own) AS first_t, max(p.t) FILTER (WHERE p.own) AS last_t,
            count(*) FILTER (WHERE p.own AND p.lat IS NOT NULL AND p.lon IS NOT NULL) AS gps_n,
            count(*) FILTER (WHERE p.own AND p.lat IS NOT NULL AND p.lon IS NOT NULL
@@ -735,6 +968,7 @@ g2 AS (
                                             THEN g1.structured_data->'correction'->'evidence_ids' END), 0) > 0
            OR nullif(btrim(coalesce(g1.content_text, '')), '') IS NOT NULL) AS cited,
          coalesce((g1.claim->>'ownership_denied')::boolean, false) AS denied_raw,
+         coalesce((g1.structured_data->>'title_denied')::boolean, false) AS title_denied,
          CASE WHEN g1.claim->>'start_date' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
               THEN (g1.claim->>'start_date')::date <= current_date - 365 ELSE false END AS tenure
   FROM g1
@@ -804,6 +1038,8 @@ h AS (
     -- Ladder: [role, confidence, why]. Steps 2 and 4 gate it; step 5 statements fill the middle.
     CASE
       WHEN g6.ver_id IS NOT NULL AND (g6.denied OR g6.disputed) THEN jsonb_build_array('claimed_interest', 0.5, 'verified title capped by cited denial or dispute')
+      WHEN g6.ver_id IS NOT NULL AND g6.title_denied AND g6.org_id IS NULL
+        THEN jsonb_build_array('owner_reported', 0.6, 'verified title capped below owner by the account''s own title denial')
       WHEN g6.ver_id IS NOT NULL THEN jsonb_build_array(
         CASE WHEN g6.co_by_other AND NOT g6.owner_perm THEN 'co_owner_verified' ELSE 'owner_verified' END,
         CASE WHEN g6.org_id IS NOT NULL THEN 0.7 ELSE 0.98 END,
@@ -812,8 +1048,10 @@ h AS (
       WHEN 'transfer_pending' = ANY (g6.roles) OR g6.claim->>'title_status' = 'transfer_pending'
         THEN jsonb_build_array('transfer_pending', 0.6, 'account states transfer pending')
       WHEN 'owner_current' = ANY (g6.roles) AND NOT g6.denied AND g6.org_id IS NULL THEN jsonb_build_array('owner_reported',
-        CASE WHEN g6.tenure AND g6.own_n > 0 AND g6.first_person THEN 0.85 WHEN g6.own_n > 0 THEN 0.75 ELSE 0.6 END,
-        CASE WHEN g6.tenure AND g6.own_n > 0 AND g6.first_person THEN 'long-tenure first-person owner statement with own-device photos'
+        least(CASE WHEN g6.tenure AND g6.own_n > 0 AND g6.first_person THEN 0.85 WHEN g6.own_n > 0 THEN 0.75 ELSE 0.6 END,
+              CASE WHEN g6.title_denied THEN 0.7 ELSE 1 END),
+        CASE WHEN g6.title_denied THEN 'first-person ownership statement; account says the title is not in its name (capped below owner)'
+             WHEN g6.tenure AND g6.own_n > 0 AND g6.first_person THEN 'long-tenure first-person owner statement with own-device photos'
              WHEN g6.first_person THEN 'account states current ownership; no verified title'
              ELSE 'agent-paraphrased ownership statement; no verified title' END)
       WHEN 'owner_past' = ANY (g6.roles) AND NOT g6.denied THEN jsonb_build_array('previously_owned', 0.6, 'account states past ownership')
@@ -826,11 +1064,13 @@ h AS (
       WHEN g6.disc_prev THEN jsonb_build_array('previously_owned', 0.5, 'discovered previously_owned')
       WHEN g6.org_member THEN jsonb_build_array('business_handling', 0.6, 'member of the organization that lists the vehicle')
       WHEN g6.shoot AND g6.s_listed AND g6.org_id IS NOT NULL
-        THEN jsonb_build_array('business_handling', CASE WHEN g6.amb THEN 0.35 ELSE 0.7 END, 'inventory shoot at the organization that lists the vehicle')
+        THEN jsonb_build_array('business_handling', 0.7, 'inventory shoot at the organization that lists the vehicle')
       WHEN g6.org_id IS NOT NULL AND g6.n_photos > 0
-        THEN jsonb_build_array('contributor', 0.45, 'own photos of an organization-listed vehicle; not ownership')
+        THEN jsonb_build_array('contributor', CASE WHEN g6.amb THEN 0.2 ELSE 0.45 END, 'own photos of an organization-listed vehicle; not ownership')
       WHEN g6.shoot
-        THEN jsonb_build_array('contributor', CASE WHEN g6.amb THEN 0.25 ELSE 0.5 END, 'contributor at organization: shoot-shaped photos at an organization; no listing; not ownership')
+        THEN jsonb_build_array('contributor', CASE WHEN g6.amb THEN 0.2 ELSE 0.5 END,
+          CASE WHEN g6.amb THEN 'contributor: org_ambiguous, two organizations in range and nothing breaks the tie; not ownership'
+               ELSE 'contributor at organization: shoot-shaped photos at an organization; no listing; not ownership' END)
       WHEN g6.doc_ok AND g6.decayed THEN jsonb_build_array('previously_documented', 0.4, 'own photos only; no photo or activity within the decay window')
       WHEN g6.doc_ok THEN jsonb_build_array('documenting', 0.4, 'own photos only; not ownership')
       WHEN g6.n_photos > 0 OR g6.contrib OR g6.any_perm
@@ -853,10 +1093,12 @@ SELECT h.vid AS vehicle_id,
          'co_owner_grant_by_other', h.co_by_other, 'long_tenure', h.tenure,
          'documented_from', h.first_t, 'documented_to', h.last_t,
          'organization_inventory', h.org_id,
+         'flags', CASE WHEN h.amb THEN '["org_ambiguous"]'::jsonb ELSE '[]'::jsonb END,
+         'title_denied', h.title_denied,
          'chain', jsonb_build_array(
            jsonb_build_object('step', 1, 'name', 'origin_facts', 'confidence', CASE WHEN h.own_n > 0 THEN 0.4 ELSE 0.3 END,
              'evidence', jsonb_build_object('uploader_photo_count', h.n_photos, 'own_device_photo_count', h.own_n,
-               'imported_photo_count', h.n_photos - h.own_n, 'device_count', h.devices,
+               'imported_photo_count', h.n_photos - h.own_n, 'own_origin_photo_count', coalesce(h.n_origin, 0), 'device_count', h.devices,
                'first_capture', h.first_t, 'last_capture', h.last_t, 'gps_photo_count', coalesce(h.gps_n, 0),
                'last_activity', h.act_last, 'decay_months', h.months, 'decayed', h.decayed),
              'eliminated', CASE WHEN h.own_n = 0 THEN '["documenting","previously_documented"]'::jsonb ELSE '[]'::jsonb END),
@@ -899,7 +1141,7 @@ SELECT h.vid AS vehicle_id,
                'statement_from_duplicate', h.stmt_vid IS NOT NULL AND h.stmt_vid <> h.vid, 'roles', to_jsonb(h.roles), 'cited', h.cited,
                'first_person', h.first_person,
                'intake_actor', h.structured_data->>'intake_actor',
-               'uncited_downgrade_ignored', h.uncited_ignored, 'long_tenure', h.tenure),
+               'uncited_downgrade_ignored', h.uncited_ignored, 'long_tenure', h.tenure, 'title_denied', h.title_denied),
              'eliminated', CASE WHEN h.uncited_ignored THEN '["claimed_interest"]'::jsonb
                                 WHEN h.obs_id IS NOT NULL AND h.ver_id IS NULL AND h.d->>0 IN ('owner_reported','previously_owned')
                                   THEN '["contributor","documenting","profile_record","imported_by_user"]'::jsonb
