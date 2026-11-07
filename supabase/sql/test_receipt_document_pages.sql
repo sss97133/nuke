@@ -19,7 +19,7 @@ CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS $$ SELECT nullif(
 CREATE FUNCTION auth.role() RETURNS text LANGUAGE sql STABLE AS $$ SELECT nullif(current_setting('test.role', true), '') $$;
 
 CREATE TABLE public.vehicles(id uuid PRIMARY KEY, user_id uuid, owner_id uuid, uploaded_by uuid, is_public boolean, deleted_at timestamptz, merged_into_vehicle_id uuid);
-CREATE TABLE public.vehicle_images(id uuid PRIMARY KEY, vehicle_id uuid, taken_at timestamptz, is_duplicate boolean);
+CREATE TABLE public.vehicle_images(id uuid PRIMARY KEY, vehicle_id uuid, taken_at timestamptz, is_duplicate boolean, is_superseded boolean, apple_ml_labels text[]);
 CREATE TABLE public.work_sessions(id uuid PRIMARY KEY, vehicle_id uuid, session_date date);
 CREATE TABLE public.vehicle_timeline_events(id uuid PRIMARY KEY, vehicle_id uuid, event_date date);
 CREATE TABLE public.vehicle_documents(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid, uploaded_by uuid, document_type text, title text,
@@ -67,7 +67,16 @@ CREATE FUNCTION public.jsonb_mask_keys(j jsonb, p_keys text[]) RETURNS jsonb LAN
     WHEN 'array' THEN coalesce((SELECT jsonb_agg(public.jsonb_mask_keys(a.e, p_keys) ORDER BY a.o) FROM jsonb_array_elements(j) WITH ORDINALITY AS a(e, o)), '[]'::jsonb)
     ELSE j END $$;
 
+-- The supply register and organizations, as the second reading joins them (stand-ins; the resolver is live code).
+CREATE FUNCTION public.supply_vendor_key(p_name text) RETURNS text LANGUAGE sql IMMUTABLE AS $$
+  SELECT NULLIF(btrim(regexp_replace(regexp_replace(lower(COALESCE(p_name, '')), '[^a-z0-9&'' ]+', ' ', 'g'), '\s+', ' ', 'g')), '') $$;
+CREATE TABLE public.organizations(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), name text, logo_url text, website text, is_public boolean DEFAULT false, created_at timestamptz DEFAULT now());
+CREATE TABLE public.supply_vendors(vendor_slug text PRIMARY KEY, business_name text NOT NULL, decision text NOT NULL, organization_id uuid REFERENCES public.organizations(id),
+  domain text, supply_kinds text[] NOT NULL, basis text NOT NULL, reviewed_at date NOT NULL DEFAULT '2026-10-19');
+CREATE TABLE public.supply_vendor_aliases(alias_key text PRIMARY KEY, vendor_slug text NOT NULL REFERENCES public.supply_vendors(vendor_slug));
+
 \ir ../migrations/20261109110000_receipt_document_pages.sql
+\ir ../migrations/20261111090000_day_documents_vendor_page_install.sql
 
 CREATE FUNCTION pg_temp.assert_true(ok boolean, label text) RETURNS void LANGUAGE plpgsql AS $$
 BEGIN IF NOT coalesce(ok, false) THEN RAISE EXCEPTION 'FAIL: %', label; END IF; RAISE NOTICE 'ok: %', label; END $$;
@@ -146,23 +155,55 @@ SELECT pg_temp.assert_true((SELECT (r->>'errors')::int = 1 AND (r->>'duplicates'
 SELECT pg_temp.assert_true((SELECT count(*) = 3 FROM public.receipts), 'three receipts after the partial run');
 
 -- 6. The timeline leg: linked receipts on their page date, beside photos and work.
-INSERT INTO public.vehicle_images(id, vehicle_id, taken_at) VALUES (gen_random_uuid(), '20d21fb0-0000-4000-8000-000000000001', '2024-10-07 18:00+00');
+INSERT INTO public.vehicle_images(id, vehicle_id, taken_at, apple_ml_labels) VALUES (gen_random_uuid(), '20d21fb0-0000-4000-8000-000000000001', '2024-10-07 18:00+00', ARRAY['engine_vehicle']);
 SELECT pg_temp.assert_true((SELECT count(*) = 1 FROM public.get_vehicle_contribution_days('20d21fb0-0000-4000-8000-000000000001') WHERE kind = 'document' AND day = '2024-10-07' AND n = 1), 'document day on the timeline');
 SELECT pg_temp.assert_true((SELECT count(*) = 1 FROM public.get_vehicle_contribution_days('20d21fb0-0000-4000-8000-000000000001') WHERE kind = 'photo' AND day = '2024-10-07'), 'photo leg unchanged');
 SELECT pg_temp.assert_true((SELECT count(*) = 0 FROM public.get_vehicle_contribution_days('20d21fb0-0000-4000-8000-000000000001') WHERE kind = 'document' AND day IS NULL), 'held (undated) receipts stay off the bar');
+
+-- 6b. Install proofs: an engine photo after the page date (a same-day photo never counts), a dashboard line with no photo yet,
+--     and the vendor's organization through the register (not public, so no id leaves). Fixture rows on stand-in tables
+--     in a disposable database. -- ALLOW_RAW_TESTIMONY_WRITE
+INSERT INTO public.vehicle_images(id, vehicle_id, taken_at, apple_ml_labels) VALUES
+  ('d0000000-0000-4000-8000-000000000001', '20d21fb0-0000-4000-8000-000000000001', '2024-10-20 18:00+00', ARRAY['engine_vehicle', 'outdoor']),
+  ('d0000000-0000-4000-8000-000000000002', '20d21fb0-0000-4000-8000-000000000001', '2024-10-25 18:00+00', ARRAY['engine_vehicle']),
+  ('d0000000-0000-4000-8000-000000000003', '20d21fb0-0000-4000-8000-000000000001', '2024-10-26 18:00+00', ARRAY['engine_vehicle']);
+UPDATE public.vehicle_images SET is_duplicate = true WHERE id = 'd0000000-0000-4000-8000-000000000003';
+INSERT INTO public.receipt_items(receipt_id, line_number, description, part_number, quantity, unit_price, total_price)
+  SELECT id, 3, '70-81 FBRD INST CLUSTER LENS (SET)', 'F70813', 1, 69.99, 69.99 FROM public.receipts WHERE invoice_number = '9810';
+INSERT INTO public.organizations(id, name, logo_url, website, is_public) VALUES ('e0000000-0000-4000-8000-000000000001', 'Atomic Motors', 'https://nuke.ag/source-logos/synthetic.png', 'https://atomic.test', false);
+INSERT INTO public.supply_vendors(vendor_slug, business_name, decision, organization_id, domain, supply_kinds, basis) VALUES ('atomic_motors', 'Atomic Motors', 'existing_organization', 'e0000000-0000-4000-8000-000000000001', NULL, ARRAY['engine_service'], 'test');
+INSERT INTO public.supply_vendor_aliases(alias_key, vendor_slug) VALUES ('atomic motors', 'atomic_motors');
+SELECT pg_temp.assert_true((SELECT vendor_slug = 'classic_industries' AND domain = 'classicindustries.com' FROM public.supply_vendors WHERE vendor_slug = 'classic_industries'), 'classic industries joins the register');
+SELECT pg_temp.assert_true(public.receipt_line_photo_zone('73-75 FBIRD TACH/CLOCK ASMBLY') = 'dashboard' AND public.receipt_line_photo_zone('Seat belt, front') = 'interior'
+  AND public.receipt_line_photo_zone('Bore cylinders .060') = 'engine' AND public.receipt_line_photo_zone('15x7 Rally II wheel') = 'wheel' AND public.receipt_line_photo_zone('Shipping') IS NULL, 'line words name a photo zone');
 
 -- 7. The day reader: public viewer sees the paper and its lines, never the money or the payer; the owner sees both.
 SELECT set_config('test.role', 'anon', false), set_config('test.uid', '', false);
 CREATE TEMP TABLE pub AS SELECT public.get_vehicle_day_documents('20d21fb0-0000-4000-8000-000000000001', '2024-10-07') AS j;
 SELECT pg_temp.assert_true((SELECT (j->>'tied')::boolean = false AND jsonb_array_length(j->'documents') = 1 FROM pub), 'public viewer sees one document');
-SELECT pg_temp.assert_true((SELECT d->>'vendor' = 'Atomic Motors' AND d->>'document_number' = '9810' AND (d->>'pages')::int = 2 AND jsonb_array_length(d->'lines') = 2
+SELECT pg_temp.assert_true((SELECT d->>'vendor' = 'Atomic Motors' AND d->>'document_number' = '9810' AND (d->>'pages')::int = 2 AND jsonb_array_length(d->'lines') = 3
    AND d->'total' = 'null'::jsonb AND d->'subtotal' = 'null'::jsonb AND d->'payer_as_named' = 'null'::jsonb AND d->'vendor_address' = 'null'::jsonb AND d->'payment_method' = 'null'::jsonb
    AND d->'lines'->1->'amount' = 'null'::jsonb AND d->'lines'->1->'unit_price' = 'null'::jsonb
    AND d->'lines'->0->>'performer' = 'Frank' AND d->'lines'->0->>'line_date' = '2024-11-13' AND (d->'lines'->0->>'hours')::numeric = 2.75
    FROM pub, jsonb_array_elements(j->'documents') d), 'public: lines, performer and hours visible; money, payer, address and card masked');
+SELECT pg_temp.assert_true((SELECT d->'vendor_org'->>'name' = 'Atomic Motors' AND d->'vendor_org'->>'logo_url' = 'https://nuke.ag/source-logos/synthetic.png'
+   AND d->'vendor_org'->>'website' = 'https://atomic.test' AND NOT (d->'vendor_org' ? 'id')
+   AND d->'page' = 'null'::jsonb AND d->'page_paths' = 'null'::jsonb
+   FROM pub, jsonb_array_elements(j->'documents') d), 'public: the vendor''s mark without its private id; never the page');
+SELECT pg_temp.assert_true((SELECT d->'lines'->0->'install'->>'zone' = 'engine' AND d->'lines'->0->'install'->>'status' = 'photographed'
+   AND d->'lines'->0->'install'->>'photo_day' = '2024-10-20' AND (d->'lines'->0->'install'->>'photo_count')::int = 2
+   AND d->'lines'->0->'install'->>'image_id' = 'd0000000-0000-4000-8000-000000000001'
+   AND d->'lines'->1->'install'->>'status' = 'photographed'
+   AND d->'lines'->2->'install'->>'zone' = 'dashboard' AND d->'lines'->2->'install'->>'status' = 'no_photo' AND d->'lines'->2->'install'->'photo_day' = 'null'::jsonb
+   FROM pub, jsonb_array_elements(j->'documents') d), 'install: first engine photo after the page date, same-day and duplicate photos excluded, dashboard waits');
 SELECT set_config('test.role', 'authenticated', false), set_config('test.uid', '0b9f107a-0000-4000-8000-000000000001', false);
 SELECT pg_temp.assert_true((SELECT (j->>'tied')::boolean AND (j->'documents'->0->>'total')::numeric = 2190 AND j->'documents'->0->>'payer_as_named' = 'Sam Builder'
    AND (j->'documents'->0->'lines'->1->>'amount')::numeric = 650 FROM public.get_vehicle_day_documents('20d21fb0-0000-4000-8000-000000000001', '2024-10-07') j), 'owner sees money and payer');
+SELECT pg_temp.assert_true((SELECT j->'documents'->0->'page'->>'bucket' = 'user-documents'
+   AND j->'documents'->0->'page'->>'path' = '0b9f107a-0000-4000-8000-000000000001/financial/' || repeat('a', 64) || '.heic'
+   AND (j->'documents'->0->'page'->>'page_no')::int = 1 AND (j->'documents'->0->'page'->>'bytes')::bigint = 1234567
+   AND jsonb_array_length(j->'documents'->0->'page_paths') = 2
+   FROM public.get_vehicle_day_documents('20d21fb0-0000-4000-8000-000000000001', '2024-10-07') j), 'owner gets the page path to sign, first page first');
 SELECT set_config('test.role', 'anon', false), set_config('test.uid', '', false);
 SELECT pg_temp.assert_true((SELECT jsonb_array_length(j->'documents') = 0 FROM public.get_vehicle_day_documents('20d21fb0-0000-4000-8000-000000000001', '2024-10-08') j), 'other days empty');
 INSERT INTO public.receipts(id, user_id, vehicle_id, scope_type, scope_id, receipt_date, vendor_name, total, raw_json) VALUES ('c0000000-0000-4000-8000-000000000001', '0b9f107a-0000-4000-8000-000000000001', '20d21fb0-0000-4000-8000-000000000002', 'vehicle', '20d21fb0-0000-4000-8000-000000000002', '2024-10-07', 'Private Vendor', 10, '{}');
@@ -176,6 +217,8 @@ SELECT pg_temp.assert_true(NOT has_function_privilege('anon', 'public.land_docum
 SELECT pg_temp.assert_true(has_function_privilege('anon', 'public.get_vehicle_day_documents(uuid,date)', 'EXECUTE'), 'reader grant');
 
 -- 9. Revert restores the three-leg reader and drops the writer.
+\ir revert_20261111090000_day_documents_vendor_page_install.sql
+SELECT pg_temp.assert_true(to_regprocedure('public.receipt_line_photo_zone(text)') IS NULL AND to_regprocedure('public.get_vehicle_day_documents(uuid,date)') IS NOT NULL, 'second-reading revert keeps the reader, drops the helpers');
 \ir revert_20261109110000_receipt_document_pages.sql
 SELECT pg_temp.assert_true(to_regprocedure('public.land_document_pages(uuid,uuid,text,jsonb)') IS NULL, 'revert drops the writer');
 SELECT pg_temp.assert_true((SELECT count(*) = 0 FROM public.get_vehicle_contribution_days('20d21fb0-0000-4000-8000-000000000001') WHERE kind = 'document'), 'revert removes the document leg');

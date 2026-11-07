@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useCallback, useRef, useEffect, useContext } from 'react';
 import { useVehicleProfile } from './VehicleProfileContext';
 import { supabase } from '../../lib/supabase';
-import { VEHICLE_DAY_OPEN_EVENT } from './VehiclePhotoLightbox';
+import { VEHICLE_DAY_OPEN_EVENT, VEHICLE_DAYS_HIGHLIGHT_EVENT } from './VehiclePhotoLightbox';
 import { useAuctionSequence } from './useAuctionSequence';
 import { auctionMomentDayTitle, auctionOpenDayTitle, momentDay } from './auctionSequence';
 import { PopupStackContext } from '../../components/popups/PopupStack';
@@ -648,7 +648,17 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = ({ selectedAuctionUrl, o
       if (date) openDay(String(date));
     };
     window.addEventListener(VEHICLE_DAY_OPEN_EVENT, onOpenDay);
-    return () => window.removeEventListener(VEHICLE_DAY_OPEN_EVENT, onOpenDay);
+    // A set of days to illuminate (a receipt's install proofs): "days:a,b" beside the area and group highlights.
+    const onHighlightDays = (e: Event) => {
+      const days = (e as CustomEvent).detail?.days;
+      const list = Array.isArray(days) ? days.filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(String(d))) : [];
+      setHighlightGroup(list.length > 0 ? `days:${list.join(',')}` : null);
+    };
+    window.addEventListener(VEHICLE_DAYS_HIGHLIGHT_EVENT, onHighlightDays);
+    return () => {
+      window.removeEventListener(VEHICLE_DAY_OPEN_EVENT, onOpenDay);
+      window.removeEventListener(VEHICLE_DAYS_HIGHLIGHT_EVENT, onHighlightDays);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -858,7 +868,9 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = ({ selectedAuctionUrl, o
                           // Area-based highlight: "area:exhaust" matches any day with "exhaust" in areas
                           (highlightGroup.startsWith('area:') && ev?.areas?.includes(highlightGroup.slice(5))) ||
                           // Group-based highlight (multi-day sessions)
-                          ev?.group === highlightGroup
+                          ev?.group === highlightGroup ||
+                          // Named days ("days:2026-10-28,2026-10-29"): a receipt's install proofs
+                          (highlightGroup.startsWith('days:') && highlightGroup.slice(5).split(',').includes(day.s))
                         );
                         return (
                           <div
