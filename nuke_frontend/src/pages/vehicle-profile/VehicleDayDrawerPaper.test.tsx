@@ -28,16 +28,25 @@ const json = (data: unknown, status = 200) => new Response(JSON.stringify(data),
 const photo = () => ({ id: 'synthetic-photo', image_url: 'https://photos.test/synthetic.jpg', vehicle_id: vehicleId,
   is_primary: true, source: 'manual', vehicle_zone: 'ext_front', taken_at: `${photoDay}T12:00:00Z` });
 const vehicle = () => ({ id: vehicleId, is_public: true, year: 1973, make: 'Pontiac', model: 'Synthetic' });
-// What get_vehicle_day_documents returns: the same shape for every viewer, money and payer null unless tied.
+const pagePath = '00000000-0000-0000-0000-000000000099/financial/' + 'a'.repeat(64) + '.heic';
+// What get_vehicle_day_documents returns: the same shape for every viewer, money, payer and the page null unless tied.
 const dayDocuments = () => ({ date: paperDay, tied, documents: [{
   receipt_id: 'synthetic-receipt', document_id: 'synthetic-document', vendor: 'Synthetic Machine Shop', vendor_address: tied ? '1 Shop St' : null,
+  vendor_org: { name: 'Synthetic Machine Shop', logo_url: 'https://nuke.ag/source-logos/synthetic.png', website: 'https://shop.test' },
+  page: tied ? { bucket: 'user-documents', path: pagePath, bytes: 1234567, page_no: 1 } : null, page_paths: tied ? [pagePath] : null,
   document_type: 'work_order', document_kind: 'parts_service', document_number: '9810', date: paperDay, date_source: 'data_v2.transaction_date',
   date_basis: 'printed_document_date', pages: 2, payer_as_named: tied ? 'Synthetic Builder' : null, payment_method: tied ? 'Visa' : null,
   subtotal: tied ? 650 : null, discount: null, shipping: null, tax: tied ? 54.76 : null, total: tied ? 2190 : null, currency: 'USD',
   link_basis: 'cited_document', link_confidence: 0.9,
   lines: [
-    { line_number: 1, description: 'Bore cylinders .060', part_number: null, quantity: null, unit_price: null, amount: null, line_date: '2024-11-13', hours: 2.75, performer: 'Frank' },
-    { line_number: 2, description: 'Piston set', part_number: 'KB-455', quantity: 1, unit_price: tied ? 650 : null, amount: tied ? 650 : null, line_date: null, hours: null, performer: null },
+    { line_number: 1, description: 'Bore cylinders .060', part_number: null, quantity: null, unit_price: null, amount: null, line_date: '2024-11-13', hours: 2.75, performer: 'Frank',
+      install: { zone: 'engine', status: 'photographed', photo_day: photoDay, photo_count: 1, image_id: 'synthetic-photo' } },
+    { line_number: 2, description: 'Piston set', part_number: 'KB-455', quantity: 1, unit_price: tied ? 650 : null, amount: tied ? 650 : null, line_date: null, hours: null, performer: null,
+      install: { zone: 'engine', status: 'photographed', photo_day: photoDay, photo_count: 1, image_id: 'synthetic-photo' } },
+    { line_number: 3, description: 'Dash cluster lens', part_number: 'F70813', quantity: 1, unit_price: tied ? 70 : null, amount: tied ? 70 : null, line_date: null, hours: null, performer: null,
+      install: { zone: 'dashboard', status: 'no_photo', photo_day: null, photo_count: 0, image_id: null } },
+    { line_number: 4, description: 'Shipping', part_number: null, quantity: null, unit_price: null, amount: tied ? 12 : null, line_date: null, hours: null, performer: null,
+      install: { zone: null, status: 'no_zone', photo_day: null, photo_count: null, image_id: null } },
   ],
 }] });
 function Probe() {
@@ -68,6 +77,10 @@ beforeEach(() => {
       requests.push({ method, url, body });
       const endpoint = url.pathname.replace('/rest/v1/', '');
       const allowedRpc = ['get_vehicle_profile_data', 'get_vehicle_day_depth', 'get_vehicle_contribution_days', 'get_vehicle_day_documents'];
+      if (url.pathname.startsWith('/storage/v1/object/sign/')) {
+        // the private bucket signs for this viewer only; a signed render URL comes back for the page
+        return json({ signedURL: `/render/image/sign/${url.pathname.replace('/storage/v1/object/sign/', '')}?token=synthetic` });
+      }
       if (method !== 'GET' && method !== 'HEAD' && !(method === 'POST' && allowedRpc.some(name => endpoint === `rpc/${name}`))) {
         return json({ code: '42501', message: 'Synthetic transport denies every write and function' }, 403);
       }
@@ -111,6 +124,7 @@ async function showDay(day: string) {
   return host.querySelector('[data-day-drawer]')?.textContent ?? '';
 }
 const paperReads = () => requests.filter(r => r.url.pathname.endsWith('/rpc/get_vehicle_day_documents'));
+const signRequests = () => requests.filter(r => r.url.pathname.startsWith('/storage/v1/object/sign/'));
 
 it('puts a document day on the calendar and opens it with one paper read, money and payer withheld as returned', async () => {
   const text = await showDay(paperDay);
@@ -146,4 +160,46 @@ it('reports an unavailable paper read instead of an empty day', async () => {
   const text = await showDay(paperDay);
   expect(text).toContain('Paper unavailable in this read.');
   expect(text).not.toContain('NO ACTIVITY');
+});
+
+it('shows the vendor mark and each line\'s install proof; a public viewer never sees the page', async () => {
+  const text = await showDay(paperDay);
+  const mark = host.querySelector<HTMLImageElement>('[data-day-drawer] img[alt="Synthetic Machine Shop"]');
+  expect(mark?.getAttribute('src')).toBe('https://nuke.ag/source-logos/synthetic.png');
+  expect(host.querySelector<HTMLAnchorElement>('[data-day-drawer] a[href="https://shop.test"]')?.textContent).toBe('Synthetic Machine Shop');
+  expect(text).toContain('Bore cylinders .060engine photographed Oct 2, 2026');
+  expect(text).toContain('Dash cluster lensno dashboard photo after this date yet');
+  expect(text).toContain('Shipping');
+  expect(host.querySelectorAll('[data-day-drawer] .day-drawer__install')).toHaveLength(3);
+  expect(text).not.toContain('OPEN THE PAGE');
+  expect(signRequests()).toHaveLength(0);
+});
+it('a tied viewer opens the page through a signed render URL from the private bucket', async () => {
+  tied = true;
+  const opened: any[] = [];
+  window.addEventListener('nuke:vehicle-photo-open', (e) => opened.push((e as CustomEvent).detail));
+  const text = await showDay(paperDay);
+  expect(text).toContain('OPEN THE PAGE');
+  const button = [...host.querySelectorAll<HTMLButtonElement>('[data-day-drawer] button')].find(b => b.textContent?.includes('OPEN THE PAGE'));
+  await act(async () => button!.click());
+  await act(async () => { await vi.advanceTimersByTimeAsync(5); });
+  expect(signRequests()).toHaveLength(1);
+  expect(signRequests()[0].url.pathname).toBe(`/storage/v1/object/sign/user-documents/${pagePath}`);
+  expect(signRequests()[0].body).toEqual({ expiresIn: 600, transform: { width: 1800, quality: 80 } });
+  expect(opened).toHaveLength(1);
+  expect(String(opened[0].imageUrl)).toContain(`/render/image/sign/user-documents/${pagePath}?token=synthetic`);
+});
+it('the date illuminates the install proofs on the timeline, and a proof line opens its day', async () => {
+  await showDay(paperDay);
+  const header = [...host.querySelectorAll<HTMLButtonElement>('[data-day-drawer] button')].find(b => b.textContent === 'MON, OCT 7, 2024');
+  expect(header, 'date header is a button when proofs exist').toBeDefined();
+  await act(async () => header!.click());
+  expect(host.querySelector(`[data-date="${photoDay}"]`)?.classList.contains('hl')).toBe(true);
+  expect(host.querySelector(`[data-date="${paperDay}"]`)?.classList.contains('hl')).toBe(false);
+  const proof = host.querySelector<HTMLButtonElement>('[data-day-drawer] button.day-drawer__install');
+  expect(proof?.textContent).toBe('engine photographed Oct 2, 2026');
+  await act(async () => proof!.click());
+  await act(async () => { await vi.advanceTimersByTimeAsync(5); });
+  expect(host.querySelector('[data-day-drawer]')?.textContent).toContain('FRI, OCT 2, 2026');
+  expect(paperReads()).toHaveLength(1);
 });
