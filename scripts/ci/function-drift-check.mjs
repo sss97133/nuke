@@ -15,13 +15,17 @@
  *
  * Live source, first that applies (a connection string is passed to psql through the environment, not argv):
  *   --live-json FILE   offline mode: rows [{name, nargs, body}] you fetched earlier (also what the tests use)
+ *   --live-digests FILE  offline, digests only: rows [{name, args, md5}] where md5 = md5(prosrc) and args = identity args.
+ *                      The migration body is hashed raw (md5, no whitespace collapse), so a whitespace-only difference
+ *                      counts as drift in this mode.
+ *   --markdown FILE    also write a names-only report (counts + names) to FILE
  *   DATABASE_URL (or SUPABASE_DB_URL)  psql with default_transaction_read_only=on
  *   SUPABASE_ACCESS_TOKEN              Management API read query (project ref SUPABASE_PROJECT_REF, default qkgaybvrernstplzjaam)
  *
  *   node scripts/ci/function-drift-check.mjs [--migrations DIR] [--strict] [--json] [--live-json FILE]
  *   node --test scripts/ci/function-drift-check.test.mjs
  */
-import { readdirSync, readFileSync } from 'node:fs';
+import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -34,6 +38,9 @@ export const LIVE_SQL = `
      and not exists (select 1 from pg_depend d where d.objid = p.oid and d.deptype = 'e')`;
 
 export const normBody = (s) => s.replace(/\s+/g, ' ').trim();
+export const md5 = (s) => createHash('md5').update(s).digest('hex');
+// digests-only live rows -> {name, nargs, md5}
+export const fromDigests = (rows) => rows.map((r) => ({ name: r.name, nargs: countArgs(r.args || ''), md5: r.md5 }));
 export const digest = (s) => createHash('sha256').update(normBody(s)).digest('hex').slice(0, 12);
 
 // Index of the ')' that closes the '(' at `open`, skipping quotes; -1 when unbalanced.
@@ -95,6 +102,8 @@ export function latestDefinitions(files) {
   return defs;
 }
 
+const ldig = (r) => (r.md5 ? r.md5.slice(0, 12) : digest(r.body));
+
 export function compare(defs, live) {
   const liveBy = new Map();
   for (const r of live) {
@@ -105,11 +114,11 @@ export function compare(defs, live) {
   const drifted = [], unmigrated = [], dropped = [];
   for (const [k, rows] of liveBy) {
     const d = defs.get(k);
-    if (!d) { for (const r of rows) unmigrated.push({ name: r.name, nargs: r.nargs, live: digest(r.body) }); continue; }
-    const want = normBody(d.body);
+    if (!d) { for (const r of rows) unmigrated.push({ name: r.name, nargs: r.nargs, live: ldig(r) }); continue; }
+    const want = normBody(d.body), wantMd5 = md5(d.body);
     // same name and argument count can be two overloads; then any live body equal to the migration's is a match
-    if (!rows.some((r) => normBody(r.body) === want)) {
-      for (const r of rows) drifted.push({ name: r.name, nargs: r.nargs, file: d.file, live: digest(r.body), migration: digest(d.body), overloads: rows.length });
+    if (!rows.some((r) => (r.md5 ? r.md5 === wantMd5 : normBody(r.body) === want))) {
+      for (const r of rows) drifted.push({ name: r.name, nargs: r.nargs, file: d.file, live: ldig(r), migration: r.md5 ? wantMd5.slice(0, 12) : digest(d.body), overloads: rows.length });
     }
   }
   for (const [k, d] of defs) if (!liveBy.has(k)) dropped.push({ name: d.name, nargs: d.nargs, file: d.file });
@@ -131,6 +140,20 @@ export function formatReport(res, { strict = false } = {}) {
   return out.join('\n');
 }
 export const exitCode = (res, strict) => (res.drifted.length || (strict && res.unmigrated.length) ? 1 : 0);
+
+// Names-only markdown: counts, then each function once per name/nargs. No bodies, no digests.
+export function formatMarkdown(res, { date, liveCount, migrationCount }) {
+  const names = (a) => [...new Set(a.map((r) => `${r.name}/${r.nargs}`))].sort();
+  const sec = (title, a) => { const n = names(a); return `## ${title}: ${n.length}\n\n` + (n.length ? n.map((x) => `- \`${x}\``).join('\n') : '_none_') + '\n'; };
+  return [
+    `# Function drift, live public schema vs repo migrations (${date})`, '',
+    `Produced by \`scripts/ci/function-drift-check.mjs --live-digests\`. Live: ${liveCount} public function overloads (name, identity args, md5(prosrc), read-only fetch); repo: ${migrationCount} distinct name/arg-count definitions parsed from \`supabase/migrations\`. Names are \`name/argument-count\`; no bodies.`, '',
+    'Limits: only \`$tag$...$tag$\` bodies are parsed (\`AS \'string\'\` bodies are not read, so they appear under live-with-no-migration); the live digest is of the raw body, so a whitespace-only difference counts as drifted; overloads sharing a name and argument count are compared as a set; extension-owned functions are excluded only if the live fetch excluded them. A historical list, not authority to reapply or delete anything.', '',
+    sec('Drifted (latest migration body differs from live)', res.drifted),
+    sec('Live with no migration', res.unmigrated),
+    sec('Migration defines it, live lacks it', res.dropped),
+  ].join('\n');
+}
 
 function fetchLive() {
   const url = process.env.DATABASE_URL || process.env.SUPABASE_DB_URL;
@@ -159,17 +182,22 @@ function fetchLive() {
 }
 
 async function main(argv) {
-  const opt = { migrations: path.join(path.dirname(fileURLToPath(import.meta.url)), '../../supabase/migrations'), strict: false, json: false, liveJson: null };
+  const opt = { migrations: path.join(path.dirname(fileURLToPath(import.meta.url)), '../../supabase/migrations'), strict: false, json: false, liveJson: null, liveDigests: null, markdown: null };
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === '--strict') opt.strict = true;
     else if (argv[i] === '--json') opt.json = true;
     else if (argv[i] === '--migrations') opt.migrations = argv[++i];
     else if (argv[i] === '--live-json') opt.liveJson = argv[++i];
+    else if (argv[i] === '--live-digests') opt.liveDigests = argv[++i];
+    else if (argv[i] === '--markdown') opt.markdown = argv[++i];
     else { console.error(`unknown argument ${argv[i]}`); return 2; }
   }
   try {
-    const live = opt.liveJson ? JSON.parse(readFileSync(opt.liveJson, 'utf8')) : await fetchLive();
-    const res = compare(latestDefinitions(loadMigrations(opt.migrations)), live);
+    const live = opt.liveDigests ? fromDigests(JSON.parse(readFileSync(opt.liveDigests, 'utf8')))
+      : opt.liveJson ? JSON.parse(readFileSync(opt.liveJson, 'utf8')) : await fetchLive();
+    const defs = latestDefinitions(loadMigrations(opt.migrations));
+    const res = compare(defs, live);
+    if (opt.markdown) writeFileSync(opt.markdown, formatMarkdown(res, { date: new Date().toISOString().slice(0, 10), liveCount: live.length, migrationCount: defs.size }));
     console.log(opt.json ? JSON.stringify(res, null, 2) : formatReport(res, opt));
     return exitCode(res, opt.strict);
   } catch (e) {

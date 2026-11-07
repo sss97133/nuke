@@ -2,12 +2,12 @@
 //   node --test scripts/ci/function-drift-check.test.mjs   (run by scripts/ci/verify.sh)
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { compare, countArgs, exitCode, formatReport, latestDefinitions, parseMigration } from './function-drift-check.mjs';
+import { md5, fromDigests, formatMarkdown, compare, countArgs, exitCode, formatReport, latestDefinitions, parseMigration } from './function-drift-check.mjs';
 
 const M1 = `
 -- CREATE OR REPLACE FUNCTION public.commented_out(a int) RETURNS int AS $$ select 1 $$;
@@ -71,4 +71,31 @@ test('offline CLI: --live-json against a migrations dir exits 1 on drift, 0 when
   assert.equal(run([{ name: 'f', nargs: 2, body: 'select 5' }]).status, 1);
   const noSource = spawnSync('node', [cli, '--migrations', dir], { encoding: 'utf8', env: { PATH: process.env.PATH } });
   assert.equal(noSource.status, 2);
+});
+
+test('digests-only live rows: md5 of the raw migration body matches, a changed one drifts, names only in the markdown', () => {
+  const live = fromDigests([
+    { name: 'f', args: 'a integer, b text', md5: md5('\n  select   42\n') },
+    { name: 'g', args: 'numeric', md5: md5('select 999') },
+    { name: 'hot_patched', args: '', md5: md5('select 7') },
+  ]);
+  assert.equal(live[0].nargs, 2);
+  const r = compare(defs, live);
+  assert.deepEqual(r.drifted.map((d) => d.name), ['g']);
+  assert.deepEqual(r.unmigrated.map((d) => d.name), ['hot_patched']);
+  const md = formatMarkdown(r, { date: '2026-11-07', liveCount: 3, migrationCount: defs.size });
+  assert.match(md, /Drifted[^\n]*: 1\n\n- `g\/1`/);
+  assert.match(md, /Live with no migration: 1/);
+  assert.doesNotMatch(md, /select 999/);
+});
+
+test('CLI --live-digests --markdown writes the report', () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'drift-'));
+  writeFileSync(path.join(dir, '20260101000000_a.sql'), M1);
+  const f = path.join(dir, 'd.json'), out = path.join(dir, 'out.md');
+  writeFileSync(f, JSON.stringify([{ name: 'f', args: 'a integer, b text', md5: md5(' select 1 ') }]));
+  const cli = path.join(path.dirname(fileURLToPath(import.meta.url)), 'function-drift-check.mjs');
+  const r = spawnSync('node', [cli, '--migrations', dir, '--live-digests', f, '--markdown', out], { encoding: 'utf8' });
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(readFileSync(out, 'utf8'), /Migration defines it, live lacks it: 2/);
 });
