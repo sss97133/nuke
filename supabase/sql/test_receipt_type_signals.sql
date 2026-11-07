@@ -1,4 +1,4 @@
--- receipt_type_signals after 20261111110000 (which captures the live hot-patch on top of 20261109130000): fulfilment words no longer read as trucks, Pontiac F-bodies read as cars,
+-- receipt_type_signals after 20261111111000 (which captures the live hot-patch on top of 20261109130000): fulfilment words no longer read as trucks, Pontiac F-bodies read as cars,
 -- a MOPAR make word on a Pontiac still fails, a printed CATEGORY header is not fitment, and a Blazer slip still passes on a truck.
 \set ON_ERROR_STOP on
 DO $$ BEGIN
@@ -14,7 +14,7 @@ CREATE FUNCTION public.receipt_vehicle_class(v vehicles) RETURNS text LANGUAGE s
     when v.body_style is null and v.model is null then 'unknown' else 'car' end $$;
 \ir gate_sv_stand_in.sql
 \ir ../migrations/20261109130000_receipt_type_signals_fulfilment.sql
-\ir ../migrations/20261111110000_receipt_type_signals_category_chrome.sql
+\ir ../migrations/20261111111000_receipt_type_signals_category_chrome.sql
 
 CREATE FUNCTION pg_temp.assert_true(ok boolean, label text) RETURNS void LANGUAGE plpgsql AS $$
 BEGIN IF NOT coalesce(ok, false) THEN RAISE EXCEPTION 'FAIL: %', label; END IF; RAISE NOTICE 'ok: %', label; END $$;
