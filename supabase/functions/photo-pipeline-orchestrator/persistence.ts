@@ -6,7 +6,7 @@ export interface PipelineReceipt {
   method: "photo-pipeline-orchestrator";
   pipeline_version: "v2";
   receipt_version: 1;
-  outcome: "processing" | "completed" | "failed" | "policy_skip";
+  outcome: "processing" | "completed" | "failed" | "policy_skip" | "deferred";
   processing_started_at: string;
   processing_finished_at: string | null;
   classifier_model?: string | null;
@@ -14,6 +14,8 @@ export interface PipelineReceipt {
   failure_phase?: string;
   error_class?: string;
   http_status?: number;
+  /** outcome 'deferred': the provider rate-limited us; the image is back in the queue, not failed. */
+  retry_after_seconds?: number;
   observation_id?: string;
   observation_status?: "created" | "existing" | "no_vehicle";
 }

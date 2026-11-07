@@ -15,6 +15,10 @@ export interface ClassifierReceipt {
   reserved_cost_usd?: number;
   model_version?: string;
   token_count_attempts?: number;
+  /** Seconds the provider (Retry-After header or RetryInfo) or our own guard asked us to wait. Bounded to 24h. */
+  retry_after_seconds?: number;
+  /** Set when the shared spend guard, not Google, refused the call (cooldown / paused / daily_cap). */
+  guard_reason?: string;
   quota?: { violations: Array<{ quota_metric: string | null; quota_id: string | null; quota_value: number | null; model: string | null; location: string | null }>; retry_delay_seconds: number | null };
   timing_ms?: { image_download: number; token_count: number; generation: number; total: number };
 }
@@ -109,9 +113,30 @@ async function readBounded(response: Response, maximum: number): Promise<Uint8Ar
   for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
   return bytes;
 }
+/** Retry-After as delta-seconds or HTTP-date; null when absent or unusable. */
+export function parseRetryAfter(value: string | null, now = Date.now()): number | null {
+  if (!value) return null;
+  const v = value.trim();
+  let seconds = /^\d+(?:\.\d+)?$/.test(v) ? Number(v) : (Date.parse(v) - now) / 1000;
+  if (!Number.isFinite(seconds)) return null;
+  seconds = Math.max(0, seconds);
+  return seconds <= 86400 ? seconds : 86400;
+}
+/** A 402/429 (or our guard's refusal) is a provider-wide condition, never evidence about the photo. */
+async function rateLimitFields(response: Response, base: ClassifierReceipt, phase: string, countStage: boolean): Promise<ClassifierReceipt> {
+  const quota = await quotaDiagnostics(response);
+  const guard = response.headers.get("x-gemini-guard") ?? undefined;
+  const header = parseRetryAfter(response.headers.get("retry-after"));
+  const limited = response.status === 429 || response.status === 402;
+  const retry = Math.max(header ?? 0, quota?.retry_delay_seconds ?? 0);
+  return { ...base, failure_phase: phase, http_status: response.status, quota,
+    ...(guard ? { guard_reason: guard } : {}), ...(retry > 0 ? { retry_after_seconds: retry } : {}),
+    error_class: guard && guard !== "unavailable" ? "provider_cooldown"
+      : limited ? "classifier_rate_limited" : countStage ? "classifier_count_http_error" : "classifier_http_error" };
+}
 /** Quota metadata only. Never retain provider prose, project IDs or credentials. */
 async function quotaDiagnostics(response: Response): Promise<ClassifierReceipt["quota"]> {
-  if (response.status !== 429) return undefined;
+  if (response.status !== 429 && response.status !== 402) return undefined;
   try {
     const body = JSON.parse(new TextDecoder().decode(await readBounded(response, CLASSIFIER_BUDGET.response_bytes)));
     const details = Array.isArray(body?.error?.details) ? body.error.details : [];
@@ -204,7 +229,7 @@ export async function classifyImage(
     const counted = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:countTokens`, {
       method: "POST", headers, body: JSON.stringify({ contents }), redirect: "error", signal: AbortSignal.timeout(CLASSIFIER_BUDGET.request_ms),
     });
-    if (!counted.ok) return UNCLASSIFIED_FALLBACK({ ...receipt, failure_phase: phase, error_class: "classifier_count_http_error", http_status: counted.status, quota: await quotaDiagnostics(counted) });
+    if (!counted.ok) return UNCLASSIFIED_FALLBACK(await rateLimitFields(counted, receipt, phase, true));
     const count = JSON.parse(new TextDecoder().decode(await readBounded(counted, CLASSIFIER_BUDGET.response_bytes)));
     if (!integer(count.totalTokens) || count.totalTokens > CLASSIFIER_BUDGET.input_tokens) {
       return UNCLASSIFIED_FALLBACK({ ...receipt, failure_phase: phase, error_class: "classifier_input_token_budget" });
@@ -218,8 +243,7 @@ export async function classifyImage(
     const response = await geminiFetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
       method: "POST", headers, body, redirect: "error", signal: AbortSignal.timeout(CLASSIFIER_BUDGET.request_ms),
     }, 'photo-pipeline-orchestrator', fetch);
-    if (!response.ok) return UNCLASSIFIED_FALLBACK({ ...receipt, failure_phase: phase,
-      error_class: response.status === 429 ? "classifier_rate_limited" : "classifier_http_error", http_status: response.status, quota: await quotaDiagnostics(response) });
+    if (!response.ok) return UNCLASSIFIED_FALLBACK(await rateLimitFields(response, receipt, phase, false));
     phase = "response";
     const result = JSON.parse(new TextDecoder().decode(await readBounded(response, CLASSIFIER_BUDGET.response_bytes)));
     const usage = result.usageMetadata;
