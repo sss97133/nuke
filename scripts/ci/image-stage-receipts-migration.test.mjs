@@ -59,3 +59,12 @@ test("cron is defined in the migration and is inert until enabled", () => {
   assert.match(code, /cron\.schedule\('image-stage-reconciler'/);
   assert.match(code, /reconcile_image_stages\(100\)/);
 });
+
+test("legacy classifier evidence accepts the live shapes and requires pipeline_version, image_type and numeric confidence", () => {
+  assert.match(code, /create or replace function public\.image_stage_legacy_version/);
+  assert.match(code, /jsonb_typeof\(p_meta #> '\{classification,image_type\}'\) = 'string'/);
+  assert.match(code, /jsonb_typeof\(p_meta #> '\{classification,confidence\}'\) = 'number'/);
+  assert.match(code, /jsonb_typeof\(p_meta -> 'pipeline_version'\) = 'string'/);
+  assert.match(code, /'legacy-' \|\| btrim\(p_meta ->> 'pipeline_version'\)/);
+  assert.match(code, /revoke all on function public\.image_stage_legacy_version\(text, jsonb\)/);
+});
