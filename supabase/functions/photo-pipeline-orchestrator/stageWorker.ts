@@ -55,3 +55,32 @@ export async function runStageWorker(db: Db, input: { stage?: string; limit?: nu
   }
   return { success: true, stage, attempted, processed: ok, stopped: stopped ?? "limit" };
 }
+
+/**
+ * Cheap availability probe. For each stage not known available (and either seen unavailable or flagged by #3024), send
+ * ONE OPTIONS request to its edge function: 404 = not deployed (stays unavailable), anything else = deployed. The result
+ * goes to set_image_stage_availability, which stamps available / available_since / last_probed_at. The reconciler then
+ * enqueues the stage's unavailable receipts (enqueue_available_stage_retries). Bounded (MAX_PROBES, 5 s each), no body, no side effects.
+ */
+export const MAX_PROBES = 6;
+export async function probeStageAvailability(db: Db, baseUrl: string, doFetch: typeof fetch = fetch) {
+  if (!(await stageWorkerEnabled(db))) return { success: true, skipped: "disabled", probed: 0 };
+  const { data, error } = await db.from("image_pipeline_stages")
+    .select("stage, producer, legacy_unavailable_key, available, last_probed_at")
+    .or("available.is.null,available.eq.false").order("last_probed_at", { ascending: true, nullsFirst: true }).limit(25);
+  if (error) return { success: false, error: "stage_read_failed", probed: 0 };
+  const due = ((data ?? []) as { stage: string; producer: string; legacy_unavailable_key: string | null; available: boolean | null }[])
+    .filter((s) => s.available === false || s.legacy_unavailable_key).slice(0, MAX_PROBES);
+  const results: { stage: string; available: boolean | null }[] = [];
+  for (const s of due) {
+    const fn = s.legacy_unavailable_key ?? s.producer;
+    let available: boolean | null = null;
+    try {
+      const r = await doFetch(`${baseUrl}/functions/v1/${encodeURIComponent(fn)}`, { method: "OPTIONS", signal: AbortSignal.timeout(5000) });
+      available = r.status !== 404;
+    } catch { /* network error: unknown, leave the signal alone */ }
+    if (available !== null) await db.rpc("set_image_stage_availability", { p_stage: s.stage, p_available: available, p_probed: true });
+    results.push({ stage: s.stage, available });
+  }
+  return { success: true, probed: results.length, results };
+}

@@ -23,7 +23,7 @@ import { persistPipelineState, rowVinQualifies, type PipelineReceipt } from "./p
 import { runClassifierAssay } from "./classifierAssay.ts";
 import { clearRetry, isRateLimited, readProviderGate, recordRateLimit } from "./providerBackoff.ts";
 import { buildStageReceipt, postClassifierFailureReceipts, type PostClassifierPhase, rateLimitRetrySeconds, recordStageReceipt, unavailableReceipts } from "./stageReceipts.ts";
-import { runStageWorker } from "./stageWorker.ts";
+import { probeStageAvailability, runStageWorker } from "./stageWorker.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -95,6 +95,13 @@ Deno.serve(async (req) => {
     const input = await req.json();
 
     if (input?.action === "classifier_assay") return await runClassifierAssay(req, input, supabase);
+
+    // Availability probe (one OPTIONS per stage seen unavailable); see stageWorker.ts.
+    if (input?.action === "probe_stages") {
+      const out = await probeStageAvailability(supabase, SUPABASE_URL);
+      return new Response(JSON.stringify(out), { status: (out as { success: boolean }).success ? 200 : 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
 
     // Single-stage worker: claims image_stage_work for one stage and runs only that stage (see stageWorker.ts).
     if (input?.action === "run_stage") {
