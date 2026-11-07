@@ -21,7 +21,7 @@ import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { classifyImage, type ClassificationResult } from "./classifier.ts";
 import { persistPipelineState, rowVinQualifies, type PipelineReceipt } from "./persistence.ts";
 import { runClassifierAssay } from "./classifierAssay.ts";
-import { isRateLimited, readProviderGate, recordRateLimit } from "./providerBackoff.ts";
+import { clearRetry, isRateLimited, readProviderGate, recordRateLimit } from "./providerBackoff.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -345,7 +345,11 @@ Deno.serve(async (req) => {
       let failedAttribution: AttributionReceipt | null = null;
       if (!vehicle_id) {
         const resolved = await resolveVehicle(image_id, user_id, classification);
-        if (resolved) failedAttribution = await fileResolvedVehicle(image_id, resolved);
+        if (resolved) {
+          // A filing error must not turn a provider rate limit into a failed photo: defer first, file on the retry.
+          try { failedAttribution = await fileResolvedVehicle(image_id, resolved); }
+          catch (e) { if (!isRateLimited(detail)) throw e; console.warn("[photo-pipeline] filing skipped during rate limit"); }
+        }
       }
       if (isRateLimited(detail)) {
         // Provider-wide condition, not a verdict on the photo: requeue with a backoff instead of failing it.
@@ -464,6 +468,8 @@ Deno.serve(async (req) => {
       observation_id: observation?.id,
       observation_status: observation?.status ?? "no_vehicle",
     }, updatePayload, scanMeta, processingSource);
+    // A real model answer closes this image's retry state and the provider breaker (AIMD +1). Nothing else calls it.
+    await clearRetry(supabase, image_id);
 
     // Late-resolution dedup pass: Step 1.5 could only see this row in the
     // detector's corpus if it was INSERTed with a vehicle_id. When the vehicle
