@@ -713,7 +713,7 @@ class PrivateProjection(unittest.TestCase):
         self.assertEqual((p['additive'], p['billable_hours'], p['hours_verified']), (False, None, False))
         self.assertEqual(p['observed']['hours_lower'], '0.33')            # aware frames only, a lower bound, never merged with 676
         self.assertEqual(p['observed']['observed_day_count'], 3)
-        self.assertEqual(p['observed']['camera_local_review']['billable_hours'], None)
+        self.assertNotIn('billable_hours', p['observed']['camera_local_review'])         # no hours key of any kind in the review
         self.assertEqual(p['holds']['unknown_clock'], 2)
         self.assertEqual(p['holds']['intent_unclassified'], 1)
         self.assertEqual(p['holds']['identity_not_confirmed'], 1)             # the unknown-identity frame
@@ -941,6 +941,102 @@ class PrivateProjection(unittest.TestCase):
             self.assertGreater(len(w.rows), 0)
             rc, _, _ = c.run_cli(['plan', mp, '--owner', OWNER, '--clock', CLOCK, '--out', os.path.join(d, 'cs2.json'), '--projection-out', pp])
             self.assertEqual(rc, 2)                                         # never overwrites a plan file
+
+    # ---- private-security fixes: fail-closed contract, registry, labor allowlist, SQL parity
+    def _pair(self):
+        pcs = self.labor_pipeline(self.images())['private_projection_changeset']
+        img = next(i for i in pcs['items'] if i['kind'] == 'image_timeline_event' and i['payload']['assertion_status'] == 'observation_unverified'
+                   and i['payload']['capture']['offset_state'] == 'unknown')
+        lab = next(i for i in pcs['items'] if i['kind'] == 'labor_reconciliation')
+        return img, lab
+
+    def test_missing_or_mistyped_image_fields_are_refused_not_defaulted(self):
+        img, _ = self._pair()
+        projection.check_item(img)
+        for key in ('assertion_status', 'identity', 'capture', 'time', 'stance', 'completed_work_asserted', 'origin_class', 'intent', 'event_key'):
+            c = copy.deepcopy(img); del c['payload'][key]
+            with self.assertRaises(ContractError, msg=key):
+                projection.check_item(c)
+        for path in (('capture', 'offset_state'), ('identity', 'state'), ('capture', 'source'), ('time', 'kind')):
+            c = copy.deepcopy(img); del c['payload'][path[0]][path[1]]
+            with self.assertRaises(ContractError, msg=str(path)):
+                projection.check_item(c)
+        # the exact review payload: UTC present, no offset_state, no assertion_status, unconfirmed identity
+        c = copy.deepcopy(img)
+        c['payload'] = {'stance': 'visual_observed', 'completed_work_asserted': False, 'capture': {'utc': '2016-03-27T10:00:00+00:00'},
+                        'identity': {'state': 'unconfirmed'}}
+        with self.assertRaises(ContractError):
+            projection.check_item(c)
+        for mutate in (lambda p: p.update(completed_work_asserted='false'), lambda p: p['capture'].update(offset_state='maybe'),
+                       lambda p: p['capture'].update(offset_state='known'),                       # known offset needs its UTC time
+                       lambda p: p['time'].update(utc='2016-03-27T10:00:00+00:00'),
+                       lambda p: p['identity'].update(extra=1), lambda p: p.update(subject_vehicle_ref='a b'),
+                       lambda p: p.update(assertion_status='held', subject_vehicle_ref='V')):
+            c = copy.deepcopy(img); mutate(c['payload'])
+            with self.assertRaises(ContractError):
+                projection.check_item(c)
+
+    def test_labor_cannot_present_a_claim_as_hours_worked(self):
+        _, lab = self._pair()
+        projection.check_item(lab)
+        def mut(f):
+            c = copy.deepcopy(lab); f(c['payload']); return c
+        for i, c in enumerate([
+            mut(lambda p: p['observed'].update(actual_hours='676')), mut(lambda p: p['observed'].update(worked_hours='676')),
+            mut(lambda p: p['observed'].update(photo_hours='676')), mut(lambda p: p['observed'].update(billable_hours='676')),
+            mut(lambda p: p['observed'].update(paid=True)), mut(lambda p: p['observed'].update(payment_status='paid')),
+            mut(lambda p: p['observed']['camera_local_review'].update(billable_hours=None)) if lab['payload']['observed'].get('camera_local_review') else mut(lambda p: p['observed'].update(hours_actual=1)),
+            mut(lambda p: p['claim'].update(actual_hours='676')), mut(lambda p: p['holds'].update(worked_hours=3)),
+            mut(lambda p: p['holds'].update(unknown_clock='many')), mut(lambda p: p.update(additive='false')),
+            mut(lambda p: p.update(hours_verified='false')), mut(lambda p: p['claim'].update(source_claim='true')),
+            mut(lambda p: p['observed'].update(status='verified_on_site')), mut(lambda p: p.update(relation='confirmed')),
+            mut(lambda p: p['observed'].update(clusters=[{'start': 'a', 'end': 'b', 'frames': 1, 'capped': False, 'single_frame': True, 'hours': 9}])),
+            mut(lambda p: p['rate_provenance'].append({'category': 'a', 'paid_hours': 1})),
+            mut(lambda p: p['observed'].update(status='review_camera_local_only', hours_lower='1.00')),
+        ] + [mut(lambda p, k=k: p.pop(k)) for k in ('claim', 'observed', 'holds', 'rate_provenance', 'conflicts', 'relation', 'additive',
+                                                    'hours_verified', 'reconciliation_key')]):
+            with self.assertRaises(ContractError, msg=f'case {i}'):
+                projection.check_item(c)
+
+    def test_origin_key_that_looks_like_an_address_is_refused_with_a_clear_error(self):
+        img, _ = self._pair()
+        c = copy.deepcopy(img); c['evidence_refs'].append({'kind': 'source_message', 'origin_key': 'gmail:someone@example.invalid:m1:p1'})
+        with self.assertRaises(ContractError) as cm:
+            projection.check_item(c)
+        self.assertIn('opaque namespace', str(cm.exception))
+
+    def test_registered_route_and_run_trace_shape(self):
+        self.assertEqual(projection.REGISTERED_PRODUCERS, {('client_evidence_projector', 'image_labor_projection', '2026-11-07a')})
+        pcs = self.labor_pipeline(self.images())['private_projection_changeset']
+        bkey = projection.batch_key(pcs, projection.batches(pcs)[0])
+        self.assertRegex(bkey, r'^pwp:[a-f0-9]{48}$')                      # the database accepts exactly this key shape; label = first 20 chars
+        self.assertEqual(len(bkey[:20]), 20)
+
+    def test_python_contract_lists_match_the_migration(self):
+        import re
+        sql = open(os.path.join(os.path.dirname(__file__), '..', '..', 'supabase', 'migrations', '20261107210025_private_work_projections.sql')).read()
+        q = lambda t: re.findall(r"'([^']*)'", t)
+        # allowed key sets
+        body = sql.split('-- parity:allowed_keys', 1)[1].split('ELSE ARRAY', 1)[0]
+        sql_sets = {m.group(1): set(q(m.group(2))) for m in re.finditer(r"WHEN '(\w+)' THEN ARRAY\[(.*?)\]", body)}
+        self.assertEqual(sql_sets, projection.ALLOWED_KEYS)
+        # forbidden keys
+        fk = sql.split('-- parity:forbidden_keys', 1)[1].split('IN (', 1)[1].split(')', 1)[0]
+        self.assertEqual(set(q(fk)), projection.FORBIDDEN)
+        rx = re.findall(r"lower\(k\) ~ '\(([^']*)\)'", sql)
+        self.assertIn(projection.FORBIDDEN_RE.pattern.strip('()'), rx)
+        self.assertIn(projection.CLAIM_AS_WORK_RE.pattern.strip('()'), rx)
+        # registered producer, status and relation vocabularies
+        reg = sql.split('-- parity:producer_registry', 1)[1].split('))', 1)[0]
+        self.assertEqual({tuple(q(t)) for t in re.findall(r"\(([^()]*)\)", reg + ')')}, projection.REGISTERED_PRODUCERS)
+        def vocab(after, before):
+            return set(q(sql.split(after, 1)[1].split(before, 1)[0]))
+        self.assertEqual(vocab("(p->'observed'->>'status') IN (", ")"), projection.LABOR_STATUS)
+        self.assertEqual(vocab("(p->>'relation') IN (", ")"), projection.LABOR_RELATION)
+        req_img = re.search(r"p \?& ARRAY\[(.*?)\]\)\s+AND p->'stance'", sql, re.S).group(1)
+        self.assertEqual(tuple(q(req_img)), projection.IMAGE_REQUIRED)
+        req_lab = re.search(r"\(p \?& ARRAY\[('reconciliation_key'.*?)\]\)", sql, re.S).group(1)
+        self.assertEqual(tuple(q(req_lab)), projection.LABOR_REQUIRED)
 
 
 if __name__ == '__main__':

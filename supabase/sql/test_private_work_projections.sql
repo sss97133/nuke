@@ -1,6 +1,9 @@
 -- Disposable synthetic contract; no production data. Runs the migration for the owner-private work projection store against
 -- the financial evidence fixture: account scope, append-only revisions, claim-versus-observation payload contract,
 -- cross-owner refusal, sticky privacy holds, idempotency and role denial.
+-- The writer path runs as the REAL service_role (SET LOCAL ROLE), not as the CI superuser, with only the privileges the
+-- deployed service_role holds (read-only probe, 2026-11-07): USAGE on schemas auth and extensions, SELECT on financial_documents,
+-- EXECUTE on extensions.digest, BYPASSRLS, and NO SELECT on auth.users. Nothing broader is granted to make a check pass.
 \set ON_ERROR_STOP on
 \ir test_financial_evidence.sql
 \ir ../migrations/20261107210025_private_work_projections.sql
@@ -9,6 +12,14 @@ INSERT INTO auth.users(id) VALUES ('11111111-1111-4111-8111-111111111111'), ('22
   ('33333333-3333-4333-8333-333333333333');
 UPDATE auth.users SET banned_until = now() + interval '1 day' WHERE id = '33333333-3333-4333-8333-333333333333';
 SELECT set_config('request.jwt.claim.role', 'service_role', true);
+ALTER ROLE service_role BYPASSRLS;                       -- transactional; rolled back with the test
+GRANT USAGE ON SCHEMA auth, extensions TO service_role;
+GRANT SELECT ON financial_documents TO service_role;     -- exactly what the deployed role holds on the document table
+DO $$ BEGIN
+  IF has_table_privilege('service_role', 'auth.users', 'select') OR has_table_privilege('service_role', 'auth.users', 'insert')
+     OR has_table_privilege('service_role', 'private_work_projections', 'update') THEN
+    RAISE EXCEPTION 'fixture grants service_role more than production does'; END IF;
+END $$;
 
 CREATE FUNCTION pg_temp.fails(q text, needle text) RETURNS void LANGUAGE plpgsql AS $$
 BEGIN
@@ -21,8 +32,9 @@ BEGIN
 END $$;
 
 CREATE FUNCTION pg_temp.rev(idem text, items jsonb) RETURNS jsonb LANGUAGE sql AS $$
-  SELECT jsonb_build_object('idempotency_key', idem, 'producer', 'synthetic_producer', 'method', 'synthetic_method',
-    'version', 'v1', 'run_label', 'run-' || idem, 'projections', items) $$;
+  SELECT jsonb_build_object('idempotency_key', 'pwp:' || substr(md5(idem) || md5(idem || '2'), 1, 48), 'producer', 'client_evidence_projector',
+    'method', 'image_labor_projection', 'version', '2026-11-07a',
+    'run_label', substr('pwp:' || substr(md5(idem) || md5(idem || '2'), 1, 48), 1, 20), 'projections', items) $$;
 
 CREATE FUNCTION pg_temp.img_item(k text, extra jsonb DEFAULT '{}') RETURNS jsonb LANGUAGE sql AS $$
   SELECT jsonb_build_object('kind', 'image_timeline_event', 'projection_key', md5(k), 'source_privacy_hold', false, 'holds',
@@ -45,10 +57,11 @@ CREATE FUNCTION pg_temp.labor_item(k text, doc uuid, run uuid, sha text, revkey 
       'rate_provenance', '[{"category":"a","rate_source":"stated_on_document"}]'::jsonb, 'conflicts', '[]'::jsonb,
       'relation', 'not_assessable', 'additive', false, 'billable_hours', NULL, 'hours_verified', false)) || extra $$;
 
+SET LOCAL ROLE service_role;
 DO $$ DECLARE
   a uuid := '11111111-1111-4111-8111-111111111111'; b uuid := '22222222-2222-4222-8222-222222222222';
   sha_a text := repeat('d', 64); sha_b text := repeat('e', 64);
-  da jsonb; db jsonb; r jsonb; r2 jsonb; id1 uuid; head jsonb; n integer; i1 jsonb; l1 jsonb;
+  da jsonb; db jsonb; r jsonb; r2 jsonb; id1 uuid; head jsonb; n integer; i1 jsonb; l1 jsonb; k text;
 BEGIN
   da := ingest_financial_evidence(a, jsonb_build_object('sha256', sha_a, 'storage_path', a || '/a.pdf', 'byte_size', 100),
     '{"idempotency_key":"rev-a","method":"synthetic","version":"1","fields":[{"field_key":"c1","value_raw":"x","evidence":{"q":"s"}}]}');
@@ -122,6 +135,64 @@ BEGIN
   PERFORM pg_temp.fails(format('SELECT ingest_private_work_projection(%L, %L::jsonb)', a, pg_temp.rev('k21', jsonb_build_array(
     pg_temp.img_item('e7', jsonb_build_object('payload', (i1->'payload') || '{"completed_work_asserted":true}'))))::text), 'observation contract');
 
+  -- fail closed on missing keys: three-valued logic must not turn an absent field into a pass
+  FOREACH k IN ARRAY ARRAY['assertion_status', 'identity', 'capture', 'time', 'stance', 'completed_work_asserted', 'origin_class', 'intent', 'event_key',
+      'capture.offset_state', 'capture.source', 'identity.state', 'time.kind'] LOOP
+    PERFORM pg_temp.fails(format('SELECT ingest_private_work_projection(%L, %L::jsonb)', a, pg_temp.rev('m-' || k,
+      jsonb_build_array(pg_temp.img_item('mk-' || k, jsonb_build_object('payload', (i1->'payload') #- string_to_array(k, '.')))))::text), 'observation contract');
+  END LOOP;
+  -- the exact payload the review found admitted: UTC on the capture, no offset_state, no assertion_status, unconfirmed identity
+  PERFORM pg_temp.fails(format('SELECT ingest_private_work_projection(%L, %L::jsonb)', a, pg_temp.rev('m-review', jsonb_build_array(
+    pg_temp.img_item('mk-review', jsonb_build_object('payload', jsonb_build_object('stance', 'visual_observed', 'completed_work_asserted', false,
+      'capture', jsonb_build_object('utc', '2016-03-27T10:00:00+00:00'), 'identity', jsonb_build_object('state', 'unconfirmed'))))))::text), 'observation contract');
+  PERFORM pg_temp.fails(format('SELECT ingest_private_work_projection(%L, %L::jsonb)', a, pg_temp.rev('m-nid', jsonb_build_array(
+    pg_temp.img_item('mk-nid', jsonb_build_object('payload', (i1->'payload') - 'identity' || jsonb_build_object('capture', jsonb_build_object('source', 'x', 'offset_state', 'unknown', 'utc', 'z'))))))::text), 'observation contract');
+  PERFORM pg_temp.fails(format('SELECT ingest_private_work_projection(%L, %L::jsonb)', a, pg_temp.rev('m-tutc', jsonb_build_array(
+    pg_temp.img_item('mk-tutc', jsonb_build_object('payload', jsonb_set(i1->'payload', '{time,utc}', '"2016-03-27T10:00:00+00:00"')))))::text), 'unknown camera offset');
+  PERFORM pg_temp.fails(format('SELECT ingest_private_work_projection(%L, %L::jsonb)', a, pg_temp.rev('m-known', jsonb_build_array(
+    pg_temp.img_item('mk-known', jsonb_build_object('payload', jsonb_set(i1->'payload', '{capture,offset_state}', '"known"')))))::text), 'observation contract');
+  PERFORM pg_temp.fails(format('SELECT ingest_private_work_projection(%L, %L::jsonb)', a, pg_temp.rev('m-offs', jsonb_build_array(
+    pg_temp.img_item('mk-offs', jsonb_build_object('payload', jsonb_set(i1->'payload', '{capture,offset_state}', '"maybe"')))))::text), 'observation contract');
+  PERFORM pg_temp.fails(format('SELECT ingest_private_work_projection(%L, %L::jsonb)', a, pg_temp.rev('m-cwa', jsonb_build_array(
+    pg_temp.img_item('mk-cwa', jsonb_build_object('payload', jsonb_set(i1->'payload', '{completed_work_asserted}', '"false"')))))::text), 'observation contract');
+  PERFORM pg_temp.fails(format('SELECT ingest_private_work_projection(%L, %L::jsonb)', a, pg_temp.rev('m-heldref', jsonb_build_array(
+    pg_temp.img_item('mk-heldref', jsonb_build_object('source_privacy_hold', true, 'payload', jsonb_set(jsonb_set(i1->'payload', '{assertion_status}', '"held"'), '{subject_vehicle_ref}', '"V"')))))::text), 'vehicle reference');
+  -- labor: nothing may present a claim as hours actually worked or paid, at any depth, and required keys are required
+  FOREACH k IN ARRAY ARRAY['actual_hours', 'worked_hours', 'photo_hours', 'hours_actual', 'billable_hours', 'paid', 'payment_status'] LOOP
+    PERFORM pg_temp.fails(format('SELECT ingest_private_work_projection(%L, %L::jsonb)', a, pg_temp.rev('a-' || k, jsonb_build_array(
+      pg_temp.labor_item('la-' || k, (da->>'document_id')::uuid, (da->>'extraction_run_id')::uuid, sha_a, 'rev-a',
+        jsonb_build_object('payload', jsonb_set(l1->'payload', '{observed}', (l1->'payload'->'observed') || jsonb_build_object(k, '676'))))))::text), 'forbidden key');
+    PERFORM pg_temp.fails(format('SELECT ingest_private_work_projection(%L, %L::jsonb)', a, pg_temp.rev('c-' || k, jsonb_build_array(
+      pg_temp.labor_item('lc-' || k, (da->>'document_id')::uuid, (da->>'extraction_run_id')::uuid, sha_a, 'rev-a',
+        jsonb_build_object('payload', jsonb_set(l1->'payload', '{claim}', (l1->'payload'->'claim') || jsonb_build_object(k, '676'))))))::text), 'forbidden key');
+  END LOOP;
+  FOREACH k IN ARRAY ARRAY['claim', 'observed', 'holds', 'rate_provenance', 'conflicts', 'relation', 'additive', 'hours_verified', 'reconciliation_key'] LOOP
+    PERFORM pg_temp.fails(format('SELECT ingest_private_work_projection(%L, %L::jsonb)', a, pg_temp.rev('r-' || k, jsonb_build_array(
+      pg_temp.labor_item('lr-' || k, (da->>'document_id')::uuid, (da->>'extraction_run_id')::uuid, sha_a, 'rev-a',
+        jsonb_build_object('payload', (l1->'payload') - k))))::text), 'claim-versus-observation');
+  END LOOP;
+  PERFORM pg_temp.fails(format('SELECT ingest_private_work_projection(%L, %L::jsonb)', a, pg_temp.rev('l-str', jsonb_build_array(
+    pg_temp.labor_item('lstr', (da->>'document_id')::uuid, (da->>'extraction_run_id')::uuid, sha_a, 'rev-a',
+      jsonb_build_object('payload', (l1->'payload') || '{"additive":"false"}'))))::text), 'claim-versus-observation');
+  PERFORM pg_temp.fails(format('SELECT ingest_private_work_projection(%L, %L::jsonb)', a, pg_temp.rev('l-ext', jsonb_build_array(
+    pg_temp.labor_item('lext', (da->>'document_id')::uuid, (da->>'extraction_run_id')::uuid, sha_a, 'rev-a',
+      jsonb_build_object('payload', jsonb_set(l1->'payload', '{observed}', (l1->'payload'->'observed') || '{"clusters":[{"start":"a","end":"b","hours":9}]}')))))::text), 'claim-versus-observation');
+  PERFORM pg_temp.fails(format('SELECT ingest_private_work_projection(%L, %L::jsonb)', a, pg_temp.rev('l-hrs', jsonb_build_array(
+    pg_temp.labor_item('lhrs', (da->>'document_id')::uuid, (da->>'extraction_run_id')::uuid, sha_a, 'rev-a',
+      jsonb_build_object('payload', jsonb_set(l1->'payload', '{observed,hours_lower}', '"1.00"')))))::text), 'claim-versus-observation');
+  PERFORM pg_temp.fails(format('SELECT ingest_private_work_projection(%L, %L::jsonb)', a, pg_temp.rev('l-stat', jsonb_build_array(
+    pg_temp.labor_item('lstat', (da->>'document_id')::uuid, (da->>'extraction_run_id')::uuid, sha_a, 'rev-a',
+      jsonb_build_object('payload', jsonb_set(l1->'payload', '{observed,status}', '"verified_on_site"')))))::text), 'claim-versus-observation');
+  -- registered producer route and exact run trace
+  PERFORM pg_temp.fails(format('SELECT ingest_private_work_projection(%L, %L::jsonb)', a,
+    (pg_temp.rev('p1', jsonb_build_array(pg_temp.img_item('pr1'))) || '{"producer":"free_text"}')::text), 'invalid private work projection envelope');
+  PERFORM pg_temp.fails(format('SELECT ingest_private_work_projection(%L, %L::jsonb)', a,
+    (pg_temp.rev('p2', jsonb_build_array(pg_temp.img_item('pr2'))) || '{"version":"9999"}')::text), 'invalid private work projection envelope');
+  PERFORM pg_temp.fails(format('SELECT ingest_private_work_projection(%L, %L::jsonb)', a,
+    (pg_temp.rev('p3', jsonb_build_array(pg_temp.img_item('pr3'))) || '{"run_label":"pwp:0000000000000000"}')::text), 'invalid private work projection envelope');
+  PERFORM pg_temp.fails(format('SELECT ingest_private_work_projection(%L, %L::jsonb)', a,
+    (pg_temp.rev('p4', jsonb_build_array(pg_temp.img_item('pr4'))) || '{"idempotency_key":"k1"}')::text), 'invalid private work projection envelope');
+
   -- a source privacy hold is sticky across revisions
   r := ingest_private_work_projection(a, pg_temp.rev('k22', jsonb_build_array(pg_temp.img_item('h1', jsonb_build_object('source_privacy_hold', true,
     'payload', jsonb_set(jsonb_set(i1->'payload', '{assertion_status}', '"held"'), '{event_key}', to_jsonb(md5('h1'))))))));
@@ -145,23 +216,36 @@ BEGIN
     (pg_temp.rev('k28', jsonb_build_array(pg_temp.img_item('e11'))) || '{"owner_id":"x"}')::text), 'invalid private work projection envelope');
 
   -- append-only for everyone, including the service role
-  PERFORM pg_temp.fails('UPDATE private_work_projections SET holds = ''[]''', 'append-only');
-  PERFORM pg_temp.fails('DELETE FROM private_work_projections', 'append-only');
-  PERFORM pg_temp.fails('TRUNCATE private_work_projections', 'append-only');
+  PERFORM pg_temp.fails('UPDATE private_work_projections SET holds = ''[]''', 'permission denied');   -- no UPDATE/DELETE/TRUNCATE grant
+  PERFORM pg_temp.fails('DELETE FROM private_work_projections', 'permission denied');
+  PERFORM pg_temp.fails('TRUNCATE private_work_projections', 'permission denied');
+  PERFORM pg_temp.fails('SELECT 1 FROM auth.users', 'permission denied');                                   -- the role never reads accounts directly
   -- raw inserts are held to the same contract
   PERFORM pg_temp.fails(format($f$INSERT INTO private_work_projections(owner_id,projection_kind,projection_key,revision_no,idempotency_key,request_digest,content_digest,
-    producer,method,version,run_label,source_privacy_hold,evidence_refs,payload,actor_user_id) VALUES(%L,'image_timeline_event',md5('raw'),1,'raw',%L,%L,'p','m','v','r',false,
-    '[{"kind":"image","sha256":"%s"}]','{"stance":"verified_work","extra":1}',%L)$f$, a, repeat('1',64), repeat('2',64), repeat('a',64), a), 'unknown keys');
+    producer,method,version,run_label,source_privacy_hold,evidence_refs,payload,actor_user_id) VALUES(%L,'image_timeline_event',md5('raw'),1,%L,%L,%L,'client_evidence_projector','image_labor_projection','2026-11-07a',%L,false,
+    '[{"kind":"image","sha256":"%s"}]','{"stance":"verified_work","extra":1}',%L)$f$, a, 'pwp:' || repeat('1', 48) || ':' || md5('raw'), repeat('1',64), repeat('2',64),
+    'pwp:' || repeat('1', 16), repeat('a',64), a), 'unknown keys');
+  PERFORM pg_temp.fails(format($f$INSERT INTO private_work_projections(owner_id,projection_kind,projection_key,revision_no,idempotency_key,request_digest,content_digest,
+    producer,method,version,run_label,source_privacy_hold,evidence_refs,payload,actor_user_id) VALUES(%L,'image_timeline_event',md5('raw2'),1,%L,%L,%L,'free_text','image_labor_projection','2026-11-07a',%L,false,
+    '[{"kind":"image","sha256":"%s"}]','{}',%L)$f$, a, 'pwp:' || repeat('1', 48) || ':' || md5('raw2'), repeat('1',64), repeat('2',64),
+    'pwp:' || repeat('1', 16), repeat('a',64), a), 'registered projection route');
   SELECT count(*) INTO n FROM private_work_projections;
   IF n <> 4 THEN RAISE EXCEPTION 'unexpected row count %', n; END IF;
 END $$;
 
+RESET ROLE;
+-- The append-only trigger holds even against a role that has the privilege (the table owner / a superuser).
+DO $$ BEGIN
+  BEGIN UPDATE private_work_projections SET holds = '[]'; RAISE EXCEPTION 'update accepted'; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  BEGIN DELETE FROM private_work_projections; RAISE EXCEPTION 'delete accepted'; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+END $$;
 -- Roles without a grant: no table read or write, no function execution.
 SET LOCAL ROLE anon;
 DO $$ BEGIN
   BEGIN PERFORM count(*) FROM private_work_projections; RAISE EXCEPTION 'anon read'; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
   BEGIN PERFORM ingest_private_work_projection('11111111-1111-4111-8111-111111111111', '{}'); RAISE EXCEPTION 'anon wrote'; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
   BEGIN PERFORM read_private_work_projections('11111111-1111-4111-8111-111111111111'); RAISE EXCEPTION 'anon rpc read'; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  BEGIN PERFORM private_work_account_ok('11111111-1111-4111-8111-111111111111'); RAISE EXCEPTION 'anon probed accounts'; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
 END $$;
 RESET ROLE;
 SELECT set_config('request.jwt.claim.role', 'authenticated', true), set_config('request.jwt.claim.sub', '11111111-1111-4111-8111-111111111111', true);
@@ -171,6 +255,7 @@ DO $$ BEGIN
   BEGIN INSERT INTO private_work_projections(owner_id) VALUES ('11111111-1111-4111-8111-111111111111'); RAISE EXCEPTION 'owner wrote directly'; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
   BEGIN PERFORM ingest_private_work_projection('11111111-1111-4111-8111-111111111111', '{}'); RAISE EXCEPTION 'authenticated wrote'; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
   BEGIN PERFORM read_private_work_projections('11111111-1111-4111-8111-111111111111'); RAISE EXCEPTION 'authenticated rpc read'; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  BEGIN PERFORM private_work_account_ok('11111111-1111-4111-8111-111111111111'); RAISE EXCEPTION 'authenticated probed accounts'; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
 END $$;
 RESET ROLE;
 -- A signed-in (non-service) session cannot reach the writer even with the privilege, and the store grants no vehicle permission.
@@ -181,8 +266,15 @@ DO $$ BEGIN
      OR has_table_privilege('service_role', 'private_work_projections', 'truncate') THEN RAISE EXCEPTION 'service role may rewrite history'; END IF;
   IF NOT (SELECT relrowsecurity FROM pg_class WHERE oid = 'public.private_work_projections'::regclass) THEN RAISE EXCEPTION 'RLS off'; END IF;
   IF EXISTS (SELECT 1 FROM pg_policy WHERE polrelid = 'public.private_work_projections'::regclass) THEN RAISE EXCEPTION 'unexpected policy'; END IF;
-  IF EXISTS (SELECT 1 FROM pg_proc WHERE proname IN ('ingest_private_work_projection', 'read_private_work_projections', 'private_work_projection_guard')
-             AND prosecdef) THEN RAISE EXCEPTION 'security definer exposed'; END IF;
+  -- exactly one SECURITY DEFINER object: the narrow account helper, pinned search_path, service role only, boolean out
+  IF (SELECT array_agg(proname ORDER BY proname) FROM pg_proc WHERE pronamespace = 'public'::regnamespace
+        AND (proname LIKE 'private_work%' OR proname IN ('ingest_private_work_projection', 'read_private_work_projections')) AND prosecdef)
+     IS DISTINCT FROM ARRAY['private_work_account_ok']::name[] THEN RAISE EXCEPTION 'unexpected security definer set'; END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'private_work_account_ok' AND prorettype = 'boolean'::regtype
+                 AND proconfig::text LIKE '%search_path=pg_catalog, pg_temp%') THEN RAISE EXCEPTION 'helper search_path not pinned'; END IF;
+  IF has_function_privilege('anon', 'public.private_work_account_ok(uuid)', 'execute') OR has_function_privilege('authenticated', 'public.private_work_account_ok(uuid)', 'execute')
+     OR NOT has_function_privilege('service_role', 'public.private_work_account_ok(uuid)', 'execute') THEN RAISE EXCEPTION 'helper grants wrong'; END IF;
+  IF has_table_privilege('service_role', 'auth.users', 'select') THEN RAISE EXCEPTION 'service role may read accounts directly'; END IF;
   RAISE NOTICE 'PASS private work projections';
 END $$;
 ROLLBACK;

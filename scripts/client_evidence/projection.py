@@ -21,16 +21,43 @@ BATCH = 50                       # the writer's per-revision cap
 MAX_REFS = 200
 PRIVACY_ORIGINS = {'privacy_hold', 'protected', 'person', 'personal'}
 HELD_ORIGINS = labor.EXCLUDED_ORIGINS
-IMAGE_KEYS = {'event_key', 'stance', 'time', 'capture', 'identity', 'origin_class', 'intent', 'assertion_status',
-              'completed_work_asserted', 'subject_vehicle_ref'}
-LABOR_KEYS = {'reconciliation_key', 'claim', 'observed', 'holds', 'rate_provenance', 'conflicts', 'relation', 'additive',
-              'billable_hours', 'hours_verified'}
+# Closed key sets per payload object. Mirrors public.private_work_allowed_keys (parity is tested against the migration).
+ALLOWED_KEYS = {
+    'image': {'event_key', 'stance', 'time', 'capture', 'identity', 'origin_class', 'intent', 'assertion_status',
+              'completed_work_asserted', 'subject_vehicle_ref'},
+    'image_time': {'kind', 'basis', 'camera_local', 'utc'},
+    'image_capture': {'source', 'offset_state', 'camera_local', 'utc'},
+    'image_identity': {'state', 'basis'},
+    'labor': {'reconciliation_key', 'claim', 'observed', 'holds', 'rate_provenance', 'conflicts', 'relation', 'additive',
+              'billable_hours', 'hours_verified'},
+    'labor_claim': {'claimed_hours', 'computed_labor', 'source_claim', 'verified', 'service_period', 'categories'},
+    'labor_category': {'category', 'hours', 'rate', 'amount', 'rate_source'},
+    'labor_period': {'start', 'end'},
+    'labor_observed': {'status', 'window', 'observed_days', 'observed_day_count', 'frames_in_scope', 'clusters',
+                       'camera_local_review', 'hours_lower', 'hours_lower_exact_seconds', 'note'},
+    'labor_cluster': {'start', 'end', 'frames', 'capped', 'single_frame'},
+    'labor_local_review': {'clock_offset', 'days'},
+    'labor_local_day': {'camera_local_day', 'frames', 'first_local', 'last_local'},
+    'labor_holds': {'unknown_clock', 'other_vehicle', 'identity_not_confirmed', 'identity_context_only', 'excluded_origin',
+                    'no_trusted_capture_time', 'implausible_clock', 'before_service_window', 'after_service_window',
+                    'outside_vehicle_date_range', 'non_install_intent', 'intent_unclassified', 'intent_not_billable'},
+    'labor_rate': {'category', 'rate', 'rate_source'},
+}
+IMAGE_KEYS, LABOR_KEYS = ALLOWED_KEYS['image'], ALLOWED_KEYS['labor']
+REGISTERED_PRODUCERS = {(PRODUCER, METHOD, VERSION)}       # mirrors public.private_work_producer_registered
+LABOR_STATUS = {'not_supplied', 'not_assessable', 'no_evidence', 'presence_only', 'review_camera_local_only', 'estimated_from_photos'}
+LABOR_RELATION = {'not_assessable', 'no_hours', 'photo_lower_bound_exceeds_claim', 'photo_lower_bound_within_claim_not_corroboration_of_total'}
+IMAGE_REQUIRED = ('event_key', 'stance', 'time', 'capture', 'identity', 'origin_class', 'intent', 'assertion_status', 'completed_work_asserted')
+LABOR_REQUIRED = ('reconciliation_key', 'claim', 'observed', 'holds', 'rate_provenance', 'conflicts', 'relation', 'additive', 'hours_verified')
+VEHICLE_REF_RE = re.compile(r'^[A-Za-z0-9_-]{1,64}$')   # an opaque, unverified pointer; never ownership
+EMAIL_RE = re.compile(r'[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+\.[A-Za-z]{2,}')
 # keys the database refuses anywhere in a payload (mirrors private_work_payload_problem)
 FORBIDDEN = {'ocr_text', 'raw_text', 'full_text', 'full_ocr', 'body', 'body_text', 'html', 'snippet', 'iban', 'bank_iban', 'full_iban',
              'email', 'phone', 'person_name', 'image_bytes', 'photo', 'face', 'verified_hours', 'billable_hours_verified',
              'total_hours', 'combined_hours', 'sum_hours', 'payment_verified', 'ownership_verified', 'owner_verified',
              'vehicle_owner', 'co_owner', 'coowner'}
 FORBIDDEN_RE = re.compile(r'(token|password|secret|authorization|cookie|credential|api_?key)')
+CLAIM_AS_WORK_RE = re.compile(r'(actual|worked|paid|payment|billable|photo_hours)')   # no key may present a claim as hours worked or paid
 
 
 def _walk_keys(o):
@@ -124,6 +151,11 @@ def image_item(im, vehicle_id):
 
 
 # ------------------------------------------------------------------ labor reconciliation
+def _review(r):
+    """The camera-local review carries no hours of any kind: its null billable_hours marker is dropped, not stored."""
+    return None if r is None else {k: v for k, v in r.items() if k != 'billable_hours'}
+
+
 def labor_item(cid, rec, res, photos, recon, doc_sha, revision_key, image_sha, origin_keys):
     """Claim, observation, holds, rate provenance and conflicts side by side. Never summed; never verified; no billable hours."""
     ids = photos.get('frames_in_scope_ids') or []
@@ -137,7 +169,7 @@ def labor_item(cid, rec, res, photos, recon, doc_sha, revision_key, image_sha, o
     observed = {'status': photos.get('status', 'not_supplied'), 'window': photos.get('window'),
                 'observed_days': photos.get('observed_days') or [], 'observed_day_count': photos.get('observed_day_count', 0),
                 'frames_in_scope': photos.get('frames_in_scope', 0), 'clusters': clusters,
-                'camera_local_review': photos.get('camera_local_review'),
+                'camera_local_review': _review(photos.get('camera_local_review')),
                 'hours_lower': photos.get('hours_lower'), 'hours_lower_exact_seconds': photos.get('hours_lower_exact_seconds'),
                 'note': photos.get('note')}
     flags = list(res['flags']) + [f for f in (recon or {}).get('flags', []) if f not in res['flags']]
@@ -178,27 +210,91 @@ def check_item(it):
         if r.get('kind') == 'financial_document_revision':
             continue                      # resolved at apply from the live document; the database verifies scope
         raise ContractError('evidence ref is not an exact hash or message citation')
-    bad = [k for k in _walk_keys(p) if k.lower() in FORBIDDEN or FORBIDDEN_RE.search(k.lower())]
+    scanned = {k: v for k, v in p.items() if k != 'billable_hours'}      # top-level billable_hours is contract-checked (null only) below
+    bad = [k for k in _walk_keys(scanned) if k.lower() in FORBIDDEN or FORBIDDEN_RE.search(k.lower()) or CLAIM_AS_WORK_RE.search(k.lower())]
     if bad or privacy_scan(p):
         raise ContractError(f'projection content refused: {bad or privacy_scan(p)[:3]}')
+    for r in refs:
+        if r.get('kind') == 'source_message' and EMAIL_RE.search(str(r.get('origin_key'))):
+            raise ContractError('a source message origin key looks like an e-mail address; account_ref must be an opaque namespace without "@"')
     if it['kind'] == 'image_timeline_event':
-        if set(p) - IMAGE_KEYS or p.get('stance') != 'visual_observed' or p.get('completed_work_asserted') is not False \
-                or p.get('assertion_status') not in ('observation_unverified', 'held') \
-                or (p.get('capture') or {}).get('offset_state') not in ('known', 'unknown') \
-                or (p.get('identity') or {}).get('state') not in ('confirmed', 'unconfirmed', 'context_only', 'unknown'):
-            raise ContractError('image observation breaks the observation contract')
-        if p['capture']['offset_state'] == 'unknown' and ('utc' in p['capture'] or 'utc' in (p.get('time') or {})):
-            raise ContractError('an unknown camera offset cannot carry a UTC time')
-        if (p['identity']['state'] != 'confirmed' or it['source_privacy_hold']) and p['assertion_status'] != 'held':
-            raise ContractError('unconfirmed identity or privacy-held frames must stay held')
+        _check_image(it, p)
     else:
-        if set(p) - LABOR_KEYS or not {'claim', 'observed', 'holds', 'rate_provenance', 'conflicts', 'relation', 'additive', 'hours_verified'} <= set(p) \
-                or p['additive'] is not False or p['hours_verified'] is not False or p.get('billable_hours') is not None \
-                or p['claim'].get('source_claim') is not True or p['claim'].get('verified') is not False \
-                or not isinstance(p['holds'], dict) or not isinstance(p['observed'], dict):
-            raise ContractError('labor projection breaks the claim-versus-observation contract')
-        if not it.get('document_binding') and not it.get('financial_document_id'):
-            raise ContractError('labor projection must bind to a financial document revision')
+        _check_labor(it, p)
+
+
+def _within(o, name):
+    return isinstance(o, dict) and set(o) <= ALLOWED_KEYS[name]
+
+
+def _is(o, key, value):
+    return key in o and o[key] is value if isinstance(value, bool) else (key in o and o[key] == value)
+
+
+def _check_image(it, p):
+    bad = ContractError('image observation breaks the observation contract')
+    if not _within(p, 'image'):
+        raise ContractError('image timeline payload has unknown keys')
+    cap, ident, tm = p.get('capture'), p.get('identity'), p.get('time')
+    if not all(k in p for k in IMAGE_REQUIRED) or p['stance'] != 'visual_observed' or p['completed_work_asserted'] is not False \
+            or not all(isinstance(p[k], str) for k in ('event_key', 'origin_class', 'intent', 'assertion_status')) \
+            or p['assertion_status'] not in ('observation_unverified', 'held') \
+            or not _within(ident, 'image_identity') or ident.get('state') not in ('confirmed', 'unconfirmed', 'context_only', 'unknown') \
+            or not _within(cap, 'image_capture') or 'source' not in cap or cap.get('offset_state') not in ('known', 'unknown') \
+            or not _within(tm, 'image_time') or tm.get('kind') not in ('instant', 'unknown'):
+        raise bad
+    off = cap['offset_state']
+    if off == 'unknown' and ('utc' in cap or 'utc' in tm):
+        raise ContractError('an unknown camera offset cannot carry a UTC time')
+    if off == 'known' and not ('camera_local' in cap and isinstance(cap.get('utc'), str)):
+        raise bad
+    if 'utc' in tm and off != 'known':
+        raise ContractError('an unknown camera offset cannot carry a UTC time')
+    if (ident['state'] != 'confirmed' or it['source_privacy_hold'] is not False) and p['assertion_status'] != 'held':
+        raise ContractError('unconfirmed identity or privacy-held frames must stay held')
+    if 'subject_vehicle_ref' in p and not (isinstance(p['subject_vehicle_ref'], str) and VEHICLE_REF_RE.match(p['subject_vehicle_ref'])
+                                          and p['assertion_status'] == 'observation_unverified'):
+        raise bad
+
+
+def _check_labor(it, p):
+    bad = ContractError('labor projection breaks the claim-versus-observation contract')
+    if not _within(p, 'labor'):
+        raise ContractError('labor payload has unknown keys')
+    claim, obs, holds = p.get('claim'), p.get('observed'), p.get('holds')
+    if not all(k in p for k in LABOR_REQUIRED) or not isinstance(p['reconciliation_key'], str) \
+            or p['additive'] is not False or p['hours_verified'] is not False \
+            or ('billable_hours' in p and p['billable_hours'] is not None) \
+            or not _within(claim, 'labor_claim') or claim.get('source_claim') is not True or claim.get('verified') is not False \
+            or not isinstance(claim.get('claimed_hours'), str) \
+            or not _within(obs, 'labor_observed') or obs.get('status') not in LABOR_STATUS \
+            or not _within(holds, 'labor_holds') or not all(type(v) in (int, float) for v in holds.values()) \
+            or not isinstance(p['rate_provenance'], list) or not isinstance(p['conflicts'], list) or p['relation'] not in LABOR_RELATION:
+        raise bad
+    if claim.get('service_period') is not None and not _within(claim['service_period'], 'labor_period'):
+        raise bad
+    cats = claim.get('categories', [])
+    if not isinstance(cats, list) or len(cats) > 60 or not all(_within(c, 'labor_category') for c in cats):
+        raise bad
+    if len(p['rate_provenance']) > 60 or len(p['conflicts']) > 100 or not all(_within(r, 'labor_rate') for r in p['rate_provenance']) \
+            or not all(isinstance(c, str) for c in p['conflicts']):
+        raise bad
+    if obs.get('window') is not None and not _within(obs['window'], 'labor_period'):
+        raise bad
+    days = obs.get('observed_days', [])
+    if not isinstance(days, list) or len(days) > 400 or not all(isinstance(d, str) for d in days):
+        raise bad
+    clusters = obs.get('clusters', [])
+    if not isinstance(clusters, list) or len(clusters) > 400 or not all(_within(c, 'labor_cluster') for c in clusters):
+        raise bad
+    rev = obs.get('camera_local_review')
+    if rev is not None and not (_within(rev, 'labor_local_review') and isinstance(rev.get('days'), list) and len(rev['days']) <= 400
+                                and all(_within(d, 'labor_local_day') for d in rev['days'])):
+        raise bad
+    if (obs.get('hours_lower') is not None or obs.get('hours_lower_exact_seconds') is not None) and obs['status'] != 'estimated_from_photos':
+        raise bad
+    if not it.get('document_binding') and not it.get('financial_document_id'):
+        raise ContractError('labor projection must bind to a financial document revision')
 
 
 def item_hash(it):

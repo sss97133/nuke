@@ -60,6 +60,13 @@ privacy-hold, person and protected origins are held and never auto-confirmed.
   `20261107210025_private_work_projections.sql` adds `public.private_work_projections` (append-only; RLS on with no policy; no grant to
   `anon`/`authenticated`; `service_role` has SELECT and INSERT only, UPDATE/DELETE/TRUNCATE are refused by trigger for everyone),
   the writer `ingest_private_work_projection` and reader `read_private_work_projections` (both `SECURITY INVOKER`, execute for `service_role` only).
+  **Privileges (read-only probe of the deployed project, 2026-11-07):** `service_role` has USAGE on schemas `auth` and `extensions`, SELECT on `financial_documents` and EXECUTE on
+  `extensions.digest`, but **no SELECT on `auth.users`**. So the invoker writer, guard and reader never read `auth.users`; the account check (not deleted, not anonymous, not banned) is
+  one narrow helper, `private_work_account_ok(uuid) -> boolean`, `SECURITY DEFINER` with a pinned `search_path`, answering only a `service_role` session and not granted to
+  `anon`/`authenticated`/PUBLIC (the same read the deployed `ingest_financial_evidence` does as its owner). It is the only definer object in the migration; the SQL test asserts that exact set.
+  No broad grant on `auth.users` is added. Supersession reads the prior revision with a plain `SELECT` (a row lock would need UPDATE, which the role must not have); forks are impossible because
+  the writer takes a per-key advisory lock and `UNIQUE(supersedes_id)` / `UNIQUE(owner_id, projection_key, revision_no)` refuse a second child. The SQL test now runs the writer path as the
+  real `service_role` (`SET LOCAL ROLE`) with only the production grants above (plus BYPASSRLS), so revision 2, supersession, replay and the denials are exercised under that role.
   They are reached only through `ingest-observation` mode `financial_evidence_v1`, actions `projection_submit` / `projection_read`
   (`privateProjection.ts`): the account is the caller's own credential (own account only; delegated access is refused), and a body naming an owner is refused.
   **Account scope is not vehicle ownership**: nothing here creates or implies a vehicle owner/co-owner permission, and a photo identity with a citation is
@@ -72,6 +79,13 @@ privacy-hold, person and protected origins are held and never auto-confirmed.
     (aware-offset frames only yield a lower bound), **holds** (unknown clock, unclassified intent, identity), **rate provenance** and **conflicts**,
     side by side. `additive:false`, `billable_hours:null`, `hours_verified:false` are enforced by the database; keys that assert total/verified hours,
     payment or ownership are refused. Photo evidence is never reinterpreted as billable hours.
+  - **Registered route.** The database accepts only the registered producer/method/version (`client_evidence_projector` / `image_labor_projection` / `2026-11-07a`, mirrored in `projection.py`; a new
+    version is a new migration) and an exact run trace: idempotency key `pwp:<48 hex>[:<projection key>]` and run label = its first 20 characters. Free text is refused on every insert path.
+    The key's hash is not recomputed in SQL, so the database enforces shape and consistency, not that the hash equals the batch content.
+  - **Closed payload contract (fail closed).** Every object in an image or labor payload has a closed key set, and required fields must be present with the right JSON type: a missing
+    `assertion_status`, `identity`, `capture.offset_state` or `time` is a refusal, not a pass (the earlier three-valued-logic hole). `observed` is an allowlist (status, window, days, clusters,
+    camera-local review, `hours_lower` only with status `estimated_from_photos`); any key matching actual/worked/paid/payment/billable/photo_hours is refused. The Python producer check and the
+    SQL function share the same lists, and a test compares them against the migration text so they cannot drift. `subject_vehicle_ref` is an unverified pointer on an unheld frame, never ownership.
   - Every row carries producer / method / version / run label and exact refs: image sha256, attachment sha256, source-message origin key, and the
     financial document revision (document id, extraction run id, original sha256, revision idempotency key) which the database checks belongs to the same account.
     Corrections are new revisions naming the current head (`supersedes_id`); a stale or missing pointer fails closed; replay is idempotent; equal content under a new run
@@ -97,7 +111,10 @@ privacy-hold, person and protected origins are held and never auto-confirmed.
   `validate_changeset` refuses any other.
 - Verified read-only 2026-11-07: the `read` action returns `read_financial_accounting`, which is `read_financial_evidence || {lines, ...}`,
   so `document.attributes.runs` is present and `state_summary` reads it; the test fixture has that shape.
-- Still unverified: whether the caller's credential type is accepted for `read`/`submit` scopes; no live execution of backup/apply.
+- Still unverified: whether the caller's credential type is accepted for `read`/`submit` scopes; no live execution of backup/apply. Also unverified: `service_role`'s `rolbypassrls` on the live project
+  (the privilege probe did not cover it; the SQL test assumes the documented Supabase default), and nothing in this change has been applied to or run against any project.
+- `account_ref` (the mail account namespace) must be opaque and contain no `@`: the source-message origin key `gmail:<account_ref>:<message>:<part>` is scanned for e-mail addresses, and the
+  producer now refuses such a key at plan time with a clear error instead of a database refusal.
 - A corrected claim amount gets a new `claim.<h>` key and drops the old one, so `apply` refuses it ("would drop prior field keys",
   fail closed). Only a forward that adds an origin is a supported revision.
 - Image-derived events and invoice-vs-photo reconciliation have a private store and writer (above) that is implemented and unit/contract-tested but **not deployed or live-verified**; nothing goes to the public timeline. The store cannot verify that a cited image sha256 or message exists (those bytes live outside the database); it verifies shape, scope and the financial-document revision only.
