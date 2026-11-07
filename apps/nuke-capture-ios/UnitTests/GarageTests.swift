@@ -90,6 +90,32 @@ final class GarageTests: XCTestCase {
         XCTAssertEqual(GarageRelation.line(past), "Previously owned")
     }
 
+    private func ownerStatement(_ vehicleSuffix: String) -> String {
+        """
+        [{"id":"c9","vehicle_id":"00000000-0000-4000-8000-00000000000\(vehicleSuffix)",
+          "correction":{"relationship":{"roles":["owner_current"],"ownership_denied":false,"title_status":"unknown",
+                                        "disputed":false,"start_date":null,"end_date":null},"cover_image_id":null},
+          "observed_at":"2026-10-18T00:00:00+00:00","cover_image_url":null}]
+        """
+    }
+
+    func testOwnerStatementWithoutServerTitleIsReportedOwner() throws {
+        let corrections = try JSONDecoder().decode([GarageOwnerCorrection].self, from: Data(ownerStatement("3").utf8))
+        let rows = GarageVehicle.applying(corrections, to: try garage())
+        let v = try XCTUnwrap(rows.first { $0.vehicle_id.hasSuffix("0003") })
+        XCTAssertEqual(v.relationship, "owner_reported")
+        XCTAssertEqual(v.relationshipLabel, "Reported owner")
+        let s = GarageSections(rows)
+        XCTAssertFalse(s.owned.contains { $0.vehicle_id.hasSuffix("0003") })
+        XCTAssertEqual(s.other.map(\.label), ["Reported owner"])
+    }
+
+    func testOwnerStatementKeepsServerOwner() throws {
+        let corrections = try JSONDecoder().decode([GarageOwnerCorrection].self, from: Data(ownerStatement("1").utf8))
+        let rows = GarageVehicle.applying(corrections, to: try garage())
+        XCTAssertEqual(rows.first { $0.vehicle_id.hasSuffix("0001") }?.relationship, "owner")
+    }
+
     func testDisputedStatementTakesTheCarOutOfOwned() throws {
         let corrections = try JSONDecoder().decode([GarageOwnerCorrection].self, from: Data(GarageFixtures.disputedOwnerStatement.utf8))
         let rows = GarageVehicle.applying(corrections, to: try garage())

@@ -195,6 +195,7 @@ struct GarageVehicle: Codable, Identifiable, Hashable, Sendable {
     var relationshipLabel: String {
         switch relationship {
         case "owner": return "Owned"
+        case "owner_reported": return "Reported owner"
         case "previously_owned": return "Previously owned"
         case "profile_record": return "Profiles you added"
         case "consignment": return "Consignment"
@@ -254,7 +255,8 @@ struct GarageVehicle: Codable, Identifiable, Hashable, Sendable {
                 let roles = r.roles.filter { ["owner_current", "owner_past", "shared_interest", "claimed_interest",
                     "consignment", "business_handling", "sales_representative", "transfer_pending"].contains($0) }
                 switch roles.first {
-                case "owner_current": result.relationship = "owner"
+                // A statement is not title: only a server-derived "owner" stays owner.
+                case "owner_current": result.relationship = vehicle.relationship == "owner" ? "owner" : "owner_reported"
                 case "owner_past": result.relationship = "previously_owned"
                 case let role?: result.relationship = role
                 default: result.relationship = "relationship_review"
@@ -262,7 +264,7 @@ struct GarageVehicle: Codable, Identifiable, Hashable, Sendable {
                 if r.ownership_denied && roles.contains(where: { $0 == "owner_current" || $0 == "owner_past" }) {
                     result.relationship = "relationship_review"
                 }
-                if result.relationship == "owner" && (r.disputed || r.title_status == "transfer_pending" ||
+                if (result.relationship == "owner" || result.relationship == "owner_reported") && (r.disputed || r.title_status == "transfer_pending" ||
                     (r.start_date.map { $0 > today } ?? false)) { result.relationship = "claimed_interest" }
             }
             // Rejection remains sourced testimony, not a vehicle in the garage.
