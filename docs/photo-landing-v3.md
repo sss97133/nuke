@@ -9,7 +9,9 @@ Applied to Supabase project `qkgaybvrernstplzjaam` (also applied via SQL; the mi
 2. **Scorer v3** (`20261109000200`): `capture_sets_score(..., p_prov)`. Adds classifier VIN/plate candidates, work-session prior (cited, not a hard assignment;
    owner_confirmed 1.0, auto_confirmed 0.8, system_hold 0.4, closed_obsolete excluded), temporal-continuity prior (prior 72h of filed history, provisional same-chunk proposals
    and work sessions, decaying `exp(-days/2)`), roster excludes discovered/merged/inactive, recent-vehicle bonus 0.5 -> 0.15 (<48h). Every decision carries `signals.cites`.
-   Perf: visual similarity uses at most 12 evenly spaced embedded photos per set.
+   Perf: visual similarity uses at most 12 evenly spaced embedded photos per set. Visual anchors (`anc`, `20261111130000`): web uploads, iOS frames
+   with no machine provenance, and filings of a landing run whose viewed gate sample passed (`filing_run_gate.passed`); a frame an auditor
+   marked wrong in `auto_filing_audit_queue` never anchors. Lettering legs (badge, make, model family) came in `20261111120000`.
 3. **Landing pipeline** (`20261109000300`): `capture_landing_config` / `_chunks` / `_sets`. Forward track = oldest-unresolved-first, one `chunk_days` (30) chunk at a time, ceiling now-7d;
    recent track = last 7 days. Each chunk: plan (chronological, each day feeds the next) -> finalize (review rows + candidates + stratified visual-gate sample) ->
    `awaiting_gate` -> gate must pass (>= min(10,n) photos viewed, <= 5% wrong) -> apply (`capture_sets_apply`, every landed photo gets a `capture_set_links` row).
