@@ -239,7 +239,9 @@ describe('every house on one board', () => {
   });
   it('writes a bid in its own currency', () => {
     expect(moneyIn(65000, 'USD')).toBe('$65,000');
-    expect(moneyIn(44694, 'GBP').replace(/\s/g, ' ')).toBe('GBP 44,694');
+    expect(moneyIn(44694, 'GBP')).toBe('£44,694');
+    expect(moneyIn(292500, 'EUR')).toBe('€292,500');
+    expect(moneyIn(50000, 'AUD')).toBe('A$50,000');
     expect(moneyIn(null, 'EUR')).toBe('—');
     expect(moneyIn(1_200_000, 'USD', true)).toBe('$1.2M');
   });
