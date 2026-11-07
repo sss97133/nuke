@@ -142,7 +142,7 @@ test('a books reader called while a visitor loads a private page fails and names
   const result = await probe({ booksCall: true });
   assert.equal(result.exitCode, 1);
   const called = result.failures.filter(f => f.what === 'a visitor page load called a books reader');
-  assert.equal(called.length, 3);
+  assert.equal(called.length, 4);   // one per private page
   assert.ok(called[0].detail.some(d => d.includes('/rest/v1/rpc/books_gate_status')));
 });
 
