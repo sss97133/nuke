@@ -24,6 +24,7 @@ import { runClassifierAssay } from "./classifierAssay.ts";
 import { clearRetry, isRateLimited, readProviderGate, recordRateLimit } from "./providerBackoff.ts";
 import { buildStageReceipt, postClassifierFailureReceipts, type PostClassifierPhase, rateLimitRetrySeconds, recordStageReceipt, unavailableReceipts } from "./stageReceipts.ts";
 import { probeStageAvailability, runStageWorker } from "./stageWorker.ts";
+import { runPostClassifierStage, type Classification, type PostClassifierDeps } from "./postClassifier.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -65,6 +66,47 @@ interface PipelineInput {
   user_id: string | null;
 }
 
+/** Post-classifier stage runner wiring (postClassifier.ts): the steps are the same functions the live path uses, below. */
+const postClassifierDeps: PostClassifierDeps = {
+  async loadSaved(imageId) {
+    const { data, error } = await supabase.from("vehicle_images").select("ai_scan_metadata, vehicle_id, image_url").eq("id", imageId).single();
+    if (error || !data) throw new Error("photo_pipeline_image_read_failed");
+    return { classification: (data.ai_scan_metadata as { classification?: Classification } | null)?.classification ?? null,
+      vehicle_id: data.vehicle_id, image_url: data.image_url };
+  },
+  async latestOutcome(imageId, stage) {
+    const { data } = await supabase.from("image_stage_current").select("outcome").eq("image_id", imageId).eq("stage", stage).maybeSingle();
+    return (data as { outcome?: string } | null)?.outcome ?? null;
+  },
+  async fileVehicle(imageId, userId, classification) {
+    const resolved = await resolveVehicle(imageId, userId, classification as ClassificationResult);
+    if (!resolved) return null;
+    const attribution = await fileResolvedVehicle(imageId, resolved);
+    return attribution.filed ? resolved.vehicle_id : null;
+  },
+  async gatherEvidence(item, imageUrl, vehicleId, classification) {
+    const cls = classification as ClassificationResult;
+    const routeResult = await routeByType(cls, item.image_id, imageUrl, vehicleId, item.user_id);
+    if (vehicleId) await createObservation(cls, item.image_id, imageUrl, vehicleId, routeResult);
+    if (vehicleId && routeResult.extracted_fields) await updateFieldEvidence(vehicleId, item.image_id, routeResult.extracted_fields, cls);
+    for (const r of unavailableReceipts(item.image_id, routeResult.stage_unavailable)) await recordStageReceipt(supabase, r);
+  },
+  async markCompleted(imageId) {
+    // only a row the failure left 'failed' is flipped back; a fresh attempt id needs the processing write first (stale-attempt guard)
+    const { data } = await supabase.from("vehicle_images").select("ai_processing_status, image_url, vehicle_id").eq("id", imageId).single();
+    if (!data || data.ai_processing_status !== "failed") return;
+    const src = { image_url: data.image_url, vehicle_id: data.vehicle_id };
+    const attemptId = crypto.randomUUID(); const startedAt = new Date().toISOString();
+    const rc = (outcome: PipelineReceipt["outcome"]): PipelineReceipt => ({ receipt_id: `${attemptId}:${imageId}:${outcome}`, attempt_id: attemptId, image_id: imageId,
+      method: "photo-pipeline-orchestrator", pipeline_version: "v2", receipt_version: 1, outcome, processing_started_at: startedAt,
+      processing_finished_at: outcome === "processing" ? null : new Date().toISOString() });
+    await persistImageState(imageId, rc("processing"), { ai_processing_status: "processing", ai_processing_started_at: startedAt }, {}, src);
+    await persistImageState(imageId, rc("completed"), { ai_processing_status: "completed", ai_processing_completed_at: new Date().toISOString() },
+      { stage_worker_completed_post_classifier: true }, src);
+  },
+  record: (r) => recordStageReceipt(supabase, r),
+};
+
 // ============================================================
 // MAIN HANDLER
 // ============================================================
@@ -105,7 +147,9 @@ Deno.serve(async (req) => {
 
     // Single-stage worker: claims image_stage_work for one stage and runs only that stage (see stageWorker.ts).
     if (input?.action === "run_stage") {
-      const out = await runStageWorker(supabase, input, async (item) => {
+      const out = await runStageWorker(supabase, input, async (item, stage) => {
+        // filing / evidence: post-classifier steps only, from the saved classification (never the paid classifier)
+        if (stage !== "classifier") return await runPostClassifierStage(postClassifierDeps, stage, item);
         const resp = await fetch(`${SUPABASE_URL}/functions/v1/photo-pipeline-orchestrator`, {
           method: "POST",
           headers: { "Content-Type": "application/json", "Authorization": `Bearer ${SERVICE_ROLE_KEY}` },

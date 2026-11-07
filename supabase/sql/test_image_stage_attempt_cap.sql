@@ -257,4 +257,84 @@ BEGIN
   PERFORM t_assert(res ? 'work_deferred' AND res ? 'available_retries' AND res ? 'reconcile', 'flag on: deferred work, available retries and the gap scan all run');
 END $$;
 
+-- ===== 8. failed post-classifier receipts are retryable with backoff and the attempt cap (migration 20261112130000)
+\ir ../migrations/20261112130000_image_stage_failed_retry.sql
+INSERT INTO public.vehicle_images(id, user_id, image_url, created_at, ai_processing_status)
+SELECT ('00000000-0000-0000-0000-0000000000' || lpad(n::text, 2, '0'))::uuid, gen_random_uuid(), 'https://example.test/' || n || '.jpg',
+       now() - interval '1 day' - n * interval '1 minute', 'failed'
+FROM generate_series(21, 24) n;
+DO $$
+DECLARE
+  f uuid := '00000000-0000-0000-0000-000000000021'; ev uuid := '00000000-0000-0000-0000-000000000022';
+  ex uuid := '00000000-0000-0000-0000-000000000023'; cl uuid := '00000000-0000-0000-0000-000000000024';
+  r record; ra timestamptz; n int; secs numeric;
+BEGIN
+  PERFORM t_assert((SELECT retries_failed FROM public.image_pipeline_stages WHERE stage = 'filing')
+                   AND (SELECT retries_failed FROM public.image_pipeline_stages WHERE stage = 'evidence')
+                   AND NOT (SELECT retries_failed FROM public.image_pipeline_stages WHERE stage = 'classifier'), 'only filing and evidence retry failed receipts');
+
+  -- a never-run filing stage is not a gap (filing is not required)
+  PERFORM t_assert(NOT EXISTS (SELECT 1 FROM public.image_stage_gaps(ARRAY[f]) WHERE stage IN ('filing', 'evidence')), 'no receipt on a non-required stage: no gap');
+
+  -- attempt 1 failed: backoff 300 s chosen by the server, whatever the caller passes
+  PERFORM public.record_image_stage_receipt(f, 'filing', 1, 'failed', 'photo_pipeline_attribution_failed', NULL, 1);
+  SELECT retry_after, attempt INTO ra, n FROM public.image_stage_receipts WHERE image_id = f AND stage = 'filing' ORDER BY attempt DESC LIMIT 1;
+  secs := extract(epoch FROM ra - now());
+  PERFORM t_assert(n = 1 AND secs BETWEEN 290 AND 301, 'first failed receipt backs off ~300 s (caller hint of 1 s ignored)');
+  PERFORM t_assert(NOT EXISTS (SELECT 1 FROM public.image_stage_gaps(ARRAY[f]) WHERE stage = 'filing'), 'inside the backoff the failure is not a gap');
+
+  -- backoff elapsed: it becomes a gap, not_before = retry_after, reason retryable_outcome
+  UPDATE public.image_stage_receipts SET retry_after = now() - interval '1 second' WHERE image_id = f AND stage = 'filing';   -- test-only clock move on the disposable DB
+  SELECT * INTO r FROM public.image_stage_gaps(ARRAY[f]) WHERE stage = 'filing';
+  PERFORM t_assert(r.image_id IS NOT NULL AND r.reason = 'retryable_outcome' AND r.target_version = 1, 'a failed receipt past its backoff is a retryable_outcome gap');
+  PERFORM t_assert(NOT EXISTS (SELECT 1 FROM public.image_stage_gaps(ARRAY[f]) WHERE stage = 'evidence'), 'a failed filing opens no evidence gap');
+
+  -- second failure doubles the backoff
+  PERFORM public.record_image_stage_receipt(f, 'filing', 1, 'failed', 'photo_pipeline_attribution_failed');
+  SELECT extract(epoch FROM retry_after - now()) INTO secs FROM public.image_stage_receipts WHERE image_id = f AND stage = 'filing' AND attempt = 2;
+  PERFORM t_assert(secs BETWEEN 590 AND 601, 'second failure backs off ~600 s');
+
+  -- attempt cap: at max_attempts the item is no longer a gap, however old
+  FOR n IN 3..6 LOOP PERFORM public.record_image_stage_receipt(f, 'filing', 1, 'failed', 'photo_pipeline_attribution_failed'); END LOOP;
+  UPDATE public.image_stage_receipts SET retry_after = now() - interval '1 second' WHERE image_id = f AND stage = 'filing';
+  PERFORM t_assert((SELECT max(attempt) FROM public.image_stage_receipts WHERE image_id = f AND stage = 'filing') = (SELECT max_attempts FROM public.image_pipeline_stages WHERE stage = 'filing'), 'six attempts recorded');
+  PERFORM t_assert(NOT EXISTS (SELECT 1 FROM public.image_stage_gaps(ARRAY[f]) WHERE stage = 'filing'), 'at max_attempts a failed receipt is no longer retried');
+
+  -- backoff is capped at 24 h
+  FOR n IN 1..12 LOOP PERFORM public.record_image_stage_receipt(ev, 'evidence', 1, 'failed', 'pipeline_operation_failed'); END LOOP;
+  SELECT extract(epoch FROM retry_after - now()) INTO secs FROM public.image_stage_receipts WHERE image_id = ev AND stage = 'evidence' AND attempt = 12;
+  PERFORM t_assert(secs <= 86401, 'backoff never exceeds 24 h');
+
+  -- a later success closes the retry
+  PERFORM public.record_image_stage_receipt(ex, 'evidence', 1, 'failed', 'pipeline_operation_failed');
+  UPDATE public.image_stage_receipts SET retry_after = now() - interval '1 second' WHERE image_id = ex AND stage = 'evidence';
+  PERFORM t_assert(EXISTS (SELECT 1 FROM public.image_stage_gaps(ARRAY[ex]) WHERE stage = 'evidence'), 'evidence failure is a gap once due');
+  PERFORM public.record_image_stage_receipt(ex, 'evidence', 1, 'succeeded');
+  PERFORM t_assert(NOT EXISTS (SELECT 1 FROM public.image_stage_gaps(ARRAY[ex]) WHERE stage = 'evidence'), 'a succeeded receipt ends the retry');
+
+  -- a failed classifier receipt keeps the old rule: terminal, no retry_after, no gap
+  PERFORM public.record_image_stage_receipt(cl, 'classifier', 1, 'failed', 'classifier_failed');
+  PERFORM t_assert((SELECT retry_after FROM public.image_stage_receipts WHERE image_id = cl AND stage = 'classifier') IS NULL
+                   AND NOT EXISTS (SELECT 1 FROM public.image_stage_gaps(ARRAY[cl]) WHERE stage = 'classifier'), 'classifier failed stays terminal (the paid stage is never blindly retried)');
+
+  -- blocked_input (no saved classification) is terminal on filing/evidence
+  PERFORM public.record_image_stage_receipt(cl, 'filing', 1, 'failed', 'pipeline_operation_failed');
+  UPDATE public.image_stage_receipts SET retry_after = now() - interval '1 second' WHERE image_id = cl AND stage = 'filing';
+  PERFORM t_assert(EXISTS (SELECT 1 FROM public.image_stage_gaps(ARRAY[cl]) WHERE stage = 'filing'), 'precondition: the failed filing receipt is due');
+  PERFORM public.record_image_stage_receipt(cl, 'filing', 1, 'blocked_input', 'no_saved_classification');
+  PERFORM t_assert(NOT EXISTS (SELECT 1 FROM public.image_stage_gaps(ARRAY[cl]) WHERE stage = 'filing'), 'a newer blocked_input receipt ends the retry (terminal)');
+
+  -- receipts written before this migration have no retry_after: due 5 minutes after observed_at, still capped
+  INSERT INTO public.image_stage_receipts(image_id, stage, producer, producer_version, outcome, attempt, observed_at, error_class)
+  VALUES ('00000000-0000-0000-0000-000000000012', 'filing', 'photo-pipeline-orchestrator', 1, 'failed', 1, now() - interval '10 minutes', 'pipeline_operation_failed');
+  PERFORM t_assert(EXISTS (SELECT 1 FROM public.image_stage_gaps(ARRAY['00000000-0000-0000-0000-000000000012'::uuid]) WHERE stage = 'filing'), 'a legacy failed receipt (retry_after NULL) older than 5 min is due');
+
+  -- the retry constraint admits failed and still refuses a retry time on succeeded
+  BEGIN
+    INSERT INTO public.image_stage_receipts(image_id, stage, producer, producer_version, outcome, attempt, retry_after)
+    VALUES (f, 'filing', 'photo-pipeline-orchestrator', 1, 'succeeded', 99, now());
+    PERFORM t_assert(false, 'retry_after on succeeded is refused');
+  EXCEPTION WHEN check_violation THEN PERFORM t_assert(true, 'retry_after on succeeded is refused'); END;
+END $$;
+
 DO $$ BEGIN RAISE NOTICE 'ALL image_stage_attempt_cap CHECKS PASSED'; END $$;

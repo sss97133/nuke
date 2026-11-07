@@ -16,7 +16,7 @@ export const FUNCTION_TO_STAGE: Record<string, string> = { "analyze-engine-bay":
 export const UNAVAILABLE_RETRY_SECONDS = 3600;   // an undeployed function is rechecked hourly, not every tick
 const MAX_RETRY_SECONDS = 86400;                 // the RPC clamps to this too
 
-export type StageOutcome = "succeeded" | "policy_skip" | "unavailable" | "rate_limited" | "failed";
+export type StageOutcome = "succeeded" | "policy_skip" | "blocked_input" | "unavailable" | "rate_limited" | "failed";
 
 export interface StageReceiptArgs {
   p_image_id: string; p_stage: string; p_producer_version: number; p_outcome: StageOutcome;

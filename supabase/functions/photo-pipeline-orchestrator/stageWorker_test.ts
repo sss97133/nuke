@@ -101,3 +101,12 @@ Deno.test("probe: a network error leaves the signal alone; disabled flag probes 
   const out = await probeStageAvailability(off.db, "https://x.test", boom) as { skipped?: string };
   assert(out.skipped === "disabled");
 });
+
+Deno.test("worker: filing and evidence are supported; the runner is told its stage; no provider gate or stagger applies", async () => {
+  for (const stage of ["filing", "evidence"]) {
+    const { db, claims } = fakeDb({ blockedUntil: future(), items: [item(1), item(2)] });   // classifier cooldown must not stop them
+    const seen: string[] = []; let slept = 0;
+    const out = await runStageWorker(db, { stage, limit: 4 }, async (_i, st) => { seen.push(st); return { ok: true }; }, Date.now, async () => { slept++; }) as { processed: number; stopped: string };
+    assert(out.processed === 2 && seen.join() === `${stage},${stage}` && claims[0] === `claim_image_stage_work:${stage}` && slept === 0);
+  }
+});
