@@ -131,11 +131,11 @@ test('a visitor sent to /login from every private page, calling no books reader,
   assert.equal(result.failures.length, 0);
 });
 
-test('a private page that opens for a visitor fails, for each of the three', async () => {
+test('a private page that opens for a visitor fails, for each of the four', async () => {
   const result = await probe({ privateOpen: true });
   assert.equal(result.exitCode, 1);
   const opened = result.failures.filter(f => f.what.startsWith('a private page opened for a visitor'));
-  assert.deepEqual(opened.map(f => f.page).sort(), ['/accounting', '/profile', '/publishing/finance']);
+  assert.deepEqual(opened.map(f => f.page).sort(), ['/accounting', '/capture/ledger', '/profile', '/publishing/finance']);
 });
 
 test('a books reader called while a visitor loads a private page fails and names the call', async () => {
