@@ -175,7 +175,7 @@ jobs:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: |
           if [ ! -s /tmp/functions.txt ]; then echo "no functions to deploy"; exit 0; fi
-          npx -y supabase@latest --version
+          npx -y supabase@2.79.0 --version
           FNS=""
           while read -r fn; do
             [ -d "supabase/functions/$fn" ] || { echo "skip (no dir): $fn"; continue; }
@@ -193,7 +193,7 @@ jobs:
           # guardrail step above.
           # No --jobs: the CLI accepts it only with --use-api (server-side bundling), and every deploy so far
           # bundled locally — keep the bundler that is known to work (run 36331008968 died on the flag).
-          npx -y supabase@latest functions deploy $FNS --project-ref qkgaybvrernstplzjaam --no-verify-jwt --yes
+          npx -y supabase@2.79.0 functions deploy $FNS --project-ref qkgaybvrernstplzjaam --no-verify-jwt --yes
           echo "✅ functions deployed"
 
       - name: Activate installed retained VIN intake
