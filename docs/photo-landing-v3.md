@@ -28,6 +28,11 @@ Applied to Supabase project `qkgaybvrernstplzjaam` (also applied via SQL; the mi
 - Backups: `backup_20261104_landing_v3_fn_defs` (original functions), `backup_20261104_landing_v3_cron`, `backup_20261104_timeline_pending_consolidated`.
 - Dedup decisions: set `superseded_at`.
 
+5. **Review drain** (`20261111140000`): `capture_set_review_sweep(user, rearm_limit)` hourly (`capture-review-sweep`, :17) resolves held sets
+   superseded by a newer run or with nothing left unfiled (`evidence.resolved = {how, by, at}`), and re-arms up to 200 user-days whose newest
+   open row predates the user's newest gate-passed filing (new visual anchors), skipping days already pending. `v_capture_review_backlog`
+   shows what remains per user.
+
 ## Open items
 - Provider credit exhaustion (HTTP 402 from the fallback classifier) needs the account owner; the breaker only stops hammering.
 - The cron idles at `awaiting_gate` until `auto_filing_audit_queue` rows for the chunk run are marked correct/wrong/unclear by actually viewing the sample photos.
