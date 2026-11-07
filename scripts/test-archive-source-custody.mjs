@@ -61,6 +61,7 @@ const sources = new Map([
   ['financialEvidence',compile('../supabase/functions/ingest-observation/financialEvidence.ts')],
   ['financialDelegation',compile('../supabase/functions/ingest-observation/financialDelegation.ts')],
   ['financialProcessing',compile('../supabase/functions/ingest-observation/financialProcessing.ts')],
+  ['privateProjection',compile('../supabase/functions/ingest-observation/privateProjection.ts')],
   ['financialCandidateContext',compile('../supabase/functions/ingest-observation/financialCandidateContext.ts')],
   ['financialCandidates',compile('../supabase/functions/ingest-observation/financialCandidates.ts')],
   ['historicalAsks',compile('../supabase/functions/ingest-observation/historicalAsks.ts')],
@@ -295,6 +296,7 @@ function fixture(options = {}) {
         if(specifier==='./financialEvidence.ts')return load('financialEvidence');
         if(specifier==='./financialDelegation.ts')return load('financialDelegation');
         if(specifier==='./financialProcessing.ts')return load('financialProcessing');
+        if(specifier==='./privateProjection.ts')return load('privateProjection');
         if(specifier==='./financialCandidateContext.ts')return load('financialCandidateContext');
         if(specifier==='./financialCandidates.ts')return load('financialCandidates');
         if(specifier==='../_shared/batAuctionRecord.ts')return load('auctionRecord');
