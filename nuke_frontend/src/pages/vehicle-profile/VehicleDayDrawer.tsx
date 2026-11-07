@@ -360,7 +360,7 @@ const VehicleDayDrawer: React.FC<VehicleDayDrawerProps> = ({ date, auctions = []
                   width={14}
                   height={14}
                   loading="lazy"
-                  style={{ width: 14, height: 14, objectFit: 'contain', borderRadius: 2, flex: 'none' }}
+                  style={{ width: 14, height: 14, objectFit: 'contain', flex: 'none' }}
                   onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
                 />
               )}
