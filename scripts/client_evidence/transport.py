@@ -54,3 +54,16 @@ class HttpTransport:
         if status != 200:
             raise TransportError(f'submit failed: HTTP {status}')
         return out
+
+    def projection_read(self, keys):
+        """Current heads of the account's own private projections (the account is derived server-side from the credential)."""
+        status, body = self._post({'mode': 'financial_evidence_v1', 'action': 'projection_read', 'keys': list(keys), 'limit': 200})
+        if status != 200:
+            raise TransportError(f'projection read failed: HTTP {status}')
+        return body.get('data')
+
+    def projection_submit(self, body):
+        status, out = self._post(body)
+        if status != 200:
+            raise TransportError(f'projection submit failed: HTTP {status}')
+        return out

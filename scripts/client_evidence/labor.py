@@ -127,6 +127,7 @@ def photo_sessions(images, target_vehicle_id, window=None, cfg=None, vehicle_ran
     base['observed_days'] = days
     base['observed_day_count'] = len(days)
     base['frames_in_scope'] = len(scoped)
+    base['frames_in_scope_ids'] = sorted(str(im['image_id']) for im, _ in scoped)   # exact frames behind the counts (evidence refs)
     base['offset_unknown_frames'] = sum(1 for _, ck in scoped if ck['offset'] == 'unknown')
     labor = []
     for im, ck in scoped:

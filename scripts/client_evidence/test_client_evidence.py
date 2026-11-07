@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import accounting, cli, labor, mail_manifest as mm, pipeline, timeline, transport
+import accounting, cli, labor, mail_manifest as mm, pipeline, projection, timeline, transport
 from common import ContractError, canon, privacy_scan, sha256_hex
 
 OWNER = '11111111-1111-4111-8111-111111111111'
@@ -582,6 +582,365 @@ class Cli(unittest.TestCase):
             ip = os.path.join(d, 'i.json'); json.dump([{'image_id': 'a', 'capture': None}], open(ip, 'w'))
             rc, out, _ = self.run_cli(['labor-hold', ip])
             self.assertTrue(json.loads(out)['hold'])
+
+
+# ---------------------------------------------------------------- owner-private projections (image timeline + labor reconciliation)
+class FakePrivate(FakeWriter):
+    """In-memory model of public.private_work_projections + ingest_private_work_projection (migration 20261107210025):
+    per-item idempotency with a content+producer digest, head lookup, 'unchanged' for equal content, supersession that must
+    name the current head, sticky privacy hold, document refs that must exist in the account, atomic per revision."""
+    def __init__(self):
+        super().__init__()
+        self.rows, self.idem, self.submits = [], {}, []
+
+    def _heads(self):
+        sup = {r['supersedes_id'] for r in self.rows if r['supersedes_id']}
+        return [r for r in self.rows if r['id'] not in sup]
+
+    def projection_read(self, keys):
+        return [{**{k: r[k] for k in ('id', 'projection_key', 'revision_no', 'content_digest', 'source_privacy_hold', 'run_label')},
+                 'superseded': False} for r in self._heads() if r['projection_key'] in keys]
+
+    def projection_submit(self, body):
+        self.submits.append(copy.deepcopy(body))
+        rev, staged, results = body['revision'], [], []
+        assert body['action'] == 'projection_submit' and set(body) == {'mode', 'action', 'revision'}
+        for it in sorted(rev['projections'], key=lambda x: x['projection_key']):
+            content = sha256_hex(canon([it['kind'], it['source_privacy_hold'], it['holds'], it['evidence_refs'],
+                                        it.get('financial_document_id'), it['payload']]))
+            request = sha256_hex(canon([content, rev['producer'], rev['method'], rev['version']]))
+            ik = rev['idempotency_key'] + ':' + it['projection_key']
+            if ik in self.idem:
+                if self.idem[ik][0] != request:
+                    raise transport.TransportError('idempotency key payload conflict')
+                results.append({'projection_key': it['projection_key'], 'revision_no': self.idem[ik][1], 'status': 'duplicate'})
+                continue
+            for ref in it['evidence_refs']:
+                if ref['kind'] == 'financial_document_revision':
+                    d = self.docs.get(ref['original_sha256'])
+                    if not d or d['id'] != ref['document_id'] or not any(r['run_id'] == ref['extraction_run_id'] and r['key'] == ref['revision_idempotency_key'] for r in d['runs']):
+                        raise transport.TransportError('financial document revision is not in this account scope')
+            heads = {r['projection_key']: r for r in self._heads()}
+            head = heads.get(it['projection_key'])
+            sup = it.get('supersedes_id')
+            if head:
+                if head['content_digest'] == content:
+                    results.append({'projection_key': it['projection_key'], 'revision_no': head['revision_no'], 'status': 'unchanged'})
+                    continue
+                if sup != head['id']:
+                    raise transport.TransportError('correction must name the current revision')
+                if head['source_privacy_hold'] and not it['source_privacy_hold']:
+                    raise transport.TransportError('a source privacy hold cannot be cleared')
+            elif sup:
+                raise transport.TransportError('correction must name the current revision')
+            row = {'id': f"p{len(self.rows) + len(staged)}", 'projection_key': it['projection_key'], 'revision_no': (head['revision_no'] + 1) if head else 1,
+                   'supersedes_id': sup, 'content_digest': content, 'source_privacy_hold': it['source_privacy_hold'],
+                   'run_label': rev['run_label'], 'item': it}
+            staged.append((row, ik, request))
+            results.append({'projection_key': it['projection_key'], 'revision_no': row['revision_no'], 'status': 'created'})
+        for row, ik, request in staged:           # atomic: nothing is kept if any item above was refused
+            self.rows.append(row)
+            self.idem[ik] = (request, row['revision_no'])
+        return {'data': {'run_label': rev['run_label'], 'results': results, 'writes': len(staged), 'public_timeline_written': False},
+                'expense_posted': False, 'public_timeline_written': False}
+
+
+def pimg(i, at, offset=None, intent='labor', sha=None, **kw):
+    return {'image_id': i, 'sha256': sha or H('img-' + i), 'vehicle_id': 'V', 'identity': 'confirmed', 'origin': 'archive', 'intent': intent,
+            'capture': {'source': 'exif_original', 'at': at, **({'offset': offset} if offset else {})}, **kw}
+
+
+class PrivateProjection(unittest.TestCase):
+    def labor_pipeline(self, images, hours='676', days=2):
+        lab = claim(kind='labor_claim', key='lab-1', amount=None, service_period_start='2016-02-01', service_period_end='2016-06-13',
+                    document_date='2016-06-13', labor={'categories': [{'name': 'a', 'hours': hours, 'rate': '90'}], 'claimed_total_hours': hours,
+                                                       'stated_labor_amount': str(int(hours) * 90), 'claimed_days': days})
+        return pipeline.build(manifest([msg('m1', [att(SHA_A, [lab])])]), OWNER, CLOCK, images=images, vehicle_id='V')
+
+    def images(self):
+        return [pimg('naive1', '2016-03-27T10:00:00'), pimg('naive2', '2016-03-27T11:00:00'),
+                pimg('aware1', '2016-04-02T10:00:00', '+01:00'), pimg('aware2', '2016-04-02T10:20:00', '+01:00'),
+                pimg('noint', '2016-04-03T10:00:00', '+00:00', intent=None),
+                pimg('personal', '2016-04-04T10:00:00', '+00:00', origin='personal'),
+                pimg('unknown', '2016-04-04T11:00:00', '+00:00', identity='unknown'),
+                pimg('ctx', '2016-04-04T12:00:00', '+00:00', identity_basis='context'),
+                pimg('other', '2016-04-05T12:00:00', '+00:00', vehicle_id='W'),
+                pimg('notime', '2016-04-05T12:00:00', capture=None) | {'capture': None}]
+
+    def items(self, out):
+        pcs = out['private_projection_changeset']
+        return pcs, {i['payload'].get('event_key') or i['payload'].get('reconciliation_key'): i for i in pcs['items']}, \
+            {i['projection_key']: i for i in pcs['items']}
+
+    def test_image_observations_are_exact_private_and_conservative(self):
+        out = self.labor_pipeline(self.images())
+        pcs, _, by_key = self.items(out)
+        key = lambda sha: sha256_hex(canon(['image_timeline_event', sha]))[:32]
+        it = lambda n: by_key[key(H('img-' + n))]
+        # unknown EXIF offset: camera-local value kept verbatim, offset unknown, no UTC and no normalization
+        n1 = it('naive1')['payload']
+        self.assertEqual((n1['capture']['offset_state'], n1['capture']['camera_local'], n1['time']['camera_local']), ('unknown', '2016-03-27T10:00:00', '2016-03-27T10:00:00'))
+        self.assertNotIn('utc', n1['capture']); self.assertNotIn('utc', n1['time'])
+        self.assertIn('clock_offset_unknown', it('naive1')['holds'])
+        a1 = it('aware1')['payload']
+        self.assertEqual((a1['capture']['offset_state'], a1['capture']['utc']), ('known', '2016-04-02T09:00:00+00:00'))
+        self.assertEqual(a1['assertion_status'], 'observation_unverified')
+        self.assertIs(a1['completed_work_asserted'], False)
+        self.assertEqual(a1['subject_vehicle_ref'], 'V')
+        # refs are the exact image bytes; the stable key is the hash, not a title
+        self.assertEqual(it('aware1')['evidence_refs'], [{'kind': 'image', 'sha256': H('img-aware1')}])
+        self.assertIn('intent_unclassified', it('noint')['holds'])
+        # personal / unknown / contextual / other-vehicle frames stay held, carry no capture time and no vehicle link
+        for n, hold in (('personal', 'privacy_hold'), ('unknown', 'identity_unknown'), ('ctx', 'identity_context_only'), ('other', 'other_or_unassigned_vehicle')):
+            p = it(n)['payload']
+            self.assertEqual(p['assertion_status'], 'held', n)
+            self.assertIn(hold, it(n)['holds'], n)
+            self.assertNotIn('subject_vehicle_ref', p, n)
+            self.assertEqual((p['capture']['source'], p['time']['kind']), ('withheld', 'unknown'), n)
+        self.assertTrue(it('personal')['source_privacy_hold'])
+        self.assertFalse(it('unknown')['source_privacy_hold'])
+        self.assertIn('no_trusted_capture_time', it('notime')['holds'])
+        self.assertEqual(pcs['posting'], {'expense_posted': False, 'payment_posted': False, 'public_timeline_written': False})
+        self.assertEqual(privacy_scan(pcs['items']), [])
+        self.assertIsNone(projection.validate_changeset(pcs, OWNER))
+
+    def test_labor_claim_and_observation_are_side_by_side_never_added(self):
+        out = self.labor_pipeline(self.images())
+        pcs, _, by_key = self.items(out)
+        lab = next(i for i in pcs['items'] if i['kind'] == 'labor_reconciliation')
+        p = lab['payload']
+        self.assertEqual((p['claim']['claimed_hours'], p['claim']['source_claim'], p['claim']['verified']), ('676', True, False))
+        self.assertEqual((p['additive'], p['billable_hours'], p['hours_verified']), (False, None, False))
+        self.assertEqual(p['observed']['hours_lower'], '0.33')            # aware frames only, a lower bound, never merged with 676
+        self.assertEqual(p['observed']['observed_day_count'], 3)
+        self.assertEqual(p['observed']['camera_local_review']['billable_hours'], None)
+        self.assertEqual(p['holds']['unknown_clock'], 2)
+        self.assertEqual(p['holds']['intent_unclassified'], 1)
+        self.assertEqual(p['holds']['identity_not_confirmed'], 1)             # the unknown-identity frame
+        self.assertEqual(p['rate_provenance'], [{'category': 'a', 'rate': '90.00', 'rate_source': 'stated_on_document'}])
+        self.assertIsInstance(p['conflicts'], list)
+        flat = canon(p)
+        for bad in ('total_hours', 'combined', '"verified":true'):
+            self.assertNotIn(bad, flat)
+        # citations: the claim's document revision binds by hash+key (ids are resolved only at apply), plus attachment, message and frames
+        self.assertEqual(lab['document_binding']['original_sha256'], SHA_A)
+        self.assertEqual(lab['document_binding']['revision_idempotency_key'], out['changeset']['envelopes'][0]['revision']['idempotency_key'])
+        kinds = [r['kind'] for r in lab['evidence_refs']]
+        self.assertEqual(kinds.count('attachment'), 1); self.assertEqual(kinds.count('source_message'), 1)
+        self.assertIn({'kind': 'image', 'sha256': H('img-aware1')}, lab['evidence_refs'])
+        self.assertNotIn({'kind': 'image', 'sha256': H('img-personal')}, lab['evidence_refs'])
+        self.assertEqual(self.labor_pipeline(self.images())['private_projection_changeset'], pcs)       # deterministic
+
+    def test_frames_without_sha_are_reported_not_guessed(self):
+        ims = [{k: v for k, v in pimg('x1', '2016-04-02T10:00:00', '+00:00').items() if k != 'sha256'}]
+        out = self.labor_pipeline(ims)
+        self.assertIsNone(out['private_projection_changeset'])
+        self.assertTrue(all('sha256' in u['reason'] for u in out['private_projection_unpersistable']))
+
+    def test_model_contract_refuses_every_forbidden_shape(self):
+        pcs = self.labor_pipeline(self.images())['private_projection_changeset']
+        img = next(i for i in pcs['items'] if i['kind'] == 'image_timeline_event' and i['payload']['assertion_status'] == 'observation_unverified'
+                   and i['payload']['capture']['offset_state'] == 'unknown')
+        lab = next(i for i in pcs['items'] if i['kind'] == 'labor_reconciliation')
+        def mut(it, f):
+            c = copy.deepcopy(it); f(c); return c
+        bad = [
+            mut(img, lambda c: c['payload']['capture'].update(utc='2016-03-27T10:00:00+00:00')),            # UTC invented for an unknown offset
+            mut(img, lambda c: c['payload'].update(completed_work_asserted=True)),
+            mut(img, lambda c: c['payload'].update(stance='completed_work')),
+            mut(img, lambda c: c['payload']['identity'].update(state='unconfirmed')),                        # unconfirmed but not held
+            mut(img, lambda c: c.update(source_privacy_hold=True)),                                          # privacy hold but not held
+            mut(img, lambda c: c['payload'].update(body='mail text')),
+            mut(img, lambda c: c['payload'].update(email_address='a@b.invalid')),
+            mut(img, lambda c: c['payload'].update(origin_class='a@b.invalid')),
+            mut(img, lambda c: c['payload'].update(note='NL00ABCD0123456789')),
+            mut(img, lambda c: c.update(evidence_refs=[{'kind': 'image', 'sha256': 'nothex'}])),
+            mut(img, lambda c: c.update(evidence_refs=[])),
+            mut(img, lambda c: c.update(owner_id=OWNER)),
+            mut(img, lambda c: c.update(projection_key='xyz')),
+            mut(lab, lambda c: c['payload'].update(additive=True)),
+            mut(lab, lambda c: c['payload'].update(billable_hours='9.5')),
+            mut(lab, lambda c: c['payload'].update(hours_verified=True)),
+            mut(lab, lambda c: c['payload']['claim'].update(verified=True)),
+            mut(lab, lambda c: c['payload']['observed'].update(total_hours='700')),
+            mut(lab, lambda c: c['payload'].update(payment_verified=True)),
+            mut(lab, lambda c: c['payload'].update(ownership_verified=True)),
+            mut(lab, lambda c: c['payload']['holds'].update(api_key='x')),
+            mut(lab, lambda c: c.pop('document_binding')),
+        ]
+        for i, b in enumerate(bad):
+            with self.assertRaises(ContractError, msg=f'case {i}'):
+                projection.check_item(b)
+        with self.assertRaises(ContractError):
+            projection.validate_changeset({**pcs, 'owner_id': 'someone-else'}, OWNER)
+        with self.assertRaises(ContractError):
+            projection.validate_changeset({**pcs, 'posting': {'expense_posted': False, 'payment_posted': False, 'public_timeline_written': True}}, OWNER)
+        with self.assertRaises(ContractError):
+            projection.validate_changeset({**pcs, 'version': 'other'}, OWNER)
+
+    def applied(self, out=None):
+        out = out or self.labor_pipeline(self.images())
+        w = FakePrivate()
+        fin = mm.apply(out['changeset'], OWNER, mm.make_backup_artifact(out['changeset'], OWNER, w.read, NOW), w, NOW)
+        self.assertTrue(fin['complete'])
+        return out, out['private_projection_changeset'], w
+
+    def test_backup_apply_replay_then_supersession(self):
+        out, pcs, w = self.applied()
+        art = projection.make_backup(pcs, OWNER, w, NOW)
+        self.assertEqual(art['projections_existing'], 0)
+        led = projection.apply(pcs, OWNER, art, w, NOW)
+        self.assertTrue(led['complete'], led)
+        n_rows = len(w.rows)
+        self.assertEqual(n_rows, len(pcs['items']))
+        sent = w.submits[0]['revision']
+        self.assertEqual((sent['producer'], sent['method'], sent['version']), (projection.PRODUCER, projection.METHOD, projection.VERSION))
+        # the document revision ref was resolved from the live document, not invented
+        lab = next(p for p in sent['projections'] if p['kind'] == 'labor_reconciliation')
+        ref = next(r for r in lab['evidence_refs'] if r['kind'] == 'financial_document_revision')
+        d = w.docs[SHA_A]
+        self.assertEqual((ref['document_id'], ref['extraction_run_id'], lab['financial_document_id']), (d['id'], d['runs'][-1]['run_id'], d['id']))
+        self.assertNotIn('document_binding', lab)
+        # replay with a fresh backup writes nothing (idempotent), with and without the already-applied shortcut
+        art2 = projection.make_backup(pcs, OWNER, w, NOW)
+        led2 = projection.apply(pcs, OWNER, art2, w, NOW)
+        self.assertTrue(led2['complete']); self.assertEqual(len(w.rows), n_rows); self.assertEqual(led2['done'], [])
+        # the same evidence re-planned under a new clock is the same plan (clock is not content)
+        # a corrected observation supersedes: new row names the head, the old row is kept
+        changed = copy.deepcopy(pcs)
+        victim = next(i for i in changed['items'] if i['kind'] == 'image_timeline_event' and i['payload']['assertion_status'] == 'observation_unverified')
+        victim['holds'] = sorted(victim['holds'] + ['reviewed_note'])
+        art3 = projection.make_backup(changed, OWNER, w, NOW)
+        led3 = projection.apply(changed, OWNER, art3, w, NOW)
+        self.assertTrue(led3['complete'], led3)
+        self.assertEqual(len(w.rows), n_rows + 1)
+        new = w.rows[-1]
+        self.assertEqual((new['revision_no'], new['supersedes_id']), (2, next(r['id'] for r in w.rows if r['projection_key'] == victim['projection_key'] and r['revision_no'] == 1)))
+        self.assertEqual(sum(1 for r in w.rows if r['projection_key'] == victim['projection_key']), 2)      # nothing deleted
+
+    def test_privacy_hold_cannot_be_cleared_through_the_apply_path(self):
+        out, pcs, w = self.applied()
+        projection.apply(pcs, OWNER, projection.make_backup(pcs, OWNER, w, NOW), w, NOW)
+        held = next(i for i in pcs['items'] if i['source_privacy_hold'])
+        cleared = copy.deepcopy(pcs)
+        c = next(i for i in cleared['items'] if i['projection_key'] == held['projection_key'])
+        c['source_privacy_hold'] = False
+        c['holds'] = [h for h in c['holds'] if h != 'privacy_hold']
+        led = projection.apply(cleared, OWNER, projection.make_backup(cleared, OWNER, w, NOW), w, NOW)
+        self.assertFalse(led['complete'])
+        self.assertIn('privacy hold cannot be cleared', led['failed'][0]['reason'])
+        self.assertTrue(next(r for r in w._heads() if r['projection_key'] == held['projection_key'])['source_privacy_hold'])
+
+    def test_requires_financial_revision_scope_and_stops_without_writing(self):
+        out = self.labor_pipeline(self.images())
+        pcs, w = out['private_projection_changeset'], FakePrivate()          # financial changeset NOT applied
+        led = projection.apply(pcs, OWNER, projection.make_backup(pcs, OWNER, w, NOW), w, NOW)
+        self.assertFalse(led['complete'])
+        self.assertIn('apply the financial changeset first', led['failed'][0]['reason'])
+        self.assertEqual((w.rows, w.submits), ([], []))
+        # the writer model (like the database trigger) refuses a ref to a document or run outside the account
+        _, pcs2, w2 = self.applied()
+        lab = next(i for i in pcs2['items'] if i['kind'] == 'labor_reconciliation')
+        d = w2.docs[SHA_A]
+        for forged in ({'document_id': 'doc-of-another-account'}, {'extraction_run_id': 'run-of-another-document'}, {'original_sha256': SHA_B}):
+            ref = {'kind': 'financial_document_revision', 'document_id': d['id'], 'extraction_run_id': d['runs'][-1]['run_id'],
+                   'original_sha256': SHA_A, 'revision_idempotency_key': lab['document_binding']['revision_idempotency_key'], **forged}
+            wire = {k: v for k, v in lab.items() if k != 'document_binding'}
+            wire.update(evidence_refs=lab['evidence_refs'] + [ref], financial_document_id=d['id'])
+            with self.assertRaises(transport.TransportError):
+                w2.projection_submit({'mode': 'financial_evidence_v1', 'action': 'projection_submit', 'revision': {
+                    'idempotency_key': 'forged', 'producer': 'p', 'method': 'm', 'version': 'v', 'run_label': 'r', 'projections': [wire]}})
+        self.assertEqual(w2.rows, [])
+
+    def test_apply_gates_owner_backup_staleness_and_atomic_stop(self):
+        out, pcs, w = self.applied()
+        art = projection.make_backup(pcs, OWNER, w, NOW)
+        with self.assertRaises(ContractError):
+            projection.apply(pcs, '22222222-2222-4222-8222-222222222222', art, w, NOW)           # other account
+        with self.assertRaises(ContractError):
+            projection.apply(pcs, OWNER, art, w, NOW + timedelta(hours=25))                         # stale artifact
+        with self.assertRaises(ContractError):
+            projection.apply({**pcs, 'items': pcs['items'][:-1]}, OWNER, art, w, NOW)               # artifact is for a different changeset
+        forged = {**art, 'owner_id': OWNER, 'pre_state': {}}
+        with self.assertRaises(ContractError):
+            projection.verify_backup(forged, pcs, OWNER, NOW)                                       # integrity hash
+        self.assertEqual(w.submits, [])
+        # state moved after the backup: refused, not overwritten
+        w.projection_submit({'mode': 'financial_evidence_v1', 'action': 'projection_submit', 'revision': {
+            'idempotency_key': 'other', 'producer': 'x', 'method': 'm', 'version': 'v', 'run_label': 'other-run',
+            'projections': [{k: v for k, v in pcs['items'][0].items() if k != 'document_binding'}]}})
+        n = len(w.rows)
+        led = projection.apply(pcs, OWNER, art, w, NOW)
+        self.assertFalse(led['complete'])
+        self.assertIn('differs from the backup', led['failed'][0]['reason'])
+        self.assertEqual(len(w.rows), n)
+        # a writer refusal stops the run and reports the rest as not attempted
+        _, pcs3, w3 = self.applied(self.labor_pipeline(self.images(), hours='100'))
+        w3.projection_submit = lambda body: (_ for _ in ()).throw(transport.TransportError('writer refused: HTTP 409 Private projection admission refused'))
+        led = projection.apply(pcs3, OWNER, projection.make_backup(pcs3, OWNER, w3, NOW), w3, NOW)
+        self.assertFalse(led['complete']); self.assertEqual(led['done'], [])
+        # a non-receipt response stops too
+        _, pcs4, w4 = self.applied(self.labor_pipeline(self.images(), hours='200'))
+        w4.projection_submit = lambda body: {'data': {'results': []}}
+        led = projection.apply(pcs4, OWNER, projection.make_backup(pcs4, OWNER, w4, NOW), w4, NOW)
+        self.assertFalse(led['complete'])
+
+    def test_batches_are_capped_and_ordered(self):
+        ims = [pimg(f'b{n}', '2016-04-02T10:00:00', '+00:00') for n in range(120)]
+        pcs = self.labor_pipeline(ims)['private_projection_changeset']
+        bs = projection.batches(pcs)
+        self.assertEqual([len(b) for b in bs], [50, 50, 21])
+        self.assertEqual(len({projection.batch_key(pcs, b) for b in bs}), 3)
+
+    def test_http_adapter_never_sends_an_owner_or_token_in_projection_calls(self):
+        seen = []
+
+        class R:
+            status = 200
+            def __enter__(s): return s
+            def __exit__(s, *a): return False
+            def read(s): return b'{"data": []}'
+        t = transport.HttpTransport('SECRET-TOKEN', opener=lambda req, timeout: (seen.append(req), R())[1])
+        self.assertEqual(t.projection_read(['a' * 32]), [])
+        body = json.loads(seen[0].data)
+        self.assertEqual(body, {'mode': 'financial_evidence_v1', 'action': 'projection_read', 'keys': ['a' * 32], 'limit': 200})
+        self.assertNotIn('SECRET-TOKEN', seen[0].data.decode())
+        for k in body:
+            self.assertNotIn('owner', k)
+
+    def test_cli_plan_backup_apply_for_projections(self):
+        with tempfile.TemporaryDirectory() as d:
+            lab = claim(kind='labor_claim', key='lab-1', amount=None, service_period_start='2016-02-01', service_period_end='2016-06-13',
+                        document_date='2016-06-13', labor={'categories': [{'name': 'a', 'hours': '10', 'rate': '90'}], 'claimed_total_hours': '10',
+                                                           'stated_labor_amount': '900'})
+            mp, ip, cp, pp, bp = (os.path.join(d, n) for n in ('m.json', 'i.json', 'cs.json', 'pcs.json', 'b.json'))
+            json.dump(manifest([msg('m1', [att(SHA_A, [lab])])]), open(mp, 'w'))
+            json.dump(self.images(), open(ip, 'w'))
+            c = Cli()
+            rc, out, _ = c.run_cli(['plan', mp, '--owner', OWNER, '--clock', CLOCK, '--images', ip, '--vehicle', 'V', '--out', cp, '--projection-out', pp])
+            self.assertEqual(rc, 0)
+            self.assertGreater(json.loads(out)['private_projection_changeset']['items'], 0)
+            w = FakePrivate()
+            rc, out, _ = c.run_cli(['backup', cp, '--owner', OWNER, '--out', os.path.join(d, 'fb.json'), '--token-env', 'X'], now=NOW, make_transport=lambda e: w)
+            fr = json.loads(out)['artifact_sha256']
+            rc, out, _ = c.run_cli(['apply', cp, '--owner', OWNER, '--backup', os.path.join(d, 'fb.json'), '--receipt-sha', fr, '--execute', '--token-env', 'X'], now=NOW, make_transport=lambda e: w)
+            self.assertTrue(json.loads(out)['complete'])
+            rc, out, _ = c.run_cli(['projection-backup', pp, '--owner', OWNER, '--out', bp, '--token-env', 'X'], now=NOW, make_transport=lambda e: w)
+            self.assertEqual(rc, 0)
+            rec = json.loads(out)
+            rc, out, _ = c.run_cli(['projection-apply', pp, '--owner', OWNER, '--backup', bp, '--receipt-sha', rec['artifact_sha256']], now=NOW)
+            self.assertEqual((rc, json.loads(out)['writes']), (0, 0))
+            self.assertEqual(w.rows, [])                                    # dry-run default: no write without --execute
+            rc, _, _ = c.run_cli(['projection-apply', pp, '--owner', OWNER, '--backup', bp, '--receipt-sha', rec['artifact_sha256'], '--execute'], now=NOW)
+            self.assertEqual(rc, 2)                                         # --execute needs a credential name
+            rc, _, _ = c.run_cli(['projection-apply', pp, '--owner', OWNER, '--backup', bp, '--receipt-sha', 'f' * 64], now=NOW)
+            self.assertEqual(rc, 2)                                         # receipt hash must match the file
+            rc, out, _ = c.run_cli(['projection-apply', pp, '--owner', OWNER, '--backup', bp, '--receipt-sha', rec['artifact_sha256'], '--execute', '--token-env', 'X'],
+                                   now=NOW, make_transport=lambda e: w)
+            self.assertTrue(json.loads(out)['complete'])
+            self.assertGreater(len(w.rows), 0)
+            rc, _, _ = c.run_cli(['plan', mp, '--owner', OWNER, '--clock', CLOCK, '--out', os.path.join(d, 'cs2.json'), '--projection-out', pp])
+            self.assertEqual(rc, 2)                                         # never overwrites a plan file
 
 
 if __name__ == '__main__':
