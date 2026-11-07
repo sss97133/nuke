@@ -3645,3 +3645,72 @@ the first grant for his own agents with a SQL call; the UI comes when a second p
 
 Open for the owner (his column): whether a grant may be re-lent (an agent minting for a sub-agent: proposed no, the
 chain is one hop), and the default expiry (proposed 7 days, renewable).
+
+### Review, 2026-11-06 evening: five readings and what they changed
+The lead put the six positions to five reviewers (security, product, finance, operations, counsel). What stands, what
+changed, and what the owner alone decides. Claims about the code were checked against main the same evening.
+
+**Changed.**
+- **No minted principal JWTs.** Supabase holds the private half of the ES256 key that `writeGuard` verifies; it cannot be
+  exported, and importing our own signing key would let anyone with edge secrets forge any user with writes that look
+  genuine. A token that PostgREST accepts also reaches raw tables through any policy that lets the principal write, so
+  "revocation is immediate" would hold only inside writers. Instead: the gate passes the hashed key to the writer RPC;
+  a security-definer `effective_principal()` resolves grant → principal, checks it, and stamps both names. Lent keys
+  reach sanctioned writers only, never tables. Reads by a lent key go through subject-scoped readers that return the
+  masked shape, never "as the principal" (a shop's agent would otherwise see every customer's line items).
+- **Build on the OAuth grant that exists.** Since 2026-10-14 the MCP connector issues no tokens; `oauth-server` on
+  nuke.ag does (login by magic link, PKCE, 1-hour access token, 30-day refresh, `/oauth/revoke`, scopes from
+  `scopeGrammar.ts` such as `write:observations`, `write:canonical`). That grant, one per (client, user), is already a
+  lent key with a principal and scopes. What it lacks is the two axes (subjects, writers), the database-side check,
+  and both names on the audit row. `agent_grants` is the record of that grant in the database, not a second system.
+- **Tier is a property of the writer, intersected with the grant.** Allowed = grant tier ∩ the writer's maximum
+  tier. A writer with its own gate (stale check, cited source, visual gate, payer as named) may accept write-as-me;
+  one without accepts agents only as propose. A write-as-me correction with no evidence ref is refused.
+- **Propose reaches any vehicle; write-as-me stops at the principal's ties.** A shop's work order is the shop's
+  testimony about a car (§19, the receipts stance: paper lands attributed to whoever is named on it and is claimed
+  later). A builder's grant hangs off the invite tie (§19), subjects = that vehicle.
+- **Ties resolve at write time, never at mint.** When the car sells, the grant stops reaching it by itself; a grant
+  auto-revokes when the principal's last tie to its subjects ends.
+- **Service-role refusal is phased, not flipped.** 52 migrations gate on `auth.role() = 'service_role'`; 215
+  `cron.schedule` lines run as postgres with no JWT; the `net.http_post` jobs arrive as service role; none name a job.
+  So: per-writer mode `off | log | enforce` (default `log`), unnamed service-role calls logged against the
+  `v_job_health` registry, jobs start stamping `app.job`, a writer flips to `enforce` after seven days with zero
+  unnamed calls, and a setter flips any writer back to `log` in seconds (the kill switch, no migration). The lanes
+  that land data over the pooler as postgres bypass every check and move to the RPC path with a grant.
+- **Refusals are codes, not raises** (`expired`, `revoked`, `writer_not_in_scope`, `subject_not_in_scope`,
+  `budget_exhausted`, `unnamed_service_role`), each with the grant id and the missing item, because a raise would
+  roll back the log row and an agent could not tell why it was refused.
+- **Authorization is proved at the mint, not by a quote the agent types.** The mint keeps the principal's
+  authenticated session, the consent text version, and a scope snapshot; every write keeps the grant id, that
+  snapshot, the agent's name and session, the evidence ref and the tier. Revocation appends who, when, why, the
+  snapshot and the write count; nothing written is deleted; `my_agent_writes` offers the revert.
+- **The budget is a blast-radius cap, not a cost control.** Runaway loops burn tokens, not writes (the 12M-token sweep
+  wrote almost nothing); token budgets belong in the agent harness. The grant caps writes per day and, later, the
+  server-side compute its writers trigger (OCR, vision). Enforced with the `FOR UPDATE` counter pattern of
+  `check_api_key_rate_limit`.
+- **Never readable or writable by a lent key, whatever the scope:** other people's payer names, amounts, contact
+  details, tax papers; title documents and the owner chain; visibility and masking flags; credentials; messages to
+  people. A restrictive policy denies those tables whenever a grant is in play.
+
+**Stands.** Both names on every write; one hop (a key cannot mint keys); 7-day expiry with renewal for grants to
+other people (an owner's own agents may run longer); the principal reads the ledger (`v_agent_grant_activity`: writes
+by writer and subject, refusals by code, budget left, expiry, last use).
+
+**Cost (finance, estimates).** First slice about 3 agent-days without the token exchange; the exchange is not built
+(see above). Exposure today is not money, which signing keeps with the person, but a wrong fact on a car being sold
+and a free-text trace of who wrote it.
+
+**Rollout (operations).** One migration per PR, each verified live: (1) `agent_grants`, `agent_write_log`,
+`agent_grant_mode`, the check, nothing calling them; (2) the three writers call the check in log mode, jobs stamp
+`app.job`, `v_job_health` counts unnamed calls; (3) the gate in the MCP connector and `writeGuard`; the owner mints the
+first grant (a credential: his column); (4) enforce per writer. Contracts run each writer as a lent-key caller against
+column-granted fixtures (the 2026-11-06 outage class); the 30-minute live check dry-runs a canary grant. Agent rules
+in AGENTS.md: grants are per lane and listed in LANES.md, the key lives only in dotenvx, a lane writes nothing unless
+its grant is active, outlasts the work, has budget and covers its writers and subjects; after a refusal never fall
+back to service role or the pooler; sub-agents read only; a handoff carries the grant id, the last audit row, the
+budget left and the expiry.
+
+**The owner's decisions.** (1) Does a write-as-me filing show publicly as his own word, or as "his word, via an
+agent, with the source document"? The reviewers recommend the second: it is his name on a record buyers bid on, and
+counsel reads the seller as making the representation whoever typed it. (2) Whether a BaT buyer's agent may hold a
+read grant to private line items (a share from owner to buyer, not a lend); proposed: not in the first slice.
