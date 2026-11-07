@@ -1,6 +1,10 @@
 #!/usr/bin/env node
 // Replay garage relationship derivations for one account. Dry-run by default: prints old vs derived as markdown.
 //
+// Dry-run runs supabase/sql/derive_vehicle_relationships_preview.sql through psql in a READ-ONLY session
+// (default_transaction_read_only=on); it needs DATABASE_URL and psql, not the service-role key, and works before
+// the evidence-chain migration is deployed. --apply calls the deployed derive_vehicle_relationships RPC.
+//
 //   dotenvx run -- node scripts/garage/replay-relationship-derivations.mjs --user <uuid> [--vehicle <uuid>]
 //   dotenvx run -- node scripts/garage/replay-relationship-derivations.mjs --user <uuid> --apply --i-have-a-backup
 //
@@ -31,7 +35,8 @@ if (apply && !args.includes('--i-have-a-backup')) {
 }
 const url = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL;
 const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-if (!url || !key) { console.error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY required (run under dotenvx)'); process.exit(2); }
+if (apply && (!url || !key)) { console.error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY required for --apply (run under dotenvx)'); process.exit(2); }
+if (!apply && !process.env.DATABASE_URL) { console.error('DATABASE_URL required for the read-only dry-run (run under dotenvx)'); process.exit(2); }
 
 const runId = randomUUID();
 async function rpc(name, body) {
@@ -43,6 +48,20 @@ async function rpc(name, body) {
 const call = (dry) => rpc('derive_vehicle_relationships',
   { p_user: user, p_vehicle: vehicle ?? null, p_run_id: runId, p_dry_run: dry });
 
+// Read-only preview: the same chain as the function, as one SELECT. Fields are separated by \x1f.
+function preview() {
+  const file = new URL('../../supabase/sql/derive_vehicle_relationships_preview.sql', import.meta.url).pathname;
+  const claims = JSON.stringify({ role: 'service_role', sub: user }).replace(/'/g, "''");
+  const out = execFileSync('psql', [process.env.DATABASE_URL, '-X', '-q', '-v', 'ON_ERROR_STOP=1', '-At', '-F', '\x1f',
+    '-v', `user_id=${user}`, '-v', `vehicle_id=${vehicle ?? ''}`,
+    '-c', `SELECT set_config('request.jwt.claims', '${claims}', false)`, '-f', file],
+  { encoding: 'utf8', env: { ...process.env, PGOPTIONS: '-c default_transaction_read_only=on' }, maxBuffer: 1 << 28 });
+  return out.split('\n').filter((l) => l.includes('\x1f')).map((l) => {
+    const [vehicle_id, old_role, derived_role, confidence, evidence, reason] = l.split('\x1f');
+    return { vehicle_id, old_role: old_role || null, derived_role, confidence, evidence: JSON.parse(evidence), reason };
+  });
+}
+
 if (apply) {
   const schema = `backup_garage_deriv_${runId.replace(/-/g, '').slice(0, 12)}`;
   if (!process.env.DATABASE_URL) { console.error('DATABASE_URL required to write the backup schema'); process.exit(2); }
@@ -53,7 +72,7 @@ if (apply) {
   console.error(`backup written to schema ${schema}`);
 }
 
-const rows = await call(!apply);
+const rows = apply ? await call(false) : preview();
 console.log(`run_id: \`${runId}\`  mode: ${apply ? 'APPLIED' : 'dry-run'}  user: \`${user}\`\n`);
 console.log('| vehicle | old | derived | confidence | reason |\n|---|---|---|---|---|');
 for (const r of rows) {
@@ -61,3 +80,8 @@ for (const r of rows) {
   console.log(`| ${r.vehicle_id} | ${r.old_role ?? '—'} | ${changed ? '**' : ''}${r.derived_role}${changed ? '**' : ''} | ${r.confidence} | ${r.reason} |`);
 }
 console.log(`\n${rows.length} vehicles; bold = role changes.`);
+for (const r of rows) {
+  const chain = (r.evidence?.chain ?? []).map((c) => `${c.step}:${c.name}${c.confidence != null ? `@${c.confidence}` : ''}` +
+    (c.eliminated?.length ? ` -[${c.eliminated.join(',')}]` : '')).join(' | ');
+  if (chain) console.log(`- \`${r.vehicle_id}\` ${chain}`);
+}

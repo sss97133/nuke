@@ -197,6 +197,7 @@ struct GarageVehicle: Codable, Identifiable, Hashable, Sendable {
         case "owner": return "Owned"
         case "owner_reported": return "Reported owner"
         case "previously_owned": return "Previously owned"
+        case "previously_documented": return "Previously documented"
         case "profile_record": return "Profiles you added"
         case "consignment": return "Consignment"
         case "business_handling": return "Business handling"

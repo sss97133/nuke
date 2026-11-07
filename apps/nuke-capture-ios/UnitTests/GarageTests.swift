@@ -110,6 +110,17 @@ final class GarageTests: XCTestCase {
         XCTAssertEqual(s.other.map(\.label), ["Reported owner"])
     }
 
+    func testPreviouslyDocumentedHasItsOwnLabelAndIsNotOwned() throws {
+        var v = try XCTUnwrap(try garage().first)
+        v.relationship = "previously_documented"
+        XCTAssertEqual(v.relationshipLabel, "Previously documented")
+        XCTAssertEqual(GarageRelation.line(v), "Previously documented")
+        XCTAssertFalse(GarageRelation.isOwned(v))
+        let s = GarageSections([v])
+        XCTAssertFalse(s.owned.contains { $0.vehicle_id == v.vehicle_id })
+        XCTAssertEqual(s.other.map(\.label), ["Previously documented"])
+    }
+
     func testOwnerStatementKeepsServerOwner() throws {
         let corrections = try JSONDecoder().decode([GarageOwnerCorrection].self, from: Data(ownerStatement("1").utf8))
         let rows = GarageVehicle.applying(corrections, to: try garage())
