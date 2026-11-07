@@ -40,7 +40,6 @@ SELECT ('00000000-0000-0000-0000-0000000000' || lpad(n::text, 2, '0'))::uuid, ge
        now() - interval '1 day' - n * interval '1 minute', 'completed'
 FROM generate_series(1, 12) n;
 
-\ir ../migrations/20261109000500_photo_pipeline_backoff.sql   -- real order: the janitor's prior definition predates the stage queue
 \ir ../migrations/20261112090000_image_stage_receipts_reconciler.sql
 \ir ../migrations/20261112110000_image_stage_attempt_cap.sql
 
