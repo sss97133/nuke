@@ -813,24 +813,36 @@ vlink AS MATERIALIZED (
       UNION SELECT el.organization_id FROM external_listings el WHERE el.vehicle_id = ca.vid) x
    WHERE x.org IS NOT NULL
 ),
-refs AS (
+refs AS MATERIALIZED (
   SELECT pto.org_id FROM pto
   UNION SELECT lsrc.org FROM lsrc
   UNION SELECT vlink.org FROM vlink
 ),
+-- Only the referenced organizations are expanded (a), before any join against the full organization list.
+orga AS MATERIALIZED (
+  SELECT n.* FROM orgn n WHERE n.id IN (SELECT r.org_id FROM refs r)
+),
 -- Duplicate organizations are one: same normalized name (not 25 km apart when both have GPS) or same website host.
 -- canon = the member with GPS, then the lowest id. organization rows are never edited.
+-- Three equi-joins (self, name hash join, host hash join) instead of one OR join; the latitude band (25 km is under
+-- 0.2249 degrees of latitude) is a superset prefilter in front of the exact distance.
 orgmap AS MATERIALIZED (
-  SELECT r.org_id, (array_agg(m.id ORDER BY (m.lat IS NULL), m.id::text))[1] AS canon
-    FROM refs r
-    JOIN orgn a ON a.id = r.org_id
-    JOIN orgn m ON m.id = a.id
-      OR (a.nn <> '' AND length(a.nn) >= 6 AND a.nn_c <= 5 AND m.nn = a.nn
-          AND (a.lat IS NULL OR m.lat IS NULL
-               OR 12742000 * asin(sqrt(least(1, power(sin(radians(m.lat - a.lat) / 2), 2)
-                    + cos(radians(a.lat)) * cos(radians(m.lat)) * power(sin(radians(m.lon - a.lon) / 2), 2)))) <= 25000))
-      OR (a.host <> '' AND a.host_c <= 5 AND m.host = a.host)
-   GROUP BY r.org_id
+  SELECT p.org_id, (array_agg(m.id ORDER BY (m.lat IS NULL), m.id::text))[1] AS canon
+    FROM (
+      SELECT a.id AS org_id, a.id AS mid FROM orga a
+      UNION
+      SELECT a.id, m.id FROM orga a JOIN orgn m ON m.nn = a.nn
+       WHERE a.nn <> '' AND length(a.nn) >= 6 AND a.nn_c <= 5
+         AND (a.lat IS NULL OR m.lat IS NULL
+              OR (abs(m.lat - a.lat) <= 0.225
+                  AND 12742000 * asin(sqrt(least(1, power(sin(radians(m.lat - a.lat) / 2), 2)
+                        + cos(radians(a.lat)) * cos(radians(m.lat)) * power(sin(radians(m.lon - a.lon) / 2), 2)))) <= 25000))
+      UNION
+      SELECT a.id, m.id FROM orga a JOIN orgn m ON m.host = a.host
+       WHERE a.host <> '' AND a.host_c <= 5
+    ) p
+    JOIN orgn m ON m.id = p.mid
+   GROUP BY p.org_id
 ),
 lsc AS (
   SELECT lsrc.vid, coalesce(om.canon, lsrc.org) AS org, lsrc.org AS listed_org, lsrc.conf, lsrc.src, lsrc.ref
